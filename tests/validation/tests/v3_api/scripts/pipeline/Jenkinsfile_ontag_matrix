@@ -154,6 +154,30 @@ if ( true == via_webhook() && (!(rancher_version ==~ rancher_version_regex)) ) {
                   try {
                       jobs = [:]
                       println "Branch: ${branch}"
+                      if (rancher_version.startsWith("v2.5")){
+                        if (!env.RKE_VERSION) {
+                          RKE_VERSION = "v1.2.22"
+                        }
+                        if (!env.RANCHER_K3S_VERSION) {
+                          RANCHER_K3S_VERSION = "v1.20.15+k3s1"
+                        }
+                      }
+                      else if (rancher_version.startsWith("v2.6")){
+                        if (!env.RKE_VERSION) {
+                          RKE_VERSION = "v1.3.15"
+                        }
+                        if (!env.RANCHER_K3S_VERSION) {
+                          RANCHER_K3S_VERSION = "v1.24.6+k3s1"
+                        }
+                      }
+                      else if (rancher_version.startsWith("v2.7")){
+                        if (!env.RKE_VERSION) {
+                          RKE_VERSION = "v1.4.0-rc4"
+                        }
+                        if (!env.RANCHER_K3S_VERSION) {
+                          RANCHER_K3S_VERSION = "v1.24.6+k3s1"
+                        }
+                      }
                       params = [ string(name: 'CATTLE_TEST_URL', value: "${CATTLE_TEST_URL}"),
                                 string(name: 'ADMIN_TOKEN', value: "${ADMIN_TOKEN}"),
                                 string(name: 'USER_TOKEN', value: "${USER_TOKEN}"),
@@ -164,6 +188,8 @@ if ( true == via_webhook() && (!(rancher_version ==~ rancher_version_regex)) ) {
                                   string(name: 'ADMIN_TOKEN', value: "${ADMIN_TOKEN_2}"),
                                   string(name: 'USER_TOKEN', value: "${USER_TOKEN_2}"),
                                   string(name: 'RANCHER_SERVER_VERSION', value: "${rancher_version}"),
+                                  string(name: 'RKE_VERSION', value: "${RKE_VERSION}"),
+                                  string(name: 'RANCHER_K3S_VERSION', value: "${RANCHER_K3S_VERSION}"),
                                   string(name: 'BRANCH', value: branch) ]
 
                       // Rancher server 1 is used to test RKE clusters
@@ -172,12 +198,16 @@ if ( true == via_webhook() && (!(rancher_version ==~ rancher_version_regex)) ) {
                       jobs["ec2"] = { build job: 'rancher-v3_ontag_ec2_certification', parameters: params }
                       jobs["az"] = { build job: 'rancher-v3_ontag_az_certification', parameters: params }
                       jobs["custom"] = { build job: 'rancher-v3_ontag_custom_certification', parameters: params}
-                      jobs["windows"] = { build job: 'rancher-v3_ontag_windows_certification', parameters: params}
-
-                      // Rancher server 2 is used to test GKE, EKS, AKS and Imported clusters
-                      jobs["gke"] = { build job: 'rancher-v3_ontag_gke_certification', parameters: params2 }
-                      jobs["eks"] = { build job: 'rancher-v3_ontag_eks_certification', parameters: params2 }
-                      jobs["aks"] = { build job: 'rancher-v3_ontag_aks_certification', parameters: params2 }
+                      // windows note: https://github.com/rancher/dashboard/issues/6549
+                      // jobs["windows"] = { build job: 'rancher-v3_ontag_windows_certification', parameters: params}
+                      if (rancher_version.startsWith("v2.6") || rancher_version.startsWith("v2.7")){
+                        // Rancher server 2 is used to test GKE, EKS, AKS and Imported clusters
+                        jobs["eks"] = { build job: 'rancher-v3_ontag_eks_certification', parameters: params2 }
+                        jobs["aks"] = { build job: 'rancher-v3_ontag_aks_certification', parameters: params2 }
+                        // gke note: https://github.com/rancher/qa-tasks/issues/429
+                        // jobs["gke"] = { build job: 'rancher-v3_ontag_gke_certification', parameters: params2 }
+                        
+                      }
                       jobs["import"] = { build job: 'rancher-v3_ontag_import_certification', parameters: params2}
                       jobs["importk3s"] = { build job: 'rancher-v3_ontag_import_k3s_certification', parameters: params2}
 

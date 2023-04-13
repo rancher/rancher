@@ -1,5 +1,9 @@
 package client
 
+import (
+	"k8s.io/apimachinery/pkg/util/intstr"
+)
+
 const (
 	StatefulSetSpecType                                      = "statefulSetSpec"
 	StatefulSetSpecFieldActiveDeadlineSeconds                = "activeDeadlineSeconds"
@@ -18,6 +22,7 @@ const (
 	StatefulSetSpecFieldHostPID                              = "hostPID"
 	StatefulSetSpecFieldHostname                             = "hostname"
 	StatefulSetSpecFieldImagePullSecrets                     = "imagePullSecrets"
+	StatefulSetSpecFieldMaxUnavailable                       = "maxUnavailable"
 	StatefulSetSpecFieldMinReadySeconds                      = "minReadySeconds"
 	StatefulSetSpecFieldNodeID                               = "nodeId"
 	StatefulSetSpecFieldOS                                   = "os"
@@ -64,6 +69,7 @@ type StatefulSetSpec struct {
 	HostPID                              bool                                             `json:"hostPID,omitempty" yaml:"hostPID,omitempty"`
 	Hostname                             string                                           `json:"hostname,omitempty" yaml:"hostname,omitempty"`
 	ImagePullSecrets                     []LocalObjectReference                           `json:"imagePullSecrets,omitempty" yaml:"imagePullSecrets,omitempty"`
+	MaxUnavailable                       intstr.IntOrString                               `json:"maxUnavailable,omitempty" yaml:"maxUnavailable,omitempty"`
 	MinReadySeconds                      int64                                            `json:"minReadySeconds,omitempty" yaml:"minReadySeconds,omitempty"`
 	NodeID                               string                                           `json:"nodeId,omitempty" yaml:"nodeId,omitempty"`
 	OS                                   *PodOS                                           `json:"os,omitempty" yaml:"os,omitempty"`

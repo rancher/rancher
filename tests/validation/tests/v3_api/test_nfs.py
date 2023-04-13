@@ -107,7 +107,7 @@ def test_nfs_wl_upgrade():
                               "subPath": sub_path,
                               "name": "vol1"
                               }],
-            "environment": {"REASON": "upgrade"}
+            "env": {"REASON": "upgrade"}
             }]
     p_client.update(wl, containers=con)
     wl = wait_for_wl_to_active(p_client, wl)

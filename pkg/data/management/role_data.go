@@ -68,7 +68,7 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("management.cattle.io").resources("users", "globalrolebindings").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("globalroles").verbs("get", "list", "watch")
 	rb.addRole("Manage Roles", "roles-manage").
-		addRule().apiGroups("management.cattle.io").resources("roletemplates").verbs("*")
+		addRule().apiGroups("management.cattle.io").resources("roletemplates").verbs("delete", "deletecollection", "get", "list", "patch", "create", "update", "watch")
 	rb.addRole("Manage Authentication", "authn-manage").
 		addRule().apiGroups("management.cattle.io").resources("authconfigs").verbs("get", "list", "watch", "update")
 	rb.addRole("Manage Settings", "settings-manage").

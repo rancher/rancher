@@ -1,5 +1,5 @@
 /*
-Copyright 2022 Rancher Labs, Inc.
+Copyright 2023 Rancher Labs, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -33,6 +33,7 @@ type Interface interface {
 	Cluster() ClusterController
 	Machine() MachineController
 	MachineDeployment() MachineDeploymentController
+	MachineSet() MachineSetController
 }
 
 func New(controllerFactory controller.SharedControllerFactory) Interface {
@@ -53,4 +54,7 @@ func (c *version) Machine() MachineController {
 }
 func (c *version) MachineDeployment() MachineDeploymentController {
 	return NewMachineDeploymentController(schema.GroupVersionKind{Group: "cluster.x-k8s.io", Version: "v1beta1", Kind: "MachineDeployment"}, "machinedeployments", true, c.controllerFactory)
+}
+func (c *version) MachineSet() MachineSetController {
+	return NewMachineSetController(schema.GroupVersionKind{Group: "cluster.x-k8s.io", Version: "v1beta1", Kind: "MachineSet"}, "machinesets", true, c.controllerFactory)
 }

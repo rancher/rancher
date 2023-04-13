@@ -42,7 +42,7 @@ func init() {
 	resource.Put(SourceCodeProviderGroupVersionResource)
 }
 
-// Deprecated use v3.SourceCodeProvider instead
+// Deprecated: use v3.SourceCodeProvider instead
 type SourceCodeProvider = v3.SourceCodeProvider
 
 func NewSourceCodeProvider(namespace, name string, obj v3.SourceCodeProvider) *v3.SourceCodeProvider {

@@ -32,6 +32,7 @@ const (
 	SoftLayerDriver    = "softlayer"
 	Vmwaredriver       = "vmwarevsphere"
 	GoogleDriver       = "google"
+	OutscaleDriver     = "outscale"
 )
 
 var DriverData = map[string]map[string][]string{
@@ -51,6 +52,7 @@ var DriverData = map[string]map[string][]string{
 	SoftLayerDriver:    {"privateCredentialFields": []string{"apiKey"}},
 	Vmwaredriver:       {"publicCredentialFields": []string{"username", "vcenter", "vcenterPort"}, "privateCredentialFields": []string{"password"}},
 	GoogleDriver:       {"privateCredentialFields": []string{"authEncodedJson"}},
+	OutscaleDriver:     {"publicCredentialFields": []string{"accessKey", "region"}, "privateCredentialFields": []string{"secretKey"}},
 }
 
 var driverDefaults = map[string]map[string]string{
@@ -78,10 +80,10 @@ func addMachineDrivers(management *config.ManagementContext) error {
 	}
 	if err := addMachineDriver(Amazonec2driver, "local://", "", "",
 		[]string{"iam.amazonaws.com", "iam.us-gov.amazonaws.com", "iam.%.amazonaws.com.cn", "ec2.%.amazonaws.com", "ec2.%.amazonaws.com.cn", "eks.%.amazonaws.com", "eks.%.amazonaws.com.cn", "kms.%.amazonaws.com", "kms.%.amazonaws.com.cn"},
-		true, true, false, management); err != nil {
+		true, true, true, management); err != nil {
 		return err
 	}
-	if err := addMachineDriver(Azuredriver, "local://", "", "", nil, true, true, false, management); err != nil {
+	if err := addMachineDriver(Azuredriver, "local://", "", "", nil, true, true, true, management); err != nil {
 		return err
 	}
 	if err := addMachineDriver("cloudca", "https://github.com/cloud-ca/docker-machine-driver-cloudca/files/2446837/docker-machine-driver-cloudca_v2.0.0_linux-amd64.zip", "https://objects-east.cloud.ca/v1/5ef827605f884961b94881e928e7a250/ui-driver-cloudca/v2.1.2/component.js", "2a55efd6d62d5f7fd27ce877d49596f4", []string{"objects-east.cloud.ca"}, false, false, false, management); err != nil {
@@ -101,7 +103,7 @@ func addMachineDrivers(management *config.ManagementContext) error {
 	}
 	harvesterEnabled := features.GetFeatureByName(HarvesterDriver).Enabled()
 	// make sure the version number is consistent with the one at Line 40 of package/Dockerfile
-	if err := addMachineDriver(HarvesterDriver, "https://releases.rancher.com/harvester-node-driver/v0.4.0/docker-machine-driver-harvester-amd64.tar.gz", "", "9bf5a6817757064abbc2eb97b0ed20fd18c66e851b1615a49cd29ae07ce6d9b0", []string{"releases.rancher.com"}, harvesterEnabled, harvesterEnabled, false, management); err != nil {
+	if err := addMachineDriver(HarvesterDriver, "https://releases.rancher.com/harvester-node-driver/v0.6.2/docker-machine-driver-harvester-amd64.tar.gz", "", "56fa7fbc738e6dc5a19d1fe8ee9c10f01822c9335fcd412df57c1c0e94856448", []string{"releases.rancher.com"}, harvesterEnabled, harvesterEnabled, false, management); err != nil {
 		return err
 	}
 	linodeBuiltin := true
@@ -123,7 +125,7 @@ func addMachineDrivers(management *config.ManagementContext) error {
 	if err := addMachineDriver(PacketDriver, "https://github.com/equinix/docker-machine-driver-metal/releases/download/v0.6.0/docker-machine-driver-metal_linux-amd64.zip", "https://rancher-drivers.equinixmetal.net/1.0.2/component.js", "fad5e551a35d2ef2db742b07ca6d61bb9c9b574d322d3000f0c557d5fb90a734", []string{"api.packet.net", "api.equinix.com", "rancher-drivers.equinixmetal.net"}, false, false, false, management); err != nil {
 		return err
 	}
-	if err := addMachineDriver(PhoenixNAPDriver, "https://github.com/phoenixnap/docker-machine-driver-pnap/releases/download/v0.1.0/docker-machine-driver-pnap_0.1.0_linux_amd64.zip", "", "5f25a7fbcaca0710b7290216464ca8433fa3d683b59d5e4e674bef2d0a3ff6c7", []string{"api.securedservers.com", "api.phoenixnap.com"}, false, false, false, management); err != nil {
+	if err := addMachineDriver(PhoenixNAPDriver, "https://github.com/phoenixnap/docker-machine-driver-pnap/releases/download/v0.4.0/docker-machine-driver-pnap_0.4.0_linux_amd64.zip", "", "0bc81bdc80ab258fa0db67918f3b04435ed2c81f84c942c9123a0729f884190b", []string{"api.securedservers.com", "api.phoenixnap.com"}, false, false, false, management); err != nil {
 		return err
 	}
 	if err := addMachineDriver(RackspaceDriver, "local://", "", "", nil, false, true, false, management); err != nil {
@@ -132,7 +134,10 @@ func addMachineDrivers(management *config.ManagementContext) error {
 	if err := addMachineDriver(SoftLayerDriver, "local://", "", "", nil, false, true, false, management); err != nil {
 		return err
 	}
-	if err := addMachineDriver(NutanixDriver, "https://github.com/nutanix/docker-machine/releases/download/v3.1.0/docker-machine-driver-nutanix_v3.1.0_linux", "https://nutanix.github.io/rancher-ui-driver/v3.1.0/component.js", "e8f4f2e7ae7e927534884b5a3a45a38a5bd2c2872de1d65375f6e009bed75dba", []string{"nutanix.github.io"}, false, false, false, management); err != nil {
+	if err := addMachineDriver(NutanixDriver, "https://github.com/nutanix/docker-machine/releases/download/v3.3.0/docker-machine-driver-nutanix_v3.3.0_linux", "https://nutanix.github.io/rancher-ui-driver/v3.3.0/component.js", "036182e3d0d6807c9763f737ebf79a6e2367e39d777d09c9ef8adc9d58779b9d", []string{"nutanix.github.io"}, false, false, false, management); err != nil {
+		return err
+	}
+	if err := addMachineDriver(OutscaleDriver, "https://github.com/outscale/docker-machine-driver-outscale/releases/download/v0.2.0/docker-machine-driver-outscale_0.2.0_linux_amd64.zip", "https://oos.eu-west-2.outscale.com/rancher-ui-driver-outscale/v0.2.0/component.js", "bb539ed4e2b0f1a1083b29cbdbab59bde3efed0a3145fefc0b2f47026c48bfe0", []string{"oos.eu-west-2.outscale.com"}, false, false, false, management); err != nil {
 		return err
 	}
 	return addMachineDriver(Vmwaredriver, "local://", "", "", nil, true, true, false, management)

@@ -2,6 +2,7 @@ package rbac
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"strings"
 
@@ -16,6 +17,7 @@ import (
 	nsutils "github.com/rancher/rancher/pkg/namespace"
 	pkgrbac "github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/wrangler/pkg/relatedresource"
 	"github.com/sirupsen/logrus"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -43,9 +45,14 @@ const (
 	rtbLabelUpdated                  = "authz.cluster.cattle.io/rtb-label-updated"
 	rtbCrbRbLabelsUpdated            = "authz.cluster.cattle.io/crb-rb-labels-updated"
 	impersonationLabel               = "authz.cluster.cattle.io/impersonator"
+
+	rolesCircularSoftLimit = 100
+	rolesCircularHardLimit = 500
 )
 
 func Register(ctx context.Context, workload *config.UserContext) {
+	management := workload.Management.WithAgent("rbac-handler-base")
+
 	// Add cache informer to project role template bindings
 	prtbInformer := workload.Management.Management.ProjectRoleTemplateBindings("").Controller().Informer()
 	crtbInformer := workload.Management.Management.ClusterRoleTemplateBindings("").Controller().Informer()
@@ -78,9 +85,9 @@ func Register(ctx context.Context, workload *config.UserContext) {
 		nsIndexer:           nsInformer.GetIndexer(),
 		crIndexer:           crInformer.GetIndexer(),
 		crbIndexer:          crbInformer.GetIndexer(),
-		rtLister:            workload.Management.Management.RoleTemplates("").Controller().Lister(),
-		rLister:             workload.Management.RBAC.Roles("").Controller().Lister(),
-		roles:               workload.Management.RBAC.Roles(""),
+		rtLister:            management.Management.RoleTemplates("").Controller().Lister(),
+		rLister:             management.RBAC.Roles("").Controller().Lister(),
+		roles:               management.RBAC.Roles(""),
 		rbLister:            workload.RBAC.RoleBindings("").Controller().Lister(),
 		crbLister:           workload.RBAC.ClusterRoleBindings("").Controller().Lister(),
 		crLister:            workload.RBAC.ClusterRoles("").Controller().Lister(),
@@ -89,21 +96,21 @@ func Register(ctx context.Context, workload *config.UserContext) {
 		roleBindings:        workload.RBAC.RoleBindings(""),
 		nsLister:            workload.Core.Namespaces("").Controller().Lister(),
 		nsController:        workload.Core.Namespaces("").Controller(),
-		clusterLister:       workload.Management.Management.Clusters("").Controller().Lister(),
-		projectLister:       workload.Management.Management.Projects(workload.ClusterName).Controller().Lister(),
-		userLister:          workload.Management.Management.Users("").Controller().Lister(),
-		userAttributeLister: workload.Management.Management.UserAttributes("").Controller().Lister(),
-		crtbs:               workload.Management.Management.ClusterRoleTemplateBindings(""),
-		prtbs:               workload.Management.Management.ProjectRoleTemplateBindings(""),
+		clusterLister:       management.Management.Clusters("").Controller().Lister(),
+		projectLister:       management.Management.Projects(workload.ClusterName).Controller().Lister(),
+		userLister:          management.Management.Users("").Controller().Lister(),
+		userAttributeLister: management.Management.UserAttributes("").Controller().Lister(),
+		crtbs:               management.Management.ClusterRoleTemplateBindings(""),
+		prtbs:               management.Management.ProjectRoleTemplateBindings(""),
 		clusterName:         workload.ClusterName,
 	}
-	workload.Management.Management.Projects(workload.ClusterName).AddClusterScopedLifecycle(ctx, "project-namespace-auth", workload.ClusterName, newProjectLifecycle(r))
-	workload.Management.Management.ProjectRoleTemplateBindings("").AddClusterScopedLifecycle(ctx, "cluster-prtb-sync", workload.ClusterName, newPRTBLifecycle(r))
+	management.Management.Projects(workload.ClusterName).AddClusterScopedLifecycle(ctx, "project-namespace-auth", workload.ClusterName, newProjectLifecycle(r))
+	management.Management.ProjectRoleTemplateBindings("").AddClusterScopedLifecycle(ctx, "cluster-prtb-sync", workload.ClusterName, newPRTBLifecycle(r))
 	workload.RBAC.ClusterRoles("").AddHandler(ctx, "cluster-clusterrole-sync", newClusterRoleHandler(r).sync)
 	workload.RBAC.ClusterRoleBindings("").AddHandler(ctx, "legacy-crb-cleaner-sync", newLegacyCRBCleaner(r).sync)
-	workload.Management.Management.ClusterRoleTemplateBindings("").AddClusterScopedLifecycle(ctx, "cluster-crtb-sync", workload.ClusterName, newCRTBLifecycle(r))
-	workload.Management.Management.Clusters("").AddHandler(ctx, "global-admin-cluster-sync", newClusterHandler(workload))
-	workload.Management.Management.GlobalRoleBindings("").AddHandler(ctx, "grb-cluster-sync", newGlobalRoleBindingHandler(workload))
+	management.Management.ClusterRoleTemplateBindings("").AddClusterScopedLifecycle(ctx, "cluster-crtb-sync", workload.ClusterName, newCRTBLifecycle(r))
+	management.Management.Clusters("").AddHandler(ctx, "global-admin-cluster-sync", newClusterHandler(workload))
+	management.Management.GlobalRoleBindings("").AddHandler(ctx, grbHandlerName, newGlobalRoleBindingHandler(workload))
 
 	sync := &resourcequota.SyncController{
 		Namespaces:          workload.Core.Namespaces(""),
@@ -112,11 +119,15 @@ func Register(ctx context.Context, workload *config.UserContext) {
 		ResourceQuotaLister: workload.Core.ResourceQuotas("").Controller().Lister(),
 		LimitRange:          workload.Core.LimitRanges(""),
 		LimitRangeLister:    workload.Core.LimitRanges("").Controller().Lister(),
-		ProjectLister:       workload.Management.Management.Projects(workload.ClusterName).Controller().Lister(),
+		ProjectLister:       management.Management.Projects(workload.ClusterName).Controller().Lister(),
 	}
 
 	workload.Core.Namespaces("").AddLifecycle(ctx, "namespace-auth", newNamespaceLifecycle(r, sync))
-	workload.Management.Management.RoleTemplates("").AddHandler(ctx, "cluster-roletemplate-sync", newRTLifecycle(r))
+	management.Management.RoleTemplates("").AddHandler(ctx, "cluster-roletemplate-sync", newRTLifecycle(r))
+
+	// If a CRTB that is owned by a GRB is updated or deleted re-enqueue the GRB to reconcile the modified CRTB.
+	resolver := newCRTBtoGRBResolver(workload.Management.Wrangler.Mgmt.GlobalRoleBinding().Cache())
+	relatedresource.WatchClusterScoped(ctx, "restricted-admin-grb-syncer", resolver, workload.Management.Wrangler.Mgmt.GlobalRoleBinding(), workload.Management.Wrangler.Mgmt.ClusterRoleTemplateBinding())
 }
 
 type manager struct {
@@ -343,8 +354,14 @@ func ToLowerRoleTemplates(roleTemplates map[string]*v3.RoleTemplate) {
 	}
 }
 
-func (m *manager) gatherRoles(rt *v3.RoleTemplate, roleTemplates map[string]*v3.RoleTemplate) error {
-	err := m.gatherRolesRecurse(rt, roleTemplates)
+func (m *manager) gatherRoles(rt *v3.RoleTemplate, roleTemplates map[string]*v3.RoleTemplate, depthCounter int) error {
+	if depthCounter == rolesCircularSoftLimit {
+		logrus.Warnf("roletemplate has caused %v recursive function calls", rolesCircularSoftLimit)
+	}
+	if depthCounter >= rolesCircularHardLimit {
+		return fmt.Errorf("roletemplate '%s' has caused %d recursive function calls, possible circular dependency", rt.Name, rolesCircularHardLimit)
+	}
+	err := m.gatherRolesRecurse(rt, roleTemplates, depthCounter)
 	if err != nil {
 		return err
 	}
@@ -352,16 +369,17 @@ func (m *manager) gatherRoles(rt *v3.RoleTemplate, roleTemplates map[string]*v3.
 	return nil
 }
 
-func (m *manager) gatherRolesRecurse(rt *v3.RoleTemplate, roleTemplates map[string]*v3.RoleTemplate) error {
+func (m *manager) gatherRolesRecurse(rt *v3.RoleTemplate, roleTemplates map[string]*v3.RoleTemplate, depthCounter int) error {
 	roleTemplates[rt.Name] = rt
+	depthCounter++
 
 	for _, rtName := range rt.RoleTemplateNames {
 		subRT, err := m.rtLister.Get("", rtName)
 		if err != nil {
 			return errors.Wrapf(err, "couldn't get RoleTemplate %s", rtName)
 		}
-		if err := m.gatherRoles(subRT, roleTemplates); err != nil {
-			return errors.Wrapf(err, "couldn't gather RoleTemplate %s", rtName)
+		if err := m.gatherRoles(subRT, roleTemplates, depthCounter); err != nil {
+			return err
 		}
 	}
 

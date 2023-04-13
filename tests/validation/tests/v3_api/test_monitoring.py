@@ -2,6 +2,8 @@ import pytest
 import copy
 from .common import *  # NOQA
 
+# Skipping all the tests from this module because monitoring v1 isn't supported on k8s 1.21+
+pytest.skip(allow_module_level=True)
 
 namespace = {
     "cluster": None,

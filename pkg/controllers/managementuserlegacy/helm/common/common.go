@@ -117,7 +117,7 @@ type HelmPath struct {
 	KustomizeInJail string
 }
 
-//Marshal kustomization settings into YAML
+// Marshal kustomization settings into YAML
 type Kustomization struct {
 	Resources    []string `json:"resources"`
 	Transformers []string `json:"transformers"`

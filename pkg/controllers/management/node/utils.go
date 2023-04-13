@@ -59,6 +59,8 @@ func buildCreateCommand(node *v3.Node, configMap map[string]interface{}) []strin
 
 	cmd = append(cmd, buildEngineOpts("--engine-install-url", []string{node.Status.NodeTemplateSpec.EngineInstallURL})...)
 	cmd = append(cmd, buildEngineOpts("--engine-opt", mapToSlice(node.Status.NodeTemplateSpec.EngineOpt))...)
+	cmd = append(cmd, buildEngineOpts("--engine-opt", storageOptMapToSlice(node.Status.NodeTemplateSpec.StorageOpt))...)
+	cmd = append(cmd, buildEngineOpts("--engine-opt", logOptMapToSlice(node.Status.NodeTemplateSpec.LogOpt))...)
 	cmd = append(cmd, buildEngineOpts("--engine-env", mapToSlice(node.Status.NodeTemplateSpec.EngineEnv))...)
 	cmd = append(cmd, buildEngineOpts("--engine-insecure-registry", node.Status.NodeTemplateSpec.EngineInsecureRegistry)...)
 	cmd = append(cmd, buildEngineOpts("--engine-label", mapToSlice(node.Status.NodeTemplateSpec.EngineLabel))...)
@@ -107,9 +109,25 @@ func buildEngineOpts(name string, values []string) []string {
 }
 
 func mapToSlice(m map[string]string) []string {
-	var ret []string
+	ret := make([]string, len(m))
 	for k, v := range m {
 		ret = append(ret, fmt.Sprintf("%s=%s", k, v))
+	}
+	return ret
+}
+
+func storageOptMapToSlice(m map[string]string) []string {
+	ret := make([]string, len(m))
+	for k, v := range m {
+		ret = append(ret, fmt.Sprintf("storage-opt %s=%s", k, v))
+	}
+	return ret
+}
+
+func logOptMapToSlice(m map[string]string) []string {
+	ret := make([]string, len(m))
+	for k, v := range m {
+		ret = append(ret, fmt.Sprintf("log-opt %s=%s", k, v))
 	}
 	return ret
 }
@@ -207,9 +225,9 @@ func (m *Lifecycle) reportStatus(stdoutReader io.Reader, stderrReader io.Reader,
 		if strings.HasPrefix(msg, debugPrefix) {
 			// calls in machine with log.Debug are all prefixed and spammy so only log
 			// under trace and don't add to the v3.NodeConditionProvisioned.Message
-			logrus.Tracef("[node-controller-rancher-machine] %v", msg)
+			logrus.Tracef("[node-controller] %v", msg)
 		} else {
-			logrus.Infof("[node-controller-rancher-machine] %v", msg)
+			logrus.Infof("[node-controller] %v", msg)
 			v32.NodeConditionProvisioned.Message(node, msg)
 		}
 
@@ -286,12 +304,12 @@ func deleteNode(nodeDir string, node *v3.Node) error {
 	scanner := bufio.NewScanner(stdoutReader)
 	for scanner.Scan() {
 		msg := scanner.Text()
-		logrus.Infof("[node-controller-rancher-machine] %v", msg)
+		logrus.Infof("[node-controller] %v", msg)
 	}
 	scanner = bufio.NewScanner(stderrReader)
 	for scanner.Scan() {
 		msg := scanner.Text()
-		logrus.Warnf("[node-controller-rancher-machine] %v", msg)
+		logrus.Warnf("[node-controller] %v", msg)
 	}
 
 	return command.Wait()

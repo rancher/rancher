@@ -7,10 +7,10 @@ import (
 	"github.com/rancher/rancher/pkg/api/steve/catalog/types"
 	catalogv1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
+	kubenamespaces "github.com/rancher/rancher/tests/framework/extensions/kubeapi/namespaces"
 	"github.com/rancher/rancher/tests/framework/extensions/namespaces"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
 	"github.com/rancher/rancher/tests/integration/pkg/defaults"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 )
@@ -24,11 +24,22 @@ const (
 
 // InstallRancherIstioChart is a helper function that installs the rancher-istio chart.
 func InstallRancherIstioChart(client *rancher.Client, installOptions *InstallOptions, rancherIstioOpts *RancherIstioOpts) error {
+	serverSetting, err := client.Management.Setting.ByID(serverURLSettingID)
+	if err != nil {
+		return err
+	}
+
+	registrySetting, err := client.Management.Setting.ByID(defaultRegistrySettingID)
+	if err != nil {
+		return err
+	}
+
 	istioChartInstallActionPayload := &payloadOpts{
-		InstallOptions: *installOptions,
-		Name:           RancherIstioName,
-		Host:           client.RancherConfig.Host,
-		Namespace:      RancherIstioNamespace,
+		InstallOptions:  *installOptions,
+		Name:            RancherIstioName,
+		Namespace:       RancherIstioNamespace,
+		Host:            serverSetting.Value,
+		DefaultRegistry: registrySetting.Value,
 	}
 
 	chartInstallAction := newIstioChartInstallAction(istioChartInstallActionPayload, rancherIstioOpts)
@@ -68,16 +79,19 @@ func InstallRancherIstioChart(client *rancher.Client, installOptions *InstallOpt
 			return err
 		}
 
-		dynamicClient, err := client.GetDownStreamClusterClient(installOptions.ClusterID)
+		steveclient, err := client.Steve.ProxyDownstream(installOptions.ClusterID)
 		if err != nil {
 			return err
 		}
-		namespaceResource := dynamicClient.Resource(namespaces.NamespaceGroupVersionResource).Namespace("")
 
-		err = namespaceResource.Delete(context.TODO(), RancherIstioNamespace, metav1.DeleteOptions{})
-		if errors.IsNotFound(err) {
-			return nil
+		namespaceClient := steveclient.SteveType(namespaces.NamespaceSteveType)
+
+		namespace, err := namespaceClient.ByID(RancherIstioNamespace)
+		if err != nil {
+			return err
 		}
+
+		err = namespaceClient.Delete(namespace)
 		if err != nil {
 			return err
 		}
@@ -90,7 +104,7 @@ func InstallRancherIstioChart(client *rancher.Client, installOptions *InstallOpt
 		if err != nil {
 			return err
 		}
-		adminNamespaceResource := adminDynamicClient.Resource(namespaces.NamespaceGroupVersionResource).Namespace("")
+		adminNamespaceResource := adminDynamicClient.Resource(kubenamespaces.NamespaceGroupVersionResource).Namespace("")
 
 		watchNamespaceInterface, err := adminNamespaceResource.Watch(context.TODO(), metav1.ListOptions{
 			FieldSelector:  "metadata.name=" + RancherIstioNamespace,
@@ -163,7 +177,7 @@ func newIstioChartInstallAction(p *payloadOpts, rancherIstioOpts *RancherIstioOp
 			"enabled": rancherIstioOpts.CNI,
 		},
 	}
-	chartInstall := newChartInstall(p.Name, p.InstallOptions.Version, p.InstallOptions.ClusterID, p.InstallOptions.ClusterName, p.Host, istioValues)
+	chartInstall := newChartInstall(p.Name, p.InstallOptions.Version, p.InstallOptions.ClusterID, p.InstallOptions.ClusterName, p.Host, p.DefaultRegistry, istioValues)
 	chartInstalls := []types.ChartInstall{*chartInstall}
 
 	chartInstallAction := newChartInstallAction(p.Namespace, p.InstallOptions.ProjectID, chartInstalls)
@@ -173,11 +187,22 @@ func newIstioChartInstallAction(p *payloadOpts, rancherIstioOpts *RancherIstioOp
 
 // UpgradeRancherIstioChart is a helper function that upgrades the rancher-istio chart.
 func UpgradeRancherIstioChart(client *rancher.Client, installOptions *InstallOptions, rancherIstioOpts *RancherIstioOpts) error {
+	serverSetting, err := client.Management.Setting.ByID(serverURLSettingID)
+	if err != nil {
+		return err
+	}
+
+	registrySetting, err := client.Management.Setting.ByID(defaultRegistrySettingID)
+	if err != nil {
+		return err
+	}
+
 	istioChartUpgradeActionPayload := &payloadOpts{
-		InstallOptions: *installOptions,
-		Name:           RancherIstioName,
-		Host:           client.RancherConfig.Host,
-		Namespace:      RancherIstioNamespace,
+		InstallOptions:  *installOptions,
+		Name:            RancherIstioName,
+		Namespace:       RancherIstioNamespace,
+		Host:            serverSetting.Value,
+		DefaultRegistry: registrySetting.Value,
 	}
 
 	chartUpgradeAction := newIstioChartUpgradeAction(istioChartUpgradeActionPayload, rancherIstioOpts)
@@ -273,7 +298,7 @@ func newIstioChartUpgradeAction(p *payloadOpts, rancherIstioOpts *RancherIstioOp
 			"enabled": rancherIstioOpts.CNI,
 		},
 	}
-	chartUpgrade := newChartUpgrade(p.Name, p.InstallOptions.Version, p.InstallOptions.ClusterID, p.InstallOptions.ClusterName, p.Host, istioValues)
+	chartUpgrade := newChartUpgrade(p.Name, p.InstallOptions.Version, p.InstallOptions.ClusterID, p.InstallOptions.ClusterName, p.Host, p.DefaultRegistry, istioValues)
 	chartUpgrades := []types.ChartUpgrade{*chartUpgrade}
 
 	chartUpgradeAction := newChartUpgradeAction(p.Namespace, chartUpgrades)

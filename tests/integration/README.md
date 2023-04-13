@@ -1,20 +1,24 @@
-# Integration scripts for Rancher
-
+# Integration Tests
 
 ## CI
 
+---
+
 To execute a full CI test, run `make test` or `make ci` which will build Rancher (including any local changes) and run the test suite on it.
 
-## Development
+## Install
 
-#### Install
+---
 
-* Setup virtualenv and enter it
-* `pip install -r requirements.txt`
-* `pip install tox`
+```
+pip install -r requirements.txt
+pip install tox
+```
 
 
-#### Run tests
+## How to Run Integration Tests
+
+---
 
 Start a local rancher instance on port 8443
 
@@ -29,11 +33,13 @@ Run with pytest
 * a file: `pytest tests/integration/suite/test_auth_proxy.py`
 
 
-#### Notes
+## Notes
+
+---
 
 To debug, use the standard inline process: `breakpoint()`
 
-The tests use a Rancher python client (https://github.com/rancher/client-python) which is dynamically generated based on the Rancher API, so any methods called on it do not exist until runtime.
+The tests use a [Rancher python client](https://github.com/rancher/client-python) which is dynamically generated based on the Rancher API, so any methods called on it do not exist until runtime.
 It will be helpful to use the debugger and tools like `dir(admin_mc)` to see all methods on a variable.
 
-conftest.py holds the primary supporting code, see [pytest docs](https://docs.pytest.org) for more info.
+`conftest.py` holds the primary supporting code. See [pytest docs](https://docs.pytest.org) for more info.

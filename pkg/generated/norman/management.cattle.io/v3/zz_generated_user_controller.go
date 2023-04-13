@@ -42,7 +42,7 @@ func init() {
 	resource.Put(UserGroupVersionResource)
 }
 
-// Deprecated use v3.User instead
+// Deprecated: use v3.User instead
 type User = v3.User
 
 func NewUser(namespace, name string, obj v3.User) *v3.User {

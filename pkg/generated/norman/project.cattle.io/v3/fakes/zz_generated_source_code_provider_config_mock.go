@@ -29,22 +29,22 @@ var _ v31.SourceCodeProviderConfigLister = &SourceCodeProviderConfigListerMock{}
 
 // SourceCodeProviderConfigListerMock is a mock implementation of v31.SourceCodeProviderConfigLister.
 //
-//     func TestSomethingThatUsesSourceCodeProviderConfigLister(t *testing.T) {
+//	    func TestSomethingThatUsesSourceCodeProviderConfigLister(t *testing.T) {
 //
-//         // make and configure a mocked v31.SourceCodeProviderConfigLister
-//         mockedSourceCodeProviderConfigLister := &SourceCodeProviderConfigListerMock{
-//             GetFunc: func(namespace string, name string) (*v3.SourceCodeProviderConfig, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             ListFunc: func(namespace string, selector labels.Selector) ([]*v3.SourceCodeProviderConfig, error) {
-// 	               panic("mock out the List method")
-//             },
-//         }
+//	        // make and configure a mocked v31.SourceCodeProviderConfigLister
+//	        mockedSourceCodeProviderConfigLister := &SourceCodeProviderConfigListerMock{
+//	            GetFunc: func(namespace string, name string) (*v3.SourceCodeProviderConfig, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v3.SourceCodeProviderConfig, error) {
+//		               panic("mock out the List method")
+//	            },
+//	        }
 //
-//         // use mockedSourceCodeProviderConfigLister in code that requires v31.SourceCodeProviderConfigLister
-//         // and then make assertions.
+//	        // use mockedSourceCodeProviderConfigLister in code that requires v31.SourceCodeProviderConfigLister
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type SourceCodeProviderConfigListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v3.SourceCodeProviderConfig, error)
@@ -91,7 +91,8 @@ func (mock *SourceCodeProviderConfigListerMock) Get(namespace string, name strin
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedSourceCodeProviderConfigLister.GetCalls())
+//
+//	len(mockedSourceCodeProviderConfigLister.GetCalls())
 func (mock *SourceCodeProviderConfigListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -126,7 +127,8 @@ func (mock *SourceCodeProviderConfigListerMock) List(namespace string, selector 
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedSourceCodeProviderConfigLister.ListCalls())
+//
+//	len(mockedSourceCodeProviderConfigLister.ListCalls())
 func (mock *SourceCodeProviderConfigListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -159,43 +161,43 @@ var _ v31.SourceCodeProviderConfigController = &SourceCodeProviderConfigControll
 
 // SourceCodeProviderConfigControllerMock is a mock implementation of v31.SourceCodeProviderConfigController.
 //
-//     func TestSomethingThatUsesSourceCodeProviderConfigController(t *testing.T) {
+//	    func TestSomethingThatUsesSourceCodeProviderConfigController(t *testing.T) {
 //
-//         // make and configure a mocked v31.SourceCodeProviderConfigController
-//         mockedSourceCodeProviderConfigController := &SourceCodeProviderConfigControllerMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.SourceCodeProviderConfigHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.SourceCodeProviderConfigHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.SourceCodeProviderConfigHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, handler v31.SourceCodeProviderConfigHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             EnqueueFunc: func(namespace string, name string)  {
-// 	               panic("mock out the Enqueue method")
-//             },
-//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-// 	               panic("mock out the EnqueueAfter method")
-//             },
-//             GenericFunc: func() controller.GenericController {
-// 	               panic("mock out the Generic method")
-//             },
-//             InformerFunc: func() cache.SharedIndexInformer {
-// 	               panic("mock out the Informer method")
-//             },
-//             ListerFunc: func() v31.SourceCodeProviderConfigLister {
-// 	               panic("mock out the Lister method")
-//             },
-//         }
+//	        // make and configure a mocked v31.SourceCodeProviderConfigController
+//	        mockedSourceCodeProviderConfigController := &SourceCodeProviderConfigControllerMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.SourceCodeProviderConfigHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.SourceCodeProviderConfigHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.SourceCodeProviderConfigHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, handler v31.SourceCodeProviderConfigHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            EnqueueFunc: func(namespace string, name string)  {
+//		               panic("mock out the Enqueue method")
+//	            },
+//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+//		               panic("mock out the EnqueueAfter method")
+//	            },
+//	            GenericFunc: func() controller.GenericController {
+//		               panic("mock out the Generic method")
+//	            },
+//	            InformerFunc: func() cache.SharedIndexInformer {
+//		               panic("mock out the Informer method")
+//	            },
+//	            ListerFunc: func() v31.SourceCodeProviderConfigLister {
+//		               panic("mock out the Lister method")
+//	            },
+//	        }
 //
-//         // use mockedSourceCodeProviderConfigController in code that requires v31.SourceCodeProviderConfigController
-//         // and then make assertions.
+//	        // use mockedSourceCodeProviderConfigController in code that requires v31.SourceCodeProviderConfigController
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type SourceCodeProviderConfigControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.SourceCodeProviderConfigHandlerFunc)
@@ -324,7 +326,8 @@ func (mock *SourceCodeProviderConfigControllerMock) AddClusterScopedFeatureHandl
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedSourceCodeProviderConfigController.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedSourceCodeProviderConfigController.AddClusterScopedFeatureHandlerCalls())
 func (mock *SourceCodeProviderConfigControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -369,7 +372,8 @@ func (mock *SourceCodeProviderConfigControllerMock) AddClusterScopedHandler(ctx 
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedSourceCodeProviderConfigController.AddClusterScopedHandlerCalls())
+//
+//	len(mockedSourceCodeProviderConfigController.AddClusterScopedHandlerCalls())
 func (mock *SourceCodeProviderConfigControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -412,7 +416,8 @@ func (mock *SourceCodeProviderConfigControllerMock) AddFeatureHandler(ctx contex
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedSourceCodeProviderConfigController.AddFeatureHandlerCalls())
+//
+//	len(mockedSourceCodeProviderConfigController.AddFeatureHandlerCalls())
 func (mock *SourceCodeProviderConfigControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -453,7 +458,8 @@ func (mock *SourceCodeProviderConfigControllerMock) AddHandler(ctx context.Conte
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedSourceCodeProviderConfigController.AddHandlerCalls())
+//
+//	len(mockedSourceCodeProviderConfigController.AddHandlerCalls())
 func (mock *SourceCodeProviderConfigControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -490,7 +496,8 @@ func (mock *SourceCodeProviderConfigControllerMock) Enqueue(namespace string, na
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//     len(mockedSourceCodeProviderConfigController.EnqueueCalls())
+//
+//	len(mockedSourceCodeProviderConfigController.EnqueueCalls())
 func (mock *SourceCodeProviderConfigControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -527,7 +534,8 @@ func (mock *SourceCodeProviderConfigControllerMock) EnqueueAfter(namespace strin
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//     len(mockedSourceCodeProviderConfigController.EnqueueAfterCalls())
+//
+//	len(mockedSourceCodeProviderConfigController.EnqueueAfterCalls())
 func (mock *SourceCodeProviderConfigControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -559,7 +567,8 @@ func (mock *SourceCodeProviderConfigControllerMock) Generic() controller.Generic
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//     len(mockedSourceCodeProviderConfigController.GenericCalls())
+//
+//	len(mockedSourceCodeProviderConfigController.GenericCalls())
 func (mock *SourceCodeProviderConfigControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -585,7 +594,8 @@ func (mock *SourceCodeProviderConfigControllerMock) Informer() cache.SharedIndex
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//     len(mockedSourceCodeProviderConfigController.InformerCalls())
+//
+//	len(mockedSourceCodeProviderConfigController.InformerCalls())
 func (mock *SourceCodeProviderConfigControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -611,7 +621,8 @@ func (mock *SourceCodeProviderConfigControllerMock) Lister() v31.SourceCodeProvi
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//     len(mockedSourceCodeProviderConfigController.ListerCalls())
+//
+//	len(mockedSourceCodeProviderConfigController.ListerCalls())
 func (mock *SourceCodeProviderConfigControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -651,76 +662,76 @@ var _ v31.SourceCodeProviderConfigInterface = &SourceCodeProviderConfigInterface
 
 // SourceCodeProviderConfigInterfaceMock is a mock implementation of v31.SourceCodeProviderConfigInterface.
 //
-//     func TestSomethingThatUsesSourceCodeProviderConfigInterface(t *testing.T) {
+//	    func TestSomethingThatUsesSourceCodeProviderConfigInterface(t *testing.T) {
 //
-//         // make and configure a mocked v31.SourceCodeProviderConfigInterface
-//         mockedSourceCodeProviderConfigInterface := &SourceCodeProviderConfigInterfaceMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.SourceCodeProviderConfigHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.SourceCodeProviderConfigLifecycle)  {
-// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.SourceCodeProviderConfigHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.SourceCodeProviderConfigLifecycle)  {
-// 	               panic("mock out the AddClusterScopedLifecycle method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.SourceCodeProviderConfigHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.SourceCodeProviderConfigLifecycle)  {
-// 	               panic("mock out the AddFeatureLifecycle method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.SourceCodeProviderConfigHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.SourceCodeProviderConfigLifecycle)  {
-// 	               panic("mock out the AddLifecycle method")
-//             },
-//             ControllerFunc: func() v31.SourceCodeProviderConfigController {
-// 	               panic("mock out the Controller method")
-//             },
-//             CreateFunc: func(in1 *v3.SourceCodeProviderConfig) (*v3.SourceCodeProviderConfig, error) {
-// 	               panic("mock out the Create method")
-//             },
-//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the Delete method")
-//             },
-//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-// 	               panic("mock out the DeleteCollection method")
-//             },
-//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the DeleteNamespaced method")
-//             },
-//             GetFunc: func(name string, opts metav1.GetOptions) (*v3.SourceCodeProviderConfig, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.SourceCodeProviderConfig, error) {
-// 	               panic("mock out the GetNamespaced method")
-//             },
-//             ListFunc: func(opts metav1.ListOptions) (*v3.SourceCodeProviderConfigList, error) {
-// 	               panic("mock out the List method")
-//             },
-//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.SourceCodeProviderConfigList, error) {
-// 	               panic("mock out the ListNamespaced method")
-//             },
-//             ObjectClientFunc: func() *objectclient.ObjectClient {
-// 	               panic("mock out the ObjectClient method")
-//             },
-//             UpdateFunc: func(in1 *v3.SourceCodeProviderConfig) (*v3.SourceCodeProviderConfig, error) {
-// 	               panic("mock out the Update method")
-//             },
-//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-// 	               panic("mock out the Watch method")
-//             },
-//         }
+//	        // make and configure a mocked v31.SourceCodeProviderConfigInterface
+//	        mockedSourceCodeProviderConfigInterface := &SourceCodeProviderConfigInterfaceMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.SourceCodeProviderConfigHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.SourceCodeProviderConfigLifecycle)  {
+//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.SourceCodeProviderConfigHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.SourceCodeProviderConfigLifecycle)  {
+//		               panic("mock out the AddClusterScopedLifecycle method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.SourceCodeProviderConfigHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.SourceCodeProviderConfigLifecycle)  {
+//		               panic("mock out the AddFeatureLifecycle method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.SourceCodeProviderConfigHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.SourceCodeProviderConfigLifecycle)  {
+//		               panic("mock out the AddLifecycle method")
+//	            },
+//	            ControllerFunc: func() v31.SourceCodeProviderConfigController {
+//		               panic("mock out the Controller method")
+//	            },
+//	            CreateFunc: func(in1 *v3.SourceCodeProviderConfig) (*v3.SourceCodeProviderConfig, error) {
+//		               panic("mock out the Create method")
+//	            },
+//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the Delete method")
+//	            },
+//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+//		               panic("mock out the DeleteCollection method")
+//	            },
+//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the DeleteNamespaced method")
+//	            },
+//	            GetFunc: func(name string, opts metav1.GetOptions) (*v3.SourceCodeProviderConfig, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.SourceCodeProviderConfig, error) {
+//		               panic("mock out the GetNamespaced method")
+//	            },
+//	            ListFunc: func(opts metav1.ListOptions) (*v3.SourceCodeProviderConfigList, error) {
+//		               panic("mock out the List method")
+//	            },
+//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.SourceCodeProviderConfigList, error) {
+//		               panic("mock out the ListNamespaced method")
+//	            },
+//	            ObjectClientFunc: func() *objectclient.ObjectClient {
+//		               panic("mock out the ObjectClient method")
+//	            },
+//	            UpdateFunc: func(in1 *v3.SourceCodeProviderConfig) (*v3.SourceCodeProviderConfig, error) {
+//		               panic("mock out the Update method")
+//	            },
+//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+//		               panic("mock out the Watch method")
+//	            },
+//	        }
 //
-//         // use mockedSourceCodeProviderConfigInterface in code that requires v31.SourceCodeProviderConfigInterface
-//         // and then make assertions.
+//	        // use mockedSourceCodeProviderConfigInterface in code that requires v31.SourceCodeProviderConfigInterface
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type SourceCodeProviderConfigInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.SourceCodeProviderConfigHandlerFunc)
@@ -973,7 +984,8 @@ func (mock *SourceCodeProviderConfigInterfaceMock) AddClusterScopedFeatureHandle
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedSourceCodeProviderConfigInterface.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedSourceCodeProviderConfigInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *SourceCodeProviderConfigInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1020,7 +1032,8 @@ func (mock *SourceCodeProviderConfigInterfaceMock) AddClusterScopedFeatureLifecy
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//     len(mockedSourceCodeProviderConfigInterface.AddClusterScopedFeatureLifecycleCalls())
+//
+//	len(mockedSourceCodeProviderConfigInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *SourceCodeProviderConfigInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1065,7 +1078,8 @@ func (mock *SourceCodeProviderConfigInterfaceMock) AddClusterScopedHandler(ctx c
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedSourceCodeProviderConfigInterface.AddClusterScopedHandlerCalls())
+//
+//	len(mockedSourceCodeProviderConfigInterface.AddClusterScopedHandlerCalls())
 func (mock *SourceCodeProviderConfigInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1108,7 +1122,8 @@ func (mock *SourceCodeProviderConfigInterfaceMock) AddClusterScopedLifecycle(ctx
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//     len(mockedSourceCodeProviderConfigInterface.AddClusterScopedLifecycleCalls())
+//
+//	len(mockedSourceCodeProviderConfigInterface.AddClusterScopedLifecycleCalls())
 func (mock *SourceCodeProviderConfigInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1151,7 +1166,8 @@ func (mock *SourceCodeProviderConfigInterfaceMock) AddFeatureHandler(ctx context
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedSourceCodeProviderConfigInterface.AddFeatureHandlerCalls())
+//
+//	len(mockedSourceCodeProviderConfigInterface.AddFeatureHandlerCalls())
 func (mock *SourceCodeProviderConfigInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1194,7 +1210,8 @@ func (mock *SourceCodeProviderConfigInterfaceMock) AddFeatureLifecycle(ctx conte
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//     len(mockedSourceCodeProviderConfigInterface.AddFeatureLifecycleCalls())
+//
+//	len(mockedSourceCodeProviderConfigInterface.AddFeatureLifecycleCalls())
 func (mock *SourceCodeProviderConfigInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1235,7 +1252,8 @@ func (mock *SourceCodeProviderConfigInterfaceMock) AddHandler(ctx context.Contex
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedSourceCodeProviderConfigInterface.AddHandlerCalls())
+//
+//	len(mockedSourceCodeProviderConfigInterface.AddHandlerCalls())
 func (mock *SourceCodeProviderConfigInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1274,7 +1292,8 @@ func (mock *SourceCodeProviderConfigInterfaceMock) AddLifecycle(ctx context.Cont
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//     len(mockedSourceCodeProviderConfigInterface.AddLifecycleCalls())
+//
+//	len(mockedSourceCodeProviderConfigInterface.AddLifecycleCalls())
 func (mock *SourceCodeProviderConfigInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1306,7 +1325,8 @@ func (mock *SourceCodeProviderConfigInterfaceMock) Controller() v31.SourceCodePr
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//     len(mockedSourceCodeProviderConfigInterface.ControllerCalls())
+//
+//	len(mockedSourceCodeProviderConfigInterface.ControllerCalls())
 func (mock *SourceCodeProviderConfigInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1335,7 +1355,8 @@ func (mock *SourceCodeProviderConfigInterfaceMock) Create(in1 *v3.SourceCodeProv
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//     len(mockedSourceCodeProviderConfigInterface.CreateCalls())
+//
+//	len(mockedSourceCodeProviderConfigInterface.CreateCalls())
 func (mock *SourceCodeProviderConfigInterfaceMock) CreateCalls() []struct {
 	In1 *v3.SourceCodeProviderConfig
 } {
@@ -1368,7 +1389,8 @@ func (mock *SourceCodeProviderConfigInterfaceMock) Delete(name string, options *
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//     len(mockedSourceCodeProviderConfigInterface.DeleteCalls())
+//
+//	len(mockedSourceCodeProviderConfigInterface.DeleteCalls())
 func (mock *SourceCodeProviderConfigInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1403,7 +1425,8 @@ func (mock *SourceCodeProviderConfigInterfaceMock) DeleteCollection(deleteOpts *
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//     len(mockedSourceCodeProviderConfigInterface.DeleteCollectionCalls())
+//
+//	len(mockedSourceCodeProviderConfigInterface.DeleteCollectionCalls())
 func (mock *SourceCodeProviderConfigInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1440,7 +1463,8 @@ func (mock *SourceCodeProviderConfigInterfaceMock) DeleteNamespaced(namespace st
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//     len(mockedSourceCodeProviderConfigInterface.DeleteNamespacedCalls())
+//
+//	len(mockedSourceCodeProviderConfigInterface.DeleteNamespacedCalls())
 func (mock *SourceCodeProviderConfigInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1477,7 +1501,8 @@ func (mock *SourceCodeProviderConfigInterfaceMock) Get(name string, opts metav1.
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedSourceCodeProviderConfigInterface.GetCalls())
+//
+//	len(mockedSourceCodeProviderConfigInterface.GetCalls())
 func (mock *SourceCodeProviderConfigInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1514,7 +1539,8 @@ func (mock *SourceCodeProviderConfigInterfaceMock) GetNamespaced(namespace strin
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//     len(mockedSourceCodeProviderConfigInterface.GetNamespacedCalls())
+//
+//	len(mockedSourceCodeProviderConfigInterface.GetNamespacedCalls())
 func (mock *SourceCodeProviderConfigInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1549,7 +1575,8 @@ func (mock *SourceCodeProviderConfigInterfaceMock) List(opts metav1.ListOptions)
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedSourceCodeProviderConfigInterface.ListCalls())
+//
+//	len(mockedSourceCodeProviderConfigInterface.ListCalls())
 func (mock *SourceCodeProviderConfigInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1582,7 +1609,8 @@ func (mock *SourceCodeProviderConfigInterfaceMock) ListNamespaced(namespace stri
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//     len(mockedSourceCodeProviderConfigInterface.ListNamespacedCalls())
+//
+//	len(mockedSourceCodeProviderConfigInterface.ListNamespacedCalls())
 func (mock *SourceCodeProviderConfigInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1612,7 +1640,8 @@ func (mock *SourceCodeProviderConfigInterfaceMock) ObjectClient() *objectclient.
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//     len(mockedSourceCodeProviderConfigInterface.ObjectClientCalls())
+//
+//	len(mockedSourceCodeProviderConfigInterface.ObjectClientCalls())
 func (mock *SourceCodeProviderConfigInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1641,7 +1670,8 @@ func (mock *SourceCodeProviderConfigInterfaceMock) Update(in1 *v3.SourceCodeProv
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//     len(mockedSourceCodeProviderConfigInterface.UpdateCalls())
+//
+//	len(mockedSourceCodeProviderConfigInterface.UpdateCalls())
 func (mock *SourceCodeProviderConfigInterfaceMock) UpdateCalls() []struct {
 	In1 *v3.SourceCodeProviderConfig
 } {
@@ -1672,7 +1702,8 @@ func (mock *SourceCodeProviderConfigInterfaceMock) Watch(opts metav1.ListOptions
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//     len(mockedSourceCodeProviderConfigInterface.WatchCalls())
+//
+//	len(mockedSourceCodeProviderConfigInterface.WatchCalls())
 func (mock *SourceCodeProviderConfigInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1695,19 +1726,19 @@ var _ v31.SourceCodeProviderConfigsGetter = &SourceCodeProviderConfigsGetterMock
 
 // SourceCodeProviderConfigsGetterMock is a mock implementation of v31.SourceCodeProviderConfigsGetter.
 //
-//     func TestSomethingThatUsesSourceCodeProviderConfigsGetter(t *testing.T) {
+//	    func TestSomethingThatUsesSourceCodeProviderConfigsGetter(t *testing.T) {
 //
-//         // make and configure a mocked v31.SourceCodeProviderConfigsGetter
-//         mockedSourceCodeProviderConfigsGetter := &SourceCodeProviderConfigsGetterMock{
-//             SourceCodeProviderConfigsFunc: func(namespace string) v31.SourceCodeProviderConfigInterface {
-// 	               panic("mock out the SourceCodeProviderConfigs method")
-//             },
-//         }
+//	        // make and configure a mocked v31.SourceCodeProviderConfigsGetter
+//	        mockedSourceCodeProviderConfigsGetter := &SourceCodeProviderConfigsGetterMock{
+//	            SourceCodeProviderConfigsFunc: func(namespace string) v31.SourceCodeProviderConfigInterface {
+//		               panic("mock out the SourceCodeProviderConfigs method")
+//	            },
+//	        }
 //
-//         // use mockedSourceCodeProviderConfigsGetter in code that requires v31.SourceCodeProviderConfigsGetter
-//         // and then make assertions.
+//	        // use mockedSourceCodeProviderConfigsGetter in code that requires v31.SourceCodeProviderConfigsGetter
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type SourceCodeProviderConfigsGetterMock struct {
 	// SourceCodeProviderConfigsFunc mocks the SourceCodeProviderConfigs method.
 	SourceCodeProviderConfigsFunc func(namespace string) v31.SourceCodeProviderConfigInterface
@@ -1740,7 +1771,8 @@ func (mock *SourceCodeProviderConfigsGetterMock) SourceCodeProviderConfigs(names
 
 // SourceCodeProviderConfigsCalls gets all the calls that were made to SourceCodeProviderConfigs.
 // Check the length with:
-//     len(mockedSourceCodeProviderConfigsGetter.SourceCodeProviderConfigsCalls())
+//
+//	len(mockedSourceCodeProviderConfigsGetter.SourceCodeProviderConfigsCalls())
 func (mock *SourceCodeProviderConfigsGetterMock) SourceCodeProviderConfigsCalls() []struct {
 	Namespace string
 } {

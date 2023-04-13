@@ -10,12 +10,17 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/rancher/rancher/pkg/provisioningv2/image"
+
+	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
+
+	v1 "k8s.io/api/core/v1"
+
 	"github.com/rancher/norman/types/values"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
 	"github.com/rancher/rancher/pkg/nodeconfig"
-	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/wrangler/pkg/data"
 	"github.com/rancher/wrangler/pkg/data/convert"
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
@@ -109,8 +114,8 @@ func addRoleConfig(config map[string]interface{}, controlPlane *rkev1.RKEControl
 		config["disable-etcd"] = true
 	}
 
-	if sdr := settings.SystemDefaultRegistry.Get(); sdr != "" && !isOnlyWorker(entry) {
-		config["system-default-registry"] = sdr
+	if pr := image.GetPrivateRepoURLFromControlPlane(controlPlane); pr != "" && !isOnlyWorker(entry) {
+		config["system-default-registry"] = pr
 	}
 
 	// If this is a control-plane node, then we need to set arguments/(and for RKE2, volume mounts) to allow probes
@@ -343,12 +348,12 @@ func addLabels(config map[string]interface{}, entry *planEntry) error {
 	return nil
 }
 
-func addTaints(config map[string]interface{}, entry *planEntry, runtime string) error {
+func addTaints(config map[string]interface{}, entry *planEntry, cp *rkev1.RKEControlPlane) error {
 	var (
 		taintString []string
 	)
 
-	taints, err := getTaints(entry, runtime)
+	taints, err := getTaints(entry, cp)
 	if err != nil {
 		return err
 	}
@@ -363,6 +368,34 @@ func addTaints(config map[string]interface{}, entry *planEntry, runtime string) 
 	config["node-taint"] = taintString
 
 	return nil
+}
+
+// retrieveClusterAuthorizedSecret accepts a secret and a cluster name, and checks if a cluster is authorized to use the secret
+// by looking at the 'v2prov-secret-authorized-for-cluster' annotation and determining if it is equal to the cluster name.
+// if the cluster is authorized to use the secret, the contents of the 'credential' key are returned as a byte slice
+func retrieveClusterAuthorizedSecret(secret *v1.Secret, clusterName string) ([]byte, error) {
+	specifiedClusterName, ownerFound := secret.Annotations[secretmigrator.AuthorizedSecretAnnotation]
+	if !ownerFound || specifiedClusterName != clusterName {
+		return nil, fmt.Errorf("the secret 'secret://%s:%s' provided within the cloud-provider-config does not belong to cluster '%s'", secret.Namespace, secret.Name, clusterName)
+	}
+
+	secretContent, configFound := secret.Data["credential"]
+	if !configFound {
+		return nil, fmt.Errorf("the cloud-provider-config specified a secret, but no config could be found within the secret 'secret://%s:%s'", secret.Namespace, secret.Name)
+	}
+	return secretContent, nil
+}
+
+func checkForSecretFormat(configValue string) (bool, string, string, error) {
+	if strings.HasPrefix(configValue, "secret://") {
+		configValue = strings.ReplaceAll(configValue, "secret://", "")
+		namespaceAndName := strings.Split(configValue, ":")
+		if len(namespaceAndName) != 2 || namespaceAndName[0] == "" || namespaceAndName[1] == "" {
+			return true, "", "", fmt.Errorf("provided value for cloud-provider-config secret is malformed, must be of the format secret://namespace:name")
+		}
+		return true, namespaceAndName[0], namespaceAndName[1], nil
+	}
+	return false, "", "", nil
 }
 
 // configFile renders the full path to a config file based on the passed in filename and controlPlane
@@ -406,15 +439,14 @@ func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEC
 	addRoleConfig(config, controlPlane, entry, initNode, joinServer)
 	addLocalClusterAuthenticationEndpointConfig(config, controlPlane, entry)
 	addToken(config, entry, tokensSecret)
+
 	if err := addAddresses(p.secretCache, config, entry); err != nil {
 		return nodePlan, config, err
 	}
 	if err := addLabels(config, entry); err != nil {
 		return nodePlan, config, err
 	}
-
-	runtime := rke2.GetRuntime(controlPlane.Spec.KubernetesVersion)
-	if err := addTaints(config, entry, runtime); err != nil {
+	if err := addTaints(config, entry, controlPlane); err != nil {
 		return nodePlan, config, err
 	}
 
@@ -423,6 +455,35 @@ func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEC
 		if !ok {
 			continue
 		}
+
+		if fileParam == "cloud-provider-config" {
+			isSecretFormat, namespace, name, err := checkForSecretFormat(convert.ToString(content))
+			if err != nil {
+				// provided secret for cloud-provider-config does not follow the format of
+				// secret://namespace:name
+				return nodePlan, config, err
+			}
+			if isSecretFormat {
+				secret, err := p.secretCache.Get(namespace, name)
+				if err != nil {
+					return nodePlan, config, err
+				}
+
+				secretContent, err := retrieveClusterAuthorizedSecret(secret, controlPlane.Name)
+				if err != nil {
+					return nodePlan, config, err
+				}
+
+				filePath := configFile(controlPlane, fileParam)
+				config[fileParam] = filePath
+				nodePlan.Files = append(nodePlan.Files, plan.File{
+					Content: base64.StdEncoding.EncodeToString(secretContent),
+					Path:    filePath,
+				})
+				continue
+			}
+		}
+
 		filePath := configFile(controlPlane, fileParam)
 		config[fileParam] = filePath
 
@@ -441,7 +502,7 @@ func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEC
 
 	nodePlan.Files = append(nodePlan.Files, plan.File{
 		Content: base64.StdEncoding.EncodeToString(configData),
-		Path:    fmt.Sprintf(ConfigYamlFileName, runtime),
+		Path:    fmt.Sprintf(ConfigYamlFileName, rke2.GetRuntime(controlPlane.Spec.KubernetesVersion)),
 	})
 
 	return nodePlan, config, nil

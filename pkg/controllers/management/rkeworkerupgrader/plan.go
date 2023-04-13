@@ -7,7 +7,7 @@ import (
 
 	"github.com/pkg/errors"
 	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
-	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
+	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator/assemblers"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/librke"
 	nodeserver "github.com/rancher/rancher/pkg/rkenodeconfigserver"
@@ -17,9 +17,7 @@ import (
 )
 
 func (uh *upgradeHandler) nonWorkerPlan(node *v3.Node, cluster *v3.Cluster) (*rketypes.RKEConfigNodePlan, error) {
-	appliedSpec := *cluster.Status.AppliedSpec.DeepCopy()
-	var err error
-	appliedSpec, err = secretmigrator.AssembleRKEConfigSpec(cluster, appliedSpec, uh.secretLister)
+	appliedSpec, err := assemblers.AssembleRKEConfigSpec(cluster, cluster.Status.AppliedSpec, uh.secretLister)
 	if err != nil {
 		return nil, err
 	}
@@ -60,7 +58,7 @@ func (uh *upgradeHandler) nonWorkerPlan(node *v3.Node, cluster *v3.Cluster) (*rk
 		if tempNode.Address == hostAddress {
 
 			np.Processes, err = nodeserver.AugmentProcesses(token, tempNode.Processes, false,
-				node.Status.NodeConfig.HostnameOverride, cluster)
+				node.Status.NodeConfig.HostnameOverride, cluster, uh.secretLister)
 			if err != nil {
 				return np, err
 			}
@@ -83,8 +81,7 @@ func (uh *upgradeHandler) workerPlan(node *v3.Node, cluster *v3.Cluster) (*rkety
 	hostAddress := node.Status.NodeConfig.Address
 	hostDockerInfo := infos[hostAddress]
 
-	appliedSpec := *cluster.Status.AppliedSpec.DeepCopy()
-	appliedSpec, err = secretmigrator.AssembleRKEConfigSpec(cluster, appliedSpec, uh.secretLister)
+	appliedSpec, err := assemblers.AssembleRKEConfigSpec(cluster, cluster.Status.AppliedSpec, uh.secretLister)
 	if err != nil {
 		return nil, err
 	}
@@ -117,7 +114,7 @@ func (uh *upgradeHandler) workerPlan(node *v3.Node, cluster *v3.Cluster) (*rkety
 				np.Processes = nodeserver.EnhanceWindowsProcesses(tempNode.Processes)
 			} else {
 				np.Processes, err = nodeserver.AugmentProcesses(token, tempNode.Processes, true,
-					node.Status.NodeConfig.HostnameOverride, cluster)
+					node.Status.NodeConfig.HostnameOverride, cluster, uh.secretLister)
 				if err != nil {
 					return np, err
 				}

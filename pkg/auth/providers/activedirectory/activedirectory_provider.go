@@ -6,11 +6,10 @@ import (
 	"fmt"
 	"strings"
 
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
 	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	v3client "github.com/rancher/rancher/pkg/client/generated/management/v3"
@@ -238,4 +237,13 @@ func (p *adProvider) GetUserExtraAttributes(userPrincipal v3.Principal) map[stri
 		extras[common.UserAttributeUserName] = []string{userPrincipal.LoginName}
 	}
 	return extras
+}
+
+// IsDisabledProvider checks if the Azure Active Directory provider is currently disabled in Rancher.
+func (p *adProvider) IsDisabledProvider() (bool, error) {
+	adConfig, _, err := p.getActiveDirectoryConfig()
+	if err != nil {
+		return false, err
+	}
+	return !adConfig.Enabled, nil
 }

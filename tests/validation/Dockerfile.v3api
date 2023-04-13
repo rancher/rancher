@@ -6,9 +6,12 @@ WORKDIR $WORKSPACE
 ENV PYTHONPATH /src/rancher-validation
 ARG RKE_VERSION=v1.0.2
 ARG CLI_VERSION=v2.3.2
-ARG RANCHER_HELM_VERSION=v3.8.0
+ARG RANCHER_HELM_VERSION=v3.9.0
 ARG SONOBUOY_VERSION=0.18.2
 ARG TERRAFORM_VERSION=0.12.10
+
+ARG EXTERNAL_ENCODED_VPN
+ARG VPN_ENCODED_LOGIN
 
 
 COPY [".", "$WORKSPACE"]
@@ -45,3 +48,11 @@ RUN wget https://storage.googleapis.com/kubernetes-release/release/$KUBECTL_VERS
     pip install --upgrade pip && \
     pip install -r requirements_v3api.txt
 
+# necessary to run if statements using [[ ]]
+SHELL ["/bin/bash", "-c"] 
+
+RUN if [[ -z "$EXTERNAL_ENCODED_VPN" ]] ; then echo no vpn provided ; else apt-get update && \
+    apt-get -y install openvpn net-tools && echo $EXTERNAL_ENCODED_VPN | base64 -d > external.ovpn && \
+    if [[ -z "$VPN_ENCODED_LOGIN}" ]] ; then echo no passcode provided ; else echo adding passfile && \
+    echo $VPN_ENCODED_LOGIN | base64 -d > passfile && \
+    sed -i 's/auth-user-pass/auth-user-pass passfile/g' external.ovpn; fi; fi;

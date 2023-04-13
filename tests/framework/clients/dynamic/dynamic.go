@@ -6,6 +6,7 @@ import (
 	"k8s.io/client-go/rest"
 
 	"github.com/rancher/rancher/tests/framework/pkg/session"
+	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -22,7 +23,7 @@ type Client struct {
 
 // NewForConfig creates a new dynamic client or returns an error.
 func NewForConfig(ts *session.Session, inConfig *rest.Config) (dynamic.Interface, error) {
-	ts.TestingT.Logf("Dynamic Client Host:%s", inConfig.Host)
+	logrus.Infof("Dynamic Client Host:%s", inConfig.Host)
 
 	dynamicClient, err := dynamic.NewForConfig(inConfig)
 	if err != nil {
@@ -36,11 +37,12 @@ func NewForConfig(ts *session.Session, inConfig *rest.Config) (dynamic.Interface
 }
 
 // Resource takes a schema.GroupVersionResource parameter to set the appropriate resource interface e.g.
-//  schema.GroupVersionResource {
-// 	  Group:    "management.cattle.io",
-// 	  Version:  "v3",
-// 	  Resource: "users",
-//  }
+//
+//	 schema.GroupVersionResource {
+//		  Group:    "management.cattle.io",
+//		  Version:  "v3",
+//		  Resource: "users",
+//	 }
 func (d *Client) Resource(resource schema.GroupVersionResource) dynamic.NamespaceableResourceInterface {
 	return &NamespaceableResourceClient{
 		NamespaceableResourceInterface: d.Interface.Resource(resource),

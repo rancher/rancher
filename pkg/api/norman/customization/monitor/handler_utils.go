@@ -6,15 +6,16 @@ import (
 	"strings"
 	"time"
 
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/managementagent/workload"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/ref"
+	"github.com/rancher/rancher/pkg/serviceaccounttoken"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -186,17 +187,12 @@ func getAuthToken(userContext *config.UserContext, appName, namespace string) (s
 		return "", fmt.Errorf("get service account %s:%s for monitor failed, %v", namespace, appName, err)
 	}
 
-	var secretName string
-	if secretName = sa.Secrets[0].Name; secretName == "" {
-		return "", fmt.Errorf("get secret from service account %s:%s for monitor failed, secret name is empty", namespace, appName)
-	}
-
-	secret, err := userContext.Core.Secrets(namespace).Get(secretName, metav1.GetOptions{})
+	secret, err := serviceaccounttoken.EnsureSecretForServiceAccount(context.Background(), nil, userContext.K8sClient, sa)
 	if err != nil {
-		return "", fmt.Errorf("get secret %s:%s for monitor failed, %v", namespace, secretName, err)
+		return "", fmt.Errorf("ensure secret from service account %s:%s for monitor failed: %w", namespace, appName, err)
 	}
 
-	return string(secret.Data["token"]), nil
+	return string(secret.Data[v1.ServiceAccountTokenKey]), nil
 }
 
 func parseMetricParams(userContext *config.UserContext, nodeLister v3.NodeLister, resourceType, clusterName, projectName string, metricParams map[string]string) (map[string]string, error) {

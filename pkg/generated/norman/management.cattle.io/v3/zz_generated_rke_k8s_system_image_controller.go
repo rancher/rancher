@@ -43,7 +43,7 @@ func init() {
 	resource.Put(RkeK8sSystemImageGroupVersionResource)
 }
 
-// Deprecated use v3.RkeK8sSystemImage instead
+// Deprecated: use v3.RkeK8sSystemImage instead
 type RkeK8sSystemImage = v3.RkeK8sSystemImage
 
 func NewRkeK8sSystemImage(namespace, name string, obj v3.RkeK8sSystemImage) *v3.RkeK8sSystemImage {

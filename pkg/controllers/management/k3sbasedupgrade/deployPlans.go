@@ -152,7 +152,7 @@ func (h *handler) deployPlans(cluster *v3.Cluster, isK3s, isRke2 bool) error {
 	return nil
 }
 
-//cmp compares two plans but does not compare their Status, returns true if they are the same
+// cmp compares two plans but does not compare their Status, returns true if they are the same
 func cmp(a, b planv1.Plan) bool {
 	if a.Namespace != b.Namespace {
 		return false
@@ -178,7 +178,7 @@ func cmp(a, b planv1.Plan) bool {
 	return true
 }
 
-//cluster state management during the upgrade, plans may be ""
+// cluster state management during the upgrade, plans may be ""
 func (h *handler) modifyClusterCondition(cluster *v3.Cluster, masterPlan, workerPlan planv1.Plan, strategy v32.ClusterUpgradeStrategy) (*v3.Cluster, error) {
 
 	// implement a simple state machine

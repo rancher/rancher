@@ -26,6 +26,7 @@ const (
 	ClusterFieldCapabilities                         = "capabilities"
 	ClusterFieldCapacity                             = "capacity"
 	ClusterFieldCertificatesExpiration               = "certificatesExpiration"
+	ClusterFieldClusterSecrets                       = "clusterSecrets"
 	ClusterFieldClusterTemplateAnswers               = "answers"
 	ClusterFieldClusterTemplateID                    = "clusterTemplateId"
 	ClusterFieldClusterTemplateQuestions             = "questions"
@@ -74,6 +75,7 @@ const (
 	ClusterFieldS3CredentialSecret                   = "s3CredentialSecret"
 	ClusterFieldScheduledClusterScan                 = "scheduledClusterScan"
 	ClusterFieldScheduledClusterScanStatus           = "scheduledClusterScanStatus"
+	ClusterFieldServiceAccountTokenSecret            = "serviceAccountTokenSecret"
 	ClusterFieldState                                = "state"
 	ClusterFieldTransitioning                        = "transitioning"
 	ClusterFieldTransitioningMessage                 = "transitioningMessage"
@@ -108,6 +110,7 @@ type Cluster struct {
 	Capabilities                         *Capabilities                  `json:"capabilities,omitempty" yaml:"capabilities,omitempty"`
 	Capacity                             map[string]string              `json:"capacity,omitempty" yaml:"capacity,omitempty"`
 	CertificatesExpiration               map[string]CertExpiration      `json:"certificatesExpiration,omitempty" yaml:"certificatesExpiration,omitempty"`
+	ClusterSecrets                       *ClusterSecrets                `json:"clusterSecrets,omitempty" yaml:"clusterSecrets,omitempty"`
 	ClusterTemplateAnswers               *Answer                        `json:"answers,omitempty" yaml:"answers,omitempty"`
 	ClusterTemplateID                    string                         `json:"clusterTemplateId,omitempty" yaml:"clusterTemplateId,omitempty"`
 	ClusterTemplateQuestions             []Question                     `json:"questions,omitempty" yaml:"questions,omitempty"`
@@ -156,6 +159,7 @@ type Cluster struct {
 	S3CredentialSecret                   string                         `json:"s3CredentialSecret,omitempty" yaml:"s3CredentialSecret,omitempty"`
 	ScheduledClusterScan                 *ScheduledClusterScan          `json:"scheduledClusterScan,omitempty" yaml:"scheduledClusterScan,omitempty"`
 	ScheduledClusterScanStatus           *ScheduledClusterScanStatus    `json:"scheduledClusterScanStatus,omitempty" yaml:"scheduledClusterScanStatus,omitempty"`
+	ServiceAccountTokenSecret            string                         `json:"serviceAccountTokenSecret,omitempty" yaml:"serviceAccountTokenSecret,omitempty"`
 	State                                string                         `json:"state,omitempty" yaml:"state,omitempty"`
 	Transitioning                        string                         `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage                 string                         `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`

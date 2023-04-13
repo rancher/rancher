@@ -19,6 +19,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/kubernetes/fake"
 	"sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
@@ -135,6 +136,7 @@ func Test_getBootstrapSecret(t *testing.T) {
 				secretCache:         getSecretCacheMock(tt.args.namespaceName, tt.args.secretName),
 				deploymentCache:     getDeploymentCacheMock(),
 				machineCache:        getMachineCacheMock(tt.args.namespaceName, tt.args.os),
+				k8s:                 fake.NewSimpleClientset(),
 			}
 
 			//act
@@ -260,6 +262,7 @@ func getSecretCacheMock(namespace, secretName string) *secretCacheMock {
 		StringData: nil,
 		Type:       "",
 	}, nil)
+
 	return mockSecretCache
 }
 

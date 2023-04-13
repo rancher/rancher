@@ -46,11 +46,12 @@ def test_delete_keypair():
 def test_deploy_rancher_server():
     if "v2.5" in  RANCHER_SERVER_VERSION or \
         "master" in RANCHER_SERVER_VERSION or \
-        "v2.6" in RANCHER_SERVER_VERSION:
+        "v2.6" in RANCHER_SERVER_VERSION or \
+        "v2.7" in RANCHER_SERVER_VERSION:
         RANCHER_SERVER_CMD = \
             'sudo docker run -d --privileged --name="rancher-server" ' \
             '--restart=unless-stopped -p 80:80 -p 443:443  ' \
-            '-e CATTLE_BOOTSTRAP_PASSWORD={} ' \
+            '-e CATTLE_BOOTSTRAP_PASSWORD="{}" ' \
             'rancher/rancher'.format(ADMIN_PASSWORD)
     else:
         RANCHER_SERVER_CMD = \
@@ -61,7 +62,8 @@ def test_deploy_rancher_server():
     print(RANCHER_SERVER_CMD)
     aws_nodes = AmazonWebServices().create_multiple_nodes(
         1, random_test_name("testsa" + HOST_NAME))
-    aws_nodes[0].execute_command(RANCHER_SERVER_CMD)
+    result = aws_nodes[0].execute_command(RANCHER_SERVER_CMD)
+    print(result)
     time.sleep(120)
     RANCHER_SERVER_URL = "https://" + aws_nodes[0].public_ip_address
     print(RANCHER_SERVER_URL)
@@ -73,8 +75,16 @@ def test_deploy_rancher_server():
 
     token = set_url_password_token(RANCHER_SERVER_URL,
                                    version=RANCHER_SERVER_VERSION)
-    admin_client = rancher.Client(url=RANCHER_SERVER_URL + "/v3",
-                                  token=token, verify=False)
+    t_end = time.time() + 30
+    while time.time() < t_end:
+        try:
+            admin_client = rancher.Client(url=RANCHER_SERVER_URL + "/v3",
+                                          token=token, verify=False)
+        except requests.exceptions:
+            print("Got exception while creating admin client - retry")
+        else:
+            break
+
     if AUTH_PROVIDER:
         enable_url = \
             RANCHER_SERVER_URL + "/v3/" + AUTH_PROVIDER + \

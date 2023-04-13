@@ -9,7 +9,9 @@ import (
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/clusterregistrationtoken"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/rancher/pkg/tunnelserver/mcmauthorizer"
+	"github.com/rancher/rke/hosts"
 
 	rketypes "github.com/rancher/rke/types"
 
@@ -27,13 +29,22 @@ import (
 	rkepki "github.com/rancher/rke/pki"
 	rkeservices "github.com/rancher/rke/services"
 	"github.com/sirupsen/logrus"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 const (
 	DefaultAgentCheckInterval       = 120
 	AgentCheckIntervalDuringUpgrade = 35
 	AgentCheckIntervalDuringCreate  = 15
+
+	// RegenerateKubeletCertificate is a header field included by the
+	// node agent which denotes that a new kubelet serving certificate
+	// should be generated for the downstream node. Its value is a
+	// string representing a boolean ('true' || 'false'). While the
+	// agent may request a new serving certificate, one should only be
+	// provided if the kubelet service field `generate_serving_certificate`
+	// is set to 'true'.
+	RegenerateKubeletCertificate = "Regenerate-Kubelet-Certificate"
 )
 
 type RKENodeConfigServer struct {
@@ -124,7 +135,7 @@ func (n *RKENodeConfigServer) ServeHTTP(rw http.ResponseWriter, req *http.Reques
 			}
 		}
 
-		nodeConfig, err = n.nodeConfig(req.Context(), client.Cluster, client.Node)
+		nodeConfig, err = n.nodeConfig(req.Context(), client.Cluster, client.Node, req.Header.Get(strings.ToLower(RegenerateKubeletCertificate)) == "true")
 	}
 
 	if err != nil {
@@ -170,7 +181,7 @@ func (n *RKENodeConfigServer) nonWorkerConfig(ctx context.Context, cluster *v3.C
 	return nc, nil
 }
 
-func (n *RKENodeConfigServer) nodeConfig(ctx context.Context, cluster *v3.Cluster, node *v3.Node) (*rkeworker.NodeConfig, error) {
+func (n *RKENodeConfigServer) nodeConfig(ctx context.Context, cluster *v3.Cluster, node *v3.Node, agentNeedsNewKubeletCertificate bool) (*rkeworker.NodeConfig, error) {
 	status := cluster.Status.AppliedSpec.DeepCopy()
 	rkeConfig := status.RancherKubernetesEngineConfig
 
@@ -204,9 +215,9 @@ func (n *RKENodeConfigServer) nodeConfig(ctx context.Context, cluster *v3.Cluste
 		bundle = bundle.ForNode(rkeConfig, hostAddress)
 	}
 
-	if rkepki.IsKubeletGenerateServingCertificateEnabledinConfig(rkeConfig) {
-		logrus.Debugf("nodeConfig: VerifyKubeletCAEnabled is true, generating kubelet certificate for [%s]", hostAddress)
-		err := rkepki.GenerateKubeletCertificate(ctx, bundle.Certs(), *rkeConfig, "", "", false)
+	if rkepki.IsKubeletGenerateServingCertificateEnabledinConfig(rkeConfig) && agentNeedsNewKubeletCertificate {
+		logrus.Debugf("nodeConfig: node agent has requested new kubelet certificate and VerifyKubeletCAEnabled is true, generating kubelet certificate for [%s]", hostAddress)
+		err := GenerateKubeletServingCertForNode(bundle.Certs(), node)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to generate kubelet certificate")
 		}
@@ -242,6 +253,27 @@ func (n *RKENodeConfigServer) nodeConfig(ctx context.Context, cluster *v3.Cluste
 	return nc, nil
 }
 
+func GenerateKubeletServingCertForNode(certs map[string]rkepki.CertificatePKI, node *v3.Node) error {
+	caCrt := certs[rkepki.CACertName].Certificate
+	caKey := certs[rkepki.CACertName].Key
+	if caCrt == nil || caKey == nil {
+		return fmt.Errorf("CA Certificate or Key is empty")
+	}
+
+	nodeAsHost := &hosts.Host{RKEConfigNode: *node.Status.NodeConfig}
+	kubeletName := rkepki.GetCrtNameForHost(nodeAsHost, rkepki.KubeletCertName)
+
+	altNames := rkepki.GetIPHostAltnamesForHost(nodeAsHost)
+
+	serviceKey := certs[kubeletName].Key
+	newCrt, newKey, err := rkepki.GenerateSignedCertAndKey(caCrt, caKey, true, kubeletName, altNames, serviceKey, nil)
+	if err != nil {
+		return err
+	}
+	certs[kubeletName] = rkepki.ToCertObject(kubeletName, "", "", newCrt, newKey, nil)
+	return nil
+}
+
 func FilterHostForSpec(spec *rketypes.RancherKubernetesEngineConfig, n *v3.Node) {
 	nodeList := make([]rketypes.RKEConfigNode, 0)
 	for _, node := range spec.Nodes {
@@ -253,7 +285,7 @@ func FilterHostForSpec(spec *rketypes.RancherKubernetesEngineConfig, n *v3.Node)
 }
 
 func AugmentProcesses(token string, processes map[string]rketypes.Process, worker bool, nodeName string,
-	cluster *v3.Cluster) (map[string]rketypes.Process, error) {
+	cluster *v3.Cluster, lister v1.SecretLister) (map[string]rketypes.Process, error) {
 	var shared bool
 
 OuterLoop:
@@ -273,7 +305,7 @@ OuterLoop:
 		if err != nil {
 			return nil, err
 		}
-		privateRegistryConfig, _ := util.GenerateClusterPrivateRegistryDockerConfig(cluster)
+		_, privateRegistryConfig, _ := util.GeneratePrivateRegistryEncodedDockerConfig(cluster, lister)
 		processes["share-mnt"] = rketypes.Process{
 			Name:  "share-mnt",
 			Args:  nodeCommand,
@@ -330,7 +362,7 @@ func EnhanceWindowsProcesses(processes map[string]rketypes.Process) map[string]r
 func AppendTaintsToKubeletArgs(processes map[string]rketypes.Process, nodeConfigTaints []rketypes.RKETaint) map[string]rketypes.Process {
 	if kubelet, ok := processes["kubelet"]; ok && len(nodeConfigTaints) != 0 {
 		initialTaints := taints.GetTaintsFromStrings(taints.GetStringsFromRKETaint(nodeConfigTaints))
-		var currentTaints []v1.Taint
+		var currentTaints []corev1.Taint
 		foundArgs := ""
 		for i, arg := range kubelet.Command {
 			if strings.HasPrefix(arg, "--register-with-taints=") {

@@ -6,7 +6,11 @@ import (
 	"unicode"
 
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
+	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
 	"github.com/rancher/rancher/tests/framework/extensions/charts"
+	"github.com/rancher/rancher/tests/framework/extensions/workloads"
+	appv1 "k8s.io/api/apps/v1"
+	kubewait "k8s.io/apimachinery/pkg/util/wait"
 )
 
 const (
@@ -46,7 +50,7 @@ type chartFeatureOptions struct {
 
 // getChartCaseEndpointUntilBodyHas is a private helper function
 // that awaits the body of the response until the desired string is found
-func getChartCaseEndpointUntilBodyHas(client *rancher.Client, host, path, bodyPart string) (bool, error) {
+func getChartCaseEndpointUntilBodyHas(client *rancher.Client, host, path, bodyPart string) (found bool, err error) {
 	trimAllSpaces := func(str string) string {
 		return strings.Map(func(r rune) rune {
 			if unicode.IsSpace(r) {
@@ -56,18 +60,48 @@ func getChartCaseEndpointUntilBodyHas(client *rancher.Client, host, path, bodyPa
 		}, str)
 	}
 
-	timeout := 30 * time.Second
-	for start := time.Now(); time.Since(start) < timeout; {
+	err = kubewait.Poll(500*time.Millisecond, 2*time.Minute, func() (ongoing bool, err error) {
 		result, err := charts.GetChartCaseEndpoint(client, host, path, false)
 		if err != nil {
-			return false, err
+			return ongoing, err
 		}
 
 		trimmedBody := trimAllSpaces(result.Body)
 		if strings.Contains(trimmedBody, bodyPart) {
-			return true, nil
+			found = true
+			return !ongoing, nil
+		}
+
+		return
+	})
+	if err != nil {
+		return
+	}
+
+	return
+}
+
+// listIstioDeployments is a private helper function
+// that returns the deployment specs if deployments have "operator.istio.io/version" label
+func listIstioDeployments(steveclient *v1.Client) (deploymentSpecList []*appv1.DeploymentSpec, err error) {
+	deploymentList, err := steveclient.SteveType(workloads.DeploymentSteveType).List(nil)
+	if err != nil {
+		return
+	}
+
+	for _, deployment := range deploymentList.Data {
+		_, ok := deployment.ObjectMeta.Labels["operator.istio.io/version"]
+
+		if ok {
+			deploymentSpec := &appv1.DeploymentSpec{}
+			err := v1.ConvertToK8sType(deployment.Spec, deploymentSpec)
+			if err != nil {
+				return deploymentSpecList, err
+			}
+
+			deploymentSpecList = append(deploymentSpecList, deploymentSpec)
 		}
 	}
 
-	return false, nil
+	return deploymentSpecList, nil
 }

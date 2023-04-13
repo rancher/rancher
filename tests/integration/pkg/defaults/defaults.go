@@ -3,7 +3,7 @@ package defaults
 import "os"
 
 var (
-	PodTestImage        = "rancher/systemd-node:v0.0.2"
+	PodTestImage        = "rancher/systemd-node:v0.0.4"
 	SomeK8sVersion      = os.Getenv("SOME_K8S_VERSION")
 	WatchTimeoutSeconds = int64(60 * 30)
 	CommonClusterConfig = map[string]interface{}{

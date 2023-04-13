@@ -1122,7 +1122,7 @@ def getRKEConfig(k8sversion):
                         "accessKey": AWS_ACCESS_KEY_ID,
                         "secretKey": AWS_SECRET_ACCESS_KEY,
                         "bucketName": "test-auto-s3",
-                        "endpoint": "s3.amazonaws.com"
+                        "endpoint": "s3.us-east-2.amazonaws.com"
                     }
                 }
             }

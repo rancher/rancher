@@ -43,7 +43,7 @@ func init() {
 	resource.Put(HorizontalPodAutoscalerGroupVersionResource)
 }
 
-// Deprecated use v2beta2.HorizontalPodAutoscaler instead
+// Deprecated: use v2beta2.HorizontalPodAutoscaler instead
 type HorizontalPodAutoscaler = v2beta2.HorizontalPodAutoscaler
 
 func NewHorizontalPodAutoscaler(namespace, name string, obj v2beta2.HorizontalPodAutoscaler) *v2beta2.HorizontalPodAutoscaler {

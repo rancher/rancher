@@ -1,25 +1,7 @@
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: default-network-dns-policy
-  namespace: kube-system
-spec:
-  ingress:
-  - ports:
-    - port: 53
-      protocol: TCP
-    - port: 53
-      protocol: UDP
-  podSelector:
-    matchLabels:
-      k8s-app: kube-dns
-  policyTypes:
-  - Ingress
----
 apiVersion: policy/v1beta1
 kind: PodSecurityPolicy
 metadata:
-  name: cis1.5-compliant-psp
+  name: restricted-psp
 spec:
   privileged: false
   allowPrivilegeEscalation: false
@@ -31,7 +13,9 @@ spec:
     - 'projected'
     - 'secret'
     - 'downwardAPI'
+    - 'csi'
     - 'persistentVolumeClaim'
+    - 'ephemeral'
   hostNetwork: false
   hostIPC: false
   hostPID: false
@@ -51,33 +35,153 @@ spec:
         max: 65535
   readOnlyRootFilesystem: false
 ---
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: system-unrestricted-psp
+  annotations:
+    seccomp.security.alpha.kubernetes.io/allowedProfileNames: '*'
+spec:
+  allowPrivilegeEscalation: true
+  allowedCapabilities:
+  - '*'
+  fsGroup:
+    rule: RunAsAny
+  hostIPC: true
+  hostNetwork: true
+  hostPID: true
+  hostPorts:
+  - max: 65535
+    min: 0
+  privileged: true
+  runAsUser:
+    rule: RunAsAny
+  seLinux:
+    rule: RunAsAny
+  supplementalGroups:
+    rule: RunAsAny
+  volumes:
+  - '*'
+---
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: svclb-psp
+  annotations:
+    seccomp.security.alpha.kubernetes.io/allowedProfileNames: '*'
+spec:
+  allowPrivilegeEscalation: false
+  allowedCapabilities:
+  - NET_ADMIN
+  allowedUnsafeSysctls:
+  - net.ipv4.ip_forward
+  - net.ipv6.conf.all.forwarding
+  fsGroup:
+    rule: RunAsAny
+  hostPorts:
+  - max: 65535
+    min: 0
+  runAsUser:
+    rule: RunAsAny
+  seLinux:
+    rule: RunAsAny
+  supplementalGroups:
+    rule: RunAsAny
+---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: psp:restricted
-  labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+  name: psp:restricted-psp
 rules:
-- apiGroups: ['extensions']
-  resources: ['podsecuritypolicies']
-  verbs:     ['use']
+- apiGroups:
+  - policy
+  resources:
+  - podsecuritypolicies
+  verbs:
+  - use
   resourceNames:
-  - cis1.5-compliant-psp
+  - restricted-psp
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: psp:system-unrestricted-psp
+rules:
+- apiGroups:
+  - policy
+  resources:
+  - podsecuritypolicies
+  resourceNames:
+  - system-unrestricted-psp
+  verbs:
+  - use
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: psp:svclb-psp
+rules:
+- apiGroups:
+  - policy
+  resources:
+  - podsecuritypolicies
+  resourceNames:
+  - svclb-psp
+  verbs:
+  - use
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: default:restricted
-  labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+  name: default:restricted-psp
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: psp:restricted
+  name: psp:restricted-psp
 subjects:
 - kind: Group
   name: system:authenticated
   apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: system-unrestricted-node-psp-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: psp:system-unrestricted-psp
+subjects:
+- apiGroup: rbac.authorization.k8s.io
+  kind: Group
+  name: system:nodes
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: system-unrestricted-svc-acct-psp-rolebinding
+  namespace: kube-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: psp:system-unrestricted-psp
+subjects:
+- apiGroup: rbac.authorization.k8s.io
+  kind: Group
+  name: system:serviceaccounts
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: svclb-psp-rolebinding
+  namespace: kube-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: psp:svclb-psp
+subjects:
+- kind: ServiceAccount
+  name: svclb
 ---
 kind: NetworkPolicy
 apiVersion: networking.k8s.io/v1
@@ -118,89 +222,20 @@ spec:
           matchLabels:
             name: kube-public
 ---
-apiVersion: policy/v1beta1
-kind: PodSecurityPolicy
-metadata:
-  name: system-unrestricted-psp
-spec:
-  allowPrivilegeEscalation: true
-  allowedCapabilities:
-  - '*'
-  fsGroup:
-    rule: RunAsAny
-  hostIPC: true
-  hostNetwork: true
-  hostPID: true
-  hostPorts:
-  - max: 65535
-    min: 0
-  privileged: true
-  runAsUser:
-    rule: RunAsAny
-  seLinux:
-    rule: RunAsAny
-  supplementalGroups:
-    rule: RunAsAny
-  volumes:
-  - '*'
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: system-unrestricted-node-psp-rolebinding
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: system-unrestricted-psp-role
-subjects:
-- apiGroup: rbac.authorization.k8s.io
-  kind: Group
-  name: system:nodes
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: system-unrestricted-psp-role
-rules:
-- apiGroups:
-  - policy
-  resourceNames:
-  - system-unrestricted-psp
-  resources:
-  - podsecuritypolicies
-  verbs:
-  - use
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: system-unrestricted-svc-acct-psp-rolebinding
-  namespace: kube-system
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: system-unrestricted-psp-role
-subjects:
-- apiGroup: rbac.authorization.k8s.io
-  kind: Group
-  name: system:serviceaccounts
----
-# Reference https://rancher.com/docs/k3s/latest/en/security/hardening_guide/#networkpolicies
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: allow-all-svclbtraefik-ingress
   namespace: kube-system
 spec:
-  podSelector:
-    matchLabels:
-      app: svclb-traefik
   ingress:
   - {}
+  podSelector:
+    matchLabels:
+      svccontroller.k3s.cattle.io/svcname: traefik
   policyTypes:
   - Ingress
 ---
-# Reference https://rancher.com/docs/k3s/latest/en/security/hardening_guide/#networkpolicies
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -215,3 +250,55 @@ spec:
   policyTypes:
   - Ingress
 ---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-network-dns-policy
+  namespace: kube-system
+spec:
+  ingress:
+  - ports:
+    - port: 53
+      protocol: TCP
+    - port: 53
+      protocol: UDP
+  podSelector:
+    matchLabels:
+      k8s-app: kube-dns
+  policyTypes:
+  - Ingress
+---
+# For NodePorts, apply to the namespace and with the port being exposed (example with port 8080)
+kind: NetworkPolicy
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: allow-external-8080-80
+  namespace: default
+spec:
+  podSelector: {}
+  ingress:
+  - from: []
+    ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 80
+---
+# For Ingress, apply to the namespace where the Ingress was receiving "Bad Gateway" error
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ingress-to-backends
+  namespace: default
+spec:
+  podSelector: {}
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/name: traefik
+  policyTypes:
+  - Ingress

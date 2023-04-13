@@ -270,11 +270,11 @@ type mgr struct {
 }
 
 func (m *mgr) createDefaultProject(obj runtime.Object) (runtime.Object, error) {
-	return m.createProject(project.Default, v32.ClusterConditionconditionDefaultProjectCreated, obj, defaultProjectLabels)
+	return m.createProject(project.Default, v32.ClusterConditionDefaultProjectCreated, obj, defaultProjectLabels)
 }
 
 func (m *mgr) createSystemProject(obj runtime.Object) (runtime.Object, error) {
-	return m.createProject(project.System, v32.ClusterConditionconditionSystemProjectCreated, obj, systemProjectLabels)
+	return m.createProject(project.System, v32.ClusterConditionSystemProjectCreated, obj, systemProjectLabels)
 }
 
 func (m *mgr) createProject(name string, cond condition.Cond, obj runtime.Object, labels labels.Set) (runtime.Object, error) {
@@ -636,7 +636,7 @@ func (m *mgr) updateClusterAnnotationandCondition(cluster *v3.Cluster, anno stri
 		}
 		// Only log if we successfully updated the cluster
 		if updateCondition {
-			logrus.Infof("[%v] Setting InitialRolesPopulated condition on cluster %v", ctrbMGMTController, c.ClusterName)
+			logrus.Infof("[%v] Setting InitialRolesPopulated condition on cluster %v", ctrbMGMTController, cluster.Name)
 		}
 		return nil
 	}

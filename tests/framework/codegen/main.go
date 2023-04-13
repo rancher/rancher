@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	managementSchema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/rancher/rancher/tests/framework/codegen/generator"
+	managementSchema "github.com/rancher/rancher/tests/framework/pkg/schemas/management.cattle.io/v3"
 )
 
 func main() {

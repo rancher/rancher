@@ -22,8 +22,8 @@ func TestValidateURL(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "cntrl error",
-			url: "http://example.com/	abc",
+			name:    "cntrl error",
+			url:     "http://example.com/	abc",
 			wantErr: true,
 		},
 		{

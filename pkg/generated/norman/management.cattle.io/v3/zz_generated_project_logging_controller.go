@@ -43,7 +43,7 @@ func init() {
 	resource.Put(ProjectLoggingGroupVersionResource)
 }
 
-// Deprecated use v3.ProjectLogging instead
+// Deprecated: use v3.ProjectLogging instead
 type ProjectLogging = v3.ProjectLogging
 
 func NewProjectLogging(namespace, name string, obj v3.ProjectLogging) *v3.ProjectLogging {

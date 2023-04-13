@@ -43,7 +43,7 @@ func init() {
 	resource.Put(ClusterScanGroupVersionResource)
 }
 
-// Deprecated use v3.ClusterScan instead
+// Deprecated: use v3.ClusterScan instead
 type ClusterScan = v3.ClusterScan
 
 func NewClusterScan(namespace, name string, obj v3.ClusterScan) *v3.ClusterScan {

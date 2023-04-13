@@ -43,9 +43,12 @@ func Resolve(image string) string {
 }
 
 func ResolveWithCluster(image string, cluster *v3.Cluster) string {
-	reg := util.GetPrivateRepoURL(cluster)
+	if cluster == nil {
+		return image
+	}
+	reg := util.GetPrivateRegistryURL(cluster)
 	if reg != "" && !strings.HasPrefix(image, reg) {
-		//Images from Dockerhub Library repo, we add rancher prefix when using private registry
+		// Images from Dockerhub Library repo, we add rancher prefix when using private registry
 		if !strings.Contains(image, "/") {
 			image = "rancher/" + image
 		}
@@ -130,7 +133,7 @@ func setRequirementImages(osType OSType, imagesSet map[string]map[string]struct{
 	case Linux:
 		addSourceToImage(imagesSet, settings.ShellImage.Get(), coreLabel)
 		addSourceToImage(imagesSet, settings.MachineProvisionImage.Get(), coreLabel)
-		addSourceToImage(imagesSet, "busybox", coreLabel)
+		addSourceToImage(imagesSet, "rancher/mirrored-library-busybox:1.34.1", coreLabel)
 	}
 }
 

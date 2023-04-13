@@ -1,0 +1,89 @@
+{
+  "actions": {},
+  "continue": "nondeterministictoken",
+  "createTypes": {
+    "secret": "https://localhost:8443/v1/secrets"
+  },
+  "data": [
+    {
+      "actions": null,
+      "apiVersion": "v1",
+      "id": "test-ns-1/test1",
+      "kind": "Secret",
+      "links": {
+        "remove": "https://localhost:8443/v1/secrets/test-ns-1/test1",
+        "self": "https://localhost:8443/v1/secrets/test-ns-1/test1",
+        "update": "https://localhost:8443/v1/secrets/test-ns-1/test1",
+        "view": "https://localhost:8443/api/v1/namespaces/test-ns-1/secrets/test1"
+      },
+      "metadata": {
+        "name": "test1",
+        "namespace": "test-ns-1",
+        "resourceVersion": "1000",
+        "state": {
+          "message": "Resource is always ready",
+          "name": "active"
+        }
+      },
+      "type": "secret"
+    },
+    {
+      "actions": null,
+      "apiVersion": "v1",
+      "id": "test-ns-1/test2",
+      "kind": "Secret",
+      "links": {
+        "remove": "https://localhost:8443/v1/secrets/test-ns-1/test2",
+        "self": "https://localhost:8443/v1/secrets/test-ns-1/test2",
+        "update": "https://localhost:8443/v1/secrets/test-ns-1/test2",
+        "view": "https://localhost:8443/api/v1/namespaces/test-ns-1/secrets/test2"
+      },
+      "metadata": {
+        "labels": {
+          "test-label": "2"
+        },
+        "name": "test2",
+        "namespace": "test-ns-1",
+        "resourceVersion": "1000",
+        "state": {
+          "message": "Resource is always ready",
+          "name": "active"
+        }
+      },
+      "type": "secret"
+    },
+    {
+      "actions": null,
+      "apiVersion": "v1",
+      "id": "test-ns-1/test3",
+      "kind": "Secret",
+      "links": {
+        "remove": "https://localhost:8443/v1/secrets/test-ns-1/test3",
+        "self": "https://localhost:8443/v1/secrets/test-ns-1/test3",
+        "update": "https://localhost:8443/v1/secrets/test-ns-1/test3",
+        "view": "https://localhost:8443/api/v1/namespaces/test-ns-1/secrets/test3"
+      },
+      "metadata": {
+        "name": "test3",
+        "namespace": "test-ns-1",
+        "resourceVersion": "1000",
+        "state": {
+          "message": "Resource is always ready",
+          "name": "active"
+        }
+      },
+      "type": "secret"
+    }
+  ],
+  "links": {
+    "self": "https://localhost:8443/v1/secrets/test-ns-1"
+  },
+  "pagination": {
+    "first": "https://localhost:8443/v1/secrets/test-ns-1",
+    "next": "https://localhost:8443/v1/secrets/test-ns-1?continue=nondeterministictoken\u0026limit=3",
+    "partial": true
+  },
+  "resourceType": "secret",
+  "revision": "100",
+  "type": "collection"
+}

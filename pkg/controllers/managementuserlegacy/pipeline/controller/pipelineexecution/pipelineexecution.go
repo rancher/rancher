@@ -538,7 +538,7 @@ func (l *Lifecycle) GetName() string {
 	return "pipeline-execution-controller"
 }
 
-//reconcileRb grant access to pipeline service account inside project namespaces
+// reconcileRb grant access to pipeline service account inside project namespaces
 func (l *Lifecycle) reconcileRb(projectName string) error {
 	commonName := utils.GetPipelineCommonName(projectName)
 	_, projectID := ref.Parse(projectName)

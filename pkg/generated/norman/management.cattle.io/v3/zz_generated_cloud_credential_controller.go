@@ -43,7 +43,7 @@ func init() {
 	resource.Put(CloudCredentialGroupVersionResource)
 }
 
-// Deprecated use v3.CloudCredential instead
+// Deprecated: use v3.CloudCredential instead
 type CloudCredential = v3.CloudCredential
 
 func NewCloudCredential(namespace, name string, obj v3.CloudCredential) *v3.CloudCredential {

@@ -17,8 +17,8 @@ type GKEClusterConfig struct {
 	EnableKubernetesAlpha          *bool                           `json:"enableKubernetesAlpha,omitempty" yaml:"enableKubernetesAlpha,omitempty"`
 	IPAllocationPolicy             *IPAllocationPolicy             `json:"ipAllocationPolicy,omitempty" yaml:"ipAllocationPolicy,omitempty"`
 	KubernetesVersion              *string                         `json:"kubernetesVersion,omitempty" yaml:"kubernetesVersion,omitempty"`
-	Labels                         *map[string]string              `json:"labels,omitempty" yaml:"labels,omitempty"`
-	Locations                      *[]string                       `json:"locations,omitempty" yaml:"locations,omitempty"`
+	Labels                         map[string]string               `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Locations                      []string                        `json:"locations,omitempty" yaml:"locations,omitempty"`
 	LoggingService                 *string                         `json:"loggingService,omitempty" yaml:"loggingService,omitempty"`
 	MaintenanceWindow              *string                         `json:"maintenanceWindow,omitempty" yaml:"maintenanceWindow,omitempty"`
 	MasterAuthorizedNetworksConfig *MasterAuthorizedNetworksConfig `json:"masterAuthorizedNetworks,omitempty" yaml:"masterAuthorizedNetworks,omitempty"`
@@ -241,8 +241,8 @@ func gkeHostClusterConfig(clusterName, cloudCredentialID string) *management.GKE
 		Imported:                       false,
 		IPAllocationPolicy:             ipAllocationPolicyBuilder(gkeClusterConfig.IPAllocationPolicy),
 		KubernetesVersion:              gkeClusterConfig.KubernetesVersion,
-		Labels:                         gkeClusterConfig.Labels,
-		Locations:                      gkeClusterConfig.Locations,
+		Labels:                         &gkeClusterConfig.Labels,
+		Locations:                      &gkeClusterConfig.Locations,
 		LoggingService:                 gkeClusterConfig.LoggingService,
 		MaintenanceWindow:              gkeClusterConfig.MaintenanceWindow,
 		MasterAuthorizedNetworksConfig: masterAuthorizedNetworksConfigBuilder(*gkeClusterConfig.MasterAuthorizedNetworksConfig),

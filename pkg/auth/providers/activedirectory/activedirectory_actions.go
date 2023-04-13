@@ -74,9 +74,6 @@ func (p *adProvider) testAndApply(actionName string, action *types.Action, reque
 	if len(config.Servers) < 1 {
 		return httperror.NewAPIError(httperror.InvalidBodyContent, "must supply a server")
 	}
-	if len(config.Servers) > 1 {
-		return httperror.NewAPIError(httperror.InvalidBodyContent, "multiple servers not yet supported")
-	}
 
 	userPrincipal, groupPrincipals, err := p.loginUser(login, config, caPool, true)
 	if err != nil {
@@ -115,7 +112,7 @@ func (p *adProvider) saveActiveDirectoryConfig(config *v32.ActiveDirectoryConfig
 		return err
 	}
 
-	config.ServiceAccountPassword = common.GetName(config.Type, field)
+	config.ServiceAccountPassword = common.GetFullSecretName(config.Type, field)
 
 	logrus.Debugf("updating activeDirectoryConfig")
 	_, err = p.authConfigs.ObjectClient().Update(config.ObjectMeta.Name, config)

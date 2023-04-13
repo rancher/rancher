@@ -102,21 +102,28 @@ func (a *APIOperations) DoGet(url string, opts *types.ListOpts, respObject inter
 }
 
 func (a *APIOperations) DoList(schemaType string, opts *types.ListOpts, respObject interface{}) error {
+	collectionURL, err := a.GetCollectionURL(schemaType, "GET")
+	if err != nil {
+		return err
+	}
+	return a.DoGet(collectionURL, opts, respObject)
+}
+
+func (a *APIOperations) GetCollectionURL(schemaType, method string) (string, error) {
 	schema, ok := a.Types[schemaType]
 	if !ok {
-		return errors.New("Unknown schema type [" + schemaType + "]")
+		return "", errors.New("Unknown schema type [" + schemaType + "]")
 	}
 
-	if !contains(schema.CollectionMethods, "GET") {
-		return errors.New("Resource type [" + schemaType + "] is not listable")
+	if !contains(schema.CollectionMethods, method) {
+		return "", errors.New("Resource type [" + schemaType + "] has no method " + method)
 	}
 
 	collectionURL, ok := schema.Links["collection"]
 	if !ok {
-		return errors.New("Resource type [" + schemaType + "] does not have a collection URL")
+		return "", errors.New("Resource type [" + schemaType + "] does not have a collection URL")
 	}
-
-	return a.DoGet(collectionURL, opts, respObject)
+	return collectionURL, nil
 }
 
 func (a *APIOperations) DoNext(nextURL string, respObject interface{}) error {
@@ -200,19 +207,38 @@ func (a *APIOperations) DoCreate(schemaType string, createObj interface{}, respO
 	}
 
 	err := a.DoModify("POST", collectionURL, createObj, respObject)
+	if err != nil {
+		return err
+	}
 	v := reflect.ValueOf(respObject)
-	resource := reflect.Indirect(v).FieldByName("Resource")
+
+	var resource types.Resource
+	if v.Type().String() == "*map[string]interface {}" {
+		resourcePointer := &types.Resource{}
+		jsonResp := *(respObject.(*map[string]any))
+		if jsonResp["id"] != nil {
+			resourcePointer.ID = jsonResp["id"].(string)
+			resourcePointer.Type = jsonResp["type"].(string)
+			resourcePointer.Links = convertMap(jsonResp["links"].(map[string]any))
+			if jsonResp["actions"] != nil {
+				resourcePointer.Actions = convertMap(jsonResp["actions"].(map[string]any))
+			}
+			resource = *resourcePointer
+		}
+
+	} else {
+		resource = reflect.Indirect(v).FieldByName("Resource").Interface().(types.Resource)
+	}
 
 	a.Session.RegisterCleanupFunc(func() error {
-		obj := resource.Interface().(types.Resource)
-		err := a.DoResourceDelete(schemaType, &obj)
-		if err != nil && strings.Contains(err.Error(), "404 Not Found") {
+		err := a.DoResourceDelete(schemaType, &resource)
+		if err != nil && (strings.Contains(err.Error(), "404 Not Found") || strings.Contains(err.Error(), "failed to find self URL of [&{  map[] map[]}]")) {
 			return nil
 		}
 		return err
 	})
 
-	return err
+	return nil
 }
 
 func (a *APIOperations) DoReplace(schemaType string, existing *types.Resource, updates interface{}, respObject interface{}) error {
@@ -392,4 +418,13 @@ func (a *APIOperations) doAction(
 		return json.Unmarshal(byteContent, respObject)
 	}
 	return nil
+}
+
+func convertMap(anyMap map[string]any) map[string]string {
+	stringMap := make(map[string]string)
+	for key, value := range anyMap {
+		stringMap[key] = value.(string)
+	}
+
+	return stringMap
 }

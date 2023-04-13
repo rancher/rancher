@@ -43,7 +43,7 @@ func init() {
 	resource.Put(SecretGroupVersionResource)
 }
 
-// Deprecated use v1.Secret instead
+// Deprecated: use v1.Secret instead
 type Secret = v1.Secret
 
 func NewSecret(namespace, name string, obj v1.Secret) *v1.Secret {

@@ -17,11 +17,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-)
-
-var (
-	specialFalse = false
-	falsePointer = &specialFalse
+	"k8s.io/utils/pointer"
 )
 
 type UserAuthRefresher interface {
@@ -148,7 +144,8 @@ func (r *refresher) triggerUserRefresh(userName string, force bool) {
 
 func (r *refresher) refreshAttributes(attribs *v3.UserAttribute) (*v3.UserAttribute, error) {
 	var (
-		derivedTokens         []*v3.Token
+		derivedTokenList      []*v3.Token
+		derivedTokens         map[string][]*v3.Token
 		loginTokenList        []*v3.Token
 		loginTokens           map[string][]*v3.Token
 		canLogInAtAll         bool
@@ -163,6 +160,7 @@ func (r *refresher) refreshAttributes(attribs *v3.UserAttribute) (*v3.UserAttrib
 	}
 
 	loginTokens = make(map[string][]*v3.Token)
+	derivedTokens = make(map[string][]*v3.Token)
 
 	allTokens, err := r.tokenLister.List("", labels.Everything())
 	if err != nil {
@@ -171,6 +169,7 @@ func (r *refresher) refreshAttributes(attribs *v3.UserAttribute) (*v3.UserAttrib
 
 	for providerName := range providers.ProviderNames {
 		loginTokens[providerName] = []*v3.Token{}
+		derivedTokens[providerName] = []*v3.Token{}
 	}
 
 	for _, token := range allTokens {
@@ -179,7 +178,8 @@ func (r *refresher) refreshAttributes(attribs *v3.UserAttribute) (*v3.UserAttrib
 		}
 
 		if token.IsDerived {
-			derivedTokens = append(derivedTokens, token)
+			derivedTokens[token.AuthProvider] = append(derivedTokens[token.AuthProvider], token)
+			derivedTokenList = append(derivedTokenList, token)
 		} else {
 			loginTokens[token.AuthProvider] = append(loginTokens[token.AuthProvider], token)
 			loginTokenList = append(loginTokenList, token)
@@ -188,18 +188,19 @@ func (r *refresher) refreshAttributes(attribs *v3.UserAttribute) (*v3.UserAttrib
 
 	for providerName := range providers.ProviderNames {
 		// We have to find out if the user has a userprincipal for the provider.
-		prefix := providerName + "_user://"
-		if providerName == "local" {
-			prefix = "local://"
-		}
-		principalID := ""
-		for _, id := range user.PrincipalIDs {
-			if strings.HasPrefix(id, prefix) {
-				principalID = id
-				break
-			}
-		}
+		principalID := GetPrincipalIDForProvider(providerName, user)
 		var newGroupPrincipals []v3.Principal
+
+		providerDisabled, err := providers.IsDisabledProvider(providerName)
+		if err != nil {
+			logrus.Warnf("Unable to determine if provider %s was disabled, will assume that it isn't with error: %v", providerName, err)
+			// this is set as false by the return, but it's re-set here to be explicit/safe about the behavior
+			providerDisabled = false
+		}
+		if providerDisabled {
+			// if this auth provider has been disabled, act as though the user lost access to this provider
+			principalID = ""
+		}
 
 		// If there is no principalID for the provider, there is no reason to go through the refetch process
 		if principalID != "" {
@@ -233,14 +234,12 @@ func (r *refresher) refreshAttributes(attribs *v3.UserAttribute) (*v3.UserAttrib
 						if existingPrincipals != nil {
 							newGroupPrincipals = existingPrincipals
 						}
-						continue
+					} else {
+						// In the case that the user explicitly cannot login at all to this provider
+						// (e.g. they no longer exist) we pretend they have no principal with this provider
+						// so that their login tokens get blanked out
+						principalID = ""
 					}
-
-					// In the case that the user explicitly cannot login at all to this provider
-					// (e.g. they no longer exist) we pretend they have no principal with this provider
-					// so that their login tokens get blanked out
-					principalID = ""
-
 				}
 			}
 		}
@@ -253,7 +252,7 @@ func (r *refresher) refreshAttributes(attribs *v3.UserAttribute) (*v3.UserAttrib
 
 		canAccessProvider := false
 
-		if principalID != "" {
+		if principalID != "" && !errorConfirmingLogins {
 			// We want to verify that the user still has rancher access
 			canStillAccess, err := providers.CanAccessWithGroupProviders(providerName, principalID, newGroupPrincipals)
 			if err != nil {
@@ -266,8 +265,31 @@ func (r *refresher) refreshAttributes(attribs *v3.UserAttribute) (*v3.UserAttrib
 			}
 		}
 
+		// Update extras if either the user has an active login token, or an API token/kubeconfig token and is still active in the auth provider.
+		// If the user cannot access the auth provider, the derived tokens are deactivated below and should not be used to determine extra attributes.
+		if principalID != "" && (len(loginTokens[providerName]) > 0 || (len(derivedTokens[providerName]) > 0 && (canAccessProvider || errorConfirmingLogins))) {
+			// A user is 1:1 with its principal for a given provider, no need to get principals from tokens beyond the first one
+			var token v3.Token
+			if len(loginTokens[providerName]) > 0 {
+				token = *loginTokens[providerName][0]
+			} else {
+				token = *derivedTokens[providerName][0]
+			}
+			userPrincipal, err := providers.GetPrincipal(principalID, token)
+			if err != nil {
+				return nil, err
+			}
+			userExtraInfo := providers.GetUserExtraAttributes(providerName, userPrincipal)
+			if userExtraInfo != nil {
+				if attribs.ExtraByProvider == nil {
+					attribs.ExtraByProvider = make(map[string]map[string][]string)
+				}
+				attribs.ExtraByProvider[providerName] = userExtraInfo
+			}
+		}
+
 		// If the user doesn't have access through this provider, we want to remove their login tokens for this provider
-		if !canAccessProvider {
+		if !canAccessProvider && !errorConfirmingLogins {
 			for _, token := range loginTokens[providerName] {
 				err := r.tokens.Delete(token.Name, &metav1.DeleteOptions{})
 				if err != nil {
@@ -285,13 +307,29 @@ func (r *refresher) refreshAttributes(attribs *v3.UserAttribute) (*v3.UserAttrib
 		return attribs, nil
 	}
 
-	for _, token := range derivedTokens {
-		token.Enabled = falsePointer
+	// user has been deactivated, disable their tokens
+	for _, token := range derivedTokenList {
+		token = token.DeepCopy()
+		token.Enabled = pointer.Bool(false)
 		_, err := r.tokenMGR.UpdateToken(token)
 		if err != nil {
 			return nil, err
 		}
 	}
+	return attribs, err
+}
 
-	return attribs, nil
+func GetPrincipalIDForProvider(providerName string, user *v3.User) string {
+	prefix := providerName + "_user://"
+	if providerName == "local" {
+		prefix = "local://"
+	}
+	principalID := ""
+	for _, id := range user.PrincipalIDs {
+		if strings.HasPrefix(id, prefix) {
+			principalID = id
+			break
+		}
+	}
+	return principalID
 }

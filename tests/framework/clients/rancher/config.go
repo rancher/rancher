@@ -5,11 +5,12 @@ const ConfigurationFileKey = "rancher"
 
 // Config is configuration need to test against a rancher instance
 type Config struct {
-	Host        string `yaml:"host"`
-	AdminToken  string `yaml:"adminToken"`
-	Insecure    *bool  `yaml:"insecure" default:"true"`
-	Cleanup     *bool  `yaml:"cleanup" default:"true"`
-	CAFile      string `yaml:"caFile" default:""`
-	CACerts     string `yaml:"caCerts" default:""`
-	ClusterName string `yaml:"clusterName" default:""`
+	Host          string `yaml:"host"`
+	AdminToken    string `yaml:"adminToken"`
+	AdminPassword string `yaml:"adminPassword"`
+	Insecure      *bool  `yaml:"insecure" default:"true"`
+	Cleanup       *bool  `yaml:"cleanup" default:"true"`
+	CAFile        string `yaml:"caFile" default:""`
+	CACerts       string `yaml:"caCerts" default:""`
+	ClusterName   string `yaml:"clusterName" default:""`
 }

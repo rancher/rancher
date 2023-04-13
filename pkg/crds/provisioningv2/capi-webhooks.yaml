@@ -366,3 +366,71 @@ webhooks:
     resources:
     - clusterresourcesets
   sideEffects: None
+- admissionReviewVersions:
+    - v1
+    - v1beta1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-ipam-cluster-x-k8s-io-v1alpha1-ipaddress
+  failurePolicy: Fail
+  matchPolicy: Equivalent
+  name: validation.ipaddress.ipam.cluster.x-k8s.io
+  rules:
+    - apiGroups:
+        - ipam.cluster.x-k8s.io
+      apiVersions:
+        - v1alpha1
+      operations:
+        - CREATE
+        - UPDATE
+        - DELETE
+      resources:
+        - ipaddresses
+  sideEffects: None
+- admissionReviewVersions:
+    - v1
+    - v1beta1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-ipam-cluster-x-k8s-io-v1alpha1-ipaddressclaim
+  failurePolicy: Fail
+  matchPolicy: Equivalent
+  name: validation.ipaddressclaim.ipam.cluster.x-k8s.io
+  rules:
+    - apiGroups:
+        - ipam.cluster.x-k8s.io
+      apiVersions:
+        - v1alpha1
+      operations:
+        - CREATE
+        - UPDATE
+        - DELETE
+      resources:
+        - ipaddressclaims
+  sideEffects: None
+- admissionReviewVersions:
+    - v1
+    - v1beta1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /mutate-runtime-cluster-x-k8s-io-v1alpha1-extensionconfig
+  failurePolicy: Fail
+  matchPolicy: Equivalent
+  name: default.extensionconfig.runtime.addons.cluster.x-k8s.io
+  rules:
+    - apiGroups:
+        - runtime.cluster.x-k8s.io
+      apiVersions:
+        - v1alpha1
+      operations:
+        - CREATE
+        - UPDATE
+      resources:
+        - extensionconfigs
+  sideEffects: None

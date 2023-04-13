@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/url"
 	"sort"
 	"strconv"
@@ -420,7 +421,7 @@ func (p *PlanStore) setMachineJoinURL(entry *planEntry, capiCluster *capi.Cluste
 			}
 		}
 
-		joinURL = fmt.Sprintf("https://%s:%d", address, rke2.GetRuntimeSupervisorPort(rkeControlPlane.Spec.KubernetesVersion))
+		joinURL = joinURLFromAddress(address, rke2.GetRuntimeSupervisorPort(rkeControlPlane.Spec.KubernetesVersion))
 	}
 
 	if joinURL != "" && entry.Metadata.Annotations[rke2.JoinURLAnnotation] != joinURL {
@@ -433,6 +434,16 @@ func (p *PlanStore) setMachineJoinURL(entry *planEntry, capiCluster *capi.Cluste
 	}
 
 	return nil
+}
+
+func joinURLFromAddress(address string, port int) string {
+	// ipv6 addresses need to be enclosed in brackets in URLs, and hostnames will fail to be parsed as IPs
+	if net.ParseIP(address) != nil && strings.Count(address, ":") >= 2 {
+		if !strings.HasPrefix(address, "[") && !strings.HasSuffix(address, "]") {
+			address = fmt.Sprintf("[%s]", address)
+		}
+	}
+	return fmt.Sprintf("https://%s:%d", address, port)
 }
 
 func getJoinURLFromOutput(entry *planEntry, capiCluster *capi.Cluster, rkeControlPlane *rkev1.RKEControlPlane) (string, error) {
@@ -480,7 +491,8 @@ func getJoinURLFromOutput(entry *planEntry, capiCluster *capi.Cluster, rkeContro
 			return "", err
 		}
 
-		return fmt.Sprintf("https://%s:%d", u.Hostname(), rke2.GetRuntimeSupervisorPort(rkeControlPlane.Spec.KubernetesVersion)), nil
+		joinURL := joinURLFromAddress(u.Hostname(), rke2.GetRuntimeSupervisorPort(rkeControlPlane.Spec.KubernetesVersion))
+		return joinURL, nil
 	}
 
 	// No need to error here because once the plan secret is updated, then this will be retried.

@@ -10,11 +10,11 @@ import (
 	"time"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator/assemblers"
 
 	"github.com/pkg/errors"
 	"github.com/prometheus/common/model"
 	"github.com/rancher/norman/controller"
-	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/alert/common"
 	alertconfig "github.com/rancher/rancher/pkg/controllers/managementuserlegacy/alert/config"
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/alert/deployer"
@@ -117,8 +117,8 @@ func (d *ConfigSyncer) NotifierSync(key string, alert *v3.Notifier) (runtime.Obj
 	return nil, d.sync()
 }
 
-//sync: update the secret which store the configuration of alertmanager given the latest configured notifiers and alerts rules.
-//For each alert, it will generate a route and a receiver in the alertmanager's configuration file, for metric rules it will update operator crd also.
+// sync: update the secret which store the configuration of alertmanager given the latest configured notifiers and alerts rules.
+// For each alert, it will generate a route and a receiver in the alertmanager's configuration file, for metric rules it will update operator crd also.
 func (d *ConfigSyncer) sync() error {
 	project, err := project.GetSystemProject(d.clusterName, d.projectLister)
 	if err != nil {
@@ -516,7 +516,7 @@ func (d *ConfigSyncer) addRecipients(notifiers []*v3.Notifier, receiver *alertco
 				receiverExist = true
 
 			} else if notifier.Spec.WechatConfig != nil {
-				notifierSpec, err := secretmigrator.AssembleWechatCredential(notifier, d.secretLister)
+				notifierSpec, err := assemblers.AssembleWechatCredential(notifier, d.secretLister)
 				if err != nil {
 					logrus.Errorf("error getting Wechat credential: %v", err)
 					continue
@@ -629,7 +629,7 @@ func (d *ConfigSyncer) addRecipients(notifiers []*v3.Notifier, receiver *alertco
 			} else if notifier.Spec.SMTPConfig != nil {
 				header := map[string]string{}
 				header["Subject"] = `{{ template "rancher.title" . }}`
-				notifierSpec, err := secretmigrator.AssembleSMTPCredential(notifier, d.secretLister)
+				notifierSpec, err := assemblers.AssembleSMTPCredential(notifier, d.secretLister)
 				if err != nil {
 					logrus.Errorf("error getting SMTP credential: %v", err)
 					continue
@@ -757,7 +757,7 @@ func (d *ConfigSyncer) syncWebhookConfig(notifiers []*v3.Notifier, cAlertGroupsM
 					Type:       DingTalk,
 					WebHookURL: notifier.Spec.DingtalkConfig.URL,
 				}
-				notifierSpec, err := secretmigrator.AssembleDingtalkCredential(notifier, d.secretLister)
+				notifierSpec, err := assemblers.AssembleDingtalkCredential(notifier, d.secretLister)
 				if err != nil {
 					return err
 				}

@@ -1,5 +1,5 @@
 /*
-Copyright 2022 Rancher Labs, Inc.
+Copyright 2023 Rancher Labs, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import (
 
 	catalogv1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/catalog.cattle.io/v1"
 	provisioningv1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/provisioning.cattle.io/v1"
+	rkev1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/rke.cattle.io/v1"
 	upgradev1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/upgrade.cattle.io/v1"
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
@@ -34,6 +35,7 @@ type Interface interface {
 	Discovery() discovery.DiscoveryInterface
 	CatalogV1() catalogv1.CatalogV1Interface
 	ProvisioningV1() provisioningv1.ProvisioningV1Interface
+	RkeV1() rkev1.RkeV1Interface
 	UpgradeV1() upgradev1.UpgradeV1Interface
 }
 
@@ -43,6 +45,7 @@ type Clientset struct {
 	*discovery.DiscoveryClient
 	catalogV1      *catalogv1.CatalogV1Client
 	provisioningV1 *provisioningv1.ProvisioningV1Client
+	rkeV1          *rkev1.RkeV1Client
 	upgradeV1      *upgradev1.UpgradeV1Client
 }
 
@@ -54,6 +57,11 @@ func (c *Clientset) CatalogV1() catalogv1.CatalogV1Interface {
 // ProvisioningV1 retrieves the ProvisioningV1Client
 func (c *Clientset) ProvisioningV1() provisioningv1.ProvisioningV1Interface {
 	return c.provisioningV1
+}
+
+// RkeV1 retrieves the RkeV1Client
+func (c *Clientset) RkeV1() rkev1.RkeV1Interface {
+	return c.rkeV1
 }
 
 // UpgradeV1 retrieves the UpgradeV1Client
@@ -76,6 +84,10 @@ func (c *Clientset) Discovery() discovery.DiscoveryInterface {
 // where httpClient was generated with rest.HTTPClientFor(c).
 func NewForConfig(c *rest.Config) (*Clientset, error) {
 	configShallowCopy := *c
+
+	if configShallowCopy.UserAgent == "" {
+		configShallowCopy.UserAgent = rest.DefaultKubernetesUserAgent()
+	}
 
 	// share the transport between all clients
 	httpClient, err := rest.HTTPClientFor(&configShallowCopy)
@@ -109,6 +121,10 @@ func NewForConfigAndClient(c *rest.Config, httpClient *http.Client) (*Clientset,
 	if err != nil {
 		return nil, err
 	}
+	cs.rkeV1, err = rkev1.NewForConfigAndClient(&configShallowCopy, httpClient)
+	if err != nil {
+		return nil, err
+	}
 	cs.upgradeV1, err = upgradev1.NewForConfigAndClient(&configShallowCopy, httpClient)
 	if err != nil {
 		return nil, err
@@ -136,6 +152,7 @@ func New(c rest.Interface) *Clientset {
 	var cs Clientset
 	cs.catalogV1 = catalogv1.New(c)
 	cs.provisioningV1 = provisioningv1.New(c)
+	cs.rkeV1 = rkev1.New(c)
 	cs.upgradeV1 = upgradev1.New(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)

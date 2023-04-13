@@ -16,7 +16,9 @@ const (
 	NodeTemplateSpecFieldEngineOpt                = "engineOpt"
 	NodeTemplateSpecFieldEngineRegistryMirror     = "engineRegistryMirror"
 	NodeTemplateSpecFieldEngineStorageDriver      = "engineStorageDriver"
+	NodeTemplateSpecFieldLogOpt                   = "logOpt"
 	NodeTemplateSpecFieldNodeTaints               = "nodeTaints"
+	NodeTemplateSpecFieldStorageOpt               = "storageOpt"
 	NodeTemplateSpecFieldUseInternalIPAddress     = "useInternalIpAddress"
 )
 
@@ -35,6 +37,8 @@ type NodeTemplateSpec struct {
 	EngineOpt                map[string]string `json:"engineOpt,omitempty" yaml:"engineOpt,omitempty"`
 	EngineRegistryMirror     []string          `json:"engineRegistryMirror,omitempty" yaml:"engineRegistryMirror,omitempty"`
 	EngineStorageDriver      string            `json:"engineStorageDriver,omitempty" yaml:"engineStorageDriver,omitempty"`
+	LogOpt                   map[string]string `json:"logOpt,omitempty" yaml:"logOpt,omitempty"`
 	NodeTaints               []Taint           `json:"nodeTaints,omitempty" yaml:"nodeTaints,omitempty"`
+	StorageOpt               map[string]string `json:"storageOpt,omitempty" yaml:"storageOpt,omitempty"`
 	UseInternalIPAddress     *bool             `json:"useInternalIpAddress,omitempty" yaml:"useInternalIpAddress,omitempty"`
 }

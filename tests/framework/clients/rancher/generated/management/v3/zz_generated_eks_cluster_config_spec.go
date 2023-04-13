@@ -27,7 +27,7 @@ type EKSClusterConfigSpec struct {
 	KmsKey                 *string            `json:"kmsKey,omitempty" yaml:"kmsKey,omitempty"`
 	KubernetesVersion      *string            `json:"kubernetesVersion,omitempty" yaml:"kubernetesVersion,omitempty"`
 	LoggingTypes           *[]string          `json:"loggingTypes,omitempty" yaml:"loggingTypes,omitempty"`
-	NodeGroups             *[]NodeGroup       `json:"nodeGroups,omitempty" yaml:"nodeGroups,omitempty"`
+	NodeGroups             []NodeGroup        `json:"nodeGroups,omitempty" yaml:"nodeGroups,omitempty"`
 	PrivateAccess          *bool              `json:"privateAccess,omitempty" yaml:"privateAccess,omitempty"`
 	PublicAccess           *bool              `json:"publicAccess,omitempty" yaml:"publicAccess,omitempty"`
 	PublicAccessSources    *[]string          `json:"publicAccessSources,omitempty" yaml:"publicAccessSources,omitempty"`

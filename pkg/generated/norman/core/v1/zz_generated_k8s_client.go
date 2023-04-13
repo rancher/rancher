@@ -3,6 +3,7 @@ package v1
 import (
 	"github.com/rancher/lasso/pkg/client"
 	"github.com/rancher/lasso/pkg/controller"
+	"github.com/rancher/norman/generator"
 	"github.com/rancher/norman/objectclient"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -36,18 +37,28 @@ func NewForConfig(cfg rest.Config) (Interface, error) {
 	if err := v1.AddToScheme(scheme); err != nil {
 		return nil, err
 	}
-	controllerFactory, err := controller.NewSharedControllerFactoryFromConfig(&cfg, scheme)
+	sharedOpts := &controller.SharedControllerFactoryOptions{
+		SyncOnlyChangedObjects: generator.SyncOnlyChangedObjects(),
+	}
+	controllerFactory, err := controller.NewSharedControllerFactoryFromConfigWithOptions(&cfg, scheme, sharedOpts)
 	if err != nil {
 		return nil, err
 	}
-	return NewFromControllerFactory(controllerFactory)
+	return NewFromControllerFactory(controllerFactory), nil
 }
 
-func NewFromControllerFactory(factory controller.SharedControllerFactory) (Interface, error) {
+func NewFromControllerFactory(factory controller.SharedControllerFactory) Interface {
 	return &Client{
 		controllerFactory: factory,
 		clientFactory:     factory.SharedCacheFactory().SharedClientFactory(),
-	}, nil
+	}
+}
+
+func NewFromControllerFactoryWithAgent(userAgent string, factory controller.SharedControllerFactory) Interface {
+	return &Client{
+		controllerFactory: factory,
+		clientFactory:     client.NewSharedClientFactoryWithAgent(userAgent, factory.SharedCacheFactory().SharedClientFactory()),
+	}
 }
 
 type NodesGetter interface {

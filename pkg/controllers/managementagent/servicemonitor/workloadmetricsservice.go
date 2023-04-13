@@ -31,7 +31,7 @@ func (c *MetricsServiceController) createService(key string, w *util.Workload) e
 	return c.ReconcileServiceMonitor(w)
 }
 
-//ReconcileServiceMonitor Workloads to ServiceMonitor
+// ReconcileServiceMonitor Workloads to ServiceMonitor
 func (c *MetricsServiceController) ReconcileServiceMonitor(w *util.Workload) error {
 	expectedServiceMonitor, err := getServiceMonitorFromWorkload(w)
 	if err != nil {

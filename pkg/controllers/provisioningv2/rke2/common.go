@@ -2,6 +2,8 @@ package rke2
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"regexp"
@@ -16,12 +18,18 @@ import (
 	"github.com/rancher/rancher/pkg/channelserver"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
 	rkecontroller "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/serviceaccounttoken"
 	"github.com/rancher/wrangler/pkg/condition"
+	"github.com/rancher/wrangler/pkg/data"
+	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/pkg/generic"
 	"github.com/rancher/wrangler/pkg/name"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	capierrors "sigs.k8s.io/cluster-api/errors"
 )
@@ -77,8 +85,6 @@ const (
 	Waiting             = condition.Cond("Waiting")
 	Pending             = condition.Cond("Pending")
 	Removed             = condition.Cond("Removed")
-	AgentDeployed       = condition.Cond("AgentDeployed")
-	AgentConnected      = condition.Cond("Connected")
 	PlanApplied         = condition.Cond("PlanApplied")
 	InfrastructureReady = condition.Cond(capi.InfrastructureReadyCondition)
 
@@ -87,12 +93,15 @@ const (
 
 	RoleBootstrap = "bootstrap"
 	RolePlan      = "plan"
+
+	MaxHelmReleaseNameLength = 53
 )
 
 var (
-	ErrNoMachineOwnerRef = errors.New("no machine owner ref")
-	labelAnnotationMatch = regexp.MustCompile(`^((rke\.cattle\.io)|((?:machine\.)?cluster\.x-k8s\.io))/`)
-	windowsDrivers       = map[string]struct{}{
+	ErrNoMachineOwnerRef            = errors.New("no machine owner ref")
+	ErrNoMatchingControllerOwnerRef = errors.New("no matching controller owner ref")
+	labelAnnotationMatch            = regexp.MustCompile(`^((rke\.cattle\.io)|((?:machine\.)?cluster\.x-k8s\.io))/`)
+	windowsDrivers                  = map[string]struct{}{
 		"vmwarevsphere": {},
 	}
 )
@@ -195,23 +204,50 @@ func IsOwnedByMachine(bootstrapCache rkecontroller.RKEBootstrapCache, machineNam
 	return false, nil
 }
 
-// GetServiceAccountSecretNames will return the plan secret name and service account token names
-func GetServiceAccountSecretNames(bootstrapCache rkecontroller.RKEBootstrapCache, machineName string, planSA *corev1.ServiceAccount) (string, string, error) {
+// PlanSACheck checks the given plan service account to ensure that it matches the machine that is passed,
+// and makes sure that the plan service account is owned by the machine in question.
+func PlanSACheck(bootstrapCache rkecontroller.RKEBootstrapCache, machineName string, planSA *corev1.ServiceAccount) error {
+	if planSA == nil {
+		return fmt.Errorf("planSA was nil during planSA check for machineName %s", machineName)
+	}
+	if machineName == "" {
+		return fmt.Errorf("planSA %s/%s compared machine name was blank", planSA.Namespace, planSA.Name)
+	}
 	if planSA.Labels[MachineNameLabel] != machineName ||
 		planSA.Labels[RoleLabel] != RolePlan ||
 		planSA.Labels[PlanSecret] == "" {
-		return "", "", nil
+		return fmt.Errorf("planSA %s/%s does not have correct labels", planSA.Namespace, planSA.Name)
 	}
-
-	if len(planSA.Secrets) == 0 {
-		return "", "", nil
+	if foundParent, err := IsOwnedByMachine(bootstrapCache, machineName, planSA); err != nil {
+		return err
+	} else if !foundParent {
+		return fmt.Errorf("planSA %s/%s no parent found for planSA, was not owned by machine %s", planSA.Namespace, planSA.Name, machineName)
 	}
+	return nil
+}
 
-	if foundParent, err := IsOwnedByMachine(bootstrapCache, machineName, planSA); err != nil || !foundParent {
-		return "", "", err
+// GetPlanSecretName will return the plan secret name that is assigned to the plan service account
+func GetPlanSecretName(planSA *corev1.ServiceAccount) (string, error) {
+	if planSA == nil {
+		return "", fmt.Errorf("planSA was nil")
 	}
+	if planSA.Labels[PlanSecret] == "" {
+		return "", fmt.Errorf("planSA %s/%s plan secret label was not set", planSA.Namespace, planSA.Name)
+	}
+	return planSA.Labels[PlanSecret], nil
+}
 
-	return planSA.Labels[PlanSecret], planSA.Secrets[0].Name, nil
+// GetPlanServiceAccountTokenSecret retrieves the secret that corresponds to the plan service account that is passed in. It will create a secret if one does not
+// already exist for the plan service account.
+func GetPlanServiceAccountTokenSecret(secretClient corecontrollers.SecretController, k8s kubernetes.Interface, planSA *corev1.ServiceAccount) (*corev1.Secret, bool, error) {
+	if planSA == nil {
+		return nil, false, fmt.Errorf("planSA was nil")
+	}
+	secret, err := serviceaccounttoken.EnsureSecretForServiceAccount(context.Background(), secretClient.Cache().Get, k8s, planSA)
+	if err != nil {
+		return nil, false, fmt.Errorf("error ensuring secret for service account [%s:%s]: %w", planSA.Namespace, planSA.Name, err)
+	}
+	return secret, true, nil
 }
 
 func PlanSecretFromBootstrapName(bootstrapName string) string {
@@ -339,4 +375,126 @@ func SortedKeys(m map[string]interface{}) []string {
 	}
 	sort.Strings(keys)
 	return keys
+}
+
+var errNilObject = errors.New("cannot get capi cluster for nil object")
+
+// GetCAPIClusterFromLabel takes a runtime.Object and will attempt to find the label denoting which capi cluster it
+// belongs to.
+// If the object is nil, it cannot access to object or type metas, or the label is not present, it returns an error.
+// If the object has the expected label, it will return the capi cluster object.
+func GetCAPIClusterFromLabel(obj runtime.Object, cache capicontrollers.ClusterCache) (*capi.Cluster, error) {
+	if obj == nil {
+		return nil, errNilObject
+	}
+	data, err := data.Convert(obj)
+	if err != nil {
+		return nil, err
+	}
+	clusterName := data.String("metadata", "labels", capi.ClusterLabelName)
+	if clusterName != "" {
+		return cache.Get(data.String("metadata", "namespace"), clusterName)
+	}
+	return nil, fmt.Errorf("%s label not present on %s: %s/%s", capi.ClusterLabelName, obj.GetObjectKind().GroupVersionKind().Kind, data.String("metadata", "namespace"), data.String("metadata", "name"))
+}
+
+// GetOwnerCAPICluster takes an obj and will attempt to find the capi cluster owner reference.
+// If the object is nil, it cannot access to object or type metas, the owner reference Kind or APIVersion do not match,
+// or the object could not be found, it returns an error.
+// If the owner reference exists and is valid, it will return the owning capi cluster object.
+func GetOwnerCAPICluster(obj runtime.Object, cache capicontrollers.ClusterCache) (*capi.Cluster, error) {
+	ref, namespace, err := GetOwnerFromGVK(capi.GroupVersion.String(), "Cluster", obj)
+	if err != nil {
+		return nil, err
+	}
+	return cache.Get(namespace, ref.Name)
+}
+
+// GetOwnerCAPIMachine takes an obj and will attempt to find the capi machine owner reference.
+// If the object is nil, it cannot access to object or type metas, the owner reference Kind or APIVersion do not match,
+// or the object could not be found, it returns an error.
+// If the owner reference exists and is valid, it will return the owning capi machine object.
+func GetOwnerCAPIMachine(obj runtime.Object, cache capicontrollers.MachineCache) (*capi.Machine, error) {
+	ref, namespace, err := GetOwnerFromGVK(capi.GroupVersion.String(), "Machine", obj)
+	if err != nil {
+		return nil, err
+	}
+	return cache.Get(namespace, ref.Name)
+}
+
+// GetOwnerCAPIMachineSet takes an obj and will attempt to find the capi machine set owner reference.
+// If the object is nil, it cannot access to object or type metas, the owner reference Kind or APIVersion do not match,
+// or the object could not be found, it returns an error.
+// If the owner reference exists and is valid, it will return the owning capi machine object.
+func GetOwnerCAPIMachineSet(obj runtime.Object, cache capicontrollers.MachineSetCache) (*capi.MachineSet, error) {
+	ref, namespace, err := GetOwnerFromGVK(capi.GroupVersion.String(), "MachineSet", obj)
+	if err != nil {
+		return nil, err
+	}
+	return cache.Get(namespace, ref.Name)
+}
+
+// GetOwnerFromGVK takes a runtime.Object, and will search for a controlling owner reference of kind apiVersion.
+// If the object is nil, it cannot access to object or type metas, the owner reference Kind or APIVersion do not match,
+// or the object could not be found, it returns an ErrNoMatchingControllerOwnerRef error.
+// If the owner reference exists and is valid, it will return the owner reference and the namespace it belongs to.
+func GetOwnerFromGVK(groupVersion, kind string, obj runtime.Object) (*metav1.OwnerReference, string, error) {
+	if obj == nil {
+		return nil, "", errNilObject
+	}
+	objMeta, err := meta.Accessor(obj)
+	if err != nil {
+		return nil, "", err
+	}
+	ref := metav1.GetControllerOf(objMeta)
+	if ref == nil || ref.Kind != kind || ref.APIVersion != groupVersion {
+		return nil, "", ErrNoMatchingControllerOwnerRef
+	}
+	return ref, objMeta.GetNamespace(), nil
+}
+
+// SafeConcatName takes a maximum length and set of strings, it returns a string
+// representing the concatenation of the given strings which is at most maxLength long.
+// If a given set of strings exceeds the maxLength parameter, the concatenated string will be truncated and
+// a hash will be appended so that the result is at most maxLength long.
+// If the maxLength parameter is equal to or less than 5, the string will simply be shortened with no additional hash added.
+// TODO; move this updated logic into wrangler, where it belongs.
+func SafeConcatName(maxLength int, name ...string) string {
+
+	hashLength := 6
+
+	fullPath := strings.Join(name, "-")
+	if len(fullPath) <= maxLength {
+		return fullPath
+	}
+
+	if maxLength == 0 {
+		return ""
+	}
+
+	if maxLength <= 5 {
+		return fullPath[:maxLength]
+	}
+
+	digest := sha256.Sum256([]byte(fullPath))
+
+	// since we index the string in the middle, the last char may not be compatible with what is expected in k8s
+	// we are checking and if necessary removing the last char
+	trailingCharacterIndex := maxLength - (hashLength + 1)
+	if trailingCharacterIndex < 0 {
+		trailingCharacterIndex = 0
+	}
+	c := fullPath[trailingCharacterIndex]
+
+	if 'a' <= c && c <= 'z' || '0' <= c && c <= '9' {
+		remainingString := fullPath[0 : maxLength-(hashLength)]
+		hash := hex.EncodeToString(digest[0:])[0 : hashLength-1]
+		if remainingString == "" {
+			// if we've completely converted the input into a hash don't append '-'
+			return hash
+		}
+		return remainingString + "-" + hash
+	}
+
+	return fullPath[0:maxLength-(hashLength+1)] + "-" + hex.EncodeToString(digest[0:])[0:hashLength]
 }

@@ -40,6 +40,7 @@ AWS_VOLUME_SIZE = os.environ.get("AWS_VOLUME_SIZE", "8")
 RANCHER_RHEL_USERNAME = os.environ.get("RANCHER_RHEL_USERNAME")
 RANCHER_RHEL_PASSWORD = os.environ.get("RANCHER_RHEL_PASSWORD")
 K3S_CREATE_LB = os.environ.get("K3S_CREATE_LB", False)
+RANCHER_ENFORCE_MODE = os.environ.get("RANCHER_ENFORCE_MODE", "privileged")
 
 
 def test_create_k3s_single_control_cluster():
@@ -144,6 +145,7 @@ def create_multiple_control_cluster():
                               'aws_user': RANCHER_AWS_USER,
                               'resource_name': RANCHER_HOSTNAME_PREFIX,
                               'access_key': keyPath,
+                              'access_key_name': AWS_SSH_KEY_NAME.replace(".pem", ""),
                               'external_db': RANCHER_EXTERNAL_DB,
                               'external_db_version': RANCHER_EXTERNAL_DB_VERSION,
                               'db_group_name': RANCHER_DB_GROUP_NAME,
@@ -165,7 +167,8 @@ def create_multiple_control_cluster():
                               'environment': RANCHER_RDS_ENVIRONMENT,
                               'cluster_type': RANCHER_CLUSTER_TYPE,
                               'volume_size': AWS_VOLUME_SIZE,
-                              'create_lb': str(K3S_CREATE_LB).lower()})
+                              'create_lb': str(K3S_CREATE_LB).lower(),
+                              'enforce_mode': RANCHER_ENFORCE_MODE})
     print("Creating cluster")
     tf.init()
     tf.plan(out="plan_server.out")
@@ -184,6 +187,7 @@ def create_multiple_control_cluster():
                                   'ec2_instance_class': RANCHER_EC2_INSTANCE_CLASS,
                                   'resource_name': RANCHER_HOSTNAME_PREFIX,
                                   'access_key': keyPath,
+                                  'access_key_name': AWS_SSH_KEY_NAME.replace(".pem", ""),
                                   'k3s_version': RANCHER_K3S_VERSION,
                                   'k3s_channel': K3S_CHANNEL,
                                   'no_of_worker_nodes': int(RANCHER_K3S_NO_OF_WORKER_NODES),

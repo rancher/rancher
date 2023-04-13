@@ -78,6 +78,47 @@ func NewPodConfig(clients *clients.Clients, namespace string) (*corev1.ObjectRef
 	podConfig.SetNamespace(namespace)
 	podConfig.SetGenerateName("pod-config-")
 	podConfig.Object["image"] = defaults.PodTestImage
+	// We are providing custom userdata to force K3s/RKE2 to use the cgroupfs cgroup driver, rather than systemd
+	// We must also drop-in replace the type of service for systemd as we are clearing the notify socket which would
+	// normally cause systemd to hang waiting for the unit to activate. Eventually, when
+	// https://github.com/rancher/rke2/issues/3240 is resolved, we should be able to roll back this workaround. If the
+	// linked github issue is resolved, we should roll back this change here as well as in
+	// tests/integration/pkg/systemdnode.
+	podConfig.Object["userdata"] = `#cloud-config
+write_files:
+- content: |
+    [Service]
+    Type=exec
+  path: /etc/systemd/system/rke2-server.service.d/10-delegate.conf
+- content: |
+    [Service]
+    Type=exec
+  path: /etc/systemd/system/rke2-agent.service.d/10-delegate.conf
+- content: |
+    [Service]
+    Type=exec
+  path: /etc/systemd/system/k3s.service.d/10-delegate.conf
+- content: |
+    [Service]
+    Type=exec
+  path: /etc/systemd/system/k3s-agent.service.d/10-delegate.conf
+- content: |
+    NOTIFY_SOCKET=
+    INVOCATION_ID=
+  path: /etc/default/rke2-server
+- content: |
+    NOTIFY_SOCKET=
+    INVOCATION_ID=
+  path: /etc/default/rke2-agent
+- content: |
+    NOTIFY_SOCKET=
+    INVOCATION_ID=
+  path: /etc/default/k3s
+- content: |
+    NOTIFY_SOCKET=
+    INVOCATION_ID=
+  path: /etc/default/k3s-agent`
+
 	podConfigClient := clients.Dynamic.Resource(schema.GroupVersionResource{
 		Group:    "rke-machine-config.cattle.io",
 		Version:  "v1",

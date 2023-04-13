@@ -1,1 +1,1 @@
-Integration scripts for Rancher
+Integration Tests

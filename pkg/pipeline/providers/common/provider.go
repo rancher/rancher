@@ -39,6 +39,7 @@ type BaseProvider struct {
 	NamespaceLister            v1.NamespaceLister
 	Namespaces                 v1.NamespaceInterface
 	ClusterLister              mv3.ClusterLister
+	SecretLister               v1.SecretLister
 	SecretMigrator             *secretmigrator.Migrator
 
 	PipelineIndexer             cache.Indexer

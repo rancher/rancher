@@ -13,6 +13,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types/set"
 	"github.com/rancher/rancher/pkg/peermanager"
+	"github.com/rancher/rancher/pkg/serviceaccounttoken"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/remotedialer"
 	"github.com/rancher/wrangler/pkg/data"
@@ -76,16 +77,11 @@ func getTokenFromToken(ctx context.Context, tokenBytes []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	if len(sa.Secrets) == 0 {
-		return nil, fmt.Errorf("no secret assigned to service account %s/%s", ns, name)
-	}
-
-	secret, err := client.CoreV1().Secrets(ns).Get(ctx, sa.Secrets[0].Name, metav1.GetOptions{})
+	secret, err := serviceaccounttoken.EnsureSecretForServiceAccount(ctx, nil, client, sa)
 	if err != nil {
 		return nil, err
 	}
-
-	return secret.Data["token"], nil
+	return secret.Data[v1.ServiceAccountTokenKey], nil
 }
 
 func startPeerManager(ctx context.Context, endpoints corecontrollers.EndpointsController, server *remotedialer.Server) (peermanager.PeerManager, error) {

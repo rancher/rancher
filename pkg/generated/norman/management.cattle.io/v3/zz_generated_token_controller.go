@@ -42,7 +42,7 @@ func init() {
 	resource.Put(TokenGroupVersionResource)
 }
 
-// Deprecated use v3.Token instead
+// Deprecated: use v3.Token instead
 type Token = v3.Token
 
 func NewToken(namespace, name string, obj v3.Token) *v3.Token {

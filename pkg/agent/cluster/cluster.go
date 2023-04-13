@@ -11,6 +11,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/namespace"
+	"github.com/rancher/rancher/pkg/serviceaccounttoken"
 	"github.com/rancher/wrangler/pkg/kubeconfig"
 	coreV1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -61,14 +62,23 @@ func getTokenFromAPI() ([]byte, []byte, error) {
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to find service account %s/%s: %w", namespace.System, "cattle", err)
 	}
-	if len(sa.Secrets) == 0 {
-		return nil, nil, fmt.Errorf("no secret exists for service account %s/%s", namespace.System, "cattle")
-	}
-	secret, err := k8s.CoreV1().Secrets(namespace.System).Get(context.Background(), sa.Secrets[0].Name, metav1.GetOptions{})
+	cm, err := k8s.CoreV1().ConfigMaps(namespace.System).Get(context.Background(), "kube-root-ca.crt", metav1.GetOptions{})
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to find secret for service account %s/%s: %w", namespace.System, "cattle", err)
+		// kube-root-ca configmap is not created by upstream for k8s <1.20, read from secret as before
+		if len(sa.Secrets) == 0 {
+			return nil, nil, fmt.Errorf("no secret exists for service account %s/%s", namespace.System, "cattle")
+		}
+		secret, err := k8s.CoreV1().Secrets(namespace.System).Get(context.Background(), sa.Secrets[0].Name, metav1.GetOptions{})
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to find secret for service account %s/%s: %w", namespace.System, "cattle", err)
+		}
+		return secret.Data[coreV1.ServiceAccountRootCAKey], secret.Data[coreV1.ServiceAccountTokenKey], nil
 	}
-	return secret.Data[coreV1.ServiceAccountRootCAKey], secret.Data[coreV1.ServiceAccountTokenKey], nil
+	secret, err := serviceaccounttoken.EnsureSecretForServiceAccount(context.Background(), nil, k8s, sa)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to ensure secret for service account %s/%s: %w", namespace.System, "cattle", err)
+	}
+	return []byte(cm.Data["ca.crt"]), []byte(secret.Data[coreV1.ServiceAccountTokenKey]), nil
 }
 
 func Params() (map[string]interface{}, error) {

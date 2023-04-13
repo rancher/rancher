@@ -1,5 +1,5 @@
 /*
-Copyright 2022 Rancher Labs, Inc.
+Copyright 2023 Rancher Labs, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ limitations under the License.
 package cluster
 
 import (
+	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/wrangler/pkg/generic"
 	"k8s.io/client-go/rest"
 )
@@ -64,4 +65,8 @@ func NewFactoryFromConfigWithOptionsOrDie(config *rest.Config, opts *FactoryOpti
 
 func (c *Factory) Cluster() Interface {
 	return New(c.ControllerFactory())
+}
+
+func (c *Factory) WithAgent(userAgent string) Interface {
+	return New(controller.NewSharedControllerFactoryWithAgent(userAgent, c.ControllerFactory()))
 }

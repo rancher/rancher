@@ -40,6 +40,7 @@ const (
 	CronJobSpecFieldSysctls                       = "sysctls"
 	CronJobSpecFieldTTLSecondsAfterFinished       = "ttlSecondsAfterFinished"
 	CronJobSpecFieldTerminationGracePeriodSeconds = "terminationGracePeriodSeconds"
+	CronJobSpecFieldTimeZone                      = "timeZone"
 	CronJobSpecFieldTopologySpreadConstraints     = "topologySpreadConstraints"
 	CronJobSpecFieldUid                           = "uid"
 	CronJobSpecFieldVolumes                       = "volumes"
@@ -85,6 +86,7 @@ type CronJobSpec struct {
 	Sysctls                       []Sysctl                       `json:"sysctls,omitempty" yaml:"sysctls,omitempty"`
 	TTLSecondsAfterFinished       *int64                         `json:"ttlSecondsAfterFinished,omitempty" yaml:"ttlSecondsAfterFinished,omitempty"`
 	TerminationGracePeriodSeconds *int64                         `json:"terminationGracePeriodSeconds,omitempty" yaml:"terminationGracePeriodSeconds,omitempty"`
+	TimeZone                      string                         `json:"timeZone,omitempty" yaml:"timeZone,omitempty"`
 	TopologySpreadConstraints     []TopologySpreadConstraint     `json:"topologySpreadConstraints,omitempty" yaml:"topologySpreadConstraints,omitempty"`
 	Uid                           *int64                         `json:"uid,omitempty" yaml:"uid,omitempty"`
 	Volumes                       []Volume                       `json:"volumes,omitempty" yaml:"volumes,omitempty"`

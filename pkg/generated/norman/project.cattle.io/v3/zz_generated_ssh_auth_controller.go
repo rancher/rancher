@@ -43,7 +43,7 @@ func init() {
 	resource.Put(SSHAuthGroupVersionResource)
 }
 
-// Deprecated use v3.SSHAuth instead
+// Deprecated: use v3.SSHAuth instead
 type SSHAuth = v3.SSHAuth
 
 func NewSSHAuth(namespace, name string, obj v3.SSHAuth) *v3.SSHAuth {

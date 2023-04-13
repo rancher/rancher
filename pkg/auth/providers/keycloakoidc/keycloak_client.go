@@ -14,7 +14,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-//account defines properties an account in keycloak has
+// account defines properties an account in keycloak has
 type account struct {
 	ID            string `json:"id,omitempty"`
 	Email         string `json:"email,omitempty"`
@@ -26,14 +26,14 @@ type account struct {
 	Type          string
 }
 
-//Group defines properties a group in keycloak has
+// Group defines properties a group in keycloak has
 type Group struct {
 	ID        string  `json:"id,omitempty"`
 	Name      string  `json:"name,omitempty"`
 	Subgroups []Group `json:"subGroups,omitempty"`
 }
 
-//KeyCloakClient implements a httpclient for keycloak
+// KeyCloakClient implements a httpclient for keycloak
 type KeyCloakClient struct {
 	httpClient *http.Client
 }
@@ -165,15 +165,18 @@ func (k *KeyCloakClient) getFromKeyCloakByID(principalID, principalType string, 
 }
 
 func getSearchURL(issuer string) (string, error) {
-	splitIssuer := strings.SplitAfter(issuer, "/auth/")
-	return fmt.Sprintf(
-		"%sadmin/%s",
-		splitIssuer[0],
-		splitIssuer[1],
-	), nil
+	iss := strings.SplitAfter(issuer, "/auth/") // keycloak < 19 has auth prefix
+	if len(iss) == 2 {
+		return fmt.Sprintf("%sadmin/%s", iss[0], iss[1]), nil
+	}
+	iss = strings.SplitN(issuer, "/realms/", 2) // keycloak >= 19 doesn't have auth prefix
+	if len(iss) == 2 {
+		return fmt.Sprintf("%s/admin/realms/%s", iss[0], iss[1]), nil
+	}
+	return "", fmt.Errorf("can't parse issuer url")
 }
 
-//URLEncoded encodes the string
+// URLEncoded encodes the string
 func URLEncoded(str string) string {
 	u, err := url.Parse(str)
 	if err != nil {

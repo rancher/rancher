@@ -1,5 +1,8 @@
 #!/bin/bash
 set -e
+if ./scripts/skip-ci.sh; then
+    exit 0
+fi
 
 cd $(dirname $0)/..
 

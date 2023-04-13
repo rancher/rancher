@@ -29,22 +29,22 @@ var _ v11.DeploymentLister = &DeploymentListerMock{}
 
 // DeploymentListerMock is a mock implementation of v11.DeploymentLister.
 //
-//     func TestSomethingThatUsesDeploymentLister(t *testing.T) {
+//	    func TestSomethingThatUsesDeploymentLister(t *testing.T) {
 //
-//         // make and configure a mocked v11.DeploymentLister
-//         mockedDeploymentLister := &DeploymentListerMock{
-//             GetFunc: func(namespace string, name string) (*v1.Deployment, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             ListFunc: func(namespace string, selector labels.Selector) ([]*v1.Deployment, error) {
-// 	               panic("mock out the List method")
-//             },
-//         }
+//	        // make and configure a mocked v11.DeploymentLister
+//	        mockedDeploymentLister := &DeploymentListerMock{
+//	            GetFunc: func(namespace string, name string) (*v1.Deployment, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v1.Deployment, error) {
+//		               panic("mock out the List method")
+//	            },
+//	        }
 //
-//         // use mockedDeploymentLister in code that requires v11.DeploymentLister
-//         // and then make assertions.
+//	        // use mockedDeploymentLister in code that requires v11.DeploymentLister
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type DeploymentListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v1.Deployment, error)
@@ -91,7 +91,8 @@ func (mock *DeploymentListerMock) Get(namespace string, name string) (*v1.Deploy
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedDeploymentLister.GetCalls())
+//
+//	len(mockedDeploymentLister.GetCalls())
 func (mock *DeploymentListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -126,7 +127,8 @@ func (mock *DeploymentListerMock) List(namespace string, selector labels.Selecto
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedDeploymentLister.ListCalls())
+//
+//	len(mockedDeploymentLister.ListCalls())
 func (mock *DeploymentListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -159,43 +161,43 @@ var _ v11.DeploymentController = &DeploymentControllerMock{}
 
 // DeploymentControllerMock is a mock implementation of v11.DeploymentController.
 //
-//     func TestSomethingThatUsesDeploymentController(t *testing.T) {
+//	    func TestSomethingThatUsesDeploymentController(t *testing.T) {
 //
-//         // make and configure a mocked v11.DeploymentController
-//         mockedDeploymentController := &DeploymentControllerMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.DeploymentHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v11.DeploymentHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.DeploymentHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, handler v11.DeploymentHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             EnqueueFunc: func(namespace string, name string)  {
-// 	               panic("mock out the Enqueue method")
-//             },
-//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-// 	               panic("mock out the EnqueueAfter method")
-//             },
-//             GenericFunc: func() controller.GenericController {
-// 	               panic("mock out the Generic method")
-//             },
-//             InformerFunc: func() cache.SharedIndexInformer {
-// 	               panic("mock out the Informer method")
-//             },
-//             ListerFunc: func() v11.DeploymentLister {
-// 	               panic("mock out the Lister method")
-//             },
-//         }
+//	        // make and configure a mocked v11.DeploymentController
+//	        mockedDeploymentController := &DeploymentControllerMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.DeploymentHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v11.DeploymentHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.DeploymentHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, handler v11.DeploymentHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            EnqueueFunc: func(namespace string, name string)  {
+//		               panic("mock out the Enqueue method")
+//	            },
+//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+//		               panic("mock out the EnqueueAfter method")
+//	            },
+//	            GenericFunc: func() controller.GenericController {
+//		               panic("mock out the Generic method")
+//	            },
+//	            InformerFunc: func() cache.SharedIndexInformer {
+//		               panic("mock out the Informer method")
+//	            },
+//	            ListerFunc: func() v11.DeploymentLister {
+//		               panic("mock out the Lister method")
+//	            },
+//	        }
 //
-//         // use mockedDeploymentController in code that requires v11.DeploymentController
-//         // and then make assertions.
+//	        // use mockedDeploymentController in code that requires v11.DeploymentController
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type DeploymentControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.DeploymentHandlerFunc)
@@ -324,7 +326,8 @@ func (mock *DeploymentControllerMock) AddClusterScopedFeatureHandler(ctx context
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedDeploymentController.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedDeploymentController.AddClusterScopedFeatureHandlerCalls())
 func (mock *DeploymentControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -369,7 +372,8 @@ func (mock *DeploymentControllerMock) AddClusterScopedHandler(ctx context.Contex
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedDeploymentController.AddClusterScopedHandlerCalls())
+//
+//	len(mockedDeploymentController.AddClusterScopedHandlerCalls())
 func (mock *DeploymentControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -412,7 +416,8 @@ func (mock *DeploymentControllerMock) AddFeatureHandler(ctx context.Context, ena
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedDeploymentController.AddFeatureHandlerCalls())
+//
+//	len(mockedDeploymentController.AddFeatureHandlerCalls())
 func (mock *DeploymentControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -453,7 +458,8 @@ func (mock *DeploymentControllerMock) AddHandler(ctx context.Context, name strin
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedDeploymentController.AddHandlerCalls())
+//
+//	len(mockedDeploymentController.AddHandlerCalls())
 func (mock *DeploymentControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -490,7 +496,8 @@ func (mock *DeploymentControllerMock) Enqueue(namespace string, name string) {
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//     len(mockedDeploymentController.EnqueueCalls())
+//
+//	len(mockedDeploymentController.EnqueueCalls())
 func (mock *DeploymentControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -527,7 +534,8 @@ func (mock *DeploymentControllerMock) EnqueueAfter(namespace string, name string
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//     len(mockedDeploymentController.EnqueueAfterCalls())
+//
+//	len(mockedDeploymentController.EnqueueAfterCalls())
 func (mock *DeploymentControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -559,7 +567,8 @@ func (mock *DeploymentControllerMock) Generic() controller.GenericController {
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//     len(mockedDeploymentController.GenericCalls())
+//
+//	len(mockedDeploymentController.GenericCalls())
 func (mock *DeploymentControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -585,7 +594,8 @@ func (mock *DeploymentControllerMock) Informer() cache.SharedIndexInformer {
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//     len(mockedDeploymentController.InformerCalls())
+//
+//	len(mockedDeploymentController.InformerCalls())
 func (mock *DeploymentControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -611,7 +621,8 @@ func (mock *DeploymentControllerMock) Lister() v11.DeploymentLister {
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//     len(mockedDeploymentController.ListerCalls())
+//
+//	len(mockedDeploymentController.ListerCalls())
 func (mock *DeploymentControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -651,76 +662,76 @@ var _ v11.DeploymentInterface = &DeploymentInterfaceMock{}
 
 // DeploymentInterfaceMock is a mock implementation of v11.DeploymentInterface.
 //
-//     func TestSomethingThatUsesDeploymentInterface(t *testing.T) {
+//	    func TestSomethingThatUsesDeploymentInterface(t *testing.T) {
 //
-//         // make and configure a mocked v11.DeploymentInterface
-//         mockedDeploymentInterface := &DeploymentInterfaceMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.DeploymentHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v11.DeploymentLifecycle)  {
-// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v11.DeploymentHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v11.DeploymentLifecycle)  {
-// 	               panic("mock out the AddClusterScopedLifecycle method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.DeploymentHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v11.DeploymentLifecycle)  {
-// 	               panic("mock out the AddFeatureLifecycle method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v11.DeploymentHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v11.DeploymentLifecycle)  {
-// 	               panic("mock out the AddLifecycle method")
-//             },
-//             ControllerFunc: func() v11.DeploymentController {
-// 	               panic("mock out the Controller method")
-//             },
-//             CreateFunc: func(in1 *v1.Deployment) (*v1.Deployment, error) {
-// 	               panic("mock out the Create method")
-//             },
-//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the Delete method")
-//             },
-//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-// 	               panic("mock out the DeleteCollection method")
-//             },
-//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the DeleteNamespaced method")
-//             },
-//             GetFunc: func(name string, opts metav1.GetOptions) (*v1.Deployment, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v1.Deployment, error) {
-// 	               panic("mock out the GetNamespaced method")
-//             },
-//             ListFunc: func(opts metav1.ListOptions) (*v1.DeploymentList, error) {
-// 	               panic("mock out the List method")
-//             },
-//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v1.DeploymentList, error) {
-// 	               panic("mock out the ListNamespaced method")
-//             },
-//             ObjectClientFunc: func() *objectclient.ObjectClient {
-// 	               panic("mock out the ObjectClient method")
-//             },
-//             UpdateFunc: func(in1 *v1.Deployment) (*v1.Deployment, error) {
-// 	               panic("mock out the Update method")
-//             },
-//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-// 	               panic("mock out the Watch method")
-//             },
-//         }
+//	        // make and configure a mocked v11.DeploymentInterface
+//	        mockedDeploymentInterface := &DeploymentInterfaceMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.DeploymentHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v11.DeploymentLifecycle)  {
+//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v11.DeploymentHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v11.DeploymentLifecycle)  {
+//		               panic("mock out the AddClusterScopedLifecycle method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.DeploymentHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v11.DeploymentLifecycle)  {
+//		               panic("mock out the AddFeatureLifecycle method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v11.DeploymentHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v11.DeploymentLifecycle)  {
+//		               panic("mock out the AddLifecycle method")
+//	            },
+//	            ControllerFunc: func() v11.DeploymentController {
+//		               panic("mock out the Controller method")
+//	            },
+//	            CreateFunc: func(in1 *v1.Deployment) (*v1.Deployment, error) {
+//		               panic("mock out the Create method")
+//	            },
+//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the Delete method")
+//	            },
+//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+//		               panic("mock out the DeleteCollection method")
+//	            },
+//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the DeleteNamespaced method")
+//	            },
+//	            GetFunc: func(name string, opts metav1.GetOptions) (*v1.Deployment, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v1.Deployment, error) {
+//		               panic("mock out the GetNamespaced method")
+//	            },
+//	            ListFunc: func(opts metav1.ListOptions) (*v1.DeploymentList, error) {
+//		               panic("mock out the List method")
+//	            },
+//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v1.DeploymentList, error) {
+//		               panic("mock out the ListNamespaced method")
+//	            },
+//	            ObjectClientFunc: func() *objectclient.ObjectClient {
+//		               panic("mock out the ObjectClient method")
+//	            },
+//	            UpdateFunc: func(in1 *v1.Deployment) (*v1.Deployment, error) {
+//		               panic("mock out the Update method")
+//	            },
+//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+//		               panic("mock out the Watch method")
+//	            },
+//	        }
 //
-//         // use mockedDeploymentInterface in code that requires v11.DeploymentInterface
-//         // and then make assertions.
+//	        // use mockedDeploymentInterface in code that requires v11.DeploymentInterface
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type DeploymentInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.DeploymentHandlerFunc)
@@ -973,7 +984,8 @@ func (mock *DeploymentInterfaceMock) AddClusterScopedFeatureHandler(ctx context.
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedDeploymentInterface.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedDeploymentInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *DeploymentInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1020,7 +1032,8 @@ func (mock *DeploymentInterfaceMock) AddClusterScopedFeatureLifecycle(ctx contex
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//     len(mockedDeploymentInterface.AddClusterScopedFeatureLifecycleCalls())
+//
+//	len(mockedDeploymentInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *DeploymentInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1065,7 +1078,8 @@ func (mock *DeploymentInterfaceMock) AddClusterScopedHandler(ctx context.Context
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedDeploymentInterface.AddClusterScopedHandlerCalls())
+//
+//	len(mockedDeploymentInterface.AddClusterScopedHandlerCalls())
 func (mock *DeploymentInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1108,7 +1122,8 @@ func (mock *DeploymentInterfaceMock) AddClusterScopedLifecycle(ctx context.Conte
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//     len(mockedDeploymentInterface.AddClusterScopedLifecycleCalls())
+//
+//	len(mockedDeploymentInterface.AddClusterScopedLifecycleCalls())
 func (mock *DeploymentInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1151,7 +1166,8 @@ func (mock *DeploymentInterfaceMock) AddFeatureHandler(ctx context.Context, enab
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedDeploymentInterface.AddFeatureHandlerCalls())
+//
+//	len(mockedDeploymentInterface.AddFeatureHandlerCalls())
 func (mock *DeploymentInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1194,7 +1210,8 @@ func (mock *DeploymentInterfaceMock) AddFeatureLifecycle(ctx context.Context, en
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//     len(mockedDeploymentInterface.AddFeatureLifecycleCalls())
+//
+//	len(mockedDeploymentInterface.AddFeatureLifecycleCalls())
 func (mock *DeploymentInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1235,7 +1252,8 @@ func (mock *DeploymentInterfaceMock) AddHandler(ctx context.Context, name string
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedDeploymentInterface.AddHandlerCalls())
+//
+//	len(mockedDeploymentInterface.AddHandlerCalls())
 func (mock *DeploymentInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1274,7 +1292,8 @@ func (mock *DeploymentInterfaceMock) AddLifecycle(ctx context.Context, name stri
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//     len(mockedDeploymentInterface.AddLifecycleCalls())
+//
+//	len(mockedDeploymentInterface.AddLifecycleCalls())
 func (mock *DeploymentInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1306,7 +1325,8 @@ func (mock *DeploymentInterfaceMock) Controller() v11.DeploymentController {
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//     len(mockedDeploymentInterface.ControllerCalls())
+//
+//	len(mockedDeploymentInterface.ControllerCalls())
 func (mock *DeploymentInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1335,7 +1355,8 @@ func (mock *DeploymentInterfaceMock) Create(in1 *v1.Deployment) (*v1.Deployment,
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//     len(mockedDeploymentInterface.CreateCalls())
+//
+//	len(mockedDeploymentInterface.CreateCalls())
 func (mock *DeploymentInterfaceMock) CreateCalls() []struct {
 	In1 *v1.Deployment
 } {
@@ -1368,7 +1389,8 @@ func (mock *DeploymentInterfaceMock) Delete(name string, options *metav1.DeleteO
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//     len(mockedDeploymentInterface.DeleteCalls())
+//
+//	len(mockedDeploymentInterface.DeleteCalls())
 func (mock *DeploymentInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1403,7 +1425,8 @@ func (mock *DeploymentInterfaceMock) DeleteCollection(deleteOpts *metav1.DeleteO
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//     len(mockedDeploymentInterface.DeleteCollectionCalls())
+//
+//	len(mockedDeploymentInterface.DeleteCollectionCalls())
 func (mock *DeploymentInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1440,7 +1463,8 @@ func (mock *DeploymentInterfaceMock) DeleteNamespaced(namespace string, name str
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//     len(mockedDeploymentInterface.DeleteNamespacedCalls())
+//
+//	len(mockedDeploymentInterface.DeleteNamespacedCalls())
 func (mock *DeploymentInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1477,7 +1501,8 @@ func (mock *DeploymentInterfaceMock) Get(name string, opts metav1.GetOptions) (*
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedDeploymentInterface.GetCalls())
+//
+//	len(mockedDeploymentInterface.GetCalls())
 func (mock *DeploymentInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1514,7 +1539,8 @@ func (mock *DeploymentInterfaceMock) GetNamespaced(namespace string, name string
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//     len(mockedDeploymentInterface.GetNamespacedCalls())
+//
+//	len(mockedDeploymentInterface.GetNamespacedCalls())
 func (mock *DeploymentInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1549,7 +1575,8 @@ func (mock *DeploymentInterfaceMock) List(opts metav1.ListOptions) (*v1.Deployme
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedDeploymentInterface.ListCalls())
+//
+//	len(mockedDeploymentInterface.ListCalls())
 func (mock *DeploymentInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1582,7 +1609,8 @@ func (mock *DeploymentInterfaceMock) ListNamespaced(namespace string, opts metav
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//     len(mockedDeploymentInterface.ListNamespacedCalls())
+//
+//	len(mockedDeploymentInterface.ListNamespacedCalls())
 func (mock *DeploymentInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1612,7 +1640,8 @@ func (mock *DeploymentInterfaceMock) ObjectClient() *objectclient.ObjectClient {
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//     len(mockedDeploymentInterface.ObjectClientCalls())
+//
+//	len(mockedDeploymentInterface.ObjectClientCalls())
 func (mock *DeploymentInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1641,7 +1670,8 @@ func (mock *DeploymentInterfaceMock) Update(in1 *v1.Deployment) (*v1.Deployment,
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//     len(mockedDeploymentInterface.UpdateCalls())
+//
+//	len(mockedDeploymentInterface.UpdateCalls())
 func (mock *DeploymentInterfaceMock) UpdateCalls() []struct {
 	In1 *v1.Deployment
 } {
@@ -1672,7 +1702,8 @@ func (mock *DeploymentInterfaceMock) Watch(opts metav1.ListOptions) (watch.Inter
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//     len(mockedDeploymentInterface.WatchCalls())
+//
+//	len(mockedDeploymentInterface.WatchCalls())
 func (mock *DeploymentInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1695,19 +1726,19 @@ var _ v11.DeploymentsGetter = &DeploymentsGetterMock{}
 
 // DeploymentsGetterMock is a mock implementation of v11.DeploymentsGetter.
 //
-//     func TestSomethingThatUsesDeploymentsGetter(t *testing.T) {
+//	    func TestSomethingThatUsesDeploymentsGetter(t *testing.T) {
 //
-//         // make and configure a mocked v11.DeploymentsGetter
-//         mockedDeploymentsGetter := &DeploymentsGetterMock{
-//             DeploymentsFunc: func(namespace string) v11.DeploymentInterface {
-// 	               panic("mock out the Deployments method")
-//             },
-//         }
+//	        // make and configure a mocked v11.DeploymentsGetter
+//	        mockedDeploymentsGetter := &DeploymentsGetterMock{
+//	            DeploymentsFunc: func(namespace string) v11.DeploymentInterface {
+//		               panic("mock out the Deployments method")
+//	            },
+//	        }
 //
-//         // use mockedDeploymentsGetter in code that requires v11.DeploymentsGetter
-//         // and then make assertions.
+//	        // use mockedDeploymentsGetter in code that requires v11.DeploymentsGetter
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type DeploymentsGetterMock struct {
 	// DeploymentsFunc mocks the Deployments method.
 	DeploymentsFunc func(namespace string) v11.DeploymentInterface
@@ -1740,7 +1771,8 @@ func (mock *DeploymentsGetterMock) Deployments(namespace string) v11.DeploymentI
 
 // DeploymentsCalls gets all the calls that were made to Deployments.
 // Check the length with:
-//     len(mockedDeploymentsGetter.DeploymentsCalls())
+//
+//	len(mockedDeploymentsGetter.DeploymentsCalls())
 func (mock *DeploymentsGetterMock) DeploymentsCalls() []struct {
 	Namespace string
 } {

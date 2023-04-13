@@ -11,6 +11,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers/oidc"
 	"github.com/rancher/rancher/pkg/auth/providers/saml"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	"github.com/rancher/rancher/pkg/controllers/management/auth"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -74,9 +75,16 @@ func AuthConfigs(management *config.ManagementContext) error {
 }
 
 func addAuthConfig(name, aType string, enabled bool, management *config.ManagementContext) error {
+	annotations := make(map[string]string)
+	if name == azure.Name {
+		annotations[azure.GraphEndpointMigratedAnnotation] = "true"
+	}
+	annotations[auth.CleanupAnnotation] = auth.CleanupRancherLocked
+
 	_, err := management.Management.AuthConfigs("").ObjectClient().Create(&v3.AuthConfig{
 		ObjectMeta: v1.ObjectMeta{
-			Name: name,
+			Name:        name,
+			Annotations: annotations,
 		},
 		Type:    aType,
 		Enabled: enabled,

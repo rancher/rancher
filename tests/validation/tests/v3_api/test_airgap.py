@@ -6,7 +6,7 @@ import time
 from lib.aws import AWS_USER
 from .common import (
     ADMIN_PASSWORD, AmazonWebServices, run_command, wait_for_status_code,
-    TEST_IMAGE, TEST_IMAGE_NGINX, TEST_IMAGE_OS_BASE, readDataFile,
+    TEST_IMAGE, TEST_IMAGE_REDIS, TEST_IMAGE_OS_BASE, readDataFile,
     DEFAULT_CLUSTER_STATE_TIMEOUT, compare_versions
 )
 from .test_custom_host_reg import (
@@ -23,7 +23,7 @@ PRIVATE_REGISTRY_PASSWORD = \
 BASTION_ID = os.environ.get("RANCHER_BASTION_ID", "")
 NUMBER_OF_INSTANCES = int(os.environ.get("RANCHER_AIRGAP_INSTANCE_COUNT", "1"))
 IMAGE_LIST = os.environ.get("RANCHER_IMAGE_LIST", ",".join(
-    [TEST_IMAGE, TEST_IMAGE_NGINX, TEST_IMAGE_OS_BASE])).split(",")
+    [TEST_IMAGE, TEST_IMAGE_REDIS, TEST_IMAGE_OS_BASE])).split(",")
 TARBALL_TYPE = os.environ.get("K3S_TARBALL_TYPE", "tar.gz")
 ARCH = os.environ.get("K3S_ARCH", "amd64")
 
@@ -34,6 +34,7 @@ RESOURCE_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                             'resource')
 SSH_KEY_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                            '.ssh')
+RANCHER_SOURCE_REGISTRY = os.environ.get("RANCHER_SOURCE_REGISTRY", "")
 
 
 def test_deploy_bastion():
@@ -148,7 +149,7 @@ def setup_rancher_server():
 def deploy_noauth_bastion_server():
     node_name = AG_HOST_NAME + "-noauthbastion"
     # Create Bastion Server in AWS
-    bastion_node = AmazonWebServices().create_node(node_name)
+    bastion_node = AmazonWebServices().create_node(node_name, for_bastion=True)
     setup_ssh_key(bastion_node)
 
     # Generate self signed certs
@@ -185,7 +186,7 @@ def deploy_noauth_bastion_server():
 def deploy_bastion_server():
     node_name = AG_HOST_NAME + "-bastion"
     # Create Bastion Server in AWS
-    bastion_node = AmazonWebServices().create_node(node_name)
+    bastion_node = AmazonWebServices().create_node(node_name, for_bastion=True)
     setup_ssh_key(bastion_node)
 
     # Get resources for private registry and generate self signed certs
@@ -215,7 +216,7 @@ def deploy_bastion_server():
 
     # Add credentials for private registry
     store_creds_command = \
-        'docker run --rm melsayed/htpasswd {} {} >> ' \
+        'docker run --rm melsayed/htpasswd "{}" "{}" >> ' \
         'basic-registry/nginx_config/registry.password'.format(
             PRIVATE_REGISTRY_USERNAME, PRIVATE_REGISTRY_PASSWORD)
     bastion_node.execute_command(store_creds_command)
@@ -257,24 +258,28 @@ def add_rancher_images_to_private_registry(bastion_node, push_images=True):
             RANCHER_SERVER_VERSION)
     bastion_node.execute_command(get_images_command)
 
-    # Remove the "docker save" and "docker load" lines to save time
+    # comment out the "docker save" and "docker load" lines to save time
     edit_save_and_load_command = \
-        "sudo sed -i '58d' rancher-save-images.sh && " \
-        "sudo sed -i '76d' rancher-load-images.sh && " \
+        "sudo sed -i -e 's/docker save /# docker/g' rancher-save-images.sh && " \
+        "sudo sed -i -e 's/docker load /# docker/g' rancher-load-images.sh && " \
         "chmod +x rancher-save-images.sh && chmod +x rancher-load-images.sh"
     bastion_node.execute_command(edit_save_and_load_command)
 
     save_images_command = \
-        "./rancher-save-images.sh --image-list ./rancher-images.txt"
+        "./rancher-save-images.sh --image-list ./rancher-images.txt" 
+    if len(RANCHER_SOURCE_REGISTRY) > 0:
+        save_images_command += " --source-registry {}".format(RANCHER_SOURCE_REGISTRY)
     save_res = bastion_node.execute_command(save_images_command)
 
     if push_images:
         load_images_command = \
-            "docker login {} -u {} -p {} && " \
+            "docker login {} -u \"{}\" -p \"{}\" && " \
             "./rancher-load-images.sh --image-list ./rancher-images.txt " \
             "--registry {}".format(
                 bastion_node.host_name, PRIVATE_REGISTRY_USERNAME,
                 PRIVATE_REGISTRY_PASSWORD, bastion_node.host_name)
+        if len(RANCHER_SOURCE_REGISTRY) > 0:
+                load_images_command += " --source-registry {}".format(RANCHER_SOURCE_REGISTRY)
         load_res = bastion_node.execute_command(load_images_command)
         print(load_res)
     else:
@@ -323,7 +328,7 @@ def tag_image(bastion_node, image):
 
 def push_image(bastion_node, image):
     push_image_command = \
-        "docker login {} -u {} -p {} && docker push {}/{}".format(
+        "docker login {} -u \"{}\" -p \"{}\" && docker push {}/{}".format(
             bastion_node.host_name, PRIVATE_REGISTRY_USERNAME,
             PRIVATE_REGISTRY_PASSWORD, bastion_node.host_name, image)
     bastion_node.execute_command(push_image_command)
@@ -571,7 +576,7 @@ def deploy_airgap_rancher(bastion_node):
             '-v ${{PWD}}/privkey.pem:/etc/rancher/ssl/key.pem ' \
             '-e CATTLE_SYSTEM_DEFAULT_REGISTRY={} ' \
             '-e CATTLE_SYSTEM_CATALOG=bundled ' \
-            '-e CATTLE_BOOTSTRAP_PASSWORD={} ' \
+            '-e CATTLE_BOOTSTRAP_PASSWORD=\\\"{}\\\" ' \
             '{}/rancher/rancher:{} --no-cacerts --trace'.format(
                 privileged, bastion_node.host_name, ADMIN_PASSWORD,
                 bastion_node.host_name, RANCHER_SERVER_VERSION)
@@ -580,7 +585,7 @@ def deploy_airgap_rancher(bastion_node):
             'sudo docker run -d {} --restart=unless-stopped ' \
             '-p 80:80 -p 443:443 ' \
             '-e CATTLE_SYSTEM_DEFAULT_REGISTRY={} ' \
-            '-e CATTLE_BOOTSTRAP_PASSWORD={} ' \
+            '-e CATTLE_BOOTSTRAP_PASSWORD=\\\"{}\\\" ' \
             '-e CATTLE_SYSTEM_CATALOG=bundled {}/rancher/rancher:{} --trace'.format(
                 privileged, bastion_node.host_name, 
                 ADMIN_PASSWORD,
@@ -596,7 +601,7 @@ def deploy_airgap_rancher(bastion_node):
 
 def run_docker_command_on_airgap_node(bastion_node, ag_node, cmd,
                                       log_out=False):
-    docker_login_command = "docker login {} -u {} -p {}".format(
+    docker_login_command = "docker login {} -u \\\"{}\\\" -p \\\"{}\\\"".format(
         bastion_node.host_name,
         PRIVATE_REGISTRY_USERNAME, PRIVATE_REGISTRY_PASSWORD)
     if cmd.startswith("sudo"):

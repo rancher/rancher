@@ -69,7 +69,7 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 
 	channelserver := channelserver.NewHandler(ctx)
 
-	supportConfigGenerator := supportconfigs.NewGeneratorHandler(scaledContext)
+	supportConfigGenerator := supportconfigs.NewHandler(scaledContext)
 	// Unauthenticated routes
 	unauthed := mux.NewRouter()
 	unauthed.UseEncodedPath()

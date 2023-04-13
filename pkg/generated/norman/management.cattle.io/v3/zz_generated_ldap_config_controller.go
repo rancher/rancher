@@ -42,7 +42,7 @@ func init() {
 	resource.Put(LdapConfigGroupVersionResource)
 }
 
-// Deprecated use v3.LdapConfig instead
+// Deprecated: use v3.LdapConfig instead
 type LdapConfig = v3.LdapConfig
 
 func NewLdapConfig(namespace, name string, obj v3.LdapConfig) *v3.LdapConfig {

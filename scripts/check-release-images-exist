@@ -1,0 +1,38 @@
+#!/bin/bash
+# This script checks if all images in the (pre) release are available in Docker Hub by checking the existence of a manifest
+# This script does not guarantee that all archs for that image are available
+cd $(dirname $0)
+
+./build
+./package
+
+cd ./..
+
+TEMP_FILE=$(mktemp)
+
+if [ -n "${DRONE_TAG}" ]; then
+  if [ -s ./bin/rancher-images.txt ]; then
+    # We skip rancher/rancher and rancher/rancher-agent because the manifest for these gets created later in the pipeline
+    for rancherimage in $(cat ./bin/rancher-images.txt | egrep -v "^rancher/rancher:|^rancher/rancher-agent:"); do
+      echo "INFO: Checking if image [${rancherimage}] exists"
+      if ! skopeo inspect "docker://${rancherimage}" >/dev/null; then
+        echo "ERROR: Image [${rancherimage}] does not exist"
+        echo "${rancherimage}" >> $TEMP_FILE
+      else
+        echo "OK: Image [${rancherimage}] does exist"
+      fi
+    done
+  else
+    echo "ERROR: ./bin/rancher-images.txt does not exist or is empty"
+    exit 1
+  fi
+
+  if [ -s $TEMP_FILE ]; then
+    echo "ERROR: Summary of missing image(s):"
+    cat $TEMP_FILE
+    exit 1
+  else
+    echo "OK: All images exist"
+    exit 0
+  fi
+fi

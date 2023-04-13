@@ -142,6 +142,8 @@ func (p *Planner) electInitNode(rkeControlPlane *rkev1.RKEControlPlane, plan *pl
 	if initNodeFound, joinURL, _, err := p.findInitNode(rkeControlPlane, plan); (initNodeFound && err == nil) || errors.Is(err, generic.ErrSkip) {
 		logrus.Debugf("rkecluster %s/%s: init node was already elected and found with joinURL: %s", rkeControlPlane.Namespace, rkeControlPlane.Spec.ClusterName, joinURL)
 		return joinURL, err
+	} else if !initNodeFound && rkeControlPlane.Labels[rke2.InitNodeMachineIDLabel] != "" {
+		return "", ErrWaitingf("unable to find designated init node matching machine ID %s", rkeControlPlane.Labels[rke2.InitNodeMachineIDLabel])
 	}
 	// If the joinURL (or an errSkip) was not found, re-elect the init node.
 	logrus.Debugf("rkecluster %s/%s: performing election of init node", rkeControlPlane.Namespace, rkeControlPlane.Spec.ClusterName)

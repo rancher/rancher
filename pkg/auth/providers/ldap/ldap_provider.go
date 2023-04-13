@@ -6,12 +6,11 @@ import (
 	"fmt"
 	"strings"
 
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
 	ldapv3 "github.com/go-ldap/ldap/v3"
 	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/common/ldap"
 	"github.com/rancher/rancher/pkg/auth/tokens"
@@ -230,7 +229,7 @@ func (p *ldapProvider) getLDAPConfig() (*v3.LdapConfig, *x509.CertPool, error) {
 
 		storedLdapConfigMap = subLdapConfig.(map[string]interface{})
 		mapstructure.Decode(storedLdapConfigMap, storedLdapConfig)
-		if len(storedLdapConfig.Servers) != 1 {
+		if len(storedLdapConfig.Servers) < 1 {
 			return storedLdapConfig, nil, errNotConfigured
 		}
 	} else {
@@ -379,4 +378,13 @@ func (p *ldapProvider) GetUserExtraAttributes(userPrincipal v3.Principal) map[st
 		extras[common.UserAttributeUserName] = []string{userPrincipal.LoginName}
 	}
 	return extras
+}
+
+// IsDisabledProvider checks if the LDAP auth provider is currently disabled in Rancher.
+func (p *ldapProvider) IsDisabledProvider() (bool, error) {
+	ldapConfig, _, err := p.getLDAPConfig()
+	if err != nil {
+		return false, err
+	}
+	return !ldapConfig.Enabled, nil
 }

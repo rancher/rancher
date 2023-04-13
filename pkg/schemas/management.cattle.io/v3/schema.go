@@ -527,6 +527,7 @@ func authnTypes(schemas *types.Schemas) *types.Schemas {
 				"testAndApply": {
 					Input: "azureADConfigApplyInput",
 				},
+				"upgrade": {},
 			}
 			schema.CollectionMethods = []string{}
 			schema.ResourceMethods = []string{http.MethodGet, http.MethodPut}

@@ -56,13 +56,14 @@ func RegisterIndexers(scaledContext *config.ScaledContext) error {
 }
 
 func RegisterEarly(ctx context.Context, management *config.ManagementContext, clusterManager *clustermanager.Manager) {
-	prtb, crtb := newRTBLifecycles(management)
-	gr := newGlobalRoleLifecycle(management)
-	grb := newGlobalRoleBindingLifecycle(management, clusterManager)
+	prtb, crtb := newRTBLifecycles(management.WithAgent("mgmt-auth-crtb-prtb-controller"))
+	gr := newGlobalRoleLifecycle(management.WithAgent(grController))
+	grb := newGlobalRoleBindingLifecycle(management.WithAgent(grbController), clusterManager)
 	p, c := newPandCLifecycles(management)
 	u := newUserLifecycle(management, clusterManager)
-	n := newTokenController(management)
-	ua := newUserAttributeController(management)
+	n := newTokenController(management.WithAgent(tokenController))
+	ac := newAuthConfigController(ctx, management, clusterManager.ScaledContext)
+	ua := newUserAttributeController(management.WithAgent(userAttributeController))
 	s := newAuthSettingController(management)
 	rt := newRoleTemplateLifecycle(management, clusterManager)
 	grbLegacy := newLegacyGRBCleaner(management)
@@ -78,6 +79,7 @@ func RegisterEarly(ctx context.Context, management *config.ManagementContext, cl
 	management.Management.Clusters("").AddHandler(ctx, clusterCreateController, c.sync)
 	management.Management.Projects("").AddHandler(ctx, projectCreateController, p.sync)
 	management.Management.Tokens("").AddHandler(ctx, tokenController, n.sync)
+	management.Management.AuthConfigs("").AddHandler(ctx, authConfigControllerName, ac.sync)
 	management.Management.UserAttributes("").AddHandler(ctx, userAttributeController, ua.sync)
 	management.Management.Settings("").AddHandler(ctx, authSettingController, s.sync)
 	management.Management.GlobalRoleBindings("").AddHandler(ctx, "legacy-grb-cleaner", grbLegacy.sync)

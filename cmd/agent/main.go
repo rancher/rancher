@@ -203,7 +203,7 @@ func run(ctx context.Context) error {
 		return err
 	}
 
-	headers := map[string][]string{
+	headers := http.Header{
 		Token:                      {token},
 		rkenodeconfigclient.Params: {base64.StdEncoding.EncodeToString(bytes)},
 	}
@@ -344,7 +344,6 @@ func run(ctx context.Context) error {
 						tt = time.Duration(receivedInterval) * time.Second
 						logrus.Infof("Plan monitor checking %v seconds", receivedInterval)
 					}
-
 				case <-ctx.Done():
 					return
 				}
@@ -365,6 +364,7 @@ func run(ctx context.Context) error {
 		if !isConnect() {
 			wsURL += "/register"
 		}
+
 		logrus.Infof("Connecting to %s with token starting with %s", wsURL, token[:len(token)/2])
 		logrus.Tracef("Connecting to %s with token %s", wsURL, token)
 		remotedialer.ClientConnect(ctx, wsURL, headers, nil, func(proto, address string) bool {

@@ -1,4 +1,5 @@
 variable "access_key" {}
+variable "access_key_name" {}
 variable "aws_ami" {}
 variable "aws_user" {}
 variable "region" {}
@@ -20,6 +21,7 @@ variable "no_of_server_nodes" {}
 variable "server_flags" {}
 variable "cluster_type" {}
 variable "node_os" {}
+variable "enforce_mode" {}
 
 variable "create_lb" {
   description = "Create Network Load Balancer if set to true"

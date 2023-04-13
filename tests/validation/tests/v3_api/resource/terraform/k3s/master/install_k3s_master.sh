@@ -20,15 +20,32 @@ fi
 
 if [[ -n "${8}" ]] && [[ "${8}" == *"protect-kernel-defaults"* ]]
 then
-  cat /tmp/cis_masterconfig.yaml >> /etc/rancher/k3s/config.yaml
+  mkdir -p /var/lib/rancher/k3s/server/manifests
+  if [[ "${1}" == *"centos"* ]] || [[ "${1}" == *"rhel"* ]] || [[ "${1}" == *"rocky"* ]]
+  then
+    yum -y install bc
+  fi
+  calc(){ awk "BEGIN { print "$*" }"; }
+  version=`echo ${4}|cut -c2-5`
+  conversion=$(calc $version*1)
+  if (( $(echo "$conversion >= 1.25" | bc -l) ))
+  then
+    sed -i "s/enforce: \"privileged\"/enforce: \"${12}\"/g" /tmp/cluster-level-pss.yaml
+    cat /tmp/cis_v125_masterconfig.yaml >> /etc/rancher/k3s/config.yaml
+    cat /tmp/v125_policy.yaml > /var/lib/rancher/k3s/server/manifests/policy.yaml
+    cat /tmp/cluster-level-pss.yaml > /var/lib/rancher/k3s/server/cluster-level-pss.yaml
+  else
+    cat /tmp/cis_masterconfig.yaml >> /etc/rancher/k3s/config.yaml
+    cat /tmp/policy.yaml > /var/lib/rancher/k3s/server/manifests/policy.yaml
+  fi
   echo -e "vm.panic_on_oom=0" >>/etc/sysctl.d/90-kubelet.conf
   echo -e "vm.overcommit_memory=1" >>/etc/sysctl.d/90-kubelet.conf
   echo -e "kernel.panic=10" >>/etc/sysctl.d/90-kubelet.conf
   echo -e "kernel.panic_on_oops=1" >>/etc/sysctl.d/90-kubelet.conf
+  echo -e "kernel.keys.root_maxbytes=25000000" >>/etc/sysctl.d/90-kubelet.conf
   sysctl -p /etc/sysctl.d/90-kubelet.conf
   systemctl restart systemd-sysctl
-  mkdir -p /var/lib/rancher/k3s/server/manifests
-  cat /tmp/policy.yaml > /var/lib/rancher/k3s/server/manifests/policy.yaml
+  cat /tmp/audit.yaml > /var/lib/rancher/k3s/server/audit.yaml
 
   if [[ "${4}" == *"v1.18"* ]] || [[ "${4}" == *"v1.19"* ]] || [[ "${4}" == *"v1.20"* ]]
   then

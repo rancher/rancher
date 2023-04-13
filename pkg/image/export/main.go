@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -91,30 +92,44 @@ func run(systemChartsPath, chartsPath string, imagesFromArgs []string) error {
 		k8sVersions = append(k8sVersions, k)
 	}
 	sort.Strings(k8sVersions)
-	writeSliceToFile(filepath.Join(os.Getenv("HOME"), "bin", "rancher-rke-k8s-versions.txt"), k8sVersions)
+	if err := writeSliceToFile(filepath.Join(os.Getenv("HOME"), "bin", "rancher-rke-k8s-versions.txt"), k8sVersions); err != nil {
+		return err
+	}
 
-	externalImages := make(map[string][]string)
-	k3sUpgradeImages, err := ext.GetExternalImages(rancherVersion, data.K3S, ext.K3S, nil)
+	k8sVersion1_21_0 := &semver.Version{
+		Major: 1,
+		Minor: 21,
+		Patch: 0,
+	}
+
+	externalLinuxImages := make(map[string][]string)
+
+	k3sUpgradeImages, err := ext.GetExternalImages(rancherVersion, data.K3S, ext.K3S, k8sVersion1_21_0, img.Linux)
 	if err != nil {
 		return err
 	}
 	if k3sUpgradeImages != nil {
-		externalImages["k3sUpgrade"] = k3sUpgradeImages
+		externalLinuxImages["k3sUpgrade"] = k3sUpgradeImages
 	}
 
 	// RKE2 Provisioning will only be supported on Kubernetes v1.21+. In addition, only RKE2
-	// releases corresponding to Kubernetes v1.21+ include the "rke2-images-all" file that we need.
-	rke2AllImages, err := ext.GetExternalImages(rancherVersion, data.RKE2, ext.RKE2, &semver.Version{
-		Major: 1,
-		Minor: 21,
-		Patch: 0,
-	})
+	// releases corresponding to Kubernetes v1.21+ include the "rke2-images-all.linux-amd64.txt" file that we need.
+	rke2AllImages, err := ext.GetExternalImages(rancherVersion, data.RKE2, ext.RKE2, k8sVersion1_21_0, img.Linux)
 	if err != nil {
 		return err
 	}
 	if rke2AllImages != nil {
-		externalImages["rke2All"] = rke2AllImages
+		externalLinuxImages["rke2All"] = rke2AllImages
 	}
+
+	sort.Strings(imagesFromArgs)
+	winsIndex := sort.SearchStrings(imagesFromArgs, "rancher/wins")
+	if winsIndex > len(imagesFromArgs)-1 {
+		return errors.New("rancher/wins upgrade image not found")
+	}
+
+	winsAgentUpdateImage := imagesFromArgs[winsIndex]
+	linuxImagesFromArgs := append(imagesFromArgs[:winsIndex], imagesFromArgs[winsIndex+1:]...)
 
 	exportConfig := img.ExportConfig{
 		SystemChartsPath: systemChartsPath,
@@ -122,13 +137,13 @@ func run(systemChartsPath, chartsPath string, imagesFromArgs []string) error {
 		OsType:           img.Linux,
 		RancherVersion:   rancherVersion,
 	}
-	targetImages, targetImagesAndSources, err := img.GetImages(exportConfig, externalImages, imagesFromArgs, linuxInfo.RKESystemImages)
+	targetImages, targetImagesAndSources, err := img.GetImages(exportConfig, externalLinuxImages, linuxImagesFromArgs, linuxInfo.RKESystemImages)
 	if err != nil {
 		return err
 	}
 
 	exportConfig.OsType = img.Windows
-	targetWindowsImages, targetWindowsImagesAndSources, err := img.GetImages(exportConfig, nil, []string{getWindowsAgentImage()}, windowsInfo.RKESystemImages)
+	targetWindowsImages, targetWindowsImagesAndSources, err := img.GetImages(exportConfig, nil, []string{getWindowsAgentImage(), winsAgentUpdateImage}, windowsInfo.RKESystemImages)
 	if err != nil {
 		return err
 	}
@@ -211,13 +226,16 @@ func saveImagesAndSources(imagesAndSources []string) []string {
 
 func checkImage(image string) error {
 	// ignore non prefixed images, also in types (image/mirror.go)
-	if strings.HasPrefix(image, "weaveworks") || strings.HasPrefix(image, "noiro") || strings.HasPrefix(image, "registry:") || strings.EqualFold(image, "busybox") {
+	if strings.HasPrefix(image, "weaveworks") || strings.HasPrefix(image, "noiro") {
 		return nil
 	}
 
 	imageNameTag := strings.Split(image, ":")
 	if len(imageNameTag) != 2 {
 		return fmt.Errorf("Can't extract tag from image [%s]", image)
+	}
+	if imageNameTag[1] == "" {
+		return fmt.Errorf("Extracted tag from image [%s] is empty", image)
 	}
 	if !strings.HasPrefix(imageNameTag[0], "rancher/") {
 		return fmt.Errorf("Image [%s] does not start with rancher/", image)
@@ -544,7 +562,7 @@ while IFS= read -r i; do
         pulled="${pulled} ${i}"
     else
         if docker inspect "${i}" > /dev/null 2>&1; then
-            pulled="${pulled} ${i}"		
+            pulled="${pulled} ${i}"
         else
             echo "Image pull failed: ${i}"
         fi
@@ -647,7 +665,7 @@ Get-Content -Force -Path $image_list | ForEach-Object {
     if ($_) {
         $fullname_image = ('{0}-windows-{1}' -f $_, $os_release_id)
 		echo "Tagging $registry/$fullname_image"
-	
+
 		switch -regex ($fullname_image)
 		{
 			'.+/.+' {

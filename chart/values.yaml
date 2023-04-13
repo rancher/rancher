@@ -24,7 +24,8 @@ addLocal: "true"
 
 # Image for collecting rancher audit logs.
 # Important: update pkg/image/export/main.go when this default image is changed, so that it's reflected accordingly in rancher-images.txt generated for air-gapped setups.
-busyboxImage: busybox
+busyboxImage: rancher/mirrored-library-busybox
+busyboxImageTag: 1.34.1
 
 # Override imagePullPolicy for busybox images
 # options: Always, Never, IfNotPresent
@@ -59,6 +60,7 @@ ingress:
   enabled: true
   includeDefaultExtraAnnotations: true
   extraAnnotations: {}
+  ingressClassName: ""
 
   # configurationSnippet - Add additional Nginx configuration. This example statically sets a header on the ingress.
   # configurationSnippet: |
@@ -153,8 +155,15 @@ postDelete:
   # by default, the job will fail if it fail to uninstall any of the apps
   ignoreTimeoutError: false
 
-# Set a bootstrap password. If leave empty, a random password will be generated.
+# Set a bootstrap password. If left empty, a random password will be generated.
 bootstrapPassword: ""
 
-# Set a bootstrap password existing secret name.
-# bootstrapPasswordExistingSecret: "secret-name"
+# Set a bootstrap password existing secret name. If left empty, a random password will be generated as 'bootstrap-secret'.
+bootstrapPasswordExistingSecret: ""
+
+livenessProbe:
+  initialDelaySeconds: 60
+  periodSeconds: 30
+readinessProbe:
+  initialDelaySeconds: 5
+  periodSeconds: 30

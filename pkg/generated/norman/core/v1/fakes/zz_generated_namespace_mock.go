@@ -29,22 +29,22 @@ var _ v11.NamespaceLister = &NamespaceListerMock{}
 
 // NamespaceListerMock is a mock implementation of v11.NamespaceLister.
 //
-//     func TestSomethingThatUsesNamespaceLister(t *testing.T) {
+//	    func TestSomethingThatUsesNamespaceLister(t *testing.T) {
 //
-//         // make and configure a mocked v11.NamespaceLister
-//         mockedNamespaceLister := &NamespaceListerMock{
-//             GetFunc: func(namespace string, name string) (*v1.Namespace, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             ListFunc: func(namespace string, selector labels.Selector) ([]*v1.Namespace, error) {
-// 	               panic("mock out the List method")
-//             },
-//         }
+//	        // make and configure a mocked v11.NamespaceLister
+//	        mockedNamespaceLister := &NamespaceListerMock{
+//	            GetFunc: func(namespace string, name string) (*v1.Namespace, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v1.Namespace, error) {
+//		               panic("mock out the List method")
+//	            },
+//	        }
 //
-//         // use mockedNamespaceLister in code that requires v11.NamespaceLister
-//         // and then make assertions.
+//	        // use mockedNamespaceLister in code that requires v11.NamespaceLister
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type NamespaceListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v1.Namespace, error)
@@ -91,7 +91,8 @@ func (mock *NamespaceListerMock) Get(namespace string, name string) (*v1.Namespa
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedNamespaceLister.GetCalls())
+//
+//	len(mockedNamespaceLister.GetCalls())
 func (mock *NamespaceListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -126,7 +127,8 @@ func (mock *NamespaceListerMock) List(namespace string, selector labels.Selector
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedNamespaceLister.ListCalls())
+//
+//	len(mockedNamespaceLister.ListCalls())
 func (mock *NamespaceListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -159,43 +161,43 @@ var _ v11.NamespaceController = &NamespaceControllerMock{}
 
 // NamespaceControllerMock is a mock implementation of v11.NamespaceController.
 //
-//     func TestSomethingThatUsesNamespaceController(t *testing.T) {
+//	    func TestSomethingThatUsesNamespaceController(t *testing.T) {
 //
-//         // make and configure a mocked v11.NamespaceController
-//         mockedNamespaceController := &NamespaceControllerMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.NamespaceHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v11.NamespaceHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.NamespaceHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, handler v11.NamespaceHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             EnqueueFunc: func(namespace string, name string)  {
-// 	               panic("mock out the Enqueue method")
-//             },
-//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-// 	               panic("mock out the EnqueueAfter method")
-//             },
-//             GenericFunc: func() controller.GenericController {
-// 	               panic("mock out the Generic method")
-//             },
-//             InformerFunc: func() cache.SharedIndexInformer {
-// 	               panic("mock out the Informer method")
-//             },
-//             ListerFunc: func() v11.NamespaceLister {
-// 	               panic("mock out the Lister method")
-//             },
-//         }
+//	        // make and configure a mocked v11.NamespaceController
+//	        mockedNamespaceController := &NamespaceControllerMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.NamespaceHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v11.NamespaceHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.NamespaceHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, handler v11.NamespaceHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            EnqueueFunc: func(namespace string, name string)  {
+//		               panic("mock out the Enqueue method")
+//	            },
+//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+//		               panic("mock out the EnqueueAfter method")
+//	            },
+//	            GenericFunc: func() controller.GenericController {
+//		               panic("mock out the Generic method")
+//	            },
+//	            InformerFunc: func() cache.SharedIndexInformer {
+//		               panic("mock out the Informer method")
+//	            },
+//	            ListerFunc: func() v11.NamespaceLister {
+//		               panic("mock out the Lister method")
+//	            },
+//	        }
 //
-//         // use mockedNamespaceController in code that requires v11.NamespaceController
-//         // and then make assertions.
+//	        // use mockedNamespaceController in code that requires v11.NamespaceController
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type NamespaceControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.NamespaceHandlerFunc)
@@ -324,7 +326,8 @@ func (mock *NamespaceControllerMock) AddClusterScopedFeatureHandler(ctx context.
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedNamespaceController.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedNamespaceController.AddClusterScopedFeatureHandlerCalls())
 func (mock *NamespaceControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -369,7 +372,8 @@ func (mock *NamespaceControllerMock) AddClusterScopedHandler(ctx context.Context
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedNamespaceController.AddClusterScopedHandlerCalls())
+//
+//	len(mockedNamespaceController.AddClusterScopedHandlerCalls())
 func (mock *NamespaceControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -412,7 +416,8 @@ func (mock *NamespaceControllerMock) AddFeatureHandler(ctx context.Context, enab
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedNamespaceController.AddFeatureHandlerCalls())
+//
+//	len(mockedNamespaceController.AddFeatureHandlerCalls())
 func (mock *NamespaceControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -453,7 +458,8 @@ func (mock *NamespaceControllerMock) AddHandler(ctx context.Context, name string
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedNamespaceController.AddHandlerCalls())
+//
+//	len(mockedNamespaceController.AddHandlerCalls())
 func (mock *NamespaceControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -490,7 +496,8 @@ func (mock *NamespaceControllerMock) Enqueue(namespace string, name string) {
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//     len(mockedNamespaceController.EnqueueCalls())
+//
+//	len(mockedNamespaceController.EnqueueCalls())
 func (mock *NamespaceControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -527,7 +534,8 @@ func (mock *NamespaceControllerMock) EnqueueAfter(namespace string, name string,
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//     len(mockedNamespaceController.EnqueueAfterCalls())
+//
+//	len(mockedNamespaceController.EnqueueAfterCalls())
 func (mock *NamespaceControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -559,7 +567,8 @@ func (mock *NamespaceControllerMock) Generic() controller.GenericController {
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//     len(mockedNamespaceController.GenericCalls())
+//
+//	len(mockedNamespaceController.GenericCalls())
 func (mock *NamespaceControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -585,7 +594,8 @@ func (mock *NamespaceControllerMock) Informer() cache.SharedIndexInformer {
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//     len(mockedNamespaceController.InformerCalls())
+//
+//	len(mockedNamespaceController.InformerCalls())
 func (mock *NamespaceControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -611,7 +621,8 @@ func (mock *NamespaceControllerMock) Lister() v11.NamespaceLister {
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//     len(mockedNamespaceController.ListerCalls())
+//
+//	len(mockedNamespaceController.ListerCalls())
 func (mock *NamespaceControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -651,76 +662,76 @@ var _ v11.NamespaceInterface = &NamespaceInterfaceMock{}
 
 // NamespaceInterfaceMock is a mock implementation of v11.NamespaceInterface.
 //
-//     func TestSomethingThatUsesNamespaceInterface(t *testing.T) {
+//	    func TestSomethingThatUsesNamespaceInterface(t *testing.T) {
 //
-//         // make and configure a mocked v11.NamespaceInterface
-//         mockedNamespaceInterface := &NamespaceInterfaceMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.NamespaceHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v11.NamespaceLifecycle)  {
-// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v11.NamespaceHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v11.NamespaceLifecycle)  {
-// 	               panic("mock out the AddClusterScopedLifecycle method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.NamespaceHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v11.NamespaceLifecycle)  {
-// 	               panic("mock out the AddFeatureLifecycle method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v11.NamespaceHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v11.NamespaceLifecycle)  {
-// 	               panic("mock out the AddLifecycle method")
-//             },
-//             ControllerFunc: func() v11.NamespaceController {
-// 	               panic("mock out the Controller method")
-//             },
-//             CreateFunc: func(in1 *v1.Namespace) (*v1.Namespace, error) {
-// 	               panic("mock out the Create method")
-//             },
-//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the Delete method")
-//             },
-//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-// 	               panic("mock out the DeleteCollection method")
-//             },
-//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the DeleteNamespaced method")
-//             },
-//             GetFunc: func(name string, opts metav1.GetOptions) (*v1.Namespace, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v1.Namespace, error) {
-// 	               panic("mock out the GetNamespaced method")
-//             },
-//             ListFunc: func(opts metav1.ListOptions) (*v1.NamespaceList, error) {
-// 	               panic("mock out the List method")
-//             },
-//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v1.NamespaceList, error) {
-// 	               panic("mock out the ListNamespaced method")
-//             },
-//             ObjectClientFunc: func() *objectclient.ObjectClient {
-// 	               panic("mock out the ObjectClient method")
-//             },
-//             UpdateFunc: func(in1 *v1.Namespace) (*v1.Namespace, error) {
-// 	               panic("mock out the Update method")
-//             },
-//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-// 	               panic("mock out the Watch method")
-//             },
-//         }
+//	        // make and configure a mocked v11.NamespaceInterface
+//	        mockedNamespaceInterface := &NamespaceInterfaceMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.NamespaceHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v11.NamespaceLifecycle)  {
+//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v11.NamespaceHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v11.NamespaceLifecycle)  {
+//		               panic("mock out the AddClusterScopedLifecycle method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.NamespaceHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v11.NamespaceLifecycle)  {
+//		               panic("mock out the AddFeatureLifecycle method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v11.NamespaceHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v11.NamespaceLifecycle)  {
+//		               panic("mock out the AddLifecycle method")
+//	            },
+//	            ControllerFunc: func() v11.NamespaceController {
+//		               panic("mock out the Controller method")
+//	            },
+//	            CreateFunc: func(in1 *v1.Namespace) (*v1.Namespace, error) {
+//		               panic("mock out the Create method")
+//	            },
+//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the Delete method")
+//	            },
+//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+//		               panic("mock out the DeleteCollection method")
+//	            },
+//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the DeleteNamespaced method")
+//	            },
+//	            GetFunc: func(name string, opts metav1.GetOptions) (*v1.Namespace, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v1.Namespace, error) {
+//		               panic("mock out the GetNamespaced method")
+//	            },
+//	            ListFunc: func(opts metav1.ListOptions) (*v1.NamespaceList, error) {
+//		               panic("mock out the List method")
+//	            },
+//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v1.NamespaceList, error) {
+//		               panic("mock out the ListNamespaced method")
+//	            },
+//	            ObjectClientFunc: func() *objectclient.ObjectClient {
+//		               panic("mock out the ObjectClient method")
+//	            },
+//	            UpdateFunc: func(in1 *v1.Namespace) (*v1.Namespace, error) {
+//		               panic("mock out the Update method")
+//	            },
+//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+//		               panic("mock out the Watch method")
+//	            },
+//	        }
 //
-//         // use mockedNamespaceInterface in code that requires v11.NamespaceInterface
-//         // and then make assertions.
+//	        // use mockedNamespaceInterface in code that requires v11.NamespaceInterface
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type NamespaceInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.NamespaceHandlerFunc)
@@ -973,7 +984,8 @@ func (mock *NamespaceInterfaceMock) AddClusterScopedFeatureHandler(ctx context.C
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedNamespaceInterface.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedNamespaceInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *NamespaceInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1020,7 +1032,8 @@ func (mock *NamespaceInterfaceMock) AddClusterScopedFeatureLifecycle(ctx context
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//     len(mockedNamespaceInterface.AddClusterScopedFeatureLifecycleCalls())
+//
+//	len(mockedNamespaceInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *NamespaceInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1065,7 +1078,8 @@ func (mock *NamespaceInterfaceMock) AddClusterScopedHandler(ctx context.Context,
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedNamespaceInterface.AddClusterScopedHandlerCalls())
+//
+//	len(mockedNamespaceInterface.AddClusterScopedHandlerCalls())
 func (mock *NamespaceInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1108,7 +1122,8 @@ func (mock *NamespaceInterfaceMock) AddClusterScopedLifecycle(ctx context.Contex
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//     len(mockedNamespaceInterface.AddClusterScopedLifecycleCalls())
+//
+//	len(mockedNamespaceInterface.AddClusterScopedLifecycleCalls())
 func (mock *NamespaceInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1151,7 +1166,8 @@ func (mock *NamespaceInterfaceMock) AddFeatureHandler(ctx context.Context, enabl
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedNamespaceInterface.AddFeatureHandlerCalls())
+//
+//	len(mockedNamespaceInterface.AddFeatureHandlerCalls())
 func (mock *NamespaceInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1194,7 +1210,8 @@ func (mock *NamespaceInterfaceMock) AddFeatureLifecycle(ctx context.Context, ena
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//     len(mockedNamespaceInterface.AddFeatureLifecycleCalls())
+//
+//	len(mockedNamespaceInterface.AddFeatureLifecycleCalls())
 func (mock *NamespaceInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1235,7 +1252,8 @@ func (mock *NamespaceInterfaceMock) AddHandler(ctx context.Context, name string,
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedNamespaceInterface.AddHandlerCalls())
+//
+//	len(mockedNamespaceInterface.AddHandlerCalls())
 func (mock *NamespaceInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1274,7 +1292,8 @@ func (mock *NamespaceInterfaceMock) AddLifecycle(ctx context.Context, name strin
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//     len(mockedNamespaceInterface.AddLifecycleCalls())
+//
+//	len(mockedNamespaceInterface.AddLifecycleCalls())
 func (mock *NamespaceInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1306,7 +1325,8 @@ func (mock *NamespaceInterfaceMock) Controller() v11.NamespaceController {
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//     len(mockedNamespaceInterface.ControllerCalls())
+//
+//	len(mockedNamespaceInterface.ControllerCalls())
 func (mock *NamespaceInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1335,7 +1355,8 @@ func (mock *NamespaceInterfaceMock) Create(in1 *v1.Namespace) (*v1.Namespace, er
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//     len(mockedNamespaceInterface.CreateCalls())
+//
+//	len(mockedNamespaceInterface.CreateCalls())
 func (mock *NamespaceInterfaceMock) CreateCalls() []struct {
 	In1 *v1.Namespace
 } {
@@ -1368,7 +1389,8 @@ func (mock *NamespaceInterfaceMock) Delete(name string, options *metav1.DeleteOp
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//     len(mockedNamespaceInterface.DeleteCalls())
+//
+//	len(mockedNamespaceInterface.DeleteCalls())
 func (mock *NamespaceInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1403,7 +1425,8 @@ func (mock *NamespaceInterfaceMock) DeleteCollection(deleteOpts *metav1.DeleteOp
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//     len(mockedNamespaceInterface.DeleteCollectionCalls())
+//
+//	len(mockedNamespaceInterface.DeleteCollectionCalls())
 func (mock *NamespaceInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1440,7 +1463,8 @@ func (mock *NamespaceInterfaceMock) DeleteNamespaced(namespace string, name stri
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//     len(mockedNamespaceInterface.DeleteNamespacedCalls())
+//
+//	len(mockedNamespaceInterface.DeleteNamespacedCalls())
 func (mock *NamespaceInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1477,7 +1501,8 @@ func (mock *NamespaceInterfaceMock) Get(name string, opts metav1.GetOptions) (*v
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedNamespaceInterface.GetCalls())
+//
+//	len(mockedNamespaceInterface.GetCalls())
 func (mock *NamespaceInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1514,7 +1539,8 @@ func (mock *NamespaceInterfaceMock) GetNamespaced(namespace string, name string,
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//     len(mockedNamespaceInterface.GetNamespacedCalls())
+//
+//	len(mockedNamespaceInterface.GetNamespacedCalls())
 func (mock *NamespaceInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1549,7 +1575,8 @@ func (mock *NamespaceInterfaceMock) List(opts metav1.ListOptions) (*v1.Namespace
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedNamespaceInterface.ListCalls())
+//
+//	len(mockedNamespaceInterface.ListCalls())
 func (mock *NamespaceInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1582,7 +1609,8 @@ func (mock *NamespaceInterfaceMock) ListNamespaced(namespace string, opts metav1
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//     len(mockedNamespaceInterface.ListNamespacedCalls())
+//
+//	len(mockedNamespaceInterface.ListNamespacedCalls())
 func (mock *NamespaceInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1612,7 +1640,8 @@ func (mock *NamespaceInterfaceMock) ObjectClient() *objectclient.ObjectClient {
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//     len(mockedNamespaceInterface.ObjectClientCalls())
+//
+//	len(mockedNamespaceInterface.ObjectClientCalls())
 func (mock *NamespaceInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1641,7 +1670,8 @@ func (mock *NamespaceInterfaceMock) Update(in1 *v1.Namespace) (*v1.Namespace, er
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//     len(mockedNamespaceInterface.UpdateCalls())
+//
+//	len(mockedNamespaceInterface.UpdateCalls())
 func (mock *NamespaceInterfaceMock) UpdateCalls() []struct {
 	In1 *v1.Namespace
 } {
@@ -1672,7 +1702,8 @@ func (mock *NamespaceInterfaceMock) Watch(opts metav1.ListOptions) (watch.Interf
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//     len(mockedNamespaceInterface.WatchCalls())
+//
+//	len(mockedNamespaceInterface.WatchCalls())
 func (mock *NamespaceInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1695,19 +1726,19 @@ var _ v11.NamespacesGetter = &NamespacesGetterMock{}
 
 // NamespacesGetterMock is a mock implementation of v11.NamespacesGetter.
 //
-//     func TestSomethingThatUsesNamespacesGetter(t *testing.T) {
+//	    func TestSomethingThatUsesNamespacesGetter(t *testing.T) {
 //
-//         // make and configure a mocked v11.NamespacesGetter
-//         mockedNamespacesGetter := &NamespacesGetterMock{
-//             NamespacesFunc: func(namespace string) v11.NamespaceInterface {
-// 	               panic("mock out the Namespaces method")
-//             },
-//         }
+//	        // make and configure a mocked v11.NamespacesGetter
+//	        mockedNamespacesGetter := &NamespacesGetterMock{
+//	            NamespacesFunc: func(namespace string) v11.NamespaceInterface {
+//		               panic("mock out the Namespaces method")
+//	            },
+//	        }
 //
-//         // use mockedNamespacesGetter in code that requires v11.NamespacesGetter
-//         // and then make assertions.
+//	        // use mockedNamespacesGetter in code that requires v11.NamespacesGetter
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type NamespacesGetterMock struct {
 	// NamespacesFunc mocks the Namespaces method.
 	NamespacesFunc func(namespace string) v11.NamespaceInterface
@@ -1740,7 +1771,8 @@ func (mock *NamespacesGetterMock) Namespaces(namespace string) v11.NamespaceInte
 
 // NamespacesCalls gets all the calls that were made to Namespaces.
 // Check the length with:
-//     len(mockedNamespacesGetter.NamespacesCalls())
+//
+//	len(mockedNamespacesGetter.NamespacesCalls())
 func (mock *NamespacesGetterMock) NamespacesCalls() []struct {
 	Namespace string
 } {

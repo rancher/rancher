@@ -43,7 +43,7 @@ func init() {
 	resource.Put(ClusterRoleTemplateBindingGroupVersionResource)
 }
 
-// Deprecated use v3.ClusterRoleTemplateBinding instead
+// Deprecated: use v3.ClusterRoleTemplateBinding instead
 type ClusterRoleTemplateBinding = v3.ClusterRoleTemplateBinding
 
 func NewClusterRoleTemplateBinding(namespace, name string, obj v3.ClusterRoleTemplateBinding) *v3.ClusterRoleTemplateBinding {

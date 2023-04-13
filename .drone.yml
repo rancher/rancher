@@ -7,7 +7,7 @@ platform:
   arch: amd64
 
 steps:
-- name: provisioning-tests
+- name: provisioning-tests-pr
   image: rancher/dapper:v0.5.8
   commands:
   - dapper provisioning-tests
@@ -17,9 +17,25 @@ steps:
     path: /var/run/docker.sock
   when:
     event:
-    - push
     - pull_request
-    - tag
+- name: provisioning-tests-push
+  image: rancher/dapper:v0.5.8
+  commands:
+  - dapper provisioning-tests
+  privileged: true
+  volumes:
+  - name: docker
+    path: /var/run/docker.sock
+  when:
+    instance:
+      - drone-publish.rancher.io
+    ref:
+      include:
+        - "refs/heads/master"
+        - "refs/heads/release/v*"
+        - "refs/tags/v*"
+    event:
+    - push
 
 volumes:
 - name: docker
@@ -39,7 +55,7 @@ platform:
   arch: amd64
 
 steps:
-- name: provisioning-tests
+- name: provisioning-tests-pr
   image: rancher/dapper:v0.5.8
   commands:
   - dapper provisioning-tests-rke
@@ -49,9 +65,25 @@ steps:
     path: /var/run/docker.sock
   when:
     event:
-    - push
     - pull_request
-    - tag
+- name: provisioning-tests-push
+  image: rancher/dapper:v0.5.8
+  commands:
+  - dapper provisioning-tests-rke
+  privileged: true
+  volumes:
+  - name: docker
+    path: /var/run/docker.sock
+  when:
+    instance:
+      - drone-publish.rancher.io
+    ref:
+      include:
+        - "refs/heads/master"
+        - "refs/heads/release/v*"
+        - "refs/tags/v*"
+    event:
+    - push
 
 volumes:
 - name: docker
@@ -71,7 +103,7 @@ platform:
   arch: amd64
 
 steps:
-- name: build
+- name: build-pr
   image: rancher/dapper:v0.5.8
   commands:
   - dapper ci
@@ -81,8 +113,26 @@ steps:
     path: /var/run/docker.sock
   when:
     event:
-    - push
     - pull_request
+
+- name: build-push-tag
+  image: rancher/dapper:v0.5.8
+  commands:
+  - dapper ci
+  privileged: true
+  volumes:
+  - name: docker
+    path: /var/run/docker.sock
+  when:
+    instance:
+      - drone-publish.rancher.io
+    ref:
+      include:
+        - "refs/heads/master"
+        - "refs/heads/release/v*"
+        - "refs/tags/v*"
+    event:
+    - push
     - tag
 
 - name: fossa-amd64
@@ -113,6 +163,13 @@ steps:
   commands:
   - "cp -r ./bin/* ./package/"
   when:
+    instance:
+      - drone-publish.rancher.io
+    ref:
+      include:
+        - "refs/heads/master"
+        - "refs/heads/release/v*"
+        - "refs/tags/v*"
     event:
     - push
     - tag
@@ -191,30 +248,6 @@ steps:
     event:
     - push
 
-- name: docker-publish-head-runtime
-  image: plugins/docker
-  settings:
-    purge: false
-    build_args:
-    - ARCH=amd64
-    - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-head
-    context: package/
-    custom_dns: 1.1.1.1
-    dockerfile: package/Dockerfile.runtime
-    tag: ${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-linux-amd64
-    password:
-      from_secret: docker_password
-    repo: rancher/rancher-runtime
-    username:
-      from_secret: docker_username
-  when:
-    ref:
-      include:
-      - "refs/heads/master"
-      - "refs/heads/release/v*"
-    event:
-    - push
-
 - name: docker-publish
   image: plugins/docker
   settings:
@@ -270,26 +303,6 @@ steps:
     password:
       from_secret: docker_password
     repo: rancher/rancher-agent
-    tag: "${DRONE_TAG}-linux-amd64"
-    username:
-      from_secret: docker_username
-  when:
-    event:
-    - tag
-
-- name: docker-publish-runtime
-  image: plugins/docker
-  settings:
-    purge: false
-    build_args:
-    - ARCH=amd64
-    - "VERSION=${DRONE_TAG}"
-    context: package/
-    custom_dns: 1.1.1.1
-    dockerfile: package/Dockerfile.runtime
-    password:
-      from_secret: docker_password
-    repo: rancher/rancher-runtime
     tag: "${DRONE_TAG}-linux-amd64"
     username:
       from_secret: docker_username
@@ -335,21 +348,23 @@ steps:
       exclude:
       - "refs/tags/*-*"
 
-- name: slack_notify
-  image: plugins/slack
-  settings:
-    template: "Build {{build.link}} failed to publish an image/artifact.\n"
-    username: Drone_Publish
-    webhook:
-      from_secret: slack_webhook
+- name: check-release-images-exists
+  image: rancher/dapper:v0.5.8
+  failure: ignore
+  commands:
+  - dapper check-release-images-exist
+  privileged: true
+  volumes:
+  - name: docker
+    path: /var/run/docker.sock
   when:
-    event:
-      exclude:
-      - pull_request
     instance:
-    - drone-publish.rancher.io
-    status:
-    - failure
+      - drone-publish.rancher.io
+    ref:
+      include:
+        - "refs/tags/v*"
+    event:
+    - tag
 
 volumes:
 - name: docker
@@ -369,7 +384,7 @@ platform:
   arch: arm64
 
 steps:
-- name: build
+- name: build-pr
   image: rancher/dapper:v0.5.8
   commands:
   - dapper ci
@@ -379,8 +394,26 @@ steps:
     path: /var/run/docker.sock
   when:
     event:
-    - push
     - pull_request
+
+- name: build-push-tag
+  image: rancher/dapper:v0.5.8
+  commands:
+  - dapper ci
+  privileged: true
+  volumes:
+  - name: docker
+    path: /var/run/docker.sock
+  when:
+    instance:
+      - drone-publish.rancher.io
+    ref:
+      include:
+        - "refs/heads/master"
+        - "refs/heads/release/v*"
+        - "refs/tags/v*"
+    event:
+    - push
     - tag
 
 - name: stage-binaries
@@ -388,6 +421,13 @@ steps:
   commands:
   - "cp -r ./bin/* ./package/"
   when:
+    instance:
+      - drone-publish.rancher.io
+    ref:
+      include:
+        - "refs/heads/master"
+        - "refs/heads/release/v*"
+        - "refs/tags/v*"
     event:
     - push
     - tag
@@ -528,22 +568,6 @@ steps:
     event:
     - tag
 
-- name: slack_notify
-  image: plugins/slack
-  settings:
-    template: "Build {{build.link}} failed to publish an image/artifact.\n"
-    username: Drone_Publish
-    webhook:
-      from_secret: slack_webhook
-  when:
-    event:
-      exclude:
-      - pull_request
-    instance:
-    - drone-publish.rancher.io
-    status:
-    - failure
-
 volumes:
 - name: docker
   host:
@@ -576,7 +600,20 @@ steps:
   - git fetch origin $DRONE_COMMIT_REF
   - git checkout $DRONE_COMMIT -b origin/$DRONE_TARGET_BRANCH
 
-- name: build
+- name: build-pr
+  image: rancher/dapper:v0.5.8
+  failure: ignore
+  commands:
+  - dapper ci
+  privileged: true
+  volumes:
+  - name: docker
+    path: /var/run/docker.sock
+  when:
+    event:
+    - pull_request
+
+- name: build-push-tag
   image: rancher/dapper:v0.5.8
   failure: ignore
   commands:
@@ -586,9 +623,15 @@ steps:
   - name: docker
     path: /var/run/docker.sock
   when:
+    instance:
+      - drone-publish.rancher.io
+    ref:
+      include:
+        - "refs/heads/master"
+        - "refs/heads/release/v*"
+        - "refs/tags/v*"
     event:
     - push
-    - pull_request
     - tag
 
 - name: stage-binaries
@@ -597,6 +640,13 @@ steps:
   commands:
   - "cp -r ./bin/* ./package/"
   when:
+    instance:
+      - drone-publish.rancher.io
+    ref:
+      include:
+        - "refs/heads/master"
+        - "refs/heads/release/v*"
+        - "refs/tags/v*"
     event:
     - push
     - tag
@@ -612,7 +662,6 @@ steps:
     build_args:
     - ARCH=s390x
     - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-head
-    - K3S_BUILDER=k3s_root
     context: package/
     custom_dns: 1.1.1.1
     dockerfile: package/Dockerfile
@@ -699,7 +748,6 @@ steps:
     build_args:
     - ARCH=s390x
     - "VERSION=${DRONE_TAG}"
-    - K3S_BUILDER=k3s_root
     context: package/
     custom_dns: 1.1.1.1
     dockerfile: package/Dockerfile
@@ -781,8 +829,13 @@ platform:
   arch: amd64
   version: 1809
 
+# Currently have to define "depth" as otherwise clone fails at
+# https://github.com/drone/drone-git/blob/39d233b3d9eccc68e66508a06a725a2567f33143/windows/clone-tag.ps1#L12
+clone:
+  depth: 20
+
 steps:
-  - name: build
+  - name: build-pr
     pull: always
     image: rancher/dapper:v0.5.8
     commands:
@@ -792,8 +845,26 @@ steps:
         path: \\\\.\\pipe\\docker_engine
     when:
       event:
-        - push
         - pull_request
+
+  - name: build-push-tag
+    pull: always
+    image: rancher/dapper:v0.5.8
+    commands:
+      - dapper.exe -f Dockerfile-windows.dapper -d ci
+    volumes:
+      - name: docker_pipe
+        path: \\\\.\\pipe\\docker_engine
+    when:
+      instance:
+        - drone-publish.rancher.io
+      ref:
+        include:
+          - "refs/heads/master"
+          - "refs/heads/release/v*"
+          - "refs/tags/v*"
+      event:
+        - push
         - tag
 
   - name: stage-binaries
@@ -801,6 +872,13 @@ steps:
     commands:
       - "cp -r ./bin/* ./package/windows/"
     when:
+      instance:
+        - drone-publish.rancher.io
+      ref:
+        include:
+          - "refs/heads/master"
+          - "refs/heads/release/v*"
+          - "refs/tags/v*"
       event:
         - push
         - tag
@@ -857,22 +935,6 @@ steps:
       event:
         - tag
 
-  - name: slack_notify
-    image: plugins/slack
-    settings:
-      template: "Build {{build.link}} failed to publish an image/artifact.\n"
-      username: Drone_Publish
-      webhook:
-        from_secret: slack_webhook
-    when:
-      event:
-        exclude:
-          - pull_request
-      instance:
-        - drone-publish.rancher.io
-      status:
-        - failure
-
 volumes:
   - name: docker_pipe
     host:
@@ -892,16 +954,13 @@ platform:
   arch: amd64
   version: 2022
 
-# remove this and use upstream images when https://github.com/drone/drone-git/pull/25 is merged
+# Currently have to define "depth" as otherwise clone fails at
+# https://github.com/drone/drone-git/blob/39d233b3d9eccc68e66508a06a725a2567f33143/windows/clone-tag.ps1#L12
 clone:
-  disable: true
+  depth: 20
 
 steps:
-  - name: clone
-    image: rancher/drone-images:git-amd64-ltsc2022
-    settings:
-      depth: 20
-  - name: build
+  - name: build-pr
     pull: always
     image: rancher/dapper:v0.5.8
     commands:
@@ -911,8 +970,26 @@ steps:
         path: \\\\.\\pipe\\docker_engine
     when:
       event:
-        - push
         - pull_request
+
+  - name: build-push-tag
+    pull: always
+    image: rancher/dapper:v0.5.8
+    commands:
+      - dapper.exe -f Dockerfile-windows.dapper -d ci
+    volumes:
+      - name: docker_pipe
+        path: \\\\.\\pipe\\docker_engine
+    when:
+      instance:
+        - drone-publish.rancher.io
+      ref:
+        include:
+          - "refs/heads/master"
+          - "refs/heads/release/v*"
+          - "refs/tags/v*"
+      event:
+        - push
         - tag
 
   - name: stage-binaries
@@ -920,6 +997,13 @@ steps:
     commands:
       - "cp -r ./bin/* ./package/windows/"
     when:
+      instance:
+        - drone-publish.rancher.io
+      ref:
+        include:
+          - "refs/heads/master"
+          - "refs/heads/release/v*"
+          - "refs/tags/v*"
       event:
         - push
         - tag
@@ -976,22 +1060,6 @@ steps:
       event:
         - tag
 
-  - name: slack_notify
-    image: plugins/slack
-    settings:
-      template: "Build {{build.link}} failed to publish an image/artifact.\n"
-      username: Drone_Publish
-      webhook:
-        from_secret: slack_webhook
-    when:
-      event:
-        exclude:
-          - pull_request
-      instance:
-        - drone-publish.rancher.io
-      status:
-        - failure
-
 volumes:
   - name: docker_pipe
     host:
@@ -1007,22 +1075,6 @@ kind: pipeline
 name: manifest
 
 steps:
-- name: push-runtime-manifest
-  image: plugins/manifest
-  settings:
-    username:
-      from_secret: docker_username
-    password:
-      from_secret: docker_password
-    spec: manifest-runtime.tmpl
-  when:
-    instance:
-      include:
-      - drone-publish.rancher.io
-    event:
-    - push
-    - tag
-
 - name: push-installer-manifest
   image: plugins/manifest
   settings:
@@ -1036,6 +1088,11 @@ steps:
     instance:
       include:
       - drone-publish.rancher.io
+    ref:
+      include:
+        - "refs/heads/master"
+        - "refs/heads/release/v*"
+        - "refs/tags/v*"
     event:
     - push
     - tag
@@ -1053,6 +1110,11 @@ steps:
     instance:
       include:
       - drone-publish.rancher.io
+    ref:
+      include:
+        - "refs/heads/master"
+        - "refs/heads/release/v*"
+        - "refs/tags/v*"
     event:
     - push
 
@@ -1069,6 +1131,11 @@ steps:
     instance:
       include:
       - drone-publish.rancher.io
+    ref:
+      include:
+        - "refs/heads/master"
+        - "refs/heads/release/v*"
+        - "refs/tags/v*"
     event:
     - push
     - tag
@@ -1086,6 +1153,11 @@ steps:
     instance:
       include:
       - drone-publish.rancher.io
+    ref:
+      include:
+        - "refs/heads/master"
+        - "refs/heads/release/v*"
+        - "refs/tags/v*"
     event:
     - push
 
@@ -1102,6 +1174,11 @@ steps:
     instance:
       include:
       - drone-publish.rancher.io
+    ref:
+      include:
+        - "refs/heads/master"
+        - "refs/heads/release/v*"
+        - "refs/tags/v*"
     event:
     - push
 
@@ -1118,6 +1195,11 @@ steps:
     instance:
       include:
       - drone-publish.rancher.io
+    ref:
+      include:
+        - "refs/heads/master"
+        - "refs/heads/release/v*"
+        - "refs/tags/v*"
     event:
     - push
     - tag
@@ -1131,6 +1213,13 @@ steps:
   - name: docker
     path: /var/run/docker.sock
   when:
+    instance:
+      - drone-publish.rancher.io
+    ref:
+      include:
+        - "refs/heads/master"
+        - "refs/heads/release/v*"
+        - "refs/tags/v*"
     event:
     - push
     - tag
@@ -1148,23 +1237,6 @@ steps:
   when:
     event:
     - tag
-
-- name: slack_notify
-  image: plugins/slack
-  settings:
-    template: "Build {{build.link}} failed to push manifests.\n"
-    username: Drone_Publish
-    webhook:
-      from_secret: slack_webhook
-  when:
-    event:
-      exclude:
-      - pull_request
-    instance:
-      include:
-      - drone-publish.rancher.io
-    status:
-      - failure
 
 volumes:
 - name: docker
@@ -1334,6 +1406,11 @@ platform:
   arch: amd64
   version: 1809
 
+# Currently have to define "depth" as otherwise clone fails at
+# https://github.com/drone/drone-git/blob/39d233b3d9eccc68e66508a06a725a2567f33143/windows/clone-tag.ps1#L12
+clone:
+  depth: 20
+
 steps:
 - name: docker-image-digests
   image: rancher/drone-docker-image-digests:v0.0.12
@@ -1379,16 +1456,12 @@ platform:
   arch: amd64
   version: 2022
 
-# remove this and use upstream images when https://github.com/drone/drone-git/pull/25 is merged
+# Currently have to define "depth" as otherwise clone fails at
+# https://github.com/drone/drone-git/blob/39d233b3d9eccc68e66508a06a725a2567f33143/windows/clone-tag.ps1#L12
 clone:
-  disable: true
+  depth: 20
 
 steps:
-- name: clone
-  image: rancher/drone-images:git-amd64-ltsc2022
-  settings:
-    depth: 1
-
 - name: docker-image-digests
   image: rancher/drone-docker-image-digests:v0.0.12
   environment:
@@ -1461,23 +1534,6 @@ steps:
     target:
     - promote-stable
 
-- name: slack_notify
-  image: plugins/slack
-  settings:
-    template: "Build {{build.link}} failed to promote chart.\n"
-    username: Drone_Publish
-    webhook:
-      from_secret: slack_webhook
-  when:
-    event:
-    - promote
-    target:
-    - promote-stable
-    instance:
-      - drone-publish.rancher.io
-    status:
-      - failure
-
 volumes:
 - name: docker
   host:
@@ -1516,23 +1572,6 @@ steps:
     target:
     - promote-docker-image
 
-- name: slack_notify
-  image: plugins/slack
-  settings:
-    template: "Build {{build.link}} failed to push Docker image.\n"
-    username: Drone_Publish
-    webhook:
-      from_secret: slack_webhook
-  when:
-    event:
-    - promote
-    target:
-    - promote-docker-image
-    instance:
-      - drone-publish.rancher.io
-    status:
-      - failure
-
 volumes:
 - name: docker
   host:
@@ -1541,4 +1580,3 @@ volumes:
 trigger:
   event:
   - promote
-...

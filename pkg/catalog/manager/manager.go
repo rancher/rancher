@@ -22,6 +22,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// IncompatibleTemplateVersionErr is returned when there's no valid template version for the current Kubernetes cluster
+type IncompatibleTemplateVersionErr error
+
 type Manager struct {
 	catalogClient         v3.CatalogInterface
 	CatalogLister         v3.CatalogLister
@@ -237,7 +240,7 @@ func (m *Manager) ValidateKubeVersion(template *v3.CatalogTemplateVersion, clust
 		return err
 	}
 	if !constraint(k8sVersion) {
-		return fmt.Errorf("incompatible kubernetes version [%s] for template [%s]", k8sVersion.String(), template.Name)
+		return IncompatibleTemplateVersionErr(fmt.Errorf("incompatible kubernetes version [%s] for template [%s]", k8sVersion.String(), template.Name))
 	}
 	return nil
 }
@@ -280,7 +283,7 @@ func (m *Manager) ValidateRancherVersion(template *v3.CatalogTemplateVersion, cu
 		return err
 	}
 	if !constraint(rancherVersion) {
-		return fmt.Errorf("incompatible rancher version [%s] for template [%s]", serverVersion, template.Name)
+		return IncompatibleTemplateVersionErr(fmt.Errorf("incompatible rancher version [%s] for template [%s]", serverVersion, template.Name))
 	}
 	return nil
 }
@@ -315,7 +318,7 @@ func (m *Manager) LatestAvailableTemplateVersion(template *v3.CatalogTemplate, c
 		}
 	}
 
-	return nil, errors.Errorf("template %s incompatible with rancher version or cluster's [%s] kubernetes version", template.Name, clusterName)
+	return nil, IncompatibleTemplateVersionErr(errors.Errorf("template %s incompatible with rancher version or cluster's [%s] kubernetes version", template.Name, clusterName))
 }
 
 func (m *Manager) GetSystemAppCatalogID(templateVersionID, clusterName string) (string, error) {

@@ -4,10 +4,12 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
+	"fmt"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/namespace"
+	"github.com/rancher/rancher/pkg/serviceaccounttoken"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
 	appscontrollers "github.com/rancher/wrangler/pkg/generated/controllers/apps/v1"
@@ -15,21 +17,26 @@ import (
 	"github.com/rancher/wrangler/pkg/name"
 	"github.com/rancher/wrangler/pkg/relatedresource"
 	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes"
 )
 
 type handler struct {
 	serviceAccounts corev1controllers.ServiceAccountCache
 	deploymentCache appscontrollers.DeploymentCache
 	daemonSetCache  appscontrollers.DaemonSetCache
-	secrets         corev1controllers.SecretCache
+	secretsCache    corev1controllers.SecretCache
+	secretsClient   corev1controllers.SecretClient
 	settings        mgmtcontrollers.SettingClient
 	apiServices     mgmtcontrollers.APIServiceCache
 	services        corev1controllers.ServiceCache
 	embedded        bool
+	k8s             kubernetes.Interface
+	ctx             context.Context
 }
 
 func Register(ctx context.Context, context *wrangler.Context, embedded bool) {
@@ -37,11 +44,14 @@ func Register(ctx context.Context, context *wrangler.Context, embedded bool) {
 		serviceAccounts: context.Core.ServiceAccount().Cache(),
 		deploymentCache: context.Apps.Deployment().Cache(),
 		daemonSetCache:  context.Apps.DaemonSet().Cache(),
-		secrets:         context.Core.Secret().Cache(),
+		secretsCache:    context.Core.Secret().Cache(),
+		secretsClient:   context.Core.Secret(),
 		settings:        context.Mgmt.Setting(),
 		apiServices:     context.Mgmt.APIService().Cache(),
 		services:        context.Core.Service().Cache(),
 		embedded:        embedded,
+		k8s:             context.K8s,
+		ctx:             ctx,
 	}
 
 	relatedresource.WatchClusterScoped(ctx, "apiservice-watch-owner",
@@ -137,19 +147,12 @@ func (h *handler) getToken(sa *corev1.ServiceAccount) (string, error) {
 		return "", err
 	}
 
-	if len(sa.Secrets) == 0 {
-		return "", nil
-	}
-
-	secret, err := h.secrets.Get(sa.Namespace, sa.Secrets[0].Name)
+	// create a secret-based token for the service account if one does not exist
+	secret, err := serviceaccounttoken.EnsureSecretForServiceAccount(h.ctx, h.secretsCache.Get, h.k8s, sa)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("error ensuring secret for service account [%s:%s]: %w", sa.Namespace, sa.Name, err)
 	}
-
-	token := secret.Data["token"]
-	if len(token) == 0 {
-		return "", nil
-	}
+	token := secret.Data[v1.ServiceAccountTokenKey]
 
 	hash := sha256.Sum256(token)
 	return base64.StdEncoding.EncodeToString(hash[:]), nil

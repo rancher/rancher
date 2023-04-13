@@ -14,9 +14,13 @@ import (
 	"github.com/rancher/rancher/tests/framework/clients/ec2"
 	"github.com/rancher/rancher/tests/framework/clients/rancher/catalog"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
-	"github.com/rancher/rancher/tests/framework/clients/rancher/provisioning"
+	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
+
+	kubeProvisioning "github.com/rancher/rancher/tests/framework/clients/provisioning"
+	kubeRKE "github.com/rancher/rancher/tests/framework/clients/rke"
 	"github.com/rancher/rancher/tests/framework/pkg/clientbase"
 	"github.com/rancher/rancher/tests/framework/pkg/config"
+	"github.com/rancher/rancher/tests/framework/pkg/environmentflag"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -31,15 +35,17 @@ import (
 type Client struct {
 	// Client used to access management.cattle.io v3 API resources
 	Management *management.Client
-	// Client used to access provisioning.cattle.io v1 API resources (clusters)
-	Provisioning *provisioning.Client
+	// Client used to access Steve v1 API resources
+	Steve *v1.Client
 	// Client used to access catalog.cattle.io v1 API resources (apps, charts, etc.)
 	Catalog *catalog.Client
 	// Config used to test against a rancher instance
 	RancherConfig *Config
-	restConfig    *rest.Config
 	// Session is the session object used by the client to track all the resources being created by the client.
 	Session *session.Session
+	// Flags is the environment flags used by the client to test selectively against a rancher instance.
+	Flags      *environmentflag.EnvironmentFlags
+	restConfig *rest.Config
 }
 
 // NewClient is the constructor to the initializing a rancher Client. It takes a bearer token and session.Session. If bearer token is not provided,
@@ -48,12 +54,16 @@ func NewClient(bearerToken string, session *session.Session) (*Client, error) {
 	rancherConfig := new(Config)
 	config.LoadConfig(ConfigurationFileKey, rancherConfig)
 
+	environmentFlags := environmentflag.NewEnvironmentFlags()
+	environmentflag.LoadEnvironmentFlags(environmentflag.ConfigurationFileKey, environmentFlags)
+
 	if bearerToken == "" {
 		bearerToken = rancherConfig.AdminToken
 	}
 
 	c := &Client{
 		RancherConfig: rancherConfig,
+		Flags:         &environmentFlags,
 	}
 
 	session.CleanupEnabled = *rancherConfig.Cleanup
@@ -69,12 +79,12 @@ func NewClient(bearerToken string, session *session.Session) (*Client, error) {
 
 	c.Management.Ops.Session = session
 
-	provClient, err := provisioning.NewForConfig(restConfig, session)
+	c.Steve, err = v1.NewClient(clientOptsV1(restConfig, c.RancherConfig))
 	if err != nil {
 		return nil, err
 	}
 
-	c.Provisioning = provClient
+	c.Steve.Ops.Session = session
 
 	catalogClient, err := catalog.NewForConfig(restConfig, session)
 	if err != nil {
@@ -102,6 +112,16 @@ func newRestConfig(bearerToken string, rancherConfig *Config) *rest.Config {
 func clientOpts(restConfig *rest.Config, rancherConfig *Config) *clientbase.ClientOpts {
 	return &clientbase.ClientOpts{
 		URL:      fmt.Sprintf("https://%s/v3", rancherConfig.Host),
+		TokenKey: restConfig.BearerToken,
+		Insecure: restConfig.Insecure,
+		CACerts:  rancherConfig.CACerts,
+	}
+}
+
+// clientOptsV1 is a constructor that sets ups clientbase.ClientOpts the configuration used by the v1 Rancher clients.
+func clientOptsV1(restConfig *rest.Config, rancherConfig *Config) *clientbase.ClientOpts {
+	return &clientbase.ClientOpts{
+		URL:      fmt.Sprintf("https://%s/v1", rancherConfig.Host),
 		TokenKey: restConfig.BearerToken,
 		Insecure: restConfig.Insecure,
 		CACerts:  rancherConfig.CACerts,
@@ -156,13 +176,19 @@ func (c *Client) AsUser(user *management.User) (*Client, error) {
 	return NewClient(returnedToken.Token, c.Session)
 }
 
+// ReLogin reinstantiates a Client to update its API schema. This function would be used for a non admin user that needs to be
+// "reloaded" inorder to have updated permissions for certain resources.
+func (c *Client) ReLogin() (*Client, error) {
+	return NewClient(c.restConfig.BearerToken, c.Session)
+}
+
 // WithSession accepts a session.Session and instantiates a new Client to reference this new session.Session. The main purpose is to use it
 // when created "sub sessions" when tracking resources created at a test case scope.
 func (c *Client) WithSession(session *session.Session) (*Client, error) {
 	return NewClient(c.restConfig.BearerToken, session)
 }
 
-// GetClusterCatalogClient is a function that takes a clusterID and instanitates a catalog client to directly communicate with that specific cluster.
+// GetClusterCatalogClient is a function that takes a clusterID and instantiates a catalog client to directly communicate with that specific cluster.
 func (c *Client) GetClusterCatalogClient(clusterID string) (*catalog.Client, error) {
 	restConfig := *c.restConfig
 	restConfig.Host = fmt.Sprintf("https://%s/k8s/clusters/%s", c.restConfig.Host, clusterID)
@@ -182,6 +208,26 @@ func (c *Client) GetRancherDynamicClient() (dynamic.Interface, error) {
 		return nil, err
 	}
 	return dynamic, nil
+}
+
+// GetKubeAPIProvisioningClient is a function that instantiates a provisioning client that communicates with the Kube API of a cluster
+func (c *Client) GetKubeAPIProvisioningClient() (*kubeProvisioning.Client, error) {
+	provClient, err := kubeProvisioning.NewForConfig(c.restConfig, c.Session)
+	if err != nil {
+		return nil, err
+	}
+
+	return provClient, nil
+}
+
+// GetKubeAPIRKEClient is a function that instantiates a rke client that communicates with the Kube API of a cluster
+func (c *Client) GetKubeAPIRKEClient() (*kubeRKE.Client, error) {
+	rkeClient, err := kubeRKE.NewForConfig(c.restConfig, c.Session)
+	if err != nil {
+		return nil, err
+	}
+
+	return rkeClient, nil
 }
 
 // GetDownStreamClusterClient is a helper function that instantiates a dynamic client to communicate with a specific cluster.
@@ -260,7 +306,7 @@ func (c *Client) login(user *management.User) (*management.Token, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = c.doAction("/v3-public/localproviders/local", "login", bodyContent, token)
+	err = c.doAction("/v3-public/localProviders/local", "login", bodyContent, token)
 	if err != nil {
 		return nil, err
 	}

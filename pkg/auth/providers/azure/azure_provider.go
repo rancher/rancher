@@ -1,21 +1,19 @@
+// Package azure provides functions and types to register and use Azure AD as the auth provider in Rancher.
 package azure
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
-	"time"
 
-	"github.com/Azure/azure-sdk-for-go/services/graphrbac/1.6/graphrbac"
-	"github.com/Azure/go-autorest/autorest/adal"
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/providers/azure/clients"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
@@ -26,18 +24,14 @@ import (
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/sync/errgroup"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
 const (
-	// Name of the provider
-	Name = "azuread"
+	Name = clients.Name
 )
-
-var groupCache *lru.Cache
 
 type azureProvider struct {
 	ctx         context.Context
@@ -49,10 +43,10 @@ type azureProvider struct {
 
 func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *tokens.Manager) common.AuthProvider {
 	var err error
-	groupCache, err = lru.New(settings.AzureGroupCacheSize.GetInt())
+	clients.GroupCache, err = lru.New(settings.AzureGroupCacheSize.GetInt())
 	if err != nil {
 		logrus.Warnf("initial azure-group-cache-size was invalid value, setting to 10000 error:%v", err)
-		groupCache, _ = lru.New(10000)
+		clients.GroupCache, _ = lru.New(10000)
 	}
 
 	return &azureProvider{
@@ -68,47 +62,48 @@ func (ap *azureProvider) GetName() string {
 	return Name
 }
 
-func (ap *azureProvider) AuthenticateUser(
-	ctx context.Context, input interface{},
-) (v3.Principal, []v3.Principal, string, error) {
+func (ap *azureProvider) AuthenticateUser(ctx context.Context, input interface{}) (v3.Principal, []v3.Principal, string, error) {
 	login, ok := input.(*v32.AzureADLogin)
 	if !ok {
 		return v3.Principal{}, nil, "", errors.New("unexpected input type")
 	}
-	return ap.loginUser(login, nil, false)
+	cfg, err := ap.getAzureConfigK8s()
+	if err != nil {
+		return v3.Principal{}, nil, "", err
+	}
+	return ap.loginUser(cfg, login, false)
 }
 
-func (ap *azureProvider) RefetchGroupPrincipals(principalID string, secret string) ([]v3.Principal, error) {
-	azureClient, err := ap.newAzureClient(secret)
+func (ap *azureProvider) RefetchGroupPrincipals(principalID, secret string) ([]v3.Principal, error) {
+	cfg, err := ap.getAzureConfigK8s()
 	if err != nil {
 		return nil, err
 	}
-
-	oid, err := parseJWTforField(azureClient.accessToken(), "oid")
+	var useDeprecatedAzureADClient = isConfigDeprecated(cfg)
+	azureClient, err := clients.NewAzureClientFromSecret(cfg, useDeprecatedAzureADClient, secret, ap.secrets)
 	if err != nil {
 		return nil, err
 	}
 
 	logrus.Debug("[AZURE_PROVIDER] Started getting user info from AzureAD")
 
-	user, err := azureClient.userClient.Get(context.Background(), oid)
+	parsed, err := clients.ParsePrincipalID(principalID)
+	if err != nil {
+		return nil, err
+	}
+	userPrincipal, err := azureClient.GetUser(parsed["ID"])
 	if err != nil {
 		return nil, err
 	}
 
 	logrus.Debug("[AZURE_PROVIDER] Completed getting user info from AzureAD")
 
-	var mem bool
-	params := graphrbac.UserGetMemberGroupsParameters{
-		SecurityEnabledOnly: &mem,
-	}
-
-	userGroups, err := azureClient.userClient.GetMemberGroups(context.Background(), *user.ObjectID, params)
+	userGroups, err := azureClient.ListGroupMemberships(clients.GetPrincipalID(userPrincipal))
 	if err != nil {
 		return nil, err
 	}
 
-	groupPrincipals, err := ap.userGroupsToPrincipals(azureClient, userGroups)
+	groupPrincipals, err := clients.UserGroupsToPrincipals(azureClient, userGroups)
 	if err != nil {
 		return nil, err
 	}
@@ -116,86 +111,74 @@ func (ap *azureProvider) RefetchGroupPrincipals(principalID string, secret strin
 	return groupPrincipals, nil
 }
 
-func (ap *azureProvider) SearchPrincipals(
-	name string,
-	principalType string,
-	token v3.Token,
-) ([]v3.Principal, error) {
-	var princ []v3.Principal
-
-	secret, err := ap.tokenMGR.GetSecret(token.UserID, Name, []*v3.Token{&token})
-	if err != nil && !apierrors.IsNotFound(err) {
+func (ap *azureProvider) SearchPrincipals(name, principalType string, token v3.Token) ([]v3.Principal, error) {
+	cfg, err := ap.getAzureConfigK8s()
+	if err != nil {
 		return nil, err
 	}
+	var principals []v3.Principal
 
-	client, err := ap.newAzureClient(secret)
+	azureClient, err := ap.newAzureClientFromToken(cfg, &token)
 	if err != nil {
 		return nil, err
 	}
 
 	switch principalType {
 	case "user":
-		princ, err = ap.searchUsers(client, name, token)
+		principals, err = ap.searchUserPrincipalsByName(azureClient, name, token)
 		if err != nil {
 			return nil, err
 		}
 	case "group":
-		princ, err = ap.searchGroups(client, name, token)
+		principals, err = ap.searchGroupPrincipalsByName(azureClient, name, token)
 		if err != nil {
 			return nil, err
 		}
 	case "":
-		users, err := ap.searchUsers(client, name, token)
+		users, err := ap.searchUserPrincipalsByName(azureClient, name, token)
 		if err != nil {
 			return nil, err
 		}
-		groups, err := ap.searchGroups(client, name, token)
+		groups, err := ap.searchGroupPrincipalsByName(azureClient, name, token)
 		if err != nil {
 			return nil, err
 		}
-		princ = append(princ, users...)
-		princ = append(princ, groups...)
-
+		principals = append(principals, users...)
+		principals = append(principals, groups...)
 	}
-
-	return princ, ap.updateToken(client, &token)
+	return principals, ap.updateToken(azureClient, &token)
 }
 
-func (ap *azureProvider) GetPrincipal(
-	principalID string,
-	token v3.Token,
-) (v3.Principal, error) {
-	var princ v3.Principal
+func (ap *azureProvider) GetPrincipal(principalID string, token v3.Token) (v3.Principal, error) {
+	var principal v3.Principal
 	var err error
-
-	secret, err := ap.tokenMGR.GetSecret(token.UserID, Name, []*v3.Token{&token})
-	if err != nil && !apierrors.IsNotFound(err) {
-		return princ, err
-	}
-
-	client, err := ap.newAzureClient(secret)
+	cfg, err := ap.getAzureConfigK8s()
 	if err != nil {
-		return princ, err
+		return v3.Principal{}, err
 	}
 
-	parsed, err := parsePrincipalID(principalID)
+	azureClient, err := ap.newAzureClientFromToken(cfg, &token)
+	if err != nil {
+		return principal, err
+	}
+
+	parsed, err := clients.ParsePrincipalID(principalID)
 	if err != nil {
 		return v3.Principal{}, httperror.NewAPIError(httperror.NotFound, "invalid principal")
 	}
 
 	switch parsed["type"] {
 	case "user":
-		princ, err = ap.getUser(client, parsed["ID"], token)
+		principal, err = ap.getUserPrincipal(azureClient, parsed["ID"], token)
 	case "group":
-		princ, err = ap.getGroup(client, parsed["ID"], token)
+		principal, err = ap.getGroupPrincipal(azureClient, parsed["ID"], token)
 	}
 
 	if err != nil {
 		return v3.Principal{}, err
 	}
 
-	return princ, ap.updateToken(client, &token)
-
+	return principal, ap.updateToken(azureClient, &token)
 }
 
 func (ap *azureProvider) CustomizeSchema(schema *types.Schema) {
@@ -211,61 +194,16 @@ func (ap *azureProvider) TransformToAuthProvider(
 	return p, nil
 }
 
-func (ap *azureProvider) loginUser(
-	azureCredential *v32.AzureADLogin,
-	config *v32.AzureADConfig,
-	test bool,
-) (v3.Principal, []v3.Principal, string, error) {
-	var err error
-
-	if config == nil {
-		config, err = ap.getAzureConfigK8s()
-		if err != nil {
-			return v3.Principal{}, nil, "", err
-		}
-	}
-
-	logrus.Debug("[AZURE_PROVIDER] Started token swap with AzureAD")
-
-	azureClient, err := newClientCode(azureCredential.Code, config)
+func (ap *azureProvider) loginUser(config *v32.AzureADConfig, azureCredential *v32.AzureADLogin, test bool) (v3.Principal, []v3.Principal, string, error) {
+	var useDeprecatedAzureADClient = isConfigDeprecated(config)
+	azureClient, err := clients.NewAzureClientFromCredential(config, useDeprecatedAzureADClient, azureCredential, ap.secrets)
 	if err != nil {
 		return v3.Principal{}, nil, "", err
 	}
-
-	logrus.Debug("[AZURE_PROVIDER] Completed token swap with AzureAD")
-
-	oid, err := parseJWTforField(azureClient.accessToken(), "oid")
+	userPrincipal, groupPrincipals, providerToken, err := azureClient.LoginUser(config, azureCredential)
 	if err != nil {
 		return v3.Principal{}, nil, "", err
 	}
-
-	logrus.Debug("[AZURE_PROVIDER] Started getting user info from AzureAD")
-
-	user, err := azureClient.userClient.Get(context.Background(), oid)
-	if err != nil {
-		return v3.Principal{}, nil, "", err
-	}
-
-	logrus.Debug("[AZURE_PROVIDER] Completed getting user info from AzureAD")
-
-	userPrincipal := ap.userToPrincipal(user)
-	userPrincipal.Me = true
-
-	var mem bool
-	params := graphrbac.UserGetMemberGroupsParameters{
-		SecurityEnabledOnly: &mem,
-	}
-
-	userGroups, err := azureClient.userClient.GetMemberGroups(context.Background(), *user.ObjectID, params)
-	if err != nil {
-		return v3.Principal{}, nil, "", err
-	}
-
-	groupPrincipals, err := ap.userGroupsToPrincipals(azureClient, userGroups)
-	if err != nil {
-		return v3.Principal{}, nil, "", err
-	}
-
 	testAllowedPrincipals := config.AllowedPrincipalIDs
 	if test && config.AccessMode == "restricted" {
 		testAllowedPrincipals = append(testAllowedPrincipals, userPrincipal.Name)
@@ -279,89 +217,67 @@ func (ap *azureProvider) loginUser(
 		return v3.Principal{}, nil, "", httperror.NewAPIError(httperror.Unauthorized, "unauthorized")
 	}
 
-	providerToken, err := azureClient.marshalTokenJSON()
-	if err != nil {
-		return v3.Principal{}, nil, "", err
-	}
-
-	return userPrincipal, groupPrincipals, string(providerToken), nil
+	return userPrincipal, groupPrincipals, providerToken, nil
 }
 
-func (ap *azureProvider) getUser(client *azureClient, principalID string, token v3.Token) (v3.Principal, error) {
-	user, err := client.userClient.Get(context.Background(), principalID)
+func (ap *azureProvider) getUserPrincipal(client clients.AzureClient, principalID string, token v3.Token) (v3.Principal, error) {
+	principal, err := client.GetUser(principalID)
 	if err != nil {
 		return v3.Principal{}, httperror.NewAPIError(httperror.NotFound, err.Error())
 	}
-
-	p := ap.userToPrincipal(user)
-	p.Me = samePrincipal(token.UserPrincipal, p)
-
-	return p, nil
+	principal.Me = samePrincipal(token.UserPrincipal, principal)
+	return principal, nil
 }
 
-func (ap *azureProvider) getGroup(client *azureClient, principalID string, token v3.Token) (v3.Principal, error) {
-	group, err := client.groupClient.Get(context.Background(), principalID)
+func (ap *azureProvider) getGroupPrincipal(client clients.AzureClient, id string, token v3.Token) (v3.Principal, error) {
+	principal, err := client.GetGroup(id)
 	if err != nil {
 		return v3.Principal{}, httperror.NewAPIError(httperror.NotFound, err.Error())
 	}
-
-	p := ap.groupToPrincipal(group)
-	p.MemberOf = ap.tokenMGR.IsMemberOf(token, p)
-
-	return p, nil
+	principal.MemberOf = ap.tokenMGR.IsMemberOf(token, principal)
+	return principal, nil
 }
 
-func (ap *azureProvider) searchUsers(client *azureClient, name string, token v3.Token) ([]v3.Principal, error) {
+func (ap *azureProvider) searchUserPrincipalsByName(client clients.AzureClient, name string, token v3.Token) ([]v3.Principal, error) {
 	filter := fmt.Sprintf("startswith(userPrincipalName,'%[1]s') or startswith(displayName,'%[1]s') or startswith(givenName,'%[1]s') or startswith(surname,'%[1]s')", name)
-	users, err := client.userClient.List(context.Background(), filter, "")
+	principals, err := client.ListUsers(filter)
 	if err != nil {
 		return nil, err
 	}
-
-	var principals []v3.Principal
-	for _, user := range users.Values() {
-		p := ap.userToPrincipal(user)
-		p.Me = samePrincipal(token.UserPrincipal, p)
-		principals = append(principals, p)
+	for _, principal := range principals {
+		principal.Me = samePrincipal(token.UserPrincipal, principal)
 	}
 	return principals, nil
 }
 
-func (ap *azureProvider) searchGroups(client *azureClient, name string, token v3.Token) ([]v3.Principal, error) {
+func (ap *azureProvider) searchGroupPrincipalsByName(client clients.AzureClient, name string, token v3.Token) ([]v3.Principal, error) {
 	filter := fmt.Sprintf("startswith(displayName,'%[1]s') or startswith(mail,'%[1]s') or startswith(mailNickname,'%[1]s')", name)
-	groups, err := client.groupClient.List(context.Background(), filter)
+	principals, err := client.ListGroups(filter)
 	if err != nil {
 		return nil, err
 	}
-
-	var principals []v3.Principal
-	for _, group := range groups.Values() {
-		p := ap.groupToPrincipal(group)
-		p.MemberOf = ap.tokenMGR.IsMemberOf(token, p)
-		principals = append(principals, p)
+	for _, principal := range principals {
+		principal.MemberOf = ap.tokenMGR.IsMemberOf(token, principal)
 	}
 	return principals, nil
 }
 
-func (ap *azureProvider) newAzureClient(secret string) (*azureClient, error) {
-	config, err := ap.getAzureConfigK8s()
-	if err != nil {
-		return nil, err
+func (ap *azureProvider) newAzureClientFromToken(cfg *v32.AzureADConfig, token *v32.Token) (clients.AzureClient, error) {
+	var secret string
+	var deprecated = isConfigDeprecated(cfg)
+	if deprecated {
+		var err error
+		secret, err = ap.tokenMGR.GetSecret(token.UserID, Name, []*v3.Token{token})
+		if err != nil && !apierrors.IsNotFound(err) {
+			return nil, err
+		}
 	}
-
-	azureToken, err := ap.getAzureToken(secret)
-	if err != nil {
-		return nil, err
-	}
-
-	client, err := newClientToken(config, azureToken)
-	if err != nil {
-		return nil, err
-	}
-	return client, nil
+	return clients.NewAzureClientFromSecret(cfg, deprecated, secret, ap.secrets)
 }
 
 func (ap *azureProvider) saveAzureConfigK8s(config *v32.AzureADConfig) error {
+	// Copy the annotations.
+	annotations := config.ObjectMeta.Annotations
 	storedAzureConfig, err := ap.getAzureConfigK8s()
 	if err != nil {
 		return err
@@ -371,12 +287,20 @@ func (ap *azureProvider) saveAzureConfigK8s(config *v32.AzureADConfig) error {
 	config.Type = client.AzureADConfigType
 	config.ObjectMeta = storedAzureConfig.ObjectMeta
 
+	// Ensure the passed in config's annotations are applied to the object to be persisted.
+	if config.ObjectMeta.Annotations == nil {
+		config.ObjectMeta.Annotations = map[string]string{}
+	}
+	for k, v := range annotations {
+		config.ObjectMeta.Annotations[k] = v
+	}
+
 	field := strings.ToLower(client.AzureADConfigFieldApplicationSecret)
 	if err := common.CreateOrUpdateSecrets(ap.secrets, config.ApplicationSecret, field, strings.ToLower(config.Type)); err != nil {
 		return err
 	}
 
-	config.ApplicationSecret = common.GetName(config.Type, field)
+	config.ApplicationSecret = common.GetFullSecretName(config.Type, field)
 
 	logrus.Debugf("updating AzureADConfig")
 	_, err = ap.authConfigs.ObjectClient().Update(config.ObjectMeta.Name, config)
@@ -399,7 +323,9 @@ func (ap *azureProvider) getAzureConfigK8s() (*v32.AzureADConfig, error) {
 	storedAzureADConfigMap := u.UnstructuredContent()
 
 	storedAzureADConfig := &v32.AzureADConfig{}
-	mapstructure.Decode(storedAzureADConfigMap, storedAzureADConfig)
+	if err := mapstructure.Decode(storedAzureADConfigMap, storedAzureADConfig); err != nil {
+		return nil, err
+	}
 
 	metadataMap, ok := storedAzureADConfigMap["metadata"].(map[string]interface{})
 	if !ok {
@@ -422,107 +348,66 @@ func (ap *azureProvider) getAzureConfigK8s() (*v32.AzureADConfig, error) {
 	return storedAzureADConfig, nil
 }
 
-func (ap *azureProvider) userToPrincipal(user graphrbac.User) v3.Principal {
-	p := v3.Principal{
-		ObjectMeta:    metav1.ObjectMeta{Name: Name + "_user://" + *user.ObjectID},
-		DisplayName:   *user.DisplayName,
-		LoginName:     *user.UserPrincipalName,
-		PrincipalType: "user",
-		Provider:      Name,
-	}
-	return p
-}
-
-func (ap *azureProvider) userGroupsToPrincipals(azureClient *azureClient, groups graphrbac.UserGetMemberGroupsResult) ([]v3.Principal, error) {
-	start := time.Now()
-	logrus.Debug("[AZURE_PROVIDER] Started gathering users groups")
-
-	var g errgroup.Group
-	groupPrincipals := make([]v3.Principal, len(*groups.Value))
-	for i, group := range *groups.Value {
-		j := i
-		gp := group
-
-		// Check the cache first, if it exists that saves an API call to azure
-		if principal, ok := groupCache.Get(gp); ok {
-			p := principal.(v3.Principal)
-			groupPrincipals[j] = p
-			continue
-		}
-
-		g.Go(func() error {
-			groupObj, err := azureClient.groupClient.Get(context.Background(), gp)
-			if err != nil {
-				logrus.Debugf("[AZURE_PROVIDER] Error getting group: %v", err)
-				return err
-			}
-
-			p := ap.groupToPrincipal(groupObj)
-			p.MemberOf = true
-
-			// Add to the cache
-			groupCache.Add(gp, p)
-			groupPrincipals[j] = p
-			return nil
-		})
-	}
-	if err := g.Wait(); err != nil {
-		return nil, err
-	}
-	logrus.Debugf("[AZURE_PROVIDER] Completed gathering users groups, took %v, keys in cache:%v", time.Since(start), groupCache.Len())
-	return groupPrincipals, nil
-}
-
-func (ap *azureProvider) groupToPrincipal(group graphrbac.ADGroup) v3.Principal {
-	p := v3.Principal{
-		ObjectMeta:    metav1.ObjectMeta{Name: Name + "_group://" + *group.ObjectID},
-		DisplayName:   *group.DisplayName,
-		PrincipalType: "group",
-		Provider:      Name,
-	}
-	return p
-}
-
-func (ap *azureProvider) getAzureToken(secret string) (adal.Token, error) {
-	var azureToken adal.Token
-	err := json.Unmarshal([]byte(secret), &azureToken)
-	if err != nil {
-		return azureToken, err
-	}
-	return azureToken, nil
-}
-
-// updateToken compares the current azure token to the azure token living in the
-// secret and updates if needed
-func (ap *azureProvider) updateToken(client *azureClient, token *v3.Token) error {
-	new, err := client.marshalTokenJSON()
+// updateToken compares the current Azure access token to the one stored in the secret and updates if needed.
+// This is relevant only for access tokens to the deprecated Azure AD Graph API.
+func (ap *azureProvider) updateToken(client clients.AzureClient, token *v3.Token) error {
+	// For the new flow via Microsoft Graph, the caching and updating of the token to the Microsoft Graph API
+	// is handled separately via the SDK client cache.
+	cfg, err := ap.getAzureConfigK8s()
 	if err != nil {
 		return err
 	}
-	stringNew := string(new)
+	if !isConfigDeprecated(cfg) {
+		return nil
+	}
+
+	current, err := client.MarshalTokenJSON()
+	if err != nil {
+		return errors.New("failed to unmarshal token")
+	}
 
 	secret, err := ap.tokenMGR.GetSecret(token.UserID, token.AuthProvider, []*v3.Token{token})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			// providerToken doesn't exists as a secret, update on token
-			if current, ok := token.ProviderInfo["access_token"]; ok && current != stringNew {
-				token.ProviderInfo["access_token"] = stringNew
+			// providerToken doesn't exist as a secret, update on token.
+			if current, ok := token.ProviderInfo["access_token"]; ok && current != current {
+				token.ProviderInfo["access_token"] = current
 			}
 			return nil
 		}
 		return err
 	}
 
-	if stringNew == secret {
+	if current == secret {
 		return nil
 	}
 
-	return ap.tokenMGR.UpdateSecret(token.UserID, token.AuthProvider, stringNew)
+	return ap.tokenMGR.UpdateSecret(token.UserID, token.AuthProvider, current)
 }
 
 func formAzureRedirectURL(config map[string]interface{}) string {
+	var ac v32.AzureADConfig
+	err := mapstructure.Decode(config, &ac)
+	if err == nil {
+		// Extract the annotations from the map. This is needed because of the type structure of
+		// the Azure config and the Auth config it embeds. Full deserialization does not work for
+		// fields of the embedded Kubernetes types in this case.
+		ac.ObjectMeta.Annotations = extractAnnotationsFromAuthConfig(config)
+		if !isConfigDeprecated(&ac) {
+			// Return the redirect URL for Microsoft Graph.
+			return fmt.Sprintf(
+				"%s?client_id=%s&redirect_uri=%s&response_type=code&scope=openid",
+				ac.AuthEndpoint,
+				ac.ApplicationID,
+				ac.RancherURL,
+			)
+		}
+	} else {
+		logrus.Warnf("failed to determine if Graph endpoint is deprecated when generating redirect URL: %v", err)
+	}
+	// Return the redirect URL for the deprecated Azure AD Graph.
 	return fmt.Sprintf(
-		"%s?client_id=%s&redirect_uri=%s&resource=%s",
+		"%s?client_id=%s&redirect_uri=%s&resource=%s&scope=openid",
 		config["authEndpoint"],
 		config["applicationId"],
 		config["rancherUrl"],
@@ -530,31 +415,49 @@ func formAzureRedirectURL(config map[string]interface{}) string {
 	)
 }
 
-// parsePrincipalID accepts a principalID in the format <provider>_<type>://<ID>
-// and returns a map of the 3 parts - ID, provider and type
-func parsePrincipalID(principalID string) (map[string]string, error) {
-	parsed := make(map[string]string)
-
-	parts := strings.SplitN(principalID, ":", 2)
-	if len(parts) != 2 {
-		return parsed, errors.Errorf("invalid id %v", principalID)
+// extractAnnotationsFromAuthConfig tries to extract the annotations from the AuthConfig value.
+// The AuthConfig value might come from either the database (on login attempts) or from the UI (on Azure AD setup attempts).
+// In these two cases, the structure of the config is different.
+// In the former, it's "metadata.annotations.[map of annotations]".
+// In the latter, it's "annotations.[map of annotations]". The function tries to find the annotations in either structure.
+func extractAnnotationsFromAuthConfig(config map[string]interface{}) map[string]string {
+	if metadata, ok := config["metadata"].(map[string]interface{}); ok {
+		return parseAnnotations(metadata)
 	}
-	externalID := strings.TrimPrefix(parts[1], "//")
-
-	parsed["ID"] = externalID
-
-	pparts := strings.SplitN(parts[0], "_", 2)
-	if len(pparts) != 2 {
-		return parsed, errors.Errorf("invalid id %v", principalID)
-	}
-
-	parsed["provider"] = pparts[0]
-	parsed["type"] = pparts[1]
-
-	return parsed, nil
+	logrus.Info("Failed to decode the 'metadata' field of the AuthConfig. Attempting to decode 'annotations' at the top level.")
+	return parseAnnotations(config)
 }
 
-// samePrincipal verifies if they are the same principal
+func parseAnnotations(metadata map[string]interface{}) map[string]string {
+	annotations := make(map[string]string)
+	rawAnnotations, ok := metadata["annotations"].(map[string]interface{})
+	if !ok {
+		logrus.Info("Failed to decode the 'annotations' field of the AuthConfig.")
+		return annotations
+	}
+	for k, v := range rawAnnotations {
+		if stringValue, ok := v.(string); ok {
+			annotations[k] = stringValue
+		} else {
+			logrus.Infof("Failed to decode the annotation value of the key %q as a string (%v of type %T) on the AuthConfig.", k, v, v)
+		}
+	}
+	return annotations
+}
+
+func (ap *azureProvider) CanAccessWithGroupProviders(userPrincipalID string, groupPrincipals []v3.Principal) (bool, error) {
+	cfg, err := ap.getAzureConfigK8s()
+	if err != nil {
+		logrus.Errorf("Error fetching azure config: %v", err)
+		return false, err
+	}
+	allowed, err := ap.userMGR.CheckAccess(cfg.AccessMode, cfg.AllowedPrincipalIDs, userPrincipalID, groupPrincipals)
+	if err != nil {
+		return false, err
+	}
+	return allowed, nil
+}
+
 func samePrincipal(me v3.Principal, other v3.Principal) bool {
 	if me.ObjectMeta.Name == other.ObjectMeta.Name && me.LoginName == other.LoginName && me.PrincipalType == other.PrincipalType {
 		return true
@@ -562,19 +465,7 @@ func samePrincipal(me v3.Principal, other v3.Principal) bool {
 	return false
 }
 
-func (ap *azureProvider) CanAccessWithGroupProviders(userPrincipalID string, groupPrincipals []v3.Principal) (bool, error) {
-	config, err := ap.getAzureConfigK8s()
-	if err != nil {
-		logrus.Errorf("Error fetching azure config: %v", err)
-		return false, err
-	}
-	allowed, err := ap.userMGR.CheckAccess(config.AccessMode, config.AllowedPrincipalIDs, userPrincipalID, groupPrincipals)
-	if err != nil {
-		return false, err
-	}
-	return allowed, nil
-}
-
+// UpdateGroupCacheSize attempts to update the size of the group cache defined at the package level.
 func UpdateGroupCacheSize(size string) {
 	i, err := strconv.Atoi(size)
 	if err != nil {
@@ -585,7 +476,7 @@ func UpdateGroupCacheSize(size string) {
 		logrus.Error("azure-group-cache-size must be >= 0, skipping update")
 		return
 	}
-	groupCache.Resize(i)
+	clients.GroupCache.Resize(i)
 }
 
 func (ap *azureProvider) GetUserExtraAttributes(userPrincipal v3.Principal) map[string][]string {
@@ -597,4 +488,13 @@ func (ap *azureProvider) GetUserExtraAttributes(userPrincipal v3.Principal) map[
 		extras[common.UserAttributeUserName] = []string{userPrincipal.LoginName}
 	}
 	return extras
+}
+
+// IsDisabledProvider checks if the Azure AD auth provider is currently disabled in Rancher.
+func (ap *azureProvider) IsDisabledProvider() (bool, error) {
+	azureConfig, err := ap.getAzureConfigK8s()
+	if err != nil {
+		return false, err
+	}
+	return !azureConfig.Enabled, nil
 }
