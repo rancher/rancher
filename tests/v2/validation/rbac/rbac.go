@@ -2,7 +2,6 @@ package rbac
 
 import (
 	"errors"
-	"fmt"
 	"sort"
 	"strings"
 	"time"
@@ -35,6 +34,8 @@ const (
 	psaWarn             = "pod-security.kubernetes.io/warn"
 	psaAudit            = "pod-security.kubernetes.io/audit"
 	psaEnforce          = "pod-security.kubernetes.io/enforce"
+
+	isCattleLabeled = true
 )
 
 func createUser(client *rancher.Client, role string) (*management.User, error) {
@@ -115,11 +116,9 @@ func getPSALabels(response *v1.SteveAPIObject, actualLabels map[string]string) m
 func createDeploymentAndWait(steveclient *v1.Client, client *rancher.Client, clusterID string, containerName string, image string, namespaceName string) (*v1.SteveAPIObject, error) {
 	deploymentName := namegen.AppendRandomString("rbac-")
 	containerTemplate := workloads.NewContainer(containerName, image, coreV1.PullAlways, []coreV1.VolumeMount{}, []coreV1.EnvFromSource{})
-	matchLabels := map[string]string{}
-	matchLabels["workload.user.cattle.io/workloadselector"] = fmt.Sprintf("apps.deployment-%v-%v", namespaceName, deploymentName)
 
-	podTemplate := workloads.NewPodTemplate([]coreV1.Container{containerTemplate}, []coreV1.Volume{}, []coreV1.LocalObjectReference{}, matchLabels)
-	deployment := workloads.NewDeploymentTemplate(deploymentName, namespaceName, podTemplate, matchLabels)
+	podTemplate := workloads.NewPodTemplate([]coreV1.Container{containerTemplate}, []coreV1.Volume{}, []coreV1.LocalObjectReference{}, nil)
+	deployment := workloads.NewDeploymentTemplate(deploymentName, namespaceName, podTemplate, isCattleLabeled, nil)
 
 	deploymentResp, err := steveclient.SteveType(workloads.DeploymentSteveType).Create(deployment)
 	if err != nil {

@@ -92,18 +92,18 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningRKE2CustomCluster()
 		nodeCountWin int
 		hasWindows   bool
 	}{
-		{"1 Node all roles Admin User", c.client, nodeRoles0, c.provisioning, 0, false},
-		{"1 Node all roles Standard User", c.standardUserClient, nodeRoles0, c.provisioning, 0, false},
-		{"2 nodes - etcd/cp roles per 1 node Admin User", c.client, nodeRoles1, c.provisioning, 0, false},
-		{"2 nodes - etcd/cp roles per 1 node Standard User", c.client, nodeRoles1, c.provisioning, 0, false},
-		{"3 nodes - 1 role per node Admin User", c.client, nodeRoles2, c.provisioning, 0, false},
-		{"3 nodes - 1 role per node Standard User", c.standardUserClient, nodeRoles2, c.provisioning, 0, false},
-		{"1 Node all roles Admin User + 1 Windows Worker", c.client, nodeRoles0, c.provisioning, 1, true},
-		{"1 Node all roles Standard User + 1 Windows Worker", c.standardUserClient, nodeRoles0, c.provisioning, 1, true},
-		{"2 nodes - etcd/cp roles per 1 node Admin User + 1 Windows Worker", c.client, nodeRoles1, c.provisioning, 1, true},
-		{"2 nodes - etcd/cp roles per 1 node Standard User + 1 Windows Worker", c.client, nodeRoles1, c.provisioning, 1, true},
-		{"3 nodes - 1 role per node Admin User + 2 Windows Workers", c.client, nodeRoles2, c.provisioning, 2, true},
-		{"3 nodes - 1 role per node Standard User + 2 Windows Workers", c.standardUserClient, nodeRoles2, c.provisioning, 2, true},
+		{"1 Node all roles " + provisioning.AdminClientName.String(), c.client, nodeRoles0, c.provisioning, 0, false},
+		{"1 Node all roles " + provisioning.StandardClientName.String(), c.standardUserClient, nodeRoles0, c.provisioning, 0, false},
+		{"2 nodes - etcd/cp roles per 1 node " + provisioning.AdminClientName.String(), c.client, nodeRoles1, c.provisioning, 0, false},
+		{"2 nodes - etcd/cp roles per 1 node " + provisioning.StandardClientName.String(), c.standardUserClient, nodeRoles1, c.provisioning, 0, false},
+		{"3 nodes - 1 role per node " + provisioning.AdminClientName.String(), c.client, nodeRoles2, c.provisioning, 0, false},
+		{"3 nodes - 1 role per node " + provisioning.StandardClientName.String(), c.standardUserClient, nodeRoles2, c.provisioning, 0, false},
+		{provisioning.AdminClientName.String() + " 1 Node all roles + 1 Windows Worker", c.client, nodeRoles0, c.provisioning, 1, true},
+		{provisioning.StandardClientName.String() + " 1 Node all roles + 1 Windows Worker", c.standardUserClient, nodeRoles0, c.provisioning, 1, true},
+		{provisioning.AdminClientName.String() + " 2 nodes - etcd/cp roles per 1 node + 1 Windows Worker", c.client, nodeRoles1, c.provisioning, 1, true},
+		{provisioning.StandardClientName.String() + " 2 nodes - etcd/cp roles per 1 node + 1 Windows Worker", c.standardUserClient, nodeRoles1, c.provisioning, 1, true},
+		{"3 nodes - 1 role per node " + provisioning.AdminClientName.String(), c.client, nodeRoles2, c.provisioning, 2, true},
+		{"3 nodes - 1 role per node " + provisioning.StandardClientName.String(), c.standardUserClient, nodeRoles2, c.provisioning, 2, true},
 	}
 	var name string
 	for _, tt := range tests {
@@ -115,8 +115,9 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningRKE2CustomCluster()
 
 		for _, nodeProviderName := range c.nodeProviders {
 			externalNodeProvider := provisioning.ExternalNodeProviderSetup(nodeProviderName)
+			providerName := " Node Provider: " + nodeProviderName
 			for _, kubeVersion := range c.kubernetesVersions {
-				name = tt.name + " Kubernetes version: " + kubeVersion
+				name = tt.name + providerName + " Kubernetes version: " + kubeVersion
 				for _, cni := range c.cnis {
 					name += " cni: " + cni
 					c.Run(name, func() {
@@ -160,10 +161,10 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningRKE2CustomClusterDy
 		nodeCountWin int
 		hasWindows   bool
 	}{
-		{"Admin User", c.client, c.provisioning, 0, false},
-		{"Standard User", c.standardUserClient, c.provisioning, 0, false},
-		{"Admin User + 1 Windows Worker", c.client, c.provisioning, 1, false},
-		{"Standard User + 1 Windows Worker", c.standardUserClient, c.provisioning, 1, false},
+		{provisioning.AdminClientName.String(), c.client, c.provisioning, 0, false},
+		{provisioning.StandardClientName.String(), c.standardUserClient, c.provisioning, 0, false},
+		{"1 Windows Worker" + provisioning.AdminClientName.String(), c.client, c.provisioning, 1, true},
+		{"1 Windows Worker" + provisioning.StandardClientName.String(), c.standardUserClient, c.provisioning, 1, true},
 	}
 	var name string
 	for _, tt := range tests {
@@ -175,8 +176,9 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningRKE2CustomClusterDy
 
 		for _, nodeProviderName := range c.nodeProviders {
 			externalNodeProvider := provisioning.ExternalNodeProviderSetup(nodeProviderName)
+			providerName := " Node Provider: " + nodeProviderName
 			for _, kubeVersion := range c.kubernetesVersions {
-				name = tt.name + " Kubernetes version: " + kubeVersion
+				name = tt.name + providerName + " Kubernetes version: " + kubeVersion
 				for _, cni := range c.cnis {
 					name += " cni: " + cni
 					c.Run(name, func() {

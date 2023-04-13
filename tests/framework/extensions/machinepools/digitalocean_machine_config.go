@@ -9,7 +9,7 @@ const (
 	DOKind                              = "DigitaloceanConfig"
 	DOPoolType                          = "rke-machine-config.cattle.io.digitaloceanconfig"
 	DOResourceConfig                    = "digitaloceanconfigs"
-	DOMachingConfigConfigurationFileKey = "doMachineConfig"
+	DOMachineConfigConfigurationFileKey = "doMachineConfig"
 )
 
 // DOMachineConfig is configuration needed to create an rke-machine-config.cattle.io.digitaloceanconfig
@@ -33,7 +33,7 @@ type DOMachineConfig struct {
 // that CreateMachineConfig uses to created the rke-machine-config
 func NewDigitalOceanMachineConfig(generatedPoolName, namespace string) *unstructured.Unstructured {
 	var doMachineConfig DOMachineConfig
-	config.LoadConfig(DOMachingConfigConfigurationFileKey, &doMachineConfig)
+	config.LoadConfig(DOMachineConfigConfigurationFileKey, &doMachineConfig)
 
 	machineConfig := &unstructured.Unstructured{}
 	machineConfig.SetAPIVersion("rke-machine-config.cattle.io/v1")

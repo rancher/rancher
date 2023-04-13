@@ -12,7 +12,9 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/cloudcredentials"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
+	"github.com/rancher/rancher/tests/framework/extensions/pipeline"
 	"github.com/rancher/rancher/tests/framework/pkg/config"
+	"github.com/rancher/rancher/tests/framework/pkg/environmentflag"
 	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
@@ -76,6 +78,10 @@ func (r *V2ProvCertRotationTestSuite) testCertRotation(provider Provider, kubeVe
 			cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, namespace, "calico", credential.ID, kubeVersion, machinePools)
 			clusterResp, err := clusters.CreateK3SRKE2Cluster(testSessionClient, cluster)
 			require.NoError(r.T(), err)
+
+			if r.client.Flags.GetValue(environmentflag.UpdateClusterName) {
+				pipeline.UpdateConfigClusterName(clusterName)
+			}
 
 			kubeProvisioningClient, err := r.client.GetKubeAPIProvisioningClient()
 			require.NoError(r.T(), err)

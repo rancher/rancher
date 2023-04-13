@@ -120,12 +120,12 @@ func (r *RKE1NodeDriverProvisioningTestSuite) TestProvisioningRKE1Cluster() {
 		nodeRoles []nodepools.NodeRoles
 		client    *rancher.Client
 	}{
-		{"1 Node all roles Admin User", nodeRoles0, r.client},
-		{"1 Node all roles Standard User", nodeRoles0, r.standardUserClient},
-		{"2 nodes - etcd/cp roles per 1 node Admin User", nodeRoles1, r.client},
-		{"2 nodes - etcd/cp roles per 1 node Standard User", nodeRoles1, r.standardUserClient},
-		{"3 nodes - 1 role per node Admin User", nodeRoles2, r.client},
-		{"3 nodes - 1 role per node Standard User", nodeRoles2, r.standardUserClient},
+		{"1 Node all roles " + provisioning.AdminClientName.String(), nodeRoles0, r.client},
+		{"1 Node all roles " + provisioning.StandardClientName.String(), nodeRoles0, r.standardUserClient},
+		{"2 nodes - etcd/cp roles per 1 node " + provisioning.AdminClientName.String(), nodeRoles1, r.client},
+		{"2 nodes - etcd/cp roles per 1 node " + provisioning.StandardClientName.String(), nodeRoles1, r.standardUserClient},
+		{"3 nodes - 1 role per node " + provisioning.AdminClientName.String(), nodeRoles2, r.client},
+		{"3 nodes - 1 role per node " + provisioning.StandardClientName.String(), nodeRoles2, r.standardUserClient},
 	}
 
 	var name, scaleName string
@@ -140,7 +140,7 @@ func (r *RKE1NodeDriverProvisioningTestSuite) TestProvisioningRKE1Cluster() {
 			provider := CreateProvider(providerName)
 			providerName := " Node Provider: " + provider.Name
 			for _, kubeVersion := range r.kubernetesVersions {
-				name = tt.name + providerName + " Kubernetes version: " + kubeVersion
+				name = tt.name + providerName.String() + " Kubernetes version: " + kubeVersion
 				for _, cni := range r.cnis {
 					nodeTemplate, err := provider.NodeTemplateFunc(client)
 					require.NoError(r.T(), err)
@@ -178,8 +178,8 @@ func (r *RKE1NodeDriverProvisioningTestSuite) TestProvisioningRKE1ClusterDynamic
 		name   string
 		client *rancher.Client
 	}{
-		{"Admin User", r.client},
-		{"Standard User", r.standardUserClient},
+		{provisioning.AdminClientName.String(), r.client},
+		{provisioning.StandardClientName.String(), r.standardUserClient},
 	}
 
 	var name, scaleName string
@@ -192,7 +192,7 @@ func (r *RKE1NodeDriverProvisioningTestSuite) TestProvisioningRKE1ClusterDynamic
 
 		for _, providerName := range r.providers {
 			provider := CreateProvider(providerName)
-			providerName := " Node Provider: " + provider.Name
+			providerName := " Node Provider: " + provider.Name.String()
 			for _, kubeVersion := range r.kubernetesVersions {
 				name = tt.name + providerName + " Kubernetes version: " + kubeVersion
 				for _, cni := range r.cnis {

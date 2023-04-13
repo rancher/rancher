@@ -15,7 +15,7 @@ type UpgradeKubernetesTestSuite struct {
 	suite.Suite
 	session  *session.Session
 	client   *rancher.Client
-	Clusters []ClustersToUpgrade
+	clusters []Clusters
 }
 
 func (u *UpgradeKubernetesTestSuite) TearDownSuite() {
@@ -31,17 +31,21 @@ func (u *UpgradeKubernetesTestSuite) SetupSuite() {
 
 	u.client = client
 
-	clusters, err := loadUpgradeConfig(client)
+	clusters, err := loadUpgradeKubernetesConfig(client)
 	require.NoError(u.T(), err)
 
 	require.NotEmptyf(u.T(), clusters, "couldn't generate the config for the upgrade test")
-	u.Clusters = clusters
+	u.clusters = clusters
 }
 
 func (u *UpgradeKubernetesTestSuite) TestUpgradeKubernetes() {
-	for _, cluster := range u.Clusters {
+	for _, cluster := range u.clusters {
 		cluster := cluster
 		u.Run(cluster.Name, func() {
+			if cluster.isUpgradeDisabled {
+				u.T().Skipf("Kubernetes upgrade is disabled for [%v]", cluster.Name)
+			}
+
 			u.testUpgradeSingleCluster(cluster.Name, cluster.VersionToUpgrade, cluster.isLatestVersion)
 		})
 	}

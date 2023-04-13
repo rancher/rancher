@@ -1,7 +1,6 @@
 package rke2
 
 import (
-	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -11,9 +10,11 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/ingresses"
 	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
+	"github.com/rancher/rancher/tests/framework/extensions/pipeline"
 	"github.com/rancher/rancher/tests/framework/extensions/workloads"
 	"github.com/rancher/rancher/tests/framework/extensions/workloads/pods"
 
+	"github.com/rancher/rancher/tests/framework/pkg/environmentflag"
 	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 
 	"github.com/rancher/rancher/tests/framework/pkg/config"
@@ -79,13 +80,17 @@ func (r *RKE2EtcdSnapshotRestoreTestSuite) EtcdSnapshotRestoreWithK8sUpgrade(pro
 	require.NoError(r.T(), err)
 	logrus.Infof("kube provisioning client created.............")
 
-	clusterName := namegen.AppendRandomString(provider.Name)
+	clusterName := namegen.AppendRandomString(provider.Name.String())
 
 	logrus.Infof("creating rke2Cluster.............")
 	clusterResp, err := createRKE2NodeDriverCluster(client, provider, clusterName, initialK8sVersion, r.ns, r.cnis[0])
 	require.NoError(r.T(), err)
 	require.Equal(r.T(), clusterName, clusterResp.ObjectMeta.Name)
 	logrus.Infof("rke2Cluster create request successful.............")
+
+	if r.client.Flags.GetValue(environmentflag.UpdateClusterName) {
+		pipeline.UpdateConfigClusterName(clusterName)
+	}
 
 	logrus.Infof("creating watch over cluster.............")
 	clusters.WatchAndWaitForCluster(r.client.Steve, kubeProvisioningClient, r.ns, clusterName)
@@ -109,12 +114,9 @@ func (r *RKE2EtcdSnapshotRestoreTestSuite) EtcdSnapshotRestoreWithK8sUpgrade(pro
 	// creating the workload W1
 	logrus.Infof("creating a workload(nginx deployment).............")
 
-	wloadBeforeRestoreLabels := map[string]string{}
-	wloadBeforeRestoreLabels["workload.user.cattle.io/workloadselector"] = fmt.Sprintf("apps.deployment-%v-%v", r.ns, wloadBeforeRestore)
-
 	containerTemplate := workloads.NewContainer("ngnix", "nginx", v1.PullAlways, []v1.VolumeMount{}, []v1.EnvFromSource{})
-	podTemplate := workloads.NewPodTemplate([]v1.Container{containerTemplate}, []v1.Volume{}, []v1.LocalObjectReference{}, wloadBeforeRestoreLabels)
-	deploymentBeforeBackup := workloads.NewDeploymentTemplate(wloadBeforeRestore, r.ns, podTemplate, wloadBeforeRestoreLabels)
+	podTemplate := workloads.NewPodTemplate([]v1.Container{containerTemplate}, []v1.Volume{}, []v1.LocalObjectReference{}, nil)
+	deploymentBeforeBackup := workloads.NewDeploymentTemplate(wloadBeforeRestore, r.ns, podTemplate, isCattleLabeled, nil)
 
 	// creating steve client
 	steveclient, err := client.Steve.ProxyDownstream(clusterID)
@@ -184,11 +186,9 @@ func (r *RKE2EtcdSnapshotRestoreTestSuite) EtcdSnapshotRestoreWithK8sUpgrade(pro
 	require.NoError(r.T(), err)
 
 	logrus.Infof("creating a workload(w2, deployment).............")
-	wloadAfterBackupLabels := map[string]string{}
-	wloadAfterBackupLabels["workload.user.cattle.io/workloadselector"] = fmt.Sprintf("apps.deployment-%v-%v", r.ns, wloadAfterBackup)
 	containerTemplate2 := workloads.NewContainer("ngnix", "nginx", v1.PullAlways, []v1.VolumeMount{}, []v1.EnvFromSource{})
-	podTemplate2 := workloads.NewPodTemplate([]v1.Container{containerTemplate2}, []v1.Volume{}, []v1.LocalObjectReference{}, wloadAfterBackupLabels)
-	deploymentAfterBackup := workloads.NewDeploymentTemplate(wloadAfterBackup, r.ns, podTemplate2, wloadAfterBackupLabels)
+	podTemplate2 := workloads.NewPodTemplate([]v1.Container{containerTemplate2}, []v1.Volume{}, []v1.LocalObjectReference{}, nil)
+	deploymentAfterBackup := workloads.NewDeploymentTemplate(wloadAfterBackup, r.ns, podTemplate2, isCattleLabeled, nil)
 
 	deploymentResp, err = createDeployment(deploymentAfterBackup, steveclient, client, clusterID)
 	require.NoError(r.T(), err)
@@ -250,7 +250,7 @@ func (r *RKE2EtcdSnapshotRestoreTestSuite) EtcdSnapshotRestoreWithUpgradeStrateg
 	require.NoError(r.T(), err)
 	logrus.Infof("kube provisioning client created.............")
 
-	clusterName := namegen.AppendRandomString(provider.Name)
+	clusterName := namegen.AppendRandomString(provider.Name.String())
 
 	logrus.Infof("creating rke2Cluster.............")
 	clusterResp, err := createRKE2NodeDriverCluster(client, provider, clusterName, initialK8sVersion, r.ns, r.cnis[0])
@@ -278,12 +278,9 @@ func (r *RKE2EtcdSnapshotRestoreTestSuite) EtcdSnapshotRestoreWithUpgradeStrateg
 
 	logrus.Infof("creating a workload(nginx deployment).............")
 
-	wloadBeforeRestoreLabels := map[string]string{}
-	wloadBeforeRestoreLabels["workload.user.cattle.io/workloadselector"] = fmt.Sprintf("apps.deployment-%v-%v", r.ns, wloadBeforeRestore)
-
 	containerTemplate := workloads.NewContainer("ngnix", "nginx", v1.PullAlways, []v1.VolumeMount{}, []v1.EnvFromSource{})
-	podTemplate := workloads.NewPodTemplate([]v1.Container{containerTemplate}, []v1.Volume{}, []v1.LocalObjectReference{}, wloadBeforeRestoreLabels)
-	deploymentBeforeBackup := workloads.NewDeploymentTemplate(wloadBeforeRestore, r.ns, podTemplate, wloadBeforeRestoreLabels)
+	podTemplate := workloads.NewPodTemplate([]v1.Container{containerTemplate}, []v1.Volume{}, []v1.LocalObjectReference{}, nil)
+	deploymentBeforeBackup := workloads.NewDeploymentTemplate(wloadBeforeRestore, r.ns, podTemplate, isCattleLabeled, nil)
 
 	steveclient, err := client.Steve.ProxyDownstream(clusterID)
 	require.NoError(r.T(), err)
@@ -337,11 +334,9 @@ func (r *RKE2EtcdSnapshotRestoreTestSuite) EtcdSnapshotRestoreWithUpgradeStrateg
 	require.NoError(r.T(), err)
 
 	logrus.Infof("creating a workload(w2, deployment).............")
-	wloadAfterBackupLabels := map[string]string{}
-	wloadAfterBackupLabels["workload.user.cattle.io/workloadselector"] = fmt.Sprintf("apps.deployment-%v-%v", r.ns, wloadAfterBackup)
 	containerTemplate2 := workloads.NewContainer("ngnix", "nginx", v1.PullAlways, []v1.VolumeMount{}, []v1.EnvFromSource{})
-	podTemplate2 := workloads.NewPodTemplate([]v1.Container{containerTemplate2}, []v1.Volume{}, []v1.LocalObjectReference{}, wloadAfterBackupLabels)
-	deploymentAfterBackup := workloads.NewDeploymentTemplate(wloadAfterBackup, r.ns, podTemplate2, wloadAfterBackupLabels)
+	podTemplate2 := workloads.NewPodTemplate([]v1.Container{containerTemplate2}, []v1.Volume{}, []v1.LocalObjectReference{}, nil)
+	deploymentAfterBackup := workloads.NewDeploymentTemplate(wloadAfterBackup, r.ns, podTemplate2, isCattleLabeled, nil)
 
 	deploymentResp, err = createDeployment(deploymentAfterBackup, steveclient, client, clusterID)
 	require.NoError(r.T(), err)
@@ -449,7 +444,7 @@ func (r *RKE2EtcdSnapshotRestoreTestSuite) EtcdSnapshotRestore(provider *Provide
 	require.NoError(r.T(), err)
 	logrus.Infof("kube provisioning client created.............")
 
-	clusterName := namegen.AppendRandomString(provider.Name)
+	clusterName := namegen.AppendRandomString(provider.Name.String())
 
 	logrus.Infof("creating rke2Cluster.............")
 	clusterResp, err := createRKE2NodeDriverCluster(client, provider, clusterName, initialK8sVersion, r.ns, r.cnis[0])
@@ -479,12 +474,9 @@ func (r *RKE2EtcdSnapshotRestoreTestSuite) EtcdSnapshotRestore(provider *Provide
 	// creating the workload W1
 	logrus.Infof("creating a workload(nginx deployment).............")
 
-	wloadBeforeRestoreLabels := map[string]string{}
-	wloadBeforeRestoreLabels["workload.user.cattle.io/workloadselector"] = fmt.Sprintf("apps.deployment-%v-%v", r.ns, wloadBeforeRestore)
-
 	containerTemplate := workloads.NewContainer("ngnix", "nginx", v1.PullAlways, []v1.VolumeMount{}, []v1.EnvFromSource{})
-	podTemplate := workloads.NewPodTemplate([]v1.Container{containerTemplate}, []v1.Volume{}, []v1.LocalObjectReference{}, wloadBeforeRestoreLabels)
-	deploymentBeforeBackup := workloads.NewDeploymentTemplate(wloadBeforeRestore, r.ns, podTemplate, wloadBeforeRestoreLabels)
+	podTemplate := workloads.NewPodTemplate([]v1.Container{containerTemplate}, []v1.Volume{}, []v1.LocalObjectReference{}, nil)
+	deploymentBeforeBackup := workloads.NewDeploymentTemplate(wloadBeforeRestore, r.ns, podTemplate, isCattleLabeled, nil)
 
 	// creating steve client
 	steveclient, err := client.Steve.ProxyDownstream(clusterID)
@@ -540,11 +532,9 @@ func (r *RKE2EtcdSnapshotRestoreTestSuite) EtcdSnapshotRestore(provider *Provide
 	require.NoError(r.T(), err)
 
 	logrus.Infof("creating a workload(w2, deployment).............")
-	wloadAfterBackupLabels := map[string]string{}
-	wloadAfterBackupLabels["workload.user.cattle.io/workloadselector"] = fmt.Sprintf("apps.deployment-%v-%v", r.ns, wloadAfterBackup)
 	containerTemplate2 := workloads.NewContainer("ngnix", "nginx", v1.PullAlways, []v1.VolumeMount{}, []v1.EnvFromSource{})
-	podTemplate2 := workloads.NewPodTemplate([]v1.Container{containerTemplate2}, []v1.Volume{}, []v1.LocalObjectReference{}, wloadAfterBackupLabels)
-	deploymentAfterBackup := workloads.NewDeploymentTemplate(wloadAfterBackup, r.ns, podTemplate2, wloadAfterBackupLabels)
+	podTemplate2 := workloads.NewPodTemplate([]v1.Container{containerTemplate2}, []v1.Volume{}, []v1.LocalObjectReference{}, nil)
+	deploymentAfterBackup := workloads.NewDeploymentTemplate(wloadAfterBackup, r.ns, podTemplate2, isCattleLabeled, nil)
 
 	deploymentResp, err = createDeployment(deploymentAfterBackup, steveclient, client, clusterID)
 	require.NoError(r.T(), err)

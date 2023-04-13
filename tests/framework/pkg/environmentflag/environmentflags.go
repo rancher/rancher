@@ -8,9 +8,9 @@ type EnvironmentFlag int
 // To add a new flag, add it to the enum before environmentFlagLastItem.
 // And run `go generate` in the tests/framework/pkg/environmentflag directory.
 const (
-	Ingress EnvironmentFlag = iota
-	Chart
-	UpgradeAllClusters
+	KubernetesUpgradeAllClusters EnvironmentFlag = iota
+	WorkloadUpgradeAllClusters
+	UpdateClusterName
 	UseExistingRegistries
 	InstallRancher
 	environmentFlagLastItem // This is used to determine the number of items in the enum

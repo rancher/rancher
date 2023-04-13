@@ -116,12 +116,12 @@ func (k *K3SNodeDriverProvisioningTestSuite) TestProvisioningK3SCluster() {
 		nodeRoles []machinepools.NodeRoles
 		client    *rancher.Client
 	}{
-		{"1 Node all roles Admin User", nodeRoles0, k.client},
-		{"1 Node all roles Standard User", nodeRoles0, k.standardUserClient},
-		{"2 nodes - etcd/cp roles per 1 node Admin User", nodeRoles1, k.client},
-		{"2 nodes - etcd/cp roles per 1 node Standard User", nodeRoles1, k.standardUserClient},
-		{"3 nodes - 1 role per node Admin User", nodeRoles2, k.client},
-		{"3 nodes - 1 role per node Standard User", nodeRoles2, k.standardUserClient},
+		{"1 Node all roles " + provisioning.AdminClientName.String(), nodeRoles0, k.client},
+		{"1 Node all roles " + provisioning.StandardClientName.String(), nodeRoles0, k.standardUserClient},
+		{"2 nodes - etcd/cp roles per 1 node " + provisioning.AdminClientName.String(), nodeRoles1, k.client},
+		{"2 nodes - etcd/cp roles per 1 node " + provisioning.StandardClientName.String(), nodeRoles1, k.standardUserClient},
+		{"3 nodes - 1 role per node " + provisioning.AdminClientName.String(), nodeRoles2, k.client},
+		{"3 nodes - 1 role per node " + provisioning.StandardClientName.String(), nodeRoles2, k.standardUserClient},
 	}
 
 	var name string
@@ -136,7 +136,7 @@ func (k *K3SNodeDriverProvisioningTestSuite) TestProvisioningK3SCluster() {
 			provider := CreateProvider(providerName)
 			providerName := " Node Provider: " + provider.Name
 			for _, kubeVersion := range k.kubernetesVersions {
-				name = tt.name + providerName + " Kubernetes version: " + kubeVersion
+				name = tt.name + providerName.String() + " Kubernetes version: " + kubeVersion
 				k.Run(name, func() {
 					TestProvisioningK3SCluster(k.T(), client, provider, tt.nodeRoles, kubeVersion)
 				})
@@ -158,8 +158,8 @@ func (k *K3SNodeDriverProvisioningTestSuite) TestProvisioningK3SClusterDynamicIn
 		name   string
 		client *rancher.Client
 	}{
-		{"Admin User", k.client},
-		{"Standard User", k.standardUserClient},
+		{provisioning.AdminClientName.String(), k.client},
+		{provisioning.StandardClientName.String(), k.standardUserClient},
 	}
 
 	var name string
@@ -172,7 +172,7 @@ func (k *K3SNodeDriverProvisioningTestSuite) TestProvisioningK3SClusterDynamicIn
 
 		for _, providerName := range k.providers {
 			provider := CreateProvider(providerName)
-			providerName := " Node Provider: " + provider.Name
+			providerName := " Node Provider: " + provider.Name.String()
 			for _, kubeVersion := range k.kubernetesVersions {
 				name = tt.name + providerName + " Kubernetes version: " + kubeVersion
 				k.Run(name, func() {
