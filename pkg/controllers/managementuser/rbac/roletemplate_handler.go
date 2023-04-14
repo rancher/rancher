@@ -1,7 +1,9 @@
 package rbac
 
 import (
-	"github.com/pkg/errors"
+	"errors"
+	"fmt"
+
 	wranglerv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/rbac"
@@ -74,7 +76,7 @@ func (c *rtSync) syncRT(template *v3.RoleTemplate, usedInProjects bool, prtbs []
 	}
 
 	if err := c.m.ensureRoles(roles); err != nil {
-		return errors.Wrapf(err, "couldn't ensure roles")
+		return fmt.Errorf("couldn't ensure roles: %w", err)
 	}
 
 	rolesToKeep := make(map[string]bool)
@@ -88,7 +90,7 @@ func (c *rtSync) syncRT(template *v3.RoleTemplate, usedInProjects bool, prtbs []
 				if len(verbs) > 0 {
 					roleName, err := c.m.reconcileRoleForProjectAccessToGlobalResource(resource, rt, verbs, baseRule)
 					if err != nil {
-						return errors.Wrapf(err, "couldn't reconcile role for project access to global resources")
+						return fmt.Errorf("couldn't reconcile role for project access to global resources: %w", err)
 					}
 					rolesToKeep[roleName] = true
 				}
@@ -123,7 +125,7 @@ func (c *rtSync) syncRT(template *v3.RoleTemplate, usedInProjects bool, prtbs []
 		// Get namespaces belonging to project to update the rolebinding in the namespaces of this project for the user
 		namespaces, err := c.m.nsIndexer.ByIndex(nsByProjectIndex, prtb.ProjectName)
 		if err != nil {
-			return errors.Wrapf(err, "couldn't list namespaces with project ID %v", prtb.ProjectName)
+			return fmt.Errorf("couldn't list namespaces with project ID %s: %w", prtb.ProjectName, err)
 		}
 
 		for _, n := range namespaces {
@@ -132,7 +134,7 @@ func (c *rtSync) syncRT(template *v3.RoleTemplate, usedInProjects bool, prtbs []
 				continue
 			}
 			if err := c.m.ensureProjectRoleBindings(ns.Name, roles, prtb); err != nil {
-				return errors.Wrapf(err, "couldn't ensure binding %v in %v", prtb.Name, ns.Name)
+				return fmt.Errorf("couldn't ensure binding %s in %s: %w", prtb.Name, ns.Name, err)
 			}
 		}
 	}

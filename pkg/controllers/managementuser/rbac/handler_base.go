@@ -6,7 +6,6 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/pkg/errors"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/slice"
 	wranglerv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -190,11 +189,11 @@ func (m *manager) ensureClusterRoles(rt *v3.RoleTemplate) error {
 			// get object from etcd and retry
 			clusterRole, err := m.clusterRoles.Get(rt.Name, metav1.GetOptions{})
 			if err != nil {
-				return errors.Wrapf(err, "error getting clusterRole %v", rt.Name)
+				return fmt.Errorf("error getting clusterRole %s: %w", rt.Name, err)
 			}
 			return m.compareAndUpdateClusterRole(clusterRole, rt)
 		}
-		return errors.Wrapf(err, "couldn't update clusterRole %v", rt.Name)
+		return fmt.Errorf("couldn't update clusterRole %s: %w", rt.Name, err)
 	}
 
 	return m.createClusterRole(rt)
@@ -209,7 +208,7 @@ func (m *manager) compareAndUpdateClusterRole(clusterRole *rbacv1.ClusterRole, r
 	logrus.Infof("Updating clusterRole %v because of rules difference with roleTemplate %v (%v).", clusterRole.Name, rt.DisplayName, rt.Name)
 	_, err := m.clusterRoles.Update(clusterRole)
 	if err != nil {
-		return errors.Wrapf(err, "couldn't update clusterRole %v", rt.Name)
+		return fmt.Errorf("couldn't update clusterRole %s: %w", rt.Name, err)
 	}
 	return nil
 }
@@ -224,7 +223,7 @@ func (m *manager) createClusterRole(rt *v3.RoleTemplate) error {
 		Rules: rt.Rules,
 	})
 	if err != nil && !apierrors.IsAlreadyExists(err) {
-		return errors.Wrapf(err, "couldn't create clusterRole %v", rt.Name)
+		return fmt.Errorf("couldn't create clusterRole %s: %w", rt.Name, err)
 	}
 	return nil
 }
@@ -306,13 +305,13 @@ func (m *manager) updateRole(rt *v3.RoleTemplate, namespace string) error {
 			// get object from etcd and retry
 			role, err = m.roles.GetNamespaced(namespace, rt.Name, metav1.GetOptions{})
 			if err != nil {
-				return errors.Wrapf(err, "error getting role %v", rt.Name)
+				return fmt.Errorf("error getting role %s: %w", rt.Name, err)
 			}
 			return m.compareAndUpdateNamespacedRole(role, rt, namespace)
 		}
-		return errors.Wrapf(err, "couldn't update role %v", rt.Name)
+		return fmt.Errorf("couldn't update role %s: %w", rt.Name, err)
 	} else if err != nil && !apierrors.IsNotFound(err) {
-		return errors.Wrapf(err, "error getting role from cache %v", rt.Name)
+		return fmt.Errorf("error getting role from cache %s: %w", rt.Name, err)
 	}
 	// auth/manager.go creates roles based on the prtb/crtb so not repeating it here
 	return nil
@@ -327,7 +326,7 @@ func (m *manager) compareAndUpdateNamespacedRole(role *rbacv1.Role, rt *v3.RoleT
 	logrus.Infof("Updating role %v in %v because of rules difference with roleTemplate %v (%v).", role.Name, namespace, rt.DisplayName, rt.Name)
 	_, err := m.roles.Update(role)
 	if err != nil {
-		return errors.Wrapf(err, "couldn't update role %v in %v", rt.Name, namespace)
+		return fmt.Errorf("couldn't update role %s in %s: %w", rt.Name, namespace, err)
 	}
 	return err
 }
@@ -384,7 +383,7 @@ func (m *manager) gatherRolesRecurse(rt *v3.RoleTemplate, roleTemplates map[stri
 	for _, rtName := range rt.RoleTemplateNames {
 		subRT, err := m.rtLister.Get("", rtName)
 		if err != nil {
-			return errors.Wrapf(err, "couldn't get RoleTemplate %s", rtName)
+			return fmt.Errorf("couldn't get RoleTemplate %s: %w", rtName, err)
 		}
 		if err := m.gatherRoles(subRT, roleTemplates, depthCounter); err != nil {
 			return err

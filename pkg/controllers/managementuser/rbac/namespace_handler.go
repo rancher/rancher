@@ -5,7 +5,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/resourcequota"
@@ -99,7 +98,7 @@ func (n *nsLifecycle) syncNS(obj *v1.Namespace) (bool, error) {
 
 		systemProjectName, err := n.GetSystemProjectName()
 		if err != nil {
-			return false, errors.Wrapf(err, "failed to add namespace %s to system project", obj.Name)
+			return false, fmt.Errorf("failed to add namespace %s to system project: %w", obj.Name, err)
 		}
 
 		// When there is no system project, we should not set this annotation as a result because the project name
@@ -190,20 +189,20 @@ func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {
 		// "authz.cluster.cattle.io/rtb-owner-updated" 2.5 onwards
 		rbs, err := n.m.rbLister.List(ns.Name, labels.Everything())
 		if err != nil {
-			return false, errors.Wrapf(err, "couldn't list role bindings in %s", ns.Name)
+			return false, fmt.Errorf("couldn't list role bindings in %s: %w", ns.Name, err)
 		}
 		for _, rb := range rbs {
 			// rtbOwnerLabelLegacy
 			if uid := convert.ToString(rb.Labels[rtbOwnerLabelLegacy]); uid != "" {
 				logrus.Infof("Deleting role binding %s in %s owned by prtb %s because namespace does not belong to a project", rb.Name, ns.Name, uid)
 				if err := n.m.roleBindings.DeleteNamespaced(ns.Name, rb.Name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
-					return false, errors.Wrapf(err, "couldn't delete role binding %s", rb.Name)
+					return false, fmt.Errorf("couldn't delete role binding %s: %w", rb.Name, err)
 				}
 			}
 			if nsAndName := convert.ToString(rb.Labels[rtbOwnerLabel]); nsAndName != "" {
 				logrus.Infof("Deleting role binding %s in %s owned by prtb %s because namespace does not belong to a project", rb.Name, ns.Name, nsAndName)
 				if err := n.m.roleBindings.DeleteNamespaced(ns.Name, rb.Name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
-					return false, errors.Wrapf(err, "couldn't delete role binding %s", rb.Name)
+					return false, fmt.Errorf("couldn't delete role binding %s: %w", rb.Name, err)
 				}
 			}
 		}
@@ -212,14 +211,14 @@ func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {
 
 	prtbs, err := n.m.prtbIndexer.ByIndex(prtbByProjectIndex, projectID)
 	if err != nil {
-		return false, errors.Wrapf(err, "couldn't get project role binding templates associated with project id %s", projectID)
+		return false, fmt.Errorf("couldn't get project role binding templates associated with project id %s: %w", projectID, err)
 	}
 	hasPRTBs := len(prtbs) > 0
 
 	for _, prtb := range prtbs {
 		prtb, ok := prtb.(*v3.ProjectRoleTemplateBinding)
 		if !ok {
-			return false, errors.Wrapf(err, "object %v is not valid project role template binding", prtb)
+			return false, fmt.Errorf("object %v is not valid project role template binding", prtb)
 		}
 
 		if prtb.UserName == "" && prtb.GroupPrincipalName == "" && prtb.GroupName == "" && prtb.ServiceAccount == "" {
@@ -233,7 +232,7 @@ func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {
 
 		rt, err := n.m.rtLister.Get("", prtb.RoleTemplateName)
 		if err != nil {
-			return false, errors.Wrapf(err, "couldn't get role template %v", prtb.RoleTemplateName)
+			return false, fmt.Errorf("couldn't get role template %s: %w", prtb.RoleTemplateName, err)
 		}
 
 		roles := map[string]*v3.RoleTemplate{}
@@ -242,11 +241,11 @@ func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {
 		}
 
 		if err := n.m.ensureRoles(roles); err != nil {
-			return false, errors.Wrap(err, "couldn't ensure roles")
+			return false, fmt.Errorf("couldn't ensure roles: %w", err)
 		}
 
 		if err := n.m.ensureProjectRoleBindings(ns.Name, roles, prtb); err != nil {
-			return false, errors.Wrapf(err, "couldn't ensure binding %v in %v", prtb.Name, ns.Name)
+			return false, fmt.Errorf("couldn't ensure binding %s in %s: %w", prtb.Name, ns.Name, err)
 		}
 	}
 
@@ -259,7 +258,7 @@ func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {
 
 	rbs, err := n.m.rbLister.List(ns.Name, labels.Everything())
 	if err != nil {
-		return false, errors.Wrapf(err, "couldn't list role bindings in %s", ns.Name)
+		return false, fmt.Errorf("couldn't list role bindings in %s: %w", ns.Name, err)
 	}
 
 	for _, rb := range rbs {
@@ -269,7 +268,7 @@ func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {
 				if apierrors.IsNotFound(err) {
 					continue
 				} else {
-					return false, errors.Wrapf(err, "couldn't find prtb for %s", rb.Name)
+					return false, fmt.Errorf("couldn't find prtb for %s: %w", rb.Name, err)
 				}
 			}
 			for _, prtb := range prtbs {
@@ -277,7 +276,7 @@ func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {
 					if prtb.Namespace != namespace {
 						logrus.Infof("Deleting role binding %s in %s owned by prtb %s because namespace belongs to a different project %s", rb.Name, ns.Name, prtb.Name, prtb.Namespace)
 						if err := n.m.roleBindings.DeleteNamespaced(ns.Name, rb.Name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
-							return false, errors.Wrapf(err, "couldn't delete role binding %s", rb.Name)
+							return false, fmt.Errorf("couldn't delete role binding %s: %w", rb.Name, err)
 						}
 					}
 				}
@@ -290,7 +289,7 @@ func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {
 				if apierrors.IsNotFound(err) {
 					continue
 				} else {
-					return false, errors.Wrapf(err, "couldn't find prtb for %s", rb.Name)
+					return false, fmt.Errorf("couldn't find prtb for %s: %w", rb.Name, err)
 				}
 			}
 			for _, prtb := range prtbs {
@@ -298,7 +297,7 @@ func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {
 					if prtb.Namespace != namespace {
 						logrus.Infof("Deleting role binding %s in %s owned by prtb %s because namespace belongs to a different project %s", rb.Name, ns.Name, prtb.Name, prtb.Namespace)
 						if err := n.m.roleBindings.DeleteNamespaced(ns.Name, rb.Name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
-							return false, errors.Wrapf(err, "couldn't delete role binding %s", rb.Name)
+							return false, fmt.Errorf("couldn't delete role binding %s: %w", rb.Name, err)
 						}
 					}
 				}
@@ -331,7 +330,7 @@ func (n *nsLifecycle) reconcileNamespaceProjectClusterRole(ns *v1.Namespace) err
 		for _, c := range clusterRoles {
 			cr, ok := c.(*rbacv1.ClusterRole)
 			if !ok {
-				return errors.Errorf("%v is not a ClusterRole", c)
+				return fmt.Errorf("%v is not a ClusterRole", c)
 			}
 
 			if cr.Name == desiredRole {
