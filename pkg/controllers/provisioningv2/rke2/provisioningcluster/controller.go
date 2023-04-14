@@ -181,6 +181,13 @@ func (h *handler) OnChange(_ string, cluster *rancherv1.Cluster) (*rancherv1.Clu
 		if machinePool.DynamicSchemaSpec != "" && json.Unmarshal([]byte(machinePool.DynamicSchemaSpec), &spec) == nil {
 			continue
 		}
+		if machinePool.NodeConfig == nil {
+			continue
+		}
+		apiVersion := machinePool.NodeConfig.APIVersion
+		if apiVersion != rke2.DefaultMachineConfigAPIVersion && apiVersion != "" {
+			continue
+		}
 		// if the field is empty or invalid, add to any machine pools that do not have it and update the cluster
 		clusterCopy := cluster.DeepCopy()
 		for j := i; j < len(cluster.Spec.RKEConfig.MachinePools); j++ {
@@ -192,6 +199,10 @@ func (h *handler) OnChange(_ string, cluster *rancherv1.Cluster) (*rancherv1.Clu
 			nodeConfig := machinePool.NodeConfig
 			if nodeConfig == nil {
 				return cluster, fmt.Errorf("machine pool node config must not be nil")
+			}
+			apiVersion := nodeConfig.APIVersion
+			if apiVersion != rke2.DefaultMachineConfigAPIVersion && apiVersion != "" {
+				continue
 			}
 			ds, err := h.dynamicSchema.Get(strings.ToLower(nodeConfig.Kind))
 			if err != nil {
