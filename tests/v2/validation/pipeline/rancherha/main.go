@@ -3,15 +3,15 @@ package main
 import (
 	"github.com/rancher/rancher/tests/framework/clients/corral"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	"github.com/rancher/rancher/tests/framework/extensions/pipelineutils"
-	"github.com/rancher/rancher/tests/framework/pkg/environmentflag"
+	"github.com/rancher/rancher/tests/framework/extensions/pipeline"
 	"github.com/rancher/rancher/tests/framework/pkg/config"
+	"github.com/rancher/rancher/tests/framework/pkg/environmentflag"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
 	"github.com/sirupsen/logrus"
 )
 
 const (
-	corralPackageRancherName         = "rancherha"
+	corralPackageRancherName = "rancherha"
 )
 
 func main() {
@@ -34,7 +34,7 @@ func main() {
 	if installRancher {
 		path := configPackage.CorralPackageImages[corralPackageRancherName]
 		corralName := corralPackageRancherName
-		
+
 		logrus.Infof("PATH", path)
 		_, err = corral.CreateCorral(corralSession, corralName, path, true, configPackage.Cleanup)
 		if err != nil {
@@ -48,7 +48,7 @@ func main() {
 		rancherConfig := new(rancher.Config)
 		config.LoadConfig(rancher.ConfigurationFileKey, rancherConfig)
 
-		token, err := pipelineutils.CreateAdminToken(bootstrapPassword, rancherConfig)
+		token, err := pipeline.CreateAdminToken(bootstrapPassword, rancherConfig)
 		if err != nil {
 			logrus.Errorf("error creating the admin token: %v", err)
 		}
@@ -60,7 +60,7 @@ func main() {
 			logrus.Errorf("error creating the rancher client: %v", err)
 		}
 
-		err = pipelineutils.PostRancherInstall(client, rancherConfig.AdminPassword)
+		err = pipeline.PostRancherInstall(client, rancherConfig.AdminPassword)
 		if err != nil {
 			logrus.Errorf("error during post rancher install: %v", err)
 		}

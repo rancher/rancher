@@ -118,7 +118,7 @@ node {
             stage("Build Environment") {
               try {
                 sh "docker run -v ${registriesVolume}:/root --name ${buildTestContainer} -t --env-file ${envFile} " +
-                "${golangImageName} sh -c \"${workPath}scripts/setup_registries_environment.sh\""
+                "${golangImageName} sh -c \"${workPath}pipeline/scripts/setup_registries_environment.sh\""
               } catch(err) {
                 sh "docker stop ${buildTestContainer}"
                 sh "docker rm -v ${buildTestContainer}"
@@ -138,7 +138,7 @@ node {
               try {
                 if ("${env.ClEANUP_RANCHER}" == "True" || "${env.ClEANUP_RANCHER}" == "true") {
                   sh "docker run --volumes-from ${buildTestContainer} --name ${cleanupTestContainer} -t --env-file ${envFile} " +
-                  "${golangImageName} sh -c \"${workPath}scripts/rancher_cleanup.sh\""
+                  "${golangImageName} sh -c \"${workPath}pipeline/scripts/rancher_cleanup.sh\""
                 }
               } catch(err) {
                 sh "docker stop ${buildTestContainer}"

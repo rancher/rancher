@@ -96,7 +96,7 @@ func (k *KdmChecksTestSuite) TestProvisioningSingleNodeRKE2Clusters() {
 
 	for _, k8sVersion := range k.rke2kubernetesVersions {
 
-		clusterName := namegen.AppendRandomString(provider.Name)
+		clusterName := namegen.AppendRandomString(provider.Name.String())
 
 		cloudCredential, err := provider.CloudCredFunc(client)
 		require.NoError(k.T(), err)

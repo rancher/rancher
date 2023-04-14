@@ -13,7 +13,7 @@ const (
 // AKSClusterConfig is the configuration needed to create an AKS host cluster
 type AKSClusterConfig struct {
 	AuthorizedIPRanges          *[]string         `json:"authorizedIpRanges,omitempty" yaml:"authorizedIpRanges,omitempty"`
-	AzureCredentialSecret       string            `json:"azureCredentialSecret,omitempty" yaml:"azureCredentialSecret,omitempty"`
+	AzureCredentialSecret       string            `json:"azureCredentialSecret" yaml:"azureCredentialSecret"`
 	DNSPrefix                   *string           `json:"dnsPrefix,omitempty" yaml:"dnsPrefix,omitempty"`
 	KubernetesVersion           *string           `json:"kubernetesVersion,omitempty" yaml:"kubernetesVersion,omitempty"`
 	LinuxAdminUsername          *string           `json:"linuxAdminUsername,omitempty" yaml:"linuxAdminUsername,omitempty"`
@@ -30,10 +30,10 @@ type AKSClusterConfig struct {
 	NetworkServiceCIDR          *string           `json:"serviceCidr,omitempty" yaml:"serviceCidr,omitempty"`
 	NodePools                   *[]AKSNodePool    `json:"nodePools,omitempty" yaml:"nodePools,omitempty"`
 	PrivateCluster              *bool             `json:"privateCluster,omitempty" yaml:"privateCluster,omitempty"`
-	ResourceGroup               string            `json:"resourceGroup,omitempty" yaml:"resourceGroup,omitempty"`
-	ResourceLocation            string            `json:"resourceLocation,omitempty" yaml:"resourceLocation,omitempty"`
+	ResourceGroup               string            `json:"resourceGroup" yaml:"resourceGroup"`
+	ResourceLocation            string            `json:"resourceLocation" yaml:"resourceLocation"`
 	Subnet                      *string           `json:"subnet,omitempty" yaml:"subnet,omitempty"`
-	Tags                        map[string]string `json:"tags,omitempty" yaml:"tags,omitempty"`
+	Tags                        map[string]string `json:"tags" yaml:"tags"`
 	VirtualNetwork              *string           `json:"virtualNetwork,omitempty" yaml:"virtualNetwork,omitempty"`
 	VirtualNetworkResourceGroup *string           `json:"virtualNetworkResourceGroup,omitempty" yaml:"virtualNetworkResourceGroup,omitempty"`
 }
@@ -45,14 +45,14 @@ type AKSNodePool struct {
 	MaxPods             *int64    `json:"maxPods,omitempty" yaml:"maxPods,omitempty"`
 	MaxCount            *int64    `json:"maxCount,omitempty" yaml:"maxCount,omitempty"`
 	MinCount            *int64    `json:"minCount,omitempty" yaml:"minCount,omitempty"`
-	Mode                string    `json:"mode,omitempty" yaml:"mode,omitempty"`
+	Mode                string    `json:"mode" yaml:"mode"`
 	Name                *string   `json:"name,omitempty" yaml:"name,omitempty"`
 	NodeCount           *int64    `json:"nodeCount,omitempty" yaml:"nodeCount,omitempty"`
 	OrchestratorVersion *string   `json:"orchestratorVersion,omitempty" yaml:"orchestratorVersion,omitempty"`
 	OsDiskSizeGB        *int64    `json:"osDiskSizeGB,omitempty" yaml:"osDiskSizeGB,omitempty"`
-	OsDiskType          string    `json:"osDiskType,omitempty" yaml:"osDiskType,omitempty"`
-	OsType              string    `json:"osType,omitempty" yaml:"osType,omitempty"`
-	VMSize              string    `json:"vmSize,omitempty" yaml:"vmSize,omitempty"`
+	OsDiskType          string    `json:"osDiskType" yaml:"osDiskType"`
+	OsType              string    `json:"osType" yaml:"osType"`
+	VMSize              string    `json:"vmSize" yaml:"vmSize"`
 }
 
 func aksNodePoolConstructor(aksNodePoolConfigs *[]AKSNodePool, kubernetesVersion string) []management.AKSNodePool {

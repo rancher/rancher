@@ -16,7 +16,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/clusterrolebindings"
 	"github.com/rancher/rancher/tests/framework/extensions/configmaps"
 	"github.com/rancher/rancher/tests/framework/extensions/serviceaccounts"
-	"github.com/rancher/rancher/tests/framework/extensions/workloads/deployments"
+	"github.com/rancher/rancher/tests/framework/extensions/workloads"
 	"github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -360,7 +360,7 @@ func createAlertWebhookReceiverDeployment(client *rancher.Client, clusterID, nam
 	// Create webhook receiver deployment
 	var runAsUser int64
 	var runAsGroup int64
-	deploymentTemplate := corev1.PodTemplateSpec{
+	podSpecTemplate := corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "alert-reciver-deployment",
 			Namespace: namespace,
@@ -428,7 +428,9 @@ func createAlertWebhookReceiverDeployment(client *rancher.Client, clusterID, nam
 		},
 	}
 
-	deployment, err := deployments.CreateDeployment(client, clusterID, deploymentName, namespace, deploymentTemplate)
+	isCattleLabeled := true
+	deploymentTemplate := workloads.NewDeploymentTemplate(deploymentName, namespace, podSpecTemplate, isCattleLabeled, nil)
+	deployment, err := steveclient.SteveType(workloads.DeploymentSteveType).Create(deploymentTemplate)
 	if err != nil {
 		return deployment, err
 	}

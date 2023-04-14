@@ -9,7 +9,7 @@ const (
 	AzureKind                              = "AzureConfig"
 	AzurePoolType                          = "rke-machine-config.cattle.io.azureconfig"
 	AzureResourceConfig                    = "azureconfigs"
-	AzureMachingConfigConfigurationFileKey = "azureMachineConfig"
+	AzureMachineConfigConfigurationFileKey = "azureMachineConfig"
 )
 
 // AzureMachineConfig is configuration needed to create an rke-machine-config.cattle.io.azureconfig
@@ -41,7 +41,7 @@ type AzureMachineConfig struct {
 // that CreateMachineConfig uses to created the rke-machine-config
 func NewAzureMachineConfig(generatedPoolName, namespace string) *unstructured.Unstructured {
 	var azureMachineConfig AzureMachineConfig
-	config.LoadConfig(AzureMachingConfigConfigurationFileKey, &azureMachineConfig)
+	config.LoadConfig(AzureMachineConfigConfigurationFileKey, &azureMachineConfig)
 
 	machineConfig := &unstructured.Unstructured{}
 	machineConfig.SetAPIVersion("rke-machine-config.cattle.io/v1")

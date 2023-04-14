@@ -37,6 +37,8 @@ func ListRKE1AllVersions(client *rancher.Client) (allAvailableVersions []string,
 	}
 	allAvailableVersions = strings.Split(setting.Value, ",")
 
+	sort.Strings(allAvailableVersions)
+
 	return
 }
 
@@ -226,9 +228,9 @@ func ListEKSAllVersions(client *rancher.Client) (allAvailableVersions []string, 
 
 // sortReleases is a private function that sorts release structs that are used for K3S and RKE2.
 // Sorted versions determined by these conditions:
-//    1. Current rancher version is between min and max channel versions
-//    2. Release struct has serverArgs and agentArgs not empty fields
-//    3. Possible newest version of the minimum channel version
+//  1. Current rancher version is between min and max channel versions
+//  2. Release struct has serverArgs and agentArgs not empty fields
+//  3. Possible newest version of the minimum channel version
 func sortReleases(rancherVersion *semver.Version, releases []interface{}) (allAvailableVersions []string) {
 	availableVersionsMap := map[string]semver.Version{}
 

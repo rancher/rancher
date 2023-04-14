@@ -32,9 +32,9 @@ func LoadEnvironmentFlags(configurationFileKey string, e EnvironmentFlags) {
 	flags := strings.Split(strings.ToLower(flagsConfig.DesiredFlags), "|")
 
 	for i := EnvironmentFlag(0); i < environmentFlagLastItem; i++ {
-		if slices.Contains(flags, strings.ToLower(i.String())) {
-			e[EnvironmentFlag(i)] = true
-		}
+		doesContainItem := slices.Contains(flags, strings.ToLower(i.String()))
+
+		e[EnvironmentFlag(i)] = doesContainItem
 	}
 }
 

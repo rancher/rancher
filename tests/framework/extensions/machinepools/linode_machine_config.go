@@ -9,7 +9,7 @@ const (
 	LinodeKind                              = "LinodeConfig"
 	LinodePoolType                          = "rke-machine-config.cattle.io.linodeconfig"
 	LinodeResourceConfig                    = "linodeconfigs"
-	LinodeMachingConfigConfigurationFileKey = "linodeMachineConfig"
+	LinodeMachineConfigConfigurationFileKey = "linodeMachineConfig"
 )
 
 // LinodeMachineConfig is configuration needed to create an rke-machine-config.cattle.io.linodeconfig
@@ -34,7 +34,7 @@ type LinodeMachineConfig struct {
 // that CreateMachineConfig uses to created the rke-machine-config
 func NewLinodeMachineConfig(generatedPoolName, namespace string) *unstructured.Unstructured {
 	var linodeMachineConfig LinodeMachineConfig
-	config.LoadConfig(LinodeMachingConfigConfigurationFileKey, &linodeMachineConfig)
+	config.LoadConfig(LinodeMachineConfigConfigurationFileKey, &linodeMachineConfig)
 
 	machineConfig := &unstructured.Unstructured{}
 	machineConfig.SetAPIVersion("rke-machine-config.cattle.io/v1")

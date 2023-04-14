@@ -99,7 +99,7 @@ func (k *KdmChecksTestSuite) TestProvisioningSingleNodeK3SClusters() {
 
 	for _, k8sVersion := range k.k3skubernetesVersions {
 
-		clusterName := namegen.AppendRandomString(provider.Name)
+		clusterName := namegen.AppendRandomString(provider.Name.String())
 
 		cloudCredential, err := provider.CloudCredFunc(client)
 		require.NoError(k.T(), err)

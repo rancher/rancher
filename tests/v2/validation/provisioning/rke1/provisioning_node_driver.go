@@ -7,9 +7,11 @@ import (
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	nodestat "github.com/rancher/rancher/tests/framework/extensions/nodes"
+	"github.com/rancher/rancher/tests/framework/extensions/pipeline"
 	nodepools "github.com/rancher/rancher/tests/framework/extensions/rke1/nodepools"
 	"github.com/rancher/rancher/tests/framework/extensions/rke1/nodetemplates"
 	"github.com/rancher/rancher/tests/framework/extensions/workloads/pods"
+	"github.com/rancher/rancher/tests/framework/pkg/environmentflag"
 	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
 	"github.com/rancher/rancher/tests/integration/pkg/defaults"
@@ -19,10 +21,14 @@ import (
 )
 
 func TestProvisioningRKE1Cluster(t *testing.T, client *rancher.Client, provider Provider, nodesAndRoles []nodepools.NodeRoles, kubeVersion, cni string, nodeTemplate *nodetemplates.NodeTemplate) (*management.Cluster, error) {
-	clusterName := namegen.AppendRandomString(provider.Name)
+	clusterName := namegen.AppendRandomString(provider.Name.String())
 	cluster := clusters.NewRKE1ClusterConfig(clusterName, cni, kubeVersion, client)
 	clusterResp, err := clusters.CreateRKE1Cluster(client, cluster)
 	require.NoError(t, err)
+
+	if client.Flags.GetValue(environmentflag.UpdateClusterName) {
+		pipeline.UpdateConfigClusterName(clusterName)
+	}
 
 	nodePool, err := nodepools.NodePoolSetup(client, nodesAndRoles, clusterResp.ID, nodeTemplate.ID)
 	require.NoError(t, err)

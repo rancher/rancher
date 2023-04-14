@@ -11,22 +11,15 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/cloudcredentials/harvester"
 	"github.com/rancher/rancher/tests/framework/extensions/cloudcredentials/linode"
 	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
+	"github.com/rancher/rancher/tests/v2/validation/provisioning"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-)
-
-const (
-	awsProviderName       = "aws"
-	azureProviderName     = "azure"
-	doProviderName        = "do"
-	harvesterProviderName = "harvester"
-	linodeProviderName    = "linode"
 )
 
 type CloudCredFunc func(rancherClient *rancher.Client) (*cloudcredentials.CloudCredential, error)
 type MachinePoolFunc func(generatedPoolName, namespace string) *unstructured.Unstructured
 
 type Provider struct {
-	Name                               string
+	Name                               provisioning.ProviderName
 	MachineConfigPoolResourceSteveType string
 	MachinePoolFunc                    MachinePoolFunc
 	CloudCredFunc                      CloudCredFunc
@@ -37,41 +30,41 @@ type Provider struct {
 // string of the name of the provider.
 func CreateProvider(name string) Provider {
 	switch {
-	case name == awsProviderName:
+	case name == provisioning.AWSProviderName.String():
 		provider := Provider{
-			Name:                               name,
+			Name:                               provisioning.AWSProviderName,
 			MachineConfigPoolResourceSteveType: machinepools.AWSPoolType,
 			MachinePoolFunc:                    machinepools.NewAWSMachineConfig,
 			CloudCredFunc:                      aws.CreateAWSCloudCredentials,
 		}
 		return provider
-	case name == azureProviderName:
+	case name == provisioning.AzureProviderName.String():
 		provider := Provider{
-			Name:                               name,
+			Name:                               provisioning.AzureProviderName,
 			MachineConfigPoolResourceSteveType: machinepools.AzurePoolType,
 			MachinePoolFunc:                    machinepools.NewAzureMachineConfig,
 			CloudCredFunc:                      azure.CreateAzureCloudCredentials,
 		}
 		return provider
-	case name == doProviderName:
+	case name == provisioning.DOProviderName.String():
 		provider := Provider{
-			Name:                               name,
+			Name:                               provisioning.DOProviderName,
 			MachineConfigPoolResourceSteveType: machinepools.DOPoolType,
 			MachinePoolFunc:                    machinepools.NewDigitalOceanMachineConfig,
 			CloudCredFunc:                      digitalocean.CreateDigitalOceanCloudCredentials,
 		}
 		return provider
-	case name == linodeProviderName:
+	case name == provisioning.LinodeProviderName.String():
 		provider := Provider{
-			Name:                               name,
+			Name:                               provisioning.LinodeProviderName,
 			MachineConfigPoolResourceSteveType: machinepools.LinodePoolType,
 			MachinePoolFunc:                    machinepools.NewLinodeMachineConfig,
 			CloudCredFunc:                      linode.CreateLinodeCloudCredentials,
 		}
 		return provider
-	case name == harvesterProviderName:
+	case name == provisioning.HarvesterProviderName.String():
 		provider := Provider{
-			Name:                               name,
+			Name:                               provisioning.HarvesterProviderName,
 			MachineConfigPoolResourceSteveType: machinepools.HarvesterPoolType,
 			MachinePoolFunc:                    machinepools.NewHarvesterMachineConfig,
 			CloudCredFunc:                      harvester.CreateHarvesterCloudCredentials,
