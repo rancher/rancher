@@ -129,7 +129,7 @@ func (p *Planner) setEncryptionKeyRotateState(status rkev1.RKEControlPlaneStatus
 	}
 	status.RotateEncryptionKeys = rotate
 	status.RotateEncryptionKeysPhase = phase
-	return status, ErrWaiting("refreshing encryption key rotation state")
+	return status, errWaiting("refreshing encryption key rotation state")
 }
 
 func (p *Planner) resetEncryptionKeyRotateState(status rkev1.RKEControlPlaneStatus) (rkev1.RKEControlPlaneStatus, error) {
@@ -173,7 +173,7 @@ func (p *Planner) rotateEncryptionKeys(cp *rkev1.RKEControlPlane, status rkev1.R
 
 	if status.RotateEncryptionKeysLeader != leader.Machine.Name {
 		status.RotateEncryptionKeysLeader = leader.Machine.Name
-		return status, ErrWaitingf("elected %s as control plane leader for encryption key rotation", leader.Machine.Name)
+		return status, errWaitingf("elected %s as control plane leader for encryption key rotation", leader.Machine.Name)
 	}
 
 	logrus.Debugf("[planner] rkecluster %s/%s: current encryption key rotation phase: [%s]", cp.Namespace, cp.Spec.ClusterName, cp.Status.RotateEncryptionKeysPhase)
@@ -181,7 +181,7 @@ func (p *Planner) rotateEncryptionKeys(cp *rkev1.RKEControlPlane, status rkev1.R
 	switch cp.Status.RotateEncryptionKeysPhase {
 	case rkev1.RotateEncryptionKeysPhasePrepare:
 		if err := p.pauseCAPICluster(cp, true); err != nil {
-			return status, ErrWaiting("pausing CAPI cluster")
+			return status, errWaiting("pausing CAPI cluster")
 		}
 		status, err = p.encryptionKeyRotationLeaderPhaseReconcile(cp, status, leader)
 		if err != nil {
@@ -218,7 +218,7 @@ func (p *Planner) rotateEncryptionKeys(cp *rkev1.RKEControlPlane, status rkev1.R
 			return status, err
 		}
 		if err = p.pauseCAPICluster(cp, false); err != nil {
-			return status, ErrWaiting("unpausing CAPI cluster")
+			return status, errWaiting("unpausing CAPI cluster")
 		}
 		status.RotateEncryptionKeysLeader = ""
 		return p.setEncryptionKeyRotateState(status, cp.Spec.RotateEncryptionKeys, rkev1.RotateEncryptionKeysPhaseDone)
@@ -468,7 +468,7 @@ func (p *Planner) encryptionKeyRotationRestartService(cp *rkev1.RKEControlPlane,
 	if err != nil {
 		if IsErrWaiting(err) {
 			if planAppliedButWaitingForProbes(entry) {
-				return "", status, ErrWaitingf("%s: %s", err.Error(), probesMessage(entry.Plan))
+				return "", status, errWaitingf("%s: %s", err.Error(), probesMessage(entry.Plan))
 			}
 			return "", status, err
 		}
@@ -544,7 +544,7 @@ func (p *Planner) encryptionKeyRotationLeaderPhaseReconcile(cp *rkev1.RKEControl
 	}
 	if scrapedStageFromOneTimeInstructions == encryptionKeyRotationStageReencryptRequest || scrapedStageFromOneTimeInstructions == encryptionKeyRotationStageReencryptActive {
 		if periodic != encryptionKeyRotationStageReencryptFinished {
-			return status, ErrWaitingf("waiting for encryption key rotation stage to be finished")
+			return status, errWaitingf("waiting for encryption key rotation stage to be finished")
 		}
 	}
 	// successful restart, complete same phases for rotate & reencrypt
@@ -559,7 +559,7 @@ func encryptionKeyRotationSecretsEncryptStageFromPeriodic(plan *planEntry) (stri
 	if !ok {
 		for _, pi := range plan.Plan.Plan.PeriodicInstructions {
 			if pi.Name == encryptionKeyRotationSecretsEncryptStatusCommand {
-				return "", ErrWaitingf("could not extract current status from plan for [%s]: no output for status", plan.Machine.Name)
+				return "", errWaitingf("could not extract current status from plan for [%s]: no output for status", plan.Machine.Name)
 			}
 		}
 		return "", fmt.Errorf("could not extract current status from plan for [%s]: status command not present in plan", plan.Machine.Name)
@@ -573,7 +573,7 @@ func encryptionKeyRotationSecretsEncryptStageFromPeriodic(plan *planEntry) (stri
 func encryptionKeyRotationSecretsEncryptStageFromOneTimeStatus(plan *planEntry) (string, error) {
 	output, ok := plan.Plan.Output[encryptionKeyRotationSecretsEncryptStatusCommand]
 	if !ok {
-		return "", ErrWaitingf("could not extract current status from plan for [%s]: no output for status", plan.Machine.Name)
+		return "", errWaitingf("could not extract current status from plan for [%s]: no output for status", plan.Machine.Name)
 	}
 	status, err := encryptionKeyRotationStageFromOutput(plan, string(output))
 	return status, err
@@ -583,7 +583,7 @@ func encryptionKeyRotationSecretsEncryptStageFromOneTimeStatus(plan *planEntry) 
 func encryptionKeyRotationStageFromOutput(plan *planEntry, output string) (string, error) {
 	a := strings.Split(output, "\n")
 	if len(a) < 2 {
-		return "", ErrWaitingf("could not extract current stage from plan for [%s]: status output is incomplete", plan.Machine.Name)
+		return "", errWaitingf("could not extract current stage from plan for [%s]: status output is incomplete", plan.Machine.Name)
 	}
 	for _, v := range a {
 		a = strings.Split(v, ": ")
@@ -593,7 +593,7 @@ func encryptionKeyRotationStageFromOutput(plan *planEntry, output string) (strin
 		status := a[1]
 		return status, nil
 	}
-	return "", ErrWaitingf("unable to parse rotation stage from output")
+	return "", errWaitingf("unable to parse rotation stage from output")
 }
 
 // encryptionKeyRotationSecretsEncryptInstruction generates a secrets-encrypt command to run on the leader node given

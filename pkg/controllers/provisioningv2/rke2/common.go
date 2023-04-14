@@ -66,11 +66,13 @@ const (
 	PostDrainAnnotation        = "rke.cattle.io/post-drain"
 	PreDrainAnnotation         = "rke.cattle.io/pre-drain"
 	RoleLabel                  = "rke.cattle.io/service-account-role"
-	SecretTypeMachinePlan      = "rke.cattle.io/machine-plan"
 	TaintsAnnotation           = "rke.cattle.io/taints"
 	UnCordonAnnotation         = "rke.cattle.io/uncordon"
 	WorkerRoleLabel            = "rke.cattle.io/worker-role"
 	AuthorizedObjectAnnotation = "rke.cattle.io/object-authorized-for-clusters"
+
+	SecretTypeMachinePlan  = "rke.cattle.io/machine-plan"
+	SecretTypeClusterState = "rke.cattle.io/cluster-state"
 
 	MachineTemplateClonedFromGroupVersionAnn = "rke.cattle.io/cloned-from-group-version"
 	MachineTemplateClonedFromKindAnn         = "rke.cattle.io/cloned-from-kind"

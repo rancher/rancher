@@ -24,6 +24,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
@@ -48,6 +49,7 @@ func NewStore(secrets corecontrollers.SecretController, machineCache capicontrol
 	}
 }
 
+// onlyRKE returns a subset of the passed in slice of CAPI machines that only contains machines that have an RKEBootstrap
 func onlyRKE(machines []*capi.Machine) (result []*capi.Machine) {
 	for _, m := range machines {
 		if !isRKEBootstrap(m) {
@@ -66,26 +68,30 @@ func (p *PlanStore) ClusterHasBeenBootstrapped(plan *plan.Plan) bool {
 	return getControlPlaneJoinURL(plan) != ""
 }
 
-func (p *PlanStore) Load(cluster *capi.Cluster, rkeControlPlane *rkev1.RKEControlPlane) (*plan.Plan, error) {
+// Load takes a clusters.cluster.x-k8s.io object and the corresponding rkecontrolplanes.rke.cattle.io object and
+// generates a new plan.Plan, a bool that indicates whether any plan has been delivered to any of the machines,
+// and an error
+func (p *PlanStore) Load(cluster *capi.Cluster, rkeControlPlane *rkev1.RKEControlPlane) (*plan.Plan, bool, error) {
 	result := &plan.Plan{
 		Nodes:    map[string]*plan.Node{},
 		Machines: map[string]*capi.Machine{},
 		Metadata: map[string]*plan.Metadata{},
-		Cluster:  cluster,
 	}
+
+	var anyPlanDelivered bool
 
 	machines, err := p.machineCache.List(cluster.Namespace, labels.SelectorFromSet(map[string]string{
 		capi.ClusterLabelName: cluster.Name,
 	}))
 	if err != nil {
-		return nil, err
+		return nil, anyPlanDelivered, err
 	}
 
 	machines = onlyRKE(machines)
 
 	secrets, err := p.getPlanSecrets(machines)
 	if err != nil {
-		return nil, err
+		return nil, anyPlanDelivered, err
 	}
 
 	for _, machine := range machines {
@@ -105,20 +111,21 @@ func (p *PlanStore) Load(cluster *capi.Cluster, rkeControlPlane *rkev1.RKEContro
 		}
 		node, err := SecretToNode(secret)
 		if err != nil {
-			return nil, err
+			return nil, anyPlanDelivered, err
 		}
 		if node == nil {
 			continue
 		}
-
-		if err := p.setMachineJoinURL(&planEntry{Machine: result.Machines[machineName], Metadata: result.Metadata[machineName], Plan: node}, cluster, rkeControlPlane); err != nil {
-			return nil, err
+		if node.PlanDataExists {
+			anyPlanDelivered = true
 		}
-
+		if err := p.setMachineJoinURL(&planEntry{Machine: result.Machines[machineName], Metadata: result.Metadata[machineName], Plan: node}, cluster, rkeControlPlane); err != nil {
+			return nil, anyPlanDelivered, err
+		}
 		result.Nodes[machineName] = node
 	}
 
-	return result, nil
+	return result, anyPlanDelivered, nil
 }
 
 func noPlanMessage(entry *planEntry) string {
@@ -165,11 +172,19 @@ func getPlanStatusReasonMessage(entry *planEntry) string {
 	}
 }
 
+// SecretToNode consumes a secret of type rke.cattle.io/machine-plan and returns a node object and an error if one exists
 func SecretToNode(secret *corev1.Secret) (*plan.Node, error) {
+	if secret == nil {
+		return nil, fmt.Errorf("unable to convert secret to node plan, secret was nil")
+	}
+	if secret.Type != rke2.SecretTypeMachinePlan {
+		return nil, fmt.Errorf("secret %s/%s was not type %s", secret.Namespace, secret.Name, rke2.SecretTypeMachinePlan)
+	}
 	result := &plan.Node{
 		Healthy: true,
 	}
 	planData := secret.Data["plan"]
+	result.PlanDataExists = len(secret.Data["plan"]) != 0
 	appliedPlanData := secret.Data["appliedPlan"]
 	failedChecksum := string(secret.Data["failed-checksum"])
 	output := secret.Data["applied-output"]
@@ -290,7 +305,9 @@ func isRKEBootstrap(machine *capi.Machine) bool {
 		machine.Spec.Bootstrap.ConfigRef.Kind == "RKEBootstrap"
 }
 
-// getPlanSecretFromMachine returns the plan secret from the secretsCache for the given machine, or an error if the plan secret is not available
+// getPlanSecretFromMachine returns the plan secret from the secrets client for the given machine,
+// or an error if the plan secret is not available. Notably we do not use the secretsCache to ensure we only operate
+// on the latest version of a machine plan secret.
 func (p *PlanStore) getPlanSecretFromMachine(machine *capi.Machine) (*corev1.Secret, error) {
 	if machine == nil {
 		return nil, fmt.Errorf("machine was nil")
@@ -308,12 +325,21 @@ func (p *PlanStore) getPlanSecretFromMachine(machine *capi.Machine) (*corev1.Sec
 		return nil, fmt.Errorf("machine %s/%s bootstrap configref name was empty", machine.Namespace, machine.Name)
 	}
 
-	return p.secretsCache.Get(machine.Namespace, rke2.PlanSecretFromBootstrapName(machine.Spec.Bootstrap.ConfigRef.Name))
+	secret, err := p.secrets.Get(machine.Namespace, rke2.PlanSecretFromBootstrapName(machine.Spec.Bootstrap.ConfigRef.Name), metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	if secret.Type != rke2.SecretTypeMachinePlan {
+		return nil, fmt.Errorf("retrieved secret %s/%s type %s did not match expected type %s", secret.Namespace, secret.Name, secret.Type, rke2.SecretTypeMachinePlan)
+	}
+
+	return secret, nil
 }
 
 // UpdatePlan should not be called directly as it will not block further progress if the plan is not in sync
 // maxFailures is the number of attempts the system-agent will make to run the plan (in a failed state). failureThreshold is used to determine when the plan has failed.
-func (p *PlanStore) UpdatePlan(entry *planEntry, plan plan.NodePlan, maxFailures, failureThreshold int) error {
+func (p *PlanStore) UpdatePlan(entry *planEntry, newNodePlan plan.NodePlan, maxFailures, failureThreshold int) error {
 	if maxFailures < failureThreshold && failureThreshold != -1 && maxFailures != -1 {
 		return fmt.Errorf("failureThreshold (%d) cannot be greater than maxFailures (%d)", failureThreshold, maxFailures)
 	}
@@ -322,7 +348,7 @@ func (p *PlanStore) UpdatePlan(entry *planEntry, plan plan.NodePlan, maxFailures
 		return err
 	}
 
-	data, err := json.Marshal(plan)
+	data, err := json.Marshal(newNodePlan)
 	if err != nil {
 		return err
 	}
@@ -351,8 +377,19 @@ func (p *PlanStore) UpdatePlan(entry *planEntry, plan plan.NodePlan, maxFailures
 		delete(secret.Data, "failure-threshold")
 	}
 
-	_, err = p.secrets.Update(secret)
-	return err
+	updatedSecret, err := p.secrets.Update(secret)
+	if err != nil {
+		return err
+	}
+
+	// Update the node immediately so that future plan processing occurs
+	newNode, err := SecretToNode(updatedSecret)
+	if err != nil {
+		return err
+	}
+
+	entry.Plan = newNode
+	return nil
 }
 
 func (p *PlanStore) updatePlanSecretLabelsAndAnnotations(entry *planEntry) error {
@@ -368,6 +405,7 @@ func (p *PlanStore) updatePlanSecretLabelsAndAnnotations(entry *planEntry) error
 	return err
 }
 
+// removePlanSecretLabel removes a label with the given key from the plan secret that corresponds to the RKEBootstrap
 func (p *PlanStore) removePlanSecretLabel(entry *planEntry, key string) error {
 	secret, err := p.getPlanSecretFromMachine(entry.Machine)
 	if err != nil {
@@ -385,18 +423,18 @@ func (p *PlanStore) removePlanSecretLabel(entry *planEntry, key string) error {
 }
 
 // assignAndCheckPlan assigns the given newPlan to the designated server in the planEntry, and will return nil if the plan is assigned and in sync.
-func assignAndCheckPlan(store *PlanStore, msg string, server *planEntry, newPlan plan.NodePlan, failureThreshold, maxRetries int) error {
-	if server.Plan == nil || !equality.Semantic.DeepEqual(server.Plan.Plan, newPlan) {
-		if err := store.UpdatePlan(server, newPlan, failureThreshold, maxRetries); err != nil {
+func assignAndCheckPlan(store *PlanStore, msg string, entry *planEntry, newPlan plan.NodePlan, failureThreshold, maxRetries int) error {
+	if entry.Plan == nil || !equality.Semantic.DeepEqual(entry.Plan.Plan, newPlan) {
+		if err := store.UpdatePlan(entry, newPlan, failureThreshold, maxRetries); err != nil {
 			return err
 		}
-		return ErrWaiting(fmt.Sprintf("starting %s", msg))
+		return errWaiting(fmt.Sprintf("starting %s", msg))
 	}
-	if server.Plan.Failed {
+	if entry.Plan.Failed {
 		return fmt.Errorf("operation %s failed", msg)
 	}
-	if !server.Plan.InSync {
-		return ErrWaiting(fmt.Sprintf("waiting for %s", msg))
+	if !entry.Plan.InSync {
+		return errWaiting(fmt.Sprintf("waiting for %s", msg))
 	}
 	return nil
 }

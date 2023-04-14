@@ -16,7 +16,7 @@ func (p *Planner) setEtcdSnapshotRestoreState(status rkev1.RKEControlPlaneStatus
 	if !equality.Semantic.DeepEqual(status.ETCDSnapshotRestore, restore) || status.ETCDSnapshotRestorePhase != phase {
 		status.ETCDSnapshotRestore = restore
 		status.ETCDSnapshotRestorePhase = phase
-		return status, ErrWaiting("refreshing etcd restore state")
+		return status, errWaiting("refreshing etcd restore state")
 	}
 	return status, nil
 }
@@ -65,7 +65,7 @@ func (p *Planner) runEtcdSnapshotRestorePlan(controlPlane *rkev1.RKEControlPlane
 		}
 	}
 
-	return ErrWaiting("failed to find etcd node to restore on")
+	return errWaiting("failed to find etcd node to restore on")
 }
 
 // generateEtcdSnapshotRestorePlan returns a node plan that contains instructions to stop etcd, remove the tombstone file (if one exists), then restore etcd in that order.
@@ -188,17 +188,17 @@ func (p *Planner) runEtcdRestoreServiceStop(controlPlane *rkev1.RKEControlPlane,
 		}
 	}
 
-	// If any of the controlplane/etcd node plans were updated, return an errwaiting message for shutting down control plane and etcd
+	// If any of the controlplane/etcd node plans were updated, return an errWaiting message for shutting down control plane and etcd
 	if updated {
-		return ErrWaiting("stopping " + rke2.GetRuntime(controlPlane.Spec.KubernetesVersion) + " services on control plane and etcd machines/nodes")
+		return errWaiting("stopping " + rke2.GetRuntime(controlPlane.Spec.KubernetesVersion) + " services on control plane and etcd machines/nodes")
 	}
 
 	for _, server := range servers {
 		if !server.Plan.InSync {
 			if server.Machine.Status.NodeRef == nil {
-				return ErrWaiting(fmt.Sprintf("waiting to stop %s services on machine [%s]", rke2.GetRuntime(controlPlane.Spec.KubernetesVersion), server.Machine.Name))
+				return errWaiting(fmt.Sprintf("waiting to stop %s services on machine [%s]", rke2.GetRuntime(controlPlane.Spec.KubernetesVersion), server.Machine.Name))
 			}
-			return ErrWaiting(fmt.Sprintf("waiting to stop %s services on node [%s]", rke2.GetRuntime(controlPlane.Spec.KubernetesVersion), server.Machine.Status.NodeRef.Name))
+			return errWaiting(fmt.Sprintf("waiting to stop %s services on node [%s]", rke2.GetRuntime(controlPlane.Spec.KubernetesVersion), server.Machine.Status.NodeRef.Name))
 		}
 	}
 
@@ -254,7 +254,7 @@ func (p *Planner) runEtcdSnapshotManagementServiceStart(controlPlane *rkev1.RKEC
 func (p *Planner) runEtcdSnapshotWorkerServiceStart(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, clusterPlan *plan.Plan, operation string) error {
 	joinServer := getControlPlaneJoinURL(clusterPlan)
 	if joinServer == "" {
-		return ErrWaiting("waiting for control plane to be available")
+		return errWaiting("waiting for control plane to be available")
 	}
 
 	for _, entry := range collect(clusterPlan, isOnlyWorker) {
