@@ -23,6 +23,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/unmanaged"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/provisioningv2/capi"
+	"github.com/rancher/rancher/pkg/provisioningv2/image"
 	"github.com/rancher/rancher/pkg/provisioningv2/kubeconfig"
 	planner2 "github.com/rancher/rancher/pkg/provisioningv2/rke2/planner"
 	"github.com/rancher/rancher/pkg/settings"
@@ -43,6 +44,7 @@ func Register(ctx context.Context, clients *wrangler.Context) error {
 	if features.RKE2.Enabled() {
 		rkePlanner := planner2.New(ctx, clients, planner2.InfoFunctions{
 			SystemAgentImage: settings.SystemAgentInstallerImage.Get,
+			ImageResolver:    image.ResolveWithControlPlane,
 		})
 		if features.MCM.Enabled() {
 			dynamicschema.Register(ctx, clients)
