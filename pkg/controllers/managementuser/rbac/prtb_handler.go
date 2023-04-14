@@ -1,11 +1,11 @@
 package rbac
 
 import (
+	"fmt"
 	"reflect"
 	"sort"
 
 	"github.com/hashicorp/go-multierror"
-	"github.com/pkg/errors"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/slice"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -92,13 +92,13 @@ func (p *prtbLifecycle) syncPRTB(binding *v3.ProjectRoleTemplateBinding) error {
 
 	rt, err := p.m.rtLister.Get("", binding.RoleTemplateName)
 	if err != nil {
-		return errors.Wrapf(err, "couldn't get role template %v", binding.RoleTemplateName)
+		return fmt.Errorf("couldn't get role template %s: %w", binding.RoleTemplateName, err)
 	}
 
 	// Get namespaces belonging to project
 	namespaces, err := p.m.nsIndexer.ByIndex(nsByProjectIndex, binding.ProjectName)
 	if err != nil {
-		return errors.Wrapf(err, "couldn't list namespaces with project ID %v", binding.ProjectName)
+		return fmt.Errorf("couldn't list namespaces with project ID %s: %w", binding.ProjectName, err)
 	}
 	roles := map[string]*v3.RoleTemplate{}
 	if err := p.m.gatherRoles(rt, roles, 0); err != nil {
@@ -106,7 +106,7 @@ func (p *prtbLifecycle) syncPRTB(binding *v3.ProjectRoleTemplateBinding) error {
 	}
 
 	if err := p.m.ensureRoles(roles); err != nil {
-		return errors.Wrap(err, "couldn't ensure roles")
+		return fmt.Errorf("couldn't ensure roles: %w", err)
 	}
 
 	for _, n := range namespaces {
@@ -115,13 +115,13 @@ func (p *prtbLifecycle) syncPRTB(binding *v3.ProjectRoleTemplateBinding) error {
 			continue
 		}
 		if err := p.m.ensureProjectRoleBindings(ns.Name, roles, binding); err != nil {
-			return errors.Wrapf(err, "couldn't ensure binding %v in %v", binding.Name, ns.Name)
+			return fmt.Errorf("couldn't ensure binding %s in %s: %w", binding.Name, ns.Name, err)
 		}
 	}
 
 	if binding.UserName != "" {
 		if err := p.m.ensureServiceAccountImpersonator(binding.UserName); err != nil {
-			return errors.Wrapf(err, "couldn't ensure service account impersonator")
+			return fmt.Errorf("couldn't ensure service account impersonator: %w", err)
 		}
 	}
 
@@ -132,7 +132,7 @@ func (p *prtbLifecycle) ensurePRTBDelete(binding *v3.ProjectRoleTemplateBinding)
 	// Get namespaces belonging to project
 	namespaces, err := p.m.nsIndexer.ByIndex(nsByProjectIndex, binding.ProjectName)
 	if err != nil {
-		return errors.Wrapf(err, "couldn't list namespaces with project ID %v", binding.ProjectName)
+		return fmt.Errorf("couldn't list namespaces with project ID %s: %w", binding.ProjectName, err)
 	}
 
 	set := labels.Set(map[string]string{rtbOwnerLabel: pkgrbac.GetRTBLabel(binding.ObjectMeta)})
@@ -141,20 +141,20 @@ func (p *prtbLifecycle) ensurePRTBDelete(binding *v3.ProjectRoleTemplateBinding)
 		bindingCli := p.m.workload.RBAC.RoleBindings(ns.Name)
 		rbs, err := p.m.rbLister.List(ns.Name, set.AsSelector())
 		if err != nil {
-			return errors.Wrapf(err, "couldn't list rolebindings with selector %s", set.AsSelector())
+			return fmt.Errorf("couldn't list rolebindings with selector %s: %w", set.AsSelector(), err)
 		}
 
 		for _, rb := range rbs {
 			if err := bindingCli.Delete(rb.Name, &metav1.DeleteOptions{}); err != nil {
 				if !apierrors.IsNotFound(err) {
-					return errors.Wrapf(err, "error deleting rolebinding %v", rb.Name)
+					return fmt.Errorf("error deleting rolebinding %s: %w", rb.Name, err)
 				}
 			}
 		}
 	}
 
 	if err := p.m.deleteServiceAccountImpersonator(binding.UserName); err != nil {
-		return errors.Wrap(err, "error deleting service account impersonator")
+		return fmt.Errorf("error deleting service account impersonator: %w", err)
 	}
 
 	return p.reconcileProjectAccessToGlobalResourcesForDelete(binding)
@@ -329,7 +329,7 @@ func (m *manager) reconcileRoleForProjectAccessToGlobalResource(resource string,
 		Rules: rules,
 	})
 	if err != nil && !apierrors.IsAlreadyExists(err) {
-		return roleName, errors.Wrapf(err, "couldn't create role %v", roleName)
+		return roleName, fmt.Errorf("couldn't create role %s: %w", roleName, err)
 	}
 
 	return roleName, nil
