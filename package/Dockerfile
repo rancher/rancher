@@ -154,7 +154,7 @@ RUN ln -s /usr/bin/cni /usr/bin/bridge && \
 
 RUN curl -sLf ${!TINI_URL} > /usr/bin/tini && \
     mkdir -p /var/lib/rancher/k3s/agent/images/ && \
-    curl -sfL ${ETCD_URL} | tar xvzf - --strip-components=1 -C /usr/bin/ etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}/etcdctl && \
+    curl -sfL ${ETCD_URL} | tar xvzf - --strip-components=1 --no-same-owner -C /usr/bin/ etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}/etcdctl && \
     curl -sLf https://github.com/rancher/telemetry/releases/download/${TELEMETRY_VERSION}/telemetry-${ARCH} > /usr/bin/telemetry && \
     chmod +x /usr/bin/tini /usr/bin/telemetry && \
     mkdir -p /var/lib/rancher-data/driver-metadata
