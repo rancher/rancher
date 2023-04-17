@@ -28,7 +28,7 @@ This table is automatically generated from the output of the integration tests. 
 1. Run the integration tests locally:
 
 ```
-go test -count=1 -v ./tests/v2/integration/steveapi/
+go test -count=1 -v ./tests/v2/integration/steveapi/ -run TestSteveLocal
 ```
 
 2. Use the [included script](./make-table.sh) to validate the JSON files and update the markdown table:

@@ -154,7 +154,7 @@ var (
 	}
 )
 
-type SteveAPITestSuite struct {
+type steveAPITestSuite struct {
 	suite.Suite
 	client            *rancher.Client
 	session           *session.Session
@@ -164,11 +164,27 @@ type SteveAPITestSuite struct {
 	lastRevision      string
 }
 
-func (s *SteveAPITestSuite) TearDownSuite() {
+type LocalSteveAPITestSuite struct {
+	steveAPITestSuite
+}
+
+type DownstreamSteveAPITestSuite struct {
+	steveAPITestSuite
+}
+
+func (s *steveAPITestSuite) TearDownSuite() {
 	s.session.Cleanup()
 }
 
-func (s *SteveAPITestSuite) SetupSuite() {
+func (s *LocalSteveAPITestSuite) SetupSuite() {
+	s.steveAPITestSuite.setupSuite("local")
+}
+
+func (s *DownstreamSteveAPITestSuite) SetupSuite() {
+	s.steveAPITestSuite.setupSuite("")
+}
+
+func (s *steveAPITestSuite) setupSuite(clusterName string) {
 	testSession := session.NewSession()
 	s.session = testSession
 
@@ -178,7 +194,9 @@ func (s *SteveAPITestSuite) SetupSuite() {
 
 	s.userClients = make(map[string]*rancher.Client)
 
-	clusterName := s.client.RancherConfig.ClusterName
+	if clusterName == "" {
+		clusterName = s.client.RancherConfig.ClusterName
+	}
 	require.NotEmptyf(s.T(), clusterName, "Cluster name is not set")
 	clusterID, err := clusters.GetClusterIDByName(client, clusterName)
 	require.NoError(s.T(), err)
@@ -279,7 +297,7 @@ func (s *SteveAPITestSuite) SetupSuite() {
 	}
 }
 
-func (s *SteveAPITestSuite) TestList() {
+func (s *steveAPITestSuite) TestList() {
 	subSession := s.session.NewSession()
 	defer subSession.Cleanup()
 
@@ -1500,9 +1518,19 @@ func (s *SteveAPITestSuite) TestList() {
 		},
 	}
 
-	csvWriter, fp, jsonDir, err := setUpResults()
-	defer fp.Close()
-	require.NoError(s.T(), err)
+	var csvWriter *csv.Writer
+	var jsonDir string
+	if s.project.ClusterID == "local" {
+		var fp *os.File
+		var err error
+		csvWriter, fp, jsonDir, err = setUpResults()
+		defer fp.Close()
+		defer func() {
+			csvWriter.Flush()
+			require.NoError(s.T(), csvWriter.Error())
+		}()
+		require.NoError(s.T(), err)
+	}
 
 	for _, test := range tests {
 		s.Run(test.description, func() {
@@ -1547,19 +1575,17 @@ func (s *SteveAPITestSuite) TestList() {
 			}
 
 			// Write human-readable request and response examples
-			curlURL, err := getCurlURL(client, test.namespace, test.query)
-			require.NoError(s.T(), err)
-			jsonResp, err := formatJSON(secretList)
-			require.NoError(s.T(), err)
-			jsonFilePath := filepath.Join(jsonDir, getFileName(test.user, test.namespace, test.query))
-			if !downStreamClusterRegex.MatchString(curlURL) {
+			if s.project.ClusterID == "local" {
+				curlURL, err := getCurlURL(client, test.namespace, test.query)
+				require.NoError(s.T(), err)
+				jsonResp, err := formatJSON(secretList)
+				require.NoError(s.T(), err)
+				jsonFilePath := filepath.Join(jsonDir, getFileName(test.user, test.namespace, test.query))
 				err = writeResp(csvWriter, test.user, curlURL, jsonFilePath, jsonResp)
 				require.NoError(s.T(), err)
 			}
 		})
 	}
-	csvWriter.Flush()
-	require.NoError(s.T(), csvWriter.Error())
 }
 
 func getFileName(user, ns, query string) string {
@@ -1667,7 +1693,7 @@ func writeResp(csvWriter *csv.Writer, user, url, path string, resp []byte) error
 	return nil
 }
 
-func (s *SteveAPITestSuite) TestCRUD() {
+func (s *steveAPITestSuite) TestCRUD() {
 	subSession := s.session.NewSession()
 	defer subSession.Cleanup()
 
@@ -1753,6 +1779,10 @@ func (s *SteveAPITestSuite) TestCRUD() {
 	})
 }
 
-func TestSteve(t *testing.T) {
-	suite.Run(t, new(SteveAPITestSuite))
+func TestSteveLocal(t *testing.T) {
+	suite.Run(t, new(LocalSteveAPITestSuite))
+}
+
+func TestSteveDownstream(t *testing.T) {
+	suite.Run(t, new(DownstreamSteveAPITestSuite))
 }
