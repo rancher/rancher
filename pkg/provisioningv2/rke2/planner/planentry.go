@@ -16,6 +16,23 @@ type planEntry struct {
 
 type roleFilter func(*planEntry) bool
 
+func collectAndValidateAnnotationValue(plan *plan.Plan, validation roleFilter, annotation, value string) bool {
+	for machineName, machine := range plan.Machines {
+		entry := &planEntry{
+			Machine:  machine,
+			Plan:     plan.Nodes[machineName],
+			Metadata: plan.Metadata[machineName],
+		}
+		if !validation(entry) {
+			continue
+		}
+		if entry.Metadata.Annotations[annotation] == value {
+			return true
+		}
+	}
+	return false
+}
+
 func collect(plan *plan.Plan, include roleFilter) (result []*planEntry) {
 	for machineName, machine := range plan.Machines {
 		entry := &planEntry{
@@ -58,6 +75,10 @@ func isNotInitNodeOrIsDeleting(entry *planEntry) bool {
 
 func isDeleting(entry *planEntry) bool {
 	return entry.Machine.DeletionTimestamp != nil
+}
+
+func isNotDeleting(entry *planEntry) bool {
+	return !isDeleting(entry)
 }
 
 // isFailed returns true if the provided entry machine.status.phase is failed

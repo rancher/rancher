@@ -525,8 +525,9 @@ func (p *Planner) renderFiles(controlPlane *rkev1.RKEControlPlane, entry *planEn
 	return files, nil
 }
 
+// addConfigFile will render the distribution configuration file and add it to the nodePlan. It also renders files that are referenced in the distribution configuration file (for example, ACE, cloud-provider,
 func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane, entry *planEntry, tokensSecret plan.Secret,
-	initNode bool, joinServer string) (plan.NodePlan, map[string]interface{}, error) {
+	initNode bool, joinServer string, reg registries) (plan.NodePlan, map[string]interface{}, error) {
 	config := map[string]interface{}{}
 
 	addDefaults(config, controlPlane)
@@ -536,13 +537,7 @@ func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEC
 		return nodePlan, config, err
 	}
 
-	files, err := p.addRegistryConfig(config, controlPlane)
-	if err != nil {
-		return nodePlan, config, err
-	}
-	nodePlan.Files = append(nodePlan.Files, files...)
-
-	files, err = p.addETCD(config, controlPlane, entry)
+	files, err := p.addETCD(config, controlPlane, entry)
 	if err != nil {
 		return nodePlan, config, err
 	}
@@ -563,13 +558,19 @@ func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEC
 	}
 
 	for _, fileParam := range fileParams {
-		content, ok := config[fileParam]
-		if !ok {
-			continue
+		var content interface{}
+		if fileParam == privateRegistryArg {
+			content = string(reg.registriesFileRaw)
+		} else {
+			var ok bool
+			content, ok = config[fileParam]
+			if !ok {
+				continue
+			}
 		}
 
-		if fileParam == "cloud-provider-config" {
-			isSecretFormat, namespace, name, err := checkForSecretFormat("cloud-provider-config", convert.ToString(content))
+		if fileParam == cloudProviderConfigArg {
+			isSecretFormat, namespace, name, err := checkForSecretFormat(cloudProviderConfigArg, convert.ToString(content))
 			if err != nil {
 				// provided secret for cloud-provider-config does not follow the format of
 				// secret://namespace:name

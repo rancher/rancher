@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -183,6 +184,7 @@ func SecretToNode(secret *corev1.Secret) (*plan.Node, error) {
 	result := &plan.Node{
 		Healthy: true,
 	}
+
 	planData := secret.Data["plan"]
 	result.PlanDataExists = len(secret.Data["plan"]) != 0
 	appliedPlanData := secret.Data["appliedPlan"]
@@ -241,6 +243,30 @@ func SecretToNode(secret *corev1.Secret) (*plan.Node, error) {
 			return nil, err
 		}
 		result.AppliedPlan = newPlan
+	}
+
+	if joinedTo, ok := secret.Annotations[rke2.JoinedToAnnotation]; ok {
+		result.JoinedTo = joinedTo
+	} else {
+		if configFirstHalf, configSecondHalf, found := strings.Cut(ConfigYamlFileName, "%s"); found {
+			for _, v := range result.Plan.Files {
+				if strings.Contains(v.Path, configFirstHalf) && strings.Contains(v.Path, configSecondHalf) {
+					// We found our config file, process it to look for the joined node and then break
+					cfr, err := base64.StdEncoding.DecodeString(v.Content)
+					if err != nil {
+						return nil, err
+					}
+					var cf = map[string]interface{}{}
+					if err := json.Unmarshal(cfr, &cf); err != nil {
+						return nil, err
+					}
+					if server, ok := cf["server"]; ok {
+						result.JoinedTo = server.(string)
+					}
+					break
+				}
+			}
+		}
 	}
 
 	if len(output) > 0 {
@@ -339,7 +365,7 @@ func (p *PlanStore) getPlanSecretFromMachine(machine *capi.Machine) (*corev1.Sec
 
 // UpdatePlan should not be called directly as it will not block further progress if the plan is not in sync
 // maxFailures is the number of attempts the system-agent will make to run the plan (in a failed state). failureThreshold is used to determine when the plan has failed.
-func (p *PlanStore) UpdatePlan(entry *planEntry, newNodePlan plan.NodePlan, maxFailures, failureThreshold int) error {
+func (p *PlanStore) UpdatePlan(entry *planEntry, newNodePlan plan.NodePlan, joinedTo string, maxFailures, failureThreshold int) error {
 	if maxFailures < failureThreshold && failureThreshold != -1 && maxFailures != -1 {
 		return fmt.Errorf("failureThreshold (%d) cannot be greater than maxFailures (%d)", failureThreshold, maxFailures)
 	}
@@ -357,6 +383,21 @@ func (p *PlanStore) UpdatePlan(entry *planEntry, newNodePlan plan.NodePlan, maxF
 	if secret.Data == nil {
 		// Create the map with enough storage for what is needed.
 		secret.Data = make(map[string][]byte, 6)
+	}
+
+	// If joinedTo is specified, set the joined-to annotation. If -, then clear the joined-to annotation
+	if joinedTo != "" {
+		if joinedTo == "-" || entry.Metadata.Annotations[rke2.InitNodeLabel] == "true" {
+			// clear the joinedTo annotation.
+			entry.Metadata.Annotations[rke2.JoinedToAnnotation] = ""
+		} else {
+			entry.Metadata.Annotations[rke2.JoinedToAnnotation] = joinedTo
+		}
+	}
+
+	// an init node cannot have a joined-to annotation value as it is essentially joined to itself.
+	if entry.Metadata.Annotations[rke2.InitNodeLabel] == "true" {
+		entry.Metadata.Annotations[rke2.JoinedToAnnotation] = ""
 	}
 
 	rke2.CopyPlanMetadataToSecret(secret, entry.Metadata)
@@ -400,9 +441,16 @@ func (p *PlanStore) updatePlanSecretLabelsAndAnnotations(entry *planEntry) error
 
 	secret = secret.DeepCopy()
 	rke2.CopyPlanMetadataToSecret(secret, entry.Metadata)
-
-	_, err = p.secrets.Update(secret)
-	return err
+	updatedSecret, err := p.secrets.Update(secret)
+	if err != nil {
+		return err
+	}
+	newNode, err := SecretToNode(updatedSecret)
+	if err != nil {
+		return err
+	}
+	entry.Plan = newNode
+	return nil
 }
 
 // removePlanSecretLabel removes a label with the given key from the plan secret that corresponds to the RKEBootstrap
@@ -418,14 +466,23 @@ func (p *PlanStore) removePlanSecretLabel(entry *planEntry, key string) error {
 
 	secret = secret.DeepCopy()
 	delete(secret.Labels, key)
-	_, err = p.secrets.Update(secret)
-	return err
+	updatedSecret, err := p.secrets.Update(secret)
+	if err != nil {
+		return err
+	}
+	newNode, err := SecretToNode(updatedSecret)
+	if err != nil {
+		return err
+	}
+	entry.Plan = newNode
+	entry.Metadata.Labels = secret.Labels
+	return nil
 }
 
 // assignAndCheckPlan assigns the given newPlan to the designated server in the planEntry, and will return nil if the plan is assigned and in sync.
-func assignAndCheckPlan(store *PlanStore, msg string, entry *planEntry, newPlan plan.NodePlan, failureThreshold, maxRetries int) error {
+func assignAndCheckPlan(store *PlanStore, msg string, entry *planEntry, newPlan plan.NodePlan, joinedTo string, failureThreshold, maxRetries int) error {
 	if entry.Plan == nil || !equality.Semantic.DeepEqual(entry.Plan.Plan, newPlan) {
-		if err := store.UpdatePlan(entry, newPlan, failureThreshold, maxRetries); err != nil {
+		if err := store.UpdatePlan(entry, newPlan, joinedTo, failureThreshold, maxRetries); err != nil {
 			return err
 		}
 		return errWaiting(fmt.Sprintf("starting %s", msg))

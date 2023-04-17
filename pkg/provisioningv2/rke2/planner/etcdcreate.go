@@ -34,7 +34,7 @@ func (p *Planner) startOrRestartEtcdSnapshotCreate(status rkev1.RKEControlPlaneS
 	return status, nil
 }
 
-func (p *Planner) runEtcdSnapshotCreate(controlPlane *rkev1.RKEControlPlane, clusterPlan *plan.Plan) []error {
+func (p *Planner) runEtcdSnapshotCreate(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, clusterPlan *plan.Plan) []error {
 	servers := collect(clusterPlan, isEtcd)
 	if len(servers) == 0 {
 		return []error{errors.New("failed to find node to perform etcd snapshot")}
@@ -43,7 +43,7 @@ func (p *Planner) runEtcdSnapshotCreate(controlPlane *rkev1.RKEControlPlane, clu
 	var errs []error
 
 	for _, server := range servers {
-		createPlan, err := p.generateEtcdSnapshotCreatePlan(controlPlane, server)
+		createPlan, err := p.generateEtcdSnapshotCreatePlan(controlPlane, tokensSecret, server)
 		if err != nil {
 			return []error{err}
 		}
@@ -51,27 +51,26 @@ func (p *Planner) runEtcdSnapshotCreate(controlPlane *rkev1.RKEControlPlane, clu
 		if server.Machine.Status.NodeRef != nil && server.Machine.Status.NodeRef.Name != "" {
 			msg = fmt.Sprintf("etcd snapshot on node %s", server.Machine.Status.NodeRef.Name)
 		}
-		if err = assignAndCheckPlan(p.store, msg, server, createPlan, 3, 3); err != nil {
+		if err = assignAndCheckPlan(p.store, msg, server, createPlan, server.Plan.JoinedTo, 3, 3); err != nil {
 			errs = append(errs, err)
 		}
 	}
 	return errs
 }
 
-func (p *Planner) generateEtcdSnapshotCreatePlan(controlPlane *rkev1.RKEControlPlane, entry *planEntry) (plan.NodePlan, error) {
+func (p *Planner) generateEtcdSnapshotCreatePlan(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, entry *planEntry) (plan.NodePlan, error) {
 	args := []string{
 		"etcd-snapshot",
 	}
-
-	return p.commonNodePlan(controlPlane, plan.NodePlan{
-		Instructions: []plan.OneTimeInstruction{
-			p.generateInstallInstructionWithSkipStart(controlPlane, entry),
-			{
-				Name:    "create",
-				Command: rke2.GetRuntimeCommand(controlPlane.Spec.KubernetesVersion),
-				Args:    args,
-			}},
-	})
+	// TODO: Plumb in joinedToValidation?
+	createPlan, _, err := p.generatePlanWithConfigFiles(controlPlane, tokensSecret, entry, entry.Plan.JoinedTo)
+	createPlan.Instructions = append(createPlan.Instructions, p.generateInstallInstructionWithSkipStart(controlPlane, entry),
+		plan.OneTimeInstruction{
+			Name:    "create",
+			Command: rke2.GetRuntimeCommand(controlPlane.Spec.KubernetesVersion),
+			Args:    args,
+		})
+	return createPlan, err
 }
 
 func (p *Planner) createEtcdSnapshot(controlPlane *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus, tokensSecret plan.Secret, clusterPlan *plan.Plan) (rkev1.RKEControlPlaneStatus, error) {
@@ -91,7 +90,7 @@ func (p *Planner) createEtcdSnapshot(controlPlane *rkev1.RKEControlPlane, status
 	case rkev1.ETCDSnapshotPhaseStarted:
 		var stateSet bool
 		var finErrs []error
-		if errs := p.runEtcdSnapshotCreate(controlPlane, clusterPlan); len(errs) > 0 {
+		if errs := p.runEtcdSnapshotCreate(controlPlane, tokensSecret, clusterPlan); len(errs) > 0 {
 			for _, err := range errs {
 				if err == nil {
 					continue

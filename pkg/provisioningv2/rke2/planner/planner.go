@@ -65,17 +65,22 @@ const (
 	etcdTier         = "etcd"
 	controlPlaneTier = "control plane"
 	workerTier       = "worker"
+
+	auditPolicyArg         = "audit-policy-file"
+	cloudProviderConfigArg = "cloud-provider-config"
+	privateRegistryArg     = "private-registry"
+	flannelConfArg         = "flannel-conf"
 )
 
 var (
 	fileParams = []string{
-		"audit-policy-file",
-		"cloud-provider-config",
-		"private-registry",
-		"flannel-conf",
+		auditPolicyArg,
+		cloudProviderConfigArg,
+		privateRegistryArg,
+		flannelConfArg,
 	}
 	filePaths = map[string]string{
-		"private-registry": "/etc/rancher/%s/registries.yaml",
+		privateRegistryArg: "/etc/rancher/%s/registries.yaml",
 	}
 	AuthnWebhook = []byte(`
 apiVersion: v1
@@ -262,7 +267,7 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlan
 		firstIgnoreError error
 		joinServer       string
 	)
-
+	// TODO: make sure this doesn't run if we don't have an init node/join server for the entry
 	if status, err = p.createEtcdSnapshot(cp, status, clusterSecretTokens, plan); err != nil {
 		return status, err
 	}
@@ -271,7 +276,7 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlan
 		return status, err
 	}
 
-	if status, err = p.rotateCertificates(cp, status, plan); err != nil {
+	if status, err = p.rotateCertificates(cp, status, clusterSecretTokens, plan); err != nil {
 		return status, err
 	}
 
@@ -317,6 +322,7 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlan
 		}
 	}
 
+	// Process all nodes that have the etcd role and are NOT an init node or deleting. Only process 1 node at a time.
 	err = p.reconcile(cp, clusterSecretTokens, plan, true, etcdTier, isEtcd, isInitNodeOrDeleting,
 		"1", joinServer,
 		cp.Spec.UpgradeStrategy.ControlPlaneDrainOptions)
@@ -325,6 +331,7 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlan
 		return status, err
 	}
 
+	// Process all nodes that have the controlplane role and are NOT an init node or deleting.
 	err = p.reconcile(cp, clusterSecretTokens, plan, true, controlPlaneTier, isControlPlane, isInitNodeOrDeleting,
 		cp.Spec.UpgradeStrategy.ControlPlaneConcurrency, joinServer,
 		cp.Spec.UpgradeStrategy.ControlPlaneDrainOptions)
@@ -333,6 +340,7 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlan
 		return status, err
 	}
 
+	// Retrieve the join URL from the first controlplane node for use with the worker-only nodes.
 	joinServer = getControlPlaneJoinURL(plan)
 	if joinServer == "" {
 		return status, errWaiting("waiting for control plane to be available")
@@ -344,6 +352,7 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlan
 		return status, errWaiting("marking control plane as initialized and ready")
 	}
 
+	// Process all nodes that are ONLY worker nodes.
 	err = p.reconcile(cp, clusterSecretTokens, plan, false, workerTier, isOnlyWorker, isInitNodeOrDeleting,
 		cp.Spec.UpgradeStrategy.WorkerConcurrency, joinServer,
 		cp.Spec.UpgradeStrategy.WorkerDrainOptions)
@@ -712,23 +721,44 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret pl
 		}
 		messages[entry.Machine.Name] = summary.Message
 
-		plan, err := p.desiredPlan(controlPlane, tokensSecret, entry, joinServer)
+		var actualJoinServer, joinedToServer string
+		// use the joinServer as specified ONLY if the existing joinServer is not valid for the cluster anymore. This is to prevent plan thrashing when a controlplane host is deleted.
+		if entry.Plan != nil && entry.Plan.JoinedTo != "" {
+			joinedToServer = entry.Plan.JoinedTo
+			// TODO: if the joinedTo is still valid, then use the existing joinedTo to reduce plan thrashing
+			if collectAndValidateAnnotationValue(clusterPlan, isNotDeleting, rke2.JoinURLAnnotation, entry.Plan.JoinedTo) {
+				actualJoinServer = entry.Plan.JoinedTo
+			}
+		}
+
+		if actualJoinServer == "" && joinServer != "" {
+			logrus.Infof("[planner] rkecluster %s/%s reconcile tier %s - machine %s/%s - previous join URL (%s) was not valid, using new join URL (%s)", controlPlane.Namespace, controlPlane.Name, tierName, entry.Machine.Namespace, entry.Machine.Name, joinedToServer, joinServer)
+			actualJoinServer = joinServer
+		}
+
+		logrus.Debugf("[planner] rkecluster %s/%s reconcile tier %s - rendering desired plan for machine %s/%s with join URL: (%s)", controlPlane.Namespace, controlPlane.Name, tierName, entry.Machine.Namespace, entry.Machine.Name, actualJoinServer)
+		plan, err := p.desiredPlan(controlPlane, tokensSecret, entry, actualJoinServer)
 		if err != nil {
 			return err
+		}
+
+		if tierName == bootstrapTier {
+			// Using `-` will clear the entry.Plan.JoinedTo annotation if it exists
+			actualJoinServer = "-"
 		}
 
 		if entry.Plan == nil {
 			logrus.Debugf("[planner] rkecluster %s/%s reconcile tier %s - setting initial plan for machine %s/%s", controlPlane.Namespace, controlPlane.Name, tierName, entry.Machine.Namespace, entry.Machine.Name)
 			logrus.Tracef("[planner] rkecluster %s/%s reconcile tier %s - initial plan for machine %s/%s new: %+v", controlPlane.Namespace, controlPlane.Name, tierName, entry.Machine.Namespace, entry.Machine.Name, plan)
 			outOfSync = append(outOfSync, entry.Machine.Name)
-			if err := p.store.UpdatePlan(entry, plan, -1, 1); err != nil {
+			if err := p.store.UpdatePlan(entry, plan, actualJoinServer, -1, 1); err != nil {
 				return err
 			}
 		} else if minorPlanChangeDetected(entry.Plan.Plan, plan) {
 			logrus.Debugf("[planner] rkecluster %s/%s reconcile tier %s - minor plan change detected for machine %s/%s, updating plan immediately", controlPlane.Namespace, controlPlane.Name, tierName, entry.Machine.Namespace, entry.Machine.Name)
 			logrus.Tracef("[planner] rkecluster %s/%s reconcile tier %s - minor plan change for machine %s/%s old: %+v, new: %+v", controlPlane.Namespace, controlPlane.Name, tierName, entry.Machine.Namespace, entry.Machine.Name, entry.Plan.Plan, plan)
 			outOfSync = append(outOfSync, entry.Machine.Name)
-			if err := p.store.UpdatePlan(entry, plan, -1, 1); err != nil {
+			if err := p.store.UpdatePlan(entry, plan, actualJoinServer, -1, 1); err != nil {
 				return err
 			}
 		} else if !equality.Semantic.DeepEqual(entry.Plan.Plan, plan) {
@@ -753,7 +783,7 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret pl
 					// Drain is done (or didn't need to be done) and there are no errors, so the plan should be updated to enact the reason the node was drained.
 					logrus.Debugf("[planner] rkecluster %s/%s reconcile tier %s - major plan change for machine %s/%s", controlPlane.Namespace, controlPlane.Name, tierName, entry.Machine.Namespace, entry.Machine.Name)
 					logrus.Tracef("[planner] rkecluster %s/%s reconcile tier %s - major plan change for machine %s/%s old: %+v, new: %+v", controlPlane.Namespace, controlPlane.Name, tierName, entry.Machine.Namespace, entry.Machine.Name, entry.Plan.Plan, plan)
-					if err = p.store.UpdatePlan(entry, plan, -1, 1); err != nil {
+					if err = p.store.UpdatePlan(entry, plan, actualJoinServer, -1, 1); err != nil {
 						return err
 					} else if entry.Metadata.Annotations[rke2.DrainDoneAnnotation] != "" {
 						messages[entry.Machine.Name] = append(messages[entry.Machine.Name], "drain completed")
@@ -845,14 +875,20 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret pl
 
 // generatePlanWithConfigFiles will generate a node plan with the corresponding config files for the entry in question.
 // Notably, it will discard the existing nodePlan in the given entry.
-func (p *Planner) generatePlanWithConfigFiles(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, entry *planEntry, joinServer string) (nodePlan plan.NodePlan, config map[string]interface{}, err error) {
+func (p *Planner) generatePlanWithConfigFiles(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, entry *planEntry, joinServer string) (plan.NodePlan, map[string]interface{}, error) {
+	var (
+		reg      registries
+		nodePlan plan.NodePlan
+		config   = map[string]interface{}{}
+		err      error
+	)
 	if !controlPlane.Spec.UnmanagedConfig {
-		nodePlan, err = p.commonNodePlan(controlPlane, plan.NodePlan{})
+		nodePlan, reg, err = p.commonNodePlan(controlPlane, plan.NodePlan{})
 		if err != nil {
 			return nodePlan, map[string]interface{}{}, err
 		}
 
-		nodePlan, config, err = p.addConfigFile(nodePlan, controlPlane, entry, tokensSecret, isInitNode(entry), joinServer)
+		nodePlan, config, err = p.addConfigFile(nodePlan, controlPlane, entry, tokensSecret, isInitNode(entry), joinServer, reg)
 		if err != nil {
 			return nodePlan, config, err
 		}
@@ -868,27 +904,9 @@ func (p *Planner) generatePlanWithConfigFiles(controlPlane *rkev1.RKEControlPlan
 		}
 
 		nodePlan, err = addOtherFiles(nodePlan, controlPlane, entry)
-		if err != nil {
-			return nodePlan, config, err
-		}
-		return
+		return nodePlan, config, err
 	}
 	return plan.NodePlan{}, map[string]interface{}{}, nil
-}
-
-func (p *Planner) ensureInstalledPlan(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, entry *planEntry, joinServer string) (nodePlan plan.NodePlan, err error) {
-	nodePlan, _, err = p.generatePlanWithConfigFiles(controlPlane, tokensSecret, entry, joinServer)
-	if err != nil {
-		return
-	}
-
-	// Add instruction last because it hashes config content
-	nodePlan, err = p.addInstallInstructionWithRestartStamp(nodePlan, controlPlane, entry)
-	if err != nil {
-		return nodePlan, err
-	}
-
-	return nodePlan, nil
 }
 
 func (p *Planner) desiredPlan(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, entry *planEntry, joinServer string) (nodePlan plan.NodePlan, err error) {

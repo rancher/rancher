@@ -11,7 +11,7 @@ import (
 )
 
 // rotateCertificates checks if there is a need to rotate any certificates and updates the plan accordingly.
-func (p *Planner) rotateCertificates(controlPlane *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus, clusterPlan *plan.Plan) (rkev1.RKEControlPlaneStatus, error) {
+func (p *Planner) rotateCertificates(controlPlane *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus, tokensSecret plan.Secret, clusterPlan *plan.Plan) (rkev1.RKEControlPlaneStatus, error) {
 	if !shouldRotate(controlPlane) {
 		return status, nil
 	}
@@ -25,8 +25,13 @@ func (p *Planner) rotateCertificates(controlPlane *rkev1.RKEControlPlane, status
 			continue
 		}
 
-		rotatePlan := rotateCertificatesPlan(controlPlane, controlPlane.Spec.RotateCertificates, node)
-		err := assignAndCheckPlan(p.store, fmt.Sprintf("[%s] certificate rotation", node.Machine.Name), node, rotatePlan, 0, 0)
+		rotatePlan, err := p.rotateCertificatesPlan(controlPlane, tokensSecret, controlPlane.Spec.RotateCertificates, node)
+		if err != nil {
+			return status, err
+		}
+
+		// TODO: We need to validate that the join URL is still valid for this operation.
+		err = assignAndCheckPlan(p.store, fmt.Sprintf("[%s] certificate rotation", node.Machine.Name), node, rotatePlan, node.Plan.JoinedTo, 0, 0)
 		if err != nil {
 			return status, err
 		}
@@ -82,20 +87,22 @@ echo $targetGeneration > "$generationFile"
 
 // rotateCertificatesPlan rotates the certificates for the services specified, if any, and restarts the service.  If no services are specified
 // all certificates are rotated.
-func rotateCertificatesPlan(controlPlane *rkev1.RKEControlPlane, rotation *rkev1.RotateCertificates, entry *planEntry) plan.NodePlan {
+func (p *Planner) rotateCertificatesPlan(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, rotation *rkev1.RotateCertificates, entry *planEntry) (plan.NodePlan, error) {
+	rotatePlan, _, err := p.generatePlanWithConfigFiles(controlPlane, tokensSecret, entry, entry.Plan.JoinedTo)
+	if err != nil {
+		return plan.NodePlan{}, err
+	}
+
 	if isOnlyWorker(entry) {
-		return plan.NodePlan{
-			Instructions: []plan.OneTimeInstruction{
-				{
-					Name:    "restart",
-					Command: "systemctl",
-					Args: []string{
-						"restart",
-						rke2.GetRuntimeAgentUnit(controlPlane.Spec.KubernetesVersion),
-					},
-				},
+		rotatePlan.Instructions = append(rotatePlan.Instructions, plan.OneTimeInstruction{
+			Name:    "restart",
+			Command: "systemctl",
+			Args: []string{
+				"restart",
+				rke2.GetRuntimeAgentUnit(controlPlane.Spec.KubernetesVersion),
 			},
-		}
+		})
+		return rotatePlan, nil
 	}
 
 	rotateScriptPath := "/var/lib/rancher/" + rke2.GetRuntime(controlPlane.Spec.KubernetesVersion) + "/rancher_v2prov_certificate_rotation/bin/rotate.sh"
@@ -113,29 +120,25 @@ func rotateCertificatesPlan(controlPlane *rkev1.RKEControlPlane, rotation *rkev1
 		}
 	}
 
-	return plan.NodePlan{
-		Files: []plan.File{
-			{
-				Content: base64.StdEncoding.EncodeToString([]byte(idempotentRotateScript)),
-				Path:    rotateScriptPath,
-			},
+	rotatePlan.Files = append(rotatePlan.Files, plan.File{
+		Content: base64.StdEncoding.EncodeToString([]byte(idempotentRotateScript)),
+		Path:    rotateScriptPath,
+	})
+	rotatePlan.Instructions = append(rotatePlan.Instructions, []plan.OneTimeInstruction{
+		{
+			Name:    "rotate certificates",
+			Command: "sh",
+			Args:    args,
 		},
-		Instructions: []plan.OneTimeInstruction{
-			{
-				Name:    "rotate certificates",
-				Command: "sh",
-				Args:    args,
+		{
+			Name:    "restart",
+			Command: "systemctl",
+			Args: []string{
+				"restart",
+				rke2.GetRuntimeServerUnit(controlPlane.Spec.KubernetesVersion),
 			},
-			{
-				Name:    "restart",
-				Command: "systemctl",
-				Args: []string{
-					"restart",
-					rke2.GetRuntimeServerUnit(controlPlane.Spec.KubernetesVersion),
-				},
-			},
-		},
-	}
+		}}...)
+	return rotatePlan, nil
 }
 
 // shouldRotateEntry returns true if the rotated services are applicable to the entry's roles.
