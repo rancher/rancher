@@ -251,14 +251,6 @@ func redeployAgent(cluster *apimgmtv3.Cluster, desiredAgent, desiredAuth string,
 	return false
 }
 
-func getDesiredImage(cluster *apimgmtv3.Cluster) string {
-	if cluster.Spec.AgentImageOverride != "" {
-		return cluster.Spec.AgentImageOverride
-	}
-
-	return cluster.Spec.DesiredAgentImage
-}
-
 func (cd *clusterDeploy) getDesiredFeatures(cluster *apimgmtv3.Cluster) map[string]bool {
 	return map[string]bool{
 		features.MCM.Name():                false,
@@ -288,6 +280,7 @@ func (cd *clusterDeploy) deployAgent(cluster *apimgmtv3.Cluster) error {
 	}
 	logrus.Tracef("clusterDeploy: deployAgent: desiredTaints is [%v] for cluster [%s]", desiredTaints, cluster.Name)
 
+	// todo: need to add fields to redeploy??
 	if !redeployAgent(cluster, desiredAgent, desiredAuth, desiredFeatures, desiredTaints) {
 		return nil
 	}

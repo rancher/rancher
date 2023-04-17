@@ -43,6 +43,9 @@ type context struct {
 	IsRKE                 bool
 	PrivateRegistryConfig string
 	Tolerations           string
+	AppendTolerations     string
+	Affinity              string
+	ResourceRequirements  string
 	ClusterRegistry       string
 }
 
@@ -71,7 +74,7 @@ func toFeatureString(features map[string]bool) string {
 
 func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url string, isWindowsCluster bool,
 	cluster *apimgmtv3.Cluster, features map[string]bool, taints []corev1.Taint, secretLister v1.SecretLister) error {
-	var tolerations, agentEnvVars string
+	var tolerations, agentEnvVars, appendTolerations, affinity, resourceRequirements string
 	d := md5.Sum([]byte(url + token + namespace))
 	tokenKey := hex.EncodeToString(d[:])[:7]
 
@@ -95,6 +98,10 @@ func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url
 
 	agentEnvVars = templates.ToYAML(envVars)
 
+	appendTolerations = templates.ToYAML(util.GetClusterAgentTolerations(cluster))
+	affinity = templates.ToYAML(util.GetClusterAgentAffinity(cluster))
+	resourceRequirements = templates.ToYAML(util.GetClusterAgentResourceRequirements(cluster))
+
 	context := &context{
 		Features:              toFeatureString(features),
 		CAChecksum:            CAChecksum(),
@@ -110,6 +117,9 @@ func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url
 		IsRKE:                 cluster != nil && cluster.Status.Driver == apimgmtv3.ClusterDriverRKE,
 		PrivateRegistryConfig: registryConfig,
 		Tolerations:           tolerations,
+		AppendTolerations:     appendTolerations,
+		Affinity:              affinity,
+		ResourceRequirements:  resourceRequirements,
 		ClusterRegistry:       registryURL,
 	}
 

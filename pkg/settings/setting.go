@@ -130,8 +130,8 @@ var (
 	HideLocalCluster                    = NewSetting("hide-local-cluster", "false")
 	MachineProvisionImage               = NewSetting("machine-provision-image", "rancher/machine:v0.15.0-rancher99")
 	SystemFeatureChartRefreshSeconds    = NewSetting("system-feature-chart-refresh-seconds", "900")
-	ClusterAgentDefaultAffinity         = NewSetting("cluster-agent-default-affinity", getClusterAgentDefaultAffinity())
-	FleetAgentDefaultAffinity           = NewSetting("fleet-agent-default-affinity", getFleetAgentDefaultAffinity())
+	ClusterAgentDefaultAffinity         = NewSetting("cluster-agent-default-affinity", marshalAffinity(GetClusterAgentDefaultAffinity()))
+	FleetAgentDefaultAffinity           = NewSetting("fleet-agent-default-affinity", marshalAffinity(GetFleetAgentDefaultAffinity()))
 
 	Rke2DefaultVersion = NewSetting("rke2-default-version", "")
 	K3sDefaultVersion  = NewSetting("k3s-default-version", "")
@@ -239,9 +239,9 @@ var (
 	UIPreferred = NewSetting("ui-preferred", "vue")
 )
 
-func getClusterAgentDefaultAffinity() string {
+func GetClusterAgentDefaultAffinity() *v1.Affinity {
 	// set default to affinity that cluster agent currently uses
-	defaultAffinity := v1.Affinity{
+	return &v1.Affinity{
 		PodAntiAffinity: &v1.PodAntiAffinity{
 			PreferredDuringSchedulingIgnoredDuringExecution: []v1.WeightedPodAffinityTerm{
 				{
@@ -327,17 +327,11 @@ func getClusterAgentDefaultAffinity() string {
 			},
 		},
 	}
-
-	data, err := json.Marshal(defaultAffinity)
-	if err != nil {
-		logrus.Errorf("failed to marshal cluster agent affinity: %s", err)
-	}
-	return string(data)
 }
 
-func getFleetAgentDefaultAffinity() string {
+func GetFleetAgentDefaultAffinity() *v1.Affinity {
 	// set default to affinity that fleet agent currently uses
-	defaultAffinity := v1.Affinity{
+	return &v1.Affinity{
 		NodeAffinity: &v1.NodeAffinity{
 			PreferredDuringSchedulingIgnoredDuringExecution: []v1.PreferredSchedulingTerm{
 				{
@@ -355,10 +349,13 @@ func getFleetAgentDefaultAffinity() string {
 			},
 		},
 	}
+}
 
-	data, err := json.Marshal(defaultAffinity)
+// marshalAffinity returns a marshalled string of the v1 node affinity.
+func marshalAffinity(affinity *v1.Affinity) string {
+	data, err := json.Marshal(affinity)
 	if err != nil {
-		logrus.Errorf("failed to marshal fleet agent affinity: %s", err)
+		logrus.Errorf("failed to marshal node affinity: %s", err)
 	}
 	return string(data)
 }
