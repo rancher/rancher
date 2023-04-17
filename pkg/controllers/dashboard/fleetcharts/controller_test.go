@@ -63,6 +63,7 @@ func Test_ChartInstallation(t *testing.T) {
 						},
 					},
 					"bootstrap": map[string]interface{}{
+						"enabled":        false,
 						"agentNamespace": fleetconst.ReleaseLocalNamespace,
 					},
 					"gitops": map[string]interface{}{
@@ -109,6 +110,7 @@ func Test_ChartInstallation(t *testing.T) {
 						},
 					},
 					"bootstrap": map[string]interface{}{
+						"enabled":        false,
 						"agentNamespace": fleetconst.ReleaseLocalNamespace,
 					},
 					"gitops": map[string]interface{}{

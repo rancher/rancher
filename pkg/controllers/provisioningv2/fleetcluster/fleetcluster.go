@@ -121,7 +121,7 @@ func (h *handler) createCluster(cluster *v1.Cluster, status v1.ClusterStatus) ([
 	clientSecret := status.ClientSecretName
 	if mgmtCluster.Spec.Internal {
 		agentNamespace = fleetconst.ReleaseLocalNamespace
-		clientSecret = "local-cluster"
+		clientSecret = "local-kubeconfig"
 		// restore fleet's hardcoded name label for the local cluster
 		labels["name"] = "local"
 	}
