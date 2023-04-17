@@ -40,6 +40,7 @@ const (
 	continueToken     = "nondeterministictoken"
 	revisionNum       = "nondeterministicint"
 	defautlUrlString  = "https://rancherurl/"
+	steveAPITestLabel = "test.cattle.io/steveapi"
 )
 
 var (
@@ -235,16 +236,14 @@ func (s *steveAPITestSuite) setupSuite(clusterName string) {
 					Name: fmt.Sprintf("test%d", i),
 				},
 			}
+			labels := map[string]string{steveAPITestLabel: "true"}
 			if i == 2 {
-				secret.ObjectMeta.SetLabels(map[string]string{
-					labelKey: "2",
-				})
+				labels[labelKey] = "2"
 			}
 			if i >= 3 {
-				secret.ObjectMeta.SetLabels(map[string]string{
-					labelGTEKey: "3",
-				})
+				labels[labelGTEKey] = "3"
 			}
+			secret.ObjectMeta.SetLabels(labels)
 			_, err := secrets.CreateSecret(s.client, secret, s.project.ClusterID, n)
 			require.NoError(s.T(), err)
 		}
@@ -1556,6 +1555,7 @@ func (s *steveAPITestSuite) TestList() {
 			if _, ok := query["revision"]; ok {
 				query["revision"] = []string{s.lastRevision}
 			}
+			query["labelSelector"] = append(query["labelSelector"], steveAPITestLabel+"=true")
 			secretList, err := secretClient.List(query)
 			require.NoError(s.T(), err)
 
@@ -1564,15 +1564,7 @@ func (s *steveAPITestSuite) TestList() {
 			}
 			s.lastRevision = secretList.Revision
 
-			assert.Equal(s.T(), len(test.expect), len(secretList.Data))
-			for i, w := range test.expect {
-				if name, ok := w["name"]; ok {
-					assert.Equal(s.T(), name, secretList.Data[i].Name)
-				}
-				if ns, ok := w["namespace"]; ok {
-					assert.Equal(s.T(), namespaceMap[ns], secretList.Data[i].Namespace)
-				}
-			}
+			s.assertListIsEqual(test.expect, secretList.Data)
 
 			// Write human-readable request and response examples
 			if s.project.ClusterID == "local" {
@@ -1777,6 +1769,18 @@ func (s *steveAPITestSuite) TestCRUD() {
 		require.Error(s.T(), err)
 		assert.Nil(s.T(), readObj)
 	})
+}
+
+func (s *steveAPITestSuite) assertListIsEqual(expect []map[string]string, list []clientv1.SteveAPIObject) {
+	assert.Equal(s.T(), len(expect), len(list))
+	for i, w := range expect {
+		if name, ok := w["name"]; ok {
+			assert.Equal(s.T(), name, list[i].Name)
+		}
+		if ns, ok := w["namespace"]; ok {
+			assert.Equal(s.T(), namespaceMap[ns], list[i].Namespace)
+		}
+	}
 }
 
 func TestSteveLocal(t *testing.T) {
