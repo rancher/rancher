@@ -157,10 +157,11 @@ func (m *Manager) runSync() {
 	}
 }
 
+// getIntervalOrDefault Converts the input to a time.Duration or returns a default value
 func getIntervalOrDefault(interval string) time.Duration {
 	i, err := strconv.Atoi(interval)
 	if err != nil {
-		return 900 * time.Second
+		return 21600 * time.Second
 	}
 	return time.Duration(i) * time.Second
 }
