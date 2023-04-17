@@ -91,3 +91,20 @@ func LoadAndUpdateConfig(key string, config any, updateFunc func()) {
 
 	UpdateConfig(key, config)
 }
+
+// WriteConfig writes a CATTLE_TEST_CONFIG config file when one is not previously written.
+func WriteConfig(key string, config interface{}) {
+	configPath := os.Getenv("CATTLE_TEST_CONFIG")
+	all := map[string]interface{}{}
+	all[key] = config
+
+	yamlConfig, err := yaml.Marshal(all)
+	if err != nil {
+		panic(err)
+	}
+
+	err = os.WriteFile(configPath, yamlConfig, 0644)
+	if err != nil {
+		panic(err)
+	}
+}
