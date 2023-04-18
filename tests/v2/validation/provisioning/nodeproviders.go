@@ -15,10 +15,12 @@ const (
 )
 
 type NodeCreationFunc func(client *rancher.Client, numOfInstances int, numOfWinInstances int, multiconfig bool) (nodes []*nodes.Node, winNodes []*nodes.Node, err error)
+type IsNodeDeletedFunc func(client *rancher.Client, nodeName string) (bool, error)
 
 type ExternalNodeProvider struct {
 	Name             string
 	NodeCreationFunc NodeCreationFunc
+	IsNodeDeleted    IsNodeDeletedFunc
 }
 
 // ExternalNodeProviderSetup is a helper function that setups an ExternalNodeProvider object is a wrapper
@@ -46,7 +48,7 @@ func ExternalNodeProviderSetup(providerType string) ExternalNodeProvider {
 						if err != nil {
 							return nil, nil, err
 						}
-	
+
 						node.SSHKey = sshKey
 					}
 					for _, node2 := range winNodesList {
@@ -63,7 +65,7 @@ func ExternalNodeProviderSetup(providerType string) ExternalNodeProvider {
 						if err != nil {
 							return nil, nil, err
 						}
-	
+
 						node.SSHKey = sshKey
 					}
 					winNodesList = nil
