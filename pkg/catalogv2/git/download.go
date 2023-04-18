@@ -18,12 +18,17 @@ import (
 const (
 	stateDir  = "management-state/git-repo"
 	staticDir = "/var/lib/rancher-data/local-catalogs/v2"
+	localDir  = "../rancher-data/local-catalogs/v2" // identical to helm.InternalCatalog
 )
 
 func gitDir(namespace, name, gitURL string) string {
 	staticDir := filepath.Join(staticDir, namespace, name, hash(gitURL))
 	if s, err := os.Stat(staticDir); err == nil && s.IsDir() {
 		return staticDir
+	}
+	localDir := filepath.Join(localDir, namespace, name, hash(gitURL))
+	if s, err := os.Stat(localDir); err == nil && s.IsDir() {
+		return localDir
 	}
 	return filepath.Join(stateDir, namespace, name, hash(gitURL))
 }
@@ -67,7 +72,7 @@ func Ensure(secret *corev1.Secret, namespace, name, gitURL, commit string, insec
 }
 
 func isBundled(git *git) bool {
-	return strings.HasPrefix(git.Directory, staticDir)
+	return strings.HasPrefix(git.Directory, staticDir) || strings.HasPrefix(git.Directory, localDir)
 }
 
 func gitForRepo(secret *corev1.Secret, namespace, name, gitURL string, insecureSkipTLS bool, caBundle []byte) (*git, error) {
