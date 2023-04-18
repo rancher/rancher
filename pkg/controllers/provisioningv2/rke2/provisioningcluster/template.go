@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/rancher/lasso/pkg/dynamic"
@@ -207,6 +208,19 @@ func toMachineTemplate(machinePoolName string, cluster *rancherv1.Cluster, machi
 	return ustr, nil
 }
 
+func populateHostnameLengthLimitAnnotation(mp rancherv1.RKEMachinePool, defaults rancherv1.RKEMachinePoolDefaults, annotations map[string]string) {
+	hostnameLimit := 0
+	if hl := mp.HostnameLengthLimit; hl >= rke2.MinimumHostnameLengthLimit && hl <= rke2.MaximumHostnameLengthLimit {
+		hostnameLimit = hl
+	} else if hl = defaults.HostnameLengthLimit; hl >= rke2.MinimumHostnameLengthLimit && hl <= rke2.MaximumHostnameLengthLimit {
+		hostnameLimit = hl
+	}
+
+	if hostnameLimit != 0 {
+		annotations[rke2.HostnameLengthLimitAnnotation] = strconv.Itoa(hostnameLimit)
+	}
+}
+
 func createMachineTemplateHash(dataMap map[string]interface{}) string {
 	ustr := &unstructured.Unstructured{Object: dataMap}
 	dataMap = ustr.DeepCopy().Object
@@ -318,6 +332,8 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 		if !machinePool.DrainBeforeDelete || machinePool.EtcdRole {
 			machineSpecAnnotations[capi.ExcludeNodeDrainingAnnotation] = "true"
 		}
+
+		populateHostnameLengthLimitAnnotation(machinePool, cluster.Spec.RKEConfig.MachinePoolDefaults, machineSpecAnnotations)
 
 		machineDeployment := &capi.MachineDeployment{
 			ObjectMeta: metav1.ObjectMeta{

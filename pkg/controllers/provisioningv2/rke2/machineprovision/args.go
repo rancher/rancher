@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
@@ -23,6 +24,7 @@ import (
 	"github.com/rancher/wrangler/pkg/generic"
 	"github.com/rancher/wrangler/pkg/kv"
 	name2 "github.com/rancher/wrangler/pkg/name"
+	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -120,10 +122,17 @@ func (h *handler) getArgsEnvAndStatus(infra *infraObject, args map[string]interf
 		fmt.Sprintf("--secret-name=%s", secretName),
 	}
 
+	instanceName := getInstanceName(*infra)
+
 	if create {
 		cmd = append(cmd, "create",
 			fmt.Sprintf("--driver=%s", driver),
 			fmt.Sprintf("--custom-install-script=/run/secrets/machine/value"))
+
+		hostname := getHostname(*infra)
+		if hostname != instanceName {
+			cmd = append(cmd, fmt.Sprintf("--hostname-override=%s", hostname))
+		}
 
 		rancherCluster, err := h.rancherClusterCache.Get(infra.meta.GetNamespace(), infra.meta.GetLabels()[capi.ClusterLabelName])
 		if err != nil {
@@ -143,9 +152,7 @@ func (h *handler) getArgsEnvAndStatus(infra *infraObject, args map[string]interf
 		return driverArgs{}, err
 	}
 
-	// cloud-init will split the hostname on '.' and set the hostname to the first chunk. This causes an issue where all
-	// nodes in a machine pool may have the same node name in Kubernetes. Converting the '.' to '-' here prevents this.
-	cmd = append(cmd, strings.ReplaceAll(infra.meta.GetName(), ".", "-"))
+	cmd = append(cmd, instanceName)
 
 	return driverArgs{
 		DriverName:          driver,
@@ -338,4 +345,45 @@ func getWhitelistedEnvVars() map[string][]byte {
 		result[name] = []byte(value)
 	})
 	return result
+}
+
+// getHostname will get the hostname for an object, and truncate it if it greater than 63 or if the specified limit
+// between 10 and 63, whichever is lower. This truncation uses the wrangler SafeConcatName mechanism to ensure that the
+// generated name is both less than or equal to the limit, and distinct by replacing the last six characters of the name
+// with a `-`, followed by a 5 character hash of the entire input.
+func getHostname(infra infraObject) string {
+	limit := rke2.MaximumHostnameLengthLimit
+	limitAnno := infra.meta.GetAnnotations()[rke2.HostnameLengthLimitAnnotation]
+	if limitAnno != "" {
+		l, err := strconv.Atoi(limitAnno)
+		if err != nil {
+			logrus.Errorf("[machineprovision] failed to parse annotation %s=%s as int for %s %s/%s: %v", rke2.HostnameLengthLimitAnnotation, limitAnno, infra.obj.GetObjectKind(), infra.meta.GetNamespace(), infra.meta.GetName(), err)
+		} else if l < rke2.MinimumHostnameLengthLimit {
+			logrus.Debugf("[machineprovision] parsed annotation %s was %d, which is less than the minimum of %d", rke2.HostnameLengthLimitAnnotation, l, rke2.MinimumHostnameLengthLimit)
+		} else if l > rke2.MaximumHostnameLengthLimit {
+			logrus.Debugf("[machineprovision] parsed annotation %s was %d, which is greater than the maximum of %d", rke2.HostnameLengthLimitAnnotation, l, rke2.MaximumHostnameLengthLimit)
+		} else {
+			limit = l
+		}
+	}
+
+	// cloud-init will split the hostname on '.' and set the hostname to the first chunk. This causes an issue where all
+	// nodes in a machine pool may have the same node name in Kubernetes. Converting the '.' to '-' here prevents this.
+	hostname := strings.ReplaceAll(infra.meta.GetName(), ".", "-")
+	hostname = rke2.SafeConcatName(limit, hostname)
+
+	return hostname
+}
+
+// getInstanceName will get the instance name for use in rancher/machine's create/delete functions. This name will use
+// the wrangler SafeConcatName mechanism to ensure that the generated name is both less than or equal to the limit of 63
+// characters, and distinct by replacing the last six characters of the name with a `-`, followed by a 5 character hash
+// of the entire input.
+func getInstanceName(infra infraObject) string {
+	// cloud-init will split the hostname on '.' and set the hostname to the first chunk. This causes an issue where all
+	// nodes in a machine pool may have the same node name in Kubernetes. Converting the '.' to '-' here prevents this.
+	instanceName := strings.ReplaceAll(infra.meta.GetName(), ".", "-")
+	instanceName = name2.SafeConcatName(instanceName)
+
+	return instanceName
 }
