@@ -318,7 +318,8 @@ func installer(cluster *rancherv1.Cluster, secretName string) []runtime.Object {
 				Namespace: namespaces.System,
 			},
 			StringData: map[string]string{
-				"generation": strconv.Itoa(int(cluster.Spec.RedeploySystemAgentGeneration)),
+				"cluster-uid": string(cluster.UID),
+				"generation":  strconv.Itoa(int(cluster.Spec.RedeploySystemAgentGeneration)),
 			},
 		})
 	}
