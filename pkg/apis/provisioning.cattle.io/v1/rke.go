@@ -77,6 +77,8 @@ type RKEConfig struct {
 	RotateCertificates   *rkev1.RotateCertificates   `json:"rotateCertificates,omitempty"`
 	RotateEncryptionKeys *rkev1.RotateEncryptionKeys `json:"rotateEncryptionKeys,omitempty"`
 
-	MachinePools      []RKEMachinePool        `json:"machinePools,omitempty"`
+	MachinePools []RKEMachinePool `json:"machinePools,omitempty"`
+
 	InfrastructureRef *corev1.ObjectReference `json:"infrastructureRef,omitempty"`
+	ControlPlaneRef   *corev1.ObjectReference `json:"controlPlaneRef,omitempty"`
 }

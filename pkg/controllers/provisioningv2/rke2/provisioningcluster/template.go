@@ -33,18 +33,27 @@ import (
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
-func getInfraRef(rkeCluster *rkev1.RKECluster) *corev1.ObjectReference {
-	gvk, _ := gvk.Get(rkeCluster)
+// getObjectRef takes a runtime.Object and returns the corresponding object reference containing the Name, APIVersion,
+// and Kind. The object is required to be in the same namespace.
+func getObjectRef(obj runtime.Object) (*corev1.ObjectReference, error) {
+	gvk, err := gvk.Get(obj)
+	if err != nil {
+		return nil, err
+	}
+	m, err := meta.Accessor(obj)
+	if err != nil {
+		return nil, err
+	}
 	infraRef := &corev1.ObjectReference{
-		Name: rkeCluster.Name,
+		Name: m.GetName(),
 	}
 	infraRef.APIVersion, infraRef.Kind = gvk.ToAPIVersionAndKind()
-	return infraRef
+	return infraRef, nil
 }
 
-// objects generates the corresponding rkecontrolplanes.rke.cattle.io, clusters.cluster.x-k8s.io, and
-// machinedeployments.cluster.x-k8s.io objects based on the passed in clusters.provisioning.cattle.io object
-func objects(cluster *rancherv1.Cluster, dynamic *dynamic.Controller, dynamicSchema mgmtcontroller.DynamicSchemaCache, secrets v1.SecretCache) (result []runtime.Object, _ error) {
+// objects generates the corresponding rkeclusters.rke.cattle.io, rkecontrolplanes.rke.cattle.io,
+// clusters.cluster.x-k8s.io, and machinedeployments.cluster.x-k8s.io objects based on the passed in clusters.provisioning.cattle.io object
+func objects(cluster *rancherv1.Cluster, dynamic *dynamic.Controller, dynamicSchema mgmtcontroller.DynamicSchemaCache, secrets v1.SecretCache) (result []runtime.Object, err error) {
 	if !cluster.DeletionTimestamp.IsZero() {
 		return nil, nil
 	}
@@ -52,17 +61,27 @@ func objects(cluster *rancherv1.Cluster, dynamic *dynamic.Controller, dynamicSch
 	infraRef := cluster.Spec.RKEConfig.InfrastructureRef
 	if infraRef == nil {
 		rkeCluster := rkeCluster(cluster)
-		infraRef = getInfraRef(rkeCluster)
+		infraRef, err = getObjectRef(rkeCluster)
+		if err != nil {
+			return nil, err
+		}
 		result = append(result, rkeCluster)
 	}
 
-	rkeControlPlane, err := rkeControlPlane(cluster)
-	if err != nil {
-		return nil, err
+	controlPlaneRef := cluster.Spec.RKEConfig.ControlPlaneRef
+	if controlPlaneRef == nil {
+		rkeControlPlane, err := rkeControlPlane(cluster)
+		if err != nil {
+			return nil, err
+		}
+		controlPlaneRef, err = getObjectRef(rkeControlPlane)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, rkeControlPlane)
 	}
-	result = append(result, rkeControlPlane)
 
-	capiCluster := capiCluster(cluster, rkeControlPlane, infraRef)
+	capiCluster := capiCluster(cluster, controlPlaneRef, infraRef)
 	result = append(result, capiCluster)
 
 	machineDeployments, err := machineDeployments(cluster, capiCluster, dynamic, dynamicSchema, secrets)
@@ -514,25 +533,15 @@ func rkeControlPlane(cluster *rancherv1.Cluster) (*rkev1.RKEControlPlane, error)
 	}, nil
 }
 
-func capiCluster(cluster *rancherv1.Cluster, rkeControlPlane *rkev1.RKEControlPlane, infraRef *corev1.ObjectReference) *capi.Cluster {
-	gvk, err := gvk.Get(rkeControlPlane)
-	if err != nil {
-		// this is a build issue if it happens
-		panic(err)
-	}
-
-	apiVersion, kind := gvk.ToAPIVersionAndKind()
-
-	ownerGVK := rancherv1.SchemeGroupVersion.WithKind("Cluster")
-	ownerAPIVersion, _ := ownerGVK.ToAPIVersionAndKind()
+func capiCluster(cluster *rancherv1.Cluster, controlPlane, infraRef *corev1.ObjectReference) *capi.Cluster {
 	return &capi.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cluster.Name,
 			Namespace: cluster.Namespace,
 			OwnerReferences: []metav1.OwnerReference{
 				{
-					APIVersion:         ownerAPIVersion,
-					Kind:               ownerGVK.Kind,
+					APIVersion:         cluster.APIVersion,
+					Kind:               cluster.Kind,
 					Name:               cluster.Name,
 					UID:                cluster.UID,
 					Controller:         &[]bool{true}[0],
@@ -542,12 +551,7 @@ func capiCluster(cluster *rancherv1.Cluster, rkeControlPlane *rkev1.RKEControlPl
 		},
 		Spec: capi.ClusterSpec{
 			InfrastructureRef: infraRef,
-			ControlPlaneRef: &corev1.ObjectReference{
-				Kind:       kind,
-				Namespace:  rkeControlPlane.Namespace,
-				Name:       rkeControlPlane.Name,
-				APIVersion: apiVersion,
-			},
+			ControlPlaneRef:   controlPlane,
 		},
 	}
 }
