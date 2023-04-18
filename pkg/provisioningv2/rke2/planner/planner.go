@@ -201,10 +201,10 @@ func (p *Planner) setMachineConditionStatus(clusterPlan *plan.Plan, machineNames
 }
 
 func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus) (rkev1.RKEControlPlaneStatus, error) {
-	logrus.Debugf("[planner] %s/%s: attempting to lock %s for processing", cp.Namespace, cp.Name, string(cp.UID))
+	logrus.Debugf("[planner] rkecluster %s/%s: attempting to lock %s for processing", cp.Namespace, cp.Name, string(cp.UID))
 	p.locker.Lock(string(cp.UID))
 	defer func(namespace, name, uid string) {
-		logrus.Debugf("[planner] %s/%s: unlocking %s", namespace, name, uid)
+		logrus.Debugf("[planner] rkecluster %s/%s: unlocking %s", namespace, name, uid)
 		_ = p.locker.Unlock(uid)
 	}(cp.Namespace, cp.Name, string(cp.UID))
 

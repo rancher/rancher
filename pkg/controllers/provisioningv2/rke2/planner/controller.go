@@ -3,6 +3,7 @@ package planner
 import (
 	"context"
 	"errors"
+	"reflect"
 	"strings"
 	"time"
 
@@ -36,6 +37,7 @@ func Register(ctx context.Context, clients *wrangler.Context, planner *planner.P
 			var relatedResources []relatedresource.Key
 			clusterName := secret.Labels[rke2.ClusterNameLabel]
 			if clusterName != "" {
+				logrus.Tracef("[planner] rkecluster %s/%s enqueue triggered by secret %s/%s", secret.Namespace, clusterName, secret.Namespace, secret.Name)
 				relatedResources = append(relatedResources, relatedresource.Key{
 					Namespace: secret.Namespace,
 					Name:      clusterName,
@@ -44,6 +46,7 @@ func Register(ctx context.Context, clients *wrangler.Context, planner *planner.P
 			authorizedObjects := secret.Annotations[rke2.AuthorizedObjectAnnotation]
 			if authorizedObjects != "" {
 				for _, clusterName = range strings.Split(authorizedObjects, ",") {
+					logrus.Tracef("[planner] rkecluster %s/%s enqueue triggered by authorized secret %s/%s", secret.Namespace, clusterName, secret.Namespace, secret.Name)
 					relatedResources = append(relatedResources, relatedresource.Key{
 						Namespace: secret.Namespace,
 						Name:      clusterName,
@@ -54,6 +57,7 @@ func Register(ctx context.Context, clients *wrangler.Context, planner *planner.P
 		} else if machine, ok := obj.(*capi.Machine); ok {
 			clusterName := machine.Labels[capi.ClusterLabelName]
 			if clusterName != "" {
+				logrus.Tracef("[planner] rkecluster %s/%s enqueue triggered by machine %s/%s", machine.Namespace, clusterName, machine.Namespace, machine.Name)
 				return []relatedresource.Key{{
 					Namespace: machine.Namespace,
 					Name:      clusterName,
@@ -64,8 +68,9 @@ func Register(ctx context.Context, clients *wrangler.Context, planner *planner.P
 			authorizedObjects := configmap.Annotations[rke2.AuthorizedObjectAnnotation]
 			if authorizedObjects != "" {
 				for _, clusterName := range strings.Split(authorizedObjects, ",") {
+					logrus.Tracef("[planner] rkecluster %s/%s enqueue triggered by authorized configmap %s/%s", configmap.Namespace, clusterName, configmap.Namespace, configmap.Name)
 					relatedResources = append(relatedResources, relatedresource.Key{
-						Namespace: secret.Namespace,
+						Namespace: configmap.Namespace,
 						Name:      clusterName,
 					})
 				}
@@ -95,7 +100,10 @@ func (h *handler) OnChange(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPla
 	if err != nil {
 		if planner.IsErrWaiting(err) {
 			logrus.Infof("[planner] rkecluster %s/%s: waiting: %v", cp.Namespace, cp.Name, err)
-			rke2.Reconciled.Message(&status, "reconciling cluster")
+			if rke2.Reconciled.GetMessage(&status) != "reconciling cluster" {
+				// Only set the reconciled message to `reconciling cluster` if it is not this value, otherwise, this will cause unnecessary updates to the status.
+				rke2.Reconciled.Message(&status, "reconciling cluster")
+			}
 			// if still waiting for same condition, convert err to generic.ErrSkip to avoid updating controlplane status and
 			// enqueue until no longer waiting.
 			if rke2.Ready.GetMessage(&status) == err.Error() && rke2.Ready.GetStatus(&status) == "Unknown" && rke2.Ready.GetReason(&status) == "Waiting" {
@@ -107,9 +115,15 @@ func (h *handler) OnChange(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPla
 					err = generic.ErrSkip
 				}
 			} else {
-				rke2.Ready.SetStatus(&status, "Unknown")
-				rke2.Ready.Message(&status, err.Error())
-				rke2.Ready.Reason(&status, "Waiting")
+				if rke2.Ready.GetStatus(&status) != "Unknown" {
+					rke2.Ready.SetStatus(&status, "Unknown")
+				}
+				if rke2.Ready.GetMessage(&status) != err.Error() {
+					rke2.Ready.Message(&status, err.Error())
+				}
+				if rke2.Ready.GetReason(&status) != "Waiting" {
+					rke2.Ready.Reason(&status, "Waiting")
+				}
 				err = nil
 			}
 		} else if !errors.Is(err, generic.ErrSkip) {
@@ -122,16 +136,36 @@ func (h *handler) OnChange(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPla
 		}
 	} else {
 		logrus.Debugf("[planner] rkecluster %s/%s: reconciliation complete", cp.Namespace, cp.Name)
-		rke2.Provisioned.True(&status)
-		rke2.Provisioned.Message(&status, "")
-		rke2.Provisioned.Reason(&status, "")
-		rke2.Ready.True(&status)
-		rke2.Ready.Message(&status, "")
-		rke2.Ready.Reason(&status, "")
-		status.AppliedSpec = &cp.Spec
-		rke2.Reconciled.True(&status)
-		rke2.Reconciled.Message(&status, "")
-		rke2.Reconciled.Reason(&status, "")
+		if !rke2.Provisioned.IsTrue(&status) {
+			rke2.Provisioned.True(&status)
+		}
+		if rke2.Provisioned.GetMessage(&status) != "" {
+			rke2.Provisioned.Message(&status, "")
+		}
+		if rke2.Provisioned.GetReason(&status) != "" {
+			rke2.Provisioned.Reason(&status, "")
+		}
+		if !rke2.Ready.IsTrue(&status) {
+			rke2.Ready.True(&status)
+		}
+		if rke2.Ready.GetMessage(&status) != "" {
+			rke2.Ready.Message(&status, "")
+		}
+		if rke2.Ready.GetReason(&status) != "" {
+			rke2.Ready.Reason(&status, "")
+		}
+		if !reflect.DeepEqual(status.AppliedSpec, cp.Spec) {
+			status.AppliedSpec = &cp.Spec
+		}
+		if !rke2.Reconciled.IsTrue(&status) {
+			rke2.Reconciled.True(&status)
+		}
+		if rke2.Reconciled.GetMessage(&status) != "" {
+			rke2.Reconciled.Message(&status, "")
+		}
+		if rke2.Reconciled.GetReason(&status) != "" {
+			rke2.Reconciled.Reason(&status, "")
+		}
 	}
 	return status, err
 }
