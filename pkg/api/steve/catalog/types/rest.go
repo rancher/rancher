@@ -36,25 +36,27 @@ type ChartInfo struct {
 }
 
 type ChartUninstallAction struct {
-	DisableHooks bool             `json:"noHooks,omitempty"`
-	DryRun       bool             `json:"dryRun,omitempty"`
-	KeepHistory  bool             `json:"keepHistory,omitempty"`
-	Timeout      *metav1.Duration `json:"timeout,omitempty"`
-	Description  string           `json:"description,omitempty"`
+	DisableHooks bool                `json:"noHooks,omitempty"`
+	DryRun       bool                `json:"dryRun,omitempty"`
+	KeepHistory  bool                `json:"keepHistory,omitempty"`
+	Timeout      *metav1.Duration    `json:"timeout,omitempty"`
+	Description  string              `json:"description,omitempty"`
+	Tolerations  []corev1.Toleration `json:"operationTolerations,omitempty"`
 }
 
 type ChartUpgradeAction struct {
-	Timeout                  *metav1.Duration `json:"timeout,omitempty"`
-	Wait                     bool             `json:"wait,omitempty"`
-	DisableHooks             bool             `json:"noHooks,omitempty"`
-	DisableOpenAPIValidation bool             `json:"disableOpenAPIValidation,omitempty"`
-	Force                    bool             `json:"force,omitempty"`
-	ForceAdopt               bool             `json:"forceAdopt,omitempty"`
-	MaxHistory               int              `json:"historyMax,omitempty"`
-	Install                  bool             `json:"install,omitempty"`
-	Namespace                string           `json:"namespace,omitempty"`
-	CleanupOnFail            bool             `json:"cleanupOnFail,omitempty"`
-	Charts                   []ChartUpgrade   `json:"charts,omitempty"`
+	Timeout                  *metav1.Duration    `json:"timeout,omitempty"`
+	Wait                     bool                `json:"wait,omitempty"`
+	DisableHooks             bool                `json:"noHooks,omitempty"`
+	DisableOpenAPIValidation bool                `json:"disableOpenAPIValidation,omitempty"`
+	Force                    bool                `json:"force,omitempty"`
+	ForceAdopt               bool                `json:"forceAdopt,omitempty"`
+	MaxHistory               int                 `json:"historyMax,omitempty"`
+	Install                  bool                `json:"install,omitempty"`
+	Namespace                string              `json:"namespace,omitempty"`
+	CleanupOnFail            bool                `json:"cleanupOnFail,omitempty"`
+	Charts                   []ChartUpgrade      `json:"charts,omitempty"`
+	Tolerations              []corev1.Toleration `json:"operationTolerations,omitempty"`
 }
 
 type ChartUpgrade struct {

@@ -362,9 +362,10 @@ func (s *Operations) getUninstallArgs(appNamespace, appName string, body io.Read
 	}
 
 	status := catalog.OperationStatus{
-		Action:    cmd.Operation,
-		Release:   rel.Spec.Name,
-		Namespace: appNamespace,
+		Action:      cmd.Operation,
+		Release:     rel.Spec.Name,
+		Namespace:   appNamespace,
+		Tolerations: uninstallArgs.Tolerations,
 	}
 
 	return status, Commands{cmd}, nil
@@ -386,8 +387,9 @@ func (s *Operations) getUpgradeCommand(repoNamespace, repoName string, body io.R
 	upgradeArgs.Install = true
 
 	status := catalog.OperationStatus{
-		Action:    "upgrade",
-		Namespace: namespace(upgradeArgs.Namespace),
+		Action:      "upgrade",
+		Namespace:   namespace(upgradeArgs.Namespace),
+		Tolerations: upgradeArgs.Tolerations,
 	}
 
 	for _, chartUpgrade := range upgradeArgs.Charts {
