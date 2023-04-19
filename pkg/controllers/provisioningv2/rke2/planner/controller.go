@@ -3,7 +3,6 @@ package planner
 import (
 	"context"
 	"errors"
-	"reflect"
 	"strings"
 	"time"
 
@@ -89,21 +88,17 @@ func (h *handler) OnChange(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPla
 
 	status.ObservedGeneration = cp.Generation
 
-	if rke2.Reconciled.IsTrue(&status) && !equality.Semantic.DeepEqual(cp.Spec, status.AppliedSpec) {
-		rke2.Reconciled.SetStatus(&status, "Unknown")
-		rke2.Reconciled.Message(&status, "reconciling control plane")
-		rke2.Reconciled.Reason(&status, "Waiting")
-	}
-
 	logrus.Debugf("[planner] rkecluster %s/%s: calling planner process", cp.Namespace, cp.Name)
 	status, err := h.planner.Process(cp, status)
 	if err != nil {
+		// planner.Process can encounter 4 types of errors:
+		// * planner.errWaiting - This is an error that indicates we are waiting for something. This will trigger an enqueue (due to error)
+		// * generic.ErrSkip / planner.errIgnore - These are both errors that do not automatically re-enqueue the object is the same as a planner.errIgnore and should be treated as such
+		// and we're waiting on that object to sync and/or be processed by some other controller, and when it is
+		// processed the rkecontrolplane will be re-enqueued.
+		// * error - All other errors. This should be an actual error during planner processing.
 		if planner.IsErrWaiting(err) {
 			logrus.Infof("[planner] rkecluster %s/%s: waiting: %v", cp.Namespace, cp.Name, err)
-			if rke2.Reconciled.GetMessage(&status) != "reconciling cluster" {
-				// Only set the reconciled message to `reconciling cluster` if it is not this value, otherwise, this will cause unnecessary updates to the status.
-				rke2.Reconciled.Message(&status, "reconciling cluster")
-			}
 			// if still waiting for same condition, convert err to generic.ErrSkip to avoid updating controlplane status and
 			// enqueue until no longer waiting.
 			if rke2.Ready.GetMessage(&status) == err.Error() && rke2.Ready.GetStatus(&status) == "Unknown" && rke2.Ready.GetReason(&status) == "Waiting" {
@@ -115,57 +110,41 @@ func (h *handler) OnChange(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPla
 					err = generic.ErrSkip
 				}
 			} else {
-				if rke2.Ready.GetStatus(&status) != "Unknown" {
-					rke2.Ready.SetStatus(&status, "Unknown")
-				}
-				if rke2.Ready.GetMessage(&status) != err.Error() {
-					rke2.Ready.Message(&status, err.Error())
-				}
-				if rke2.Ready.GetReason(&status) != "Waiting" {
-					rke2.Ready.Reason(&status, "Waiting")
-				}
+				rke2.Ready.SetStatus(&status, "Unknown")
+				rke2.Ready.Message(&status, err.Error())
+				rke2.Ready.Reason(&status, "Waiting")
+				// Set err to nil so planner doesn't automatically re-enqueue the object, as we're waiting.
 				err = nil
 			}
-		} else if !errors.Is(err, generic.ErrSkip) {
+		} else if errors.Is(err, generic.ErrSkip) || planner.IsErrIgnore(err) {
+			logrus.Debugf("[planner] rkecluster %s/%s: ErrSkip | errIgnore : %v", cp.Namespace, cp.Name, err)
+			h.controlPlanes.EnqueueAfter(cp.Namespace, cp.Name, 5*time.Second)
+		} else {
+			// An actual error occurred, so set the Ready and Reconciled condiitons to this error and return
 			logrus.Errorf("[planner] rkecluster %s/%s: error encountered during plan processing was %v", cp.Namespace, cp.Name, err)
 			rke2.Ready.SetError(&status, "", err)
 			rke2.Reconciled.SetError(&status, "", err)
+			return status, err
 		}
-		if errors.Is(err, generic.ErrSkip) {
-			h.controlPlanes.EnqueueAfter(cp.Namespace, cp.Name, 5*time.Second)
+		// If the Reconciled condition is already true and the error was NOT an errIgnore/ErrSkip/ErrWaiting and the status.AppliedSpec (from planner.Process) does not match the controlplane spec, set reconciled to unknown.
+		if !equality.Semantic.DeepEqual(cp.Spec, status.AppliedSpec) {
+			rke2.Reconciled.SetStatus(&status, "Unknown")
+			rke2.Reconciled.Message(&status, "reconciling control plane")
+			rke2.Reconciled.Reason(&status, "Waiting")
 		}
 	} else {
+		// No error encountered during planner.Process
 		logrus.Debugf("[planner] rkecluster %s/%s: reconciliation complete", cp.Namespace, cp.Name)
-		if !rke2.Provisioned.IsTrue(&status) {
-			rke2.Provisioned.True(&status)
-		}
-		if rke2.Provisioned.GetMessage(&status) != "" {
-			rke2.Provisioned.Message(&status, "")
-		}
-		if rke2.Provisioned.GetReason(&status) != "" {
-			rke2.Provisioned.Reason(&status, "")
-		}
-		if !rke2.Ready.IsTrue(&status) {
-			rke2.Ready.True(&status)
-		}
-		if rke2.Ready.GetMessage(&status) != "" {
-			rke2.Ready.Message(&status, "")
-		}
-		if rke2.Ready.GetReason(&status) != "" {
-			rke2.Ready.Reason(&status, "")
-		}
-		if !reflect.DeepEqual(status.AppliedSpec, cp.Spec) {
-			status.AppliedSpec = &cp.Spec
-		}
-		if !rke2.Reconciled.IsTrue(&status) {
-			rke2.Reconciled.True(&status)
-		}
-		if rke2.Reconciled.GetMessage(&status) != "" {
-			rke2.Reconciled.Message(&status, "")
-		}
-		if rke2.Reconciled.GetReason(&status) != "" {
-			rke2.Reconciled.Reason(&status, "")
-		}
+		rke2.Provisioned.True(&status)
+		rke2.Provisioned.Message(&status, "")
+		rke2.Provisioned.Reason(&status, "")
+		rke2.Ready.True(&status)
+		rke2.Ready.Message(&status, "")
+		rke2.Ready.Reason(&status, "")
+		status.AppliedSpec = &cp.Spec
+		rke2.Reconciled.True(&status)
+		rke2.Reconciled.Message(&status, "")
+		rke2.Reconciled.Reason(&status, "")
 	}
 	return status, err
 }

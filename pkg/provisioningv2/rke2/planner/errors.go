@@ -34,6 +34,11 @@ func errIgnoref(format string, a ...interface{}) errIgnore {
 	return errIgnore(fmt.Sprintf(format, a...))
 }
 
+func IsErrIgnore(err error) bool {
+	var errIgnore errIgnore
+	return errors.As(err, &errIgnore)
+}
+
 // ignoreErrors accepts two errors. If the err is type errIgnore, it will return (err, nil) if firstIgnoreErr is nil or (firstIgnoreErr, nil).
 // Otherwise, it will simply return (firstIgnoreErr, err)
 func ignoreErrors(firstIgnoreError error, err error) (error, error) {
