@@ -156,8 +156,8 @@ if ( true == via_webhook() && (!(rancher_version ==~ rancher_version_regex)) ) {
                 }
 
                 // AWS_USER and AWS_AMI are currently not set in the environmental variables.
-                env.CATTLE_TEST_URL = env.CATTLE_TEST_URL.replace('https://', '')
-                env.CONFIG = env.CONFIG.replace('${CATTLE_TEST_URL}', env.CATTLE_TEST_URL)
+                def GO_CATTLE_TEST_URL = env.CATTLE_TEST_URL.replace('https://', '')
+                env.CONFIG = env.CONFIG.replace('${CATTLE_TEST_URL}', "${GO_CATTLE_TEST_URL}")
                 env.CONFIG = env.CONFIG.replace('${ADMIN_TOKEN}', env.ADMIN_TOKEN)
                 env.CONFIG = env.CONFIG.replace('${AZURE_CLIENT_ID}', env.USER_TOKEN)
                 env.CONFIG = env.CONFIG.replace('${AZURE_CLIENT_SECRET}', env.AZURE_CLIENT_SECRET)
