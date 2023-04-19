@@ -157,19 +157,19 @@ if ( true == via_webhook() && (!(rancher_version ==~ rancher_version_regex)) ) {
 
                 // AWS_USER and AWS_AMI are currently not set in the environmental variables.
                 env.CATTLE_TEST_URL = env.CATTLE_TEST_URL.replace('https://', '')
-                env.CONFIG = env.CONFIG.replace('${CATTLE_TEST_URL}', '${env.CATTLE_TEST_URL}')
-                env.CONFIG = env.CONFIG.replace('${ADMIN_TOKEN}', '${env.ADMIN_TOKEN}')
-                env.CONFIG = env.CONFIG.replace('${AZURE_CLIENT_ID}', '${env.USER_TOKEN}')
-                env.CONFIG = env.CONFIG.replace('${AZURE_CLIENT_SECRET}', '${env.AZURE_CLIENT_SECRET}')
-                env.CONFIG = env.CONFIG.replace('${AZURE_SUBSCRIPTION_ID}', '${env.AZURE_SUBSCRIPTION_ID}')
-                env.CONFIG = env.CONFIG.replace('${AWS_SECRET_ACCESS_KEY}', '${env.AWS_SECRET_ACCESS_KEY}')
-                env.CONFIG = env.CONFIG.replace('${AWS_ACCESS_KEY_ID}', '${env.AWS_ACCESS_KEY_ID}')
-                env.CONFIG = env.CONFIG.replace('${AWS_IAM_PROFILE}', '${env.AWS_IAM_PROFILE}')
-                env.CONFIG = env.CONFIG.replace('${AWS_REGION}', '${env.AWS_REGION}')
-                env.CONFIG = env.CONFIG.replace('${AWS_INSTANCE_TYPE}', '${env.AWS_INSTANCE_TYPE}')
-                env.CONFIG = env.CONFIG.replace('${AWS_VPC}', '${env.AWS_VPC}')
-                env.CONFIG = env.CONFIG.replace('${AWS_SECURITY_GROUPS}', '${env.AWS_SECURITY_GROUPS}')
-                env.CONFIG = env.CONFIG.replace('${AWS_SSH_PEM_KEY}', '${env.AWS_SSH_KEY_NAME}')
+                env.CONFIG = env.CONFIG.replace('${CATTLE_TEST_URL}', env.CATTLE_TEST_URL)
+                env.CONFIG = env.CONFIG.replace('${ADMIN_TOKEN}', env.ADMIN_TOKEN)
+                env.CONFIG = env.CONFIG.replace('${AZURE_CLIENT_ID}', env.USER_TOKEN)
+                env.CONFIG = env.CONFIG.replace('${AZURE_CLIENT_SECRET}', env.AZURE_CLIENT_SECRET)
+                env.CONFIG = env.CONFIG.replace('${AZURE_SUBSCRIPTION_ID}', env.AZURE_SUBSCRIPTION_ID)
+                env.CONFIG = env.CONFIG.replace('${AWS_SECRET_ACCESS_KEY}', env.AWS_SECRET_ACCESS_KEY)
+                env.CONFIG = env.CONFIG.replace('${AWS_ACCESS_KEY_ID}', env.AWS_ACCESS_KEY_ID)
+                env.CONFIG = env.CONFIG.replace('${AWS_IAM_PROFILE}', env.AWS_IAM_PROFILE)
+                env.CONFIG = env.CONFIG.replace('${AWS_REGION}', env.AWS_REGION)
+                env.CONFIG = env.CONFIG.replace('${AWS_INSTANCE_TYPE}', env.AWS_INSTANCE_TYPE)
+                env.CONFIG = env.CONFIG.replace('${AWS_VPC}', env.AWS_VPC)
+                env.CONFIG = env.CONFIG.replace('${AWS_SECURITY_GROUPS}', env.AWS_SECURITY_GROUPS)
+                env.CONFIG = env.CONFIG.replace('${AWS_SSH_PEM_KEY}', env.AWS_SSH_KEY_NAME)
 
                 stage('Execute subjobs') {
                   try {
