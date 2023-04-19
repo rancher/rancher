@@ -335,6 +335,67 @@ func (rb *RBTestSuite) ValidateAddCMAsProjectOwner() {
 
 }
 
+func (rb *RBTestSuite) ValidateAddPOsAsProjectOwner() {
+	createProjectAsCO, err := createProject(rb.client, rb.cluster.ID)
+	require.NoError(rb.T(), err)
+	rb.standardUserCOProject = createProjectAsCO
+
+	log.Info("Additional Testcase4 - Validating if Project Owner can add another Project Owner ")
+	errUserRole := users.AddProjectMember(rb.standardUserClient, rb.standardUserCOProject, rb.additionalUser, roleProjectOwner)
+	require.NoError(rb.T(), errUserRole)
+	rb.additionalUserClient, err = rb.additionalUserClient.ReLogin()
+
+	addNewUserAsPO, err := createUser(rb.client, standardUser)
+	addNewUserAsPOClient, err := rb.client.AsUser(addNewUserAsPO)
+	require.NoError(rb.T(), err)
+
+	errUserRole2 := users.AddProjectMember(rb.additionalUserClient, rb.standardUserCOProject, addNewUserAsPO, roleProjectOwner)
+	require.NoError(rb.T(), errUserRole2)
+	addNewUserAsPOClient, err = addNewUserAsPOClient.ReLogin()
+
+	userGetProject, err := projects.GetProjectList(addNewUserAsPOClient, rb.cluster.ID)
+	require.NoError(rb.T(), err)
+	assert.Equal(rb.T(), 1, len(userGetProject.Data))
+	assert.Equal(rb.T(), rb.standardUserCOProject.Name, userGetProject.Data[0].Name)
+
+	errRemoveMember := users.RemoveProjectMember(rb.standardUserClient, addNewUserAsPO)
+	require.NoError(rb.T(), errRemoveMember)
+
+	userProjectEmptyAfterRemoval, err := projects.GetProjectList(addNewUserAsPOClient, rb.cluster.ID)
+	require.NoError(rb.T(), err)
+	assert.Equal(rb.T(), 0, len(userProjectEmptyAfterRemoval.Data))
+	users.RemoveProjectMember(rb.additionalUserClient, rb.additionalUser)
+}
+
+func (rb *RBTestSuite) ValidateCannotAddMPMsAsProjectOwner() {
+	//Create project as a cluster Owner
+	createProjectAsCO, err := createProject(rb.client, rb.cluster.ID)
+	require.NoError(rb.T(), err)
+	rb.standardUserCOProject = createProjectAsCO
+
+	log.Info("Additional Testcase5 - Validating if Manage Project Member cannot add Project Owner ")
+	errUserRole := users.AddProjectMember(rb.standardUserClient, rb.standardUserCOProject, rb.additionalUser, roleManageProjectMember)
+	require.NoError(rb.T(), errUserRole)
+	rb.additionalUserClient, err = rb.additionalUserClient.ReLogin()
+
+	addNewUserAsPO, err := createUser(rb.client, standardUser)
+	addNewUserAsPOClient, err := rb.client.AsUser(addNewUserAsPO)
+	require.NoError(rb.T(), err)
+
+	errUserRole2 := users.AddProjectMember(rb.additionalUserClient, rb.standardUserCOProject, addNewUserAsPO, roleProjectOwner)
+	require.Error(rb.T(), errUserRole2)
+	errStatus := strings.Split(errUserRole2.Error(), ".")[1]
+	rgx := regexp.MustCompile(`\[(.*?)\]`)
+	errorMsg := rgx.FindStringSubmatch(errStatus)
+	assert.Equal(rb.T(), "422 Unprocessable Entity", errorMsg[1])
+
+	addNewUserAsPOClient, err = addNewUserAsPOClient.ReLogin()
+
+	userGetProject, err := projects.GetProjectList(addNewUserAsPOClient, rb.cluster.ID)
+	require.NoError(rb.T(), err)
+	assert.Equal(rb.T(), 0, len(userGetProject.Data))
+}
+
 func (rb *RBTestSuite) TestRBAC() {
 	tests := []struct {
 		name   string
@@ -493,6 +554,14 @@ func (rb *RBTestSuite) TestRBACAdditional() {
 	rb.Run("Additional testcase3 - Validating if member with role "+roleOwner+" can add a cluster member as a project owner", func() {
 		rb.ValidateAddCMAsProjectOwner()
 
+	})
+
+	rb.Run("Additional testcase4 - Validating if member with role "+roleProjectOwner+" can add a project owner", func() {
+		rb.ValidateAddPOsAsProjectOwner()
+	})
+
+	rb.Run("Additional testcase5 - Validating if member with role "+roleManageProjectMember+" can not add a project owner", func() {
+		rb.ValidateCannotAddMPMsAsProjectOwner()
 	})
 
 }
