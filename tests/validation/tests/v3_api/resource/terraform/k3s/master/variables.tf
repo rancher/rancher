@@ -37,3 +37,4 @@ variable "environment" {}
 variable "engine_mode" {}
 variable "instance_class" {}
 variable "max_connections" {}
+variable "optional_files" {}
