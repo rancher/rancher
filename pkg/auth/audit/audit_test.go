@@ -114,6 +114,11 @@ func (a *AuditTest) TestConcealSensitiveData() {
 			want:  []byte(fmt.Sprintf(`{"accessToken": "%s", "user": "fake_user"}`, redacted)),
 		},
 		{
+			name:  "Token entry in slice",
+			input: []byte(`[{"accessToken": "fake_access_token", "user": "fake_user"}]`),
+			want:  []byte(fmt.Sprintf(`[{"accessToken": "%s", "user": "fake_user"}]`, redacted)),
+		},
+		{
 			name:  "With public fields",
 			input: []byte(`{"accessKey": "fake_access_key", "secretKey": "fake_secret_key", "user": "fake_user"}`),
 			want:  []byte(fmt.Sprintf(`{"accessKey": "fake_access_key", "secretKey": "%s", "user": "fake_user"}`, redacted)),
@@ -144,6 +149,19 @@ func (a *AuditTest) TestConcealSensitiveData() {
 	for i := range tests {
 		test := tests[i]
 		a.Run(test.name, func() {
+			fmt.Println(string(test.want[0]))
+			fmt.Println(byte('['))
+			if len(test.want) > 0 && test.want[0] == byte('[') {
+				var want []interface{}
+				err := json.Unmarshal(test.want, &want)
+				a.NoError(err, "failed to unmarshal")
+				got := logger.concealSensitiveData(test.uri, test.input)
+				var gotMap []interface{}
+				err = json.Unmarshal(got, &gotMap)
+				a.NoError(err, "failed to unmarshal")
+				a.Equal(want, gotMap, "concealSensitiveData() for slice = %s, want %s", got, test.want)
+				return
+			}
 			var want map[string]interface{}
 			err := json.Unmarshal(test.want, &want)
 			a.NoError(err, "failed to unmarshal")
@@ -151,7 +169,7 @@ func (a *AuditTest) TestConcealSensitiveData() {
 			var gotMap map[string]interface{}
 			err = json.Unmarshal(got, &gotMap)
 			a.NoError(err, "failed to unmarshal")
-			a.Equal(want, gotMap, "concealSensitiveData() = %s, want %s", got, test.want)
+			a.Equal(want, gotMap, "concealSensitiveData() for map = %s, want %s", got, test.want)
 		})
 	}
 }
