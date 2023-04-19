@@ -67,38 +67,26 @@ func (h *clusterHandler) sync(key string, obj *v3.Cluster) (runtime.Object, erro
 	return obj, nil
 }
 
+// doSync syncs CRBs for all GlobalAdmins to the clustere role 'cluster-admin'.
 func (h *clusterHandler) doSync(cluster *v3.Cluster) error {
 	_, err := v32.ClusterConditionGlobalAdminsSynced.DoUntilTrue(cluster, func() (runtime.Object, error) {
-		// For restricted admins, re-enqueue the GRBs to trigger the creation of any RBAC resources on new cluster creation.
-		grbs, err := h.grbIndexer.ByIndex(grbByRoleIndex, rbac.GlobalRestrictedAdmin)
-		if err != nil {
-			return nil, fmt.Errorf("failed to list GlobalRoleBindings for restricted-admin: %w", err)
-		}
-		for _, x := range grbs {
-			grb, ok := x.(*v3.GlobalRoleBinding)
-			if !ok || grb == nil {
-				continue
-			}
-			h.grbController.Enqueue("", grb.Name)
-		}
-
-		grbs, err = h.grbIndexer.ByIndex(grbByRoleIndex, rbac.GlobalAdmin)
+		grbs, err := h.grbIndexer.ByIndex(grbByRoleIndex, rbac.GlobalAdmin)
 		if err != nil {
 			return nil, fmt.Errorf("failed to list GlobalRoleBindings for global-admin: %w", err)
 		}
 
 		for _, x := range grbs {
-			grb, ok := x.(*v3.GlobalRoleBinding)
+			grb, ok := x.(*v32.GlobalRoleBinding)
 			if !ok || grb == nil {
 				continue
 			}
 			bindingName := rbac.GrbCRBName(grb)
-			b, err := h.userGRBLister.Get("", bindingName)
-			if err != nil && !k8serrors.IsNotFound(err) {
+			_, err := h.userGRBLister.Get("", bindingName)
+			if !k8serrors.IsNotFound(err) {
 				return nil, fmt.Errorf("failed to get GlobalRoleBinding for '%s': %w", bindingName, err)
 			}
 
-			if b != nil {
+			if err == nil {
 				// binding exists, nothing to do
 				continue
 			}
@@ -119,14 +107,13 @@ func (h *clusterHandler) doSync(cluster *v3.Cluster) error {
 				return nil, fmt.Errorf("failed to create new ClusterRoleBinding for GlobalRoleBinding '%s': %w", grb.Name, err)
 			}
 		}
-
 		return nil, nil
 	})
 	return err
 }
 
 func grbByRole(obj interface{}) ([]string, error) {
-	grb, ok := obj.(*v3.GlobalRoleBinding)
+	grb, ok := obj.(*v32.GlobalRoleBinding)
 	if !ok {
 		return []string{}, nil
 	}
