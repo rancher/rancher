@@ -195,13 +195,13 @@ func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {
 		for _, rb := range rbs {
 			// rtbOwnerLabelLegacy
 			if uid := convert.ToString(rb.Labels[rtbOwnerLabelLegacy]); uid != "" {
-				logrus.Infof("Deleting role binding %s in %s", rb.Name, ns.Name)
+				logrus.Infof("Deleting role binding %s in %s owned by prtb %s because namespace does not belong to a project", rb.Name, ns.Name, uid)
 				if err := n.m.roleBindings.DeleteNamespaced(ns.Name, rb.Name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
 					return false, errors.Wrapf(err, "couldn't delete role binding %s", rb.Name)
 				}
 			}
 			if nsAndName := convert.ToString(rb.Labels[rtbOwnerLabel]); nsAndName != "" {
-				logrus.Infof("Deleting role binding %s in %s", rb.Name, ns.Name)
+				logrus.Infof("Deleting role binding %s in %s owned by prtb %s because namespace does not belong to a project", rb.Name, ns.Name, nsAndName)
 				if err := n.m.roleBindings.DeleteNamespaced(ns.Name, rb.Name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
 					return false, errors.Wrapf(err, "couldn't delete role binding %s", rb.Name)
 				}
@@ -275,7 +275,7 @@ func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {
 			for _, prtb := range prtbs {
 				if prtb, ok := prtb.(*v3.ProjectRoleTemplateBinding); ok {
 					if prtb.Namespace != namespace {
-						logrus.Infof("Deleting role binding %s in %s", rb.Name, ns.Name)
+						logrus.Infof("Deleting role binding %s in %s owned by prtb %s because namespace belongs to a different project %s", rb.Name, ns.Name, prtb.Name, prtb.Namespace)
 						if err := n.m.roleBindings.DeleteNamespaced(ns.Name, rb.Name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
 							return false, errors.Wrapf(err, "couldn't delete role binding %s", rb.Name)
 						}
@@ -296,7 +296,7 @@ func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {
 			for _, prtb := range prtbs {
 				if prtb, ok := prtb.(*v3.ProjectRoleTemplateBinding); ok {
 					if prtb.Namespace != namespace {
-						logrus.Infof("Deleting role binding %s in %s", rb.Name, ns.Name)
+						logrus.Infof("Deleting role binding %s in %s owned by prtb %s because namespace belongs to a different project %s", rb.Name, ns.Name, prtb.Name, prtb.Namespace)
 						if err := n.m.roleBindings.DeleteNamespaced(ns.Name, rb.Name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
 							return false, errors.Wrapf(err, "couldn't delete role binding %s", rb.Name)
 						}
