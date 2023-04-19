@@ -18,7 +18,10 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var errorDebounceTime = time.Second * 30
+var (
+	errorDebounceTime = time.Second * 30
+	secretBaseType    = regexp.MustCompile(".\"baseType\":\"([A-Za-z]*[S|s]ecret)\".")
+)
 
 func NewAuditLogMiddleware(auditWriter *LogWriter) (func(http.Handler) http.Handler, error) {
 	sensitiveRegex, err := constructKeyConcealRegex()

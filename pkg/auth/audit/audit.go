@@ -278,26 +278,15 @@ func isExist(array []string, key string) bool {
 func (a *auditLog) concealSensitiveData(requestURI string, body []byte) []byte {
 	var m map[string]interface{}
 	if err := json.Unmarshal(body, &m); err != nil {
+		logrus.Debugf("auditLog: Skipping concealment for requestURI [%s]. Cannot marshal body into a map[string]interface{}.", requestURI)
 		return body
 	}
 
 	var changed bool
 	// Conceal values of secret data.
-	if strings.Contains(requestURI, "secrets") {
-		dataKey := "data"
-		data, _ := m[dataKey].(map[string]interface{})
-		if data == nil {
-			dataKey = "stringData"
-			data, _ = m[dataKey].(map[string]interface{})
-		}
-
-		for key := range data {
-			data[key] = redacted
-		}
-		if data != nil {
-			changed = true
-			m[dataKey] = data
-		}
+	secretBaseType.Match(body)
+	if strings.Contains(requestURI, "secrets") || secretBaseType.Match(body) {
+		changed = a.concealSecretsData(requestURI, m)
 	}
 
 	// Conceal values for data considered sensitive: passwords, tokens, etc.
@@ -312,20 +301,148 @@ func (a *auditLog) concealSensitiveData(requestURI string, body []byte) []byte {
 	return newBody
 }
 
+func (a *auditLog) concealSecretsData(requestURI string, body map[string]interface{}) bool {
+	var changed bool
+	var err error
+
+	isK8sProxyList := strings.HasPrefix(requestURI, "/k8s/") && (body["kind"] != nil && body["kind"] == "SecretList")
+	isRegularList := body["type"] != nil && body["type"] == "collection"
+	if !(isK8sProxyList || isRegularList) {
+		changed, err = concealSecret(body)
+		if err != nil {
+			logrus.Debugf("auditLog: Skipping concealment of body for secrets URI [%s]: %v", requestURI, err)
+		}
+		return changed
+	}
+
+	itemsKey := "data"
+	if isK8sProxyList {
+		itemsKey = "items"
+	}
+
+	if _, ok := body[itemsKey]; isRegularList && !ok {
+		logrus.Debugf("auditLog: Skipping concealment of secret bodies in secrets list: no key [%s] present.", itemsKey)
+		return false
+	}
+
+	secretsList, ok := body[itemsKey].([]interface{})
+	if !ok {
+		logrus.Debugf("auditLog: Skipping concealment of secret list data, unable to assert body is of type []interface{}")
+	}
+
+	for index, secret := range secretsList {
+		m, ok := secret.(map[string]interface{})
+		if !ok {
+			logrus.Debugf("auditLog: failed to assert secret element as map[string]interface")
+			continue
+		}
+
+		secretChanged, err := concealSecret(m)
+		changed = changed || secretChanged
+		if err != nil {
+			logrus.Debugf("auditLog: Skipping concealment of body for secrets URI [%s]: %v", requestURI, err)
+			continue
+		}
+		changed = changed || secretChanged
+		secretsList[index] = m
+	}
+	logrus.Debugf("auditLog: failed to assert secret data to any supported type")
+	if changed {
+		body[itemsKey] = secretsList
+		return changed
+	}
+
+	return changed
+}
+
+func concealSecret(secret map[string]interface{}) (bool, error) {
+	var dataKey string
+	var censorAll bool
+	if secret["data"] != nil {
+		dataKey = "data"
+	} else if secret["stringData"] != nil {
+		dataKey = "stringData"
+	} else {
+		censorAll = true
+	}
+
+	secretData := secret
+	if !censorAll {
+		var ok bool
+		secretData, ok = secret[dataKey].(map[string]interface{})
+		if !ok {
+			return false, fmt.Errorf("auditLog: Skipping concealment of secret data, unable to assert data is of map[string]interface{} type")
+		}
+	}
+
+	var changed bool
+	for key := range secretData {
+		if censorAll && key == "id" || key == "baseType" || key == "created" {
+			// censorAll is used when the secret is formatted in such a way where its
+			// data fields cannot be distinguished from its other fields. In this case
+			// most of the data is redacted apart from "id", "baseType", "key"
+			continue
+		}
+		secretData[key] = redacted
+		changed = true
+	}
+
+	if !censorAll {
+		secret[dataKey] = secretData
+	}
+	return changed, nil
+}
+
 func (a *auditLog) concealMap(m map[string]interface{}) bool {
 	var changed bool
 	for key := range m {
-		if _, ok := m[key].(string); ok {
+		switch val := m[key].(type) {
+		case string:
 			if a.keysToConcealRegex.MatchString(key) {
 				changed = true
 				m[key] = redacted
 			}
-		} else if nested, ok := m[key].(map[string]interface{}); ok && a.concealMap(nested) {
-			changed = true
-			m[key] = nested
+		case map[string]interface{}:
+			if a.concealMap(val) {
+				changed = true
+				m[key] = val
+			}
+		case []interface{}:
+			if a.concealSlice(val) {
+				changed = true
+				m[key] = val
+			}
 		}
 	}
 
+	return changed
+}
+
+func (a *auditLog) concealSlice(valSlice []interface{}) bool {
+	var changed bool
+	for i, v := range valSlice {
+		switch val := v.(type) {
+		case map[string]interface{}:
+			if a.concealMap(val) {
+				changed = true
+				valSlice[i] = val
+			}
+		case string:
+			// this attempts to identify slices that represent commands of the format ["--<command>, <value>"], and
+			// redact value is command indicates it is sensitive.
+			if i+1 == len(valSlice) {
+				continue
+			}
+			if !strings.HasPrefix(val, "--") {
+				continue
+			}
+			if !a.keysToConcealRegex.MatchString(val) {
+				continue
+			}
+			valSlice[i+1] = redacted
+			changed = true
+		}
+	}
 	return changed
 }
 
