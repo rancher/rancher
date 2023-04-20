@@ -166,7 +166,10 @@ require (
 	sigs.k8s.io/yaml v1.3.0
 )
 
-require github.com/google/gnostic v0.5.7-v3refs
+require (
+	github.com/golang/mock v1.6.0
+	github.com/google/gnostic v0.5.7-v3refs
+)
 
 require github.com/kr/fs v0.1.0 // indirect
 
