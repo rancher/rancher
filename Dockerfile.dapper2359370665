@@ -29,9 +29,6 @@ RUN if [ "${ARCH}" == "amd64" ]; then \
         curl -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/fossas/spectrometer/master/install.sh | sh; \
     fi
 
-# install controller-tools for crd generation
-RUN go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.12.0
-
 ENV HELM_URL_V2_amd64=https://github.com/rancher/helm/releases/download/${CATTLE_HELM_VERSION}/rancher-helm \
     HELM_URL_V2_arm64=https://github.com/rancher/helm/releases/download/${CATTLE_HELM_VERSION}/rancher-helm-arm64 \
     HELM_URL_V2_s390x=https://github.com/rancher/helm/releases/download/${CATTLE_HELM_VERSION}/rancher-helm-s390x \
@@ -109,11 +106,11 @@ RUN zypper install -y python3-tox python3-base python3 libffi-devel libopenssl-d
 ENV HELM_HOME /root/.helm
 ENV DAPPER_ENV REPO TAG CI DRONE_BUILD_NUMBER DRONE_TAG DRONE_COMMIT DRONE_BRANCH DRONE_BUILD_EVENT SYSTEM_CHART_DEFAULT_BRANCH FOSSA_API_KEY GOGET_MODULE GOGET_VERSION RELEASE_ACTION RELEASE_TYPE POSTRELEASE_RANCHER_VERSION POSTRELEASE_RANCHER_STABLE DEBUG V2PROV_TEST_DIST V2PROV_TEST_RUN_REGEX
 ENV DAPPER_SOURCE /go/src/github.com/rancher/rancher/
-ENV DAPPER_OUTPUT ./bin ./dist ./go.mod ./go.sum ./pkg/apis/go.mod ./pkg/apis/go.sum ./pkg/client/go.mod ./pkg/client/go.sum ./scripts/package ./pkg/settings/setting.go ./package/Dockerfile ./Dockerfile.dapper ./pkg/crds/yaml/generated
+ENV DAPPER_OUTPUT ./bin ./dist ./go.mod ./go.sum ./pkg/apis/go.mod ./pkg/apis/go.sum ./pkg/client/go.mod ./pkg/client/go.sum ./scripts/package ./pkg/settings/setting.go ./package/Dockerfile ./Dockerfile.dapper
 ENV DAPPER_DOCKER_SOCKET true
 ARG CI
 ARG DRONE_BUILD_NUMBER
-ENV DAPPER_RUN_ARGS "-v rancher2-go16-pkg-1:/go/pkg -v rancher2-go16-cache-1:/root/.cache/go-build --privileged --label CI=${CI} --label DRONE_BUILD_NUMBER=${DRONE_BUILD_NUMBER}"
+ENV DAPPER_RUN_ARGS "-v rancher2-go16-pkg-1:/go/pkg -v rancher2-go16-cache-1:/root/.cache/go-build --privileged --network=host --label CI=${CI} --label DRONE_BUILD_NUMBER=${DRONE_BUILD_NUMBER}"
 ENV GOCACHE /root/.cache/go-build
 ENV HOME ${DAPPER_SOURCE}
 
