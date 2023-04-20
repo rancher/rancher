@@ -113,7 +113,7 @@ func (h *handler) doClusterRemove(cluster *v1.Cluster) func() (string, error) {
 			}
 		}
 
-		machines, err := h.capiMachinesCache.List(cluster.Namespace, labels.SelectorFromSet(labels.Set{capi.ClusterLabelName: cluster.Name}))
+		machines, err := h.capiMachinesCache.List(cluster.Namespace, labels.SelectorFromSet(labels.Set{capi.ClusterNameLabel: cluster.Name}))
 		if err != nil {
 			return "", err
 		}
