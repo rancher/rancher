@@ -17,7 +17,6 @@ import (
 	nsutils "github.com/rancher/rancher/pkg/namespace"
 	pkgrbac "github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
-	"github.com/rancher/wrangler/pkg/relatedresource"
 	"github.com/sirupsen/logrus"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -125,9 +124,6 @@ func Register(ctx context.Context, workload *config.UserContext) {
 	workload.Core.Namespaces("").AddLifecycle(ctx, "namespace-auth", newNamespaceLifecycle(r, sync))
 	management.Management.RoleTemplates("").AddHandler(ctx, "cluster-roletemplate-sync", newRTLifecycle(r))
 
-	// If a CRTB that is owned by a GRB is updated or deleted re-enqueue the GRB to reconcile the modified CRTB.
-	resolver := newCRTBtoGRBResolver(workload.Management.Wrangler.Mgmt.GlobalRoleBinding().Cache())
-	relatedresource.WatchClusterScoped(ctx, "restricted-admin-grb-syncer", resolver, workload.Management.Wrangler.Mgmt.GlobalRoleBinding(), workload.Management.Wrangler.Mgmt.ClusterRoleTemplateBinding())
 }
 
 type manager struct {

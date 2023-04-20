@@ -5,13 +5,10 @@ import (
 
 	"github.com/rancher/norman/types/slice"
 	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	rbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
-	"github.com/rancher/wrangler/pkg/name"
-	"github.com/rancher/wrangler/pkg/relatedresource"
 	"github.com/sirupsen/logrus"
 	v12 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -23,7 +20,6 @@ import (
 const (
 	grbByUserAndRoleIndex = "authz.cluster.cattle.io/grb-by-user-and-role"
 	grbHandlerName        = "grb-cluster-sync"
-	sourceKey             = "field.cattle.io/source"
 )
 
 func RegisterIndexers(scaledContext *config.ScaledContext) error {
@@ -65,10 +61,7 @@ func newGlobalRoleBindingHandler(workload *config.UserContext) v3.GlobalRoleBind
 		clusterRoleBindings: workload.RBAC.ClusterRoleBindings(""),
 		crbLister:           workload.RBAC.ClusterRoleBindings("").Controller().Lister(),
 		// The following clients/controllers all point at the management cluster
-		crtbCache: workload.Management.Wrangler.Mgmt.ClusterRoleTemplateBinding().Cache(),
-		crtbCtrl:  workload.Management.Wrangler.Mgmt.ClusterRoleTemplateBinding(),
-		grbCache:  workload.Management.Wrangler.Mgmt.GlobalRoleBinding().Cache(),
-		grLister:  workload.Management.Management.GlobalRoles("").Controller().Lister(),
+		grLister: workload.Management.Management.GlobalRoles("").Controller().Lister(),
 	}
 
 	return h.sync
@@ -80,9 +73,6 @@ type grbHandler struct {
 	clusterName         string
 	clusterRoleBindings rbacv1.ClusterRoleBindingInterface
 	crbLister           rbacv1.ClusterRoleBindingLister
-	grbCache            mgmtv3.GlobalRoleBindingCache
-	crtbCache           mgmtv3.ClusterRoleTemplateBindingCache
-	crtbCtrl            mgmtv3.ClusterRoleTemplateBindingClient
 	grLister            v3.GlobalRoleLister
 }
 
@@ -90,12 +80,6 @@ func (c *grbHandler) sync(key string, obj *apisv3.GlobalRoleBinding) (runtime.Ob
 	if obj == nil || obj.DeletionTimestamp != nil {
 		return obj, nil
 	}
-
-	if obj.GlobalRoleName == rbac.GlobalRestrictedAdmin {
-		// restricted admin only needs to get a CRTB to cluster-owner RoleTemplate
-		return obj, c.ensureClusterOwnerTemplateBinding(obj)
-	}
-
 	isAdmin, err := c.isAdminRole(obj.GlobalRoleName)
 	if err != nil {
 		return nil, err
@@ -139,61 +123,6 @@ func (c *grbHandler) ensureClusterAdminBinding(obj *apisv3.GlobalRoleBinding) er
 	return nil
 }
 
-// ensureClusterOwnerTemplateBinding creates a ClusterRoleTemplateBinding for the GRB subject to
-// the "cluster-owner" ClusterRoleTemplate the downstream cluster. If the cluster is the local cluster no action is performed.
-func (c *grbHandler) ensureClusterOwnerTemplateBinding(obj *apisv3.GlobalRoleBinding) error {
-	if c.clusterName == "local" {
-		// Do not sync restricted-admin to the local cluster as 'cluster-admin'
-		return nil
-	}
-	crtbName := name.SafeConcatName(rbac.GetGRBTargetKey(obj), "restricted-admin", "cluster-owner")
-	_, err := c.crtbCache.Get(c.clusterName, crtbName)
-	if err != nil && !apierrors.IsNotFound(err) {
-		return fmt.Errorf("failed to get CRTB '%s' from cache: %w", crtbName, err)
-	}
-	if err == nil {
-		// CRTB was already created.
-		// we do not need to check for equivalence between the current CRTB and the desired CRTB
-		// this is because the fields we care about can not be modified
-		return nil
-	}
-
-	// add the restricted admin user as a member of the downstream cluster
-	// by creating a CRTB in the local custer in the namespace named after the downstream cluster.
-	crtb := apisv3.ClusterRoleTemplateBinding{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      crtbName,
-			Namespace: c.clusterName,
-			Labels:    map[string]string{sourceKey: grbHandlerName},
-			OwnerReferences: []metav1.OwnerReference{
-				{
-					APIVersion: obj.APIVersion,
-					Kind:       obj.Kind,
-					Name:       obj.Name,
-					UID:        obj.UID,
-				},
-			},
-		},
-		ClusterName:      c.clusterName,
-		RoleTemplateName: "cluster-owner",
-	}
-
-	// CRTBs must contain either user or group information but not both.
-	// we will attempt to first use the userName then if not assign the groupName.
-	if obj.UserName != "" {
-		crtb.UserName = obj.UserName
-	} else {
-		crtb.GroupPrincipalName = obj.GroupPrincipalName
-	}
-
-	_, err = c.crtbCtrl.Create(&crtb)
-	if err != nil && !apierrors.IsAlreadyExists(err) {
-		return fmt.Errorf("failed to create a CRTB '%s': %w", crtbName, err)
-	}
-
-	return nil
-}
-
 // isAdminRole detects whether a GlobalRole has admin permissions or not.
 func (c *grbHandler) isAdminRole(rtName string) (bool, error) {
 	gr, err := c.grLister.Get("", rtName)
@@ -233,38 +162,4 @@ func grbByUserAndRole(obj interface{}) ([]string, error) {
 	}
 
 	return []string{rbac.GetGRBTargetKey(grb) + "-" + grb.GlobalRoleName}, nil
-}
-
-// newCRTBtoGRBResolver returns a resolver which provides the key to the GRB that owns a given CRTB if one exist.
-func newCRTBtoGRBResolver(grbCache mgmtv3.GlobalRoleBindingCache) relatedresource.Resolver {
-	return func(_, _ string, obj runtime.Object) ([]relatedresource.Key, error) {
-		crtb, ok := obj.(*apisv3.ClusterRoleTemplateBinding)
-		if !ok || crtb == nil {
-			return nil, nil
-		}
-
-		var grbOwner *metav1.OwnerReference
-		for i := range crtb.OwnerReferences {
-			ref := &crtb.OwnerReferences[i]
-			if ref.Kind == "GlobalRoleBinding" && ref.APIVersion == apisv3.SchemeGroupVersion.Version {
-				grbOwner = ref
-				break
-			}
-		}
-
-		if grbOwner == nil {
-			// there are no owner references to GlobalRoleBindings
-			return nil, nil
-		}
-
-		grb, err := grbCache.Get(grbOwner.Name)
-		if err != nil {
-			if apierrors.IsNotFound(err) {
-				return nil, nil
-			}
-			return nil, fmt.Errorf("failed to get owner reference '%s' from cache: %w", grbOwner.Name, err)
-		}
-
-		return []relatedresource.Key{{Name: grb.Name}}, nil
-	}
 }
