@@ -194,7 +194,7 @@ func (r *RKE2ConfigServer) connectConfigYaml(name, ns string, rw http.ResponseWr
 		return
 	}
 
-	kubernetesVersion, err := r.getClusterKubernetesVersion(mpSecret.Labels[capi.ClusterLabelName], ns)
+	kubernetesVersion, err := r.getClusterKubernetesVersion(mpSecret.Labels[capi.ClusterNameLabel], ns)
 	if err != nil {
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		return
@@ -273,7 +273,7 @@ func (r *RKE2ConfigServer) infoKubernetesVersion(machineID, ns string) (string, 
 		return "", err
 	}
 
-	clusterName, ok := machine.Labels[capi.ClusterLabelName]
+	clusterName, ok := machine.Labels[capi.ClusterNameLabel]
 	if !ok {
 		return "", fmt.Errorf("unable to find cluster name for machine")
 	}

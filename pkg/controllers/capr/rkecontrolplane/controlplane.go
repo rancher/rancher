@@ -103,7 +103,7 @@ func (h *handler) doRemove(cp *rkev1.RKEControlPlane) func() (string, error) {
 	return func() (string, error) {
 		logrus.Debugf("[rkecontrolplane] (%s/%s) Peforming removal of rkecontrolplane", cp.Namespace, cp.Name)
 		// Control plane nodes are managed by the control plane object. Therefore, the control plane object shouldn't be cleaned up before the control plane nodes are removed.
-		machines, err := h.machineCache.List(cp.Namespace, labels.SelectorFromSet(labels.Set{capi.ClusterLabelName: cp.Name, capr.ControlPlaneRoleLabel: "true"}))
+		machines, err := h.machineCache.List(cp.Namespace, labels.SelectorFromSet(labels.Set{capi.ClusterNameLabel: cp.Name, capr.ControlPlaneRoleLabel: "true"}))
 		if err != nil {
 			return "", err
 		}

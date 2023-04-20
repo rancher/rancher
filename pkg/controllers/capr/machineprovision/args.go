@@ -137,7 +137,7 @@ func (h *handler) getArgsEnvAndStatus(infra *infraObject, args map[string]interf
 			cmd = append(cmd, fmt.Sprintf("--hostname-override=%s", hostname))
 		}
 
-		rancherCluster, err := h.rancherClusterCache.Get(infra.meta.GetNamespace(), infra.meta.GetLabels()[capi.ClusterLabelName])
+		rancherCluster, err := h.rancherClusterCache.Get(infra.meta.GetNamespace(), infra.meta.GetLabels()[capi.ClusterNameLabel])
 		if err != nil {
 			return driverArgs{}, err
 		}

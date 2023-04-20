@@ -274,7 +274,7 @@ func (h *handler) OnChange(_ string, bootstrap *rkev1.RKEBootstrap) (*rkev1.RKEB
 
 	// If the bootstrap spec cluster name is blank, we need to update the bootstrap spec to the correct value
 	// This is to handle old rkebootstrap objects for unmanaged clusters that did not have the spec properly set
-	if v, ok := bootstrap.Labels[capi.ClusterLabelName]; ok && v != "" {
+	if v, ok := bootstrap.Labels[capi.ClusterNameLabel]; ok && v != "" {
 		logrus.Debugf("[rkebootstrap] %s/%s: setting cluster name", bootstrap.Namespace, bootstrap.Name)
 		bootstrap = bootstrap.DeepCopy()
 		bootstrap.Spec.ClusterName = v
@@ -430,9 +430,9 @@ func (h *handler) reconcileMachinePreTerminateAnnotation(bootstrap *rkev1.RKEBoo
 		return bootstrap, nil
 	}
 
-	clusterName := bootstrap.Labels[capi.ClusterLabelName]
+	clusterName := bootstrap.Labels[capi.ClusterNameLabel]
 	if clusterName == "" {
-		logrus.Warnf("[rkebootstrap] %s/%s: CAPI cluster label %s was not found in bootstrap labels, ensuring machine pre-terminate annotation is removed", bootstrap.Namespace, bootstrap.Name, capi.ClusterLabelName)
+		logrus.Warnf("[rkebootstrap] %s/%s: CAPI cluster label %s was not found in bootstrap labels, ensuring machine pre-terminate annotation is removed", bootstrap.Namespace, bootstrap.Name, capi.ClusterNameLabel)
 		return h.ensureMachinePreTerminateAnnotationRemoved(bootstrap, machine)
 	}
 
