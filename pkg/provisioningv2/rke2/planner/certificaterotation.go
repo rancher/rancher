@@ -3,12 +3,12 @@ package planner
 import (
 	"encoding/base64"
 	"fmt"
-	"github.com/sirupsen/logrus"
 	"strconv"
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
+	"github.com/sirupsen/logrus"
 )
 
 // rotateCertificates checks if there is a need to rotate any certificates and updates the plan accordingly.
