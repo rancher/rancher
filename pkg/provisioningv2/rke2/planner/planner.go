@@ -879,9 +879,9 @@ func (p *Planner) generatePlanWithConfigFiles(controlPlane *rkev1.RKEControlPlan
 	var (
 		reg      registries
 		nodePlan plan.NodePlan
-		config   = map[string]interface{}{}
 		err      error
 	)
+	config := make(map[string]interface{})
 	if !controlPlane.Spec.UnmanagedConfig {
 		nodePlan, reg, err = p.commonNodePlan(controlPlane, plan.NodePlan{})
 		if err != nil {
