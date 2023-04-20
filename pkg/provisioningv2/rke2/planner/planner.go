@@ -342,7 +342,7 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlan
 	}
 
 	// If there are any suitable controlplane nodes with join URL annotations
-	if len(collect(plan, isControlPlaneAndHasJoinURLAndNotDeleting)) != 0 {
+	if len(collect(plan, isControlPlaneAndHasJoinURLAndNotDeleting)) == 0 {
 		return status, errWaiting("waiting for control plane to be available")
 	}
 

@@ -156,5 +156,5 @@ func validJoinURL(plan *plan.Plan, joinURL string) bool {
 }
 
 func isControlPlaneAndHasJoinURLAndNotDeleting(entry *planEntry) bool {
-	return entry.Metadata != nil && entry.Metadata.Labels[rke2.ControlPlaneRoleLabel] == "true" && entry.Metadata.Annotations[rke2.JoinURLAnnotation] != "" && !isDeleting(entry)
+	return entry.Metadata != nil && entry.Metadata.Labels[rke2.ControlPlaneRoleLabel] == "true" && entry.Metadata.Annotations[rke2.JoinURLAnnotation] != "" && isNotDeleting(entry)
 }
