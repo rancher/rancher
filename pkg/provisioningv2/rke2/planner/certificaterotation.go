@@ -3,6 +3,7 @@ package planner
 import (
 	"encoding/base64"
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"strconv"
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
@@ -16,6 +17,15 @@ func (p *Planner) rotateCertificates(controlPlane *rkev1.RKEControlPlane, status
 		return status, nil
 	}
 
+	found, joinServer, _, err := p.findInitNode(controlPlane, clusterPlan)
+	if err != nil {
+		logrus.Errorf("[planner] rkecluster %s/%s: error encountered while searching for init node during certificate rotation: %v", controlPlane.Namespace, controlPlane.Name, err)
+	}
+	if !found || joinServer == "" {
+		logrus.Warnf("[planner] rkecluster %s/%s: skipping certificate creation as cluster does not have an init node", controlPlane.Namespace, controlPlane.Name)
+		return status, nil
+	}
+
 	if err := p.pauseCAPICluster(controlPlane, true); err != nil {
 		return status, errWaiting("pausing CAPI cluster")
 	}
@@ -25,13 +35,12 @@ func (p *Planner) rotateCertificates(controlPlane *rkev1.RKEControlPlane, status
 			continue
 		}
 
-		rotatePlan, err := p.rotateCertificatesPlan(controlPlane, tokensSecret, controlPlane.Spec.RotateCertificates, node)
+		rotatePlan, joinedServer, err := p.rotateCertificatesPlan(controlPlane, tokensSecret, controlPlane.Spec.RotateCertificates, node, joinServer)
 		if err != nil {
 			return status, err
 		}
 
-		// TODO: We need to validate that the join URL is still valid for this operation.
-		err = assignAndCheckPlan(p.store, fmt.Sprintf("[%s] certificate rotation", node.Machine.Name), node, rotatePlan, node.Plan.JoinedTo, 0, 0)
+		err = assignAndCheckPlan(p.store, fmt.Sprintf("[%s] certificate rotation", node.Machine.Name), node, rotatePlan, joinedServer, 0, 0)
 		if err != nil {
 			return status, err
 		}
@@ -47,13 +56,14 @@ func (p *Planner) rotateCertificates(controlPlane *rkev1.RKEControlPlane, status
 
 // shouldRotate `true` if the cluster is ready and the generation is stale
 func shouldRotate(cp *rkev1.RKEControlPlane) bool {
-	// The controlplane must be initialized before we rotate anything
-	if cp.Status.Initialized != true {
+	// if a spec is not defined there is nothing to do
+	if cp.Spec.RotateCertificates == nil {
 		return false
 	}
 
-	// if a spec is not defined there is nothing to do
-	if cp.Spec.RotateCertificates == nil {
+	// The controlplane must be initialized before we rotate anything
+	if cp.Status.Initialized != true {
+		logrus.Warnf("[planner] rkecluster %s/%s: skipping encryption key rotation as cluster was not initialized", cp.Namespace, cp.Name)
 		return false
 	}
 
@@ -87,10 +97,14 @@ echo $targetGeneration > "$generationFile"
 
 // rotateCertificatesPlan rotates the certificates for the services specified, if any, and restarts the service.  If no services are specified
 // all certificates are rotated.
-func (p *Planner) rotateCertificatesPlan(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, rotation *rkev1.RotateCertificates, entry *planEntry) (plan.NodePlan, error) {
-	rotatePlan, _, err := p.generatePlanWithConfigFiles(controlPlane, tokensSecret, entry, entry.Plan.JoinedTo)
+func (p *Planner) rotateCertificatesPlan(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, rotation *rkev1.RotateCertificates, entry *planEntry, joinServer string) (plan.NodePlan, string, error) {
+	if isOnlyWorker(entry) {
+		// Don't overwrite the joinURL annotation.
+		joinServer = ""
+	}
+	rotatePlan, _, joinedServer, err := p.generatePlanWithConfigFiles(controlPlane, tokensSecret, entry, joinServer)
 	if err != nil {
-		return plan.NodePlan{}, err
+		return plan.NodePlan{}, joinedServer, err
 	}
 
 	if isOnlyWorker(entry) {
@@ -102,7 +116,7 @@ func (p *Planner) rotateCertificatesPlan(controlPlane *rkev1.RKEControlPlane, to
 				rke2.GetRuntimeAgentUnit(controlPlane.Spec.KubernetesVersion),
 			},
 		})
-		return rotatePlan, nil
+		return rotatePlan, joinedServer, nil
 	}
 
 	rotateScriptPath := "/var/lib/rancher/" + rke2.GetRuntime(controlPlane.Spec.KubernetesVersion) + "/rancher_v2prov_certificate_rotation/bin/rotate.sh"
@@ -138,7 +152,7 @@ func (p *Planner) rotateCertificatesPlan(controlPlane *rkev1.RKEControlPlane, to
 				rke2.GetRuntimeServerUnit(controlPlane.Spec.KubernetesVersion),
 			},
 		}}...)
-	return rotatePlan, nil
+	return rotatePlan, joinedServer, nil
 }
 
 // shouldRotateEntry returns true if the rotated services are applicable to the entry's roles.

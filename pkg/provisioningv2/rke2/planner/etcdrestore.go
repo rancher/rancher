@@ -18,6 +18,9 @@ func (p *Planner) setEtcdSnapshotRestoreState(status rkev1.RKEControlPlaneStatus
 		status.ETCDSnapshotRestorePhase = phase
 		return status, errWaiting("refreshing etcd restore state")
 	}
+	// Reset the status initialized and ready at this point
+	status.Initialized = false
+	status.Ready = false
 	return status, nil
 }
 
@@ -57,11 +60,11 @@ func (p *Planner) runEtcdSnapshotRestorePlan(controlPlane *rkev1.RKEControlPlane
 		if isS3 ||
 			(server.Machine.Labels[rke2.MachineIDLabel] != "" && snapshot.Labels[rke2.MachineIDLabel] != "" &&
 				server.Machine.Labels[rke2.MachineIDLabel] == snapshot.Labels[rke2.MachineIDLabel]) {
-			restorePlan, err := p.generateEtcdSnapshotRestorePlan(controlPlane, snapshot, tokensSecret, server, joinServer)
+			restorePlan, joinedServer, err := p.generateEtcdSnapshotRestorePlan(controlPlane, snapshot, tokensSecret, server, joinServer)
 			if err != nil {
 				return err
 			}
-			return assignAndCheckPlan(p.store, ETCDRestoreMessage, server, restorePlan, joinServer, 0, 0)
+			return assignAndCheckPlan(p.store, ETCDRestoreMessage, server, restorePlan, joinedServer, 0, 0)
 		}
 	}
 
@@ -69,9 +72,9 @@ func (p *Planner) runEtcdSnapshotRestorePlan(controlPlane *rkev1.RKEControlPlane
 }
 
 // generateEtcdSnapshotRestorePlan returns a node plan that contains instructions to stop etcd, remove the tombstone file (if one exists), then restore etcd in that order.
-func (p *Planner) generateEtcdSnapshotRestorePlan(controlPlane *rkev1.RKEControlPlane, snapshot *rkev1.ETCDSnapshot, tokensSecret plan.Secret, entry *planEntry, joinServer string) (plan.NodePlan, error) {
+func (p *Planner) generateEtcdSnapshotRestorePlan(controlPlane *rkev1.RKEControlPlane, snapshot *rkev1.ETCDSnapshot, tokensSecret plan.Secret, entry *planEntry, joinServer string) (plan.NodePlan, string, error) {
 	if controlPlane.Spec.ETCDSnapshotRestore == nil {
-		return plan.NodePlan{}, fmt.Errorf("ETCD Snapshot restore was not defined")
+		return plan.NodePlan{}, "", fmt.Errorf("ETCD Snapshot restore was not defined")
 	}
 	args := []string{
 		"server",
@@ -86,13 +89,13 @@ func (p *Planner) generateEtcdSnapshotRestorePlan(controlPlane *rkev1.RKEControl
 
 	s3Args, s3Env, s3Files, err := p.etcdS3Args.ToArgs(snapshot.SnapshotFile.S3, controlPlane, "etcd-", true)
 	if err != nil {
-		return plan.NodePlan{}, err
+		return plan.NodePlan{}, "", err
 	}
 
 	// This is likely redundant but can make sense in the event that there is an external watchdog.
-	stopPlan, err := p.generateStopServiceAndKillAllPlan(controlPlane, tokensSecret, entry, joinServer)
+	stopPlan, joinedServer, err := p.generateStopServiceAndKillAllPlan(controlPlane, tokensSecret, entry, joinServer)
 	if err != nil {
-		return plan.NodePlan{}, err
+		return plan.NodePlan{}, joinedServer, err
 	}
 
 	// make sure to install the desired version before performing restore
@@ -117,18 +120,18 @@ func (p *Planner) generateEtcdSnapshotRestorePlan(controlPlane *rkev1.RKEControl
 		}),
 	}
 
-	return nodePlan, nil
+	return nodePlan, joinedServer, nil
 }
 
-func (p *Planner) generateStopServiceAndKillAllPlan(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, server *planEntry, joinServer string) (plan.NodePlan, error) {
-	nodePlan, _, err := p.generatePlanWithConfigFiles(controlPlane, tokensSecret, server, joinServer)
+func (p *Planner) generateStopServiceAndKillAllPlan(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, server *planEntry, joinServer string) (plan.NodePlan, string, error) {
+	nodePlan, _, joinedServer, err := p.generatePlanWithConfigFiles(controlPlane, tokensSecret, server, joinServer)
 	if err != nil {
-		return nodePlan, err
+		return nodePlan, joinedServer, err
 	}
 	runtime := rke2.GetRuntime(controlPlane.Spec.KubernetesVersion)
 	nodePlan.Instructions = append(nodePlan.Instructions,
 		generateKillAllInstruction(runtime))
-	return nodePlan, nil
+	return nodePlan, joinedServer, nil
 }
 
 func generateKillAllInstruction(runtime string) plan.OneTimeInstruction {
@@ -173,7 +176,7 @@ func (p *Planner) runEtcdRestoreServiceStop(controlPlane *rkev1.RKEControlPlane,
 	servers := collect(clusterPlan, anyRoleWithoutWindows)
 	updated := false
 	for _, server := range servers {
-		stopPlan, err := p.generateStopServiceAndKillAllPlan(controlPlane, tokensSecret, server, joinServer)
+		stopPlan, joinedServer, err := p.generateStopServiceAndKillAllPlan(controlPlane, tokensSecret, server, joinServer)
 		if err != nil {
 			return err
 		}
@@ -181,7 +184,7 @@ func (p *Planner) runEtcdRestoreServiceStop(controlPlane *rkev1.RKEControlPlane,
 			stopPlan.Instructions = append(stopPlan.Instructions, generateCreateEtcdTombstoneInstruction(controlPlane))
 		}
 		if server.Plan == nil || !equality.Semantic.DeepEqual(server.Plan.Plan, stopPlan) {
-			if err := p.store.UpdatePlan(server, stopPlan, joinServer, 0, 0); err != nil {
+			if err := p.store.UpdatePlan(server, stopPlan, joinedServer, 0, 0); err != nil {
 				return err
 			}
 			updated = true
@@ -225,12 +228,13 @@ func (p *Planner) runEtcdSnapshotManagementServiceStart(controlPlane *rkev1.RKEC
 		return fmt.Errorf("error encountered restarting cluster during %s, joinServer was empty", operation)
 	}
 
-	plan, err := p.desiredPlan(controlPlane, tokensSecret, initNode, "")
+	// Generate and deliver desired plan for the init node first.
+	plan, joinedServer, err := p.desiredPlan(controlPlane, tokensSecret, initNode, "")
 	if err != nil {
 		return err
 	}
 
-	if err = assignAndCheckPlan(p.store, fmt.Sprintf("%s bootstrap restart", operation), initNode, plan, joinServer, 1, -1); err != nil {
+	if err = assignAndCheckPlan(p.store, fmt.Sprintf("%s bootstrap restart", operation), initNode, plan, joinedServer, 1, -1); err != nil {
 		return err
 	}
 
@@ -238,11 +242,11 @@ func (p *Planner) runEtcdSnapshotManagementServiceStart(controlPlane *rkev1.RKEC
 		if isInitNodeOrDeleting(entry) {
 			continue
 		}
-		plan, err = p.desiredPlan(controlPlane, tokensSecret, entry, joinServer)
+		plan, joinedServer, err = p.desiredPlan(controlPlane, tokensSecret, entry, joinServer)
 		if err != nil {
 			return err
 		}
-		if err = assignAndCheckPlan(p.store, fmt.Sprintf("%s management plane restart", operation), entry, plan, joinServer, 1, -1); err != nil {
+		if err = assignAndCheckPlan(p.store, fmt.Sprintf("%s management plane restart", operation), entry, plan, joinedServer, 1, -1); err != nil {
 			return err
 		}
 	}
@@ -256,11 +260,11 @@ func (p *Planner) runEtcdSnapshotWorkerServiceStart(controlPlane *rkev1.RKEContr
 		if isInitNodeOrDeleting(entry) {
 			continue
 		}
-		plan, err := p.desiredPlan(controlPlane, tokensSecret, entry, entry.Plan.JoinedTo)
+		plan, joinedServer, err := p.desiredPlan(controlPlane, tokensSecret, entry, entry.Plan.JoinedTo)
 		if err != nil {
 			return err
 		}
-		if err = assignAndCheckPlan(p.store, fmt.Sprintf("%s worker restart", operation), entry, plan, entry.Plan.JoinedTo, 1, -1); err != nil {
+		if err = assignAndCheckPlan(p.store, fmt.Sprintf("%s worker restart", operation), entry, plan, joinedServer, 1, -1); err != nil {
 			return err
 		}
 	}

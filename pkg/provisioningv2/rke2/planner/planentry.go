@@ -81,6 +81,10 @@ func isNotDeleting(entry *planEntry) bool {
 	return !isDeleting(entry)
 }
 
+func isNotDeletingAndControlPlaneOrInitNode(entry *planEntry) bool {
+	return !isDeleting(entry) && (isControlPlane(entry) || isInitNode(entry))
+}
+
 // isFailed returns true if the provided entry machine.status.phase is failed
 func isFailed(entry *planEntry) bool {
 	return entry.Machine.Status.Phase == string(capi.MachinePhaseFailed)
@@ -145,4 +149,12 @@ func anyPlanDelivered(plan *plan.Plan, include roleFilter) bool {
 		}
 	}
 	return planDataExists
+}
+
+func validJoinURL(plan *plan.Plan, joinURL string) bool {
+	return collectAndValidateAnnotationValue(plan, isNotDeletingAndControlPlaneOrInitNode, rke2.JoinURLAnnotation, joinURL)
+}
+
+func isControlPlaneAndHasJoinURLAndNotDeleting(entry *planEntry) bool {
+	return entry.Metadata != nil && entry.Metadata.Labels[rke2.ControlPlaneRoleLabel] == "true" && entry.Metadata.Annotations[rke2.JoinURLAnnotation] != "" && !isDeleting(entry)
 }
