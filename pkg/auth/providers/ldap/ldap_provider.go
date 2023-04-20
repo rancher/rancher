@@ -3,12 +3,12 @@ package ldap
 import (
 	"context"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"strings"
 
 	ldapv3 "github.com/go-ldap/ldap/v3"
 	"github.com/mitchellh/mapstructure"
-	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
@@ -29,6 +29,7 @@ const (
 	FreeIpaName    = "freeipa"
 	ShibbolethName = "shibboleth"
 	ObjectClass    = "objectClass"
+	OKTAName       = "okta"
 )
 
 var (
@@ -43,6 +44,7 @@ var (
 		FreeIpaName:    "",
 		OpenLdapName:   "",
 		ShibbolethName: client.ShibbolethConfigFieldOpenLdapConfig,
+		OKTAName:       client.OKTAConfigFieldOpenLdapConfig,
 	}
 )
 
@@ -84,7 +86,7 @@ func GetLDAPConfig(authProvider common.AuthProvider) (*v3.LdapConfig, *x509.Cert
 }
 
 func IsNotConfigured(err error) bool {
-	return err == errNotConfigured
+	return errors.Is(err, errNotConfigured)
 }
 
 func (p *ldapProvider) GetName() string {
@@ -280,7 +282,7 @@ func (p *ldapProvider) CanAccessWithGroupProviders(userPrincipalID string, group
 func (p *ldapProvider) getDNAndScopeFromPrincipalID(principalID string) (string, string, error) {
 	parts := strings.SplitN(principalID, ":", 2)
 	if len(parts) != 2 {
-		return "", "", errors.Errorf("invalid id %v", principalID)
+		return "", "", fmt.Errorf("invalid id %v", principalID)
 	}
 	scope := parts[0]
 	externalID := strings.TrimPrefix(parts[1], "//")
@@ -290,10 +292,7 @@ func (p *ldapProvider) getDNAndScopeFromPrincipalID(principalID string) (string,
 
 // if provider only enabled for search by a SAML provider
 func (p *ldapProvider) samlSearchProvider() bool {
-	if p.providerName == ShibbolethName {
-		return true
-	}
-	return false
+	return ShibbolethName == p.providerName || OKTAName == p.providerName
 }
 
 func (p *ldapProvider) samlSearchGetPrincipal(

@@ -388,16 +388,18 @@ func (s *Provider) combineSamlAndLdapConfig(config *v32.SamlConfig) runtime.Obje
 			SamlConfig:     samlConfig,
 			OpenLdapConfig: ldapConfig.LdapFields,
 		}
+	case OKTAName:
+		fullConfig = &v32.OKTAConfig{
+			SamlConfig:     samlConfig,
+			OpenLdapConfig: ldapConfig.LdapFields,
+		}
 	}
 
 	return fullConfig
 }
 
 func (s *Provider) hasLdapGroupSearch() bool {
-	if s.name == ShibbolethName {
-		return true
-	}
-	return false
+	return ShibbolethName == s.name || OKTAName == s.name
 }
 
 func (s *Provider) GetUserExtraAttributes(userPrincipal v3.Principal) map[string][]string {
