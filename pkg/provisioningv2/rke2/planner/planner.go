@@ -914,7 +914,7 @@ func (p *Planner) generatePlanWithConfigFiles(controlPlane *rkev1.RKEControlPlan
 		}
 		var (
 			joinedServer string
-			config       = map[string]interface{}{}
+			config       map[string]interface{}
 		)
 		nodePlan, config, joinedServer, err = p.addConfigFile(nodePlan, controlPlane, entry, tokensSecret, joinServer, reg)
 		if err != nil {
