@@ -908,12 +908,14 @@ func (p *Planner) generatePlanWithConfigFiles(controlPlane *rkev1.RKEControlPlan
 		err      error
 	)
 	if !controlPlane.Spec.UnmanagedConfig {
-		config := make(map[string]interface{})
 		nodePlan, reg, err = p.commonNodePlan(controlPlane, plan.NodePlan{})
 		if err != nil {
 			return nodePlan, map[string]interface{}{}, "", err
 		}
-		var joinedServer string
+		var (
+			joinedServer string
+			config       = map[string]interface{}{}
+		)
 		nodePlan, config, joinedServer, err = p.addConfigFile(nodePlan, controlPlane, entry, tokensSecret, joinServer, reg)
 		if err != nil {
 			return nodePlan, config, joinedServer, err
