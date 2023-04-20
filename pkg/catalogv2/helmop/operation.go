@@ -341,6 +341,8 @@ func (s *Operations) getUser(userInfo user.Info, namespace, name string, isApp b
 	}, nil
 }
 
+// getUninstallArgs receives the app namespace, app name and body of the request
+// returns an uninstall command according to the input received and also returns the status of the operation that will be created
 func (s *Operations) getUninstallArgs(appNamespace, appName string, body io.Reader) (catalog.OperationStatus, Commands, error) {
 	rel, err := s.apps.Get(appNamespace, appName, metav1.GetOptions{})
 	if err != nil {
@@ -371,6 +373,8 @@ func (s *Operations) getUninstallArgs(appNamespace, appName string, body io.Read
 	return status, Commands{cmd}, nil
 }
 
+// getUpgradeCommand receives the repository namespace and name and body of the request
+// returns the status of the operation that will be created and a slice of Commands to upgrade the charts received in the body of the request
 func (s *Operations) getUpgradeCommand(repoNamespace, repoName string, body io.Reader) (catalog.OperationStatus, Commands, error) {
 	var (
 		upgradeArgs = &types2.ChartUpgradeAction{}
@@ -483,6 +487,8 @@ func (c Command) Render(index int) (map[string][]byte, error) {
 	return data, nil
 }
 
+// renderArgs returns a slice of string representing the helm command and it's arguments
+// It uses the ArgObjects of the command struct to generate the helm command and removes the fields that aren't necessary in the command
 func (c Command) renderArgs() ([]string, error) {
 	var (
 		args []string
@@ -681,6 +687,8 @@ func (s *Operations) getChartCommand(namespace, name, chartName, chartVersion st
 	return c, nil
 }
 
+// getInstallCommand receives the repository namespace and name and body of the request
+// returns the status of the operation that will be created and a slice of Commands to install the charts received in the body of the request
 func (s *Operations) getInstallCommand(repoNamespace, repoName string, body io.Reader) (catalog.OperationStatus, Commands, error) {
 	installArgs := &types2.ChartInstallAction{}
 	err := json.NewDecoder(body).Decode(installArgs)
@@ -739,6 +747,7 @@ func namespace(ns string) string {
 	return ns
 }
 
+// createOperation returns the created operation that will execute the commands received as input
 func (s *Operations) createOperation(ctx context.Context, user user.Info, status catalog.OperationStatus, cmds Commands, imageOverride string) (*catalog.Operation, error) {
 	if status.Action != "uninstall" {
 		_, err := s.createNamespace(ctx, status.Namespace, status.ProjectID)
@@ -905,6 +914,7 @@ func (s *Operations) createNamespace(ctx context.Context, namespace, projectID s
 	return nil, fmt.Errorf("failed to wait for roles to be populated")
 }
 
+// createPod returns a pod object and a pod options object representing the helm operation pod and it's options
 func (s *Operations) createPod(secretData map[string][]byte, kustomize bool, imageOverride string, tolerations []corev1.Toleration) (*v1.Pod, *podimpersonation.PodOptions) {
 	image := imageOverride
 	if image == "" {

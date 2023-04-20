@@ -10,12 +10,14 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// renderTestCase represent test cases for the Commands.Render method
 type renderTestCase struct {
 	commands Commands
 	expected map[string][]byte
 	failMsg  string
 }
 
+// createPodTestCase represent the test cases for the Operations.createPod method
 type createPodTestCase struct {
 	name          string
 	operation     Operations
@@ -157,6 +159,7 @@ func Test_Render(t *testing.T) {
 	}
 }
 
+// Test_CreatePod function to run tests for the createPod method
 func Test_CreatePod(t *testing.T) {
 	asserts := assert.New(t)
 	defaultTolerations := []corev1.Toleration{

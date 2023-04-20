@@ -15,6 +15,7 @@ type ChartInstall struct {
 	Annotations map[string]string     `json:"annotations,omitempty"`
 }
 
+// ChartInstallAction represents the input received when installing the charts received in the charts field
 type ChartInstallAction struct {
 	Timeout                  *metav1.Duration    `json:"timeout,omitempty"`
 	Wait                     bool                `json:"wait,omitempty"`
@@ -23,8 +24,7 @@ type ChartInstallAction struct {
 	Namespace                string              `json:"namespace,omitempty"`
 	ProjectID                string              `json:"projectId,omitempty"`
 	Tolerations              []corev1.Toleration `json:"operationTolerations,omitempty"`
-
-	Charts []ChartInstall `json:"charts,omitempty"`
+	Charts                   []ChartInstall      `json:"charts,omitempty"`
 }
 
 type ChartInfo struct {
@@ -35,6 +35,7 @@ type ChartInfo struct {
 	Chart     v3.MapStringInterface `json:"chart,omitempty"`
 }
 
+// ChartUninstallAction represents the input received when uninstalling a chart
 type ChartUninstallAction struct {
 	DisableHooks bool                `json:"noHooks,omitempty"`
 	DryRun       bool                `json:"dryRun,omitempty"`
@@ -44,6 +45,7 @@ type ChartUninstallAction struct {
 	Tolerations  []corev1.Toleration `json:"operationTolerations,omitempty"`
 }
 
+// ChartUpgradeAction represents the input received when upgrading the charts received in the charts field
 type ChartUpgradeAction struct {
 	Timeout                  *metav1.Duration    `json:"timeout,omitempty"`
 	Wait                     bool                `json:"wait,omitempty"`

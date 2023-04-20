@@ -106,6 +106,7 @@ type Operation struct {
 	Status            OperationStatus `json:"status"`
 }
 
+// OperationStatus represents the status of a helm operation that's going to be created
 type OperationStatus struct {
 	ObservedGeneration int64                               `json:"observedGeneration"`
 	Action             string                              `json:"action,omitempty"`
