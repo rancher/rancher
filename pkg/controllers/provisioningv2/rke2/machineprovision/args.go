@@ -125,7 +125,7 @@ func (h *handler) getArgsEnvAndStatus(infra *infraObject, args map[string]interf
 			fmt.Sprintf("--driver=%s", driver),
 			fmt.Sprintf("--custom-install-script=/run/secrets/machine/value"))
 
-		rancherCluster, err := h.rancherClusterCache.Get(infra.meta.GetNamespace(), infra.meta.GetLabels()[capi.ClusterLabelName])
+		rancherCluster, err := h.rancherClusterCache.Get(infra.meta.GetNamespace(), infra.meta.GetLabels()[capi.ClusterNameLabel])
 		if err != nil {
 			return driverArgs{}, err
 		}

@@ -52,7 +52,7 @@ func Register(ctx context.Context, clients *wrangler.Context, planner *planner.P
 			}
 			return relatedResources, nil
 		} else if machine, ok := obj.(*capi.Machine); ok {
-			clusterName := machine.Labels[capi.ClusterLabelName]
+			clusterName := machine.Labels[capi.ClusterNameLabel]
 			if clusterName != "" {
 				return []relatedresource.Key{{
 					Namespace: machine.Namespace,

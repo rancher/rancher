@@ -388,9 +388,9 @@ func (h *handler) OnRemove(key string, obj runtime.Object) (runtime.Object, erro
 		return obj, generic.ErrSkip
 	}
 
-	clusterName := infra.meta.GetLabels()[capi.ClusterLabelName]
+	clusterName := infra.meta.GetLabels()[capi.ClusterNameLabel]
 	if clusterName == "" {
-		return obj, fmt.Errorf("error retrieving the clustername for machine, label key %s does not appear to exist for dynamic machine %s", capi.ClusterLabelName, key)
+		return obj, fmt.Errorf("error retrieving the clustername for machine, label key %s does not appear to exist for dynamic machine %s", capi.ClusterNameLabel, key)
 	}
 
 	machine, err := rke2.GetOwnerCAPIMachine(obj, h.machineCache)

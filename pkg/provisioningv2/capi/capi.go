@@ -50,7 +50,7 @@ type connectedAgentClusterCacheClient struct {
 	rkeControlPlanesCache rkecontrollers.RKEControlPlaneCache
 }
 
-func (t *connectedAgentClusterCacheClient) Get(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+func (t *connectedAgentClusterCacheClient) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
 	rkeCP, err := t.rkeControlPlanesCache.Get(key.Namespace, key.Name)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
@@ -128,7 +128,6 @@ func reconcilers(mgr ctrl.Manager, clients *wrangler.Context) ([]reconciler, err
 			// By using a connectedAgentClusterCacheClient (which returns a NotFound error if the agent is not connected), then
 			// we can force CAPI to refresh its caches once the agent is connected again.
 			Client:  &connectedAgentClusterCacheClient{Client: mgr.GetClient(), rkeControlPlanesCache: clients.RKE.RKEControlPlane().Cache()},
-			Log:     ctrl.Log.WithName("remote").WithName("ClusterCacheReconciler"),
 			Tracker: tracker,
 		},
 		&controllers.ClusterReconciler{

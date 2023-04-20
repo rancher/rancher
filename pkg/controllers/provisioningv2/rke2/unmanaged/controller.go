@@ -149,7 +149,7 @@ func (h *handler) createMachineObjects(capiCluster *capi.Cluster, machineName st
 
 	if data.Bool("role-control-plane") {
 		labels[rke2.ControlPlaneRoleLabel] = "true"
-		labels[capi.MachineControlPlaneLabelName] = "true"
+		labels[capi.MachineControlPlaneNameLabel] = "true"
 	}
 	if data.Bool("role-etcd") {
 		labels[rke2.EtcdRoleLabel] = "true"
@@ -169,7 +169,7 @@ func (h *handler) createMachineObjects(capiCluster *capi.Cluster, machineName st
 
 	labels[rke2.MachineIDLabel] = data.String("id")
 	labels[rke2.ClusterNameLabel] = capiCluster.Name
-	labels[capi.ClusterLabelName] = capiCluster.Name
+	labels[capi.ClusterNameLabel] = capiCluster.Name
 
 	labelsMap := map[string]string{}
 	for _, str := range strings.Split(data.String("labels"), ",") {
@@ -314,7 +314,7 @@ func (h *handler) onUnmanagedMachineHealth(key string, customMachine *rkev1.Cust
 }
 
 func (h *handler) onUnmanagedMachineOnRemove(key string, customMachine *rkev1.CustomMachine) (*rkev1.CustomMachine, error) {
-	clusterName := customMachine.Labels[capi.ClusterLabelName]
+	clusterName := customMachine.Labels[capi.ClusterNameLabel]
 	if clusterName == "" {
 		return customMachine, nil
 	}

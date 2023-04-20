@@ -419,7 +419,7 @@ func (h *handler) setProvisionedStatusFromMachineInfra(cluster *rancherv1.Cluste
 		return clusterStatus, nil
 	}
 
-	machines, err := h.capiMachineCache.List(cluster.Namespace, labels.SelectorFromSet(labels.Set{capi.ClusterLabelName: cluster.Name}))
+	machines, err := h.capiMachineCache.List(cluster.Namespace, labels.SelectorFromSet(labels.Set{capi.ClusterNameLabel: cluster.Name}))
 	if err != nil {
 		return clusterStatus, err
 	} else if len(machines) == 0 {

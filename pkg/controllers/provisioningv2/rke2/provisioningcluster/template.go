@@ -340,9 +340,9 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 				Template: capi.MachineTemplateSpec{
 					ObjectMeta: capi.ObjectMeta{
 						Labels: map[string]string{
-							capi.ClusterLabelName:           capiCluster.Name,
+							capi.ClusterNameLabel:           capiCluster.Name,
 							rke2.ClusterNameLabel:           capiCluster.Name,
-							capi.MachineDeploymentLabelName: machineDeploymentName,
+							capi.MachineDeploymentNameLabel: machineDeploymentName,
 							rke2.RKEMachinePoolNameLabel:    machinePool.Name,
 						},
 						Annotations: machineSpecAnnotations,
@@ -375,7 +375,7 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 
 		if machinePool.ControlPlaneRole {
 			machineDeployment.Spec.Template.Labels[rke2.ControlPlaneRoleLabel] = "true"
-			machineDeployment.Spec.Template.Labels[capi.MachineControlPlaneLabelName] = "true"
+			machineDeployment.Spec.Template.Labels[capi.MachineControlPlaneNameLabel] = "true"
 		}
 
 		if machinePool.WorkerRole {
@@ -432,7 +432,7 @@ func deploymentHealthChecks(machineDeployment *capi.MachineDeployment, machinePo
 			ClusterName: machineDeployment.Spec.ClusterName,
 			Selector: metav1.LabelSelector{ // this health check only applies to machines in this deployment
 				MatchLabels: map[string]string{
-					capi.MachineDeploymentLabelName: machineDeployment.Name,
+					capi.MachineDeploymentNameLabel: machineDeployment.Name,
 				},
 			},
 			UnhealthyConditions: []capi.UnhealthyCondition{ // if a node status is unready or unknown for the timeout mark it unhealthy

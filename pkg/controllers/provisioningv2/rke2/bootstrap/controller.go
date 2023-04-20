@@ -270,7 +270,7 @@ func (h *handler) OnChange(_ string, bootstrap *rkev1.RKEBootstrap) (*rkev1.RKEB
 	logrus.Debugf("[rkebootstrap] %s/%s: setting cluster name", bootstrap.Namespace, bootstrap.Name)
 	// If the bootstrap spec cluster name is blank, we need to update the bootstrap spec to the correct value
 	// This is to handle old rkebootstrap objects for unmanaged clusters that did not have the spec properly set
-	if v, ok := bootstrap.Labels[capi.ClusterLabelName]; ok && v != "" {
+	if v, ok := bootstrap.Labels[capi.ClusterNameLabel]; ok && v != "" {
 		bootstrap = bootstrap.DeepCopy()
 		bootstrap.Spec.ClusterName = v
 		return h.rkeBootstrap.Update(bootstrap)
