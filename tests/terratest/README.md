@@ -405,7 +405,7 @@ terratest:
     </tr>
     <tr>
       <td>nodeRole</td>
-      <td>Optional with Rancher v2.7+ - if provided, EKS will use this custom role when creating instances for node groups</td>
+      <td>Optional with Rancher v2.7+ - if provided, this custom role will be used when creating instances for node groups</td>
       <td>string</td>
       <td>arn:aws:iam::############:role/my-custom-NodeInstanceRole-############</td>
     </tr>
