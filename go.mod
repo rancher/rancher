@@ -3,6 +3,19 @@ module github.com/rancher/rancher
 go 1.19
 
 replace (
+	github.com/rancher/apiserver => github.com/vardhaman22/apiserver v1.26.4-rancher1
+	github.com/rancher/dynamiclistener => github.com/vardhaman22/dynamiclistener v1.26.4-rancher1
+	github.com/rancher/fleet/pkg/apis => github.com/vardhaman22/fleet/pkg/apis v1.26.4-rancher1
+	github.com/rancher/lasso => github.com/vardhaman22/lasso v1.26.4-rancher1
+	github.com/rancher/lasso/controller-runtime => github.com/vardhaman22/lasso/controller-runtime v1.26.4-rancher1
+	github.com/rancher/machine => github.com/vardhaman22/machine v1.26.4-rancher1
+	github.com/rancher/norman => github.com/vardhaman22/norman v1.26.4-rancher1
+	github.com/rancher/rke => github.com/vardhaman22/rancher-rke v1.26.4-rancher1
+	github.com/rancher/steve => github.com/vardhaman22/steve v1.26.4-rancher1
+	github.com/rancher/wrangler => github.com/vardhaman22/wrangler v1.26.4-rancher1
+)
+
+replace (
 	github.com/containerd/containerd => github.com/containerd/containerd v1.6.20
 	github.com/docker/distribution => github.com/docker/distribution v2.7.1+incompatible // oras dep requires a replace is set
 	github.com/docker/docker => github.com/docker/docker v20.10.18+incompatible // oras dep requires a replace is set
@@ -29,7 +42,7 @@ replace (
 	k8s.io/apimachinery => k8s.io/apimachinery v0.26.4
 	k8s.io/apiserver => k8s.io/apiserver v0.26.4
 	k8s.io/cli-runtime => k8s.io/cli-runtime v0.26.4
-	k8s.io/client-go => github.com/rancher/client-go v1.25.4-rancher1
+	k8s.io/client-go => github.com/vardhaman22/rancher-client-go v1.26.4-rancher1
 	k8s.io/cloud-provider => k8s.io/cloud-provider v0.26.4
 	k8s.io/cluster-bootstrap => k8s.io/cluster-bootstrap v0.26.4
 	k8s.io/code-generator => k8s.io/code-generator v0.26.4
@@ -112,7 +125,7 @@ require (
 	github.com/rancher/fleet/pkg/apis v0.0.0-20230302144315-26bdd9326b02
 	github.com/rancher/gke-operator v1.1.5
 	github.com/rancher/kubernetes-provider-detector v0.1.5
-	github.com/rancher/lasso v0.0.0-20221227210133-6ea88ca2fbcc
+	github.com/rancher/lasso v0.0.0-20230331223032-f2977a658e8e
 	github.com/rancher/lasso/controller-runtime v0.0.0-20220627205005-00d9c8e9dda6
 	github.com/rancher/machine v0.15.0-rancher98
 	github.com/rancher/norman v0.0.0-20230328153514-ae12f166495a
@@ -123,7 +136,7 @@ require (
 	github.com/rancher/rke v1.4.4
 	github.com/rancher/steve v0.0.0-20230222210822-3d3cc7767928
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007
-	github.com/rancher/wrangler v1.1.0
+	github.com/rancher/wrangler v1.1.1
 	github.com/robfig/cron v1.1.0
 	github.com/sirupsen/logrus v1.9.0
 	github.com/stretchr/testify v1.8.2
@@ -179,7 +192,7 @@ require (
 	go.opentelemetry.io/otel/exporters/otlp/internal/retry v1.14.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.14.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.14.0 // indirect
-	k8s.io/pod-security-admission v0.25.4 // indirect
+	k8s.io/pod-security-admission v0.26.4 // indirect
 )
 
 require (
@@ -354,7 +367,6 @@ require (
 	k8s.io/code-generator v0.26.4 // indirect
 	k8s.io/component-base v0.26.4 // indirect
 	k8s.io/component-helpers v0.26.4 // indirect
-	k8s.io/klog v1.0.0 // indirect
 	k8s.io/klog/v2 v2.90.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20221012153701-172d655c2280 // indirect
 	oras.land/oras-go v1.2.2 // indirect

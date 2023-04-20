@@ -2,7 +2,13 @@ module github.com/rancher/rancher/pkg/apis
 
 go 1.19
 
-replace k8s.io/client-go => github.com/rancher/client-go v1.25.4-rancher1
+replace k8s.io/client-go => github.com/vardhaman22/rancher-client-go v1.26.4-rancher1
+
+replace (
+	github.com/rancher/norman => github.com/vardhaman22/norman v1.26.4-rancher1
+	github.com/rancher/rke => github.com/vardhaman22/rancher-rke v1.26.4-rancher1
+	github.com/rancher/wrangler => github.com/vardhaman22/wrangler v1.26.4-rancher1
+)
 
 require (
 	github.com/rancher/aks-operator v1.1.0
@@ -11,7 +17,7 @@ require (
 	github.com/rancher/gke-operator v1.1.5
 	github.com/rancher/norman v0.0.0-20230328153514-ae12f166495a
 	github.com/rancher/rke v1.4.4
-	github.com/rancher/wrangler v1.1.0
+	github.com/rancher/wrangler v1.1.1
 	github.com/sirupsen/logrus v1.9.0
 	k8s.io/api v0.26.4
 	k8s.io/apimachinery v0.26.4
@@ -65,13 +71,13 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	k8s.io/apiextensions-apiserver v0.26.1 // indirect
-	k8s.io/apiserver v0.26.1 // indirect
+	k8s.io/apiextensions-apiserver v0.26.4 // indirect
+	k8s.io/apiserver v0.26.4 // indirect
 	k8s.io/client-go v12.0.0+incompatible // indirect
-	k8s.io/component-base v0.26.1 // indirect
+	k8s.io/component-base v0.26.4 // indirect
 	k8s.io/klog/v2 v2.80.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20221012153701-172d655c2280 // indirect
-	k8s.io/kubernetes v1.13.0 // indirect
+	k8s.io/kubernetes v1.26.4 // indirect
 	k8s.io/utils v0.0.0-20221128185143-99ec85e7a448 // indirect
 	sigs.k8s.io/cli-utils v0.27.0 // indirect
 	sigs.k8s.io/controller-runtime v0.14.5 // indirect
