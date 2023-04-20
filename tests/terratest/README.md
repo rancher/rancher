@@ -403,6 +403,12 @@ terratest:
       <td>boolean</td>
       <td>true</td>
     </tr>
+    <tr>
+      <td>nodeRole</td>
+      <td>Optional with Rancher v2.7+ - if provided, EKS will use this custom role when creating instances for node groups</td>
+      <td>string</td>
+      <td>arn:aws:iam::############:role/my-custom-NodeInstanceRole-############</td>
+    </tr>
   </tbody>
 </table>
 
@@ -427,6 +433,7 @@ terratest:
   hostnamePrefix: jkeslar
   publicAccess: true
   privateAccess: true
+  nodeRole: arn:aws:iam::############:role/my-custom-NodeInstanceRole-############
 ```
 
 ---
