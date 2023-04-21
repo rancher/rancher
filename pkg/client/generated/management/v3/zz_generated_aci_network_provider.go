@@ -23,6 +23,7 @@ const (
 	AciNetworkProviderFieldEpRegistry                        = "epRegistry"
 	AciNetworkProviderFieldGbpPodSubnet                      = "gbpPodSubnet"
 	AciNetworkProviderFieldHostAgentLogLevel                 = "hostAgentLogLevel"
+	AciNetworkProviderFieldHppOptimization                   = "hppOptimization"
 	AciNetworkProviderFieldImagePullPolicy                   = "imagePullPolicy"
 	AciNetworkProviderFieldImagePullSecret                   = "imagePullSecret"
 	AciNetworkProviderFieldInfraVlan                         = "infraVlan"
@@ -45,6 +46,8 @@ const (
 	AciNetworkProviderFieldNodeSubnet                        = "nodeSubnet"
 	AciNetworkProviderFieldOVSMemoryLimit                    = "ovsMemoryLimit"
 	AciNetworkProviderFieldOpflexAgentLogLevel               = "opflexLogLevel"
+	AciNetworkProviderFieldOpflexAgentOpflexAsyncjsonEnabled = "opflexAgentOpflexAsyncjsonEnabled"
+	AciNetworkProviderFieldOpflexAgentOvsAsyncjsonEnabled    = "opflexAgentOvsAsyncjsonEnabled"
 	AciNetworkProviderFieldOpflexClientSSL                   = "opflexClientSsl"
 	AciNetworkProviderFieldOpflexDeviceDeleteTimeout         = "opflexDeviceDeleteTimeout"
 	AciNetworkProviderFieldOpflexMode                        = "opflexMode"
@@ -59,6 +62,7 @@ const (
 	AciNetworkProviderFieldServiceGraphSubnet                = "nodeSvcSubnet"
 	AciNetworkProviderFieldServiceMonitorInterval            = "serviceMonitorInterval"
 	AciNetworkProviderFieldServiceVlan                       = "serviceVlan"
+	AciNetworkProviderFieldSleepTimeSnatGlobalInfoSync       = "sleepTimeSnatGlobalInfoSync"
 	AciNetworkProviderFieldSnatContractScope                 = "snatContractScope"
 	AciNetworkProviderFieldSnatNamespace                     = "snatNamespace"
 	AciNetworkProviderFieldSnatPortRangeEnd                  = "snatPortRangeEnd"
@@ -104,6 +108,7 @@ type AciNetworkProvider struct {
 	EpRegistry                        string              `json:"epRegistry,omitempty" yaml:"epRegistry,omitempty"`
 	GbpPodSubnet                      string              `json:"gbpPodSubnet,omitempty" yaml:"gbpPodSubnet,omitempty"`
 	HostAgentLogLevel                 string              `json:"hostAgentLogLevel,omitempty" yaml:"hostAgentLogLevel,omitempty"`
+	HppOptimization                   string              `json:"hppOptimization,omitempty" yaml:"hppOptimization,omitempty"`
 	ImagePullPolicy                   string              `json:"imagePullPolicy,omitempty" yaml:"imagePullPolicy,omitempty"`
 	ImagePullSecret                   string              `json:"imagePullSecret,omitempty" yaml:"imagePullSecret,omitempty"`
 	InfraVlan                         string              `json:"infraVlan,omitempty" yaml:"infraVlan,omitempty"`
@@ -126,6 +131,8 @@ type AciNetworkProvider struct {
 	NodeSubnet                        string              `json:"nodeSubnet,omitempty" yaml:"nodeSubnet,omitempty"`
 	OVSMemoryLimit                    string              `json:"ovsMemoryLimit,omitempty" yaml:"ovsMemoryLimit,omitempty"`
 	OpflexAgentLogLevel               string              `json:"opflexLogLevel,omitempty" yaml:"opflexLogLevel,omitempty"`
+	OpflexAgentOpflexAsyncjsonEnabled string              `json:"opflexAgentOpflexAsyncjsonEnabled,omitempty" yaml:"opflexAgentOpflexAsyncjsonEnabled,omitempty"`
+	OpflexAgentOvsAsyncjsonEnabled    string              `json:"opflexAgentOvsAsyncjsonEnabled,omitempty" yaml:"opflexAgentOvsAsyncjsonEnabled,omitempty"`
 	OpflexClientSSL                   string              `json:"opflexClientSsl,omitempty" yaml:"opflexClientSsl,omitempty"`
 	OpflexDeviceDeleteTimeout         string              `json:"opflexDeviceDeleteTimeout,omitempty" yaml:"opflexDeviceDeleteTimeout,omitempty"`
 	OpflexMode                        string              `json:"opflexMode,omitempty" yaml:"opflexMode,omitempty"`
@@ -140,6 +147,7 @@ type AciNetworkProvider struct {
 	ServiceGraphSubnet                string              `json:"nodeSvcSubnet,omitempty" yaml:"nodeSvcSubnet,omitempty"`
 	ServiceMonitorInterval            string              `json:"serviceMonitorInterval,omitempty" yaml:"serviceMonitorInterval,omitempty"`
 	ServiceVlan                       string              `json:"serviceVlan,omitempty" yaml:"serviceVlan,omitempty"`
+	SleepTimeSnatGlobalInfoSync       string              `json:"sleepTimeSnatGlobalInfoSync,omitempty" yaml:"sleepTimeSnatGlobalInfoSync,omitempty"`
 	SnatContractScope                 string              `json:"snatContractScope,omitempty" yaml:"snatContractScope,omitempty"`
 	SnatNamespace                     string              `json:"snatNamespace,omitempty" yaml:"snatNamespace,omitempty"`
 	SnatPortRangeEnd                  string              `json:"snatPortRangeEnd,omitempty" yaml:"snatPortRangeEnd,omitempty"`
