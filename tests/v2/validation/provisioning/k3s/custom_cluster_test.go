@@ -5,6 +5,8 @@ import (
 
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
+	"github.com/rancher/rancher/tests/framework/extensions/clusters"
+	"github.com/rancher/rancher/tests/framework/extensions/clusters/kubernetesversions"
 	"github.com/rancher/rancher/tests/framework/extensions/users"
 	password "github.com/rancher/rancher/tests/framework/extensions/users/passwordgenerator"
 	"github.com/rancher/rancher/tests/framework/pkg/config"
@@ -44,6 +46,9 @@ func (c *CustomClusterProvisioningTestSuite) SetupSuite() {
 	require.NoError(c.T(), err)
 
 	c.client = client
+
+	c.kubernetesVersions, err = kubernetesversions.Default(c.T(), c.client, clusters.K3SClusterType.String(), c.kubernetesVersions)
+	require.NoError(c.T(), err)
 
 	enabled := true
 	var testuser = namegen.AppendRandomString("testuser-")

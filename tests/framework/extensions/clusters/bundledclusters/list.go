@@ -5,7 +5,7 @@ import (
 
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
-	available "github.com/rancher/rancher/tests/framework/extensions/clusters/versions"
+	available "github.com/rancher/rancher/tests/framework/extensions/clusters/kubernetesversions"
 )
 
 // ListAvailable is a method of BundledCluster that uses list available functions
