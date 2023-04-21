@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/cloudcredentials/digitalocean"
 	"github.com/rancher/rancher/tests/framework/extensions/cloudcredentials/harvester"
 	"github.com/rancher/rancher/tests/framework/extensions/cloudcredentials/linode"
+	"github.com/rancher/rancher/tests/framework/extensions/cloudcredentials/vsphere"
 	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
 	"github.com/rancher/rancher/tests/v2/validation/provisioning"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -68,6 +69,14 @@ func CreateProvider(name string) Provider {
 			MachineConfigPoolResourceSteveType: machinepools.HarvesterPoolType,
 			MachinePoolFunc:                    machinepools.NewHarvesterMachineConfig,
 			CloudCredFunc:                      harvester.CreateHarvesterCloudCredentials,
+		}
+		return provider
+	case name == provisioning.VsphereProviderName.String():
+		provider := Provider{
+			Name:                               provisioning.VsphereProviderName,
+			MachineConfigPoolResourceSteveType: machinepools.VmwarevsphereType,
+			MachinePoolFunc:                    machinepools.NewVSphereMachineConfig,
+			CloudCredFunc:                      vsphere.CreateVsphereCloudCredentials,
 		}
 		return provider
 	default:

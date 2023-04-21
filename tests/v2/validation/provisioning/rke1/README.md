@@ -173,7 +173,37 @@ RKE1 specifically needs a node template config to run properly. These are the in
     "tags": "",
     "token": "",
     "type": "linodeConfig",
-    "uaPrefix": "Rancher",
+    "uaPrefix": "Rancher"
+}
+```
+
+### Vsphere
+```json
+"vmwarevsphereNodeTemplate:" { 
+    "cfgparam": ["disk.enableUUID=TRUE"],
+    "cloneFrom": "",
+    "cloudinit": "",
+    "contentLibrary": "",
+    "cpuCount": "4",
+    "creationType": "",
+    "datacenter": "",
+    "datastore": "",
+    "datastoreCluster": "",
+    "diskSize": "20000",
+    "folder": "",
+    "hostSystem": "",
+    "memorySize": "4096",
+    "network": [""],
+    "os": "linux",
+    "password": "",
+    "pool": "",
+    "sshPassword": "",
+    "sshPort": "22",
+    "sshUser": "",
+    "sshUserGroup": "",
+    "username": "",
+    "vcenter": "",
+    "vcenterPort": "443"
 }
 ```
 
