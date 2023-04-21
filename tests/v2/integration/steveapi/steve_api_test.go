@@ -30,7 +30,9 @@ import (
 	"github.com/stretchr/testify/suite"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/retry"
 )
 
 const (
@@ -244,7 +246,13 @@ func (s *steveAPITestSuite) setupSuite(clusterName string) {
 				labels[labelGTEKey] = "3"
 			}
 			secret.ObjectMeta.SetLabels(labels)
-			_, err := secrets.CreateSecret(s.client, secret, s.project.ClusterID, n)
+			err := retryRequest(func() error {
+				_, err := secrets.CreateSecret(s.client, secret, s.project.ClusterID, n)
+				if apierrors.IsAlreadyExists(err) {
+					return nil
+				}
+				return err
+			})
 			require.NoError(s.T(), err)
 		}
 	}
@@ -253,11 +261,23 @@ func (s *steveAPITestSuite) setupSuite(clusterName string) {
 	for _, n := range namespaceMap {
 		role := namespaceSecretManagerRole
 		role.Namespace = n
-		_, err = rbac.CreateRole(s.client, s.project.ClusterID, &role)
+		err := retryRequest(func() error {
+			_, err = rbac.CreateRole(s.client, s.project.ClusterID, &role)
+			if apierrors.IsAlreadyExists(err) {
+				return nil
+			}
+			return err
+		})
 		require.NoError(s.T(), err)
 		role = mixedSecretUserRole
 		role.Namespace = n
-		_, err = rbac.CreateRole(s.client, s.project.ClusterID, &role)
+		err = retryRequest(func() error {
+			_, err = rbac.CreateRole(s.client, s.project.ClusterID, &role)
+			if apierrors.IsAlreadyExists(err) {
+				return nil
+			}
+			return err
+		})
 		require.NoError(s.T(), err)
 	}
 
@@ -287,7 +307,13 @@ func (s *steveAPITestSuite) setupSuite(clusterName string) {
 					Kind: "User",
 					Name: userObj.ID,
 				}
-				_, err = rbac.CreateRoleBinding(s.client, s.project.ClusterID, namegenerator.AppendRandomString(rb.Name), namespaceMap[rb.Namespace], rb.RoleRef.Name, subject)
+				err := retryRequest(func() error {
+					_, err = rbac.CreateRoleBinding(s.client, s.project.ClusterID, namegenerator.AppendRandomString(rb.Name), namespaceMap[rb.Namespace], rb.RoleRef.Name, subject)
+					if apierrors.IsAlreadyExists(err) {
+						return nil
+					}
+					return err
+				})
 				require.NoError(s.T(), err)
 			}
 		}
@@ -1895,6 +1921,11 @@ func (s *steveAPITestSuite) TestCRUD() {
 		require.Error(s.T(), err)
 		assert.Nil(s.T(), readObj)
 	})
+}
+
+func retryRequest(fn func() error) error {
+	retriable := func(err error) bool { return strings.Contains(err.Error(), "tunnel disconnect") }
+	return retry.OnError(retry.DefaultBackoff, retriable, fn)
 }
 
 func (s *steveAPITestSuite) assertListIsEqual(expect []map[string]string, list []clientv1.SteveAPIObject) {
