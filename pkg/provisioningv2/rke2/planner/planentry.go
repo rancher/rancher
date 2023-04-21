@@ -16,15 +16,18 @@ type planEntry struct {
 
 type roleFilter func(*planEntry) bool
 
-func collectAndValidateAnnotationValue(plan *plan.Plan, validation roleFilter, annotation, value string) bool {
-	for machineName, machine := range plan.Machines {
+func collectAndValidateAnnotationValue(p *plan.Plan, validation roleFilter, annotation, value string) bool {
+	for machineName, machine := range p.Machines {
 		entry := &planEntry{
 			Machine:  machine,
-			Plan:     plan.Nodes[machineName],
-			Metadata: plan.Metadata[machineName],
+			Plan:     p.Nodes[machineName],
+			Metadata: p.Metadata[machineName],
 		}
 		if !validation(entry) {
 			continue
+		}
+		if entry.Plan == nil {
+			entry.Plan = &plan.Node{}
 		}
 		if entry.Metadata.Annotations[annotation] == value {
 			return true
@@ -33,15 +36,18 @@ func collectAndValidateAnnotationValue(plan *plan.Plan, validation roleFilter, a
 	return false
 }
 
-func collect(plan *plan.Plan, include roleFilter) (result []*planEntry) {
-	for machineName, machine := range plan.Machines {
+func collect(p *plan.Plan, include roleFilter) (result []*planEntry) {
+	for machineName, machine := range p.Machines {
 		entry := &planEntry{
 			Machine:  machine,
-			Plan:     plan.Nodes[machineName],
-			Metadata: plan.Metadata[machineName],
+			Plan:     p.Nodes[machineName],
+			Metadata: p.Metadata[machineName],
 		}
 		if !include(entry) {
 			continue
+		}
+		if entry.Plan == nil {
+			entry.Plan = &plan.Node{}
 		}
 		result = append(result, entry)
 	}

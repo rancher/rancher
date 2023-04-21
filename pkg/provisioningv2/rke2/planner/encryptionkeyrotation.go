@@ -167,7 +167,7 @@ func (p *Planner) rotateEncryptionKeys(cp *rkev1.RKEControlPlane, status rkev1.R
 		return status, nil
 	}
 
-	found, joinServer, _, err := p.findInitNode(cp, clusterPlan)
+	found, joinServer, initNode, err := p.findInitNode(cp, clusterPlan)
 	if err != nil {
 		logrus.Errorf("[planner] rkecluster %s/%s: error encountered while searching for init node during encryption key rotation: %v", cp.Namespace, cp.Name, err)
 	}
@@ -181,7 +181,7 @@ func (p *Planner) rotateEncryptionKeys(cp *rkev1.RKEControlPlane, status rkev1.R
 		return p.setEncryptionKeyRotateState(status, cp.Spec.RotateEncryptionKeys, rkev1.RotateEncryptionKeysPhasePrepare)
 	}
 
-	leader, err := p.encryptionKeyRotationFindLeader(cp, status, clusterPlan)
+	leader, err := p.encryptionKeyRotationFindLeader(status, clusterPlan, initNode)
 	if err != nil {
 		return status, err
 	}
@@ -204,7 +204,7 @@ func (p *Planner) rotateEncryptionKeys(cp *rkev1.RKEControlPlane, status rkev1.R
 		}
 		return p.setEncryptionKeyRotateState(status, cp.Spec.RotateEncryptionKeys, rkev1.RotateEncryptionKeysPhasePostPrepareRestart)
 	case rkev1.RotateEncryptionKeysPhasePostPrepareRestart:
-		status, err = p.encryptionKeyRotationRestartNodes(cp, status, tokensSecret, clusterPlan, leader)
+		status, err = p.encryptionKeyRotationRestartNodes(cp, status, tokensSecret, clusterPlan, leader, initNode, joinServer)
 		if err != nil {
 			return status, err
 		}
@@ -216,7 +216,7 @@ func (p *Planner) rotateEncryptionKeys(cp *rkev1.RKEControlPlane, status rkev1.R
 		}
 		return p.setEncryptionKeyRotateState(status, cp.Spec.RotateEncryptionKeys, rkev1.RotateEncryptionKeysPhasePostRotateRestart)
 	case rkev1.RotateEncryptionKeysPhasePostRotateRestart:
-		status, err = p.encryptionKeyRotationRestartNodes(cp, status, tokensSecret, clusterPlan, leader)
+		status, err = p.encryptionKeyRotationRestartNodes(cp, status, tokensSecret, clusterPlan, leader, initNode, joinServer)
 		if err != nil {
 			return status, err
 		}
@@ -228,7 +228,7 @@ func (p *Planner) rotateEncryptionKeys(cp *rkev1.RKEControlPlane, status rkev1.R
 		}
 		return p.setEncryptionKeyRotateState(status, cp.Spec.RotateEncryptionKeys, rkev1.RotateEncryptionKeysPhasePostReencryptRestart)
 	case rkev1.RotateEncryptionKeysPhasePostReencryptRestart:
-		status, err = p.encryptionKeyRotationRestartNodes(cp, status, tokensSecret, clusterPlan, leader)
+		status, err = p.encryptionKeyRotationRestartNodes(cp, status, tokensSecret, clusterPlan, leader, initNode, joinServer)
 		if err != nil {
 			return status, err
 		}
@@ -318,12 +318,7 @@ func rotateEncryptionKeyInProgress(cp *rkev1.RKEControlPlane) bool {
 // phase is "prepare", it will re-elect a new leader. It will look for the init node, and if the init node is not valid
 // (etcd-only), it will elect the first suitable control plane node. If the phase is not in "prepare" and a re-election
 // of the leader is necessary, the phase will be set to failed as this is unexpected.
-func (p *Planner) encryptionKeyRotationFindLeader(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus, clusterPlan *plan.Plan) (*planEntry, error) {
-	_, _, init, _ := p.findInitNode(cp, clusterPlan)
-	if init == nil {
-		return nil, fmt.Errorf("cannot find suitable init node")
-	}
-
+func (p *Planner) encryptionKeyRotationFindLeader(status rkev1.RKEControlPlaneStatus, clusterPlan *plan.Plan, init *planEntry) (*planEntry, error) {
 	machineName := status.RotateEncryptionKeysLeader
 	if machine, ok := clusterPlan.Machines[machineName]; ok {
 		entry := &planEntry{
@@ -356,7 +351,7 @@ func (p *Planner) encryptionKeyRotationFindLeader(cp *rkev1.RKEControlPlane, sta
 // encryptionKeyRotationIsSuitableControlPlane ensures that a control plane node has not been deleted and has a valid
 // node associated with it.
 func encryptionKeyRotationIsSuitableControlPlane(entry *planEntry) bool {
-	return isControlPlane(entry) && entry.Machine.DeletionTimestamp == nil && entry.Machine.Status.NodeRef != nil && rke2.Ready.IsTrue(entry.Machine)
+	return isControlPlane(entry) && isNotDeleting(entry) && entry.Machine.Status.NodeRef != nil && rke2.Ready.IsTrue(entry.Machine)
 }
 
 // encryptionKeyRotationIsControlPlaneAndNotLeaderAndInit allows us to filter cluster plans to restart healthy follower nodes.
@@ -380,20 +375,12 @@ func encryptionKeyRotationIsEtcdAndNotControlPlaneAndNotLeaderAndInit(cp *rkev1.
 // The followers (if any exist) are subsequently restarted. Notably, if the encryption key rotation leader is not the init node,
 // it will restart the init node, then restart the encryption key rotation leader,
 // then finalize walking through etcd nodes (that are not controlplane), then finally controlplane nodes.
-func (p *Planner) encryptionKeyRotationRestartNodes(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus, tokensSecret plan.Secret, clusterPlan *plan.Plan, leader *planEntry) (rkev1.RKEControlPlaneStatus, error) {
-	// find init node for restart and join server for probe generation
-	initNodeFound, joinServer, initNode, err := p.findInitNode(cp, clusterPlan)
-	if err != nil {
-		return status, err
-	}
-	if !initNodeFound || initNode == nil || joinServer == "" {
-		return status, fmt.Errorf("unable to find suitable init node")
-	}
+func (p *Planner) encryptionKeyRotationRestartNodes(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus, tokensSecret plan.Secret, clusterPlan *plan.Plan, leader *planEntry, initNode *planEntry, joinServer string) (rkev1.RKEControlPlaneStatus, error) {
 	// in certain cases with multi-node setups, we must restart the init node before we can proceed to restarting the leader.
 	if !isInitNode(leader) {
 		logrus.Debugf("[planner] rkecluster %s/%s: leader %s was not the init node, finding and restarting etcd nodes", cp.Namespace, cp.Name, leader.Machine.Name)
 
-		_, status, err = p.encryptionKeyRotationRestartService(cp, status, tokensSecret, joinServer, initNode, false, "")
+		_, status, err := p.encryptionKeyRotationRestartService(cp, status, tokensSecret, joinServer, initNode, false, "")
 		if err != nil {
 			return status, err
 		}

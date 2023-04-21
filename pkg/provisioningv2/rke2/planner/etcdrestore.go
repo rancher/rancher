@@ -260,7 +260,11 @@ func (p *Planner) runEtcdSnapshotWorkerServiceStart(controlPlane *rkev1.RKEContr
 		if isInitNodeOrDeleting(entry) {
 			continue
 		}
-		plan, joinedServer, err := p.desiredPlan(controlPlane, tokensSecret, entry, entry.Plan.JoinedTo)
+		joinURL, err := determineJoinURL(controlPlane, entry, clusterPlan, "")
+		if err != nil {
+			return err
+		}
+		plan, joinedServer, err := p.desiredPlan(controlPlane, tokensSecret, entry, joinURL)
 		if err != nil {
 			return err
 		}

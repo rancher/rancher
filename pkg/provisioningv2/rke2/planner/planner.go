@@ -394,7 +394,7 @@ func calculateJoinURL(cp *rkev1.RKEControlPlane, entry *planEntry, plan *plan.Pl
 // If the entry is a worker-only node and joinURL is empty, it will validate the existing node the worker is joined to and return if valid. If the existing node is no longer valid, it will calculate a new join URL and return the new join URL.
 func determineJoinURL(cp *rkev1.RKEControlPlane, entry *planEntry, plan *plan.Plan, joinURL string) (string, error) {
 	if cp == nil || entry == nil || plan == nil {
-		return "", fmt.Errorf("getJoinURL arguments cannot be nil")
+		return "", fmt.Errorf("determineJoinURL arguments cannot be nil")
 	}
 	if !isOnlyWorker(entry) {
 		return joinURL, nil
