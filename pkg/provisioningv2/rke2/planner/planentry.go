@@ -26,9 +26,6 @@ func collectAndValidateAnnotationValue(p *plan.Plan, validation roleFilter, anno
 		if !validation(entry) {
 			continue
 		}
-		if entry.Plan == nil {
-			entry.Plan = &plan.Node{}
-		}
 		if entry.Metadata.Annotations[annotation] == value {
 			return true
 		}
@@ -45,9 +42,6 @@ func collect(p *plan.Plan, include roleFilter) (result []*planEntry) {
 		}
 		if !include(entry) {
 			continue
-		}
-		if entry.Plan == nil {
-			entry.Plan = &plan.Node{}
 		}
 		result = append(result, entry)
 	}

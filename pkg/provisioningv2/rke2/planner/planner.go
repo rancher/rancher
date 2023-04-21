@@ -410,7 +410,11 @@ func determineJoinURL(cp *rkev1.RKEControlPlane, entry *planEntry, plan *plan.Pl
 		if joinURL == "" {
 			// calculate the next join server for this node
 			joinURL = calculateJoinURL(cp, entry, plan)
-			logrus.Infof("[planner] rkecluster %s/%s - machine %s/%s - previous join server (%s) was not valid, using new join server (%s)", cp.Namespace, cp.Name, entry.Machine.Namespace, entry.Machine.Name, entry.Plan.JoinedTo, joinURL)
+			joinedTo := ""
+			if entry.Plan != nil {
+				joinedTo = entry.Plan.JoinedTo
+			}
+			logrus.Infof("[planner] rkecluster %s/%s - machine %s/%s - previous join server (%s) was not valid, using new join server (%s)", cp.Namespace, cp.Name, entry.Machine.Namespace, entry.Machine.Name, joinedTo, joinURL)
 			if joinURL == "" {
 				return "", fmt.Errorf("no suitable join URL found to join machine %s/%s in rkecluster %s/%s to", entry.Machine.Namespace, entry.Machine.Name, cp.Namespace, cp.Name)
 			}
