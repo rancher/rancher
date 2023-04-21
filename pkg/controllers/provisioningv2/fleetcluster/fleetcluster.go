@@ -7,27 +7,30 @@ import (
 	fleet "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	mgmt "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
-	mgmtcluster "github.com/rancher/rancher/pkg/cluster"
-	fleetconst "github.com/rancher/rancher/pkg/fleet"
 	fleetcontrollers "github.com/rancher/rancher/pkg/generated/controllers/fleet.cattle.io/v1alpha1"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	rocontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
+
+	mgmtcluster "github.com/rancher/rancher/pkg/cluster"
+	fleetconst "github.com/rancher/rancher/pkg/fleet"
 	"github.com/rancher/rancher/pkg/provisioningv2/image"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/pkg/apply"
 	"github.com/rancher/wrangler/pkg/generic"
 	"github.com/rancher/wrangler/pkg/yaml"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation"
 )
 
 type handler struct {
-	clusters      mgmtcontrollers.ClusterClient
-	clustersCache mgmtcontrollers.ClusterCache
-	fleetClusters fleetcontrollers.ClusterController
-	apply         apply.Apply
+	clusters          mgmtcontrollers.ClusterClient
+	clustersCache     mgmtcontrollers.ClusterCache
+	fleetClusters     fleetcontrollers.ClusterController
+	apply             apply.Apply
+	getPrivateRepoURL func(*v1.Cluster, *mgmt.Cluster) string
 }
 
 // Register registers the fleetcluster controller, which is responsible for creating fleet cluster objects.
@@ -43,10 +46,21 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 		apply:         clients.Apply.WithCacheTypes(clients.Provisioning.Cluster()),
 	}
 
+	h.getPrivateRepoURL = func(cluster *v1.Cluster, mgmtCluster *mgmt.Cluster) string {
+		if cluster.Spec.RKEConfig == nil {
+			// If the RKEConfig is nil, we are likely dealing with
+			// a legacy (v3/mgmt) cluster, and need to check the v3
+			// cluster for the cluster level registry.
+			return mgmtcluster.GetPrivateRegistryURL(mgmtCluster)
+		}
+		return image.GetPrivateRepoURLFromCluster(cluster)
+	}
+
 	rocontrollers.RegisterClusterGeneratingHandler(ctx,
 		clients.Provisioning.Cluster(),
 		clients.Apply.
 			WithCacheTypes(clients.Fleet.Cluster(),
+				clients.Fleet.ClusterGroup(),
 				clients.Provisioning.Cluster()),
 		"",
 		"fleet-cluster",
@@ -109,8 +123,7 @@ func (h *handler) createCluster(cluster *v1.Cluster, status v1.ClusterStatus) ([
 		return nil, status, generic.ErrSkip
 	}
 
-	// this overwrites the default labels from fleet and any labels a user
-	// set on the fleet cluster resource directly
+	// this removes any annotations containing "cattle.io" or starting with "kubectl.kubernetes.io"
 	labels := yaml.CleanAnnotationsForExport(mgmtCluster.Labels)
 	labels["management.cattle.io/cluster-name"] = mgmtCluster.Name
 	if errs := validation.IsValidLabelValue(mgmtCluster.Spec.DisplayName); len(errs) == 0 {
@@ -119,20 +132,24 @@ func (h *handler) createCluster(cluster *v1.Cluster, status v1.ClusterStatus) ([
 
 	agentNamespace := ""
 	clientSecret := status.ClientSecretName
+
+	objs := []runtime.Object{}
 	if mgmtCluster.Spec.Internal {
 		agentNamespace = fleetconst.ReleaseLocalNamespace
-		clientSecret = "local-kubeconfig"
 		// restore fleet's hardcoded name label for the local cluster
 		labels["name"] = "local"
-	}
-
-	var privateRepoURL string
-	if cluster.Spec.RKEConfig == nil {
-		// If the RKEConfig is nil, we are likely dealing with a legacy (v3/mgmt) cluster, and need to check the v3
-		// cluster for the cluster level registry.
-		privateRepoURL = mgmtcluster.GetPrivateRegistryURL(mgmtCluster)
-	} else {
-		privateRepoURL = image.GetPrivateRepoURLFromCluster(cluster)
+		// default cluster group, used if fleet bundle has no targets, uses hardcoded name label
+		objs = append(objs, &fleet.ClusterGroup{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "default",
+				Namespace: cluster.Namespace,
+			},
+			Spec: fleet.ClusterGroupSpec{
+				Selector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{"name": "local"},
+				},
+			},
+		})
 	}
 
 	agentAffinity, err := mgmtcluster.GetFleetAgentAffinity(mgmtCluster)
@@ -140,7 +157,7 @@ func (h *handler) createCluster(cluster *v1.Cluster, status v1.ClusterStatus) ([
 		return nil, status, err
 	}
 
-	return []runtime.Object{&fleet.Cluster{
+	return append(objs, &fleet.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cluster.Name,
 			Namespace: cluster.Namespace,
@@ -150,10 +167,10 @@ func (h *handler) createCluster(cluster *v1.Cluster, status v1.ClusterStatus) ([
 			KubeConfigSecret: clientSecret,
 			AgentEnvVars:     mgmtCluster.Spec.AgentEnvVars,
 			AgentNamespace:   agentNamespace,
-			PrivateRepoURL:   privateRepoURL,
+			PrivateRepoURL:   h.getPrivateRepoURL(cluster, mgmtCluster),
 			AgentTolerations: mgmtcluster.GetFleetAgentTolerations(mgmtCluster),
 			AgentAffinity:    agentAffinity,
 			AgentResources:   mgmtcluster.GetFleetAgentResourceRequirements(mgmtCluster),
 		},
-	}}, status, nil
+	}), status, nil
 }
