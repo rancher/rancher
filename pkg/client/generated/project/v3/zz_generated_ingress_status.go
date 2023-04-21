@@ -6,5 +6,5 @@ const (
 )
 
 type IngressStatus struct {
-	LoadBalancer *LoadBalancerStatus `json:"loadBalancer,omitempty" yaml:"loadBalancer,omitempty"`
+	LoadBalancer *IngressLoadBalancerStatus `json:"loadBalancer,omitempty" yaml:"loadBalancer,omitempty"`
 }

@@ -22,8 +22,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/lasso/pkg/client"
-	"github.com/rancher/lasso/pkg/controller"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/wrangler/pkg/apply"
 	"github.com/rancher/wrangler/pkg/condition"
@@ -36,236 +34,120 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/tools/cache"
 )
 
-type NotifierHandler func(string, *v3.Notifier) (*v3.Notifier, error)
-
+// NotifierController interface for managing Notifier resources.
 type NotifierController interface {
 	generic.ControllerMeta
 	NotifierClient
 
+	// OnChange runs the given handler when the controller detects a resource was changed.
 	OnChange(ctx context.Context, name string, sync NotifierHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
 	OnRemove(ctx context.Context, name string, sync NotifierHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
 	Enqueue(namespace, name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
 	EnqueueAfter(namespace, name string, duration time.Duration)
 
+	// Cache returns a cache for the resource type T.
 	Cache() NotifierCache
 }
 
+// NotifierClient interface for managing Notifier resources in Kubernetes.
 type NotifierClient interface {
+	// Create creates a new object and return the newly created Object or an error.
 	Create(*v3.Notifier) (*v3.Notifier, error)
+
+	// Update updates the object and return the newly updated Object or an error.
 	Update(*v3.Notifier) (*v3.Notifier, error)
+	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
+	// Will always return an error if the object does not have a status field.
 	UpdateStatus(*v3.Notifier) (*v3.Notifier, error)
+
+	// Delete deletes the Object in the given name.
 	Delete(namespace, name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
 	Get(namespace, name string, options metav1.GetOptions) (*v3.Notifier, error)
+
+	// List will attempt to find multiple resources.
 	List(namespace string, opts metav1.ListOptions) (*v3.NotifierList, error)
+
+	// Watch will start watching resources.
 	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
 	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.Notifier, err error)
 }
 
+// NotifierCache interface for retrieving Notifier resources in memory.
 type NotifierCache interface {
+	// Get returns the resources with the specified name from the cache.
 	Get(namespace, name string) (*v3.Notifier, error)
+
+	// List will attempt to find resources from the Cache.
 	List(namespace string, selector labels.Selector) ([]*v3.Notifier, error)
 
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
 	AddIndexer(indexName string, indexer NotifierIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
 	GetByIndex(indexName, key string) ([]*v3.Notifier, error)
 }
 
+// NotifierHandler is function for performing any potential modifications to a Notifier resource.
+type NotifierHandler func(string, *v3.Notifier) (*v3.Notifier, error)
+
+// NotifierIndexer computes a set of indexed values for the provided object.
 type NotifierIndexer func(obj *v3.Notifier) ([]string, error)
 
-type notifierController struct {
-	controller    controller.SharedController
-	client        *client.Client
-	gvk           schema.GroupVersionKind
-	groupResource schema.GroupResource
+// NotifierGenericController wraps wrangler/pkg/generic.Controller so that the function definitions adhere to NotifierController interface.
+type NotifierGenericController struct {
+	generic.ControllerInterface[*v3.Notifier, *v3.NotifierList]
 }
 
-func NewNotifierController(gvk schema.GroupVersionKind, resource string, namespaced bool, controller controller.SharedControllerFactory) NotifierController {
-	c := controller.ForResourceKind(gvk.GroupVersion().WithResource(resource), gvk.Kind, namespaced)
-	return &notifierController{
-		controller: c,
-		client:     c.Client(),
-		gvk:        gvk,
-		groupResource: schema.GroupResource{
-			Group:    gvk.Group,
-			Resource: resource,
-		},
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *NotifierGenericController) OnChange(ctx context.Context, name string, sync NotifierHandler) {
+	c.ControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.Notifier](sync))
+}
+
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *NotifierGenericController) OnRemove(ctx context.Context, name string, sync NotifierHandler) {
+	c.ControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.Notifier](sync))
+}
+
+// Cache returns a cache of resources in memory.
+func (c *NotifierGenericController) Cache() NotifierCache {
+	return &NotifierGenericCache{
+		c.ControllerInterface.Cache(),
 	}
 }
 
-func FromNotifierHandlerToHandler(sync NotifierHandler) generic.Handler {
-	return func(key string, obj runtime.Object) (ret runtime.Object, err error) {
-		var v *v3.Notifier
-		if obj == nil {
-			v, err = sync(key, nil)
-		} else {
-			v, err = sync(key, obj.(*v3.Notifier))
-		}
-		if v == nil {
-			return nil, err
-		}
-		return v, err
-	}
+// NotifierGenericCache wraps wrangler/pkg/generic.Cache so the function definitions adhere to NotifierCache interface.
+type NotifierGenericCache struct {
+	generic.CacheInterface[*v3.Notifier]
 }
 
-func (c *notifierController) Updater() generic.Updater {
-	return func(obj runtime.Object) (runtime.Object, error) {
-		newObj, err := c.Update(obj.(*v3.Notifier))
-		if newObj == nil {
-			return nil, err
-		}
-		return newObj, err
-	}
-}
-
-func UpdateNotifierDeepCopyOnChange(client NotifierClient, obj *v3.Notifier, handler func(obj *v3.Notifier) (*v3.Notifier, error)) (*v3.Notifier, error) {
-	if obj == nil {
-		return obj, nil
-	}
-
-	copyObj := obj.DeepCopy()
-	newObj, err := handler(copyObj)
-	if newObj != nil {
-		copyObj = newObj
-	}
-	if obj.ResourceVersion == copyObj.ResourceVersion && !equality.Semantic.DeepEqual(obj, copyObj) {
-		return client.Update(copyObj)
-	}
-
-	return copyObj, err
-}
-
-func (c *notifierController) AddGenericHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.controller.RegisterHandler(ctx, name, controller.SharedControllerHandlerFunc(handler))
-}
-
-func (c *notifierController) AddGenericRemoveHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), handler))
-}
-
-func (c *notifierController) OnChange(ctx context.Context, name string, sync NotifierHandler) {
-	c.AddGenericHandler(ctx, name, FromNotifierHandlerToHandler(sync))
-}
-
-func (c *notifierController) OnRemove(ctx context.Context, name string, sync NotifierHandler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), FromNotifierHandlerToHandler(sync)))
-}
-
-func (c *notifierController) Enqueue(namespace, name string) {
-	c.controller.Enqueue(namespace, name)
-}
-
-func (c *notifierController) EnqueueAfter(namespace, name string, duration time.Duration) {
-	c.controller.EnqueueAfter(namespace, name, duration)
-}
-
-func (c *notifierController) Informer() cache.SharedIndexInformer {
-	return c.controller.Informer()
-}
-
-func (c *notifierController) GroupVersionKind() schema.GroupVersionKind {
-	return c.gvk
-}
-
-func (c *notifierController) Cache() NotifierCache {
-	return &notifierCache{
-		indexer:  c.Informer().GetIndexer(),
-		resource: c.groupResource,
-	}
-}
-
-func (c *notifierController) Create(obj *v3.Notifier) (*v3.Notifier, error) {
-	result := &v3.Notifier{}
-	return result, c.client.Create(context.TODO(), obj.Namespace, obj, result, metav1.CreateOptions{})
-}
-
-func (c *notifierController) Update(obj *v3.Notifier) (*v3.Notifier, error) {
-	result := &v3.Notifier{}
-	return result, c.client.Update(context.TODO(), obj.Namespace, obj, result, metav1.UpdateOptions{})
-}
-
-func (c *notifierController) UpdateStatus(obj *v3.Notifier) (*v3.Notifier, error) {
-	result := &v3.Notifier{}
-	return result, c.client.UpdateStatus(context.TODO(), obj.Namespace, obj, result, metav1.UpdateOptions{})
-}
-
-func (c *notifierController) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	if options == nil {
-		options = &metav1.DeleteOptions{}
-	}
-	return c.client.Delete(context.TODO(), namespace, name, *options)
-}
-
-func (c *notifierController) Get(namespace, name string, options metav1.GetOptions) (*v3.Notifier, error) {
-	result := &v3.Notifier{}
-	return result, c.client.Get(context.TODO(), namespace, name, result, options)
-}
-
-func (c *notifierController) List(namespace string, opts metav1.ListOptions) (*v3.NotifierList, error) {
-	result := &v3.NotifierList{}
-	return result, c.client.List(context.TODO(), namespace, result, opts)
-}
-
-func (c *notifierController) Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
-	return c.client.Watch(context.TODO(), namespace, opts)
-}
-
-func (c *notifierController) Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (*v3.Notifier, error) {
-	result := &v3.Notifier{}
-	return result, c.client.Patch(context.TODO(), namespace, name, pt, data, result, metav1.PatchOptions{}, subresources...)
-}
-
-type notifierCache struct {
-	indexer  cache.Indexer
-	resource schema.GroupResource
-}
-
-func (c *notifierCache) Get(namespace, name string) (*v3.Notifier, error) {
-	obj, exists, err := c.indexer.GetByKey(namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(c.resource, name)
-	}
-	return obj.(*v3.Notifier), nil
-}
-
-func (c *notifierCache) List(namespace string, selector labels.Selector) (ret []*v3.Notifier, err error) {
-
-	err = cache.ListAllByNamespace(c.indexer, namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v3.Notifier))
-	})
-
-	return ret, err
-}
-
-func (c *notifierCache) AddIndexer(indexName string, indexer NotifierIndexer) {
-	utilruntime.Must(c.indexer.AddIndexers(map[string]cache.IndexFunc{
-		indexName: func(obj interface{}) (strings []string, e error) {
-			return indexer(obj.(*v3.Notifier))
-		},
-	}))
-}
-
-func (c *notifierCache) GetByIndex(indexName, key string) (result []*v3.Notifier, err error) {
-	objs, err := c.indexer.ByIndex(indexName, key)
-	if err != nil {
-		return nil, err
-	}
-	result = make([]*v3.Notifier, 0, len(objs))
-	for _, obj := range objs {
-		result = append(result, obj.(*v3.Notifier))
-	}
-	return result, nil
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c NotifierGenericCache) AddIndexer(indexName string, indexer NotifierIndexer) {
+	c.CacheInterface.AddIndexer(indexName, generic.Indexer[*v3.Notifier](indexer))
 }
 
 type NotifierStatusHandler func(obj *v3.Notifier, status v3.NotifierStatus) (v3.NotifierStatus, error)
 
 type NotifierGeneratingHandler func(obj *v3.Notifier, status v3.NotifierStatus) ([]runtime.Object, v3.NotifierStatus, error)
+
+func FromNotifierHandlerToHandler(sync NotifierHandler) generic.Handler {
+	return generic.FromObjectHandlerToHandler(generic.ObjectHandler[*v3.Notifier](sync))
+}
 
 func RegisterNotifierStatusHandler(ctx context.Context, controller NotifierController, condition condition.Cond, name string, handler NotifierStatusHandler) {
 	statusHandler := &notifierStatusHandler{

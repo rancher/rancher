@@ -22,235 +22,111 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/lasso/pkg/client"
-	"github.com/rancher/lasso/pkg/controller"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/wrangler/pkg/generic"
-	"k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/tools/cache"
 )
 
-type ClusterMonitorGraphHandler func(string, *v3.ClusterMonitorGraph) (*v3.ClusterMonitorGraph, error)
-
+// ClusterMonitorGraphController interface for managing ClusterMonitorGraph resources.
 type ClusterMonitorGraphController interface {
 	generic.ControllerMeta
 	ClusterMonitorGraphClient
 
+	// OnChange runs the given handler when the controller detects a resource was changed.
 	OnChange(ctx context.Context, name string, sync ClusterMonitorGraphHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
 	OnRemove(ctx context.Context, name string, sync ClusterMonitorGraphHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
 	Enqueue(namespace, name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
 	EnqueueAfter(namespace, name string, duration time.Duration)
 
+	// Cache returns a cache for the resource type T.
 	Cache() ClusterMonitorGraphCache
 }
 
+// ClusterMonitorGraphClient interface for managing ClusterMonitorGraph resources in Kubernetes.
 type ClusterMonitorGraphClient interface {
+	// Create creates a new object and return the newly created Object or an error.
 	Create(*v3.ClusterMonitorGraph) (*v3.ClusterMonitorGraph, error)
+
+	// Update updates the object and return the newly updated Object or an error.
 	Update(*v3.ClusterMonitorGraph) (*v3.ClusterMonitorGraph, error)
 
+	// Delete deletes the Object in the given name.
 	Delete(namespace, name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
 	Get(namespace, name string, options metav1.GetOptions) (*v3.ClusterMonitorGraph, error)
+
+	// List will attempt to find multiple resources.
 	List(namespace string, opts metav1.ListOptions) (*v3.ClusterMonitorGraphList, error)
+
+	// Watch will start watching resources.
 	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
 	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.ClusterMonitorGraph, err error)
 }
 
+// ClusterMonitorGraphCache interface for retrieving ClusterMonitorGraph resources in memory.
 type ClusterMonitorGraphCache interface {
+	// Get returns the resources with the specified name from the cache.
 	Get(namespace, name string) (*v3.ClusterMonitorGraph, error)
+
+	// List will attempt to find resources from the Cache.
 	List(namespace string, selector labels.Selector) ([]*v3.ClusterMonitorGraph, error)
 
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
 	AddIndexer(indexName string, indexer ClusterMonitorGraphIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
 	GetByIndex(indexName, key string) ([]*v3.ClusterMonitorGraph, error)
 }
 
+// ClusterMonitorGraphHandler is function for performing any potential modifications to a ClusterMonitorGraph resource.
+type ClusterMonitorGraphHandler func(string, *v3.ClusterMonitorGraph) (*v3.ClusterMonitorGraph, error)
+
+// ClusterMonitorGraphIndexer computes a set of indexed values for the provided object.
 type ClusterMonitorGraphIndexer func(obj *v3.ClusterMonitorGraph) ([]string, error)
 
-type clusterMonitorGraphController struct {
-	controller    controller.SharedController
-	client        *client.Client
-	gvk           schema.GroupVersionKind
-	groupResource schema.GroupResource
+// ClusterMonitorGraphGenericController wraps wrangler/pkg/generic.Controller so that the function definitions adhere to ClusterMonitorGraphController interface.
+type ClusterMonitorGraphGenericController struct {
+	generic.ControllerInterface[*v3.ClusterMonitorGraph, *v3.ClusterMonitorGraphList]
 }
 
-func NewClusterMonitorGraphController(gvk schema.GroupVersionKind, resource string, namespaced bool, controller controller.SharedControllerFactory) ClusterMonitorGraphController {
-	c := controller.ForResourceKind(gvk.GroupVersion().WithResource(resource), gvk.Kind, namespaced)
-	return &clusterMonitorGraphController{
-		controller: c,
-		client:     c.Client(),
-		gvk:        gvk,
-		groupResource: schema.GroupResource{
-			Group:    gvk.Group,
-			Resource: resource,
-		},
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *ClusterMonitorGraphGenericController) OnChange(ctx context.Context, name string, sync ClusterMonitorGraphHandler) {
+	c.ControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.ClusterMonitorGraph](sync))
+}
+
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *ClusterMonitorGraphGenericController) OnRemove(ctx context.Context, name string, sync ClusterMonitorGraphHandler) {
+	c.ControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.ClusterMonitorGraph](sync))
+}
+
+// Cache returns a cache of resources in memory.
+func (c *ClusterMonitorGraphGenericController) Cache() ClusterMonitorGraphCache {
+	return &ClusterMonitorGraphGenericCache{
+		c.ControllerInterface.Cache(),
 	}
 }
 
-func FromClusterMonitorGraphHandlerToHandler(sync ClusterMonitorGraphHandler) generic.Handler {
-	return func(key string, obj runtime.Object) (ret runtime.Object, err error) {
-		var v *v3.ClusterMonitorGraph
-		if obj == nil {
-			v, err = sync(key, nil)
-		} else {
-			v, err = sync(key, obj.(*v3.ClusterMonitorGraph))
-		}
-		if v == nil {
-			return nil, err
-		}
-		return v, err
-	}
+// ClusterMonitorGraphGenericCache wraps wrangler/pkg/generic.Cache so the function definitions adhere to ClusterMonitorGraphCache interface.
+type ClusterMonitorGraphGenericCache struct {
+	generic.CacheInterface[*v3.ClusterMonitorGraph]
 }
 
-func (c *clusterMonitorGraphController) Updater() generic.Updater {
-	return func(obj runtime.Object) (runtime.Object, error) {
-		newObj, err := c.Update(obj.(*v3.ClusterMonitorGraph))
-		if newObj == nil {
-			return nil, err
-		}
-		return newObj, err
-	}
-}
-
-func UpdateClusterMonitorGraphDeepCopyOnChange(client ClusterMonitorGraphClient, obj *v3.ClusterMonitorGraph, handler func(obj *v3.ClusterMonitorGraph) (*v3.ClusterMonitorGraph, error)) (*v3.ClusterMonitorGraph, error) {
-	if obj == nil {
-		return obj, nil
-	}
-
-	copyObj := obj.DeepCopy()
-	newObj, err := handler(copyObj)
-	if newObj != nil {
-		copyObj = newObj
-	}
-	if obj.ResourceVersion == copyObj.ResourceVersion && !equality.Semantic.DeepEqual(obj, copyObj) {
-		return client.Update(copyObj)
-	}
-
-	return copyObj, err
-}
-
-func (c *clusterMonitorGraphController) AddGenericHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.controller.RegisterHandler(ctx, name, controller.SharedControllerHandlerFunc(handler))
-}
-
-func (c *clusterMonitorGraphController) AddGenericRemoveHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), handler))
-}
-
-func (c *clusterMonitorGraphController) OnChange(ctx context.Context, name string, sync ClusterMonitorGraphHandler) {
-	c.AddGenericHandler(ctx, name, FromClusterMonitorGraphHandlerToHandler(sync))
-}
-
-func (c *clusterMonitorGraphController) OnRemove(ctx context.Context, name string, sync ClusterMonitorGraphHandler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), FromClusterMonitorGraphHandlerToHandler(sync)))
-}
-
-func (c *clusterMonitorGraphController) Enqueue(namespace, name string) {
-	c.controller.Enqueue(namespace, name)
-}
-
-func (c *clusterMonitorGraphController) EnqueueAfter(namespace, name string, duration time.Duration) {
-	c.controller.EnqueueAfter(namespace, name, duration)
-}
-
-func (c *clusterMonitorGraphController) Informer() cache.SharedIndexInformer {
-	return c.controller.Informer()
-}
-
-func (c *clusterMonitorGraphController) GroupVersionKind() schema.GroupVersionKind {
-	return c.gvk
-}
-
-func (c *clusterMonitorGraphController) Cache() ClusterMonitorGraphCache {
-	return &clusterMonitorGraphCache{
-		indexer:  c.Informer().GetIndexer(),
-		resource: c.groupResource,
-	}
-}
-
-func (c *clusterMonitorGraphController) Create(obj *v3.ClusterMonitorGraph) (*v3.ClusterMonitorGraph, error) {
-	result := &v3.ClusterMonitorGraph{}
-	return result, c.client.Create(context.TODO(), obj.Namespace, obj, result, metav1.CreateOptions{})
-}
-
-func (c *clusterMonitorGraphController) Update(obj *v3.ClusterMonitorGraph) (*v3.ClusterMonitorGraph, error) {
-	result := &v3.ClusterMonitorGraph{}
-	return result, c.client.Update(context.TODO(), obj.Namespace, obj, result, metav1.UpdateOptions{})
-}
-
-func (c *clusterMonitorGraphController) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	if options == nil {
-		options = &metav1.DeleteOptions{}
-	}
-	return c.client.Delete(context.TODO(), namespace, name, *options)
-}
-
-func (c *clusterMonitorGraphController) Get(namespace, name string, options metav1.GetOptions) (*v3.ClusterMonitorGraph, error) {
-	result := &v3.ClusterMonitorGraph{}
-	return result, c.client.Get(context.TODO(), namespace, name, result, options)
-}
-
-func (c *clusterMonitorGraphController) List(namespace string, opts metav1.ListOptions) (*v3.ClusterMonitorGraphList, error) {
-	result := &v3.ClusterMonitorGraphList{}
-	return result, c.client.List(context.TODO(), namespace, result, opts)
-}
-
-func (c *clusterMonitorGraphController) Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
-	return c.client.Watch(context.TODO(), namespace, opts)
-}
-
-func (c *clusterMonitorGraphController) Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (*v3.ClusterMonitorGraph, error) {
-	result := &v3.ClusterMonitorGraph{}
-	return result, c.client.Patch(context.TODO(), namespace, name, pt, data, result, metav1.PatchOptions{}, subresources...)
-}
-
-type clusterMonitorGraphCache struct {
-	indexer  cache.Indexer
-	resource schema.GroupResource
-}
-
-func (c *clusterMonitorGraphCache) Get(namespace, name string) (*v3.ClusterMonitorGraph, error) {
-	obj, exists, err := c.indexer.GetByKey(namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(c.resource, name)
-	}
-	return obj.(*v3.ClusterMonitorGraph), nil
-}
-
-func (c *clusterMonitorGraphCache) List(namespace string, selector labels.Selector) (ret []*v3.ClusterMonitorGraph, err error) {
-
-	err = cache.ListAllByNamespace(c.indexer, namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v3.ClusterMonitorGraph))
-	})
-
-	return ret, err
-}
-
-func (c *clusterMonitorGraphCache) AddIndexer(indexName string, indexer ClusterMonitorGraphIndexer) {
-	utilruntime.Must(c.indexer.AddIndexers(map[string]cache.IndexFunc{
-		indexName: func(obj interface{}) (strings []string, e error) {
-			return indexer(obj.(*v3.ClusterMonitorGraph))
-		},
-	}))
-}
-
-func (c *clusterMonitorGraphCache) GetByIndex(indexName, key string) (result []*v3.ClusterMonitorGraph, err error) {
-	objs, err := c.indexer.ByIndex(indexName, key)
-	if err != nil {
-		return nil, err
-	}
-	result = make([]*v3.ClusterMonitorGraph, 0, len(objs))
-	for _, obj := range objs {
-		result = append(result, obj.(*v3.ClusterMonitorGraph))
-	}
-	return result, nil
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c ClusterMonitorGraphGenericCache) AddIndexer(indexName string, indexer ClusterMonitorGraphIndexer) {
+	c.CacheInterface.AddIndexer(indexName, generic.Indexer[*v3.ClusterMonitorGraph](indexer))
 }

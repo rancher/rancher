@@ -22,8 +22,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/lasso/pkg/client"
-	"github.com/rancher/lasso/pkg/controller"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/wrangler/pkg/apply"
 	"github.com/rancher/wrangler/pkg/condition"
@@ -36,236 +34,120 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/tools/cache"
 )
 
-type FeatureHandler func(string, *v3.Feature) (*v3.Feature, error)
-
+// FeatureController interface for managing Feature resources.
 type FeatureController interface {
 	generic.ControllerMeta
 	FeatureClient
 
+	// OnChange runs the given handler when the controller detects a resource was changed.
 	OnChange(ctx context.Context, name string, sync FeatureHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
 	OnRemove(ctx context.Context, name string, sync FeatureHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
 	Enqueue(name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
 	EnqueueAfter(name string, duration time.Duration)
 
+	// Cache returns a cache for the resource type T.
 	Cache() FeatureCache
 }
 
+// FeatureClient interface for managing Feature resources in Kubernetes.
 type FeatureClient interface {
+	// Create creates a new object and return the newly created Object or an error.
 	Create(*v3.Feature) (*v3.Feature, error)
+
+	// Update updates the object and return the newly updated Object or an error.
 	Update(*v3.Feature) (*v3.Feature, error)
+	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
+	// Will always return an error if the object does not have a status field.
 	UpdateStatus(*v3.Feature) (*v3.Feature, error)
+
+	// Delete deletes the Object in the given name.
 	Delete(name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
 	Get(name string, options metav1.GetOptions) (*v3.Feature, error)
+
+	// List will attempt to find multiple resources.
 	List(opts metav1.ListOptions) (*v3.FeatureList, error)
+
+	// Watch will start watching resources.
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.Feature, err error)
 }
 
+// FeatureCache interface for retrieving Feature resources in memory.
 type FeatureCache interface {
+	// Get returns the resources with the specified name from the cache.
 	Get(name string) (*v3.Feature, error)
+
+	// List will attempt to find resources from the Cache.
 	List(selector labels.Selector) ([]*v3.Feature, error)
 
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
 	AddIndexer(indexName string, indexer FeatureIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
 	GetByIndex(indexName, key string) ([]*v3.Feature, error)
 }
 
+// FeatureHandler is function for performing any potential modifications to a Feature resource.
+type FeatureHandler func(string, *v3.Feature) (*v3.Feature, error)
+
+// FeatureIndexer computes a set of indexed values for the provided object.
 type FeatureIndexer func(obj *v3.Feature) ([]string, error)
 
-type featureController struct {
-	controller    controller.SharedController
-	client        *client.Client
-	gvk           schema.GroupVersionKind
-	groupResource schema.GroupResource
+// FeatureGenericController wraps wrangler/pkg/generic.NonNamespacedController so that the function definitions adhere to FeatureController interface.
+type FeatureGenericController struct {
+	generic.NonNamespacedControllerInterface[*v3.Feature, *v3.FeatureList]
 }
 
-func NewFeatureController(gvk schema.GroupVersionKind, resource string, namespaced bool, controller controller.SharedControllerFactory) FeatureController {
-	c := controller.ForResourceKind(gvk.GroupVersion().WithResource(resource), gvk.Kind, namespaced)
-	return &featureController{
-		controller: c,
-		client:     c.Client(),
-		gvk:        gvk,
-		groupResource: schema.GroupResource{
-			Group:    gvk.Group,
-			Resource: resource,
-		},
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *FeatureGenericController) OnChange(ctx context.Context, name string, sync FeatureHandler) {
+	c.NonNamespacedControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.Feature](sync))
+}
+
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *FeatureGenericController) OnRemove(ctx context.Context, name string, sync FeatureHandler) {
+	c.NonNamespacedControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.Feature](sync))
+}
+
+// Cache returns a cache of resources in memory.
+func (c *FeatureGenericController) Cache() FeatureCache {
+	return &FeatureGenericCache{
+		c.NonNamespacedControllerInterface.Cache(),
 	}
 }
 
-func FromFeatureHandlerToHandler(sync FeatureHandler) generic.Handler {
-	return func(key string, obj runtime.Object) (ret runtime.Object, err error) {
-		var v *v3.Feature
-		if obj == nil {
-			v, err = sync(key, nil)
-		} else {
-			v, err = sync(key, obj.(*v3.Feature))
-		}
-		if v == nil {
-			return nil, err
-		}
-		return v, err
-	}
+// FeatureGenericCache wraps wrangler/pkg/generic.NonNamespacedCache so the function definitions adhere to FeatureCache interface.
+type FeatureGenericCache struct {
+	generic.NonNamespacedCacheInterface[*v3.Feature]
 }
 
-func (c *featureController) Updater() generic.Updater {
-	return func(obj runtime.Object) (runtime.Object, error) {
-		newObj, err := c.Update(obj.(*v3.Feature))
-		if newObj == nil {
-			return nil, err
-		}
-		return newObj, err
-	}
-}
-
-func UpdateFeatureDeepCopyOnChange(client FeatureClient, obj *v3.Feature, handler func(obj *v3.Feature) (*v3.Feature, error)) (*v3.Feature, error) {
-	if obj == nil {
-		return obj, nil
-	}
-
-	copyObj := obj.DeepCopy()
-	newObj, err := handler(copyObj)
-	if newObj != nil {
-		copyObj = newObj
-	}
-	if obj.ResourceVersion == copyObj.ResourceVersion && !equality.Semantic.DeepEqual(obj, copyObj) {
-		return client.Update(copyObj)
-	}
-
-	return copyObj, err
-}
-
-func (c *featureController) AddGenericHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.controller.RegisterHandler(ctx, name, controller.SharedControllerHandlerFunc(handler))
-}
-
-func (c *featureController) AddGenericRemoveHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), handler))
-}
-
-func (c *featureController) OnChange(ctx context.Context, name string, sync FeatureHandler) {
-	c.AddGenericHandler(ctx, name, FromFeatureHandlerToHandler(sync))
-}
-
-func (c *featureController) OnRemove(ctx context.Context, name string, sync FeatureHandler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), FromFeatureHandlerToHandler(sync)))
-}
-
-func (c *featureController) Enqueue(name string) {
-	c.controller.Enqueue("", name)
-}
-
-func (c *featureController) EnqueueAfter(name string, duration time.Duration) {
-	c.controller.EnqueueAfter("", name, duration)
-}
-
-func (c *featureController) Informer() cache.SharedIndexInformer {
-	return c.controller.Informer()
-}
-
-func (c *featureController) GroupVersionKind() schema.GroupVersionKind {
-	return c.gvk
-}
-
-func (c *featureController) Cache() FeatureCache {
-	return &featureCache{
-		indexer:  c.Informer().GetIndexer(),
-		resource: c.groupResource,
-	}
-}
-
-func (c *featureController) Create(obj *v3.Feature) (*v3.Feature, error) {
-	result := &v3.Feature{}
-	return result, c.client.Create(context.TODO(), "", obj, result, metav1.CreateOptions{})
-}
-
-func (c *featureController) Update(obj *v3.Feature) (*v3.Feature, error) {
-	result := &v3.Feature{}
-	return result, c.client.Update(context.TODO(), "", obj, result, metav1.UpdateOptions{})
-}
-
-func (c *featureController) UpdateStatus(obj *v3.Feature) (*v3.Feature, error) {
-	result := &v3.Feature{}
-	return result, c.client.UpdateStatus(context.TODO(), "", obj, result, metav1.UpdateOptions{})
-}
-
-func (c *featureController) Delete(name string, options *metav1.DeleteOptions) error {
-	if options == nil {
-		options = &metav1.DeleteOptions{}
-	}
-	return c.client.Delete(context.TODO(), "", name, *options)
-}
-
-func (c *featureController) Get(name string, options metav1.GetOptions) (*v3.Feature, error) {
-	result := &v3.Feature{}
-	return result, c.client.Get(context.TODO(), "", name, result, options)
-}
-
-func (c *featureController) List(opts metav1.ListOptions) (*v3.FeatureList, error) {
-	result := &v3.FeatureList{}
-	return result, c.client.List(context.TODO(), "", result, opts)
-}
-
-func (c *featureController) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return c.client.Watch(context.TODO(), "", opts)
-}
-
-func (c *featureController) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (*v3.Feature, error) {
-	result := &v3.Feature{}
-	return result, c.client.Patch(context.TODO(), "", name, pt, data, result, metav1.PatchOptions{}, subresources...)
-}
-
-type featureCache struct {
-	indexer  cache.Indexer
-	resource schema.GroupResource
-}
-
-func (c *featureCache) Get(name string) (*v3.Feature, error) {
-	obj, exists, err := c.indexer.GetByKey(name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(c.resource, name)
-	}
-	return obj.(*v3.Feature), nil
-}
-
-func (c *featureCache) List(selector labels.Selector) (ret []*v3.Feature, err error) {
-
-	err = cache.ListAll(c.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v3.Feature))
-	})
-
-	return ret, err
-}
-
-func (c *featureCache) AddIndexer(indexName string, indexer FeatureIndexer) {
-	utilruntime.Must(c.indexer.AddIndexers(map[string]cache.IndexFunc{
-		indexName: func(obj interface{}) (strings []string, e error) {
-			return indexer(obj.(*v3.Feature))
-		},
-	}))
-}
-
-func (c *featureCache) GetByIndex(indexName, key string) (result []*v3.Feature, err error) {
-	objs, err := c.indexer.ByIndex(indexName, key)
-	if err != nil {
-		return nil, err
-	}
-	result = make([]*v3.Feature, 0, len(objs))
-	for _, obj := range objs {
-		result = append(result, obj.(*v3.Feature))
-	}
-	return result, nil
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c FeatureGenericCache) AddIndexer(indexName string, indexer FeatureIndexer) {
+	c.NonNamespacedCacheInterface.AddIndexer(indexName, generic.Indexer[*v3.Feature](indexer))
 }
 
 type FeatureStatusHandler func(obj *v3.Feature, status v3.FeatureStatus) (v3.FeatureStatus, error)
 
 type FeatureGeneratingHandler func(obj *v3.Feature, status v3.FeatureStatus) ([]runtime.Object, v3.FeatureStatus, error)
+
+func FromFeatureHandlerToHandler(sync FeatureHandler) generic.Handler {
+	return generic.FromObjectHandlerToHandler(generic.ObjectHandler[*v3.Feature](sync))
+}
 
 func RegisterFeatureStatusHandler(ctx context.Context, controller FeatureController, condition condition.Cond, name string, handler FeatureStatusHandler) {
 	statusHandler := &featureStatusHandler{

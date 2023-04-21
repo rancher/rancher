@@ -23,8 +23,6 @@ import (
 	"time"
 
 	v1alpha1 "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
-	"github.com/rancher/lasso/pkg/client"
-	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/wrangler/pkg/apply"
 	"github.com/rancher/wrangler/pkg/condition"
 	"github.com/rancher/wrangler/pkg/generic"
@@ -36,236 +34,120 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/tools/cache"
 )
 
-type BundleHandler func(string, *v1alpha1.Bundle) (*v1alpha1.Bundle, error)
-
+// BundleController interface for managing Bundle resources.
 type BundleController interface {
 	generic.ControllerMeta
 	BundleClient
 
+	// OnChange runs the given handler when the controller detects a resource was changed.
 	OnChange(ctx context.Context, name string, sync BundleHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
 	OnRemove(ctx context.Context, name string, sync BundleHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
 	Enqueue(namespace, name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
 	EnqueueAfter(namespace, name string, duration time.Duration)
 
+	// Cache returns a cache for the resource type T.
 	Cache() BundleCache
 }
 
+// BundleClient interface for managing Bundle resources in Kubernetes.
 type BundleClient interface {
+	// Create creates a new object and return the newly created Object or an error.
 	Create(*v1alpha1.Bundle) (*v1alpha1.Bundle, error)
+
+	// Update updates the object and return the newly updated Object or an error.
 	Update(*v1alpha1.Bundle) (*v1alpha1.Bundle, error)
+	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
+	// Will always return an error if the object does not have a status field.
 	UpdateStatus(*v1alpha1.Bundle) (*v1alpha1.Bundle, error)
+
+	// Delete deletes the Object in the given name.
 	Delete(namespace, name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
 	Get(namespace, name string, options metav1.GetOptions) (*v1alpha1.Bundle, error)
+
+	// List will attempt to find multiple resources.
 	List(namespace string, opts metav1.ListOptions) (*v1alpha1.BundleList, error)
+
+	// Watch will start watching resources.
 	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
 	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.Bundle, err error)
 }
 
+// BundleCache interface for retrieving Bundle resources in memory.
 type BundleCache interface {
+	// Get returns the resources with the specified name from the cache.
 	Get(namespace, name string) (*v1alpha1.Bundle, error)
+
+	// List will attempt to find resources from the Cache.
 	List(namespace string, selector labels.Selector) ([]*v1alpha1.Bundle, error)
 
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
 	AddIndexer(indexName string, indexer BundleIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
 	GetByIndex(indexName, key string) ([]*v1alpha1.Bundle, error)
 }
 
+// BundleHandler is function for performing any potential modifications to a Bundle resource.
+type BundleHandler func(string, *v1alpha1.Bundle) (*v1alpha1.Bundle, error)
+
+// BundleIndexer computes a set of indexed values for the provided object.
 type BundleIndexer func(obj *v1alpha1.Bundle) ([]string, error)
 
-type bundleController struct {
-	controller    controller.SharedController
-	client        *client.Client
-	gvk           schema.GroupVersionKind
-	groupResource schema.GroupResource
+// BundleGenericController wraps wrangler/pkg/generic.Controller so that the function definitions adhere to BundleController interface.
+type BundleGenericController struct {
+	generic.ControllerInterface[*v1alpha1.Bundle, *v1alpha1.BundleList]
 }
 
-func NewBundleController(gvk schema.GroupVersionKind, resource string, namespaced bool, controller controller.SharedControllerFactory) BundleController {
-	c := controller.ForResourceKind(gvk.GroupVersion().WithResource(resource), gvk.Kind, namespaced)
-	return &bundleController{
-		controller: c,
-		client:     c.Client(),
-		gvk:        gvk,
-		groupResource: schema.GroupResource{
-			Group:    gvk.Group,
-			Resource: resource,
-		},
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *BundleGenericController) OnChange(ctx context.Context, name string, sync BundleHandler) {
+	c.ControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v1alpha1.Bundle](sync))
+}
+
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *BundleGenericController) OnRemove(ctx context.Context, name string, sync BundleHandler) {
+	c.ControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v1alpha1.Bundle](sync))
+}
+
+// Cache returns a cache of resources in memory.
+func (c *BundleGenericController) Cache() BundleCache {
+	return &BundleGenericCache{
+		c.ControllerInterface.Cache(),
 	}
 }
 
-func FromBundleHandlerToHandler(sync BundleHandler) generic.Handler {
-	return func(key string, obj runtime.Object) (ret runtime.Object, err error) {
-		var v *v1alpha1.Bundle
-		if obj == nil {
-			v, err = sync(key, nil)
-		} else {
-			v, err = sync(key, obj.(*v1alpha1.Bundle))
-		}
-		if v == nil {
-			return nil, err
-		}
-		return v, err
-	}
+// BundleGenericCache wraps wrangler/pkg/generic.Cache so the function definitions adhere to BundleCache interface.
+type BundleGenericCache struct {
+	generic.CacheInterface[*v1alpha1.Bundle]
 }
 
-func (c *bundleController) Updater() generic.Updater {
-	return func(obj runtime.Object) (runtime.Object, error) {
-		newObj, err := c.Update(obj.(*v1alpha1.Bundle))
-		if newObj == nil {
-			return nil, err
-		}
-		return newObj, err
-	}
-}
-
-func UpdateBundleDeepCopyOnChange(client BundleClient, obj *v1alpha1.Bundle, handler func(obj *v1alpha1.Bundle) (*v1alpha1.Bundle, error)) (*v1alpha1.Bundle, error) {
-	if obj == nil {
-		return obj, nil
-	}
-
-	copyObj := obj.DeepCopy()
-	newObj, err := handler(copyObj)
-	if newObj != nil {
-		copyObj = newObj
-	}
-	if obj.ResourceVersion == copyObj.ResourceVersion && !equality.Semantic.DeepEqual(obj, copyObj) {
-		return client.Update(copyObj)
-	}
-
-	return copyObj, err
-}
-
-func (c *bundleController) AddGenericHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.controller.RegisterHandler(ctx, name, controller.SharedControllerHandlerFunc(handler))
-}
-
-func (c *bundleController) AddGenericRemoveHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), handler))
-}
-
-func (c *bundleController) OnChange(ctx context.Context, name string, sync BundleHandler) {
-	c.AddGenericHandler(ctx, name, FromBundleHandlerToHandler(sync))
-}
-
-func (c *bundleController) OnRemove(ctx context.Context, name string, sync BundleHandler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), FromBundleHandlerToHandler(sync)))
-}
-
-func (c *bundleController) Enqueue(namespace, name string) {
-	c.controller.Enqueue(namespace, name)
-}
-
-func (c *bundleController) EnqueueAfter(namespace, name string, duration time.Duration) {
-	c.controller.EnqueueAfter(namespace, name, duration)
-}
-
-func (c *bundleController) Informer() cache.SharedIndexInformer {
-	return c.controller.Informer()
-}
-
-func (c *bundleController) GroupVersionKind() schema.GroupVersionKind {
-	return c.gvk
-}
-
-func (c *bundleController) Cache() BundleCache {
-	return &bundleCache{
-		indexer:  c.Informer().GetIndexer(),
-		resource: c.groupResource,
-	}
-}
-
-func (c *bundleController) Create(obj *v1alpha1.Bundle) (*v1alpha1.Bundle, error) {
-	result := &v1alpha1.Bundle{}
-	return result, c.client.Create(context.TODO(), obj.Namespace, obj, result, metav1.CreateOptions{})
-}
-
-func (c *bundleController) Update(obj *v1alpha1.Bundle) (*v1alpha1.Bundle, error) {
-	result := &v1alpha1.Bundle{}
-	return result, c.client.Update(context.TODO(), obj.Namespace, obj, result, metav1.UpdateOptions{})
-}
-
-func (c *bundleController) UpdateStatus(obj *v1alpha1.Bundle) (*v1alpha1.Bundle, error) {
-	result := &v1alpha1.Bundle{}
-	return result, c.client.UpdateStatus(context.TODO(), obj.Namespace, obj, result, metav1.UpdateOptions{})
-}
-
-func (c *bundleController) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	if options == nil {
-		options = &metav1.DeleteOptions{}
-	}
-	return c.client.Delete(context.TODO(), namespace, name, *options)
-}
-
-func (c *bundleController) Get(namespace, name string, options metav1.GetOptions) (*v1alpha1.Bundle, error) {
-	result := &v1alpha1.Bundle{}
-	return result, c.client.Get(context.TODO(), namespace, name, result, options)
-}
-
-func (c *bundleController) List(namespace string, opts metav1.ListOptions) (*v1alpha1.BundleList, error) {
-	result := &v1alpha1.BundleList{}
-	return result, c.client.List(context.TODO(), namespace, result, opts)
-}
-
-func (c *bundleController) Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
-	return c.client.Watch(context.TODO(), namespace, opts)
-}
-
-func (c *bundleController) Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (*v1alpha1.Bundle, error) {
-	result := &v1alpha1.Bundle{}
-	return result, c.client.Patch(context.TODO(), namespace, name, pt, data, result, metav1.PatchOptions{}, subresources...)
-}
-
-type bundleCache struct {
-	indexer  cache.Indexer
-	resource schema.GroupResource
-}
-
-func (c *bundleCache) Get(namespace, name string) (*v1alpha1.Bundle, error) {
-	obj, exists, err := c.indexer.GetByKey(namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(c.resource, name)
-	}
-	return obj.(*v1alpha1.Bundle), nil
-}
-
-func (c *bundleCache) List(namespace string, selector labels.Selector) (ret []*v1alpha1.Bundle, err error) {
-
-	err = cache.ListAllByNamespace(c.indexer, namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1alpha1.Bundle))
-	})
-
-	return ret, err
-}
-
-func (c *bundleCache) AddIndexer(indexName string, indexer BundleIndexer) {
-	utilruntime.Must(c.indexer.AddIndexers(map[string]cache.IndexFunc{
-		indexName: func(obj interface{}) (strings []string, e error) {
-			return indexer(obj.(*v1alpha1.Bundle))
-		},
-	}))
-}
-
-func (c *bundleCache) GetByIndex(indexName, key string) (result []*v1alpha1.Bundle, err error) {
-	objs, err := c.indexer.ByIndex(indexName, key)
-	if err != nil {
-		return nil, err
-	}
-	result = make([]*v1alpha1.Bundle, 0, len(objs))
-	for _, obj := range objs {
-		result = append(result, obj.(*v1alpha1.Bundle))
-	}
-	return result, nil
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c BundleGenericCache) AddIndexer(indexName string, indexer BundleIndexer) {
+	c.CacheInterface.AddIndexer(indexName, generic.Indexer[*v1alpha1.Bundle](indexer))
 }
 
 type BundleStatusHandler func(obj *v1alpha1.Bundle, status v1alpha1.BundleStatus) (v1alpha1.BundleStatus, error)
 
 type BundleGeneratingHandler func(obj *v1alpha1.Bundle, status v1alpha1.BundleStatus) ([]runtime.Object, v1alpha1.BundleStatus, error)
+
+func FromBundleHandlerToHandler(sync BundleHandler) generic.Handler {
+	return generic.FromObjectHandlerToHandler(generic.ObjectHandler[*v1alpha1.Bundle](sync))
+}
 
 func RegisterBundleStatusHandler(ctx context.Context, controller BundleController, condition condition.Cond, name string, handler BundleStatusHandler) {
 	statusHandler := &bundleStatusHandler{

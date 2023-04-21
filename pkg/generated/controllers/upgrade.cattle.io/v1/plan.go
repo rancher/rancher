@@ -22,8 +22,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/lasso/pkg/client"
-	"github.com/rancher/lasso/pkg/controller"
 	v1 "github.com/rancher/system-upgrade-controller/pkg/apis/upgrade.cattle.io/v1"
 	"github.com/rancher/wrangler/pkg/apply"
 	"github.com/rancher/wrangler/pkg/condition"
@@ -36,236 +34,120 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/tools/cache"
 )
 
-type PlanHandler func(string, *v1.Plan) (*v1.Plan, error)
-
+// PlanController interface for managing Plan resources.
 type PlanController interface {
 	generic.ControllerMeta
 	PlanClient
 
+	// OnChange runs the given handler when the controller detects a resource was changed.
 	OnChange(ctx context.Context, name string, sync PlanHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
 	OnRemove(ctx context.Context, name string, sync PlanHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
 	Enqueue(namespace, name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
 	EnqueueAfter(namespace, name string, duration time.Duration)
 
+	// Cache returns a cache for the resource type T.
 	Cache() PlanCache
 }
 
+// PlanClient interface for managing Plan resources in Kubernetes.
 type PlanClient interface {
+	// Create creates a new object and return the newly created Object or an error.
 	Create(*v1.Plan) (*v1.Plan, error)
+
+	// Update updates the object and return the newly updated Object or an error.
 	Update(*v1.Plan) (*v1.Plan, error)
+	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
+	// Will always return an error if the object does not have a status field.
 	UpdateStatus(*v1.Plan) (*v1.Plan, error)
+
+	// Delete deletes the Object in the given name.
 	Delete(namespace, name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
 	Get(namespace, name string, options metav1.GetOptions) (*v1.Plan, error)
+
+	// List will attempt to find multiple resources.
 	List(namespace string, opts metav1.ListOptions) (*v1.PlanList, error)
+
+	// Watch will start watching resources.
 	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
 	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Plan, err error)
 }
 
+// PlanCache interface for retrieving Plan resources in memory.
 type PlanCache interface {
+	// Get returns the resources with the specified name from the cache.
 	Get(namespace, name string) (*v1.Plan, error)
+
+	// List will attempt to find resources from the Cache.
 	List(namespace string, selector labels.Selector) ([]*v1.Plan, error)
 
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
 	AddIndexer(indexName string, indexer PlanIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
 	GetByIndex(indexName, key string) ([]*v1.Plan, error)
 }
 
+// PlanHandler is function for performing any potential modifications to a Plan resource.
+type PlanHandler func(string, *v1.Plan) (*v1.Plan, error)
+
+// PlanIndexer computes a set of indexed values for the provided object.
 type PlanIndexer func(obj *v1.Plan) ([]string, error)
 
-type planController struct {
-	controller    controller.SharedController
-	client        *client.Client
-	gvk           schema.GroupVersionKind
-	groupResource schema.GroupResource
+// PlanGenericController wraps wrangler/pkg/generic.Controller so that the function definitions adhere to PlanController interface.
+type PlanGenericController struct {
+	generic.ControllerInterface[*v1.Plan, *v1.PlanList]
 }
 
-func NewPlanController(gvk schema.GroupVersionKind, resource string, namespaced bool, controller controller.SharedControllerFactory) PlanController {
-	c := controller.ForResourceKind(gvk.GroupVersion().WithResource(resource), gvk.Kind, namespaced)
-	return &planController{
-		controller: c,
-		client:     c.Client(),
-		gvk:        gvk,
-		groupResource: schema.GroupResource{
-			Group:    gvk.Group,
-			Resource: resource,
-		},
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *PlanGenericController) OnChange(ctx context.Context, name string, sync PlanHandler) {
+	c.ControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v1.Plan](sync))
+}
+
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *PlanGenericController) OnRemove(ctx context.Context, name string, sync PlanHandler) {
+	c.ControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v1.Plan](sync))
+}
+
+// Cache returns a cache of resources in memory.
+func (c *PlanGenericController) Cache() PlanCache {
+	return &PlanGenericCache{
+		c.ControllerInterface.Cache(),
 	}
 }
 
-func FromPlanHandlerToHandler(sync PlanHandler) generic.Handler {
-	return func(key string, obj runtime.Object) (ret runtime.Object, err error) {
-		var v *v1.Plan
-		if obj == nil {
-			v, err = sync(key, nil)
-		} else {
-			v, err = sync(key, obj.(*v1.Plan))
-		}
-		if v == nil {
-			return nil, err
-		}
-		return v, err
-	}
+// PlanGenericCache wraps wrangler/pkg/generic.Cache so the function definitions adhere to PlanCache interface.
+type PlanGenericCache struct {
+	generic.CacheInterface[*v1.Plan]
 }
 
-func (c *planController) Updater() generic.Updater {
-	return func(obj runtime.Object) (runtime.Object, error) {
-		newObj, err := c.Update(obj.(*v1.Plan))
-		if newObj == nil {
-			return nil, err
-		}
-		return newObj, err
-	}
-}
-
-func UpdatePlanDeepCopyOnChange(client PlanClient, obj *v1.Plan, handler func(obj *v1.Plan) (*v1.Plan, error)) (*v1.Plan, error) {
-	if obj == nil {
-		return obj, nil
-	}
-
-	copyObj := obj.DeepCopy()
-	newObj, err := handler(copyObj)
-	if newObj != nil {
-		copyObj = newObj
-	}
-	if obj.ResourceVersion == copyObj.ResourceVersion && !equality.Semantic.DeepEqual(obj, copyObj) {
-		return client.Update(copyObj)
-	}
-
-	return copyObj, err
-}
-
-func (c *planController) AddGenericHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.controller.RegisterHandler(ctx, name, controller.SharedControllerHandlerFunc(handler))
-}
-
-func (c *planController) AddGenericRemoveHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), handler))
-}
-
-func (c *planController) OnChange(ctx context.Context, name string, sync PlanHandler) {
-	c.AddGenericHandler(ctx, name, FromPlanHandlerToHandler(sync))
-}
-
-func (c *planController) OnRemove(ctx context.Context, name string, sync PlanHandler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), FromPlanHandlerToHandler(sync)))
-}
-
-func (c *planController) Enqueue(namespace, name string) {
-	c.controller.Enqueue(namespace, name)
-}
-
-func (c *planController) EnqueueAfter(namespace, name string, duration time.Duration) {
-	c.controller.EnqueueAfter(namespace, name, duration)
-}
-
-func (c *planController) Informer() cache.SharedIndexInformer {
-	return c.controller.Informer()
-}
-
-func (c *planController) GroupVersionKind() schema.GroupVersionKind {
-	return c.gvk
-}
-
-func (c *planController) Cache() PlanCache {
-	return &planCache{
-		indexer:  c.Informer().GetIndexer(),
-		resource: c.groupResource,
-	}
-}
-
-func (c *planController) Create(obj *v1.Plan) (*v1.Plan, error) {
-	result := &v1.Plan{}
-	return result, c.client.Create(context.TODO(), obj.Namespace, obj, result, metav1.CreateOptions{})
-}
-
-func (c *planController) Update(obj *v1.Plan) (*v1.Plan, error) {
-	result := &v1.Plan{}
-	return result, c.client.Update(context.TODO(), obj.Namespace, obj, result, metav1.UpdateOptions{})
-}
-
-func (c *planController) UpdateStatus(obj *v1.Plan) (*v1.Plan, error) {
-	result := &v1.Plan{}
-	return result, c.client.UpdateStatus(context.TODO(), obj.Namespace, obj, result, metav1.UpdateOptions{})
-}
-
-func (c *planController) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	if options == nil {
-		options = &metav1.DeleteOptions{}
-	}
-	return c.client.Delete(context.TODO(), namespace, name, *options)
-}
-
-func (c *planController) Get(namespace, name string, options metav1.GetOptions) (*v1.Plan, error) {
-	result := &v1.Plan{}
-	return result, c.client.Get(context.TODO(), namespace, name, result, options)
-}
-
-func (c *planController) List(namespace string, opts metav1.ListOptions) (*v1.PlanList, error) {
-	result := &v1.PlanList{}
-	return result, c.client.List(context.TODO(), namespace, result, opts)
-}
-
-func (c *planController) Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
-	return c.client.Watch(context.TODO(), namespace, opts)
-}
-
-func (c *planController) Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (*v1.Plan, error) {
-	result := &v1.Plan{}
-	return result, c.client.Patch(context.TODO(), namespace, name, pt, data, result, metav1.PatchOptions{}, subresources...)
-}
-
-type planCache struct {
-	indexer  cache.Indexer
-	resource schema.GroupResource
-}
-
-func (c *planCache) Get(namespace, name string) (*v1.Plan, error) {
-	obj, exists, err := c.indexer.GetByKey(namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(c.resource, name)
-	}
-	return obj.(*v1.Plan), nil
-}
-
-func (c *planCache) List(namespace string, selector labels.Selector) (ret []*v1.Plan, err error) {
-
-	err = cache.ListAllByNamespace(c.indexer, namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.Plan))
-	})
-
-	return ret, err
-}
-
-func (c *planCache) AddIndexer(indexName string, indexer PlanIndexer) {
-	utilruntime.Must(c.indexer.AddIndexers(map[string]cache.IndexFunc{
-		indexName: func(obj interface{}) (strings []string, e error) {
-			return indexer(obj.(*v1.Plan))
-		},
-	}))
-}
-
-func (c *planCache) GetByIndex(indexName, key string) (result []*v1.Plan, err error) {
-	objs, err := c.indexer.ByIndex(indexName, key)
-	if err != nil {
-		return nil, err
-	}
-	result = make([]*v1.Plan, 0, len(objs))
-	for _, obj := range objs {
-		result = append(result, obj.(*v1.Plan))
-	}
-	return result, nil
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c PlanGenericCache) AddIndexer(indexName string, indexer PlanIndexer) {
+	c.CacheInterface.AddIndexer(indexName, generic.Indexer[*v1.Plan](indexer))
 }
 
 type PlanStatusHandler func(obj *v1.Plan, status v1.PlanStatus) (v1.PlanStatus, error)
 
 type PlanGeneratingHandler func(obj *v1.Plan, status v1.PlanStatus) ([]runtime.Object, v1.PlanStatus, error)
+
+func FromPlanHandlerToHandler(sync PlanHandler) generic.Handler {
+	return generic.FromObjectHandlerToHandler(generic.ObjectHandler[*v1.Plan](sync))
+}
 
 func RegisterPlanStatusHandler(ctx context.Context, controller PlanController, condition condition.Cond, name string, handler PlanStatusHandler) {
 	statusHandler := &planStatusHandler{

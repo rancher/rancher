@@ -22,8 +22,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/lasso/pkg/client"
-	"github.com/rancher/lasso/pkg/controller"
 	v1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/wrangler/pkg/apply"
 	"github.com/rancher/wrangler/pkg/condition"
@@ -36,236 +34,120 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/tools/cache"
 )
 
-type ETCDSnapshotHandler func(string, *v1.ETCDSnapshot) (*v1.ETCDSnapshot, error)
-
+// ETCDSnapshotController interface for managing ETCDSnapshot resources.
 type ETCDSnapshotController interface {
 	generic.ControllerMeta
 	ETCDSnapshotClient
 
+	// OnChange runs the given handler when the controller detects a resource was changed.
 	OnChange(ctx context.Context, name string, sync ETCDSnapshotHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
 	OnRemove(ctx context.Context, name string, sync ETCDSnapshotHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
 	Enqueue(namespace, name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
 	EnqueueAfter(namespace, name string, duration time.Duration)
 
+	// Cache returns a cache for the resource type T.
 	Cache() ETCDSnapshotCache
 }
 
+// ETCDSnapshotClient interface for managing ETCDSnapshot resources in Kubernetes.
 type ETCDSnapshotClient interface {
+	// Create creates a new object and return the newly created Object or an error.
 	Create(*v1.ETCDSnapshot) (*v1.ETCDSnapshot, error)
+
+	// Update updates the object and return the newly updated Object or an error.
 	Update(*v1.ETCDSnapshot) (*v1.ETCDSnapshot, error)
+	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
+	// Will always return an error if the object does not have a status field.
 	UpdateStatus(*v1.ETCDSnapshot) (*v1.ETCDSnapshot, error)
+
+	// Delete deletes the Object in the given name.
 	Delete(namespace, name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
 	Get(namespace, name string, options metav1.GetOptions) (*v1.ETCDSnapshot, error)
+
+	// List will attempt to find multiple resources.
 	List(namespace string, opts metav1.ListOptions) (*v1.ETCDSnapshotList, error)
+
+	// Watch will start watching resources.
 	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
 	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.ETCDSnapshot, err error)
 }
 
+// ETCDSnapshotCache interface for retrieving ETCDSnapshot resources in memory.
 type ETCDSnapshotCache interface {
+	// Get returns the resources with the specified name from the cache.
 	Get(namespace, name string) (*v1.ETCDSnapshot, error)
+
+	// List will attempt to find resources from the Cache.
 	List(namespace string, selector labels.Selector) ([]*v1.ETCDSnapshot, error)
 
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
 	AddIndexer(indexName string, indexer ETCDSnapshotIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
 	GetByIndex(indexName, key string) ([]*v1.ETCDSnapshot, error)
 }
 
+// ETCDSnapshotHandler is function for performing any potential modifications to a ETCDSnapshot resource.
+type ETCDSnapshotHandler func(string, *v1.ETCDSnapshot) (*v1.ETCDSnapshot, error)
+
+// ETCDSnapshotIndexer computes a set of indexed values for the provided object.
 type ETCDSnapshotIndexer func(obj *v1.ETCDSnapshot) ([]string, error)
 
-type eTCDSnapshotController struct {
-	controller    controller.SharedController
-	client        *client.Client
-	gvk           schema.GroupVersionKind
-	groupResource schema.GroupResource
+// ETCDSnapshotGenericController wraps wrangler/pkg/generic.Controller so that the function definitions adhere to ETCDSnapshotController interface.
+type ETCDSnapshotGenericController struct {
+	generic.ControllerInterface[*v1.ETCDSnapshot, *v1.ETCDSnapshotList]
 }
 
-func NewETCDSnapshotController(gvk schema.GroupVersionKind, resource string, namespaced bool, controller controller.SharedControllerFactory) ETCDSnapshotController {
-	c := controller.ForResourceKind(gvk.GroupVersion().WithResource(resource), gvk.Kind, namespaced)
-	return &eTCDSnapshotController{
-		controller: c,
-		client:     c.Client(),
-		gvk:        gvk,
-		groupResource: schema.GroupResource{
-			Group:    gvk.Group,
-			Resource: resource,
-		},
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *ETCDSnapshotGenericController) OnChange(ctx context.Context, name string, sync ETCDSnapshotHandler) {
+	c.ControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v1.ETCDSnapshot](sync))
+}
+
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *ETCDSnapshotGenericController) OnRemove(ctx context.Context, name string, sync ETCDSnapshotHandler) {
+	c.ControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v1.ETCDSnapshot](sync))
+}
+
+// Cache returns a cache of resources in memory.
+func (c *ETCDSnapshotGenericController) Cache() ETCDSnapshotCache {
+	return &ETCDSnapshotGenericCache{
+		c.ControllerInterface.Cache(),
 	}
 }
 
-func FromETCDSnapshotHandlerToHandler(sync ETCDSnapshotHandler) generic.Handler {
-	return func(key string, obj runtime.Object) (ret runtime.Object, err error) {
-		var v *v1.ETCDSnapshot
-		if obj == nil {
-			v, err = sync(key, nil)
-		} else {
-			v, err = sync(key, obj.(*v1.ETCDSnapshot))
-		}
-		if v == nil {
-			return nil, err
-		}
-		return v, err
-	}
+// ETCDSnapshotGenericCache wraps wrangler/pkg/generic.Cache so the function definitions adhere to ETCDSnapshotCache interface.
+type ETCDSnapshotGenericCache struct {
+	generic.CacheInterface[*v1.ETCDSnapshot]
 }
 
-func (c *eTCDSnapshotController) Updater() generic.Updater {
-	return func(obj runtime.Object) (runtime.Object, error) {
-		newObj, err := c.Update(obj.(*v1.ETCDSnapshot))
-		if newObj == nil {
-			return nil, err
-		}
-		return newObj, err
-	}
-}
-
-func UpdateETCDSnapshotDeepCopyOnChange(client ETCDSnapshotClient, obj *v1.ETCDSnapshot, handler func(obj *v1.ETCDSnapshot) (*v1.ETCDSnapshot, error)) (*v1.ETCDSnapshot, error) {
-	if obj == nil {
-		return obj, nil
-	}
-
-	copyObj := obj.DeepCopy()
-	newObj, err := handler(copyObj)
-	if newObj != nil {
-		copyObj = newObj
-	}
-	if obj.ResourceVersion == copyObj.ResourceVersion && !equality.Semantic.DeepEqual(obj, copyObj) {
-		return client.Update(copyObj)
-	}
-
-	return copyObj, err
-}
-
-func (c *eTCDSnapshotController) AddGenericHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.controller.RegisterHandler(ctx, name, controller.SharedControllerHandlerFunc(handler))
-}
-
-func (c *eTCDSnapshotController) AddGenericRemoveHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), handler))
-}
-
-func (c *eTCDSnapshotController) OnChange(ctx context.Context, name string, sync ETCDSnapshotHandler) {
-	c.AddGenericHandler(ctx, name, FromETCDSnapshotHandlerToHandler(sync))
-}
-
-func (c *eTCDSnapshotController) OnRemove(ctx context.Context, name string, sync ETCDSnapshotHandler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), FromETCDSnapshotHandlerToHandler(sync)))
-}
-
-func (c *eTCDSnapshotController) Enqueue(namespace, name string) {
-	c.controller.Enqueue(namespace, name)
-}
-
-func (c *eTCDSnapshotController) EnqueueAfter(namespace, name string, duration time.Duration) {
-	c.controller.EnqueueAfter(namespace, name, duration)
-}
-
-func (c *eTCDSnapshotController) Informer() cache.SharedIndexInformer {
-	return c.controller.Informer()
-}
-
-func (c *eTCDSnapshotController) GroupVersionKind() schema.GroupVersionKind {
-	return c.gvk
-}
-
-func (c *eTCDSnapshotController) Cache() ETCDSnapshotCache {
-	return &eTCDSnapshotCache{
-		indexer:  c.Informer().GetIndexer(),
-		resource: c.groupResource,
-	}
-}
-
-func (c *eTCDSnapshotController) Create(obj *v1.ETCDSnapshot) (*v1.ETCDSnapshot, error) {
-	result := &v1.ETCDSnapshot{}
-	return result, c.client.Create(context.TODO(), obj.Namespace, obj, result, metav1.CreateOptions{})
-}
-
-func (c *eTCDSnapshotController) Update(obj *v1.ETCDSnapshot) (*v1.ETCDSnapshot, error) {
-	result := &v1.ETCDSnapshot{}
-	return result, c.client.Update(context.TODO(), obj.Namespace, obj, result, metav1.UpdateOptions{})
-}
-
-func (c *eTCDSnapshotController) UpdateStatus(obj *v1.ETCDSnapshot) (*v1.ETCDSnapshot, error) {
-	result := &v1.ETCDSnapshot{}
-	return result, c.client.UpdateStatus(context.TODO(), obj.Namespace, obj, result, metav1.UpdateOptions{})
-}
-
-func (c *eTCDSnapshotController) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	if options == nil {
-		options = &metav1.DeleteOptions{}
-	}
-	return c.client.Delete(context.TODO(), namespace, name, *options)
-}
-
-func (c *eTCDSnapshotController) Get(namespace, name string, options metav1.GetOptions) (*v1.ETCDSnapshot, error) {
-	result := &v1.ETCDSnapshot{}
-	return result, c.client.Get(context.TODO(), namespace, name, result, options)
-}
-
-func (c *eTCDSnapshotController) List(namespace string, opts metav1.ListOptions) (*v1.ETCDSnapshotList, error) {
-	result := &v1.ETCDSnapshotList{}
-	return result, c.client.List(context.TODO(), namespace, result, opts)
-}
-
-func (c *eTCDSnapshotController) Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
-	return c.client.Watch(context.TODO(), namespace, opts)
-}
-
-func (c *eTCDSnapshotController) Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (*v1.ETCDSnapshot, error) {
-	result := &v1.ETCDSnapshot{}
-	return result, c.client.Patch(context.TODO(), namespace, name, pt, data, result, metav1.PatchOptions{}, subresources...)
-}
-
-type eTCDSnapshotCache struct {
-	indexer  cache.Indexer
-	resource schema.GroupResource
-}
-
-func (c *eTCDSnapshotCache) Get(namespace, name string) (*v1.ETCDSnapshot, error) {
-	obj, exists, err := c.indexer.GetByKey(namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(c.resource, name)
-	}
-	return obj.(*v1.ETCDSnapshot), nil
-}
-
-func (c *eTCDSnapshotCache) List(namespace string, selector labels.Selector) (ret []*v1.ETCDSnapshot, err error) {
-
-	err = cache.ListAllByNamespace(c.indexer, namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.ETCDSnapshot))
-	})
-
-	return ret, err
-}
-
-func (c *eTCDSnapshotCache) AddIndexer(indexName string, indexer ETCDSnapshotIndexer) {
-	utilruntime.Must(c.indexer.AddIndexers(map[string]cache.IndexFunc{
-		indexName: func(obj interface{}) (strings []string, e error) {
-			return indexer(obj.(*v1.ETCDSnapshot))
-		},
-	}))
-}
-
-func (c *eTCDSnapshotCache) GetByIndex(indexName, key string) (result []*v1.ETCDSnapshot, err error) {
-	objs, err := c.indexer.ByIndex(indexName, key)
-	if err != nil {
-		return nil, err
-	}
-	result = make([]*v1.ETCDSnapshot, 0, len(objs))
-	for _, obj := range objs {
-		result = append(result, obj.(*v1.ETCDSnapshot))
-	}
-	return result, nil
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c ETCDSnapshotGenericCache) AddIndexer(indexName string, indexer ETCDSnapshotIndexer) {
+	c.CacheInterface.AddIndexer(indexName, generic.Indexer[*v1.ETCDSnapshot](indexer))
 }
 
 type ETCDSnapshotStatusHandler func(obj *v1.ETCDSnapshot, status v1.ETCDSnapshotStatus) (v1.ETCDSnapshotStatus, error)
 
 type ETCDSnapshotGeneratingHandler func(obj *v1.ETCDSnapshot, status v1.ETCDSnapshotStatus) ([]runtime.Object, v1.ETCDSnapshotStatus, error)
+
+func FromETCDSnapshotHandlerToHandler(sync ETCDSnapshotHandler) generic.Handler {
+	return generic.FromObjectHandlerToHandler(generic.ObjectHandler[*v1.ETCDSnapshot](sync))
+}
 
 func RegisterETCDSnapshotStatusHandler(ctx context.Context, controller ETCDSnapshotController, condition condition.Cond, name string, handler ETCDSnapshotStatusHandler) {
 	statusHandler := &eTCDSnapshotStatusHandler{

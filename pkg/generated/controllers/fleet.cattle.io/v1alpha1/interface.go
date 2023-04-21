@@ -21,6 +21,7 @@ package v1alpha1
 import (
 	v1alpha1 "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	"github.com/rancher/lasso/pkg/controller"
+	"github.com/rancher/wrangler/pkg/generic"
 	"github.com/rancher/wrangler/pkg/schemes"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -44,9 +45,14 @@ type version struct {
 	controllerFactory controller.SharedControllerFactory
 }
 
-func (c *version) Bundle() BundleController {
-	return NewBundleController(schema.GroupVersionKind{Group: "fleet.cattle.io", Version: "v1alpha1", Kind: "Bundle"}, "bundles", true, c.controllerFactory)
+func (v *version) Bundle() BundleController {
+	return &BundleGenericController{
+		generic.NewController[*v1alpha1.Bundle, *v1alpha1.BundleList](schema.GroupVersionKind{Group: "fleet.cattle.io", Version: "v1alpha1", Kind: "Bundle"}, "bundles", true, v.controllerFactory),
+	}
 }
-func (c *version) Cluster() ClusterController {
-	return NewClusterController(schema.GroupVersionKind{Group: "fleet.cattle.io", Version: "v1alpha1", Kind: "Cluster"}, "clusters", true, c.controllerFactory)
+
+func (v *version) Cluster() ClusterController {
+	return &ClusterGenericController{
+		generic.NewController[*v1alpha1.Cluster, *v1alpha1.ClusterList](schema.GroupVersionKind{Group: "fleet.cattle.io", Version: "v1alpha1", Kind: "Cluster"}, "clusters", true, v.controllerFactory),
+	}
 }

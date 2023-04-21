@@ -22,8 +22,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/lasso/pkg/client"
-	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/wrangler/pkg/apply"
 	"github.com/rancher/wrangler/pkg/condition"
 	"github.com/rancher/wrangler/pkg/generic"
@@ -35,237 +33,121 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/tools/cache"
 	v1beta1 "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
-type MachineSetHandler func(string, *v1beta1.MachineSet) (*v1beta1.MachineSet, error)
-
+// MachineSetController interface for managing MachineSet resources.
 type MachineSetController interface {
 	generic.ControllerMeta
 	MachineSetClient
 
+	// OnChange runs the given handler when the controller detects a resource was changed.
 	OnChange(ctx context.Context, name string, sync MachineSetHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
 	OnRemove(ctx context.Context, name string, sync MachineSetHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
 	Enqueue(namespace, name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
 	EnqueueAfter(namespace, name string, duration time.Duration)
 
+	// Cache returns a cache for the resource type T.
 	Cache() MachineSetCache
 }
 
+// MachineSetClient interface for managing MachineSet resources in Kubernetes.
 type MachineSetClient interface {
+	// Create creates a new object and return the newly created Object or an error.
 	Create(*v1beta1.MachineSet) (*v1beta1.MachineSet, error)
+
+	// Update updates the object and return the newly updated Object or an error.
 	Update(*v1beta1.MachineSet) (*v1beta1.MachineSet, error)
+	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
+	// Will always return an error if the object does not have a status field.
 	UpdateStatus(*v1beta1.MachineSet) (*v1beta1.MachineSet, error)
+
+	// Delete deletes the Object in the given name.
 	Delete(namespace, name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
 	Get(namespace, name string, options metav1.GetOptions) (*v1beta1.MachineSet, error)
+
+	// List will attempt to find multiple resources.
 	List(namespace string, opts metav1.ListOptions) (*v1beta1.MachineSetList, error)
+
+	// Watch will start watching resources.
 	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
 	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.MachineSet, err error)
 }
 
+// MachineSetCache interface for retrieving MachineSet resources in memory.
 type MachineSetCache interface {
+	// Get returns the resources with the specified name from the cache.
 	Get(namespace, name string) (*v1beta1.MachineSet, error)
+
+	// List will attempt to find resources from the Cache.
 	List(namespace string, selector labels.Selector) ([]*v1beta1.MachineSet, error)
 
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
 	AddIndexer(indexName string, indexer MachineSetIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
 	GetByIndex(indexName, key string) ([]*v1beta1.MachineSet, error)
 }
 
+// MachineSetHandler is function for performing any potential modifications to a MachineSet resource.
+type MachineSetHandler func(string, *v1beta1.MachineSet) (*v1beta1.MachineSet, error)
+
+// MachineSetIndexer computes a set of indexed values for the provided object.
 type MachineSetIndexer func(obj *v1beta1.MachineSet) ([]string, error)
 
-type machineSetController struct {
-	controller    controller.SharedController
-	client        *client.Client
-	gvk           schema.GroupVersionKind
-	groupResource schema.GroupResource
+// MachineSetGenericController wraps wrangler/pkg/generic.Controller so that the function definitions adhere to MachineSetController interface.
+type MachineSetGenericController struct {
+	generic.ControllerInterface[*v1beta1.MachineSet, *v1beta1.MachineSetList]
 }
 
-func NewMachineSetController(gvk schema.GroupVersionKind, resource string, namespaced bool, controller controller.SharedControllerFactory) MachineSetController {
-	c := controller.ForResourceKind(gvk.GroupVersion().WithResource(resource), gvk.Kind, namespaced)
-	return &machineSetController{
-		controller: c,
-		client:     c.Client(),
-		gvk:        gvk,
-		groupResource: schema.GroupResource{
-			Group:    gvk.Group,
-			Resource: resource,
-		},
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *MachineSetGenericController) OnChange(ctx context.Context, name string, sync MachineSetHandler) {
+	c.ControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v1beta1.MachineSet](sync))
+}
+
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *MachineSetGenericController) OnRemove(ctx context.Context, name string, sync MachineSetHandler) {
+	c.ControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v1beta1.MachineSet](sync))
+}
+
+// Cache returns a cache of resources in memory.
+func (c *MachineSetGenericController) Cache() MachineSetCache {
+	return &MachineSetGenericCache{
+		c.ControllerInterface.Cache(),
 	}
 }
 
-func FromMachineSetHandlerToHandler(sync MachineSetHandler) generic.Handler {
-	return func(key string, obj runtime.Object) (ret runtime.Object, err error) {
-		var v *v1beta1.MachineSet
-		if obj == nil {
-			v, err = sync(key, nil)
-		} else {
-			v, err = sync(key, obj.(*v1beta1.MachineSet))
-		}
-		if v == nil {
-			return nil, err
-		}
-		return v, err
-	}
+// MachineSetGenericCache wraps wrangler/pkg/generic.Cache so the function definitions adhere to MachineSetCache interface.
+type MachineSetGenericCache struct {
+	generic.CacheInterface[*v1beta1.MachineSet]
 }
 
-func (c *machineSetController) Updater() generic.Updater {
-	return func(obj runtime.Object) (runtime.Object, error) {
-		newObj, err := c.Update(obj.(*v1beta1.MachineSet))
-		if newObj == nil {
-			return nil, err
-		}
-		return newObj, err
-	}
-}
-
-func UpdateMachineSetDeepCopyOnChange(client MachineSetClient, obj *v1beta1.MachineSet, handler func(obj *v1beta1.MachineSet) (*v1beta1.MachineSet, error)) (*v1beta1.MachineSet, error) {
-	if obj == nil {
-		return obj, nil
-	}
-
-	copyObj := obj.DeepCopy()
-	newObj, err := handler(copyObj)
-	if newObj != nil {
-		copyObj = newObj
-	}
-	if obj.ResourceVersion == copyObj.ResourceVersion && !equality.Semantic.DeepEqual(obj, copyObj) {
-		return client.Update(copyObj)
-	}
-
-	return copyObj, err
-}
-
-func (c *machineSetController) AddGenericHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.controller.RegisterHandler(ctx, name, controller.SharedControllerHandlerFunc(handler))
-}
-
-func (c *machineSetController) AddGenericRemoveHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), handler))
-}
-
-func (c *machineSetController) OnChange(ctx context.Context, name string, sync MachineSetHandler) {
-	c.AddGenericHandler(ctx, name, FromMachineSetHandlerToHandler(sync))
-}
-
-func (c *machineSetController) OnRemove(ctx context.Context, name string, sync MachineSetHandler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), FromMachineSetHandlerToHandler(sync)))
-}
-
-func (c *machineSetController) Enqueue(namespace, name string) {
-	c.controller.Enqueue(namespace, name)
-}
-
-func (c *machineSetController) EnqueueAfter(namespace, name string, duration time.Duration) {
-	c.controller.EnqueueAfter(namespace, name, duration)
-}
-
-func (c *machineSetController) Informer() cache.SharedIndexInformer {
-	return c.controller.Informer()
-}
-
-func (c *machineSetController) GroupVersionKind() schema.GroupVersionKind {
-	return c.gvk
-}
-
-func (c *machineSetController) Cache() MachineSetCache {
-	return &machineSetCache{
-		indexer:  c.Informer().GetIndexer(),
-		resource: c.groupResource,
-	}
-}
-
-func (c *machineSetController) Create(obj *v1beta1.MachineSet) (*v1beta1.MachineSet, error) {
-	result := &v1beta1.MachineSet{}
-	return result, c.client.Create(context.TODO(), obj.Namespace, obj, result, metav1.CreateOptions{})
-}
-
-func (c *machineSetController) Update(obj *v1beta1.MachineSet) (*v1beta1.MachineSet, error) {
-	result := &v1beta1.MachineSet{}
-	return result, c.client.Update(context.TODO(), obj.Namespace, obj, result, metav1.UpdateOptions{})
-}
-
-func (c *machineSetController) UpdateStatus(obj *v1beta1.MachineSet) (*v1beta1.MachineSet, error) {
-	result := &v1beta1.MachineSet{}
-	return result, c.client.UpdateStatus(context.TODO(), obj.Namespace, obj, result, metav1.UpdateOptions{})
-}
-
-func (c *machineSetController) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	if options == nil {
-		options = &metav1.DeleteOptions{}
-	}
-	return c.client.Delete(context.TODO(), namespace, name, *options)
-}
-
-func (c *machineSetController) Get(namespace, name string, options metav1.GetOptions) (*v1beta1.MachineSet, error) {
-	result := &v1beta1.MachineSet{}
-	return result, c.client.Get(context.TODO(), namespace, name, result, options)
-}
-
-func (c *machineSetController) List(namespace string, opts metav1.ListOptions) (*v1beta1.MachineSetList, error) {
-	result := &v1beta1.MachineSetList{}
-	return result, c.client.List(context.TODO(), namespace, result, opts)
-}
-
-func (c *machineSetController) Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
-	return c.client.Watch(context.TODO(), namespace, opts)
-}
-
-func (c *machineSetController) Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (*v1beta1.MachineSet, error) {
-	result := &v1beta1.MachineSet{}
-	return result, c.client.Patch(context.TODO(), namespace, name, pt, data, result, metav1.PatchOptions{}, subresources...)
-}
-
-type machineSetCache struct {
-	indexer  cache.Indexer
-	resource schema.GroupResource
-}
-
-func (c *machineSetCache) Get(namespace, name string) (*v1beta1.MachineSet, error) {
-	obj, exists, err := c.indexer.GetByKey(namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(c.resource, name)
-	}
-	return obj.(*v1beta1.MachineSet), nil
-}
-
-func (c *machineSetCache) List(namespace string, selector labels.Selector) (ret []*v1beta1.MachineSet, err error) {
-
-	err = cache.ListAllByNamespace(c.indexer, namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1beta1.MachineSet))
-	})
-
-	return ret, err
-}
-
-func (c *machineSetCache) AddIndexer(indexName string, indexer MachineSetIndexer) {
-	utilruntime.Must(c.indexer.AddIndexers(map[string]cache.IndexFunc{
-		indexName: func(obj interface{}) (strings []string, e error) {
-			return indexer(obj.(*v1beta1.MachineSet))
-		},
-	}))
-}
-
-func (c *machineSetCache) GetByIndex(indexName, key string) (result []*v1beta1.MachineSet, err error) {
-	objs, err := c.indexer.ByIndex(indexName, key)
-	if err != nil {
-		return nil, err
-	}
-	result = make([]*v1beta1.MachineSet, 0, len(objs))
-	for _, obj := range objs {
-		result = append(result, obj.(*v1beta1.MachineSet))
-	}
-	return result, nil
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c MachineSetGenericCache) AddIndexer(indexName string, indexer MachineSetIndexer) {
+	c.CacheInterface.AddIndexer(indexName, generic.Indexer[*v1beta1.MachineSet](indexer))
 }
 
 type MachineSetStatusHandler func(obj *v1beta1.MachineSet, status v1beta1.MachineSetStatus) (v1beta1.MachineSetStatus, error)
 
 type MachineSetGeneratingHandler func(obj *v1beta1.MachineSet, status v1beta1.MachineSetStatus) ([]runtime.Object, v1beta1.MachineSetStatus, error)
+
+func FromMachineSetHandlerToHandler(sync MachineSetHandler) generic.Handler {
+	return generic.FromObjectHandlerToHandler(generic.ObjectHandler[*v1beta1.MachineSet](sync))
+}
 
 func RegisterMachineSetStatusHandler(ctx context.Context, controller MachineSetController, condition condition.Cond, name string, handler MachineSetStatusHandler) {
 	statusHandler := &machineSetStatusHandler{

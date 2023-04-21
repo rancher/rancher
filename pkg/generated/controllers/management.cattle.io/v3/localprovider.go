@@ -22,235 +22,111 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/lasso/pkg/client"
-	"github.com/rancher/lasso/pkg/controller"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/wrangler/pkg/generic"
-	"k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/tools/cache"
 )
 
-type LocalProviderHandler func(string, *v3.LocalProvider) (*v3.LocalProvider, error)
-
+// LocalProviderController interface for managing LocalProvider resources.
 type LocalProviderController interface {
 	generic.ControllerMeta
 	LocalProviderClient
 
+	// OnChange runs the given handler when the controller detects a resource was changed.
 	OnChange(ctx context.Context, name string, sync LocalProviderHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
 	OnRemove(ctx context.Context, name string, sync LocalProviderHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
 	Enqueue(name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
 	EnqueueAfter(name string, duration time.Duration)
 
+	// Cache returns a cache for the resource type T.
 	Cache() LocalProviderCache
 }
 
+// LocalProviderClient interface for managing LocalProvider resources in Kubernetes.
 type LocalProviderClient interface {
+	// Create creates a new object and return the newly created Object or an error.
 	Create(*v3.LocalProvider) (*v3.LocalProvider, error)
+
+	// Update updates the object and return the newly updated Object or an error.
 	Update(*v3.LocalProvider) (*v3.LocalProvider, error)
 
+	// Delete deletes the Object in the given name.
 	Delete(name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
 	Get(name string, options metav1.GetOptions) (*v3.LocalProvider, error)
+
+	// List will attempt to find multiple resources.
 	List(opts metav1.ListOptions) (*v3.LocalProviderList, error)
+
+	// Watch will start watching resources.
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.LocalProvider, err error)
 }
 
+// LocalProviderCache interface for retrieving LocalProvider resources in memory.
 type LocalProviderCache interface {
+	// Get returns the resources with the specified name from the cache.
 	Get(name string) (*v3.LocalProvider, error)
+
+	// List will attempt to find resources from the Cache.
 	List(selector labels.Selector) ([]*v3.LocalProvider, error)
 
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
 	AddIndexer(indexName string, indexer LocalProviderIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
 	GetByIndex(indexName, key string) ([]*v3.LocalProvider, error)
 }
 
+// LocalProviderHandler is function for performing any potential modifications to a LocalProvider resource.
+type LocalProviderHandler func(string, *v3.LocalProvider) (*v3.LocalProvider, error)
+
+// LocalProviderIndexer computes a set of indexed values for the provided object.
 type LocalProviderIndexer func(obj *v3.LocalProvider) ([]string, error)
 
-type localProviderController struct {
-	controller    controller.SharedController
-	client        *client.Client
-	gvk           schema.GroupVersionKind
-	groupResource schema.GroupResource
+// LocalProviderGenericController wraps wrangler/pkg/generic.NonNamespacedController so that the function definitions adhere to LocalProviderController interface.
+type LocalProviderGenericController struct {
+	generic.NonNamespacedControllerInterface[*v3.LocalProvider, *v3.LocalProviderList]
 }
 
-func NewLocalProviderController(gvk schema.GroupVersionKind, resource string, namespaced bool, controller controller.SharedControllerFactory) LocalProviderController {
-	c := controller.ForResourceKind(gvk.GroupVersion().WithResource(resource), gvk.Kind, namespaced)
-	return &localProviderController{
-		controller: c,
-		client:     c.Client(),
-		gvk:        gvk,
-		groupResource: schema.GroupResource{
-			Group:    gvk.Group,
-			Resource: resource,
-		},
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *LocalProviderGenericController) OnChange(ctx context.Context, name string, sync LocalProviderHandler) {
+	c.NonNamespacedControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.LocalProvider](sync))
+}
+
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *LocalProviderGenericController) OnRemove(ctx context.Context, name string, sync LocalProviderHandler) {
+	c.NonNamespacedControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.LocalProvider](sync))
+}
+
+// Cache returns a cache of resources in memory.
+func (c *LocalProviderGenericController) Cache() LocalProviderCache {
+	return &LocalProviderGenericCache{
+		c.NonNamespacedControllerInterface.Cache(),
 	}
 }
 
-func FromLocalProviderHandlerToHandler(sync LocalProviderHandler) generic.Handler {
-	return func(key string, obj runtime.Object) (ret runtime.Object, err error) {
-		var v *v3.LocalProvider
-		if obj == nil {
-			v, err = sync(key, nil)
-		} else {
-			v, err = sync(key, obj.(*v3.LocalProvider))
-		}
-		if v == nil {
-			return nil, err
-		}
-		return v, err
-	}
+// LocalProviderGenericCache wraps wrangler/pkg/generic.NonNamespacedCache so the function definitions adhere to LocalProviderCache interface.
+type LocalProviderGenericCache struct {
+	generic.NonNamespacedCacheInterface[*v3.LocalProvider]
 }
 
-func (c *localProviderController) Updater() generic.Updater {
-	return func(obj runtime.Object) (runtime.Object, error) {
-		newObj, err := c.Update(obj.(*v3.LocalProvider))
-		if newObj == nil {
-			return nil, err
-		}
-		return newObj, err
-	}
-}
-
-func UpdateLocalProviderDeepCopyOnChange(client LocalProviderClient, obj *v3.LocalProvider, handler func(obj *v3.LocalProvider) (*v3.LocalProvider, error)) (*v3.LocalProvider, error) {
-	if obj == nil {
-		return obj, nil
-	}
-
-	copyObj := obj.DeepCopy()
-	newObj, err := handler(copyObj)
-	if newObj != nil {
-		copyObj = newObj
-	}
-	if obj.ResourceVersion == copyObj.ResourceVersion && !equality.Semantic.DeepEqual(obj, copyObj) {
-		return client.Update(copyObj)
-	}
-
-	return copyObj, err
-}
-
-func (c *localProviderController) AddGenericHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.controller.RegisterHandler(ctx, name, controller.SharedControllerHandlerFunc(handler))
-}
-
-func (c *localProviderController) AddGenericRemoveHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), handler))
-}
-
-func (c *localProviderController) OnChange(ctx context.Context, name string, sync LocalProviderHandler) {
-	c.AddGenericHandler(ctx, name, FromLocalProviderHandlerToHandler(sync))
-}
-
-func (c *localProviderController) OnRemove(ctx context.Context, name string, sync LocalProviderHandler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), FromLocalProviderHandlerToHandler(sync)))
-}
-
-func (c *localProviderController) Enqueue(name string) {
-	c.controller.Enqueue("", name)
-}
-
-func (c *localProviderController) EnqueueAfter(name string, duration time.Duration) {
-	c.controller.EnqueueAfter("", name, duration)
-}
-
-func (c *localProviderController) Informer() cache.SharedIndexInformer {
-	return c.controller.Informer()
-}
-
-func (c *localProviderController) GroupVersionKind() schema.GroupVersionKind {
-	return c.gvk
-}
-
-func (c *localProviderController) Cache() LocalProviderCache {
-	return &localProviderCache{
-		indexer:  c.Informer().GetIndexer(),
-		resource: c.groupResource,
-	}
-}
-
-func (c *localProviderController) Create(obj *v3.LocalProvider) (*v3.LocalProvider, error) {
-	result := &v3.LocalProvider{}
-	return result, c.client.Create(context.TODO(), "", obj, result, metav1.CreateOptions{})
-}
-
-func (c *localProviderController) Update(obj *v3.LocalProvider) (*v3.LocalProvider, error) {
-	result := &v3.LocalProvider{}
-	return result, c.client.Update(context.TODO(), "", obj, result, metav1.UpdateOptions{})
-}
-
-func (c *localProviderController) Delete(name string, options *metav1.DeleteOptions) error {
-	if options == nil {
-		options = &metav1.DeleteOptions{}
-	}
-	return c.client.Delete(context.TODO(), "", name, *options)
-}
-
-func (c *localProviderController) Get(name string, options metav1.GetOptions) (*v3.LocalProvider, error) {
-	result := &v3.LocalProvider{}
-	return result, c.client.Get(context.TODO(), "", name, result, options)
-}
-
-func (c *localProviderController) List(opts metav1.ListOptions) (*v3.LocalProviderList, error) {
-	result := &v3.LocalProviderList{}
-	return result, c.client.List(context.TODO(), "", result, opts)
-}
-
-func (c *localProviderController) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return c.client.Watch(context.TODO(), "", opts)
-}
-
-func (c *localProviderController) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (*v3.LocalProvider, error) {
-	result := &v3.LocalProvider{}
-	return result, c.client.Patch(context.TODO(), "", name, pt, data, result, metav1.PatchOptions{}, subresources...)
-}
-
-type localProviderCache struct {
-	indexer  cache.Indexer
-	resource schema.GroupResource
-}
-
-func (c *localProviderCache) Get(name string) (*v3.LocalProvider, error) {
-	obj, exists, err := c.indexer.GetByKey(name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(c.resource, name)
-	}
-	return obj.(*v3.LocalProvider), nil
-}
-
-func (c *localProviderCache) List(selector labels.Selector) (ret []*v3.LocalProvider, err error) {
-
-	err = cache.ListAll(c.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v3.LocalProvider))
-	})
-
-	return ret, err
-}
-
-func (c *localProviderCache) AddIndexer(indexName string, indexer LocalProviderIndexer) {
-	utilruntime.Must(c.indexer.AddIndexers(map[string]cache.IndexFunc{
-		indexName: func(obj interface{}) (strings []string, e error) {
-			return indexer(obj.(*v3.LocalProvider))
-		},
-	}))
-}
-
-func (c *localProviderCache) GetByIndex(indexName, key string) (result []*v3.LocalProvider, err error) {
-	objs, err := c.indexer.ByIndex(indexName, key)
-	if err != nil {
-		return nil, err
-	}
-	result = make([]*v3.LocalProvider, 0, len(objs))
-	for _, obj := range objs {
-		result = append(result, obj.(*v3.LocalProvider))
-	}
-	return result, nil
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c LocalProviderGenericCache) AddIndexer(indexName string, indexer LocalProviderIndexer) {
+	c.NonNamespacedCacheInterface.AddIndexer(indexName, generic.Indexer[*v3.LocalProvider](indexer))
 }

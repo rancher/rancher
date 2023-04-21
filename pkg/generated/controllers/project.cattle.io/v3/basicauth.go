@@ -22,235 +22,111 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/lasso/pkg/client"
-	"github.com/rancher/lasso/pkg/controller"
 	v3 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
 	"github.com/rancher/wrangler/pkg/generic"
-	"k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/tools/cache"
 )
 
-type BasicAuthHandler func(string, *v3.BasicAuth) (*v3.BasicAuth, error)
-
+// BasicAuthController interface for managing BasicAuth resources.
 type BasicAuthController interface {
 	generic.ControllerMeta
 	BasicAuthClient
 
+	// OnChange runs the given handler when the controller detects a resource was changed.
 	OnChange(ctx context.Context, name string, sync BasicAuthHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
 	OnRemove(ctx context.Context, name string, sync BasicAuthHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
 	Enqueue(namespace, name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
 	EnqueueAfter(namespace, name string, duration time.Duration)
 
+	// Cache returns a cache for the resource type T.
 	Cache() BasicAuthCache
 }
 
+// BasicAuthClient interface for managing BasicAuth resources in Kubernetes.
 type BasicAuthClient interface {
+	// Create creates a new object and return the newly created Object or an error.
 	Create(*v3.BasicAuth) (*v3.BasicAuth, error)
+
+	// Update updates the object and return the newly updated Object or an error.
 	Update(*v3.BasicAuth) (*v3.BasicAuth, error)
 
+	// Delete deletes the Object in the given name.
 	Delete(namespace, name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
 	Get(namespace, name string, options metav1.GetOptions) (*v3.BasicAuth, error)
+
+	// List will attempt to find multiple resources.
 	List(namespace string, opts metav1.ListOptions) (*v3.BasicAuthList, error)
+
+	// Watch will start watching resources.
 	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
 	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.BasicAuth, err error)
 }
 
+// BasicAuthCache interface for retrieving BasicAuth resources in memory.
 type BasicAuthCache interface {
+	// Get returns the resources with the specified name from the cache.
 	Get(namespace, name string) (*v3.BasicAuth, error)
+
+	// List will attempt to find resources from the Cache.
 	List(namespace string, selector labels.Selector) ([]*v3.BasicAuth, error)
 
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
 	AddIndexer(indexName string, indexer BasicAuthIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
 	GetByIndex(indexName, key string) ([]*v3.BasicAuth, error)
 }
 
+// BasicAuthHandler is function for performing any potential modifications to a BasicAuth resource.
+type BasicAuthHandler func(string, *v3.BasicAuth) (*v3.BasicAuth, error)
+
+// BasicAuthIndexer computes a set of indexed values for the provided object.
 type BasicAuthIndexer func(obj *v3.BasicAuth) ([]string, error)
 
-type basicAuthController struct {
-	controller    controller.SharedController
-	client        *client.Client
-	gvk           schema.GroupVersionKind
-	groupResource schema.GroupResource
+// BasicAuthGenericController wraps wrangler/pkg/generic.Controller so that the function definitions adhere to BasicAuthController interface.
+type BasicAuthGenericController struct {
+	generic.ControllerInterface[*v3.BasicAuth, *v3.BasicAuthList]
 }
 
-func NewBasicAuthController(gvk schema.GroupVersionKind, resource string, namespaced bool, controller controller.SharedControllerFactory) BasicAuthController {
-	c := controller.ForResourceKind(gvk.GroupVersion().WithResource(resource), gvk.Kind, namespaced)
-	return &basicAuthController{
-		controller: c,
-		client:     c.Client(),
-		gvk:        gvk,
-		groupResource: schema.GroupResource{
-			Group:    gvk.Group,
-			Resource: resource,
-		},
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *BasicAuthGenericController) OnChange(ctx context.Context, name string, sync BasicAuthHandler) {
+	c.ControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.BasicAuth](sync))
+}
+
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *BasicAuthGenericController) OnRemove(ctx context.Context, name string, sync BasicAuthHandler) {
+	c.ControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.BasicAuth](sync))
+}
+
+// Cache returns a cache of resources in memory.
+func (c *BasicAuthGenericController) Cache() BasicAuthCache {
+	return &BasicAuthGenericCache{
+		c.ControllerInterface.Cache(),
 	}
 }
 
-func FromBasicAuthHandlerToHandler(sync BasicAuthHandler) generic.Handler {
-	return func(key string, obj runtime.Object) (ret runtime.Object, err error) {
-		var v *v3.BasicAuth
-		if obj == nil {
-			v, err = sync(key, nil)
-		} else {
-			v, err = sync(key, obj.(*v3.BasicAuth))
-		}
-		if v == nil {
-			return nil, err
-		}
-		return v, err
-	}
+// BasicAuthGenericCache wraps wrangler/pkg/generic.Cache so the function definitions adhere to BasicAuthCache interface.
+type BasicAuthGenericCache struct {
+	generic.CacheInterface[*v3.BasicAuth]
 }
 
-func (c *basicAuthController) Updater() generic.Updater {
-	return func(obj runtime.Object) (runtime.Object, error) {
-		newObj, err := c.Update(obj.(*v3.BasicAuth))
-		if newObj == nil {
-			return nil, err
-		}
-		return newObj, err
-	}
-}
-
-func UpdateBasicAuthDeepCopyOnChange(client BasicAuthClient, obj *v3.BasicAuth, handler func(obj *v3.BasicAuth) (*v3.BasicAuth, error)) (*v3.BasicAuth, error) {
-	if obj == nil {
-		return obj, nil
-	}
-
-	copyObj := obj.DeepCopy()
-	newObj, err := handler(copyObj)
-	if newObj != nil {
-		copyObj = newObj
-	}
-	if obj.ResourceVersion == copyObj.ResourceVersion && !equality.Semantic.DeepEqual(obj, copyObj) {
-		return client.Update(copyObj)
-	}
-
-	return copyObj, err
-}
-
-func (c *basicAuthController) AddGenericHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.controller.RegisterHandler(ctx, name, controller.SharedControllerHandlerFunc(handler))
-}
-
-func (c *basicAuthController) AddGenericRemoveHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), handler))
-}
-
-func (c *basicAuthController) OnChange(ctx context.Context, name string, sync BasicAuthHandler) {
-	c.AddGenericHandler(ctx, name, FromBasicAuthHandlerToHandler(sync))
-}
-
-func (c *basicAuthController) OnRemove(ctx context.Context, name string, sync BasicAuthHandler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), FromBasicAuthHandlerToHandler(sync)))
-}
-
-func (c *basicAuthController) Enqueue(namespace, name string) {
-	c.controller.Enqueue(namespace, name)
-}
-
-func (c *basicAuthController) EnqueueAfter(namespace, name string, duration time.Duration) {
-	c.controller.EnqueueAfter(namespace, name, duration)
-}
-
-func (c *basicAuthController) Informer() cache.SharedIndexInformer {
-	return c.controller.Informer()
-}
-
-func (c *basicAuthController) GroupVersionKind() schema.GroupVersionKind {
-	return c.gvk
-}
-
-func (c *basicAuthController) Cache() BasicAuthCache {
-	return &basicAuthCache{
-		indexer:  c.Informer().GetIndexer(),
-		resource: c.groupResource,
-	}
-}
-
-func (c *basicAuthController) Create(obj *v3.BasicAuth) (*v3.BasicAuth, error) {
-	result := &v3.BasicAuth{}
-	return result, c.client.Create(context.TODO(), obj.Namespace, obj, result, metav1.CreateOptions{})
-}
-
-func (c *basicAuthController) Update(obj *v3.BasicAuth) (*v3.BasicAuth, error) {
-	result := &v3.BasicAuth{}
-	return result, c.client.Update(context.TODO(), obj.Namespace, obj, result, metav1.UpdateOptions{})
-}
-
-func (c *basicAuthController) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	if options == nil {
-		options = &metav1.DeleteOptions{}
-	}
-	return c.client.Delete(context.TODO(), namespace, name, *options)
-}
-
-func (c *basicAuthController) Get(namespace, name string, options metav1.GetOptions) (*v3.BasicAuth, error) {
-	result := &v3.BasicAuth{}
-	return result, c.client.Get(context.TODO(), namespace, name, result, options)
-}
-
-func (c *basicAuthController) List(namespace string, opts metav1.ListOptions) (*v3.BasicAuthList, error) {
-	result := &v3.BasicAuthList{}
-	return result, c.client.List(context.TODO(), namespace, result, opts)
-}
-
-func (c *basicAuthController) Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
-	return c.client.Watch(context.TODO(), namespace, opts)
-}
-
-func (c *basicAuthController) Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (*v3.BasicAuth, error) {
-	result := &v3.BasicAuth{}
-	return result, c.client.Patch(context.TODO(), namespace, name, pt, data, result, metav1.PatchOptions{}, subresources...)
-}
-
-type basicAuthCache struct {
-	indexer  cache.Indexer
-	resource schema.GroupResource
-}
-
-func (c *basicAuthCache) Get(namespace, name string) (*v3.BasicAuth, error) {
-	obj, exists, err := c.indexer.GetByKey(namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(c.resource, name)
-	}
-	return obj.(*v3.BasicAuth), nil
-}
-
-func (c *basicAuthCache) List(namespace string, selector labels.Selector) (ret []*v3.BasicAuth, err error) {
-
-	err = cache.ListAllByNamespace(c.indexer, namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v3.BasicAuth))
-	})
-
-	return ret, err
-}
-
-func (c *basicAuthCache) AddIndexer(indexName string, indexer BasicAuthIndexer) {
-	utilruntime.Must(c.indexer.AddIndexers(map[string]cache.IndexFunc{
-		indexName: func(obj interface{}) (strings []string, e error) {
-			return indexer(obj.(*v3.BasicAuth))
-		},
-	}))
-}
-
-func (c *basicAuthCache) GetByIndex(indexName, key string) (result []*v3.BasicAuth, err error) {
-	objs, err := c.indexer.ByIndex(indexName, key)
-	if err != nil {
-		return nil, err
-	}
-	result = make([]*v3.BasicAuth, 0, len(objs))
-	for _, obj := range objs {
-		result = append(result, obj.(*v3.BasicAuth))
-	}
-	return result, nil
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c BasicAuthGenericCache) AddIndexer(indexName string, indexer BasicAuthIndexer) {
+	c.CacheInterface.AddIndexer(indexName, generic.Indexer[*v3.BasicAuth](indexer))
 }

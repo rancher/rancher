@@ -22,8 +22,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/lasso/pkg/client"
-	"github.com/rancher/lasso/pkg/controller"
 	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	"github.com/rancher/wrangler/pkg/apply"
 	"github.com/rancher/wrangler/pkg/condition"
@@ -36,236 +34,120 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/tools/cache"
 )
 
-type OperationHandler func(string, *v1.Operation) (*v1.Operation, error)
-
+// OperationController interface for managing Operation resources.
 type OperationController interface {
 	generic.ControllerMeta
 	OperationClient
 
+	// OnChange runs the given handler when the controller detects a resource was changed.
 	OnChange(ctx context.Context, name string, sync OperationHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
 	OnRemove(ctx context.Context, name string, sync OperationHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
 	Enqueue(namespace, name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
 	EnqueueAfter(namespace, name string, duration time.Duration)
 
+	// Cache returns a cache for the resource type T.
 	Cache() OperationCache
 }
 
+// OperationClient interface for managing Operation resources in Kubernetes.
 type OperationClient interface {
+	// Create creates a new object and return the newly created Object or an error.
 	Create(*v1.Operation) (*v1.Operation, error)
+
+	// Update updates the object and return the newly updated Object or an error.
 	Update(*v1.Operation) (*v1.Operation, error)
+	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
+	// Will always return an error if the object does not have a status field.
 	UpdateStatus(*v1.Operation) (*v1.Operation, error)
+
+	// Delete deletes the Object in the given name.
 	Delete(namespace, name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
 	Get(namespace, name string, options metav1.GetOptions) (*v1.Operation, error)
+
+	// List will attempt to find multiple resources.
 	List(namespace string, opts metav1.ListOptions) (*v1.OperationList, error)
+
+	// Watch will start watching resources.
 	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
 	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Operation, err error)
 }
 
+// OperationCache interface for retrieving Operation resources in memory.
 type OperationCache interface {
+	// Get returns the resources with the specified name from the cache.
 	Get(namespace, name string) (*v1.Operation, error)
+
+	// List will attempt to find resources from the Cache.
 	List(namespace string, selector labels.Selector) ([]*v1.Operation, error)
 
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
 	AddIndexer(indexName string, indexer OperationIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
 	GetByIndex(indexName, key string) ([]*v1.Operation, error)
 }
 
+// OperationHandler is function for performing any potential modifications to a Operation resource.
+type OperationHandler func(string, *v1.Operation) (*v1.Operation, error)
+
+// OperationIndexer computes a set of indexed values for the provided object.
 type OperationIndexer func(obj *v1.Operation) ([]string, error)
 
-type operationController struct {
-	controller    controller.SharedController
-	client        *client.Client
-	gvk           schema.GroupVersionKind
-	groupResource schema.GroupResource
+// OperationGenericController wraps wrangler/pkg/generic.Controller so that the function definitions adhere to OperationController interface.
+type OperationGenericController struct {
+	generic.ControllerInterface[*v1.Operation, *v1.OperationList]
 }
 
-func NewOperationController(gvk schema.GroupVersionKind, resource string, namespaced bool, controller controller.SharedControllerFactory) OperationController {
-	c := controller.ForResourceKind(gvk.GroupVersion().WithResource(resource), gvk.Kind, namespaced)
-	return &operationController{
-		controller: c,
-		client:     c.Client(),
-		gvk:        gvk,
-		groupResource: schema.GroupResource{
-			Group:    gvk.Group,
-			Resource: resource,
-		},
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *OperationGenericController) OnChange(ctx context.Context, name string, sync OperationHandler) {
+	c.ControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v1.Operation](sync))
+}
+
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *OperationGenericController) OnRemove(ctx context.Context, name string, sync OperationHandler) {
+	c.ControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v1.Operation](sync))
+}
+
+// Cache returns a cache of resources in memory.
+func (c *OperationGenericController) Cache() OperationCache {
+	return &OperationGenericCache{
+		c.ControllerInterface.Cache(),
 	}
 }
 
-func FromOperationHandlerToHandler(sync OperationHandler) generic.Handler {
-	return func(key string, obj runtime.Object) (ret runtime.Object, err error) {
-		var v *v1.Operation
-		if obj == nil {
-			v, err = sync(key, nil)
-		} else {
-			v, err = sync(key, obj.(*v1.Operation))
-		}
-		if v == nil {
-			return nil, err
-		}
-		return v, err
-	}
+// OperationGenericCache wraps wrangler/pkg/generic.Cache so the function definitions adhere to OperationCache interface.
+type OperationGenericCache struct {
+	generic.CacheInterface[*v1.Operation]
 }
 
-func (c *operationController) Updater() generic.Updater {
-	return func(obj runtime.Object) (runtime.Object, error) {
-		newObj, err := c.Update(obj.(*v1.Operation))
-		if newObj == nil {
-			return nil, err
-		}
-		return newObj, err
-	}
-}
-
-func UpdateOperationDeepCopyOnChange(client OperationClient, obj *v1.Operation, handler func(obj *v1.Operation) (*v1.Operation, error)) (*v1.Operation, error) {
-	if obj == nil {
-		return obj, nil
-	}
-
-	copyObj := obj.DeepCopy()
-	newObj, err := handler(copyObj)
-	if newObj != nil {
-		copyObj = newObj
-	}
-	if obj.ResourceVersion == copyObj.ResourceVersion && !equality.Semantic.DeepEqual(obj, copyObj) {
-		return client.Update(copyObj)
-	}
-
-	return copyObj, err
-}
-
-func (c *operationController) AddGenericHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.controller.RegisterHandler(ctx, name, controller.SharedControllerHandlerFunc(handler))
-}
-
-func (c *operationController) AddGenericRemoveHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), handler))
-}
-
-func (c *operationController) OnChange(ctx context.Context, name string, sync OperationHandler) {
-	c.AddGenericHandler(ctx, name, FromOperationHandlerToHandler(sync))
-}
-
-func (c *operationController) OnRemove(ctx context.Context, name string, sync OperationHandler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), FromOperationHandlerToHandler(sync)))
-}
-
-func (c *operationController) Enqueue(namespace, name string) {
-	c.controller.Enqueue(namespace, name)
-}
-
-func (c *operationController) EnqueueAfter(namespace, name string, duration time.Duration) {
-	c.controller.EnqueueAfter(namespace, name, duration)
-}
-
-func (c *operationController) Informer() cache.SharedIndexInformer {
-	return c.controller.Informer()
-}
-
-func (c *operationController) GroupVersionKind() schema.GroupVersionKind {
-	return c.gvk
-}
-
-func (c *operationController) Cache() OperationCache {
-	return &operationCache{
-		indexer:  c.Informer().GetIndexer(),
-		resource: c.groupResource,
-	}
-}
-
-func (c *operationController) Create(obj *v1.Operation) (*v1.Operation, error) {
-	result := &v1.Operation{}
-	return result, c.client.Create(context.TODO(), obj.Namespace, obj, result, metav1.CreateOptions{})
-}
-
-func (c *operationController) Update(obj *v1.Operation) (*v1.Operation, error) {
-	result := &v1.Operation{}
-	return result, c.client.Update(context.TODO(), obj.Namespace, obj, result, metav1.UpdateOptions{})
-}
-
-func (c *operationController) UpdateStatus(obj *v1.Operation) (*v1.Operation, error) {
-	result := &v1.Operation{}
-	return result, c.client.UpdateStatus(context.TODO(), obj.Namespace, obj, result, metav1.UpdateOptions{})
-}
-
-func (c *operationController) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	if options == nil {
-		options = &metav1.DeleteOptions{}
-	}
-	return c.client.Delete(context.TODO(), namespace, name, *options)
-}
-
-func (c *operationController) Get(namespace, name string, options metav1.GetOptions) (*v1.Operation, error) {
-	result := &v1.Operation{}
-	return result, c.client.Get(context.TODO(), namespace, name, result, options)
-}
-
-func (c *operationController) List(namespace string, opts metav1.ListOptions) (*v1.OperationList, error) {
-	result := &v1.OperationList{}
-	return result, c.client.List(context.TODO(), namespace, result, opts)
-}
-
-func (c *operationController) Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
-	return c.client.Watch(context.TODO(), namespace, opts)
-}
-
-func (c *operationController) Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (*v1.Operation, error) {
-	result := &v1.Operation{}
-	return result, c.client.Patch(context.TODO(), namespace, name, pt, data, result, metav1.PatchOptions{}, subresources...)
-}
-
-type operationCache struct {
-	indexer  cache.Indexer
-	resource schema.GroupResource
-}
-
-func (c *operationCache) Get(namespace, name string) (*v1.Operation, error) {
-	obj, exists, err := c.indexer.GetByKey(namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(c.resource, name)
-	}
-	return obj.(*v1.Operation), nil
-}
-
-func (c *operationCache) List(namespace string, selector labels.Selector) (ret []*v1.Operation, err error) {
-
-	err = cache.ListAllByNamespace(c.indexer, namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.Operation))
-	})
-
-	return ret, err
-}
-
-func (c *operationCache) AddIndexer(indexName string, indexer OperationIndexer) {
-	utilruntime.Must(c.indexer.AddIndexers(map[string]cache.IndexFunc{
-		indexName: func(obj interface{}) (strings []string, e error) {
-			return indexer(obj.(*v1.Operation))
-		},
-	}))
-}
-
-func (c *operationCache) GetByIndex(indexName, key string) (result []*v1.Operation, err error) {
-	objs, err := c.indexer.ByIndex(indexName, key)
-	if err != nil {
-		return nil, err
-	}
-	result = make([]*v1.Operation, 0, len(objs))
-	for _, obj := range objs {
-		result = append(result, obj.(*v1.Operation))
-	}
-	return result, nil
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c OperationGenericCache) AddIndexer(indexName string, indexer OperationIndexer) {
+	c.CacheInterface.AddIndexer(indexName, generic.Indexer[*v1.Operation](indexer))
 }
 
 type OperationStatusHandler func(obj *v1.Operation, status v1.OperationStatus) (v1.OperationStatus, error)
 
 type OperationGeneratingHandler func(obj *v1.Operation, status v1.OperationStatus) ([]runtime.Object, v1.OperationStatus, error)
+
+func FromOperationHandlerToHandler(sync OperationHandler) generic.Handler {
+	return generic.FromObjectHandlerToHandler(generic.ObjectHandler[*v1.Operation](sync))
+}
 
 func RegisterOperationStatusHandler(ctx context.Context, controller OperationController, condition condition.Cond, name string, handler OperationStatusHandler) {
 	statusHandler := &operationStatusHandler{

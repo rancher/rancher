@@ -22,235 +22,111 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/lasso/pkg/client"
-	"github.com/rancher/lasso/pkg/controller"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/wrangler/pkg/generic"
-	"k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/tools/cache"
 )
 
-type ProjectCatalogHandler func(string, *v3.ProjectCatalog) (*v3.ProjectCatalog, error)
-
+// ProjectCatalogController interface for managing ProjectCatalog resources.
 type ProjectCatalogController interface {
 	generic.ControllerMeta
 	ProjectCatalogClient
 
+	// OnChange runs the given handler when the controller detects a resource was changed.
 	OnChange(ctx context.Context, name string, sync ProjectCatalogHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
 	OnRemove(ctx context.Context, name string, sync ProjectCatalogHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
 	Enqueue(namespace, name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
 	EnqueueAfter(namespace, name string, duration time.Duration)
 
+	// Cache returns a cache for the resource type T.
 	Cache() ProjectCatalogCache
 }
 
+// ProjectCatalogClient interface for managing ProjectCatalog resources in Kubernetes.
 type ProjectCatalogClient interface {
+	// Create creates a new object and return the newly created Object or an error.
 	Create(*v3.ProjectCatalog) (*v3.ProjectCatalog, error)
+
+	// Update updates the object and return the newly updated Object or an error.
 	Update(*v3.ProjectCatalog) (*v3.ProjectCatalog, error)
 
+	// Delete deletes the Object in the given name.
 	Delete(namespace, name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
 	Get(namespace, name string, options metav1.GetOptions) (*v3.ProjectCatalog, error)
+
+	// List will attempt to find multiple resources.
 	List(namespace string, opts metav1.ListOptions) (*v3.ProjectCatalogList, error)
+
+	// Watch will start watching resources.
 	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
 	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.ProjectCatalog, err error)
 }
 
+// ProjectCatalogCache interface for retrieving ProjectCatalog resources in memory.
 type ProjectCatalogCache interface {
+	// Get returns the resources with the specified name from the cache.
 	Get(namespace, name string) (*v3.ProjectCatalog, error)
+
+	// List will attempt to find resources from the Cache.
 	List(namespace string, selector labels.Selector) ([]*v3.ProjectCatalog, error)
 
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
 	AddIndexer(indexName string, indexer ProjectCatalogIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
 	GetByIndex(indexName, key string) ([]*v3.ProjectCatalog, error)
 }
 
+// ProjectCatalogHandler is function for performing any potential modifications to a ProjectCatalog resource.
+type ProjectCatalogHandler func(string, *v3.ProjectCatalog) (*v3.ProjectCatalog, error)
+
+// ProjectCatalogIndexer computes a set of indexed values for the provided object.
 type ProjectCatalogIndexer func(obj *v3.ProjectCatalog) ([]string, error)
 
-type projectCatalogController struct {
-	controller    controller.SharedController
-	client        *client.Client
-	gvk           schema.GroupVersionKind
-	groupResource schema.GroupResource
+// ProjectCatalogGenericController wraps wrangler/pkg/generic.Controller so that the function definitions adhere to ProjectCatalogController interface.
+type ProjectCatalogGenericController struct {
+	generic.ControllerInterface[*v3.ProjectCatalog, *v3.ProjectCatalogList]
 }
 
-func NewProjectCatalogController(gvk schema.GroupVersionKind, resource string, namespaced bool, controller controller.SharedControllerFactory) ProjectCatalogController {
-	c := controller.ForResourceKind(gvk.GroupVersion().WithResource(resource), gvk.Kind, namespaced)
-	return &projectCatalogController{
-		controller: c,
-		client:     c.Client(),
-		gvk:        gvk,
-		groupResource: schema.GroupResource{
-			Group:    gvk.Group,
-			Resource: resource,
-		},
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *ProjectCatalogGenericController) OnChange(ctx context.Context, name string, sync ProjectCatalogHandler) {
+	c.ControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.ProjectCatalog](sync))
+}
+
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *ProjectCatalogGenericController) OnRemove(ctx context.Context, name string, sync ProjectCatalogHandler) {
+	c.ControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.ProjectCatalog](sync))
+}
+
+// Cache returns a cache of resources in memory.
+func (c *ProjectCatalogGenericController) Cache() ProjectCatalogCache {
+	return &ProjectCatalogGenericCache{
+		c.ControllerInterface.Cache(),
 	}
 }
 
-func FromProjectCatalogHandlerToHandler(sync ProjectCatalogHandler) generic.Handler {
-	return func(key string, obj runtime.Object) (ret runtime.Object, err error) {
-		var v *v3.ProjectCatalog
-		if obj == nil {
-			v, err = sync(key, nil)
-		} else {
-			v, err = sync(key, obj.(*v3.ProjectCatalog))
-		}
-		if v == nil {
-			return nil, err
-		}
-		return v, err
-	}
+// ProjectCatalogGenericCache wraps wrangler/pkg/generic.Cache so the function definitions adhere to ProjectCatalogCache interface.
+type ProjectCatalogGenericCache struct {
+	generic.CacheInterface[*v3.ProjectCatalog]
 }
 
-func (c *projectCatalogController) Updater() generic.Updater {
-	return func(obj runtime.Object) (runtime.Object, error) {
-		newObj, err := c.Update(obj.(*v3.ProjectCatalog))
-		if newObj == nil {
-			return nil, err
-		}
-		return newObj, err
-	}
-}
-
-func UpdateProjectCatalogDeepCopyOnChange(client ProjectCatalogClient, obj *v3.ProjectCatalog, handler func(obj *v3.ProjectCatalog) (*v3.ProjectCatalog, error)) (*v3.ProjectCatalog, error) {
-	if obj == nil {
-		return obj, nil
-	}
-
-	copyObj := obj.DeepCopy()
-	newObj, err := handler(copyObj)
-	if newObj != nil {
-		copyObj = newObj
-	}
-	if obj.ResourceVersion == copyObj.ResourceVersion && !equality.Semantic.DeepEqual(obj, copyObj) {
-		return client.Update(copyObj)
-	}
-
-	return copyObj, err
-}
-
-func (c *projectCatalogController) AddGenericHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.controller.RegisterHandler(ctx, name, controller.SharedControllerHandlerFunc(handler))
-}
-
-func (c *projectCatalogController) AddGenericRemoveHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), handler))
-}
-
-func (c *projectCatalogController) OnChange(ctx context.Context, name string, sync ProjectCatalogHandler) {
-	c.AddGenericHandler(ctx, name, FromProjectCatalogHandlerToHandler(sync))
-}
-
-func (c *projectCatalogController) OnRemove(ctx context.Context, name string, sync ProjectCatalogHandler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), FromProjectCatalogHandlerToHandler(sync)))
-}
-
-func (c *projectCatalogController) Enqueue(namespace, name string) {
-	c.controller.Enqueue(namespace, name)
-}
-
-func (c *projectCatalogController) EnqueueAfter(namespace, name string, duration time.Duration) {
-	c.controller.EnqueueAfter(namespace, name, duration)
-}
-
-func (c *projectCatalogController) Informer() cache.SharedIndexInformer {
-	return c.controller.Informer()
-}
-
-func (c *projectCatalogController) GroupVersionKind() schema.GroupVersionKind {
-	return c.gvk
-}
-
-func (c *projectCatalogController) Cache() ProjectCatalogCache {
-	return &projectCatalogCache{
-		indexer:  c.Informer().GetIndexer(),
-		resource: c.groupResource,
-	}
-}
-
-func (c *projectCatalogController) Create(obj *v3.ProjectCatalog) (*v3.ProjectCatalog, error) {
-	result := &v3.ProjectCatalog{}
-	return result, c.client.Create(context.TODO(), obj.Namespace, obj, result, metav1.CreateOptions{})
-}
-
-func (c *projectCatalogController) Update(obj *v3.ProjectCatalog) (*v3.ProjectCatalog, error) {
-	result := &v3.ProjectCatalog{}
-	return result, c.client.Update(context.TODO(), obj.Namespace, obj, result, metav1.UpdateOptions{})
-}
-
-func (c *projectCatalogController) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	if options == nil {
-		options = &metav1.DeleteOptions{}
-	}
-	return c.client.Delete(context.TODO(), namespace, name, *options)
-}
-
-func (c *projectCatalogController) Get(namespace, name string, options metav1.GetOptions) (*v3.ProjectCatalog, error) {
-	result := &v3.ProjectCatalog{}
-	return result, c.client.Get(context.TODO(), namespace, name, result, options)
-}
-
-func (c *projectCatalogController) List(namespace string, opts metav1.ListOptions) (*v3.ProjectCatalogList, error) {
-	result := &v3.ProjectCatalogList{}
-	return result, c.client.List(context.TODO(), namespace, result, opts)
-}
-
-func (c *projectCatalogController) Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
-	return c.client.Watch(context.TODO(), namespace, opts)
-}
-
-func (c *projectCatalogController) Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (*v3.ProjectCatalog, error) {
-	result := &v3.ProjectCatalog{}
-	return result, c.client.Patch(context.TODO(), namespace, name, pt, data, result, metav1.PatchOptions{}, subresources...)
-}
-
-type projectCatalogCache struct {
-	indexer  cache.Indexer
-	resource schema.GroupResource
-}
-
-func (c *projectCatalogCache) Get(namespace, name string) (*v3.ProjectCatalog, error) {
-	obj, exists, err := c.indexer.GetByKey(namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(c.resource, name)
-	}
-	return obj.(*v3.ProjectCatalog), nil
-}
-
-func (c *projectCatalogCache) List(namespace string, selector labels.Selector) (ret []*v3.ProjectCatalog, err error) {
-
-	err = cache.ListAllByNamespace(c.indexer, namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v3.ProjectCatalog))
-	})
-
-	return ret, err
-}
-
-func (c *projectCatalogCache) AddIndexer(indexName string, indexer ProjectCatalogIndexer) {
-	utilruntime.Must(c.indexer.AddIndexers(map[string]cache.IndexFunc{
-		indexName: func(obj interface{}) (strings []string, e error) {
-			return indexer(obj.(*v3.ProjectCatalog))
-		},
-	}))
-}
-
-func (c *projectCatalogCache) GetByIndex(indexName, key string) (result []*v3.ProjectCatalog, err error) {
-	objs, err := c.indexer.ByIndex(indexName, key)
-	if err != nil {
-		return nil, err
-	}
-	result = make([]*v3.ProjectCatalog, 0, len(objs))
-	for _, obj := range objs {
-		result = append(result, obj.(*v3.ProjectCatalog))
-	}
-	return result, nil
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c ProjectCatalogGenericCache) AddIndexer(indexName string, indexer ProjectCatalogIndexer) {
+	c.CacheInterface.AddIndexer(indexName, generic.Indexer[*v3.ProjectCatalog](indexer))
 }

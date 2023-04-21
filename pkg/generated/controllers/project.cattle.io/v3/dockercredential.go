@@ -22,235 +22,111 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/lasso/pkg/client"
-	"github.com/rancher/lasso/pkg/controller"
 	v3 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
 	"github.com/rancher/wrangler/pkg/generic"
-	"k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/tools/cache"
 )
 
-type DockerCredentialHandler func(string, *v3.DockerCredential) (*v3.DockerCredential, error)
-
+// DockerCredentialController interface for managing DockerCredential resources.
 type DockerCredentialController interface {
 	generic.ControllerMeta
 	DockerCredentialClient
 
+	// OnChange runs the given handler when the controller detects a resource was changed.
 	OnChange(ctx context.Context, name string, sync DockerCredentialHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
 	OnRemove(ctx context.Context, name string, sync DockerCredentialHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
 	Enqueue(namespace, name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
 	EnqueueAfter(namespace, name string, duration time.Duration)
 
+	// Cache returns a cache for the resource type T.
 	Cache() DockerCredentialCache
 }
 
+// DockerCredentialClient interface for managing DockerCredential resources in Kubernetes.
 type DockerCredentialClient interface {
+	// Create creates a new object and return the newly created Object or an error.
 	Create(*v3.DockerCredential) (*v3.DockerCredential, error)
+
+	// Update updates the object and return the newly updated Object or an error.
 	Update(*v3.DockerCredential) (*v3.DockerCredential, error)
 
+	// Delete deletes the Object in the given name.
 	Delete(namespace, name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
 	Get(namespace, name string, options metav1.GetOptions) (*v3.DockerCredential, error)
+
+	// List will attempt to find multiple resources.
 	List(namespace string, opts metav1.ListOptions) (*v3.DockerCredentialList, error)
+
+	// Watch will start watching resources.
 	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
 	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.DockerCredential, err error)
 }
 
+// DockerCredentialCache interface for retrieving DockerCredential resources in memory.
 type DockerCredentialCache interface {
+	// Get returns the resources with the specified name from the cache.
 	Get(namespace, name string) (*v3.DockerCredential, error)
+
+	// List will attempt to find resources from the Cache.
 	List(namespace string, selector labels.Selector) ([]*v3.DockerCredential, error)
 
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
 	AddIndexer(indexName string, indexer DockerCredentialIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
 	GetByIndex(indexName, key string) ([]*v3.DockerCredential, error)
 }
 
+// DockerCredentialHandler is function for performing any potential modifications to a DockerCredential resource.
+type DockerCredentialHandler func(string, *v3.DockerCredential) (*v3.DockerCredential, error)
+
+// DockerCredentialIndexer computes a set of indexed values for the provided object.
 type DockerCredentialIndexer func(obj *v3.DockerCredential) ([]string, error)
 
-type dockerCredentialController struct {
-	controller    controller.SharedController
-	client        *client.Client
-	gvk           schema.GroupVersionKind
-	groupResource schema.GroupResource
+// DockerCredentialGenericController wraps wrangler/pkg/generic.Controller so that the function definitions adhere to DockerCredentialController interface.
+type DockerCredentialGenericController struct {
+	generic.ControllerInterface[*v3.DockerCredential, *v3.DockerCredentialList]
 }
 
-func NewDockerCredentialController(gvk schema.GroupVersionKind, resource string, namespaced bool, controller controller.SharedControllerFactory) DockerCredentialController {
-	c := controller.ForResourceKind(gvk.GroupVersion().WithResource(resource), gvk.Kind, namespaced)
-	return &dockerCredentialController{
-		controller: c,
-		client:     c.Client(),
-		gvk:        gvk,
-		groupResource: schema.GroupResource{
-			Group:    gvk.Group,
-			Resource: resource,
-		},
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *DockerCredentialGenericController) OnChange(ctx context.Context, name string, sync DockerCredentialHandler) {
+	c.ControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.DockerCredential](sync))
+}
+
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *DockerCredentialGenericController) OnRemove(ctx context.Context, name string, sync DockerCredentialHandler) {
+	c.ControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.DockerCredential](sync))
+}
+
+// Cache returns a cache of resources in memory.
+func (c *DockerCredentialGenericController) Cache() DockerCredentialCache {
+	return &DockerCredentialGenericCache{
+		c.ControllerInterface.Cache(),
 	}
 }
 
-func FromDockerCredentialHandlerToHandler(sync DockerCredentialHandler) generic.Handler {
-	return func(key string, obj runtime.Object) (ret runtime.Object, err error) {
-		var v *v3.DockerCredential
-		if obj == nil {
-			v, err = sync(key, nil)
-		} else {
-			v, err = sync(key, obj.(*v3.DockerCredential))
-		}
-		if v == nil {
-			return nil, err
-		}
-		return v, err
-	}
+// DockerCredentialGenericCache wraps wrangler/pkg/generic.Cache so the function definitions adhere to DockerCredentialCache interface.
+type DockerCredentialGenericCache struct {
+	generic.CacheInterface[*v3.DockerCredential]
 }
 
-func (c *dockerCredentialController) Updater() generic.Updater {
-	return func(obj runtime.Object) (runtime.Object, error) {
-		newObj, err := c.Update(obj.(*v3.DockerCredential))
-		if newObj == nil {
-			return nil, err
-		}
-		return newObj, err
-	}
-}
-
-func UpdateDockerCredentialDeepCopyOnChange(client DockerCredentialClient, obj *v3.DockerCredential, handler func(obj *v3.DockerCredential) (*v3.DockerCredential, error)) (*v3.DockerCredential, error) {
-	if obj == nil {
-		return obj, nil
-	}
-
-	copyObj := obj.DeepCopy()
-	newObj, err := handler(copyObj)
-	if newObj != nil {
-		copyObj = newObj
-	}
-	if obj.ResourceVersion == copyObj.ResourceVersion && !equality.Semantic.DeepEqual(obj, copyObj) {
-		return client.Update(copyObj)
-	}
-
-	return copyObj, err
-}
-
-func (c *dockerCredentialController) AddGenericHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.controller.RegisterHandler(ctx, name, controller.SharedControllerHandlerFunc(handler))
-}
-
-func (c *dockerCredentialController) AddGenericRemoveHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), handler))
-}
-
-func (c *dockerCredentialController) OnChange(ctx context.Context, name string, sync DockerCredentialHandler) {
-	c.AddGenericHandler(ctx, name, FromDockerCredentialHandlerToHandler(sync))
-}
-
-func (c *dockerCredentialController) OnRemove(ctx context.Context, name string, sync DockerCredentialHandler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), FromDockerCredentialHandlerToHandler(sync)))
-}
-
-func (c *dockerCredentialController) Enqueue(namespace, name string) {
-	c.controller.Enqueue(namespace, name)
-}
-
-func (c *dockerCredentialController) EnqueueAfter(namespace, name string, duration time.Duration) {
-	c.controller.EnqueueAfter(namespace, name, duration)
-}
-
-func (c *dockerCredentialController) Informer() cache.SharedIndexInformer {
-	return c.controller.Informer()
-}
-
-func (c *dockerCredentialController) GroupVersionKind() schema.GroupVersionKind {
-	return c.gvk
-}
-
-func (c *dockerCredentialController) Cache() DockerCredentialCache {
-	return &dockerCredentialCache{
-		indexer:  c.Informer().GetIndexer(),
-		resource: c.groupResource,
-	}
-}
-
-func (c *dockerCredentialController) Create(obj *v3.DockerCredential) (*v3.DockerCredential, error) {
-	result := &v3.DockerCredential{}
-	return result, c.client.Create(context.TODO(), obj.Namespace, obj, result, metav1.CreateOptions{})
-}
-
-func (c *dockerCredentialController) Update(obj *v3.DockerCredential) (*v3.DockerCredential, error) {
-	result := &v3.DockerCredential{}
-	return result, c.client.Update(context.TODO(), obj.Namespace, obj, result, metav1.UpdateOptions{})
-}
-
-func (c *dockerCredentialController) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	if options == nil {
-		options = &metav1.DeleteOptions{}
-	}
-	return c.client.Delete(context.TODO(), namespace, name, *options)
-}
-
-func (c *dockerCredentialController) Get(namespace, name string, options metav1.GetOptions) (*v3.DockerCredential, error) {
-	result := &v3.DockerCredential{}
-	return result, c.client.Get(context.TODO(), namespace, name, result, options)
-}
-
-func (c *dockerCredentialController) List(namespace string, opts metav1.ListOptions) (*v3.DockerCredentialList, error) {
-	result := &v3.DockerCredentialList{}
-	return result, c.client.List(context.TODO(), namespace, result, opts)
-}
-
-func (c *dockerCredentialController) Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
-	return c.client.Watch(context.TODO(), namespace, opts)
-}
-
-func (c *dockerCredentialController) Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (*v3.DockerCredential, error) {
-	result := &v3.DockerCredential{}
-	return result, c.client.Patch(context.TODO(), namespace, name, pt, data, result, metav1.PatchOptions{}, subresources...)
-}
-
-type dockerCredentialCache struct {
-	indexer  cache.Indexer
-	resource schema.GroupResource
-}
-
-func (c *dockerCredentialCache) Get(namespace, name string) (*v3.DockerCredential, error) {
-	obj, exists, err := c.indexer.GetByKey(namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(c.resource, name)
-	}
-	return obj.(*v3.DockerCredential), nil
-}
-
-func (c *dockerCredentialCache) List(namespace string, selector labels.Selector) (ret []*v3.DockerCredential, err error) {
-
-	err = cache.ListAllByNamespace(c.indexer, namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v3.DockerCredential))
-	})
-
-	return ret, err
-}
-
-func (c *dockerCredentialCache) AddIndexer(indexName string, indexer DockerCredentialIndexer) {
-	utilruntime.Must(c.indexer.AddIndexers(map[string]cache.IndexFunc{
-		indexName: func(obj interface{}) (strings []string, e error) {
-			return indexer(obj.(*v3.DockerCredential))
-		},
-	}))
-}
-
-func (c *dockerCredentialCache) GetByIndex(indexName, key string) (result []*v3.DockerCredential, err error) {
-	objs, err := c.indexer.ByIndex(indexName, key)
-	if err != nil {
-		return nil, err
-	}
-	result = make([]*v3.DockerCredential, 0, len(objs))
-	for _, obj := range objs {
-		result = append(result, obj.(*v3.DockerCredential))
-	}
-	return result, nil
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c DockerCredentialGenericCache) AddIndexer(indexName string, indexer DockerCredentialIndexer) {
+	c.CacheInterface.AddIndexer(indexName, generic.Indexer[*v3.DockerCredential](indexer))
 }

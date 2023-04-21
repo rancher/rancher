@@ -22,8 +22,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/lasso/pkg/client"
-	"github.com/rancher/lasso/pkg/controller"
 	v1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/wrangler/pkg/apply"
 	"github.com/rancher/wrangler/pkg/condition"
@@ -36,236 +34,120 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/tools/cache"
 )
 
-type RKEControlPlaneHandler func(string, *v1.RKEControlPlane) (*v1.RKEControlPlane, error)
-
+// RKEControlPlaneController interface for managing RKEControlPlane resources.
 type RKEControlPlaneController interface {
 	generic.ControllerMeta
 	RKEControlPlaneClient
 
+	// OnChange runs the given handler when the controller detects a resource was changed.
 	OnChange(ctx context.Context, name string, sync RKEControlPlaneHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
 	OnRemove(ctx context.Context, name string, sync RKEControlPlaneHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
 	Enqueue(namespace, name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
 	EnqueueAfter(namespace, name string, duration time.Duration)
 
+	// Cache returns a cache for the resource type T.
 	Cache() RKEControlPlaneCache
 }
 
+// RKEControlPlaneClient interface for managing RKEControlPlane resources in Kubernetes.
 type RKEControlPlaneClient interface {
+	// Create creates a new object and return the newly created Object or an error.
 	Create(*v1.RKEControlPlane) (*v1.RKEControlPlane, error)
+
+	// Update updates the object and return the newly updated Object or an error.
 	Update(*v1.RKEControlPlane) (*v1.RKEControlPlane, error)
+	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
+	// Will always return an error if the object does not have a status field.
 	UpdateStatus(*v1.RKEControlPlane) (*v1.RKEControlPlane, error)
+
+	// Delete deletes the Object in the given name.
 	Delete(namespace, name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
 	Get(namespace, name string, options metav1.GetOptions) (*v1.RKEControlPlane, error)
+
+	// List will attempt to find multiple resources.
 	List(namespace string, opts metav1.ListOptions) (*v1.RKEControlPlaneList, error)
+
+	// Watch will start watching resources.
 	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
 	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.RKEControlPlane, err error)
 }
 
+// RKEControlPlaneCache interface for retrieving RKEControlPlane resources in memory.
 type RKEControlPlaneCache interface {
+	// Get returns the resources with the specified name from the cache.
 	Get(namespace, name string) (*v1.RKEControlPlane, error)
+
+	// List will attempt to find resources from the Cache.
 	List(namespace string, selector labels.Selector) ([]*v1.RKEControlPlane, error)
 
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
 	AddIndexer(indexName string, indexer RKEControlPlaneIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
 	GetByIndex(indexName, key string) ([]*v1.RKEControlPlane, error)
 }
 
+// RKEControlPlaneHandler is function for performing any potential modifications to a RKEControlPlane resource.
+type RKEControlPlaneHandler func(string, *v1.RKEControlPlane) (*v1.RKEControlPlane, error)
+
+// RKEControlPlaneIndexer computes a set of indexed values for the provided object.
 type RKEControlPlaneIndexer func(obj *v1.RKEControlPlane) ([]string, error)
 
-type rKEControlPlaneController struct {
-	controller    controller.SharedController
-	client        *client.Client
-	gvk           schema.GroupVersionKind
-	groupResource schema.GroupResource
+// RKEControlPlaneGenericController wraps wrangler/pkg/generic.Controller so that the function definitions adhere to RKEControlPlaneController interface.
+type RKEControlPlaneGenericController struct {
+	generic.ControllerInterface[*v1.RKEControlPlane, *v1.RKEControlPlaneList]
 }
 
-func NewRKEControlPlaneController(gvk schema.GroupVersionKind, resource string, namespaced bool, controller controller.SharedControllerFactory) RKEControlPlaneController {
-	c := controller.ForResourceKind(gvk.GroupVersion().WithResource(resource), gvk.Kind, namespaced)
-	return &rKEControlPlaneController{
-		controller: c,
-		client:     c.Client(),
-		gvk:        gvk,
-		groupResource: schema.GroupResource{
-			Group:    gvk.Group,
-			Resource: resource,
-		},
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *RKEControlPlaneGenericController) OnChange(ctx context.Context, name string, sync RKEControlPlaneHandler) {
+	c.ControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v1.RKEControlPlane](sync))
+}
+
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *RKEControlPlaneGenericController) OnRemove(ctx context.Context, name string, sync RKEControlPlaneHandler) {
+	c.ControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v1.RKEControlPlane](sync))
+}
+
+// Cache returns a cache of resources in memory.
+func (c *RKEControlPlaneGenericController) Cache() RKEControlPlaneCache {
+	return &RKEControlPlaneGenericCache{
+		c.ControllerInterface.Cache(),
 	}
 }
 
-func FromRKEControlPlaneHandlerToHandler(sync RKEControlPlaneHandler) generic.Handler {
-	return func(key string, obj runtime.Object) (ret runtime.Object, err error) {
-		var v *v1.RKEControlPlane
-		if obj == nil {
-			v, err = sync(key, nil)
-		} else {
-			v, err = sync(key, obj.(*v1.RKEControlPlane))
-		}
-		if v == nil {
-			return nil, err
-		}
-		return v, err
-	}
+// RKEControlPlaneGenericCache wraps wrangler/pkg/generic.Cache so the function definitions adhere to RKEControlPlaneCache interface.
+type RKEControlPlaneGenericCache struct {
+	generic.CacheInterface[*v1.RKEControlPlane]
 }
 
-func (c *rKEControlPlaneController) Updater() generic.Updater {
-	return func(obj runtime.Object) (runtime.Object, error) {
-		newObj, err := c.Update(obj.(*v1.RKEControlPlane))
-		if newObj == nil {
-			return nil, err
-		}
-		return newObj, err
-	}
-}
-
-func UpdateRKEControlPlaneDeepCopyOnChange(client RKEControlPlaneClient, obj *v1.RKEControlPlane, handler func(obj *v1.RKEControlPlane) (*v1.RKEControlPlane, error)) (*v1.RKEControlPlane, error) {
-	if obj == nil {
-		return obj, nil
-	}
-
-	copyObj := obj.DeepCopy()
-	newObj, err := handler(copyObj)
-	if newObj != nil {
-		copyObj = newObj
-	}
-	if obj.ResourceVersion == copyObj.ResourceVersion && !equality.Semantic.DeepEqual(obj, copyObj) {
-		return client.Update(copyObj)
-	}
-
-	return copyObj, err
-}
-
-func (c *rKEControlPlaneController) AddGenericHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.controller.RegisterHandler(ctx, name, controller.SharedControllerHandlerFunc(handler))
-}
-
-func (c *rKEControlPlaneController) AddGenericRemoveHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), handler))
-}
-
-func (c *rKEControlPlaneController) OnChange(ctx context.Context, name string, sync RKEControlPlaneHandler) {
-	c.AddGenericHandler(ctx, name, FromRKEControlPlaneHandlerToHandler(sync))
-}
-
-func (c *rKEControlPlaneController) OnRemove(ctx context.Context, name string, sync RKEControlPlaneHandler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), FromRKEControlPlaneHandlerToHandler(sync)))
-}
-
-func (c *rKEControlPlaneController) Enqueue(namespace, name string) {
-	c.controller.Enqueue(namespace, name)
-}
-
-func (c *rKEControlPlaneController) EnqueueAfter(namespace, name string, duration time.Duration) {
-	c.controller.EnqueueAfter(namespace, name, duration)
-}
-
-func (c *rKEControlPlaneController) Informer() cache.SharedIndexInformer {
-	return c.controller.Informer()
-}
-
-func (c *rKEControlPlaneController) GroupVersionKind() schema.GroupVersionKind {
-	return c.gvk
-}
-
-func (c *rKEControlPlaneController) Cache() RKEControlPlaneCache {
-	return &rKEControlPlaneCache{
-		indexer:  c.Informer().GetIndexer(),
-		resource: c.groupResource,
-	}
-}
-
-func (c *rKEControlPlaneController) Create(obj *v1.RKEControlPlane) (*v1.RKEControlPlane, error) {
-	result := &v1.RKEControlPlane{}
-	return result, c.client.Create(context.TODO(), obj.Namespace, obj, result, metav1.CreateOptions{})
-}
-
-func (c *rKEControlPlaneController) Update(obj *v1.RKEControlPlane) (*v1.RKEControlPlane, error) {
-	result := &v1.RKEControlPlane{}
-	return result, c.client.Update(context.TODO(), obj.Namespace, obj, result, metav1.UpdateOptions{})
-}
-
-func (c *rKEControlPlaneController) UpdateStatus(obj *v1.RKEControlPlane) (*v1.RKEControlPlane, error) {
-	result := &v1.RKEControlPlane{}
-	return result, c.client.UpdateStatus(context.TODO(), obj.Namespace, obj, result, metav1.UpdateOptions{})
-}
-
-func (c *rKEControlPlaneController) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	if options == nil {
-		options = &metav1.DeleteOptions{}
-	}
-	return c.client.Delete(context.TODO(), namespace, name, *options)
-}
-
-func (c *rKEControlPlaneController) Get(namespace, name string, options metav1.GetOptions) (*v1.RKEControlPlane, error) {
-	result := &v1.RKEControlPlane{}
-	return result, c.client.Get(context.TODO(), namespace, name, result, options)
-}
-
-func (c *rKEControlPlaneController) List(namespace string, opts metav1.ListOptions) (*v1.RKEControlPlaneList, error) {
-	result := &v1.RKEControlPlaneList{}
-	return result, c.client.List(context.TODO(), namespace, result, opts)
-}
-
-func (c *rKEControlPlaneController) Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
-	return c.client.Watch(context.TODO(), namespace, opts)
-}
-
-func (c *rKEControlPlaneController) Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (*v1.RKEControlPlane, error) {
-	result := &v1.RKEControlPlane{}
-	return result, c.client.Patch(context.TODO(), namespace, name, pt, data, result, metav1.PatchOptions{}, subresources...)
-}
-
-type rKEControlPlaneCache struct {
-	indexer  cache.Indexer
-	resource schema.GroupResource
-}
-
-func (c *rKEControlPlaneCache) Get(namespace, name string) (*v1.RKEControlPlane, error) {
-	obj, exists, err := c.indexer.GetByKey(namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(c.resource, name)
-	}
-	return obj.(*v1.RKEControlPlane), nil
-}
-
-func (c *rKEControlPlaneCache) List(namespace string, selector labels.Selector) (ret []*v1.RKEControlPlane, err error) {
-
-	err = cache.ListAllByNamespace(c.indexer, namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.RKEControlPlane))
-	})
-
-	return ret, err
-}
-
-func (c *rKEControlPlaneCache) AddIndexer(indexName string, indexer RKEControlPlaneIndexer) {
-	utilruntime.Must(c.indexer.AddIndexers(map[string]cache.IndexFunc{
-		indexName: func(obj interface{}) (strings []string, e error) {
-			return indexer(obj.(*v1.RKEControlPlane))
-		},
-	}))
-}
-
-func (c *rKEControlPlaneCache) GetByIndex(indexName, key string) (result []*v1.RKEControlPlane, err error) {
-	objs, err := c.indexer.ByIndex(indexName, key)
-	if err != nil {
-		return nil, err
-	}
-	result = make([]*v1.RKEControlPlane, 0, len(objs))
-	for _, obj := range objs {
-		result = append(result, obj.(*v1.RKEControlPlane))
-	}
-	return result, nil
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c RKEControlPlaneGenericCache) AddIndexer(indexName string, indexer RKEControlPlaneIndexer) {
+	c.CacheInterface.AddIndexer(indexName, generic.Indexer[*v1.RKEControlPlane](indexer))
 }
 
 type RKEControlPlaneStatusHandler func(obj *v1.RKEControlPlane, status v1.RKEControlPlaneStatus) (v1.RKEControlPlaneStatus, error)
 
 type RKEControlPlaneGeneratingHandler func(obj *v1.RKEControlPlane, status v1.RKEControlPlaneStatus) ([]runtime.Object, v1.RKEControlPlaneStatus, error)
+
+func FromRKEControlPlaneHandlerToHandler(sync RKEControlPlaneHandler) generic.Handler {
+	return generic.FromObjectHandlerToHandler(generic.ObjectHandler[*v1.RKEControlPlane](sync))
+}
 
 func RegisterRKEControlPlaneStatusHandler(ctx context.Context, controller RKEControlPlaneController, condition condition.Cond, name string, handler RKEControlPlaneStatusHandler) {
 	statusHandler := &rKEControlPlaneStatusHandler{

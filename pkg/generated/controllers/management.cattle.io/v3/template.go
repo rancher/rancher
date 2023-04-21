@@ -22,8 +22,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/lasso/pkg/client"
-	"github.com/rancher/lasso/pkg/controller"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/wrangler/pkg/apply"
 	"github.com/rancher/wrangler/pkg/condition"
@@ -36,236 +34,120 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/tools/cache"
 )
 
-type TemplateHandler func(string, *v3.Template) (*v3.Template, error)
-
+// TemplateController interface for managing Template resources.
 type TemplateController interface {
 	generic.ControllerMeta
 	TemplateClient
 
+	// OnChange runs the given handler when the controller detects a resource was changed.
 	OnChange(ctx context.Context, name string, sync TemplateHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
 	OnRemove(ctx context.Context, name string, sync TemplateHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
 	Enqueue(name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
 	EnqueueAfter(name string, duration time.Duration)
 
+	// Cache returns a cache for the resource type T.
 	Cache() TemplateCache
 }
 
+// TemplateClient interface for managing Template resources in Kubernetes.
 type TemplateClient interface {
+	// Create creates a new object and return the newly created Object or an error.
 	Create(*v3.Template) (*v3.Template, error)
+
+	// Update updates the object and return the newly updated Object or an error.
 	Update(*v3.Template) (*v3.Template, error)
+	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
+	// Will always return an error if the object does not have a status field.
 	UpdateStatus(*v3.Template) (*v3.Template, error)
+
+	// Delete deletes the Object in the given name.
 	Delete(name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
 	Get(name string, options metav1.GetOptions) (*v3.Template, error)
+
+	// List will attempt to find multiple resources.
 	List(opts metav1.ListOptions) (*v3.TemplateList, error)
+
+	// Watch will start watching resources.
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.Template, err error)
 }
 
+// TemplateCache interface for retrieving Template resources in memory.
 type TemplateCache interface {
+	// Get returns the resources with the specified name from the cache.
 	Get(name string) (*v3.Template, error)
+
+	// List will attempt to find resources from the Cache.
 	List(selector labels.Selector) ([]*v3.Template, error)
 
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
 	AddIndexer(indexName string, indexer TemplateIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
 	GetByIndex(indexName, key string) ([]*v3.Template, error)
 }
 
+// TemplateHandler is function for performing any potential modifications to a Template resource.
+type TemplateHandler func(string, *v3.Template) (*v3.Template, error)
+
+// TemplateIndexer computes a set of indexed values for the provided object.
 type TemplateIndexer func(obj *v3.Template) ([]string, error)
 
-type templateController struct {
-	controller    controller.SharedController
-	client        *client.Client
-	gvk           schema.GroupVersionKind
-	groupResource schema.GroupResource
+// TemplateGenericController wraps wrangler/pkg/generic.NonNamespacedController so that the function definitions adhere to TemplateController interface.
+type TemplateGenericController struct {
+	generic.NonNamespacedControllerInterface[*v3.Template, *v3.TemplateList]
 }
 
-func NewTemplateController(gvk schema.GroupVersionKind, resource string, namespaced bool, controller controller.SharedControllerFactory) TemplateController {
-	c := controller.ForResourceKind(gvk.GroupVersion().WithResource(resource), gvk.Kind, namespaced)
-	return &templateController{
-		controller: c,
-		client:     c.Client(),
-		gvk:        gvk,
-		groupResource: schema.GroupResource{
-			Group:    gvk.Group,
-			Resource: resource,
-		},
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *TemplateGenericController) OnChange(ctx context.Context, name string, sync TemplateHandler) {
+	c.NonNamespacedControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.Template](sync))
+}
+
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *TemplateGenericController) OnRemove(ctx context.Context, name string, sync TemplateHandler) {
+	c.NonNamespacedControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.Template](sync))
+}
+
+// Cache returns a cache of resources in memory.
+func (c *TemplateGenericController) Cache() TemplateCache {
+	return &TemplateGenericCache{
+		c.NonNamespacedControllerInterface.Cache(),
 	}
 }
 
-func FromTemplateHandlerToHandler(sync TemplateHandler) generic.Handler {
-	return func(key string, obj runtime.Object) (ret runtime.Object, err error) {
-		var v *v3.Template
-		if obj == nil {
-			v, err = sync(key, nil)
-		} else {
-			v, err = sync(key, obj.(*v3.Template))
-		}
-		if v == nil {
-			return nil, err
-		}
-		return v, err
-	}
+// TemplateGenericCache wraps wrangler/pkg/generic.NonNamespacedCache so the function definitions adhere to TemplateCache interface.
+type TemplateGenericCache struct {
+	generic.NonNamespacedCacheInterface[*v3.Template]
 }
 
-func (c *templateController) Updater() generic.Updater {
-	return func(obj runtime.Object) (runtime.Object, error) {
-		newObj, err := c.Update(obj.(*v3.Template))
-		if newObj == nil {
-			return nil, err
-		}
-		return newObj, err
-	}
-}
-
-func UpdateTemplateDeepCopyOnChange(client TemplateClient, obj *v3.Template, handler func(obj *v3.Template) (*v3.Template, error)) (*v3.Template, error) {
-	if obj == nil {
-		return obj, nil
-	}
-
-	copyObj := obj.DeepCopy()
-	newObj, err := handler(copyObj)
-	if newObj != nil {
-		copyObj = newObj
-	}
-	if obj.ResourceVersion == copyObj.ResourceVersion && !equality.Semantic.DeepEqual(obj, copyObj) {
-		return client.Update(copyObj)
-	}
-
-	return copyObj, err
-}
-
-func (c *templateController) AddGenericHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.controller.RegisterHandler(ctx, name, controller.SharedControllerHandlerFunc(handler))
-}
-
-func (c *templateController) AddGenericRemoveHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), handler))
-}
-
-func (c *templateController) OnChange(ctx context.Context, name string, sync TemplateHandler) {
-	c.AddGenericHandler(ctx, name, FromTemplateHandlerToHandler(sync))
-}
-
-func (c *templateController) OnRemove(ctx context.Context, name string, sync TemplateHandler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), FromTemplateHandlerToHandler(sync)))
-}
-
-func (c *templateController) Enqueue(name string) {
-	c.controller.Enqueue("", name)
-}
-
-func (c *templateController) EnqueueAfter(name string, duration time.Duration) {
-	c.controller.EnqueueAfter("", name, duration)
-}
-
-func (c *templateController) Informer() cache.SharedIndexInformer {
-	return c.controller.Informer()
-}
-
-func (c *templateController) GroupVersionKind() schema.GroupVersionKind {
-	return c.gvk
-}
-
-func (c *templateController) Cache() TemplateCache {
-	return &templateCache{
-		indexer:  c.Informer().GetIndexer(),
-		resource: c.groupResource,
-	}
-}
-
-func (c *templateController) Create(obj *v3.Template) (*v3.Template, error) {
-	result := &v3.Template{}
-	return result, c.client.Create(context.TODO(), "", obj, result, metav1.CreateOptions{})
-}
-
-func (c *templateController) Update(obj *v3.Template) (*v3.Template, error) {
-	result := &v3.Template{}
-	return result, c.client.Update(context.TODO(), "", obj, result, metav1.UpdateOptions{})
-}
-
-func (c *templateController) UpdateStatus(obj *v3.Template) (*v3.Template, error) {
-	result := &v3.Template{}
-	return result, c.client.UpdateStatus(context.TODO(), "", obj, result, metav1.UpdateOptions{})
-}
-
-func (c *templateController) Delete(name string, options *metav1.DeleteOptions) error {
-	if options == nil {
-		options = &metav1.DeleteOptions{}
-	}
-	return c.client.Delete(context.TODO(), "", name, *options)
-}
-
-func (c *templateController) Get(name string, options metav1.GetOptions) (*v3.Template, error) {
-	result := &v3.Template{}
-	return result, c.client.Get(context.TODO(), "", name, result, options)
-}
-
-func (c *templateController) List(opts metav1.ListOptions) (*v3.TemplateList, error) {
-	result := &v3.TemplateList{}
-	return result, c.client.List(context.TODO(), "", result, opts)
-}
-
-func (c *templateController) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return c.client.Watch(context.TODO(), "", opts)
-}
-
-func (c *templateController) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (*v3.Template, error) {
-	result := &v3.Template{}
-	return result, c.client.Patch(context.TODO(), "", name, pt, data, result, metav1.PatchOptions{}, subresources...)
-}
-
-type templateCache struct {
-	indexer  cache.Indexer
-	resource schema.GroupResource
-}
-
-func (c *templateCache) Get(name string) (*v3.Template, error) {
-	obj, exists, err := c.indexer.GetByKey(name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(c.resource, name)
-	}
-	return obj.(*v3.Template), nil
-}
-
-func (c *templateCache) List(selector labels.Selector) (ret []*v3.Template, err error) {
-
-	err = cache.ListAll(c.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v3.Template))
-	})
-
-	return ret, err
-}
-
-func (c *templateCache) AddIndexer(indexName string, indexer TemplateIndexer) {
-	utilruntime.Must(c.indexer.AddIndexers(map[string]cache.IndexFunc{
-		indexName: func(obj interface{}) (strings []string, e error) {
-			return indexer(obj.(*v3.Template))
-		},
-	}))
-}
-
-func (c *templateCache) GetByIndex(indexName, key string) (result []*v3.Template, err error) {
-	objs, err := c.indexer.ByIndex(indexName, key)
-	if err != nil {
-		return nil, err
-	}
-	result = make([]*v3.Template, 0, len(objs))
-	for _, obj := range objs {
-		result = append(result, obj.(*v3.Template))
-	}
-	return result, nil
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c TemplateGenericCache) AddIndexer(indexName string, indexer TemplateIndexer) {
+	c.NonNamespacedCacheInterface.AddIndexer(indexName, generic.Indexer[*v3.Template](indexer))
 }
 
 type TemplateStatusHandler func(obj *v3.Template, status v3.TemplateStatus) (v3.TemplateStatus, error)
 
 type TemplateGeneratingHandler func(obj *v3.Template, status v3.TemplateStatus) ([]runtime.Object, v3.TemplateStatus, error)
+
+func FromTemplateHandlerToHandler(sync TemplateHandler) generic.Handler {
+	return generic.FromObjectHandlerToHandler(generic.ObjectHandler[*v3.Template](sync))
+}
 
 func RegisterTemplateStatusHandler(ctx context.Context, controller TemplateController, condition condition.Cond, name string, handler TemplateStatusHandler) {
 	statusHandler := &templateStatusHandler{

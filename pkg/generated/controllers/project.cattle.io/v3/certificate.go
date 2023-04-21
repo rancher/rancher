@@ -22,235 +22,111 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/lasso/pkg/client"
-	"github.com/rancher/lasso/pkg/controller"
 	v3 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
 	"github.com/rancher/wrangler/pkg/generic"
-	"k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/tools/cache"
 )
 
-type CertificateHandler func(string, *v3.Certificate) (*v3.Certificate, error)
-
+// CertificateController interface for managing Certificate resources.
 type CertificateController interface {
 	generic.ControllerMeta
 	CertificateClient
 
+	// OnChange runs the given handler when the controller detects a resource was changed.
 	OnChange(ctx context.Context, name string, sync CertificateHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
 	OnRemove(ctx context.Context, name string, sync CertificateHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
 	Enqueue(namespace, name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
 	EnqueueAfter(namespace, name string, duration time.Duration)
 
+	// Cache returns a cache for the resource type T.
 	Cache() CertificateCache
 }
 
+// CertificateClient interface for managing Certificate resources in Kubernetes.
 type CertificateClient interface {
+	// Create creates a new object and return the newly created Object or an error.
 	Create(*v3.Certificate) (*v3.Certificate, error)
+
+	// Update updates the object and return the newly updated Object or an error.
 	Update(*v3.Certificate) (*v3.Certificate, error)
 
+	// Delete deletes the Object in the given name.
 	Delete(namespace, name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
 	Get(namespace, name string, options metav1.GetOptions) (*v3.Certificate, error)
+
+	// List will attempt to find multiple resources.
 	List(namespace string, opts metav1.ListOptions) (*v3.CertificateList, error)
+
+	// Watch will start watching resources.
 	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
 	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.Certificate, err error)
 }
 
+// CertificateCache interface for retrieving Certificate resources in memory.
 type CertificateCache interface {
+	// Get returns the resources with the specified name from the cache.
 	Get(namespace, name string) (*v3.Certificate, error)
+
+	// List will attempt to find resources from the Cache.
 	List(namespace string, selector labels.Selector) ([]*v3.Certificate, error)
 
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
 	AddIndexer(indexName string, indexer CertificateIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
 	GetByIndex(indexName, key string) ([]*v3.Certificate, error)
 }
 
+// CertificateHandler is function for performing any potential modifications to a Certificate resource.
+type CertificateHandler func(string, *v3.Certificate) (*v3.Certificate, error)
+
+// CertificateIndexer computes a set of indexed values for the provided object.
 type CertificateIndexer func(obj *v3.Certificate) ([]string, error)
 
-type certificateController struct {
-	controller    controller.SharedController
-	client        *client.Client
-	gvk           schema.GroupVersionKind
-	groupResource schema.GroupResource
+// CertificateGenericController wraps wrangler/pkg/generic.Controller so that the function definitions adhere to CertificateController interface.
+type CertificateGenericController struct {
+	generic.ControllerInterface[*v3.Certificate, *v3.CertificateList]
 }
 
-func NewCertificateController(gvk schema.GroupVersionKind, resource string, namespaced bool, controller controller.SharedControllerFactory) CertificateController {
-	c := controller.ForResourceKind(gvk.GroupVersion().WithResource(resource), gvk.Kind, namespaced)
-	return &certificateController{
-		controller: c,
-		client:     c.Client(),
-		gvk:        gvk,
-		groupResource: schema.GroupResource{
-			Group:    gvk.Group,
-			Resource: resource,
-		},
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *CertificateGenericController) OnChange(ctx context.Context, name string, sync CertificateHandler) {
+	c.ControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.Certificate](sync))
+}
+
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *CertificateGenericController) OnRemove(ctx context.Context, name string, sync CertificateHandler) {
+	c.ControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.Certificate](sync))
+}
+
+// Cache returns a cache of resources in memory.
+func (c *CertificateGenericController) Cache() CertificateCache {
+	return &CertificateGenericCache{
+		c.ControllerInterface.Cache(),
 	}
 }
 
-func FromCertificateHandlerToHandler(sync CertificateHandler) generic.Handler {
-	return func(key string, obj runtime.Object) (ret runtime.Object, err error) {
-		var v *v3.Certificate
-		if obj == nil {
-			v, err = sync(key, nil)
-		} else {
-			v, err = sync(key, obj.(*v3.Certificate))
-		}
-		if v == nil {
-			return nil, err
-		}
-		return v, err
-	}
+// CertificateGenericCache wraps wrangler/pkg/generic.Cache so the function definitions adhere to CertificateCache interface.
+type CertificateGenericCache struct {
+	generic.CacheInterface[*v3.Certificate]
 }
 
-func (c *certificateController) Updater() generic.Updater {
-	return func(obj runtime.Object) (runtime.Object, error) {
-		newObj, err := c.Update(obj.(*v3.Certificate))
-		if newObj == nil {
-			return nil, err
-		}
-		return newObj, err
-	}
-}
-
-func UpdateCertificateDeepCopyOnChange(client CertificateClient, obj *v3.Certificate, handler func(obj *v3.Certificate) (*v3.Certificate, error)) (*v3.Certificate, error) {
-	if obj == nil {
-		return obj, nil
-	}
-
-	copyObj := obj.DeepCopy()
-	newObj, err := handler(copyObj)
-	if newObj != nil {
-		copyObj = newObj
-	}
-	if obj.ResourceVersion == copyObj.ResourceVersion && !equality.Semantic.DeepEqual(obj, copyObj) {
-		return client.Update(copyObj)
-	}
-
-	return copyObj, err
-}
-
-func (c *certificateController) AddGenericHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.controller.RegisterHandler(ctx, name, controller.SharedControllerHandlerFunc(handler))
-}
-
-func (c *certificateController) AddGenericRemoveHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), handler))
-}
-
-func (c *certificateController) OnChange(ctx context.Context, name string, sync CertificateHandler) {
-	c.AddGenericHandler(ctx, name, FromCertificateHandlerToHandler(sync))
-}
-
-func (c *certificateController) OnRemove(ctx context.Context, name string, sync CertificateHandler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), FromCertificateHandlerToHandler(sync)))
-}
-
-func (c *certificateController) Enqueue(namespace, name string) {
-	c.controller.Enqueue(namespace, name)
-}
-
-func (c *certificateController) EnqueueAfter(namespace, name string, duration time.Duration) {
-	c.controller.EnqueueAfter(namespace, name, duration)
-}
-
-func (c *certificateController) Informer() cache.SharedIndexInformer {
-	return c.controller.Informer()
-}
-
-func (c *certificateController) GroupVersionKind() schema.GroupVersionKind {
-	return c.gvk
-}
-
-func (c *certificateController) Cache() CertificateCache {
-	return &certificateCache{
-		indexer:  c.Informer().GetIndexer(),
-		resource: c.groupResource,
-	}
-}
-
-func (c *certificateController) Create(obj *v3.Certificate) (*v3.Certificate, error) {
-	result := &v3.Certificate{}
-	return result, c.client.Create(context.TODO(), obj.Namespace, obj, result, metav1.CreateOptions{})
-}
-
-func (c *certificateController) Update(obj *v3.Certificate) (*v3.Certificate, error) {
-	result := &v3.Certificate{}
-	return result, c.client.Update(context.TODO(), obj.Namespace, obj, result, metav1.UpdateOptions{})
-}
-
-func (c *certificateController) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	if options == nil {
-		options = &metav1.DeleteOptions{}
-	}
-	return c.client.Delete(context.TODO(), namespace, name, *options)
-}
-
-func (c *certificateController) Get(namespace, name string, options metav1.GetOptions) (*v3.Certificate, error) {
-	result := &v3.Certificate{}
-	return result, c.client.Get(context.TODO(), namespace, name, result, options)
-}
-
-func (c *certificateController) List(namespace string, opts metav1.ListOptions) (*v3.CertificateList, error) {
-	result := &v3.CertificateList{}
-	return result, c.client.List(context.TODO(), namespace, result, opts)
-}
-
-func (c *certificateController) Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
-	return c.client.Watch(context.TODO(), namespace, opts)
-}
-
-func (c *certificateController) Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (*v3.Certificate, error) {
-	result := &v3.Certificate{}
-	return result, c.client.Patch(context.TODO(), namespace, name, pt, data, result, metav1.PatchOptions{}, subresources...)
-}
-
-type certificateCache struct {
-	indexer  cache.Indexer
-	resource schema.GroupResource
-}
-
-func (c *certificateCache) Get(namespace, name string) (*v3.Certificate, error) {
-	obj, exists, err := c.indexer.GetByKey(namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(c.resource, name)
-	}
-	return obj.(*v3.Certificate), nil
-}
-
-func (c *certificateCache) List(namespace string, selector labels.Selector) (ret []*v3.Certificate, err error) {
-
-	err = cache.ListAllByNamespace(c.indexer, namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v3.Certificate))
-	})
-
-	return ret, err
-}
-
-func (c *certificateCache) AddIndexer(indexName string, indexer CertificateIndexer) {
-	utilruntime.Must(c.indexer.AddIndexers(map[string]cache.IndexFunc{
-		indexName: func(obj interface{}) (strings []string, e error) {
-			return indexer(obj.(*v3.Certificate))
-		},
-	}))
-}
-
-func (c *certificateCache) GetByIndex(indexName, key string) (result []*v3.Certificate, err error) {
-	objs, err := c.indexer.ByIndex(indexName, key)
-	if err != nil {
-		return nil, err
-	}
-	result = make([]*v3.Certificate, 0, len(objs))
-	for _, obj := range objs {
-		result = append(result, obj.(*v3.Certificate))
-	}
-	return result, nil
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c CertificateGenericCache) AddIndexer(indexName string, indexer CertificateIndexer) {
+	c.CacheInterface.AddIndexer(indexName, generic.Indexer[*v3.Certificate](indexer))
 }

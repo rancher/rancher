@@ -22,235 +22,111 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/lasso/pkg/client"
-	"github.com/rancher/lasso/pkg/controller"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/wrangler/pkg/generic"
-	"k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/tools/cache"
 )
 
-type AuthConfigHandler func(string, *v3.AuthConfig) (*v3.AuthConfig, error)
-
+// AuthConfigController interface for managing AuthConfig resources.
 type AuthConfigController interface {
 	generic.ControllerMeta
 	AuthConfigClient
 
+	// OnChange runs the given handler when the controller detects a resource was changed.
 	OnChange(ctx context.Context, name string, sync AuthConfigHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
 	OnRemove(ctx context.Context, name string, sync AuthConfigHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
 	Enqueue(name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
 	EnqueueAfter(name string, duration time.Duration)
 
+	// Cache returns a cache for the resource type T.
 	Cache() AuthConfigCache
 }
 
+// AuthConfigClient interface for managing AuthConfig resources in Kubernetes.
 type AuthConfigClient interface {
+	// Create creates a new object and return the newly created Object or an error.
 	Create(*v3.AuthConfig) (*v3.AuthConfig, error)
+
+	// Update updates the object and return the newly updated Object or an error.
 	Update(*v3.AuthConfig) (*v3.AuthConfig, error)
 
+	// Delete deletes the Object in the given name.
 	Delete(name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
 	Get(name string, options metav1.GetOptions) (*v3.AuthConfig, error)
+
+	// List will attempt to find multiple resources.
 	List(opts metav1.ListOptions) (*v3.AuthConfigList, error)
+
+	// Watch will start watching resources.
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.AuthConfig, err error)
 }
 
+// AuthConfigCache interface for retrieving AuthConfig resources in memory.
 type AuthConfigCache interface {
+	// Get returns the resources with the specified name from the cache.
 	Get(name string) (*v3.AuthConfig, error)
+
+	// List will attempt to find resources from the Cache.
 	List(selector labels.Selector) ([]*v3.AuthConfig, error)
 
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
 	AddIndexer(indexName string, indexer AuthConfigIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
 	GetByIndex(indexName, key string) ([]*v3.AuthConfig, error)
 }
 
+// AuthConfigHandler is function for performing any potential modifications to a AuthConfig resource.
+type AuthConfigHandler func(string, *v3.AuthConfig) (*v3.AuthConfig, error)
+
+// AuthConfigIndexer computes a set of indexed values for the provided object.
 type AuthConfigIndexer func(obj *v3.AuthConfig) ([]string, error)
 
-type authConfigController struct {
-	controller    controller.SharedController
-	client        *client.Client
-	gvk           schema.GroupVersionKind
-	groupResource schema.GroupResource
+// AuthConfigGenericController wraps wrangler/pkg/generic.NonNamespacedController so that the function definitions adhere to AuthConfigController interface.
+type AuthConfigGenericController struct {
+	generic.NonNamespacedControllerInterface[*v3.AuthConfig, *v3.AuthConfigList]
 }
 
-func NewAuthConfigController(gvk schema.GroupVersionKind, resource string, namespaced bool, controller controller.SharedControllerFactory) AuthConfigController {
-	c := controller.ForResourceKind(gvk.GroupVersion().WithResource(resource), gvk.Kind, namespaced)
-	return &authConfigController{
-		controller: c,
-		client:     c.Client(),
-		gvk:        gvk,
-		groupResource: schema.GroupResource{
-			Group:    gvk.Group,
-			Resource: resource,
-		},
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *AuthConfigGenericController) OnChange(ctx context.Context, name string, sync AuthConfigHandler) {
+	c.NonNamespacedControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.AuthConfig](sync))
+}
+
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *AuthConfigGenericController) OnRemove(ctx context.Context, name string, sync AuthConfigHandler) {
+	c.NonNamespacedControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.AuthConfig](sync))
+}
+
+// Cache returns a cache of resources in memory.
+func (c *AuthConfigGenericController) Cache() AuthConfigCache {
+	return &AuthConfigGenericCache{
+		c.NonNamespacedControllerInterface.Cache(),
 	}
 }
 
-func FromAuthConfigHandlerToHandler(sync AuthConfigHandler) generic.Handler {
-	return func(key string, obj runtime.Object) (ret runtime.Object, err error) {
-		var v *v3.AuthConfig
-		if obj == nil {
-			v, err = sync(key, nil)
-		} else {
-			v, err = sync(key, obj.(*v3.AuthConfig))
-		}
-		if v == nil {
-			return nil, err
-		}
-		return v, err
-	}
+// AuthConfigGenericCache wraps wrangler/pkg/generic.NonNamespacedCache so the function definitions adhere to AuthConfigCache interface.
+type AuthConfigGenericCache struct {
+	generic.NonNamespacedCacheInterface[*v3.AuthConfig]
 }
 
-func (c *authConfigController) Updater() generic.Updater {
-	return func(obj runtime.Object) (runtime.Object, error) {
-		newObj, err := c.Update(obj.(*v3.AuthConfig))
-		if newObj == nil {
-			return nil, err
-		}
-		return newObj, err
-	}
-}
-
-func UpdateAuthConfigDeepCopyOnChange(client AuthConfigClient, obj *v3.AuthConfig, handler func(obj *v3.AuthConfig) (*v3.AuthConfig, error)) (*v3.AuthConfig, error) {
-	if obj == nil {
-		return obj, nil
-	}
-
-	copyObj := obj.DeepCopy()
-	newObj, err := handler(copyObj)
-	if newObj != nil {
-		copyObj = newObj
-	}
-	if obj.ResourceVersion == copyObj.ResourceVersion && !equality.Semantic.DeepEqual(obj, copyObj) {
-		return client.Update(copyObj)
-	}
-
-	return copyObj, err
-}
-
-func (c *authConfigController) AddGenericHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.controller.RegisterHandler(ctx, name, controller.SharedControllerHandlerFunc(handler))
-}
-
-func (c *authConfigController) AddGenericRemoveHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), handler))
-}
-
-func (c *authConfigController) OnChange(ctx context.Context, name string, sync AuthConfigHandler) {
-	c.AddGenericHandler(ctx, name, FromAuthConfigHandlerToHandler(sync))
-}
-
-func (c *authConfigController) OnRemove(ctx context.Context, name string, sync AuthConfigHandler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), FromAuthConfigHandlerToHandler(sync)))
-}
-
-func (c *authConfigController) Enqueue(name string) {
-	c.controller.Enqueue("", name)
-}
-
-func (c *authConfigController) EnqueueAfter(name string, duration time.Duration) {
-	c.controller.EnqueueAfter("", name, duration)
-}
-
-func (c *authConfigController) Informer() cache.SharedIndexInformer {
-	return c.controller.Informer()
-}
-
-func (c *authConfigController) GroupVersionKind() schema.GroupVersionKind {
-	return c.gvk
-}
-
-func (c *authConfigController) Cache() AuthConfigCache {
-	return &authConfigCache{
-		indexer:  c.Informer().GetIndexer(),
-		resource: c.groupResource,
-	}
-}
-
-func (c *authConfigController) Create(obj *v3.AuthConfig) (*v3.AuthConfig, error) {
-	result := &v3.AuthConfig{}
-	return result, c.client.Create(context.TODO(), "", obj, result, metav1.CreateOptions{})
-}
-
-func (c *authConfigController) Update(obj *v3.AuthConfig) (*v3.AuthConfig, error) {
-	result := &v3.AuthConfig{}
-	return result, c.client.Update(context.TODO(), "", obj, result, metav1.UpdateOptions{})
-}
-
-func (c *authConfigController) Delete(name string, options *metav1.DeleteOptions) error {
-	if options == nil {
-		options = &metav1.DeleteOptions{}
-	}
-	return c.client.Delete(context.TODO(), "", name, *options)
-}
-
-func (c *authConfigController) Get(name string, options metav1.GetOptions) (*v3.AuthConfig, error) {
-	result := &v3.AuthConfig{}
-	return result, c.client.Get(context.TODO(), "", name, result, options)
-}
-
-func (c *authConfigController) List(opts metav1.ListOptions) (*v3.AuthConfigList, error) {
-	result := &v3.AuthConfigList{}
-	return result, c.client.List(context.TODO(), "", result, opts)
-}
-
-func (c *authConfigController) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return c.client.Watch(context.TODO(), "", opts)
-}
-
-func (c *authConfigController) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (*v3.AuthConfig, error) {
-	result := &v3.AuthConfig{}
-	return result, c.client.Patch(context.TODO(), "", name, pt, data, result, metav1.PatchOptions{}, subresources...)
-}
-
-type authConfigCache struct {
-	indexer  cache.Indexer
-	resource schema.GroupResource
-}
-
-func (c *authConfigCache) Get(name string) (*v3.AuthConfig, error) {
-	obj, exists, err := c.indexer.GetByKey(name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(c.resource, name)
-	}
-	return obj.(*v3.AuthConfig), nil
-}
-
-func (c *authConfigCache) List(selector labels.Selector) (ret []*v3.AuthConfig, err error) {
-
-	err = cache.ListAll(c.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v3.AuthConfig))
-	})
-
-	return ret, err
-}
-
-func (c *authConfigCache) AddIndexer(indexName string, indexer AuthConfigIndexer) {
-	utilruntime.Must(c.indexer.AddIndexers(map[string]cache.IndexFunc{
-		indexName: func(obj interface{}) (strings []string, e error) {
-			return indexer(obj.(*v3.AuthConfig))
-		},
-	}))
-}
-
-func (c *authConfigCache) GetByIndex(indexName, key string) (result []*v3.AuthConfig, err error) {
-	objs, err := c.indexer.ByIndex(indexName, key)
-	if err != nil {
-		return nil, err
-	}
-	result = make([]*v3.AuthConfig, 0, len(objs))
-	for _, obj := range objs {
-		result = append(result, obj.(*v3.AuthConfig))
-	}
-	return result, nil
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c AuthConfigGenericCache) AddIndexer(indexName string, indexer AuthConfigIndexer) {
+	c.NonNamespacedCacheInterface.AddIndexer(indexName, generic.Indexer[*v3.AuthConfig](indexer))
 }
