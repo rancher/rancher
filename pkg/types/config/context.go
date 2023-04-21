@@ -21,7 +21,7 @@ import (
 	"github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io"
 	apiregistrationv1 "github.com/rancher/rancher/pkg/generated/norman/apiregistration.k8s.io/v1"
 	appsv1 "github.com/rancher/rancher/pkg/generated/norman/apps/v1"
-	autoscaling "github.com/rancher/rancher/pkg/generated/norman/autoscaling/v2beta2"
+	autoscaling "github.com/rancher/rancher/pkg/generated/norman/autoscaling/v2"
 	batchv1 "github.com/rancher/rancher/pkg/generated/norman/batch/v1"
 	clusterv3 "github.com/rancher/rancher/pkg/generated/norman/cluster.cattle.io/v3"
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
