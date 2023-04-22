@@ -16,7 +16,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/clusterrolebindings"
 	"github.com/rancher/rancher/tests/framework/extensions/configmaps"
 	"github.com/rancher/rancher/tests/framework/extensions/serviceaccounts"
-	"github.com/rancher/rancher/tests/framework/extensions/workloads/deployments"
+	"github.com/rancher/rancher/tests/framework/extensions/workloads"
 	"github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -40,6 +40,8 @@ const (
 	webhookReceiverAnnotationValue = "true"
 	// Steve type for prometheus rules for schema
 	prometheusRulesSteveType = "monitoring.coreos.com.prometheusrule"
+	// rancherShellSettingID is the setting ID that used to grab rancher/shell image
+	rancherShellSettingID = "shell-image"
 	// Kubeconfig that linked to webhook deployment
 	kubeConfig = `
 apiVersion: v1
@@ -350,10 +352,15 @@ func createAlertWebhookReceiverDeployment(client *rancher.Client, clusterID, nam
 	labels := map[string]string{}
 	labels["workload.user.cattle.io/workloadselector"] = fmt.Sprintf("apps.deployment-%v-%v", namespace, deploymentName)
 
+	imageSetting, err := client.Management.Setting.ByID(rancherShellSettingID)
+	if err != nil {
+		return nil, err
+	}
+
 	// Create webhook receiver deployment
 	var runAsUser int64
 	var runAsGroup int64
-	deploymentTemplate := corev1.PodTemplateSpec{
+	podSpecTemplate := corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "alert-reciver-deployment",
 			Namespace: namespace,
@@ -364,7 +371,7 @@ func createAlertWebhookReceiverDeployment(client *rancher.Client, clusterID, nam
 			Containers: []corev1.Container{
 				{
 					Name:    "kubectl",
-					Image:   "rancher/shell:v0.1.19",
+					Image:   imageSetting.Value,
 					Command: []string{"/bin/sh", "-c"},
 					Args: []string{
 						fmt.Sprintf(
@@ -421,7 +428,9 @@ func createAlertWebhookReceiverDeployment(client *rancher.Client, clusterID, nam
 		},
 	}
 
-	deployment, err := deployments.CreateDeployment(client, clusterID, deploymentName, namespace, deploymentTemplate)
+	isCattleLabeled := true
+	deploymentTemplate := workloads.NewDeploymentTemplate(deploymentName, namespace, podSpecTemplate, isCattleLabeled, nil)
+	deployment, err := steveclient.SteveType(workloads.DeploymentSteveType).Create(deploymentTemplate)
 	if err != nil {
 		return deployment, err
 	}

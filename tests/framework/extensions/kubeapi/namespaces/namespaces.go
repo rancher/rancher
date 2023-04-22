@@ -1,8 +1,10 @@
 package namespaces
 
 import (
+	"context"
 	"fmt"
 
+	"github.com/rancher/rancher/pkg/api/scheme"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,18 +30,21 @@ func ContainerDefaultResourceLimit(limitsCPU, limitsMemory, requestsCPU, request
 
 // GetNamespaceByName is a helper function that returns the namespace by name in a specific cluster, uses ListNamespaces to get the namespace.
 func GetNamespaceByName(client *rancher.Client, clusterID, namespaceName string) (*corev1.Namespace, error) {
-	var namespace *corev1.Namespace
+	namespace := new(corev1.Namespace)
 
-	namespaceList, err := ListNamespaces(client, clusterID, metav1.ListOptions{})
+	dynamicClient, err := client.GetDownStreamClusterClient(clusterID)
 	if err != nil {
 		return nil, err
 	}
 
-	for i, ns := range namespaceList.Items {
-		if namespaceName == ns.Name {
-			namespace = &namespaceList.Items[i]
-			break
-		}
+	namespaceResource := dynamicClient.Resource(NamespaceGroupVersionResource).Namespace("")
+	unstructuredNamespace, err := namespaceResource.Get(context.TODO(), namespaceName, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	if err = scheme.Scheme.Convert(unstructuredNamespace, namespace, unstructuredNamespace.GroupVersionKind()); err != nil {
+		return nil, err
 	}
 
 	return namespace, nil

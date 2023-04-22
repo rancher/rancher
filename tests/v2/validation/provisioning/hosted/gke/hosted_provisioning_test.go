@@ -5,16 +5,20 @@ import (
 
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
-	"github.com/rancher/rancher/tests/framework/extensions/cloudcredentials"
 	"github.com/rancher/rancher/tests/framework/extensions/cloudcredentials/google"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters/gke"
+	nodestat "github.com/rancher/rancher/tests/framework/extensions/nodes"
+	"github.com/rancher/rancher/tests/framework/extensions/pipeline"
 	"github.com/rancher/rancher/tests/framework/extensions/users"
 	password "github.com/rancher/rancher/tests/framework/extensions/users/passwordgenerator"
+	"github.com/rancher/rancher/tests/framework/extensions/workloads/pods"
+	"github.com/rancher/rancher/tests/framework/pkg/environmentflag"
 	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
 	"github.com/rancher/rancher/tests/integration/pkg/defaults"
+	"github.com/rancher/rancher/tests/v2/validation/provisioning"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -64,35 +68,38 @@ func (h *HostedGKEClusterProvisioningTestSuite) SetupSuite() {
 
 func (h *HostedGKEClusterProvisioningTestSuite) TestProvisioningHostedGKE() {
 	tests := []struct {
-		name            string
-		client          *rancher.Client
-		clusterName     string
-		cloudCredential *cloudcredentials.CloudCredential
+		name        string
+		client      *rancher.Client
+		clusterName string
 	}{
-		{"Admin User", h.client, "", nil},
-		{"Standard User", h.standardUserClient, "", nil},
+		{provisioning.AdminClientName.String(), h.client, ""},
+		{provisioning.StandardClientName.String(), h.standardUserClient, ""},
 	}
 
 	for _, tt := range tests {
+		subSession := h.session.NewSession()
+		defer subSession.Cleanup()
+
+		client, err := tt.client.WithSession(subSession)
+		require.NoError(h.T(), err)
+
 		h.Run(tt.name, func() {
-			subSession := h.session.NewSession()
-			defer subSession.Cleanup()
-
-			client, err := tt.client.WithSession(subSession)
-			require.NoError(h.T(), err)
-
-			h.testProvisioningHostedGKECluster(client, tt.clusterName, tt.cloudCredential)
+			h.testProvisioningHostedGKECluster(client, tt.clusterName)
 		})
 	}
 }
 
-func (h *HostedGKEClusterProvisioningTestSuite) testProvisioningHostedGKECluster(rancherClient *rancher.Client, clusterName string, cloudcredential *cloudcredentials.CloudCredential) (*management.Cluster, error) {
+func (h *HostedGKEClusterProvisioningTestSuite) testProvisioningHostedGKECluster(rancherClient *rancher.Client, clusterName string) (*management.Cluster, error) {
 	cloudCredential, err := google.CreateGoogleCloudCredentials(rancherClient)
 	require.NoError(h.T(), err)
 
 	clusterName = namegen.AppendRandomString("gkehostcluster")
 	clusterResp, err := gke.CreateGKEHostedCluster(rancherClient, clusterName, cloudCredential.ID, false, false, false, false, map[string]string{})
 	require.NoError(h.T(), err)
+
+	if h.client.Flags.GetValue(environmentflag.UpdateClusterName) {
+		pipeline.UpdateConfigClusterName(clusterName)
+	}
 
 	opts := metav1.ListOptions{
 		FieldSelector:  "metadata.name=" + clusterResp.ID,
@@ -110,6 +117,13 @@ func (h *HostedGKEClusterProvisioningTestSuite) testProvisioningHostedGKECluster
 	clusterToken, err := clusters.CheckServiceAccountTokenSecret(rancherClient, clusterName)
 	require.NoError(h.T(), err)
 	assert.NotEmpty(h.T(), clusterToken)
+
+	err = nodestat.IsNodeReady(rancherClient, clusterResp.ID)
+	require.NoError(h.T(), err)
+
+	podResults, podErrors := pods.StatusPods(rancherClient, clusterResp.ID)
+	assert.NotEmpty(h.T(), podResults)
+	assert.Empty(h.T(), podErrors)
 
 	return clusterResp, nil
 }

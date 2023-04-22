@@ -181,8 +181,15 @@ func (h *handler) OnChange(_ string, cluster *rancherv1.Cluster) (*rancherv1.Clu
 		if machinePool.DynamicSchemaSpec != "" && json.Unmarshal([]byte(machinePool.DynamicSchemaSpec), &spec) == nil {
 			continue
 		}
+		if machinePool.NodeConfig == nil {
+			continue
+		}
+		apiVersion := machinePool.NodeConfig.APIVersion
+		if apiVersion != rke2.DefaultMachineConfigAPIVersion && apiVersion != "" {
+			continue
+		}
 		// if the field is empty or invalid, add to any machine pools that do not have it and update the cluster
-		cluster = cluster.DeepCopy()
+		clusterCopy := cluster.DeepCopy()
 		for j := i; j < len(cluster.Spec.RKEConfig.MachinePools); j++ {
 			machinePool := cluster.Spec.RKEConfig.MachinePools[j]
 			spec = apimgmtv3.DynamicSchemaSpec{}
@@ -193,6 +200,10 @@ func (h *handler) OnChange(_ string, cluster *rancherv1.Cluster) (*rancherv1.Clu
 			if nodeConfig == nil {
 				return cluster, fmt.Errorf("machine pool node config must not be nil")
 			}
+			apiVersion := nodeConfig.APIVersion
+			if apiVersion != rke2.DefaultMachineConfigAPIVersion && apiVersion != "" {
+				continue
+			}
 			ds, err := h.dynamicSchema.Get(strings.ToLower(nodeConfig.Kind))
 			if err != nil {
 				return cluster, err
@@ -201,9 +212,9 @@ func (h *handler) OnChange(_ string, cluster *rancherv1.Cluster) (*rancherv1.Clu
 			if err != nil {
 				return cluster, err
 			}
-			cluster.Spec.RKEConfig.MachinePools[j].DynamicSchemaSpec = string(specJSON)
+			clusterCopy.Spec.RKEConfig.MachinePools[j].DynamicSchemaSpec = string(specJSON)
 		}
-		return h.clusterController.Update(cluster)
+		return h.clusterController.Update(clusterCopy)
 	}
 	return cluster, nil
 }
@@ -262,6 +273,10 @@ func reconcileClusterSpecEtcdRestore(cluster *rancherv1.Cluster, desiredSpec ran
 	if cluster.Spec.KubernetesVersion != desiredSpec.KubernetesVersion {
 		changed = true
 		cluster.Spec.KubernetesVersion = desiredSpec.KubernetesVersion
+	}
+	if cluster.Spec.DefaultPodSecurityPolicyTemplateName != desiredSpec.DefaultPodSecurityPolicyTemplateName {
+		changed = true
+		cluster.Spec.DefaultPodSecurityPolicyTemplateName = desiredSpec.DefaultPodSecurityPolicyTemplateName
 	}
 	if cluster.Spec.DefaultPodSecurityAdmissionConfigurationTemplateName != desiredSpec.DefaultPodSecurityAdmissionConfigurationTemplateName {
 		changed = true
@@ -364,6 +379,7 @@ func (h *handler) getRKEControlPlaneForCluster(cluster *rancherv1.Cluster) (*rke
 	return cp, nil
 }
 
+// updateClusterProvisioningStatus copies the condition (clusterCondition) to both the clusters.management.cattle.io and clusters.provisioning.cattle.io objects based on the passed in rkecontrolplane cp + cpCondition
 func (h *handler) updateClusterProvisioningStatus(cluster *rancherv1.Cluster, status rancherv1.ClusterStatus, cp *rkev1.RKEControlPlane, clusterCondition, cpCondition condition.Cond) (rancherv1.ClusterStatus, error) {
 	if cp == nil {
 		return status, fmt.Errorf("error while updating cluster provisioning status - rkecontrolplane was nil")

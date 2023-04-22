@@ -399,9 +399,9 @@ func (p *Provisioner) Create(cluster *apimgmtv3.Cluster) (runtime.Object, error)
 
 	if apimgmtv3.ClusterConditionWaiting.GetStatus(cluster) == "" {
 		apimgmtv3.ClusterConditionWaiting.Unknown(cluster)
-	}
-	if apimgmtv3.ClusterConditionWaiting.GetMessage(cluster) == "" {
-		apimgmtv3.ClusterConditionWaiting.Message(cluster, "Waiting for API to be available")
+		if apimgmtv3.ClusterConditionWaiting.GetMessage(cluster) == "" {
+			apimgmtv3.ClusterConditionWaiting.Message(cluster, "Waiting for API to be available")
+		}
 	}
 
 	cluster, err = p.pending(cluster)

@@ -19,6 +19,7 @@ import (
 	"github.com/rancher/wrangler/pkg/data"
 	"github.com/rancher/wrangler/pkg/data/convert"
 	v1 "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
+	"github.com/rancher/wrangler/pkg/generic"
 	"github.com/rancher/wrangler/pkg/gvk"
 	"github.com/rancher/wrangler/pkg/name"
 	"github.com/sirupsen/logrus"
@@ -144,7 +145,8 @@ func toMachineTemplate(machinePoolName string, cluster *rancherv1.Cluster, machi
 	}
 
 	if machinePool.DynamicSchemaSpec == "" {
-		return nil, fmt.Errorf("waiting for dynamic schema to be populated for machine pool %s", machinePoolName)
+		logrus.Debugf("rkecluster %s/%s: waiting for dynamic schema to be populated for machine pool %s", cluster.Namespace, cluster.Name, machinePoolName)
+		return nil, generic.ErrSkip
 	}
 	var spec v3.DynamicSchemaSpec
 	err = json.Unmarshal([]byte(machinePool.DynamicSchemaSpec), &spec)

@@ -1,30 +1,19 @@
 package k3s
 
 import (
-	"context"
-	"fmt"
 	"testing"
 
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
-	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
 	"github.com/rancher/rancher/tests/framework/extensions/users"
 	password "github.com/rancher/rancher/tests/framework/extensions/users/passwordgenerator"
 	"github.com/rancher/rancher/tests/framework/pkg/config"
 	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
-	"github.com/rancher/rancher/tests/framework/pkg/wait"
-	"github.com/rancher/rancher/tests/integration/pkg/defaults"
 	provisioning "github.com/rancher/rancher/tests/v2/validation/provisioning"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-)
-
-const (
-	namespace = "fleet-default"
 )
 
 type K3SNodeDriverProvisioningTestSuite struct {
@@ -89,6 +78,21 @@ func (k *K3SNodeDriverProvisioningTestSuite) TestProvisioningK3SCluster() {
 	nodeRoles1 := []machinepools.NodeRoles{
 		{
 			ControlPlane: true,
+			Etcd:         true,
+			Worker:       false,
+			Quantity:     1,
+		},
+		{
+			ControlPlane: false,
+			Etcd:         false,
+			Worker:       true,
+			Quantity:     1,
+		},
+	}
+
+	nodeRoles2 := []machinepools.NodeRoles{
+		{
+			ControlPlane: true,
 			Etcd:         false,
 			Worker:       false,
 			Quantity:     1,
@@ -112,10 +116,12 @@ func (k *K3SNodeDriverProvisioningTestSuite) TestProvisioningK3SCluster() {
 		nodeRoles []machinepools.NodeRoles
 		client    *rancher.Client
 	}{
-		{"1 Node all roles Admin User", nodeRoles0, k.client},
-		{"1 Node all roles Standard User", nodeRoles0, k.standardUserClient},
-		{"3 nodes - 1 role per node Admin User", nodeRoles1, k.client},
-		{"3 nodes - 1 role per node Standard User", nodeRoles1, k.standardUserClient},
+		{"1 Node all roles " + provisioning.AdminClientName.String(), nodeRoles0, k.client},
+		{"1 Node all roles " + provisioning.StandardClientName.String(), nodeRoles0, k.standardUserClient},
+		{"2 nodes - etcd/cp roles per 1 node " + provisioning.AdminClientName.String(), nodeRoles1, k.client},
+		{"2 nodes - etcd/cp roles per 1 node " + provisioning.StandardClientName.String(), nodeRoles1, k.standardUserClient},
+		{"3 nodes - 1 role per node " + provisioning.AdminClientName.String(), nodeRoles2, k.client},
+		{"3 nodes - 1 role per node " + provisioning.StandardClientName.String(), nodeRoles2, k.standardUserClient},
 	}
 
 	var name string
@@ -128,10 +134,11 @@ func (k *K3SNodeDriverProvisioningTestSuite) TestProvisioningK3SCluster() {
 
 		for _, providerName := range k.providers {
 			provider := CreateProvider(providerName)
+			providerName := " Node Provider: " + provider.Name
 			for _, kubeVersion := range k.kubernetesVersions {
-				name = tt.name + providerName + " Kubernetes version: " + kubeVersion
+				name = tt.name + providerName.String() + " Kubernetes version: " + kubeVersion
 				k.Run(name, func() {
-					k.testProvisioningK3SCluster(client, provider, tt.nodeRoles, kubeVersion)
+					TestProvisioningK3SCluster(k.T(), client, provider, tt.nodeRoles, kubeVersion)
 				})
 			}
 		}
@@ -151,8 +158,8 @@ func (k *K3SNodeDriverProvisioningTestSuite) TestProvisioningK3SClusterDynamicIn
 		name   string
 		client *rancher.Client
 	}{
-		{"Admin User", k.client},
-		{"Standard User", k.standardUserClient},
+		{provisioning.AdminClientName.String(), k.client},
+		{provisioning.StandardClientName.String(), k.standardUserClient},
 	}
 
 	var name string
@@ -165,51 +172,15 @@ func (k *K3SNodeDriverProvisioningTestSuite) TestProvisioningK3SClusterDynamicIn
 
 		for _, providerName := range k.providers {
 			provider := CreateProvider(providerName)
+			providerName := " Node Provider: " + provider.Name.String()
 			for _, kubeVersion := range k.kubernetesVersions {
 				name = tt.name + providerName + " Kubernetes version: " + kubeVersion
 				k.Run(name, func() {
-					k.testProvisioningK3SCluster(client, provider, nodesAndRoles, kubeVersion)
+					TestProvisioningK3SCluster(k.T(), client, provider, nodesAndRoles, kubeVersion)
 				})
 			}
 		}
 	}
-}
-
-func (k *K3SNodeDriverProvisioningTestSuite) testProvisioningK3SCluster(client *rancher.Client, provider Provider, nodesAndRoles []machinepools.NodeRoles, kubeVersion string) {
-	cloudCredential, err := provider.CloudCredFunc(client)
-
-	clusterName := namegen.AppendRandomString(provider.Name)
-	generatedPoolName := fmt.Sprintf("nc-%s-pool1-", clusterName)
-	machinePoolConfig := provider.MachinePoolFunc(generatedPoolName, namespace)
-
-	machineConfigResp, err := client.Steve.SteveType(provider.MachineConfigPoolResourceSteveType).Create(machinePoolConfig)
-	require.NoError(k.T(), err)
-
-	machinePools := machinepools.RKEMachinePoolSetup(nodesAndRoles, machineConfigResp)
-
-	cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, namespace, "", cloudCredential.ID, kubeVersion, machinePools)
-
-	clusterResp, err := clusters.CreateK3SRKE2Cluster(client, cluster)
-	require.NoError(k.T(), err)
-
-	kubeProvisioningClient, err := k.client.GetKubeAPIProvisioningClient()
-	require.NoError(k.T(), err)
-
-	result, err := kubeProvisioningClient.Clusters(namespace).Watch(context.TODO(), metav1.ListOptions{
-		FieldSelector:  "metadata.name=" + clusterName,
-		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
-	})
-	require.NoError(k.T(), err)
-
-	checkFunc := clusters.IsProvisioningClusterReady
-
-	err = wait.WatchWait(result, checkFunc)
-	assert.NoError(k.T(), err)
-	assert.Equal(k.T(), clusterName, clusterResp.ObjectMeta.Name)
-
-	clusterToken, err := clusters.CheckServiceAccountTokenSecret(client, clusterName)
-	require.NoError(k.T(), err)
-	assert.NotEmpty(k.T(), clusterToken)
 }
 
 // In order for 'go test' to run this suite, we need to create

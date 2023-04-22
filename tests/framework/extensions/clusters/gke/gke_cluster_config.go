@@ -17,51 +17,51 @@ type GKEClusterConfig struct {
 	EnableKubernetesAlpha          *bool                           `json:"enableKubernetesAlpha,omitempty" yaml:"enableKubernetesAlpha,omitempty"`
 	IPAllocationPolicy             *IPAllocationPolicy             `json:"ipAllocationPolicy,omitempty" yaml:"ipAllocationPolicy,omitempty"`
 	KubernetesVersion              *string                         `json:"kubernetesVersion,omitempty" yaml:"kubernetesVersion,omitempty"`
-	Labels                         map[string]string               `json:"labels,omitempty" yaml:"labels,omitempty"`
-	Locations                      []string                        `json:"locations,omitempty" yaml:"locations,omitempty"`
+	Labels                         map[string]string               `json:"labels" yaml:"labels"`
+	Locations                      []string                        `json:"locations" yaml:"locations"`
 	LoggingService                 *string                         `json:"loggingService,omitempty" yaml:"loggingService,omitempty"`
 	MaintenanceWindow              *string                         `json:"maintenanceWindow,omitempty" yaml:"maintenanceWindow,omitempty"`
 	MasterAuthorizedNetworksConfig *MasterAuthorizedNetworksConfig `json:"masterAuthorizedNetworks,omitempty" yaml:"masterAuthorizedNetworks,omitempty"`
 	MonitoringService              *string                         `json:"monitoringService,omitempty" yaml:"monitoringService,omitempty"`
 	Network                        *string                         `json:"network,omitempty" yaml:"network,omitempty"`
 	NetworkPolicyEnabled           *bool                           `json:"networkPolicyEnabled,omitempty" yaml:"networkPolicyEnabled,omitempty"`
-	NodePools                      []NodePool                      `json:"nodePools,omitempty" yaml:"nodePools,omitempty"`
+	NodePools                      []NodePool                      `json:"nodePools" yaml:"nodePools"`
 	PrivateClusterConfig           *PrivateClusterConfig           `json:"privateClusterConfig,omitempty" yaml:"privateClusterConfig,omitempty"`
-	ProjectID                      string                          `json:"projectID,omitempty" yaml:"projectID,omitempty"`
-	Region                         string                          `json:"region,omitempty" yaml:"region,omitempty"`
+	ProjectID                      string                          `json:"projectID" yaml:"projectID"`
+	Region                         string                          `json:"region" yaml:"region"`
 	Subnetwork                     *string                         `json:"subnetwork,omitempty" yaml:"subnetwork,omitempty"`
-	Zone                           string                          `json:"zone,omitempty" yaml:"zone,omitempty"`
+	Zone                           string                          `json:"zone" yaml:"zone"`
 }
 
 // ClusterAddons is the configuration for the GKEClusterConfig ClusterAddons
 type ClusterAddons struct {
-	HTTPLoadBalancing        bool `json:"httpLoadBalancing,omitempty" yaml:"httpLoadBalancing,omitempty"`
-	HorizontalPodAutoscaling bool `json:"horizontalPodAutoscaling,omitempty" yaml:"horizontalPodAutoscaling,omitempty"`
-	NetworkPolicyConfig      bool `json:"networkPolicyConfig,omitempty" yaml:"networkPolicyConfig,omitempty"`
+	HTTPLoadBalancing        bool `json:"httpLoadBalancing" yaml:"httpLoadBalancing"`
+	HorizontalPodAutoscaling bool `json:"horizontalPodAutoscaling" yaml:"horizontalPodAutoscaling"`
+	NetworkPolicyConfig      bool `json:"networkPolicyConfig" yaml:"networkPolicyConfig"`
 }
 
 // IPAllocationPolicy is the configuration for the GKEClusterConfig IPAllocationPolicy
 type IPAllocationPolicy struct {
-	ClusterIpv4CidrBlock       string `json:"clusterIpv4CidrBlock,omitempty" yaml:"clusterIpv4CidrBlock,omitempty"`
-	ClusterSecondaryRangeName  string `json:"clusterSecondaryRangeName,omitempty" yaml:"clusterSecondaryRangeName,omitempty"`
-	CreateSubnetwork           bool   `json:"createSubnetwork,omitempty" yaml:"createSubnetwork,omitempty"`
-	NodeIpv4CidrBlock          string `json:"nodeIpv4CidrBlock,omitempty" yaml:"nodeIpv4CidrBlock,omitempty"`
-	ServicesIpv4CidrBlock      string `json:"servicesIpv4CidrBlock,omitempty" yaml:"servicesIpv4CidrBlock,omitempty"`
-	ServicesSecondaryRangeName string `json:"servicesSecondaryRangeName,omitempty" yaml:"servicesSecondaryRangeName,omitempty"`
-	SubnetworkName             string `json:"subnetworkName,omitempty" yaml:"subnetworkName,omitempty"`
-	UseIPAliases               bool   `json:"useIpAliases,omitempty" yaml:"useIpAliases,omitempty"`
+	ClusterIpv4CidrBlock       string `json:"clusterIpv4CidrBlock" yaml:"clusterIpv4CidrBlock"`
+	ClusterSecondaryRangeName  string `json:"clusterSecondaryRangeName" yaml:"clusterSecondaryRangeName"`
+	CreateSubnetwork           bool   `json:"createSubnetwork" yaml:"createSubnetwork"`
+	NodeIpv4CidrBlock          string `json:"nodeIpv4CidrBlock" yaml:"nodeIpv4CidrBlock"`
+	ServicesIpv4CidrBlock      string `json:"servicesIpv4CidrBlock" yaml:"servicesIpv4CidrBlock"`
+	ServicesSecondaryRangeName string `json:"servicesSecondaryRangeName" yaml:"servicesSecondaryRangeName"`
+	SubnetworkName             string `json:"subnetworkName" yaml:"subnetworkName"`
+	UseIPAliases               bool   `json:"useIpAliases" yaml:"useIpAliases"`
 }
 
 // MasterAuthorizedNetworksConfig is the configuration for the GKEClusterConfig MasterAuthorizedNetworksConfig
 type MasterAuthorizedNetworksConfig struct {
-	CidrBlocks []CidrBlock `json:"cidrBlocks,omitempty" yaml:"cidrBlocks,omitempty"`
-	Enabled    bool        `json:"enabled,omitempty" yaml:"enabled,omitempty"`
+	CidrBlocks []CidrBlock `json:"cidrBlocks" yaml:"cidrBlocks"`
+	Enabled    bool        `json:"enabled" yaml:"enabled"`
 }
 
 // CidrBlock is the configuration needed for the MasterAuthorizedNetworksConfig CidrBlock
 type CidrBlock struct {
-	CidrBlock   string `json:"cidrBlock,omitempty" yaml:"cidrBlock,omitempty"`
-	DisplayName string `json:"displayName,omitempty" yaml:"displayName,omitempty"`
+	CidrBlock   string `json:"cidrBlock" yaml:"cidrBlock"`
+	DisplayName string `json:"displayName" yaml:"displayName"`
 }
 
 // NodePool is the configuration needed for the GKEClusterConfig NodePools
@@ -77,43 +77,43 @@ type NodePool struct {
 
 // Autoscaling is the configuration needed for the NodePool Autoscaling
 type Autoscaling struct {
-	Enabled      bool  `json:"enabled,omitempty" yaml:"enabled,omitempty"`
-	MaxNodeCount int64 `json:"maxNodeCount,omitempty" yaml:"maxNodeCount,omitempty"`
-	MinNodeCount int64 `json:"minNodeCount,omitempty" yaml:"minNodeCount,omitempty"`
+	Enabled      bool  `json:"enabled" yaml:"enabled"`
+	MaxNodeCount int64 `json:"maxNodeCount" yaml:"maxNodeCount"`
+	MinNodeCount int64 `json:"minNodeCount" yaml:"minNodeCount"`
 }
 
 // NodeConfig is the configuration needed for the NodePool NodeConfig
 type NodeConfig struct {
-	DiskSizeGb    int64             `json:"diskSizeGb,omitempty" yaml:"diskSizeGb,omitempty"`
-	DiskType      string            `json:"diskType,omitempty" yaml:"diskType,omitempty"`
-	ImageType     string            `json:"imageType,omitempty" yaml:"imageType,omitempty"`
-	Labels        map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
-	LocalSsdCount int64             `json:"localSsdCount,omitempty" yaml:"localSsdCount,omitempty"`
-	MachineType   string            `json:"machineType,omitempty" yaml:"machineType,omitempty"`
-	OauthScopes   []string          `json:"oauthScopes,omitempty" yaml:"oauthScopes,omitempty"`
-	Preemptible   bool              `json:"preemptible,omitempty" yaml:"preemptible,omitempty"`
-	Tags          []string          `json:"tags,omitempty" yaml:"tags,omitempty"`
-	Taints        []NodeTaintConfig `json:"taints,omitempty" yaml:"taints,omitempty"`
+	DiskSizeGb    int64             `json:"diskSizeGb" yaml:"diskSizeGb"`
+	DiskType      string            `json:"diskType" yaml:"diskType"`
+	ImageType     string            `json:"imageType" yaml:"imageType"`
+	Labels        map[string]string `json:"labels" yaml:"labels"`
+	LocalSsdCount int64             `json:"localSsdCount" yaml:"localSsdCount"`
+	MachineType   string            `json:"machineType" yaml:"machineType"`
+	OauthScopes   []string          `json:"oauthScopes" yaml:"oauthScopes"`
+	Preemptible   bool              `json:"preemptible" yaml:"preemptible"`
+	Tags          []string          `json:"tags" yaml:"tags"`
+	Taints        []NodeTaintConfig `json:"taints" yaml:"taints"`
 }
 
 // NodeTaintConfig is the configuration needed for the NodeConfig Taints
 type NodeTaintConfig struct {
-	Effect string `json:"effect,omitempty" yaml:"effect,omitempty"`
-	Key    string `json:"key,omitempty" yaml:"key,omitempty"`
-	Value  string `json:"value,omitempty" yaml:"value,omitempty"`
+	Effect string `json:"effect" yaml:"effect"`
+	Key    string `json:"key" yaml:"key"`
+	Value  string `json:"value" yaml:"value"`
 }
 
 // NodePoolManagement is the configuration needed for the NodePool Management
 type NodePoolManagement struct {
-	AutoRepair  bool `json:"autoRepair,omitempty" yaml:"autoRepair,omitempty"`
-	AutoUpgrade bool `json:"autoUpgrade,omitempty" yaml:"autoUpgrade,omitempty"`
+	AutoRepair  bool `json:"autoRepair" yaml:"autoRepair"`
+	AutoUpgrade bool `json:"autoUpgrade" yaml:"autoUpgrade"`
 }
 
 // PrivateClusterConfig is the configuration needed for the GKEClusterConfig PrivateClusterConfig
 type PrivateClusterConfig struct {
-	EnablePrivateEndpoint bool   `json:"enablePrivateEndpoint,omitempty" yaml:"enablePrivateEndpoint,omitempty"`
-	EnablePrivateNodes    bool   `json:"enablePrivateNodes,omitempty" yaml:"enablePrivateNodes,omitempty"`
-	MasterIpv4CidrBlock   string `json:"masterIpv4CidrBlock,omitempty" yaml:"masterIpv4CidrBlock,omitempty"`
+	EnablePrivateEndpoint bool   `json:"enablePrivateEndpoint" yaml:"enablePrivateEndpoint"`
+	EnablePrivateNodes    bool   `json:"enablePrivateNodes" yaml:"enablePrivateNodes"`
+	MasterIpv4CidrBlock   string `json:"masterIpv4CidrBlock" yaml:"masterIpv4CidrBlock"`
 }
 
 func clusterAddonsBuilder(clusterAddons *ClusterAddons) *management.GKEClusterAddons {

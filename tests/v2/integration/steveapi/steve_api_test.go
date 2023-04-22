@@ -16,10 +16,11 @@ import (
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	clientv1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
-	"github.com/rancher/rancher/tests/framework/extensions/kubeapi/namespaces"
 	"github.com/rancher/rancher/tests/framework/extensions/kubeapi/rbac"
 	"github.com/rancher/rancher/tests/framework/extensions/kubeapi/secrets"
+	"github.com/rancher/rancher/tests/framework/extensions/namespaces"
 	stevesecrets "github.com/rancher/rancher/tests/framework/extensions/secrets"
+	"github.com/rancher/rancher/tests/framework/extensions/serviceaccounts"
 	"github.com/rancher/rancher/tests/framework/extensions/users"
 	password "github.com/rancher/rancher/tests/framework/extensions/users/passwordgenerator"
 	"github.com/rancher/rancher/tests/framework/pkg/namegenerator"
@@ -38,11 +39,16 @@ const (
 	labelGTEKey       = "test-label-gte"
 	continueToken     = "nondeterministictoken"
 	revisionNum       = "nondeterministicint"
+	defautlUrlString  = "https://rancherurl/"
 )
 
 var (
 	userEnabled                = true
+	impersonationNamespace     = "cattle-impersonation-system"
+	impersonationSABase        = "cattle-impersonation-"
 	continueReg                = regexp.MustCompile(`(continue=)[\w]+(%3D){0,2}`)
+	urlRegex                   = regexp.MustCompile(`https://([\w.:]+)/`)
+	downStreamClusterRegex     = regexp.MustCompile(`(k8s/clusters/c-m-\w+/)`)
 	revisionReg                = regexp.MustCompile(`(revision=)[\d]+`)
 	namespaceSecretManagerRole = rbacv1.Role{
 		ObjectMeta: metav1.ObjectMeta{
@@ -177,6 +183,9 @@ func (s *SteveAPITestSuite) SetupSuite() {
 	clusterID, err := clusters.GetClusterIDByName(client, clusterName)
 	require.NoError(s.T(), err)
 
+	mgmtCluster, err := client.Management.Cluster.ByID(clusterID)
+	require.NoError(s.T(), err)
+
 	// create project
 	projectName := namegenerator.AppendRandomString(projectNamePrefix)
 	s.project, err = s.client.Management.Project.Create(&management.Project{
@@ -185,10 +194,17 @@ func (s *SteveAPITestSuite) SetupSuite() {
 	})
 	require.NoError(s.T(), err)
 
+	userID, err := users.GetUserIDByName(client, "admin")
+	require.NoError(s.T(), err)
+
+	impersonationSA := impersonationSABase + userID
+	err = serviceaccounts.IsServiceAccountReady(client, clusterID, impersonationNamespace, impersonationSA)
+	require.NoError(s.T(), err)
+
 	// create project namespaces
 	for k := range namespaceMap {
 		name := namegenerator.AppendRandomString(k)
-		_, err := namespaces.CreateNamespace(client, name, "", nil, nil, s.project)
+		_, err := namespaces.CreateNamespace(client, name, "{}", nil, nil, s.project)
 		require.NoError(s.T(), err)
 		namespaceMap[k] = name
 	}
@@ -244,8 +260,11 @@ func (s *SteveAPITestSuite) SetupSuite() {
 		// users either have access to a whole project or to select namespaces or resources in a project
 		switch binding := access.(type) {
 		case management.ProjectRoleTemplateBinding:
-			users.AddProjectMember(client, s.project, userObj, binding.RoleTemplateID)
+			err = users.AddProjectMember(client, s.project, userObj, binding.RoleTemplateID)
+			require.NoError(s.T(), err)
 		case []rbacv1.RoleBinding:
+			err = users.AddClusterRoleToUser(client, mgmtCluster, userObj, "cluster-member")
+			require.NoError(s.T(), err)
 			for _, rb := range binding {
 				subject := rbacv1.Subject{
 					Kind: "User",
@@ -1533,8 +1552,10 @@ func (s *SteveAPITestSuite) TestList() {
 			jsonResp, err := formatJSON(secretList)
 			require.NoError(s.T(), err)
 			jsonFilePath := filepath.Join(jsonDir, getFileName(test.user, test.namespace, test.query))
-			err = writeResp(csvWriter, test.user, curlURL, jsonFilePath, jsonResp)
-			require.NoError(s.T(), err)
+			if !downStreamClusterRegex.MatchString(curlURL) {
+				err = writeResp(csvWriter, test.user, curlURL, jsonFilePath, jsonResp)
+				require.NoError(s.T(), err)
+			}
 		})
 	}
 	csvWriter.Flush()
@@ -1565,6 +1586,8 @@ func getCurlURL(client *clientv1.Client, namespace, query string) (string, error
 	if query != "" {
 		curlURL += "?" + query
 	}
+
+	curlURL = urlRegex.ReplaceAllString(curlURL, defautlUrlString)
 	return curlURL, nil
 }
 
@@ -1578,6 +1601,7 @@ func formatJSON(obj *clientv1.SteveCollection) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	mapResp["revision"] = "100"
 	if _, ok := mapResp["continue"]; ok {
 		mapResp["continue"] = continueToken
@@ -1609,6 +1633,7 @@ func formatJSON(obj *clientv1.SteveCollection) ([]byte, error) {
 	for k, v := range namespaceMap {
 		jsonString = strings.ReplaceAll(jsonString, v, k)
 	}
+	jsonString = urlRegex.ReplaceAllString(jsonString, defautlUrlString)
 	return []byte(jsonString), nil
 }
 

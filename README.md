@@ -2,7 +2,7 @@
 
 *This file is auto-generated from README-template.md, please make any changes there.*
 
-[![Build Status](https://drone-publish.rancher.io/api/badges/rancher/rancher/status.svg?branch=release/v2.6)](https://drone-publish.rancher.io/rancher/rancher)
+[![Build Status](https://drone-publish.rancher.io/api/badges/rancher/rancher/status.svg?branch=release/v2.7)](https://drone-publish.rancher.io/rancher/rancher)
 [![Docker Pulls](https://img.shields.io/docker/pulls/rancher/rancher.svg)](https://store.docker.com/community/images/rancher/rancher)
 [![Go Report Card](https://goreportcard.com/badge/github.com/rancher/rancher)](https://goreportcard.com/report/github.com/rancher/rancher)
 
@@ -12,10 +12,10 @@ Rancher is an open source container management platform built for organizations 
 
 ## Latest Release
 * v2.7
-  * Latest - v2.7.1 - `rancher/rancher:v2.7.1` / `rancher/rancher:latest` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.7.1).
-  * Stable - v2.7.1 - `rancher/rancher:v2.7.1` / `rancher/rancher:stable` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.7.1).
+  * Latest - v2.7.2 - `rancher/rancher:v2.7.2` / `rancher/rancher:latest` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.7.2).
+  * Stable - v2.7.2 - `rancher/rancher:v2.7.2` / `rancher/rancher:stable` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.7.2).
 * v2.6
-  * Latest - v2.6.10 - `rancher/rancher:v2.6.10` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.6.10).
+  * Latest - v2.6.11 - `rancher/rancher:v2.6.11` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.6.11).
   * Stable - v2.6.11 - `rancher/rancher:v2.6.11` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.6.11).
 * v2.5
   * Latest - v2.5.17 - `rancher/rancher:v2.5.17` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.5.17).

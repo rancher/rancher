@@ -6,7 +6,6 @@ type Plan struct {
 	Nodes    map[string]*Node         `json:"nodes,omitempty"`
 	Machines map[string]*capi.Machine `json:"machines,omitempty"`
 	Metadata map[string]*Metadata     `json:"metadata,omitempty"`
-	Cluster  *capi.Cluster            `json:"cluster,omitempty"`
 }
 
 type Metadata struct {
@@ -28,6 +27,7 @@ type Node struct {
 	Failed         bool                                 `json:"failed,omitempty"`
 	InSync         bool                                 `json:"inSync,omitempty"`
 	Healthy        bool                                 `json:"healthy,omitempty"`
+	PlanDataExists bool                                 `json:"planDataExists,omitempty"`
 	ProbeStatus    map[string]ProbeStatus               `json:"probeStatus,omitempty"`
 }
 
@@ -70,6 +70,7 @@ type File struct {
 	Minor       bool   `json:"minor,omitempty"` // minor signifies that the file can be changed on a node without having to cause a full-blown drain/cordon operation
 }
 
+// NodePlan is the struct used to deliver instructions/files/probes to the system-agent, and retrieve feedback
 type NodePlan struct {
 	Files                []File                `json:"files,omitempty"`
 	Instructions         []OneTimeInstruction  `json:"instructions,omitempty"`

@@ -9,17 +9,27 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/api/scheme"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
+	"github.com/rancher/rancher/tests/framework/extensions/kubeapi/rbac"
 	kubeapiSecrets "github.com/rancher/rancher/tests/framework/extensions/kubeapi/secrets"
 	"github.com/rancher/rancher/tests/framework/extensions/secrets"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
 	"github.com/rancher/rancher/tests/integration/pkg/defaults"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selection"
 	kwait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 )
+
+const (
+	rtbOwnerLabel = "authz.cluster.cattle.io/rtb-owner-updated"
+)
+
+var timeout = int64(60 * 3)
 
 // CreateUserWithRole is helper function that creates a user with a role or multiple roles
 func CreateUserWithRole(rancherClient *rancher.Client, user *management.User, roles ...string) (*management.User, error) {
@@ -60,7 +70,7 @@ func AddProjectMember(rancherClient *rancher.Client, project *management.Project
 
 	opts := metav1.ListOptions{
 		FieldSelector:  "metadata.name=" + name,
-		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+		TimeoutSeconds: &timeout,
 	}
 	watchInterface, err := adminClient.GetManagementWatchInterface(management.ProjectType, opts)
 	if err != nil {
@@ -168,7 +178,36 @@ func RemoveProjectMember(rancherClient *rancher.Client, user *management.User) e
 			break
 		}
 	}
-	return rancherClient.Management.ProjectRoleTemplateBinding.Delete(&roleToDelete)
+
+	var backoff = kwait.Backoff{
+		Duration: 100 * time.Millisecond,
+		Factor:   1,
+		Jitter:   0,
+		Steps:    5,
+	}
+	err = rancherClient.Management.ProjectRoleTemplateBinding.Delete(&roleToDelete)
+	if err != nil {
+		return err
+	}
+	err = kwait.ExponentialBackoff(backoff, func() (done bool, err error) {
+		clusterID, projName := ref.Parse(roleToDelete.ProjectID)
+		req, err := labels.NewRequirement(rtbOwnerLabel, selection.Equals, []string{fmt.Sprintf("%s_%s", projName, roleToDelete.Name)})
+		if err != nil {
+			return false, err
+		}
+
+		downstreamRBs, err := rbac.ListRoleBindings(rancherClient, clusterID, "", metav1.ListOptions{
+			LabelSelector: labels.NewSelector().Add(*req).String(),
+		})
+		if err != nil {
+			return false, err
+		}
+		if len(downstreamRBs.Items) != 0 {
+			return false, nil
+		}
+		return true, nil
+	})
+	return err
 }
 
 // AddClusterRoleToUser is a helper function that adds a cluster role to `user`.
@@ -179,11 +218,16 @@ func AddClusterRoleToUser(rancherClient *rancher.Client, cluster *management.Clu
 		RoleTemplateID:  clusterRole,
 	}
 
+	adminClient, err := rancher.NewClient(rancherClient.RancherConfig.AdminToken, rancherClient.Session)
+	if err != nil {
+		return err
+	}
+
 	opts := metav1.ListOptions{
 		FieldSelector:  "metadata.name=" + cluster.ID,
-		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+		TimeoutSeconds: &timeout,
 	}
-	watchInterface, err := rancherClient.GetManagementWatchInterface(management.ClusterType, opts)
+	watchInterface, err := adminClient.GetManagementWatchInterface(management.ClusterType, opts)
 	if err != nil {
 		return err
 	}
@@ -191,14 +235,20 @@ func AddClusterRoleToUser(rancherClient *rancher.Client, cluster *management.Clu
 	checkFunc := func(event watch.Event) (ready bool, err error) {
 		clusterUnstructured := event.Object.(*unstructured.Unstructured)
 		cluster := &v3.Cluster{}
+
 		err = scheme.Scheme.Convert(clusterUnstructured, cluster, clusterUnstructured.GroupVersionKind())
 		if err != nil {
 			return false, err
 		}
-		if v3.ClusterConditionInitialRolesPopulated.IsTrue(cluster) {
+		if cluster.Annotations == nil || cluster.Annotations["field.cattle.io/creatorId"] == "" {
+			// no cluster creator, no roles to populate. This will be the case for the "local" cluster.
 			return true, nil
 		}
 
+		v3.ClusterConditionInitialRolesPopulated.CreateUnknownIfNotExists(cluster)
+		if v3.ClusterConditionInitialRolesPopulated.IsUnknown(cluster) || v3.ClusterConditionInitialRolesPopulated.IsTrue(cluster) {
+			return true, nil
+		}
 		return false, nil
 	}
 
@@ -244,5 +294,53 @@ func RemoveClusterRoleFromUser(rancherClient *rancher.Client, user *management.U
 		}
 	}
 
-	return rancherClient.Management.ClusterRoleTemplateBinding.Delete(&roleToDelete)
+	if err = rancherClient.Management.ClusterRoleTemplateBinding.Delete(&roleToDelete); err != nil {
+		return err
+	}
+
+	var backoff = kwait.Backoff{
+		Duration: 100 * time.Millisecond,
+		Factor:   1,
+		Jitter:   0,
+		Steps:    5,
+	}
+
+	err = kwait.ExponentialBackoff(backoff, func() (done bool, err error) {
+		req, err := labels.NewRequirement(rtbOwnerLabel, selection.Equals, []string{fmt.Sprintf("%s_%s", roleToDelete.ClusterID, roleToDelete.Name)})
+		if err != nil {
+			return false, err
+		}
+
+		downstreamCRBs, err := rbac.ListClusterRoleBindings(rancherClient, roleToDelete.ClusterID, metav1.ListOptions{
+			LabelSelector: labels.NewSelector().Add(*req).String(),
+		})
+		if err != nil {
+			return false, err
+		}
+		if len(downstreamCRBs.Items) != 0 {
+			return false, nil
+		}
+		return true, nil
+	})
+	return err
+}
+
+// GetUserIDByName is a helper function that returns the user ID by name
+func GetUserIDByName(client *rancher.Client, username string) (string, error) {
+	userList, err := client.Management.User.List(&types.ListOpts{})
+	if err != nil {
+		return "", err
+	}
+
+	if err != nil {
+		return "", err
+	}
+
+	for _, user := range userList.Data {
+		if user.Username == username {
+			return user.ID, nil
+		}
+	}
+
+	return "", nil
 }

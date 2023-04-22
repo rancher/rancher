@@ -8,15 +8,17 @@ func _() {
 	// An "invalid array index" compiler error signifies that the constant values have changed.
 	// Re-run the stringer command to generate them again.
 	var x [1]struct{}
-	_ = x[Ingress-0]
-	_ = x[Chart-1]
-	_ = x[UpgradeAllClusters-2]
-	_ = x[environmentFlagLastItem-3]
+	_ = x[KubernetesUpgradeAllClusters-0]
+	_ = x[WorkloadUpgradeAllClusters-1]
+	_ = x[UpdateClusterName-2]
+	_ = x[UseExistingRegistries-3]
+	_ = x[InstallRancher-4]
+	_ = x[environmentFlagLastItem-5]
 }
 
-const _EnvironmentFlag_name = "IngressChartUpgradeAllClustersThis is used to determine the number of items in the enum"
+const _EnvironmentFlag_name = "KubernetesUpgradeAllClustersWorkloadUpgradeAllClustersUpdateClusterNameUseExistingRegistriesInstallRancherThis is used to determine the number of items in the enum"
 
-var _EnvironmentFlag_index = [...]uint8{0, 7, 12, 30, 87}
+var _EnvironmentFlag_index = [...]uint8{0, 28, 54, 71, 92, 106, 163}
 
 func (i EnvironmentFlag) String() string {
 	if i < 0 || i >= EnvironmentFlag(len(_EnvironmentFlag_index)-1) {

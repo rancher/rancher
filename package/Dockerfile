@@ -14,6 +14,7 @@ RUN mkdir /root/.kube && \
 WORKDIR /var/lib/rancher
 
 ARG ARCH=amd64
+ARG ETCD_UNSUPPORTED_ARCH
 ARG IMAGE_REPO=rancher
 ARG SYSTEM_CHART_DEFAULT_BRANCH=dev-v2.7
 ARG CHART_DEFAULT_BRANCH=dev-v2.7
@@ -46,16 +47,17 @@ ENV CATTLE_WINS_AGENT_INSTALL_SCRIPT https://raw.githubusercontent.com/rancher/w
 ENV CATTLE_WINS_AGENT_UNINSTALL_SCRIPT https://raw.githubusercontent.com/rancher/wins/${CATTLE_WINS_AGENT_VERSION}/uninstall.ps1
 ENV CATTLE_WINS_AGENT_UPGRADE_IMAGE rancher/wins:${CATTLE_WINS_AGENT_VERSION}
 ENV CATTLE_CSI_PROXY_AGENT_VERSION v1.1.1
-ENV CATTLE_SYSTEM_AGENT_VERSION v0.3.2
+# make sure the CATTLE_SYSTEM_AGENT_VERSION is consistent with tests/v2/codecoverage/package/Dockerfile and pkg/settings/setting.go
+ENV CATTLE_SYSTEM_AGENT_VERSION v0.3.3-rc2
 ENV CATTLE_SYSTEM_AGENT_INSTALL_SCRIPT https://raw.githubusercontent.com/rancher/system-agent/${CATTLE_SYSTEM_AGENT_VERSION}/install.sh
 ENV CATTLE_SYSTEM_AGENT_UNINSTALL_SCRIPT https://raw.githubusercontent.com/rancher/system-agent/${CATTLE_SYSTEM_AGENT_VERSION}/system-agent-uninstall.sh
 ENV CATTLE_SYSTEM_AGENT_UPGRADE_IMAGE rancher/system-agent:${CATTLE_SYSTEM_AGENT_VERSION}-suc
 ENV CATTLE_SYSTEM_UPGRADE_CONTROLLER_CHART_VERSION 102.0.0+up0.4.0
 
 # System charts minimal version
-ENV CATTLE_FLEET_MIN_VERSION=102.0.0+up0.6.0-rc.5
-ENV CATTLE_RANCHER_WEBHOOK_MIN_VERSION=2.0.2+up0.3.2-rc21
-ENV CATTLE_CSP_ADAPTER_MIN_VERSION=2.0.1-rc1
+ENV CATTLE_FLEET_MIN_VERSION=102.0.0+up0.6.0
+ENV CATTLE_RANCHER_WEBHOOK_MIN_VERSION=2.0.2+up0.3.2
+ENV CATTLE_CSP_ADAPTER_MIN_VERSION=2.0.1
 
 RUN mkdir -p /var/lib/rancher-data/local-catalogs/system-library && \
     mkdir -p /var/lib/rancher-data/local-catalogs/library && \
@@ -154,13 +156,13 @@ RUN ln -s /usr/bin/cni /usr/bin/bridge && \
 
 RUN curl -sLf ${!TINI_URL} > /usr/bin/tini && \
     mkdir -p /var/lib/rancher/k3s/agent/images/ && \
-    curl -sfL ${ETCD_URL} | tar xvzf - --strip-components=1 -C /usr/bin/ etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}/etcdctl && \
+    curl -sfL ${ETCD_URL} | tar xvzf - --strip-components=1 --no-same-owner -C /usr/bin/ etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}/etcdctl && \
     curl -sLf https://github.com/rancher/telemetry/releases/download/${TELEMETRY_VERSION}/telemetry-${ARCH} > /usr/bin/telemetry && \
     chmod +x /usr/bin/tini /usr/bin/telemetry && \
     mkdir -p /var/lib/rancher-data/driver-metadata
 
-ENV CATTLE_UI_VERSION 2.7.2-rc4
-ENV CATTLE_DASHBOARD_UI_VERSION v2.7.2-rc4
+ENV CATTLE_UI_VERSION 2.7.2-rc8
+ENV CATTLE_DASHBOARD_UI_VERSION v2.7.2-rc8
 ENV CATTLE_CLI_VERSION v2.7.2-rc1
 
 # Base UI brand used as a fallback env setting (not user facing) to indicate this is a non-prime install
@@ -226,5 +228,7 @@ VOLUME /var/lib/rancher
 VOLUME /var/lib/kubelet
 VOLUME /var/lib/cni
 VOLUME /var/log
+
+ENV ETCD_UNSUPPORTED_ARCH ${ETCD_UNSUPPORTED_ARCH}
 
 ENTRYPOINT ["entrypoint.sh"]

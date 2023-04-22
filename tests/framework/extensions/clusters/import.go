@@ -27,8 +27,11 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-// kubeConfig is a basic kubeconfig that uses the pod's service account
-const kubeConfig = `
+const (
+	// rancherShellSettingID is the setting ID that used to grab rancher/shell image
+	rancherShellSettingID = "shell-image"
+	// kubeConfig is a basic kubeconfig that uses the pod's service account
+	kubeConfig = `
 apiVersion: v1
 kind: Config
 clusters:
@@ -47,6 +50,7 @@ users:
   user:
     tokenFile: /run/secrets/kubernetes.io/serviceaccount/token
 `
+)
 
 // ImportCluster creates a job using the given rest config that applies the import yaml from the given management cluster.
 func ImportCluster(client *rancher.Client, cluster *apisV1.Cluster, rest *rest.Config) error {
@@ -124,6 +128,11 @@ func ImportCluster(client *rancher.Client, cluster *apisV1.Cluster, rest *rest.C
 		return err
 	}
 
+	imageSetting, err := client.Management.Setting.ByID(rancherShellSettingID)
+	if err != nil {
+		return err
+	}
+
 	var user int64
 	var group int64
 	job := &batchv1.Job{
@@ -141,7 +150,7 @@ func ImportCluster(client *rancher.Client, cluster *apisV1.Cluster, rest *rest.C
 					Containers: []corev1.Container{
 						{
 							Name:    "kubectl",
-							Image:   "rancher/shell:v0.1.19",
+							Image:   imageSetting.Value,
 							Command: []string{"/bin/sh", "-c"},
 							Args: []string{
 								fmt.Sprintf("wget -qO- --tries=10 --no-check-certificate %s | kubectl apply -f - ;", token.ManifestURL),
@@ -202,4 +211,31 @@ func IsClusterImported(client *rancher.Client, clusterID string) (isImported boo
 	isImported = cluster.Driver == apisV3.ClusterDriverImported // For imported K3s and RKE2, driver != "imported", for custom and provisioning drive ones = "imported"
 
 	return
+}
+
+// IsImportedClusterReady is basic check function that would be used for the wait.WatchWait func in pkg/wait.
+// This functions just waits until an imported cluster becomes ready.
+func IsImportedClusterReady(event watch.Event) (ready bool, err error) {
+	cluster := event.Object.(*apisV1.Cluster)
+	var readyCondition bool
+	ready = cluster.Status.Ready
+	agentDeployed := cluster.Status.AgentDeployed
+	var numSuccess int
+	for _, condition := range cluster.Status.Conditions {
+		if condition.Type == "Ready" && condition.Status == corev1.ConditionTrue {
+			numSuccess += 1
+		}
+		if condition.Type == "SystemAccountCreated" && condition.Status == corev1.ConditionTrue {
+			numSuccess += 1
+		}
+		if condition.Type == "ServiceAccountSecretsMigrated" && condition.Status == corev1.ConditionTrue {
+			numSuccess += 1
+		}
+	}
+
+	if numSuccess == 3 {
+		readyCondition = true
+	}
+
+	return ready && readyCondition && agentDeployed, nil
 }

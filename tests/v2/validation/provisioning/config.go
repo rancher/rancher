@@ -5,11 +5,44 @@ import (
 	nodepools "github.com/rancher/rancher/tests/framework/extensions/rke1/nodepools"
 )
 
+type Version string
+
 const (
-	namespace               = "fleet-default"
-	defaultRandStringLength = 5
-	ConfigurationFileKey    = "provisioningInput"
+	namespace                       = "fleet-default"
+	defaultRandStringLength         = 5
+	ConfigurationFileKey            = "provisioningInput"
+	HardenedKubeVersion     Version = "v1.24.99"
 )
+
+// ProviderName is string enum for provider names used in provisioning tests.
+type ProviderName string
+
+const (
+	AWSProviderName       ProviderName = "aws"
+	AzureProviderName     ProviderName = "azure"
+	DOProviderName        ProviderName = "do"
+	HarvesterProviderName ProviderName = "harvester"
+	LinodeProviderName    ProviderName = "linode"
+	GoogleProviderName    ProviderName = "google"
+)
+
+// String stringer for the ProviderName
+func (p ProviderName) String() string {
+	return string(p)
+}
+
+// TestClientName is string enum for client/user names used in provisioning tests.
+type TestClientName string
+
+const (
+	AdminClientName    TestClientName = "Admin User"
+	StandardClientName TestClientName = "Standard User"
+)
+
+// String stringer for the TestClientName
+func (c TestClientName) String() string {
+	return string(c)
+}
 
 type Config struct {
 	NodesAndRoles          []machinepools.NodeRoles `json:"nodesAndRoles" yaml:"nodesAndRoles" default:"[]"`

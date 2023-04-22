@@ -17,6 +17,7 @@ import (
 	"github.com/rancher/rancher/pkg/metrics"
 	tpeermanager "github.com/rancher/rancher/pkg/peermanager"
 	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/wrangler/pkg/relatedresource"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -24,13 +25,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 )
 
-var (
-	all = "_all_"
-)
-
 // currentClusterControllersVersion is the version of the controllers that are run in the local cluster for a particular downstream cluster.
 const currentClusterControllersVersion = "management.cattle.io/current-cluster-controllers-version"
 
+// Register adds the user-controllers-controller handler and starts the peer manager.
 func Register(ctx context.Context, scaledContext *config.ScaledContext, clusterManager *clustermanager.Manager) {
 	u := &userControllersController{
 		starter:       clusterManager,
@@ -97,11 +95,15 @@ func (u *userControllersController) sync(key string, cluster *v3.Cluster) (runti
 	if cluster != nil && cluster.DeletionTimestamp != nil {
 		err := u.cleanFinalizers(key, cluster)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("userControllersController: failed to clean finalizers for cluster %s: %w", cluster.Name, err)
 		}
 	}
-	if key == all {
-		return nil, u.setPeers(nil)
+	if key == relatedresource.AllKey {
+		err := u.setPeers(nil)
+		if err != nil {
+			return nil, fmt.Errorf("userControllersController: failed to set peers for key %s: %w", key, err)
+		}
+		return nil, nil
 	}
 
 	// Check if the cluster has been upgraded to a major or minor version and restart the controllers.
@@ -109,34 +111,40 @@ func (u *userControllersController) sync(key string, cluster *v3.Cluster) (runti
 		var err error
 		currentVersion, err := getCurrentClusterControllersVersion(cluster)
 		// If the version is not found on the annotation, set it and update the cluster object.
+		var clusterCopy *v3.Cluster
 		if err != nil {
-			if cluster, err = u.saveClusterControllersVersionAnnotation(cluster, cluster.Status.Version.String()); err != nil {
-				return nil, err
+			if clusterCopy, err = u.saveClusterControllersVersionAnnotation(cluster, cluster.Status.Version.String()); err != nil {
+				return nil, fmt.Errorf("userControllersController: failed to save version annotation for cluster %s: %w", cluster.Name, err)
 			}
+			cluster = clusterCopy
+			u.clusters.Controller().Enqueue("", relatedresource.AllKey)
 			return cluster, nil
 		}
 
 		newVersion, err := version.ParseSemantic(cluster.Status.Version.String())
 		if err != nil {
 			logrus.Errorf("failed to parse the K8s version of the upgraded cluster %s, will not restart cluster controllers: %v", cluster.Name, err)
+			u.clusters.Controller().Enqueue("", relatedresource.AllKey)
 			return cluster, nil
 		}
 
 		if !clusterVersionChanged(currentVersion, newVersion) {
+			u.clusters.Controller().Enqueue("", relatedresource.AllKey)
 			return cluster, nil
 		}
 
 		u.starter.Stop(cluster)
 		err = u.starter.Start(u.ctx, cluster, u.amOwner(u.peers, cluster))
 		if err != nil {
-			return cluster, fmt.Errorf("unable to restart controllers for cluster %s: %w", cluster.Name, err)
+			return nil, fmt.Errorf("userControllersController: unable to restart controllers for cluster %s: %w", cluster.Name, err)
 		}
-		if cluster, err = u.saveClusterControllersVersionAnnotation(cluster, newVersion.String()); err != nil {
-			return nil, err
+		if clusterCopy, err = u.saveClusterControllersVersionAnnotation(cluster, newVersion.String()); err != nil {
+			return nil, fmt.Errorf("userControllersController: failed to save new version annotation for cluster %s: %w", cluster.Name, err)
 		}
+		cluster = clusterCopy
 	}
 
-	u.clusters.Controller().Enqueue("", all)
+	u.clusters.Controller().Enqueue("", relatedresource.AllKey)
 	return cluster, nil
 }
 
