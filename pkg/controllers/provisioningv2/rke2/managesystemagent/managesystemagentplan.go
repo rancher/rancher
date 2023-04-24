@@ -9,7 +9,6 @@ import (
 	rancherv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
-	"github.com/rancher/rancher/pkg/fleet"
 	namespaces "github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/provisioningv2/image"
 	"github.com/rancher/rancher/pkg/settings"
@@ -87,7 +86,7 @@ func (h *handler) OnChangeInstallSUC(cluster *rancherv1.Cluster, status rancherv
 func (h *handler) syncSystemUpgradeControllerStatus(obj *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus) (rkev1.RKEControlPlaneStatus, error) {
 	// perform the same name limiting as in the OnChangeInstallSUC controller, but prepend the 'mcc-' prefix that is added when the bundle is created
 	bundleName := fmt.Sprintf("mcc-%s", name.Limit(name.SafeConcatName(obj.Name, "managed", "system-upgrade-controller"), 48))
-	sucBundle, err := h.bundles.Get(fleet.ClustersDefaultNamespace, bundleName, metav1.GetOptions{})
+	sucBundle, err := h.bundles.Get(obj.Namespace, bundleName, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
 		// if we couldn't find the bundle then we know it's not ready
 		rke2.SystemUpgradeControllerReady.False(&status)
