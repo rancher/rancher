@@ -2,21 +2,16 @@ package planner
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"hash/crc32"
-	"math"
-	"path/filepath"
-	"reflect"
-	"strconv"
-	"strings"
-
 	"github.com/Masterminds/semver/v3"
 	"github.com/moby/locker"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
+	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/managesystemagent"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	ranchercontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
@@ -28,14 +23,20 @@ import (
 	"github.com/rancher/wrangler/pkg/randomtoken"
 	"github.com/rancher/wrangler/pkg/summary"
 	"github.com/sirupsen/logrus"
+	"hash/crc32"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"math"
+	"path/filepath"
+	"reflect"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	capiannotations "sigs.k8s.io/cluster-api/util/annotations"
 	"sigs.k8s.io/cluster-api/util/conditions"
+	"strconv"
+	"strings"
 )
 
 const (
@@ -209,6 +210,11 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlan
 		_ = p.locker.Unlock(uid)
 	}(cp.Namespace, cp.Name, string(cp.UID))
 
+	currentVersion, err := semver.NewVersion(cp.Spec.KubernetesVersion)
+	if err != nil {
+		return status, fmt.Errorf("rkecluster %s/%s: error semver parsing kubernetes version %s: %v", cp.Namespace, cp.Name, cp.Spec.KubernetesVersion, err)
+	}
+
 	releaseData := rke2.GetKDMReleaseData(p.ctx, cp)
 	if releaseData == nil {
 		return status, errWaitingf("%s/%s: releaseData nil for version %s", cp.Namespace, cp.Name, cp.Spec.KubernetesVersion)
@@ -243,7 +249,7 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlan
 		return status, errWaitingf("rkecluster %s/%s: waiting for infrastructure ready", cp.Namespace, cp.Name)
 	}
 
-	plan, plansDelivered, err := p.store.Load(capiCluster, cp)
+	plan, _, err := p.store.Load(capiCluster, cp)
 	if err != nil {
 		return status, err
 	}
@@ -266,15 +272,25 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlan
 		return status, err
 	}
 
-	// we need to make sure the cluster has undergone initial provisioning and bootstrapping before we can enforce this condition,
+	// In the case that we're dealing with K8s >= 1.25, ensure that system-upgrade-controller has PodSecurityPolicies disabled.
+	// We need to make sure the cluster has undergone initial provisioning and bootstrapping before we can enforce this condition,
 	// otherwise the system-upgrade-controller bundle will never become ready and the planner will be indefinitely blocked.
 	// We do this by determining if any plans have been delivered to any of the nodes. Notably we perform this check after etcd
-	// snapshot restoration can happen, to allow recovery in the event that
-	if plansDelivered && (rke2.SystemUpgradeControllerReady.GetStatus(&status) == "" || rke2.SystemUpgradeControllerReady.IsFalse(&status)) {
-		if rke2.SystemUpgradeControllerReady.GetReason(&status) != "" {
-			return status, errWaitingf("Waiting for System Upgrade Controller to be updated for Kubernetes version %s: %s", cp.Spec.KubernetesVersion, rke2.SystemUpgradeControllerReady.GetReason(&status))
+	// snapshot restoration can happen, to allow recovery in the event that the cluster has failed.
+	if anyPlanDelivered(plan, isEtcd) && anyPlanDelivered(plan, isControlPlane) && anyPlanDelivered(plan, isWorker) && !currentVersion.LessThan(managesystemagent.Kubernetes125) {
+		if rke2.SystemUpgradeControllerReady.GetStatus(&status) == "" || rke2.SystemUpgradeControllerReady.IsFalse(&status) {
+			if rke2.SystemUpgradeControllerReady.GetReason(&status) != "" {
+				return status, errWaitingf("Waiting for System Upgrade Controller to be updated for Kubernetes version %s: %s", cp.Spec.KubernetesVersion, rke2.SystemUpgradeControllerReady.GetReason(&status))
+			}
+			return status, errWaitingf("Waiting for System Upgrade Controller to be updated for Kubernetes version %s", cp.Spec.KubernetesVersion)
 		}
-		return status, errWaitingf("Waiting for System Upgrade Controller to be updated for Kubernetes version %s", cp.Spec.KubernetesVersion)
+		if disabled, err := systemUpgradeControllerPSPsDisabled(rke2.SystemUpgradeControllerReady.GetMessage(&status)); err == nil {
+			if !disabled {
+				return status, errWaitingf("system-upgrade-controller chart still has PodSecurityPolicies enabled and Kubernetes version is > 1.25")
+			}
+		} else {
+			return status, errWaitingf("error occurred while determining whether SUC PSPs were disabled: %v", err)
+		}
 	}
 
 	if status, err = p.rotateCertificates(cp, status, clusterSecretTokens, plan); err != nil {
@@ -366,6 +382,22 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlan
 	}
 
 	return status, nil
+}
+
+func systemUpgradeControllerPSPsDisabled(data string) (bool, error) {
+	var sucMetadata = managesystemagent.SUCMetadata{}
+	if data == "" {
+		return false, fmt.Errorf("data for SUC Metadata was blank")
+	}
+	rawMetadata, err := base64.StdEncoding.DecodeString(data)
+	if err != nil {
+		return false, err
+	}
+	err = json.Unmarshal(rawMetadata, &sucMetadata)
+	if err != nil {
+		return false, err
+	}
+	return !sucMetadata.PspEnabled, nil
 }
 
 // calculateJoinURL will return a join URL based on calculating the checksum of the given machine UID. This is somewhat deterministic but will change when suitable machine lists change.
