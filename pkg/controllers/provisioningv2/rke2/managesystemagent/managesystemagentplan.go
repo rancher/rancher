@@ -95,7 +95,9 @@ func (h *handler) syncSystemUpgradeControllerStatus(obj *rkev1.RKEControlPlane, 
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// if we couldn't find the bundle then we know it's not ready
-			rke2.SystemUpgradeControllerReady.SetError(&status, fmt.Sprintf("unable to find bundle %s", bundleName), err)
+			rke2.SystemUpgradeControllerReady.Reason(&status, fmt.Sprintf("unable to find bundle %s: %v", bundleName, err))
+			rke2.SystemUpgradeControllerReady.Message(&status, "")
+			rke2.SystemUpgradeControllerReady.False(&status)
 			// don't return the error, otherwise the status won't be set to 'false'
 			err = nil
 		}
@@ -106,11 +108,13 @@ func (h *handler) syncSystemUpgradeControllerStatus(obj *rkev1.RKEControlPlane, 
 	if sucBundle.Status.Summary.Ready != sucBundle.Status.Summary.DesiredReady || sucBundle.Status.Summary.DesiredReady == 0 {
 		if sucBundle.Status.Summary.ErrApplied != 0 && len(sucBundle.Status.Summary.NonReadyResources) > 0 {
 			nonReady := sucBundle.Status.Summary.NonReadyResources
-			rke2.SystemUpgradeControllerReady.Reason(&status, fmt.Sprintf("Error Encountered Waiting for System Upgrade Controller Deployment To Roll Out: %s", nonReady[0].Message))
+			rke2.SystemUpgradeControllerReady.Reason(&status, fmt.Sprintf("error encountered waiting for system-upgrade-controller bundle roll out: %s", nonReady[0].Message))
+			rke2.SystemUpgradeControllerReady.Message(&status, "")
 			rke2.SystemUpgradeControllerReady.Unknown(&status)
 			return status, nil
 		}
-		rke2.SystemUpgradeControllerReady.Reason(&status, "Waiting for System Upgrade Controller Deployment roll out")
+		rke2.SystemUpgradeControllerReady.Reason(&status, "waiting for system-upgrade-controller bundle roll out")
+		rke2.SystemUpgradeControllerReady.Message(&status, "")
 		rke2.SystemUpgradeControllerReady.Unknown(&status)
 		return status, nil
 	}
@@ -120,7 +124,8 @@ func (h *handler) syncSystemUpgradeControllerStatus(obj *rkev1.RKEControlPlane, 
 	// we expect the PSP value to be explicitly defined as either true or false
 	valuesYamlAvailable := sucBundle.Spec.Helm != nil && sucBundle.Spec.Helm.Values != nil
 	if !valuesYamlAvailable {
-		rke2.SystemUpgradeControllerReady.Reason(&status, "Waiting for Upgraded System Upgrade Controller Deployment")
+		rke2.SystemUpgradeControllerReady.Reason(&status, "waiting for system-upgrade-controller bundle values availability")
+		rke2.SystemUpgradeControllerReady.Message(&status, "")
 		rke2.SystemUpgradeControllerReady.Unknown(&status)
 		return status, nil
 	}
@@ -130,7 +135,8 @@ func (h *handler) syncSystemUpgradeControllerStatus(obj *rkev1.RKEControlPlane, 
 	global, ok := data["global"].(map[string]interface{})
 	if !ok {
 		logrus.Debugf("[managesystemagentplan] rkecluster %s/%s: bundle %s did not have global field", obj.Namespace, obj.Name, bundleName)
-		rke2.SystemUpgradeControllerReady.Reason(&status, "Waiting for System Upgrade Controller Bundle Update")
+		rke2.SystemUpgradeControllerReady.Reason(&status, "waiting for system-upgrade-controller bundle update")
+		rke2.SystemUpgradeControllerReady.Message(&status, "")
 		rke2.SystemUpgradeControllerReady.Unknown(&status)
 		return status, nil
 	}
@@ -138,7 +144,8 @@ func (h *handler) syncSystemUpgradeControllerStatus(obj *rkev1.RKEControlPlane, 
 	cattle, ok := global["cattle"].(map[string]interface{})
 	if !ok {
 		logrus.Debugf("[managesystemagentplan] rkecluster %s/%s: bundle %s did not have global.cattle field", obj.Namespace, obj.Name, bundleName)
-		rke2.SystemUpgradeControllerReady.Reason(&status, "Waiting for System Upgrade Controller Bundle Update")
+		rke2.SystemUpgradeControllerReady.Reason(&status, "waiting for system-upgrade-controller bundle update")
+		rke2.SystemUpgradeControllerReady.Message(&status, "")
 		rke2.SystemUpgradeControllerReady.Unknown(&status)
 		return status, nil
 	}
@@ -146,7 +153,8 @@ func (h *handler) syncSystemUpgradeControllerStatus(obj *rkev1.RKEControlPlane, 
 	psp, ok := cattle["psp"].(map[string]interface{})
 	if !ok {
 		logrus.Debugf("[managesystemagentplan] rkecluster %s/%s: bundle %s did not have global.cattle.psp field", obj.Namespace, obj.Name, bundleName)
-		rke2.SystemUpgradeControllerReady.Reason(&status, "Waiting for System Upgrade Controller Bundle Update")
+		rke2.SystemUpgradeControllerReady.Reason(&status, "waiting for system-upgrade-controller bundle update")
+		rke2.SystemUpgradeControllerReady.Message(&status, "")
 		rke2.SystemUpgradeControllerReady.Unknown(&status)
 		return status, nil
 	}
@@ -160,14 +168,15 @@ func (h *handler) syncSystemUpgradeControllerStatus(obj *rkev1.RKEControlPlane, 
 	// a version greater than or equal to 1.25.
 	enabled, ok := psp["enabled"].(bool)
 	if !ok {
-		rke2.SystemUpgradeControllerReady.Reason(&status, "Waiting for System Upgrade Controller Bundle Update")
+		rke2.SystemUpgradeControllerReady.Reason(&status, "waiting for system-upgrade-controller bundle update")
+		rke2.SystemUpgradeControllerReady.Message(&status, "")
 		rke2.SystemUpgradeControllerReady.Unknown(&status)
 		return status, nil
 	}
 
 	if !currentVersion.LessThan(Kubernetes125) && enabled {
 		logrus.Debugf("[managesystemagentplan] rkecluster %s/%s: bundle %s still has SUC PSPs enabled", obj.Namespace, obj.Name, bundleName)
-		rke2.SystemUpgradeControllerReady.Reason(&status, "System Upgrade Controller Not Ready")
+		rke2.SystemUpgradeControllerReady.Reason(&status, "system-upgrade-controller is deployed with podsecuritypolicy enabled")
 		rke2.SystemUpgradeControllerReady.False(&status)
 		return status, nil
 	}
@@ -181,6 +190,7 @@ func (h *handler) syncSystemUpgradeControllerStatus(obj *rkev1.RKEControlPlane, 
 	}
 
 	rke2.SystemUpgradeControllerReady.Message(&status, base64.StdEncoding.EncodeToString(metadata))
+	rke2.SystemUpgradeControllerReady.Reason(&status, "")
 	rke2.SystemUpgradeControllerReady.True(&status)
 	return status, nil
 }

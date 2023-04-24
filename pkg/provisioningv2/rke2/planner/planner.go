@@ -278,15 +278,15 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlan
 	// We do this by determining if any plans have been delivered to any of the nodes. Notably we perform this check after etcd
 	// snapshot restoration can happen, to allow recovery in the event that the cluster has failed.
 	if anyPlanDelivered(plan, isEtcd) && anyPlanDelivered(plan, isControlPlane) && anyPlanDelivered(plan, isWorker) && !currentVersion.LessThan(managesystemagent.Kubernetes125) {
-		if rke2.SystemUpgradeControllerReady.GetStatus(&status) == "" || rke2.SystemUpgradeControllerReady.IsFalse(&status) {
+		if rke2.SystemUpgradeControllerReady.GetStatus(&status) == "" || rke2.SystemUpgradeControllerReady.IsFalse(&status) || rke2.SystemUpgradeControllerReady.IsUnknown(&status) {
 			if rke2.SystemUpgradeControllerReady.GetReason(&status) != "" {
-				return status, errWaitingf("Waiting for System Upgrade Controller to be updated for Kubernetes version %s: %s", cp.Spec.KubernetesVersion, rke2.SystemUpgradeControllerReady.GetReason(&status))
+				return status, errWaitingf("waiting for system-upgrade-controller helm chart reconciliation: %s", rke2.SystemUpgradeControllerReady.GetReason(&status))
 			}
-			return status, errWaitingf("Waiting for System Upgrade Controller to be updated for Kubernetes version %s", cp.Spec.KubernetesVersion)
+			return status, errWaiting("waiting for system-upgrade-controller helm chart reconciliation")
 		}
 		if disabled, err := systemUpgradeControllerPSPsDisabled(rke2.SystemUpgradeControllerReady.GetMessage(&status)); err == nil {
 			if !disabled {
-				return status, errWaitingf("system-upgrade-controller chart still has PodSecurityPolicies enabled and Kubernetes version is > 1.25")
+				return status, errWaitingf("system-upgrade-controller helm chart has podsecuritypolicy enabled, waiting for helm chart reconciliation")
 			}
 		} else {
 			return status, errWaitingf("error occurred while determining whether SUC PSPs were disabled: %v", err)
