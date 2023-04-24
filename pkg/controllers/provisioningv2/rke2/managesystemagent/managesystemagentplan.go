@@ -103,7 +103,7 @@ func (h *handler) syncSystemUpgradeControllerStatus(obj *rkev1.RKEControlPlane, 
 		return status, err
 	}
 	// determine if the SUC deployment has been rolled out fully, and if there were any errors encountered
-	if sucBundle.Status.Summary.Ready != sucBundle.Status.Summary.DesiredReady {
+	if sucBundle.Status.Summary.Ready != sucBundle.Status.Summary.DesiredReady || sucBundle.Status.Summary.DesiredReady == 0 {
 		if sucBundle.Status.Summary.ErrApplied != 0 && len(sucBundle.Status.Summary.NonReadyResources) > 0 {
 			nonReady := sucBundle.Status.Summary.NonReadyResources
 			rke2.SystemUpgradeControllerReady.Reason(&status, fmt.Sprintf("Error Encountered Waiting for System Upgrade Controller Deployment To Roll Out: %s", nonReady[0].Message))
