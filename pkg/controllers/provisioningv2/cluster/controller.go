@@ -300,6 +300,21 @@ func (h *handler) createNewCluster(cluster *v1.Cluster, status v1.ClusterStatus,
 		})
 	}
 
+	if cluster.Spec.ClusterAgentDeploymentCustomization != nil {
+		spec.ClusterAgentDeploymentCustomization = &v3.AgentDeploymentCustomization{
+			AppendTolerations:            cluster.Spec.ClusterAgentDeploymentCustomization.AppendTolerations,
+			OverrideAffinity:             cluster.Spec.ClusterAgentDeploymentCustomization.OverrideAffinity,
+			OverrideResourceRequirements: cluster.Spec.ClusterAgentDeploymentCustomization.OverrideResourceRequirements,
+		}
+	}
+	if cluster.Spec.FleetAgentDeploymentCustomization != nil {
+		spec.FleetAgentDeploymentCustomization = &v3.AgentDeploymentCustomization{
+			AppendTolerations:            cluster.Spec.FleetAgentDeploymentCustomization.AppendTolerations,
+			OverrideAffinity:             cluster.Spec.FleetAgentDeploymentCustomization.OverrideAffinity,
+			OverrideResourceRequirements: cluster.Spec.FleetAgentDeploymentCustomization.OverrideResourceRequirements,
+		}
+	}
+
 	if cluster.Spec.RKEConfig != nil {
 		if err := h.updateFeatureLockedValue(true); err != nil {
 			return nil, status, err

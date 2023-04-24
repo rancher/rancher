@@ -207,6 +207,9 @@ type ClusterStatus struct {
 	OpenStackSecret                      string                    `json:"openStackSecret,omitempty" norman:"nocreate,noupdate"`       // Deprecated: use ClusterSpec.ClusterSecrets.OpenStackSecret instead
 	AADClientSecret                      string                    `json:"aadClientSecret,omitempty" norman:"nocreate,noupdate"`       // Deprecated: use ClusterSpec.ClusterSecrets.AADClientSecret instead
 	AADClientCertSecret                  string                    `json:"aadClientCertSecret,omitempty" norman:"nocreate,noupdate"`   // Deprecated: use ClusterSpec.ClusterSecrets.AADClientCertSecret instead
+
+	AppliedClusterAgentDeploymentCustomization *AgentDeploymentCustomization `json:"appliedClusterAgentDeploymentCustomization,omitempty"`
+	AppliedFleetAgentDeploymentCustomization   *AgentDeploymentCustomization `json:"appliedFleetAgentDeploymentCustomization,omitempty"`
 }
 
 type ClusterComponentStatus struct {

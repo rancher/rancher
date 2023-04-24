@@ -2321,6 +2321,16 @@ func (in *ClusterStatus) DeepCopyInto(out *ClusterStatus) {
 	in.AKSStatus.DeepCopyInto(&out.AKSStatus)
 	in.EKSStatus.DeepCopyInto(&out.EKSStatus)
 	in.GKEStatus.DeepCopyInto(&out.GKEStatus)
+	if in.AppliedClusterAgentDeploymentCustomization != nil {
+		in, out := &in.AppliedClusterAgentDeploymentCustomization, &out.AppliedClusterAgentDeploymentCustomization
+		*out = new(AgentDeploymentCustomization)
+		(*in).DeepCopyInto(*out)
+	}
+	if in.AppliedFleetAgentDeploymentCustomization != nil {
+		in, out := &in.AppliedFleetAgentDeploymentCustomization, &out.AppliedFleetAgentDeploymentCustomization
+		*out = new(AgentDeploymentCustomization)
+		(*in).DeepCopyInto(*out)
+	}
 	return
 }
 
