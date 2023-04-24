@@ -14,6 +14,7 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/moby/locker"
+	"github.com/rancher/channelserver/pkg/model"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
@@ -128,8 +129,9 @@ type Planner struct {
 // InfoFunctions is a struct that contains various dynamic functions that allow for abstracting out Rancher-specific
 // logic from the Planner
 type InfoFunctions struct {
-	SystemAgentImage func() string
 	ImageResolver    func(image string, cp *rkev1.RKEControlPlane) string
+	ReleaseData      func(context.Context, *rkev1.RKEControlPlane) *model.Release
+	SystemAgentImage func() string
 }
 
 func New(ctx context.Context, clients *wrangler.Context, functions InfoFunctions) *Planner {
@@ -216,7 +218,7 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlan
 		return status, fmt.Errorf("rkecluster %s/%s: error semver parsing kubernetes version %s: %v", cp.Namespace, cp.Name, cp.Spec.KubernetesVersion, err)
 	}
 
-	releaseData := rke2.GetKDMReleaseData(p.ctx, cp)
+	releaseData := p.retrievalFunctions.ReleaseData(p.ctx, cp)
 	if releaseData == nil {
 		return status, errWaitingf("%s/%s: releaseData nil for version %s", cp.Namespace, cp.Name, cp.Spec.KubernetesVersion)
 	}
