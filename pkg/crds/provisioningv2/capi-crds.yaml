@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.9.1
+    controller-gen.kubebuilder.io/version: v0.11.3
   creationTimestamp: null
   name: clusterresourcesetbindings.addons.cluster.x-k8s.io
 spec:
@@ -20,8 +20,9 @@ spec:
     - name: v1alpha3
       schema:
         openAPIV3Schema:
-          description: ClusterResourceSetBinding lists all matching ClusterResourceSets
-            with the cluster it belongs to.
+          description: "ClusterResourceSetBinding lists all matching ClusterResourceSets
+            with the cluster it belongs to. \n Deprecated: This type will be removed
+            in one of the next releases."
           properties:
             apiVersion:
               description: 'APIVersion defines the versioned schema of this representation
@@ -108,8 +109,9 @@ spec:
       name: v1alpha4
       schema:
         openAPIV3Schema:
-          description: ClusterResourceSetBinding lists all matching ClusterResourceSets
-            with the cluster it belongs to.
+          description: "ClusterResourceSetBinding lists all matching ClusterResourceSets
+            with the cluster it belongs to. \n Deprecated: This type will be removed
+            in one of the next releases."
           properties:
             apiVersion:
               description: 'APIVersion defines the versioned schema of this representation
@@ -270,6 +272,10 @@ spec:
                       - clusterResourceSetName
                     type: object
                   type: array
+                clusterName:
+                  description: "ClusterName is the name of the Cluster this binding
+                  applies to. Note: this field mandatory in v1beta2."
+                  type: string
               type: object
           type: object
       served: true
@@ -281,7 +287,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.9.1
+    controller-gen.kubebuilder.io/version: v0.11.3
   creationTimestamp: null
   name: clusterresourcesets.addons.cluster.x-k8s.io
 spec:
@@ -298,8 +304,8 @@ spec:
     - name: v1alpha3
       schema:
         openAPIV3Schema:
-          description: ClusterResourceSet is the Schema for the clusterresourcesets
-            API.
+          description: "ClusterResourceSet is the Schema for the clusterresourcesets
+            API. \n Deprecated: This type will be removed in one of the next releases."
           properties:
             apiVersion:
               description: 'APIVersion defines the versioned schema of this representation
@@ -460,8 +466,8 @@ spec:
       name: v1alpha4
       schema:
         openAPIV3Schema:
-          description: ClusterResourceSet is the Schema for the clusterresourcesets
-            API.
+          description: "ClusterResourceSet is the Schema for the clusterresourcesets
+            API. \n Deprecated: This type will be removed in one of the next releases."
           properties:
             apiVersion:
               description: 'APIVersion defines the versioned schema of this representation
@@ -553,6 +559,7 @@ spec:
                     Defaults to ApplyOnce. This field is immutable.
                   enum:
                     - ApplyOnce
+                    - Reconcile
                   type: string
               required:
                 - clusterSelector
@@ -808,8 +815,9 @@ spec:
       name: v1alpha4
       schema:
         openAPIV3Schema:
-          description: ClusterClass is a template which can be used to create managed
-            topologies.
+          description: "ClusterClass is a template which can be used to create managed
+            topologies. \n Deprecated: This type will be removed in one of the next
+            releases."
           properties:
             apiVersion:
               description: 'APIVersion defines the versioned schema of this representation
@@ -1289,6 +1297,7 @@ spec:
                           over MaxUnhealthy. Eg. "[3-5]" - This means that remediation
                           will be allowed only when: (a) there are at least 3 unhealthy
                           machines (and) (b) there are at most 5 unhealthy machines'
+                          pattern: ^\[[0-9]+-[0-9]+\]$
                           type: string
                       type: object
                     machineInfrastructure:
@@ -1340,11 +1349,13 @@ spec:
                         - ref
                       type: object
                     metadata:
-                      description: "Metadata is the metadata applied to the machines
-                      of the ControlPlane. At runtime this metadata is merged with
-                      the corresponding metadata from the topology. \n This field
-                      is supported if and only if the control plane provider template
-                      referenced is Machine based."
+                      description: "Metadata is the metadata applied to the ControlPlane
+                        and the Machines of the ControlPlane if the ControlPlaneTemplate
+                        referenced is machine based. If not, it is applied only to the
+                        ControlPlane. At runtime this metadata is merged with the corresponding
+                        metadata from the topology. \n This field is supported if and
+                        only if the control plane provider template referenced is Machine
+                        based."
                       properties:
                         annotations:
                           additionalProperties:
@@ -1364,6 +1375,28 @@ spec:
                           More info: http://kubernetes.io/docs/user-guide/labels'
                           type: object
                       type: object
+                    nodeDeletionTimeout:
+                      description: 'NodeDeletionTimeout defines how long the controller
+                        will attempt to delete the Node that the Machine hosts after
+                        the Machine is marked for deletion. A duration of 0 will retry
+                        deletion indefinitely. Defaults to 10 seconds. NOTE: This value
+                        can be overridden while defining a Cluster.Topology.'
+                      type: string
+                    nodeDrainTimeout:
+                      description: 'NodeDrainTimeout is the total amount of time that
+                        the controller will spend on draining a node. The default value
+                        is 0, meaning that the node can be drained without any time
+                        limitations. NOTE: NodeDrainTimeout is different from `kubectl
+                        drain --timeout` NOTE: This value can be overridden while defining
+                        a Cluster.Topology.'
+                      type: string
+                    nodeVolumeDetachTimeout:
+                      description: 'NodeVolumeDetachTimeout is the total amount of time
+                        that the controller will spend on waiting for all volumes to
+                        be detached. The default value is 0, meaning that the volumes
+                        can be detached without any time limitations. NOTE: This value
+                        can be overridden while defining a Cluster.Topology.'
+                      type: string
                     ref:
                       description: Ref is a required reference to a custom resource
                         offered by a provider.
@@ -1589,10 +1622,21 @@ spec:
                         description: 'External defines an external patch. Note: Exactly
                         one of Definitions or External must be set.'
                         properties:
+                          discoverVariablesExtension:
+                            description: DiscoverVariablesExtension references an extension
+                              which is called to discover variables.
+                            type: string
                           generateExtension:
                             description: GenerateExtension references an extension which
                               is called to generate patches.
                             type: string
+                          settings:
+                            additionalProperties:
+                              type: string
+                            description: Settings defines key value pairs to be passed
+                              to the extensions. Values defined here take precedence
+                              over the values defined in the corresponding ExtensionConfig.
+                            type: object
                           validateExtension:
                             description: ValidateExtension references an extension which
                               is called to validate the topology.
@@ -1744,6 +1788,13 @@ spec:
                                 description: 'UniqueItems specifies if items in an array
                                 must be unique. NOTE: Can only be set if type is array.'
                                 type: boolean
+                              x-kubernetes-preserve-unknown-fields:
+                                description: XPreserveUnknownFields allows setting fields
+                                  in a variable object which are not defined in the
+                                  variable schema. This affects fields recursively,
+                                  except if nested properties or additionalProperties
+                                  are specified in the schema.
+                                type: boolean
                             required:
                               - type
                             type: object
@@ -1774,6 +1825,13 @@ spec:
                               in the cluster, this name MUST be unique within a ClusterClass
                               and can be referenced in the Cluster to create a managed
                               MachineDeployment.
+                            type: string
+                          failureDomain:
+                            description: 'FailureDomain is the failure domain the machines
+                              will be created in. Must match a key in the FailureDomains
+                              map stored on the cluster object. NOTE: This value can
+                              be overridden while defining a Cluster.Topology using
+                              this MachineDeploymentClass.'
                             type: string
                           machineHealthCheck:
                             description: MachineHealthCheck defines a MachineHealthCheck
@@ -1875,6 +1933,107 @@ spec:
                                 This means that remediation will be allowed only when:
                                 (a) there are at least 3 unhealthy machines (and)
                                 (b) there are at most 5 unhealthy machines'
+                                pattern: ^\[[0-9]+-[0-9]+\]$
+                                type: string
+                            type: object
+                          minReadySeconds:
+                            description: 'Minimum number of seconds for which a newly
+                              created machine should be ready. Defaults to 0 (machine
+                              will be considered available as soon as it is ready) NOTE:
+                              This value can be overridden while defining a Cluster.Topology
+                              using this MachineDeploymentClass.'
+                            format: int32
+                            type: integer
+                          nodeDeletionTimeout:
+                            description: 'NodeDeletionTimeout defines how long the controller
+                              will attempt to delete the Node that the Machine hosts
+                              after the Machine is marked for deletion. A duration of
+                              0 will retry deletion indefinitely. Defaults to 10 seconds.
+                              NOTE: This value can be overridden while defining a Cluster.Topology
+                              using this MachineDeploymentClass.'
+                            type: string
+                          nodeDrainTimeout:
+                            description: 'NodeDrainTimeout is the total amount of time
+                              that the controller will spend on draining a node. The
+                              default value is 0, meaning that the node can be drained
+                              without any time limitations. NOTE: NodeDrainTimeout is
+                              different from `kubectl drain --timeout` NOTE: This value
+                              can be overridden while defining a Cluster.Topology using
+                              this MachineDeploymentClass.'
+                            type: string
+                          nodeVolumeDetachTimeout:
+                            description: 'NodeVolumeDetachTimeout is the total amount
+                              of time that the controller will spend on waiting for
+                              all volumes to be detached. The default value is 0, meaning
+                              that the volumes can be detached without any time limitations.
+                              NOTE: This value can be overridden while defining a Cluster.Topology
+                              using this MachineDeploymentClass.'
+                            type: string
+                          strategy:
+                            description: 'The deployment strategy to use to replace
+                              existing machines with new ones. NOTE: This value can
+                              be overridden while defining a Cluster.Topology using
+                              this MachineDeploymentClass.'
+                            properties:
+                              rollingUpdate:
+                                description: Rolling update config params. Present only
+                                  if MachineDeploymentStrategyType = RollingUpdate.
+                                properties:
+                                  deletePolicy:
+                                    description: DeletePolicy defines the policy used
+                                      by the MachineDeployment to identify nodes to
+                                      delete when downscaling. Valid values are "Random,
+                                      "Newest", "Oldest" When no value is supplied,
+                                      the default DeletePolicy of MachineSet is used
+                                    enum:
+                                    - Random
+                                    - Newest
+                                    - Oldest
+                                    type: string
+                                  maxSurge:
+                                    anyOf:
+                                    - type: integer
+                                    - type: string
+                                    description: 'The maximum number of machines that
+                                      can be scheduled above the desired number of machines.
+                                      Value can be an absolute number (ex: 5) or a percentage
+                                      of desired machines (ex: 10%). This can not be
+                                      0 if MaxUnavailable is 0. Absolute number is calculated
+                                      from percentage by rounding up. Defaults to 1.
+                                      Example: when this is set to 30%, the new MachineSet
+                                      can be scaled up immediately when the rolling
+                                      update starts, such that the total number of old
+                                      and new machines do not exceed 130% of desired
+                                      machines. Once old machines have been killed,
+                                      new MachineSet can be scaled up further, ensuring
+                                      that total number of machines running at any time
+                                      during the update is at most 130% of desired machines.'
+                                    x-kubernetes-int-or-string: true
+                                  maxUnavailable:
+                                    anyOf:
+                                    - type: integer
+                                    - type: string
+                                    description: 'The maximum number of machines that
+                                      can be unavailable during the update. Value can
+                                      be an absolute number (ex: 5) or a percentage
+                                      of desired machines (ex: 10%). Absolute number
+                                      is calculated from percentage by rounding down.
+                                      This can not be 0 if MaxSurge is 0. Defaults to
+                                      0. Example: when this is set to 30%, the old MachineSet
+                                      can be scaled down to 70% of desired machines
+                                      immediately when the rolling update starts. Once
+                                      new machines are ready, old MachineSet can be
+                                      scaled down further, followed by scaling up the
+                                      new MachineSet, ensuring that the total number
+                                      of machines available at all times during the
+                                      update is at least 70% of desired machines.'
+                                    x-kubernetes-int-or-string: true
+                                type: object
+                              type:
+                                description: Type of deployment. Default is RollingUpdate.
+                                enum:
+                                - RollingUpdate
+                                - OnDelete
                                 type: string
                             type: object
                           template:
@@ -1993,9 +2152,9 @@ spec:
                                 type: object
                               metadata:
                                 description: Metadata is the metadata applied to the
-                                  machines of the MachineDeployment. At runtime this
-                                  metadata is merged with the corresponding metadata
-                                  from the topology.
+                                  MachineDeployment and the machines of the MachineDeployment.
+                                  At runtime this metadata is merged with the corresponding
+                                  metadata from the topology.
                                 properties:
                                   annotations:
                                     additionalProperties:
@@ -2026,16 +2185,260 @@ spec:
                       type: array
                   type: object
               type: object
+            status:
+              description: ClusterClassStatus defines the observed state of the ClusterClass.
+              properties:
+                conditions:
+                  description: Conditions defines current observed state of the ClusterClass.
+                  items:
+                    description: Condition defines an observation of a Cluster API resource
+                      operational state.
+                    properties:
+                      lastTransitionTime:
+                        description: Last time the condition transitioned from one status
+                          to another. This should be when the underlying condition changed.
+                          If that is not known, then using the time when the API field
+                          changed is acceptable.
+                        format: date-time
+                        type: string
+                      message:
+                        description: A human readable message indicating details about
+                          the transition. This field may be empty.
+                        type: string
+                      reason:
+                        description: The reason for the condition's last transition
+                          in CamelCase. The specific API may choose whether or not this
+                          field is considered a guaranteed API. This field may not be
+                          empty.
+                        type: string
+                      severity:
+                        description: Severity provides an explicit classification of
+                          Reason code, so the users or machines can immediately understand
+                          the current situation and act accordingly. The Severity field
+                          MUST be set only when Status=False.
+                        type: string
+                      status:
+                        description: Status of the condition, one of True, False, Unknown.
+                        type: string
+                      type:
+                        description: Type of condition in CamelCase or in foo.example.com/CamelCase.
+                          Many .condition.type values are consistent across resources
+                          like Available, but because arbitrary conditions can be useful
+                          (see .node.status.conditions), the ability to deconflict is
+                          important.
+                        type: string
+                    required:
+                    - lastTransitionTime
+                    - status
+                    - type
+                    type: object
+                  type: array
+                observedGeneration:
+                  description: ObservedGeneration is the latest generation observed
+                    by the controller.
+                  format: int64
+                  type: integer
+                variables:
+                  description: Variables is a list of ClusterClassStatusVariable that
+                    are defined for the ClusterClass.
+                  items:
+                    description: ClusterClassStatusVariable defines a variable which
+                      appears in the status of a ClusterClass.
+                    properties:
+                      definitions:
+                        description: Definitions is a list of definitions for a variable.
+                        items:
+                          description: ClusterClassStatusVariableDefinition defines
+                            a variable which appears in the status of a ClusterClass.
+                          properties:
+                            from:
+                              description: From specifies the origin of the variable
+                                definition. This will be `inline` for variables defined
+                                in the ClusterClass or the name of a patch defined in
+                                the ClusterClass for variables discovered from a DiscoverVariables
+                                runtime extensions.
+                              type: string
+                            required:
+                              description: 'Required specifies if the variable is required.
+                                Note: this applies to the variable as a whole and thus
+                                the top-level object defined in the schema. If nested
+                                fields are required, this will be specified inside the
+                                schema.'
+                              type: boolean
+                            schema:
+                              description: Schema defines the schema of the variable.
+                              properties:
+                                openAPIV3Schema:
+                                  description: OpenAPIV3Schema defines the schema of
+                                    a variable via OpenAPI v3 schema. The schema is
+                                    a subset of the schema used in Kubernetes CRDs.
+                                  properties:
+                                    additionalProperties:
+                                      description: 'AdditionalProperties specifies the
+                                        schema of values in a map (keys are always strings).
+                                        NOTE: Can only be set if type is object. NOTE:
+                                        AdditionalProperties is mutually exclusive with
+                                        Properties. NOTE: This field uses PreserveUnknownFields
+                                        and Schemaless, because recursive validation
+                                        is not possible.'
+                                      x-kubernetes-preserve-unknown-fields: true
+                                    default:
+                                      description: 'Default is the default value of
+                                        the variable. NOTE: Can be set for all types.'
+                                      x-kubernetes-preserve-unknown-fields: true
+                                    description:
+                                      description: Description is a human-readable description
+                                        of this variable.
+                                      type: string
+                                    enum:
+                                      description: 'Enum is the list of valid values
+                                        of the variable. NOTE: Can be set for all types.'
+                                      items:
+                                        x-kubernetes-preserve-unknown-fields: true
+                                      type: array
+                                    example:
+                                      description: Example is an example for this variable.
+                                      x-kubernetes-preserve-unknown-fields: true
+                                    exclusiveMaximum:
+                                      description: 'ExclusiveMaximum specifies if the
+                                        Maximum is exclusive. NOTE: Can only be set
+                                        if type is integer or number.'
+                                      type: boolean
+                                    exclusiveMinimum:
+                                      description: 'ExclusiveMinimum specifies if the
+                                        Minimum is exclusive. NOTE: Can only be set
+                                        if type is integer or number.'
+                                      type: boolean
+                                    format:
+                                      description: 'Format is an OpenAPI v3 format string.
+                                        Unknown formats are ignored. For a list of supported
+                                        formats please see: (of the k8s.io/apiextensions-apiserver
+                                        version we''re currently using) https://github.com/kubernetes/apiextensions-apiserver/blob/master/pkg/apiserver/validation/formats.go
+                                        NOTE: Can only be set if type is string.'
+                                      type: string
+                                    items:
+                                      description: 'Items specifies fields of an array.
+                                        NOTE: Can only be set if type is array. NOTE:
+                                        This field uses PreserveUnknownFields and Schemaless,
+                                        because recursive validation is not possible.'
+                                      x-kubernetes-preserve-unknown-fields: true
+                                    maxItems:
+                                      description: 'MaxItems is the max length of an
+                                        array variable. NOTE: Can only be set if type
+                                        is array.'
+                                      format: int64
+                                      type: integer
+                                    maxLength:
+                                      description: 'MaxLength is the max length of a
+                                        string variable. NOTE: Can only be set if type
+                                        is string.'
+                                      format: int64
+                                      type: integer
+                                    maximum:
+                                      description: 'Maximum is the maximum of an integer
+                                        or number variable. If ExclusiveMaximum is false,
+                                        the variable is valid if it is lower than, or
+                                        equal to, the value of Maximum. If ExclusiveMaximum
+                                        is true, the variable is valid if it is strictly
+                                        lower than the value of Maximum. NOTE: Can only
+                                        be set if type is integer or number.'
+                                      format: int64
+                                      type: integer
+                                    minItems:
+                                      description: 'MinItems is the min length of an
+                                        array variable. NOTE: Can only be set if type
+                                        is array.'
+                                      format: int64
+                                      type: integer
+                                    minLength:
+                                      description: 'MinLength is the min length of a
+                                        string variable. NOTE: Can only be set if type
+                                        is string.'
+                                      format: int64
+                                      type: integer
+                                    minimum:
+                                      description: 'Minimum is the minimum of an integer
+                                        or number variable. If ExclusiveMinimum is false,
+                                        the variable is valid if it is greater than,
+                                        or equal to, the value of Minimum. If ExclusiveMinimum
+                                        is true, the variable is valid if it is strictly
+                                        greater than the value of Minimum. NOTE: Can
+                                        only be set if type is integer or number.'
+                                      format: int64
+                                      type: integer
+                                    pattern:
+                                      description: 'Pattern is the regex which a string
+                                        variable must match. NOTE: Can only be set if
+                                        type is string.'
+                                      type: string
+                                    properties:
+                                      description: 'Properties specifies fields of an
+                                        object. NOTE: Can only be set if type is object.
+                                        NOTE: Properties is mutually exclusive with
+                                        AdditionalProperties. NOTE: This field uses
+                                        PreserveUnknownFields and Schemaless, because
+                                        recursive validation is not possible.'
+                                      x-kubernetes-preserve-unknown-fields: true
+                                    required:
+                                      description: 'Required specifies which fields
+                                        of an object are required. NOTE: Can only be
+                                        set if type is object.'
+                                      items:
+                                        type: string
+                                      type: array
+                                    type:
+                                      description: 'Type is the type of the variable.
+                                        Valid values are: object, array, string, integer,
+                                        number or boolean.'
+                                      type: string
+                                    uniqueItems:
+                                      description: 'UniqueItems specifies if items in
+                                        an array must be unique. NOTE: Can only be set
+                                        if type is array.'
+                                      type: boolean
+                                    x-kubernetes-preserve-unknown-fields:
+                                      description: XPreserveUnknownFields allows setting
+                                        fields in a variable object which are not defined
+                                        in the variable schema. This affects fields
+                                        recursively, except if nested properties or
+                                        additionalProperties are specified in the schema.
+                                      type: boolean
+                                  required:
+                                  - type
+                                  type: object
+                              required:
+                              - openAPIV3Schema
+                              type: object
+                          required:
+                          - from
+                          - required
+                          - schema
+                          type: object
+                        type: array
+                      definitionsConflict:
+                        description: DefinitionsConflict specifies whether or not there
+                          are conflicting definitions for a single variable name.
+                        type: boolean
+                      name:
+                        description: Name is the name of the variable.
+                        type: string
+                    required:
+                    - definitions
+                    - name
+                    type: object
+                  type: array
+              type: object
           type: object
       served: true
       storage: true
-      subresources: {}
+      subresources:
+        status: {}
 ---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.9.1
+    controller-gen.kubebuilder.io/version: v0.11.3
   creationTimestamp: null
   name: clusters.cluster.x-k8s.io
 spec:
@@ -2320,7 +2723,8 @@ spec:
       name: v1alpha4
       schema:
         openAPIV3Schema:
-          description: Cluster is the Schema for the clusters API.
+          description: "Cluster is the Schema for the clusters API. \n Deprecated: This
+            type will be removed in one of the next releases."
           properties:
             apiVersion:
               description: 'APIVersion defines the versioned schema of this representation
@@ -2869,13 +3273,126 @@ spec:
                     controlPlane:
                       description: ControlPlane describes the cluster control plane.
                       properties:
+                        machineHealthCheck:
+                          description: MachineHealthCheck allows to enable, disable
+                            and override the MachineHealthCheck configuration in the
+                            ClusterClass for this control plane.
+                          properties:
+                            enable:
+                              description: "Enable controls if a MachineHealthCheck
+                                should be created for the target machines. \n If false:
+                                No MachineHealthCheck will be created. \n If not set(default):
+                                A MachineHealthCheck will be created if it is defined
+                                here or in the associated ClusterClass. If no MachineHealthCheck
+                                is defined then none will be created. \n If true: A
+                                MachineHealthCheck is guaranteed to be created. Cluster
+                                validation will block if `enable` is true and no MachineHealthCheck
+                                definition is available."
+                              type: boolean
+                            maxUnhealthy:
+                              anyOf:
+                              - type: integer
+                              - type: string
+                              description: Any further remediation is only allowed if
+                                at most "MaxUnhealthy" machines selected by "selector"
+                                are not healthy.
+                              x-kubernetes-int-or-string: true
+                            nodeStartupTimeout:
+                              description: Machines older than this duration without
+                                a node will be considered to have failed and will be
+                                remediated. If you wish to disable this feature, set
+                                the value explicitly to 0.
+                              type: string
+                            remediationTemplate:
+                              description: "RemediationTemplate is a reference to a
+                                remediation template provided by an infrastructure provider.
+                                \n This field is completely optional, when filled, the
+                                MachineHealthCheck controller creates a new object from
+                                the template referenced and hands off remediation of
+                                the machine to a controller that lives outside of Cluster
+                                API."
+                              properties:
+                                apiVersion:
+                                  description: API version of the referent.
+                                  type: string
+                                fieldPath:
+                                  description: 'If referring to a piece of an object
+                                    instead of an entire object, this string should
+                                    contain a valid JSON/Go field access statement,
+                                    such as desiredState.manifest.containers[2]. For
+                                    example, if the object reference is to a container
+                                    within a pod, this would take on a value like: "spec.containers{name}"
+                                    (where "name" refers to the name of the container
+                                    that triggered the event) or if no container name
+                                    is specified "spec.containers[2]" (container with
+                                    index 2 in this pod). This syntax is chosen only
+                                    to have some well-defined way of referencing a part
+                                    of an object. TODO: this design is not final and
+                                    this field is subject to change in the future.'
+                                  type: string
+                                kind:
+                                  description: 'Kind of the referent. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+                                  type: string
+                                name:
+                                  description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
+                                  type: string
+                                namespace:
+                                  description: 'Namespace of the referent. More info:
+                                    https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/'
+                                  type: string
+                                resourceVersion:
+                                  description: 'Specific resourceVersion to which this
+                                    reference is made, if any. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency'
+                                  type: string
+                                uid:
+                                  description: 'UID of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids'
+                                  type: string
+                              type: object
+                              x-kubernetes-map-type: atomic
+                            unhealthyConditions:
+                              description: UnhealthyConditions contains a list of the
+                                conditions that determine whether a node is considered
+                                unhealthy. The conditions are combined in a logical
+                                OR, i.e. if any of the conditions is met, the node is
+                                unhealthy.
+                              items:
+                                description: UnhealthyCondition represents a Node condition
+                                  type and value with a timeout specified as a duration.  When
+                                  the named condition has been in the given status for
+                                  at least the timeout value, a node is considered unhealthy.
+                                properties:
+                                  status:
+                                    minLength: 1
+                                    type: string
+                                  timeout:
+                                    type: string
+                                  type:
+                                    minLength: 1
+                                    type: string
+                                required:
+                                - status
+                                - timeout
+                                - type
+                                type: object
+                              type: array
+                            unhealthyRange:
+                              description: 'Any further remediation is only allowed
+                                if the number of machines selected by "selector" as
+                                not healthy is within the range of "UnhealthyRange".
+                                Takes precedence over MaxUnhealthy. Eg. "[3-5]" - This
+                                means that remediation will be allowed only when: (a)
+                                there are at least 3 unhealthy machines (and) (b) there
+                                are at most 5 unhealthy machines'
+                              pattern: ^\[[0-9]+-[0-9]+\]$
+                              type: string
+                          type: object
                         metadata:
-                          description: "Metadata is the metadata applied to the machines
-                          of the ControlPlane. At runtime this metadata is merged
-                          with the corresponding metadata from the ClusterClass. \n
-                          This field is supported if and only if the control plane
-                          provider template referenced in the ClusterClass is Machine
-                          based."
+                          description: Metadata is the metadata applied to the ControlPlane
+                            and the Machines of the ControlPlane if the ControlPlaneTemplate
+                            referenced by the ClusterClass is machine based. If not,
+                            it is applied only to the ControlPlane. At runtime this
+                            metadata is merged with the corresponding metadata from
+                            the ClusterClass.
                           properties:
                             annotations:
                               additionalProperties:
@@ -2895,12 +3412,24 @@ spec:
                               More info: http://kubernetes.io/docs/user-guide/labels'
                               type: object
                           type: object
+                        nodeDeletionTimeout:
+                          description: NodeDeletionTimeout defines how long the controller
+                            will attempt to delete the Node that the Machine hosts after
+                            the Machine is marked for deletion. A duration of 0 will
+                            retry deletion indefinitely. Defaults to 10 seconds.
+                          type: string
                         nodeDrainTimeout:
                           description: 'NodeDrainTimeout is the total amount of time
                           that the controller will spend on draining a node. The default
                           value is 0, meaning that the node can be drained without
                           any time limitations. NOTE: NodeDrainTimeout is different
                           from `kubectl drain --timeout`'
+                          type: string
+                        nodeVolumeDetachTimeout:
+                          description: NodeVolumeDetachTimeout is the total amount of
+                            time that the controller will spend on waiting for all volumes
+                            to be detached. The default value is 0, meaning that the
+                            volumes can be detached without any time limitations.
                           type: string
                         replicas:
                           description: Replicas is the number of control plane nodes.
@@ -2913,9 +3442,10 @@ spec:
                           type: integer
                       type: object
                     rolloutAfter:
-                      description: RolloutAfter performs a rollout of the entire cluster
+                      description: 'RolloutAfter performs a rollout of the entire cluster
                         one component at a time, control plane first and then machine
-                        deployments.
+                        deployments. Deprecated: This field has no function and is going
+                        to be removed in the next apiVersion.'
                       format: date-time
                       type: string
                     variables:
@@ -2924,9 +3454,18 @@ spec:
                         defined in the ClusterClass.
                       items:
                         description: ClusterVariable can be used to customize the Cluster
-                          through patches. It must comply to the corresponding ClusterClassVariable
-                          defined in the ClusterClass.
+                          through patches. Each ClusterVariable is associated with a
+                          Variable definition in the ClusterClass `status` variables.
                         properties:
+                          definitionFrom:
+                            description: 'DefinitionFrom specifies where the definition
+                              of this Variable is from. DefinitionFrom is `inline` when
+                              the definition is from the ClusterClass `.spec.variables`
+                              or the name of a patch defined in the ClusterClass `.spec.patches`
+                              where the patch is external and provides external variables.
+                              This field is mandatory if the variable has `DefinitionsConflict:
+                              true` in ClusterClass `status.variables[]`'
+                            type: string
                           name:
                             description: Name of the variable.
                             type: string
@@ -2972,11 +3511,133 @@ spec:
                                   machines will be created in. Must match a key in the
                                   FailureDomains map stored on the cluster object.
                                 type: string
+                              machineHealthCheck:
+                                description: MachineHealthCheck allows to enable, disable
+                                  and override the MachineHealthCheck configuration
+                                  in the ClusterClass for this MachineDeployment.
+                                properties:
+                                  enable:
+                                    description: "Enable controls if a MachineHealthCheck
+                                      should be created for the target machines. \n
+                                      If false: No MachineHealthCheck will be created.
+                                      \n If not set(default): A MachineHealthCheck will
+                                      be created if it is defined here or in the associated
+                                      ClusterClass. If no MachineHealthCheck is defined
+                                      then none will be created. \n If true: A MachineHealthCheck
+                                      is guaranteed to be created. Cluster validation
+                                      will block if `enable` is true and no MachineHealthCheck
+                                      definition is available."
+                                    type: boolean
+                                  maxUnhealthy:
+                                    anyOf:
+                                    - type: integer
+                                    - type: string
+                                    description: Any further remediation is only allowed
+                                      if at most "MaxUnhealthy" machines selected by
+                                      "selector" are not healthy.
+                                    x-kubernetes-int-or-string: true
+                                  nodeStartupTimeout:
+                                    description: Machines older than this duration without
+                                      a node will be considered to have failed and will
+                                      be remediated. If you wish to disable this feature,
+                                      set the value explicitly to 0.
+                                    type: string
+                                  remediationTemplate:
+                                    description: "RemediationTemplate is a reference
+                                      to a remediation template provided by an infrastructure
+                                      provider. \n This field is completely optional,
+                                      when filled, the MachineHealthCheck controller
+                                      creates a new object from the template referenced
+                                      and hands off remediation of the machine to a
+                                      controller that lives outside of Cluster API."
+                                    properties:
+                                      apiVersion:
+                                        description: API version of the referent.
+                                        type: string
+                                      fieldPath:
+                                        description: 'If referring to a piece of an
+                                          object instead of an entire object, this string
+                                          should contain a valid JSON/Go field access
+                                          statement, such as desiredState.manifest.containers[2].
+                                          For example, if the object reference is to
+                                          a container within a pod, this would take
+                                          on a value like: "spec.containers{name}" (where
+                                          "name" refers to the name of the container
+                                          that triggered the event) or if no container
+                                          name is specified "spec.containers[2]" (container
+                                          with index 2 in this pod). This syntax is
+                                          chosen only to have some well-defined way
+                                          of referencing a part of an object. TODO:
+                                          this design is not final and this field is
+                                          subject to change in the future.'
+                                        type: string
+                                      kind:
+                                        description: 'Kind of the referent. More info:
+                                          https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+                                        type: string
+                                      name:
+                                        description: 'Name of the referent. More info:
+                                          https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
+                                        type: string
+                                      namespace:
+                                        description: 'Namespace of the referent. More
+                                          info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/'
+                                        type: string
+                                      resourceVersion:
+                                        description: 'Specific resourceVersion to which
+                                          this reference is made, if any. More info:
+                                          https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency'
+                                        type: string
+                                      uid:
+                                        description: 'UID of the referent. More info:
+                                          https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids'
+                                        type: string
+                                    type: object
+                                    x-kubernetes-map-type: atomic
+                                  unhealthyConditions:
+                                    description: UnhealthyConditions contains a list
+                                      of the conditions that determine whether a node
+                                      is considered unhealthy. The conditions are combined
+                                      in a logical OR, i.e. if any of the conditions
+                                      is met, the node is unhealthy.
+                                    items:
+                                      description: UnhealthyCondition represents a Node
+                                        condition type and value with a timeout specified
+                                        as a duration.  When the named condition has
+                                        been in the given status for at least the timeout
+                                        value, a node is considered unhealthy.
+                                      properties:
+                                        status:
+                                          minLength: 1
+                                          type: string
+                                        timeout:
+                                          type: string
+                                        type:
+                                          minLength: 1
+                                          type: string
+                                      required:
+                                      - status
+                                      - timeout
+                                      - type
+                                      type: object
+                                    type: array
+                                  unhealthyRange:
+                                    description: 'Any further remediation is only allowed
+                                      if the number of machines selected by "selector"
+                                      as not healthy is within the range of "UnhealthyRange".
+                                      Takes precedence over MaxUnhealthy. Eg. "[3-5]"
+                                      - This means that remediation will be allowed
+                                      only when: (a) there are at least 3 unhealthy
+                                      machines (and) (b) there are at most 5 unhealthy
+                                      machines'
+                                    pattern: ^\[[0-9]+-[0-9]+\]$
+                                    type: string
+                                type: object
                               metadata:
-                                description: Metadata is the metadata applied to the
-                                  machines of the MachineDeployment. At runtime this
-                                  metadata is merged with the corresponding metadata
-                                  from the ClusterClass.
+                                description:  Metadata is the metadata applied to the
+                                  MachineDeployment and the machines of the MachineDeployment.
+                                  At runtime this metadata is merged with the corresponding
+                                  metadata from the ClusterClass.
                                 properties:
                                   annotations:
                                     additionalProperties:
@@ -2996,6 +3657,12 @@ spec:
                                     controllers and services. More info: http://kubernetes.io/docs/user-guide/labels'
                                     type: object
                                 type: object
+                              minReadySeconds:
+                                description: Minimum number of seconds for which a newly
+                                  created machine should be ready. Defaults to 0 (machine
+                                  will be considered available as soon as it is ready)
+                                format: int32
+                                type: integer
                               name:
                                 description: Name is the unique identifier for this
                                   MachineDeploymentTopology. The value is used with
@@ -3003,6 +3670,13 @@ spec:
                                   Name (e.g. cluster's name, etc). In case the name
                                   is greater than the allowed maximum length, the values
                                   are hashed together.
+                                type: string
+                              nodeDeletionTimeout:
+                                description: NodeDeletionTimeout defines how long the
+                                  controller will attempt to delete the Node that the
+                                  Machine hosts after the Machine is marked for deletion.
+                                  A duration of 0 will retry deletion indefinitely.
+                                  Defaults to 10 seconds.
                                 type: string
                               nodeDrainTimeout:
                                 description: 'NodeDrainTimeout is the total amount of
@@ -3012,15 +3686,90 @@ spec:
                                 NodeDrainTimeout is different from `kubectl drain
                                 --timeout`'
                                 type: string
+                              nodeVolumeDetachTimeout:
+                                description: NodeVolumeDetachTimeout is the total amount
+                                  of time that the controller will spend on waiting
+                                  for all volumes to be detached. The default value
+                                  is 0, meaning that the volumes can be detached without
+                                  any time limitations.
+                                type: string
                               replicas:
                                 description: Replicas is the number of worker nodes
                                   belonging to this set. If the value is nil, the MachineDeployment
                                   is created without the number of Replicas (defaulting
-                                  to zero) and it's assumed that an external entity
-                                  (like cluster autoscaler) is responsible for the management
-                                  of this value.
+                                  to 1) and it's assumed that an external entity (like
+                                  cluster autoscaler) is responsible for the management
                                 format: int32
                                 type: integer
+                              strategy:
+                                description: The deployment strategy to use to replace
+                                  existing machines with new ones.
+                                properties:
+                                  rollingUpdate:
+                                    description: Rolling update config params. Present
+                                      only if MachineDeploymentStrategyType = RollingUpdate.
+                                    properties:
+                                      deletePolicy:
+                                        description: DeletePolicy defines the policy
+                                          used by the MachineDeployment to identify
+                                          nodes to delete when downscaling. Valid values
+                                          are "Random, "Newest", "Oldest" When no value
+                                          is supplied, the default DeletePolicy of MachineSet
+                                          is used
+                                        enum:
+                                        - Random
+                                        - Newest
+                                        - Oldest
+                                        type: string
+                                      maxSurge:
+                                        anyOf:
+                                        - type: integer
+                                        - type: string
+                                        description: 'The maximum number of machines
+                                          that can be scheduled above the desired number
+                                          of machines. Value can be an absolute number
+                                          (ex: 5) or a percentage of desired machines
+                                          (ex: 10%). This can not be 0 if MaxUnavailable
+                                          is 0. Absolute number is calculated from percentage
+                                          by rounding up. Defaults to 1. Example: when
+                                          this is set to 30%, the new MachineSet can
+                                          be scaled up immediately when the rolling
+                                          update starts, such that the total number
+                                          of old and new machines do not exceed 130%
+                                          of desired machines. Once old machines have
+                                          been killed, new MachineSet can be scaled
+                                          up further, ensuring that total number of
+                                          machines running at any time during the update
+                                          is at most 130% of desired machines.'
+                                        x-kubernetes-int-or-string: true
+                                      maxUnavailable:
+                                        anyOf:
+                                        - type: integer
+                                        - type: string
+                                        description: 'The maximum number of machines
+                                          that can be unavailable during the update.
+                                          Value can be an absolute number (ex: 5) or
+                                          a percentage of desired machines (ex: 10%).
+                                          Absolute number is calculated from percentage
+                                          by rounding down. This can not be 0 if MaxSurge
+                                          is 0. Defaults to 0. Example: when this is
+                                          set to 30%, the old MachineSet can be scaled
+                                          down to 70% of desired machines immediately
+                                          when the rolling update starts. Once new machines
+                                          are ready, old MachineSet can be scaled down
+                                          further, followed by scaling up the new MachineSet,
+                                          ensuring that the total number of machines
+                                          available at all times during the update is
+                                          at least 70% of desired machines.'
+                                        x-kubernetes-int-or-string: true
+                                    type: object
+                                  type:
+                                    description: Type of deployment. Default is RollingUpdate.
+                                    enum:
+                                    - RollingUpdate
+                                    - OnDelete
+                                    type: string
+                                type: object
                               variables:
                                 description: Variables can be used to customize the
                                   MachineDeployment through patches.
@@ -3030,10 +3779,21 @@ spec:
                                       level variables.
                                     items:
                                       description: ClusterVariable can be used to customize
-                                        the Cluster through patches. It must comply
-                                        to the corresponding ClusterClassVariable defined
-                                        in the ClusterClass.
+                                        the Cluster through patches. Each ClusterVariable
+                                        is associated with a Variable definition in
+                                        the ClusterClass `status` variables.
                                       properties:
+                                        definitionFrom:
+                                          description: 'DefinitionFrom specifies where
+                                            the definition of this Variable is from.
+                                            DefinitionFrom is `inline` when the definition
+                                            is from the ClusterClass `.spec.variables`
+                                            or the name of a patch defined in the ClusterClass
+                                            `.spec.patches` where the patch is external
+                                            and provides external variables. This field
+                                            is mandatory if the variable has `DefinitionsConflict:
+                                            true` in ClusterClass `status.variables[]`'
+                                          type: string
                                         name:
                                           description: Name of the variable.
                                           type: string
@@ -3170,7 +3930,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.9.1
+    controller-gen.kubebuilder.io/version: v0.11.3
   creationTimestamp: null
   name: machinedeployments.cluster.x-k8s.io
 spec:
@@ -3211,7 +3971,8 @@ spec:
       name: v1alpha3
       schema:
         openAPIV3Schema:
-          description: MachineDeployment is the Schema for the machinedeployments API.
+          description: "MachineDeployment is the Schema for the machinedeployments API.
+            \n Deprecated: This type will be removed in one of the next releases."
           properties:
             apiVersion:
               description: 'APIVersion defines the versioned schema of this representation
@@ -3710,7 +4471,8 @@ spec:
       name: v1alpha4
       schema:
         openAPIV3Schema:
-          description: MachineDeployment is the Schema for the machinedeployments API.
+          description: "MachineDeployment is the Schema for the machinedeployments API.
+            \n Deprecated: This type will be removed in one of the next releases."
           properties:
             apiVersion:
               description: 'APIVersion defines the versioned schema of this representation
@@ -4221,9 +4983,22 @@ spec:
                   format: int32
                   type: integer
                 replicas:
-                  default: 1
-                  description: Number of desired machines. Defaults to 1. This is a
-                    pointer to distinguish between explicit zero and not specified.
+                  description: "Number of desired machines. This is a pointer to distinguish
+                    between explicit zero and not specified. \n Defaults to: * if the
+                    Kubernetes autoscaler min size and max size annotations are set:
+                    - if it's a new MachineDeployment, use min size - if the replicas
+                    field of the old MachineDeployment is < min size, use min size -
+                    if the replicas field of the old MachineDeployment is > max size,
+                    use max size - if the replicas field of the old MachineDeployment
+                    is in the (min size, max size) range, keep the value from the oldMD
+                    * otherwise use 1 Note: Defaulting will be run whenever the replicas
+                    field is not set: * A new MachineDeployment is created with replicas
+                    not set. * On an existing MachineDeployment the replicas field was
+                    first set and is now unset. Those cases are especially relevant
+                    for the following Kubernetes autoscaler use cases: * A new MachineDeployment
+                    is created and replicas should be managed by the autoscaler * An
+                    existing MachineDeployment which initially wasn't controlled by
+                    the autoscaler should be later controlled by the autoscaler"
                   format: int32
                   type: integer
                 revisionHistoryLimit:
@@ -4232,6 +5007,14 @@ spec:
                     Defaults to 1.
                   format: int32
                   type: integer
+                rolloutAfter:
+                  description: 'RolloutAfter is a field to indicate a rollout should
+                    be performed after the specified time even if no changes have been
+                    made to the MachineDeployment. Example: In the YAML the time can
+                    be specified in the RFC3339 format. To specify the rolloutAfter
+                    target as March 9, 2023, at 9 am UTC use "2023-03-09T09:00:00Z".'
+                  format: date-time
+                  type: string
                 selector:
                   description: Label selector for machines. Existing MachineSets whose
                     machines are selected by this will be the ones affected by this
@@ -4483,6 +5266,12 @@ spec:
                           any time limitations. NOTE: NodeDrainTimeout is different
                           from `kubectl drain --timeout`'
                           type: string
+                        nodeVolumeDetachTimeout:
+                          description: NodeVolumeDetachTimeout is the total amount of
+                            time that the controller will spend on waiting for all volumes
+                            to be detached. The default value is 0, meaning that the
+                            volumes can be detached without any time limitations.
+                          type: string
                         providerID:
                           description: ProviderID is the identification ID of the machine
                             provided by the provider. This field must match the provider
@@ -4620,7 +5409,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.9.1
+    controller-gen.kubebuilder.io/version: v0.11.3
   creationTimestamp: null
   name: machinehealthchecks.cluster.x-k8s.io
 spec:
@@ -4653,8 +5442,8 @@ spec:
       name: v1alpha3
       schema:
         openAPIV3Schema:
-          description: MachineHealthCheck is the Schema for the machinehealthchecks
-            API.
+          description: "MachineHealthCheck is the Schema for the machinehealthchecks
+            API. \n Deprecated: This type will be removed in one of the next releases."
           properties:
             apiVersion:
               description: 'APIVersion defines the versioned schema of this representation
@@ -4913,8 +5702,8 @@ spec:
       name: v1alpha4
       schema:
         openAPIV3Schema:
-          description: MachineHealthCheck is the Schema for the machinehealthchecks
-            API.
+          description: "MachineHealthCheck is the Schema for the machinehealthchecks
+            API. \n Deprecated: This type will be removed in one of the next releases."
           properties:
             apiVersion:
               description: 'APIVersion defines the versioned schema of this representation
@@ -5437,7 +6226,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.9.1
+    controller-gen.kubebuilder.io/version: v0.11.3
   creationTimestamp: null
   name: machinepools.cluster.x-k8s.io
 spec:
@@ -5470,7 +6259,8 @@ spec:
       name: v1alpha3
       schema:
         openAPIV3Schema:
-          description: MachinePool is the Schema for the machinepools API.
+          description: "MachinePool is the Schema for the machinepools API. \n Deprecated:
+            This type will be removed in one of the next releases."
           properties:
             apiVersion:
               description: 'APIVersion defines the versioned schema of this representation
@@ -5902,31 +6692,31 @@ spec:
                   description: NodeRefs will point to the corresponding Nodes if it
                     they exist.
                   items:
-                    description: 'ObjectReference contains enough information to let
-                    you inspect or modify the referred object. --- New uses of this
-                    type are discouraged because of difficulty describing its usage
-                    when embedded in APIs. 1. Ignored fields.  It includes many fields
-                    which are not generally honored.  For instance, ResourceVersion
-                    and FieldPath are both very rarely valid in actual usage. 2. Invalid
-                    usage help.  It is impossible to add specific help for individual
-                    usage.  In most embedded usages, there are particular restrictions
-                    like, "must refer only to types A and B" or "UID not honored"
-                    or "name must be restricted". Those cannot be well described when
-                    embedded. 3. Inconsistent validation.  Because the usages are
-                    different, the validation rules are different by usage, which
-                    makes it hard for users to predict what will happen. 4. The fields
-                    are both imprecise and overly precise.  Kind is not a precise
-                    mapping to a URL. This can produce ambiguity during interpretation
-                    and require a REST mapping.  In most cases, the dependency is
-                    on the group,resource tuple and the version of the actual struct
-                    is irrelevant. 5. We cannot easily change it.  Because this type
-                    is embedded in many locations, updates to this type will affect
-                    numerous schemas.  Don''t make new APIs embed an underspecified
-                    API type they do not control. Instead of using this type, create
-                    a locally provided and used type that is well-focused on your
-                    reference. For example, ServiceReferences for admission registration:
-                    https://github.com/kubernetes/api/blob/release-1.17/admissionregistration/v1/types.go#L533
-                    .'
+                    description:  "ObjectReference contains enough information to let
+                      you inspect or modify the referred object. --- New uses of this
+                      type are discouraged because of difficulty describing its usage
+                      when embedded in APIs. 1. Ignored fields.  It includes many fields
+                      which are not generally honored.  For instance, ResourceVersion
+                      and FieldPath are both very rarely valid in actual usage. 2. Invalid
+                      usage help.  It is impossible to add specific help for individual
+                      usage.  In most embedded usages, there are particular restrictions
+                      like, \"must refer only to types A and B\" or \"UID not honored\"
+                      or \"name must be restricted\". Those cannot be well described
+                      when embedded. 3. Inconsistent validation.  Because the usages
+                      are different, the validation rules are different by usage, which
+                      makes it hard for users to predict what will happen. 4. The fields
+                      are both imprecise and overly precise.  Kind is not a precise
+                      mapping to a URL. This can produce ambiguity during interpretation
+                      and require a REST mapping.  In most cases, the dependency is
+                      on the group,resource tuple and the version of the actual struct
+                      is irrelevant. 5. We cannot easily change it.  Because this type
+                      is embedded in many locations, updates to this type will affect
+                      numerous schemas.  Don't make new APIs embed an underspecified
+                      API type they do not control. \n Instead of using this type, create
+                      a locally provided and used type that is well-focused on your
+                      reference. For example, ServiceReferences for admission registration:
+                      https://github.com/kubernetes/api/blob/release-1.17/admissionregistration/v1/types.go#L533
+                      ."
                     properties:
                       apiVersion:
                         description: API version of the referent.
@@ -6020,7 +6810,8 @@ spec:
       name: v1alpha4
       schema:
         openAPIV3Schema:
-          description: MachinePool is the Schema for the machinepools API.
+          description: "MachinePool is the Schema for the machinepools API. \n Deprecated:
+            This type will be removed in one of the next releases."
           properties:
             apiVersion:
               description: 'APIVersion defines the versioned schema of this representation
@@ -6309,31 +7100,31 @@ spec:
                   description: NodeRefs will point to the corresponding Nodes if it
                     they exist.
                   items:
-                    description: 'ObjectReference contains enough information to let
-                    you inspect or modify the referred object. --- New uses of this
-                    type are discouraged because of difficulty describing its usage
-                    when embedded in APIs. 1. Ignored fields.  It includes many fields
-                    which are not generally honored.  For instance, ResourceVersion
-                    and FieldPath are both very rarely valid in actual usage. 2. Invalid
-                    usage help.  It is impossible to add specific help for individual
-                    usage.  In most embedded usages, there are particular restrictions
-                    like, "must refer only to types A and B" or "UID not honored"
-                    or "name must be restricted". Those cannot be well described when
-                    embedded. 3. Inconsistent validation.  Because the usages are
-                    different, the validation rules are different by usage, which
-                    makes it hard for users to predict what will happen. 4. The fields
-                    are both imprecise and overly precise.  Kind is not a precise
-                    mapping to a URL. This can produce ambiguity during interpretation
-                    and require a REST mapping.  In most cases, the dependency is
-                    on the group,resource tuple and the version of the actual struct
-                    is irrelevant. 5. We cannot easily change it.  Because this type
-                    is embedded in many locations, updates to this type will affect
-                    numerous schemas.  Don''t make new APIs embed an underspecified
-                    API type they do not control. Instead of using this type, create
-                    a locally provided and used type that is well-focused on your
-                    reference. For example, ServiceReferences for admission registration:
-                    https://github.com/kubernetes/api/blob/release-1.17/admissionregistration/v1/types.go#L533
-                    .'
+                    description: "ObjectReference contains enough information to let
+                      you inspect or modify the referred object. --- New uses of this
+                      type are discouraged because of difficulty describing its usage
+                      when embedded in APIs. 1. Ignored fields.  It includes many fields
+                      which are not generally honored.  For instance, ResourceVersion
+                      and FieldPath are both very rarely valid in actual usage. 2. Invalid
+                      usage help.  It is impossible to add specific help for individual
+                      usage.  In most embedded usages, there are particular restrictions
+                      like, \"must refer only to types A and B\" or \"UID not honored\"
+                      or \"name must be restricted\". Those cannot be well described
+                      when embedded. 3. Inconsistent validation.  Because the usages
+                      are different, the validation rules are different by usage, which
+                      makes it hard for users to predict what will happen. 4. The fields
+                      are both imprecise and overly precise.  Kind is not a precise
+                      mapping to a URL. This can produce ambiguity during interpretation
+                      and require a REST mapping.  In most cases, the dependency is
+                      on the group,resource tuple and the version of the actual struct
+                      is irrelevant. 5. We cannot easily change it.  Because this type
+                      is embedded in many locations, updates to this type will affect
+                      numerous schemas.  Don't make new APIs embed an underspecified
+                      API type they do not control. \n Instead of using this type, create
+                      a locally provided and used type that is well-focused on your
+                      reference. For example, ServiceReferences for admission registration:
+                      https://github.com/kubernetes/api/blob/release-1.17/admissionregistration/v1/types.go#L533
+                      ."
                     properties:
                       apiVersion:
                         description: API version of the referent.
@@ -6627,6 +7418,12 @@ spec:
                           any time limitations. NOTE: NodeDrainTimeout is different
                           from `kubectl drain --timeout`'
                           type: string
+                        nodeVolumeDetachTimeout:
+                          description: NodeVolumeDetachTimeout is the total amount of
+                            time that the controller will spend on waiting for all volumes
+                            to be detached. The default value is 0, meaning that the
+                            volumes can be detached without any time limitations.
+                          type: string
                         providerID:
                           description: ProviderID is the identification ID of the machine
                             provided by the provider. This field must match the provider
@@ -6732,7 +7529,7 @@ spec:
                   description: NodeRefs will point to the corresponding Nodes if it
                     they exist.
                   items:
-                    description: 'ObjectReference contains enough information to let
+                    description: "ObjectReference contains enough information to let
                     you inspect or modify the referred object. --- New uses of this
                     type are discouraged because of difficulty describing its usage
                     when embedded in APIs. 1. Ignored fields.  It includes many fields
@@ -6740,10 +7537,10 @@ spec:
                     and FieldPath are both very rarely valid in actual usage. 2. Invalid
                     usage help.  It is impossible to add specific help for individual
                     usage.  In most embedded usages, there are particular restrictions
-                    like, "must refer only to types A and B" or "UID not honored"
-                    or "name must be restricted". Those cannot be well described when
-                    embedded. 3. Inconsistent validation.  Because the usages are
-                    different, the validation rules are different by usage, which
+                    like, \"must refer only to types A and B\" or \"UID not honored\"
+                    or \"name must be restricted\". Those cannot be well described
+                    when embedded. 3. Inconsistent validation.  Because the usages
+                    are different, the validation rules are different by usage, which
                     makes it hard for users to predict what will happen. 4. The fields
                     are both imprecise and overly precise.  Kind is not a precise
                     mapping to a URL. This can produce ambiguity during interpretation
@@ -6751,12 +7548,12 @@ spec:
                     on the group,resource tuple and the version of the actual struct
                     is irrelevant. 5. We cannot easily change it.  Because this type
                     is embedded in many locations, updates to this type will affect
-                    numerous schemas.  Don''t make new APIs embed an underspecified
-                    API type they do not control. Instead of using this type, create
+                    numerous schemas.  Don't make new APIs embed an underspecified
+                    API type they do not control. \n Instead of using this type, create
                     a locally provided and used type that is well-focused on your
                     reference. For example, ServiceReferences for admission registration:
                     https://github.com/kubernetes/api/blob/release-1.17/admissionregistration/v1/types.go#L533
-                    .'
+                    ."
                     properties:
                       apiVersion:
                         description: API version of the referent.
@@ -6834,7 +7631,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.9.1
+    controller-gen.kubebuilder.io/version: v0.11.3
   creationTimestamp: null
   name: machines.cluster.x-k8s.io
 spec:
@@ -6871,7 +7668,8 @@ spec:
       name: v1alpha3
       schema:
         openAPIV3Schema:
-          description: Machine is the Schema for the machines API.
+          description:  "Machine is the Schema for the machines API. \n Deprecated: This
+            type will be removed in one of the next releases."
           properties:
             apiVersion:
               description: 'APIVersion defines the versioned schema of this representation
@@ -7217,7 +8015,8 @@ spec:
       name: v1alpha4
       schema:
         openAPIV3Schema:
-          description: Machine is the Schema for the machines API.
+          description: "Machine is the Schema for the machines API. \n Deprecated: This
+            type will be removed in one of the next releases."
           properties:
             apiVersion:
               description: 'APIVersion defines the versioned schema of this representation
@@ -7338,6 +8137,12 @@ spec:
                   meaning that the node can be drained without any time limitations.
                   NOTE: NodeDrainTimeout is different from `kubectl drain --timeout`'
                   type: string
+                nodeVolumeDetachTimeout:
+                  description: NodeVolumeDetachTimeout is the total amount of time that
+                    the controller will spend on waiting for all volumes to be detached.
+                    The default value is 0, meaning that the volumes can be detached
+                    without any time limitations.
+                  type: string
                 providerID:
                   description: ProviderID is the identification ID of the machine provided
                     by the provider. This field must match the provider ID as seen on
@@ -7377,8 +8182,8 @@ spec:
                         description: The machine address.
                         type: string
                       type:
-                        description: Machine address type, one of Hostname, ExternalIP
-                          or InternalIP.
+                        description: Machine address type, one of Hostname, ExternalIP,
+                          InternalIP, ExternalDNS or InternalDNS.
                         type: string
                     required:
                       - address
@@ -7388,6 +8193,11 @@ spec:
                 bootstrapReady:
                   description: BootstrapReady is the state of the bootstrap provider.
                   type: boolean
+                certificatesExpiryDate:
+                  description: CertificatesExpiryDate is the expiry date of the machine
+                    certificates. This value is only set for control plane machines.
+                  format: date-time
+                  type: string
                 conditions:
                   description: Conditions defines current service state of the Machine.
                   items:
@@ -7737,6 +8547,12 @@ spec:
                   meaning that the node can be drained without any time limitations.
                   NOTE: NodeDrainTimeout is different from `kubectl drain --timeout`'
                   type: string
+                nodeVolumeDetachTimeout:
+                  description: NodeVolumeDetachTimeout is the total amount of time that
+                    the controller will spend on waiting for all volumes to be detached.
+                    The default value is 0, meaning that the volumes can be detached
+                    without any time limitations.
+                  type: string
                 providerID:
                   description: ProviderID is the identification ID of the machine provided
                     by the provider. This field must match the provider ID as seen on
@@ -7776,8 +8592,8 @@ spec:
                         description: The machine address.
                         type: string
                       type:
-                        description: Machine address type, one of Hostname, ExternalIP
-                          or InternalIP.
+                        description: Machine address type, one of Hostname, ExternalIP,
+                          InternalIP, ExternalDNS or InternalDNS.
                         type: string
                     required:
                       - address
@@ -7787,6 +8603,11 @@ spec:
                 bootstrapReady:
                   description: BootstrapReady is the state of the bootstrap provider.
                   type: boolean
+                certificatesExpiryDate:
+                  description: CertificatesExpiryDate is the expiry date of the machine
+                    certificates. This value is only set for control plane machines.
+                  format: date-time
+                  type: string
                 conditions:
                   description: Conditions defines current service state of the Machine.
                   items:
@@ -7981,7 +8802,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.9.1
+    controller-gen.kubebuilder.io/version: v0.11.3
   creationTimestamp: null
   name: machinesets.cluster.x-k8s.io
 spec:
@@ -8013,7 +8834,8 @@ spec:
       name: v1alpha3
       schema:
         openAPIV3Schema:
-          description: MachineSet is the Schema for the machinesets API.
+          description: "MachineSet is the Schema for the machinesets API. \n Deprecated:
+          This type will be removed in one of the next releases."
           properties:
             apiVersion:
               description: 'APIVersion defines the versioned schema of this representation
@@ -8107,7 +8929,7 @@ spec:
                 template:
                   description: Template is the object that describes the machine that
                     will be created if insufficient replicas are detected. Object references
-                    to custom resources resources are treated as templates.
+                    to custom resources are treated as templates.
                   properties:
                     metadata:
                       description: 'Standard object''s metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata'
@@ -8458,7 +9280,8 @@ spec:
       name: v1alpha4
       schema:
         openAPIV3Schema:
-          description: MachineSet is the Schema for the machinesets API.
+          description: "MachineSet is the Schema for the machinesets API. \n Deprecated:
+            This type will be removed in one of the next releases."
           properties:
             apiVersion:
               description: 'APIVersion defines the versioned schema of this representation
@@ -8553,7 +9376,7 @@ spec:
                 template:
                   description: Template is the object that describes the machine that
                     will be created if insufficient replicas are detected. Object references
-                    to custom resources resources are treated as templates.
+                    to custom resources are treated as templates.
                   properties:
                     metadata:
                       description: 'Standard object''s metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata'
@@ -8957,7 +9780,7 @@ spec:
                 template:
                   description: Template is the object that describes the machine that
                     will be created if insufficient replicas are detected. Object references
-                    to custom resources resources are treated as templates.
+                    to custom resources are treated as templates.
                   properties:
                     metadata:
                       description: 'Standard object''s metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata'
@@ -9099,6 +9922,12 @@ spec:
                           value is 0, meaning that the node can be drained without
                           any time limitations. NOTE: NodeDrainTimeout is different
                           from `kubectl drain --timeout`'
+                          type: string
+                        nodeVolumeDetachTimeout:
+                          description: NodeVolumeDetachTimeout is the total amount of
+                            time that the controller will spend on waiting for all volumes
+                            to be detached. The default value is 0, meaning that the
+                            volumes can be detached without any time limitations.
                           type: string
                         providerID:
                           description: ProviderID is the identification ID of the machine
@@ -9245,7 +10074,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.9.1
+    controller-gen.kubebuilder.io/version: v0.11.3
   creationTimestamp: null
   name: ipaddressclaims.ipam.cluster.x-k8s.io
 spec:
@@ -9382,7 +10211,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.9.1
+    controller-gen.kubebuilder.io/version: v0.11.3
   creationTimestamp: null
   name: ipaddresses.ipam.cluster.x-k8s.io
 spec:
@@ -9485,7 +10314,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.9.1
+    controller-gen.kubebuilder.io/version: v0.11.3
   creationTimestamp: null
   name: extensionconfigs.runtime.cluster.x-k8s.io
 spec:
@@ -9621,6 +10450,13 @@ spec:
                         is "In", and the values array contains only "value". The requirements
                         are ANDed.
                       type: object
+                  type: object
+                settings:
+                  additionalProperties:
+                    type: string
+                  description: 'Settings defines key value pairs to be passed to all
+                    calls to all supported RuntimeExtensions. Note: Settings can be
+                    overridden on the ClusterClass.'
                   type: object
               required:
                 - clientConfig
