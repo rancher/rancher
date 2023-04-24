@@ -88,14 +88,18 @@ export AGENT_TAG=${TAG}
 
 echo Running tests
 
-echo Running: build-token-generator
+echo Running build-integration-setup
 ./tests/v2/integration/scripts/build-integration-setup
 
+echo Running integrationsetup
 path=$(pwd)
 export CATTLE_TEST_CONFIG=${path}/config.yaml
 ./tests/v2/integration/bin/integrationsetup
+
+echo Running go tests
 go test -v ./tests/v2/integration/...
 
+echo Running tox tests
 INT_TESTS_STARTED=true
 cd ./tests/integration
 tox -e rancher -- -m "not nonparallel" -n $(nproc)
