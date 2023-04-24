@@ -287,13 +287,13 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlan
 	// otherwise the system-upgrade-controller bundle will never become ready and the planner will be indefinitely blocked.
 	// We do this by determining if any plans have been delivered to any of the nodes. Notably we perform this check after etcd
 	// snapshot restoration can happen, to allow recovery in the event that the cluster has failed.
-	if lowestKubelet != nil && !currentVersion.LessThan(managesystemagent.Kubernetes125) && !lowestKubelet.LessThan(managesystemagent.Kubernetes125) {
+	if lowestKubelet != nil && !currentVersion.LessThan(managesystemagent.Kubernetes125) && lowestKubelet.LessThan(managesystemagent.Kubernetes125) {
 		logrus.Tracef("rkecluster %s/%s: checking for SystemUpgradeController readiness", cp.Namespace, cp.Name)
 		if rke2.SystemUpgradeControllerReady.GetStatus(&status) == "" || rke2.SystemUpgradeControllerReady.IsFalse(&status) || rke2.SystemUpgradeControllerReady.IsUnknown(&status) {
 			if rke2.SystemUpgradeControllerReady.GetReason(&status) != "" {
 				return status, errWaitingf("waiting for system-upgrade-controller helm chart reconciliation: %s", rke2.SystemUpgradeControllerReady.GetReason(&status))
 			}
-			return status, errIgnore("waiting for system-upgrade-controller helm chart reconciliation")
+			return status, errWaiting("waiting for system-upgrade-controller helm chart reconciliation")
 		}
 		if disabled, err := systemUpgradeControllerPSPsDisabled(rke2.SystemUpgradeControllerReady.GetMessage(&status)); err == nil {
 			if !disabled {
