@@ -27,14 +27,14 @@ type AuditTest struct {
 func TestAuditSuite(t *testing.T) {
 	suite.Run(t, new(AuditTest))
 }
-func (a *AuditTest) TestConcealSensitiveData() {
-	r, err := constructKeyConcealRegex()
+func (a *AuditTest) TestRedactSensitiveData() {
+	r, err := constructKeyRedactRegex()
 	a.Require().NoError(err, "failed compiling sanitizing regex")
 	logger := auditLog{
-		log:                nil,
-		writer:             nil,
-		reqBody:            nil,
-		keysToConcealRegex: r,
+		log:               nil,
+		writer:            nil,
+		reqBody:           nil,
+		keysToRedactRegex: r,
 	}
 
 	machineDataInput, machineDataWant := []byte("{"), []byte("{")
@@ -115,8 +115,18 @@ func (a *AuditTest) TestConcealSensitiveData() {
 		},
 		{
 			name:  "Token entry in slice",
-			input: []byte(`[{"accessToken": "fake_access_token", "user": "fake_user"}]`),
-			want:  []byte(fmt.Sprintf(`[{"accessToken": "%s", "user": "fake_user"}]`, redacted)),
+			input: []byte(`{"data":[{"accessToken": "fake_access_token", "user": "fake_user"}]}`),
+			want:  []byte(fmt.Sprintf(`{"data":[{"accessToken": "%s", "user": "fake_user"}]}`, redacted)),
+		},
+		{
+			name:  "Token entry in args slice",
+			input: []byte(`{"data":{"commands":["--user","user","--token","sometoken"]}}`),
+			want:  []byte(fmt.Sprintf(`{"data":{"commands":["--user","user","--token","%s"]}}`, redacted)),
+		},
+		{
+			name:  "Token entry in args slice but is last element of slice",
+			input: []byte(`{"data":{"commands":["--user","user","--token"]}}`),
+			want:  []byte(`{"data":{"commands":["--user","user","--token"]}}`),
 		},
 		{
 			name:  "With public fields",
@@ -126,8 +136,28 @@ func (a *AuditTest) TestConcealSensitiveData() {
 		{
 			name:  "With secret data",
 			input: []byte(`{"type":"Opaque","metadata":{"namespace":"default","name":"my secret"},"_type":"Opaque","data":{"foo":"c3VwZXIgc2VjcmV0IGRhdGE=\\", "bar": "U3VwZXIgU2VjcmV0IERhdGEK"}, "accessToken" : "fake_access_token"}`),
-			want:  []byte(fmt.Sprintf(`{"type":"Opaque","metadata":{"namespace":"default","name":"my secret"},"_type":"Opaque","data":{"foo":"%s", "bar": "%[1]s"}, "accessToken" : "%[1]s"}`, redacted)),
+			want:  []byte(fmt.Sprintf(`{"type":"Opaque","metadata":{"namespace":"default","name":"my secret"},"_type":"Opaque","data":"%s", "accessToken" : "%[1]s"}`, redacted)),
 			uri:   "/secrets",
+		},
+		{
+			name:  "With secret list data",
+			input: []byte(`{"type": "collection", "data":[{"type":"Opaque","metadata":{"namespace":"default","name":"my secret"},"_type":"Opaque","data":{"foo":"c3VwZXIgc2VjcmV0IGRhdGE=\\", "bar": "U3VwZXIgU2VjcmV0IERhdGEK"}},{"type":"Opaque","metadata":{"namespace":"default","name":"my secret2"},"_type":"Opaque","data":{"foo":"c3VwZXIgc2VjcmV0IGRhdGE=\\", "bar": "U3VwZXIgU2VjcmV0IERhdGEK"}}]}`),
+			want:  []byte(fmt.Sprintf(`{"type": "collection", "data":[{"type":"Opaque","metadata":{"namespace":"default","name":"my secret"},"_type":"Opaque","data":"%s"},{"type":"Opaque","metadata":{"namespace":"default","name":"my secret2"},"_type":"Opaque","data":"%[1]s"}]}`, redacted)),
+			uri:   "/v1/secrets",
+		},
+		{
+			// norman transforms some secret subtypes to where their data fields cannot be distinguished from non-sensitive fields.
+			// In this case, all fields aside from id, created, and baseType should be redacted.
+			name:  "With secret list data but no data field for array elements",
+			input: []byte(`{"type": "collection", "data":[{"id":"p-12345:testsecret","baseType":"secret","type":"Opaque","_type":"Opaque","foo":"something","bar":"something","accessToken":"token"}]}`),
+			want:  []byte(fmt.Sprintf(`{"data":[{"_type":"%s","accessToken":"%[1]s","bar":"%[1]s","baseType":"secret","foo":"%[1]s","id":"p-12345:testsecret","type":"%[1]s"}],"type":"collection"}`, redacted)),
+			uri:   "/secrets",
+		},
+		{
+			name:  "With secret list data from k8s proxy",
+			input: []byte(`{"kind": "SecretList", "items":[{"type":"Opaque","metadata":{"namespace":"default","name":"my secret"},"_type":"Opaque","data":{"foo":"c3VwZXIgc2VjcmV0IGRhdGE=\\", "bar": "U3VwZXIgU2VjcmV0IERhdGEK"}}]}`),
+			want:  []byte(fmt.Sprintf(`{"kind": "SecretList", "items":[{"type":"Opaque","metadata":{"namespace":"default","name":"my secret"},"_type":"Opaque","data":"%s"}]}`, redacted)),
+			uri:   "/k8s/clusters/local/api/v1/secrets?limit=500",
 		},
 		{
 			name:  "With secret data and wrong URI",
@@ -145,31 +175,24 @@ func (a *AuditTest) TestConcealSensitiveData() {
 			input: machineDataInput,
 			want:  machineDataWant,
 		},
+		{
+			name:  "With no secret uri but secret base type slice",
+			input: []byte(`{"type":"collection","data":[{"baseType":"namespacedSecret","creatorId":null,"data":{"testfield":"somesecretencodeddata"},"id":"cattle-system:test","kind":"Opaque"}]}`),
+			want:  []byte(fmt.Sprintf(`{"type":"collection","data":[{"baseType":"namespacedSecret","creatorId":null,"data":"%s","id":"cattle-system:test","kind":"Opaque"}]}`, redacted)),
+			uri:   `/v3/project/local:p-12345/namespacedcertificates?limit=-1&sort=name"`,
+		},
 	}
 	for i := range tests {
 		test := tests[i]
 		a.Run(test.name, func() {
-			fmt.Println(string(test.want[0]))
-			fmt.Println(byte('['))
-			if len(test.want) > 0 && test.want[0] == byte('[') {
-				var want []interface{}
-				err := json.Unmarshal(test.want, &want)
-				a.NoError(err, "failed to unmarshal")
-				got := logger.concealSensitiveData(test.uri, test.input)
-				var gotMap []interface{}
-				err = json.Unmarshal(got, &gotMap)
-				a.NoError(err, "failed to unmarshal")
-				a.Equal(want, gotMap, "concealSensitiveData() for slice = %s, want %s", got, test.want)
-				return
-			}
 			var want map[string]interface{}
 			err := json.Unmarshal(test.want, &want)
 			a.NoError(err, "failed to unmarshal")
-			got := logger.concealSensitiveData(test.uri, test.input)
+			got := logger.redactSensitiveData(test.uri, test.input)
 			var gotMap map[string]interface{}
 			err = json.Unmarshal(got, &gotMap)
 			a.NoError(err, "failed to unmarshal")
-			a.Equal(want, gotMap, "concealSensitiveData() for map = %s, want %s", got, test.want)
+			a.Equal(want, gotMap, "redactSensitiveData() for map = %s, want %s", got, test.want)
 		})
 	}
 }
