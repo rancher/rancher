@@ -254,6 +254,10 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlan
 		return status, err
 	}
 
+	if !clusterIsSane(plan) {
+		return status, errIgnoref("rkecluster %s/%s: waiting for at least one control plane, etcd, and worker node to be registered", cp.Namespace, cp.Name)
+	}
+
 	_, clusterSecretTokens, err := p.ensureRKEStateSecret(cp)
 	if err != nil {
 		return status, err
@@ -272,24 +276,30 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlan
 		return status, err
 	}
 
+	lowestKubelet := getLowestMachineKubeletVersion(plan)
+	if lowestKubelet != nil {
+		logrus.Debugf("rkecluster %s/%s: lowest detected Kubelet version for cluster was: %s", cp.Namespace, cp.Name, lowestKubelet.String())
+	}
+
 	// In the case that we're dealing with K8s >= 1.25, ensure that system-upgrade-controller has PodSecurityPolicies disabled.
 	// We need to make sure the cluster has undergone initial provisioning and bootstrapping before we can enforce this condition,
 	// otherwise the system-upgrade-controller bundle will never become ready and the planner will be indefinitely blocked.
 	// We do this by determining if any plans have been delivered to any of the nodes. Notably we perform this check after etcd
 	// snapshot restoration can happen, to allow recovery in the event that the cluster has failed.
-	if anyPlanDelivered(plan, isEtcd) && anyPlanDelivered(plan, isControlPlane) && anyPlanDelivered(plan, isWorker) && !currentVersion.LessThan(managesystemagent.Kubernetes125) {
+	if lowestKubelet != nil && !currentVersion.LessThan(managesystemagent.Kubernetes125) && !lowestKubelet.LessThan(managesystemagent.Kubernetes125) {
+		logrus.Tracef("rkecluster %s/%s: checking for SystemUpgradeController readiness", cp.Namespace, cp.Name)
 		if rke2.SystemUpgradeControllerReady.GetStatus(&status) == "" || rke2.SystemUpgradeControllerReady.IsFalse(&status) || rke2.SystemUpgradeControllerReady.IsUnknown(&status) {
 			if rke2.SystemUpgradeControllerReady.GetReason(&status) != "" {
-				return status, errWaitingf("waiting for system-upgrade-controller helm chart reconciliation: %s", rke2.SystemUpgradeControllerReady.GetReason(&status))
+				return status, errIgnoref("waiting for system-upgrade-controller helm chart reconciliation: %s", rke2.SystemUpgradeControllerReady.GetReason(&status))
 			}
-			return status, errWaiting("waiting for system-upgrade-controller helm chart reconciliation")
+			return status, errIgnore("waiting for system-upgrade-controller helm chart reconciliation")
 		}
 		if disabled, err := systemUpgradeControllerPSPsDisabled(rke2.SystemUpgradeControllerReady.GetMessage(&status)); err == nil {
 			if !disabled {
-				return status, errWaitingf("system-upgrade-controller helm chart has podsecuritypolicy enabled, waiting for helm chart reconciliation")
+				return status, errIgnoref("system-upgrade-controller helm chart has podsecuritypolicy enabled, waiting for helm chart reconciliation")
 			}
 		} else {
-			return status, errWaitingf("error occurred while determining whether SUC PSPs were disabled: %v", err)
+			return status, errIgnoref("error occurred while determining whether SUC PSPs were disabled: %v", err)
 		}
 	}
 
@@ -382,6 +392,36 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlan
 	}
 
 	return status, nil
+}
+
+// getLowestMachineK8sVersion determines the lowest kubelet version in the plan
+func getLowestMachineKubeletVersion(plan *plan.Plan) *semver.Version {
+	var lowestVersion *semver.Version
+	for _, machine := range plan.Machines {
+		if machine.Status.NodeInfo != nil {
+			ver, err := semver.NewVersion(machine.Status.NodeInfo.KubeletVersion)
+			if err != nil {
+				logrus.Errorf("error while parsing node kubelet version (%s): %v", machine.Status.NodeInfo.KubeletVersion, err)
+				continue
+			}
+			if lowestVersion == nil {
+				lowestVersion = ver
+			} else {
+				if ver.LessThan(lowestVersion) {
+					lowestVersion = ver
+				}
+			}
+		}
+	}
+	return lowestVersion
+}
+
+// clusterIsSane ensures that there is at least one controlplane, etcd, and worker node for the cluster.
+func clusterIsSane(plan *plan.Plan) bool {
+	if len(collect(plan, isEtcd)) == 0 || len(collect(plan, isControlPlane)) == 0 || len(collect(plan, isWorker)) == 0 {
+		return false
+	}
+	return true
 }
 
 func systemUpgradeControllerPSPsDisabled(data string) (bool, error) {
