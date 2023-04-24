@@ -247,7 +247,7 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlan
 	}
 
 	if !capiCluster.Status.InfrastructureReady {
-		return status, errWaitingf("rkecluster %s/%s: waiting for infrastructure ready", cp.Namespace, cp.Name)
+		return status, errWaiting("waiting for infrastructure ready")
 	}
 
 	plan, _, err := p.store.Load(capiCluster, cp)
@@ -256,7 +256,7 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlan
 	}
 
 	if !clusterIsSane(plan) {
-		return status, errWaitingf("rkecluster %s/%s: waiting for at least one control plane, etcd, and worker node to be registered", cp.Namespace, cp.Name)
+		return status, errWaiting("waiting for at least one control plane, etcd, and worker node to be registered")
 	}
 
 	_, clusterSecretTokens, err := p.ensureRKEStateSecret(cp)
@@ -297,7 +297,7 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlan
 		}
 		if disabled, err := systemUpgradeControllerPSPsDisabled(rke2.SystemUpgradeControllerReady.GetMessage(&status)); err == nil {
 			if !disabled {
-				return status, errWaitingf("system-upgrade-controller helm chart has podsecuritypolicy enabled, waiting for helm chart reconciliation")
+				return status, errWaiting("system-upgrade-controller helm chart has podsecuritypolicy enabled, waiting for helm chart reconciliation")
 			}
 		} else {
 			return status, errWaitingf("error occurred while determining whether SUC PSPs were disabled: %v", err)
@@ -321,7 +321,7 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlan
 	// In the case where the cluster has been initialized, there is no current init node, and no plans have been
 	// delivered, don't proceed with electing a new init node. The only way out of this is to restore an etcd snapshot.
 	if status.Initialized && !anyPlanDelivered(plan, isEtcd) {
-		return status, errWaitingf("rkecontrolplane %s/%s was already initialized but no etcd machines exist that have plans, indicating the etcd plane has been entirely replaced. Restoration from etcd snapshot is required.", cp.Namespace, cp.Name)
+		return status, errWaiting("rkecontrolplane was already initialized but no etcd machines exist that have plans, indicating the etcd plane has been entirely replaced. Restoration from etcd snapshot is required.")
 	}
 
 	// on the first run through, electInitNode will return a `generic.ErrSkip` as it is attempting to wait for the cache to catch up.
