@@ -39,6 +39,7 @@ func main() {
 		Password: "admin",
 	}
 
+	logrus.Infof("Generating test config...")
 	ipAddress := getOutboundIP()
 	hostURL := fmt.Sprintf("%s:8443", ipAddress.String())
 	token, err := token.GenerateUserToken(user, hostURL)
@@ -60,6 +61,7 @@ func main() {
 
 	config.WriteConfig(rancherClient.ConfigurationFileKey, rancherConfig)
 
+	logrus.Infof("Setting up K3D downstream cluster...")
 	testSession := session.NewSession()
 
 	client, err := rancherClient.NewClient("", testSession)
@@ -85,6 +87,7 @@ func main() {
 	if err != nil {
 		logrus.Fatalf("error updating agent-image setting: %v", err)
 	}
+	logrus.Infof("Updated agent-image setting to %s", agentSetting.Value)
 
 	// docker is sometimes unable to take the xtables lock to set up networking.
 	// See this issue https://github.com/weaveworks/scope/issues/2308 which describes similar symptoms,
