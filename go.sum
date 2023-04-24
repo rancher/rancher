@@ -1355,8 +1355,8 @@ github.com/rancher/dynamiclistener v0.3.5 h1:5TaIHvkDGmZKvc96Huur16zfTKOiLhDtK4S
 github.com/rancher/dynamiclistener v0.3.5/go.mod h1:dW/YF6/m2+uEyJ5VtEcd9THxda599HP6N9dSXk81+k0=
 github.com/rancher/eks-operator v1.2.0 h1:hwM6HBegxC62Am8Og1PLOGtCrDDLXXp5I259rYlUwLI=
 github.com/rancher/eks-operator v1.2.0/go.mod h1:mx3fp0rFzDX7gEXJtisHWDFeDJHpDsAjwDkmbSf1BKs=
-github.com/rancher/fleet/pkg/apis v0.0.0-20230302144315-26bdd9326b02 h1:v7vRsjYVOwfkZ9v6zNWGttHK5j9MaCJ1YKctjRTR10U=
-github.com/rancher/fleet/pkg/apis v0.0.0-20230302144315-26bdd9326b02/go.mod h1:3855TZydHgNlp6aUHW08QqTJIAG3gGU8G6YearJJvc0=
+github.com/rancher/fleet/pkg/apis v0.0.0-20230420151154-ab055fa31e05 h1:dBR/K04EcW2xZ1HPbUqNUHdNyfIO1LEpT1Eo1evKcD8=
+github.com/rancher/fleet/pkg/apis v0.0.0-20230420151154-ab055fa31e05/go.mod h1:TbpjMODeuFUJlHG8IfehZ4FBzgzpxwPwa+GwtFq2Tq0=
 github.com/rancher/gke-operator v1.1.5 h1:XHNrM67enwDkqYG5C4s1HVgfJGmfwtVYGfl9TgXT6zA=
 github.com/rancher/gke-operator v1.1.5/go.mod h1:ZApFZ7iCuyzwX/+aCSdEqkbAPtOYcTH7/BeLoI/Mz9Y=
 github.com/rancher/helm/v3 v3.9.0-rancher1 h1:lqDYFI2AmkDn6Jwzu9A3YKr8EJ34ZmdahREF6lDk2pw=
@@ -1389,8 +1389,8 @@ github.com/rancher/wrangler v0.6.1/go.mod h1:L4HtjPeX8iqLgsxfJgz+JjKMcX2q3qbRXSe
 github.com/rancher/wrangler v0.6.2-0.20200427172034-da9b142ae061/go.mod h1:n5Du/gGD7WoiqnEo0SHnPirDIp1V9Zu+6guc8lXS2dk=
 github.com/rancher/wrangler v0.8.10/go.mod h1:Lte9WjPtGYxYacIWeiS9qawvu2R4NujFU9xuXWJvc/0=
 github.com/rancher/wrangler v0.8.11-0.20220120160420-18c996a8e956/go.mod h1:Lte9WjPtGYxYacIWeiS9qawvu2R4NujFU9xuXWJvc/0=
-github.com/rancher/wrangler v1.1.0 h1:1VWistON261oKmCPF5fOPMWb/YwjgEciO9pCw5Z0mzQ=
-github.com/rancher/wrangler v1.1.0/go.mod h1:lQorqAAIMkNWteece1GiuwZTmMqkaVTXL5qjiiPVDxQ=
+github.com/rancher/wrangler v1.1.1 h1:wmqUwqc2M7ADfXnBCJTFkTB5ZREWpD78rnZMzmxwMvM=
+github.com/rancher/wrangler v1.1.1/go.mod h1:ioVbKupzcBOdzsl55MvEDN0R1wdGggj8iNCYGFI5JvM=
 github.com/rancher/wrangler-api v0.6.1-0.20200427172631-a7c2f09b783e/go.mod h1:2lcWR98q8HU3U4mVETnXc8quNG0uXxrt8vKd6cAa/30=
 github.com/remyoudompheng/bigfft v0.0.0-20170806203942-52369c62f446/go.mod h1:uYEyJGbgTkfkS4+E/PavXkNJcbFIpEtjt2B0KDQ5+9M=
 github.com/rivo/uniseg v0.2.0 h1:S1pD9weZBuJdFmowNwbpi7BJ8TNftyUImj/0WQi72jY=
