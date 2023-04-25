@@ -2,15 +2,16 @@ package planner
 
 import (
 	"fmt"
-	"github.com/Masterminds/semver/v3"
 	"math/rand"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/Masterminds/semver/v3"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
+	"github.com/rancher/rancher/pkg/provisioningv2/image"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -73,6 +74,7 @@ func TestPlanner_addInstruction(t *testing.T) {
 			controlPlane := createTestControlPlane(tt.args.version)
 			entry := createTestPlanEntry(tt.args.os)
 			planner.retrievalFunctions.SystemAgentImage = func() string { return "system-agent" }
+			planner.retrievalFunctions.ImageResolver = image.ResolveWithControlPlane
 			// act
 			p, err := planner.addInstallInstructionWithRestartStamp(plan.NodePlan{}, controlPlane, entry)
 
@@ -356,6 +358,95 @@ func TestPlanner_getLowestMachineKubeletVersion(t *testing.T) {
 			} else {
 				a.Nil(lowestV)
 			}
+		})
+	}
+}
+
+func Test_getInstallerImage(t *testing.T) {
+	tests := []struct {
+		name         string
+		expected     string
+		controlPlane *rkev1.RKEControlPlane
+	}{
+		{
+			name:     "default",
+			expected: "rancher/system-agent-installer-rke2:v1.25.7-rke2r1",
+			controlPlane: &rkev1.RKEControlPlane{
+				Spec: rkev1.RKEControlPlaneSpec{
+					KubernetesVersion: "v1.25.7+rke2r1",
+				},
+			},
+		},
+		{
+			name:     "cluster private registry - machine global",
+			expected: "test.rancher.io/rancher/system-agent-installer-rke2:v1.25.7-rke2r1",
+			controlPlane: &rkev1.RKEControlPlane{
+				Spec: rkev1.RKEControlPlaneSpec{
+					RKEClusterSpecCommon: rkev1.RKEClusterSpecCommon{
+						MachineGlobalConfig: rkev1.GenericMap{
+							Data: map[string]any{
+								"system-default-registry": "test.rancher.io",
+							},
+						},
+					},
+					KubernetesVersion: "v1.25.7+rke2r1",
+				},
+			},
+		},
+		{
+			name:     "cluster private registry - machine selector",
+			expected: "test.rancher.io/rancher/system-agent-installer-rke2:v1.25.7-rke2r1",
+			controlPlane: &rkev1.RKEControlPlane{
+				Spec: rkev1.RKEControlPlaneSpec{
+					RKEClusterSpecCommon: rkev1.RKEClusterSpecCommon{
+						MachineSelectorConfig: []rkev1.RKESystemConfig{
+							{
+								Config: rkev1.GenericMap{
+									Data: map[string]any{
+										"system-default-registry": "test.rancher.io",
+									},
+								},
+							},
+						},
+					},
+					KubernetesVersion: "v1.25.7+rke2r1",
+				},
+			},
+		},
+		{
+			name:     "cluster private registry - prefer machine global",
+			expected: "test.rancher.io/rancher/system-agent-installer-rke2:v1.25.7-rke2r1",
+			controlPlane: &rkev1.RKEControlPlane{
+				Spec: rkev1.RKEControlPlaneSpec{
+					RKEClusterSpecCommon: rkev1.RKEClusterSpecCommon{
+						MachineGlobalConfig: rkev1.GenericMap{
+							Data: map[string]any{
+								"system-default-registry": "test.rancher.io",
+							},
+						},
+						MachineSelectorConfig: []rkev1.RKESystemConfig{
+							{
+								Config: rkev1.GenericMap{
+									Data: map[string]any{
+										"system-default-registry": "test2.rancher.io",
+									},
+								},
+							},
+						},
+					},
+					KubernetesVersion: "v1.25.7+rke2r1",
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var planner Planner
+			planner.retrievalFunctions.ImageResolver = image.ResolveWithControlPlane
+			planner.retrievalFunctions.SystemAgentImage = func() string { return "rancher/system-agent-installer-" }
+
+			assert.Equal(t, tt.expected, planner.getInstallerImage(tt.controlPlane))
 		})
 	}
 }

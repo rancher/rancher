@@ -23,7 +23,6 @@ import (
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	ranchercontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	rkecontrollers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
-	"github.com/rancher/rancher/pkg/provisioningv2/image"
 	"github.com/rancher/rancher/pkg/wrangler"
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/pkg/name"
@@ -130,6 +129,7 @@ type Planner struct {
 // logic from the Planner
 type InfoFunctions struct {
 	SystemAgentImage func() string
+	ImageResolver    func(image string, cp *rkev1.RKEControlPlane) string
 }
 
 func New(ctx context.Context, clients *wrangler.Context, functions InfoFunctions) *Planner {
@@ -1067,7 +1067,7 @@ func (p *Planner) desiredPlan(controlPlane *rkev1.RKEControlPlane, tokensSecret 
 func (p *Planner) getInstallerImage(controlPlane *rkev1.RKEControlPlane) string {
 	runtime := rke2.GetRuntime(controlPlane.Spec.KubernetesVersion)
 	installerImage := p.retrievalFunctions.SystemAgentImage() + runtime + ":" + strings.ReplaceAll(controlPlane.Spec.KubernetesVersion, "+", "-")
-	return image.ResolveWithControlPlane(installerImage, controlPlane)
+	return p.retrievalFunctions.ImageResolver(installerImage, controlPlane)
 }
 
 // ensureRKEStateSecret ensures that the RKE state secret for the given RKEControlPlane exists. This secret contains the
