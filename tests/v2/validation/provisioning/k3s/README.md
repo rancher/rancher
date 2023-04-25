@@ -78,6 +78,15 @@ These are the inputs needed for the different node provider cloud credentials, i
 ```json
 "googleCredentials": {
     "authEncodedJson": ""
+},
+```
+### VSphere
+```json
+"vmwarevsphereCredentials": {
+  "password": "",
+  "username": "",
+  "vcenter": "",
+  "vcenterPort": "",
 }
 ```
 
@@ -154,6 +163,35 @@ Machine K3S config is the final piece needed for the config to run K3S provision
   "vmNamespace": "default",
   "sshUser": "ubuntu",
   "diskBus": "virtio"
+},
+```
+### Vsphere K3S Machine Config
+```json
+"vmwarevsphereMachineConfig": {
+  "cfgparam": ["disk.enableUUID=TRUE"],
+  "cloneFrom": "",
+  "cloudinit": "",
+  "contentLibrary": "",
+  "cpuCount": "4",
+  "creationType": "",
+  "datacenter": "",
+  "datastore": "",
+  "datastoreCluster": "",
+  "diskSize": "20000",
+  "folder": "",
+  "hostSystem": "",
+  "memorySize": "4096",
+  "network": [""],
+  "os": "linux",
+  "password": "",
+  "pool": "",
+  "sshPassword": "",
+  "sshPort": "22",
+  "sshUser": "",
+  "sshUserGroup": "",
+  "username": "",
+  "vcenter": "",
+  "vcenterPort": "443"
 }
 ```
 
