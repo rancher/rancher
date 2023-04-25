@@ -24,7 +24,7 @@ func (p *Planner) generateInstallInstruction(controlPlane *rkev1.RKEControlPlane
 			continue
 		}
 		switch cattleOS {
-		case windows:
+		case rke2.WindowsMachineOS:
 			env = append(env, fmt.Sprintf("$env:%s=\"%s\"", arg.Name, arg.Value))
 		default:
 			env = append(env, fmt.Sprintf("%s=%s", arg.Name, arg.Value))
@@ -32,7 +32,7 @@ func (p *Planner) generateInstallInstruction(controlPlane *rkev1.RKEControlPlane
 	}
 
 	switch cattleOS {
-	case windows:
+	case rke2.WindowsMachineOS:
 		instruction = plan.OneTimeInstruction{
 			Name:    "install",
 			Image:   image,
@@ -52,7 +52,7 @@ func (p *Planner) generateInstallInstruction(controlPlane *rkev1.RKEControlPlane
 
 	if isOnlyWorker(entry) {
 		switch cattleOS {
-		case windows:
+		case rke2.WindowsMachineOS:
 			instruction.Env = append(instruction.Env, fmt.Sprintf("$env:INSTALL_%s_EXEC=\"agent\"", rke2.GetRuntimeEnv(controlPlane.Spec.KubernetesVersion)))
 		default:
 			instruction.Env = append(instruction.Env, fmt.Sprintf("INSTALL_%s_EXEC=agent", rke2.GetRuntimeEnv(controlPlane.Spec.KubernetesVersion)))
@@ -69,7 +69,7 @@ func (p *Planner) addInstallInstructionWithRestartStamp(nodePlan plan.NodePlan, 
 	var restartStampEnv string
 	stamp := restartStamp(nodePlan, controlPlane, p.getInstallerImage(controlPlane))
 	switch entry.Metadata.Labels[rke2.CattleOSLabel] {
-	case windows:
+	case rke2.WindowsMachineOS:
 		restartStampEnv = "$env:RESTART_STAMP=\"" + stamp + "\""
 	default:
 		restartStampEnv = "RESTART_STAMP=" + stamp
@@ -85,7 +85,7 @@ func (p *Planner) addInstallInstructionWithRestartStamp(nodePlan plan.NodePlan, 
 func (p *Planner) generateInstallInstructionWithSkipStart(controlPlane *rkev1.RKEControlPlane, entry *planEntry) plan.OneTimeInstruction {
 	var skipStartEnv string
 	switch entry.Metadata.Labels[rke2.CattleOSLabel] {
-	case windows:
+	case rke2.WindowsMachineOS:
 		skipStartEnv = fmt.Sprintf("$env:INSTALL_%s_SKIP_START=\"true\"", strings.ToUpper(rke2.GetRuntime(controlPlane.Spec.KubernetesVersion)))
 	default:
 		skipStartEnv = fmt.Sprintf("INSTALL_%s_SKIP_START=true", strings.ToUpper(rke2.GetRuntime(controlPlane.Spec.KubernetesVersion)))

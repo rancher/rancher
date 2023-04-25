@@ -87,8 +87,9 @@ func (p *PlanStore) Load(cluster *capi.Cluster, rkeControlPlane *rkev1.RKEContro
 		return nil, anyPlanDelivered, err
 	}
 
+	// Place a DeepCopy of the machine in the resulting Plan, making mutative operations on the Machine object safe.
 	for _, machine := range machines {
-		result.Machines[machine.Name] = machine
+		result.Machines[machine.Name] = machine.DeepCopy()
 	}
 
 	for machineName, secret := range secrets {

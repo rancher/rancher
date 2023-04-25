@@ -104,7 +104,7 @@ func (h *handler) OnChange(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPla
 			// If the Reconciled condition is already true and the error was NOT an errIgnore/ErrSkip/ErrWaiting and the status.AppliedSpec (from planner.Process) does not match the controlplane spec, set reconciled to unknown.
 			if !equality.Semantic.DeepEqual(cp.Spec, status.AppliedSpec) {
 				rke2.Reconciled.SetStatus(&status, "Unknown")
-				rke2.Reconciled.Message(&status, "reconciling control plane")
+				rke2.Reconciled.Message(&status, "RKEControlPlane has not been fully reconciled yet")
 				rke2.Reconciled.Reason(&status, "Waiting")
 			}
 			return status, nil
@@ -122,12 +122,12 @@ func (h *handler) OnChange(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPla
 	}
 	// No error encountered during planner.Process
 	logrus.Debugf("[planner] rkecluster %s/%s: reconciliation complete", cp.Namespace, cp.Name)
-	rke2.Provisioned.True(&status)
-	rke2.Provisioned.Message(&status, "")
-	rke2.Provisioned.Reason(&status, "")
 	rke2.Ready.True(&status)
 	rke2.Ready.Message(&status, "")
 	rke2.Ready.Reason(&status, "")
+	rke2.Stable.True(&status)
+	rke2.Stable.Message(&status, "")
+	rke2.Stable.Reason(&status, "")
 	status.AppliedSpec = &cp.Spec
 	rke2.Reconciled.True(&status)
 	rke2.Reconciled.Message(&status, "")

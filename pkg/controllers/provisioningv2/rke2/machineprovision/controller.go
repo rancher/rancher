@@ -13,7 +13,6 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/drivers/nodedriver"
 	"github.com/rancher/rancher/pkg/controllers/management/node"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
-	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/etcdmgmt"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	ranchercontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
@@ -413,28 +412,6 @@ func (h *handler) OnRemove(key string, obj runtime.Object) (runtime.Object, erro
 	}
 	if apierrors.IsNotFound(err) || !cluster.DeletionTimestamp.IsZero() {
 		return h.doRemove(infra)
-	}
-
-	removed := true
-	// In the event we are removing an etcd node (as indicated by the etcd-role label on the node), we must safely remove the etcd node from the cluster before allowing machine deprovisioning
-	if strings.ToLower(infra.meta.GetLabels()[rke2.EtcdRoleLabel]) == "true" {
-		// we need to block removal until our the v1 node that corresponds has been removed
-		restConfig, err := h.kubeconfigManager.GetRESTConfig(cluster, cluster.Status)
-		if err != nil {
-			return obj, err
-		}
-
-		removed, err = etcdmgmt.SafelyRemoved(restConfig, rke2.GetRuntimeCommand(cluster.Spec.KubernetesVersion), machine.Status.NodeRef.Name)
-		if err != nil {
-			return obj, err
-		}
-	}
-
-	if !removed {
-		if err = h.dynamic.EnqueueAfter(obj.GetObjectKind().GroupVersionKind(), infra.meta.GetNamespace(), infra.meta.GetName(), 5*time.Second); err != nil {
-			return obj, err
-		}
-		return obj, generic.ErrSkip
 	}
 
 	return h.doRemove(infra)

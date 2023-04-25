@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strings"
 
@@ -28,10 +27,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
 const (
@@ -343,11 +340,30 @@ func (h *handler) OnRancherClusterChange(obj *rancherv1.Cluster, status rancherv
 				}
 			}
 		}
-		logrus.Debugf("rkecluster %s/%s: updating cluster provisioning status", obj.Namespace, obj.Name)
-		if status, err = h.setProvisionedStatusFromMachineInfra(obj, status, rkeCP); err != nil && !apierror.IsNotFound(err) && !errors.Is(err, generic.ErrSkip) {
-			return nil, status, err
-		} else if err == nil {
-			if status, err = h.updateClusterProvisioningStatus(obj, status, rkeCP, rke2.Updated, rke2.Ready); err != nil && !apierror.IsNotFound(err) {
+		mgmtCluster, err := h.retrieveMgmtClusterFromCache(obj)
+		if err != nil {
+			// don't return because the management cluster condition updating should not be blocking
+			logrus.Errorf("rkecluster %s/%s: error while retrieving management cluster from cache: %v", obj.Namespace, obj.Name, err)
+		}
+		if mgmtCluster != nil {
+			reconcileCondition(mgmtCluster, rke2.Updated, rkeCP, rke2.Ready)
+			reconcileCondition(mgmtCluster, rke2.Provisioned, rkeCP, rke2.Provisioned) // This was originally set by checking machine provisioning, but now we simply set it to true.
+		}
+
+		reconcileCondition(&status, rke2.Updated, rkeCP, rke2.Ready)
+		reconcileCondition(&status, rke2.Provisioned, rkeCP, rke2.Ready)
+
+		// If the Stable condition is not true, then copy the Ready condition from the rkeControlPlane to the v1.Clusters object
+		// Otherwise, use the v3 clusters Ready condition.
+		if !rke2.Stable.IsTrue(rkeCP) {
+			// Set the Ready condition on the v1.cluster to the controlplane Ready status
+			reconcileCondition(&status, rke2.Ready, rkeCP, rke2.Ready)
+		} else if mgmtCluster != nil {
+			reconcileCondition(&status, rke2.Ready, mgmtCluster, rke2.Ready)
+		}
+		if mgmtCluster != nil {
+			_, err := h.mgmtClusterClient.Update(mgmtCluster)
+			if err != nil {
 				return nil, status, err
 			}
 		}
@@ -379,73 +395,31 @@ func (h *handler) getRKEControlPlaneForCluster(cluster *rancherv1.Cluster) (*rke
 	return cp, nil
 }
 
-// updateClusterProvisioningStatus copies the condition (clusterCondition) to both the clusters.management.cattle.io and clusters.provisioning.cattle.io objects based on the passed in rkecontrolplane cp + cpCondition
-func (h *handler) updateClusterProvisioningStatus(cluster *rancherv1.Cluster, status rancherv1.ClusterStatus, cp *rkev1.RKEControlPlane, clusterCondition, cpCondition condition.Cond) (rancherv1.ClusterStatus, error) {
-	if cp == nil {
-		return status, fmt.Errorf("error while updating cluster provisioning status - rkecontrolplane was nil")
+// retrieveMgmtClusterFromCache retrieves an editable copy of the v3.Clusters object from the mgmtCache
+func (h *handler) retrieveMgmtClusterFromCache(cluster *rancherv1.Cluster) (*apimgmtv3.Cluster, error) {
+	if cluster == nil {
+		return nil, fmt.Errorf("cluster was nil")
 	}
-	if h.mgmtClusterCache != nil {
-		mgmtCluster, err := h.mgmtClusterCache.Get(cluster.Status.ClusterName)
-		if err != nil {
-			return status, err
-		}
-
-		if cpCondition.GetStatus(cp) != clusterCondition.GetStatus(mgmtCluster) || cpCondition.GetMessage(cp) != clusterCondition.GetMessage(mgmtCluster) {
-			mgmtCluster = mgmtCluster.DeepCopy()
-
-			clusterCondition.SetStatus(mgmtCluster, cpCondition.GetStatus(cp))
-			clusterCondition.Reason(mgmtCluster, cpCondition.GetReason(cp))
-			clusterCondition.Message(mgmtCluster, cpCondition.GetMessage(cp))
-
-			if _, err = h.mgmtClusterClient.Update(mgmtCluster); err != nil {
-				return status, err
-			}
-		}
+	if h.mgmtClusterCache == nil {
+		return nil, fmt.Errorf("management cluster cache was nil")
 	}
-
-	clusterCondition.SetStatus(&status, cpCondition.GetStatus(cp))
-	clusterCondition.Reason(&status, cpCondition.GetReason(cp))
-	clusterCondition.Message(&status, cpCondition.GetMessage(cp))
-
-	return status, nil
+	mgmtCluster, err := h.mgmtClusterCache.Get(cluster.Status.ClusterName)
+	if err != nil {
+		return nil, err
+	}
+	return mgmtCluster.DeepCopy(), nil
 }
 
-// setProvisionedStatusFromMachineInfra sets the cluster provisioning status based on the machine infrastructure provisioning status.
-// The cluster is considered provisioned if all the machine infrastructure is provisioned.
-// This is required because the CAPI controllers used the proxied kubeconfig to communicate with the downstream cluster,
-// and this proxy is not available until the cluster's Provisioned condition is set to true.
-func (h *handler) setProvisionedStatusFromMachineInfra(cluster *rancherv1.Cluster, clusterStatus rancherv1.ClusterStatus, cp *rkev1.RKEControlPlane) (rancherv1.ClusterStatus, error) {
-	if cluster == nil || cp == nil || rke2.Provisioned.IsTrue(cluster) {
-		return clusterStatus, nil
+// reconcileCondition accepts an object, a condition to reconcile on the object, and the status/reason/message to reconcile.
+// It returns a boolean indicating whether the condition was changed.
+func reconcileCondition(to interface{}, toCondition condition.Cond, from interface{}, fromCondition condition.Cond) bool {
+	if fromCondition.GetStatus(from) != toCondition.GetStatus(to) || fromCondition.GetReason(from) != toCondition.GetMessage(to) || fromCondition.GetMessage(from) != toCondition.GetMessage(to) {
+		toCondition.SetStatus(to, fromCondition.GetStatus(from))
+		toCondition.Reason(to, fromCondition.GetReason(from))
+		toCondition.Message(to, fromCondition.GetMessage(from))
+		return true
 	}
-
-	machines, err := h.capiMachineCache.List(cluster.Namespace, labels.SelectorFromSet(labels.Set{capi.ClusterLabelName: cluster.Name}))
-	if err != nil {
-		return clusterStatus, err
-	} else if len(machines) == 0 {
-		return clusterStatus, generic.ErrSkip
-	}
-
-	for _, machine := range machines {
-		if !machine.DeletionTimestamp.IsZero() || rke2.InfrastructureReady.IsTrue(machine) {
-			continue
-		}
-
-		clusterStatus, err = h.updateClusterProvisioningStatus(cluster, clusterStatus, cp, rke2.Provisioned, rke2.Ready)
-		if err != nil {
-			return clusterStatus, err
-		}
-
-		return clusterStatus, generic.ErrSkip
-	}
-
-	// Set the Provisioned condition to true on the control plane and use this to set the Provisioned condition to true on the cluster objects.
-	cp = cp.DeepCopy()
-	rke2.Provisioned.SetStatus(cp, "True")
-	rke2.Provisioned.Message(cp, "")
-	rke2.Provisioned.Reason(cp, "")
-
-	return h.updateClusterProvisioningStatus(cluster, clusterStatus, cp, rke2.Provisioned, rke2.Provisioned)
+	return false
 }
 
 func (h *handler) OnRemove(_ string, cluster *rancherv1.Cluster) (*rancherv1.Cluster, error) {
@@ -458,14 +432,28 @@ func (h *handler) OnRemove(_ string, cluster *rancherv1.Cluster) (*rancherv1.Clu
 		return cluster, err
 	}
 
-	status := *cluster.Status.DeepCopy()
-	status, err = h.updateClusterProvisioningStatus(cluster, status, rkeCP, rke2.Removed, rke2.Removed)
-	if apierror.IsNotFound(err) {
-		return cluster, nil
-	} else if err != nil {
-		return cluster, err
+	// Check to see if the management cluster still exists. If it exists, copy the Removed condition from the
+	// controlplane to the object. If it does not exist, allow the v1 Cluster object to be removed.
+	mgmtCluster, err := h.retrieveMgmtClusterFromCache(cluster)
+	if err != nil {
+		if apierror.IsNotFound(err) {
+			// go ahead and proceed with removal
+			return cluster, nil
+		}
+		logrus.Errorf("rkecluster %s/%s: error retrieving management cluster during removal of cluster: %v", cluster.Namespace, cluster.Name, err)
+	}
+	if mgmtCluster != nil {
+		reconcileCondition(&mgmtCluster, rke2.Removed, rkeCP, rke2.Removed)
+		_, err = h.mgmtClusterClient.Update(mgmtCluster)
+		if apierror.IsNotFound(err) {
+			return cluster, nil
+		} else if err != nil {
+			return cluster, err
+		}
 	}
 
+	status := *cluster.Status.DeepCopy()
+	reconcileCondition(&status, rke2.Removed, rkeCP, rke2.Removed)
 	cluster.Status = status
 	cluster, err = h.clusterController.UpdateStatus(cluster)
 	if err != nil {

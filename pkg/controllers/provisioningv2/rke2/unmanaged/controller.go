@@ -10,7 +10,6 @@ import (
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/clusterindex"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
-	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/etcdmgmt"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
 	mgmtcontroller "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	rocontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
@@ -21,9 +20,7 @@ import (
 	"github.com/rancher/wrangler/pkg/apply"
 	"github.com/rancher/wrangler/pkg/data"
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
-	"github.com/rancher/wrangler/pkg/generic"
 	"github.com/rancher/wrangler/pkg/kv"
-	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -314,56 +311,7 @@ func (h *handler) onUnmanagedMachineHealth(key string, customMachine *rkev1.Cust
 }
 
 func (h *handler) onUnmanagedMachineOnRemove(key string, customMachine *rkev1.CustomMachine) (*rkev1.CustomMachine, error) {
-	clusterName := customMachine.Labels[capi.ClusterLabelName]
-	if clusterName == "" {
-		return customMachine, nil
-	}
-
-	logrus.Debugf("[UnmanagedMachine] Removing machine %s in cluster %s", key, clusterName)
-
-	cluster, err := h.clusterCache.Get(customMachine.Namespace, clusterName)
-	if apierror.IsNotFound(err) {
-		return customMachine, nil
-	} else if err != nil {
-		return customMachine, err
-	}
-
-	if !cluster.DeletionTimestamp.IsZero() {
-		logrus.Debugf("[UnmanagedMachine] Machine %s belonged to cluster %s that is being deleted. Skipping safe removal", key, clusterName)
-		return customMachine, nil // if the cluster is deleting, we don't care about safe etcd member removal.
-	}
-
-	machine, err := rke2.GetMachineByOwner(h.machineCache, customMachine)
-	if err != nil {
-		if errors.Is(err, rke2.ErrNoMachineOwnerRef) {
-			return customMachine, nil
-		}
-		return customMachine, err
-	}
-
-	if _, ok := machine.Labels[rke2.EtcdRoleLabel]; !ok {
-		logrus.Debugf("[UnmanagedMachine] Safe removal for machine %s in cluster %s not necessary as it is not an etcd node", key, clusterName)
-		return customMachine, nil // If we are not dealing with an etcd node, we can go ahead and allow removal
-	}
-
-	if machine.Status.NodeRef == nil {
-		logrus.Infof("[UnmanagedMachine] No associated node found for machine %s in cluster %s, proceeding with removal", key, clusterName)
-		return customMachine, nil
-	}
-
-	restConfig, err := h.kubeconfigManager.GetRESTConfig(cluster, cluster.Status)
-	if err != nil {
-		return customMachine, err
-	}
-
-	removed, err := etcdmgmt.SafelyRemoved(restConfig, rke2.GetRuntimeCommand(cluster.Spec.KubernetesVersion), machine.Status.NodeRef.Name)
-	if err != nil {
-		return customMachine, err
-	}
-	if !removed {
-		h.unmanagedMachine.EnqueueAfter(customMachine.Namespace, customMachine.Name, 5*time.Second)
-		return customMachine, generic.ErrSkip
-	}
+	// We may want to look at using a migration to remove this finalizer.
 	return customMachine, nil
 }
 

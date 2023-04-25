@@ -129,26 +129,26 @@ func anyRole(entry *planEntry) bool {
 }
 
 func anyRoleWithoutWindows(entry *planEntry) bool {
-	return !noRole(entry) && notWindows(entry)
+	return !noRole(entry) && !windows(entry)
 }
 
 func isOnlyWorker(entry *planEntry) bool {
 	return !isEtcd(entry) && !isControlPlane(entry) && isWorker(entry)
 }
 
-func notWindows(entry *planEntry) bool {
-	return entry.Machine.Status.NodeInfo.OperatingSystem != windows
+func windows(entry *planEntry) bool {
+	if entry == nil || entry.Machine == nil {
+		return false
+	}
+	if val, ok := entry.Machine.Labels[rke2.CattleOSLabel]; ok {
+		return val == rke2.WindowsMachineOS
+	}
+	return false
 }
 
-func anyPlanDelivered(plan *plan.Plan, include roleFilter) bool {
-	planEntries := collect(plan, include)
-	for _, entry := range planEntries {
-		if entry.Plan == nil {
-			continue
-		}
-		if entry.Plan.PlanDataExists {
-			return true
-		}
+func anyPlanDataExists(entry *planEntry) bool {
+	if entry.Plan != nil {
+		return entry.Plan.PlanDataExists
 	}
 	return false
 }
@@ -157,6 +157,28 @@ func validJoinURL(plan *plan.Plan, joinURL string) bool {
 	return collectAndValidateAnnotationValue(plan, isNotDeletingAndControlPlaneOrInitNode, rke2.JoinURLAnnotation, joinURL)
 }
 
-func isControlPlaneAndHasJoinURLAndNotDeleting(entry *planEntry) bool {
-	return entry.Metadata != nil && entry.Metadata.Labels[rke2.ControlPlaneRoleLabel] == "true" && entry.Metadata.Annotations[rke2.JoinURLAnnotation] != "" && isNotDeleting(entry)
+func hasJoinURL(entry *planEntry) bool {
+	return entry.Metadata != nil && entry.Metadata.Annotations[rke2.JoinURLAnnotation] != ""
+}
+
+func hasJoinedTo(entry *planEntry) bool {
+	return entry.Metadata != nil && entry.Metadata.Annotations[rke2.JoinedToAnnotation] != ""
+}
+
+func roleAnd(r1, r2 roleFilter) roleFilter {
+	return func(entry *planEntry) bool {
+		return r1(entry) && r2(entry)
+	}
+}
+
+func roleOr(r1, r2 roleFilter) roleFilter {
+	return func(entry *planEntry) bool {
+		return r1(entry) || r2(entry)
+	}
+}
+
+func roleNot(r1 roleFilter) roleFilter {
+	return func(entry *planEntry) bool {
+		return !r1(entry)
+	}
 }

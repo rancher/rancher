@@ -48,6 +48,7 @@ const (
 	DrainAnnotation            = "rke.cattle.io/drain-options"
 	DrainDoneAnnotation        = "rke.cattle.io/drain-done"
 	DrainErrorAnnotation       = "rke.cattle.io/drain-error"
+	ForceRemoveEtcdAnnotation  = "rke.cattle.io/etcd-force-remove"
 	EtcdRoleLabel              = "rke.cattle.io/etcd-role"
 	InitNodeLabel              = "rke.cattle.io/init-node"
 	InitNodeMachineIDLabel     = "rke.cattle.io/init-node-machine-id"
@@ -88,6 +89,7 @@ const (
 	RKEAPIVersion                  = "rke.cattle.io/v1"
 
 	Provisioned                  = condition.Cond("Provisioned")
+	Stable                       = condition.Cond("Stable") // The Stable condition is used to indicate whether we can safely copy the v3 management cluster Ready condition to the v1 object.
 	Updated                      = condition.Cond("Updated")
 	Reconciled                   = condition.Cond("Reconciled")
 	Ready                        = condition.Cond("Ready")
@@ -97,6 +99,7 @@ const (
 	PlanApplied                  = condition.Cond("PlanApplied")
 	InfrastructureReady          = condition.Cond(capi.InfrastructureReadyCondition)
 	SystemUpgradeControllerReady = condition.Cond("SystemUpgradeControllerReady")
+	Bootstrapped                 = condition.Cond("Bootstrapped")
 
 	RuntimeK3S  = "k3s"
 	RuntimeRKE2 = "rke2"
@@ -265,11 +268,12 @@ func PlanSecretFromBootstrapName(bootstrapName string) string {
 }
 
 func DoRemoveAndUpdateStatus(obj metav1.Object, doRemove func() (string, error), enqueueAfter func(string, string, time.Duration)) error {
-	if !Provisioned.IsTrue(obj) || !Waiting.IsTrue(obj) || !Pending.IsTrue(obj) {
+	if !Provisioned.IsTrue(obj) || !Waiting.IsTrue(obj) || !Pending.IsTrue(obj) || !Updated.IsTrue(obj) {
 		// Ensure the Removed obj appears in the UI.
 		Provisioned.SetStatus(obj, "True")
 		Waiting.SetStatus(obj, "True")
 		Pending.SetStatus(obj, "True")
+		Updated.SetStatus(obj, "True")
 	}
 	message, err := doRemove()
 	if errors.Is(err, generic.ErrSkip) {
