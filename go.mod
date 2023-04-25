@@ -4,7 +4,7 @@ go 1.19
 
 replace (
 	github.com/docker/distribution => github.com/docker/distribution v2.7.1+incompatible // oras dep requires a replace is set
-	github.com/docker/docker => github.com/docker/docker v20.10.9+incompatible // oras dep requires a replace is set
+	github.com/docker/docker => github.com/docker/docker v20.10.18+incompatible // oras dep requires a replace is set
 
 	github.com/knative/pkg => github.com/rancher/pkg v0.0.0-20190514055449-b30ab9de040e
 	github.com/matryer/moq => github.com/rancher/moq v0.0.0-20200712062324-13d1f37d2d77
@@ -50,7 +50,7 @@ replace (
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.25.4
 
 	sigs.k8s.io/aws-iam-authenticator => github.com/rancher/aws-iam-authenticator v0.5.9-0.20220713170329-78acb8c83863
-	sigs.k8s.io/cluster-api => sigs.k8s.io/cluster-api v1.2.8
+	sigs.k8s.io/cluster-api => sigs.k8s.io/cluster-api v1.2.12
 )
 
 require (
@@ -81,6 +81,7 @@ require (
 	github.com/golang-jwt/jwt v3.2.1+incompatible
 	github.com/golang/mock v1.6.0
 	github.com/golang/protobuf v1.5.3
+	github.com/google/gnostic v0.5.7-v3refs
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/gorilla/mux v1.8.0
 	github.com/gorilla/websocket v1.4.2
@@ -108,15 +109,15 @@ require (
 	github.com/rancher/fleet/pkg/apis v0.0.0-20230420151154-ab055fa31e05
 	github.com/rancher/gke-operator v1.1.5
 	github.com/rancher/kubernetes-provider-detector v0.1.5
-	github.com/rancher/lasso v0.0.0-20221227210133-6ea88ca2fbcc
-	github.com/rancher/lasso/controller-runtime v0.0.0-20220627205005-00d9c8e9dda6
+	github.com/rancher/lasso v0.0.0-20230428185353-36908edf817b
+	github.com/rancher/lasso/controller-runtime v0.0.0-20230502204209-3eb356f3e8cf
 	github.com/rancher/machine v0.15.0-rancher99
 	github.com/rancher/norman v0.0.0-20230328153514-ae12f166495a
 	github.com/rancher/rancher/pkg/apis v0.0.0
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 	github.com/rancher/remotedialer v0.2.6-0.20220624190122-ea57207bf2b8
-	github.com/rancher/rke v1.4.6-rc1
+	github.com/rancher/rke v1.4.6-rc3
 	github.com/rancher/steve v0.0.0-20230330114540-e6a8019546c1
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007
 	github.com/rancher/wrangler v1.1.1
@@ -153,12 +154,10 @@ require (
 	k8s.io/kubernetes v1.25.4
 	k8s.io/utils v0.0.0-20230209194617-a36077c30491
 	sigs.k8s.io/aws-iam-authenticator v0.5.9
-	sigs.k8s.io/cluster-api v1.2.8
+	sigs.k8s.io/cluster-api v1.2.12
 	sigs.k8s.io/controller-runtime v0.12.3
 	sigs.k8s.io/yaml v1.3.0
 )
-
-require github.com/google/gnostic v0.5.7-v3refs
 
 require (
 	github.com/kr/fs v0.1.0 // indirect
@@ -193,7 +192,7 @@ require (
 	github.com/containerd/cgroups v1.0.4 // indirect
 	github.com/containerd/containerd v1.6.18 // indirect
 	github.com/coredns/caddy v1.1.0 // indirect
-	github.com/coredns/corefile-migration v1.0.18 // indirect
+	github.com/coredns/corefile-migration v1.0.20 // indirect
 	github.com/coreos/go-systemd/v22 v22.3.2 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
 	github.com/cyphar/filepath-securejoin v0.2.3 // indirect
