@@ -170,9 +170,10 @@ func (p *Planner) rotateEncryptionKeys(cp *rkev1.RKEControlPlane, status rkev1.R
 	found, joinServer, initNode, err := p.findInitNode(cp, clusterPlan)
 	if err != nil {
 		logrus.Errorf("[planner] rkecluster %s/%s: error encountered while searching for init node during encryption key rotation: %v", cp.Namespace, cp.Name, err)
+		return status, err
 	}
 	if !found || joinServer == "" {
-		logrus.Warnf("[planner] rkecluster %s/%s: skipping etcd snapshot creation as cluster does not have an init node", cp.Namespace, cp.Name)
+		logrus.Warnf("[planner] rkecluster %s/%s: skipping encryption key rotation as cluster does not have an init node", cp.Namespace, cp.Name)
 		return status, nil
 	}
 

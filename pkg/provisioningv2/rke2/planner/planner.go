@@ -280,27 +280,8 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlan
 	lowestKubelet := getLowestMachineKubeletVersion(plan)
 	if lowestKubelet != nil {
 		logrus.Debugf("rkecluster %s/%s: lowest detected Kubelet version for cluster was: %s", cp.Namespace, cp.Name, lowestKubelet.String())
-	}
-
-	// In the case that we're dealing with K8s >= 1.25, ensure that system-upgrade-controller has PodSecurityPolicies disabled.
-	// We need to make sure the cluster has undergone initial provisioning and bootstrapping before we can enforce this condition,
-	// otherwise the system-upgrade-controller bundle will never become ready and the planner will be indefinitely blocked.
-	// We do this by determining if any plans have been delivered to any of the nodes. Notably we perform this check after etcd
-	// snapshot restoration can happen, to allow recovery in the event that the cluster has failed.
-	if lowestKubelet != nil && !currentVersion.LessThan(managesystemagent.Kubernetes125) && lowestKubelet.LessThan(managesystemagent.Kubernetes125) {
-		logrus.Tracef("rkecluster %s/%s: checking for SystemUpgradeController readiness", cp.Namespace, cp.Name)
-		if rke2.SystemUpgradeControllerReady.GetStatus(&status) == "" || rke2.SystemUpgradeControllerReady.IsFalse(&status) || rke2.SystemUpgradeControllerReady.IsUnknown(&status) {
-			if rke2.SystemUpgradeControllerReady.GetReason(&status) != "" {
-				return status, errWaitingf("waiting for system-upgrade-controller helm chart reconciliation: %s", rke2.SystemUpgradeControllerReady.GetReason(&status))
-			}
-			return status, errWaiting("waiting for system-upgrade-controller helm chart reconciliation")
-		}
-		if disabled, err := systemUpgradeControllerPSPsDisabled(rke2.SystemUpgradeControllerReady.GetMessage(&status)); err == nil {
-			if !disabled {
-				return status, errWaiting("system-upgrade-controller helm chart has podsecuritypolicy enabled, waiting for helm chart reconciliation")
-			}
-		} else {
-			return status, errWaitingf("error occurred while determining whether SUC PSPs were disabled: %v", err)
+		if err := blockProgressForSUCPSPIf125(fmt.Sprintf("[planner] rkecluster %s/%s:", cp.Namespace, cp.Name), status, currentVersion, lowestKubelet); err != nil {
+			return status, err
 		}
 	}
 
@@ -415,6 +396,34 @@ func getLowestMachineKubeletVersion(plan *plan.Plan) *semver.Version {
 		}
 	}
 	return lowestVersion
+}
+
+// blockProgressForSUCPSPIf125 handles the case that we're dealing with K8s >= 1.25, ensuring that system-upgrade-controller has PodSecurityPolicies disabled.
+// We need to make sure the cluster has undergone initial provisioning and bootstrapping before we can enforce this condition,
+// otherwise the system-upgrade-controller bundle will never become ready and the planner will be indefinitely blocked.
+// We do this by determining if any plans have been delivered to any of the nodes. Notably we perform this check after etcd
+// snapshot restoration can happen, to allow recovery in the event that the cluster has failed.
+func blockProgressForSUCPSPIf125(msgPrefix string, status rkev1.RKEControlPlaneStatus, currentVersion, lowestKubelet *semver.Version) error {
+	if currentVersion == nil || lowestKubelet == nil {
+		return fmt.Errorf("%s currentVersion or lowestKubelet was nil", msgPrefix)
+	}
+	if lowestKubelet != nil && !currentVersion.LessThan(managesystemagent.Kubernetes125) && lowestKubelet.LessThan(managesystemagent.Kubernetes125) {
+		logrus.Tracef("%s checking for SystemUpgradeController readiness", msgPrefix)
+		if rke2.SystemUpgradeControllerReady.GetStatus(&status) == "" || rke2.SystemUpgradeControllerReady.IsFalse(&status) || rke2.SystemUpgradeControllerReady.IsUnknown(&status) {
+			if rke2.SystemUpgradeControllerReady.GetReason(&status) != "" {
+				return errWaitingf("waiting for system-upgrade-controller helm chart reconciliation: %s", rke2.SystemUpgradeControllerReady.GetReason(&status))
+			}
+			return errWaiting("waiting for system-upgrade-controller helm chart reconciliation")
+		}
+		if disabled, err := systemUpgradeControllerPSPsDisabled(rke2.SystemUpgradeControllerReady.GetMessage(&status)); err == nil {
+			if !disabled {
+				return errWaiting("system-upgrade-controller helm chart has podsecuritypolicy enabled, waiting for helm chart reconciliation")
+			}
+		} else {
+			return errWaitingf("error occurred while determining whether SUC PSPs were disabled: %v", err)
+		}
+	}
+	return nil
 }
 
 // clusterIsSane ensures that there is at least one controlplane, etcd, and worker node for the cluster.

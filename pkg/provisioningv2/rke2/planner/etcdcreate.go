@@ -89,7 +89,9 @@ func (p *Planner) createEtcdSnapshot(controlPlane *rkev1.RKEControlPlane, status
 
 	found, joinServer, _, err := p.findInitNode(controlPlane, clusterPlan)
 	if err != nil {
+		// TODO: chase down err trickling
 		logrus.Errorf("[planner] rkecluster %s/%s: error encountered while searching for init node during etcd snapshot creation: %v", controlPlane.Namespace, controlPlane.Name, err)
+		return status, err
 	}
 	if !found || joinServer == "" {
 		logrus.Warnf("[planner] rkecluster %s/%s: skipping etcd snapshot creation as cluster does not have an init node", controlPlane.Namespace, controlPlane.Name)

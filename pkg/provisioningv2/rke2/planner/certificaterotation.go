@@ -20,6 +20,7 @@ func (p *Planner) rotateCertificates(controlPlane *rkev1.RKEControlPlane, status
 	found, joinServer, _, err := p.findInitNode(controlPlane, clusterPlan)
 	if err != nil {
 		logrus.Errorf("[planner] rkecluster %s/%s: error encountered while searching for init node during certificate rotation: %v", controlPlane.Namespace, controlPlane.Name, err)
+		return status, err
 	}
 	if !found || joinServer == "" {
 		logrus.Warnf("[planner] rkecluster %s/%s: skipping certificate creation as cluster does not have an init node", controlPlane.Namespace, controlPlane.Name)
@@ -63,7 +64,7 @@ func shouldRotate(cp *rkev1.RKEControlPlane) bool {
 
 	// The controlplane must be initialized before we rotate anything
 	if cp.Status.Initialized != true {
-		logrus.Warnf("[planner] rkecluster %s/%s: skipping encryption key rotation as cluster was not initialized", cp.Namespace, cp.Name)
+		logrus.Warnf("[planner] rkecluster %s/%s: skipping certificate rotation as cluster was not initialized", cp.Namespace, cp.Name)
 		return false
 	}
 

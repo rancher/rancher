@@ -141,17 +141,16 @@ func notWindows(entry *planEntry) bool {
 }
 
 func anyPlanDelivered(plan *plan.Plan, include roleFilter) bool {
-	var planDataExists bool
 	planEntries := collect(plan, include)
 	for _, entry := range planEntries {
 		if entry.Plan == nil {
 			continue
 		}
 		if entry.Plan.PlanDataExists {
-			planDataExists = true
+			return true
 		}
 	}
-	return planDataExists
+	return false
 }
 
 func validJoinURL(plan *plan.Plan, joinURL string) bool {

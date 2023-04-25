@@ -1,15 +1,18 @@
 package planner
 
 import (
+	"fmt"
+	"github.com/Masterminds/semver/v3"
+	"math/rand"
 	"strings"
 	"testing"
-
-	v1 "k8s.io/api/core/v1"
+	"time"
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
 	"github.com/stretchr/testify/assert"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
@@ -242,6 +245,117 @@ func Test_anyRoleWithoutWindows(t *testing.T) {
 
 			// assert
 			a.Equal(result, tt.args.expected)
+		})
+	}
+}
+
+func TestPlanner_getLowestMachineKubeletVersion(t *testing.T) {
+	type args struct {
+		versions       []string
+		expectedLowest string
+	}
+
+	tests := []struct {
+		name string
+		args args
+	}{
+		{
+			name: "Check lowest RKE2 version within minor release",
+			args: args{
+				versions: []string{
+					"v1.25.5+rke2r1",
+					"v1.25.6+rke2r1",
+					"v1.25.7+rke2r1",
+				},
+				expectedLowest: "v1.25.5+rke2r1",
+			},
+		},
+		{
+			name: "Check lowest K3s version within minor release",
+			args: args{
+				versions: []string{
+					"v1.25.5+k3s1",
+					"v1.25.6+k3s1",
+					"v1.25.7+k3s1",
+				},
+				expectedLowest: "v1.25.5+k3s1",
+			},
+		},
+		{
+			name: "Check lowest RKE2 version across any change in release",
+			args: args{
+				versions: []string{
+					"v1.25.4+rke2r1",
+					"v2.21.6+rke2r1",
+					"v1.26.7+rke2r1",
+				},
+				expectedLowest: "v1.25.4+rke2r1",
+			},
+		},
+		{
+			name: "Check lowest K3s version across any change in release",
+			args: args{
+				versions: []string{
+					"v1.25.4+k3s1",
+					"v2.21.6+k3s1",
+					"v1.26.7+k3s1",
+				},
+				expectedLowest: "v1.25.4+k3s1",
+			},
+		},
+		{
+			name: "Check lowest version across mixed K3s/RKE2 cluster",
+			args: args{
+				versions: []string{
+					"v1.25.4+k3s1",
+					"v2.21.6+k3s1",
+					"v1.26.7+k3s1",
+					"v1.21.5+rke2r1",
+				},
+				expectedLowest: "v1.21.5+rke2r1",
+			},
+		},
+		{
+			name: "Check lowest K3s version with RCs",
+			args: args{
+				versions: []string{
+					"v1.21.4+k3s1",
+					"v1.21.3-rc1+k3s1",
+					"v1.23.7+k3s1",
+				},
+				expectedLowest: "v1.21.3-rc1+k3s1",
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			a := assert.New(t)
+			var plan = &plan.Plan{
+				Machines: map[string]*capi.Machine{},
+			}
+			rand.Seed(time.Now().UnixNano())
+			versions := test.args.versions
+			// Shuffle the versions to really test the function.
+			rand.Shuffle(len(versions), func(i, j int) { versions[i], versions[j] = versions[j], versions[i] })
+			for i, v := range versions {
+				plan.Machines[fmt.Sprintf("machine%d", i)] = &capi.Machine{
+					Status: capi.MachineStatus{
+						NodeInfo: &v1.NodeSystemInfo{
+							KubeletVersion: v,
+						},
+					},
+				}
+			}
+			lowestV := getLowestMachineKubeletVersion(plan)
+			if len(test.args.versions) > 0 {
+				a.NotNil(lowestV)
+				expectedLowest, err := semver.NewVersion(test.args.expectedLowest)
+				if a.NoError(err) {
+					a.Equal(lowestV.String(), expectedLowest.String())
+				}
+			} else {
+				a.Nil(lowestV)
+			}
 		})
 	}
 }

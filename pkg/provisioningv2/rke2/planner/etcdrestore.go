@@ -18,9 +18,6 @@ func (p *Planner) setEtcdSnapshotRestoreState(status rkev1.RKEControlPlaneStatus
 		status.ETCDSnapshotRestorePhase = phase
 		return status, errWaiting("refreshing etcd restore state")
 	}
-	// Reset the status initialized and ready at this point
-	status.Initialized = false
-	status.Ready = false
 	return status, nil
 }
 
@@ -312,10 +309,16 @@ func (p *Planner) restoreEtcdSnapshot(cp *rkev1.RKEControlPlane, status rkev1.RK
 		if err != nil {
 			return status, err
 		}
+		// Reset the status initialized and ready at this point
+		status.Initialized = false
+		status.Ready = false
 		if err = p.runEtcdRestoreServiceStop(cp, snapshot, tokensSecret, clusterPlan); err != nil {
 			return status, err
 		}
-		return p.setEtcdSnapshotRestoreState(status, cp.Spec.ETCDSnapshotRestore, rkev1.ETCDSnapshotPhaseRestore)
+		// the error returned from setEtcdSnapshotRestoreState is set based on etcd snapshot restore fields, but we are
+		// manipulating other fields so we should unconditionally return a waiting error.
+		status, _ = p.setEtcdSnapshotRestoreState(status, cp.Spec.ETCDSnapshotRestore, rkev1.ETCDSnapshotPhaseRestore)
+		return status, errWaiting("refreshing etcd restore state")
 	case rkev1.ETCDSnapshotPhaseRestore:
 		snapshot, err := p.retrieveEtcdSnapshot(cp)
 		if err != nil {
