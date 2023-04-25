@@ -17,12 +17,14 @@ import (
 	"github.com/rancher/wrangler/pkg/condition"
 	"github.com/rancher/wrangler/pkg/data"
 	"github.com/rancher/wrangler/pkg/generic"
+	"github.com/rancher/wrangler/pkg/relatedresource"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
@@ -56,6 +58,30 @@ func Register(ctx context.Context, clients *wrangler.Context, kubeconfigManager 
 	}
 
 	clients.RKE.RKEBootstrap().OnChange(ctx, "machine-node-lookup", h.associateMachineWithNode)
+
+	relatedresource.Watch(ctx, "machine-node-lookup-rke-controlplane", func(namespace, name string, obj runtime.Object) ([]relatedresource.Key, error) {
+		if cp, ok := obj.(*rkev1.RKEControlPlane); ok {
+			logrus.Tracef("[machinenodelookup] rkecluster %s/%s: handling controlplane in related resource watch", cp.Namespace, cp.Name)
+			if !cp.Status.AgentConnected {
+				logrus.Tracef("[machinenodelookup] rkecluster %s/%s: short circuiting as AgentConnected was false", cp.Namespace, cp.Name)
+				return nil, nil
+			}
+			var relatedResources []relatedresource.Key
+			relatedBootstraps, err := clients.RKE.RKEBootstrap().List(cp.Namespace, metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", rke2.ClusterNameLabel, cp.Name)})
+			if err != nil {
+				logrus.Errorf("[machinenodelookup] rkecluster %s/%s: error retrieving RKEBootstraps to list: %v", cp.Namespace, cp.Name, err)
+			}
+			for _, b := range relatedBootstraps.Items {
+				relatedResources = append(relatedResources, relatedresource.Key{
+					Namespace: b.Namespace,
+					Name:      b.Name,
+				})
+			}
+			logrus.Tracef("[machinenodelookup] rkecluster %s/%s: enqueueing: %+v", cp.Namespace, cp.Name, relatedResources)
+			return relatedResources, nil
+		}
+		return nil, nil
+	}, clients.RKE.RKEBootstrap(), clients.RKE.RKEControlPlane())
 }
 
 func (h *handler) associateMachineWithNode(_ string, bootstrap *rkev1.RKEBootstrap) (*rkev1.RKEBootstrap, error) {
