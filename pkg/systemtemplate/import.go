@@ -74,7 +74,7 @@ func toFeatureString(features map[string]bool) string {
 
 func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url string, isWindowsCluster bool,
 	cluster *apimgmtv3.Cluster, features map[string]bool, taints []corev1.Taint, secretLister v1.SecretLister) error {
-	var tolerations, agentEnvVars, appendTolerations, affinity, resourceRequirements string
+	var tolerations, agentEnvVars, agentAppendTolerations, agentAffinity, agentResourceRequirements string
 	d := md5.Sum([]byte(url + token + namespace))
 	tokenKey := hex.EncodeToString(d[:])[:7]
 
@@ -98,9 +98,17 @@ func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url
 
 	agentEnvVars = templates.ToYAML(envVars)
 
-	appendTolerations = templates.ToYAML(util.GetClusterAgentTolerations(cluster))
-	affinity = templates.ToYAML(util.GetClusterAgentAffinity(cluster))
-	resourceRequirements = templates.ToYAML(util.GetClusterAgentResourceRequirements(cluster))
+	if appendTolerations := util.GetClusterAgentTolerations(cluster); appendTolerations != nil {
+		agentAppendTolerations = templates.ToYAML(appendTolerations)
+	}
+
+	if affinity := util.GetClusterAgentAffinity(cluster); affinity != nil {
+		agentAffinity = templates.ToYAML(affinity)
+	}
+
+	if resourceRequirements := util.GetClusterAgentResourceRequirements(cluster); resourceRequirements != nil {
+		agentResourceRequirements = templates.ToYAML(resourceRequirements)
+	}
 
 	context := &context{
 		Features:              toFeatureString(features),
@@ -117,9 +125,9 @@ func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url
 		IsRKE:                 cluster != nil && cluster.Status.Driver == apimgmtv3.ClusterDriverRKE,
 		PrivateRegistryConfig: registryConfig,
 		Tolerations:           tolerations,
-		AppendTolerations:     appendTolerations,
-		Affinity:              affinity,
-		ResourceRequirements:  resourceRequirements,
+		AppendTolerations:     agentAppendTolerations,
+		Affinity:              agentAffinity,
+		ResourceRequirements:  agentResourceRequirements,
 		ClusterRegistry:       registryURL,
 	}
 

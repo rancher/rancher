@@ -124,8 +124,8 @@ spec:
       labels:
         app: cattle-cluster-agent
     spec:
-      # Affinity added if user defined, otherwise add default
       {{- if .Affinity }}
+      # Affinity added if user defined, otherwise add default
       affinity:
 {{ .Affinity | indent 8 }}
       {{- end }}
@@ -146,15 +146,15 @@ spec:
         key: "node-role.kubernetes.io/master"
         operator: "Exists"
       {{- end }}
-      # Additional tolerations appended if user defined
       {{- if .AppendTolerations }}
+      # Additional tolerations appended if user defined
 {{ .AppendTolerations | indent 6 }}
       {{- end }}
       containers:
         - name: cluster-register
           imagePullPolicy: IfNotPresent
-          # Resource requirements added if user defined
           {{- if .ResourceRequirements }}
+          # Resource requirements added if user defined
           resources:
 {{ .ResourceRequirements | indent 12 }}
           {{- end }}
