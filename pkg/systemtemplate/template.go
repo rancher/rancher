@@ -125,7 +125,6 @@ spec:
         app: cattle-cluster-agent
     spec:
       {{- if .Affinity }}
-      # Affinity added if user defined, otherwise add default
       affinity:
 {{ .Affinity | indent 8 }}
       {{- end }}
@@ -147,14 +146,12 @@ spec:
         operator: "Exists"
       {{- end }}
       {{- if .AppendTolerations }}
-      # Additional tolerations appended if user defined
 {{ .AppendTolerations | indent 6 }}
       {{- end }}
       containers:
         - name: cluster-register
           imagePullPolicy: IfNotPresent
           {{- if .ResourceRequirements }}
-          # Resource requirements added if user defined
           resources:
 {{ .ResourceRequirements | indent 12 }}
           {{- end }}

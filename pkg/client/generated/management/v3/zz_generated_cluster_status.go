@@ -12,7 +12,6 @@ const (
 	ClusterStatusFieldAppliedAgentEnvVars                        = "appliedAgentEnvVars"
 	ClusterStatusFieldAppliedClusterAgentDeploymentCustomization = "appliedClusterAgentDeploymentCustomization"
 	ClusterStatusFieldAppliedEnableNetworkPolicy                 = "appliedEnableNetworkPolicy"
-	ClusterStatusFieldAppliedFleetAgentDeploymentCustomization   = "appliedFleetAgentDeploymentCustomization"
 	ClusterStatusFieldAppliedPodSecurityPolicyTemplateName       = "appliedPodSecurityPolicyTemplateId"
 	ClusterStatusFieldAppliedSpec                                = "appliedSpec"
 	ClusterStatusFieldAuthImage                                  = "authImage"
@@ -57,7 +56,6 @@ type ClusterStatus struct {
 	AppliedAgentEnvVars                        []EnvVar                      `json:"appliedAgentEnvVars,omitempty" yaml:"appliedAgentEnvVars,omitempty"`
 	AppliedClusterAgentDeploymentCustomization *AgentDeploymentCustomization `json:"appliedClusterAgentDeploymentCustomization,omitempty" yaml:"appliedClusterAgentDeploymentCustomization,omitempty"`
 	AppliedEnableNetworkPolicy                 bool                          `json:"appliedEnableNetworkPolicy,omitempty" yaml:"appliedEnableNetworkPolicy,omitempty"`
-	AppliedFleetAgentDeploymentCustomization   *AgentDeploymentCustomization `json:"appliedFleetAgentDeploymentCustomization,omitempty" yaml:"appliedFleetAgentDeploymentCustomization,omitempty"`
 	AppliedPodSecurityPolicyTemplateName       string                        `json:"appliedPodSecurityPolicyTemplateId,omitempty" yaml:"appliedPodSecurityPolicyTemplateId,omitempty"`
 	AppliedSpec                                *ClusterSpec                  `json:"appliedSpec,omitempty" yaml:"appliedSpec,omitempty"`
 	AuthImage                                  string                        `json:"authImage,omitempty" yaml:"authImage,omitempty"`

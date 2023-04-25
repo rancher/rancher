@@ -239,8 +239,8 @@ var (
 	UIPreferred = NewSetting("ui-preferred", "vue")
 )
 
+// GetClusterAgentDefaultAffinity returns the default node affinity for the cluster agent.
 func GetClusterAgentDefaultAffinity() *v1.Affinity {
-	// set default to affinity that cluster agent currently uses
 	return &v1.Affinity{
 		PodAntiAffinity: &v1.PodAntiAffinity{
 			PreferredDuringSchedulingIgnoredDuringExecution: []v1.WeightedPodAffinityTerm{
@@ -329,8 +329,8 @@ func GetClusterAgentDefaultAffinity() *v1.Affinity {
 	}
 }
 
+// GetFleetAgentDefaultAffinity returns the default node affinity for the fleet agent.
 func GetFleetAgentDefaultAffinity() *v1.Affinity {
-	// set default to affinity that fleet agent currently uses
 	return &v1.Affinity{
 		NodeAffinity: &v1.NodeAffinity{
 			PreferredDuringSchedulingIgnoredDuringExecution: []v1.PreferredSchedulingTerm{
@@ -355,7 +355,7 @@ func GetFleetAgentDefaultAffinity() *v1.Affinity {
 func marshalAffinity(affinity *v1.Affinity) string {
 	data, err := json.Marshal(affinity)
 	if err != nil {
-		logrus.Errorf("failed to marshal node affinity: %s", err)
+		panic(fmt.Errorf("failed to marshal node affinity: %v", err))
 	}
 	return string(data)
 }

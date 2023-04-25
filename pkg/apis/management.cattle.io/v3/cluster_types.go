@@ -209,7 +209,6 @@ type ClusterStatus struct {
 	AADClientCertSecret                  string                    `json:"aadClientCertSecret,omitempty" norman:"nocreate,noupdate"`   // Deprecated: use ClusterSpec.ClusterSecrets.AADClientCertSecret instead
 
 	AppliedClusterAgentDeploymentCustomization *AgentDeploymentCustomization `json:"appliedClusterAgentDeploymentCustomization,omitempty"`
-	AppliedFleetAgentDeploymentCustomization   *AgentDeploymentCustomization `json:"appliedFleetAgentDeploymentCustomization,omitempty"`
 }
 
 type ClusterComponentStatus struct {

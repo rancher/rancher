@@ -2326,11 +2326,6 @@ func (in *ClusterStatus) DeepCopyInto(out *ClusterStatus) {
 		*out = new(AgentDeploymentCustomization)
 		(*in).DeepCopyInto(*out)
 	}
-	if in.AppliedFleetAgentDeploymentCustomization != nil {
-		in, out := &in.AppliedFleetAgentDeploymentCustomization, &out.AppliedFleetAgentDeploymentCustomization
-		*out = new(AgentDeploymentCustomization)
-		(*in).DeepCopyInto(*out)
-	}
 	return
 }
 

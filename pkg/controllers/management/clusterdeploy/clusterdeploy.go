@@ -388,7 +388,6 @@ func (cd *clusterDeploy) deployAgent(cluster *apimgmtv3.Cluster) error {
 	cluster.Status.AppliedAgentEnvVars = append(settings.DefaultAgentSettingsAsEnvVars(), cluster.Spec.AgentEnvVars...)
 
 	cluster.Status.AppliedClusterAgentDeploymentCustomization = cluster.Spec.ClusterAgentDeploymentCustomization
-	cluster.Status.AppliedFleetAgentDeploymentCustomization = cluster.Spec.FleetAgentDeploymentCustomization
 
 	return nil
 }
