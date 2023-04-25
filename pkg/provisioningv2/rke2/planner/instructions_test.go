@@ -6,6 +6,7 @@ import (
 	v1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
+	"github.com/rancher/rancher/pkg/provisioningv2/image"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -94,6 +95,7 @@ func TestPlanner_generateInstallInstruction(t *testing.T) {
 			entry := createTestPlanEntry(tt.args.os)
 			var planner Planner
 			planner.retrievalFunctions.SystemAgentImage = func() string { return tt.args.image }
+			planner.retrievalFunctions.ImageResolver = image.ResolveWithControlPlane
 			// act
 			p := planner.generateInstallInstruction(controlPlane, entry, []string{})
 
@@ -159,6 +161,7 @@ func TestPlanner_addInstallInstructionWithRestartStamp(t *testing.T) {
 			a := assert.New(t)
 			var planner Planner
 			planner.retrievalFunctions.SystemAgentImage = func() string { return tt.args.image }
+			planner.retrievalFunctions.ImageResolver = image.ResolveWithControlPlane
 			controlPlane := createTestControlPlane(tt.args.version)
 			entry := createTestPlanEntry(tt.args.os)
 
@@ -233,6 +236,7 @@ func TestPlanner_generateInstallInstructionWithSkipStart(t *testing.T) {
 			a := assert.New(t)
 			var planner Planner
 			planner.retrievalFunctions.SystemAgentImage = func() string { return tt.args.image }
+			planner.retrievalFunctions.ImageResolver = image.ResolveWithControlPlane
 			controlPlane := createTestControlPlane(tt.args.version)
 			entry := createTestPlanEntry(tt.args.os)
 
