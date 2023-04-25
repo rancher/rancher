@@ -4,6 +4,7 @@ import (
 	"context"
 
 	catalog "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/chart"
 	"github.com/rancher/rancher/pkg/features"
 	namespace "github.com/rancher/rancher/pkg/namespace"
@@ -37,6 +38,15 @@ func Register(ctx context.Context, wContext *wrangler.Context, registryOverride 
 			Name: repoName,
 		}}, nil
 	}, wContext.Catalog.ClusterRepo(), wContext.Mgmt.Feature())
+
+	relatedresource.WatchClusterScoped(ctx, "bootstrap-settings-charts", func(namespace, name string, obj runtime.Object) ([]relatedresource.Key, error) {
+		if s, ok := obj.(*v3.Setting); ok && (s.Name == "rancher-webhook-version" || s.Name == "rancher-webhook-min-version") {
+			return []relatedresource.Key{{
+				Name: repoName,
+			}}, nil
+		}
+		return nil, nil
+	}, wContext.Catalog.ClusterRepo(), wContext.Mgmt.Setting())
 	return nil
 }
 
@@ -101,7 +111,12 @@ func (h *handler) onRepo(key string, repo *catalog.ClusterRepo) (*catalog.Cluste
 		}
 		// webhook needs to be able to adopt the MutatingWebhookConfiguration which originally wasn't a part of the
 		// chart definition, but is now part of the chart definition
-		if err := h.manager.Ensure(chartDef.ReleaseNamespace, chartDef.ChartName, chartDef.MinVersionSetting.Get(), values, chartDef.ChartName == webhookChartName, installImageOverride); err != nil {
+		minVersion := chartDef.MinVersionSetting.Get()
+		exactVersion := chartDef.ExactVersionSetting.Get()
+		if chartDef.ChartName == webhookChartName && minVersion != "" {
+			exactVersion = ""
+		}
+		if err := h.manager.Ensure(chartDef.ReleaseNamespace, chartDef.ChartName, minVersion, exactVersion, values, chartDef.ChartName == webhookChartName, installImageOverride); err != nil {
 			return repo, err
 		}
 	}
@@ -112,9 +127,10 @@ func (h *handler) onRepo(key string, repo *catalog.ClusterRepo) (*catalog.Cluste
 func (h *handler) getChartsToInstall() []*chart.Definition {
 	return []*chart.Definition{
 		{
-			ReleaseNamespace:  namespace.System,
-			ChartName:         webhookChartName,
-			MinVersionSetting: settings.RancherWebhookMinVersion,
+			ReleaseNamespace:    namespace.System,
+			ChartName:           webhookChartName,
+			MinVersionSetting:   settings.RancherWebhookMinVersion,
+			ExactVersionSetting: settings.RancherWebhookVersion,
 			Values: func() map[string]interface{} {
 				values := map[string]interface{}{
 					"capi": map[string]interface{}{

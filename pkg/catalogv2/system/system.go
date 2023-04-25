@@ -48,6 +48,7 @@ type desiredKey struct {
 	namespace            string
 	name                 string
 	minVersion           string
+	exactVersion         string
 	installImageOverride string
 }
 
@@ -170,7 +171,7 @@ func (m *Manager) installCharts(charts map[desiredKey]map[string]interface{}, fo
 	var errs []error
 	for key, values := range charts {
 		for {
-			if err := m.install(key.namespace, key.name, key.minVersion, values, forceAdopt, key.installImageOverride); err == repo.ErrNoChartName || apierrors.IsNotFound(err) {
+			if err := m.install(key.namespace, key.name, key.minVersion, key.exactVersion, values, forceAdopt, key.installImageOverride); err == repo.ErrNoChartName || apierrors.IsNotFound(err) {
 				logrus.Errorf("Failed to find system chart %s will try again in 5 seconds: %v", key.name, err)
 				time.Sleep(5 * time.Second)
 				continue
@@ -212,13 +213,14 @@ func (m *Manager) Uninstall(namespace, name string) error {
 	return m.waitPodDone(op)
 }
 
-func (m *Manager) Ensure(namespace, name, minVersion string, values map[string]interface{}, forceAdopt bool, installImageOverride string) error {
+func (m *Manager) Ensure(namespace, name, minVersion, exactVersion string, values map[string]interface{}, forceAdopt bool, installImageOverride string) error {
 	go func() {
 		m.sync <- desired{
 			key: desiredKey{
 				namespace:            namespace,
 				name:                 name,
 				minVersion:           minVersion,
+				exactVersion:         exactVersion,
 				installImageOverride: installImageOverride,
 			},
 			values:     values,
@@ -228,22 +230,25 @@ func (m *Manager) Ensure(namespace, name, minVersion string, values map[string]i
 	return nil
 }
 
-func (m *Manager) Remove(namespace, name, minVersion string) {
-	delete(m.desiredCharts, desiredKey{
-		namespace:  namespace,
-		name:       name,
-		minVersion: minVersion,
-	})
+func (m *Manager) Remove(namespace, name string) {
+	for k := range m.desiredCharts {
+		if k.namespace == namespace && k.name == name {
+			delete(m.desiredCharts, k)
+		}
+	}
 }
 
-func (m *Manager) install(namespace, name, minVersion string, values map[string]interface{}, forceAdopt bool, installImageOverride string) error {
+func (m *Manager) install(namespace, name, minVersion, exactVersion string, values map[string]interface{}, forceAdopt bool, installImageOverride string) error {
 	index, err := m.content.Index("", "rancher-charts", true)
 	if err != nil {
 		return err
 	}
 
-	// get latest, the >=0-a is a weird syntax to match everything including prereleases build
-	chart, err := index.Get(name, ">=0-a")
+	v := ">=0-a" // latest
+	if exactVersion != "" {
+		v = exactVersion
+	}
+	chart, err := index.Get(name, v)
 	if err != nil {
 		return err
 	}
@@ -428,9 +433,10 @@ func (m *Manager) isInstalled(namespace, name, version, minVersion string, desir
 			}
 		}
 
-		if (desired.LessThan(ver) || desired.Equal(ver)) && bytes.Equal(patchedJSON, actualValueJSON) {
-			return true, "", nil, nil
+		if !desired.Equal(ver) {
+			return false, desired.String(), desiredValue, nil
 		}
+		return true, "", nil, nil
 	}
 
 	return false, version, desiredValue, nil

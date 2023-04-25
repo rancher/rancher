@@ -44,6 +44,7 @@ func Test_ChartInstallation(t *testing.T) {
 			name: "normal installation",
 			setup: func(ctrl *gomock.Controller) chart.Manager {
 				settings.ConfigMapName.Set("pass")
+				settings.RancherWebhookVersion.Set("2.0.0")
 				manager := fake.NewMockManager(ctrl)
 				expectedValues := map[string]interface{}{
 					"priorityClassName": priorityClassName,
@@ -63,7 +64,8 @@ func Test_ChartInstallation(t *testing.T) {
 				manager.EXPECT().Ensure(
 					namespace.System,
 					"rancher-webhook",
-					settings.RancherWebhookMinVersion.Get(),
+					"",
+					"2.0.0",
 					expectedValues,
 					gomock.AssignableToTypeOf(b),
 					"",
@@ -77,6 +79,7 @@ func Test_ChartInstallation(t *testing.T) {
 			name: "installation without webhook priority class",
 			setup: func(ctrl *gomock.Controller) chart.Manager {
 				settings.ConfigMapName.Set("fail")
+				settings.RancherWebhookVersion.Set("2.0.0")
 				manager := fake.NewMockManager(ctrl)
 				expectedValues := map[string]interface{}{
 					"capi": map[string]interface{}{
@@ -95,7 +98,8 @@ func Test_ChartInstallation(t *testing.T) {
 				manager.EXPECT().Ensure(
 					namespace.System,
 					"rancher-webhook",
-					settings.RancherWebhookMinVersion.Get(),
+					"",
+					"2.0.0",
 					expectedValues,
 					gomock.AssignableToTypeOf(b),
 					"",
@@ -110,6 +114,7 @@ func Test_ChartInstallation(t *testing.T) {
 			name: "installation with image override",
 			setup: func(ctrl *gomock.Controller) chart.Manager {
 				settings.ConfigMapName.Set("fail")
+				settings.RancherWebhookVersion.Set("2.0.1")
 				manager := fake.NewMockManager(ctrl)
 				expectedValues := map[string]interface{}{
 					"capi": map[string]interface{}{
@@ -131,7 +136,48 @@ func Test_ChartInstallation(t *testing.T) {
 				manager.EXPECT().Ensure(
 					namespace.System,
 					"rancher-webhook",
-					settings.RancherWebhookMinVersion.Get(),
+					"",
+					"2.0.1",
+					expectedValues,
+					gomock.AssignableToTypeOf(b),
+					"rancher-test.io/"+settings.ShellImage.Get(),
+				).Return(nil)
+
+				manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
+				return manager
+			},
+			registryOverride: "rancher-test.io",
+		},
+		// TODO (maxsokolovsky) remove once the rancher-webhook-min-version setting is fully removed.
+		{
+			name: "installation with min version override",
+			setup: func(ctrl *gomock.Controller) chart.Manager {
+				settings.ConfigMapName.Set("fail")
+				settings.RancherWebhookMinVersion.Set("2.0.1")
+				settings.RancherWebhookVersion.Set("2.0.4")
+				manager := fake.NewMockManager(ctrl)
+				expectedValues := map[string]interface{}{
+					"capi": map[string]interface{}{
+						"enabled": features.EmbeddedClusterAPI.Enabled(),
+					},
+					"mcm": map[string]interface{}{
+						"enabled": features.MCM.Enabled(),
+					},
+					"global": map[string]interface{}{
+						"cattle": map[string]interface{}{
+							"systemDefaultRegistry": "",
+						},
+					},
+					"image": map[string]interface{}{
+						"repository": "rancher-test.io/rancher/rancher-webhook",
+					},
+				}
+				var b bool
+				manager.EXPECT().Ensure(
+					namespace.System,
+					"rancher-webhook",
+					"2.0.1",
+					"",
 					expectedValues,
 					gomock.AssignableToTypeOf(b),
 					"rancher-test.io/"+settings.ShellImage.Get(),

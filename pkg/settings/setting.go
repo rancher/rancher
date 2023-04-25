@@ -169,8 +169,13 @@ var (
 	// Deprecated: On removal use kubeconfig-default-ttl-minutes for all kubeconfigs.
 	KubeconfigTokenTTLMinutes = NewSetting("kubeconfig-token-ttl-minutes", "960") // 16 hours
 
-	// RancherWebhookMinVersion is the minimum version of the webhook that rancher will install.
+	// RancherWebhookMinVersion is the minimum version of the webhook that Rancher will install.
+	//
+	// Deprecated.
 	RancherWebhookMinVersion = NewSetting("rancher-webhook-min-version", "")
+
+	// RancherWebhookVersion is the exact version of the webhook that Rancher will install.
+	RancherWebhookVersion = NewSetting("rancher-webhook-version", "")
 
 	// SystemDefaultRegistry is the default contrainer registry used for images.
 	// The environmental variable "CATTLE_BASE_REGISTRY" controls the default value of this setting.
