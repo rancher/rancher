@@ -22,6 +22,7 @@ type ProbeStatus struct {
 type Node struct {
 	Plan           NodePlan                             `json:"plan,omitempty"`
 	AppliedPlan    *NodePlan                            `json:"appliedPlan,omitempty"`
+	JoinedTo       string                               `json:"joinedTo,omitempty"`
 	Output         map[string][]byte                    `json:"-"`
 	PeriodicOutput map[string]PeriodicInstructionOutput `json:"-"`
 	Failed         bool                                 `json:"failed,omitempty"`

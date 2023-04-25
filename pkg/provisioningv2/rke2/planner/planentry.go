@@ -16,12 +16,29 @@ type planEntry struct {
 
 type roleFilter func(*planEntry) bool
 
-func collect(plan *plan.Plan, include roleFilter) (result []*planEntry) {
-	for machineName, machine := range plan.Machines {
+func collectAndValidateAnnotationValue(p *plan.Plan, validation roleFilter, annotation, value string) bool {
+	for machineName, machine := range p.Machines {
 		entry := &planEntry{
 			Machine:  machine,
-			Plan:     plan.Nodes[machineName],
-			Metadata: plan.Metadata[machineName],
+			Plan:     p.Nodes[machineName],
+			Metadata: p.Metadata[machineName],
+		}
+		if !validation(entry) {
+			continue
+		}
+		if entry.Metadata.Annotations[annotation] == value {
+			return true
+		}
+	}
+	return false
+}
+
+func collect(p *plan.Plan, include roleFilter) (result []*planEntry) {
+	for machineName, machine := range p.Machines {
+		entry := &planEntry{
+			Machine:  machine,
+			Plan:     p.Nodes[machineName],
+			Metadata: p.Metadata[machineName],
 		}
 		if !include(entry) {
 			continue
@@ -58,6 +75,14 @@ func isNotInitNodeOrIsDeleting(entry *planEntry) bool {
 
 func isDeleting(entry *planEntry) bool {
 	return entry.Machine.DeletionTimestamp != nil
+}
+
+func isNotDeleting(entry *planEntry) bool {
+	return !isDeleting(entry)
+}
+
+func isNotDeletingAndControlPlaneOrInitNode(entry *planEntry) bool {
+	return !isDeleting(entry) && (isControlPlane(entry) || isInitNode(entry))
 }
 
 // isFailed returns true if the provided entry machine.status.phase is failed
@@ -116,12 +141,22 @@ func notWindows(entry *planEntry) bool {
 }
 
 func anyPlanDelivered(plan *plan.Plan, include roleFilter) bool {
-	var planDataExists bool
 	planEntries := collect(plan, include)
 	for _, entry := range planEntries {
+		if entry.Plan == nil {
+			continue
+		}
 		if entry.Plan.PlanDataExists {
-			planDataExists = true
+			return true
 		}
 	}
-	return planDataExists
+	return false
+}
+
+func validJoinURL(plan *plan.Plan, joinURL string) bool {
+	return collectAndValidateAnnotationValue(plan, isNotDeletingAndControlPlaneOrInitNode, rke2.JoinURLAnnotation, joinURL)
+}
+
+func isControlPlaneAndHasJoinURLAndNotDeleting(entry *planEntry) bool {
+	return entry.Metadata != nil && entry.Metadata.Labels[rke2.ControlPlaneRoleLabel] == "true" && entry.Metadata.Annotations[rke2.JoinURLAnnotation] != "" && isNotDeleting(entry)
 }

@@ -91,13 +91,19 @@ func addUserConfig(config map[string]interface{}, controlPlane *rkev1.RKEControl
 	return nil
 }
 
-func addRoleConfig(config map[string]interface{}, controlPlane *rkev1.RKEControlPlane, entry *planEntry, initNode bool, joinServer string) {
+// addRoleConfig adds the role config to the passed in map, and returns the join server that the config was rendered for.
+// It will return "-" as the join server if the entry is an init node (the init node should not join a server)
+func addRoleConfig(config map[string]interface{}, controlPlane *rkev1.RKEControlPlane, entry *planEntry, joinServer string) string {
 	runtime := rke2.GetRuntime(controlPlane.Spec.KubernetesVersion)
-	if initNode {
+	if isInitNode(entry) {
+		// If this node is the init node, it should not be joined to anything. Clear the joinServer URL.
 		if runtime == rke2.RuntimeK3S {
 			config["cluster-init"] = true
 		}
-	} else if joinServer != "" {
+		joinServer = "-"
+	}
+
+	if joinServer != "" && joinServer != "-" {
 		// it's very important that the joinServer param isn't used on the initNode. The init node is special
 		// because it will be evaluated twice, first with joinServer = "" and then with joinServer == self.
 		// If we use the joinServer param then we will get different nodePlan and cause issues.
@@ -137,6 +143,7 @@ func addRoleConfig(config map[string]interface{}, controlPlane *rkev1.RKEControl
 	if nodeName := entry.Metadata.Labels[rke2.NodeNameLabel]; nodeName != "" {
 		config["node-name"] = nodeName
 	}
+	return joinServer
 }
 
 func addLocalClusterAuthenticationEndpointConfig(config map[string]interface{}, controlPlane *rkev1.RKEControlPlane, entry *planEntry) {
@@ -525,65 +532,69 @@ func (p *Planner) renderFiles(controlPlane *rkev1.RKEControlPlane, entry *planEn
 	return files, nil
 }
 
+// addConfigFile will render the distribution configuration file and add it to the nodePlan. It also renders files that
+// are referenced in the distribution configuration file (for example, ACE and the cloud-provider). It returns the updated
+// NodePlan, the config that was rendered in a map, the joined server, and an error if one exists.
+// NOTE: the joined server can be "-" if the config file is being added for the init node.
 func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane, entry *planEntry, tokensSecret plan.Secret,
-	initNode bool, joinServer string) (plan.NodePlan, map[string]interface{}, error) {
+	joinServer string, reg registries) (plan.NodePlan, map[string]interface{}, string, error) {
 	config := map[string]interface{}{}
 
 	addDefaults(config, controlPlane)
 
 	// Must call addUserConfig first because it will filter out non-kdm data
 	if err := addUserConfig(config, controlPlane, entry); err != nil {
-		return nodePlan, config, err
+		return nodePlan, config, "", err
 	}
 
-	files, err := p.addRegistryConfig(config, controlPlane)
+	files, err := p.addETCD(config, controlPlane, entry)
 	if err != nil {
-		return nodePlan, config, err
+		return nodePlan, config, "", err
 	}
 	nodePlan.Files = append(nodePlan.Files, files...)
 
-	files, err = p.addETCD(config, controlPlane, entry)
-	if err != nil {
-		return nodePlan, config, err
-	}
-	nodePlan.Files = append(nodePlan.Files, files...)
-
-	addRoleConfig(config, controlPlane, entry, initNode, joinServer)
+	joinedServer := addRoleConfig(config, controlPlane, entry, joinServer)
 	addLocalClusterAuthenticationEndpointConfig(config, controlPlane, entry)
 	addToken(config, entry, tokensSecret)
 
 	if err := addAddresses(p.secretCache, config, entry); err != nil {
-		return nodePlan, config, err
+		return nodePlan, config, joinedServer, err
 	}
 	if err := addLabels(config, entry); err != nil {
-		return nodePlan, config, err
+		return nodePlan, config, joinedServer, err
 	}
 	if err := addTaints(config, entry, controlPlane); err != nil {
-		return nodePlan, config, err
+		return nodePlan, config, joinedServer, err
 	}
 
 	for _, fileParam := range fileParams {
-		content, ok := config[fileParam]
-		if !ok {
-			continue
+		var content interface{}
+		if fileParam == privateRegistryArg {
+			content = string(reg.registriesFileRaw)
+		} else {
+			var ok bool
+			content, ok = config[fileParam]
+			if !ok {
+				continue
+			}
 		}
 
-		if fileParam == "cloud-provider-config" {
-			isSecretFormat, namespace, name, err := checkForSecretFormat("cloud-provider-config", convert.ToString(content))
+		if fileParam == cloudProviderConfigArg {
+			isSecretFormat, namespace, name, err := checkForSecretFormat(cloudProviderConfigArg, convert.ToString(content))
 			if err != nil {
 				// provided secret for cloud-provider-config does not follow the format of
 				// secret://namespace:name
-				return nodePlan, config, err
+				return nodePlan, config, joinedServer, err
 			}
 			if isSecretFormat {
 				secret, err := p.secretCache.Get(namespace, name)
 				if err != nil {
-					return nodePlan, config, err
+					return nodePlan, config, joinedServer, err
 				}
 
 				secretContent, err := retrieveClusterAuthorizedSecret(secret, controlPlane.Name)
 				if err != nil {
-					return nodePlan, config, err
+					return nodePlan, config, joinedServer, err
 				}
 
 				filePath := configFile(controlPlane, fileParam)
@@ -607,7 +618,7 @@ func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEC
 
 	files, err = p.renderFiles(controlPlane, entry)
 	if err != nil {
-		return nodePlan, config, err
+		return nodePlan, config, joinedServer, err
 	}
 
 	nodePlan.Files = append(nodePlan.Files, files...)
@@ -616,7 +627,7 @@ func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEC
 
 	configData, err := json.MarshalIndent(config, "", "  ")
 	if err != nil {
-		return nodePlan, config, err
+		return nodePlan, config, joinedServer, err
 	}
 
 	nodePlan.Files = append(nodePlan.Files, plan.File{
@@ -624,5 +635,5 @@ func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEC
 		Path:    fmt.Sprintf(ConfigYamlFileName, rke2.GetRuntime(controlPlane.Spec.KubernetesVersion)),
 	})
 
-	return nodePlan, config, nil
+	return nodePlan, config, joinedServer, nil
 }

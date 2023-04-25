@@ -4,32 +4,20 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"sort"
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
-	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
 	corev1 "k8s.io/api/core/v1"
 )
 
-func (p *Planner) addRegistryConfig(config map[string]interface{}, controlPlane *rkev1.RKEControlPlane) ([]plan.File, error) {
-	registry := controlPlane.Spec.Registries
-	if registry == nil {
-		return nil, nil
-	}
-
-	registryConfig, files, err := p.toRegistryConfig(rke2.GetRuntime(controlPlane.Spec.KubernetesVersion), controlPlane.Namespace, registry)
-	if err != nil {
-		return nil, err
-	}
-
-	config["private-registry"] = string(registryConfig)
-	return files, nil
-}
-
-func (p *Planner) toRegistryConfig(runtime, namespace string, registry *rkev1.Registry) ([]byte, []plan.File, error) {
+// renderRegistries accepts a runtime, namespace, and registry and generates the data needed to set up registries
+func (p *Planner) renderRegistries(runtime, namespace string, registry *rkev1.Registry) (registries, error) {
 	var (
 		files   []plan.File
 		configs = map[string]interface{}{}
+		data    registries
+		err     error
 	)
 
 	for registryName, config := range registry.Configs {
@@ -43,10 +31,10 @@ func (p *Planner) toRegistryConfig(runtime, namespace string, registry *rkev1.Re
 		if config.TLSSecretName != "" {
 			secret, err := p.secretCache.Get(namespace, config.TLSSecretName)
 			if err != nil {
-				return nil, nil, err
+				return data, err
 			}
 			if secret.Type != corev1.SecretTypeTLS {
-				return nil, nil, fmt.Errorf("secret [%s] must be of type [%s]", config.TLSSecretName, corev1.SecretTypeTLS)
+				return data, fmt.Errorf("secret [%s] must be of type [%s]", config.TLSSecretName, corev1.SecretTypeTLS)
 			}
 
 			if cert := secret.Data[corev1.TLSCertKey]; len(cert) != 0 {
@@ -71,10 +59,10 @@ func (p *Planner) toRegistryConfig(runtime, namespace string, registry *rkev1.Re
 		if config.AuthConfigSecretName != "" {
 			secret, err := p.secretCache.Get(namespace, config.AuthConfigSecretName)
 			if err != nil {
-				return nil, nil, err
+				return data, err
 			}
 			if secret.Type != rkev1.AuthConfigSecretType && secret.Type != corev1.SecretTypeBasicAuth {
-				return nil, nil, fmt.Errorf("secret [%s] must be of type [%s] or [%s]",
+				return data, fmt.Errorf("secret [%s] must be of type [%s] or [%s]",
 					config.AuthConfigSecretName, rkev1.AuthConfigSecretType, corev1.SecretTypeBasicAuth)
 			}
 			registryConfig.Auth = &authConfig{
@@ -88,22 +76,31 @@ func (p *Planner) toRegistryConfig(runtime, namespace string, registry *rkev1.Re
 		configs[registryName] = registryConfig
 	}
 
-	data, err := json.Marshal(map[string]interface{}{
+	data.registriesFileRaw, err = json.Marshal(map[string]interface{}{
 		"mirrors": registry.Mirrors,
 		"configs": configs,
 	})
 	if err != nil {
-		return nil, nil, err
+		return data, err
 	}
 
-	return data, files, nil
+	// Sort the returned files slice because map iteration is not deterministic. This can lead to unexpected behavior where registry files are out of order.
+	sort.Slice(files, func(i, j int) bool { return files[i].Path < files[j].Path })
+	data.certificateFiles = files
+	return data, nil
 }
 
+// toFile accepts the runtime, path, and a byte slice containing data to be written to a file on host. It returns a plan.File.
 func toFile(runtime, path string, content []byte) plan.File {
 	return plan.File{
 		Content: base64.StdEncoding.EncodeToString(content),
 		Path:    fmt.Sprintf("/var/lib/rancher/%s/etc/%s", runtime, path),
 	}
+}
+
+type registries struct {
+	registriesFileRaw []byte
+	certificateFiles  []plan.File
 }
 
 type registryConfig struct {

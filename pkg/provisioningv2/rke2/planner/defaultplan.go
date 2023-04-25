@@ -10,22 +10,26 @@ import (
 
 // commonNodePlan returns a "default" node plan with the corresponding registry configuration.
 // It will append to the node plan passed in through options.
-func (p *Planner) commonNodePlan(controlPlane *rkev1.RKEControlPlane, options plan.NodePlan) (plan.NodePlan, error) {
+func (p *Planner) commonNodePlan(controlPlane *rkev1.RKEControlPlane, np plan.NodePlan) (plan.NodePlan, registries, error) {
 	if controlPlane.Spec.Registries == nil {
-		return options, nil
+		return np, registries{}, nil
 	}
 
-	registryConfig, files, err := p.toRegistryConfig(rke2.GetRuntime(controlPlane.Spec.KubernetesVersion),
+	reg, err := p.renderRegistries(rke2.GetRuntime(controlPlane.Spec.KubernetesVersion),
 		controlPlane.Namespace, controlPlane.Spec.Registries)
 	if err != nil {
-		return plan.NodePlan{}, err
+		return plan.NodePlan{}, registries{}, err
 	}
 
-	options.Files = append(append([]plan.File{{
-		Content: base64.StdEncoding.EncodeToString(registryConfig),
+	// Render the registries.yaml file for the rancher-system-agent. The registries.yaml file for the respective distribution should be rendered elsewhere
+	// (at config file rendering)
+	np.Files = append(np.Files, plan.File{
+		Content: base64.StdEncoding.EncodeToString(reg.registriesFileRaw),
 		Path:    "/etc/rancher/agent/registries.yaml",
 		Dynamic: true,
-	}}, files...), options.Files...)
+	})
+	// Add the corresponding certificate files (if they exist)
+	np.Files = append(np.Files, reg.certificateFiles...)
 
-	return options, nil
+	return np, reg, nil
 }
