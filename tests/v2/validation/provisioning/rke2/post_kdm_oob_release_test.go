@@ -9,7 +9,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
-	"github.com/rancher/rancher/tests/framework/extensions/clusters/versions"
+	"github.com/rancher/rancher/tests/framework/extensions/clusters/kubernetesversions"
 	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
 	"github.com/rancher/rancher/tests/framework/extensions/workloads/pods"
 	"github.com/rancher/rancher/tests/framework/pkg/config"
@@ -65,7 +65,7 @@ func (k *KdmChecksTestSuite) TestRKE2K8sVersions() {
 	logrus.Infof("checking for valid k8s versions..")
 	require.GreaterOrEqual(k.T(), len(k.rke2kubernetesVersions), 1)
 	// fetching all available k8s versions from rancher
-	releasedK8sVersions, _ := versions.ListRKE2AllVersions(k.client)
+	releasedK8sVersions, _ := kubernetesversions.ListRKE2AllVersions(k.client)
 	logrus.Info("expected k8s versions : ", k.rke2kubernetesVersions)
 	logrus.Info("k8s versions available on rancher server : ", releasedK8sVersions)
 	for _, expectedK8sVersion := range k.rke2kubernetesVersions {

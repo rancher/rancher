@@ -1,4 +1,4 @@
-package versions
+package kubernetesversions
 
 import (
 	"encoding/json"
