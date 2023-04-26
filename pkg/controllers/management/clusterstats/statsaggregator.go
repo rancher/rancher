@@ -306,8 +306,8 @@ func resourceListChanged(oldList, newList v1.ResourceList) bool {
 func callWithTimeout(do func()) {
 	done := make(chan struct{})
 	go func() {
+		defer close(done)
 		do()
-		done <- struct{}{}
 	}()
 
 	select {
