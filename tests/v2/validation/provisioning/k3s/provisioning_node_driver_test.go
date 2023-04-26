@@ -46,7 +46,7 @@ func (k *K3SNodeDriverProvisioningTestSuite) SetupSuite() {
 
 	k.client = client
 
-	k.kubernetesVersions, err = kubernetesversions.Default(k.T(), k.client, clusters.K3SClusterType.String(), k.kubernetesVersions)
+	k.kubernetesVersions, err = kubernetesversions.Default(k.client, clusters.K3SClusterType.String(), k.kubernetesVersions)
 	require.NoError(k.T(), err)
 
 	enabled := true

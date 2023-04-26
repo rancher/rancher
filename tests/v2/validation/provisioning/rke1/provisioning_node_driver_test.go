@@ -50,7 +50,7 @@ func (r *RKE1NodeDriverProvisioningTestSuite) SetupSuite() {
 
 	r.client = client
 
-	r.kubernetesVersions, err = kubernetesversions.Default(r.T(), r.client, clusters.RKE1ClusterType.String(), r.kubernetesVersions)
+	r.kubernetesVersions, err = kubernetesversions.Default(r.client, clusters.RKE1ClusterType.String(), r.kubernetesVersions)
 	require.NoError(r.T(), err)
 
 	enabled := true
