@@ -47,7 +47,7 @@ func (c *CustomClusterProvisioningTestSuite) SetupSuite() {
 
 	c.client = client
 
-	c.kubernetesVersions, err = kubernetesversions.Default(c.T(), c.client, clusters.K3SClusterType.String(), c.kubernetesVersions)
+	c.kubernetesVersions, err = kubernetesversions.Default(c.client, clusters.K3SClusterType.String(), c.kubernetesVersions)
 	require.NoError(c.T(), err)
 
 	enabled := true
