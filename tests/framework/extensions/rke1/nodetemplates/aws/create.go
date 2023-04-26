@@ -16,7 +16,7 @@ func CreateAWSNodeTemplate(rancherClient *rancher.Client) (*nodetemplates.NodeTe
 	config.LoadConfig(nodetemplates.AmazonEC2NodeTemplateConfigurationFileKey, &amazonEC2NodeTemplateConfig)
 
 	nodeTemplate := nodetemplates.NodeTemplate{
-		EngineInstallURL:            "https://releases.rancher.com/install-docker/20.10.sh",
+		EngineInstallURL:            "https://releases.rancher.com/install-docker/23.0.sh",
 		Name:                        awsEC2NodeTemplateNameBase,
 		AmazonEC2NodeTemplateConfig: &amazonEC2NodeTemplateConfig,
 	}
