@@ -92,7 +92,7 @@ func (c *ClusterRepoTestSuite) testClusterRepo(params ClusterRepoParams) {
 	setClusterRepoURL(&cr.Spec, params.Type, params.URL1)
 	_, err := c.client.Steve.SteveType(catalog.ClusterRepoSteveResourceType).Create(cr)
 	require.NoError(c.T(), err)
-	time.Sleep(1 * time.Second)
+	// time.Sleep(1 * time.Second)
 
 	// Validate the ClusterRepo was created and resources were downloaded
 	clusterRepo, err := c.pollUntilDownloaded(params.Name, metav1.Time{})
@@ -112,7 +112,7 @@ func (c *ClusterRepoTestSuite) testClusterRepo(params ClusterRepoParams) {
 	clusterRepoUpdated.Spec = spec
 	_, err = c.client.Steve.SteveType(catalog.ClusterRepoSteveResourceType).Replace(&clusterRepoUpdated)
 	require.NoError(c.T(), err)
-	time.Sleep(1 * time.Second)
+	// time.Sleep(1 * time.Second)
 
 	clusterRepo, err = c.pollUntilDownloaded(params.Name, downloadTime)
 	require.NoError(c.T(), err)
