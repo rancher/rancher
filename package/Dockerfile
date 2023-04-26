@@ -16,12 +16,12 @@ WORKDIR /var/lib/rancher
 ARG ARCH=amd64
 ARG ETCD_UNSUPPORTED_ARCH
 ARG IMAGE_REPO=rancher
-ARG SYSTEM_CHART_DEFAULT_BRANCH=dev-v2.6
-ARG CHART_DEFAULT_BRANCH=dev-v2.6
+ARG SYSTEM_CHART_DEFAULT_BRANCH=release-v2.6
+ARG CHART_DEFAULT_BRANCH=release-v2.6
 ARG PARTNER_CHART_DEFAULT_BRANCH=main
 ARG RKE2_CHART_DEFAULT_BRANCH=main
 # kontainer-driver-metadata branch to be set for specific branch other than dev/master, logic at rancher/rancher/pkg/settings/setting.go
-ARG CATTLE_KDM_BRANCH=dev-v2.6
+ARG CATTLE_KDM_BRANCH=release-v2.6
 
 ENV CATTLE_SYSTEM_CHART_DEFAULT_BRANCH=$SYSTEM_CHART_DEFAULT_BRANCH
 ENV CATTLE_CHART_DEFAULT_BRANCH=$CHART_DEFAULT_BRANCH
@@ -162,8 +162,8 @@ RUN curl -sLf ${!TINI_URL} > /usr/bin/tini && \
     chmod +x /usr/bin/tini /usr/bin/telemetry && \
     mkdir -p /var/lib/rancher-data/driver-metadata
 
-ENV CATTLE_UI_VERSION 2.6.12-rc4
-ENV CATTLE_DASHBOARD_UI_VERSION v2.6.12-rc4
+ENV CATTLE_UI_VERSION 2.6.12
+ENV CATTLE_DASHBOARD_UI_VERSION v2.6.12
 ENV CATTLE_CLI_VERSION v2.6.11
 
 # Please update the api-ui-version in pkg/settings/settings.go when updating the version here.
