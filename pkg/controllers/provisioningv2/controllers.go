@@ -7,6 +7,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/fleetcluster"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/fleetworkspace"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/managedchart"
+	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/bootstrap"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/dynamicschema"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/machinedrain"
@@ -43,8 +44,9 @@ func Register(ctx context.Context, clients *wrangler.Context) error {
 
 	if features.RKE2.Enabled() {
 		rkePlanner := planner2.New(ctx, clients, planner2.InfoFunctions{
-			SystemAgentImage: settings.SystemAgentInstallerImage.Get,
 			ImageResolver:    image.ResolveWithControlPlane,
+			ReleaseData:      rke2.GetKDMReleaseData,
+			SystemAgentImage: settings.SystemAgentInstallerImage.Get,
 		})
 		if features.MCM.Enabled() {
 			dynamicschema.Register(ctx, clients)
