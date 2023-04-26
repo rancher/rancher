@@ -162,12 +162,12 @@ RUN curl -sLf ${!TINI_URL} > /usr/bin/tini && \
     chmod +x /usr/bin/tini /usr/bin/telemetry && \
     mkdir -p /var/lib/rancher-data/driver-metadata
 
-ENV CATTLE_UI_VERSION 2.6.12
-ENV CATTLE_DASHBOARD_UI_VERSION v2.6.12
+ENV CATTLE_UI_VERSION 2.6.13-rc1
+ENV CATTLE_DASHBOARD_UI_VERSION v2.6.13-rc1
 ENV CATTLE_CLI_VERSION v2.6.11
 
 # Please update the api-ui-version in pkg/settings/settings.go when updating the version here.
-ENV CATTLE_API_UI_VERSION 1.1.9
+ENV CATTLE_API_UI_VERSION 1.1.10
 
 RUN mkdir -p /var/log/auditlog
 ENV AUDIT_LOG_PATH /var/log/auditlog/rancher-api-audit.log
