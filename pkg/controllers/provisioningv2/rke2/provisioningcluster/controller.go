@@ -399,7 +399,7 @@ func (h *handler) retrieveMgmtClusterFromCache(cluster *rancherv1.Cluster) (*api
 // reconcileCondition accepts an object, a condition to reconcile on the object, and the status/reason/message to reconcile.
 // It returns a boolean indicating whether the condition was changed.
 func reconcileCondition(to interface{}, toCondition condition.Cond, from interface{}, fromCondition condition.Cond) bool {
-	if fromCondition.GetStatus(from) != toCondition.GetStatus(to) || fromCondition.GetReason(from) != toCondition.GetMessage(to) || fromCondition.GetMessage(from) != toCondition.GetMessage(to) {
+	if fromCondition.GetStatus(from) != toCondition.GetStatus(to) || fromCondition.GetReason(from) != toCondition.GetReason(to) || fromCondition.GetMessage(from) != toCondition.GetMessage(to) {
 		toCondition.SetStatus(to, fromCondition.GetStatus(from))
 		toCondition.Reason(to, fromCondition.GetReason(from))
 		toCondition.Message(to, fromCondition.GetMessage(from))
