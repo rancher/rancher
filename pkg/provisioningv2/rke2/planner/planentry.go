@@ -137,10 +137,10 @@ func isOnlyWorker(entry *planEntry) bool {
 }
 
 func windows(entry *planEntry) bool {
-	if entry == nil || entry.Machine == nil {
+	if entry == nil || entry.Metadata == nil {
 		return false
 	}
-	if val, ok := entry.Machine.Labels[rke2.CattleOSLabel]; ok {
+	if val, ok := entry.Metadata.Labels[rke2.CattleOSLabel]; ok {
 		return val == rke2.WindowsMachineOS
 	}
 	return false
