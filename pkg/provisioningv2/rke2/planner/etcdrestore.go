@@ -58,6 +58,10 @@ func (p *Planner) runEtcdSnapshotRestorePlan(controlPlane *rkev1.RKEControlPlane
 		return fmt.Errorf("more than one init node existed, cannot run etcd snapshot restore")
 	}
 
+	if err := p.pauseCAPICluster(controlPlane, true); err != nil {
+		return err
+	}
+
 	restorePlan, joinedServer, err := p.generateEtcdSnapshotRestorePlan(controlPlane, snapshot, snapshotName, tokensSecret, servers[0], joinServer)
 	if err != nil {
 		return err
@@ -348,9 +352,6 @@ func (p *Planner) restoreEtcdSnapshot(cp *rkev1.RKEControlPlane, status rkev1.RK
 			status.Initialized = false
 			status.Ready = false
 			logrus.Debugf("[planner] rkecluster %s/%s: setting controlplane ready/initialized to false during etcd restore", cp.Namespace, cp.Name)
-		}
-		if err := p.pauseCAPICluster(cp, true); err != nil {
-			return status, err
 		}
 		status, _ = p.setEtcdSnapshotRestoreState(status, cp.Spec.ETCDSnapshotRestore, rkev1.ETCDSnapshotPhaseShutdown)
 		return status, errWaitingf("shutting down cluster")
