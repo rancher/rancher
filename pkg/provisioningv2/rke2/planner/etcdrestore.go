@@ -139,7 +139,27 @@ func (p *Planner) generateStopServiceAndKillAllPlan(controlPlane *rkev1.RKEContr
 	runtime := rke2.GetRuntime(controlPlane.Spec.KubernetesVersion)
 	nodePlan.Instructions = append(nodePlan.Instructions,
 		generateKillAllInstruction(runtime))
+	if runtime == rke2.RuntimeRKE2 {
+		if generated, instruction := generateManifestRemovalInstruction(runtime, server); generated {
+			nodePlan.Instructions = append(nodePlan.Instructions, instruction)
+		}
+	}
 	return nodePlan, joinedServer, nil
+}
+
+// generateManifestRemovalInstruction generates a rm -rf command for the manifests of a server. This was created in response to https://github.com/rancher/rancher/issues/41174
+func generateManifestRemovalInstruction(runtime string, entry *planEntry) (bool, plan.OneTimeInstruction) {
+	if runtime == "" || entry == nil || roleNot(roleOr(isEtcd, isControlPlane))(entry) {
+		return false, plan.OneTimeInstruction{}
+	}
+	return true, plan.OneTimeInstruction{
+		Name:    "remove server manifests",
+		Command: "rm",
+		Args: []string{
+			"-rf",
+			fmt.Sprintf("/var/lib/rancher/%s/server/manifests/%s-*.yaml", runtime, runtime),
+		},
+	}
 }
 
 func generateKillAllInstruction(runtime string) plan.OneTimeInstruction {
