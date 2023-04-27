@@ -55,7 +55,7 @@ func (p *Planner) runEtcdSnapshotRestorePlan(controlPlane *rkev1.RKEControlPlane
 	servers := collect(clusterPlan, isInitNode)
 
 	if len(servers) != 1 {
-		return fmt.Errorf("more than one init node existed, cannot running etcd snapshot restore")
+		return fmt.Errorf("more than one init node existed, cannot run etcd snapshot restore")
 	}
 
 	restorePlan, joinedServer, err := p.generateEtcdSnapshotRestorePlan(controlPlane, snapshot, snapshotName, tokensSecret, servers[0], joinServer)
@@ -63,8 +63,6 @@ func (p *Planner) runEtcdSnapshotRestorePlan(controlPlane *rkev1.RKEControlPlane
 		return err
 	}
 	return assignAndCheckPlan(p.store, ETCDRestoreMessage, servers[0], restorePlan, joinedServer, 1, 1)
-
-	return errWaiting("failed to find etcd node to restore on")
 }
 
 // generateEtcdSnapshotRestorePlan returns a node plan that contains instructions to stop etcd, remove the tombstone file (if one exists), then restore etcd in that order.

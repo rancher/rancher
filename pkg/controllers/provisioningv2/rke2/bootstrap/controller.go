@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"errors"
-	"fmt"
 	"strings"
 	"time"
 
@@ -440,9 +439,6 @@ func (h *handler) OnRemove(key string, bootstrap *rkev1.RKEBootstrap) (*rkev1.RK
 
 	kcSecret, err := h.secretCache.Get(bootstrap.Namespace, secret.Name(clusterName, secret.Kubeconfig))
 	if err != nil {
-		if apierrors.IsNotFound(err) {
-			return bootstrap, fmt.Errorf("error retrieving kubeconfig secret %s/%s: %v", bootstrap.Namespace, secret.Name(clusterName, secret.Kubeconfig), err)
-		}
 		return bootstrap, err
 	}
 
