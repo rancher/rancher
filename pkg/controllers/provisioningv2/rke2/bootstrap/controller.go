@@ -332,16 +332,14 @@ func (h *handler) GeneratingHandler(bootstrap *rkev1.RKEBootstrap, status rkev1.
 	_, isEtcd := machine.Labels[rke2.EtcdRoleLabel]
 
 	// annotate the CAPI machine with the pre-terminate.delete.hook.machine.cluster.x-k8s.io annotation if it is an etcd machine
-	if val, ok := machine.GetAnnotations()[capiMachinePreTerminateAnnotation]; !ok || val != capiMachinePreTerminateAnnotationOwner && isEtcd {
+	if val, ok := machine.GetAnnotations()[capiMachinePreTerminateAnnotation]; isEtcd && (!ok || val != capiMachinePreTerminateAnnotationOwner) {
 		machine = machine.DeepCopy()
 		if machine.Labels == nil {
 			machine.Labels = make(map[string]string)
 		}
 		machine.Labels[capiMachinePreTerminateAnnotation] = capiMachinePreTerminateAnnotationOwner
-		newMachine, err := h.machineClient.Update(machine)
-		if !apierrors.IsNotFound(err) {
-			machine = newMachine
-		} else if err != nil {
+		machine, err = h.machineClient.Update(machine)
+		if err != nil {
 			return nil, status, err
 		}
 	}

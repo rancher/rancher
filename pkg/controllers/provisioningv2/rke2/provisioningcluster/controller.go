@@ -428,8 +428,7 @@ func (h *handler) OnRemove(_ string, cluster *rancherv1.Cluster) (*rancherv1.Clu
 		}
 		logrus.Errorf("rkecluster %s/%s: error retrieving management cluster during removal of cluster: %v", cluster.Namespace, cluster.Name, err)
 	}
-	if mgmtCluster != nil {
-		reconcileCondition(&mgmtCluster, rke2.Removed, rkeCP, rke2.Removed)
+	if mgmtCluster != nil && reconcileCondition(mgmtCluster, rke2.Removed, rkeCP, rke2.Removed) {
 		_, err = h.mgmtClusterClient.Update(mgmtCluster)
 		if apierror.IsNotFound(err) {
 			return cluster, nil
@@ -438,12 +437,13 @@ func (h *handler) OnRemove(_ string, cluster *rancherv1.Cluster) (*rancherv1.Clu
 		}
 	}
 
-	status := *cluster.Status.DeepCopy()
-	reconcileCondition(&status, rke2.Removed, rkeCP, rke2.Removed)
-	cluster.Status = status
-	cluster, err = h.clusterController.UpdateStatus(cluster)
-	if err != nil {
-		return cluster, err
+	status := cluster.Status.DeepCopy()
+	if reconcileCondition(status, rke2.Removed, rkeCP, rke2.Removed) {
+		cluster.Status = *status
+		cluster, err = h.clusterController.UpdateStatus(cluster)
+		if err != nil {
+			return cluster, err
+		}
 	}
 	return cluster, generic.ErrSkip
 }
