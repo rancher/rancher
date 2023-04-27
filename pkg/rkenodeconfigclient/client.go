@@ -85,19 +85,26 @@ func ConfigClient(ctx context.Context, url string, header http.Header, writeCert
 		}
 
 		if nc != nil {
-			// check to see if we need a new kubelet certificate
-			kubeletCertNeedsRegen, err := kubeletNeedsNewCertificate(nc)
-			if err != nil {
-				return interval, err
-			}
 
-			if kubeletCertNeedsRegen && !requestedRenewedCert {
-				// add to the  header and run getConfig again, so we get a new cert
-				// we should only do this at most once per call to ConfigClient
-				header.Set(rkenodeconfigserver.RegenerateKubeletCertificate, "true")
-				logrus.Infof("Requesting kubelet certificate regeneration")
-				requestedRenewedCert = true
-				continue
+			// if a cert file and key file are passed to the kubelet
+			// then we need to ensure they are valid, otherwise we can safely skip the check
+			certFile, keyFile := getKubeletCertificateFilesFromProcess(nc.Processes)
+			if certFile != "" && keyFile != "" {
+				logrus.Debugf("agent detected certificate arguments within kubelet process, checking kubelet certificate validity")
+				// check to see if we need a new kubelet certificate
+				kubeletCertNeedsRegen, err := kubeletNeedsNewCertificate(nc)
+				if err != nil {
+					return interval, err
+				}
+
+				if kubeletCertNeedsRegen && !requestedRenewedCert {
+					// add to the  header and run getConfig again, so we get a new cert
+					// we should only do this at most once per call to ConfigClient
+					header.Set(rkenodeconfigserver.RegenerateKubeletCertificate, "true")
+					logrus.Debugf("Requesting kubelet certificate regeneration")
+					requestedRenewedCert = true
+					continue
+				}
 			}
 
 			header.Set(rkenodeconfigserver.RegenerateKubeletCertificate, "false")
