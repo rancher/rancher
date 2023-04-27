@@ -2,7 +2,6 @@ package provisioningcluster
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -221,20 +220,7 @@ func (h *handler) findSnapshotClusterSpec(snapshotNamespace, snapshotName string
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving etcdsnapshot %s/%s: %w", snapshotNamespace, snapshotName, err)
 	}
-	if snapshot.SnapshotFile.Metadata != "" {
-		var md map[string]string
-		b, err := base64.StdEncoding.DecodeString(snapshot.SnapshotFile.Metadata)
-		if err != nil {
-			return nil, err
-		}
-		if err := json.Unmarshal(b, &md); err != nil {
-			return nil, err
-		}
-		if v, ok := md["provisioning-cluster-spec"]; ok {
-			return rke2.DecompressClusterSpec(v)
-		}
-	}
-	return nil, fmt.Errorf("unable to find and decode snapshot ClusterSpec for snapshot %s/%s", snapshotNamespace, snapshotName)
+	return rke2.ParseSnapshotClusterSpecOrError(snapshot)
 }
 
 // reconcileClusterSpecEtcdRestore reconciles the cluster against the desiredSpec, but only sets fields that should be set

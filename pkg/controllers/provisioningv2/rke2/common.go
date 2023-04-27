@@ -574,3 +574,24 @@ func DecompressClusterSpec(inputb64 string) (*provv1.ClusterSpec, error) {
 	}
 	return &c, nil
 }
+
+// ParseSnapshotClusterSpecOrError returns a provv1 ClusterSpec from the etcd snapshot if it can be found in the CR. If it cannot be found, it returns an error.
+func ParseSnapshotClusterSpecOrError(snapshot *rkev1.ETCDSnapshot) (*provv1.ClusterSpec, error) {
+	if snapshot == nil {
+		return nil, fmt.Errorf("snapshot was nil")
+	}
+	if snapshot.SnapshotFile.Metadata != "" {
+		var md map[string]string
+		b, err := base64.StdEncoding.DecodeString(snapshot.SnapshotFile.Metadata)
+		if err != nil {
+			return nil, err
+		}
+		if err := json.Unmarshal(b, &md); err != nil {
+			return nil, err
+		}
+		if v, ok := md["provisioning-cluster-spec"]; ok {
+			return DecompressClusterSpec(v)
+		}
+	}
+	return nil, fmt.Errorf("unable to find and decode snapshot ClusterSpec for snapshot")
+}
