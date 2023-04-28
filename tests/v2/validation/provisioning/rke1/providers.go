@@ -9,6 +9,7 @@ import (
 	azure "github.com/rancher/rancher/tests/framework/extensions/rke1/nodetemplates/azure"
 	harvester "github.com/rancher/rancher/tests/framework/extensions/rke1/nodetemplates/harvester"
 	linode "github.com/rancher/rancher/tests/framework/extensions/rke1/nodetemplates/linode"
+	vsphere "github.com/rancher/rancher/tests/framework/extensions/rke1/nodetemplates/vsphere"
 	"github.com/rancher/rancher/tests/v2/validation/provisioning"
 )
 
@@ -46,6 +47,12 @@ func CreateProvider(name string) Provider {
 		provider := Provider{
 			Name:             provisioning.LinodeProviderName,
 			NodeTemplateFunc: linode.CreateLinodeNodeTemplate,
+		}
+		return provider
+	case name == provisioning.VsphereProviderName.String():
+		provider := Provider{
+			Name:             provisioning.VsphereProviderName,
+			NodeTemplateFunc: vsphere.CreateVSphereNodeTemplate,
 		}
 		return provider
 	default:

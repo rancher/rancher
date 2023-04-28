@@ -24,6 +24,7 @@ const (
 	HarvesterProviderName ProviderName = "harvester"
 	LinodeProviderName    ProviderName = "linode"
 	GoogleProviderName    ProviderName = "google"
+	VsphereProviderName   ProviderName = "vsphere"
 )
 
 // String stringer for the ProviderName
