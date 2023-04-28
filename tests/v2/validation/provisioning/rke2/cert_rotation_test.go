@@ -75,7 +75,7 @@ func (r *V2ProvCertRotationTestSuite) testCertRotation(provider Provider, kubeVe
 
 			machinePools := machinepools.RKEMachinePoolSetup(nodesAndRoles, machineConfigResp)
 
-			cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, namespace, "calico", credential.ID, kubeVersion, machinePools)
+			cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, namespace, "calico", credential.ID, kubeVersion, "", machinePools)
 			clusterResp, err := clusters.CreateK3SRKE2Cluster(testSessionClient, cluster)
 			require.NoError(r.T(), err)
 

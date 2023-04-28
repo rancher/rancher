@@ -172,7 +172,8 @@ func (rt *RegistryTestSuite) SetupSuite() {
 
 func (rt *RegistryTestSuite) testProvisionRKE1Cluster(client *rancher.Client, provider rke1.Provider, nodesAndRoles []nodepools.NodeRoles, kubeVersion, cni string, privateRegistries []management.PrivateRegistry) (string, error) {
 	clusterName := namegen.AppendRandomString(provider.Name.String())
-	cluster := clusters.NewRKE1ClusterConfig(clusterName, cni, kubeVersion, client)
+	cluster := clusters.NewRKE1ClusterConfig(clusterName, cni, kubeVersion, "", client)
+
 	cluster.RancherKubernetesEngineConfig.PrivateRegistries = privateRegistries
 
 	clusterResp, err := clusters.CreateRKE1Cluster(client, cluster)

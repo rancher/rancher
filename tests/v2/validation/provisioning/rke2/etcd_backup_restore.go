@@ -124,7 +124,7 @@ func createRKE2NodeDriverCluster(client *rancher.Client, provider *Provider, clu
 
 	machinePools := machinepools.RKEMachinePoolSetup(nodeRoles, machineConfigResp)
 
-	cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, namespace, cni, cloudCredential.ID, k8sVersion, machinePools)
+	cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, namespace, cni, cloudCredential.ID, k8sVersion, "", machinePools)
 
 	return clusters.CreateK3SRKE2Cluster(client, cluster)
 

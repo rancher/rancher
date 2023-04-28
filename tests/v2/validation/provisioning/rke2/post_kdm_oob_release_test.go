@@ -106,7 +106,7 @@ func (k *KdmChecksTestSuite) TestProvisioningSingleNodeRKE2Clusters() {
 		require.NoError(k.T(), err)
 		machinePools := machinepools.RKEMachinePoolSetup(nodeRoles, machineConfigResp)
 
-		cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, k.ns, k.cnis[0], cloudCredential.ID, k8sVersion, machinePools)
+		cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, k.ns, k.cnis[0], cloudCredential.ID, k8sVersion, "", machinePools)
 
 		logrus.Info("provisioning " + k8sVersion + " cluster..")
 

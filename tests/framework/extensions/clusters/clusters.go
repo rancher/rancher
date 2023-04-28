@@ -115,13 +115,13 @@ func CheckServiceAccountTokenSecret(client *rancher.Client, clusterName string) 
 		logrus.Infof("serviceAccountTokenSecret in this cluster is: %s", cluster.ServiceAccountTokenSecret)
 		return true, nil
 	} else {
-		logrus.Infof("serviceAccountTokenSecret does not exist in this cluster!")
+		logrus.Warn("warning: serviceAccountTokenSecret does not exist in this cluster!")
 		return false, nil
 	}
 }
 
 // NewRKE1lusterConfig is a constructor for a v3.Cluster object, to be used by the rancher.Client.Provisioning client.
-func NewRKE1ClusterConfig(clusterName, cni, kubernetesVersion string, client *rancher.Client) *management.Cluster {
+func NewRKE1ClusterConfig(clusterName, cni, kubernetesVersion string, psact string, client *rancher.Client) *management.Cluster {
 	clusterConfig := &management.Cluster{
 		DockerRootDir:           "/var/lib/docker",
 		EnableClusterAlerting:   false,
@@ -151,11 +151,15 @@ func NewRKE1ClusterConfig(clusterName, cni, kubernetesVersion string, client *ra
 		},
 	}
 
+	if psact != "" {
+		clusterConfig.DefaultPodSecurityAdmissionConfigurationTemplateName = psact
+	}
+
 	return clusterConfig
 }
 
 // NewK3SRKE2ClusterConfig is a constructor for a apisV1.Cluster object, to be used by the rancher.Client.Provisioning client.
-func NewK3SRKE2ClusterConfig(clusterName, namespace, cni, cloudCredentialSecretName, kubernetesVersion string, machinePools []apisV1.RKEMachinePool) *apisV1.Cluster {
+func NewK3SRKE2ClusterConfig(clusterName, namespace, cni, cloudCredentialSecretName, kubernetesVersion string, psact string, machinePools []apisV1.RKEMachinePool) *apisV1.Cluster {
 	typeMeta := metav1.TypeMeta{
 		Kind:       "Cluster",
 		APIVersion: "provisioning.cattle.io/v1",
@@ -218,6 +222,10 @@ func NewK3SRKE2ClusterConfig(clusterName, namespace, cni, cloudCredentialSecretN
 		RKEConfig:                 rkeConfig,
 	}
 
+	if psact != "" {
+		spec.DefaultPodSecurityAdmissionConfigurationTemplateName = psact
+	}
+
 	v1Cluster := &apisV1.Cluster{
 		TypeMeta:   typeMeta,
 		ObjectMeta: objectMeta,
@@ -228,8 +236,8 @@ func NewK3SRKE2ClusterConfig(clusterName, namespace, cni, cloudCredentialSecretN
 }
 
 // HardenK3SRKE2ClusterConfig is a constructor for a apisV1.Cluster object, to be used by the rancher.Client.Provisioning client.
-func HardenK3SRKE2ClusterConfig(clusterName, namespace, cni, cloudCredentialSecretName, kubernetesVersion string, machinePools []apisV1.RKEMachinePool) *apisV1.Cluster {
-	v1Cluster := NewK3SRKE2ClusterConfig(clusterName, namespace, cni, cloudCredentialSecretName, kubernetesVersion, machinePools)
+func HardenK3SRKE2ClusterConfig(clusterName, namespace, cni, cloudCredentialSecretName, kubernetesVersion string, psact string, machinePools []apisV1.RKEMachinePool) *apisV1.Cluster {
+	v1Cluster := NewK3SRKE2ClusterConfig(clusterName, namespace, cni, cloudCredentialSecretName, kubernetesVersion, psact, machinePools)
 
 	if strings.Contains(kubernetesVersion, "k3s") {
 		v1Cluster.Spec.RKEConfig.MachineGlobalConfig.Data["kube-apiserver-arg"] = []string{

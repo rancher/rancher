@@ -26,6 +26,7 @@ type RKE2NodeDriverProvisioningTestSuite struct {
 	kubernetesVersions []string
 	cnis               []string
 	providers          []string
+	psact              string
 }
 
 func (r *RKE2NodeDriverProvisioningTestSuite) TearDownSuite() {
@@ -42,6 +43,7 @@ func (r *RKE2NodeDriverProvisioningTestSuite) SetupSuite() {
 	r.kubernetesVersions = clustersConfig.RKE2KubernetesVersions
 	r.cnis = clustersConfig.CNIs
 	r.providers = clustersConfig.Providers
+	r.psact = clustersConfig.PSACT
 
 	client, err := rancher.NewClient("", testSession)
 	require.NoError(r.T(), err)
@@ -122,13 +124,14 @@ func (r *RKE2NodeDriverProvisioningTestSuite) TestProvisioningRKE2Cluster() {
 		name      string
 		nodeRoles []machinepools.NodeRoles
 		client    *rancher.Client
+		psact     string
 	}{
-		{"1 Node all roles " + provisioning.AdminClientName.String(), nodeRoles0, r.client},
-		{"1 Node all roles " + provisioning.StandardClientName.String(), nodeRoles0, r.standardUserClient},
-		{"2 nodes - etcd/cp roles per 1 node " + provisioning.AdminClientName.String(), nodeRoles1, r.client},
-		{"2 nodes - etcd/cp roles per 1 node " + provisioning.StandardClientName.String(), nodeRoles1, r.standardUserClient},
-		{"3 nodes - 1 role per node " + provisioning.AdminClientName.String(), nodeRoles2, r.client},
-		{"3 nodes - 1 role per node " + provisioning.StandardClientName.String(), nodeRoles2, r.standardUserClient},
+		{"1 Node all roles " + provisioning.AdminClientName.String(), nodeRoles0, r.client, r.psact},
+		{"1 Node all roles " + provisioning.StandardClientName.String(), nodeRoles0, r.standardUserClient, r.psact},
+		{"2 nodes - etcd/cp roles per 1 node " + provisioning.AdminClientName.String(), nodeRoles1, r.client, r.psact},
+		{"2 nodes - etcd/cp roles per 1 node " + provisioning.StandardClientName.String(), nodeRoles1, r.standardUserClient, r.psact},
+		{"3 nodes - 1 role per node " + provisioning.AdminClientName.String(), nodeRoles2, r.client, r.psact},
+		{"3 nodes - 1 role per node " + provisioning.StandardClientName.String(), nodeRoles2, r.standardUserClient, r.psact},
 	}
 
 	var name string
@@ -147,7 +150,7 @@ func (r *RKE2NodeDriverProvisioningTestSuite) TestProvisioningRKE2Cluster() {
 				for _, cni := range r.cnis {
 					name += " cni: " + cni
 					r.Run(name, func() {
-						TestProvisioningRKE2Cluster(r.T(), client, provider, tt.nodeRoles, kubeVersion, cni)
+						TestProvisioningRKE2Cluster(r.T(), client, provider, tt.nodeRoles, kubeVersion, cni, tt.psact)
 					})
 				}
 			}
@@ -167,9 +170,10 @@ func (r *RKE2NodeDriverProvisioningTestSuite) TestProvisioningRKE2ClusterDynamic
 	tests := []struct {
 		name   string
 		client *rancher.Client
+		psact  string
 	}{
-		{provisioning.AdminClientName.String(), r.client},
-		{provisioning.StandardClientName.String(), r.standardUserClient},
+		{provisioning.AdminClientName.String(), r.client, r.psact},
+		{provisioning.StandardClientName.String(), r.standardUserClient, r.psact},
 	}
 
 	var name string
@@ -188,7 +192,7 @@ func (r *RKE2NodeDriverProvisioningTestSuite) TestProvisioningRKE2ClusterDynamic
 				for _, cni := range r.cnis {
 					name += " cni: " + cni
 					r.Run(name, func() {
-						TestProvisioningRKE2Cluster(r.T(), client, provider, nodesAndRoles, kubeVersion, cni)
+						TestProvisioningRKE2Cluster(r.T(), client, provider, nodesAndRoles, kubeVersion, cni, tt.psact)
 					})
 				}
 			}
