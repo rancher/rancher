@@ -5,6 +5,8 @@ import (
 
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
+	"github.com/rancher/rancher/tests/framework/extensions/clusters"
+	"github.com/rancher/rancher/tests/framework/extensions/clusters/kubernetesversions"
 	nodepools "github.com/rancher/rancher/tests/framework/extensions/rke1/nodepools"
 	"github.com/rancher/rancher/tests/framework/extensions/rke1/nodetemplates"
 	"github.com/rancher/rancher/tests/framework/extensions/users"
@@ -47,6 +49,9 @@ func (r *RKE1NodeDriverProvisioningTestSuite) SetupSuite() {
 	require.NoError(r.T(), err)
 
 	r.client = client
+
+	r.kubernetesVersions, err = kubernetesversions.Default(r.client, clusters.RKE1ClusterType.String(), r.kubernetesVersions)
+	require.NoError(r.T(), err)
 
 	enabled := true
 	var testuser = namegen.AppendRandomString("testuser-")
