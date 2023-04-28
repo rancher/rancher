@@ -5,6 +5,8 @@ import (
 
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
+	"github.com/rancher/rancher/tests/framework/extensions/clusters"
+	"github.com/rancher/rancher/tests/framework/extensions/clusters/kubernetesversions"
 	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
 	"github.com/rancher/rancher/tests/framework/extensions/users"
 	password "github.com/rancher/rancher/tests/framework/extensions/users/passwordgenerator"
@@ -43,6 +45,9 @@ func (k *K3SNodeDriverProvisioningTestSuite) SetupSuite() {
 	require.NoError(k.T(), err)
 
 	k.client = client
+
+	k.kubernetesVersions, err = kubernetesversions.Default(k.client, clusters.K3SClusterType.String(), k.kubernetesVersions)
+	require.NoError(k.T(), err)
 
 	enabled := true
 	var testuser = namegen.AppendRandomString("testuser-")
