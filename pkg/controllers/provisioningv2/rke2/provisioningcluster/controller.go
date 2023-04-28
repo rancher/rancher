@@ -288,6 +288,12 @@ func (h *handler) OnRancherClusterChange(obj *rancherv1.Cluster, status rancherv
 		return nil, status, err
 	}
 
+	mgmtCluster, err := h.retrieveMgmtClusterFromCache(obj)
+	if err != nil {
+		// don't return because the management cluster condition updating should not be blocking
+		logrus.Errorf("rkecluster %s/%s: error while retrieving management cluster from cache: %v", obj.Namespace, obj.Name, err)
+	}
+
 	// If the rkecontrolplane is not nil, we can check it to determine action items.
 	if rkeCP != nil {
 		// If EtcdSnapshotRestore is not nil, we need to check to see if we need to update the cluster object it.
@@ -326,28 +332,33 @@ func (h *handler) OnRancherClusterChange(obj *rancherv1.Cluster, status rancherv
 				}
 			}
 		}
-		mgmtCluster, err := h.retrieveMgmtClusterFromCache(obj)
-		if err != nil {
-			// don't return because the management cluster condition updating should not be blocking
-			logrus.Errorf("rkecluster %s/%s: error while retrieving management cluster from cache: %v", obj.Namespace, obj.Name, err)
-		}
-		if mgmtCluster != nil {
-			reconcileCondition(mgmtCluster, rke2.Updated, rkeCP, rke2.Ready)
-			reconcileCondition(mgmtCluster, rke2.Provisioned, rkeCP, rke2.Provisioned) // This was originally set by checking machine provisioning, but now we simply set it to true.
-		}
 
 		reconcileCondition(&status, rke2.Updated, rkeCP, rke2.Ready)
 		reconcileCondition(&status, rke2.Provisioned, rkeCP, rke2.Ready)
 
 		// If the Stable condition is not true, then copy the Ready condition from the rkeControlPlane to the v1.Clusters object
-		// Otherwise, use the v3 clusters Ready condition.
-		if !rke2.Stable.IsTrue(rkeCP) {
-			// Set the Ready condition on the v1.cluster to the controlplane Ready status
+		// Otherwise, use the v3 clusters Ready condition. Note that we use `IsTrue` here because `IsFalse` specifically looks
+		// for `False`, and the condition may not be defined which would not match `IsFalse`.
+		useRKEControlPlaneReadyStatus := !rke2.Stable.IsTrue(rkeCP)
+		if useRKEControlPlaneReadyStatus {
 			reconcileCondition(&status, rke2.Ready, rkeCP, rke2.Ready)
-		} else if mgmtCluster != nil {
-			reconcileCondition(&status, rke2.Ready, mgmtCluster, rke2.Ready)
 		}
 		if mgmtCluster != nil {
+			if !useRKEControlPlaneReadyStatus {
+				reconcileCondition(&status, rke2.Ready, mgmtCluster, rke2.Ready)
+			}
+			reconcileCondition(mgmtCluster, rke2.Updated, rkeCP, rke2.Ready)
+			reconcileCondition(mgmtCluster, rke2.Provisioned, rkeCP, rke2.Provisioned) // This was originally set by checking machine provisioning, but now we simply set it to true.
+			_, err := h.mgmtClusterClient.Update(mgmtCluster)
+			if err != nil {
+				return nil, status, err
+			}
+		}
+	} else {
+		// Copy the Ready condition from the management cluster to the provisioning cluster
+		// This is going to occur for all clusters that do NOT have an RKEControlPlane associated with them (imported, RKE1, etc)
+		if mgmtCluster != nil {
+			reconcileCondition(&status, rke2.Ready, mgmtCluster, rke2.Ready)
 			_, err := h.mgmtClusterClient.Update(mgmtCluster)
 			if err != nil {
 				return nil, status, err
@@ -359,6 +370,9 @@ func (h *handler) OnRancherClusterChange(obj *rancherv1.Cluster, status rancherv
 	return objs, status, err
 }
 
+// getRKEControlPlaneForCluster retrieves the rkecontrolplane that corresponds to a provisioning cluster object.
+// If it cannot retrieve the corresponding CAPI cluster (is not found), if the capi cluster controlplane ref is not
+// an rkecontrolplane, or the rkecontrolplane object can't be found and the cluster is deleting, it returns nil, nil.
 func (h *handler) getRKEControlPlaneForCluster(cluster *rancherv1.Cluster) (*rkev1.RKEControlPlane, error) {
 	capiCluster, err := h.capiClusters.Get(cluster.Namespace, cluster.Name)
 	if apierror.IsNotFound(err) {
