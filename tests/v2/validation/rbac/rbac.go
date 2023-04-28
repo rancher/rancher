@@ -41,8 +41,8 @@ const (
 	psaEnforce                    = "pod-security.kubernetes.io/enforce"
 	kubeConfigTokenSettingID      = "kubeconfig-default-token-ttl-minutes"
 	psaRole                       = "updatepsa"
-
-	isCattleLabeled = true
+	defaultNamespace              = "fleet-default"
+	isCattleLabeled               = true
 )
 
 type ClusterConfig struct {
