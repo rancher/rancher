@@ -4,10 +4,13 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
+	"errors"
+	"strings"
 	"time"
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
+	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/etcdmgmt"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
 	rkecontroller "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/namespace"
@@ -27,12 +30,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	capiannotations "sigs.k8s.io/cluster-api/util/annotations"
+	"sigs.k8s.io/cluster-api/util/secret"
 )
 
 const (
-	rkeBootstrapName = "rke.cattle.io/rkebootstrap-name"
+	rkeBootstrapName                       = "rke.cattle.io/rkebootstrap-name"
+	capiMachinePreTerminateAnnotation      = "pre-terminate.delete.hook.machine.cluster.x-k8s.io/rke-bootstrap-cleanup"
+	capiMachinePreTerminateAnnotationOwner = "rke-bootstrap-controller"
 )
 
 type handler struct {
@@ -40,6 +47,7 @@ type handler struct {
 	secretCache         corecontrollers.SecretCache
 	secretClient        corecontrollers.SecretClient
 	machineCache        capicontrollers.MachineCache
+	machineClient       capicontrollers.MachineClient
 	capiClusterCache    capicontrollers.ClusterCache
 	deploymentCache     appcontrollers.DeploymentCache
 	rkeControlPlanes    rkecontroller.RKEControlPlaneCache
@@ -53,6 +61,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 		secretCache:         clients.Core.Secret().Cache(),
 		secretClient:        clients.Core.Secret(),
 		machineCache:        clients.CAPI.Machine().Cache(),
+		machineClient:       clients.CAPI.Machine(),
 		capiClusterCache:    clients.CAPI.Cluster().Cache(),
 		deploymentCache:     clients.Apps.Deployment().Cache(),
 		rkeControlPlanes:    clients.RKE.RKEControlPlane().Cache(),
@@ -61,7 +70,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 	}
 
 	clients.RKE.RKEBootstrap().OnChange(ctx, "rke-bootstrap-cluster-name", h.OnChange)
-
+	clients.RKE.RKEBootstrap().OnRemove(ctx, "rke-bootstrap-etcd-removal", h.OnRemove)
 	rkecontroller.RegisterRKEBootstrapGeneratingHandler(ctx,
 		clients.RKE.RKEBootstrap(),
 		clients.Apply.
@@ -320,6 +329,21 @@ func (h *handler) GeneratingHandler(bootstrap *rkev1.RKEBootstrap, status rkev1.
 
 	result = append(result, h.assignPlanSecret(machine, bootstrap)...)
 
+	_, isEtcd := machine.Labels[rke2.EtcdRoleLabel]
+
+	// annotate the CAPI machine with the pre-terminate.delete.hook.machine.cluster.x-k8s.io annotation if it is an etcd machine
+	if val, ok := machine.GetAnnotations()[capiMachinePreTerminateAnnotation]; isEtcd && (!ok || val != capiMachinePreTerminateAnnotationOwner) {
+		machine = machine.DeepCopy()
+		if machine.Labels == nil {
+			machine.Labels = make(map[string]string)
+		}
+		machine.Labels[capiMachinePreTerminateAnnotation] = capiMachinePreTerminateAnnotationOwner
+		machine, err = h.machineClient.Update(machine)
+		if err != nil {
+			return nil, status, err
+		}
+	}
+
 	bootstrapSecret, objs, err := h.assignBootStrapSecret(machine, bootstrap, capiCluster)
 	if err != nil {
 		return nil, status, err
@@ -372,4 +396,107 @@ func getLabelsAndAnnotationsForPlanSecret(bootstrap *rkev1.RKEBootstrap, machine
 	}
 
 	return labels, annotations
+}
+
+// OnRemove adds finalizer handling to the RKEBootstrap object, and is used to prevent deletion of the RKE Bootstrap
+// when it is deleting and bootstrap is for an etcd node.
+func (h *handler) OnRemove(key string, bootstrap *rkev1.RKEBootstrap) (*rkev1.RKEBootstrap, error) {
+	logrus.Debugf("[rkebootstrap] %s/%s: OnRemove invoked", bootstrap.Namespace, bootstrap.Name)
+	clusterName := bootstrap.Labels[capi.ClusterLabelName]
+	if clusterName == "" {
+		logrus.Warnf("[rkebootstrap] %s/%s: CAPI cluster label %s was not found in bootstrap labels, allowing bootstrap to delete", bootstrap.Namespace, bootstrap.Name, capi.ClusterLabelName)
+		return bootstrap, nil
+	}
+
+	capiCluster, err := h.capiClusterCache.Get(bootstrap.Namespace, clusterName)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			logrus.Warnf("[rkebootstrap] %s/%s: CAPI cluster %s/%s was not found, allowing bootstrap to delete", bootstrap.Namespace, bootstrap.Name, bootstrap.Namespace, clusterName)
+			return bootstrap, nil
+		}
+		return bootstrap, err
+	}
+
+	if capiCluster.Spec.ControlPlaneRef == nil {
+		logrus.Warnf("[rkebootstrap] %s/%s: CAPI cluster %s/%s controlplane object reference was nil, allowing bootstrap to delete", bootstrap.Namespace, bootstrap.Name, capiCluster.Namespace, capiCluster.Name)
+		return bootstrap, nil
+	}
+
+	logrus.Debugf("[rkebootstrap] Removing machine %s in cluster %s", key, clusterName)
+
+	cp, err := h.rkeControlPlanes.Get(capiCluster.Spec.ControlPlaneRef.Namespace, capiCluster.Spec.ControlPlaneRef.Name)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			logrus.Warnf("[rkebootstrap] %s/%s: RKEControlPlane %s/%s was not found, allowing bootstrap to delete", bootstrap.Namespace, bootstrap.Name, capiCluster.Spec.ControlPlaneRef.Namespace, capiCluster.Spec.ControlPlaneRef.Name)
+			return bootstrap, nil
+		}
+		return bootstrap, err
+	}
+
+	machine, err := rke2.GetMachineByOwner(h.machineCache, bootstrap)
+	if err != nil {
+		if errors.Is(err, rke2.ErrNoMachineOwnerRef) || apierrors.IsNotFound(err) {
+			// If we did not find the machine by owner ref or the cache returned a not found, then proceed with deletion
+			return bootstrap, nil
+		}
+		return bootstrap, err
+	}
+
+	// The controlplane is owned by the capi cluster and will not be deleted until the capi cluster is deleted.
+	if cp.DeletionTimestamp != nil || capiCluster.DeletionTimestamp != nil {
+		return h.removeMachinePreTerminateAnnotation(bootstrap, machine)
+	}
+
+	if _, ok := machine.Labels[rke2.EtcdRoleLabel]; !ok {
+		logrus.Debugf("[rkebootstrap] Safe removal for machine %s in cluster %s not necessary as it is not an etcd node", key, clusterName)
+		return h.removeMachinePreTerminateAnnotation(bootstrap, machine) // If we are not dealing with an etcd node, we can go ahead and allow removal
+	}
+
+	if v, ok := bootstrap.Annotations[rke2.ForceRemoveEtcdAnnotation]; ok && strings.ToLower(v) == "true" {
+		logrus.Infof("[rkebootstrap] Force removing etcd machine %s in cluster %s", key, clusterName)
+		return h.removeMachinePreTerminateAnnotation(bootstrap, machine)
+	}
+
+	if machine.Status.NodeRef == nil {
+		logrus.Infof("[rkebootstrap] No associated node found for machine %s in cluster %s, proceeding with removal", key, clusterName)
+		return h.removeMachinePreTerminateAnnotation(bootstrap, machine)
+	}
+
+	kcSecret, err := h.secretCache.Get(bootstrap.Namespace, secret.Name(clusterName, secret.Kubeconfig))
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return h.removeMachinePreTerminateAnnotation(bootstrap, machine)
+		}
+		return bootstrap, err
+	}
+
+	restConfig, err := clientcmd.RESTConfigFromKubeConfig(kcSecret.Data["value"])
+	if err != nil {
+		return bootstrap, err
+	}
+
+	removed, err := etcdmgmt.SafelyRemoved(restConfig, rke2.GetRuntimeCommand(cp.Spec.KubernetesVersion), machine.Status.NodeRef.Name)
+	if err != nil {
+		return bootstrap, err
+	}
+	if !removed {
+		h.rkeBootstrap.EnqueueAfter(bootstrap.Namespace, bootstrap.Name, 5*time.Second)
+		return bootstrap, generic.ErrSkip
+	}
+	return h.removeMachinePreTerminateAnnotation(bootstrap, machine)
+}
+
+// removeMachinePreTerminateAnnotation removes the pre-terminate annotation from a CAPI machine when we removing the rkebootstrap, indicating the infrastructure can be deleted.
+func (h *handler) removeMachinePreTerminateAnnotation(bootstrap *rkev1.RKEBootstrap, machine *capi.Machine) (*rkev1.RKEBootstrap, error) {
+	if machine == nil || machine.Annotations == nil {
+		return bootstrap, nil
+	}
+
+	var err error
+	if _, ok := machine.GetAnnotations()[capiMachinePreTerminateAnnotation]; ok {
+		machine = machine.DeepCopy()
+		delete(machine.Annotations, capiMachinePreTerminateAnnotation)
+		_, err = h.machineClient.Update(machine)
+	}
+	return bootstrap, err
 }

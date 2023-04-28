@@ -156,7 +156,7 @@ func Test_IsWindows(t *testing.T) {
 		"":        false,
 	}
 	for k, v := range data {
-		a.Equal(v, isWindows(&planEntry{
+		a.Equal(v, windows(&planEntry{
 			Metadata: &plan.Metadata{
 				Labels: map[string]string{
 					rke2.CattleOSLabel: k,
@@ -197,7 +197,7 @@ func Test_notWindows(t *testing.T) {
 			a := assert.New(t)
 
 			// act
-			result := notWindows(tt.args.entry)
+			result := roleNot(windows)(tt.args.entry)
 
 			// assert
 			a.Equal(result, tt.args.expected)

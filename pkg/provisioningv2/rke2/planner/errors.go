@@ -5,14 +5,14 @@ import (
 	"fmt"
 )
 
-// errWaiting will cause a re-enqueue of the object being processed
+// errWaiting will not cause a re-enqueue of the object being processed and should be used when waiting for other objects/controllers
 type errWaiting string
 
 func (e errWaiting) Error() string {
 	return string(e)
 }
 
-// errWaitingf renders an error of type errWaiting that will cause a re-enqueue of the object being processed
+// errWaitingf renders an error of type errWaiting that will not cause a re-enqueue of the object being processed and should be used when waiting for other objects/controllers
 func errWaitingf(format string, a ...interface{}) errWaiting {
 	return errWaiting(fmt.Sprintf(format, a...))
 }

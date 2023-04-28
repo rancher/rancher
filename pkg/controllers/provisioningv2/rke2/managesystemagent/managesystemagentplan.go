@@ -100,7 +100,7 @@ func (h *handler) syncSystemUpgradeControllerStatus(obj *rkev1.RKEControlPlane, 
 			rke2.SystemUpgradeControllerReady.Message(&status, "")
 			rke2.SystemUpgradeControllerReady.False(&status)
 			// don't return the error, otherwise the status won't be set to 'false'
-			err = nil
+			return status, nil
 		}
 		logrus.Errorf("[managesystemagentplan] rkecluster %s/%s: error encountered while retrieving bundle %s: %v", obj.Namespace, obj.Name, bundleName, err)
 		return status, err

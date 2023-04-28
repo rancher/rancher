@@ -62,8 +62,6 @@ const (
 	authnWebhookFileName = "/var/lib/rancher/%s/kube-api-authn-webhook.yaml"
 	ConfigYamlFileName   = "/etc/rancher/%s/config.yaml.d/50-rancher.yaml"
 
-	windows = "windows"
-
 	bootstrapTier    = "bootstrap"
 	etcdTier         = "etcd"
 	controlPlaneTier = "control plane"
@@ -109,6 +107,8 @@ contexts:
 type Planner struct {
 	ctx                           context.Context
 	store                         *PlanStore
+	rkeBootstrap                  rkecontrollers.RKEBootstrapClient
+	rkeBootstrapCache             rkecontrollers.RKEBootstrapCache
 	rkeControlPlanes              rkecontrollers.RKEControlPlaneController
 	etcdSnapshotCache             rkecontrollers.ETCDSnapshotCache
 	secretClient                  corecontrollers.SecretClient
@@ -154,6 +154,8 @@ func New(ctx context.Context, clients *wrangler.Context, functions InfoFunctions
 		managementClusters:            clients.Mgmt.Cluster().Cache(),
 		rancherClusterCache:           clients.Provisioning.Cluster().Cache(),
 		rkeControlPlanes:              clients.RKE.RKEControlPlane(),
+		rkeBootstrap:                  clients.RKE.RKEBootstrap(),
+		rkeBootstrapCache:             clients.RKE.RKEBootstrap().Cache(),
 		etcdSnapshotCache:             clients.RKE.ETCDSnapshot().Cache(),
 		etcdS3Args: s3Args{
 			secretCache: clients.Core.Secret().Cache(),
@@ -257,25 +259,85 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlan
 		return status, err
 	}
 
+	// Check for cluster sanity to ensure we can properly deliver plans to this cluster.
 	if !clusterIsSane(plan) {
+		// Set the Stable condition on the controlplane to False. This will be used to indicate that the Ready condition
+		// on the v1 cluster object should be set from the rkecontrolplane Provisioned condition rather than the v3
+		// cluster objects Ready condition.
+		rke2.Stable.False(&status)
+
+		// Set the `initialized` and `ready` status fields on the status to false, as the cluster is not sane and cannot
+		// be considered initialized. This is to also prevent CAPI from setting the ControlPlaneInitialized condition
+		// using fallback logic from the status field.
+		if status.Initialized || status.Ready {
+			status.Initialized = false
+			status.Ready = false
+			logrus.Debugf("[planner] rkecluster %s/%s: setting controlplane ready/initialized to false as cluster was not sane", cp.Namespace, cp.Name)
+			return status, errWaitingf("uninitializing rkecontrolplane %s/%s", cp.Namespace, cp.Name)
+		}
+
+		// Uninitialize the CAPI ClusterControlPlaneInitialized condition so that CAPI controllers don't get hung up and will take ownership of new RKEBootstraps (amongst other objects)
+		if err := p.ensureCAPIClusterControlPlaneInitializedFalse(cp); err != nil {
+			return status, errWaitingf("uninitializing CAPI cluster: %v", err)
+		}
+
+		// Collect all nodes that are etcd and deleting. At this point, if we have any etcd nodes left in the cluster,
+		// they will be deleting, so force delete them to prevent quorum loss.
+		etcdDeleting := collect(plan, roleAnd(isEtcd, isDeleting))
+		for _, deletingEtcdNode := range etcdDeleting {
+			if deletingEtcdNode.Machine == nil {
+				logrus.Warnf("[planner] rkecluster %s/%s: did not find CAPI machine for entry when deleting etcd nodes", cp.Namespace, cp.Name)
+				continue
+			}
+			if deletingEtcdNode.Machine.Spec.Bootstrap.ConfigRef == nil {
+				logrus.Warnf("[planner] rkecluster %s/%s: did not find a corresponding CAPI machine for %s/%s", cp.Namespace, cp.Name, deletingEtcdNode.Machine.Namespace, deletingEtcdNode.Machine.Name)
+				continue
+			}
+			if !strings.Contains(deletingEtcdNode.Machine.Spec.Bootstrap.ConfigRef.APIVersion, "rke.cattle.io") {
+				logrus.Warnf("[planner] rkecluster %s/%s: CAPI machine %s/%s had a bootstrap ref with an unexpected API version: %s", cp.Namespace, cp.Name, deletingEtcdNode.Machine.Namespace, deletingEtcdNode.Machine.Name, deletingEtcdNode.Machine.Spec.Bootstrap.ConfigRef.APIVersion)
+				continue
+			}
+			logrus.Infof("[planner] rkecluster %s/%s: force deleting etcd machine %s/%s as cluster was not sane and machine was deleting", cp.Namespace, cp.Name, deletingEtcdNode.Machine.Namespace, deletingEtcdNode.Machine.Name)
+			// Update the CAPI machine annotation for exclude node draining and set it to true to get the CAPI controllers to not try to drain this node.
+			deletingEtcdNode.Machine.Annotations[capi.ExcludeNodeDrainingAnnotation] = "true"
+			deletingEtcdNode.Machine, err = p.machines.Update(deletingEtcdNode.Machine)
+			if err != nil {
+				// If we get an error here, go ahead and return the error as this will re-enqueue and we can try again.
+				return status, err
+			}
+			rb, err := p.rkeBootstrapCache.Get(deletingEtcdNode.Machine.Spec.Bootstrap.ConfigRef.Namespace, deletingEtcdNode.Machine.Spec.Bootstrap.ConfigRef.Name)
+			if err != nil {
+				return status, err
+			}
+			rb = rb.DeepCopy()
+			// Annotate the rkebootstrap with a "force remove" annotation. This will short-circuit the "safe etcd removal"
+			// logic because at this point we are completely taking the cluster down.
+			rb.Annotations[rke2.ForceRemoveEtcdAnnotation] = "true"
+			_, err = p.rkeBootstrap.Update(rb)
+			if err != nil {
+				return status, err
+			}
+		}
+		if len(etcdDeleting) != 0 {
+			return status, errWaiting("waiting for all etcd machines to be deleted")
+		}
 		return status, errWaiting("waiting for at least one control plane, etcd, and worker node to be registered")
 	}
+
+	rke2.Provisioned.True(&status)
+	rke2.Provisioned.Message(&status, "")
+	rke2.Provisioned.Reason(&status, "")
 
 	_, clusterSecretTokens, err := p.ensureRKEStateSecret(cp)
 	if err != nil {
 		return status, err
 	}
 
-	var (
-		firstIgnoreError error
-		joinServer       string
-	)
-
 	if status, err = p.createEtcdSnapshot(cp, status, clusterSecretTokens, plan); err != nil {
 		return status, err
 	}
 
-	if status, err = p.restoreEtcdSnapshot(cp, status, clusterSecretTokens, plan); err != nil {
+	if status, err = p.restoreEtcdSnapshot(cp, status, clusterSecretTokens, plan, currentVersion); err != nil {
 		return status, err
 	}
 
@@ -301,22 +363,43 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlan
 		return status, errWaitingf("CAPI cluster or RKEControlPlane is paused")
 	}
 
-	// In the case where the cluster has been initialized, there is no current init node, and no plans have been
-	// delivered, don't proceed with electing a new init node. The only way out of this is to restore an etcd snapshot.
-	if status.Initialized && !anyPlanDelivered(plan, isEtcd) {
+	// In the case where the cluster has been bootstrapped and no plans have been
+	// delivered to any etcd nodes, don't proceed with electing a new init node.
+	// The only way out of this is to restore an etcd snapshot.
+	if (rke2.Bootstrapped.IsTrue(&status) || len(collect(plan, roleOr(hasJoinURL, hasJoinedTo))) != 0) && len(collect(plan, roleAnd(isEtcd, anyPlanDataExists))) == 0 {
+		// deliver an etcd snapshot list command to the etcd nodes.
+		rke2.Stable.False(&status) // Set the Stable condition on the controlplane to False. This will be used to hide the v3.Cluster Ready condition from the UI.
 		return status, errWaiting("rkecontrolplane was already initialized but no etcd machines exist that have plans, indicating the etcd plane has been entirely replaced. Restoration from etcd snapshot is required.")
 	}
 
+	return p.fullReconcile(cp, status, clusterSecretTokens, plan, false)
+}
+
+func (p *Planner) fullReconcile(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus, clusterSecretTokens plan.Secret, plan *plan.Plan, ignoreDrainAndConcurrency bool) (rkev1.RKEControlPlaneStatus, error) {
 	// on the first run through, electInitNode will return a `generic.ErrSkip` as it is attempting to wait for the cache to catch up.
-	joinServer, err = p.electInitNode(cp, plan)
+	joinServer, err := p.electInitNode(cp, plan)
 	if err != nil {
 		return status, err
+	}
+
+	var (
+		firstIgnoreError                             error
+		controlPlaneDrainOptions, workerDrainOptions rkev1.DrainOptions
+		controlPlaneConcurrency, workerConcurrency   string
+	)
+
+	if !ignoreDrainAndConcurrency {
+		controlPlaneDrainOptions = cp.Spec.UpgradeStrategy.ControlPlaneDrainOptions
+		workerDrainOptions = cp.Spec.UpgradeStrategy.WorkerDrainOptions
+		controlPlaneConcurrency = cp.Spec.UpgradeStrategy.ControlPlaneConcurrency
+		workerConcurrency = cp.Spec.UpgradeStrategy.WorkerConcurrency
 	}
 
 	// select all etcd and then filter to just initNodes so that unavailable count is correct
 	err = p.reconcile(cp, clusterSecretTokens, plan, true, bootstrapTier, isEtcd, isNotInitNodeOrIsDeleting,
 		"1", "",
-		cp.Spec.UpgradeStrategy.ControlPlaneDrainOptions)
+		controlPlaneDrainOptions)
+	rke2.Bootstrapped.True(&status)
 	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
 	if err != nil {
 		return status, err
@@ -336,7 +419,7 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlan
 	// Process all nodes that have the etcd role and are NOT an init node or deleting. Only process 1 node at a time.
 	err = p.reconcile(cp, clusterSecretTokens, plan, true, etcdTier, isEtcd, isInitNodeOrDeleting,
 		"1", joinServer,
-		cp.Spec.UpgradeStrategy.ControlPlaneDrainOptions)
+		controlPlaneDrainOptions)
 	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
 	if err != nil {
 		return status, err
@@ -344,15 +427,15 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlan
 
 	// Process all nodes that have the controlplane role and are NOT an init node or deleting.
 	err = p.reconcile(cp, clusterSecretTokens, plan, true, controlPlaneTier, isControlPlane, isInitNodeOrDeleting,
-		cp.Spec.UpgradeStrategy.ControlPlaneConcurrency, joinServer,
-		cp.Spec.UpgradeStrategy.ControlPlaneDrainOptions)
+		controlPlaneConcurrency, joinServer,
+		controlPlaneDrainOptions)
 	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
 	if err != nil {
 		return status, err
 	}
 
 	// If there are any suitable controlplane nodes with join URL annotations
-	if len(collect(plan, isControlPlaneAndHasJoinURLAndNotDeleting)) == 0 {
+	if len(collect(plan, roleAnd(isControlPlane, roleAnd(hasJoinURL, roleNot(isDeleting))))) == 0 {
 		return status, errWaiting("waiting for control plane to be available")
 	}
 
@@ -364,8 +447,8 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlan
 
 	// Process all nodes that are ONLY worker nodes.
 	err = p.reconcile(cp, clusterSecretTokens, plan, false, workerTier, isOnlyWorker, isInitNodeOrDeleting,
-		cp.Spec.UpgradeStrategy.WorkerConcurrency, "",
-		cp.Spec.UpgradeStrategy.WorkerDrainOptions)
+		workerConcurrency, "",
+		workerDrainOptions)
 	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
 	if err != nil {
 		return status, err
@@ -374,7 +457,6 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlan
 	if firstIgnoreError != nil {
 		return status, errWaiting(firstIgnoreError.Error())
 	}
-
 	return status, nil
 }
 
@@ -428,9 +510,9 @@ func blockProgressForSUCPSPIf125(msgPrefix string, status rkev1.RKEControlPlaneS
 	return nil
 }
 
-// clusterIsSane ensures that there is at least one controlplane, etcd, and worker node for the cluster.
+// clusterIsSane ensures that there is at least one controlplane, etcd, and worker node that are not deleting for the cluster.
 func clusterIsSane(plan *plan.Plan) bool {
-	if len(collect(plan, isEtcd)) == 0 || len(collect(plan, isControlPlane)) == 0 || len(collect(plan, isWorker)) == 0 {
+	if len(collect(plan, roleAnd(isEtcd, roleNot(isDeleting)))) == 0 || len(collect(plan, roleAnd(isControlPlane, roleNot(isDeleting)))) == 0 || len(collect(plan, roleAnd(isWorker, roleNot(isDeleting)))) == 0 {
 		return false
 	}
 	return true
@@ -458,7 +540,7 @@ func calculateJoinURL(cp *rkev1.RKEControlPlane, entry *planEntry, plan *plan.Pl
 		return "-"
 	}
 
-	entries := collect(plan, isControlPlaneAndHasJoinURLAndNotDeleting)
+	entries := collect(plan, roleAnd(isControlPlane, roleAnd(hasJoinURL, roleNot(isDeleting))))
 
 	if len(entries) == 0 {
 		return ""
@@ -1142,10 +1224,32 @@ func (p *Planner) pauseCAPICluster(cp *rkev1.RKEControlPlane, pause bool) error 
 	if cluster == nil {
 		return fmt.Errorf("CAPI cluster does not exist for %s/%s", cp.Namespace, cp.Name)
 	}
+	cluster = cluster.DeepCopy()
 	if cluster.Spec.Paused == pause {
 		return nil
 	}
 	cluster.Spec.Paused = pause
 	_, err = p.capiClient.Update(cluster)
+	return err
+}
+
+// ensureCAPIClusterControlPlaneInitializedFalse retrieves the CAPI cluster from cache and sets the ControlPlaneInitializedCondition
+// to False if it is not already False.
+func (p *Planner) ensureCAPIClusterControlPlaneInitializedFalse(cp *rkev1.RKEControlPlane) error {
+	if cp == nil {
+		return fmt.Errorf("cannot uninitialize CAPI cluster for nil controlplane")
+	}
+	cluster, err := rke2.GetOwnerCAPICluster(cp, p.capiClusters)
+	if err != nil {
+		return err
+	}
+	if cluster == nil {
+		return fmt.Errorf("CAPI cluster does not exist for %s/%s", cp.Namespace, cp.Name)
+	}
+	cluster = cluster.DeepCopy()
+	if !conditions.IsFalse(cluster, capi.ControlPlaneInitializedCondition) {
+		conditions.MarkFalse(cluster, capi.ControlPlaneInitializedCondition, capi.WaitingForControlPlaneProviderInitializedReason, capi.ConditionSeverityInfo, "Waiting for control plane provider to indicate the control plane has been initialized")
+		_, err = p.capiClient.UpdateStatus(cluster)
+	}
 	return err
 }
