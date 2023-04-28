@@ -435,10 +435,15 @@ func (h *handler) OnRemove(key string, bootstrap *rkev1.RKEBootstrap) (*rkev1.RK
 
 	machine, err := rke2.GetMachineByOwner(h.machineCache, bootstrap)
 	if err != nil {
-		if errors.Is(err, rke2.ErrNoMachineOwnerRef) {
+		if errors.Is(err, rke2.ErrNoMachineOwnerRef) || apierrors.IsNotFound(err) {
+			// If we did not find the machine by owner ref or the cache returned a not found, then proceed with deletion
 			return bootstrap, nil
 		}
 		return bootstrap, err
+	}
+
+	if cp.DeletionTimestamp != nil {
+		return h.removeMachinePreTerminateAnnotation(bootstrap, machine)
 	}
 
 	if _, ok := machine.Labels[rke2.EtcdRoleLabel]; !ok {
@@ -458,6 +463,9 @@ func (h *handler) OnRemove(key string, bootstrap *rkev1.RKEBootstrap) (*rkev1.RK
 
 	kcSecret, err := h.secretCache.Get(bootstrap.Namespace, secret.Name(clusterName, secret.Kubeconfig))
 	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return h.removeMachinePreTerminateAnnotation(bootstrap, machine)
+		}
 		return bootstrap, err
 	}
 
