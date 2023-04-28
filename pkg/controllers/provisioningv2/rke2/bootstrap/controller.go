@@ -442,7 +442,8 @@ func (h *handler) OnRemove(key string, bootstrap *rkev1.RKEBootstrap) (*rkev1.RK
 		return bootstrap, err
 	}
 
-	if cp.DeletionTimestamp != nil {
+	// The controlplane is owned by the capi cluster and will not be deleted until the capi cluster is deleted.
+	if cp.DeletionTimestamp != nil || capiCluster.DeletionTimestamp != nil {
 		return h.removeMachinePreTerminateAnnotation(bootstrap, machine)
 	}
 
