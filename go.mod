@@ -110,7 +110,7 @@ require (
 	github.com/rancher/kubernetes-provider-detector v0.1.5
 	github.com/rancher/lasso v0.0.0-20221227210133-6ea88ca2fbcc
 	github.com/rancher/lasso/controller-runtime v0.0.0-20220627205005-00d9c8e9dda6
-	github.com/rancher/machine v0.15.0-rancher98
+	github.com/rancher/machine v0.15.0-rancher99
 	github.com/rancher/norman v0.0.0-20230328153514-ae12f166495a
 	github.com/rancher/rancher/pkg/apis v0.0.0
 	github.com/rancher/rancher/pkg/client v0.0.0
@@ -126,7 +126,7 @@ require (
 	github.com/tomnomnom/linkheader v0.0.0-20180905144013-02ca5825eb80
 	github.com/urfave/cli v1.22.9
 	github.com/vishvananda/netlink v1.1.1-0.20210330154013-f5de75959ad5
-	github.com/vmware/govmomi v0.26.0
+	github.com/vmware/govmomi v0.30.4
 	golang.org/x/crypto v0.3.0
 	golang.org/x/mod v0.9.0
 	golang.org/x/net v0.8.0
