@@ -9,6 +9,10 @@ if [ ! -x $CMD ]; then
     ./scripts/build-server
 fi
 
+if [ $1 = "--trace" ] || [ $1 = "--info" ] || [ $1 = "--debug" ]; then
+  LOGFLAG=$1
+fi
+
 rm -rf build/testdata
 mkdir -p build/testdata
 cd build/testdata
@@ -34,4 +38,4 @@ if [ -f /sys/fs/cgroup/cgroup.controllers ]; then
   sed -e 's/ / +/g' -e 's/^/+/' <"/sys/fs/cgroup/cgroup.controllers" >"/sys/fs/cgroup/cgroup.subtree_control"
 fi
 
-exec ../../$CMD
+exec ../../$CMD $LOGFLAG

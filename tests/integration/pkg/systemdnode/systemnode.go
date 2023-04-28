@@ -9,7 +9,7 @@ import (
 
 // New is used to create a new instance of systemd-node as a pod in a Kubernetes cluster. Notably, this is used for the
 // v2prov integration tests for custom clusters to simulate custom cluster nodes.
-func New(clients *clients.Clients, namespace, script string) (*corev1.Pod, error) {
+func New(clients *clients.Clients, namespace, script string, labels map[string]string) (*corev1.Pod, error) {
 	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:    namespace,
@@ -53,6 +53,7 @@ INVOCATION_ID=
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:    namespace,
 			GenerateName: "test-node-",
+			Labels:       labels,
 		},
 		Spec: corev1.PodSpec{
 			Volumes: []corev1.Volume{
