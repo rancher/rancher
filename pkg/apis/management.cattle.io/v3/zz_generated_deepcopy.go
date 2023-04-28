@@ -6776,6 +6776,7 @@ func (in *OIDCTestOutput) DeepCopy() *OIDCTestOutput {
 func (in *OKTAConfig) DeepCopyInto(out *OKTAConfig) {
 	*out = *in
 	in.SamlConfig.DeepCopyInto(&out.SamlConfig)
+	in.OpenLdapConfig.DeepCopyInto(&out.OpenLdapConfig)
 	return
 }
 

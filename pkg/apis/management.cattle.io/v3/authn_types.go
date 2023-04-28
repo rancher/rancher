@@ -397,7 +397,8 @@ type KeyCloakConfig struct {
 }
 
 type OKTAConfig struct {
-	SamlConfig `json:",inline" mapstructure:",squash"`
+	SamlConfig     `json:",inline" mapstructure:",squash"`
+	OpenLdapConfig LdapFields `json:"openLdapConfig" mapstructure:",squash"`
 }
 
 type ShibbolethConfig struct {
