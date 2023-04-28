@@ -1,14 +1,15 @@
 package cluster
 
 import (
+	"bufio"
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	provisioningv1api "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/machineprovision"
 	"github.com/rancher/rancher/tests/integration/pkg/clients"
@@ -118,46 +119,11 @@ func PodInfraMachines(clients *clients.Clients, cluster *provisioningv1api.Clust
 func WaitForCreate(clients *clients.Clients, c *provisioningv1api.Cluster) (_ *provisioningv1api.Cluster, err error) {
 	defer func() {
 		if err != nil {
-			c, newErr := clients.Provisioning.Cluster().Get(c.Namespace, c.Name, metav1.GetOptions{})
+			data, newErr := gatherDebugData(clients, c)
 			if newErr != nil {
-				logrus.Errorf("failed to get cluster %s/%s to print error: %v", c.Namespace, c.Name, err)
-				return
+				logrus.Error(newErr)
 			}
-
-			machines, newErr := Machines(clients, c)
-			if newErr != nil {
-				logrus.Errorf("failed to get machines for %s/%s to print error: %v", c.Namespace, c.Name, err)
-			}
-
-			var plans []*corev1.Secret
-			for _, machine := range machines.Items {
-				if machine.Spec.Bootstrap.ConfigRef == nil {
-					continue
-				}
-
-				planSAs, err := clients.Core.ServiceAccount().List(machine.Namespace, metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s,%s=%s", rke2.MachineNameLabel, machine.Name,
-					rke2.RoleLabel, rke2.RolePlan),
-				})
-				if err != nil {
-					continue
-				}
-
-				if len(planSAs.Items) != 1 {
-					continue
-				}
-
-				secret, err := clients.Core.Secret().Get(machine.Namespace, planSAs.Items[0].Labels[rke2.PlanSecret], metav1.GetOptions{})
-				if err == nil {
-					plans = append(plans, secret)
-				}
-			}
-
-			data, _ := json.Marshal(map[string]interface{}{
-				"cluster":  c,
-				"machines": machines,
-				"plans":    plans,
-			})
-			err = fmt.Errorf("creation wait failed on %s: %w", data, err)
+			err = fmt.Errorf("creation wait failed on: %w\n%s", err, data)
 		}
 	}()
 
@@ -213,54 +179,11 @@ func WaitForCreate(clients *clients.Clients, c *provisioningv1api.Cluster) (_ *p
 func WaitForDelete(clients *clients.Clients, c *provisioningv1api.Cluster) (_ *provisioningv1api.Cluster, err error) {
 	defer func() {
 		if err != nil {
-			newC, newErr := clients.Provisioning.Cluster().Get(c.Namespace, c.Name, metav1.GetOptions{})
-			if apierrors.IsNotFound(newErr) {
-				newC = nil
-			} else if newErr != nil {
-				logrus.Errorf("failed to get cluster %s/%s to print error: %v", c.Namespace, c.Name, err)
-				return
-			}
-
-			machines, newErr := Machines(clients, c)
+			data, newErr := gatherDebugData(clients, c)
 			if newErr != nil {
-				logrus.Errorf("failed to get machines for %s/%s to print error: %v", c.Namespace, c.Name, err)
+				logrus.Error(newErr)
 			}
-
-			gvr := schema.GroupVersionResource{
-				Group:    "rke-machine.cattle.io",
-				Version:  "v1",
-				Resource: "podmachines",
-			}
-
-			infraMachines, newErr := clients.Dynamic.Resource(gvr).List(context.TODO(), metav1.ListOptions{
-				LabelSelector: "cluster.x-k8s.io/cluster-name=" + c.Name,
-			})
-			if newErr != nil {
-				logrus.Errorf("failed to get infra machines for %s/%s to print error: %v", c.Namespace, c.Name, err)
-			}
-
-			mgmtCluster, newErr := clients.Mgmt.Cluster().Get(c.Status.ClusterName, metav1.GetOptions{})
-			if apierrors.IsNotFound(newErr) {
-				mgmtCluster = nil
-			} else if newErr != nil {
-				logrus.Errorf("failed to get mgmt cluster %s/%s to print error: %v", c.Namespace, c.Name, err)
-			}
-
-			capiCluster, newErr := clients.CAPI.Cluster().Get(c.Namespace, c.Name, metav1.GetOptions{})
-			if apierrors.IsNotFound(newErr) {
-				capiCluster = nil
-			} else if newErr != nil {
-				logrus.Errorf("failed to get capi cluster %s/%s to print error: %v", c.Namespace, c.Name, err)
-			}
-
-			data, _ := json.Marshal(map[string]interface{}{
-				"cluster":       newC,
-				"mgmtCluster":   mgmtCluster,
-				"capiCluster":   capiCluster,
-				"machines":      machines,
-				"infraMachines": infraMachines,
-			})
-			err = fmt.Errorf("deletion wait failed on %s: %w", data, err)
+			err = fmt.Errorf("deletion wait failed on: %w\n%s", err, data)
 		}
 	}()
 
@@ -345,4 +268,153 @@ func CustomCommand(clients *clients.Clients, c *provisioningv1api.Cluster) (stri
 	}
 
 	return "", fmt.Errorf("timeout getting custom command")
+}
+
+func getPodLogs(clients *clients.Clients, podNamespace, podName string) (string, error) {
+	plr := clients.K8s.CoreV1().Pods(podNamespace).GetLogs(podName, &corev1.PodLogOptions{})
+	stream, err := plr.Stream(context.TODO())
+	if err != nil {
+		return "", fmt.Errorf("error streaming pod logs for pod %s/%s: %v", podNamespace, podName, err)
+	}
+	defer stream.Close()
+
+	reader := bufio.NewScanner(stream)
+	var logs string
+	for reader.Scan() {
+		logs = logs + fmt.Sprintf("%sSnewlineG", reader.Text())
+	}
+	return rke2.CompressInterface(logs)
+}
+
+func gatherDebugData(clients *clients.Clients, c *provisioningv1api.Cluster) (string, error) {
+	newC, newErr := clients.Provisioning.Cluster().Get(c.Namespace, c.Name, metav1.GetOptions{})
+	if newErr != nil {
+		logrus.Errorf("failed to get cluster %s/%s to print error: %v", c.Namespace, c.Name, newErr)
+		newC = nil
+	}
+
+	newControlPlane, newErr := clients.RKE.RKEControlPlane().Get(c.Namespace, c.Name, metav1.GetOptions{})
+	if newErr != nil {
+		logrus.Errorf("failed to get controlplane %s/%s to print error: %v", c.Namespace, c.Name, newErr)
+		newControlPlane = nil
+	}
+
+	var rkeBootstraps []*rkev1.RKEBootstrap
+	var infraMachines []*unstructured.Unstructured
+
+	var podLogs = make(map[string]string)
+
+	machines, newErr := Machines(clients, c)
+	if newErr != nil {
+		logrus.Errorf("failed to get machines for %s/%s to print error: %v", c.Namespace, c.Name, newErr)
+	} else {
+		for _, machine := range machines.Items {
+			rb, newErr := clients.RKE.RKEBootstrap().Get(machine.Spec.Bootstrap.ConfigRef.Namespace, machine.Spec.Bootstrap.ConfigRef.Name, metav1.GetOptions{})
+			if newErr != nil {
+				logrus.Errorf("failed to get RKEBootstrap %s/%s to print error: %v", c.Namespace, c.Name, newErr)
+			} else {
+				rkeBootstraps = append(rkeBootstraps, rb)
+			}
+			im, newErr := clients.Dynamic.Resource(schema.GroupVersionResource{
+				Group:    machine.Spec.InfrastructureRef.GroupVersionKind().Group,
+				Version:  machine.Spec.InfrastructureRef.GroupVersionKind().Version,
+				Resource: strings.ToLower(fmt.Sprintf("%ss", machine.Spec.InfrastructureRef.GroupVersionKind().Kind)),
+			}).Namespace(machine.Spec.InfrastructureRef.Namespace).Get(context.TODO(), machine.Spec.InfrastructureRef.Name, metav1.GetOptions{})
+			if newErr != nil {
+				logrus.Errorf("failed to get %s %s/%s to print error: %v", machine.Spec.InfrastructureRef.GroupVersionKind().String(), machine.Spec.InfrastructureRef.Namespace, machine.Spec.InfrastructureRef.Name, newErr)
+			} else {
+				infraMachines = append(infraMachines, im)
+				if machine.Spec.InfrastructureRef.GroupVersionKind().Kind != "CustomMachine" {
+					// In the case of a podmachine, the pod name will be strings.ReplaceAll(infra.meta.GetName(), ".", "-")
+					logs, newErr := getPodLogs(clients, machine.Spec.InfrastructureRef.Namespace, strings.ReplaceAll(im.GetName(), ".", "-"))
+					if newErr != nil {
+						logrus.Errorf("error while retrieving pod logs: %v", newErr)
+					} else {
+						podLogs[im.GetName()] = logs
+					}
+				}
+			}
+		}
+	}
+
+	customPods, newErr := clients.Core.Pod().List(c.Namespace, metav1.ListOptions{
+		LabelSelector: "custom-cluster-name=" + c.Name,
+	})
+	if newErr != nil {
+		logrus.Errorf("failed to list custommachine pods: %v", newErr)
+	} else {
+		for _, pod := range customPods.Items {
+			// In the case of a custommachine, the pod will be labeled with custom-cluster-name = <cluster-name>
+			logs, newErr := getPodLogs(clients, pod.Namespace, pod.Name)
+			if newErr != nil {
+				logrus.Errorf("error while retrieving pod logs: %v", newErr)
+			} else {
+				podLogs[pod.Name] = logs
+			}
+		}
+	}
+
+	rkeBootstrapTemplates, newErr := clients.RKE.RKEBootstrapTemplate().List(c.Namespace, metav1.ListOptions{
+		LabelSelector: "cluster.x-k8s.io/cluster-name=" + c.Name,
+	})
+	if newErr != nil {
+		logrus.Errorf("failed to get rkebootstrap templates for %s/%s to print error: %v", c.Namespace, c.Name, newErr)
+	}
+
+	mgmtCluster, newErr := clients.Mgmt.Cluster().Get(c.Status.ClusterName, metav1.GetOptions{})
+	if apierrors.IsNotFound(newErr) {
+		mgmtCluster = nil
+	} else if newErr != nil {
+		logrus.Errorf("failed to get mgmt cluster %s/%s to print error: %v", c.Namespace, c.Name, newErr)
+	}
+
+	var infraCluster *unstructured.Unstructured
+	var machineDeployments *capi.MachineDeploymentList
+	var machineSets *capi.MachineSetList
+
+	capiCluster, newErr := clients.CAPI.Cluster().Get(c.Namespace, c.Name, metav1.GetOptions{})
+	if apierrors.IsNotFound(newErr) {
+		capiCluster = nil
+	} else if newErr != nil {
+		logrus.Errorf("failed to get capi cluster %s/%s to print error: %v", c.Namespace, c.Name, newErr)
+	} else {
+		infraCluster, newErr = clients.Dynamic.Resource(schema.GroupVersionResource{
+			Group:    capiCluster.Spec.InfrastructureRef.GroupVersionKind().Group,
+			Version:  capiCluster.Spec.InfrastructureRef.GroupVersionKind().Version,
+			Resource: strings.ToLower(fmt.Sprintf("%ss", capiCluster.Spec.InfrastructureRef.GroupVersionKind().Kind)),
+		}).Namespace(capiCluster.Spec.InfrastructureRef.Namespace).Get(context.TODO(), capiCluster.Spec.InfrastructureRef.Name, metav1.GetOptions{})
+		if newErr != nil {
+			logrus.Errorf("failed to get %s %s/%s to print error: %v", capiCluster.Spec.InfrastructureRef.GroupVersionKind().String(), capiCluster.Spec.InfrastructureRef.Namespace, capiCluster.Spec.InfrastructureRef.Name, newErr)
+			infraCluster = nil
+		}
+		machineDeployments, newErr = clients.CAPI.MachineDeployment().List(c.Namespace, metav1.ListOptions{
+			LabelSelector: "cluster.x-k8s.io/cluster-name=" + c.Name,
+		})
+		if newErr != nil {
+			logrus.Error(newErr)
+			machineDeployments = nil
+		}
+		machineSets, newErr = clients.CAPI.MachineSet().List(c.Namespace, metav1.ListOptions{
+			LabelSelector: "cluster.x-k8s.io/cluster-name=" + c.Name,
+		})
+		if newErr != nil {
+			logrus.Error(newErr)
+			machineSets = nil
+		}
+	}
+
+	return rke2.CompressInterface(map[string]interface{}{
+		"cluster":               newC,
+		"rkecontrolplane":       newControlPlane,
+		"mgmtCluster":           mgmtCluster,
+		"capiCluster":           capiCluster,
+		"machineDeployments":    machineDeployments,
+		"machineSets":           machineSets,
+		"machines":              machines,
+		"rkeBootstraps":         rkeBootstraps,
+		"rkeBootstrapTemplates": rkeBootstrapTemplates,
+		"infraCluster":          infraCluster,
+		"infraMachines":         infraMachines,
+		"podLogs":               podLogs,
+	})
 }

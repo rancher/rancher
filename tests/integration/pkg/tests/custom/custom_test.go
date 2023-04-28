@@ -93,7 +93,7 @@ func TestCustomOneNode(t *testing.T) {
 
 	assert.NotEmpty(t, command)
 
-	_, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --worker --etcd --controlplane --label foo=bar --label ball=life")
+	_, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --worker --etcd --controlplane --label foo=bar --label ball=life", map[string]string{"custom-cluster-name": c.Name})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -153,7 +153,7 @@ func TestCustomThreeNode(t *testing.T) {
 	assert.NotEmpty(t, command)
 
 	for i := 0; i < 3; i++ {
-		_, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --worker --etcd --controlplane --label rancher=awesome")
+		_, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --worker --etcd --controlplane --label rancher=awesome", map[string]string{"custom-cluster-name": c.Name})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -215,20 +215,20 @@ func TestCustomUniqueRoles(t *testing.T) {
 	assert.NotEmpty(t, command)
 
 	for i := 0; i < 3; i++ {
-		_, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --etcd")
+		_, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --etcd", map[string]string{"custom-cluster-name": c.Name})
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
 
 	for i := 0; i < 1; i++ {
-		_, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --controlplane")
+		_, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --controlplane", map[string]string{"custom-cluster-name": c.Name})
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	_, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --worker")
+	_, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --worker", map[string]string{"custom-cluster-name": c.Name})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -301,7 +301,7 @@ func TestCustomThreeNodeWithTaints(t *testing.T) {
 		if i == 1 {
 			taint = " --taint key=value:NoExecute"
 		}
-		_, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --worker --etcd --controlplane --label rancher=awesome"+taint)
+		_, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --worker --etcd --controlplane --label rancher=awesome"+taint, map[string]string{"custom-cluster-name": c.Name})
 		if err != nil {
 			t.Fatal(err)
 		}
