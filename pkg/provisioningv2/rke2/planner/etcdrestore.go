@@ -180,6 +180,27 @@ func generateCreateEtcdTombstoneInstruction(controlPlane *rkev1.RKEControlPlane)
 	}
 }
 
+func generateRemoveTLSAndCredDirInstructions(controlPlane *rkev1.RKEControlPlane) []plan.OneTimeInstruction {
+	return []plan.OneTimeInstruction{
+		{
+			Name:    "remove-tls-directory",
+			Command: "rm",
+			Args: []string{
+				"-rf",
+				fmt.Sprintf("/var/lib/rancher/%s/server/tls", rke2.GetRuntimeCommand(controlPlane.Spec.KubernetesVersion)),
+			},
+		},
+		{
+			Name:    "remove-cred-directory",
+			Command: "rm",
+			Args: []string{
+				"-rf",
+				fmt.Sprintf("/var/lib/rancher/%s/server/cred", rke2.GetRuntimeCommand(controlPlane.Spec.KubernetesVersion)),
+			},
+		},
+	}
+}
+
 // runEtcdRestoreInitNodeElection runs an election for an init node. Notably, it accepts a nil snapshot, and will
 func (p *Planner) runEtcdRestoreInitNodeElection(controlPlane *rkev1.RKEControlPlane, snapshot *rkev1.ETCDSnapshot, clusterPlan *plan.Plan) (string, error) {
 	if snapshot != nil { // If the snapshot CR is not nil, then find an init node.
@@ -225,6 +246,9 @@ func (p *Planner) runEtcdRestoreServiceStop(controlPlane *rkev1.RKEControlPlane,
 		}
 		if isEtcd(server) {
 			stopPlan.Instructions = append(stopPlan.Instructions, generateCreateEtcdTombstoneInstruction(controlPlane))
+		}
+		if roleOr(isEtcd, isControlPlane)(server) {
+			stopPlan.Instructions = append(stopPlan.Instructions, generateRemoveTLSAndCredDirInstructions(controlPlane)...)
 		}
 		if !equality.Semantic.DeepEqual(server.Plan.Plan, stopPlan) {
 			if err := p.store.UpdatePlan(server, stopPlan, joinedServer, 0, 0); err != nil {
