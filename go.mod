@@ -101,7 +101,7 @@ require (
 	github.com/prometheus/client_model v0.2.0
 	github.com/prometheus/common v0.32.1
 	github.com/rancher/aks-operator v1.1.0
-	github.com/rancher/apiserver v0.0.0-20230120214941-e88c32739dc7
+	github.com/rancher/apiserver v0.0.0-20230426211119-c75d1c70aa2b
 	github.com/rancher/channelserver v0.5.1-0.20220405170618-28c9b37deff1
 	github.com/rancher/dynamiclistener v0.3.5
 	github.com/rancher/eks-operator v1.2.0
@@ -111,7 +111,7 @@ require (
 	github.com/rancher/lasso v0.0.0-20221227210133-6ea88ca2fbcc
 	github.com/rancher/lasso/controller-runtime v0.0.0-20220627205005-00d9c8e9dda6
 	github.com/rancher/machine v0.15.0-rancher98
-	github.com/rancher/norman v0.0.0-20230328153514-ae12f166495a
+	github.com/rancher/norman v0.0.0-20230426211126-d3552b018687
 	github.com/rancher/rancher/pkg/apis v0.0.0
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
