@@ -9,10 +9,10 @@ import (
 
 func TestPopulateHostnameLengthLimitAnnotation(t *testing.T) {
 	tests := []struct {
-		name        string
-		machinePool provv1.RKEMachinePool
-		defaults    provv1.RKEMachinePoolDefaults
-		expected    map[string]string
+		name                       string
+		machinePool                provv1.RKEMachinePool
+		defaultHostnameLengthLimit int
+		expected                   map[string]string
 	}{
 		{
 			name:     "default",
@@ -44,48 +44,52 @@ func TestPopulateHostnameLengthLimitAnnotation(t *testing.T) {
 			expected:    map[string]string{},
 		},
 		{
-			name:     "default valid",
-			defaults: provv1.RKEMachinePoolDefaults{HostnameLengthLimit: 32},
-			expected: map[string]string{"rke.cattle.io/hostname-length-limit": "32"},
+			name:                       "default valid",
+			defaultHostnameLengthLimit: 32,
+			expected:                   map[string]string{"rke.cattle.io/hostname-length-limit": "32"},
 		},
 		{
-			name:     "default valid min",
-			defaults: provv1.RKEMachinePoolDefaults{HostnameLengthLimit: 10},
-			expected: map[string]string{"rke.cattle.io/hostname-length-limit": "10"},
+			name:                       "default valid min",
+			defaultHostnameLengthLimit: 10,
+			expected:                   map[string]string{"rke.cattle.io/hostname-length-limit": "10"},
 		},
 		{
-			name:     "default valid max",
-			defaults: provv1.RKEMachinePoolDefaults{HostnameLengthLimit: 63},
-			expected: map[string]string{"rke.cattle.io/hostname-length-limit": "63"},
+			name:                       "default valid max",
+			defaultHostnameLengthLimit: 63,
+			expected:                   map[string]string{"rke.cattle.io/hostname-length-limit": "63"},
 		},
 		{
-			name:     "default < min",
-			defaults: provv1.RKEMachinePoolDefaults{HostnameLengthLimit: 1},
-			expected: map[string]string{},
+			name:                       "default < min",
+			defaultHostnameLengthLimit: 1,
+			expected:                   map[string]string{},
 		},
 		{
-			name:     "default > max",
-			defaults: provv1.RKEMachinePoolDefaults{HostnameLengthLimit: 64},
-			expected: map[string]string{},
+			name:                       "default > max",
+			defaultHostnameLengthLimit: 64,
+			expected:                   map[string]string{},
 		},
 		{
-			name:        "prefer pool value over default",
-			machinePool: provv1.RKEMachinePool{HostnameLengthLimit: 16},
-			defaults:    provv1.RKEMachinePoolDefaults{HostnameLengthLimit: 32},
-			expected:    map[string]string{"rke.cattle.io/hostname-length-limit": "16"},
+			name:                       "prefer pool value over default",
+			machinePool:                provv1.RKEMachinePool{HostnameLengthLimit: 16},
+			defaultHostnameLengthLimit: 32,
+			expected:                   map[string]string{"rke.cattle.io/hostname-length-limit": "16"},
 		},
 		{
-			name:        "fallback default",
-			machinePool: provv1.RKEMachinePool{HostnameLengthLimit: 1234},
-			defaults:    provv1.RKEMachinePoolDefaults{HostnameLengthLimit: 32},
-			expected:    map[string]string{"rke.cattle.io/hostname-length-limit": "32"},
+			name:                       "fallback default",
+			machinePool:                provv1.RKEMachinePool{HostnameLengthLimit: 1234},
+			defaultHostnameLengthLimit: 32,
+			expected:                   map[string]string{"rke.cattle.io/hostname-length-limit": "32"},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			annotations := map[string]string{}
-			populateHostnameLengthLimitAnnotation(tt.machinePool, tt.defaults, annotations)
+			tt.machinePool.Name = tt.name
+			err := populateHostnameLengthLimitAnnotation(tt.machinePool, &provv1.Cluster{Spec: provv1.ClusterSpec{RKEConfig: &provv1.RKEConfig{
+				MachinePoolDefaults: provv1.RKEMachinePoolDefaults{HostnameLengthLimit: tt.defaultHostnameLengthLimit},
+			}}}, annotations)
+			assert.NoError(t, err)
 			assert.Equal(t, tt.expected, annotations)
 		})
 	}

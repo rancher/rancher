@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/pkg/errors"
 	"github.com/rancher/lasso/pkg/dynamic"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	rancherv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
@@ -208,17 +209,41 @@ func toMachineTemplate(machinePoolName string, cluster *rancherv1.Cluster, machi
 	return ustr, nil
 }
 
-func populateHostnameLengthLimitAnnotation(mp rancherv1.RKEMachinePool, defaults rancherv1.RKEMachinePoolDefaults, annotations map[string]string) {
+func populateHostnameLengthLimitAnnotation(mp rancherv1.RKEMachinePool, cluster *rancherv1.Cluster, annotations map[string]string) error {
+	if cluster == nil {
+		return errors.New("cannot add hostname length limit annotation for nil cluster")
+	}
+	if annotations == nil {
+		return errors.Errorf("cannot add hostname length limit annotation for nil annotations")
+	}
 	hostnameLimit := 0
-	if hl := mp.HostnameLengthLimit; hl >= rke2.MinimumHostnameLengthLimit && hl <= rke2.MaximumHostnameLengthLimit {
-		hostnameLimit = hl
-	} else if hl = defaults.HostnameLengthLimit; hl >= rke2.MinimumHostnameLengthLimit && hl <= rke2.MaximumHostnameLengthLimit {
-		hostnameLimit = hl
+
+	if limit := mp.HostnameLengthLimit; limit != 0 {
+		if limit < rke2.MinimumHostnameLengthLimit {
+			logrus.Errorf("rkecluster %s/%s: cannot use machine pool %s hostname length limit, %d under minimum value of %d", cluster.Namespace, cluster.Name, mp.Name, limit, rke2.MinimumHostnameLengthLimit)
+		} else if limit > rke2.MaximumHostnameLengthLimit {
+			logrus.Errorf("rkecluster %s/%s: cannot use machine pool %s hostname length limit, %d under minimum value of %d", cluster.Namespace, cluster.Name, mp.Name, limit, rke2.MinimumHostnameLengthLimit)
+		} else {
+			hostnameLimit = limit
+		}
+	}
+
+	// if the machine pool limit was not specified, or was invalid, fallback to cluster default
+	if limit := cluster.Spec.RKEConfig.MachinePoolDefaults.HostnameLengthLimit; hostnameLimit == 0 && limit != 0 {
+		if limit < rke2.MinimumHostnameLengthLimit {
+			logrus.Errorf("rkecluster %s/%s: cannot use cluster machine pool default hostname length limit, %d under minimum value of %d", cluster.Namespace, cluster.Name, limit, rke2.MinimumHostnameLengthLimit)
+		} else if limit > rke2.MaximumHostnameLengthLimit {
+			logrus.Errorf("rkecluster %s/%s: cannot use cluster machine pool default hostname length limit, %d under minimum value of %d", cluster.Namespace, cluster.Name, limit, rke2.MinimumHostnameLengthLimit)
+		} else {
+			hostnameLimit = limit
+		}
 	}
 
 	if hostnameLimit != 0 {
 		annotations[rke2.HostnameLengthLimitAnnotation] = strconv.Itoa(hostnameLimit)
 	}
+
+	return nil
 }
 
 func createMachineTemplateHash(dataMap map[string]interface{}) string {
@@ -333,7 +358,10 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 			machineSpecAnnotations[capi.ExcludeNodeDrainingAnnotation] = "true"
 		}
 
-		populateHostnameLengthLimitAnnotation(machinePool, cluster.Spec.RKEConfig.MachinePoolDefaults, machineSpecAnnotations)
+		err := populateHostnameLengthLimitAnnotation(machinePool, cluster, machineSpecAnnotations)
+		if err != nil {
+			return nil, err
+		}
 
 		machineDeployment := &capi.MachineDeployment{
 			ObjectMeta: metav1.ObjectMeta{
