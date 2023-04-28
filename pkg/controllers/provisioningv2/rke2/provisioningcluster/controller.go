@@ -354,16 +354,6 @@ func (h *handler) OnRancherClusterChange(obj *rancherv1.Cluster, status rancherv
 				return nil, status, err
 			}
 		}
-	} else {
-		// Copy the Ready condition from the management cluster to the provisioning cluster
-		// This is going to occur for all clusters that do NOT have an RKEControlPlane associated with them (imported, RKE1, etc)
-		if mgmtCluster != nil {
-			reconcileCondition(&status, rke2.Ready, mgmtCluster, rke2.Ready)
-			_, err := h.mgmtClusterClient.Update(mgmtCluster)
-			if err != nil {
-				return nil, status, err
-			}
-		}
 	}
 
 	objs, err := objects(obj, h.dynamic, h.dynamicSchema, h.secretCache)
