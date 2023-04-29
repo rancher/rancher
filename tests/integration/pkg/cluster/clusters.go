@@ -10,8 +10,8 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	provisioningv1api "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
-	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
-	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/machineprovision"
+	"github.com/rancher/rancher/pkg/capr"
+	"github.com/rancher/rancher/pkg/controllers/capr/machineprovision"
 	"github.com/rancher/rancher/tests/integration/pkg/clients"
 	"github.com/rancher/rancher/tests/integration/pkg/defaults"
 	"github.com/rancher/rancher/tests/integration/pkg/namespace"
@@ -283,7 +283,7 @@ func getPodLogs(clients *clients.Clients, podNamespace, podName string) (string,
 	for reader.Scan() {
 		logs = logs + fmt.Sprintf("%sSnewlineG", reader.Text())
 	}
-	return rke2.CompressInterface(logs)
+	return capr.CompressInterface(logs)
 }
 
 func gatherDebugData(clients *clients.Clients, c *provisioningv1api.Cluster) (string, error) {
@@ -403,7 +403,7 @@ func gatherDebugData(clients *clients.Clients, c *provisioningv1api.Cluster) (st
 		}
 	}
 
-	return rke2.CompressInterface(map[string]interface{}{
+	return capr.CompressInterface(map[string]interface{}{
 		"cluster":               newC,
 		"rkecontrolplane":       newControlPlane,
 		"mgmtCluster":           mgmtCluster,

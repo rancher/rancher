@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/rancher/apiserver/pkg/types"
-	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
+	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/wrangler"
 	schema2 "github.com/rancher/steve/pkg/schema"
 	steve "github.com/rancher/steve/pkg/server"
@@ -27,7 +27,7 @@ func Register(server *steve.Server, clients *wrangler.Context) {
 			schema.LinkHandlers["sshkeys"] = sshClient
 			schema.Formatter = func(request *types.APIRequest, resource *types.RawResource) {
 				if err := request.AccessControl.CanUpdate(request, types.APIObject{}, request.Schema); err != nil ||
-					resource.APIObject.Data().String("spec", "infrastructureRef", "apiVersion") != rke2.RKEMachineAPIVersion {
+					resource.APIObject.Data().String("spec", "infrastructureRef", "apiVersion") != capr.RKEMachineAPIVersion {
 					delete(resource.Links, "shell")
 					delete(resource.Links, "sshkeys")
 				}

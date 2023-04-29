@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	provisioningv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
-	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
+	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/tests/integration/pkg/clients"
 	"github.com/rancher/rancher/tests/integration/pkg/cluster"
 	"github.com/rancher/rancher/tests/integration/pkg/systemdnode"
@@ -109,18 +109,18 @@ func TestCustomOneNode(t *testing.T) {
 	}
 
 	assert.Len(t, machines.Items, 1)
-	assert.Equal(t, machines.Items[0].Labels[rke2.WorkerRoleLabel], "true")
-	assert.Equal(t, machines.Items[0].Labels[rke2.ControlPlaneRoleLabel], "true")
-	assert.Equal(t, machines.Items[0].Labels[rke2.EtcdRoleLabel], "true")
+	assert.Equal(t, machines.Items[0].Labels[capr.WorkerRoleLabel], "true")
+	assert.Equal(t, machines.Items[0].Labels[capr.ControlPlaneRoleLabel], "true")
+	assert.Equal(t, machines.Items[0].Labels[capr.EtcdRoleLabel], "true")
 	assert.Len(t, machines.Items[0].Status.Addresses, 2)
 	assert.NotNil(t, machines.Items[0].Spec.Bootstrap.ConfigRef)
 
-	secret, err := clients.Core.Secret().Get(machines.Items[0].Namespace, rke2.PlanSecretFromBootstrapName(machines.Items[0].Spec.Bootstrap.ConfigRef.Name), metav1.GetOptions{})
+	secret, err := clients.Core.Secret().Get(machines.Items[0].Namespace, capr.PlanSecretFromBootstrapName(machines.Items[0].Spec.Bootstrap.ConfigRef.Name), metav1.GetOptions{})
 	assert.NoError(t, err)
 
-	assert.NotEmpty(t, secret.Annotations[rke2.LabelsAnnotation])
+	assert.NotEmpty(t, secret.Annotations[capr.LabelsAnnotation])
 	var labels map[string]string
-	if err := json.Unmarshal([]byte(secret.Annotations[rke2.LabelsAnnotation]), &labels); err != nil {
+	if err := json.Unmarshal([]byte(secret.Annotations[capr.LabelsAnnotation]), &labels); err != nil {
 		t.Error(err)
 	}
 	assert.Equal(t, labels, map[string]string{"cattle.io/os": "linux", "foo": "bar", "ball": "life"})
@@ -171,17 +171,17 @@ func TestCustomThreeNode(t *testing.T) {
 
 	assert.Len(t, machines.Items, 3)
 	for _, m := range machines.Items {
-		assert.Equal(t, m.Labels[rke2.WorkerRoleLabel], "true")
-		assert.Equal(t, m.Labels[rke2.ControlPlaneRoleLabel], "true")
-		assert.Equal(t, m.Labels[rke2.EtcdRoleLabel], "true")
+		assert.Equal(t, m.Labels[capr.WorkerRoleLabel], "true")
+		assert.Equal(t, m.Labels[capr.ControlPlaneRoleLabel], "true")
+		assert.Equal(t, m.Labels[capr.EtcdRoleLabel], "true")
 		assert.NotNil(t, machines.Items[0].Spec.Bootstrap.ConfigRef)
 
-		secret, err := clients.Core.Secret().Get(machines.Items[0].Namespace, rke2.PlanSecretFromBootstrapName(machines.Items[0].Spec.Bootstrap.ConfigRef.Name), metav1.GetOptions{})
+		secret, err := clients.Core.Secret().Get(machines.Items[0].Namespace, capr.PlanSecretFromBootstrapName(machines.Items[0].Spec.Bootstrap.ConfigRef.Name), metav1.GetOptions{})
 		assert.NoError(t, err)
 
-		assert.NotEmpty(t, secret.Annotations[rke2.LabelsAnnotation])
+		assert.NotEmpty(t, secret.Annotations[capr.LabelsAnnotation])
 		var labels map[string]string
-		if err := json.Unmarshal([]byte(secret.Annotations[rke2.LabelsAnnotation]), &labels); err != nil {
+		if err := json.Unmarshal([]byte(secret.Annotations[capr.LabelsAnnotation]), &labels); err != nil {
 			t.Error(err)
 		}
 		assert.Equal(t, labels, map[string]string{"cattle.io/os": "linux", "rancher": "awesome"})
@@ -250,13 +250,13 @@ func TestCustomUniqueRoles(t *testing.T) {
 		etcd         = 0
 	)
 	for _, m := range machines.Items {
-		if m.Labels[rke2.WorkerRoleLabel] == "true" {
+		if m.Labels[capr.WorkerRoleLabel] == "true" {
 			worker++
 		}
-		if m.Labels[rke2.ControlPlaneRoleLabel] == "true" {
+		if m.Labels[capr.ControlPlaneRoleLabel] == "true" {
 			controlPlane++
 		}
-		if m.Labels[rke2.EtcdRoleLabel] == "true" {
+		if m.Labels[capr.EtcdRoleLabel] == "true" {
 			etcd++
 		}
 	}
@@ -320,27 +320,27 @@ func TestCustomThreeNodeWithTaints(t *testing.T) {
 	var taintFound bool
 	assert.Len(t, machines.Items, 3)
 	for _, m := range machines.Items {
-		assert.Equal(t, m.Labels[rke2.WorkerRoleLabel], "true")
-		assert.Equal(t, m.Labels[rke2.ControlPlaneRoleLabel], "true")
-		assert.Equal(t, m.Labels[rke2.EtcdRoleLabel], "true")
+		assert.Equal(t, m.Labels[capr.WorkerRoleLabel], "true")
+		assert.Equal(t, m.Labels[capr.ControlPlaneRoleLabel], "true")
+		assert.Equal(t, m.Labels[capr.EtcdRoleLabel], "true")
 		assert.NotNil(t, m.Spec.Bootstrap.ConfigRef)
 
-		secret, err := clients.Core.Secret().Get(m.Namespace, rke2.PlanSecretFromBootstrapName(m.Spec.Bootstrap.ConfigRef.Name), metav1.GetOptions{})
+		secret, err := clients.Core.Secret().Get(m.Namespace, capr.PlanSecretFromBootstrapName(m.Spec.Bootstrap.ConfigRef.Name), metav1.GetOptions{})
 		assert.NoError(t, err)
 
-		assert.NotEmpty(t, secret.Annotations[rke2.LabelsAnnotation])
+		assert.NotEmpty(t, secret.Annotations[capr.LabelsAnnotation])
 		var labels map[string]string
-		if err := json.Unmarshal([]byte(secret.Annotations[rke2.LabelsAnnotation]), &labels); err != nil {
+		if err := json.Unmarshal([]byte(secret.Annotations[capr.LabelsAnnotation]), &labels); err != nil {
 			t.Error(err)
 		}
 		assert.Equal(t, labels, map[string]string{"cattle.io/os": "linux", "rancher": "awesome"})
 
-		if len(secret.Annotations[rke2.TaintsAnnotation]) != 0 {
+		if len(secret.Annotations[capr.TaintsAnnotation]) != 0 {
 			// Only one node should have the taint
 			assert.False(t, taintFound)
 
 			var taints []corev1.Taint
-			if err := json.Unmarshal([]byte(secret.Annotations[rke2.TaintsAnnotation]), &taints); err != nil {
+			if err := json.Unmarshal([]byte(secret.Annotations[capr.TaintsAnnotation]), &taints); err != nil {
 				t.Error(err)
 			}
 

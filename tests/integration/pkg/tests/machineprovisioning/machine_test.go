@@ -8,7 +8,7 @@ import (
 
 	provisioningv1api "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
-	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
+	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/tests/integration/pkg/clients"
 	"github.com/rancher/rancher/tests/integration/pkg/cluster"
 	"github.com/rancher/rancher/tests/integration/pkg/defaults"
@@ -149,14 +149,14 @@ func TestMachineTemplateClonedAnnotations(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		gv, err := schema.ParseGroupVersion(machineTemplate.GetAnnotations()[rke2.MachineTemplateClonedFromGroupVersionAnn])
+		gv, err := schema.ParseGroupVersion(machineTemplate.GetAnnotations()[capr.MachineTemplateClonedFromGroupVersionAnn])
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		assert.Equal(t, gv.String(), rke2.DefaultMachineConfigAPIVersion)
-		assert.Equal(t, machineTemplate.GetAnnotations()[rke2.MachineTemplateClonedFromKindAnn], c.Spec.RKEConfig.MachinePools[0].NodeConfig.Kind)
-		assert.Equal(t, machineTemplate.GetAnnotations()[rke2.MachineTemplateClonedFromNameAnn], c.Spec.RKEConfig.MachinePools[0].NodeConfig.Name)
+		assert.Equal(t, gv.String(), capr.DefaultMachineConfigAPIVersion)
+		assert.Equal(t, machineTemplate.GetAnnotations()[capr.MachineTemplateClonedFromKindAnn], c.Spec.RKEConfig.MachinePools[0].NodeConfig.Kind)
+		assert.Equal(t, machineTemplate.GetAnnotations()[capr.MachineTemplateClonedFromNameAnn], c.Spec.RKEConfig.MachinePools[0].NodeConfig.Name)
 	}
 }
 
@@ -475,22 +475,22 @@ func TestDrain(t *testing.T) {
 			if err != nil {
 				return err
 			}
-			secret, err = clients.Core.Secret().Get(bootstrap.Namespace, rke2.PlanSecretFromBootstrapName(bootstrap.Name), metav1.GetOptions{})
+			secret, err = clients.Core.Secret().Get(bootstrap.Namespace, capr.PlanSecretFromBootstrapName(bootstrap.Name), metav1.GetOptions{})
 			return err
 		})
 		return wait.Object(clients.Ctx, clients.Core.Secret().Watch, secret, func(obj runtime.Object) (bool, error) {
 			secret := obj.(*corev1.Secret)
-			if secret.Annotations[rke2.PreDrainAnnotation] != "" &&
-				secret.Annotations[rke2.PreDrainAnnotation] != secret.Annotations["test.io/pre-hook1"] {
-				secret.Annotations["test.io/pre-hook1"] = secret.Annotations[rke2.PreDrainAnnotation]
-				secret.Annotations["test.io/pre-hook2"] = secret.Annotations[rke2.PreDrainAnnotation]
+			if secret.Annotations[capr.PreDrainAnnotation] != "" &&
+				secret.Annotations[capr.PreDrainAnnotation] != secret.Annotations["test.io/pre-hook1"] {
+				secret.Annotations["test.io/pre-hook1"] = secret.Annotations[capr.PreDrainAnnotation]
+				secret.Annotations["test.io/pre-hook2"] = secret.Annotations[capr.PreDrainAnnotation]
 				_, err := clients.Core.Secret().Update(secret)
 				return false, err
 			}
-			if secret.Annotations[rke2.PostDrainAnnotation] != "" &&
-				secret.Annotations[rke2.PostDrainAnnotation] != secret.Annotations["test.io/post-hook1"] {
-				secret.Annotations["test.io/post-hook1"] = secret.Annotations[rke2.PostDrainAnnotation]
-				secret.Annotations["test.io/post-hook2"] = secret.Annotations[rke2.PostDrainAnnotation]
+			if secret.Annotations[capr.PostDrainAnnotation] != "" &&
+				secret.Annotations[capr.PostDrainAnnotation] != secret.Annotations["test.io/post-hook1"] {
+				secret.Annotations["test.io/post-hook1"] = secret.Annotations[capr.PostDrainAnnotation]
+				secret.Annotations["test.io/post-hook2"] = secret.Annotations[capr.PostDrainAnnotation]
 				_, err := clients.Core.Secret().Update(secret)
 				if err != nil {
 					return false, err
