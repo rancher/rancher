@@ -77,6 +77,17 @@ resource "aws_instance" "master" {
   }
 
   provisioner "file" {
+    source      = "../../scripts/optional_write_files.sh"
+    destination = "/tmp/optional_write_files.sh"
+  }
+  provisioner "remote-exec" {
+    inline = [
+      "chmod +x /tmp/optional_write_files.sh",
+      "sudo /tmp/optional_write_files.sh \"${var.optional_files}\"",
+    ]
+  }
+
+  provisioner "file" {
     source = "install_k3s_master.sh"
     destination = "/tmp/install_k3s_master.sh"
   }
@@ -175,6 +186,16 @@ resource "aws_instance" "master2-ha" {
   depends_on             = [aws_instance.master]
   tags = {
     Name                 = "${var.resource_name}-servers"
+  }
+  provisioner "file" {
+    source      = "../../scripts/optional_write_files.sh"
+    destination = "/tmp/optional_write_files.sh"
+  }
+  provisioner "remote-exec" {
+    inline = [
+      "chmod +x /tmp/optional_write_files.sh",
+      "sudo /tmp/optional_write_files.sh \"${var.optional_files}\"",
+    ]
   }
   provisioner "file" {
     source               = "join_k3s_master.sh"
