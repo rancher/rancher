@@ -9,7 +9,7 @@ import (
 	"github.com/rancher/norman/condition"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/tokens"
-	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
+	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/features"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	rancherversion "github.com/rancher/rancher/pkg/version"
@@ -303,17 +303,17 @@ func migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(w *wrangler.Context) err
 	}
 
 	bootstrapLabelExcludes := map[string]struct{}{
-		rke2.InitNodeMachineIDLabel: {},
-		rke2.InitNodeLabel:          {},
+		capr.InitNodeMachineIDLabel: {},
+		capr.InitNodeLabel:          {},
 	}
 
 	boostrapAnnotationExcludes := map[string]struct{}{
-		rke2.DrainAnnotation:     {},
-		rke2.DrainDoneAnnotation: {},
-		rke2.JoinURLAnnotation:   {},
-		rke2.PostDrainAnnotation: {},
-		rke2.PreDrainAnnotation:  {},
-		rke2.UnCordonAnnotation:  {},
+		capr.DrainAnnotation:     {},
+		capr.DrainDoneAnnotation: {},
+		capr.JoinURLAnnotation:   {},
+		capr.PostDrainAnnotation: {},
+		capr.PreDrainAnnotation:  {},
+		capr.UnCordonAnnotation:  {},
 	}
 
 	for _, mgmtCluster := range mgmtClusters.Items {
@@ -330,7 +330,7 @@ func migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(w *wrangler.Context) err
 				return err
 			}
 
-			otherMachines, err := w.CAPI.Machine().List(provCluster.Namespace, metav1.ListOptions{LabelSelector: labels.Set{rke2.ClusterNameLabel: provCluster.Name}.String()})
+			otherMachines, err := w.CAPI.Machine().List(provCluster.Namespace, metav1.ListOptions{LabelSelector: labels.Set{capr.ClusterNameLabel: provCluster.Name}.String()})
 			if err != nil {
 				return err
 			}
@@ -338,11 +338,11 @@ func migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(w *wrangler.Context) err
 			allMachines := append(machines.Items, otherMachines.Items...)
 
 			for _, machine := range allMachines {
-				if machine.Spec.Bootstrap.ConfigRef == nil || machine.Spec.Bootstrap.ConfigRef.APIVersion != rke2.RKEAPIVersion {
+				if machine.Spec.Bootstrap.ConfigRef == nil || machine.Spec.Bootstrap.ConfigRef.APIVersion != capr.RKEAPIVersion {
 					continue
 				}
 
-				planSecrets, err := w.Core.Secret().List(machine.Namespace, metav1.ListOptions{LabelSelector: labels.Set{rke2.MachineNameLabel: machine.Name}.String()})
+				planSecrets, err := w.Core.Secret().List(machine.Namespace, metav1.ListOptions{LabelSelector: labels.Set{capr.MachineNameLabel: machine.Name}.String()})
 				if err != nil {
 					return err
 				}
@@ -358,8 +358,8 @@ func migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(w *wrangler.Context) err
 						}
 
 						secret = secret.DeepCopy()
-						rke2.CopyMap(secret.Labels, machine.Labels)
-						rke2.CopyMap(secret.Annotations, machine.Annotations)
+						capr.CopyMap(secret.Labels, machine.Labels)
+						capr.CopyMap(secret.Annotations, machine.Annotations)
 						_, err = w.Core.Secret().Update(secret)
 						return err
 					}); err != nil {
@@ -373,8 +373,8 @@ func migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(w *wrangler.Context) err
 						return err
 					}
 					bootstrap = bootstrap.DeepCopy()
-					rke2.CopyMapWithExcludes(bootstrap.Labels, machine.Labels, bootstrapLabelExcludes)
-					rke2.CopyMapWithExcludes(bootstrap.Annotations, machine.Annotations, boostrapAnnotationExcludes)
+					capr.CopyMapWithExcludes(bootstrap.Labels, machine.Labels, bootstrapLabelExcludes)
+					capr.CopyMapWithExcludes(bootstrap.Annotations, machine.Annotations, boostrapAnnotationExcludes)
 					if bootstrap.Spec.ClusterName == "" {
 						// If the bootstrap spec cluster name is blank, we need to update the bootstrap spec to the correct value
 						// This is to handle old rkebootstrap objects for unmanaged clusters that did not have the spec properly set
@@ -388,7 +388,7 @@ func migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(w *wrangler.Context) err
 					return err
 				}
 
-				if machine.Spec.InfrastructureRef.APIVersion == rke2.RKEAPIVersion || machine.Spec.InfrastructureRef.APIVersion == rke2.RKEMachineAPIVersion {
+				if machine.Spec.InfrastructureRef.APIVersion == capr.RKEAPIVersion || machine.Spec.InfrastructureRef.APIVersion == capr.RKEMachineAPIVersion {
 					gv, err := schema.ParseGroupVersion(machine.Spec.InfrastructureRef.APIVersion)
 					if err != nil {
 						// This error should not occur because RKEAPIVersion and RKEMachineAPIVersion are valid
@@ -517,7 +517,7 @@ func migrateMachinePoolsDynamicSchemaLabel(w *wrangler.Context) error {
 					return fmt.Errorf("machine pool node config must not be nil")
 				}
 				apiVersion := nodeConfig.APIVersion
-				if apiVersion != rke2.DefaultMachineConfigAPIVersion && apiVersion != "" {
+				if apiVersion != capr.DefaultMachineConfigAPIVersion && apiVersion != "" {
 					continue
 				}
 				ds, err := w.Mgmt.DynamicSchema().Get(strings.ToLower(nodeConfig.Kind), metav1.GetOptions{})

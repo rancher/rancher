@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
+	"github.com/rancher/rancher/pkg/capr"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/vim25/mo"
@@ -53,10 +53,10 @@ func getVirtualMachineGuestOS(ctx context.Context, vm *object.VirtualMachine) (s
 func checkGuestID(g string) string {
 	var machineOS string
 	switch {
-	case strings.Contains(strings.ToLower(g), rke2.WindowsMachineOS):
-		machineOS = rke2.WindowsMachineOS
+	case strings.Contains(strings.ToLower(g), capr.WindowsMachineOS):
+		machineOS = capr.WindowsMachineOS
 	default:
-		machineOS = rke2.DefaultMachineOS
+		machineOS = capr.DefaultMachineOS
 	}
 	return machineOS
 }
