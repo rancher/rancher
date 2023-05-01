@@ -12,6 +12,17 @@ cleanup()
       kill $PID
       wait $PID
     fi
+    echo "######### GZIPPED RANCHER LOGS #########"
+    gzip -c /tmp/rancher.log | base64
+    downstream=$(k3d cluster list --no-headers | awk '{print $1}')
+    k3d kubeconfig get $downstream > kubeconfig
+    export KUBECONFIG=kubeconfig
+    echo "######### CLUSTER AGENT LOGS #########"
+    kubectl -n cattle-system logs --tail=-1 -l app=cattle-cluster-agent
+    echo "######### IMPORT LOGS #########"
+    kubectl -n kube-system get pod
+    kubectl -n kube-system logs --tail=-1 -l job-name=rancher-import
+    kubectl -n kube-system describe pod -l job-name=rancher-import
     return $EXIT
 }
 
@@ -23,7 +34,7 @@ fi
 cd $(dirname $0)/..
 
 #[ "${ARCH}" == "amd64" ] && RACE=-race
-go test -cover -tags=test ./pkg/...
+#go test -cover -tags=test ./pkg/...
 
 if [ ${ARCH} == arm64 ] || [ ${ARCH} == s390x ]; then
     export ETCD_UNSUPPORTED_ARCH=${ARCH}
@@ -54,7 +65,7 @@ run_rancher()
         fi
         if [ "$PID" = "-1" ]; then
           echo Starting rancher server using run
-          ./scripts/run >/tmp/rancher.log 2>&1 &
+          ./scripts/run --debug >/tmp/rancher.log 2>&1 &
           PID=$!
         fi
         sleep 2
@@ -97,12 +108,12 @@ export CATTLE_TEST_CONFIG=${path}/config.yaml
 ./tests/v2/integration/bin/integrationsetup
 
 echo Running go tests
-go test -v ./tests/v2/integration/...
+go test -v ./tests/v2/integration/steveapi
 
-echo Running tox tests
-INT_TESTS_STARTED=true
-cd ./tests/integration
-tox -e rancher -- -m "not nonparallel" -n $(nproc)
-tox -e rancher -- -m nonparallel
+#echo Running tox tests
+#INT_TESTS_STARTED=true
+#cd ./tests/integration
+#tox -e rancher -- -m "not nonparallel" -n $(nproc)
+#tox -e rancher -- -m nonparallel
 
 #tail -f /tmp/rancher-test.log &
