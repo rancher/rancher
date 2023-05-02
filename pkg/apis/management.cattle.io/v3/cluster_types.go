@@ -13,7 +13,7 @@ import (
 	"github.com/rancher/norman/types"
 	rketypes "github.com/rancher/rke/types"
 	"github.com/sirupsen/logrus"
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/version"
 )
@@ -130,9 +130,9 @@ type ClusterSpecBase struct {
 }
 
 type AgentDeploymentCustomization struct {
-	AppendTolerations             []v1.Toleration          `json:"appendTolerations,omitempty"`
-	OverrideAffinity              *v1.Affinity             `json:"overrideAffinity,omitempty"`
-	OverrideResourceRequirements  *v1.ResourceRequirements `json:"overrideResourceRequirements,omitempty"`
+	AppendTolerations            []v1.Toleration          `json:"appendTolerations,omitempty"`
+	OverrideAffinity             *v1.Affinity             `json:"overrideAffinity,omitempty"`
+	OverrideResourceRequirements *v1.ResourceRequirements `json:"overrideResourceRequirements,omitempty"`
 }
 
 type ClusterSpec struct {

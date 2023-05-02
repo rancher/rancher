@@ -3,7 +3,7 @@ package v1
 import (
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/wrangler/pkg/genericcondition"
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -37,9 +37,9 @@ type ClusterSpec struct {
 }
 
 type AgentDeploymentCustomization struct {
-	AppendTolerations             []v1.Toleration          `json:"appendTolerations,omitempty"`
-	OverrideAffinity              *v1.Affinity             `json:"overrideAffinity,omitempty"`
-	OverrideResourceRequirements  *v1.ResourceRequirements `json:"overrideResourceRequirements,omitempty"`
+	AppendTolerations            []v1.Toleration          `json:"appendTolerations,omitempty"`
+	OverrideAffinity             *v1.Affinity             `json:"overrideAffinity,omitempty"`
+	OverrideResourceRequirements *v1.ResourceRequirements `json:"overrideResourceRequirements,omitempty"`
 }
 
 type ClusterStatus struct {

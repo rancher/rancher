@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
+	"fmt"
 	"io"
 	"sort"
 	"strings"
@@ -100,14 +101,25 @@ func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url
 
 	if appendTolerations := util.GetClusterAgentTolerations(cluster); appendTolerations != nil {
 		agentAppendTolerations = templates.ToYAML(appendTolerations)
+		if agentAppendTolerations == "" {
+			return fmt.Errorf("error converting agent append tolerations to YAML")
+		}
 	}
 
-	if affinity := util.GetClusterAgentAffinity(cluster); affinity != nil {
-		agentAffinity = templates.ToYAML(affinity)
+	affinity, err := util.GetClusterAgentAffinity(cluster)
+	if err != nil {
+		return err
+	}
+	agentAffinity = templates.ToYAML(affinity)
+	if agentAffinity == "" {
+		return fmt.Errorf("error converting agent affinity to YAML")
 	}
 
 	if resourceRequirements := util.GetClusterAgentResourceRequirements(cluster); resourceRequirements != nil {
 		agentResourceRequirements = templates.ToYAML(resourceRequirements)
+		if agentResourceRequirements == "" {
+			return fmt.Errorf("error converting agent resource requirements to YAML")
+		}
 	}
 
 	context := &context{

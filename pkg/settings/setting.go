@@ -14,7 +14,6 @@ import (
 	fleetconst "github.com/rancher/rancher/pkg/fleet"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const RancherVersionDev = "2.7.99"
@@ -130,8 +129,8 @@ var (
 	HideLocalCluster                    = NewSetting("hide-local-cluster", "false")
 	MachineProvisionImage               = NewSetting("machine-provision-image", "rancher/machine:v0.15.0-rancher99")
 	SystemFeatureChartRefreshSeconds    = NewSetting("system-feature-chart-refresh-seconds", "900")
-	ClusterAgentDefaultAffinity         = NewSetting("cluster-agent-default-affinity", marshalAffinity(GetClusterAgentDefaultAffinity()))
-	FleetAgentDefaultAffinity           = NewSetting("fleet-agent-default-affinity", marshalAffinity(GetFleetAgentDefaultAffinity()))
+	ClusterAgentDefaultAffinity         = NewSetting("cluster-agent-default-affinity", ClusterAgentAffinity)
+	FleetAgentDefaultAffinity           = NewSetting("fleet-agent-default-affinity", FleetAgentAffinity)
 
 	Rke2DefaultVersion = NewSetting("rke2-default-version", "")
 	K3sDefaultVersion  = NewSetting("k3s-default-version", "")
@@ -238,127 +237,6 @@ var (
 	// UIPreferred Ensure that the new Dashboard is the default UI.
 	UIPreferred = NewSetting("ui-preferred", "vue")
 )
-
-// GetClusterAgentDefaultAffinity returns the default node affinity for the cluster agent.
-func GetClusterAgentDefaultAffinity() *v1.Affinity {
-	return &v1.Affinity{
-		PodAntiAffinity: &v1.PodAntiAffinity{
-			PreferredDuringSchedulingIgnoredDuringExecution: []v1.WeightedPodAffinityTerm{
-				{
-					Weight: 100,
-					PodAffinityTerm: v1.PodAffinityTerm{
-						LabelSelector: &metav1.LabelSelector{
-							MatchExpressions: []metav1.LabelSelectorRequirement{
-								{
-									Key:      "app",
-									Operator: metav1.LabelSelectorOperator(v1.NodeSelectorOpIn),
-									Values:   []string{"cattle-cluster-agent"},
-								},
-							},
-						},
-						TopologyKey: "kubernetes.io/hostname",
-					},
-				},
-			},
-		},
-		NodeAffinity: &v1.NodeAffinity{
-			RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
-				NodeSelectorTerms: []v1.NodeSelectorTerm{
-					{
-						MatchExpressions: []v1.NodeSelectorRequirement{
-							{
-								Key:      "beta.kubernetes.io/os",
-								Operator: v1.NodeSelectorOpNotIn,
-								Values:   []string{"windows"},
-							},
-						},
-					},
-				},
-			},
-			PreferredDuringSchedulingIgnoredDuringExecution: []v1.PreferredSchedulingTerm{
-				{
-					Weight: 100,
-					Preference: v1.NodeSelectorTerm{
-						MatchExpressions: []v1.NodeSelectorRequirement{
-							{
-								Key:      "node-role.kubernetes.io/controlplane",
-								Operator: v1.NodeSelectorOpIn,
-								Values:   []string{"true"},
-							},
-						},
-					},
-				},
-				{
-					Weight: 100,
-					Preference: v1.NodeSelectorTerm{
-						MatchExpressions: []v1.NodeSelectorRequirement{
-							{
-								Key:      "node-role.kubernetes.io/control-plane",
-								Operator: v1.NodeSelectorOpIn,
-								Values:   []string{"true"},
-							},
-						},
-					},
-				},
-				{
-					Weight: 100,
-					Preference: v1.NodeSelectorTerm{
-						MatchExpressions: []v1.NodeSelectorRequirement{
-							{
-								Key:      "node-role.kubernetes.io/master",
-								Operator: v1.NodeSelectorOpIn,
-								Values:   []string{"true"},
-							},
-						},
-					},
-				},
-				{
-					Weight: 1,
-					Preference: v1.NodeSelectorTerm{
-						MatchExpressions: []v1.NodeSelectorRequirement{
-							{
-								Key:      "cattle.io/cluster-agent",
-								Operator: v1.NodeSelectorOpIn,
-								Values:   []string{"true"},
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-}
-
-// GetFleetAgentDefaultAffinity returns the default node affinity for the fleet agent.
-func GetFleetAgentDefaultAffinity() *v1.Affinity {
-	return &v1.Affinity{
-		NodeAffinity: &v1.NodeAffinity{
-			PreferredDuringSchedulingIgnoredDuringExecution: []v1.PreferredSchedulingTerm{
-				{
-					Weight: 1,
-					Preference: v1.NodeSelectorTerm{
-						MatchExpressions: []v1.NodeSelectorRequirement{
-							{
-								Key:      "fleet.cattle.io/agent",
-								Operator: v1.NodeSelectorOpIn,
-								Values:   []string{"true"},
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-}
-
-// marshalAffinity returns a marshalled string of the v1 node affinity.
-func marshalAffinity(affinity *v1.Affinity) string {
-	data, err := json.Marshal(affinity)
-	if err != nil {
-		panic(fmt.Errorf("failed to marshal node affinity: %v", err))
-	}
-	return string(data)
-}
 
 // FullShellImage returns the full private registry name of the rancher shell image.
 func FullShellImage() string {

@@ -2,10 +2,10 @@ package cluster
 
 import (
 	"encoding/json"
+	"fmt"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
-	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -22,18 +22,13 @@ func GetClusterAgentTolerations(cluster *v3.Cluster) []corev1.Toleration {
 
 // GetClusterAgentAffinity returns node affinity for the cluster agent if it has been user defined. If not, then the
 // default affinity is returned.
-func GetClusterAgentAffinity(cluster *v3.Cluster) *corev1.Affinity {
+func GetClusterAgentAffinity(cluster *v3.Cluster) (*corev1.Affinity, error) {
 	if cluster.Spec.ClusterAgentDeploymentCustomization != nil &&
 		cluster.Spec.ClusterAgentDeploymentCustomization.OverrideAffinity != nil {
-		return cluster.Spec.ClusterAgentDeploymentCustomization.OverrideAffinity
+		return cluster.Spec.ClusterAgentDeploymentCustomization.OverrideAffinity, nil
 	}
 
-	affinity, err := unmarshalAffinity(settings.ClusterAgentDefaultAffinity.Get())
-	if err != nil {
-		return settings.GetClusterAgentDefaultAffinity()
-	}
-
-	return affinity
+	return unmarshalAffinity(settings.ClusterAgentDefaultAffinity.Get())
 }
 
 // GetClusterAgentResourceRequirements returns resource requirements (cpu, memory) for the cluster agent if it has been
@@ -60,18 +55,13 @@ func GetFleetAgentTolerations(cluster *v3.Cluster) []corev1.Toleration {
 
 // GetFleetAgentAffinity returns node affinity for the fleet agent if it has been user defined. If not, then the
 // default affinity is returned.
-func GetFleetAgentAffinity(cluster *v3.Cluster) *corev1.Affinity {
+func GetFleetAgentAffinity(cluster *v3.Cluster) (*corev1.Affinity, error) {
 	if cluster.Spec.FleetAgentDeploymentCustomization != nil &&
 		cluster.Spec.FleetAgentDeploymentCustomization.OverrideAffinity != nil {
-		return cluster.Spec.FleetAgentDeploymentCustomization.OverrideAffinity
+		return cluster.Spec.FleetAgentDeploymentCustomization.OverrideAffinity, nil
 	}
 
-	affinity, err := unmarshalAffinity(settings.FleetAgentDefaultAffinity.Get())
-	if err != nil {
-		return settings.GetFleetAgentDefaultAffinity()
-	}
-
-	return affinity
+	return unmarshalAffinity(settings.FleetAgentDefaultAffinity.Get())
 }
 
 // GetFleetAgentResourceRequirements returns resource requirements (cpu, memory) for the fleet agent if it has been
@@ -85,14 +75,14 @@ func GetFleetAgentResourceRequirements(cluster *v3.Cluster) *corev1.ResourceRequ
 	return nil
 }
 
-// ummarshalAffinity returns an unmarshalled v1 node affinity object. If unable to be unmarshalled, it returns nil
-// and an error.
+// unmarshalAffinity returns an unmarshalled object of the v1 node affinity. If unable to be unmarshalled, it returns
+// nil and an error.
 func unmarshalAffinity(affinity string) (*corev1.Affinity, error) {
 	var affinityObj corev1.Affinity
 	err := json.Unmarshal([]byte(affinity), &affinityObj)
 	if err != nil {
-		logrus.Errorf("failed to unmarshal node affinity: %v", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to unmarshal node affinity: %w", err)
 	}
+
 	return &affinityObj, nil
 }

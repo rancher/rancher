@@ -8,7 +8,6 @@ import (
 	mgmt "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	mgmtcluster "github.com/rancher/rancher/pkg/cluster"
-	util "github.com/rancher/rancher/pkg/cluster"
 	fleetconst "github.com/rancher/rancher/pkg/fleet"
 	fleetcontrollers "github.com/rancher/rancher/pkg/generated/controllers/fleet.cattle.io/v1alpha1"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
@@ -136,6 +135,11 @@ func (h *handler) createCluster(cluster *v1.Cluster, status v1.ClusterStatus) ([
 		privateRepoURL = image.GetPrivateRepoURLFromCluster(cluster)
 	}
 
+	agentAffinity, err := mgmtcluster.GetFleetAgentAffinity(mgmtCluster)
+	if err != nil {
+		return nil, status, err
+	}
+
 	return []runtime.Object{&fleet.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cluster.Name,
@@ -147,9 +151,9 @@ func (h *handler) createCluster(cluster *v1.Cluster, status v1.ClusterStatus) ([
 			AgentEnvVars:     mgmtCluster.Spec.AgentEnvVars,
 			AgentNamespace:   agentNamespace,
 			PrivateRepoURL:   privateRepoURL,
-			AgentTolerations: util.GetFleetAgentTolerations(mgmtCluster),
-			AgentAffinity:    util.GetFleetAgentAffinity(mgmtCluster),
-			AgentResources:   util.GetFleetAgentResourceRequirements(mgmtCluster),
+			AgentTolerations: mgmtcluster.GetFleetAgentTolerations(mgmtCluster),
+			AgentAffinity:    agentAffinity,
+			AgentResources:   mgmtcluster.GetFleetAgentResourceRequirements(mgmtCluster),
 		},
 	}}, status, nil
 }
