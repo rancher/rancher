@@ -218,6 +218,7 @@ def test_create_and_validate_ingress_io_wl():
 # It's hard to find an App to support Windows case for now.
 # Could we make an App to support both Windows and Linux?
 @skip_test_hardened
+@skip_test_windows_os
 @pytest.mark.run(order=5)
 def test_create_and_validate_catalog_app():
     create_and_validate_catalog_app()
@@ -253,8 +254,13 @@ def create_and_validate_wl():
     ns = namespace["ns"]
     con = [{"name": "test1",
             "image": TEST_IMAGE}]
+    
+    sel = {"node": {
+        "nodeId": "null", 
+        "requireAll": ["kubernetes.io/os =" + TEST_OS]
+        }}
     p_client.create_workload(name=wl_name_create, containers=con,
-                             namespaceId=ns.id, scale=2)
+                             namespaceId=ns.id, scale=2, scheduling=sel)
     validate_wl(wl_name_create)
 
 
@@ -278,10 +284,15 @@ def create_and_validate_ingress_io_daemon():
             "image": TEST_IMAGE}]
 
     # Ingress with daemonSet target
+    sel = {"node": {
+        "nodeId": "null", 
+        "requireAll": ["kubernetes.io/os =" + TEST_OS]
+        }}
     workload = p_client.create_workload(name=ingress_wlname1_create,
                                         containers=con,
                                         namespaceId=ns.id,
-                                        daemonSetConfig={})
+                                        daemonSetConfig={},
+                                        scheduling=sel)
     validate_workload(p_client, workload, "daemonSet", ns.name,
                       len(get_schedulable_nodes(cluster)))
     path = "/name.html"
@@ -302,9 +313,14 @@ def create_and_validate_ingress_io_wl():
             "image": TEST_IMAGE}]
 
     # Ingress with Deployment target
+    sel = {"node": {
+        "nodeId": "null", 
+        "requireAll": ["kubernetes.io/os =" + TEST_OS]
+        }}
     workload = p_client.create_workload(name=ingress_wlname2_create,
                                         containers=con,
-                                        namespaceId=ns.id, scale=2)
+                                        namespaceId=ns.id, scale=2, 
+                                        scheduling=sel)
     validate_wl(ingress_wlname2_create, 2)
     path = "/name.html"
     rule = {"host": get_ingress_ip_domain(),
@@ -417,17 +433,22 @@ def create_and_validate_service_discovery():
 
     con = [{"name": "test1",
             "image": TEST_IMAGE}]
+    sel = {"node": {
+        "nodeId": "null", 
+        "requireAll": ["kubernetes.io/os =" + TEST_OS]
+        }}
     workload = p_client.create_workload(name=sd_wlname1_create,
                                         containers=con,
                                         namespaceId=ns.id,
-                                        daemonSetConfig={})
+                                        scheduling=sel,
+                                        daemonSetConfig={},)
     validate_workload(p_client, workload, "daemonSet", ns.name,
                       len(get_schedulable_nodes(cluster)))
 
     additional_workload = p_client.create_workload(name=sd_wlname2_create,
                                                    containers=con,
                                                    namespaceId=ns.id,
-                                                   scale=1)
+                                                   scale=1, scheduling=sel)
     wait_for_wl_to_active(p_client, additional_workload)
     awl_pods = wait_for_pods_in_workload(p_client, additional_workload, 1)
     wait_for_pod_to_running(p_client, awl_pods[0])
@@ -525,11 +546,14 @@ def create_project_resources():
 
     con = [{"name": "test1",
             "image": TEST_IMAGE}]
-
+    sel = {"node": {
+        "nodeId": "null", 
+        "requireAll": ["kubernetes.io/os =" + TEST_OS]
+        }}
     workload = p_client.create_workload(name=wlname,
                                         containers=con,
                                         namespaceId=ns.id,
-                                        scale=1)
+                                        scale=1, scheduling=sel)
     wait_for_wl_to_active(p_client, workload)
     namespace["workload"] = workload
 
@@ -543,7 +567,7 @@ def create_project_resources():
     workload = p_client.create_workload(name=wlname,
                                         containers=con,
                                         namespaceId=new_ns.id,
-                                        scale=1)
+                                        scale=1, scheduling=sel)
     wait_for_wl_to_active(p_client, workload)
     pods = wait_for_pods_in_workload(p_client, workload, 1)
     pod = wait_for_pod_to_running(p_client, pods[0])
