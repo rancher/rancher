@@ -53,7 +53,7 @@ func Setup(ctx context.Context, mgmt *config.ScaledContext, clusterManager *clus
 	addProxyStore(ctx, schemas, mgmt, clusterClient.NamespaceType, "v1", namespace.New)
 	addProxyStore(ctx, schemas, mgmt, clusterClient.PersistentVolumeType, "v1", nil)
 	addProxyStore(ctx, schemas, mgmt, clusterClient.APIServiceType, "apiregistration.k8s.io/v1", nil)
-	addProxyStore(ctx, schemas, mgmt, client.HorizontalPodAutoscalerType, "autoscaling/v2beta2", nil)
+	addProxyStore(ctx, schemas, mgmt, client.HorizontalPodAutoscalerType, "autoscaling/v2", nil)
 	addProxyStore(ctx, schemas, mgmt, clusterClient.StorageClassType, "storage.k8s.io/v1", nil)
 	addProxyStore(ctx, schemas, mgmt, client.PrometheusType, "monitoring.coreos.com/v1", nil)
 	addProxyStore(ctx, schemas, mgmt, client.PrometheusRuleType, "monitoring.coreos.com/v1", nil)
@@ -152,7 +152,7 @@ func Secret(ctx context.Context, management *config.ScaledContext, schemas *type
 
 func HPA(schemas *types.Schemas, manager *clustermanager.Manager) {
 	schema := schemas.Schema(&schema.Version, client.HorizontalPodAutoscalerType)
-	schema.Store = apiservice.NewAPIServicFilterStoreFunc(manager, "autoscaling/v2beta2")(schema.Store)
+	schema.Store = apiservice.NewAPIServicFilterStoreFunc(manager, "autoscaling/v2")(schema.Store)
 	schema.Store = nocondition.NewWrapper("initializing", "")(schema.Store)
 	schema.Store = hpa.NewIgnoreTransitioningErrorStore(schema.Store, 60*time.Second, "initializing")
 }
