@@ -26,11 +26,10 @@ func newClusterHandler(workload *config.UserContext) v3.ClusterHandlerFunc { //*
 		clusterName: workload.ClusterName,
 		grbIndexer:  informer.GetIndexer(),
 		// Management level resources
-		grbController: workload.Management.Management.GlobalRoleBindings("").Controller(),
-		clusters:      workload.Management.Management.Clusters(""),
+		clusters: workload.Management.Management.Clusters(""),
 		// User context resources
-		userGRB:       workload.RBAC.ClusterRoleBindings(""),
-		userGRBLister: workload.RBAC.ClusterRoleBindings("").Controller().Lister(),
+		userCRB:       workload.RBAC.ClusterRoleBindings(""),
+		userCRBLister: workload.RBAC.ClusterRoleBindings("").Controller().Lister(),
 	}
 	return ch.sync
 }
@@ -39,11 +38,10 @@ type clusterHandler struct {
 	clusterName string
 	grbIndexer  cache.Indexer
 	// Management level resources
-	grbController v3.GlobalRoleBindingController
-	clusters      v3.ClusterInterface
+	clusters v3.ClusterInterface
 	// User context resources
-	userGRB       v1.ClusterRoleBindingInterface
-	userGRBLister v1.ClusterRoleBindingLister
+	userCRB       v1.ClusterRoleBindingInterface
+	userCRBLister v1.ClusterRoleBindingLister
 }
 
 func (h *clusterHandler) sync(key string, obj *v3.Cluster) (runtime.Object, error) {
@@ -81,17 +79,16 @@ func (h *clusterHandler) doSync(cluster *v3.Cluster) error {
 				continue
 			}
 			bindingName := rbac.GrbCRBName(grb)
-			_, err := h.userGRBLister.Get("", bindingName)
-			if !k8serrors.IsNotFound(err) {
-				return nil, fmt.Errorf("failed to get GlobalRoleBinding for '%s': %w", bindingName, err)
-			}
-
+			_, err := h.userCRBLister.Get("", bindingName)
 			if err == nil {
 				// binding exists, nothing to do
 				continue
 			}
+			if !k8serrors.IsNotFound(err) {
+				return nil, fmt.Errorf("failed to get GlobalRoleBinding for '%s': %w", bindingName, err)
+			}
 
-			_, err = h.userGRB.Create(&k8srbac.ClusterRoleBinding{
+			_, err = h.userCRB.Create(&k8srbac.ClusterRoleBinding{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: bindingName,
 				},
