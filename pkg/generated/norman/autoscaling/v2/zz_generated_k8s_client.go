@@ -1,11 +1,11 @@
-package v2beta2
+package v2
 
 import (
 	"github.com/rancher/lasso/pkg/client"
 	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/norman/generator"
 	"github.com/rancher/norman/objectclient"
-	"k8s.io/api/autoscaling/v2beta2"
+	"k8s.io/api/autoscaling/v2"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 )
@@ -21,7 +21,7 @@ type Client struct {
 
 func NewForConfig(cfg rest.Config) (Interface, error) {
 	scheme := runtime.NewScheme()
-	if err := v2beta2.AddToScheme(scheme); err != nil {
+	if err := v2.AddToScheme(scheme); err != nil {
 		return nil, err
 	}
 	sharedOpts := &controller.SharedControllerFactoryOptions{

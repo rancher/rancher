@@ -1,4 +1,4 @@
-package v2beta2
+package v2
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/norman/resource"
-	"k8s.io/api/autoscaling/v2beta2"
+	"k8s.io/api/autoscaling/v2"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -43,23 +43,23 @@ func init() {
 	resource.Put(HorizontalPodAutoscalerGroupVersionResource)
 }
 
-// Deprecated: use v2beta2.HorizontalPodAutoscaler instead
-type HorizontalPodAutoscaler = v2beta2.HorizontalPodAutoscaler
+// Deprecated: use v2.HorizontalPodAutoscaler instead
+type HorizontalPodAutoscaler = v2.HorizontalPodAutoscaler
 
-func NewHorizontalPodAutoscaler(namespace, name string, obj v2beta2.HorizontalPodAutoscaler) *v2beta2.HorizontalPodAutoscaler {
+func NewHorizontalPodAutoscaler(namespace, name string, obj v2.HorizontalPodAutoscaler) *v2.HorizontalPodAutoscaler {
 	obj.APIVersion, obj.Kind = HorizontalPodAutoscalerGroupVersionKind.ToAPIVersionAndKind()
 	obj.Name = name
 	obj.Namespace = namespace
 	return &obj
 }
 
-type HorizontalPodAutoscalerHandlerFunc func(key string, obj *v2beta2.HorizontalPodAutoscaler) (runtime.Object, error)
+type HorizontalPodAutoscalerHandlerFunc func(key string, obj *v2.HorizontalPodAutoscaler) (runtime.Object, error)
 
-type HorizontalPodAutoscalerChangeHandlerFunc func(obj *v2beta2.HorizontalPodAutoscaler) (runtime.Object, error)
+type HorizontalPodAutoscalerChangeHandlerFunc func(obj *v2.HorizontalPodAutoscaler) (runtime.Object, error)
 
 type HorizontalPodAutoscalerLister interface {
-	List(namespace string, selector labels.Selector) (ret []*v2beta2.HorizontalPodAutoscaler, err error)
-	Get(namespace, name string) (*v2beta2.HorizontalPodAutoscaler, error)
+	List(namespace string, selector labels.Selector) (ret []*v2.HorizontalPodAutoscaler, err error)
+	Get(namespace, name string) (*v2.HorizontalPodAutoscaler, error)
 }
 
 type HorizontalPodAutoscalerController interface {
@@ -76,14 +76,14 @@ type HorizontalPodAutoscalerController interface {
 
 type HorizontalPodAutoscalerInterface interface {
 	ObjectClient() *objectclient.ObjectClient
-	Create(*v2beta2.HorizontalPodAutoscaler) (*v2beta2.HorizontalPodAutoscaler, error)
-	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v2beta2.HorizontalPodAutoscaler, error)
-	Get(name string, opts metav1.GetOptions) (*v2beta2.HorizontalPodAutoscaler, error)
-	Update(*v2beta2.HorizontalPodAutoscaler) (*v2beta2.HorizontalPodAutoscaler, error)
+	Create(*v2.HorizontalPodAutoscaler) (*v2.HorizontalPodAutoscaler, error)
+	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v2.HorizontalPodAutoscaler, error)
+	Get(name string, opts metav1.GetOptions) (*v2.HorizontalPodAutoscaler, error)
+	Update(*v2.HorizontalPodAutoscaler) (*v2.HorizontalPodAutoscaler, error)
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
-	List(opts metav1.ListOptions) (*v2beta2.HorizontalPodAutoscalerList, error)
-	ListNamespaced(namespace string, opts metav1.ListOptions) (*v2beta2.HorizontalPodAutoscalerList, error)
+	List(opts metav1.ListOptions) (*v2.HorizontalPodAutoscalerList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*v2.HorizontalPodAutoscalerList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() HorizontalPodAutoscalerController
@@ -102,17 +102,17 @@ type horizontalPodAutoscalerLister struct {
 	controller *horizontalPodAutoscalerController
 }
 
-func (l *horizontalPodAutoscalerLister) List(namespace string, selector labels.Selector) (ret []*v2beta2.HorizontalPodAutoscaler, err error) {
+func (l *horizontalPodAutoscalerLister) List(namespace string, selector labels.Selector) (ret []*v2.HorizontalPodAutoscaler, err error) {
 	if namespace == "" {
 		namespace = l.ns
 	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
-		ret = append(ret, obj.(*v2beta2.HorizontalPodAutoscaler))
+		ret = append(ret, obj.(*v2.HorizontalPodAutoscaler))
 	})
 	return
 }
 
-func (l *horizontalPodAutoscalerLister) Get(namespace, name string) (*v2beta2.HorizontalPodAutoscaler, error) {
+func (l *horizontalPodAutoscalerLister) Get(namespace, name string) (*v2.HorizontalPodAutoscaler, error) {
 	var key string
 	if namespace != "" {
 		key = namespace + "/" + name
@@ -129,7 +129,7 @@ func (l *horizontalPodAutoscalerLister) Get(namespace, name string) (*v2beta2.Ho
 			Resource: HorizontalPodAutoscalerGroupVersionResource.Resource,
 		}, key)
 	}
-	return obj.(*v2beta2.HorizontalPodAutoscaler), nil
+	return obj.(*v2.HorizontalPodAutoscaler), nil
 }
 
 type horizontalPodAutoscalerController struct {
@@ -152,7 +152,7 @@ func (c *horizontalPodAutoscalerController) AddHandler(ctx context.Context, name
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
 			return handler(key, nil)
-		} else if v, ok := obj.(*v2beta2.HorizontalPodAutoscaler); ok {
+		} else if v, ok := obj.(*v2.HorizontalPodAutoscaler); ok {
 			return handler(key, v)
 		} else {
 			return nil, nil
@@ -166,7 +166,7 @@ func (c *horizontalPodAutoscalerController) AddFeatureHandler(ctx context.Contex
 			return nil, nil
 		} else if obj == nil {
 			return handler(key, nil)
-		} else if v, ok := obj.(*v2beta2.HorizontalPodAutoscaler); ok {
+		} else if v, ok := obj.(*v2.HorizontalPodAutoscaler); ok {
 			return handler(key, v)
 		} else {
 			return nil, nil
@@ -178,7 +178,7 @@ func (c *horizontalPodAutoscalerController) AddClusterScopedHandler(ctx context.
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
 			return handler(key, nil)
-		} else if v, ok := obj.(*v2beta2.HorizontalPodAutoscaler); ok && controller.ObjectInCluster(cluster, obj) {
+		} else if v, ok := obj.(*v2.HorizontalPodAutoscaler); ok && controller.ObjectInCluster(cluster, obj) {
 			return handler(key, v)
 		} else {
 			return nil, nil
@@ -192,7 +192,7 @@ func (c *horizontalPodAutoscalerController) AddClusterScopedFeatureHandler(ctx c
 			return nil, nil
 		} else if obj == nil {
 			return handler(key, nil)
-		} else if v, ok := obj.(*v2beta2.HorizontalPodAutoscaler); ok && controller.ObjectInCluster(cluster, obj) {
+		} else if v, ok := obj.(*v2.HorizontalPodAutoscaler); ok && controller.ObjectInCluster(cluster, obj) {
 			return handler(key, v)
 		} else {
 			return nil, nil
@@ -204,11 +204,11 @@ type horizontalPodAutoscalerFactory struct {
 }
 
 func (c horizontalPodAutoscalerFactory) Object() runtime.Object {
-	return &v2beta2.HorizontalPodAutoscaler{}
+	return &v2.HorizontalPodAutoscaler{}
 }
 
 func (c horizontalPodAutoscalerFactory) List() runtime.Object {
-	return &v2beta2.HorizontalPodAutoscalerList{}
+	return &v2.HorizontalPodAutoscalerList{}
 }
 
 func (s *horizontalPodAutoscalerClient) Controller() HorizontalPodAutoscalerController {
@@ -232,29 +232,29 @@ func (s *horizontalPodAutoscalerClient) ObjectClient() *objectclient.ObjectClien
 	return s.objectClient
 }
 
-func (s *horizontalPodAutoscalerClient) Create(o *v2beta2.HorizontalPodAutoscaler) (*v2beta2.HorizontalPodAutoscaler, error) {
+func (s *horizontalPodAutoscalerClient) Create(o *v2.HorizontalPodAutoscaler) (*v2.HorizontalPodAutoscaler, error) {
 	obj, err := s.objectClient.Create(o)
-	return obj.(*v2beta2.HorizontalPodAutoscaler), err
+	return obj.(*v2.HorizontalPodAutoscaler), err
 }
 
-func (s *horizontalPodAutoscalerClient) Get(name string, opts metav1.GetOptions) (*v2beta2.HorizontalPodAutoscaler, error) {
+func (s *horizontalPodAutoscalerClient) Get(name string, opts metav1.GetOptions) (*v2.HorizontalPodAutoscaler, error) {
 	obj, err := s.objectClient.Get(name, opts)
-	return obj.(*v2beta2.HorizontalPodAutoscaler), err
+	return obj.(*v2.HorizontalPodAutoscaler), err
 }
 
-func (s *horizontalPodAutoscalerClient) GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v2beta2.HorizontalPodAutoscaler, error) {
+func (s *horizontalPodAutoscalerClient) GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v2.HorizontalPodAutoscaler, error) {
 	obj, err := s.objectClient.GetNamespaced(namespace, name, opts)
-	return obj.(*v2beta2.HorizontalPodAutoscaler), err
+	return obj.(*v2.HorizontalPodAutoscaler), err
 }
 
-func (s *horizontalPodAutoscalerClient) Update(o *v2beta2.HorizontalPodAutoscaler) (*v2beta2.HorizontalPodAutoscaler, error) {
+func (s *horizontalPodAutoscalerClient) Update(o *v2.HorizontalPodAutoscaler) (*v2.HorizontalPodAutoscaler, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
-	return obj.(*v2beta2.HorizontalPodAutoscaler), err
+	return obj.(*v2.HorizontalPodAutoscaler), err
 }
 
-func (s *horizontalPodAutoscalerClient) UpdateStatus(o *v2beta2.HorizontalPodAutoscaler) (*v2beta2.HorizontalPodAutoscaler, error) {
+func (s *horizontalPodAutoscalerClient) UpdateStatus(o *v2.HorizontalPodAutoscaler) (*v2.HorizontalPodAutoscaler, error) {
 	obj, err := s.objectClient.UpdateStatus(o.Name, o)
-	return obj.(*v2beta2.HorizontalPodAutoscaler), err
+	return obj.(*v2.HorizontalPodAutoscaler), err
 }
 
 func (s *horizontalPodAutoscalerClient) Delete(name string, options *metav1.DeleteOptions) error {
@@ -265,14 +265,14 @@ func (s *horizontalPodAutoscalerClient) DeleteNamespaced(namespace, name string,
 	return s.objectClient.DeleteNamespaced(namespace, name, options)
 }
 
-func (s *horizontalPodAutoscalerClient) List(opts metav1.ListOptions) (*v2beta2.HorizontalPodAutoscalerList, error) {
+func (s *horizontalPodAutoscalerClient) List(opts metav1.ListOptions) (*v2.HorizontalPodAutoscalerList, error) {
 	obj, err := s.objectClient.List(opts)
-	return obj.(*v2beta2.HorizontalPodAutoscalerList), err
+	return obj.(*v2.HorizontalPodAutoscalerList), err
 }
 
-func (s *horizontalPodAutoscalerClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*v2beta2.HorizontalPodAutoscalerList, error) {
+func (s *horizontalPodAutoscalerClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*v2.HorizontalPodAutoscalerList, error) {
 	obj, err := s.objectClient.ListNamespaced(namespace, opts)
-	return obj.(*v2beta2.HorizontalPodAutoscalerList), err
+	return obj.(*v2.HorizontalPodAutoscalerList), err
 }
 
 func (s *horizontalPodAutoscalerClient) Watch(opts metav1.ListOptions) (watch.Interface, error) {
@@ -280,9 +280,9 @@ func (s *horizontalPodAutoscalerClient) Watch(opts metav1.ListOptions) (watch.In
 }
 
 // Patch applies the patch and returns the patched deployment.
-func (s *horizontalPodAutoscalerClient) Patch(o *v2beta2.HorizontalPodAutoscaler, patchType types.PatchType, data []byte, subresources ...string) (*v2beta2.HorizontalPodAutoscaler, error) {
+func (s *horizontalPodAutoscalerClient) Patch(o *v2.HorizontalPodAutoscaler, patchType types.PatchType, data []byte, subresources ...string) (*v2.HorizontalPodAutoscaler, error) {
 	obj, err := s.objectClient.Patch(o.Name, o, patchType, data, subresources...)
-	return obj.(*v2beta2.HorizontalPodAutoscaler), err
+	return obj.(*v2.HorizontalPodAutoscaler), err
 }
 
 func (s *horizontalPodAutoscalerClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {

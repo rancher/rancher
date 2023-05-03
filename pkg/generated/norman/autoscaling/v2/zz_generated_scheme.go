@@ -1,4 +1,4 @@
-package v2beta2
+package v2
 
 import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -6,7 +6,7 @@ import (
 
 const (
 	GroupName = "autoscaling"
-	Version   = "v2beta2"
+	Version   = "v2"
 )
 
 // SchemeGroupVersion is group version used to register these objects
