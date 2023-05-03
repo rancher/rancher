@@ -19,12 +19,15 @@ import (
 )
 
 var (
-	ErrNotHelmRelease = errors.New("not helm release")
-	magicGzip         = []byte{0x1f, 0x8b, 0x08}
+	ErrNotHelmRelease = errors.New("not helm release") // error for when it's not a helm release
+	magicGzip         = []byte{0x1f, 0x8b, 0x08}       // gzip magic header
 )
 
+// IsNamespaced Alias for func(gvk schema.GroupVersionKind) bool
 type IsNamespaced func(gvk schema.GroupVersionKind) bool
 
+// IsLatest checked if the received v1.ReleaseSpec is on the latest version of a helm chart
+// by comparing its version to all release helm objects.
 func IsLatest(release *v1.ReleaseSpec, others []runtime.Object) bool {
 	for _, other := range others {
 		m, err := meta.Accessor(other)
@@ -58,6 +61,9 @@ func IsLatest(release *v1.ReleaseSpec, others []runtime.Object) bool {
 	return true
 }
 
+// ToRelease return a v1.ReleaseSpec for the given runtime.Object received.
+// The function populates the releaseSpec with release information related
+// to an installed app based on the helm version used to install the app.
 func ToRelease(obj runtime.Object, isNamespaced IsNamespaced) (*v1.ReleaseSpec, error) {
 	releaseData, err := getReleaseDataAndKind(obj)
 	if err != nil {
@@ -79,6 +85,9 @@ func ToRelease(obj runtime.Object, isNamespaced IsNamespaced) (*v1.ReleaseSpec, 
 	return nil, ErrNotHelmRelease
 }
 
+// getReleaseDataAndKind receives a runtime.Object which can be an
+// unstructured.Unstructured, corev1.ConfigMap or a corev1.Secret.
+// It extracts the data["release"] based on the object type and returns it.
 func getReleaseDataAndKind(obj runtime.Object) (string, error) {
 	switch t := obj.(type) {
 	case *unstructured.Unstructured:
@@ -111,6 +120,9 @@ func getReleaseDataAndKind(obj runtime.Object) (string, error) {
 	return "", ErrNotHelmRelease
 }
 
+// resourcesFromManifest receives the rendered manifest template as a string and
+// uses the wrangler yaml functions to convert it to a list of runtime.Objects.
+// It then converts each object to a v1.ReleaseResource and returns that list.
 func resourcesFromManifest(namespace string, manifest string, isNamespaced IsNamespaced) (result []v1.ReleaseResource, err error) {
 	objs, err := yaml.ToObjects(bytes.NewReader([]byte(manifest)))
 	if err != nil {
