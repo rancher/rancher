@@ -135,6 +135,11 @@ func (h *handler) createCluster(cluster *v1.Cluster, status v1.ClusterStatus) ([
 		privateRepoURL = image.GetPrivateRepoURLFromCluster(cluster)
 	}
 
+	agentAffinity, err := mgmtcluster.GetFleetAgentAffinity(mgmtCluster)
+	if err != nil {
+		return nil, status, err
+	}
+
 	return []runtime.Object{&fleet.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cluster.Name,
@@ -146,6 +151,9 @@ func (h *handler) createCluster(cluster *v1.Cluster, status v1.ClusterStatus) ([
 			AgentEnvVars:     mgmtCluster.Spec.AgentEnvVars,
 			AgentNamespace:   agentNamespace,
 			PrivateRepoURL:   privateRepoURL,
+			AgentTolerations: mgmtcluster.GetFleetAgentTolerations(mgmtCluster),
+			AgentAffinity:    agentAffinity,
+			AgentResources:   mgmtcluster.GetFleetAgentResourceRequirements(mgmtCluster),
 		},
 	}}, status, nil
 }
