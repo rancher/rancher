@@ -85,6 +85,12 @@ func (h handler) onClusterChange(key string, cluster *v3.Cluster) (*v3.Cluster, 
 		return cluster, nil
 	}
 
+	skipChartInstallation := strings.EqualFold(settings.SkipHostedClusterChartInstallation.Get(), "true")
+	if skipChartInstallation {
+		logrus.Warn("Skipping installation of hosted cluster charts, 'skip-hosted-cluster-chart-installation' is set to true")
+		return cluster, nil
+	}
+
 	var toInstallCrdChart, toInstallChart *chart.Definition
 	var provider string
 	if cluster.Spec.AKSConfig != nil {
