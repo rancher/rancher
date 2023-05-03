@@ -81,6 +81,7 @@ require (
 	github.com/golang-jwt/jwt v3.2.1+incompatible
 	github.com/golang/mock v1.6.0
 	github.com/golang/protobuf v1.5.3
+	github.com/google/gnostic v0.5.7-v3refs
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/gorilla/mux v1.8.0
 	github.com/gorilla/websocket v1.4.2
@@ -108,13 +109,15 @@ require (
 	github.com/rancher/fleet/pkg/apis v0.0.0-20230420151154-ab055fa31e05
 	github.com/rancher/gke-operator v1.1.5
 	github.com/rancher/kubernetes-provider-detector v0.1.5
+	github.com/rancher/lasso v0.0.0-20230428185353-36908edf817b
+	github.com/rancher/lasso/controller-runtime v0.0.0-20230502204209-3eb356f3e8cf
 	github.com/rancher/machine v0.15.0-rancher99
 	github.com/rancher/norman v0.0.0-20230328153514-ae12f166495a
 	github.com/rancher/rancher/pkg/apis v0.0.0
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 	github.com/rancher/remotedialer v0.2.6-0.20220624190122-ea57207bf2b8
-	github.com/rancher/rke v1.4.6-rc1
+	github.com/rancher/rke v1.4.6-rc2
 	github.com/rancher/steve v0.0.0-20230222210822-3d3cc7767928
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007
 	github.com/rancher/wrangler v1.1.1
@@ -154,12 +157,6 @@ require (
 	sigs.k8s.io/cluster-api v1.2.12
 	sigs.k8s.io/controller-runtime v0.12.3
 	sigs.k8s.io/yaml v1.3.0
-)
-
-require (
-	github.com/google/gnostic v0.5.7-v3refs
-	github.com/rancher/lasso v0.0.0-20230428185353-36908edf817b
-	github.com/rancher/lasso/controller-runtime v0.0.0-20230502204209-3eb356f3e8cf
 )
 
 require (
