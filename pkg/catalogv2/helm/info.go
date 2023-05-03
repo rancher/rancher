@@ -12,6 +12,7 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
+// decodeYAML reads YAML data from input and decodes it into target
 func decodeYAML(input io.Reader, target interface{}) error {
 	data, err := ioutil.ReadAll(input)
 	if err != nil {
@@ -20,6 +21,8 @@ func decodeYAML(input io.Reader, target interface{}) error {
 	return yaml.Unmarshal(data, target)
 }
 
+// InfoFromTarball receives an input containing a tarball file with chart-data
+// Returns a pointer to a types.ChartInfo struct containing the chart-data
 func InfoFromTarball(input io.Reader) (*types.ChartInfo, error) {
 	result := &types.ChartInfo{
 		Values:    map[string]interface{}{},
