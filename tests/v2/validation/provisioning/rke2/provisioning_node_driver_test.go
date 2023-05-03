@@ -1,10 +1,12 @@
 package rke2
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
+	"github.com/rancher/rancher/tests/framework/extensions/agent"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters/kubernetesversions"
 	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
@@ -16,6 +18,7 @@ import (
 	provisioning "github.com/rancher/rancher/tests/v2/validation/provisioning"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	corev1 "k8s.io/api/core/v1"
 )
 
 type RKE2NodeDriverProvisioningTestSuite struct {
@@ -156,6 +159,42 @@ func (r *RKE2NodeDriverProvisioningTestSuite) TestProvisioningRKE2Cluster() {
 			}
 		}
 	}
+
+	clusterAgentCustomization := agent.AgentDeploymentCustomization{
+		Tolerations:          corev1.Toleration{},
+		Affinity:             corev1.Affinity{},
+		ResourceRequirements: corev1.ResourceRequirements{},
+	}
+
+	fleetAgentCustomization := agent.AgentDeploymentCustomization{
+		Tolerations:          corev1.Toleration{},
+		Affinity:             corev1.Affinity{},
+		ResourceRequirements: corev1.ResourceRequirements{},
+	}
+
+	agentCustomizationTests := []struct {
+		name                      string
+		nodeRoles                 []machinepools.NodeRoles
+		client                    *rancher.Client
+		psact                     string
+		clusterAgentCustomization agent.AgentDeploymentCustomization
+		fleetAgentCustomization   agent.AgentDeploymentCustomization
+	}{
+		{"1 node all role with agent customization " + provisioning.StandardClientName.String(), nodeRoles0, r.standardUserClient, r.psact,
+			clusterAgentCustomization,
+			fleetAgentCustomization},
+
+		{"2 nodes - etcd/cp roles per 1 node with agent customization " + provisioning.StandardClientName.String(), nodeRoles1, r.standardUserClient, r.psact,
+			clusterAgentCustomization,
+			fleetAgentCustomization},
+
+		{"3 nodes - 1 role per node with agent customization " + provisioning.StandardClientName.String(), nodeRoles2, r.standardUserClient, r.psact,
+			clusterAgentCustomization,
+			fleetAgentCustomization},
+	}
+
+	// test to compile
+	fmt.Printf("%v", agentCustomizationTests)
 }
 
 func (r *RKE2NodeDriverProvisioningTestSuite) TestProvisioningRKE2ClusterDynamicInput() {
