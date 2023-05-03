@@ -18,11 +18,13 @@ import (
 )
 
 var (
+	// Map containing the accepted name of readme files
 	readmes = map[string]bool{
 		"readme":     true,
 		"readme.txt": true,
 		"readme.md":  true,
 	}
+	// Map containing the possible release status
 	statusMapping = map[string]v1.Status{
 		"UNKNOWN":          v1.StatusUnknown,
 		"DEPLOYED":         v1.StatusDeployed,
@@ -36,10 +38,14 @@ var (
 	}
 )
 
+// isHelm2 checks if the value of the owner key of the received map is equal to TILLER.
+// Every helm2 release object contains this label.
 func isHelm2(labels map[string]string) bool {
 	return labels["OWNER"] == "TILLER"
 }
 
+// fromHelm2Data receives a helm2 release data string of an installed helm chart.
+// It then converts the string into Helm2 release struct and again to rancher v1.ReleaseSpec struct to return it.
 func fromHelm2Data(data string, isNamespaced IsNamespaced) (*v1.ReleaseSpec, error) {
 	release, err := decodeHelm2(data)
 	if err != nil {
@@ -49,6 +55,7 @@ func fromHelm2Data(data string, isNamespaced IsNamespaced) (*v1.ReleaseSpec, err
 	return fromHelm2ReleaseToRelease(release, isNamespaced)
 }
 
+// toTime receives timestamp in google protobuf format and returns the corresponding metav1.Time struct
 func toTime(t *timestamp.Timestamp) *metav1.Time {
 	if t == nil || (t.Seconds == 0 && t.Nanos == 0) {
 		return nil
@@ -58,6 +65,8 @@ func toTime(t *timestamp.Timestamp) *metav1.Time {
 	}
 }
 
+// fromHelm2ReleaseToRelease receives a k8s release proto struct representing a helm2 release.
+// Returns a pointer to a v1.ReleaseSpec struct for the helm2 release
 func fromHelm2ReleaseToRelease(release *rspb.Release, isNamespaced IsNamespaced) (*v1.ReleaseSpec, error) {
 	var (
 		err error
@@ -121,6 +130,9 @@ func fromHelm2ReleaseToRelease(release *rspb.Release, isNamespaced IsNamespaced)
 	return hr, err
 }
 
+// toMap receives the namespace, name and manifest of a release.
+// If the manifest is a valid yaml, returns a map representing it,
+// otherwise returns an empty map
 func toMap(namespace, name string, manifest string) map[string]interface{} {
 	values := map[string]interface{}{}
 
@@ -135,6 +147,7 @@ func toMap(namespace, name string, manifest string) map[string]interface{} {
 	return values
 }
 
+// decodeHelm2 receives a helm2 release data and returns the corresponding helm2 release proto struct
 func decodeHelm2(data string) (*rspb.Release, error) {
 	b, err := base64.StdEncoding.DecodeString(data)
 	if err != nil {
