@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	kwait "k8s.io/apimachinery/pkg/util/wait"
 	"time"
+
 	"github.com/rancher/rancher/pkg/api/scheme"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
@@ -18,6 +18,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeUnstructured "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	kwait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 )
 
