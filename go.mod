@@ -59,7 +59,7 @@ require (
 	github.com/Azure/go-autorest/autorest/adal v0.9.22
 	github.com/Azure/go-autorest/autorest/to v0.4.1-0.20210111195520-9fc88b15294e
 	github.com/AzureAD/microsoft-authentication-library-for-go v0.5.1
-	github.com/Masterminds/semver/v3 v3.2.0
+	github.com/Masterminds/semver/v3 v3.2.1
 	github.com/Masterminds/sprig/v3 v3.2.3
 	github.com/aws/aws-sdk-go v1.44.83
 	github.com/bep/debounce v1.2.0
