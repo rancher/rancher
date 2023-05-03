@@ -106,22 +106,73 @@ type GlobalRoleBinding struct {
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// RoleTemplate holds configuration for a template that is used to create roles and clusterRoles for a cluster or project.
+// +kubebuilder:resource:scope=Cluster
 type RoleTemplate struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	DisplayName           string              `json:"displayName,omitempty" norman:"required"`
-	Description           string              `json:"description"`
-	Rules                 []rbacv1.PolicyRule `json:"rules,omitempty"`
-	Builtin               bool                `json:"builtin" norman:"nocreate,noupdate"`
-	External              bool                `json:"external"`
-	Hidden                bool                `json:"hidden"`
-	Locked                bool                `json:"locked,omitempty" norman:"type=boolean"`
-	ClusterCreatorDefault bool                `json:"clusterCreatorDefault,omitempty" norman:"required"`
-	ProjectCreatorDefault bool                `json:"projectCreatorDefault,omitempty" norman:"required"`
-	Context               string              `json:"context" norman:"type=string,options=project|cluster"`
-	RoleTemplateNames     []string            `json:"roleTemplateNames,omitempty" norman:"type=array[reference[roleTemplate]]"`
-	Administrative        bool                `json:"administrative,omitempty"`
+	// DisplayName is the human-readable name used for this resource.
+	// +kubebuilder:validation:Required
+	DisplayName string `json:"displayName,omitempty" norman:"required"`
+
+	// Description holds any text desired to better describes the resource.
+	// +optional
+	Description string `json:"description"`
+
+	// Rules holds all the PolicyRules for this RoleTemplate
+	// +optional
+	Rules []rbacv1.PolicyRule `json:"rules,omitempty"`
+
+	// Builtin if true specifies that this RoleTemplate was created by Rancher and is immutable.
+	// Default to false.
+	// +optional
+	Builtin bool `json:"builtin" norman:"nocreate,noupdate"`
+
+	// External if true specifies that rules for this RoleTemplate should be gathered from a ClusterRole with the matching name
+	// If set to true the Rules on the template will not be evaluated.
+	// External's value is only evaluated if the RoleTemplate's context is set to "cluster"
+	// Default to false.
+	// +optional
+	External bool `json:"external"`
+
+	// Hidden if true informs the Rancher UI not to display this RoleTemplate.
+	// Default to false.
+	// +optional
+	Hidden bool `json:"hidden"`
+
+	// Locked if true, new bindings will not be able to use this RoleTemplate.
+	// Default to false.
+	// +optional
+	Locked bool `json:"locked,omitempty" norman:"type=boolean"`
+
+	// ClusterCreatorDefault if true, a binding with this RoleTemplate will be created for a users when they create a new cluster.
+	// ClusterCreatorDefault is only evaluated if the context of the RoleTemplate is set to cluster.
+	// Default to false.
+	// +optional
+	ClusterCreatorDefault bool `json:"clusterCreatorDefault,omitempty" norman:"required"`
+
+	// ProjectCreatorDefault if true, a binding with this RoleTemplate will be created for a users when they create a new project.
+	// ProjectCreatorDefault is only evaluated if the context of the RoleTemplate is set to project.
+	// Default to false.
+	// +optional
+	ProjectCreatorDefault bool `json:"projectCreatorDefault,omitempty" norman:"required"`
+
+	// Context describes if the roleTemplate applies to clusters or projects.
+	// Valid values are "project" and "cluster".
+	// +kubebuilder:validation:Enum={"project","cluster"}
+	// +kubebuilder:validation:Required
+	Context string `json:"context" norman:"type=string,options=project|cluster"`
+
+	// RoleTemplateNames list of RoleTemplate names that this RoleTemplate will inherit.
+	// Inherited  RoleTemplates must already exist.
+	// +optional
+	RoleTemplateNames []string `json:"roleTemplateNames,omitempty" norman:"type=array[reference[roleTemplate]]"`
+
+	// Administrative if false, and context is set to cluster this RoleTemplate will not grant access to "CatalogTemplates" and "CatalogTemplateVersions" for any project in the cluster.
+	// Default is false.
+	// +optional
+	Administrative bool `json:"administrative,omitempty"`
 }
 
 // +genclient
