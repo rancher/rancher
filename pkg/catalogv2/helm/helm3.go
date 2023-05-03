@@ -15,10 +15,15 @@ import (
 	"helm.sh/helm/v3/pkg/release"
 )
 
+// isHelm3 checks if the value of the owner key of the received map is equal to helm.
+// Every helm3 release object has this particular label on it.
 func isHelm3(labels map[string]string) bool {
 	return labels["owner"] == "helm"
 }
 
+// fromHelm3Data receives a helm3 release data string of an installed helm chart.
+// It then converts the string into Helm3 release struct and again to rancher
+// v1.ReleaseSpec struct to return it.
 func fromHelm3Data(data string, isNamespaced IsNamespaced) (*v1.ReleaseSpec, error) {
 	release, err := decodeHelm3(data)
 	if err != nil {
@@ -28,6 +33,8 @@ func fromHelm3Data(data string, isNamespaced IsNamespaced) (*v1.ReleaseSpec, err
 	return fromHelm3ReleaseToRelease(release, isNamespaced)
 }
 
+// fromHelm3ReleaseToRelease receives a helm3 release struct.
+// Returns a pointer to a rancher v1.ReleaseSpec struct constructed from the helm3 release struct.
 func fromHelm3ReleaseToRelease(release *release.Release, isNamespaced IsNamespaced) (*v1.ReleaseSpec, error) {
 	var (
 		info  = &v1.Info{}
@@ -112,6 +119,8 @@ func fromHelm3ReleaseToRelease(release *release.Release, isNamespaced IsNamespac
 	return hr, err
 }
 
+// decodeHelm3 receives a helm3 release data string, decodes the string data using the standard base64 library
+// and unmarshals the data into release.Release struct to return it.
 func decodeHelm3(data string) (*release.Release, error) {
 	b, err := base64.StdEncoding.DecodeString(data)
 	if err != nil {
