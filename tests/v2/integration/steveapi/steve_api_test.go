@@ -38,6 +38,7 @@ const (
 	labelKey          = "test-label"
 	continueToken     = "nondeterministictoken"
 	defautlUrlString  = "https://rancherurl/"
+	steveAPITestLabel = "test.cattle.io/steveapi"
 )
 
 var (
@@ -151,7 +152,7 @@ var (
 	}
 )
 
-type SteveAPITestSuite struct {
+type steveAPITestSuite struct {
 	suite.Suite
 	client            *rancher.Client
 	session           *session.Session
@@ -160,11 +161,27 @@ type SteveAPITestSuite struct {
 	lastContinueToken string
 }
 
-func (s *SteveAPITestSuite) TearDownSuite() {
+type LocalSteveAPITestSuite struct {
+	steveAPITestSuite
+}
+
+type DownstreamSteveAPITestSuite struct {
+	steveAPITestSuite
+}
+
+func (s *steveAPITestSuite) TearDownSuite() {
 	s.session.Cleanup()
 }
 
-func (s *SteveAPITestSuite) SetupSuite() {
+func (s *LocalSteveAPITestSuite) SetupSuite() {
+	s.steveAPITestSuite.setupSuite("local")
+}
+
+func (s *DownstreamSteveAPITestSuite) SetupSuite() {
+	s.steveAPITestSuite.setupSuite("")
+}
+
+func (s *steveAPITestSuite) setupSuite(clusterName string) {
 	testSession := session.NewSession()
 	s.session = testSession
 
@@ -174,7 +191,9 @@ func (s *SteveAPITestSuite) SetupSuite() {
 
 	s.userClients = make(map[string]*rancher.Client)
 
-	clusterName := s.client.RancherConfig.ClusterName
+	if clusterName == "" {
+		clusterName = s.client.RancherConfig.ClusterName
+	}
 	require.NotEmptyf(s.T(), clusterName, "Cluster name is not set")
 	clusterID, err := clusters.GetClusterIDByName(client, clusterName)
 	require.NoError(s.T(), err)
@@ -213,11 +232,11 @@ func (s *SteveAPITestSuite) SetupSuite() {
 					Name: fmt.Sprintf("test%d", i),
 				},
 			}
+			labels := map[string]string{steveAPITestLabel: "true"}
 			if i == 2 {
-				secret.ObjectMeta.SetLabels(map[string]string{
-					labelKey: "2",
-				})
+				labels[labelKey] = "2"
 			}
+			secret.ObjectMeta.SetLabels(labels)
 			_, err := secrets.CreateSecret(s.client, secret, s.project.ClusterID, n)
 			require.NoError(s.T(), err)
 		}
@@ -270,7 +289,7 @@ func (s *SteveAPITestSuite) SetupSuite() {
 	}
 }
 
-func (s *SteveAPITestSuite) TestList() {
+func (s *steveAPITestSuite) TestList() {
 	subSession := s.session.NewSession()
 	defer subSession.Cleanup()
 
@@ -845,9 +864,19 @@ func (s *SteveAPITestSuite) TestList() {
 		},
 	}
 
-	csvWriter, fp, jsonDir, err := setUpResults()
-	defer fp.Close()
-	require.NoError(s.T(), err)
+	var csvWriter *csv.Writer
+	var jsonDir string
+	if s.project.ClusterID == "local" {
+		var fp *os.File
+		var err error
+		csvWriter, fp, jsonDir, err = setUpResults()
+		defer fp.Close()
+		defer func() {
+			csvWriter.Flush()
+			require.NoError(s.T(), csvWriter.Error())
+		}()
+		require.NoError(s.T(), err)
+	}
 
 	for _, test := range tests {
 		s.Run(test.description, func() {
@@ -870,6 +899,7 @@ func (s *SteveAPITestSuite) TestList() {
 					query["fieldSelector"] = []string{"metadata.namespace=" + ns}
 				}
 			}
+			query["labelSelector"] = append(query["labelSelector"], steveAPITestLabel+"=true")
 			secretList, err := secretClient.List(query)
 			require.NoError(s.T(), err)
 
@@ -877,26 +907,20 @@ func (s *SteveAPITestSuite) TestList() {
 				s.lastContinueToken = secretList.Continue
 			}
 
-			assert.Equal(s.T(), len(test.expect), len(secretList.Data))
-			for i, w := range test.expect {
-				assert.Equal(s.T(), w["name"], secretList.Data[i].Name)
-				assert.Equal(s.T(), namespaceMap[w["namespace"]], secretList.Data[i].Namespace)
-			}
+			s.assertListIsEqual(test.expect, secretList.Data)
 
 			// Write human-readable request and response examples
-			curlURL, err := getCurlURL(client, test.namespace, test.query)
-			require.NoError(s.T(), err)
-			jsonResp, err := formatJSON(secretList)
-			require.NoError(s.T(), err)
-			jsonFilePath := filepath.Join(jsonDir, getFileName(test.user, test.namespace, test.query))
-			if !downStreamClusterRegex.MatchString(curlURL) {
+			if s.project.ClusterID == "local" {
+				curlURL, err := getCurlURL(client, test.namespace, test.query)
+				require.NoError(s.T(), err)
+				jsonResp, err := formatJSON(secretList)
+				require.NoError(s.T(), err)
+				jsonFilePath := filepath.Join(jsonDir, getFileName(test.user, test.namespace, test.query))
 				err = writeResp(csvWriter, test.user, curlURL, jsonFilePath, jsonResp)
 				require.NoError(s.T(), err)
 			}
 		})
 	}
-	csvWriter.Flush()
-	require.NoError(s.T(), csvWriter.Error())
 }
 
 func getFileName(user, ns, query string) string {
@@ -1003,7 +1027,7 @@ func writeResp(csvWriter *csv.Writer, user, url, path string, resp []byte) error
 	return nil
 }
 
-func (s *SteveAPITestSuite) TestCRUD() {
+func (s *steveAPITestSuite) TestCRUD() {
 	subSession := s.session.NewSession()
 	defer subSession.Cleanup()
 
@@ -1089,6 +1113,22 @@ func (s *SteveAPITestSuite) TestCRUD() {
 	})
 }
 
-func TestSteve(t *testing.T) {
-	suite.Run(t, new(SteveAPITestSuite))
+func (s *steveAPITestSuite) assertListIsEqual(expect []map[string]string, list []clientv1.SteveAPIObject) {
+	assert.Equal(s.T(), len(expect), len(list))
+	for i, w := range expect {
+		if name, ok := w["name"]; ok {
+			assert.Equal(s.T(), name, list[i].Name)
+		}
+		if ns, ok := w["namespace"]; ok {
+			assert.Equal(s.T(), namespaceMap[ns], list[i].Namespace)
+		}
+	}
+}
+
+func TestSteveLocal(t *testing.T) {
+	suite.Run(t, new(LocalSteveAPITestSuite))
+}
+
+func TestSteveDownstream(t *testing.T) {
+	suite.Run(t, new(DownstreamSteveAPITestSuite))
 }

@@ -12,7 +12,8 @@
       },
       "metadata": {
         "labels": {
-          "test-label": "2"
+          "test-label": "2",
+          "test.cattle.io/steveapi": "true"
         },
         "name": "test2",
         "namespace": "test-ns-1",
