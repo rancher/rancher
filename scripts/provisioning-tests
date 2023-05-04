@@ -30,6 +30,12 @@ else
   LINUX=.linux
 fi
 
+if [ -z "${CATEGORY}" ]; then
+  CATEGORY=provisioning
+fi
+
+TAGARG="--tags=${CATEGORY}"
+
 export DIST=${DIST}
 export SOME_K8S_VERSION=${SOME_K8S_VERSION}
 export TB_ORG=${TB_ORG}
@@ -110,14 +116,29 @@ sleep 5
 while ! curl -sf http://localhost:8080/ping; do
     sleep 2
 done
-while ! kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -w -n cattle-system deploy/rancher-webhook; do
+
+# Echo a newline to handle the "pong" from the above ping
+echo ""
+
+rwWC=0
+echo "Waiting up to 5 minutes for rancher-webhook deployment"
+while ! kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -w -n cattle-system deploy/rancher-webhook &>/dev/null; do
+  if [[ "$rwWC" == 150 ]]; then
+    echo "rancher-webhook was not available within 5 minutes. failing fast"
+    exit 1
+  fi
+  if [[ $((rwWC%60)) == 0 ]] && [[ "$rwWC" != "0" ]]; then
+    echo "rancher-webhook was not ready within $((rwWC/60)) minutes"
+  fi
     sleep 2
+    rwWC=$((rwWC + 1))
 done
 #kill $TPID
 
-echo Running provisioning-tests
+echo Running provisioning-tests $TAGARG
+
 export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
-go test -v -failfast -timeout 60m ./tests/integration/pkg/tests/... || {
+go test $TAGARG -v -failfast -timeout 60m ./tests/integration/pkg/tests/... || {
     echo -e "-----RANCHER-LOG-DUMP-START-----"
     cat /tmp/rancher.log | gzip | base64 -w 0
     echo -e "\n-----RANCHER-LOG-DUMP-END-----"

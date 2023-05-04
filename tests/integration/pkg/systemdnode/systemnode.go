@@ -113,6 +113,11 @@ INVOCATION_ID=
 						MountPath: "/usr/local/lib/systemd/system/k3s-agent.service.d/10-delegate.conf",
 						SubPath:   "dropin",
 					},
+					{ // We have to set invocation disabling on the rancher-system-agent because it runs rke2/k3s server and this also has cgroup issues.
+						Name:      "systemd",
+						MountPath: "/etc/default/rancher-system-agent",
+						SubPath:   "disable",
+					},
 					{
 						Name:      "systemd",
 						MountPath: "/etc/default/rke2-server",
