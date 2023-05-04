@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"strconv"
+	"strings"
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
@@ -103,7 +104,7 @@ func (p *Planner) rotateCertificatesPlan(controlPlane *rkev1.RKEControlPlane, to
 		// Don't overwrite the joinURL annotation.
 		joinServer = ""
 	}
-	rotatePlan, _, joinedServer, err := p.generatePlanWithConfigFiles(controlPlane, tokensSecret, entry, joinServer)
+	rotatePlan, config, joinedServer, err := p.generatePlanWithConfigFiles(controlPlane, tokensSecret, entry, joinServer)
 	if err != nil {
 		return plan.NodePlan{}, joinedServer, err
 	}
@@ -122,6 +123,8 @@ func (p *Planner) rotateCertificatesPlan(controlPlane *rkev1.RKEControlPlane, to
 
 	rotateScriptPath := "/var/lib/rancher/" + capr.GetRuntime(controlPlane.Spec.KubernetesVersion) + "/rancher_v2prov_certificate_rotation/bin/rotate.sh"
 
+	runtime := capr.GetRuntime(controlPlane.Spec.KubernetesVersion)
+
 	args := []string{
 		"-xe",
 		rotateScriptPath,
@@ -139,20 +142,81 @@ func (p *Planner) rotateCertificatesPlan(controlPlane *rkev1.RKEControlPlane, to
 		Content: base64.StdEncoding.EncodeToString([]byte(idempotentRotateScript)),
 		Path:    rotateScriptPath,
 	})
-	rotatePlan.Instructions = append(rotatePlan.Instructions, []plan.OneTimeInstruction{
-		{
-			Name:    "rotate certificates",
-			Command: "sh",
-			Args:    args,
+	rotatePlan.Instructions = append(rotatePlan.Instructions, plan.OneTimeInstruction{
+		Name:    "rotate certificates",
+		Command: "sh",
+		Args:    args,
+	})
+	if isControlPlane(entry) {
+		if kcmCertDir := getArgValue(config[KubeControllerManagerArg], CertDirArgument, "="); kcmCertDir != "" && getArgValue(config[KubeControllerManagerArg], TLSCertFileArgument, "=") == "" {
+			rotatePlan.Instructions = append(rotatePlan.Instructions, []plan.OneTimeInstruction{
+				{
+					Name:    "remove kube-controller-manager cert for regeneration",
+					Command: "rm",
+					Args: []string{
+						"-f",
+						fmt.Sprintf("%s/%s", kcmCertDir, DefaultKubeControllerManagerCert),
+					},
+				},
+				{
+					Name:    "remove kube-controller-manager key for regeneration",
+					Command: "rm",
+					Args: []string{
+						"-f",
+						fmt.Sprintf("%s/%s", kcmCertDir, strings.ReplaceAll(DefaultKubeControllerManagerCert, ".crt", ".key")),
+					},
+				},
+			}...)
+			if runtime == capr.RuntimeRKE2 {
+				rotatePlan.Instructions = append(rotatePlan.Instructions, plan.OneTimeInstruction{
+					Name:    "remove kube-controller-manager static pod manifest",
+					Command: "rm",
+					Args: []string{
+						"-f",
+						"/var/lib/rancher/rke2/agent/pod-manifests/kube-controller-manager.yaml",
+					},
+				})
+			}
+		}
+		if ksCertDir := getArgValue(config[KubeSchedulerArg], CertDirArgument, "="); ksCertDir != "" && getArgValue(config[KubeSchedulerArg], TLSCertFileArgument, "=") == "" {
+			rotatePlan.Instructions = append(rotatePlan.Instructions, []plan.OneTimeInstruction{
+				{
+					Name:    "remove kube-scheduler cert for regeneration",
+					Command: "rm",
+					Args: []string{
+						"-f",
+						fmt.Sprintf("%s/%s", ksCertDir, KubeSchedulerArg),
+					},
+				},
+				{
+					Name:    "remove kube-scheduler key for regeneration",
+					Command: "rm",
+					Args: []string{
+						"-f",
+						fmt.Sprintf("%s/%s", ksCertDir, strings.ReplaceAll(KubeSchedulerArg, ".crt", ".key")),
+					},
+				},
+			}...)
+			if runtime == capr.RuntimeRKE2 {
+				rotatePlan.Instructions = append(rotatePlan.Instructions, plan.OneTimeInstruction{
+					Name:    "remove kube-scheduler static pod manifest",
+					Command: "rm",
+					Args: []string{
+						"-f",
+						"/var/lib/rancher/rke2/agent/pod-manifests/kube-scheduler.yaml",
+					},
+				})
+			}
+		}
+	}
+	rotatePlan.Instructions = append(rotatePlan.Instructions, plan.OneTimeInstruction{
+		Name:    "restart",
+		Command: "systemctl",
+		Args: []string{
+			"restart",
+			runtime,
 		},
-		{
-			Name:    "restart",
-			Command: "systemctl",
-			Args: []string{
-				"restart",
-				capr.GetRuntimeServerUnit(controlPlane.Spec.KubernetesVersion),
-			},
-		}}...)
+	})
 	return rotatePlan, joinedServer, nil
 }
 
