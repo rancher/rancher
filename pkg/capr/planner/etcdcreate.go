@@ -4,9 +4,11 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/Masterminds/semver/v3"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/capr"
+	"github.com/rancher/rancher/pkg/controllers/capr/managesystemagent"
 	"github.com/rancher/wrangler/pkg/merr"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -61,9 +63,20 @@ func (p *Planner) runEtcdSnapshotCreate(controlPlane *rkev1.RKEControlPlane, tok
 
 // generateEtcdSnapshotCreatePlan generates a plan that contains an instruction to create an etcd snapshot.
 func (p *Planner) generateEtcdSnapshotCreatePlan(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, entry *planEntry, joinServer string) (plan.NodePlan, string, error) {
+	v, err := semver.NewVersion(controlPlane.Spec.KubernetesVersion)
+	if err != nil {
+		return plan.NodePlan{}, "", err
+	}
+
 	args := []string{
 		"etcd-snapshot",
 	}
+
+	// Starting in v1.26, we must specify "save" when creating an etcd snapshot
+	if v.GreaterThan(managesystemagent.Kubernetes125) {
+		args = append(args, "save")
+	}
+
 	createPlan, _, joinedServer, err := p.generatePlanWithConfigFiles(controlPlane, tokensSecret, entry, joinServer)
 	createPlan.Instructions = append(createPlan.Instructions, p.generateInstallInstructionWithSkipStart(controlPlane, entry),
 		plan.OneTimeInstruction{
