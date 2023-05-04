@@ -68,11 +68,9 @@ func SetCustomRepo(repo string) error {
 // CreateCorral creates a corral taking the corral name, the package path, and a debug set so if someone wants to view the
 // corral create log
 func CreateCorral(ts *session.Session, corralName, packageName string, debug bool, cleanup bool) ([]byte, error) {
-	if cleanup {
-		ts.RegisterCleanupFunc(func() error {
-			return DeleteCorral(corralName)
-		})
-	}
+	ts.RegisterCleanupFunc(func() error {
+		return DeleteCorral(corralName)
+	})
 
 	args := []string{"create"}
 	if !cleanup {

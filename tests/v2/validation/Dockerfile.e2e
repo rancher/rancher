@@ -12,7 +12,7 @@ WORKDIR $WORKSPACE
 COPY ["./rancher", "$WORKSPACE"]
 COPY ["./corral-packages", "$WORKSPACE2"]
 
-ENV CORRAL_VERSION="v1.1.1"
+ARG CORRAL_VERSION=v1.1.1
 
 RUN zypper -n install gcc binutils glibc-devel-static ca-certificates git-core wget curl unzip tar vim less file xz gzip sed gawk iproute2 iptables jq
 RUN zypper install -y -f docker && rpm -e --nodeps --noscripts containerd

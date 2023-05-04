@@ -6,9 +6,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/clients/corral"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
-	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
-	"github.com/rancher/rancher/tests/framework/extensions/defaults"
 	"github.com/rancher/rancher/tests/framework/extensions/registries"
 	nodepools "github.com/rancher/rancher/tests/framework/extensions/rke1/nodepools"
 	"github.com/rancher/rancher/tests/framework/extensions/workloads/pods"
@@ -19,6 +17,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
 	provisioning "github.com/rancher/rancher/tests/v2/validation/provisioning"
 	"github.com/rancher/rancher/tests/v2/validation/provisioning/rke1"
+	"github.com/rancher/rancher/tests/v2prov/defaults"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -36,9 +35,9 @@ type RegistryTestSuite struct {
 	suite.Suite
 	session                        *session.Session
 	client                         *rancher.Client
-	podListClusterAuth             *v1.SteveCollection
-	podListClusterNoAuth           *v1.SteveCollection
-	podListClusterLocal            *v1.SteveCollection
+	clusterAuthID                  string
+	clusterNoAuthID                string
+	clusterLocalID                 string
 	clusterAuthRegistryHost        string
 	clusterNoAuthRegistryHost      string
 	localClusterGlobalRegistryHost string
@@ -80,7 +79,7 @@ func (rt *RegistryTestSuite) SetupSuite() {
 			path := configPackage.CorralPackageImages[name]
 			logrus.Infof("PATH: %s", path)
 
-			_, err = corral.CreateCorral(testSession, name, path, true, configPackage.Cleanup)
+			_, err = corral.CreateCorral(testSession, name, path, true, configPackage.HasCleanup)
 			if err != nil {
 				logrus.Errorf("error creating corral: %v", err)
 			}
@@ -175,30 +174,16 @@ func (rt *RegistryTestSuite) SetupSuite() {
 	clusterID, err := clusters.GetClusterIDByName(client, clusterNameNoAuth)
 	require.NoError(rt.T(), err)
 
-	downstreamClient, err := client.Steve.ProxyDownstream(clusterID)
-	require.NoError(rt.T(), err)
-	steveClient := downstreamClient.SteveType(pods.PodResourceSteveType)
-	podsList, err := steveClient.List(nil)
-	require.NoError(rt.T(), err)
-	rt.podListClusterNoAuth = podsList
+	rt.clusterNoAuthID = clusterID
 	rt.clusterNoAuthRegistryHost = registryDisabledFqdn
 
 	clusterID, err = clusters.GetClusterIDByName(client, clusterNameAuth)
 	require.NoError(rt.T(), err)
-	downstreamClient, err = client.Steve.ProxyDownstream(clusterID)
-	require.NoError(rt.T(), err)
-	steveClient = downstreamClient.SteveType(pods.PodResourceSteveType)
-	podsList, err = steveClient.List(nil)
-	require.NoError(rt.T(), err)
-	rt.podListClusterAuth = podsList
+
+	rt.clusterAuthID = clusterID
 	rt.clusterAuthRegistryHost = registryEnabledFqdn
 
-	downstreamClient, err = client.Steve.ProxyDownstream("local")
-	require.NoError(rt.T(), err)
-	steveClient = downstreamClient.SteveType(pods.PodResourceSteveType)
-	podsList, err = steveClient.List(nil)
-	require.NoError(rt.T(), err)
-	rt.podListClusterLocal = podsList
+	rt.clusterLocalID = "local"
 	rt.localClusterGlobalRegistryHost = globalRegistryFqdn
 
 }
@@ -240,34 +225,33 @@ func (rt *RegistryTestSuite) testProvisionRKE1Cluster(client *rancher.Client, pr
 func (rt *RegistryTestSuite) TestRegistryAllPods() {
 
 	if rt.rancherUsesRegistry {
-		havePrefix, err := registries.CheckAllClusterPodsForRegistryPrefix(rt.podListClusterLocal, rt.localClusterGlobalRegistryHost)
+		havePrefix, err := registries.CheckAllClusterPodsForRegistryPrefix(rt.client, rt.clusterLocalID, rt.localClusterGlobalRegistryHost)
 		require.NoError(rt.T(), err)
 		assert.True(rt.T(), havePrefix)
 	}
 
-	havePrefix, err := registries.CheckAllClusterPodsForRegistryPrefix(rt.podListClusterNoAuth, rt.clusterNoAuthRegistryHost)
+	havePrefix, err := registries.CheckAllClusterPodsForRegistryPrefix(rt.client, rt.clusterNoAuthID, rt.clusterNoAuthRegistryHost)
 	require.NoError(rt.T(), err)
 	assert.True(rt.T(), havePrefix)
 
-	havePrefix, err = registries.CheckAllClusterPodsForRegistryPrefix(rt.podListClusterAuth, rt.clusterAuthRegistryHost)
+	havePrefix, err = registries.CheckAllClusterPodsForRegistryPrefix(rt.client, rt.clusterAuthID, rt.clusterAuthRegistryHost)
 	require.NoError(rt.T(), err)
 	assert.True(rt.T(), havePrefix)
 
 }
 
 func (rt *RegistryTestSuite) TestStatusAllPods() {
+	podResults, podErrors := pods.StatusPods(rt.client, rt.clusterLocalID)
+	assert.NotEmpty(rt.T(), podResults)
+	assert.Empty(rt.T(), podErrors)
 
-	areStatusesOk, err := registries.CheckAllClusterPodsStatusForRegistry(rt.podListClusterLocal)
-	require.NoError(rt.T(), err)
-	assert.True(rt.T(), areStatusesOk)
+	podResults, podErrors = pods.StatusPods(rt.client, rt.clusterNoAuthID)
+	assert.NotEmpty(rt.T(), podResults)
+	assert.Empty(rt.T(), podErrors)
 
-	areStatusesOk, err = registries.CheckAllClusterPodsStatusForRegistry(rt.podListClusterNoAuth)
-	require.NoError(rt.T(), err)
-	assert.True(rt.T(), areStatusesOk)
-
-	areStatusesOk, err = registries.CheckAllClusterPodsStatusForRegistry(rt.podListClusterAuth)
-	require.NoError(rt.T(), err)
-	assert.True(rt.T(), areStatusesOk)
+	podResults, podErrors = pods.StatusPods(rt.client, rt.clusterAuthID)
+	assert.NotEmpty(rt.T(), podResults)
+	assert.Empty(rt.T(), podErrors)
 
 }
 
