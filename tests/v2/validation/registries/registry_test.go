@@ -66,6 +66,12 @@ func (rt *RegistryTestSuite) SetupSuite() {
 	require.NoError(rt.T(), err)
 	configPackage := corral.CorralPackagesConfig()
 
+	globalRegistryFqdn := ""
+	registryDisabledFqdn := ""
+	registryEnabledUsername := ""
+	registryEnabledPassword := ""
+	registryEnabledFqdn := ""
+
 	useRegistries := client.Flags.GetValue(environmentflag.UseExistingRegistries)
 	logrus.Infof("The value of useRegistries is %t", useRegistries)
 
@@ -79,8 +85,28 @@ func (rt *RegistryTestSuite) SetupSuite() {
 				logrus.Errorf("error creating corral: %v", err)
 			}
 		}
+		registryDisabledFqdn, err = corral.GetCorralEnvVar(corralAuthDisabledName, "registry_fqdn")
+		require.NoError(rt.T(), err)
+		logrus.Infof("RegistryNoAuth FQDN %s", registryDisabledFqdn)
+		registryEnabledUsername, err = corral.GetCorralEnvVar(corralAuthEnabledName, "registry_username")
+		require.NoError(rt.T(), err)
+		logrus.Infof("RegistryAuth Username %s", registryEnabledUsername)
+		registryEnabledPassword, err = corral.GetCorralEnvVar(corralAuthEnabledName, "registry_password")
+		require.NoError(rt.T(), err)
+		logrus.Infof("RegistryAuth Password %s", registryEnabledPassword)
+		registryEnabledFqdn, err = corral.GetCorralEnvVar(corralAuthEnabledName, "registry_fqdn")
+		require.NoError(rt.T(), err)
+		logrus.Infof("RegistryAuth FQDN %s", registryEnabledFqdn)
 	} else {
 		logrus.Infof("Using Existing Registries because value of useRegistries is %t", useRegistries)
+		registryDisabledFqdn = registriesConfig.ExistingNoAuthRegistryURL
+		registryEnabledFqdn = registriesConfig.ExistingAuthRegistryInfo.URL
+		registryEnabledUsername = registriesConfig.ExistingAuthRegistryInfo.Username
+		registryEnabledPassword = registriesConfig.ExistingAuthRegistryInfo.Password
+		logrus.Infof("RegistryNoAuth FQDN %s", registryDisabledFqdn)
+		logrus.Infof("RegistryAuth Username %s", registryEnabledUsername)
+		logrus.Infof("RegistryAuth Password %s", registryEnabledPassword)
+		logrus.Infof("RegistryAuth FQDN %s", registryEnabledFqdn)
 	}
 
 	clustersConfig := new(provisioning.Config)
@@ -91,27 +117,32 @@ func (rt *RegistryTestSuite) SetupSuite() {
 	providers := clustersConfig.Providers
 	rt.advancedOptions = clustersConfig.AdvancedOptions
 
-	globalRegistryFqdn := ""
 	rt.rancherUsesRegistry = false
-	globalRegistryFqdn, err = corral.GetCorralEnvVar(corralRancherName, "registry_fqdn")
+	listOfCorrals, err := corral.ListCorral()
 	require.NoError(rt.T(), err)
-	if globalRegistryFqdn != "<nil>" {
-		rt.rancherUsesRegistry = true
-		logrus.Infof("Rancher Global Registry FQDN %s", globalRegistryFqdn)
+	_, corralExist := listOfCorrals[corralRancherName]
+	if corralExist {
+		globalRegistryFqdn, err = corral.GetCorralEnvVar(corralRancherName, "registry_fqdn")
+		require.NoError(rt.T(), err)
+		if globalRegistryFqdn != "<nil>" {
+			rt.rancherUsesRegistry = true
+			logrus.Infof("Rancher Global Registry FQDN %s", globalRegistryFqdn)
+		}
+		logrus.Infof("Rancher was built using corral: %t", corralExist)
+		logrus.Infof("Is Rancher using a global registry: %t", rt.rancherUsesRegistry)
+	} else {
+		if useRegistries {
+			globalRegistryFqdn = registriesConfig.ExistingNoAuthRegistryURL
+			rt.rancherUsesRegistry = true
+			logrus.Infof("Rancher was built using corral: %t", corralExist)
+			logrus.Infof("Is Rancher using a global registry: %t", rt.rancherUsesRegistry)
+			logrus.Infof("Rancher Global Registry FQDN %s", globalRegistryFqdn)
+		} else {
+			rt.rancherUsesRegistry = false
+			logrus.Infof("Rancher was built using corral: %t", corralExist)
+			logrus.Infof("Is Rancher using a global registry: %t", rt.rancherUsesRegistry)
+		}
 	}
-	logrus.Infof("Is Rancher using a global registry: %t", rt.rancherUsesRegistry)
-	registryDisabledFqdn, err := corral.GetCorralEnvVar(corralAuthDisabledName, "registry_fqdn")
-	require.NoError(rt.T(), err)
-	logrus.Infof("RegistryNoAuth FQDN %s", registryDisabledFqdn)
-	registryEnabledUsername, err := corral.GetCorralEnvVar(corralAuthEnabledName, "registry_username")
-	require.NoError(rt.T(), err)
-	logrus.Infof("RegistryAuth Username %s", registryEnabledUsername)
-	registryEnabledPassword, err := corral.GetCorralEnvVar(corralAuthEnabledName, "registry_password")
-	require.NoError(rt.T(), err)
-	logrus.Infof("RegistryAuth Password %s", registryEnabledPassword)
-	registryEnabledFqdn, err := corral.GetCorralEnvVar(corralAuthEnabledName, "registry_fqdn")
-	require.NoError(rt.T(), err)
-	logrus.Infof("RegistryAuth FQDN %s", registryEnabledFqdn)
 
 	var privateRegistriesNoAuth []management.PrivateRegistry
 	privateRegistry := management.PrivateRegistry{}
@@ -186,6 +217,7 @@ func (rt *RegistryTestSuite) testProvisionRKE1Cluster(client *rancher.Client, pr
 	require.NoError(rt.T(), err)
 
 	nodePoolName := nodePool.Name
+
 	opts := metav1.ListOptions{
 		FieldSelector:  "metadata.name=" + clusterResp.ID,
 		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
