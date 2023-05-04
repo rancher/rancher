@@ -40,6 +40,7 @@ const (
 	continueToken     = "nondeterministictoken"
 	revisionNum       = "nondeterministicint"
 	defautlUrlString  = "https://rancherurl/"
+	steveAPITestLabel = "test.cattle.io/steveapi"
 )
 
 var (
@@ -154,7 +155,7 @@ var (
 	}
 )
 
-type SteveAPITestSuite struct {
+type steveAPITestSuite struct {
 	suite.Suite
 	client            *rancher.Client
 	session           *session.Session
@@ -164,11 +165,27 @@ type SteveAPITestSuite struct {
 	lastRevision      string
 }
 
-func (s *SteveAPITestSuite) TearDownSuite() {
+type LocalSteveAPITestSuite struct {
+	steveAPITestSuite
+}
+
+type DownstreamSteveAPITestSuite struct {
+	steveAPITestSuite
+}
+
+func (s *steveAPITestSuite) TearDownSuite() {
 	s.session.Cleanup()
 }
 
-func (s *SteveAPITestSuite) SetupSuite() {
+func (s *LocalSteveAPITestSuite) SetupSuite() {
+	s.steveAPITestSuite.setupSuite("local")
+}
+
+func (s *DownstreamSteveAPITestSuite) SetupSuite() {
+	s.steveAPITestSuite.setupSuite("")
+}
+
+func (s *steveAPITestSuite) setupSuite(clusterName string) {
 	testSession := session.NewSession()
 	s.session = testSession
 
@@ -178,7 +195,9 @@ func (s *SteveAPITestSuite) SetupSuite() {
 
 	s.userClients = make(map[string]*rancher.Client)
 
-	clusterName := s.client.RancherConfig.ClusterName
+	if clusterName == "" {
+		clusterName = s.client.RancherConfig.ClusterName
+	}
 	require.NotEmptyf(s.T(), clusterName, "Cluster name is not set")
 	clusterID, err := clusters.GetClusterIDByName(client, clusterName)
 	require.NoError(s.T(), err)
@@ -217,16 +236,14 @@ func (s *SteveAPITestSuite) SetupSuite() {
 					Name: fmt.Sprintf("test%d", i),
 				},
 			}
+			labels := map[string]string{steveAPITestLabel: "true"}
 			if i == 2 {
-				secret.ObjectMeta.SetLabels(map[string]string{
-					labelKey: "2",
-				})
+				labels[labelKey] = "2"
 			}
 			if i >= 3 {
-				secret.ObjectMeta.SetLabels(map[string]string{
-					labelGTEKey: "3",
-				})
+				labels[labelGTEKey] = "3"
 			}
+			secret.ObjectMeta.SetLabels(labels)
 			_, err := secrets.CreateSecret(s.client, secret, s.project.ClusterID, n)
 			require.NoError(s.T(), err)
 		}
@@ -279,7 +296,7 @@ func (s *SteveAPITestSuite) SetupSuite() {
 	}
 }
 
-func (s *SteveAPITestSuite) TestList() {
+func (s *steveAPITestSuite) TestList() {
 	subSession := s.session.NewSession()
 	defer subSession.Cleanup()
 
@@ -507,6 +524,63 @@ func (s *SteveAPITestSuite) TestList() {
 			query:       "filter=metadata.name=test1",
 			expect: []map[string]string{
 				{"name": "test1", "namespace": "test-ns-1"},
+			},
+		},
+		{
+			description: "user:user-a,namespace:none,query:filter=metadata.name=1,metadata.namespace=1",
+			user:        "user-a",
+			namespace:   "",
+			query:       "filter=metadata.name=1,metadata.namespace=1",
+			expect: []map[string]string{
+				{"name": "test1", "namespace": "test-ns-1"},
+				{"name": "test2", "namespace": "test-ns-1"},
+				{"name": "test3", "namespace": "test-ns-1"},
+				{"name": "test4", "namespace": "test-ns-1"},
+				{"name": "test5", "namespace": "test-ns-1"},
+				{"name": "test1", "namespace": "test-ns-2"},
+				{"name": "test1", "namespace": "test-ns-3"},
+				{"name": "test1", "namespace": "test-ns-4"},
+				{"name": "test1", "namespace": "test-ns-5"},
+			},
+		},
+		{
+			description: "user:user-a,namespace:none,query:filter=metadata.labels.test-label-gte=3,metadata.labels.test-label=2&filter=metadata.namespace=1",
+			user:        "user-a",
+			namespace:   "",
+			query:       "filter=metadata.labels.test-label-gte=3,metadata.labels.test-label=2&filter=metadata.namespace=1",
+			expect: []map[string]string{
+				{"name": "test2", "namespace": "test-ns-1"},
+				{"name": "test3", "namespace": "test-ns-1"},
+				{"name": "test4", "namespace": "test-ns-1"},
+				{"name": "test5", "namespace": "test-ns-1"},
+			},
+		},
+		{
+			description: "user:user-a,namespace:none,query:filter=metadata.name!=1",
+			user:        "user-a",
+			namespace:   "",
+			query:       "filter=metadata.name!=1",
+			expect: []map[string]string{
+				{"name": "test2", "namespace": "test-ns-1"},
+				{"name": "test3", "namespace": "test-ns-1"},
+				{"name": "test4", "namespace": "test-ns-1"},
+				{"name": "test5", "namespace": "test-ns-1"},
+				{"name": "test2", "namespace": "test-ns-2"},
+				{"name": "test3", "namespace": "test-ns-2"},
+				{"name": "test4", "namespace": "test-ns-2"},
+				{"name": "test5", "namespace": "test-ns-2"},
+				{"name": "test2", "namespace": "test-ns-3"},
+				{"name": "test3", "namespace": "test-ns-3"},
+				{"name": "test4", "namespace": "test-ns-3"},
+				{"name": "test5", "namespace": "test-ns-3"},
+				{"name": "test2", "namespace": "test-ns-4"},
+				{"name": "test3", "namespace": "test-ns-4"},
+				{"name": "test4", "namespace": "test-ns-4"},
+				{"name": "test5", "namespace": "test-ns-4"},
+				{"name": "test2", "namespace": "test-ns-5"},
+				{"name": "test3", "namespace": "test-ns-5"},
+				{"name": "test4", "namespace": "test-ns-5"},
+				{"name": "test5", "namespace": "test-ns-5"},
 			},
 		},
 		{
@@ -968,6 +1042,43 @@ func (s *SteveAPITestSuite) TestList() {
 			expect:      []map[string]string{},
 		},
 		{
+			description: "user:user-b,namespace:none,query:filter=metadata.name=1,metadata.namespace=1",
+			user:        "user-b",
+			namespace:   "",
+			query:       "filter=metadata.name=1,metadata.namespace=1",
+			expect: []map[string]string{
+				{"name": "test1", "namespace": "test-ns-1"},
+				{"name": "test2", "namespace": "test-ns-1"},
+				{"name": "test3", "namespace": "test-ns-1"},
+				{"name": "test4", "namespace": "test-ns-1"},
+				{"name": "test5", "namespace": "test-ns-1"},
+			},
+		},
+		{
+			description: "user:user-b,namespace:none,query:filter=metadata.labels.test-label-gte=3,metadata.labels.test-label=2&filter=metadata.namespace=1",
+			user:        "user-b",
+			namespace:   "",
+			query:       "filter=metadata.labels.test-label-gte=3,metadata.labels.test-label=2&filter=metadata.namespace=1",
+			expect: []map[string]string{
+				{"name": "test2", "namespace": "test-ns-1"},
+				{"name": "test3", "namespace": "test-ns-1"},
+				{"name": "test4", "namespace": "test-ns-1"},
+				{"name": "test5", "namespace": "test-ns-1"},
+			},
+		},
+		{
+			description: "user:user-b,namespace:none,query:filter=metadata.name!=1",
+			user:        "user-b",
+			namespace:   "",
+			query:       "filter=metadata.name!=1",
+			expect: []map[string]string{
+				{"name": "test2", "namespace": "test-ns-1"},
+				{"name": "test3", "namespace": "test-ns-1"},
+				{"name": "test4", "namespace": "test-ns-1"},
+				{"name": "test5", "namespace": "test-ns-1"},
+			},
+		},
+		{
 			description: "user:user-b,namespace:none,query:sort=metadata.name",
 			user:        "user-b",
 			namespace:   "",
@@ -1339,6 +1450,38 @@ func (s *SteveAPITestSuite) TestList() {
 			expect:      []map[string]string{},
 		},
 		{
+			description: "user:user-c,namespace:none,query:filter=metadata.name=1,metadata.namespace=1",
+			user:        "user-c",
+			namespace:   "",
+			query:       "filter=metadata.name=1,metadata.namespace=1",
+			expect: []map[string]string{
+				{"name": "test1", "namespace": "test-ns-1"},
+				{"name": "test2", "namespace": "test-ns-1"},
+				{"name": "test1", "namespace": "test-ns-2"},
+				{"name": "test1", "namespace": "test-ns-3"},
+			},
+		},
+		{
+			description: "user:user-c,namespace:test-ns-1,query:filter=metadata.name!=test1",
+			user:        "user-c",
+			namespace:   "",
+			query:       "filter=metadata.name!=test1",
+			expect: []map[string]string{
+				{"name": "test2", "namespace": "test-ns-1"},
+				{"name": "test2", "namespace": "test-ns-2"},
+				{"name": "test2", "namespace": "test-ns-3"},
+			},
+		},
+		{
+			description: "user:user-c,namespace:none,query:filter=metadata.labels.test-label-gte=3,metadata.labels.test-label=2&filter=metadata.namespace=1",
+			user:        "user-c",
+			namespace:   "",
+			query:       "filter=metadata.labels.test-label-gte=3,metadata.labels.test-label=2&filter=metadata.namespace=1",
+			expect: []map[string]string{
+				{"name": "test2", "namespace": "test-ns-1"},
+			},
+		},
+		{
 			description: "user:user-c,namespace:none,query:sort=metadata.name",
 			user:        "user-c",
 			namespace:   "",
@@ -1500,9 +1643,19 @@ func (s *SteveAPITestSuite) TestList() {
 		},
 	}
 
-	csvWriter, fp, jsonDir, err := setUpResults()
-	defer fp.Close()
-	require.NoError(s.T(), err)
+	var csvWriter *csv.Writer
+	var jsonDir string
+	if s.project.ClusterID == "local" {
+		var fp *os.File
+		var err error
+		csvWriter, fp, jsonDir, err = setUpResults()
+		defer fp.Close()
+		defer func() {
+			csvWriter.Flush()
+			require.NoError(s.T(), csvWriter.Error())
+		}()
+		require.NoError(s.T(), err)
+	}
 
 	for _, test := range tests {
 		s.Run(test.description, func() {
@@ -1528,6 +1681,7 @@ func (s *SteveAPITestSuite) TestList() {
 			if _, ok := query["revision"]; ok {
 				query["revision"] = []string{s.lastRevision}
 			}
+			query["labelSelector"] = append(query["labelSelector"], steveAPITestLabel+"=true")
 			secretList, err := secretClient.List(query)
 			require.NoError(s.T(), err)
 
@@ -1536,30 +1690,20 @@ func (s *SteveAPITestSuite) TestList() {
 			}
 			s.lastRevision = secretList.Revision
 
-			assert.Equal(s.T(), len(test.expect), len(secretList.Data))
-			for i, w := range test.expect {
-				if name, ok := w["name"]; ok {
-					assert.Equal(s.T(), name, secretList.Data[i].Name)
-				}
-				if ns, ok := w["namespace"]; ok {
-					assert.Equal(s.T(), namespaceMap[ns], secretList.Data[i].Namespace)
-				}
-			}
+			s.assertListIsEqual(test.expect, secretList.Data)
 
 			// Write human-readable request and response examples
-			curlURL, err := getCurlURL(client, test.namespace, test.query)
-			require.NoError(s.T(), err)
-			jsonResp, err := formatJSON(secretList)
-			require.NoError(s.T(), err)
-			jsonFilePath := filepath.Join(jsonDir, getFileName(test.user, test.namespace, test.query))
-			if !downStreamClusterRegex.MatchString(curlURL) {
+			if s.project.ClusterID == "local" {
+				curlURL, err := getCurlURL(client, test.namespace, test.query)
+				require.NoError(s.T(), err)
+				jsonResp, err := formatJSON(secretList)
+				require.NoError(s.T(), err)
+				jsonFilePath := filepath.Join(jsonDir, getFileName(test.user, test.namespace, test.query))
 				err = writeResp(csvWriter, test.user, curlURL, jsonFilePath, jsonResp)
 				require.NoError(s.T(), err)
 			}
 		})
 	}
-	csvWriter.Flush()
-	require.NoError(s.T(), csvWriter.Error())
 }
 
 func getFileName(user, ns, query string) string {
@@ -1667,7 +1811,7 @@ func writeResp(csvWriter *csv.Writer, user, url, path string, resp []byte) error
 	return nil
 }
 
-func (s *SteveAPITestSuite) TestCRUD() {
+func (s *steveAPITestSuite) TestCRUD() {
 	subSession := s.session.NewSession()
 	defer subSession.Cleanup()
 
@@ -1753,6 +1897,22 @@ func (s *SteveAPITestSuite) TestCRUD() {
 	})
 }
 
-func TestSteve(t *testing.T) {
-	suite.Run(t, new(SteveAPITestSuite))
+func (s *steveAPITestSuite) assertListIsEqual(expect []map[string]string, list []clientv1.SteveAPIObject) {
+	assert.Equal(s.T(), len(expect), len(list))
+	for i, w := range expect {
+		if name, ok := w["name"]; ok {
+			assert.Equal(s.T(), name, list[i].Name)
+		}
+		if ns, ok := w["namespace"]; ok {
+			assert.Equal(s.T(), namespaceMap[ns], list[i].Namespace)
+		}
+	}
+}
+
+func TestSteveLocal(t *testing.T) {
+	suite.Run(t, new(LocalSteveAPITestSuite))
+}
+
+func TestSteveDownstream(t *testing.T) {
+	suite.Run(t, new(DownstreamSteveAPITestSuite))
 }
