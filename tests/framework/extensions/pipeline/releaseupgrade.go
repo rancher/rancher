@@ -81,6 +81,7 @@ type RancherCluster struct {
 	CNIs                       []string         `yaml:"cni"`
 	FeaturesToTest             upgrade.Features `yaml:"enabledFeatures" default:""`
 	SSHUser                    string           `yaml:"sshUser" default:""`
+	VolumeType                 string           `yaml:"volumeType" default:""`
 }
 
 // HostedCluster is a struct that contains related information about the downstream cluster that's going to be created and upgraded.

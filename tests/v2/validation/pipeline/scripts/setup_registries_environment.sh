@@ -1,6 +1,6 @@
 #!/bin/bash
 set -ex
-cd $(dirname $0)/../../../../
+cd $(dirname $0)/../../../../../
 
 echo "build corral packages"
 sh tests/v2/validation/pipeline/scripts/build_corral_packages.sh
