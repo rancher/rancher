@@ -25,7 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func TestProvisioningK3SCustomCluster(t *testing.T, client *rancher.Client, externalNodeProvider provisioning.ExternalNodeProvider, nodesAndRoles []string, kubeVersion string, hardened bool, psact string) {
+func TestProvisioningK3SCustomCluster(t *testing.T, client *rancher.Client, externalNodeProvider provisioning.ExternalNodeProvider, nodesAndRoles []string, kubeVersion string, hardened bool, psact string, advancedOptions provisioning.AdvancedOptions) {
 	namespace := "fleet-default"
 
 	numNodes := len(nodesAndRoles)
@@ -34,7 +34,7 @@ func TestProvisioningK3SCustomCluster(t *testing.T, client *rancher.Client, exte
 
 	clusterName := namegen.AppendRandomString(externalNodeProvider.Name)
 
-	cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, namespace, "", "", kubeVersion, psact, nil)
+	cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, namespace, "", "", kubeVersion, psact, nil, advancedOptions)
 
 	clusterResp, err := clusters.CreateK3SRKE2Cluster(client, cluster)
 	require.NoError(t, err)
@@ -100,7 +100,7 @@ func TestProvisioningK3SCustomCluster(t *testing.T, client *rancher.Client, exte
 		err = hardening.HardeningNodes(client, hardened, nodes, nodesAndRoles)
 		require.NoError(t, err)
 
-		hardenCluster := clusters.HardenK3SRKE2ClusterConfig(clusterName, namespace, "", "", kubeVersion, psact, nil)
+		hardenCluster := clusters.HardenK3SRKE2ClusterConfig(clusterName, namespace, "", "", kubeVersion, psact, nil, provisioning.AdvancedOptions{})
 		hardenClusterResp, err := clusters.UpdateK3SRKE2Cluster(client, clusterResp, hardenCluster)
 		require.NoError(t, err)
 		assert.Equal(t, clusterName, hardenClusterResp.ObjectMeta.Name)

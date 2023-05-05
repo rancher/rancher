@@ -34,6 +34,7 @@ type KdmChecksTestSuite struct {
 	cnis                   []string
 	providers              []string
 	nodesAndRoles          []machinepools.NodeRoles
+	advancedOptions        provisioning.AdvancedOptions
 }
 
 func (k *KdmChecksTestSuite) TearDownSuite() {
@@ -105,17 +106,18 @@ func (k *KdmChecksTestSuite) TestProvisioningSingleNodeRKE2Clusters() {
 		machineConfigResp, err := client.Steve.SteveType(provider.MachineConfigPoolResourceSteveType).Create(machinePoolConfig)
 		require.NoError(k.T(), err)
 		machinePools := machinepools.RKEMachinePoolSetup(nodeRoles, machineConfigResp)
+		for _, cni := range k.cnis {
+			cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, k.ns, cni, cloudCredential.ID, k8sVersion, "", machinePools, k.advancedOptions)
 
-		cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, k.ns, k.cnis[0], cloudCredential.ID, k8sVersion, "", machinePools)
+			logrus.Info("provisioning " + k8sVersion + " cluster..")
 
-		logrus.Info("provisioning " + k8sVersion + " cluster..")
+			clusterResp, err := clusters.CreateK3SRKE2Cluster(client, cluster)
+			require.NoError(k.T(), err)
 
-		clusterResp, err := clusters.CreateK3SRKE2Cluster(client, cluster)
-		require.NoError(k.T(), err)
-
-		clusterNames = append(clusterNames, clusterName)
-		clusterResps = append(clusterResps, clusterResp)
-		k8sVersions = append(k8sVersions, cluster.Spec.KubernetesVersion)
+			clusterNames = append(clusterNames, clusterName)
+			clusterResps = append(clusterResps, clusterResp)
+			k8sVersions = append(k8sVersions, cluster.Spec.KubernetesVersion)
+		}
 	}
 
 	k.checkClustersReady(client, kubeProvisioningClient, clusterResps, clusterNames, k8sVersions)

@@ -26,6 +26,7 @@ type K3SNodeDriverProvisioningTestSuite struct {
 	kubernetesVersions []string
 	providers          []string
 	psact              string
+	advancedOptions    provisioning.AdvancedOptions
 }
 
 func (k *K3SNodeDriverProvisioningTestSuite) TearDownSuite() {
@@ -42,6 +43,7 @@ func (k *K3SNodeDriverProvisioningTestSuite) SetupSuite() {
 	k.kubernetesVersions = clustersConfig.K3SKubernetesVersions
 	k.providers = clustersConfig.Providers
 	k.psact = clustersConfig.PSACT
+	k.advancedOptions = clustersConfig.AdvancedOptions
 
 	client, err := rancher.NewClient("", testSession)
 	require.NoError(k.T(), err)
@@ -146,7 +148,7 @@ func (k *K3SNodeDriverProvisioningTestSuite) TestProvisioningK3SCluster() {
 			for _, kubeVersion := range k.kubernetesVersions {
 				name = tt.name + providerName.String() + " Kubernetes version: " + kubeVersion
 				k.Run(name, func() {
-					TestProvisioningK3SCluster(k.T(), client, provider, tt.nodeRoles, kubeVersion, tt.psact)
+					TestProvisioningK3SCluster(k.T(), client, provider, tt.nodeRoles, kubeVersion, tt.psact, k.advancedOptions)
 				})
 			}
 		}
@@ -185,7 +187,7 @@ func (k *K3SNodeDriverProvisioningTestSuite) TestProvisioningK3SClusterDynamicIn
 			for _, kubeVersion := range k.kubernetesVersions {
 				name = tt.name + providerName + " Kubernetes version: " + kubeVersion
 				k.Run(name, func() {
-					TestProvisioningK3SCluster(k.T(), client, provider, nodesAndRoles, kubeVersion, tt.psact)
+					TestProvisioningK3SCluster(k.T(), client, provider, nodesAndRoles, kubeVersion, tt.psact, k.advancedOptions)
 				})
 			}
 		}

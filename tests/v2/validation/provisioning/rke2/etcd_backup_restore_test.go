@@ -39,6 +39,7 @@ type RKE2EtcdSnapshotRestoreTestSuite struct {
 	cnis               []string
 	providers          []string
 	nodesAndRoles      []machinepools.NodeRoles
+	advancedOptions    provisioning.AdvancedOptions
 }
 
 func (r *RKE2EtcdSnapshotRestoreTestSuite) TearDownSuite() {
@@ -58,6 +59,7 @@ func (r *RKE2EtcdSnapshotRestoreTestSuite) SetupSuite() {
 	r.cnis = clustersConfig.CNIs
 	r.providers = clustersConfig.Providers
 	r.nodesAndRoles = clustersConfig.NodesAndRoles
+	r.advancedOptions = clustersConfig.AdvancedOptions
 
 	client, err := rancher.NewClient("", testSession)
 	require.NoError(r.T(), err)
@@ -83,7 +85,7 @@ func (r *RKE2EtcdSnapshotRestoreTestSuite) EtcdSnapshotRestoreWithK8sUpgrade(pro
 	clusterName := namegen.AppendRandomString(provider.Name.String())
 
 	logrus.Infof("creating rke2Cluster.............")
-	clusterResp, err := createRKE2NodeDriverCluster(client, provider, clusterName, initialK8sVersion, r.ns, r.cnis[0])
+	clusterResp, err := createRKE2NodeDriverCluster(client, provider, clusterName, initialK8sVersion, r.ns, r.cnis[0], r.advancedOptions)
 	require.NoError(r.T(), err)
 	require.Equal(r.T(), clusterName, clusterResp.ObjectMeta.Name)
 	logrus.Infof("rke2Cluster create request successful.............")
@@ -253,7 +255,7 @@ func (r *RKE2EtcdSnapshotRestoreTestSuite) EtcdSnapshotRestoreWithUpgradeStrateg
 	clusterName := namegen.AppendRandomString(provider.Name.String())
 
 	logrus.Infof("creating rke2Cluster.............")
-	clusterResp, err := createRKE2NodeDriverCluster(client, provider, clusterName, initialK8sVersion, r.ns, r.cnis[0])
+	clusterResp, err := createRKE2NodeDriverCluster(client, provider, clusterName, initialK8sVersion, r.ns, r.cnis[0], r.advancedOptions)
 	require.NoError(r.T(), err)
 	require.Equal(r.T(), clusterName, clusterResp.ObjectMeta.Name)
 	logrus.Infof("rke2Cluster create request successful.............")
@@ -447,7 +449,7 @@ func (r *RKE2EtcdSnapshotRestoreTestSuite) EtcdSnapshotRestore(provider *Provide
 	clusterName := namegen.AppendRandomString(provider.Name.String())
 
 	logrus.Infof("creating rke2Cluster.............")
-	clusterResp, err := createRKE2NodeDriverCluster(client, provider, clusterName, initialK8sVersion, r.ns, r.cnis[0])
+	clusterResp, err := createRKE2NodeDriverCluster(client, provider, clusterName, initialK8sVersion, r.ns, r.cnis[0], r.advancedOptions)
 	require.NoError(r.T(), err)
 	require.Equal(r.T(), clusterName, clusterResp.ObjectMeta.Name)
 	logrus.Infof("rke2Cluster create request successful.............")
