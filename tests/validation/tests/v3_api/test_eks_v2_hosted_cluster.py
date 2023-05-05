@@ -203,7 +203,7 @@ def create_resources_eks():
     return cluster_name
 
 
-@pytest.fixture(scope='module', autouse="True")
+@pytest.fixture(scope='module', autouse="False")
 def create_project_client(request):
 
     def fin():
