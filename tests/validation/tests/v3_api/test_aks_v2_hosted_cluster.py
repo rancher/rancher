@@ -124,7 +124,7 @@ def create_and_validate_aks_cluster(cluster_config, imported=False):
     return client, cluster
 
 
-@pytest.fixture(scope='module', autouse="True")
+@pytest.fixture(scope='module', autouse="False")
 def create_project_client(request):
     def fin():
         client = get_user_client()
