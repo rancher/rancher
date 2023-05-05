@@ -32,6 +32,67 @@ const (
 	VsphereProviderName   ProviderName = "vsphere"
 )
 
+var AllRolesPool = machinepools.NodeRoles{
+	Etcd:         true,
+	ControlPlane: true,
+	Worker:       true,
+	Quantity:     1,
+}
+
+var EtcdControlPlanePool = machinepools.NodeRoles{
+	Etcd:         true,
+	ControlPlane: true,
+	Quantity:     1,
+}
+
+var EtcdPool = machinepools.NodeRoles{
+	Etcd:     true,
+	Quantity: 1,
+}
+
+var ControlPlanePool = machinepools.NodeRoles{
+	ControlPlane: true,
+	Quantity:     1,
+}
+
+var WorkerPool = machinepools.NodeRoles{
+	Worker:   true,
+	Quantity: 1,
+}
+
+var WindowsPool = machinepools.NodeRoles{
+	Windows:  true,
+	Quantity: 1,
+}
+
+var RKE1AllRolesPool = nodepools.NodeRoles{
+	Etcd:         true,
+	ControlPlane: true,
+	Worker:       true,
+	Quantity:     1,
+}
+
+var RKE1EtcdControlPlanePool = nodepools.NodeRoles{
+	Etcd:         true,
+	ControlPlane: true,
+	Quantity:     1,
+}
+
+var RKE1EtcdPool = nodepools.NodeRoles{
+	Etcd:     true,
+	Quantity: 1,
+}
+
+var RKE1ControlPlanePool = nodepools.NodeRoles{
+	ControlPlane: true,
+	Quantity:     1,
+}
+
+var RKE1WorkerPool = nodepools.NodeRoles{
+	Worker:   true,
+	Quantity: 1,
+}
+
 // String stringer for the ProviderName
 func (p ProviderName) String() string {
 	return string(p)
