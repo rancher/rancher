@@ -17,7 +17,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/apps/v1beta1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
-	scalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
+	scalingv2 "k8s.io/api/autoscaling/v2"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	extv1beta1 "k8s.io/api/extensions/v1beta1"
@@ -67,7 +67,7 @@ var builders = []runtime.SchemeBuilder{
 	planv1.SchemeBuilder,
 	appsv1.SchemeBuilder,
 	appsv1beta1.SchemeBuilder,
-	scalingv2beta2.SchemeBuilder,
+	scalingv2.SchemeBuilder,
 	batchv1.SchemeBuilder,
 	v1.SchemeBuilder,
 	v1beta1.SchemeBuilder,
