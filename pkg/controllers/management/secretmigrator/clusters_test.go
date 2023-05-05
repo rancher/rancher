@@ -539,3 +539,127 @@ func TestMigrateRKESecrets(t *testing.T) {
 
 	assert.True(t, apimgmtv3.ClusterConditionRKESecretsMigrated.IsTrue(cluster))
 }
+
+func TestMigrateACISecrets(t *testing.T) {
+	h := newTestHandler()
+	defer resetMockClusters()
+	defer resetMockSecrets()
+
+	testCluster := &apimgmtv3.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "testcluster",
+		},
+		Spec: apimgmtv3.ClusterSpec{
+			ClusterSpecBase: apimgmtv3.ClusterSpecBase{
+				RancherKubernetesEngineConfig: &rketypes.RancherKubernetesEngineConfig{
+					Network: rketypes.NetworkConfig{
+						Plugin: "aci",
+						AciNetworkProvider: &rketypes.AciNetworkProvider{
+							Token:          "secret",
+							ApicUserKey:    "secret",
+							KafkaClientKey: "secret",
+						},
+					},
+				},
+			},
+		},
+	}
+	_, err := h.clusters.Create(testCluster)
+	assert.Nil(t, err)
+	cluster, err := h.migrateACISecrets(testCluster)
+	assert.Nil(t, err)
+
+	// test that cluster object does not get updated if migrated again
+	clusterCopy := cluster.DeepCopy()
+	clusterCopy, err = h.migrateACISecrets(clusterCopy)
+	assert.Nil(t, err)
+	assert.Equal(t, cluster, clusterCopy)
+
+	type verifyFunc func(t *testing.T, cluster *apimgmtv3.Cluster)
+
+	emptyStringCondition := func(fields ...string) verifyFunc {
+		return func(t *testing.T, cluster *apimgmtv3.Cluster) {
+			for _, field := range fields {
+				assert.Equal(t, "", field)
+			}
+		}
+	}
+
+	tests := []struct {
+		name               string
+		cleanupVerifyFunc  verifyFunc
+		secretName         string
+		key                string
+		expected           string
+		assembler          assemblers.Assembler
+		assembleVerifyFunc verifyFunc
+	}{
+		{
+			name:              "token",
+			cleanupVerifyFunc: emptyStringCondition(cluster.Spec.RancherKubernetesEngineConfig.Network.AciNetworkProvider.Token),
+			secretName:        cluster.Spec.ClusterSecrets.ACITokenSecret,
+			key:               SecretKey,
+			expected:          "secret",
+			assembler:         assemblers.AssembleACITokenCredential,
+			assembleVerifyFunc: func(t *testing.T, cluster *apimgmtv3.Cluster) {
+				assert.Equal(t, testCluster.Spec.RancherKubernetesEngineConfig.Network.AciNetworkProvider.Token, cluster.Spec.RancherKubernetesEngineConfig.Network.AciNetworkProvider.Token)
+			},
+		},
+		{
+			name:              "user key",
+			cleanupVerifyFunc: emptyStringCondition(cluster.Spec.RancherKubernetesEngineConfig.Network.AciNetworkProvider.ApicUserKey),
+			secretName:        cluster.Spec.ClusterSecrets.ACIAPICUserKeySecret,
+			key:               SecretKey,
+			expected:          "secret",
+			assembler:         assemblers.AssembleACIAPICUserKeyCredential,
+			assembleVerifyFunc: func(t *testing.T, cluster *apimgmtv3.Cluster) {
+				assert.Equal(t, testCluster.Spec.RancherKubernetesEngineConfig.Network.AciNetworkProvider.ApicUserKey, cluster.Spec.RancherKubernetesEngineConfig.Network.AciNetworkProvider.ApicUserKey)
+			},
+		},
+		{
+			name:              "kafka key",
+			cleanupVerifyFunc: emptyStringCondition(cluster.Spec.RancherKubernetesEngineConfig.Network.AciNetworkProvider.KafkaClientKey),
+			secretName:        cluster.Spec.ClusterSecrets.ACIKafkaClientKeySecret,
+			key:               SecretKey,
+			expected:          "secret",
+			assembler:         assemblers.AssembleACIKafkaClientKeyCredential,
+			assembleVerifyFunc: func(t *testing.T, cluster *apimgmtv3.Cluster) {
+				assert.Equal(t, testCluster.Spec.RancherKubernetesEngineConfig.Network.AciNetworkProvider.KafkaClientKey, cluster.Spec.RancherKubernetesEngineConfig.Network.AciNetworkProvider.KafkaClientKey)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.cleanupVerifyFunc(t, cluster)
+			assert.NotEqual(t, "", tt.secretName)
+			secret, err := h.migrator.secretLister.Get(secretsNS, tt.secretName)
+			assert.Nil(t, err)
+			assert.Equal(t, tt.expected, string(secret.Data[tt.key]))
+			cluster.Spec, err = tt.assembler(tt.secretName, "", "", cluster.Spec, h.migrator.secretLister)
+			assert.Nil(t, err)
+			tt.assembleVerifyFunc(t, cluster)
+		})
+	}
+
+	assert.True(t, apimgmtv3.ClusterConditionACISecretsMigrated.IsTrue(cluster))
+}
+
+func TestSync(t *testing.T) {
+	h := newTestHandler()
+	defer resetMockClusters()
+	defer resetMockSecrets()
+	testCluster := &apimgmtv3.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "testcluster",
+		},
+	}
+	_, err := h.clusters.Create(testCluster)
+	assert.Nil(t, err)
+	got, err := h.sync("", testCluster)
+	assert.Nil(t, err)
+	assert.True(t, apimgmtv3.ClusterConditionSecretsMigrated.IsTrue(got))
+	assert.True(t, apimgmtv3.ClusterConditionServiceAccountSecretsMigrated.IsTrue(got))
+	assert.True(t, apimgmtv3.ClusterConditionRKESecretsMigrated.IsTrue(got))
+	assert.True(t, apimgmtv3.ClusterConditionACISecretsMigrated.IsTrue(got))
+}
