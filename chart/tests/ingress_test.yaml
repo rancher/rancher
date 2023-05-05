@@ -229,10 +229,12 @@ tests:
       path: spec.rules
       value:
         - host: host.example.com
-          paths:
-          - service:
-              name: RELEASE-NAME-rancher
-              port:
-                number: 80
-            pathType: ImplementationSpecific
-            path: /
+          http:
+            paths:
+            - backend:
+                service:
+                  name: RELEASE-NAME-rancher
+                  port:
+                    number: 80
+              pathType: ImplementationSpecific
+              path: /
