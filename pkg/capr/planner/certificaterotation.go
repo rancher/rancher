@@ -148,64 +148,69 @@ func (p *Planner) rotateCertificatesPlan(controlPlane *rkev1.RKEControlPlane, to
 		Args:    args,
 	})
 	if isControlPlane(entry) {
-		if kcmCertDir := getArgValue(config[KubeControllerManagerArg], CertDirArgument, "="); kcmCertDir != "" && getArgValue(config[KubeControllerManagerArg], TLSCertFileArgument, "=") == "" {
-			rotatePlan.Instructions = append(rotatePlan.Instructions, []plan.OneTimeInstruction{
-				{
-					Name:    "remove kube-controller-manager cert for regeneration",
-					Command: "rm",
-					Args: []string{
-						"-f",
-						fmt.Sprintf("%s/%s", kcmCertDir, DefaultKubeControllerManagerCert),
+		// The following kube-scheduler and kube-controller-manager certificates are self-signed by the respective services and are used by CAPR for secure healthz probes against the service.
+		if rotationContainsService(rotation, "controller-manager") {
+			if kcmCertDir := getArgValue(config[KubeControllerManagerArg], CertDirArgument, "="); kcmCertDir != "" && getArgValue(config[KubeControllerManagerArg], TLSCertFileArgument, "=") == "" {
+				rotatePlan.Instructions = append(rotatePlan.Instructions, []plan.OneTimeInstruction{
+					{
+						Name:    "remove kube-controller-manager cert for regeneration",
+						Command: "rm",
+						Args: []string{
+							"-f",
+							fmt.Sprintf("%s/%s", kcmCertDir, DefaultKubeControllerManagerCert),
+						},
 					},
-				},
-				{
-					Name:    "remove kube-controller-manager key for regeneration",
-					Command: "rm",
-					Args: []string{
-						"-f",
-						fmt.Sprintf("%s/%s", kcmCertDir, strings.ReplaceAll(DefaultKubeControllerManagerCert, ".crt", ".key")),
+					{
+						Name:    "remove kube-controller-manager key for regeneration",
+						Command: "rm",
+						Args: []string{
+							"-f",
+							fmt.Sprintf("%s/%s", kcmCertDir, strings.ReplaceAll(DefaultKubeControllerManagerCert, ".crt", ".key")),
+						},
 					},
-				},
-			}...)
-			if runtime == capr.RuntimeRKE2 {
-				rotatePlan.Instructions = append(rotatePlan.Instructions, plan.OneTimeInstruction{
-					Name:    "remove kube-controller-manager static pod manifest",
-					Command: "rm",
-					Args: []string{
-						"-f",
-						"/var/lib/rancher/rke2/agent/pod-manifests/kube-controller-manager.yaml",
-					},
-				})
+				}...)
+				if runtime == capr.RuntimeRKE2 {
+					rotatePlan.Instructions = append(rotatePlan.Instructions, plan.OneTimeInstruction{
+						Name:    "remove kube-controller-manager static pod manifest",
+						Command: "rm",
+						Args: []string{
+							"-f",
+							"/var/lib/rancher/rke2/agent/pod-manifests/kube-controller-manager.yaml",
+						},
+					})
+				}
 			}
 		}
-		if ksCertDir := getArgValue(config[KubeSchedulerArg], CertDirArgument, "="); ksCertDir != "" && getArgValue(config[KubeSchedulerArg], TLSCertFileArgument, "=") == "" {
-			rotatePlan.Instructions = append(rotatePlan.Instructions, []plan.OneTimeInstruction{
-				{
-					Name:    "remove kube-scheduler cert for regeneration",
-					Command: "rm",
-					Args: []string{
-						"-f",
-						fmt.Sprintf("%s/%s", ksCertDir, KubeSchedulerArg),
+		if rotationContainsService(rotation, "scheduler") {
+			if ksCertDir := getArgValue(config[KubeSchedulerArg], CertDirArgument, "="); ksCertDir != "" && getArgValue(config[KubeSchedulerArg], TLSCertFileArgument, "=") == "" {
+				rotatePlan.Instructions = append(rotatePlan.Instructions, []plan.OneTimeInstruction{
+					{
+						Name:    "remove kube-scheduler cert for regeneration",
+						Command: "rm",
+						Args: []string{
+							"-f",
+							fmt.Sprintf("%s/%s", ksCertDir, KubeSchedulerArg),
+						},
 					},
-				},
-				{
-					Name:    "remove kube-scheduler key for regeneration",
-					Command: "rm",
-					Args: []string{
-						"-f",
-						fmt.Sprintf("%s/%s", ksCertDir, strings.ReplaceAll(KubeSchedulerArg, ".crt", ".key")),
+					{
+						Name:    "remove kube-scheduler key for regeneration",
+						Command: "rm",
+						Args: []string{
+							"-f",
+							fmt.Sprintf("%s/%s", ksCertDir, strings.ReplaceAll(KubeSchedulerArg, ".crt", ".key")),
+						},
 					},
-				},
-			}...)
-			if runtime == capr.RuntimeRKE2 {
-				rotatePlan.Instructions = append(rotatePlan.Instructions, plan.OneTimeInstruction{
-					Name:    "remove kube-scheduler static pod manifest",
-					Command: "rm",
-					Args: []string{
-						"-f",
-						"/var/lib/rancher/rke2/agent/pod-manifests/kube-scheduler.yaml",
-					},
-				})
+				}...)
+				if runtime == capr.RuntimeRKE2 {
+					rotatePlan.Instructions = append(rotatePlan.Instructions, plan.OneTimeInstruction{
+						Name:    "remove kube-scheduler static pod manifest",
+						Command: "rm",
+						Args: []string{
+							"-f",
+							"/var/lib/rancher/rke2/agent/pod-manifests/kube-scheduler.yaml",
+						},
+					})
+				}
 			}
 		}
 	}
@@ -214,10 +219,26 @@ func (p *Planner) rotateCertificatesPlan(controlPlane *rkev1.RKEControlPlane, to
 		Command: "systemctl",
 		Args: []string{
 			"restart",
-			runtime,
+			capr.GetRuntimeServerUnit(controlPlane.Spec.KubernetesVersion),
 		},
 	})
 	return rotatePlan, joinedServer, nil
+}
+
+// rotationContainsService searches the rotation.Services slice the specified service. If the length of the services slice is 0, it returns true.
+func rotationContainsService(rotation *rkev1.RotateCertificates, service string) bool {
+	if rotation == nil {
+		return false
+	}
+	if len(rotation.Services) == 0 {
+		return true
+	}
+	for _, desiredService := range rotation.Services {
+		if desiredService == service {
+			return true
+		}
+	}
+	return false
 }
 
 // shouldRotateEntry returns true if the rotated services are applicable to the entry's roles.
