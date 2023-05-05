@@ -69,7 +69,12 @@ func (h *handler) Migrate(cluster *apimgmtv3.Cluster) (*apimgmtv3.Cluster, error
 		return cluster, err
 	}
 
-	return h.migrateRKESecrets(cluster)
+	cluster, err = h.migrateRKESecrets(cluster)
+	if err != nil {
+		return cluster, err
+	}
+
+	return h.migrateACISecrets(cluster)
 }
 
 func (h *handler) getUnstructuredPipelineConfig(namespace, pType string) (map[string]interface{}, error) {
