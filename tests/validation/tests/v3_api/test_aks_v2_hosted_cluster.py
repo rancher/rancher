@@ -1,7 +1,5 @@
 import os
-from .common import get_user_client
-from .common import random_test_name
-from .common import validate_cluster
+from .common import *
 import pytest
 
 AZURE_SUBSCRIPTION_ID = os.environ.get("AZURE_SUBSCRIPTION_ID")
@@ -58,6 +56,7 @@ def test_aks_v2_hosted_cluster_create_basic():
     """
     Create a hosted AKS v2 cluster with basic UI parameters
     """
+    client = get_user_client()
     cluster_name = random_test_name("test-auto-aks")
     aks_config_temp = get_aks_config(cluster_name)
     cluster_config = {
@@ -69,7 +68,8 @@ def test_aks_v2_hosted_cluster_create_basic():
         "enableClusterAlerting": False,
         "enableClusterMonitoring": False
     }
-    create_and_validate_aks_cluster(cluster_config)
+    cluster = create_and_validate_aks_cluster(cluster_config)
+    hosted_cluster_cleanup(client, cluster)
 
 
 def get_aks_config(cluster_name):
