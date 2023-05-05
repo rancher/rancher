@@ -62,7 +62,12 @@ func (h *handler) sync(_ string, cluster *apimgmtv3.Cluster) (runtime.Object, er
 		return cluster, err
 	}
 
-	return h.migrateRKESecrets(cluster)
+	cluster, err = h.migrateRKESecrets(cluster)
+	if err != nil {
+		return cluster, err
+	}
+
+	return h.migrateACISecrets(cluster)
 }
 
 type CreateOrUpdateSecretFunc func(secretName string, rkeConfig *rketypes.RancherKubernetesEngineConfig, owner runtime.Object) (*corev1.Secret, error)
