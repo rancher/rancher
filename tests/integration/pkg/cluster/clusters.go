@@ -3,7 +3,10 @@ package cluster
 import (
 	"bufio"
 	"context"
+	"encoding/base64"
 	"fmt"
+	"os"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -176,6 +179,33 @@ func WaitForCreate(clients *clients.Clients, c *provisioningv1api.Cluster) (_ *p
 	return c, nil
 }
 
+func WaitForControlPlane(clients *clients.Clients, c *provisioningv1api.Cluster, errorPrefix string, rkeControlPlaneCheckFunc func(rkeControlPlane *rkev1.RKEControlPlane) (bool, error)) (_ *rkev1.RKEControlPlane, err error) {
+	defer func() {
+		if err != nil {
+			data, newErr := gatherDebugData(clients, c)
+			if newErr != nil {
+				logrus.Error(newErr)
+			}
+			err = fmt.Errorf("%s wait failed on: %w\n%s", errorPrefix, err, data)
+		}
+	}()
+
+	controlPlane, err := clients.RKE.RKEControlPlane().Get(c.Namespace, c.Name, metav1.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("%s wait did not succeed : %w", errorPrefix, err)
+	}
+
+	err = wait.Object(clients.Ctx, clients.RKE.RKEControlPlane().Watch, controlPlane, func(obj runtime.Object) (bool, error) {
+		controlPlane = obj.(*rkev1.RKEControlPlane)
+		return rkeControlPlaneCheckFunc(controlPlane)
+	})
+	if err != nil {
+		return nil, fmt.Errorf("%s wait did not succeed : %w", errorPrefix, err)
+	}
+
+	return controlPlane, nil
+}
+
 func WaitForDelete(clients *clients.Clients, c *provisioningv1api.Cluster) (_ *provisioningv1api.Cluster, err error) {
 	defer func() {
 		if err != nil {
@@ -286,6 +316,37 @@ func getPodLogs(clients *clients.Clients, podNamespace, podName string) (string,
 	return capr.CompressInterface(logs)
 }
 
+// getPodFileContents executes a corresponding `kubectl cp` and gathers data for the purposes of helping increasing debug data.
+func getPodFileContents(podNamespace, podName, podPath string) (string, error) {
+	destFile := fmt.Sprintf("/tmp/%s", base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s/%s/%s", podNamespace, podName, podPath))))
+	kcp := []string{
+		"-n",
+		podNamespace,
+		"cp",
+		fmt.Sprintf("%s:%s", podName, podPath),
+		destFile,
+	}
+
+	cmd := exec.Command("kubectl", kcp...)
+	if err := cmd.Run(); err != nil {
+		logrus.Errorf("error running kubectl -n %s cp %s:%s %s", podNamespace, podName, podPath, destFile)
+		return "", nil
+	}
+
+	file, err := os.Open(destFile)
+	if err != nil {
+		logrus.Errorf("error retrieving destination file %s: %v", destFile, err)
+		return "", nil
+	}
+	defer file.Close()
+	reader := bufio.NewScanner(file)
+	var logs string
+	for reader.Scan() {
+		logs = logs + fmt.Sprintf("%sSnewlineG", reader.Text())
+	}
+	return capr.CompressInterface(logs)
+}
+
 func gatherDebugData(clients *clients.Clients, c *provisioningv1api.Cluster) (string, error) {
 	newC, newErr := clients.Provisioning.Cluster().Get(c.Namespace, c.Name, metav1.GetOptions{})
 	if newErr != nil {
@@ -299,10 +360,12 @@ func gatherDebugData(clients *clients.Clients, c *provisioningv1api.Cluster) (st
 		newControlPlane = nil
 	}
 
+	runtime := capr.GetRuntime(newControlPlane.Spec.KubernetesVersion)
+
 	var rkeBootstraps []*rkev1.RKEBootstrap
 	var infraMachines []*unstructured.Unstructured
 
-	var podLogs = make(map[string]string)
+	var podLogs = make(map[string]map[string]string)
 
 	machines, newErr := Machines(clients, c)
 	if newErr != nil {
@@ -324,14 +387,10 @@ func gatherDebugData(clients *clients.Clients, c *provisioningv1api.Cluster) (st
 				logrus.Errorf("failed to get %s %s/%s to print error: %v", machine.Spec.InfrastructureRef.GroupVersionKind().String(), machine.Spec.InfrastructureRef.Namespace, machine.Spec.InfrastructureRef.Name, newErr)
 			} else {
 				infraMachines = append(infraMachines, im)
-				if machine.Spec.InfrastructureRef.GroupVersionKind().Kind != "CustomMachine" {
+				if machine.Spec.InfrastructureRef.GroupVersionKind().Kind == "PodMachine" {
 					// In the case of a podmachine, the pod name will be strings.ReplaceAll(infra.meta.GetName(), ".", "-")
-					logs, newErr := getPodLogs(clients, machine.Spec.InfrastructureRef.Namespace, strings.ReplaceAll(im.GetName(), ".", "-"))
-					if newErr != nil {
-						logrus.Errorf("error while retrieving pod logs: %v", newErr)
-					} else {
-						podLogs[im.GetName()] = logs
-					}
+					podName := strings.ReplaceAll(im.GetName(), ".", "-")
+					podLogs[podName] = populatePodLogs(clients, runtime, im.GetNamespace(), podName)
 				}
 			}
 		}
@@ -344,13 +403,7 @@ func gatherDebugData(clients *clients.Clients, c *provisioningv1api.Cluster) (st
 		logrus.Errorf("failed to list custommachine pods: %v", newErr)
 	} else {
 		for _, pod := range customPods.Items {
-			// In the case of a custommachine, the pod will be labeled with custom-cluster-name = <cluster-name>
-			logs, newErr := getPodLogs(clients, pod.Namespace, pod.Name)
-			if newErr != nil {
-				logrus.Errorf("error while retrieving pod logs: %v", newErr)
-			} else {
-				podLogs[pod.Name] = logs
-			}
+			podLogs[pod.Name] = populatePodLogs(clients, runtime, pod.Namespace, pod.Name)
 		}
 	}
 
@@ -417,4 +470,26 @@ func gatherDebugData(clients *clients.Clients, c *provisioningv1api.Cluster) (st
 		"infraMachines":         infraMachines,
 		"podLogs":               podLogs,
 	})
+}
+
+func populatePodLogs(clients *clients.Clients, runtime, podNamespace, podName string) map[string]string {
+	var logMap = make(map[string]string)
+
+	logs, newErr := getPodLogs(clients, podNamespace, podName)
+	if newErr != nil {
+		logrus.Errorf("error while retrieving pod logs: %v", newErr)
+	} else {
+		logMap["logs"] = logs
+	}
+
+	if runtime == capr.RuntimeRKE2 {
+		kubeletLogs, newErr := getPodFileContents(podNamespace, podName, fmt.Sprintf("/var/lib/rancher/rke2/agent/logs/kubelet.log"))
+		if newErr != nil {
+			logrus.Errorf("error while retrieving pod kubelet logs: %v", newErr)
+		} else {
+			logMap["kubeletLogs"] = kubeletLogs
+		}
+	}
+
+	return logMap
 }

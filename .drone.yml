@@ -48,7 +48,7 @@ trigger:
     - promote
 ---
 kind: pipeline
-name: provisioning-tests-rke
+name: provisioning-tests-rke2
 
 platform:
   os: linux
@@ -58,7 +58,7 @@ steps:
 - name: provisioning-tests-pr
   image: rancher/dapper:v0.5.8
   commands:
-  - dapper provisioning-tests-rke
+  - dapper provisioning-tests-rke2
   privileged: true
   volumes:
   - name: docker
@@ -69,7 +69,7 @@ steps:
 - name: provisioning-tests-push
   image: rancher/dapper:v0.5.8
   commands:
-  - dapper provisioning-tests-rke
+  - dapper provisioning-tests-rke2
   privileged: true
   volumes:
   - name: docker
@@ -94,6 +94,102 @@ trigger:
   event:
     exclude:
     - promote
+---
+kind: pipeline
+name: provisioning-operations-tests-k3s
+
+platform:
+  os: linux
+  arch: amd64
+
+steps:
+  - name: provisioning-operations-tests-pr
+    image: rancher/dapper:v0.5.8
+    commands:
+      - dapper provisioning-operations-tests
+    privileged: true
+    volumes:
+      - name: docker
+        path: /var/run/docker.sock
+    when:
+      event:
+        - pull_request
+  - name: provisioning-operations-tests-push
+    image: rancher/dapper:v0.5.8
+    commands:
+      - dapper provisioning-operations-tests
+    privileged: true
+    volumes:
+      - name: docker
+        path: /var/run/docker.sock
+    when:
+      instance:
+        - drone-publish.rancher.io
+      ref:
+        include:
+          - "refs/heads/master"
+          - "refs/heads/release/v*"
+          - "refs/tags/v*"
+      event:
+        - push
+
+volumes:
+  - name: docker
+    host:
+      path: /var/run/docker.sock
+
+trigger:
+  event:
+    exclude:
+      - promote
+---
+kind: pipeline
+name: provisioning-operations-tests-rke2
+
+platform:
+  os: linux
+  arch: amd64
+
+steps:
+  - name: provisioning-operations-tests-pr
+    image: rancher/dapper:v0.5.8
+    commands:
+      - dapper provisioning-operations-tests-rke2
+    privileged: true
+    volumes:
+      - name: docker
+        path: /var/run/docker.sock
+    when:
+      event:
+        - pull_request
+  - name: provisioning-operations-tests-push
+    image: rancher/dapper:v0.5.8
+    commands:
+      - dapper provisioning-operations-tests-rke2
+    privileged: true
+    volumes:
+      - name: docker
+        path: /var/run/docker.sock
+    when:
+      instance:
+        - drone-publish.rancher.io
+      ref:
+        include:
+          - "refs/heads/master"
+          - "refs/heads/release/v*"
+          - "refs/tags/v*"
+      event:
+        - push
+
+volumes:
+  - name: docker
+    host:
+      path: /var/run/docker.sock
+
+trigger:
+  event:
+    exclude:
+      - promote
 ---
 kind: pipeline
 name: default-linux-amd64

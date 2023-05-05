@@ -1,3 +1,6 @@
+//go:build provisioning
+// +build provisioning
+
 package custom
 
 import (
