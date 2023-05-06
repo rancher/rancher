@@ -1370,8 +1370,8 @@ github.com/rancher/kubernetes-provider-detector v0.1.5 h1:hWRAsWuJOemzGjz/XrbTlM
 github.com/rancher/kubernetes-provider-detector v0.1.5/go.mod h1:ypuJS7kP7rUiAn330xG46mj+Nhvym05GM8NqMVekpH0=
 github.com/rancher/lasso v0.0.0-20200427171700-e0509f89f319/go.mod h1:6Dw19z1lDIpL887eelVjyqH/mna1hfR61ddCFOG78lw=
 github.com/rancher/lasso v0.0.0-20210616224652-fc3ebd901c08/go.mod h1:9qZd/S8DqWzfKtjKGgSoHqGEByYmUE3qRaBaaAHwfEM=
-github.com/rancher/lasso v0.0.0-20230428185353-36908edf817b h1:mcCmrZZlkjh9bMWk6CXCf85WajjarmEyuSJzCTL67fU=
-github.com/rancher/lasso v0.0.0-20230428185353-36908edf817b/go.mod h1:dEfC9eFQigj95lv/JQ8K5e7+qQCacWs1aIA6nLxKzT8=
+github.com/rancher/lasso v0.0.0-20230502204209-3eb356f3e8cf h1:ZfjUaNDL46WGGmInoJ5xqXUbcRoVznPXwPQtjV95ubA=
+github.com/rancher/lasso v0.0.0-20230502204209-3eb356f3e8cf/go.mod h1:dEfC9eFQigj95lv/JQ8K5e7+qQCacWs1aIA6nLxKzT8=
 github.com/rancher/lasso/controller-runtime v0.0.0-20230502204209-3eb356f3e8cf h1:E01Nkl/cPX6EcCOEII0LEvgOS5YayYpYfYuVzHzPQ3Y=
 github.com/rancher/lasso/controller-runtime v0.0.0-20230502204209-3eb356f3e8cf/go.mod h1:uH7/g2d49is+3K1qRuqawlwBUTyAKuIDsMSyLIdX8Dc=
 github.com/rancher/machine v0.15.0-rancher99 h1:hv5BeRBJJJD8AxqX+iNWMQxOH0QZ5zWIpDDeQamfUzA=
