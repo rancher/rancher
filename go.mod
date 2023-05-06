@@ -89,7 +89,7 @@ require (
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/heptio/authenticator v0.0.0-20180409043135-d282f87a1972
 	github.com/manicminer/hamilton v0.46.0
-	github.com/mattn/go-colorable v0.1.12
+	github.com/mattn/go-colorable v0.1.13
 	github.com/mcuadros/go-version v0.0.0-20180611085657-6d5863ca60fa
 	github.com/minio/minio-go/v7 v7.0.10
 	github.com/mitchellh/mapstructure v1.5.0
@@ -260,7 +260,7 @@ require (
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/matryer/moq v0.0.0-20200607124540-4638a53893e6 // indirect
 	github.com/mattermost/xml-roundtrip-validator v0.1.0 // indirect
-	github.com/mattn/go-isatty v0.0.14 // indirect
+	github.com/mattn/go-isatty v0.0.16 // indirect
 	github.com/mattn/go-runewidth v0.0.13 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
 	github.com/minio/md5-simd v1.1.0 // indirect
