@@ -16,7 +16,7 @@ replace (
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc => go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.20.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp => go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.20.0
 	go.opentelemetry.io/otel => go.opentelemetry.io/otel v0.20.0
-	go.opentelemetry.io/otel/exporters/otlp => go.opentelemetry.io/otel/exporters/otlp v0.20.0
+	go.opentelemetry.io/otel/exporters/otlp => go.opentelemetry.io/otel/exporters/otlp v0.20.1
 	go.opentelemetry.io/otel/sdk => go.opentelemetry.io/otel/sdk v0.20.0
 	go.opentelemetry.io/otel/trace => go.opentelemetry.io/otel/trace v0.20.0
 	go.opentelemetry.io/proto/otlp => go.opentelemetry.io/proto/otlp v0.7.0
