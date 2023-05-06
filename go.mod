@@ -22,32 +22,32 @@ replace (
 	go.opentelemetry.io/proto/otlp => go.opentelemetry.io/proto/otlp v0.7.0
 
 	helm.sh/helm/v3 => github.com/rancher/helm/v3 v3.9.0-rancher1
-	k8s.io/api => k8s.io/api v0.25.4
-	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.25.4
-	k8s.io/apimachinery => k8s.io/apimachinery v0.25.4
-	k8s.io/apiserver => k8s.io/apiserver v0.25.4
-	k8s.io/cli-runtime => k8s.io/cli-runtime v0.25.4
+	k8s.io/api => k8s.io/api v0.26.4
+	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.26.4
+	k8s.io/apimachinery => k8s.io/apimachinery v0.26.4
+	k8s.io/apiserver => k8s.io/apiserver v0.26.4
+	k8s.io/cli-runtime => k8s.io/cli-runtime v0.26.4
 	k8s.io/client-go => github.com/rancher/client-go v1.25.4-rancher1
-	k8s.io/cloud-provider => k8s.io/cloud-provider v0.25.4
-	k8s.io/cluster-bootstrap => k8s.io/cluster-bootstrap v0.25.4
-	k8s.io/code-generator => k8s.io/code-generator v0.25.4
-	k8s.io/component-base => k8s.io/component-base v0.25.4
-	k8s.io/component-helpers => k8s.io/component-helpers v0.25.4
-	k8s.io/controller-manager => k8s.io/controller-manager v0.25.4
-	k8s.io/cri-api => k8s.io/cri-api v0.25.4
-	k8s.io/csi-translation-lib => k8s.io/csi-translation-lib v0.25.4
-	k8s.io/kube-aggregator => k8s.io/kube-aggregator v0.25.4
-	k8s.io/kube-controller-manager => k8s.io/kube-controller-manager v0.25.4
-	k8s.io/kube-proxy => k8s.io/kube-proxy v0.25.4
-	k8s.io/kube-scheduler => k8s.io/kube-scheduler v0.25.4
-	k8s.io/kubectl => k8s.io/kubectl v0.25.4
-	k8s.io/kubelet => k8s.io/kubelet v0.25.4
+	k8s.io/cloud-provider => k8s.io/cloud-provider v0.26.4
+	k8s.io/cluster-bootstrap => k8s.io/cluster-bootstrap v0.26.4
+	k8s.io/code-generator => k8s.io/code-generator v0.26.4
+	k8s.io/component-base => k8s.io/component-base v0.26.4
+	k8s.io/component-helpers => k8s.io/component-helpers v0.26.4
+	k8s.io/controller-manager => k8s.io/controller-manager v0.26.4
+	k8s.io/cri-api => k8s.io/cri-api v0.26.4
+	k8s.io/csi-translation-lib => k8s.io/csi-translation-lib v0.26.4
+	k8s.io/kube-aggregator => k8s.io/kube-aggregator v0.26.4
+	k8s.io/kube-controller-manager => k8s.io/kube-controller-manager v0.26.4
+	k8s.io/kube-proxy => k8s.io/kube-proxy v0.26.4
+	k8s.io/kube-scheduler => k8s.io/kube-scheduler v0.26.4
+	k8s.io/kubectl => k8s.io/kubectl v0.26.4
+	k8s.io/kubelet => k8s.io/kubelet v0.26.4
 	k8s.io/kubernetes => k8s.io/kubernetes v1.25.4
-	k8s.io/legacy-cloud-providers => k8s.io/legacy-cloud-providers v0.25.4
-	k8s.io/metrics => k8s.io/metrics v0.25.4
-	k8s.io/mount-utils => k8s.io/mount-utils v0.25.4
-	k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.25.4
-	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.25.4
+	k8s.io/legacy-cloud-providers => k8s.io/legacy-cloud-providers v0.26.4
+	k8s.io/metrics => k8s.io/metrics v0.26.4
+	k8s.io/mount-utils => k8s.io/mount-utils v0.26.4
+	k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.26.4
+	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.26.4
 
 	sigs.k8s.io/aws-iam-authenticator => github.com/rancher/aws-iam-authenticator v0.5.9-0.20220713170329-78acb8c83863
 	sigs.k8s.io/cluster-api => sigs.k8s.io/cluster-api v1.2.12
@@ -141,16 +141,16 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/yaml.v2 v2.4.0
 	helm.sh/helm/v3 v3.9.0
-	k8s.io/api v0.25.4
-	k8s.io/apiextensions-apiserver v0.25.4
-	k8s.io/apimachinery v0.25.4
-	k8s.io/apiserver v0.25.4
-	k8s.io/cli-runtime v0.25.4
+	k8s.io/api v0.26.4
+	k8s.io/apiextensions-apiserver v0.26.4
+	k8s.io/apimachinery v0.26.4
+	k8s.io/apiserver v0.26.4
+	k8s.io/cli-runtime v0.26.4
 	k8s.io/client-go v12.0.0+incompatible
 	k8s.io/gengo v0.0.0-20220902162205-c0856e24416d
 	k8s.io/helm v2.16.7+incompatible
-	k8s.io/kube-aggregator v0.25.4
-	k8s.io/kubectl v0.25.4
+	k8s.io/kube-aggregator v0.26.4
+	k8s.io/kubectl v0.26.4
 	k8s.io/kubernetes v1.25.4
 	k8s.io/utils v0.0.0-20230209194617-a36077c30491
 	sigs.k8s.io/aws-iam-authenticator v0.5.9
