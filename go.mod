@@ -112,7 +112,7 @@ require (
 	github.com/rancher/lasso v0.0.0-20230428185353-36908edf817b
 	github.com/rancher/lasso/controller-runtime v0.0.0-20230502204209-3eb356f3e8cf
 	github.com/rancher/machine v0.15.0-rancher99
-	github.com/rancher/norman v0.0.0-20230328153514-ae12f166495a
+	github.com/rancher/norman v0.0.0-20230428185400-96b95e3475e0
 	github.com/rancher/rancher/pkg/apis v0.0.0
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
