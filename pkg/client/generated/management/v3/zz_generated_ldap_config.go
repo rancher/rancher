@@ -32,6 +32,7 @@ const (
 	LdapConfigFieldServiceAccountDistinguishedName = "serviceAccountDistinguishedName"
 	LdapConfigFieldServiceAccountPassword          = "serviceAccountPassword"
 	LdapConfigFieldStartTLS                        = "starttls"
+	LdapConfigFieldStatus                          = "status"
 	LdapConfigFieldTLS                             = "tls"
 	LdapConfigFieldType                            = "type"
 	LdapConfigFieldUUID                            = "uuid"
@@ -74,6 +75,7 @@ type LdapConfig struct {
 	ServiceAccountDistinguishedName string            `json:"serviceAccountDistinguishedName,omitempty" yaml:"serviceAccountDistinguishedName,omitempty"`
 	ServiceAccountPassword          string            `json:"serviceAccountPassword,omitempty" yaml:"serviceAccountPassword,omitempty"`
 	StartTLS                        bool              `json:"starttls,omitempty" yaml:"starttls,omitempty"`
+	Status                          *AuthConfigStatus `json:"status,omitempty" yaml:"status,omitempty"`
 	TLS                             bool              `json:"tls,omitempty" yaml:"tls,omitempty"`
 	Type                            string            `json:"type,omitempty" yaml:"type,omitempty"`
 	UUID                            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
