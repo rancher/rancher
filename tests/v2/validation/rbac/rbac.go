@@ -24,21 +24,23 @@ import (
 )
 
 const (
-	roleOwner                = "cluster-owner"
-	roleMember               = "cluster-member"
-	roleProjectOwner         = "project-owner"
-	roleProjectMember        = "project-member"
-	roleManageProjectMember  = "projectroletemplatebindings-manage"
-	roleProjectReadOnly      = "read-only"
-	restrictedAdmin          = "restricted-admin"
-	standardUser             = "user"
-	pssRestrictedPolicy      = "restricted"
-	pssBaselinePolicy        = "baseline"
-	pssPrivilegedPolicy      = "privileged"
-	psaWarn                  = "pod-security.kubernetes.io/warn"
-	psaAudit                 = "pod-security.kubernetes.io/audit"
-	psaEnforce               = "pod-security.kubernetes.io/enforce"
-	kubeConfigTokenSettingID = "kubeconfig-default-token-ttl-minutes"
+	roleOwner                     = "cluster-owner"
+	roleMember                    = "cluster-member"
+	roleProjectOwner              = "project-owner"
+	roleProjectMember             = "project-member"
+	roleCustomManageProjectMember = "projectroletemplatebindings-manage"
+	roleCustomCreateNS            = "create-ns"
+	roleProjectReadOnly           = "read-only"
+	restrictedAdmin               = "restricted-admin"
+	standardUser                  = "user"
+	pssRestrictedPolicy           = "restricted"
+	pssBaselinePolicy             = "baseline"
+	pssPrivilegedPolicy           = "privileged"
+	psaWarn                       = "pod-security.kubernetes.io/warn"
+	psaAudit                      = "pod-security.kubernetes.io/audit"
+	psaEnforce                    = "pod-security.kubernetes.io/enforce"
+	kubeConfigTokenSettingID      = "kubeconfig-default-token-ttl-minutes"
+	psaRole                       = "updatepsa"
 
 	isCattleLabeled = true
 )
@@ -162,7 +164,7 @@ func createDeploymentAndWait(steveclient *v1.Client, client *rancher.Client, clu
 		}
 		return false, nil
 	})
-	return deploymentResp, nil
+	return deploymentResp, err
 }
 
 func getAndConvertNamespace(namespace *v1.SteveAPIObject, steveAdminClient *v1.Client) (*coreV1.Namespace, error) {
@@ -243,4 +245,15 @@ func getClusterConfig() *ClusterConfig {
 		kubernetesVersion: kubernetesVersion, cni: cni, advancedOptions: advancedOptions}
 
 	return &clusterConfig
+}
+
+func createRole(client *rancher.Client, context string, roleName string, rules []management.PolicyRule) (role *management.RoleTemplate, err error) {
+	role, err = client.Management.RoleTemplate.Create(
+		&management.RoleTemplate{
+			Context: "cluster",
+			Name:    "additional-psa-role",
+			Rules:   rules,
+		})
+	return
+
 }

@@ -71,15 +71,15 @@ func (rb *RBTestSuite) ValidateListCluster(role string) {
 	err = v1.ConvertToK8sType(clusterList.Data[0].Status, clusterStatus)
 	require.NoError(rb.T(), err)
 
-	if role != restrictedAdmin {
-		assert.Equal(rb.T(), 1, len(clusterList.Data))
-		actualClusterID := clusterStatus.ClusterName
-		assert.Equal(rb.T(), rb.cluster.ID, actualClusterID)
-	} else {
+	if role == restrictedAdmin {
 		adminClusterList, err := rb.client.Steve.SteveType(clusters.ProvisioningSteveResouceType).ListAll(nil)
 		require.NoError(rb.T(), err)
 		assert.Equal(rb.T(), (len(adminClusterList.Data) - 1), len(clusterList.Data))
+		return
 	}
+	assert.Equal(rb.T(), 1, len(clusterList.Data))
+	actualClusterID := clusterStatus.ClusterName
+	assert.Equal(rb.T(), rb.cluster.ID, actualClusterID)
 }
 
 func (rb *RBTestSuite) ValidateListProjects(role string) {
@@ -388,7 +388,7 @@ func (rb *RBTestSuite) ValidateCannotAddMPMsAsProjectOwner() {
 	rb.standardUserCOProject = createProjectAsCO
 
 	log.Info("Additional Testcase5 - Validating if Manage Project Member cannot add Project Owner ")
-	errUserRole := users.AddProjectMember(rb.standardUserClient, rb.standardUserCOProject, rb.additionalUser, roleManageProjectMember)
+	errUserRole := users.AddProjectMember(rb.standardUserClient, rb.standardUserCOProject, rb.additionalUser, roleCustomManageProjectMember)
 	require.NoError(rb.T(), errUserRole)
 	rb.additionalUserClient, err = rb.additionalUserClient.ReLogin()
 	require.NoError(rb.T(), err)
@@ -603,7 +603,7 @@ func (rb *RBTestSuite) TestRBACAdditional() {
 				rb.ValidateAddPOsAsProjectOwner()
 			})
 
-			rb.Run("Additional testcase5 - Validating if member with role "+roleManageProjectMember+" can not add a project owner", func() {
+			rb.Run("Additional testcase5 - Validating if member with role "+roleCustomManageProjectMember+" can not add a project owner", func() {
 				rb.ValidateCannotAddMPMsAsProjectOwner()
 			})
 
