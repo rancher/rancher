@@ -6,5 +6,6 @@
     "release/v2.7"
   ],
   "prHourlyLimit": 2,
-  "prConcurrentLimit": 4
+  "prConcurrentLimit": 4,
+  "prCreation": "status-success"
 }
