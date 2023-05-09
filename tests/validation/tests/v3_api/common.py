@@ -1503,13 +1503,14 @@ def cluster_cleanup(client, cluster, aws_nodes=None):
         create_config_file(env_details)
         
         
-def hosted_cluster_cleanup(client, cluster):
+def hosted_cluster_cleanup(client, cluster, cluster_name):
     if RANCHER_CLEANUP_CLUSTER:
         client.delete(cluster)
     else:
         env_details = "env.CATTLE_TEST_URL='" + CATTLE_TEST_URL + "'\n"
         env_details += "env.ADMIN_TOKEN='" + ADMIN_TOKEN + "'\n"
         env_details += "env.USER_TOKEN='" + USER_TOKEN + "'\n"
+        env_details += "env.CLUSTER_NAME='" + cluster_name + "'\n"
         create_config_file(env_details)
 
 
