@@ -4,7 +4,7 @@ pytest-xdist==1.23.0
 boto3==1.21.33
 cryptography==39.0.1
 flake8==3.5.0
-invoke==1.2.0
+invoke==1.7.3
 Jinja2==3.0.0
 kubernetes==12.0.1
 paramiko==2.10.1
