@@ -82,7 +82,7 @@ func (h *clusterHandler) doSync(cluster *v3.Cluster) error {
 			}
 			bindingName := rbac.GrbCRBName(grb)
 			_, err := h.userGRBLister.Get("", bindingName)
-			if !k8serrors.IsNotFound(err) {
+			if err != nil && !k8serrors.IsNotFound(err) {
 				return nil, fmt.Errorf("failed to get GlobalRoleBinding for '%s': %w", bindingName, err)
 			}
 
