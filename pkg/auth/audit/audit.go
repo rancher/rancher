@@ -289,6 +289,11 @@ func (a *auditLog) redactSensitiveData(requestURI string, body []byte) []byte {
 		changed = a.redactSecretsData(requestURI, m)
 	}
 
+	// Redact kubeconfig
+	if strings.Contains(requestURI, "action=generateKubeconfig") {
+		changed = redactKubeconfig(m)
+	}
+
 	// Redact values for data considered sensitive: passwords, tokens, etc.
 	if !a.redactMap(m) && !changed {
 		return body
@@ -299,6 +304,14 @@ func (a *auditLog) redactSensitiveData(requestURI string, body []byte) []byte {
 		return []byte{}
 	}
 	return newBody
+}
+
+func redactKubeconfig(body map[string]interface{}) bool {
+	if _, ok := body["config"]; !ok {
+		return false
+	}
+	body["config"] = redacted
+	return true
 }
 
 func (a *auditLog) redactSecretsData(requestURI string, body map[string]interface{}) bool {
