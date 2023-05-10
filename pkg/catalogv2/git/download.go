@@ -12,7 +12,6 @@ import (
 	"strings"
 
 	"github.com/rancher/rancher/pkg/settings"
-	"github.com/rancher/wrangler/pkg/git"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -67,11 +66,11 @@ func Ensure(secret *corev1.Secret, namespace, name, gitURL, commit string, insec
 	return git.Ensure(commit)
 }
 
-func isBundled(git *git.Git) bool {
+func isBundled(git *git) bool {
 	return strings.HasPrefix(git.Directory, staticDir)
 }
 
-func gitForRepo(secret *corev1.Secret, namespace, name, gitURL string, insecureSkipTLS bool, caBundle []byte) (*git.Git, error) {
+func gitForRepo(secret *corev1.Secret, namespace, name, gitURL string, insecureSkipTLS bool, caBundle []byte) (*git, error) {
 	isGitSSH, err := isGitSSH(gitURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to verify the type of URL %s: %w", gitURL, err)
@@ -95,7 +94,7 @@ func gitForRepo(secret *corev1.Secret, namespace, name, gitURL string, insecureS
 		caBundle = convertDERToPEM(caBundle)
 		insecureSkipTLS = false
 	}
-	return git.NewGit(dir, gitURL, &git.Options{
+	return newGit(dir, gitURL, &Options{
 		Credential:        secret,
 		Headers:           headers,
 		InsecureTLSVerify: insecureSkipTLS,
