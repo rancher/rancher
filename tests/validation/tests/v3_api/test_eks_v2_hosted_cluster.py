@@ -86,7 +86,7 @@ def test_eks_v2_hosted_cluster_create_basic():
 
     # validate nodegroups created
     validate_nodegroup(eks_config_temp["nodeGroups"], cluster_name)
-    hosted_cluster_cleanup(client, cluster)
+    hosted_cluster_cleanup(client, cluster, cluster_name)
 
 
 @ekscredential
@@ -201,20 +201,6 @@ def create_resources_eks():
     IMPORTED_EKS_CLUSTERS.append(cluster_name)
     AmazonWebServices().wait_for_eks_cluster_state(cluster_name, "ACTIVE")
     return cluster_name
-
-
-@pytest.fixture(scope='module', autouse="False")
-def create_project_client(request):
-
-    def fin():
-        client = get_user_client()
-        for name, cluster in cluster_details.items():
-            if len(client.list_cluster(name=name).data) > 0:
-                client.delete(cluster)
-        for display_name in IMPORTED_EKS_CLUSTERS:
-            AmazonWebServices().delete_eks_cluster(cluster_name=display_name)
-
-    request.addfinalizer(fin)
 
 
 def create_and_validate_eks_cluster(cluster_config, imported=False):
