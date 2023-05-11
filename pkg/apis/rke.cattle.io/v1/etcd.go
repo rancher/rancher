@@ -5,12 +5,13 @@ import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 type ETCDSnapshotPhase string
 
 const (
-	ETCDSnapshotPhaseStarted        ETCDSnapshotPhase = "Started"
-	ETCDSnapshotPhaseShutdown       ETCDSnapshotPhase = "Shutdown"
-	ETCDSnapshotPhaseRestore        ETCDSnapshotPhase = "Restore"
-	ETCDSnapshotPhaseRestartCluster ETCDSnapshotPhase = "RestartCluster"
-	ETCDSnapshotPhaseFinished       ETCDSnapshotPhase = "Finished"
-	ETCDSnapshotPhaseFailed         ETCDSnapshotPhase = "Failed"
+	ETCDSnapshotPhaseStarted            ETCDSnapshotPhase = "Started"
+	ETCDSnapshotPhaseShutdown           ETCDSnapshotPhase = "Shutdown"
+	ETCDSnapshotPhaseRestore            ETCDSnapshotPhase = "Restore"
+	ETCDSnapshotPhasePostRestoreCleanup ETCDSnapshotPhase = "PostRestoreCleanup"
+	ETCDSnapshotPhaseRestartCluster     ETCDSnapshotPhase = "RestartCluster"
+	ETCDSnapshotPhaseFinished           ETCDSnapshotPhase = "Finished"
+	ETCDSnapshotPhaseFailed             ETCDSnapshotPhase = "Failed"
 )
 
 type ETCDSnapshotS3 struct {

@@ -129,9 +129,10 @@ type Planner struct {
 // InfoFunctions is a struct that contains various dynamic functions that allow for abstracting out Rancher-specific
 // logic from the Planner
 type InfoFunctions struct {
-	ImageResolver    func(image string, cp *rkev1.RKEControlPlane) string
-	ReleaseData      func(context.Context, *rkev1.RKEControlPlane) *model.Release
-	SystemAgentImage func() string
+	ImageResolver           func(image string, cp *rkev1.RKEControlPlane) string
+	ReleaseData             func(context.Context, *rkev1.RKEControlPlane) *model.Release
+	SystemAgentImage        func() string
+	SystemPodLabelSelectors func(plane *rkev1.RKEControlPlane) []string
 }
 
 func New(ctx context.Context, clients *wrangler.Context, functions InfoFunctions) *Planner {
@@ -254,7 +255,7 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlan
 		return status, errWaiting("waiting for infrastructure ready")
 	}
 
-	plan, _, err := p.store.Load(capiCluster, cp)
+	plan, anyPlansDelivered, err := p.store.Load(capiCluster, cp)
 	if err != nil {
 		return status, err
 	}
@@ -328,7 +329,7 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlan
 	capr.Provisioned.Message(&status, "")
 	capr.Provisioned.Reason(&status, "")
 
-	_, clusterSecretTokens, err := p.ensureRKEStateSecret(cp)
+	_, clusterSecretTokens, err := p.ensureRKEStateSecret(cp, !anyPlansDelivered)
 	if err != nil {
 		return status, err
 	}
@@ -965,9 +966,8 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret pl
 			// 2. If the plan has failed to apply. Note that the `Failed` will only be `true` if the max failure count has passed, or (if max-failures is not set) the plan has failed to apply at least once.
 			// 3. concurrency == 0 which means infinite concurrency.
 			// 4. unavailable < concurrency meaning we have capacity to make something unavailable
-			// 5. If the plans are in sync, but we are still waiting for probes, it is safe to apply new instructions
 			logrus.Debugf("[planner] rkecluster %s/%s reconcile tier %s - concurrency: %d, unavailable: %d", controlPlane.Namespace, controlPlane.Name, tierName, concurrency, unavailable)
-			if isInDrain(entry) || entry.Plan.Failed || concurrency == 0 || unavailable < concurrency || planAppliedButWaitingForProbes(entry) {
+			if isInDrain(entry) || entry.Plan.Failed || concurrency == 0 || unavailable < concurrency {
 				reconciling = append(reconciling, entry.Machine.Name)
 				if !isUnavailable(entry) {
 					unavailable++
@@ -1156,7 +1156,7 @@ func (p *Planner) getInstallerImage(controlPlane *rkev1.RKEControlPlane) string 
 
 // ensureRKEStateSecret ensures that the RKE state secret for the given RKEControlPlane exists. This secret contains the
 // serverToken and agentToken used for server/agent registration.
-func (p *Planner) ensureRKEStateSecret(controlPlane *rkev1.RKEControlPlane) (string, plan.Secret, error) {
+func (p *Planner) ensureRKEStateSecret(controlPlane *rkev1.RKEControlPlane, newCluster bool) (string, plan.Secret, error) {
 	if controlPlane.Spec.UnmanagedConfig {
 		return "", plan.Secret{}, nil
 	}
@@ -1164,6 +1164,9 @@ func (p *Planner) ensureRKEStateSecret(controlPlane *rkev1.RKEControlPlane) (str
 	name := name.SafeConcatName(controlPlane.Name, "rke", "state")
 	secret, err := p.secretCache.Get(controlPlane.Namespace, name)
 	if apierror.IsNotFound(err) {
+		if !newCluster {
+			return "", plan.Secret{}, fmt.Errorf("newCluster was false and secret does not exist: %w", err)
+		}
 		serverToken, err := randomtoken.Generate()
 		if err != nil {
 			return "", plan.Secret{}, err

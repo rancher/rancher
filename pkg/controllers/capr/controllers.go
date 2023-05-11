@@ -19,15 +19,17 @@ import (
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/provisioningv2/image"
 	"github.com/rancher/rancher/pkg/provisioningv2/kubeconfig"
+	"github.com/rancher/rancher/pkg/provisioningv2/systeminfo"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
 )
 
 func Register(ctx context.Context, clients *wrangler.Context, kubeconfigManager *kubeconfig.Manager) {
 	rkePlanner := planner.New(ctx, clients, planner.InfoFunctions{
-		ImageResolver:    image.ResolveWithControlPlane,
-		ReleaseData:      capr.GetKDMReleaseData,
-		SystemAgentImage: settings.SystemAgentInstallerImage.Get,
+		ImageResolver:           image.ResolveWithControlPlane,
+		ReleaseData:             capr.GetKDMReleaseData,
+		SystemAgentImage:        settings.SystemAgentInstallerImage.Get,
+		SystemPodLabelSelectors: systeminfo.NewRetriever(clients).GetSystemPodLabelSelectors,
 	})
 	if features.MCM.Enabled() {
 		dynamicschema.Register(ctx, clients)

@@ -1,7 +1,9 @@
 package planner
 
 import (
+	"encoding/base64"
 	"fmt"
+	"strings"
 
 	"github.com/Masterminds/semver/v3"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
@@ -11,6 +13,28 @@ import (
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+)
+
+const (
+	etcdRestoreInstallRoot = "/var/lib/rancher"
+	etcdRestoreBinPrefix   = "capr_etcd_restore/bin"
+
+	etcdRestorePostRestoreWaitForPodListCleanupPath   = "wait_for_pod_list.sh"
+	etcdRestorePostRestoreWaitForPodListCleanupScript = `
+#!/bin/sh
+
+i=0
+
+while [ $i -lt 30 ]; do
+	$@ &>/dev/null
+	if [ $? -eq 0 ]; then
+		exit 0
+	fi
+	sleep 10
+	i=$((i + 1))
+done
+exit 1
+`
 )
 
 const ETCDRestoreMessage = "etcd restore"
@@ -67,6 +91,55 @@ func (p *Planner) runEtcdSnapshotRestorePlan(controlPlane *rkev1.RKEControlPlane
 		return err
 	}
 	return assignAndCheckPlan(p.store, ETCDRestoreMessage, servers[0], restorePlan, joinedServer, 1, 1)
+}
+
+func (p *Planner) runEtcdSnapshotPostRestoreCleanupPlan(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, clusterPlan *plan.Plan) error {
+	initNodes := collect(clusterPlan, isInitNode)
+	if len(initNodes) != 1 {
+		return fmt.Errorf("multiple init nodes found")
+	}
+	initNode := initNodes[0]
+
+	initNodePlan, _, err := p.desiredPlan(controlPlane, tokensSecret, initNode, "")
+	if err != nil {
+		return err
+	}
+
+	cleanupScriptFile, cleanupInstructions := p.generateEtcdRestorePodCleanupFilesAndInstruction(controlPlane)
+
+	// If the init node is a controlplane node, deliver the desired plan + pod cleanup instruction
+	if isControlPlane(initNode) {
+		initNodePlan.Files = append(initNodePlan.Files, cleanupScriptFile)
+		initNodePlan.Instructions = append(initNodePlan.Instructions, cleanupInstructions...)
+		return assignAndCheckPlan(p.store, ETCDRestoreMessage, initNode, initNodePlan, "", 5, 5)
+	}
+
+	if err := assignAndCheckPlan(p.store, ETCDRestoreMessage, initNode, initNodePlan, "", 5, 5); err != nil {
+		return err
+	}
+
+	_, joinServer, _, err := p.findInitNode(controlPlane, clusterPlan)
+	if joinServer == "" {
+		return errWaitingf("waiting for join server")
+	}
+	if err != nil {
+		return err
+	}
+
+	controlPlaneEntries := collect(clusterPlan, roleAnd(isControlPlane, roleNot(isDeleting)))
+	if len(controlPlaneEntries) == 0 {
+		return fmt.Errorf("no suitable controlplane entries found for post restore cleanup during etcd restoration")
+	}
+
+	controlPlaneEntry := controlPlaneEntries[0]
+
+	firstControlPlanePlan, joinedServer, err := p.desiredPlan(controlPlane, tokensSecret, controlPlaneEntry, joinServer)
+	if err != nil {
+		return err
+	}
+	firstControlPlanePlan.Files = append(firstControlPlanePlan.Files, cleanupScriptFile)
+	firstControlPlanePlan.Instructions = append(firstControlPlanePlan.Instructions, cleanupInstructions...)
+	return assignAndCheckPlan(p.store, ETCDRestoreMessage, controlPlaneEntry, firstControlPlanePlan, joinedServer, 5, 5)
 }
 
 // generateEtcdSnapshotRestorePlan returns a node plan that contains instructions to stop etcd, remove the tombstone file (if one exists), then restore etcd in that order.
@@ -178,6 +251,91 @@ func generateCreateEtcdTombstoneInstruction(controlPlane *rkev1.RKEControlPlane)
 			fmt.Sprintf("/var/lib/rancher/%s/server/db/etcd/tombstone", capr.GetRuntimeCommand(controlPlane.Spec.KubernetesVersion)),
 		},
 	}
+}
+
+func etcdRestoreScriptPath(controlPlane *rkev1.RKEControlPlane, file string) string {
+	return fmt.Sprintf("%s/%s/%s/%s", etcdRestoreInstallRoot, capr.GetRuntime(controlPlane.Spec.KubernetesVersion), etcdRestoreBinPrefix, file)
+}
+
+// generateEtcdRestorePodCleanupFilesAndInstruction generates a file that contains a script that checks API server health and a slice of instructions that cleans up system pods on etcd restore.
+func (p *Planner) generateEtcdRestorePodCleanupFilesAndInstruction(controlPlane *rkev1.RKEControlPlane) (plan.File, []plan.OneTimeInstruction) {
+	runtime := capr.GetRuntime(controlPlane.Spec.KubernetesVersion)
+
+	kubectl := "/usr/local/bin/kubectl"
+	kubeconfig := "/etc/rancher/k3s/k3s.yaml"
+
+	if runtime == capr.RuntimeRKE2 {
+		kubectl = "/var/lib/rancher/rke2/bin/kubectl"
+		kubeconfig = "/etc/rancher/rke2/rke2.yaml"
+	}
+
+	instructions := []plan.OneTimeInstruction{
+		{
+			Name:    "post-restore-cleanup-pods-wait-for-podlist",
+			Command: "/bin/sh",
+			Args: []string{
+				"-x",
+				etcdRestoreScriptPath(controlPlane, etcdRestorePostRestoreWaitForPodListCleanupPath),
+				kubectl,
+				"--kubeconfig",
+				kubeconfig,
+				"get",
+				"pods",
+				"--all-namespaces",
+			},
+		},
+	}
+
+	// These are the pod selectors that are common between K3s/RKE2 (CoreDNS/KubeDNS)
+	podSelectors := []string{
+		"kube-system:k8s-app=kube-dns",
+		"kube-system:k8s-app=kube-dns-autoscaler",
+	}
+
+	// RKE2 charts come from: https://github.com/rancher/rke2/blob/253af9ca3115de691f5fdb8ed8dcb284287b1856/Dockerfile#L109-L123 and are deployed into `kube-system` as the Helm {{ .Release.Namespace }} by default
+	if runtime == capr.RuntimeRKE2 {
+		podSelectors = append(podSelectors,
+			"kube-system:app=rke2-metrics-server",                   // rke2-metrics-server is deployed into `{{ .Release.Namespace }}` which is kube-system in RKE2: https://github.com/rancher/rke2-charts/blob/237251fccd793df825de0f27804ca7b6ad6e2981/charts/rke2-metrics-server/rke2-metrics-server/2.11.100/templates/metrics-server-deployment.yaml#L5
+			"tigera-operator:k8s-app=tigera-operator",               // https://github.com/rancher/rke2-charts/blob/237251fccd793df825de0f27804ca7b6ad6e2981/charts/rke2-calico/rke2-calico/v3.25.002/templates/tigera-operator/00-namespace-tigera-operator.yaml#L4
+			"calico-system:k8s-app=calico-node",                     // Managed by tigera-operator https://github.com/tigera/operator/blob/08cdc5df85fda2ebe69ffafded1953744409c554/pkg/common/common.go#L20
+			"calico-system:k8s-app=calico-kube-controllers",         // Managed by tigera-operator https://github.com/tigera/operator/blob/08cdc5df85fda2ebe69ffafded1953744409c554/pkg/common/common.go#L21
+			"calico-system:k8s-app=calico-typha",                    // Managed by tigera-operator https://github.com/tigera/operator/blob/08cdc5df85fda2ebe69ffafded1953744409c554/pkg/common/common.go#L19
+			"kube-system:k8s-app=canal",                             // Canal is hardcode deployed into `kube-system` https://github.com/rancher/rke2-charts/blob/237251fccd793df825de0f27804ca7b6ad6e2981/charts/rke2-canal/rke2-canal/v3.25.0-build2023020902/templates/daemonset.yaml#L10
+			"kube-system:k8s-app=cilium",                            // Cilium agent is deployed into `{{ .Release.Namespace }}` which is kube-system in RKE2: https://github.com/rancher/rke2-charts/blob/237251fccd793df825de0f27804ca7b6ad6e2981/charts/rke2-cilium/rke2-cilium/1.13.200/templates/cilium-agent/daemonset.yaml#L26
+			"kube-system:app=rke2-multus",                           // Multus is deployed into `{{ .Release.Namespace }}` which is kube-system in RKE2: https://github.com/rancher/rke2-charts/blob/237251fccd793df825de0f27804ca7b6ad6e2981/charts/rke2-multus/rke2-multus/v3.9.3-build2023010902/templates/daemonSet.yaml#L20
+			"kube-system:app.kubernetes.io/name=rke2-ingress-nginx", // rke2-ingress-nginx is deployed into `{{ .Release.Namespace }}` which is in kube-system in RKE2: https://github.com/rancher/rke2-charts/blob/237251fccd793df825de0f27804ca7b6ad6e2981/charts/rke2-ingress-nginx/rke2-ingress-nginx/4.5.201/templates/controller-daemonset.yaml#L13
+		)
+	}
+
+	if p.retrievalFunctions.SystemPodLabelSelectors != nil {
+		podSelectors = append(podSelectors, p.retrievalFunctions.SystemPodLabelSelectors(controlPlane)...)
+	}
+
+	for i, podSelector := range podSelectors {
+		if namespace, labelSelector, usable := strings.Cut(podSelector, ":"); usable {
+			instructions = append(instructions, plan.OneTimeInstruction{
+				Name:    fmt.Sprintf("post-restore-cleanup-pods-%d", i),
+				Command: kubectl,
+				Args: []string{
+					"--kubeconfig",
+					kubeconfig,
+					"delete",
+					"pods",
+					"-n",
+					namespace,
+					"-l",
+					labelSelector,
+					"--wait=false",
+				},
+			})
+		}
+	}
+
+	return plan.File{
+		Content: base64.StdEncoding.EncodeToString([]byte(etcdRestorePostRestoreWaitForPodListCleanupScript)),
+		Path:    etcdRestoreScriptPath(controlPlane, etcdRestorePostRestoreWaitForPodListCleanupPath),
+		Dynamic: true,
+	}, instructions
 }
 
 func generateRemoveTLSAndCredDirInstructions(controlPlane *rkev1.RKEControlPlane) []plan.OneTimeInstruction {
@@ -392,7 +550,12 @@ func (p *Planner) restoreEtcdSnapshot(cp *rkev1.RKEControlPlane, status rkev1.RK
 		if err = p.runEtcdSnapshotRestorePlan(cp, snapshot, cp.Spec.ETCDSnapshotRestore.Name, tokensSecret, clusterPlan); err != nil {
 			return status, err
 		}
-		status.ConfigGeneration++
+		status.ConfigGeneration++ // Increment config generation to cause the restart_stamp to change
+		return p.setEtcdSnapshotRestoreState(status, cp.Spec.ETCDSnapshotRestore, rkev1.ETCDSnapshotPhasePostRestoreCleanup)
+	case rkev1.ETCDSnapshotPhasePostRestoreCleanup:
+		if err = p.runEtcdSnapshotPostRestoreCleanupPlan(cp, tokensSecret, clusterPlan); err != nil {
+			return status, err
+		}
 		return p.setEtcdSnapshotRestoreState(status, cp.Spec.ETCDSnapshotRestore, rkev1.ETCDSnapshotPhaseRestartCluster)
 	case rkev1.ETCDSnapshotPhaseRestartCluster:
 		if err := p.pauseCAPICluster(cp, false); err != nil {
