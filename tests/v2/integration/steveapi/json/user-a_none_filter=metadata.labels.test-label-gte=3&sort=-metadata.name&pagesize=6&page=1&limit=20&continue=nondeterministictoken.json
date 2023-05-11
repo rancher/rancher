@@ -19,7 +19,7 @@
       "metadata": {
         "labels": {
           "test-label-gte": "3",
-          "test.cattle.io/steveapi": "true"
+          "test.cattle.io/steveapi": "nondeterministicid"
         },
         "name": "test5",
         "namespace": "test-ns-5",
@@ -45,7 +45,7 @@
       "metadata": {
         "labels": {
           "test-label-gte": "3",
-          "test.cattle.io/steveapi": "true"
+          "test.cattle.io/steveapi": "nondeterministicid"
         },
         "name": "test4",
         "namespace": "test-ns-5",
@@ -71,7 +71,7 @@
       "metadata": {
         "labels": {
           "test-label-gte": "3",
-          "test.cattle.io/steveapi": "true"
+          "test.cattle.io/steveapi": "nondeterministicid"
         },
         "name": "test3",
         "namespace": "test-ns-5",

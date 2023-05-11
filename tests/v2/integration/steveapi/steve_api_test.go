@@ -41,18 +41,21 @@ const (
 	labelGTEKey       = "test-label-gte"
 	continueToken     = "nondeterministictoken"
 	revisionNum       = "nondeterministicint"
+	fakeTestID        = "nondeterministicid"
 	defautlUrlString  = "https://rancherurl/"
 	steveAPITestLabel = "test.cattle.io/steveapi"
 )
 
 var (
+	testID                     = namegenerator.RandStringLower(5)
 	userEnabled                = true
 	impersonationNamespace     = "cattle-impersonation-system"
 	impersonationSABase        = "cattle-impersonation-"
-	continueReg                = regexp.MustCompile(`(continue=)[\w]+(%3D){0,2}`)
 	urlRegex                   = regexp.MustCompile(`https://([\w.:]+)/`)
 	downStreamClusterRegex     = regexp.MustCompile(`(k8s/clusters/c-m-\w+/)`)
+	continueReg                = regexp.MustCompile(`(continue=)[\w]+(%3D){0,2}`)
 	revisionReg                = regexp.MustCompile(`(revision=)[\d]+`)
+	testLabelReg               = regexp.MustCompile(`(labelSelector=test.cattle.io%2Fsteveapi%3D)[\w]+`)
 	namespaceSecretManagerRole = rbacv1.Role{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "namespace-secret-manager",
@@ -238,7 +241,7 @@ func (s *steveAPITestSuite) setupSuite(clusterName string) {
 					Name: fmt.Sprintf("test%d", i),
 				},
 			}
-			labels := map[string]string{steveAPITestLabel: "true"}
+			labels := map[string]string{steveAPITestLabel: testID}
 			if i == 2 {
 				labels[labelKey] = "2"
 			}
@@ -1707,7 +1710,7 @@ func (s *steveAPITestSuite) TestList() {
 			if _, ok := query["revision"]; ok {
 				query["revision"] = []string{s.lastRevision}
 			}
-			query["labelSelector"] = append(query["labelSelector"], steveAPITestLabel+"=true")
+			query["labelSelector"] = append(query["labelSelector"], steveAPITestLabel+"="+testID)
 			secretList, err := secretClient.List(query)
 			require.NoError(s.T(), err)
 
@@ -1780,6 +1783,7 @@ func formatJSON(obj *clientv1.SteveCollection) ([]byte, error) {
 		if next, ok := pagination["next"].(string); ok {
 			next = continueReg.ReplaceAllString(next, "${1}"+continueToken)
 			next = revisionReg.ReplaceAllString(next, "${1}"+revisionNum)
+			next = testLabelReg.ReplaceAllString(next, "${1}"+fakeTestID)
 			pagination["next"] = next
 			mapResp["pagination"] = pagination
 		}
@@ -1791,6 +1795,7 @@ func formatJSON(obj *clientv1.SteveCollection) ([]byte, error) {
 			delete(data[i].(map[string]interface{})["metadata"].(map[string]interface{}), "creationTimestamp")
 			delete(data[i].(map[string]interface{})["metadata"].(map[string]interface{}), "managedFields")
 			delete(data[i].(map[string]interface{})["metadata"].(map[string]interface{}), "uid")
+			data[i].(map[string]interface{})["metadata"].(map[string]interface{})["labels"].(map[string]interface{})[steveAPITestLabel] = fakeTestID
 			data[i].(map[string]interface{})["metadata"].(map[string]interface{})["resourceVersion"] = "1000"
 		}
 		mapResp["data"] = data
