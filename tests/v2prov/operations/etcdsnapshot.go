@@ -1,16 +1,36 @@
 package operations
 
 import (
+	"context"
+	"testing"
+
 	"github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/tests/v2prov/clients"
 	"github.com/rancher/rancher/tests/v2prov/cluster"
+	"github.com/stretchr/testify/assert"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/retry"
 )
 
-func CreateSnapshot(clients *clients.Clients, c *v1.Cluster) (*rkev1.ETCDSnapshot, error) {
+func RunLocalSnapshotCreateTest(t *testing.T, clients *clients.Clients, c *v1.Cluster, configMap corev1.ConfigMap) *rkev1.ETCDSnapshot {
+	clientset, err := GetAndVerifyDownstreamClientset(clients, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ns := corev1.NamespaceDefault
+
+	if configMap.Namespace != "" {
+		ns = configMap.Namespace
+	}
+	_, err = clientset.CoreV1().ConfigMaps(ns).Create(context.TODO(), &configMap, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	// Create an etcd snapshot
 	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		newC, err := clients.Provisioning.Cluster().Get(c.Namespace, c.Name, metav1.GetOptions{})
@@ -27,14 +47,14 @@ func CreateSnapshot(clients *clients.Clients, c *v1.Cluster) (*rkev1.ETCDSnapsho
 		c = newC
 		return nil
 	}); err != nil {
-		return nil, err
+		t.Fatal(err)
 	}
 
-	_, err := cluster.WaitForControlPlane(clients, c, "etcd snapshot creation", func(rkeControlPlane *rkev1.RKEControlPlane) (bool, error) {
+	_, err = cluster.WaitForControlPlane(clients, c, "etcd snapshot creation", func(rkeControlPlane *rkev1.RKEControlPlane) (bool, error) {
 		return rkeControlPlane.Status.ETCDSnapshotCreatePhase == rkev1.ETCDSnapshotPhaseFinished, nil
 	})
 	if err != nil {
-		return nil, err
+		t.Fatal(err)
 	}
 
 	var snapshot *rkev1.ETCDSnapshot
@@ -53,12 +73,27 @@ func CreateSnapshot(clients *clients.Clients, c *v1.Cluster) (*rkev1.ETCDSnapsho
 			snapshot = snapshots.Items[0].DeepCopy()
 			return nil
 		}); err != nil {
-		return nil, err
+		t.Fatal(err)
 	}
-	return snapshot, nil
+
+	assert.NotNil(t, snapshot)
+
+	err = clientset.CoreV1().ConfigMaps(ns).Delete(context.TODO(), configMap.Name, metav1.DeleteOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	newCM, expectedErr := clientset.CoreV1().ConfigMaps(ns).Get(context.TODO(), configMap.Name, metav1.GetOptions{})
+	if !apierrors.IsNotFound(expectedErr) {
+		t.Fatal(expectedErr)
+	}
+
+	// The client will return a configmap object but it will not have anything populated.
+	assert.Equal(t, "", newCM.Name)
+	return snapshot
 }
 
-func RestoreSnapshot(clients *clients.Clients, c *v1.Cluster, snapshotName string) error {
+func RunLocalSnapshotRestoreTest(t *testing.T, clients *clients.Clients, c *v1.Cluster, snapshotName string, expectedConfigMap corev1.ConfigMap) {
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		newC, err := clients.Provisioning.Cluster().Get(c.Namespace, c.Name, metav1.GetOptions{})
 		if err != nil {
@@ -77,16 +112,39 @@ func RestoreSnapshot(clients *clients.Clients, c *v1.Cluster, snapshotName strin
 		return nil
 	})
 	if err != nil {
-		return err
+		t.Fatal(err)
 	}
 
 	_, err = cluster.WaitForControlPlane(clients, c, "etcd snapshot restore", func(rkeControlPlane *rkev1.RKEControlPlane) (bool, error) {
 		return rkeControlPlane.Status.ETCDSnapshotRestorePhase == rkev1.ETCDSnapshotPhaseFinished, nil
 	})
 	if err != nil {
-		return err
+		t.Fatal(err)
 	}
 
 	_, err = cluster.WaitForCreate(clients, c)
-	return err
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	clientset, err := GetAndVerifyDownstreamClientset(clients, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ns := corev1.NamespaceDefault
+
+	if expectedConfigMap.Namespace != "" {
+		ns = expectedConfigMap.Namespace
+	}
+
+	// Check for the configmap!
+	retrievedConfigMap, err := clientset.CoreV1().ConfigMaps(ns).Get(context.TODO(), expectedConfigMap.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, expectedConfigMap.Name, retrievedConfigMap.Name)
+	assert.Equal(t, expectedConfigMap.Data, retrievedConfigMap.Data)
+
 }

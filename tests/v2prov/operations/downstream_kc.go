@@ -16,7 +16,7 @@ import (
 	"k8s.io/client-go/util/retry"
 )
 
-func GetDownstreamClientset(clients *clients.Clients, c *v1.Cluster) (*kubernetes.Clientset, error) {
+func getDownstreamClientset(clients *clients.Clients, c *v1.Cluster) (*kubernetes.Clientset, error) {
 	wContext, err := wrangler.NewContext(context.TODO(), clients.ClientConfig, clients.RESTConfig)
 	if err != nil {
 		return nil, err
@@ -38,7 +38,7 @@ func GetDownstreamClientset(clients *clients.Clients, c *v1.Cluster) (*kubernete
 }
 
 func GetAndVerifyDownstreamClientset(clients *clients.Clients, c *v1.Cluster) (*kubernetes.Clientset, error) {
-	clientset, err := GetDownstreamClientset(clients, c)
+	clientset, err := getDownstreamClientset(clients, c)
 	if err != nil {
 		return nil, err
 	}

@@ -1,7 +1,6 @@
 package custom
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -18,7 +17,6 @@ import (
 	"github.com/rancher/wrangler/pkg/name"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -27,7 +25,6 @@ import (
 // It then creates a new controlplane+etcd node and restores from local snapshot file. This validates that it is possible to restore
 // a snapshot on a completely new etcd node from file (without a corresponding snapshot file)
 func Test_Operation_Custom_EtcdSnapshotOperationsOnNewCombinedNode(t *testing.T) {
-	configmapName := "my-configmap-" + name.Hex(time.Now().String(), 10)
 	clients, err := clients.New()
 	if err != nil {
 		t.Fatal(err)
@@ -67,7 +64,6 @@ func Test_Operation_Custom_EtcdSnapshotOperationsOnNewCombinedNode(t *testing.T)
 		fmt.Sprintf("%s:/var/lib/rancher/%s/server/db/snapshots", tmpDir, capr.GetRuntime(c.Spec.KubernetesVersion)),
 	}
 
-	// Taint the etcd node so that we don't have important (namely coredns) workloads running on the node that we are deleting
 	var etcdNode *corev1.Pod
 	etcdNode, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --controlplane --etcd", map[string]string{"custom-cluster-name": c.Name}, etcdSnapshotDir)
 	if err != nil {
@@ -79,41 +75,17 @@ func Test_Operation_Custom_EtcdSnapshotOperationsOnNewCombinedNode(t *testing.T)
 		t.Fatal(err)
 	}
 
-	clientset, err := operations.GetDownstreamClientset(clients, c)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Create a configmap called "myspecialconfigmap" that we will delete after taking a snapshot.
-	_, err = clientset.CoreV1().ConfigMaps("default").Create(context.TODO(), &corev1.ConfigMap{
+	cm := corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: configmapName,
+			Name: "my-configmap-" + name.Hex(time.Now().String(), 10),
 		},
 		Data: map[string]string{
 			"test": "wow",
 		},
-	}, metav1.CreateOptions{})
-	if err != nil {
-		t.Fatal(err)
 	}
 
-	snapshot, err := operations.CreateSnapshot(clients, c)
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	snapshot := operations.RunLocalSnapshotCreateTest(t, clients, c, cm)
 	assert.NotNil(t, snapshot)
-
-	err = clientset.CoreV1().ConfigMaps(corev1.NamespaceDefault).Delete(context.TODO(), configmapName, metav1.DeleteOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Verify that the configmap no longer exists
-	configMap, expectedErr := clientset.CoreV1().ConfigMaps(corev1.NamespaceDefault).Get(context.TODO(), configmapName, metav1.GetOptions{})
-	if !apierrors.IsNotFound(expectedErr) {
-		t.Fatal(expectedErr)
-	}
 
 	err = clients.Core.Pod().Delete(etcdNode.Namespace, etcdNode.Name, &metav1.DeleteOptions{PropagationPolicy: &[]metav1.DeletionPropagation{metav1.DeletePropagationForeground}[0]})
 	if err != nil {
@@ -146,16 +118,5 @@ func Test_Operation_Custom_EtcdSnapshotOperationsOnNewCombinedNode(t *testing.T)
 		return strings.Contains(capr.Ready.GetMessage(&rkeControlPlane.Status), "rkecontrolplane was already initialized but no etcd machines exist that have plans, indicating the etcd plane has been entirely replaced. Restoration from etcd snapshot is required."), nil
 	})
 
-	err = operations.RestoreSnapshot(clients, c, snapshot.SnapshotFile.Name)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Check for the configmap!
-	configMap, err = clientset.CoreV1().ConfigMaps(corev1.NamespaceDefault).Get(context.TODO(), configmapName, metav1.GetOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	assert.NotNil(t, configMap)
+	operations.RunLocalSnapshotRestoreTest(t, clients, c, snapshot.SnapshotFile.Name, cm)
 }
