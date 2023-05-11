@@ -10,17 +10,17 @@ import (
 	"strings"
 	"time"
 
-	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	provisioningv1api "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/controllers/capr/machineprovision"
-	"github.com/rancher/rancher/tests/integration/pkg/clients"
-	"github.com/rancher/rancher/tests/integration/pkg/defaults"
-	"github.com/rancher/rancher/tests/integration/pkg/namespace"
-	"github.com/rancher/rancher/tests/integration/pkg/nodeconfig"
-	"github.com/rancher/rancher/tests/integration/pkg/registry"
-	"github.com/rancher/rancher/tests/integration/pkg/wait"
+	"github.com/rancher/rancher/tests/v2prov/clients"
+	"github.com/rancher/rancher/tests/v2prov/defaults"
+	"github.com/rancher/rancher/tests/v2prov/namespace"
+	"github.com/rancher/rancher/tests/v2prov/nodeconfig"
+	"github.com/rancher/rancher/tests/v2prov/registry"
+	"github.com/rancher/rancher/tests/v2prov/wait"
 	"github.com/rancher/wrangler/pkg/condition"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
@@ -300,6 +300,7 @@ func CustomCommand(clients *clients.Clients, c *provisioningv1api.Cluster) (stri
 	return "", fmt.Errorf("timeout getting custom command")
 }
 
+// getPodLogs gathers the logs from the specified pod in a manner similar to `kubectl logs`
 func getPodLogs(clients *clients.Clients, podNamespace, podName string) (string, error) {
 	plr := clients.K8s.CoreV1().Pods(podNamespace).GetLogs(podName, &corev1.PodLogOptions{})
 	stream, err := plr.Stream(context.TODO())
@@ -347,6 +348,7 @@ func getPodFileContents(podNamespace, podName, podPath string) (string, error) {
 	return capr.CompressInterface(logs)
 }
 
+// gatherDebugData gathers debug data that is relevant to the current cluster and returns a gzip compressed + base64 encoded string of the json.
 func gatherDebugData(clients *clients.Clients, c *provisioningv1api.Cluster) (string, error) {
 	newC, newErr := clients.Provisioning.Cluster().Get(c.Namespace, c.Name, metav1.GetOptions{})
 	if newErr != nil {
@@ -472,6 +474,7 @@ func gatherDebugData(clients *clients.Clients, c *provisioningv1api.Cluster) (st
 	})
 }
 
+// populatePodLogs creates a map[string]string of logs that correspond to the pod in question. If the pod is an RKE2 pod, it also collects the kubelet logs from the pod filesystem.
 func populatePodLogs(clients *clients.Clients, runtime, podNamespace, podName string) map[string]string {
 	var logMap = make(map[string]string)
 

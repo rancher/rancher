@@ -3,14 +3,14 @@ package nodeconfig
 import (
 	"encoding/json"
 
-	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/tests/integration/pkg/clients"
-	"github.com/rancher/rancher/tests/integration/pkg/defaults"
-	"github.com/rancher/rancher/tests/integration/pkg/wait"
+	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/tests/v2prov/clients"
+	"github.com/rancher/rancher/tests/v2prov/defaults"
+	"github.com/rancher/rancher/tests/v2prov/wait"
 	"github.com/rancher/wrangler/pkg/condition"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -83,7 +83,7 @@ func NewPodConfig(clients *clients.Clients, namespace string) (*corev1.ObjectRef
 	// normally cause systemd to hang waiting for the unit to activate. Eventually, when
 	// https://github.com/rancher/rke2/issues/3240 is resolved, we should be able to roll back this workaround. If the
 	// linked github issue is resolved, we should roll back this change here as well as in
-	// tests/integration/pkg/systemdnode.
+	// v2prov/systemdnode.
 	podConfig.Object["userdata"] = `#cloud-config
 write_files:
 - content: |
