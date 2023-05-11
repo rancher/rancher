@@ -32,8 +32,11 @@ const (
 	OKTAName       = "okta"
 )
 
+// An ErrorNotConfigured indicates that the requested LDAP operation
+// failed due to missing or incomplete configuration.
 type ErrorNotConfigured struct{}
 
+// Error provides a string representation of an ErrorNotConfigured
 func (e ErrorNotConfigured) Error() string {
 	return "not configured"
 }
@@ -90,6 +93,7 @@ func GetLDAPConfig(authProvider common.AuthProvider) (*v3.LdapConfig, *x509.Cert
 	return ldapProvider.getLDAPConfig()
 }
 
+// IsNotConfigured checks whether this error indicates a missing LDAP configuration.
 func IsNotConfigured(err error) bool {
 	return errors.Is(err, ErrorNotConfigured{})
 }
