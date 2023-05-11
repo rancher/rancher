@@ -430,10 +430,18 @@ func (p *Planner) encryptionKeyRotationRestartService(cp *rkev1.RKEControlPlane,
 		Path:    encryptionKeyRotationScriptPath(cp, encryptionKeyRotationWaitForSystemctlStatusPath),
 	})
 
-	nodePlan.Instructions = []plan.OneTimeInstruction{
-		encryptionKeyRotationRestartInstruction(cp),
-		encryptionKeyRotationWaitForSystemctlStatusInstruction(cp),
+	nodePlan.Instructions = []plan.OneTimeInstruction{}
+
+	runtime := capr.GetRuntime(cp.Spec.KubernetesVersion)
+	if runtime == capr.RuntimeRKE2 {
+		if generated, instruction := generateManifestRemovalInstruction(runtime, entry); generated {
+			nodePlan.Instructions = append(nodePlan.Instructions, instruction)
+		}
 	}
+
+	nodePlan.Instructions = append(nodePlan.Instructions,
+		encryptionKeyRotationRestartInstruction(cp),
+		encryptionKeyRotationWaitForSystemctlStatusInstruction(cp))
 
 	if isControlPlane(entry) {
 		nodePlan.Files = append(nodePlan.Files,

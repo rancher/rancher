@@ -214,6 +214,11 @@ func (p *Planner) rotateCertificatesPlan(controlPlane *rkev1.RKEControlPlane, to
 			}
 		}
 	}
+	if runtime == capr.RuntimeRKE2 {
+		if generated, instruction := generateManifestRemovalInstruction(runtime, entry); generated {
+			rotatePlan.Instructions = append(rotatePlan.Instructions, instruction)
+		}
+	}
 	rotatePlan.Instructions = append(rotatePlan.Instructions, plan.OneTimeInstruction{
 		Name:    "restart",
 		Command: "systemctl",
