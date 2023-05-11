@@ -91,6 +91,13 @@ run_rancher()
     done
 }
 
+tail_slow_starting_rancher()
+{
+    sleep 300
+    echo 'Rancher has not deployed webhook after 5m tailing logs'
+    tail -f "/tmp/rancher.log"
+}
+
 # uncomment to get startup logs. Don't leave them on because it slows drone down too
 # much
 #tail -F /tmp/rancher.log &
@@ -108,11 +115,26 @@ echo Sleeping for 5 seconds before checking Rancher health
 sleep 5
 
 while ! curl -sf http://localhost:8080/ping; do
-    sleep 2
+    sleep 5
 done
-while ! kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -w -n cattle-system deploy/rancher-webhook; do
-    sleep 2
+
+# Tail the rancher logs if rancher fails to deploy the webhook after 5 minutes.
+tail_slow_starting_rancher &
+# Get PID of the tail command so we can kill it if needed using pgrep over $! since there are other async commands being run
+TAIL_PID=$!
+
+# Wait for Rancher to deploy rancher-webhook.
+while ! kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -w -n cattle-system deploy/rancher-webhook >/dev/null 2>&1; do
+    echo "Waiting for rancher to deploy rancher-webhook..."
+    sleep 5
 done
+
+# After rancher deploys webhook kill the bash command running tail.
+kill ${TAIL_PID}
+KILL_PID=$!
+# Dump the terminated message from the above kill command.
+wait ${KILL_PID} 2>/dev/null
+
 #kill $TPID
 
 echo Running provisioning-tests
