@@ -8,7 +8,7 @@ ENV CATTLE_K3S_VERSION v1.24.8+k3s1
 # version used by helm plugin install script
 ENV CATTLE_HELM_UNITTEST_VERSION v0.1.7-rancher4
 # helm 3 version
-ENV HELM_VERSION v3.11.3
+ENV HELM_VERSION v3.12.0
 ENV KUSTOMIZE_VERSION v5.0.1
 # k3d ci version
 ENV K3D_VERSION v5.4.6
