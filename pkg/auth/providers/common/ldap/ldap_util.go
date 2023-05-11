@@ -136,7 +136,8 @@ func GetUserSearchAttributes(memberOfAttribute, ObjectClass string, config *v32.
 		config.UserObjectClass,
 		config.UserLoginAttribute,
 		config.UserNameAttribute,
-		config.UserEnabledAttribute}
+		config.UserEnabledAttribute,
+		"objectGUID"}
 	return userSearchAttributes
 }
 
@@ -187,7 +188,7 @@ func AuthenticateServiceAccountUser(serviceAccountPassword string, serviceAccoun
 	return nil
 }
 
-func AttributesToPrincipal(attribs []*ldapv3.EntryAttribute, dnStr, scope, providerName, userObjectClass, userNameAttribute, userLoginAttribute, groupObjectClass, groupNameAttribute string) (*v3.Principal, error) {
+func AttributesToPrincipal(attribs []*ldapv3.EntryAttribute, dnStr, scope, providerName, userObjectClass, userNameAttribute, userLoginAttribute, groupObjectClass, groupNameAttribute, objectGUID string) (*v3.Principal, error) {
 	var externalIDType, accountName, externalID, login, kind string
 	externalID = dnStr
 	externalIDType = scope
@@ -234,8 +235,15 @@ func AttributesToPrincipal(attribs []*ldapv3.EntryAttribute, dnStr, scope, provi
 		return nil, fmt.Errorf("Failed to get attributes for %s", dnStr)
 	}
 
+	var metaName string
+	if kind == "group" || objectGUID == "" {
+		metaName = externalIDType + "://" + dnStr
+	} else {
+		metaName = externalIDType + "://" + objectGUID
+	}
+
 	principal := &v3.Principal{
-		ObjectMeta:    metav1.ObjectMeta{Name: externalIDType + "://" + externalID},
+		ObjectMeta:    metav1.ObjectMeta{Name: metaName},
 		DisplayName:   accountName,
 		LoginName:     login,
 		PrincipalType: kind,
@@ -267,7 +275,7 @@ func GatherParentGroups(groupPrincipal v3.Principal, searchDomain string, groupS
 
 	for i := 0; i < len(resultGroups.Entries); i++ {
 		entry := resultGroups.Entries[i]
-		principal, err := AttributesToPrincipal(entry.Attributes, entry.DN, groupScope, config.ProviderName, config.UserObjectClass, config.UserNameAttribute, config.UserLoginAttribute, config.GroupObjectClass, config.GroupNameAttribute)
+		principal, err := AttributesToPrincipal(entry.Attributes, entry.DN, groupScope, config.ProviderName, config.UserObjectClass, config.UserNameAttribute, config.UserLoginAttribute, config.GroupObjectClass, config.GroupNameAttribute, "")
 		if err != nil {
 			logrus.Errorf("Error translating group result: %v", err)
 			continue
