@@ -284,42 +284,10 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlan
 
 		// Collect all nodes that are etcd and deleting. At this point, if we have any etcd nodes left in the cluster,
 		// they will be deleting, so force delete them to prevent quorum loss.
-		etcdDeleting := collect(plan, roleAnd(isEtcd, isDeleting))
-		for _, deletingEtcdNode := range etcdDeleting {
-			if deletingEtcdNode.Machine == nil {
-				logrus.Warnf("[planner] rkecluster %s/%s: did not find CAPI machine for entry when deleting etcd nodes", cp.Namespace, cp.Name)
-				continue
-			}
-			if deletingEtcdNode.Machine.Spec.Bootstrap.ConfigRef == nil {
-				logrus.Warnf("[planner] rkecluster %s/%s: did not find a corresponding CAPI machine for %s/%s", cp.Namespace, cp.Name, deletingEtcdNode.Machine.Namespace, deletingEtcdNode.Machine.Name)
-				continue
-			}
-			if !strings.Contains(deletingEtcdNode.Machine.Spec.Bootstrap.ConfigRef.APIVersion, "rke.cattle.io") {
-				logrus.Warnf("[planner] rkecluster %s/%s: CAPI machine %s/%s had a bootstrap ref with an unexpected API version: %s", cp.Namespace, cp.Name, deletingEtcdNode.Machine.Namespace, deletingEtcdNode.Machine.Name, deletingEtcdNode.Machine.Spec.Bootstrap.ConfigRef.APIVersion)
-				continue
-			}
-			logrus.Infof("[planner] rkecluster %s/%s: force deleting etcd machine %s/%s as cluster was not sane and machine was deleting", cp.Namespace, cp.Name, deletingEtcdNode.Machine.Namespace, deletingEtcdNode.Machine.Name)
-			// Update the CAPI machine annotation for exclude node draining and set it to true to get the CAPI controllers to not try to drain this node.
-			deletingEtcdNode.Machine.Annotations[capi.ExcludeNodeDrainingAnnotation] = "true"
-			deletingEtcdNode.Machine, err = p.machines.Update(deletingEtcdNode.Machine)
-			if err != nil {
-				// If we get an error here, go ahead and return the error as this will re-enqueue and we can try again.
-				return status, err
-			}
-			rb, err := p.rkeBootstrapCache.Get(deletingEtcdNode.Machine.Spec.Bootstrap.ConfigRef.Namespace, deletingEtcdNode.Machine.Spec.Bootstrap.ConfigRef.Name)
-			if err != nil {
-				return status, err
-			}
-			rb = rb.DeepCopy()
-			// Annotate the rkebootstrap with a "force remove" annotation. This will short-circuit the "safe etcd removal"
-			// logic because at this point we are completely taking the cluster down.
-			rb.Annotations[capr.ForceRemoveEtcdAnnotation] = "true"
-			_, err = p.rkeBootstrap.Update(rb)
-			if err != nil {
-				return status, err
-			}
-		}
-		if len(etcdDeleting) != 0 {
+		etcdDeleting, err := p.forceDeleteAllDeletingEtcdMachines(cp, plan)
+		if err != nil {
+			return status, err
+		} else if etcdDeleting != 0 {
 			return status, errWaiting("waiting for all etcd machines to be deleted")
 		}
 		return status, errWaiting("waiting for at least one control plane, etcd, and worker node to be registered")

@@ -13,6 +13,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
 const (
@@ -140,16 +141,6 @@ func (p *Planner) runEtcdSnapshotPostRestoreCleanupPlan(controlPlane *rkev1.RKEC
 	firstControlPlanePlan.Files = append(firstControlPlanePlan.Files, cleanupScriptFile)
 	firstControlPlanePlan.Instructions = append(firstControlPlanePlan.Instructions, cleanupInstructions...)
 	return assignAndCheckPlan(p.store, ETCDRestoreMessage, controlPlaneEntry, firstControlPlanePlan, joinedServer, 5, 5)
-}
-
-// appendFile appends the file `new` to the `existing` slice if it is not found in the slice
-func appendFile(existing []plan.File, new plan.File) []plan.File {
-	for _, f := range existing {
-		if f == new {
-			return existing
-		}
-	}
-	return append(existing, new)
 }
 
 // generateEtcdSnapshotRestorePlan returns a node plan that contains instructions to stop etcd, remove the tombstone file (if one exists), then restore etcd in that order.
@@ -408,6 +399,13 @@ func (p *Planner) runEtcdRestoreServiceStop(controlPlane *rkev1.RKEControlPlane,
 		return err
 	}
 
+	deletingEtcdNodes, err := p.forceDeleteAllDeletingEtcdMachines(controlPlane, clusterPlan)
+	if err != nil {
+		return err
+	} else if deletingEtcdNodes != 0 {
+		return errWaitingf("waiting for %d etcd machines to delete", deletingEtcdNodes)
+	}
+
 	servers := collect(clusterPlan, anyRoleWithoutWindows)
 	updated := false
 	for _, server := range servers {
@@ -455,40 +453,6 @@ func (p *Planner) runEtcdRestoreServiceStop(controlPlane *rkev1.RKEControlPlane,
 	return nil
 }
 
-// runEtcdSnapshotManagementServiceStart walks through the reconciliation process for the controlplane and etcd nodes.
-// Notably, this function will blatantly ignore drain and concurrency options, as during an etcd snapshot operation, there is no necessity to drain nodes.
-func (p *Planner) runEtcdSnapshotManagementServiceStart(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, clusterPlan *plan.Plan, include roleFilter, operation string) error {
-	// Generate and deliver desired plan for the bootstrap/init node first.
-	if err := p.reconcile(controlPlane, tokensSecret, clusterPlan, true, bootstrapTier, isEtcd, isNotInitNodeOrIsDeleting,
-		"1", "",
-		controlPlane.Spec.UpgradeStrategy.ControlPlaneDrainOptions); err != nil {
-		return err
-	}
-
-	_, joinServer, _, err := p.findInitNode(controlPlane, clusterPlan)
-	if err != nil {
-		return err
-	}
-
-	if joinServer == "" {
-		return fmt.Errorf("error encountered restarting cluster during %s, joinServer was empty", operation)
-	}
-
-	for _, entry := range collect(clusterPlan, include) {
-		if isInitNodeOrDeleting(entry) {
-			continue
-		}
-		plan, joinedServer, err := p.desiredPlan(controlPlane, tokensSecret, entry, joinServer)
-		if err != nil {
-			return err
-		}
-		if err = assignAndCheckPlan(p.store, fmt.Sprintf("%s management plane restart", operation), entry, plan, joinedServer, 1, -1); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 // retrieveEtcdSnapshot attempts to retrieve the etcdsnapshot CR that corresponds to the etcd snapshot restore name specified on the controlplane.
 func (p *Planner) retrieveEtcdSnapshot(controlPlane *rkev1.RKEControlPlane) (*rkev1.ETCDSnapshot, error) {
 	if controlPlane == nil {
@@ -505,6 +469,48 @@ func (p *Planner) retrieveEtcdSnapshot(controlPlane *rkev1.RKEControlPlane) (*rk
 		return nil, nil
 	}
 	return snapshot, err
+}
+
+// forceDeleteAllDeletingEtcdMachines collects the etcd machines that are deleting for the given plan and force-deletes them.
+// This is helpful for the case where an etcd restore operation is happening on a cluster with "stuck" deleting etcd machines (quorum loss).
+func (p *Planner) forceDeleteAllDeletingEtcdMachines(cp *rkev1.RKEControlPlane, plan *plan.Plan) (int, error) {
+	etcdDeleting := collect(plan, roleAnd(isEtcd, isDeleting))
+	for _, deletingEtcdNode := range etcdDeleting {
+		if deletingEtcdNode.Machine == nil {
+			logrus.Warnf("[planner] rkecluster %s/%s: did not find CAPI machine for entry when deleting etcd nodes", cp.Namespace, cp.Name)
+			continue
+		}
+		if deletingEtcdNode.Machine.Spec.Bootstrap.ConfigRef == nil {
+			logrus.Warnf("[planner] rkecluster %s/%s: did not find a corresponding CAPI machine for %s/%s", cp.Namespace, cp.Name, deletingEtcdNode.Machine.Namespace, deletingEtcdNode.Machine.Name)
+			continue
+		}
+		if !strings.Contains(deletingEtcdNode.Machine.Spec.Bootstrap.ConfigRef.APIVersion, "rke.cattle.io") {
+			logrus.Warnf("[planner] rkecluster %s/%s: CAPI machine %s/%s had a bootstrap ref with an unexpected API version: %s", cp.Namespace, cp.Name, deletingEtcdNode.Machine.Namespace, deletingEtcdNode.Machine.Name, deletingEtcdNode.Machine.Spec.Bootstrap.ConfigRef.APIVersion)
+			continue
+		}
+		logrus.Infof("[planner] rkecluster %s/%s: force deleting etcd machine %s/%s as cluster was not sane and machine was deleting", cp.Namespace, cp.Name, deletingEtcdNode.Machine.Namespace, deletingEtcdNode.Machine.Name)
+		// Update the CAPI machine annotation for exclude node draining and set it to true to get the CAPI controllers to not try to drain this node.
+		deletingEtcdNode.Machine.Annotations[capi.ExcludeNodeDrainingAnnotation] = "true"
+		var err error
+		deletingEtcdNode.Machine, err = p.machines.Update(deletingEtcdNode.Machine)
+		if err != nil {
+			// If we get an error here, go ahead and return the error as this will re-enqueue and we can try again.
+			return -1, err
+		}
+		rb, err := p.rkeBootstrapCache.Get(deletingEtcdNode.Machine.Spec.Bootstrap.ConfigRef.Namespace, deletingEtcdNode.Machine.Spec.Bootstrap.ConfigRef.Name)
+		if err != nil {
+			return -1, err
+		}
+		rb = rb.DeepCopy()
+		// Annotate the rkebootstrap with a "force remove" annotation. This will short-circuit the "safe etcd removal"
+		// logic because at this point we are completely taking the cluster down.
+		rb.Annotations[capr.ForceRemoveEtcdAnnotation] = "true"
+		_, err = p.rkeBootstrap.Update(rb)
+		if err != nil {
+			return -1, err
+		}
+	}
+	return len(etcdDeleting), nil
 }
 
 // restoreEtcdSnapshot is called multiple times during an etcd snapshot restoration.
