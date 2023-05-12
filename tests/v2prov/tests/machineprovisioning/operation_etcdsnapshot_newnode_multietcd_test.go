@@ -1,6 +1,8 @@
 package machineprovisioning
 
 import (
+	"github.com/rancher/rancher/pkg/capr"
+	"strings"
 	"testing"
 	"time"
 
@@ -91,32 +93,23 @@ func Test_Operation_MP_EtcdSnapshotOperationsWithThreeEtcdNodesOnNewNode(t *test
 
 	snapshot := operations.RunSnapshotCreateTest(t, clients, c, cm, "s3")
 	assert.NotNil(t, snapshot)
-	// Scale controlplane/etcd nodes to 2
-	c, err = operations.Scale(clients, c, 0, 2)
-	if err != nil {
-		t.Fatal(err)
-	}
-	// Scale controlplane/etcd nodes to 1
-	c, err = operations.Scale(clients, c, 0, 1)
-	if err != nil {
-		t.Fatal(err)
-	}
 	// Scale controlplane/etcd nodes to 0
 	c, err = operations.Scale(clients, c, 0, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
+	_, err = cluster.WaitForControlPlane(clients, c, "rkecontrolplane ready condition indicating insane cluster", func(rkeControlPlane *rkev1.RKEControlPlane) (bool, error) {
+		return strings.Contains(capr.Ready.GetMessage(&rkeControlPlane.Status), "waiting for at least one control plane, etcd, and worker node to be registered"), nil
+	})
 	// Scale etcd nodes to 1
 	c, err = operations.Scale(clients, c, 0, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
+	_, err = cluster.WaitForControlPlane(clients, c, "rkecontrolplane ready condition indicating restoration required", func(rkeControlPlane *rkev1.RKEControlPlane) (bool, error) {
+		return strings.Contains(capr.Ready.GetMessage(&rkeControlPlane.Status), "rkecontrolplane was already initialized but no etcd machines exist that have plans, indicating the etcd plane has been entirely replaced. Restoration from etcd snapshot is required."), nil
+	})
 	operations.RunSnapshotRestoreTest(t, clients, c, snapshot.Name, cm)
-	// Scale etcd nodes to 3
-	c, err = operations.Scale(clients, c, 0, 3)
-	if err != nil {
-		t.Fatal(err)
-	}
 	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
 	assert.NoError(t, err)
 }
