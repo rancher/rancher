@@ -84,6 +84,7 @@ func NewPodConfig(clients *clients.Clients, namespace string) (*corev1.ObjectRef
 	// https://github.com/rancher/rke2/issues/3240 is resolved, we should be able to roll back this workaround. If the
 	// linked github issue is resolved, we should roll back this change here as well as in
 	// v2prov/systemdnode.
+	// We have to set invocation disabling on the rancher-system-agent because it runs rke2/k3s server on restore and this has cgroup issues
 	podConfig.Object["userdata"] = `#cloud-config
 write_files:
 - content: |
@@ -117,7 +118,11 @@ write_files:
 - content: |
     NOTIFY_SOCKET=
     INVOCATION_ID=
-  path: /etc/default/k3s-agent`
+  path: /etc/default/k3s-agent
+- content: |
+    NOTIFY_SOCKET=
+    INVOCATION_ID=
+  path: /etc/default/rancher-system-agent`
 
 	podConfigClient := clients.Dynamic.Resource(schema.GroupVersionResource{
 		Group:    "rke-machine-config.cattle.io",

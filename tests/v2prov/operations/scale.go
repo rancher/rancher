@@ -14,7 +14,7 @@ func Scale(clients *clients.Clients, c *v1.Cluster, index int, quantity int32) (
 		if err != nil {
 			return err
 		}
-		c.Spec.RKEConfig.MachinePools[index].Quantity = &quantity
+		newC.Spec.RKEConfig.MachinePools[index].Quantity = &quantity
 		newC, err = clients.Provisioning.Cluster().Update(newC)
 		if err != nil {
 			return err

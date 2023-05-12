@@ -97,6 +97,8 @@ func Test_Provisioning_MP_SingleNodeAllRolesWithDelete(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
+	assert.NoError(t, err)
 }
 
 func Test_Provisioning_MP_MachineTemplateClonedAnnotations(t *testing.T) {
@@ -159,6 +161,8 @@ func Test_Provisioning_MP_MachineTemplateClonedAnnotations(t *testing.T) {
 		assert.Equal(t, machineTemplate.GetAnnotations()[capr.MachineTemplateClonedFromKindAnn], c.Spec.RKEConfig.MachinePools[0].NodeConfig.Kind)
 		assert.Equal(t, machineTemplate.GetAnnotations()[capr.MachineTemplateClonedFromNameAnn], c.Spec.RKEConfig.MachinePools[0].NodeConfig.Name)
 	}
+	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
+	assert.NoError(t, err)
 }
 
 func Test_Provisioning_MP_MachineSetDeletePolicyOldestSet(t *testing.T) {
@@ -228,6 +232,8 @@ func Test_Provisioning_MP_MachineSetDeletePolicyOldestSet(t *testing.T) {
 
 		assert.Equal(t, string(capi.OldestMachineSetDeletePolicy), d.String("Object", "spec", "deletePolicy"))
 	}
+	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
+	assert.NoError(t, err)
 }
 
 func Test_Provisioning_MP_ThreeNodesAllRolesScaledToOneThenDelete(t *testing.T) {
@@ -280,6 +286,8 @@ func Test_Provisioning_MP_ThreeNodesAllRolesScaledToOneThenDelete(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
+	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
+	assert.NoError(t, err)
 }
 
 func Test_Provisioning_MP_FiveNodesUniqueRolesWithDelete(t *testing.T) {
@@ -335,6 +343,8 @@ func Test_Provisioning_MP_FiveNodesUniqueRolesWithDelete(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
+	assert.NoError(t, err)
 }
 
 func Test_Provisioning_MP_FourNodesServerAndWorkerRolesWithDelete(t *testing.T) {
@@ -388,6 +398,8 @@ func Test_Provisioning_MP_FourNodesServerAndWorkerRolesWithDelete(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
+	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
+	assert.NoError(t, err)
 }
 
 func Test_Provisioning_MP_Drain(t *testing.T) {
@@ -528,6 +540,8 @@ func Test_Provisioning_MP_Drain(t *testing.T) {
 	}
 
 	assert.Equal(t, int32(2), atomic.LoadInt32(&doneHooks))
+	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
+	assert.NoError(t, err)
 }
 
 func Test_Provisioning_MP_DrainNoDelete(t *testing.T) {
@@ -582,4 +596,6 @@ func Test_Provisioning_MP_DrainNoDelete(t *testing.T) {
 
 	_, ok = machines.Items[1].Annotations[capi.ExcludeNodeDrainingAnnotation]
 	assert.False(t, ok)
+	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
+	assert.NoError(t, err)
 }

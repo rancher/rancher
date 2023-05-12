@@ -2,6 +2,7 @@ package operations
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
@@ -15,7 +16,7 @@ import (
 	"k8s.io/client-go/util/retry"
 )
 
-func RunLocalSnapshotCreateTest(t *testing.T, clients *clients.Clients, c *v1.Cluster, configMap corev1.ConfigMap) *rkev1.ETCDSnapshot {
+func RunSnapshotCreateTest(t *testing.T, clients *clients.Clients, c *v1.Cluster, configMap corev1.ConfigMap, targetNode string) *rkev1.ETCDSnapshot {
 	clientset, err := GetAndVerifyDownstreamClientset(clients, c)
 	if err != nil {
 		t.Fatal(err)
@@ -70,8 +71,13 @@ func RunLocalSnapshotCreateTest(t *testing.T, clients *clients.Clients, c *v1.Cl
 			if err != nil || len(snapshots.Items) == 0 {
 				return err
 			}
-			snapshot = snapshots.Items[0].DeepCopy()
-			return nil
+			for _, s := range snapshots.Items {
+				if s.SnapshotFile.NodeName == targetNode {
+					snapshot = s.DeepCopy()
+					return nil
+				}
+			}
+			return fmt.Errorf("snapshot of target was not found")
 		}); err != nil {
 		t.Fatal(err)
 	}
@@ -93,7 +99,7 @@ func RunLocalSnapshotCreateTest(t *testing.T, clients *clients.Clients, c *v1.Cl
 	return snapshot
 }
 
-func RunLocalSnapshotRestoreTest(t *testing.T, clients *clients.Clients, c *v1.Cluster, snapshotName string, expectedConfigMap corev1.ConfigMap) {
+func RunSnapshotRestoreTest(t *testing.T, clients *clients.Clients, c *v1.Cluster, snapshotName string, expectedConfigMap corev1.ConfigMap) {
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		newC, err := clients.Provisioning.Cluster().Get(c.Namespace, c.Name, metav1.GetOptions{})
 		if err != nil {
@@ -146,5 +152,4 @@ func RunLocalSnapshotRestoreTest(t *testing.T, clients *clients.Clients, c *v1.C
 
 	assert.Equal(t, expectedConfigMap.Name, retrievedConfigMap.Name)
 	assert.Equal(t, expectedConfigMap.Data, retrievedConfigMap.Data)
-
 }

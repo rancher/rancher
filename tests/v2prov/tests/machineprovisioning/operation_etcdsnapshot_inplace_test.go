@@ -1,15 +1,19 @@
 package machineprovisioning
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
 	provisioningv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/tests/v2prov/clients"
 	"github.com/rancher/rancher/tests/v2prov/cluster"
 	"github.com/rancher/rancher/tests/v2prov/defaults"
 	"github.com/rancher/rancher/tests/v2prov/operations"
 	"github.com/rancher/wrangler/pkg/name"
+	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -32,6 +36,11 @@ func Test_Operation_MP_EtcdSnapshotCreationRestoreInPlace(t *testing.T) {
 						ControlPlaneRole: true,
 						WorkerRole:       true,
 						Quantity:         &defaults.One,
+						RKECommonNodeConfig: rkev1.RKECommonNodeConfig{
+							Labels: map[string]string{
+								"node-type": "etcd",
+							},
+						},
 					},
 					{
 						EtcdRole: true,
@@ -50,6 +59,17 @@ func Test_Operation_MP_EtcdSnapshotCreationRestoreInPlace(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	machines, err := clients.CAPI.Machine().List(c.Namespace, metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", capr.EtcdRoleLabel, "true")})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(machines.Items) != 1 {
+		t.Fatal(fmt.Errorf("length of etcd machines is not 1"))
+	}
+
+	assert.NotNil(t, machines.Items[0].Status.NodeRef)
+
 	cm := corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "my-configmap-" + name.Hex(time.Now().String(), 10),
@@ -59,6 +79,8 @@ func Test_Operation_MP_EtcdSnapshotCreationRestoreInPlace(t *testing.T) {
 		},
 	}
 
-	snapshot := operations.RunLocalSnapshotCreateTest(t, clients, c, cm)
-	operations.RunLocalSnapshotRestoreTest(t, clients, c, snapshot.Name, cm)
+	snapshot := operations.RunSnapshotCreateTest(t, clients, c, cm, machines.Items[0].Status.NodeRef.Name)
+	operations.RunSnapshotRestoreTest(t, clients, c, snapshot.Name, cm)
+	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
+	assert.NoError(t, err)
 }

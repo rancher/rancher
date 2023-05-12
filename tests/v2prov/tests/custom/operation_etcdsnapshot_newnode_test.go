@@ -65,7 +65,7 @@ func Test_Operation_Custom_EtcdSnapshotOperationsOnNewNode(t *testing.T) {
 	}
 
 	var etcdNode *corev1.Pod
-	etcdNode, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --etcd", map[string]string{"custom-cluster-name": c.Name}, etcdSnapshotDir)
+	etcdNode, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --etcd --node-name etcd-test-node", map[string]string{"custom-cluster-name": c.Name}, etcdSnapshotDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -84,7 +84,7 @@ func Test_Operation_Custom_EtcdSnapshotOperationsOnNewNode(t *testing.T) {
 		},
 	}
 
-	snapshot := operations.RunLocalSnapshotCreateTest(t, clients, c, cm)
+	snapshot := operations.RunSnapshotCreateTest(t, clients, c, cm, "etcd-test-node")
 	assert.NotNil(t, snapshot)
 
 	err = clients.Core.Pod().Delete(etcdNode.Namespace, etcdNode.Name, &metav1.DeleteOptions{PropagationPolicy: &[]metav1.DeletionPropagation{metav1.DeletePropagationForeground}[0]})
@@ -118,5 +118,7 @@ func Test_Operation_Custom_EtcdSnapshotOperationsOnNewNode(t *testing.T) {
 		return strings.Contains(capr.Ready.GetMessage(&rkeControlPlane.Status), "rkecontrolplane was already initialized but no etcd machines exist that have plans, indicating the etcd plane has been entirely replaced. Restoration from etcd snapshot is required."), nil
 	})
 
-	operations.RunLocalSnapshotRestoreTest(t, clients, c, snapshot.SnapshotFile.Name, cm)
+	operations.RunSnapshotRestoreTest(t, clients, c, snapshot.SnapshotFile.Name, cm)
+	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
+	assert.NoError(t, err)
 }

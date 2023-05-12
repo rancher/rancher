@@ -49,7 +49,7 @@ func Test_Operation_Custom_EtcdSnapshotCreationRestoreInPlace(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --etcd", map[string]string{"custom-cluster-name": c.Name}, nil)
+	_, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --etcd --node-name etcd-test-node", map[string]string{"custom-cluster-name": c.Name}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,6 +68,8 @@ func Test_Operation_Custom_EtcdSnapshotCreationRestoreInPlace(t *testing.T) {
 		},
 	}
 
-	snapshot := operations.RunLocalSnapshotCreateTest(t, clients, c, cm)
-	operations.RunLocalSnapshotRestoreTest(t, clients, c, snapshot.Name, cm)
+	snapshot := operations.RunSnapshotCreateTest(t, clients, c, cm, "etcd-test-node")
+	operations.RunSnapshotRestoreTest(t, clients, c, snapshot.Name, cm)
+	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
+	assert.NoError(t, err)
 }

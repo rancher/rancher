@@ -1,6 +1,7 @@
 package machineprovisioning
 
 import (
+	"github.com/stretchr/testify/assert"
 	"testing"
 
 	provisioningv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
@@ -44,4 +45,6 @@ func Test_Operation_MP_CertificateRotation(t *testing.T) {
 	}
 
 	operations.RunCertificateRotationTest(t, clients, c)
+	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
+	assert.NoError(t, err)
 }

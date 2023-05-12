@@ -124,6 +124,8 @@ func Test_Provisioning_Custom_OneNode(t *testing.T) {
 		t.Error(err)
 	}
 	assert.Equal(t, labels, map[string]string{"cattle.io/os": "linux", "foo": "bar", "ball": "life"})
+	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
+	assert.NoError(t, err)
 }
 
 func Test_Provisioning_Custom_ThreeNode(t *testing.T) {
@@ -186,6 +188,8 @@ func Test_Provisioning_Custom_ThreeNode(t *testing.T) {
 		}
 		assert.Equal(t, labels, map[string]string{"cattle.io/os": "linux", "rancher": "awesome"})
 	}
+	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
+	assert.NoError(t, err)
 }
 
 func Test_Provisioning_Custom_UniqueRoles(t *testing.T) {
@@ -264,6 +268,8 @@ func Test_Provisioning_Custom_UniqueRoles(t *testing.T) {
 	assert.Equal(t, worker, 1)
 	assert.Equal(t, etcd, 3)
 	assert.Equal(t, controlPlane, 1)
+	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
+	assert.NoError(t, err)
 }
 
 func Test_Provisioning_Custom_ThreeNodeWithTaints(t *testing.T) {
@@ -353,4 +359,6 @@ func Test_Provisioning_Custom_ThreeNodeWithTaints(t *testing.T) {
 	}
 
 	assert.True(t, taintFound)
+	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
+	assert.NoError(t, err)
 }

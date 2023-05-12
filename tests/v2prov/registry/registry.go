@@ -230,6 +230,7 @@ func GetCache(clients *clients.Clients, namespace string) (rkev1.Registry, error
 		return rkev1.Registry{}, err
 	}
 
+	// Specify dummy.io registries to ensure we can deliver the same data twice without thrashing.
 	return rkev1.Registry{
 		Mirrors: map[string]rkev1.Mirror{
 			"docker.io": {
@@ -237,9 +238,19 @@ func GetCache(clients *clients.Clients, namespace string) (rkev1.Registry, error
 					fmt.Sprintf("https://%s:5000", cacheServiceName),
 				},
 			},
+			"dummy.cattle.io": {
+				Endpoints: []string{
+					"https://dummy.cattle.io",
+				},
+			},
 		},
 		Configs: map[string]rkev1.RegistryConfig{
 			cacheServiceName + ":5000": {
+				AuthConfigSecretName: passwordSecret.Name,
+				TLSSecretName:        tlsSecret.Name,
+				CABundle:             tlsSecret.Data[corev1.TLSCertKey],
+			},
+			"dummy.cattle.io": {
 				AuthConfigSecretName: passwordSecret.Name,
 				TLSSecretName:        tlsSecret.Name,
 				CABundle:             tlsSecret.Data[corev1.TLSCertKey],

@@ -1,6 +1,7 @@
 package machineprovisioning
 
 import (
+	"github.com/stretchr/testify/assert"
 	"os"
 	"strings"
 	"testing"
@@ -50,4 +51,6 @@ func Test_Operation_MP_EncryptionKeyRotation(t *testing.T) {
 	}
 
 	operations.RunRotateEncryptionKeysTest(t, clients, c)
+	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
+	assert.NoError(t, err)
 }

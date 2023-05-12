@@ -66,4 +66,6 @@ func Test_Operation_Custom_EncryptionKeyRotation(t *testing.T) {
 	}
 
 	operations.RunRotateEncryptionKeysTest(t, clients, c)
+	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
+	assert.NoError(t, err)
 }
