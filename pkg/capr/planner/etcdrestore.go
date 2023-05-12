@@ -227,8 +227,7 @@ func (p *Planner) runEtcdSnapshotPostRestorePodCleanupPlan(controlPlane *rkev1.R
 
 	// If the init node is a controlplane node, deliver the desired plan + pod cleanup instruction
 	if isControlPlane(initNode) {
-		cleanupMachineUIDs := string(initNode.Machine.UID)
-		cleanupScriptFiles, cleanupInstructions := p.generateEtcdRestorePodCleanupFilesAndInstruction(controlPlane, cleanupMachineUIDs)
+		cleanupScriptFiles, cleanupInstructions := p.generateEtcdRestorePodCleanupFilesAndInstruction(controlPlane, []string{string(initNode.Machine.UID)})
 		initNodePlan.Files = append(initNodePlan.Files, cleanupScriptFiles...)
 		initNodePlan.Instructions = append(initNodePlan.Instructions, cleanupInstructions...)
 		return assignAndCheckPlan(p.store, ETCDRestoreMessage, initNode, initNodePlan, "", 5, 5)
@@ -258,8 +257,7 @@ func (p *Planner) runEtcdSnapshotPostRestorePodCleanupPlan(controlPlane *rkev1.R
 		return err
 	}
 
-	cleanupMachineUIDs := string(initNode.Machine.UID) + " " + string(controlPlaneEntry.Machine.UID)
-	cleanupScriptFiles, cleanupInstructions := p.generateEtcdRestorePodCleanupFilesAndInstruction(controlPlane, cleanupMachineUIDs)
+	cleanupScriptFiles, cleanupInstructions := p.generateEtcdRestorePodCleanupFilesAndInstruction(controlPlane, []string{string(initNode.Machine.UID), string(controlPlaneEntry.Machine.UID)})
 	firstControlPlanePlan.Files = append(firstControlPlanePlan.Files, cleanupScriptFiles...)
 	firstControlPlanePlan.Instructions = append(firstControlPlanePlan.Instructions, cleanupInstructions...)
 	return assignAndCheckPlan(p.store, ETCDRestoreMessage, controlPlaneEntry, firstControlPlanePlan, joinedServer, 5, 5)
@@ -277,13 +275,10 @@ func (p *Planner) runEtcdSnapshotPostRestoreNodeCleanupPlan(controlPlane *rkev1.
 		return err
 	}
 
-	var allMachineUIDs string
+	var allMachineUIDs []string
 	for _, n := range collect(clusterPlan, isNotDeleting) {
 		if n.Machine != nil && n.Machine.UID != "" {
-			if allMachineUIDs != "" {
-				allMachineUIDs = allMachineUIDs + " "
-			}
-			allMachineUIDs = allMachineUIDs + string(n.Machine.UID)
+			allMachineUIDs = append(allMachineUIDs, string(n.Machine.UID))
 		}
 	}
 
@@ -415,7 +410,7 @@ func etcdRestoreScriptPath(controlPlane *rkev1.RKEControlPlane, file string) str
 }
 
 // generateEtcdRestorePodCleanupFilesAndInstruction generates a file that contains a script that checks API server health and a slice of instructions that cleans up system pods on etcd restore.
-func (p *Planner) generateEtcdRestorePodCleanupFilesAndInstruction(controlPlane *rkev1.RKEControlPlane, cleanupMachineUIDs string) ([]plan.File, []plan.OneTimeInstruction) {
+func (p *Planner) generateEtcdRestorePodCleanupFilesAndInstruction(controlPlane *rkev1.RKEControlPlane, cleanupMachineUIDs []string) ([]plan.File, []plan.OneTimeInstruction) {
 	runtime := capr.GetRuntime(controlPlane.Spec.KubernetesVersion)
 
 	kubectl := "/usr/local/bin/kubectl"
@@ -448,10 +443,7 @@ func (p *Planner) generateEtcdRestorePodCleanupFilesAndInstruction(controlPlane 
 				fmt.Sprintf("%s=%s", "KUBECTL", kubectl),
 				fmt.Sprintf("%s=%s", "KUBECONFIG", kubeconfig),
 			},
-			Args: []string{
-				etcdRestoreScriptPath(controlPlane, etcdRestoreNodeWaitForReadyPath),
-				cleanupMachineUIDs,
-			},
+			Args: append([]string{etcdRestoreScriptPath(controlPlane, etcdRestoreNodeWaitForReadyPath)}, cleanupMachineUIDs...),
 		},
 	}
 
@@ -515,7 +507,7 @@ func (p *Planner) generateEtcdRestorePodCleanupFilesAndInstruction(controlPlane 
 }
 
 // generateEtcdRestorePodCleanupFilesAndInstruction generates a file that contains a script that checks API server health and a slice of instructions that cleans up system pods on etcd restore.
-func (p *Planner) generateEtcdRestoreNodeCleanupFilesAndInstruction(controlPlane *rkev1.RKEControlPlane, allMachineUIDs string) ([]plan.File, []plan.OneTimeInstruction) {
+func (p *Planner) generateEtcdRestoreNodeCleanupFilesAndInstruction(controlPlane *rkev1.RKEControlPlane, allMachineUIDs []string) ([]plan.File, []plan.OneTimeInstruction) {
 	runtime := capr.GetRuntime(controlPlane.Spec.KubernetesVersion)
 
 	kubectl := "/usr/local/bin/kubectl"
@@ -534,10 +526,7 @@ func (p *Planner) generateEtcdRestoreNodeCleanupFilesAndInstruction(controlPlane
 				fmt.Sprintf("%s=%s", "KUBECTL", kubectl),
 				fmt.Sprintf("%s=%s", "KUBECONFIG", kubeconfig),
 			},
-			Args: []string{
-				etcdRestoreScriptPath(controlPlane, etcdRestoreNodeCleanUpPath),
-				allMachineUIDs,
-			},
+			Args: append([]string{etcdRestoreScriptPath(controlPlane, etcdRestoreNodeCleanUpPath)}, allMachineUIDs...),
 		},
 	}
 
