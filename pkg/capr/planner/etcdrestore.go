@@ -27,14 +27,133 @@ const (
 i=0
 
 while [ $i -lt 30 ]; do
-	$@ &>/dev/null
-	if [ $? -eq 0 ]; then
+	if $@ >/dev/null 2>&1; then
 		exit 0
 	fi
 	sleep 10
 	i=$((i + 1))
 done
 exit 1
+`
+	etcdRestoreNodeCleanUpPath   = "clean_up_nodes.sh"
+	etcdRestoreNodeCleanUpScript = `
+#!/bin/sh
+
+if [ -z "$KUBECTL" ]; then
+        echo "Must define KUBECTL environment variable"
+        exit 1
+fi
+
+if [ -z "$KUBECONFIG" ]; then
+        echo "Must define KUBECONFIG environment variable"
+        exit 1
+fi
+
+TMPMACHINEIDS=$(mktemp)
+TMPALLNODES=$(mktemp)
+TMPSAVENODES=$(mktemp)
+
+printf '%s\n' "$@" > "$TMPMACHINEIDS"
+
+if ! ${KUBECTL} get nodes --no-headers -o=jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' > "$TMPALLNODES"; then
+        echo "Error listing all nodes"
+        exit 1
+fi
+
+while IFS='' read -r MID; do
+        if NODENAME=$(${KUBECTL} get node --no-headers -o=jsonpath='{.items[0].metadata.name}' -l rke.cattle.io/machine="$MID"); then
+                echo "$NODENAME" >> "$TMPSAVENODES"
+        fi
+done < "$TMPMACHINEIDS"
+
+rm "$TMPMACHINEIDS"
+
+echo "Saving nodes:"
+cat "$TMPSAVENODES"
+
+while IFS='' read -r NODE; do
+        if [ "${NODE}" = "" ]; then
+                continue
+        fi
+        FOUND=false
+        while IFS='' read -r KEEP; do
+                if [ "${NODE}" = "${KEEP}" ]; then
+                        FOUND=true
+                        break
+                fi
+        done < "$TMPSAVENODES"
+        if [ "${FOUND}" != "true" ]; then
+                echo "Deleting node ${NODE}"
+                ${KUBECTL} delete node "${NODE}" --wait=false
+        fi
+done < "$TMPALLNODES"
+rm "$TMPALLNODES"
+rm "$TMPSAVENODES"
+`
+	etcdRestoreNodeWaitForReadyPath   = "wait_for_ready.sh"
+	etcdRestoreNodeWaitForReadyScript = `
+#!/bin/sh
+
+if [ -z "$KUBECTL" ]; then
+        echo "Must define KUBECTL environment variable"
+        exit 1
+fi
+
+if [ -z "$KUBECONFIG" ]; then
+        echo "Must define KUBECONFIG environment variable"
+        exit 1
+fi
+
+TMPMACHINEIDS=$(mktemp)
+
+printf '%s\n' "$@" > "$TMPMACHINEIDS"
+
+DESIREDREADYCOUNT=$(wc -l < "$TMPMACHINEIDS")
+
+DESIREDNODESREADY=false
+
+while ! $DESIREDNODESREADY; do
+        DESIREDNODESREADY=true
+        while IFS='' read -r MID; do
+                if [ "$MID" = "" ]; then
+                        exit
+                fi
+                if NODEREADY=$(${KUBECTL} get node --no-headers -o=custom-columns=STATUS:status.conditions\[\?\(\@.type==\"Ready\"\)\].status -l rke.cattle.io/machine="$MID"); then
+                        if [ "$NODEREADY" != "True" ]; then
+                                DESIREDNODESREADY=false
+                                sleep 5
+                                break
+                        fi
+                fi
+        done < "$TMPMACHINEIDS"
+done
+
+
+DESIREDREADYCOUNT=$(wc -l < "$TMPMACHINEIDS")
+rm "$TMPMACHINEIDS"
+
+TMPALLREADY=$(mktemp)
+
+ITERCOUNT=0
+while [ "$ITERCOUNT" != 60 ]; do
+        ACTUALREADYCOUNT=0
+        ITERCOUNT=$((ITERCOUNT+1))
+        if ! ${KUBECTL} get nodes --no-headers -o=custom-columns=STATUS:status.conditions\[\?\(\@.type==\"Ready\"\)\].status > "$TMPALLREADY"; then
+                sleep 5
+                continue
+        fi
+        while IFS='' read -r STATUS; do
+                if [ "$STATUS" = "True" ]; then
+                        ACTUALREADYCOUNT=$((ACTUALREADYCOUNT+1))
+                fi
+        done < "$TMPALLREADY"
+        if [ "$DESIREDREADYCOUNT" = "$ACTUALREADYCOUNT" ]; then
+                break
+        fi
+        sleep 5
+done
+
+rm "$TMPALLREADY"
 `
 )
 
@@ -94,7 +213,7 @@ func (p *Planner) runEtcdSnapshotRestorePlan(controlPlane *rkev1.RKEControlPlane
 	return assignAndCheckPlan(p.store, ETCDRestoreMessage, servers[0], restorePlan, joinedServer, 1, 1)
 }
 
-func (p *Planner) runEtcdSnapshotPostRestoreCleanupPlan(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, clusterPlan *plan.Plan) error {
+func (p *Planner) runEtcdSnapshotPostRestorePodCleanupPlan(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, clusterPlan *plan.Plan) error {
 	initNodes := collect(clusterPlan, isInitNode)
 	if len(initNodes) != 1 {
 		return fmt.Errorf("multiple init nodes found")
@@ -106,11 +225,11 @@ func (p *Planner) runEtcdSnapshotPostRestoreCleanupPlan(controlPlane *rkev1.RKEC
 		return err
 	}
 
-	cleanupScriptFile, cleanupInstructions := p.generateEtcdRestorePodCleanupFilesAndInstruction(controlPlane)
-
 	// If the init node is a controlplane node, deliver the desired plan + pod cleanup instruction
 	if isControlPlane(initNode) {
-		initNodePlan.Files = append(initNodePlan.Files, cleanupScriptFile)
+		cleanupMachineUIDs := string(initNode.Machine.UID)
+		cleanupScriptFiles, cleanupInstructions := p.generateEtcdRestorePodCleanupFilesAndInstruction(controlPlane, cleanupMachineUIDs)
+		initNodePlan.Files = append(initNodePlan.Files, cleanupScriptFiles...)
 		initNodePlan.Instructions = append(initNodePlan.Instructions, cleanupInstructions...)
 		return assignAndCheckPlan(p.store, ETCDRestoreMessage, initNode, initNodePlan, "", 5, 5)
 	}
@@ -138,9 +257,40 @@ func (p *Planner) runEtcdSnapshotPostRestoreCleanupPlan(controlPlane *rkev1.RKEC
 	if err != nil {
 		return err
 	}
-	firstControlPlanePlan.Files = append(firstControlPlanePlan.Files, cleanupScriptFile)
+
+	cleanupMachineUIDs := string(initNode.Machine.UID) + " " + string(controlPlaneEntry.Machine.UID)
+	cleanupScriptFiles, cleanupInstructions := p.generateEtcdRestorePodCleanupFilesAndInstruction(controlPlane, cleanupMachineUIDs)
+	firstControlPlanePlan.Files = append(firstControlPlanePlan.Files, cleanupScriptFiles...)
 	firstControlPlanePlan.Instructions = append(firstControlPlanePlan.Instructions, cleanupInstructions...)
 	return assignAndCheckPlan(p.store, ETCDRestoreMessage, controlPlaneEntry, firstControlPlanePlan, joinedServer, 5, 5)
+}
+
+func (p *Planner) runEtcdSnapshotPostRestoreNodeCleanupPlan(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, clusterPlan *plan.Plan) error {
+	initNodes := collect(clusterPlan, isInitNode)
+	if len(initNodes) != 1 {
+		return fmt.Errorf("multiple init nodes found")
+	}
+	initNode := initNodes[0]
+
+	initNodePlan, _, err := p.desiredPlan(controlPlane, tokensSecret, initNode, "")
+	if err != nil {
+		return err
+	}
+
+	var allMachineUIDs string
+	for _, n := range collect(clusterPlan, isNotDeleting) {
+		if n.Machine != nil && n.Machine.UID != "" {
+			if allMachineUIDs != "" {
+				allMachineUIDs = allMachineUIDs + " "
+			}
+			allMachineUIDs = allMachineUIDs + string(n.Machine.UID)
+		}
+	}
+
+	cleanupScriptFiles, cleanupInstructions := p.generateEtcdRestoreNodeCleanupFilesAndInstruction(controlPlane, allMachineUIDs)
+	initNodePlan.Files = append(initNodePlan.Files, cleanupScriptFiles...)
+	initNodePlan.Instructions = append(initNodePlan.Instructions, cleanupInstructions...)
+	return assignAndCheckPlan(p.store, ETCDRestoreMessage, initNode, initNodePlan, "", 5, 5)
 }
 
 // generateEtcdSnapshotRestorePlan returns a node plan that contains instructions to stop etcd, remove the tombstone file (if one exists), then restore etcd in that order.
@@ -265,7 +415,7 @@ func etcdRestoreScriptPath(controlPlane *rkev1.RKEControlPlane, file string) str
 }
 
 // generateEtcdRestorePodCleanupFilesAndInstruction generates a file that contains a script that checks API server health and a slice of instructions that cleans up system pods on etcd restore.
-func (p *Planner) generateEtcdRestorePodCleanupFilesAndInstruction(controlPlane *rkev1.RKEControlPlane) (plan.File, []plan.OneTimeInstruction) {
+func (p *Planner) generateEtcdRestorePodCleanupFilesAndInstruction(controlPlane *rkev1.RKEControlPlane, cleanupMachineUIDs string) ([]plan.File, []plan.OneTimeInstruction) {
 	runtime := capr.GetRuntime(controlPlane.Spec.KubernetesVersion)
 
 	kubectl := "/usr/local/bin/kubectl"
@@ -289,6 +439,18 @@ func (p *Planner) generateEtcdRestorePodCleanupFilesAndInstruction(controlPlane 
 				"get",
 				"pods",
 				"--all-namespaces",
+			},
+		},
+		{
+			Name:    "wait-for-desired-ready-nodes",
+			Command: "/bin/sh",
+			Env: []string{
+				fmt.Sprintf("%s=%s", "KUBECTL", kubectl),
+				fmt.Sprintf("%s=%s", "KUBECONFIG", kubeconfig),
+			},
+			Args: []string{
+				etcdRestoreScriptPath(controlPlane, etcdRestoreNodeWaitForReadyPath),
+				cleanupMachineUIDs,
 			},
 		},
 	}
@@ -338,10 +500,53 @@ func (p *Planner) generateEtcdRestorePodCleanupFilesAndInstruction(controlPlane 
 		}
 	}
 
-	return plan.File{
-		Content: base64.StdEncoding.EncodeToString([]byte(etcdRestorePostRestoreWaitForPodListCleanupScript)),
-		Path:    etcdRestoreScriptPath(controlPlane, etcdRestorePostRestoreWaitForPodListCleanupPath),
-		Dynamic: true,
+	return []plan.File{
+		{
+			Content: base64.StdEncoding.EncodeToString([]byte(etcdRestorePostRestoreWaitForPodListCleanupScript)),
+			Path:    etcdRestoreScriptPath(controlPlane, etcdRestorePostRestoreWaitForPodListCleanupPath),
+			Dynamic: true,
+		},
+		{
+			Content: base64.StdEncoding.EncodeToString([]byte(etcdRestoreNodeWaitForReadyScript)),
+			Path:    etcdRestoreScriptPath(controlPlane, etcdRestoreNodeWaitForReadyPath),
+			Dynamic: true,
+		},
+	}, instructions
+}
+
+// generateEtcdRestorePodCleanupFilesAndInstruction generates a file that contains a script that checks API server health and a slice of instructions that cleans up system pods on etcd restore.
+func (p *Planner) generateEtcdRestoreNodeCleanupFilesAndInstruction(controlPlane *rkev1.RKEControlPlane, allMachineUIDs string) ([]plan.File, []plan.OneTimeInstruction) {
+	runtime := capr.GetRuntime(controlPlane.Spec.KubernetesVersion)
+
+	kubectl := "/usr/local/bin/kubectl"
+	kubeconfig := "/etc/rancher/k3s/k3s.yaml"
+
+	if runtime == capr.RuntimeRKE2 {
+		kubectl = "/var/lib/rancher/rke2/bin/kubectl"
+		kubeconfig = "/etc/rancher/rke2/rke2.yaml"
+	}
+
+	instructions := []plan.OneTimeInstruction{
+		{
+			Name:    "cleanup-nodes",
+			Command: "/bin/sh",
+			Env: []string{
+				fmt.Sprintf("%s=%s", "KUBECTL", kubectl),
+				fmt.Sprintf("%s=%s", "KUBECONFIG", kubeconfig),
+			},
+			Args: []string{
+				etcdRestoreScriptPath(controlPlane, etcdRestoreNodeCleanUpPath),
+				allMachineUIDs,
+			},
+		},
+	}
+
+	return []plan.File{
+		{
+			Content: base64.StdEncoding.EncodeToString([]byte(etcdRestoreNodeCleanUpScript)),
+			Path:    etcdRestoreScriptPath(controlPlane, etcdRestoreNodeCleanUpPath),
+			Dynamic: true,
+		},
 	}, instructions
 }
 
@@ -573,9 +778,24 @@ func (p *Planner) restoreEtcdSnapshot(cp *rkev1.RKEControlPlane, status rkev1.RK
 			return status, err
 		}
 		status.ConfigGeneration++ // Increment config generation to cause the restart_stamp to change
-		return p.setEtcdSnapshotRestoreState(status, cp.Spec.ETCDSnapshotRestore, rkev1.ETCDSnapshotPhasePostRestoreCleanup)
-	case rkev1.ETCDSnapshotPhasePostRestoreCleanup:
-		if err = p.runEtcdSnapshotPostRestoreCleanupPlan(cp, tokensSecret, clusterPlan); err != nil {
+		return p.setEtcdSnapshotRestoreState(status, cp.Spec.ETCDSnapshotRestore, rkev1.ETCDSnapshotPhasePostRestorePodCleanup)
+	case rkev1.ETCDSnapshotPhasePostRestorePodCleanup:
+		if err = p.runEtcdSnapshotPostRestorePodCleanupPlan(cp, tokensSecret, clusterPlan); err != nil {
+			return status, err
+		}
+		return p.setEtcdSnapshotRestoreState(status, cp.Spec.ETCDSnapshotRestore, rkev1.ETCDSnapshotPhaseInitialRestartCluster)
+	case rkev1.ETCDSnapshotPhaseInitialRestartCluster:
+		if err := p.pauseCAPICluster(cp, false); err != nil {
+			return status, err
+		}
+		logrus.Infof("[planner] rkecluster %s/%s: running full reconcile during etcd restore to initially restart cluster", cp.Namespace, cp.Name)
+		// Run a full reconcile of the cluster at this point, ignoring drain and concurrency.
+		if status, err := p.fullReconcile(cp, status, tokensSecret, clusterPlan, true); err != nil {
+			return status, err
+		}
+		return p.setEtcdSnapshotRestoreState(status, cp.Spec.ETCDSnapshotRestore, rkev1.ETCDSnapshotPhasePostRestoreNodeCleanup)
+	case rkev1.ETCDSnapshotPhasePostRestoreNodeCleanup:
+		if err = p.runEtcdSnapshotPostRestoreNodeCleanupPlan(cp, tokensSecret, clusterPlan); err != nil {
 			return status, err
 		}
 		return p.setEtcdSnapshotRestoreState(status, cp.Spec.ETCDSnapshotRestore, rkev1.ETCDSnapshotPhaseRestartCluster)
