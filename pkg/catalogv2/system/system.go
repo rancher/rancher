@@ -24,7 +24,7 @@ import (
 	"github.com/rancher/wrangler/pkg/merr"
 	"github.com/sirupsen/logrus"
 	"helm.sh/helm/v3/pkg/action"
-	release2 "helm.sh/helm/v3/pkg/release"
+	"helm.sh/helm/v3/pkg/release"
 	"helm.sh/helm/v3/pkg/repo"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -244,7 +244,7 @@ func (m *Manager) install(namespace, name, minVersion, exactVersion string, valu
 		return err
 	}
 
-	v := ">=0-a" // latest
+	v := ">=0-a" // latest - this is special syntax to match everything including pre-releases build
 	if exactVersion != "" {
 		v = exactVersion
 	}
@@ -372,24 +372,23 @@ func (m *Manager) isInstalled(namespace, name, version, minVersion string, desir
 		return false, "", nil, err
 	}
 
-	desired, err := semver.NewVersion(version)
-	if err != nil {
-		return false, "", nil, err
-	}
+	return isInstalled(releases, version, minVersion, desiredValue)
+}
 
-	for _, release := range releases {
-		if release.Info.Status != release2.StatusDeployed {
+func isInstalled(releases []*release.Release, latestVersion, minVersion string, desiredValues map[string]any) (bool, string, map[string]interface{}, error) {
+	for _, r := range releases {
+		if r.Info.Status != release.StatusDeployed {
 			continue
 		}
-		if desiredValue == nil {
-			desiredValue = map[string]interface{}{}
+		if desiredValues == nil {
+			desiredValues = map[string]interface{}{}
 		}
-		releaseConfig := release.Config
+		releaseConfig := r.Config
 		if releaseConfig == nil {
 			releaseConfig = map[string]interface{}{}
 		}
 
-		desiredValuesJSON, err := json.Marshal(desiredValue)
+		desiredValuesJSON, err := json.Marshal(desiredValues)
 		if err != nil {
 			return false, "", nil, err
 		}
@@ -404,12 +403,12 @@ func (m *Manager) isInstalled(namespace, name, version, minVersion string, desir
 			return false, "", nil, err
 		}
 
-		desiredValue = map[string]interface{}{}
-		if err := json.Unmarshal(patchedJSON, &desiredValue); err != nil {
+		current, err := semver.NewVersion(r.Chart.Metadata.Version)
+		if err != nil {
 			return false, "", nil, err
 		}
 
-		ver, err := semver.NewVersion(release.Chart.Metadata.Version)
+		desired, err := semver.NewVersion(latestVersion)
 		if err != nil {
 			return false, "", nil, err
 		}
@@ -420,26 +419,24 @@ func (m *Manager) isInstalled(namespace, name, version, minVersion string, desir
 				return false, "", nil, err
 			}
 			if desired.LessThan(min) {
-				logrus.Errorf("available chart version (%s) for %s is less than the min version (%s) ", desired, name, min)
+				logrus.Errorf("available chart version (%s) for %s is less than the min version (%s) ", desired, r.Chart.Name(), min)
 				return false, "", nil, repo.ErrNoChartName
 			}
-			if min.LessThan(ver) || min.Equal(ver) {
+			if min.LessThan(current) || min.Equal(current) {
 				// If the current deployed version is greater or equal than the min version but configuration has changed, return false and upgrade with the current version
 				if !bytes.Equal(patchedJSON, actualValueJSON) {
-					return false, release.Chart.Metadata.Version, desiredValue, nil
+					return false, r.Chart.Metadata.Version, desiredValues, nil
 				}
-				logrus.Debugf("Skipping installing/upgrading desired version %v for release %v, current version %v is greater or equal to minimal required version %v", desired.String(), name, ver.String(), minVersion)
+				logrus.Debugf("Skipping installing/upgrading desired version %v for release %v, current version %v is greater or equal to minimal required version %v", desired.String(), r.Chart.Name(), current.String(), minVersion)
 				return true, "", nil, nil
 			}
 		}
 
-		if !desired.Equal(ver) {
-			return false, desired.String(), desiredValue, nil
+		if (desired.LessThan(current) || desired.Equal(current)) && bytes.Equal(patchedJSON, actualValueJSON) {
+			return true, "", nil, nil
 		}
-		return true, "", nil, nil
 	}
-
-	return false, version, desiredValue, nil
+	return false, latestVersion, desiredValues, nil
 }
 
 func (m *Manager) hasStatus(namespace, name string, stateMask action.ListStates) (bool, error) {
