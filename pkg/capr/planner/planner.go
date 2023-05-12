@@ -1071,7 +1071,7 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret pl
 // generatePlanWithConfigFiles will generate a node plan with the corresponding config files for the entry in question.
 // Notably, it will discard the existing nodePlan in the given entry. It returns the new node plan, the config that was
 // rendered, the rendered join server ("-" in the case that the plan is generated for an init node), and an error (if one exists).
-func (p *Planner) generatePlanWithConfigFiles(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, entry *planEntry, joinServer string) (plan.NodePlan, map[string]interface{}, string, error) {
+func (p *Planner) generatePlanWithConfigFiles(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, entry *planEntry, joinServer string, renderS3 bool) (plan.NodePlan, map[string]interface{}, string, error) {
 	var (
 		reg      registries
 		nodePlan plan.NodePlan
@@ -1086,7 +1086,7 @@ func (p *Planner) generatePlanWithConfigFiles(controlPlane *rkev1.RKEControlPlan
 			joinedServer string
 			config       map[string]interface{}
 		)
-		nodePlan, config, joinedServer, err = p.addConfigFile(nodePlan, controlPlane, entry, tokensSecret, joinServer, reg)
+		nodePlan, config, joinedServer, err = p.addConfigFile(nodePlan, controlPlane, entry, tokensSecret, joinServer, reg, renderS3)
 		if err != nil {
 			return nodePlan, config, joinedServer, err
 		}
@@ -1108,7 +1108,7 @@ func (p *Planner) generatePlanWithConfigFiles(controlPlane *rkev1.RKEControlPlan
 }
 
 func (p *Planner) desiredPlan(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, entry *planEntry, joinServer string) (plan.NodePlan, string, error) {
-	nodePlan, config, joinedTo, err := p.generatePlanWithConfigFiles(controlPlane, tokensSecret, entry, joinServer)
+	nodePlan, config, joinedTo, err := p.generatePlanWithConfigFiles(controlPlane, tokensSecret, entry, joinServer, true)
 	if err != nil {
 		return nodePlan, joinedTo, err
 	}

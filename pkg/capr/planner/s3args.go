@@ -99,17 +99,26 @@ func (s *s3Args) ToArgs(s3 *rkev1.ETCDSnapshotS3, controlPlane *rkev1.RKEControl
 				filePath := configFile(controlPlane, s3CAName)
 				if filePath == v {
 					// If the filepath of the s3cred endpointCA matches the endpoint CA that was used for the snapshot, go ahead and include the file for posterity
+					ca := s3Cred.EndpointCA
+					if _, err := base64.StdEncoding.DecodeString(ca); err != nil {
+						// There was an error decoding the endpointCA, indicating that it needs to be encoded.
+						ca = base64.StdEncoding.EncodeToString([]byte(ca))
+					}
 					files = append(files, plan.File{
-						Content: base64.StdEncoding.EncodeToString([]byte(s3Cred.EndpointCA)),
+						Content: ca,
 						Path:    filePath,
 					})
 				}
 			}
 		} else {
+			if _, err := base64.StdEncoding.DecodeString(v); err != nil {
+				// There was an error decoding the endpointCA, indicating that it needs to be encoded.
+				v = base64.StdEncoding.EncodeToString([]byte(v))
+			}
 			s3CAName := fmt.Sprintf("s3-endpoint-ca-%s.crt", name.Hex(v, 5))
 			filePath := configFile(controlPlane, s3CAName)
 			files = append(files, plan.File{
-				Content: base64.StdEncoding.EncodeToString([]byte(v)),
+				Content: v,
 				Path:    filePath,
 			})
 			args = append(args, fmt.Sprintf("--%ss3-endpoint-ca=%s", prefix, filePath))

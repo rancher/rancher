@@ -77,7 +77,7 @@ func (p *Planner) generateEtcdSnapshotCreatePlan(controlPlane *rkev1.RKEControlP
 		args = append(args, "save")
 	}
 
-	createPlan, _, joinedServer, err := p.generatePlanWithConfigFiles(controlPlane, tokensSecret, entry, joinServer)
+	createPlan, _, joinedServer, err := p.generatePlanWithConfigFiles(controlPlane, tokensSecret, entry, joinServer, true)
 	createPlan.Instructions = append(createPlan.Instructions, p.generateInstallInstructionWithSkipStart(controlPlane, entry),
 		plan.OneTimeInstruction{
 			Name:    "create",

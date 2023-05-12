@@ -104,7 +104,7 @@ func (p *Planner) rotateCertificatesPlan(controlPlane *rkev1.RKEControlPlane, to
 		// Don't overwrite the joinURL annotation.
 		joinServer = ""
 	}
-	rotatePlan, config, joinedServer, err := p.generatePlanWithConfigFiles(controlPlane, tokensSecret, entry, joinServer)
+	rotatePlan, config, joinedServer, err := p.generatePlanWithConfigFiles(controlPlane, tokensSecret, entry, joinServer, true)
 	if err != nil {
 		return plan.NodePlan{}, joinedServer, err
 	}

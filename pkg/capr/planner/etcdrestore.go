@@ -142,13 +142,24 @@ func (p *Planner) runEtcdSnapshotPostRestoreCleanupPlan(controlPlane *rkev1.RKEC
 	return assignAndCheckPlan(p.store, ETCDRestoreMessage, controlPlaneEntry, firstControlPlanePlan, joinedServer, 5, 5)
 }
 
+// appendFile appends the file `new` to the `existing` slice if it is not found in the slice
+func appendFile(existing []plan.File, new plan.File) []plan.File {
+	for _, f := range existing {
+		if f == new {
+			return existing
+		}
+	}
+	return append(existing, new)
+}
+
 // generateEtcdSnapshotRestorePlan returns a node plan that contains instructions to stop etcd, remove the tombstone file (if one exists), then restore etcd in that order.
 func (p *Planner) generateEtcdSnapshotRestorePlan(controlPlane *rkev1.RKEControlPlane, snapshot *rkev1.ETCDSnapshot, snapshotName string, tokensSecret plan.Secret, entry *planEntry, joinServer string) (plan.NodePlan, string, error) {
 	if controlPlane.Spec.ETCDSnapshotRestore == nil {
 		return plan.NodePlan{}, "", fmt.Errorf("ETCD Snapshot restore was not defined")
 	}
 
-	nodePlan, _, joinedServer, err := p.generatePlanWithConfigFiles(controlPlane, tokensSecret, entry, joinServer)
+	// Notably, if we are generating a restore plan for an S3 snapshot, we will render S3 arguments, environment variables, and files from the snapshot metadata.
+	nodePlan, _, joinedServer, err := p.generatePlanWithConfigFiles(controlPlane, tokensSecret, entry, joinServer, false)
 	if err != nil {
 		return nodePlan, joinedServer, err
 	}
@@ -159,6 +170,8 @@ func (p *Planner) generateEtcdSnapshotRestorePlan(controlPlane *rkev1.RKEControl
 		"--etcd-arg=advertise-client-urls=https://127.0.0.1:2379", // this is a workaround for: https://github.com/rancher/rke2/issues/4052 and can likely remain indefinitely (unless IPv6-only becomes a requirement)
 	}
 
+	var env []string
+
 	if snapshot == nil {
 		// If the snapshot is nil, then we will assume the passed in snapshot name is a local snapshot.
 		args = append(args, fmt.Sprintf("--cluster-reset-restore-path=db/snapshots/%s", snapshotName), "--etcd-s3=false")
@@ -166,11 +179,13 @@ func (p *Planner) generateEtcdSnapshotRestorePlan(controlPlane *rkev1.RKEControl
 		args = append(args, fmt.Sprintf("--cluster-reset-restore-path=db/snapshots/%s", snapshot.SnapshotFile.Name), "--etcd-s3=false")
 	} else {
 		args = append(args, fmt.Sprintf("--cluster-reset-restore-path=%s", snapshot.SnapshotFile.Name))
-		s3Args, _, _, err := p.etcdS3Args.ToArgs(snapshot.SnapshotFile.S3, controlPlane, "etcd-", true)
+		s3, s3Env, s3Files, err := p.etcdS3Args.ToArgs(snapshot.SnapshotFile.S3, controlPlane, "etcd-", true)
 		if err != nil {
 			return plan.NodePlan{}, "", err
 		}
-		args = append(args, s3Args...)
+		args = append(args, s3...)
+		env = s3Env
+		nodePlan.Files = append(nodePlan.Files, s3Files...)
 	}
 
 	// This is likely redundant but can make sense in the event that there is an external watchdog.
@@ -194,6 +209,7 @@ func (p *Planner) generateEtcdSnapshotRestorePlan(controlPlane *rkev1.RKEControl
 	nodePlan.Instructions = append(planInstructions, plan.OneTimeInstruction{
 		Name:    "restore",
 		Args:    args,
+		Env:     env,
 		Command: capr.GetRuntimeCommand(controlPlane.Spec.KubernetesVersion),
 	})
 
@@ -201,7 +217,7 @@ func (p *Planner) generateEtcdSnapshotRestorePlan(controlPlane *rkev1.RKEControl
 }
 
 func (p *Planner) generateStopServiceAndKillAllPlan(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, server *planEntry, joinServer string) (plan.NodePlan, string, error) {
-	nodePlan, _, joinedServer, err := p.generatePlanWithConfigFiles(controlPlane, tokensSecret, server, joinServer)
+	nodePlan, _, joinedServer, err := p.generatePlanWithConfigFiles(controlPlane, tokensSecret, server, joinServer, true)
 	if err != nil {
 		return nodePlan, joinedServer, err
 	}
