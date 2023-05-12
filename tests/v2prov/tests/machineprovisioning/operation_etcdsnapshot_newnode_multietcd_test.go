@@ -94,7 +94,7 @@ func Test_Operation_MP_EtcdSnapshotOperationsWithThreeEtcdNodesOnNewNode(t *test
 	snapshot := operations.RunSnapshotCreateTest(t, clients, c, cm, "s3")
 	assert.NotNil(t, snapshot)
 	// Scale controlplane/etcd nodes to 0
-	c, err = operations.Scale(clients, c, 0, 0)
+	c, err = operations.Scale(clients, c, 0, 0, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,7 +102,7 @@ func Test_Operation_MP_EtcdSnapshotOperationsWithThreeEtcdNodesOnNewNode(t *test
 		return strings.Contains(capr.Ready.GetMessage(&rkeControlPlane.Status), "waiting for at least one control plane, etcd, and worker node to be registered"), nil
 	})
 	// Scale etcd nodes to 1
-	c, err = operations.Scale(clients, c, 0, 1)
+	c, err = operations.Scale(clients, c, 0, 1, false)
 	if err != nil {
 		t.Fatal(err)
 	}

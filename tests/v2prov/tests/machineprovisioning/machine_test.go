@@ -268,9 +268,9 @@ func Test_Provisioning_MP_ThreeNodesAllRolesScaledToOneThenDelete(t *testing.T) 
 		t.Fatal(err)
 	}
 
-	c, err = operations.Scale(clients, c, 0, 2)
+	c, err = operations.Scale(clients, c, 0, 2, true)
 	assert.NoError(t, err)
-	c, err = operations.Scale(clients, c, 0, 1)
+	c, err = operations.Scale(clients, c, 0, 1, true)
 	assert.NoError(t, err)
 
 	_, err = operations.GetAndVerifyDownstreamClientset(clients, c)

@@ -3,6 +3,7 @@ package machineprovisioning
 import (
 	provisioningv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/tests/v2prov/clients"
 	"github.com/rancher/rancher/tests/v2prov/cluster"
 	"github.com/rancher/rancher/tests/v2prov/defaults"
@@ -13,6 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"strings"
 	"testing"
 	"time"
 )
@@ -90,15 +92,21 @@ func Test_Operation_MP_EtcdSnapshotOperationsOnNewNode(t *testing.T) {
 	snapshot := operations.RunSnapshotCreateTest(t, clients, c, cm, "s3")
 	assert.NotNil(t, snapshot)
 	// Scale etcd nodes to 0
-	c, err = operations.Scale(clients, c, 0, 0)
+	c, err = operations.Scale(clients, c, 0, 0, false)
 	if err != nil {
 		t.Fatal(err)
 	}
+	_, err = cluster.WaitForControlPlane(clients, c, "rkecontrolplane ready condition indicating insane cluster", func(rkeControlPlane *rkev1.RKEControlPlane) (bool, error) {
+		return strings.Contains(capr.Ready.GetMessage(&rkeControlPlane.Status), "waiting for at least one control plane, etcd, and worker node to be registered"), nil
+	})
 	// Scale etcd nodes to 1
-	c, err = operations.Scale(clients, c, 0, 1)
+	c, err = operations.Scale(clients, c, 0, 1, false)
 	if err != nil {
 		t.Fatal(err)
 	}
+	_, err = cluster.WaitForControlPlane(clients, c, "rkecontrolplane ready condition indicating restoration required", func(rkeControlPlane *rkev1.RKEControlPlane) (bool, error) {
+		return strings.Contains(capr.Ready.GetMessage(&rkeControlPlane.Status), "rkecontrolplane was already initialized but no etcd machines exist that have plans, indicating the etcd plane has been entirely replaced. Restoration from etcd snapshot is required."), nil
+	})
 	operations.RunSnapshotRestoreTest(t, clients, c, snapshot.Name, cm)
 	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
 	assert.NoError(t, err)

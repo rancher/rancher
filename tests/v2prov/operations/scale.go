@@ -8,7 +8,7 @@ import (
 	"k8s.io/client-go/util/retry"
 )
 
-func Scale(clients *clients.Clients, c *v1.Cluster, index int, quantity int32) (*v1.Cluster, error) {
+func Scale(clients *clients.Clients, c *v1.Cluster, index int, quantity int32, waitForCreate bool) (*v1.Cluster, error) {
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		newC, err := clients.Provisioning.Cluster().Get(c.Namespace, c.Name, metav1.GetOptions{})
 		if err != nil {
@@ -27,5 +27,8 @@ func Scale(clients *clients.Clients, c *v1.Cluster, index int, quantity int32) (
 		return c, err
 	}
 
-	return cluster.WaitForCreate(clients, c)
+	if waitForCreate {
+		return cluster.WaitForCreate(clients, c)
+	}
+	return c, err
 }

@@ -1094,9 +1094,12 @@ func (p *Planner) desiredPlan(controlPlane *rkev1.RKEControlPlane, tokensSecret 
 	}
 
 	if isInitNode(entry) && IsOnlyEtcd(entry) {
-		nodePlan, err = p.addInitNodePeriodicInstruction(nodePlan, controlPlane)
-		if err != nil {
-			return nodePlan, joinedTo, err
+		// If the annotation to disable autosetting the join URL is enabled, don't deliver a plan to add the periodic instruction to scrape init node.
+		if _, autosetDisabled := entry.Metadata.Annotations[capr.JoinURLAutosetDisabled]; !autosetDisabled {
+			nodePlan, err = p.addInitNodePeriodicInstruction(nodePlan, controlPlane)
+			if err != nil {
+				return nodePlan, joinedTo, err
+			}
 		}
 	}
 
