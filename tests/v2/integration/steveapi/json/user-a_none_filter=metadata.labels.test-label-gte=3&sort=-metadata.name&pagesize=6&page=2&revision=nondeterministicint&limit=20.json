@@ -20,7 +20,7 @@
       "metadata": {
         "labels": {
           "test-label-gte": "3",
-          "test.cattle.io/steveapi": "true"
+          "test.cattle.io/steveapi": "nondeterministicid"
         },
         "name": "test4",
         "namespace": "test-ns-3",
@@ -46,7 +46,7 @@
       "metadata": {
         "labels": {
           "test-label-gte": "3",
-          "test.cattle.io/steveapi": "true"
+          "test.cattle.io/steveapi": "nondeterministicid"
         },
         "name": "test4",
         "namespace": "test-ns-4",
@@ -72,7 +72,7 @@
       "metadata": {
         "labels": {
           "test-label-gte": "3",
-          "test.cattle.io/steveapi": "true"
+          "test.cattle.io/steveapi": "nondeterministicid"
         },
         "name": "test3",
         "namespace": "test-ns-1",
@@ -98,7 +98,7 @@
       "metadata": {
         "labels": {
           "test-label-gte": "3",
-          "test.cattle.io/steveapi": "true"
+          "test.cattle.io/steveapi": "nondeterministicid"
         },
         "name": "test3",
         "namespace": "test-ns-2",
@@ -124,7 +124,7 @@
       "metadata": {
         "labels": {
           "test-label-gte": "3",
-          "test.cattle.io/steveapi": "true"
+          "test.cattle.io/steveapi": "nondeterministicid"
         },
         "name": "test3",
         "namespace": "test-ns-3",
@@ -150,7 +150,7 @@
       "metadata": {
         "labels": {
           "test-label-gte": "3",
-          "test.cattle.io/steveapi": "true"
+          "test.cattle.io/steveapi": "nondeterministicid"
         },
         "name": "test3",
         "namespace": "test-ns-4",
@@ -169,7 +169,7 @@
   "pages": 2,
   "pagination": {
     "first": "https://rancherurl/v1/secrets",
-    "next": "https://rancherurl/v1/secrets?continue=nondeterministictoken\u0026filter=metadata.labels.test-label-gte%3D3\u0026labelSelector=test.cattle.io%2Fsteveapi%3Dtrue\u0026limit=20\u0026page=2\u0026pagesize=6\u0026revision=nondeterministicint\u0026sort=-metadata.name",
+    "next": "https://rancherurl/v1/secrets?continue=nondeterministictoken\u0026filter=metadata.labels.test-label-gte%3D3\u0026labelSelector=test.cattle.io%2Fsteveapi%3Dnondeterministicid\u0026limit=20\u0026page=2\u0026pagesize=6\u0026revision=nondeterministicint\u0026sort=-metadata.name",
     "partial": true
   },
   "resourceType": "secret",
