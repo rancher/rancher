@@ -3,6 +3,7 @@ package operations
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
@@ -83,6 +84,7 @@ func RunSnapshotCreateTest(t *testing.T, clients *clients.Clients, c *v1.Cluster
 	}
 
 	assert.NotNil(t, snapshot)
+	assert.NotEqual(t, "failed", strings.ToLower(snapshot.SnapshotFile.Status))
 
 	err = clientset.CoreV1().ConfigMaps(ns).Delete(context.TODO(), configMap.Name, metav1.DeleteOptions{})
 	if err != nil {

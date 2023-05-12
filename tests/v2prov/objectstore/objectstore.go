@@ -34,6 +34,10 @@ const (
 const setupMinioBucket = `
 #!/bin/sh
 
+while ! curl -ksf https://127.0.0.1:9000/minio/health/live; do
+    sleep 2
+done
+
 mc config host --insecure add myminio https://127.0.0.1:9000 $%s $%s
 
 while true; do 
