@@ -15,6 +15,7 @@ import (
 	"github.com/rancher/rancher/tests/v2prov/operations"
 	"github.com/rancher/rancher/tests/v2prov/systemdnode"
 	"github.com/rancher/wrangler/pkg/name"
+	"github.com/rancher/wrangler/pkg/randomtoken"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,7 +34,7 @@ func Test_Operation_Custom_EtcdSnapshotOperationsOnNewNode(t *testing.T) {
 
 	c, err := cluster.New(clients, &provisioningv1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "test-custom-etcd-snapshot-operations-on-new-combined-node",
+			Name: "test-custom-etcd-snapshot-operations-on-new-node",
 		},
 		Spec: provisioningv1.ClusterSpec{
 			RKEConfig: &provisioningv1.RKEConfig{},
@@ -55,9 +56,11 @@ func Test_Operation_Custom_EtcdSnapshotOperationsOnNewNode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tmpDir := os.TempDir() + "/snapshot-" + name.Hex(time.Now().String(), 5)
-
-	// TODO: defer to remove the temp dir
+	tmpDirSeed, err := randomtoken.Generate()
+	if err != nil {
+		t.Fatal(err)
+	}
+	tmpDir := os.TempDir() + "/snapshot-" + tmpDirSeed[:32]
 
 	// store the snapshots in a universal directory
 	etcdSnapshotDir := []string{

@@ -15,6 +15,7 @@ import (
 	"github.com/rancher/rancher/tests/v2prov/operations"
 	"github.com/rancher/rancher/tests/v2prov/systemdnode"
 	"github.com/rancher/wrangler/pkg/name"
+	"github.com/rancher/wrangler/pkg/randomtoken"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -55,9 +56,11 @@ func Test_Operation_Custom_EtcdSnapshotOperationsOnNewCombinedNode(t *testing.T)
 		t.Fatal(err)
 	}
 
-	tmpDir := os.TempDir() + "/snapshot-" + name.Hex(time.Now().String(), 5)
-
-	// TODO: defer to remove the temp dir
+	tmpDirSeed, err := randomtoken.Generate()
+	if err != nil {
+		t.Fatal(err)
+	}
+	tmpDir := os.TempDir() + "/snapshot-" + tmpDirSeed[:32]
 
 	// store the snapshots in a universal directory
 	etcdSnapshotDir := []string{
@@ -65,7 +68,7 @@ func Test_Operation_Custom_EtcdSnapshotOperationsOnNewCombinedNode(t *testing.T)
 	}
 
 	var etcdNode *corev1.Pod
-	etcdNode, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --controlplane --etcd --node-name etcd-test-node", map[string]string{"custom-cluster-name": c.Name}, etcdSnapshotDir)
+	etcdNode, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --controlplane --etcd --node-name control-etcd-test-node", map[string]string{"custom-cluster-name": c.Name}, etcdSnapshotDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -84,7 +87,7 @@ func Test_Operation_Custom_EtcdSnapshotOperationsOnNewCombinedNode(t *testing.T)
 		},
 	}
 
-	snapshot := operations.RunSnapshotCreateTest(t, clients, c, cm, "etcd-test-node")
+	snapshot := operations.RunSnapshotCreateTest(t, clients, c, cm, "control-etcd-test-node")
 	assert.NotNil(t, snapshot)
 
 	err = clients.Core.Pod().Delete(etcdNode.Namespace, etcdNode.Name, &metav1.DeleteOptions{PropagationPolicy: &[]metav1.DeletionPropagation{metav1.DeletePropagationForeground}[0]})
