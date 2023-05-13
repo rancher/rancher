@@ -28,10 +28,6 @@ func (p *Planner) rotateCertificates(controlPlane *rkev1.RKEControlPlane, status
 		return status, nil
 	}
 
-	if err := p.pauseCAPICluster(controlPlane, true); err != nil {
-		return status, errWaiting("pausing CAPI cluster")
-	}
-
 	for _, node := range collect(clusterPlan, anyRole) {
 		if !shouldRotateEntry(controlPlane.Spec.RotateCertificates, node) {
 			continue
@@ -44,6 +40,10 @@ func (p *Planner) rotateCertificates(controlPlane *rkev1.RKEControlPlane, status
 
 		err = assignAndCheckPlan(p.store, fmt.Sprintf("[%s] certificate rotation", node.Machine.Name), node, rotatePlan, joinedServer, 0, 0)
 		if err != nil {
+			// Ensure the CAPI cluster is paused if we have assigned and are checking a plan.
+			if pauseErr := p.pauseCAPICluster(controlPlane, true); pauseErr != nil {
+				return status, pauseErr
+			}
 			return status, err
 		}
 	}

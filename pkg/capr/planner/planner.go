@@ -35,6 +35,7 @@ import (
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/retry"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	capiannotations "sigs.k8s.io/cluster-api/util/annotations"
 	"sigs.k8s.io/cluster-api/util/conditions"
@@ -1187,24 +1188,29 @@ func (p *Planner) ensureRKEStateSecret(controlPlane *rkev1.RKEControlPlane, newC
 	}, nil
 }
 
+// pauseCAPICluster reconciles the given boolean to the owning CAPI cluster. Notably, it retries if there is a conflict
+// editing the CAPI cluster as there are many controllers that may be racing to edit the object, but there is only one
+// controller that should actively be toggling the paused field on the CAPI cluster object.
 func (p *Planner) pauseCAPICluster(cp *rkev1.RKEControlPlane, pause bool) error {
 	if cp == nil {
-		return fmt.Errorf("cannot toggle health checks for nil controlplane")
+		return fmt.Errorf("cannot pause CAPI cluster for nil controlplane")
 	}
-	cluster, err := capr.GetOwnerCAPICluster(cp, p.capiClusters)
-	if err != nil {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		cluster, err := capr.GetOwnerCAPICluster(cp, p.capiClusters)
+		if err != nil {
+			return err
+		}
+		if cluster == nil {
+			return fmt.Errorf("CAPI cluster does not exist for %s/%s", cp.Namespace, cp.Name)
+		}
+		cluster = cluster.DeepCopy()
+		if cluster.Spec.Paused == pause {
+			return nil
+		}
+		cluster.Spec.Paused = pause
+		_, err = p.capiClient.Update(cluster)
 		return err
-	}
-	if cluster == nil {
-		return fmt.Errorf("CAPI cluster does not exist for %s/%s", cp.Namespace, cp.Name)
-	}
-	cluster = cluster.DeepCopy()
-	if cluster.Spec.Paused == pause {
-		return nil
-	}
-	cluster.Spec.Paused = pause
-	_, err = p.capiClient.Update(cluster)
-	return err
+	})
 }
 
 // ensureCAPIClusterControlPlaneInitializedFalse retrieves the CAPI cluster from cache and sets the ControlPlaneInitializedCondition
