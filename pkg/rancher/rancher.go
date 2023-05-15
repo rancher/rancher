@@ -464,7 +464,11 @@ func setupRancherService(ctx context.Context, restConfig *rest.Config, httpsList
 // This should only be called when Rancher is run in a Docker container because the Kubernetes version and Rancher version
 // are bumped at the same time. In a Kubernetes cluster, usually the Rancher version is bumped when the cluster is upgraded.
 func bumpRancherWebhookIfNecessary(ctx context.Context, restConfig *rest.Config) error {
-	webhookVersionParts := strings.Split(os.Getenv("CATTLE_RANCHER_WEBHOOK_VERSION"), "+up")
+	v := os.Getenv("CATTLE_RANCHER_WEBHOOK_MIN_VERSION")
+	if v == "" {
+		v = os.Getenv("CATTLE_RANCHER_WEBHOOK_VERSION")
+	}
+	webhookVersionParts := strings.Split(v, "+up")
 	if len(webhookVersionParts) != 2 {
 		return nil
 	} else if !strings.HasPrefix(webhookVersionParts[1], "v") {
