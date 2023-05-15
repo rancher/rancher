@@ -253,7 +253,7 @@ func (m *Manager) install(namespace, name, minVersion, exactVersion string, valu
 		return err
 	}
 
-	installed, desiredVersion, desiredValue, err := m.isInstalled(namespace, name, chart.Version, minVersion, values)
+	installed, desiredVersion, desiredValue, err := m.isInstalled(namespace, name, minVersion, chart.Version, values)
 	if err != nil {
 		return err
 	} else if installed {
@@ -358,7 +358,7 @@ func podDone(chart string, newPod *corev1.Pod) (bool, error) {
 }
 
 // isInstalled returns whether the release is installed, if false, it will return the version and values.yaml it should install/upgrade
-func (m *Manager) isInstalled(namespace, name, version, minVersion string, desiredValue map[string]interface{}) (bool, string, map[string]interface{}, error) {
+func (m *Manager) isInstalled(namespace, name, minVersion, version string, desiredValue map[string]interface{}) (bool, string, map[string]interface{}, error) {
 	helmcfg := &action.Configuration{}
 	if err := helmcfg.Init(m.restClientGetter, namespace, "", logrus.Infof); err != nil {
 		return false, "", nil, err
@@ -372,10 +372,13 @@ func (m *Manager) isInstalled(namespace, name, version, minVersion string, desir
 		return false, "", nil, err
 	}
 
-	return isInstalled(releases, version, minVersion, desiredValue)
+	return isInstalled(releases, minVersion, version, desiredValue)
 }
 
-func isInstalled(releases []*release.Release, latestVersion, minVersion string, desiredValues map[string]any) (bool, string, map[string]interface{}, error) {
+func isInstalled(releases []*release.Release, minVersion, latestVersion string, desiredValues map[string]any) (bool, string, map[string]interface{}, error) {
+	if minVersion == "" && latestVersion == "" {
+		return false, "", nil, fmt.Errorf("min and latest (or exact) versions cannot both be empty")
+	}
 	for _, r := range releases {
 		if r.Info.Status != release.StatusDeployed {
 			continue
@@ -411,6 +414,13 @@ func isInstalled(releases []*release.Release, latestVersion, minVersion string, 
 		desired, err := semver.NewVersion(latestVersion)
 		if err != nil {
 			return false, "", nil, err
+		}
+
+		if minVersion == "" {
+			// Use exact version.
+			if !current.Equal(desired) {
+				return false, desired.String(), desiredValues, nil
+			}
 		}
 
 		if minVersion != "" {

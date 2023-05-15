@@ -206,6 +206,17 @@ func TestIsInstalled(t *testing.T) {
 			expectedValues:    nil,
 			expectedErr:       true,
 		},
+		{
+			name:          "min and latest are both unset",
+			latestVersion: "",
+			minVersion:    "",
+			desiredValues: standardValues,
+
+			expectedInstalled: false,
+			expectedVersion:   "",
+			expectedValues:    nil,
+			expectedErr:       true,
+		},
 	}
 
 	releases := []*release.Release{
@@ -225,7 +236,96 @@ func TestIsInstalled(t *testing.T) {
 		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
-			installed, version, values, err := isInstalled(releases, test.latestVersion, test.minVersion, test.desiredValues)
+			installed, version, values, err := isInstalled(releases, test.minVersion, test.latestVersion, test.desiredValues)
+			assert.Equal(t, test.expectedInstalled, installed)
+			assert.Equal(t, test.expectedVersion, version)
+			assert.Equal(t, test.expectedValues, values)
+			assert.Equal(t, test.expectedErr, err != nil)
+		})
+	}
+}
+
+func TestIsInstalledExactVersion(t *testing.T) {
+	t.Parallel()
+
+	standardValues := map[string]any{
+		"name": "Pablo",
+	}
+	newValues := map[string]any{
+		"name": "Winston",
+	}
+
+	tests := []struct {
+		name          string
+		exactVersion  string
+		desiredValues map[string]any
+
+		expectedInstalled bool
+		expectedVersion   string
+		expectedValues    map[string]any
+		expectedErr       bool
+	}{
+		{
+			name:          "exact is higher than current",
+			exactVersion:  "2.0.0",
+			desiredValues: standardValues,
+
+			expectedInstalled: false,
+			expectedVersion:   "2.0.0",
+			expectedValues:    standardValues,
+			expectedErr:       false,
+		},
+		{
+			name:          "exact is lower than current",
+			exactVersion:  "0.9.0",
+			desiredValues: standardValues,
+
+			expectedInstalled: false,
+			expectedVersion:   "0.9.0",
+			expectedValues:    standardValues,
+			expectedErr:       false,
+		},
+		{
+			name:          "exact matches current",
+			exactVersion:  "1.0.0",
+			desiredValues: nil,
+
+			expectedInstalled: true,
+			expectedVersion:   "",
+			expectedValues:    nil,
+			expectedErr:       false,
+		},
+		{
+			name:          "exact matches current but values changed",
+			exactVersion:  "1.0.0",
+			desiredValues: newValues,
+
+			expectedInstalled: false,
+			expectedVersion:   "1.0.0",
+			expectedValues:    newValues,
+			expectedErr:       false,
+		},
+	}
+
+	releases := []*release.Release{
+		{
+			Name: "rancher-webhook",
+			Info: &release.Info{Status: release.StatusDeployed},
+			Chart: &chart.Chart{
+				Metadata: &chart.Metadata{
+					Version: "1.0.0",
+				},
+			},
+			Config: standardValues,
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			// Note that the minVersion argument must be an empty string.
+			installed, version, values, err := isInstalled(releases, "", test.exactVersion, test.desiredValues)
 			assert.Equal(t, test.expectedInstalled, installed)
 			assert.Equal(t, test.expectedVersion, version)
 			assert.Equal(t, test.expectedValues, values)
