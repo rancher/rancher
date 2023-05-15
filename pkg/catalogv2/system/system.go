@@ -357,7 +357,7 @@ func podDone(chart string, newPod *corev1.Pod) (bool, error) {
 	return false, nil
 }
 
-// isInstalled returns whether the release is installed, if false, it will return the version and values.yaml it should install/upgrade
+// isInstalled returns whether the release is installed. If not, it returns the version and Helm values it should install or upgrade.
 func (m *Manager) isInstalled(namespace, name, minVersion, version string, desiredValue map[string]interface{}) (bool, string, map[string]interface{}, error) {
 	helmcfg := &action.Configuration{}
 	if err := helmcfg.Init(m.restClientGetter, namespace, "", logrus.Infof); err != nil {
@@ -372,13 +372,10 @@ func (m *Manager) isInstalled(namespace, name, minVersion, version string, desir
 		return false, "", nil, err
 	}
 
-	return isInstalled(releases, minVersion, version, desiredValue)
+	return chartWithValuesInstalled(releases, minVersion, version, desiredValue)
 }
 
-func isInstalled(releases []*release.Release, minVersion, latestVersion string, desiredValues map[string]any) (bool, string, map[string]interface{}, error) {
-	if minVersion == "" && latestVersion == "" {
-		return false, "", nil, fmt.Errorf("min and latest (or exact) versions cannot both be empty")
-	}
+func chartWithValuesInstalled(releases []*release.Release, minVersion, latestVersion string, desiredValues map[string]any) (bool, string, map[string]interface{}, error) {
 	for _, r := range releases {
 		if r.Info.Status != release.StatusDeployed {
 			continue
@@ -403,6 +400,11 @@ func isInstalled(releases []*release.Release, minVersion, latestVersion string, 
 
 		patchedJSON, err := jsonpatch.MergePatch(actualValueJSON, desiredValuesJSON)
 		if err != nil {
+			return false, "", nil, err
+		}
+
+		desiredValues = map[string]interface{}{}
+		if err := json.Unmarshal(patchedJSON, &desiredValues); err != nil {
 			return false, "", nil, err
 		}
 
@@ -437,7 +439,7 @@ func isInstalled(releases []*release.Release, minVersion, latestVersion string, 
 				if !bytes.Equal(patchedJSON, actualValueJSON) {
 					return false, r.Chart.Metadata.Version, desiredValues, nil
 				}
-				logrus.Debugf("Skipping installing/upgrading desired version %v for release %v, current version %v is greater or equal to minimal required version %v", desired.String(), r.Chart.Name(), current.String(), minVersion)
+				logrus.Debugf("Skipping installing/upgrading desired version %s for release %s, since current version %s is greater or equal to minimal required version %s", desired.String(), r.Name, current.String(), minVersion)
 				return true, "", nil, nil
 			}
 		}

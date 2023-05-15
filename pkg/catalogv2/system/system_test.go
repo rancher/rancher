@@ -217,6 +217,35 @@ func TestIsInstalled(t *testing.T) {
 			expectedValues:    nil,
 			expectedErr:       true,
 		},
+		{
+			name:          "values are merged",
+			latestVersion: "1.3.0",
+			minVersion:    "1.2.0",
+			desiredValues: map[string]any{
+				"foo": "bar",
+			},
+
+			expectedInstalled: false,
+			expectedVersion:   "1.3.0",
+			expectedValues: map[string]any{
+				"name": "Pablo",
+				"foo":  "bar",
+			},
+			expectedErr: false,
+		},
+		{
+			name:          "new values are empty yet old ones remain in merge",
+			latestVersion: "1.3.0",
+			minVersion:    "1.2.0",
+			desiredValues: map[string]any{},
+
+			expectedInstalled: false,
+			expectedVersion:   "1.3.0",
+			expectedValues: map[string]any{
+				"name": "Pablo",
+			},
+			expectedErr: false,
+		},
 	}
 
 	releases := []*release.Release{
@@ -236,7 +265,7 @@ func TestIsInstalled(t *testing.T) {
 		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
-			installed, version, values, err := isInstalled(releases, test.minVersion, test.latestVersion, test.desiredValues)
+			installed, version, values, err := chartWithValuesInstalled(releases, test.minVersion, test.latestVersion, test.desiredValues)
 			assert.Equal(t, test.expectedInstalled, installed)
 			assert.Equal(t, test.expectedVersion, version)
 			assert.Equal(t, test.expectedValues, values)
@@ -251,10 +280,6 @@ func TestIsInstalledExactVersion(t *testing.T) {
 	standardValues := map[string]any{
 		"name": "Pablo",
 	}
-	newValues := map[string]any{
-		"name": "Winston",
-	}
-
 	tests := []struct {
 		name          string
 		exactVersion  string
@@ -296,14 +321,19 @@ func TestIsInstalledExactVersion(t *testing.T) {
 			expectedErr:       false,
 		},
 		{
-			name:          "exact matches current but values changed",
-			exactVersion:  "1.0.0",
-			desiredValues: newValues,
+			name:         "exact matches current but values changed and got merged",
+			exactVersion: "1.0.0",
+			desiredValues: map[string]any{
+				"foo": "bar",
+			},
 
 			expectedInstalled: false,
 			expectedVersion:   "1.0.0",
-			expectedValues:    newValues,
-			expectedErr:       false,
+			expectedValues: map[string]any{
+				"name": "Pablo",
+				"foo":  "bar",
+			},
+			expectedErr: false,
 		},
 	}
 
@@ -325,7 +355,7 @@ func TestIsInstalledExactVersion(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			// Note that the minVersion argument must be an empty string.
-			installed, version, values, err := isInstalled(releases, "", test.exactVersion, test.desiredValues)
+			installed, version, values, err := chartWithValuesInstalled(releases, "", test.exactVersion, test.desiredValues)
 			assert.Equal(t, test.expectedInstalled, installed)
 			assert.Equal(t, test.expectedVersion, version)
 			assert.Equal(t, test.expectedValues, values)

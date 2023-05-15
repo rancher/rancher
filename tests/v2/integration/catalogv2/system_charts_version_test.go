@@ -105,7 +105,7 @@ func (w *SystemChartsVersionSuite) TestInstallWebhook() {
 
 	// Allow the new release to fully deploy. Otherwise, the client won't find it among current releases.
 	var newRelease *release.Release
-	err = kwait.Poll(10*time.Second, time.Minute, func() (done bool, err error) {
+	err = kwait.Poll(10*time.Second, 2*time.Minute, func() (done bool, err error) {
 		newRelease, err = w.fetchRelease("cattle-system", "rancher-webhook")
 		if err != nil {
 			return false, nil
@@ -145,7 +145,7 @@ func (w *SystemChartsVersionSuite) TestInstallWebhookMinVersion() {
 
 	// Allow the new release to fully deploy. Otherwise, the client won't find it among current releases.
 	var newRelease *release.Release
-	err = kwait.Poll(10*time.Second, time.Minute, func() (done bool, err error) {
+	err = kwait.Poll(10*time.Second, 2*time.Minute, func() (done bool, err error) {
 		newRelease, err = w.fetchRelease("cattle-system", "rancher-webhook")
 		if err != nil {
 			return false, nil

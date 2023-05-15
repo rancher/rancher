@@ -148,7 +148,6 @@ func Test_ChartInstallation(t *testing.T) {
 			},
 			registryOverride: "rancher-test.io",
 		},
-		// TODO (maxsokolovsky) remove once the rancher-webhook-min-version setting is fully removed.
 		{
 			name: "installation with min version override",
 			setup: func(ctrl *gomock.Controller) chart.Manager {
