@@ -2,211 +2,53 @@ package restrictedadminrbac
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/hashicorp/go-multierror"
-	clusterv2 "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/wrangler/pkg/name"
-	"github.com/sirupsen/logrus"
-	k8srbac "k8s.io/api/rbac/v1"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"github.com/rancher/wrangler/pkg/relatedresource"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-func (r *rbaccontroller) clusterRBACSync(key string, cluster *v3.Cluster) (runtime.Object, error) {
-	if cluster == nil || cluster.DeletionTimestamp != nil {
+// clusterOwnerSync ensures that the given enqueued GRB has a cluster-owner CRTB in all downstream clusters iff the role is GlobalRestrictedAdmin.
+func (r *rbaccontroller) clusterOwnerSync(_ string, grb *v3.GlobalRoleBinding) (runtime.Object, error) {
+	if grb == nil || grb.DeletionTimestamp != nil || grb.GlobalRoleName != rbac.GlobalRestrictedAdmin {
 		return nil, nil
 	}
-
-	// restricted-admin should not be granted admin access to the local cluster, it only needs access to downstream clusters
-	if cluster.Name == "local" {
-		return nil, nil
-	}
-
-	grbs, err := r.grbIndexer.ByIndex(grbByRoleIndex, rbac.GlobalRestrictedAdmin)
+	clusters, err := r.clusterCache.List(labels.Everything())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to list clusters: %w", err)
 	}
+	var retError error
+	for _, cluster := range clusters {
+		if cluster.Name == "local" {
+			// do not sync to the local cluster
+			continue
+		}
+		crtbName := name.SafeConcatName(rbac.GetGRBTargetKey(grb), "restricted-admin", "cluster-owner")
+		_, err := r.crtbCache.Get(cluster.Name, crtbName)
+		if err != nil && !apierrors.IsNotFound(err) {
+			retError = multierror.Append(retError, fmt.Errorf("failed to get CRTB '%s' from cache: %w", crtbName, err))
+			continue
+		}
+		if err == nil {
+			// CRTB was already created.
+			// we do not need to check for equivalence between the current CRTB and the desired CRTB
+			// this is because the fields we care about can not be modified
+			continue
+		}
 
-	var subjects []k8srbac.Subject
-	var returnErr error
-	var grbList []*v3.GlobalRoleBinding
-	for _, x := range grbs {
-		grb, _ := x.(*v3.GlobalRoleBinding)
-		grbList = append(grbList, grb)
-		subject := rbac.GetGRBSubject(grb)
-		subjects = append(subjects, subject)
-		rbName := fmt.Sprintf("%s-%s", grb.Name, rbac.RestrictedAdminClusterRoleBinding)
-		rb, err := r.rbLister.Get(cluster.Name, rbName)
-		if err != nil && !k8serrors.IsNotFound(err) {
-			returnErr = multierror.Append(returnErr, err)
-			continue
-		}
-		if rb != nil {
-			continue
-		}
-		_, err = r.roleBindings.Create(&k8srbac.RoleBinding{
+		// add the restricted admin user as a member of the downstream cluster
+		// by creating a CRTB in the local custer in the namespace named after the downstream cluster.
+		crtb := v3.ClusterRoleTemplateBinding{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      rbName,
+				Name:      crtbName,
 				Namespace: cluster.Name,
-				Labels:    map[string]string{rbac.RestrictedAdminClusterRoleBinding: "true"},
-				OwnerReferences: []metav1.OwnerReference{
-					{
-						APIVersion: grb.TypeMeta.APIVersion,
-						Kind:       grb.TypeMeta.Kind,
-						UID:        grb.UID,
-						Name:       grb.Name,
-					},
-				},
-			},
-			RoleRef: k8srbac.RoleRef{
-				Name: rbac.ClusterCRDsClusterRole,
-				Kind: "ClusterRole",
-			},
-			Subjects: []k8srbac.Subject{subject},
-		})
-		if err != nil && !k8serrors.IsAlreadyExists(err) {
-			returnErr = multierror.Append(returnErr, err)
-		}
-	}
-
-	if returnErr != nil {
-		return nil, returnErr
-	}
-
-	err = r.createCRAndCRBForRestrictedAdminClusterAccess(cluster, subjects)
-	if err != nil {
-		return nil, err
-	}
-
-	return nil, r.createRBForRestrictedAdminProvisioningClusterAccess(cluster, grbList)
-}
-
-/*
-	createCRAndCRBForRestrictedAdminClusterAccess creates a CR with the resourceName field containing current cluster's ID. It also creates
-
-a CRB for binding this CR to all the restricted admins. This way all restricted admins become owners of the cluster
-*/
-func (r *rbaccontroller) createCRAndCRBForRestrictedAdminClusterAccess(cluster *v3.Cluster, subjects []k8srbac.Subject) error {
-	var returnErr error
-
-	crName := fmt.Sprintf("%s-%s", cluster.Name, rbac.RestrictedAdminCRForClusters)
-	_, err := r.crLister.Get("", crName)
-	if err != nil {
-		if !k8serrors.IsNotFound(err) {
-			return err
-		}
-		cr := k8srbac.ClusterRole{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:   crName,
-				Labels: map[string]string{rbac.RestrictedAdminCRForClusters: cluster.Name},
-				OwnerReferences: []metav1.OwnerReference{
-					{
-						APIVersion: cluster.TypeMeta.APIVersion,
-						Kind:       cluster.TypeMeta.Kind,
-						UID:        cluster.UID,
-						Name:       cluster.Name,
-					},
-				},
-			},
-			Rules: []k8srbac.PolicyRule{
-				{
-					APIGroups:     []string{"management.cattle.io"},
-					Resources:     []string{"clusters"},
-					ResourceNames: []string{cluster.Name},
-					Verbs:         []string{"*"},
-				},
-			},
-		}
-		_, err := r.clusterRoles.Create(&cr)
-		if err != nil && !k8serrors.IsAlreadyExists(err) {
-			return err
-		}
-
-		crbNamePrefix := fmt.Sprintf("%s-%s", cluster.Name, rbac.RestrictedAdminCRBForClusters)
-		for _, subject := range subjects {
-			crbName := fmt.Sprintf("%s-%s", crbNamePrefix, subject.Name)
-			existingCrb, err := r.crbLister.Get("", crbName)
-			if err != nil && !k8serrors.IsNotFound(err) {
-				returnErr = multierror.Append(returnErr, err)
-			}
-			if existingCrb != nil {
-				continue
-			}
-			crb := k8srbac.ClusterRoleBinding{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:   crbName,
-					Labels: map[string]string{rbac.RestrictedAdminCRBForClusters: cluster.Name},
-					OwnerReferences: []metav1.OwnerReference{
-						{
-							APIVersion: cluster.TypeMeta.APIVersion,
-							Kind:       cluster.TypeMeta.Kind,
-							UID:        cluster.UID,
-							Name:       cluster.Name,
-						},
-					},
-				},
-				RoleRef: k8srbac.RoleRef{
-					Kind: "ClusterRole",
-					Name: crName,
-				},
-				Subjects: []k8srbac.Subject{subject},
-			}
-
-			_, err = r.clusterRoleBindings.Create(&crb)
-			if err != nil && !k8serrors.IsAlreadyExists(err) {
-				returnErr = multierror.Append(returnErr, err)
-			}
-		}
-	}
-	return returnErr
-}
-
-/*
-	createRBForRestrictedAdminProvisioningClusterAccess creates for all restrictedAdmin users, a RB to the cluster-admin Role
-
-created with the resourceName field containing the provisioning cluster's ID corresponding to the v3.cluster,
-This way all restricted admins become owners of the provisioning cluster
-*/
-func (r *rbaccontroller) createRBForRestrictedAdminProvisioningClusterAccess(cluster *v3.Cluster, grbList []*v3.GlobalRoleBinding) error {
-	var returnErr error
-	clusterName := cluster.Name
-
-	pClusters, err := r.provClusters.GetByIndex(clusterv2.ByCluster, clusterName)
-	if err != nil {
-		return err
-	}
-
-	if len(pClusters) == 0 {
-		// When no provisioning cluster is found, enqueue this v3.cluster to wait for
-		// the provisioning cluster to be created. If we don't try again
-		// these rbac permissions for the restrictedAdmin users won't be created until an
-		// update to the v3.cluster happens again.
-		logrus.Debugf("No provisioning cluster found for cluster %v in rbac handler for restrictedAdmin, enqueuing", clusterName)
-		r.clusters.Controller().EnqueueAfter(cluster.Namespace, clusterName, 10*time.Second)
-		return nil
-	}
-
-	provCluster := pClusters[0]
-	for _, grb := range grbList {
-		// The roleBinding name format: r-cluster-<cluster name>-admin-<subject name>
-		// Example: r-cluster-cluster1-admin-u-xyz
-		subject := rbac.GetGRBSubject(grb)
-		rbName := name.SafeConcatName(rbac.ProvisioningClusterAdminName(provCluster), rbac.GetGRBTargetKey(grb))
-		existingRb, err := r.rbLister.Get(provCluster.Namespace, rbName)
-		if err != nil && !k8serrors.IsNotFound(err) {
-			returnErr = multierror.Append(returnErr, err)
-		}
-		if existingRb != nil {
-			continue
-		}
-		_, err = r.roleBindings.Create(&k8srbac.RoleBinding{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      rbName,
-				Namespace: provCluster.Namespace,
+				Labels:    map[string]string{sourceKey: grbHandlerName},
 				OwnerReferences: []metav1.OwnerReference{
 					{
 						APIVersion: grb.APIVersion,
@@ -216,16 +58,67 @@ func (r *rbaccontroller) createRBForRestrictedAdminProvisioningClusterAccess(clu
 					},
 				},
 			},
-			RoleRef: k8srbac.RoleRef{
-				APIGroup: k8srbac.GroupName,
-				Kind:     "Role",
-				Name:     rbac.ProvisioningClusterAdminName(provCluster),
-			},
-			Subjects: []k8srbac.Subject{subject},
-		})
-		if err != nil && !k8serrors.IsAlreadyExists(err) {
-			returnErr = multierror.Append(returnErr, err)
+			ClusterName:      cluster.Name,
+			RoleTemplateName: "cluster-owner",
+		}
+
+		// CRTBs must contain either user or group information but not both.
+		// we will attempt to first use the userName then if not assign the groupName.
+		if grb.UserName != "" {
+			crtb.UserName = grb.UserName
+		} else {
+			crtb.GroupPrincipalName = grb.GroupPrincipalName
+		}
+
+		_, err = r.crtbCtrl.Create(&crtb)
+		if err != nil && !apierrors.IsAlreadyExists(err) {
+			retError = multierror.Append(retError, fmt.Errorf("failed to create a CRTB '%s': %w", crtbName, err))
+			continue
 		}
 	}
-	return returnErr
+	return nil, retError
+}
+
+// enqueueGrbOnCRTB returns a resolver which provides the key to the GRBs that owns a given CRTB if one exist.
+func (r *rbaccontroller) enqueueGrbOnCRTB(_, _ string, obj runtime.Object) ([]relatedresource.Key, error) {
+	crtb, ok := obj.(*v3.ClusterRoleTemplateBinding)
+	if !ok || crtb == nil {
+		return nil, nil
+	}
+
+	var grbOwner []*metav1.OwnerReference
+	for i := range crtb.OwnerReferences {
+		ref := &crtb.OwnerReferences[i]
+		if ref.Kind == "GlobalRoleBinding" && ref.APIVersion == v3.SchemeGroupVersion.String() {
+			grbOwner = append(grbOwner, ref)
+		}
+	}
+
+	if grbOwner == nil {
+		// there are no owner references to GlobalRoleBindings
+		return nil, nil
+	}
+
+	keys := make([]relatedresource.Key, 0, len(grbOwner))
+	for _, owner := range grbOwner {
+		grb, err := r.grbCache.Get(owner.Name)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil, nil
+			}
+			return nil, fmt.Errorf("failed to get owner reference '%s' from cache: %w", owner.Name, err)
+		}
+		keys = append(keys, relatedresource.Key{Name: grb.Name})
+	}
+
+	return keys, nil
+}
+
+// enqueueGrbOnCluster returns a resolver which provides the keys to all restrictedAdminGRBs.
+func (r *rbaccontroller) enqueueGrbOnCluster(_, _ string, obj runtime.Object) ([]relatedresource.Key, error) {
+	cluster, ok := obj.(*v3.Cluster)
+	if !ok || cluster == nil || cluster.DeletionTimestamp != nil || cluster.Name == "local" {
+		return nil, nil
+	}
+	return r.getRestrictedAdminGRBs()
 }
