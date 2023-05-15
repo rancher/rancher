@@ -3,6 +3,7 @@ package planner
 import (
 	"encoding/base64"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
@@ -10,6 +11,7 @@ import (
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/controllers/capr/managesystemagent"
+	"github.com/rancher/wrangler/pkg/name"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -49,24 +51,28 @@ if [ -z "$KUBECONFIG" ]; then
         exit 1
 fi
 
-TMPMACHINEIDS=$(mktemp)
+MACHINEIDSFILE="$1"
+NODENAMESFILE="$2"
+
+if [ -z "$MACHINEIDSFILE" ] || [ -z "$NODENAMESFILE" ]; then
+        echo "Must define nodenames file and machineids file"
+fi
+
 TMPALLNODES=$(mktemp)
 TMPSAVENODES=$(mktemp)
 
-printf '%s\n' "$@" > "$TMPMACHINEIDS"
+cat "$NODENAMESFILE" > "$TMPSAVENODES"
 
 if ! ${KUBECTL} get nodes --no-headers -o=jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' > "$TMPALLNODES"; then
         echo "Error listing all nodes"
         exit 1
 fi
 
-while IFS='' read -r MID; do
-        if NODENAME=$(${KUBECTL} get node --no-headers -o=jsonpath='{.items[0].metadata.name}' -l rke.cattle.io/machine="$MID"); then
+while IFS='' read -r IDENTIFIER; do
+        if NODENAME=$(${KUBECTL} get node --no-headers -o=jsonpath='{.items[0].metadata.name}' -l rke.cattle.io/machine="$IDENTIFIER"); then
                 echo "$NODENAME" >> "$TMPSAVENODES"
         fi
-done < "$TMPMACHINEIDS"
-
-rm "$TMPMACHINEIDS"
+done < "$MACHINEIDSFILE"
 
 echo "Saving nodes:"
 cat "$TMPSAVENODES"
@@ -89,6 +95,9 @@ while IFS='' read -r NODE; do
 done < "$TMPALLNODES"
 rm "$TMPALLNODES"
 rm "$TMPSAVENODES"
+
+rm "$MACHINEIDSFILE"
+rm "$NODENAMESFILE"
 `
 	etcdRestoreNodeWaitForReadyPath   = "wait_for_ready.sh"
 	etcdRestoreNodeWaitForReadyScript = `
@@ -275,14 +284,17 @@ func (p *Planner) runEtcdSnapshotPostRestoreNodeCleanupPlan(controlPlane *rkev1.
 		return err
 	}
 
-	var allMachineUIDs []string
+	var allMachineUIDs, allNodeNames []string
 	for _, n := range collect(clusterPlan, isNotDeleting) {
 		if n.Machine != nil && n.Machine.UID != "" {
 			allMachineUIDs = append(allMachineUIDs, string(n.Machine.UID))
 		}
+		if n.Machine != nil && n.Machine.Status.NodeRef != nil && n.Machine.Status.NodeRef.Name != "" {
+			allNodeNames = append(allNodeNames, n.Machine.Status.NodeRef.Name)
+		}
 	}
 
-	cleanupScriptFiles, cleanupInstructions := p.generateEtcdRestoreNodeCleanupFilesAndInstruction(controlPlane, allMachineUIDs)
+	cleanupScriptFiles, cleanupInstructions := p.generateEtcdRestoreNodeCleanupFilesAndInstruction(controlPlane, allMachineUIDs, allNodeNames)
 	initNodePlan.Files = append(initNodePlan.Files, cleanupScriptFiles...)
 	initNodePlan.Instructions = append(initNodePlan.Instructions, cleanupInstructions...)
 	return assignAndCheckPlan(p.store, ETCDRestoreMessage, initNode, initNodePlan, "", 5, 5)
@@ -413,12 +425,9 @@ func etcdRestoreScriptPath(controlPlane *rkev1.RKEControlPlane, file string) str
 func (p *Planner) generateEtcdRestorePodCleanupFilesAndInstruction(controlPlane *rkev1.RKEControlPlane, cleanupMachineUIDs []string) ([]plan.File, []plan.OneTimeInstruction) {
 	runtime := capr.GetRuntime(controlPlane.Spec.KubernetesVersion)
 
-	kubectl := "/usr/local/bin/kubectl"
-	kubeconfig := "/etc/rancher/k3s/k3s.yaml"
-
-	if runtime == capr.RuntimeRKE2 {
-		kubectl = "/var/lib/rancher/rke2/bin/kubectl"
-		kubeconfig = "/etc/rancher/rke2/rke2.yaml"
+	kubectl, kubeconfig := capr.GetKubectlAndKubeconfigPaths(controlPlane.Spec.KubernetesVersion)
+	if kubectl == "" || kubeconfig == "" {
+		return nil, nil
 	}
 
 	instructions := []plan.OneTimeInstruction{
@@ -507,16 +516,26 @@ func (p *Planner) generateEtcdRestorePodCleanupFilesAndInstruction(controlPlane 
 }
 
 // generateEtcdRestorePodCleanupFilesAndInstruction generates a file that contains a script that checks API server health and a slice of instructions that cleans up system pods on etcd restore.
-func (p *Planner) generateEtcdRestoreNodeCleanupFilesAndInstruction(controlPlane *rkev1.RKEControlPlane, allMachineUIDs []string) ([]plan.File, []plan.OneTimeInstruction) {
-	runtime := capr.GetRuntime(controlPlane.Spec.KubernetesVersion)
-
-	kubectl := "/usr/local/bin/kubectl"
-	kubeconfig := "/etc/rancher/k3s/k3s.yaml"
-
-	if runtime == capr.RuntimeRKE2 {
-		kubectl = "/var/lib/rancher/rke2/bin/kubectl"
-		kubeconfig = "/etc/rancher/rke2/rke2.yaml"
+func (p *Planner) generateEtcdRestoreNodeCleanupFilesAndInstruction(controlPlane *rkev1.RKEControlPlane, allMachineUIDs []string, allNodeNames []string) ([]plan.File, []plan.OneTimeInstruction) {
+	kubectl, kubeconfig := capr.GetKubectlAndKubeconfigPaths(controlPlane.Spec.KubernetesVersion)
+	if kubectl == "" || kubeconfig == "" {
+		return nil, nil
 	}
+
+	var nodeNames, machineIds []byte
+
+	for _, mid := range allMachineUIDs {
+		machineIds = fmt.Appendf(machineIds, "%s\n", mid)
+	}
+
+	for _, nodeName := range allNodeNames {
+		nodeNames = fmt.Appendf(nodeNames, "%s\n", nodeName)
+	}
+
+	identifier := name.Hex(controlPlane.Spec.ETCDSnapshotRestore.Name+controlPlane.Spec.ETCDSnapshotRestore.RestoreRKEConfig+strconv.Itoa(controlPlane.Spec.ETCDSnapshotRestore.Generation), 10)
+
+	machineIdsFile := fmt.Sprintf("machine-ids-%s", identifier)
+	nodeNamesFile := fmt.Sprintf("node-names-%s", identifier)
 
 	instructions := []plan.OneTimeInstruction{
 		{
@@ -526,7 +545,7 @@ func (p *Planner) generateEtcdRestoreNodeCleanupFilesAndInstruction(controlPlane
 				fmt.Sprintf("%s=%s", "KUBECTL", kubectl),
 				fmt.Sprintf("%s=%s", "KUBECONFIG", kubeconfig),
 			},
-			Args: append([]string{etcdRestoreScriptPath(controlPlane, etcdRestoreNodeCleanUpPath)}, allMachineUIDs...),
+			Args: []string{etcdRestoreScriptPath(controlPlane, etcdRestoreNodeCleanUpPath), etcdRestoreScriptPath(controlPlane, machineIdsFile), etcdRestoreScriptPath(controlPlane, nodeNamesFile)},
 		},
 	}
 
@@ -534,6 +553,16 @@ func (p *Planner) generateEtcdRestoreNodeCleanupFilesAndInstruction(controlPlane
 		{
 			Content: base64.StdEncoding.EncodeToString([]byte(etcdRestoreNodeCleanUpScript)),
 			Path:    etcdRestoreScriptPath(controlPlane, etcdRestoreNodeCleanUpPath),
+			Dynamic: true,
+		},
+		{
+			Content: base64.StdEncoding.EncodeToString(machineIds),
+			Path:    etcdRestoreScriptPath(controlPlane, machineIdsFile),
+			Dynamic: true,
+		},
+		{
+			Content: base64.StdEncoding.EncodeToString(nodeNames),
+			Path:    etcdRestoreScriptPath(controlPlane, nodeNamesFile),
 			Dynamic: true,
 		},
 	}, instructions
