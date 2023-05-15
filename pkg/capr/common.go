@@ -54,6 +54,7 @@ const (
 	InitNodeLabel                 = "rke.cattle.io/init-node"
 	InitNodeMachineIDLabel        = "rke.cattle.io/init-node-machine-id"
 	InternalAddressAnnotation     = "rke.cattle.io/internal-address"
+	JoinURLAutosetDisabled        = "rke.cattle.io/join-url-autoset-disabled"
 	JoinURLAnnotation             = "rke.cattle.io/join-url"
 	JoinedToAnnotation            = "rke.cattle.io/joined-to"
 	LabelsAnnotation              = "rke.cattle.io/labels"

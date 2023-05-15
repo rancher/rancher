@@ -4,6 +4,17 @@ These are the mock controllers/clients/caches that are used to allow unit testin
 
 ### Maintenance
 
+Make sure you have `mockgen`, you can get it through
+
+```
+go install github.com/golang/mock/mockgen@v1.6.0
+```
+
+Make sure your `$GOPATH/bin` is in your path, i.e.
+```
+export PATH=$PATH:/root/go/bin
+```
+
 They were generated through the following commands:
 
 ```
@@ -12,6 +23,7 @@ mockgen --build_flags=--mod=mod -package mockcorecontrollers -destination ./pkg/
 mockgen --build_flags=--mod=mod -package mockmgmtcontrollers -destination ./pkg/capr/mock/mockmgmtcontrollers/mock_mgmtcontrollers.go github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3 ClusterRegistrationTokenCache,ClusterCache
 mockgen --build_flags=--mod=mod -package mockcapicontrollers -destination ./pkg/capr/mock/mockcapicontrollers/mock_capicontrollers.go github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1 MachineClient,MachineCache,ClusterClient,ClusterCache
 mockgen --build_flags=--mod=mod -package mockranchercontrollers -destination ./pkg/capr/mock/mockranchercontrollers/mock_ranchercontrollers.go github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1 ClusterCache
+mockgen --build_flags=--mod=mod -package mockfleetcontrollers -destination ./pkg/capr/mock/mockfleetcontrollers/mock_fleetcontrollers.go github.com/rancher/rancher/pkg/generated/controllers/fleet.cattle.io/v1alpha1 BundleController
 ```
 
 Eventually, when Wrangler is updated to generate mock clients, we should use that instead of generating our own mock clients/controllers/caches.

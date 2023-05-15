@@ -420,7 +420,7 @@ func (p *Planner) encryptionKeyRotationRestartNodes(cp *rkev1.RKEControlPlane, s
 // status can be successfully queried, and then gets the status. leaderStage is allowed to be empty if entry is the
 // leader.
 func (p *Planner) encryptionKeyRotationRestartService(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus, tokensSecret plan.Secret, joinServer string, entry *planEntry, scrapeStage bool, leaderStage string) (string, rkev1.RKEControlPlaneStatus, error) {
-	nodePlan, config, joinedServer, err := p.generatePlanWithConfigFiles(cp, tokensSecret, entry, joinServer)
+	nodePlan, config, joinedServer, err := p.generatePlanWithConfigFiles(cp, tokensSecret, entry, joinServer, true)
 	if err != nil {
 		return "", status, err
 	}
@@ -430,10 +430,18 @@ func (p *Planner) encryptionKeyRotationRestartService(cp *rkev1.RKEControlPlane,
 		Path:    encryptionKeyRotationScriptPath(cp, encryptionKeyRotationWaitForSystemctlStatusPath),
 	})
 
-	nodePlan.Instructions = []plan.OneTimeInstruction{
-		encryptionKeyRotationRestartInstruction(cp),
-		encryptionKeyRotationWaitForSystemctlStatusInstruction(cp),
+	nodePlan.Instructions = []plan.OneTimeInstruction{}
+
+	runtime := capr.GetRuntime(cp.Spec.KubernetesVersion)
+	if runtime == capr.RuntimeRKE2 {
+		if generated, instruction := generateManifestRemovalInstruction(runtime, entry); generated {
+			nodePlan.Instructions = append(nodePlan.Instructions, instruction)
+		}
 	}
+
+	nodePlan.Instructions = append(nodePlan.Instructions,
+		encryptionKeyRotationRestartInstruction(cp),
+		encryptionKeyRotationWaitForSystemctlStatusInstruction(cp))
 
 	if isControlPlane(entry) {
 		nodePlan.Files = append(nodePlan.Files,
@@ -491,7 +499,7 @@ func (p *Planner) encryptionKeyRotationRestartService(cp *rkev1.RKEControlPlane,
 // successful. If the secrets-encrypt command does not exist on the plan, that means this is the first reconciliation, and
 // it must be added, otherwise reenqueue until the plan is in sync.
 func (p *Planner) encryptionKeyRotationLeaderPhaseReconcile(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus, tokensSecret plan.Secret, joinServer string, leader *planEntry) (rkev1.RKEControlPlaneStatus, error) {
-	nodePlan, _, joinedServer, err := p.generatePlanWithConfigFiles(cp, tokensSecret, leader, joinServer)
+	nodePlan, _, joinedServer, err := p.generatePlanWithConfigFiles(cp, tokensSecret, leader, joinServer, true)
 	if err != nil {
 		return status, err
 	}

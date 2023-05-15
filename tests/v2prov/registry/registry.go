@@ -5,8 +5,8 @@ import (
 	"sync"
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
-	"github.com/rancher/rancher/tests/integration/pkg/clients"
-	"github.com/rancher/rancher/tests/integration/pkg/wait"
+	"github.com/rancher/rancher/tests/v2prov/clients"
+	"github.com/rancher/rancher/tests/v2prov/wait"
 	"github.com/rancher/rke/pki/cert"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -230,6 +230,7 @@ func GetCache(clients *clients.Clients, namespace string) (rkev1.Registry, error
 		return rkev1.Registry{}, err
 	}
 
+	// Specify dummy.io registries to ensure we can deliver the same data twice without thrashing.
 	return rkev1.Registry{
 		Mirrors: map[string]rkev1.Mirror{
 			"docker.io": {
@@ -237,9 +238,19 @@ func GetCache(clients *clients.Clients, namespace string) (rkev1.Registry, error
 					fmt.Sprintf("https://%s:5000", cacheServiceName),
 				},
 			},
+			"dummy.cattle.io": {
+				Endpoints: []string{
+					"https://dummy.cattle.io",
+				},
+			},
 		},
 		Configs: map[string]rkev1.RegistryConfig{
 			cacheServiceName + ":5000": {
+				AuthConfigSecretName: passwordSecret.Name,
+				TLSSecretName:        tlsSecret.Name,
+				CABundle:             tlsSecret.Data[corev1.TLSCertKey],
+			},
+			"dummy.cattle.io": {
 				AuthConfigSecretName: passwordSecret.Name,
 				TLSSecretName:        tlsSecret.Name,
 				CABundle:             tlsSecret.Data[corev1.TLSCertKey],

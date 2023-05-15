@@ -6,6 +6,10 @@ platform:
   os: linux
   arch: amd64
 
+environment:
+  V2PROV_TEST_DIST: "k3s"
+  V2PROV_TEST_RUN_REGEX: "^Test_(General|Provisioning)_.*$"
+
 steps:
 - name: provisioning-tests-pr
   image: rancher/dapper:v0.5.8
@@ -54,11 +58,15 @@ platform:
   os: linux
   arch: amd64
 
+environment:
+  V2PROV_TEST_DIST: "rke2"
+  V2PROV_TEST_RUN_REGEX: "^Test_(General|Provisioning)_.*$"
+
 steps:
 - name: provisioning-tests-pr
   image: rancher/dapper:v0.5.8
   commands:
-  - dapper provisioning-tests-rke2
+  - dapper provisioning-tests
   privileged: true
   volumes:
   - name: docker
@@ -69,7 +77,7 @@ steps:
 - name: provisioning-tests-push
   image: rancher/dapper:v0.5.8
   commands:
-  - dapper provisioning-tests-rke2
+  - dapper provisioning-tests
   privileged: true
   volumes:
   - name: docker
@@ -102,11 +110,15 @@ platform:
   os: linux
   arch: amd64
 
+environment:
+  V2PROV_TEST_DIST: "k3s"
+  V2PROV_TEST_RUN_REGEX: "^Test_Operation_.*$"
+
 steps:
   - name: provisioning-operations-tests-pr
     image: rancher/dapper:v0.5.8
     commands:
-      - dapper provisioning-operations-tests
+      - dapper provisioning-tests
     privileged: true
     volumes:
       - name: docker
@@ -117,7 +129,7 @@ steps:
   - name: provisioning-operations-tests-push
     image: rancher/dapper:v0.5.8
     commands:
-      - dapper provisioning-operations-tests
+      - dapper provisioning-tests
     privileged: true
     volumes:
       - name: docker
@@ -150,11 +162,15 @@ platform:
   os: linux
   arch: amd64
 
+environment:
+  V2PROV_TEST_DIST: "rke2"
+  V2PROV_TEST_RUN_REGEX: "^Test_Operation_.*$"
+
 steps:
   - name: provisioning-operations-tests-pr
     image: rancher/dapper:v0.5.8
     commands:
-      - dapper provisioning-operations-tests-rke2
+      - dapper provisioning-tests
     privileged: true
     volumes:
       - name: docker
@@ -165,7 +181,7 @@ steps:
   - name: provisioning-operations-tests-push
     image: rancher/dapper:v0.5.8
     commands:
-      - dapper provisioning-operations-tests-rke2
+      - dapper provisioning-tests
     privileged: true
     volumes:
       - name: docker

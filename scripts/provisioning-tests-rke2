@@ -1,9 +1,0 @@
-#!/bin/bash
-set -e
-if ./scripts/only-ui-bumps.sh; then
-    exit 0
-fi
-
-cd $(dirname $0)/..
-
-DIST=rke2 ./scripts/provisioning-tests

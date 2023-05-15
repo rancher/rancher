@@ -7,20 +7,21 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 	"time"
 
-	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	provisioningv1api "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/controllers/capr/machineprovision"
-	"github.com/rancher/rancher/tests/integration/pkg/clients"
-	"github.com/rancher/rancher/tests/integration/pkg/defaults"
-	"github.com/rancher/rancher/tests/integration/pkg/namespace"
-	"github.com/rancher/rancher/tests/integration/pkg/nodeconfig"
-	"github.com/rancher/rancher/tests/integration/pkg/registry"
-	"github.com/rancher/rancher/tests/integration/pkg/wait"
+	"github.com/rancher/rancher/tests/v2prov/clients"
+	"github.com/rancher/rancher/tests/v2prov/defaults"
+	"github.com/rancher/rancher/tests/v2prov/namespace"
+	"github.com/rancher/rancher/tests/v2prov/nodeconfig"
+	"github.com/rancher/rancher/tests/v2prov/registry"
+	"github.com/rancher/rancher/tests/v2prov/wait"
 	"github.com/rancher/wrangler/pkg/condition"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
@@ -32,6 +33,9 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
+
+const ConflictMessageRegex = `\[K8s\] encountered an error while attempting to update the secret: Operation cannot be fulfilled on secrets.*: the object has been modified; please apply your changes to the latest version and try again`
+const SaneConflictMessageThreshold = 3
 
 func New(clients *clients.Clients, cluster *provisioningv1api.Cluster) (*provisioningv1api.Cluster, error) {
 	cluster = cluster.DeepCopy()
@@ -300,6 +304,7 @@ func CustomCommand(clients *clients.Clients, c *provisioningv1api.Cluster) (stri
 	return "", fmt.Errorf("timeout getting custom command")
 }
 
+// getPodLogs gathers the logs from the specified pod in a manner similar to `kubectl logs`
 func getPodLogs(clients *clients.Clients, podNamespace, podName string) (string, error) {
 	plr := clients.K8s.CoreV1().Pods(podNamespace).GetLogs(podName, &corev1.PodLogOptions{})
 	stream, err := plr.Stream(context.TODO())
@@ -314,6 +319,27 @@ func getPodLogs(clients *clients.Clients, podNamespace, podName string) (string,
 		logs = logs + fmt.Sprintf("%sSnewlineG", reader.Text())
 	}
 	return capr.CompressInterface(logs)
+}
+
+// countPodLogRegexOccurances gathers the logs from the specified pod in a manner similar to `kubectl logs` and counts the number of times the log matches the given regex.
+func countPodLogRegexOccurances(clients *clients.Clients, podNamespace, podName, regex string) (int, error) {
+	count := 0
+	plr := clients.K8s.CoreV1().Pods(podNamespace).GetLogs(podName, &corev1.PodLogOptions{})
+	stream, err := plr.Stream(context.TODO())
+	if err != nil {
+		return count, fmt.Errorf("error streaming pod logs for pod %s/%s: %v", podNamespace, podName, err)
+	}
+	defer stream.Close()
+
+	re := regexp.MustCompile(regex)
+
+	reader := bufio.NewScanner(stream)
+	for reader.Scan() {
+		if re.Match(reader.Bytes()) {
+			count++
+		}
+	}
+	return count, nil
 }
 
 // getPodFileContents executes a corresponding `kubectl cp` and gathers data for the purposes of helping increasing debug data.
@@ -347,6 +373,7 @@ func getPodFileContents(podNamespace, podName, podPath string) (string, error) {
 	return capr.CompressInterface(logs)
 }
 
+// gatherDebugData gathers debug data that is relevant to the current cluster and returns a gzip compressed + base64 encoded string of the json.
 func gatherDebugData(clients *clients.Clients, c *provisioningv1api.Cluster) (string, error) {
 	newC, newErr := clients.Provisioning.Cluster().Get(c.Namespace, c.Name, metav1.GetOptions{})
 	if newErr != nil {
@@ -472,6 +499,7 @@ func gatherDebugData(clients *clients.Clients, c *provisioningv1api.Cluster) (st
 	})
 }
 
+// populatePodLogs creates a map[string]string of logs that correspond to the pod in question. If the pod is an RKE2 pod, it also collects the kubelet logs from the pod filesystem.
 func populatePodLogs(clients *clients.Clients, runtime, podNamespace, podName string) map[string]string {
 	var logMap = make(map[string]string)
 
@@ -492,4 +520,52 @@ func populatePodLogs(clients *clients.Clients, runtime, podNamespace, podName st
 	}
 
 	return logMap
+}
+
+// EnsureMinimalConflictsWithThreshold walks through pod logs and ensures a minimal number of conflict messages have occurred.
+func EnsureMinimalConflictsWithThreshold(clients *clients.Clients, c *provisioningv1api.Cluster, threshold int) error {
+	customPods, newErr := clients.Core.Pod().List(c.Namespace, metav1.ListOptions{
+		LabelSelector: "custom-cluster-name=" + c.Name,
+	})
+	if newErr != nil {
+		logrus.Errorf("failed to list custommachine pods: %v", newErr)
+	} else {
+		for _, pod := range customPods.Items {
+			count, err := countPodLogRegexOccurances(clients, pod.Namespace, pod.Name, ConflictMessageRegex)
+			if err != nil {
+				return err
+			}
+			if count > threshold {
+				return fmt.Errorf("pod %s/%s had %d occurances of conflicts which was greater than the threshold of %d", pod.Namespace, pod.Name, count, threshold)
+			}
+		}
+	}
+
+	machines, newErr := Machines(clients, c)
+	if newErr != nil {
+		logrus.Errorf("failed to get machines for %s/%s to count conflicts: %v", c.Namespace, c.Name, newErr)
+	}
+	for _, machine := range machines.Items {
+		im, newErr := clients.Dynamic.Resource(schema.GroupVersionResource{
+			Group:    machine.Spec.InfrastructureRef.GroupVersionKind().Group,
+			Version:  machine.Spec.InfrastructureRef.GroupVersionKind().Version,
+			Resource: strings.ToLower(fmt.Sprintf("%ss", machine.Spec.InfrastructureRef.GroupVersionKind().Kind)),
+		}).Namespace(machine.Spec.InfrastructureRef.Namespace).Get(context.TODO(), machine.Spec.InfrastructureRef.Name, metav1.GetOptions{})
+		if newErr != nil {
+			logrus.Errorf("failed to get %s %s/%s to print error: %v", machine.Spec.InfrastructureRef.GroupVersionKind().String(), machine.Spec.InfrastructureRef.Namespace, machine.Spec.InfrastructureRef.Name, newErr)
+		} else {
+			if machine.Spec.InfrastructureRef.GroupVersionKind().Kind == "PodMachine" {
+				// In the case of a podmachine, the pod name will be strings.ReplaceAll(infra.meta.GetName(), ".", "-")
+				podName := strings.ReplaceAll(im.GetName(), ".", "-")
+				count, err := countPodLogRegexOccurances(clients, im.GetNamespace(), podName, ConflictMessageRegex)
+				if err != nil {
+					return err
+				}
+				if count > threshold {
+					return fmt.Errorf("pod %s/%s had %d occurances of conflicts which was greater than the threshold of %d", im.GetNamespace(), podName, count, threshold)
+				}
+			}
+		}
+	}
+	return nil
 }

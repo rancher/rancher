@@ -1,6 +1,3 @@
-//go:build provisioning
-// +build provisioning
-
 package custom
 
 import (
@@ -11,63 +8,15 @@ import (
 
 	provisioningv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
-	"github.com/rancher/rancher/tests/integration/pkg/clients"
-	"github.com/rancher/rancher/tests/integration/pkg/cluster"
-	"github.com/rancher/rancher/tests/integration/pkg/systemdnode"
+	"github.com/rancher/rancher/tests/v2prov/clients"
+	"github.com/rancher/rancher/tests/v2prov/cluster"
+	"github.com/rancher/rancher/tests/v2prov/systemdnode"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func TestSystemAgentVersion(t *testing.T) {
-	clients, err := clients.New()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer clients.Close()
-
-	setting, err := clients.Mgmt.Setting().Get("system-agent-version", metav1.GetOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	assert.NotEmpty(t, setting.Value)
-	assert.True(t, setting.Value == os.Getenv("CATTLE_SYSTEM_AGENT_VERSION"))
-}
-
-func TestWinsAgentVersion(t *testing.T) {
-	clients, err := clients.New()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer clients.Close()
-
-	setting, err := clients.Mgmt.Setting().Get("wins-agent-version", metav1.GetOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	assert.NotEmpty(t, setting.Value)
-	assert.True(t, setting.Value == os.Getenv("CATTLE_WINS_AGENT_VERSION"))
-}
-
-func TestCSIProxyAgentVersion(t *testing.T) {
-	clients, err := clients.New()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer clients.Close()
-
-	setting, err := clients.Mgmt.Setting().Get("csi-proxy-agent-version", metav1.GetOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	assert.NotEmpty(t, setting.Value)
-	assert.True(t, setting.Value == os.Getenv("CATTLE_CSI_PROXY_AGENT_VERSION"))
-}
-
-func TestCustomOneNode(t *testing.T) {
+func Test_Provisioning_Custom_OneNode(t *testing.T) {
 	if strings.ToLower(os.Getenv("DIST")) == "rke2" {
 		t.Skip()
 	}
@@ -96,7 +45,7 @@ func TestCustomOneNode(t *testing.T) {
 
 	assert.NotEmpty(t, command)
 
-	_, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --worker --etcd --controlplane --label foo=bar --label ball=life", map[string]string{"custom-cluster-name": c.Name})
+	_, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --worker --etcd --controlplane --label foo=bar --label ball=life", map[string]string{"custom-cluster-name": c.Name}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -127,9 +76,11 @@ func TestCustomOneNode(t *testing.T) {
 		t.Error(err)
 	}
 	assert.Equal(t, labels, map[string]string{"cattle.io/os": "linux", "foo": "bar", "ball": "life"})
+	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
+	assert.NoError(t, err)
 }
 
-func TestCustomThreeNode(t *testing.T) {
+func Test_Provisioning_Custom_ThreeNode(t *testing.T) {
 	clients, err := clients.New()
 	if err != nil {
 		t.Fatal(err)
@@ -156,7 +107,7 @@ func TestCustomThreeNode(t *testing.T) {
 	assert.NotEmpty(t, command)
 
 	for i := 0; i < 3; i++ {
-		_, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --worker --etcd --controlplane --label rancher=awesome", map[string]string{"custom-cluster-name": c.Name})
+		_, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --worker --etcd --controlplane --label rancher=awesome", map[string]string{"custom-cluster-name": c.Name}, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -189,9 +140,11 @@ func TestCustomThreeNode(t *testing.T) {
 		}
 		assert.Equal(t, labels, map[string]string{"cattle.io/os": "linux", "rancher": "awesome"})
 	}
+	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
+	assert.NoError(t, err)
 }
 
-func TestCustomUniqueRoles(t *testing.T) {
+func Test_Provisioning_Custom_UniqueRoles(t *testing.T) {
 	clients, err := clients.New()
 	if err != nil {
 		t.Fatal(err)
@@ -218,20 +171,20 @@ func TestCustomUniqueRoles(t *testing.T) {
 	assert.NotEmpty(t, command)
 
 	for i := 0; i < 3; i++ {
-		_, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --etcd", map[string]string{"custom-cluster-name": c.Name})
+		_, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --etcd", map[string]string{"custom-cluster-name": c.Name}, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
 
 	for i := 0; i < 1; i++ {
-		_, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --controlplane", map[string]string{"custom-cluster-name": c.Name})
+		_, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --controlplane", map[string]string{"custom-cluster-name": c.Name}, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	_, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --worker", map[string]string{"custom-cluster-name": c.Name})
+	_, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --worker", map[string]string{"custom-cluster-name": c.Name}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -267,9 +220,11 @@ func TestCustomUniqueRoles(t *testing.T) {
 	assert.Equal(t, worker, 1)
 	assert.Equal(t, etcd, 3)
 	assert.Equal(t, controlPlane, 1)
+	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
+	assert.NoError(t, err)
 }
 
-func TestCustomThreeNodeWithTaints(t *testing.T) {
+func Test_Provisioning_Custom_ThreeNodeWithTaints(t *testing.T) {
 	if strings.ToLower(os.Getenv("DIST")) == "rke2" {
 		t.Skip()
 	}
@@ -304,7 +259,7 @@ func TestCustomThreeNodeWithTaints(t *testing.T) {
 		if i == 1 {
 			taint = " --taint key=value:NoExecute"
 		}
-		_, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --worker --etcd --controlplane --label rancher=awesome"+taint, map[string]string{"custom-cluster-name": c.Name})
+		_, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --worker --etcd --controlplane --label rancher=awesome"+taint, map[string]string{"custom-cluster-name": c.Name}, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -356,4 +311,6 @@ func TestCustomThreeNodeWithTaints(t *testing.T) {
 	}
 
 	assert.True(t, taintFound)
+	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
+	assert.NoError(t, err)
 }

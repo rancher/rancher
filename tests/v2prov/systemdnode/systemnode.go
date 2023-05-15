@@ -1,15 +1,18 @@
 package systemdnode
 
 import (
-	"github.com/rancher/rancher/tests/integration/pkg/clients"
-	"github.com/rancher/rancher/tests/integration/pkg/defaults"
+	"fmt"
+	"strings"
+
+	"github.com/rancher/rancher/tests/v2prov/clients"
+	"github.com/rancher/rancher/tests/v2prov/defaults"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // New is used to create a new instance of systemd-node as a pod in a Kubernetes cluster. Notably, this is used for the
-// v2prov integration tests for custom clusters to simulate custom cluster nodes.
-func New(clients *clients.Clients, namespace, script string, labels map[string]string) (*corev1.Pod, error) {
+// v2prov integration tests for custom clusters to simulate custom cluster nodes. If extraDirs is defined, it expects a slice of elements of format "host-source:pod-mount".
+func New(clients *clients.Clients, namespace, script string, labels map[string]string, extraDirs []string) (*corev1.Pod, error) {
 	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:    namespace,
@@ -30,7 +33,7 @@ func New(clients *clients.Clients, namespace, script string, labels map[string]s
 	// normally cause systemd to hang waiting for the unit to activate. Eventually, when
 	// https://github.com/rancher/rke2/issues/3240 is resolved, we should be able to roll back this workaround. If the
 	// linked github issue is resolved, we should roll back this change here as well as in
-	// tests/integration/pkg/nodeconfig.
+	// v2prov/nodeconfig.
 	cmConfigure := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:    namespace,
@@ -113,7 +116,7 @@ INVOCATION_ID=
 						MountPath: "/usr/local/lib/systemd/system/k3s-agent.service.d/10-delegate.conf",
 						SubPath:   "dropin",
 					},
-					{ // We have to set invocation disabling on the rancher-system-agent because it runs rke2/k3s server and this also has cgroup issues.
+					{ // We have to set invocation disabling on the rancher-system-agent because it runs rke2/k3s server on restore and this has cgroup issues
 						Name:      "systemd",
 						MountPath: "/etc/default/rancher-system-agent",
 						SubPath:   "disable",
@@ -142,6 +145,29 @@ INVOCATION_ID=
 			}},
 			AutomountServiceAccountToken: new(bool),
 		},
+	}
+
+	for i, v := range extraDirs {
+		hostSource, mountPath, ok := strings.Cut(v, ":")
+		if !ok {
+			// TODO: log
+			continue
+		}
+		pod.Spec.Volumes = append(pod.Spec.Volumes, corev1.Volume{
+			Name: fmt.Sprintf("extra-directory-%d", i),
+			VolumeSource: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{
+					Path: hostSource,
+					Type: &[]corev1.HostPathType{corev1.HostPathDirectoryOrCreate}[0],
+				},
+			},
+		})
+
+		pod.Spec.Containers[0].VolumeMounts = append(pod.Spec.Containers[0].VolumeMounts, corev1.VolumeMount{
+			Name:      fmt.Sprintf("extra-directory-%d", i),
+			MountPath: mountPath,
+		})
+
 	}
 
 	pod, err = clients.Core.Pod().Create(pod)

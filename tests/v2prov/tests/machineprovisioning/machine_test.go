@@ -1,6 +1,3 @@
-//go:build provisioning
-// +build provisioning
-
 package machineprovisioning
 
 import (
@@ -12,11 +9,12 @@ import (
 	provisioningv1api "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
-	"github.com/rancher/rancher/tests/integration/pkg/clients"
-	"github.com/rancher/rancher/tests/integration/pkg/cluster"
-	"github.com/rancher/rancher/tests/integration/pkg/defaults"
-	"github.com/rancher/rancher/tests/integration/pkg/nodeconfig"
-	"github.com/rancher/rancher/tests/integration/pkg/wait"
+	"github.com/rancher/rancher/tests/v2prov/clients"
+	"github.com/rancher/rancher/tests/v2prov/cluster"
+	"github.com/rancher/rancher/tests/v2prov/defaults"
+	"github.com/rancher/rancher/tests/v2prov/nodeconfig"
+	"github.com/rancher/rancher/tests/v2prov/operations"
+	"github.com/rancher/rancher/tests/v2prov/wait"
 	"github.com/rancher/wrangler/pkg/data"
 	"github.com/stretchr/testify/assert"
 	errgroup2 "golang.org/x/sync/errgroup"
@@ -30,7 +28,7 @@ import (
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
-func TestSingleNodeAllRolesWithDelete(t *testing.T) {
+func Test_Provisioning_MP_SingleNodeAllRolesWithDelete(t *testing.T) {
 	clients, err := clients.New()
 	if err != nil {
 		t.Fatal(err)
@@ -99,9 +97,11 @@ func TestSingleNodeAllRolesWithDelete(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
+	assert.NoError(t, err)
 }
 
-func TestMachineTemplateClonedAnnotations(t *testing.T) {
+func Test_Provisioning_MP_MachineTemplateClonedAnnotations(t *testing.T) {
 	if strings.ToLower(os.Getenv("DIST")) == "rke2" {
 		t.Skip()
 	}
@@ -161,9 +161,11 @@ func TestMachineTemplateClonedAnnotations(t *testing.T) {
 		assert.Equal(t, machineTemplate.GetAnnotations()[capr.MachineTemplateClonedFromKindAnn], c.Spec.RKEConfig.MachinePools[0].NodeConfig.Kind)
 		assert.Equal(t, machineTemplate.GetAnnotations()[capr.MachineTemplateClonedFromNameAnn], c.Spec.RKEConfig.MachinePools[0].NodeConfig.Name)
 	}
+	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
+	assert.NoError(t, err)
 }
 
-func TestMachineSetDeletePolicyOldestSet(t *testing.T) {
+func Test_Provisioning_MP_MachineSetDeletePolicyOldestSet(t *testing.T) {
 	if strings.ToLower(os.Getenv("DIST")) == "rke2" {
 		t.Skip()
 	}
@@ -230,9 +232,11 @@ func TestMachineSetDeletePolicyOldestSet(t *testing.T) {
 
 		assert.Equal(t, string(capi.OldestMachineSetDeletePolicy), d.String("Object", "spec", "deletePolicy"))
 	}
+	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
+	assert.NoError(t, err)
 }
 
-func TestThreeNodesAllRolesWithDelete(t *testing.T) {
+func Test_Provisioning_MP_ThreeNodesAllRolesScaledToOneThenDelete(t *testing.T) {
 	clients, err := clients.New()
 	if err != nil {
 		t.Fatal(err)
@@ -264,6 +268,14 @@ func TestThreeNodesAllRolesWithDelete(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	c, err = operations.Scale(clients, c, 0, 2, true)
+	assert.NoError(t, err)
+	c, err = operations.Scale(clients, c, 0, 1, true)
+	assert.NoError(t, err)
+
+	_, err = operations.GetAndVerifyDownstreamClientset(clients, c)
+	assert.NoError(t, err)
+
 	// Delete the cluster and wait for cleanup.
 	err = clients.Provisioning.Cluster().Delete(c.Namespace, c.Name, &metav1.DeleteOptions{})
 	if err != nil {
@@ -274,9 +286,11 @@ func TestThreeNodesAllRolesWithDelete(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
+	assert.NoError(t, err)
 }
 
-func TestFiveNodesUniqueRolesWithDelete(t *testing.T) {
+func Test_Provisioning_MP_FiveNodesUniqueRolesWithDelete(t *testing.T) {
 	if strings.ToLower(os.Getenv("DIST")) == "rke2" {
 		t.Skip()
 	}
@@ -329,9 +343,11 @@ func TestFiveNodesUniqueRolesWithDelete(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
+	assert.NoError(t, err)
 }
 
-func TestFourNodesServerAndWorkerRolesWithDelete(t *testing.T) {
+func Test_Provisioning_MP_FourNodesServerAndWorkerRolesWithDelete(t *testing.T) {
 	if strings.ToLower(os.Getenv("DIST")) == "rke2" {
 		t.Skip()
 	}
@@ -382,9 +398,11 @@ func TestFourNodesServerAndWorkerRolesWithDelete(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
+	assert.NoError(t, err)
 }
 
-func TestDrain(t *testing.T) {
+func Test_Provisioning_MP_Drain(t *testing.T) {
 	clients, err := clients.New()
 	if err != nil {
 		t.Fatal(err)
@@ -522,9 +540,11 @@ func TestDrain(t *testing.T) {
 	}
 
 	assert.Equal(t, int32(2), atomic.LoadInt32(&doneHooks))
+	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
+	assert.NoError(t, err)
 }
 
-func TestDrainNoDelete(t *testing.T) {
+func Test_Provisioning_MP_DrainNoDelete(t *testing.T) {
 	clients, err := clients.New()
 	if err != nil {
 		t.Fatal(err)
@@ -576,4 +596,6 @@ func TestDrainNoDelete(t *testing.T) {
 
 	_, ok = machines.Items[1].Annotations[capi.ExcludeNodeDrainingAnnotation]
 	assert.False(t, ok)
+	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
+	assert.NoError(t, err)
 }
