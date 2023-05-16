@@ -221,3 +221,20 @@ tests:
         nginx.ingress.kubernetes.io/configuration-snippet: |
           more_set_input_headers "X-Forwarded-Host: host.example.com";
           more_set_input_headers "foo: bar";
+- it: should create a http rule with path
+  set:
+    hostname: host.example.com
+  asserts:
+  - equal:
+      path: spec.rules
+      value:
+        - host: host.example.com
+          http:
+            paths:
+            - backend:
+                service:
+                  name: RELEASE-NAME-rancher
+                  port:
+                    number: 80
+              pathType: ImplementationSpecific
+              path: /
