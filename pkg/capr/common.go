@@ -106,6 +106,11 @@ const (
 	RuntimeK3S  = "k3s"
 	RuntimeRKE2 = "rke2"
 
+	K3sKubectlPath     = "/usr/local/bin/kubectl"
+	K3sKubeconfigPath  = "/etc/rancher/k3s/k3s.yaml"
+	RKE2KubectlPath    = "/var/lib/rancher/rke2/bin/kubectl"
+	RKE2KubeconfigPath = "/etc/rancher/rke2/rke2.yaml"
+
 	RoleBootstrap = "bootstrap"
 	RolePlan      = "plan"
 
@@ -143,6 +148,17 @@ func GetMachineByOwner(machineCache capicontrollers.MachineCache, obj metav1.Obj
 	}
 
 	return nil, ErrNoMachineOwnerRef
+}
+
+// GetKubectlAndKubeconfigPaths returns the corresponding kubectl/kubeconfig paths for a downstream node for the given kubernetes version.
+func GetKubectlAndKubeconfigPaths(kubernetesVersion string) (string, string) {
+	switch GetRuntime(kubernetesVersion) {
+	case RuntimeK3S:
+		return K3sKubectlPath, K3sKubeconfigPath
+	case RuntimeRKE2:
+		return RKE2KubectlPath, RKE2KubeconfigPath
+	}
+	return "", ""
 }
 
 func GetRuntimeCommand(kubernetesVersion string) string {

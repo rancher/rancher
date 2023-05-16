@@ -129,8 +129,8 @@ while ! kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -w -n catt
     echo "rancher-webhook was not available within 5 minutes. failing fast"
     exit 1
   fi
-  if [[ $((rwWC%60)) == 0 ]] && [[ "$rwWC" != "0" ]]; then
-    echo "rancher-webhook was not ready within $((rwWC/60)) minutes"
+  if [[ $((rwWC%30)) == 0 ]] && [[ "$rwWC" != "0" ]]; then
+    echo "rancher-webhook was not ready within $((rwWC/30)) minutes"
   fi
     sleep 2
     rwWC=$((rwWC + 1))

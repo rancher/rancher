@@ -80,7 +80,7 @@ func Test_Operation_MP_EtcdSnapshotCreationRestoreInPlace(t *testing.T) {
 	}
 
 	snapshot := operations.RunSnapshotCreateTest(t, clients, c, cm, machines.Items[0].Status.NodeRef.Name)
-	operations.RunSnapshotRestoreTest(t, clients, c, snapshot.Name, cm)
+	operations.RunSnapshotRestoreTest(t, clients, c, snapshot.Name, cm, 2)
 	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
 	assert.NoError(t, err)
 }
