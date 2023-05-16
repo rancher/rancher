@@ -30,24 +30,28 @@ import (
 	"github.com/stretchr/testify/suite"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/retry"
 )
 
 const (
 	projectNamePrefix = "test-project"
 	labelKey          = "test-label"
 	continueToken     = "nondeterministictoken"
+	fakeTestID        = "nondeterministicid"
 	defautlUrlString  = "https://rancherurl/"
 	steveAPITestLabel = "test.cattle.io/steveapi"
 )
 
 var (
+	testID                     = namegenerator.RandStringLower(5)
 	userEnabled                = true
 	impersonationNamespace     = "cattle-impersonation-system"
 	impersonationSABase        = "cattle-impersonation-"
-	continueReg                = regexp.MustCompile(`(continue=)[\w]+(%3D){0,2}`)
 	urlRegex                   = regexp.MustCompile(`https://([\w.:]+)/`)
-	downStreamClusterRegex     = regexp.MustCompile(`(k8s/clusters/c-m-\w+/)`)
+	continueReg                = regexp.MustCompile(`(continue=)[\w]+(%3D){0,2}`)
+	testLabelReg               = regexp.MustCompile(`(labelSelector=test.cattle.io%2Fsteveapi%3D)[\w]+`)
 	namespaceSecretManagerRole = rbacv1.Role{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "namespace-secret-manager",
@@ -232,12 +236,18 @@ func (s *steveAPITestSuite) setupSuite(clusterName string) {
 					Name: fmt.Sprintf("test%d", i),
 				},
 			}
-			labels := map[string]string{steveAPITestLabel: "true"}
+			labels := map[string]string{steveAPITestLabel: testID}
 			if i == 2 {
 				labels[labelKey] = "2"
 			}
 			secret.ObjectMeta.SetLabels(labels)
-			_, err := secrets.CreateSecret(s.client, secret, s.project.ClusterID, n)
+			err := retryRequest(func() error {
+				_, err := secrets.CreateSecret(s.client, secret, s.project.ClusterID, n)
+				if apierrors.IsAlreadyExists(err) {
+					return nil
+				}
+				return err
+			})
 			require.NoError(s.T(), err)
 		}
 	}
@@ -246,11 +256,23 @@ func (s *steveAPITestSuite) setupSuite(clusterName string) {
 	for _, n := range namespaceMap {
 		role := namespaceSecretManagerRole
 		role.Namespace = n
-		_, err = rbac.CreateRole(s.client, s.project.ClusterID, &role)
+		err := retryRequest(func() error {
+			_, err = rbac.CreateRole(s.client, s.project.ClusterID, &role)
+			if apierrors.IsAlreadyExists(err) {
+				return nil
+			}
+			return err
+		})
 		require.NoError(s.T(), err)
 		role = mixedSecretUserRole
 		role.Namespace = n
-		_, err = rbac.CreateRole(s.client, s.project.ClusterID, &role)
+		err = retryRequest(func() error {
+			_, err = rbac.CreateRole(s.client, s.project.ClusterID, &role)
+			if apierrors.IsAlreadyExists(err) {
+				return nil
+			}
+			return err
+		})
 		require.NoError(s.T(), err)
 	}
 
@@ -280,7 +302,13 @@ func (s *steveAPITestSuite) setupSuite(clusterName string) {
 					Kind: "User",
 					Name: userObj.ID,
 				}
-				_, err = rbac.CreateRoleBinding(s.client, s.project.ClusterID, namegenerator.AppendRandomString(rb.Name), namespaceMap[rb.Namespace], rb.RoleRef.Name, subject)
+				err := retryRequest(func() error {
+					_, err = rbac.CreateRoleBinding(s.client, s.project.ClusterID, namegenerator.AppendRandomString(rb.Name), namespaceMap[rb.Namespace], rb.RoleRef.Name, subject)
+					if apierrors.IsAlreadyExists(err) {
+						return nil
+					}
+					return err
+				})
 				require.NoError(s.T(), err)
 			}
 		}
@@ -899,7 +927,7 @@ func (s *steveAPITestSuite) TestList() {
 					query["fieldSelector"] = []string{"metadata.namespace=" + ns}
 				}
 			}
-			query["labelSelector"] = append(query["labelSelector"], steveAPITestLabel+"=true")
+			query["labelSelector"] = append(query["labelSelector"], steveAPITestLabel+"="+testID)
 			secretList, err := secretClient.List(query)
 			require.NoError(s.T(), err)
 
@@ -970,6 +998,7 @@ func formatJSON(obj *clientv1.SteveCollection) ([]byte, error) {
 	if pagination, ok := mapResp["pagination"].(map[string]interface{}); ok {
 		if next, ok := pagination["next"].(string); ok {
 			next = continueReg.ReplaceAllString(next, "${1}"+continueToken)
+			next = testLabelReg.ReplaceAllString(next, "${1}"+fakeTestID)
 			pagination["next"] = next
 			mapResp["pagination"] = pagination
 		}
@@ -981,6 +1010,7 @@ func formatJSON(obj *clientv1.SteveCollection) ([]byte, error) {
 			delete(data[i].(map[string]interface{})["metadata"].(map[string]interface{}), "creationTimestamp")
 			delete(data[i].(map[string]interface{})["metadata"].(map[string]interface{}), "managedFields")
 			delete(data[i].(map[string]interface{})["metadata"].(map[string]interface{}), "uid")
+			data[i].(map[string]interface{})["metadata"].(map[string]interface{})["labels"].(map[string]interface{})[steveAPITestLabel] = fakeTestID
 			data[i].(map[string]interface{})["metadata"].(map[string]interface{})["resourceVersion"] = "1000"
 		}
 		mapResp["data"] = data
@@ -1111,6 +1141,11 @@ func (s *steveAPITestSuite) TestCRUD() {
 		require.Error(s.T(), err)
 		assert.Nil(s.T(), readObj)
 	})
+}
+
+func retryRequest(fn func() error) error {
+	retriable := func(err error) bool { return strings.Contains(err.Error(), "tunnel disconnect") }
+	return retry.OnError(retry.DefaultBackoff, retriable, fn)
 }
 
 func (s *steveAPITestSuite) assertListIsEqual(expect []map[string]string, list []clientv1.SteveAPIObject) {
