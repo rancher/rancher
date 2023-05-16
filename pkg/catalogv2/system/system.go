@@ -245,15 +245,17 @@ func (m *Manager) install(namespace, name, minVersion, exactVersion string, valu
 	}
 
 	v := ">=0-a" // latest - this is special syntax to match everything including pre-releases build
+	var isExact bool
 	if exactVersion != "" {
 		v = exactVersion
+		isExact = true
 	}
 	chart, err := index.Get(name, v)
 	if err != nil {
 		return err
 	}
 
-	installed, desiredVersion, desiredValue, err := m.isInstalled(namespace, name, minVersion, chart.Version, values)
+	installed, desiredVersion, desiredValue, err := m.isInstalled(namespace, name, minVersion, chart.Version, isExact, values)
 	if err != nil {
 		return err
 	} else if installed {
@@ -357,8 +359,7 @@ func podDone(chart string, newPod *corev1.Pod) (bool, error) {
 	return false, nil
 }
 
-// isInstalled returns whether the release is installed. If not, it returns the version and Helm values it should install or upgrade.
-func (m *Manager) isInstalled(namespace, name, minVersion, version string, desiredValue map[string]interface{}) (bool, string, map[string]interface{}, error) {
+func (m *Manager) isInstalled(namespace, name, minVersion, desiredVersion string, isExact bool, desiredValue map[string]interface{}) (bool, string, map[string]interface{}, error) {
 	helmcfg := &action.Configuration{}
 	if err := helmcfg.Init(m.restClientGetter, namespace, "", logrus.Infof); err != nil {
 		return false, "", nil, err
@@ -372,10 +373,14 @@ func (m *Manager) isInstalled(namespace, name, minVersion, version string, desir
 		return false, "", nil, err
 	}
 
-	return chartWithValuesInstalled(releases, minVersion, version, desiredValue)
+	return desiredVersionAndValues(releases, minVersion, desiredVersion, isExact, desiredValue)
 }
 
-func chartWithValuesInstalled(releases []*release.Release, minVersion, latestVersion string, desiredValues map[string]any) (bool, string, map[string]interface{}, error) {
+// desiredVersionAndValues returns whether the release is installed. If not, it returns the desired version and Helm values.
+// Callers must provide the desired version. If isExact is true, then the resulting value is the desiredVersion, which
+// may result in a forced upgrade or downgrade. Otherwise, the desiredVersion signifies the latest version, which may
+// or may not be installed, depending on the value of the min version.
+func desiredVersionAndValues(releases []*release.Release, minVersion, desiredVersion string, isExact bool, desiredValues map[string]any) (bool, string, map[string]interface{}, error) {
 	for _, r := range releases {
 		if r.Info.Status != release.StatusDeployed {
 			continue
@@ -413,13 +418,12 @@ func chartWithValuesInstalled(releases []*release.Release, minVersion, latestVer
 			return false, "", nil, err
 		}
 
-		desired, err := semver.NewVersion(latestVersion)
+		desired, err := semver.NewVersion(desiredVersion)
 		if err != nil {
 			return false, "", nil, err
 		}
 
-		if minVersion == "" {
-			// Use exact version.
+		if isExact {
 			if !current.Equal(desired) {
 				return false, desired.String(), desiredValues, nil
 			}
@@ -448,7 +452,7 @@ func chartWithValuesInstalled(releases []*release.Release, minVersion, latestVer
 			return true, "", nil, nil
 		}
 	}
-	return false, latestVersion, desiredValues, nil
+	return false, desiredVersion, desiredValues, nil
 }
 
 func (m *Manager) hasStatus(namespace, name string, stateMask action.ListStates) (bool, error) {
