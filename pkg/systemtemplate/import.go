@@ -1,7 +1,6 @@
 package systemtemplate
 
 import (
-	"bytes"
 	"crypto/md5"
 	"crypto/sha256"
 	"encoding/base64"
@@ -156,15 +155,6 @@ func GetDesiredFeatures(cluster *apimgmtv3.Cluster) map[string]bool {
 		features.EmbeddedClusterAPI.Name(): false,
 		features.MonitoringV1.Name():       cluster.Spec.EnableClusterMonitoring,
 	}
-}
-
-func ForCluster(cluster *apimgmtv3.Cluster, token string, taints []corev1.Taint, secretLister v1.SecretLister) ([]byte, error) {
-	buf := &bytes.Buffer{}
-	err := SystemTemplate(buf, GetDesiredAgentImage(cluster),
-		GetDesiredAuthImage(cluster),
-		cluster.Name, token, settings.ServerURL.Get(), cluster.Spec.WindowsPreferedCluster,
-		cluster, GetDesiredFeatures(cluster), taints, secretLister)
-	return buf.Bytes(), err
 }
 
 func InternalCAChecksum() string {

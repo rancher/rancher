@@ -600,3 +600,30 @@ func ParseSnapshotClusterSpecOrError(snapshot *rkev1.ETCDSnapshot) (*provv1.Clus
 	}
 	return nil, fmt.Errorf("unable to find and decode snapshot ClusterSpec for snapshot")
 }
+
+// GetTaints returns a slice of taints for the machine in question
+func GetTaints(existingTaints, runtime string, isControlPlane, isEtcd, isWorker bool) (result []corev1.Taint, _ error) {
+	if existingTaints != "" {
+		if err := json.Unmarshal([]byte(existingTaints), &result); err != nil {
+			return result, err
+		}
+	}
+
+	if !isWorker {
+		// k3s charts do not have correct tolerations when the master node is both controlplane and etcd
+		if isEtcd && (runtime != RuntimeK3S || !isControlPlane) {
+			result = append(result, corev1.Taint{
+				Key:    "node-role.kubernetes.io/etcd",
+				Effect: corev1.TaintEffectNoExecute,
+			})
+		}
+		if isControlPlane {
+			result = append(result, corev1.Taint{
+				Key:    "node-role.kubernetes.io/control-plane",
+				Effect: corev1.TaintEffectNoSchedule,
+			})
+		}
+	}
+
+	return
+}

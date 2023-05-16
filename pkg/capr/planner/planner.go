@@ -836,34 +836,6 @@ func PruneEmpty(config map[string]interface{}) {
 	}
 }
 
-// getTaints returns a slice of taints for the machine in question
-func getTaints(entry *planEntry, cp *rkev1.RKEControlPlane) (result []corev1.Taint, _ error) {
-	data := entry.Metadata.Annotations[capr.TaintsAnnotation]
-	if data != "" {
-		if err := json.Unmarshal([]byte(data), &result); err != nil {
-			return result, err
-		}
-	}
-
-	if !isWorker(entry) {
-		// k3s charts do not have correct tolerations when the master node is both controlplane and etcd
-		if isEtcd(entry) && (capr.GetRuntime(cp.Spec.KubernetesVersion) != capr.RuntimeK3S || !isControlPlane(entry)) {
-			result = append(result, corev1.Taint{
-				Key:    "node-role.kubernetes.io/etcd",
-				Effect: corev1.TaintEffectNoExecute,
-			})
-		}
-		if isControlPlane(entry) {
-			result = append(result, corev1.Taint{
-				Key:    "node-role.kubernetes.io/control-plane",
-				Effect: corev1.TaintEffectNoSchedule,
-			})
-		}
-	}
-
-	return
-}
-
 func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, clusterPlan *plan.Plan, required bool,
 	tierName string, include, exclude roleFilter, maxUnavailable string, forcedJoinURL string, drainOptions rkev1.DrainOptions) error {
 	var (
