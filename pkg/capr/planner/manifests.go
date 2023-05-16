@@ -67,7 +67,7 @@ func getEtcdSnapshotExtraMetadata(controlPlane *rkev1.RKEControlPlane, runtime s
 
 // getClusterAgentManifestFile returns a plan.File that contains the cluster agent manifest.
 func (p *Planner) getClusterAgentManifestFile(controlPlane *rkev1.RKEControlPlane, runtime string, entry *planEntry) (plan.File, error) {
-	data, err := p.generateClusterAgentManifest(controlPlane, entry)
+	data, err := p.generateClusterAgentManifest(controlPlane)
 	if err != nil {
 		return plan.File{}, err
 	}

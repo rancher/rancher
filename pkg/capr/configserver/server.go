@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -35,10 +36,11 @@ import (
 )
 
 const (
-	ConnectClusterInfo          = "/v3/connect/cluster-info"
-	ConnectConfigYamlPath       = "/v3/connect/config-yaml"
-	ConnectClusterAgentYamlPath = "/v3/connect/cluster-agent-yaml"
-	ConnectAgent                = "/v3/connect/agent"
+	ConnectClusterInfo           = "/v3/connect/cluster-info"
+	ConnectConfigYamlPath        = "/v3/connect/config-yaml"
+	ConnectClusterAgentYamlPath  = "/v3/connect/cluster-agent/{token}.yaml"
+	ConnectClusterAgentYamlRegex = `^\/v3\/connect\/cluster-agent\/[bcdfghjklmnpqrstvwxz2456789]{54}\.yaml$` // Per wrangler: pkg/randomtoken
+	ConnectAgent                 = "/v3/connect/agent"
 )
 
 var (
@@ -113,8 +115,9 @@ func (r *RKE2ConfigServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) 
 		return
 	}
 
+	reg := regexp.MustCompile(ConnectClusterAgentYamlRegex)
 	// Short circuit if the path is the connect cluster agent yaml path
-	if req.URL.Path == ConnectClusterAgentYamlPath {
+	if reg.MatchString(req.URL.Path) {
 		r.connectClusterAgentYAML(rw, req)
 	}
 

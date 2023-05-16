@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"net/http"
 	"sort"
-	"strings"
 
+	"github.com/gorilla/mux"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/clusterindex"
 	"github.com/rancher/rancher/pkg/settings"
@@ -18,7 +18,7 @@ import (
 
 // connectClusterAgentYAML renders a cattle-cluster-agent manifest for the given bearer token
 func (r *RKE2ConfigServer) connectClusterAgentYAML(rw http.ResponseWriter, req *http.Request) {
-	token := strings.TrimPrefix(req.Header.Get("Authorization"), "Bearer ")
+	token := mux.Vars(req)["token"]
 	if token == "" {
 		http.Error(rw, "unauthorized", http.StatusUnauthorized)
 		return
