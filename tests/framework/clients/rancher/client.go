@@ -45,7 +45,7 @@ type Client struct {
 	Session *session.Session
 	// Flags is the environment flags used by the client to test selectively against a rancher instance.
 	Flags      *environmentflag.EnvironmentFlags
-	RestConfig *rest.Config
+	restConfig *rest.Config
 }
 
 // NewClient is the constructor to the initializing a rancher Client. It takes a bearer token and session.Session. If bearer token is not provided,
@@ -70,7 +70,7 @@ func NewClient(bearerToken string, session *session.Session) (*Client, error) {
 
 	var err error
 	restConfig := newRestConfig(bearerToken, rancherConfig)
-	c.RestConfig = restConfig
+	c.restConfig = restConfig
 	c.Session = session
 	c.Management, err = management.NewClient(clientOpts(restConfig, c.RancherConfig))
 	if err != nil {
@@ -130,13 +130,13 @@ func clientOptsV1(restConfig *rest.Config, rancherConfig *Config) *clientbase.Cl
 
 // doAction is used to post an action to an endpoint, and marshal the response into the output parameter.
 func (c *Client) doAction(endpoint, action string, body []byte, output interface{}) error {
-	url := "https://" + c.RestConfig.Host + endpoint + "?action=" + action
+	url := "https://" + c.restConfig.Host + endpoint + "?action=" + action
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
 	if err != nil {
 		return err
 	}
 
-	req.Header.Add("Authorization", "Bearer "+c.RestConfig.BearerToken)
+	req.Header.Add("Authorization", "Bearer "+c.restConfig.BearerToken)
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.Management.APIBaseClient.Ops.Client.Do(req)
@@ -179,19 +179,19 @@ func (c *Client) AsUser(user *management.User) (*Client, error) {
 // ReLogin reinstantiates a Client to update its API schema. This function would be used for a non admin user that needs to be
 // "reloaded" inorder to have updated permissions for certain resources.
 func (c *Client) ReLogin() (*Client, error) {
-	return NewClient(c.RestConfig.BearerToken, c.Session)
+	return NewClient(c.restConfig.BearerToken, c.Session)
 }
 
 // WithSession accepts a session.Session and instantiates a new Client to reference this new session.Session. The main purpose is to use it
 // when created "sub sessions" when tracking resources created at a test case scope.
 func (c *Client) WithSession(session *session.Session) (*Client, error) {
-	return NewClient(c.RestConfig.BearerToken, session)
+	return NewClient(c.restConfig.BearerToken, session)
 }
 
 // GetClusterCatalogClient is a function that takes a clusterID and instantiates a catalog client to directly communicate with that specific cluster.
 func (c *Client) GetClusterCatalogClient(clusterID string) (*catalog.Client, error) {
-	restConfig := *c.RestConfig
-	restConfig.Host = fmt.Sprintf("https://%s/k8s/clusters/%s", c.RestConfig.Host, clusterID)
+	restConfig := *c.restConfig
+	restConfig.Host = fmt.Sprintf("https://%s/k8s/clusters/%s", c.restConfig.Host, clusterID)
 
 	catalogClient, err := catalog.NewForConfig(&restConfig, c.Session)
 	if err != nil {
@@ -203,7 +203,7 @@ func (c *Client) GetClusterCatalogClient(clusterID string) (*catalog.Client, err
 
 // GetRancherDynamicClient is a helper function that instantiates a dynamic client to communicate with the rancher host.
 func (c *Client) GetRancherDynamicClient() (dynamic.Interface, error) {
-	dynamic, err := frameworkDynamic.NewForConfig(c.Session, c.RestConfig)
+	dynamic, err := frameworkDynamic.NewForConfig(c.Session, c.restConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -212,7 +212,7 @@ func (c *Client) GetRancherDynamicClient() (dynamic.Interface, error) {
 
 // GetKubeAPIProvisioningClient is a function that instantiates a provisioning client that communicates with the Kube API of a cluster
 func (c *Client) GetKubeAPIProvisioningClient() (*kubeProvisioning.Client, error) {
-	provClient, err := kubeProvisioning.NewForConfig(c.RestConfig, c.Session)
+	provClient, err := kubeProvisioning.NewForConfig(c.restConfig, c.Session)
 	if err != nil {
 		return nil, err
 	}
@@ -222,7 +222,7 @@ func (c *Client) GetKubeAPIProvisioningClient() (*kubeProvisioning.Client, error
 
 // GetKubeAPIRKEClient is a function that instantiates a rke client that communicates with the Kube API of a cluster
 func (c *Client) GetKubeAPIRKEClient() (*kubeRKE.Client, error) {
-	rkeClient, err := kubeRKE.NewForConfig(c.RestConfig, c.Session)
+	rkeClient, err := kubeRKE.NewForConfig(c.restConfig, c.Session)
 	if err != nil {
 		return nil, err
 	}
@@ -232,8 +232,8 @@ func (c *Client) GetKubeAPIRKEClient() (*kubeRKE.Client, error) {
 
 // GetDownStreamClusterClient is a helper function that instantiates a dynamic client to communicate with a specific cluster.
 func (c *Client) GetDownStreamClusterClient(clusterID string) (dynamic.Interface, error) {
-	restConfig := *c.RestConfig
-	restConfig.Host = fmt.Sprintf("https://%s/k8s/clusters/%s", c.RestConfig.Host, clusterID)
+	restConfig := *c.restConfig
+	restConfig.Host = fmt.Sprintf("https://%s/k8s/clusters/%s", c.restConfig.Host, clusterID)
 
 	dynamic, err := frameworkDynamic.NewForConfig(c.Session, &restConfig)
 	if err != nil {

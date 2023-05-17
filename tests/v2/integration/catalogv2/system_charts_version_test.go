@@ -3,12 +3,17 @@ package integration
 import (
 	"context"
 	"fmt"
-	"strings"
 	"testing"
 	"time"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/tests/framework/clients/rancher"
+	"github.com/rancher/rancher/tests/framework/clients/rancher/catalog"
 	stevev1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
+	"github.com/rancher/rancher/tests/framework/extensions/kubeconfig"
+	"github.com/rancher/rancher/tests/framework/pkg/session"
+	"github.com/rancher/rancher/tests/framework/pkg/wait"
+	"github.com/rancher/rancher/tests/integration/pkg/defaults"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -18,12 +23,6 @@ import (
 	kwait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-
-	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	"github.com/rancher/rancher/tests/framework/clients/rancher/catalog"
-	"github.com/rancher/rancher/tests/framework/pkg/session"
-	"github.com/rancher/rancher/tests/framework/pkg/wait"
-	"github.com/rancher/rancher/tests/integration/pkg/defaults"
 )
 
 type SystemChartsVersionSuite struct {
@@ -53,13 +52,12 @@ func (w *SystemChartsVersionSuite) SetupSuite() {
 	w.catalogClient, err = w.client.GetClusterCatalogClient("local")
 	require.NoError(w.T(), err)
 
-	host := hostName(w.client.RestConfig.Host)
-	w.restClientGetter = &genericclioptions.ConfigFlags{
-		CAFile:      &w.client.RestConfig.TLSClientConfig.CAFile,
-		APIServer:   &host,
-		Insecure:    &w.client.RestConfig.TLSClientConfig.Insecure,
-		BearerToken: &w.client.RestConfig.BearerToken,
-	}
+	kubeConfig, err := kubeconfig.GetKubeconfig(w.client, "local")
+	require.NoError(w.T(), err)
+	restConfig, err := (*kubeConfig).ClientConfig()
+	require.NoError(w.T(), err)
+	w.restClientGetter, err = kubeconfig.NewRestGetter(restConfig, *kubeConfig)
+	require.NoError(w.T(), err)
 
 	w.latestWebhookVersion, err = w.catalogClient.GetLatestChartVersion("rancher-webhook")
 	require.NoError(w.T(), err)
@@ -261,12 +259,4 @@ func (w *SystemChartsVersionSuite) updateSetting(name, value string) error {
 	s.Value = value
 	_, err = w.client.Steve.SteveType("management.cattle.io.setting").Update(existing, s)
 	return err
-}
-
-func hostName(host string) string {
-	const prefix = "https://"
-	if strings.HasPrefix(host, prefix) {
-		return host
-	}
-	return prefix + host
 }
