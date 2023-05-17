@@ -29,22 +29,13 @@ func New(clients *clients.Clients, namespace, script string, labels map[string]s
 
 	// We are providing the following files/configmap in order to force K3s/RKE2 to use the cgroupfs cgroup driver,
 	// rather than systemd.
-	// We must also drop-in replace the type of service for systemd as we are clearing the notify socket which would
-	// normally cause systemd to hang waiting for the unit to activate. Eventually, when
-	// https://github.com/rancher/rke2/issues/3240 is resolved, we should be able to roll back this workaround. If the
-	// linked github issue is resolved, we should roll back this change here as well as in
-	// v2prov/nodeconfig.
 	cmConfigure := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:    namespace,
 			GenerateName: "test-node-configure-systemd-",
 		},
 		Data: map[string]string{
-			"dropin": `[Service]
-Type=exec
-`,
-			"disable": `NOTIFY_SOCKET=
-INVOCATION_ID=
+			"disable": `INVOCATION_ID=
 `},
 	}
 	cmConfigure, err = clients.Core.ConfigMap().Create(cmConfigure)
@@ -95,26 +86,6 @@ INVOCATION_ID=
 						Name:      "seed",
 						MountPath: "/var/lib/cloud/seed/nocloud/user-data",
 						SubPath:   "user-data",
-					},
-					{
-						Name:      "systemd",
-						MountPath: "/usr/local/lib/systemd/system/rke2-server.service.d/10-delegate.conf",
-						SubPath:   "dropin",
-					},
-					{
-						Name:      "systemd",
-						MountPath: "/usr/local/lib/systemd/system/rke2-agent.service.d/10-delegate.conf",
-						SubPath:   "dropin",
-					},
-					{
-						Name:      "systemd",
-						MountPath: "/usr/local/lib/systemd/system/k3s.service.d/10-delegate.conf",
-						SubPath:   "dropin",
-					},
-					{
-						Name:      "systemd",
-						MountPath: "/usr/local/lib/systemd/system/k3s-agent.service.d/10-delegate.conf",
-						SubPath:   "dropin",
 					},
 					{ // We have to set invocation disabling on the rancher-system-agent because it runs rke2/k3s server on restore and this has cgroup issues
 						Name:      "systemd",
