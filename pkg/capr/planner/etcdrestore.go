@@ -20,7 +20,7 @@ import (
 
 const (
 	etcdRestoreInstallRoot = "/var/lib/rancher"
-	etcdRestoreBinPrefix   = "capr_etcd_restore/bin"
+	etcdRestoreBinPrefix   = "capr/etcd-restore/bin"
 
 	etcdRestorePostRestoreWaitForPodListCleanupPath   = "wait_for_pod_list.sh"
 	etcdRestorePostRestoreWaitForPodListCleanupScript = `
@@ -336,30 +336,28 @@ func (p *Planner) generateEtcdSnapshotRestorePlan(controlPlane *rkev1.RKEControl
 		nodePlan.Files = append(nodePlan.Files, s3Files...)
 	}
 
-	// This is likely redundant but can make sense in the event that there is an external watchdog.
-	stopPlan, joinedServer, err := p.generateStopServiceAndKillAllPlan(controlPlane, tokensSecret, entry, joinServer)
-	if err != nil {
-		return plan.NodePlan{}, joinedServer, err
+	runtime := capr.GetRuntime(controlPlane.Spec.KubernetesVersion)
+
+	nodePlan.Instructions = append(nodePlan.Instructions, convertToIdempotentInstruction("etcd-restore/restore-kill-all", fmt.Sprintf("%v", controlPlane.Status.ETCDSnapshotRestore), generateKillAllInstruction(runtime)))
+
+	if runtime == capr.RuntimeRKE2 {
+		if generated, instruction := generateManifestRemovalInstruction(runtime, entry); generated {
+			nodePlan.Instructions = append(nodePlan.Instructions, convertToIdempotentInstruction("etcd-restore/restore-manifest-removal", fmt.Sprintf("%v", controlPlane.Status.ETCDSnapshotRestore), instruction))
+		}
 	}
 
 	// make sure to install the desired version before performing restore
-	stopPlan.Instructions = append(stopPlan.Instructions, p.generateInstallInstructionWithSkipStart(controlPlane, entry))
-
-	planInstructions := append(stopPlan.Instructions,
-		plan.OneTimeInstruction{
+	nodePlan.Instructions = append(nodePlan.Instructions,
+		p.generateInstallInstructionWithSkipStart(controlPlane, entry),
+		convertToIdempotentInstruction("etcd-restore/clean-etcd-dir", fmt.Sprintf("%v", controlPlane.Status.ETCDSnapshotRestore), plan.OneTimeInstruction{
 			Name:    "remove-etcd-db-dir",
 			Command: "rm",
 			Args: []string{
 				"-rf",
 				fmt.Sprintf("/var/lib/rancher/%s/server/db/etcd", capr.GetRuntimeCommand(controlPlane.Spec.KubernetesVersion)),
-			}})
-
-	nodePlan.Instructions = append(planInstructions, plan.OneTimeInstruction{
-		Name:    "restore",
-		Args:    args,
-		Env:     env,
-		Command: capr.GetRuntimeCommand(controlPlane.Spec.KubernetesVersion),
-	})
+			}}),
+		idempotentInstruction("etcd-restore/restore", fmt.Sprintf("%v", controlPlane.Status.ETCDSnapshotRestore), capr.GetRuntimeCommand(controlPlane.Spec.KubernetesVersion), args, env),
+	)
 
 	return nodePlan, joinedServer, nil
 }
@@ -431,10 +429,11 @@ func (p *Planner) generateEtcdRestorePodCleanupFilesAndInstruction(controlPlane 
 	}
 
 	instructions := []plan.OneTimeInstruction{
-		{
-			Name:    "post-restore-cleanup-pods-wait-for-podlist",
-			Command: "/bin/sh",
-			Args: []string{
+		idempotentInstruction(
+			"etcd-restore/pods-wait-for-podlist",
+			fmt.Sprintf("%v", controlPlane.Status.ETCDSnapshotRestore),
+			"/bin/sh",
+			[]string{
 				"-x",
 				etcdRestoreScriptPath(controlPlane, etcdRestorePostRestoreWaitForPodListCleanupPath),
 				kubectl,
@@ -444,16 +443,16 @@ func (p *Planner) generateEtcdRestorePodCleanupFilesAndInstruction(controlPlane 
 				"pods",
 				"--all-namespaces",
 			},
-		},
-		{
-			Name:    "wait-for-desired-ready-nodes",
-			Command: "/bin/sh",
-			Env: []string{
+			[]string{}),
+		idempotentInstruction(
+			"etcd-restore/wait-for-desired-ready-nodes",
+			fmt.Sprintf("%v", controlPlane.Status.ETCDSnapshotRestore),
+			"/bin/sh",
+			append([]string{etcdRestoreScriptPath(controlPlane, etcdRestoreNodeWaitForReadyPath)}, cleanupMachineUIDs...),
+			[]string{
 				fmt.Sprintf("%s=%s", "KUBECTL", kubectl),
 				fmt.Sprintf("%s=%s", "KUBECONFIG", kubeconfig),
-			},
-			Args: append([]string{etcdRestoreScriptPath(controlPlane, etcdRestoreNodeWaitForReadyPath)}, cleanupMachineUIDs...),
-		},
+			}),
 	}
 
 	// These are the pod selectors that are common between K3s/RKE2 (CoreDNS/KubeDNS)
@@ -483,10 +482,11 @@ func (p *Planner) generateEtcdRestorePodCleanupFilesAndInstruction(controlPlane 
 
 	for i, podSelector := range podSelectors {
 		if namespace, labelSelector, usable := strings.Cut(podSelector, ":"); usable {
-			instructions = append(instructions, plan.OneTimeInstruction{
-				Name:    fmt.Sprintf("post-restore-cleanup-pods-%d", i),
-				Command: kubectl,
-				Args: []string{
+			instructions = append(instructions, idempotentInstruction(
+				fmt.Sprintf("etcd-restore/post-restore-cleanup-pods-%d", i),
+				fmt.Sprintf("%v", controlPlane.Status.ETCDSnapshotRestore),
+				kubectl,
+				[]string{
 					"--kubeconfig",
 					kubeconfig,
 					"delete",
@@ -497,7 +497,7 @@ func (p *Planner) generateEtcdRestorePodCleanupFilesAndInstruction(controlPlane 
 					labelSelector,
 					"--wait=false",
 				},
-			})
+				[]string{}))
 		}
 	}
 
@@ -538,15 +538,15 @@ func (p *Planner) generateEtcdRestoreNodeCleanupFilesAndInstruction(controlPlane
 	nodeNamesFile := fmt.Sprintf("node-names-%s", identifier)
 
 	instructions := []plan.OneTimeInstruction{
-		{
-			Name:    "cleanup-nodes",
-			Command: "/bin/sh",
-			Env: []string{
+		idempotentInstruction(
+			"etcd-restore/cleanup-nodes",
+			fmt.Sprintf("%v", controlPlane.Status.ETCDSnapshotRestore),
+			"/bin/sh",
+			[]string{etcdRestoreScriptPath(controlPlane, etcdRestoreNodeCleanUpPath), etcdRestoreScriptPath(controlPlane, machineIdsFile), etcdRestoreScriptPath(controlPlane, nodeNamesFile)},
+			[]string{
 				fmt.Sprintf("%s=%s", "KUBECTL", kubectl),
 				fmt.Sprintf("%s=%s", "KUBECONFIG", kubeconfig),
-			},
-			Args: []string{etcdRestoreScriptPath(controlPlane, etcdRestoreNodeCleanUpPath), etcdRestoreScriptPath(controlPlane, machineIdsFile), etcdRestoreScriptPath(controlPlane, nodeNamesFile)},
-		},
+			}),
 	}
 
 	return []plan.File{

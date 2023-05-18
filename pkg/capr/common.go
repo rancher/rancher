@@ -75,6 +75,8 @@ const (
 	WorkerRoleLabel               = "rke.cattle.io/worker-role"
 	AuthorizedObjectAnnotation    = "rke.cattle.io/object-authorized-for-clusters"
 
+	JoinServerImplausible = "implausible"
+
 	SecretTypeMachinePlan  = "rke.cattle.io/machine-plan"
 	SecretTypeClusterState = "rke.cattle.io/cluster-state"
 
