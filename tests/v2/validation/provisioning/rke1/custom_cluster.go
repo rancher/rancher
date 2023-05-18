@@ -22,14 +22,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func TestProvisioningRKE1CustomCluster(t *testing.T, client *rancher.Client, externalNodeProvider provisioning.ExternalNodeProvider, nodesAndRoles []string, psact, kubeVersion, cni string) {
+func TestProvisioningRKE1CustomCluster(t *testing.T, client *rancher.Client, externalNodeProvider provisioning.ExternalNodeProvider, nodesAndRoles []string, psact, kubeVersion, cni string, advancedOptions provisioning.AdvancedOptions) {
 	numNodes := len(nodesAndRoles)
 	nodes, _, err := externalNodeProvider.NodeCreationFunc(client, numNodes, 0, false)
 	require.NoError(t, err)
 
 	clusterName := namegen.AppendRandomString(externalNodeProvider.Name)
 
-	cluster := clusters.NewRKE1ClusterConfig(clusterName, cni, kubeVersion, psact, client)
+	cluster := clusters.NewRKE1ClusterConfig(clusterName, cni, kubeVersion, psact, client, advancedOptions)
 	clusterResp, err := clusters.CreateRKE1Cluster(client, cluster)
 	require.NoError(t, err)
 

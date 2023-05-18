@@ -43,6 +43,7 @@ type RegistryTestSuite struct {
 	clusterNoAuthRegistryHost      string
 	localClusterGlobalRegistryHost string
 	rancherUsesRegistry            bool
+	advancedOptions                provisioning.AdvancedOptions
 }
 
 func (rt *RegistryTestSuite) TearDownSuite() {
@@ -88,6 +89,7 @@ func (rt *RegistryTestSuite) SetupSuite() {
 	cnis := clustersConfig.CNIs
 	nodesAndRoles := clustersConfig.NodesAndRolesRKE1
 	providers := clustersConfig.Providers
+	rt.advancedOptions = clustersConfig.AdvancedOptions
 
 	globalRegistryFqdn := ""
 	rt.rancherUsesRegistry = false
@@ -134,9 +136,9 @@ func (rt *RegistryTestSuite) SetupSuite() {
 	require.NoError(rt.T(), err)
 
 	provider := rke1.CreateProvider(providers[0])
-	clusterNameNoAuth, err := rt.testProvisionRKE1Cluster(subClient, provider, nodesAndRoles, kubernetesVersions[0], cnis[0], privateRegistriesNoAuth)
+	clusterNameNoAuth, err := rt.testProvisionRKE1Cluster(subClient, provider, nodesAndRoles, kubernetesVersions[0], cnis[0], privateRegistriesNoAuth, rt.advancedOptions)
 	require.NoError(rt.T(), err)
-	clusterNameAuth, err := rt.testProvisionRKE1Cluster(subClient, provider, nodesAndRoles, kubernetesVersions[0], cnis[0], privateRegistriesAuth)
+	clusterNameAuth, err := rt.testProvisionRKE1Cluster(subClient, provider, nodesAndRoles, kubernetesVersions[0], cnis[0], privateRegistriesAuth, rt.advancedOptions)
 	require.NoError(rt.T(), err)
 
 	clusterID, err := clusters.GetClusterIDByName(client, clusterNameNoAuth)
@@ -170,9 +172,9 @@ func (rt *RegistryTestSuite) SetupSuite() {
 
 }
 
-func (rt *RegistryTestSuite) testProvisionRKE1Cluster(client *rancher.Client, provider rke1.Provider, nodesAndRoles []nodepools.NodeRoles, kubeVersion, cni string, privateRegistries []management.PrivateRegistry) (string, error) {
+func (rt *RegistryTestSuite) testProvisionRKE1Cluster(client *rancher.Client, provider rke1.Provider, nodesAndRoles []nodepools.NodeRoles, kubeVersion, cni string, privateRegistries []management.PrivateRegistry, advancedOptions provisioning.AdvancedOptions) (string, error) {
 	clusterName := namegen.AppendRandomString(provider.Name.String())
-	cluster := clusters.NewRKE1ClusterConfig(clusterName, cni, kubeVersion, "", client)
+	cluster := clusters.NewRKE1ClusterConfig(clusterName, cni, kubeVersion, "", client, advancedOptions)
 
 	cluster.RancherKubernetesEngineConfig.PrivateRegistries = privateRegistries
 

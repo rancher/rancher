@@ -29,7 +29,7 @@ const (
 	namespace = "fleet-default"
 )
 
-func TestProvisioningRKE2CustomCluster(t *testing.T, client *rancher.Client, externalNodeProvider provisioning.ExternalNodeProvider, nodesAndRoles []string, psact, kubeVersion, cni string, hardened bool, nodeCountWin int, hasWindows bool) {
+func TestProvisioningRKE2CustomCluster(t *testing.T, client *rancher.Client, externalNodeProvider provisioning.ExternalNodeProvider, nodesAndRoles []string, psact, kubeVersion, cni string, hardened bool, nodeCountWin int, hasWindows bool, advancedOptions provisioning.AdvancedOptions) {
 	numNodesLin := len(nodesAndRoles)
 
 	adminClient, err := rancher.NewClient(client.RancherConfig.AdminToken, client.Session)
@@ -40,7 +40,7 @@ func TestProvisioningRKE2CustomCluster(t *testing.T, client *rancher.Client, ext
 
 	clusterName := namegen.AppendRandomString(externalNodeProvider.Name)
 
-	cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, namespace, cni, "", kubeVersion, psact, nil)
+	cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, namespace, cni, "", kubeVersion, psact, nil, advancedOptions)
 
 	clusterResp, err := clusters.CreateK3SRKE2Cluster(client, cluster)
 	require.NoError(t, err)
@@ -128,7 +128,7 @@ func TestProvisioningRKE2CustomCluster(t *testing.T, client *rancher.Client, ext
 		err = hardening.HardeningNodes(client, hardened, linuxNodes, nodesAndRoles)
 		require.NoError(t, err)
 
-		hardenCluster := clusters.HardenK3SRKE2ClusterConfig(clusterName, namespace, "", "", kubeVersion, psact, nil)
+		hardenCluster := clusters.HardenK3SRKE2ClusterConfig(clusterName, namespace, "", "", kubeVersion, psact, nil, provisioning.AdvancedOptions{})
 
 		hardenClusterResp, err := clusters.UpdateK3SRKE2Cluster(client, clusterResp, hardenCluster)
 		require.NoError(t, err)

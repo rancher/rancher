@@ -34,6 +34,7 @@ type KdmChecksTestSuite struct {
 	cnis                  []string
 	providers             []string
 	nodesAndRoles         []machinepools.NodeRoles
+	advancedOptions       provisioning.AdvancedOptions
 }
 
 const (
@@ -58,6 +59,7 @@ func (k *KdmChecksTestSuite) SetupSuite() {
 	k.cnis = clustersConfig.CNIs
 	k.providers = clustersConfig.Providers
 	k.nodesAndRoles = clustersConfig.NodesAndRoles
+	k.advancedOptions = clustersConfig.AdvancedOptions
 
 	client, err := rancher.NewClient("", testSession)
 	require.NoError(k.T(), err)
@@ -110,7 +112,7 @@ func (k *KdmChecksTestSuite) TestProvisioningSingleNodeK3SClusters() {
 		require.NoError(k.T(), err)
 
 		machinePools := machinepools.RKEMachinePoolSetup(nodeRoles, machineConfigResp)
-		cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, k.ns, "", cloudCredential.ID, k8sVersion, "", machinePools)
+		cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, k.ns, "", cloudCredential.ID, k8sVersion, "", machinePools, k.advancedOptions)
 
 		logrus.Info("provisioning " + k8sVersion + " cluster..")
 

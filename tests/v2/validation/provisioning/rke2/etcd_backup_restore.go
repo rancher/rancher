@@ -13,6 +13,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
 	"github.com/rancher/rancher/tests/framework/extensions/workloads"
 	"github.com/rancher/rancher/tests/framework/extensions/workloads/pods"
+	"github.com/rancher/rancher/tests/v2/validation/provisioning"
 	"github.com/sirupsen/logrus"
 	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -87,7 +88,7 @@ func getSnapshots(client *rancher.Client,
 
 }
 
-func createRKE2NodeDriverCluster(client *rancher.Client, provider *Provider, clusterName string, k8sVersion string, namespace string, cni string) (*steveV1.SteveAPIObject, error) {
+func createRKE2NodeDriverCluster(client *rancher.Client, provider *Provider, clusterName string, k8sVersion string, namespace string, cni string, advancedOptions provisioning.AdvancedOptions) (*steveV1.SteveAPIObject, error) {
 
 	nodeRoles := []machinepools.NodeRoles{
 		{
@@ -124,7 +125,7 @@ func createRKE2NodeDriverCluster(client *rancher.Client, provider *Provider, clu
 
 	machinePools := machinepools.RKEMachinePoolSetup(nodeRoles, machineConfigResp)
 
-	cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, namespace, cni, cloudCredential.ID, k8sVersion, "", machinePools)
+	cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, namespace, cni, cloudCredential.ID, k8sVersion, "", machinePools, advancedOptions)
 
 	return clusters.CreateK3SRKE2Cluster(client, cluster)
 

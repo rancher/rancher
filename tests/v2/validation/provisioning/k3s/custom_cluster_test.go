@@ -26,6 +26,7 @@ type CustomClusterProvisioningTestSuite struct {
 	nodeProviders      []string
 	psact              string
 	hardened           bool
+	advancedOptions    provisioning.AdvancedOptions
 }
 
 func (c *CustomClusterProvisioningTestSuite) TearDownSuite() {
@@ -43,6 +44,7 @@ func (c *CustomClusterProvisioningTestSuite) SetupSuite() {
 	c.nodeProviders = clustersConfig.NodeProviders
 	c.psact = clustersConfig.PSACT
 	c.hardened = clustersConfig.Hardened
+	c.advancedOptions = clustersConfig.AdvancedOptions
 
 	client, err := rancher.NewClient("", testSession)
 	require.NoError(c.T(), err)
@@ -116,7 +118,7 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningK3SCustomCluster() 
 			for _, kubeVersion := range c.kubernetesVersions {
 				name = tt.name + providerName + " Kubernetes version: " + kubeVersion
 				c.Run(name, func() {
-					TestProvisioningK3SCustomCluster(c.T(), client, externalNodeProvider, tt.nodeRoles, kubeVersion, c.hardened, tt.psact)
+					TestProvisioningK3SCustomCluster(c.T(), client, externalNodeProvider, tt.nodeRoles, kubeVersion, c.hardened, tt.psact, c.advancedOptions)
 				})
 			}
 		}
@@ -170,7 +172,7 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningK3SCustomClusterDyn
 			for _, kubeVersion := range c.kubernetesVersions {
 				name = tt.name + providerName + " Kubernetes version: " + kubeVersion
 				c.Run(name, func() {
-					TestProvisioningK3SCustomCluster(c.T(), client, externalNodeProvider, rolesPerNode, kubeVersion, c.hardened, tt.psact)
+					TestProvisioningK3SCustomCluster(c.T(), client, externalNodeProvider, rolesPerNode, kubeVersion, c.hardened, tt.psact, c.advancedOptions)
 				})
 			}
 		}
