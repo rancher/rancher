@@ -25,7 +25,7 @@ resource "azurerm_kubernetes_cluster" "default" {
   resource_group_name = azurerm_resource_group.default.name
   dns_prefix          = "taaks${random_string.random.result}"
   kubernetes_version  = var.kubernetes_version
-  sku_tier            = "Paid"
+  sku_tier            = var.sku_tier
 
   default_node_pool {
     name            = "taaks${random_string.random.result}"
