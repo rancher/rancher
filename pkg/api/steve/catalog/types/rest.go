@@ -1,3 +1,22 @@
+/*
+Package types define several types representing Helm chart operations.
+
+These types are used by the Steve Catalog API to handle requests and responses
+associated with Helm chart actions such as install, upgrade, and uninstall.
+
+Types in this package include:
+
+  - ChartInstall: Represents a Helm chart installation request.
+  - ChartInstallAction: Describes the configuration for an installation action.
+  - ChartInfo: Contains detailed information about a Helm chart.
+  - ChartUninstallAction: Describes the configuration for an uninstallation action.
+  - ChartUpgradeAction: Describes the configuration for an upgrade action.
+  - ChartUpgrade: Represents a Helm chart upgrade request.
+  - ChartActionOutput: Represents the output after performing a Helm chart action.
+
+Each type includes fields that map directly to properties of Helm chart operations,
+allowing for a structured approach to managing Helm charts through the API.
+*/
 package types
 
 import (
