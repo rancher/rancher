@@ -385,10 +385,10 @@ func generateManifestRemovalInstruction(runtime string, entry *planEntry) (bool,
 	}
 	return true, plan.OneTimeInstruction{
 		Name:    "remove server manifests",
-		Command: "rm",
+		Command: "/bin/sh",
 		Args: []string{
-			"-rf",
-			fmt.Sprintf("/var/lib/rancher/%s/server/manifests/%s-*.yaml", runtime, runtime),
+			"-c",
+			fmt.Sprintf("rm -rf /var/lib/rancher/%s/server/manifests/%s-*.yaml", runtime, runtime),
 		},
 	}
 }
