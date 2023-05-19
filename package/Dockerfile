@@ -163,7 +163,7 @@ RUN curl -sLf ${!TINI_URL} > /usr/bin/tini && \
     chmod +x /usr/bin/tini /usr/bin/telemetry && \
     mkdir -p /var/lib/rancher-data/driver-metadata
 
-ENV CATTLE_UI_VERSION 2.7.2-rc8
+ENV CATTLE_UI_VERSION 2.7.4-rc4
 ENV CATTLE_DASHBOARD_UI_VERSION v2.7.2-rc8
 ENV CATTLE_CLI_VERSION v2.7.2-rc1
 
