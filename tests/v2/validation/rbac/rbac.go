@@ -48,6 +48,7 @@ type ClusterConfig struct {
 	externalNodeProvider provisioning.ExternalNodeProvider
 	kubernetesVersion    string
 	cni                  string
+	advancedOptions      provisioning.AdvancedOptions
 }
 
 func createUser(client *rancher.Client, role string) (*management.User, error) {
@@ -233,12 +234,13 @@ func getClusterConfig() *ClusterConfig {
 
 	kubernetesVersion := userConfig.RKE1KubernetesVersions[0]
 	cni := userConfig.CNIs[0]
+	advancedOptions := userConfig.AdvancedOptions
 	nodeProviders := userConfig.NodeProviders[0]
 
 	externalNodeProvider := provisioning.ExternalNodeProviderSetup(nodeProviders)
 
 	clusterConfig := ClusterConfig{nodeRoles: nodeAndRoles, externalNodeProvider: externalNodeProvider,
-		kubernetesVersion: kubernetesVersion, cni: cni}
+		kubernetesVersion: kubernetesVersion, cni: cni, advancedOptions: advancedOptions}
 
 	return &clusterConfig
 }
