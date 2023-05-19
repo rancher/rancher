@@ -68,7 +68,7 @@ func (m *Lifecycle) deleteV1Node(node *v3.Node) (runtime.Object, error) {
 		ctx, node.Status.NodeName, metav1.DeleteOptions{})
 	if err != nil && !kerror.IsNotFound(err) &&
 		ctx.Err() != context.DeadlineExceeded &&
-		!strings.Contains(err.Error(), dialer.ErrAgentDisconnected.Error()) &&
+		!errors.Is(err, dialer.ErrAgentDisconnected) &&
 		!strings.Contains(err.Error(), "connection refused") {
 		return node, err
 	}
@@ -255,7 +255,7 @@ func (m *Lifecycle) createCleanupJob(userContext *config.UserContext, cluster *v
 		LabelSelector: fmt.Sprintf("%s=%s", nodeLabel, node.Name),
 	})
 	if err != nil && !kerror.IsNotFound(err) {
-		if strings.Contains(err.Error(), dialer.ErrAgentDisconnected.Error()) ||
+		if errors.Is(err, dialer.ErrAgentDisconnected) ||
 			strings.Contains(err.Error(), "connection refused") {
 			return nil, nil // can't connect, just continue on with deleting v3 node
 		}

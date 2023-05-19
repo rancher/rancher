@@ -2,21 +2,23 @@ package rkedialerfactory
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
 	"strings"
 
 	"github.com/rancher/norman/types/slice"
+	"github.com/rancher/rancher/pkg/dialer"
 	"github.com/rancher/rancher/pkg/ref"
-	"github.com/rancher/rancher/pkg/types/config/dialer"
+	dialertypes "github.com/rancher/rancher/pkg/types/config/dialer"
 	"github.com/rancher/rke/hosts"
 	rketypes "github.com/rancher/rke/types"
 	"k8s.io/client-go/transport"
 )
 
 type RKEDialerFactory struct {
-	Factory dialer.Factory
+	Factory dialertypes.Factory
 	Docker  bool
 	Ctx     context.Context
 }
@@ -67,8 +69,8 @@ func (t *RKEDialerFactory) WrapTransport(config *rketypes.RancherKubernetesEngin
 		}
 
 		ns, n := ref.Parse(node.NodeName)
-		dialer, err := t.Factory.NodeDialer(ns, n)
-		if dialer == nil || err != nil {
+		nodeDialer, err := t.Factory.NodeDialer(ns, n)
+		if nodeDialer == nil || err != nil {
 			continue
 		}
 
@@ -81,8 +83,8 @@ func (t *RKEDialerFactory) WrapTransport(config *rketypes.RancherKubernetesEngin
 					if privateIP, ok := translateAddress[ip]; ok {
 						address = strings.Replace(address, ip, privateIP, 1)
 					}
-					conn, err := dialer(ctx, network, address)
-					if ref.IsNodeNotFound(err) {
+					conn, err := nodeDialer(ctx, network, address)
+					if errors.Is(err, dialer.ErrNodeNotFound) {
 						clusterDialer, dialerErr := t.Factory.ClusterDialer(ns)
 						if dialerErr == nil {
 							return clusterDialer(ctx, network, address)

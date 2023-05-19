@@ -29,7 +29,10 @@ const (
 	WaitForAgentError = "waiting for cluster [%s] agent to connect"
 )
 
-var ErrAgentDisconnected = errors.New("cluster agent disconnected")
+var (
+	ErrAgentDisconnected = errors.New("cluster agent disconnected")
+	ErrNodeNotFound      = errors.New("node not found")
+)
 
 func NewFactory(apiContext *config.ScaledContext, wrangler *wrangler.Context) (*Factory, error) {
 	return &Factory{
@@ -292,7 +295,7 @@ func (f *Factory) DockerDialer(clusterName, machineName string) (dialer.Dialer, 
 		}, nil
 	}
 
-	return nil, fmt.Errorf("can not build dialer to [%s:%s]", clusterName, machineName)
+	return nil, fmt.Errorf("can not build dialer to [%s:%s]: %w", clusterName, machineName, ErrNodeNotFound)
 }
 
 func (f *Factory) NodeDialer(clusterName, machineName string) (dialer.Dialer, error) {
@@ -317,7 +320,7 @@ func (f *Factory) nodeDialer(clusterName, machineName string) (dialer.Dialer, er
 		return dialer.Dialer(d), nil
 	}
 
-	return nil, fmt.Errorf("can not build dialer to [%s:%s]", clusterName, machineName)
+	return nil, fmt.Errorf("can not build dialer to [%s:%s]: %w", clusterName, machineName, ErrNodeNotFound)
 }
 
 func machineSessionKey(machine *v3.Node) string {
