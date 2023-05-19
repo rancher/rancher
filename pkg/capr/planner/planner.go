@@ -1071,6 +1071,9 @@ func (p *Planner) generatePlanWithConfigFiles(controlPlane *rkev1.RKEControlPlan
 		}
 
 		nodePlan, err = addOtherFiles(nodePlan, controlPlane, entry)
+
+		nodePlan.Files = append(nodePlan.Files, idempotentScriptFile)
+
 		return nodePlan, config, joinedServer, err
 	}
 	return plan.NodePlan{}, map[string]interface{}{}, "", nil
