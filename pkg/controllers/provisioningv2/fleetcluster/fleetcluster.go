@@ -5,12 +5,12 @@ import (
 	"time"
 
 	fleet "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
-	mgmt "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	mgmtcluster "github.com/rancher/rancher/pkg/cluster"
 	fleetconst "github.com/rancher/rancher/pkg/fleet"
 	fleetcontrollers "github.com/rancher/rancher/pkg/generated/controllers/fleet.cattle.io/v1alpha1"
-	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	rocontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/provisioningv2/image"
 	"github.com/rancher/rancher/pkg/settings"
@@ -24,11 +24,11 @@ import (
 )
 
 type handler struct {
-	clusters          mgmtcontrollers.ClusterClient
-	clustersCache     mgmtcontrollers.ClusterCache
+	clusters          v3.ClusterClient
+	clustersCache     v3.ClusterCache
 	fleetClusters     fleetcontrollers.ClusterController
 	apply             apply.Apply
-	getPrivateRepoURL func(*v1.Cluster, *mgmt.Cluster) string
+	getPrivateRepoURL func(*provv1.Cluster, *apimgmtv3.Cluster) string
 }
 
 // Register registers the fleetcluster controller, which is responsible for creating fleet cluster objects.
@@ -44,7 +44,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 		apply:         clients.Apply.WithCacheTypes(clients.Provisioning.Cluster()),
 	}
 
-	h.getPrivateRepoURL = func(cluster *v1.Cluster, mgmtCluster *mgmt.Cluster) string {
+	h.getPrivateRepoURL = func(cluster *provv1.Cluster, mgmtCluster *apimgmtv3.Cluster) string {
 		if cluster.Spec.RKEConfig == nil {
 			// If the RKEConfig is nil, we are likely dealing with
 			// a legacy (v3/mgmt) cluster, and need to check the v3
@@ -70,7 +70,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 	clients.Fleet.Cluster().OnChange(ctx, "fleet-local-agent-migration", h.ensureAgentMigrated)
 }
 
-func (h *handler) assignWorkspace(key string, cluster *mgmt.Cluster) (*mgmt.Cluster, error) {
+func (h *handler) assignWorkspace(key string, cluster *apimgmtv3.Cluster) (*apimgmtv3.Cluster, error) {
 	if cluster == nil {
 		return cluster, nil
 	}
@@ -107,7 +107,7 @@ func (h *handler) ensureAgentMigrated(key string, cluster *fleet.Cluster) (*flee
 	return cluster, nil
 }
 
-func (h *handler) createCluster(cluster *v1.Cluster, status v1.ClusterStatus) ([]runtime.Object, v1.ClusterStatus, error) {
+func (h *handler) createCluster(cluster *provv1.Cluster, status provv1.ClusterStatus) ([]runtime.Object, provv1.ClusterStatus, error) {
 	if status.ClusterName == "" || status.ClientSecretName == "" {
 		return nil, status, nil
 	}
@@ -117,7 +117,7 @@ func (h *handler) createCluster(cluster *v1.Cluster, status v1.ClusterStatus) ([
 		return nil, status, err
 	}
 
-	if !mgmt.ClusterConditionReady.IsTrue(mgmtCluster) {
+	if !apimgmtv3.ClusterConditionReady.IsTrue(mgmtCluster) {
 		return nil, status, generic.ErrSkip
 	}
 
