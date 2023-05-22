@@ -29,6 +29,7 @@ type RKE1NodeDriverProvisioningTestSuite struct {
 	cnis               []string
 	providers          []string
 	psact              string
+	advancedOptions    provisioning.AdvancedOptions
 }
 
 func (r *RKE1NodeDriverProvisioningTestSuite) TearDownSuite() {
@@ -46,6 +47,7 @@ func (r *RKE1NodeDriverProvisioningTestSuite) SetupSuite() {
 	r.cnis = clustersConfig.CNIs
 	r.providers = clustersConfig.Providers
 	r.psact = clustersConfig.PSACT
+	r.advancedOptions = clustersConfig.AdvancedOptions
 
 	client, err := rancher.NewClient("", testSession)
 	require.NoError(r.T(), err)
@@ -156,7 +158,7 @@ func (r *RKE1NodeDriverProvisioningTestSuite) TestProvisioningRKE1Cluster() {
 					name += " cni: " + cni
 					scaleName = "scaling " + name
 					r.Run(name, func() {
-						cluster, err := TestProvisioningRKE1Cluster(r.T(), client, provider, tt.nodeRoles, tt.psact, kubeVersion, cni, nodeTemplate)
+						cluster, err := TestProvisioningRKE1Cluster(r.T(), client, provider, tt.nodeRoles, tt.psact, kubeVersion, cni, nodeTemplate, r.advancedOptions)
 						require.NoError(r.T(), err)
 
 						r.cluster = cluster
@@ -211,7 +213,7 @@ func (r *RKE1NodeDriverProvisioningTestSuite) TestProvisioningRKE1ClusterDynamic
 					name += " cni: " + cni
 					scaleName = "scaling " + name
 					r.Run(name, func() {
-						cluster, err := TestProvisioningRKE1Cluster(r.T(), client, provider, nodesAndRoles, tt.psact, kubeVersion, cni, nodeTemplate)
+						cluster, err := TestProvisioningRKE1Cluster(r.T(), client, provider, nodesAndRoles, tt.psact, kubeVersion, cni, nodeTemplate, r.advancedOptions)
 						require.NoError(r.T(), err)
 
 						r.cluster = cluster
@@ -230,7 +232,7 @@ func (r *RKE1NodeDriverProvisioningTestSuite) TestProvisioningRKE1ClusterDynamic
 
 func (r *RKE1NodeDriverProvisioningTestSuite) testScalingRKE1NodePools(client *rancher.Client, provider Provider, nodesAndRoles []nodepools.NodeRoles, psact string, kubeVersion, cni string, cluster *management.Cluster, nodeTemplate *nodetemplates.NodeTemplate) {
 	if cluster == nil {
-		cluster, err := TestProvisioningRKE1Cluster(r.T(), client, provider, nodesAndRoles, psact, kubeVersion, cni, nodeTemplate)
+		cluster, err := TestProvisioningRKE1Cluster(r.T(), client, provider, nodesAndRoles, psact, kubeVersion, cni, nodeTemplate, r.advancedOptions)
 		require.NoError(r.T(), err)
 
 		err = nodepools.ScaleWorkerNodePool(client, nodesAndRoles, cluster.ID, nodeTemplate.ID)

@@ -9,7 +9,7 @@ if [ ! -x $CMD ]; then
     ./scripts/build-server
 fi
 
-if [ $1 = "--trace" ] || [ $1 = "--info" ] || [ $1 = "--debug" ]; then
+if [ ! -z $1 ] && ( [ $1 = "--trace" ] || [ $1 = "--info" ] || [ $1 = "--debug" ] ); then
   LOGFLAG=$1
 fi
 

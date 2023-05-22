@@ -15,6 +15,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/workloads/pods"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
 	"github.com/rancher/rancher/tests/integration/pkg/defaults"
+	provisioning "github.com/rancher/rancher/tests/v2/validation/provisioning"
 	name2 "github.com/rancher/wrangler/pkg/name"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -24,7 +25,7 @@ import (
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
-func TestHostnameTruncation(t *testing.T, client *rancher.Client, provider Provider, machinePools []provv1.RKEMachinePool, defaultHostnameLengthLimit int, kubeVersion, cni string) {
+func TestHostnameTruncation(t *testing.T, client *rancher.Client, provider Provider, machinePools []provv1.RKEMachinePool, defaultHostnameLengthLimit int, kubeVersion, cni string, advancedOptions provisioning.AdvancedOptions) {
 	cloudCredential, err := provider.CloudCredFunc(client)
 	require.NoError(t, err)
 
@@ -44,7 +45,7 @@ func TestHostnameTruncation(t *testing.T, client *rancher.Client, provider Provi
 		machinePools[i].WorkerRole = true
 	}
 
-	cluster := clusters.NewK3SRKE2ClusterConfig("", namespace, cni, cloudCredential.ID, kubeVersion, "", machinePools)
+	cluster := clusters.NewK3SRKE2ClusterConfig("", namespace, cni, cloudCredential.ID, kubeVersion, "", machinePools, advancedOptions)
 
 	cluster.GenerateName = "t-"
 	cluster.Spec.RKEConfig.MachinePoolDefaults.HostnameLengthLimit = defaultHostnameLengthLimit

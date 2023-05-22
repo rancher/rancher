@@ -27,6 +27,7 @@ type CustomClusterProvisioningTestSuite struct {
 	cnis               []string
 	nodeProviders      []string
 	psact              string
+	advancedOptions    provisioning.AdvancedOptions
 }
 
 func (c *CustomClusterProvisioningTestSuite) TearDownSuite() {
@@ -45,6 +46,7 @@ func (c *CustomClusterProvisioningTestSuite) SetupSuite() {
 	c.nodeProviders = clustersConfig.NodeProviders
 	c.hardened = clustersConfig.Hardened
 	c.psact = clustersConfig.PSACT
+	c.advancedOptions = clustersConfig.AdvancedOptions
 
 	client, err := rancher.NewClient("", testSession)
 	require.NoError(c.T(), err)
@@ -128,7 +130,7 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningRKE2CustomCluster()
 				for _, cni := range c.cnis {
 					name += " cni: " + cni
 					c.Run(name, func() {
-						TestProvisioningRKE2CustomCluster(c.T(), client, externalNodeProvider, tt.nodeRoles, tt.psact, kubeVersion, cni, c.hardened, tt.nodeCountWin, tt.hasWindows)
+						TestProvisioningRKE2CustomCluster(c.T(), client, externalNodeProvider, tt.nodeRoles, tt.psact, kubeVersion, cni, c.hardened, tt.nodeCountWin, tt.hasWindows, c.advancedOptions)
 					})
 				}
 			}
@@ -189,7 +191,7 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningRKE2CustomClusterDy
 				for _, cni := range c.cnis {
 					name += " cni: " + cni
 					c.Run(name, func() {
-						TestProvisioningRKE2CustomCluster(c.T(), client, externalNodeProvider, rolesPerNode, tt.psact, kubeVersion, cni, c.hardened, tt.nodeCountWin, tt.hasWindows)
+						TestProvisioningRKE2CustomCluster(c.T(), client, externalNodeProvider, rolesPerNode, tt.psact, kubeVersion, cni, c.hardened, tt.nodeCountWin, tt.hasWindows, c.advancedOptions)
 					})
 				}
 			}

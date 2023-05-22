@@ -1,6 +1,7 @@
 package planner
 
 import (
+	"strconv"
 	"testing"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -72,6 +73,7 @@ func Test_rotateCertificatesPlan(t *testing.T) {
 		entryIsControlPlane bool
 		machineGlobalConfig *rkev1.GenericMap
 		expected            expected
+		rotateCertificates  *rkev1.RotateCertificates
 	}{
 		{
 			name:                "test KCM cert regeneration removal instruction contains K3s",
@@ -81,15 +83,17 @@ func Test_rotateCertificatesPlan(t *testing.T) {
 			setup:               genericSetup,
 			expected: expected{
 				otiIndex: 1,
-				oti: &plan.OneTimeInstruction{
-					Name:    "remove kube-controller-manager cert for regeneration",
-					Command: "rm",
-					Args: []string{
+				oti: &[]plan.OneTimeInstruction{idempotentInstruction(
+					"certificate-rotation/rm-kcm-cert",
+					strconv.FormatInt(int64(0), 10),
+					"rm",
+					[]string{
 						"-f",
 						"/var/lib/rancher/k3s/server/tls/kube-controller-manager/kube-controller-manager.crt",
 					},
-				},
-				otiCount:   6,
+					[]string{},
+				)}[0],
+				otiCount:   7,
 				joinServer: "my-magic-joinserver",
 			},
 		},
@@ -99,17 +103,66 @@ func Test_rotateCertificatesPlan(t *testing.T) {
 			entryIsControlPlane: true,
 			joinServer:          "my-magic-joinserver",
 			setup:               genericSetup,
+			rotateCertificates: &rkev1.RotateCertificates{
+				Generation: 244,
+			},
 			expected: expected{
 				otiIndex: 1,
-				oti: &plan.OneTimeInstruction{
-					Name:    "remove kube-controller-manager cert for regeneration",
-					Command: "rm",
-					Args: []string{
+				oti: &[]plan.OneTimeInstruction{idempotentInstruction(
+					"certificate-rotation/rm-kcm-cert",
+					strconv.FormatInt(int64(244), 10),
+					"rm",
+					[]string{
 						"-f",
 						"/var/lib/rancher/rke2/server/tls/kube-controller-manager/kube-controller-manager.crt",
 					},
-				},
-				otiCount:   8, // the extra removal instructions are for removing the static pod manifests for RKE2
+					[]string{},
+				)}[0],
+				otiCount:   9, // the extra removal instructions are for removing the static pod manifests for RKE2
+				joinServer: "my-magic-joinserver",
+			},
+		},
+		{
+			name:                "test KS cert regeneration removal instruction contains K3s",
+			version:             "v1.25.7+k3s1",
+			entryIsControlPlane: true,
+			joinServer:          "my-magic-joinserver",
+			setup:               genericSetup,
+			expected: expected{
+				otiIndex: 1,
+				oti: &[]plan.OneTimeInstruction{idempotentInstruction(
+					"certificate-rotation/rm-ks-cert",
+					strconv.FormatInt(int64(0), 10),
+					"rm",
+					[]string{
+						"-f",
+						"/var/lib/rancher/rke2/server/tls/kube-scheduler/kube-scheduler.crt",
+					},
+					[]string{},
+				)}[0],
+				otiCount:   7,
+				joinServer: "my-magic-joinserver",
+			},
+		},
+		{
+			name:                "test KS cert regeneration removal instruction contains RKE2",
+			version:             "v1.25.7+rke2r1",
+			entryIsControlPlane: true,
+			joinServer:          "my-magic-joinserver",
+			setup:               genericSetup,
+			expected: expected{
+				otiIndex: 1,
+				oti: &[]plan.OneTimeInstruction{idempotentInstruction(
+					"certificate-rotation/rm-ks-cert",
+					strconv.FormatInt(int64(0), 10),
+					"rm",
+					[]string{
+						"-f",
+						"/var/lib/rancher/rke2/server/tls/kube-scheduler/kube-scheduler.crt",
+					},
+					[]string{},
+				)}[0],
+				otiCount:   9, // the extra removal instructions are for removing the static pod manifests for RKE2
 				joinServer: "my-magic-joinserver",
 			},
 		},
@@ -119,15 +172,8 @@ func Test_rotateCertificatesPlan(t *testing.T) {
 			entryIsControlPlane: false,
 			joinServer:          "my-magic-joinserver",
 			expected: expected{
-				otiIndex: 0,
-				oti: &plan.OneTimeInstruction{
-					Name:    "restart",
-					Command: "systemctl",
-					Args: []string{
-						"restart",
-						"rke2-agent",
-					},
-				},
+				otiIndex:   1,
+				oti:        &[]plan.OneTimeInstruction{idempotentRestartInstructions("certificate-rotation/restart", strconv.FormatInt(int64(0), 10), capr.GetRuntimeAgentUnit("v1.25.7+rke2r1"))[1]}[0],
 				otiCount:   1,
 				joinServer: "",
 			},
@@ -138,21 +184,14 @@ func Test_rotateCertificatesPlan(t *testing.T) {
 			entryIsControlPlane: false,
 			joinServer:          "my-magic-joinserver",
 			expected: expected{
-				otiIndex: 0,
-				oti: &plan.OneTimeInstruction{
-					Name:    "restart",
-					Command: "systemctl",
-					Args: []string{
-						"restart",
-						"k3s-agent",
-					},
-				},
-				otiCount:   1,
+				otiIndex:   1,
+				oti:        &[]plan.OneTimeInstruction{idempotentRestartInstructions("certificate-rotation/restart", strconv.FormatInt(int64(0), 10), capr.GetRuntimeAgentUnit("v1.25.7+k3s1"))[1]}[0],
+				otiCount:   2,
 				joinServer: "",
 			},
 		},
 		{
-			name:                "test K3s kcm custom kube-scheduler instruction",
+			name:                "test K3s kcm custom kube-controller-manager cert-dir instruction",
 			version:             "v1.25.7+k3s1",
 			entryIsControlPlane: true,
 			joinServer:          "my-magic-joinserver",
@@ -164,15 +203,17 @@ func Test_rotateCertificatesPlan(t *testing.T) {
 			},
 			expected: expected{
 				otiIndex: 1,
-				oti: &plan.OneTimeInstruction{
-					Name:    "remove kube-controller-manager cert for regeneration",
-					Command: "rm",
-					Args: []string{
+				oti: &[]plan.OneTimeInstruction{idempotentInstruction(
+					"certificate-rotation/rm-kcm-cert",
+					strconv.FormatInt(int64(0), 10),
+					"rm",
+					[]string{
 						"-f",
 						"/mycustomdir/kube-controller-manager.crt",
 					},
-				},
-				otiCount:   6,
+					[]string{},
+				)}[0],
+				otiCount:   7,
 				joinServer: "my-magic-joinserver",
 			},
 		},
@@ -191,6 +232,9 @@ func Test_rotateCertificatesPlan(t *testing.T) {
 			controlPlane := createTestControlPlane(tt.version)
 			controlPlane.Spec.MachineGlobalConfig = *tt.machineGlobalConfig
 			controlPlane.Spec.ManagementClusterName = "somecluster"
+			if tt.rotateCertificates != nil {
+				controlPlane.Spec.RotateCertificates = tt.rotateCertificates
+			}
 			entry := createTestPlanEntry(capr.DefaultMachineOS)
 			if tt.entryIsControlPlane {
 				entry.Machine.Labels[capr.ControlPlaneRoleLabel] = "true"

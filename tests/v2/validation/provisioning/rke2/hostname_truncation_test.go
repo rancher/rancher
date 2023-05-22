@@ -20,6 +20,7 @@ type HostnameTruncationTestSuite struct {
 	kubernetesVersions []string
 	cnis               []string
 	providers          []string
+	advancedOptions    provisioning.AdvancedOptions
 }
 
 func (r *HostnameTruncationTestSuite) TearDownSuite() {
@@ -36,6 +37,7 @@ func (r *HostnameTruncationTestSuite) SetupSuite() {
 	r.kubernetesVersions = clustersConfig.RKE2KubernetesVersions
 	r.cnis = clustersConfig.CNIs
 	r.providers = clustersConfig.Providers
+	r.advancedOptions = clustersConfig.AdvancedOptions
 
 	client, err := rancher.NewClient("", testSession)
 	require.NoError(r.T(), err)
@@ -153,7 +155,7 @@ func (r *HostnameTruncationTestSuite) TestProvisioningRKE2Cluster() {
 							client, err := r.client.WithSession(subSession)
 							require.NoError(r.T(), err)
 
-							TestHostnameTruncation(r.T(), client, provider, tt.machinePools, limit, kubeVersion, cni)
+							TestHostnameTruncation(r.T(), client, provider, tt.machinePools, limit, kubeVersion, cni, r.advancedOptions)
 
 							subSession.Cleanup()
 						}

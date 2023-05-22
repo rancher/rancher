@@ -22,7 +22,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func TestProvisioningRKE2Cluster(t *testing.T, client *rancher.Client, provider Provider, nodesAndRoles []machinepools.NodeRoles, kubeVersion, cni, psact string) {
+func TestProvisioningRKE2Cluster(t *testing.T, client *rancher.Client, provider Provider, nodesAndRoles []machinepools.NodeRoles, kubeVersion, cni, psact string, advancedOptions provisioning.AdvancedOptions) {
 	cloudCredential, err := provider.CloudCredFunc(client)
 	require.NoError(t, err)
 
@@ -34,8 +34,8 @@ func TestProvisioningRKE2Cluster(t *testing.T, client *rancher.Client, provider 
 	require.NoError(t, err)
 
 	machinePools := machinepools.RKEMachinePoolSetup(nodesAndRoles, machineConfigResp)
+	cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, namespace, cni, cloudCredential.ID, kubeVersion, psact, machinePools, advancedOptions)
 
-	cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, namespace, cni, cloudCredential.ID, kubeVersion, psact, machinePools)
 	clusterResp, err := clusters.CreateK3SRKE2Cluster(client, cluster)
 	require.NoError(t, err)
 

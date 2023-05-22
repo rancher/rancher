@@ -104,6 +104,13 @@ func addRoleConfig(config map[string]interface{}, controlPlane *rkev1.RKEControl
 			config["cluster-init"] = true
 		}
 		joinServer = "-"
+	} else if joinServer == "" {
+		// If no join server was specified, use the join server annotation for the node.
+		var ok bool
+		joinServer, ok = entry.Metadata.Annotations[capr.JoinedToAnnotation]
+		if !ok {
+			return capr.JoinServerImplausible
+		}
 	}
 
 	if joinServer != "" && joinServer != "-" {
@@ -557,6 +564,10 @@ func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEC
 	nodePlan.Files = append(nodePlan.Files, files...)
 
 	joinedServer := addRoleConfig(config, controlPlane, entry, joinServer)
+	if joinedServer == capr.JoinServerImplausible {
+		return nodePlan, config, "", fmt.Errorf("implausible joined server for entry")
+	}
+
 	addLocalClusterAuthenticationEndpointConfig(config, controlPlane, entry)
 	addToken(config, entry, tokensSecret)
 

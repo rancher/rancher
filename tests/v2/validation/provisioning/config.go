@@ -1,6 +1,7 @@
 package provisioning
 
 import (
+	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
 	nodepools "github.com/rancher/rancher/tests/framework/extensions/rke1/nodepools"
 )
@@ -48,6 +49,11 @@ func (c TestClientName) String() string {
 	return string(c)
 }
 
+type AdvancedOptions struct {
+	ClusterAgentCustomization management.AgentDeploymentCustomization `json:"clusterAgentCustomization" yaml:"clusterAgentCustomization"`
+	FleetAgentCustomization   management.AgentDeploymentCustomization `json:"fleetAgentCustomization" yaml:"fleetAgentCustomization"`
+}
+
 type Config struct {
 	NodesAndRoles          []machinepools.NodeRoles `json:"nodesAndRoles" yaml:"nodesAndRoles" default:"[]"`
 	NodesAndRolesRKE1      []nodepools.NodeRoles    `json:"nodesAndRolesRKE1" yaml:"nodesAndRolesRKE1" default:"[]"`
@@ -59,4 +65,5 @@ type Config struct {
 	NodeProviders          []string                 `json:"nodeProviders" yaml:"nodeProviders"`
 	PSACT                  string                   `json:"psact" yaml:"psact"`
 	Hardened               bool                     `json:"hardened" yaml:"hardened"`
+	AdvancedOptions        AdvancedOptions          `json:"advancedOptions" yaml:"advancedOptions"`
 }

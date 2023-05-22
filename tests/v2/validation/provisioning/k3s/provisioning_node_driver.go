@@ -26,7 +26,7 @@ const (
 	namespace = "fleet-default"
 )
 
-func TestProvisioningK3SCluster(t *testing.T, client *rancher.Client, provider Provider, nodesAndRoles []machinepools.NodeRoles, kubeVersion string, psact string) {
+func TestProvisioningK3SCluster(t *testing.T, client *rancher.Client, provider Provider, nodesAndRoles []machinepools.NodeRoles, kubeVersion string, psact string, advancedOptions provisioning.AdvancedOptions) {
 	cloudCredential, err := provider.CloudCredFunc(client)
 	require.NoError(t, err)
 
@@ -39,7 +39,7 @@ func TestProvisioningK3SCluster(t *testing.T, client *rancher.Client, provider P
 
 	machinePools := machinepools.RKEMachinePoolSetup(nodesAndRoles, machineConfigResp)
 
-	cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, namespace, "", cloudCredential.ID, kubeVersion, psact, machinePools)
+	cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, namespace, "", cloudCredential.ID, kubeVersion, psact, machinePools, advancedOptions)
 
 	clusterResp, err := clusters.CreateK3SRKE2Cluster(client, cluster)
 	require.NoError(t, err)

@@ -48,7 +48,7 @@ ENV CATTLE_WINS_AGENT_UNINSTALL_SCRIPT https://raw.githubusercontent.com/rancher
 ENV CATTLE_WINS_AGENT_UPGRADE_IMAGE rancher/wins:${CATTLE_WINS_AGENT_VERSION}
 ENV CATTLE_CSI_PROXY_AGENT_VERSION v1.1.1
 # make sure the CATTLE_SYSTEM_AGENT_VERSION is consistent with tests/v2/codecoverage/package/Dockerfile and pkg/settings/setting.go
-ENV CATTLE_SYSTEM_AGENT_VERSION v0.3.3-rc3
+ENV CATTLE_SYSTEM_AGENT_VERSION v0.3.3-rc4
 ENV CATTLE_SYSTEM_AGENT_INSTALL_SCRIPT https://raw.githubusercontent.com/rancher/system-agent/${CATTLE_SYSTEM_AGENT_VERSION}/install.sh
 ENV CATTLE_SYSTEM_AGENT_UNINSTALL_SCRIPT https://raw.githubusercontent.com/rancher/system-agent/${CATTLE_SYSTEM_AGENT_VERSION}/system-agent-uninstall.sh
 ENV CATTLE_SYSTEM_AGENT_UPGRADE_IMAGE rancher/system-agent:${CATTLE_SYSTEM_AGENT_VERSION}-suc
@@ -56,7 +56,9 @@ ENV CATTLE_SYSTEM_UPGRADE_CONTROLLER_CHART_VERSION 102.1.0+up0.5.0
 
 # System charts minimal version
 ENV CATTLE_FLEET_MIN_VERSION=102.1.0+up0.7.0-rc.3
-ENV CATTLE_RANCHER_WEBHOOK_MIN_VERSION=2.0.5+up0.3.5-rc5
+# Deprecated in favor of CATTLE_RANCHER_WEBHOOK_VERSION.
+ENV CATTLE_RANCHER_WEBHOOK_MIN_VERSION=''
+ENV CATTLE_RANCHER_WEBHOOK_VERSION=2.0.5+up0.3.5-rc5
 ENV CATTLE_CSP_ADAPTER_MIN_VERSION=2.0.2+up2.0.2-rc2
 
 RUN mkdir -p /var/lib/rancher-data/local-catalogs/system-library && \
