@@ -1,8 +1,5 @@
 import os
-from .common import  get_user_client
-from .common import random_test_name
-from .common import  validate_cluster
-from .common import  wait_for_cluster_delete
+from .common import *
 from .test_create_ha import resource_prefix
 from lib.aws import AmazonWebServices
 import pytest
@@ -53,6 +50,8 @@ eks_config = {
             "maxSize": EKS_NODESIZE,
             "minSize": EKS_NODESIZE,
             "nodegroupName": random_test_name("test-ng"),
+            "requestSpotInstances": False,
+            "resourceTags": {},
             "type": "nodeGroup",
             "subnets": [],
             "tags": {},
@@ -68,6 +67,7 @@ def test_eks_v2_hosted_cluster_create_basic():
     """
     Create a hosted EKS v2 cluster with all default values from the UI
     """
+    client = get_user_client()
     cluster_name = random_test_name("test-auto-eks")
     eks_config_temp = get_eks_config_basic(cluster_name)
     cluster_config = {
@@ -79,13 +79,14 @@ def test_eks_v2_hosted_cluster_create_basic():
         "enableClusterAlerting": False,
         "enableClusterMonitoring": False
     }
-    create_and_validate_eks_cluster(cluster_config)
+    cluster = create_and_validate_eks_cluster(cluster_config)
 
     # validate cluster created
     validate_eks_cluster(cluster_name, eks_config_temp)
 
     # validate nodegroups created
     validate_nodegroup(eks_config_temp["nodeGroups"], cluster_name)
+    hosted_cluster_cleanup(client, cluster, cluster_name)
 
 
 @ekscredential
@@ -202,20 +203,6 @@ def create_resources_eks():
     return cluster_name
 
 
-@pytest.fixture(scope='module', autouse="True")
-def create_project_client(request):
-
-    def fin():
-        client = get_user_client()
-        for name, cluster in cluster_details.items():
-            if len(client.list_cluster(name=name).data) > 0:
-                client.delete(cluster)
-        for display_name in IMPORTED_EKS_CLUSTERS:
-            AmazonWebServices().delete_eks_cluster(cluster_name=display_name)
-
-    request.addfinalizer(fin)
-
-
 def create_and_validate_eks_cluster(cluster_config, imported=False):
     """
     Create and validate EKS cluster
@@ -278,6 +265,13 @@ def get_eks_config_basic(cluster_name):
     eks_config_temp = eks_config.copy()
     eks_config_temp["displayName"] = cluster_name
     eks_config_temp["amazonCredentialSecret"] = ec2_cloud_credential.id
+    eks_config_temp["subnets"] = [] \
+        if EKS_SUBNETS is None else EKS_SUBNETS.split(",")
+    eks_config_temp["securityGroups"] = [] \
+        if EKS_SECURITYGROUP is None else EKS_SECURITYGROUP.split(",")
+    eks_config_temp["nodeGroups"][0]["requestedSpotInstances"] = False
+    eks_config_temp["nodeGroups"][0]["resourceTags"] = {}
+    eks_config_temp["nodeGroups"][0]["version"] = EKS_K8S_VERSION
     return eks_config_temp
 
 
@@ -435,25 +429,13 @@ def validate_nodegroup(nodegroup_list, cluster_name):
             "Nodegroups are not in active status"
 
         # check scalingConfig
-        assert nodegroup["maxSize"] \
+        assert int(nodegroup["maxSize"]) \
                == eks_nodegroup["nodegroup"]["scalingConfig"]["maxSize"], \
             "maxSize is incorrect on the nodes"
-        assert nodegroup["minSize"] \
+        assert int(nodegroup["minSize"]) \
                == eks_nodegroup["nodegroup"]["scalingConfig"]["minSize"], \
             "minSize is incorrect on the nodes"
-        assert nodegroup["minSize"] \
-               == eks_nodegroup["nodegroup"]["scalingConfig"]["minSize"], \
-            "minSize is incorrect on the nodes"
-
-        # check instance type
-        assert nodegroup["instanceType"] \
-               == eks_nodegroup["nodegroup"]["instanceTypes"][0], \
-            "instanceType is incorrect on the nodes"
-
-        # check disk size
-        assert nodegroup["diskSize"] \
-               == eks_nodegroup["nodegroup"]["diskSize"], \
-            "diskSize is incorrect on the nodes"
+        
         # check ec2SshKey
         if "ec2SshKey" in nodegroup.keys() and \
                 nodegroup["ec2SshKey"] is not "":

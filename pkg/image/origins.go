@@ -120,6 +120,7 @@ var OriginMap = map[string]string{
 	"mirrored-epinio-epinio-ui":                               "https://github.com/kubeops/config-syncer",
 	"mirrored-epinio-epinio-unpacker":                         "https://github.com/epinio/epinio",
 	"mirrored-flannelcni-flannel":                             "https://github.com/flannel-io/flannel",
+	"mirrored-flannel-flannel":                                "https://github.com/flannel-io/flannel",
 	"mirrored-fluent-fluent-bit":                              "https://github.com/fluent/fluent-bit",
 	"mirrored-grafana-grafana":                                "https://github.com/grafana/grafana",
 	"mirrored-grafana-grafana-image-renderer":                 "https://github.com/grafana/grafana-image-renderer",

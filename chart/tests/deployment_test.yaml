@@ -197,13 +197,13 @@ tests:
     customLogos.enabled: true
     customLogos.volumeKind: configMap
   asserts:
-  - isNull:
+  - isNullOrEmpty:
       path: spec.template.spec.volumes
 - it: should not create custom-logos volume if not customLogos.enabled
   set:
     customLogos.enabled: false
   asserts:
-  - isNull:
+  - isNullOrEmpty:
       path: spec.template.spec.volumes
 - it: should mount custom-logos volume with default subpaths if customLogos.enabled and customLogos.volumeKind=persistentVolumeClaim
   set:
@@ -323,13 +323,13 @@ tests:
     customLogos.enabled: true
     customLogos.volumeKind: configMap
   asserts:
-  - isNull:
+  - isNullOrEmpty:
       path: spec.template.spec.containers[0].volumeMounts
 - it: should not mount custom-logos volume if not customLogos.enabled
   set:
     customLogos.enabled: false
   asserts:
-  - isNull:
+  - isNullOrEmpty:
       path: spec.template.spec.containers[0].volumeMounts
 - it: should set priorityClassName=system-node-critical
   set:
@@ -342,7 +342,7 @@ tests:
   set:
     priorityClassName: ""
   asserts:
-    - isNull:
+    - isNullOrEmpty:
         path: spec.template.spec.priorityClassName
 - it: should default priorityClassName="rancher-critical"
   asserts:

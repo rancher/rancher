@@ -15,6 +15,7 @@ import (
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
+	"github.com/rancher/rancher/tests/framework/extensions/defaults"
 	"github.com/rancher/rancher/tests/framework/extensions/kubeapi/workloads/deployments"
 	nodepools "github.com/rancher/rancher/tests/framework/extensions/rke1/nodepools"
 	aws "github.com/rancher/rancher/tests/framework/extensions/rke1/nodetemplates/aws"
@@ -26,7 +27,6 @@ import (
 	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
-	"github.com/rancher/rancher/tests/integration/pkg/defaults"
 	"github.com/rancher/rancher/tests/v2/validation/provisioning"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
@@ -95,6 +95,7 @@ func main() {
 	kubernetesVersions := clustersConfig.RKE1KubernetesVersions
 	cnis := clustersConfig.CNIs
 	nodesAndRoles := clustersConfig.NodesAndRolesRKE1
+	advancedOptions := clustersConfig.AdvancedOptions
 
 	client, err := rancher.NewClient("", session)
 	if err != nil {
@@ -129,13 +130,13 @@ func main() {
 	}
 
 	// create admin cluster
-	adminClusterNames, err := createTestCluster(client, client, 1, "admintestcluster", cnis[0], kubernetesVersions[0], nodesAndRoles)
+	adminClusterNames, err := createTestCluster(client, client, 1, "admintestcluster", cnis[0], kubernetesVersions[0], nodesAndRoles, advancedOptions)
 	if err != nil {
 		logrus.Fatalf("error creating admin user cluster: %v", err)
 	}
 
 	// create standard user clusters
-	standardClusterNames, err := createTestCluster(standardUserClient, client, 2, "standardtestcluster", cnis[0], kubernetesVersions[0], nodesAndRoles)
+	standardClusterNames, err := createTestCluster(standardUserClient, client, 2, "standardtestcluster", cnis[0], kubernetesVersions[0], nodesAndRoles, advancedOptions)
 	if err != nil {
 		logrus.Fatalf("error creating standard user clusters: %v", err)
 	}
@@ -355,12 +356,12 @@ func updateRancherDeployment(kubeconfig []byte) error {
 	return err
 }
 
-func createTestCluster(client, adminClient *rancher.Client, numClusters int, clusterNameBase, cni, kubeVersion string, nodesAndRoles []nodepools.NodeRoles) ([]string, error) {
+func createTestCluster(client, adminClient *rancher.Client, numClusters int, clusterNameBase, cni, kubeVersion string, nodesAndRoles []nodepools.NodeRoles, advancedOptions provisioning.AdvancedOptions) ([]string, error) {
 	clusterNames := []string{}
 	for i := 0; i < numClusters; i++ {
 		clusterName := namegen.AppendRandomString(clusterNameBase)
 		clusterNames = append(clusterNames, clusterName)
-		cluster := clusters.NewRKE1ClusterConfig(clusterName, cni, kubeVersion, client)
+		cluster := clusters.NewRKE1ClusterConfig(clusterName, cni, kubeVersion, "", client, advancedOptions)
 
 		clusterResp, err := clusters.CreateRKE1Cluster(client, cluster)
 		if err != nil {

@@ -3,6 +3,8 @@ package dashboard
 import (
 	"context"
 
+	"github.com/rancher/rancher/pkg/controllers/capi"
+	"github.com/rancher/rancher/pkg/controllers/capr"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/apiservice"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/clusterindex"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/clusterregistrationtoken"
@@ -17,8 +19,10 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/clusterconnected"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2"
 	"github.com/rancher/rancher/pkg/features"
+	"github.com/rancher/rancher/pkg/provisioningv2/kubeconfig"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/pkg/needacert"
+	"github.com/sirupsen/logrus"
 )
 
 func Register(ctx context.Context, wrangler *wrangler.Context, embedded bool, registryOverride string) error {
@@ -60,10 +64,26 @@ func Register(ctx context.Context, wrangler *wrangler.Context, embedded bool, re
 	}
 
 	if features.ProvisioningV2.Enabled() {
+		kubeconfigManager := kubeconfig.New(wrangler)
 		clusterindex.Register(ctx, wrangler)
-		if err := provisioningv2.Register(ctx, wrangler); err != nil {
+		provisioningv2.Register(ctx, wrangler, kubeconfigManager)
+		if features.RKE2.Enabled() {
+			capr.Register(ctx, wrangler, kubeconfigManager)
+		}
+	}
+
+	if features.EmbeddedClusterAPI.Enabled() {
+		capiStart, err := capi.Register(ctx, wrangler)
+		if err != nil {
 			return err
 		}
+		wrangler.OnLeader(func(ctx context.Context) error {
+			if err := capiStart(ctx); err != nil {
+				logrus.Fatal(err)
+			}
+			logrus.Info("Cluster API is started")
+			return nil
+		})
 	}
 
 	if features.MCMAgent.Enabled() || features.MCM.Enabled() {

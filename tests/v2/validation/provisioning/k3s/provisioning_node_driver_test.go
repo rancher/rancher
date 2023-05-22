@@ -25,6 +25,8 @@ type K3SNodeDriverProvisioningTestSuite struct {
 	standardUserClient *rancher.Client
 	kubernetesVersions []string
 	providers          []string
+	psact              string
+	advancedOptions    provisioning.AdvancedOptions
 }
 
 func (k *K3SNodeDriverProvisioningTestSuite) TearDownSuite() {
@@ -40,6 +42,8 @@ func (k *K3SNodeDriverProvisioningTestSuite) SetupSuite() {
 
 	k.kubernetesVersions = clustersConfig.K3SKubernetesVersions
 	k.providers = clustersConfig.Providers
+	k.psact = clustersConfig.PSACT
+	k.advancedOptions = clustersConfig.AdvancedOptions
 
 	client, err := rancher.NewClient("", testSession)
 	require.NoError(k.T(), err)
@@ -120,13 +124,14 @@ func (k *K3SNodeDriverProvisioningTestSuite) TestProvisioningK3SCluster() {
 		name      string
 		nodeRoles []machinepools.NodeRoles
 		client    *rancher.Client
+		psact     string
 	}{
-		{"1 Node all roles " + provisioning.AdminClientName.String(), nodeRoles0, k.client},
-		{"1 Node all roles " + provisioning.StandardClientName.String(), nodeRoles0, k.standardUserClient},
-		{"2 nodes - etcd/cp roles per 1 node " + provisioning.AdminClientName.String(), nodeRoles1, k.client},
-		{"2 nodes - etcd/cp roles per 1 node " + provisioning.StandardClientName.String(), nodeRoles1, k.standardUserClient},
-		{"3 nodes - 1 role per node " + provisioning.AdminClientName.String(), nodeRoles2, k.client},
-		{"3 nodes - 1 role per node " + provisioning.StandardClientName.String(), nodeRoles2, k.standardUserClient},
+		{"1 Node all roles " + provisioning.AdminClientName.String(), nodeRoles0, k.client, k.psact},
+		{"1 Node all roles " + provisioning.StandardClientName.String(), nodeRoles0, k.standardUserClient, k.psact},
+		{"2 nodes - etcd/cp roles per 1 node " + provisioning.AdminClientName.String(), nodeRoles1, k.client, k.psact},
+		{"2 nodes - etcd/cp roles per 1 node " + provisioning.StandardClientName.String(), nodeRoles1, k.standardUserClient, k.psact},
+		{"3 nodes - 1 role per node " + provisioning.AdminClientName.String(), nodeRoles2, k.client, k.psact},
+		{"3 nodes - 1 role per node " + provisioning.StandardClientName.String(), nodeRoles2, k.standardUserClient, k.psact},
 	}
 
 	var name string
@@ -143,7 +148,7 @@ func (k *K3SNodeDriverProvisioningTestSuite) TestProvisioningK3SCluster() {
 			for _, kubeVersion := range k.kubernetesVersions {
 				name = tt.name + providerName.String() + " Kubernetes version: " + kubeVersion
 				k.Run(name, func() {
-					TestProvisioningK3SCluster(k.T(), client, provider, tt.nodeRoles, kubeVersion)
+					TestProvisioningK3SCluster(k.T(), client, provider, tt.nodeRoles, kubeVersion, tt.psact, k.advancedOptions)
 				})
 			}
 		}
@@ -162,9 +167,10 @@ func (k *K3SNodeDriverProvisioningTestSuite) TestProvisioningK3SClusterDynamicIn
 	tests := []struct {
 		name   string
 		client *rancher.Client
+		psact  string
 	}{
-		{provisioning.AdminClientName.String(), k.client},
-		{provisioning.StandardClientName.String(), k.standardUserClient},
+		{provisioning.AdminClientName.String(), k.client, k.psact},
+		{provisioning.StandardClientName.String(), k.standardUserClient, k.psact},
 	}
 
 	var name string
@@ -181,7 +187,7 @@ func (k *K3SNodeDriverProvisioningTestSuite) TestProvisioningK3SClusterDynamicIn
 			for _, kubeVersion := range k.kubernetesVersions {
 				name = tt.name + providerName + " Kubernetes version: " + kubeVersion
 				k.Run(name, func() {
-					TestProvisioningK3SCluster(k.T(), client, provider, nodesAndRoles, kubeVersion)
+					TestProvisioningK3SCluster(k.T(), client, provider, nodesAndRoles, kubeVersion, tt.psact, k.advancedOptions)
 				})
 			}
 		}

@@ -7,20 +7,22 @@ import (
 
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
+	"github.com/rancher/rancher/tests/framework/extensions/defaults"
 	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
 	nodestat "github.com/rancher/rancher/tests/framework/extensions/nodes"
 	"github.com/rancher/rancher/tests/framework/extensions/pipeline"
+	psadeploy "github.com/rancher/rancher/tests/framework/extensions/psact"
 	"github.com/rancher/rancher/tests/framework/extensions/workloads/pods"
 	"github.com/rancher/rancher/tests/framework/pkg/environmentflag"
 	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
-	"github.com/rancher/rancher/tests/integration/pkg/defaults"
+	provisioning "github.com/rancher/rancher/tests/v2/validation/provisioning"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func TestProvisioningRKE2Cluster(t *testing.T, client *rancher.Client, provider Provider, nodesAndRoles []machinepools.NodeRoles, kubeVersion, cni string) {
+func TestProvisioningRKE2Cluster(t *testing.T, client *rancher.Client, provider Provider, nodesAndRoles []machinepools.NodeRoles, kubeVersion, cni, psact string, advancedOptions provisioning.AdvancedOptions) {
 	cloudCredential, err := provider.CloudCredFunc(client)
 	require.NoError(t, err)
 
@@ -32,8 +34,8 @@ func TestProvisioningRKE2Cluster(t *testing.T, client *rancher.Client, provider 
 	require.NoError(t, err)
 
 	machinePools := machinepools.RKEMachinePoolSetup(nodesAndRoles, machineConfigResp)
+	cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, namespace, cni, cloudCredential.ID, kubeVersion, psact, machinePools, advancedOptions)
 
-	cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, namespace, cni, cloudCredential.ID, kubeVersion, machinePools)
 	clusterResp, err := clusters.CreateK3SRKE2Cluster(client, cluster)
 	require.NoError(t, err)
 
@@ -72,4 +74,12 @@ func TestProvisioningRKE2Cluster(t *testing.T, client *rancher.Client, provider 
 	podResults, podErrors := pods.StatusPods(client, clusterIDName)
 	assert.NotEmpty(t, podResults)
 	assert.Empty(t, podErrors)
+
+	if psact == string(provisioning.RancherPrivileged) || psact == string(provisioning.RancherRestricted) {
+		err = psadeploy.CheckPSACT(client, clusterName)
+		require.NoError(t, err)
+
+		_, err = psadeploy.CreateNginxDeployment(client, clusterIDName, psact)
+		require.NoError(t, err)
+	}
 }

@@ -1,7 +1,0 @@
-#{{- if gt (len (lookup "rbac.authorization.k8s.io/v1" "ClusterRole" "" "")) 0 -}}
-#{{- if .Values.global.cattle.psp.enabled }}
-#{{- if not (.Capabilities.APIVersions.Has "policy/v1beta1/PodSecurityPolicy") }}
-#{{- fail "The target cluster does not have the PodSecurityPolicy API resource. Please disable PSPs in this chart before proceeding." -}}
-#{{- end }}
-#{{- end }}
-#{{- end -}}

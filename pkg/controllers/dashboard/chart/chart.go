@@ -14,29 +14,30 @@ const (
 	PriorityClassKey = "priorityClassName"
 )
 
-// Manager is an interface used by the handler to install an uninstall charts. If the interface is changed,
-// regenerate the mock with the below command (run from project root):
+// Manager is an interface used by the handler to install and uninstall charts.
+// If the interface is changed, regenerate the mock with the below command (run from project root):
 // mockgen --build_flags=--mod=mod -destination=pkg/controllers/dashboard/chart/fake/manager.go -package=fake github.com/rancher/rancher/pkg/controllers/dashboard/chart Manager
 type Manager interface {
-	// Ensure ensures that the chart is installed into the given namespace with the given minVersion version and values.
-	Ensure(namespace, name, minVersion string, values map[string]interface{}, forceAdopt bool, installImageOverride string) error
+	// Ensure ensures that the chart is installed into the given namespace with the given version configuration and values.
+	Ensure(namespace, name, minVersion, exactVersion string, values map[string]interface{}, forceAdopt bool, installImageOverride string) error
 
 	// Uninstall uninstalls the given chart in the given namespace.
 	Uninstall(namespace, name string) error
 
-	// Remove removes the chart from the desired state
-	Remove(namespace, name, minVersion string)
+	// Remove removes the chart from the desired state.
+	Remove(namespace, name string)
 }
 
 // Definition defines a helm chart.
 type Definition struct {
-	ReleaseNamespace  string
-	ChartName         string
-	MinVersionSetting settings.Setting
-	Values            func() map[string]interface{}
-	Enabled           func() bool
-	Uninstall         bool
-	RemoveNamespace   bool
+	ReleaseNamespace    string
+	ChartName           string
+	MinVersionSetting   settings.Setting
+	ExactVersionSetting settings.Setting
+	Values              func() map[string]interface{}
+	Enabled             func() bool
+	Uninstall           bool
+	RemoveNamespace     bool
 }
 
 // RancherConfigGetter is used to get Rancher chart configuration information from the rancher config map

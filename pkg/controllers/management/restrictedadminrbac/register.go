@@ -3,9 +3,10 @@ package restrictedadminrbac
 import (
 	"context"
 
-	provisioningcontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
+	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
+	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/pkg/relatedresource"
@@ -13,48 +14,67 @@ import (
 )
 
 type rbaccontroller struct {
-	grbLister           v3.GlobalRoleBindingLister
-	grbIndexer          cache.Indexer
-	globalRoleBindings  v3.GlobalRoleBindingInterface
-	roleBindings        v1.RoleBindingInterface
-	rbLister            v1.RoleBindingLister
-	clusters            v3.ClusterInterface
-	projects            v3.ProjectInterface
-	clusterRoles        v1.ClusterRoleInterface
-	crLister            v1.ClusterRoleLister
-	crbLister           v1.ClusterRoleBindingLister
-	clusterRoleBindings v1.ClusterRoleBindingInterface
-	fleetworkspaces     v3.FleetWorkspaceInterface
-	provClusters        provisioningcontrollers.ClusterCache
+	grbIndexer      cache.Indexer
+	roleBindings    v1.RoleBindingInterface
+	rbLister        v1.RoleBindingLister
+	fleetworkspaces v3.FleetWorkspaceInterface
+	clusterCache    mgmtv3.ClusterCache
+	grbCache        mgmtv3.GlobalRoleBindingCache
+	crtbCache       mgmtv3.ClusterRoleTemplateBindingCache
+	crtbCtrl        mgmtv3.ClusterRoleTemplateBindingClient
 }
 
 const (
 	grbByRoleIndex = "management.cattle.io/grb-by-role"
+	sourceKey      = "field.cattle.io/source"
+	grbHandlerName = "restrictedAdminsClusterOwner"
 )
 
 func Register(ctx context.Context, management *config.ManagementContext, wrangler *wrangler.Context) {
 
 	informer := management.Management.GlobalRoleBindings("").Controller().Informer()
+	globalRoleBindings := management.Management.GlobalRoleBindings("")
 	r := rbaccontroller{
-		clusters:            management.Management.Clusters(""),
-		projects:            management.Management.Projects(""),
-		grbLister:           management.Management.GlobalRoleBindings("").Controller().Lister(),
-		globalRoleBindings:  management.Management.GlobalRoleBindings(""),
-		grbIndexer:          informer.GetIndexer(),
-		roleBindings:        management.RBAC.RoleBindings(""),
-		rbLister:            management.RBAC.RoleBindings("").Controller().Lister(),
-		crLister:            management.RBAC.ClusterRoles("").Controller().Lister(),
-		clusterRoles:        management.RBAC.ClusterRoles(""),
-		crbLister:           management.RBAC.ClusterRoleBindings("").Controller().Lister(),
-		clusterRoleBindings: management.RBAC.ClusterRoleBindings(""),
-		fleetworkspaces:     management.Management.FleetWorkspaces(""),
-		provClusters:        wrangler.Provisioning.Cluster().Cache(),
+		grbIndexer:      informer.GetIndexer(),
+		roleBindings:    management.RBAC.RoleBindings(""),
+		rbLister:        management.RBAC.RoleBindings("").Controller().Lister(),
+		fleetworkspaces: management.Management.FleetWorkspaces(""),
+		clusterCache:    management.Wrangler.Mgmt.Cluster().Cache(),
+		crtbCache:       management.Wrangler.Mgmt.ClusterRoleTemplateBinding().Cache(),
+		crtbCtrl:        management.Wrangler.Mgmt.ClusterRoleTemplateBinding(),
+		grbCache:        management.Wrangler.Mgmt.GlobalRoleBinding().Cache(),
+	}
+	globalRoleBindings.AddHandler(ctx, grbHandlerName, r.clusterOwnerSync)
+	globalRoleBindings.AddHandler(ctx, "restrictedAdminGlobalBindingsFleet", r.ensureRestricedAdminForFleet)
+
+	// if a fleetwokspace changes then enqueue the restricted-admin globalRoleBindings
+	relatedresource.Watch(ctx, "restricted-admin-fleet", r.enqueueGrb, globalRoleBindings.Controller(), wrangler.Mgmt.FleetWorkspace())
+
+	// if a cluster is updated enqueue the restricted-admin globalRoleBindings
+	relatedresource.Watch(ctx, "restricted-admin-cluster", r.enqueueGrbOnCluster, globalRoleBindings.Controller(), wrangler.Mgmt.Cluster())
+
+	// if a CRTB that is owned by a GRB is modified enqueue the GRB to reconcile the modified CRTB.
+	relatedresource.Watch(ctx, "restricted-admin-crtb", r.enqueueGrbOnCRTB, globalRoleBindings.Controller(), wrangler.Mgmt.ClusterRoleTemplateBinding())
+}
+
+// getRestrictedAdminGRBs gets returns a list of keys for all restricted admin GlobalRoleBindings.
+func (r *rbaccontroller) getRestrictedAdminGRBs() ([]relatedresource.Key, error) {
+	grbs, err := r.grbIndexer.ByIndex(grbByRoleIndex, rbac.GlobalRestrictedAdmin)
+	if err != nil {
+		return nil, err
 	}
 
-	r.clusters.AddHandler(ctx, "restrictedAdminsRBACCluster", r.clusterRBACSync)
-	r.projects.AddHandler(ctx, "restrictedAdminsRBACProject", r.projectRBACSync)
+	result := make([]relatedresource.Key, 0, len(grbs))
+	for _, grbObj := range grbs {
+		grb, ok := grbObj.(*v3.GlobalRoleBinding)
+		if !ok {
+			continue
+		}
+		result = append(result, relatedresource.Key{
+			Namespace: grb.Namespace,
+			Name:      grb.Name,
+		})
+	}
 
-	r.globalRoleBindings.AddHandler(ctx, "restrictedAdminGlobalBindingsFleet", r.ensureRestricedAdminForFleet)
-	relatedresource.Watch(ctx, "restricted-admin-fleet", r.enqueueGrb, r.globalRoleBindings.Controller(), wrangler.Mgmt.FleetWorkspace())
-
+	return result, nil
 }

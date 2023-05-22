@@ -28,6 +28,8 @@ type RKE1NodeDriverProvisioningTestSuite struct {
 	kubernetesVersions []string
 	cnis               []string
 	providers          []string
+	psact              string
+	advancedOptions    provisioning.AdvancedOptions
 }
 
 func (r *RKE1NodeDriverProvisioningTestSuite) TearDownSuite() {
@@ -44,6 +46,8 @@ func (r *RKE1NodeDriverProvisioningTestSuite) SetupSuite() {
 	r.kubernetesVersions = clustersConfig.RKE1KubernetesVersions
 	r.cnis = clustersConfig.CNIs
 	r.providers = clustersConfig.Providers
+	r.psact = clustersConfig.PSACT
+	r.advancedOptions = clustersConfig.AdvancedOptions
 
 	client, err := rancher.NewClient("", testSession)
 	require.NoError(r.T(), err)
@@ -124,13 +128,14 @@ func (r *RKE1NodeDriverProvisioningTestSuite) TestProvisioningRKE1Cluster() {
 		name      string
 		nodeRoles []nodepools.NodeRoles
 		client    *rancher.Client
+		psact     string
 	}{
-		{"1 Node all roles " + provisioning.AdminClientName.String(), nodeRoles0, r.client},
-		{"1 Node all roles " + provisioning.StandardClientName.String(), nodeRoles0, r.standardUserClient},
-		{"2 nodes - etcd/cp roles per 1 node " + provisioning.AdminClientName.String(), nodeRoles1, r.client},
-		{"2 nodes - etcd/cp roles per 1 node " + provisioning.StandardClientName.String(), nodeRoles1, r.standardUserClient},
-		{"3 nodes - 1 role per node " + provisioning.AdminClientName.String(), nodeRoles2, r.client},
-		{"3 nodes - 1 role per node " + provisioning.StandardClientName.String(), nodeRoles2, r.standardUserClient},
+		{"1 Node all roles " + provisioning.AdminClientName.String(), nodeRoles0, r.client, r.psact},
+		{"1 Node all roles " + provisioning.StandardClientName.String(), nodeRoles0, r.standardUserClient, r.psact},
+		{"2 nodes - etcd/cp roles per 1 node " + provisioning.AdminClientName.String(), nodeRoles1, r.client, r.psact},
+		{"2 nodes - etcd/cp roles per 1 node " + provisioning.StandardClientName.String(), nodeRoles1, r.standardUserClient, r.psact},
+		{"3 nodes - 1 role per node " + provisioning.AdminClientName.String(), nodeRoles2, r.client, r.psact},
+		{"3 nodes - 1 role per node " + provisioning.StandardClientName.String(), nodeRoles2, r.standardUserClient, r.psact},
 	}
 
 	var name, scaleName string
@@ -153,14 +158,14 @@ func (r *RKE1NodeDriverProvisioningTestSuite) TestProvisioningRKE1Cluster() {
 					name += " cni: " + cni
 					scaleName = "scaling " + name
 					r.Run(name, func() {
-						cluster, err := TestProvisioningRKE1Cluster(r.T(), client, provider, tt.nodeRoles, kubeVersion, cni, nodeTemplate)
+						cluster, err := TestProvisioningRKE1Cluster(r.T(), client, provider, tt.nodeRoles, tt.psact, kubeVersion, cni, nodeTemplate, r.advancedOptions)
 						require.NoError(r.T(), err)
 
 						r.cluster = cluster
 					})
 
 					r.Run(scaleName, func() {
-						r.testScalingRKE1NodePools(client, provider, tt.nodeRoles, kubeVersion, cni, r.cluster, nodeTemplate)
+						r.testScalingRKE1NodePools(client, provider, tt.nodeRoles, tt.psact, kubeVersion, cni, r.cluster, nodeTemplate)
 					})
 
 					r.cluster = nil
@@ -182,9 +187,10 @@ func (r *RKE1NodeDriverProvisioningTestSuite) TestProvisioningRKE1ClusterDynamic
 	tests := []struct {
 		name   string
 		client *rancher.Client
+		psact  string
 	}{
-		{provisioning.AdminClientName.String(), r.client},
-		{provisioning.StandardClientName.String(), r.standardUserClient},
+		{provisioning.AdminClientName.String(), r.client, r.psact},
+		{provisioning.StandardClientName.String(), r.standardUserClient, r.psact},
 	}
 
 	var name, scaleName string
@@ -207,14 +213,14 @@ func (r *RKE1NodeDriverProvisioningTestSuite) TestProvisioningRKE1ClusterDynamic
 					name += " cni: " + cni
 					scaleName = "scaling " + name
 					r.Run(name, func() {
-						cluster, err := TestProvisioningRKE1Cluster(r.T(), client, provider, nodesAndRoles, kubeVersion, cni, nodeTemplate)
+						cluster, err := TestProvisioningRKE1Cluster(r.T(), client, provider, nodesAndRoles, tt.psact, kubeVersion, cni, nodeTemplate, r.advancedOptions)
 						require.NoError(r.T(), err)
 
 						r.cluster = cluster
 					})
 
 					r.Run(scaleName, func() {
-						r.testScalingRKE1NodePools(client, provider, nodesAndRoles, kubeVersion, cni, r.cluster, nodeTemplate)
+						r.testScalingRKE1NodePools(client, provider, nodesAndRoles, tt.psact, kubeVersion, cni, r.cluster, nodeTemplate)
 					})
 
 					r.cluster = nil
@@ -224,9 +230,9 @@ func (r *RKE1NodeDriverProvisioningTestSuite) TestProvisioningRKE1ClusterDynamic
 	}
 }
 
-func (r *RKE1NodeDriverProvisioningTestSuite) testScalingRKE1NodePools(client *rancher.Client, provider Provider, nodesAndRoles []nodepools.NodeRoles, kubeVersion, cni string, cluster *management.Cluster, nodeTemplate *nodetemplates.NodeTemplate) {
+func (r *RKE1NodeDriverProvisioningTestSuite) testScalingRKE1NodePools(client *rancher.Client, provider Provider, nodesAndRoles []nodepools.NodeRoles, psact string, kubeVersion, cni string, cluster *management.Cluster, nodeTemplate *nodetemplates.NodeTemplate) {
 	if cluster == nil {
-		cluster, err := TestProvisioningRKE1Cluster(r.T(), client, provider, nodesAndRoles, kubeVersion, cni, nodeTemplate)
+		cluster, err := TestProvisioningRKE1Cluster(r.T(), client, provider, nodesAndRoles, psact, kubeVersion, cni, nodeTemplate, r.advancedOptions)
 		require.NoError(r.T(), err)
 
 		err = nodepools.ScaleWorkerNodePool(client, nodesAndRoles, cluster.ID, nodeTemplate.ID)

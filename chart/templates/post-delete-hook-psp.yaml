@@ -1,4 +1,4 @@
-{{- if .Values.global.cattle.psp.enabled  -}}
+{{- if eq (include "rancher.chart_psp_enabled" . ) "true" -}}
 apiVersion: policy/v1beta1
 kind: PodSecurityPolicy
 metadata:

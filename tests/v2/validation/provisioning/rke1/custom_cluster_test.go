@@ -25,6 +25,8 @@ type CustomClusterProvisioningTestSuite struct {
 	kubernetesVersions []string
 	cnis               []string
 	nodeProviders      []string
+	psact              string
+	advancedOptions    provisioning.AdvancedOptions
 }
 
 func (c *CustomClusterProvisioningTestSuite) TearDownSuite() {
@@ -41,6 +43,8 @@ func (c *CustomClusterProvisioningTestSuite) SetupSuite() {
 	c.kubernetesVersions = clustersConfig.RKE1KubernetesVersions
 	c.cnis = clustersConfig.CNIs
 	c.nodeProviders = clustersConfig.NodeProviders
+	c.psact = clustersConfig.PSACT
+	c.advancedOptions = clustersConfig.AdvancedOptions
 
 	client, err := rancher.NewClient("", testSession)
 	require.NoError(c.T(), err)
@@ -91,13 +95,14 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningRKE1CustomCluster()
 		name      string
 		nodeRoles []string
 		client    *rancher.Client
+		psact     string
 	}{
-		{"1 Node all roles " + provisioning.AdminClientName.String(), nodeRoles0, c.client},
-		{"1 Node all roles " + provisioning.StandardClientName.String(), nodeRoles0, c.standardUserClient},
-		{"2 nodes - etcd/cp roles per 1 node " + provisioning.AdminClientName.String(), nodeRoles1, c.client},
-		{"2 nodes - etcd/cp roles per 1 node " + provisioning.StandardClientName.String(), nodeRoles1, c.standardUserClient},
-		{"3 nodes - 1 role per node " + provisioning.AdminClientName.String(), nodeRoles2, c.client},
-		{"3 nodes - 1 role per node " + provisioning.StandardClientName.String(), nodeRoles2, c.standardUserClient},
+		{"1 Node all roles " + provisioning.AdminClientName.String(), nodeRoles0, c.client, c.psact},
+		{"1 Node all roles " + provisioning.StandardClientName.String(), nodeRoles0, c.standardUserClient, c.psact},
+		{"2 nodes - etcd/cp roles per 1 node " + provisioning.AdminClientName.String(), nodeRoles1, c.client, c.psact},
+		{"2 nodes - etcd/cp roles per 1 node " + provisioning.StandardClientName.String(), nodeRoles1, c.standardUserClient, c.psact},
+		{"3 nodes - 1 role per node " + provisioning.AdminClientName.String(), nodeRoles2, c.client, c.psact},
+		{"3 nodes - 1 role per node " + provisioning.StandardClientName.String(), nodeRoles2, c.standardUserClient, c.psact},
 	}
 	var name string
 	for _, tt := range tests {
@@ -115,7 +120,7 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningRKE1CustomCluster()
 				for _, cni := range c.cnis {
 					name += " cni: " + cni
 					c.Run(name, func() {
-						TestProvisioningRKE1CustomCluster(c.T(), client, externalNodeProvider, tt.nodeRoles, kubeVersion, cni)
+						TestProvisioningRKE1CustomCluster(c.T(), client, externalNodeProvider, tt.nodeRoles, tt.psact, kubeVersion, cni, c.advancedOptions)
 					})
 				}
 			}
@@ -151,9 +156,10 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningRKE1CustomClusterDy
 	tests := []struct {
 		name   string
 		client *rancher.Client
+		psact  string
 	}{
-		{provisioning.AdminClientName.String(), c.client},
-		{provisioning.StandardClientName.String(), c.standardUserClient},
+		{provisioning.AdminClientName.String(), c.client, c.psact},
+		{provisioning.StandardClientName.String(), c.standardUserClient, c.psact},
 	}
 
 	var name string
@@ -171,7 +177,7 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningRKE1CustomClusterDy
 				for _, cni := range c.cnis {
 					name += " cni: " + cni
 					c.Run(name, func() {
-						TestProvisioningRKE1CustomCluster(c.T(), client, externalNodeProvider, rolesPerNode, kubeVersion, cni)
+						TestProvisioningRKE1CustomCluster(c.T(), client, externalNodeProvider, rolesPerNode, tt.psact, kubeVersion, cni, c.advancedOptions)
 					})
 				}
 			}

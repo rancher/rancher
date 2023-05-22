@@ -33,7 +33,7 @@ rules:
   - apiGroups: [ "policy" ]
     resources: [ "podsecuritypolicies" ]
     verbs: ["delete", "create" ]
-{{- if .Values.global.cattle.psp.enabled }}
+{{- if eq (include "rancher.chart_psp_enabled" . ) "true" }}
   - apiGroups: [ "policy" ]
     resources: [ "podsecuritypolicies" ]
     verbs: [ "use"]

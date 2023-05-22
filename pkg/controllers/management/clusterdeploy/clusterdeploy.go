@@ -208,6 +208,7 @@ func redeployAgent(cluster *apimgmtv3.Cluster, desiredAgent, desiredAuth string,
 			}
 		}
 	}
+
 	if forceDeploy || imageChange || repoChange || agentFeaturesChanged {
 		logrus.Infof("Redeploy Rancher Agents is needed for %s: forceDeploy=%v, agent/auth image changed=%v,"+
 			" private repo changed=%v, agent features changed=%v", cluster.Name, forceDeploy, imageChange, repoChange,
@@ -228,8 +229,8 @@ func redeployAgent(cluster *apimgmtv3.Cluster, desiredAgent, desiredAuth string,
 	}
 
 	// Taints/tolerations
-	// Current taints are cached for comparison
-	currentTaints := getCachedTaints(cluster.Name)
+	// Current control plane taints are cached for comparison
+	currentTaints := getCachedControlPlaneTaints(cluster.Name)
 	logrus.Tracef("clusterDeploy: redeployAgent: cluster [%s] currentTaints: [%v]", cluster.Name, currentTaints)
 	logrus.Tracef("clusterDeploy: redeployAgent: cluster [%s] desiredTaints: [%v]", cluster.Name, desiredTaints)
 	toAdd, toDelete := taints.GetToDiffTaints(currentTaints, desiredTaints)
@@ -246,17 +247,14 @@ func redeployAgent(cluster *apimgmtv3.Cluster, desiredAgent, desiredAuth string,
 		return true
 	}
 
+	if !reflect.DeepEqual(cluster.Spec.ClusterAgentDeploymentCustomization, cluster.Status.AppliedClusterAgentDeploymentCustomization) {
+		logrus.Infof("clusterDeploy: redeployAgent: redeploy Rancher agents due to agent customization mismatch for [%s], was [%v] and will be [%v]", cluster.Name, cluster.Status.AppliedClusterAgentDeploymentCustomization, cluster.Spec.ClusterAgentDeploymentCustomization)
+		return true
+	}
+
 	logrus.Tracef("clusterDeploy: redeployAgent: returning false for redeployAgent")
 
 	return false
-}
-
-func getDesiredImage(cluster *apimgmtv3.Cluster) string {
-	if cluster.Spec.AgentImageOverride != "" {
-		return cluster.Spec.AgentImageOverride
-	}
-
-	return cluster.Spec.DesiredAgentImage
 }
 
 func (cd *clusterDeploy) getDesiredFeatures(cluster *apimgmtv3.Cluster) map[string]bool {
@@ -388,6 +386,8 @@ func (cd *clusterDeploy) deployAgent(cluster *apimgmtv3.Cluster) error {
 	}
 
 	cluster.Status.AppliedAgentEnvVars = append(settings.DefaultAgentSettingsAsEnvVars(), cluster.Spec.AgentEnvVars...)
+
+	cluster.Status.AppliedClusterAgentDeploymentCustomization = cluster.Spec.ClusterAgentDeploymentCustomization
 
 	return nil
 }
@@ -531,7 +531,7 @@ func getAgentImages(name string) (string, string) {
 	return agentImages[nodeImage][name], agentImages[clusterImage][name]
 }
 
-func getCachedTaints(name string) []corev1.Taint {
+func getCachedControlPlaneTaints(name string) []corev1.Taint {
 	controlPlaneTaintsMutex.RLock()
 	defer controlPlaneTaintsMutex.RUnlock()
 	if _, ok := controlPlaneTaints[name]; ok {

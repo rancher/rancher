@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/slice"
+	wranglerv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/resourcequota"
 	typescorev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -17,6 +18,7 @@ import (
 	nsutils "github.com/rancher/rancher/pkg/namespace"
 	pkgrbac "github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/wrangler/pkg/relatedresource"
 	"github.com/sirupsen/logrus"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -43,6 +45,7 @@ const (
 	crbByRoleAndSubjectIndex         = "authz.cluster.cattle.io/crb-by-role-and-subject"
 	rtbLabelUpdated                  = "authz.cluster.cattle.io/rtb-label-updated"
 	rtbCrbRbLabelsUpdated            = "authz.cluster.cattle.io/crb-rb-labels-updated"
+	rtByInheritedRTsIndex            = "authz.cluster.cattle.io/rts-by-inherited-rts"
 	impersonationLabel               = "authz.cluster.cattle.io/impersonator"
 
 	rolesCircularSoftLimit = 100
@@ -77,6 +80,13 @@ func Register(ctx context.Context, workload *config.UserContext) {
 	}
 	crbInformer.AddIndexers(crbIndexers)
 
+	// Get RoleTemplates by RoleTemplate they inherit from
+	rtInformer := workload.Management.Wrangler.Mgmt.RoleTemplate().Informer()
+	rtIndexers := map[string]cache.IndexFunc{
+		rtByInheritedRTsIndex: rtByInterhitedRTs,
+	}
+	rtInformer.AddIndexers(rtIndexers)
+
 	r := &manager{
 		workload:            workload,
 		prtbIndexer:         prtbInformer.GetIndexer(),
@@ -109,7 +119,7 @@ func Register(ctx context.Context, workload *config.UserContext) {
 	workload.RBAC.ClusterRoleBindings("").AddHandler(ctx, "legacy-crb-cleaner-sync", newLegacyCRBCleaner(r).sync)
 	management.Management.ClusterRoleTemplateBindings("").AddClusterScopedLifecycle(ctx, "cluster-crtb-sync", workload.ClusterName, newCRTBLifecycle(r))
 	management.Management.Clusters("").AddHandler(ctx, "global-admin-cluster-sync", newClusterHandler(workload))
-	management.Management.GlobalRoleBindings("").AddHandler(ctx, "grb-cluster-sync", newGlobalRoleBindingHandler(workload))
+	management.Management.GlobalRoleBindings("").AddHandler(ctx, grbHandlerName, newGlobalRoleBindingHandler(workload))
 
 	sync := &resourcequota.SyncController{
 		Namespaces:          workload.Core.Namespaces(""),
@@ -123,6 +133,8 @@ func Register(ctx context.Context, workload *config.UserContext) {
 
 	workload.Core.Namespaces("").AddLifecycle(ctx, "namespace-auth", newNamespaceLifecycle(r, sync))
 	management.Management.RoleTemplates("").AddHandler(ctx, "cluster-roletemplate-sync", newRTLifecycle(r))
+	relatedresource.WatchClusterScoped(ctx, "enqueue-beneficiary-roletemplates", newRTEnqueueFunc(rtInformer.GetIndexer()),
+		management.Wrangler.Mgmt.RoleTemplate(), management.Wrangler.Mgmt.RoleTemplate())
 }
 
 type manager struct {
@@ -631,6 +643,14 @@ func rtbByClusterAndRoleTemplateName(obj interface{}) ([]string, error) {
 		return []string{}, nil
 	}
 	return []string{idx}, nil
+}
+
+func rtByInterhitedRTs(obj interface{}) ([]string, error) {
+	rt, ok := obj.(*wranglerv3.RoleTemplate)
+	if !ok {
+		return nil, fmt.Errorf("failed to convert object to *RoleTemplate in indexer [%s]", rtByInheritedRTsIndex)
+	}
+	return rt.RoleTemplateNames, nil
 }
 
 func rtbByClusterAndUserNotDeleting(obj interface{}) ([]string, error) {

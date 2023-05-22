@@ -20,20 +20,7 @@ func (r *rbaccontroller) enqueueGrb(namespace, _ string, obj runtime.Object) ([]
 		return nil, nil
 	}
 
-	grbs, err := r.grbIndexer.ByIndex(grbByRoleIndex, rbac.GlobalRestrictedAdmin)
-	if err != nil {
-		return nil, err
-	}
-
-	var result []relatedresource.Key
-	for _, grb := range grbs {
-		result = append(result, relatedresource.Key{
-			Namespace: grb.(*v3.GlobalRoleBinding).Namespace,
-			Name:      grb.(*v3.GlobalRoleBinding).Name,
-		})
-	}
-
-	return result, nil
+	return r.getRestrictedAdminGRBs()
 }
 
 func (r *rbaccontroller) ensureRestricedAdminForFleet(key string, obj *v3.GlobalRoleBinding) (runtime.Object, error) {

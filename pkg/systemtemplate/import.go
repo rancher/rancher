@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
+	"fmt"
 	"io"
 	"sort"
 	"strings"
@@ -43,6 +44,9 @@ type context struct {
 	IsRKE                 bool
 	PrivateRegistryConfig string
 	Tolerations           string
+	AppendTolerations     string
+	Affinity              string
+	ResourceRequirements  string
 	ClusterRegistry       string
 }
 
@@ -71,7 +75,7 @@ func toFeatureString(features map[string]bool) string {
 
 func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url string, isWindowsCluster bool,
 	cluster *apimgmtv3.Cluster, features map[string]bool, taints []corev1.Taint, secretLister v1.SecretLister) error {
-	var tolerations, agentEnvVars string
+	var tolerations, agentEnvVars, agentAppendTolerations, agentAffinity, agentResourceRequirements string
 	d := md5.Sum([]byte(url + token + namespace))
 	tokenKey := hex.EncodeToString(d[:])[:7]
 
@@ -95,6 +99,29 @@ func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url
 
 	agentEnvVars = templates.ToYAML(envVars)
 
+	if appendTolerations := util.GetClusterAgentTolerations(cluster); appendTolerations != nil {
+		agentAppendTolerations = templates.ToYAML(appendTolerations)
+		if agentAppendTolerations == "" {
+			return fmt.Errorf("error converting agent append tolerations to YAML")
+		}
+	}
+
+	affinity, err := util.GetClusterAgentAffinity(cluster)
+	if err != nil {
+		return err
+	}
+	agentAffinity = templates.ToYAML(affinity)
+	if agentAffinity == "" {
+		return fmt.Errorf("error converting agent affinity to YAML")
+	}
+
+	if resourceRequirements := util.GetClusterAgentResourceRequirements(cluster); resourceRequirements != nil {
+		agentResourceRequirements = templates.ToYAML(resourceRequirements)
+		if agentResourceRequirements == "" {
+			return fmt.Errorf("error converting agent resource requirements to YAML")
+		}
+	}
+
 	context := &context{
 		Features:              toFeatureString(features),
 		CAChecksum:            CAChecksum(),
@@ -110,6 +137,9 @@ func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url
 		IsRKE:                 cluster != nil && cluster.Status.Driver == apimgmtv3.ClusterDriverRKE,
 		PrivateRegistryConfig: registryConfig,
 		Tolerations:           tolerations,
+		AppendTolerations:     agentAppendTolerations,
+		Affinity:              agentAffinity,
+		ResourceRequirements:  agentResourceRequirements,
 		ClusterRegistry:       registryURL,
 	}
 

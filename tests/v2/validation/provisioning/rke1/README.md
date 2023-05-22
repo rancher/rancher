@@ -11,10 +11,11 @@ Please see below for more details for your config.
 2. [Define your test](#Provisioning-Input)
 3. [Configure providers to use for Node Driver Clusters](#NodeTemplateConfigs)
 4. [Configuring Custom Clusters](#Custom-Cluster)
-5. [Back to general provisioning](../README.md)
+5. [Advanced Cluster Settings](#advanced-settings)
+6. [Back to general provisioning](../README.md)
 
 ## Provisioning Input
-provisioningInput is needed to the run the RKE1 tests, specifically kubernetesVersion, cni, and providers. nodesAndRoles is only needed for the TestProvisioningDynamicInput test, node pools are divided by "{nodepool},". 
+provisioningInput is needed to the run the RKE1 tests, specifically kubernetesVersion, cni, and providers. nodesAndRoles is only needed for the TestProvisioningDynamicInput test, node pools are divided by "{nodepool},". psact is optional and takes values `rancher-privileged` and `rancher-restricted` only.
 
 **nodeProviders is only needed for custom cluster tests; the framework only supports custom clusters through aws/ec2 instances.**
 
@@ -34,7 +35,8 @@ provisioningInput is needed to the run the RKE1 tests, specifically kubernetesVe
     ],
     "rke1KubernetesVersion": ["v1.24.2-rancher1-1"],
     "providers": ["linode", "aws", "azure", "harvester"],
-    "nodeProviders": ["ec2"]
+    "nodeProviders": ["ec2"],
+    "psact": ""
   }
 ```
 
@@ -226,4 +228,59 @@ For custom clusters, the below config is needed, only AWS/EC2. It is important t
     "awsUser": "ubuntu",
     "volumeSize": 50
   },
+```
+
+## Advanced Settings
+This encapsulates any other setting that is applied in the cluster.spec. Currently we have support for:
+* cluster agent customization 
+* fleet agent customization
+
+Please read up on general k8s to get an idea of correct formatting for:
+* resource requests
+* resource limits
+* node affinity
+* tolerations
+
+```json
+"advancedOptions": {
+    "flusterAgentCustomization": { // change this to fleetAgentCustomization for fleet agent
+        "appendTolerations": [
+            {
+                "key": "Testkey",
+                "value": "testValue",
+                "effect": "NoSchedule"
+            }
+        ],
+        "overrideResourceRequirements": {
+            "limits": {
+                "cpu": "750m",
+                "memory": "500Mi"
+            },
+            "requests": {
+                "cpu": "250m",
+                "memory": "250Mi"
+            }
+        },
+        "overrideAffinity": {
+            "nodeAffinity": {
+                "preferredDuringSchedulingIgnoredDuringExecution": [
+                    {
+                        "preference": {
+                            "matchExpressions": [
+                                {
+                                    "key": "cattle.io/cluster-agent",
+                                    "operator": "In",
+                                    "values": [
+                                        "true"
+                                    ]
+                                }
+                            ]
+                        },
+                        "weight": 1
+                    }
+                ]
+            }
+        }
+    }
+}
 ```

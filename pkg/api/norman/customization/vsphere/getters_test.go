@@ -3,7 +3,7 @@ package vsphere
 import (
 	"testing"
 
-	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
+	"github.com/rancher/rancher/pkg/capr"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -20,17 +20,17 @@ func Test_checkGuestId(t *testing.T) {
 		{
 			name: "guestId-windows",
 			args: args{
-				g: rke2.WindowsMachineOS,
+				g: capr.WindowsMachineOS,
 			},
-			want:    rke2.WindowsMachineOS,
+			want:    capr.WindowsMachineOS,
 			wantErr: false,
 		},
 		{
 			name: "guestId-linux",
 			args: args{
-				g: rke2.DefaultMachineOS,
+				g: capr.DefaultMachineOS,
 			},
-			want:    rke2.DefaultMachineOS,
+			want:    capr.DefaultMachineOS,
 			wantErr: false,
 		},
 		{
@@ -40,7 +40,7 @@ func Test_checkGuestId(t *testing.T) {
 			args: args{
 				g: "",
 			},
-			want:    rke2.DefaultMachineOS,
+			want:    capr.DefaultMachineOS,
 			wantErr: false,
 		},
 		{

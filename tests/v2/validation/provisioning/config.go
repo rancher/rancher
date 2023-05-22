@@ -1,17 +1,21 @@
 package provisioning
 
 import (
+	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
 	nodepools "github.com/rancher/rancher/tests/framework/extensions/rke1/nodepools"
 )
 
 type Version string
+type PSACT string
 
 const (
 	namespace                       = "fleet-default"
 	defaultRandStringLength         = 5
 	ConfigurationFileKey            = "provisioningInput"
 	HardenedKubeVersion     Version = "v1.24.99"
+	RancherPrivileged       PSACT   = "rancher-privileged"
+	RancherRestricted       PSACT   = "rancher-restricted"
 )
 
 // ProviderName is string enum for provider names used in provisioning tests.
@@ -45,6 +49,11 @@ func (c TestClientName) String() string {
 	return string(c)
 }
 
+type AdvancedOptions struct {
+	ClusterAgentCustomization management.AgentDeploymentCustomization `json:"clusterAgentCustomization" yaml:"clusterAgentCustomization"`
+	FleetAgentCustomization   management.AgentDeploymentCustomization `json:"fleetAgentCustomization" yaml:"fleetAgentCustomization"`
+}
+
 type Config struct {
 	NodesAndRoles          []machinepools.NodeRoles `json:"nodesAndRoles" yaml:"nodesAndRoles" default:"[]"`
 	NodesAndRolesRKE1      []nodepools.NodeRoles    `json:"nodesAndRolesRKE1" yaml:"nodesAndRolesRKE1" default:"[]"`
@@ -54,5 +63,7 @@ type Config struct {
 	CNIs                   []string                 `json:"cni" yaml:"cni"`
 	Providers              []string                 `json:"providers" yaml:"providers"`
 	NodeProviders          []string                 `json:"nodeProviders" yaml:"nodeProviders"`
+	PSACT                  string                   `json:"psact" yaml:"psact"`
 	Hardened               bool                     `json:"hardened" yaml:"hardened"`
+	AdvancedOptions        AdvancedOptions          `json:"advancedOptions" yaml:"advancedOptions"`
 }

@@ -190,15 +190,34 @@ func (h *handler) generateProvisioningClusterFromLegacyCluster(cluster *v3.Clust
 	if !h.isLegacyCluster(cluster) || cluster.Spec.FleetWorkspaceName == "" {
 		return nil, status, nil
 	}
-	return []runtime.Object{
-		&v1.Cluster{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:        cluster.Name,
-				Namespace:   cluster.Spec.FleetWorkspaceName,
-				Labels:      yaml.CleanAnnotationsForExport(cluster.Labels),
-				Annotations: yaml.CleanAnnotationsForExport(cluster.Annotations),
-			},
+	provCluster := &v1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        cluster.Name,
+			Namespace:   cluster.Spec.FleetWorkspaceName,
+			Labels:      yaml.CleanAnnotationsForExport(cluster.Labels),
+			Annotations: yaml.CleanAnnotationsForExport(cluster.Annotations),
 		},
+	}
+
+	if cluster.Spec.ClusterAgentDeploymentCustomization != nil {
+		clusterAgentCustomizationCopy := cluster.Spec.ClusterAgentDeploymentCustomization.DeepCopy()
+		provCluster.Spec.ClusterAgentDeploymentCustomization = &v1.AgentDeploymentCustomization{
+			AppendTolerations:            clusterAgentCustomizationCopy.AppendTolerations,
+			OverrideAffinity:             clusterAgentCustomizationCopy.OverrideAffinity,
+			OverrideResourceRequirements: clusterAgentCustomizationCopy.OverrideResourceRequirements,
+		}
+	}
+	if cluster.Spec.FleetAgentDeploymentCustomization != nil {
+		fleetAgentCustomizationCopy := cluster.Spec.FleetAgentDeploymentCustomization.DeepCopy()
+		provCluster.Spec.FleetAgentDeploymentCustomization = &v1.AgentDeploymentCustomization{
+			AppendTolerations:            fleetAgentCustomizationCopy.AppendTolerations,
+			OverrideAffinity:             fleetAgentCustomizationCopy.OverrideAffinity,
+			OverrideResourceRequirements: fleetAgentCustomizationCopy.OverrideResourceRequirements,
+		}
+	}
+
+	return []runtime.Object{
+		provCluster,
 	}, status, nil
 }
 
@@ -300,6 +319,23 @@ func (h *handler) createNewCluster(cluster *v1.Cluster, status v1.ClusterStatus,
 		})
 	}
 
+	if cluster.Spec.ClusterAgentDeploymentCustomization != nil {
+		clusterAgentCustomizationCopy := cluster.Spec.ClusterAgentDeploymentCustomization.DeepCopy()
+		spec.ClusterAgentDeploymentCustomization = &v3.AgentDeploymentCustomization{
+			AppendTolerations:            clusterAgentCustomizationCopy.AppendTolerations,
+			OverrideAffinity:             clusterAgentCustomizationCopy.OverrideAffinity,
+			OverrideResourceRequirements: clusterAgentCustomizationCopy.OverrideResourceRequirements,
+		}
+	}
+	if cluster.Spec.FleetAgentDeploymentCustomization != nil {
+		fleetAgentCustomizationCopy := cluster.Spec.FleetAgentDeploymentCustomization.DeepCopy()
+		spec.FleetAgentDeploymentCustomization = &v3.AgentDeploymentCustomization{
+			AppendTolerations:            fleetAgentCustomizationCopy.AppendTolerations,
+			OverrideAffinity:             fleetAgentCustomizationCopy.OverrideAffinity,
+			OverrideResourceRequirements: fleetAgentCustomizationCopy.OverrideResourceRequirements,
+		}
+	}
+
 	if cluster.Spec.RKEConfig != nil {
 		if err := h.updateFeatureLockedValue(true); err != nil {
 			return nil, status, err
@@ -356,7 +392,12 @@ func (h *handler) updateStatus(objs []runtime.Object, cluster *v1.Cluster, statu
 			ready = true
 		}
 		for _, messageCond := range existing.Status.Conditions {
-			if messageCond.Type == "Updated" || messageCond.Type == "Provisioned" || messageCond.Type == "Removed" {
+			if messageCond.Type == "Updated" || messageCond.Type == "Provisioned" || messageCond.Type == "Removed" || (cluster.Spec.RKEConfig != nil && messageCond.Type == "Ready") {
+				// Don't copy these conditions from v3 management object to the v1 provisioning object. This is because we copy these specific conditions from other places and we need to prevent clobbering.
+				// Updated - This is copied from the rkecontrolplane Ready condition to the v1 object by the rke2/provisioningcluster/controller.go via the reconcile function
+				// Provisioned - This is copied from the rkecontrolplane Ready condition to the v1 object by the rke2/provisioningcluster/controller.go via the reconcile function
+				// Removed - This is copied from the rkecontrolplane Removed condition on rkecontrolplane deletion.
+				// Ready - Conditionally, if RKEConfig != nil. This is copied from the rkecontrolplane Ready condition (if cluster is not stable) or v3/management cluster Ready condition (if cluster is stable) by the rke2/provisioningcluster/controller.go via the reconcile function
 				continue
 			}
 
@@ -399,9 +440,6 @@ func (h *handler) updateStatus(objs []runtime.Object, cluster *v1.Cluster, statu
 			return nil, status, err
 		}
 		if secret != nil {
-			if secret.UID == "" {
-				objs = append(objs, secret)
-			}
 			status.ClientSecretName = secret.Name
 
 			if features.MCM.Enabled() {

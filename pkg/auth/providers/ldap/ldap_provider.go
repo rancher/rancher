@@ -3,12 +3,12 @@ package ldap
 import (
 	"context"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"strings"
 
 	ldapv3 "github.com/go-ldap/ldap/v3"
 	"github.com/mitchellh/mapstructure"
-	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
@@ -29,10 +29,19 @@ const (
 	FreeIpaName    = "freeipa"
 	ShibbolethName = "shibboleth"
 	ObjectClass    = "objectClass"
+	OKTAName       = "okta"
 )
 
+// An ErrorNotConfigured indicates that the requested LDAP operation
+// failed due to missing or incomplete configuration.
+type ErrorNotConfigured struct{}
+
+// Error provides a string representation of an ErrorNotConfigured
+func (e ErrorNotConfigured) Error() string {
+	return "not configured"
+}
+
 var (
-	errNotConfigured       = fmt.Errorf("not configured")
 	testAndApplyInputTypes = map[string]string{
 		FreeIpaName:  client.FreeIpaTestAndApplyInputType,
 		OpenLdapName: client.OpenLdapTestAndApplyInputType,
@@ -43,6 +52,7 @@ var (
 		FreeIpaName:    "",
 		OpenLdapName:   "",
 		ShibbolethName: client.ShibbolethConfigFieldOpenLdapConfig,
+		OKTAName:       client.OKTAConfigFieldOpenLdapConfig,
 	}
 )
 
@@ -83,8 +93,9 @@ func GetLDAPConfig(authProvider common.AuthProvider) (*v3.LdapConfig, *x509.Cert
 	return ldapProvider.getLDAPConfig()
 }
 
+// IsNotConfigured checks whether this error indicates a missing LDAP configuration.
 func IsNotConfigured(err error) bool {
-	return err == errNotConfigured
+	return errors.Is(err, ErrorNotConfigured{})
 }
 
 func (p *ldapProvider) GetName() string {
@@ -224,13 +235,13 @@ func (p *ldapProvider) getLDAPConfig() (*v3.LdapConfig, *x509.CertPool, error) {
 	if p.samlSearchProvider() && ldapConfigKey[p.providerName] != "" {
 		subLdapConfig, ok := storedLdapConfigMap[ldapConfigKey[p.providerName]]
 		if !ok {
-			return nil, nil, errNotConfigured
+			return nil, nil, ErrorNotConfigured{}
 		}
 
 		storedLdapConfigMap = subLdapConfig.(map[string]interface{})
 		mapstructure.Decode(storedLdapConfigMap, storedLdapConfig)
 		if len(storedLdapConfig.Servers) < 1 {
-			return storedLdapConfig, nil, errNotConfigured
+			return storedLdapConfig, nil, ErrorNotConfigured{}
 		}
 	} else {
 		mapstructure.Decode(storedLdapConfigMap, storedLdapConfig)
@@ -280,7 +291,7 @@ func (p *ldapProvider) CanAccessWithGroupProviders(userPrincipalID string, group
 func (p *ldapProvider) getDNAndScopeFromPrincipalID(principalID string) (string, string, error) {
 	parts := strings.SplitN(principalID, ":", 2)
 	if len(parts) != 2 {
-		return "", "", errors.Errorf("invalid id %v", principalID)
+		return "", "", fmt.Errorf("invalid id %v", principalID)
 	}
 	scope := parts[0]
 	externalID := strings.TrimPrefix(parts[1], "//")
@@ -290,10 +301,7 @@ func (p *ldapProvider) getDNAndScopeFromPrincipalID(principalID string) (string,
 
 // if provider only enabled for search by a SAML provider
 func (p *ldapProvider) samlSearchProvider() bool {
-	if p.providerName == ShibbolethName {
-		return true
-	}
-	return false
+	return ShibbolethName == p.providerName || OKTAName == p.providerName
 }
 
 func (p *ldapProvider) samlSearchGetPrincipal(
@@ -366,7 +374,8 @@ func (p *ldapProvider) samlSearchGetPrincipal(
 		config.UserNameAttribute,
 		config.UserLoginAttribute,
 		config.GroupObjectClass,
-		config.GroupNameAttribute)
+		config.GroupNameAttribute,
+		"")
 }
 
 func (p *ldapProvider) GetUserExtraAttributes(userPrincipal v3.Principal) map[string][]string {
