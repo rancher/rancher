@@ -14,7 +14,7 @@ func NewConfigurationsDir(dirName string) (err error) {
 	err = os.Mkdir(dirName, 0777)
 	if err != nil {
 		if strings.Contains(err.Error(), "file exists") {
-			logrus.Infof("configs dir already exists", err)
+			logrus.Info("configs dir already exists ", err)
 			return nil
 		} else {
 			return

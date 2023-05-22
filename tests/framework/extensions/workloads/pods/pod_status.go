@@ -49,7 +49,7 @@ func StatusPods(client *rancher.Client, clusterID string) ([]string, []error) {
 			phase := podStatus.Phase
 			if phase == corev1.PodFailed || phase == corev1.PodUnknown {
 				podErrors = append(podErrors, fmt.Errorf("ERROR: %s: %s", pod.Name, podStatus))
-				logrus.Infof("%Pod %s is not in an active state", pod.Name)
+				logrus.Infof("Pod %s is not in an active state", pod.Name)
 				return false, nil
 			} else if phase == corev1.PodRunning {
 				podResults = append(podResults, fmt.Sprintf("INFO: %s: %s\n", pod.Name, podStatus))

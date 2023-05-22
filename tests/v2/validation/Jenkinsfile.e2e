@@ -137,7 +137,7 @@ node {
             }
             stage('Cleanup Rancher Environment') {
               try {
-                if ("${env.ClEANUP_RANCHER}" == "True" || "${env.ClEANUP_RANCHER}" == "true") {
+                if ("${env.CLEANUP_RANCHER}" == "True" || "${env.CLEANUP_RANCHER}" == "true") {
                   sh "docker run --volumes-from ${buildTestContainer} --name ${cleanupTestContainer} -t --env-file ${envFile} " +
                   "${golangImageName} sh -c \"${workPath}pipeline/scripts/rancher_cleanup.sh\""
                 }

@@ -3,7 +3,7 @@ node {
     def rootPath = "/root/go/src/github.com/rancher/rancher/"
     def workPath = "/root/go/src/github.com/rancher/rancher/tests/v2/codecoverage/"
     def job_name = "${JOB_NAME}"
-    def code_cover_volume = "CodeCoverageReportTestingSharedVolume"
+    def code_cover_volume = "CodeCoverageTestReportSharedVolume"
 
     if (job_name.contains('/')) { 
       job_names = job_name.split('/')
@@ -14,6 +14,7 @@ node {
     def golangTestContainer = "golang-setup-test"
     def golangUnitTestContainer = "golang-unit-test"
     def pythonTestContainer = "python-integration-test"
+    def v2ProvTestContainer = "v2-prov-integration-test"
     def cleanupContainer = "code-cover-cleanup"
     def goImageName = "rancher-code-coverage-${job_name}"
     def envFile = ".env"
@@ -21,6 +22,7 @@ node {
     def codeCoverageTest = "-run TestRetrieveCoverageReports"
     def rancherConfig = "rancher_env.config"
     def branch = "release/v2.7"
+    def defaultBranch = branch
     def unitTestCoverfile = "unittestcover.out"
     def unitTestHTMLfile = "coverage.html"
     def coverDir = "cover/"
@@ -33,9 +35,19 @@ node {
     if ("${env.BRANCH}" != "null" && "${env.BRANCH}" != "") {
       branch = "${env.BRANCH}"
     }
-    def repo = scm.userRemoteConfigs
+
+    if ("${env.RANCHER_CORRAL_PACKAGES_REPO_BRANCH}" != "null" && "${env.RANCHER_CORRAL_PACKAGES_REPO_BRANCH}" != "") {
+      corralBranch = "${env.RANCHER_CORRAL_PACKAGES_REPO_BRANCH}"
+    }
+
+    def rancherRepo = scm.getUserRemoteConfigs()[0].getUrl()
     if ("${env.REPO}" != "null" && "${env.REPO}" != "") {
-      repo = [[url: "${env.REPO}"]]
+      rancherRepo = "${env.REPO}"
+    }
+
+    def corralRepo = scm.getUserRemoteConfigs()[1].getUrl()
+    if ("${env.RANCHER_CORRAL_PACKAGES_REPO_URL}" != "null" && "${env.RANCHER_CORRAL_PACKAGES_REPO_URL}" != "") {
+      corralRepo = "${env.RANCHER_CORRAL_PACKAGES_REPO_URL}"
     }
     def timeout = "6h45m"
     if ("${env.TIMEOUT}" != "null" && "${env.TIMEOUT}" != "") {
@@ -97,54 +109,64 @@ node {
 
           stage('Checkout') {
             deleteDir()
-            checkout([
+            dir("./rancher") {
+              checkout([
                       $class: 'GitSCM',
                       branches: [[name: "*/${branch}"]],
                       extensions: scm.extensions + [[$class: 'CleanCheckout']],
-                      userRemoteConfigs: repo
+                      userRemoteConfigs: [[url: rancherRepo]]
                     ])
-          }
-          dir('/home/jenkins/go/src/github.com/rancherlabs') {
+            }
+            dir('./') {
               echo "cloning corral-packages repo"
-              sh "git clone https://github.com/rancherlabs/corral-packages.git"
-          }
-          dir ("/home/jenkins/go/src/github.com/") {
-            try {
-              stage('Configure and Build') {
-                sh "docker volume rm -f ${code_cover_volume}"
-                if (env.AWS_SSH_PEM_KEY && env.AWS_SSH_KEY_NAME) {
-                  dir("./rancher/rancher/tests/validation/.ssh") {
-                    def decoded = new String(AWS_SSH_PEM_KEY.decodeBase64())
-                    writeFile file: AWS_SSH_KEY_NAME, text: decoded
-                  }
-                }
-                dir("./rancher/rancher/tests/v2/codecoverage") {
-                  def filename = "config.yaml"
-                  def configContents = env.CONFIG
 
-                  writeFile file: filename, text: configContents
-                  env.CATTLE_TEST_CONFIG = workPath+filename
+              dir('./corral-packages') {
+                checkout([
+                      $class: 'GitSCM',
+                      branches: [[name: "*/${corralBranch}"]],
+                      extensions: scm.extensions + [[$class: 'CleanCheckout']],
+                      userRemoteConfigs: [[url: corralRepo]]
+                    ])
+              }
+            }
+          }
+          dir ("./") {
+            stage('Configure and Build') {
+              if (env.AWS_SSH_PEM_KEY && env.AWS_SSH_KEY_NAME) {
+                dir("./rancher/tests/v2/validation/.ssh") {
+                  def decoded = new String(AWS_SSH_PEM_KEY.decodeBase64())
+                  writeFile file: AWS_SSH_KEY_NAME, text: decoded
                 }
-                sh "rancher/rancher/tests/v2/validation/configure.sh"
-                sh "docker build . -f rancher/rancher/tests/v2/codecoverage/Dockerfile.codecoverage -t ${goImageName}"
-                sh "docker volume create --name ${code_cover_volume}"
               }
-              stage('Run Unit Tests') {
-                sh "docker run --name ${golangUnitTestContainer} -t " +
-                  "${goImageName} sh -c \"go test -coverprofile ${unitTestCoverfile} -tags=test ${rootPath}pkg/..." +
-                  ";go tool cover -func ${unitTestCoverfile} | grep \"total\";go tool cover -html ${unitTestCoverfile} -o ${unitTestHTMLfile}\""
+              dir("./rancher/tests/v2/codecoverage") {
+                def filename = "config.yaml"
+                def configContents = env.CONFIG
+
+                writeFile file: filename, text: configContents
+                env.CATTLE_TEST_CONFIG = workPath+filename
               }
-              stage('Setup Enviornment') {
+              sh "rancher/tests/v2/validation/configure.sh"
+              sh "docker build . -f rancher/tests/v2/codecoverage/Dockerfile.codecoverage -t ${goImageName}"
+              sh "docker volume create --name ${code_cover_volume}"
+            }
+            stage('Run Unit Tests') {
+              sh "docker run --name ${golangUnitTestContainer} -t " +
+                "${goImageName} sh -c \"go test -coverprofile ${unitTestCoverfile} -tags=test ${rootPath}pkg/..." +
+                ";go tool cover -func ${unitTestCoverfile} | grep \"total\";go tool cover -html ${unitTestCoverfile} -o ${unitTestHTMLfile}\""
+            }
+            stage('Setup Enviornment') {
+              try {
                 sh "docker run -v ${code_cover_volume}:/root --name ${golangTestContainer} -t --env-file ${envFile} " +
                   "${goImageName} sh -c \"${workPath}scripts/setup_code_coverage_enviornment.sh\""
-                dir("./rancher/rancher/tests/v2/codecoverage") {
+                dir("./rancher/tests/v2/codecoverage") {
                   sh "rm config.yaml"
                   sh "docker cp ${golangTestContainer}:${workPath}config.yaml ./"
                   sh "cp config.yaml cleanupconfig.yaml"
                   sh "cp config.yaml provisioningconfig.yaml"
                 }
+                
   
-                dir("./rancher/rancher/tests/v2/codecoverage/scripts") {
+                dir("./rancher/tests/v2/codecoverage/scripts") {
                   sh "docker cp ${golangTestContainer}:${rootPath}userclusterconfig.yaml ./"
                   sh ". ./download_yq.sh"
                   env.RANCHER_CLUSTER0 = sh (
@@ -164,112 +186,145 @@ node {
                       returnStdout: true
                   )
                   env.RANCHER_SERVER_PASSWORD = sh (
-                      script: './yq ".userClusterConfig.bootStrapPassword" ./userclusterconfig.yaml',
+                      script: './yq ".userClusterConfig.adminPassword" ./userclusterconfig.yaml',
                       returnStdout: true
                   )
                   sh "./yq e '.rancher.cleanup = true' -i ../cleanupconfig.yaml"
                   sh "./yq e '.provisioningInput.providers = [\"aws\"]' -i ../provisioningconfig.yaml"
                 }
-
-                env.CATTLE_TEST_CONFIG = "${workPath}cleanupconfig.yaml"
-                dir("./rancher/rancher/tests/v2/codecoverage") {
-                  sh "docker cp ./cleanupconfig.yaml ${golangTestContainer}:${workPath}cleanupconfig.yaml"
-                  cleanupYaml = readFile(file: './cleanupconfig.yaml')
-                  configYaml = readFile(file: './config.yaml')
-                  provisioningYaml = readFile(file: './provisioningconfig.yaml')
-                }
-                
-                sh "rm ${envFile}"
-                sh "rancher/rancher/tests/v2/validation/configure.sh"
-              }
-
-              stage ('Run Go Integration Tests') {
-                try {
-                  sh "docker run --volumes-from ${golangTestContainer} --name ${integrationTestContainer} -t --env-file ${envFile} " +
-                  "${goImageName} sh -c \"go test -v -tags=test ${rootPath}tests/v2/integration/...\""
-                } catch(err) {
-                    echo "Go Integration tests had failures."
-                }
-              }
-              stage('Execute Subjobs') {
-                try {
-                  jobs = [:]
-                  goProvisioningParams = [ string(name: 'TIMEOUT', value: "5h"),
-                                  text(name: 'CONFIG', value: configYaml),
-                                  string(name: 'REPO', value: "https://github.com/rancher/rancher.git"),
-                                  string(name: 'BRANCH', value: "release/v2.6"),
-                                  string(name: 'TEST_PACKAGE', value: "provisioning/..."),
-                                  string(name: 'GOTEST_TESTCASE', value: "${GO_PROVISIONING_TEST_CASES}") ]
-
-                  goExtendedProvisioningParams = [ string(name: 'TIMEOUT', value: "5h"),
-                                  text(name: 'CONFIG', value: provisioningYaml),
-                                  string(name: 'REPO', value: "https://github.com/rancher/rancher.git"),
-                                  string(name: 'BRANCH', value: "release/v2.6"),
-                                  string(name: 'TEST_PACKAGE', value: "provisioning/..."),
-                                  string(name: 'GOTEST_TESTCASE', value: "${GO_EXTEND_PROVISIONING_TEST_CASES}") ]
-
-                  goValidationParams = [ string(name: 'TIMEOUT', value: "1h"),
-                                  text(name: 'CONFIG', value: cleanupYaml),
-                                  string(name: 'REPO', value: "https://github.com/rancher/rancher.git"),
-                                  string(name: 'BRANCH', value: "release/v2.6"),
-                                  string(name: 'TEST_PACKAGE', value: "..."),
-                                  string(name: 'GOTEST_TESTCASE', value: "${GO_VALIDATION_TEST_CASES} -p 1") ]
-
-                  pythonParam0 = [ string(name: 'CATTLE_TEST_URL', value: "${CATTLE_TEST_URL}"),
-                              string(name: 'ADMIN_TOKEN', value: env.ADMIN_TOKEN),
-                              string(name: 'USER_TOKEN', value: env.USER_TOKEN),
-                              string(name: 'PYTEST_OPTIONS', value: "${PYTEST_OPTIONS}"),
-                              string(name: 'RANCHER_CLUSTER_NAME', value: env.RANCHER_CLUSTER0) ]
-
-                  pythonParam1 = [ string(name: 'CATTLE_TEST_URL', value: "${CATTLE_TEST_URL}"),
-                              string(name: 'ADMIN_TOKEN', value: env.ADMIN_TOKEN),
-                              string(name: 'USER_TOKEN', value: env.USER_TOKEN),
-                              string(name: 'PYTEST_OPTIONS', value: "${PYTEST_OPTIONS_ADDITIONAL}"),
-                              string(name: 'RANCHER_CLUSTER_NAME', value: env.RANCHER_CLUSTER1) ]
-                  // Go provisioning base tests
-                  jobs["go-provisioning"] = { build job: 'go-automation-freeform-job', parameters: goProvisioningParams }
-                  // Go provisioning tests
-                  jobs["go-extent-provisioning"] = { build job: 'go-automation-freeform-job', parameters: goExtendedProvisioningParams }
-                  // Go charts tests
-                  jobs["go-validations"] = { build job: 'go-automation-freeform-job', parameters: goValidationParams }
-                  // python cluster tests
-                  jobs["python-cluster-test"] = { build job: 'rancher-v3_needs_cluster', parameters: pythonParam0}
-                  // python additional tests
-                  jobs["python-additional-cluster-test"] = { build job: 'rancher-v3_needs_cluster', parameters: pythonParam1}
-                  parallel jobs
-                } catch(err) {
-                    echo "Validation SubJobs had failures ${err}"
-                }
-
-              }
-              stage ('Run Python Integration Tests') {
-                try {
-                  sh "docker run --name ${pythonTestContainer} --env-file ${envFile} " +
-                  "${goImageName} /bin/bash -c \'cd ${rootPath}tests/integration;tox -e rancher -- -m \"not nonparallel\" -n 8;tox -e rancher -- -m nonparallel\'"
-                } catch(err) {
-                  echo "Python Integration tests had failures."
-                }
-              }
-              stage("Code Coverage Report") {
-                sh "docker run --volumes-from ${golangTestContainer} --name ${codeCoverTestContainer} -t --env-file ${envFile} " +
-                "${goImageName} sh -c \"gotestsum --format standard-verbose --packages=${codeCoverageDir} -- ${codeCoverageTest} -timeout=${timeout} -v;cd ${workPath}scripts; . ./merge_coverage_reports.sh\""
-              }
-            } finally {           
-              stage('Test Report') {
-                sh "docker run --volumes-from ${golangTestContainer} --name ${cleanupContainer} -t --env-file ${envFile} " +
-                  "${goImageName} sh -c \"${workPath}bin/ranchercleanup\""
+              } catch(err) {
                 sh "docker stop ${golangTestContainer}"
                 sh "docker rm -v ${golangTestContainer}"
+                sh "docker volume rm -f ${code_cover_volume}"
+                error "Setup Environment had failures."
+            }
 
-                sh "docker stop ${cleanupContainer}"
-                sh "docker rm -v ${cleanupContainer}"
+              env.CATTLE_TEST_CONFIG = "${workPath}cleanupconfig.yaml"
+              dir("./rancher/tests/v2/codecoverage") {
+                sh "docker cp ./cleanupconfig.yaml ${golangTestContainer}:${workPath}cleanupconfig.yaml"
+                cleanupYaml = readFile(file: './cleanupconfig.yaml')
+                configYaml = readFile(file: './config.yaml')
+                provisioningYaml = readFile(file: './provisioningconfig.yaml')
+              }
+              
+              sh "rm ${envFile}"
+              sh "rancher/tests/v2/validation/configure.sh"
+            }
 
-                sh "docker stop ${integrationTestContainer}"
-                sh "docker rm -v ${integrationTestContainer}"
+            stage ('Run Go Integration Tests') {
+              try {
+                sh "docker run --volumes-from ${golangTestContainer} --name ${integrationTestContainer} -t --env-file ${envFile} " +
+                "${goImageName} sh -c \"go test -v -tags=test ${rootPath}tests/v2/integration/...\""
+              } catch(err) {
+                  echo "Go Integration tests had failures."
+              }
+            }
+            stage('Execute Subjobs') {
+              try {
+                jobs = [:]
+                goProvisioningParams = [ string(name: 'TIMEOUT', value: "3h"),
+                                text(name: 'CONFIG', value: configYaml),
+                                string(name: 'REPO', value: repo),
+                                string(name: 'BRANCH', value: branch),
+                                string(name: 'TEST_PACKAGE', value: "provisioning/..."),
+                                string(name: 'GOTEST_TESTCASE', value: "${GO_PROVISIONING_TEST_CASES}") ]
 
-                sh "docker stop ${pythonTestContainer}"
-                sh "docker rm -v ${pythonTestContainer}"
+                goExtendedProvisioningParams = [ string(name: 'TIMEOUT', value: "3h"),
+                                text(name: 'CONFIG', value: provisioningYaml),
+                                string(name: 'REPO', value: repo),
+                                string(name: 'BRANCH', value: branch),
+                                string(name: 'TEST_PACKAGE', value: "provisioning/..."),
+                                string(name: 'GOTEST_TESTCASE', value: "${GO_EXTEND_PROVISIONING_TEST_CASES}") ]
 
+                goValidationParams = [ string(name: 'TIMEOUT', value: "1h"),
+                                text(name: 'CONFIG', value: cleanupYaml),
+                                string(name: 'REPO', value: repo),
+                                string(name: 'BRANCH', value: branch),
+                                string(name: 'TEST_PACKAGE', value: "..."),
+                                string(name: 'GOTEST_TESTCASE', value: "${GO_VALIDATION_TEST_CASES} -p 1") ]
+
+                pythonParam0 = [ string(name: 'CATTLE_TEST_URL', value: "${CATTLE_TEST_URL}"),
+                            string(name: 'ADMIN_TOKEN', value: env.ADMIN_TOKEN),
+                            string(name: 'USER_TOKEN', value: env.USER_TOKEN),
+                            string(name: 'PYTEST_OPTIONS', value: "${PYTEST_OPTIONS}"),
+                            string(name: 'BRANCH', value: defaultBranch),
+                            string(name: 'RANCHER_CLUSTER_NAME', value: env.RANCHER_CLUSTER0) ]
+
+                pythonParam1 = [ string(name: 'CATTLE_TEST_URL', value: "${CATTLE_TEST_URL}"),
+                            string(name: 'ADMIN_TOKEN', value: env.ADMIN_TOKEN),
+                            string(name: 'USER_TOKEN', value: env.USER_TOKEN),
+                            string(name: 'BRANCH', value: defaultBranch),
+                            string(name: 'PYTEST_OPTIONS', value: "${PYTEST_OPTIONS_ADDITIONAL}"),
+                            string(name: 'RANCHER_CLUSTER_NAME', value: env.RANCHER_CLUSTER1) ]
+                // Go provisioning base tests
+                jobs["go-provisioning"] = { build job: 'go-automation-freeform-job', parameters: goProvisioningParams }
+                // Go provisioning tests
+                jobs["go-extent-provisioning"] = { build job: 'go-automation-freeform-job', parameters: goExtendedProvisioningParams }
+                // Go charts tests
+                jobs["go-validations"] = { build job: 'go-automation-freeform-job', parameters: goValidationParams }
+                // python cluster tests
+                jobs["python-cluster-test"] = { build job: 'rancher-v3_needs_cluster', parameters: pythonParam0}
+                // python additional tests
+                jobs["python-additional-cluster-test"] = { build job: 'rancher-v3_needs_cluster', parameters: pythonParam1}
+                parallel jobs
+              } catch(err) {
+                  echo "Validation SubJobs had failures ${err}"
+              }
+
+            }
+            stage ('Run Python Integration Tests') {
+              try {
+                sh "docker run --name ${pythonTestContainer} --env-file ${envFile} " +
+                "${goImageName} /bin/bash -c \'cd ${rootPath}tests/integration;tox -e rancher -- -m \"not nonparallel\" -n 8;tox -e rancher -- -m nonparallel\'"
+              } catch(err) {
+                echo "Python Integration tests had failures."
+              }
+            }
+            stage ('Run V2Prov Tests') {
+              try {
+                sh "docker run --volumes-from ${golangTestContainer} --name ${v2ProvTestContainer} --env-file ${envFile} " +
+                "${goImageName} sh -c \"${workPath}scripts/run_provisioning_integration_tests.sh\""
+              } catch(err) {
+                echo "Python Integration tests had failures."
+              }
+            }
+            stage("Code Coverage Report") {
+              sh "docker run --volumes-from ${golangTestContainer} --name ${codeCoverTestContainer} -t --env-file ${envFile} " +
+              "${goImageName} sh -c \"gotestsum --format standard-verbose --packages=${codeCoverageDir} -- ${codeCoverageTest} -timeout=${timeout} -v;cd ${workPath}scripts; . ./merge_coverage_reports.sh\""
+            }
+            stage('Cleanup Rancher Environment') {
+              try {
+                if ("${env.CLEANUP_RANCHER}" == "True" || "${env.CLEANUP_RANCHER}" == "true") {
+                  sh "docker run --volumes-from ${golangTestContainer} --name ${cleanupContainer} -t --env-file ${envFile} " +
+                " ${goImageName} sh -c \"${workPath}bin/ranchercleanup\""
+                }
+              } catch(err) {
+                  sh "docker stop ${golangTestContainer}"
+                  sh "docker rm -v ${golangTestContainer}"
+
+                  sh "docker stop ${cleanupContainer}"
+                  sh "docker rm -v ${cleanupContainer}"
+
+                  sh "docker stop ${integrationTestContainer}"
+                  sh "docker rm -v ${integrationTestContainer}"
+
+                  sh "docker stop ${pythonTestContainer}"
+                  sh "docker rm -v ${pythonTestContainer}"
+
+                  sh "docker stop ${v2ProvTestContainer}"
+                  sh "docker rm -v ${v2ProvTestContainer}"
+
+                  sh "docker stop ${golangUnitTestContainer}"
+                  sh "docker rm -v ${golangUnitTestContainer}"
+                  sh "docker stop ${codeCoverTestContainer}"
+                  sh "docker rm -v ${codeCoverTestContainer}"
+                  sh "docker rmi -f ${goImageName}"
+                  sh "docker volume rm -f ${code_cover_volume}"
+                  error "Cleanup had failures."
+              }
+            }       
+            stage('Test Report') {
+              try {
                 sh "docker cp ${codeCoverTestContainer}:${workPath}ranchercover/${coverDir}${mergedCovFile} ."
                 sh "docker cp ${codeCoverTestContainer}:${workPath}ranchercover/${coverDir}${mergedHTMLFile} ."
                 archiveArtifacts(artifacts: "**/${mergedCovFile}",
@@ -291,14 +346,52 @@ node {
                 //       reportFiles: mergedHTMLFile,
                 //       reportName: "Single-click Code Coverage Test Results"
                 //     ])
+              } catch (err) {
+                sh "docker stop ${golangTestContainer}"
+                sh "docker rm -v ${golangTestContainer}"
+
+                sh "docker stop ${cleanupContainer}"
+                sh "docker rm -v ${cleanupContainer}"
+
+                sh "docker stop ${integrationTestContainer}"
+                sh "docker rm -v ${integrationTestContainer}"
+
+                sh "docker stop ${pythonTestContainer}"
+                sh "docker rm -v ${pythonTestContainer}"
+
+                sh "docker stop ${v2ProvTestContainer}"
+                sh "docker rm -v ${v2ProvTestContainer}"
                 sh "docker stop ${golangUnitTestContainer}"
                 sh "docker rm -v ${golangUnitTestContainer}"
                 sh "docker stop ${codeCoverTestContainer}"
                 sh "docker rm -v ${codeCoverTestContainer}"
                 sh "docker rmi -f ${goImageName}"
                 sh "docker volume rm -f ${code_cover_volume}"
-              } // test report
-            } // finally
+                error 'Report had failures.'
+              }
+              stage('Clean Up Containers, Image, and Volume') {
+                sh "docker stop ${golangTestContainer}"
+                sh "docker rm -v ${golangTestContainer}"
+
+                sh "docker stop ${cleanupContainer}"
+                sh "docker rm -v ${cleanupContainer}"
+
+                sh "docker stop ${integrationTestContainer}"
+                sh "docker rm -v ${integrationTestContainer}"
+
+                sh "docker stop ${pythonTestContainer}"
+                sh "docker rm -v ${pythonTestContainer}"
+
+                sh "docker stop ${v2ProvTestContainer}"
+                sh "docker rm -v ${v2ProvTestContainer}"
+                sh "docker stop ${golangUnitTestContainer}"
+                sh "docker rm -v ${golangUnitTestContainer}"
+                sh "docker stop ${codeCoverTestContainer}"
+                sh "docker rm -v ${codeCoverTestContainer}"
+                sh "docker rmi -f ${goImageName}"
+                sh "docker volume rm -f ${code_cover_volume}"
+              }
+            } // test report
           } // dir 
         } // creds
       } // withEnv

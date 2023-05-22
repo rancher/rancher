@@ -18,7 +18,6 @@ import (
 	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
 	"github.com/rancher/rancher/tests/integration/pkg/defaults"
-	"github.com/rancher/rancher/tests/v2/validation/provisioning"
 	rancherProvisioning "github.com/rancher/rancher/tests/v2/validation/provisioning"
 	"github.com/rancher/wrangler/pkg/summary"
 	"github.com/sirupsen/logrus"
@@ -124,7 +123,7 @@ func CheckServiceAccountTokenSecret(client *rancher.Client, clusterName string) 
 }
 
 // NewRKE1lusterConfig is a constructor for a v3.Cluster object, to be used by the rancher.Client.Provisioning client.
-func NewRKE1ClusterConfig(clusterName, cni, kubernetesVersion string, psact string, client *rancher.Client, advancedOptions provisioning.AdvancedOptions) *management.Cluster {
+func NewRKE1ClusterConfig(clusterName, cni, kubernetesVersion string, psact string, client *rancher.Client, advancedOptions rancherProvisioning.AdvancedOptions) *management.Cluster {
 	clusterConfig := &management.Cluster{
 		DockerRootDir:           "/var/lib/docker",
 		EnableClusterAlerting:   false,
@@ -626,7 +625,20 @@ func CreateRKE1Cluster(client *rancher.Client, rke1Cluster *management.Cluster) 
 		return nil, err
 	}
 
-	client, err = client.ReLogin()
+	err = kwait.Poll(500*time.Millisecond, 2*time.Minute, func() (done bool, err error) {
+		client, err = client.ReLogin()
+		if err != nil {
+			return false, err
+		}
+
+		_, err = client.Management.Cluster.ByID(cluster.ID)
+		if err != nil {
+			return false, nil
+		} else {
+			return true, nil
+		}
+	})
+
 	if err != nil {
 		return nil, err
 	}
@@ -689,7 +701,7 @@ func CreateK3SRKE2Cluster(client *rancher.Client, rke2Cluster *apisV1.Cluster) (
 
 		_, err = client.Steve.SteveType(ProvisioningSteveResouceType).ByID(cluster.ID)
 		if err != nil {
-			return false, err
+			return false, nil
 		} else {
 			return true, nil
 		}
