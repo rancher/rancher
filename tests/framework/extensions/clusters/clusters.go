@@ -146,6 +146,7 @@ func NewRKE1ClusterConfig(clusterName, cni, kubernetesVersion string, psact stri
 				Provider: "metrics-server",
 			},
 			Network: &management.NetworkConfig{
+				Plugin:  cni,
 				MTU:     0,
 				Options: map[string]string{},
 			},
