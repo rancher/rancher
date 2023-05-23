@@ -32,6 +32,7 @@ func init() {
 type Interface interface {
 	Bundle() BundleController
 	Cluster() ClusterController
+	ClusterGroup() ClusterGroupController
 }
 
 func New(controllerFactory controller.SharedControllerFactory) Interface {
@@ -49,4 +50,7 @@ func (c *version) Bundle() BundleController {
 }
 func (c *version) Cluster() ClusterController {
 	return NewClusterController(schema.GroupVersionKind{Group: "fleet.cattle.io", Version: "v1alpha1", Kind: "Cluster"}, "clusters", true, c.controllerFactory)
+}
+func (c *version) ClusterGroup() ClusterGroupController {
+	return NewClusterGroupController(schema.GroupVersionKind{Group: "fleet.cattle.io", Version: "v1alpha1", Kind: "ClusterGroup"}, "clustergroups", true, c.controllerFactory)
 }

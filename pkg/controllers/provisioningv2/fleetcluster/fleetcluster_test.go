@@ -5,9 +5,9 @@ import (
 	"testing"
 
 	fleet "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
-	mgmt "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
-	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -73,40 +73,40 @@ var (
 	}
 )
 
-func TestCluster(t *testing.T) {
+func TestClusterCustomization(t *testing.T) {
 	require := require.New(t)
 
 	h := &handler{
 		clustersCache:     &fakeClusterCache{},
-		getPrivateRepoURL: func(*v1.Cluster, *mgmt.Cluster) string { return "" },
+		getPrivateRepoURL: func(*provv1.Cluster, *apimgmtv3.Cluster) string { return "" },
 	}
 
-	cluster := &v1.Cluster{
+	cluster := &provv1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-cluster", Namespace: "test-namespace",
 		},
-		Spec: v1.ClusterSpec{},
+		Spec: provv1.ClusterSpec{},
 	}
-	clusterStatus := v1.ClusterStatus{ClusterName: "cluster-name", ClientSecretName: "client-secret-name"}
+	clusterStatus := provv1.ClusterStatus{ClusterName: "cluster-name", ClientSecretName: "client-secret-name"}
 
 	labels := map[string]string{"cluster-group": "cluster-group-name"}
 
 	tests := []struct {
 		name          string
-		cluster       *v1.Cluster
-		status        v1.ClusterStatus
-		clustersCache mgmtv3.ClusterCache
+		cluster       *provv1.Cluster
+		status        provv1.ClusterStatus
+		clustersCache v3.ClusterCache
 		expectedFleet *fleet.Cluster
 	}{
 		{
 			"cluster-has-no-customization",
 			cluster,
 			clusterStatus,
-			newClusterCache(map[string]*mgmt.Cluster{
+			newClusterCache(map[string]*apimgmtv3.Cluster{
 				"cluster-name": newMgmtCluster(
 					"cluster-name",
 					labels,
-					mgmt.ClusterSpec{},
+					apimgmtv3.ClusterSpec{},
 				),
 			}),
 			&fleet.Cluster{
@@ -119,13 +119,13 @@ func TestCluster(t *testing.T) {
 			"cluster-has-affinity-override",
 			cluster,
 			clusterStatus,
-			newClusterCache(map[string]*mgmt.Cluster{
+			newClusterCache(map[string]*apimgmtv3.Cluster{
 				"cluster-name": newMgmtCluster(
 					"cluster-name",
 					labels,
-					mgmt.ClusterSpec{
-						ClusterSpecBase: mgmt.ClusterSpecBase{
-							FleetAgentDeploymentCustomization: &mgmt.AgentDeploymentCustomization{
+					apimgmtv3.ClusterSpec{
+						ClusterSpecBase: apimgmtv3.ClusterSpecBase{
+							FleetAgentDeploymentCustomization: &apimgmtv3.AgentDeploymentCustomization{
 								OverrideAffinity:             &linuxAffinity,
 								OverrideResourceRequirements: &corev1.ResourceRequirements{},
 								AppendTolerations:            []corev1.Toleration{},
@@ -146,13 +146,13 @@ func TestCluster(t *testing.T) {
 			"cluster-has-custom-tolerations-and-resources",
 			cluster,
 			clusterStatus,
-			newClusterCache(map[string]*mgmt.Cluster{
+			newClusterCache(map[string]*apimgmtv3.Cluster{
 				"cluster-name": newMgmtCluster(
 					"cluster-name",
 					labels,
-					mgmt.ClusterSpec{
-						ClusterSpecBase: mgmt.ClusterSpecBase{
-							FleetAgentDeploymentCustomization: &mgmt.AgentDeploymentCustomization{
+					apimgmtv3.ClusterSpec{
+						ClusterSpecBase: apimgmtv3.ClusterSpecBase{
+							FleetAgentDeploymentCustomization: &apimgmtv3.AgentDeploymentCustomization{
 								OverrideAffinity:             nil,
 								OverrideResourceRequirements: resourceReq,
 								AppendTolerations:            tolerations,
@@ -192,41 +192,125 @@ func TestCluster(t *testing.T) {
 
 }
 
-func newMgmtCluster(name string, labels map[string]string, spec mgmt.ClusterSpec) *mgmt.Cluster {
+func TestCreateCluster(t *testing.T) {
+	h := &handler{
+		clustersCache:     &fakeClusterCache{},
+		getPrivateRepoURL: func(*provv1.Cluster, *apimgmtv3.Cluster) string { return "" },
+	}
+
+	tests := []struct {
+		name          string
+		cluster       *provv1.Cluster
+		status        provv1.ClusterStatus
+		clustersCache v3.ClusterCache
+		expectedLen   int
+	}{
+		{
+			"cluster-has-no-cg",
+			&provv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cluster",
+					Namespace: "test-namespace",
+				},
+				Spec: provv1.ClusterSpec{},
+			},
+			provv1.ClusterStatus{
+				ClusterName:      "cluster-name",
+				ClientSecretName: "client-secret-name",
+			},
+
+			newClusterCache(map[string]*apimgmtv3.Cluster{
+				"cluster-name": newMgmtCluster(
+					"cluster-name",
+					map[string]string{
+						"cluster-group": "cluster-group-name",
+					},
+					apimgmtv3.ClusterSpec{Internal: false},
+				),
+			}),
+			1,
+		},
+		{
+			"local-cluster-has-cg-has-label",
+			&provv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "local-cluster",
+					Namespace: "fleet-local",
+				},
+				Spec: provv1.ClusterSpec{},
+			},
+			provv1.ClusterStatus{
+				ClusterName:      "local-cluster",
+				ClientSecretName: "local-kubeconfig",
+			},
+			newClusterCache(map[string]*apimgmtv3.Cluster{
+				"local-cluster": newMgmtCluster(
+					"local-cluster",
+					map[string]string{
+						"cluster-group": "default",
+					},
+					apimgmtv3.ClusterSpec{Internal: true},
+				),
+			}),
+			2,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h.clustersCache = tt.clustersCache
+			objs, _, err := h.createCluster(tt.cluster, tt.status)
+
+			if objs == nil {
+				t.Errorf("Expected non-nil objs: %v", err)
+			}
+
+			if err != nil {
+				t.Errorf("Expected nil err")
+			}
+
+			if len(objs) != tt.expectedLen {
+				t.Errorf("Expected %d objects, got %d", tt.expectedLen, len(objs))
+			}
+		})
+	}
+
+}
+
+func newMgmtCluster(name string, labels map[string]string, spec apimgmtv3.ClusterSpec) *apimgmtv3.Cluster {
 	spec.DisplayName = name
-	mgmtCluster := &mgmt.Cluster{
+	mgmtCluster := &apimgmtv3.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   name,
 			Labels: labels,
 		},
 		Spec: spec,
 	}
-	mgmt.ClusterConditionReady.SetStatus(mgmtCluster, "True")
+	apimgmtv3.ClusterConditionReady.SetStatus(mgmtCluster, "True")
 	return mgmtCluster
 
 }
 
 // implements v3.ClusterCache
-func newClusterCache(clusters map[string]*mgmt.Cluster) mgmtv3.ClusterCache {
+func newClusterCache(clusters map[string]*apimgmtv3.Cluster) v3.ClusterCache {
 	return &fakeClusterCache{
 		clusters: clusters,
 	}
 }
 
 type fakeClusterCache struct {
-	clusters map[string]*mgmt.Cluster
+	clusters map[string]*apimgmtv3.Cluster
 }
 
-func (f *fakeClusterCache) Get(name string) (*mgmt.Cluster, error) {
+func (f *fakeClusterCache) Get(name string) (*apimgmtv3.Cluster, error) {
 	if c, ok := f.clusters[name]; ok {
 		return c, nil
 	}
 	return nil, errNotFound
 }
-func (f *fakeClusterCache) List(selector labels.Selector) ([]*mgmt.Cluster, error) {
+func (f *fakeClusterCache) List(selector labels.Selector) ([]*apimgmtv3.Cluster, error) {
 	return nil, errNotImplemented
 }
-func (f *fakeClusterCache) AddIndexer(indexName string, indexer mgmtv3.ClusterIndexer) {}
-func (f *fakeClusterCache) GetByIndex(indexName, key string) ([]*mgmt.Cluster, error) {
+func (f *fakeClusterCache) AddIndexer(indexName string, indexer v3.ClusterIndexer) {}
+func (f *fakeClusterCache) GetByIndex(indexName, key string) ([]*apimgmtv3.Cluster, error) {
 	return nil, errNotImplemented
 }

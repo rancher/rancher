@@ -98,6 +98,7 @@ func main() {
 				Types: []interface{}{
 					fleet.Bundle{},
 					fleet.Cluster{},
+					fleet.ClusterGroup{},
 				},
 			},
 			"rke.cattle.io": {
