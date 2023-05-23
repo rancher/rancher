@@ -250,9 +250,15 @@ func (m *Manager) install(namespace, name, minVersion, exactVersion string, valu
 		v = exactVersion
 		isExact = true
 	}
+	// This method from the Helm fork doesn't return an error when given a non-existent version, unfortunately.
+	// It instead returns the latest version in the index.
 	chart, err := index.Get(name, v)
 	if err != nil {
 		return err
+	}
+	// Because of the behavior of `index.Get`, we need this check.
+	if exactVersion != "" && chart.Version != exactVersion {
+		return fmt.Errorf("specified exact version %s doesn't exist in the index", exactVersion)
 	}
 
 	installed, desiredVersion, desiredValue, err := m.isInstalled(namespace, name, minVersion, chart.Version, isExact, values)
