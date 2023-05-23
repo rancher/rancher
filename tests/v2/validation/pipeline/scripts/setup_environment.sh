@@ -7,8 +7,8 @@ sh tests/v2/validation/pipeline/scripts/build_corral_packages.sh
 
 echo | corral config
 
-echo "build registries images"
-sh tests/v2/validation/pipeline/scripts/build_registries_images.sh
+echo "build rancherHA images"
+sh tests/v2/validation/pipeline/scripts/build_rancherha_images.sh
 
 corral list
 

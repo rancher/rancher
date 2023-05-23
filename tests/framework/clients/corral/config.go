@@ -20,9 +20,10 @@ type CorralConfigs struct {
 // CorralPackages is a struct that has the path to the packages
 type CorralPackages struct {
 	CorralPackageImages map[string]string `json:"corralPackageImages" yaml:"corralPackageImages"`
-	Cleanup             bool              `json:"cleanup" yaml:"cleanup" default:"true"`
-	Debug               bool              `json:"debug" yaml:"debug" default:"false"`
-	CustomRepo          string            `json:"customRepo" yaml:"customRepo"`
+	HasCleanup          bool              `json:"hasCleanup" yaml:"hasCleanup" default:"true"`
+	HasDebug            bool              `json:"hasDebug" yaml:"hasDebug" default:"false"`
+	HasCustomRepo       string            `json:"hasCustomRepo" yaml:"hasCustomRepo"`
+	HasSetCorralSSHKeys bool              `json:"hasSetCorralSSHKeys" yaml:"hasSetCorralSSHKeys" default:"false"`
 }
 
 // CorralPackagesConfig is a function that reads in the corral package object from the config file
