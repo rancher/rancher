@@ -43,7 +43,6 @@ const (
 	LevelRequestResponse
 
 	generateKubeconfigURI = "action=generateKubeconfig"
-	agentConnectURI       = "/v3/agent/connect"
 )
 
 var (
@@ -292,12 +291,9 @@ func (a *auditLog) redactSensitiveData(requestURI string, body []byte) []byte {
 		changed = a.redactSecretsData(requestURI, m)
 	}
 
-	// Redact kubeconfig
 	if strings.Contains(requestURI, generateKubeconfigURI) {
+		// generateKubeconfig cannot rely on regex because it uses config key instead of [kK]ube[cC]onfig
 		changed = redact(m, "config")
-	}
-	if strings.Contains(requestURI, agentConnectURI) {
-		changed = redact(m, "kubeConfig")
 	}
 
 	// Redact values for data considered sensitive: passwords, tokens, etc.
