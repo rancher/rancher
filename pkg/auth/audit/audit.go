@@ -41,6 +41,9 @@ const (
 	LevelRequest
 	// LevelRequestResponse log metadata request body and response header and body.
 	LevelRequestResponse
+
+	generateKubeconfigURI = "action=generateKubeconfig"
+	agentConnectURI       = "/v3/agent/connect"
 )
 
 var (
@@ -290,8 +293,11 @@ func (a *auditLog) redactSensitiveData(requestURI string, body []byte) []byte {
 	}
 
 	// Redact kubeconfig
-	if strings.Contains(requestURI, "action=generateKubeconfig") {
-		changed = redactKubeconfig(m)
+	if strings.Contains(requestURI, generateKubeconfigURI) {
+		changed = redact(m, "config")
+	}
+	if strings.Contains(requestURI, agentConnectURI) {
+		changed = redact(m, "kubeConfig")
 	}
 
 	// Redact values for data considered sensitive: passwords, tokens, etc.
@@ -306,11 +312,11 @@ func (a *auditLog) redactSensitiveData(requestURI string, body []byte) []byte {
 	return newBody
 }
 
-func redactKubeconfig(body map[string]interface{}) bool {
-	if _, ok := body["config"]; !ok {
+func redact(body map[string]interface{}, key string) bool {
+	if _, ok := body[key]; !ok {
 		return false
 	}
-	body["config"] = redacted
+	body[key] = redacted
 	return true
 }
 
