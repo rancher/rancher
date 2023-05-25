@@ -3,6 +3,7 @@ package steve
 import (
 	"context"
 
+	"github.com/rancher/rancher/pkg/api/steve/apiui"
 	"github.com/rancher/rancher/pkg/api/steve/catalog"
 	"github.com/rancher/rancher/pkg/api/steve/clusters"
 	"github.com/rancher/rancher/pkg/api/steve/disallow"
@@ -23,6 +24,7 @@ func Setup(ctx context.Context, server *steve.Server, config *wrangler.Context) 
 	navlinks.Register(ctx, server)
 	settings.Register(server)
 	disallow.Register(server)
+	apiui.Register(server)
 	return catalog.Register(ctx,
 		server,
 		config.HelmOperations,
