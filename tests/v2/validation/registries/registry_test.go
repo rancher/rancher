@@ -1,14 +1,19 @@
 package registries
 
 import (
+	"context"
+	"fmt"
 	"testing"
 
+	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/tests/framework/clients/corral"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
+	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
 	"github.com/rancher/rancher/tests/framework/extensions/registries"
 	nodepools "github.com/rancher/rancher/tests/framework/extensions/rke1/nodepools"
+	"github.com/rancher/rancher/tests/framework/extensions/secrets"
 	"github.com/rancher/rancher/tests/framework/extensions/workloads/pods"
 	"github.com/rancher/rancher/tests/framework/pkg/config"
 	"github.com/rancher/rancher/tests/framework/pkg/environmentflag"
@@ -17,11 +22,13 @@ import (
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
 	provisioning "github.com/rancher/rancher/tests/v2/validation/provisioning"
 	"github.com/rancher/rancher/tests/v2/validation/provisioning/rke1"
+	rke2k3s "github.com/rancher/rancher/tests/v2/validation/provisioning/rke2"
 	"github.com/rancher/rancher/tests/v2prov/defaults"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -29,6 +36,8 @@ const (
 	corralRancherName      = "rancherha"
 	corralAuthDisabledName = "registryauthdisabled"
 	corralAuthEnabledName  = "registryauthenabled"
+	systemRegistry         = "system-default-registry"
+	namespace              = "fleet-default"
 )
 
 type RegistryTestSuite struct {
@@ -43,6 +52,15 @@ type RegistryTestSuite struct {
 	localClusterGlobalRegistryHost string
 	rancherUsesRegistry            bool
 	advancedOptions                provisioning.AdvancedOptions
+	cnis                           []string
+	providers                      []string
+	k3sKubernetesVersions          []string
+	rkeKubernetesVersions          []string
+	rke2KubernetesVersions         []string
+	privateRegistriesAuth          []management.PrivateRegistry
+	privateRegistriesNoAuth        []management.PrivateRegistry
+	rkeNodesAndRoles               []nodepools.NodeRoles
+	k3sRke2NodesAndRoles           []machinepools.NodeRoles
 }
 
 func (rt *RegistryTestSuite) TearDownSuite() {
@@ -110,10 +128,14 @@ func (rt *RegistryTestSuite) SetupSuite() {
 
 	clustersConfig := new(provisioning.Config)
 	config.LoadConfig(provisioning.ConfigurationFileKey, clustersConfig)
-	kubernetesVersions := clustersConfig.RKE1KubernetesVersions
-	cnis := clustersConfig.CNIs
-	nodesAndRoles := clustersConfig.NodesAndRolesRKE1
-	providers := clustersConfig.Providers
+	rt.rkeKubernetesVersions = clustersConfig.RKE1KubernetesVersions
+	rt.k3sKubernetesVersions = clustersConfig.K3SKubernetesVersions
+	rt.rke2KubernetesVersions = clustersConfig.RKE2KubernetesVersions
+
+	rt.cnis = clustersConfig.CNIs
+	rt.rkeNodesAndRoles = clustersConfig.NodesAndRolesRKE1
+	rt.k3sRke2NodesAndRoles = clustersConfig.NodesAndRoles
+	rt.providers = clustersConfig.Providers
 	rt.advancedOptions = clustersConfig.AdvancedOptions
 
 	rt.rancherUsesRegistry = false
@@ -130,7 +152,15 @@ func (rt *RegistryTestSuite) SetupSuite() {
 		logrus.Infof("Rancher was built using corral: %t", corralExist)
 		logrus.Infof("Is Rancher using a global registry: %t", rt.rancherUsesRegistry)
 	} else {
-		if useRegistries {
+		var isSystemRegistrySet bool
+		registry, err := client.Management.Setting.ByID(systemRegistry)
+		require.NoError(rt.T(), err)
+
+		if registry.Value != "" {
+			isSystemRegistrySet = true
+		}
+
+		if useRegistries && isSystemRegistrySet {
 			globalRegistryFqdn = registriesConfig.ExistingNoAuthRegistryURL
 			rt.rancherUsesRegistry = true
 			logrus.Infof("Rancher was built using corral: %t", corralExist)
@@ -143,49 +173,94 @@ func (rt *RegistryTestSuite) SetupSuite() {
 		}
 	}
 
-	var privateRegistriesNoAuth []management.PrivateRegistry
 	privateRegistry := management.PrivateRegistry{}
 	privateRegistry.URL = registryDisabledFqdn
 	privateRegistry.IsDefault = true
 	privateRegistry.Password = ""
 	privateRegistry.User = ""
-	privateRegistriesNoAuth = append(privateRegistriesNoAuth, privateRegistry)
+	rt.privateRegistriesNoAuth = append(rt.privateRegistriesNoAuth, privateRegistry)
 
-	var privateRegistriesAuth []management.PrivateRegistry
 	privateRegistry = management.PrivateRegistry{}
 	privateRegistry.URL = registryEnabledFqdn
 	privateRegistry.IsDefault = true
 	privateRegistry.Password = registryEnabledPassword
 	privateRegistry.User = registryEnabledUsername
-	privateRegistriesAuth = append(privateRegistriesAuth, privateRegistry)
-
-	subSession := session.NewSession()
-	defer subSession.Cleanup()
-
-	subClient, err := client.WithSession(subSession)
-	require.NoError(rt.T(), err)
-
-	provider := rke1.CreateProvider(providers[0])
-	clusterNameNoAuth, err := rt.testProvisionRKE1Cluster(subClient, provider, nodesAndRoles, kubernetesVersions[0], cnis[0], privateRegistriesNoAuth, rt.advancedOptions)
-	require.NoError(rt.T(), err)
-	clusterNameAuth, err := rt.testProvisionRKE1Cluster(subClient, provider, nodesAndRoles, kubernetesVersions[0], cnis[0], privateRegistriesAuth, rt.advancedOptions)
-	require.NoError(rt.T(), err)
-
-	clusterID, err := clusters.GetClusterIDByName(client, clusterNameNoAuth)
-	require.NoError(rt.T(), err)
-
-	rt.clusterNoAuthID = clusterID
-	rt.clusterNoAuthRegistryHost = registryDisabledFqdn
-
-	clusterID, err = clusters.GetClusterIDByName(client, clusterNameAuth)
-	require.NoError(rt.T(), err)
-
-	rt.clusterAuthID = clusterID
-	rt.clusterAuthRegistryHost = registryEnabledFqdn
+	rt.privateRegistriesAuth = append(rt.privateRegistriesAuth, privateRegistry)
 
 	rt.clusterLocalID = "local"
 	rt.localClusterGlobalRegistryHost = globalRegistryFqdn
+}
 
+func (rt *RegistryTestSuite) TestRegistriesRKE() {
+	subSession := session.NewSession()
+	defer subSession.Cleanup()
+
+	subClient, err := rt.client.WithSession(subSession)
+	require.NoError(rt.T(), err)
+
+	provider := rke1.CreateProvider(rt.providers[0])
+	clusterNameNoAuth, err := rt.testProvisionRKE1Cluster(subClient, provider, rt.rkeNodesAndRoles, rt.rkeKubernetesVersions[0], rt.cnis[0], rt.privateRegistriesNoAuth, rt.advancedOptions)
+	require.NoError(rt.T(), err)
+	clusterNameAuth, err := rt.testProvisionRKE1Cluster(subClient, provider, rt.rkeNodesAndRoles, rt.rkeKubernetesVersions[0], rt.cnis[0], rt.privateRegistriesAuth, rt.advancedOptions)
+	require.NoError(rt.T(), err)
+
+	clusterID, err := clusters.GetClusterIDByName(rt.client, clusterNameNoAuth)
+	require.NoError(rt.T(), err)
+
+	rt.clusterNoAuthID = clusterID
+
+	clusterID, err = clusters.GetClusterIDByName(rt.client, clusterNameAuth)
+	require.NoError(rt.T(), err)
+
+	rt.clusterAuthID = clusterID
+	rt.testStatusAllPods()
+	rt.testRegistryAllPods()
+}
+
+func (rt *RegistryTestSuite) TestRegistriesK3S() {
+	subSession := session.NewSession()
+	defer subSession.Cleanup()
+
+	subClient, err := rt.client.WithSession(subSession)
+	require.NoError(rt.T(), err)
+	rt.testAndProvisionRKE2K3SCluster(subClient, rt.k3sKubernetesVersions[0])
+
+	rt.testStatusAllPods()
+	rt.testRegistryAllPods()
+}
+
+func (rt *RegistryTestSuite) TestRegistriesRKE2() {
+	subSession := session.NewSession()
+	defer subSession.Cleanup()
+
+	subClient, err := rt.client.WithSession(subSession)
+	require.NoError(rt.T(), err)
+	rt.testAndProvisionRKE2K3SCluster(subClient, rt.rke2KubernetesVersions[0])
+
+	rt.testStatusAllPods()
+	rt.testRegistryAllPods()
+}
+
+func (rt *RegistryTestSuite) testAndProvisionRKE2K3SCluster(client *rancher.Client, kubernetesVersion string) {
+	rt.clusterAuthRegistryHost = rt.privateRegistriesAuth[0].URL
+	registryEnabledUsername := rt.privateRegistriesAuth[0].User
+	registryEnabledPassword := rt.privateRegistriesAuth[0].Password
+
+	rke2k3sProvider := rke2k3s.CreateProvider(rt.providers[0])
+	rke2k3sClusterName := rt.testProvisionRKE2K3SCluster(client, rke2k3sProvider, rt.k3sRke2NodesAndRoles, kubernetesVersion, "", rt.clusterAuthRegistryHost, registryEnabledUsername, registryEnabledPassword, rt.advancedOptions)
+	clusterID, err := clusters.GetClusterIDByName(rt.client, rke2k3sClusterName)
+	require.NoError(rt.T(), err)
+	rt.clusterAuthID = clusterID
+
+	rt.clusterNoAuthRegistryHost = rt.privateRegistriesNoAuth[0].URL
+
+	rke2k3sClusterName = rt.testProvisionRKE2K3SCluster(client, rke2k3sProvider, rt.k3sRke2NodesAndRoles, kubernetesVersion, "", rt.clusterNoAuthRegistryHost, "", "", rt.advancedOptions)
+	clusterID, err = clusters.GetClusterIDByName(rt.client, rke2k3sClusterName)
+	require.NoError(rt.T(), err)
+	rt.clusterNoAuthID = clusterID
+
+	rt.testStatusAllPods()
+	rt.testRegistryAllPods()
 }
 
 func (rt *RegistryTestSuite) testProvisionRKE1Cluster(client *rancher.Client, provider rke1.Provider, nodesAndRoles []nodepools.NodeRoles, kubeVersion, cni string, privateRegistries []management.PrivateRegistry, advancedOptions provisioning.AdvancedOptions) (string, error) {
@@ -222,7 +297,105 @@ func (rt *RegistryTestSuite) testProvisionRKE1Cluster(client *rancher.Client, pr
 	return clusterName, nil
 }
 
-func (rt *RegistryTestSuite) TestRegistryAllPods() {
+func (rt *RegistryTestSuite) testProvisionRKE2K3SCluster(client *rancher.Client, provider rke2k3s.Provider, nodesAndRoles []machinepools.NodeRoles, kubeVersion string, psact string, registryHostname string, registryUsername string, registryPassword string, advancedOptions provisioning.AdvancedOptions) string {
+	cloudCredential, err := provider.CloudCredFunc(client)
+	require.NoError(rt.T(), err)
+
+	clusterName := namegen.AppendRandomString(provider.Name.String())
+	generatedPoolName := fmt.Sprintf("nc-%s-pool1-", clusterName)
+	machinePoolConfig := provider.MachinePoolFunc(generatedPoolName, namespace)
+
+	machineConfigResp, err := client.Steve.SteveType(provider.MachineConfigPoolResourceSteveType).Create(machinePoolConfig)
+	require.NoError(rt.T(), err)
+
+	machinePools := machinepools.RKEMachinePoolSetup(nodesAndRoles, machineConfigResp)
+	if registryUsername != "" && registryPassword != "" {
+		steveClient, err := client.Steve.ProxyDownstream("local")
+		require.NoError(rt.T(), err)
+		secretName := fmt.Sprintf("priv-reg-sec-%s", clusterName)
+		secretTemplate := secrets.NewSecretTemplate(secretName, namespace, map[string][]byte{
+			"password": []byte(registryPassword),
+			"username": []byte(registryUsername),
+		},
+			v1.SecretTypeBasicAuth,
+		)
+
+		registrySecret, err := steveClient.SteveType(secrets.SecretSteveType).Create(secretTemplate)
+		require.NoError(rt.T(), err)
+
+		var machineSelectorConfig []rkev1.RKESystemConfig
+
+		if len(registryHostname) > 0 {
+			machineSelectorConfig = []rkev1.RKESystemConfig{
+				{
+					Config: rkev1.GenericMap{
+						Data: map[string]interface{}{
+							"protect-kernel-defaults": false,
+							"system-default-registry": registryHostname,
+						},
+					},
+				},
+			}
+		}
+
+		var registries rkev1.Registry
+
+		if registrySecret != nil {
+
+			registries = rkev1.Registry{
+				Configs: map[string]rkev1.RegistryConfig{
+					registryHostname: {
+						AuthConfigSecretName: registrySecret.Name,
+					},
+				},
+			}
+
+		}
+
+		cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, namespace, "", cloudCredential.ID, kubeVersion, psact, machinePools, advancedOptions)
+		cluster.Spec.RKEConfig.RKEClusterSpecCommon.MachineSelectorConfig = machineSelectorConfig
+		cluster.Spec.RKEConfig.RKEClusterSpecCommon.Registries = &registries
+		_, err = clusters.CreateK3SRKE2Cluster(client, cluster)
+		require.NoError(rt.T(), err)
+	} else {
+		cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, namespace, "", cloudCredential.ID, kubeVersion, psact, machinePools, advancedOptions)
+		var machineSelectorConfig []rkev1.RKESystemConfig
+		if len(registryHostname) > 0 {
+			machineSelectorConfig = []rkev1.RKESystemConfig{
+				{
+					Config: rkev1.GenericMap{
+						Data: map[string]interface{}{
+							"protect-kernel-defaults": false,
+							"system-default-registry": registryHostname,
+						},
+					},
+				},
+			}
+		}
+		cluster.Spec.RKEConfig.RKEClusterSpecCommon.MachineSelectorConfig = machineSelectorConfig
+		_, err = clusters.CreateK3SRKE2Cluster(client, cluster)
+		require.NoError(rt.T(), err)
+	}
+
+	adminClient, err := rancher.NewClient(client.RancherConfig.AdminToken, client.Session)
+	require.NoError(rt.T(), err)
+	kubeProvisioningClient, err := adminClient.GetKubeAPIProvisioningClient()
+	require.NoError(rt.T(), err)
+
+	result, err := kubeProvisioningClient.Clusters(namespace).Watch(context.TODO(), metav1.ListOptions{
+		FieldSelector:  "metadata.name=" + clusterName,
+		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+	})
+	require.NoError(rt.T(), err)
+
+	checkFunc := clusters.IsProvisioningClusterReady
+	err = wait.WatchWait(result, checkFunc)
+	assert.NoError(rt.T(), err)
+
+	return clusterName
+}
+
+func (rt *RegistryTestSuite) testRegistryAllPods() {
 
 	if rt.rancherUsesRegistry {
 		havePrefix, err := registries.CheckAllClusterPodsForRegistryPrefix(rt.client, rt.clusterLocalID, rt.localClusterGlobalRegistryHost)
@@ -237,10 +410,9 @@ func (rt *RegistryTestSuite) TestRegistryAllPods() {
 	havePrefix, err = registries.CheckAllClusterPodsForRegistryPrefix(rt.client, rt.clusterAuthID, rt.clusterAuthRegistryHost)
 	require.NoError(rt.T(), err)
 	assert.True(rt.T(), havePrefix)
-
 }
 
-func (rt *RegistryTestSuite) TestStatusAllPods() {
+func (rt *RegistryTestSuite) testStatusAllPods() {
 	podResults, podErrors := pods.StatusPods(rt.client, rt.clusterLocalID)
 	assert.NotEmpty(rt.T(), podResults)
 	assert.Empty(rt.T(), podErrors)
@@ -252,7 +424,6 @@ func (rt *RegistryTestSuite) TestStatusAllPods() {
 	podResults, podErrors = pods.StatusPods(rt.client, rt.clusterAuthID)
 	assert.NotEmpty(rt.T(), podResults)
 	assert.Empty(rt.T(), podErrors)
-
 }
 
 func TestRegistryTestSuite(t *testing.T) {
