@@ -6,13 +6,13 @@ replace k8s.io/client-go => github.com/rancher/client-go v1.25.4-rancher1
 
 require (
 	github.com/rancher/aks-operator v1.1.1-rc2
-	github.com/rancher/eks-operator v1.2.1-rc3
+	github.com/rancher/eks-operator v1.2.1
 	github.com/rancher/fleet/pkg/apis v0.0.0-20230516111835-f52a0e7d38af
 	github.com/rancher/gke-operator v1.1.5
 	github.com/rancher/norman v0.0.0-20230328153514-ae12f166495a
 	github.com/rancher/rke v1.4.6-rc3
 	github.com/rancher/wrangler v1.1.1
-	github.com/sirupsen/logrus v1.9.0
+	github.com/sirupsen/logrus v1.9.2
 	k8s.io/api v0.25.4
 	k8s.io/apimachinery v0.25.4
 	sigs.k8s.io/cluster-api v1.2.12
@@ -27,7 +27,7 @@ require (
 	github.com/evanphx/json-patch v4.12.0+incompatible // indirect
 	github.com/fsnotify/fsnotify v1.5.4 // indirect
 	github.com/ghodss/yaml v1.0.0 // indirect
-	github.com/go-logr/logr v1.2.3 // indirect
+	github.com/go-logr/logr v1.2.4 // indirect
 	github.com/go-openapi/jsonpointer v0.19.6 // indirect
 	github.com/go-openapi/jsonreference v0.20.1 // indirect
 	github.com/go-openapi/swag v0.22.3 // indirect
@@ -53,10 +53,10 @@ require (
 	github.com/prometheus/procfs v0.8.0 // indirect
 	github.com/rancher/lasso v0.0.0-20221227210133-6ea88ca2fbcc // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
-	golang.org/x/net v0.9.0 // indirect
+	golang.org/x/net v0.10.0 // indirect
 	golang.org/x/oauth2 v0.0.0-20220608161450-d0670ef3b1eb // indirect
-	golang.org/x/sys v0.7.0 // indirect
-	golang.org/x/term v0.7.0 // indirect
+	golang.org/x/sys v0.8.0 // indirect
+	golang.org/x/term v0.8.0 // indirect
 	golang.org/x/text v0.9.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.2.0 // indirect
