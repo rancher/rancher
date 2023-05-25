@@ -187,6 +187,12 @@ func (a *AuditTest) TestRedactSensitiveData() {
 			want:  []byte(fmt.Sprintf(`{"baseType":"generateKubeConfigOutput","config":"%s","type":"generateKubeConfigOutput"}`, redacted)),
 			uri:   `/v3/clusters/c-xxxxx?action=generateKubeconfig`,
 		},
+		{
+			name:  "With kubeconfig from generateKubeconfig action",
+			input: []byte(`{"kubeConfig":"apiVersion: v1\nkind: Config\nclusters:\n- name: \"somecluster-rke\"\n  cluster:\n    server: \"https://rancherurl.com/k8s/clusters/c-xxxxx\"\n- name: \"somecluster-rke-somecluster-rke1\"\n  cluster:\n    server: \"https://34.211.205.110:6443\"\n    certificate-authority-data: \"somecadata\"\n\nusers:\n- name: \"somecluster-rke\"\n  user:\n    token: \"kubeconfig-user-12345:sometoken\"\n\n\ncontexts:\n- name: \"somecluster-rke\"\n  context:\n    user: \"somecluster-rke\"\n    cluster: \"somecluster-rke\"\n- name: \"somecluster-rke-somecluster-rke1\"\n  context:\n    user: \"somecluster-rke\"\n    cluster: \"somecluster-rke-somecluster-rke1\"\n\ncurrent-context: \"somecluster-rke\"\n","namespace":"testns","secretName":"secret-name"}`),
+			want:  []byte(fmt.Sprintf(`{"kubeConfig":"%s","namespace":"testns","secretName":"secret-name"}`, redacted)),
+			uri:   `/v3/agent/connect`,
+		},
 	}
 	for i := range tests {
 		test := tests[i]
