@@ -49,7 +49,7 @@ func constructKeyRedactRegex() (*regexp.Regexp, error) {
 			}
 		}
 	}
-	s.WriteString(`[pP]assword|[tT]oken)`)
+	s.WriteString(`[pP]assword|[tT]oken|[kK]ube[cC]onfig)`)
 
 	return regexp.Compile(s.String())
 }
