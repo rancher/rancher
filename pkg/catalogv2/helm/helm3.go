@@ -1,3 +1,7 @@
+/*
+Package helm implements ways of extracting information from helm2 and helm3 data and making a k8s releaseSpec.
+It also implements a partition.Partition to handle the resources needed by the release.
+*/
 package helm
 
 import (
