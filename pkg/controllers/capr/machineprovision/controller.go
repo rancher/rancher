@@ -365,7 +365,7 @@ func (h *handler) OnRemove(key string, obj runtime.Object) (runtime.Object, erro
 	}
 
 	// infrastructure deletion finished
-	if cond := getCondition(infra.data, deleteJobConditionType); cond != nil && cond.Status() == "True" {
+	if cond := getCondition(infra.data, deleteJobConditionType); cond != nil && cond.Status() != "Unknown" {
 		job, err := h.getJobFromInfraMachine(infra)
 		if apierrors.IsNotFound(err) {
 			// If the deletion job condition has been set on the infrastructure object and the deletion job has been removed,
@@ -384,7 +384,9 @@ func (h *handler) OnRemove(key string, obj runtime.Object) (runtime.Object, erro
 			// passed here, it will delete all objects it finds.
 			return obj, h.apply.WithOwner(obj).ApplyObjects()
 		}
-		return obj, generic.ErrSkip
+		if cond.Status() == "True" {
+			return obj, generic.ErrSkip
+		}
 	}
 
 	clusterName := infra.meta.GetLabels()[capi.ClusterLabelName]
