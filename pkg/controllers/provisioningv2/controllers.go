@@ -44,11 +44,11 @@ func Register(ctx context.Context, clients *wrangler.Context) error {
 		if features.MCM.Enabled() {
 			dynamicschema.Register(ctx, clients)
 			machineprovision.Register(ctx, clients, kubeconfigManager)
+			secret.Register(ctx, clients)
 		}
 		rkecluster.Register(ctx, clients)
 		provisioningcluster.Register(ctx, clients)
 		provisioninglog.Register(ctx, clients)
-		secret.Register(ctx, clients)
 		bootstrap.Register(ctx, clients)
 		machinenodelookup.Register(ctx, clients, kubeconfigManager)
 		planner.Register(ctx, clients, rkePlanner)
