@@ -3,8 +3,31 @@
 # See README.md for details.
 additionalTrustedCAs: false
 
-antiAffinity: preferred
-topologyKey: kubernetes.io/hostname
+# Affinity rules for scheduling the pod. 
+# If an explicit label selector is not provided 
+# for pod affinity or pod anti-affinity one will be created from the pod selector labels.
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - topologyKey: "kubernetes.io/hostname"
+        weight: 100
+        #podAffinityTerm: {}
+    requiredDuringSchedulingIgnoredDuringExecution:
+      - topologyKey: "kubernetes.io/hostname"
+
+# Topology spread constraints.
+# If an explicit label selector is not provided one will be created from the pod selector labels.
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: ScheduleAnyway
+
+# Node selectors to schedule rancher on specific nodes
+nodeSelector:
+  kubernetes.io/os: linux
+
+# Tolerations to allow the pod to be scheduled to nodes with taints.
+tolerations: []
 
 # Audit Logs https://rancher.com/docs/rancher/v2.x/en/installation/api-auditing/
 # The audit log is piped to the console of the rancher-audit-log container in the rancher pod.
@@ -18,6 +41,9 @@ auditLog:
   maxAge: 1
   maxBackup: 1
   maxSize: 100
+
+  # Set pod resource requests/limits for Audit Logs sidecar.
+  resources: {}
 
   # Image for collecting rancher audit logs.
   # Important: update pkg/image/export/resolve.go when this default image is changed, so that it's reflected accordingly in rancher-images.txt generated for air-gapped setups.
@@ -181,3 +207,8 @@ global:
       # will default to true on 1.24 and below, and false for 1.25 and above
       # can be changed manually to true or false to bypass version checks and force that option
       enabled: "" 
+
+# Pod Disruption Budget configuration
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1

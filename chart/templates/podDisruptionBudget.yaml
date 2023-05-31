@@ -1,0 +1,14 @@
+{{- if .Values.podDisruptionBudget.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ template "rancher.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+{{ include "rancher.labels" . | indent 4 }}
+spec:
+  minAvailable: {{ .Values.podDisruptionBudget.minAvailable }}
+  selector:
+    matchLabels:
+    {{- include "rancher.selectorLabels" . | nindent 6 }}
+{{- end }}

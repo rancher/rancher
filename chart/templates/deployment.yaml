@@ -14,7 +14,7 @@ spec:
 {{- end  }}
   selector:
     matchLabels:
-      app: {{ template "rancher.fullname" . }}
+      {{- include "rancher.selectorLabels" . | nindent 6 }}
   strategy:
     rollingUpdate:
       maxSurge: 1
@@ -27,8 +27,9 @@ spec:
   template:
     metadata:
       labels:
-        app: {{ template "rancher.fullname" . }}
-        release: {{ .Release.Name }}
+        {{- include "rancher.selectorLabels" . | nindent 8 }}
+        #app: {{ template "rancher.fullname" . }}
+        #release: {{ .Release.Name }}
     spec:
       priorityClassName: {{ .Values.priorityClassName }}
       serviceAccountName: {{ template "rancher.fullname" . }}
@@ -36,33 +37,21 @@ spec:
       imagePullSecrets:
 {{ toYaml .Values.imagePullSecrets | indent 6 }}
 {{- end }}
+{{- with .Values.affinity }}
+{{- $_ := include "rancher.patchAffinity" $ }}
       affinity:
-        podAntiAffinity:
-{{- if eq .Values.antiAffinity "required" }}
-          requiredDuringSchedulingIgnoredDuringExecution:
-          - labelSelector:
-              matchExpressions:
-              - key: app
-                operator: In
-                values:
-                - {{ template "rancher.fullname" . }}
-            topologyKey: {{ .Values.topologyKey | default "kubernetes.io/hostname" }}
-{{- else }}
-          preferredDuringSchedulingIgnoredDuringExecution:
-          - weight: 100
-            podAffinityTerm:
-              labelSelector:
-                matchExpressions:
-                - key: app
-                  operator: In
-                  values:
-                  - {{ template "rancher.fullname" . }}
-              topologyKey: {{ .Values.topologyKey | default "kubernetes.io/hostname" }}
+        {{- toYaml . | nindent 8 }}
 {{- end }}
-        nodeAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            nodeSelectorTerms: {{ include "linux-node-selector-terms" . | nindent 14 }}
-      tolerations: {{ include "linux-node-tolerations" . | nindent 8 }}
+{{- with .Values.topologySpreadConstraints }}
+{{- $_ := include "rancher.patchTopologySpreadConstraints" $ }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+{{- end }}
+      tolerations: {{ include "node-tolerations" . | nindent 8 }}
+{{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+{{- end }}
       containers:
       - image: {{ .Values.rancherImage }}:{{ default .Chart.AppVersion .Values.rancherImageTag }}
         imagePullPolicy: {{ default "IfNotPresent" .Values.rancherImagePullPolicy }}
@@ -212,6 +201,8 @@ spec:
         name: {{ template "rancher.name" . }}-audit-log
         command: ["tail"]
         args: ["-F", "/var/log/auditlog/rancher-api-audit.log"]
+        resources:
+{{ toYaml .Values.auditLog.resources | indent 10 }}
         volumeMounts:
         - mountPath: /var/log/auditlog
           name: audit-log
