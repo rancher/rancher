@@ -54,7 +54,7 @@ ENV CATTLE_SYSTEM_UPGRADE_CONTROLLER_CHART_VERSION 102.0.0+up0.4.0
 
 # System charts minimal version
 ENV CATTLE_FLEET_MIN_VERSION=102.0.0+up0.6.0
-ENV CATTLE_RANCHER_WEBHOOK_MIN_VERSION=2.0.3+up0.3.3
+ENV CATTLE_RANCHER_WEBHOOK_MIN_VERSION=2.0.4+up0.3.4
 ENV CATTLE_CSP_ADAPTER_MIN_VERSION=2.0.1
 
 RUN mkdir -p /var/lib/rancher-data/local-catalogs/system-library && \
@@ -159,8 +159,8 @@ RUN curl -sLf ${!TINI_URL} > /usr/bin/tini && \
     chmod +x /usr/bin/tini /usr/bin/telemetry && \
     mkdir -p /var/lib/rancher-data/driver-metadata
 
-ENV CATTLE_UI_VERSION 2.7.4-rc4
-ENV CATTLE_DASHBOARD_UI_VERSION v2.7.4-rc4
+ENV CATTLE_UI_VERSION 2.7.4
+ENV CATTLE_DASHBOARD_UI_VERSION v2.7.4
 ENV CATTLE_CLI_VERSION v2.7.0
 
 # Base UI brand used as a fallback env setting (not user facing) to indicate this is a non-prime install
