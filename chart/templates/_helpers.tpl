@@ -128,7 +128,6 @@ This works because Helm treats dictionaries as mutable objects and allows passin
 {{- end }}
 {{- if (hasKey ._podAffinity "preferredDuringSchedulingIgnoredDuringExecution") }}
 {{- range $weightedTerm := ._podAffinity.preferredDuringSchedulingIgnoredDuringExecution }}
-{{- $_ := set $weightedTerm "podAffinityTerm" (dict) }}
 {{- include "rancher.patchLabelSelector" (merge (dict "_target" $weightedTerm.podAffinityTerm) $) }}
 {{- end }}
 {{- end }}

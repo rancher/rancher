@@ -9,9 +9,9 @@ additionalTrustedCAs: false
 affinity:
   podAntiAffinity:
     preferredDuringSchedulingIgnoredDuringExecution:
-      - topologyKey: "kubernetes.io/hostname"
+      - podAffinityTerm:
+          topologyKey: "kubernetes.io/hostname"
         weight: 100
-        #podAffinityTerm: {}
     requiredDuringSchedulingIgnoredDuringExecution:
       - topologyKey: "kubernetes.io/hostname"
 
