@@ -34,7 +34,7 @@ var (
 				}
 			},
 			Enabled: func() bool {
-				return features.MCM.Enabled() || features.EmbeddedClusterAPI.Enabled()
+				return true
 			},
 		},
 		{
@@ -44,13 +44,19 @@ var (
 			RemoveNamespace:  true,
 		},
 	}
-	repoName = "rancher-charts"
 )
 
-func Register(ctx context.Context, wContext *wrangler.Context) error {
+const (
+	repoName         = "rancher-charts"
+	webhookChartName = "rancher-webhook"
+	webhookImage     = "rancher/rancher-webhook"
+)
+
+func Register(ctx context.Context, wContext *wrangler.Context, registryOverride string) error {
 	h := &handler{
-		manager:    wContext.SystemChartsManager,
-		namespaces: wContext.Core.Namespace(),
+		manager:          wContext.SystemChartsManager,
+		namespaces:       wContext.Core.Namespace(),
+		registryOverride: registryOverride,
 	}
 
 	wContext.Catalog.ClusterRepo().OnChange(ctx, "bootstrap-charts", h.onRepo)
@@ -63,9 +69,10 @@ func Register(ctx context.Context, wContext *wrangler.Context) error {
 }
 
 type handler struct {
-	manager    *system.Manager
-	namespaces corecontrollers.NamespaceController
-	once       sync.Once
+	manager          *system.Manager
+	namespaces       corecontrollers.NamespaceController
+	registryOverride string
+	once             sync.Once
 }
 
 func (h *handler) onRepo(key string, repo *catalog.ClusterRepo) (*catalog.ClusterRepo, error) {
@@ -77,6 +84,13 @@ func (h *handler) onRepo(key string, repo *catalog.ClusterRepo) (*catalog.Cluste
 		"cattle": map[string]interface{}{
 			"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
 		},
+	}
+	if h.registryOverride != "" {
+		// if we have a specific image override, don't set the system default registry
+		// don't need to check for type assert since we just created this above
+		registryMap := systemGlobalRegistry["cattle"].(map[string]interface{})
+		registryMap["systemDefaultRegistry"] = ""
+		systemGlobalRegistry["cattle"] = registryMap
 	}
 	for _, chartDef := range toInstall {
 		if chartDef.Enabled != nil && !chartDef.Enabled() {
@@ -98,12 +112,22 @@ func (h *handler) onRepo(key string, repo *catalog.ClusterRepo) (*catalog.Cluste
 		values := map[string]interface{}{
 			"global": systemGlobalRegistry,
 		}
+		var installImageOverride string
+		if h.registryOverride != "" {
+			imageSettings, ok := values["image"].(map[string]interface{})
+			if !ok {
+				imageSettings = map[string]interface{}{}
+			}
+			imageSettings["repository"] = h.registryOverride + "/" + webhookImage
+			values["image"] = imageSettings
+			installImageOverride = h.registryOverride + "/" + settings.ShellImage.Get()
+		}
 		if chartDef.Values != nil {
 			for k, v := range chartDef.Values() {
 				values[k] = v
 			}
 		}
-		if err := h.manager.Ensure(chartDef.ReleaseNamespace, chartDef.ChartName, chartDef.MinVersionSetting.Get(), values, false); err != nil {
+		if err := h.manager.Ensure(chartDef.ReleaseNamespace, chartDef.ChartName, chartDef.MinVersionSetting.Get(), values, false, installImageOverride); err != nil {
 			return repo, err
 		}
 	}
