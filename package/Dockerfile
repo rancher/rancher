@@ -17,7 +17,7 @@ ARG ARCH=amd64
 ARG ETCD_UNSUPPORTED_ARCH
 ARG IMAGE_REPO=rancher
 ARG SYSTEM_CHART_DEFAULT_BRANCH=release-v2.6
-ARG CHART_DEFAULT_BRANCH=dev-v2.6
+ARG CHART_DEFAULT_BRANCH=release-v2.6
 ARG PARTNER_CHART_DEFAULT_BRANCH=main
 ARG RKE2_CHART_DEFAULT_BRANCH=main
 # kontainer-driver-metadata branch to be set for specific branch other than dev/master, logic at rancher/rancher/pkg/settings/setting.go
@@ -55,7 +55,7 @@ ENV CATTLE_SYSTEM_UPGRADE_CONTROLLER_CHART_VERSION 100.0.3+up0.3.3
 
 # System charts minimal version
 ENV CATTLE_FLEET_MIN_VERSION=100.2.3+up0.5.3
-ENV CATTLE_RANCHER_WEBHOOK_MIN_VERSION=1.0.9+up0.2.10-rc2
+ENV CATTLE_RANCHER_WEBHOOK_MIN_VERSION=1.0.9+up0.2.10
 ENV CATTLE_CSP_ADAPTER_MIN_VERSION=1.0.1
 
 RUN mkdir -p /var/lib/rancher-data/local-catalogs/system-library && \
@@ -162,8 +162,8 @@ RUN curl -sLf ${!TINI_URL} > /usr/bin/tini && \
     chmod +x /usr/bin/tini /usr/bin/telemetry && \
     mkdir -p /var/lib/rancher-data/driver-metadata
 
-ENV CATTLE_UI_VERSION 2.6.13-rc4
-ENV CATTLE_DASHBOARD_UI_VERSION v2.6.13-rc4
+ENV CATTLE_UI_VERSION 2.6.13
+ENV CATTLE_DASHBOARD_UI_VERSION v2.6.13
 ENV CATTLE_CLI_VERSION v2.6.11
 
 # Please update the api-ui-version in pkg/settings/settings.go when updating the version here.
