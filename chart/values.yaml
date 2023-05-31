@@ -12,8 +12,8 @@ affinity:
       - podAffinityTerm:
           topologyKey: "kubernetes.io/hostname"
         weight: 100
-    requiredDuringSchedulingIgnoredDuringExecution:
-      - topologyKey: "kubernetes.io/hostname"
+    # requiredDuringSchedulingIgnoredDuringExecution:
+    #   - topologyKey: "kubernetes.io/hostname"
 
 # Topology spread constraints.
 # If an explicit label selector is not provided one will be created from the pod selector labels.
