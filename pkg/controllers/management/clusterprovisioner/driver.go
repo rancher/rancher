@@ -134,10 +134,9 @@ func (p *Provisioner) driverRestore(cluster *apimgmtv3.Cluster, spec apimgmtv3.C
 	}
 
 	newCluster, err := p.Clusters.Update(cluster)
-	if err != nil {
-		return "", "", "", err
+	if err == nil {
+		cluster = newCluster
 	}
-	cluster = newCluster
 
 	kontainerDriver, err := p.getKontainerDriver(spec)
 	if err != nil {
