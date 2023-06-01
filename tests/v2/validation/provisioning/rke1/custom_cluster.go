@@ -103,10 +103,6 @@ func TestProvisioningRKE1CustomCluster(t *testing.T, client *rancher.Client, ext
 	require.NoError(t, err)
 	assert.NotEmpty(t, clusterToken)
 
-	podResults, podErrors := pods.StatusPods(client, clusterResp.ID)
-	assert.NotEmpty(t, podResults)
-	assert.Empty(t, podErrors)
-
 	etcdVersion, err := matrix.CheckETCDVersion(client, nodes, rolesPerPool)
 	require.NoError(t, err)
 	assert.NotEmpty(t, etcdVersion)
@@ -118,4 +114,8 @@ func TestProvisioningRKE1CustomCluster(t *testing.T, client *rancher.Client, ext
 		_, err = psadeploy.CreateNginxDeployment(client, clusterName, psact)
 		require.NoError(t, err)
 	}
+
+	podResults, podErrors := pods.StatusPods(client, clusterResp.ID)
+	assert.NotEmpty(t, podResults)
+	assert.Empty(t, podErrors)
 }

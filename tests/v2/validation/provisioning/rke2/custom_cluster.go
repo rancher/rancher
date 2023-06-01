@@ -131,10 +131,6 @@ func TestProvisioningRKE2CustomCluster(t *testing.T, client *rancher.Client, ext
 	require.NoError(t, err)
 	assert.NotEmpty(t, clusterToken)
 
-	podResults, podErrors := pods.StatusPods(client, clusterIDName)
-	assert.NotEmpty(t, podResults)
-	assert.Empty(t, podErrors)
-
 	if hardened && kubeVersion <= string(provisioning.HardenedKubeVersion) {
 		err = hardening.HardeningNodes(client, hardened, nodes, rolesPerNode)
 		require.NoError(t, err)
@@ -156,4 +152,8 @@ func TestProvisioningRKE2CustomCluster(t *testing.T, client *rancher.Client, ext
 		_, err = psadeploy.CreateNginxDeployment(client, clusterIDName, psact)
 		require.NoError(t, err)
 	}
+
+	podResults, podErrors := pods.StatusPods(client, clusterIDName)
+	assert.NotEmpty(t, podResults)
+	assert.Empty(t, podErrors)
 }

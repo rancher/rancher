@@ -8,18 +8,20 @@ import (
 	"github.com/rancher/rancher/tests/framework/pkg/environmentflag"
 )
 
+type PSACT string
+
 const (
-	// ConfigurationFileKey is used to parse the configuration of upgrade tests.
-	ConfigurationFileKey = "upgradeInput"
-	// localClusterID is a string to used ignore this cluster in comparisons
-	localClusterID = "local"
-	// latestKey is a string to determine automatically version pooling to the latest possible
-	latestKey = "latest"
+	ConfigurationFileKey       = "upgradeInput" // ConfigurationFileKey is used to parse the configuration of upgrade tests.
+	localClusterID             = "local"        // localClusterID is a string to used ignore this cluster in comparisons
+	latestKey                  = "latest"       // latestKey is a string to determine automatically version pooling to the latest possible
+	RancherPrivileged    PSACT = "rancher-privileged"
+	RancherRestricted    PSACT = "rancher-restricted"
 )
 
 type Clusters struct {
 	Name              string   `json:"name" yaml:"name" default:""`
 	VersionToUpgrade  string   `json:"versionToUpgrade" yaml:"versionToUpgrade" default:""`
+	PSACT             string   `json:"psact" yaml:"psact" default:""`
 	FeaturesToTest    Features `json:"enabledFeatures" yaml:"enabledFeatures" default:""`
 	isLatestVersion   bool
 	isUpgradeDisabled bool
@@ -74,6 +76,7 @@ func loadUpgradeKubernetesConfig(client *rancher.Client) (clusters []Clusters, e
 
 			cluster.Name = c.Name
 			cluster.VersionToUpgrade = c.VersionToUpgrade
+			cluster.PSACT = c.PSACT
 
 			isVersionFieldLatest := cluster.VersionToUpgrade == latestKey
 			if isVersionFieldLatest {
@@ -131,6 +134,7 @@ func loadUpgradeWorkloadConfig(client *rancher.Client) (clusters []Clusters, err
 
 			cluster.Name = c.Name
 			cluster.FeaturesToTest = c.FeaturesToTest
+			cluster.PSACT = c.PSACT
 
 			clusters = append(clusters, *cluster)
 		}

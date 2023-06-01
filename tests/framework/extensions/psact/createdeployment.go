@@ -7,6 +7,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	steveV1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
 	"github.com/rancher/rancher/tests/framework/extensions/workloads"
+	namegenerator "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 	"github.com/sirupsen/logrus"
 	appv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -38,6 +39,11 @@ func CreateNginxDeployment(client *rancher.Client, clusterID string, psact strin
 		return nil, err
 	}
 
+	// If the deployment already exists, then create a new deployment with a different name to avoid a naming conflict.
+	if _, err := steveclient.SteveType(workloads.DeploymentSteveType).ByID(deploymentTemplate.Namespace + "/" + deploymentTemplate.Name); err == nil {
+		deploymentTemplate.Name = deploymentTemplate.Name + "-" + namegenerator.RandStringLower(5)
+	}
+
 	_, err = steveclient.SteveType(workloads.DeploymentSteveType).Create(deploymentTemplate)
 	if err != nil {
 		return nil, err
@@ -61,10 +67,10 @@ func CreateNginxDeployment(client *rancher.Client, clusterID string, psact strin
 		}
 
 		if *deployment.Spec.Replicas == deployment.Status.AvailableReplicas && psact == rancherPrivileged {
-			logrus.Infof("Deployment successfully created; this is expected for " + psact + "!")
+			logrus.Infof("Deployment %s successfully created; this is expected for %s!", deployment.Name, psact)
 			return true, nil
 		} else if *deployment.Spec.Replicas != deployment.Status.AvailableReplicas && psact == rancherRestricted {
-			logrus.Infof("Deployment failed to create; this is expected for " + psact + "!")
+			logrus.Infof("Deployment %s failed to create; this is expected for %s!", deployment.Name, psact)
 			return true, nil
 		}
 
