@@ -2,6 +2,7 @@ package feature
 
 import (
 	"context"
+	"reflect"
 	"time"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -9,6 +10,7 @@ import (
 	"github.com/rancher/rancher/pkg/features"
 	managementv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/wrangler"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
@@ -46,7 +48,33 @@ func (h *handler) sync(_ string, obj *v3.Feature) (*v3.Feature, error) {
 	if obj.Name == features.Harvester.Name() {
 		return obj, h.toggleHarvesterNodeDriver(obj.Name)
 	}
+
+	if obj.Name == features.HarvesterBaremetalContainerWorkload.Name() {
+		return obj, h.syncHarvesterFeature(obj.Name)
+	}
 	return obj, nil
+}
+
+// syncHarvesterFeature ensures that Harvester feature is enabled
+// if baremetal management feature is enabled
+func (h *handler) syncHarvesterFeature(harvesterBaremetal string) error {
+
+	if features.GetFeatureByName(harvesterBaremetal).Enabled() {
+		harvesterFeature, err := h.featuresClient.Get(features.Harvester.Name(), metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		harvesterFeatureCopy := harvesterFeature.DeepCopy()
+		if !*harvesterFeatureCopy.Spec.Value {
+			harvesterFeatureCopy.Spec.Value = &[]bool{true}[0]
+		}
+		if !reflect.DeepEqual(harvesterFeature, harvesterFeatureCopy) {
+			_, err := h.featuresClient.Update(harvesterFeatureCopy)
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (h *handler) toggleHarvesterNodeDriver(harvester string) error {
