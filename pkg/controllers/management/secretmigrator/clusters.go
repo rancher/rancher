@@ -69,7 +69,12 @@ func (h *handler) Migrate(cluster *apimgmtv3.Cluster) (*apimgmtv3.Cluster, error
 		return cluster, err
 	}
 
-	return h.migrateRKESecrets(cluster)
+	cluster, err = h.migrateRKESecrets(cluster)
+	if err != nil {
+		return cluster, err
+	}
+
+	return h.migrateACISecrets(cluster)
 }
 
 func (h *handler) getUnstructuredPipelineConfig(namespace, pType string) (map[string]interface{}, error) {
@@ -1231,10 +1236,10 @@ func (h *handler) migrateACISecrets(cluster *apimgmtv3.Cluster) (*apimgmtv3.Clus
 				logrus.Tracef("[secretmigrator] aci apic user key secret found for cluster %s", clusterCopy.Name)
 				clusterCopy.Spec.ClusterSecrets.ACIAPICUserKeySecret = aciUserKeySecret.Name
 				clusterCopy.Spec.RancherKubernetesEngineConfig.Network.AciNetworkProvider.ApicUserKey = ""
-				if clusterCopy.Status.AppliedSpec.RancherKubernetesEngineConfig != nil {
+				if clusterCopy.Status.AppliedSpec.RancherKubernetesEngineConfig != nil && clusterCopy.Status.AppliedSpec.RancherKubernetesEngineConfig.Network.AciNetworkProvider != nil {
 					clusterCopy.Status.AppliedSpec.RancherKubernetesEngineConfig.Network.AciNetworkProvider.ApicUserKey = ""
 				}
-				if clusterCopy.Status.FailedSpec != nil && clusterCopy.Status.FailedSpec.RancherKubernetesEngineConfig != nil {
+				if clusterCopy.Status.FailedSpec != nil && clusterCopy.Status.FailedSpec.RancherKubernetesEngineConfig != nil && clusterCopy.Status.FailedSpec.RancherKubernetesEngineConfig.Network.AciNetworkProvider != nil {
 					clusterCopy.Status.FailedSpec.RancherKubernetesEngineConfig.Network.AciNetworkProvider.ApicUserKey = ""
 				}
 				clusterCopy, err = h.clusters.Update(clusterCopy)
@@ -1262,10 +1267,10 @@ func (h *handler) migrateACISecrets(cluster *apimgmtv3.Cluster) (*apimgmtv3.Clus
 				logrus.Tracef("[secretmigrator] aci token secret found for cluster %s", clusterCopy.Name)
 				clusterCopy.Spec.ClusterSecrets.ACITokenSecret = aciTokenSecret.Name
 				clusterCopy.Spec.RancherKubernetesEngineConfig.Network.AciNetworkProvider.Token = ""
-				if clusterCopy.Status.AppliedSpec.RancherKubernetesEngineConfig != nil {
+				if clusterCopy.Status.AppliedSpec.RancherKubernetesEngineConfig != nil && clusterCopy.Status.AppliedSpec.RancherKubernetesEngineConfig.Network.AciNetworkProvider != nil {
 					clusterCopy.Status.AppliedSpec.RancherKubernetesEngineConfig.Network.AciNetworkProvider.Token = ""
 				}
-				if clusterCopy.Status.FailedSpec != nil && clusterCopy.Status.FailedSpec.RancherKubernetesEngineConfig != nil {
+				if clusterCopy.Status.FailedSpec != nil && clusterCopy.Status.FailedSpec.RancherKubernetesEngineConfig != nil && clusterCopy.Status.FailedSpec.RancherKubernetesEngineConfig.Network.AciNetworkProvider != nil {
 					clusterCopy.Status.FailedSpec.RancherKubernetesEngineConfig.Network.AciNetworkProvider.Token = ""
 				}
 				clusterCopy, err = h.clusters.Update(clusterCopy)
@@ -1293,10 +1298,10 @@ func (h *handler) migrateACISecrets(cluster *apimgmtv3.Cluster) (*apimgmtv3.Clus
 				logrus.Tracef("[secretmigrator] aci kafka client key secret found for cluster %s", clusterCopy.Name)
 				clusterCopy.Spec.ClusterSecrets.ACIKafkaClientKeySecret = aciKafkaClientKeySecret.Name
 				clusterCopy.Spec.RancherKubernetesEngineConfig.Network.AciNetworkProvider.KafkaClientKey = ""
-				if clusterCopy.Status.AppliedSpec.RancherKubernetesEngineConfig != nil {
+				if clusterCopy.Status.AppliedSpec.RancherKubernetesEngineConfig != nil && clusterCopy.Status.AppliedSpec.RancherKubernetesEngineConfig.Network.AciNetworkProvider != nil {
 					clusterCopy.Status.AppliedSpec.RancherKubernetesEngineConfig.Network.AciNetworkProvider.KafkaClientKey = ""
 				}
-				if clusterCopy.Status.FailedSpec != nil && clusterCopy.Status.FailedSpec.RancherKubernetesEngineConfig != nil {
+				if clusterCopy.Status.FailedSpec != nil && clusterCopy.Status.FailedSpec.RancherKubernetesEngineConfig != nil && clusterCopy.Status.FailedSpec.RancherKubernetesEngineConfig.Network.AciNetworkProvider != nil {
 					clusterCopy.Status.FailedSpec.RancherKubernetesEngineConfig.Network.AciNetworkProvider.KafkaClientKey = ""
 				}
 				clusterCopy, err = h.clusters.Update(clusterCopy)

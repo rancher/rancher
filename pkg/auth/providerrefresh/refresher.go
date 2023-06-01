@@ -205,7 +205,11 @@ func (r *refresher) refreshAttributes(attribs *v3.UserAttribute) (*v3.UserAttrib
 		// If there is no principalID for the provider, there is no reason to go through the refetch process
 		if principalID != "" {
 			secret := ""
-			if providers.ProvidersWithSecrets[providerName] {
+			hasPerUserSecrets, err := providers.ProviderHasPerUserSecrets(providerName)
+			if err != nil {
+				return nil, err
+			}
+			if hasPerUserSecrets {
 				secret, err = r.tokenMGR.GetSecret(user.Name, providerName, loginTokens[providerName])
 				if apierrors.IsNotFound(err) {
 					// There is no secret so we can't refresh, just continue to the next attribute
