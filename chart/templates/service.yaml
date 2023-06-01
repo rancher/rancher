@@ -25,4 +25,4 @@ spec:
     protocol: TCP
     name: https-internal
   selector:
-    app: {{ template "rancher.fullname" . }}
+    {{- include "rancher.selectorLabels" . | nindent 4 }}
