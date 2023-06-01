@@ -1,6 +1,6 @@
 # Rancher
 
-*This file is auto-generated from README-template.md, please make any changes there.*
+*This file is auto-generated from `README-template.md` using [Update README workflow](https://github.com/rancher/rancher/actions/workflows/update-readme.yml), please make any changes in `README-template.md` and generate a new `README.md` using the workflow. See [Workflows README](.github/workflows#update-readme-update-readme.yml) for more information.*
 
 [![Build Status](https://drone-publish.rancher.io/api/badges/rancher/rancher/status.svg?branch=release/v2.6)](https://drone-publish.rancher.io/rancher/rancher)
 [![Docker Pulls](https://img.shields.io/docker/pulls/rancher/rancher.svg)](https://store.docker.com/community/images/rancher/rancher)
@@ -12,11 +12,11 @@ Rancher is an open source container management platform built for organizations 
 
 ## Latest Release
 * v2.6
-  * Latest - v2.6.9 - `rancher/rancher:v2.6.9` / `rancher/rancher:latest` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.6.9).
-  * Stable - v2.6.11 - `rancher/rancher:v2.6.11` / `rancher/rancher:stable` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.6.11).
+  * Latest - v2.6.13 - `rancher/rancher:v2.6.13` / `rancher/rancher:latest` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.6.13).
+  * Stable - v2.6.13 - `rancher/rancher:v2.6.13` / `rancher/rancher:stable` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.6.13).
 * v2.5
-  * Latest - v2.5.16 - `rancher/rancher:v2.5.16` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.5.16).
-  * Stable - v2.5.16 - `rancher/rancher:v2.5.16` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.5.16).
+  * Latest - v2.5.17 - `rancher/rancher:v2.5.17` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.5.17).
+  * Stable - v2.5.17 - `rancher/rancher:v2.5.17` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.5.17).
 
 To get automated notifications of our latest release, you can watch the announcements category in our [forums](http://forums.rancher.com/c/announcements), or subscribe to the RSS feed `https://forums.rancher.com/c/announcements.rss`.
 
@@ -56,7 +56,7 @@ For security issues, please first check our [security policy](SECURITY.md) and e
 
 # License
 
-Copyright (c) 2014-2022 [Rancher Labs, Inc.](http://rancher.com)
+Copyright (c) 2014-2023 [Rancher Labs, Inc.](http://rancher.com)
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
