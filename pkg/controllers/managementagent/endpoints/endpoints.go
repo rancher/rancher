@@ -306,6 +306,9 @@ func convertIngressToServicePublicEndpointsMap(ingress ingresswrapper.Ingress, a
 						continue
 					}
 				}
+				if path.Backend.Service == nil {
+					continue
+				}
 				p := v32.PublicEndpoint{
 					Hostname:    rule.Host,
 					Path:        path.Path,
