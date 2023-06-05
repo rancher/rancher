@@ -61,7 +61,7 @@ require (
 	github.com/AzureAD/microsoft-authentication-library-for-go v0.5.1
 	github.com/Masterminds/semver/v3 v3.2.0
 	github.com/Masterminds/sprig/v3 v3.2.3
-	github.com/aws/aws-sdk-go v1.44.266
+	github.com/aws/aws-sdk-go v1.44.275
 	github.com/bep/debounce v1.2.0
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/coreos/go-iptables v0.6.0
@@ -105,7 +105,7 @@ require (
 	github.com/rancher/apiserver v0.0.0-20230515173455-c3b182bdbf7d
 	github.com/rancher/channelserver v0.5.1-0.20220405170618-28c9b37deff1
 	github.com/rancher/dynamiclistener v0.3.5
-	github.com/rancher/eks-operator v1.2.1
+	github.com/rancher/eks-operator v1.2.2-rc1
 	github.com/rancher/fleet/pkg/apis v0.0.0-20230516111835-f52a0e7d38af
 	github.com/rancher/gke-operator v1.1.5
 	github.com/rancher/kubernetes-provider-detector v0.1.5
@@ -122,8 +122,8 @@ require (
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007
 	github.com/rancher/wrangler v1.1.1
 	github.com/robfig/cron v1.1.0
-	github.com/sirupsen/logrus v1.9.2
-	github.com/stretchr/testify v1.8.3
+	github.com/sirupsen/logrus v1.9.3
+	github.com/stretchr/testify v1.8.4
 	github.com/tomnomnom/linkheader v0.0.0-20180905144013-02ca5825eb80
 	github.com/urfave/cli v1.22.9
 	github.com/vishvananda/netlink v1.1.1-0.20210330154013-f5de75959ad5
