@@ -23,7 +23,7 @@
     * Validation (Go Framework)
     * Other - Explain: _EXPLAIN_
     * None
-    * _REMOVE NOT APPLICABLE OPTIONS AND THIS LINE_
+    * _REMOVE NOT APPLICABLE BULLET POINTS ABOVE_
 * If "None" - Reason: _EXPLAIN THE REASON_
   <!-- 
   Non-exhaustive list of reasons:
@@ -34,16 +34,16 @@
     - Other (explain)
   Note: Outside of the exceptions above, the "existing tests cover the changes" is very unlikely to be an acceptable reason as the existing tests generally don't cover the logic changes implemented by this PR 
   -->
-* If "None" - GH Issue/PR: _LINK TO GH ISSUE TO ADD TESTS_
+* If "None" - GH Issue/PR: _LINK TO GH ISSUE/PR TO ADD TESTS_
 
-Summary: _FILL OUT_
+Summary: _TODO_
 
 ## QA Testing Considerations
 <!-- Highlight areas or (additional) cases that QA should test w.r.t a fresh install as well as the upgrade scenarios -->
  
 ### Regressions Considerations
 <!-- Dedicated section to specifically call out any areas that with higher chance of regressions caused by this change, include estimation of probability of regressions -->
-_FILL OUT_
+_TODO_
 
 Existing / newly added automated tests that provide evidence there are no regressions:
-* _FILL OUT_
+* _TODO_
