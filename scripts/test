@@ -5,6 +5,12 @@ cleanup()
 {
     EXIT=$?
     set +ex
+    echo Getting Webhook Logs:
+    kubectl get pods -n cattle-system
+    kubectl get settings rancher-webhook-version -o yaml 
+    kubectl get settings rancher-webhook-min-version -o yaml 
+    kubectl get deployment -n cattle-system  rancher-webhook -o yaml
+    kubectl logs -n cattle-system deploy/rancher-webhook
     echo Stopping rancher server
     kill $RANCHER_RUN_PID
     wait $RANCHER_RUN_PID
@@ -81,6 +87,12 @@ while ! kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -w -n catt
     sleep 2
 done
 #kill $TPID
+
+kubectl patch deployment -n cattle-system rancher-webhook --patch '{"spec": {"template": {"spec": {"containers": [{"name": "rancher-webhook", "env": [{"name": "CATTLE_DEBUG", "value": "true"}]}]}}}}' 
+
+while ! kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -w -n cattle-system deploy/rancher-webhook; do
+    sleep 2
+done
 
 # get correct agent tag
 source ./scripts/version
