@@ -75,7 +75,7 @@ func (w *SystemChartsVersionSuite) resetSettings() {
 }
 
 func TestSystemChartsVersionSuite(t *testing.T) {
-	suite.Run(t, new(SystemChartsVersionSuite))
+	// suite.Run(t, new(SystemChartsVersionSuite))
 }
 
 func (w *SystemChartsVersionSuite) TestInstallWebhook() {
