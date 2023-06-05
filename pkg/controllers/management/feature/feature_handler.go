@@ -50,16 +50,32 @@ func (h *handler) sync(_ string, obj *v3.Feature) (*v3.Feature, error) {
 	}
 
 	if obj.Name == features.HarvesterBaremetalContainerWorkload.Name() {
-		return obj, h.syncHarvesterFeature(obj.Name)
+		return obj, h.syncHarvesterFeature(obj)
 	}
 	return obj, nil
 }
 
 // syncHarvesterFeature ensures that Harvester feature is enabled
-// if baremetal management feature is enabled
-func (h *handler) syncHarvesterFeature(harvesterBaremetal string) error {
+// if baremetal management feature is enabled and annotates feature with experimental annotation
+func (h *handler) syncHarvesterFeature(obj *v3.Feature) error {
 
-	if features.GetFeatureByName(harvesterBaremetal).Enabled() {
+	objCopy := obj.DeepCopy()
+
+	if objCopy.Annotations == nil {
+		objCopy.Annotations = make(map[string]string)
+	}
+
+	if val, ok := objCopy.Annotations[v3.ExperimentalFeatureKey]; !ok || val != v3.ExperimentalFeatureValue {
+		objCopy.Annotations[v3.ExperimentalFeatureKey] = v3.ExperimentalFeatureValue
+	}
+
+	if !reflect.DeepEqual(obj, objCopy) {
+		_, err := h.featuresClient.Update(objCopy)
+		return err
+	}
+
+	// if feature is enabled, ensure harvester feature is also enabled
+	if features.GetFeatureByName(obj.Name).Enabled() {
 		harvesterFeature, err := h.featuresClient.Get(features.Harvester.Name(), metav1.GetOptions{})
 		if err != nil {
 			return err
