@@ -1,6 +1,7 @@
 package provisioning
 
 import (
+	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
 	nodepools "github.com/rancher/rancher/tests/framework/extensions/rke1/nodepools"
@@ -55,15 +56,16 @@ type AdvancedOptions struct {
 }
 
 type Config struct {
-	NodesAndRoles          []machinepools.NodeRoles `json:"nodesAndRoles" yaml:"nodesAndRoles" default:"[]"`
-	NodesAndRolesRKE1      []nodepools.NodeRoles    `json:"nodesAndRolesRKE1" yaml:"nodesAndRolesRKE1" default:"[]"`
-	K3SKubernetesVersions  []string                 `json:"k3sKubernetesVersion" yaml:"k3sKubernetesVersion"`
-	RKE1KubernetesVersions []string                 `json:"rke1KubernetesVersion" yaml:"rke1KubernetesVersion"`
-	RKE2KubernetesVersions []string                 `json:"rke2KubernetesVersion" yaml:"rke2KubernetesVersion"`
-	CNIs                   []string                 `json:"cni" yaml:"cni"`
-	Providers              []string                 `json:"providers" yaml:"providers"`
-	NodeProviders          []string                 `json:"nodeProviders" yaml:"nodeProviders"`
-	PSACT                  string                   `json:"psact" yaml:"psact"`
-	Hardened               bool                     `json:"hardened" yaml:"hardened"`
-	AdvancedOptions        AdvancedOptions          `json:"advancedOptions" yaml:"advancedOptions"`
+	NodesAndRoles            []machinepools.NodeRoles       `json:"nodesAndRoles" yaml:"nodesAndRoles" default:"[]"`
+	NodesAndRolesRKE1        []nodepools.NodeRoles          `json:"nodesAndRolesRKE1" yaml:"nodesAndRolesRKE1" default:"[]"`
+	K3SKubernetesVersions    []string                       `json:"k3sKubernetesVersion" yaml:"k3sKubernetesVersion"`
+	RKE1KubernetesVersions   []string                       `json:"rke1KubernetesVersion" yaml:"rke1KubernetesVersion"`
+	RKE2KubernetesVersions   []string                       `json:"rke2KubernetesVersion" yaml:"rke2KubernetesVersion"`
+	CNIs                     []string                       `json:"cni" yaml:"cni"`
+	Providers                []string                       `json:"providers" yaml:"providers"`
+	NodeProviders            []string                       `json:"nodeProviders" yaml:"nodeProviders"`
+	PSACT                    string                         `json:"psact" yaml:"psact"`
+	Hardened                 bool                           `json:"hardened" yaml:"hardened"`
+	AdvancedOptions          AdvancedOptions                `json:"advancedOptions" yaml:"advancedOptions"`
+	LocalClusterAuthEndpoint rkev1.LocalClusterAuthEndpoint `json:"localClusterAuthEndpoint" yaml:"localClusterAuthEndpoint"`
 }
