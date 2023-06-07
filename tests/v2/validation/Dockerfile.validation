@@ -24,6 +24,10 @@ RUN go install github.com/rancherlabs/corral@${CORRAL_VERSION}
 RUN mkdir /root/.ssh && chmod 600 .ssh/jenkins-*
 RUN ssh-keygen -f .ssh/jenkins-* -y > /root/.ssh/public.pub
 
+# Configure Terraform
+ARG TERRAFORM_VERSION=0.13.7
+RUN wget https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip && apt-get update && apt-get install unzip &&  unzip terraform_${TERRAFORM_VERSION}_linux_amd64.zip && rm terraform_${TERRAFORM_VERSION}_linux_amd64.zip && chmod u+x terraform && mv terraform /usr/bin/terraform
+
 RUN CGO_ENABLED=0
 
 # necessary to run if statements using [[ ]]

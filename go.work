@@ -1,0 +1,8 @@
+go 1.19
+
+use (
+	.
+	./pkg/apis
+	./pkg/client
+	./tests/terratest
+)
