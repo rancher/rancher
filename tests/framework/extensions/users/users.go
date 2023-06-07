@@ -302,7 +302,7 @@ func RemoveClusterRoleFromUser(rancherClient *rancher.Client, user *management.U
 		Duration: 100 * time.Millisecond,
 		Factor:   1,
 		Jitter:   0,
-		Steps:    5,
+		Steps:    10,
 	}
 
 	err = kwait.ExponentialBackoff(backoff, func() (done bool, err error) {

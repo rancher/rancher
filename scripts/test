@@ -22,11 +22,22 @@ fi
 
 cd $(dirname $0)/..
 
-#[ "${ARCH}" == "amd64" ] && RACE=-race
+echo Running unit tests
 go test -cover -tags=test ./pkg/...
 
 if [ ${ARCH} == arm64 ] || [ ${ARCH} == s390x ]; then
     export ETCD_UNSUPPORTED_ARCH=${ARCH}
+fi
+
+# Set envvar required by v2prov for cluster creation
+export SOME_K8S_VERSION=${SOME_K8S_VERSION}
+if [ -z "${SOME_K8S_VERSION}" ]; then
+  # Get the last release for $DIST, which is usually the latest version or an experimental version.
+  # Previously this would use channels, but channels no longer reflect the latest version since
+  # https://github.com/rancher/rancher/issues/36827 has added appDefaults. We do not use appDefaults
+  # here for simplicity's sake, as it requires semver parsing & matching. The last release should
+  # be good enough for our needs.
+  export SOME_K8S_VERSION=$(curl -sS https://raw.githubusercontent.com/rancher/kontainer-driver-metadata/dev-v2.7/data/data.json | jq -r ".k3s.releases[-1].version")
 fi
 
 echo Starting rancher server for test
@@ -34,22 +45,28 @@ touch /tmp/rancher.log
 
 run_rancher()
 {
+    RESTART_COUNT=0
     while sleep 2; do
         if [ "$PID" != "-1" ] && [ ! -e /proc/$PID ]; then
             echo Rancher died
             echo Rancher logs were
-            tail -n 25 /tmp/rancher.log
+            echo -e "-----RANCHER-LOG-DUMP-START-----"
+            cat /tmp/rancher.log | gzip | base64 -w 0
+            echo -e "\n-----RANCHER-LOG-DUMP-END-----"
             echo K3s logs were:
-            tail -n 25 build/testdata/k3s.log
-            if [ "$INT_TESTS_STARTED" = "true" ]; then
-              echo Rancher died after tests started, aborting
-              exit 1
-            fi
+            echo -e "-----K3S-LOG-DUMP-START-----"
+            cat build/testdata/k3s.log | gzip | base64 -w 0
+            echo -e "\n-----K3S-LOG-DUMP-END-----"
             set +e
             echo Attempting to kill K3s
             pkill -e k3s
             set -e
             PID=-1
+            if [ "$RESTART_COUNT" = "2" ]; then
+                echo Rancher died 3 times, aborting
+                kill -42 $PWRAPPROC
+            fi
+            RESTART_COUNT=$((RESTART_COUNT + 1))
             sleep 5
         fi
         if [ "$PID" = "-1" ]; then
@@ -65,6 +82,10 @@ run_rancher()
 # much
 #tail -F /tmp/rancher.log &
 #TPID=$!
+
+trap "exit 1" 42
+PWRAPPROC="$$"
+
 PID=-1
 run_rancher &
 RANCHER_RUN_PID=$!
@@ -77,8 +98,21 @@ while ! curl -sf http://localhost:8080/ping; do
     sleep 2
 done
 
-while ! kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -w -n cattle-system deploy/rancher-webhook; do
+# Echo a newline to handle the "pong" from the above ping
+echo ""
+
+rwWC=0
+echo "Waiting up to 5 minutes for rancher-webhook deployment"
+while ! kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -w -n cattle-system deploy/rancher-webhook &>/dev/null; do
+  if [[ "$rwWC" == 150 ]]; then
+    echo "rancher-webhook was not available within 5 minutes. failing fast"
+    exit 1
+  fi
+  if [[ $((rwWC%30)) == 0 ]] && [[ "$rwWC" != "0" ]]; then
+    echo "rancher-webhook was not ready within $((rwWC/30)) minutes"
+  fi
     sleep 2
+    rwWC=$((rwWC + 1))
 done
 #kill $TPID
 
@@ -86,18 +120,15 @@ done
 source ./scripts/version
 export AGENT_TAG=${TAG}
 
-echo Running tests
-
 echo Running build-integration-setup
 ./tests/v2/integration/scripts/build-integration-setup
 
 echo Running integrationsetup
-path=$(pwd)
-export CATTLE_TEST_CONFIG=${path}/config.yaml
+export CATTLE_TEST_CONFIG=$(pwd)/config.yaml # used by integration tests and test setup
 ./tests/v2/integration/bin/integrationsetup
 
-echo Running go tests
-go test -v ./tests/v2/integration/...
+echo Running go integration tests
+go test -v -failfast ./tests/v2/integration/...
 
 echo Running tox tests
 INT_TESTS_STARTED=true

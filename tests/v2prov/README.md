@@ -30,7 +30,7 @@ Operation tests are day 2 operation tests like encryption key rotation, certific
 
 ## Test Naming Format
 
-WIthin the `tests` folder, there are mutliple types of tests. They notably all have a format like to ensure we do not clog up individual pipeline stages as they are resource intensive.
+Within the `tests` folder, there are mutliple types of tests. They notably all have a format like to ensure we do not clog up individual pipeline stages as they are resource intensive.
 
 `Test_<Category>_<TestName>`
 
