@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/mitchellh/mapstructure"
 	"github.com/rancher/norman/api/handler"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
@@ -50,7 +49,7 @@ func (p *ldapProvider) testAndApply(actionName string, action *types.Action, req
 
 	configApplyInput := &v32.LdapTestAndApplyInput{}
 
-	if err := mapstructure.Decode(input, configApplyInput); err != nil {
+	if err := common.Decode(input, configApplyInput); err != nil {
 		return httperror.NewAPIError(httperror.InvalidBodyContent,
 			fmt.Sprintf("Failed to parse body: %v", err))
 	}
