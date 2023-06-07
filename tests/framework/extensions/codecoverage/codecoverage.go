@@ -62,7 +62,7 @@ func killTestServices(client *rancher.Client, clusterID string, podNames []strin
 	for _, podName := range podNames {
 		_, err := kubeconfig.KubectlExec(restConfig, podName, cattleSystemNameSpace, cmd)
 		if err != nil {
-			logrus.Error("error killing pod container %v", err)
+			logrus.Errorf("error killing pod container %v", err)
 		}
 	}
 
