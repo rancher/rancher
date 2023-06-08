@@ -227,7 +227,7 @@ if ( true == via_webhook() && (!(rancher_version ==~ rancher_version_regex)) ) {
                       jobs["ec2"] = { build job: 'rancher-v3_ontag_ec2_certification', parameters: params }
                       jobs["az"] = { build job: 'rancher-v3_ontag_az_certification', parameters: params }
                       jobs["custom"] = { build job: 'rancher-v3_ontag_custom_certification', parameters: params}
-                      jobs["go-provisioning"] = { build job: 'go-automation-freeform-job', parameters: goParams }
+                      jobs["go-provisioning"] = { build job: 'rancher_ontag_go_certification', parameters: goParams }
                       // windows note: https://github.com/rancher/dashboard/issues/6549
                       // jobs["windows"] = { build job: 'rancher-v3_ontag_windows_certification', parameters: params}
                       if (rancher_version.startsWith("v2.6") || rancher_version.startsWith("v2.7")){
