@@ -110,7 +110,7 @@ ENV DAPPER_OUTPUT ./bin ./dist ./go.mod ./go.sum ./pkg/apis/go.mod ./pkg/apis/go
 ENV DAPPER_DOCKER_SOCKET true
 ARG CI
 ARG DRONE_BUILD_NUMBER
-ENV DAPPER_RUN_ARGS "-v rancher2-go16-pkg-1:/go/pkg -v rancher2-go16-cache-1:/root/.cache/go-build --privileged --network=host --label CI=${CI} --label DRONE_BUILD_NUMBER=${DRONE_BUILD_NUMBER}"
+ENV DAPPER_RUN_ARGS "-v rancher2-go16-pkg-1:/go/pkg -v rancher2-go16-cache-1:/root/.cache/go-build --privileged --label CI=${CI} --label DRONE_BUILD_NUMBER=${DRONE_BUILD_NUMBER}"
 ENV GOCACHE /root/.cache/go-build
 ENV HOME ${DAPPER_SOURCE}
 
