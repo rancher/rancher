@@ -29,19 +29,44 @@ if [ ${ARCH} == arm64 ] || [ ${ARCH} == s390x ]; then
     export ETCD_UNSUPPORTED_ARCH=${ARCH}
 fi
 
-# Set envvar required by v2prov for cluster creation
+TB_ORG=rancher
+
+if [ -z "${TEST_DIST}" ] || [ "${TEST_DIST}" = "k3s" ]; then
+  TEST_DIST=k3s
+  AIRGAP=-airgap
+  TB_ORG=k3s-io
+else
+  LINUX=.linux
+fi
+
+export DIST=${TEST_DIST}
 export SOME_K8S_VERSION=${SOME_K8S_VERSION}
+export TB_ORG=${TB_ORG}
+
+eval "$(grep '^ENV CATTLE_SYSTEM_AGENT' package/Dockerfile | awk '{print "export " $2 "=" $3}')"
+eval "$(grep '^ENV CATTLE_WINS_AGENT' package/Dockerfile | awk '{print "export " $2 "=" $3}')"
+eval "$(grep '^ENV CATTLE_CSI_PROXY_AGENT' package/Dockerfile | awk '{print "export " $2 "=" $3}')"
+eval "$(grep '^ENV CATTLE_KDM_BRANCH' package/Dockerfile | awk '{print "export " $2 "=" $3}')"
+
 if [ -z "${SOME_K8S_VERSION}" ]; then
-  # Get the last release for $DIST, which is usually the latest version or an experimental version.
-  # Previously this would use channels, but channels no longer reflect the latest version since
-  # https://github.com/rancher/rancher/issues/36827 has added appDefaults. We do not use appDefaults
-  # here for simplicity's sake, as it requires semver parsing & matching. The last release should
-  # be good enough for our needs.
-  export SOME_K8S_VERSION=$(curl -sS https://raw.githubusercontent.com/rancher/kontainer-driver-metadata/dev-v2.7/data/data.json | jq -r ".k3s.releases[-1].version")
+# Get the last release for $DIST, which is usually the latest version or an experimental version.
+# Previously this would use channels, but channels no longer reflect the latest version since
+# https://github.com/rancher/rancher/issues/36827 has added appDefaults. We do not use appDefaults
+# here for simplicity's sake, as it requires semver parsing & matching. The last release should
+# be good enough for our needs.
+export SOME_K8S_VERSION=$(curl -sS https://raw.githubusercontent.com/rancher/kontainer-driver-metadata/dev-v2.7/data/data.json | jq -r ".$DIST.releases[-1].version")
 fi
 
 echo Starting rancher server for test
 touch /tmp/rancher.log
+
+mkdir -p /var/lib/rancher/$DIST/agent/images
+grep PodTestImage ./tests/v2prov/defaults/defaults.go | cut -f2 -d'"' > /var/lib/rancher/$DIST/agent/images/pull.txt
+grep MachineProvisionImage ./pkg/settings/setting.go | cut -f4 -d'"' >> /var/lib/rancher/$DIST/agent/images/pull.txt
+mkdir -p /usr/share/rancher/ui/assets
+curl -sLf https://github.com/rancher/system-agent/releases/download/${CATTLE_SYSTEM_AGENT_VERSION}/rancher-system-agent-amd64 -o /usr/share/rancher/ui/assets/rancher-system-agent-amd64
+curl -sLf https://github.com/rancher/system-agent/releases/download/${CATTLE_SYSTEM_AGENT_VERSION}/rancher-system-agent-arm64 -o /usr/share/rancher/ui/assets/rancher-system-agent-arm64
+curl -sLf https://github.com/rancher/system-agent/releases/download/${CATTLE_SYSTEM_AGENT_VERSION}/system-agent-uninstall.sh -o /usr/share/rancher/ui/assets/system-agent-uninstall.sh
 
 run_rancher()
 {
