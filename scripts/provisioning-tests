@@ -123,19 +123,14 @@ done
 # Echo a newline to handle the "pong" from the above ping
 echo ""
 
-rwWC=0
 echo "Waiting up to 5 minutes for rancher-webhook deployment"
-while ! kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -w -n cattle-system deploy/rancher-webhook &>/dev/null; do
-  if [[ "$rwWC" == 150 ]]; then
-    echo "rancher-webhook was not available within 5 minutes. failing fast"
-    exit 1
-  fi
-  if [[ $((rwWC%30)) == 0 ]] && [[ "$rwWC" != "0" ]]; then
-    echo "rancher-webhook was not ready within $((rwWC/30)) minutes"
-  fi
-    sleep 2
-    rwWC=$((rwWC + 1))
-done
+./scripts/await \
+  --timeout 300 `# Time out after 300 seconds (5 min)` \
+  --sleep 2 `# Sleep for 2 seconds in between attempts` \
+  --message-interval 30 `# Print the progress message below every 30 attempts (roughly every minute)` \
+  --message "rancher-webhook was not available after {{elapsed}} seconds" `# Print this progress message` \
+  "kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -w -n cattle-system deploy/rancher-webhook &>/dev/null"
+
 #kill $TPID
 
 echo Running provisioning-tests $RUNARG
