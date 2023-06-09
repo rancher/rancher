@@ -26,7 +26,9 @@ const (
 func main() {
 	logrus.Infof("Generating test config")
 	ipAddress, err := getOutboundIP()
-	handleFatalf(err, "Error getting outbound IP address: %v", err)
+	if err != nil {
+		logrus.Fatalf("Error getting outbound IP address: %v", err)
+	}
 
 	hostURL := fmt.Sprintf("%s:8443", ipAddress.String())
 	userToken, err := token.GenerateUserToken(
@@ -36,7 +38,9 @@ func main() {
 		},
 		hostURL,
 	)
-	handleFatalf(err, "Error with generating admin token: %v", err)
+	if err != nil {
+		logrus.Fatalf("Error with generating admin token: %v", err)
+	}
 
 	cleanup := true
 	rancherConfig := rancherClient.Config{
@@ -47,15 +51,21 @@ func main() {
 	}
 
 	err = defaults.Set(&rancherConfig)
-	handleFatalf(err, "Error with setting up config file: %v", err)
+	if err != nil {
+		logrus.Fatalf("Error with setting up config file: %v", err)
+	}
 
 	err = config.WriteConfig(rancherClient.ConfigurationFileKey, &rancherConfig)
-	handleFatalf(err, "Error writing test config: %v", err)
+	if err != nil {
+		logrus.Fatalf("Error writing test config: %v", err)
+	}
 
 	// Note that we do not defer clusterClients.Close() here. This is because doing so would cause the test namespace
 	// in which the downstream cluster resides to be deleted before it can be used in tests.
 	clusterClients, err := clients.New()
-	handleFatalf(err, "Error creating clients: %v", err)
+	if err != nil {
+		logrus.Fatalf("Error creating clients: %v", err)
+	}
 
 	logrus.Infof("Creating test cluster %s with %s", rancherConfig.ClusterName, testdefaults.SomeK8sVersion)
 	c, err := cluster.New(clusterClients, &provisioningv1api.Cluster{
@@ -74,11 +84,15 @@ func main() {
 			},
 		},
 	})
-	handleFatalf(err, "Error creating integration test cluster: %v", err)
+	if err != nil {
+		logrus.Fatalf("Error creating integration test cluster: %v", err)
+	}
 
 	logrus.Info("Waiting for test cluster to be ready")
 	c, err = cluster.WaitForCreate(clusterClients, c)
-	handleFatalf(err, "Error waiting for test cluster to be ready: %v", err)
+	if err != nil {
+		logrus.Fatalf("Error waiting for test cluster to be ready: %v", err)
+	}
 
 	logrus.Infof("Test cluster %s created successfully. Setup complete.", c.Name)
 }
@@ -92,11 +106,4 @@ func getOutboundIP() (net.IP, error) {
 	defer conn.Close()
 
 	return conn.LocalAddr().(*net.UDPAddr).IP, nil
-}
-
-// handleFatalf logs a fatal error message and exits if the given error is not nil and does nothing otherwise.
-func handleFatalf(err error, format string, args ...interface{}) {
-	if err != nil {
-		logrus.Fatalf(format, args...)
-	}
 }
