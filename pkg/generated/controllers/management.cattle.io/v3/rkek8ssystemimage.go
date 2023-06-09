@@ -22,235 +22,111 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/lasso/pkg/client"
-	"github.com/rancher/lasso/pkg/controller"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/wrangler/pkg/generic"
-	"k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/tools/cache"
 )
 
-type RkeK8sSystemImageHandler func(string, *v3.RkeK8sSystemImage) (*v3.RkeK8sSystemImage, error)
-
+// RkeK8sSystemImageController interface for managing RkeK8sSystemImage resources.
 type RkeK8sSystemImageController interface {
 	generic.ControllerMeta
 	RkeK8sSystemImageClient
 
+	// OnChange runs the given handler when the controller detects a resource was changed.
 	OnChange(ctx context.Context, name string, sync RkeK8sSystemImageHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
 	OnRemove(ctx context.Context, name string, sync RkeK8sSystemImageHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
 	Enqueue(namespace, name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
 	EnqueueAfter(namespace, name string, duration time.Duration)
 
+	// Cache returns a cache for the resource type T.
 	Cache() RkeK8sSystemImageCache
 }
 
+// RkeK8sSystemImageClient interface for managing RkeK8sSystemImage resources in Kubernetes.
 type RkeK8sSystemImageClient interface {
+	// Create creates a new object and return the newly created Object or an error.
 	Create(*v3.RkeK8sSystemImage) (*v3.RkeK8sSystemImage, error)
+
+	// Update updates the object and return the newly updated Object or an error.
 	Update(*v3.RkeK8sSystemImage) (*v3.RkeK8sSystemImage, error)
 
+	// Delete deletes the Object in the given name.
 	Delete(namespace, name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
 	Get(namespace, name string, options metav1.GetOptions) (*v3.RkeK8sSystemImage, error)
+
+	// List will attempt to find multiple resources.
 	List(namespace string, opts metav1.ListOptions) (*v3.RkeK8sSystemImageList, error)
+
+	// Watch will start watching resources.
 	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
 	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.RkeK8sSystemImage, err error)
 }
 
+// RkeK8sSystemImageCache interface for retrieving RkeK8sSystemImage resources in memory.
 type RkeK8sSystemImageCache interface {
+	// Get returns the resources with the specified name from the cache.
 	Get(namespace, name string) (*v3.RkeK8sSystemImage, error)
+
+	// List will attempt to find resources from the Cache.
 	List(namespace string, selector labels.Selector) ([]*v3.RkeK8sSystemImage, error)
 
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
 	AddIndexer(indexName string, indexer RkeK8sSystemImageIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
 	GetByIndex(indexName, key string) ([]*v3.RkeK8sSystemImage, error)
 }
 
+// RkeK8sSystemImageHandler is function for performing any potential modifications to a RkeK8sSystemImage resource.
+type RkeK8sSystemImageHandler func(string, *v3.RkeK8sSystemImage) (*v3.RkeK8sSystemImage, error)
+
+// RkeK8sSystemImageIndexer computes a set of indexed values for the provided object.
 type RkeK8sSystemImageIndexer func(obj *v3.RkeK8sSystemImage) ([]string, error)
 
-type rkeK8sSystemImageController struct {
-	controller    controller.SharedController
-	client        *client.Client
-	gvk           schema.GroupVersionKind
-	groupResource schema.GroupResource
+// RkeK8sSystemImageGenericController wraps wrangler/pkg/generic.Controller so that the function definitions adhere to RkeK8sSystemImageController interface.
+type RkeK8sSystemImageGenericController struct {
+	generic.ControllerInterface[*v3.RkeK8sSystemImage, *v3.RkeK8sSystemImageList]
 }
 
-func NewRkeK8sSystemImageController(gvk schema.GroupVersionKind, resource string, namespaced bool, controller controller.SharedControllerFactory) RkeK8sSystemImageController {
-	c := controller.ForResourceKind(gvk.GroupVersion().WithResource(resource), gvk.Kind, namespaced)
-	return &rkeK8sSystemImageController{
-		controller: c,
-		client:     c.Client(),
-		gvk:        gvk,
-		groupResource: schema.GroupResource{
-			Group:    gvk.Group,
-			Resource: resource,
-		},
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *RkeK8sSystemImageGenericController) OnChange(ctx context.Context, name string, sync RkeK8sSystemImageHandler) {
+	c.ControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.RkeK8sSystemImage](sync))
+}
+
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *RkeK8sSystemImageGenericController) OnRemove(ctx context.Context, name string, sync RkeK8sSystemImageHandler) {
+	c.ControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.RkeK8sSystemImage](sync))
+}
+
+// Cache returns a cache of resources in memory.
+func (c *RkeK8sSystemImageGenericController) Cache() RkeK8sSystemImageCache {
+	return &RkeK8sSystemImageGenericCache{
+		c.ControllerInterface.Cache(),
 	}
 }
 
-func FromRkeK8sSystemImageHandlerToHandler(sync RkeK8sSystemImageHandler) generic.Handler {
-	return func(key string, obj runtime.Object) (ret runtime.Object, err error) {
-		var v *v3.RkeK8sSystemImage
-		if obj == nil {
-			v, err = sync(key, nil)
-		} else {
-			v, err = sync(key, obj.(*v3.RkeK8sSystemImage))
-		}
-		if v == nil {
-			return nil, err
-		}
-		return v, err
-	}
+// RkeK8sSystemImageGenericCache wraps wrangler/pkg/generic.Cache so the function definitions adhere to RkeK8sSystemImageCache interface.
+type RkeK8sSystemImageGenericCache struct {
+	generic.CacheInterface[*v3.RkeK8sSystemImage]
 }
 
-func (c *rkeK8sSystemImageController) Updater() generic.Updater {
-	return func(obj runtime.Object) (runtime.Object, error) {
-		newObj, err := c.Update(obj.(*v3.RkeK8sSystemImage))
-		if newObj == nil {
-			return nil, err
-		}
-		return newObj, err
-	}
-}
-
-func UpdateRkeK8sSystemImageDeepCopyOnChange(client RkeK8sSystemImageClient, obj *v3.RkeK8sSystemImage, handler func(obj *v3.RkeK8sSystemImage) (*v3.RkeK8sSystemImage, error)) (*v3.RkeK8sSystemImage, error) {
-	if obj == nil {
-		return obj, nil
-	}
-
-	copyObj := obj.DeepCopy()
-	newObj, err := handler(copyObj)
-	if newObj != nil {
-		copyObj = newObj
-	}
-	if obj.ResourceVersion == copyObj.ResourceVersion && !equality.Semantic.DeepEqual(obj, copyObj) {
-		return client.Update(copyObj)
-	}
-
-	return copyObj, err
-}
-
-func (c *rkeK8sSystemImageController) AddGenericHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.controller.RegisterHandler(ctx, name, controller.SharedControllerHandlerFunc(handler))
-}
-
-func (c *rkeK8sSystemImageController) AddGenericRemoveHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), handler))
-}
-
-func (c *rkeK8sSystemImageController) OnChange(ctx context.Context, name string, sync RkeK8sSystemImageHandler) {
-	c.AddGenericHandler(ctx, name, FromRkeK8sSystemImageHandlerToHandler(sync))
-}
-
-func (c *rkeK8sSystemImageController) OnRemove(ctx context.Context, name string, sync RkeK8sSystemImageHandler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), FromRkeK8sSystemImageHandlerToHandler(sync)))
-}
-
-func (c *rkeK8sSystemImageController) Enqueue(namespace, name string) {
-	c.controller.Enqueue(namespace, name)
-}
-
-func (c *rkeK8sSystemImageController) EnqueueAfter(namespace, name string, duration time.Duration) {
-	c.controller.EnqueueAfter(namespace, name, duration)
-}
-
-func (c *rkeK8sSystemImageController) Informer() cache.SharedIndexInformer {
-	return c.controller.Informer()
-}
-
-func (c *rkeK8sSystemImageController) GroupVersionKind() schema.GroupVersionKind {
-	return c.gvk
-}
-
-func (c *rkeK8sSystemImageController) Cache() RkeK8sSystemImageCache {
-	return &rkeK8sSystemImageCache{
-		indexer:  c.Informer().GetIndexer(),
-		resource: c.groupResource,
-	}
-}
-
-func (c *rkeK8sSystemImageController) Create(obj *v3.RkeK8sSystemImage) (*v3.RkeK8sSystemImage, error) {
-	result := &v3.RkeK8sSystemImage{}
-	return result, c.client.Create(context.TODO(), obj.Namespace, obj, result, metav1.CreateOptions{})
-}
-
-func (c *rkeK8sSystemImageController) Update(obj *v3.RkeK8sSystemImage) (*v3.RkeK8sSystemImage, error) {
-	result := &v3.RkeK8sSystemImage{}
-	return result, c.client.Update(context.TODO(), obj.Namespace, obj, result, metav1.UpdateOptions{})
-}
-
-func (c *rkeK8sSystemImageController) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	if options == nil {
-		options = &metav1.DeleteOptions{}
-	}
-	return c.client.Delete(context.TODO(), namespace, name, *options)
-}
-
-func (c *rkeK8sSystemImageController) Get(namespace, name string, options metav1.GetOptions) (*v3.RkeK8sSystemImage, error) {
-	result := &v3.RkeK8sSystemImage{}
-	return result, c.client.Get(context.TODO(), namespace, name, result, options)
-}
-
-func (c *rkeK8sSystemImageController) List(namespace string, opts metav1.ListOptions) (*v3.RkeK8sSystemImageList, error) {
-	result := &v3.RkeK8sSystemImageList{}
-	return result, c.client.List(context.TODO(), namespace, result, opts)
-}
-
-func (c *rkeK8sSystemImageController) Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
-	return c.client.Watch(context.TODO(), namespace, opts)
-}
-
-func (c *rkeK8sSystemImageController) Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (*v3.RkeK8sSystemImage, error) {
-	result := &v3.RkeK8sSystemImage{}
-	return result, c.client.Patch(context.TODO(), namespace, name, pt, data, result, metav1.PatchOptions{}, subresources...)
-}
-
-type rkeK8sSystemImageCache struct {
-	indexer  cache.Indexer
-	resource schema.GroupResource
-}
-
-func (c *rkeK8sSystemImageCache) Get(namespace, name string) (*v3.RkeK8sSystemImage, error) {
-	obj, exists, err := c.indexer.GetByKey(namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(c.resource, name)
-	}
-	return obj.(*v3.RkeK8sSystemImage), nil
-}
-
-func (c *rkeK8sSystemImageCache) List(namespace string, selector labels.Selector) (ret []*v3.RkeK8sSystemImage, err error) {
-
-	err = cache.ListAllByNamespace(c.indexer, namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v3.RkeK8sSystemImage))
-	})
-
-	return ret, err
-}
-
-func (c *rkeK8sSystemImageCache) AddIndexer(indexName string, indexer RkeK8sSystemImageIndexer) {
-	utilruntime.Must(c.indexer.AddIndexers(map[string]cache.IndexFunc{
-		indexName: func(obj interface{}) (strings []string, e error) {
-			return indexer(obj.(*v3.RkeK8sSystemImage))
-		},
-	}))
-}
-
-func (c *rkeK8sSystemImageCache) GetByIndex(indexName, key string) (result []*v3.RkeK8sSystemImage, err error) {
-	objs, err := c.indexer.ByIndex(indexName, key)
-	if err != nil {
-		return nil, err
-	}
-	result = make([]*v3.RkeK8sSystemImage, 0, len(objs))
-	for _, obj := range objs {
-		result = append(result, obj.(*v3.RkeK8sSystemImage))
-	}
-	return result, nil
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c RkeK8sSystemImageGenericCache) AddIndexer(indexName string, indexer RkeK8sSystemImageIndexer) {
+	c.CacheInterface.AddIndexer(indexName, generic.Indexer[*v3.RkeK8sSystemImage](indexer))
 }

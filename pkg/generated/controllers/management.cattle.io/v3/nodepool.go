@@ -22,8 +22,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/lasso/pkg/client"
-	"github.com/rancher/lasso/pkg/controller"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/wrangler/pkg/apply"
 	"github.com/rancher/wrangler/pkg/condition"
@@ -36,236 +34,120 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/tools/cache"
 )
 
-type NodePoolHandler func(string, *v3.NodePool) (*v3.NodePool, error)
-
+// NodePoolController interface for managing NodePool resources.
 type NodePoolController interface {
 	generic.ControllerMeta
 	NodePoolClient
 
+	// OnChange runs the given handler when the controller detects a resource was changed.
 	OnChange(ctx context.Context, name string, sync NodePoolHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
 	OnRemove(ctx context.Context, name string, sync NodePoolHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
 	Enqueue(namespace, name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
 	EnqueueAfter(namespace, name string, duration time.Duration)
 
+	// Cache returns a cache for the resource type T.
 	Cache() NodePoolCache
 }
 
+// NodePoolClient interface for managing NodePool resources in Kubernetes.
 type NodePoolClient interface {
+	// Create creates a new object and return the newly created Object or an error.
 	Create(*v3.NodePool) (*v3.NodePool, error)
+
+	// Update updates the object and return the newly updated Object or an error.
 	Update(*v3.NodePool) (*v3.NodePool, error)
+	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
+	// Will always return an error if the object does not have a status field.
 	UpdateStatus(*v3.NodePool) (*v3.NodePool, error)
+
+	// Delete deletes the Object in the given name.
 	Delete(namespace, name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
 	Get(namespace, name string, options metav1.GetOptions) (*v3.NodePool, error)
+
+	// List will attempt to find multiple resources.
 	List(namespace string, opts metav1.ListOptions) (*v3.NodePoolList, error)
+
+	// Watch will start watching resources.
 	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
 	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.NodePool, err error)
 }
 
+// NodePoolCache interface for retrieving NodePool resources in memory.
 type NodePoolCache interface {
+	// Get returns the resources with the specified name from the cache.
 	Get(namespace, name string) (*v3.NodePool, error)
+
+	// List will attempt to find resources from the Cache.
 	List(namespace string, selector labels.Selector) ([]*v3.NodePool, error)
 
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
 	AddIndexer(indexName string, indexer NodePoolIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
 	GetByIndex(indexName, key string) ([]*v3.NodePool, error)
 }
 
+// NodePoolHandler is function for performing any potential modifications to a NodePool resource.
+type NodePoolHandler func(string, *v3.NodePool) (*v3.NodePool, error)
+
+// NodePoolIndexer computes a set of indexed values for the provided object.
 type NodePoolIndexer func(obj *v3.NodePool) ([]string, error)
 
-type nodePoolController struct {
-	controller    controller.SharedController
-	client        *client.Client
-	gvk           schema.GroupVersionKind
-	groupResource schema.GroupResource
+// NodePoolGenericController wraps wrangler/pkg/generic.Controller so that the function definitions adhere to NodePoolController interface.
+type NodePoolGenericController struct {
+	generic.ControllerInterface[*v3.NodePool, *v3.NodePoolList]
 }
 
-func NewNodePoolController(gvk schema.GroupVersionKind, resource string, namespaced bool, controller controller.SharedControllerFactory) NodePoolController {
-	c := controller.ForResourceKind(gvk.GroupVersion().WithResource(resource), gvk.Kind, namespaced)
-	return &nodePoolController{
-		controller: c,
-		client:     c.Client(),
-		gvk:        gvk,
-		groupResource: schema.GroupResource{
-			Group:    gvk.Group,
-			Resource: resource,
-		},
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *NodePoolGenericController) OnChange(ctx context.Context, name string, sync NodePoolHandler) {
+	c.ControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.NodePool](sync))
+}
+
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *NodePoolGenericController) OnRemove(ctx context.Context, name string, sync NodePoolHandler) {
+	c.ControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.NodePool](sync))
+}
+
+// Cache returns a cache of resources in memory.
+func (c *NodePoolGenericController) Cache() NodePoolCache {
+	return &NodePoolGenericCache{
+		c.ControllerInterface.Cache(),
 	}
 }
 
-func FromNodePoolHandlerToHandler(sync NodePoolHandler) generic.Handler {
-	return func(key string, obj runtime.Object) (ret runtime.Object, err error) {
-		var v *v3.NodePool
-		if obj == nil {
-			v, err = sync(key, nil)
-		} else {
-			v, err = sync(key, obj.(*v3.NodePool))
-		}
-		if v == nil {
-			return nil, err
-		}
-		return v, err
-	}
+// NodePoolGenericCache wraps wrangler/pkg/generic.Cache so the function definitions adhere to NodePoolCache interface.
+type NodePoolGenericCache struct {
+	generic.CacheInterface[*v3.NodePool]
 }
 
-func (c *nodePoolController) Updater() generic.Updater {
-	return func(obj runtime.Object) (runtime.Object, error) {
-		newObj, err := c.Update(obj.(*v3.NodePool))
-		if newObj == nil {
-			return nil, err
-		}
-		return newObj, err
-	}
-}
-
-func UpdateNodePoolDeepCopyOnChange(client NodePoolClient, obj *v3.NodePool, handler func(obj *v3.NodePool) (*v3.NodePool, error)) (*v3.NodePool, error) {
-	if obj == nil {
-		return obj, nil
-	}
-
-	copyObj := obj.DeepCopy()
-	newObj, err := handler(copyObj)
-	if newObj != nil {
-		copyObj = newObj
-	}
-	if obj.ResourceVersion == copyObj.ResourceVersion && !equality.Semantic.DeepEqual(obj, copyObj) {
-		return client.Update(copyObj)
-	}
-
-	return copyObj, err
-}
-
-func (c *nodePoolController) AddGenericHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.controller.RegisterHandler(ctx, name, controller.SharedControllerHandlerFunc(handler))
-}
-
-func (c *nodePoolController) AddGenericRemoveHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), handler))
-}
-
-func (c *nodePoolController) OnChange(ctx context.Context, name string, sync NodePoolHandler) {
-	c.AddGenericHandler(ctx, name, FromNodePoolHandlerToHandler(sync))
-}
-
-func (c *nodePoolController) OnRemove(ctx context.Context, name string, sync NodePoolHandler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), FromNodePoolHandlerToHandler(sync)))
-}
-
-func (c *nodePoolController) Enqueue(namespace, name string) {
-	c.controller.Enqueue(namespace, name)
-}
-
-func (c *nodePoolController) EnqueueAfter(namespace, name string, duration time.Duration) {
-	c.controller.EnqueueAfter(namespace, name, duration)
-}
-
-func (c *nodePoolController) Informer() cache.SharedIndexInformer {
-	return c.controller.Informer()
-}
-
-func (c *nodePoolController) GroupVersionKind() schema.GroupVersionKind {
-	return c.gvk
-}
-
-func (c *nodePoolController) Cache() NodePoolCache {
-	return &nodePoolCache{
-		indexer:  c.Informer().GetIndexer(),
-		resource: c.groupResource,
-	}
-}
-
-func (c *nodePoolController) Create(obj *v3.NodePool) (*v3.NodePool, error) {
-	result := &v3.NodePool{}
-	return result, c.client.Create(context.TODO(), obj.Namespace, obj, result, metav1.CreateOptions{})
-}
-
-func (c *nodePoolController) Update(obj *v3.NodePool) (*v3.NodePool, error) {
-	result := &v3.NodePool{}
-	return result, c.client.Update(context.TODO(), obj.Namespace, obj, result, metav1.UpdateOptions{})
-}
-
-func (c *nodePoolController) UpdateStatus(obj *v3.NodePool) (*v3.NodePool, error) {
-	result := &v3.NodePool{}
-	return result, c.client.UpdateStatus(context.TODO(), obj.Namespace, obj, result, metav1.UpdateOptions{})
-}
-
-func (c *nodePoolController) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	if options == nil {
-		options = &metav1.DeleteOptions{}
-	}
-	return c.client.Delete(context.TODO(), namespace, name, *options)
-}
-
-func (c *nodePoolController) Get(namespace, name string, options metav1.GetOptions) (*v3.NodePool, error) {
-	result := &v3.NodePool{}
-	return result, c.client.Get(context.TODO(), namespace, name, result, options)
-}
-
-func (c *nodePoolController) List(namespace string, opts metav1.ListOptions) (*v3.NodePoolList, error) {
-	result := &v3.NodePoolList{}
-	return result, c.client.List(context.TODO(), namespace, result, opts)
-}
-
-func (c *nodePoolController) Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
-	return c.client.Watch(context.TODO(), namespace, opts)
-}
-
-func (c *nodePoolController) Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (*v3.NodePool, error) {
-	result := &v3.NodePool{}
-	return result, c.client.Patch(context.TODO(), namespace, name, pt, data, result, metav1.PatchOptions{}, subresources...)
-}
-
-type nodePoolCache struct {
-	indexer  cache.Indexer
-	resource schema.GroupResource
-}
-
-func (c *nodePoolCache) Get(namespace, name string) (*v3.NodePool, error) {
-	obj, exists, err := c.indexer.GetByKey(namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(c.resource, name)
-	}
-	return obj.(*v3.NodePool), nil
-}
-
-func (c *nodePoolCache) List(namespace string, selector labels.Selector) (ret []*v3.NodePool, err error) {
-
-	err = cache.ListAllByNamespace(c.indexer, namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v3.NodePool))
-	})
-
-	return ret, err
-}
-
-func (c *nodePoolCache) AddIndexer(indexName string, indexer NodePoolIndexer) {
-	utilruntime.Must(c.indexer.AddIndexers(map[string]cache.IndexFunc{
-		indexName: func(obj interface{}) (strings []string, e error) {
-			return indexer(obj.(*v3.NodePool))
-		},
-	}))
-}
-
-func (c *nodePoolCache) GetByIndex(indexName, key string) (result []*v3.NodePool, err error) {
-	objs, err := c.indexer.ByIndex(indexName, key)
-	if err != nil {
-		return nil, err
-	}
-	result = make([]*v3.NodePool, 0, len(objs))
-	for _, obj := range objs {
-		result = append(result, obj.(*v3.NodePool))
-	}
-	return result, nil
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c NodePoolGenericCache) AddIndexer(indexName string, indexer NodePoolIndexer) {
+	c.CacheInterface.AddIndexer(indexName, generic.Indexer[*v3.NodePool](indexer))
 }
 
 type NodePoolStatusHandler func(obj *v3.NodePool, status v3.NodePoolStatus) (v3.NodePoolStatus, error)
 
 type NodePoolGeneratingHandler func(obj *v3.NodePool, status v3.NodePoolStatus) ([]runtime.Object, v3.NodePoolStatus, error)
+
+func FromNodePoolHandlerToHandler(sync NodePoolHandler) generic.Handler {
+	return generic.FromObjectHandlerToHandler(generic.ObjectHandler[*v3.NodePool](sync))
+}
 
 func RegisterNodePoolStatusHandler(ctx context.Context, controller NodePoolController, condition condition.Cond, name string, handler NodePoolStatusHandler) {
 	statusHandler := &nodePoolStatusHandler{

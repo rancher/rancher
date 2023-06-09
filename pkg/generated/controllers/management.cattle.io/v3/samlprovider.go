@@ -22,235 +22,111 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/lasso/pkg/client"
-	"github.com/rancher/lasso/pkg/controller"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/wrangler/pkg/generic"
-	"k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/tools/cache"
 )
 
-type SamlProviderHandler func(string, *v3.SamlProvider) (*v3.SamlProvider, error)
-
+// SamlProviderController interface for managing SamlProvider resources.
 type SamlProviderController interface {
 	generic.ControllerMeta
 	SamlProviderClient
 
+	// OnChange runs the given handler when the controller detects a resource was changed.
 	OnChange(ctx context.Context, name string, sync SamlProviderHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
 	OnRemove(ctx context.Context, name string, sync SamlProviderHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
 	Enqueue(name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
 	EnqueueAfter(name string, duration time.Duration)
 
+	// Cache returns a cache for the resource type T.
 	Cache() SamlProviderCache
 }
 
+// SamlProviderClient interface for managing SamlProvider resources in Kubernetes.
 type SamlProviderClient interface {
+	// Create creates a new object and return the newly created Object or an error.
 	Create(*v3.SamlProvider) (*v3.SamlProvider, error)
+
+	// Update updates the object and return the newly updated Object or an error.
 	Update(*v3.SamlProvider) (*v3.SamlProvider, error)
 
+	// Delete deletes the Object in the given name.
 	Delete(name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
 	Get(name string, options metav1.GetOptions) (*v3.SamlProvider, error)
+
+	// List will attempt to find multiple resources.
 	List(opts metav1.ListOptions) (*v3.SamlProviderList, error)
+
+	// Watch will start watching resources.
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.SamlProvider, err error)
 }
 
+// SamlProviderCache interface for retrieving SamlProvider resources in memory.
 type SamlProviderCache interface {
+	// Get returns the resources with the specified name from the cache.
 	Get(name string) (*v3.SamlProvider, error)
+
+	// List will attempt to find resources from the Cache.
 	List(selector labels.Selector) ([]*v3.SamlProvider, error)
 
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
 	AddIndexer(indexName string, indexer SamlProviderIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
 	GetByIndex(indexName, key string) ([]*v3.SamlProvider, error)
 }
 
+// SamlProviderHandler is function for performing any potential modifications to a SamlProvider resource.
+type SamlProviderHandler func(string, *v3.SamlProvider) (*v3.SamlProvider, error)
+
+// SamlProviderIndexer computes a set of indexed values for the provided object.
 type SamlProviderIndexer func(obj *v3.SamlProvider) ([]string, error)
 
-type samlProviderController struct {
-	controller    controller.SharedController
-	client        *client.Client
-	gvk           schema.GroupVersionKind
-	groupResource schema.GroupResource
+// SamlProviderGenericController wraps wrangler/pkg/generic.NonNamespacedController so that the function definitions adhere to SamlProviderController interface.
+type SamlProviderGenericController struct {
+	generic.NonNamespacedControllerInterface[*v3.SamlProvider, *v3.SamlProviderList]
 }
 
-func NewSamlProviderController(gvk schema.GroupVersionKind, resource string, namespaced bool, controller controller.SharedControllerFactory) SamlProviderController {
-	c := controller.ForResourceKind(gvk.GroupVersion().WithResource(resource), gvk.Kind, namespaced)
-	return &samlProviderController{
-		controller: c,
-		client:     c.Client(),
-		gvk:        gvk,
-		groupResource: schema.GroupResource{
-			Group:    gvk.Group,
-			Resource: resource,
-		},
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *SamlProviderGenericController) OnChange(ctx context.Context, name string, sync SamlProviderHandler) {
+	c.NonNamespacedControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.SamlProvider](sync))
+}
+
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *SamlProviderGenericController) OnRemove(ctx context.Context, name string, sync SamlProviderHandler) {
+	c.NonNamespacedControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.SamlProvider](sync))
+}
+
+// Cache returns a cache of resources in memory.
+func (c *SamlProviderGenericController) Cache() SamlProviderCache {
+	return &SamlProviderGenericCache{
+		c.NonNamespacedControllerInterface.Cache(),
 	}
 }
 
-func FromSamlProviderHandlerToHandler(sync SamlProviderHandler) generic.Handler {
-	return func(key string, obj runtime.Object) (ret runtime.Object, err error) {
-		var v *v3.SamlProvider
-		if obj == nil {
-			v, err = sync(key, nil)
-		} else {
-			v, err = sync(key, obj.(*v3.SamlProvider))
-		}
-		if v == nil {
-			return nil, err
-		}
-		return v, err
-	}
+// SamlProviderGenericCache wraps wrangler/pkg/generic.NonNamespacedCache so the function definitions adhere to SamlProviderCache interface.
+type SamlProviderGenericCache struct {
+	generic.NonNamespacedCacheInterface[*v3.SamlProvider]
 }
 
-func (c *samlProviderController) Updater() generic.Updater {
-	return func(obj runtime.Object) (runtime.Object, error) {
-		newObj, err := c.Update(obj.(*v3.SamlProvider))
-		if newObj == nil {
-			return nil, err
-		}
-		return newObj, err
-	}
-}
-
-func UpdateSamlProviderDeepCopyOnChange(client SamlProviderClient, obj *v3.SamlProvider, handler func(obj *v3.SamlProvider) (*v3.SamlProvider, error)) (*v3.SamlProvider, error) {
-	if obj == nil {
-		return obj, nil
-	}
-
-	copyObj := obj.DeepCopy()
-	newObj, err := handler(copyObj)
-	if newObj != nil {
-		copyObj = newObj
-	}
-	if obj.ResourceVersion == copyObj.ResourceVersion && !equality.Semantic.DeepEqual(obj, copyObj) {
-		return client.Update(copyObj)
-	}
-
-	return copyObj, err
-}
-
-func (c *samlProviderController) AddGenericHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.controller.RegisterHandler(ctx, name, controller.SharedControllerHandlerFunc(handler))
-}
-
-func (c *samlProviderController) AddGenericRemoveHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), handler))
-}
-
-func (c *samlProviderController) OnChange(ctx context.Context, name string, sync SamlProviderHandler) {
-	c.AddGenericHandler(ctx, name, FromSamlProviderHandlerToHandler(sync))
-}
-
-func (c *samlProviderController) OnRemove(ctx context.Context, name string, sync SamlProviderHandler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), FromSamlProviderHandlerToHandler(sync)))
-}
-
-func (c *samlProviderController) Enqueue(name string) {
-	c.controller.Enqueue("", name)
-}
-
-func (c *samlProviderController) EnqueueAfter(name string, duration time.Duration) {
-	c.controller.EnqueueAfter("", name, duration)
-}
-
-func (c *samlProviderController) Informer() cache.SharedIndexInformer {
-	return c.controller.Informer()
-}
-
-func (c *samlProviderController) GroupVersionKind() schema.GroupVersionKind {
-	return c.gvk
-}
-
-func (c *samlProviderController) Cache() SamlProviderCache {
-	return &samlProviderCache{
-		indexer:  c.Informer().GetIndexer(),
-		resource: c.groupResource,
-	}
-}
-
-func (c *samlProviderController) Create(obj *v3.SamlProvider) (*v3.SamlProvider, error) {
-	result := &v3.SamlProvider{}
-	return result, c.client.Create(context.TODO(), "", obj, result, metav1.CreateOptions{})
-}
-
-func (c *samlProviderController) Update(obj *v3.SamlProvider) (*v3.SamlProvider, error) {
-	result := &v3.SamlProvider{}
-	return result, c.client.Update(context.TODO(), "", obj, result, metav1.UpdateOptions{})
-}
-
-func (c *samlProviderController) Delete(name string, options *metav1.DeleteOptions) error {
-	if options == nil {
-		options = &metav1.DeleteOptions{}
-	}
-	return c.client.Delete(context.TODO(), "", name, *options)
-}
-
-func (c *samlProviderController) Get(name string, options metav1.GetOptions) (*v3.SamlProvider, error) {
-	result := &v3.SamlProvider{}
-	return result, c.client.Get(context.TODO(), "", name, result, options)
-}
-
-func (c *samlProviderController) List(opts metav1.ListOptions) (*v3.SamlProviderList, error) {
-	result := &v3.SamlProviderList{}
-	return result, c.client.List(context.TODO(), "", result, opts)
-}
-
-func (c *samlProviderController) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return c.client.Watch(context.TODO(), "", opts)
-}
-
-func (c *samlProviderController) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (*v3.SamlProvider, error) {
-	result := &v3.SamlProvider{}
-	return result, c.client.Patch(context.TODO(), "", name, pt, data, result, metav1.PatchOptions{}, subresources...)
-}
-
-type samlProviderCache struct {
-	indexer  cache.Indexer
-	resource schema.GroupResource
-}
-
-func (c *samlProviderCache) Get(name string) (*v3.SamlProvider, error) {
-	obj, exists, err := c.indexer.GetByKey(name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(c.resource, name)
-	}
-	return obj.(*v3.SamlProvider), nil
-}
-
-func (c *samlProviderCache) List(selector labels.Selector) (ret []*v3.SamlProvider, err error) {
-
-	err = cache.ListAll(c.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v3.SamlProvider))
-	})
-
-	return ret, err
-}
-
-func (c *samlProviderCache) AddIndexer(indexName string, indexer SamlProviderIndexer) {
-	utilruntime.Must(c.indexer.AddIndexers(map[string]cache.IndexFunc{
-		indexName: func(obj interface{}) (strings []string, e error) {
-			return indexer(obj.(*v3.SamlProvider))
-		},
-	}))
-}
-
-func (c *samlProviderCache) GetByIndex(indexName, key string) (result []*v3.SamlProvider, err error) {
-	objs, err := c.indexer.ByIndex(indexName, key)
-	if err != nil {
-		return nil, err
-	}
-	result = make([]*v3.SamlProvider, 0, len(objs))
-	for _, obj := range objs {
-		result = append(result, obj.(*v3.SamlProvider))
-	}
-	return result, nil
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c SamlProviderGenericCache) AddIndexer(indexName string, indexer SamlProviderIndexer) {
+	c.NonNamespacedCacheInterface.AddIndexer(indexName, generic.Indexer[*v3.SamlProvider](indexer))
 }

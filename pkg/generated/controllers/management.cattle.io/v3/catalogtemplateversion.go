@@ -22,8 +22,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/lasso/pkg/client"
-	"github.com/rancher/lasso/pkg/controller"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/wrangler/pkg/apply"
 	"github.com/rancher/wrangler/pkg/condition"
@@ -36,236 +34,120 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/tools/cache"
 )
 
-type CatalogTemplateVersionHandler func(string, *v3.CatalogTemplateVersion) (*v3.CatalogTemplateVersion, error)
-
+// CatalogTemplateVersionController interface for managing CatalogTemplateVersion resources.
 type CatalogTemplateVersionController interface {
 	generic.ControllerMeta
 	CatalogTemplateVersionClient
 
+	// OnChange runs the given handler when the controller detects a resource was changed.
 	OnChange(ctx context.Context, name string, sync CatalogTemplateVersionHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
 	OnRemove(ctx context.Context, name string, sync CatalogTemplateVersionHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
 	Enqueue(namespace, name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
 	EnqueueAfter(namespace, name string, duration time.Duration)
 
+	// Cache returns a cache for the resource type T.
 	Cache() CatalogTemplateVersionCache
 }
 
+// CatalogTemplateVersionClient interface for managing CatalogTemplateVersion resources in Kubernetes.
 type CatalogTemplateVersionClient interface {
+	// Create creates a new object and return the newly created Object or an error.
 	Create(*v3.CatalogTemplateVersion) (*v3.CatalogTemplateVersion, error)
+
+	// Update updates the object and return the newly updated Object or an error.
 	Update(*v3.CatalogTemplateVersion) (*v3.CatalogTemplateVersion, error)
+	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
+	// Will always return an error if the object does not have a status field.
 	UpdateStatus(*v3.CatalogTemplateVersion) (*v3.CatalogTemplateVersion, error)
+
+	// Delete deletes the Object in the given name.
 	Delete(namespace, name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
 	Get(namespace, name string, options metav1.GetOptions) (*v3.CatalogTemplateVersion, error)
+
+	// List will attempt to find multiple resources.
 	List(namespace string, opts metav1.ListOptions) (*v3.CatalogTemplateVersionList, error)
+
+	// Watch will start watching resources.
 	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
 	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.CatalogTemplateVersion, err error)
 }
 
+// CatalogTemplateVersionCache interface for retrieving CatalogTemplateVersion resources in memory.
 type CatalogTemplateVersionCache interface {
+	// Get returns the resources with the specified name from the cache.
 	Get(namespace, name string) (*v3.CatalogTemplateVersion, error)
+
+	// List will attempt to find resources from the Cache.
 	List(namespace string, selector labels.Selector) ([]*v3.CatalogTemplateVersion, error)
 
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
 	AddIndexer(indexName string, indexer CatalogTemplateVersionIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
 	GetByIndex(indexName, key string) ([]*v3.CatalogTemplateVersion, error)
 }
 
+// CatalogTemplateVersionHandler is function for performing any potential modifications to a CatalogTemplateVersion resource.
+type CatalogTemplateVersionHandler func(string, *v3.CatalogTemplateVersion) (*v3.CatalogTemplateVersion, error)
+
+// CatalogTemplateVersionIndexer computes a set of indexed values for the provided object.
 type CatalogTemplateVersionIndexer func(obj *v3.CatalogTemplateVersion) ([]string, error)
 
-type catalogTemplateVersionController struct {
-	controller    controller.SharedController
-	client        *client.Client
-	gvk           schema.GroupVersionKind
-	groupResource schema.GroupResource
+// CatalogTemplateVersionGenericController wraps wrangler/pkg/generic.Controller so that the function definitions adhere to CatalogTemplateVersionController interface.
+type CatalogTemplateVersionGenericController struct {
+	generic.ControllerInterface[*v3.CatalogTemplateVersion, *v3.CatalogTemplateVersionList]
 }
 
-func NewCatalogTemplateVersionController(gvk schema.GroupVersionKind, resource string, namespaced bool, controller controller.SharedControllerFactory) CatalogTemplateVersionController {
-	c := controller.ForResourceKind(gvk.GroupVersion().WithResource(resource), gvk.Kind, namespaced)
-	return &catalogTemplateVersionController{
-		controller: c,
-		client:     c.Client(),
-		gvk:        gvk,
-		groupResource: schema.GroupResource{
-			Group:    gvk.Group,
-			Resource: resource,
-		},
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *CatalogTemplateVersionGenericController) OnChange(ctx context.Context, name string, sync CatalogTemplateVersionHandler) {
+	c.ControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.CatalogTemplateVersion](sync))
+}
+
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *CatalogTemplateVersionGenericController) OnRemove(ctx context.Context, name string, sync CatalogTemplateVersionHandler) {
+	c.ControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.CatalogTemplateVersion](sync))
+}
+
+// Cache returns a cache of resources in memory.
+func (c *CatalogTemplateVersionGenericController) Cache() CatalogTemplateVersionCache {
+	return &CatalogTemplateVersionGenericCache{
+		c.ControllerInterface.Cache(),
 	}
 }
 
-func FromCatalogTemplateVersionHandlerToHandler(sync CatalogTemplateVersionHandler) generic.Handler {
-	return func(key string, obj runtime.Object) (ret runtime.Object, err error) {
-		var v *v3.CatalogTemplateVersion
-		if obj == nil {
-			v, err = sync(key, nil)
-		} else {
-			v, err = sync(key, obj.(*v3.CatalogTemplateVersion))
-		}
-		if v == nil {
-			return nil, err
-		}
-		return v, err
-	}
+// CatalogTemplateVersionGenericCache wraps wrangler/pkg/generic.Cache so the function definitions adhere to CatalogTemplateVersionCache interface.
+type CatalogTemplateVersionGenericCache struct {
+	generic.CacheInterface[*v3.CatalogTemplateVersion]
 }
 
-func (c *catalogTemplateVersionController) Updater() generic.Updater {
-	return func(obj runtime.Object) (runtime.Object, error) {
-		newObj, err := c.Update(obj.(*v3.CatalogTemplateVersion))
-		if newObj == nil {
-			return nil, err
-		}
-		return newObj, err
-	}
-}
-
-func UpdateCatalogTemplateVersionDeepCopyOnChange(client CatalogTemplateVersionClient, obj *v3.CatalogTemplateVersion, handler func(obj *v3.CatalogTemplateVersion) (*v3.CatalogTemplateVersion, error)) (*v3.CatalogTemplateVersion, error) {
-	if obj == nil {
-		return obj, nil
-	}
-
-	copyObj := obj.DeepCopy()
-	newObj, err := handler(copyObj)
-	if newObj != nil {
-		copyObj = newObj
-	}
-	if obj.ResourceVersion == copyObj.ResourceVersion && !equality.Semantic.DeepEqual(obj, copyObj) {
-		return client.Update(copyObj)
-	}
-
-	return copyObj, err
-}
-
-func (c *catalogTemplateVersionController) AddGenericHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.controller.RegisterHandler(ctx, name, controller.SharedControllerHandlerFunc(handler))
-}
-
-func (c *catalogTemplateVersionController) AddGenericRemoveHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), handler))
-}
-
-func (c *catalogTemplateVersionController) OnChange(ctx context.Context, name string, sync CatalogTemplateVersionHandler) {
-	c.AddGenericHandler(ctx, name, FromCatalogTemplateVersionHandlerToHandler(sync))
-}
-
-func (c *catalogTemplateVersionController) OnRemove(ctx context.Context, name string, sync CatalogTemplateVersionHandler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), FromCatalogTemplateVersionHandlerToHandler(sync)))
-}
-
-func (c *catalogTemplateVersionController) Enqueue(namespace, name string) {
-	c.controller.Enqueue(namespace, name)
-}
-
-func (c *catalogTemplateVersionController) EnqueueAfter(namespace, name string, duration time.Duration) {
-	c.controller.EnqueueAfter(namespace, name, duration)
-}
-
-func (c *catalogTemplateVersionController) Informer() cache.SharedIndexInformer {
-	return c.controller.Informer()
-}
-
-func (c *catalogTemplateVersionController) GroupVersionKind() schema.GroupVersionKind {
-	return c.gvk
-}
-
-func (c *catalogTemplateVersionController) Cache() CatalogTemplateVersionCache {
-	return &catalogTemplateVersionCache{
-		indexer:  c.Informer().GetIndexer(),
-		resource: c.groupResource,
-	}
-}
-
-func (c *catalogTemplateVersionController) Create(obj *v3.CatalogTemplateVersion) (*v3.CatalogTemplateVersion, error) {
-	result := &v3.CatalogTemplateVersion{}
-	return result, c.client.Create(context.TODO(), obj.Namespace, obj, result, metav1.CreateOptions{})
-}
-
-func (c *catalogTemplateVersionController) Update(obj *v3.CatalogTemplateVersion) (*v3.CatalogTemplateVersion, error) {
-	result := &v3.CatalogTemplateVersion{}
-	return result, c.client.Update(context.TODO(), obj.Namespace, obj, result, metav1.UpdateOptions{})
-}
-
-func (c *catalogTemplateVersionController) UpdateStatus(obj *v3.CatalogTemplateVersion) (*v3.CatalogTemplateVersion, error) {
-	result := &v3.CatalogTemplateVersion{}
-	return result, c.client.UpdateStatus(context.TODO(), obj.Namespace, obj, result, metav1.UpdateOptions{})
-}
-
-func (c *catalogTemplateVersionController) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	if options == nil {
-		options = &metav1.DeleteOptions{}
-	}
-	return c.client.Delete(context.TODO(), namespace, name, *options)
-}
-
-func (c *catalogTemplateVersionController) Get(namespace, name string, options metav1.GetOptions) (*v3.CatalogTemplateVersion, error) {
-	result := &v3.CatalogTemplateVersion{}
-	return result, c.client.Get(context.TODO(), namespace, name, result, options)
-}
-
-func (c *catalogTemplateVersionController) List(namespace string, opts metav1.ListOptions) (*v3.CatalogTemplateVersionList, error) {
-	result := &v3.CatalogTemplateVersionList{}
-	return result, c.client.List(context.TODO(), namespace, result, opts)
-}
-
-func (c *catalogTemplateVersionController) Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
-	return c.client.Watch(context.TODO(), namespace, opts)
-}
-
-func (c *catalogTemplateVersionController) Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (*v3.CatalogTemplateVersion, error) {
-	result := &v3.CatalogTemplateVersion{}
-	return result, c.client.Patch(context.TODO(), namespace, name, pt, data, result, metav1.PatchOptions{}, subresources...)
-}
-
-type catalogTemplateVersionCache struct {
-	indexer  cache.Indexer
-	resource schema.GroupResource
-}
-
-func (c *catalogTemplateVersionCache) Get(namespace, name string) (*v3.CatalogTemplateVersion, error) {
-	obj, exists, err := c.indexer.GetByKey(namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(c.resource, name)
-	}
-	return obj.(*v3.CatalogTemplateVersion), nil
-}
-
-func (c *catalogTemplateVersionCache) List(namespace string, selector labels.Selector) (ret []*v3.CatalogTemplateVersion, err error) {
-
-	err = cache.ListAllByNamespace(c.indexer, namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v3.CatalogTemplateVersion))
-	})
-
-	return ret, err
-}
-
-func (c *catalogTemplateVersionCache) AddIndexer(indexName string, indexer CatalogTemplateVersionIndexer) {
-	utilruntime.Must(c.indexer.AddIndexers(map[string]cache.IndexFunc{
-		indexName: func(obj interface{}) (strings []string, e error) {
-			return indexer(obj.(*v3.CatalogTemplateVersion))
-		},
-	}))
-}
-
-func (c *catalogTemplateVersionCache) GetByIndex(indexName, key string) (result []*v3.CatalogTemplateVersion, err error) {
-	objs, err := c.indexer.ByIndex(indexName, key)
-	if err != nil {
-		return nil, err
-	}
-	result = make([]*v3.CatalogTemplateVersion, 0, len(objs))
-	for _, obj := range objs {
-		result = append(result, obj.(*v3.CatalogTemplateVersion))
-	}
-	return result, nil
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c CatalogTemplateVersionGenericCache) AddIndexer(indexName string, indexer CatalogTemplateVersionIndexer) {
+	c.CacheInterface.AddIndexer(indexName, generic.Indexer[*v3.CatalogTemplateVersion](indexer))
 }
 
 type CatalogTemplateVersionStatusHandler func(obj *v3.CatalogTemplateVersion, status v3.TemplateVersionStatus) (v3.TemplateVersionStatus, error)
 
 type CatalogTemplateVersionGeneratingHandler func(obj *v3.CatalogTemplateVersion, status v3.TemplateVersionStatus) ([]runtime.Object, v3.TemplateVersionStatus, error)
+
+func FromCatalogTemplateVersionHandlerToHandler(sync CatalogTemplateVersionHandler) generic.Handler {
+	return generic.FromObjectHandlerToHandler(generic.ObjectHandler[*v3.CatalogTemplateVersion](sync))
+}
 
 func RegisterCatalogTemplateVersionStatusHandler(ctx context.Context, controller CatalogTemplateVersionController, condition condition.Cond, name string, handler CatalogTemplateVersionStatusHandler) {
 	statusHandler := &catalogTemplateVersionStatusHandler{

@@ -22,235 +22,111 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/lasso/pkg/client"
-	"github.com/rancher/lasso/pkg/controller"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/wrangler/pkg/generic"
-	"k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/tools/cache"
 )
 
-type UserAttributeHandler func(string, *v3.UserAttribute) (*v3.UserAttribute, error)
-
+// UserAttributeController interface for managing UserAttribute resources.
 type UserAttributeController interface {
 	generic.ControllerMeta
 	UserAttributeClient
 
+	// OnChange runs the given handler when the controller detects a resource was changed.
 	OnChange(ctx context.Context, name string, sync UserAttributeHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
 	OnRemove(ctx context.Context, name string, sync UserAttributeHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
 	Enqueue(name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
 	EnqueueAfter(name string, duration time.Duration)
 
+	// Cache returns a cache for the resource type T.
 	Cache() UserAttributeCache
 }
 
+// UserAttributeClient interface for managing UserAttribute resources in Kubernetes.
 type UserAttributeClient interface {
+	// Create creates a new object and return the newly created Object or an error.
 	Create(*v3.UserAttribute) (*v3.UserAttribute, error)
+
+	// Update updates the object and return the newly updated Object or an error.
 	Update(*v3.UserAttribute) (*v3.UserAttribute, error)
 
+	// Delete deletes the Object in the given name.
 	Delete(name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
 	Get(name string, options metav1.GetOptions) (*v3.UserAttribute, error)
+
+	// List will attempt to find multiple resources.
 	List(opts metav1.ListOptions) (*v3.UserAttributeList, error)
+
+	// Watch will start watching resources.
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.UserAttribute, err error)
 }
 
+// UserAttributeCache interface for retrieving UserAttribute resources in memory.
 type UserAttributeCache interface {
+	// Get returns the resources with the specified name from the cache.
 	Get(name string) (*v3.UserAttribute, error)
+
+	// List will attempt to find resources from the Cache.
 	List(selector labels.Selector) ([]*v3.UserAttribute, error)
 
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
 	AddIndexer(indexName string, indexer UserAttributeIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
 	GetByIndex(indexName, key string) ([]*v3.UserAttribute, error)
 }
 
+// UserAttributeHandler is function for performing any potential modifications to a UserAttribute resource.
+type UserAttributeHandler func(string, *v3.UserAttribute) (*v3.UserAttribute, error)
+
+// UserAttributeIndexer computes a set of indexed values for the provided object.
 type UserAttributeIndexer func(obj *v3.UserAttribute) ([]string, error)
 
-type userAttributeController struct {
-	controller    controller.SharedController
-	client        *client.Client
-	gvk           schema.GroupVersionKind
-	groupResource schema.GroupResource
+// UserAttributeGenericController wraps wrangler/pkg/generic.NonNamespacedController so that the function definitions adhere to UserAttributeController interface.
+type UserAttributeGenericController struct {
+	generic.NonNamespacedControllerInterface[*v3.UserAttribute, *v3.UserAttributeList]
 }
 
-func NewUserAttributeController(gvk schema.GroupVersionKind, resource string, namespaced bool, controller controller.SharedControllerFactory) UserAttributeController {
-	c := controller.ForResourceKind(gvk.GroupVersion().WithResource(resource), gvk.Kind, namespaced)
-	return &userAttributeController{
-		controller: c,
-		client:     c.Client(),
-		gvk:        gvk,
-		groupResource: schema.GroupResource{
-			Group:    gvk.Group,
-			Resource: resource,
-		},
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *UserAttributeGenericController) OnChange(ctx context.Context, name string, sync UserAttributeHandler) {
+	c.NonNamespacedControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.UserAttribute](sync))
+}
+
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *UserAttributeGenericController) OnRemove(ctx context.Context, name string, sync UserAttributeHandler) {
+	c.NonNamespacedControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.UserAttribute](sync))
+}
+
+// Cache returns a cache of resources in memory.
+func (c *UserAttributeGenericController) Cache() UserAttributeCache {
+	return &UserAttributeGenericCache{
+		c.NonNamespacedControllerInterface.Cache(),
 	}
 }
 
-func FromUserAttributeHandlerToHandler(sync UserAttributeHandler) generic.Handler {
-	return func(key string, obj runtime.Object) (ret runtime.Object, err error) {
-		var v *v3.UserAttribute
-		if obj == nil {
-			v, err = sync(key, nil)
-		} else {
-			v, err = sync(key, obj.(*v3.UserAttribute))
-		}
-		if v == nil {
-			return nil, err
-		}
-		return v, err
-	}
+// UserAttributeGenericCache wraps wrangler/pkg/generic.NonNamespacedCache so the function definitions adhere to UserAttributeCache interface.
+type UserAttributeGenericCache struct {
+	generic.NonNamespacedCacheInterface[*v3.UserAttribute]
 }
 
-func (c *userAttributeController) Updater() generic.Updater {
-	return func(obj runtime.Object) (runtime.Object, error) {
-		newObj, err := c.Update(obj.(*v3.UserAttribute))
-		if newObj == nil {
-			return nil, err
-		}
-		return newObj, err
-	}
-}
-
-func UpdateUserAttributeDeepCopyOnChange(client UserAttributeClient, obj *v3.UserAttribute, handler func(obj *v3.UserAttribute) (*v3.UserAttribute, error)) (*v3.UserAttribute, error) {
-	if obj == nil {
-		return obj, nil
-	}
-
-	copyObj := obj.DeepCopy()
-	newObj, err := handler(copyObj)
-	if newObj != nil {
-		copyObj = newObj
-	}
-	if obj.ResourceVersion == copyObj.ResourceVersion && !equality.Semantic.DeepEqual(obj, copyObj) {
-		return client.Update(copyObj)
-	}
-
-	return copyObj, err
-}
-
-func (c *userAttributeController) AddGenericHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.controller.RegisterHandler(ctx, name, controller.SharedControllerHandlerFunc(handler))
-}
-
-func (c *userAttributeController) AddGenericRemoveHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), handler))
-}
-
-func (c *userAttributeController) OnChange(ctx context.Context, name string, sync UserAttributeHandler) {
-	c.AddGenericHandler(ctx, name, FromUserAttributeHandlerToHandler(sync))
-}
-
-func (c *userAttributeController) OnRemove(ctx context.Context, name string, sync UserAttributeHandler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), FromUserAttributeHandlerToHandler(sync)))
-}
-
-func (c *userAttributeController) Enqueue(name string) {
-	c.controller.Enqueue("", name)
-}
-
-func (c *userAttributeController) EnqueueAfter(name string, duration time.Duration) {
-	c.controller.EnqueueAfter("", name, duration)
-}
-
-func (c *userAttributeController) Informer() cache.SharedIndexInformer {
-	return c.controller.Informer()
-}
-
-func (c *userAttributeController) GroupVersionKind() schema.GroupVersionKind {
-	return c.gvk
-}
-
-func (c *userAttributeController) Cache() UserAttributeCache {
-	return &userAttributeCache{
-		indexer:  c.Informer().GetIndexer(),
-		resource: c.groupResource,
-	}
-}
-
-func (c *userAttributeController) Create(obj *v3.UserAttribute) (*v3.UserAttribute, error) {
-	result := &v3.UserAttribute{}
-	return result, c.client.Create(context.TODO(), "", obj, result, metav1.CreateOptions{})
-}
-
-func (c *userAttributeController) Update(obj *v3.UserAttribute) (*v3.UserAttribute, error) {
-	result := &v3.UserAttribute{}
-	return result, c.client.Update(context.TODO(), "", obj, result, metav1.UpdateOptions{})
-}
-
-func (c *userAttributeController) Delete(name string, options *metav1.DeleteOptions) error {
-	if options == nil {
-		options = &metav1.DeleteOptions{}
-	}
-	return c.client.Delete(context.TODO(), "", name, *options)
-}
-
-func (c *userAttributeController) Get(name string, options metav1.GetOptions) (*v3.UserAttribute, error) {
-	result := &v3.UserAttribute{}
-	return result, c.client.Get(context.TODO(), "", name, result, options)
-}
-
-func (c *userAttributeController) List(opts metav1.ListOptions) (*v3.UserAttributeList, error) {
-	result := &v3.UserAttributeList{}
-	return result, c.client.List(context.TODO(), "", result, opts)
-}
-
-func (c *userAttributeController) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return c.client.Watch(context.TODO(), "", opts)
-}
-
-func (c *userAttributeController) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (*v3.UserAttribute, error) {
-	result := &v3.UserAttribute{}
-	return result, c.client.Patch(context.TODO(), "", name, pt, data, result, metav1.PatchOptions{}, subresources...)
-}
-
-type userAttributeCache struct {
-	indexer  cache.Indexer
-	resource schema.GroupResource
-}
-
-func (c *userAttributeCache) Get(name string) (*v3.UserAttribute, error) {
-	obj, exists, err := c.indexer.GetByKey(name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(c.resource, name)
-	}
-	return obj.(*v3.UserAttribute), nil
-}
-
-func (c *userAttributeCache) List(selector labels.Selector) (ret []*v3.UserAttribute, err error) {
-
-	err = cache.ListAll(c.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v3.UserAttribute))
-	})
-
-	return ret, err
-}
-
-func (c *userAttributeCache) AddIndexer(indexName string, indexer UserAttributeIndexer) {
-	utilruntime.Must(c.indexer.AddIndexers(map[string]cache.IndexFunc{
-		indexName: func(obj interface{}) (strings []string, e error) {
-			return indexer(obj.(*v3.UserAttribute))
-		},
-	}))
-}
-
-func (c *userAttributeCache) GetByIndex(indexName, key string) (result []*v3.UserAttribute, err error) {
-	objs, err := c.indexer.ByIndex(indexName, key)
-	if err != nil {
-		return nil, err
-	}
-	result = make([]*v3.UserAttribute, 0, len(objs))
-	for _, obj := range objs {
-		result = append(result, obj.(*v3.UserAttribute))
-	}
-	return result, nil
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c UserAttributeGenericCache) AddIndexer(indexName string, indexer UserAttributeIndexer) {
+	c.NonNamespacedCacheInterface.AddIndexer(indexName, generic.Indexer[*v3.UserAttribute](indexer))
 }

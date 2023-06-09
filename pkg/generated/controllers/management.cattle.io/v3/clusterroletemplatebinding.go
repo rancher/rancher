@@ -22,235 +22,111 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/lasso/pkg/client"
-	"github.com/rancher/lasso/pkg/controller"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/wrangler/pkg/generic"
-	"k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/tools/cache"
 )
 
-type ClusterRoleTemplateBindingHandler func(string, *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error)
-
+// ClusterRoleTemplateBindingController interface for managing ClusterRoleTemplateBinding resources.
 type ClusterRoleTemplateBindingController interface {
 	generic.ControllerMeta
 	ClusterRoleTemplateBindingClient
 
+	// OnChange runs the given handler when the controller detects a resource was changed.
 	OnChange(ctx context.Context, name string, sync ClusterRoleTemplateBindingHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
 	OnRemove(ctx context.Context, name string, sync ClusterRoleTemplateBindingHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
 	Enqueue(namespace, name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
 	EnqueueAfter(namespace, name string, duration time.Duration)
 
+	// Cache returns a cache for the resource type T.
 	Cache() ClusterRoleTemplateBindingCache
 }
 
+// ClusterRoleTemplateBindingClient interface for managing ClusterRoleTemplateBinding resources in Kubernetes.
 type ClusterRoleTemplateBindingClient interface {
+	// Create creates a new object and return the newly created Object or an error.
 	Create(*v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error)
+
+	// Update updates the object and return the newly updated Object or an error.
 	Update(*v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error)
 
+	// Delete deletes the Object in the given name.
 	Delete(namespace, name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
 	Get(namespace, name string, options metav1.GetOptions) (*v3.ClusterRoleTemplateBinding, error)
+
+	// List will attempt to find multiple resources.
 	List(namespace string, opts metav1.ListOptions) (*v3.ClusterRoleTemplateBindingList, error)
+
+	// Watch will start watching resources.
 	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
 	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.ClusterRoleTemplateBinding, err error)
 }
 
+// ClusterRoleTemplateBindingCache interface for retrieving ClusterRoleTemplateBinding resources in memory.
 type ClusterRoleTemplateBindingCache interface {
+	// Get returns the resources with the specified name from the cache.
 	Get(namespace, name string) (*v3.ClusterRoleTemplateBinding, error)
+
+	// List will attempt to find resources from the Cache.
 	List(namespace string, selector labels.Selector) ([]*v3.ClusterRoleTemplateBinding, error)
 
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
 	AddIndexer(indexName string, indexer ClusterRoleTemplateBindingIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
 	GetByIndex(indexName, key string) ([]*v3.ClusterRoleTemplateBinding, error)
 }
 
+// ClusterRoleTemplateBindingHandler is function for performing any potential modifications to a ClusterRoleTemplateBinding resource.
+type ClusterRoleTemplateBindingHandler func(string, *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error)
+
+// ClusterRoleTemplateBindingIndexer computes a set of indexed values for the provided object.
 type ClusterRoleTemplateBindingIndexer func(obj *v3.ClusterRoleTemplateBinding) ([]string, error)
 
-type clusterRoleTemplateBindingController struct {
-	controller    controller.SharedController
-	client        *client.Client
-	gvk           schema.GroupVersionKind
-	groupResource schema.GroupResource
+// ClusterRoleTemplateBindingGenericController wraps wrangler/pkg/generic.Controller so that the function definitions adhere to ClusterRoleTemplateBindingController interface.
+type ClusterRoleTemplateBindingGenericController struct {
+	generic.ControllerInterface[*v3.ClusterRoleTemplateBinding, *v3.ClusterRoleTemplateBindingList]
 }
 
-func NewClusterRoleTemplateBindingController(gvk schema.GroupVersionKind, resource string, namespaced bool, controller controller.SharedControllerFactory) ClusterRoleTemplateBindingController {
-	c := controller.ForResourceKind(gvk.GroupVersion().WithResource(resource), gvk.Kind, namespaced)
-	return &clusterRoleTemplateBindingController{
-		controller: c,
-		client:     c.Client(),
-		gvk:        gvk,
-		groupResource: schema.GroupResource{
-			Group:    gvk.Group,
-			Resource: resource,
-		},
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *ClusterRoleTemplateBindingGenericController) OnChange(ctx context.Context, name string, sync ClusterRoleTemplateBindingHandler) {
+	c.ControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.ClusterRoleTemplateBinding](sync))
+}
+
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *ClusterRoleTemplateBindingGenericController) OnRemove(ctx context.Context, name string, sync ClusterRoleTemplateBindingHandler) {
+	c.ControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.ClusterRoleTemplateBinding](sync))
+}
+
+// Cache returns a cache of resources in memory.
+func (c *ClusterRoleTemplateBindingGenericController) Cache() ClusterRoleTemplateBindingCache {
+	return &ClusterRoleTemplateBindingGenericCache{
+		c.ControllerInterface.Cache(),
 	}
 }
 
-func FromClusterRoleTemplateBindingHandlerToHandler(sync ClusterRoleTemplateBindingHandler) generic.Handler {
-	return func(key string, obj runtime.Object) (ret runtime.Object, err error) {
-		var v *v3.ClusterRoleTemplateBinding
-		if obj == nil {
-			v, err = sync(key, nil)
-		} else {
-			v, err = sync(key, obj.(*v3.ClusterRoleTemplateBinding))
-		}
-		if v == nil {
-			return nil, err
-		}
-		return v, err
-	}
+// ClusterRoleTemplateBindingGenericCache wraps wrangler/pkg/generic.Cache so the function definitions adhere to ClusterRoleTemplateBindingCache interface.
+type ClusterRoleTemplateBindingGenericCache struct {
+	generic.CacheInterface[*v3.ClusterRoleTemplateBinding]
 }
 
-func (c *clusterRoleTemplateBindingController) Updater() generic.Updater {
-	return func(obj runtime.Object) (runtime.Object, error) {
-		newObj, err := c.Update(obj.(*v3.ClusterRoleTemplateBinding))
-		if newObj == nil {
-			return nil, err
-		}
-		return newObj, err
-	}
-}
-
-func UpdateClusterRoleTemplateBindingDeepCopyOnChange(client ClusterRoleTemplateBindingClient, obj *v3.ClusterRoleTemplateBinding, handler func(obj *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error)) (*v3.ClusterRoleTemplateBinding, error) {
-	if obj == nil {
-		return obj, nil
-	}
-
-	copyObj := obj.DeepCopy()
-	newObj, err := handler(copyObj)
-	if newObj != nil {
-		copyObj = newObj
-	}
-	if obj.ResourceVersion == copyObj.ResourceVersion && !equality.Semantic.DeepEqual(obj, copyObj) {
-		return client.Update(copyObj)
-	}
-
-	return copyObj, err
-}
-
-func (c *clusterRoleTemplateBindingController) AddGenericHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.controller.RegisterHandler(ctx, name, controller.SharedControllerHandlerFunc(handler))
-}
-
-func (c *clusterRoleTemplateBindingController) AddGenericRemoveHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), handler))
-}
-
-func (c *clusterRoleTemplateBindingController) OnChange(ctx context.Context, name string, sync ClusterRoleTemplateBindingHandler) {
-	c.AddGenericHandler(ctx, name, FromClusterRoleTemplateBindingHandlerToHandler(sync))
-}
-
-func (c *clusterRoleTemplateBindingController) OnRemove(ctx context.Context, name string, sync ClusterRoleTemplateBindingHandler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), FromClusterRoleTemplateBindingHandlerToHandler(sync)))
-}
-
-func (c *clusterRoleTemplateBindingController) Enqueue(namespace, name string) {
-	c.controller.Enqueue(namespace, name)
-}
-
-func (c *clusterRoleTemplateBindingController) EnqueueAfter(namespace, name string, duration time.Duration) {
-	c.controller.EnqueueAfter(namespace, name, duration)
-}
-
-func (c *clusterRoleTemplateBindingController) Informer() cache.SharedIndexInformer {
-	return c.controller.Informer()
-}
-
-func (c *clusterRoleTemplateBindingController) GroupVersionKind() schema.GroupVersionKind {
-	return c.gvk
-}
-
-func (c *clusterRoleTemplateBindingController) Cache() ClusterRoleTemplateBindingCache {
-	return &clusterRoleTemplateBindingCache{
-		indexer:  c.Informer().GetIndexer(),
-		resource: c.groupResource,
-	}
-}
-
-func (c *clusterRoleTemplateBindingController) Create(obj *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
-	result := &v3.ClusterRoleTemplateBinding{}
-	return result, c.client.Create(context.TODO(), obj.Namespace, obj, result, metav1.CreateOptions{})
-}
-
-func (c *clusterRoleTemplateBindingController) Update(obj *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
-	result := &v3.ClusterRoleTemplateBinding{}
-	return result, c.client.Update(context.TODO(), obj.Namespace, obj, result, metav1.UpdateOptions{})
-}
-
-func (c *clusterRoleTemplateBindingController) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	if options == nil {
-		options = &metav1.DeleteOptions{}
-	}
-	return c.client.Delete(context.TODO(), namespace, name, *options)
-}
-
-func (c *clusterRoleTemplateBindingController) Get(namespace, name string, options metav1.GetOptions) (*v3.ClusterRoleTemplateBinding, error) {
-	result := &v3.ClusterRoleTemplateBinding{}
-	return result, c.client.Get(context.TODO(), namespace, name, result, options)
-}
-
-func (c *clusterRoleTemplateBindingController) List(namespace string, opts metav1.ListOptions) (*v3.ClusterRoleTemplateBindingList, error) {
-	result := &v3.ClusterRoleTemplateBindingList{}
-	return result, c.client.List(context.TODO(), namespace, result, opts)
-}
-
-func (c *clusterRoleTemplateBindingController) Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
-	return c.client.Watch(context.TODO(), namespace, opts)
-}
-
-func (c *clusterRoleTemplateBindingController) Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (*v3.ClusterRoleTemplateBinding, error) {
-	result := &v3.ClusterRoleTemplateBinding{}
-	return result, c.client.Patch(context.TODO(), namespace, name, pt, data, result, metav1.PatchOptions{}, subresources...)
-}
-
-type clusterRoleTemplateBindingCache struct {
-	indexer  cache.Indexer
-	resource schema.GroupResource
-}
-
-func (c *clusterRoleTemplateBindingCache) Get(namespace, name string) (*v3.ClusterRoleTemplateBinding, error) {
-	obj, exists, err := c.indexer.GetByKey(namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(c.resource, name)
-	}
-	return obj.(*v3.ClusterRoleTemplateBinding), nil
-}
-
-func (c *clusterRoleTemplateBindingCache) List(namespace string, selector labels.Selector) (ret []*v3.ClusterRoleTemplateBinding, err error) {
-
-	err = cache.ListAllByNamespace(c.indexer, namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v3.ClusterRoleTemplateBinding))
-	})
-
-	return ret, err
-}
-
-func (c *clusterRoleTemplateBindingCache) AddIndexer(indexName string, indexer ClusterRoleTemplateBindingIndexer) {
-	utilruntime.Must(c.indexer.AddIndexers(map[string]cache.IndexFunc{
-		indexName: func(obj interface{}) (strings []string, e error) {
-			return indexer(obj.(*v3.ClusterRoleTemplateBinding))
-		},
-	}))
-}
-
-func (c *clusterRoleTemplateBindingCache) GetByIndex(indexName, key string) (result []*v3.ClusterRoleTemplateBinding, err error) {
-	objs, err := c.indexer.ByIndex(indexName, key)
-	if err != nil {
-		return nil, err
-	}
-	result = make([]*v3.ClusterRoleTemplateBinding, 0, len(objs))
-	for _, obj := range objs {
-		result = append(result, obj.(*v3.ClusterRoleTemplateBinding))
-	}
-	return result, nil
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c ClusterRoleTemplateBindingGenericCache) AddIndexer(indexName string, indexer ClusterRoleTemplateBindingIndexer) {
+	c.CacheInterface.AddIndexer(indexName, generic.Indexer[*v3.ClusterRoleTemplateBinding](indexer))
 }

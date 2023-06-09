@@ -22,235 +22,111 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/lasso/pkg/client"
-	"github.com/rancher/lasso/pkg/controller"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/wrangler/pkg/generic"
-	"k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/tools/cache"
 )
 
-type GoogleOAuthProviderHandler func(string, *v3.GoogleOAuthProvider) (*v3.GoogleOAuthProvider, error)
-
+// GoogleOAuthProviderController interface for managing GoogleOAuthProvider resources.
 type GoogleOAuthProviderController interface {
 	generic.ControllerMeta
 	GoogleOAuthProviderClient
 
+	// OnChange runs the given handler when the controller detects a resource was changed.
 	OnChange(ctx context.Context, name string, sync GoogleOAuthProviderHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
 	OnRemove(ctx context.Context, name string, sync GoogleOAuthProviderHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
 	Enqueue(name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
 	EnqueueAfter(name string, duration time.Duration)
 
+	// Cache returns a cache for the resource type T.
 	Cache() GoogleOAuthProviderCache
 }
 
+// GoogleOAuthProviderClient interface for managing GoogleOAuthProvider resources in Kubernetes.
 type GoogleOAuthProviderClient interface {
+	// Create creates a new object and return the newly created Object or an error.
 	Create(*v3.GoogleOAuthProvider) (*v3.GoogleOAuthProvider, error)
+
+	// Update updates the object and return the newly updated Object or an error.
 	Update(*v3.GoogleOAuthProvider) (*v3.GoogleOAuthProvider, error)
 
+	// Delete deletes the Object in the given name.
 	Delete(name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
 	Get(name string, options metav1.GetOptions) (*v3.GoogleOAuthProvider, error)
+
+	// List will attempt to find multiple resources.
 	List(opts metav1.ListOptions) (*v3.GoogleOAuthProviderList, error)
+
+	// Watch will start watching resources.
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.GoogleOAuthProvider, err error)
 }
 
+// GoogleOAuthProviderCache interface for retrieving GoogleOAuthProvider resources in memory.
 type GoogleOAuthProviderCache interface {
+	// Get returns the resources with the specified name from the cache.
 	Get(name string) (*v3.GoogleOAuthProvider, error)
+
+	// List will attempt to find resources from the Cache.
 	List(selector labels.Selector) ([]*v3.GoogleOAuthProvider, error)
 
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
 	AddIndexer(indexName string, indexer GoogleOAuthProviderIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
 	GetByIndex(indexName, key string) ([]*v3.GoogleOAuthProvider, error)
 }
 
+// GoogleOAuthProviderHandler is function for performing any potential modifications to a GoogleOAuthProvider resource.
+type GoogleOAuthProviderHandler func(string, *v3.GoogleOAuthProvider) (*v3.GoogleOAuthProvider, error)
+
+// GoogleOAuthProviderIndexer computes a set of indexed values for the provided object.
 type GoogleOAuthProviderIndexer func(obj *v3.GoogleOAuthProvider) ([]string, error)
 
-type googleOAuthProviderController struct {
-	controller    controller.SharedController
-	client        *client.Client
-	gvk           schema.GroupVersionKind
-	groupResource schema.GroupResource
+// GoogleOAuthProviderGenericController wraps wrangler/pkg/generic.NonNamespacedController so that the function definitions adhere to GoogleOAuthProviderController interface.
+type GoogleOAuthProviderGenericController struct {
+	generic.NonNamespacedControllerInterface[*v3.GoogleOAuthProvider, *v3.GoogleOAuthProviderList]
 }
 
-func NewGoogleOAuthProviderController(gvk schema.GroupVersionKind, resource string, namespaced bool, controller controller.SharedControllerFactory) GoogleOAuthProviderController {
-	c := controller.ForResourceKind(gvk.GroupVersion().WithResource(resource), gvk.Kind, namespaced)
-	return &googleOAuthProviderController{
-		controller: c,
-		client:     c.Client(),
-		gvk:        gvk,
-		groupResource: schema.GroupResource{
-			Group:    gvk.Group,
-			Resource: resource,
-		},
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *GoogleOAuthProviderGenericController) OnChange(ctx context.Context, name string, sync GoogleOAuthProviderHandler) {
+	c.NonNamespacedControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.GoogleOAuthProvider](sync))
+}
+
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *GoogleOAuthProviderGenericController) OnRemove(ctx context.Context, name string, sync GoogleOAuthProviderHandler) {
+	c.NonNamespacedControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.GoogleOAuthProvider](sync))
+}
+
+// Cache returns a cache of resources in memory.
+func (c *GoogleOAuthProviderGenericController) Cache() GoogleOAuthProviderCache {
+	return &GoogleOAuthProviderGenericCache{
+		c.NonNamespacedControllerInterface.Cache(),
 	}
 }
 
-func FromGoogleOAuthProviderHandlerToHandler(sync GoogleOAuthProviderHandler) generic.Handler {
-	return func(key string, obj runtime.Object) (ret runtime.Object, err error) {
-		var v *v3.GoogleOAuthProvider
-		if obj == nil {
-			v, err = sync(key, nil)
-		} else {
-			v, err = sync(key, obj.(*v3.GoogleOAuthProvider))
-		}
-		if v == nil {
-			return nil, err
-		}
-		return v, err
-	}
+// GoogleOAuthProviderGenericCache wraps wrangler/pkg/generic.NonNamespacedCache so the function definitions adhere to GoogleOAuthProviderCache interface.
+type GoogleOAuthProviderGenericCache struct {
+	generic.NonNamespacedCacheInterface[*v3.GoogleOAuthProvider]
 }
 
-func (c *googleOAuthProviderController) Updater() generic.Updater {
-	return func(obj runtime.Object) (runtime.Object, error) {
-		newObj, err := c.Update(obj.(*v3.GoogleOAuthProvider))
-		if newObj == nil {
-			return nil, err
-		}
-		return newObj, err
-	}
-}
-
-func UpdateGoogleOAuthProviderDeepCopyOnChange(client GoogleOAuthProviderClient, obj *v3.GoogleOAuthProvider, handler func(obj *v3.GoogleOAuthProvider) (*v3.GoogleOAuthProvider, error)) (*v3.GoogleOAuthProvider, error) {
-	if obj == nil {
-		return obj, nil
-	}
-
-	copyObj := obj.DeepCopy()
-	newObj, err := handler(copyObj)
-	if newObj != nil {
-		copyObj = newObj
-	}
-	if obj.ResourceVersion == copyObj.ResourceVersion && !equality.Semantic.DeepEqual(obj, copyObj) {
-		return client.Update(copyObj)
-	}
-
-	return copyObj, err
-}
-
-func (c *googleOAuthProviderController) AddGenericHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.controller.RegisterHandler(ctx, name, controller.SharedControllerHandlerFunc(handler))
-}
-
-func (c *googleOAuthProviderController) AddGenericRemoveHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), handler))
-}
-
-func (c *googleOAuthProviderController) OnChange(ctx context.Context, name string, sync GoogleOAuthProviderHandler) {
-	c.AddGenericHandler(ctx, name, FromGoogleOAuthProviderHandlerToHandler(sync))
-}
-
-func (c *googleOAuthProviderController) OnRemove(ctx context.Context, name string, sync GoogleOAuthProviderHandler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), FromGoogleOAuthProviderHandlerToHandler(sync)))
-}
-
-func (c *googleOAuthProviderController) Enqueue(name string) {
-	c.controller.Enqueue("", name)
-}
-
-func (c *googleOAuthProviderController) EnqueueAfter(name string, duration time.Duration) {
-	c.controller.EnqueueAfter("", name, duration)
-}
-
-func (c *googleOAuthProviderController) Informer() cache.SharedIndexInformer {
-	return c.controller.Informer()
-}
-
-func (c *googleOAuthProviderController) GroupVersionKind() schema.GroupVersionKind {
-	return c.gvk
-}
-
-func (c *googleOAuthProviderController) Cache() GoogleOAuthProviderCache {
-	return &googleOAuthProviderCache{
-		indexer:  c.Informer().GetIndexer(),
-		resource: c.groupResource,
-	}
-}
-
-func (c *googleOAuthProviderController) Create(obj *v3.GoogleOAuthProvider) (*v3.GoogleOAuthProvider, error) {
-	result := &v3.GoogleOAuthProvider{}
-	return result, c.client.Create(context.TODO(), "", obj, result, metav1.CreateOptions{})
-}
-
-func (c *googleOAuthProviderController) Update(obj *v3.GoogleOAuthProvider) (*v3.GoogleOAuthProvider, error) {
-	result := &v3.GoogleOAuthProvider{}
-	return result, c.client.Update(context.TODO(), "", obj, result, metav1.UpdateOptions{})
-}
-
-func (c *googleOAuthProviderController) Delete(name string, options *metav1.DeleteOptions) error {
-	if options == nil {
-		options = &metav1.DeleteOptions{}
-	}
-	return c.client.Delete(context.TODO(), "", name, *options)
-}
-
-func (c *googleOAuthProviderController) Get(name string, options metav1.GetOptions) (*v3.GoogleOAuthProvider, error) {
-	result := &v3.GoogleOAuthProvider{}
-	return result, c.client.Get(context.TODO(), "", name, result, options)
-}
-
-func (c *googleOAuthProviderController) List(opts metav1.ListOptions) (*v3.GoogleOAuthProviderList, error) {
-	result := &v3.GoogleOAuthProviderList{}
-	return result, c.client.List(context.TODO(), "", result, opts)
-}
-
-func (c *googleOAuthProviderController) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return c.client.Watch(context.TODO(), "", opts)
-}
-
-func (c *googleOAuthProviderController) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (*v3.GoogleOAuthProvider, error) {
-	result := &v3.GoogleOAuthProvider{}
-	return result, c.client.Patch(context.TODO(), "", name, pt, data, result, metav1.PatchOptions{}, subresources...)
-}
-
-type googleOAuthProviderCache struct {
-	indexer  cache.Indexer
-	resource schema.GroupResource
-}
-
-func (c *googleOAuthProviderCache) Get(name string) (*v3.GoogleOAuthProvider, error) {
-	obj, exists, err := c.indexer.GetByKey(name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(c.resource, name)
-	}
-	return obj.(*v3.GoogleOAuthProvider), nil
-}
-
-func (c *googleOAuthProviderCache) List(selector labels.Selector) (ret []*v3.GoogleOAuthProvider, err error) {
-
-	err = cache.ListAll(c.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v3.GoogleOAuthProvider))
-	})
-
-	return ret, err
-}
-
-func (c *googleOAuthProviderCache) AddIndexer(indexName string, indexer GoogleOAuthProviderIndexer) {
-	utilruntime.Must(c.indexer.AddIndexers(map[string]cache.IndexFunc{
-		indexName: func(obj interface{}) (strings []string, e error) {
-			return indexer(obj.(*v3.GoogleOAuthProvider))
-		},
-	}))
-}
-
-func (c *googleOAuthProviderCache) GetByIndex(indexName, key string) (result []*v3.GoogleOAuthProvider, err error) {
-	objs, err := c.indexer.ByIndex(indexName, key)
-	if err != nil {
-		return nil, err
-	}
-	result = make([]*v3.GoogleOAuthProvider, 0, len(objs))
-	for _, obj := range objs {
-		result = append(result, obj.(*v3.GoogleOAuthProvider))
-	}
-	return result, nil
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c GoogleOAuthProviderGenericCache) AddIndexer(indexName string, indexer GoogleOAuthProviderIndexer) {
+	c.NonNamespacedCacheInterface.AddIndexer(indexName, generic.Indexer[*v3.GoogleOAuthProvider](indexer))
 }

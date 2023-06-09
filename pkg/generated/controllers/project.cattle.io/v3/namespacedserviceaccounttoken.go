@@ -22,235 +22,111 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/lasso/pkg/client"
-	"github.com/rancher/lasso/pkg/controller"
 	v3 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
 	"github.com/rancher/wrangler/pkg/generic"
-	"k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/tools/cache"
 )
 
-type NamespacedServiceAccountTokenHandler func(string, *v3.NamespacedServiceAccountToken) (*v3.NamespacedServiceAccountToken, error)
-
+// NamespacedServiceAccountTokenController interface for managing NamespacedServiceAccountToken resources.
 type NamespacedServiceAccountTokenController interface {
 	generic.ControllerMeta
 	NamespacedServiceAccountTokenClient
 
+	// OnChange runs the given handler when the controller detects a resource was changed.
 	OnChange(ctx context.Context, name string, sync NamespacedServiceAccountTokenHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
 	OnRemove(ctx context.Context, name string, sync NamespacedServiceAccountTokenHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
 	Enqueue(namespace, name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
 	EnqueueAfter(namespace, name string, duration time.Duration)
 
+	// Cache returns a cache for the resource type T.
 	Cache() NamespacedServiceAccountTokenCache
 }
 
+// NamespacedServiceAccountTokenClient interface for managing NamespacedServiceAccountToken resources in Kubernetes.
 type NamespacedServiceAccountTokenClient interface {
+	// Create creates a new object and return the newly created Object or an error.
 	Create(*v3.NamespacedServiceAccountToken) (*v3.NamespacedServiceAccountToken, error)
+
+	// Update updates the object and return the newly updated Object or an error.
 	Update(*v3.NamespacedServiceAccountToken) (*v3.NamespacedServiceAccountToken, error)
 
+	// Delete deletes the Object in the given name.
 	Delete(namespace, name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
 	Get(namespace, name string, options metav1.GetOptions) (*v3.NamespacedServiceAccountToken, error)
+
+	// List will attempt to find multiple resources.
 	List(namespace string, opts metav1.ListOptions) (*v3.NamespacedServiceAccountTokenList, error)
+
+	// Watch will start watching resources.
 	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
 	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.NamespacedServiceAccountToken, err error)
 }
 
+// NamespacedServiceAccountTokenCache interface for retrieving NamespacedServiceAccountToken resources in memory.
 type NamespacedServiceAccountTokenCache interface {
+	// Get returns the resources with the specified name from the cache.
 	Get(namespace, name string) (*v3.NamespacedServiceAccountToken, error)
+
+	// List will attempt to find resources from the Cache.
 	List(namespace string, selector labels.Selector) ([]*v3.NamespacedServiceAccountToken, error)
 
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
 	AddIndexer(indexName string, indexer NamespacedServiceAccountTokenIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
 	GetByIndex(indexName, key string) ([]*v3.NamespacedServiceAccountToken, error)
 }
 
+// NamespacedServiceAccountTokenHandler is function for performing any potential modifications to a NamespacedServiceAccountToken resource.
+type NamespacedServiceAccountTokenHandler func(string, *v3.NamespacedServiceAccountToken) (*v3.NamespacedServiceAccountToken, error)
+
+// NamespacedServiceAccountTokenIndexer computes a set of indexed values for the provided object.
 type NamespacedServiceAccountTokenIndexer func(obj *v3.NamespacedServiceAccountToken) ([]string, error)
 
-type namespacedServiceAccountTokenController struct {
-	controller    controller.SharedController
-	client        *client.Client
-	gvk           schema.GroupVersionKind
-	groupResource schema.GroupResource
+// NamespacedServiceAccountTokenGenericController wraps wrangler/pkg/generic.Controller so that the function definitions adhere to NamespacedServiceAccountTokenController interface.
+type NamespacedServiceAccountTokenGenericController struct {
+	generic.ControllerInterface[*v3.NamespacedServiceAccountToken, *v3.NamespacedServiceAccountTokenList]
 }
 
-func NewNamespacedServiceAccountTokenController(gvk schema.GroupVersionKind, resource string, namespaced bool, controller controller.SharedControllerFactory) NamespacedServiceAccountTokenController {
-	c := controller.ForResourceKind(gvk.GroupVersion().WithResource(resource), gvk.Kind, namespaced)
-	return &namespacedServiceAccountTokenController{
-		controller: c,
-		client:     c.Client(),
-		gvk:        gvk,
-		groupResource: schema.GroupResource{
-			Group:    gvk.Group,
-			Resource: resource,
-		},
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *NamespacedServiceAccountTokenGenericController) OnChange(ctx context.Context, name string, sync NamespacedServiceAccountTokenHandler) {
+	c.ControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.NamespacedServiceAccountToken](sync))
+}
+
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *NamespacedServiceAccountTokenGenericController) OnRemove(ctx context.Context, name string, sync NamespacedServiceAccountTokenHandler) {
+	c.ControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.NamespacedServiceAccountToken](sync))
+}
+
+// Cache returns a cache of resources in memory.
+func (c *NamespacedServiceAccountTokenGenericController) Cache() NamespacedServiceAccountTokenCache {
+	return &NamespacedServiceAccountTokenGenericCache{
+		c.ControllerInterface.Cache(),
 	}
 }
 
-func FromNamespacedServiceAccountTokenHandlerToHandler(sync NamespacedServiceAccountTokenHandler) generic.Handler {
-	return func(key string, obj runtime.Object) (ret runtime.Object, err error) {
-		var v *v3.NamespacedServiceAccountToken
-		if obj == nil {
-			v, err = sync(key, nil)
-		} else {
-			v, err = sync(key, obj.(*v3.NamespacedServiceAccountToken))
-		}
-		if v == nil {
-			return nil, err
-		}
-		return v, err
-	}
+// NamespacedServiceAccountTokenGenericCache wraps wrangler/pkg/generic.Cache so the function definitions adhere to NamespacedServiceAccountTokenCache interface.
+type NamespacedServiceAccountTokenGenericCache struct {
+	generic.CacheInterface[*v3.NamespacedServiceAccountToken]
 }
 
-func (c *namespacedServiceAccountTokenController) Updater() generic.Updater {
-	return func(obj runtime.Object) (runtime.Object, error) {
-		newObj, err := c.Update(obj.(*v3.NamespacedServiceAccountToken))
-		if newObj == nil {
-			return nil, err
-		}
-		return newObj, err
-	}
-}
-
-func UpdateNamespacedServiceAccountTokenDeepCopyOnChange(client NamespacedServiceAccountTokenClient, obj *v3.NamespacedServiceAccountToken, handler func(obj *v3.NamespacedServiceAccountToken) (*v3.NamespacedServiceAccountToken, error)) (*v3.NamespacedServiceAccountToken, error) {
-	if obj == nil {
-		return obj, nil
-	}
-
-	copyObj := obj.DeepCopy()
-	newObj, err := handler(copyObj)
-	if newObj != nil {
-		copyObj = newObj
-	}
-	if obj.ResourceVersion == copyObj.ResourceVersion && !equality.Semantic.DeepEqual(obj, copyObj) {
-		return client.Update(copyObj)
-	}
-
-	return copyObj, err
-}
-
-func (c *namespacedServiceAccountTokenController) AddGenericHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.controller.RegisterHandler(ctx, name, controller.SharedControllerHandlerFunc(handler))
-}
-
-func (c *namespacedServiceAccountTokenController) AddGenericRemoveHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), handler))
-}
-
-func (c *namespacedServiceAccountTokenController) OnChange(ctx context.Context, name string, sync NamespacedServiceAccountTokenHandler) {
-	c.AddGenericHandler(ctx, name, FromNamespacedServiceAccountTokenHandlerToHandler(sync))
-}
-
-func (c *namespacedServiceAccountTokenController) OnRemove(ctx context.Context, name string, sync NamespacedServiceAccountTokenHandler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), FromNamespacedServiceAccountTokenHandlerToHandler(sync)))
-}
-
-func (c *namespacedServiceAccountTokenController) Enqueue(namespace, name string) {
-	c.controller.Enqueue(namespace, name)
-}
-
-func (c *namespacedServiceAccountTokenController) EnqueueAfter(namespace, name string, duration time.Duration) {
-	c.controller.EnqueueAfter(namespace, name, duration)
-}
-
-func (c *namespacedServiceAccountTokenController) Informer() cache.SharedIndexInformer {
-	return c.controller.Informer()
-}
-
-func (c *namespacedServiceAccountTokenController) GroupVersionKind() schema.GroupVersionKind {
-	return c.gvk
-}
-
-func (c *namespacedServiceAccountTokenController) Cache() NamespacedServiceAccountTokenCache {
-	return &namespacedServiceAccountTokenCache{
-		indexer:  c.Informer().GetIndexer(),
-		resource: c.groupResource,
-	}
-}
-
-func (c *namespacedServiceAccountTokenController) Create(obj *v3.NamespacedServiceAccountToken) (*v3.NamespacedServiceAccountToken, error) {
-	result := &v3.NamespacedServiceAccountToken{}
-	return result, c.client.Create(context.TODO(), obj.Namespace, obj, result, metav1.CreateOptions{})
-}
-
-func (c *namespacedServiceAccountTokenController) Update(obj *v3.NamespacedServiceAccountToken) (*v3.NamespacedServiceAccountToken, error) {
-	result := &v3.NamespacedServiceAccountToken{}
-	return result, c.client.Update(context.TODO(), obj.Namespace, obj, result, metav1.UpdateOptions{})
-}
-
-func (c *namespacedServiceAccountTokenController) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	if options == nil {
-		options = &metav1.DeleteOptions{}
-	}
-	return c.client.Delete(context.TODO(), namespace, name, *options)
-}
-
-func (c *namespacedServiceAccountTokenController) Get(namespace, name string, options metav1.GetOptions) (*v3.NamespacedServiceAccountToken, error) {
-	result := &v3.NamespacedServiceAccountToken{}
-	return result, c.client.Get(context.TODO(), namespace, name, result, options)
-}
-
-func (c *namespacedServiceAccountTokenController) List(namespace string, opts metav1.ListOptions) (*v3.NamespacedServiceAccountTokenList, error) {
-	result := &v3.NamespacedServiceAccountTokenList{}
-	return result, c.client.List(context.TODO(), namespace, result, opts)
-}
-
-func (c *namespacedServiceAccountTokenController) Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
-	return c.client.Watch(context.TODO(), namespace, opts)
-}
-
-func (c *namespacedServiceAccountTokenController) Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (*v3.NamespacedServiceAccountToken, error) {
-	result := &v3.NamespacedServiceAccountToken{}
-	return result, c.client.Patch(context.TODO(), namespace, name, pt, data, result, metav1.PatchOptions{}, subresources...)
-}
-
-type namespacedServiceAccountTokenCache struct {
-	indexer  cache.Indexer
-	resource schema.GroupResource
-}
-
-func (c *namespacedServiceAccountTokenCache) Get(namespace, name string) (*v3.NamespacedServiceAccountToken, error) {
-	obj, exists, err := c.indexer.GetByKey(namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(c.resource, name)
-	}
-	return obj.(*v3.NamespacedServiceAccountToken), nil
-}
-
-func (c *namespacedServiceAccountTokenCache) List(namespace string, selector labels.Selector) (ret []*v3.NamespacedServiceAccountToken, err error) {
-
-	err = cache.ListAllByNamespace(c.indexer, namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v3.NamespacedServiceAccountToken))
-	})
-
-	return ret, err
-}
-
-func (c *namespacedServiceAccountTokenCache) AddIndexer(indexName string, indexer NamespacedServiceAccountTokenIndexer) {
-	utilruntime.Must(c.indexer.AddIndexers(map[string]cache.IndexFunc{
-		indexName: func(obj interface{}) (strings []string, e error) {
-			return indexer(obj.(*v3.NamespacedServiceAccountToken))
-		},
-	}))
-}
-
-func (c *namespacedServiceAccountTokenCache) GetByIndex(indexName, key string) (result []*v3.NamespacedServiceAccountToken, err error) {
-	objs, err := c.indexer.ByIndex(indexName, key)
-	if err != nil {
-		return nil, err
-	}
-	result = make([]*v3.NamespacedServiceAccountToken, 0, len(objs))
-	for _, obj := range objs {
-		result = append(result, obj.(*v3.NamespacedServiceAccountToken))
-	}
-	return result, nil
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c NamespacedServiceAccountTokenGenericCache) AddIndexer(indexName string, indexer NamespacedServiceAccountTokenIndexer) {
+	c.CacheInterface.AddIndexer(indexName, generic.Indexer[*v3.NamespacedServiceAccountToken](indexer))
 }

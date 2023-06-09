@@ -22,235 +22,111 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/lasso/pkg/client"
-	"github.com/rancher/lasso/pkg/controller"
 	v1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/wrangler/pkg/generic"
-	"k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/tools/cache"
 )
 
-type RKEBootstrapTemplateHandler func(string, *v1.RKEBootstrapTemplate) (*v1.RKEBootstrapTemplate, error)
-
+// RKEBootstrapTemplateController interface for managing RKEBootstrapTemplate resources.
 type RKEBootstrapTemplateController interface {
 	generic.ControllerMeta
 	RKEBootstrapTemplateClient
 
+	// OnChange runs the given handler when the controller detects a resource was changed.
 	OnChange(ctx context.Context, name string, sync RKEBootstrapTemplateHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
 	OnRemove(ctx context.Context, name string, sync RKEBootstrapTemplateHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
 	Enqueue(namespace, name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
 	EnqueueAfter(namespace, name string, duration time.Duration)
 
+	// Cache returns a cache for the resource type T.
 	Cache() RKEBootstrapTemplateCache
 }
 
+// RKEBootstrapTemplateClient interface for managing RKEBootstrapTemplate resources in Kubernetes.
 type RKEBootstrapTemplateClient interface {
+	// Create creates a new object and return the newly created Object or an error.
 	Create(*v1.RKEBootstrapTemplate) (*v1.RKEBootstrapTemplate, error)
+
+	// Update updates the object and return the newly updated Object or an error.
 	Update(*v1.RKEBootstrapTemplate) (*v1.RKEBootstrapTemplate, error)
 
+	// Delete deletes the Object in the given name.
 	Delete(namespace, name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
 	Get(namespace, name string, options metav1.GetOptions) (*v1.RKEBootstrapTemplate, error)
+
+	// List will attempt to find multiple resources.
 	List(namespace string, opts metav1.ListOptions) (*v1.RKEBootstrapTemplateList, error)
+
+	// Watch will start watching resources.
 	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
 	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.RKEBootstrapTemplate, err error)
 }
 
+// RKEBootstrapTemplateCache interface for retrieving RKEBootstrapTemplate resources in memory.
 type RKEBootstrapTemplateCache interface {
+	// Get returns the resources with the specified name from the cache.
 	Get(namespace, name string) (*v1.RKEBootstrapTemplate, error)
+
+	// List will attempt to find resources from the Cache.
 	List(namespace string, selector labels.Selector) ([]*v1.RKEBootstrapTemplate, error)
 
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
 	AddIndexer(indexName string, indexer RKEBootstrapTemplateIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
 	GetByIndex(indexName, key string) ([]*v1.RKEBootstrapTemplate, error)
 }
 
+// RKEBootstrapTemplateHandler is function for performing any potential modifications to a RKEBootstrapTemplate resource.
+type RKEBootstrapTemplateHandler func(string, *v1.RKEBootstrapTemplate) (*v1.RKEBootstrapTemplate, error)
+
+// RKEBootstrapTemplateIndexer computes a set of indexed values for the provided object.
 type RKEBootstrapTemplateIndexer func(obj *v1.RKEBootstrapTemplate) ([]string, error)
 
-type rKEBootstrapTemplateController struct {
-	controller    controller.SharedController
-	client        *client.Client
-	gvk           schema.GroupVersionKind
-	groupResource schema.GroupResource
+// RKEBootstrapTemplateGenericController wraps wrangler/pkg/generic.Controller so that the function definitions adhere to RKEBootstrapTemplateController interface.
+type RKEBootstrapTemplateGenericController struct {
+	generic.ControllerInterface[*v1.RKEBootstrapTemplate, *v1.RKEBootstrapTemplateList]
 }
 
-func NewRKEBootstrapTemplateController(gvk schema.GroupVersionKind, resource string, namespaced bool, controller controller.SharedControllerFactory) RKEBootstrapTemplateController {
-	c := controller.ForResourceKind(gvk.GroupVersion().WithResource(resource), gvk.Kind, namespaced)
-	return &rKEBootstrapTemplateController{
-		controller: c,
-		client:     c.Client(),
-		gvk:        gvk,
-		groupResource: schema.GroupResource{
-			Group:    gvk.Group,
-			Resource: resource,
-		},
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *RKEBootstrapTemplateGenericController) OnChange(ctx context.Context, name string, sync RKEBootstrapTemplateHandler) {
+	c.ControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v1.RKEBootstrapTemplate](sync))
+}
+
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *RKEBootstrapTemplateGenericController) OnRemove(ctx context.Context, name string, sync RKEBootstrapTemplateHandler) {
+	c.ControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v1.RKEBootstrapTemplate](sync))
+}
+
+// Cache returns a cache of resources in memory.
+func (c *RKEBootstrapTemplateGenericController) Cache() RKEBootstrapTemplateCache {
+	return &RKEBootstrapTemplateGenericCache{
+		c.ControllerInterface.Cache(),
 	}
 }
 
-func FromRKEBootstrapTemplateHandlerToHandler(sync RKEBootstrapTemplateHandler) generic.Handler {
-	return func(key string, obj runtime.Object) (ret runtime.Object, err error) {
-		var v *v1.RKEBootstrapTemplate
-		if obj == nil {
-			v, err = sync(key, nil)
-		} else {
-			v, err = sync(key, obj.(*v1.RKEBootstrapTemplate))
-		}
-		if v == nil {
-			return nil, err
-		}
-		return v, err
-	}
+// RKEBootstrapTemplateGenericCache wraps wrangler/pkg/generic.Cache so the function definitions adhere to RKEBootstrapTemplateCache interface.
+type RKEBootstrapTemplateGenericCache struct {
+	generic.CacheInterface[*v1.RKEBootstrapTemplate]
 }
 
-func (c *rKEBootstrapTemplateController) Updater() generic.Updater {
-	return func(obj runtime.Object) (runtime.Object, error) {
-		newObj, err := c.Update(obj.(*v1.RKEBootstrapTemplate))
-		if newObj == nil {
-			return nil, err
-		}
-		return newObj, err
-	}
-}
-
-func UpdateRKEBootstrapTemplateDeepCopyOnChange(client RKEBootstrapTemplateClient, obj *v1.RKEBootstrapTemplate, handler func(obj *v1.RKEBootstrapTemplate) (*v1.RKEBootstrapTemplate, error)) (*v1.RKEBootstrapTemplate, error) {
-	if obj == nil {
-		return obj, nil
-	}
-
-	copyObj := obj.DeepCopy()
-	newObj, err := handler(copyObj)
-	if newObj != nil {
-		copyObj = newObj
-	}
-	if obj.ResourceVersion == copyObj.ResourceVersion && !equality.Semantic.DeepEqual(obj, copyObj) {
-		return client.Update(copyObj)
-	}
-
-	return copyObj, err
-}
-
-func (c *rKEBootstrapTemplateController) AddGenericHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.controller.RegisterHandler(ctx, name, controller.SharedControllerHandlerFunc(handler))
-}
-
-func (c *rKEBootstrapTemplateController) AddGenericRemoveHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), handler))
-}
-
-func (c *rKEBootstrapTemplateController) OnChange(ctx context.Context, name string, sync RKEBootstrapTemplateHandler) {
-	c.AddGenericHandler(ctx, name, FromRKEBootstrapTemplateHandlerToHandler(sync))
-}
-
-func (c *rKEBootstrapTemplateController) OnRemove(ctx context.Context, name string, sync RKEBootstrapTemplateHandler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), FromRKEBootstrapTemplateHandlerToHandler(sync)))
-}
-
-func (c *rKEBootstrapTemplateController) Enqueue(namespace, name string) {
-	c.controller.Enqueue(namespace, name)
-}
-
-func (c *rKEBootstrapTemplateController) EnqueueAfter(namespace, name string, duration time.Duration) {
-	c.controller.EnqueueAfter(namespace, name, duration)
-}
-
-func (c *rKEBootstrapTemplateController) Informer() cache.SharedIndexInformer {
-	return c.controller.Informer()
-}
-
-func (c *rKEBootstrapTemplateController) GroupVersionKind() schema.GroupVersionKind {
-	return c.gvk
-}
-
-func (c *rKEBootstrapTemplateController) Cache() RKEBootstrapTemplateCache {
-	return &rKEBootstrapTemplateCache{
-		indexer:  c.Informer().GetIndexer(),
-		resource: c.groupResource,
-	}
-}
-
-func (c *rKEBootstrapTemplateController) Create(obj *v1.RKEBootstrapTemplate) (*v1.RKEBootstrapTemplate, error) {
-	result := &v1.RKEBootstrapTemplate{}
-	return result, c.client.Create(context.TODO(), obj.Namespace, obj, result, metav1.CreateOptions{})
-}
-
-func (c *rKEBootstrapTemplateController) Update(obj *v1.RKEBootstrapTemplate) (*v1.RKEBootstrapTemplate, error) {
-	result := &v1.RKEBootstrapTemplate{}
-	return result, c.client.Update(context.TODO(), obj.Namespace, obj, result, metav1.UpdateOptions{})
-}
-
-func (c *rKEBootstrapTemplateController) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	if options == nil {
-		options = &metav1.DeleteOptions{}
-	}
-	return c.client.Delete(context.TODO(), namespace, name, *options)
-}
-
-func (c *rKEBootstrapTemplateController) Get(namespace, name string, options metav1.GetOptions) (*v1.RKEBootstrapTemplate, error) {
-	result := &v1.RKEBootstrapTemplate{}
-	return result, c.client.Get(context.TODO(), namespace, name, result, options)
-}
-
-func (c *rKEBootstrapTemplateController) List(namespace string, opts metav1.ListOptions) (*v1.RKEBootstrapTemplateList, error) {
-	result := &v1.RKEBootstrapTemplateList{}
-	return result, c.client.List(context.TODO(), namespace, result, opts)
-}
-
-func (c *rKEBootstrapTemplateController) Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
-	return c.client.Watch(context.TODO(), namespace, opts)
-}
-
-func (c *rKEBootstrapTemplateController) Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (*v1.RKEBootstrapTemplate, error) {
-	result := &v1.RKEBootstrapTemplate{}
-	return result, c.client.Patch(context.TODO(), namespace, name, pt, data, result, metav1.PatchOptions{}, subresources...)
-}
-
-type rKEBootstrapTemplateCache struct {
-	indexer  cache.Indexer
-	resource schema.GroupResource
-}
-
-func (c *rKEBootstrapTemplateCache) Get(namespace, name string) (*v1.RKEBootstrapTemplate, error) {
-	obj, exists, err := c.indexer.GetByKey(namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(c.resource, name)
-	}
-	return obj.(*v1.RKEBootstrapTemplate), nil
-}
-
-func (c *rKEBootstrapTemplateCache) List(namespace string, selector labels.Selector) (ret []*v1.RKEBootstrapTemplate, err error) {
-
-	err = cache.ListAllByNamespace(c.indexer, namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.RKEBootstrapTemplate))
-	})
-
-	return ret, err
-}
-
-func (c *rKEBootstrapTemplateCache) AddIndexer(indexName string, indexer RKEBootstrapTemplateIndexer) {
-	utilruntime.Must(c.indexer.AddIndexers(map[string]cache.IndexFunc{
-		indexName: func(obj interface{}) (strings []string, e error) {
-			return indexer(obj.(*v1.RKEBootstrapTemplate))
-		},
-	}))
-}
-
-func (c *rKEBootstrapTemplateCache) GetByIndex(indexName, key string) (result []*v1.RKEBootstrapTemplate, err error) {
-	objs, err := c.indexer.ByIndex(indexName, key)
-	if err != nil {
-		return nil, err
-	}
-	result = make([]*v1.RKEBootstrapTemplate, 0, len(objs))
-	for _, obj := range objs {
-		result = append(result, obj.(*v1.RKEBootstrapTemplate))
-	}
-	return result, nil
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c RKEBootstrapTemplateGenericCache) AddIndexer(indexName string, indexer RKEBootstrapTemplateIndexer) {
+	c.CacheInterface.AddIndexer(indexName, generic.Indexer[*v1.RKEBootstrapTemplate](indexer))
 }

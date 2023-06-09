@@ -22,235 +22,111 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/lasso/pkg/client"
-	"github.com/rancher/lasso/pkg/controller"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/wrangler/pkg/generic"
-	"k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/tools/cache"
 )
 
-type TokenHandler func(string, *v3.Token) (*v3.Token, error)
-
+// TokenController interface for managing Token resources.
 type TokenController interface {
 	generic.ControllerMeta
 	TokenClient
 
+	// OnChange runs the given handler when the controller detects a resource was changed.
 	OnChange(ctx context.Context, name string, sync TokenHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
 	OnRemove(ctx context.Context, name string, sync TokenHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
 	Enqueue(name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
 	EnqueueAfter(name string, duration time.Duration)
 
+	// Cache returns a cache for the resource type T.
 	Cache() TokenCache
 }
 
+// TokenClient interface for managing Token resources in Kubernetes.
 type TokenClient interface {
+	// Create creates a new object and return the newly created Object or an error.
 	Create(*v3.Token) (*v3.Token, error)
+
+	// Update updates the object and return the newly updated Object or an error.
 	Update(*v3.Token) (*v3.Token, error)
 
+	// Delete deletes the Object in the given name.
 	Delete(name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
 	Get(name string, options metav1.GetOptions) (*v3.Token, error)
+
+	// List will attempt to find multiple resources.
 	List(opts metav1.ListOptions) (*v3.TokenList, error)
+
+	// Watch will start watching resources.
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.Token, err error)
 }
 
+// TokenCache interface for retrieving Token resources in memory.
 type TokenCache interface {
+	// Get returns the resources with the specified name from the cache.
 	Get(name string) (*v3.Token, error)
+
+	// List will attempt to find resources from the Cache.
 	List(selector labels.Selector) ([]*v3.Token, error)
 
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
 	AddIndexer(indexName string, indexer TokenIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
 	GetByIndex(indexName, key string) ([]*v3.Token, error)
 }
 
+// TokenHandler is function for performing any potential modifications to a Token resource.
+type TokenHandler func(string, *v3.Token) (*v3.Token, error)
+
+// TokenIndexer computes a set of indexed values for the provided object.
 type TokenIndexer func(obj *v3.Token) ([]string, error)
 
-type tokenController struct {
-	controller    controller.SharedController
-	client        *client.Client
-	gvk           schema.GroupVersionKind
-	groupResource schema.GroupResource
+// TokenGenericController wraps wrangler/pkg/generic.NonNamespacedController so that the function definitions adhere to TokenController interface.
+type TokenGenericController struct {
+	generic.NonNamespacedControllerInterface[*v3.Token, *v3.TokenList]
 }
 
-func NewTokenController(gvk schema.GroupVersionKind, resource string, namespaced bool, controller controller.SharedControllerFactory) TokenController {
-	c := controller.ForResourceKind(gvk.GroupVersion().WithResource(resource), gvk.Kind, namespaced)
-	return &tokenController{
-		controller: c,
-		client:     c.Client(),
-		gvk:        gvk,
-		groupResource: schema.GroupResource{
-			Group:    gvk.Group,
-			Resource: resource,
-		},
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *TokenGenericController) OnChange(ctx context.Context, name string, sync TokenHandler) {
+	c.NonNamespacedControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.Token](sync))
+}
+
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *TokenGenericController) OnRemove(ctx context.Context, name string, sync TokenHandler) {
+	c.NonNamespacedControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.Token](sync))
+}
+
+// Cache returns a cache of resources in memory.
+func (c *TokenGenericController) Cache() TokenCache {
+	return &TokenGenericCache{
+		c.NonNamespacedControllerInterface.Cache(),
 	}
 }
 
-func FromTokenHandlerToHandler(sync TokenHandler) generic.Handler {
-	return func(key string, obj runtime.Object) (ret runtime.Object, err error) {
-		var v *v3.Token
-		if obj == nil {
-			v, err = sync(key, nil)
-		} else {
-			v, err = sync(key, obj.(*v3.Token))
-		}
-		if v == nil {
-			return nil, err
-		}
-		return v, err
-	}
+// TokenGenericCache wraps wrangler/pkg/generic.NonNamespacedCache so the function definitions adhere to TokenCache interface.
+type TokenGenericCache struct {
+	generic.NonNamespacedCacheInterface[*v3.Token]
 }
 
-func (c *tokenController) Updater() generic.Updater {
-	return func(obj runtime.Object) (runtime.Object, error) {
-		newObj, err := c.Update(obj.(*v3.Token))
-		if newObj == nil {
-			return nil, err
-		}
-		return newObj, err
-	}
-}
-
-func UpdateTokenDeepCopyOnChange(client TokenClient, obj *v3.Token, handler func(obj *v3.Token) (*v3.Token, error)) (*v3.Token, error) {
-	if obj == nil {
-		return obj, nil
-	}
-
-	copyObj := obj.DeepCopy()
-	newObj, err := handler(copyObj)
-	if newObj != nil {
-		copyObj = newObj
-	}
-	if obj.ResourceVersion == copyObj.ResourceVersion && !equality.Semantic.DeepEqual(obj, copyObj) {
-		return client.Update(copyObj)
-	}
-
-	return copyObj, err
-}
-
-func (c *tokenController) AddGenericHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.controller.RegisterHandler(ctx, name, controller.SharedControllerHandlerFunc(handler))
-}
-
-func (c *tokenController) AddGenericRemoveHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), handler))
-}
-
-func (c *tokenController) OnChange(ctx context.Context, name string, sync TokenHandler) {
-	c.AddGenericHandler(ctx, name, FromTokenHandlerToHandler(sync))
-}
-
-func (c *tokenController) OnRemove(ctx context.Context, name string, sync TokenHandler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), FromTokenHandlerToHandler(sync)))
-}
-
-func (c *tokenController) Enqueue(name string) {
-	c.controller.Enqueue("", name)
-}
-
-func (c *tokenController) EnqueueAfter(name string, duration time.Duration) {
-	c.controller.EnqueueAfter("", name, duration)
-}
-
-func (c *tokenController) Informer() cache.SharedIndexInformer {
-	return c.controller.Informer()
-}
-
-func (c *tokenController) GroupVersionKind() schema.GroupVersionKind {
-	return c.gvk
-}
-
-func (c *tokenController) Cache() TokenCache {
-	return &tokenCache{
-		indexer:  c.Informer().GetIndexer(),
-		resource: c.groupResource,
-	}
-}
-
-func (c *tokenController) Create(obj *v3.Token) (*v3.Token, error) {
-	result := &v3.Token{}
-	return result, c.client.Create(context.TODO(), "", obj, result, metav1.CreateOptions{})
-}
-
-func (c *tokenController) Update(obj *v3.Token) (*v3.Token, error) {
-	result := &v3.Token{}
-	return result, c.client.Update(context.TODO(), "", obj, result, metav1.UpdateOptions{})
-}
-
-func (c *tokenController) Delete(name string, options *metav1.DeleteOptions) error {
-	if options == nil {
-		options = &metav1.DeleteOptions{}
-	}
-	return c.client.Delete(context.TODO(), "", name, *options)
-}
-
-func (c *tokenController) Get(name string, options metav1.GetOptions) (*v3.Token, error) {
-	result := &v3.Token{}
-	return result, c.client.Get(context.TODO(), "", name, result, options)
-}
-
-func (c *tokenController) List(opts metav1.ListOptions) (*v3.TokenList, error) {
-	result := &v3.TokenList{}
-	return result, c.client.List(context.TODO(), "", result, opts)
-}
-
-func (c *tokenController) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return c.client.Watch(context.TODO(), "", opts)
-}
-
-func (c *tokenController) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (*v3.Token, error) {
-	result := &v3.Token{}
-	return result, c.client.Patch(context.TODO(), "", name, pt, data, result, metav1.PatchOptions{}, subresources...)
-}
-
-type tokenCache struct {
-	indexer  cache.Indexer
-	resource schema.GroupResource
-}
-
-func (c *tokenCache) Get(name string) (*v3.Token, error) {
-	obj, exists, err := c.indexer.GetByKey(name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(c.resource, name)
-	}
-	return obj.(*v3.Token), nil
-}
-
-func (c *tokenCache) List(selector labels.Selector) (ret []*v3.Token, err error) {
-
-	err = cache.ListAll(c.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v3.Token))
-	})
-
-	return ret, err
-}
-
-func (c *tokenCache) AddIndexer(indexName string, indexer TokenIndexer) {
-	utilruntime.Must(c.indexer.AddIndexers(map[string]cache.IndexFunc{
-		indexName: func(obj interface{}) (strings []string, e error) {
-			return indexer(obj.(*v3.Token))
-		},
-	}))
-}
-
-func (c *tokenCache) GetByIndex(indexName, key string) (result []*v3.Token, err error) {
-	objs, err := c.indexer.ByIndex(indexName, key)
-	if err != nil {
-		return nil, err
-	}
-	result = make([]*v3.Token, 0, len(objs))
-	for _, obj := range objs {
-		result = append(result, obj.(*v3.Token))
-	}
-	return result, nil
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c TokenGenericCache) AddIndexer(indexName string, indexer TokenIndexer) {
+	c.NonNamespacedCacheInterface.AddIndexer(indexName, generic.Indexer[*v3.Token](indexer))
 }

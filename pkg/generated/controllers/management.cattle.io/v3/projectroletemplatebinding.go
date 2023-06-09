@@ -22,235 +22,111 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/lasso/pkg/client"
-	"github.com/rancher/lasso/pkg/controller"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/wrangler/pkg/generic"
-	"k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/tools/cache"
 )
 
-type ProjectRoleTemplateBindingHandler func(string, *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error)
-
+// ProjectRoleTemplateBindingController interface for managing ProjectRoleTemplateBinding resources.
 type ProjectRoleTemplateBindingController interface {
 	generic.ControllerMeta
 	ProjectRoleTemplateBindingClient
 
+	// OnChange runs the given handler when the controller detects a resource was changed.
 	OnChange(ctx context.Context, name string, sync ProjectRoleTemplateBindingHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
 	OnRemove(ctx context.Context, name string, sync ProjectRoleTemplateBindingHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
 	Enqueue(namespace, name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
 	EnqueueAfter(namespace, name string, duration time.Duration)
 
+	// Cache returns a cache for the resource type T.
 	Cache() ProjectRoleTemplateBindingCache
 }
 
+// ProjectRoleTemplateBindingClient interface for managing ProjectRoleTemplateBinding resources in Kubernetes.
 type ProjectRoleTemplateBindingClient interface {
+	// Create creates a new object and return the newly created Object or an error.
 	Create(*v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error)
+
+	// Update updates the object and return the newly updated Object or an error.
 	Update(*v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error)
 
+	// Delete deletes the Object in the given name.
 	Delete(namespace, name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
 	Get(namespace, name string, options metav1.GetOptions) (*v3.ProjectRoleTemplateBinding, error)
+
+	// List will attempt to find multiple resources.
 	List(namespace string, opts metav1.ListOptions) (*v3.ProjectRoleTemplateBindingList, error)
+
+	// Watch will start watching resources.
 	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
 	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.ProjectRoleTemplateBinding, err error)
 }
 
+// ProjectRoleTemplateBindingCache interface for retrieving ProjectRoleTemplateBinding resources in memory.
 type ProjectRoleTemplateBindingCache interface {
+	// Get returns the resources with the specified name from the cache.
 	Get(namespace, name string) (*v3.ProjectRoleTemplateBinding, error)
+
+	// List will attempt to find resources from the Cache.
 	List(namespace string, selector labels.Selector) ([]*v3.ProjectRoleTemplateBinding, error)
 
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
 	AddIndexer(indexName string, indexer ProjectRoleTemplateBindingIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
 	GetByIndex(indexName, key string) ([]*v3.ProjectRoleTemplateBinding, error)
 }
 
+// ProjectRoleTemplateBindingHandler is function for performing any potential modifications to a ProjectRoleTemplateBinding resource.
+type ProjectRoleTemplateBindingHandler func(string, *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error)
+
+// ProjectRoleTemplateBindingIndexer computes a set of indexed values for the provided object.
 type ProjectRoleTemplateBindingIndexer func(obj *v3.ProjectRoleTemplateBinding) ([]string, error)
 
-type projectRoleTemplateBindingController struct {
-	controller    controller.SharedController
-	client        *client.Client
-	gvk           schema.GroupVersionKind
-	groupResource schema.GroupResource
+// ProjectRoleTemplateBindingGenericController wraps wrangler/pkg/generic.Controller so that the function definitions adhere to ProjectRoleTemplateBindingController interface.
+type ProjectRoleTemplateBindingGenericController struct {
+	generic.ControllerInterface[*v3.ProjectRoleTemplateBinding, *v3.ProjectRoleTemplateBindingList]
 }
 
-func NewProjectRoleTemplateBindingController(gvk schema.GroupVersionKind, resource string, namespaced bool, controller controller.SharedControllerFactory) ProjectRoleTemplateBindingController {
-	c := controller.ForResourceKind(gvk.GroupVersion().WithResource(resource), gvk.Kind, namespaced)
-	return &projectRoleTemplateBindingController{
-		controller: c,
-		client:     c.Client(),
-		gvk:        gvk,
-		groupResource: schema.GroupResource{
-			Group:    gvk.Group,
-			Resource: resource,
-		},
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *ProjectRoleTemplateBindingGenericController) OnChange(ctx context.Context, name string, sync ProjectRoleTemplateBindingHandler) {
+	c.ControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.ProjectRoleTemplateBinding](sync))
+}
+
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *ProjectRoleTemplateBindingGenericController) OnRemove(ctx context.Context, name string, sync ProjectRoleTemplateBindingHandler) {
+	c.ControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.ProjectRoleTemplateBinding](sync))
+}
+
+// Cache returns a cache of resources in memory.
+func (c *ProjectRoleTemplateBindingGenericController) Cache() ProjectRoleTemplateBindingCache {
+	return &ProjectRoleTemplateBindingGenericCache{
+		c.ControllerInterface.Cache(),
 	}
 }
 
-func FromProjectRoleTemplateBindingHandlerToHandler(sync ProjectRoleTemplateBindingHandler) generic.Handler {
-	return func(key string, obj runtime.Object) (ret runtime.Object, err error) {
-		var v *v3.ProjectRoleTemplateBinding
-		if obj == nil {
-			v, err = sync(key, nil)
-		} else {
-			v, err = sync(key, obj.(*v3.ProjectRoleTemplateBinding))
-		}
-		if v == nil {
-			return nil, err
-		}
-		return v, err
-	}
+// ProjectRoleTemplateBindingGenericCache wraps wrangler/pkg/generic.Cache so the function definitions adhere to ProjectRoleTemplateBindingCache interface.
+type ProjectRoleTemplateBindingGenericCache struct {
+	generic.CacheInterface[*v3.ProjectRoleTemplateBinding]
 }
 
-func (c *projectRoleTemplateBindingController) Updater() generic.Updater {
-	return func(obj runtime.Object) (runtime.Object, error) {
-		newObj, err := c.Update(obj.(*v3.ProjectRoleTemplateBinding))
-		if newObj == nil {
-			return nil, err
-		}
-		return newObj, err
-	}
-}
-
-func UpdateProjectRoleTemplateBindingDeepCopyOnChange(client ProjectRoleTemplateBindingClient, obj *v3.ProjectRoleTemplateBinding, handler func(obj *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error)) (*v3.ProjectRoleTemplateBinding, error) {
-	if obj == nil {
-		return obj, nil
-	}
-
-	copyObj := obj.DeepCopy()
-	newObj, err := handler(copyObj)
-	if newObj != nil {
-		copyObj = newObj
-	}
-	if obj.ResourceVersion == copyObj.ResourceVersion && !equality.Semantic.DeepEqual(obj, copyObj) {
-		return client.Update(copyObj)
-	}
-
-	return copyObj, err
-}
-
-func (c *projectRoleTemplateBindingController) AddGenericHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.controller.RegisterHandler(ctx, name, controller.SharedControllerHandlerFunc(handler))
-}
-
-func (c *projectRoleTemplateBindingController) AddGenericRemoveHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), handler))
-}
-
-func (c *projectRoleTemplateBindingController) OnChange(ctx context.Context, name string, sync ProjectRoleTemplateBindingHandler) {
-	c.AddGenericHandler(ctx, name, FromProjectRoleTemplateBindingHandlerToHandler(sync))
-}
-
-func (c *projectRoleTemplateBindingController) OnRemove(ctx context.Context, name string, sync ProjectRoleTemplateBindingHandler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), FromProjectRoleTemplateBindingHandlerToHandler(sync)))
-}
-
-func (c *projectRoleTemplateBindingController) Enqueue(namespace, name string) {
-	c.controller.Enqueue(namespace, name)
-}
-
-func (c *projectRoleTemplateBindingController) EnqueueAfter(namespace, name string, duration time.Duration) {
-	c.controller.EnqueueAfter(namespace, name, duration)
-}
-
-func (c *projectRoleTemplateBindingController) Informer() cache.SharedIndexInformer {
-	return c.controller.Informer()
-}
-
-func (c *projectRoleTemplateBindingController) GroupVersionKind() schema.GroupVersionKind {
-	return c.gvk
-}
-
-func (c *projectRoleTemplateBindingController) Cache() ProjectRoleTemplateBindingCache {
-	return &projectRoleTemplateBindingCache{
-		indexer:  c.Informer().GetIndexer(),
-		resource: c.groupResource,
-	}
-}
-
-func (c *projectRoleTemplateBindingController) Create(obj *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error) {
-	result := &v3.ProjectRoleTemplateBinding{}
-	return result, c.client.Create(context.TODO(), obj.Namespace, obj, result, metav1.CreateOptions{})
-}
-
-func (c *projectRoleTemplateBindingController) Update(obj *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error) {
-	result := &v3.ProjectRoleTemplateBinding{}
-	return result, c.client.Update(context.TODO(), obj.Namespace, obj, result, metav1.UpdateOptions{})
-}
-
-func (c *projectRoleTemplateBindingController) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	if options == nil {
-		options = &metav1.DeleteOptions{}
-	}
-	return c.client.Delete(context.TODO(), namespace, name, *options)
-}
-
-func (c *projectRoleTemplateBindingController) Get(namespace, name string, options metav1.GetOptions) (*v3.ProjectRoleTemplateBinding, error) {
-	result := &v3.ProjectRoleTemplateBinding{}
-	return result, c.client.Get(context.TODO(), namespace, name, result, options)
-}
-
-func (c *projectRoleTemplateBindingController) List(namespace string, opts metav1.ListOptions) (*v3.ProjectRoleTemplateBindingList, error) {
-	result := &v3.ProjectRoleTemplateBindingList{}
-	return result, c.client.List(context.TODO(), namespace, result, opts)
-}
-
-func (c *projectRoleTemplateBindingController) Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
-	return c.client.Watch(context.TODO(), namespace, opts)
-}
-
-func (c *projectRoleTemplateBindingController) Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (*v3.ProjectRoleTemplateBinding, error) {
-	result := &v3.ProjectRoleTemplateBinding{}
-	return result, c.client.Patch(context.TODO(), namespace, name, pt, data, result, metav1.PatchOptions{}, subresources...)
-}
-
-type projectRoleTemplateBindingCache struct {
-	indexer  cache.Indexer
-	resource schema.GroupResource
-}
-
-func (c *projectRoleTemplateBindingCache) Get(namespace, name string) (*v3.ProjectRoleTemplateBinding, error) {
-	obj, exists, err := c.indexer.GetByKey(namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(c.resource, name)
-	}
-	return obj.(*v3.ProjectRoleTemplateBinding), nil
-}
-
-func (c *projectRoleTemplateBindingCache) List(namespace string, selector labels.Selector) (ret []*v3.ProjectRoleTemplateBinding, err error) {
-
-	err = cache.ListAllByNamespace(c.indexer, namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v3.ProjectRoleTemplateBinding))
-	})
-
-	return ret, err
-}
-
-func (c *projectRoleTemplateBindingCache) AddIndexer(indexName string, indexer ProjectRoleTemplateBindingIndexer) {
-	utilruntime.Must(c.indexer.AddIndexers(map[string]cache.IndexFunc{
-		indexName: func(obj interface{}) (strings []string, e error) {
-			return indexer(obj.(*v3.ProjectRoleTemplateBinding))
-		},
-	}))
-}
-
-func (c *projectRoleTemplateBindingCache) GetByIndex(indexName, key string) (result []*v3.ProjectRoleTemplateBinding, err error) {
-	objs, err := c.indexer.ByIndex(indexName, key)
-	if err != nil {
-		return nil, err
-	}
-	result = make([]*v3.ProjectRoleTemplateBinding, 0, len(objs))
-	for _, obj := range objs {
-		result = append(result, obj.(*v3.ProjectRoleTemplateBinding))
-	}
-	return result, nil
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c ProjectRoleTemplateBindingGenericCache) AddIndexer(indexName string, indexer ProjectRoleTemplateBindingIndexer) {
+	c.CacheInterface.AddIndexer(indexName, generic.Indexer[*v3.ProjectRoleTemplateBinding](indexer))
 }

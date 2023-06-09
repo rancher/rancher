@@ -22,235 +22,111 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/lasso/pkg/client"
-	"github.com/rancher/lasso/pkg/controller"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/wrangler/pkg/generic"
-	"k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/tools/cache"
 )
 
-type SettingHandler func(string, *v3.Setting) (*v3.Setting, error)
-
+// SettingController interface for managing Setting resources.
 type SettingController interface {
 	generic.ControllerMeta
 	SettingClient
 
+	// OnChange runs the given handler when the controller detects a resource was changed.
 	OnChange(ctx context.Context, name string, sync SettingHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
 	OnRemove(ctx context.Context, name string, sync SettingHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
 	Enqueue(name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
 	EnqueueAfter(name string, duration time.Duration)
 
+	// Cache returns a cache for the resource type T.
 	Cache() SettingCache
 }
 
+// SettingClient interface for managing Setting resources in Kubernetes.
 type SettingClient interface {
+	// Create creates a new object and return the newly created Object or an error.
 	Create(*v3.Setting) (*v3.Setting, error)
+
+	// Update updates the object and return the newly updated Object or an error.
 	Update(*v3.Setting) (*v3.Setting, error)
 
+	// Delete deletes the Object in the given name.
 	Delete(name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
 	Get(name string, options metav1.GetOptions) (*v3.Setting, error)
+
+	// List will attempt to find multiple resources.
 	List(opts metav1.ListOptions) (*v3.SettingList, error)
+
+	// Watch will start watching resources.
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.Setting, err error)
 }
 
+// SettingCache interface for retrieving Setting resources in memory.
 type SettingCache interface {
+	// Get returns the resources with the specified name from the cache.
 	Get(name string) (*v3.Setting, error)
+
+	// List will attempt to find resources from the Cache.
 	List(selector labels.Selector) ([]*v3.Setting, error)
 
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
 	AddIndexer(indexName string, indexer SettingIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
 	GetByIndex(indexName, key string) ([]*v3.Setting, error)
 }
 
+// SettingHandler is function for performing any potential modifications to a Setting resource.
+type SettingHandler func(string, *v3.Setting) (*v3.Setting, error)
+
+// SettingIndexer computes a set of indexed values for the provided object.
 type SettingIndexer func(obj *v3.Setting) ([]string, error)
 
-type settingController struct {
-	controller    controller.SharedController
-	client        *client.Client
-	gvk           schema.GroupVersionKind
-	groupResource schema.GroupResource
+// SettingGenericController wraps wrangler/pkg/generic.NonNamespacedController so that the function definitions adhere to SettingController interface.
+type SettingGenericController struct {
+	generic.NonNamespacedControllerInterface[*v3.Setting, *v3.SettingList]
 }
 
-func NewSettingController(gvk schema.GroupVersionKind, resource string, namespaced bool, controller controller.SharedControllerFactory) SettingController {
-	c := controller.ForResourceKind(gvk.GroupVersion().WithResource(resource), gvk.Kind, namespaced)
-	return &settingController{
-		controller: c,
-		client:     c.Client(),
-		gvk:        gvk,
-		groupResource: schema.GroupResource{
-			Group:    gvk.Group,
-			Resource: resource,
-		},
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *SettingGenericController) OnChange(ctx context.Context, name string, sync SettingHandler) {
+	c.NonNamespacedControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.Setting](sync))
+}
+
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *SettingGenericController) OnRemove(ctx context.Context, name string, sync SettingHandler) {
+	c.NonNamespacedControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.Setting](sync))
+}
+
+// Cache returns a cache of resources in memory.
+func (c *SettingGenericController) Cache() SettingCache {
+	return &SettingGenericCache{
+		c.NonNamespacedControllerInterface.Cache(),
 	}
 }
 
-func FromSettingHandlerToHandler(sync SettingHandler) generic.Handler {
-	return func(key string, obj runtime.Object) (ret runtime.Object, err error) {
-		var v *v3.Setting
-		if obj == nil {
-			v, err = sync(key, nil)
-		} else {
-			v, err = sync(key, obj.(*v3.Setting))
-		}
-		if v == nil {
-			return nil, err
-		}
-		return v, err
-	}
+// SettingGenericCache wraps wrangler/pkg/generic.NonNamespacedCache so the function definitions adhere to SettingCache interface.
+type SettingGenericCache struct {
+	generic.NonNamespacedCacheInterface[*v3.Setting]
 }
 
-func (c *settingController) Updater() generic.Updater {
-	return func(obj runtime.Object) (runtime.Object, error) {
-		newObj, err := c.Update(obj.(*v3.Setting))
-		if newObj == nil {
-			return nil, err
-		}
-		return newObj, err
-	}
-}
-
-func UpdateSettingDeepCopyOnChange(client SettingClient, obj *v3.Setting, handler func(obj *v3.Setting) (*v3.Setting, error)) (*v3.Setting, error) {
-	if obj == nil {
-		return obj, nil
-	}
-
-	copyObj := obj.DeepCopy()
-	newObj, err := handler(copyObj)
-	if newObj != nil {
-		copyObj = newObj
-	}
-	if obj.ResourceVersion == copyObj.ResourceVersion && !equality.Semantic.DeepEqual(obj, copyObj) {
-		return client.Update(copyObj)
-	}
-
-	return copyObj, err
-}
-
-func (c *settingController) AddGenericHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.controller.RegisterHandler(ctx, name, controller.SharedControllerHandlerFunc(handler))
-}
-
-func (c *settingController) AddGenericRemoveHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), handler))
-}
-
-func (c *settingController) OnChange(ctx context.Context, name string, sync SettingHandler) {
-	c.AddGenericHandler(ctx, name, FromSettingHandlerToHandler(sync))
-}
-
-func (c *settingController) OnRemove(ctx context.Context, name string, sync SettingHandler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), FromSettingHandlerToHandler(sync)))
-}
-
-func (c *settingController) Enqueue(name string) {
-	c.controller.Enqueue("", name)
-}
-
-func (c *settingController) EnqueueAfter(name string, duration time.Duration) {
-	c.controller.EnqueueAfter("", name, duration)
-}
-
-func (c *settingController) Informer() cache.SharedIndexInformer {
-	return c.controller.Informer()
-}
-
-func (c *settingController) GroupVersionKind() schema.GroupVersionKind {
-	return c.gvk
-}
-
-func (c *settingController) Cache() SettingCache {
-	return &settingCache{
-		indexer:  c.Informer().GetIndexer(),
-		resource: c.groupResource,
-	}
-}
-
-func (c *settingController) Create(obj *v3.Setting) (*v3.Setting, error) {
-	result := &v3.Setting{}
-	return result, c.client.Create(context.TODO(), "", obj, result, metav1.CreateOptions{})
-}
-
-func (c *settingController) Update(obj *v3.Setting) (*v3.Setting, error) {
-	result := &v3.Setting{}
-	return result, c.client.Update(context.TODO(), "", obj, result, metav1.UpdateOptions{})
-}
-
-func (c *settingController) Delete(name string, options *metav1.DeleteOptions) error {
-	if options == nil {
-		options = &metav1.DeleteOptions{}
-	}
-	return c.client.Delete(context.TODO(), "", name, *options)
-}
-
-func (c *settingController) Get(name string, options metav1.GetOptions) (*v3.Setting, error) {
-	result := &v3.Setting{}
-	return result, c.client.Get(context.TODO(), "", name, result, options)
-}
-
-func (c *settingController) List(opts metav1.ListOptions) (*v3.SettingList, error) {
-	result := &v3.SettingList{}
-	return result, c.client.List(context.TODO(), "", result, opts)
-}
-
-func (c *settingController) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return c.client.Watch(context.TODO(), "", opts)
-}
-
-func (c *settingController) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (*v3.Setting, error) {
-	result := &v3.Setting{}
-	return result, c.client.Patch(context.TODO(), "", name, pt, data, result, metav1.PatchOptions{}, subresources...)
-}
-
-type settingCache struct {
-	indexer  cache.Indexer
-	resource schema.GroupResource
-}
-
-func (c *settingCache) Get(name string) (*v3.Setting, error) {
-	obj, exists, err := c.indexer.GetByKey(name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(c.resource, name)
-	}
-	return obj.(*v3.Setting), nil
-}
-
-func (c *settingCache) List(selector labels.Selector) (ret []*v3.Setting, err error) {
-
-	err = cache.ListAll(c.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v3.Setting))
-	})
-
-	return ret, err
-}
-
-func (c *settingCache) AddIndexer(indexName string, indexer SettingIndexer) {
-	utilruntime.Must(c.indexer.AddIndexers(map[string]cache.IndexFunc{
-		indexName: func(obj interface{}) (strings []string, e error) {
-			return indexer(obj.(*v3.Setting))
-		},
-	}))
-}
-
-func (c *settingCache) GetByIndex(indexName, key string) (result []*v3.Setting, err error) {
-	objs, err := c.indexer.ByIndex(indexName, key)
-	if err != nil {
-		return nil, err
-	}
-	result = make([]*v3.Setting, 0, len(objs))
-	for _, obj := range objs {
-		result = append(result, obj.(*v3.Setting))
-	}
-	return result, nil
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c SettingGenericCache) AddIndexer(indexName string, indexer SettingIndexer) {
+	c.NonNamespacedCacheInterface.AddIndexer(indexName, generic.Indexer[*v3.Setting](indexer))
 }

@@ -22,235 +22,111 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/lasso/pkg/client"
-	"github.com/rancher/lasso/pkg/controller"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/wrangler/pkg/generic"
-	"k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/tools/cache"
 )
 
-type MonitorMetricHandler func(string, *v3.MonitorMetric) (*v3.MonitorMetric, error)
-
+// MonitorMetricController interface for managing MonitorMetric resources.
 type MonitorMetricController interface {
 	generic.ControllerMeta
 	MonitorMetricClient
 
+	// OnChange runs the given handler when the controller detects a resource was changed.
 	OnChange(ctx context.Context, name string, sync MonitorMetricHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
 	OnRemove(ctx context.Context, name string, sync MonitorMetricHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
 	Enqueue(namespace, name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
 	EnqueueAfter(namespace, name string, duration time.Duration)
 
+	// Cache returns a cache for the resource type T.
 	Cache() MonitorMetricCache
 }
 
+// MonitorMetricClient interface for managing MonitorMetric resources in Kubernetes.
 type MonitorMetricClient interface {
+	// Create creates a new object and return the newly created Object or an error.
 	Create(*v3.MonitorMetric) (*v3.MonitorMetric, error)
+
+	// Update updates the object and return the newly updated Object or an error.
 	Update(*v3.MonitorMetric) (*v3.MonitorMetric, error)
 
+	// Delete deletes the Object in the given name.
 	Delete(namespace, name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
 	Get(namespace, name string, options metav1.GetOptions) (*v3.MonitorMetric, error)
+
+	// List will attempt to find multiple resources.
 	List(namespace string, opts metav1.ListOptions) (*v3.MonitorMetricList, error)
+
+	// Watch will start watching resources.
 	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
 	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.MonitorMetric, err error)
 }
 
+// MonitorMetricCache interface for retrieving MonitorMetric resources in memory.
 type MonitorMetricCache interface {
+	// Get returns the resources with the specified name from the cache.
 	Get(namespace, name string) (*v3.MonitorMetric, error)
+
+	// List will attempt to find resources from the Cache.
 	List(namespace string, selector labels.Selector) ([]*v3.MonitorMetric, error)
 
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
 	AddIndexer(indexName string, indexer MonitorMetricIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
 	GetByIndex(indexName, key string) ([]*v3.MonitorMetric, error)
 }
 
+// MonitorMetricHandler is function for performing any potential modifications to a MonitorMetric resource.
+type MonitorMetricHandler func(string, *v3.MonitorMetric) (*v3.MonitorMetric, error)
+
+// MonitorMetricIndexer computes a set of indexed values for the provided object.
 type MonitorMetricIndexer func(obj *v3.MonitorMetric) ([]string, error)
 
-type monitorMetricController struct {
-	controller    controller.SharedController
-	client        *client.Client
-	gvk           schema.GroupVersionKind
-	groupResource schema.GroupResource
+// MonitorMetricGenericController wraps wrangler/pkg/generic.Controller so that the function definitions adhere to MonitorMetricController interface.
+type MonitorMetricGenericController struct {
+	generic.ControllerInterface[*v3.MonitorMetric, *v3.MonitorMetricList]
 }
 
-func NewMonitorMetricController(gvk schema.GroupVersionKind, resource string, namespaced bool, controller controller.SharedControllerFactory) MonitorMetricController {
-	c := controller.ForResourceKind(gvk.GroupVersion().WithResource(resource), gvk.Kind, namespaced)
-	return &monitorMetricController{
-		controller: c,
-		client:     c.Client(),
-		gvk:        gvk,
-		groupResource: schema.GroupResource{
-			Group:    gvk.Group,
-			Resource: resource,
-		},
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *MonitorMetricGenericController) OnChange(ctx context.Context, name string, sync MonitorMetricHandler) {
+	c.ControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.MonitorMetric](sync))
+}
+
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *MonitorMetricGenericController) OnRemove(ctx context.Context, name string, sync MonitorMetricHandler) {
+	c.ControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.MonitorMetric](sync))
+}
+
+// Cache returns a cache of resources in memory.
+func (c *MonitorMetricGenericController) Cache() MonitorMetricCache {
+	return &MonitorMetricGenericCache{
+		c.ControllerInterface.Cache(),
 	}
 }
 
-func FromMonitorMetricHandlerToHandler(sync MonitorMetricHandler) generic.Handler {
-	return func(key string, obj runtime.Object) (ret runtime.Object, err error) {
-		var v *v3.MonitorMetric
-		if obj == nil {
-			v, err = sync(key, nil)
-		} else {
-			v, err = sync(key, obj.(*v3.MonitorMetric))
-		}
-		if v == nil {
-			return nil, err
-		}
-		return v, err
-	}
+// MonitorMetricGenericCache wraps wrangler/pkg/generic.Cache so the function definitions adhere to MonitorMetricCache interface.
+type MonitorMetricGenericCache struct {
+	generic.CacheInterface[*v3.MonitorMetric]
 }
 
-func (c *monitorMetricController) Updater() generic.Updater {
-	return func(obj runtime.Object) (runtime.Object, error) {
-		newObj, err := c.Update(obj.(*v3.MonitorMetric))
-		if newObj == nil {
-			return nil, err
-		}
-		return newObj, err
-	}
-}
-
-func UpdateMonitorMetricDeepCopyOnChange(client MonitorMetricClient, obj *v3.MonitorMetric, handler func(obj *v3.MonitorMetric) (*v3.MonitorMetric, error)) (*v3.MonitorMetric, error) {
-	if obj == nil {
-		return obj, nil
-	}
-
-	copyObj := obj.DeepCopy()
-	newObj, err := handler(copyObj)
-	if newObj != nil {
-		copyObj = newObj
-	}
-	if obj.ResourceVersion == copyObj.ResourceVersion && !equality.Semantic.DeepEqual(obj, copyObj) {
-		return client.Update(copyObj)
-	}
-
-	return copyObj, err
-}
-
-func (c *monitorMetricController) AddGenericHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.controller.RegisterHandler(ctx, name, controller.SharedControllerHandlerFunc(handler))
-}
-
-func (c *monitorMetricController) AddGenericRemoveHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), handler))
-}
-
-func (c *monitorMetricController) OnChange(ctx context.Context, name string, sync MonitorMetricHandler) {
-	c.AddGenericHandler(ctx, name, FromMonitorMetricHandlerToHandler(sync))
-}
-
-func (c *monitorMetricController) OnRemove(ctx context.Context, name string, sync MonitorMetricHandler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), FromMonitorMetricHandlerToHandler(sync)))
-}
-
-func (c *monitorMetricController) Enqueue(namespace, name string) {
-	c.controller.Enqueue(namespace, name)
-}
-
-func (c *monitorMetricController) EnqueueAfter(namespace, name string, duration time.Duration) {
-	c.controller.EnqueueAfter(namespace, name, duration)
-}
-
-func (c *monitorMetricController) Informer() cache.SharedIndexInformer {
-	return c.controller.Informer()
-}
-
-func (c *monitorMetricController) GroupVersionKind() schema.GroupVersionKind {
-	return c.gvk
-}
-
-func (c *monitorMetricController) Cache() MonitorMetricCache {
-	return &monitorMetricCache{
-		indexer:  c.Informer().GetIndexer(),
-		resource: c.groupResource,
-	}
-}
-
-func (c *monitorMetricController) Create(obj *v3.MonitorMetric) (*v3.MonitorMetric, error) {
-	result := &v3.MonitorMetric{}
-	return result, c.client.Create(context.TODO(), obj.Namespace, obj, result, metav1.CreateOptions{})
-}
-
-func (c *monitorMetricController) Update(obj *v3.MonitorMetric) (*v3.MonitorMetric, error) {
-	result := &v3.MonitorMetric{}
-	return result, c.client.Update(context.TODO(), obj.Namespace, obj, result, metav1.UpdateOptions{})
-}
-
-func (c *monitorMetricController) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	if options == nil {
-		options = &metav1.DeleteOptions{}
-	}
-	return c.client.Delete(context.TODO(), namespace, name, *options)
-}
-
-func (c *monitorMetricController) Get(namespace, name string, options metav1.GetOptions) (*v3.MonitorMetric, error) {
-	result := &v3.MonitorMetric{}
-	return result, c.client.Get(context.TODO(), namespace, name, result, options)
-}
-
-func (c *monitorMetricController) List(namespace string, opts metav1.ListOptions) (*v3.MonitorMetricList, error) {
-	result := &v3.MonitorMetricList{}
-	return result, c.client.List(context.TODO(), namespace, result, opts)
-}
-
-func (c *monitorMetricController) Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
-	return c.client.Watch(context.TODO(), namespace, opts)
-}
-
-func (c *monitorMetricController) Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (*v3.MonitorMetric, error) {
-	result := &v3.MonitorMetric{}
-	return result, c.client.Patch(context.TODO(), namespace, name, pt, data, result, metav1.PatchOptions{}, subresources...)
-}
-
-type monitorMetricCache struct {
-	indexer  cache.Indexer
-	resource schema.GroupResource
-}
-
-func (c *monitorMetricCache) Get(namespace, name string) (*v3.MonitorMetric, error) {
-	obj, exists, err := c.indexer.GetByKey(namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(c.resource, name)
-	}
-	return obj.(*v3.MonitorMetric), nil
-}
-
-func (c *monitorMetricCache) List(namespace string, selector labels.Selector) (ret []*v3.MonitorMetric, err error) {
-
-	err = cache.ListAllByNamespace(c.indexer, namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v3.MonitorMetric))
-	})
-
-	return ret, err
-}
-
-func (c *monitorMetricCache) AddIndexer(indexName string, indexer MonitorMetricIndexer) {
-	utilruntime.Must(c.indexer.AddIndexers(map[string]cache.IndexFunc{
-		indexName: func(obj interface{}) (strings []string, e error) {
-			return indexer(obj.(*v3.MonitorMetric))
-		},
-	}))
-}
-
-func (c *monitorMetricCache) GetByIndex(indexName, key string) (result []*v3.MonitorMetric, err error) {
-	objs, err := c.indexer.ByIndex(indexName, key)
-	if err != nil {
-		return nil, err
-	}
-	result = make([]*v3.MonitorMetric, 0, len(objs))
-	for _, obj := range objs {
-		result = append(result, obj.(*v3.MonitorMetric))
-	}
-	return result, nil
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c MonitorMetricGenericCache) AddIndexer(indexName string, indexer MonitorMetricIndexer) {
+	c.CacheInterface.AddIndexer(indexName, generic.Indexer[*v3.MonitorMetric](indexer))
 }
