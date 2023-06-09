@@ -17,6 +17,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/endpoints"
 	v4 "github.com/aws/aws-sdk-go/aws/signer/v4"
 	"github.com/rancher/norman/httperror"
+	"github.com/rancher/rancher/pkg/catalog/utils"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 )
 
@@ -26,6 +27,9 @@ const (
 	cnNorth1AWSRegion     = "cn-north-1"
 	cnNorthwest1AWSRegion = "cn-northwest-1"
 )
+
+// List of global services for AWS from: https://docs.aws.amazon.com/general/latest/gr/rande.html#global-endpoints
+var globalAWSServices = []string{"cloudfront", "globalaccelerator", "iam", "networkmanager", "organizations", "route53", "shield", "waf"}
 
 var requiredHeadersForAws = map[string]bool{"host": true,
 	"x-amz-content-sha256": true,
@@ -114,6 +118,15 @@ func (a awsv4) getServiceAndRegion(host string) (string, string) {
 	region := ""
 	for _, partition := range endpoints.DefaultPartitions() {
 		service, region = partitionServiceAndRegion(partition, host)
+		// Some services are global and don't have a region. If a partition returns a service
+		// that is global then stop processing partitions. If we carry on processing partitions
+		// for a global service then when new partitions are introduced the signing may break.
+		if service != "" && region == "" {
+			if utils.Contains(globalAWSServices, service) {
+				break
+			}
+		}
+
 		// empty region is valid, but if one is found it should be assumed correct
 		if region != "" {
 			return service, region
