@@ -253,4 +253,8 @@ func (c *authConfigCache) GetByIndex(indexName, key string) (result []*v3.AuthCo
 		result = append(result, obj.(*v3.AuthConfig))
 	}
 	return result, nil
+<<<<<<< Updated upstream
 }
+=======
+}
+>>>>>>> Stashed changes
