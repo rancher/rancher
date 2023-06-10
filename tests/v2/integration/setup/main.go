@@ -24,10 +24,10 @@ const (
 
 // main creates a test namespace and cluster for use in integration tests.
 func main() {
-	logrus.Infof("Generating test config")
+	logrus.Infof("generating test config")
 	ipAddress, err := getOutboundIP()
 	if err != nil {
-		logrus.Fatalf("Error getting outbound IP address: %v", err)
+		logrus.Fatalf("error getting outbound IP address: %v", err)
 	}
 
 	hostURL := fmt.Sprintf("%s:8443", ipAddress.String())
@@ -39,7 +39,7 @@ func main() {
 		hostURL,
 	)
 	if err != nil {
-		logrus.Fatalf("Error with generating admin token: %v", err)
+		logrus.Fatalf("error with generating admin token: %v", err)
 	}
 
 	cleanup := true
@@ -52,19 +52,19 @@ func main() {
 
 	err = defaults.Set(&rancherConfig)
 	if err != nil {
-		logrus.Fatalf("Error with setting up config file: %v", err)
+		logrus.Fatalf("error with setting up config file: %v", err)
 	}
 
 	err = config.WriteConfig(rancherClient.ConfigurationFileKey, &rancherConfig)
 	if err != nil {
-		logrus.Fatalf("Error writing test config: %v", err)
+		logrus.Fatalf("error writing test config: %v", err)
 	}
 
 	// Note that we do not defer clusterClients.Close() here. This is because doing so would cause the test namespace
 	// in which the downstream cluster resides to be deleted before it can be used in tests.
 	clusterClients, err := clients.New()
 	if err != nil {
-		logrus.Fatalf("Error creating clients: %v", err)
+		logrus.Fatalf("error creating clients: %v", err)
 	}
 
 	logrus.Infof("Creating test cluster %s with %s", rancherConfig.ClusterName, testdefaults.SomeK8sVersion)
@@ -85,13 +85,13 @@ func main() {
 		},
 	})
 	if err != nil {
-		logrus.Fatalf("Error creating integration test cluster: %v", err)
+		logrus.Fatalf("error creating integration test cluster: %v", err)
 	}
 
 	logrus.Info("Waiting for test cluster to be ready")
 	c, err = cluster.WaitForCreate(clusterClients, c)
 	if err != nil {
-		logrus.Fatalf("Error waiting for test cluster to be ready: %v", err)
+		logrus.Fatalf("error waiting for test cluster to be ready: %v", err)
 	}
 
 	logrus.Infof("Test cluster %s created successfully. Setup complete.", c.Name)
