@@ -21,6 +21,7 @@ package v1
 import (
 	"github.com/rancher/lasso/pkg/controller"
 	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	"github.com/rancher/wrangler/pkg/generic"
 	"github.com/rancher/wrangler/pkg/schemes"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -43,6 +44,6 @@ type version struct {
 	controllerFactory controller.SharedControllerFactory
 }
 
-func (c *version) Cluster() ClusterController {
-	return NewClusterController(schema.GroupVersionKind{Group: "provisioning.cattle.io", Version: "v1", Kind: "Cluster"}, "clusters", true, c.controllerFactory)
+func (v *version) Cluster() ClusterController {
+	return generic.NewController[*v1.Cluster, *v1.ClusterList](schema.GroupVersionKind{Group: "provisioning.cattle.io", Version: "v1", Kind: "Cluster"}, "clusters", true, v.controllerFactory)
 }
