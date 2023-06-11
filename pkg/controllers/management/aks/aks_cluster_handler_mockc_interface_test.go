@@ -5,7 +5,6 @@ import (
 	"net"
 
 	openapi2 "github.com/google/gnostic/openapiv2"
-	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config/dialer"
 	meta1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -26,42 +25,6 @@ const (
 )
 
 // mock interfaces
-
-// mock cluster client
-
-type MockClusterClient struct{}
-
-func (m MockClusterClient) Create(cluster *v3.Cluster) (*v3.Cluster, error) {
-	panic("implement me")
-}
-
-func (m MockClusterClient) Update(cluster *v3.Cluster) (*v3.Cluster, error) {
-	return cluster, nil
-}
-
-func (m MockClusterClient) UpdateStatus(cluster *v3.Cluster) (*v3.Cluster, error) {
-	panic("implement me")
-}
-
-func (m MockClusterClient) Delete(name string, options *meta1.DeleteOptions) error {
-	panic("implement me")
-}
-
-func (m MockClusterClient) Get(name string, options meta1.GetOptions) (*v3.Cluster, error) {
-	panic("implement me")
-}
-
-func (m MockClusterClient) List(opts meta1.ListOptions) (*v3.ClusterList, error) {
-	panic("implement me")
-}
-
-func (m MockClusterClient) Watch(opts meta1.ListOptions) (watch.Interface, error) {
-	panic("implement me")
-}
-
-func (m MockClusterClient) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.Cluster, err error) {
-	panic("implement me")
-}
 
 // mock dynamic client (to return a mock AKSClusterConfig)
 
