@@ -1,7 +1,4 @@
 // mocks created with the following commands
-//
-//	mockgen --build_flags=--mod=mod -package restrictedadminrbac -destination ./mocks_test.go github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3 ClusterRoleTemplateBindingController,ClusterRoleTemplateBindingCache,ClusterCache,GlobalRoleBindingCache
-//
 // mockgen --build_flags=--mod=mod -package restrictedadminrbac -destination ./mockIndexer_test.go k8s.io/client-go/tools/cache Indexer
 package restrictedadminrbac
 
@@ -12,6 +9,7 @@ import (
 	"github.com/golang/mock/gomock"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/rbac"
+	"github.com/rancher/wrangler/pkg/generic/fake"
 	"github.com/rancher/wrangler/pkg/relatedresource"
 	"github.com/stretchr/testify/require"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -431,10 +429,10 @@ func Test_enqueueGrbOnCluster(t *testing.T) {
 func newMockController(t *testing.T) *mockController {
 	t.Helper()
 	ctrl := gomock.NewController(t)
-	clusterCache := NewMockClusterCache(ctrl)
-	crtbCache := NewMockClusterRoleTemplateBindingCache(ctrl)
-	crtbCtrl := NewMockClusterRoleTemplateBindingController(ctrl)
-	grbCache := NewMockGlobalRoleBindingCache(ctrl)
+	clusterCache := fake.NewMockNonNamespacedCacheInterface[*v3.Cluster](ctrl)
+	crtbCache := fake.NewMockCacheInterface[*v3.ClusterRoleTemplateBinding](ctrl)
+	crtbCtrl := fake.NewMockControllerInterface[*v3.ClusterRoleTemplateBinding, *v3.ClusterRoleTemplateBindingList](ctrl)
+	grbCache := fake.NewMockNonNamespacedCacheInterface[*v3.GlobalRoleBinding](ctrl)
 	grbIndexer := NewMockIndexer(ctrl)
 	return &mockController{
 		t:                t,
@@ -449,10 +447,10 @@ func newMockController(t *testing.T) *mockController {
 type mockController struct {
 	t                *testing.T
 	mockIndexer      *MockIndexer
-	mockClusterCache *MockClusterCache
-	mockCRTBCache    *MockClusterRoleTemplateBindingCache
-	mockCRTBCtrl     *MockClusterRoleTemplateBindingController
-	mockGRBCache     *MockGlobalRoleBindingCache
+	mockClusterCache *fake.MockNonNamespacedCacheInterface[*v3.Cluster]
+	mockCRTBCache    *fake.MockCacheInterface[*v3.ClusterRoleTemplateBinding]
+	mockCRTBCtrl     *fake.MockControllerInterface[*v3.ClusterRoleTemplateBinding, *v3.ClusterRoleTemplateBindingList]
+	mockGRBCache     *fake.MockNonNamespacedCacheInterface[*v3.GlobalRoleBinding]
 }
 
 func (m *mockController) rbacController() *rbaccontroller {

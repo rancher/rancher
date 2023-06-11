@@ -14,13 +14,10 @@ import (
 	"testing"
 
 	"github.com/rancher/rancher/pkg/api/steve/proxy"
-	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/remotedialer"
 	"github.com/stretchr/testify/assert"
 	authv1 "k8s.io/api/authorization/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	k8sUser "k8s.io/apiserver/pkg/authentication/user"
 	k8sRequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -123,7 +120,7 @@ func TestLocalCluster(t *testing.T) {
 			assert.NoError(t, err, "error when creating rest client")
 			sarWrapper := Authv1ClientInterface{Client: client}
 
-			proxyMiddleware, err := proxy.NewProxyMiddleware(&sarWrapper, defaultDialer, &fakeClusterCache{}, true, &localHandler)
+			proxyMiddleware, err := proxy.NewProxyMiddleware(&sarWrapper, defaultDialer, nil, true, &localHandler)
 			assert.NoError(t, err, "unable to construct proxy middleware")
 			// construct the middleware with our default handler
 			testHandler := proxyMiddleware(&responder)
@@ -338,11 +335,3 @@ func RestClientForURL(serverURL string, token string) (rest.Interface, error) {
 	}
 	return rest.UnversionedRESTClientFor(restConfig)
 }
-
-// implements v3.ClusterCache, but does absolutely nothing
-type fakeClusterCache struct{}
-
-func (f *fakeClusterCache) Get(name string) (*v3.Cluster, error)                       { return nil, nil }
-func (f *fakeClusterCache) List(selector labels.Selector) ([]*v3.Cluster, error)       { return nil, nil }
-func (f *fakeClusterCache) AddIndexer(indexName string, indexer mgmtv3.ClusterIndexer) {}
-func (f *fakeClusterCache) GetByIndex(indexName, key string) ([]*v3.Cluster, error)    { return nil, nil }

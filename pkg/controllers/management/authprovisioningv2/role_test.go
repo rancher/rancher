@@ -1,23 +1,24 @@
 package authprovisioningv2
 
 import (
+	"errors"
 	"testing"
 
+	"github.com/golang/mock/gomock"
+	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	apisv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	provisioningv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/wrangler/pkg/generic"
+	"github.com/rancher/wrangler/pkg/generic/fake"
+	rbacv1 "k8s.io/api/rbac/v1"
 	v1 "k8s.io/api/rbac/v1"
+	apierror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 var (
-	simpleHandler = &handler{
-		roleController:               mockRoleController{},
-		roleBindingController:        mockRoleBindingController{},
-		clusters:                     mockCluster{},
-		mgmtClusters:                 mockMgmtCluster{},
-		clusterRoleController:        mockClusterRoleController{},
-		clusterRoleBindingController: mockClusterRoleBindingController{},
-	}
-
 	clusterDeletingAnnotationLabel = "deleting"
 	clusterDeletedAnnotationLabel  = "deleted"
 	genericAnnotationLabel         = "clusternamespace"
@@ -75,7 +76,7 @@ func Test_handler_hasClusterAnnotationsAndDeletionTimestamp(t *testing.T) {
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
 				// first returned value is always the same role object as the role argument
-				enqueue, err := simpleHandler.hasAnnotationsForDeletingCluster(tt.annotations, isClusterArg)
+				enqueue, err := simpleHandler(t).hasAnnotationsForDeletingCluster(tt.annotations, isClusterArg)
 				if enqueue != tt.want {
 					t.Errorf("%v returned %v, wanted %v", funcName, enqueue, tt.want)
 				}
@@ -136,7 +137,7 @@ func Test_OnRemoveRole(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := simpleHandler.OnRemoveRole("", tt.role)
+			_, err := simpleHandler(t).OnRemoveRole("", tt.role)
 			if tt.wantEnqueue && err != generic.ErrSkip {
 				t.Errorf("%v wanted enqueue, got err = %v", funcName, err)
 				return
@@ -186,7 +187,7 @@ func Test_OnRemoveRoleBinding(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := simpleHandler.OnRemoveRoleBinding("", tt.role)
+			_, err := simpleHandler(t).OnRemoveRoleBinding("", tt.role)
 			if tt.wantEnqueue && err != generic.ErrSkip {
 				t.Errorf("%v wanted enqueue, got err = %v", funcName, err)
 				return
@@ -236,7 +237,7 @@ func Test_OnRemoveClusterRole(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := simpleHandler.OnRemoveClusterRole("", tt.role)
+			_, err := simpleHandler(t).OnRemoveClusterRole("", tt.role)
 			if tt.wantEnqueue && err != generic.ErrSkip {
 				t.Errorf("%v wanted enqueue, got err = %v", funcName, err)
 				return
@@ -286,7 +287,7 @@ func Test_OnRemoveClusterRoleBinding(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := simpleHandler.OnRemoveClusterRoleBinding("", tt.role)
+			_, err := simpleHandler(t).OnRemoveClusterRoleBinding("", tt.role)
 			if tt.wantEnqueue && err != generic.ErrSkip {
 				t.Errorf("%v wanted enqueue, got err = %v", funcName, err)
 				return
@@ -304,4 +305,53 @@ func createNameAndNamespaceAnnotation(n string) map[string]string {
 
 func createNameAnnotation(n string) map[string]string {
 	return map[string]string{clusterNameLabel: n}
+}
+
+func simpleHandler(t *testing.T) *handler {
+	t.Helper()
+	ctrl := gomock.NewController(t)
+
+	mockRoleController := fake.NewMockControllerInterface[*rbacv1.Role, *rbacv1.RoleList](ctrl)
+	mockRoleController.EXPECT().EnqueueAfter(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+
+	mockRoleBindingController := fake.NewMockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList](ctrl)
+	mockRoleBindingController.EXPECT().EnqueueAfter(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+
+	mockCluster := fake.NewMockCacheInterface[*apisv1.Cluster](ctrl)
+	mockCluster.EXPECT().Get("deleted", gomock.Any()).Return(nil, apierror.NewNotFound(schema.GroupResource{}, "deleted")).AnyTimes()
+	mockCluster.EXPECT().Get("deleting", gomock.Any()).Return(newDeletingCuster(), nil).AnyTimes()
+	mockCluster.EXPECT().Get("other error", gomock.Any()).Return(nil, errors.New("other error")).AnyTimes()
+	mockCluster.EXPECT().Get(gomock.Any(), gomock.Any()).Return(&provisioningv1.Cluster{}, nil).AnyTimes()
+
+	mockMgmtCluster := fake.NewMockNonNamespacedCacheInterface[*apisv3.Cluster](ctrl)
+	mockMgmtCluster.EXPECT().Get("deleted").Return(nil, apierror.NewNotFound(schema.GroupResource{}, "deleted")).AnyTimes()
+	mockMgmtCluster.EXPECT().Get("deleting").Return(newDeletingMgmtCuster(), nil).AnyTimes()
+	mockMgmtCluster.EXPECT().Get("other error").Return(nil, errors.New("other error")).AnyTimes()
+	mockMgmtCluster.EXPECT().Get(gomock.Any()).Return(&v3.Cluster{}, nil).AnyTimes()
+
+	mockClusterRoleController := fake.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList](ctrl)
+	mockClusterRoleController.EXPECT().EnqueueAfter(gomock.Any(), gomock.Any()).AnyTimes()
+
+	mockClusterRoleBindingController := fake.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList](ctrl)
+	mockClusterRoleBindingController.EXPECT().EnqueueAfter(gomock.Any(), gomock.Any()).AnyTimes()
+
+	return &handler{
+		roleController:               mockRoleController,
+		roleBindingController:        mockRoleBindingController,
+		clusters:                     mockCluster,
+		mgmtClusters:                 mockMgmtCluster,
+		clusterRoleController:        mockClusterRoleController,
+		clusterRoleBindingController: mockClusterRoleBindingController,
+	}
+
+}
+func newDeletingCuster() *provisioningv1.Cluster {
+	c := &provisioningv1.Cluster{}
+	c.DeletionTimestamp = &metav1.Time{}
+	return c
+}
+func newDeletingMgmtCuster() *v3.Cluster {
+	c := &v3.Cluster{}
+	c.DeletionTimestamp = &metav1.Time{}
+	return c
 }
