@@ -1,7 +1,5 @@
-//
 // CODE GENERATED AUTOMATICALLY WITH github.com/kelveny/mockcompose
-// THIS FILE SHOULD NOT BE EDITED BY HAND
-//
+// But has since been manually updated.
 package gke
 
 import (
@@ -10,12 +8,16 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"testing"
 	"time"
 
 	"github.com/ghodss/yaml"
+	"github.com/golang/mock/gomock"
 	v1 "github.com/rancher/gke-operator/pkg/apis/gke.cattle.io/v1"
+	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/management/clusteroperator"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/wrangler/pkg/generic/fake"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/mock"
 	secretv1 "k8s.io/api/core/v1"
@@ -33,7 +35,16 @@ type mockGkeOperatorController struct {
 	mock.Mock
 }
 
-func getMockGkeOperatorController(clusterState string) mockGkeOperatorController {
+func getMockGkeOperatorController(t *testing.T, clusterState string) mockGkeOperatorController {
+	t.Helper()
+	ctrl := gomock.NewController(t)
+	clusterMock := fake.NewMockNonNamespacedClientInterface[*apisv3.Cluster, *apisv3.ClusterList](ctrl)
+	clusterMock.EXPECT().Update(gomock.Any()).DoAndReturn(
+		func(c *apisv3.Cluster) (*apisv3.Cluster, error) {
+			return c, nil
+		},
+	).AnyTimes()
+
 	var dynamicClient dynamic.NamespaceableResourceInterface
 
 	switch clusterState {
@@ -54,7 +65,7 @@ func getMockGkeOperatorController(clusterState string) mockGkeOperatorController
 	return mockGkeOperatorController{
 		gkeOperatorController: gkeOperatorController{
 			OperatorController: clusteroperator.OperatorController{
-				ClusterEnqueueAfter:  func(name string, duration time.Duration){},
+				ClusterEnqueueAfter:  func(name string, duration time.Duration) {},
 				SecretsCache:         nil,
 				Secrets:              nil,
 				TemplateCache:        nil,
@@ -62,11 +73,11 @@ func getMockGkeOperatorController(clusterState string) mockGkeOperatorController
 				AppLister:            nil,
 				AppClient:            nil,
 				NsClient:             nil,
-				ClusterClient:        MockClusterClient{},
+				ClusterClient:        clusterMock,
 				CatalogManager:       nil,
 				SystemAccountManager: nil,
 				DynamicClient:        dynamicClient,
-				ClientDialer: 		  MockFactory{},
+				ClientDialer:         MockFactory{},
 				Discovery:            MockDiscovery{},
 			},
 		},
@@ -181,11 +192,13 @@ func getMockV3Cluster(filename string) (mgmtv3.Cluster, error) {
 	var mockCluster mgmtv3.Cluster
 
 	// Read the embedded file
-	cluster, err := testFs.ReadFile(filename); if err != nil {
+	cluster, err := testFs.ReadFile(filename)
+	if err != nil {
 		return mockCluster, err
 	}
 	// Unmarshal cluster yaml into a management v3 cluster object
-	err = yaml.Unmarshal(cluster, &mockCluster); if err != nil {
+	err = yaml.Unmarshal(cluster, &mockCluster)
+	if err != nil {
 		return mockCluster, err
 	}
 
@@ -196,11 +209,13 @@ func getMockGkeClusterConfig(filename string) (*unstructured.Unstructured, error
 	var gkeClusterConfig *unstructured.Unstructured
 
 	// Read the embedded file
-	bytes, err := testFs.ReadFile(filename); if err != nil {
+	bytes, err := testFs.ReadFile(filename)
+	if err != nil {
 		return gkeClusterConfig, err
 	}
 	// Unmarshal json into an unstructured cluster config object
-	err = json.Unmarshal(bytes, &gkeClusterConfig); if err != nil {
+	err = json.Unmarshal(bytes, &gkeClusterConfig)
+	if err != nil {
 		return gkeClusterConfig, err
 	}
 

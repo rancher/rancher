@@ -1,11 +1,10 @@
-package eks
+package gke
 
 import (
 	"context"
 	"net"
 
 	openapi2 "github.com/google/gnostic/openapiv2"
-	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config/dialer"
 	meta1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -18,54 +17,18 @@ import (
 )
 
 const (
-	MockDefaultEksClusterConfigFilename = "test/onclusterchange_ekscc_default.json"
-	MockCreateEksClusterConfigFilename  = "test/onclusterchange_ekscc_create.json"
-	MockActiveEksClusterConfigFilename  = "test/onclusterchange_ekscc_active.json"
-	MockUpdateEksClusterConfigFilename  = "test/onclusterchange_ekscc_update.json"
-	MockEksClusterConfigUpdatedFilename = "test/updateeksclusterconfig_updated.json"
+	MockDefaultgkeClusterConfigFilename = "test/onclusterchange_gkecc_default.json"
+	MockCreategkeClusterConfigFilename  = "test/onclusterchange_gkecc_create.json"
+	MockActivegkeClusterConfigFilename  = "test/onclusterchange_gkecc_active.json"
+	MockUpdategkeClusterConfigFilename  = "test/onclusterchange_gkecc_update.json"
+	MockgkeClusterConfigUpdatedFilename = "test/updategkeclusterconfig_updated.json"
 )
 
 // mock interfaces
 
-// mock cluster client
+// mock dynamic client (to return a mock gkeClusterConfig)
 
-type MockClusterClient struct{}
-
-func (m MockClusterClient) Create(cluster *v3.Cluster) (*v3.Cluster, error) {
-	panic("implement me")
-}
-
-func (m MockClusterClient) Update(cluster *v3.Cluster) (*v3.Cluster, error) {
-	return cluster, nil
-}
-
-func (m MockClusterClient) UpdateStatus(cluster *v3.Cluster) (*v3.Cluster, error) {
-	panic("implement me")
-}
-
-func (m MockClusterClient) Delete(name string, options *meta1.DeleteOptions) error {
-	panic("implement me")
-}
-
-func (m MockClusterClient) Get(name string, options meta1.GetOptions) (*v3.Cluster, error) {
-	panic("implement me")
-}
-
-func (m MockClusterClient) List(opts meta1.ListOptions) (*v3.ClusterList, error) {
-	panic("implement me")
-}
-
-func (m MockClusterClient) Watch(opts meta1.ListOptions) (watch.Interface, error) {
-	panic("implement me")
-}
-
-func (m MockClusterClient) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.Cluster, err error) {
-	panic("implement me")
-}
-
-// mock dynamic client (to return a mock EksClusterConfig)
-
-// Test 1 - cluster in default/unknown state. Get will return an EksClusterConfig with an unknown provisioning phase.
+// Test 1 - cluster in default/unknown state. Get will return an gkeClusterConfig with an unknown provisioning phase.
 // The rest of the method signatures have to be implemented to mock the interface. There will be one mock of this
 // interface for each test.
 
@@ -121,6 +84,14 @@ func (m MockNamespaceableResourceInterfaceDefault) Patch(ctx context.Context, na
 
 type MockResourceInterfaceDefault struct{}
 
+func (m MockResourceInterfaceDefault) Apply(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions, subresources ...string) (*unstructured.Unstructured, error) {
+	panic("implement me")
+}
+
+func (m MockResourceInterfaceDefault) ApplyStatus(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions) (*unstructured.Unstructured, error) {
+	panic("implement me")
+}
+
 func (m MockResourceInterfaceDefault) Create(ctx context.Context, obj *unstructured.Unstructured, options meta1.CreateOptions, subresources ...string) (*unstructured.Unstructured, error) {
 	panic("implement me")
 }
@@ -142,7 +113,7 @@ func (m MockResourceInterfaceDefault) DeleteCollection(ctx context.Context, opti
 }
 
 func (m MockResourceInterfaceDefault) Get(ctx context.Context, name string, options meta1.GetOptions, subresources ...string) (*unstructured.Unstructured, error) {
-	return getMockEksClusterConfig(MockDefaultEksClusterConfigFilename)
+	return getMockGkeClusterConfig(MockDefaultgkeClusterConfigFilename)
 }
 
 func (m MockResourceInterfaceDefault) List(ctx context.Context, opts meta1.ListOptions) (*unstructured.UnstructuredList, error) {
@@ -154,13 +125,6 @@ func (m MockResourceInterfaceDefault) Watch(ctx context.Context, opts meta1.List
 }
 
 func (m MockResourceInterfaceDefault) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, options meta1.PatchOptions, subresources ...string) (*unstructured.Unstructured, error) {
-	panic("implement me")
-}
-
-func (m MockResourceInterfaceDefault) Apply(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions, subresources ...string) (*unstructured.Unstructured, error) {
-	panic("implement me")
-}
-func (m MockResourceInterfaceDefault) ApplyStatus(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions) (*unstructured.Unstructured, error) {
 	panic("implement me")
 }
 
@@ -218,6 +182,14 @@ func (m MockNamespaceableResourceInterfaceCreate) Patch(ctx context.Context, nam
 
 type MockResourceInterfaceCreate struct{}
 
+func (m MockResourceInterfaceCreate) Apply(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions, subresources ...string) (*unstructured.Unstructured, error) {
+	panic("implement me")
+}
+
+func (m MockResourceInterfaceCreate) ApplyStatus(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions) (*unstructured.Unstructured, error) {
+	panic("implement me")
+}
+
 func (m MockResourceInterfaceCreate) Create(ctx context.Context, obj *unstructured.Unstructured, options meta1.CreateOptions, subresources ...string) (*unstructured.Unstructured, error) {
 	panic("implement me")
 }
@@ -239,7 +211,7 @@ func (m MockResourceInterfaceCreate) DeleteCollection(ctx context.Context, optio
 }
 
 func (m MockResourceInterfaceCreate) Get(ctx context.Context, name string, options meta1.GetOptions, subresources ...string) (*unstructured.Unstructured, error) {
-	return getMockEksClusterConfig(MockCreateEksClusterConfigFilename)
+	return getMockGkeClusterConfig(MockCreategkeClusterConfigFilename)
 }
 
 func (m MockResourceInterfaceCreate) List(ctx context.Context, opts meta1.ListOptions) (*unstructured.UnstructuredList, error) {
@@ -251,14 +223,6 @@ func (m MockResourceInterfaceCreate) Watch(ctx context.Context, opts meta1.ListO
 }
 
 func (m MockResourceInterfaceCreate) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, options meta1.PatchOptions, subresources ...string) (*unstructured.Unstructured, error) {
-	panic("implement me")
-}
-
-func (m MockResourceInterfaceCreate) Apply(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions, subresources ...string) (*unstructured.Unstructured, error) {
-	panic("implement me")
-}
-
-func (m MockResourceInterfaceCreate) ApplyStatus(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions) (*unstructured.Unstructured, error) {
 	panic("implement me")
 }
 
@@ -316,6 +280,14 @@ func (m MockNamespaceableResourceInterfaceActive) Patch(ctx context.Context, nam
 
 type MockResourceInterfaceActive struct{}
 
+func (m MockResourceInterfaceActive) Apply(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions, subresources ...string) (*unstructured.Unstructured, error) {
+	panic("implement me")
+}
+
+func (m MockResourceInterfaceActive) ApplyStatus(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions) (*unstructured.Unstructured, error) {
+	panic("implement me")
+}
+
 func (m MockResourceInterfaceActive) Create(ctx context.Context, obj *unstructured.Unstructured, options meta1.CreateOptions, subresources ...string) (*unstructured.Unstructured, error) {
 	panic("implement me")
 }
@@ -337,7 +309,7 @@ func (m MockResourceInterfaceActive) DeleteCollection(ctx context.Context, optio
 }
 
 func (m MockResourceInterfaceActive) Get(ctx context.Context, name string, options meta1.GetOptions, subresources ...string) (*unstructured.Unstructured, error) {
-	return getMockEksClusterConfig(MockActiveEksClusterConfigFilename)
+	return getMockGkeClusterConfig(MockActivegkeClusterConfigFilename)
 }
 
 func (m MockResourceInterfaceActive) List(ctx context.Context, opts meta1.ListOptions) (*unstructured.UnstructuredList, error) {
@@ -349,16 +321,6 @@ func (m MockResourceInterfaceActive) Watch(ctx context.Context, opts meta1.ListO
 }
 
 func (m MockResourceInterfaceActive) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, options meta1.PatchOptions, subresources ...string) (*unstructured.Unstructured, error) {
-	panic("implement me")
-}
-
-func (m MockResourceInterfaceActive) Apply(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions, subresources ...string) (*unstructured.Unstructured, error) {
-	// TODO implement me
-	panic("implement me")
-}
-
-func (m MockResourceInterfaceActive) ApplyStatus(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions) (*unstructured.Unstructured, error) {
-	// TODO implement me
 	panic("implement me")
 }
 
@@ -416,6 +378,14 @@ func (m MockNamespaceableResourceInterfaceUpdate) Patch(ctx context.Context, nam
 
 type MockResourceInterfaceUpdate struct{}
 
+func (m MockResourceInterfaceUpdate) Apply(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions, subresources ...string) (*unstructured.Unstructured, error) {
+	panic("implement me")
+}
+
+func (m MockResourceInterfaceUpdate) ApplyStatus(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions) (*unstructured.Unstructured, error) {
+	panic("implement me")
+}
+
 func (m MockResourceInterfaceUpdate) Create(ctx context.Context, obj *unstructured.Unstructured, options meta1.CreateOptions, subresources ...string) (*unstructured.Unstructured, error) {
 	panic("implement me")
 }
@@ -437,7 +407,7 @@ func (m MockResourceInterfaceUpdate) DeleteCollection(ctx context.Context, optio
 }
 
 func (m MockResourceInterfaceUpdate) Get(ctx context.Context, name string, options meta1.GetOptions, subresources ...string) (*unstructured.Unstructured, error) {
-	return getMockEksClusterConfig(MockUpdateEksClusterConfigFilename)
+	return getMockGkeClusterConfig(MockUpdategkeClusterConfigFilename)
 }
 
 func (m MockResourceInterfaceUpdate) List(ctx context.Context, opts meta1.ListOptions) (*unstructured.UnstructuredList, error) {
@@ -452,112 +422,104 @@ func (m MockResourceInterfaceUpdate) Patch(ctx context.Context, name string, pt 
 	panic("implement me")
 }
 
-func (m MockResourceInterfaceUpdate) Apply(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions, subresources ...string) (*unstructured.Unstructured, error) {
+// Test UpdateGKEClusterConfig
+
+type MockNamespaceableResourceInterfaceGkeCC struct{}
+
+func (m MockNamespaceableResourceInterfaceGkeCC) Apply(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions, subresources ...string) (*unstructured.Unstructured, error) {
 	panic("implement me")
 }
 
-func (m MockResourceInterfaceUpdate) ApplyStatus(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions) (*unstructured.Unstructured, error) {
+func (m MockNamespaceableResourceInterfaceGkeCC) ApplyStatus(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions) (*unstructured.Unstructured, error) {
 	panic("implement me")
 }
 
-// Test UpdateEksClusterConfig
+func (m MockNamespaceableResourceInterfaceGkeCC) Namespace(s string) dynamic.ResourceInterface {
+	return MockResourceInterfaceGkeCC{}
+}
 
-type MockNamespaceableResourceInterfaceEksCC struct{}
-
-func (m MockNamespaceableResourceInterfaceEksCC) Apply(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions, subresources ...string) (*unstructured.Unstructured, error) {
+func (m MockNamespaceableResourceInterfaceGkeCC) Create(ctx context.Context, obj *unstructured.Unstructured, options meta1.CreateOptions, subresources ...string) (*unstructured.Unstructured, error) {
 	panic("implement me")
 }
 
-func (m MockNamespaceableResourceInterfaceEksCC) ApplyStatus(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions) (*unstructured.Unstructured, error) {
+func (m MockNamespaceableResourceInterfaceGkeCC) Update(ctx context.Context, obj *unstructured.Unstructured, options meta1.UpdateOptions, subresources ...string) (*unstructured.Unstructured, error) {
 	panic("implement me")
 }
 
-func (m MockNamespaceableResourceInterfaceEksCC) Namespace(s string) dynamic.ResourceInterface {
-	return MockResourceInterfaceEksCC{}
-}
-
-func (m MockNamespaceableResourceInterfaceEksCC) Create(ctx context.Context, obj *unstructured.Unstructured, options meta1.CreateOptions, subresources ...string) (*unstructured.Unstructured, error) {
+func (m MockNamespaceableResourceInterfaceGkeCC) UpdateStatus(ctx context.Context, obj *unstructured.Unstructured, options meta1.UpdateOptions) (*unstructured.Unstructured, error) {
 	panic("implement me")
 }
 
-func (m MockNamespaceableResourceInterfaceEksCC) Update(ctx context.Context, obj *unstructured.Unstructured, options meta1.UpdateOptions, subresources ...string) (*unstructured.Unstructured, error) {
+func (m MockNamespaceableResourceInterfaceGkeCC) Delete(ctx context.Context, name string, options meta1.DeleteOptions, subresources ...string) error {
 	panic("implement me")
 }
 
-func (m MockNamespaceableResourceInterfaceEksCC) UpdateStatus(ctx context.Context, obj *unstructured.Unstructured, options meta1.UpdateOptions) (*unstructured.Unstructured, error) {
+func (m MockNamespaceableResourceInterfaceGkeCC) DeleteCollection(ctx context.Context, options meta1.DeleteOptions, listOptions meta1.ListOptions) error {
 	panic("implement me")
 }
 
-func (m MockNamespaceableResourceInterfaceEksCC) Delete(ctx context.Context, name string, options meta1.DeleteOptions, subresources ...string) error {
+func (m MockNamespaceableResourceInterfaceGkeCC) Get(ctx context.Context, name string, options meta1.GetOptions, subresources ...string) (*unstructured.Unstructured, error) {
 	panic("implement me")
 }
 
-func (m MockNamespaceableResourceInterfaceEksCC) DeleteCollection(ctx context.Context, options meta1.DeleteOptions, listOptions meta1.ListOptions) error {
+func (m MockNamespaceableResourceInterfaceGkeCC) List(ctx context.Context, opts meta1.ListOptions) (*unstructured.UnstructuredList, error) {
 	panic("implement me")
 }
 
-func (m MockNamespaceableResourceInterfaceEksCC) Get(ctx context.Context, name string, options meta1.GetOptions, subresources ...string) (*unstructured.Unstructured, error) {
+func (m MockNamespaceableResourceInterfaceGkeCC) Watch(ctx context.Context, opts meta1.ListOptions) (watch.Interface, error) {
 	panic("implement me")
 }
 
-func (m MockNamespaceableResourceInterfaceEksCC) List(ctx context.Context, opts meta1.ListOptions) (*unstructured.UnstructuredList, error) {
+func (m MockNamespaceableResourceInterfaceGkeCC) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, options meta1.PatchOptions, subresources ...string) (*unstructured.Unstructured, error) {
 	panic("implement me")
 }
 
-func (m MockNamespaceableResourceInterfaceEksCC) Watch(ctx context.Context, opts meta1.ListOptions) (watch.Interface, error) {
+type MockResourceInterfaceGkeCC struct{}
+
+func (m MockResourceInterfaceGkeCC) Apply(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions, subresources ...string) (*unstructured.Unstructured, error) {
 	panic("implement me")
 }
 
-func (m MockNamespaceableResourceInterfaceEksCC) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, options meta1.PatchOptions, subresources ...string) (*unstructured.Unstructured, error) {
+func (m MockResourceInterfaceGkeCC) ApplyStatus(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions) (*unstructured.Unstructured, error) {
 	panic("implement me")
 }
 
-type MockResourceInterfaceEksCC struct{}
-
-func (m MockResourceInterfaceEksCC) Create(ctx context.Context, obj *unstructured.Unstructured, options meta1.CreateOptions, subresources ...string) (*unstructured.Unstructured, error) {
+func (m MockResourceInterfaceGkeCC) Create(ctx context.Context, obj *unstructured.Unstructured, options meta1.CreateOptions, subresources ...string) (*unstructured.Unstructured, error) {
 	panic("implement me")
 }
 
-func (m MockResourceInterfaceEksCC) Update(ctx context.Context, obj *unstructured.Unstructured, options meta1.UpdateOptions, subresources ...string) (*unstructured.Unstructured, error) {
-	return getMockEksClusterConfig(MockEksClusterConfigUpdatedFilename)
+func (m MockResourceInterfaceGkeCC) Update(ctx context.Context, obj *unstructured.Unstructured, options meta1.UpdateOptions, subresources ...string) (*unstructured.Unstructured, error) {
+	return getMockGkeClusterConfig(MockgkeClusterConfigUpdatedFilename)
 }
 
-func (m MockResourceInterfaceEksCC) UpdateStatus(ctx context.Context, obj *unstructured.Unstructured, options meta1.UpdateOptions) (*unstructured.Unstructured, error) {
+func (m MockResourceInterfaceGkeCC) UpdateStatus(ctx context.Context, obj *unstructured.Unstructured, options meta1.UpdateOptions) (*unstructured.Unstructured, error) {
 	panic("implement me")
 }
 
-func (m MockResourceInterfaceEksCC) Delete(ctx context.Context, name string, options meta1.DeleteOptions, subresources ...string) error {
+func (m MockResourceInterfaceGkeCC) Delete(ctx context.Context, name string, options meta1.DeleteOptions, subresources ...string) error {
 	panic("implement me")
 }
 
-func (m MockResourceInterfaceEksCC) DeleteCollection(ctx context.Context, options meta1.DeleteOptions, listOptions meta1.ListOptions) error {
+func (m MockResourceInterfaceGkeCC) DeleteCollection(ctx context.Context, options meta1.DeleteOptions, listOptions meta1.ListOptions) error {
 	panic("implement me")
 }
 
-func (m MockResourceInterfaceEksCC) Get(ctx context.Context, name string, options meta1.GetOptions, subresources ...string) (*unstructured.Unstructured, error) {
-	return getMockEksClusterConfig(MockEksClusterConfigUpdatedFilename)
+func (m MockResourceInterfaceGkeCC) Get(ctx context.Context, name string, options meta1.GetOptions, subresources ...string) (*unstructured.Unstructured, error) {
+	return getMockGkeClusterConfig(MockgkeClusterConfigUpdatedFilename)
 }
 
-func (m MockResourceInterfaceEksCC) List(ctx context.Context, opts meta1.ListOptions) (*unstructured.UnstructuredList, error) {
+func (m MockResourceInterfaceGkeCC) List(ctx context.Context, opts meta1.ListOptions) (*unstructured.UnstructuredList, error) {
 	return &unstructured.UnstructuredList{
 		Object: map[string]interface{}{
-			"apiVersion": "Eks.cattle.io/v1",
-			"kind":       "EksClusterConfigList",
+			"apiVersion": "gke.cattle.io/v1",
+			"kind":       "gkeClusterConfigList",
 			"metadata":   map[string]interface{}{"resourceVersion": "142650"},
 		},
 		Items: nil,
 	}, nil
 }
 
-func (m MockResourceInterfaceEksCC) Apply(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions, subresources ...string) (*unstructured.Unstructured, error) {
-	panic("implement me")
-}
-
-func (m MockResourceInterfaceEksCC) ApplyStatus(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions) (*unstructured.Unstructured, error) {
-	panic("implement me")
-}
-
-// mock interface that returns a watch event (for updateEksClusterConfig test)
+// mock interface that returns a watch event (for updateGKEClusterConfig test)
 
 type MockInterface struct{}
 
@@ -567,11 +529,11 @@ func (m MockInterface) ResultChan() <-chan watch.Event {
 	return make(chan watch.Event)
 }
 
-func (m MockResourceInterfaceEksCC) Watch(ctx context.Context, opts meta1.ListOptions) (watch.Interface, error) {
+func (m MockResourceInterfaceGkeCC) Watch(ctx context.Context, opts meta1.ListOptions) (watch.Interface, error) {
 	return MockInterface{}, nil
 }
 
-func (m MockResourceInterfaceEksCC) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, options meta1.PatchOptions, subresources ...string) (*unstructured.Unstructured, error) {
+func (m MockResourceInterfaceGkeCC) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, options meta1.PatchOptions, subresources ...string) (*unstructured.Unstructured, error) {
 	panic("implement me")
 }
 
@@ -615,7 +577,7 @@ func (m MockDiscovery) ServerResourcesForGroupVersion(groupVersion string) (*met
 		TypeMeta:     meta1.TypeMeta{},
 		GroupVersion: "",
 		APIResources: []meta1.APIResource{
-			{Name: "EksClusterConfig"},
+			{Name: "gkeClusterConfig"},
 			{Name: "status"}},
 	}, nil
 }

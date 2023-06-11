@@ -1,7 +1,5 @@
-//
 // CODE GENERATED AUTOMATICALLY WITH github.com/kelveny/mockcompose
-// THIS FILE SHOULD NOT BE EDITED BY HAND
-//
+// But has since been manually updated.
 package eks
 
 import (
@@ -10,13 +8,17 @@ import (
 	stderrors "errors"
 	"net"
 	"net/url"
+	"testing"
 	"time"
 
 	"github.com/ghodss/yaml"
+	"github.com/golang/mock/gomock"
 	v1 "github.com/rancher/eks-operator/pkg/apis/eks.cattle.io/v1"
+	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/management/clusteroperator"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	typesDialer "github.com/rancher/rancher/pkg/types/config/dialer"
+	"github.com/rancher/wrangler/pkg/generic/fake"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/mock"
 	secretv1 "k8s.io/api/core/v1"
@@ -34,7 +36,16 @@ type mockEksOperatorController struct {
 	mock.Mock
 }
 
-func getMockEksOperatorController(clusterState string) mockEksOperatorController {
+func getMockEksOperatorController(t *testing.T, clusterState string) mockEksOperatorController {
+	t.Helper()
+	ctrl := gomock.NewController(t)
+	clusterMock := fake.NewMockNonNamespacedClientInterface[*apisv3.Cluster, *apisv3.ClusterList](ctrl)
+	clusterMock.EXPECT().Update(gomock.Any()).DoAndReturn(
+		func(c *apisv3.Cluster) (*apisv3.Cluster, error) {
+			return c, nil
+		},
+	).AnyTimes()
+
 	var dynamicClient dynamic.NamespaceableResourceInterface
 
 	switch clusterState {
@@ -55,7 +66,7 @@ func getMockEksOperatorController(clusterState string) mockEksOperatorController
 	return mockEksOperatorController{
 		eksOperatorController: eksOperatorController{
 			OperatorController: clusteroperator.OperatorController{
-				ClusterEnqueueAfter:  func(name string, duration time.Duration){},
+				ClusterEnqueueAfter:  func(name string, duration time.Duration) {},
 				SecretsCache:         nil,
 				Secrets:              nil,
 				TemplateCache:        nil,
@@ -63,7 +74,7 @@ func getMockEksOperatorController(clusterState string) mockEksOperatorController
 				AppLister:            nil,
 				AppClient:            nil,
 				NsClient:             nil,
-				ClusterClient:        MockClusterClient{},
+				ClusterClient:        clusterMock,
 				CatalogManager:       nil,
 				SystemAccountManager: nil,
 				DynamicClient:        dynamicClient,
@@ -201,11 +212,13 @@ func getMockV3Cluster(filename string) (mgmtv3.Cluster, error) {
 	var mockCluster mgmtv3.Cluster
 
 	// Read the embedded file
-	cluster, err := testFs.ReadFile(filename); if err != nil {
+	cluster, err := testFs.ReadFile(filename)
+	if err != nil {
 		return mockCluster, err
 	}
 	// Unmarshal cluster yaml into a management v3 cluster object
-	err = yaml.Unmarshal(cluster, &mockCluster); if err != nil {
+	err = yaml.Unmarshal(cluster, &mockCluster)
+	if err != nil {
 		return mockCluster, err
 	}
 
@@ -216,11 +229,13 @@ func getMockEksClusterConfig(filename string) (*unstructured.Unstructured, error
 	var EksClusterConfig *unstructured.Unstructured
 
 	// Read the embedded file
-	bytes, err := testFs.ReadFile(filename); if err != nil {
+	bytes, err := testFs.ReadFile(filename)
+	if err != nil {
 		return EksClusterConfig, err
 	}
 	// Unmarshal json into an unstructured cluster config object
-	err = json.Unmarshal(bytes, &EksClusterConfig); if err != nil {
+	err = json.Unmarshal(bytes, &EksClusterConfig)
+	if err != nil {
 		return EksClusterConfig, err
 	}
 
