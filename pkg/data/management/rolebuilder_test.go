@@ -6,6 +6,7 @@ import (
 
 	"github.com/golang/mock/gomock"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/controllers"
 	"github.com/rancher/wrangler/pkg/generic/fake"
 	"github.com/stretchr/testify/require"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -81,6 +82,7 @@ func Test_reconcileGlobalRoles(t *testing.T) {
 
 				// return empty list
 				mocks.grClientMock.EXPECT().List(gomock.Any()).Return(&v3.GlobalRoleList{}, nil)
+				mocks.grClientMock.EXPECT().WithImpersonation(controllers.WebhookImpersonation()).Return(mocks.grClientMock, nil)
 				mocks.grClientMock.EXPECT().Create(ObjectMatcher(basicGR)).DoAndReturn(
 					func(toCreate *v3.GlobalRole) (*v3.GlobalRole, error) {
 						require.EqualValues(mocks.t, basicGR.Rules, toCreate.Rules, "roleBuilder did not attempt to create the correct role")
@@ -96,6 +98,7 @@ func Test_reconcileGlobalRoles(t *testing.T) {
 			setup: func(mocks testMocks) {
 				curr := &v3.GlobalRoleList{Items: []v3.GlobalRole{*adminGR}}
 				mocks.grClientMock.EXPECT().List(gomock.Any()).Return(curr, nil)
+				mocks.grClientMock.EXPECT().WithImpersonation(controllers.WebhookImpersonation()).Return(mocks.grClientMock, nil)
 				mocks.grClientMock.EXPECT().Create(ObjectMatcher(basicGR)).DoAndReturn(
 					func(toCreate *v3.GlobalRole) (*v3.GlobalRole, error) {
 						require.EqualValues(mocks.t, basicGR.Rules, toCreate.Rules, "roleBuilder did not attempt to create the correct role")
@@ -112,7 +115,7 @@ func Test_reconcileGlobalRoles(t *testing.T) {
 			setup: func(mocks testMocks) {
 				curr := &v3.GlobalRoleList{Items: []v3.GlobalRole{*adminGR}}
 				mocks.grClientMock.EXPECT().List(gomock.Any()).Return(curr, nil)
-
+				mocks.grClientMock.EXPECT().WithImpersonation(controllers.WebhookImpersonation()).Return(mocks.grClientMock, nil)
 				mocks.grClientMock.EXPECT().Create(ObjectMatcher(basicGR)).DoAndReturn(
 					func(toCreate *v3.GlobalRole) (*v3.GlobalRole, error) {
 						require.EqualValues(mocks.t, basicGR.Rules, toCreate.Rules, "roleBuilder did not attempt to create the correct role")
@@ -140,6 +143,7 @@ func Test_reconcileGlobalRoles(t *testing.T) {
 				oldAdmin.DisplayName = "Old Display Name"
 				curr := &v3.GlobalRoleList{Items: []v3.GlobalRole{*oldAdmin}}
 				mocks.grClientMock.EXPECT().List(gomock.Any()).Return(curr, nil)
+				mocks.grClientMock.EXPECT().WithImpersonation(controllers.WebhookImpersonation()).Return(mocks.grClientMock, nil)
 				mocks.grClientMock.EXPECT().Update(ObjectMatcher(adminGR)).DoAndReturn(
 					func(toUpdate *v3.GlobalRole) (*v3.GlobalRole, error) {
 						require.EqualValues(mocks.t, adminGR.Rules, toUpdate.Rules, "roleBuilder attempted to update rules that were not changed")
@@ -156,6 +160,7 @@ func Test_reconcileGlobalRoles(t *testing.T) {
 				oldAdmin.Rules = append(oldAdmin.Rules, ruleWriteNodes)
 				curr := &v3.GlobalRoleList{Items: []v3.GlobalRole{*oldAdmin}}
 				mocks.grClientMock.EXPECT().List(gomock.Any()).Return(curr, nil)
+				mocks.grClientMock.EXPECT().WithImpersonation(controllers.WebhookImpersonation()).Return(mocks.grClientMock, nil)
 				mocks.grClientMock.EXPECT().Update(ObjectMatcher(adminGR)).DoAndReturn(
 					func(toUpdate *v3.GlobalRole) (*v3.GlobalRole, error) {
 						require.EqualValues(mocks.t, adminGR.Rules, toUpdate.Rules, "roleBuilder did not attempt to update the correct rules")
@@ -170,6 +175,7 @@ func Test_reconcileGlobalRoles(t *testing.T) {
 			setup: func(mocks testMocks) {
 				curr := &v3.GlobalRoleList{Items: []v3.GlobalRole{*adminGR}}
 				mocks.grClientMock.EXPECT().List(gomock.Any()).Return(curr, nil)
+				mocks.grClientMock.EXPECT().WithImpersonation(controllers.WebhookImpersonation()).Return(mocks.grClientMock, nil)
 				mocks.grClientMock.EXPECT().Delete(adminGR.Name, nil).Return(nil)
 			},
 		},
@@ -179,6 +185,7 @@ func Test_reconcileGlobalRoles(t *testing.T) {
 			setup: func(mocks testMocks) {
 				curr := &v3.GlobalRoleList{Items: []v3.GlobalRole{*adminGR}}
 				mocks.grClientMock.EXPECT().List(gomock.Any()).Return(curr, nil)
+				mocks.grClientMock.EXPECT().WithImpersonation(controllers.WebhookImpersonation()).Return(mocks.grClientMock, nil)
 				mocks.grClientMock.EXPECT().Delete(adminGR.Name, nil).Return(errExpected)
 			},
 		},
@@ -186,6 +193,7 @@ func Test_reconcileGlobalRoles(t *testing.T) {
 			name:    "Fail to list existing GRB Rules",
 			wantErr: true,
 			setup: func(mocks testMocks) {
+				mocks.grClientMock.EXPECT().WithImpersonation(controllers.WebhookImpersonation()).Return(mocks.grClientMock, nil)
 				mocks.grClientMock.EXPECT().List(gomock.Any()).Return(nil, errExpected)
 			},
 		},
@@ -195,6 +203,7 @@ func Test_reconcileGlobalRoles(t *testing.T) {
 			wantErr:     true,
 			setup: func(mocks testMocks) {
 				mocks.grClientMock.EXPECT().List(gomock.Any()).Return(&v3.GlobalRoleList{}, nil)
+				mocks.grClientMock.EXPECT().WithImpersonation(controllers.WebhookImpersonation()).Return(mocks.grClientMock, nil)
 				mocks.grClientMock.EXPECT().Create(ObjectMatcher(basicGR)).Return(nil, errExpected)
 			},
 		},
@@ -207,6 +216,7 @@ func Test_reconcileGlobalRoles(t *testing.T) {
 				oldAdmin.Rules = append(oldAdmin.Rules, ruleWriteNodes)
 				curr := &v3.GlobalRoleList{Items: []v3.GlobalRole{*oldAdmin}}
 				mocks.grClientMock.EXPECT().List(gomock.Any()).Return(curr, nil)
+				mocks.grClientMock.EXPECT().WithImpersonation(controllers.WebhookImpersonation()).Return(mocks.grClientMock, nil)
 				mocks.grClientMock.EXPECT().Update(ObjectMatcher(adminGR)).Return(nil, errExpected)
 			},
 		},
@@ -275,6 +285,7 @@ func Test_reconcileRoleTemplate(t *testing.T) {
 			setup: func(mocks testMocks) {
 				// return empty list
 				mocks.rtClientMock.EXPECT().List(gomock.Any()).Return(&v3.RoleTemplateList{}, nil)
+				mocks.rtClientMock.EXPECT().WithImpersonation(controllers.WebhookImpersonation()).Return(mocks.rtClientMock, nil)
 				mocks.rtClientMock.EXPECT().Create(ObjectMatcher(basicRT)).DoAndReturn(
 					func(toCreate *v3.RoleTemplate) (*v3.RoleTemplate, error) {
 						require.EqualValues(mocks.t, basicRT.Rules, toCreate.Rules, "roleBuilder did not attempt to create the correct role")
@@ -290,6 +301,7 @@ func Test_reconcileRoleTemplate(t *testing.T) {
 			setup: func(mocks testMocks) {
 				curr := &v3.RoleTemplateList{Items: []v3.RoleTemplate{*adminRT}}
 				mocks.rtClientMock.EXPECT().List(gomock.Any()).Return(curr, nil)
+				mocks.rtClientMock.EXPECT().WithImpersonation(controllers.WebhookImpersonation()).Return(mocks.rtClientMock, nil)
 				mocks.rtClientMock.EXPECT().Create(ObjectMatcher(basicRT)).DoAndReturn(
 					func(toCreate *v3.RoleTemplate) (*v3.RoleTemplate, error) {
 						require.EqualValues(mocks.t, basicRT.Rules, toCreate.Rules, "roleBuilder did not attempt to create the correct role")
@@ -305,7 +317,7 @@ func Test_reconcileRoleTemplate(t *testing.T) {
 			setup: func(mocks testMocks) {
 				curr := &v3.RoleTemplateList{Items: []v3.RoleTemplate{*adminRT}}
 				mocks.rtClientMock.EXPECT().List(gomock.Any()).Return(curr, nil)
-
+				mocks.rtClientMock.EXPECT().WithImpersonation(controllers.WebhookImpersonation()).Return(mocks.rtClientMock, nil)
 				mocks.rtClientMock.EXPECT().Create(ObjectMatcher(basicRT)).DoAndReturn(
 					func(toCreate *v3.RoleTemplate) (*v3.RoleTemplate, error) {
 						require.EqualValues(mocks.t, basicRT.Rules, toCreate.Rules, "roleBuilder did not attempt to create the correct role")
@@ -333,6 +345,7 @@ func Test_reconcileRoleTemplate(t *testing.T) {
 				oldAdmin.DisplayName = "Update Display Name"
 				curr := &v3.RoleTemplateList{Items: []v3.RoleTemplate{*oldAdmin}}
 				mocks.rtClientMock.EXPECT().List(gomock.Any()).Return(curr, nil)
+				mocks.rtClientMock.EXPECT().WithImpersonation(controllers.WebhookImpersonation()).Return(mocks.rtClientMock, nil)
 				mocks.rtClientMock.EXPECT().Update(ObjectMatcher(adminRT)).DoAndReturn(
 					func(toUpdate *v3.RoleTemplate) (*v3.RoleTemplate, error) {
 						require.EqualValues(mocks.t, adminRT.Rules, toUpdate.Rules, "roleBuilder attempted to update rules that were not changed")
@@ -349,6 +362,7 @@ func Test_reconcileRoleTemplate(t *testing.T) {
 				oldAdmin.Rules = append(oldAdmin.Rules, ruleWriteNodes)
 				curr := &v3.RoleTemplateList{Items: []v3.RoleTemplate{*oldAdmin}}
 				mocks.rtClientMock.EXPECT().List(gomock.Any()).Return(curr, nil)
+				mocks.rtClientMock.EXPECT().WithImpersonation(controllers.WebhookImpersonation()).Return(mocks.rtClientMock, nil)
 				mocks.rtClientMock.EXPECT().Update(ObjectMatcher(adminRT)).DoAndReturn(
 					func(toUpdate *v3.RoleTemplate) (*v3.RoleTemplate, error) {
 						require.EqualValues(mocks.t, adminRT.Rules, toUpdate.Rules, "roleBuilder did not attempt to update the correct rules")
@@ -365,6 +379,7 @@ func Test_reconcileRoleTemplate(t *testing.T) {
 				oldAdmin.Builtin = false
 				curr := &v3.RoleTemplateList{Items: []v3.RoleTemplate{*oldAdmin}}
 				mocks.rtClientMock.EXPECT().List(gomock.Any()).Return(curr, nil)
+				mocks.rtClientMock.EXPECT().WithImpersonation(controllers.WebhookImpersonation()).Return(mocks.rtClientMock, nil)
 				mocks.rtClientMock.EXPECT().Update(ObjectMatcher(adminRT)).DoAndReturn(
 					func(toUpdate *v3.RoleTemplate) (*v3.RoleTemplate, error) {
 						require.EqualValues(mocks.t, adminRT.Builtin, toUpdate.Builtin, "roleBuilder did not make the correct updates")
@@ -381,6 +396,7 @@ func Test_reconcileRoleTemplate(t *testing.T) {
 				oldAdmin.External = true
 				curr := &v3.RoleTemplateList{Items: []v3.RoleTemplate{*oldAdmin}}
 				mocks.rtClientMock.EXPECT().List(gomock.Any()).Return(curr, nil)
+				mocks.rtClientMock.EXPECT().WithImpersonation(controllers.WebhookImpersonation()).Return(mocks.rtClientMock, nil)
 				mocks.rtClientMock.EXPECT().Update(ObjectMatcher(adminRT)).DoAndReturn(
 					func(toUpdate *v3.RoleTemplate) (*v3.RoleTemplate, error) {
 						require.EqualValues(mocks.t, adminRT.External, toUpdate.External, "roleBuilder did not make the correct updates")
@@ -397,6 +413,7 @@ func Test_reconcileRoleTemplate(t *testing.T) {
 				oldAdmin.Hidden = true
 				curr := &v3.RoleTemplateList{Items: []v3.RoleTemplate{*oldAdmin}}
 				mocks.rtClientMock.EXPECT().List(gomock.Any()).Return(curr, nil)
+				mocks.rtClientMock.EXPECT().WithImpersonation(controllers.WebhookImpersonation()).Return(mocks.rtClientMock, nil)
 				mocks.rtClientMock.EXPECT().Update(ObjectMatcher(adminRT)).DoAndReturn(
 					func(toUpdate *v3.RoleTemplate) (*v3.RoleTemplate, error) {
 						require.EqualValues(mocks.t, adminRT.Hidden, toUpdate.Hidden, "roleBuilder did not make the correct updates")
@@ -413,6 +430,7 @@ func Test_reconcileRoleTemplate(t *testing.T) {
 				oldAdmin.Context = "project"
 				curr := &v3.RoleTemplateList{Items: []v3.RoleTemplate{*oldAdmin}}
 				mocks.rtClientMock.EXPECT().List(gomock.Any()).Return(curr, nil)
+				mocks.rtClientMock.EXPECT().WithImpersonation(controllers.WebhookImpersonation()).Return(mocks.rtClientMock, nil)
 				mocks.rtClientMock.EXPECT().Update(ObjectMatcher(adminRT)).DoAndReturn(
 					func(toUpdate *v3.RoleTemplate) (*v3.RoleTemplate, error) {
 						require.EqualValues(mocks.t, adminRT.Context, toUpdate.Context, "roleBuilder did not make the correct updates")
@@ -429,6 +447,7 @@ func Test_reconcileRoleTemplate(t *testing.T) {
 				oldAdmin.RoleTemplateNames = []string{readRT.Name}
 				curr := &v3.RoleTemplateList{Items: []v3.RoleTemplate{*oldAdmin}}
 				mocks.rtClientMock.EXPECT().List(gomock.Any()).Return(curr, nil)
+				mocks.rtClientMock.EXPECT().WithImpersonation(controllers.WebhookImpersonation()).Return(mocks.rtClientMock, nil)
 				mocks.rtClientMock.EXPECT().Update(ObjectMatcher(adminRT)).DoAndReturn(
 					func(toUpdate *v3.RoleTemplate) (*v3.RoleTemplate, error) {
 						require.EqualValues(mocks.t, adminRT.RoleTemplateNames, toUpdate.RoleTemplateNames, "roleBuilder did not make the correct updates")
@@ -445,6 +464,7 @@ func Test_reconcileRoleTemplate(t *testing.T) {
 				oldAdmin.Administrative = true
 				curr := &v3.RoleTemplateList{Items: []v3.RoleTemplate{*oldAdmin}}
 				mocks.rtClientMock.EXPECT().List(gomock.Any()).Return(curr, nil)
+				mocks.rtClientMock.EXPECT().WithImpersonation(controllers.WebhookImpersonation()).Return(mocks.rtClientMock, nil)
 				mocks.rtClientMock.EXPECT().Update(ObjectMatcher(adminRT)).DoAndReturn(
 					func(toUpdate *v3.RoleTemplate) (*v3.RoleTemplate, error) {
 						require.EqualValues(mocks.t, adminRT.Administrative, toUpdate.Administrative, "roleBuilder did not make the correct updates")
@@ -459,6 +479,7 @@ func Test_reconcileRoleTemplate(t *testing.T) {
 			setup: func(mocks testMocks) {
 				curr := &v3.RoleTemplateList{Items: []v3.RoleTemplate{*adminRT}}
 				mocks.rtClientMock.EXPECT().List(gomock.Any()).Return(curr, nil)
+				mocks.rtClientMock.EXPECT().WithImpersonation(controllers.WebhookImpersonation()).Return(mocks.rtClientMock, nil)
 				mocks.rtClientMock.EXPECT().Delete(adminRT.Name, nil).Return(nil)
 			},
 		},
@@ -468,6 +489,7 @@ func Test_reconcileRoleTemplate(t *testing.T) {
 			setup: func(mocks testMocks) {
 				curr := &v3.RoleTemplateList{Items: []v3.RoleTemplate{*adminRT}}
 				mocks.rtClientMock.EXPECT().List(gomock.Any()).Return(curr, nil)
+				mocks.rtClientMock.EXPECT().WithImpersonation(controllers.WebhookImpersonation()).Return(mocks.rtClientMock, nil)
 				mocks.rtClientMock.EXPECT().Delete(adminRT.Name, nil).Return(errExpected)
 			},
 			wantErr: true,
@@ -477,6 +499,7 @@ func Test_reconcileRoleTemplate(t *testing.T) {
 			wantErr: true,
 			setup: func(mocks testMocks) {
 				mocks.rtClientMock.EXPECT().List(gomock.Any()).Return(nil, errExpected)
+				mocks.rtClientMock.EXPECT().WithImpersonation(controllers.WebhookImpersonation()).Return(mocks.rtClientMock, nil)
 			},
 		},
 		{
@@ -486,6 +509,7 @@ func Test_reconcileRoleTemplate(t *testing.T) {
 			setup: func(mocks testMocks) {
 				// return empty list
 				mocks.rtClientMock.EXPECT().List(gomock.Any()).Return(&v3.RoleTemplateList{}, nil)
+				mocks.rtClientMock.EXPECT().WithImpersonation(controllers.WebhookImpersonation()).Return(mocks.rtClientMock, nil)
 				mocks.rtClientMock.EXPECT().Create(ObjectMatcher(basicRT)).Return(nil, errExpected)
 			},
 		},
@@ -498,6 +522,7 @@ func Test_reconcileRoleTemplate(t *testing.T) {
 				oldAdmin.Rules = append(oldAdmin.Rules, ruleWriteNodes)
 				curr := &v3.RoleTemplateList{Items: []v3.RoleTemplate{*oldAdmin}}
 				mocks.rtClientMock.EXPECT().List(gomock.Any()).Return(curr, nil)
+				mocks.rtClientMock.EXPECT().WithImpersonation(controllers.WebhookImpersonation()).Return(mocks.rtClientMock, nil)
 				mocks.rtClientMock.EXPECT().Update(ObjectMatcher(adminRT)).Return(nil, errExpected)
 			},
 		},

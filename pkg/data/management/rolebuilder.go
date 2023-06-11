@@ -6,6 +6,7 @@ import (
 
 	"github.com/pkg/errors"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/controllers"
 	wranglerv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/wrangler/pkg/generic"
 	"github.com/sirupsen/logrus"
@@ -271,7 +272,12 @@ func (rb *roleBuilder) reconcileGlobalRoles(grClient wranglerv3.GlobalRoleClient
 		return equal, haveGR, nil
 	}
 
-	return reconcile[*v3.GlobalRole, *v3.GlobalRoleList](rb, build, gather, compareAndMod, grClient)
+	// create a new client that impersonates the webhook to bypass field validation that would normally block updating builtin roles
+	bypassClient, err := grClient.WithImpersonation(controllers.WebhookImpersonation())
+	if err != nil {
+		return fmt.Errorf("failed to make impersonation client: %w", err)
+	}
+	return reconcile(rb, build, gather, compareAndMod, bypassClient)
 }
 
 func (rb *roleBuilder) reconcileRoleTemplates(rtClient wranglerv3.RoleTemplateClient) error {
@@ -327,5 +333,10 @@ func (rb *roleBuilder) reconcileRoleTemplates(rtClient wranglerv3.RoleTemplateCl
 		return equal, haveRT, nil
 	}
 
-	return reconcile[*v3.RoleTemplate, *v3.RoleTemplateList](rb, build, gather, compareAndMod, rtClient)
+	// create a new client that impersonates the webhook to bypass field validation that would normally block updating builtin roles
+	bypassClient, err := rtClient.WithImpersonation(controllers.WebhookImpersonation())
+	if err != nil {
+		return fmt.Errorf("failed to make impersonation client: %w", err)
+	}
+	return reconcile(rb, build, gather, compareAndMod, bypassClient)
 }
