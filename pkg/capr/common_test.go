@@ -4,12 +4,12 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/golang/mock/gomock"
 	"github.com/pkg/errors"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
-	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
+	"github.com/rancher/wrangler/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
@@ -20,22 +20,6 @@ type test struct {
 	expected    *capi.Cluster
 	expectedErr error
 	obj         runtime.Object
-}
-
-func (t *test) Get(_, _ string) (*capi.Cluster, error) {
-	return t.expected, t.expectedErr
-}
-
-func (t *test) List(_ string, _ labels.Selector) ([]*capi.Cluster, error) {
-	panic("not implemented")
-}
-
-func (t *test) AddIndexer(_ string, _ capicontrollers.ClusterIndexer) {
-	panic("not implemented")
-}
-
-func (t *test) GetByIndex(_, _ string) ([]*capi.Cluster, error) {
-	panic("not implemented")
 }
 
 func TestFindCAPIClusterFromLabel(t *testing.T) {
@@ -86,7 +70,10 @@ func TestFindCAPIClusterFromLabel(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cluster, err := GetCAPIClusterFromLabel(tt.obj, &tt)
+			ctrl := gomock.NewController(t)
+			capiCache := fake.NewMockCacheInterface[*capi.Cluster](ctrl)
+			capiCache.EXPECT().Get(gomock.Any(), gomock.Any()).Return(tt.expected, nil).MaxTimes(1)
+			cluster, err := GetCAPIClusterFromLabel(tt.obj, capiCache)
 			if err == nil {
 				assert.Nil(t, tt.expectedErr)
 			} else if tt.expectedErr != nil {
@@ -207,7 +194,10 @@ func TestFindOwnerCAPICluster(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cluster, err := GetOwnerCAPICluster(tt.obj, &tt)
+			ctrl := gomock.NewController(t)
+			capiCache := fake.NewMockCacheInterface[*capi.Cluster](ctrl)
+			capiCache.EXPECT().Get(gomock.Any(), gomock.Any()).Return(tt.expected, tt.expectedErr).MaxTimes(1)
+			cluster, err := GetOwnerCAPICluster(tt.obj, capiCache)
 			if err == nil {
 				assert.Nil(t, tt.expectedErr)
 			} else if tt.expectedErr != nil {

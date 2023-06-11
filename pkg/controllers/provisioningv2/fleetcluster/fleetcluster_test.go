@@ -4,17 +4,16 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/golang/mock/gomock"
 	fleet "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
-
+	"github.com/rancher/wrangler/pkg/generic/fake"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-
-	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -77,7 +76,6 @@ func TestClusterCustomization(t *testing.T) {
 	require := require.New(t)
 
 	h := &handler{
-		clustersCache:     &fakeClusterCache{},
 		getPrivateRepoURL: func(*provv1.Cluster, *apimgmtv3.Cluster) string { return "" },
 	}
 
@@ -102,7 +100,7 @@ func TestClusterCustomization(t *testing.T) {
 			"cluster-has-no-customization",
 			cluster,
 			clusterStatus,
-			newClusterCache(map[string]*apimgmtv3.Cluster{
+			newClusterCache(t, map[string]*apimgmtv3.Cluster{
 				"cluster-name": newMgmtCluster(
 					"cluster-name",
 					labels,
@@ -119,7 +117,7 @@ func TestClusterCustomization(t *testing.T) {
 			"cluster-has-affinity-override",
 			cluster,
 			clusterStatus,
-			newClusterCache(map[string]*apimgmtv3.Cluster{
+			newClusterCache(t, map[string]*apimgmtv3.Cluster{
 				"cluster-name": newMgmtCluster(
 					"cluster-name",
 					labels,
@@ -146,7 +144,7 @@ func TestClusterCustomization(t *testing.T) {
 			"cluster-has-custom-tolerations-and-resources",
 			cluster,
 			clusterStatus,
-			newClusterCache(map[string]*apimgmtv3.Cluster{
+			newClusterCache(t, map[string]*apimgmtv3.Cluster{
 				"cluster-name": newMgmtCluster(
 					"cluster-name",
 					labels,
@@ -194,7 +192,7 @@ func TestClusterCustomization(t *testing.T) {
 
 func TestCreateCluster(t *testing.T) {
 	h := &handler{
-		clustersCache:     &fakeClusterCache{},
+		clustersCache:     newClusterCache(t, nil),
 		getPrivateRepoURL: func(*provv1.Cluster, *apimgmtv3.Cluster) string { return "" },
 	}
 
@@ -219,7 +217,7 @@ func TestCreateCluster(t *testing.T) {
 				ClientSecretName: "client-secret-name",
 			},
 
-			newClusterCache(map[string]*apimgmtv3.Cluster{
+			newClusterCache(t, map[string]*apimgmtv3.Cluster{
 				"cluster-name": newMgmtCluster(
 					"cluster-name",
 					map[string]string{
@@ -243,7 +241,7 @@ func TestCreateCluster(t *testing.T) {
 				ClusterName:      "local-cluster",
 				ClientSecretName: "local-kubeconfig",
 			},
-			newClusterCache(map[string]*apimgmtv3.Cluster{
+			newClusterCache(t, map[string]*apimgmtv3.Cluster{
 				"local-cluster": newMgmtCluster(
 					"local-cluster",
 					map[string]string{
@@ -291,26 +289,15 @@ func newMgmtCluster(name string, labels map[string]string, spec apimgmtv3.Cluste
 }
 
 // implements v3.ClusterCache
-func newClusterCache(clusters map[string]*apimgmtv3.Cluster) v3.ClusterCache {
-	return &fakeClusterCache{
-		clusters: clusters,
-	}
-}
-
-type fakeClusterCache struct {
-	clusters map[string]*apimgmtv3.Cluster
-}
-
-func (f *fakeClusterCache) Get(name string) (*apimgmtv3.Cluster, error) {
-	if c, ok := f.clusters[name]; ok {
-		return c, nil
-	}
-	return nil, errNotFound
-}
-func (f *fakeClusterCache) List(selector labels.Selector) ([]*apimgmtv3.Cluster, error) {
-	return nil, errNotImplemented
-}
-func (f *fakeClusterCache) AddIndexer(indexName string, indexer v3.ClusterIndexer) {}
-func (f *fakeClusterCache) GetByIndex(indexName, key string) ([]*apimgmtv3.Cluster, error) {
-	return nil, errNotImplemented
+func newClusterCache(t *testing.T, clusters map[string]*apimgmtv3.Cluster) v3.ClusterCache {
+	t.Helper()
+	ctrl := gomock.NewController(t)
+	clusterCache := fake.NewMockNonNamespacedCacheInterface[*apimgmtv3.Cluster](ctrl)
+	clusterCache.EXPECT().Get(gomock.Any()).DoAndReturn(func(name string) (*apimgmtv3.Cluster, error) {
+		if c, ok := clusters[name]; ok {
+			return c, nil
+		}
+		return nil, errNotFound
+	}).AnyTimes()
+	return clusterCache
 }
