@@ -2,6 +2,9 @@ module github.com/rancher/rancher/pkg/apis
 
 go 1.19
 
+// wrangler bracnhes need to be updated before replace can be removed
+replace github.com/rancher/wrangler v1.1.1 => github.com/rancher/wrangler v1.1.1-0.20230629203936-0e36fee7aea5
+
 replace k8s.io/client-go => github.com/rancher/client-go v1.25.4-rancher1
 
 require (
@@ -52,7 +55,7 @@ require (
 	github.com/prometheus/client_model v0.3.0 // indirect
 	github.com/prometheus/common v0.37.0 // indirect
 	github.com/prometheus/procfs v0.8.0 // indirect
-	github.com/rancher/lasso v0.0.0-20221227210133-6ea88ca2fbcc // indirect
+	github.com/rancher/lasso v0.0.0-20230629200414-8a54b32e6792 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	golang.org/x/net v0.11.0 // indirect
 	golang.org/x/oauth2 v0.0.0-20220608161450-d0670ef3b1eb // indirect
