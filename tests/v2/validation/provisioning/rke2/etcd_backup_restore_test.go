@@ -1,6 +1,7 @@
 package rke2
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -406,7 +407,12 @@ func (r *RKE2EtcdSnapshotRestoreTestSuite) watchAndWaitForPods(client *rancher.C
 		}
 		isIngressControllerPodPresent := false
 		isKubeControllerManagerPresent := false
+		var podErrors []error
+
 		for _, pod := range pods.Data {
+			if pod.Namespace == cattleSystem && strings.HasPrefix(pod.Name, podPrefix) {
+				continue
+			}
 			podStatus := &v1.PodStatus{}
 			err = steveV1.ConvertToK8sType(pod.Status, podStatus)
 			if err != nil {
@@ -420,10 +426,30 @@ func (r *RKE2EtcdSnapshotRestoreTestSuite) watchAndWaitForPods(client *rancher.C
 			}
 
 			phase := podStatus.Phase
-			if phase != v1.PodRunning && phase != v1.PodSucceeded {
-				return false, nil
-			}
+			conditions := podStatus.Conditions
+			if phase == v1.PodPending || phase == v1.PodRunning {
+				podReady := false
+				for _, condition := range conditions {
+					if condition.Type == v1.PodReady && condition.Status == v1.ConditionTrue {
+						podReady = true
+						break
+					}
+				}
+				if !podReady {
+					for _, cs := range podStatus.ContainerStatuses {
+						if !cs.Ready {
+							logrus.Infof("container %s of pod %s is not ready, state: %+v ", cs.Name, pod.Name, cs.State)
+						}
+					}
+					return false, nil
+				}
 
+			} else if phase == v1.PodFailed || phase == v1.PodUnknown {
+				podErrors = append(podErrors, fmt.Errorf("ERROR: %s: %s", pod.Name, podStatus))
+			}
+		}
+		if len(podErrors) > 0 {
+			return false, fmt.Errorf("Error in running pods : %v", podErrors)
 		}
 		if isIngressControllerPodPresent && isKubeControllerManagerPresent {
 			return true, nil

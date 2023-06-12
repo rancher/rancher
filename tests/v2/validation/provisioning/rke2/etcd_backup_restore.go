@@ -30,6 +30,9 @@ const (
 	ProvisioningSteveResouceType = "provisioning.cattle.io.cluster"
 	isCattleLabeled              = true
 	etcdnodeCount                = 3
+	maxContainerRestartCount     = 3
+	cattleSystem                 = "cattle-system"
+	podPrefix                    = "helm-operation"
 )
 
 func createSnapshot(client *rancher.Client, clustername string, generation int, namespace string) error {
