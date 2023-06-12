@@ -20,6 +20,11 @@ const (
 	clusterLabel             = "cluster.x-k8s.io/cluster-name"
 	PollInterval             = time.Duration(5 * time.Second)
 	PollTimeout              = time.Duration(15 * time.Minute)
+	EtcdNodeLabel            = "node-role.kubernetes.io/etcd"
+	MachineAnnotation        = "cluster.x-k8s.io/machine"
+	K3sExternalIP            = "k3s.io/external-ip"
+	RKE2ExternalIP           = "rke2.io/external-ip"
+	ClusterAnnotation        = "cluster.x-k8s.io/cluster-name"
 )
 
 // AllManagementNodeReady is a helper method that will loop and check if the node is ready in the RKE1 cluster.
