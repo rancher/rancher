@@ -2,7 +2,10 @@ module github.com/rancher/rancher/pkg/apis
 
 go 1.19
 
-replace k8s.io/client-go => github.com/doflamingo721/client-go v1.26.5-rancher1
+replace (
+	github.com/rancher/rke => github.com/rayandas/rke v1.27.2-rancher1
+	k8s.io/client-go => github.com/doflamingo721/client-go v1.26.5-rancher2
+)
 
 require (
 	github.com/rancher/aks-operator v1.1.1-rc2
@@ -66,9 +69,9 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/apiextensions-apiserver v0.26.1 // indirect
-	k8s.io/apiserver v0.26.1 // indirect
+	k8s.io/apiserver v0.26.5 // indirect
 	k8s.io/client-go v12.0.0+incompatible // indirect
-	k8s.io/component-base v0.26.1 // indirect
+	k8s.io/component-base v0.26.5 // indirect
 	k8s.io/klog/v2 v2.90.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20230308215209-15aac26d736a // indirect
 	k8s.io/kubernetes v1.13.0 // indirect

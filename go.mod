@@ -5,8 +5,8 @@ go 1.19
 replace (
 	github.com/rancher/apiserver => github.com/doflamingo721/apiserver v1.26.5-rancher1
 	github.com/rancher/dynamiclistener => github.com/doflamingo721/dynamiclistener v1.26.5-rancher1
-	github.com/rancher/lasso => github.com/doflamingo721/lasso v1.26.5-rancher1
-	github.com/rancher/lasso/controller-runtime => github.com/doflamingo721/lasso/controller-runtime v1.26.5-rancher1
+	github.com/rancher/lasso => github.com/doflamingo721/lasso v1.26.5-rancher2
+	github.com/rancher/lasso/controller-runtime => github.com/doflamingo721/lasso/controller-runtime v1.26.5-rancher2
 	github.com/rancher/machine => github.com/doflamingo721/machine v1.26.5-rancher1
 	github.com/rancher/norman => github.com/doflamingo721/norman v1.26.5-rancher1
 	github.com/rancher/rke => github.com/rayandas/rke v1.27.2-rancher1
@@ -29,10 +29,10 @@ replace (
 
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc => go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.35.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp => go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.35.0
-	go.opentelemetry.io/otel => go.opentelemetry.io/otel v1.14.0
-	go.opentelemetry.io/otel/exporters/otlp => go.opentelemetry.io/otel/exporters/otlp v0.20.0
+	go.opentelemetry.io/otel => go.opentelemetry.io/otel v1.10.0
+	go.opentelemetry.io/otel/exporters/otlp => go.opentelemetry.io/otel/exporters/otlp v1.10.0
 	go.opentelemetry.io/otel/sdk => go.opentelemetry.io/otel/sdk v1.10.0
-	go.opentelemetry.io/otel/trace => go.opentelemetry.io/otel/trace v1.16.0
+	go.opentelemetry.io/otel/trace => go.opentelemetry.io/otel/trace v1.10.0
 	go.opentelemetry.io/proto/otlp => go.opentelemetry.io/proto/otlp v0.19.0
 
 	helm.sh/helm/v3 => github.com/rancher/helm/v3 v3.11.3-rancher1
@@ -56,7 +56,7 @@ replace (
 	k8s.io/kube-scheduler => k8s.io/kube-scheduler v0.26.5
 	k8s.io/kubectl => k8s.io/kubectl v0.26.5
 	k8s.io/kubelet => k8s.io/kubelet v0.26.5
-	k8s.io/kubernetes => k8s.io/kubernetes v1.25.4
+	k8s.io/kubernetes => k8s.io/kubernetes v1.26.5
 	k8s.io/legacy-cloud-providers => k8s.io/legacy-cloud-providers v0.26.5
 	k8s.io/metrics => k8s.io/metrics v0.26.5
 	k8s.io/mount-utils => k8s.io/mount-utils v0.26.5
@@ -165,7 +165,7 @@ require (
 	k8s.io/helm v2.16.7+incompatible
 	k8s.io/kube-aggregator v0.26.5
 	k8s.io/kubectl v0.26.5
-	k8s.io/kubernetes v1.25.4
+	k8s.io/kubernetes v1.26.5
 	k8s.io/utils v0.0.0-20230220204549-a5ecb0141aa5
 	sigs.k8s.io/aws-iam-authenticator v0.5.9
 	sigs.k8s.io/cluster-api v1.4.3
@@ -306,7 +306,7 @@ require (
 	github.com/onsi/gomega v1.27.7 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.0-rc2.0.20221005185240-3a7f492d3f1b // indirect
-	github.com/opencontainers/runc v1.1.5 // indirect
+	github.com/opencontainers/runc v1.1.6 // indirect
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
 	github.com/pkg/sftp v1.13.5
 	github.com/pmezard/go-difflib v1.0.0 // indirect
