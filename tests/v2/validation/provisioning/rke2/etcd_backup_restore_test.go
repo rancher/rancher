@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	steveV1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
+	"github.com/rancher/rancher/tests/framework/extensions/etcdsnapshot"
 	"github.com/rancher/rancher/tests/framework/extensions/ingresses"
 	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
 	"github.com/rancher/rancher/tests/framework/extensions/pipeline"
@@ -157,7 +158,7 @@ func (r *RKE2EtcdSnapshotRestoreTestSuite) EtcdSnapshotRestoreWithK8sUpgrade(pro
 	logrus.Infof("created an ingress.............")
 
 	logrus.Infof("creating a snapshot of the cluster.............")
-	err = createSnapshot(client, clusterName, 1, r.ns)
+	err = etcdsnapshot.CreateSnapshot(client, clusterName, r.ns)
 	require.NoError(r.T(), err)
 	logrus.Infof("created a snapshot of the cluster.............")
 
@@ -205,7 +206,7 @@ func (r *RKE2EtcdSnapshotRestoreTestSuite) EtcdSnapshotRestoreWithK8sUpgrade(pro
 	clusters.WatchAndWaitForCluster(r.client.Steve, kubeProvisioningClient, r.ns, clusterName)
 	logrus.Infof("cluster is active again.............")
 
-	cluster, _, err := getProvisioningClusterByName(client, clusterName, r.ns)
+	cluster, _, err := clusters.GetProvisioningClusterByName(client, clusterName, r.ns)
 	require.NoError(r.T(), err)
 	require.Equal(r.T(), k8sUpgradedVersion, cluster.Spec.KubernetesVersion)
 
@@ -234,7 +235,7 @@ func (r *RKE2EtcdSnapshotRestoreTestSuite) EtcdSnapshotRestoreWithK8sUpgrade(pro
 	require.NotNil(r.T(), ingressResp)
 	logrus.Infof("ingress validated successfully.............")
 
-	cluster, _, err = getProvisioningClusterByName(client, clusterName, r.ns)
+	cluster, _, err = clusters.GetProvisioningClusterByName(client, clusterName, r.ns)
 	require.NoError(r.T(), err)
 	require.Equal(r.T(), initialK8sVersion, cluster.Spec.KubernetesVersion)
 }
@@ -305,7 +306,7 @@ func (r *RKE2EtcdSnapshotRestoreTestSuite) EtcdSnapshotRestoreWithUpgradeStrateg
 	logrus.Infof("created an ingress.............")
 
 	logrus.Infof("creating a snapshot of the cluster.............")
-	err = createSnapshot(client, clusterName, 1, r.ns)
+	err = etcdsnapshot.CreateSnapshot(client, clusterName, r.ns)
 	require.NoError(r.T(), err)
 	logrus.Infof("created a snapshot of the cluster.............")
 
@@ -353,7 +354,7 @@ func (r *RKE2EtcdSnapshotRestoreTestSuite) EtcdSnapshotRestoreWithUpgradeStrateg
 	clusters.WatchAndWaitForCluster(r.client.Steve, kubeProvisioningClient, r.ns, clusterName)
 	logrus.Infof("cluster is active again.............")
 
-	cluster, _, err := getProvisioningClusterByName(client, clusterName, r.ns)
+	cluster, _, err := clusters.GetProvisioningClusterByName(client, clusterName, r.ns)
 	require.NoError(r.T(), err)
 	require.Equal(r.T(), k8sUpgradedVersion, cluster.Spec.KubernetesVersion)
 
@@ -386,7 +387,7 @@ func (r *RKE2EtcdSnapshotRestoreTestSuite) EtcdSnapshotRestoreWithUpgradeStrateg
 	require.NotNil(r.T(), ingressResp)
 	logrus.Infof("ingress validated successfully.............")
 
-	cluster, _, err = getProvisioningClusterByName(client, clusterName, r.ns)
+	cluster, _, err = clusters.GetProvisioningClusterByName(client, clusterName, r.ns)
 	require.NoError(r.T(), err)
 	require.Equal(r.T(), initialK8sVersion, cluster.Spec.KubernetesVersion)
 	logrus.Infof("validating ControlPlaneConcurrency and WorkerConcurrency are restored to default values..")
@@ -528,7 +529,7 @@ func (r *RKE2EtcdSnapshotRestoreTestSuite) EtcdSnapshotRestore(provider *Provide
 	logrus.Infof("created an ingress.............")
 
 	logrus.Infof("creating a snapshot of the cluster.............")
-	err = createSnapshot(client, clusterName, 1, r.ns)
+	err = etcdsnapshot.CreateSnapshot(client, clusterName, r.ns)
 	require.NoError(r.T(), err)
 	logrus.Infof("created a snapshot of the cluster.............")
 
