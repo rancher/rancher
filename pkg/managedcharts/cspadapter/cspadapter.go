@@ -1,4 +1,5 @@
-// Package cspadapter provides utilities which can help discover if the csp adapter chart is installed
+// Package cspadapter provides utilities which can help discover if the csp adapter chart is installed,
+// for either the original Managed License Offering (MLO) or new Pay-As-You-Go (PAYG) licensing.
 package cspadapter
 
 import (
@@ -11,10 +12,16 @@ import (
 )
 
 const (
-	// ChartNamespace is the namespace that we expect the adapter to be installed in
-	ChartNamespace = "cattle-csp-adapter-system"
-	// chartName is the name of the csp adapter chart.
-	chartName = "rancher-csp-adapter"
+	// MLOChartNamespace is the namespace that we expect the adapter to be installed in,
+	// for the original Managed License Offering (MLO) licensing
+	MLOChartNamespace = "cattle-csp-adapter-system"
+	// MLOChartName is the name of the csp adapter chart for MLO licensing.
+	MLOChartName = "rancher-csp-adapter"
+	// PAYGChartNamespace is the namespace that we expect the adapter to be installed in,
+	// for the new Pay-As-You-Go (PAYG) license offering
+	PAYGChartNamespace = "cattle-csp-billing-adapter-system"
+	// PAYGChartName is the name of the csp adapter chart for PAYG licensing.
+	PAYGChartName = "rancher-csp-billing-adapter"
 )
 
 // ErrNotFound indicates that the adapter was not found to be installed
@@ -32,10 +39,10 @@ func NewChartUtil(clientGetter genericclioptions.RESTClientGetter) *ChartUtil {
 	}
 }
 
-// GetRelease finds the release for the CSP adapter. If not found, returns nil, ErrNotFound.
-func (c *ChartUtil) GetRelease() (*release.Release, error) {
+// GetRelease finds the release for the CSP adapter for a given offering. If not found, returns nil, ErrNotFound.
+func (c *ChartUtil) GetRelease(chartNamespace string, chartName string) (*release.Release, error) {
 	cfg := &action.Configuration{}
-	if err := cfg.Init(c.restClientGetter, ChartNamespace, "", logrus.Infof); err != nil {
+	if err := cfg.Init(c.restClientGetter, chartNamespace, "", logrus.Infof); err != nil {
 		return nil, err
 	}
 	l := action.NewList(cfg)
