@@ -11,7 +11,7 @@ type Version string
 type PSACT string
 
 const (
-	namespace                       = "fleet-default"
+	Namespace                       = "fleet-default"
 	defaultRandStringLength         = 5
 	ConfigurationFileKey            = "provisioningInput"
 	HardenedKubeVersion     Version = "v1.24.99"
