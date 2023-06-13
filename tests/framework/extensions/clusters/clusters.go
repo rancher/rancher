@@ -133,6 +133,9 @@ func NewRKE1ClusterConfig(clusterName, cni, kubernetesVersion string, psact stri
 		},
 		Name: clusterName,
 		RancherKubernetesEngineConfig: &management.RancherKubernetesEngineConfig{
+			CloudProvider: &management.CloudProvider{
+				Name: "aws",
+			},
 			DNS: &management.DNSConfig{
 				Provider: "coredns",
 				Options: map[string]string{
