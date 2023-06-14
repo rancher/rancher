@@ -1,3 +1,5 @@
+//go:build (validation || infra.any || cluster.any) && !stress && !sanity && !extended
+
 package shell
 
 import (

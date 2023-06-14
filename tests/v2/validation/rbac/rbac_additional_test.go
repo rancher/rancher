@@ -1,3 +1,5 @@
+//go:build (validation || infra.any || cluster.any || extended) && !sanity && !stress
+
 package rbac
 
 import (
@@ -9,6 +11,7 @@ import (
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
+	"github.com/rancher/rancher/tests/framework/extensions/clusters/kubernetesversions"
 	"github.com/rancher/rancher/tests/framework/extensions/projects"
 	"github.com/rancher/rancher/tests/framework/extensions/provisioning"
 	"github.com/rancher/rancher/tests/framework/extensions/provisioninginput"
@@ -73,7 +76,6 @@ func (rb *RBACAdditionalTestSuite) ValidateAddStdUserAsProjectOwner() {
 
 	err = users.RemoveProjectMember(rb.standardUserClient, rb.additionalUser)
 	require.NoError(rb.T(), err)
-
 }
 
 func (rb *RBACAdditionalTestSuite) ValidateAddMemberAsClusterRoles() {
@@ -272,7 +274,10 @@ func (rb *RBACAdditionalTestSuite) TestRBACAdditional() {
 				externalNodeProvider := provisioning.ExternalNodeProviderSetup(nodeProviders)
 				clusterConfig := clusters.ConvertConfigToClusterConfig(userConfig)
 				clusterConfig.NodePools = nodeAndRoles
-				clusterConfig.KubernetesVersion = userConfig.RKE1KubernetesVersions[0]
+				kubernetesVersion, err := kubernetesversions.Default(rb.client, clusters.RKE1ClusterType.String(), []string{})
+				require.NoError(rb.T(), err)
+
+				clusterConfig.KubernetesVersion = kubernetesVersion[0]
 				clusterConfig.CNI = userConfig.CNIs[0]
 				clusterObject, _, err := provisioning.CreateProvisioningRKE1CustomCluster(rb.client, &externalNodeProvider, clusterConfig)
 				require.NoError(rb.T(), err)

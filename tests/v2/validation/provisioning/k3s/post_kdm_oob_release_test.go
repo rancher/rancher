@@ -1,3 +1,5 @@
+//go:build validation
+
 package k3s
 
 import (

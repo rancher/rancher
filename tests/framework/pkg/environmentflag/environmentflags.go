@@ -15,5 +15,7 @@ const (
 	UpgradeAllClusters
 	UseExistingRegistries
 	InstallRancher
+	Long
+	Short
 	environmentFlagLastItem // This is used to determine the number of items in the enum
 )
