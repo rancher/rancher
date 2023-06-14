@@ -623,7 +623,7 @@ func encryptionKeyRotationGenerationEnv(cp *rkev1.RKEControlPlane) string {
 	return fmt.Sprintf("ENCRYPTION_KEY_ROTATION_GENERATION=%d", cp.Spec.RotateEncryptionKeys.Generation)
 }
 
-// encryptionKeyRotationSecretsEncryptStatusOneTimeInstruction generates a one time instruction which will scrape the secrets-encrypt
+// encryptionKeyRotationSecretsEncryptStatusScriptOneTimeInstruction generates a one time instruction which will scrape the secrets-encrypt
 // status.
 func encryptionKeyRotationSecretsEncryptStatusScriptOneTimeInstruction(cp *rkev1.RKEControlPlane, expected string) plan.OneTimeInstruction {
 	i := plan.OneTimeInstruction{

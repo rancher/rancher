@@ -48,7 +48,7 @@ func Decode(input, output any) error {
 	return nil
 }
 
-// stringToTimeHookFunc returns a DecodeHookFunc that converts strings to metav1.Time.
+// stringToK8sTimeHookFunc returns a DecodeHookFunc that converts strings to metav1.Time.
 func stringToK8sTimeHookFunc() mapstructure.DecodeHookFunc {
 	return func(
 		f reflect.Type,

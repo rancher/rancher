@@ -48,7 +48,7 @@ func NewHandler(scaledContext *config.ScaledContext) Handler {
 	}
 }
 
-// ServerHTTP implements http.Handler - attempts to authenticate/authorize the user. Returns a tar of support information
+// ServeHTTP implements http.Handler - attempts to authenticate/authorize the user. Returns a tar of support information
 // if the user can get the backing configmap in the adapter namespace
 func (h *Handler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	authorized, err := h.authorize(request)

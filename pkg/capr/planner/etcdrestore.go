@@ -515,7 +515,7 @@ func (p *Planner) generateEtcdRestorePodCleanupFilesAndInstruction(controlPlane 
 	}, instructions
 }
 
-// generateEtcdRestorePodCleanupFilesAndInstruction generates a file that contains a script that checks API server health and a slice of instructions that cleans up system pods on etcd restore.
+// generateEtcdRestoreNodeCleanupFilesAndInstruction generates a file that contains a script that checks API server health and a slice of instructions that cleans up system pods on etcd restore.
 func (p *Planner) generateEtcdRestoreNodeCleanupFilesAndInstruction(controlPlane *rkev1.RKEControlPlane, allMachineUIDs []string, allNodeNames []string) ([]plan.File, []plan.OneTimeInstruction) {
 	kubectl, kubeconfig := capr.GetKubectlAndKubeconfigPaths(controlPlane.Spec.KubernetesVersion)
 	if kubectl == "" || kubeconfig == "" {
