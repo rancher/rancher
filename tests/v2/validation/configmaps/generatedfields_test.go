@@ -1,7 +1,12 @@
+//go:build (infra.any || cluster.any || sanity || validation) && !stress && !extended
+
 package configmaps
 
 import (
 	"fmt"
+	"strings"
+	"testing"
+
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	steveV1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
@@ -13,8 +18,6 @@ import (
 	"github.com/stretchr/testify/suite"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"strings"
-	"testing"
 )
 
 const configMapNamespace = "default"

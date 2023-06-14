@@ -15,12 +15,14 @@ func _() {
 	_ = x[UpgradeAllClusters-4]
 	_ = x[UseExistingRegistries-5]
 	_ = x[InstallRancher-6]
-	_ = x[environmentFlagLastItem-7]
+	_ = x[Long-7]
+	_ = x[Short-8]
+	_ = x[environmentFlagLastItem-9]
 }
 
-const _EnvironmentFlag_name = "KubernetesUpgradeAllClustersWorkloadUpgradeAllClustersUpdateClusterNameGatekeeperAllowedNamespacesUpgradeAllClustersUseExistingRegistriesInstallRancherThis is used to determine the number of items in the enum"
+const _EnvironmentFlag_name = "KubernetesUpgradeAllClustersWorkloadUpgradeAllClustersUpdateClusterNameGatekeeperAllowedNamespacesUpgradeAllClustersUseExistingRegistriesInstallRancherLongShortThis is used to determine the number of items in the enum"
 
-var _EnvironmentFlag_index = [...]uint8{0, 28, 54, 71, 98, 116, 137, 151, 208}
+var _EnvironmentFlag_index = [...]uint8{0, 28, 54, 71, 98, 116, 137, 151, 155, 160, 217}
 
 func (i EnvironmentFlag) String() string {
 	if i < 0 || i >= EnvironmentFlag(len(_EnvironmentFlag_index)-1) {

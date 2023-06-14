@@ -38,6 +38,12 @@ type TestCases struct {
 	UpgradeKubernetesTestCase string `yaml:"upgradeKubernetesTestCase"`
 	PreUpgradeTestCase        string `yaml:"preUpgradeTestCase"`
 	PostUpgradeTestCase       string `yaml:"postUpgradeTestCase"`
+
+	//validation tag
+	Tags string `yaml:"tags"`
+
+	//validation test run flag
+	RunFlag string `yaml:"runFlag"`
 }
 
 // HAConfigKey is the key name of HAConfig values in the cattle config
@@ -80,6 +86,8 @@ type RancherCluster struct {
 	Image                      string           `yaml:"image"`
 	CNIs                       []string         `yaml:"cni"`
 	FeaturesToTest             upgrade.Features `yaml:"enabledFeatures" default:""`
+	Tags                       string           `yaml:"tags" default:""`
+	RunFlag                    string           `yaml:"runFlag" default:""`
 	SSHUser                    string           `yaml:"sshUser" default:""`
 	VolumeType                 string           `yaml:"volumeType" default:""`
 }

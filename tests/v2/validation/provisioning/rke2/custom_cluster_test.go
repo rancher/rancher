@@ -1,3 +1,5 @@
+//go:build (validation || sanity) && !infra.any && !infra.aks && !infra.eks && !infra.rke2k3s && !infra.gke && !infra.rke1 && !cluster.any && !cluster.custom && !cluster.nodedriver && !extended && !stress
+
 package rke2
 
 import (
@@ -11,6 +13,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/users"
 	password "github.com/rancher/rancher/tests/framework/extensions/users/passwordgenerator"
 	"github.com/rancher/rancher/tests/framework/pkg/config"
+	"github.com/rancher/rancher/tests/framework/pkg/environmentflag"
 	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
 	"github.com/rancher/rancher/tests/v2/validation/provisioning/permutations"
@@ -86,22 +89,29 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningRKE2CustomCluster()
 		client       *rancher.Client
 		machinePools []provisioninginput.MachinePools
 		isWindows    bool
+		runFlag      bool
 	}{
-		{"1 Node all roles " + provisioninginput.AdminClientName.String(), c.client, nodeRolesAll, false},
-		{"1 Node all roles " + provisioninginput.StandardClientName.String(), c.standardUserClient, nodeRolesAll, false},
-		{"2 nodes - etcd/cp roles per 1 node " + provisioninginput.AdminClientName.String(), c.client, nodeRolesShared, false},
-		{"2 nodes - etcd/cp roles per 1 node " + provisioninginput.StandardClientName.String(), c.standardUserClient, nodeRolesShared, false},
-		{"3 nodes - 1 role per node " + provisioninginput.AdminClientName.String(), c.client, nodeRolesDedicated, false},
-		{"3 nodes - 1 role per node " + provisioninginput.StandardClientName.String(), c.standardUserClient, nodeRolesDedicated, false},
-		{"4 nodes - 1 role per node + 1 windows worker" + provisioninginput.AdminClientName.String(), c.client, nodeRolesDedicatedWindows, true},
-		{"4 nodes - 1 role per node + 1 windows worker" + provisioninginput.StandardClientName.String(), c.standardUserClient, nodeRolesDedicatedWindows, true},
+		{"1 Node all roles " + provisioninginput.AdminClientName.String(), c.client, nodeRolesAll, false, c.client.Flags.GetValue(environmentflag.Long)},
+		{"1 Node all roles " + provisioninginput.StandardClientName.String(), c.standardUserClient, nodeRolesAll, false, c.client.Flags.GetValue(environmentflag.Short) || c.client.Flags.GetValue(environmentflag.Long)},
+		{"2 nodes - etcd/cp roles per 1 node " + provisioninginput.AdminClientName.String(), c.client, nodeRolesShared, false, c.client.Flags.GetValue(environmentflag.Long)},
+		{"2 nodes - etcd/cp roles per 1 node " + provisioninginput.StandardClientName.String(), c.standardUserClient, nodeRolesShared, false, c.client.Flags.GetValue(environmentflag.Short) || c.client.Flags.GetValue(environmentflag.Long)},
+		{"3 nodes - 1 role per node " + provisioninginput.AdminClientName.String(), c.client, nodeRolesDedicated, false, c.client.Flags.GetValue(environmentflag.Long)},
+		{"3 nodes - 1 role per node " + provisioninginput.StandardClientName.String(), c.standardUserClient, nodeRolesDedicated, false, c.client.Flags.GetValue(environmentflag.Long)},
+		{"4 nodes - 1 role per node + 1 windows worker" + provisioninginput.AdminClientName.String(), c.client, nodeRolesDedicatedWindows, true, c.client.Flags.GetValue(environmentflag.Long)},
+		{"4 nodes - 1 role per node + 1 windows worker" + provisioninginput.StandardClientName.String(), c.standardUserClient, nodeRolesDedicatedWindows, true, c.client.Flags.GetValue(environmentflag.Long)},
 	}
 	for _, tt := range tests {
+		if !tt.runFlag {
+			c.T().Logf("SKIPPED")
+			continue
+		}
+
 		testSession := session.NewSession()
 		defer testSession.Cleanup()
 		if (c.isWindows == tt.isWindows) || (c.isWindows && !tt.isWindows) {
-			c.provisioningConfig.MachinePools = tt.machinePools
-			permutations.RunTestPermutations(&c.Suite, tt.name, tt.client, c.provisioningConfig, permutations.RKE2CustomCluster, nil, nil)
+			provisioningConfig := *c.provisioningConfig
+			provisioningConfig.MachinePools = tt.machinePools
+			permutations.RunTestPermutations(&c.Suite, tt.name, tt.client, &provisioningConfig, permutations.RKE2CustomCluster, nil, nil)
 		} else {
 			c.T().Skip("Skipping Windows tests")
 		}

@@ -15,7 +15,6 @@ func RequestRancherVersion(rancherURL string) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	byteObject, err := io.ReadAll(req.Body)
 	if err != nil || byteObject == nil {
 		return nil, err
