@@ -18,6 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	appv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -115,7 +116,7 @@ func (u *UpgradeWorkloadTestSuite) testPreUpgradeSingleCluster(clusterName strin
 	u.T().Logf("Validating daemonset[%v] available replicas number is equal to worker nodes number in the cluster [%v]", names.random["daemonsetName"], project.ClusterID)
 	validateDaemonset(u.T(), client, project.ClusterID, namespace.Name, names.random["daemonsetName"])
 
-	secretTemplate := secrets.NewSecretTemplate(names.random["secretName"], namespace.Name, map[string][]byte{"test": []byte("test")})
+	secretTemplate := secrets.NewSecretTemplate(names.random["secretName"], namespace.Name, map[string][]byte{"test": []byte("test")}, corev1.SecretTypeBasicAuth)
 
 	u.T().Logf("Creating a secret with name [%v]", names.random["secretName"])
 	createdSecret, err := steveClient.SteveType(secrets.SecretSteveType).Create(secretTemplate)
