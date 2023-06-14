@@ -1,11 +1,11 @@
+//go:build (validation || infra.rke2k3s || cluster.any || stress) && !infra.any && !infra.aks && !infra.eks && !infra.gke && !infra.rke1 && !sanity && !extended
+
 package snapshot
 
 import (
 	"testing"
 
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	"github.com/rancher/rancher/tests/framework/extensions/clusters"
-	"github.com/rancher/rancher/tests/framework/extensions/clusters/kubernetesversions"
 	"github.com/rancher/rancher/tests/framework/extensions/provisioninginput"
 
 	"github.com/rancher/rancher/tests/framework/pkg/config"
@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-type RKE2SnapshotRestoreTestSuite struct {
+type SnapshotRestoreTestSuite struct {
 	suite.Suite
 	session        *session.Session
 	client         *rancher.Client
@@ -23,11 +23,11 @@ type RKE2SnapshotRestoreTestSuite struct {
 	clustersConfig *provisioninginput.Config
 }
 
-func (r *RKE2SnapshotRestoreTestSuite) TearDownSuite() {
+func (r *SnapshotRestoreTestSuite) TearDownSuite() {
 	r.session.Cleanup()
 }
 
-func (r *RKE2SnapshotRestoreTestSuite) SetupSuite() {
+func (r *SnapshotRestoreTestSuite) SetupSuite() {
 	testSession := session.NewSession()
 	r.session = testSession
 
@@ -40,39 +40,44 @@ func (r *RKE2SnapshotRestoreTestSuite) SetupSuite() {
 	require.NoError(r.T(), err)
 
 	r.client = client
-
 }
 
-func (r *RKE2SnapshotRestoreTestSuite) TestOnlySnapshotRestore() {
-	r.Run("rke2-snapshot-restore", func() {
-		snapshotRestore(r.T(), r.client, r.client.RancherConfig.ClusterName, "", false)
+func (r *SnapshotRestoreTestSuite) TestOnlySnapshotRestore() {
+	r.Run("snapshot-restore", func() {
+		subSession := r.session.NewSession()
+		defer subSession.Cleanup()
+
+		client, err := r.client.WithSession(subSession)
+		require.NoError(r.T(), err)
+
+		snapshotRestore(r.T(), client, r.client.RancherConfig.ClusterName, false, false)
 	})
 }
 
-func (r *RKE2SnapshotRestoreTestSuite) TestSnapshotRestoreWithK8sUpgrade() {
-	availableVersions, err := kubernetesversions.Default(r.client, clusters.RKE2ClusterType.String(), nil)
-	require.NoError(r.T(), err)
-	upgrade := availableVersions[0]
-	if len(r.clustersConfig.RKE2KubernetesVersions) == 2 {
-		upgrade = r.clustersConfig.RKE2KubernetesVersions[1]
-	}
-	r.Run("rke2-snapshot-restore-with-k8s-upgrade", func() {
-		snapshotRestore(r.T(), r.client, r.client.RancherConfig.ClusterName, upgrade, false)
+func (r *SnapshotRestoreTestSuite) TestSnapshotRestoreWithK8sUpgrade() {
+	r.Run("snapshot-restore-with-k8s-upgrade", func() {
+		subSession := r.session.NewSession()
+		defer subSession.Cleanup()
+
+		client, err := r.client.WithSession(subSession)
+		require.NoError(r.T(), err)
+
+		snapshotRestore(r.T(), client, r.client.RancherConfig.ClusterName, true, false)
 	})
 }
 
-func (r *RKE2SnapshotRestoreTestSuite) TestSnapshotRestoreWithUpgradeStrategy() {
-	availableVersions, err := kubernetesversions.Default(r.client, clusters.RKE2ClusterType.String(), nil)
-	require.NoError(r.T(), err)
-	upgrade := availableVersions[0]
-	if len(r.clustersConfig.RKE2KubernetesVersions) == 2 {
-		upgrade = r.clustersConfig.RKE2KubernetesVersions[1]
-	}
-	r.Run("rke2-snapshot-restore-with-upgrade-strategy", func() {
-		snapshotRestore(r.T(), r.client, r.client.RancherConfig.ClusterName, upgrade, true)
+func (r *SnapshotRestoreTestSuite) TestSnapshotRestoreWithUpgradeStrategy() {
+	r.Run("snapshot-restore-with-upgrade-strategy", func() {
+		subSession := r.session.NewSession()
+		defer subSession.Cleanup()
+
+		client, err := r.client.WithSession(subSession)
+		require.NoError(r.T(), err)
+
+		snapshotRestore(r.T(), client, r.client.RancherConfig.ClusterName, true, true)
 	})
 }
 
-func TestRKE2SnapshotRestore(t *testing.T) {
-	suite.Run(t, new(RKE2SnapshotRestoreTestSuite))
+func TestSnapshotRestore(t *testing.T) {
+	suite.Run(t, new(SnapshotRestoreTestSuite))
 }

@@ -1,3 +1,5 @@
+//go:build (validation || sanity) && !infra.any && !infra.aks && !infra.eks && !infra.rke2k3s && !infra.gke && !infra.rke1 && !cluster.any && !cluster.custom && !cluster.nodedriver && !extended && !stress
+
 package rke1
 
 import (
@@ -11,6 +13,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/users"
 	password "github.com/rancher/rancher/tests/framework/extensions/users/passwordgenerator"
 	"github.com/rancher/rancher/tests/framework/pkg/config"
+	"github.com/rancher/rancher/tests/framework/pkg/environmentflag"
 	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
 	"github.com/rancher/rancher/tests/v2/validation/provisioning/permutations"
@@ -77,16 +80,23 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningRKE1CustomCluster()
 		name      string
 		nodePools []provisioninginput.NodePools
 		client    *rancher.Client
+		runFlag   bool
 	}{
-		{"1 Node all roles " + provisioninginput.AdminClientName.String(), nodeRolesAll, c.client},
-		{"1 Node all roles " + provisioninginput.StandardClientName.String(), nodeRolesAll, c.standardUserClient},
-		{"2 nodes - etcd/cp roles per 1 node " + provisioninginput.AdminClientName.String(), nodeRolesShared, c.client},
-		{"2 nodes - etcd/cp roles per 1 node " + provisioninginput.StandardClientName.String(), nodeRolesShared, c.standardUserClient},
-		{"3 nodes - 1 role per node " + provisioninginput.AdminClientName.String(), nodeRolesDedicated, c.client},
-		{"3 nodes - 1 role per node " + provisioninginput.StandardClientName.String(), nodeRolesDedicated, c.standardUserClient},
+		{"1 Node all roles " + provisioninginput.AdminClientName.String(), nodeRolesAll, c.client, c.client.Flags.GetValue(environmentflag.Long)},
+		{"1 Node all roles " + provisioninginput.StandardClientName.String(), nodeRolesAll, c.standardUserClient, c.client.Flags.GetValue(environmentflag.Short) || c.client.Flags.GetValue(environmentflag.Long)},
+		{"2 nodes - etcd/cp roles per 1 node " + provisioninginput.AdminClientName.String(), nodeRolesShared, c.client, c.client.Flags.GetValue(environmentflag.Long)},
+		{"2 nodes - etcd/cp roles per 1 node " + provisioninginput.StandardClientName.String(), nodeRolesShared, c.standardUserClient, c.client.Flags.GetValue(environmentflag.Short) || c.client.Flags.GetValue(environmentflag.Long)},
+		{"3 nodes - 1 role per node " + provisioninginput.AdminClientName.String(), nodeRolesDedicated, c.client, c.client.Flags.GetValue(environmentflag.Long)},
+		{"3 nodes - 1 role per node " + provisioninginput.StandardClientName.String(), nodeRolesDedicated, c.standardUserClient, c.client.Flags.GetValue(environmentflag.Long)},
 	}
 	for _, tt := range tests {
-		c.provisioningConfig.NodePools = tt.nodePools
+		if !tt.runFlag {
+			c.T().Logf("SKIPPED")
+			continue
+		}
+
+		provisioningConfig := *c.provisioningConfig
+		provisioningConfig.NodePools = tt.nodePools
 		permutations.RunTestPermutations(&c.Suite, tt.name, tt.client, c.provisioningConfig, permutations.RKE1CustomCluster, nil, nil)
 	}
 }

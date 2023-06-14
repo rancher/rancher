@@ -52,6 +52,7 @@ func main() {
 		if err != nil {
 			logrus.Errorf("error creating the admin token: %v", err)
 		}
+
 		rancherConfig.AdminToken = token
 		config.UpdateConfig(rancher.ConfigurationFileKey, rancherConfig)
 		rancherSession := session.NewSession()
