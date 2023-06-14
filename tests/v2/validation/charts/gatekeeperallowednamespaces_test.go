@@ -1,3 +1,5 @@
+//go:build (validation || infra.rke1 || cluster.any || stress) && !infra.any && !infra.aks && !infra.eks && !infra.gke && !infra.rke2k3s && !sanity && !extended
+
 package charts
 
 import (

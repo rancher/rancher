@@ -1091,9 +1091,11 @@ func logClusterInfoWithChanges(clusterID, clusterInfo string, summary summary.Su
 	return clusterInfo
 }
 
-func WatchAndWaitForCluster(client *rancher.Client, ns string, clusterName string) error {
-	err := kwait.Poll(5*time.Second, 2*time.Minute, func() (done bool, err error) {
-		clusterResp, err := client.Steve.SteveType(ProvisioningSteveResourceType).ByID(ns + "/" + clusterName)
+// WatchAndWaitForCluster is function that waits for a cluster to go unactive before checking its active state.
+func WatchAndWaitForCluster(client *rancher.Client, steveID string) error {
+	var clusterResp *v1.SteveAPIObject
+	err := kwait.Poll(500*time.Millisecond, 2*time.Minute, func() (done bool, err error) {
+		clusterResp, err = client.Steve.SteveType(ProvisioningSteveResourceType).ByID(steveID)
 		if err != nil {
 			return false, err
 		}
@@ -1114,8 +1116,8 @@ func WatchAndWaitForCluster(client *rancher.Client, ns string, clusterName strin
 		return err
 	}
 
-	result, err := kubeProvisioningClient.Clusters(ns).Watch(context.TODO(), metav1.ListOptions{
-		FieldSelector:  "metadata.name=" + clusterName,
+	result, err := kubeProvisioningClient.Clusters(clusterResp.ObjectMeta.Namespace).Watch(context.TODO(), metav1.ListOptions{
+		FieldSelector:  "metadata.name=" + clusterResp.Name,
 		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
 	})
 	if err != nil {

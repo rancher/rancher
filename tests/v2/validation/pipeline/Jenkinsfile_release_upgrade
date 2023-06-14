@@ -28,6 +28,8 @@ node {
     def envFile = ".env"
     def rancherConfig = "rancher_env.config"
     def branch = "release/v2.8"
+    def defaultTag = "validation"
+
     if ("${env.BRANCH}" != "null" && "${env.BRANCH}" != "") {
       branch = "${env.BRANCH}"
     }
@@ -332,7 +334,8 @@ node {
                         string(name: 'REPO', value: "${pointedRepo}"),
                         string(name: 'BRANCH', value: "${branch}"),
                         string(name: 'TEST_PACKAGE', value: "${testPackage}"),
-                        string(name: 'GOTEST_TESTCASE', value: "${testCase}"),
+                        string(name: 'TAGS', value: "${defaultTag}"),
+                        string(name: 'GOTEST_TESTCASE', value: "${testCase}")
                       ]
 
                       jobs["$it-preupgrade"] = { build job: 'go-automation-freeform-job', parameters: goValidationParams }
@@ -383,6 +386,7 @@ node {
                         string(name: 'REPO', value: "${pointedRepo}"),
                         string(name: 'BRANCH', value: "${branch}"),
                         string(name: 'TEST_PACKAGE', value: "${testPackage}"),
+                        string(name: 'TAGS', value: "${defaultTag}"),
                         string(name: 'GOTEST_TESTCASE', value: "${testCase}")
                       ]
 
@@ -422,6 +426,7 @@ node {
                         string(name: 'REPO', value: "${pointedRepo}"),
                         string(name: 'BRANCH', value: "${branch}"),
                         string(name: 'TEST_PACKAGE', value: "${testPackage}"),
+                        string(name: 'TAGS', value: "${defaultTag}"),
                         string(name: 'GOTEST_TESTCASE', value: "${testCase}" )
                       ]
 
@@ -461,6 +466,7 @@ node {
                         string(name: 'REPO', value: "${pointedRepo}"),
                         string(name: 'BRANCH', value: "${branch}"),
                         string(name: 'TEST_PACKAGE', value: "${testPackage}"),
+                        string(name: 'TAGS', value: "${defaultTag}"),
                         string(name: 'GOTEST_TESTCASE', value: "${testCase}")
                       ]
 
@@ -500,6 +506,7 @@ node {
                         string(name: 'REPO', value: "${pointedRepo}"),
                         string(name: 'BRANCH', value: "${branch}"),
                         string(name: 'TEST_PACKAGE', value: "${testPackage}"),
+                        string(name: 'TAGS', value: "${defaultTag}"),
                         string(name: 'GOTEST_TESTCASE', value: "${testCase}")
                       ]
 

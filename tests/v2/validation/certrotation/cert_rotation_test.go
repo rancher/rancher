@@ -1,3 +1,5 @@
+//go:build (validation || infra.rke2k3s || cluster.any || stress) && !infra.any && !infra.aks && !infra.eks && !infra.gke && !infra.rke1 && !sanity && !extended
+
 package certrotation
 
 import (
@@ -37,8 +39,8 @@ func (r *V2ProvCertRotationTestSuite) SetupSuite() {
 
 func (r *V2ProvCertRotationTestSuite) TestCertRotation() {
 	r.Run("test-cert-rotation", func() {
-		require.NoError(r.T(), RotateCerts(r.client, r.client.RancherConfig.ClusterName))
-		require.NoError(r.T(), RotateCerts(r.client, r.client.RancherConfig.ClusterName))
+		require.NoError(r.T(), rotateCerts(r.client, r.client.RancherConfig.ClusterName))
+		require.NoError(r.T(), rotateCerts(r.client, r.client.RancherConfig.ClusterName))
 	})
 }
 

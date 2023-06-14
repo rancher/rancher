@@ -33,8 +33,8 @@ type NodePools struct {
 }
 
 type Config struct {
-	NodePools    NodePools            `json:"nodePools" yaml:"nodePools"`
-	MachinePools MachinePools         `json:"machinePools" yaml:"machinePools"`
+	NodePools    *NodePools           `json:"nodePools" yaml:"nodePools"`
+	MachinePools *MachinePools        `json:"machinePools" yaml:"machinePools"`
 	AKSNodePool  *aks.NodePool        `json:"aksNodePool" yaml:"aksNodePool"`
 	EKSNodePool  *eks.NodeGroupConfig `json:"eksNodePool" yaml:"eksNodePool"`
 	GKENodePool  *gke.NodePool        `json:"gkeNodePool" yaml:"gkeNodePool"`

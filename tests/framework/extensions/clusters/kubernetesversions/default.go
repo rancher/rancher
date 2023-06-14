@@ -8,6 +8,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// Default is a helper function that returns the latest version if kubernetes version of a specific cluster type
 func Default(client *rancher.Client, provider string, kubernetesVersions []string) ([]string, error) {
 
 	switch {
@@ -24,9 +25,10 @@ func Default(client *rancher.Client, provider string, kubernetesVersions []strin
 		if kubernetesVersions == nil {
 			kubernetesVersions = append(kubernetesVersions, defaultVersion)
 			logrus.Infof("no version found in kubernetesVersions; default rke1 kubernetes version %v will be used: %v", defaultVersion, kubernetesVersions)
-		}
-
-		if kubernetesVersions[0] == "" {
+		} else if len(kubernetesVersions) == 0 {
+			kubernetesVersions = append(kubernetesVersions, defaultVersion)
+			logrus.Infof("empty list found in kubernetesVersions; default rke1 kubernetes version %v will be used: %v", defaultVersion, kubernetesVersions)
+		} else if kubernetesVersions[0] == "" {
 			kubernetesVersions[0] = defaultVersion
 			logrus.Infof("empty string value found in kubernetesVersions; default rke1 kubernetes version %v will be used: %v", defaultVersion, kubernetesVersions)
 		}
@@ -44,9 +46,10 @@ func Default(client *rancher.Client, provider string, kubernetesVersions []strin
 		if kubernetesVersions == nil {
 			kubernetesVersions = append(kubernetesVersions, defaultVersion)
 			logrus.Infof("no version found in kubernetesVersions; default rke2 kubernetes version %v will be used: %v", defaultVersion, kubernetesVersions)
-		}
-
-		if kubernetesVersions[0] == "" {
+		} else if len(kubernetesVersions) == 0 {
+			kubernetesVersions = append(kubernetesVersions, defaultVersion)
+			logrus.Infof("empty list found in kubernetesVersions; default rke2 kubernetes version %v will be used: %v", defaultVersion, kubernetesVersions)
+		} else if kubernetesVersions[0] == "" {
 			kubernetesVersions[0] = defaultVersion
 			logrus.Infof("empty string value found in kubernetesVersions; default rke2 kubernetes version %v will be used: %v", defaultVersion, kubernetesVersions)
 		}
@@ -64,9 +67,10 @@ func Default(client *rancher.Client, provider string, kubernetesVersions []strin
 		if kubernetesVersions == nil {
 			kubernetesVersions = append(kubernetesVersions, defaultVersion)
 			logrus.Infof("no version found in kubernetesVersions; default k3s kubernetes version %v will be used: %v", defaultVersion, kubernetesVersions)
-		}
-
-		if kubernetesVersions[0] == "" {
+		} else if len(kubernetesVersions) == 0 {
+			kubernetesVersions = append(kubernetesVersions, defaultVersion)
+			logrus.Infof("empty list found in kubernetesVersions; default k3s kubernetes version %v will be used: %v", defaultVersion, kubernetesVersions)
+		} else if kubernetesVersions[0] == "" {
 			kubernetesVersions[0] = defaultVersion
 			logrus.Infof("empty string value found in kubernetesVersions; default k3s kubernetes version %v will be used: %v", defaultVersion, kubernetesVersions)
 		}

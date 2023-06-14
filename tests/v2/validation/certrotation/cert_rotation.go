@@ -24,8 +24,8 @@ const (
 	clusterLabel                 = "cluster.x-k8s.io/cluster-name"
 )
 
-// RotateCerts rotates the certificates in a cluster
-func RotateCerts(client *rancher.Client, clusterName string) error {
+// rotateCerts rotates the certificates in a cluster
+func rotateCerts(client *rancher.Client, clusterName string) error {
 	kubeProvisioningClient, err := client.GetKubeAPIProvisioningClient()
 	if err != nil {
 		return err
@@ -36,7 +36,12 @@ func RotateCerts(client *rancher.Client, clusterName string) error {
 		return err
 	}
 
-	cluster, err := adminClient.Steve.SteveType(ProvisioningSteveResouceType).ByID("fleet-default/" + clusterName)
+	id, err := clusters.GetV1ProvisioningClusterByName(client, clusterName)
+	if err != nil {
+		return err
+	}
+
+	cluster, err := adminClient.Steve.SteveType(ProvisioningSteveResouceType).ByID(id)
 	if err != nil {
 		return err
 	}

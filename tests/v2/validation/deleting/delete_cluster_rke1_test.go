@@ -1,3 +1,5 @@
+//go:build (infra.rke1 || validation) && !infra.any && !infra.aks && !infra.eks && !infra.gke && !infra.rke2k3s && !stress && !sanity && !extended
+
 package deleting
 
 import (
