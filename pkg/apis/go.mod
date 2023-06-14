@@ -5,14 +5,14 @@ go 1.19
 replace k8s.io/client-go => github.com/rancher/client-go v1.25.4-rancher1
 
 require (
-	github.com/rancher/aks-operator v1.1.1-rc2
-	github.com/rancher/eks-operator v1.2.1
+	github.com/rancher/aks-operator v1.1.1
+	github.com/rancher/eks-operator v1.2.0
 	github.com/rancher/fleet/pkg/apis v0.0.0-20230605094423-ddbb43505e80
 	github.com/rancher/gke-operator v1.1.5
 	github.com/rancher/norman v0.0.0-20230426211126-d3552b018687
 	github.com/rancher/rke v1.4.6-rc3
 	github.com/rancher/wrangler v1.1.1
-	github.com/sirupsen/logrus v1.9.2
+	github.com/sirupsen/logrus v1.9.3
 	k8s.io/api v0.25.4
 	k8s.io/apimachinery v0.25.4
 	sigs.k8s.io/cluster-api v1.2.12
