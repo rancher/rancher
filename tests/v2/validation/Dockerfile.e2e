@@ -1,4 +1,4 @@
-FROM registry.suse.com/bci/golang:1.19
+FROM registry.opensuse.org/devel/bci/sle-15-sp5/containerfile/bci/golang:1.19
 
 # Configure Go
 ENV GOPATH /root
