@@ -912,6 +912,40 @@ func CreateK3SRKE2Cluster(client *rancher.Client, rke2Cluster *apisV1.Cluster) (
 	return cluster, nil
 }
 
+// DeleteKE1Cluster is a "helper" functions that takes a rancher client, and the rke1 cluster ID as parameters to delete
+// the cluster.
+func DeleteRKE1Cluster(client *rancher.Client, clusterID string) error {
+	cluster, err := client.Management.Cluster.ByID(clusterID)
+	if err != nil {
+		return err
+	}
+
+	logrus.Infof("Deleting cluster %s...", cluster.Name)
+	err = client.Management.Cluster.Delete(cluster)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// DeleteK3SRKE2Cluster is a "helper" functions that takes a rancher client, and the non-rke1 cluster ID as parameters to delete
+// the cluster.
+func DeleteK3SRKE2Cluster(client *rancher.Client, clusterID string) error {
+	cluster, err := client.Steve.SteveType(ProvisioningSteveResourceType).ByID(clusterID)
+	if err != nil {
+		return err
+	}
+
+	logrus.Infof("Deleting cluster %s...", cluster.Name)
+	err = client.Steve.SteveType(ProvisioningSteveResourceType).Delete(cluster)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // UpdateK3SRKE2Cluster is a "helper" functions that takes a rancher client, old rke2/k3s cluster config, and the new rke2/k3s cluster config as parameters.
 func UpdateK3SRKE2Cluster(client *rancher.Client, cluster *v1.SteveAPIObject, updatedCluster *apisV1.Cluster) (*v1.SteveAPIObject, error) {
 	updateCluster, err := client.Steve.SteveType(ProvisioningSteveResourceType).ByID(cluster.ID)

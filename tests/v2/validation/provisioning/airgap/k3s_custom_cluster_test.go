@@ -111,7 +111,7 @@ func (a *AirGapK3SCustomClusterTestSuite) TestProvisioningUpgradeK3SCustomCluste
 	clusterObject, err := provisioning.CreateProvisioningAirgapCustomCluster(a.client, testConfig, a.corralPackage)
 	require.NoError(a.T(), err)
 
-	provisioning.VerifyCluster(a.T(), a.client, clusterObject)
+	provisioning.VerifyCluster(a.T(), a.client, testConfig, clusterObject)
 
 	upgradedCluster, err := provisioning.UpgradeClusterK8sVersion(a.client, &clusterObject.Name, &k3sVersions[numOfK3SVersions-1])
 	require.NoError(a.T(), err)

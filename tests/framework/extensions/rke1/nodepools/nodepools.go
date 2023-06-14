@@ -2,11 +2,18 @@ package rke1
 
 import (
 	"strconv"
+	"time"
 
+	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	nodestat "github.com/rancher/rancher/tests/framework/extensions/nodes"
 	"github.com/sirupsen/logrus"
+	kwait "k8s.io/apimachinery/pkg/util/wait"
+)
+
+const (
+	active = "active"
 )
 
 type NodeRoles struct {
@@ -57,61 +64,78 @@ func NodePoolSetup(client *rancher.Client, nodeRoles []NodeRoles, ClusterID, Nod
 	return &nodePoolConfig, nil
 }
 
-// ScaleWorkerNodePool is a helper method that will add a worker node pool to the existing RKE1 cluster. Once done, it will scale
-// the worker node pool to add a worker node, scale it back down to remove the worker node, and then delete the worker node pool.
-func ScaleWorkerNodePool(client *rancher.Client, nodeRoles []NodeRoles, ClusterID, NodeTemplateID string) error {
-	nodePoolConfig := management.NodePool{
-		ClusterID:               ClusterID,
-		ControlPlane:            false,
-		DeleteNotReadyAfterSecs: 0,
-		Etcd:                    false,
-		HostnamePrefix:          "auto-rke1-scale-" + ClusterID,
-		NodeTemplateID:          NodeTemplateID,
-		Quantity:                1,
-		Worker:                  true,
-	}
-
-	logrus.Infof("Creating new worker node pool...")
-	nodePool, err := client.Management.NodePool.Create(&nodePoolConfig)
+// MatchRKE1NodeRoles is a helper method that will return the desired node in the cluster, based on the node role.
+func MatchRKE1NodeRoles(client *rancher.Client, cluster *management.Cluster, nodeRoles NodeRoles) (*management.Node, error) {
+	nodes, err := client.Management.Node.ListAll(&types.ListOpts{
+		Filters: map[string]interface{}{
+			"clusterId": cluster.ID,
+		},
+	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	if nodestat.AllManagementNodeReady(client, ClusterID) != nil {
-		return err
+	for _, node := range nodes.Data {
+		if nodeRoles.ControlPlane != node.ControlPlane {
+			continue
+		}
+		if nodeRoles.Etcd != node.Etcd {
+			continue
+		}
+		if nodeRoles.Worker != node.Worker {
+			continue
+		}
+
+		return &node, nil
 	}
 
-	logrus.Infof("New node pool is ready!")
-	nodePoolConfig.Quantity = 2
+	return nil, nil
+}
 
-	logrus.Infof("Scaling node pool to 2 worker nodes...")
-	updatedPool, err := client.Management.NodePool.Update(nodePool, &nodePoolConfig)
+// updateNodePoolQuantity is a helper method that will update the node pool with the desired quantity.
+func updateNodePoolQuantity(client *rancher.Client, cluster *management.Cluster, node *management.Node, nodeRoles NodeRoles) (*management.NodePool, error) {
+	updatedNodePool, err := client.Management.NodePool.ByID(node.NodePoolID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	if nodestat.AllManagementNodeReady(client, ClusterID) != nil {
-		return err
-	}
+	updatedNodePool.Quantity += nodeRoles.Quantity
 
-	logrus.Infof("Node pool is scaled to 2 worker nodes!")
-	nodePoolConfig.Quantity = 1
-
-	logrus.Infof("Scaling node pool back to 1 worker node...")
-	_, err = client.Management.NodePool.Update(updatedPool, &nodePoolConfig)
+	logrus.Infof("Scaling the machine pool to %v total nodes", updatedNodePool.Quantity)
+	_, err = client.Management.NodePool.Update(updatedNodePool, &updatedNodePool)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	logrus.Infof("Node pool is scaled back to 1 worker node!")
+	err = kwait.Poll(500*time.Millisecond, 10*time.Minute, func() (done bool, err error) {
+		clusterResp, err := client.Management.Cluster.ByID(cluster.ID)
+		if err != nil {
+			return false, err
+		}
 
-	logrus.Infof("Deleting node pool...")
-	err = client.Management.NodePool.Delete(nodePool)
+		if clusterResp.State == active && nodestat.AllManagementNodeReady(client, clusterResp.ID) == nil {
+			logrus.Infof("Node pool is scaled!")
+			return true, nil
+		} else {
+			return false, nil
+		}
+	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	logrus.Infof("Node pool deleted!")
+	return updatedNodePool, nil
+}
 
-	return nil
+// ScaleNodePoolNodes is a helper method that will add a new node pool to the existing RKE1 cluster, based on the nodeRoles
+// configuration. Once done, it will scale the node pool, scale it back down and then delete the node pool.
+func ScaleNodePoolNodes(client *rancher.Client, cluster *management.Cluster, node *management.Node, nodeRoles NodeRoles) (*management.NodePool, error) {
+	updatedNodePool, err := updateNodePoolQuantity(client, cluster, node, nodeRoles)
+	if err != nil {
+		return nil, err
+	}
+
+	logrus.Infof("Node pool has been scaled!")
+
+	return updatedNodePool, nil
 }

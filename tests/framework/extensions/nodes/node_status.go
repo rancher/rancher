@@ -32,7 +32,7 @@ func AllManagementNodeReady(client *rancher.Client, ClusterID string) error {
 			},
 		})
 		if err != nil {
-			return false, err
+			return false, nil
 		}
 
 		for _, node := range nodes.Data {
@@ -85,6 +85,29 @@ func AllMachineReady(client *rancher.Client, clusterID string) error {
 		logrus.Infof("All nodes in the cluster are running!")
 		return true, nil
 	})
+	return err
+}
+
+// AllNodeDeleted is a helper method that will loop and check if the node is deleted in the cluster.
+func AllNodeDeleted(client *rancher.Client, ClusterID string) error {
+	err := wait.Poll(500*time.Millisecond, 5*time.Minute, func() (bool, error) {
+		nodes, err := client.Management.Node.ListAll(&types.ListOpts{
+			Filters: map[string]interface{}{
+				"clusterId": ClusterID,
+			},
+		})
+		if err != nil {
+			return false, err
+		}
+
+		if len(nodes.Data) == 0 {
+			logrus.Infof("All nodes in the cluster are deleted!")
+			return true, nil
+		}
+
+		return false, nil
+	})
+
 	return err
 }
 
