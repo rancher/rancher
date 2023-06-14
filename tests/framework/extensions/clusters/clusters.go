@@ -758,6 +758,96 @@ func CreateK3SRKE2Cluster(client *rancher.Client, rke2Cluster *apisV1.Cluster) (
 	return cluster, nil
 }
 
+// DeleteKE1Cluster is a "helper" functions that takes a rancher client, and the rke1 cluster config as parameters. This function
+// registers a delete cluster fuction with a wait.WatchWait to ensure the cluster is removed cleanly.
+func DeleteRKE1Cluster(client *rancher.Client, cluster *management.Cluster) error {
+	client, err := client.ReLogin()
+	if err != nil {
+		return nil
+	}
+
+	adminClient, err := rancher.NewClient(client.RancherConfig.AdminToken, client.Session)
+	if err != nil {
+		return err
+	}
+
+	watchInterface, err := adminClient.GetManagementWatchInterface(management.ClusterType, metav1.ListOptions{
+		FieldSelector:  "metadata.name=" + cluster.ID,
+		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+	})
+	if err != nil {
+		return err
+	}
+
+	logrus.Infof("Deleting cluster %s...", cluster.Name)
+	err = client.Management.Cluster.Delete(cluster)
+	if err != nil {
+		return err
+	}
+
+	wait.WatchWait(watchInterface, func(event watch.Event) (ready bool, err error) {
+		if event.Type == watch.Error {
+			return false, fmt.Errorf("error: unable to delete cluster %s", cluster.Name)
+		} else if event.Type == watch.Deleted {
+			logrus.Infof("Cluster %s deleted!", cluster.Name)
+			return true, nil
+		}
+		return false, nil
+	})
+
+	return nil
+}
+
+// DeleteK3SRKE2Cluster is a "helper" functions that takes a rancher client, and the rke2 cluster config as parameters. This function
+// registers a delete cluster fuction with a wait.WatchWait to ensure the cluster is removed cleanly.
+func DeleteK3SRKE2Cluster(client *rancher.Client, cluster *v1.SteveAPIObject) error {
+	adminClient, err := rancher.NewClient(client.RancherConfig.AdminToken, client.Session)
+	if err != nil {
+		return err
+	}
+
+	provKubeClient, err := adminClient.GetKubeAPIProvisioningClient()
+	if err != nil {
+		return err
+	}
+
+	watchInterface, err := provKubeClient.Clusters(cluster.ObjectMeta.Namespace).Watch(context.TODO(), metav1.ListOptions{
+		FieldSelector:  "metadata.name=" + cluster.ObjectMeta.Name,
+		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+	})
+
+	if err != nil {
+		return err
+	}
+
+	client, err = client.ReLogin()
+	if err != nil {
+		return err
+	}
+
+	logrus.Infof("Deleting cluster %s...", cluster.ObjectMeta.Name)
+	err = client.Steve.SteveType(ProvisioningSteveResouceType).Delete(cluster)
+	if err != nil {
+		return err
+	}
+
+	wait.WatchWait(watchInterface, func(event watch.Event) (ready bool, err error) {
+		cluster := event.Object.(*apisV1.Cluster)
+		if event.Type == watch.Error {
+			return false, fmt.Errorf("error: unable to delete cluster %s", cluster.ObjectMeta.Name)
+		} else if event.Type == watch.Deleted {
+			logrus.Infof("Cluster %s deleted!", cluster.ObjectMeta.Name)
+			return true, nil
+		} else if cluster == nil {
+			logrus.Infof("Cluster %s deleted!", cluster.ObjectMeta.Name)
+			return true, nil
+		}
+		return false, nil
+	})
+
+	return nil
+}
+
 // UpdateK3SRKE2Cluster is a "helper" functions that takes a rancher client, old rke2/k3s cluster config, and the new rke2/k3s cluster config as parameters.
 func UpdateK3SRKE2Cluster(client *rancher.Client, cluster *v1.SteveAPIObject, updatedCluster *apisV1.Cluster) (*v1.SteveAPIObject, error) {
 	updateCluster, err := client.Steve.SteveType(ProvisioningSteveResourceType).ByID(cluster.ID)

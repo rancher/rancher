@@ -51,6 +51,29 @@ func IsNodeReady(client *rancher.Client, ClusterID string) error {
 	return err
 }
 
+// IsNodeDeleted is a helper method that will loop and check if the node is deleted in the cluster.
+func IsNodeDeleted(client *rancher.Client, ClusterID string) error {
+	err := wait.Poll(500*time.Millisecond, 30*time.Minute, func() (bool, error) {
+		nodes, err := client.Management.Node.ListAll(&types.ListOpts{
+			Filters: map[string]interface{}{
+				"clusterId": ClusterID,
+			},
+		})
+		if err != nil {
+			return false, err
+		}
+
+		if len(nodes.Data) == 0 {
+			logrus.Infof("All nodes in the cluster are deleted!")
+			return true, nil
+		}
+
+		return false, nil
+	})
+
+	return err
+}
+
 func IsRKE1EtcdNodeReplaced(client *rancher.Client, etcdNodeToDelete management.Node, clusterResp *management.Cluster, numOfEtcdNodesBeforeDeletion int) (bool, error) {
 	numOfEtcdNodesAfterDeletion := 0
 

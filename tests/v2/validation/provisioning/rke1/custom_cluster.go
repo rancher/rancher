@@ -24,7 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func TestProvisioningRKE1CustomCluster(t *testing.T, client *rancher.Client, externalNodeProvider provisioning.ExternalNodeProvider, nodesAndRoles []nodepools.NodeRoles, psact, kubeVersion, cni string, advancedOptions provisioning.AdvancedOptions) {
+func TestProvisioningRKE1CustomCluster(t *testing.T, client *rancher.Client, externalNodeProvider provisioning.ExternalNodeProvider, nodesAndRoles []nodepools.NodeRoles, psact, kubeVersion, cni string, advancedOptions provisioning.AdvancedOptions) (*management.Cluster, error) {
 	rolesPerNode := []string{}
 	quantityPerPool := []int32{}
 	rolesPerPool := []string{}
@@ -48,6 +48,7 @@ func TestProvisioningRKE1CustomCluster(t *testing.T, client *rancher.Client, ext
 	}
 
 	nodes, err := externalNodeProvider.NodeCreationFunc(client, rolesPerPool, quantityPerPool)
+
 	require.NoError(t, err)
 
 	clusterName := namegen.AppendRandomString(externalNodeProvider.Name)
@@ -118,4 +119,6 @@ func TestProvisioningRKE1CustomCluster(t *testing.T, client *rancher.Client, ext
 	podResults, podErrors := pods.StatusPods(client, clusterResp.ID)
 	assert.NotEmpty(t, podResults)
 	assert.Empty(t, podErrors)
+
+	return clusterResp, nil
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	apisV1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
@@ -27,7 +28,7 @@ const (
 	namespace = "fleet-default"
 )
 
-func TestProvisioningK3SCluster(t *testing.T, client *rancher.Client, provider Provider, nodesAndRoles []machinepools.NodeRoles, kubeVersion string, psact string, advancedOptions provisioning.AdvancedOptions) *v1.SteveAPIObject {
+func TestProvisioningK3SCluster(t *testing.T, client *rancher.Client, provider Provider, nodesAndRoles []machinepools.NodeRoles, kubeVersion string, psact string, advancedOptions provisioning.AdvancedOptions) (*v1.SteveAPIObject, *apisV1.Cluster, *v1.SteveAPIObject, error) {
 	cloudCredential, err := provider.CloudCredFunc(client)
 	require.NoError(t, err)
 
@@ -89,5 +90,5 @@ func TestProvisioningK3SCluster(t *testing.T, client *rancher.Client, provider P
 	assert.NotEmpty(t, podResults)
 	assert.Empty(t, podErrors)
 
-	return clusterResp
+	return clusterResp, cluster, machineConfigResp, nil
 }

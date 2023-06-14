@@ -79,7 +79,8 @@ func (e *EtcdNodeDeleteAndReplace) TestEtcdNodeDeletionAndReplacement() {
 	for _, provider := range e.providers {
 		for _, k8sVersion := range e.k3skubernetesVersions {
 			provider := CreateProvider(provider)
-			clusterResp := TestProvisioningK3SCluster(e.T(), client, provider, e.nodesAndRoles, k8sVersion, e.psact, e.advancedOptions)
+			clusterResp, _, _, err := TestProvisioningK3SCluster(e.T(), client, provider, e.nodesAndRoles, k8sVersion, e.psact, e.advancedOptions)
+			require.NoError(e.T(), err)
 
 			query, err := url.ParseQuery(fmt.Sprintf("fieldSelector=metadata.namespace=%s", e.ns))
 			require.NoError(e.T(), err)

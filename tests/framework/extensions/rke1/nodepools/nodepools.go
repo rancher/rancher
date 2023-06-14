@@ -6,6 +6,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	nodestat "github.com/rancher/rancher/tests/framework/extensions/nodes"
+	"github.com/rancher/rancher/tests/framework/extensions/rke1/nodetemplates"
 	"github.com/sirupsen/logrus"
 )
 
@@ -59,14 +60,14 @@ func NodePoolSetup(client *rancher.Client, nodeRoles []NodeRoles, ClusterID, Nod
 
 // ScaleWorkerNodePool is a helper method that will add a worker node pool to the existing RKE1 cluster. Once done, it will scale
 // the worker node pool to add a worker node, scale it back down to remove the worker node, and then delete the worker node pool.
-func ScaleWorkerNodePool(client *rancher.Client, nodeRoles []NodeRoles, ClusterID, NodeTemplateID string) error {
+func ScaleNewWorkerNodePool(client *rancher.Client, nodeRoles []NodeRoles, cluster *management.Cluster, nodeTemplate *nodetemplates.NodeTemplate) error {
 	nodePoolConfig := management.NodePool{
-		ClusterID:               ClusterID,
+		ClusterID:               cluster.ID,
 		ControlPlane:            false,
 		DeleteNotReadyAfterSecs: 0,
 		Etcd:                    false,
-		HostnamePrefix:          "auto-rke1-scale-" + ClusterID,
-		NodeTemplateID:          NodeTemplateID,
+		HostnamePrefix:          "auto-rke1-scale-" + cluster.ID,
+		NodeTemplateID:          nodeTemplate.ID,
 		Quantity:                1,
 		Worker:                  true,
 	}
@@ -77,7 +78,7 @@ func ScaleWorkerNodePool(client *rancher.Client, nodeRoles []NodeRoles, ClusterI
 		return err
 	}
 
-	if nodestat.IsNodeReady(client, ClusterID) != nil {
+	if nodestat.IsNodeReady(client, cluster.ID) != nil {
 		return err
 	}
 
@@ -90,7 +91,7 @@ func ScaleWorkerNodePool(client *rancher.Client, nodeRoles []NodeRoles, ClusterI
 		return err
 	}
 
-	if nodestat.IsNodeReady(client, ClusterID) != nil {
+	if nodestat.IsNodeReady(client, cluster.ID) != nil {
 		return err
 	}
 

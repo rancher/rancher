@@ -7,7 +7,6 @@ import (
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters/kubernetesversions"
-	nodepools "github.com/rancher/rancher/tests/framework/extensions/rke1/nodepools"
 	"github.com/rancher/rancher/tests/framework/extensions/users"
 	password "github.com/rancher/rancher/tests/framework/extensions/users/passwordgenerator"
 	"github.com/rancher/rancher/tests/framework/pkg/config"
@@ -18,7 +17,7 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-type RKE1NodeDriverProvisioningTestSuite struct {
+type RKE1ScalingTestSuite struct {
 	suite.Suite
 	client             *rancher.Client
 	standardUserClient *rancher.Client
@@ -31,11 +30,11 @@ type RKE1NodeDriverProvisioningTestSuite struct {
 	advancedOptions    provisioning.AdvancedOptions
 }
 
-func (r *RKE1NodeDriverProvisioningTestSuite) TearDownSuite() {
+func (r *RKE1ScalingTestSuite) TearDownSuite() {
 	r.session.Cleanup()
 }
 
-func (r *RKE1NodeDriverProvisioningTestSuite) SetupSuite() {
+func (r *RKE1ScalingTestSuite) SetupSuite() {
 	testSession := session.NewSession()
 	r.session = testSession
 
@@ -77,95 +76,7 @@ func (r *RKE1NodeDriverProvisioningTestSuite) SetupSuite() {
 	r.standardUserClient = standardUserClient
 }
 
-func (r *RKE1NodeDriverProvisioningTestSuite) TestProvisioningRKE1Cluster() {
-	nodeRoles0 := []nodepools.NodeRoles{
-		{
-			ControlPlane: true,
-			Etcd:         true,
-			Worker:       true,
-			Quantity:     1,
-		},
-	}
-
-	nodeRoles1 := []nodepools.NodeRoles{
-		{
-			ControlPlane: true,
-			Etcd:         true,
-			Worker:       false,
-			Quantity:     1,
-		},
-		{
-			ControlPlane: false,
-			Etcd:         false,
-			Worker:       true,
-			Quantity:     1,
-		},
-	}
-
-	nodeRoles2 := []nodepools.NodeRoles{
-		{
-			ControlPlane: true,
-			Etcd:         false,
-			Worker:       false,
-			Quantity:     1,
-		},
-		{
-			ControlPlane: false,
-			Etcd:         true,
-			Worker:       false,
-			Quantity:     1,
-		},
-		{
-			ControlPlane: false,
-			Etcd:         false,
-			Worker:       true,
-			Quantity:     1,
-		},
-	}
-
-	tests := []struct {
-		name      string
-		nodeRoles []nodepools.NodeRoles
-		client    *rancher.Client
-		psact     string
-	}{
-		{"1 Node all roles " + provisioning.AdminClientName.String(), nodeRoles0, r.client, r.psact},
-		{"1 Node all roles " + provisioning.StandardClientName.String(), nodeRoles0, r.standardUserClient, r.psact},
-		{"2 nodes - etcd/cp roles per 1 node " + provisioning.AdminClientName.String(), nodeRoles1, r.client, r.psact},
-		{"2 nodes - etcd/cp roles per 1 node " + provisioning.StandardClientName.String(), nodeRoles1, r.standardUserClient, r.psact},
-		{"3 nodes - 1 role per node " + provisioning.AdminClientName.String(), nodeRoles2, r.client, r.psact},
-		{"3 nodes - 1 role per node " + provisioning.StandardClientName.String(), nodeRoles2, r.standardUserClient, r.psact},
-	}
-
-	var name string
-	for _, tt := range tests {
-		subSession := r.session.NewSession()
-		defer subSession.Cleanup()
-
-		client, err := tt.client.WithSession(subSession)
-		require.NoError(r.T(), err)
-
-		for _, providerName := range r.providers {
-			provider := CreateProvider(providerName)
-			providerName := " Node Provider: " + provider.Name
-			for _, kubeVersion := range r.kubernetesVersions {
-				for _, cni := range r.cnis {
-					nodeTemplate, err := provider.NodeTemplateFunc(client)
-					require.NoError(r.T(), err)
-
-					name = tt.name + providerName.String() + " Kubernetes version: " + kubeVersion + " cni: " + cni
-					r.Run(name, func() {
-						TestProvisioningRKE1Cluster(r.T(), client, provider, tt.nodeRoles, tt.psact, kubeVersion, cni, nodeTemplate, r.advancedOptions)
-						require.NoError(r.T(), err)
-
-					})
-				}
-			}
-		}
-	}
-}
-
-func (r *RKE1NodeDriverProvisioningTestSuite) TestProvisioningRKE1ClusterDynamicInput() {
+func (r *RKE1ScalingTestSuite) TestScalingRKE1NodePools() {
 	clustersConfig := new(provisioning.Config)
 	config.LoadConfig(provisioning.ConfigurationFileKey, clustersConfig)
 	nodesAndRoles := clustersConfig.NodesAndRolesRKE1
@@ -195,16 +106,16 @@ func (r *RKE1NodeDriverProvisioningTestSuite) TestProvisioningRKE1ClusterDynamic
 			provider := CreateProvider(providerName)
 			providerName := " Node Provider: " + provider.Name.String()
 			for _, kubeVersion := range r.kubernetesVersions {
+				name = tt.name + providerName + " Kubernetes version: " + kubeVersion
 				for _, cni := range r.cnis {
 					nodeTemplate, err := provider.NodeTemplateFunc(client)
 					require.NoError(r.T(), err)
 
-					name = tt.name + providerName + " Kubernetes version: " + kubeVersion + " cni: " + cni
-					r.Run(name, func() {
-						TestProvisioningRKE1Cluster(r.T(), client, provider, nodesAndRoles, tt.psact, kubeVersion, cni, nodeTemplate, r.advancedOptions)
-						require.NoError(r.T(), err)
+					name += " cni: " + cni
+					cluster, err := TestProvisioningRKE1Cluster(r.T(), client, provider, nodesAndRoles, tt.psact, kubeVersion, cni, nodeTemplate, r.advancedOptions)
+					require.NoError(r.T(), err)
 
-					})
+					TestScalingRKE1NodePools(r.T(), client, cluster, nodesAndRoles, nodeTemplate)
 				}
 			}
 		}
@@ -213,6 +124,6 @@ func (r *RKE1NodeDriverProvisioningTestSuite) TestProvisioningRKE1ClusterDynamic
 
 // In order for 'go test' to run this suite, we need to create
 // a normal test function and pass our suite to suite.Run
-func TestRKE1ProvisioningTestSuite(t *testing.T) {
-	suite.Run(t, new(RKE1NodeDriverProvisioningTestSuite))
+func TestRKE1ScalingTestSuite(t *testing.T) {
+	suite.Run(t, new(RKE1ScalingTestSuite))
 }

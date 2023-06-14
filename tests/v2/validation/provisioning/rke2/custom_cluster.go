@@ -31,7 +31,7 @@ const (
 	namespace = "fleet-default"
 )
 
-func TestProvisioningRKE2CustomCluster(t *testing.T, client *rancher.Client, externalNodeProvider provisioning.ExternalNodeProvider, nodesAndRoles []machinepools.NodeRoles, psact, kubeVersion, cni string, hardened bool, advancedOptions provisioning.AdvancedOptions) {
+func TestProvisioningRKE2CustomCluster(t *testing.T, client *rancher.Client, externalNodeProvider provisioning.ExternalNodeProvider, nodesAndRoles []machinepools.NodeRoles, psact, kubeVersion, cni string, hardened bool, advancedOptions provisioning.AdvancedOptions) (*v1.SteveAPIObject, error) {
 	rolesPerNode := []string{}
 	quantityPerPool := []int32{}
 	rolesPerPool := []string{}
@@ -55,6 +55,7 @@ func TestProvisioningRKE2CustomCluster(t *testing.T, client *rancher.Client, ext
 			rolesPerNode = append(rolesPerNode, finalRoleCommand)
 		}
 	}
+
 	adminClient, err := rancher.NewClient(client.RancherConfig.AdminToken, client.Session)
 	require.NoError(t, err)
 
@@ -156,4 +157,6 @@ func TestProvisioningRKE2CustomCluster(t *testing.T, client *rancher.Client, ext
 	podResults, podErrors := pods.StatusPods(client, clusterIDName)
 	assert.NotEmpty(t, podResults)
 	assert.Empty(t, podErrors)
+
+	return clusterResp, nil
 }

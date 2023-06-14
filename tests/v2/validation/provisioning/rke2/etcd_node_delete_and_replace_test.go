@@ -81,7 +81,8 @@ func (e *EtcdNodeDeleteAndReplace) TestEtcdNodeDeletionAndReplacement() {
 		for _, k8sVersion := range e.rke2kubernetesVersions {
 			for _, cni := range e.cnis {
 				provider := CreateProvider(provider)
-				clusterResp := TestProvisioningRKE2Cluster(e.T(), client, provider, e.nodesAndRoles, k8sVersion, cni, e.psact, e.advancedOptions)
+				clusterResp, _, _, err := TestProvisioningRKE2Cluster(e.T(), client, provider, e.nodesAndRoles, k8sVersion, cni, e.psact, e.advancedOptions)
+				require.NoError(e.T(), err)
 
 				query, err := url.ParseQuery(fmt.Sprintf("fieldSelector=metadata.namespace=%s", e.ns))
 				require.NoError(e.T(), err)

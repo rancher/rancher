@@ -26,7 +26,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func TestProvisioningK3SCustomCluster(t *testing.T, client *rancher.Client, externalNodeProvider provisioning.ExternalNodeProvider, nodesAndRoles []machinepools.NodeRoles, kubeVersion string, hardened bool, psact string, advancedOptions provisioning.AdvancedOptions) {
+func TestProvisioningK3SCustomCluster(t *testing.T, client *rancher.Client, externalNodeProvider provisioning.ExternalNodeProvider, nodesAndRoles []machinepools.NodeRoles, kubeVersion string, hardened bool, psact string, advancedOptions provisioning.AdvancedOptions) (*v1.SteveAPIObject, error) {
+
 	namespace := "fleet-default"
 	rolesPerNode := []string{}
 	quantityPerPool := []int32{}
@@ -134,4 +135,6 @@ func TestProvisioningK3SCustomCluster(t *testing.T, client *rancher.Client, exte
 	podResults, podErrors := pods.StatusPods(client, clusterIDName)
 	assert.NotEmpty(t, podResults)
 	assert.Empty(t, podErrors)
+
+	return clusterResp, nil
 }
