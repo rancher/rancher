@@ -486,5 +486,4 @@ func VerifySSHTests(t *testing.T, client *rancher.Client, clusterObject *steveV1
 
 		}
 	}
-
 }

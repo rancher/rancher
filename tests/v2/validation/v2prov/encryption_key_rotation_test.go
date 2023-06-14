@@ -1,3 +1,5 @@
+//go:build (validation || infra.rke2k3s || cluster.any || stress) && !infra.any && !infra.aks && !infra.eks && !infra.gke && !infra.rke1 && !sanity && !extended
+
 package v2prov
 
 import (
@@ -14,6 +16,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/kubeapi"
 	"github.com/rancher/rancher/tests/framework/extensions/kubeapi/secrets"
+	"github.com/rancher/rancher/tests/framework/pkg/environmentflag"
 	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
@@ -63,6 +66,34 @@ func (r *V2ProvEncryptionKeyRotationTestSuite) SetupSuite() {
 	r.clusterName = r.client.RancherConfig.ClusterName
 }
 
+func setEncryptSecret(t *testing.T, client *rancher.Client, steveID string) {
+	t.Logf("Set secret encryption key for cluster %s", steveID)
+
+	cluster, err := client.Steve.SteveType(clusters.ProvisioningSteveResourceType).ByID(steveID)
+	require.NoError(t, err)
+
+	clusterSpec := &apiv1.ClusterSpec{}
+	err = v1.ConvertToK8sType(cluster.Spec, clusterSpec)
+	require.NoError(t, err)
+
+	updatedCluster := *cluster
+
+	secretEncryption := clusterSpec.RKEConfig.MachineGlobalConfig.Data["secrets-encryption"]
+	if secretEncryption == nil {
+		clusterSpec.RKEConfig.MachineGlobalConfig.Data["secrets-encryption"] = true
+
+		updatedCluster.Spec = *clusterSpec
+
+		cluster, err = client.Steve.SteveType(clusters.ProvisioningSteveResourceType).Update(cluster, updatedCluster)
+		require.NoError(t, err)
+
+		err = clusters.WatchAndWaitForCluster(client, steveID)
+		require.NoError(t, err)
+
+		t.Logf("Successfully set secret encryption key for %s", cluster.ObjectMeta.Name)
+	}
+}
+
 func rotateEncryptionKeys(t *testing.T, client *rancher.Client, steveID string, generation int64, timeout time.Duration) {
 	t.Logf("Applying encryption key rotation generation %d for cluster %s", generation, steveID)
 
@@ -88,7 +119,7 @@ func rotateEncryptionKeys(t *testing.T, client *rancher.Client, steveID string, 
 	require.NoError(t, err)
 
 	for _, phase := range phases {
-		err = kwait.Poll(10*time.Second, timeout, IsAtLeast(t, client, namespace, cluster.ObjectMeta.Name, phase))
+		err = kwait.Poll(10*time.Second, timeout, isAtLeast(t, client, namespace, cluster.ObjectMeta.Name, phase))
 		require.NoError(t, err)
 	}
 
@@ -136,20 +167,24 @@ func (r *V2ProvEncryptionKeyRotationTestSuite) TestEncryptionKeyRotation() {
 	id, err := clusters.GetV1ProvisioningClusterByName(r.client, r.clusterName)
 	require.NoError(r.T(), err)
 
+	setEncryptSecret(r.T(), r.client, id)
+
 	prefix := "encryption-key-rotation-"
 	r.Run(prefix+"new-cluster", func() {
 		rotateEncryptionKeys(r.T(), r.client, id, 1, 10*time.Minute)
 	})
 
-	// create 10k secrets for stress test, takes ~30 minutes
-	createSecretsForCluster(r.T(), r.client, id, totalSecrets)
+	if r.client.Flags.GetValue(environmentflag.Long) {
+		// create 10k secrets for stress test, takes ~30 minutes
+		createSecretsForCluster(r.T(), r.client, id, totalSecrets)
 
-	r.Run(prefix+"stress-test", func() {
-		rotateEncryptionKeys(r.T(), r.client, id, 2, 1*time.Hour) // takes ~45 minutes for HA
-	})
+		r.Run(prefix+"stress-test", func() {
+			rotateEncryptionKeys(r.T(), r.client, id, 2, 1*time.Hour) // takes ~45 minutes for HA
+		})
+	}
 }
 
-func IsAtLeast(t *testing.T, client *rancher.Client, namespace, name string, phase rkev1.RotateEncryptionKeysPhase) kwait.ConditionFunc {
+func isAtLeast(t *testing.T, client *rancher.Client, namespace, name string, phase rkev1.RotateEncryptionKeysPhase) kwait.ConditionFunc {
 	return func() (ready bool, err error) {
 		kubeRKEClient, err := client.GetKubeAPIRKEClient()
 		if err != nil {

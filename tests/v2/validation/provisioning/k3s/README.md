@@ -52,6 +52,9 @@ provisioningInput is needed to the run the K3S tests, specifically kubernetesVer
         "nodeNamePrefix": "qa",
       },
     ],
+    "flags": {
+      "desiredflags": "Long" //These flags are for running TestProvisioningK3SCluster or TestProvisioningK3SCustomCluster it is not needed for the dynamic tests. Long will run the full table, where as short will run the short version of this test.
+    },
     "k3sKubernetesVersion": ["v1.26.8+k3s1"],
     "providers": ["linode", "aws", "azure", "harvester"],
     "nodeProviders": ["ec2"],

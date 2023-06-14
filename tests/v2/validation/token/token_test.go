@@ -1,3 +1,5 @@
+//go:build (validation || infra.any || cluster.any || sanity) && !stress
+
 package token
 
 import (
@@ -16,6 +18,7 @@ import (
 const (
 	initialTokenDesc = "my-token"
 	updatedTokenDesc = "changed-token"
+	localClusterID   = "local"
 )
 
 type TokenTestSuite struct {
@@ -46,7 +49,7 @@ func (t *TokenTestSuite) TestPatchToken() {
 
 	assert.Equal(t.T(), initialTokenDesc, createdToken.Description)
 
-	patchedToken, unstructuredRes, err := tokens.PatchToken(t.client, t.client.RancherConfig.ClusterName, createdToken.Name, "replace", "/description", updatedTokenDesc)
+	patchedToken, unstructuredRes, err := tokens.PatchToken(t.client, localClusterID, createdToken.Name, "replace", "/description", updatedTokenDesc)
 	require.NoError(t.T(), err)
 
 	assert.Equal(t.T(), updatedTokenDesc, patchedToken.Description)

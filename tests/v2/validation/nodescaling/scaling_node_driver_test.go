@@ -1,3 +1,5 @@
+//go:build (validation || infra.rke2k3s || cluster.nodedriver || extended) && !infra.any && !infra.aks && !infra.eks && !infra.gke && !infra.rke1 && !cluster.any && !cluster.custom && !sanity && !stress
+
 package nodescaling
 
 import (
@@ -13,18 +15,18 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-type K3SNodeScalingTestSuite struct {
+type NodeScalingTestSuite struct {
 	suite.Suite
 	client        *rancher.Client
 	session       *session.Session
 	scalingConfig *scalinginput.Config
 }
 
-func (s *K3SNodeScalingTestSuite) TearDownSuite() {
+func (s *NodeScalingTestSuite) TearDownSuite() {
 	s.session.Cleanup()
 }
 
-func (s *K3SNodeScalingTestSuite) SetupSuite() {
+func (s *NodeScalingTestSuite) SetupSuite() {
 	testSession := session.NewSession()
 	s.session = testSession
 
@@ -37,7 +39,7 @@ func (s *K3SNodeScalingTestSuite) SetupSuite() {
 	s.client = client
 }
 
-func (s *K3SNodeScalingTestSuite) TestScalingK3SNodePools() {
+func (s *NodeScalingTestSuite) TestScalingNodePools() {
 	nodeRolesEtcd := machinepools.NodeRoles{
 		Etcd:     true,
 		Quantity: 1,
@@ -74,24 +76,24 @@ func (s *K3SNodeScalingTestSuite) TestScalingK3SNodePools() {
 		require.NoError(s.T(), err)
 
 		s.Run(tt.name, func() {
-			ScalingRKE2K3SNodePools(s.T(), s.client, clusterID, tt.nodeRoles)
+			scalingRKE2K3SNodePools(s.T(), s.client, clusterID, tt.nodeRoles)
 		})
 	}
 }
 
-func (s *K3SNodeScalingTestSuite) TestScalingK3SNodePoolsDynamicInput() {
-	if s.scalingConfig.MachinePools.NodeRoles == nil {
+func (s *NodeScalingTestSuite) TestScalingNodePoolsDynamicInput() {
+	if s.scalingConfig.MachinePools == nil {
 		s.T().Skip()
 	}
 
 	clusterID, err := clusters.GetV1ProvisioningClusterByName(s.client, s.client.RancherConfig.ClusterName)
 	require.NoError(s.T(), err)
 
-	ScalingRKE2K3SNodePools(s.T(), s.client, clusterID, *s.scalingConfig.MachinePools.NodeRoles)
+	scalingRKE2K3SNodePools(s.T(), s.client, clusterID, *s.scalingConfig.MachinePools.NodeRoles)
 }
 
 // In order for 'go test' to run this suite, we need to create
 // a normal test function and pass our suite to suite.Run
-func TestK3SNodeScalingTestSuite(t *testing.T) {
-	suite.Run(t, new(K3SNodeScalingTestSuite))
+func TestNodeScalingTestSuite(t *testing.T) {
+	suite.Run(t, new(NodeScalingTestSuite))
 }

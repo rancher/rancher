@@ -54,15 +54,22 @@ func PostRancherInstall(adminClient *rancher.Client, adminPassword string) error
 
 	UpdateEULA(adminClient, clusterID)
 
-	userList, err := adminClient.Management.User.List(&types.ListOpts{
-		Filters: map[string]interface{}{
-			"username": "admin",
-		},
+	var userList *management.UserCollection
+	err = kwait.Poll(500*time.Millisecond, 2*time.Minute, func() (done bool, err error) {
+		userList, err = adminClient.Management.User.List(&types.ListOpts{
+			Filters: map[string]interface{}{
+				"username": "admin",
+			},
+		})
+		if err != nil {
+			return false, err
+		} else if len(userList.Data) == 0 {
+			return false, nil
+		}
+		return true, nil
 	})
 	if err != nil {
 		return err
-	} else if len(userList.Data) == 0 {
-		return fmt.Errorf("admin user not found")
 	}
 
 	adminUser := &userList.Data[0]

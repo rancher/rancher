@@ -49,6 +49,9 @@ provisioningInput is needed to the run the RKE1 tests, specifically kubernetesVe
         "nodeNamePrefix": "qa",
       },
     ],
+    "flags": {
+      "desiredflags": "Long" //These flags are for running TestProvisioningRKE1Cluster or TestProvisioningRKE1CustomCluster it is not needed for the dynamic tests. Long will run the full table, where as short will run the short version of this test.
+    },
     "rke1KubernetesVersion": ["v1.26.8-rancher1-1"],
     "providers": ["linode", "aws", "azure", "harvester"],
     "nodeProviders": ["ec2"],

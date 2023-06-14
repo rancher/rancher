@@ -1,3 +1,5 @@
+//go:build (validation || stress) && !infra.any && !infra.aks && !infra.eks && !infra.rke2k3s && !infra.gke && !infra.rke1 && !cluster.any && !cluster.custom && !cluster.nodedriver && !sanity && !extended
+
 package hostnametruncation
 
 import (
@@ -113,6 +115,6 @@ func (r *HostnameTruncationTestSuite) TestProvisioningRKE2ClusterTruncation() {
 
 // In order for 'go test' to run this suite, we need to create
 // a normal test function and pass our suite to suite.Run
-func TestHostnameTruncationTestSuite(t *testing.T) {
+func TestProvisioningHostnameTruncationTestSuite(t *testing.T) {
 	suite.Run(t, new(HostnameTruncationTestSuite))
 }

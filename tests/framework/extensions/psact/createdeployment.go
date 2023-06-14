@@ -2,6 +2,7 @@ package psact
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
@@ -16,11 +17,12 @@ import (
 )
 
 const (
-	containerName  = "nginx"
-	deploymentName = "nginx"
-	imageName      = "nginx"
-	namespace      = "default"
-	workload       = "workload"
+	containerName     = "nginx"
+	deploymentName    = "nginx"
+	imageName         = "nginx"
+	namespace         = "default"
+	workload          = "workload"
+	podFailureMessage = `forbidden: violates PodSecurity "restricted:latest"`
 )
 
 // CreateTestDeployment will create an nginx deployment into the default namespace. If the PSACT value is rancher-privileged, then the
@@ -68,11 +70,15 @@ func CreateNginxDeployment(client *rancher.Client, clusterID string, psact strin
 			return false, err
 		}
 
-		if *deployment.Spec.Replicas == deployment.Status.AvailableReplicas && (psact == string(provisioninginput.RancherPrivileged) || psact == string(provisioninginput.RancherBaseline)) {
+		if psact == string(provisioninginput.RancherRestricted) {
+			for _, condition := range deployment.Status.Conditions {
+				if strings.Contains(condition.Message, podFailureMessage) {
+					logrus.Infof("Deployment %s failed to create; this is expected for %s!", deployment.Name, psact)
+					return true, nil
+				}
+			}
+		} else if *deployment.Spec.Replicas == deployment.Status.AvailableReplicas {
 			logrus.Infof("Deployment %s successfully created; this is expected for %s!", deployment.Name, psact)
-			return true, nil
-		} else if *deployment.Spec.Replicas != deployment.Status.AvailableReplicas && psact == string(provisioninginput.RancherRestricted) {
-			logrus.Infof("Deployment %s failed to create; this is expected for %s!", deployment.Name, psact)
 			return true, nil
 		}
 

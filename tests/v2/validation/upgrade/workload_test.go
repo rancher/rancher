@@ -1,3 +1,5 @@
+//go:build validation
+
 package upgrade
 
 import (
