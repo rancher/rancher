@@ -284,7 +284,7 @@ func (rt *RegistryTestSuite) TestRegistriesK3S() {
 			clusterObject, err := provisioning.CreateProvisioningCluster(subClient, *k3sProvider, testConfig, nil)
 			require.NoError(rt.T(), err)
 
-			provisioning.VerifyCluster(rt.T(), subClient, clusterObject)
+			provisioning.VerifyCluster(rt.T(), subClient, testConfig, clusterObject)
 		})
 	}
 
@@ -299,7 +299,7 @@ func (rt *RegistryTestSuite) TestRegistriesK3S() {
 		clusterObject, err := provisioning.CreateProvisioningCluster(subClient, *k3sProvider, testConfig, nil)
 		require.NoError(rt.T(), err)
 
-		provisioning.VerifyCluster(rt.T(), subClient, clusterObject)
+		provisioning.VerifyCluster(rt.T(), subClient, testConfig, clusterObject)
 	}
 
 	podResults, podErrors := pods.StatusPods(rt.client, rt.clusterLocalID)
@@ -334,7 +334,7 @@ func (rt *RegistryTestSuite) TestRegistriesRKE2() {
 			clusterObject, err := provisioning.CreateProvisioningCluster(subClient, *rke2Provider, testConfig, nil)
 			require.NoError(rt.T(), err)
 
-			provisioning.VerifyCluster(rt.T(), subClient, clusterObject)
+			provisioning.VerifyCluster(rt.T(), subClient, testConfig, clusterObject)
 		})
 	}
 	if rt.rancherUsesRegistry {
@@ -348,7 +348,7 @@ func (rt *RegistryTestSuite) TestRegistriesRKE2() {
 		clusterObject, err := provisioning.CreateProvisioningCluster(subClient, *rke2Provider, testConfig, nil)
 		require.NoError(rt.T(), err)
 
-		provisioning.VerifyCluster(rt.T(), subClient, clusterObject)
+		provisioning.VerifyCluster(rt.T(), subClient, testConfig, clusterObject)
 	}
 
 	podResults, podErrors := pods.StatusPods(rt.client, rt.clusterLocalID)
