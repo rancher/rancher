@@ -2,6 +2,7 @@ package feature
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"time"
 
@@ -65,9 +66,7 @@ func (h *handler) syncHarvesterFeature(obj *v3.Feature) error {
 		objCopy.Annotations = make(map[string]string)
 	}
 
-	if val, ok := objCopy.Annotations[v3.ExperimentalFeatureKey]; !ok || val != v3.ExperimentalFeatureValue {
-		objCopy.Annotations[v3.ExperimentalFeatureKey] = v3.ExperimentalFeatureValue
-	}
+	objCopy.Annotations[v3.ExperimentalFeatureKey] = v3.ExperimentalFeatureValue
 
 	if !reflect.DeepEqual(obj, objCopy) {
 		_, err := h.featuresClient.Update(objCopy)
@@ -78,7 +77,7 @@ func (h *handler) syncHarvesterFeature(obj *v3.Feature) error {
 	if features.GetFeatureByName(obj.Name).Enabled() {
 		harvesterFeature, err := h.featuresClient.Get(features.Harvester.Name(), metav1.GetOptions{})
 		if err != nil {
-			return err
+			return fmt.Errorf("error fetching feature %s: %w", features.Harvester.Name(), err)
 		}
 		harvesterFeatureCopy := harvesterFeature.DeepCopy()
 		if !*harvesterFeatureCopy.Spec.Value {
@@ -86,7 +85,7 @@ func (h *handler) syncHarvesterFeature(obj *v3.Feature) error {
 		}
 		if !reflect.DeepEqual(harvesterFeature, harvesterFeatureCopy) {
 			_, err := h.featuresClient.Update(harvesterFeatureCopy)
-			return err
+			return fmt.Errorf("error updating Harvester feature %s: %w", obj.Name, err)
 		}
 	}
 
