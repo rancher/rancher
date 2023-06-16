@@ -113,15 +113,8 @@ run_rancher &
 RANCHER_RUN_PID=$!
 trap cleanup exit
 
-echo Sleeping for 5 seconds before checking Rancher health
-sleep 5
-
-while ! curl -sf http://localhost:8080/ping; do
-    sleep 2
-done
-
-# Echo a newline to handle the "pong" from the above ping
-echo ""
+echo "Waiting for Rancher to be healthy"
+./scripts/await --sleep 2 --timeout 300 "curl -sf -o /dev/null http://localhost:8080/ping"
 
 echo "Waiting up to 5 minutes for rancher-webhook deployment"
 ./scripts/await \

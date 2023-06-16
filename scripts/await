@@ -26,7 +26,9 @@ print_usage() {
 }
 
 print_progress() {
-  echo "$message" | sed "s/{{attempts}}/$attempts/g; s/{{elapsed}}/$elapsedSeconds/g"
+  if [ -n "$message" ]; then
+    echo "$message" | sed "s/{{attempts}}/$attempts/g; s/{{elapsed}}/$elapsedSeconds/g"
+  fi
 }
 
 # Parse options and arguments

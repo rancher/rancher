@@ -161,10 +161,6 @@ func getPod(clients *clients.Clients) (*corev1.Pod, error) {
 							Value: "/etc/auth/htpasswd",
 						},
 						{
-							Name:  "REGISTRY_PROXY_REMOTEURL",
-							Value: "https://registry-1.docker.io",
-						},
-						{
 							Name:  "REGISTRY_HTTP_TLS_CERTIFICATE",
 							Value: "/etc/auth/tls.crt",
 						},
