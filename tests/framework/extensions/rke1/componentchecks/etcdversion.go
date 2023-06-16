@@ -1,7 +1,6 @@
 package componentchecks
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
@@ -30,7 +29,7 @@ func CheckETCDVersion(client *rancher.Client, nodes []*nodes.Node, clusterID str
 		if etcdRole == "true" {
 			for _, node := range nodes {
 				if strings.Contains(node.PublicIPAddress, externalIP) {
-					command := fmt.Sprint("docker exec etcd etcdctl version")
+					command := "docker exec etcd etcdctl version"
 					output, err := node.ExecuteCommand(command)
 					if err != nil {
 						return []string{}, err

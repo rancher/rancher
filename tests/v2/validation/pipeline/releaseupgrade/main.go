@@ -6,9 +6,9 @@ import (
 
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	"github.com/rancher/rancher/tests/framework/extensions/pipeline"
+	"github.com/rancher/rancher/tests/framework/extensions/provisioninginput"
 	"github.com/rancher/rancher/tests/framework/pkg/config"
 	"github.com/rancher/rancher/tests/framework/pkg/environmentflag"
-	"github.com/rancher/rancher/tests/v2/validation/provisioning"
 	"github.com/rancher/rancher/tests/v2/validation/upgrade"
 	"github.com/sirupsen/logrus"
 )
@@ -211,11 +211,11 @@ func main() {
 		var newConfigName config.ConfigFileName
 
 		switch v.Provider {
-		case provisioning.AWSProviderName.String():
+		case provisioninginput.AWSProviderName.String():
 			newConfigName = config.NewConfigFileName(dirName, v.Provider, eksFileName, fmt.Sprint(i))
-		case provisioning.AzureProviderName.String():
+		case provisioninginput.AzureProviderName.String():
 			newConfigName = config.NewConfigFileName(dirName, v.Provider, aksFileName, fmt.Sprint(i))
-		case provisioning.GoogleProviderName.String():
+		case provisioninginput.GoogleProviderName.String():
 			newConfigName = config.NewConfigFileName(dirName, v.Provider, gkeFileName, fmt.Sprint(i))
 		default:
 			continue
@@ -230,19 +230,19 @@ func main() {
 		hostedTestPackage := "provisioning/hosted/"
 
 		switch v.Provider {
-		case provisioning.AWSProviderName.String():
+		case provisioninginput.AWSProviderName.String():
 			config.LoadAndUpdateConfig(pipeline.TestCasesConfigKey, testCases, func() {
 				testCases.ProvisioningTestPackage = hostedTestPackage + "eks"
 				runCommand := "TestHostedEKSClusterProvisioningTestSuite/TestProvisioningHostedEKS"
 				testCases.ProvisioningTestCase = pipeline.WrapWithAdminRunCommand(runCommand)
 			})
-		case provisioning.AzureProviderName.String():
+		case provisioninginput.AzureProviderName.String():
 			config.LoadAndUpdateConfig(pipeline.TestCasesConfigKey, testCases, func() {
 				testCases.ProvisioningTestPackage = hostedTestPackage + "aks"
 				runCommand := "TestHostedAKSClusterProvisioningTestSuite/TestProvisioningHostedAKS"
 				testCases.ProvisioningTestCase = pipeline.WrapWithAdminRunCommand(runCommand)
 			})
-		case provisioning.GoogleProviderName.String():
+		case provisioninginput.GoogleProviderName.String():
 			config.LoadAndUpdateConfig(pipeline.TestCasesConfigKey, testCases, func() {
 				testCases.ProvisioningTestPackage = hostedTestPackage + "gke"
 				runCommand := "TestHostedGKEClusterProvisioningTestSuite/TestProvisioningHostedGKE"
@@ -278,8 +278,8 @@ func NewRancherClusterConfiguration(cluster pipeline.RancherCluster, newConfigNa
 		return err
 	}
 
-	provisioningConfig := new(provisioning.Config)
-	config.LoadAndUpdateConfig(provisioning.ConfigurationFileKey, provisioningConfig, func() {
+	provisioningConfig := new(provisioninginput.Config)
+	config.LoadAndUpdateConfig(provisioninginput.ConfigurationFileKey, provisioningConfig, func() {
 		provisioningConfig.CNIs = []string{cni}
 		if isRKE1 {
 			provisioningConfig.RKE1KubernetesVersions = []string{cluster.KubernetesVersion}

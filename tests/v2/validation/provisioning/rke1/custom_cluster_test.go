@@ -7,13 +7,14 @@ import (
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters/kubernetesversions"
+	"github.com/rancher/rancher/tests/framework/extensions/provisioninginput"
 	nodepools "github.com/rancher/rancher/tests/framework/extensions/rke1/nodepools"
 	"github.com/rancher/rancher/tests/framework/extensions/users"
 	password "github.com/rancher/rancher/tests/framework/extensions/users/passwordgenerator"
 	"github.com/rancher/rancher/tests/framework/pkg/config"
 	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
-	"github.com/rancher/rancher/tests/v2/validation/provisioning"
+	"github.com/rancher/rancher/tests/v2/validation/provisioning/permutations"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
@@ -23,11 +24,7 @@ type CustomClusterProvisioningTestSuite struct {
 	client             *rancher.Client
 	session            *session.Session
 	standardUserClient *rancher.Client
-	kubernetesVersions []string
-	cnis               []string
-	nodeProviders      []string
-	psact              string
-	advancedOptions    provisioning.AdvancedOptions
+	clustersConfig     *provisioninginput.Config
 }
 
 func (c *CustomClusterProvisioningTestSuite) TearDownSuite() {
@@ -38,21 +35,15 @@ func (c *CustomClusterProvisioningTestSuite) SetupSuite() {
 	testSession := session.NewSession()
 	c.session = testSession
 
-	clustersConfig := new(provisioning.Config)
-	config.LoadConfig(provisioning.ConfigurationFileKey, clustersConfig)
-
-	c.kubernetesVersions = clustersConfig.RKE1KubernetesVersions
-	c.cnis = clustersConfig.CNIs
-	c.nodeProviders = clustersConfig.NodeProviders
-	c.psact = clustersConfig.PSACT
-	c.advancedOptions = clustersConfig.AdvancedOptions
+	c.clustersConfig = new(provisioninginput.Config)
+	config.LoadConfig(provisioninginput.ConfigurationFileKey, c.clustersConfig)
 
 	client, err := rancher.NewClient("", testSession)
 	require.NoError(c.T(), err)
 
 	c.client = client
 
-	c.kubernetesVersions, err = kubernetesversions.Default(c.client, clusters.RKE1ClusterType.String(), c.kubernetesVersions)
+	c.clustersConfig.RKE1KubernetesVersions, err = kubernetesversions.Default(c.client, clusters.RKE1ClusterType.String(), c.clustersConfig.RKE1KubernetesVersions)
 	require.NoError(c.T(), err)
 
 	enabled := true
@@ -77,88 +68,46 @@ func (c *CustomClusterProvisioningTestSuite) SetupSuite() {
 }
 
 func (c *CustomClusterProvisioningTestSuite) TestProvisioningRKE1CustomCluster() {
-	nodeRolesAll := []nodepools.NodeRoles{provisioning.RKE1AllRolesPool}
-	nodeRolesShared := []nodepools.NodeRoles{provisioning.RKE1EtcdControlPlanePool, provisioning.RKE1WorkerPool}
-	nodeRolesDedicated := []nodepools.NodeRoles{provisioning.RKE1EtcdPool, provisioning.RKE1ControlPlanePool, provisioning.RKE1WorkerPool}
+	nodeRolesAll := []nodepools.NodeRoles{provisioninginput.RKE1AllRolesPool}
+	nodeRolesShared := []nodepools.NodeRoles{provisioninginput.RKE1EtcdControlPlanePool, provisioninginput.RKE1WorkerPool}
+	nodeRolesDedicated := []nodepools.NodeRoles{provisioninginput.RKE1EtcdPool, provisioninginput.RKE1ControlPlanePool, provisioninginput.RKE1WorkerPool}
 
-	require.GreaterOrEqual(c.T(), len(c.cnis), 1)
+	require.GreaterOrEqual(c.T(), len(c.clustersConfig.CNIs), 1)
 
 	tests := []struct {
 		name      string
 		nodeRoles []nodepools.NodeRoles
 		client    *rancher.Client
-		psact     string
 	}{
-		{"1 Node all roles " + provisioning.AdminClientName.String(), nodeRolesAll, c.client, c.psact},
-		{"1 Node all roles " + provisioning.StandardClientName.String(), nodeRolesAll, c.standardUserClient, c.psact},
-		{"2 nodes - etcd/cp roles per 1 node " + provisioning.AdminClientName.String(), nodeRolesShared, c.client, c.psact},
-		{"2 nodes - etcd/cp roles per 1 node " + provisioning.StandardClientName.String(), nodeRolesShared, c.standardUserClient, c.psact},
-		{"3 nodes - 1 role per node " + provisioning.AdminClientName.String(), nodeRolesDedicated, c.client, c.psact},
-		{"3 nodes - 1 role per node " + provisioning.StandardClientName.String(), nodeRolesDedicated, c.standardUserClient, c.psact},
+		{"1 Node all roles " + provisioninginput.AdminClientName.String(), nodeRolesAll, c.client},
+		{"1 Node all roles " + provisioninginput.StandardClientName.String(), nodeRolesAll, c.standardUserClient},
+		{"2 nodes - etcd/cp roles per 1 node " + provisioninginput.AdminClientName.String(), nodeRolesShared, c.client},
+		{"2 nodes - etcd/cp roles per 1 node " + provisioninginput.StandardClientName.String(), nodeRolesShared, c.standardUserClient},
+		{"3 nodes - 1 role per node " + provisioninginput.AdminClientName.String(), nodeRolesDedicated, c.client},
+		{"3 nodes - 1 role per node " + provisioninginput.StandardClientName.String(), nodeRolesDedicated, c.standardUserClient},
 	}
-
-	var name string
 	for _, tt := range tests {
-		testSession := session.NewSession()
-		defer testSession.Cleanup()
-
-		client, err := tt.client.WithSession(testSession)
-		require.NoError(c.T(), err)
-
-		for _, nodeProviderName := range c.nodeProviders {
-			externalNodeProvider := provisioning.ExternalNodeProviderSetup(nodeProviderName)
-			providerName := " Node Provider: " + nodeProviderName
-			for _, kubeVersion := range c.kubernetesVersions {
-				for _, cni := range c.cnis {
-					name = tt.name + providerName + " Kubernetes version: " + kubeVersion + " cni: " + cni
-					c.Run(name, func() {
-						TestProvisioningRKE1CustomCluster(c.T(), client, externalNodeProvider, tt.nodeRoles, tt.psact, kubeVersion, cni, c.advancedOptions)
-					})
-				}
-			}
-		}
+		c.clustersConfig.NodesAndRolesRKE1 = tt.nodeRoles
+		permutations.RunTestPermutations(&c.Suite, tt.name, tt.client, c.clustersConfig, permutations.RKE1CustomCluster, nil, nil)
 	}
 }
 
 func (c *CustomClusterProvisioningTestSuite) TestProvisioningRKE1CustomClusterDynamicInput() {
-	require.GreaterOrEqual(c.T(), len(c.cnis), 1)
+	require.GreaterOrEqual(c.T(), len(c.clustersConfig.CNIs), 1)
 
-	clustersConfig := new(provisioning.Config)
-	config.LoadConfig(provisioning.ConfigurationFileKey, clustersConfig)
-	nodesAndRoles := clustersConfig.NodesAndRolesRKE1
-
-	if len(nodesAndRoles) == 0 {
+	if len(c.clustersConfig.NodesAndRolesRKE1) == 0 {
 		c.T().Skip()
 	}
 
 	tests := []struct {
 		name   string
 		client *rancher.Client
-		psact  string
 	}{
-		{provisioning.AdminClientName.String(), c.client, c.psact},
-		{provisioning.StandardClientName.String(), c.standardUserClient, c.psact},
+		{provisioninginput.AdminClientName.String(), c.client},
+		{provisioninginput.StandardClientName.String(), c.standardUserClient},
 	}
-
-	var name string
 	for _, tt := range tests {
-		testSession := session.NewSession()
-		defer testSession.Cleanup()
-
-		client, err := tt.client.WithSession(testSession)
-		require.NoError(c.T(), err)
-
-		for _, nodeProviderName := range c.nodeProviders {
-			externalNodeProvider := provisioning.ExternalNodeProviderSetup(nodeProviderName)
-			for _, kubeVersion := range c.kubernetesVersions {
-				for _, cni := range c.cnis {
-					name = tt.name + " Kubernetes version: " + kubeVersion + " cni: " + cni
-					c.Run(name, func() {
-						TestProvisioningRKE1CustomCluster(c.T(), client, externalNodeProvider, nodesAndRoles, tt.psact, kubeVersion, cni, c.advancedOptions)
-					})
-				}
-			}
-		}
+		permutations.RunTestPermutations(&c.Suite, tt.name, tt.client, c.clustersConfig, permutations.RKE1CustomCluster, nil, nil)
 	}
 }
 
