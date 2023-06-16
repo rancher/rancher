@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	apiv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
@@ -26,7 +27,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/watch"
+	kwait "k8s.io/apimachinery/pkg/util/wait"
 )
 
 type RKE2EncryptionKeyRotationTestSuite struct {
@@ -110,7 +111,7 @@ func (r *RKE2EncryptionKeyRotationTestSuite) TestEncryptionKeyRotationFreshClust
 		require.NoError(r.T(), err)
 		assert.Equal(r.T(), clusterName, clusterResp.ObjectMeta.Name)
 
-		require.NoError(r.T(), r.rotateEncryptionKeys(clusterResp.ID, 1, defaults.WatchTimeoutSeconds))
+		require.NoError(r.T(), r.rotateEncryptionKeys(clusterResp.ID, 1, 5*time.Minute))
 		r.T().Logf("Successfully completed encryption key rotation for %s", name)
 
 		r.T().Logf("Creating %d secrets in namespace default for encryption key rotation for %s", scale, name)
@@ -136,12 +137,12 @@ func (r *RKE2EncryptionKeyRotationTestSuite) TestEncryptionKeyRotationFreshClust
 		r.T().Logf("Successfully created %d secrets in namespace default for encryption key rotation for %s", scale, name)
 		// encryption key rotation is capped at 5 secrets per second (10 every 2 seconds), so 10000 secrets will take
 		// 2000 seconds which is ~33 minutes.
-		require.NoError(r.T(), r.rotateEncryptionKeys(clusterResp.ID, 2, 60*60))
+		require.NoError(r.T(), r.rotateEncryptionKeys(clusterResp.ID, 2, 1*time.Hour))
 		r.T().Logf("Successfully completed second encryption key rotation for %s", name)
 	})
 }
 
-func (r *RKE2EncryptionKeyRotationTestSuite) rotateEncryptionKeys(id string, generation, timeout int64) error {
+func (r *RKE2EncryptionKeyRotationTestSuite) rotateEncryptionKeys(id string, generation int64, timeout time.Duration) error {
 	kubeProvisioningClient, err := r.client.GetKubeAPIProvisioningClient()
 	require.NoError(r.T(), err)
 
@@ -167,20 +168,9 @@ func (r *RKE2EncryptionKeyRotationTestSuite) rotateEncryptionKeys(id string, gen
 		return err
 	}
 
-	kubeRKEClient, err := r.client.GetKubeAPIRKEClient()
-	require.NoError(r.T(), err)
-
 	for _, phase := range phases {
-		result, err := kubeRKEClient.RKEControlPlanes(namespace).Watch(context.TODO(), metav1.ListOptions{
-			FieldSelector:  "metadata.name=" + cluster.ObjectMeta.Name,
-			TimeoutSeconds: &timeout,
-		})
+		err = kwait.Poll(10*time.Second, timeout, r.IsAtLeast(namespace, cluster.ObjectMeta.Name, phase))
 		require.NoError(r.T(), err)
-
-		err = wait.WatchWait(result, IsAtLeast(r.T(), phase))
-		if err != nil {
-			return err
-		}
 	}
 
 	clusterWait, err := kubeProvisioningClient.Clusters(namespace).Watch(context.TODO(), metav1.ListOptions{
@@ -219,12 +209,16 @@ func (r *RKE2EncryptionKeyRotationTestSuite) TestEncryptionKeyRotation() {
 	}
 }
 
-func IsAtLeast(t *testing.T, phase rkev1.RotateEncryptionKeysPhase) wait.WatchCheckFunc {
-	return func(event watch.Event) (ready bool, err error) {
-		controlPlane := event.Object.(*rkev1.RKEControlPlane)
+func (r *RKE2EncryptionKeyRotationTestSuite) IsAtLeast(namespace, name string, phase rkev1.RotateEncryptionKeysPhase) kwait.ConditionFunc {
+	return func() (ready bool, err error) {
+		kubeRKEClient, err := r.client.GetKubeAPIRKEClient()
+		require.NoError(r.T(), err)
+
+		controlPlane, err := kubeRKEClient.RKEControlPlanes(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+		require.NoError(r.T(), err)
 
 		if controlPlane.Status.RotateEncryptionKeysPhase == rkev1.RotateEncryptionKeysPhaseFailed {
-			t.Errorf("Encryption key rotation failed waiting to reach %s", phase)
+			r.T().Errorf("Encryption key rotation failed waiting to reach %s", phase)
 			return ready, fmt.Errorf("encryption key rotation failed")
 		}
 
@@ -247,7 +241,7 @@ func IsAtLeast(t *testing.T, phase rkev1.RotateEncryptionKeysPhase) wait.WatchCh
 			return false, nil
 		}
 
-		t.Logf("Encryption key rotation successfully entered %s", phase)
+		r.T().Logf("Encryption key rotation successfully entered %s", phase)
 
 		return true, nil
 	}
