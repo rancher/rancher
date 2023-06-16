@@ -31,6 +31,7 @@ type NodeRoles struct {
 	ControlPlane bool  `json:"controlplane,omitempty" yaml:"controlplane,omitempty"`
 	Etcd         bool  `json:"etcd,omitempty" yaml:"etcd,omitempty"`
 	Worker       bool  `json:"worker,omitempty" yaml:"worker,omitempty"`
+	Windows      bool  `json:"windows,omitempty" yaml:"windows,omitempty"`
 	Quantity     int32 `json:"quantity" yaml:"quantity"`
 }
 
