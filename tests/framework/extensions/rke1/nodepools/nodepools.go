@@ -77,7 +77,7 @@ func ScaleWorkerNodePool(client *rancher.Client, nodeRoles []NodeRoles, ClusterI
 		return err
 	}
 
-	if nodestat.IsNodeReady(client, ClusterID) != nil {
+	if nodestat.AllManagementNodeReady(client, ClusterID) != nil {
 		return err
 	}
 
@@ -90,7 +90,7 @@ func ScaleWorkerNodePool(client *rancher.Client, nodeRoles []NodeRoles, ClusterI
 		return err
 	}
 
-	if nodestat.IsNodeReady(client, ClusterID) != nil {
+	if nodestat.AllManagementNodeReady(client, ClusterID) != nil {
 		return err
 	}
 
