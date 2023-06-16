@@ -1,4 +1,4 @@
-package rke2
+package k3s
 
 import (
 	"context"
@@ -30,7 +30,7 @@ import (
 	kwait "k8s.io/apimachinery/pkg/util/wait"
 )
 
-type RKE2EncryptionKeyRotationTestSuite struct {
+type K3SEncryptionKeyRotationTestSuite struct {
 	suite.Suite
 	session     *session.Session
 	client      *rancher.Client
@@ -39,7 +39,7 @@ type RKE2EncryptionKeyRotationTestSuite struct {
 	namespace   string
 }
 
-const scale = 10000
+const totalSecrets = 10000
 
 var phases = []rkev1.RotateEncryptionKeysPhase{
 	rkev1.RotateEncryptionKeysPhasePrepare,
@@ -51,11 +51,11 @@ var phases = []rkev1.RotateEncryptionKeysPhase{
 	rkev1.RotateEncryptionKeysPhaseDone,
 }
 
-func (r *RKE2EncryptionKeyRotationTestSuite) TearDownSuite() {
+func (r *K3SEncryptionKeyRotationTestSuite) TearDownSuite() {
 	r.session.Cleanup()
 }
 
-func (r *RKE2EncryptionKeyRotationTestSuite) SetupSuite() {
+func (r *K3SEncryptionKeyRotationTestSuite) SetupSuite() {
 	testSession := session.NewSession()
 	r.session = testSession
 
@@ -71,89 +71,50 @@ func (r *RKE2EncryptionKeyRotationTestSuite) SetupSuite() {
 	r.namespace = r.client.RancherConfig.ClusterName
 }
 
-func (r *RKE2EncryptionKeyRotationTestSuite) TestEncryptionKeyRotationFreshCluster(provider Provider, kubeVersion string, nodesAndRoles []machinepools.NodeRoles, credential *cloudcredentials.CloudCredential) {
-	name := fmt.Sprintf("Provider_%s/Kubernetes_Version_%s/Nodes_%v", provider.Name, kubeVersion, nodesAndRoles)
-	r.Run(name, func() {
-		testSession := session.NewSession()
-		defer testSession.Cleanup()
+func provisionEnvironment(t *testing.T, client *rancher.Client, prefix string, provider Provider, version string, nodesAndRoles []machinepools.NodeRoles, credential *cloudcredentials.CloudCredential, psact string, advancedOptions provisioning.AdvancedOptions) string {
+	clusterName := namegen.AppendRandomString(fmt.Sprintf("%s-%s", prefix, provider.Name))
+	generatedPoolName := fmt.Sprintf("nc-%s-pool1-", clusterName)
+	machinePoolConfig := provider.MachinePoolFunc(generatedPoolName, namespace)
 
-		testSessionClient, err := r.client.WithSession(testSession)
-		require.NoError(r.T(), err)
+	machineConfigResp, err := client.Steve.SteveType(provider.MachineConfigPoolResourceSteveType).Create(machinePoolConfig)
+	require.NoError(t, err)
 
-		clusterName := namegen.AppendRandomString(fmt.Sprintf("%s-%s", r.clusterName, provider.Name))
-		generatedPoolName := fmt.Sprintf("nc-%s-pool1-", clusterName)
-		machinePoolConfig := provider.MachinePoolFunc(generatedPoolName, namespace)
+	machinePools := machinepools.RKEMachinePoolSetup(nodesAndRoles, machineConfigResp)
 
-		machineConfigResp, err := testSessionClient.Steve.SteveType(provider.MachineConfigPoolResourceSteveType).Create(machinePoolConfig)
-		require.NoError(r.T(), err)
+	cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, namespace, "", credential.ID, version, psact, machinePools, advancedOptions)
+	cluster.Spec.RKEConfig.MachineGlobalConfig.Data["secrets-encryption"] = true
 
-		machinePools := machinepools.RKEMachinePoolSetup(nodesAndRoles, machineConfigResp)
+	clusterResp, err := clusters.CreateK3SRKE2Cluster(client, cluster)
+	require.NoError(t, err)
 
-		cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, namespace, "calico", credential.ID, kubeVersion, "", machinePools, r.config.AdvancedOptions)
+	kubeProvisioningClient, err := client.GetKubeAPIProvisioningClient()
+	require.NoError(t, err)
 
-		if strings.Contains(kubeVersion, "k3s") {
-			cluster.Spec.RKEConfig.MachineGlobalConfig.Data["secrets-encryption"] = true
-		}
-
-		clusterResp, err := clusters.CreateK3SRKE2Cluster(testSessionClient, cluster)
-		require.NoError(r.T(), err)
-
-		kubeProvisioningClient, err := r.client.GetKubeAPIProvisioningClient()
-		require.NoError(r.T(), err)
-
-		result, err := kubeProvisioningClient.Clusters(namespace).Watch(context.TODO(), metav1.ListOptions{
-			FieldSelector:  "metadata.name=" + cluster.ObjectMeta.Name,
-			TimeoutSeconds: &defaults.WatchTimeoutSeconds,
-		})
-		require.NoError(r.T(), err)
-
-		err = wait.WatchWait(result, clusters.IsProvisioningClusterReady)
-		require.NoError(r.T(), err)
-		assert.Equal(r.T(), clusterName, clusterResp.ObjectMeta.Name)
-
-		require.NoError(r.T(), r.rotateEncryptionKeys(clusterResp.ID, 1, 5*time.Minute))
-		r.T().Logf("Successfully completed encryption key rotation for %s", name)
-
-		r.T().Logf("Creating %d secrets in namespace default for encryption key rotation for %s", scale, name)
-
-		clusterID, err := clusters.GetClusterIDByName(r.client, clusterName)
-		require.NoError(r.T(), err)
-		secretResource, err := kubeapi.ResourceForClient(r.client, clusterID, "default", secrets.SecretGroupVersionResource)
-		require.NoError(r.T(), err)
-
-		for i := 0; i < scale; i++ {
-			secret := &corev1.Secret{
-				ObjectMeta: metav1.ObjectMeta{
-					GenerateName: fmt.Sprintf("encryption-key-rotation-test-%d-", i),
-				},
-				Data: map[string][]byte{
-					"key": []byte(namegen.RandStringLower(5)),
-				},
-			}
-			_, err = secrets.CreateSecret(secretResource, secret)
-			require.NoError(r.T(), err)
-		}
-
-		r.T().Logf("Successfully created %d secrets in namespace default for encryption key rotation for %s", scale, name)
-		// encryption key rotation is capped at 5 secrets per second (10 every 2 seconds), so 10000 secrets will take
-		// 2000 seconds which is ~33 minutes.
-		require.NoError(r.T(), r.rotateEncryptionKeys(clusterResp.ID, 2, 1*time.Hour))
-		r.T().Logf("Successfully completed second encryption key rotation for %s", name)
+	result, err := kubeProvisioningClient.Clusters(namespace).Watch(context.TODO(), metav1.ListOptions{
+		FieldSelector:  "metadata.name=" + cluster.ObjectMeta.Name,
+		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
 	})
+	require.NoError(t, err)
+
+	err = wait.WatchWait(result, clusters.IsProvisioningClusterReady)
+	require.NoError(t, err)
+	assert.Equal(t, clusterName, clusterResp.ObjectMeta.Name)
+
+	return clusterResp.ID
 }
 
-func (r *RKE2EncryptionKeyRotationTestSuite) rotateEncryptionKeys(id string, generation int64, timeout time.Duration) error {
-	kubeProvisioningClient, err := r.client.GetKubeAPIProvisioningClient()
-	require.NoError(r.T(), err)
+func rotateEncryptionKeys(t *testing.T, client *rancher.Client, steveID string, generation int64, timeout time.Duration) {
+	t.Logf("Applying encryption key rotation generation %d for cluster %s", generation, steveID)
 
-	cluster, err := r.client.Steve.SteveType(clusters.ProvisioningSteveResouceType).ByID(id)
-	if err != nil {
-		return err
-	}
+	kubeProvisioningClient, err := client.GetKubeAPIProvisioningClient()
+	require.NoError(t, err)
+
+	cluster, err := client.Steve.SteveType(clusters.ProvisioningSteveResourceType).ByID(steveID)
+	require.NoError(t, err)
 
 	clusterSpec := &apiv1.ClusterSpec{}
 	err = v1.ConvertToK8sType(cluster.Spec, clusterSpec)
-	require.NoError(r.T(), err)
+	require.NoError(t, err)
 
 	updatedCluster := *cluster
 
@@ -163,62 +124,95 @@ func (r *RKE2EncryptionKeyRotationTestSuite) rotateEncryptionKeys(id string, gen
 
 	updatedCluster.Spec = *clusterSpec
 
-	cluster, err = r.client.Steve.SteveType(clusters.ProvisioningSteveResouceType).Update(cluster, updatedCluster)
-	if err != nil {
-		return err
-	}
+	cluster, err = client.Steve.SteveType(clusters.ProvisioningSteveResourceType).Update(cluster, updatedCluster)
+	require.NoError(t, err)
 
 	for _, phase := range phases {
-		err = kwait.Poll(10*time.Second, timeout, r.IsAtLeast(namespace, cluster.ObjectMeta.Name, phase))
-		require.NoError(r.T(), err)
+		err = kwait.Poll(10*time.Second, timeout, IsAtLeast(t, client, namespace, cluster.ObjectMeta.Name, phase))
+		require.NoError(t, err)
 	}
 
 	clusterWait, err := kubeProvisioningClient.Clusters(namespace).Watch(context.TODO(), metav1.ListOptions{
 		FieldSelector:  "metadata.name=" + cluster.ObjectMeta.Name,
 		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
 	})
-	if err != nil {
-		return err
-	}
+	require.NoError(t, err)
 
 	err = wait.WatchWait(clusterWait, clusters.IsProvisioningClusterReady)
-	if err != nil {
-		return err
-	}
+	require.NoError(t, err)
 
-	return nil
+	t.Logf("Successfully completed encryption key rotation for %s", cluster.ObjectMeta.Name)
 }
 
-func (r *RKE2EncryptionKeyRotationTestSuite) TestEncryptionKeyRotation() {
-	for _, providerName := range r.config.Providers {
-		subSession := r.session.NewSession()
+func createSecretsForCluster(t *testing.T, client *rancher.Client, steveID string, scale int) {
+	t.Logf("Creating %d secrets in namespace default for encryption key rotation", scale)
 
-		provider := CreateProvider(providerName)
+	_, clusterName, found := strings.Cut(steveID, "/")
+	require.True(t, found)
 
-		client, err := r.client.WithSession(subSession)
-		require.NoError(r.T(), err)
+	clusterID, err := clusters.GetClusterIDByName(client, clusterName)
+	require.NoError(t, err)
+	secretResource, err := kubeapi.ResourceForClient(client, clusterID, "default", secrets.SecretGroupVersionResource)
+	require.NoError(t, err)
 
-		cloudCredential, err := provider.CloudCredFunc(client)
-		require.NoError(r.T(), err)
-
-		for _, kubernetesVersion := range r.config.RKE2KubernetesVersions {
-			r.TestEncryptionKeyRotationFreshCluster(provider, kubernetesVersion, r.config.NodesAndRoles, cloudCredential)
+	for i := 0; i < scale; i++ {
+		secret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: fmt.Sprintf("encryption-key-rotation-test-%d-", i),
+			},
+			Data: map[string][]byte{
+				"key": []byte(namegen.RandStringLower(5)),
+			},
 		}
-
-		subSession.Cleanup()
+		_, err = secrets.CreateSecret(secretResource, secret)
+		require.NoError(t, err)
 	}
 }
 
-func (r *RKE2EncryptionKeyRotationTestSuite) IsAtLeast(namespace, name string, phase rkev1.RotateEncryptionKeysPhase) kwait.ConditionFunc {
+func (r *K3SEncryptionKeyRotationTestSuite) TestEncryptionKeyRotation() {
+	for _, providerName := range r.config.Providers {
+		for _, kubernetesVersion := range r.config.K3SKubernetesVersions {
+			// cleanup resources inside the for loop to prevent leaking
+			subSession := r.session.NewSession()
+
+			provider := CreateProvider(providerName)
+
+			client, err := r.client.WithSession(subSession)
+			require.NoError(r.T(), err)
+
+			cloudCredential, err := provider.CloudCredFunc(client)
+			require.NoError(r.T(), err)
+
+			// provisioning is not considered part of the test
+			id := provisionEnvironment(r.T(), client, r.clusterName, provider, kubernetesVersion, r.config.NodesAndRoles, cloudCredential, r.config.PSACT, r.config.AdvancedOptions)
+
+			name := fmt.Sprintf("%s/%s/%v", provider.Name, kubernetesVersion, r.config.NodesAndRoles)
+			//r.Run(name+"-new-cluster", func() {
+			//	rotateEncryptionKeys(r.T(), client, id, 1, 10*time.Minute)
+			//})
+
+			// create 10k secrets for stress test, takes ~30 minutes
+			createSecretsForCluster(r.T(), client, id, totalSecrets)
+
+			r.Run(name+"-stress-test", func() {
+				rotateEncryptionKeys(r.T(), client, id, 2, 1*time.Hour) // takes ~45 minutes for HA
+			})
+
+			subSession.Cleanup()
+		}
+	}
+}
+
+func IsAtLeast(t *testing.T, client *rancher.Client, namespace, name string, phase rkev1.RotateEncryptionKeysPhase) kwait.ConditionFunc {
 	return func() (ready bool, err error) {
-		kubeRKEClient, err := r.client.GetKubeAPIRKEClient()
-		require.NoError(r.T(), err)
+		kubeRKEClient, err := client.GetKubeAPIRKEClient()
+		require.NoError(t, err)
 
 		controlPlane, err := kubeRKEClient.RKEControlPlanes(namespace).Get(context.TODO(), name, metav1.GetOptions{})
-		require.NoError(r.T(), err)
+		require.NoError(t, err)
 
 		if controlPlane.Status.RotateEncryptionKeysPhase == rkev1.RotateEncryptionKeysPhaseFailed {
-			r.T().Errorf("Encryption key rotation failed waiting to reach %s", phase)
+			t.Errorf("Encryption key rotation failed waiting to reach %s", phase)
 			return ready, fmt.Errorf("encryption key rotation failed")
 		}
 
@@ -241,12 +235,12 @@ func (r *RKE2EncryptionKeyRotationTestSuite) IsAtLeast(namespace, name string, p
 			return false, nil
 		}
 
-		r.T().Logf("Encryption key rotation successfully entered %s", phase)
+		t.Logf("Encryption key rotation successfully entered %s", phase)
 
 		return true, nil
 	}
 }
 
 func TestEncryptionKeyRotation(t *testing.T) {
-	suite.Run(t, new(RKE2EncryptionKeyRotationTestSuite))
+	suite.Run(t, new(K3SEncryptionKeyRotationTestSuite))
 }
