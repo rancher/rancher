@@ -145,8 +145,13 @@ func CreateNodes(client *rancher.Client, rolesPerPool []string, quantityPerPool 
 // MatchRoleToConfig matches the role of nodesAndRoles to the ec2Config that allows this role.
 func MatchRoleToConfig(poolRole string, ec2Configs []rancherEc2.AWSEC2Config) *rancherEc2.AWSEC2Config {
 	for _, config := range ec2Configs {
-		configRoles := " --" + strings.Join(config.Roles, " --")
-		if strings.Contains(configRoles, poolRole) {
+		hasMatch := false
+		for _, configRole := range config.Roles {
+			if strings.Contains(poolRole, configRole) {
+				hasMatch = true
+			}
+		}
+		if hasMatch {
 			return &config
 		}
 	}
