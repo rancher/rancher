@@ -65,14 +65,14 @@ func (rb *RBTestSuite) SetupSuite() {
 func (rb *RBTestSuite) ValidateListCluster(role string) {
 
 	//Testcase1 Verify cluster members - Owner/member,  Project members - Owner/member are able to list clusters
-	clusterList, err := rb.standardUserClient.Steve.SteveType(clusters.ProvisioningSteveResouceType).ListAll(nil)
+	clusterList, err := rb.standardUserClient.Steve.SteveType(clusters.ProvisioningSteveResourceType).ListAll(nil)
 	require.NoError(rb.T(), err)
 	clusterStatus := &apiV1.ClusterStatus{}
 	err = v1.ConvertToK8sType(clusterList.Data[0].Status, clusterStatus)
 	require.NoError(rb.T(), err)
 
 	if role == restrictedAdmin {
-		adminClusterList, err := rb.client.Steve.SteveType(clusters.ProvisioningSteveResouceType).ListAll(nil)
+		adminClusterList, err := rb.client.Steve.SteveType(clusters.ProvisioningSteveResourceType).ListAll(nil)
 		require.NoError(rb.T(), err)
 		assert.Equal(rb.T(), (len(adminClusterList.Data) - 1), len(clusterList.Data))
 		return
@@ -313,7 +313,7 @@ func (rb *RBTestSuite) ValidateAddMemberAsClusterRoles() {
 	require.NoError(rb.T(), err)
 	rb.additionalUserClient = additionalUserClient
 
-	clusterList, err := rb.additionalUserClient.Steve.SteveType(clusters.ProvisioningSteveResouceType).ListAll(nil)
+	clusterList, err := rb.additionalUserClient.Steve.SteveType(clusters.ProvisioningSteveResourceType).ListAll(nil)
 	require.NoError(rb.T(), err)
 	assert.Equal(rb.T(), 1, len(clusterList.Data))
 
@@ -332,7 +332,7 @@ func (rb *RBTestSuite) ValidateAddCMAsProjectOwner() {
 	require.NoError(rb.T(), err)
 	rb.additionalUserClient = additionalUserClient
 
-	clusterList, err := rb.standardUserClient.Steve.SteveType(clusters.ProvisioningSteveResouceType).ListAll(nil)
+	clusterList, err := rb.standardUserClient.Steve.SteveType(clusters.ProvisioningSteveResourceType).ListAll(nil)
 	require.NoError(rb.T(), err)
 	assert.Equal(rb.T(), 1, len(clusterList.Data))
 
@@ -470,7 +470,7 @@ func (rb *RBTestSuite) TestRBAC() {
 
 		//Verify standard users cannot list any clusters
 		rb.Run("Test case Validate if users can list any downstream clusters before adding the cluster role "+tt.name, func() {
-			_, err := rb.standardUserClient.Steve.SteveType(clusters.ProvisioningSteveResouceType).ListAll(nil)
+			_, err := rb.standardUserClient.Steve.SteveType(clusters.ProvisioningSteveResourceType).ListAll(nil)
 			if tt.member == standardUser {
 				require.Error(rb.T(), err)
 				assert.Contains(rb.T(), "Resource type [provisioning.cattle.io.cluster] has no method GET", err.Error())
