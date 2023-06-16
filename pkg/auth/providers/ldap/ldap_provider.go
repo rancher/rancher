@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	ldapv3 "github.com/go-ldap/ldap/v3"
+	"github.com/mitchellh/mapstructure"
 	"github.com/rancher/norman/types"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
@@ -238,18 +239,19 @@ func (p *ldapProvider) getLDAPConfig() (*v3.LdapConfig, *x509.CertPool, error) {
 		}
 
 		storedLdapConfigMap = subLdapConfig.(map[string]interface{})
-		err = common.Decode(storedLdapConfigMap, storedLdapConfig)
-		if err != nil {
-			return nil, nil, fmt.Errorf("unable to decode Ldap Config: %w", err)
-		}
+		mapstructure.Decode(storedLdapConfigMap, storedLdapConfig)
 		if len(storedLdapConfig.Servers) < 1 {
 			return storedLdapConfig, nil, ErrorNotConfigured{}
 		}
 	} else {
-		err = common.Decode(storedLdapConfigMap, storedLdapConfig)
-		if err != nil {
-			return nil, nil, fmt.Errorf("unable to decode Ldap Config: %w", err)
+		mapstructure.Decode(storedLdapConfigMap, storedLdapConfig)
+		metadataMap, ok := storedLdapConfigMap["metadata"].(map[string]interface{})
+		if !ok {
+			return nil, nil, fmt.Errorf("failed to retrieve %s metadata, cannot read k8s Unstructured data", p.providerName)
 		}
+		objectMeta := &metav1.ObjectMeta{}
+		mapstructure.Decode(metadataMap, objectMeta)
+		storedLdapConfig.ObjectMeta = *objectMeta
 	}
 
 	if p.certs != storedLdapConfig.Certificate || p.caPool == nil {
