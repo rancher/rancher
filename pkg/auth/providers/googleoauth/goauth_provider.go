@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mitchellh/mapstructure"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
@@ -303,11 +304,16 @@ func (g *googleOauthProvider) getGoogleOAuthConfigCR() (*v32.GoogleOauthConfig, 
 	storedGoogleOAuthConfigMap := u.UnstructuredContent()
 
 	storedGoogleOAuthConfig := &v32.GoogleOauthConfig{}
-	err = common.Decode(storedGoogleOAuthConfigMap, storedGoogleOAuthConfig)
-	if err != nil {
-		return nil, fmt.Errorf("unable to decode Google Oauth Config: %w", err)
+	mapstructure.Decode(storedGoogleOAuthConfigMap, storedGoogleOAuthConfig)
+
+	metadataMap, ok := storedGoogleOAuthConfigMap["metadata"].(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("failed to retrieve GoogleOAuthConfig metadata, cannot read k8s Unstructured data")
 	}
 
+	typemeta := &metav1.ObjectMeta{}
+	mapstructure.Decode(metadataMap, typemeta)
+	storedGoogleOAuthConfig.ObjectMeta = *typemeta
 	if storedGoogleOAuthConfig.OauthCredential != "" {
 		value, err := common.ReadFromSecret(g.secrets, storedGoogleOAuthConfig.OauthCredential, strings.ToLower(client.GoogleOauthConfigFieldOauthCredential))
 		if err != nil {
