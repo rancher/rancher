@@ -55,7 +55,6 @@ func TestProvisioningRKE2CustomCluster(t *testing.T, client *rancher.Client, ext
 			rolesPerNode = append(rolesPerNode, finalRoleCommand)
 		}
 	}
-
 	adminClient, err := rancher.NewClient(client.RancherConfig.AdminToken, client.Session)
 	require.NoError(t, err)
 
