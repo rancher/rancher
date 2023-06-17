@@ -5,10 +5,9 @@ import (
 	"fmt"
 	"testing"
 
-	apiv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
+	"github.com/rancher/rancher/tests/framework/extensions/certs/rotatecerts"
 	"github.com/rancher/rancher/tests/framework/extensions/cloudcredentials"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/defaults"
@@ -132,6 +131,7 @@ func (r *V2ProvCertRotationTestSuite) TestCertRotation() {
 }
 
 func (r *V2ProvCertRotationTestSuite) rotateCerts(id string, generation int64) error {
+	namespace := provisioning.Namespace
 	kubeProvisioningClient, err := r.client.GetKubeAPIProvisioningClient()
 	require.NoError(r.T(), err)
 
@@ -139,24 +139,8 @@ func (r *V2ProvCertRotationTestSuite) rotateCerts(id string, generation int64) e
 	if err != nil {
 		return err
 	}
-
-	clusterSpec := &apiv1.ClusterSpec{}
-	err = v1.ConvertToK8sType(cluster.Spec, clusterSpec)
+	err = rotatecerts.RotateCertificates(r.client, r.clusterName, namespace)
 	require.NoError(r.T(), err)
-
-	updatedCluster := *cluster
-
-	clusterSpec.RKEConfig.RotateCertificates = &rkev1.RotateCertificates{
-		Generation: generation,
-	}
-
-	updatedCluster.Spec = *clusterSpec
-
-	cluster, err = r.client.Steve.SteveType(clusters.ProvisioningSteveResourceType).Update(cluster, updatedCluster)
-	if err != nil {
-		return err
-	}
-
 	kubeRKEClient, err := r.client.GetKubeAPIRKEClient()
 	require.NoError(r.T(), err)
 
