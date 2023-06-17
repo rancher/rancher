@@ -236,5 +236,5 @@ tests:
                   name: RELEASE-NAME-rancher
                   port:
                     number: 80
-              pathType: ImplementationSpecific
+              pathType: Prefix
               path: /
