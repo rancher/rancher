@@ -101,7 +101,7 @@ func IsHostedProvisioningClusterReady(event watch.Event) (ready bool, err error)
 	return false, nil
 }
 
-// Verify if a serviceAccountTokenSecret exists or not in the cluster.
+// CheckServiceAccountTokenSecret verifies if a serviceAccountTokenSecret exists or not in the cluster.
 func CheckServiceAccountTokenSecret(client *rancher.Client, clusterName string) (success bool, err error) {
 	clusterID, err := GetClusterIDByName(client, clusterName)
 	if err != nil {
