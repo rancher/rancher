@@ -14,8 +14,6 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/namespaces"
 	"github.com/rancher/rancher/tests/framework/extensions/projects"
 	nodepools "github.com/rancher/rancher/tests/framework/extensions/rke1/nodepools"
-	"github.com/rancher/rancher/tests/framework/extensions/users"
-	password "github.com/rancher/rancher/tests/framework/extensions/users/passwordgenerator"
 	"github.com/rancher/rancher/tests/framework/extensions/workloads"
 	"github.com/rancher/rancher/tests/framework/pkg/config"
 	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
@@ -53,25 +51,6 @@ type ClusterConfig struct {
 	kubernetesVersion    string
 	cni                  string
 	advancedOptions      provisioning.AdvancedOptions
-}
-
-func createUser(client *rancher.Client, role string) (*management.User, error) {
-	enabled := true
-	var username = namegen.AppendRandomString("testuser-")
-	var testpassword = password.GenerateUserPassword("testpass-")
-	user := &management.User{
-		Username: username,
-		Password: testpassword,
-		Name:     username,
-		Enabled:  &enabled,
-	}
-
-	newUser, err := users.CreateUserWithRole(client, user, role)
-	if err != nil {
-		return newUser, err
-	}
-	newUser.Password = user.Password
-	return newUser, err
 }
 
 func listProjects(client *rancher.Client, clusterID string) ([]string, error) {

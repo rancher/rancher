@@ -16,6 +16,8 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/kubeapi/rbac"
 	kubeapiSecrets "github.com/rancher/rancher/tests/framework/extensions/kubeapi/secrets"
 	"github.com/rancher/rancher/tests/framework/extensions/secrets"
+	password "github.com/rancher/rancher/tests/framework/extensions/users/passwordgenerator"
+	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -31,11 +33,28 @@ const (
 
 var timeout = int64(60 * 3)
 
+// UserConfig sets and returns username and password of the user
+func UserConfig() (user *management.User) {
+	enabled := true
+	var username = namegen.AppendRandomString("testuser-")
+	var testpassword = password.GenerateUserPassword("testpass-")
+	user = &management.User{
+		Username: username,
+		Password: testpassword,
+		Name:     username,
+		Enabled:  &enabled,
+	}
+
+	return
+}
+
 // CreateUserWithRole is helper function that creates a user with a role or multiple roles
 func CreateUserWithRole(rancherClient *rancher.Client, user *management.User, roles ...string) (*management.User, error) {
 	createdUser, err := rancherClient.Management.User.Create(user)
 	if err != nil {
 		return nil, err
+	} else {
+		createdUser.Password = user.Password
 	}
 
 	for _, role := range roles {

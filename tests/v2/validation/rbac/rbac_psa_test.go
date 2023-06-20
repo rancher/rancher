@@ -251,7 +251,7 @@ func (rb *PSATestSuite) ValidateAdditionalPSA(role string) {
 }
 
 func (rb *PSATestSuite) TestPSA() {
-	nonAdminUserRoles := [...]string{roleMember, restrictedAdmin, roleOwner, roleProjectOwner , roleProjectReadOnly, roleProjectMember, roleCustomCreateNS} 
+	nonAdminUserRoles := [...]string{roleMember, restrictedAdmin, roleOwner, roleProjectOwner, roleProjectReadOnly, roleProjectMember, roleCustomCreateNS}
 	for _, role := range nonAdminUserRoles {
 		var customRole bool
 		if role == roleCustomCreateNS {
@@ -287,7 +287,8 @@ func (rb *PSATestSuite) TestPSA() {
 			} else {
 				userRole = standardUser
 			}
-			newUser, err := createUser(rb.client, userRole)
+			newUser, err := users.CreateUserWithRole(rb.client, users.UserConfig(), userRole)
+
 			require.NoError(rb.T(), err)
 			rb.nonAdminUser = newUser
 			rb.T().Logf("Created user: %v", rb.nonAdminUser.Username)
