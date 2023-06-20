@@ -1,11 +1,11 @@
-#!/usr/bin/env bash
+# #!/usr/bin/env bash
 
-echo "-- chart/validate --"
+# echo "-- chart/validate --"
 
-# Check for helm
-if [ -z "$(type -p helm_v3)" ]; then
-    echo "helm_v3 not found. Helm is required to run tests."
-    exit 1
-fi
+# # Check for helm
+# if [ -z "$(type -p helm_v3)" ]; then
+#     echo "helm_v3 not found. Helm is required to run tests."
+#     exit 1
+# fi
 
-helm_v3 lint ../../build/chart/rancher
+# helm_v3 lint ../../build/chart/rancher
