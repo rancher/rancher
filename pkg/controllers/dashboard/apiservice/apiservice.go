@@ -17,7 +17,6 @@ import (
 	"github.com/rancher/wrangler/pkg/name"
 	"github.com/rancher/wrangler/pkg/relatedresource"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -152,7 +151,7 @@ func (h *handler) getToken(sa *corev1.ServiceAccount) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("error ensuring secret for service account [%s:%s]: %w", sa.Namespace, sa.Name, err)
 	}
-	token := secret.Data[v1.ServiceAccountTokenKey]
+	token := secret.Data[corev1.ServiceAccountTokenKey]
 
 	hash := sha256.Sum256(token)
 	return base64.StdEncoding.EncodeToString(hash[:]), nil

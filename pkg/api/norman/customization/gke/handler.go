@@ -18,7 +18,6 @@ import (
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/ref"
 	mgmtSchema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
-	schema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 )
@@ -146,7 +145,7 @@ func (h *handler) getCloudCredential(req *http.Request, cap *Capabilities, credI
 	}
 
 	var accessCred client.CloudCredential // var to check access
-	if err := access.ByID(h.generateAPIContext(req), &schema.Version, client.CloudCredentialType, credID, &accessCred); err != nil {
+	if err := access.ByID(h.generateAPIContext(req), &mgmtSchema.Version, client.CloudCredentialType, credID, &accessCred); err != nil {
 		apiError, ok := err.(*httperror.APIError)
 		if !ok {
 			return httperror.NotFound.Status, err

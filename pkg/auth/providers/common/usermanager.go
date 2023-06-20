@@ -14,7 +14,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/slice"
-	"github.com/rancher/rancher/pkg/auth/tokens"
 	tokenUtil "github.com/rancher/rancher/pkg/auth/tokens"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	rbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
@@ -262,8 +261,8 @@ func (m *userManager) EnsureClusterToken(clusterName string, input user.TokenInp
 		ObjectMeta: v1.ObjectMeta{
 			Name: input.TokenName,
 			Labels: map[string]string{
-				tokens.UserIDLabel:    input.UserName,
-				tokens.TokenKindLabel: input.Kind,
+				tokenUtil.UserIDLabel:    input.UserName,
+				tokenUtil.TokenKindLabel: input.Kind,
 			},
 		},
 		TTLMillis:     0,
@@ -282,7 +281,7 @@ func (m *userManager) EnsureClusterToken(clusterName string, input user.TokenInp
 		token.ObjectMeta.Name = ""
 		token.ObjectMeta.GenerateName = input.TokenName
 	}
-	err = tokens.ConvertTokenKeyToHash(token)
+	err = tokenUtil.ConvertTokenKeyToHash(token)
 	if err != nil {
 		return "", err
 	}
@@ -312,12 +311,12 @@ func (m *userManager) EnsureClusterToken(clusterName string, input user.TokenInp
 // newTokenForKubeconfig creates a new token for a generated kubeconfig.
 func (m *userManager) newTokenForKubeconfig(clusterName, tokenName, description, kind, userName string, userPrincipal v3.Principal) (string, error) {
 	// settings.KubeconfigTokenTTLMinutes is deprecated use tokens.GetKubeconfigDefaultTokenTTLInMilliSeconds() when the setting is removed
-	tokenTTL, err := tokens.ParseTokenTTL(settings.KubeconfigTokenTTLMinutes.Get())
+	tokenTTL, err := tokenUtil.ParseTokenTTL(settings.KubeconfigTokenTTLMinutes.Get())
 	if err != nil {
 		return "", fmt.Errorf("failed to parse setting '%s': %w", settings.KubeconfigTokenTTLMinutes.Name, err)
 	}
 
-	tokenTTL, err = tokens.ClampToMaxTTL(tokenTTL)
+	tokenTTL, err = tokenUtil.ClampToMaxTTL(tokenTTL)
 	if err != nil {
 		return "", fmt.Errorf("failed to validate token ttl %w", err)
 	}
@@ -348,7 +347,7 @@ func (m *userManager) GetKubeconfigToken(clusterName, tokenName, description, ki
 		return nil, "", err
 	}
 
-	randomizedTokenName, createdTokenValue := tokens.SplitTokenParts(fullCreatedToken)
+	randomizedTokenName, createdTokenValue := tokenUtil.SplitTokenParts(fullCreatedToken)
 	token, err := m.tokens.Get(randomizedTokenName, v1.GetOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
 		return nil, createdTokenValue, err

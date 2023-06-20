@@ -13,7 +13,6 @@ import (
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/pkg/relatedresource"
 	"github.com/sirupsen/logrus"
-	"k8s.io/apimachinery/pkg/api/errors"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -84,7 +83,7 @@ func (h *handler) onRepo(key string, repo *catalog.ClusterRepo) (*catalog.Cluste
 				return repo, err
 			}
 			if chartDef.RemoveNamespace {
-				if err := h.namespaces.Delete(chartDef.ReleaseNamespace, nil); err != nil && !errors.IsNotFound(err) {
+				if err := h.namespaces.Delete(chartDef.ReleaseNamespace, nil); err != nil && !apierror.IsNotFound(err) {
 					return repo, err
 				}
 			}

@@ -19,7 +19,6 @@ import (
 	"github.com/rancher/wrangler/pkg/kv"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -192,7 +191,7 @@ func (h handler) removeLegacyOperatorIfExists(provider string) error {
 	legacyOperatorAppName := fmt.Sprintf(legacyOperatorAppNameFormat, provider)
 	_, err = h.appCache.Get(systemProjectName, legacyOperatorAppName)
 	if err != nil {
-		if errors.IsNotFound(err) {
+		if apierror.IsNotFound(err) {
 			// legacy app doesn't exist, no-op
 			return nil
 		}
@@ -204,7 +203,7 @@ func (h handler) removeLegacyOperatorIfExists(provider string) error {
 
 func getAdditionalCA(secretsCache v1.SecretCache) ([]byte, error) {
 	secret, err := secretsCache.Get(namespace.System, "tls-ca-additional")
-	if err != nil && !errors.IsNotFound(err) {
+	if err != nil && !apierror.IsNotFound(err) {
 		return nil, err
 	}
 

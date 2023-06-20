@@ -8,7 +8,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	typescorev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
-	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
@@ -21,7 +20,7 @@ const (
 )
 
 type namespaceHandler struct {
-	secrets  v1.SecretInterface
+	secrets  typescorev1.SecretInterface
 	nsClient typescorev1.NamespaceInterface
 }
 

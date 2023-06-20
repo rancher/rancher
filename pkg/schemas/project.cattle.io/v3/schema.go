@@ -9,7 +9,6 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/schemas/factory"
 	"github.com/rancher/rancher/pkg/schemas/mapper"
-	appsv1 "k8s.io/api/apps/v1"
 	k8sappv1 "k8s.io/api/apps/v1"
 	autoscaling "k8s.io/api/autoscaling/v2"
 	batchv1 "k8s.io/api/batch/v1"
@@ -205,7 +204,7 @@ func statefulSetTypes(schemas *types.Schemas) *types.Schemas {
 
 func replicaSetTypes(schemas *types.Schemas) *types.Schemas {
 	return schemas.
-		AddMapperForType(&Version, appsv1.ReplicaSetSpec{},
+		AddMapperForType(&Version, k8sappv1.ReplicaSetSpec{},
 			&m.Move{
 				From: "replicas",
 				To:   "scale",
@@ -216,7 +215,7 @@ func replicaSetTypes(schemas *types.Schemas) *types.Schemas {
 			},
 		).
 		MustImport(&Version, v3.WorkloadMetric{}).
-		AddMapperForType(&Version, appsv1.ReplicaSet{},
+		AddMapperForType(&Version, k8sappv1.ReplicaSet{},
 			&m.Move{
 				From: "status",
 				To:   "replicaSetStatus",
@@ -224,8 +223,8 @@ func replicaSetTypes(schemas *types.Schemas) *types.Schemas {
 			&m.Embed{Field: "template"},
 			NewWorkloadTypeMapper(),
 		).
-		MustImport(&Version, appsv1.ReplicaSetSpec{}, replicaSetConfigOverride{}).
-		MustImportAndCustomize(&Version, appsv1.ReplicaSet{}, func(schema *types.Schema) {
+		MustImport(&Version, k8sappv1.ReplicaSetSpec{}, replicaSetConfigOverride{}).
+		MustImportAndCustomize(&Version, k8sappv1.ReplicaSet{}, func(schema *types.Schema) {
 			schema.BaseType = "workload"
 			schema.ResourceActions = map[string]types.Action{
 				"redeploy": {},

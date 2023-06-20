@@ -22,7 +22,6 @@ import (
 	"github.com/rancher/rancher/pkg/user"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -313,9 +312,9 @@ func (n *ProviderCatalogLauncher) getProviderIfAlreadyRunning(globalDNSProviderN
 	}
 	existingApp, err := n.appLister.Get(sysProject, fmt.Sprintf("%s-%s", "systemapp", globalDNSProviderName))
 
-	if (err != nil && k8serrors.IsNotFound(err)) || existingApp == nil {
+	if (err != nil && apierrors.IsNotFound(err)) || existingApp == nil {
 		return nil, nil
-	} else if err != nil && !k8serrors.IsNotFound(err) {
+	} else if err != nil && !apierrors.IsNotFound(err) {
 		logrus.Errorf("GlobaldnsProviderCatalogLauncher: Error listing external-dns %v app %v", globalDNSProviderName, err)
 		return nil, err
 	}

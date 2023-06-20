@@ -5,7 +5,6 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/rancher/rancher/pkg/app"
 	app2 "github.com/rancher/rancher/pkg/app"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -144,7 +143,7 @@ func (ph *projectHandler) ensureAppProjectName(appTargetNamespace string, projec
 		return "", err
 	}
 
-	appProjectName, err := app.EnsureAppProjectName(ph.app.agentNamespaceClient, project.Name, project.Spec.ClusterName, appTargetNamespace, creator.Name)
+	appProjectName, err := app2.EnsureAppProjectName(ph.app.agentNamespaceClient, project.Name, project.Spec.ClusterName, appTargetNamespace, creator.Name)
 	if err != nil {
 		return "", err
 	}

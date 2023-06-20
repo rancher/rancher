@@ -14,7 +14,6 @@ import (
 	fleetconst "github.com/rancher/rancher/pkg/fleet"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	namespaceutil "github.com/rancher/rancher/pkg/namespace"
-	"github.com/rancher/rancher/pkg/project"
 	projectpkg "github.com/rancher/rancher/pkg/project"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
@@ -40,8 +39,8 @@ var projectNSVerbToSuffix = map[string]string{
 var defaultProjectLabels = labels.Set(map[string]string{"authz.management.cattle.io/default-project": "true"})
 var systemProjectLabels = labels.Set(map[string]string{"authz.management.cattle.io/system-project": "true"})
 var initialProjectToLabels = map[string]labels.Set{
-	project.Default: defaultProjectLabels,
-	project.System:  systemProjectLabels,
+	projectpkg.Default: defaultProjectLabels,
+	projectpkg.System:  systemProjectLabels,
 }
 
 func newNamespaceLifecycle(m *manager, sync *resourcequota.SyncController) *nsLifecycle {

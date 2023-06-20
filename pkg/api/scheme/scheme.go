@@ -3,7 +3,6 @@ package scheme
 import (
 	"fmt"
 
-	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	monitoringv1alpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	fleet "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	catalog "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
@@ -15,7 +14,6 @@ import (
 	ui "github.com/rancher/rancher/pkg/apis/ui.cattle.io/v1"
 	planv1 "github.com/rancher/system-upgrade-controller/pkg/apis/upgrade.cattle.io/v1"
 	appsv1 "k8s.io/api/apps/v1"
-	"k8s.io/api/apps/v1beta1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	scalingv2 "k8s.io/api/autoscaling/v2"
 	batchv1 "k8s.io/api/batch/v1"
@@ -62,7 +60,7 @@ var builders = []runtime.SchemeBuilder{
 	cluster.SchemeBuilder,
 	catalog.SchemeBuilder,
 	fleet.SchemeBuilder,
-	monitoringv1.SchemeBuilder,
+	monitoringv1alpha1.SchemeBuilder,
 	monitoringv1alpha1.SchemeBuilder,
 	planv1.SchemeBuilder,
 	appsv1.SchemeBuilder,
@@ -70,7 +68,7 @@ var builders = []runtime.SchemeBuilder{
 	scalingv2.SchemeBuilder,
 	batchv1.SchemeBuilder,
 	v1.SchemeBuilder,
-	v1beta1.SchemeBuilder,
+	appsv1beta1.SchemeBuilder,
 	extv1beta1.SchemeBuilder,
 	knetworkingv1.SchemeBuilder,
 	knetworkingv1beta1.SchemeBuilder,

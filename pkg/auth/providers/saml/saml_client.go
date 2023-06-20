@@ -27,7 +27,6 @@ import (
 	"github.com/rancher/rancher/pkg/namespace"
 	log "github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type IDPMetadata struct {
@@ -436,7 +435,7 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 			samlToken := &v3.SamlToken{
 				Token:     encoded,
 				ExpiresAt: token.ExpiresAt,
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      requestID,
 					Namespace: namespace.GlobalNamespace,
 				},

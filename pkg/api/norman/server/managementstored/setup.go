@@ -54,7 +54,6 @@ import (
 	"github.com/rancher/rancher/pkg/api/norman/store/scoped"
 	settingstore "github.com/rancher/rancher/pkg/api/norman/store/setting"
 	"github.com/rancher/rancher/pkg/api/scheme"
-	"github.com/rancher/rancher/pkg/auth/api"
 	authapi "github.com/rancher/rancher/pkg/auth/api"
 	"github.com/rancher/rancher/pkg/auth/requests"
 	"github.com/rancher/rancher/pkg/auth/tokens"
@@ -153,7 +152,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 
 	Clusters(ctx, schemas, apiContext, clusterManager, k8sProxy)
 	ClusterRoleTemplateBinding(schemas, apiContext)
-	api.User(ctx, schemas, apiContext)
+	authapi.User(ctx, schemas, apiContext)
 	SecretTypes(ctx, schemas, apiContext)
 	Setting(schemas)
 	Feature(schemas, apiContext)

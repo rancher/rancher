@@ -25,7 +25,6 @@ import (
 	"github.com/sirupsen/logrus"
 	v12 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -108,7 +107,7 @@ func (l *projectLifecycle) sync(key string, orig *v3.Project) (runtime.Object, e
 			return nil, err
 		}
 	}
-	if err != nil && !kerrors.IsAlreadyExists(err) {
+	if err != nil && !apierrors.IsAlreadyExists(err) {
 		return nil, err
 	}
 

@@ -32,7 +32,6 @@ import (
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
-	apierror "k8s.io/apimachinery/pkg/api/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/retry"
@@ -1138,7 +1137,7 @@ func (p *Planner) ensureRKEStateSecret(controlPlane *rkev1.RKEControlPlane, newC
 
 	name := name.SafeConcatName(controlPlane.Name, "rke", "state")
 	secret, err := p.secretCache.Get(controlPlane.Namespace, name)
-	if apierror.IsNotFound(err) {
+	if apierrors.IsNotFound(err) {
 		if !newCluster {
 			return "", plan.Secret{}, fmt.Errorf("newCluster was false and secret does not exist: %w", err)
 		}

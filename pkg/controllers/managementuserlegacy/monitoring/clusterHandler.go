@@ -23,7 +23,6 @@ import (
 	"github.com/rancher/rke/pki"
 	k8scorev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -219,7 +218,7 @@ func (ch *clusterHandler) deployEtcdCert(clusterName, appTargetNamespace string)
 
 	agentSecretClient := ch.app.agentSecretClient
 	oldSec, err := agentSecretClient.GetNamespaced(appTargetNamespace, exporterEtcdCertName, metav1.GetOptions{})
-	if err != nil && k8serrors.IsNotFound(err) {
+	if err != nil && apierrors.IsNotFound(err) {
 		secret := &k8scorev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      exporterEtcdCertName,
@@ -227,7 +226,7 @@ func (ch *clusterHandler) deployEtcdCert(clusterName, appTargetNamespace string)
 			},
 			Data: secretData,
 		}
-		if _, err = agentSecretClient.Create(secret); err != nil && !k8serrors.IsAlreadyExists(err) {
+		if _, err = agentSecretClient.Create(secret); err != nil && !apierrors.IsAlreadyExists(err) {
 			return nil, err
 		}
 		return etcdTLSConfigs, nil
@@ -459,7 +458,7 @@ func (ch *clusterHandler) deployMetrics(cluster *mgmtv3.Cluster) error {
 		newObj.Namespace = clusterName
 
 		_, err := ch.app.cattleMonitorMetricClient.Create(newObj)
-		if err != nil && !k8serrors.IsAlreadyExists(err) {
+		if err != nil && !apierrors.IsAlreadyExists(err) {
 			return err
 		}
 	}
@@ -469,7 +468,7 @@ func (ch *clusterHandler) deployMetrics(cluster *mgmtv3.Cluster) error {
 		newObj.Namespace = clusterName
 
 		_, err := ch.app.cattleClusterGraphClient.Create(newObj)
-		if err != nil && !k8serrors.IsAlreadyExists(err) {
+		if err != nil && !apierrors.IsAlreadyExists(err) {
 			return err
 		}
 	}
@@ -482,14 +481,14 @@ func (ch *clusterHandler) withdrawMetrics(cluster *mgmtv3.Cluster) error {
 
 	for _, metric := range preDefinedClusterMetrics {
 		err := ch.app.cattleMonitorMetricClient.DeleteNamespaced(clusterName, metric.Name, &metav1.DeleteOptions{})
-		if err != nil && !k8serrors.IsNotFound(err) {
+		if err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}
 	}
 
 	for _, graph := range preDefinedClusterGraph {
 		err := ch.app.cattleClusterGraphClient.DeleteNamespaced(clusterName, graph.Name, &metav1.DeleteOptions{})
-		if err != nil && !k8serrors.IsNotFound(err) {
+		if err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}
 	}

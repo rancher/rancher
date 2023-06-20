@@ -11,7 +11,6 @@ import (
 	"github.com/rancher/wrangler/pkg/data"
 	"github.com/rancher/wrangler/pkg/yaml"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	meta2 "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -27,7 +26,7 @@ type IsNamespaced func(gvk schema.GroupVersionKind) bool
 
 func IsLatest(release *v1.ReleaseSpec, others []runtime.Object) bool {
 	for _, other := range others {
-		m, err := meta.Accessor(other)
+		m, err := meta2.Accessor(other)
 		if err != nil {
 			continue
 		}
@@ -64,7 +63,7 @@ func ToRelease(obj runtime.Object, isNamespaced IsNamespaced) (*v1.ReleaseSpec, 
 		return nil, err
 	}
 
-	meta, err := meta.Accessor(obj)
+	meta, err := meta2.Accessor(obj)
 	if err != nil {
 		return nil, err
 	}

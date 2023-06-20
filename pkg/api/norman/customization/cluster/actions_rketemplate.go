@@ -19,7 +19,6 @@ import (
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -98,7 +97,7 @@ func (a ActionHandler) validateClusterState(apiContext *types.APIContext) (*v3.C
 			fmt.Sprintf("failed to get cluster by id %v", apiContext.ID))
 	}
 
-	cluster, err := a.ClusterClient.Get(apiContext.ID, v1.GetOptions{})
+	cluster, err := a.ClusterClient.Get(apiContext.ID, metav1.GetOptions{})
 	if err != nil {
 		return nil, httperror.WrapAPIError(err, httperror.NotFound,
 			fmt.Sprintf("cluster with id %v doesn't exist", apiContext.ID))
@@ -123,7 +122,7 @@ func (a ActionHandler) createNewClusterTemplate(apiContext *types.APIContext, cl
 
 func (a ActionHandler) newClusterTemplate(clusterTempName string, cluster *v3.Cluster, creatorID string) *v3.ClusterTemplate {
 	return &v3.ClusterTemplate{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "ct-",
 			Namespace:    namespace.GlobalNamespace,
 			Labels: map[string]string{
@@ -151,10 +150,10 @@ func (a ActionHandler) newClusterTemplateRevision(clusterTempRevisionName string
 	clusterConfig := cluster.Status.AppliedSpec.ClusterSpecBase.DeepCopy()
 
 	return &v3.ClusterTemplateRevision{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "ctr-",
 			Namespace:    namespace.GlobalNamespace,
-			OwnerReferences: []v1.OwnerReference{
+			OwnerReferences: []metav1.OwnerReference{
 				{
 					Name:       clusterTemplate.Name,
 					UID:        clusterTemplate.UID,
@@ -182,7 +181,7 @@ func (a ActionHandler) newClusterTemplateRevision(clusterTempRevisionName string
 func (a ActionHandler) updateCluster(apiContext *types.APIContext, clusterTemplate *v3.ClusterTemplate, clusterTemplateRevision *v3.ClusterTemplateRevision) error {
 	// Can't add either too many retries or longer interval as this an API handler
 	for i := 0; i < numberOfRetries; i++ {
-		cluster, err := a.ClusterClient.Get(apiContext.ID, v1.GetOptions{})
+		cluster, err := a.ClusterClient.Get(apiContext.ID, metav1.GetOptions{})
 		if err != nil {
 			logrus.Errorf("error fetching cluster with id %v: %v", apiContext.ID, err)
 			continue

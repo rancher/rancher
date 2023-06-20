@@ -13,7 +13,6 @@ import (
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
 
@@ -174,7 +173,7 @@ func (m *adMigration) migrateCRTB(newPrincipalID string, dn string) error {
 			return fmt.Errorf("failed to convert object to CRTB for principalId %v", newPrincipalID)
 		}
 		newCrtb := &v3.ClusterRoleTemplateBinding{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:         "",
 				Namespace:    oldCrtb.ObjectMeta.Namespace,
 				GenerateName: "crtb-",
@@ -207,7 +206,7 @@ func (m *adMigration) migratePRTB(newPrincipalID string, dn string) error {
 			return fmt.Errorf("failed to convert object to PRTB for principalId %v: %w", newPrincipalID, err)
 		}
 		newPrtb := &v3.ProjectRoleTemplateBinding{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:         "",
 				Namespace:    oldPrtb.ObjectMeta.Namespace,
 				GenerateName: "prtb-",

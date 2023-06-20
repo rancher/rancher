@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	fv3 "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	"github.com/rancher/rancher/tests/framework/extensions/kubeapi/tokens"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
@@ -40,7 +39,7 @@ func (t *TokenTestSuite) SetupSuite() {
 }
 
 func (t *TokenTestSuite) TestPatchToken() {
-	tokenToCreate := &fv3.Token{Description: initialTokenDesc}
+	tokenToCreate := &management.Token{Description: initialTokenDesc}
 	createdToken, err := t.client.Management.Token.Create(tokenToCreate)
 	require.NoError(t.T(), err)
 
