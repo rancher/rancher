@@ -6,6 +6,8 @@ import (
 	"k8s.io/client-go/dynamic"
 )
 
+// ResourceForClient is a helper function that creates a dynamic client and instantiates a subsequent resource interface
+// in the requested cluster and namespace for said resource.
 func ResourceForClient(client *rancher.Client, clusterName, namespace string, resource schema.GroupVersionResource) (dynamic.ResourceInterface, error) {
 	dynamicClient, err := client.GetDownStreamClusterClient(clusterName)
 	if err != nil {

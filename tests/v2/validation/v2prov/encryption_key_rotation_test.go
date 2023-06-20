@@ -1,4 +1,4 @@
-package k3s
+package v2prov
 
 import (
 	"context"
@@ -11,18 +11,13 @@ import (
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
-	"github.com/rancher/rancher/tests/framework/extensions/cloudcredentials"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/kubeapi"
 	"github.com/rancher/rancher/tests/framework/extensions/kubeapi/secrets"
-	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
-	"github.com/rancher/rancher/tests/framework/pkg/config"
 	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
 	"github.com/rancher/rancher/tests/integration/pkg/defaults"
-	"github.com/rancher/rancher/tests/v2/validation/provisioning"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	corev1 "k8s.io/api/core/v1"
@@ -30,16 +25,17 @@ import (
 	kwait "k8s.io/apimachinery/pkg/util/wait"
 )
 
-type K3SEncryptionKeyRotationTestSuite struct {
+type V2ProvEncryptionKeyRotationTestSuite struct {
 	suite.Suite
 	session     *session.Session
 	client      *rancher.Client
-	config      *provisioning.Config
 	clusterName string
-	namespace   string
 }
 
-const totalSecrets = 10000
+const (
+	namespace    = "fleet-default"
+	totalSecrets = 10000
+)
 
 var phases = []rkev1.RotateEncryptionKeysPhase{
 	rkev1.RotateEncryptionKeysPhasePrepare,
@@ -51,16 +47,13 @@ var phases = []rkev1.RotateEncryptionKeysPhase{
 	rkev1.RotateEncryptionKeysPhaseDone,
 }
 
-func (r *K3SEncryptionKeyRotationTestSuite) TearDownSuite() {
+func (r *V2ProvEncryptionKeyRotationTestSuite) TearDownSuite() {
 	r.session.Cleanup()
 }
 
-func (r *K3SEncryptionKeyRotationTestSuite) SetupSuite() {
+func (r *V2ProvEncryptionKeyRotationTestSuite) SetupSuite() {
 	testSession := session.NewSession()
 	r.session = testSession
-
-	r.config = new(provisioning.Config)
-	config.LoadConfig(provisioning.ConfigurationFileKey, r.config)
 
 	client, err := rancher.NewClient("", testSession)
 	require.NoError(r.T(), err)
@@ -68,39 +61,6 @@ func (r *K3SEncryptionKeyRotationTestSuite) SetupSuite() {
 	r.client = client
 
 	r.clusterName = r.client.RancherConfig.ClusterName
-	r.namespace = r.client.RancherConfig.ClusterName
-}
-
-func provisionEnvironment(t *testing.T, client *rancher.Client, prefix string, provider Provider, version string, nodesAndRoles []machinepools.NodeRoles, credential *cloudcredentials.CloudCredential, psact string, advancedOptions provisioning.AdvancedOptions) string {
-	clusterName := namegen.AppendRandomString(fmt.Sprintf("%s-%s", prefix, provider.Name))
-	generatedPoolName := fmt.Sprintf("nc-%s-pool1-", clusterName)
-	machinePoolConfig := provider.MachinePoolFunc(generatedPoolName, namespace)
-
-	machineConfigResp, err := client.Steve.SteveType(provider.MachineConfigPoolResourceSteveType).Create(machinePoolConfig)
-	require.NoError(t, err)
-
-	machinePools := machinepools.RKEMachinePoolSetup(nodesAndRoles, machineConfigResp)
-
-	cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, namespace, "", credential.ID, version, psact, machinePools, advancedOptions)
-	cluster.Spec.RKEConfig.MachineGlobalConfig.Data["secrets-encryption"] = true
-
-	clusterResp, err := clusters.CreateK3SRKE2Cluster(client, cluster)
-	require.NoError(t, err)
-
-	kubeProvisioningClient, err := client.GetKubeAPIProvisioningClient()
-	require.NoError(t, err)
-
-	result, err := kubeProvisioningClient.Clusters(namespace).Watch(context.TODO(), metav1.ListOptions{
-		FieldSelector:  "metadata.name=" + cluster.ObjectMeta.Name,
-		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
-	})
-	require.NoError(t, err)
-
-	err = wait.WatchWait(result, clusters.IsProvisioningClusterReady)
-	require.NoError(t, err)
-	assert.Equal(t, clusterName, clusterResp.ObjectMeta.Name)
-
-	return clusterResp.ID
 }
 
 func rotateEncryptionKeys(t *testing.T, client *rancher.Client, steveID string, generation int64, timeout time.Duration) {
@@ -169,38 +129,24 @@ func createSecretsForCluster(t *testing.T, client *rancher.Client, steveID strin
 	}
 }
 
-func (r *K3SEncryptionKeyRotationTestSuite) TestEncryptionKeyRotation() {
-	for _, providerName := range r.config.Providers {
-		for _, kubernetesVersion := range r.config.K3SKubernetesVersions {
-			// cleanup resources inside the for loop to prevent leaking
-			subSession := r.session.NewSession()
+func (r *V2ProvEncryptionKeyRotationTestSuite) TestEncryptionKeyRotation() {
+	subSession := r.session.NewSession()
+	defer subSession.Cleanup()
 
-			provider := CreateProvider(providerName)
+	id, err := clusters.GetClusterIDByName(r.client, r.clusterName)
+	require.NoError(r.T(), err)
 
-			client, err := r.client.WithSession(subSession)
-			require.NoError(r.T(), err)
+	prefix := "encryption-key-rotation-"
+	r.Run(prefix+"new-cluster", func() {
+		rotateEncryptionKeys(r.T(), r.client, id, 1, 10*time.Minute)
+	})
 
-			cloudCredential, err := provider.CloudCredFunc(client)
-			require.NoError(r.T(), err)
+	// create 10k secrets for stress test, takes ~30 minutes
+	createSecretsForCluster(r.T(), r.client, id, totalSecrets)
 
-			// provisioning is not considered part of the test
-			id := provisionEnvironment(r.T(), client, r.clusterName, provider, kubernetesVersion, r.config.NodesAndRoles, cloudCredential, r.config.PSACT, r.config.AdvancedOptions)
-
-			name := fmt.Sprintf("%s/%s/%v", provider.Name, kubernetesVersion, r.config.NodesAndRoles)
-			//r.Run(name+"-new-cluster", func() {
-			//	rotateEncryptionKeys(r.T(), client, id, 1, 10*time.Minute)
-			//})
-
-			// create 10k secrets for stress test, takes ~30 minutes
-			createSecretsForCluster(r.T(), client, id, totalSecrets)
-
-			r.Run(name+"-stress-test", func() {
-				rotateEncryptionKeys(r.T(), client, id, 2, 1*time.Hour) // takes ~45 minutes for HA
-			})
-
-			subSession.Cleanup()
-		}
-	}
+	r.Run(prefix+"stress-test", func() {
+		rotateEncryptionKeys(r.T(), r.client, id, 2, 1*time.Hour) // takes ~45 minutes for HA
+	})
 }
 
 func IsAtLeast(t *testing.T, client *rancher.Client, namespace, name string, phase rkev1.RotateEncryptionKeysPhase) kwait.ConditionFunc {
@@ -242,5 +188,5 @@ func IsAtLeast(t *testing.T, client *rancher.Client, namespace, name string, pha
 }
 
 func TestEncryptionKeyRotation(t *testing.T) {
-	suite.Run(t, new(K3SEncryptionKeyRotationTestSuite))
+	suite.Run(t, new(V2ProvEncryptionKeyRotationTestSuite))
 }
