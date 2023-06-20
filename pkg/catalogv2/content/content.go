@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/url"
 	"strings"
 	"sync"
@@ -142,7 +141,7 @@ func (c *Manager) Index(namespace, name string, skipFilter bool) (*repo.IndexFil
 	}
 	defer gz.Close()
 
-	data, err = ioutil.ReadAll(gz)
+	data, err = io.ReadAll(gz)
 	if err != nil {
 		return nil, err
 	}

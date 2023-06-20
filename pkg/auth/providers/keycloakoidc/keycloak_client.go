@@ -3,7 +3,7 @@ package keycloakoidc
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -198,7 +198,7 @@ func (k *KeyCloakClient) getFromKeyCloak(url string) ([]byte, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return b, err
 	}

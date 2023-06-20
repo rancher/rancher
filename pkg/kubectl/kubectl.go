@@ -2,7 +2,6 @@ package kubectl
 
 import (
 	"context"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"strings"
@@ -122,7 +121,7 @@ func writeYAMLFile(yaml []byte) (*os.File, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := ioutil.WriteFile(yamlFile.Name(), yaml, 0600); err != nil {
+	if err := os.WriteFile(yamlFile.Name(), yaml, 0600); err != nil {
 		return nil, err
 	}
 	return yamlFile, nil
@@ -146,7 +145,7 @@ func tempFile(prefix string) (*os.File, error) {
 		}
 	}
 
-	f, err := ioutil.TempFile(tmpDir, prefix)
+	f, err := os.CreateTemp(tmpDir, prefix)
 	if err != nil {
 		return nil, err
 	}

@@ -3,7 +3,7 @@ package kontainerdrivermetadata
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"strings"
 
@@ -56,7 +56,7 @@ func getDataHTTP(url string) (kdm.Data, error) {
 		return data, fmt.Errorf("driverMetadata statusCode %v", resp.StatusCode)
 	}
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return data, fmt.Errorf("driverMetadata read response body error %v", err)
 	}
@@ -93,7 +93,7 @@ func getDataGit(urlPath, branch string) (kdm.Data, error) {
 	}
 	defer file.Close()
 
-	buf, err := ioutil.ReadAll(file)
+	buf, err := io.ReadAll(file)
 	if err != nil {
 		return data, fmt.Errorf("error reading file %s %v", filePath, err)
 	}

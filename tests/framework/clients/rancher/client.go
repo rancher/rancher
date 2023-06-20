@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 
 	"github.com/pkg/errors"
@@ -150,7 +150,7 @@ func (c *Client) doAction(endpoint, action string, body []byte, output interface
 		return httperror.NewAPIErrorLong(resp.StatusCode, resp.Status, url)
 	}
 
-	byteContent, err := ioutil.ReadAll(resp.Body)
+	byteContent, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return err
 	}

@@ -8,7 +8,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"strings"
 	"time"
@@ -89,7 +88,7 @@ func (a awsv4) sign(req *http.Request, secrets SecretGetter, auth string) error 
 	awsSigner := v4.NewSigner(creds)
 	var body []byte
 	if req.Body != nil {
-		body, err = ioutil.ReadAll(req.Body)
+		body, err = io.ReadAll(req.Body)
 		if err != nil {
 			return fmt.Errorf("error reading request body %v", err)
 		}

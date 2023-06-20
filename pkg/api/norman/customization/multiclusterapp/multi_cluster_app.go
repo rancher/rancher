@@ -3,7 +3,7 @@ package multiclusterapp
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -59,7 +59,7 @@ func (w Wrapper) ActionHandler(actionName string, action *types.Action, apiConte
 	}
 	switch actionName {
 	case "rollback":
-		data, err := ioutil.ReadAll(apiContext.Request.Body)
+		data, err := io.ReadAll(apiContext.Request.Body)
 		if err != nil {
 			return errors.Wrap(err, "reading request body error")
 		}

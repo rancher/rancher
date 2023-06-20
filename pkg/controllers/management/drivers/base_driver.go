@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"hash"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
@@ -49,7 +48,7 @@ func (d *BaseDriver) FriendlyName() string {
 
 func (d *BaseDriver) Remove() error {
 	cacheFilePrefix := d.cacheFile()
-	content, err := ioutil.ReadFile(cacheFilePrefix)
+	content, err := os.ReadFile(cacheFilePrefix)
 	if os.IsNotExist(err) {
 		return nil
 	}
@@ -79,7 +78,7 @@ func (d *BaseDriver) setError(err error) error {
 
 	if err != nil {
 		os.MkdirAll(path.Dir(errFile), 0700)
-		ioutil.WriteFile(errFile, []byte(err.Error()), 0600)
+		os.WriteFile(errFile, []byte(err.Error()), 0600)
 	}
 	return err
 }
@@ -87,7 +86,7 @@ func (d *BaseDriver) setError(err error) error {
 func (d *BaseDriver) getError() error {
 	errFile := d.cacheFile() + ".error"
 
-	if content, err := ioutil.ReadFile(errFile); err == nil {
+	if content, err := os.ReadFile(errFile); err == nil {
 		logrus.Errorf("Returning previous error: %s", content)
 		d.ClearError()
 		return errors.New(string(content))
@@ -114,7 +113,7 @@ func (d *BaseDriver) stage(forceUpdate bool) error {
 		return err
 	}
 
-	tempFile, err := ioutil.TempFile("", "machine-driver")
+	tempFile, err := os.CreateTemp("", "machine-driver")
 	if err != nil {
 		return err
 	}
@@ -186,7 +185,7 @@ func isElf(input string) bool {
 }
 
 func (d *BaseDriver) copyBinary(cacheFile, input string) (string, error) {
-	temp, err := ioutil.TempDir("", "machine-driver-extract")
+	temp, err := os.MkdirTemp("", "machine-driver-extract")
 	if err != nil {
 		return "", err
 	}
@@ -264,7 +263,7 @@ func (d *BaseDriver) copyBinary(cacheFile, input string) (string, error) {
 	}
 
 	logrus.Infof("Found driver %s", driverName)
-	return driverName, ioutil.WriteFile(cacheFile, []byte(driverName), 0644)
+	return driverName, os.WriteFile(cacheFile, []byte(driverName), 0644)
 }
 
 // binName is the full path to the binary executable. This does not take in
@@ -339,7 +338,7 @@ func (d *BaseDriver) cacheFile() string {
 }
 
 func isInstalled(file string) (string, error) {
-	content, err := ioutil.ReadFile(file)
+	content, err := os.ReadFile(file)
 	if os.IsNotExist(err) {
 		return "", nil
 	}

@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"time"
 
@@ -160,7 +160,7 @@ func (h *handler) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
 
 func (h *handler) checkCredentials(req *http.Request) (int, error) {
 	cred := &Capabilities{}
-	raw, err := ioutil.ReadAll(req.Body)
+	raw, err := io.ReadAll(req.Body)
 	if err != nil {
 		return http.StatusBadRequest, fmt.Errorf("cannot read request body: %v", err)
 	}
@@ -315,7 +315,7 @@ func (h *handler) clusterCheck(apiContext *types.APIContext, clusterID, cloudCre
 }
 
 func (h *handler) getCredentialsFromBody(req *http.Request, cap *Capabilities) (int, error) {
-	raw, err := ioutil.ReadAll(req.Body)
+	raw, err := io.ReadAll(req.Body)
 	if err != nil {
 		return http.StatusBadRequest, fmt.Errorf("cannot read request body: %v", err)
 	}

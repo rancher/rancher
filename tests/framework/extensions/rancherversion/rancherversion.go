@@ -2,7 +2,7 @@ package rancherversion
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strconv"
 )
@@ -16,7 +16,7 @@ func RequestRancherVersion(rancher_url string) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	byte_object, err := ioutil.ReadAll(req.Body)
+	byte_object, err := io.ReadAll(req.Body)
 	if err != nil || byte_object == nil {
 		return nil, err
 	}

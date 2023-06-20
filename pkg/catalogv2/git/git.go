@@ -7,7 +7,6 @@ import (
 	"crypto/x509"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
@@ -333,7 +332,7 @@ func (g *git) gitCmd(output io.Writer, args ...string) error {
 	}
 
 	if len(g.knownHosts) != 0 {
-		f, err := ioutil.TempFile("", "known_hosts")
+		f, err := os.CreateTemp("", "known_hosts")
 		if err != nil {
 			return err
 		}
@@ -358,7 +357,7 @@ func (g *git) gitCmd(output io.Writer, args ...string) error {
 	}
 
 	if len(g.caBundle) > 0 {
-		f, err := ioutil.TempFile("", "ca-pem-")
+		f, err := os.CreateTemp("", "ca-pem-")
 		if err != nil {
 			return err
 		}
@@ -387,13 +386,13 @@ func (g *git) injectAgent(cmd *exec.Cmd) (io.Closer, error) {
 		return nil, err
 	}
 
-	tmpDir, err := ioutil.TempDir("", "ssh-agent")
+	tmpDir, err := os.CreateTemp("", "ssh-agent")
 	if err != nil {
 		return nil, err
 	}
 
 	addr := &net.UnixAddr{
-		Name: filepath.Join(tmpDir, r),
+		Name: filepath.Join(tmpDir.Name(), r),
 		Net:  "unix",
 	}
 
@@ -405,7 +404,7 @@ func (g *git) injectAgent(cmd *exec.Cmd) (io.Closer, error) {
 	cmd.Env = append(cmd.Env, "SSH_AUTH_SOCK="+addr.Name)
 
 	go func() {
-		defer os.RemoveAll(tmpDir)
+		defer os.RemoveAll(tmpDir.Name())
 		defer l.Close()
 		for {
 			conn, err := l.Accept()

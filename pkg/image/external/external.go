@@ -2,7 +2,7 @@ package external
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"sort"
 	"strings"
@@ -162,7 +162,7 @@ func downloadExternalImageListFromURL(url string) (string, error) {
 		return "", err
 	}
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if resp.StatusCode != 200 {
 		return "", fmt.Errorf("failed to get url: %v", string(body))
 	}

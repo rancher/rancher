@@ -3,7 +3,7 @@ package cluster
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 
 	rketypes "github.com/rancher/rke/types"
@@ -36,7 +36,7 @@ func (a ActionHandler) RotateCertificates(actionName string, action *types.Actio
 
 		return errors.Wrapf(err, "failed to get Cluster by ID %s", apiContext.ID)
 	}
-	data, err := ioutil.ReadAll(apiContext.Request.Body)
+	data, err := io.ReadAll(apiContext.Request.Body)
 	if err != nil {
 		rtn["message"] = "reading request body error"
 		apiContext.WriteResponse(http.StatusBadRequest, rtn)

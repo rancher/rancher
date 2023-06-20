@@ -5,7 +5,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 
 	"github.com/rancher/norman/httperror"
@@ -62,7 +62,7 @@ func postAction(endpoint, action, host string, body []byte, output interface{}) 
 		return httperror.NewAPIErrorLong(resp.StatusCode, resp.Status, url)
 	}
 
-	byteContent, err := ioutil.ReadAll(resp.Body)
+	byteContent, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return err
 	}

@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"time"
 
@@ -28,7 +28,7 @@ import (
 )
 
 func (a ActionHandler) ImportYamlHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {
-	data, err := ioutil.ReadAll(apiContext.Request.Body)
+	data, err := io.ReadAll(apiContext.Request.Body)
 	if err != nil {
 		return errors.Wrap(err, "reading request body error")
 	}

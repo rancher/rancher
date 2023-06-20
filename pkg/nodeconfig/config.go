@@ -2,7 +2,7 @@ package nodeconfig
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"io/fs"
 	"os"
 	"path/filepath"
 
@@ -180,13 +180,17 @@ func (m *NodeConfig) UpdateAmazonAuth(rawConfig interface{}) (bool, error) {
 
 	machines := filepath.Join(m.fullMachinePath, "machines")
 	logrus.Debugf("[UpdateAmazonAuth] machine path %v", machines)
-	files, err := ioutil.ReadDir(machines)
+	entries, err := os.ReadDir(machines)
 	if err != nil {
-		// There aren't any machines, nothing to update
-		if os.IsNotExist(err) {
+		return update, nil
+	}
+	files := make([]fs.FileInfo, 0, len(entries))
+	for _, entry := range entries {
+		info, err := entry.Info()
+		if err != nil {
 			return update, nil
 		}
-		return update, err
+		files = append(files, info)
 	}
 
 	for _, file := range files {

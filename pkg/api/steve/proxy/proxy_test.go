@@ -5,11 +5,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"strings"
 	"testing"
 
@@ -251,7 +252,7 @@ func NewSARServer(reviewer *testReviewer, rootPath string) (*httptest.Server, er
 			return
 		}
 		var review authv1.SubjectAccessReview
-		bodyData, _ := ioutil.ReadAll(r.Body)
+		bodyData, _ := io.ReadAll(r.Body)
 		if err := json.Unmarshal(bodyData, &review); err != nil {
 			http.Error(w, fmt.Sprintf("failed to decode body %s", err), http.StatusBadRequest)
 			return
@@ -320,7 +321,7 @@ func RestClientForURL(serverURL string, token string) (rest.Interface, error) {
 			},
 		},
 	}
-	tempfile, err := ioutil.TempFile("", "")
+	tempfile, err := os.CreateTemp("", "")
 	if err != nil {
 		return nil, err
 	}
