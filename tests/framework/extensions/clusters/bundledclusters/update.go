@@ -16,7 +16,7 @@ func (bc *BundledCluster) Update(client *rancher.Client, cUpdates *BundledCluste
 	updatedCluster = new(BundledCluster)
 	updatedCluster.Meta = bc.Meta
 
-	steveclient := client.Steve.SteveType(clusters.ProvisioningSteveResouceType)
+	steveclient := client.Steve.SteveType(clusters.ProvisioningSteveResourceType)
 	if err != nil {
 		return
 	}

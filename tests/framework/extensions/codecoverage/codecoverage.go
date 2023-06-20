@@ -132,7 +132,7 @@ func KillRancherTestServicesRetrieveCoverage(client *rancher.Client) error {
 // inorder for the code coverage report to be written, and then copies over the coverage reports from the pods
 // to a local destination. The custom code coverage rancher-agent image must be running in the downstream cluster.
 func KillAgentTestServicesRetrieveCoverage(client *rancher.Client) error {
-	clusters, err := client.Steve.SteveType(clusters.ProvisioningSteveResouceType).ListAll(nil)
+	clusters, err := client.Steve.SteveType(clusters.ProvisioningSteveResourceType).ListAll(nil)
 	if err != nil {
 		return err
 	}

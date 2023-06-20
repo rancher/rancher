@@ -35,7 +35,7 @@ func CreateSnapshot(client *rancher.Client, clustername string, namespace string
 		}
 	}
 
-	_, err = client.Steve.SteveType(clusters.ProvisioningSteveResouceType).Update(existingSteveAPIObj, clusterObj)
+	_, err = client.Steve.SteveType(clusters.ProvisioningSteveResourceType).Update(existingSteveAPIObj, clusterObj)
 	if err != nil {
 		return err
 	}
