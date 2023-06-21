@@ -124,8 +124,8 @@ func TestCleanupRuns(t *testing.T) {
 func TestAuthConfigReset(t *testing.T) {
 	t.Parallel()
 
-	allFields := []string{"accessMode", "allowedPrincipalIds", "apiVersion", "kind", "metadata", "type"}
-	postResetFields := []string{"apiVersion", "kind", "metadata", "type"}
+	allFields := []string{"accessMode", "allowedPrincipalIds", "apiVersion", "kind", "metadata", "type", "status"}
+	postResetFields := []string{"apiVersion", "kind", "metadata", "type", "status"}
 
 	tests := []struct {
 		annotationValue string
