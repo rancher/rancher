@@ -1,13 +1,24 @@
+//go:build integrationsetup
+
+// We're protecting this file with a build tag because it depends on github.com/containers/image which depends on C
+// libraries that we can't and don't want to build unless we're going to run this integration setup program.
+
 package main
 
 import (
+	"context"
 	"fmt"
 	"net"
-	"os/exec"
+	"time"
 
+	"github.com/containers/image/v5/copy"
+	"github.com/containers/image/v5/signature"
+	"github.com/containers/image/v5/transports/alltransports"
+	"github.com/containers/image/v5/types"
 	"github.com/creasty/defaults"
 	provisioningv1api "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	v1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
+	pkgpf "github.com/rancher/rancher/pkg/portforward"
 	rancherClient "github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	"github.com/rancher/rancher/tests/framework/extensions/token"
@@ -20,11 +31,12 @@ import (
 	"github.com/rancher/rancher/tests/v2prov/registry"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/util/retry"
 )
 
 const (
-	clusterNameBaseName  = "integration-test-cluster"
-	clusterNamespaceBase = "test-ns"
+	clusterNameBaseName = "integration-test-cluster"
 )
 
 // main creates a test namespace and cluster for use in integration tests.
@@ -78,31 +90,79 @@ func main() {
 		logrus.Fatalf("Error creating namespace: %v", err)
 	}
 
-	logrus.Info("Setting up registry cache in namespace default")
-	reg, err := registry.GetCache(clusterClients, ns.Name)
+	logrus.Infof("Deploying registry to default namespace with secrets in namespace %s", ns.Name)
+	reg, err := registry.CreateOrGetRegistry(clusterClients, ns.Name, "registry", false)
 	if err != nil {
-		logrus.Fatalf("Error getting registry cache: %v", err)
+		logrus.Fatalf("Error creating registry: %v", err)
 	}
 
-	// The purpose of this step is to ensure that our downstream cluster(s) use the images we just built during our
-	// CI process rancher than the official ones from DockerHub. If we didn't do this, then we wouldn't be testing
-	// against the code we just wrote – we'd be testing against code we released a while ago.
-	// We may have to retry a few times to push images to the registry as the port-forward we're using can be flaky.
-	maxAttempts := 10
-	attempts := 0
-	for ; attempts < maxAttempts; attempts++ {
-		logrus.Infof("Pushing test images to registry")
-		out, err := exec.Command("/usr/bin/bash", "tests/v2/integration/scripts/seed-registry").Output()
-		if err != nil {
-			logrus.Errorf("Pushing images to registry: %v. Process output:\n%s\nRetrying", err, string(out))
-		} else {
-			logrus.Infof("Successfully pushed test images")
-			break
+	logrus.Infof("Deploying registry-cache to default namespace with secrets in namespace %s", ns.Name)
+	regCache, err := registry.CreateOrGetRegistry(clusterClients, ns.Name, "registry-cache", true)
+	if err != nil {
+		logrus.Fatalf("Error creating registry-cache: %v", err)
+	}
+
+	{
+		// Merge the two registry configs so that when we look for an image in the downstream cluster, we will:
+		//  - First check "registry" (where we push our recently-built test images)
+		//  - If not found "registry", check "registry-cache" (i.e. the pull-through cache)
+		//  - If not present in "registry-cache", it will pull the image from docker.io
+		mirrors := reg.Mirrors["docker.io"]
+		mirrors.Endpoints = append(mirrors.Endpoints, regCache.Mirrors["docker.io"].Endpoints...)
+		reg.Mirrors["docker.io"] = mirrors
+		for k, v := range regCache.Configs {
+			reg.Configs[k] = v
 		}
 	}
 
-	if attempts >= maxAttempts {
-		logrus.Fatalf("Failed to push images to registry after %d attempts", maxAttempts)
+	// Set up a port-forward to the registry pod, so we can copy images to it.
+	stopCh := make(chan struct{}, 1)
+	errCh := make(chan error)
+	defer func() {
+		// This will stop the port-forward if it's still running
+		close(stopCh)
+
+		// Print any errors returned by the port-forwarder
+		select {
+		case err := <-errCh:
+			logrus.Errorf("error in port-forward: %v", err)
+		default: // Do nothing
+		}
+		close(errCh)
+	}()
+
+	logrus.Info("Forwarding local port 5000 to registry:5000")
+	if err = pkgpf.ForwardPorts(
+		clusterClients.RESTConfig,
+		"default",
+		"registry",
+		[]string{"5000:5000"},
+		stopCh,
+		errCh,
+		time.Second*10,
+	); err != nil {
+		logrus.Fatalf("Error forwarding ports: %v", err)
+	}
+
+	// Copy the local image rancher/rancher-agent:master-head from the Docker daemon to the Docker registry
+	// at localhost:5000. We need to do this before we create downstream clusters to ensure that they can use this
+	// locally-built image. We're also retrying on error here because the port-forward tends to be flaky when we're
+	// transferring large images, at least on my machine.
+	shouldRetry := func(err error) bool {
+		if err != nil {
+			logrus.Errorf("Error pushing images: %v", err)
+		}
+
+		return err != nil
+	}
+	attemptImagePush := func() error {
+		logrus.Infof("Attempting to push images to registry")
+		return pushImages(map[string]string{
+			"docker-daemon:rancher/rancher-agent:master-head": "docker://localhost:5000/rancher/rancher-agent:master-head",
+		})
+	}
+	if err = retry.OnError(wait.Backoff{Steps: 10}, shouldRetry, attemptImagePush); err != nil {
+		logrus.Fatalf("Failed to push images to registry: %v", err)
 	}
 
 	logrus.Infof(
@@ -153,4 +213,51 @@ func getOutboundIP() (net.IP, error) {
 	defer conn.Close()
 
 	return conn.LocalAddr().(*net.UDPAddr).IP, nil
+}
+
+// pushImages does the equivalent of
+// "skopeo copy --dest-tls-verify=false --dest-creds=admin:admin <src> <dst>"
+// for each image. imageMapping should map source image to destination image in skopeo format.
+func pushImages(imageMapping map[string]string) error {
+	// Don't bother verifying any image signatures
+	policyCtx, err := signature.NewPolicyContext(&signature.Policy{
+		Default: []signature.PolicyRequirement{signature.NewPRInsecureAcceptAnything()},
+	})
+	if err != nil {
+		return fmt.Errorf("error creating policy context: %v", err)
+	}
+
+	for src, dst := range imageMapping {
+		srcRef, err := alltransports.ParseImageName(src)
+		if err != nil {
+			return fmt.Errorf("error parsing source image %s: %v", src, err)
+		}
+
+		dstRef, err := alltransports.ParseImageName(dst)
+		if err != nil {
+			return fmt.Errorf("error parsing destination image %s: %v", dst, err)
+		}
+
+		if _, err = copy.Image(
+			context.Background(),
+			policyCtx,
+			dstRef,
+			srcRef,
+			&copy.Options{
+				DestinationCtx: &types.SystemContext{
+					// Don't use TLS because the registry we're pushing to uses self-signed certs.
+					DockerInsecureSkipTLSVerify: types.OptionalBoolTrue,
+					// Use registry credentials admin:admin
+					DockerAuthConfig: &types.DockerAuthConfig{
+						Username: "admin",
+						Password: "admin",
+					},
+				},
+			},
+		); err != nil {
+			return fmt.Errorf("error copying image from source %s to destination %s: %v", src, dst, err)
+		}
+	}
+
+	return nil
 }

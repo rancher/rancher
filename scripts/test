@@ -118,10 +118,10 @@ RANCHER_RUN_PID=$!
 trap cleanup exit
 
 echo "Waiting for Rancher to be healthy"
-./scripts/await --sleep 2 "curl -sf -o /dev/null http://localhost:8080/ping"
+./scripts/retry --sleep 2 "curl -sf -o /dev/null http://localhost:8080/ping"
 
 echo "Waiting up to 5 minutes for rancher-webhook deployment"
-./scripts/await \
+./scripts/retry \
   --timeout 300 `# Time out after 300 seconds (5 min)` \
   --sleep 2 `# Sleep for 2 seconds in between attempts` \
   --message-interval 30 `# Print the progress message below every 30 attempts (roughly every minute)` \
