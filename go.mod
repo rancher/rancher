@@ -71,8 +71,8 @@ require (
 	github.com/creasty/defaults v1.5.2
 	github.com/crewjam/saml v0.4.13
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/docker/distribution v2.8.1+incompatible
-	github.com/docker/docker v20.10.17+incompatible
+	github.com/docker/distribution v2.8.2+incompatible
+	github.com/docker/docker v20.10.24+incompatible
 	github.com/docker/go-connections v0.4.0
 	github.com/ehazlett/simplelog v0.0.0-20200226020431-d374894e92a4
 	github.com/evanphx/json-patch v4.12.0+incompatible
@@ -118,7 +118,7 @@ require (
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 	github.com/rancher/remotedialer v0.2.6-0.20220624190122-ea57207bf2b8
-	github.com/rancher/rke v1.4.6-rc3
+	github.com/rancher/rke v1.4.6-rc5
 	github.com/rancher/steve v0.0.0-20230609202141-bf2e9655f5dd
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007
 	github.com/rancher/wrangler v1.1.1
