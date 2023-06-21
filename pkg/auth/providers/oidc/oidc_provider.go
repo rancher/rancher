@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/coreos/go-oidc/v3/oidc"
+	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
@@ -317,10 +318,15 @@ func (o *OpenIDCProvider) GetOIDCConfig() (*v32.OIDCConfig, error) {
 	storedOidcConfigMap := u.UnstructuredContent()
 
 	storedOidcConfig := &v32.OIDCConfig{}
-	err = common.Decode(storedOidcConfigMap, storedOidcConfig)
-	if err != nil {
-		return nil, fmt.Errorf("unable to decode OidcConfig: %w", err)
+	mapstructure.Decode(storedOidcConfigMap, storedOidcConfig)
+
+	metadataMap, ok := storedOidcConfigMap["metadata"].(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("failed to retrieve OIDCConfig metadata, cannot read k8s Unstructured data")
 	}
+	objectMeta := &metav1.ObjectMeta{}
+	mapstructure.Decode(metadataMap, objectMeta)
+	storedOidcConfig.ObjectMeta = *objectMeta
 
 	if storedOidcConfig.PrivateKey != "" {
 		value, err := common.ReadFromSecret(o.Secrets, storedOidcConfig.PrivateKey, strings.ToLower(client.OIDCConfigFieldPrivateKey))

@@ -7,10 +7,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const (
-	UserConditionInitialRolesPopulated condition.Cond = "InitialRolesPopulated"
-	AuthConfigConditionSecretsMigrated condition.Cond = "SecretsMigrated"
-)
+const UserConditionInitialRolesPopulated condition.Cond = "InitialRolesPopulated"
 
 // +genclient
 // +genclient:nonNamespaced
@@ -163,38 +160,13 @@ type SetPasswordInput struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type AuthConfig struct {
-	metav1.TypeMeta   `json:",inline" mapstructure:",squash"`
-	metav1.ObjectMeta `json:"metadata,omitempty" mapstructure:"metadata"`
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Type                string           `json:"type" norman:"noupdate"`
-	Enabled             bool             `json:"enabled,omitempty"`
-	AccessMode          string           `json:"accessMode,omitempty" norman:"required,notnullable,type=enum,options=required|restricted|unrestricted"`
-	AllowedPrincipalIDs []string         `json:"allowedPrincipalIds,omitempty" norman:"type=array[reference[principal]]"`
-	Status              AuthConfigStatus `json:"status"`
-}
-
-type AuthConfigStatus struct {
-	Conditions []AuthConfigConditions `json:"conditions"`
-}
-
-type AuthConfigConditions struct {
-	// Type of condition
-	Type condition.Cond `json:"type"`
-
-	// Status of condition (one of True, False, Unknown)
-	Status v1.ConditionStatus `json:"status"`
-
-	// Last time the condition was updated
-	LastUpdateTime string `json:"lastUpdateTime,omitempty"`
-
-	// Last time the condition transitioned from one status to another
-	LastTransitionTime string `json:"lastTransitionTime,omitempty"`
-
-	// The reason for the condition's last transition
-	Reason string `json:"reason,omitempty"`
-
-	// Human-readable message indicating details about last transition
-	Message string `json:"message,omitempty"`
+	Type                string   `json:"type" norman:"noupdate"`
+	Enabled             bool     `json:"enabled,omitempty"`
+	AccessMode          string   `json:"accessMode,omitempty" norman:"required,notnullable,type=enum,options=required|restricted|unrestricted"`
+	AllowedPrincipalIDs []string `json:"allowedPrincipalIds,omitempty" norman:"type=array[reference[principal]]"`
 }
 
 // +genclient
@@ -430,7 +402,7 @@ type OKTAConfig struct {
 
 type ShibbolethConfig struct {
 	SamlConfig     `json:",inline" mapstructure:",squash"`
-	OpenLdapConfig LdapFields `json:"openLdapConfig"`
+	OpenLdapConfig LdapFields `json:"openLdapConfig" mapstructure:",squash"`
 }
 
 type AuthSystemImages struct {
