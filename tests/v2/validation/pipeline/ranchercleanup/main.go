@@ -34,7 +34,7 @@ func main() {
 	var clusterList *v1.SteveCollection
 	err = kwait.Poll(500*time.Millisecond, 2*time.Minute, func() (done bool, err error) {
 		//clean up clusters
-		resp, err := client.Steve.SteveType(clusters.ProvisioningSteveResouceType).List(nil)
+		resp, err := client.Steve.SteveType(clusters.ProvisioningSteveResourceType).List(nil)
 		if k8sErrors.IsInternalError(err) || k8sErrors.IsServiceUnavailable(err) {
 			return false, err
 		} else if resp != nil {
@@ -51,7 +51,7 @@ func main() {
 	deleteTimeout := timeout
 	for _, cluster := range clusterList.Data {
 		if cluster.ObjectMeta.Name != "local" {
-			err := client.Steve.SteveType(clusters.ProvisioningSteveResouceType).Delete(&cluster)
+			err := client.Steve.SteveType(clusters.ProvisioningSteveResourceType).Delete(&cluster)
 			if err != nil {
 				logrus.Errorf("error deleting cluster: %v", err)
 			}

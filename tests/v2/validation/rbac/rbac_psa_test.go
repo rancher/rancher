@@ -29,6 +29,8 @@ type PSATestSuite struct {
 	client              *rancher.Client
 	nonAdminUser        *management.User
 	nonAdminUserClient  *rancher.Client
+	standardUser        *management.User
+	standardUserClient  *rancher.Client
 	session             *session.Session
 	cluster             *management.Cluster
 	adminProject        *management.Project
@@ -38,6 +40,8 @@ type PSATestSuite struct {
 	adminNamespace      *v1.SteveAPIObject
 	stdUserNamespace    *v1.SteveAPIObject
 	psaRole             *management.RoleTemplate
+	namespace           string
+	clusterName         string
 }
 
 func (rb *PSATestSuite) TearDownSuite() {
@@ -51,10 +55,11 @@ func (rb *PSATestSuite) SetupSuite() {
 	client, err := rancher.NewClient("", testSession)
 	require.NoError(rb.T(), err)
 
+	rb.namespace = defaultNamespace
 	rb.client = client
-	clusterName := client.RancherConfig.ClusterName
-	require.NotEmptyf(rb.T(), clusterName, "Cluster name to install should be set")
-	clusterID, err := clusters.GetClusterIDByName(rb.client, clusterName)
+	rb.clusterName = client.RancherConfig.ClusterName
+	require.NotEmptyf(rb.T(), rb.clusterName, "Cluster name to install should be set")
+	clusterID, err := clusters.GetClusterIDByName(rb.client, rb.clusterName)
 	require.NoError(rb.T(), err, "Error getting cluster ID")
 	rb.cluster, err = rb.client.Management.Cluster.ByID(clusterID)
 	require.NoError(rb.T(), err)
@@ -250,8 +255,27 @@ func (rb *PSATestSuite) ValidateAdditionalPSA(role string) {
 	}
 }
 
+func (rb *PSATestSuite) ValidateEditCluster(role string) {
+	log.Infof("Editing the cluster as %v", role)
+	clusterType, err := editCluster(rb.standardUserClient, rb.clusterName, rb.namespace, "")
+	switch role {
+	case roleOwner, restrictedAdmin:
+		require.NoError(rb.T(), err)
+	case roleMember, roleProjectOwner, roleProjectMember, roleProjectReadOnly:
+		require.Error(rb.T(), err)
+		if clusterType == "RKE2K3S" {
+			assert.Equal(rb.T(), "Resource type [provisioning.cattle.io.cluster] is not updatable", err.Error())
+		} else {
+			errStatus := strings.Split(err.Error(), ".")[1]
+			rgx := regexp.MustCompile(`\[(.*?)\]`)
+			errorMsg := rgx.FindStringSubmatch(errStatus)
+			assert.Equal(rb.T(), "403 Forbidden", errorMsg[1])
+		}
+	}
+}
+
 func (rb *PSATestSuite) TestPSA() {
-	nonAdminUserRoles := [...]string{roleMember, restrictedAdmin, roleOwner, roleProjectOwner , roleProjectReadOnly, roleProjectMember, roleCustomCreateNS} 
+	nonAdminUserRoles := [...]string{roleMember, restrictedAdmin, roleOwner, roleProjectOwner, roleProjectReadOnly, roleProjectMember, roleCustomCreateNS}
 	for _, role := range nonAdminUserRoles {
 		var customRole bool
 		if role == roleCustomCreateNS {
@@ -333,6 +357,57 @@ func (rb *PSATestSuite) TestPSA() {
 				rb.ValidatePSA(psaRole, customRole)
 			})
 		}
+	}
+}
+
+func (rb *PSATestSuite) TestPsactRBAC() {
+	tests := []struct {
+		name   string
+		role   string
+		member string
+	}{
+		{"Cluster Owner", roleOwner, standardUser},
+		{"Cluster Member", roleMember, standardUser},
+		{"Project Owner", roleProjectOwner, standardUser},
+		{"Project Member", roleProjectMember, standardUser},
+		{"Project Read Only", roleProjectReadOnly, standardUser},
+		{"Restricted Admin", restrictedAdmin, restrictedAdmin},
+	}
+	for _, tt := range tests {
+
+		rb.Run("Set up User with Cluster Role "+tt.name, func() {
+			newUser, err := createUser(rb.client, tt.member)
+			require.NoError(rb.T(), err)
+			rb.standardUser = newUser
+			rb.T().Logf("Created user: %v", rb.standardUser.Username)
+			rb.standardUserClient, err = rb.client.AsUser(newUser)
+			require.NoError(rb.T(), err)
+
+			subSession := rb.session.NewSession()
+			defer subSession.Cleanup()
+
+			createProjectAsAdmin, err := createProject(rb.client, rb.cluster.ID)
+			rb.adminProject = createProjectAsAdmin
+			require.NoError(rb.T(), err)
+		})
+		rb.Run("Adding user as "+tt.name+" to the downstream cluster.", func() {
+			if tt.member == standardUser {
+				if strings.Contains(tt.role, "project") || tt.role == roleProjectReadOnly {
+					err := users.AddProjectMember(rb.client, rb.adminProject, rb.standardUser, tt.role)
+					require.NoError(rb.T(), err)
+				} else {
+					err := users.AddClusterRoleToUser(rb.client, rb.cluster, rb.standardUser, tt.role)
+					require.NoError(rb.T(), err)
+				}
+			}
+			relogin, err := rb.standardUserClient.ReLogin()
+			require.NoError(rb.T(), err)
+			rb.standardUserClient = relogin
+		})
+		rb.T().Logf("Starting validations for %v", tt.role)
+		rb.Run("Test case - Edit cluster as a "+tt.name, func() {
+			rb.ValidateEditCluster(tt.role)
+		})
 	}
 }
 

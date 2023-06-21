@@ -10,8 +10,10 @@ import (
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
+	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/namespaces"
 	"github.com/rancher/rancher/tests/framework/extensions/projects"
+	nodepools "github.com/rancher/rancher/tests/framework/extensions/rke1/nodepools"
 	"github.com/rancher/rancher/tests/framework/extensions/users"
 	password "github.com/rancher/rancher/tests/framework/extensions/users/passwordgenerator"
 	"github.com/rancher/rancher/tests/framework/extensions/workloads"
@@ -43,10 +45,11 @@ const (
 	psaRole                       = "updatepsa"
 	defaultNamespace              = "fleet-default"
 	isCattleLabeled               = true
+	ProvisioningSteveResouceType  = "provisioning.cattle.io.cluster"
 )
 
 type ClusterConfig struct {
-	nodeRoles            []string
+	nodesAndRoles        []nodepools.NodeRoles
 	externalNodeProvider provisioning.ExternalNodeProvider
 	kubernetesVersion    string
 	cni                  string
@@ -226,11 +229,9 @@ func editGlobalSettings(steveclient *v1.Client, globalSetting *v1.SteveAPIObject
 }
 
 func getClusterConfig() *ClusterConfig {
-	nodeAndRoles := []string{
-		"--etcd",
-		"--controlplane",
-		"--worker",
-	}
+
+	nodeAndRoles := []nodepools.NodeRoles{provisioning.RKE1AllRolesPool}
+
 	userConfig := new(provisioning.Config)
 	config.LoadConfig(provisioning.ConfigurationFileKey, userConfig)
 
@@ -241,7 +242,7 @@ func getClusterConfig() *ClusterConfig {
 
 	externalNodeProvider := provisioning.ExternalNodeProviderSetup(nodeProviders)
 
-	clusterConfig := ClusterConfig{nodeRoles: nodeAndRoles, externalNodeProvider: externalNodeProvider,
+	clusterConfig := ClusterConfig{nodesAndRoles: nodeAndRoles, externalNodeProvider: externalNodeProvider,
 		kubernetesVersion: kubernetesVersion, cni: cni, advancedOptions: advancedOptions}
 
 	return &clusterConfig
@@ -256,4 +257,79 @@ func createRole(client *rancher.Client, context string, roleName string, rules [
 		})
 	return
 
+}
+
+func waitForActiveCluster(client *rancher.Client, clusterID string) error {
+	err := kwait.Poll(500*time.Millisecond, 30*time.Minute, func() (done bool, err error) {
+		client, err = client.ReLogin()
+		if err != nil {
+			return false, err
+		}
+		clusterResp, err := client.Management.Cluster.ByID(clusterID)
+		if err != nil {
+			return false, err
+		}
+		if clusterResp.State == "active" {
+			return true, nil
+		}
+		return false, nil
+	})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func editCluster(client *rancher.Client, clustername string, namespace string, psact string) (clusterType string, err error) {
+	clusterID, err := clusters.GetClusterIDByName(client, clustername)
+	if err != nil {
+		return "", err
+	}
+	//Check if the downstream cluster is RKE2/K3S or RKE1
+	if strings.Contains(clusterID, "c-m-") {
+		clusterType = "RKE2K3S"
+		clusterObj, existingSteveAPIObj, err := clusters.GetProvisioningClusterByName(client, clustername, namespace)
+		if err != nil {
+			return "", err
+		}
+		oldPsact := clusterObj.Spec.DefaultPodSecurityAdmissionConfigurationTemplateName
+		clusterObj.Spec.DefaultPodSecurityAdmissionConfigurationTemplateName = psact
+		_, err = clusters.UpdateK3SRKE2Cluster(client, existingSteveAPIObj, clusterObj)
+		if err != nil {
+			return clusterType, err
+		}
+		//Revert the value of psact back to the original value
+		clusterObj.Spec.DefaultPodSecurityAdmissionConfigurationTemplateName = oldPsact
+		_, err = clusters.UpdateK3SRKE2Cluster(client, existingSteveAPIObj, clusterObj)
+		if err != nil {
+			return clusterType, err
+		}
+	} else {
+		clusterType = "RKE"
+		if psact == "" {
+			psact = " "
+		}
+		existingCluster, err := client.Management.Cluster.ByID(clusterID)
+		if err != nil {
+			return "", err
+		}
+		updatedCluster := &management.Cluster{
+			Name: existingCluster.Name,
+			DefaultPodSecurityAdmissionConfigurationTemplateName: psact,
+		}
+		_, err = client.Management.Cluster.Update(existingCluster, updatedCluster)
+		if err != nil {
+			return clusterType, err
+		}
+		waitForActiveCluster(client, clusterID)
+
+		//Revert the value of psact back to the original value
+		updatedCluster.DefaultPodSecurityAdmissionConfigurationTemplateName = existingCluster.DefaultPodSecurityAdmissionConfigurationTemplateName
+		_, err = client.Management.Cluster.Update(existingCluster, updatedCluster)
+		if err != nil {
+			return clusterType, err
+		}
+		waitForActiveCluster(client, clusterID)
+	}
+	return clusterType, nil
 }

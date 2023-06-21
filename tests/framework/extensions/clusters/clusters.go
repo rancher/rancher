@@ -30,8 +30,8 @@ import (
 )
 
 const (
-	ProvisioningSteveResouceType = "provisioning.cattle.io.cluster"
-	FleetSteveResourceType       = "fleet.cattle.io.cluster"
+	ProvisioningSteveResourceType = "provisioning.cattle.io.cluster"
+	FleetSteveResourceType        = "fleet.cattle.io.cluster"
 )
 
 // GetClusterIDByName is a helper function that returns the cluster ID by name
@@ -101,7 +101,7 @@ func IsHostedProvisioningClusterReady(event watch.Event) (ready bool, err error)
 	return false, nil
 }
 
-// Verify if a serviceAccountTokenSecret exists or not in the cluster.
+// CheckServiceAccountTokenSecret verifies if a serviceAccountTokenSecret exists or not in the cluster.
 func CheckServiceAccountTokenSecret(client *rancher.Client, clusterName string) (success bool, err error) {
 	clusterID, err := GetClusterIDByName(client, clusterName)
 	if err != nil {
@@ -688,7 +688,7 @@ func CreateRKE1Cluster(client *rancher.Client, rke1Cluster *management.Cluster) 
 // CreateK3SRKE2Cluster is a "helper" functions that takes a rancher client, and the rke2 cluster config as parameters. This function
 // registers a delete cluster fuction with a wait.WatchWait to ensure the cluster is removed cleanly.
 func CreateK3SRKE2Cluster(client *rancher.Client, rke2Cluster *apisV1.Cluster) (*v1.SteveAPIObject, error) {
-	cluster, err := client.Steve.SteveType(ProvisioningSteveResouceType).Create(rke2Cluster)
+	cluster, err := client.Steve.SteveType(ProvisioningSteveResourceType).Create(rke2Cluster)
 	if err != nil {
 		return nil, err
 	}
@@ -699,7 +699,7 @@ func CreateK3SRKE2Cluster(client *rancher.Client, rke2Cluster *apisV1.Cluster) (
 			return false, err
 		}
 
-		_, err = client.Steve.SteveType(ProvisioningSteveResouceType).ByID(cluster.ID)
+		_, err = client.Steve.SteveType(ProvisioningSteveResourceType).ByID(cluster.ID)
 		if err != nil {
 			return false, nil
 		} else {
@@ -736,7 +736,7 @@ func CreateK3SRKE2Cluster(client *rancher.Client, rke2Cluster *apisV1.Cluster) (
 			return err
 		}
 
-		err = client.Steve.SteveType(ProvisioningSteveResouceType).Delete(cluster)
+		err = client.Steve.SteveType(ProvisioningSteveResourceType).Delete(cluster)
 		if err != nil {
 			return err
 		}
@@ -759,7 +759,7 @@ func CreateK3SRKE2Cluster(client *rancher.Client, rke2Cluster *apisV1.Cluster) (
 
 // UpdateK3SRKE2Cluster is a "helper" functions that takes a rancher client, old rke2/k3s cluster config, and the new rke2/k3s cluster config as parameters.
 func UpdateK3SRKE2Cluster(client *rancher.Client, cluster *v1.SteveAPIObject, updatedCluster *apisV1.Cluster) (*v1.SteveAPIObject, error) {
-	updateCluster, err := client.Steve.SteveType(ProvisioningSteveResouceType).ByID(cluster.ID)
+	updateCluster, err := client.Steve.SteveType(ProvisioningSteveResourceType).ByID(cluster.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -767,7 +767,7 @@ func UpdateK3SRKE2Cluster(client *rancher.Client, cluster *v1.SteveAPIObject, up
 	updatedCluster.ObjectMeta.ResourceVersion = updateCluster.ObjectMeta.ResourceVersion
 
 	logrus.Infof("Applying cluster YAML hardening changes...")
-	cluster, err = client.Steve.SteveType(ProvisioningSteveResouceType).Update(cluster, updatedCluster)
+	cluster, err = client.Steve.SteveType(ProvisioningSteveResourceType).Update(cluster, updatedCluster)
 	if err != nil {
 		return nil, err
 	}
@@ -778,7 +778,7 @@ func UpdateK3SRKE2Cluster(client *rancher.Client, cluster *v1.SteveAPIObject, up
 			return false, err
 		}
 
-		clusterResp, err := client.Steve.SteveType(ProvisioningSteveResouceType).ByID(cluster.ID)
+		clusterResp, err := client.Steve.SteveType(ProvisioningSteveResourceType).ByID(cluster.ID)
 		if err != nil {
 			return false, err
 		}
@@ -893,7 +893,7 @@ func logClusterInfoWithChanges(clusterID, clusterInfo string, summary summary.Su
 
 func WatchAndWaitForCluster(steveClient *v1.Client, kubeProvisioningClient *kubeProvisioning.Client, ns string, clusterName string) error {
 	err := kwait.Poll(5*time.Second, 2*time.Minute, func() (done bool, err error) {
-		clusterResp, err := steveClient.SteveType(ProvisioningSteveResouceType).ByID(ns + "/" + clusterName)
+		clusterResp, err := steveClient.SteveType(ProvisioningSteveResourceType).ByID(ns + "/" + clusterName)
 		if err != nil {
 			return false, err
 		}
@@ -918,7 +918,7 @@ func WatchAndWaitForCluster(steveClient *v1.Client, kubeProvisioningClient *kube
 
 // GetProvisioningClusterByName is a helper function to get cluster object with the cluster name
 func GetProvisioningClusterByName(client *rancher.Client, clusterName string, namespace string) (*apisV1.Cluster, *v1.SteveAPIObject, error) {
-	clusterObj, err := client.Steve.SteveType(ProvisioningSteveResouceType).ByID(namespace + "/" + clusterName)
+	clusterObj, err := client.Steve.SteveType(ProvisioningSteveResourceType).ByID(namespace + "/" + clusterName)
 	if err != nil {
 		return nil, nil, err
 	}

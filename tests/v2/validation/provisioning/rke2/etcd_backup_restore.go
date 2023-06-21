@@ -48,7 +48,7 @@ func restoreSnapshot(client *rancher.Client, clustername string, name string,
 		RestoreRKEConfig: restoreconfig,
 	}
 
-	_, err = client.Steve.SteveType(clusters.ProvisioningSteveResouceType).Update(existingSteveAPIObj, clusterObj)
+	_, err = client.Steve.SteveType(clusters.ProvisioningSteveResourceType).Update(existingSteveAPIObj, clusterObj)
 	if err != nil {
 		return err
 	}
@@ -123,7 +123,7 @@ func upgradeClusterK8sVersion(client *rancher.Client, clustername string, k8sUpg
 
 	clusterObj.Spec.KubernetesVersion = k8sUpgradedVersion
 
-	_, err = client.Steve.SteveType(clusters.ProvisioningSteveResouceType).Update(existingSteveAPIObj, clusterObj)
+	_, err = client.Steve.SteveType(clusters.ProvisioningSteveResourceType).Update(existingSteveAPIObj, clusterObj)
 	if err != nil {
 		return err
 	}
@@ -213,7 +213,7 @@ func upgradeClusterK8sVersionWithUpgradeStrategy(client *rancher.Client, cluster
 	clusterObj.Spec.RKEConfig.UpgradeStrategy.WorkerConcurrency = "20%"
 	clusterObj.Spec.KubernetesVersion = k8sUpgradedVersion
 
-	_, err = client.Steve.SteveType(clusters.ProvisioningSteveResouceType).Update(existingSteveAPIObj, clusterObj)
+	_, err = client.Steve.SteveType(clusters.ProvisioningSteveResourceType).Update(existingSteveAPIObj, clusterObj)
 	if err != nil {
 		return err
 	}
