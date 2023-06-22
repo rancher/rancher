@@ -11,6 +11,7 @@ import (
 	nodestat "github.com/rancher/rancher/tests/framework/extensions/nodes"
 	"github.com/rancher/rancher/tests/framework/extensions/pipeline"
 	psadeploy "github.com/rancher/rancher/tests/framework/extensions/psact"
+	matrix "github.com/rancher/rancher/tests/framework/extensions/rke1/componentchecks"
 	nodepools "github.com/rancher/rancher/tests/framework/extensions/rke1/nodepools"
 	"github.com/rancher/rancher/tests/framework/extensions/tokenregistration"
 	"github.com/rancher/rancher/tests/framework/extensions/workloads/pods"
@@ -105,6 +106,10 @@ func TestProvisioningRKE1CustomCluster(t *testing.T, client *rancher.Client, ext
 	podResults, podErrors := pods.StatusPods(client, clusterResp.ID)
 	assert.NotEmpty(t, podResults)
 	assert.Empty(t, podErrors)
+
+	etcdVersion, err := matrix.CheckETCDVersion(client, nodes, rolesPerPool)
+	require.NoError(t, err)
+	assert.NotEmpty(t, etcdVersion)
 
 	if psact == string(provisioning.RancherPrivileged) || psact == string(provisioning.RancherRestricted) {
 		err = psadeploy.CheckPSACT(client, clusterName)

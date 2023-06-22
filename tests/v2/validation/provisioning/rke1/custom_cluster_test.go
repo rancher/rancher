@@ -81,6 +81,8 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningRKE1CustomCluster()
 	nodeRolesShared := []nodepools.NodeRoles{provisioning.RKE1EtcdControlPlanePool, provisioning.RKE1WorkerPool}
 	nodeRolesDedicated := []nodepools.NodeRoles{provisioning.RKE1EtcdPool, provisioning.RKE1ControlPlanePool, provisioning.RKE1WorkerPool}
 
+	require.GreaterOrEqual(c.T(), len(c.cnis), 1)
+
 	tests := []struct {
 		name      string
 		nodeRoles []nodepools.NodeRoles
@@ -94,6 +96,7 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningRKE1CustomCluster()
 		{"3 nodes - 1 role per node " + provisioning.AdminClientName.String(), nodeRolesDedicated, c.client, c.psact},
 		{"3 nodes - 1 role per node " + provisioning.StandardClientName.String(), nodeRolesDedicated, c.standardUserClient, c.psact},
 	}
+
 	var name string
 	for _, tt := range tests {
 		testSession := session.NewSession()
@@ -106,9 +109,8 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningRKE1CustomCluster()
 			externalNodeProvider := provisioning.ExternalNodeProviderSetup(nodeProviderName)
 			providerName := " Node Provider: " + nodeProviderName
 			for _, kubeVersion := range c.kubernetesVersions {
-				name = tt.name + providerName + " Kubernetes version: " + kubeVersion
 				for _, cni := range c.cnis {
-					name += " cni: " + cni
+					name = tt.name + providerName + " Kubernetes version: " + kubeVersion + " cni: " + cni
 					c.Run(name, func() {
 						TestProvisioningRKE1CustomCluster(c.T(), client, externalNodeProvider, tt.nodeRoles, tt.psact, kubeVersion, cni, c.advancedOptions)
 					})
@@ -119,6 +121,8 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningRKE1CustomCluster()
 }
 
 func (c *CustomClusterProvisioningTestSuite) TestProvisioningRKE1CustomClusterDynamicInput() {
+	require.GreaterOrEqual(c.T(), len(c.cnis), 1)
+
 	clustersConfig := new(provisioning.Config)
 	config.LoadConfig(provisioning.ConfigurationFileKey, clustersConfig)
 	nodesAndRoles := clustersConfig.NodesAndRolesRKE1
@@ -147,9 +151,8 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningRKE1CustomClusterDy
 		for _, nodeProviderName := range c.nodeProviders {
 			externalNodeProvider := provisioning.ExternalNodeProviderSetup(nodeProviderName)
 			for _, kubeVersion := range c.kubernetesVersions {
-				name = tt.name + " Kubernetes version: " + kubeVersion
 				for _, cni := range c.cnis {
-					name += " cni: " + cni
+					name = tt.name + " Kubernetes version: " + kubeVersion + " cni: " + cni
 					c.Run(name, func() {
 						TestProvisioningRKE1CustomCluster(c.T(), client, externalNodeProvider, nodesAndRoles, tt.psact, kubeVersion, cni, c.advancedOptions)
 					})
