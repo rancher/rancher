@@ -77,10 +77,6 @@ func TestProvisioningK3SCluster(t *testing.T, client *rancher.Client, provider P
 	require.NoError(t, err)
 	assert.NotEmpty(t, clusterToken)
 
-	podResults, podErrors := pods.StatusPods(client, clusterIDName)
-	assert.NotEmpty(t, podResults)
-	assert.Empty(t, podErrors)
-
 	if psact == string(provisioning.RancherPrivileged) || psact == string(provisioning.RancherRestricted) {
 		err = psadeploy.CheckPSACT(client, clusterName)
 		require.NoError(t, err)
@@ -88,5 +84,10 @@ func TestProvisioningK3SCluster(t *testing.T, client *rancher.Client, provider P
 		_, err = psadeploy.CreateNginxDeployment(client, clusterIDName, psact)
 		require.NoError(t, err)
 	}
+
+	podResults, podErrors := pods.StatusPods(client, clusterIDName)
+	assert.NotEmpty(t, podResults)
+	assert.Empty(t, podErrors)
+
 	return clusterResp
 }

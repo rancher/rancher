@@ -882,7 +882,7 @@ func isClusterInaccessible(messages []string) (isInaccessible bool) {
 }
 
 func logClusterInfoWithChanges(clusterID, clusterInfo string, summary summary.Summary) string {
-	newClusterInfo := fmt.Sprintf("ClusterID: %v, Message: %v, Error: %v, State: %v, Transiationing: %v", clusterID, summary.Message, summary.Error, summary.State, summary.Transitioning)
+	newClusterInfo := fmt.Sprintf("ClusterID: %v, Message: %v, Error: %v, State: %v, Transitioning: %v", clusterID, summary.Message, summary.Error, summary.State, summary.Transitioning)
 
 	if clusterInfo != newClusterInfo {
 		logrus.Infof(newClusterInfo)
