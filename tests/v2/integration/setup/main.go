@@ -42,7 +42,8 @@ const (
 
 // main creates a test namespace and cluster for use in integration tests.
 func main() {
-	// Make sure a valid cluster agent image was provided before doing anything else.
+	// Make sure a valid cluster agent image tag was provided before doing anything else. The envvar CATTLE_AGENT_IMAGE
+	// should be the image name (and tag) assigned to the cattle cluster agent image that was just built during CI.
 	agentImage := os.Getenv("CATTLE_AGENT_IMAGE")
 	if agentImage == "" {
 		logrus.Fatal("Envvar CATTLE_AGENT_IMAGE must be set to a valid rancher-agent Docker image")
@@ -152,9 +153,9 @@ func main() {
 	}
 
 	// Copy the local image rancher/rancher-agent:master-head from the Docker daemon to the Docker registry
-	// at localhost:5000. We need to do this before we create downstream clusters to ensure that they can use this
-	// locally-built image. We're also retrying on error here because the port-forward tends to be flaky when we're
-	// transferring large images, at least on my machine.
+	// at localhost:5000 where it will be given the tag "test-local". We need to do this before we create downstream
+	// clusters to ensure that they can use this locally-built image. We're also retrying on error here because the
+	// port-forward tends to be flaky when we're transferring large images, at least on my machine.
 	shouldRetry := func(err error) bool {
 		if err != nil {
 			logrus.Errorf("Error pushing images: %v", err)
