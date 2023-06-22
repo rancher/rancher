@@ -42,7 +42,11 @@ fi
 export DIST=${TEST_DIST}
 export SOME_K8S_VERSION=${SOME_K8S_VERSION}
 export TB_ORG=${TB_ORG}
-export CATTLE_AGENT_IMAGE=rancher/rancher-agent:master-head
+
+# Get correct agent tag so we can set CATTLE_AGENT_IMAGE, which tells Rancher which Docker images to use
+# for the cattle cluster agent. For CI, this should be the image built from the head of the current branch.
+source ./scripts/version
+export CATTLE_AGENT_IMAGE=rancher/rancher-agent:${AGENT_TAG}
 
 eval "$(grep '^ENV CATTLE_SYSTEM_AGENT' package/Dockerfile | awk '{print "export " $2 "=" $3}')"
 eval "$(grep '^ENV CATTLE_WINS_AGENT' package/Dockerfile | awk '{print "export " $2 "=" $3}')"
@@ -129,10 +133,6 @@ echo "Waiting up to 5 minutes for rancher-webhook deployment"
   "kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -w -n cattle-system deploy/rancher-webhook &>/dev/null"
 
 #kill $TPID
-
-# get correct agent tag
-source ./scripts/version
-export AGENT_TAG=${TAG}
 
 echo Running build-integration-setup
 ./tests/v2/integration/scripts/build-integration-setup

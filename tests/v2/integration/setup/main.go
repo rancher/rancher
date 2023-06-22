@@ -9,6 +9,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"os"
 	"time"
 
 	"github.com/containers/image/v5/copy"
@@ -41,6 +42,12 @@ const (
 
 // main creates a test namespace and cluster for use in integration tests.
 func main() {
+	// Make sure a valid cluster agent image was provided before doing anything else.
+	agentImage := os.Getenv("CATTLE_AGENT_IMAGE")
+	if agentImage == "" {
+		logrus.Fatal("Envvar CATTLE_AGENT_IMAGE must be set to a valid rancher-agent Docker image")
+	}
+
 	logrus.Infof("Generating test config")
 	ipAddress, err := getOutboundIP()
 	if err != nil {
@@ -156,9 +163,9 @@ func main() {
 		return err != nil
 	}
 	attemptImagePush := func() error {
-		logrus.Infof("Attempting to push images to registry")
+		logrus.Info("Attempting to push images to registry")
 		return pushImages(map[string]string{
-			"docker-daemon:rancher/rancher-agent:master-head": "docker://localhost:5000/rancher/rancher-agent:master-head",
+			"docker-daemon:" + agentImage: "docker://localhost:5000/" + agentImage,
 		})
 	}
 	if err = retry.OnError(wait.Backoff{Steps: 10}, shouldRetry, attemptImagePush); err != nil {
