@@ -192,6 +192,7 @@ var OriginMap = map[string]string{
 	"mirrored-prometheus-operator-prometheus-operator":        "https://github.com/prometheus-operator/prometheus-operator",
 	"mirrored-prometheus-prometheus":                          "https://github.com/prometheus/prometheus",
 	"mirrored-pstauffer-curl":                                 "https://github.com/pstauffer/docker-curl",
+	"mirrored-s3gw-s3gw":                                      "https://github.com/aquarist-labs/s3gw",
 	"mirrored-sig-storage-csi-attacher":                       "https://github.com/kubernetes-csi/external-attacher",
 	"mirrored-sig-storage-csi-node-driver-registrar":          "https://github.com/kubernetes-csi/node-driver-registrar",
 	"mirrored-sig-storage-csi-provisioner":                    "https://github.com/kubernetes-csi/external-provisioner",
