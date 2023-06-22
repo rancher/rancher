@@ -644,9 +644,17 @@ func (h *handler) run(infra *infraObject, create bool) (rkev1.RKEMachineStatus, 
 		failureReasonType = capierrors.DeleteMachineError
 	}
 
+	// Check to see if we have a failure reason.
 	failure := infra.data.String("status", "failureReason") == string(failureReasonType)
+	ready := false
 
-	if err := h.apply.WithOwner(infra.obj).ApplyObjects(objects((args.String("providerID") != "" || failure) && create, dArgs)...); err != nil {
+	cond := getCondition(infra.data, "Ready")
+	if cond != nil {
+		// We are only "ready" if both the condition "Ready" is "True" and the provider ID has been set on the machine.
+		ready = cond.Status() == "True" && args.String("providerID") != ""
+	}
+
+	if err := h.apply.WithOwner(infra.obj).ApplyObjects(objects((ready || failure) && create, dArgs)...); err != nil {
 		return rkev1.RKEMachineStatus{}, failure, err
 	}
 
