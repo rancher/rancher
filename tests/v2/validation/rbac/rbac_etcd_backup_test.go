@@ -8,6 +8,7 @@ import (
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/etcdsnapshot"
+	"github.com/rancher/rancher/tests/framework/extensions/projects"
 	"github.com/rancher/rancher/tests/framework/extensions/users"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
 	log "github.com/sirupsen/logrus"
@@ -93,7 +94,7 @@ func (rb *ETCDRbacBackupTestSuite) TestETCDRbac() {
 			subSession := rb.session.NewSession()
 			defer subSession.Cleanup()
 
-			createProjectAsAdmin, err := createProject(rb.client, rb.cluster.ID)
+			createProjectAsAdmin, err := rb.client.Management.Project.Create(projects.NewProjectConfig(rb.cluster.ID))
 			rb.adminProject = createProjectAsAdmin
 			require.NoError(rb.T(), err)
 		})

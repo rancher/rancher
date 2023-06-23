@@ -59,7 +59,7 @@ func (rb *RBACAdditionalTestSuite) SetupSuite() {
 
 func (rb *RBACAdditionalTestSuite) ValidateAddStdUserAsProjectOwner() {
 
-	createProjectAsCO, err := createProject(rb.client, rb.cluster.ID)
+	createProjectAsCO, err := rb.client.Management.Project.Create(projects.NewProjectConfig(rb.cluster.ID))
 	require.NoError(rb.T(), err)
 	rb.standardUserCOProject = createProjectAsCO
 
@@ -116,7 +116,7 @@ func (rb *RBACAdditionalTestSuite) ValidateAddCMAsProjectOwner() {
 }
 
 func (rb *RBACAdditionalTestSuite) ValidateAddPOsAsProjectOwner() {
-	createProjectAsCO, err := createProject(rb.client, rb.cluster.ID)
+	createProjectAsCO, err := rb.client.Management.Project.Create(projects.NewProjectConfig(rb.cluster.ID))
 	require.NoError(rb.T(), err)
 	rb.standardUserCOProject = createProjectAsCO
 
@@ -152,7 +152,7 @@ func (rb *RBACAdditionalTestSuite) ValidateAddPOsAsProjectOwner() {
 }
 
 func (rb *RBACAdditionalTestSuite) ValidateCannotAddMPMsAsProjectOwner() {
-	createProjectAsCO, err := createProject(rb.client, rb.cluster.ID)
+	createProjectAsCO, err := rb.client.Management.Project.Create(projects.NewProjectConfig(rb.cluster.ID))
 	require.NoError(rb.T(), err)
 	rb.standardUserCOProject = createProjectAsCO
 

@@ -1,6 +1,8 @@
 package projects
 
 import (
+	"sort"
+
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
@@ -48,4 +50,20 @@ func GetProjectList(client *rancher.Client, clusterID string) (*management.Proje
 	}
 
 	return projectsList, nil
+}
+
+// ListProjectNames is a helper which returns a sorted list of project names
+func ListProjectNames(client *rancher.Client, clusterID string) ([]string, error) {
+	projectList, err := GetProjectList(client, clusterID)
+	if err != nil {
+		return nil, err
+	}
+
+	projectNames := make([]string, len(projectList.Data))
+
+	for idx, project := range projectList.Data {
+		projectNames[idx] = project.Name
+	}
+	sort.Strings(projectNames)
+	return projectNames, nil
 }

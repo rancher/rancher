@@ -12,7 +12,6 @@ import (
 	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/namespaces"
-	"github.com/rancher/rancher/tests/framework/extensions/projects"
 	nodepools "github.com/rancher/rancher/tests/framework/extensions/rke1/nodepools"
 	"github.com/rancher/rancher/tests/framework/extensions/workloads"
 	"github.com/rancher/rancher/tests/framework/pkg/config"
@@ -51,54 +50,6 @@ type ClusterConfig struct {
 	kubernetesVersion    string
 	cni                  string
 	advancedOptions      provisioning.AdvancedOptions
-}
-
-func listProjects(client *rancher.Client, clusterID string) ([]string, error) {
-	projectList, err := projects.GetProjectList(client, clusterID)
-	if err != nil {
-		return nil, err
-	}
-
-	projectNames := make([]string, len(projectList.Data))
-
-	for idx, project := range projectList.Data {
-		projectNames[idx] = project.Name
-	}
-	sort.Strings(projectNames)
-	return projectNames, nil
-}
-
-func getNamespaces(steveclient *v1.Client) ([]string, error) {
-
-	namespaceList, err := steveclient.SteveType(namespaces.NamespaceSteveType).List(nil)
-	if err != nil {
-		return nil, err
-	}
-
-	namespace := make([]string, len(namespaceList.Data))
-	for idx, ns := range namespaceList.Data {
-		namespace[idx] = ns.GetName()
-	}
-	sort.Strings(namespace)
-	return namespace, nil
-}
-
-func deleteNamespace(namespaceID *v1.SteveAPIObject, steveclient *v1.Client) error {
-	deletens := steveclient.SteveType(namespaces.NamespaceSteveType).Delete(namespaceID)
-	return deletens
-}
-
-func createProject(client *rancher.Client, clusterID string) (*management.Project, error) {
-	projectName := namegen.AppendRandomString("testproject-")
-	projectConfig := &management.Project{
-		ClusterID: clusterID,
-		Name:      projectName,
-	}
-	createProject, err := client.Management.Project.Create(projectConfig)
-	if err != nil {
-		return nil, err
-	}
-	return createProject, nil
 }
 
 func getPSALabels(response *v1.SteveAPIObject, actualLabels map[string]string) map[string]string {

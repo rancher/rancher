@@ -10,6 +10,7 @@ import (
 	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/namespaces"
+	"github.com/rancher/rancher/tests/framework/extensions/projects"
 	psadeploy "github.com/rancher/rancher/tests/framework/extensions/psact"
 	"github.com/rancher/rancher/tests/framework/extensions/users"
 	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
@@ -170,7 +171,7 @@ func (rb *PSATestSuite) ValidatePSA(role string, customRole bool) {
 }
 
 func (rb *PSATestSuite) ValidateAdditionalPSA(role string) {
-	createProjectAsNonAdmin, err := createProject(rb.nonAdminUserClient, rb.cluster.ID)
+	createProjectAsNonAdmin, err := rb.nonAdminUserClient.Management.Project.Create(projects.NewProjectConfig(rb.cluster.ID))
 	require.NoError(rb.T(), err)
 	rb.stdUserProject = createProjectAsNonAdmin
 
@@ -281,7 +282,8 @@ func (rb *PSATestSuite) TestPSA() {
 			customRole = true
 		}
 		rb.Run("Add PSA labels on the namespaces created by admins ", func() {
-			createProjectAsAdmin, err := createProject(rb.client, rb.cluster.ID)
+			createProjectAsAdmin, err := rb.client.Management.Project.Create(projects.NewProjectConfig(rb.cluster.ID))
+
 			rb.adminProject = createProjectAsAdmin
 			require.NoError(rb.T(), err)
 
@@ -376,7 +378,7 @@ func (rb *PSATestSuite) TestPsactRBAC() {
 	for _, tt := range tests {
 
 		rb.Run("Set up User with Cluster Role "+tt.name, func() {
-			newUser, err := createUser(rb.client, tt.member)
+			newUser, err := users.CreateUserWithRole(rb.client, users.UserConfig(), tt.member) 
 			require.NoError(rb.T(), err)
 			rb.nonAdminUser = newUser
 			rb.T().Logf("Created user: %v", rb.nonAdminUser.Username)
@@ -386,7 +388,7 @@ func (rb *PSATestSuite) TestPsactRBAC() {
 			subSession := rb.session.NewSession()
 			defer subSession.Cleanup()
 
-			createProjectAsAdmin, err := createProject(rb.client, rb.cluster.ID)
+			createProjectAsAdmin, err := rb.client.Management.Project.Create(projects.NewProjectConfig(rb.cluster.ID))
 			rb.adminProject = createProjectAsAdmin
 			require.NoError(rb.T(), err)
 		})
