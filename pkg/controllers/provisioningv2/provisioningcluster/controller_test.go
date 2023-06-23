@@ -1,11 +1,16 @@
 package provisioningcluster
 
 import (
+	"errors"
 	"testing"
 
+	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/wrangler/pkg/condition"
+	"github.com/rancher/wrangler/pkg/generic"
 	"github.com/rancher/wrangler/pkg/genericcondition"
 	"github.com/stretchr/testify/assert"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 func TestProvisioningClusterController_reconcileConditions(t *testing.T) {
@@ -349,4 +354,104 @@ func TestProvisioningClusterController_reconcileConditions(t *testing.T) {
 		})
 	}
 
+}
+
+func TestGeneratingHandler(t *testing.T) {
+	tests := []struct {
+		name           string
+		obj            *provv1.Cluster
+		expected       []runtime.Object
+		expectedStatus provv1.ClusterStatus
+		expectedErr    error
+	}{
+		{
+			name:           "no rkeconfig",
+			obj:            &provv1.Cluster{},
+			expected:       nil,
+			expectedStatus: provv1.ClusterStatus{},
+			expectedErr:    nil,
+		},
+		{
+			name: "no cluster name",
+			obj: &provv1.Cluster{
+				Spec: provv1.ClusterSpec{
+					RKEConfig: &provv1.RKEConfig{},
+				},
+			},
+			expected:       nil,
+			expectedStatus: provv1.ClusterStatus{},
+			expectedErr:    nil,
+		},
+		{
+			name: "deleting",
+			obj: &provv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					DeletionTimestamp: &[]metav1.Time{metav1.Now()}[0],
+				},
+				Spec: provv1.ClusterSpec{
+					RKEConfig: &provv1.RKEConfig{},
+				},
+				Status: provv1.ClusterStatus{
+					ClusterName: "test-cluster",
+				},
+			},
+			expected: nil,
+			expectedStatus: provv1.ClusterStatus{
+				ClusterName: "test-cluster",
+			},
+			expectedErr: nil,
+		},
+		{
+			name: "k8s version",
+			obj: &provv1.Cluster{
+				Spec: provv1.ClusterSpec{
+					RKEConfig: &provv1.RKEConfig{},
+				},
+				Status: provv1.ClusterStatus{
+					ClusterName: "test-cluster",
+				},
+			},
+			expected: nil,
+			expectedStatus: provv1.ClusterStatus{
+				ClusterName: "test-cluster",
+			},
+			expectedErr: errors.New("kubernetesVersion not set on /"),
+		},
+		{
+			name: "no finalizers",
+			obj: &provv1.Cluster{
+				Spec: provv1.ClusterSpec{
+					KubernetesVersion: "test-version",
+					RKEConfig:         &provv1.RKEConfig{},
+				},
+				Status: provv1.ClusterStatus{
+					ClusterName: "test-cluster",
+				},
+			},
+			expected: nil,
+			expectedStatus: provv1.ClusterStatus{
+				ClusterName: "test-cluster",
+			},
+			expectedErr: generic.ErrSkip,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := &handler{}
+			var status provv1.ClusterStatus
+			if tt.obj != nil {
+				status = tt.obj.Status
+			}
+			objs, generatedStatus, err := h.OnRancherClusterChange(tt.obj, status)
+			assert.Equal(t, tt.expected, objs)
+			assert.Equal(t, tt.expectedStatus, generatedStatus)
+			if tt.expectedErr != nil {
+				assert.NotNil(t, err)
+				assert.Equal(t, tt.expectedErr.Error(), err.Error())
+			} else {
+				assert.Nil(t, err)
+			}
+		})
+	}
 }

@@ -105,7 +105,7 @@ func CreateAndImportK3DCluster(client *rancher.Client, name, image, hostname str
 			Namespace: "fleet-default",
 		},
 	}
-	clusterObj, err := client.Steve.SteveType(clusters.ProvisioningSteveResouceType).Create(cluster)
+	clusterObj, err := client.Steve.SteveType(clusters.ProvisioningSteveResourceType).Create(cluster)
 	if err != nil {
 		return nil, errors.Wrap(err, "CreateAndImportK3DCluster: failed to create provisioning cluster")
 	}
@@ -114,7 +114,7 @@ func CreateAndImportK3DCluster(client *rancher.Client, name, image, hostname str
 	logrus.Infof("Creating K3D cluster...")
 	downRest, err := CreateK3DCluster(client.Session, name, hostname, servers, agents)
 	if err != nil {
-		_ = client.Steve.SteveType(clusters.ProvisioningSteveResouceType).Delete(clusterObj)
+		_ = client.Steve.SteveType(clusters.ProvisioningSteveResourceType).Delete(clusterObj)
 		return nil, errors.Wrap(err, "CreateAndImportK3DCluster: failed to create k3d cluster")
 	}
 

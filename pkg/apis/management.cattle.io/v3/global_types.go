@@ -40,3 +40,8 @@ type FeatureStatus struct {
 	Description string `json:"description"`
 	LockedValue *bool  `json:"lockedValue"`
 }
+
+const (
+	ExperimentalFeatureKey   = "feature.cattle.io/experimental"
+	ExperimentalFeatureValue = "true"
+)

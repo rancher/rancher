@@ -99,9 +99,6 @@ func (h *handler) doClusterRemove(cluster *v1.Cluster) func() (string, error) {
 
 		if capiCluster != nil {
 			if capiCluster.DeletionTimestamp == nil {
-				if !capiClusterIsRancherOwned(cluster, capiCluster) {
-					return "", nil
-				}
 				// Deleting the CAPI cluster will start the process of deleting Machines, Bootstraps, etc.
 				if err := h.capiClusters.Delete(capiCluster.Namespace, capiCluster.Name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
 					return "", err
@@ -132,18 +129,4 @@ func (h *handler) doClusterRemove(cluster *v1.Cluster) func() (string, error) {
 
 		return "", h.kubeconfigManager.DeleteUser(cluster.Namespace, cluster.Name)
 	}
-}
-
-func capiClusterIsRancherOwned(cluster *v1.Cluster, capiCluster *capi.Cluster) bool {
-	if len(capiCluster.OwnerReferences) == 0 {
-		return false
-	}
-
-	for _, ref := range capiCluster.OwnerReferences {
-		if ref.Kind == "Cluster" && ref.Name == cluster.Name && ref.APIVersion == v1.SchemeGroupVersion.Identifier() {
-			return true
-		}
-	}
-
-	return false
 }

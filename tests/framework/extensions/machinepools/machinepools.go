@@ -31,6 +31,7 @@ type NodeRoles struct {
 	ControlPlane bool  `json:"controlplane,omitempty" yaml:"controlplane,omitempty"`
 	Etcd         bool  `json:"etcd,omitempty" yaml:"etcd,omitempty"`
 	Worker       bool  `json:"worker,omitempty" yaml:"worker,omitempty"`
+	Windows      bool  `json:"windows,omitempty" yaml:"windows,omitempty"`
 	Quantity     int32 `json:"quantity" yaml:"quantity"`
 }
 
@@ -71,7 +72,7 @@ func (n NodeRoles) String() string {
 //  }
 
 func RKEMachinePoolSetup(nodeRoles []NodeRoles, machineConfig *v1.SteveAPIObject) []apisV1.RKEMachinePool {
-	machinePools := []apisV1.RKEMachinePool{}
+	machinePools := make([]apisV1.RKEMachinePool, 0, len(nodeRoles))
 	for index, roles := range nodeRoles {
 		machinePool := NewRKEMachinePool(roles.ControlPlane, roles.Etcd, roles.Worker, "pool"+strconv.Itoa(index), roles.Quantity, machineConfig)
 		machinePools = append(machinePools, machinePool)

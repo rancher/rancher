@@ -11,6 +11,8 @@ const (
 	KubernetesUpgradeAllClusters EnvironmentFlag = iota
 	WorkloadUpgradeAllClusters
 	UpdateClusterName
+	GatekeeperAllowedNamespaces
+	UpgradeAllClusters
 	UseExistingRegistries
 	InstallRancher
 	environmentFlagLastItem // This is used to determine the number of items in the enum

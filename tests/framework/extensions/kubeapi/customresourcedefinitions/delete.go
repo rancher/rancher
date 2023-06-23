@@ -3,6 +3,7 @@ package customresourcedefinitions
 import (
 	"context"
 
+	"github.com/hashicorp/go-multierror"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -30,12 +31,14 @@ func BatchDeleteCustomResourceDefinition(client *rancher.Client, clusterID strin
 
 	customResourceDefinitionResource := dynamicClient.Resource(CustomResourceDefinitions).Namespace(namespace)
 
+	var errs error
 	for _, crd := range list {
 		err = customResourceDefinitionResource.Delete(context.TODO(), crd, metav1.DeleteOptions{})
 		if err != nil {
-			return err
+			errs = multierror.Append(errs, err)
+			continue
 		}
 	}
 
-	return err
+	return errs
 }

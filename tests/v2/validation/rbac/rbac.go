@@ -10,8 +10,10 @@ import (
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
+
 	"github.com/rancher/rancher/tests/framework/extensions/namespaces"
 	"github.com/rancher/rancher/tests/framework/extensions/projects"
+	nodepools "github.com/rancher/rancher/tests/framework/extensions/rke1/nodepools"
 	"github.com/rancher/rancher/tests/framework/extensions/users"
 	password "github.com/rancher/rancher/tests/framework/extensions/users/passwordgenerator"
 	"github.com/rancher/rancher/tests/framework/extensions/workloads"
@@ -41,12 +43,12 @@ const (
 	psaEnforce                    = "pod-security.kubernetes.io/enforce"
 	kubeConfigTokenSettingID      = "kubeconfig-default-token-ttl-minutes"
 	psaRole                       = "updatepsa"
-
-	isCattleLabeled = true
+	defaultNamespace              = "fleet-default"
+	isCattleLabeled               = true
 )
 
 type ClusterConfig struct {
-	nodeRoles            []string
+	nodesAndRoles        []nodepools.NodeRoles
 	externalNodeProvider provisioning.ExternalNodeProvider
 	kubernetesVersion    string
 	cni                  string
@@ -226,11 +228,9 @@ func editGlobalSettings(steveclient *v1.Client, globalSetting *v1.SteveAPIObject
 }
 
 func getClusterConfig() *ClusterConfig {
-	nodeAndRoles := []string{
-		"--etcd",
-		"--controlplane",
-		"--worker",
-	}
+
+	nodeAndRoles := []nodepools.NodeRoles{provisioning.RKE1AllRolesPool}
+
 	userConfig := new(provisioning.Config)
 	config.LoadConfig(provisioning.ConfigurationFileKey, userConfig)
 
@@ -241,7 +241,7 @@ func getClusterConfig() *ClusterConfig {
 
 	externalNodeProvider := provisioning.ExternalNodeProviderSetup(nodeProviders)
 
-	clusterConfig := ClusterConfig{nodeRoles: nodeAndRoles, externalNodeProvider: externalNodeProvider,
+	clusterConfig := ClusterConfig{nodesAndRoles: nodeAndRoles, externalNodeProvider: externalNodeProvider,
 		kubernetesVersion: kubernetesVersion, cni: cni, advancedOptions: advancedOptions}
 
 	return &clusterConfig

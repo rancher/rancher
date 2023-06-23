@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/mitchellh/mapstructure"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/saml"
@@ -57,10 +58,16 @@ func (a *authProvider) sync(key string, config *v3.AuthConfig) (runtime.Object, 
 		return nil, fmt.Errorf("failed to retrieve SamlConfig, cannot read k8s Unstructured data")
 	}
 	storedSamlConfigMap := u.UnstructuredContent()
-	err = common.Decode(storedSamlConfigMap, samlConfig)
-	if err != nil {
-		return nil, fmt.Errorf("unable to decode Azure Config: %w", err)
+	mapstructure.Decode(storedSamlConfigMap, samlConfig)
+
+	metadataMap, ok := storedSamlConfigMap["metadata"].(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("failed to retrieve SamlConfig metadata, cannot read k8s Unstructured data")
 	}
+
+	typemeta := &metav1.ObjectMeta{}
+	mapstructure.Decode(metadataMap, typemeta)
+	samlConfig.ObjectMeta = *typemeta
 
 	if samlConfig.SpKey != "" {
 		value, err := common.ReadFromSecret(a.secrets, samlConfig.SpKey, "spkey")
