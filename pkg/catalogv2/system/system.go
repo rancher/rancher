@@ -268,12 +268,10 @@ func (m *Manager) install(namespace, name, minVersion, exactVersion string, valu
 		return nil
 	}
 
-	if ok, err := m.hasStatus(namespace, name, action.ListPendingInstall); err != nil {
+	if ok, err := m.hasStatus(namespace, name, action.ListPendingInstall|action.ListPendingUpgrade|action.ListPendingRollback); err != nil {
 		return err
 	} else if ok {
-		if err = m.Uninstall(namespace, name); err != nil {
-			return err
-		}
+		return nil
 	}
 
 	upgrade, err := json.Marshal(types.ChartUpgradeAction{
