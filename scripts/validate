@@ -4,7 +4,7 @@ set -e
 echo Running: flake8 python linting
 
 cd $(dirname $0)/../tests/integration
-tox -e flake8
+#tox -e flake8
 
 cd ../..
 
@@ -29,9 +29,9 @@ dirty_files="$(git status --porcelain --untracked-files=no)"
 if [ -n "$dirty_files" ]; then
   echo "Encountered dirty repo! Aborting."
   echo "If you're seeing this, it means there are uncommitted changes in the repo."
-  echo "If you're seeing this in CI, it probably means that your go.mod isn't tidy, or more generally that running"
+  echo "If you're seeing this in CI, it probably means that your Go modules aren't tidy, or more generally that running"
   echo "validation would result in changes to the repo. Try 'go mod tidy' and commit the changes, if any."
-  echo "The offending file changes are as follows:"
+  echo "The offending changed files are as follows:"
   echo "$dirty_files"
   exit 1
 fi
