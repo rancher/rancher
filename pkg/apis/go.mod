@@ -10,7 +10,7 @@ require (
 	github.com/rancher/fleet/pkg/apis v0.0.0-20230605094423-ddbb43505e80
 	github.com/rancher/gke-operator v1.1.5
 	github.com/rancher/norman v0.0.0-20230426211126-d3552b018687
-	github.com/rancher/rke v1.4.6-rc3
+	github.com/rancher/rke v1.4.7-rc1
 	github.com/rancher/wrangler v1.1.1
 	github.com/sirupsen/logrus v1.9.2
 	k8s.io/api v0.25.4
@@ -41,6 +41,7 @@ require (
 	github.com/imdario/mergo v0.3.12 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
+	github.com/kr/pretty v0.3.0 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.2 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
