@@ -12,86 +12,121 @@ func TestPickImagesFromValuesMap(t *testing.T) {
 		values              map[interface{}]interface{}
 		chartNameAndVersion string
 		osType              OSType
+		tagToIgnore         string
 		expectedImagesSet   map[string]map[string]struct{}
 	}{
 		{
-			"Want linux images",
-			map[interface{}]interface{}{
+			description: "Want linux images",
+			values: map[interface{}]interface{}{
 				"repository": "test-repository",
 				"tag":        "1.2.3",
 				"os":         "Linux",
 			},
-			"chart:0.1.2",
-			Linux,
-			map[string]map[string]struct{}{
+			chartNameAndVersion: "chart:0.1.2",
+			osType:              Linux,
+			tagToIgnore:         "",
+			expectedImagesSet: map[string]map[string]struct{}{
 				"test-repository:1.2.3": {
 					"chart:0.1.2": struct{}{},
 				},
 			},
 		},
 		{
-			"Want Windows images",
-			map[interface{}]interface{}{
+			description: "Want Windows images",
+			values: map[interface{}]interface{}{
 				"repository": "test-repository",
 				"tag":        "1.2.3",
 				"os":         "windows,linux",
 			},
-			"chart:0.1.2",
-			Windows,
-			map[string]map[string]struct{}{
+			chartNameAndVersion: "chart:0.1.2",
+			osType:              Windows,
+			tagToIgnore:         "",
+			expectedImagesSet: map[string]map[string]struct{}{
 				"test-repository:1.2.3": {
 					"chart:0.1.2": struct{}{},
 				},
 			},
 		},
 		{
-			"No images of the given OS (want Windows, but images are Linux)",
-			map[interface{}]interface{}{
+			description: "No images of the given OS (want Windows, but images are Linux)",
+			values: map[interface{}]interface{}{
 				"repository": "test-repository",
 				"tag":        "1.2.3",
 				"os":         "linux",
 			},
-			"chart:0.1.2",
-			Windows,
-			map[string]map[string]struct{}{},
+			chartNameAndVersion: "chart:0.1.2",
+			osType:              Windows,
+			tagToIgnore:         "",
+			expectedImagesSet:   map[string]map[string]struct{}{},
 		},
 		{
-			"No OS provided, default to Linux",
-			map[interface{}]interface{}{
+			description: "No OS provided, default to Linux",
+			values: map[interface{}]interface{}{
 				"repository": "test-repository",
 				"tag":        "1.2.3",
 			},
-			"chart:0.1.2",
-			Linux,
-			map[string]map[string]struct{}{
+			chartNameAndVersion: "chart:0.1.2",
+			osType:              Linux,
+			tagToIgnore:         "",
+			expectedImagesSet: map[string]map[string]struct{}{
 				"test-repository:1.2.3": {
 					"chart:0.1.2": struct{}{},
 				},
 			},
 		},
 		{
-			"Unsupported OS provided",
-			map[interface{}]interface{}{
+			description: "Unsupported OS provided",
+			values: map[interface{}]interface{}{
 				"repository": "test-repository",
 				"tag":        "1.2.3",
 				"os":         "unsupported-os",
 			},
-			"chart:0.1.2",
-			Linux,
-			map[string]map[string]struct{}{},
+			chartNameAndVersion: "chart:0.1.2",
+			osType:              Linux,
+			tagToIgnore:         "",
+			expectedImagesSet:   map[string]map[string]struct{}{},
 		},
 		{
-			"Missing required information in values file",
-			map[interface{}]interface{}{},
-			"chart:0.1.2",
-			Linux,
-			map[string]map[string]struct{}{},
+			description:         "Missing required information in values file",
+			values:              map[interface{}]interface{}{},
+			chartNameAndVersion: "chart:0.1.2",
+			osType:              Linux,
+			tagToIgnore:         "",
+			expectedImagesSet:   map[string]map[string]struct{}{},
+		},
+		{
+			description: "Ignore an non-matching tag",
+			values: map[interface{}]interface{}{
+				"repository": "test-repository",
+				"tag":        "1.2.3",
+				"os":         "Linux",
+			},
+			chartNameAndVersion: "chart:0.1.2",
+			osType:              Linux,
+			tagToIgnore:         "latest",
+			expectedImagesSet: map[string]map[string]struct{}{
+				"test-repository:1.2.3": {
+					"chart:0.1.2": struct{}{},
+				},
+			},
+		},
+		{
+			description: "Ignore a matching tag",
+			values: map[interface{}]interface{}{
+				"repository": "test-repository",
+				"tag":        "1.2.3",
+				"os":         "Linux",
+			},
+			chartNameAndVersion: "chart:0.1.2",
+			osType:              Linux,
+			tagToIgnore:         "1.2.3",
+			expectedImagesSet:   map[string]map[string]struct{}{},
 		},
 	}
 	assert := assertlib.New(t)
 	for _, tc := range testCases {
 		actualImagesSet := make(map[string]map[string]struct{})
-		err := pickImagesFromValuesMap(actualImagesSet, tc.values, tc.chartNameAndVersion, tc.osType)
+		err := pickImagesFromValuesMap(actualImagesSet, tc.values, tc.chartNameAndVersion, tc.osType, tc.tagToIgnore)
 		if err != nil {
 			t.Errorf("unexpected error: %s", err)
 		}
