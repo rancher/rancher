@@ -18,7 +18,7 @@ node {
     def rancherConfig = "rancher_env.config"
     def branch = "release/v2.7"
     def corralBranch = "main"
-    def corralRepo = ""
+    def cleanup = env.RANCHER_CLEANUP.toLowerCase()
     if ("${env.BRANCH}" != "null" && "${env.BRANCH}" != "") {
       branch = "${env.BRANCH}"
     }
@@ -141,7 +141,7 @@ node {
             }
             stage('Cleanup Rancher Environment') {
               try {
-                if ("${env.CLEANUP_RANCHER}" == "True" || "${env.CLEANUP_RANCHER}" == "true") {
+                if (cleanup.toBoolean()) {
                   sh "docker run --volumes-from ${buildTestContainer} --name ${cleanupTestContainer} -t --env-file ${envFile} " +
                   "${golangImageName} sh -c \"${workPath}pipeline/scripts/rancher_cleanup.sh\""
                 }
@@ -166,8 +166,10 @@ node {
                 sh "docker rm -v ${buildTestContainer}"
                 sh "docker stop ${golangTestContainer}"
                 sh "docker rm -v ${golangTestContainer}"
-                sh "docker stop ${cleanupTestContainer}"
-                sh "docker rm -v ${cleanupTestContainer}"
+                if (cleanup.toBoolean()) {
+                  sh "docker stop ${cleanupTestContainer}"
+                  sh "docker rm -v ${cleanupTestContainer}"
+                }
                 sh "docker rmi -f ${golangImageName}"
                 sh "docker volume rm -f ${validationVolume}"
                 error 'Report had failures.'
@@ -179,8 +181,10 @@ node {
               sh "docker rm -v ${buildTestContainer}"
               sh "docker stop ${golangTestContainer}"
               sh "docker rm -v ${golangTestContainer}"
-              sh "docker stop ${cleanupTestContainer}"
-              sh "docker rm -v ${cleanupTestContainer}"
+              if (cleanup.toBoolean()) {
+                  sh "docker stop ${cleanupTestContainer}"
+                  sh "docker rm -v ${cleanupTestContainer}"
+              }
               sh "docker rmi -f ${golangImageName}"
               sh "docker volume rm -f ${validationVolume}"
             }
