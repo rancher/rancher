@@ -52,6 +52,9 @@ replace (
 
 	sigs.k8s.io/aws-iam-authenticator => github.com/rancher/aws-iam-authenticator v0.5.9-0.20220713170329-78acb8c83863
 	sigs.k8s.io/cluster-api => sigs.k8s.io/cluster-api v1.2.12
+
+	github.com/rancher/wrangler => github.com/moio/wrangler v0.0.0-20230628215402-5feef5c34a5a
+	github.com/rancher/steve => github.com/moio/steve v0.0.0-20230628215854-08dbc12761a5
 )
 
 require (
