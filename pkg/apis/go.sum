@@ -612,8 +612,8 @@ github.com/prometheus/procfs v0.8.0 h1:ODq8ZFEaYeCaZOJlZZdJA2AbQR98dSHSM1KW/You5
 github.com/prometheus/procfs v0.8.0/go.mod h1:z7EfXMXOkbkqb9IINtpCn86r/to3BnA0uaxHdg830/4=
 github.com/prometheus/tsdb v0.7.1/go.mod h1:qhTCs0VvXwvX/y3TZrWD7rabWM+ijKTux40TwIPHuXU=
 github.com/qri-io/starlib v0.4.2-0.20200213133954-ff2e8cd5ef8d/go.mod h1:7DPO4domFU579Ga6E61sB9VFNaniPVwJP5C4bBCu3wA=
-github.com/rancher/aks-operator v1.1.2-rc2 h1:Mw3SEaDJFZfLJZdhfTrxEmoocHAv49Tp4bE2Uta/f3o=
-github.com/rancher/aks-operator v1.1.2-rc2/go.mod h1:K42em/NW4hkvpck3XtVSpa7lQRc2spBjZbqx1aSRWhk=
+github.com/rancher/aks-operator v1.1.2 h1:sMlOp64g3drY5YYqlB1kR6RoR8WtbNsroQlq2liDZi8=
+github.com/rancher/aks-operator v1.1.2/go.mod h1:K42em/NW4hkvpck3XtVSpa7lQRc2spBjZbqx1aSRWhk=
 github.com/rancher/client-go v1.25.4-rancher1 h1:9MlBC8QbgngUkhNzMR8rZmmCIj6WNRHFOnYiwC2Kty4=
 github.com/rancher/client-go v1.25.4-rancher1/go.mod h1:8trHCAC83XKY0wsBIpbirZU4NTUpbuhc2JnI7OruGZw=
 github.com/rancher/eks-operator v1.2.0 h1:hwM6HBegxC62Am8Og1PLOGtCrDDLXXp5I259rYlUwLI=
@@ -628,8 +628,8 @@ github.com/rancher/lasso v0.0.0-20221227210133-6ea88ca2fbcc h1:29VHrInLV4qSevvcv
 github.com/rancher/lasso v0.0.0-20221227210133-6ea88ca2fbcc/go.mod h1:dEfC9eFQigj95lv/JQ8K5e7+qQCacWs1aIA6nLxKzT8=
 github.com/rancher/norman v0.0.0-20230426211126-d3552b018687 h1:9Bf4fZBIdkidKTqHFsJXMlnzflxx3h4ZAEH/n6HMuyI=
 github.com/rancher/norman v0.0.0-20230426211126-d3552b018687/go.mod h1:7MyWxfCmPl6N/UFLu4neLH6nwTFgQQF5rxtUGyZvPFE=
-github.com/rancher/rke v1.4.6-rc3 h1:r/akzh+yxf5El1xwumQtp+QuKEVo77BaB+Tieev3Nzc=
-github.com/rancher/rke v1.4.6-rc3/go.mod h1:0s8+XfiyC9Ff3KLaQ4Z5mDNI+taSb/hma13xOpW6slg=
+github.com/rancher/rke v1.4.6 h1:zrz9DQVmD5IoYA97m/lGjfy6i9PtDMuKeBg2xpf48ak=
+github.com/rancher/rke v1.4.6/go.mod h1:2tq7a87T8d7o6WMDM6q5f6Nu0cL0Y0W3AT07d7Rb4/M=
 github.com/rancher/wrangler v0.6.2-0.20200427172034-da9b142ae061/go.mod h1:n5Du/gGD7WoiqnEo0SHnPirDIp1V9Zu+6guc8lXS2dk=
 github.com/rancher/wrangler v0.8.10/go.mod h1:Lte9WjPtGYxYacIWeiS9qawvu2R4NujFU9xuXWJvc/0=
 github.com/rancher/wrangler v1.1.1 h1:wmqUwqc2M7ADfXnBCJTFkTB5ZREWpD78rnZMzmxwMvM=
