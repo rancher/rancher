@@ -13,6 +13,9 @@ replace (
 	github.com/rancher/machine => github.com/rancher/machine v0.15.0-rancher100 // aks-operator requires rancher99 but rancher100 should not break it.
 	github.com/rancher/rancher/pkg/apis => ./pkg/apis
 	github.com/rancher/rancher/pkg/client => ./pkg/client
+	github.com/rancher/steve => github.com/moio/steve v0.0.0-20230628215854-08dbc12761a5
+
+	github.com/rancher/wrangler => github.com/moio/wrangler v0.0.0-20230628215402-5feef5c34a5a
 
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc => go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.20.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp => go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.20.0
@@ -52,9 +55,6 @@ replace (
 
 	sigs.k8s.io/aws-iam-authenticator => github.com/rancher/aws-iam-authenticator v0.5.9-0.20220713170329-78acb8c83863
 	sigs.k8s.io/cluster-api => sigs.k8s.io/cluster-api v1.2.12
-
-	github.com/rancher/wrangler => github.com/moio/wrangler v0.0.0-20230628215402-5feef5c34a5a
-	github.com/rancher/steve => github.com/moio/steve v0.0.0-20230628215854-08dbc12761a5
 )
 
 require (
