@@ -25,6 +25,11 @@ jobs:
         stable2x=$(yq  ".entries.rancher[].appVersion | select(test(\"^v${rancher_major_minor}\") and select(. != \"*-rc*\"))" 'stable.index.yaml' | head -1)
         [[ -z ${latest2x} ]] && [[ -z ${stable2x} ]] && continue
         echo "* v${rancher_major_minor}" >> $tmpfile
+        echo $rancher_major_minor
+        echo $latest2x
+        echo $stable2x
+        echo $latest
+        echo ""
         if [[ -n ${latest2x} ]]; then
           if [[ -n ${latest} ]]; then
             echo "  * Latest - ${latest2x} - \`rancher/rancher:${latest2x}\` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/${latest2x})." >> $tmpfile
@@ -41,8 +46,14 @@ jobs:
         fi
         latest=${latest2x}
         stable=${stable2x}
+        cat $tmpfile
+        echo ""
        done
+       cat README.md
+       echo ""
        sed -e '/## Latest Release/r '"$tmpfile"'' -e 's/CURRENTYEAR/'"$(date +%Y)"'/g' README-template.md > README.md
+        cat README.md
+       echo ""
     - name: Check for repository changes
       run: |
         if git diff --name-only --exit-code; then
