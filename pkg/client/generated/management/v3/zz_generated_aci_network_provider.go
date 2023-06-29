@@ -3,6 +3,8 @@ package client
 const (
 	AciNetworkProviderType                                   = "aciNetworkProvider"
 	AciNetworkProviderFieldAEP                               = "aep"
+	AciNetworkProviderFieldAciMultipod                       = "aciMultipod"
+	AciNetworkProviderFieldAciMultipodUbuntu                 = "aciMultipodUbuntu"
 	AciNetworkProviderFieldAddExternalSubnetsToRdconfig      = "addExternalSubnetsToRdconfig"
 	AciNetworkProviderFieldApicHosts                         = "apicHosts"
 	AciNetworkProviderFieldApicRefreshTickerAdjust           = "apicRefreshTickerAdjust"
@@ -13,6 +15,8 @@ const (
 	AciNetworkProviderFieldApicUserName                      = "apicUserName"
 	AciNetworkProviderFieldCApic                             = "capic"
 	AciNetworkProviderFieldControllerLogLevel                = "controllerLogLevel"
+	AciNetworkProviderFieldDhcpDelay                         = "dhcpDelay"
+	AciNetworkProviderFieldDhcpRenewMaxRetryCount            = "dhcpRenewMaxRetryCount"
 	AciNetworkProviderFieldDisablePeriodicSnatGlobalInfoSync = "disablePeriodicSnatGlobalInfoSync"
 	AciNetworkProviderFieldDisableWaitForNetwork             = "disableWaitForNetwork"
 	AciNetworkProviderFieldDropLogEnable                     = "dropLogEnable"
@@ -23,6 +27,7 @@ const (
 	AciNetworkProviderFieldEpRegistry                        = "epRegistry"
 	AciNetworkProviderFieldGbpPodSubnet                      = "gbpPodSubnet"
 	AciNetworkProviderFieldHostAgentLogLevel                 = "hostAgentLogLevel"
+	AciNetworkProviderFieldHppOptimization                   = "hppOptimization"
 	AciNetworkProviderFieldImagePullPolicy                   = "imagePullPolicy"
 	AciNetworkProviderFieldImagePullSecret                   = "imagePullSecret"
 	AciNetworkProviderFieldInfraVlan                         = "infraVlan"
@@ -45,6 +50,9 @@ const (
 	AciNetworkProviderFieldNodeSubnet                        = "nodeSubnet"
 	AciNetworkProviderFieldOVSMemoryLimit                    = "ovsMemoryLimit"
 	AciNetworkProviderFieldOpflexAgentLogLevel               = "opflexLogLevel"
+	AciNetworkProviderFieldOpflexAgentOpflexAsyncjsonEnabled = "opflexAgentOpflexAsyncjsonEnabled"
+	AciNetworkProviderFieldOpflexAgentOvsAsyncjsonEnabled    = "opflexAgentOvsAsyncjsonEnabled"
+	AciNetworkProviderFieldOpflexAgentPolicyRetryDelayTimer  = "opflexAgentPolicyRetryDelayTimer"
 	AciNetworkProviderFieldOpflexClientSSL                   = "opflexClientSsl"
 	AciNetworkProviderFieldOpflexDeviceDeleteTimeout         = "opflexDeviceDeleteTimeout"
 	AciNetworkProviderFieldOpflexMode                        = "opflexMode"
@@ -59,6 +67,7 @@ const (
 	AciNetworkProviderFieldServiceGraphSubnet                = "nodeSvcSubnet"
 	AciNetworkProviderFieldServiceMonitorInterval            = "serviceMonitorInterval"
 	AciNetworkProviderFieldServiceVlan                       = "serviceVlan"
+	AciNetworkProviderFieldSleepTimeSnatGlobalInfoSync       = "sleepTimeSnatGlobalInfoSync"
 	AciNetworkProviderFieldSnatContractScope                 = "snatContractScope"
 	AciNetworkProviderFieldSnatNamespace                     = "snatNamespace"
 	AciNetworkProviderFieldSnatPortRangeEnd                  = "snatPortRangeEnd"
@@ -84,6 +93,8 @@ const (
 
 type AciNetworkProvider struct {
 	AEP                               string              `json:"aep,omitempty" yaml:"aep,omitempty"`
+	AciMultipod                       string              `json:"aciMultipod,omitempty" yaml:"aciMultipod,omitempty"`
+	AciMultipodUbuntu                 string              `json:"aciMultipodUbuntu,omitempty" yaml:"aciMultipodUbuntu,omitempty"`
 	AddExternalSubnetsToRdconfig      string              `json:"addExternalSubnetsToRdconfig,omitempty" yaml:"addExternalSubnetsToRdconfig,omitempty"`
 	ApicHosts                         []string            `json:"apicHosts,omitempty" yaml:"apicHosts,omitempty"`
 	ApicRefreshTickerAdjust           string              `json:"apicRefreshTickerAdjust,omitempty" yaml:"apicRefreshTickerAdjust,omitempty"`
@@ -94,6 +105,8 @@ type AciNetworkProvider struct {
 	ApicUserName                      string              `json:"apicUserName,omitempty" yaml:"apicUserName,omitempty"`
 	CApic                             string              `json:"capic,omitempty" yaml:"capic,omitempty"`
 	ControllerLogLevel                string              `json:"controllerLogLevel,omitempty" yaml:"controllerLogLevel,omitempty"`
+	DhcpDelay                         string              `json:"dhcpDelay,omitempty" yaml:"dhcpDelay,omitempty"`
+	DhcpRenewMaxRetryCount            string              `json:"dhcpRenewMaxRetryCount,omitempty" yaml:"dhcpRenewMaxRetryCount,omitempty"`
 	DisablePeriodicSnatGlobalInfoSync string              `json:"disablePeriodicSnatGlobalInfoSync,omitempty" yaml:"disablePeriodicSnatGlobalInfoSync,omitempty"`
 	DisableWaitForNetwork             string              `json:"disableWaitForNetwork,omitempty" yaml:"disableWaitForNetwork,omitempty"`
 	DropLogEnable                     string              `json:"dropLogEnable,omitempty" yaml:"dropLogEnable,omitempty"`
@@ -104,6 +117,7 @@ type AciNetworkProvider struct {
 	EpRegistry                        string              `json:"epRegistry,omitempty" yaml:"epRegistry,omitempty"`
 	GbpPodSubnet                      string              `json:"gbpPodSubnet,omitempty" yaml:"gbpPodSubnet,omitempty"`
 	HostAgentLogLevel                 string              `json:"hostAgentLogLevel,omitempty" yaml:"hostAgentLogLevel,omitempty"`
+	HppOptimization                   string              `json:"hppOptimization,omitempty" yaml:"hppOptimization,omitempty"`
 	ImagePullPolicy                   string              `json:"imagePullPolicy,omitempty" yaml:"imagePullPolicy,omitempty"`
 	ImagePullSecret                   string              `json:"imagePullSecret,omitempty" yaml:"imagePullSecret,omitempty"`
 	InfraVlan                         string              `json:"infraVlan,omitempty" yaml:"infraVlan,omitempty"`
@@ -126,6 +140,9 @@ type AciNetworkProvider struct {
 	NodeSubnet                        string              `json:"nodeSubnet,omitempty" yaml:"nodeSubnet,omitempty"`
 	OVSMemoryLimit                    string              `json:"ovsMemoryLimit,omitempty" yaml:"ovsMemoryLimit,omitempty"`
 	OpflexAgentLogLevel               string              `json:"opflexLogLevel,omitempty" yaml:"opflexLogLevel,omitempty"`
+	OpflexAgentOpflexAsyncjsonEnabled string              `json:"opflexAgentOpflexAsyncjsonEnabled,omitempty" yaml:"opflexAgentOpflexAsyncjsonEnabled,omitempty"`
+	OpflexAgentOvsAsyncjsonEnabled    string              `json:"opflexAgentOvsAsyncjsonEnabled,omitempty" yaml:"opflexAgentOvsAsyncjsonEnabled,omitempty"`
+	OpflexAgentPolicyRetryDelayTimer  string              `json:"opflexAgentPolicyRetryDelayTimer,omitempty" yaml:"opflexAgentPolicyRetryDelayTimer,omitempty"`
 	OpflexClientSSL                   string              `json:"opflexClientSsl,omitempty" yaml:"opflexClientSsl,omitempty"`
 	OpflexDeviceDeleteTimeout         string              `json:"opflexDeviceDeleteTimeout,omitempty" yaml:"opflexDeviceDeleteTimeout,omitempty"`
 	OpflexMode                        string              `json:"opflexMode,omitempty" yaml:"opflexMode,omitempty"`
@@ -140,6 +157,7 @@ type AciNetworkProvider struct {
 	ServiceGraphSubnet                string              `json:"nodeSvcSubnet,omitempty" yaml:"nodeSvcSubnet,omitempty"`
 	ServiceMonitorInterval            string              `json:"serviceMonitorInterval,omitempty" yaml:"serviceMonitorInterval,omitempty"`
 	ServiceVlan                       string              `json:"serviceVlan,omitempty" yaml:"serviceVlan,omitempty"`
+	SleepTimeSnatGlobalInfoSync       string              `json:"sleepTimeSnatGlobalInfoSync,omitempty" yaml:"sleepTimeSnatGlobalInfoSync,omitempty"`
 	SnatContractScope                 string              `json:"snatContractScope,omitempty" yaml:"snatContractScope,omitempty"`
 	SnatNamespace                     string              `json:"snatNamespace,omitempty" yaml:"snatNamespace,omitempty"`
 	SnatPortRangeEnd                  string              `json:"snatPortRangeEnd,omitempty" yaml:"snatPortRangeEnd,omitempty"`
