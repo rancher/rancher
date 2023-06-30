@@ -57,15 +57,21 @@ type desired struct {
 }
 
 type HelmClient interface {
+	// ListReleases lists all releases in the given namespace that matches the given name and stateMask
 	ListReleases(namespace, name string, stateMask action.ListStates) ([]*release.Release, error)
 }
 
 type OperationClient interface {
+	// Upgrade gets the upgrade commands using the given namespace, name and options and gets the user using the isApp flag as false.
+	// Returns a catalog.Operation that represents the helm operation to be created
 	Upgrade(ctx context.Context, user user.Info, namespace, name string, options io.Reader, imageOverride string) (*catalog.Operation, error)
+	// Uninstall gets the uninstallation commands using the given namespace, name and options and gets the user information using the isApp flag as true.
+	// Returns a catalog.Operation that represents the helm operation to be created
 	Uninstall(ctx context.Context, user user.Info, namespace, name string, options io.Reader, imageOverride string) (*catalog.Operation, error)
 }
 
 type ContentClient interface {
+	// Index receives a repository's name and namespace and returns its index file.
 	Index(namespace, name string, skipFilter bool) (*repo.IndexFile, error)
 }
 
@@ -249,6 +255,10 @@ func (m *Manager) Remove(namespace, name string) {
 	}
 }
 
+// install tries to install a new version of a chart. If the exact version is provided, it will try to install it
+// otherwise it will try to install the latest version available. If a release with the version to be installed is already installed,
+// or it's pending install, upgrade or rollback this does nothing.
+// The operation created is always an upgrade, even in the case of an installation. In that case, the Install flag will be used.
 func (m *Manager) install(namespace, name, minVersion, exactVersion string, values map[string]interface{}, forceAdopt bool, installImageOverride string) error {
 	index, err := m.content.Index("", "rancher-charts", true)
 	if err != nil {
@@ -272,6 +282,7 @@ func (m *Manager) install(namespace, name, minVersion, exactVersion string, valu
 		return fmt.Errorf("specified exact version %s doesn't exist in the index", exactVersion)
 	}
 
+	// If the chart version is already installed, we do nothing
 	installed, desiredVersion, desiredValue, err := m.isInstalled(namespace, name, minVersion, chart.Version, isExact, values)
 	if err != nil {
 		return err
@@ -279,6 +290,8 @@ func (m *Manager) install(namespace, name, minVersion, exactVersion string, valu
 		return nil
 	}
 
+	// If the release is pending install, upgrade or rollback, we do nothing.
+	// If it's not, we proceed to create an operation
 	if ok, err := m.hasStatus(namespace, name, action.ListPendingInstall); err != nil {
 		return err
 	} else if ok {
@@ -316,6 +329,9 @@ func (m *Manager) install(namespace, name, minVersion, exactVersion string, valu
 	return m.waitPodDone(op)
 }
 
+// waitPodDone receives an operation, get its pod and check if it's done and
+// returns nil if it is. If not, creates a watch for the pod with a timeout of 300 seconds
+// that will check if the pod is done and return nil. If the watch timeouts, it returns an error.
 func (m *Manager) waitPodDone(op *catalog.Operation) error {
 	pod, err := m.pods.Get(op.Status.PodNamespace, op.Status.PodName, metav1.GetOptions{})
 	if err != nil {
@@ -360,6 +376,9 @@ func (m *Manager) waitPodDone(op *catalog.Operation) error {
 	return fmt.Errorf("pod %s/%s failed, watch closed", pod.Namespace, pod.Name)
 }
 
+// podDone receives a chart name and a pod. It will check all containers in that pod and
+// get one named helm to check if it terminated and if it did so successfully.
+// If there's no helm container or if the container didn't terminate, it returns false.
 func podDone(chart string, newPod *corev1.Pod) (bool, error) {
 	for _, container := range newPod.Status.ContainerStatuses {
 		if container.Name != "helm" {
@@ -376,6 +395,8 @@ func podDone(chart string, newPod *corev1.Pod) (bool, error) {
 	return false, nil
 }
 
+// isInstalled gets all releases for a particular namespace and name that has the status action.ListDeployed.
+// It calls the desiredVersionAndValues function with it to return if the chart is installed, the desired version and the desired values for it.
 func (m *Manager) isInstalled(namespace, name, minVersion, desiredVersion string, isExact bool, desiredValue map[string]interface{}) (bool, string, map[string]interface{}, error) {
 	releases, err := m.helmClient.ListReleases(namespace, name, action.ListDeployed)
 	if err != nil {
@@ -464,6 +485,8 @@ func desiredVersionAndValues(releases []*release.Release, minVersion, desiredVer
 	return false, desiredVersion, desiredValues, nil
 }
 
+// hasStatus gets all releases in the given namespace that matches the given name and stateMask and
+// returns true if there's any release that matches those conditions.
 func (m *Manager) hasStatus(namespace, name string, stateMask action.ListStates) (bool, error) {
 	releases, err := m.helmClient.ListReleases(namespace, name, stateMask)
 	if err != nil {
