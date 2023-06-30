@@ -16,7 +16,7 @@ func CreateLinodeNodeTemplate(rancherClient *rancher.Client) (*nodetemplates.Nod
 	config.LoadConfig(nodetemplates.LinodeNodeTemplateConfigurationFileKey, &linodeNodeTemplateConfig)
 
 	nodeTemplate := nodetemplates.NodeTemplate{
-		EngineInstallURL:         "https://releases.rancher.com/install-docker/23.0.sh",
+		EngineInstallURL:         "https://releases.rancher.com/install-docker/24.0.sh",
 		Name:                     linodeNodeTemplateNameBase,
 		LinodeNodeTemplateConfig: &linodeNodeTemplateConfig,
 	}
