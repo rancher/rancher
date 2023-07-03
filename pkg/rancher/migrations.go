@@ -332,6 +332,23 @@ func migrateAddCAPIWatchFilterLabels(w *wrangler.Context) error {
 			}
 		}
 
+		// MachineSets
+		sets, err := w.CAPI.MachineSet().List(ns.Name, metav1.ListOptions{})
+		if err != nil {
+			return fmt.Errorf("listing capi machine sets in ns %s: %w", ns.Name, err)
+		}
+		for _, dep := range sets.Items {
+			if isRancherOwned(dep.OwnerReferences) {
+				if _, ok := dep.Labels[capi.WatchLabel]; !ok {
+					depCopy := dep.DeepCopy()
+					depCopy.Labels[capi.WatchLabel] = capr.CAPIFilterValue
+					if _, updateErr := w.CAPI.MachineSet().Update(depCopy); updateErr != nil {
+						return fmt.Errorf("saving update to machine set %s: %w", depCopy.Name, updateErr)
+					}
+				}
+			}
+		}
+
 		// Machines
 		machines, err := w.CAPI.Machine().List(ns.Name, metav1.ListOptions{})
 		if err != nil {
@@ -533,7 +550,7 @@ func migrateEncryptionKeyRotationLeader(w *wrangler.Context) error {
 			}
 			cp = cp.DeepCopy()
 			delete(cp.Annotations, "rke.cattle.io/encrypt-key-rotation-leader")
-			cp, err = w.RKE.RKEControlPlane().Update(cp)
+			_, err = w.RKE.RKEControlPlane().Update(cp)
 			if err != nil {
 				return err
 			}
