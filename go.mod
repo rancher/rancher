@@ -2,6 +2,9 @@ module github.com/rancher/rancher
 
 go 1.19
 
+// on release remove this wrangler replace and use the latest tag
+replace github.com/rancher/wrangler v1.1.1 => github.com/rancher/wrangler v1.1.1-0.20230705223603-201b4da5bdaf
+
 replace (
 	github.com/docker/distribution => github.com/docker/distribution v2.7.1+incompatible // oras dep requires a replace is set
 	github.com/docker/docker => github.com/docker/docker v20.10.18+incompatible // oras dep requires a replace is set
@@ -13,8 +16,6 @@ replace (
 	github.com/rancher/machine => github.com/rancher/machine v0.15.0-rancher100 // aks-operator requires rancher99 but rancher100 should not break it.
 	github.com/rancher/rancher/pkg/apis => ./pkg/apis
 	github.com/rancher/rancher/pkg/client => ./pkg/client
-	// wrangler bracnhes need to be updated before replace can be removed
-	github.com/rancher/wrangler v1.1.1 => github.com/rancher/wrangler v1.1.1-0.20230629203936-0e36fee7aea5
 
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc => go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.20.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp => go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.20.0
