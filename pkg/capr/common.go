@@ -122,6 +122,7 @@ const (
 	MaximumHostnameLengthLimit = 63
 
 	CAPIFilterValue = "rancher-prov-v2"
+	RKEClusterKind  = "RKECluster"
 )
 
 var (

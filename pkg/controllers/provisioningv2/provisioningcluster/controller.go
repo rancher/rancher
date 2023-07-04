@@ -86,7 +86,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 				clients.RKE.RKECluster(),
 				clients.RKE.RKEBootstrapTemplate(),
 			),
-		"RKECluster",
+		capr.RKEClusterKind,
 		"rke-cluster",
 		h.OnRancherClusterChange,
 		nil)
