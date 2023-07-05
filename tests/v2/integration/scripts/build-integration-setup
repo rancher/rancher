@@ -3,4 +3,6 @@ set -e
 
 cd $(dirname $0)/..
 
-CGO_ENABLED=0 go build -o bin/integrationsetup ./setup
+# We're compiling with the tag "containers_image_openpgp" to prevent Go from attempting to build unnecessary C
+# dependencies of the github.com/containers/image package we use in the setup package.
+CGO_ENABLED=0 go build -tags containers_image_openpgp,integrationsetup -o bin/integrationsetup ./setup

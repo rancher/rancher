@@ -16,11 +16,13 @@ import (
 )
 
 var (
-	cachePodName      = "registry-cache"
-	cachePodNamespace = "default"
-	cacheServiceName  = "registry.default.svc.cluster.local"
+	registryNamespace = "default"
 	cacheLock         sync.Mutex
 )
+
+func newRegistryServiceName(baseName string) string {
+	return fmt.Sprintf("%s.default.svc.cluster.local", baseName)
+}
 
 func createPasswordSecret(clients *clients.Clients, namespace string) (*corev1.Secret, error) {
 	secret, err := clients.Core.Secret().Create(&corev1.Secret{
@@ -61,23 +63,23 @@ func createTLSSecret(clients *clients.Clients, namespace string, registryTLSSecr
 	return secret, nil
 }
 
-func createRegistrySecret(clients *clients.Clients) (*corev1.Secret, error) {
-	secret, err := clients.Core.Secret().Get(cachePodNamespace, cachePodName, metav1.GetOptions{})
+func createRegistrySecret(clients *clients.Clients, podName string) (*corev1.Secret, error) {
+	secret, err := clients.Core.Secret().Get(registryNamespace, podName, metav1.GetOptions{})
 	if err == nil {
 		return secret, nil
 	} else if !apierrors.IsNotFound(err) {
 		return nil, err
 	}
 
-	cert, key, err := cert.GenerateSelfSignedCertKey(cacheServiceName, nil, nil)
+	cert, key, err := cert.GenerateSelfSignedCertKey(newRegistryServiceName(podName), nil, nil)
 	if err != nil {
 		return nil, err
 	}
 
 	secret, err = clients.Core.Secret().Create(&corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      cachePodName,
-			Namespace: cachePodNamespace,
+			Name:      podName,
+			Namespace: registryNamespace,
 		},
 		Data: map[string][]byte{
 			// admin:admin
@@ -89,16 +91,16 @@ func createRegistrySecret(clients *clients.Clients) (*corev1.Secret, error) {
 	if err == nil {
 		return secret, nil
 	} else if apierrors.IsAlreadyExists(err) {
-		return clients.Core.Secret().Get(cachePodNamespace, cachePodName, metav1.GetOptions{})
+		return clients.Core.Secret().Get(registryNamespace, podName, metav1.GetOptions{})
 	}
 	return nil, err
 }
 
-func createService(clients *clients.Clients) error {
+func createService(clients *clients.Clients, name string) error {
 	_, err := clients.Core.Service().Create(&corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "registry",
-			Namespace: cachePodNamespace,
+			Name:      name,
+			Namespace: registryNamespace,
 		},
 		Spec: corev1.ServiceSpec{
 			Ports: []corev1.ServicePort{{
@@ -109,7 +111,7 @@ func createService(clients *clients.Clients) error {
 				TargetPort:  intstr.FromInt(5000),
 			}},
 			Selector: map[string]string{
-				"app": cachePodName,
+				"app": name,
 			},
 		},
 	})
@@ -119,18 +121,51 @@ func createService(clients *clients.Clients) error {
 	return err
 }
 
-func getPod(clients *clients.Clients) (*corev1.Pod, error) {
-	pod, err := clients.Core.Pod().Get(cachePodNamespace, cachePodName, metav1.GetOptions{})
+func createOrGetPod(clients *clients.Clients, podName string, pullThrough bool) (*corev1.Pod, error) {
+	pod, err := clients.Core.Pod().Get(registryNamespace, podName, metav1.GetOptions{})
 	if err == nil || !apierrors.IsNotFound(err) {
 		return pod, err
 	}
 
+	podEnv := []corev1.EnvVar{
+		{
+			Name:  "REGISTRY_AUTH",
+			Value: "htpasswd",
+		},
+		{
+			Name:  "REGISTRY_AUTH_HTPASSWD_REALM",
+			Value: "Registry Realm",
+		},
+		{
+			Name:  "REGISTRY_AUTH_HTPASSWD_PATH",
+			Value: "/etc/auth/htpasswd",
+		},
+		{
+			Name:  "REGISTRY_HTTP_TLS_CERTIFICATE",
+			Value: "/etc/auth/tls.crt",
+		},
+		{
+			Name:  "REGISTRY_HTTP_TLS_KEY",
+			Value: "/etc/auth/tls.key",
+		},
+	}
+
+	// Configure the pod as a pull-through cache, if necessary. When proxy.remoteUrl on the registry config, it will
+	// act as a proxy for the upstream registry and cache images it downloads, but you will not be able to push images
+	// to it! For that, you'd need another registry.
+	if pullThrough {
+		podEnv = append(podEnv, corev1.EnvVar{
+			Name:  "REGISTRY_PROXY_REMOTEURL",
+			Value: "https://registry-1.docker.io",
+		})
+	}
+
 	pod, err = clients.Core.Pod().Create(&corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      cachePodName,
-			Namespace: cachePodNamespace,
+			Name:      podName,
+			Namespace: registryNamespace,
 			Labels: map[string]string{
-				"app": cachePodName,
+				"app": podName,
 			},
 		},
 		Spec: corev1.PodSpec{
@@ -139,7 +174,7 @@ func getPod(clients *clients.Clients) (*corev1.Pod, error) {
 				Name: "htpasswd",
 				VolumeSource: corev1.VolumeSource{
 					Secret: &corev1.SecretVolumeSource{
-						SecretName: "registry-cache",
+						SecretName: podName,
 					},
 				},
 			}},
@@ -147,32 +182,7 @@ func getPod(clients *clients.Clients) (*corev1.Pod, error) {
 				{
 					Name:  "cache",
 					Image: "registry",
-					Env: []corev1.EnvVar{
-						{
-							Name:  "REGISTRY_AUTH",
-							Value: "htpasswd",
-						},
-						{
-							Name:  "REGISTRY_AUTH_HTPASSWD_REALM",
-							Value: "Registry Realm",
-						},
-						{
-							Name:  "REGISTRY_AUTH_HTPASSWD_PATH",
-							Value: "/etc/auth/htpasswd",
-						},
-						{
-							Name:  "REGISTRY_PROXY_REMOTEURL",
-							Value: "https://registry-1.docker.io",
-						},
-						{
-							Name:  "REGISTRY_HTTP_TLS_CERTIFICATE",
-							Value: "/etc/auth/tls.crt",
-						},
-						{
-							Name:  "REGISTRY_HTTP_TLS_KEY",
-							Value: "/etc/auth/tls.key",
-						},
-					},
+					Env:   podEnv,
 					VolumeMounts: []corev1.VolumeMount{{
 						Name:      "htpasswd",
 						ReadOnly:  true,
@@ -183,26 +193,26 @@ func getPod(clients *clients.Clients) (*corev1.Pod, error) {
 		},
 	})
 	if apierrors.IsAlreadyExists(err) {
-		return clients.Core.Pod().Get(cachePodNamespace, cachePodName, metav1.GetOptions{})
+		return clients.Core.Pod().Get(registryNamespace, podName, metav1.GetOptions{})
 	}
 	return pod, err
 }
 
-func createSharedObjects(clients *clients.Clients) (*corev1.Secret, error) {
+func createSharedObjects(clients *clients.Clients, podName string, pullThrough bool) (*corev1.Secret, error) {
 	cacheLock.Lock()
 	defer cacheLock.Unlock()
 
-	registrySecret, err := createRegistrySecret(clients)
+	registrySecret, err := createRegistrySecret(clients, podName)
 	if err != nil {
 		return nil, err
 	}
 
-	pod, err := getPod(clients)
+	pod, err := createOrGetPod(clients, podName, pullThrough)
 	if err != nil {
 		return nil, err
 	}
 
-	err = createService(clients)
+	err = createService(clients, podName)
 	if err != nil {
 		return nil, err
 	}
@@ -214,8 +224,12 @@ func createSharedObjects(clients *clients.Clients) (*corev1.Secret, error) {
 	return registrySecret, err
 }
 
-func GetCache(clients *clients.Clients, namespace string) (rkev1.Registry, error) {
-	registrySecret, err := createSharedObjects(clients)
+// CreateOrGetRegistry gets existing registry config, or creates a new one and returns the config. The registry will
+// be created with the given name in the "default" namespace, and its secrets will be created in the given namespace so
+// that pods created in that namespace can rely on images sourced from the new registry. If pullThrough is set to true,
+// the registry will be configured as a proxy (a.k.a pull-through cache) for docker.io.
+func CreateOrGetRegistry(clients *clients.Clients, namespace, name string, pullThrough bool) (rkev1.Registry, error) {
+	registrySecret, err := createSharedObjects(clients, name, pullThrough)
 	if err != nil {
 		return rkev1.Registry{}, err
 	}
@@ -230,12 +244,14 @@ func GetCache(clients *clients.Clients, namespace string) (rkev1.Registry, error
 		return rkev1.Registry{}, err
 	}
 
+	serviceName := newRegistryServiceName(name)
+
 	// Specify dummy.io registries to ensure we can deliver the same data twice without thrashing.
 	return rkev1.Registry{
 		Mirrors: map[string]rkev1.Mirror{
 			"docker.io": {
 				Endpoints: []string{
-					fmt.Sprintf("https://%s:5000", cacheServiceName),
+					fmt.Sprintf("https://%s:5000", serviceName),
 				},
 			},
 			"dummy.cattle.io": {
@@ -245,7 +261,7 @@ func GetCache(clients *clients.Clients, namespace string) (rkev1.Registry, error
 			},
 		},
 		Configs: map[string]rkev1.RegistryConfig{
-			cacheServiceName + ":5000": {
+			serviceName + ":5000": {
 				AuthConfigSecretName: passwordSecret.Name,
 				TLSSecretName:        tlsSecret.Name,
 				CABundle:             tlsSecret.Data[corev1.TLSCertKey],
