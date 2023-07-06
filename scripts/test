@@ -80,10 +80,7 @@ run_rancher()
     while sleep 2; do
         if [ "$PID" != "-1" ] && [ ! -e /proc/$PID ]; then
             echo Rancher died
-            echo Rancher logs were
-            echo -e "-----RANCHER-LOG-DUMP-START-----"
-            cat /tmp/rancher.log | gzip | base64 -w 0
-            echo -e "\n-----RANCHER-LOG-DUMP-END-----"
+            dump_rancher_logs
             echo K3s logs were:
             echo -e "-----K3S-LOG-DUMP-START-----"
             cat build/testdata/k3s.log | gzip | base64 -w 0
@@ -107,6 +104,14 @@ run_rancher()
         fi
         sleep 2
     done
+}
+
+dump_rancher_logs()
+{
+  echo Rancher logs were
+  echo -e "-----RANCHER-LOG-DUMP-START-----"
+  cat /tmp/rancher.log | gzip | base64 -w 0
+  echo -e "\n-----RANCHER-LOG-DUMP-END-----"
 }
 
 # uncomment to get startup logs. Don't leave them on because it slows drone down too
@@ -140,10 +145,16 @@ echo Running build-integration-setup
 
 echo Running integrationsetup
 export CATTLE_TEST_CONFIG=$(pwd)/config.yaml # used by integration tests and test setup
-./tests/v2/integration/bin/integrationsetup
+./tests/v2/integration/bin/integrationsetup || {
+  dump_rancher_logs
+  exit 1
+}
 
 echo Running go integration tests
-go test -v -failfast ./tests/v2/integration/...
+go test -v -failfast ./tests/v2/integration/... || {
+  dump_rancher_logs
+  exit 1
+}
 
 echo Running tox tests
 INT_TESTS_STARTED=true
