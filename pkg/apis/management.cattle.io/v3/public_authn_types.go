@@ -5,6 +5,7 @@ import (
 )
 
 // +genclient
+// +kubebuilder:skipversion
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -16,6 +17,7 @@ type AuthProvider struct {
 }
 
 // +genclient
+// +kubebuilder:skipversion
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -40,6 +42,7 @@ type BasicLogin struct {
 }
 
 // +genclient
+// +kubebuilder:skipversion
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -50,6 +53,7 @@ type LocalProvider struct {
 }
 
 // +genclient
+// +kubebuilder:skipversion
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -67,6 +71,7 @@ type GithubLogin struct {
 }
 
 // +genclient
+// +kubebuilder:skipversion
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -84,6 +89,7 @@ type GoogleOauthLogin struct {
 }
 
 // +genclient
+// +kubebuilder:skipversion
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -96,6 +102,7 @@ type ActiveDirectoryProvider struct {
 }
 
 // +genclient
+// +kubebuilder:skipversion
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -108,6 +115,7 @@ type AzureADProvider struct {
 }
 
 // +genclient
+// +kubebuilder:skipversion
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -125,6 +133,7 @@ type AzureADLogin struct {
 }
 
 // +genclient
+// +kubebuilder:skipversion
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -135,6 +144,7 @@ type OpenLdapProvider struct {
 }
 
 // +genclient
+// +kubebuilder:skipversion
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -176,6 +186,7 @@ type SamlLoginOutput struct {
 }
 
 // +genclient
+// +kubebuilder:skipversion
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 

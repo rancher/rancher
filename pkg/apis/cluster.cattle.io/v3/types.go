@@ -6,6 +6,7 @@ import (
 )
 
 // +genclient
+// +kubebuilder:skipversion
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type ClusterUserAttribute struct {
@@ -22,6 +23,7 @@ type ClusterUserAttribute struct {
 }
 
 // +genclient
+// +kubebuilder:skipversion
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type ClusterAuthToken struct {

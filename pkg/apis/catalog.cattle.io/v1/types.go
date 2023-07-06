@@ -6,6 +6,7 @@ import (
 )
 
 // +genclient
+// +kubebuilder:skipversion
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -97,6 +98,7 @@ type RepoStatus struct {
 }
 
 // +genclient
+// +kubebuilder:skipversion
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type Operation struct {
