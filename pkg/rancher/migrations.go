@@ -3,8 +3,11 @@ package rancher
 import (
 	"encoding/json"
 	"fmt"
+	"hash"
+	"hash/fnv"
 	"strings"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/mcuadros/go-version"
 	"github.com/rancher/norman/condition"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -30,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/util/retry"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	capiutil "sigs.k8s.io/cluster-api/util"
 )
 
 const (
@@ -292,33 +296,44 @@ func addWebhookConfigToCAPICRDs(crdClient controllerapiextv1.CustomResourceDefin
 }
 
 func migrateAddCAPIWatchFilterLabels(w *wrangler.Context) error {
+	logrus.Info("Running CAPI watch filter migration")
+
 	namespaces, err := w.Core.Namespace().List(metav1.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("listing namespaces: %w", err)
 	}
 	for _, ns := range namespaces.Items {
-		// Clusters
 		clusters, err := w.CAPI.Cluster().List(ns.Name, metav1.ListOptions{})
 		if err != nil {
 			return fmt.Errorf("listing capi clusters in ns %s: %w", ns.Name, err)
 		}
 		for _, cluster := range clusters.Items {
+			log := logrus.WithFields(logrus.Fields{
+				"name":           cluster.Name,
+				"namespace":      cluster.Namespace,
+				"migration_name": "capi-watch-filter",
+			})
+
 			if !isRKECluster(&cluster) {
+				log.Debug("found non-RKE2 cluster, not migrating")
+
 				continue
 			}
 
-			// Cluster
+			clusterCopy := cluster.DeepCopy()
 			if _, ok := cluster.Labels[capi.WatchLabel]; !ok {
-				clusterCopy := cluster.DeepCopy()
 				clusterCopy.Labels[capi.WatchLabel] = capr.CAPIFilterValue
+
 				if _, updateErr := w.CAPI.Cluster().Update(clusterCopy); updateErr != nil {
 					return fmt.Errorf("saving update to cluster %s: %w", clusterCopy.Name, updateErr)
 				}
+
+				log.Debug("Updated CAPI cluster with watch filter")
 			}
 
 			// MachineDeployments
 			deployments, err := w.CAPI.MachineDeployment().List(ns.Name, metav1.ListOptions{
-				FieldSelector: fmt.Sprintf("spec.clusterName=%s", cluster.Name),
+				LabelSelector: fmt.Sprintf("%s=%s", capi.ClusterLabelName, cluster.Name),
 			})
 			if err != nil {
 				return fmt.Errorf("listing capi machine deployments in ns %s: %w", ns.Name, err)
@@ -330,49 +345,84 @@ func migrateAddCAPIWatchFilterLabels(w *wrangler.Context) error {
 					depCopy.Labels[capi.WatchLabel] = capr.CAPIFilterValue
 					depUpdated = true
 				}
-				if _, ok := dep.Spec.Template.ObjectMeta.Labels[capi.WatchLabel]; !ok {
-					depCopy.Spec.Template.ObjectMeta.Labels[capi.WatchLabel] = capr.CAPIFilterValue
+				if _, ok := dep.Spec.Template.Labels[capi.WatchLabel]; !ok {
+					depCopy.Spec.Template.Labels[capi.WatchLabel] = capr.CAPIFilterValue
 					depUpdated = true
 				}
+
+				hash, err := computeSpewHash(depCopy.Spec.Template)
+				if err != nil {
+					return fmt.Errorf("creating machine deployment hash: %w", err)
+				}
+				machineTemplateSpecHash := fmt.Sprintf("%d", hash)
+				log.Debugf("computed hash for machine deployment %s=%s", dep.Name, machineTemplateSpecHash)
+
+				//MachineSets
+				sets, err := w.CAPI.MachineSet().List(ns.Name, metav1.ListOptions{
+					LabelSelector: fmt.Sprintf("%s=%s", capi.ClusterLabelName, cluster.Name),
+				})
+				if err != nil {
+					return fmt.Errorf("listing capi machine sets in ns %s: %w", ns.Name, err)
+				}
+				for _, ms := range sets.Items {
+					if !capiutil.HasOwnerRef(ms.OwnerReferences, metav1.OwnerReference{
+						APIVersion: capi.GroupVersion.Identifier(),
+						Kind:       "MachineDeployment",
+						Name:       dep.Name,
+					}) {
+						continue
+					}
+
+					if _, ok := ms.Labels[capi.WatchLabel]; !ok {
+						msCopy := ms.DeepCopy()
+						msCopy.Labels[capi.WatchLabel] = capr.CAPIFilterValue
+						msCopy.Labels[capi.MachineDeploymentUniqueLabel] = machineTemplateSpecHash
+						msCopy.Spec.Selector.MatchLabels[capi.MachineDeploymentUniqueLabel] = machineTemplateSpecHash
+						msCopy.Spec.Template.Labels[capi.MachineDeploymentUniqueLabel] = machineTemplateSpecHash
+
+						machines, err := w.CAPI.Machine().List(ns.Name, metav1.ListOptions{
+							LabelSelector: fmt.Sprintf("%s=%s", capi.ClusterLabelName, cluster.Name),
+						})
+						if err != nil {
+							return fmt.Errorf("listing capi machines in ns %s: %w", ns.Name, err)
+						}
+						for _, machine := range machines.Items {
+							if !capiutil.HasOwnerRef(machine.OwnerReferences, metav1.OwnerReference{
+								APIVersion: capi.GroupVersion.Identifier(),
+								Kind:       "MachineSet",
+								Name:       ms.Name,
+							}) {
+								continue
+							}
+
+							if _, ok := machine.Labels[capi.WatchLabel]; !ok {
+								machineCopy := machine.DeepCopy()
+								machineCopy.Labels[capi.WatchLabel] = capr.CAPIFilterValue
+								machineCopy.Labels[capi.MachineDeploymentUniqueLabel] = machineTemplateSpecHash
+
+								if _, updateErr := w.CAPI.Machine().Update(machineCopy); updateErr != nil {
+									return fmt.Errorf("saving update to machine %s: %w", machineCopy.Name, updateErr)
+								}
+
+								log.Debugf("Updated CAPI machine %s with watch filter", machineCopy.Name)
+							}
+						}
+
+						if _, updateErr := w.CAPI.MachineSet().Update(msCopy); updateErr != nil {
+							return fmt.Errorf("saving update to machine set %s: %w", ms.Name, updateErr)
+						}
+
+						log.Debugf("Updated CAPI machineset %s with watch filter", msCopy.Name)
+					}
+				}
+
 				if depUpdated {
 					if _, updateErr := w.CAPI.MachineDeployment().Update(depCopy); updateErr != nil {
 						return fmt.Errorf("saving update to machine deployment %s: %w", depCopy.Name, updateErr)
 					}
 				}
-			}
 
-			//MachineSets
-			sets, err := w.CAPI.MachineSet().List(ns.Name, metav1.ListOptions{
-				FieldSelector: fmt.Sprintf("spec.clusterName=%s", cluster.Name),
-			})
-			if err != nil {
-				return fmt.Errorf("listing capi machine sets in ns %s: %w", ns.Name, err)
-			}
-			for _, dep := range sets.Items {
-				if _, ok := dep.Labels[capi.WatchLabel]; !ok {
-					depCopy := dep.DeepCopy()
-					depCopy.Labels[capi.WatchLabel] = capr.CAPIFilterValue
-					if _, updateErr := w.CAPI.MachineSet().Update(depCopy); updateErr != nil {
-						return fmt.Errorf("saving update to machine set %s: %w", depCopy.Name, updateErr)
-					}
-				}
-			}
-
-			// Machines
-			machines, err := w.CAPI.Machine().List(ns.Name, metav1.ListOptions{
-				FieldSelector: fmt.Sprintf("spec.clusterName=%s", cluster.Name),
-			})
-			if err != nil {
-				return fmt.Errorf("listing capi machines in ns %s: %w", ns.Name, err)
-			}
-			for _, machine := range machines.Items {
-				if _, ok := machine.Labels[capi.WatchLabel]; !ok {
-					machineCopy := machine.DeepCopy()
-					machineCopy.Labels[capi.WatchLabel] = capr.CAPIFilterValue
-					if _, updateErr := w.CAPI.Machine().Update(machineCopy); updateErr != nil {
-						return fmt.Errorf("saving update to machine %s: %w", machineCopy.Name, updateErr)
-					}
-				}
+				log.Debugf("Updated CAPI machinedeployment %s with watch filter", depCopy.Name)
 			}
 		}
 	}
@@ -674,4 +724,33 @@ func insertOrUpdateCondition(d data.Object, desiredCondition summary.Condition) 
 
 func isRKECluster(cluster *capi.Cluster) bool {
 	return cluster.Spec.InfrastructureRef.Kind == capr.RKEClusterKind && cluster.Spec.InfrastructureRef.APIVersion == capr.RKEAPIVersion
+}
+
+// SpewHashObject writes specified object to hash using the spew library
+// which follows pointers and prints actual values of the nested objects
+// ensuring the hash does not change when a pointer changes.
+// NOTE: this is taken from upstream CAPI
+func spewHashObject(hasher hash.Hash, objectToWrite interface{}) error {
+	hasher.Reset()
+	printer := spew.ConfigState{
+		Indent:         " ",
+		SortKeys:       true,
+		DisableMethods: true,
+		SpewKeys:       true,
+	}
+
+	if _, err := printer.Fprintf(hasher, "%#v", objectToWrite); err != nil {
+		return fmt.Errorf("failed to write object to hasher")
+	}
+	return nil
+}
+
+// computeSpewHash computes the hash of a MachineTemplateSpec using the spew library.
+// NOTE: this is taken from upstream CAPI
+func computeSpewHash(objectToWrite interface{}) (uint32, error) {
+	machineTemplateSpecHasher := fnv.New32a()
+	if err := spewHashObject(machineTemplateSpecHasher, objectToWrite); err != nil {
+		return 0, err
+	}
+	return machineTemplateSpecHasher.Sum32(), nil
 }
