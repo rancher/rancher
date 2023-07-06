@@ -39,6 +39,10 @@ This repo is a meta-repo used for packaging and contains the majority of Rancher
 
 Rancher also includes other open source libraries and projects, [see go.mod](https://github.com/rancher/rancher/blob/release/v2.8/go.mod) for the full list.
 
+## Build configuration
+
+Refer to the [build docs](docs/build.md) on how to customize the building and packaging of Rancher.
+
 ## Support, Discussion, and Community
 If you need any help with Rancher, please join us at either our [Rancher forums](http://forums.rancher.com/) or [Slack](https://slack.rancher.io/) where most of our team hangs out at.
 
