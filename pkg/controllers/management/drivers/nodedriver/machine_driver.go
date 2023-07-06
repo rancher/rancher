@@ -84,11 +84,11 @@ type Lifecycle struct {
 	dockerMachineVersion string
 }
 
-func (m *Lifecycle) Create(obj *v3.NodeDriver) (runtime.Object, error) {
+func (m *Lifecycle) Create(obj *v32.NodeDriver) (runtime.Object, error) {
 	return m.download(obj)
 }
 
-func (m *Lifecycle) download(obj *v3.NodeDriver) (*v3.NodeDriver, error) {
+func (m *Lifecycle) download(obj *v32.NodeDriver) (*v32.NodeDriver, error) {
 	driverLock.Lock()
 	defer driverLock.Unlock()
 	if !obj.Spec.Active && !obj.Spec.AddCloudCredential {
@@ -101,7 +101,7 @@ func (m *Lifecycle) download(obj *v3.NodeDriver) (*v3.NodeDriver, error) {
 	// if node driver was created, we also activate the driver by default
 	driver := drivers.NewDynamicDriver(obj.Spec.Builtin, obj.Spec.DisplayName, obj.Spec.URL, obj.Spec.Checksum)
 	schemaName := obj.Spec.DisplayName + "config"
-	var existingSchema *v3.DynamicSchema
+	var existingSchema *v32.DynamicSchema
 	if obj.Spec.DisplayName != "" {
 		existingSchema, err = m.schemaLister.Get("", schemaName)
 	}
@@ -153,7 +153,7 @@ func (m *Lifecycle) download(obj *v3.NodeDriver) (*v3.NodeDriver, error) {
 		return obj, err
 	}
 
-	obj = newObj.(*v3.NodeDriver)
+	obj = newObj.(*v32.NodeDriver)
 	newObj, err = v32.NodeDriverConditionInstalled.Once(obj, func() (runtime.Object, error) {
 		if err := driver.Install(); err != nil {
 			return nil, err
@@ -165,10 +165,10 @@ func (m *Lifecycle) download(obj *v3.NodeDriver) (*v3.NodeDriver, error) {
 		return obj, nil
 	})
 	if err != nil {
-		return newObj.(*v3.NodeDriver), err
+		return newObj.(*v32.NodeDriver), err
 	}
 
-	obj = newObj.(*v3.NodeDriver)
+	obj = newObj.(*v32.NodeDriver)
 	driverName := strings.TrimPrefix(driver.Name(), drivers.DockerMachineDriverPrefix)
 
 	obj = m.addVersionInfo(obj)
@@ -213,7 +213,7 @@ func (m *Lifecycle) download(obj *v3.NodeDriver) (*v3.NodeDriver, error) {
 
 		resourceFields[name] = field
 	}
-	dynamicSchema := &v3.DynamicSchema{
+	dynamicSchema := &v32.DynamicSchema{
 		Spec: v32.DynamicSchemaSpec{
 			ResourceFields: resourceFields,
 		},
@@ -250,7 +250,7 @@ func (m *Lifecycle) download(obj *v3.NodeDriver) (*v3.NodeDriver, error) {
 	return m.createCredSchema(obj, credFields)
 }
 
-func (m *Lifecycle) createCredSchema(obj *v3.NodeDriver, credFields map[string]v32.Field) (*v3.NodeDriver, error) {
+func (m *Lifecycle) createCredSchema(obj *v32.NodeDriver, credFields map[string]v32.Field) (*v32.NodeDriver, error) {
 	name := credentialConfigSchemaName(obj.Spec.DisplayName)
 	credSchema, err := m.schemaLister.Get("", name)
 
@@ -266,7 +266,7 @@ func (m *Lifecycle) createCredSchema(obj *v3.NodeDriver, credFields map[string]v
 
 	if err != nil {
 		if errors.IsNotFound(err) {
-			credentialSchema := &v3.DynamicSchema{
+			credentialSchema := &v32.DynamicSchema{
 				Spec: v32.DynamicSchemaSpec{
 					ResourceFields: credFields,
 				},
@@ -295,7 +295,7 @@ func (m *Lifecycle) createCredSchema(obj *v3.NodeDriver, credFields map[string]v
 	return obj, nil
 }
 
-func (m *Lifecycle) checkDriverVersion(obj *v3.NodeDriver) bool {
+func (m *Lifecycle) checkDriverVersion(obj *v32.NodeDriver) bool {
 	if v32.NodeDriverConditionDownloaded.IsUnknown(obj) || v32.NodeDriverConditionInstalled.IsUnknown(obj) {
 		return true
 	}
@@ -323,7 +323,7 @@ func (m *Lifecycle) checkDriverVersion(obj *v3.NodeDriver) bool {
 	return false
 }
 
-func (m *Lifecycle) addVersionInfo(obj *v3.NodeDriver) *v3.NodeDriver {
+func (m *Lifecycle) addVersionInfo(obj *v32.NodeDriver) *v32.NodeDriver {
 	if obj.Spec.Builtin {
 		obj.Status.AppliedDockerMachineVersion = m.dockerMachineVersion
 	} else {
@@ -333,7 +333,7 @@ func (m *Lifecycle) addVersionInfo(obj *v3.NodeDriver) *v3.NodeDriver {
 	return obj
 }
 
-func (m *Lifecycle) addUIHintsAnno(driverName string, obj *v3.NodeDriver) (*v3.NodeDriver, error) {
+func (m *Lifecycle) addUIHintsAnno(driverName string, obj *v32.NodeDriver) (*v32.NodeDriver, error) {
 	if aliases, ok := DriverToSchemaFields[driverName]; ok {
 		anno := make(map[string]map[string]string)
 
@@ -357,7 +357,7 @@ func (m *Lifecycle) addUIHintsAnno(driverName string, obj *v3.NodeDriver) (*v3.N
 	return obj, nil
 }
 
-func (m *Lifecycle) Updated(obj *v3.NodeDriver) (runtime.Object, error) {
+func (m *Lifecycle) Updated(obj *v32.NodeDriver) (runtime.Object, error) {
 	var err error
 
 	obj, err = m.download(obj)
@@ -380,7 +380,7 @@ func (m *Lifecycle) Updated(obj *v3.NodeDriver) (runtime.Object, error) {
 	return obj, nil
 }
 
-func (m *Lifecycle) Remove(obj *v3.NodeDriver) (runtime.Object, error) {
+func (m *Lifecycle) Remove(obj *v32.NodeDriver) (runtime.Object, error) {
 	schemas, err := m.schemaClient.List(metav1.ListOptions{
 		LabelSelector: fmt.Sprintf("%s=%s", driverNameLabel, obj.Spec.DisplayName),
 	})
@@ -432,7 +432,7 @@ func (m *Lifecycle) createOrUpdateNodeForEmbeddedTypeWithParents(embeddedType, f
 				Type:     embeddedType,
 			}
 		}
-		dynamicSchema := &v3.DynamicSchema{}
+		dynamicSchema := &v32.DynamicSchema{}
 		dynamicSchema.Name = schemaID
 		dynamicSchema.Spec.ResourceFields = resourceField
 		dynamicSchema.Spec.Embed = true
