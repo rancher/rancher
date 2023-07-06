@@ -26,6 +26,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/dashboard/apiservice"
 	"github.com/rancher/rancher/pkg/controllers/dashboardapi"
 	managementauth "github.com/rancher/rancher/pkg/controllers/management/auth"
+	"github.com/rancher/rancher/pkg/controllers/nodedriver"
 	provisioningv2 "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
 	crds "github.com/rancher/rancher/pkg/crds/dashboard"
 	dashboarddata "github.com/rancher/rancher/pkg/data/dashboard"
@@ -253,6 +254,8 @@ func (r *Rancher) Start(ctx context.Context) error {
 	}
 
 	if features.MCM.Enabled() {
+		// Registers handlers for all rancher replicas running in the local cluster, but not downstream agents
+		nodedriver.Register(ctx, r.Wrangler)
 		if err := r.Wrangler.MultiClusterManager.Start(ctx); err != nil {
 			return err
 		}

@@ -96,6 +96,9 @@ func (m *Lifecycle) download(obj *v32.NodeDriver) (*v32.NodeDriver, error) {
 	}
 
 	forceUpdate := m.checkDriverVersion(obj)
+	if v32.NodeDriverConditionDownloaded.GetStatus(obj) == "" || v32.NodeDriverConditionInstalled.GetStatus(obj) == "" {
+		forceUpdate = true
+	}
 
 	err := errs.New("not found")
 	// if node driver was created, we also activate the driver by default
