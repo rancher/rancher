@@ -1,0 +1,10 @@
+#! /bin/sh
+
+cd $(dirname $0)/../
+
+# This will return non-zero until all of our objects in ./pkg/apis can generate valid crds.
+# allowDangerousTypes is needed for struct that use floats
+controller-gen crd:generateEmbeddedObjectMeta=true,allowDangerousTypes=false paths=./pkg/apis/... output:crd:dir=./pkg/crds/yaml/generated
+
+# remove empty CRD that is generated from our use of // +kubebuilder:skipversion
+rm -f ./pkg/crds/yaml/generated/_.yaml
