@@ -284,7 +284,7 @@ var MigratedResources = map[string]bool{
 	"rkecontrolplanes.rke.cattle.io":                                  false,
 	"rkek8sserviceoptions.management.cattle.io":                       false,
 	"rkek8ssystemimages.management.cattle.io":                         false,
-	"roletemplates.management.cattle.io":                              false,
+	"roletemplates.management.cattle.io":                              true,
 	"samlproviders.management.cattle.io":                              false,
 	"samltokens.management.cattle.io":                                 false,
 	"serviceaccounttokens.project.cattle.io":                          false,
