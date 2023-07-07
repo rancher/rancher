@@ -55,7 +55,7 @@ func Test_onClusterChange_Default(t *testing.T) {
 	// setup
 	// create an instance of the operator controller with mock data to simulate the onChangeCluster function reacting
 	// to a real cluster!
-	mockOperatorController = getMockAksOperatorController("default")
+	mockOperatorController = getMockAksOperatorController(t, "default")
 
 	mockCluster, err := getMockV3Cluster(MockDefaultClusterFilename)
 	if err != nil {
@@ -75,7 +75,7 @@ func Test_onClusterChange_Default(t *testing.T) {
 }
 
 func Test_onClusterChange_Create(t *testing.T) {
-	mockOperatorController = getMockAksOperatorController("create")
+	mockOperatorController = getMockAksOperatorController(t, "create")
 	mockCluster, err := getMockV3Cluster(MockCreateClusterFilename)
 	if err != nil {
 		t.Errorf("error getting mock v3 cluster: %s", err)
@@ -92,7 +92,7 @@ func Test_onClusterChange_Create(t *testing.T) {
 }
 
 func Test_onClusterChange_Active(t *testing.T) {
-	mockOperatorController = getMockAksOperatorController("active")
+	mockOperatorController = getMockAksOperatorController(t, "active")
 	mockCluster, err := getMockV3Cluster(MockActiveClusterFilename)
 	if err != nil {
 		t.Errorf("error getting mock v3 cluster: %s", err)
@@ -109,7 +109,7 @@ func Test_onClusterChange_Active(t *testing.T) {
 }
 
 func Test_onClusterChange_UpdateNodePool(t *testing.T) {
-	mockOperatorController = getMockAksOperatorController("update")
+	mockOperatorController = getMockAksOperatorController(t, "update")
 	mockCluster, err := getMockV3Cluster(MockUpdateClusterFilename)
 	if err != nil {
 		t.Errorf("error getting mock v3 cluster: %s", err)
@@ -131,7 +131,7 @@ func Test_onClusterChange_UpdateNodePool(t *testing.T) {
 - success: buildUpstreamClusterState returns a valid upstream spec
 */
 func Test_setInitialUpstreamSpec(t *testing.T) {
-	mockOperatorController = getMockAksOperatorController("create")
+	mockOperatorController = getMockAksOperatorController(t, "create")
 	mockCluster, err := getMockV3Cluster(MockCreateClusterFilename)
 	if err != nil {
 		t.Errorf("error getting mock v3 cluster: %s", err)
@@ -153,7 +153,7 @@ func Test_setInitialUpstreamSpec(t *testing.T) {
     seconds, return (cluster nil)
 */
 func Test_updateAKSClusterConfig(t *testing.T) {
-	mockOperatorController = getMockAksOperatorController("akscc")
+	mockOperatorController = getMockAksOperatorController(t, "akscc")
 	mockCluster, err := getMockV3Cluster(MockAksClusterConfigClusterFilename)
 	if err != nil {
 		t.Errorf("error getting mock v3 cluster: %s", err)
@@ -174,7 +174,7 @@ func Test_updateAKSClusterConfig(t *testing.T) {
 - error generating service account token. Return (cluster, err)
 */
 func Test_generateAndSetServiceAccount(t *testing.T) {
-	mockOperatorController = getMockAksOperatorController("active")
+	mockOperatorController = getMockAksOperatorController(t, "active")
 	mockCluster, err := getMockV3Cluster(MockActiveClusterFilename)
 	if err != nil {
 		t.Errorf("error getting mock v3 cluster: %s", err)
@@ -220,7 +220,7 @@ func Test_buildAKSCCCreateObject(t *testing.T) {
 func Test_recordAppliedSpec_Updated(t *testing.T) {
 	// We use a mock cluster that is still provisioning and in an Unknown state, because that is when the applied spec
 	// needs to be updated.
-	mockOperatorController = getMockAksOperatorController("default")
+	mockOperatorController = getMockAksOperatorController(t, "default")
 	mockCluster, err := getMockV3Cluster(MockDefaultClusterFilename)
 	if err != nil {
 		t.Errorf("error getting mock v3 cluster: %s", err)
@@ -238,7 +238,7 @@ func Test_recordAppliedSpec_Updated(t *testing.T) {
 
 func Test_recordAppliedSpec_NoUpdate(t *testing.T) {
 	// A mock active cluster already has the AKSConfig set on the applied spec, so no update is required.
-	mockOperatorController = getMockAksOperatorController("active")
+	mockOperatorController = getMockAksOperatorController(t, "active")
 	mockCluster, err := getMockV3Cluster(MockActiveClusterFilename)
 	if err != nil {
 		t.Errorf("error getting mock v3 cluster: %s", err)
@@ -262,7 +262,7 @@ func Test_recordAppliedSpec_NoUpdate(t *testing.T) {
   - unknown error. Return ("" mustTunnel=nil err)
 */
 func Test_generateSATokenWithPublicAPI(t *testing.T) {
-	mockOperatorController = getMockAksOperatorController("active")
+	mockOperatorController = getMockAksOperatorController(t, "active")
 	mockCluster, err := getMockV3Cluster(MockActiveClusterFilename)
 	if err != nil {
 		t.Errorf("error getting mock v3 cluster: %s", err)

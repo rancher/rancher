@@ -13,6 +13,8 @@ replace (
 	github.com/rancher/machine => github.com/rancher/machine v0.15.0-rancher100 // aks-operator requires rancher99 but rancher100 should not break it.
 	github.com/rancher/rancher/pkg/apis => ./pkg/apis
 	github.com/rancher/rancher/pkg/client => ./pkg/client
+	// wrangler bracnhes need to be updated before replace can be removed
+	github.com/rancher/wrangler v1.1.1 => github.com/rancher/wrangler v1.1.1-0.20230629203936-0e36fee7aea5
 
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc => go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.20.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp => go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.20.0
@@ -110,7 +112,7 @@ require (
 	github.com/rancher/fleet/pkg/apis v0.0.0-20230605094423-ddbb43505e80
 	github.com/rancher/gke-operator v1.1.5
 	github.com/rancher/kubernetes-provider-detector v0.1.5
-	github.com/rancher/lasso v0.0.0-20230428185353-36908edf817b
+	github.com/rancher/lasso v0.0.0-20230629200414-8a54b32e6792
 	github.com/rancher/lasso/controller-runtime v0.0.0-20230502204209-3eb356f3e8cf
 	github.com/rancher/machine v0.15.0-rancher99
 	github.com/rancher/norman v0.0.0-20230426211126-d3552b018687
