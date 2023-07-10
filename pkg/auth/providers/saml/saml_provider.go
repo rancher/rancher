@@ -288,7 +288,8 @@ func (s *Provider) GetPrincipal(principalID string, token v3.Token) (v3.Principa
 		return v3.Principal{}, fmt.Errorf("SAML: invalid id %v", principalID)
 	}
 	if principalType != s.userType && principalType != s.groupType {
-		return v3.Principal{}, fmt.Errorf("SAML: Invalid principal type")
+		return v3.Principal{}, fmt.Errorf("SAML: Invalid principal type: %s is not %s or %s",
+			principalType, s.userType, s.groupType)
 	}
 
 	if s.hasLdapGroupSearch() {
