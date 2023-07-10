@@ -44,6 +44,7 @@ spec:
     publicAccess: true
     publicAccessSources:
     - 0.0.0.0/0
+    ebsCSIDriver: false
     region: us-east-2
     secretsEncryption: false
     securityGroups: []
@@ -123,6 +124,7 @@ status:
       publicAccess: true
       publicAccessSources:
       - 0.0.0.0/0
+      ebsCSIDriver: false
       region: us-east-2
       secretsEncryption: false
       securityGroups: []
@@ -243,6 +245,7 @@ status:
       publicAccess: true
       publicAccessSources:
       - 0.0.0.0/0
+      ebsCSIDriver: false
       region: us-east-2
       secretsEncryption: false
       securityGroups: []
