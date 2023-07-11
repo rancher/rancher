@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/auth/tokens/hashers"
 	"github.com/rancher/rancher/pkg/features"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/wrangler/pkg/randomtoken"
@@ -62,7 +63,8 @@ func TestTokenStreamTransformer(t *testing.T) {
 	if err != nil {
 		testManager.assert.FailNow(fmt.Sprintf("unable to generate token for token stream transformer test: %v", err))
 	}
-	tokenHashed, err = CreateSHA256Hash(token)
+	sha256Hasher := hashers.Sha256Hasher{}
+	tokenHashed, err = sha256Hasher.CreateHash(token)
 	if err != nil {
 		testManager.assert.FailNow(fmt.Sprintf("unable to hash token for token stream transformer test: %v", err))
 	}
