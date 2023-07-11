@@ -604,7 +604,10 @@ func (p *Planner) runEtcdRestoreInitNodeElection(controlPlane *rkev1.RKEControlP
 		return p.electInitNode(controlPlane, clusterPlan)
 	}
 	// make sure that we only have one suitable init node, and elect it.
-	if len(collect(clusterPlan, canBeInitNode)) != 1 {
+	count := len(collect(clusterPlan, canBeInitNode))
+	if count == 0 {
+		return "", fmt.Errorf("no init node existed and no corresponding etcd snapshot CR found, no assumption can be made for the machine that contains the snapshot")
+	} else if count > 1 {
 		return "", fmt.Errorf("more than one init node existed and no corresponding etcd snapshot CR found, no assumption can be made for the machine that contains the snapshot")
 	}
 	logrus.Infof("[planner] rkecluster %s/%s: electing init node for local snapshot with no associated CR", controlPlane.Namespace, controlPlane.Name)
