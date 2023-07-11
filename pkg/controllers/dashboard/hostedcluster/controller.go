@@ -85,6 +85,12 @@ func (h handler) onClusterChange(key string, cluster *v3.Cluster) (*v3.Cluster, 
 		return cluster, nil
 	}
 
+	skipChartInstallation := strings.EqualFold(settings.SkipHostedClusterChartInstallation.Get(), "true")
+	if skipChartInstallation {
+		logrus.Warn("Skipping installation of hosted cluster charts, 'skip-hosted-cluster-chart-installation' is set to true")
+		return cluster, nil
+	}
+
 	var toInstallCrdChart, toInstallChart *chart.Definition
 	var provider string
 	if cluster.Spec.AKSConfig != nil {
@@ -109,7 +115,7 @@ func (h handler) onClusterChange(key string, cluster *v3.Cluster) (*v3.Cluster, 
 		return cluster, err
 	}
 
-	if err := h.manager.Ensure(toInstallCrdChart.ReleaseNamespace, toInstallCrdChart.ChartName, "", nil, true, ""); err != nil {
+	if err := h.manager.Ensure(toInstallCrdChart.ReleaseNamespace, toInstallCrdChart.ChartName, "", "", nil, true, ""); err != nil {
 		return cluster, err
 	}
 
@@ -140,7 +146,7 @@ func (h handler) onClusterChange(key string, cluster *v3.Cluster) (*v3.Cluster, 
 		chartValues[chart.PriorityClassKey] = priorityClassName
 	}
 
-	if err := h.manager.Ensure(toInstallChart.ReleaseNamespace, toInstallChart.ChartName, "", chartValues, true, ""); err != nil {
+	if err := h.manager.Ensure(toInstallChart.ReleaseNamespace, toInstallChart.ChartName, "", "", chartValues, true, ""); err != nil {
 		return cluster, err
 	}
 
@@ -158,7 +164,7 @@ func (h handler) onSecretChange(key string, obj *corev1.Secret) (*corev1.Secret,
 			if len(parts) == 6 {
 				releaseName := parts[4]
 				if isOperatorChartRelease(releaseName) {
-					h.manager.Remove(ns, releaseName, "")
+					h.manager.Remove(ns, releaseName)
 				}
 			}
 		}

@@ -3,17 +3,24 @@
 echo "-- chart/test --"
 
 # Check for helm
-if [ -z "$(type -p helm)" ]; then
+if [ -z "$(type -p helm_v3)" ]; then
     echo "helm not found. Helm is required to run tests."
     exit 1
 fi
 
+if [ "${ARCH}" != "amd64" ]; then 
+    echo "${ARCH} is not supported for chart tests, chart tests won't run"
+    exit 0
+fi
 # Check for unittest plugin
-helm unittest --help >/dev/null 2>&1
+helm_v3 unittest --help >/dev/null 2>&1
 if [[ $? > 0 ]]; then
     echo "helm plugin unittest not found."
-    echo "Run to install plugin: helm plugin install https://github.com/rancher/helm-unittest"
+    echo "Run to install plugin: helm plugin install https://github.com/helm-unittest/helm-unittest.git"
     exit 1
 fi
 
-helm unittest ../../build/chart/rancher
+current_dir=$(pwd)
+cd ../../build/chart/rancher
+helm_v3 unittest ./
+cd $current_dir

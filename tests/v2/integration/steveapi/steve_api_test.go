@@ -2,6 +2,7 @@ package integration
 
 import (
 	"bufio"
+	"context"
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
@@ -11,16 +12,20 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/rancher/rancher/pkg/api/scheme"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	clientv1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
+	kubenamespaces "github.com/rancher/rancher/tests/framework/extensions/kubeapi/namespaces"
 	"github.com/rancher/rancher/tests/framework/extensions/kubeapi/rbac"
 	"github.com/rancher/rancher/tests/framework/extensions/kubeapi/secrets"
 	"github.com/rancher/rancher/tests/framework/extensions/namespaces"
 	stevesecrets "github.com/rancher/rancher/tests/framework/extensions/secrets"
 	"github.com/rancher/rancher/tests/framework/extensions/serviceaccounts"
+	"github.com/rancher/rancher/tests/framework/extensions/unstructured"
 	"github.com/rancher/rancher/tests/framework/extensions/users"
 	password "github.com/rancher/rancher/tests/framework/extensions/users/passwordgenerator"
 	"github.com/rancher/rancher/tests/framework/pkg/namegenerator"
@@ -30,26 +35,33 @@ import (
 	"github.com/stretchr/testify/suite"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/util/retry"
 )
 
 const (
-	projectNamePrefix = "test-project"
 	labelKey          = "test-label"
 	labelGTEKey       = "test-label-gte"
 	continueToken     = "nondeterministictoken"
 	revisionNum       = "nondeterministicint"
+	fakeTestID        = "nondeterministicid"
 	defautlUrlString  = "https://rancherurl/"
+	steveAPITestLabel = "test.cattle.io/steveapi"
 )
 
 var (
+	testID                     = namegenerator.RandStringLower(5)
 	userEnabled                = true
 	impersonationNamespace     = "cattle-impersonation-system"
 	impersonationSABase        = "cattle-impersonation-"
-	continueReg                = regexp.MustCompile(`(continue=)[\w]+(%3D){0,2}`)
 	urlRegex                   = regexp.MustCompile(`https://([\w.:]+)/`)
-	downStreamClusterRegex     = regexp.MustCompile(`(k8s/clusters/c-m-\w+/)`)
+	continueReg                = regexp.MustCompile(`(continue=)[\w]+(%3D){0,2}`)
 	revisionReg                = regexp.MustCompile(`(revision=)[\d]+`)
+	testLabelReg               = regexp.MustCompile(`(labelSelector=test.cattle.io%2Fsteveapi%3D)[\w]+`)
+	projectTag                 = regexp.MustCompile(`(test-prj-[1-9])`)
+	namespaceTag               = regexp.MustCompile(`(test-ns-[1-9])`)
 	namespaceSecretManagerRole = rbacv1.Role{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "namespace-secret-manager",
@@ -92,12 +104,15 @@ var (
 			},
 		},
 	}
-	testUsers = map[string]interface{}{
-		"user-a": management.ProjectRoleTemplateBinding{
-			RoleTemplateID: "project-owner",
+	testUsers = map[string][]interface{}{
+		"user-a": {
+			management.ProjectRoleTemplateBinding{
+				RoleTemplateID: "project-owner",
+				ProjectID:      "test-prj-1",
+			},
 		},
-		"user-b": []rbacv1.RoleBinding{
-			{
+		"user-b": {
+			rbacv1.RoleBinding{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "namespace-secret-manager",
 					Namespace: "test-ns-1",
@@ -109,8 +124,8 @@ var (
 				},
 			},
 		},
-		"user-c": []rbacv1.RoleBinding{
-			{
+		"user-c": {
+			rbacv1.RoleBinding{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "mixed-secret-user",
 					Namespace: "test-ns-1",
@@ -121,7 +136,7 @@ var (
 					Name:     "mixed-secret-user",
 				},
 			},
-			{
+			rbacv1.RoleBinding{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "mixed-secret-user",
 					Namespace: "test-ns-2",
@@ -132,7 +147,7 @@ var (
 					Name:     "mixed-secret-user",
 				},
 			},
-			{
+			rbacv1.RoleBinding{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "mixed-secret-user",
 					Namespace: "test-ns-3",
@@ -144,6 +159,43 @@ var (
 				},
 			},
 		},
+		"user-d": {
+			management.ProjectRoleTemplateBinding{
+				RoleTemplateID: "project-owner",
+				ProjectID:      "test-prj-1",
+			},
+			management.ProjectRoleTemplateBinding{
+				RoleTemplateID: "project-owner",
+				ProjectID:      "test-prj-2",
+			},
+			rbacv1.RoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "namespace-secret-manager",
+					Namespace: "test-ns-8",
+				},
+				RoleRef: rbacv1.RoleRef{
+					APIGroup: rbacv1.SchemeGroupVersion.Group,
+					Kind:     "Role",
+					Name:     "namespace-secret-manager",
+				},
+			},
+			rbacv1.RoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "namespace-secret-manager",
+					Namespace: "test-ns-9",
+				},
+				RoleRef: rbacv1.RoleRef{
+					APIGroup: rbacv1.SchemeGroupVersion.Group,
+					Kind:     "Role",
+					Name:     "namespace-secret-manager",
+				},
+			},
+		},
+		"user-e": {
+			management.ClusterRoleTemplateBinding{
+				RoleTemplateID: "cluster-owner",
+			},
+		},
 	}
 	namespaceMap = map[string]string{
 		"test-ns-1": "",
@@ -151,24 +203,59 @@ var (
 		"test-ns-3": "",
 		"test-ns-4": "",
 		"test-ns-5": "",
+		"test-ns-6": "",
+		"test-ns-7": "",
+		"test-ns-8": "",
+		"test-ns-9": "",
+	}
+	projectMap = map[string]*management.Project{
+		"test-prj-1": nil,
+		"test-prj-2": nil,
+	}
+	projectNamespaceMap = map[string]string{
+		"test-ns-1": "test-prj-1",
+		"test-ns-2": "test-prj-1",
+		"test-ns-3": "test-prj-1",
+		"test-ns-4": "test-prj-1",
+		"test-ns-5": "test-prj-1",
+		"test-ns-6": "test-prj-2",
+		"test-ns-7": "test-prj-2",
+		"test-ns-8": "",
+		"test-ns-9": "",
 	}
 )
 
-type SteveAPITestSuite struct {
+type steveAPITestSuite struct {
 	suite.Suite
 	client            *rancher.Client
 	session           *session.Session
-	project           *management.Project
+	clusterID         string
 	userClients       map[string]*rancher.Client
 	lastContinueToken string
 	lastRevision      string
 }
 
-func (s *SteveAPITestSuite) TearDownSuite() {
+type LocalSteveAPITestSuite struct {
+	steveAPITestSuite
+}
+
+type DownstreamSteveAPITestSuite struct {
+	steveAPITestSuite
+}
+
+func (s *steveAPITestSuite) TearDownSuite() {
 	s.session.Cleanup()
 }
 
-func (s *SteveAPITestSuite) SetupSuite() {
+func (s *LocalSteveAPITestSuite) SetupSuite() {
+	s.steveAPITestSuite.setupSuite("local")
+}
+
+func (s *DownstreamSteveAPITestSuite) SetupSuite() {
+	s.steveAPITestSuite.setupSuite("")
+}
+
+func (s *steveAPITestSuite) setupSuite(clusterName string) {
 	testSession := session.NewSession()
 	s.session = testSession
 
@@ -178,56 +265,104 @@ func (s *SteveAPITestSuite) SetupSuite() {
 
 	s.userClients = make(map[string]*rancher.Client)
 
-	clusterName := s.client.RancherConfig.ClusterName
-	require.NotEmptyf(s.T(), clusterName, "Cluster name is not set")
-	clusterID, err := clusters.GetClusterIDByName(client, clusterName)
+	if clusterName == "" {
+		clusterName = s.client.RancherConfig.ClusterName
+	}
+	s.clusterID, err = clusters.GetClusterIDByName(client, clusterName)
 	require.NoError(s.T(), err)
 
-	mgmtCluster, err := client.Management.Cluster.ByID(clusterID)
+	mgmtCluster, err := client.Management.Cluster.ByID(s.clusterID)
 	require.NoError(s.T(), err)
 
-	// create project
-	projectName := namegenerator.AppendRandomString(projectNamePrefix)
-	s.project, err = s.client.Management.Project.Create(&management.Project{
-		ClusterID: clusterID,
-		Name:      projectName,
-	})
-	require.NoError(s.T(), err)
+	// create projects
+	for p := range projectMap {
+		project, err := s.client.Management.Project.Create(&management.Project{
+			ClusterID: s.clusterID,
+			Name:      p,
+		})
+		require.NoError(s.T(), err)
+		projectMap[p] = project
+	}
 
 	userID, err := users.GetUserIDByName(client, "admin")
 	require.NoError(s.T(), err)
 
 	impersonationSA := impersonationSABase + userID
-	err = serviceaccounts.IsServiceAccountReady(client, clusterID, impersonationNamespace, impersonationSA)
+	err = serviceaccounts.IsServiceAccountReady(client, s.clusterID, impersonationNamespace, impersonationSA)
 	require.NoError(s.T(), err)
 
 	// create project namespaces
-	for k := range namespaceMap {
-		name := namegenerator.AppendRandomString(k)
-		_, err := namespaces.CreateNamespace(client, name, "{}", nil, nil, s.project)
+	for n := range namespaceMap {
+		if projectMap[projectNamespaceMap[n]] == nil {
+			continue
+		}
+		name := namegenerator.AppendRandomString(n)
+		_, err := namespaces.CreateNamespace(client, name, "", nil, nil, projectMap[projectNamespaceMap[n]])
 		require.NoError(s.T(), err)
-		namespaceMap[k] = name
+		namespaceMap[n] = name
+	}
+	// create non project namespaces
+	for n := range namespaceMap {
+		if projectMap[projectNamespaceMap[n]] != nil {
+			continue
+		}
+		name := namegenerator.AppendRandomString(n)
+		ns := &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: name,
+			},
+		}
+		dynamicClient, err := client.GetDownStreamClusterClient(s.clusterID)
+		require.NoError(s.T(), err)
+		namespaceResource := dynamicClient.Resource(kubenamespaces.NamespaceGroupVersionResource)
+		resp, err := namespaceResource.Create(context.TODO(), unstructured.MustToUnstructured(ns), metav1.CreateOptions{})
+		require.NoError(s.T(), err)
+		s.client.Session.RegisterCleanupFunc(func() error {
+			err := namespaceResource.Delete(context.TODO(), resp.GetName(), metav1.DeleteOptions{})
+			if apierrors.IsNotFound(err) {
+				return nil
+			}
+			return err
+		})
+		err = scheme.Scheme.Convert(resp, ns, resp.GroupVersionKind())
+		require.NoError(s.T(), err)
+		err = wait.Poll(time.Second, time.Minute, func() (done bool, err error) {
+			ns, _ := kubenamespaces.GetNamespaceByName(s.client, s.clusterID, ns.Name)
+			if ns != nil {
+				return true, nil
+			}
+			return false, nil
+		})
+		require.NoError(s.T(), err)
+		namespaceMap[n] = name
 	}
 
 	// create resources in all namespaces
-	for _, n := range namespaceMap {
+	for name, n := range namespaceMap {
 		for i := 1; i <= 5; i++ {
+			if i > 2 && (projectNamespaceMap[name] == "test-prj-2" || projectNamespaceMap[name] == "") {
+				break
+			}
 			secret := &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: fmt.Sprintf("test%d", i),
 				},
 			}
+			labels := map[string]string{steveAPITestLabel: testID}
 			if i == 2 {
-				secret.ObjectMeta.SetLabels(map[string]string{
-					labelKey: "2",
-				})
+				labels[labelKey] = "2"
 			}
 			if i >= 3 {
-				secret.ObjectMeta.SetLabels(map[string]string{
-					labelGTEKey: "3",
-				})
+				labels[labelGTEKey] = "3"
 			}
-			_, err := secrets.CreateSecret(s.client, secret, s.project.ClusterID, n)
+			secret.ObjectMeta.SetLabels(labels)
+			err := retryRequest(func() error {
+				_, err := secrets.CreateSecretForCluster(s.client, secret, s.clusterID, n)
+				if apierrors.IsAlreadyExists(err) {
+					return nil
+				}
+				return err
+			})
 			require.NoError(s.T(), err)
 		}
 	}
@@ -236,11 +371,23 @@ func (s *SteveAPITestSuite) SetupSuite() {
 	for _, n := range namespaceMap {
 		role := namespaceSecretManagerRole
 		role.Namespace = n
-		_, err = rbac.CreateRole(s.client, s.project.ClusterID, &role)
+		err := retryRequest(func() error {
+			_, err = rbac.CreateRole(s.client, s.clusterID, &role)
+			if apierrors.IsAlreadyExists(err) {
+				return nil
+			}
+			return err
+		})
 		require.NoError(s.T(), err)
 		role = mixedSecretUserRole
 		role.Namespace = n
-		_, err = rbac.CreateRole(s.client, s.project.ClusterID, &role)
+		err = retryRequest(func() error {
+			_, err = rbac.CreateRole(s.client, s.clusterID, &role)
+			if apierrors.IsAlreadyExists(err) {
+				return nil
+			}
+			return err
+		})
 		require.NoError(s.T(), err)
 	}
 
@@ -258,19 +405,27 @@ func (s *SteveAPITestSuite) SetupSuite() {
 		require.NoError(s.T(), err)
 		userObj.Password = password
 		// users either have access to a whole project or to select namespaces or resources in a project
-		switch binding := access.(type) {
-		case management.ProjectRoleTemplateBinding:
-			err = users.AddProjectMember(client, s.project, userObj, binding.RoleTemplateID)
-			require.NoError(s.T(), err)
-		case []rbacv1.RoleBinding:
-			err = users.AddClusterRoleToUser(client, mgmtCluster, userObj, "cluster-member")
-			require.NoError(s.T(), err)
-			for _, rb := range binding {
+		for _, binding := range access {
+			switch b := binding.(type) {
+			case management.ClusterRoleTemplateBinding:
+				err = users.AddClusterRoleToUser(client, mgmtCluster, userObj, b.RoleTemplateID)
+				require.NoError(s.T(), err)
+			case management.ProjectRoleTemplateBinding:
+				err = users.AddProjectMember(client, projectMap[b.ProjectID], userObj, b.RoleTemplateID)
+				require.NoError(s.T(), err)
+			case rbacv1.RoleBinding:
+				_ = users.AddClusterRoleToUser(client, mgmtCluster, userObj, "cluster-member")
 				subject := rbacv1.Subject{
 					Kind: "User",
 					Name: userObj.ID,
 				}
-				_, err = rbac.CreateRoleBinding(s.client, s.project.ClusterID, namegenerator.AppendRandomString(rb.Name), namespaceMap[rb.Namespace], rb.RoleRef.Name, subject)
+				err := retryRequest(func() error {
+					_, err = rbac.CreateRoleBinding(s.client, s.clusterID, namegenerator.AppendRandomString(b.Name), namespaceMap[b.Namespace], b.RoleRef.Name, subject)
+					if apierrors.IsAlreadyExists(err) {
+						return nil
+					}
+					return err
+				})
 				require.NoError(s.T(), err)
 			}
 		}
@@ -279,16 +434,18 @@ func (s *SteveAPITestSuite) SetupSuite() {
 	}
 }
 
-func (s *SteveAPITestSuite) TestList() {
+func (s *steveAPITestSuite) TestList() {
 	subSession := s.session.NewSession()
 	defer subSession.Cleanup()
 
 	tests := []struct {
-		description string
-		user        string
-		namespace   string
-		query       string
-		expect      []map[string]string
+		description    string
+		user           string
+		namespace      string
+		query          string
+		expect         []map[string]string
+		expectExcludes bool
+		expectContains bool
 	}{
 		// user-a
 		{
@@ -507,6 +664,63 @@ func (s *SteveAPITestSuite) TestList() {
 			query:       "filter=metadata.name=test1",
 			expect: []map[string]string{
 				{"name": "test1", "namespace": "test-ns-1"},
+			},
+		},
+		{
+			description: "user:user-a,namespace:none,query:filter=metadata.name=1,metadata.namespace=1",
+			user:        "user-a",
+			namespace:   "",
+			query:       "filter=metadata.name=1,metadata.namespace=1",
+			expect: []map[string]string{
+				{"name": "test1", "namespace": "test-ns-1"},
+				{"name": "test2", "namespace": "test-ns-1"},
+				{"name": "test3", "namespace": "test-ns-1"},
+				{"name": "test4", "namespace": "test-ns-1"},
+				{"name": "test5", "namespace": "test-ns-1"},
+				{"name": "test1", "namespace": "test-ns-2"},
+				{"name": "test1", "namespace": "test-ns-3"},
+				{"name": "test1", "namespace": "test-ns-4"},
+				{"name": "test1", "namespace": "test-ns-5"},
+			},
+		},
+		{
+			description: "user:user-a,namespace:none,query:filter=metadata.labels.test-label-gte=3,metadata.labels.test-label=2&filter=metadata.namespace=1",
+			user:        "user-a",
+			namespace:   "",
+			query:       "filter=metadata.labels.test-label-gte=3,metadata.labels.test-label=2&filter=metadata.namespace=1",
+			expect: []map[string]string{
+				{"name": "test2", "namespace": "test-ns-1"},
+				{"name": "test3", "namespace": "test-ns-1"},
+				{"name": "test4", "namespace": "test-ns-1"},
+				{"name": "test5", "namespace": "test-ns-1"},
+			},
+		},
+		{
+			description: "user:user-a,namespace:none,query:filter=metadata.name!=1",
+			user:        "user-a",
+			namespace:   "",
+			query:       "filter=metadata.name!=1",
+			expect: []map[string]string{
+				{"name": "test2", "namespace": "test-ns-1"},
+				{"name": "test3", "namespace": "test-ns-1"},
+				{"name": "test4", "namespace": "test-ns-1"},
+				{"name": "test5", "namespace": "test-ns-1"},
+				{"name": "test2", "namespace": "test-ns-2"},
+				{"name": "test3", "namespace": "test-ns-2"},
+				{"name": "test4", "namespace": "test-ns-2"},
+				{"name": "test5", "namespace": "test-ns-2"},
+				{"name": "test2", "namespace": "test-ns-3"},
+				{"name": "test3", "namespace": "test-ns-3"},
+				{"name": "test4", "namespace": "test-ns-3"},
+				{"name": "test5", "namespace": "test-ns-3"},
+				{"name": "test2", "namespace": "test-ns-4"},
+				{"name": "test3", "namespace": "test-ns-4"},
+				{"name": "test4", "namespace": "test-ns-4"},
+				{"name": "test5", "namespace": "test-ns-4"},
+				{"name": "test2", "namespace": "test-ns-5"},
+				{"name": "test3", "namespace": "test-ns-5"},
+				{"name": "test4", "namespace": "test-ns-5"},
+				{"name": "test5", "namespace": "test-ns-5"},
 			},
 		},
 		{
@@ -968,6 +1182,43 @@ func (s *SteveAPITestSuite) TestList() {
 			expect:      []map[string]string{},
 		},
 		{
+			description: "user:user-b,namespace:none,query:filter=metadata.name=1,metadata.namespace=1",
+			user:        "user-b",
+			namespace:   "",
+			query:       "filter=metadata.name=1,metadata.namespace=1",
+			expect: []map[string]string{
+				{"name": "test1", "namespace": "test-ns-1"},
+				{"name": "test2", "namespace": "test-ns-1"},
+				{"name": "test3", "namespace": "test-ns-1"},
+				{"name": "test4", "namespace": "test-ns-1"},
+				{"name": "test5", "namespace": "test-ns-1"},
+			},
+		},
+		{
+			description: "user:user-b,namespace:none,query:filter=metadata.labels.test-label-gte=3,metadata.labels.test-label=2&filter=metadata.namespace=1",
+			user:        "user-b",
+			namespace:   "",
+			query:       "filter=metadata.labels.test-label-gte=3,metadata.labels.test-label=2&filter=metadata.namespace=1",
+			expect: []map[string]string{
+				{"name": "test2", "namespace": "test-ns-1"},
+				{"name": "test3", "namespace": "test-ns-1"},
+				{"name": "test4", "namespace": "test-ns-1"},
+				{"name": "test5", "namespace": "test-ns-1"},
+			},
+		},
+		{
+			description: "user:user-b,namespace:none,query:filter=metadata.name!=1",
+			user:        "user-b",
+			namespace:   "",
+			query:       "filter=metadata.name!=1",
+			expect: []map[string]string{
+				{"name": "test2", "namespace": "test-ns-1"},
+				{"name": "test3", "namespace": "test-ns-1"},
+				{"name": "test4", "namespace": "test-ns-1"},
+				{"name": "test5", "namespace": "test-ns-1"},
+			},
+		},
+		{
 			description: "user:user-b,namespace:none,query:sort=metadata.name",
 			user:        "user-b",
 			namespace:   "",
@@ -1339,6 +1590,38 @@ func (s *SteveAPITestSuite) TestList() {
 			expect:      []map[string]string{},
 		},
 		{
+			description: "user:user-c,namespace:none,query:filter=metadata.name=1,metadata.namespace=1",
+			user:        "user-c",
+			namespace:   "",
+			query:       "filter=metadata.name=1,metadata.namespace=1",
+			expect: []map[string]string{
+				{"name": "test1", "namespace": "test-ns-1"},
+				{"name": "test2", "namespace": "test-ns-1"},
+				{"name": "test1", "namespace": "test-ns-2"},
+				{"name": "test1", "namespace": "test-ns-3"},
+			},
+		},
+		{
+			description: "user:user-c,namespace:test-ns-1,query:filter=metadata.name!=test1",
+			user:        "user-c",
+			namespace:   "",
+			query:       "filter=metadata.name!=test1",
+			expect: []map[string]string{
+				{"name": "test2", "namespace": "test-ns-1"},
+				{"name": "test2", "namespace": "test-ns-2"},
+				{"name": "test2", "namespace": "test-ns-3"},
+			},
+		},
+		{
+			description: "user:user-c,namespace:none,query:filter=metadata.labels.test-label-gte=3,metadata.labels.test-label=2&filter=metadata.namespace=1",
+			user:        "user-c",
+			namespace:   "",
+			query:       "filter=metadata.labels.test-label-gte=3,metadata.labels.test-label=2&filter=metadata.namespace=1",
+			expect: []map[string]string{
+				{"name": "test2", "namespace": "test-ns-1"},
+			},
+		},
+		{
 			description: "user:user-c,namespace:none,query:sort=metadata.name",
 			user:        "user-c",
 			namespace:   "",
@@ -1498,15 +1781,589 @@ func (s *SteveAPITestSuite) TestList() {
 				{"name": "test1", "namespace": "test-ns-3"},
 			},
 		},
+
+		// user-d
+		{
+			description: "user:user-d,namespace:none,query:none",
+			user:        "user-d",
+			query:       "",
+			expect: []map[string]string{
+				{"name": "test1", "namespace": "test-ns-1"},
+				{"name": "test2", "namespace": "test-ns-1"},
+				{"name": "test3", "namespace": "test-ns-1"},
+				{"name": "test4", "namespace": "test-ns-1"},
+				{"name": "test5", "namespace": "test-ns-1"},
+				{"name": "test1", "namespace": "test-ns-2"},
+				{"name": "test2", "namespace": "test-ns-2"},
+				{"name": "test3", "namespace": "test-ns-2"},
+				{"name": "test4", "namespace": "test-ns-2"},
+				{"name": "test5", "namespace": "test-ns-2"},
+				{"name": "test1", "namespace": "test-ns-3"},
+				{"name": "test2", "namespace": "test-ns-3"},
+				{"name": "test3", "namespace": "test-ns-3"},
+				{"name": "test4", "namespace": "test-ns-3"},
+				{"name": "test5", "namespace": "test-ns-3"},
+				{"name": "test1", "namespace": "test-ns-4"},
+				{"name": "test2", "namespace": "test-ns-4"},
+				{"name": "test3", "namespace": "test-ns-4"},
+				{"name": "test4", "namespace": "test-ns-4"},
+				{"name": "test5", "namespace": "test-ns-4"},
+				{"name": "test1", "namespace": "test-ns-5"},
+				{"name": "test2", "namespace": "test-ns-5"},
+				{"name": "test3", "namespace": "test-ns-5"},
+				{"name": "test4", "namespace": "test-ns-5"},
+				{"name": "test5", "namespace": "test-ns-5"},
+				{"name": "test1", "namespace": "test-ns-6"},
+				{"name": "test2", "namespace": "test-ns-6"},
+				{"name": "test1", "namespace": "test-ns-7"},
+				{"name": "test2", "namespace": "test-ns-7"},
+				{"name": "test1", "namespace": "test-ns-8"},
+				{"name": "test2", "namespace": "test-ns-8"},
+				{"name": "test1", "namespace": "test-ns-9"},
+				{"name": "test2", "namespace": "test-ns-9"},
+			},
+		},
+		{
+			description: "user:user-d,namespace:none,query:projectsornamespaces=test-prj-2",
+			user:        "user-d",
+			query:       "projectsornamespaces=test-prj-2",
+			expect: []map[string]string{
+				{"name": "test1", "namespace": "test-ns-6"},
+				{"name": "test2", "namespace": "test-ns-6"},
+				{"name": "test1", "namespace": "test-ns-7"},
+				{"name": "test2", "namespace": "test-ns-7"},
+			},
+		},
+		{
+			description: "user:user-d,namespace:none,query:projectsornamespaces=test-prj-1,test-prj-2",
+			user:        "user-d",
+			query:       "projectsornamespaces=test-prj-1,test-prj-2",
+			expect: []map[string]string{
+				{"name": "test1", "namespace": "test-ns-1"},
+				{"name": "test2", "namespace": "test-ns-1"},
+				{"name": "test3", "namespace": "test-ns-1"},
+				{"name": "test4", "namespace": "test-ns-1"},
+				{"name": "test5", "namespace": "test-ns-1"},
+				{"name": "test1", "namespace": "test-ns-2"},
+				{"name": "test2", "namespace": "test-ns-2"},
+				{"name": "test3", "namespace": "test-ns-2"},
+				{"name": "test4", "namespace": "test-ns-2"},
+				{"name": "test5", "namespace": "test-ns-2"},
+				{"name": "test1", "namespace": "test-ns-3"},
+				{"name": "test2", "namespace": "test-ns-3"},
+				{"name": "test3", "namespace": "test-ns-3"},
+				{"name": "test4", "namespace": "test-ns-3"},
+				{"name": "test5", "namespace": "test-ns-3"},
+				{"name": "test1", "namespace": "test-ns-4"},
+				{"name": "test2", "namespace": "test-ns-4"},
+				{"name": "test3", "namespace": "test-ns-4"},
+				{"name": "test4", "namespace": "test-ns-4"},
+				{"name": "test5", "namespace": "test-ns-4"},
+				{"name": "test1", "namespace": "test-ns-5"},
+				{"name": "test2", "namespace": "test-ns-5"},
+				{"name": "test3", "namespace": "test-ns-5"},
+				{"name": "test4", "namespace": "test-ns-5"},
+				{"name": "test5", "namespace": "test-ns-5"},
+				{"name": "test1", "namespace": "test-ns-6"},
+				{"name": "test2", "namespace": "test-ns-6"},
+				{"name": "test1", "namespace": "test-ns-7"},
+				{"name": "test2", "namespace": "test-ns-7"},
+			},
+		},
+		{
+			description: "user:user-d,namespace:none,query:projectsornamespaces=test-ns-1",
+			user:        "user-d",
+			query:       "projectsornamespaces=test-ns-1",
+			expect: []map[string]string{
+				{"name": "test1", "namespace": "test-ns-1"},
+				{"name": "test2", "namespace": "test-ns-1"},
+				{"name": "test3", "namespace": "test-ns-1"},
+				{"name": "test4", "namespace": "test-ns-1"},
+				{"name": "test5", "namespace": "test-ns-1"},
+			},
+		},
+		{
+			description: "user:user-d,namespace:none,query:projectsornamespaces=test-ns-1,test-ns-2",
+			user:        "user-d",
+			query:       "projectsornamespaces=test-ns-1,test-ns-2",
+			expect: []map[string]string{
+				{"name": "test1", "namespace": "test-ns-1"},
+				{"name": "test2", "namespace": "test-ns-1"},
+				{"name": "test3", "namespace": "test-ns-1"},
+				{"name": "test4", "namespace": "test-ns-1"},
+				{"name": "test5", "namespace": "test-ns-1"},
+				{"name": "test1", "namespace": "test-ns-2"},
+				{"name": "test2", "namespace": "test-ns-2"},
+				{"name": "test3", "namespace": "test-ns-2"},
+				{"name": "test4", "namespace": "test-ns-2"},
+				{"name": "test5", "namespace": "test-ns-2"},
+			},
+		},
+		{
+			description: "user:user-d,namespace:none,query:projectsornamespaces=test-prj-2,test-ns-2,test-ns-3",
+			user:        "user-d",
+			query:       "projectsornamespaces=test-prj-2,test-ns-2,test-ns-3",
+			expect: []map[string]string{
+				{"name": "test1", "namespace": "test-ns-2"},
+				{"name": "test2", "namespace": "test-ns-2"},
+				{"name": "test3", "namespace": "test-ns-2"},
+				{"name": "test4", "namespace": "test-ns-2"},
+				{"name": "test5", "namespace": "test-ns-2"},
+				{"name": "test1", "namespace": "test-ns-3"},
+				{"name": "test2", "namespace": "test-ns-3"},
+				{"name": "test3", "namespace": "test-ns-3"},
+				{"name": "test4", "namespace": "test-ns-3"},
+				{"name": "test5", "namespace": "test-ns-3"},
+				{"name": "test1", "namespace": "test-ns-6"},
+				{"name": "test2", "namespace": "test-ns-6"},
+				{"name": "test1", "namespace": "test-ns-7"},
+				{"name": "test2", "namespace": "test-ns-7"},
+			},
+		},
+		{
+			description: "user:user-d,namespace:none,query:projectsornamespaces=test-ns-8,test-ns-9",
+			user:        "user-d",
+			query:       "projectsornamespaces=test-ns-8,test-ns-9",
+			expect: []map[string]string{
+				{"name": "test1", "namespace": "test-ns-8"},
+				{"name": "test2", "namespace": "test-ns-8"},
+				{"name": "test1", "namespace": "test-ns-9"},
+				{"name": "test2", "namespace": "test-ns-9"},
+			},
+		},
+		{
+			description: "user:user-d,namespace:none,query:projectsornamespaces!=test-prj-1",
+			user:        "user-d",
+			query:       "projectsornamespaces!=test-prj-1",
+			expect: []map[string]string{
+				{"name": "test1", "namespace": "test-ns-6"},
+				{"name": "test2", "namespace": "test-ns-6"},
+				{"name": "test1", "namespace": "test-ns-7"},
+				{"name": "test2", "namespace": "test-ns-7"},
+				{"name": "test1", "namespace": "test-ns-8"},
+				{"name": "test2", "namespace": "test-ns-8"},
+				{"name": "test1", "namespace": "test-ns-9"},
+				{"name": "test2", "namespace": "test-ns-9"},
+			},
+		},
+		{
+			description: "user:user-d,namespace:none,query:projectsornamespaces!=test-prj-1,test-prj-2",
+			user:        "user-d",
+			query:       "projectsornamespaces!=test-prj-1,test-prj-2",
+			expect: []map[string]string{
+				{"name": "test1", "namespace": "test-ns-8"},
+				{"name": "test2", "namespace": "test-ns-8"},
+				{"name": "test1", "namespace": "test-ns-9"},
+				{"name": "test2", "namespace": "test-ns-9"},
+			},
+		},
+		{
+			description: "user:user-d,namespace:none,query:projectsornamespaces!=test-prj-1,test-ns-6,test-ns-8",
+			user:        "user-d",
+			query:       "projectsornamespaces!=test-prj-1,test-ns-6,test-ns-8",
+			expect: []map[string]string{
+				{"name": "test1", "namespace": "test-ns-7"},
+				{"name": "test2", "namespace": "test-ns-7"},
+				{"name": "test1", "namespace": "test-ns-9"},
+				{"name": "test2", "namespace": "test-ns-9"},
+			},
+		},
+		{
+			description: "user:user-d,namespace:test-ns-6,query:none",
+			user:        "user-d",
+			namespace:   "test-ns-6",
+			query:       "",
+			expect: []map[string]string{
+				{"name": "test1", "namespace": "test-ns-6"},
+				{"name": "test2", "namespace": "test-ns-6"},
+			},
+		},
+		{
+			description: "user:user-d,namespace:test-ns-6,query:projectsornamespaces=test-prj-2",
+			user:        "user-d",
+			namespace:   "test-ns-6",
+			query:       "projectsornamespaces=test-prj-2",
+			expect: []map[string]string{
+				{"name": "test1", "namespace": "test-ns-6"},
+				{"name": "test2", "namespace": "test-ns-6"},
+			},
+		},
+		{
+			description: "user:user-d,namespace:test-ns-6,query:projectsornamespaces=test-prj-2",
+			user:        "user-d",
+			namespace:   "test-ns-6",
+			query:       "projectsornamespaces=test-prj-1",
+			expect:      []map[string]string{},
+		},
+		{
+			description: "user:user-d,namespace:test-ns-1,query:projectsornamespaces=test-ns-1,test-ns-2,-test-prj-2,test-ns-7",
+			user:        "user-d",
+			namespace:   "test-ns-1",
+			query:       "projectsornamespaces=test-ns-1,test-ns-2,test-prj-2,test-ns-7",
+			expect: []map[string]string{
+				{"name": "test1", "namespace": "test-ns-1"},
+				{"name": "test2", "namespace": "test-ns-1"},
+				{"name": "test3", "namespace": "test-ns-1"},
+				{"name": "test4", "namespace": "test-ns-1"},
+				{"name": "test5", "namespace": "test-ns-1"},
+			},
+		},
+		{
+			description: "user:user-d,namespace:test-ns-1,query:projectsornamespaces!=test-prj-1",
+			user:        "user-d",
+			namespace:   "test-ns-1",
+			query:       "projectsornamespaces!=test-prj-1",
+			expect:      []map[string]string{},
+		},
+		{
+			description: "user:user-d,namespace:test-ns-1,query:projectsornamespaces!=test-prj-1,test-prj-2",
+			user:        "user-d",
+			namespace:   "test-ns-1",
+			query:       "projectsornamespaces!=test-prj-1,test-prj-2",
+			expect:      []map[string]string{},
+		},
+
+		// user-e
+		{
+			description: "user:user-e,namespace:none,query:none",
+			user:        "user-e",
+			query:       "",
+			expect: []map[string]string{
+				{"name": "test1", "namespace": "test-ns-1"},
+				{"name": "test2", "namespace": "test-ns-1"},
+				{"name": "test3", "namespace": "test-ns-1"},
+				{"name": "test4", "namespace": "test-ns-1"},
+				{"name": "test5", "namespace": "test-ns-1"},
+				{"name": "test1", "namespace": "test-ns-2"},
+				{"name": "test2", "namespace": "test-ns-2"},
+				{"name": "test3", "namespace": "test-ns-2"},
+				{"name": "test4", "namespace": "test-ns-2"},
+				{"name": "test5", "namespace": "test-ns-2"},
+				{"name": "test1", "namespace": "test-ns-3"},
+				{"name": "test2", "namespace": "test-ns-3"},
+				{"name": "test3", "namespace": "test-ns-3"},
+				{"name": "test4", "namespace": "test-ns-3"},
+				{"name": "test5", "namespace": "test-ns-3"},
+				{"name": "test1", "namespace": "test-ns-4"},
+				{"name": "test2", "namespace": "test-ns-4"},
+				{"name": "test3", "namespace": "test-ns-4"},
+				{"name": "test4", "namespace": "test-ns-4"},
+				{"name": "test5", "namespace": "test-ns-4"},
+				{"name": "test1", "namespace": "test-ns-5"},
+				{"name": "test2", "namespace": "test-ns-5"},
+				{"name": "test3", "namespace": "test-ns-5"},
+				{"name": "test4", "namespace": "test-ns-5"},
+				{"name": "test5", "namespace": "test-ns-5"},
+				{"name": "test1", "namespace": "test-ns-6"},
+				{"name": "test2", "namespace": "test-ns-6"},
+				{"name": "test1", "namespace": "test-ns-7"},
+				{"name": "test2", "namespace": "test-ns-7"},
+				{"name": "test1", "namespace": "test-ns-8"},
+				{"name": "test2", "namespace": "test-ns-8"},
+				{"name": "test1", "namespace": "test-ns-9"},
+				{"name": "test2", "namespace": "test-ns-9"},
+			},
+			expectContains: true,
+		},
+		{
+			description: "user:user-e,namespace:none,query:projectsornamespaces=test-prj-2",
+			user:        "user-e",
+			query:       "projectsornamespaces=test-prj-2",
+			expect: []map[string]string{
+				{"name": "test1", "namespace": "test-ns-6"},
+				{"name": "test2", "namespace": "test-ns-6"},
+				{"name": "test1", "namespace": "test-ns-7"},
+				{"name": "test2", "namespace": "test-ns-7"},
+			},
+		},
+		{
+			description: "user:user-e,namespace:none,query:projectsornamespaces=test-prj-1,test-prj-2",
+			user:        "user-e",
+			query:       "projectsornamespaces=test-prj-1,test-prj-2",
+			expect: []map[string]string{
+				{"name": "test1", "namespace": "test-ns-1"},
+				{"name": "test2", "namespace": "test-ns-1"},
+				{"name": "test3", "namespace": "test-ns-1"},
+				{"name": "test4", "namespace": "test-ns-1"},
+				{"name": "test5", "namespace": "test-ns-1"},
+				{"name": "test1", "namespace": "test-ns-2"},
+				{"name": "test2", "namespace": "test-ns-2"},
+				{"name": "test3", "namespace": "test-ns-2"},
+				{"name": "test4", "namespace": "test-ns-2"},
+				{"name": "test5", "namespace": "test-ns-2"},
+				{"name": "test1", "namespace": "test-ns-3"},
+				{"name": "test2", "namespace": "test-ns-3"},
+				{"name": "test3", "namespace": "test-ns-3"},
+				{"name": "test4", "namespace": "test-ns-3"},
+				{"name": "test5", "namespace": "test-ns-3"},
+				{"name": "test1", "namespace": "test-ns-4"},
+				{"name": "test2", "namespace": "test-ns-4"},
+				{"name": "test3", "namespace": "test-ns-4"},
+				{"name": "test4", "namespace": "test-ns-4"},
+				{"name": "test5", "namespace": "test-ns-4"},
+				{"name": "test1", "namespace": "test-ns-5"},
+				{"name": "test2", "namespace": "test-ns-5"},
+				{"name": "test3", "namespace": "test-ns-5"},
+				{"name": "test4", "namespace": "test-ns-5"},
+				{"name": "test5", "namespace": "test-ns-5"},
+				{"name": "test1", "namespace": "test-ns-6"},
+				{"name": "test2", "namespace": "test-ns-6"},
+				{"name": "test1", "namespace": "test-ns-7"},
+				{"name": "test2", "namespace": "test-ns-7"},
+			},
+		},
+		{
+			description: "user:user-e,namespace:none,query:projectsornamespaces=test-ns-1",
+			user:        "user-e",
+			query:       "projectsornamespaces=test-ns-1",
+			expect: []map[string]string{
+				{"name": "test1", "namespace": "test-ns-1"},
+				{"name": "test2", "namespace": "test-ns-1"},
+				{"name": "test3", "namespace": "test-ns-1"},
+				{"name": "test4", "namespace": "test-ns-1"},
+				{"name": "test5", "namespace": "test-ns-1"},
+			},
+		},
+		{
+			description: "user:user-e,namespace:none,query:projectsornamespaces=test-ns-1,test-ns-2",
+			user:        "user-e",
+			query:       "projectsornamespaces=test-ns-1,test-ns-2",
+			expect: []map[string]string{
+				{"name": "test1", "namespace": "test-ns-1"},
+				{"name": "test2", "namespace": "test-ns-1"},
+				{"name": "test3", "namespace": "test-ns-1"},
+				{"name": "test4", "namespace": "test-ns-1"},
+				{"name": "test5", "namespace": "test-ns-1"},
+				{"name": "test1", "namespace": "test-ns-2"},
+				{"name": "test2", "namespace": "test-ns-2"},
+				{"name": "test3", "namespace": "test-ns-2"},
+				{"name": "test4", "namespace": "test-ns-2"},
+				{"name": "test5", "namespace": "test-ns-2"},
+			},
+		},
+		{
+			description: "user:user-e,namespace:none,query:projectsornamespaces=test-prj-2,test-ns-2,test-ns-3",
+			user:        "user-e",
+			query:       "projectsornamespaces=test-prj-2,test-ns-2,test-ns-3",
+			expect: []map[string]string{
+				{"name": "test1", "namespace": "test-ns-2"},
+				{"name": "test2", "namespace": "test-ns-2"},
+				{"name": "test3", "namespace": "test-ns-2"},
+				{"name": "test4", "namespace": "test-ns-2"},
+				{"name": "test5", "namespace": "test-ns-2"},
+				{"name": "test1", "namespace": "test-ns-3"},
+				{"name": "test2", "namespace": "test-ns-3"},
+				{"name": "test3", "namespace": "test-ns-3"},
+				{"name": "test4", "namespace": "test-ns-3"},
+				{"name": "test5", "namespace": "test-ns-3"},
+				{"name": "test1", "namespace": "test-ns-6"},
+				{"name": "test2", "namespace": "test-ns-6"},
+				{"name": "test1", "namespace": "test-ns-7"},
+				{"name": "test2", "namespace": "test-ns-7"},
+			},
+		},
+		{
+			description: "user:user-e,namespace:none,query:projectsornamespaces=test-ns-8,test-ns-9",
+			user:        "user-e",
+			query:       "projectsornamespaces=test-ns-8,test-ns-9",
+			expect: []map[string]string{
+				{"name": "test1", "namespace": "test-ns-8"},
+				{"name": "test2", "namespace": "test-ns-8"},
+				{"name": "test1", "namespace": "test-ns-9"},
+				{"name": "test2", "namespace": "test-ns-9"},
+			},
+		},
+		{
+			description: "user:user-e,namespace:none,query:projectsornamespaces!=test-prj-1",
+			user:        "user-e",
+			query:       "projectsornamespaces!=test-prj-1",
+			expect: []map[string]string{
+				{"name": "test1", "namespace": "test-ns-1"},
+				{"name": "test2", "namespace": "test-ns-1"},
+				{"name": "test3", "namespace": "test-ns-1"},
+				{"name": "test4", "namespace": "test-ns-1"},
+				{"name": "test5", "namespace": "test-ns-1"},
+				{"name": "test1", "namespace": "test-ns-2"},
+				{"name": "test2", "namespace": "test-ns-2"},
+				{"name": "test3", "namespace": "test-ns-2"},
+				{"name": "test4", "namespace": "test-ns-2"},
+				{"name": "test5", "namespace": "test-ns-2"},
+				{"name": "test1", "namespace": "test-ns-3"},
+				{"name": "test2", "namespace": "test-ns-3"},
+				{"name": "test3", "namespace": "test-ns-3"},
+				{"name": "test4", "namespace": "test-ns-3"},
+				{"name": "test5", "namespace": "test-ns-3"},
+				{"name": "test1", "namespace": "test-ns-4"},
+				{"name": "test2", "namespace": "test-ns-4"},
+				{"name": "test3", "namespace": "test-ns-4"},
+				{"name": "test4", "namespace": "test-ns-4"},
+				{"name": "test5", "namespace": "test-ns-4"},
+				{"name": "test1", "namespace": "test-ns-5"},
+				{"name": "test2", "namespace": "test-ns-5"},
+				{"name": "test3", "namespace": "test-ns-5"},
+				{"name": "test4", "namespace": "test-ns-5"},
+				{"name": "test5", "namespace": "test-ns-5"},
+			},
+			expectExcludes: true,
+		},
+		{
+			description: "user:user-e,namespace:none,query:projectsornamespaces!=test-prj-1,test-prj-2",
+			user:        "user-e",
+			query:       "projectsornamespaces!=test-prj-1,test-prj-2",
+			expect: []map[string]string{
+				{"name": "test1", "namespace": "test-ns-1"},
+				{"name": "test2", "namespace": "test-ns-1"},
+				{"name": "test3", "namespace": "test-ns-1"},
+				{"name": "test4", "namespace": "test-ns-1"},
+				{"name": "test5", "namespace": "test-ns-1"},
+				{"name": "test1", "namespace": "test-ns-2"},
+				{"name": "test2", "namespace": "test-ns-2"},
+				{"name": "test3", "namespace": "test-ns-2"},
+				{"name": "test4", "namespace": "test-ns-2"},
+				{"name": "test5", "namespace": "test-ns-2"},
+				{"name": "test1", "namespace": "test-ns-3"},
+				{"name": "test2", "namespace": "test-ns-3"},
+				{"name": "test3", "namespace": "test-ns-3"},
+				{"name": "test4", "namespace": "test-ns-3"},
+				{"name": "test5", "namespace": "test-ns-3"},
+				{"name": "test1", "namespace": "test-ns-4"},
+				{"name": "test2", "namespace": "test-ns-4"},
+				{"name": "test3", "namespace": "test-ns-4"},
+				{"name": "test4", "namespace": "test-ns-4"},
+				{"name": "test5", "namespace": "test-ns-4"},
+				{"name": "test1", "namespace": "test-ns-5"},
+				{"name": "test2", "namespace": "test-ns-5"},
+				{"name": "test3", "namespace": "test-ns-5"},
+				{"name": "test4", "namespace": "test-ns-5"},
+				{"name": "test5", "namespace": "test-ns-5"},
+				{"name": "test1", "namespace": "test-ns-6"},
+				{"name": "test2", "namespace": "test-ns-6"},
+				{"name": "test1", "namespace": "test-ns-7"},
+				{"name": "test2", "namespace": "test-ns-7"},
+			},
+			expectExcludes: true,
+		},
+		{
+			description: "user:user-e,namespace:none,query:projectsornamespaces!=test-prj-1,test-ns-6,test-ns-8",
+			user:        "user-e",
+			query:       "projectsornamespaces!=test-prj-1,test-ns-6,test-ns-8",
+			expect: []map[string]string{
+				{"name": "test1", "namespace": "test-ns-1"},
+				{"name": "test2", "namespace": "test-ns-1"},
+				{"name": "test3", "namespace": "test-ns-1"},
+				{"name": "test4", "namespace": "test-ns-1"},
+				{"name": "test5", "namespace": "test-ns-1"},
+				{"name": "test1", "namespace": "test-ns-2"},
+				{"name": "test2", "namespace": "test-ns-2"},
+				{"name": "test3", "namespace": "test-ns-2"},
+				{"name": "test4", "namespace": "test-ns-2"},
+				{"name": "test5", "namespace": "test-ns-2"},
+				{"name": "test1", "namespace": "test-ns-3"},
+				{"name": "test2", "namespace": "test-ns-3"},
+				{"name": "test3", "namespace": "test-ns-3"},
+				{"name": "test4", "namespace": "test-ns-3"},
+				{"name": "test5", "namespace": "test-ns-3"},
+				{"name": "test1", "namespace": "test-ns-4"},
+				{"name": "test2", "namespace": "test-ns-4"},
+				{"name": "test3", "namespace": "test-ns-4"},
+				{"name": "test4", "namespace": "test-ns-4"},
+				{"name": "test5", "namespace": "test-ns-4"},
+				{"name": "test1", "namespace": "test-ns-5"},
+				{"name": "test2", "namespace": "test-ns-5"},
+				{"name": "test3", "namespace": "test-ns-5"},
+				{"name": "test4", "namespace": "test-ns-5"},
+				{"name": "test5", "namespace": "test-ns-5"},
+				{"name": "test1", "namespace": "test-ns-6"},
+				{"name": "test2", "namespace": "test-ns-6"},
+				{"name": "test1", "namespace": "test-ns-8"},
+				{"name": "test2", "namespace": "test-ns-8"},
+			},
+			expectExcludes: true,
+		},
+		{
+			description: "user:user-e,namespace:test-ns-6,query:none",
+			user:        "user-e",
+			namespace:   "test-ns-6",
+			query:       "",
+			expect: []map[string]string{
+				{"name": "test1", "namespace": "test-ns-6"},
+				{"name": "test2", "namespace": "test-ns-6"},
+			},
+		},
+		{
+			description: "user:user-e,namespace:test-ns-6,query:projectsornamespaces=test-prj-2",
+			user:        "user-e",
+			namespace:   "test-ns-6",
+			query:       "projectsornamespaces=test-prj-2",
+			expect: []map[string]string{
+				{"name": "test1", "namespace": "test-ns-6"},
+				{"name": "test2", "namespace": "test-ns-6"},
+			},
+		},
+		{
+			description: "user:user-e,namespace:test-ns-6,query:projectsornamespaces=test-prj-1",
+			user:        "user-e",
+			namespace:   "test-ns-6",
+			query:       "projectsornamespaces=test-prj-1",
+			expect:      []map[string]string{},
+		},
+		{
+			description: "user:user-e,namespace:test-ns-1,query:projectsornamespaces=test-ns-1,test-ns-2,test-prj-2,test-ns-7",
+			user:        "user-e",
+			namespace:   "test-ns-1",
+			query:       "projectsornamespaces=test-ns-1,test-ns-2,test-prj-2,test-ns-7",
+			expect: []map[string]string{
+				{"name": "test1", "namespace": "test-ns-1"},
+				{"name": "test2", "namespace": "test-ns-1"},
+				{"name": "test3", "namespace": "test-ns-1"},
+				{"name": "test4", "namespace": "test-ns-1"},
+				{"name": "test5", "namespace": "test-ns-1"},
+			},
+		},
+		{
+			description: "user:user-e,namespace:test-ns-1,query:projectsornamespaces!=test-prj-1",
+			user:        "user-e",
+			namespace:   "test-ns-1",
+			query:       "projectsornamespaces!=test-prj-1",
+			expect:      []map[string]string{},
+		},
+		{
+			description: "user:user-e,namespace:test-ns-1,query:projectsornamespaces!=test-prj-1,test-prj-2",
+			user:        "user-e",
+			namespace:   "test-ns-1",
+			query:       "projectsornamespaces!=test-prj-1,test-prj-2",
+			expect:      []map[string]string{},
+		},
+		{
+			description: "user:user-e,namespace:test-ns-1,query:projectsornamespaces!=test-prj-1,test-ns-2,test-ns-8",
+			user:        "user-e",
+			namespace:   "test-ns-1",
+			query:       "projectsornamespaces!=test-prj-1,test-ns-2,test-ns-8",
+			expect:      []map[string]string{},
+		},
 	}
 
-	csvWriter, fp, jsonDir, err := setUpResults()
-	defer fp.Close()
-	require.NoError(s.T(), err)
+	var csvWriter *csv.Writer
+	var jsonDir string
+	if s.clusterID == "local" {
+		var fp *os.File
+		var err error
+		csvWriter, fp, jsonDir, err = setUpResults()
+		defer fp.Close()
+		defer func() {
+			csvWriter.Flush()
+			require.NoError(s.T(), csvWriter.Error())
+		}()
+		require.NoError(s.T(), err)
+	}
 
 	for _, test := range tests {
 		s.Run(test.description, func() {
-			client, err := s.userClients[test.user].Steve.ProxyDownstream(s.project.ClusterID)
+			userClient := s.userClients[test.user]
+			userClient, err := userClient.ReLogin()
+			require.NoError(s.T(), err)
+
+			client, err := userClient.Steve.ProxyDownstream(s.clusterID)
 			require.NoError(s.T(), err)
 			var secretClient clientv1.SteveOperations
 			secretClient = client.SteveType(stevesecrets.SecretSteveType)
@@ -1515,6 +2372,11 @@ func (s *SteveAPITestSuite) TestList() {
 			}
 			query, err := url.ParseQuery(test.query)
 			require.NoError(s.T(), err)
+			if _, ok := query["sort"]; !ok && s.clusterID != "local" {
+				// k8s does not guarantee any particular order but usually returns results sorted by namespace and name.
+				// k3d seems to have its own ideas, so we can't rely on a consistent order when testing on the downstream cluster.
+				query["sort"] = []string{"metadata.namespace,metadata.name"}
+			}
 			if _, ok := query["continue"]; ok {
 				query["continue"] = []string{s.lastContinueToken}
 			}
@@ -1525,9 +2387,31 @@ func (s *SteveAPITestSuite) TestList() {
 					query["fieldSelector"] = []string{"metadata.namespace=" + ns}
 				}
 			}
+			key := "projectsornamespaces"
+			projectsOrNamespaces, ok := query[key]
+			if !ok {
+				key += "!"
+				projectsOrNamespaces = query[key]
+			}
+			if len(projectsOrNamespaces) != 0 {
+				groups := projectTag.FindAllStringSubmatch(projectsOrNamespaces[0], -1)
+				for _, g := range groups {
+					name := string(g[1])
+					projectID := projectMap[name].ID
+					projectID = strings.Split(projectID, ":")[1]
+					projectsOrNamespaces[0] = strings.ReplaceAll(projectsOrNamespaces[0], name, projectID)
+				}
+				groups = namespaceTag.FindAllStringSubmatch(projectsOrNamespaces[0], -1)
+				for _, g := range groups {
+					name := string(g[1])
+					projectsOrNamespaces[0] = strings.ReplaceAll(projectsOrNamespaces[0], name, namespaceMap[name])
+				}
+				query[key] = projectsOrNamespaces
+			}
 			if _, ok := query["revision"]; ok {
 				query["revision"] = []string{s.lastRevision}
 			}
+			query["labelSelector"] = append(query["labelSelector"], steveAPITestLabel+"="+testID)
 			secretList, err := secretClient.List(query)
 			require.NoError(s.T(), err)
 
@@ -1536,30 +2420,26 @@ func (s *SteveAPITestSuite) TestList() {
 			}
 			s.lastRevision = secretList.Revision
 
-			assert.Equal(s.T(), len(test.expect), len(secretList.Data))
-			for i, w := range test.expect {
-				if name, ok := w["name"]; ok {
-					assert.Equal(s.T(), name, secretList.Data[i].Name)
-				}
-				if ns, ok := w["namespace"]; ok {
-					assert.Equal(s.T(), namespaceMap[ns], secretList.Data[i].Namespace)
-				}
+			if test.expectContains {
+				s.assertListContains(test.expect, secretList.Data)
+			} else if test.expectExcludes {
+				s.assertListExcludes(test.expect, secretList.Data)
+			} else {
+				s.assertListIsEqual(test.expect, secretList.Data)
 			}
 
 			// Write human-readable request and response examples
-			curlURL, err := getCurlURL(client, test.namespace, test.query)
-			require.NoError(s.T(), err)
-			jsonResp, err := formatJSON(secretList)
-			require.NoError(s.T(), err)
-			jsonFilePath := filepath.Join(jsonDir, getFileName(test.user, test.namespace, test.query))
-			if !downStreamClusterRegex.MatchString(curlURL) {
+			if s.clusterID == "local" {
+				curlURL, err := getCurlURL(client, test.namespace, test.query)
+				require.NoError(s.T(), err)
+				jsonResp, err := formatJSON(secretList)
+				require.NoError(s.T(), err)
+				jsonFilePath := filepath.Join(jsonDir, getFileName(test.user, test.namespace, test.query))
 				err = writeResp(csvWriter, test.user, curlURL, jsonFilePath, jsonResp)
 				require.NoError(s.T(), err)
 			}
 		})
 	}
-	csvWriter.Flush()
-	require.NoError(s.T(), csvWriter.Error())
 }
 
 func getFileName(user, ns, query string) string {
@@ -1610,6 +2490,7 @@ func formatJSON(obj *clientv1.SteveCollection) ([]byte, error) {
 		if next, ok := pagination["next"].(string); ok {
 			next = continueReg.ReplaceAllString(next, "${1}"+continueToken)
 			next = revisionReg.ReplaceAllString(next, "${1}"+revisionNum)
+			next = testLabelReg.ReplaceAllString(next, "${1}"+fakeTestID)
 			pagination["next"] = next
 			mapResp["pagination"] = pagination
 		}
@@ -1621,6 +2502,7 @@ func formatJSON(obj *clientv1.SteveCollection) ([]byte, error) {
 			delete(data[i].(map[string]interface{})["metadata"].(map[string]interface{}), "creationTimestamp")
 			delete(data[i].(map[string]interface{})["metadata"].(map[string]interface{}), "managedFields")
 			delete(data[i].(map[string]interface{})["metadata"].(map[string]interface{}), "uid")
+			data[i].(map[string]interface{})["metadata"].(map[string]interface{})["labels"].(map[string]interface{})[steveAPITestLabel] = fakeTestID
 			data[i].(map[string]interface{})["metadata"].(map[string]interface{})["resourceVersion"] = "1000"
 		}
 		mapResp["data"] = data
@@ -1667,11 +2549,11 @@ func writeResp(csvWriter *csv.Writer, user, url, path string, resp []byte) error
 	return nil
 }
 
-func (s *SteveAPITestSuite) TestCRUD() {
+func (s *steveAPITestSuite) TestCRUD() {
 	subSession := s.session.NewSession()
 	defer subSession.Cleanup()
 
-	client, err := s.client.Steve.ProxyDownstream(s.project.ClusterID)
+	client, err := s.client.Steve.ProxyDownstream(s.clusterID)
 	require.NoError(s.T(), err)
 
 	s.Run("global", func() {
@@ -1752,7 +2634,61 @@ func (s *SteveAPITestSuite) TestCRUD() {
 		assert.Nil(s.T(), readObj)
 	})
 }
+func (s *steveAPITestSuite) assertListIsEqual(expect []map[string]string, list []clientv1.SteveAPIObject) {
+	assert.Equal(s.T(), len(expect), len(list))
+	for i, w := range expect {
+		if name, ok := w["name"]; ok {
+			assert.Equal(s.T(), name, list[i].Name)
+		}
+		if ns, ok := w["namespace"]; ok {
+			assert.Equal(s.T(), namespaceMap[ns], list[i].Namespace)
+		}
+	}
+}
 
-func TestSteve(t *testing.T) {
-	suite.Run(t, new(SteveAPITestSuite))
+func (s *steveAPITestSuite) assertListContains(expect []map[string]string, list []clientv1.SteveAPIObject) {
+	assert.GreaterOrEqual(s.T(), len(list), len(expect))
+	matches := true
+	for _, w := range expect {
+		found := false
+		for _, obj := range list {
+			if obj.Name == w["name"] && obj.Namespace == namespaceMap[w["namespace"]] {
+				found = true
+				break
+			}
+		}
+		if !found {
+			matches = false
+		}
+	}
+	assert.True(s.T(), matches, "list did not contain expected results")
+}
+
+func (s *steveAPITestSuite) assertListExcludes(expect []map[string]string, list []clientv1.SteveAPIObject) {
+	found := false
+	for _, w := range expect {
+		for _, obj := range list {
+			if obj.Name == w["name"] && obj.Namespace == namespaceMap[w["namespace"]] {
+				found = true
+				break
+			}
+		}
+		if found == true {
+			break
+		}
+	}
+	assert.False(s.T(), found, "list contained unexpected results")
+}
+
+func retryRequest(fn func() error) error {
+	retriable := func(err error) bool { return strings.Contains(err.Error(), "tunnel disconnect") }
+	return retry.OnError(retry.DefaultBackoff, retriable, fn)
+}
+
+func TestSteveLocal(t *testing.T) {
+	suite.Run(t, new(LocalSteveAPITestSuite))
+}
+
+func TestSteveDownstream(t *testing.T) {
+	suite.Run(t, new(DownstreamSteveAPITestSuite))
 }

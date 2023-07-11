@@ -7,6 +7,7 @@ import (
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters/kubernetesversions"
+	"github.com/rancher/rancher/tests/framework/extensions/defaults"
 	nodepools "github.com/rancher/rancher/tests/framework/extensions/rke1/nodepools"
 	"github.com/rancher/rancher/tests/framework/extensions/rke1/nodetemplates"
 	"github.com/rancher/rancher/tests/framework/extensions/workloads/pods"
@@ -14,7 +15,6 @@ import (
 	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
-	"github.com/rancher/rancher/tests/integration/pkg/defaults"
 	"github.com/rancher/rancher/tests/v2/validation/provisioning"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -32,6 +32,7 @@ type KdmChecksTestSuite struct {
 	cnis                   []string
 	providers              []string
 	nodesAndRoles          []nodepools.NodeRoles
+	advancedOptions        provisioning.AdvancedOptions
 }
 
 const (
@@ -57,6 +58,7 @@ func (k *KdmChecksTestSuite) SetupSuite() {
 	k.cnis = clustersConfig.CNIs
 	k.providers = clustersConfig.Providers
 	k.nodesAndRoles = clustersConfig.NodesAndRolesRKE1
+	k.advancedOptions = clustersConfig.AdvancedOptions
 
 	client, err := rancher.NewClient("", testSession)
 	require.NoError(k.T(), err)
@@ -100,7 +102,7 @@ func (k *KdmChecksTestSuite) TestProvisioningSingleNodeRKE1Clusters() {
 			nodeTemplate, err := provider.NodeTemplateFunc(client)
 			require.NoError(k.T(), err)
 
-			clusterResp, nodePool, nodePoolName, clusterName, err := k.provisionRKE1Cluster(client, provider, k.nodesAndRoles, k8sVersion, cni, nodeTemplate)
+			clusterResp, nodePool, nodePoolName, clusterName, err := k.provisionRKE1Cluster(client, provider, k.nodesAndRoles, k8sVersion, cni, nodeTemplate, k.advancedOptions)
 			require.NoError(k.T(), err)
 
 			nodePoolNames = append(nodePoolNames, nodePoolName)
@@ -114,10 +116,10 @@ func (k *KdmChecksTestSuite) TestProvisioningSingleNodeRKE1Clusters() {
 
 }
 
-func (k *KdmChecksTestSuite) provisionRKE1Cluster(client *rancher.Client, provider Provider, nodesAndRoles []nodepools.NodeRoles, k8sVersion, cni string, nodeTemplate *nodetemplates.NodeTemplate) (*management.Cluster, *management.NodePool, string, string, error) {
+func (k *KdmChecksTestSuite) provisionRKE1Cluster(client *rancher.Client, provider Provider, nodesAndRoles []nodepools.NodeRoles, k8sVersion, cni string, nodeTemplate *nodetemplates.NodeTemplate, advancedOptions provisioning.AdvancedOptions) (*management.Cluster, *management.NodePool, string, string, error) {
 	clusterName := namegen.AppendRandomString(provider.Name.String())
 
-	cluster := clusters.NewRKE1ClusterConfig(clusterName, cni, k8sVersion, "", client)
+	cluster := clusters.NewRKE1ClusterConfig(clusterName, cni, k8sVersion, "", client, advancedOptions)
 	clusterResp, err := clusters.CreateRKE1Cluster(client, cluster)
 	require.NoError(k.T(), err)
 

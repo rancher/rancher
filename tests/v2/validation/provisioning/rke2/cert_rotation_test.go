@@ -11,6 +11,7 @@ import (
 	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
 	"github.com/rancher/rancher/tests/framework/extensions/cloudcredentials"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
+	"github.com/rancher/rancher/tests/framework/extensions/defaults"
 	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
 	"github.com/rancher/rancher/tests/framework/extensions/pipeline"
 	"github.com/rancher/rancher/tests/framework/pkg/config"
@@ -18,7 +19,6 @@ import (
 	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
-	"github.com/rancher/rancher/tests/integration/pkg/defaults"
 	"github.com/rancher/rancher/tests/v2/validation/provisioning"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -29,11 +29,12 @@ import (
 
 type V2ProvCertRotationTestSuite struct {
 	suite.Suite
-	session     *session.Session
-	client      *rancher.Client
-	config      *provisioning.Config
-	clusterName string
-	namespace   string
+	session         *session.Session
+	client          *rancher.Client
+	config          *provisioning.Config
+	clusterName     string
+	namespace       string
+	advancedOptions provisioning.AdvancedOptions
 }
 
 func (r *V2ProvCertRotationTestSuite) TearDownSuite() {
@@ -54,6 +55,7 @@ func (r *V2ProvCertRotationTestSuite) SetupSuite() {
 
 	r.clusterName = r.client.RancherConfig.ClusterName
 	r.namespace = r.client.RancherConfig.ClusterName
+	r.advancedOptions = r.config.AdvancedOptions
 }
 
 func (r *V2ProvCertRotationTestSuite) testCertRotation(provider Provider, kubeVersion string, nodesAndRoles []machinepools.NodeRoles, credential *cloudcredentials.CloudCredential) {
@@ -75,7 +77,7 @@ func (r *V2ProvCertRotationTestSuite) testCertRotation(provider Provider, kubeVe
 
 			machinePools := machinepools.RKEMachinePoolSetup(nodesAndRoles, machineConfigResp)
 
-			cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, namespace, "calico", credential.ID, kubeVersion, "", machinePools)
+			cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, namespace, "calico", credential.ID, kubeVersion, "", machinePools, r.advancedOptions)
 			clusterResp, err := clusters.CreateK3SRKE2Cluster(testSessionClient, cluster)
 			require.NoError(r.T(), err)
 
@@ -86,7 +88,7 @@ func (r *V2ProvCertRotationTestSuite) testCertRotation(provider Provider, kubeVe
 			kubeProvisioningClient, err := r.client.GetKubeAPIProvisioningClient()
 			require.NoError(r.T(), err)
 
-			result, err := kubeProvisioningClient.Clusters("fleet-default").Watch(context.TODO(), metav1.ListOptions{
+			result, err := kubeProvisioningClient.Clusters(namespace).Watch(context.TODO(), metav1.ListOptions{
 				FieldSelector:  "metadata.name=" + cluster.ObjectMeta.Name,
 				TimeoutSeconds: &defaults.WatchTimeoutSeconds,
 			})
@@ -97,7 +99,7 @@ func (r *V2ProvCertRotationTestSuite) testCertRotation(provider Provider, kubeVe
 			require.NoError(r.T(), err)
 			assert.Equal(r.T(), clusterName, clusterResp.ObjectMeta.Name)
 
-			steveCluster, err := r.client.Steve.SteveType(clusters.ProvisioningSteveResouceType).ByID(clusterResp.ID)
+			steveCluster, err := r.client.Steve.SteveType(clusters.ProvisioningSteveResourceType).ByID(clusterResp.ID)
 			require.NoError(r.T(), err)
 			require.NotNil(r.T(), steveCluster.Status)
 
@@ -133,7 +135,7 @@ func (r *V2ProvCertRotationTestSuite) rotateCerts(id string, generation int64) e
 	kubeProvisioningClient, err := r.client.GetKubeAPIProvisioningClient()
 	require.NoError(r.T(), err)
 
-	cluster, err := r.client.Steve.SteveType(clusters.ProvisioningSteveResouceType).ByID(id)
+	cluster, err := r.client.Steve.SteveType(clusters.ProvisioningSteveResourceType).ByID(id)
 	if err != nil {
 		return err
 	}
@@ -150,7 +152,7 @@ func (r *V2ProvCertRotationTestSuite) rotateCerts(id string, generation int64) e
 
 	updatedCluster.Spec = *clusterSpec
 
-	cluster, err = r.client.Steve.SteveType(clusters.ProvisioningSteveResouceType).Update(cluster, updatedCluster)
+	cluster, err = r.client.Steve.SteveType(clusters.ProvisioningSteveResourceType).Update(cluster, updatedCluster)
 	if err != nil {
 		return err
 	}
@@ -171,7 +173,7 @@ func (r *V2ProvCertRotationTestSuite) rotateCerts(id string, generation int64) e
 		return err
 	}
 
-	clusterWait, err := kubeProvisioningClient.Clusters("fleet-default").Watch(context.TODO(), metav1.ListOptions{
+	clusterWait, err := kubeProvisioningClient.Clusters(namespace).Watch(context.TODO(), metav1.ListOptions{
 		FieldSelector:  "metadata.name=" + cluster.ObjectMeta.Name,
 		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
 	})

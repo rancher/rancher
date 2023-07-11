@@ -365,7 +365,7 @@ func (h *handler) OnRemove(key string, obj runtime.Object) (runtime.Object, erro
 	}
 
 	// infrastructure deletion finished
-	if cond := getCondition(infra.data, deleteJobConditionType); cond != nil && cond.Status() == "True" {
+	if cond := getCondition(infra.data, deleteJobConditionType); cond != nil && cond.Status() != "Unknown" {
 		job, err := h.getJobFromInfraMachine(infra)
 		if apierrors.IsNotFound(err) {
 			// If the deletion job condition has been set on the infrastructure object and the deletion job has been removed,
@@ -384,7 +384,9 @@ func (h *handler) OnRemove(key string, obj runtime.Object) (runtime.Object, erro
 			// passed here, it will delete all objects it finds.
 			return obj, h.apply.WithOwner(obj).ApplyObjects()
 		}
-		return obj, generic.ErrSkip
+		if cond.Status() == "True" {
+			return obj, generic.ErrSkip
+		}
 	}
 
 	clusterName := infra.meta.GetLabels()[capi.ClusterLabelName]
@@ -642,9 +644,17 @@ func (h *handler) run(infra *infraObject, create bool) (rkev1.RKEMachineStatus, 
 		failureReasonType = capierrors.DeleteMachineError
 	}
 
+	// Check to see if we have a failure reason.
 	failure := infra.data.String("status", "failureReason") == string(failureReasonType)
+	ready := false
 
-	if err := h.apply.WithOwner(infra.obj).ApplyObjects(objects((args.String("providerID") != "" || failure) && create, dArgs)...); err != nil {
+	cond := getCondition(infra.data, "Ready")
+	if cond != nil {
+		// We are only "ready" if both the condition "Ready" is "True" and the provider ID has been set on the machine.
+		ready = cond.Status() == "True" && args.String("providerID") != ""
+	}
+
+	if err := h.apply.WithOwner(infra.obj).ApplyObjects(objects((ready || failure) && create, dArgs)...); err != nil {
 		return rkev1.RKEMachineStatus{}, failure, err
 	}
 

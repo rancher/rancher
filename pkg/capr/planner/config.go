@@ -31,7 +31,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-func (p *Planner) addETCD(config map[string]interface{}, controlPlane *rkev1.RKEControlPlane, entry *planEntry) (result []plan.File, _ error) {
+// addEtcd mutates the given config map with etcd-specific configuration elements, and adds S3-related arguments and files if renderS3 is true.
+func (p *Planner) addETCD(config map[string]interface{}, controlPlane *rkev1.RKEControlPlane, entry *planEntry, renderS3 bool) (result []plan.File, _ error) {
 	if !isEtcd(entry) || controlPlane.Spec.ETCD == nil {
 		return nil, nil
 	}
@@ -46,20 +47,22 @@ func (p *Planner) addETCD(config map[string]interface{}, controlPlane *rkev1.RKE
 		config["etcd-snapshot-schedule-cron"] = controlPlane.Spec.ETCD.SnapshotScheduleCron
 	}
 
-	args, _, files, err := p.etcdS3Args.ToArgs(controlPlane.Spec.ETCD.S3, controlPlane, "etcd-", false)
-	if err != nil {
-		return nil, err
-	}
-	for _, arg := range args {
-		k, v := kv.Split(arg, "=")
-		k = strings.TrimPrefix(k, "--")
-		if v == "" {
-			config[k] = true
-		} else {
-			config[k] = v
+	if renderS3 {
+		args, _, files, err := p.etcdS3Args.ToArgs(controlPlane.Spec.ETCD.S3, controlPlane, "etcd-", false)
+		if err != nil {
+			return nil, err
 		}
+		for _, arg := range args {
+			k, v := kv.Split(arg, "=")
+			k = strings.TrimPrefix(k, "--")
+			if v == "" {
+				config[k] = true
+			} else {
+				config[k] = v
+			}
+		}
+		result = files
 	}
-	result = files
 
 	return
 }
@@ -101,6 +104,13 @@ func addRoleConfig(config map[string]interface{}, controlPlane *rkev1.RKEControl
 			config["cluster-init"] = true
 		}
 		joinServer = "-"
+	} else if joinServer == "" {
+		// If no join server was specified, use the join server annotation for the node.
+		var ok bool
+		joinServer, ok = entry.Metadata.Annotations[capr.JoinedToAnnotation]
+		if !ok {
+			return capr.JoinServerImplausible
+		}
 	}
 
 	if joinServer != "" && joinServer != "-" {
@@ -537,7 +547,7 @@ func (p *Planner) renderFiles(controlPlane *rkev1.RKEControlPlane, entry *planEn
 // NodePlan, the config that was rendered in a map, the joined server, and an error if one exists.
 // NOTE: the joined server can be "-" if the config file is being added for the init node.
 func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane, entry *planEntry, tokensSecret plan.Secret,
-	joinServer string, reg registries) (plan.NodePlan, map[string]interface{}, string, error) {
+	joinServer string, reg registries, renderS3 bool) (plan.NodePlan, map[string]interface{}, string, error) {
 	config := map[string]interface{}{}
 
 	addDefaults(config, controlPlane)
@@ -547,13 +557,17 @@ func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEC
 		return nodePlan, config, "", err
 	}
 
-	files, err := p.addETCD(config, controlPlane, entry)
+	files, err := p.addETCD(config, controlPlane, entry, renderS3)
 	if err != nil {
 		return nodePlan, config, "", err
 	}
 	nodePlan.Files = append(nodePlan.Files, files...)
 
 	joinedServer := addRoleConfig(config, controlPlane, entry, joinServer)
+	if joinedServer == capr.JoinServerImplausible {
+		return nodePlan, config, "", fmt.Errorf("implausible joined server for entry")
+	}
+
 	addLocalClusterAuthenticationEndpointConfig(config, controlPlane, entry)
 	addToken(config, entry, tokensSecret)
 

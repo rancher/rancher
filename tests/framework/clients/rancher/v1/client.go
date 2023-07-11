@@ -5,15 +5,20 @@ import (
 	"fmt"
 	"net/url"
 	"regexp"
+	"time"
 
 	"github.com/rancher/apiserver/pkg/types"
 	normantypes "github.com/rancher/norman/types"
 	"github.com/rancher/rancher/tests/framework/pkg/clientbase"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 const (
 	hostRegex = "https://(.+)/v1"
+	duration  = 100 * time.Millisecond // duration of 100 miliseconds to be short since this is a fast check
+	factor    = 1                      // with a factor of 1
+	steps     = 5                      // only do 5 tries
 )
 
 // State is the Steve specific field in the rancher Steve API
@@ -105,6 +110,15 @@ func (c *SteveClient) NamespacedSteveClient(namespace string) *NamespacedSteveCl
 // ProxyDownstream is a function that sets the URL to a proxy URL
 // to be able to make Steve API calls to a downstream cluster
 func (c *Client) ProxyDownstream(clusterID string) (*Client, error) {
+	// sometimes it is necessary to retry the GetCollectionURL due to the schema not being updated
+	// fast enough after a cluster has been provisioned
+	var backoff = wait.Backoff{
+		Duration: duration,
+		Factor:   factor,
+		Jitter:   0,
+		Steps:    steps,
+	}
+
 	hostRegexp := regexp.MustCompile(hostRegex)
 
 	matches := hostRegexp.FindStringSubmatch(c.Opts.URL)
@@ -114,9 +128,23 @@ func (c *Client) ProxyDownstream(clusterID string) (*Client, error) {
 	proxyHost := fmt.Sprintf("https://%s/k8s/clusters/%s/v1", host, clusterID)
 	updatedOpts.URL = proxyHost
 
-	baseClient, err := clientbase.NewAPIClient(&updatedOpts)
+	var baseClient clientbase.APIBaseClient
+	err := wait.ExponentialBackoff(backoff, func() (done bool, err error) {
+		baseClient, err = clientbase.NewAPIClient(&updatedOpts)
+		if err != nil {
+			return false, err
+		}
+
+		typesLength := len(baseClient.Types)
+		if typesLength > 0 {
+			return true, nil
+		}
+
+		return false, nil
+	})
+
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed creating Proxy Client. Backoff error: %v", err)
 	}
 
 	client := &Client{

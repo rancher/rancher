@@ -81,6 +81,7 @@ type RancherCluster struct {
 	CNIs                       []string         `yaml:"cni"`
 	FeaturesToTest             upgrade.Features `yaml:"enabledFeatures" default:""`
 	SSHUser                    string           `yaml:"sshUser" default:""`
+	VolumeType                 string           `yaml:"volumeType" default:""`
 }
 
 // HostedCluster is a struct that contains related information about the downstream cluster that's going to be created and upgraded.
@@ -99,10 +100,10 @@ func GenerateDefaultReleaseUpgradeConfig() {
 
 	configData, err := yaml.Marshal(&config)
 	if err != nil {
-		logrus.Fatalf("error marshaling", err)
+		logrus.Fatalf("error marshaling: %v", err)
 	}
 	err = os.WriteFile(configFileName, configData, 0644)
 	if err != nil {
-		logrus.Fatalf("error writing yaml", err)
+		logrus.Fatalf("error writing yaml: %v", err)
 	}
 }

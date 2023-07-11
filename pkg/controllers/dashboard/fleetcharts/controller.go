@@ -75,7 +75,7 @@ func (h *handler) onSetting(key string, setting *v3.Setting) (*v3.Setting, error
 	}
 	h.Unlock()
 
-	err := h.manager.Ensure(fleetCRDChart.ReleaseNamespace, fleetCRDChart.ChartName, settings.FleetMinVersion.Get(), nil, true, "")
+	err := h.manager.Ensure(fleetCRDChart.ReleaseNamespace, fleetCRDChart.ChartName, settings.FleetMinVersion.Get(), "", nil, true, "")
 	if err != nil {
 		return setting, err
 	}
@@ -91,12 +91,12 @@ func (h *handler) onSetting(key string, setting *v3.Setting) (*v3.Setting, error
 		"apiServerCA":  settings.CACerts.Get(),
 		"global":       systemGlobalRegistry,
 		"bootstrap": map[string]interface{}{
+			"enabled":        false,
 			"agentNamespace": fleetconst.ReleaseLocalNamespace,
 		},
-	}
-
-	fleetChartValues["gitops"] = map[string]interface{}{
-		"enabled": features.Gitops.Enabled(),
+		"gitops": map[string]interface{}{
+			"enabled": features.Gitops.Enabled(),
+		},
 	}
 
 	gitjobChartValues := make(map[string]interface{})
@@ -124,5 +124,5 @@ func (h *handler) onSetting(key string, setting *v3.Setting) (*v3.Setting, error
 		fleetChartValues["gitjob"] = gitjobChartValues
 	}
 
-	return setting, h.manager.Ensure(fleetChart.ReleaseNamespace, fleetChart.ChartName, settings.FleetMinVersion.Get(), fleetChartValues, true, "")
+	return setting, h.manager.Ensure(fleetChart.ReleaseNamespace, fleetChart.ChartName, settings.FleetMinVersion.Get(), "", fleetChartValues, true, "")
 }

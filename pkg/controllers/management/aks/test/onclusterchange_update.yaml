@@ -66,6 +66,7 @@ spec:
       Stakeholder: stakeholder@suse.com
     virtualNetwork: null
     virtualNetworkResourceGroup: null
+    outboundType: null
   answers: {}
   clusterSecrets: {}
   description: ""

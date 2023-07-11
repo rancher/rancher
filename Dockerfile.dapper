@@ -3,13 +3,12 @@ FROM registry.suse.com/bci/golang:1.19
 ARG DAPPER_HOST_ARCH
 ENV HOST_ARCH=${DAPPER_HOST_ARCH} ARCH=${DAPPER_HOST_ARCH}
 ENV CATTLE_HELM_VERSION v2.16.8-rancher2
-ENV CATTLE_MACHINE_VERSION v0.15.0-rancher99
-ENV CATTLE_K3S_VERSION v1.25.5+k3s1
-# version used by helm plugin install script
-ENV CATTLE_HELM_UNITTEST_VERSION v0.1.7-rancher4
+ENV CATTLE_MACHINE_VERSION v0.15.0-rancher100
+ENV CATTLE_K3S_VERSION v1.26.4+k3s1
 # helm 3 version
 ENV HELM_VERSION v3.11.3
-ENV KUSTOMIZE_VERSION v5.0.0
+ENV KUSTOMIZE_VERSION v5.0.1
+ENV HELM_UNITTEST_VERSION 0.3.2
 # k3d ci version
 ENV K3D_VERSION v5.4.6
 
@@ -30,6 +29,9 @@ RUN if [ "${ARCH}" == "amd64" ]; then \
         curl -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/fossas/spectrometer/master/install.sh | sh; \
     fi
 
+# install controller-tools for crd generation
+RUN go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.12.0
+
 ENV HELM_URL_V2_amd64=https://github.com/rancher/helm/releases/download/${CATTLE_HELM_VERSION}/rancher-helm \
     HELM_URL_V2_arm64=https://github.com/rancher/helm/releases/download/${CATTLE_HELM_VERSION}/rancher-helm-arm64 \
     HELM_URL_V2_s390x=https://github.com/rancher/helm/releases/download/${CATTLE_HELM_VERSION}/rancher-helm-s390x \
@@ -49,8 +51,7 @@ RUN curl -sLf ${!HELM_URL_V2} -o /usr/bin/rancher-helm && \
     chmod +x /usr/bin/rancher-helm /usr/bin/rancher-tiller && \
     ln -s /usr/bin/rancher-helm /usr/bin/helm && \
     ln -s /usr/bin/rancher-tiller /usr/bin/tiller && \
-    helm init -c --stable-repo-url https://charts.helm.sh/stable/ && \
-    helm plugin install https://github.com/rancher/helm-unittest
+    helm init -c --stable-repo-url https://charts.helm.sh/stable/
 
 # set up helm 3
 RUN mkdir /usr/tmp && \
@@ -59,7 +60,7 @@ RUN mkdir /usr/tmp && \
     chmod +x /usr/bin/kustomize
 
 # Set up K3s: copy the necessary binaries from the K3s image.
-COPY --from=rancher/k3s:v1.25.5-k3s1 \
+COPY --from=rancher/k3s:v1.26.4-k3s1 \
     /bin/blkid \
     /bin/cni \
     /bin/conntrack \
@@ -106,13 +107,22 @@ RUN curl -sLf https://github.com/rancher/k3s/releases/download/${CATTLE_K3S_VERS
 RUN zypper install -y python3-tox python3-base python3 libffi-devel libopenssl-devel
 
 ENV HELM_HOME /root/.helm
-ENV DAPPER_ENV REPO TAG DRONE_TAG DRONE_COMMIT DRONE_BRANCH DRONE_BUILD_EVENT SYSTEM_CHART_DEFAULT_BRANCH FOSSA_API_KEY GOGET_MODULE GOGET_VERSION RELEASE_ACTION RELEASE_TYPE POSTRELEASE_RANCHER_VERSION POSTRELEASE_RANCHER_STABLE DEBUG
+ENV DAPPER_ENV REPO TAG CI DRONE_BUILD_NUMBER DRONE_TAG DRONE_COMMIT DRONE_BRANCH DRONE_BUILD_EVENT SYSTEM_CHART_DEFAULT_BRANCH FOSSA_API_KEY GOGET_MODULE GOGET_VERSION RELEASE_ACTION RELEASE_TYPE POSTRELEASE_RANCHER_VERSION POSTRELEASE_RANCHER_STABLE DEBUG V2PROV_TEST_DIST V2PROV_TEST_RUN_REGEX
 ENV DAPPER_SOURCE /go/src/github.com/rancher/rancher/
-ENV DAPPER_OUTPUT ./bin ./dist ./go.mod ./go.sum ./pkg/apis/go.mod ./pkg/apis/go.sum ./pkg/client/go.mod ./pkg/client/go.sum ./scripts/package ./pkg/settings/setting.go ./package/Dockerfile ./Dockerfile.dapper
+ENV DAPPER_OUTPUT ./bin ./dist ./go.mod ./go.sum ./pkg/apis/go.mod ./pkg/apis/go.sum ./pkg/client/go.mod ./pkg/client/go.sum ./scripts/package ./pkg/settings/setting.go ./package/Dockerfile ./Dockerfile.dapper ./pkg/crds/yaml/generated
 ENV DAPPER_DOCKER_SOCKET true
-ENV DAPPER_RUN_ARGS "-v rancher2-go16-pkg-1:/go/pkg -v rancher2-go16-cache-1:/root/.cache/go-build --privileged --network=host"
+ARG CI
+ARG DRONE_BUILD_NUMBER
+ENV DAPPER_RUN_ARGS "-v rancher2-go16-pkg-1:/go/pkg -v rancher2-go16-cache-1:/root/.cache/go-build --privileged --label CI=${CI} --label DRONE_BUILD_NUMBER=${DRONE_BUILD_NUMBER}"
 ENV GOCACHE /root/.cache/go-build
 ENV HOME ${DAPPER_SOURCE}
+
+# set up helm unittest - only needs to run on one arch. Needs to run after $HOME has been changed so we can find it later 
+RUN if [ "${ARCH}" == "amd64" ]; then \
+        helm_v3 plugin install https://github.com/helm-unittest/helm-unittest.git --version ${HELM_UNITTEST_VERSION}; \
+    fi
+
+
 VOLUME /var/lib/rancher
 VOLUME /var/lib/kubelet
 WORKDIR ${DAPPER_SOURCE}

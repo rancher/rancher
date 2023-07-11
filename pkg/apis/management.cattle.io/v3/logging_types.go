@@ -10,6 +10,7 @@ import (
 )
 
 // +genclient
+// +kubebuilder:skipversion
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type ClusterLogging struct {
@@ -32,6 +33,7 @@ func (c *ClusterLogging) ObjClusterName() string {
 }
 
 // +genclient
+// +kubebuilder:skipversion
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type ProjectLogging struct {

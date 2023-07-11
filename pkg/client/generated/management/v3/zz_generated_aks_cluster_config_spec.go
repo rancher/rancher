@@ -24,6 +24,8 @@ const (
 	AKSClusterConfigSpecFieldNetworkPolicy               = "networkPolicy"
 	AKSClusterConfigSpecFieldNetworkServiceCIDR          = "serviceCidr"
 	AKSClusterConfigSpecFieldNodePools                   = "nodePools"
+	AKSClusterConfigSpecFieldNodeResourceGroup           = "nodeResourceGroup"
+	AKSClusterConfigSpecFieldOutboundType                = "outboundType"
 	AKSClusterConfigSpecFieldPrivateCluster              = "privateCluster"
 	AKSClusterConfigSpecFieldResourceGroup               = "resourceGroup"
 	AKSClusterConfigSpecFieldResourceLocation            = "resourceLocation"
@@ -56,6 +58,8 @@ type AKSClusterConfigSpec struct {
 	NetworkPolicy               *string           `json:"networkPolicy,omitempty" yaml:"networkPolicy,omitempty"`
 	NetworkServiceCIDR          *string           `json:"serviceCidr,omitempty" yaml:"serviceCidr,omitempty"`
 	NodePools                   []AKSNodePool     `json:"nodePools,omitempty" yaml:"nodePools,omitempty"`
+	NodeResourceGroup           *string           `json:"nodeResourceGroup,omitempty" yaml:"nodeResourceGroup,omitempty"`
+	OutboundType                *string           `json:"outboundType,omitempty" yaml:"outboundType,omitempty"`
 	PrivateCluster              *bool             `json:"privateCluster,omitempty" yaml:"privateCluster,omitempty"`
 	ResourceGroup               string            `json:"resourceGroup,omitempty" yaml:"resourceGroup,omitempty"`
 	ResourceLocation            string            `json:"resourceLocation,omitempty" yaml:"resourceLocation,omitempty"`

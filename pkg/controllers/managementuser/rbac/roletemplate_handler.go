@@ -2,12 +2,15 @@ package rbac
 
 import (
 	"github.com/pkg/errors"
+	wranglerv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/rbac"
+	"github.com/rancher/wrangler/pkg/relatedresource"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/cache"
 )
 
 func newRTLifecycle(m *manager) v3.RoleTemplateHandlerFunc {
@@ -22,6 +25,17 @@ func newRTLifecycle(m *manager) v3.RoleTemplateHandlerFunc {
 // ClusterRoleTemplateBinding references the roleTemplates. This handler only ensures they remain in-sync after being created
 type rtSync struct {
 	m *manager
+}
+
+func newRTEnqueueFunc(rtIndxer cache.Indexer) relatedresource.Resolver {
+	return (&rtEnqueue{rtIndexer: rtIndxer}).rtRelatedResources
+}
+
+// rtEnqueue is responsible for returning RoleTemplates names that inherit from a changed roletemplate and should be
+// enqueued as a result. This is to ensure those beneficiary roletemplates make the necessary syncs for their own
+// corresponding clusterRoles.
+type rtEnqueue struct {
+	rtIndexer cache.Indexer
 }
 
 func (c *rtSync) sync(key string, obj *v3.RoleTemplate) (runtime.Object, error) {
@@ -133,4 +147,16 @@ func (c *rtSync) syncRT(template *v3.RoleTemplate, usedInProjects bool, prtbs []
 		}
 	}
 	return nil
+}
+
+func (r *rtEnqueue) rtRelatedResources(_, name string, _ runtime.Object) ([]relatedresource.Key, error) {
+	beneficiaryRTs, err := r.rtIndexer.ByIndex(rtByInheritedRTsIndex, name)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]relatedresource.Key, len(beneficiaryRTs))
+	for i, rt := range beneficiaryRTs {
+		result[i] = relatedresource.Key{Name: rt.(*wranglerv3.RoleTemplate).Name}
+	}
+	return result, nil
 }

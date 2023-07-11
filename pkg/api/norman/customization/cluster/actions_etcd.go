@@ -138,6 +138,9 @@ func (a ActionHandler) RestoreFromEtcdBackupHandler(actionName string, action *t
 		cluster.Spec.RancherKubernetesEngineConfig = clusterBackup.Spec.RancherKubernetesEngineConfig
 		cluster.Spec.DefaultPodSecurityPolicyTemplateName = clusterBackup.Spec.DefaultPodSecurityPolicyTemplateName
 		cluster.Spec.DefaultPodSecurityAdmissionConfigurationTemplateName = clusterBackup.Spec.DefaultPodSecurityAdmissionConfigurationTemplateName
+
+		cluster.Spec.ClusterAgentDeploymentCustomization = clusterBackup.Spec.ClusterAgentDeploymentCustomization
+		cluster.Spec.FleetAgentDeploymentCustomization = clusterBackup.Spec.FleetAgentDeploymentCustomization
 	}
 
 	// flag cluster for restore

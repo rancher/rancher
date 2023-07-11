@@ -39,6 +39,7 @@ type NodeGroupConfig struct {
 	LaunchTemplateConfig *LaunchTemplateConfig `json:"launchTemplate,omitempty" yaml:"launchTemplate,omitempty"`
 	MaxSize              *int64                `json:"maxSize,omitempty" yaml:"maxSize,omitempty"`
 	MinSize              *int64                `json:"minSize,omitempty" yaml:"minSize,omitempty"`
+	NodeRole             *string               `json:"nodeRole,omitempty" yaml:"nodeRole,omitempty"`
 	NodegroupName        *string               `json:"nodegroupName,omitempty" yaml:"nodegroupName,omitempty"`
 	RequestSpotInstances *bool                 `json:"requestSpotInstances,omitempty" yaml:"requestSpotInstances,omitempty"`
 	ResourceTags         map[string]string     `json:"resourceTags" yaml:"resourceTags"`
@@ -76,6 +77,7 @@ func nodeGroupsConstructor(nodeGroupsConfig *[]NodeGroupConfig, kubernetesVersio
 			MaxSize:              nodeGroupConfig.MaxSize,
 			MinSize:              nodeGroupConfig.MinSize,
 			NodegroupName:        nodeGroupConfig.NodegroupName,
+			NodeRole:             nodeGroupConfig.NodeRole,
 			RequestSpotInstances: nodeGroupConfig.RequestSpotInstances,
 			ResourceTags:         &nodeGroupConfig.ResourceTags,
 			SpotInstanceTypes:    &nodeGroupConfig.SpotInstanceTypes,

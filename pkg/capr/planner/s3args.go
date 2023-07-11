@@ -51,8 +51,10 @@ func (s *s3Args) ToArgs(s3 *rkev1.ETCDSnapshotS3, controlPlane *rkev1.RKEControl
 		s3Cred s3Credential
 	)
 
+	controlPlaneEtcdS3NotNil := controlPlane.Spec.ETCD != nil && controlPlane.Spec.ETCD.S3 != nil
+
 	credName := s3.CloudCredentialName
-	if credName == "" && controlPlane.Spec.ETCD != nil && controlPlane.Spec.ETCD.S3 != nil {
+	if credName == "" && controlPlaneEtcdS3NotNil {
 		credName = controlPlane.Spec.ETCD.S3.CloudCredentialName
 	}
 
@@ -89,27 +91,31 @@ func (s *s3Args) ToArgs(s3 *rkev1.ETCDSnapshotS3, controlPlane *rkev1.RKEControl
 	}
 	if v := first(s3.EndpointCA, s3Cred.EndpointCA); v != "" {
 		// An etcd s3 snapshot object may have its endpoint CA be the filepath that was used to create the snapshot.
-		// If this is the case, we can reference the filepath.
+		// If this is the case, search the corresponding cloud credential and controlplane S3 spec for the actual CA data,
+		// and use if it exists.
+		// TODO: find a better way to bubble an error to the user that a restore is failing due to a missing endpoint CA file.
 		if v == s3.EndpointCA && strings.HasSuffix(v, ".crt") {
 			args = append(args, fmt.Sprintf("--%ss3-endpoint-ca=%s", prefix, v))
-			// Check to see if the s3Cred.EndpointCA matches the s3.EndpointCA. If it does, use that CA, otherwise,
-			// fallback to just specifying the CA as an argument.
 			if s3Cred.EndpointCA != "" {
-				s3CAName := fmt.Sprintf("s3-endpoint-ca-%s.crt", name.Hex(s3Cred.EndpointCA, 5))
-				filePath := configFile(controlPlane, s3CAName)
-				if filePath == v {
-					// If the filepath of the s3cred endpointCA matches the endpoint CA that was used for the snapshot, go ahead and include the file for posterity
-					files = append(files, plan.File{
-						Content: base64.StdEncoding.EncodeToString([]byte(s3Cred.EndpointCA)),
-						Path:    filePath,
-					})
+				possibleCA := generateEndpointCAFileIfPathMatches(controlPlane, v, s3Cred.EndpointCA)
+				if possibleCA != nil {
+					files = append(files, *possibleCA)
+				}
+			} else if controlPlaneEtcdS3NotNil && controlPlane.Spec.ETCD.S3.EndpointCA != "" {
+				possibleCA := generateEndpointCAFileIfPathMatches(controlPlane, v, controlPlane.Spec.ETCD.S3.EndpointCA)
+				if possibleCA != nil {
+					files = append(files, *possibleCA)
 				}
 			}
 		} else {
+			if _, err := base64.StdEncoding.DecodeString(v); err != nil {
+				// There was an error decoding the endpointCA, indicating that it needs to be encoded.
+				v = base64.StdEncoding.EncodeToString([]byte(v))
+			}
 			s3CAName := fmt.Sprintf("s3-endpoint-ca-%s.crt", name.Hex(v, 5))
 			filePath := configFile(controlPlane, s3CAName)
 			files = append(files, plan.File{
-				Content: base64.StdEncoding.EncodeToString([]byte(v)),
+				Content: v,
 				Path:    filePath,
 			})
 			args = append(args, fmt.Sprintf("--%ss3-endpoint-ca=%s", prefix, filePath))
@@ -122,6 +128,23 @@ func (s *s3Args) ToArgs(s3 *rkev1.ETCDSnapshotS3, controlPlane *rkev1.RKEControl
 	}
 
 	return
+}
+
+func generateEndpointCAFileIfPathMatches(controlPlane *rkev1.RKEControlPlane, existingEndpointCAPath, endpointCA string) *plan.File {
+	s3CAName := fmt.Sprintf("s3-endpoint-ca-%s.crt", name.Hex(endpointCA, 5))
+	filePath := configFile(controlPlane, s3CAName)
+	if existingEndpointCAPath == filePath {
+		// If the filepath of the s3cred endpointCA matches the endpoint CA that was used for the snapshot, go ahead and include the file for posterity
+		if _, err := base64.StdEncoding.DecodeString(endpointCA); err != nil {
+			// There was an error decoding the endpointCA, indicating that it needs to be encoded.
+			endpointCA = base64.StdEncoding.EncodeToString([]byte(endpointCA))
+		}
+		return &plan.File{
+			Content: endpointCA,
+			Path:    filePath,
+		}
+	}
+	return nil
 }
 
 type s3Credential struct {

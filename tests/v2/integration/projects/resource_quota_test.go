@@ -7,12 +7,12 @@ import (
 
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
+	"github.com/rancher/rancher/tests/framework/extensions/defaults"
 	"github.com/rancher/rancher/tests/framework/extensions/kubeapi/resourcequotas"
 	"github.com/rancher/rancher/tests/framework/extensions/namespaces"
 	steveResourceQuotas "github.com/rancher/rancher/tests/framework/extensions/resourcequotas"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
-	"github.com/rancher/rancher/tests/integration/pkg/defaults"
 	"github.com/stretchr/testify/suite"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"

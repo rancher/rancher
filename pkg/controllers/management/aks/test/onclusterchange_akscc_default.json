@@ -47,6 +47,7 @@
     "subnet": null,
     "tags": {},
     "virtualNetwork": null,
-    "virtualNetworkResourceGroup": null
+    "virtualNetworkResourceGroup": null,
+    "outboundType": null
   }
 }

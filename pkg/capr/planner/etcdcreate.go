@@ -4,9 +4,11 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/Masterminds/semver/v3"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/capr"
+	"github.com/rancher/rancher/pkg/controllers/capr/managesystemagent"
 	"github.com/rancher/wrangler/pkg/merr"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -59,12 +61,57 @@ func (p *Planner) runEtcdSnapshotCreate(controlPlane *rkev1.RKEControlPlane, tok
 	return errs
 }
 
+// runEtcdSnapshotManagementServiceStart walks through the reconciliation process for the controlplane and etcd nodes.
+// Notably, this function will blatantly ignore drain and concurrency options, as during an etcd snapshot operation, there is no necessity to drain nodes.
+func (p *Planner) runEtcdSnapshotManagementServiceStart(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, clusterPlan *plan.Plan, include roleFilter, operation string) error {
+	// Generate and deliver desired plan for the bootstrap/init node first.
+	if err := p.reconcile(controlPlane, tokensSecret, clusterPlan, true, bootstrapTier, isEtcd, isNotInitNodeOrIsDeleting,
+		"1", "",
+		controlPlane.Spec.UpgradeStrategy.ControlPlaneDrainOptions); err != nil {
+		return err
+	}
+
+	_, joinServer, _, err := p.findInitNode(controlPlane, clusterPlan)
+	if err != nil {
+		return err
+	}
+
+	if joinServer == "" {
+		return fmt.Errorf("error encountered restarting cluster during %s, joinServer was empty", operation)
+	}
+
+	for _, entry := range collect(clusterPlan, include) {
+		if isInitNodeOrDeleting(entry) {
+			continue
+		}
+		plan, joinedServer, err := p.desiredPlan(controlPlane, tokensSecret, entry, joinServer)
+		if err != nil {
+			return err
+		}
+		if err = assignAndCheckPlan(p.store, fmt.Sprintf("%s management plane restart", operation), entry, plan, joinedServer, 1, -1); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // generateEtcdSnapshotCreatePlan generates a plan that contains an instruction to create an etcd snapshot.
 func (p *Planner) generateEtcdSnapshotCreatePlan(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, entry *planEntry, joinServer string) (plan.NodePlan, string, error) {
+	v, err := semver.NewVersion(controlPlane.Spec.KubernetesVersion)
+	if err != nil {
+		return plan.NodePlan{}, "", err
+	}
+
 	args := []string{
 		"etcd-snapshot",
 	}
-	createPlan, _, joinedServer, err := p.generatePlanWithConfigFiles(controlPlane, tokensSecret, entry, joinServer)
+
+	// Starting in v1.26, we must specify "save" when creating an etcd snapshot
+	if v.GreaterThan(managesystemagent.Kubernetes125) {
+		args = append(args, "save")
+	}
+
+	createPlan, _, joinedServer, err := p.generatePlanWithConfigFiles(controlPlane, tokensSecret, entry, joinServer, true)
 	createPlan.Instructions = append(createPlan.Instructions, p.generateInstallInstructionWithSkipStart(controlPlane, entry),
 		plan.OneTimeInstruction{
 			Name:    "create",

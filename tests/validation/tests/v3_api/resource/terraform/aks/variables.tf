@@ -26,3 +26,7 @@ variable "disk_capacity" {
 variable "cluster_name" {
   default = "testautoaks"
 }
+
+variable "sku_tier" {
+  default = "Paid"
+}

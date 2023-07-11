@@ -62,7 +62,12 @@ func (h *handler) sync(_ string, cluster *apimgmtv3.Cluster) (runtime.Object, er
 		return cluster, err
 	}
 
-	return h.migrateRKESecrets(cluster)
+	cluster, err = h.migrateRKESecrets(cluster)
+	if err != nil {
+		return cluster, err
+	}
+
+	return h.migrateACISecrets(cluster)
 }
 
 type CreateOrUpdateSecretFunc func(secretName string, rkeConfig *rketypes.RancherKubernetesEngineConfig, owner runtime.Object) (*corev1.Secret, error)
@@ -706,6 +711,9 @@ func (h *handler) migrateSecret(cluster *apimgmtv3.Cluster, secretName, secretCl
 }
 
 func (h *handler) migrateClusterSecrets(cluster *apimgmtv3.Cluster) (*apimgmtv3.Cluster, error) {
+	if apimgmtv3.ClusterConditionSecretsMigrated.IsTrue(cluster) {
+		return cluster, nil
+	}
 	clusterCopy := cluster.DeepCopy()
 	var err error
 	obj, doErr := apimgmtv3.ClusterConditionSecretsMigrated.DoUntilTrue(clusterCopy, func() (runtime.Object, error) {
@@ -952,17 +960,10 @@ func (h *handler) migrateClusterSecrets(cluster *apimgmtv3.Cluster) (*apimgmtv3.
 				}
 			}
 		}
-
-		logrus.Tracef("[secretmigrator] setting cluster condition [%s] and updating cluster [%s]", apimgmtv3.ClusterConditionSecretsMigrated, clusterCopy.Name)
-		clusterCopy, err = h.clusters.Update(clusterCopy)
-		if err != nil {
-			return cluster, err
-		}
-		cluster = clusterCopy.DeepCopy()
-		// clusterCopy is returned here since it's value will be passed and fields modified without an update
 		return clusterCopy, err
 	})
 
+	logrus.Tracef("[secretmigrator] setting cluster condition [%s] and updating cluster [%s]", apimgmtv3.ClusterConditionSecretsMigrated, clusterCopy.Name)
 	// this is done for safety, but obj should never be nil as long as the object passed into Do() is not nil
 	clusterCopy, _ = obj.(*apimgmtv3.Cluster)
 	clusterCopy, err = h.clusters.Update(clusterCopy)
@@ -974,6 +975,9 @@ func (h *handler) migrateClusterSecrets(cluster *apimgmtv3.Cluster) (*apimgmtv3.
 }
 
 func (h *handler) migrateServiceAccountSecrets(cluster *apimgmtv3.Cluster) (*apimgmtv3.Cluster, error) {
+	if apimgmtv3.ClusterConditionServiceAccountSecretsMigrated.IsTrue(cluster) {
+		return cluster, nil
+	}
 	clusterCopy := cluster.DeepCopy()
 	obj, doErr := apimgmtv3.ClusterConditionServiceAccountSecretsMigrated.DoUntilTrue(clusterCopy, func() (runtime.Object, error) {
 		// serviceAccountToken
@@ -1000,15 +1004,9 @@ func (h *handler) migrateServiceAccountSecrets(cluster *apimgmtv3.Cluster) (*api
 				cluster = clusterCopy
 			}
 		}
-		logrus.Tracef("[secretmigrator] setting cluster condition [%s] and updating cluster [%s]", apimgmtv3.ClusterConditionServiceAccountSecretsMigrated, clusterCopy.Name)
-		var err error
-		clusterCopy, err = h.clusters.Update(clusterCopy)
-		if err != nil {
-			return cluster, err
-		}
-		cluster = clusterCopy.DeepCopy()
 		return clusterCopy, nil
 	})
+	logrus.Tracef("[secretmigrator] setting cluster condition [%s] and updating cluster [%s]", apimgmtv3.ClusterConditionServiceAccountSecretsMigrated, clusterCopy.Name)
 	// this is done for safety, but obj should never be nil as long as the object passed into DoUntilTrue() is not nil
 	clusterCopy, _ = obj.(*apimgmtv3.Cluster)
 	var err error
@@ -1021,6 +1019,9 @@ func (h *handler) migrateServiceAccountSecrets(cluster *apimgmtv3.Cluster) (*api
 }
 
 func (h *handler) migrateACISecrets(cluster *apimgmtv3.Cluster) (*apimgmtv3.Cluster, error) {
+	if apimgmtv3.ClusterConditionACISecretsMigrated.IsTrue(cluster) {
+		return cluster, nil
+	}
 	clusterCopy := cluster.DeepCopy()
 	obj, doErr := apimgmtv3.ClusterConditionACISecretsMigrated.DoUntilTrue(clusterCopy, func() (runtime.Object, error) {
 		// aci apic user key
@@ -1035,10 +1036,10 @@ func (h *handler) migrateACISecrets(cluster *apimgmtv3.Cluster) (*apimgmtv3.Clus
 				logrus.Tracef("[secretmigrator] aci apic user key secret found for cluster %s", clusterCopy.Name)
 				clusterCopy.Spec.ClusterSecrets.ACIAPICUserKeySecret = aciUserKeySecret.Name
 				clusterCopy.Spec.RancherKubernetesEngineConfig.Network.AciNetworkProvider.ApicUserKey = ""
-				if clusterCopy.Status.AppliedSpec.RancherKubernetesEngineConfig != nil {
+				if clusterCopy.Status.AppliedSpec.RancherKubernetesEngineConfig != nil && clusterCopy.Status.AppliedSpec.RancherKubernetesEngineConfig.Network.AciNetworkProvider != nil {
 					clusterCopy.Status.AppliedSpec.RancherKubernetesEngineConfig.Network.AciNetworkProvider.ApicUserKey = ""
 				}
-				if clusterCopy.Status.FailedSpec != nil && clusterCopy.Status.FailedSpec.RancherKubernetesEngineConfig != nil {
+				if clusterCopy.Status.FailedSpec != nil && clusterCopy.Status.FailedSpec.RancherKubernetesEngineConfig != nil && clusterCopy.Status.FailedSpec.RancherKubernetesEngineConfig.Network.AciNetworkProvider != nil {
 					clusterCopy.Status.FailedSpec.RancherKubernetesEngineConfig.Network.AciNetworkProvider.ApicUserKey = ""
 				}
 				clusterCopy, err = h.clusters.Update(clusterCopy)
@@ -1066,10 +1067,10 @@ func (h *handler) migrateACISecrets(cluster *apimgmtv3.Cluster) (*apimgmtv3.Clus
 				logrus.Tracef("[secretmigrator] aci token secret found for cluster %s", clusterCopy.Name)
 				clusterCopy.Spec.ClusterSecrets.ACITokenSecret = aciTokenSecret.Name
 				clusterCopy.Spec.RancherKubernetesEngineConfig.Network.AciNetworkProvider.Token = ""
-				if clusterCopy.Status.AppliedSpec.RancherKubernetesEngineConfig != nil {
+				if clusterCopy.Status.AppliedSpec.RancherKubernetesEngineConfig != nil && clusterCopy.Status.AppliedSpec.RancherKubernetesEngineConfig.Network.AciNetworkProvider != nil {
 					clusterCopy.Status.AppliedSpec.RancherKubernetesEngineConfig.Network.AciNetworkProvider.Token = ""
 				}
-				if clusterCopy.Status.FailedSpec != nil && clusterCopy.Status.FailedSpec.RancherKubernetesEngineConfig != nil {
+				if clusterCopy.Status.FailedSpec != nil && clusterCopy.Status.FailedSpec.RancherKubernetesEngineConfig != nil && clusterCopy.Status.FailedSpec.RancherKubernetesEngineConfig.Network.AciNetworkProvider != nil {
 					clusterCopy.Status.FailedSpec.RancherKubernetesEngineConfig.Network.AciNetworkProvider.Token = ""
 				}
 				clusterCopy, err = h.clusters.Update(clusterCopy)
@@ -1097,10 +1098,10 @@ func (h *handler) migrateACISecrets(cluster *apimgmtv3.Cluster) (*apimgmtv3.Clus
 				logrus.Tracef("[secretmigrator] aci kafka client key secret found for cluster %s", clusterCopy.Name)
 				clusterCopy.Spec.ClusterSecrets.ACIKafkaClientKeySecret = aciKafkaClientKeySecret.Name
 				clusterCopy.Spec.RancherKubernetesEngineConfig.Network.AciNetworkProvider.KafkaClientKey = ""
-				if clusterCopy.Status.AppliedSpec.RancherKubernetesEngineConfig != nil {
+				if clusterCopy.Status.AppliedSpec.RancherKubernetesEngineConfig != nil && clusterCopy.Status.AppliedSpec.RancherKubernetesEngineConfig.Network.AciNetworkProvider != nil {
 					clusterCopy.Status.AppliedSpec.RancherKubernetesEngineConfig.Network.AciNetworkProvider.KafkaClientKey = ""
 				}
-				if clusterCopy.Status.FailedSpec != nil && clusterCopy.Status.FailedSpec.RancherKubernetesEngineConfig != nil {
+				if clusterCopy.Status.FailedSpec != nil && clusterCopy.Status.FailedSpec.RancherKubernetesEngineConfig != nil && clusterCopy.Status.FailedSpec.RancherKubernetesEngineConfig.Network.AciNetworkProvider != nil {
 					clusterCopy.Status.FailedSpec.RancherKubernetesEngineConfig.Network.AciNetworkProvider.KafkaClientKey = ""
 				}
 				clusterCopy, err = h.clusters.Update(clusterCopy)
@@ -1115,15 +1116,9 @@ func (h *handler) migrateACISecrets(cluster *apimgmtv3.Cluster) (*apimgmtv3.Clus
 				cluster = clusterCopy
 			}
 		}
-		logrus.Tracef("[secretmigrator] setting cluster condition [%s] and updating cluster [%s]", apimgmtv3.ClusterConditionACISecretsMigrated, clusterCopy.Name)
-		var err error
-		clusterCopy, err = h.clusters.Update(clusterCopy)
-		if err != nil {
-			return cluster, err
-		}
-		cluster = clusterCopy.DeepCopy()
 		return clusterCopy, nil
 	})
+	logrus.Tracef("[secretmigrator] setting cluster condition [%s] and updating cluster [%s]", apimgmtv3.ClusterConditionACISecretsMigrated, clusterCopy.Name)
 	// this is done for safety, but obj should never be nil as long as the object passed into Do() is not nil
 	clusterCopy, _ = obj.(*apimgmtv3.Cluster)
 	var err error
@@ -1136,6 +1131,9 @@ func (h *handler) migrateACISecrets(cluster *apimgmtv3.Cluster) (*apimgmtv3.Clus
 }
 
 func (h *handler) migrateRKESecrets(cluster *apimgmtv3.Cluster) (*apimgmtv3.Cluster, error) {
+	if apimgmtv3.ClusterConditionRKESecretsMigrated.IsTrue(cluster) {
+		return cluster, nil
+	}
 	clusterCopy := cluster.DeepCopy()
 	var err error
 	obj, doErr := apimgmtv3.ClusterConditionRKESecretsMigrated.DoUntilTrue(clusterCopy, func() (runtime.Object, error) {
@@ -1203,14 +1201,9 @@ func (h *handler) migrateRKESecrets(cluster *apimgmtv3.Cluster) (*apimgmtv3.Clus
 		}
 		cluster = clusterCopy
 
-		logrus.Tracef("[secretmigrator] setting cluster condition [%s] and updating cluster [%s]", apimgmtv3.ClusterConditionRKESecretsMigrated, clusterCopy.Name)
-		clusterCopy, err = h.clusters.Update(clusterCopy)
-		if err != nil {
-			return cluster, err
-		}
-		cluster = clusterCopy.DeepCopy()
 		return clusterCopy, nil
 	})
+	logrus.Tracef("[secretmigrator] setting cluster condition [%s] and updating cluster [%s]", apimgmtv3.ClusterConditionRKESecretsMigrated, clusterCopy.Name)
 	// this is done for safety, but obj should never be nil as long as the object passed into Do() is not nil
 	clusterCopy, _ = obj.(*apimgmtv3.Cluster)
 	clusterCopy, err = h.clusters.Update(clusterCopy)

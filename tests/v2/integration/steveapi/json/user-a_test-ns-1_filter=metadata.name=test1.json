@@ -17,6 +17,9 @@
         "view": "https://rancherurl/api/v1/namespaces/test-ns-1/secrets/test1"
       },
       "metadata": {
+        "labels": {
+          "test.cattle.io/steveapi": "nondeterministicid"
+        },
         "name": "test1",
         "namespace": "test-ns-1",
         "resourceVersion": "1000",

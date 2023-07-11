@@ -1,9 +1,9 @@
 package planner
 
 import (
-	"encoding/base64"
 	"fmt"
 	"strconv"
+	"strings"
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
@@ -27,10 +27,6 @@ func (p *Planner) rotateCertificates(controlPlane *rkev1.RKEControlPlane, status
 		return status, nil
 	}
 
-	if err := p.pauseCAPICluster(controlPlane, true); err != nil {
-		return status, errWaiting("pausing CAPI cluster")
-	}
-
 	for _, node := range collect(clusterPlan, anyRole) {
 		if !shouldRotateEntry(controlPlane.Spec.RotateCertificates, node) {
 			continue
@@ -43,6 +39,10 @@ func (p *Planner) rotateCertificates(controlPlane *rkev1.RKEControlPlane, status
 
 		err = assignAndCheckPlan(p.store, fmt.Sprintf("[%s] certificate rotation", node.Machine.Name), node, rotatePlan, joinedServer, 0, 0)
 		if err != nil {
+			// Ensure the CAPI cluster is paused if we have assigned and are checking a plan.
+			if pauseErr := p.pauseCAPICluster(controlPlane, true); pauseErr != nil {
+				return status, pauseErr
+			}
 			return status, err
 		}
 	}
@@ -72,30 +72,6 @@ func shouldRotate(cp *rkev1.RKEControlPlane) bool {
 	return cp.Status.CertificateRotationGeneration != cp.Spec.RotateCertificates.Generation
 }
 
-const idempotentRotateScript = `
-#!/bin/sh
-
-currentGeneration=""
-targetGeneration=$2
-runtime=$1
-shift
-shift
-
-dataRoot="/var/lib/rancher/$runtime/certificate_rotation"
-generationFile="$dataRoot/generation"
-
-currentGeneration=$(cat "$generationFile" || echo "")
-
-if [ "$currentGeneration" != "$targetGeneration" ]; then
-  $runtime certificate rotate  $@
-else
-	echo "certificates have already been rotated to the current generation."
-fi
-
-mkdir -p $dataRoot
-echo $targetGeneration > "$generationFile"
-`
-
 // rotateCertificatesPlan rotates the certificates for the services specified, if any, and restarts the service.  If no services are specified
 // all certificates are rotated.
 func (p *Planner) rotateCertificatesPlan(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, rotation *rkev1.RotateCertificates, entry *planEntry, joinServer string) (plan.NodePlan, string, error) {
@@ -103,30 +79,19 @@ func (p *Planner) rotateCertificatesPlan(controlPlane *rkev1.RKEControlPlane, to
 		// Don't overwrite the joinURL annotation.
 		joinServer = ""
 	}
-	rotatePlan, _, joinedServer, err := p.generatePlanWithConfigFiles(controlPlane, tokensSecret, entry, joinServer)
+	rotatePlan, config, joinedServer, err := p.generatePlanWithConfigFiles(controlPlane, tokensSecret, entry, joinServer, true)
 	if err != nil {
 		return plan.NodePlan{}, joinedServer, err
 	}
 
 	if isOnlyWorker(entry) {
-		rotatePlan.Instructions = append(rotatePlan.Instructions, plan.OneTimeInstruction{
-			Name:    "restart",
-			Command: "systemctl",
-			Args: []string{
-				"restart",
-				capr.GetRuntimeAgentUnit(controlPlane.Spec.KubernetesVersion),
-			},
-		})
+		rotatePlan.Instructions = append(rotatePlan.Instructions, idempotentRestartInstructions("certificate-rotation/restart", strconv.FormatInt(rotation.Generation, 10), capr.GetRuntimeAgentUnit(controlPlane.Spec.KubernetesVersion))...)
 		return rotatePlan, joinedServer, nil
 	}
 
-	rotateScriptPath := "/var/lib/rancher/" + capr.GetRuntime(controlPlane.Spec.KubernetesVersion) + "/rancher_v2prov_certificate_rotation/bin/rotate.sh"
-
 	args := []string{
-		"-xe",
-		rotateScriptPath,
-		capr.GetRuntime(controlPlane.Spec.KubernetesVersion),
-		strconv.FormatInt(rotation.Generation, 10),
+		"certificate",
+		"rotate",
 	}
 
 	if len(rotation.Services) > 0 {
@@ -135,25 +100,117 @@ func (p *Planner) rotateCertificatesPlan(controlPlane *rkev1.RKEControlPlane, to
 		}
 	}
 
-	rotatePlan.Files = append(rotatePlan.Files, plan.File{
-		Content: base64.StdEncoding.EncodeToString([]byte(idempotentRotateScript)),
-		Path:    rotateScriptPath,
-	})
-	rotatePlan.Instructions = append(rotatePlan.Instructions, []plan.OneTimeInstruction{
-		{
-			Name:    "rotate certificates",
-			Command: "sh",
-			Args:    args,
-		},
-		{
-			Name:    "restart",
-			Command: "systemctl",
-			Args: []string{
-				"restart",
-				capr.GetRuntimeServerUnit(controlPlane.Spec.KubernetesVersion),
-			},
-		}}...)
+	runtime := capr.GetRuntime(controlPlane.Spec.KubernetesVersion)
+
+	rotatePlan.Instructions = append(rotatePlan.Instructions, idempotentInstruction(
+		"certificate-rotation/rotate",
+		strconv.FormatInt(rotation.Generation, 10),
+		capr.GetRuntime(controlPlane.Spec.KubernetesVersion),
+		args,
+		[]string{},
+	))
+	if isControlPlane(entry) {
+		// The following kube-scheduler and kube-controller-manager certificates are self-signed by the respective services and are used by CAPR for secure healthz probes against the service.
+		if rotationContainsService(rotation, "controller-manager") {
+			if kcmCertDir := getArgValue(config[KubeControllerManagerArg], CertDirArgument, "="); kcmCertDir != "" && getArgValue(config[KubeControllerManagerArg], TLSCertFileArgument, "=") == "" {
+				rotatePlan.Instructions = append(rotatePlan.Instructions, []plan.OneTimeInstruction{
+					idempotentInstruction(
+						"certificate-rotation/rm-kcm-cert",
+						strconv.FormatInt(rotation.Generation, 10),
+						"rm",
+						[]string{
+							"-f",
+							fmt.Sprintf("%s/%s", kcmCertDir, DefaultKubeControllerManagerCert),
+						},
+						[]string{},
+					),
+					idempotentInstruction(
+						"certificate-rotation/rm-kcm-key",
+						strconv.FormatInt(rotation.Generation, 10),
+						"rm",
+						[]string{
+							"-f",
+							fmt.Sprintf("%s/%s", kcmCertDir, strings.ReplaceAll(DefaultKubeControllerManagerCert, ".crt", ".key")),
+						},
+						[]string{},
+					),
+				}...)
+				if runtime == capr.RuntimeRKE2 {
+					rotatePlan.Instructions = append(rotatePlan.Instructions, idempotentInstruction(
+						"certificate-rotation/rm-kcm-spm",
+						strconv.FormatInt(rotation.Generation, 10),
+						"rm",
+						[]string{
+							"-f",
+							"/var/lib/rancher/rke2/agent/pod-manifests/kube-controller-manager.yaml",
+						},
+						[]string{},
+					))
+				}
+			}
+		}
+		if rotationContainsService(rotation, "scheduler") {
+			if ksCertDir := getArgValue(config[KubeSchedulerArg], CertDirArgument, "="); ksCertDir != "" && getArgValue(config[KubeSchedulerArg], TLSCertFileArgument, "=") == "" {
+				rotatePlan.Instructions = append(rotatePlan.Instructions, []plan.OneTimeInstruction{
+					idempotentInstruction(
+						"certificate-rotation/rm-ks-cert",
+						strconv.FormatInt(rotation.Generation, 10),
+						"rm",
+						[]string{
+							"-f",
+							fmt.Sprintf("%s/%s", ksCertDir, DefaultKubeSchedulerCert),
+						},
+						[]string{},
+					),
+					idempotentInstruction(
+						"certificate-rotation/rm-ks-key",
+						strconv.FormatInt(rotation.Generation, 10),
+						"rm",
+						[]string{
+							"-f",
+							fmt.Sprintf("%s/%s", ksCertDir, strings.ReplaceAll(DefaultKubeSchedulerCert, ".crt", ".key")),
+						},
+						[]string{},
+					),
+				}...)
+				if runtime == capr.RuntimeRKE2 {
+					rotatePlan.Instructions = append(rotatePlan.Instructions, idempotentInstruction(
+						"certificate-rotation/rm-ks-spm",
+						strconv.FormatInt(rotation.Generation, 10),
+						"rm",
+						[]string{
+							"-f",
+							"/var/lib/rancher/rke2/agent/pod-manifests/kube-scheduler.yaml",
+						},
+						[]string{},
+					))
+				}
+			}
+		}
+	}
+	if runtime == capr.RuntimeRKE2 {
+		if generated, instruction := generateManifestRemovalInstruction(runtime, entry); generated {
+			rotatePlan.Instructions = append(rotatePlan.Instructions, convertToIdempotentInstruction("certificate-rotation/manifest-removal", strconv.FormatInt(rotation.Generation, 10), instruction))
+		}
+	}
+	rotatePlan.Instructions = append(rotatePlan.Instructions, idempotentRestartInstructions("certificate-rotation/restart", strconv.FormatInt(rotation.Generation, 10), capr.GetRuntimeServerUnit(controlPlane.Spec.KubernetesVersion))...)
 	return rotatePlan, joinedServer, nil
+}
+
+// rotationContainsService searches the rotation.Services slice the specified service. If the length of the services slice is 0, it returns true.
+func rotationContainsService(rotation *rkev1.RotateCertificates, service string) bool {
+	if rotation == nil {
+		return false
+	}
+	if len(rotation.Services) == 0 {
+		return true
+	}
+	for _, desiredService := range rotation.Services {
+		if desiredService == service {
+			return true
+		}
+	}
+	return false
 }
 
 // shouldRotateEntry returns true if the rotated services are applicable to the entry's roles.

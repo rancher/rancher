@@ -18,9 +18,9 @@ func UpdateRancherDownstreamClusterFields(cluster *RancherCluster, isCustom, isR
 	UpdateProviderField(cluster.Provider, isCustom)
 
 	if isRKE1 {
-		UpdateRKE1ImageFields(cluster.Provider, cluster.Image, cluster.SSHUser, isCustom)
+		UpdateRKE1ImageFields(cluster.Provider, cluster.Image, cluster.SSHUser, cluster.VolumeType, isCustom)
 	} else {
-		UpdateRKE2ImageFields(cluster.Provider, cluster.Image, cluster.SSHUser, isCustom)
+		UpdateRKE2ImageFields(cluster.Provider, cluster.Image, cluster.SSHUser, cluster.VolumeType, isCustom)
 	}
 }
 
@@ -63,7 +63,7 @@ func UpdateProviderField(provider string, isCustom bool) {
 
 // UpdateRKE1ImageFields is function that updates the cattle config's node template ssh and image fields
 // depending on the provider type.
-func UpdateRKE1ImageFields(provider, image, sshUser string, isCustom bool) {
+func UpdateRKE1ImageFields(provider, image, sshUser, volumeType string, isCustom bool) {
 	switch provider {
 	case provisioning.AWSProviderName.String():
 		if !isCustom {
@@ -71,6 +71,7 @@ func UpdateRKE1ImageFields(provider, image, sshUser string, isCustom bool) {
 			config.LoadAndUpdateConfig(nodetemplates.AmazonEC2NodeTemplateConfigurationFileKey, nodeTemplate, func() {
 				nodeTemplate.AMI = image
 				nodeTemplate.SSHUser = sshUser
+				nodeTemplate.VolumeType = volumeType
 			})
 		} else {
 			ec2Configs := new(ec2.AWSEC2Configs)
@@ -106,7 +107,7 @@ func UpdateRKE1ImageFields(provider, image, sshUser string, isCustom bool) {
 
 // UpdateRKE2ImageFields is function that updates the cattle config's node template ssh and image fields
 // depending on the provider type.
-func UpdateRKE2ImageFields(provider, image, sshUser string, isCustom bool) {
+func UpdateRKE2ImageFields(provider, image, sshUser, volumeType string, isCustom bool) {
 	switch provider {
 	case provisioning.AWSProviderName.String():
 		if !isCustom {
@@ -114,6 +115,7 @@ func UpdateRKE2ImageFields(provider, image, sshUser string, isCustom bool) {
 			config.LoadAndUpdateConfig(machinepools.AWSMachineConfigConfigurationFileKey, machineConfig, func() {
 				machineConfig.AMI = image
 				machineConfig.SSHUser = sshUser
+				machineConfig.VolumeType = volumeType
 			})
 		} else {
 			ec2Configs := new(ec2.AWSEC2Configs)

@@ -12,7 +12,8 @@ Please see below for more details for your config.
 3. [Cloud Credential](#cloud-credentials)
 4. [Configure providers to use for Node Driver Clusters](#machine-k3s-config)
 5. [Configuring Custom Clusters](#custom-cluster)
-6. [Back to general provisioning](../README.md)
+6. [Advanced Cluster Settings](#advanced-settings)
+7. [Back to general provisioning](../README.md)
 
 ## Provisioning Input
 provisioningInput is needed to the run the K3S tests, specifically kubernetesVersion and providers. nodesAndRoles is only needed for the TestProvisioningDynamicInput test, node pools are divided by "{nodepool},". psact is optional and takes values `rancher-privileged` and `rancher-restricted` only.
@@ -21,17 +22,17 @@ provisioningInput is needed to the run the K3S tests, specifically kubernetesVer
 
 ```json
 "provisioningInput": {
+    // for custom clusters, len(nodesAndRoles) should be equal to len(awsEc2Config)
     "nodesAndRoles": [
       {
         "etcd": true,
         "controlplane": true,
-        "worker": true,
         "quantity": 1,
       },
       {
         "worker": true,
-        "quantity": 1,
-      }
+        "quantity": 2,
+      },
     ],
     "k3sKubernetesVersion": ["v1.24.4+k3s1"],
     "providers": ["linode", "aws", "azure", "harvester"],
@@ -197,22 +198,103 @@ Machine K3S config is the final piece needed for the config to run K3S provision
 ```
 
 ## Custom Cluster
-For custom clusters, the below config is needed, only AWS/EC2 will work.
-**Ensure you have nodeProviders in provisioningInput**
+For custom clusters, no machineConfig or credentials are needed. Currently only supported for ec2.
+
+Dependencies:
+* **Ensure you have nodeProviders in provisioningInput**
+* make sure that all roles are entered at least once
+* windows pool(s) should always be last in the config
+```json
+{
+  "awsEC2Configs": {
+    "region": "us-east-2",
+    "awsSecretAccessKey": "",
+    "awsAccessKeyID": "",
+    "awsEC2Config": [
+      {
+        "instanceType": "t3a.medium",
+        "awsRegionAZ": "",
+        "awsAMI": "",
+        "awsSecurityGroups": [
+          ""
+        ],
+        "awsSSHKeyName": "",
+        "awsCICDInstanceTag": "rancher-validation",
+        "awsIAMProfile": "",
+        "awsUser": "ubuntu",
+        "volumeSize": 25,
+        "roles": ["worker"]
+      },
+      {
+        "instanceType": "t3a.large",
+        "awsRegionAZ": "",
+        "awsAMI": "",
+        "awsSecurityGroups": [
+          ""
+        ],
+        "awsSSHKeyName": "",
+        "awsCICDInstanceTag": "rancher-validation",
+        "awsIAMProfile": "",
+        "awsUser": "ubuntu",
+        "volumeSize": 25,
+        "roles": ["etcd", "contolplane"]
+      },
+    ]
+  }
+}
+```
+
+## Advanced Settings
+This encapsulates any other setting that is applied in the cluster.spec. Currently we have support for:
+* cluster agent customization 
+* fleet agent customization
+
+Please read up on general k8s to get an idea of correct formatting for:
+* resource requests
+* resource limits
+* node affinity
+* tolerations
 
 ```json
- "awsEC2Config": {
-    "region": "us-east-2",
-    "instanceType": "t3a.medium",
-    "awsRegionAZ": "",
-    "awsAMI": "",
-    "awsSecurityGroups": [""],
-    "awsAccessKeyID": "",
-    "awsSecretAccessKey": "",
-    "awsSSHKeyName": "",
-    "awsCICDInstanceTag": "",
-    "awsIAMProfile": "",
-    "awsUser": "ubuntu",
-    "volumeSize": 50
-  },
+"advancedOptions": {
+    "clusterAgentCustomization": { // change this to fleetAgentCustomization for fleet agent
+        "appendTolerations": [
+            {
+                "key": "Testkey",
+                "value": "testValue",
+                "effect": "NoSchedule"
+            }
+        ],
+        "overrideResourceRequirements": {
+            "limits": {
+                "cpu": "750m",
+                "memory": "500Mi"
+            },
+            "requests": {
+                "cpu": "250m",
+                "memory": "250Mi"
+            }
+        },
+        "overrideAffinity": {
+            "nodeAffinity": {
+                "preferredDuringSchedulingIgnoredDuringExecution": [
+                    {
+                        "preference": {
+                            "matchExpressions": [
+                                {
+                                    "key": "cattle.io/cluster-agent",
+                                    "operator": "In",
+                                    "values": [
+                                        "true"
+                                    ]
+                                }
+                            ]
+                        },
+                        "weight": 1
+                    }
+                ]
+            }
+        }
+    }
+}
 ```

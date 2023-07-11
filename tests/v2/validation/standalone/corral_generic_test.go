@@ -32,8 +32,8 @@ func (r *CorralStandaloneTestSuite) SetupSuite() {
 func (r *CorralStandaloneTestSuite) TestGenericCorralPackage() {
 	corralPackage := corral.CorralPackagesConfig()
 	// Expecting in the future, we will be mainly running from publically available corral images
-	if corralPackage.CustomRepo != "" {
-		err := corral.SetCustomRepo(corralPackage.CustomRepo)
+	if corralPackage.HasCustomRepo != "" {
+		err := corral.SetCustomRepo(corralPackage.HasCustomRepo)
 		require.Nil(r.T(), err, "error setting remote repo")
 	}
 	newPackages := []string{}
@@ -43,7 +43,7 @@ func (r *CorralStandaloneTestSuite) TestGenericCorralPackage() {
 	for packageName, packageImage := range corralPackage.CorralPackageImages {
 		newPackageName := namegen.AppendRandomString(packageName)
 		newPackages = append(newPackages, newPackageName)
-		corralRun, err := corral.CreateCorral(r.session, newPackageName, packageImage, corralPackage.Debug, corralPackage.Cleanup)
+		corralRun, err := corral.CreateCorral(r.session, newPackageName, packageImage, corralPackage.HasDebug, corralPackage.HasDebug)
 		require.NoError(r.T(), err, "error creating corral %v", packageName)
 		r.T().Logf("Corral %v created successfully", packageName)
 		require.NotNil(r.T(), corralRun, "corral run had no restConfig")

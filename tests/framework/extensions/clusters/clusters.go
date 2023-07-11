@@ -16,11 +16,13 @@ import (
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
+	"github.com/rancher/rancher/tests/framework/extensions/defaults"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
-	"github.com/rancher/rancher/tests/integration/pkg/defaults"
+	rancherProvisioning "github.com/rancher/rancher/tests/v2/validation/provisioning"
 	"github.com/rancher/wrangler/pkg/summary"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	kwait "k8s.io/apimachinery/pkg/util/wait"
@@ -28,8 +30,8 @@ import (
 )
 
 const (
-	ProvisioningSteveResouceType = "provisioning.cattle.io.cluster"
-	FleetSteveResourceType       = "fleet.cattle.io.cluster"
+	ProvisioningSteveResourceType = "provisioning.cattle.io.cluster"
+	FleetSteveResourceType        = "fleet.cattle.io.cluster"
 )
 
 // GetClusterIDByName is a helper function that returns the cluster ID by name
@@ -99,7 +101,7 @@ func IsHostedProvisioningClusterReady(event watch.Event) (ready bool, err error)
 	return false, nil
 }
 
-// Verify if a serviceAccountTokenSecret exists or not in the cluster.
+// CheckServiceAccountTokenSecret verifies if a serviceAccountTokenSecret exists or not in the cluster.
 func CheckServiceAccountTokenSecret(client *rancher.Client, clusterName string) (success bool, err error) {
 	clusterID, err := GetClusterIDByName(client, clusterName)
 	if err != nil {
@@ -121,7 +123,7 @@ func CheckServiceAccountTokenSecret(client *rancher.Client, clusterName string) 
 }
 
 // NewRKE1lusterConfig is a constructor for a v3.Cluster object, to be used by the rancher.Client.Provisioning client.
-func NewRKE1ClusterConfig(clusterName, cni, kubernetesVersion string, psact string, client *rancher.Client) *management.Cluster {
+func NewRKE1ClusterConfig(clusterName, cni, kubernetesVersion string, psact string, client *rancher.Client, advancedOptions rancherProvisioning.AdvancedOptions) *management.Cluster {
 	clusterConfig := &management.Cluster{
 		DockerRootDir:           "/var/lib/docker",
 		EnableClusterAlerting:   false,
@@ -144,12 +146,15 @@ func NewRKE1ClusterConfig(clusterName, cni, kubernetesVersion string, psact stri
 				Provider: "metrics-server",
 			},
 			Network: &management.NetworkConfig{
+				Plugin:  cni,
 				MTU:     0,
 				Options: map[string]string{},
 			},
 			Version: kubernetesVersion,
 		},
 	}
+	clusterConfig.ClusterAgentDeploymentCustomization = &advancedOptions.ClusterAgentCustomization
+	clusterConfig.FleetAgentDeploymentCustomization = &advancedOptions.FleetAgentCustomization
 
 	if psact != "" {
 		clusterConfig.DefaultPodSecurityAdmissionConfigurationTemplateName = psact
@@ -159,7 +164,7 @@ func NewRKE1ClusterConfig(clusterName, cni, kubernetesVersion string, psact stri
 }
 
 // NewK3SRKE2ClusterConfig is a constructor for a apisV1.Cluster object, to be used by the rancher.Client.Provisioning client.
-func NewK3SRKE2ClusterConfig(clusterName, namespace, cni, cloudCredentialSecretName, kubernetesVersion string, psact string, machinePools []apisV1.RKEMachinePool) *apisV1.Cluster {
+func NewK3SRKE2ClusterConfig(clusterName, namespace, cni, cloudCredentialSecretName, kubernetesVersion string, psact string, machinePools []apisV1.RKEMachinePool, advancedOptions rancherProvisioning.AdvancedOptions) *apisV1.Cluster {
 	typeMeta := metav1.TypeMeta{
 		Kind:       "Cluster",
 		APIVersion: "provisioning.cattle.io/v1",
@@ -201,6 +206,47 @@ func NewK3SRKE2ClusterConfig(clusterName, namespace, cni, cloudCredentialSecretN
 		WorkerConcurrency:        "10%",
 		WorkerDrainOptions:       rkev1.DrainOptions{},
 	}
+	clusterAgentDeploymentCustomization := &apisV1.AgentDeploymentCustomization{}
+	if advancedOptions.ClusterAgentCustomization.OverrideResourceRequirements != nil {
+		clusterAgentOverrides := ResourceConfigHelper(advancedOptions.ClusterAgentCustomization.OverrideResourceRequirements)
+		clusterAgentDeploymentCustomization.OverrideResourceRequirements = clusterAgentOverrides
+	}
+	if advancedOptions.ClusterAgentCustomization.AppendTolerations != nil {
+		v1ClusterTolerations := []corev1.Toleration{}
+		for _, t := range advancedOptions.ClusterAgentCustomization.AppendTolerations {
+			v1ClusterTolerations = append(v1ClusterTolerations, corev1.Toleration{
+				Key:      t.Key,
+				Operator: corev1.TolerationOperator(t.Operator),
+				Value:    t.Value,
+				Effect:   corev1.TaintEffect(t.Effect),
+			})
+		}
+		clusterAgentDeploymentCustomization.AppendTolerations = v1ClusterTolerations
+	}
+	if advancedOptions.ClusterAgentCustomization.OverrideAffinity != nil {
+		clusterAgentDeploymentCustomization.OverrideAffinity = AgentAffinityConfigHelper(advancedOptions.ClusterAgentCustomization.OverrideAffinity)
+	}
+
+	fleetAgentDeploymentCustomization := &apisV1.AgentDeploymentCustomization{}
+	if advancedOptions.FleetAgentCustomization.OverrideResourceRequirements != nil {
+		fleetAgentOverrides := ResourceConfigHelper(advancedOptions.FleetAgentCustomization.OverrideResourceRequirements)
+		fleetAgentDeploymentCustomization.OverrideResourceRequirements = fleetAgentOverrides
+	}
+	if advancedOptions.FleetAgentCustomization.AppendTolerations != nil {
+		v1FleetTolerations := []corev1.Toleration{}
+		for _, t := range advancedOptions.FleetAgentCustomization.AppendTolerations {
+			v1FleetTolerations = append(v1FleetTolerations, corev1.Toleration{
+				Key:      t.Key,
+				Operator: corev1.TolerationOperator(t.Operator),
+				Value:    t.Value,
+				Effect:   corev1.TaintEffect(t.Effect),
+			})
+		}
+		fleetAgentDeploymentCustomization.AppendTolerations = v1FleetTolerations
+	}
+	if advancedOptions.FleetAgentCustomization.OverrideAffinity != nil {
+		fleetAgentDeploymentCustomization.OverrideAffinity = AgentAffinityConfigHelper(advancedOptions.FleetAgentCustomization.OverrideAffinity)
+	}
 
 	rkeSpecCommon := rkev1.RKEClusterSpecCommon{
 		ChartValues:           chartValuesMap,
@@ -209,17 +255,18 @@ func NewK3SRKE2ClusterConfig(clusterName, namespace, cni, cloudCredentialSecretN
 		UpgradeStrategy:       upgradeStrategy,
 		MachineSelectorConfig: []rkev1.RKESystemConfig{},
 	}
-
 	rkeConfig := &apisV1.RKEConfig{
 		RKEClusterSpecCommon: rkeSpecCommon,
 		MachinePools:         machinePools,
 	}
 
 	spec := apisV1.ClusterSpec{
-		CloudCredentialSecretName: cloudCredentialSecretName,
-		KubernetesVersion:         kubernetesVersion,
-		LocalClusterAuthEndpoint:  localClusterAuthEndpoint,
-		RKEConfig:                 rkeConfig,
+		CloudCredentialSecretName:           cloudCredentialSecretName,
+		KubernetesVersion:                   kubernetesVersion,
+		LocalClusterAuthEndpoint:            localClusterAuthEndpoint,
+		RKEConfig:                           rkeConfig,
+		ClusterAgentDeploymentCustomization: clusterAgentDeploymentCustomization,
+		FleetAgentDeploymentCustomization:   fleetAgentDeploymentCustomization,
 	}
 
 	if psact != "" {
@@ -235,9 +282,301 @@ func NewK3SRKE2ClusterConfig(clusterName, namespace, cni, cloudCredentialSecretN
 	return v1Cluster
 }
 
+// ResourceConfigHelper is a "helper" function that is used to convert the management.ResourceRequirements struct
+// to a corev1.ResourceRequirements struct.
+func ResourceConfigHelper(advancedClusterResourceRequirements *management.ResourceRequirements) *corev1.ResourceRequirements {
+	agentOverrides := corev1.ResourceRequirements{}
+	agentOverrides.Limits = corev1.ResourceList{}
+	agentOverrides.Requests = corev1.ResourceList{}
+	if advancedClusterResourceRequirements.Limits[string(corev1.ResourceCPU)] != "" {
+		agentOverrides.Limits[corev1.ResourceCPU] = resource.MustParse(advancedClusterResourceRequirements.Limits[string(corev1.ResourceCPU)])
+	}
+	if advancedClusterResourceRequirements.Limits[string(corev1.ResourceMemory)] != "" {
+		agentOverrides.Limits[corev1.ResourceMemory] = resource.MustParse(advancedClusterResourceRequirements.Limits[string(corev1.ResourceMemory)])
+	}
+	if advancedClusterResourceRequirements.Requests[string(corev1.ResourceCPU)] != "" {
+		agentOverrides.Requests[corev1.ResourceCPU] = resource.MustParse(advancedClusterResourceRequirements.Requests[string(corev1.ResourceCPU)])
+	}
+	if advancedClusterResourceRequirements.Requests[string(corev1.ResourceMemory)] != "" {
+		agentOverrides.Requests[corev1.ResourceMemory] = resource.MustParse(advancedClusterResourceRequirements.Requests[string(corev1.ResourceMemory)])
+	}
+	return &agentOverrides
+}
+
+// AgentAffinityConfigHelper is a "helper" function that converts a management.Affinity struct and returns a corev1.Affinity struct.
+func AgentAffinityConfigHelper(advancedClusterAffinity *management.Affinity) *corev1.Affinity {
+	agentAffinity := &corev1.Affinity{}
+	if advancedClusterAffinity.NodeAffinity != nil {
+		agentAffinity.NodeAffinity = &corev1.NodeAffinity{}
+		if advancedClusterAffinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution != nil {
+			agentAffinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution = &corev1.NodeSelector{}
+			agentAffinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms = []corev1.NodeSelectorTerm{}
+			for _, term := range advancedClusterAffinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms {
+				agentMatchExpressions := []corev1.NodeSelectorRequirement{}
+				if term.MatchExpressions != nil {
+					for _, match := range term.MatchExpressions {
+						newMatchExpression := corev1.NodeSelectorRequirement{}
+						newMatchExpression.Key = match.Key
+						newMatchExpression.Operator = corev1.NodeSelectorOperator(match.Operator)
+						newMatchExpression.Values = match.Values
+						agentMatchExpressions = append(agentMatchExpressions, newMatchExpression)
+					}
+				}
+				agentMatchFields := []corev1.NodeSelectorRequirement{}
+				if term.MatchFields != nil {
+					for _, match := range term.MatchFields {
+						newMatchExpression := corev1.NodeSelectorRequirement{}
+						newMatchExpression.Key = match.Key
+						newMatchExpression.Operator = corev1.NodeSelectorOperator(match.Operator)
+						newMatchExpression.Values = match.Values
+						agentMatchFields = append(agentMatchFields, newMatchExpression)
+					}
+				}
+				agentAffinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms = append(agentAffinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms, corev1.NodeSelectorTerm{
+					MatchExpressions: agentMatchExpressions,
+					MatchFields:      agentMatchFields,
+				})
+			}
+		}
+		if advancedClusterAffinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution != nil {
+			agentAffinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution = []corev1.PreferredSchedulingTerm{}
+			for _, preferred := range advancedClusterAffinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution {
+				termPreferences := corev1.NodeSelectorTerm{}
+				if preferred.Preference.MatchExpressions != nil {
+					termPreferences.MatchExpressions = []corev1.NodeSelectorRequirement{}
+					for _, match := range preferred.Preference.MatchExpressions {
+						newMatchExpression := corev1.NodeSelectorRequirement{}
+						newMatchExpression.Key = match.Key
+						newMatchExpression.Operator = corev1.NodeSelectorOperator(match.Operator)
+						newMatchExpression.Values = match.Values
+						termPreferences.MatchExpressions = append(termPreferences.MatchExpressions, newMatchExpression)
+					}
+				}
+				if preferred.Preference.MatchFields != nil {
+					termPreferences.MatchFields = []corev1.NodeSelectorRequirement{}
+					for _, match := range preferred.Preference.MatchFields {
+						newMatchExpression := corev1.NodeSelectorRequirement{}
+						newMatchExpression.Key = match.Key
+						newMatchExpression.Operator = corev1.NodeSelectorOperator(match.Operator)
+						newMatchExpression.Values = match.Values
+						termPreferences.MatchFields = append(termPreferences.MatchFields, newMatchExpression)
+					}
+				}
+				agentAffinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution = append(agentAffinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution, corev1.PreferredSchedulingTerm{
+					Weight:     int32(preferred.Weight),
+					Preference: termPreferences,
+				})
+			}
+		}
+	}
+	if advancedClusterAffinity.PodAffinity != nil {
+		agentAffinity.PodAffinity = &corev1.PodAffinity{}
+		if advancedClusterAffinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution != nil {
+			agentAffinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution = []corev1.PodAffinityTerm{}
+			for _, term := range advancedClusterAffinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution {
+				matchExpressions := []metav1.LabelSelectorRequirement{}
+				if term.LabelSelector != nil {
+					for _, expression := range term.LabelSelector.MatchExpressions {
+						newExpression := metav1.LabelSelectorRequirement{}
+						newExpression.Key = expression.Key
+						newExpression.Operator = metav1.LabelSelectorOperator(expression.Operator)
+						newExpression.Values = expression.Values
+						matchExpressions = append(matchExpressions, newExpression)
+					}
+				}
+				matchNamespaces := metav1.LabelSelector{}
+				if term.NamespaceSelector != nil {
+					if term.NamespaceSelector.MatchLabels != nil {
+						matchNamespaces.MatchLabels = term.NamespaceSelector.MatchLabels
+					}
+					for _, expression := range term.NamespaceSelector.MatchExpressions {
+						newExpression := metav1.LabelSelectorRequirement{}
+						newExpression.Key = expression.Key
+						newExpression.Operator = metav1.LabelSelectorOperator(expression.Operator)
+						newExpression.Values = expression.Values
+						matchNamespaces.MatchExpressions = append(matchNamespaces.MatchExpressions, newExpression)
+					}
+				}
+				newAffinityTerms := corev1.PodAffinityTerm{
+					TopologyKey: term.TopologyKey,
+				}
+				if len(term.Namespaces) > 0 {
+					newAffinityTerms.Namespaces = term.Namespaces
+				}
+				if term.LabelSelector != nil {
+					newAffinityTerms.LabelSelector = &metav1.LabelSelector{}
+					if term.LabelSelector.MatchLabels != nil {
+						newAffinityTerms.LabelSelector.MatchLabels = term.LabelSelector.MatchLabels
+					}
+					if len(matchExpressions) > 0 {
+						newAffinityTerms.LabelSelector.MatchExpressions = matchExpressions
+					}
+				}
+				if matchNamespaces.MatchLabels != nil || len(matchNamespaces.MatchExpressions) > 0 {
+					newAffinityTerms.NamespaceSelector = &matchNamespaces
+				}
+				agentAffinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(agentAffinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution, newAffinityTerms)
+			}
+		}
+		if advancedClusterAffinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution != nil {
+			agentAffinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution = []corev1.WeightedPodAffinityTerm{}
+			for _, preferred := range advancedClusterAffinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution {
+				matchExpressions := []metav1.LabelSelectorRequirement{}
+				if preferred.PodAffinityTerm.LabelSelector != nil {
+					for _, expression := range preferred.PodAffinityTerm.LabelSelector.MatchExpressions {
+						newExpression := metav1.LabelSelectorRequirement{}
+						newExpression.Key = expression.Key
+						newExpression.Operator = metav1.LabelSelectorOperator(expression.Operator)
+						newExpression.Values = expression.Values
+						matchExpressions = append(matchExpressions, newExpression)
+					}
+				}
+				matchNamespaces := metav1.LabelSelector{}
+				if preferred.PodAffinityTerm.NamespaceSelector != nil {
+					if preferred.PodAffinityTerm.NamespaceSelector.MatchLabels == nil {
+						matchNamespaces.MatchLabels = preferred.PodAffinityTerm.NamespaceSelector.MatchLabels
+					}
+					for _, expression := range preferred.PodAffinityTerm.NamespaceSelector.MatchExpressions {
+						newExpression := metav1.LabelSelectorRequirement{}
+						newExpression.Key = expression.Key
+						newExpression.Operator = metav1.LabelSelectorOperator(expression.Operator)
+						newExpression.Values = expression.Values
+						matchNamespaces.MatchExpressions = append(matchNamespaces.MatchExpressions, newExpression)
+					}
+				}
+				newAffinityTerms := corev1.WeightedPodAffinityTerm{
+					Weight: int32(preferred.Weight),
+					PodAffinityTerm: corev1.PodAffinityTerm{
+						TopologyKey: preferred.PodAffinityTerm.TopologyKey,
+					},
+				}
+				// add in optional variables if they exist
+				if preferred.PodAffinityTerm.Namespaces != nil {
+					newAffinityTerms.PodAffinityTerm.Namespaces = preferred.PodAffinityTerm.Namespaces
+				}
+				if matchNamespaces.MatchLabels != nil || matchNamespaces.MatchExpressions != nil {
+					newAffinityTerms.PodAffinityTerm.NamespaceSelector = &matchNamespaces
+				}
+				if preferred.PodAffinityTerm.LabelSelector != nil {
+					newAffinityTerms.PodAffinityTerm.LabelSelector = &metav1.LabelSelector{}
+					if preferred.PodAffinityTerm.LabelSelector.MatchLabels != nil {
+						newAffinityTerms.PodAffinityTerm.LabelSelector.MatchLabels = preferred.PodAffinityTerm.LabelSelector.MatchLabels
+					}
+					if preferred.PodAffinityTerm.LabelSelector.MatchExpressions != nil {
+						newAffinityTerms.PodAffinityTerm.LabelSelector.MatchExpressions = matchExpressions
+					}
+				}
+				agentAffinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution = append(agentAffinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution, newAffinityTerms)
+			}
+		}
+	}
+	if advancedClusterAffinity.PodAntiAffinity != nil {
+		agentAffinity.PodAntiAffinity = &corev1.PodAntiAffinity{}
+		if advancedClusterAffinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution != nil {
+			agentAffinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = []corev1.PodAffinityTerm{}
+			for _, term := range advancedClusterAffinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution {
+				matchExpressions := []metav1.LabelSelectorRequirement{}
+				if term.LabelSelector != nil {
+					for _, expression := range term.LabelSelector.MatchExpressions {
+						newExpression := metav1.LabelSelectorRequirement{}
+						newExpression.Key = expression.Key
+						newExpression.Operator = metav1.LabelSelectorOperator(expression.Operator)
+						newExpression.Values = expression.Values
+						matchExpressions = append(matchExpressions, newExpression)
+					}
+				}
+				matchNamespaces := metav1.LabelSelector{}
+				if term.NamespaceSelector != nil {
+					if term.NamespaceSelector.MatchLabels != nil {
+						matchNamespaces.MatchLabels = term.NamespaceSelector.MatchLabels
+					}
+					for _, expression := range term.NamespaceSelector.MatchExpressions {
+						newExpression := metav1.LabelSelectorRequirement{}
+						newExpression.Key = expression.Key
+						newExpression.Operator = metav1.LabelSelectorOperator(expression.Operator)
+						newExpression.Values = expression.Values
+						matchNamespaces.MatchExpressions = append(matchNamespaces.MatchExpressions, newExpression)
+					}
+				}
+				newAffinityTerms := corev1.PodAffinityTerm{
+					TopologyKey: term.TopologyKey,
+				}
+				if len(term.Namespaces) > 0 {
+					newAffinityTerms.Namespaces = term.Namespaces
+				}
+				if term.LabelSelector != nil {
+					newAffinityTerms.LabelSelector = &metav1.LabelSelector{}
+					if term.LabelSelector.MatchLabels != nil {
+						newAffinityTerms.LabelSelector.MatchLabels = term.LabelSelector.MatchLabels
+					}
+					if len(matchExpressions) > 0 {
+						newAffinityTerms.LabelSelector.MatchExpressions = matchExpressions
+					}
+				}
+				if matchNamespaces.MatchLabels != nil || len(matchNamespaces.MatchExpressions) > 0 {
+					newAffinityTerms.NamespaceSelector = &matchNamespaces
+				}
+				agentAffinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(agentAffinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution, newAffinityTerms)
+			}
+		}
+		if advancedClusterAffinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution != nil {
+			agentAffinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution = []corev1.WeightedPodAffinityTerm{}
+			for _, preferred := range advancedClusterAffinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution {
+				matchExpressions := []metav1.LabelSelectorRequirement{}
+				if preferred.PodAffinityTerm.LabelSelector != nil {
+					for _, expression := range preferred.PodAffinityTerm.LabelSelector.MatchExpressions {
+						newExpression := metav1.LabelSelectorRequirement{}
+						newExpression.Key = expression.Key
+						newExpression.Operator = metav1.LabelSelectorOperator(expression.Operator)
+						newExpression.Values = expression.Values
+						matchExpressions = append(matchExpressions, newExpression)
+					}
+				}
+				matchNamespaces := metav1.LabelSelector{}
+				if preferred.PodAffinityTerm.NamespaceSelector != nil {
+					if preferred.PodAffinityTerm.NamespaceSelector.MatchLabels == nil {
+						matchNamespaces.MatchLabels = preferred.PodAffinityTerm.NamespaceSelector.MatchLabels
+					}
+					for _, expression := range preferred.PodAffinityTerm.NamespaceSelector.MatchExpressions {
+						newExpression := metav1.LabelSelectorRequirement{}
+						newExpression.Key = expression.Key
+						newExpression.Operator = metav1.LabelSelectorOperator(expression.Operator)
+						newExpression.Values = expression.Values
+						matchNamespaces.MatchExpressions = append(matchNamespaces.MatchExpressions, newExpression)
+					}
+				}
+				newAffinityTerms := corev1.WeightedPodAffinityTerm{
+					Weight: int32(preferred.Weight),
+					PodAffinityTerm: corev1.PodAffinityTerm{
+						TopologyKey: preferred.PodAffinityTerm.TopologyKey,
+					},
+				}
+				// add in optional variables if they exist
+				if preferred.PodAffinityTerm.Namespaces != nil {
+					newAffinityTerms.PodAffinityTerm.Namespaces = preferred.PodAffinityTerm.Namespaces
+				}
+				if matchNamespaces.MatchLabels != nil || matchNamespaces.MatchExpressions != nil {
+					newAffinityTerms.PodAffinityTerm.NamespaceSelector = &matchNamespaces
+				}
+				if preferred.PodAffinityTerm.LabelSelector != nil {
+					newAffinityTerms.PodAffinityTerm.LabelSelector = &metav1.LabelSelector{}
+					if preferred.PodAffinityTerm.LabelSelector.MatchLabels != nil {
+						newAffinityTerms.PodAffinityTerm.LabelSelector.MatchLabels = preferred.PodAffinityTerm.LabelSelector.MatchLabels
+					}
+					if preferred.PodAffinityTerm.LabelSelector.MatchExpressions != nil {
+						newAffinityTerms.PodAffinityTerm.LabelSelector.MatchExpressions = matchExpressions
+					}
+				}
+				agentAffinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution = append(agentAffinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution, newAffinityTerms)
+			}
+		}
+	}
+	return agentAffinity
+}
+
 // HardenK3SRKE2ClusterConfig is a constructor for a apisV1.Cluster object, to be used by the rancher.Client.Provisioning client.
-func HardenK3SRKE2ClusterConfig(clusterName, namespace, cni, cloudCredentialSecretName, kubernetesVersion string, psact string, machinePools []apisV1.RKEMachinePool) *apisV1.Cluster {
-	v1Cluster := NewK3SRKE2ClusterConfig(clusterName, namespace, cni, cloudCredentialSecretName, kubernetesVersion, psact, machinePools)
+func HardenK3SRKE2ClusterConfig(clusterName, namespace, cni, cloudCredentialSecretName, kubernetesVersion string, psact string, machinePools []apisV1.RKEMachinePool, advancedOptions rancherProvisioning.AdvancedOptions) *apisV1.Cluster {
+	v1Cluster := NewK3SRKE2ClusterConfig(clusterName, namespace, cni, cloudCredentialSecretName, kubernetesVersion, psact, machinePools, advancedOptions)
 
 	if strings.Contains(kubernetesVersion, "k3s") {
 		v1Cluster.Spec.RKEConfig.MachineGlobalConfig.Data["kube-apiserver-arg"] = []string{
@@ -287,7 +626,20 @@ func CreateRKE1Cluster(client *rancher.Client, rke1Cluster *management.Cluster) 
 		return nil, err
 	}
 
-	client, err = client.ReLogin()
+	err = kwait.Poll(500*time.Millisecond, 2*time.Minute, func() (done bool, err error) {
+		client, err = client.ReLogin()
+		if err != nil {
+			return false, err
+		}
+
+		_, err = client.Management.Cluster.ByID(cluster.ID)
+		if err != nil {
+			return false, nil
+		} else {
+			return true, nil
+		}
+	})
+
 	if err != nil {
 		return nil, err
 	}
@@ -337,7 +689,7 @@ func CreateRKE1Cluster(client *rancher.Client, rke1Cluster *management.Cluster) 
 // CreateK3SRKE2Cluster is a "helper" functions that takes a rancher client, and the rke2 cluster config as parameters. This function
 // registers a delete cluster fuction with a wait.WatchWait to ensure the cluster is removed cleanly.
 func CreateK3SRKE2Cluster(client *rancher.Client, rke2Cluster *apisV1.Cluster) (*v1.SteveAPIObject, error) {
-	cluster, err := client.Steve.SteveType(ProvisioningSteveResouceType).Create(rke2Cluster)
+	cluster, err := client.Steve.SteveType(ProvisioningSteveResourceType).Create(rke2Cluster)
 	if err != nil {
 		return nil, err
 	}
@@ -348,9 +700,9 @@ func CreateK3SRKE2Cluster(client *rancher.Client, rke2Cluster *apisV1.Cluster) (
 			return false, err
 		}
 
-		_, err = client.Steve.SteveType(ProvisioningSteveResouceType).ByID(cluster.ID)
+		_, err = client.Steve.SteveType(ProvisioningSteveResourceType).ByID(cluster.ID)
 		if err != nil {
-			return false, err
+			return false, nil
 		} else {
 			return true, nil
 		}
@@ -385,7 +737,7 @@ func CreateK3SRKE2Cluster(client *rancher.Client, rke2Cluster *apisV1.Cluster) (
 			return err
 		}
 
-		err = client.Steve.SteveType(ProvisioningSteveResouceType).Delete(cluster)
+		err = client.Steve.SteveType(ProvisioningSteveResourceType).Delete(cluster)
 		if err != nil {
 			return err
 		}
@@ -408,7 +760,7 @@ func CreateK3SRKE2Cluster(client *rancher.Client, rke2Cluster *apisV1.Cluster) (
 
 // UpdateK3SRKE2Cluster is a "helper" functions that takes a rancher client, old rke2/k3s cluster config, and the new rke2/k3s cluster config as parameters.
 func UpdateK3SRKE2Cluster(client *rancher.Client, cluster *v1.SteveAPIObject, updatedCluster *apisV1.Cluster) (*v1.SteveAPIObject, error) {
-	updateCluster, err := client.Steve.SteveType(ProvisioningSteveResouceType).ByID(cluster.ID)
+	updateCluster, err := client.Steve.SteveType(ProvisioningSteveResourceType).ByID(cluster.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -416,7 +768,7 @@ func UpdateK3SRKE2Cluster(client *rancher.Client, cluster *v1.SteveAPIObject, up
 	updatedCluster.ObjectMeta.ResourceVersion = updateCluster.ObjectMeta.ResourceVersion
 
 	logrus.Infof("Applying cluster YAML hardening changes...")
-	cluster, err = client.Steve.SteveType(ProvisioningSteveResouceType).Update(cluster, updatedCluster)
+	cluster, err = client.Steve.SteveType(ProvisioningSteveResourceType).Update(cluster, updatedCluster)
 	if err != nil {
 		return nil, err
 	}
@@ -427,7 +779,7 @@ func UpdateK3SRKE2Cluster(client *rancher.Client, cluster *v1.SteveAPIObject, up
 			return false, err
 		}
 
-		clusterResp, err := client.Steve.SteveType(ProvisioningSteveResouceType).ByID(cluster.ID)
+		clusterResp, err := client.Steve.SteveType(ProvisioningSteveResourceType).ByID(cluster.ID)
 		if err != nil {
 			return false, err
 		}
@@ -530,7 +882,7 @@ func isClusterInaccessible(messages []string) (isInaccessible bool) {
 }
 
 func logClusterInfoWithChanges(clusterID, clusterInfo string, summary summary.Summary) string {
-	newClusterInfo := fmt.Sprintf("ClusterID: %v, Message: %v, Error: %v, State: %v, Transiationing: %v", clusterID, summary.Message, summary.Error, summary.State, summary.Transitioning)
+	newClusterInfo := fmt.Sprintf("ClusterID: %v, Message: %v, Error: %v, State: %v, Transitioning: %v", clusterID, summary.Message, summary.Error, summary.State, summary.Transitioning)
 
 	if clusterInfo != newClusterInfo {
 		logrus.Infof(newClusterInfo)
@@ -542,7 +894,7 @@ func logClusterInfoWithChanges(clusterID, clusterInfo string, summary summary.Su
 
 func WatchAndWaitForCluster(steveClient *v1.Client, kubeProvisioningClient *kubeProvisioning.Client, ns string, clusterName string) error {
 	err := kwait.Poll(5*time.Second, 2*time.Minute, func() (done bool, err error) {
-		clusterResp, err := steveClient.SteveType(ProvisioningSteveResouceType).ByID(ns + "/" + clusterName)
+		clusterResp, err := steveClient.SteveType(ProvisioningSteveResourceType).ByID(ns + "/" + clusterName)
 		if err != nil {
 			return false, err
 		}
@@ -563,4 +915,20 @@ func WatchAndWaitForCluster(steveClient *v1.Client, kubeProvisioningClient *kube
 
 	err = wait.WatchWait(result, IsProvisioningClusterReady)
 	return err
+}
+
+// GetProvisioningClusterByName is a helper function to get cluster object with the cluster name
+func GetProvisioningClusterByName(client *rancher.Client, clusterName string, namespace string) (*apisV1.Cluster, *v1.SteveAPIObject, error) {
+	clusterObj, err := client.Steve.SteveType(ProvisioningSteveResourceType).ByID(namespace + "/" + clusterName)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	cluster := new(apisV1.Cluster)
+	err = v1.ConvertToK8sType(clusterObj, &cluster)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return cluster, clusterObj, nil
 }

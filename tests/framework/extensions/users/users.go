@@ -12,11 +12,11 @@ import (
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
+	"github.com/rancher/rancher/tests/framework/extensions/defaults"
 	"github.com/rancher/rancher/tests/framework/extensions/kubeapi/rbac"
 	kubeapiSecrets "github.com/rancher/rancher/tests/framework/extensions/kubeapi/secrets"
 	"github.com/rancher/rancher/tests/framework/extensions/secrets"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
-	"github.com/rancher/rancher/tests/integration/pkg/defaults"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
@@ -302,7 +302,7 @@ func RemoveClusterRoleFromUser(rancherClient *rancher.Client, user *management.U
 		Duration: 100 * time.Millisecond,
 		Factor:   1,
 		Jitter:   0,
-		Steps:    5,
+		Steps:    10,
 	}
 
 	err = kwait.ExponentialBackoff(backoff, func() (done bool, err error) {

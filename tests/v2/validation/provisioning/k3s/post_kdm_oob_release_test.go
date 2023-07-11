@@ -10,13 +10,13 @@ import (
 	provisioningV1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters/kubernetesversions"
+	"github.com/rancher/rancher/tests/framework/extensions/defaults"
 	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
 	"github.com/rancher/rancher/tests/framework/extensions/workloads/pods"
 	"github.com/rancher/rancher/tests/framework/pkg/config"
 	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
-	"github.com/rancher/rancher/tests/integration/pkg/defaults"
 	"github.com/rancher/rancher/tests/v2/validation/provisioning"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -34,6 +34,7 @@ type KdmChecksTestSuite struct {
 	cnis                  []string
 	providers             []string
 	nodesAndRoles         []machinepools.NodeRoles
+	advancedOptions       provisioning.AdvancedOptions
 }
 
 const (
@@ -58,6 +59,7 @@ func (k *KdmChecksTestSuite) SetupSuite() {
 	k.cnis = clustersConfig.CNIs
 	k.providers = clustersConfig.Providers
 	k.nodesAndRoles = clustersConfig.NodesAndRoles
+	k.advancedOptions = clustersConfig.AdvancedOptions
 
 	client, err := rancher.NewClient("", testSession)
 	require.NoError(k.T(), err)
@@ -110,7 +112,7 @@ func (k *KdmChecksTestSuite) TestProvisioningSingleNodeK3SClusters() {
 		require.NoError(k.T(), err)
 
 		machinePools := machinepools.RKEMachinePoolSetup(nodeRoles, machineConfigResp)
-		cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, k.ns, "", cloudCredential.ID, k8sVersion, "", machinePools)
+		cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, k.ns, "", cloudCredential.ID, k8sVersion, "", machinePools, k.advancedOptions)
 
 		logrus.Info("provisioning " + k8sVersion + " cluster..")
 

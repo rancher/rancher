@@ -19,7 +19,8 @@
       },
       "metadata": {
         "labels": {
-          "test-label-gte": "3"
+          "test-label-gte": "3",
+          "test.cattle.io/steveapi": "nondeterministicid"
         },
         "name": "test4",
         "namespace": "test-ns-2",
@@ -44,7 +45,8 @@
       },
       "metadata": {
         "labels": {
-          "test-label-gte": "3"
+          "test-label-gte": "3",
+          "test.cattle.io/steveapi": "nondeterministicid"
         },
         "name": "test5",
         "namespace": "test-ns-2",
@@ -68,6 +70,9 @@
         "view": "https://rancherurl/api/v1/namespaces/test-ns-3/secrets/test1"
       },
       "metadata": {
+        "labels": {
+          "test.cattle.io/steveapi": "nondeterministicid"
+        },
         "name": "test1",
         "namespace": "test-ns-3",
         "resourceVersion": "1000",
@@ -91,7 +96,8 @@
       },
       "metadata": {
         "labels": {
-          "test-label": "2"
+          "test-label": "2",
+          "test.cattle.io/steveapi": "nondeterministicid"
         },
         "name": "test2",
         "namespace": "test-ns-3",
@@ -116,7 +122,8 @@
       },
       "metadata": {
         "labels": {
-          "test-label-gte": "3"
+          "test-label-gte": "3",
+          "test.cattle.io/steveapi": "nondeterministicid"
         },
         "name": "test3",
         "namespace": "test-ns-3",
@@ -141,7 +148,8 @@
       },
       "metadata": {
         "labels": {
-          "test-label-gte": "3"
+          "test-label-gte": "3",
+          "test.cattle.io/steveapi": "nondeterministicid"
         },
         "name": "test4",
         "namespace": "test-ns-3",
@@ -166,7 +174,8 @@
       },
       "metadata": {
         "labels": {
-          "test-label-gte": "3"
+          "test-label-gte": "3",
+          "test.cattle.io/steveapi": "nondeterministicid"
         },
         "name": "test5",
         "namespace": "test-ns-3",
@@ -190,6 +199,9 @@
         "view": "https://rancherurl/api/v1/namespaces/test-ns-4/secrets/test1"
       },
       "metadata": {
+        "labels": {
+          "test.cattle.io/steveapi": "nondeterministicid"
+        },
         "name": "test1",
         "namespace": "test-ns-4",
         "resourceVersion": "1000",
@@ -206,7 +218,7 @@
   },
   "pagination": {
     "first": "https://rancherurl/v1/secrets",
-    "next": "https://rancherurl/v1/secrets?continue=nondeterministictoken\u0026limit=8",
+    "next": "https://rancherurl/v1/secrets?continue=nondeterministictoken\u0026labelSelector=test.cattle.io%2Fsteveapi%3Dnondeterministicid\u0026limit=8",
     "partial": true
   },
   "resourceType": "secret",

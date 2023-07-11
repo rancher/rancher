@@ -495,6 +495,11 @@ func (p *PlanStore) setMachineJoinURL(entry *planEntry, capiCluster *capi.Cluste
 		joinURL string
 	)
 
+	// If the annotation to disable autosetting the join URL is enabled, don't process the join URL.
+	if _, autosetDisabled := entry.Metadata.Annotations[capr.JoinURLAutosetDisabled]; autosetDisabled {
+		return nil
+	}
+
 	if IsEtcdOnlyInitNode(entry) {
 		joinURL, err = getJoinURLFromOutput(entry, capiCluster, rkeControlPlane)
 		if err != nil || joinURL == "" {

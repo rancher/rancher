@@ -68,11 +68,9 @@ func SetCustomRepo(repo string) error {
 // CreateCorral creates a corral taking the corral name, the package path, and a debug set so if someone wants to view the
 // corral create log
 func CreateCorral(ts *session.Session, corralName, packageName string, debug bool, cleanup bool) ([]byte, error) {
-	if cleanup {
-		ts.RegisterCleanupFunc(func() error {
-			return DeleteCorral(corralName)
-		})
-	}
+	ts.RegisterCleanupFunc(func() error {
+		return DeleteCorral(corralName)
+	})
 
 	args := []string{"create"}
 	if !cleanup {
@@ -82,7 +80,7 @@ func CreateCorral(ts *session.Session, corralName, packageName string, debug boo
 		args = append(args, debugFlag)
 	}
 	args = append(args, corralName, packageName)
-	logrus.Infof("Creating corral with the following parameters: %", args)
+	logrus.Infof("Creating corral with the following parameters: %v", args)
 	// complicated, but running the command in a way that allows us to
 	// capture the output and error(s) and print it to the console
 	msg, err := exec.Command("corral", args...).CombinedOutput()

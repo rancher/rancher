@@ -32,8 +32,16 @@ const (
 	OKTAName       = "okta"
 )
 
+// An ErrorNotConfigured indicates that the requested LDAP operation
+// failed due to missing or incomplete configuration.
+type ErrorNotConfigured struct{}
+
+// Error provides a string representation of an ErrorNotConfigured
+func (e ErrorNotConfigured) Error() string {
+	return "not configured"
+}
+
 var (
-	errNotConfigured       = fmt.Errorf("not configured")
 	testAndApplyInputTypes = map[string]string{
 		FreeIpaName:  client.FreeIpaTestAndApplyInputType,
 		OpenLdapName: client.OpenLdapTestAndApplyInputType,
@@ -85,8 +93,9 @@ func GetLDAPConfig(authProvider common.AuthProvider) (*v3.LdapConfig, *x509.Cert
 	return ldapProvider.getLDAPConfig()
 }
 
+// IsNotConfigured checks whether this error indicates a missing LDAP configuration.
 func IsNotConfigured(err error) bool {
-	return errors.Is(err, errNotConfigured)
+	return errors.Is(err, ErrorNotConfigured{})
 }
 
 func (p *ldapProvider) GetName() string {
@@ -226,13 +235,13 @@ func (p *ldapProvider) getLDAPConfig() (*v3.LdapConfig, *x509.CertPool, error) {
 	if p.samlSearchProvider() && ldapConfigKey[p.providerName] != "" {
 		subLdapConfig, ok := storedLdapConfigMap[ldapConfigKey[p.providerName]]
 		if !ok {
-			return nil, nil, errNotConfigured
+			return nil, nil, ErrorNotConfigured{}
 		}
 
 		storedLdapConfigMap = subLdapConfig.(map[string]interface{})
 		mapstructure.Decode(storedLdapConfigMap, storedLdapConfig)
 		if len(storedLdapConfig.Servers) < 1 {
-			return storedLdapConfig, nil, errNotConfigured
+			return storedLdapConfig, nil, ErrorNotConfigured{}
 		}
 	} else {
 		mapstructure.Decode(storedLdapConfigMap, storedLdapConfig)
@@ -365,7 +374,8 @@ func (p *ldapProvider) samlSearchGetPrincipal(
 		config.UserNameAttribute,
 		config.UserLoginAttribute,
 		config.GroupObjectClass,
-		config.GroupNameAttribute)
+		config.GroupNameAttribute,
+		"")
 }
 
 func (p *ldapProvider) GetUserExtraAttributes(userPrincipal v3.Principal) map[string][]string {

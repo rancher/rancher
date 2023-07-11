@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/rancher/rancher/pkg/apis/management.cattle.io"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	projectpkg "github.com/rancher/rancher/pkg/project"
@@ -12,6 +13,8 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac"
 )
 
 func newProjectLifecycle(r *manager) *pLifecycle {
@@ -30,7 +33,7 @@ func (p *pLifecycle) Create(project *v3.Project) (runtime.Object, error) {
 			continue
 		}
 
-		err = p.m.createProjectNSRole(roleName, verb, "")
+		err = p.m.createProjectNSRole(roleName, verb, "", project.Name)
 		if err != nil {
 			return project, err
 		}
@@ -42,7 +45,11 @@ func (p *pLifecycle) Create(project *v3.Project) (runtime.Object, error) {
 }
 
 func (p *pLifecycle) Updated(project *v3.Project) (runtime.Object, error) {
-	err := p.ensureNamespacesAssigned(project)
+	err := p.ensureNamespaceRolesUpdated(project)
+	if err != nil {
+		return project, err
+	}
+	err = p.ensureNamespacesAssigned(project)
 	return project, err
 }
 
@@ -124,6 +131,39 @@ func (p *pLifecycle) ensureSystemNamespaceAssigned(project *v3.Project) error {
 		return nil, p.assignNamespacesToProject(project, projectpkg.System)
 	})
 	return err
+}
+
+// ensureNamespaceRolesUpdated makes sure that the namespace roles have up-to-date rules, and issues updates if they don't
+func (p *pLifecycle) ensureNamespaceRolesUpdated(project *v3.Project) error {
+	// right now, only the edit role for namespaces has need of an update
+	suffix := projectNSVerbToSuffix[projectNSEditVerb]
+	roleName := fmt.Sprintf(projectNSGetClusterRoleNameFmt, project.Name, suffix)
+	cr, err := p.m.crLister.Get("", roleName)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return p.m.createProjectNSRole(roleName, projectNSEditVerb, "", project.Name)
+		}
+		return fmt.Errorf("unable to get backing cluster role for project %s: %w", project.Name, err)
+	}
+	// manage-ns permission was added later on in rancher's lifecycle, so we may need to update the CR if it doesn't
+	// have this permission
+	manageNSRecord := authorizer.AttributesRecord{
+		Verb:            manageNSVerb,
+		APIGroup:        management.GroupName,
+		Resource:        v32.ProjectResourceName,
+		Name:            project.Name,
+		ResourceRequest: true,
+	}
+	if !rbac.RulesAllow(manageNSRecord, cr.Rules...) {
+		// only add the manageNS permission so that we don't overwrite the other permissions dynamically given by the
+		// namespace_handler
+		cr = addManageNSPermission(cr, project.Name)
+		_, err = p.m.clusterRoles.Update(cr)
+		if err != nil {
+			return fmt.Errorf("unable to update backing cluster role for project %s: %w", project.Name, err)
+		}
+	}
+	return nil
 }
 
 func (p *pLifecycle) assignNamespacesToProject(project *v3.Project, projectName string) error {

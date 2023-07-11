@@ -3,12 +3,10 @@ package publicapi
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
@@ -27,17 +25,12 @@ import (
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/auth/util"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3public"
-	"github.com/rancher/rancher/pkg/clustermanager"
-	"github.com/rancher/rancher/pkg/controllers/managementuser/clusterauthtoken/common"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	schema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3public"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
 	"github.com/sirupsen/logrus"
-	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 const (
@@ -219,11 +212,6 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 		if err != nil {
 			return v3.Token{}, "", "", err
 		}
-
-		if err := h.createClusterAuthTokenIfNeeded(token, tokenValue); err != nil {
-			return v3.Token{}, "", "", httperror.NewAPIError(httperror.ServerError,
-				fmt.Sprintf("Failed to create cluster auth token for cluster [%s], cluster auth endpoint may fail: %v", token.ClusterName, err))
-		}
 		return *token, tokenValue, responseType, nil
 	}
 
@@ -231,72 +219,4 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 
 	rToken, unhashedTokenKey, err := h.tokenMGR.NewLoginToken(currUser.Name, userPrincipal, groupPrincipals, providerToken, ttl, description, userExtraInfo)
 	return rToken, unhashedTokenKey, responseType, err
-}
-
-// createClusterAuthTokenIfNeeded checks if local cluster auth endpoint is enabled. If it is, a cluster auth token
-// is created.
-func (h *loginHandler) createClusterAuthTokenIfNeeded(token *v3.Token, tokenValue string) error {
-	clusterID := token.ClusterName
-	if clusterID == "" {
-		// Cluster ID being empty is likely because cluster auth endpoint is not being used.
-		// Custer auth token is not necessary in the aforementioned scenario.
-		return nil
-	}
-	cluster, err := h.clusterLister.Get("", clusterID)
-	if err != nil {
-		return err
-	}
-
-	if !cluster.Spec.LocalClusterAuthEndpoint.Enabled {
-		return nil
-	}
-	clusterConfig, err := clustermanager.ToRESTConfig(cluster, h.scaledContext, h.secretLister)
-	if err != nil {
-		return err
-	}
-
-	clusterContext, err := config.NewUserContext(h.scaledContext, *clusterConfig, clusterID)
-	if err != nil {
-		return err
-	}
-
-	clusterAuthToken, err := common.NewClusterAuthToken(token, tokenValue)
-	if err != nil {
-		return err
-	}
-
-	_, err = clusterContext.Cluster.ClusterAuthTokens("").Controller().Lister().Get("cattle-system", clusterAuthToken.Name)
-	if err != nil {
-		if !errors.IsNotFound(err) {
-			return err
-		}
-	}
-
-	if err == nil {
-		err = clusterContext.Cluster.ClusterAuthTokens("cattle-system").Delete(clusterAuthToken.Name, &metav1.DeleteOptions{})
-		if err != nil {
-			if !errors.IsNotFound(err) {
-				return err
-			}
-		}
-	}
-
-	var backoff = wait.Backoff{
-		Duration: 100 * time.Millisecond,
-		Factor:   1,
-		Jitter:   0,
-		Steps:    7,
-	}
-
-	err = wait.ExponentialBackoff(backoff, func() (bool, error) {
-		if _, err := clusterContext.Cluster.ClusterAuthTokens("cattle-system").Create(clusterAuthToken); err != nil {
-			if errors.IsAlreadyExists(err) {
-				return false, nil
-			}
-			return false, err
-		}
-		return true, nil
-	})
-
-	return err
 }

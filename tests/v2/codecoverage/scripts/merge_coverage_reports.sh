@@ -3,9 +3,7 @@ set -e -x
 
 cd  ~/go/src/github.com/rancher/rancher/tests/v2/codecoverage/ranchercover/cover
 
-# ls -al cover
-# gocovmerge cover/*.out > cover/merged.cov
-# ls -al cover
+ls -al
 
 dirlist=(`ls -p | tr '\n' ',' | tr -d '/' | sed 's/.$//'`) 
 mkdir merged

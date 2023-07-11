@@ -54,6 +54,7 @@ const (
 	InitNodeLabel                 = "rke.cattle.io/init-node"
 	InitNodeMachineIDLabel        = "rke.cattle.io/init-node-machine-id"
 	InternalAddressAnnotation     = "rke.cattle.io/internal-address"
+	JoinURLAutosetDisabled        = "rke.cattle.io/join-url-autoset-disabled"
 	JoinURLAnnotation             = "rke.cattle.io/join-url"
 	JoinedToAnnotation            = "rke.cattle.io/joined-to"
 	LabelsAnnotation              = "rke.cattle.io/labels"
@@ -73,6 +74,8 @@ const (
 	UnCordonAnnotation            = "rke.cattle.io/uncordon"
 	WorkerRoleLabel               = "rke.cattle.io/worker-role"
 	AuthorizedObjectAnnotation    = "rke.cattle.io/object-authorized-for-clusters"
+
+	JoinServerImplausible = "implausible"
 
 	SecretTypeMachinePlan  = "rke.cattle.io/machine-plan"
 	SecretTypeClusterState = "rke.cattle.io/cluster-state"
@@ -104,6 +107,11 @@ const (
 
 	RuntimeK3S  = "k3s"
 	RuntimeRKE2 = "rke2"
+
+	K3sKubectlPath     = "/usr/local/bin/kubectl"
+	K3sKubeconfigPath  = "/etc/rancher/k3s/k3s.yaml"
+	RKE2KubectlPath    = "/var/lib/rancher/rke2/bin/kubectl"
+	RKE2KubeconfigPath = "/etc/rancher/rke2/rke2.yaml"
 
 	RoleBootstrap = "bootstrap"
 	RolePlan      = "plan"
@@ -142,6 +150,17 @@ func GetMachineByOwner(machineCache capicontrollers.MachineCache, obj metav1.Obj
 	}
 
 	return nil, ErrNoMachineOwnerRef
+}
+
+// GetKubectlAndKubeconfigPaths returns the corresponding kubectl/kubeconfig paths for a downstream node for the given kubernetes version.
+func GetKubectlAndKubeconfigPaths(kubernetesVersion string) (string, string) {
+	switch GetRuntime(kubernetesVersion) {
+	case RuntimeK3S:
+		return K3sKubectlPath, K3sKubeconfigPath
+	case RuntimeRKE2:
+		return RKE2KubectlPath, RKE2KubeconfigPath
+	}
+	return "", ""
 }
 
 func GetRuntimeCommand(kubernetesVersion string) string {

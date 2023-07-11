@@ -6,38 +6,54 @@ import (
 	"strings"
 	"time"
 
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
+
 	"github.com/rancher/rancher/tests/framework/extensions/namespaces"
 	"github.com/rancher/rancher/tests/framework/extensions/projects"
+	nodepools "github.com/rancher/rancher/tests/framework/extensions/rke1/nodepools"
 	"github.com/rancher/rancher/tests/framework/extensions/users"
 	password "github.com/rancher/rancher/tests/framework/extensions/users/passwordgenerator"
 	"github.com/rancher/rancher/tests/framework/extensions/workloads"
+	"github.com/rancher/rancher/tests/framework/pkg/config"
 	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
+	"github.com/rancher/rancher/tests/v2/validation/provisioning"
 	appv1 "k8s.io/api/apps/v1"
 	coreV1 "k8s.io/api/core/v1"
 	kwait "k8s.io/apimachinery/pkg/util/wait"
 )
 
 const (
-	roleOwner               = "cluster-owner"
-	roleMember              = "cluster-member"
-	roleProjectOwner        = "project-owner"
-	roleProjectMember       = "project-member"
-	roleManageProjectMember = "projectroletemplatebindings-manage"
-	roleProjectReadOnly     = "read-only"
-	restrictedAdmin         = "restricted-admin"
-	standardUser            = "user"
-	pssRestrictedPolicy     = "restricted"
-	pssBaselinePolicy       = "baseline"
-	pssPrivilegedPolicy     = "privileged"
-	psaWarn                 = "pod-security.kubernetes.io/warn"
-	psaAudit                = "pod-security.kubernetes.io/audit"
-	psaEnforce              = "pod-security.kubernetes.io/enforce"
-
-	isCattleLabeled = true
+	roleOwner                     = "cluster-owner"
+	roleMember                    = "cluster-member"
+	roleProjectOwner              = "project-owner"
+	roleProjectMember             = "project-member"
+	roleCustomManageProjectMember = "projectroletemplatebindings-manage"
+	roleCustomCreateNS            = "create-ns"
+	roleProjectReadOnly           = "read-only"
+	restrictedAdmin               = "restricted-admin"
+	standardUser                  = "user"
+	pssRestrictedPolicy           = "restricted"
+	pssBaselinePolicy             = "baseline"
+	pssPrivilegedPolicy           = "privileged"
+	psaWarn                       = "pod-security.kubernetes.io/warn"
+	psaAudit                      = "pod-security.kubernetes.io/audit"
+	psaEnforce                    = "pod-security.kubernetes.io/enforce"
+	kubeConfigTokenSettingID      = "kubeconfig-default-token-ttl-minutes"
+	psaRole                       = "updatepsa"
+	defaultNamespace              = "fleet-default"
+	isCattleLabeled               = true
 )
+
+type ClusterConfig struct {
+	nodesAndRoles        []nodepools.NodeRoles
+	externalNodeProvider provisioning.ExternalNodeProvider
+	kubernetesVersion    string
+	cni                  string
+	advancedOptions      provisioning.AdvancedOptions
+}
 
 func createUser(client *rancher.Client, role string) (*management.User, error) {
 	enabled := true
@@ -58,34 +74,34 @@ func createUser(client *rancher.Client, role string) (*management.User, error) {
 	return newUser, err
 }
 
-func listProjects(client *rancher.Client, clusterID string) (projectNames []string, err error) {
+func listProjects(client *rancher.Client, clusterID string) ([]string, error) {
 	projectList, err := projects.GetProjectList(client, clusterID)
 	if err != nil {
-		return projectNames, err
+		return nil, err
 	}
 
-	projectNames = make([]string, len(projectList.Data))
+	projectNames := make([]string, len(projectList.Data))
 
 	for idx, project := range projectList.Data {
 		projectNames[idx] = project.Name
 	}
 	sort.Strings(projectNames)
-	return projectNames, err
+	return projectNames, nil
 }
 
-func getNamespaces(steveclient *v1.Client) (namespace []string, err error) {
+func getNamespaces(steveclient *v1.Client) ([]string, error) {
 
 	namespaceList, err := steveclient.SteveType(namespaces.NamespaceSteveType).List(nil)
 	if err != nil {
-		return namespace, err
+		return nil, err
 	}
 
-	namespace = make([]string, len(namespaceList.Data))
+	namespace := make([]string, len(namespaceList.Data))
 	for idx, ns := range namespaceList.Data {
 		namespace[idx] = ns.GetName()
 	}
 	sort.Strings(namespace)
-	return namespace, err
+	return namespace, nil
 }
 
 func deleteNamespace(namespaceID *v1.SteveAPIObject, steveclient *v1.Client) error {
@@ -93,14 +109,17 @@ func deleteNamespace(namespaceID *v1.SteveAPIObject, steveclient *v1.Client) err
 	return deletens
 }
 
-func createProject(client *rancher.Client, clusterID string) (createProject *management.Project, err error) {
+func createProject(client *rancher.Client, clusterID string) (*management.Project, error) {
 	projectName := namegen.AppendRandomString("testproject-")
 	projectConfig := &management.Project{
 		ClusterID: clusterID,
 		Name:      projectName,
 	}
-	createProject, err = client.Management.Project.Create(projectConfig)
-	return createProject, err
+	createProject, err := client.Management.Project.Create(projectConfig)
+	if err != nil {
+		return nil, err
+	}
+	return createProject, nil
 }
 
 func getPSALabels(response *v1.SteveAPIObject, actualLabels map[string]string) map[string]string {
@@ -128,12 +147,12 @@ func createDeploymentAndWait(steveclient *v1.Client, client *rancher.Client, clu
 	err = kwait.Poll(5*time.Second, 5*time.Minute, func() (done bool, err error) {
 		deploymentResp, err := steveclient.SteveType(workloads.DeploymentSteveType).ByID(deployment.Namespace + "/" + deployment.Name)
 		if err != nil {
-			return false, nil
+			return false, err
 		}
 		deployment := &appv1.Deployment{}
 		err = v1.ConvertToK8sType(deploymentResp.JSONResp, deployment)
 		if err != nil {
-			return false, nil
+			return false, err
 		}
 		status := deployment.Status.Conditions
 		for _, statusCondition := range status {
@@ -150,7 +169,7 @@ func createDeploymentAndWait(steveclient *v1.Client, client *rancher.Client, clu
 	return deploymentResp, err
 }
 
-func getAndConverNamespace(namespace *v1.SteveAPIObject, steveAdminClient *v1.Client) (*coreV1.Namespace, error) {
+func getAndConvertNamespace(namespace *v1.SteveAPIObject, steveAdminClient *v1.Client) (*coreV1.Namespace, error) {
 	getNSSteveObject, err := steveAdminClient.SteveType(namespaces.NamespaceSteveType).ByID(namespace.ID)
 	if err != nil {
 		return nil, err
@@ -160,7 +179,7 @@ func getAndConverNamespace(namespace *v1.SteveAPIObject, steveAdminClient *v1.Cl
 	if err != nil {
 		return nil, err
 	}
-	return namespaceObj, err
+	return namespaceObj, nil
 }
 
 func deleteLabels(labels map[string]string) {
@@ -169,4 +188,72 @@ func deleteLabels(labels map[string]string) {
 			delete(labels, label)
 		}
 	}
+}
+
+func convertSetting(globalSetting *v1.SteveAPIObject) (*v3.Setting, error) {
+	updateSetting := &v3.Setting{}
+	err := v1.ConvertToK8sType(globalSetting.JSONResp, updateSetting)
+	if err != nil {
+		return nil, err
+	}
+	return updateSetting, nil
+}
+
+func listGlobalSettings(steveclient *v1.Client) ([]string, error) {
+	globalSettings, err := steveclient.SteveType("management.cattle.io.setting").List(nil)
+	if err != nil {
+		return nil, err
+	}
+
+	settingsNameList := make([]string, len(globalSettings.Data))
+	for idx, setting := range globalSettings.Data {
+		settingsNameList[idx] = setting.Name
+	}
+	sort.Strings(settingsNameList)
+	return settingsNameList, nil
+}
+
+func editGlobalSettings(steveclient *v1.Client, globalSetting *v1.SteveAPIObject, value string) (*v1.SteveAPIObject, error) {
+	updateSetting, err := convertSetting(globalSetting)
+	if err != nil {
+		return nil, err
+	}
+
+	updateSetting.Value = value
+	updateGlobalSetting, err := steveclient.SteveType("management.cattle.io.setting").Update(globalSetting, updateSetting)
+	if err != nil {
+		return nil, err
+	}
+	return updateGlobalSetting, nil
+}
+
+func getClusterConfig() *ClusterConfig {
+
+	nodeAndRoles := []nodepools.NodeRoles{provisioning.RKE1AllRolesPool}
+
+	userConfig := new(provisioning.Config)
+	config.LoadConfig(provisioning.ConfigurationFileKey, userConfig)
+
+	kubernetesVersion := userConfig.RKE1KubernetesVersions[0]
+	cni := userConfig.CNIs[0]
+	advancedOptions := userConfig.AdvancedOptions
+	nodeProviders := userConfig.NodeProviders[0]
+
+	externalNodeProvider := provisioning.ExternalNodeProviderSetup(nodeProviders)
+
+	clusterConfig := ClusterConfig{nodesAndRoles: nodeAndRoles, externalNodeProvider: externalNodeProvider,
+		kubernetesVersion: kubernetesVersion, cni: cni, advancedOptions: advancedOptions}
+
+	return &clusterConfig
+}
+
+func createRole(client *rancher.Client, context string, roleName string, rules []management.PolicyRule) (role *management.RoleTemplate, err error) {
+	role, err = client.Management.RoleTemplate.Create(
+		&management.RoleTemplate{
+			Context: "cluster",
+			Name:    "additional-psa-role",
+			Rules:   rules,
+		})
+	return
+
 }

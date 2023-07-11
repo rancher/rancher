@@ -27,7 +27,8 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/dashboardapi"
 	managementauth "github.com/rancher/rancher/pkg/controllers/management/auth"
 	provisioningv2 "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
-	crds "github.com/rancher/rancher/pkg/crds/dashboard"
+	"github.com/rancher/rancher/pkg/crds"
+	dashboardcrds "github.com/rancher/rancher/pkg/crds/dashboard"
 	dashboarddata "github.com/rancher/rancher/pkg/data/dashboard"
 	"github.com/rancher/rancher/pkg/features"
 	mgmntv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -47,6 +48,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -137,7 +139,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 	wranglerContext.MultiClusterManager = newMCM(wranglerContext, opts)
 
 	// Initialize Features as early as possible
-	if err := crds.CreateFeatureCRD(ctx, restConfig); err != nil {
+	if err := dashboardcrds.CreateFeatureCRD(ctx, restConfig); err != nil {
 		return nil, err
 	}
 
@@ -155,8 +157,19 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		provisioningv2.RegisterIndexers(wranglerContext)
 	}
 
-	if err := crds.Create(ctx, restConfig); err != nil {
-		return nil, err
+	clientSet, err := clientset.NewForConfig(restConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create new clientset: %w", err)
+	}
+
+	// ensure migrated CRDs
+	if err := crds.EnsureRequired(ctx, clientSet.ApiextensionsV1().CustomResourceDefinitions()); err != nil {
+		return nil, fmt.Errorf("failed to ensure CRDs: %w", err)
+	}
+
+	// install all non migrated CRDs
+	if err := dashboardcrds.Create(ctx, restConfig); err != nil {
+		return nil, fmt.Errorf("failed to create CRDs: %w", err)
 	}
 
 	if features.MCM.Enabled() && !features.Fleet.Enabled() {
@@ -464,7 +477,11 @@ func setupRancherService(ctx context.Context, restConfig *rest.Config, httpsList
 // This should only be called when Rancher is run in a Docker container because the Kubernetes version and Rancher version
 // are bumped at the same time. In a Kubernetes cluster, usually the Rancher version is bumped when the cluster is upgraded.
 func bumpRancherWebhookIfNecessary(ctx context.Context, restConfig *rest.Config) error {
-	webhookVersionParts := strings.Split(os.Getenv("CATTLE_RANCHER_WEBHOOK_MIN_VERSION"), "+up")
+	v := os.Getenv("CATTLE_RANCHER_WEBHOOK_MIN_VERSION")
+	if v == "" {
+		v = os.Getenv("CATTLE_RANCHER_WEBHOOK_VERSION")
+	}
+	webhookVersionParts := strings.Split(v, "+up")
 	if len(webhookVersionParts) != 2 {
 		return nil
 	} else if !strings.HasPrefix(webhookVersionParts[1], "v") {

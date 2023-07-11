@@ -13,7 +13,8 @@
       },
       "metadata": {
         "labels": {
-          "test-label": "2"
+          "test-label": "2",
+          "test.cattle.io/steveapi": "nondeterministicid"
         },
         "name": "test2",
         "namespace": "test-ns-3",

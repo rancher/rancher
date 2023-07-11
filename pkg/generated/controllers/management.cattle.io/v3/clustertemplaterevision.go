@@ -22,8 +22,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/lasso/pkg/client"
-	"github.com/rancher/lasso/pkg/controller"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/wrangler/pkg/apply"
 	"github.com/rancher/wrangler/pkg/condition"
@@ -31,236 +29,23 @@ import (
 	"github.com/rancher/wrangler/pkg/kv"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/tools/cache"
 )
 
-type ClusterTemplateRevisionHandler func(string, *v3.ClusterTemplateRevision) (*v3.ClusterTemplateRevision, error)
-
+// ClusterTemplateRevisionController interface for managing ClusterTemplateRevision resources.
 type ClusterTemplateRevisionController interface {
-	generic.ControllerMeta
-	ClusterTemplateRevisionClient
-
-	OnChange(ctx context.Context, name string, sync ClusterTemplateRevisionHandler)
-	OnRemove(ctx context.Context, name string, sync ClusterTemplateRevisionHandler)
-	Enqueue(namespace, name string)
-	EnqueueAfter(namespace, name string, duration time.Duration)
-
-	Cache() ClusterTemplateRevisionCache
+	generic.ControllerInterface[*v3.ClusterTemplateRevision, *v3.ClusterTemplateRevisionList]
 }
 
+// ClusterTemplateRevisionClient interface for managing ClusterTemplateRevision resources in Kubernetes.
 type ClusterTemplateRevisionClient interface {
-	Create(*v3.ClusterTemplateRevision) (*v3.ClusterTemplateRevision, error)
-	Update(*v3.ClusterTemplateRevision) (*v3.ClusterTemplateRevision, error)
-	UpdateStatus(*v3.ClusterTemplateRevision) (*v3.ClusterTemplateRevision, error)
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-	Get(namespace, name string, options metav1.GetOptions) (*v3.ClusterTemplateRevision, error)
-	List(namespace string, opts metav1.ListOptions) (*v3.ClusterTemplateRevisionList, error)
-	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.ClusterTemplateRevision, err error)
+	generic.ClientInterface[*v3.ClusterTemplateRevision, *v3.ClusterTemplateRevisionList]
 }
 
+// ClusterTemplateRevisionCache interface for retrieving ClusterTemplateRevision resources in memory.
 type ClusterTemplateRevisionCache interface {
-	Get(namespace, name string) (*v3.ClusterTemplateRevision, error)
-	List(namespace string, selector labels.Selector) ([]*v3.ClusterTemplateRevision, error)
-
-	AddIndexer(indexName string, indexer ClusterTemplateRevisionIndexer)
-	GetByIndex(indexName, key string) ([]*v3.ClusterTemplateRevision, error)
-}
-
-type ClusterTemplateRevisionIndexer func(obj *v3.ClusterTemplateRevision) ([]string, error)
-
-type clusterTemplateRevisionController struct {
-	controller    controller.SharedController
-	client        *client.Client
-	gvk           schema.GroupVersionKind
-	groupResource schema.GroupResource
-}
-
-func NewClusterTemplateRevisionController(gvk schema.GroupVersionKind, resource string, namespaced bool, controller controller.SharedControllerFactory) ClusterTemplateRevisionController {
-	c := controller.ForResourceKind(gvk.GroupVersion().WithResource(resource), gvk.Kind, namespaced)
-	return &clusterTemplateRevisionController{
-		controller: c,
-		client:     c.Client(),
-		gvk:        gvk,
-		groupResource: schema.GroupResource{
-			Group:    gvk.Group,
-			Resource: resource,
-		},
-	}
-}
-
-func FromClusterTemplateRevisionHandlerToHandler(sync ClusterTemplateRevisionHandler) generic.Handler {
-	return func(key string, obj runtime.Object) (ret runtime.Object, err error) {
-		var v *v3.ClusterTemplateRevision
-		if obj == nil {
-			v, err = sync(key, nil)
-		} else {
-			v, err = sync(key, obj.(*v3.ClusterTemplateRevision))
-		}
-		if v == nil {
-			return nil, err
-		}
-		return v, err
-	}
-}
-
-func (c *clusterTemplateRevisionController) Updater() generic.Updater {
-	return func(obj runtime.Object) (runtime.Object, error) {
-		newObj, err := c.Update(obj.(*v3.ClusterTemplateRevision))
-		if newObj == nil {
-			return nil, err
-		}
-		return newObj, err
-	}
-}
-
-func UpdateClusterTemplateRevisionDeepCopyOnChange(client ClusterTemplateRevisionClient, obj *v3.ClusterTemplateRevision, handler func(obj *v3.ClusterTemplateRevision) (*v3.ClusterTemplateRevision, error)) (*v3.ClusterTemplateRevision, error) {
-	if obj == nil {
-		return obj, nil
-	}
-
-	copyObj := obj.DeepCopy()
-	newObj, err := handler(copyObj)
-	if newObj != nil {
-		copyObj = newObj
-	}
-	if obj.ResourceVersion == copyObj.ResourceVersion && !equality.Semantic.DeepEqual(obj, copyObj) {
-		return client.Update(copyObj)
-	}
-
-	return copyObj, err
-}
-
-func (c *clusterTemplateRevisionController) AddGenericHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.controller.RegisterHandler(ctx, name, controller.SharedControllerHandlerFunc(handler))
-}
-
-func (c *clusterTemplateRevisionController) AddGenericRemoveHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), handler))
-}
-
-func (c *clusterTemplateRevisionController) OnChange(ctx context.Context, name string, sync ClusterTemplateRevisionHandler) {
-	c.AddGenericHandler(ctx, name, FromClusterTemplateRevisionHandlerToHandler(sync))
-}
-
-func (c *clusterTemplateRevisionController) OnRemove(ctx context.Context, name string, sync ClusterTemplateRevisionHandler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), FromClusterTemplateRevisionHandlerToHandler(sync)))
-}
-
-func (c *clusterTemplateRevisionController) Enqueue(namespace, name string) {
-	c.controller.Enqueue(namespace, name)
-}
-
-func (c *clusterTemplateRevisionController) EnqueueAfter(namespace, name string, duration time.Duration) {
-	c.controller.EnqueueAfter(namespace, name, duration)
-}
-
-func (c *clusterTemplateRevisionController) Informer() cache.SharedIndexInformer {
-	return c.controller.Informer()
-}
-
-func (c *clusterTemplateRevisionController) GroupVersionKind() schema.GroupVersionKind {
-	return c.gvk
-}
-
-func (c *clusterTemplateRevisionController) Cache() ClusterTemplateRevisionCache {
-	return &clusterTemplateRevisionCache{
-		indexer:  c.Informer().GetIndexer(),
-		resource: c.groupResource,
-	}
-}
-
-func (c *clusterTemplateRevisionController) Create(obj *v3.ClusterTemplateRevision) (*v3.ClusterTemplateRevision, error) {
-	result := &v3.ClusterTemplateRevision{}
-	return result, c.client.Create(context.TODO(), obj.Namespace, obj, result, metav1.CreateOptions{})
-}
-
-func (c *clusterTemplateRevisionController) Update(obj *v3.ClusterTemplateRevision) (*v3.ClusterTemplateRevision, error) {
-	result := &v3.ClusterTemplateRevision{}
-	return result, c.client.Update(context.TODO(), obj.Namespace, obj, result, metav1.UpdateOptions{})
-}
-
-func (c *clusterTemplateRevisionController) UpdateStatus(obj *v3.ClusterTemplateRevision) (*v3.ClusterTemplateRevision, error) {
-	result := &v3.ClusterTemplateRevision{}
-	return result, c.client.UpdateStatus(context.TODO(), obj.Namespace, obj, result, metav1.UpdateOptions{})
-}
-
-func (c *clusterTemplateRevisionController) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	if options == nil {
-		options = &metav1.DeleteOptions{}
-	}
-	return c.client.Delete(context.TODO(), namespace, name, *options)
-}
-
-func (c *clusterTemplateRevisionController) Get(namespace, name string, options metav1.GetOptions) (*v3.ClusterTemplateRevision, error) {
-	result := &v3.ClusterTemplateRevision{}
-	return result, c.client.Get(context.TODO(), namespace, name, result, options)
-}
-
-func (c *clusterTemplateRevisionController) List(namespace string, opts metav1.ListOptions) (*v3.ClusterTemplateRevisionList, error) {
-	result := &v3.ClusterTemplateRevisionList{}
-	return result, c.client.List(context.TODO(), namespace, result, opts)
-}
-
-func (c *clusterTemplateRevisionController) Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
-	return c.client.Watch(context.TODO(), namespace, opts)
-}
-
-func (c *clusterTemplateRevisionController) Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (*v3.ClusterTemplateRevision, error) {
-	result := &v3.ClusterTemplateRevision{}
-	return result, c.client.Patch(context.TODO(), namespace, name, pt, data, result, metav1.PatchOptions{}, subresources...)
-}
-
-type clusterTemplateRevisionCache struct {
-	indexer  cache.Indexer
-	resource schema.GroupResource
-}
-
-func (c *clusterTemplateRevisionCache) Get(namespace, name string) (*v3.ClusterTemplateRevision, error) {
-	obj, exists, err := c.indexer.GetByKey(namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(c.resource, name)
-	}
-	return obj.(*v3.ClusterTemplateRevision), nil
-}
-
-func (c *clusterTemplateRevisionCache) List(namespace string, selector labels.Selector) (ret []*v3.ClusterTemplateRevision, err error) {
-
-	err = cache.ListAllByNamespace(c.indexer, namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v3.ClusterTemplateRevision))
-	})
-
-	return ret, err
-}
-
-func (c *clusterTemplateRevisionCache) AddIndexer(indexName string, indexer ClusterTemplateRevisionIndexer) {
-	utilruntime.Must(c.indexer.AddIndexers(map[string]cache.IndexFunc{
-		indexName: func(obj interface{}) (strings []string, e error) {
-			return indexer(obj.(*v3.ClusterTemplateRevision))
-		},
-	}))
-}
-
-func (c *clusterTemplateRevisionCache) GetByIndex(indexName, key string) (result []*v3.ClusterTemplateRevision, err error) {
-	objs, err := c.indexer.ByIndex(indexName, key)
-	if err != nil {
-		return nil, err
-	}
-	result = make([]*v3.ClusterTemplateRevision, 0, len(objs))
-	for _, obj := range objs {
-		result = append(result, obj.(*v3.ClusterTemplateRevision))
-	}
-	return result, nil
+	generic.CacheInterface[*v3.ClusterTemplateRevision]
 }
 
 type ClusterTemplateRevisionStatusHandler func(obj *v3.ClusterTemplateRevision, status v3.ClusterTemplateRevisionStatus) (v3.ClusterTemplateRevisionStatus, error)
@@ -273,7 +58,7 @@ func RegisterClusterTemplateRevisionStatusHandler(ctx context.Context, controlle
 		condition: condition,
 		handler:   handler,
 	}
-	controller.AddGenericHandler(ctx, name, FromClusterTemplateRevisionHandlerToHandler(statusHandler.sync))
+	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
 }
 
 func RegisterClusterTemplateRevisionGeneratingHandler(ctx context.Context, controller ClusterTemplateRevisionController, apply apply.Apply,

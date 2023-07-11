@@ -11,7 +11,8 @@ Please see below for more details for your config.
 2. [Define your test](#Provisioning-Input)
 3. [Configure providers to use for Node Driver Clusters](#NodeTemplateConfigs)
 4. [Configuring Custom Clusters](#Custom-Cluster)
-5. [Back to general provisioning](../README.md)
+5. [Advanced Cluster Settings](#advanced-settings)
+6. [Back to general provisioning](../README.md)
 
 ## Provisioning Input
 provisioningInput is needed to the run the RKE1 tests, specifically kubernetesVersion, cni, and providers. nodesAndRoles is only needed for the TestProvisioningDynamicInput test, node pools are divided by "{nodepool},". psact is optional and takes values `rancher-privileged` and `rancher-restricted` only.
@@ -20,17 +21,16 @@ provisioningInput is needed to the run the RKE1 tests, specifically kubernetesVe
 
 ```json
 "provisioningInput": {
-    "nodesAndRoles": [ 
+    "nodesAndRolesRKE1": [ 
       {
         "etcd": true,
         "controlplane": true,
-        "worker": true,
         "quantity": 1,
       },
       {
         "worker": true,
         "quantity": 2,
-      }
+      },
     ],
     "rke1KubernetesVersion": ["v1.24.2-rancher1-1"],
     "providers": ["linode", "aws", "azure", "harvester"],
@@ -209,22 +209,129 @@ RKE1 specifically needs a node template config to run properly. These are the in
 ```
 
 ## Custom Cluster
-For custom clusters, the below config is needed, only AWS/EC2. It is important to note that you MUST use an AMI that already has Docker installed and the service is enabled on boot; otherwise, this will not work.
-**Ensure you have nodeProviders in provisioningInput**
+For custom clusters, no nodeTemplateConfig or credentials are required. 
+
+Dependencies:
+* **Ensure you have nodeProviders in provisioningInput**
+* make sure that all roles are entered at least once
+* use AMIs that already have Docker installed and the service is enabled on boot
 
 ```json
- "awsEC2Config": {
+{
+  "awsEC2Configs": {
     "region": "us-east-2",
-    "instanceType": "t3a.medium",
-    "awsRegionAZ": "",
-    "awsAMI": "",
-    "awsSecurityGroups": [""],
-    "awsAccessKeyID": "",
     "awsSecretAccessKey": "",
-    "awsSSHKeyName": "",
-    "awsCICDInstanceTag": "",
-    "awsIAMProfile": "",
-    "awsUser": "ubuntu",
-    "volumeSize": 50
-  },
+    "awsAccessKeyID": "",
+    "awsEC2Config": [
+      {
+        "instanceType": "t3a.medium",
+        "awsRegionAZ": "",
+        "awsAMI": "",
+        "awsSecurityGroups": [
+          ""
+        ],
+        "awsSSHKeyName": "",
+        "awsCICDInstanceTag": "rancher-validation",
+        "awsIAMProfile": "",
+        "awsUser": "ubuntu",
+        "volumeSize": 25,
+        "roles": ["etcd", "contolplane"]
+      },
+      {
+        "instanceType": "t3a.large",
+        "awsRegionAZ": "",
+        "awsAMI": "",
+        "awsSecurityGroups": [
+          ""
+        ],
+        "awsSSHKeyName": "",
+        "awsCICDInstanceTag": "rancher-validation",
+        "awsIAMProfile": "",
+        "awsUser": "ubuntu",
+        "volumeSize": 25,
+        "roles": ["worker"]
+      }
+    ]
+  }
+}
+```
+
+## RKE1 Support Matrix Checks - K8s Components & Architecture
+Custom clusters have the ability to perform RKE1 support matrix checks for K8s components & architectures. 
+
+To do this, ensure that your `provisioningInput` has `flannel` and `canal` both defined, along with your desired K8s versions as shown below:
+
+```json
+"provisioningInput": {
+    "nodesAndRolesRKE1": [ 
+      {
+        "etcd": true,
+        "controlplane": true,
+        "quantity": 1,
+      },
+      {
+        "worker": true,
+        "quantity": 2,
+      },
+    ],
+    "rke1KubernetesVersion": ["v1.25.9-rancher2-1", "v1.26.4-rancher2-1"],
+    "nodeProviders": ["ec2"],
+    "cni": ["flannel", "canal"],
+    "psact": ""
+  }
+```
+
+## Advanced Settings
+This encapsulates any other setting that is applied in the cluster.spec. Currently we have support for:
+* cluster agent customization 
+* fleet agent customization
+
+Please read up on general k8s to get an idea of correct formatting for:
+* resource requests
+* resource limits
+* node affinity
+* tolerations
+
+```json
+"advancedOptions": {
+    "flusterAgentCustomization": { // change this to fleetAgentCustomization for fleet agent
+        "appendTolerations": [
+            {
+                "key": "Testkey",
+                "value": "testValue",
+                "effect": "NoSchedule"
+            }
+        ],
+        "overrideResourceRequirements": {
+            "limits": {
+                "cpu": "750m",
+                "memory": "500Mi"
+            },
+            "requests": {
+                "cpu": "250m",
+                "memory": "250Mi"
+            }
+        },
+        "overrideAffinity": {
+            "nodeAffinity": {
+                "preferredDuringSchedulingIgnoredDuringExecution": [
+                    {
+                        "preference": {
+                            "matchExpressions": [
+                                {
+                                    "key": "cattle.io/cluster-agent",
+                                    "operator": "In",
+                                    "values": [
+                                        "true"
+                                    ]
+                                }
+                            ]
+                        },
+                        "weight": 1
+                    }
+                ]
+            }
+        }
+    }
+}
 ```

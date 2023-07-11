@@ -130,7 +130,7 @@ func (p *ldapProvider) getPrincipalsFromSearchResult(result *ldapv3.SearchResult
 	userScope = p.userScope
 	groupScope = p.groupScope
 
-	user, err := ldap.AttributesToPrincipal(entry.Attributes, result.Entries[0].DN, userScope, p.providerName, config.UserObjectClass, config.UserNameAttribute, config.UserLoginAttribute, config.GroupObjectClass, config.GroupNameAttribute)
+	user, err := ldap.AttributesToPrincipal(entry.Attributes, result.Entries[0].DN, userScope, p.providerName, config.UserObjectClass, config.UserNameAttribute, config.UserLoginAttribute, config.GroupObjectClass, config.GroupNameAttribute, "")
 	if err != nil {
 		return v3.Principal{}, groupPrincipals, err
 	}
@@ -330,7 +330,7 @@ func (p *ldapProvider) getPrincipal(distinguishedName string, scope string, conf
 		return nil, fmt.Errorf("Permission denied")
 	}
 
-	principal, err := ldap.AttributesToPrincipal(entryAttributes, distinguishedName, scope, p.providerName, config.UserObjectClass, config.UserNameAttribute, config.UserLoginAttribute, config.GroupObjectClass, config.GroupNameAttribute)
+	principal, err := ldap.AttributesToPrincipal(entryAttributes, distinguishedName, scope, p.providerName, config.UserObjectClass, config.UserNameAttribute, config.UserLoginAttribute, config.GroupObjectClass, config.GroupNameAttribute, "")
 	if err != nil {
 		return nil, err
 	}
@@ -454,7 +454,8 @@ func (p *ldapProvider) searchLdap(query string, scope string, config *v3.LdapCon
 			config.UserNameAttribute,
 			config.UserLoginAttribute,
 			config.GroupObjectClass,
-			config.GroupNameAttribute)
+			config.GroupNameAttribute,
+			"")
 		if err != nil {
 			return []v3.Principal{}, err
 		}

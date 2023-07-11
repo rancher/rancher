@@ -8,9 +8,9 @@ corralPackages:
   corralPackageImages:
     <nameOfPackage1>: <public corral image to deploy "ghcr.io/rancherlabs/corral/$pkg:latest>
     ...
-  debug: <bool, default=false>
-  cleanup: <bool, default=true>
-  customRepo: <string, suggeseted=https://github.com/rancherlabs/corral-packages.git>
+  hasDebug: <bool, default=false>
+  hasCleanup: <bool, default=true>
+  hasCustomRepo: <string, suggeseted=https://github.com/rancherlabs/corral-packages.git>
 
 corralConfigs:
   corralConfigUser: <string, default="jenkauto">

@@ -9,11 +9,12 @@ import (
 	apisV1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
+	"github.com/rancher/rancher/tests/framework/extensions/defaults"
 	"github.com/rancher/rancher/tests/framework/pkg/config"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
-	"github.com/rancher/rancher/tests/integration/pkg/defaults"
 	"github.com/rancher/wrangler/pkg/randomtoken"
+	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/rest"
@@ -97,24 +98,28 @@ func CreateAndImportK3DCluster(client *rancher.Client, name, image, hostname str
 	name = defaultName(name)
 
 	// create the provisioning cluster
+	logrus.Infof("Creating provisioning cluster...")
 	cluster := &apisV1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: "fleet-default",
 		},
 	}
-	_, err = client.Steve.SteveType(clusters.ProvisioningSteveResouceType).Create(cluster)
+	clusterObj, err := client.Steve.SteveType(clusters.ProvisioningSteveResourceType).Create(cluster)
 	if err != nil {
 		return nil, errors.Wrap(err, "CreateAndImportK3DCluster: failed to create provisioning cluster")
 	}
 
-	// create the k3s cluster
+	// create the k3d cluster
+	logrus.Infof("Creating K3D cluster...")
 	downRest, err := CreateK3DCluster(client.Session, name, hostname, servers, agents)
 	if err != nil {
+		_ = client.Steve.SteveType(clusters.ProvisioningSteveResourceType).Delete(clusterObj)
 		return nil, errors.Wrap(err, "CreateAndImportK3DCluster: failed to create k3d cluster")
 	}
 
 	if importImage {
+		logrus.Infof("Importing image to K3D cluster...")
 		err = ImportImage(image, name)
 		if err != nil {
 			return nil, errors.Wrap(err, "CreateAndImportK3DCluster: failed to import image to k3d cluster")
@@ -125,7 +130,8 @@ func CreateAndImportK3DCluster(client *rancher.Client, name, image, hostname str
 	if err != nil {
 		return nil, errors.Wrap(err, "CreateAndImportK3DCluster: failed to instantiate kube api provisioning client")
 	}
-	// wait for the imported cluster
+	// wait for the provisioning cluster
+	logrus.Infof("Waiting for provisioning cluster...")
 	clusterWatch, err := kubeProvisioningClient.Clusters("fleet-default").Watch(context.TODO(), metav1.ListOptions{
 		FieldSelector:  "metadata.name=" + name,
 		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
@@ -150,12 +156,14 @@ func CreateAndImportK3DCluster(client *rancher.Client, name, image, hostname str
 	}
 
 	// import the k3d cluster
+	logrus.Infof("Importing cluster...")
 	err = clusters.ImportCluster(client, impCluster, downRest)
 	if err != nil {
 		return nil, errors.Wrap(err, "CreateAndImportK3DCluster: failed to import cluster")
 	}
 
 	// wait for the imported cluster to be ready
+	logrus.Infof("Waiting for imported cluster...")
 	clusterWatch, err = kubeProvisioningClient.Clusters("fleet-default").Watch(context.TODO(), metav1.ListOptions{
 		FieldSelector:  "metadata.name=" + name,
 		TimeoutSeconds: &importTimeout,

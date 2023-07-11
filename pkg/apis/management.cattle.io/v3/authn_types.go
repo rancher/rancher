@@ -10,6 +10,7 @@ import (
 const UserConditionInitialRolesPopulated condition.Cond = "InitialRolesPopulated"
 
 // +genclient
+// +kubebuilder:skipversion
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -39,6 +40,7 @@ func (t *Token) ObjClusterName() string {
 }
 
 // +genclient
+// +kubebuilder:skipversion
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -80,6 +82,7 @@ type UserCondition struct {
 type UserSpec struct{}
 
 // +genclient
+// +kubebuilder:skipversion
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -100,6 +103,7 @@ type Principals struct {
 }
 
 // +genclient
+// +kubebuilder:skipversion
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -111,6 +115,7 @@ type Group struct {
 }
 
 // +genclient
+// +kubebuilder:skipversion
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -123,6 +128,7 @@ type GroupMember struct {
 }
 
 // +genclient
+// +kubebuilder:skipversion
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -156,6 +162,7 @@ type SetPasswordInput struct {
 }
 
 // +genclient
+// +kubebuilder:skipversion
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -170,6 +177,7 @@ type AuthConfig struct {
 }
 
 // +genclient
+// +kubebuilder:skipversion
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -189,6 +197,7 @@ type LocalConfig struct {
 }
 
 // +genclient
+// +kubebuilder:skipversion
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 

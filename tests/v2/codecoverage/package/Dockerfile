@@ -1,4 +1,4 @@
-FROM registry.suse.com/bci/bci-base:15.4
+FROM registry.suse.com/bci/bci-base:15.5
 
 RUN zypper -n install --no-recommends git-core curl ca-certificates unzip xz gzip sed tar shadow gawk vim-small netcat-openbsd mkisofs && \
     zypper -n clean -a && rm -rf /tmp/* /var/tmp/* /usr/share/doc/packages/* && \
@@ -14,6 +14,7 @@ RUN mkdir /root/.kube && \
 WORKDIR /var/lib/rancher
 
 ARG ARCH=amd64
+ARG ETCD_UNSUPPORTED_ARCH
 ARG IMAGE_REPO=rancher
 ARG SYSTEM_CHART_DEFAULT_BRANCH=dev-v2.7
 ARG CHART_DEFAULT_BRANCH=dev-v2.7
@@ -27,35 +28,38 @@ ENV CATTLE_CHART_DEFAULT_BRANCH=$CHART_DEFAULT_BRANCH
 ENV CATTLE_PARTNER_CHART_DEFAULT_BRANCH=$PARTNER_CHART_DEFAULT_BRANCH
 ENV CATTLE_RKE2_CHART_DEFAULT_BRANCH=$RKE2_CHART_DEFAULT_BRANCH
 ENV CATTLE_HELM_VERSION v2.16.8-rancher2
-ENV CATTLE_MACHINE_VERSION v0.15.0-rancher99
-ENV CATTLE_K3S_VERSION v1.25.5+k3s1
+ENV CATTLE_MACHINE_VERSION v0.15.0-rancher100
+ENV CATTLE_K3S_VERSION v1.26.4+k3s1
 ENV CATTLE_MACHINE_PROVISION_IMAGE rancher/machine:${CATTLE_MACHINE_VERSION}
 ENV CATTLE_ETCD_VERSION v3.5.1
 ENV LOGLEVEL_VERSION v0.1.5
 ENV TINI_VERSION v0.18.0
 ENV TELEMETRY_VERSION v0.5.20
 ENV DOCKER_MACHINE_LINODE_VERSION v0.1.8
-ENV LINODE_UI_DRIVER_VERSION v0.4.0
+ENV LINODE_UI_DRIVER_VERSION v0.5.0
 # make sure the version number is consistent with the one at Line 100 of pkg/data/management/machinedriver_data.go
-ENV DOCKER_MACHINE_HARVESTER_VERSION v0.6.1
+ENV DOCKER_MACHINE_HARVESTER_VERSION v0.6.3
 ENV CATTLE_KDM_BRANCH ${CATTLE_KDM_BRANCH}
-ENV HELM_VERSION v3.10.3
-ENV KUSTOMIZE_VERSION v4.5.7
+ENV HELM_VERSION v3.11.3
+ENV KUSTOMIZE_VERSION v5.0.1
 ENV CATTLE_WINS_AGENT_VERSION v0.4.11
 ENV CATTLE_WINS_AGENT_INSTALL_SCRIPT https://raw.githubusercontent.com/rancher/wins/${CATTLE_WINS_AGENT_VERSION}/install.ps1
 ENV CATTLE_WINS_AGENT_UNINSTALL_SCRIPT https://raw.githubusercontent.com/rancher/wins/${CATTLE_WINS_AGENT_VERSION}/uninstall.ps1
 ENV CATTLE_WINS_AGENT_UPGRADE_IMAGE rancher/wins:${CATTLE_WINS_AGENT_VERSION}
 ENV CATTLE_CSI_PROXY_AGENT_VERSION v1.1.1
-ENV CATTLE_SYSTEM_AGENT_VERSION v0.3.3-rc2
+# make sure the CATTLE_SYSTEM_AGENT_VERSION is consistent with tests/v2/codecoverage/package/Dockerfile and pkg/settings/setting.go
+ENV CATTLE_SYSTEM_AGENT_VERSION v0.3.3-rc4
 ENV CATTLE_SYSTEM_AGENT_INSTALL_SCRIPT https://raw.githubusercontent.com/rancher/system-agent/${CATTLE_SYSTEM_AGENT_VERSION}/install.sh
 ENV CATTLE_SYSTEM_AGENT_UNINSTALL_SCRIPT https://raw.githubusercontent.com/rancher/system-agent/${CATTLE_SYSTEM_AGENT_VERSION}/system-agent-uninstall.sh
 ENV CATTLE_SYSTEM_AGENT_UPGRADE_IMAGE rancher/system-agent:${CATTLE_SYSTEM_AGENT_VERSION}-suc
-ENV CATTLE_SYSTEM_UPGRADE_CONTROLLER_CHART_VERSION 101.0.0+up0.3.3
+ENV CATTLE_SYSTEM_UPGRADE_CONTROLLER_CHART_VERSION 102.1.0+up0.5.0
 
 # System charts minimal version
-ENV CATTLE_FLEET_MIN_VERSION=102.0.0+up0.6.0-rc.5
-ENV CATTLE_RANCHER_WEBHOOK_MIN_VERSION=2.0.2+up0.3.2-rc21
-ENV CATTLE_CSP_ADAPTER_MIN_VERSION=2.0.1-rc1
+ENV CATTLE_FLEET_MIN_VERSION=102.1.0+up0.7.0-rc.3
+# Deprecated in favor of CATTLE_RANCHER_WEBHOOK_VERSION.
+ENV CATTLE_RANCHER_WEBHOOK_MIN_VERSION=''
+ENV CATTLE_RANCHER_WEBHOOK_VERSION=2.0.5+up0.3.5-rc6
+ENV CATTLE_CSP_ADAPTER_MIN_VERSION=2.0.2+up2.0.2-rc2
 
 RUN mkdir -p /var/lib/rancher-data/local-catalogs/system-library && \
     mkdir -p /var/lib/rancher-data/local-catalogs/library && \
@@ -114,7 +118,7 @@ RUN curl ${HELM_URL_V3} | tar xvzf - --strip-components=1 -C /usr/bin && \
     chmod +x /usr/bin/kustomize
 
 # Set up K3s: copy the necessary binaries from the K3s image.
-COPY --from=rancher/k3s:v1.25.5-k3s1 \
+COPY --from=rancher/k3s:v1.26.4-k3s1 \
     /bin/blkid \
     /bin/cni \
     /bin/conntrack \
@@ -154,20 +158,20 @@ RUN ln -s /usr/bin/cni /usr/bin/bridge && \
 
 RUN curl -sLf ${!TINI_URL} > /usr/bin/tini && \
     mkdir -p /var/lib/rancher/k3s/agent/images/ && \
-    curl -sfL ${ETCD_URL} | tar xvzf - --strip-components=1 -C /usr/bin/ etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}/etcdctl && \
+    curl -sfL ${ETCD_URL} | tar xvzf - --strip-components=1 --no-same-owner -C /usr/bin/ etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}/etcdctl && \
     curl -sLf https://github.com/rancher/telemetry/releases/download/${TELEMETRY_VERSION}/telemetry-${ARCH} > /usr/bin/telemetry && \
     chmod +x /usr/bin/tini /usr/bin/telemetry && \
     mkdir -p /var/lib/rancher-data/driver-metadata
 
-ENV CATTLE_UI_VERSION 2.7.2-rc8
-ENV CATTLE_DASHBOARD_UI_VERSION v2.7.2-rc8
-ENV CATTLE_CLI_VERSION v2.7.2-rc1
+ENV CATTLE_UI_VERSION 2.7.5-rc2
+ENV CATTLE_DASHBOARD_UI_VERSION v2.7.5-rc2
+ENV CATTLE_CLI_VERSION v2.7.0
 
 # Base UI brand used as a fallback env setting (not user facing) to indicate this is a non-prime install
 ENV CATTLE_BASE_UI_BRAND=
 
 # Please update the api-ui-version in pkg/settings/settings.go when updating the version here.
-ENV CATTLE_API_UI_VERSION 1.1.9
+ENV CATTLE_API_UI_VERSION 1.1.10
 
 RUN mkdir -p /var/log/auditlog
 ENV AUDIT_LOG_PATH /var/log/auditlog/rancher-api-audit.log
@@ -226,5 +230,7 @@ VOLUME /var/lib/rancher
 VOLUME /var/lib/kubelet
 VOLUME /var/lib/cni
 VOLUME /var/log
+
+ENV ETCD_UNSUPPORTED_ARCH ${ETCD_UNSUPPORTED_ARCH}
 
 ENTRYPOINT ["run_rancher.sh"]

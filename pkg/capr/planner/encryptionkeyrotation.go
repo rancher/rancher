@@ -29,7 +29,7 @@ const (
 	encryptionKeyRotationSecretsEncryptStatusCommand = "secrets-encrypt-status"
 
 	encryptionKeyRotationInstallRoot = "/var/lib/rancher"
-	encryptionKeyRotationBinPrefix   = "rancher_v2prov_encryption_key_rotation/bin"
+	encryptionKeyRotationBinPrefix   = "capr/encryption-key-rotation/bin"
 
 	encryptionKeyRotationWaitForSystemctlStatusPath      = "wait_for_systemctl_status.sh"
 	encryptionKeyRotationWaitForSecretsEncryptStatusPath = "wait_for_secrets_encrypt_status.sh"
@@ -42,7 +42,7 @@ const (
 runtimeServer=$1
 i=0
 
-while [ $i -lt 10 ]; do
+while [ $i -lt 30 ]; do
 	systemctl is-active $runtimeServer
 	if [ $? -eq 0 ]; then
 		exit 0
@@ -92,32 +92,6 @@ while [ $i -lt 10 ]; do
 	i=$((i + 1))
 done
 exit 1
-`
-
-	idempotentActionScript = `
-#!/bin/sh
-
-currentGeneration=""
-key=$1
-targetGeneration=$2
-runtime=$3
-shift
-shift
-shift
-
-dataRoot="/var/lib/rancher/$runtime/$key"
-generationFile="$dataRoot/generation"
-
-currentGeneration=$(cat "$generationFile" || echo "")
-
-if [ "$currentGeneration" != "$targetGeneration" ]; then
-	$runtime $@
-else
-	echo "action has already been reconciled to the current generation."
-fi
-
-mkdir -p "$dataRoot"
-echo "$targetGeneration" > "$generationFile"
 `
 
 	encryptionKeyRotationEndpointEnv = "CONTAINER_RUNTIME_ENDPOINT=unix:///var/run/k3s/containerd/containerd.sock"
@@ -420,7 +394,7 @@ func (p *Planner) encryptionKeyRotationRestartNodes(cp *rkev1.RKEControlPlane, s
 // status can be successfully queried, and then gets the status. leaderStage is allowed to be empty if entry is the
 // leader.
 func (p *Planner) encryptionKeyRotationRestartService(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus, tokensSecret plan.Secret, joinServer string, entry *planEntry, scrapeStage bool, leaderStage string) (string, rkev1.RKEControlPlaneStatus, error) {
-	nodePlan, config, joinedServer, err := p.generatePlanWithConfigFiles(cp, tokensSecret, entry, joinServer)
+	nodePlan, config, joinedServer, err := p.generatePlanWithConfigFiles(cp, tokensSecret, entry, joinServer, true)
 	if err != nil {
 		return "", status, err
 	}
@@ -430,10 +404,18 @@ func (p *Planner) encryptionKeyRotationRestartService(cp *rkev1.RKEControlPlane,
 		Path:    encryptionKeyRotationScriptPath(cp, encryptionKeyRotationWaitForSystemctlStatusPath),
 	})
 
-	nodePlan.Instructions = []plan.OneTimeInstruction{
-		encryptionKeyRotationRestartInstruction(cp),
-		encryptionKeyRotationWaitForSystemctlStatusInstruction(cp),
+	nodePlan.Instructions = []plan.OneTimeInstruction{}
+
+	runtime := capr.GetRuntime(cp.Spec.KubernetesVersion)
+	if runtime == capr.RuntimeRKE2 {
+		if generated, instruction := generateManifestRemovalInstruction(runtime, entry); generated {
+			nodePlan.Instructions = append(nodePlan.Instructions, convertToIdempotentInstruction(strings.ToLower(fmt.Sprintf("encryption-key-rotation/manifest-cleanup/%s", cp.Status.RotateEncryptionKeysPhase)), strconv.FormatInt(cp.Spec.RotateEncryptionKeys.Generation, 10), instruction))
+		}
 	}
+
+	nodePlan.Instructions = append(nodePlan.Instructions, idempotentRestartInstructions(strings.ToLower(fmt.Sprintf("encryption-key-rotation/restart/%s", cp.Status.RotateEncryptionKeysPhase)), strconv.FormatInt(cp.Spec.RotateEncryptionKeys.Generation, 10), capr.GetRuntimeServerUnit(cp.Spec.KubernetesVersion))...)
+
+	nodePlan.Instructions = append(nodePlan.Instructions, encryptionKeyRotationWaitForSystemctlStatusInstruction(cp))
 
 	if isControlPlane(entry) {
 		nodePlan.Files = append(nodePlan.Files,
@@ -491,7 +473,7 @@ func (p *Planner) encryptionKeyRotationRestartService(cp *rkev1.RKEControlPlane,
 // successful. If the secrets-encrypt command does not exist on the plan, that means this is the first reconciliation, and
 // it must be added, otherwise reenqueue until the plan is in sync.
 func (p *Planner) encryptionKeyRotationLeaderPhaseReconcile(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus, tokensSecret plan.Secret, joinServer string, leader *planEntry) (rkev1.RKEControlPlaneStatus, error) {
-	nodePlan, _, joinedServer, err := p.generatePlanWithConfigFiles(cp, tokensSecret, leader, joinServer)
+	nodePlan, _, joinedServer, err := p.generatePlanWithConfigFiles(cp, tokensSecret, leader, joinServer, true)
 	if err != nil {
 		return status, err
 	}
@@ -502,10 +484,6 @@ func (p *Planner) encryptionKeyRotationLeaderPhaseReconcile(cp *rkev1.RKEControl
 	}
 
 	nodePlan.Files = append(nodePlan.Files, []plan.File{
-		{
-			Content: base64.StdEncoding.EncodeToString([]byte(idempotentActionScript)),
-			Path:    encryptionKeyRotationScriptPath(cp, encryptionKeyRotationActionPath),
-		},
 		{
 			Content: base64.StdEncoding.EncodeToString([]byte(encryptionKeyRotationWaitForSecretsEncryptStatusScript)),
 			Path:    encryptionKeyRotationScriptPath(cp, encryptionKeyRotationWaitForSecretsEncryptStatusPath),
@@ -619,19 +597,16 @@ func encryptionKeyRotationSecretsEncryptInstruction(cp *rkev1.RKEControlPlane) (
 		return plan.OneTimeInstruction{}, fmt.Errorf("cannot determine desired secrets-encrypt command for phase: [%s]", cp.Status.RotateEncryptionKeysPhase)
 	}
 
-	return plan.OneTimeInstruction{
-		Name:    encryptionKeyRotationSecretsEncryptApplyCommand,
-		Command: "sh",
-		Args: []string{
-			"-xe",
-			encryptionKeyRotationScriptPath(cp, encryptionKeyRotationActionPath),
-			strings.ToLower(fmt.Sprintf("rancher_v2prov_encryption_key_rotation/%s", cp.Status.RotateEncryptionKeysPhase)),
-			strconv.FormatInt(cp.Spec.RotateEncryptionKeys.Generation, 10),
-			capr.GetRuntimeCommand(cp.Spec.KubernetesVersion),
+	return idempotentInstruction(
+		strings.ToLower(fmt.Sprintf("encryption-key-rotation/%s", cp.Status.RotateEncryptionKeysPhase)),
+		strconv.FormatInt(cp.Spec.RotateEncryptionKeys.Generation, 10),
+		capr.GetRuntimeCommand(cp.Spec.KubernetesVersion),
+		[]string{
 			"secrets-encrypt",
 			command,
 		},
-	}, nil
+		[]string{},
+	), nil
 }
 
 // encryptionKeyRotationStatusEnv returns an environment variable in order to force followers to rerun their plans
@@ -719,25 +694,6 @@ func encryptionKeyRotationWaitForSystemctlStatusInstruction(cp *rkev1.RKEControl
 			encryptionKeyRotationGenerationEnv(cp),
 		},
 		SaveOutput: false,
-	}
-}
-
-// encryptionKeyRotationRestartInstruction generates a restart command for the rke2/k3s server, using the last known
-// leader stage in order to ensure that non-init nodes have a refreshed plan if the leader stage changes. If
-// secrets-encrypt commands were run on a node that is not the init node, this ensures that after this situation is
-// identified and the leader is restarted, other control plane nodes will be restarted given that the leader stage will
-// have changed without a corresponding apply command.
-func encryptionKeyRotationRestartInstruction(cp *rkev1.RKEControlPlane) plan.OneTimeInstruction {
-	return plan.OneTimeInstruction{
-		Name:    "restart-service",
-		Command: "systemctl",
-		Args: []string{
-			"restart", capr.GetRuntimeServerUnit(cp.Spec.KubernetesVersion),
-		},
-		Env: []string{
-			encryptionKeyRotationStatusEnv(cp),
-			encryptionKeyRotationGenerationEnv(cp),
-		},
 	}
 }
 

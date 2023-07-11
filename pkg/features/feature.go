@@ -107,6 +107,13 @@ var (
 		true,
 		true,
 		true)
+
+	HarvesterBaremetalContainerWorkload = newFeature(
+		"harvester-baremetal-container-workload",
+		"[Experimental]: Deploy container workloads to underlying harvester cluster",
+		false,
+		true,
+		true)
 )
 
 type Feature struct {

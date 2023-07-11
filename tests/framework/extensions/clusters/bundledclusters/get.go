@@ -11,7 +11,7 @@ func (bc *BundledCluster) Get(client *rancher.Client) (cluster *BundledCluster, 
 	cluster = new(BundledCluster)
 	cluster.Meta = bc.Meta
 
-	steveclient := client.Steve.SteveType(clusters.ProvisioningSteveResouceType)
+	steveclient := client.Steve.SteveType(clusters.ProvisioningSteveResourceType)
 	if err != nil {
 		return
 	}

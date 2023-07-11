@@ -15,6 +15,7 @@ var (
 )
 
 // +genclient
+// +kubebuilder:skipversion
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type MultiClusterApp struct {
@@ -91,6 +92,7 @@ type RollingUpdate struct {
 }
 
 // +genclient
+// +kubebuilder:skipversion
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type MultiClusterAppRevision struct {

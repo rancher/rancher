@@ -27,6 +27,7 @@ type RKE2NodeDriverProvisioningTestSuite struct {
 	cnis               []string
 	providers          []string
 	psact              string
+	advancedOptions    provisioning.AdvancedOptions
 }
 
 func (r *RKE2NodeDriverProvisioningTestSuite) TearDownSuite() {
@@ -44,6 +45,7 @@ func (r *RKE2NodeDriverProvisioningTestSuite) SetupSuite() {
 	r.cnis = clustersConfig.CNIs
 	r.providers = clustersConfig.Providers
 	r.psact = clustersConfig.PSACT
+	r.advancedOptions = clustersConfig.AdvancedOptions
 
 	client, err := rancher.NewClient("", testSession)
 	require.NoError(r.T(), err)
@@ -150,7 +152,7 @@ func (r *RKE2NodeDriverProvisioningTestSuite) TestProvisioningRKE2Cluster() {
 				for _, cni := range r.cnis {
 					name += " cni: " + cni
 					r.Run(name, func() {
-						TestProvisioningRKE2Cluster(r.T(), client, provider, tt.nodeRoles, kubeVersion, cni, tt.psact)
+						TestProvisioningRKE2Cluster(r.T(), client, provider, tt.nodeRoles, kubeVersion, cni, tt.psact, r.advancedOptions)
 					})
 				}
 			}
@@ -180,7 +182,6 @@ func (r *RKE2NodeDriverProvisioningTestSuite) TestProvisioningRKE2ClusterDynamic
 	for _, tt := range tests {
 		subSession := r.session.NewSession()
 		defer subSession.Cleanup()
-
 		client, err := tt.client.WithSession(subSession)
 		require.NoError(r.T(), err)
 
@@ -192,7 +193,7 @@ func (r *RKE2NodeDriverProvisioningTestSuite) TestProvisioningRKE2ClusterDynamic
 				for _, cni := range r.cnis {
 					name += " cni: " + cni
 					r.Run(name, func() {
-						TestProvisioningRKE2Cluster(r.T(), client, provider, nodesAndRoles, kubeVersion, cni, tt.psact)
+						TestProvisioningRKE2Cluster(r.T(), client, provider, nodesAndRoles, kubeVersion, cni, tt.psact, r.advancedOptions)
 					})
 				}
 			}

@@ -14,6 +14,7 @@ const (
 	OKTAConfigFieldIDPMetadataContent  = "idpMetadataContent"
 	OKTAConfigFieldLabels              = "labels"
 	OKTAConfigFieldName                = "name"
+	OKTAConfigFieldOpenLdapConfig      = "openLdapConfig"
 	OKTAConfigFieldOwnerReferences     = "ownerReferences"
 	OKTAConfigFieldRancherAPIHost      = "rancherApiHost"
 	OKTAConfigFieldRemoved             = "removed"
@@ -38,6 +39,7 @@ type OKTAConfig struct {
 	IDPMetadataContent  string            `json:"idpMetadataContent,omitempty" yaml:"idpMetadataContent,omitempty"`
 	Labels              map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Name                string            `json:"name,omitempty" yaml:"name,omitempty"`
+	OpenLdapConfig      *LdapFields       `json:"openLdapConfig,omitempty" yaml:"openLdapConfig,omitempty"`
 	OwnerReferences     []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	RancherAPIHost      string            `json:"rancherApiHost,omitempty" yaml:"rancherApiHost,omitempty"`
 	Removed             string            `json:"removed,omitempty" yaml:"removed,omitempty"`

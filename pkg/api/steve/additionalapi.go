@@ -40,7 +40,7 @@ func AdditionalAPIsPreMCM(config *wrangler.Context) func(http.Handler) http.Hand
 }
 
 func AdditionalAPIs(ctx context.Context, config *wrangler.Context, steve *steve.Server) (func(http.Handler) http.Handler, error) {
-	clusterAPI, err := projects.Projects(ctx, steve)
+	clusterAPI, err := projects.Projects(ctx, config, steve)
 	if err != nil {
 		return nil, err
 	}

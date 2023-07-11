@@ -11,30 +11,58 @@ import (
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	v3 "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
+	"github.com/sirupsen/logrus"
 )
 
 // ListRKE1AvailableVersions is a function to list and return only available RKE1 versions for a specific cluster.
 func ListRKE1AvailableVersions(client *rancher.Client, cluster *v3.Cluster) (availableVersions []string, err error) {
-	allAvailableVersions, err := ListRKE1AllVersions(client)
+	var allAvailableVersions []*semver.Version
+	allRKE1Versions, err := ListRKE1AllVersions(client)
 	if err != nil {
 		return
 	}
 
-	for i, version := range allAvailableVersions {
-		if strings.Contains(version, cluster.RancherKubernetesEngineConfig.Version) {
-			availableVersions = allAvailableVersions[i+1:]
-			break
+	for _, v := range allRKE1Versions {
+		rkeVersion, err := semver.NewVersion(strings.TrimPrefix(v, "v"))
+		if err != nil {
+			logrus.Errorf("couldn't turn %v to a semantic version", rkeVersion)
+			continue
 		}
+
+		allAvailableVersions = append(allAvailableVersions, rkeVersion)
+	}
+
+	currentVersion, err := semver.NewVersion(strings.TrimPrefix(cluster.RancherKubernetesEngineConfig.Version, "v"))
+	if err != nil {
+		return
+	}
+
+	for _, v := range allAvailableVersions {
+		if v.Compare(currentVersion) == 0 || v.Compare(currentVersion) == -1 {
+			continue
+		}
+		availableVersions = append(availableVersions, fmt.Sprint("v", v.String()))
 	}
 
 	return
 }
 
 // ListRKE2AvailableVersions is a function to list and return only available RKE2 versions for a specific cluster.
-func ListRKE2AvailableVersions(client *rancher.Client, cluster *v1.SteveAPIObject) (availableVersion []string, err error) {
-	allAvailableVersions, err := ListRKE2AllVersions(client)
+func ListRKE2AvailableVersions(client *rancher.Client, cluster *v1.SteveAPIObject) (availableVersions []string, err error) {
+	var allAvailableVersions []*semver.Version
+	allRKE2Versions, err := ListRKE2AllVersions(client)
 	if err != nil {
 		return
+	}
+
+	for _, v := range allRKE2Versions {
+		rke2Version, err := semver.NewVersion(strings.TrimPrefix(v, "v"))
+		if err != nil {
+			logrus.Errorf("couldn't turn %v to a semantic version", rke2Version)
+			continue
+		}
+
+		allAvailableVersions = append(allAvailableVersions, rke2Version)
 	}
 
 	clusterSpec := &apiv1.ClusterSpec{}
@@ -43,45 +71,73 @@ func ListRKE2AvailableVersions(client *rancher.Client, cluster *v1.SteveAPIObjec
 		return
 	}
 
-	availableVersion = allAvailableVersions
+	currentVersion, err := semver.NewVersion(strings.TrimPrefix(clusterSpec.KubernetesVersion, "v"))
+	if err != nil {
+		return
+	}
 
-	for i, version := range allAvailableVersions {
-		if strings.Contains(version, clusterSpec.KubernetesVersion) {
-			availableVersion = allAvailableVersions[i+1:]
-			break
+	for _, v := range allAvailableVersions {
+		if v.Compare(currentVersion) == 0 || v.Compare(currentVersion) == -1 {
+			continue
 		}
+
+		availableVersions = append(availableVersions, fmt.Sprint("v", v.String()))
 	}
 
 	return
 }
 
 // ListNormanRKE2AvailableVersions is a function to list and return only available RKE2 versions for an imported specific cluster.
-func ListNormanRKE2AvailableVersions(client *rancher.Client, cluster *v3.Cluster) (availableVersion []string, err error) {
-	allAvailableVersions, err := ListRKE2AllVersions(client)
+func ListNormanRKE2AvailableVersions(client *rancher.Client, cluster *v3.Cluster) (availableVersions []string, err error) {
+	var allAvailableVersions []*semver.Version
+	allRKE2Versions, err := ListRKE2AllVersions(client)
 	if err != nil {
 		return
 	}
 
-	availableVersion = allAvailableVersions
-
-	for i, version := range allAvailableVersions {
-		if strings.Contains(version, cluster.Rke2Config.Version) {
-			availableVersion = allAvailableVersions[i+1:]
-			break
+	for _, v := range allRKE2Versions {
+		k3sVersion, err := semver.NewVersion(strings.TrimPrefix(v, "v"))
+		if err != nil {
+			logrus.Errorf("couldn't turn %v to a semantic version", k3sVersion)
+			continue
 		}
+
+		allAvailableVersions = append(allAvailableVersions, k3sVersion)
+	}
+
+	currentVersion, err := semver.NewVersion(strings.TrimPrefix(cluster.Rke2Config.Version, "v"))
+	if err != nil {
+		return
+	}
+
+	for _, v := range allAvailableVersions {
+		if v.Compare(currentVersion) == 0 || v.Compare(currentVersion) == -1 {
+			continue
+		}
+
+		availableVersions = append(availableVersions, fmt.Sprint("v", v.String()))
 	}
 
 	return
 }
 
 // ListK3SAvailableVersions is a function to list and return only available K3S versions for a specific cluster.
-func ListK3SAvailableVersions(client *rancher.Client, cluster *v1.SteveAPIObject) (availableVersion []string, err error) {
-	allAvailableVersions, err := ListK3SAllVersions(client)
+func ListK3SAvailableVersions(client *rancher.Client, cluster *v1.SteveAPIObject) (availableVersions []string, err error) {
+	var allAvailableVersions []*semver.Version
+	allK3sVersions, err := ListK3SAllVersions(client)
 	if err != nil {
 		return
 	}
 
-	availableVersion = allAvailableVersions
+	for _, v := range allK3sVersions {
+		rkeVersion, err := semver.NewVersion(strings.TrimPrefix(v, "v"))
+		if err != nil {
+			logrus.Errorf("couldn't turn %v to a semantic version", rkeVersion)
+			continue
+		}
+
+		allAvailableVersions = append(allAvailableVersions, rkeVersion)
+	}
 
 	clusterSpec := &apiv1.ClusterSpec{}
 	err = v1.ConvertToK8sType(cluster.Spec, clusterSpec)
@@ -89,30 +145,51 @@ func ListK3SAvailableVersions(client *rancher.Client, cluster *v1.SteveAPIObject
 		return
 	}
 
-	for i, version := range allAvailableVersions {
-		if strings.Contains(version, clusterSpec.KubernetesVersion) {
-			availableVersion = allAvailableVersions[i+1:]
-			break
+	currentVersion, err := semver.NewVersion(strings.TrimPrefix(clusterSpec.KubernetesVersion, "v"))
+	if err != nil {
+		return
+	}
+
+	for _, v := range allAvailableVersions {
+		if v.Compare(currentVersion) == 0 || v.Compare(currentVersion) == -1 {
+			continue
 		}
+
+		availableVersions = append(availableVersions, fmt.Sprint("v", v.String()))
 	}
 
 	return
 }
 
 // ListNormanK3SAvailableVersions is a function to list and return only available K3S versions for an imported specific cluster.
-func ListNormanK3SAvailableVersions(client *rancher.Client, cluster *v3.Cluster) (availableVersion []string, err error) {
-	allAvailableVersions, err := ListK3SAllVersions(client)
+func ListNormanK3SAvailableVersions(client *rancher.Client, cluster *v3.Cluster) (availableVersions []string, err error) {
+	var allAvailableVersions []*semver.Version
+	allK3sVersions, err := ListK3SAllVersions(client)
 	if err != nil {
 		return
 	}
 
-	availableVersion = allAvailableVersions
-
-	for i, version := range allAvailableVersions {
-		if strings.Contains(version, cluster.K3sConfig.Version) {
-			availableVersion = allAvailableVersions[i+1:]
-			break
+	for _, v := range allK3sVersions {
+		rkeVersion, err := semver.NewVersion(strings.TrimPrefix(v, "v"))
+		if err != nil {
+			logrus.Errorf("couldn't turn %v to a semantic version", rkeVersion)
+			continue
 		}
+
+		allAvailableVersions = append(allAvailableVersions, rkeVersion)
+	}
+
+	currentVersion, err := semver.NewVersion(strings.TrimPrefix(cluster.K3sConfig.Version, "v"))
+	if err != nil {
+		return
+	}
+
+	for _, v := range allAvailableVersions {
+		if v.Compare(currentVersion) == 0 || v.Compare(currentVersion) == -1 {
+			continue
+		}
+
+		availableVersions = append(availableVersions, fmt.Sprint("v", v.String()))
 	}
 
 	return

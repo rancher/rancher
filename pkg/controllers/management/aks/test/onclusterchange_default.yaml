@@ -67,6 +67,7 @@ spec:
     tags: {}
     virtualNetwork: null
     virtualNetworkResourceGroup: null
+    outboundType: null
   answers: {}
   clusterSecrets: {}
   description: ""

@@ -18,6 +18,7 @@ const (
 	ClusterFieldAllocatable                                          = "allocatable"
 	ClusterFieldAnnotations                                          = "annotations"
 	ClusterFieldAppliedAgentEnvVars                                  = "appliedAgentEnvVars"
+	ClusterFieldAppliedClusterAgentDeploymentCustomization           = "appliedClusterAgentDeploymentCustomization"
 	ClusterFieldAppliedEnableNetworkPolicy                           = "appliedEnableNetworkPolicy"
 	ClusterFieldAppliedPodSecurityPolicyTemplateName                 = "appliedPodSecurityPolicyTemplateId"
 	ClusterFieldAppliedSpec                                          = "appliedSpec"
@@ -26,6 +27,7 @@ const (
 	ClusterFieldCapabilities                                         = "capabilities"
 	ClusterFieldCapacity                                             = "capacity"
 	ClusterFieldCertificatesExpiration                               = "certificatesExpiration"
+	ClusterFieldClusterAgentDeploymentCustomization                  = "clusterAgentDeploymentCustomization"
 	ClusterFieldClusterSecrets                                       = "clusterSecrets"
 	ClusterFieldClusterTemplateAnswers                               = "answers"
 	ClusterFieldClusterTemplateID                                    = "clusterTemplateId"
@@ -50,6 +52,7 @@ const (
 	ClusterFieldEnableClusterMonitoring                              = "enableClusterMonitoring"
 	ClusterFieldEnableNetworkPolicy                                  = "enableNetworkPolicy"
 	ClusterFieldFailedSpec                                           = "failedSpec"
+	ClusterFieldFleetAgentDeploymentCustomization                    = "fleetAgentDeploymentCustomization"
 	ClusterFieldFleetWorkspaceName                                   = "fleetWorkspaceName"
 	ClusterFieldGKEConfig                                            = "gkeConfig"
 	ClusterFieldGKEStatus                                            = "gkeStatus"
@@ -101,6 +104,7 @@ type Cluster struct {
 	Allocatable                                          map[string]string              `json:"allocatable,omitempty" yaml:"allocatable,omitempty"`
 	Annotations                                          map[string]string              `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	AppliedAgentEnvVars                                  []EnvVar                       `json:"appliedAgentEnvVars,omitempty" yaml:"appliedAgentEnvVars,omitempty"`
+	AppliedClusterAgentDeploymentCustomization           *AgentDeploymentCustomization  `json:"appliedClusterAgentDeploymentCustomization,omitempty" yaml:"appliedClusterAgentDeploymentCustomization,omitempty"`
 	AppliedEnableNetworkPolicy                           bool                           `json:"appliedEnableNetworkPolicy,omitempty" yaml:"appliedEnableNetworkPolicy,omitempty"`
 	AppliedPodSecurityPolicyTemplateName                 string                         `json:"appliedPodSecurityPolicyTemplateId,omitempty" yaml:"appliedPodSecurityPolicyTemplateId,omitempty"`
 	AppliedSpec                                          *ClusterSpec                   `json:"appliedSpec,omitempty" yaml:"appliedSpec,omitempty"`
@@ -109,6 +113,7 @@ type Cluster struct {
 	Capabilities                                         *Capabilities                  `json:"capabilities,omitempty" yaml:"capabilities,omitempty"`
 	Capacity                                             map[string]string              `json:"capacity,omitempty" yaml:"capacity,omitempty"`
 	CertificatesExpiration                               map[string]CertExpiration      `json:"certificatesExpiration,omitempty" yaml:"certificatesExpiration,omitempty"`
+	ClusterAgentDeploymentCustomization                  *AgentDeploymentCustomization  `json:"clusterAgentDeploymentCustomization,omitempty" yaml:"clusterAgentDeploymentCustomization,omitempty"`
 	ClusterSecrets                                       *ClusterSecrets                `json:"clusterSecrets,omitempty" yaml:"clusterSecrets,omitempty"`
 	ClusterTemplateAnswers                               *Answer                        `json:"answers,omitempty" yaml:"answers,omitempty"`
 	ClusterTemplateID                                    string                         `json:"clusterTemplateId,omitempty" yaml:"clusterTemplateId,omitempty"`
@@ -133,6 +138,7 @@ type Cluster struct {
 	EnableClusterMonitoring                              bool                           `json:"enableClusterMonitoring,omitempty" yaml:"enableClusterMonitoring,omitempty"`
 	EnableNetworkPolicy                                  *bool                          `json:"enableNetworkPolicy,omitempty" yaml:"enableNetworkPolicy,omitempty"`
 	FailedSpec                                           *ClusterSpec                   `json:"failedSpec,omitempty" yaml:"failedSpec,omitempty"`
+	FleetAgentDeploymentCustomization                    *AgentDeploymentCustomization  `json:"fleetAgentDeploymentCustomization,omitempty" yaml:"fleetAgentDeploymentCustomization,omitempty"`
 	FleetWorkspaceName                                   string                         `json:"fleetWorkspaceName,omitempty" yaml:"fleetWorkspaceName,omitempty"`
 	GKEConfig                                            *GKEClusterConfigSpec          `json:"gkeConfig,omitempty" yaml:"gkeConfig,omitempty"`
 	GKEStatus                                            *GKEStatus                     `json:"gkeStatus,omitempty" yaml:"gkeStatus,omitempty"`

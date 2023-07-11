@@ -6,6 +6,10 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/rancher/rancher/pkg/auth/providers/common"
+
+	"golang.org/x/net/html"
+
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 
 	ldapv3 "github.com/go-ldap/ldap/v3"
@@ -115,18 +119,18 @@ func (p *adProvider) RefetchGroupPrincipals(principalID string, secret string) (
 		return nil, err
 	}
 
-	dn := externalID
+	escapedGUID := common.EscapeUUID(externalID)
+	logrus.Debugf("LDAP Refetch principals GUID : {%s}", externalID)
 
-	logrus.Debugf("LDAP Refetch principals base DN : {%s}", dn)
-
+	filter := fmt.Sprintf("(&(%v=%v)(%v=%v))", ObjectClass, config.UserObjectClass, common.AttributeObjectGUID, escapedGUID)
 	search := ldapv3.NewSearchRequest(
-		dn,
-		ldapv3.ScopeBaseObject,
+		config.UserSearchBase,
+		ldapv3.ScopeWholeSubtree,
 		ldapv3.NeverDerefAliases,
 		0,
 		0,
 		false,
-		fmt.Sprintf("(%v=%v)", ObjectClass, config.UserObjectClass),
+		filter,
 		ldap.GetUserSearchAttributes(MemberOfAttribute, ObjectClass, config),
 		nil,
 	)
@@ -160,6 +164,7 @@ func (p *adProvider) getPrincipalsFromSearchResult(result *ldapv3.SearchResult, 
 	groupMap := make(map[string]bool)
 
 	entry := result.Entries[0]
+	guidString := html.EscapeString(fmt.Sprintf("%x", entry.GetRawAttributeValue(common.AttributeObjectGUID)))
 
 	if !p.permissionCheck(entry.Attributes, config) {
 		return v3.Principal{}, nil, fmt.Errorf("Permission denied")
@@ -181,7 +186,7 @@ func (p *adProvider) getPrincipalsFromSearchResult(result *ldapv3.SearchResult, 
 		return v3.Principal{}, nil, nil
 	}
 
-	user, err := ldap.AttributesToPrincipal(entry.Attributes, result.Entries[0].DN, UserScope, Name, config.UserObjectClass, config.UserNameAttribute, config.UserLoginAttribute, config.GroupObjectClass, config.GroupNameAttribute)
+	user, err := ldap.AttributesToPrincipal(entry.Attributes, result.Entries[0].DN, UserScope, Name, config.UserObjectClass, config.UserNameAttribute, config.UserLoginAttribute, config.GroupObjectClass, config.GroupNameAttribute, guidString)
 	if err != nil {
 		return userPrincipal, groupPrincipals, err
 	}
@@ -294,7 +299,7 @@ func (p *adProvider) getGroupPrincipalsFromSearch(searchBase string, filter stri
 	}
 
 	for _, e := range result.Entries {
-		principal, err := ldap.AttributesToPrincipal(e.Attributes, e.DN, GroupScope, Name, config.UserObjectClass, config.UserNameAttribute, config.UserLoginAttribute, config.GroupObjectClass, config.GroupNameAttribute)
+		principal, err := ldap.AttributesToPrincipal(e.Attributes, e.DN, GroupScope, Name, config.UserObjectClass, config.UserNameAttribute, config.UserLoginAttribute, config.GroupObjectClass, config.GroupNameAttribute, "")
 		if err != nil {
 			logrus.Errorf("AD: Error in getting principal for group entry %v: %v", e, err)
 			continue
@@ -315,32 +320,24 @@ func (p *adProvider) getPrincipal(distinguishedName string, scope string, config
 		return nil, fmt.Errorf("Invalid scope")
 	}
 
-	var attributes []*ldapv3.AttributeTypeAndValue
-	var attribs []*ldapv3.EntryAttribute
-	object, err := ldapv3.ParseDN(distinguishedName)
-	if err != nil {
-		return nil, err
-	}
-	for _, rdns := range object.RDNs {
-		for _, attr := range rdns.Attributes {
-			attributes = append(attributes, attr)
-			entryAttr := ldapv3.NewEntryAttribute(attr.Type, []string{attr.Value})
-			attribs = append(attribs, entryAttr)
-		}
-	}
-
-	if !ldap.IsType(attribs, scope) && !p.permissionCheck(attribs, config) {
-		logrus.Errorf("Failed to get object %s", distinguishedName)
-		return nil, nil
-	}
-
+	var userSearchString string
+	var searchScope int
 	if strings.EqualFold(UserScope, scope) {
-		filter = fmt.Sprintf("(%v=%v)", ObjectClass, config.UserObjectClass)
+		if strings.HasSuffix(strings.ToLower(distinguishedName), strings.ToLower(config.UserSearchBase)) {
+			userSearchString = distinguishedName
+			searchScope = ldapv3.ScopeBaseObject
+			filter = fmt.Sprintf("(&(%v=%v))", ObjectClass, config.UserObjectClass)
+		} else {
+			userSearchString = config.UserSearchBase
+			searchScope = ldapv3.ScopeWholeSubtree
+			filter = fmt.Sprintf("(&(%v=%v)(%v=%v))", ObjectClass, config.UserObjectClass, common.AttributeObjectGUID, common.EscapeUUID(distinguishedName))
+		}
+
 	} else {
 		filter = fmt.Sprintf("(%v=%v)", ObjectClass, config.GroupObjectClass)
 	}
 
-	logrus.Debugf("Query for getPrincipal(%s): %s", distinguishedName, filter)
+	logrus.Debugf("Query for getPrincipal(%s): %s", userSearchString, filter)
 	lConn, err := p.ldapConnection(config, caPool)
 	if err != nil {
 		return nil, err
@@ -372,8 +369,8 @@ func (p *adProvider) getPrincipal(distinguishedName string, scope string, config
 	}
 
 	if strings.EqualFold(UserScope, scope) {
-		search = ldapv3.NewSearchRequest(distinguishedName,
-			ldapv3.ScopeBaseObject, ldapv3.NeverDerefAliases, 0, 0, false,
+		search = ldapv3.NewSearchRequest(userSearchString,
+			searchScope, ldapv3.NeverDerefAliases, 0, 0, false,
 			filter,
 			ldap.GetUserSearchAttributes(MemberOfAttribute, ObjectClass, config), nil)
 	} else {
@@ -403,7 +400,8 @@ func (p *adProvider) getPrincipal(distinguishedName string, scope string, config
 		return nil, fmt.Errorf("Permission denied")
 	}
 
-	principal, err := ldap.AttributesToPrincipal(entryAttributes, distinguishedName, scope, Name, config.UserObjectClass, config.UserNameAttribute, config.UserLoginAttribute, config.GroupObjectClass, config.GroupNameAttribute)
+	objectGUID := html.EscapeString(fmt.Sprintf("%x", entry.GetRawAttributeValue(common.AttributeObjectGUID)))
+	principal, err := ldap.AttributesToPrincipal(entryAttributes, distinguishedName, scope, Name, config.UserObjectClass, config.UserNameAttribute, config.UserLoginAttribute, config.GroupObjectClass, config.GroupNameAttribute, objectGUID)
 	if err != nil {
 		return nil, err
 	}
@@ -491,7 +489,9 @@ func (p *adProvider) searchLdap(query string, scope string, config *v32.ActiveDi
 
 	for i := 0; i < len(results.Entries); i++ {
 		entry := results.Entries[i]
-		principal, err := ldap.AttributesToPrincipal(entry.Attributes, results.Entries[i].DN, scope, Name, config.UserObjectClass, config.UserNameAttribute, config.UserLoginAttribute, config.GroupObjectClass, config.GroupNameAttribute)
+		objectGUID := html.EscapeString(fmt.Sprintf("%x", entry.GetRawAttributeValue(common.AttributeObjectGUID)))
+
+		principal, err := ldap.AttributesToPrincipal(entry.Attributes, results.Entries[i].DN, scope, Name, config.UserObjectClass, config.UserNameAttribute, config.UserLoginAttribute, config.GroupObjectClass, config.GroupNameAttribute, objectGUID)
 		if err != nil {
 			logrus.Errorf("Error translating search result: %v", err)
 			continue

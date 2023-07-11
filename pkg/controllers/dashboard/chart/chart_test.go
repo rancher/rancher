@@ -4,14 +4,13 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/golang/mock/gomock"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/chart"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
-	corev1 "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
+	"github.com/rancher/wrangler/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 )
 
 var (
@@ -22,23 +21,11 @@ var (
 const priorityClassName = "rancher-critical"
 
 func TestGetPriorityClassNameFromRancherConfigMap(t *testing.T) {
-	configCache := &mockCache{
-		Maps: []*v1.ConfigMap{
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "set-config",
-					Namespace: namespace.System,
-				},
-				Data: map[string]string{"priorityClassName": priorityClassName},
-			},
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "empty-config",
-					Namespace: namespace.System,
-				},
-			},
-		},
-	}
+	ctrl := gomock.NewController(t)
+	configCache := fake.NewMockCacheInterface[*v1.ConfigMap](ctrl)
+	configCache.EXPECT().Get(namespace.System, "set-config").Return(&v1.ConfigMap{Data: map[string]string{"priorityClassName": priorityClassName}}, nil).AnyTimes()
+	configCache.EXPECT().Get(namespace.System, "empty-config").Return(&v1.ConfigMap{}, nil).AnyTimes()
+	configCache.EXPECT().Get(gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("not found")).AnyTimes()
 
 	tests := []*struct {
 		name    string
@@ -88,25 +75,4 @@ func TestGetPriorityClassNameFromRancherConfigMap(t *testing.T) {
 			assert.Equal(t, tt.want, got, "Unexpected priorityClassName returned")
 		})
 	}
-}
-
-type mockCache struct {
-	Maps []*v1.ConfigMap
-}
-
-func (m *mockCache) Get(namespace, name string) (*v1.ConfigMap, error) {
-	for _, configMap := range m.Maps {
-		if configMap.Name == name && configMap.Namespace == namespace {
-			return configMap, nil
-		}
-	}
-	return nil, errNotFound
-}
-func (m *mockCache) List(namespace string, selector labels.Selector) ([]*v1.ConfigMap, error) {
-	return m.Maps, nil
-}
-
-func (m *mockCache) AddIndexer(indexName string, indexer corev1.ConfigMapIndexer) {}
-func (m *mockCache) GetByIndex(indexName, key string) ([]*v1.ConfigMap, error) {
-	return nil, errUnimplemented
 }

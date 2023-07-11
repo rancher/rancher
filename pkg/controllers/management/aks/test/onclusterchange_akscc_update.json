@@ -72,7 +72,8 @@
       "Stakeholder": "stakeholder@suse.com"
     },
     "virtualNetwork": null,
-    "virtualNetworkResourceGroup": null
+    "virtualNetworkResourceGroup": null,
+    "outboundType": null
   },
   "status": {
     "failureMessage": "",

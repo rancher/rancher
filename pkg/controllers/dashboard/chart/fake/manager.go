@@ -34,29 +34,29 @@ func (m *MockManager) EXPECT() *MockManagerMockRecorder {
 }
 
 // Ensure mocks base method.
-func (m *MockManager) Ensure(arg0, arg1, arg2 string, arg3 map[string]interface{}, arg4 bool, arg5 string) error {
+func (m *MockManager) Ensure(arg0, arg1, arg2, arg3 string, arg4 map[string]interface{}, arg5 bool, arg6 string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Ensure", arg0, arg1, arg2, arg3, arg4, arg5)
+	ret := m.ctrl.Call(m, "Ensure", arg0, arg1, arg2, arg3, arg4, arg5, arg6)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Ensure indicates an expected call of Ensure.
-func (mr *MockManagerMockRecorder) Ensure(arg0, arg1, arg2, arg3, arg4, arg5 interface{}) *gomock.Call {
+func (mr *MockManagerMockRecorder) Ensure(arg0, arg1, arg2, arg3, arg4, arg5, arg6 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Ensure", reflect.TypeOf((*MockManager)(nil).Ensure), arg0, arg1, arg2, arg3, arg4, arg5)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Ensure", reflect.TypeOf((*MockManager)(nil).Ensure), arg0, arg1, arg2, arg3, arg4, arg5, arg6)
 }
 
 // Remove mocks base method.
-func (m *MockManager) Remove(arg0, arg1, arg2 string) {
+func (m *MockManager) Remove(arg0, arg1 string) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "Remove", arg0, arg1, arg2)
+	m.ctrl.Call(m, "Remove", arg0, arg1)
 }
 
 // Remove indicates an expected call of Remove.
-func (mr *MockManagerMockRecorder) Remove(arg0, arg1, arg2 interface{}) *gomock.Call {
+func (mr *MockManagerMockRecorder) Remove(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Remove", reflect.TypeOf((*MockManager)(nil).Remove), arg0, arg1, arg2)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Remove", reflect.TypeOf((*MockManager)(nil).Remove), arg0, arg1)
 }
 
 // Uninstall mocks base method.

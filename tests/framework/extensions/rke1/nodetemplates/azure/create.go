@@ -16,7 +16,7 @@ func CreateAzureNodeTemplate(rancherClient *rancher.Client) (*nodetemplates.Node
 	config.LoadConfig(nodetemplates.AzureNodeTemplateConfigurationFileKey, &azureNodeTemplateConfig)
 
 	nodeTemplate := nodetemplates.NodeTemplate{
-		EngineInstallURL:        "https://releases.rancher.com/install-docker/20.10.sh",
+		EngineInstallURL:        "https://releases.rancher.com/install-docker/23.0.sh",
 		Name:                    azureNodeTemplateNameBase,
 		AzureNodeTemplateConfig: &azureNodeTemplateConfig,
 	}

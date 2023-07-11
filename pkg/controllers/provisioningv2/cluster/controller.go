@@ -190,15 +190,34 @@ func (h *handler) generateProvisioningClusterFromLegacyCluster(cluster *v3.Clust
 	if !h.isLegacyCluster(cluster) || cluster.Spec.FleetWorkspaceName == "" {
 		return nil, status, nil
 	}
-	return []runtime.Object{
-		&v1.Cluster{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:        cluster.Name,
-				Namespace:   cluster.Spec.FleetWorkspaceName,
-				Labels:      yaml.CleanAnnotationsForExport(cluster.Labels),
-				Annotations: yaml.CleanAnnotationsForExport(cluster.Annotations),
-			},
+	provCluster := &v1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        cluster.Name,
+			Namespace:   cluster.Spec.FleetWorkspaceName,
+			Labels:      yaml.CleanAnnotationsForExport(cluster.Labels),
+			Annotations: yaml.CleanAnnotationsForExport(cluster.Annotations),
 		},
+	}
+
+	if cluster.Spec.ClusterAgentDeploymentCustomization != nil {
+		clusterAgentCustomizationCopy := cluster.Spec.ClusterAgentDeploymentCustomization.DeepCopy()
+		provCluster.Spec.ClusterAgentDeploymentCustomization = &v1.AgentDeploymentCustomization{
+			AppendTolerations:            clusterAgentCustomizationCopy.AppendTolerations,
+			OverrideAffinity:             clusterAgentCustomizationCopy.OverrideAffinity,
+			OverrideResourceRequirements: clusterAgentCustomizationCopy.OverrideResourceRequirements,
+		}
+	}
+	if cluster.Spec.FleetAgentDeploymentCustomization != nil {
+		fleetAgentCustomizationCopy := cluster.Spec.FleetAgentDeploymentCustomization.DeepCopy()
+		provCluster.Spec.FleetAgentDeploymentCustomization = &v1.AgentDeploymentCustomization{
+			AppendTolerations:            fleetAgentCustomizationCopy.AppendTolerations,
+			OverrideAffinity:             fleetAgentCustomizationCopy.OverrideAffinity,
+			OverrideResourceRequirements: fleetAgentCustomizationCopy.OverrideResourceRequirements,
+		}
+	}
+
+	return []runtime.Object{
+		provCluster,
 	}, status, nil
 }
 
@@ -298,6 +317,23 @@ func (h *handler) createNewCluster(cluster *v1.Cluster, status v1.ClusterStatus,
 			Name:  env.Name,
 			Value: env.Value,
 		})
+	}
+
+	if cluster.Spec.ClusterAgentDeploymentCustomization != nil {
+		clusterAgentCustomizationCopy := cluster.Spec.ClusterAgentDeploymentCustomization.DeepCopy()
+		spec.ClusterAgentDeploymentCustomization = &v3.AgentDeploymentCustomization{
+			AppendTolerations:            clusterAgentCustomizationCopy.AppendTolerations,
+			OverrideAffinity:             clusterAgentCustomizationCopy.OverrideAffinity,
+			OverrideResourceRequirements: clusterAgentCustomizationCopy.OverrideResourceRequirements,
+		}
+	}
+	if cluster.Spec.FleetAgentDeploymentCustomization != nil {
+		fleetAgentCustomizationCopy := cluster.Spec.FleetAgentDeploymentCustomization.DeepCopy()
+		spec.FleetAgentDeploymentCustomization = &v3.AgentDeploymentCustomization{
+			AppendTolerations:            fleetAgentCustomizationCopy.AppendTolerations,
+			OverrideAffinity:             fleetAgentCustomizationCopy.OverrideAffinity,
+			OverrideResourceRequirements: fleetAgentCustomizationCopy.OverrideResourceRequirements,
+		}
 	}
 
 	if cluster.Spec.RKEConfig != nil {
