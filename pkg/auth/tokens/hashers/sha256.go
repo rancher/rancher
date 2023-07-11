@@ -1,4 +1,4 @@
-package tokens
+package hashers
 
 import (
 	"crypto/rand"
@@ -11,11 +11,15 @@ import (
 	"strings"
 )
 
-const hashFormat = "$%d:%s:%s" // $version:salt:hash -> $1:abc:def
-const Version = 2
+const (
+	sha256HashFormat = "$%d:%s:%s" // $version:salt:hash -> $1:abc:def
+)
 
-// CreateSHA256Hash can be used for basic key hashing, includes a random salt
-func CreateSHA256Hash(secretKey string) (string, error) {
+// Sha256Hasher implements the Hasher interface using a backing algorithm of SHA256.
+type Sha256Hasher struct{}
+
+// CreateHash hashes secretKey using a random salt and SHA256.
+func (s Sha256Hasher) CreateHash(secretKey string) (string, error) {
 	salt := make([]byte, 8)
 	_, err := rand.Read(salt)
 	if err != nil {
@@ -24,11 +28,12 @@ func CreateSHA256Hash(secretKey string) (string, error) {
 	hash := sha256.Sum256([]byte(fmt.Sprintf("%s%s", salt, secretKey)))
 	encSalt := base64.RawStdEncoding.EncodeToString(salt)
 	encKey := base64.RawStdEncoding.EncodeToString(hash[:])
-	return fmt.Sprintf(hashFormat, Version, encSalt, encKey), nil
+	return fmt.Sprintf(sha256HashFormat, SHA256Version, encSalt, encKey), nil
 }
 
-// VerifySHA256Hash takes a key and compares it with stored hash, including its salt
-func VerifySHA256Hash(hash, secretKey string) error {
+// VerifyHash compares a key with the hash, and will produce an error if the hash does not match or if the hash is not
+// a valid SHA256 hash.
+func (s Sha256Hasher) VerifyHash(hash, secretKey string) error {
 	if !strings.HasPrefix(hash, "$") {
 		return errors.New("hash format invalid")
 	}
@@ -41,8 +46,8 @@ func VerifySHA256Hash(hash, secretKey string) error {
 	if err != nil {
 		return err
 	}
-	if version != Version {
-		return fmt.Errorf("hash version %d does not match package version %d", version, Version)
+	if HashVersion(version) != SHA256Version {
+		return fmt.Errorf("hash version %d does not match package version %d", version, SHA256Version)
 	}
 
 	salt, enc := splitHash[1], splitHash[2]
