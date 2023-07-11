@@ -13,6 +13,8 @@ import (
 	"github.com/moby/locker"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/auth/tokens"
+	"github.com/rancher/rancher/pkg/auth/tokens/hashers"
 	"github.com/rancher/rancher/pkg/features"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
@@ -31,9 +33,8 @@ import (
 )
 
 const (
-	userIDLabel     = "authn.management.cattle.io/token-userId"
-	tokenKindLabel  = "authn.management.cattle.io/kind"
-	tokenHashedAnno = "authn.management.cattle.io/token-hashed"
+	userIDLabel    = "authn.management.cattle.io/token-userId"
+	tokenKindLabel = "authn.management.cattle.io/kind"
 
 	hashFormat = "$%d:%s:%s" // $version:salt:hash -> $1:abc:def
 	Version    = 2
@@ -90,13 +91,13 @@ func (m *Manager) getToken(clusterNamespace, clusterName string) (string, error)
 
 // getCachedToken retrieves the token for a given cluster without manipulating the token itself. This function is
 // primary to ensure the kubeconfig for a cluster remains valid.
-func (m *Manager) getCachedToken(clusterNamespace, clusterName string) (string, error) {
+func (m *Manager) getCachedToken(clusterNamespace, clusterName string) (string, *v3.Token, error) {
 	_, userName := getPrincipalAndUserName(clusterNamespace, clusterName)
 	token, err := m.tokensCache.Get(userName)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
-	return fmt.Sprintf("%s:%s", userName, token.Token), nil
+	return userName, token, nil
 }
 
 func getPrincipalAndUserName(clusterNamespace, clusterName string) (string, string) {
@@ -207,12 +208,10 @@ func (m *Manager) createUserToken(userName string) (string, error) {
 	}
 
 	if features.TokenHashing.Enabled() {
-		tokenHash, err := createSHA256Hash(tokenValue)
+		err := tokens.ConvertTokenKeyToHash(token)
 		if err != nil {
-			return "", err
+			return "", fmt.Errorf("unable to hash token: %w", err)
 		}
-		token.Token = tokenHash
-		token.Annotations[tokenHashedAnno] = "true"
 	}
 
 	_, err = m.tokens.Create(token)
@@ -271,13 +270,26 @@ func (m *Manager) kubeConfigValid(kcData []byte, cluster *v1.Cluster, currentSer
 	managementCluster = splitServer[1]
 	logrus.Tracef("[kubeconfigmanager] cluster %s/%s: parsed serverURL: %s and managementServer: %s from existing kubeconfig", cluster.Namespace, cluster.Name, serverURL, managementCluster)
 
-	token, err := m.getCachedToken(cluster.Namespace, cluster.Name)
+	userName, token, err := m.getCachedToken(cluster.Namespace, cluster.Name)
 	if err != nil {
 		logrus.Errorf("error while retrieving cached token in kubeconfigmanager for validation: %v", err)
 		return true, false
 	}
 
-	if serverURL != currentServerURL || !bytes.Equal([]byte(strings.TrimSpace(currentServerCA)), kc.Clusters["cluster"].CertificateAuthorityData) || managementCluster != currentManagementClusterName || token != kc.AuthInfos["user"].Token {
+	tokenMatches := fmt.Sprintf("%s:%s", userName, token.Token) == kc.AuthInfos["user"].Token
+	if token.Annotations[tokens.TokenHashed] == "true" {
+		// if tokenHashing is enabled, the stored token will be hashed. So we instead make sure it's up-to-date by checking if the token is valid for the hash
+		hasher, err := hashers.GetHasherForHash(token.Token)
+		if err != nil {
+			logrus.Errorf("[kubeconfigmanager] error when retrieving hasher for token hash, %s", err.Error())
+			return true, false
+		}
+		_, tokenKey := tokens.SplitTokenParts(kc.AuthInfos["user"].Token)
+		err = hasher.VerifyHash(token.Token, tokenKey)
+		tokenMatches = err == nil
+	}
+
+	if serverURL != currentServerURL || !bytes.Equal([]byte(strings.TrimSpace(currentServerCA)), kc.Clusters["cluster"].CertificateAuthorityData) || managementCluster != currentManagementClusterName || !tokenMatches {
 		logrus.Tracef("[kubeconfigmanager] cluster %s/%s: kubeconfig secret failed validation, did not match provided data", cluster.Namespace, cluster.Name)
 		return false, false
 	}
