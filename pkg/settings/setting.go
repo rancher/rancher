@@ -136,7 +136,7 @@ var (
 	K3sDefaultVersion  = NewSetting("k3s-default-version", "")
 
 	// AuthTokenMaxTTLMinutes is the max allowable time to live for tokens. Excluding those created for UI sessions which is controlled by AuthUserSessionTTLMinutes.
-	AuthTokenMaxTTLMinutes = NewSetting("auth-token-max-ttl-minutes", "0") // never expire
+	AuthTokenMaxTTLMinutes = NewSetting("auth-token-max-ttl-minutes", "129600") // 90 days
 
 	// AuthUserInfoMaxAgeSeconds represents the maximum age of a users auth tokens before an auth provider group membership sync will be performed.
 	AuthUserInfoMaxAgeSeconds = NewSetting("auth-user-info-max-age-seconds", "3600") // 1 hour
@@ -157,7 +157,7 @@ var (
 
 	// KubeconfigDefaultTokenTTLMinutes is the default time to live applied to kubeconfigs created for users.
 	// This setting will take effect regardless of the kubeconfig-generate-token status.
-	KubeconfigDefaultTokenTTLMinutes = NewSetting("kubeconfig-default-token-ttl-minutes", "0") // 0 TTL = never expire
+	KubeconfigDefaultTokenTTLMinutes = NewSetting("kubeconfig-default-token-ttl-minutes", "43200") // 30 days
 
 	// KubeconfigGenerateToken determines whether the UI will return a generate token with kubeconfigs.
 	// If set to false the kubeconfig will contain a command to login to Rancher.
