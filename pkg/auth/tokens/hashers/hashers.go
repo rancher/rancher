@@ -53,7 +53,7 @@ func GetHashVersion(hash string) (HashVersion, error) {
 		return 0, fmt.Errorf("hash format invalid")
 	}
 	version, err := strconv.Atoi(splitHash[0])
-	// this value could in theory be part of a senstive value, so we don't include it in the error
+	// this value could in theory be part of a sensitive value, so we don't include it in the error
 	if err != nil {
 		return 0, fmt.Errorf("unable to convert hash version")
 	}

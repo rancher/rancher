@@ -4,15 +4,15 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/golang/mock/gomock"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/features"
-	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	"github.com/rancher/wrangler/pkg/generic/fake"
 	"github.com/stretchr/testify/require"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -332,43 +332,26 @@ func Test_kubeConfigValid(t *testing.T) {
 			} else if test.invalidKubeconfig {
 				kcData = []byte{'a'}
 			}
-			mockCache := mockTokenCache{
-				token: test.storedToken,
-				err:   test.tokenCacheError,
-			}
+
+			ctrl := gomock.NewController(t)
+			mockCache := fake.NewMockNonNamespacedCacheInterface[*v3.Token](ctrl)
+
+			mockCache.EXPECT().Get(gomock.Any()).AnyTimes().DoAndReturn(func(name string) (*v3.Token, error) {
+				if test.storedToken != nil && name == test.storedToken.Name {
+					return test.storedToken, nil
+				}
+				if test.tokenCacheError != nil {
+					return nil, test.tokenCacheError
+				}
+				return nil, apierrors.NewNotFound(schema.GroupResource{Group: "management.cattle.io", Resource: "Token"}, name)
+
+			})
 			m := Manager{
-				tokensCache: &mockCache,
+				tokensCache: mockCache,
 			}
 			isError, isValid := m.kubeConfigValid(kcData, test.cluster, test.wantData.serverURL, test.wantData.serverCA, test.wantData.clusterName)
 			require.Equal(t, test.wantError, isError)
 			require.Equal(t, test.wantValid, isValid)
 		})
 	}
-}
-
-type mockTokenCache struct {
-	token *v3.Token
-	err   error
-}
-
-func (m *mockTokenCache) Get(name string) (*v3.Token, error) {
-	if m.token != nil && name == m.token.Name {
-		return m.token, nil
-	}
-	if m.err != nil {
-		return nil, m.err
-	}
-	return nil, apierrors.NewNotFound(schema.GroupResource{Group: "management.cattle.io", Resource: "Token"}, name)
-}
-
-func (m *mockTokenCache) List(selector labels.Selector) ([]*v3.Token, error) {
-	panic("not implemented")
-}
-
-func (m *mockTokenCache) AddIndexer(indexName string, indexer mgmtcontrollers.TokenIndexer) {
-	panic("not implemented")
-}
-
-func (m *mockTokenCache) GetByIndex(indexName, key string) ([]*v3.Token, error) {
-	panic("not implemented")
 }
