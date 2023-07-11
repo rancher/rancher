@@ -125,7 +125,7 @@ func (p *adProvider) RefetchGroupPrincipals(principalID string, secret string) (
 	filter := fmt.Sprintf("(&(%v=%v)(%v=%v))", ObjectClass, config.UserObjectClass, common.AttributeObjectGUID, escapedGUID)
 	search := ldapv3.NewSearchRequest(
 		config.UserSearchBase,
-		ldapv3.ScopeSingleLevel,
+		ldapv3.ScopeWholeSubtree,
 		ldapv3.NeverDerefAliases,
 		0,
 		0,
@@ -329,7 +329,7 @@ func (p *adProvider) getPrincipal(distinguishedName string, scope string, config
 			filter = fmt.Sprintf("(&(%v=%v))", ObjectClass, config.UserObjectClass)
 		} else {
 			userSearchString = config.UserSearchBase
-			searchScope = ldapv3.ScopeSingleLevel
+			searchScope = ldapv3.ScopeWholeSubtree
 			filter = fmt.Sprintf("(&(%v=%v)(%v=%v))", ObjectClass, config.UserObjectClass, common.AttributeObjectGUID, common.EscapeUUID(distinguishedName))
 		}
 
