@@ -284,11 +284,13 @@ func (s *Provider) SearchPrincipals(searchKey, principalType string, token v3.To
 
 func (s *Provider) GetPrincipal(principalID string, token v3.Token) (v3.Principal, error) {
 	externalID, principalType := splitPrincipalID(principalID)
+	logrus.Debugf("SAML [GetPrincipal]: Principal id [%s] split into [%s] and [%s]",
+		principalID, externalID, principalType)
 	if externalID == "" && principalType == "" {
 		return v3.Principal{}, fmt.Errorf("SAML: invalid id %v", principalID)
 	}
 	if principalType != s.userType && principalType != s.groupType {
-		return v3.Principal{}, fmt.Errorf("SAML: Invalid principal type: %s is not %s or %s",
+		return v3.Principal{}, fmt.Errorf("SAML: Invalid principal type: [%s] is not [%s] or [%s]",
 			principalType, s.userType, s.groupType)
 	}
 
