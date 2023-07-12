@@ -96,7 +96,7 @@ func GeneratePrivateRegistryEncodedDockerConfig(cluster *v3.Cluster, secretListe
 			if err != nil {
 				return registry.URL, "", err
 			}
-			return registry.URL, base64.URLEncoding.EncodeToString(encodedJSON), nil
+			return registry.URL, base64.StdEncoding.EncodeToString(encodedJSON), nil
 		}
 
 		// no private registry secret, generate authconfig based on existing fields
@@ -107,7 +107,7 @@ func GeneratePrivateRegistryEncodedDockerConfig(cluster *v3.Cluster, secretListe
 		// check for the RKE1 registry secret next
 		registrySecret, err := secretLister.Get(namespace.GlobalNamespace, registrySecretName)
 		if err == nil {
-			return registry.URL, base64.URLEncoding.EncodeToString(registrySecret.Data[corev1.DockerConfigJsonKey]), nil
+			return registry.URL, base64.StdEncoding.EncodeToString(registrySecret.Data[corev1.DockerConfigJsonKey]), nil
 		}
 		if err != nil && !apierrors.IsNotFound(err) { // ignore secret not found errors as we need to check v2prov clusters
 			return registry.URL, "", err
@@ -149,5 +149,5 @@ func GeneratePrivateRegistryEncodedDockerConfig(cluster *v3.Cluster, secretListe
 		return registryURL, "", err
 	}
 
-	return registryURL, base64.URLEncoding.EncodeToString(registryJSON), nil
+	return registryURL, base64.StdEncoding.EncodeToString(registryJSON), nil
 }
