@@ -103,7 +103,7 @@ func getPSALabels(response *v1.SteveAPIObject, actualLabels map[string]string) m
 
 func createDeploymentAndWait(steveclient *v1.Client, client *rancher.Client, clusterID string, containerName string, image string, namespaceName string) (*v1.SteveAPIObject, error) {
 	deploymentName := namegen.AppendRandomString("rbac-")
-	containerTemplate := workloads.NewContainer(containerName, image, coreV1.PullAlways, []coreV1.VolumeMount{}, []coreV1.EnvFromSource{})
+	containerTemplate := workloads.NewContainer(containerName, image, coreV1.PullAlways, []coreV1.VolumeMount{}, []coreV1.EnvFromSource{}, nil, nil, nil)
 
 	podTemplate := workloads.NewPodTemplate([]coreV1.Container{containerTemplate}, []coreV1.Volume{}, []coreV1.LocalObjectReference{}, nil)
 	deployment := workloads.NewDeploymentTemplate(deploymentName, namespaceName, podTemplate, isCattleLabeled, nil)
