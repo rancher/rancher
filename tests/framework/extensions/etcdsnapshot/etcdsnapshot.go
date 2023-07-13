@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	ProvisioningSteveResouceType = "provisioning.cattle.io.cluster"
+	ProvisioningSteveResourceType = "provisioning.cattle.io.cluster"
 )
 
 // CreateSnapshot is a helper function to create a snapshot on an RKE2 or k3s cluster. Returns error if any.

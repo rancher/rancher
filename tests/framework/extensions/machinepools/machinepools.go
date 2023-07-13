@@ -9,38 +9,51 @@ import (
 	apisV1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
-	namegenerator "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
+	"github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	kwait "k8s.io/apimachinery/pkg/util/wait"
 )
 
 const (
-	ProvisioningSteveResouceType = "provisioning.cattle.io.cluster"
-	active                       = "active"
+	ProvisioningSteveResourceType = "provisioning.cattle.io.cluster"
+	active                        = "active"
 )
 
-func isClusterReady(client *rancher.Client, cluster *v1.SteveAPIObject, updatedCluster *apisV1.Cluster, machinePools []apisV1.RKEMachinePool, newQuantity int32) (*v1.SteveAPIObject, error) {
+func updateClusterMachinePool(client *rancher.Client, cluster *v1.SteveAPIObject, updatedCluster *apisV1.Cluster, newQuantity int32) (*v1.SteveAPIObject, error) {
+
 	err := kwait.Poll(500*time.Millisecond, 10*time.Minute, func() (done bool, err error) {
-		updateCluster, err := client.Steve.SteveType(ProvisioningSteveResouceType).ByID(cluster.ID)
-		if err != nil {
-			return false, err
-		}
+		clusterResp, err := client.Steve.SteveType(ProvisioningSteveResourceType).ByID(cluster.ID)
+		if clusterResp.ObjectMeta.State.Name == active {
+			updateCluster, err := client.Steve.SteveType(ProvisioningSteveResourceType).ByID(cluster.ID)
+			if err != nil {
+				return false, err
+			}
 
-		updatedCluster.ObjectMeta.ResourceVersion = updateCluster.ObjectMeta.ResourceVersion
-		updatedCluster.Spec.RKEConfig.MachinePools[len(updatedCluster.Spec.RKEConfig.MachinePools)-1].Quantity = &newQuantity
+			updatedCluster.ObjectMeta.ResourceVersion = updateCluster.ObjectMeta.ResourceVersion
+			updatedCluster.Spec.RKEConfig.MachinePools[len(updatedCluster.Spec.RKEConfig.MachinePools)-1].Quantity = &newQuantity
 
-		cluster, err = client.Steve.SteveType(ProvisioningSteveResouceType).Update(cluster, updatedCluster)
-		if err != nil {
-			return false, err
+			cluster, err = client.Steve.SteveType(ProvisioningSteveResourceType).Update(cluster, updatedCluster)
+			if err != nil {
+				return false, err
+			}
+			return true, nil
 		}
+		return false, nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = kwait.Poll(500*time.Millisecond, 10*time.Minute, func() (done bool, err error) {
 
 		client, err = client.ReLogin()
 		if err != nil {
 			return false, err
 		}
 
-		clusterResp, err := client.Steve.SteveType(ProvisioningSteveResouceType).ByID(cluster.ID)
+		clusterResp, err := client.Steve.SteveType(ProvisioningSteveResourceType).ByID(cluster.ID)
 		if err != nil {
 			return false, err
 		}
@@ -130,9 +143,7 @@ func RKEMachinePoolSetup(nodeRoles []NodeRoles, machineConfig *v1.SteveAPIObject
 	return machinePools
 }
 
-// ScaleWorkerMachinePool is a helper method that will add a worker node pool to the existing RKE2/K3S cluster. Once done, it will scale
-// the worker machine pool to add a worker node, scale it back down to remove the worker node, and then delete the worker machine pool.
-func ScaleNewWorkerMachinePool(client *rancher.Client, cluster *v1.SteveAPIObject, updatedCluster *apisV1.Cluster, machineConfig *v1.SteveAPIObject) error {
+func CreateNewWorkerMachinePool(client *rancher.Client, cluster *v1.SteveAPIObject, updatedCluster *apisV1.Cluster, machineConfig *v1.SteveAPIObject, quantity int32) (error, *v1.SteveAPIObject, *apisV1.Cluster) {
 	nodePoolConfig := []NodeRoles{
 		{
 			ControlPlane: false,
@@ -148,36 +159,44 @@ func ScaleNewWorkerMachinePool(client *rancher.Client, cluster *v1.SteveAPIObjec
 
 	adminClient, err := rancher.NewClient(client.RancherConfig.AdminToken, client.Session)
 	if err != nil {
-		return err
+		return err, nil, nil
 	}
 
 	logrus.Infof("Creating new worker machine pool...")
 
-	clusterResp, err := isClusterReady(adminClient, cluster, updatedCluster, machinePools, 1)
+	updatedClusterResp, err := updateClusterMachinePool(adminClient, cluster, updatedCluster, quantity)
+	if err != nil {
+		return err, nil, nil
+	}
+
+	return nil, updatedClusterResp, updatedCluster
+}
+
+func ScaleNewWorkerMachinePool(client *rancher.Client, updatedClusterResp *v1.SteveAPIObject, updatedCluster *apisV1.Cluster, quantity int32) (error, *v1.SteveAPIObject) {
+	adminClient, err := rancher.NewClient(client.RancherConfig.AdminToken, client.Session)
+	if err != nil {
+		return err, nil
+	}
+
+	logrus.Infof("Scaling machine pool to %v worker nodes...", quantity)
+	scaledClusterResp, err := updateClusterMachinePool(adminClient, updatedClusterResp, updatedCluster, quantity)
+	if err != nil {
+		return err, nil
+	}
+
+	logrus.Infof("Machine pool is scaled to %v worker nodes!", quantity)
+
+	return nil, scaledClusterResp
+}
+
+func DeleteWorkerMachinePool(client *rancher.Client, cluster *v1.SteveAPIObject, scaledClusterResp *v1.SteveAPIObject, updatedCluster *apisV1.Cluster) error {
+	adminClient, err := rancher.NewClient(client.RancherConfig.AdminToken, client.Session)
 	if err != nil {
 		return err
 	}
-
-	logrus.Infof("New machine pool is ready!")
-	logrus.Infof("Scaling machine pool to 2 worker nodes...")
-
-	updatedClusterResp, err := isClusterReady(adminClient, clusterResp, updatedCluster, machinePools, 2)
-	if err != nil {
-		return err
-	}
-
-	logrus.Infof("Machine pool is scaled to 2 worker nodes!")
-	logrus.Infof("Scaling machine pool back to 1 worker node...")
-
-	scaledClusterResp, err := isClusterReady(adminClient, updatedClusterResp, updatedCluster, machinePools, 1)
-	if err != nil {
-		return err
-	}
-
-	logrus.Infof("Machine pool is scaled back to 1 worker node!")
 
 	logrus.Infof("Deleting machine pool...")
-	updateCluster, err := adminClient.Steve.SteveType(ProvisioningSteveResouceType).ByID(scaledClusterResp.ID)
+	updateCluster, err := adminClient.Steve.SteveType(ProvisioningSteveResourceType).ByID(cluster.ID)
 	if err != nil {
 		return err
 	}
@@ -185,7 +204,7 @@ func ScaleNewWorkerMachinePool(client *rancher.Client, cluster *v1.SteveAPIObjec
 	updatedCluster.ObjectMeta.ResourceVersion = updateCluster.ObjectMeta.ResourceVersion
 	updatedCluster.Spec.RKEConfig.MachinePools = updatedCluster.Spec.RKEConfig.MachinePools[:len(updatedCluster.Spec.RKEConfig.MachinePools)-1]
 
-	_, err = adminClient.Steve.SteveType(ProvisioningSteveResouceType).Update(scaledClusterResp, updatedCluster)
+	_, err = adminClient.Steve.SteveType(ProvisioningSteveResourceType).Update(scaledClusterResp, updatedCluster)
 	if err != nil {
 		return err
 	}

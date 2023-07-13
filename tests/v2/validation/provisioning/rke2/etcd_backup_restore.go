@@ -20,18 +20,18 @@ import (
 )
 
 const (
-	defaultNamespace             = "default"
-	localClusterName             = "local"
-	wloadBeforeRestore           = "wload-before-restore"
-	ingressName                  = "ingress"
-	wloadServiceName             = "wload-service"
-	wloadAfterBackup             = "wload-after-backup"
-	ProvisioningSteveResouceType = "provisioning.cattle.io.cluster"
-	isCattleLabeled              = true
-	etcdnodeCount                = 3
-	maxContainerRestartCount     = 3
-	cattleSystem                 = "cattle-system"
-	podPrefix                    = "helm-operation"
+	defaultNamespace              = "default"
+	localClusterName              = "local"
+	wloadBeforeRestore            = "wload-before-restore"
+	ingressName                   = "ingress"
+	wloadServiceName              = "wload-service"
+	wloadAfterBackup              = "wload-after-backup"
+	ProvisioningSteveResourceType = "provisioning.cattle.io.cluster"
+	isCattleLabeled               = true
+	etcdnodeCount                 = 3
+	maxContainerRestartCount      = 3
+	cattleSystem                  = "cattle-system"
+	podPrefix                     = "helm-operation"
 )
 
 func restoreSnapshot(client *rancher.Client, clustername string, name string,

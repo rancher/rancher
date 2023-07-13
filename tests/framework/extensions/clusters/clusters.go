@@ -826,7 +826,7 @@ func DeleteK3SRKE2Cluster(client *rancher.Client, cluster *v1.SteveAPIObject) er
 	}
 
 	logrus.Infof("Deleting cluster %s...", cluster.ObjectMeta.Name)
-	err = client.Steve.SteveType(ProvisioningSteveResouceType).Delete(cluster)
+	err = client.Steve.SteveType(ProvisioningSteveResourceType).Delete(cluster)
 	if err != nil {
 		return err
 	}
