@@ -223,7 +223,7 @@ func readConfig(secrets corev1controllers.SecretController, acmeDomains []string
 		err error
 	)
 
-	tlsConfig, err := BaseTLSConfig()
+	tlsConfig, err := baseTLSConfig(settings.TLSMinVersion.Get(), settings.TLSCiphers.Get())
 	if err != nil {
 		return "", noCACerts, nil, err
 	}
