@@ -119,13 +119,24 @@ func (p *adProvider) RefetchGroupPrincipals(principalID string, secret string) (
 		return nil, err
 	}
 
-	escapedGUID := common.EscapeUUID(externalID)
-	logrus.Debugf("LDAP Refetch principals GUID : {%s}", externalID)
+	var filter string
+	var userSearchString string
+	var searchScope int
+	if strings.HasSuffix(strings.ToLower(externalID), strings.ToLower(config.UserSearchBase)) {
+		userSearchString = externalID
+		searchScope = ldapv3.ScopeBaseObject
+		filter = fmt.Sprintf("(&(%v=%v))", ObjectClass, config.UserObjectClass)
+	} else {
+		userSearchString = config.UserSearchBase
+		searchScope = ldapv3.ScopeWholeSubtree
+		escapedGUID := common.EscapeUUID(externalID)
+		filter = fmt.Sprintf("(&(%v=%v)(%v=%v))", ObjectClass, config.UserObjectClass, common.AttributeObjectGUID, escapedGUID)
+	}
 
-	filter := fmt.Sprintf("(&(%v=%v)(%v=%v))", ObjectClass, config.UserObjectClass, common.AttributeObjectGUID, escapedGUID)
+	logrus.Tracef("LDAP Refetch principals ID : {%s}", externalID)
 	search := ldapv3.NewSearchRequest(
-		config.UserSearchBase,
-		ldapv3.ScopeWholeSubtree,
+		userSearchString,
+		searchScope,
 		ldapv3.NeverDerefAliases,
 		0,
 		0,
