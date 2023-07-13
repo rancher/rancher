@@ -59,7 +59,7 @@ func MigrateActiveDirectoryDNToGUID(ctx context.Context, management *config.Mana
 		err := wait.PollImmediate(time.Hour*24, 0, func() (bool, error) {
 			logrus.Debugf("Starting active directory principalID migration with exponentialBackoff")
 			steps := 5
-			backOffDuration := time.Minute * 10
+			backOffDuration := time.Second * 30
 			var err error
 			for steps > 0 {
 				err = m.migrate()
