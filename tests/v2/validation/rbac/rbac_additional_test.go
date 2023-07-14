@@ -126,7 +126,7 @@ func (rb *RBACAdditionalTestSuite) ValidateAddPOsAsProjectOwner() {
 	rb.additionalUserClient, err = rb.additionalUserClient.ReLogin()
 	require.NoError(rb.T(), err)
 
-	addNewUserAsPO, err := createUser(rb.client, standardUser)
+	addNewUserAsPO, err := users.CreateUserWithRole(rb.client, users.UserConfig(), standardUser)
 	require.NoError(rb.T(), err)
 	addNewUserAsPOClient, err := rb.client.AsUser(addNewUserAsPO)
 	require.NoError(rb.T(), err)
@@ -162,7 +162,7 @@ func (rb *RBACAdditionalTestSuite) ValidateCannotAddMPMsAsProjectOwner() {
 	rb.additionalUserClient, err = rb.additionalUserClient.ReLogin()
 	require.NoError(rb.T(), err)
 
-	addNewUserAsPO, err := createUser(rb.client, standardUser)
+	addNewUserAsPO, err := users.CreateUserWithRole(rb.client, users.UserConfig(), standardUser)
 	require.NoError(rb.T(), err)
 	addNewUserAsPOClient, err := rb.client.AsUser(addNewUserAsPO)
 	require.NoError(rb.T(), err)
@@ -215,7 +215,7 @@ func (rb *RBACAdditionalTestSuite) TestRBACAdditional() {
 
 	for _, tt := range tests {
 		rb.Run("Set up User with cluster Role for additional rbac test cases "+roleOwner, func() {
-			newUser, err := createUser(rb.client, tt.member)
+			newUser, err := users.CreateUserWithRole(rb.client, users.UserConfig(), tt.member)
 			require.NoError(rb.T(), err)
 			rb.standardUser = newUser
 			rb.T().Logf("Created user: %v", rb.standardUser.Username)
@@ -232,7 +232,7 @@ func (rb *RBACAdditionalTestSuite) TestRBACAdditional() {
 			require.NoError(rb.T(), err)
 
 			//Setting up an additional user for the additional rbac cases
-			additionalUser, err := createUser(rb.client, standardUser)
+			additionalUser, err := users.CreateUserWithRole(rb.client, users.UserConfig(), standardUser)
 			require.NoError(rb.T(), err)
 			rb.additionalUser = additionalUser
 			rb.additionalUserClient, err = rb.client.AsUser(rb.additionalUser)
