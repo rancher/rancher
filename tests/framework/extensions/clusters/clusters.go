@@ -1022,3 +1022,26 @@ func GetProvisioningClusterByName(client *rancher.Client, clusterName string, na
 
 	return cluster, clusterObj, nil
 }
+
+// WaitForActiveCluster is a "helper" function that waits for the cluster to reach the active state.
+// The function accepts a Rancher client and a cluster ID as parameters.
+func WaitForActiveRKE1Cluster(client *rancher.Client, clusterID string) error {
+	err := kwait.Poll(500*time.Millisecond, 30*time.Minute, func() (done bool, err error) {
+		client, err = client.ReLogin()
+		if err != nil {
+			return false, err
+		}
+		clusterResp, err := client.Management.Cluster.ByID(clusterID)
+		if err != nil {
+			return false, err
+		}
+		if clusterResp.State == "active" {
+			return true, nil
+		}
+		return false, nil
+	})
+	if err != nil {
+		return err
+	}
+	return nil
+}

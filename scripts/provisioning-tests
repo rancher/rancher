@@ -62,6 +62,7 @@ grep PodTestImage ./tests/v2prov/defaults/defaults.go | cut -f2 -d'"' > /var/lib
 grep MachineProvisionImage ./pkg/settings/setting.go | cut -f4 -d'"' >> /var/lib/rancher/$DIST/agent/images/pull.txt
 mkdir -p /usr/share/rancher/ui/assets
 curl -sLf https://github.com/rancher/system-agent/releases/download/${CATTLE_SYSTEM_AGENT_VERSION}/rancher-system-agent-amd64 -o /usr/share/rancher/ui/assets/rancher-system-agent-amd64
+curl -sLf https://github.com/rancher/system-agent/releases/download/${CATTLE_SYSTEM_AGENT_VERSION}/rancher-system-agent-arm64 -o /usr/share/rancher/ui/assets/rancher-system-agent-arm64
 curl -sLf https://github.com/rancher/system-agent/releases/download/${CATTLE_SYSTEM_AGENT_VERSION}/system-agent-uninstall.sh -o /usr/share/rancher/ui/assets/system-agent-uninstall.sh
 
 run_rancher()
@@ -70,10 +71,7 @@ run_rancher()
     while sleep 2; do
         if [ "$PID" != "-1" ] && [ ! -e /proc/$PID ]; then
             echo Rancher died
-            echo Rancher logs were
-            echo -e "-----RANCHER-LOG-DUMP-START-----"
-            cat /tmp/rancher.log | gzip | base64 -w 0
-            echo -e "\n-----RANCHER-LOG-DUMP-END-----"
+            dump_rancher_logs
             echo K3s logs were:
             echo -e "-----K3S-LOG-DUMP-START-----"
             cat build/testdata/k3s.log | gzip | base64 -w 0
@@ -99,6 +97,14 @@ run_rancher()
     done
 }
 
+dump_rancher_logs()
+{
+  echo Rancher logs were
+  echo -e "-----RANCHER-LOG-DUMP-START-----"
+  cat /tmp/rancher.log | gzip | base64 -w 0
+  echo -e "\n-----RANCHER-LOG-DUMP-END-----"
+}
+
 # uncomment to get startup logs. Don't leave them on because it slows drone down too
 # much
 #tail -F /tmp/rancher.log &
@@ -112,37 +118,20 @@ run_rancher &
 RANCHER_RUN_PID=$!
 trap cleanup exit
 
-echo Sleeping for 5 seconds before checking Rancher health
-sleep 5
+echo "Waiting for Rancher to be healthy"
+./scripts/retry --sleep 2 --timeout 300 "curl -sf -o /dev/null http://localhost:8080/ping"
 
-while ! curl -sf http://localhost:8080/ping; do
-    sleep 2
-done
-
-# Echo a newline to handle the "pong" from the above ping
-echo ""
-
-rwWC=0
 echo "Waiting up to 5 minutes for rancher-webhook deployment"
-while ! kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -w -n cattle-system deploy/rancher-webhook &>/dev/null; do
-  if [[ "$rwWC" == 150 ]]; then
-    echo "rancher-webhook was not available within 5 minutes. failing fast"
-    exit 1
-  fi
-  if [[ $((rwWC%30)) == 0 ]] && [[ "$rwWC" != "0" ]]; then
-    echo "rancher-webhook was not ready within $((rwWC/30)) minutes"
-  fi
-    sleep 2
-    rwWC=$((rwWC + 1))
-done
+./scripts/retry \
+  --timeout 300 `# Time out after 300 seconds (5 min)` \
+  --sleep 2 `# Sleep for 2 seconds in between attempts` \
+  --message-interval 30 `# Print the progress message below every 30 attempts (roughly every minute)` \
+  --message "rancher-webhook was not available after {{elapsed}} seconds" `# Print this progress message` \
+  "kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -w -n cattle-system deploy/rancher-webhook &>/dev/null"
+
 #kill $TPID
 
 echo Running provisioning-tests $RUNARG
 
 export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
-go test $RUNARG -v -failfast -timeout 60m ./tests/v2prov/tests/... || {
-    echo -e "-----RANCHER-LOG-DUMP-START-----"
-    cat /tmp/rancher.log | gzip | base64 -w 0
-    echo -e "\n-----RANCHER-LOG-DUMP-END-----"
-    exit 1
-}
+go test $RUNARG -v -failfast -timeout 60m ./tests/v2prov/tests/... || dump_rancher_logs

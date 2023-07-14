@@ -55,8 +55,8 @@ type ImageTargetsAndSources struct {
 	TargetWindowsImagesAndSources []string
 }
 
-// GatherTargetImagesAndSources queries KDM and charts/system-charts to gather all the images used by Rancher and their source.
-// it an aggregate type, ImageTargetsAndSources, which contains the images required to run Rancher on Linux and Windows, as well
+// GatherTargetImagesAndSources queries KDM, charts and system-charts to gather all the images used by Rancher and their source.
+// It returns an aggregate type, ImageTargetsAndSources, which contains the images required to run Rancher on Linux and Windows, as well
 // as the source of each image.
 func GatherTargetImagesAndSources(systemChartsPath, chartsPath string, imagesFromArgs []string) (ImageTargetsAndSources, error) {
 	rancherVersion, ok := os.LookupEnv("TAG")

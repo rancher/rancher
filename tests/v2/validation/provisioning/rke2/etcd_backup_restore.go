@@ -32,6 +32,7 @@ const (
 	maxContainerRestartCount      = 3
 	cattleSystem                  = "cattle-system"
 	podPrefix                     = "helm-operation"
+	s3BackupPrefix               = "on-demand-"
 )
 
 func restoreSnapshot(client *rancher.Client, clustername string, name string,
@@ -72,7 +73,7 @@ func getSnapshots(client *rancher.Client,
 
 }
 
-func createRKE2NodeDriverCluster(client *rancher.Client, provider *Provider, clusterName string, k8sVersion string, namespace string, cni string, advancedOptions provisioning.AdvancedOptions) (*steveV1.SteveAPIObject, error) {
+func createRKE2NodeDriverCluster(client *rancher.Client, provider *Provider, clusterName string, k8sVersion string, namespace string, cni string, advancedOptions provisioning.AdvancedOptions, s3Snapshot *rkev1.ETCDSnapshotS3) (*steveV1.SteveAPIObject, error) {
 
 	nodeRoles := []machinepools.NodeRoles{
 		{
@@ -110,7 +111,7 @@ func createRKE2NodeDriverCluster(client *rancher.Client, provider *Provider, clu
 	machinePools := machinepools.RKEMachinePoolSetup(nodeRoles, machineConfigResp)
 
 	cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, namespace, cni, cloudCredential.ID, k8sVersion, "", machinePools, advancedOptions)
-
+	cluster.Spec.RKEConfig.ETCD.S3 = s3Snapshot
 	return clusters.CreateK3SRKE2Cluster(client, cluster)
 
 }

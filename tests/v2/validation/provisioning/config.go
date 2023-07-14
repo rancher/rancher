@@ -5,6 +5,7 @@ import (
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
 	nodepools "github.com/rancher/rancher/tests/framework/extensions/rke1/nodepools"
+	"github.com/rancher/rke/types"
 )
 
 type Version string
@@ -129,4 +130,5 @@ type Config struct {
 	Hardened                 bool                           `json:"hardened" yaml:"hardened"`
 	AdvancedOptions          AdvancedOptions                `json:"advancedOptions" yaml:"advancedOptions"`
 	LocalClusterAuthEndpoint rkev1.LocalClusterAuthEndpoint `json:"localClusterAuthEndpoint" yaml:"localClusterAuthEndpoint"`
+	S3BackupConfig           *types.S3BackupConfig          `json:"s3BackupConfig" yaml:"s3BackupConfig"`
 }

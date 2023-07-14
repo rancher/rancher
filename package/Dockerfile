@@ -1,4 +1,4 @@
-FROM registry.suse.com/bci/bci-base:15.4
+FROM registry.suse.com/bci/bci-base:15.5
 
 RUN zypper -n install --no-recommends git-core curl ca-certificates unzip xz gzip sed tar shadow gawk vim-small netcat-openbsd mkisofs && \
     zypper -n clean -a && rm -rf /tmp/* /var/tmp/* /usr/share/doc/packages/* && \
@@ -35,7 +35,7 @@ ENV CATTLE_ETCD_VERSION v3.5.1
 ENV LOGLEVEL_VERSION v0.1.5
 ENV TINI_VERSION v0.18.0
 ENV TELEMETRY_VERSION v0.5.20
-ENV DOCKER_MACHINE_LINODE_VERSION v0.1.8
+ENV DOCKER_MACHINE_LINODE_VERSION v0.1.11
 ENV LINODE_UI_DRIVER_VERSION v0.5.0
 # make sure the version number is consistent with the one at Line 100 of pkg/data/management/machinedriver_data.go
 ENV DOCKER_MACHINE_HARVESTER_VERSION v0.6.5
@@ -48,7 +48,7 @@ ENV CATTLE_WINS_AGENT_UNINSTALL_SCRIPT https://raw.githubusercontent.com/rancher
 ENV CATTLE_WINS_AGENT_UPGRADE_IMAGE rancher/wins:${CATTLE_WINS_AGENT_VERSION}
 ENV CATTLE_CSI_PROXY_AGENT_VERSION v1.1.1
 # make sure the CATTLE_SYSTEM_AGENT_VERSION is consistent with tests/v2/codecoverage/package/Dockerfile and pkg/settings/setting.go
-ENV CATTLE_SYSTEM_AGENT_VERSION v0.3.3-rc4
+ENV CATTLE_SYSTEM_AGENT_VERSION v0.3.3
 ENV CATTLE_SYSTEM_AGENT_INSTALL_SCRIPT https://raw.githubusercontent.com/rancher/system-agent/${CATTLE_SYSTEM_AGENT_VERSION}/install.sh
 ENV CATTLE_SYSTEM_AGENT_UNINSTALL_SCRIPT https://raw.githubusercontent.com/rancher/system-agent/${CATTLE_SYSTEM_AGENT_VERSION}/system-agent-uninstall.sh
 ENV CATTLE_SYSTEM_AGENT_UPGRADE_IMAGE rancher/system-agent:${CATTLE_SYSTEM_AGENT_VERSION}-suc
@@ -58,7 +58,7 @@ ENV CATTLE_SYSTEM_UPGRADE_CONTROLLER_CHART_VERSION 102.1.0+up0.5.0
 ENV CATTLE_FLEET_MIN_VERSION=102.1.0+up0.7.0
 # Deprecated in favor of CATTLE_RANCHER_WEBHOOK_VERSION.
 ENV CATTLE_RANCHER_WEBHOOK_MIN_VERSION=''
-ENV CATTLE_RANCHER_WEBHOOK_VERSION=2.0.5+up0.3.5
+ENV CATTLE_RANCHER_WEBHOOK_VERSION=2.0.6+up0.3.6-rc1
 ENV CATTLE_CSP_ADAPTER_MIN_VERSION=2.0.2
 
 RUN mkdir -p /var/lib/rancher-data/local-catalogs/system-library && \
@@ -163,8 +163,8 @@ RUN curl -sLf ${!TINI_URL} > /usr/bin/tini && \
     chmod +x /usr/bin/tini /usr/bin/telemetry && \
     mkdir -p /var/lib/rancher-data/driver-metadata
 
-ENV CATTLE_UI_VERSION 2.7.5-rc5
-ENV CATTLE_DASHBOARD_UI_VERSION v2.7.5-rc5
+ENV CATTLE_UI_VERSION 2.7.5
+ENV CATTLE_DASHBOARD_UI_VERSION v2.7.5
 ENV CATTLE_CLI_VERSION v2.7.0
 
 # Base UI brand used as a fallback env setting (not user facing) to indicate this is a non-prime install

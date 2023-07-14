@@ -2,19 +2,16 @@ package cluster
 
 import (
 	"encoding/json"
-	"fmt"
 	"testing"
 
+	"github.com/golang/mock/gomock"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	"github.com/rancher/wrangler/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-
-	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
-	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 )
 
 func TestRegexp(t *testing.T) {
@@ -112,11 +109,13 @@ func TestController_createNewCluster(t *testing.T) {
 		},
 	}
 
+	mockCtrl := gomock.NewController(t)
+	clusterCache := fake.NewMockNonNamespacedCacheInterface[*v3.Cluster](mockCtrl)
+	clusterCache.EXPECT().Get(gomock.AssignableToTypeOf("")).Return(&v3.Cluster{}, nil).AnyTimes()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			h := handler{
-				mgmtClusterCache: &mockClusterCache{
-					clusters: map[string]*v3.Cluster{}},
+				mgmtClusterCache: clusterCache,
 			}
 
 			obj, _, err := h.createNewCluster(tt.cluster, tt.cluster.Status, tt.clusterSpec)
@@ -252,21 +251,4 @@ func getTestFleetAgentResourceReq() *corev1.ResourceRequirements {
 			corev1.ResourceMemory: resource.MustParse("1Gi"),
 		},
 	}
-}
-
-// implements v3.ClusterCache
-type mockClusterCache struct {
-	clusters map[string]*v3.Cluster
-}
-
-func (f *mockClusterCache) Get(name string) (*v3.Cluster, error) {
-	return &v3.Cluster{}, nil
-}
-
-func (f *mockClusterCache) List(selector labels.Selector) ([]*v3.Cluster, error) {
-	return nil, fmt.Errorf("unimplemented")
-}
-func (f *mockClusterCache) AddIndexer(indexName string, indexer mgmtv3.ClusterIndexer) {}
-func (f *mockClusterCache) GetByIndex(indexName, key string) ([]*v3.Cluster, error) {
-	return nil, fmt.Errorf("unimplemented")
 }

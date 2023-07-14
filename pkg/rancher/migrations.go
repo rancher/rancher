@@ -506,32 +506,44 @@ func migrateMachinePoolsDynamicSchemaLabel(w *wrangler.Context) error {
 			if provCluster.Spec.RKEConfig == nil {
 				continue
 			}
-			// search for machine pools without the `dynamic-schema-spec` annotation and apply it
-			for i, machinePool := range provCluster.Spec.RKEConfig.MachinePools {
-				var spec v32.DynamicSchemaSpec
-				if machinePool.DynamicSchemaSpec != "" && json.Unmarshal([]byte(machinePool.DynamicSchemaSpec), &spec) == nil {
-					continue
+			if err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+				cluster, err := w.Provisioning.Cluster().Get(provCluster.Namespace, provCluster.Name, metav1.GetOptions{})
+				if k8serror.IsNotFound(err) {
+					return nil
+				} else if err != nil {
+					return err
 				}
-				nodeConfig := machinePool.NodeConfig
-				if nodeConfig == nil {
-					return fmt.Errorf("machine pool node config must not be nil")
+				cluster = cluster.DeepCopy()
+				// search for machine pools without the `dynamic-schema-spec` annotation and apply it
+				for i, machinePool := range cluster.Spec.RKEConfig.MachinePools {
+					var spec v32.DynamicSchemaSpec
+					if machinePool.DynamicSchemaSpec != "" && json.Unmarshal([]byte(machinePool.DynamicSchemaSpec), &spec) == nil {
+						continue
+					}
+					nodeConfig := machinePool.NodeConfig
+					if nodeConfig == nil {
+						return fmt.Errorf("machine pool node config must not be nil")
+					}
+					apiVersion := nodeConfig.APIVersion
+					if apiVersion != capr.DefaultMachineConfigAPIVersion && apiVersion != "" {
+						continue
+					}
+					ds, err := w.Mgmt.DynamicSchema().Get(strings.ToLower(nodeConfig.Kind), metav1.GetOptions{})
+					if err != nil {
+						return err
+					}
+					specJSON, err := json.Marshal(ds.Spec)
+					if err != nil {
+						return err
+					}
+					cluster.Spec.RKEConfig.MachinePools[i].DynamicSchemaSpec = string(specJSON)
 				}
-				apiVersion := nodeConfig.APIVersion
-				if apiVersion != capr.DefaultMachineConfigAPIVersion && apiVersion != "" {
-					continue
-				}
-				ds, err := w.Mgmt.DynamicSchema().Get(strings.ToLower(nodeConfig.Kind), metav1.GetOptions{})
+				_, err = w.Provisioning.Cluster().Update(cluster)
 				if err != nil {
 					return err
 				}
-				specJSON, err := json.Marshal(ds.Spec)
-				if err != nil {
-					return err
-				}
-				provCluster.Spec.RKEConfig.MachinePools[i].DynamicSchemaSpec = string(specJSON)
-			}
-			_, err = w.Provisioning.Cluster().Update(&provCluster)
-			if err != nil {
+				return nil
+			}); err != nil {
 				return err
 			}
 		}
