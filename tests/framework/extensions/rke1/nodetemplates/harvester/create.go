@@ -16,7 +16,7 @@ func CreateHarvesterNodeTemplate(rancherClient *rancher.Client) (*nodetemplates.
 	config.LoadConfig(nodetemplates.HarvesterNodeTemplateConfigurationFileKey, &harvesterNodeTemplateConfig)
 
 	nodeTemplate := nodetemplates.NodeTemplate{
-		EngineInstallURL:            "https://releases.rancher.com/install-docker/23.0.sh",
+		EngineInstallURL:            "https://releases.rancher.com/install-docker/24.0.sh",
 		Name:                        harvesterNodeTemplateNameBase,
 		HarvesterNodeTemplateConfig: &harvesterNodeTemplateConfig,
 	}
