@@ -49,7 +49,7 @@ spec:
             - ""
             type: string
           description:
-            description: Description holds any text desired to better describes the
+            description: Description holds any text desired to better describe the
               resource.
             type: string
           displayName:
@@ -58,7 +58,7 @@ spec:
             type: string
           external:
             description: External if true specifies that rules for this RoleTemplate
-              should be gathered from a ClusterRole with the matching name If set
+              should be gathered from a ClusterRole with the matching name. If set
               to true the Rules on the template will not be evaluated. External's
               value is only evaluated if the RoleTemplate's context is set to "cluster"
               Default to false.
@@ -80,7 +80,7 @@ spec:
             type: object
           projectCreatorDefault:
             description: ProjectCreatorDefault if true, a binding with this RoleTemplate
-              will be created for a users when they create a new project. ProjectCreatorDefault
+              will be created for a user when they create a new project. ProjectCreatorDefault
               is only evaluated if the context of the RoleTemplate is set to project.
               Default to false.
             type: boolean
@@ -92,7 +92,7 @@ spec:
               type: string
             type: array
           rules:
-            description: Rules holds all the PolicyRules for this RoleTemplate
+            description: Rules holds all the PolicyRules for this RoleTemplate.
             items:
               description: PolicyRule holds information that describes a policy rule,
                 but does not contain information about who the rule applies to or

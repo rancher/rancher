@@ -5,9 +5,10 @@ import (
 	"reflect"
 
 	"github.com/pkg/errors"
-	"github.com/rancher/norman/objectclient"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/types/config"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/controllers"
+	wranglerv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	"github.com/rancher/wrangler/pkg/generic"
 	"github.com/sirupsen/logrus"
 	rbacv1 "k8s.io/api/rbac/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -151,12 +152,12 @@ func (r *ruleBuilder) setRoleTemplateNames(names ...string) *roleBuilder {
 	return r.rb.setRoleTemplateNames(names...)
 }
 
-func (r *ruleBuilder) reconcileGlobalRoles(mgmt *config.ManagementContext) error {
-	return r.rb.reconcileGlobalRoles(mgmt)
+func (r *ruleBuilder) reconcileGlobalRoles(grClient wranglerv3.GlobalRoleClient) error {
+	return r.rb.reconcileGlobalRoles(grClient)
 }
 
-func (r *ruleBuilder) reconcileRoleTemplates(mgmt *config.ManagementContext) error {
-	return r.rb.reconcileRoleTemplates(mgmt)
+func (r *ruleBuilder) reconcileRoleTemplates(rtClient wranglerv3.RoleTemplateClient) error {
+	return r.rb.reconcileRoleTemplates(rtClient)
 }
 
 func (r *ruleBuilder) toPolicyRule() rbacv1.PolicyRule {
@@ -169,16 +170,26 @@ func (r *ruleBuilder) toPolicyRule() rbacv1.PolicyRule {
 	}
 }
 
-type buildFnc func(thisRB *roleBuilder) (string, runtime.Object)
-type compareAndModifyFnc func(have runtime.Object, want runtime.Object) (bool, runtime.Object, error)
-type gatherExistingFnc func() (map[string]runtime.Object, error)
+// buildFnc takes in a roleBuilder and returns desired runtime.Objects.
+type buildFnc[T runtime.Object] func(thisRB *roleBuilder) (name string, object T)
 
-func (rb *roleBuilder) reconcile(build buildFnc, gatherExisting gatherExistingFnc, compareAndModify compareAndModifyFnc, client *objectclient.ObjectClient) error {
+// compareAndModifyFnc check two objects and returns if they are different as well as the desired object to create.
+// haveObj will be mutated and returned contain the desired values from the wantObj.
+type compareAndModifyFnc[T runtime.Object] func(haveObj T, wantObj T) (isDifferent bool, desiredObject T, err error)
+
+// gatherExistingFnc returns a map of objects that already exist using the object name as the key.
+type gatherExistingFnc[T runtime.Object] func() (ObjectNameMap map[string]T, err error)
+
+func reconcile[T generic.RuntimeMetaObject, TList runtime.Object](
+	rb *roleBuilder, build buildFnc[T], gatherExisting gatherExistingFnc[T],
+	compareAndModify compareAndModifyFnc[T], client generic.NonNamespacedClientInterface[T, TList]) error {
 	current := rb.first()
-	builtRoles := map[string]runtime.Object{}
+	builtRoles := map[string]T{}
 	for current != nil {
 		name, role := build(current)
-		builtRoles[name] = role
+		if name != "" {
+			builtRoles[name] = role
+		}
 		current = current.next
 	}
 
@@ -190,7 +201,7 @@ func (rb *roleBuilder) reconcile(build buildFnc, gatherExisting gatherExistingFn
 	for name := range existing {
 		if _, ok := builtRoles[name]; !ok {
 			logrus.Infof("Removing %v", name)
-			if err := client.Delete(name, &v1.DeleteOptions{}); err != nil {
+			if err := client.Delete(name, nil); err != nil {
 				return errors.Wrapf(err, "couldn't delete %v", name)
 			}
 			delete(existing, name)
@@ -204,7 +215,7 @@ func (rb *roleBuilder) reconcile(build buildFnc, gatherExisting gatherExistingFn
 				return err
 			}
 			if !equal {
-				if _, err := client.Update(name, modified); err != nil {
+				if _, err := client.Update(modified); err != nil {
 					return errors.Wrapf(err, "couldn't update %v", name)
 				}
 			}
@@ -220,10 +231,9 @@ func (rb *roleBuilder) reconcile(build buildFnc, gatherExisting gatherExistingFn
 	return nil
 }
 
-func (rb *roleBuilder) reconcileGlobalRoles(mgmt *config.ManagementContext) error {
+func (rb *roleBuilder) reconcileGlobalRoles(grClient wranglerv3.GlobalRoleClient) error {
 	logrus.Info("Reconciling GlobalRoles")
-
-	build := func(current *roleBuilder) (string, runtime.Object) {
+	build := func(current *roleBuilder) (string, *v3.GlobalRole) {
 		gr := &v3.GlobalRole{
 			ObjectMeta: v1.ObjectMeta{
 				Name:   current.name,
@@ -236,15 +246,14 @@ func (rb *roleBuilder) reconcileGlobalRoles(mgmt *config.ManagementContext) erro
 		return gr.Name, gr
 	}
 
-	grCli := mgmt.Management.GlobalRoles("")
-	gather := func() (map[string]runtime.Object, error) {
+	gather := func() (map[string]*v3.GlobalRole, error) {
 		set := labels.Set(defaultGRLabel)
-		existingList, err := grCli.List(v1.ListOptions{LabelSelector: set.String()})
+		existingList, err := grClient.List(v1.ListOptions{LabelSelector: set.String()})
 		if err != nil {
 			return nil, errors.Wrapf(err, "couldn't list globalRoles with selector %s", set)
 		}
 
-		existing := map[string]runtime.Object{}
+		existing := map[string]*v3.GlobalRole{}
 		for _, e := range existingList.Items {
 			existing[e.Name] = e.DeepCopy()
 		}
@@ -252,13 +261,7 @@ func (rb *roleBuilder) reconcileGlobalRoles(mgmt *config.ManagementContext) erro
 		return existing, nil
 	}
 
-	compareAndMod := func(have runtime.Object, want runtime.Object) (bool, runtime.Object, error) {
-		haveGR, ok := have.(*v3.GlobalRole)
-		wantGR, ok2 := want.(*v3.GlobalRole)
-		if !ok || !ok2 {
-			return false, nil, errors.Errorf("unexpected type comparing %v and %v", have, want)
-		}
-
+	compareAndMod := func(haveGR *v3.GlobalRole, wantGR *v3.GlobalRole) (bool, *v3.GlobalRole, error) {
 		builtin := haveGR.Builtin == wantGR.Builtin
 		equal := builtin && haveGR.DisplayName == wantGR.DisplayName && reflect.DeepEqual(haveGR.Rules, wantGR.Rules)
 
@@ -269,13 +272,17 @@ func (rb *roleBuilder) reconcileGlobalRoles(mgmt *config.ManagementContext) erro
 		return equal, haveGR, nil
 	}
 
-	return rb.reconcile(build, gather, compareAndMod, grCli.ObjectClient())
+	// create a new client that impersonates the webhook to bypass field validation that would normally block updating builtin roles
+	bypassClient, err := grClient.WithImpersonation(controllers.WebhookImpersonation())
+	if err != nil {
+		return fmt.Errorf("failed to make impersonation client: %w", err)
+	}
+	return reconcile(rb, build, gather, compareAndMod, bypassClient)
 }
 
-func (rb *roleBuilder) reconcileRoleTemplates(mgmt *config.ManagementContext) error {
+func (rb *roleBuilder) reconcileRoleTemplates(rtClient wranglerv3.RoleTemplateClient) error {
 	logrus.Info("Reconciling RoleTemplates")
-
-	build := func(current *roleBuilder) (string, runtime.Object) {
+	build := func(current *roleBuilder) (string, *v3.RoleTemplate) {
 		role := &v3.RoleTemplate{
 			ObjectMeta: v1.ObjectMeta{
 				Name:   current.name,
@@ -293,15 +300,14 @@ func (rb *roleBuilder) reconcileRoleTemplates(mgmt *config.ManagementContext) er
 		return role.Name, role
 	}
 
-	client := mgmt.Management.RoleTemplates("")
-	gather := func() (map[string]runtime.Object, error) {
+	gather := func() (map[string]*v3.RoleTemplate, error) {
 		set := labels.Set(defaultRTLabel)
-		existingList, err := client.List(v1.ListOptions{LabelSelector: set.String()})
+		existingList, err := rtClient.List(v1.ListOptions{LabelSelector: set.String()})
 		if err != nil {
 			return nil, errors.Wrapf(err, "couldn't list roleTemplate with selector %s", set)
 		}
 
-		existing := map[string]runtime.Object{}
+		existing := map[string]*v3.RoleTemplate{}
 		for _, e := range existingList.Items {
 			existing[e.Name] = e.DeepCopy()
 		}
@@ -309,13 +315,7 @@ func (rb *roleBuilder) reconcileRoleTemplates(mgmt *config.ManagementContext) er
 		return existing, nil
 	}
 
-	compareAndMod := func(have runtime.Object, want runtime.Object) (bool, runtime.Object, error) {
-		haveRT, ok := have.(*v3.RoleTemplate)
-		wantRT, ok2 := want.(*v3.RoleTemplate)
-		if !ok || !ok2 {
-			return false, nil, errors.Errorf("unexpected type comparing %v and %v", have, want)
-		}
-
+	compareAndMod := func(haveRT *v3.RoleTemplate, wantRT *v3.RoleTemplate) (bool, *v3.RoleTemplate, error) {
 		equal := haveRT.DisplayName == wantRT.DisplayName && reflect.DeepEqual(haveRT.Rules, wantRT.Rules) &&
 			reflect.DeepEqual(haveRT.RoleTemplateNames, wantRT.RoleTemplateNames) && haveRT.Builtin == wantRT.Builtin &&
 			haveRT.External == wantRT.External && haveRT.Hidden == wantRT.Hidden && haveRT.Context == wantRT.Context &&
@@ -333,5 +333,10 @@ func (rb *roleBuilder) reconcileRoleTemplates(mgmt *config.ManagementContext) er
 		return equal, haveRT, nil
 	}
 
-	return rb.reconcile(build, gather, compareAndMod, client.ObjectClient())
+	// create a new client that impersonates the webhook to bypass field validation that would normally block updating builtin roles
+	bypassClient, err := rtClient.WithImpersonation(controllers.WebhookImpersonation())
+	if err != nil {
+		return fmt.Errorf("failed to make impersonation client: %w", err)
+	}
+	return reconcile(rb, build, gather, compareAndMod, bypassClient)
 }
