@@ -2,6 +2,7 @@ package rbac
 
 import (
 	"fmt"
+	"net/url"
 	"regexp"
 	"strings"
 	"testing"
@@ -216,7 +217,6 @@ func (rb *RBTestSuite) ValidateAddClusterRoles(role string) {
 		assert.Equal(rb.T(), "403 Forbidden", errorMsg[1])
 	case restrictedAdmin:
 		require.NoError(rb.T(), errUserRole)
-
 	}
 }
 
@@ -275,9 +275,7 @@ func (rb *RBTestSuite) ValidateRemoveProjectRoles() {
 
 	err := users.RemoveProjectMember(rb.client, rb.standardUser)
 	require.NoError(rb.T(), err)
-
 }
-
 
 func (rb *RBTestSuite) TestRBAC() {
 	tests := []struct {
@@ -301,6 +299,14 @@ func (rb *RBTestSuite) TestRBAC() {
 			rb.standardUserClient, err = rb.client.AsUser(newUser)
 			require.NoError(rb.T(), err)
 
+			log.Info("Validating Global Role Binding is created for the user.")
+			userId, err := users.GetUserIDByName(rb.client, rb.standardUser.Username)
+			require.NoError(rb.T(), err)
+			query := url.Values{"filter": {"userName=" + userId}}
+			grbs, err := rb.client.Steve.SteveType("management.cattle.io.globalrolebinding").List(query)
+			require.NoError(rb.T(), err)
+			assert.Equal(rb.T(), 1, len(grbs.Data))
+
 			subSession := rb.session.NewSession()
 			defer subSession.Cleanup()
 
@@ -311,7 +317,6 @@ func (rb *RBTestSuite) TestRBAC() {
 			steveAdminClient, err := rb.client.Steve.ProxyDownstream(rb.cluster.ID)
 			require.NoError(rb.T(), err)
 			rb.steveAdminClient = steveAdminClient
-
 		})
 
 		log.Info("Validating standard users cannot list any clusters")
