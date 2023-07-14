@@ -207,18 +207,40 @@ type PodSecurityPolicyTemplateProjectBinding struct {
 // +kubebuilder:skipversion
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// ProjectRoleTemplateBinding is the object representing membership of a subject in a project with permissions
+// specified by a given role template.
 type ProjectRoleTemplateBinding struct {
-	types.Namespaced
+	types.Namespaced  `json:",inline"`
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	UserName           string `json:"userName,omitempty" norman:"noupdate,type=reference[user]"`
-	UserPrincipalName  string `json:"userPrincipalName,omitempty" norman:"noupdate,type=reference[principal]"`
-	GroupName          string `json:"groupName,omitempty" norman:"noupdate,type=reference[group]"`
+	// UserName is the name of the user subject added to the project. Immutable.
+	// +optional
+	UserName string `json:"userName,omitempty" norman:"noupdate,type=reference[user]"`
+
+	// UserPrincipalName is the name of the user principal subject added to the project. Immutable.
+	// +optional
+	UserPrincipalName string `json:"userPrincipalName,omitempty" norman:"noupdate,type=reference[principal]"`
+
+	// GroupName is the name of the group subject added to the project. Immutable.
+	// +optional
+	GroupName string `json:"groupName,omitempty" norman:"noupdate,type=reference[group]"`
+
+	// GroupPrincipalName is the name of the group principal subject added to the project. Immutable.
+	// +optional
 	GroupPrincipalName string `json:"groupPrincipalName,omitempty" norman:"noupdate,type=reference[principal]"`
-	ProjectName        string `json:"projectName,omitempty" norman:"required,noupdate,type=reference[project]"`
-	RoleTemplateName   string `json:"roleTemplateName,omitempty" norman:"required,noupdate,type=reference[roleTemplate]"`
-	ServiceAccount     string `json:"serviceAccount,omitempty" norman:"nocreate,noupdate"`
+
+	// ProjectName is the name of the project to which a subject is added. Immutable.
+	// +kubebuilder:validation:Required
+	ProjectName string `json:"projectName,omitempty" norman:"required,noupdate,type=reference[project]"`
+
+	// RoleTemplateName is the name of the role template that defines permissions to perform actions on resources in the project. Immutable.
+	// +kubebuilder:validation:Required
+	RoleTemplateName string `json:"roleTemplateName,omitempty" norman:"required,noupdate,type=reference[roleTemplate]"`
+
+	// ServiceAccount is the name of the service account bound as a subject. Immutable.
+	// +optional
+	ServiceAccount string `json:"serviceAccount,omitempty" norman:"nocreate,noupdate"`
 }
 
 func (p *ProjectRoleTemplateBinding) ObjClusterName() string {
