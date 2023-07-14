@@ -34,6 +34,7 @@ func (p *ldapProvider) loginUser(credential *v32.BasicLogin, config *v3.LdapConf
 		return v3.Principal{}, nil, err
 	}
 	defer lConn.Close()
+	configureLdapDebug(lConn)
 
 	serviceAccountPassword := config.ServiceAccountPassword
 	serviceAccountUserName := config.ServiceAccountDistinguishedName
@@ -272,6 +273,8 @@ func (p *ldapProvider) getPrincipal(distinguishedName string, scope string, conf
 		return nil, err
 	}
 	defer lConn.Close()
+	configureLdapDebug(lConn)
+
 	// Bind before query
 	// If service acc bind fails, and auth is on, return principal formed using DN
 	serviceAccountUsername := ldap.GetUserExternalID(config.ServiceAccountDistinguishedName, "")
@@ -482,6 +485,7 @@ func (p *ldapProvider) RefetchGroupPrincipals(principalID string, secret string)
 		return nil, err
 	}
 	defer lConn.Close()
+	configureLdapDebug(lConn)
 
 	serviceAccountPassword := config.ServiceAccountPassword
 	serviceAccountUserName := config.ServiceAccountDistinguishedName

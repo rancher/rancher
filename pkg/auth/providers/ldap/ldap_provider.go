@@ -149,6 +149,7 @@ func (p *ldapProvider) SearchPrincipals(searchKey, principalType string, myToken
 		logrus.Warnf("ldap search principals failed to connect to ldap: %s\n", err)
 		return principals, nil
 	}
+	configureLdapDebug(lConn)
 	defer lConn.Close()
 
 	principals, err = p.searchPrincipals(searchKey, principalType, config, lConn)
@@ -164,6 +165,8 @@ func (p *ldapProvider) SearchPrincipals(searchKey, principalType string, myToken
 				}
 			}
 		}
+	} else {
+		logrus.Warnf("ldap search principals returned error: %s\n", err)
 	}
 
 	return principals, nil
@@ -314,6 +317,7 @@ func (p *ldapProvider) samlSearchGetPrincipal(
 		return nil, err
 	}
 	defer lConn.Close()
+	configureLdapDebug(lConn)
 
 	err = ldap.AuthenticateServiceAccountUser(
 		config.ServiceAccountPassword, config.ServiceAccountDistinguishedName, "", lConn)
@@ -374,6 +378,12 @@ func (p *ldapProvider) samlSearchGetPrincipal(
 		config.GroupObjectClass,
 		config.GroupNameAttribute,
 		"")
+}
+
+func configureLdapDebug(lConn *ldapv3.Conn) {
+	if logrus.IsLevelEnabled(logrus.TraceLevel) {
+		lConn.Debug = true
+	}
 }
 
 func (p *ldapProvider) GetUserExtraAttributes(userPrincipal v3.Principal) map[string][]string {
