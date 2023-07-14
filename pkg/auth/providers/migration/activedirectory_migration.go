@@ -3,12 +3,14 @@ package migration
 import (
 	"context"
 	"fmt"
+	"github.com/rancher/norman/httperror"
 	"strings"
 	"time"
 
 	"github.com/pkg/errors"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers"
+	"github.com/rancher/rancher/pkg/auth/providers/common"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
@@ -24,6 +26,8 @@ const (
 	crtbsByPrincipalAndUserIndex = "auth.management.cattle.io/crtbByPrincipalAndUser"
 	prtbsByPrincipalAndUserIndex = "auth.management.cattle.io/prtbByPrincipalAndUser"
 	tokenByUserRefKey            = "auth.management.cattle.io/token-by-user-ref"
+	maxRetries                   = 5
+	retryDelay                   = time.Second * 10
 )
 
 type adMigration struct {
@@ -110,7 +114,7 @@ func (m *adMigration) migrateUser(user *v32.User, dn string) error {
 		return fmt.Errorf("unable to fetch activedirectory provider: %w", err)
 	}
 	token := v3.Token{}
-	userPrincipal, err := adProvider.GetPrincipal(dn, token)
+	userPrincipal, err := getPrincipalWithRetry(adProvider, dn, token)
 	if err != nil {
 		return fmt.Errorf("failed to fetch principal: %w", err)
 	}
@@ -227,4 +231,20 @@ func (m *adMigration) migratePRTB(newPrincipalID string, dn string) error {
 		}
 	}
 	return nil
+}
+
+func getPrincipalWithRetry(adProvider common.AuthProvider, dn string, token v3.Token) (*v3.Principal, error) {
+	for retry := 0; retry < maxRetries; retry++ {
+		userPrincipal, err := adProvider.GetPrincipal(dn, token)
+		if err == nil {
+			return &userPrincipal, nil
+		}
+		var apiError *httperror.APIError
+		if errors.As(err, &apiError) && httperror.IsNotFound(apiError) {
+			return nil, err
+		}
+		logrus.Debugf("fetch principal failed: %v. Retrying in %v...\n", err, retryDelay)
+		time.Sleep(retryDelay)
+	}
+	return nil, fmt.Errorf("failed to fetch principal after %d retries", maxRetries)
 }
