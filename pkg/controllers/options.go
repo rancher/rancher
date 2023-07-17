@@ -7,7 +7,9 @@ import (
 	"os"
 	"strings"
 
+	"github.com/rancher/lasso/pkg/cache"
 	"github.com/rancher/lasso/pkg/controller"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type controllerContextType string
@@ -22,6 +24,9 @@ const (
 func GetOptsFromEnv(contextType controllerContextType) *controller.SharedControllerFactoryOptions {
 	return &controller.SharedControllerFactoryOptions{
 		SyncOnlyChangedObjects: syncOnlyChangedObjects(contextType),
+		CacheOptions: &cache.SharedCacheFactoryOptions{
+			DefaultTweakList: defaultTweakListOptions(),
+		},
 	}
 }
 
@@ -40,4 +45,14 @@ func syncOnlyChangedObjects(option controllerContextType) bool {
 		}
 	}
 	return false
+}
+
+func defaultTweakListOptions() cache.TweakListOptionsFunc {
+	globalLabelSelector := os.Getenv("CATTLE_GLOBAL_LABEL_SELECTOR")
+	if globalLabelSelector == "" {
+		return func(*v1.ListOptions) {}
+	}
+	return func(opts *v1.ListOptions) {
+		opts.LabelSelector = globalLabelSelector
+	}
 }
