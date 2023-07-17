@@ -2,12 +2,12 @@ package migration
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"github.com/rancher/norman/httperror"
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
+	"github.com/rancher/norman/httperror"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
@@ -100,6 +100,11 @@ func (m *adMigration) migrate() error {
 			if strings.HasPrefix(principal, "activedirectory_user://") && strings.Contains(principal, ",") {
 				err = m.migrateUser(user, principal)
 				if err != nil {
+					var apiError *httperror.APIError
+					if errors.As(err, &apiError) && httperror.IsNotFound(apiError) {
+						logrus.Infof("user %s does not exist, skipping migration", principal)
+						continue
+					}
 					return fmt.Errorf("error migrating user: %w", err)
 				}
 			}
@@ -156,7 +161,7 @@ func (m *adMigration) migrateTokens(userName string, newPrincipalID string) erro
 	for _, obj := range userTokens {
 		token, ok := obj.(*v3.Token)
 		if !ok {
-			return errors.Errorf("failed to convert object to Token for user %v principalId %v", userName, newPrincipalID)
+			return fmt.Errorf("failed to convert object to Token for user %v principalId %v", userName, newPrincipalID)
 		}
 		token.UserPrincipal.Name = newPrincipalID
 		_, e := m.tokens.Update(token)
@@ -241,7 +246,7 @@ func getPrincipalWithRetry(adProvider common.AuthProvider, dn string, token v3.T
 		}
 		var apiError *httperror.APIError
 		if errors.As(err, &apiError) && httperror.IsNotFound(apiError) {
-			return nil, err
+			return nil, fmt.Errorf("AD user does not exist, skipping migration retries: %w", err)
 		}
 		logrus.Debugf("fetch principal failed: %v. Retrying in %v...\n", err, retryDelay)
 		time.Sleep(retryDelay)
