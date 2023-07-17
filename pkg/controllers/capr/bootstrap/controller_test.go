@@ -16,7 +16,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
-	"sigs.k8s.io/cluster-api/api/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
 func Test_getBootstrapSecret(t *testing.T) {
@@ -122,16 +122,15 @@ func Test_getBootstrapSecret(t *testing.T) {
 				a.Contains(data, "$env:CSI_PROXY_URL")
 				a.Contains(data, "$env:CSI_PROXY_VERSION")
 				a.Contains(data, "$env:CSI_PROXY_KUBELET_PATH")
-
 			}
 		})
 	}
 }
 
-func getMachineCacheMock(ctrl *gomock.Controller, namespace, os string) *ctrlfake.MockCacheInterface[*v1beta1.Machine] {
-	mockMachineCache := ctrlfake.NewMockCacheInterface[*v1beta1.Machine](ctrl)
-	mockMachineCache.EXPECT().Get(namespace, capr.DefaultMachineOS).DoAndReturn(func(namespace, name string) (*v1beta1.Machine, error) {
-		return &v1beta1.Machine{
+func getMachineCacheMock(ctrl *gomock.Controller, namespace, os string) *ctrlfake.MockCacheInterface[*capi.Machine] {
+	mockMachineCache := ctrlfake.NewMockCacheInterface[*capi.Machine](ctrl)
+	mockMachineCache.EXPECT().Get(namespace, capr.DefaultMachineOS).DoAndReturn(func(namespace, name string) (*capi.Machine, error) {
+		return &capi.Machine{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      os,
 				Namespace: namespace,
@@ -145,8 +144,8 @@ func getMachineCacheMock(ctrl *gomock.Controller, namespace, os string) *ctrlfak
 		}, nil
 	}).AnyTimes()
 
-	mockMachineCache.EXPECT().Get(namespace, capr.WindowsMachineOS).DoAndReturn(func(namespace, name string) (*v1beta1.Machine, error) {
-		return &v1beta1.Machine{
+	mockMachineCache.EXPECT().Get(namespace, capr.WindowsMachineOS).DoAndReturn(func(namespace, name string) (*capi.Machine, error) {
+		return &capi.Machine{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      os,
 				Namespace: namespace,
@@ -223,4 +222,51 @@ func getServiceAccountCacheMock(ctrl *gomock.Controller, namespace, name string)
 		}, nil
 	}).AnyTimes()
 	return mockServiceAccountCache
+}
+
+func TestShouldCreateBootstrapSecret(t *testing.T) {
+	tests := []struct {
+		phase    capi.MachinePhase
+		expected bool
+	}{
+		{
+			phase:    capi.MachinePhasePending,
+			expected: true,
+		},
+		{
+			phase:    capi.MachinePhaseProvisioning,
+			expected: true,
+		},
+		{
+			phase:    capi.MachinePhaseProvisioned,
+			expected: true,
+		},
+		{
+			phase:    capi.MachinePhaseRunning,
+			expected: true,
+		},
+		{
+			phase:    capi.MachinePhaseDeleting,
+			expected: false,
+		},
+		{
+			phase:    capi.MachinePhaseDeleted,
+			expected: false,
+		},
+		{
+			phase:    capi.MachinePhaseFailed,
+			expected: false,
+		},
+		{
+			phase:    capi.MachinePhaseUnknown,
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(string(tt.phase), func(t *testing.T) {
+			actual := shouldCreateBootstrapSecret(tt.phase)
+			assert.Equal(t, tt.expected, actual)
+		})
+	}
 }
