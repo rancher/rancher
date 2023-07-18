@@ -13,6 +13,29 @@ import (
 )
 
 func TestEnsureSecretForServiceAccount(t *testing.T) {
+	t.Parallel()
+	defaultWantSA := &v1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test",
+			Namespace: "default",
+		},
+		Secrets: []v1.ObjectReference{{
+			Name: "test-token-abcde",
+		}},
+	}
+	defaultWantSecret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-token-abcde",
+			Namespace: "default",
+			Annotations: map[string]string{
+				"kubernetes.io/service-account.name": "test",
+			},
+		},
+		Data: map[string][]byte{
+			"token": []byte("abcde"),
+		},
+		Type: v1.SecretTypeServiceAccountToken,
+	}
 	tests := []struct {
 		name           string
 		sa             *v1.ServiceAccount
@@ -29,28 +52,8 @@ func TestEnsureSecretForServiceAccount(t *testing.T) {
 					Namespace: "default",
 				},
 			},
-			wantSA: &v1.ServiceAccount{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test",
-					Namespace: "default",
-				},
-				Secrets: []v1.ObjectReference{{
-					Name: "test-token-abcde",
-				}},
-			},
-			wantSecret: &v1.Secret{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-token-abcde",
-					Namespace: "default",
-					Annotations: map[string]string{
-						"kubernetes.io/service-account.name": "test",
-					},
-				},
-				Data: map[string][]byte{
-					"token": []byte("abcde"),
-				},
-				Type: v1.SecretTypeServiceAccountToken,
-			},
+			wantSA:     defaultWantSA,
+			wantSecret: defaultWantSecret,
 		},
 		{
 			name: "service account with existing secret returns it",
@@ -63,15 +66,7 @@ func TestEnsureSecretForServiceAccount(t *testing.T) {
 					Name: "test-token-abcde",
 				}},
 			},
-			wantSA: &v1.ServiceAccount{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test",
-					Namespace: "default",
-				},
-				Secrets: []v1.ObjectReference{{
-					Name: "test-token-abcde",
-				}},
-			},
+			wantSA: defaultWantSA,
 			existingSecret: &v1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-token-abcde",
@@ -85,19 +80,7 @@ func TestEnsureSecretForServiceAccount(t *testing.T) {
 				},
 				Type: v1.SecretTypeServiceAccountToken,
 			},
-			wantSecret: &v1.Secret{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-token-abcde",
-					Namespace: "default",
-					Annotations: map[string]string{
-						"kubernetes.io/service-account.name": "test",
-					},
-				},
-				Data: map[string][]byte{
-					"token": []byte("abcde"),
-				},
-				Type: v1.SecretTypeServiceAccountToken,
-			},
+			wantSecret: defaultWantSecret,
 		},
 		{
 			name:    "returns error for nil service account",
@@ -114,28 +97,8 @@ func TestEnsureSecretForServiceAccount(t *testing.T) {
 					Name: "wrong",
 				}},
 			},
-			wantSA: &v1.ServiceAccount{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test",
-					Namespace: "default",
-				},
-				Secrets: []v1.ObjectReference{{
-					Name: "test-token-abcde",
-				}},
-			},
-			wantSecret: &v1.Secret{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-token-abcde",
-					Namespace: "default",
-					Annotations: map[string]string{
-						"kubernetes.io/service-account.name": "test",
-					},
-				},
-				Data: map[string][]byte{
-					"token": []byte("abcde"),
-				},
-				Type: v1.SecretTypeServiceAccountToken,
-			},
+			wantSA:     defaultWantSA,
+			wantSecret: defaultWantSecret,
 		},
 		{
 			name: "secret of wrong type gets recreated",
@@ -148,15 +111,7 @@ func TestEnsureSecretForServiceAccount(t *testing.T) {
 					Name: "test-token-xyz",
 				}},
 			},
-			wantSA: &v1.ServiceAccount{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test",
-					Namespace: "default",
-				},
-				Secrets: []v1.ObjectReference{{
-					Name: "test-token-abcde",
-				}},
-			},
+			wantSA: defaultWantSA,
 			existingSecret: &v1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-token-xyz",
@@ -170,19 +125,7 @@ func TestEnsureSecretForServiceAccount(t *testing.T) {
 				},
 				Type: v1.SecretTypeOpaque,
 			},
-			wantSecret: &v1.Secret{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-token-abcde",
-					Namespace: "default",
-					Annotations: map[string]string{
-						"kubernetes.io/service-account.name": "test",
-					},
-				},
-				Data: map[string][]byte{
-					"token": []byte("abcde"),
-				},
-				Type: v1.SecretTypeServiceAccountToken,
-			},
+			wantSecret: defaultWantSecret,
 		},
 		{
 			name: "secret for wrong service account type gets recreated",
@@ -195,15 +138,7 @@ func TestEnsureSecretForServiceAccount(t *testing.T) {
 					Name: "test-token-xyz",
 				}},
 			},
-			wantSA: &v1.ServiceAccount{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test",
-					Namespace: "default",
-				},
-				Secrets: []v1.ObjectReference{{
-					Name: "test-token-abcde",
-				}},
-			},
+			wantSA: defaultWantSA,
 			existingSecret: &v1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-token-xyz",
@@ -217,24 +152,14 @@ func TestEnsureSecretForServiceAccount(t *testing.T) {
 				},
 				Type: v1.SecretTypeServiceAccountToken,
 			},
-			wantSecret: &v1.Secret{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-token-abcde",
-					Namespace: "default",
-					Annotations: map[string]string{
-						"kubernetes.io/service-account.name": "test",
-					},
-				},
-				Data: map[string][]byte{
-					"token": []byte("abcde"),
-				},
-				Type: v1.SecretTypeServiceAccountToken,
-			},
+			wantSecret: defaultWantSecret,
 		},
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			var k8sClient *fake.Clientset
 			objs := []runtime.Object{}
 			if tt.sa != nil {
