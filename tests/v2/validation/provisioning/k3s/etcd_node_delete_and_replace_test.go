@@ -110,7 +110,7 @@ func (e *EtcdNodeDeleteAndReplace) TestEtcdNodeDeletionAndReplacement() {
 			err = nodestat.IsNodeReady(client, clusterId)
 			require.NoError(e.T(), err)
 
-			isEtcdNodeReplaced, err := nodestat.IsRKE2K3SEtcdNodeReplaced(client, query, clusterResp.Name, etcdNodeToDelete, numOfEtcdNodesBeforeDeletion)
+			isEtcdNodeReplaced, err := nodestat.IsRKE2K3SNodeReplaced(client, query, clusterResp.Name, etcdLabel, etcdNodeToDelete, numOfEtcdNodesBeforeDeletion)
 			require.NoError(e.T(), err)
 			require.True(e.T(), isEtcdNodeReplaced)
 

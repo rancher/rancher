@@ -1,6 +1,7 @@
 package nodes
 
 import (
+	"fmt"
 	"net/url"
 	"time"
 
@@ -15,7 +16,6 @@ import (
 const (
 	active                   = "active"
 	machineSteveResourceType = "cluster.x-k8s.io.machine"
-	etcdLabel                = "rke.cattle.io/etcd-role"
 	clusterLabel             = "cluster.x-k8s.io/cluster-name"
 	PollInterval             = time.Duration(5 * time.Second)
 	PollTimeout              = time.Duration(15 * time.Minute)
@@ -81,31 +81,31 @@ func IsRKE1EtcdNodeReplaced(client *rancher.Client, etcdNodeToDelete management.
 	return numOfEtcdNodesBeforeDeletion == numOfEtcdNodesAfterDeletion, err
 }
 
-func IsRKE2K3SEtcdNodeReplaced(client *rancher.Client, query url.Values, clusterName string, etcdNodeToDelete v1.SteveAPIObject, numOfEtcdNodesBeforeDeletion int) (bool, error) {
-	numOfEtcdNodesAfterDeletion := 0
-
+func IsRKE2K3SNodeReplaced(client *rancher.Client, query url.Values, clusterName string, nodeLabel string, nodeToDelete v1.SteveAPIObject, numNodesBeforeDeletion int) (bool, error) {
+	numNodesAfterDeletion := 0
 	err := wait.Poll(PollInterval, PollTimeout, func() (done bool, err error) {
 		machines, err := client.Steve.SteveType(machineSteveResourceType).List(query)
 		if err != nil {
 			return false, err
 		}
 
-		numOfEtcdNodesAfterDeletion = 0
+		numNodesAfterDeletion = 0
 		for _, machine := range machines.Data {
-			if machine.Labels[etcdLabel] == "true" && machine.Labels[clusterLabel] == clusterName {
-				if machine.Name == etcdNodeToDelete.Name {
+			if machine.Labels[nodeLabel] == "true" && machine.Labels[clusterLabel] == clusterName {
+				logrus.Info(machine.Name)
+				if machine.Name == nodeToDelete.Name {
 					return false, nil
 				}
-				numOfEtcdNodesAfterDeletion++
+				numNodesAfterDeletion++
 			}
 		}
-		logrus.Info("new etcd node : ")
+		logrus.Info(fmt.Sprintf("%s node replaced: ", nodeLabel))
 		for _, machine := range machines.Data {
-			if machine.Labels[etcdLabel] == "true" && machine.Labels[clusterLabel] == clusterName {
+			if machine.Labels[nodeLabel] == "true" && machine.Labels[clusterLabel] == clusterName {
 				logrus.Info(machine.Name)
 			}
 		}
 		return true, nil
 	})
-	return numOfEtcdNodesBeforeDeletion == numOfEtcdNodesAfterDeletion, err
+	return numNodesBeforeDeletion == numNodesAfterDeletion, err
 }

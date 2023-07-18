@@ -22,11 +22,13 @@ import (
 
 const (
 	etcdLabel                = "rke.cattle.io/etcd-role"
+	workerLabel              = "rke.cattle.io/worker-role"
+	controlPlaneLabel        = "rke.cattle.io/control-plane-role"
 	clusterLabel             = "cluster.x-k8s.io/cluster-name"
 	machineSteveResourceType = "cluster.x-k8s.io.machine"
 )
 
-type EtcdNodeDeleteAndReplace struct {
+type NodeDeleteAndReplace struct {
 	suite.Suite
 	session                *session.Session
 	client                 *rancher.Client
@@ -39,11 +41,11 @@ type EtcdNodeDeleteAndReplace struct {
 	advancedOptions        provisioning.AdvancedOptions
 }
 
-func (e *EtcdNodeDeleteAndReplace) TearDownSuite() {
+func (e *NodeDeleteAndReplace) TearDownSuite() {
 	e.session.Cleanup()
 }
 
-func (e *EtcdNodeDeleteAndReplace) SetupSuite() {
+func (e *NodeDeleteAndReplace) SetupSuite() {
 	testSession := session.NewSession()
 	e.session = testSession
 
@@ -66,7 +68,7 @@ func (e *EtcdNodeDeleteAndReplace) SetupSuite() {
 	e.client = client
 }
 
-func (e *EtcdNodeDeleteAndReplace) TestEtcdNodeDeletionAndReplacement() {
+func (e *NodeDeleteAndReplace) TestNodeDeletionAndReplacement() {
 	require.GreaterOrEqual(e.T(), len(e.providers), 1)
 	require.GreaterOrEqual(e.T(), len(e.cnis), 1)
 	require.GreaterOrEqual(e.T(), len(e.rke2kubernetesVersions), 1)
@@ -89,41 +91,46 @@ func (e *EtcdNodeDeleteAndReplace) TestEtcdNodeDeletionAndReplacement() {
 				machines, err := e.client.Steve.SteveType(machineSteveResourceType).List(query)
 				require.NoError(e.T(), err)
 
-				numOfEtcdNodesBeforeDeletion := 0
-				etcdNodeToDelete := v1.SteveAPIObject{}
+				previousNodeName := ""
+				for _, nodeLabel := range []string{etcdLabel, workerLabel, controlPlaneLabel} {
+					numNodesBeforeDeletions := 0
+					nodeToDelete := v1.SteveAPIObject{}
 
-				for _, machine := range machines.Data {
-					if machine.Labels[etcdLabel] == "true" && machine.Labels[clusterLabel] == clusterResp.Name {
-						etcdNodeToDelete = machine
-						numOfEtcdNodesBeforeDeletion++
+					for _, machine := range machines.Data {
+						if machine.Labels[nodeLabel] == "true" && machine.Labels[clusterLabel] == clusterResp.Name {
+							if machine.Name != previousNodeName {
+								nodeToDelete = machine
+							}
+							numNodesBeforeDeletions++
+						}
 					}
+					previousNodeName = nodeToDelete.Name
+					logrus.Info(fmt.Sprintf("Deleting a %s node: %s ...", nodeLabel, nodeToDelete.Name))
+					err = e.client.Steve.SteveType(machineSteveResourceType).Delete(&nodeToDelete)
+					require.NoError(e.T(), err)
+
+					clusterId, err := clusters.GetClusterIDByName(client, clusterResp.Name)
+					require.NoError(e.T(), err)
+
+					err = clusters.WaitClusterToBeUpgraded(client, clusterId)
+					require.NoError(e.T(), err)
+
+					err = nodestat.IsNodeReady(client, clusterId)
+					require.NoError(e.T(), err)
+
+					isEtcdNodeReplaced, err := nodestat.IsRKE2K3SNodeReplaced(client, query, clusterResp.Name, nodeLabel, nodeToDelete, numNodesBeforeDeletions)
+					require.NoError(e.T(), err)
+					require.True(e.T(), isEtcdNodeReplaced)
+
+					podResults, podErrors := pods.StatusPods(client, clusterId)
+					assert.NotEmpty(e.T(), podResults)
+					assert.Empty(e.T(), podErrors)
 				}
-
-				logrus.Info("Deleting, " + etcdNodeToDelete.Name + " etcd node..")
-				err = e.client.Steve.SteveType(machineSteveResourceType).Delete(&etcdNodeToDelete)
-				require.NoError(e.T(), err)
-
-				clusterId, err := clusters.GetClusterIDByName(client, clusterResp.Name)
-				require.NoError(e.T(), err)
-
-				err = clusters.WaitClusterToBeUpgraded(client, clusterId)
-				require.NoError(e.T(), err)
-
-				err = nodestat.IsNodeReady(client, clusterId)
-				require.NoError(e.T(), err)
-
-				isEtcdNodeReplaced, err := nodestat.IsRKE2K3SEtcdNodeReplaced(client, query, clusterResp.Name, etcdNodeToDelete, numOfEtcdNodesBeforeDeletion)
-				require.NoError(e.T(), err)
-				require.True(e.T(), isEtcdNodeReplaced)
-
-				podResults, podErrors := pods.StatusPods(client, clusterId)
-				assert.NotEmpty(e.T(), podResults)
-				assert.Empty(e.T(), podErrors)
 			}
 		}
 	}
 }
 
-func TestEtcdNodeDeleteAndReplace(t *testing.T) {
-	suite.Run(t, new(EtcdNodeDeleteAndReplace))
+func TestNodeDeleteAndReplace(t *testing.T) {
+	suite.Run(t, new(NodeDeleteAndReplace))
 }
