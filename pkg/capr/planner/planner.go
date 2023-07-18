@@ -347,7 +347,7 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlan
 
 func (p *Planner) fullReconcile(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus, clusterSecretTokens plan.Secret, plan *plan.Plan, ignoreDrainAndConcurrency bool) (rkev1.RKEControlPlaneStatus, error) {
 	// on the first run through, electInitNode will return a `generic.ErrSkip` as it is attempting to wait for the cache to catch up.
-	joinServer, err := p.electInitNode(cp, plan)
+	joinServer, err := p.electInitNode(cp, plan, false)
 	if err != nil {
 		return status, err
 	}
