@@ -42,7 +42,7 @@ func resetMockClusters() {
 	mockClusters = make(map[string]*apimgmtv3.Cluster)
 }
 
-func newTestHandler() *handler {
+func newTestHandler(t *testing.T) *handler {
 	secrets := corefakes.SecretInterfaceMock{
 		CreateFunc: func(secret *corev1.Secret) (*corev1.Secret, error) {
 			if secret.GenerateName != "" {
@@ -65,9 +65,11 @@ func newTestHandler() *handler {
 					secret.Data[k] = []byte(v)
 				}
 			}
+			secret.ResourceVersion = "0"
 			secret.StringData = map[string]string{}
-			mockSecrets[fmt.Sprintf("%s:%s", secret.Namespace, secret.Name)] = secret
-			return secret, nil
+			key := fmt.Sprintf("%s:%s", secret.Namespace, secret.Name)
+			mockSecrets[key] = secret.DeepCopy()
+			return mockSecrets[key], nil
 		},
 		UpdateFunc: func(secret *corev1.Secret) (*corev1.Secret, error) {
 			key := fmt.Sprintf("%s:%s", secret.Namespace, secret.Name)
@@ -81,8 +83,14 @@ func newTestHandler() *handler {
 				}
 			}
 			secret.StringData = map[string]string{}
-			mockSecrets[fmt.Sprintf("%s:%s", secret.Namespace, secret.Name)] = secret
-			return secret, nil
+			rv, _ := strconv.Atoi(mockSecrets[key].ObjectMeta.ResourceVersion)
+			rv++
+			if reflect.DeepEqual(secret, mockSecrets[key]) {
+				assert.Fail(t, "update called with no changes")
+			}
+			secret.ResourceVersion = strconv.Itoa(rv)
+			mockSecrets[key] = secret
+			return mockSecrets[key].DeepCopy(), nil
 		},
 		DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
 			key := fmt.Sprintf("%s:%s", namespace, name)
@@ -137,13 +145,13 @@ func newTestHandler() *handler {
 					return nil, apierror.NewNotFound(schema.GroupResource{}, fmt.Sprintf("cluster [%s]", cluster.Name))
 				}
 				if reflect.DeepEqual(mockClusters[cluster.Name], cluster) {
-					return cluster, nil
+					assert.Fail(t, "update called with no changes")
 				}
 				mockClusters[cluster.Name] = cluster.DeepCopy()
 				rv, _ := strconv.Atoi(mockClusters[cluster.Name].ObjectMeta.ResourceVersion)
 				rv++
 				mockClusters[cluster.Name].ObjectMeta.ResourceVersion = strconv.Itoa(rv)
-				return mockClusters[cluster.Name], nil
+				return mockClusters[cluster.Name].DeepCopy(), nil
 			},
 			GetFunc: func(name string, opts metav1.GetOptions) (*apimgmtv3.Cluster, error) {
 				cluster, ok := mockClusters[name]
@@ -162,7 +170,7 @@ func newTestHandler() *handler {
 }
 
 func TestMigrateClusterSecrets(t *testing.T) {
-	h := newTestHandler()
+	h := newTestHandler(t)
 	defer resetMockClusters()
 	defer resetMockSecrets()
 	secretKey := "abcdefg123"
@@ -346,7 +354,7 @@ func TestMigrateClusterSecrets(t *testing.T) {
 }
 
 func TestMigrateClusterServiceAccountToken(t *testing.T) {
-	h := newTestHandler()
+	h := newTestHandler(t)
 	defer resetMockClusters()
 	defer resetMockSecrets()
 	token := "somefaketoken"
@@ -376,11 +384,11 @@ func TestMigrateClusterServiceAccountToken(t *testing.T) {
 	clusterCopy := cluster.DeepCopy()
 	clusterCopy, err = h.migrateServiceAccountSecrets(clusterCopy)
 	assert.Nil(t, err)
-	assert.Equal(t, cluster, clusterCopy)
+	assert.Equal(t, cluster, clusterCopy) // purposefully test pointer equality
 }
 
 func TestMigrateRKESecrets(t *testing.T) {
-	h := newTestHandler()
+	h := newTestHandler(t)
 	defer resetMockClusters()
 	defer resetMockSecrets()
 
@@ -541,7 +549,7 @@ func TestMigrateRKESecrets(t *testing.T) {
 }
 
 func TestMigrateACISecrets(t *testing.T) {
-	h := newTestHandler()
+	h := newTestHandler(t)
 	defer resetMockClusters()
 	defer resetMockSecrets()
 
@@ -646,7 +654,7 @@ func TestMigrateACISecrets(t *testing.T) {
 }
 
 func TestSync(t *testing.T) {
-	h := newTestHandler()
+	h := newTestHandler(t)
 	defer resetMockClusters()
 	defer resetMockSecrets()
 	testCluster := &apimgmtv3.Cluster{
@@ -654,7 +662,7 @@ func TestSync(t *testing.T) {
 			Name: "testcluster",
 		},
 	}
-	_, err := h.clusters.Create(testCluster)
+	testCluster, err := h.clusters.Create(testCluster)
 	assert.Nil(t, err)
 	got, err := h.sync("", testCluster)
 	assert.Nil(t, err)
@@ -662,4 +670,10 @@ func TestSync(t *testing.T) {
 	assert.True(t, apimgmtv3.ClusterConditionServiceAccountSecretsMigrated.IsTrue(got))
 	assert.True(t, apimgmtv3.ClusterConditionRKESecretsMigrated.IsTrue(got))
 	assert.True(t, apimgmtv3.ClusterConditionACISecretsMigrated.IsTrue(got))
+
+	testClusterCopy := got.(*apimgmtv3.Cluster).DeepCopy()
+	got, err = h.sync("", testClusterCopy)
+
+	assert.Nil(t, err)
+	assert.Equal(t, got, testClusterCopy)
 }

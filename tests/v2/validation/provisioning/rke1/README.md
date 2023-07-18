@@ -256,6 +256,31 @@ Dependencies:
 }
 ```
 
+## RKE1 Support Matrix Checks - K8s Components & Architecture
+Custom clusters have the ability to perform RKE1 support matrix checks for K8s components & architectures. 
+
+To do this, ensure that your `provisioningInput` has `flannel` and `canal` both defined, along with your desired K8s versions as shown below:
+
+```json
+"provisioningInput": {
+    "nodesAndRolesRKE1": [ 
+      {
+        "etcd": true,
+        "controlplane": true,
+        "quantity": 1,
+      },
+      {
+        "worker": true,
+        "quantity": 2,
+      },
+    ],
+    "rke1KubernetesVersion": ["v1.25.9-rancher2-1", "v1.26.4-rancher2-1"],
+    "nodeProviders": ["ec2"],
+    "cni": ["flannel", "canal"],
+    "psact": ""
+  }
+```
+
 ## Advanced Settings
 This encapsulates any other setting that is applied in the cluster.spec. Currently we have support for:
 * cluster agent customization 

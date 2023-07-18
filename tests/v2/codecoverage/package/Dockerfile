@@ -1,4 +1,4 @@
-FROM registry.suse.com/bci/bci-base:15.4
+FROM registry.suse.com/bci/bci-base:15.5
 
 RUN zypper -n install --no-recommends git-core curl ca-certificates unzip xz gzip sed tar shadow gawk vim-small netcat-openbsd mkisofs && \
     zypper -n clean -a && rm -rf /tmp/* /var/tmp/* /usr/share/doc/packages/* && \
@@ -35,7 +35,7 @@ ENV CATTLE_ETCD_VERSION v3.5.1
 ENV LOGLEVEL_VERSION v0.1.5
 ENV TINI_VERSION v0.18.0
 ENV TELEMETRY_VERSION v0.5.20
-ENV DOCKER_MACHINE_LINODE_VERSION v0.1.8
+ENV DOCKER_MACHINE_LINODE_VERSION v0.1.11
 ENV LINODE_UI_DRIVER_VERSION v0.5.0
 # make sure the version number is consistent with the one at Line 100 of pkg/data/management/machinedriver_data.go
 ENV DOCKER_MACHINE_HARVESTER_VERSION v0.6.3

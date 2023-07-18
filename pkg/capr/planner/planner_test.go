@@ -10,15 +10,13 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/golang/mock/gomock"
+	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	apisv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/capr"
-	"github.com/rancher/rancher/pkg/capr/mock/mockcapicontrollers"
-	"github.com/rancher/rancher/pkg/capr/mock/mockcorecontrollers"
-	"github.com/rancher/rancher/pkg/capr/mock/mockmgmtcontrollers"
-	"github.com/rancher/rancher/pkg/capr/mock/mockranchercontrollers"
-	"github.com/rancher/rancher/pkg/capr/mock/mockrkecontrollers"
 	"github.com/rancher/rancher/pkg/provisioningv2/image"
+	"github.com/rancher/wrangler/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,40 +25,40 @@ import (
 
 type mockPlanner struct {
 	planner                       *Planner
-	rkeBootstrap                  *mockrkecontrollers.MockRKEBootstrapClient
-	rkeBootstrapCache             *mockrkecontrollers.MockRKEBootstrapCache
-	rkeControlPlanes              *mockrkecontrollers.MockRKEControlPlaneController
-	etcdSnapshotCache             *mockrkecontrollers.MockETCDSnapshotCache
-	secretClient                  *mockcorecontrollers.MockSecretClient
-	secretCache                   *mockcorecontrollers.MockSecretCache
-	configMapCache                *mockcorecontrollers.MockConfigMapCache
-	machines                      *mockcapicontrollers.MockMachineClient
-	machinesCache                 *mockcapicontrollers.MockMachineCache
-	clusterRegistrationTokenCache *mockmgmtcontrollers.MockClusterRegistrationTokenCache
-	capiClient                    *mockcapicontrollers.MockClusterClient
-	capiClusters                  *mockcapicontrollers.MockClusterCache
-	managementClusters            *mockmgmtcontrollers.MockClusterCache
-	rancherClusterCache           *mockranchercontrollers.MockClusterCache
+	rkeBootstrap                  *fake.MockClientInterface[*rkev1.RKEBootstrap, *rkev1.RKEBootstrapList]
+	rkeBootstrapCache             *fake.MockCacheInterface[*rkev1.RKEBootstrap]
+	rkeControlPlanes              *fake.MockControllerInterface[*rkev1.RKEControlPlane, *rkev1.RKEControlPlaneList]
+	etcdSnapshotCache             *fake.MockCacheInterface[*rkev1.ETCDSnapshot]
+	secretClient                  *fake.MockClientInterface[*v1.Secret, *v1.SecretList]
+	secretCache                   *fake.MockCacheInterface[*v1.Secret]
+	configMapCache                *fake.MockCacheInterface[*v1.ConfigMap]
+	machines                      *fake.MockClientInterface[*capi.Machine, *capi.MachineList]
+	machinesCache                 *fake.MockCacheInterface[*capi.Machine]
+	clusterRegistrationTokenCache *fake.MockCacheInterface[*apisv3.ClusterRegistrationToken]
+	capiClient                    *fake.MockClientInterface[*capi.Cluster, *capi.ClusterList]
+	capiClusters                  *fake.MockCacheInterface[*capi.Cluster]
+	managementClusters            *fake.MockNonNamespacedCacheInterface[*apisv3.Cluster]
+	rancherClusterCache           *fake.MockCacheInterface[*apisv1.Cluster]
 }
 
 // newMockPlanner creates a new mockPlanner that can be used for simulating a functional Planner.
 func newMockPlanner(t *testing.T, functions InfoFunctions) *mockPlanner {
 	ctrl := gomock.NewController(t)
 	mp := mockPlanner{
-		rkeBootstrap:                  mockrkecontrollers.NewMockRKEBootstrapClient(ctrl),
-		rkeBootstrapCache:             mockrkecontrollers.NewMockRKEBootstrapCache(ctrl),
-		rkeControlPlanes:              mockrkecontrollers.NewMockRKEControlPlaneController(ctrl),
-		etcdSnapshotCache:             mockrkecontrollers.NewMockETCDSnapshotCache(ctrl),
-		secretClient:                  mockcorecontrollers.NewMockSecretClient(ctrl),
-		secretCache:                   mockcorecontrollers.NewMockSecretCache(ctrl),
-		configMapCache:                mockcorecontrollers.NewMockConfigMapCache(ctrl),
-		machines:                      mockcapicontrollers.NewMockMachineClient(ctrl),
-		machinesCache:                 mockcapicontrollers.NewMockMachineCache(ctrl),
-		clusterRegistrationTokenCache: mockmgmtcontrollers.NewMockClusterRegistrationTokenCache(ctrl),
-		capiClient:                    mockcapicontrollers.NewMockClusterClient(ctrl),
-		capiClusters:                  mockcapicontrollers.NewMockClusterCache(ctrl),
-		managementClusters:            mockmgmtcontrollers.NewMockClusterCache(ctrl),
-		rancherClusterCache:           mockranchercontrollers.NewMockClusterCache(ctrl),
+		rkeBootstrap:                  fake.NewMockClientInterface[*rkev1.RKEBootstrap, *rkev1.RKEBootstrapList](ctrl),
+		rkeBootstrapCache:             fake.NewMockCacheInterface[*rkev1.RKEBootstrap](ctrl),
+		rkeControlPlanes:              fake.NewMockControllerInterface[*rkev1.RKEControlPlane, *rkev1.RKEControlPlaneList](ctrl),
+		etcdSnapshotCache:             fake.NewMockCacheInterface[*rkev1.ETCDSnapshot](ctrl),
+		secretClient:                  fake.NewMockClientInterface[*v1.Secret, *v1.SecretList](ctrl),
+		secretCache:                   fake.NewMockCacheInterface[*v1.Secret](ctrl),
+		configMapCache:                fake.NewMockCacheInterface[*v1.ConfigMap](ctrl),
+		machines:                      fake.NewMockClientInterface[*capi.Machine, *capi.MachineList](ctrl),
+		machinesCache:                 fake.NewMockCacheInterface[*capi.Machine](ctrl),
+		clusterRegistrationTokenCache: fake.NewMockCacheInterface[*apisv3.ClusterRegistrationToken](ctrl),
+		capiClient:                    fake.NewMockClientInterface[*capi.Cluster, *capi.ClusterList](ctrl),
+		capiClusters:                  fake.NewMockCacheInterface[*capi.Cluster](ctrl),
+		managementClusters:            fake.NewMockNonNamespacedCacheInterface[*apisv3.Cluster](ctrl),
+		rancherClusterCache:           fake.NewMockCacheInterface[*apisv1.Cluster](ctrl),
 	}
 	store := PlanStore{
 		secrets:      mp.secretClient,

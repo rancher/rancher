@@ -7,10 +7,11 @@ import (
 	"time"
 
 	"github.com/golang/mock/gomock"
+	"github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	fleetv1alpha1 "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
-	"github.com/rancher/rancher/pkg/capr/mock/mockfleetcontrollers"
+	"github.com/rancher/wrangler/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -87,7 +88,7 @@ func TestManageSystemAgent_syncSystemUpgradeControllerStatusConditionManipulatio
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			bc := mockfleetcontrollers.NewMockBundleController(ctrl)
+			bc := fake.NewMockControllerInterface[*v1alpha1.Bundle, *v1alpha1.BundleList](ctrl)
 			h := &handler{
 				bundles: bc,
 			}

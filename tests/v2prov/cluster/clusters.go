@@ -63,21 +63,21 @@ func New(clients *clients.Clients, cluster *provisioningv1api.Cluster) (*provisi
 			cluster.Spec.RKEConfig.MachineGlobalConfig.Data[k] = v
 		}
 
-		for i, np := range cluster.Spec.RKEConfig.MachinePools {
-			if np.NodeConfig == nil {
+		for i, mp := range cluster.Spec.RKEConfig.MachinePools {
+			if mp.NodeConfig == nil {
 				podConfig, err := nodeconfig.NewPodConfig(clients, cluster.Namespace)
 				if err != nil {
 					return nil, err
 				}
 				cluster.Spec.RKEConfig.MachinePools[i].NodeConfig = podConfig
 			}
-			if np.Name == "" {
+			if mp.Name == "" {
 				cluster.Spec.RKEConfig.MachinePools[i].Name = fmt.Sprintf("pool-%d", i)
 			}
 		}
 
 		if cluster.Spec.RKEConfig.Registries == nil {
-			registryConfig, err := registry.GetCache(clients, cluster.Namespace)
+			registryConfig, err := registry.CreateOrGetRegistry(clients, cluster.Namespace, "registry-cache", false)
 			if err != nil {
 				return nil, err
 			}
@@ -483,6 +483,12 @@ func gatherDebugData(clients *clients.Clients, c *provisioningv1api.Cluster) (st
 		}
 	}
 
+	snapshots, newErr := clients.RKE.ETCDSnapshot().List(c.Namespace, metav1.ListOptions{})
+	if newErr != nil {
+		logrus.Error(newErr)
+		snapshots = nil
+	}
+
 	return capr.CompressInterface(map[string]interface{}{
 		"cluster":               newC,
 		"rkecontrolplane":       newControlPlane,
@@ -496,6 +502,7 @@ func gatherDebugData(clients *clients.Clients, c *provisioningv1api.Cluster) (st
 		"infraCluster":          infraCluster,
 		"infraMachines":         infraMachines,
 		"podLogs":               podLogs,
+		"snapshots":             snapshots,
 	})
 }
 

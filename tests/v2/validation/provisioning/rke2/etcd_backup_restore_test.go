@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	steveV1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
@@ -42,6 +43,7 @@ type RKE2EtcdSnapshotRestoreTestSuite struct {
 	providers          []string
 	nodesAndRoles      []machinepools.NodeRoles
 	advancedOptions    provisioning.AdvancedOptions
+	etcdSnapshotS3     *rkev1.ETCDSnapshotS3
 }
 
 func (r *RKE2EtcdSnapshotRestoreTestSuite) TearDownSuite() {
@@ -66,6 +68,21 @@ func (r *RKE2EtcdSnapshotRestoreTestSuite) SetupSuite() {
 	client, err := rancher.NewClient("", testSession)
 	require.NoError(r.T(), err)
 
+	if clustersConfig.S3BackupConfig != nil {
+		r.etcdSnapshotS3 = &rkev1.ETCDSnapshotS3{
+			Endpoint:      clustersConfig.S3BackupConfig.Endpoint,
+			Bucket:        clustersConfig.S3BackupConfig.BucketName,
+			Region:        clustersConfig.S3BackupConfig.Region,
+			Folder:        clustersConfig.S3BackupConfig.Folder,
+			SkipSSLVerify: true,
+		}
+		provider := CreateProvider(provisioning.AWSProviderName.String())
+		creds, err := provider.CloudCredFunc(client)
+		require.NoError(r.T(), err)
+		r.etcdSnapshotS3.CloudCredentialName = creds.ID
+		logrus.Infof("%v", creds.ID)
+	}
+
 	r.client = client
 
 }
@@ -87,7 +104,7 @@ func (r *RKE2EtcdSnapshotRestoreTestSuite) EtcdSnapshotRestoreWithK8sUpgrade(pro
 	clusterName := namegen.AppendRandomString(provider.Name.String())
 
 	logrus.Infof("creating rke2Cluster.............")
-	clusterResp, err := createRKE2NodeDriverCluster(client, provider, clusterName, initialK8sVersion, r.ns, r.cnis[0], r.advancedOptions)
+	clusterResp, err := createRKE2NodeDriverCluster(client, provider, clusterName, initialK8sVersion, r.ns, r.cnis[0], r.advancedOptions, r.etcdSnapshotS3)
 	require.NoError(r.T(), err)
 	require.Equal(r.T(), clusterName, clusterResp.ObjectMeta.Name)
 	logrus.Infof("rke2Cluster create request successful.............")
@@ -175,19 +192,24 @@ func (r *RKE2EtcdSnapshotRestoreTestSuite) EtcdSnapshotRestoreWithK8sUpgrade(pro
 		}
 		totalClusterSnapShots := 0
 		for _, snapshot := range snapshotList {
-			if strings.Contains(snapshot.ObjectMeta.Name, clusterName) {
+			prefix := "on-demand-" + clusterName
+			if strings.Contains(snapshot.ObjectMeta.Name, prefix) {
 				if snapshotToBeRestored == "" {
 					snapshotToBeRestored = snapshot.Name
 				}
 				totalClusterSnapShots++
 			}
 		}
-		if totalClusterSnapShots == etcdnodeCount {
+		if totalClusterSnapShots >= etcdnodeCount {
 			return true, nil
 		}
 		return false, nil
 	})
 	require.NoError(r.T(), err)
+
+	logrus.Infof("creating watch over pods.............")
+	r.watchAndWaitForPods(client, clusterID)
+	logrus.Infof("All pods are up and running.............")
 
 	logrus.Infof("creating a workload(w2, deployment).............")
 	containerTemplate2 := workloads.NewContainer("ngnix", "nginx", v1.PullAlways, []v1.VolumeMount{}, []v1.EnvFromSource{})
@@ -257,7 +279,7 @@ func (r *RKE2EtcdSnapshotRestoreTestSuite) EtcdSnapshotRestoreWithUpgradeStrateg
 	clusterName := namegen.AppendRandomString(provider.Name.String())
 
 	logrus.Infof("creating rke2Cluster.............")
-	clusterResp, err := createRKE2NodeDriverCluster(client, provider, clusterName, initialK8sVersion, r.ns, r.cnis[0], r.advancedOptions)
+	clusterResp, err := createRKE2NodeDriverCluster(client, provider, clusterName, initialK8sVersion, r.ns, r.cnis[0], r.advancedOptions, r.etcdSnapshotS3)
 	require.NoError(r.T(), err)
 	require.Equal(r.T(), clusterName, clusterResp.ObjectMeta.Name)
 	logrus.Infof("rke2Cluster create request successful.............")
@@ -323,19 +345,24 @@ func (r *RKE2EtcdSnapshotRestoreTestSuite) EtcdSnapshotRestoreWithUpgradeStrateg
 		}
 		totalClusterSnapShots := 0
 		for _, snapshot := range snapshotList {
-			if strings.Contains(snapshot.ObjectMeta.Name, clusterName) {
+			prefix := "on-demand-" + clusterName
+			if strings.Contains(snapshot.ObjectMeta.Name, prefix) {
 				if snapshotToBeRestored == "" {
 					snapshotToBeRestored = snapshot.Name
 				}
 				totalClusterSnapShots++
 			}
 		}
-		if totalClusterSnapShots == etcdnodeCount {
+		if totalClusterSnapShots >= etcdnodeCount {
 			return true, nil
 		}
 		return false, nil
 	})
 	require.NoError(r.T(), err)
+
+	logrus.Infof("creating watch over pods.............")
+	r.watchAndWaitForPods(client, clusterID)
+	logrus.Infof("All pods are up and running.............")
 
 	logrus.Infof("creating a workload(w2, deployment).............")
 	containerTemplate2 := workloads.NewContainer("ngnix", "nginx", v1.PullAlways, []v1.VolumeMount{}, []v1.EnvFromSource{})
@@ -476,7 +503,7 @@ func (r *RKE2EtcdSnapshotRestoreTestSuite) EtcdSnapshotRestore(provider *Provide
 	clusterName := namegen.AppendRandomString(provider.Name.String())
 
 	logrus.Infof("creating rke2Cluster.............")
-	clusterResp, err := createRKE2NodeDriverCluster(client, provider, clusterName, initialK8sVersion, r.ns, r.cnis[0], r.advancedOptions)
+	clusterResp, err := createRKE2NodeDriverCluster(client, provider, clusterName, initialK8sVersion, r.ns, r.cnis[0], r.advancedOptions, r.etcdSnapshotS3)
 	require.NoError(r.T(), err)
 	require.Equal(r.T(), clusterName, clusterResp.ObjectMeta.Name)
 	logrus.Infof("rke2Cluster create request successful.............")
@@ -537,6 +564,9 @@ func (r *RKE2EtcdSnapshotRestoreTestSuite) EtcdSnapshotRestore(provider *Provide
 	clusters.WatchAndWaitForCluster(r.client.Steve, kubeProvisioningClient, r.ns, clusterName)
 	logrus.Infof("cluster is active again.............")
 
+	logrus.Infof("creating watch over pods.............")
+	r.watchAndWaitForPods(client, clusterID)
+	logrus.Infof("All pods are up and running.............")
 	var snapshotToBeRestored string
 
 	err = kwait.Poll(5*time.Second, 5*time.Minute, func() (done bool, err error) {
@@ -546,19 +576,23 @@ func (r *RKE2EtcdSnapshotRestoreTestSuite) EtcdSnapshotRestore(provider *Provide
 		}
 		totalClusterSnapShots := 0
 		for _, snapshot := range snapshotList {
-			if strings.Contains(snapshot.ObjectMeta.Name, clusterName) {
+			if strings.Contains(snapshot.ObjectMeta.Name, s3BackupPrefix+clusterName) {
 				if snapshotToBeRestored == "" {
 					snapshotToBeRestored = snapshot.Name
 				}
 				totalClusterSnapShots++
 			}
 		}
-		if totalClusterSnapShots == etcdnodeCount {
+		if totalClusterSnapShots >= etcdnodeCount {
 			return true, nil
 		}
 		return false, nil
 	})
 	require.NoError(r.T(), err)
+
+	logrus.Infof("creating watch over pods.............")
+	r.watchAndWaitForPods(client, clusterID)
+	logrus.Infof("All pods are up and running.............")
 
 	logrus.Infof("creating a workload(w2, deployment).............")
 	containerTemplate2 := workloads.NewContainer("ngnix", "nginx", v1.PullAlways, []v1.VolumeMount{}, []v1.EnvFromSource{})

@@ -146,6 +146,7 @@ func NewRKE1ClusterConfig(clusterName, cni, kubernetesVersion string, psact stri
 				Provider: "metrics-server",
 			},
 			Network: &management.NetworkConfig{
+				Plugin:  cni,
 				MTU:     0,
 				Options: map[string]string{},
 			},
@@ -881,7 +882,7 @@ func isClusterInaccessible(messages []string) (isInaccessible bool) {
 }
 
 func logClusterInfoWithChanges(clusterID, clusterInfo string, summary summary.Summary) string {
-	newClusterInfo := fmt.Sprintf("ClusterID: %v, Message: %v, Error: %v, State: %v, Transiationing: %v", clusterID, summary.Message, summary.Error, summary.State, summary.Transitioning)
+	newClusterInfo := fmt.Sprintf("ClusterID: %v, Message: %v, Error: %v, State: %v, Transitioning: %v", clusterID, summary.Message, summary.Error, summary.State, summary.Transitioning)
 
 	if clusterInfo != newClusterInfo {
 		logrus.Infof(newClusterInfo)
@@ -930,4 +931,27 @@ func GetProvisioningClusterByName(client *rancher.Client, clusterName string, na
 	}
 
 	return cluster, clusterObj, nil
+}
+
+// WaitForActiveCluster is a "helper" function that waits for the cluster to reach the active state.
+// The function accepts a Rancher client and a cluster ID as parameters.
+func WaitForActiveRKE1Cluster(client *rancher.Client, clusterID string) error {
+	err := kwait.Poll(500*time.Millisecond, 30*time.Minute, func() (done bool, err error) {
+		client, err = client.ReLogin()
+		if err != nil {
+			return false, err
+		}
+		clusterResp, err := client.Management.Cluster.ByID(clusterID)
+		if err != nil {
+			return false, err
+		}
+		if clusterResp.State == "active" {
+			return true, nil
+		}
+		return false, nil
+	})
+	if err != nil {
+		return err
+	}
+	return nil
 }
