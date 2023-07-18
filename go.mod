@@ -65,7 +65,7 @@ require (
 	github.com/AzureAD/microsoft-authentication-library-for-go v0.5.1
 	github.com/Masterminds/semver/v3 v3.2.0
 	github.com/Masterminds/sprig/v3 v3.2.3
-	github.com/aws/aws-sdk-go v1.44.294
+	github.com/aws/aws-sdk-go v1.44.300
 	github.com/bep/debounce v1.2.0
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/coreos/go-iptables v0.6.0
@@ -109,7 +109,7 @@ require (
 	github.com/rancher/apiserver v0.0.0-20230515173455-c3b182bdbf7d
 	github.com/rancher/channelserver v0.5.1-0.20220405170618-28c9b37deff1
 	github.com/rancher/dynamiclistener v0.3.5
-	github.com/rancher/eks-operator v1.2.2-rc2
+	github.com/rancher/eks-operator v1.2.2-rc3
 	github.com/rancher/fleet/pkg/apis v0.0.0-20230605094423-ddbb43505e80
 	github.com/rancher/gke-operator v1.1.6-rc1
 	github.com/rancher/kubernetes-provider-detector v0.1.5

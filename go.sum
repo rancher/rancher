@@ -183,8 +183,8 @@ github.com/auth0/go-jwt-middleware v1.0.1/go.mod h1:YSeUX3z6+TF2H+7padiEqNJ73Zy9
 github.com/aws/aws-sdk-go v1.35.24/go.mod h1:tlPOdRjfxPBpNIwqDj61rmsnA85v9jc0Ps9+muhnW+k=
 github.com/aws/aws-sdk-go v1.38.49/go.mod h1:hcU610XS61/+aQV88ixoOzUoG7v3b31pl2zKMmprdro=
 github.com/aws/aws-sdk-go v1.43.28/go.mod h1:y4AeaBuwd2Lk+GepC1E9v0qOiTws0MIWAX4oIKwKHZo=
-github.com/aws/aws-sdk-go v1.44.294 h1:3x7GaEth+pDU9HwFcAU0awZlEix5CEdyIZvV08SlHa8=
-github.com/aws/aws-sdk-go v1.44.294/go.mod h1:aVsgQcEevwlmQ7qHE9I3h+dtQgpqhFB+i8Phjh7fkwI=
+github.com/aws/aws-sdk-go v1.44.300 h1:Zn+3lqgYahIf9yfrwZ+g+hq/c3KzUBaQ8wqY/ZXiAbY=
+github.com/aws/aws-sdk-go v1.44.300/go.mod h1:aVsgQcEevwlmQ7qHE9I3h+dtQgpqhFB+i8Phjh7fkwI=
 github.com/beevik/etree v1.1.0 h1:T0xke/WvNtMoCqgzPhkX2r4rjY3GDZFi+FjpRZY2Jbs=
 github.com/beevik/etree v1.1.0/go.mod h1:r8Aw8JqVegEf0w2fDnATrX9VpkMcyFeM0FhwO62wh+A=
 github.com/benbjohnson/clock v1.0.3/go.mod h1:bGMdMPoPVvcYyt1gHDf4J2KE153Yf9BuiUKYMaxlTDM=
@@ -1261,8 +1261,8 @@ github.com/rancher/client-go v1.25.4-rancher1 h1:9MlBC8QbgngUkhNzMR8rZmmCIj6WNRH
 github.com/rancher/client-go v1.25.4-rancher1/go.mod h1:8trHCAC83XKY0wsBIpbirZU4NTUpbuhc2JnI7OruGZw=
 github.com/rancher/dynamiclistener v0.3.5 h1:5TaIHvkDGmZKvc96Huur16zfTKOiLhDtK4S+WV0JA6A=
 github.com/rancher/dynamiclistener v0.3.5/go.mod h1:dW/YF6/m2+uEyJ5VtEcd9THxda599HP6N9dSXk81+k0=
-github.com/rancher/eks-operator v1.2.2-rc2 h1:5fKSeVhUuLK/A+BjRXaT5fGXknXOYjKoEHUViwz+pvI=
-github.com/rancher/eks-operator v1.2.2-rc2/go.mod h1:jiUipRKnCXC7PAeZagBphP163ZwTKsi3E6pNBRDkyxw=
+github.com/rancher/eks-operator v1.2.2-rc3 h1:zzf4JNCXJHPmI82bVFbJvywz346vWL9FFaBSrvNOhPQ=
+github.com/rancher/eks-operator v1.2.2-rc3/go.mod h1:/wyszmtekvefdRRuBSe0XVZln5BnVrFIeBFrNHCPawo=
 github.com/rancher/fleet/pkg/apis v0.0.0-20230605094423-ddbb43505e80 h1:UgkWQlXoPG1c5kKMOSbHnmSCbWwFPTCXKXfgyhTQVHE=
 github.com/rancher/fleet/pkg/apis v0.0.0-20230605094423-ddbb43505e80/go.mod h1:TbpjMODeuFUJlHG8IfehZ4FBzgzpxwPwa+GwtFq2Tq0=
 github.com/rancher/gke-operator v1.1.6-rc1 h1:VMznbMabusNMar62NWZMNBNnL9zIRGBC3CEy/m4/exw=
