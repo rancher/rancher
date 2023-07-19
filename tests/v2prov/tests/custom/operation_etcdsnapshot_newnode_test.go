@@ -14,11 +14,13 @@ import (
 	"github.com/rancher/rancher/tests/v2prov/cluster"
 	"github.com/rancher/rancher/tests/v2prov/operations"
 	"github.com/rancher/rancher/tests/v2prov/systemdnode"
+	"github.com/rancher/rancher/tests/v2prov/wait"
 	"github.com/rancher/wrangler/pkg/name"
 	"github.com/rancher/wrangler/pkg/randomtoken"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // Test_Operation_Custom_EtcdSnapshotOperationsOnNewNode creates a custom 2 node cluster with a controlplane+worker and
@@ -67,10 +69,11 @@ func Test_Operation_Custom_EtcdSnapshotOperationsOnNewNode(t *testing.T) {
 		fmt.Sprintf("%s:/var/lib/rancher/%s/server/db/snapshots", tmpDir, capr.GetRuntime(c.Spec.KubernetesVersion)),
 	}
 
-	var etcdNode *corev1.Pod
-	etcdNode, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --etcd --node-name etcd-test-node", map[string]string{"custom-cluster-name": c.Name}, etcdSnapshotDir)
-	if err != nil {
+	var etcdNodePodName string
+	if etcdNode, err := systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --etcd --node-name etcd-test-node", map[string]string{"custom-cluster-name": c.Name}, etcdSnapshotDir); err != nil {
 		t.Fatal(err)
+	} else {
+		etcdNodePodName = etcdNode.Name
 	}
 
 	_, err = cluster.WaitForCreate(clients, c)
@@ -90,8 +93,14 @@ func Test_Operation_Custom_EtcdSnapshotOperationsOnNewNode(t *testing.T) {
 	snapshot := operations.RunSnapshotCreateTest(t, clients, c, cm, "etcd-test-node")
 	assert.NotNil(t, snapshot)
 
-	err = clients.Core.Pod().Delete(etcdNode.Namespace, etcdNode.Name, &metav1.DeleteOptions{PropagationPolicy: &[]metav1.DeletionPropagation{metav1.DeletePropagationForeground}[0]})
+	err = clients.Core.Pod().Delete(c.Namespace, etcdNodePodName, &metav1.DeleteOptions{PropagationPolicy: &[]metav1.DeletionPropagation{metav1.DeletePropagationForeground}[0]})
 	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := wait.EnsureDoesNotExist(clients.Ctx, func() (runtime.Object, error) {
+		return clients.Core.Pod().Get(c.Namespace, etcdNodePodName, metav1.GetOptions{})
+	}); err != nil {
 		t.Fatal(err)
 	}
 
