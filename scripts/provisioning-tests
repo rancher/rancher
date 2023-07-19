@@ -134,4 +134,7 @@ echo "Waiting up to 5 minutes for rancher-webhook deployment"
 echo Running provisioning-tests $RUNARG
 
 export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
-go test $RUNARG -v -failfast -timeout 60m ./tests/v2prov/tests/... || dump_rancher_logs
+go test $RUNARG -v -failfast -timeout 60m ./tests/v2prov/tests/... || {
+     dump_rancher_logs
+     exit 1
+}
