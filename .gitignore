@@ -34,3 +34,5 @@ tests/validation/.idea
 all.yaml
 kustomization.yaml
 kontainer-engine
+**/coverage.out
+rancher_debug

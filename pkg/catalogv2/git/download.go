@@ -1,16 +1,7 @@
 package git
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
-	"encoding/pem"
-	"fmt"
-	"net/url"
-	"os"
-	"path/filepath"
-	"regexp"
-	"strings"
-
+	plumbing "github.com/go-git/go-git/v5/plumbing"
 	"github.com/rancher/rancher/pkg/settings"
 	corev1 "k8s.io/api/core/v1"
 )
@@ -20,103 +11,118 @@ const (
 	staticDir = "/var/lib/rancher-data/local-catalogs/v2"
 )
 
-func gitDir(namespace, name, gitURL string) string {
-	staticDir := filepath.Join(staticDir, namespace, name, hash(gitURL))
-	if s, err := os.Stat(staticDir); err == nil && s.IsDir() {
-		return staticDir
+// Ensure builds the configuration for a should-existing repo and makes sure it is cloned or reseted to the latest commit
+func Ensure(secret *corev1.Secret, namespace, name, gitURL, commit string, insecureSkipTLS bool, caBundle []byte) error {
+	if commit == "" {
+		return nil
 	}
-	return filepath.Join(stateDir, namespace, name, hash(gitURL))
+
+	git, err := gitForRepo(secret, namespace, name, gitURL, insecureSkipTLS, caBundle)
+	if err != nil {
+		return err
+	}
+
+	return git.EnsureClonedRepo(commit)
 }
 
+// EnsureClonedRepo will check if repo is cloned, if not will clone and reset to the latest commit.
+// If reseting to the latest commit is not possible it will fetch and try to reset
+func (er *extendedRepo) EnsureClonedRepo(commit string) error {
+
+	err := er.cloneOrOpen("")
+	if err != nil {
+		return err
+	}
+
+	commitHASH := plumbing.NewHash(commit)
+
+	// Try to reset to the given commit, if success exit
+	err = er.hardReset(commitHASH)
+	if err == nil {
+		return nil
+	}
+	// If we do not have the commit locally, fetch and reset
+	return er.fetchAndReset(commitHASH, "")
+}
+
+// Head builds the configuration for a new repo which will be cloned for the first time
 func Head(secret *corev1.Secret, namespace, name, gitURL, branch string, insecureSkipTLS bool, caBundle []byte) (string, error) {
 	git, err := gitForRepo(secret, namespace, name, gitURL, insecureSkipTLS, caBundle)
 	if err != nil {
 		return "", err
 	}
 
-	return git.Head(branch)
+	return git.CloneHead(branch)
 }
 
+// CloneHead clones the HEAD of a git branch and return the commit hash of the HEAD.
+func (er *extendedRepo) CloneHead(branch string) (string, error) {
+	err := er.cloneOrOpen(branch)
+	if err != nil {
+		return "", err
+	}
+
+	zeroHash := plumbing.NewHash("")
+	err = er.hardReset(zeroHash)
+	if err != nil {
+		return "", err
+	}
+
+	commit, err := er.getCurrentCommit()
+	return commit.String(), err
+}
+
+// Update builds the configuration to update an existing repository
 func Update(secret *corev1.Secret, namespace, name, gitURL, branch string, insecureSkipTLS bool, caBundle []byte) (string, error) {
 	git, err := gitForRepo(secret, namespace, name, gitURL, insecureSkipTLS, caBundle)
 	if err != nil {
 		return "", err
 	}
 
-	if isBundled(git) && settings.SystemCatalog.Get() == "bundled" {
+	if isBundled(git.GetConfig()) && settings.SystemCatalog.Get() == "bundled" {
 		return Head(secret, namespace, name, gitURL, branch, insecureSkipTLS, caBundle)
 	}
 
-	commit, err := git.Update(branch)
-	if err != nil && isBundled(git) {
+	commit, err := git.UpdateToLatestRef(branch)
+
+	if err != nil && isBundled(git.GetConfig()) {
 		return Head(secret, namespace, name, gitURL, branch, insecureSkipTLS, caBundle)
 	}
+
 	return commit, err
 }
 
-func Ensure(secret *corev1.Secret, namespace, name, gitURL, commit string, insecureSkipTLS bool, caBundle []byte) error {
-	if commit == "" {
-		return nil
-	}
-	git, err := gitForRepo(secret, namespace, name, gitURL, insecureSkipTLS, caBundle)
+// UpdateToLatestRef will check if repository exists, if exists will check for latest commit and update to it.
+// If the repository does not exist will try cloning again.
+func (er *extendedRepo) UpdateToLatestRef(branch string) (string, error) {
+	err := er.cloneOrOpen(branch)
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	return git.Ensure(commit)
-}
-
-func isBundled(git *git) bool {
-	return strings.HasPrefix(git.Directory, staticDir)
-}
-
-func gitForRepo(secret *corev1.Secret, namespace, name, gitURL string, insecureSkipTLS bool, caBundle []byte) (*git, error) {
-	isGitSSH, err := isGitSSH(gitURL)
+	zeroHash := plumbing.NewHash("")
+	err = er.hardReset(zeroHash)
 	if err != nil {
-		return nil, fmt.Errorf("failed to verify the type of URL %s: %w", gitURL, err)
+		return "", err
 	}
-	if !isGitSSH {
-		u, err := url.Parse(gitURL)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse URL %s: %w", gitURL, err)
-		}
-		if u.Scheme != "http" && u.Scheme != "https" {
-			return nil, fmt.Errorf("invalid git URL scheme %s, only http(s) and git supported", u.Scheme)
-		}
-	}
-	dir := gitDir(namespace, name, gitURL)
-	headers := map[string]string{}
-	if settings.InstallUUID.Get() != "" {
-		headers["X-Install-Uuid"] = settings.InstallUUID.Get()
-	}
-	// convert caBundle to PEM format because git requires correct line breaks, header and footer.
-	if len(caBundle) > 0 {
-		caBundle = convertDERToPEM(caBundle)
-		insecureSkipTLS = false
-	}
-	return newGit(dir, gitURL, &Options{
-		Credential:        secret,
-		Headers:           headers,
-		InsecureTLSVerify: insecureSkipTLS,
-		CABundle:          caBundle,
-	})
-}
 
-func isGitSSH(gitURL string) (bool, error) {
-	// Matches URLs with the format [anything]@[anything]:[anything]
-	return regexp.MatchString("(.+)@(.+):(.+)", gitURL)
-}
+	commit, err := er.getCurrentCommit()
+	if err != nil {
+		return commit.String(), err
+	}
 
-func hash(gitURL string) string {
-	b := sha256.Sum256([]byte(gitURL))
-	return hex.EncodeToString(b[:])
-}
+	lastCommit, err := er.getLastCommitHash(branch, commit)
+	if err != nil || lastCommit == commit {
+		return commit.String(), err
+	}
 
-// convertDERToPEM converts a src DER certificate into PEM with line breaks, header, and footer.
-func convertDERToPEM(src []byte) []byte {
-	return pem.EncodeToMemory(&pem.Block{
-		Type:    "CERTIFICATE",
-		Headers: map[string]string{},
-		Bytes:   src,
-	})
+	err = er.fetchAndReset(lastCommit, branch)
+	if err != nil {
+		return commit.String(), err
+	}
+
+	lastCommitRef, err := er.getCurrentCommit()
+	lastCommitHashStr := lastCommitRef.String()
+
+	return lastCommitHashStr, err
 }
