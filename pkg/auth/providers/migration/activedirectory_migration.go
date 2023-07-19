@@ -66,11 +66,13 @@ func MigrateActiveDirectoryDNToGUID(ctx context.Context, management *config.Mana
 			backOffDuration := time.Second * 30
 			var err error
 			for steps > 0 {
+				logrus.Infof("Active directory principalID migration starting")
 				err = m.migrate()
 				if err != nil {
 					time.Sleep(backOffDuration)
 					backOffDuration = 2 * backOffDuration
 				} else {
+					logrus.Infof("Active directory principalID migration complete")
 					break
 				}
 				steps--
