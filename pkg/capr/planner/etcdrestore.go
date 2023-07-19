@@ -601,14 +601,14 @@ func (p *Planner) runEtcdRestoreInitNodeElection(controlPlane *rkev1.RKEControlP
 			return "", fmt.Errorf("unable to designate machine as label %s on snapshot %s/%s did not exist", capr.MachineIDLabel, snapshot.Namespace, snapshot.Name)
 		}
 		logrus.Infof("[planner] rkecluster %s/%s: electing init node for S3 snapshot %s/%s restoration", controlPlane.Namespace, controlPlane.Name, snapshot.Namespace, snapshot.Name)
-		return p.electInitNode(controlPlane, clusterPlan)
+		return p.electInitNode(controlPlane, clusterPlan, true)
 	}
 	// make sure that we only have one suitable init node, and elect it.
 	if len(collect(clusterPlan, canBeInitNode)) != 1 {
 		return "", fmt.Errorf("more than one init node existed and no corresponding etcd snapshot CR found, no assumption can be made for the machine that contains the snapshot")
 	}
 	logrus.Infof("[planner] rkecluster %s/%s: electing init node for local snapshot with no associated CR", controlPlane.Namespace, controlPlane.Name)
-	return p.electInitNode(controlPlane, clusterPlan)
+	return p.electInitNode(controlPlane, clusterPlan, true)
 }
 
 // runEtcdRestoreServiceStop generates service stop plans for every non-windows node in the cluster and

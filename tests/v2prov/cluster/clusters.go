@@ -23,6 +23,7 @@ import (
 	"github.com/rancher/rancher/tests/v2prov/registry"
 	"github.com/rancher/rancher/tests/v2prov/wait"
 	"github.com/rancher/wrangler/pkg/condition"
+	"github.com/rancher/wrangler/pkg/name"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -103,12 +104,8 @@ func Machines(clients *clients.Clients, cluster *provisioningv1api.Cluster) (*ca
 	})
 }
 
-func MachineSets(clients *clients.Clients, cluster *provisioningv1api.Cluster) (*unstructured.UnstructuredList, error) {
-	return clients.Dynamic.Resource(schema.GroupVersionResource{
-		Group:    "cluster.x-k8s.io",
-		Version:  "v1beta1",
-		Resource: "machinesets",
-	}).Namespace(cluster.Namespace).List(clients.Ctx, metav1.ListOptions{
+func MachineSets(clients *clients.Clients, cluster *provisioningv1api.Cluster) (*capi.MachineSetList, error) {
+	return clients.CAPI.MachineSet().List(cluster.Namespace, metav1.ListOptions{
 		LabelSelector: "cluster.x-k8s.io/cluster-name=" + cluster.Name,
 	})
 }
@@ -136,18 +133,44 @@ func WaitForCreate(clients *clients.Clients, c *provisioningv1api.Cluster) (_ *p
 
 	err = wait.Object(clients.Ctx, clients.Provisioning.Cluster().Watch, c, func(obj runtime.Object) (bool, error) {
 		c = obj.(*provisioningv1api.Cluster)
-		return c.Status.ClusterName != "", nil
-	})
-	if err != nil {
-		return nil, fmt.Errorf("mgmt cluster not assigned: %w", err)
-	}
-
-	err = wait.Object(clients.Ctx, clients.Provisioning.Cluster().Watch, c, func(obj runtime.Object) (bool, error) {
-		c = obj.(*provisioningv1api.Cluster)
-		return c.Status.Ready, nil
+		return c.Status.ClusterName != "" && c.Status.Ready && c.Status.ObservedGeneration == c.Generation && capr.Ready.IsTrue(c) && capr.Provisioned.IsTrue(c), nil
 	})
 	if err != nil {
 		return nil, fmt.Errorf("prov cluster is not ready: %w", err)
+	}
+
+	if len(c.Spec.RKEConfig.MachinePools) > 0 {
+		machineSets, err := MachineSets(clients, c)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, machineSet := range machineSets.Items {
+			// retrieve the corresponding machinedeployment and verify that it is "sane"
+			mpName, ok := machineSet.Labels[capr.RKEMachinePoolNameLabel]
+			if !ok {
+				return nil, fmt.Errorf("machineset %s/%s did not have a corresponding machine pool name label", machineSet.Namespace, machineSet.Name)
+			}
+			md, err := clients.CAPI.MachineDeployment().Get(c.Namespace, name.SafeConcatName(c.Name, mpName), metav1.GetOptions{})
+			if err != nil {
+				return nil, err
+			}
+			err = wait.Object(clients.Ctx, clients.CAPI.MachineDeployment().Watch, md, func(obj runtime.Object) (bool, error) {
+				md = obj.(*capi.MachineDeployment)
+				for _, mp := range c.Spec.RKEConfig.MachinePools {
+					if mpName == mp.Name {
+						if mp.Quantity != nil && (*mp.Quantity != *md.Spec.Replicas || *mp.Quantity != md.Status.ReadyReplicas) {
+							return false, nil
+						}
+						return capr.Ready.IsTrue(md), nil
+					}
+				}
+				return false, nil
+			})
+			if err != nil {
+				return nil, fmt.Errorf("machineset %s/%s was not ready: %w", machineSet.Namespace, machineSet.Name, err)
+			}
+		}
 	}
 
 	machines, err := Machines(clients, c)
@@ -156,6 +179,9 @@ func WaitForCreate(clients *clients.Clients, c *provisioningv1api.Cluster) (_ *p
 	}
 
 	for _, machine := range machines.Items {
+		if !machine.DeletionTimestamp.IsZero() {
+			continue
+		}
 		err = wait.Object(clients.Ctx, clients.CAPI.Machine().Watch, &machine, func(obj runtime.Object) (bool, error) {
 			machine = *obj.(*capi.Machine)
 			return machine.Status.NodeRef != nil, nil
