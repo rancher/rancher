@@ -44,7 +44,7 @@ Sessions are used to track resources created by tests.  A session allows cleanup
 
 ### Configuration
 
-Configuration is loaded from the yaml or json file described in `CATTLE_TEST_CONFIG`.  Configuration objects are loaded from their associated key in the configuration file.  Default values can also be set on configuration objects.
+Configuration is loaded from the yaml or json file described in `CATTLE_TEST_CONFIG`.  Configuration objects are loaded from their associated key in the configuration file.  Default values can also be set on configuration objects. An example configuration file can be found in `example_config.yaml` - replace `$HOST` with the hostname of rancher, `$PORT` with the port that Rancher is running on, and `$TOKEN` with a valid token generated for an admin user.
 
 
 ## How to Write Tests

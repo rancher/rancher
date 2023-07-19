@@ -1,0 +1,5 @@
+rancher:
+  host: $HOST:$PORT
+  adminToken: $TOKEN
+  cleanup: true # defaults to true anyways.
+  clusterName: auto-aws-uiisl # to run tests against a downstream cluster 
