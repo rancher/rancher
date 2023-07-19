@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"strconv"
 	"sync"
 	"time"
@@ -27,7 +28,6 @@ import (
 	"helm.sh/helm/v3/pkg/release"
 	"helm.sh/helm/v3/pkg/repo"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -45,17 +45,21 @@ var (
 )
 
 type desiredKey struct {
-	namespace            string
-	name                 string
+	namespace string
+	name      string
+}
+
+type desiredValues struct {
 	minVersion           string
 	exactVersion         string
 	installImageOverride string
+	values               map[string]interface{}
+	forceAdopt           bool
 }
 
 type desired struct {
-	key        desiredKey
-	values     map[string]interface{}
-	forceAdopt bool
+	key   desiredKey
+	value desiredValues
 }
 
 type Manager struct {
@@ -64,7 +68,7 @@ type Manager struct {
 	content               *content.Manager
 	restClientGetter      genericclioptions.RESTClientGetter
 	pods                  corecontrollers.PodClient
-	desiredCharts         map[desiredKey]map[string]interface{}
+	desiredCharts         map[desiredKey]desiredValues
 	sync                  chan desired
 	syncLock              sync.Mutex
 	refreshIntervalChange chan struct{}
@@ -88,7 +92,7 @@ func NewManager(ctx context.Context,
 		restClientGetter:      restClientGetter,
 		pods:                  pods,
 		sync:                  make(chan desired, 10),
-		desiredCharts:         map[desiredKey]map[string]interface{}{},
+		desiredCharts:         map[desiredKey]desiredValues{},
 		refreshIntervalChange: make(chan struct{}, 1),
 		settings:              settings,
 		trigger:               make(chan struct{}, 1),
@@ -146,12 +150,12 @@ func (m *Manager) runSync() {
 		case desired := <-m.sync:
 			v, exists := m.desiredCharts[desired.key]
 			// newly requested or changed
-			if !exists || !equality.Semantic.DeepEqual(v, desired.values) {
-				err := m.installCharts(map[desiredKey]map[string]interface{}{
-					desired.key: desired.values,
-				}, desired.forceAdopt)
+			if !exists || !reflect.DeepEqual(v, desired.value) {
+				err := m.installCharts(map[desiredKey]desiredValues{
+					desired.key: desired.value,
+				}, desired.value.forceAdopt)
 				if err == nil {
-					m.desiredCharts[desired.key] = desired.values
+					m.desiredCharts[desired.key] = desired.value
 				}
 			}
 		}
@@ -167,11 +171,11 @@ func getIntervalOrDefault(interval string) time.Duration {
 	return time.Duration(i) * time.Second
 }
 
-func (m *Manager) installCharts(charts map[desiredKey]map[string]interface{}, forceAdopt bool) error {
+func (m *Manager) installCharts(charts map[desiredKey]desiredValues, forceAdopt bool) error {
 	var errs []error
-	for key, values := range charts {
+	for key, value := range charts {
 		for {
-			if err := m.install(key.namespace, key.name, key.minVersion, key.exactVersion, values, forceAdopt, key.installImageOverride); err == repo.ErrNoChartName || apierrors.IsNotFound(err) {
+			if err := m.install(key.namespace, key.name, value.minVersion, value.exactVersion, value.values, forceAdopt, value.installImageOverride); err == repo.ErrNoChartName || apierrors.IsNotFound(err) {
 				logrus.Errorf("Failed to find system chart %s will try again in 5 seconds: %v", key.name, err)
 				time.Sleep(5 * time.Second)
 				continue
@@ -217,14 +221,16 @@ func (m *Manager) Ensure(namespace, name, minVersion, exactVersion string, value
 	go func() {
 		m.sync <- desired{
 			key: desiredKey{
-				namespace:            namespace,
-				name:                 name,
+				namespace: namespace,
+				name:      name,
+			},
+			value: desiredValues{
 				minVersion:           minVersion,
 				exactVersion:         exactVersion,
 				installImageOverride: installImageOverride,
+				values:               values,
+				forceAdopt:           forceAdopt,
 			},
-			values:     values,
-			forceAdopt: forceAdopt,
 		}
 	}()
 	return nil
