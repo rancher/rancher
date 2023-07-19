@@ -137,7 +137,7 @@ func (p *Planner) findInitNode(rkeControlPlane *rkev1.RKEControlPlane, plan *pla
 // electInitNode returns a joinURL and error (if one exists) of an init node. It will first search to see if an init node exists
 // (using findInitNode), then will perform a re-election of the most suitable init node (one with a joinURL) and fall back to simply
 // electing the first possible init node if no fully populated init node is found.
-func (p *Planner) electInitNode(rkeControlPlane *rkev1.RKEControlPlane, plan *plan.Plan) (string, error) {
+func (p *Planner) electInitNode(rkeControlPlane *rkev1.RKEControlPlane, plan *plan.Plan, allowReelection bool) (string, error) {
 	logrus.Debugf("rkecluster %s/%s: determining if election of init node is necessary", rkeControlPlane.Namespace, rkeControlPlane.Spec.ClusterName)
 	if initNodeFound, joinURL, _, err := p.findInitNode(rkeControlPlane, plan); (initNodeFound && err == nil) || errors.Is(err, generic.ErrSkip) {
 		logrus.Debugf("rkecluster %s/%s: init node was already elected and found with joinURL: %s", rkeControlPlane.Namespace, rkeControlPlane.Spec.ClusterName, joinURL)
@@ -151,10 +151,9 @@ func (p *Planner) electInitNode(rkeControlPlane *rkev1.RKEControlPlane, plan *pl
 	// keep track of whether we invalidate our machine cache when we clear init node marks across nodes.
 	cachesInvalidated := false
 	// clear all etcd init node marks because we are re-electing our init node
-	for _, entry := range collect(plan, isEtcd) {
-		// Ignore all etcd nodes that are not init nodes
-		if !isInitNode(entry) {
-			continue
+	for _, entry := range collect(plan, isInitNode) {
+		if !allowReelection {
+			return "", errWaitingf("rkecluster %s/%s: waiting for existing init machine %s/%s to be deleted", rkeControlPlane.Namespace, rkeControlPlane.Spec.ClusterName, entry.Machine.Namespace, entry.Machine.Name)
 		}
 		logrus.Debugf("rkecluster %s/%s: clearing init node mark on machine %s", rkeControlPlane.Namespace, rkeControlPlane.Spec.ClusterName, entry.Machine.Name)
 		if err := p.clearInitNodeMark(entry); errors.Is(err, generic.ErrSkip) {

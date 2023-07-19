@@ -15,7 +15,6 @@ import (
 	"github.com/rancher/rancher/tests/v2prov/nodeconfig"
 	"github.com/rancher/rancher/tests/v2prov/operations"
 	"github.com/rancher/rancher/tests/v2prov/wait"
-	"github.com/rancher/wrangler/pkg/data"
 	"github.com/stretchr/testify/assert"
 	errgroup2 "golang.org/x/sync/errgroup"
 	corev1 "k8s.io/api/core/v1"
@@ -225,18 +224,13 @@ func Test_Provisioning_MP_MachineSetDeletePolicyOldestSet(t *testing.T) {
 	}
 
 	for _, machineSet := range machineSets.Items {
-		d, err := data.Convert(machineSet)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		assert.Equal(t, string(capi.OldestMachineSetDeletePolicy), d.String("Object", "spec", "deletePolicy"))
+		assert.Equal(t, string(capi.OldestMachineSetDeletePolicy), machineSet.Spec.DeletePolicy)
 	}
 	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
 	assert.NoError(t, err)
 }
 
-func Test_Provisioning_MP_ThreeNodesAllRolesScaledToOneThenDelete(t *testing.T) {
+func Test_Provisioning_MP_ThreeEtcdNodesScaledDownThenDelete(t *testing.T) {
 	clients, err := clients.New()
 	if err != nil {
 		t.Fatal(err)
@@ -245,17 +239,24 @@ func Test_Provisioning_MP_ThreeNodesAllRolesScaledToOneThenDelete(t *testing.T) 
 
 	c, err := cluster.New(clients, &provisioningv1api.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "test-three-nodes-all-roles-with-delete",
+			Name: "test-etcd-nodes-scaled-down-with-delete",
 		},
 		Spec: provisioningv1api.ClusterSpec{
 			KubernetesVersion: defaults.SomeK8sVersion,
 			RKEConfig: &provisioningv1api.RKEConfig{
-				MachinePools: []provisioningv1api.RKEMachinePool{{
-					EtcdRole:         true,
-					ControlPlaneRole: true,
-					WorkerRole:       true,
-					Quantity:         &defaults.Three,
-				}},
+				MachinePools: []provisioningv1api.RKEMachinePool{
+					{
+						EtcdRole:         true,
+						ControlPlaneRole: false,
+						WorkerRole:       false,
+						Quantity:         &defaults.Three,
+					},
+					{
+						EtcdRole:         false,
+						ControlPlaneRole: true,
+						WorkerRole:       true,
+						Quantity:         &defaults.One,
+					}},
 			},
 		},
 	})
