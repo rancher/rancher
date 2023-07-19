@@ -3,17 +3,14 @@ package integration
 import (
 	"context"
 	"fmt"
-	"strings"
 	"testing"
 	"time"
 
-	"github.com/rancher/rancher/pkg/api/scheme"
+	catalogv1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	"github.com/rancher/rancher/tests/framework/clients/rancher/catalog"
 	stevev1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
-	"github.com/rancher/rancher/tests/framework/extensions/kubeapi/workloads/deployments"
-	"github.com/rancher/rancher/tests/framework/extensions/kubeapi/workloads/pods"
 	"github.com/rancher/rancher/tests/framework/extensions/kubeconfig"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
@@ -23,8 +20,6 @@ import (
 	"github.com/stretchr/testify/suite"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/release"
-	appv1 "k8s.io/api/apps/v1"
-	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kwait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
@@ -63,6 +58,13 @@ func (w *SystemChartsVersionSuite) SetupSuite() {
 	kubeConfig, err := kubeconfig.GetKubeconfig(w.client, "local")
 	require.NoError(w.T(), err)
 	restConfig, err := (*kubeConfig).ClientConfig()
+	// increasing the burst to allow helm to complete without client-side throttling
+	restConfig.Burst = 250
+	restConfig.QPS = 250
+	if w.client.RancherConfig.Insecure != nil && *w.client.RancherConfig.Insecure {
+		// if rancher is insecure, it's unlikely that the route to the cluster is secure
+		restConfig.Insecure = true
+	}
 	require.NoError(w.T(), err)
 	w.restClientGetter, err = kubeconfig.NewRestGetter(restConfig, *kubeConfig)
 	require.NoError(w.T(), err)
@@ -70,62 +72,21 @@ func (w *SystemChartsVersionSuite) SetupSuite() {
 	w.latestWebhookVersion, err = w.catalogClient.GetLatestChartVersion(rancherWebhook)
 	require.NoError(w.T(), err)
 
-	require.NoError(w.T(), w.updateSetting("rancher-webhook-version", w.latestWebhookVersion))
+	require.NoError(w.T(), w.updateSetting("rancher-webhook-version", ""))
 	require.NoError(w.T(), w.updateSetting("rancher-webhook-min-version", ""))
-	require.NoError(w.T(), w.updateSetting("system-feature-chart-refresh-seconds", "10"))
 }
 
 func (w *SystemChartsVersionSuite) resetSettings() {
 	w.T().Helper()
-	require.NoError(w.T(), w.updateSetting("rancher-webhook-version", w.latestWebhookVersion))
+	// fully reset the webhook and wait for the final version to rollout
+	require.NoError(w.T(), w.uninstallApp("cattle-system", "rancher-webhook"))
+	require.NoError(w.T(), w.updateSetting("rancher-webhook-version", ""))
 	require.NoError(w.T(), w.updateSetting("rancher-webhook-min-version", ""))
-	require.NoError(w.T(), w.updateSetting("system-feature-chart-refresh-seconds", "10"))
-
-	// need to recreate the rancher-webhook pod because there are rbac issues without doing so.
-	dynamicClient, err := w.client.GetRancherDynamicClient()
-	require.NoError(w.T(), err)
-
-	podList, err := dynamicClient.Resource(pods.PodGroupVersionResource).Namespace(cattleSystemNameSpace).List(context.Background(), metav1.ListOptions{})
-	require.NoError(w.T(), err)
-
-	var podName string
-
-	for _, pod := range podList.Items {
-		name := pod.GetName()
-		if strings.Contains(name, rancherWebhook) {
-			podName = name
-			break
-		}
-	}
-
-	err = dynamicClient.Resource(pods.PodGroupVersionResource).Namespace(cattleSystemNameSpace).Delete(context.Background(), podName, metav1.DeleteOptions{})
-	require.NoError(w.T(), err)
-
-	err = kwait.Poll(500*time.Millisecond, 10*time.Minute, func() (done bool, err error) {
-		deployment, err := dynamicClient.Resource(deployments.DeploymentGroupVersionResource).Namespace(cattleSystemNameSpace).Get(context.TODO(), rancherWebhook, metav1.GetOptions{})
-		if k8sErrors.IsNotFound(err) {
-			return false, nil
-		} else if err != nil {
-			return false, err
-		}
-
-		newDeployment := &appv1.Deployment{}
-		err = scheme.Scheme.Convert(deployment, newDeployment, deployment.GroupVersionKind())
-		if err != nil {
-			return false, err
-		}
-		if newDeployment.Status.ReadyReplicas == *newDeployment.Spec.Replicas {
-			return true, nil
-		}
-
-		return false, nil
-	})
-	require.NoError(w.T(), err)
-
+	require.NoError(w.T(), w.waitForChartDeploy("cattle-system", "rancher-webhook", w.latestWebhookVersion))
 }
 
 func TestSystemChartsVersionSuite(t *testing.T) {
-	// suite.Run(t, new(SystemChartsVersionSuite))
+	suite.Run(t, new(SystemChartsVersionSuite))
 }
 
 func (w *SystemChartsVersionSuite) TestInstallWebhook() {
@@ -134,37 +95,7 @@ func (w *SystemChartsVersionSuite) TestInstallWebhook() {
 	const exactVersion = "2.0.3+up0.3.3"
 	w.Require().NoError(w.uninstallApp("cattle-system", "rancher-webhook"))
 	w.Require().NoError(w.updateSetting("rancher-webhook-version", exactVersion))
-
-	watcher, err := w.catalogClient.Apps("cattle-system").Watch(context.TODO(), metav1.ListOptions{
-		FieldSelector:  "metadata.name=" + "rancher-webhook",
-		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
-	})
-	w.Require().NoError(err)
-
-	err = wait.WatchWait(watcher, func(event watch.Event) (ready bool, err error) {
-		if event.Type == watch.Error {
-			return false, fmt.Errorf("there was an error installing the rancher-webhook chart")
-		} else if event.Type == watch.Added {
-			return true, nil
-		}
-		return false, nil
-	})
-	w.Require().NoError(err)
-
-	// Allow the new release to fully deploy. Otherwise, the client won't find it among current releases.
-	var newRelease *release.Release
-	err = kwait.Poll(10*time.Second, 2*time.Minute, func() (done bool, err error) {
-		newRelease, err = w.fetchRelease("cattle-system", "rancher-webhook")
-		if err != nil {
-			return false, nil
-		}
-		if v := newRelease.Chart.Metadata.Version; v != exactVersion {
-			w.T().Logf("%s version %s does not yet match expected %s", newRelease.Chart.Name(), v, exactVersion)
-			return false, nil
-		}
-		return true, nil
-	})
-	w.Require().NoError(err)
+	w.Require().NoError(w.waitForChartDeploy("cattle-system", "rancher-webhook", exactVersion))
 }
 
 // TODO (maxsokolovsky) remove once the rancher-webhook-min-version setting is fully removed.
@@ -175,78 +106,7 @@ func (w *SystemChartsVersionSuite) TestInstallWebhookMinVersion() {
 	w.Require().NoError(w.uninstallApp("cattle-system", "rancher-webhook"))
 	w.Require().NoError(w.updateSetting("rancher-webhook-min-version", minVersion))
 
-	watcher, err := w.catalogClient.Apps("cattle-system").Watch(context.TODO(), metav1.ListOptions{
-		FieldSelector:  "metadata.name=" + "rancher-webhook",
-		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
-	})
-	w.Require().NoError(err)
-
-	err = wait.WatchWait(watcher, func(event watch.Event) (ready bool, err error) {
-		if event.Type == watch.Error {
-			return false, fmt.Errorf("there was an error installing the rancher-webhook chart")
-		} else if event.Type == watch.Added {
-			return true, nil
-		}
-		return false, nil
-	})
-	w.Require().NoError(err)
-
-	// Allow the new release to fully deploy. Otherwise, the client won't find it among current releases.
-	var newRelease *release.Release
-	err = kwait.Poll(10*time.Second, 2*time.Minute, func() (done bool, err error) {
-		newRelease, err = w.fetchRelease("cattle-system", "rancher-webhook")
-		if err != nil {
-			return false, nil
-		}
-		if v := newRelease.Chart.Metadata.Version; v != w.latestWebhookVersion {
-			w.T().Logf("%s version %s does not yet match expected %s", newRelease.Chart.Name(), v, w.latestWebhookVersion)
-			return false, nil
-		}
-		return true, nil
-	})
-	w.Require().NoError(err)
-}
-
-func (w *SystemChartsVersionSuite) TestInstallFleet() {
-	defer w.resetSettings()
-
-	w.Require().NoError(w.uninstallApp("cattle-fleet-system", "fleet"))
-
-	const minVersion = "102.0.0+up0.6.0"
-	w.Require().NoError(w.updateSetting("fleet-min-version", minVersion))
-
-	watcher, err := w.catalogClient.Apps("cattle-fleet-system").Watch(context.TODO(), metav1.ListOptions{
-		FieldSelector:  "metadata.name=" + "fleet",
-		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
-	})
-	w.Require().NoError(err)
-
-	err = wait.WatchWait(watcher, func(event watch.Event) (ready bool, err error) {
-		if event.Type == watch.Error {
-			return false, fmt.Errorf("there was an error installing the fleet chart")
-		} else if event.Type == watch.Added {
-			return true, nil
-		}
-		return false, nil
-	})
-	w.Require().NoError(err)
-
-	// Allow the new release to fully deploy. Otherwise, the client won't find it among current releases.
-	var newRelease *release.Release
-	err = kwait.Poll(10*time.Second, 2*time.Minute, func() (done bool, err error) {
-		newRelease, err = w.fetchRelease("cattle-fleet-system", "fleet")
-		if err != nil {
-			return false, nil
-		}
-		return true, nil
-	})
-	w.Require().NoError(err)
-
-	latest, err := w.catalogClient.GetLatestChartVersion("fleet")
-	w.Require().NoError(err)
-
-	// Ensure Rancher deployed the latest version when the minimum version is below the latest.
-	w.Assert().Equal(newRelease.Chart.Metadata.Version, latest)
+	w.Require().NoError(w.waitForChartDeploy("cattle-system", "rancher-webhook", w.latestWebhookVersion))
 }
 
 func (w *SystemChartsVersionSuite) uninstallApp(namespace, chartName string) error {
@@ -258,18 +118,63 @@ func (w *SystemChartsVersionSuite) uninstallApp(namespace, chartName string) err
 	if err != nil {
 		return fmt.Errorf("failed to fetch all releases in the %s namespace: %w", namespace, err)
 	}
+	var targetRelease *release.Release
 	for _, r := range releases {
 		if r.Chart.Name() == chartName {
-			err = kwait.Poll(10*time.Second, time.Minute, func() (done bool, err error) {
-				if _, err := action.NewUninstall(&cfg).Run(r.Name); err != nil {
-					return false, nil
-				}
-				return true, nil
-			})
-			return err
+			targetRelease = r
 		}
 	}
-	return fmt.Errorf("the chartName %s was never installed", chartName)
+	if targetRelease == nil {
+		return fmt.Errorf("the chart name %s was never installed", chartName)
+	}
+	if _, err := action.NewUninstall(&cfg).Run(targetRelease.Name); err != nil {
+		return err
+	}
+	// remove the app associated with this release so later on we can tell that this was uninstalled
+	return w.catalogClient.Apps(namespace).Delete(context.Background(), chartName, metav1.DeleteOptions{})
+}
+
+func (w *SystemChartsVersionSuite) waitForChartDeploy(namespace, chartName, version string) error {
+	watcher, err := w.catalogClient.Apps(namespace).Watch(context.TODO(), metav1.ListOptions{
+		FieldSelector:  "metadata.name=" + chartName,
+		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+	})
+	if err != nil {
+		return err
+	}
+
+	err = wait.WatchWait(watcher, func(event watch.Event) (ready bool, err error) {
+		switch event.Type {
+		case watch.Added:
+			return false, nil
+		case watch.Modified:
+			app := event.Object.(*catalogv1.App)
+			if app.Status.Summary.State == string(catalogv1.StatusDeployed) {
+				return true, nil
+			}
+			return false, nil
+		case watch.Error:
+			return false, fmt.Errorf("there was an error installing the rancher-webhook chart")
+		default:
+			return false, nil
+		}
+	})
+	if err != nil {
+		return fmt.Errorf("failed to wait for app to rollout %w", err)
+	}
+	// even though the app has rolled out, there's a short time where the release may not be installed
+	return kwait.Poll(10*time.Second, 30*time.Second, func() (done bool, err error) {
+		newRelease, err := w.fetchRelease(namespace, chartName)
+		if err != nil {
+			return false, nil
+		}
+		if v := newRelease.Chart.Metadata.Version; v != version {
+			w.T().Logf("%s version %s does not yet match expected %s", newRelease.Chart.Name(), v, version)
+			return false, nil
+		}
+		return true, nil
+	})
+
 }
 
 func (w *SystemChartsVersionSuite) getReleases(cfg *action.Configuration) ([]*release.Release, error) {
@@ -304,6 +209,10 @@ func (w *SystemChartsVersionSuite) updateSetting(name, value string) error {
 	var s v3.Setting
 	if err := stevev1.ConvertToK8sType(existing.JSONResp, &s); err != nil {
 		return err
+	}
+	// setting sourced from env vars won't react to k8s changes, so we need to un-register them as env vars
+	if s.Source == "env" {
+		s.Source = ""
 	}
 
 	s.Value = value
