@@ -419,6 +419,13 @@ func (m *userManager) EnsureUser(principalName, displayName string) (*v3.User, e
 	}
 
 	if user != nil {
+		if displayName != "" && user.DisplayName == "" {
+			user.DisplayName = displayName
+			if _, err := m.users.Update(user); err != nil {
+				return nil, err
+			}
+		}
+
 		// If the user does not have the annotation it indicates the user was created
 		// through the UI or from a previous rancher version so don't add the
 		// default bindings.
