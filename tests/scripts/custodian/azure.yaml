@@ -1,0 +1,143 @@
+# Azure Policies
+policies:
+# VMs
+- name: az-mark-unknown-vms-for-deletion
+  resource: azure.vm
+  description: |
+    Mark unknown user instances for deletion in 1 day
+  filters:
+    - "State.Name": running
+    # instance name not in accepted user keys
+    - type: value
+      key: name
+      op: regex
+      #doesNOTcontain
+      value:  "^((?!USERKEYS).)*$"
+    # instance is not doNotDelete
+    - 'tag:doNotDelete': absent
+    - 'tag:DoNotDelete': absent
+    - 'tag:known_user': absent
+    - "tag:DeletesOnFriday": absent
+    - not: 
+      - type: value
+        key: name
+        op: regex
+        value:  "^.*DONOTDELETEKEYS.*$"
+  actions:
+    - type: mark-for-op
+      tag: unknown_user
+      op: delete
+      days: 1
+
+- name: az-mark-known-vms-for-deletion
+  resource: azure.vm
+  description: |
+    Mark known user instances for deletion in 2 days
+  filters:
+    # instance is named with accepted user key
+    - type: value
+      key: name
+      op: regex
+      value:  "^.*USERKEYS.*$"
+    # instance is not doNotDelete
+    - 'tag:doNotDelete': absent
+    - 'tag:DoNotDelete': absent
+    - 'tag:unknown_user': absent
+    - "tag:DeletesOnFriday": absent
+    - not: 
+      - type: value
+        key: name
+        op: regex
+        value:  "^.*DONOTDELETEKEYS.*$"
+  actions:
+    - type: mark-for-op
+      tag: known_user
+      op: delete
+      days: 2
+
+- name: azure-terminate-vms
+  resource: azure.vm
+  description: |
+    Delete any marked instances which have been 
+    marked for deletion for more than 1 day.
+  filters:
+    - or:
+      - type: marked-for-op
+        tag: unknown_user
+        op: delete
+      - type: marked-for-op
+        tag: known_user
+        op: delete
+  actions:
+    - type: delete
+
+# AKS
+- name: az-mark-unknown-aks-for-deletion
+  resource: azure.aks
+  description: |
+    Mark unknown user instances for deletion in 1 day
+  filters:
+    - "State.Name": running
+    # instance name not in accepted user keys
+    - type: value
+      key: name
+      op: regex
+      #doesNOTcontain
+      value:  "^((?!USERKEYS).)*$"
+    # instance is not doNotDelete
+    - 'tag:doNotDelete': absent
+    - 'tag:DoNotDelete': absent
+    - 'tag:known_user': absent
+    - "tag:DeletesOnFriday": absent
+    - not: 
+      - type: value
+        key: name
+        op: regex
+        value:  "^.*DONOTDELETEKEYS.*$"
+  actions:
+    - type: mark-for-op
+      tag: unknown_user
+      op: delete
+      days: 1
+
+- name: az-mark-known-aks-for-deletion
+  resource: azure.aks
+  description: |
+    Mark known user instances for deletion in 2 days
+  filters:
+    # instance is named with accepted user key
+    - type: value
+      key: name
+      op: regex
+      value:  "^.*USERKEYS.*$"
+    # instance is not doNotDelete
+    - 'tag:doNotDelete': absent
+    - 'tag:DoNotDelete': absent
+    - 'tag:unknown_user': absent
+    - "tag:DeletesOnFriday": absent
+    - not: 
+      - type: value
+        key: name
+        op: regex
+        value:  "^.*DONOTDELETEKEYS.*$"
+  actions:
+    - type: mark-for-op
+      tag: known_user
+      op: delete
+      days: 2
+
+- name: azure-terminate-aks
+  resource: azure.aks
+  description: |
+    Delete any marked instances which have been 
+    marked for deletion for more than 1 day.
+  filters:
+    - or:
+      - type: marked-for-op
+        tag: unknown_user
+        op: delete
+      - type: marked-for-op
+        tag: known_user
+        op: delete
+  actions:
+    - type: delete
