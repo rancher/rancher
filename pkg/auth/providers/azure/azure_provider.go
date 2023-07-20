@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	lru "github.com/hashicorp/golang-lru"
-	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
@@ -329,18 +328,10 @@ func (ap *Provider) GetAzureConfigK8s() (*v32.AzureADConfig, error) {
 	storedAzureADConfigMap := u.UnstructuredContent()
 
 	storedAzureADConfig := &v32.AzureADConfig{}
-	if err := mapstructure.Decode(storedAzureADConfigMap, storedAzureADConfig); err != nil {
-		return nil, err
+	err = common.Decode(storedAzureADConfigMap, storedAzureADConfig)
+	if err != nil {
+		return nil, fmt.Errorf("unable to decode Azure Config: %w", err)
 	}
-
-	metadataMap, ok := storedAzureADConfigMap["metadata"].(map[string]interface{})
-	if !ok {
-		return nil, fmt.Errorf("failed to retrieve AzureADConfig metadata, cannot read k8s Unstructured data")
-	}
-
-	objectMeta := &metav1.ObjectMeta{}
-	mapstructure.Decode(metadataMap, objectMeta)
-	storedAzureADConfig.ObjectMeta = *objectMeta
 
 	if storedAzureADConfig.ApplicationSecret != "" {
 		value, err := common.ReadFromSecret(ap.secrets, storedAzureADConfig.ApplicationSecret,
@@ -393,7 +384,7 @@ func (ap *Provider) updateToken(client clients.AzureClient, token *v3.Token) err
 
 func formAzureRedirectURL(config map[string]interface{}) string {
 	var ac v32.AzureADConfig
-	err := mapstructure.Decode(config, &ac)
+	err := common.Decode(config, &ac)
 	if err == nil {
 		// Extract the annotations from the map. This is needed because of the type structure of
 		// the Azure config and the Auth config it embeds. Full deserialization does not work for
