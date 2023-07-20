@@ -13,6 +13,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
+const serviceAccountSecretAnnotation = "kubernetes.io/service-account.name"
+
 // secretGetter is an abstraction over any kind of secret getter.
 // The caller can use any cache or client it has available, whether that is from norman, wrangler, or client-go,
 // as long as it can wrap it in a simplified lambda with this signature.
@@ -40,7 +42,7 @@ func EnsureSecretForServiceAccount(ctx context.Context, secretGetter secretGette
 			return nil, fmt.Errorf("error ensuring secret for service account [%s:%s]: %w", sa.Namespace, sa.Name, err)
 		}
 	}
-	if secret == nil {
+	if secret == nil || !isSecretForServiceAccount(secret, sa) {
 		sc := SecretTemplate(sa)
 		secret, err = secretClient.Create(ctx, sc, metav1.CreateOptions{})
 		if err != nil {
@@ -48,16 +50,17 @@ func EnsureSecretForServiceAccount(ctx context.Context, secretGetter secretGette
 		}
 		// k8s >=1.24 does not store a reference to the secret, but we need it to refer back to later
 		saCopy := sa.DeepCopy()
-		saCopy.Secrets = append(saCopy.Secrets, v1.ObjectReference{Name: secret.Name})
+		saCopy.Secrets = []v1.ObjectReference{{Name: secret.Name}}
 		saCopy, err = saClient.Update(ctx, saCopy, metav1.UpdateOptions{})
 		if err != nil {
 			// clean up the secret we just created
 			cleanupErr := secretClient.Delete(ctx, secret.Name, metav1.DeleteOptions{})
-			if cleanupErr != nil {
+			if cleanupErr != nil && !apierror.IsNotFound(cleanupErr) {
 				return nil, fmt.Errorf("encountered error while handling service account update error: %v, original error: %w", cleanupErr, err)
 			}
 			return nil, fmt.Errorf("error ensuring secret for service account [%s:%s]: %w", sa.Namespace, sa.Name, err)
 		}
+		*sa = *saCopy
 	}
 	if len(secret.Data[v1.ServiceAccountTokenKey]) > 0 {
 		return secret, nil
@@ -101,7 +104,7 @@ func SecretTemplate(sa *v1.ServiceAccount) *v1.Secret {
 				},
 			},
 			Annotations: map[string]string{
-				"kubernetes.io/service-account.name": sa.Name,
+				serviceAccountSecretAnnotation: sa.Name,
 			},
 		},
 		Type: v1.SecretTypeServiceAccountToken,
@@ -121,4 +124,13 @@ func ServiceAccountSecretName(sa *v1.ServiceAccount) string {
 		return ""
 	}
 	return sa.Secrets[0].Name
+}
+
+func isSecretForServiceAccount(secret *v1.Secret, sa *v1.ServiceAccount) bool {
+	if secret.Type != v1.SecretTypeServiceAccountToken {
+		return false
+	}
+	annotations := secret.Annotations
+	annotation := annotations[serviceAccountSecretAnnotation]
+	return sa.Name == annotation
 }

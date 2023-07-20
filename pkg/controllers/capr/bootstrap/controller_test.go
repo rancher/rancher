@@ -76,11 +76,13 @@ func Test_getBootstrapSecret(t *testing.T) {
 			a.Nil(err)
 
 			serviceAccount, err := handler.serviceAccountCache.Get(tt.args.namespaceName, tt.args.secretName)
+			a.Nil(err)
 			machine, err := handler.machineCache.Get(tt.args.namespaceName, tt.args.os)
+			a.Nil(err)
 			secret, err := handler.getBootstrapSecret(tt.args.namespaceName, tt.args.secretName, []v1.EnvVar{}, machine)
+			a.Nil(err)
 
 			// assert
-			a.Nil(err)
 			a.NotNil(secret)
 			a.NotNil(serviceAccount)
 			a.NotNil(machine)
@@ -193,13 +195,16 @@ func getSecretCacheMock(ctrl *gomock.Controller, namespace, secretName string) *
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: namespace,
 				Name:      name,
+				Annotations: map[string]string{
+					"kubernetes.io/service-account.name": secretName,
+				},
 			},
 			Immutable: nil,
 			Data: map[string][]byte{
 				"token": []byte("thisismytokenandiwillprotectit"),
 			},
 			StringData: nil,
-			Type:       "",
+			Type:       "kubernetes.io/service-account-token",
 		}, nil
 	}).AnyTimes()
 	return mockSecretCache
