@@ -118,9 +118,9 @@ func (e *NodeDeleteAndReplace) TestNodeDeletionAndReplacement() {
 					err = nodestat.IsNodeReady(client, clusterId)
 					require.NoError(e.T(), err)
 
-					isEtcdNodeReplaced, err := nodestat.IsRKE2K3SNodeReplaced(client, query, clusterResp.Name, nodeLabel, nodeToDelete, numNodesBeforeDeletions)
+					isNodeReplaced, err := nodestat.IsRKE2K3SNodeReplaced(client, query, clusterResp.Name, nodeLabel, nodeToDelete, numNodesBeforeDeletions)
 					require.NoError(e.T(), err)
-					require.True(e.T(), isEtcdNodeReplaced)
+					require.True(e.T(), isNodeReplaced)
 
 					podResults, podErrors := pods.StatusPods(client, clusterId)
 					assert.NotEmpty(e.T(), podResults)
