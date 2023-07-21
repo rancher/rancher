@@ -30,6 +30,7 @@ type Node struct {
 	Healthy        bool                                 `json:"healthy,omitempty"`
 	PlanDataExists bool                                 `json:"planDataExists,omitempty"`
 	ProbeStatus    map[string]ProbeStatus               `json:"probeStatus,omitempty"`
+	ProbesUsable   bool                                 `json:"probesUsable,omitempty"` // ProbesUsable indicates that the probes have passed at least once for the appliedPlan
 }
 
 type PeriodicInstructionOutput struct {

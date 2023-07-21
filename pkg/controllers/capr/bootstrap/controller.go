@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -28,6 +29,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
@@ -151,24 +153,24 @@ func (h *handler) getBootstrapSecret(namespace, name string, envVars []corev1.En
 }
 
 func (h *handler) assignPlanSecret(machine *capi.Machine, bootstrap *rkev1.RKEBootstrap) []runtime.Object {
-	secretName := capr.PlanSecretFromBootstrapName(bootstrap.Name)
+	planSecretName := capr.PlanSecretFromBootstrapName(bootstrap.Name)
 	labels, annotations := getLabelsAndAnnotationsForPlanSecret(bootstrap, machine)
 
 	sa := &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      secretName,
+			Name:      planSecretName,
 			Namespace: bootstrap.Namespace,
 			Labels: map[string]string{
 				capr.MachineNameLabel: machine.Name,
 				rkeBootstrapName:      bootstrap.Name,
 				capr.RoleLabel:        capr.RolePlan,
-				capr.PlanSecret:       secretName,
+				capr.PlanSecret:       planSecretName,
 			},
 		},
 	}
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        secretName,
+			Name:        planSecretName,
 			Namespace:   bootstrap.Namespace,
 			Labels:      labels,
 			Annotations: annotations,
@@ -177,7 +179,7 @@ func (h *handler) assignPlanSecret(machine *capi.Machine, bootstrap *rkev1.RKEBo
 	}
 	role := &rbacv1.Role{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      secretName,
+			Name:      planSecretName,
 			Namespace: bootstrap.Namespace,
 		},
 		Rules: []rbacv1.PolicyRule{
@@ -185,13 +187,13 @@ func (h *handler) assignPlanSecret(machine *capi.Machine, bootstrap *rkev1.RKEBo
 				Verbs:         []string{"watch", "get", "update", "list"},
 				APIGroups:     []string{""},
 				Resources:     []string{"secrets"},
-				ResourceNames: []string{secretName},
+				ResourceNames: []string{planSecretName},
 			},
 		},
 	}
 	roleBinding := &rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      secretName,
+			Name:      planSecretName,
 			Namespace: bootstrap.Namespace,
 		},
 		Subjects: []rbacv1.Subject{
@@ -204,7 +206,7 @@ func (h *handler) assignPlanSecret(machine *capi.Machine, bootstrap *rkev1.RKEBo
 		RoleRef: rbacv1.RoleRef{
 			APIGroup: rbacv1.GroupName,
 			Kind:     "Role",
-			Name:     secretName,
+			Name:     planSecretName,
 		},
 	}
 
@@ -331,8 +333,10 @@ func (h *handler) GeneratingHandler(bootstrap *rkev1.RKEBootstrap, status rkev1.
 		return result, status, generic.ErrSkip
 	}
 
+	// The plan secret is used by the planner to deliver plans to the system-agent (and receive feedback)
 	result = append(result, h.assignPlanSecret(machine, bootstrap)...)
 
+	// The bootstrap secret contains the system-agent install script with corresponding information to bootstrap the node
 	bootstrapSecret, objs, err := h.assignBootStrapSecret(machine, bootstrap, capiCluster)
 	if err != nil {
 		return nil, status, err
@@ -477,6 +481,32 @@ func (h *handler) reconcileMachinePreTerminateAnnotation(bootstrap *rkev1.RKEBoo
 	if machine.Status.NodeRef == nil {
 		logrus.Infof("[rkebootstrap] No associated node found for machine %s/%s in cluster %s, ensuring machine pre-terminate annotation is removed", machine.Namespace, machine.Name, bootstrap.Spec.ClusterName)
 		return h.ensureMachinePreTerminateAnnotationRemoved(bootstrap, machine)
+	}
+
+	// If the RKEControlPlane is not deleting, then make sure this node is not being used as an init node.
+	if cp.DeletionTimestamp.IsZero() {
+		planSecret, err := h.secretCache.Get(bootstrap.Namespace, capr.PlanSecretFromBootstrapName(bootstrap.Name))
+		if err != nil && !apierrors.IsNotFound(err) {
+			return bootstrap, fmt.Errorf("error retrieving plan secret to validate it was not an init node: %v", err)
+		}
+
+		if planSecret != nil {
+			// validate that no other nodes are joined to this node, otherwise removing it will cause a bunch of nodes to start crashing.
+			joinURL := planSecret.Annotations[capr.JoinURLAnnotation]
+			planSecrets, err := h.secretCache.List(bootstrap.Namespace, labels.SelectorFromSet(map[string]string{
+				capi.ClusterLabelName: bootstrap.Spec.ClusterName,
+			}))
+			if err != nil {
+				return bootstrap, fmt.Errorf("error encountered list plansecrets to ensure node was not joined: %v", err)
+			}
+			for _, ps := range planSecrets {
+				if ps.GetAnnotations()[capr.JoinedToAnnotation] == joinURL {
+					logrus.Errorf("[rkebootstrap] %s/%s: cluster %s/%s machine %s/%s was still joined to deleting etcd machine %s/%s", bootstrap.Namespace, bootstrap.Name, capiCluster.Namespace, capiCluster.Name, bootstrap.Namespace, ps.GetLabels()[capr.MachineNameLabel], machine.Namespace, machine.Name)
+					h.rkeBootstrap.EnqueueAfter(bootstrap.Namespace, bootstrap.Name, 5*time.Second)
+					return bootstrap, generic.ErrSkip
+				}
+			}
+		}
 	}
 
 	kcSecret, err := h.secretCache.Get(bootstrap.Namespace, secret.Name(bootstrap.Spec.ClusterName, secret.Kubeconfig))
