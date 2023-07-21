@@ -66,9 +66,6 @@ node {
               } else {
                 echo "No OVERRIDE_REGION passed in, running all tests"
               }
-              } else {
-                echo "No OVERRIDE_REGION passed in, running all tests"
-              }
           }
           stage('Run Docker Image for AWS,Azure, and GCP'){
             sh "docker run --privileged --name ${testContainer} -e CUSTODIAN_YAML=\"${awsYaml}\" -e DONOTDELETE_KEYS=\"${env.DONOTDELETE_KEYS}\" -e USER_KEYS=\"${env.USER_KEYS}\" ${imageName}"
