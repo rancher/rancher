@@ -137,7 +137,7 @@ func (p *adProvider) GetPrincipal(principalID string, token v3.Token) (v3.Princi
 	if err != nil {
 		return v3.Principal{}, err
 	}
-	if token.Token != "" && p.isThisUserMe(token.UserPrincipal, *principal) {
+	if p.isThisUserMe(token.UserPrincipal, *principal) {
 		principal.Me = true
 	}
 	return *principal, err
