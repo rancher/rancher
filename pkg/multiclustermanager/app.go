@@ -7,8 +7,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rancher/rancher/pkg/auth/providers/migration"
-
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/auth/providerrefresh"
@@ -216,7 +214,6 @@ func (m *mcm) Start(ctx context.Context) error {
 		}
 
 		tokens.StartPurgeDaemon(ctx, management)
-		migration.MigrateActiveDirectoryDNToGUID(ctx, management)
 		providerrefresh.StartRefreshDaemon(ctx, m.ScaledContext, management)
 		managementdata.CleanupOrphanedSystemUsers(ctx, management)
 		clusterupstreamrefresher.MigrateEksRefreshCronSetting(m.wranglerContext)
