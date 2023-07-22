@@ -36,6 +36,8 @@ node {
       withCredentials([ string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
                         string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
                         string(credentialsId: 'AZURE_SUBSCRIPTION_ID', variable: 'AZURE_SUBSCRIPTION_ID'),
+                        string(credentialsId: 'DONOTDELETE_KEYS', variable: 'DONOTDELETE_KEYS'),
+                        string(credentialsId: 'USER_KEYS', variable: 'USER_KEYS'),
                         string(credentialsId: 'AZURE_TENANT_ID', variable: 'AZURE_TENANT_ID'),
                         string(credentialsId: 'AZURE_CLIENT_ID', variable: 'AZURE_CLIENT_ID'),
                         string(credentialsId: 'AZURE_CLIENT_SECRET', variable: 'AZURE_CLIENT_SECRET'),
@@ -62,15 +64,13 @@ node {
           stage('Run Docker Image for Adding Tags') {
               // if a user only wants to run the test using a subset of keys, they can pass in OVERRIDE_REGION
               if ("${env.OVERRIDE_REGION}" != "null" && "${env.OVERRIDE_REGION}" != "") {
-              sh "docker run --privileged --name ${testContainer} -e CUSTODIAN_YAML=\"add-friday-tags.yaml\" -e OVERRIDE_REGION=\"${env.OVERRIDE_REGION}\" -e DONOTDELETE_KEYS=\"${env.DONOTDELETE_KEYS}\" -e USER_KEYS=\"${env.USER_KEYS}\" ${imageName} "
+              sh "docker run --privileged --name ${testContainer} -e CUSTODIAN_YAML=\"add-friday-tags.yaml\" -e OVERRIDE_REGION=\"${env.OVERRIDE_REGION}\" -e DONOTDELETE_KEYS=\"${DONOTDELETE_KEYS}\" -e USER_KEYS=\"${USER_KEYS}\" ${imageName} "
               } else {
                 echo "No OVERRIDE_REGION passed in, running all tests"
               }
           }
           stage('Run Docker Image for AWS,Azure, and GCP'){
-            sh "docker run --privileged --name ${testContainer} -e CUSTODIAN_YAML=\"${awsYaml}\" -e DONOTDELETE_KEYS=\"${env.DONOTDELETE_KEYS}\" -e USER_KEYS=\"${env.USER_KEYS}\" ${imageName}"
-            sh "docker run --privileged --name ${testContainer} -e CUSTODIAN_YAML=\"${azureYaml}\" -e DONOTDELETE_KEYS=\"${env.DONOTDELETE_KEYS}\" -e USER_KEYS=\"${env.USER_KEYS}\" ${imageName}"
-            sh "docker run --privileged --name ${testContainer} -e CUSTODIAN_YAML=\"${gcpYaml}\" -e DONOTDELETE_KEYS=\"${env.DONOTDELETE_KEYS}\" -e USER_KEYS=\"${env.USER_KEYS}\" ${imageName}"
+            sh "docker run --privileged --name ${testContainer} -e CUSTODIAN_YAML=\"${CUSTODIAN_YAML}\" -e DONOTDELETE_KEYS=\"${DONOTDELETE_KEYS}\" -e USER_KEYS=\"${USER_KEYS}\" ${imageName}"
           }
         } // dir 
       } // creds
