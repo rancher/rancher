@@ -1,8 +1,12 @@
 package v1
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"gopkg.in/yaml.v3"
+	"io/ioutil"
+	"net/http"
 	"net/url"
 	"regexp"
 	"time"
@@ -281,6 +285,45 @@ func (c *NamespacedSteveClient) Create(container any) (*SteveAPIObject, error) {
 
 func (c *NamespacedSteveClient) Update(existing *SteveAPIObject, updates any) (*SteveAPIObject, error) {
 	return c.SteveClient.Update(existing, updates)
+}
+
+func (c *NamespacedSteveClient) PerformPutCaptureHeaders(host, token, endpoint, namespace, name string, payload interface{}) (http.Header, []byte, error) {
+	body, err := yaml.Marshal(payload)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error marshalling payload: %v", err)
+	}
+
+	url := fmt.Sprintf("https://%v/v1/%v/%v/%v", host, endpoint, namespace, name)
+	req, err := http.NewRequest(http.MethodPut, url, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, nil, fmt.Errorf("error creating request: %v", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/yaml")
+
+	var httpClient = &http.Client{}
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error executing request: %v", err)
+	}
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 300 {
+		return resp.Header, nil, fmt.Errorf("received HTTP error: %s", resp.Status)
+	}
+
+	byteContent, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return resp.Header, nil, fmt.Errorf("error reading response body: %v", err)
+	}
+
+	if len(byteContent) == 0 {
+		return resp.Header, nil, fmt.Errorf("received empty response")
+	}
+
+	return resp.Header, byteContent, nil
 }
 
 func (c *NamespacedSteveClient) Replace(obj *SteveAPIObject) (*SteveAPIObject, error) {

@@ -387,7 +387,7 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/square/go-jose.v2 v2.6.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
+	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/cluster-bootstrap v0.24.0 // indirect
 	k8s.io/code-generator v0.27.1 // indirect
 	k8s.io/component-base v0.25.4 // indirect
