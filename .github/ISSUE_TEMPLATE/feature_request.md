@@ -1,8 +1,8 @@
 ---
 name: Feature request
 about: Suggest an idea for this project
-title: '[RFE] '
-labels: 'kind/enhancement'
+title: "[RFE] "
+labels: kind/enhancement
 assignees: ''
 
 ---
