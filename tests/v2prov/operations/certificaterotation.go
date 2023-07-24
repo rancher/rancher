@@ -2,7 +2,6 @@ package operations
 
 import (
 	"context"
-	"strings"
 	"testing"
 
 	"github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
@@ -12,7 +11,6 @@ import (
 	"github.com/rancher/rancher/tests/v2prov/cluster"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/retry"
 )
@@ -51,20 +49,6 @@ func RunCertificateRotationTest(t *testing.T, clients *clients.Clients, c *v1.Cl
 	}
 
 	clientset, err := GetAndVerifyDownstreamClientset(clients, c)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Try to continuously get the kubernetes default service because the API server will be flapping at this point.
-	err = retry.OnError(retry.DefaultRetry, func(err error) bool {
-		if strings.Contains(err.Error(), "connection refused") || apierrors.IsServiceUnavailable(err) {
-			return true
-		}
-		return false
-	}, func() error {
-		_, err = clientset.CoreV1().Services(corev1.NamespaceDefault).Get(context.TODO(), "kubernetes", metav1.GetOptions{})
-		return err
-	})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -1,6 +1,11 @@
 package defaults
 
-import "os"
+import (
+	"os"
+	"time"
+
+	"k8s.io/apimachinery/pkg/util/wait"
+)
 
 var (
 	PodTestImage           = "rancher/systemd-node:v0.0.5-rc2"
@@ -14,7 +19,13 @@ var (
 		"garbage":      "value",
 	}
 
-	One   = int32(1)
-	Two   = int32(2)
-	Three = int32(3)
+	One             = int32(1)
+	Two             = int32(2)
+	Three           = int32(3)
+	DownstreamRetry = wait.Backoff{
+		Steps:    10,
+		Duration: 30 * time.Second,
+		Factor:   1.0,
+		Jitter:   0.1,
+	}
 )

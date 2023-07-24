@@ -316,6 +316,7 @@ func (p *Planner) generateEtcdSnapshotRestorePlan(controlPlane *rkev1.RKEControl
 		"server",
 		"--cluster-reset",
 		"--etcd-arg=advertise-client-urls=https://127.0.0.1:2379", // this is a workaround for: https://github.com/rancher/rke2/issues/4052 and can likely remain indefinitely (unless IPv6-only becomes a requirement)
+		"--etcd-disable-snapshots=false",                          // this is a workaround for https://github.com/k3s-io/k3s/issues/8031
 	}
 
 	var env []string
