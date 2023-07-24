@@ -15,8 +15,28 @@ type RKEBootstrap struct {
 	Status            RKEBootstrapStatus `json:"status,omitempty"`
 }
 
+type Encoding string
+
+const (
+	// Base64 implies the contents of the file are encoded as base64.
+	Base64 Encoding = "base64"
+	// Gzip implies the contents of the file are encoded with gzip.
+	Gzip Encoding = "gzip"
+	// GzipBase64 implies the contents of the file are first base64 encoded and then gzip encoded.
+	GzipBase64 Encoding = "gzip+base64"
+)
+
+type CloudInitFile struct {
+	Encoding    Encoding `json:"encoding,omitempty"`
+	Content     string   `json:"content,omitempty"`
+	Owner       string   `json:"owner,omitempty"`
+	Path        string   `json:"path"`
+	Permissions string   `json:"permissions,omitempty"`
+}
+
 type RKEBootstrapSpec struct {
-	ClusterName string `json:"clusterName,omitempty"`
+	ClusterName string          `json:"clusterName,omitempty"`
+	Files       []CloudInitFile `json:"files,omitempty"`
 }
 
 type RKEBootstrapStatus struct {

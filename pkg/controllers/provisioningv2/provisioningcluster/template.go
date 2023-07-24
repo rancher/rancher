@@ -289,6 +289,12 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 				Template: rkev1.RKEBootstrap{
 					Spec: rkev1.RKEBootstrapSpec{
 						ClusterName: cluster.Name,
+						Files: []rkev1.CloudInitFile{
+							{
+								Path:    "/etc/rancher/rke2/config.yaml.d/40-provider-id.yaml",
+								Content: `kubelet-arg+: 'provider-id=digitalocean://{{ ds.meta_data["instance_id"] }}'`,
+							},
+						},
 					},
 				},
 			},

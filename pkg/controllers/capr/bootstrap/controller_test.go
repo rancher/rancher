@@ -4,9 +4,11 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/golang/mock/gomock"
+	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
@@ -17,6 +19,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	"sigs.k8s.io/yaml"
 )
 
 func Test_getBootstrapSecret(t *testing.T) {
@@ -68,6 +71,7 @@ func Test_getBootstrapSecret(t *testing.T) {
 				secretCache:         getSecretCacheMock(ctrl, tt.args.namespaceName, tt.args.secretName),
 				deploymentCache:     getDeploymentCacheMock(ctrl),
 				machineCache:        getMachineCacheMock(ctrl, tt.args.namespaceName, tt.args.os),
+				rkeBootstrap:        getBootstrapControllerMock(ctrl, tt.args.namespaceName, tt.args.os),
 				k8s:                 fake.NewSimpleClientset(),
 			}
 
@@ -79,7 +83,9 @@ func Test_getBootstrapSecret(t *testing.T) {
 			a.Nil(err)
 			machine, err := handler.machineCache.Get(tt.args.namespaceName, tt.args.os)
 			a.Nil(err)
-			secret, err := handler.getBootstrapSecret(tt.args.namespaceName, tt.args.secretName, []v1.EnvVar{}, machine)
+			bootstrap, err := handler.rkeBootstrap.Get(tt.args.namespaceName, tt.args.os, metav1.GetOptions{})
+			a.Nil(err)
+			secret, err := handler.getBootstrapSecret(tt.args.namespaceName, tt.args.secretName, []v1.EnvVar{}, bootstrap, machine)
 			a.Nil(err)
 
 			// assert
@@ -97,36 +103,104 @@ func Test_getBootstrapSecret(t *testing.T) {
 			a.Equal(tt.args.namespaceName, machine.Namespace)
 
 			a.Equal("rke.cattle.io/bootstrap", string(secret.Type))
-			data := string(secret.Data["value"])
-			a.Contains(data, fmt.Sprintf("CATTLE_TOKEN=\"%s\"", expectEncodedHash))
+			value := secret.Data["value"]
+
+			a.True(strings.HasPrefix(string(value), "## template: jinja\n#cloud-config"))
+
+			data := map[string]any{}
+			err = yaml.Unmarshal(value, &data)
+			a.Nil(err)
+
+			a.Contains(data, "write_files")
+			scriptData := (data["write_files"].([]any)[0]).(map[string]any)
+
+			a.Contains(scriptData, "content")
+			content := scriptData["content"].(string)
+
+			a.Equal("gzip+b64", scriptData["encoding"])
+
+			decompressed, err := capr.DecompressBytes(content)
+			a.Nil(err)
+
+			decompressedString := string(decompressed)
+
+			a.Contains(decompressedString, fmt.Sprintf("CATTLE_TOKEN=\"%s\"", expectEncodedHash))
 
 			switch tt.args.os {
 
 			case capr.DefaultMachineOS:
 				a.Equal(tt.args.os, capr.DefaultMachineOS)
-				a.Contains(data, "#!/usr/bin")
+				a.Contains(data, "runcmd")
+				a.Equal("sh /usr/local/custom_script/install.sh", data["runcmd"].([]any)[0])
+				a.Contains(decompressedString, "#!/usr/bin/env sh")
+				a.Contains(decompressedString, "#!/bin/sh")
 				a.True(machine.GetLabels()[capr.CattleOSLabel] == capr.DefaultMachineOS)
 				a.True(machine.GetLabels()[capr.ControlPlaneRoleLabel] == "true")
 				a.True(machine.GetLabels()[capr.EtcdRoleLabel] == "true")
 				a.True(machine.GetLabels()[capr.WorkerRoleLabel] == "true")
-				a.Contains(data, "CATTLE_SERVER=localhost")
-				a.Contains(data, "CATTLE_ROLE_NONE=true")
+				a.Contains(decompressedString, "CATTLE_SERVER=localhost")
+				a.Contains(decompressedString, "CATTLE_ROLE_NONE=true")
+				a.Equal((data["write_files"]).([]any)[1].(map[string]any)["path"].(string), "/etc/rancher/rke2/config.yaml.d/40-provider-id.yaml")
+				a.Equal((data["write_files"]).([]any)[1].(map[string]any)["content"].(string), `kubelet-arg+: 'provider-id=digitalocean://{{ ds.meta_data["instance_id"] }}'`)
 
 			case capr.WindowsMachineOS:
 				a.Equal(tt.args.os, capr.WindowsMachineOS)
-				a.Contains(data, "Invoke-WinsInstaller")
+				a.Contains(data, "runcmd")
+				a.Equal("powershell C:\\install.ps1", data["runcmd"].([]any)[0])
+				a.Contains(decompressedString, "Invoke-WinsInstaller")
 				a.True(machine.GetLabels()[capr.CattleOSLabel] == capr.WindowsMachineOS)
 				a.True(machine.GetLabels()[capr.ControlPlaneRoleLabel] == "false")
 				a.True(machine.GetLabels()[capr.EtcdRoleLabel] == "false")
 				a.True(machine.GetLabels()[capr.WorkerRoleLabel] == "true")
-				a.Contains(data, "$env:CATTLE_SERVER=\"localhost\"")
-				a.Contains(data, "CATTLE_ROLE_NONE=\"true\"")
-				a.Contains(data, "$env:CSI_PROXY_URL")
-				a.Contains(data, "$env:CSI_PROXY_VERSION")
-				a.Contains(data, "$env:CSI_PROXY_KUBELET_PATH")
+				a.Contains(decompressedString, "$env:CATTLE_SERVER=\"localhost\"")
+				a.Contains(decompressedString, "CATTLE_ROLE_NONE=\"true\"")
+				a.Contains(decompressedString, "$env:CSI_PROXY_URL")
+				a.Contains(decompressedString, "$env:CSI_PROXY_VERSION")
+				a.Contains(decompressedString, "$env:CSI_PROXY_KUBELET_PATH")
 			}
 		})
 	}
+}
+
+func getBootstrapControllerMock(ctrl *gomock.Controller, namespace, os string) *ctrlfake.MockControllerInterface[*rkev1.RKEBootstrap, *rkev1.RKEBootstrapList] {
+	mockBootstrapController := ctrlfake.NewMockControllerInterface[*rkev1.RKEBootstrap, *rkev1.RKEBootstrapList](ctrl)
+	mockBootstrapController.EXPECT().Get(namespace, capr.DefaultMachineOS, gomock.Any()).DoAndReturn(func(namespace, name string, options metav1.GetOptions) (*rkev1.RKEBootstrap, error) {
+		return &rkev1.RKEBootstrap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      os,
+				Namespace: namespace,
+				Labels: map[string]string{
+					capr.ControlPlaneRoleLabel: "true",
+					capr.EtcdRoleLabel:         "true",
+					capr.WorkerRoleLabel:       "true",
+					capr.CattleOSLabel:         os,
+				},
+			},
+			Spec: rkev1.RKEBootstrapSpec{
+				Files: []rkev1.CloudInitFile{
+					{
+						Path:    "/etc/rancher/rke2/config.yaml.d/40-provider-id.yaml",
+						Content: `kubelet-arg+: 'provider-id=digitalocean://{{ ds.meta_data["instance_id"] }}'`,
+					},
+				},
+			},
+		}, nil
+	}).AnyTimes()
+	mockBootstrapController.EXPECT().Get(namespace, capr.WindowsMachineOS, gomock.Any()).DoAndReturn(func(namespace, name string, options metav1.GetOptions) (*rkev1.RKEBootstrap, error) {
+		return &rkev1.RKEBootstrap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      os,
+				Namespace: namespace,
+				Labels: map[string]string{
+					capr.ControlPlaneRoleLabel: "false",
+					capr.EtcdRoleLabel:         "false",
+					capr.WorkerRoleLabel:       "true",
+					capr.CattleOSLabel:         os,
+				},
+			},
+		}, nil
+	}).AnyTimes()
+	return mockBootstrapController
 }
 
 func getMachineCacheMock(ctrl *gomock.Controller, namespace, os string) *ctrlfake.MockCacheInterface[*capi.Machine] {

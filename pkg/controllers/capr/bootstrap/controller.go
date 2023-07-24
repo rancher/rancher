@@ -34,6 +34,7 @@ import (
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	capiannotations "sigs.k8s.io/cluster-api/util/annotations"
 	"sigs.k8s.io/cluster-api/util/secret"
+	"sigs.k8s.io/yaml"
 )
 
 const (
@@ -109,7 +110,13 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 	}, clients.RKE.RKEBootstrap(), clients.Core.ServiceAccount(), clients.CAPI.Machine())
 }
 
-func (h *handler) getBootstrapSecret(namespace, name string, envVars []corev1.EnvVar, machine *capi.Machine) (*corev1.Secret, error) {
+type UserData struct {
+	Hostname   string                `json:"hostname,omitempty"`
+	RunCmd     []string              `json:"runcmd,omitempty"`
+	WriteFiles []rkev1.CloudInitFile `json:"write_files,omitempty"`
+}
+
+func (h *handler) getBootstrapSecret(namespace, name string, envVars []corev1.EnvVar, bootstrap *rkev1.RKEBootstrap, machine *capi.Machine) (*corev1.Secret, error) {
 	sa, err := h.serviceAccountCache.Get(namespace, name)
 	if apierrors.IsNotFound(err) {
 		return nil, nil
@@ -129,11 +136,47 @@ func (h *handler) getBootstrapSecret(namespace, name string, envVars []corev1.En
 		return nil, err
 	}
 
+	os := capr.DefaultMachineOS
+	if machine.GetLabels()[capr.CattleOSLabel] == capr.WindowsMachineOS {
+		os = capr.WindowsMachineOS
+	}
+
 	is := installer.LinuxInstallScript
-	if os := machine.GetLabels()[capr.CattleOSLabel]; os == capr.WindowsMachineOS {
+	if os == capr.WindowsMachineOS {
 		is = installer.WindowsInstallScript
 	}
-	data, err := is(context.WithValue(context.Background(), tls.InternalAPI, hasHostPort), base64.URLEncoding.EncodeToString(hash[:]), envVars, "")
+
+	var userData UserData
+
+	bootstrapScript, err := is(context.WithValue(context.Background(), tls.InternalAPI, hasHostPort), base64.URLEncoding.EncodeToString(hash[:]), envVars, "")
+	if err != nil {
+		return nil, err
+	}
+
+	compressed, err := capr.CompressBytes(bootstrapScript)
+	if err != nil {
+		return nil, err
+	}
+
+	userData.WriteFiles = append(userData.WriteFiles, rkev1.CloudInitFile{
+		Content:     compressed,
+		Encoding:    "gzip+b64",
+		Path:        "/usr/local/custom_script/install.sh",
+		Permissions: "0644",
+	})
+
+	for _, file := range bootstrap.Spec.Files {
+		userData.WriteFiles = append(userData.WriteFiles, file)
+	}
+
+	userData.Hostname = machine.Spec.InfrastructureRef.Name
+
+	userData.RunCmd = []string{"sh /usr/local/custom_script/install.sh"}
+	if os == capr.WindowsMachineOS {
+		userData.RunCmd = []string{"powershell C:\\install.ps1"}
+	}
+
+	data, err := yaml.Marshal(userData)
 	if err != nil {
 		return nil, err
 	}
@@ -144,7 +187,7 @@ func (h *handler) getBootstrapSecret(namespace, name string, envVars []corev1.En
 			Namespace: namespace,
 		},
 		Data: map[string][]byte{
-			"value": data,
+			"value": append([]byte("## template: jinja\n#cloud-config\n"), data...),
 		},
 		Type: "rke.cattle.io/bootstrap",
 	}, nil
@@ -267,7 +310,7 @@ func (h *handler) assignBootStrapSecret(machine *capi.Machine, bootstrap *rkev1.
 		},
 	}
 
-	bootstrapSecret, err := h.getBootstrapSecret(sa.Namespace, sa.Name, envVars, machine)
+	bootstrapSecret, err := h.getBootstrapSecret(sa.Namespace, sa.Name, envVars, bootstrap, machine)
 	if err != nil {
 		return nil, nil, err
 	}
