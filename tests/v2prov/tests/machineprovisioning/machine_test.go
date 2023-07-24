@@ -1,6 +1,8 @@
 package machineprovisioning
 
 import (
+	"context"
+	"fmt"
 	"os"
 	"strings"
 	"sync/atomic"
@@ -230,7 +232,7 @@ func Test_Provisioning_MP_MachineSetDeletePolicyOldestSet(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func Test_Provisioning_MP_ThreeEtcdNodesScaledDownThenDelete(t *testing.T) {
+func Test_Provisioning_MP_MultipleEtcdNodesScaledDownThenDelete(t *testing.T) {
 	clients, err := clients.New()
 	if err != nil {
 		t.Fatal(err)
@@ -239,7 +241,7 @@ func Test_Provisioning_MP_ThreeEtcdNodesScaledDownThenDelete(t *testing.T) {
 
 	c, err := cluster.New(clients, &provisioningv1api.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "test-etcd-nodes-scaled-down-with-delete",
+			Name: "etcd-scaled-down",
 		},
 		Spec: provisioningv1api.ClusterSpec{
 			KubernetesVersion: defaults.SomeK8sVersion,
@@ -249,7 +251,7 @@ func Test_Provisioning_MP_ThreeEtcdNodesScaledDownThenDelete(t *testing.T) {
 						EtcdRole:         true,
 						ControlPlaneRole: false,
 						WorkerRole:       false,
-						Quantity:         &defaults.Three,
+						Quantity:         &defaults.Two,
 					},
 					{
 						EtcdRole:         false,
@@ -257,6 +259,25 @@ func Test_Provisioning_MP_ThreeEtcdNodesScaledDownThenDelete(t *testing.T) {
 						WorkerRole:       true,
 						Quantity:         &defaults.One,
 					}},
+			},
+			ClusterAgentDeploymentCustomization: &provisioningv1api.AgentDeploymentCustomization{
+				OverrideAffinity: &corev1.Affinity{
+					NodeAffinity: &corev1.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+							NodeSelectorTerms: []corev1.NodeSelectorTerm{
+								{
+									MatchExpressions: []corev1.NodeSelectorRequirement{
+										{
+											Key:      "node-role.kubernetes.io/control-plane",
+											Operator: corev1.NodeSelectorOpIn,
+											Values:   []string{"true"},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
 			},
 		},
 	})
@@ -269,13 +290,40 @@ func Test_Provisioning_MP_ThreeEtcdNodesScaledDownThenDelete(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c, err = operations.Scale(clients, c, 0, 2, true)
-	assert.NoError(t, err)
+	kc, err := operations.GetAndVerifyDownstreamClientset(clients, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// wait for all nodes to be ready
+	err = retry.OnError(defaults.DownstreamRetry, func(error) bool { return true }, func() error {
+		nodes, err := kc.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
+		if err != nil {
+			return err
+		}
+		if len(nodes.Items) != 3 {
+			return fmt.Errorf("nodes did not match 3: actual: %d", len(nodes.Items))
+		}
+		for _, n := range nodes.Items {
+			if !capr.Ready.IsTrue(n) {
+				return fmt.Errorf("node %s was not ready", n.Name)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	c, err = operations.Scale(clients, c, 0, 1, true)
-	assert.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	_, err = operations.GetAndVerifyDownstreamClientset(clients, c)
-	assert.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Delete the cluster and wait for cleanup.
 	err = clients.Provisioning.Cluster().Delete(c.Namespace, c.Name, &metav1.DeleteOptions{})

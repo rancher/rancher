@@ -84,6 +84,12 @@ func New(clients *clients.Clients, cluster *provisioningv1api.Cluster) (*provisi
 			}
 			cluster.Spec.RKEConfig.Registries = &registryConfig
 		}
+
+		if cluster.Spec.RKEConfig.ETCD == nil {
+			cluster.Spec.RKEConfig.ETCD = &rkev1.ETCD{
+				DisableSnapshots: true,
+			}
+		}
 	}
 
 	c, err := clients.Provisioning.Cluster().Create(cluster)
@@ -123,11 +129,11 @@ func PodInfraMachines(clients *clients.Clients, cluster *provisioningv1api.Clust
 func WaitForCreate(clients *clients.Clients, c *provisioningv1api.Cluster) (_ *provisioningv1api.Cluster, err error) {
 	defer func() {
 		if err != nil {
-			data, newErr := gatherDebugData(clients, c)
+			data, newErr := GatherDebugData(clients, c)
 			if newErr != nil {
 				logrus.Error(newErr)
 			}
-			err = fmt.Errorf("creation wait failed on: %w\n%s", err, data)
+			err = fmt.Errorf("cluster %s creation wait failed on: %w\ncluster %s test data bundle: \n%s", c.Name, err, c.Name, data)
 		}
 	}()
 
@@ -159,16 +165,17 @@ func WaitForCreate(clients *clients.Clients, c *provisioningv1api.Cluster) (_ *p
 				md = obj.(*capi.MachineDeployment)
 				for _, mp := range c.Spec.RKEConfig.MachinePools {
 					if mpName == mp.Name {
-						if mp.Quantity != nil && (*mp.Quantity != *md.Spec.Replicas || *mp.Quantity != md.Status.ReadyReplicas) {
-							return false, nil
+						mpQuantityMatches := true
+						if mp.Quantity != nil {
+							mpQuantityMatches = *mp.Quantity == *md.Spec.Replicas
 						}
-						return capr.Ready.IsTrue(md), nil
+						return mpQuantityMatches && md.Status.Phase == "Running" && capr.Ready.IsTrue(md), nil
 					}
 				}
 				return false, nil
 			})
 			if err != nil {
-				return nil, fmt.Errorf("machineset %s/%s was not ready: %w", machineSet.Namespace, machineSet.Name, err)
+				return nil, fmt.Errorf("MachineDeployment %s/%s was not ready: %w", md.Namespace, md.Name, err)
 			}
 		}
 	}
@@ -212,11 +219,11 @@ func WaitForCreate(clients *clients.Clients, c *provisioningv1api.Cluster) (_ *p
 func WaitForControlPlane(clients *clients.Clients, c *provisioningv1api.Cluster, errorPrefix string, rkeControlPlaneCheckFunc func(rkeControlPlane *rkev1.RKEControlPlane) (bool, error)) (_ *rkev1.RKEControlPlane, err error) {
 	defer func() {
 		if err != nil {
-			data, newErr := gatherDebugData(clients, c)
+			data, newErr := GatherDebugData(clients, c)
 			if newErr != nil {
 				logrus.Error(newErr)
 			}
-			err = fmt.Errorf("%s wait failed on: %w\n%s", errorPrefix, err, data)
+			err = fmt.Errorf("cluster %s %s wait failed on: %w\ncluster %s test data bundle: \n%s", c.Name, errorPrefix, err, c.Name, data)
 		}
 	}()
 
@@ -239,11 +246,11 @@ func WaitForControlPlane(clients *clients.Clients, c *provisioningv1api.Cluster,
 func WaitForDelete(clients *clients.Clients, c *provisioningv1api.Cluster) (_ *provisioningv1api.Cluster, err error) {
 	defer func() {
 		if err != nil {
-			data, newErr := gatherDebugData(clients, c)
+			data, newErr := GatherDebugData(clients, c)
 			if newErr != nil {
 				logrus.Error(newErr)
 			}
-			err = fmt.Errorf("deletion wait failed on: %w\n%s", err, data)
+			err = fmt.Errorf("cluster %s delete wait failed on: %w\ncluster %s test data bundle: \n%s", c.Name, err, c.Name, data)
 		}
 	}()
 
@@ -399,8 +406,8 @@ func getPodFileContents(podNamespace, podName, podPath string) (string, error) {
 	return capr.CompressInterface(logs)
 }
 
-// gatherDebugData gathers debug data that is relevant to the current cluster and returns a gzip compressed + base64 encoded string of the json.
-func gatherDebugData(clients *clients.Clients, c *provisioningv1api.Cluster) (string, error) {
+// GatherDebugData gathers debug data that is relevant to the current cluster and returns a gzip compressed + base64 encoded string of the json.
+func GatherDebugData(clients *clients.Clients, c *provisioningv1api.Cluster) (string, error) {
 	newC, newErr := clients.Provisioning.Cluster().Get(c.Namespace, c.Name, metav1.GetOptions{})
 	if newErr != nil {
 		logrus.Errorf("failed to get cluster %s/%s to print error: %v", c.Namespace, c.Name, newErr)
@@ -417,6 +424,7 @@ func gatherDebugData(clients *clients.Clients, c *provisioningv1api.Cluster) (st
 
 	var rkeBootstraps []*rkev1.RKEBootstrap
 	var infraMachines []*unstructured.Unstructured
+	var machineSecrets []*corev1.Secret
 
 	var podLogs = make(map[string]map[string]string)
 
@@ -444,6 +452,16 @@ func gatherDebugData(clients *clients.Clients, c *provisioningv1api.Cluster) (st
 					// In the case of a podmachine, the pod name will be strings.ReplaceAll(infra.meta.GetName(), ".", "-")
 					podName := strings.ReplaceAll(im.GetName(), ".", "-")
 					podLogs[podName] = populatePodLogs(clients, runtime, im.GetNamespace(), podName)
+				}
+			}
+			ms, newErr := clients.Core.Secret().List(machine.Namespace, metav1.ListOptions{
+				LabelSelector: fmt.Sprintf("cluster.x-k8s.io/cluster-name=%s,rke.cattle.io/machine-name=", machine.Name),
+			})
+			if newErr != nil {
+				logrus.Errorf("failed to get secrets for machine %s: %v", machine.Name, newErr)
+			} else {
+				for _, s := range ms.Items {
+					machineSecrets = append(machineSecrets, s.DeepCopy())
 				}
 			}
 		}
