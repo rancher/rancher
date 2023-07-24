@@ -89,6 +89,12 @@ type GlobalRole struct {
 	Rules          []rbacv1.PolicyRule `json:"rules,omitempty"`
 	NewUserDefault bool                `json:"newUserDefault,omitempty" norman:"required"`
 	Builtin        bool                `json:"builtin" norman:"nocreate,noupdate"`
+
+	// InheritedClusterRoles are the names of RoleTemplates whose permissions are granted by this GlobalRole in every
+	// cluster besides the local cluster. To grant permissions in the local cluster, use the Rules or NamespacedRules
+	// fields.
+	// +optional
+	InheritedClusterRoles []string `json:"inheritedClusterRoles,omitempty"`
 }
 
 // +genclient
