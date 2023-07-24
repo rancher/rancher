@@ -50,6 +50,7 @@ func Test_Operation_MP_EtcdSnapshotOperationsWithThreeEtcdNodesOnNewNode(t *test
 			RKEConfig: &provisioningv1.RKEConfig{
 				RKEClusterSpecCommon: rkev1.RKEClusterSpecCommon{
 					ETCD: &rkev1.ETCD{
+						DisableSnapshots: true,
 						S3: &rkev1.ETCDSnapshotS3{
 							Endpoint:            osInfo.Endpoint,
 							EndpointCA:          osInfo.Cert,

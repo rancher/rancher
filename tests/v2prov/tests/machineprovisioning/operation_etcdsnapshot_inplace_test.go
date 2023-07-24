@@ -31,6 +31,11 @@ func Test_Operation_MP_EtcdSnapshotCreationRestoreInPlace(t *testing.T) {
 		},
 		Spec: provisioningv1.ClusterSpec{
 			RKEConfig: &provisioningv1.RKEConfig{
+				RKEClusterSpecCommon: rkev1.RKEClusterSpecCommon{
+					ETCD: &rkev1.ETCD{
+						DisableSnapshots: true,
+					},
+				},
 				MachinePools: []provisioningv1.RKEMachinePool{
 					{
 						ControlPlaneRole: true,
