@@ -16,10 +16,10 @@ Make sure to assign the appropriate engineering team.-->
 
 **Release Branch**
 
-branch: `release/vXXX`
-<!-- List which release branch in rancher/rancher the test failed on -->
+source branch of PR: `release/vXXX`
+<!-- List which source branch in rancher/rancher that the PR was -->
 
-**Drone Build (If applicable)**
+**Drone Build (if applicable)**
 
-drone build URL:
-<!-- Link the drone build run if the failure was in CI-->
+pipeline stage URL:
+<!-- Link to the specific pipeline stage/step that the drone build failed if applicable-->
