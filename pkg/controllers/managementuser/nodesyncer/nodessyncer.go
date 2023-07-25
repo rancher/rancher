@@ -11,10 +11,14 @@ import (
 	"github.com/pkg/errors"
 	cond "github.com/rancher/norman/condition"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
 	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator/assemblers"
 	"github.com/rancher/rancher/pkg/controllers/managementagent/podresources"
 	"github.com/rancher/rancher/pkg/controllers/managementlegacy/compose/common"
+	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
+	provcontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
+	rkecontrollers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/librke"
@@ -54,6 +58,9 @@ type nodesSyncer struct {
 	sysImagesLister      v3.RkeK8sSystemImageLister
 	sysImages            v3.RkeK8sSystemImageInterface
 	secretLister         v1.SecretLister
+	provClusterCache     provcontrollers.ClusterCache
+	capiClusterCache     capicontrollers.ClusterCache
+	rkeControlPlaneCache rkecontrollers.RKEControlPlaneCache
 }
 
 type nodeDrain struct {
@@ -85,6 +92,9 @@ func Register(ctx context.Context, cluster *config.UserContext, kubeConfigGetter
 		sysImagesLister:      cluster.Management.Management.RkeK8sSystemImages("").Controller().Lister(),
 		sysImages:            cluster.Management.Management.RkeK8sSystemImages(""),
 		secretLister:         cluster.Management.Core.Secrets("").Controller().Lister(),
+		provClusterCache:     cluster.Management.Wrangler.Provisioning.Cluster().Cache(),
+		capiClusterCache:     cluster.Management.Wrangler.CAPI.Cluster().Cache(),
+		rkeControlPlaneCache: cluster.Management.Wrangler.RKE.RKEControlPlane().Cache(),
 	}
 
 	n := &nodeSyncer{
@@ -822,6 +832,26 @@ func (m *nodesSyncer) isClusterRestoring() (bool, error) {
 		cluster.Spec.RancherKubernetesEngineConfig.Restore.Restore {
 		return true, nil
 	}
+	if strings.HasPrefix(cluster.Name, "c-m-") {
+		provCluster, err := m.provClusterCache.Get(cluster.Spec.FleetWorkspaceName, cluster.Spec.DisplayName)
+		if err != nil {
+			return false, err
+		}
+		capiCluster, err := m.capiClusterCache.Get(provCluster.Namespace, provCluster.Name)
+		if err != nil {
+			return false, err
+		}
+		if capiCluster.Spec.ControlPlaneRef.Kind != "RKEControlPlane" || capiCluster.Spec.ControlPlaneRef.APIVersion != "rke.cattle.io/v1" {
+			return false, nil
+		}
+		controlplane, err := m.rkeControlPlaneCache.Get(capiCluster.Spec.ControlPlaneRef.Namespace, capiCluster.Spec.ControlPlaneRef.Name)
+		if err != nil {
+			return false, err
+		}
+		phase := controlplane.Status.ETCDSnapshotRestorePhase
+		return phase != "" && phase != rkev1.ETCDSnapshotPhaseFinished && phase != rkev1.ETCDSnapshotPhaseFailed, nil
+	}
+
 	return false, nil
 }
 
