@@ -107,6 +107,7 @@ var OriginMap = map[string]string{
 	"mirrored-cloud-provider-vsphere-cpi-release-manager":     "https://github.com/kubernetes/cloud-provider-vsphere/blob/master/cluster/images/controller-manager/Dockerfile",
 	"mirrored-cloud-provider-vsphere-csi-release-driver":      "https://github.com/kubernetes-sigs/vsphere-csi-driver",
 	"mirrored-cloud-provider-vsphere-csi-release-syncer":      "https://github.com/kubernetes-sigs/vsphere-csi-driver/tree/master/pkg/syncer",
+	"mirrored-cluster-api-controller":                         "https://github.com/kubernetes-sigs/cluster-api",
 	"mirrored-cluster-proportional-autoscaler":                "https://github.com/kubernetes-sigs/cluster-proportional-autoscaler",
 	"mirrored-coredns-coredns":                                "https://github.com/coredns/coredns",
 	"mirrored-coreos-etcd":                                    "https://github.com/etcd-io/etcd",
