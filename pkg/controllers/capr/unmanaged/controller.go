@@ -3,7 +3,6 @@ package unmanaged
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"strings"
 	"time"
 
@@ -26,7 +25,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/kubernetes"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
@@ -48,7 +46,6 @@ func Register(ctx context.Context, clients *wrangler.Context, kubeconfigManager 
 				clients.CAPI.Machine(),
 				clients.RKE.RKEBootstrap()),
 	}
-	clients.RKE.CustomMachine().OnChange(ctx, "unmanaged-machine", h.onUnmanagedMachineHealth)
 	clients.RKE.CustomMachine().OnRemove(ctx, "unmanaged-machine", h.onUnmanagedMachineOnRemove)
 	clients.RKE.CustomMachine().OnChange(ctx, "unmanaged-health", h.onUnmanagedMachineChange)
 	clients.Core.Secret().OnChange(ctx, "unmanaged-machine-secret", h.onSecretChange)
@@ -83,7 +80,7 @@ func (h *handler) findMachine(cluster *capi.Cluster, machineName, machineID stri
 	return machineName, nil
 }
 
-func (h *handler) onSecretChange(key string, secret *corev1.Secret) (*corev1.Secret, error) {
+func (h *handler) onSecretChange(_ string, secret *corev1.Secret) (*corev1.Secret, error) {
 	if secret == nil || secret.Type != capr.MachineRequestType {
 		return secret, nil
 	}
@@ -264,53 +261,7 @@ func (h *handler) getCAPICluster(secret *corev1.Secret) (*capi.Cluster, error) {
 	return h.capiClusterCache.Get(rClusters[0].Namespace, rClusters[0].Name)
 }
 
-func (h *handler) onUnmanagedMachineHealth(key string, customMachine *rkev1.CustomMachine) (*rkev1.CustomMachine, error) {
-	if customMachine == nil {
-		return nil, nil
-	}
-
-	if customMachine.Spec.ProviderID == "" || !customMachine.Status.Ready {
-		return customMachine, nil
-	}
-
-	machine, err := capr.GetMachineByOwner(h.machineCache, customMachine)
-	if err != nil {
-		if errors.Is(err, capr.ErrNoMachineOwnerRef) {
-			return customMachine, nil
-		}
-		return customMachine, err
-	}
-
-	cluster, err := h.clusterCache.Get(machine.Namespace, machine.Spec.ClusterName)
-	if err != nil {
-		return customMachine, err
-	}
-
-	h.unmanagedMachine.EnqueueAfter(customMachine.Namespace, customMachine.Name, 15*time.Second)
-
-	if machine.Status.NodeRef == nil {
-		return customMachine, nil
-	}
-
-	restConfig, err := h.kubeconfigManager.GetRESTConfig(cluster, cluster.Status)
-	if err != nil {
-		return customMachine, err
-	}
-
-	clientset, err := kubernetes.NewForConfig(restConfig)
-	if err != nil {
-		return customMachine, err
-	}
-
-	_, err = clientset.CoreV1().Nodes().Get(context.Background(), machine.Status.NodeRef.Name, metav1.GetOptions{})
-	if apierror.IsNotFound(err) {
-		err = h.machineClient.Delete(machine.Namespace, machine.Name, nil)
-	}
-
-	return customMachine, err
-}
-
-func (h *handler) onUnmanagedMachineOnRemove(key string, customMachine *rkev1.CustomMachine) (*rkev1.CustomMachine, error) {
+func (h *handler) onUnmanagedMachineOnRemove(_ string, customMachine *rkev1.CustomMachine) (*rkev1.CustomMachine, error) {
 	// We may want to look at using a migration to remove this finalizer.
 	return customMachine, nil
 }
