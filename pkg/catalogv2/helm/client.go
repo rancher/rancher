@@ -8,22 +8,26 @@ import (
 )
 
 type Client struct {
+	actRun           func(*action.List) ([]*release.Release, error)
+	newList          func(*action.Configuration) *action.List
 	restClientGetter genericclioptions.RESTClientGetter
 }
 
 func NewClient(restClientGetter genericclioptions.RESTClientGetter) *Client {
-	return &Client{restClientGetter: restClientGetter}
+	return &Client{restClientGetter: restClientGetter, actRun: runAction, newList: action.NewList}
 }
 
 func (c *Client) ListReleases(namespace, name string, stateMask action.ListStates) ([]*release.Release, error) {
-	helmcfg := &action.Configuration{}
-	if err := helmcfg.Init(c.restClientGetter, namespace, "", logrus.Infof); err != nil {
+	helmCfg := &action.Configuration{}
+	if err := helmCfg.Init(c.restClientGetter, namespace, "", logrus.Infof); err != nil {
 		return nil, err
 	}
-
-	l := action.NewList(helmcfg)
+	l := c.newList(helmCfg)
 	l.Filter = "^" + name + "$"
 	l.StateMask = stateMask
+	return c.actRun(l)
+}
 
+func runAction(l *action.List) ([]*release.Release, error) {
 	return l.Run()
 }
