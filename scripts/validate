@@ -22,6 +22,9 @@ go mod tidy
 cd ../..
 go mod tidy
 
+echo Re-generating CRDs to ensure changes are committed to CI
+./scripts/build-crds
+
 echo Verifying modules
 go mod verify
 
@@ -31,7 +34,8 @@ if [ -n "$dirty_files" ]; then
   echo "If you're seeing this, it means there are uncommitted changes in the repo."
   echo "If you're seeing this in CI, it probably means that your Go modules aren't tidy, or more generally that running"
   echo "validation would result in changes to the repo. Make sure you're up to date with the upstream branch and run"
-  echo "'go mod tidy' and commit the changes, if any. The offending changed files are as follows:"
+  echo "'go mod tidy' and commit the changes, if any. You also may not have committed changes to the generated CRDs."
+  echo "This can be done by running 'make build-crds' and committing any changes. The offending changed files are as follows:"
   echo "$dirty_files"
   exit 1
 fi
