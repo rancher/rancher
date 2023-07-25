@@ -110,7 +110,8 @@ type GlobalRoleBinding struct {
 // +kubebuilder:resource:scope=Cluster
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// RoleTemplate holds configuration for a template that is used to create roles and clusterRoles for a cluster or project.
+// RoleTemplate holds configuration for a template that is used to create kubernetes Roles and ClusterRoles
+// (in the rbac.authorization.k8s.io group) for a cluster or project.
 type RoleTemplate struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -118,11 +119,11 @@ type RoleTemplate struct {
 	// DisplayName is the human-readable name displayed in the UI for this resource.
 	DisplayName string `json:"displayName,omitempty" norman:"required"`
 
-	// Description holds any text desired to better describe the resource.
+	// Description holds text that describes the resource.
 	// +optional
 	Description string `json:"description"`
 
-	// Rules holds all the PolicyRules for this RoleTemplate.
+	// Rules hold all the PolicyRules for this RoleTemplate.
 	// +optional
 	Rules []rbacv1.PolicyRule `json:"rules,omitempty"`
 
