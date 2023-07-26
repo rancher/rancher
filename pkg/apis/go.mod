@@ -7,7 +7,7 @@ replace k8s.io/client-go => k8s.io/client-go v0.24.2
 require (
 	github.com/pkg/errors v0.9.1
 	github.com/rancher/aks-operator v1.0.9
-	github.com/rancher/eks-operator v1.1.5
+	github.com/rancher/eks-operator v1.1.6-rc2
 	github.com/rancher/fleet/pkg/apis v0.0.0-20230116113701-fc276f5505be
 	github.com/rancher/gke-operator v1.1.5-rc4
 	github.com/rancher/norman v0.0.0-20230426211157-18989f78fc0a
@@ -67,10 +67,10 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	k8s.io/apiextensions-apiserver v0.24.0 // indirect
-	k8s.io/apiserver v0.24.2 // indirect
+	k8s.io/apiextensions-apiserver v0.25.4 // indirect
+	k8s.io/apiserver v0.25.4 // indirect
 	k8s.io/client-go v12.0.0+incompatible // indirect
-	k8s.io/component-base v0.24.2 // indirect
+	k8s.io/component-base v0.25.4 // indirect
 	k8s.io/klog/v2 v2.70.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20220803162953-67bda5d908f1 // indirect
 	k8s.io/utils v0.0.0-20220728103510-ee6ede2d64ed // indirect

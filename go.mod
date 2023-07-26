@@ -106,7 +106,7 @@ require (
 	github.com/rancher/apiserver v0.0.0-20230502191800-c17b7df705a5
 	github.com/rancher/channelserver v0.5.1-0.20220405170618-28c9b37deff1
 	github.com/rancher/dynamiclistener v0.3.5
-	github.com/rancher/eks-operator v1.1.5
+	github.com/rancher/eks-operator v1.1.6-rc2
 	github.com/rancher/fleet/pkg/apis v0.0.0-20230116113701-fc276f5505be
 	github.com/rancher/gke-operator v1.1.5-rc4
 	github.com/rancher/kubernetes-provider-detector v0.1.5
@@ -149,7 +149,7 @@ require (
 	gopkg.in/yaml.v2 v2.4.0
 	helm.sh/helm/v3 v3.9.0
 	k8s.io/api v0.25.4
-	k8s.io/apiextensions-apiserver v0.24.2
+	k8s.io/apiextensions-apiserver v0.25.4
 	k8s.io/apimachinery v0.25.4
 	k8s.io/apiserver v0.24.2
 	k8s.io/cli-runtime v0.24.2
@@ -302,7 +302,7 @@ require (
 	github.com/morikuni/aec v1.0.0 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f // indirect
-	github.com/onsi/gomega v1.19.0 // indirect
+	github.com/onsi/gomega v1.24.1 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.0.3-0.20220114050600-8b9d41f48198 // indirect
 	github.com/opencontainers/runc v1.1.3 // indirect
@@ -372,7 +372,7 @@ require (
 	gopkg.in/square/go-jose.v2 v2.5.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/cluster-bootstrap v0.24.0 // indirect
-	k8s.io/code-generator v0.24.2 // indirect
+	k8s.io/code-generator v0.25.4 // indirect
 	k8s.io/component-base v0.24.2 // indirect
 	k8s.io/component-helpers v0.24.2 // indirect
 	k8s.io/klog v1.0.0 // indirect
