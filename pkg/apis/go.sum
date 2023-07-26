@@ -489,8 +489,8 @@ github.com/rancher/client-go v1.25.4-rancher1 h1:9MlBC8QbgngUkhNzMR8rZmmCIj6WNRH
 github.com/rancher/client-go v1.25.4-rancher1/go.mod h1:8trHCAC83XKY0wsBIpbirZU4NTUpbuhc2JnI7OruGZw=
 github.com/rancher/eks-operator v1.2.2-rc3 h1:zzf4JNCXJHPmI82bVFbJvywz346vWL9FFaBSrvNOhPQ=
 github.com/rancher/eks-operator v1.2.2-rc3/go.mod h1:/wyszmtekvefdRRuBSe0XVZln5BnVrFIeBFrNHCPawo=
-github.com/rancher/fleet/pkg/apis v0.0.0-20230721155330-5040cf183feb h1:2lL5TiXVKbgWtxiMXfnghx/54V8bK7dAmXHKyLFLBS8=
-github.com/rancher/fleet/pkg/apis v0.0.0-20230721155330-5040cf183feb/go.mod h1:TbpjMODeuFUJlHG8IfehZ4FBzgzpxwPwa+GwtFq2Tq0=
+github.com/rancher/fleet/pkg/apis v0.0.0-20230726092045-134ea8ac3ff2 h1:sQBRxKrsTdH/4jVc2iU70IlHQ0s2iPA/na8Sb2vRXlc=
+github.com/rancher/fleet/pkg/apis v0.0.0-20230726092045-134ea8ac3ff2/go.mod h1:TbpjMODeuFUJlHG8IfehZ4FBzgzpxwPwa+GwtFq2Tq0=
 github.com/rancher/gke-operator v1.1.6-rc1 h1:VMznbMabusNMar62NWZMNBNnL9zIRGBC3CEy/m4/exw=
 github.com/rancher/gke-operator v1.1.6-rc1/go.mod h1:IjcWkhYhRa23Oz8YgBgZUZzPtuPhHk7+ZW5m/gSuJU4=
 github.com/rancher/lasso v0.0.0-20230629200414-8a54b32e6792 h1:IaPhDqppVYX2v/nCR8j2i0nqOLD5yggzzy39QUlcqDw=
@@ -1137,8 +1137,8 @@ k8s.io/kube-openapi v0.0.0-20220803162953-67bda5d908f1/go.mod h1:C/N6wCaBHeBHkHU
 k8s.io/kube-openapi v0.0.0-20230308215209-15aac26d736a h1:gmovKNur38vgoWfGtP5QOGNOA7ki4n6qNYoFAgMlNvg=
 k8s.io/kube-openapi v0.0.0-20230308215209-15aac26d736a/go.mod h1:y5VtZWM9sHHc2ZodIH/6SHzXj+TPU5USoA8lcIeKEKY=
 k8s.io/kubectl v0.22.2/go.mod h1:BApg2j0edxLArCOfO0ievI27EeTQqBDMNU9VQH734iQ=
-k8s.io/kubernetes v1.25.4 h1:M1+MR8IxE64zHhSSDn30twChLaOI+p0Kt77pvyQMKwU=
-k8s.io/kubernetes v1.25.4/go.mod h1:lvEY+3iJhh+sGIK1LorGkI56rW0eLGsfalnp68wQwYU=
+k8s.io/kubernetes v1.15.0-alpha.0 h1:gIwzzIgt0BX8fznDZRxdZv2837cEmVetI54aUfzkPk8=
+k8s.io/kubernetes v1.15.0-alpha.0/go.mod h1:ocZa8+6APFNC2tX1DZASIbocyYT5jHzqFVsY5aoB7Jk=
 k8s.io/metrics v0.22.2/go.mod h1:GUcsBtpsqQD1tKFS/2wCKu4ZBowwRncLOJH1rgWs3uw=
 k8s.io/utils v0.0.0-20210802155522-efc7438f0176/go.mod h1:jPW/WVKK9YHAvNhRxK0md/EJ228hCsBRufyofKtW8HA=
 k8s.io/utils v0.0.0-20210819203725-bdf08cb9a70a/go.mod h1:jPW/WVKK9YHAvNhRxK0md/EJ228hCsBRufyofKtW8HA=
