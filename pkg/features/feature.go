@@ -61,7 +61,7 @@ var (
 		false)
 	EmbeddedClusterAPI = newFeature(
 		"embedded-cluster-api",
-		"Enable an embedded instance of cluster-api core controller",
+		"Enable a Rancher-managed instance of cluster-api core controller",
 		true,
 		false,
 		false)
