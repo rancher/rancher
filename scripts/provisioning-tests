@@ -107,8 +107,8 @@ dump_rancher_logs()
 
 # uncomment to get startup logs. Don't leave them on because it slows drone down too
 # much
-#tail -F /tmp/rancher.log &
-#TPID=$!
+tail -F /tmp/rancher.log &
+TPID=$!
 
 trap "exit 1" 42
 PWRAPPROC="$$"
@@ -129,7 +129,7 @@ echo "Waiting up to 5 minutes for rancher-webhook deployment"
   --message "rancher-webhook was not available after {{elapsed}} seconds" `# Print this progress message` \
   "kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -w -n cattle-system deploy/rancher-webhook &>/dev/null"
 
-#kill $TPID
+kill $TPID
 
 echo Running provisioning-tests $RUNARG
 
