@@ -2,13 +2,13 @@ package operations
 
 import (
 	"context"
-	"strings"
 
 	"github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/controllers/dashboardapi/settings"
 	"github.com/rancher/rancher/pkg/provisioningv2/kubeconfig"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/rancher/tests/v2prov/clients"
+	"github.com/rancher/rancher/tests/v2prov/defaults"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -43,11 +43,11 @@ func GetAndVerifyDownstreamClientset(clients *clients.Clients, c *v1.Cluster) (*
 		return nil, err
 	}
 	// Try to continuously get the kubernetes default service
-	err = retry.OnError(retry.DefaultRetry, func(err error) bool {
-		if strings.Contains(err.Error(), "connection refused") || apierrors.IsServiceUnavailable(err) {
-			return true
+	err = retry.OnError(defaults.DownstreamRetry, func(err error) bool {
+		if apierrors.IsForbidden(err) {
+			return false
 		}
-		return false
+		return true
 	}, func() error {
 		_, err = clientset.CoreV1().Services(corev1.NamespaceDefault).Get(context.TODO(), "kubernetes", metav1.GetOptions{})
 		return err
