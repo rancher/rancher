@@ -29,6 +29,7 @@ import (
 	rketypes "github.com/rancher/rke/types"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -832,12 +833,18 @@ func (m *nodesSyncer) isClusterRestoring() (bool, error) {
 		cluster.Spec.RancherKubernetesEngineConfig.Restore.Restore {
 		return true, nil
 	}
+	if cluster.Status.Driver == "imported" {
+		return false, nil
+	}
 	if strings.HasPrefix(cluster.Name, "c-m-") {
 		provCluster, err := m.provClusterCache.Get(cluster.Spec.FleetWorkspaceName, cluster.Spec.DisplayName)
 		if err != nil {
 			return false, err
 		}
 		capiCluster, err := m.capiClusterCache.Get(provCluster.Namespace, provCluster.Name)
+		if apierrors.IsNotFound(err) {
+			return false, nil
+		}
 		if err != nil {
 			return false, err
 		}
