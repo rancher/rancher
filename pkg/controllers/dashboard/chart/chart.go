@@ -21,6 +21,9 @@ const (
 
 	// WebhookChartName name of the chart for rancher-webhook.
 	WebhookChartName = "rancher-webhook"
+
+	// ProvisioningCAPIChartName name of the chart for rancher-provisioning-capi.
+	ProvisioningCAPIChartName = "rancher-provisioning-capi"
 )
 
 var errKeyNotFound = errors.New("key not found")

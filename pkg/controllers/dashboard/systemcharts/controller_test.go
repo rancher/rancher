@@ -80,12 +80,12 @@ func Test_ChartInstallation(t *testing.T) {
 			name: "normal installation",
 			setup: func(mocks testMocks) {
 				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
-				mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).Times(2)
+				mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).Times(4)
 				settings.RancherWebhookVersion.Set("2.0.0")
 				expectedValues := map[string]interface{}{
 					"priorityClassName": priorityClassName,
 					"capi": map[string]interface{}{
-						"enabled": features.EmbeddedClusterAPI.Enabled(),
+						"enabled": false,
 					},
 					"mcm": map[string]interface{}{
 						"enabled": features.MCM.Enabled(),
@@ -102,6 +102,25 @@ func Test_ChartInstallation(t *testing.T) {
 					"",
 					"2.0.0",
 					expectedValues,
+					gomock.AssignableToTypeOf(false),
+					"",
+				).Return(nil)
+
+				expectedProvCAPIValues := map[string]interface{}{
+					"priorityClassName": priorityClassName,
+					"global": map[string]interface{}{
+						"cattle": map[string]interface{}{
+							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+						},
+					},
+				}
+
+				mocks.manager.EXPECT().Ensure(
+					namespace.ProvisioningCAPINamespace,
+					"rancher-provisioning-capi",
+					"",
+					"",
+					expectedProvCAPIValues,
 					gomock.AssignableToTypeOf(false),
 					"",
 				).Return(nil)
@@ -113,11 +132,11 @@ func Test_ChartInstallation(t *testing.T) {
 			name: "installation with config cache errors",
 			setup: func(mocks testMocks) {
 				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
-				mocks.configCache.EXPECT().Get(gomock.Any(), chart.CustomValueMapName).Return(nil, errTest).Times(2)
+				mocks.configCache.EXPECT().Get(gomock.Any(), chart.CustomValueMapName).Return(nil, errTest).Times(4)
 				settings.RancherWebhookVersion.Set("2.0.0")
 				expectedValues := map[string]interface{}{
 					"capi": map[string]interface{}{
-						"enabled": features.EmbeddedClusterAPI.Enabled(),
+						"enabled": false,
 					},
 					"mcm": map[string]interface{}{
 						"enabled": features.MCM.Enabled(),
@@ -138,6 +157,23 @@ func Test_ChartInstallation(t *testing.T) {
 					"",
 				).Return(nil)
 
+				expectedProvCAPIValues := map[string]interface{}{
+					"global": map[string]interface{}{
+						"cattle": map[string]interface{}{
+							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+						},
+					},
+				}
+				mocks.manager.EXPECT().Ensure(
+					namespace.ProvisioningCAPINamespace,
+					"rancher-provisioning-capi",
+					"",
+					"",
+					expectedProvCAPIValues,
+					gomock.AssignableToTypeOf(false),
+					"",
+				).Return(nil)
+
 				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
 			},
 		},
@@ -145,11 +181,11 @@ func Test_ChartInstallation(t *testing.T) {
 			name: "installation with image override",
 			setup: func(mocks testMocks) {
 				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
-				mocks.configCache.EXPECT().Get(gomock.Any(), chart.CustomValueMapName).Return(emptyConfig, nil).Times(2)
+				mocks.configCache.EXPECT().Get(gomock.Any(), chart.CustomValueMapName).Return(emptyConfig, nil).Times(4)
 				settings.RancherWebhookVersion.Set("2.0.1")
 				expectedValues := map[string]interface{}{
 					"capi": map[string]interface{}{
-						"enabled": features.EmbeddedClusterAPI.Enabled(),
+						"enabled": false,
 					},
 					"mcm": map[string]interface{}{
 						"enabled": features.MCM.Enabled(),
@@ -169,6 +205,27 @@ func Test_ChartInstallation(t *testing.T) {
 					"",
 					"2.0.1",
 					expectedValues,
+					gomock.AssignableToTypeOf(false),
+					"rancher-test.io/"+settings.ShellImage.Get(),
+				).Return(nil)
+
+				expectedProvCAPIValues := map[string]interface{}{
+					"global": map[string]interface{}{
+						"cattle": map[string]interface{}{
+							"systemDefaultRegistry": "",
+						},
+					},
+					"image": map[string]interface{}{
+						"repository": "rancher-test.io/rancher/mirrored-cluster-api-controller",
+					},
+				}
+
+				mocks.manager.EXPECT().Ensure(
+					namespace.ProvisioningCAPINamespace,
+					"rancher-provisioning-capi",
+					"",
+					"",
+					expectedProvCAPIValues,
 					gomock.AssignableToTypeOf(false),
 					"rancher-test.io/"+settings.ShellImage.Get(),
 				).Return(nil)
@@ -181,12 +238,12 @@ func Test_ChartInstallation(t *testing.T) {
 			name: "installation with min version override",
 			setup: func(mocks testMocks) {
 				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
-				mocks.configCache.EXPECT().Get(gomock.Any(), chart.CustomValueMapName).Return(emptyConfig, nil).Times(2)
+				mocks.configCache.EXPECT().Get(gomock.Any(), chart.CustomValueMapName).Return(emptyConfig, nil).Times(4)
 				settings.RancherWebhookMinVersion.Set("2.0.1")
 				settings.RancherWebhookVersion.Set("2.0.4")
 				expectedValues := map[string]interface{}{
 					"capi": map[string]interface{}{
-						"enabled": features.EmbeddedClusterAPI.Enabled(),
+						"enabled": false,
 					},
 					"mcm": map[string]interface{}{
 						"enabled": features.MCM.Enabled(),
@@ -210,6 +267,26 @@ func Test_ChartInstallation(t *testing.T) {
 					"rancher-test.io/"+settings.ShellImage.Get(),
 				).Return(nil)
 
+				expectedProvCAPIValues := map[string]interface{}{
+					"global": map[string]interface{}{
+						"cattle": map[string]interface{}{
+							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+						},
+					},
+					"image": map[string]interface{}{
+						"repository": "rancher-test.io/rancher/mirrored-cluster-api-controller",
+					},
+				}
+				mocks.manager.EXPECT().Ensure(
+					namespace.ProvisioningCAPINamespace,
+					"rancher-provisioning-capi",
+					"",
+					"",
+					expectedProvCAPIValues,
+					gomock.AssignableToTypeOf(false),
+					"rancher-test.io/"+settings.ShellImage.Get(),
+				).Return(nil)
+
 				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
 			},
 			registryOverride: "rancher-test.io",
@@ -218,13 +295,13 @@ func Test_ChartInstallation(t *testing.T) {
 			name: "installation with webhook values",
 			setup: func(mocks testMocks) {
 				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
-				mocks.configCache.EXPECT().Get(gomock.Any(), chart.CustomValueMapName).Return(fullConfig, nil).Times(2)
+				mocks.configCache.EXPECT().Get(gomock.Any(), chart.CustomValueMapName).Return(fullConfig, nil).Times(4)
 				settings.RancherWebhookVersion.Set("2.0.0")
 				features.MCM.Set(true)
 				expectedValues := map[string]interface{}{
 					"priorityClassName": "newClass",
 					"capi": map[string]interface{}{
-						"enabled": features.EmbeddedClusterAPI.Enabled(),
+						"enabled": false,
 					},
 					"mcm": map[any]interface{}{
 						"enabled": false,
@@ -238,6 +315,24 @@ func Test_ChartInstallation(t *testing.T) {
 					"",
 					"2.0.0",
 					expectedValues,
+					gomock.AssignableToTypeOf(false),
+					"",
+				).Return(nil)
+
+				expectedProvCAPIValues := map[string]interface{}{
+					"priorityClassName": priorityClassName,
+					"global": map[string]interface{}{
+						"cattle": map[string]interface{}{
+							"systemDefaultRegistry": "",
+						},
+					},
+				}
+				mocks.manager.EXPECT().Ensure(
+					namespace.ProvisioningCAPINamespace,
+					"rancher-provisioning-capi",
+					"",
+					"",
+					expectedProvCAPIValues,
 					gomock.AssignableToTypeOf(false),
 					"",
 				).Return(nil)

@@ -22,11 +22,14 @@ import (
 
 const (
 	repoName         = "rancher-charts"
-	webhookImage     = "rancher/rancher-webhook"
 	priorityClassKey = "priorityClassName"
 )
 
 var (
+	primaryImages = map[string]string{
+		chart.WebhookChartName:          "rancher/rancher-webhook",
+		chart.ProvisioningCAPIChartName: "rancher/mirrored-cluster-api-controller",
+	}
 	watchedSettings = map[string]struct{}{
 		settings.RancherWebhookMinVersion.Name: {},
 		settings.RancherWebhookVersion.Name:    {},
@@ -104,7 +107,9 @@ func (h *handler) onRepo(key string, repo *catalog.ClusterRepo) (*catalog.Cluste
 			if !ok {
 				imageSettings = map[string]interface{}{}
 			}
-			imageSettings["repository"] = h.registryOverride + "/" + webhookImage
+			if image, ok := primaryImages[chartDef.ChartName]; ok {
+				imageSettings["repository"] = h.registryOverride + "/" + image
+			}
 			values["image"] = imageSettings
 			installImageOverride = h.registryOverride + "/" + settings.ShellImage.Get()
 		}
@@ -120,7 +125,8 @@ func (h *handler) onRepo(key string, repo *catalog.ClusterRepo) (*catalog.Cluste
 		if chartDef.ChartName == chart.WebhookChartName && minVersion != "" {
 			exactVersion = ""
 		}
-		if err := h.manager.Ensure(chartDef.ReleaseNamespace, chartDef.ChartName, minVersion, exactVersion, values, chartDef.ChartName == chart.WebhookChartName, installImageOverride); err != nil {
+		forceAdopt := chartDef.ChartName == chart.WebhookChartName || chartDef.ChartName == chart.ProvisioningCAPIChartName
+		if err := h.manager.Ensure(chartDef.ReleaseNamespace, chartDef.ChartName, minVersion, exactVersion, values, forceAdopt, installImageOverride); err != nil {
 			return repo, err
 		}
 	}
@@ -138,7 +144,7 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 			Values: func() map[string]interface{} {
 				values := map[string]interface{}{
 					"capi": map[string]interface{}{
-						"enabled": features.EmbeddedClusterAPI.Enabled(),
+						"enabled": false,
 					},
 					"mcm": map[string]interface{}{
 						"enabled": features.MCM.Enabled(),
@@ -168,6 +174,32 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 			ChartName:        "rancher-operator",
 			Uninstall:        true,
 			RemoveNamespace:  true,
+		},
+		{
+			ReleaseNamespace: namespace.ProvisioningCAPINamespace,
+			ChartName:        chart.ProvisioningCAPIChartName,
+			Values: func() map[string]interface{} {
+				values := map[string]interface{}{}
+				// add priority class value
+				if priorityClassName, err := h.chartsConfig.GetGlobalValue(chart.PriorityClassKey); err != nil {
+					if !chart.IsNotFoundError(err) {
+						logrus.Warnf("Failed to get rancher %s for 'rancher-provisioning-capi': %s", chart.PriorityClassKey, err.Error())
+					}
+				} else {
+					values[priorityClassKey] = priorityClassName
+				}
+
+				// get custom values for the rancher-provisioning-capi
+				configMapValues, err := h.chartsConfig.GetChartValues(chart.ProvisioningCAPIChartName)
+				if err != nil && !chart.IsNotFoundError(err) {
+					logrus.Warnf("Failed to get rancher-provisioning-capi %s", err.Error())
+				}
+
+				return data.MergeMaps(values, configMapValues)
+			},
+			Enabled:         func() bool { return true },
+			Uninstall:       !features.EmbeddedClusterAPI.Enabled(),
+			RemoveNamespace: !features.EmbeddedClusterAPI.Enabled(),
 		},
 	}
 }
