@@ -46,7 +46,7 @@ replace (
 	k8s.io/kube-scheduler => k8s.io/kube-scheduler v0.25.4
 	k8s.io/kubectl => k8s.io/kubectl v0.25.4
 	k8s.io/kubelet => k8s.io/kubelet v0.25.4
-	k8s.io/kubernetes => k8s.io/kubernetes v1.25.4
+	k8s.io/kubernetes => k8s.io/kubernetes v1.25.11
 	k8s.io/legacy-cloud-providers => k8s.io/legacy-cloud-providers v0.25.4
 	k8s.io/metrics => k8s.io/metrics v0.25.4
 	k8s.io/mount-utils => k8s.io/mount-utils v0.25.4
@@ -154,7 +154,7 @@ require (
 	k8s.io/helm v2.16.7+incompatible
 	k8s.io/kube-aggregator v0.25.4
 	k8s.io/kubectl v0.25.4
-	k8s.io/kubernetes v1.25.4
+	k8s.io/kubernetes v1.25.11
 	k8s.io/utils v0.0.0-20230209194617-a36077c30491
 	sigs.k8s.io/aws-iam-authenticator v0.5.9
 	sigs.k8s.io/cluster-api v1.2.12
@@ -332,7 +332,7 @@ require (
 	github.com/onsi/gomega v1.27.8 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.0-rc2 // indirect
-	github.com/opencontainers/runc v1.1.5 // indirect
+	github.com/opencontainers/runc v1.1.6 // indirect
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
 	github.com/pkg/sftp v1.13.5
 	github.com/pmezard/go-difflib v1.0.0 // indirect
@@ -396,7 +396,7 @@ require (
 	k8s.io/klog/v2 v2.90.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20230308215209-15aac26d736a // indirect
 	oras.land/oras-go v1.1.0 // indirect
-	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.33 // indirect
+	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.37 // indirect
 	sigs.k8s.io/cli-utils v0.27.0 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/kustomize/api v0.12.1 // indirect
