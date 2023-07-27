@@ -5,17 +5,18 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"testing"
+	"time"
+
 	types2 "github.com/rancher/rancher/pkg/api/steve/catalog/types"
 	catalog "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/catalogv2/system/mocks"
 	"github.com/stretchr/testify/mock"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/repo"
-	"io"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"helm.sh/helm/v3/pkg/chart"
@@ -490,7 +491,7 @@ func TestInstall(t *testing.T) {
 					Chart: &chart.Chart{Metadata: &chart.Metadata{Version: "100.0.0+up1.0.0"}},
 				}},
 			},
-			expected: repo.ErrNoChartName,
+			expected: errors.New("no chart version found for test-chart-102.0.0+up1.0.0"),
 		},
 		{
 			name: "Should do nothing if chart is pending upgrade, pending install or pending rollback",
