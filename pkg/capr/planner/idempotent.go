@@ -43,6 +43,21 @@ var idempotentScriptFile = plan.File{
 	Minor:   true,
 }
 
+// generateIdempotencyCleanupInstruction generates a one-time instruction that performs a cleanup of the given key.
+func generateIdempotencyCleanupInstruction(key string) plan.OneTimeInstruction {
+	if key == "" {
+		return plan.OneTimeInstruction{}
+	}
+	return plan.OneTimeInstruction{
+		Name:    "remove idempotency tracking",
+		Command: "/bin/sh",
+		Args: []string{
+			"-c",
+			fmt.Sprintf("rm -rf /var/lib/rancher/capr/idempotence/%s", key),
+		},
+	}
+}
+
 // idempotentInstruction generates an idempotent action instruction that will execute the given command + args exactly once.
 // It works by running a script that writes the given "value" to a file at /var/lib/rancher/idempotence/<identifier>/<hashedCommand>,
 // and checks this file to determine if it needs to run the instruction again. Notably, `identifier` must be a valid relative path.
