@@ -115,7 +115,8 @@ func NewSubscriptionServiceClient(cap *Capabilities) (*subscription.Subscription
 		return nil, err
 	}
 
-	subscriptionService := subscription.NewSubscriptionsClient()
+	//subscriptionService := subscription.NewSubscriptionsClient()
+	subscriptionService := subscription.NewSubscriptionsClientWithBaseURI(cap.BaseURL)
 	subscriptionService.Authorizer = authorizer
 
 	return &subscriptionService, nil
