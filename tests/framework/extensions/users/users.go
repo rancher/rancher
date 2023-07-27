@@ -131,12 +131,17 @@ func AddProjectMember(rancherClient *rancher.Client, project *management.Project
 	if err != nil {
 		return err
 	}
-	return waitForPRTBRollout(rancherClient, prtb, createOp)
+	return waitForPRTBRollout(adminClient, prtb, createOp)
 }
 
 // RemoveProjectMember is a helper function that removes the project role from `user`
 func RemoveProjectMember(rancherClient *rancher.Client, user *management.User) error {
 	roles, err := rancherClient.Management.ProjectRoleTemplateBinding.List(&types.ListOpts{})
+	if err != nil {
+		return err
+	}
+
+	adminClient, err := rancher.NewClient(rancherClient.RancherConfig.AdminToken, rancherClient.Session)
 	if err != nil {
 		return err
 	}
@@ -154,7 +159,7 @@ func RemoveProjectMember(rancherClient *rancher.Client, user *management.User) e
 	if err != nil {
 		return err
 	}
-	return waitForPRTBRollout(rancherClient, &roleToDelete, deleteOp)
+	return waitForPRTBRollout(adminClient, &roleToDelete, deleteOp)
 }
 
 // AddClusterRoleToUser is a helper function that adds a cluster role to `user`.
@@ -224,12 +229,17 @@ func AddClusterRoleToUser(rancherClient *rancher.Client, cluster *management.Clu
 	if err != nil {
 		return err
 	}
-	return waitForCRTBRollout(rancherClient, crtb, createOp)
+	return waitForCRTBRollout(adminClient, crtb, createOp)
 }
 
 // RemoveClusterRoleFromUser is a helper function that removes the user from cluster
 func RemoveClusterRoleFromUser(rancherClient *rancher.Client, user *management.User) error {
 	roles, err := rancherClient.Management.ClusterRoleTemplateBinding.List(&types.ListOpts{})
+	if err != nil {
+		return err
+	}
+
+	adminClient, err := rancher.NewClient(rancherClient.RancherConfig.AdminToken, rancherClient.Session)
 	if err != nil {
 		return err
 	}
@@ -246,7 +256,7 @@ func RemoveClusterRoleFromUser(rancherClient *rancher.Client, user *management.U
 	if err = rancherClient.Management.ClusterRoleTemplateBinding.Delete(&roleToDelete); err != nil {
 		return err
 	}
-	return waitForCRTBRollout(rancherClient, &roleToDelete, deleteOp)
+	return waitForCRTBRollout(adminClient, &roleToDelete, deleteOp)
 }
 
 // GetUserIDByName is a helper function that returns the user ID by name
