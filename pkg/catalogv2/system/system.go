@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/Masterminds/semver/v3"
@@ -17,7 +16,6 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	catalogcontrollers "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
-	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/rancher/pkg/settings"
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/pkg/merr"
@@ -82,7 +80,6 @@ type Manager struct {
 	pods                  corecontrollers.PodClient
 	desiredCharts         map[desiredKey]map[string]interface{}
 	sync                  chan desired
-	syncLock              sync.Mutex
 	refreshIntervalChange chan struct{}
 	settings              mgmtcontrollers.SettingController
 	trigger               chan struct{}
@@ -164,9 +161,12 @@ func (m *Manager) runSync() {
 			v, exists := m.desiredCharts[desired.key]
 			// newly requested or changed
 			if !exists || !equality.Semantic.DeepEqual(v, desired.values) {
-				err := m.installCharts(map[desiredKey]map[string]interface{}{
-					desired.key: desired.values,
-				}, desired.forceAdopt)
+				err := m.installCharts(
+					map[desiredKey]map[string]interface{}{
+						desired.key: desired.values,
+					},
+					desired.forceAdopt,
+				)
 				if err == nil {
 					m.desiredCharts[desired.key] = desired.values
 				}
@@ -184,8 +184,10 @@ func getIntervalOrDefault(interval string) time.Duration {
 	return time.Duration(i) * time.Second
 }
 
+// installCharts installs charts with forceAdopt.
 func (m *Manager) installCharts(charts map[desiredKey]map[string]interface{}, forceAdopt bool) error {
 	var errs []error
+
 	for key, values := range charts {
 		for {
 			if err := m.install(key.namespace, key.name, key.minVersion, key.exactVersion, values, forceAdopt, key.installImageOverride); err == repo.ErrNoChartName || apierrors.IsNotFound(err) {
@@ -269,7 +271,12 @@ func (m *Manager) install(namespace, name, minVersion, exactVersion string, valu
 	if exactVersion != "" {
 		v = exactVersion
 		isExact = true
+	} else if minVersion != "" {
+		v = minVersion
+		// not enforcing exact version install, to keep any possibly newer, already installed version.
+		// This prevents automated downgrades of updates done manually through the web UI, eg. for Fleet.
 	}
+
 	// This method from the Helm fork doesn't return an error when given a non-existent version, unfortunately.
 	// It instead returns the latest version in the index.
 	chart, err := index.Get(name, v)
@@ -278,7 +285,7 @@ func (m *Manager) install(namespace, name, minVersion, exactVersion string, valu
 		return fmt.Errorf(err.Error())
 	}
 	// Because of the behavior of `index.Get`, we need this check.
-	if exactVersion != "" && chart.Version != exactVersion {
+	if isExact && chart.Version != v {
 		return fmt.Errorf("specified exact version %s doesn't exist in the index", exactVersion)
 	}
 
@@ -379,7 +386,7 @@ func (m *Manager) waitPodDone(op *catalog.Operation) error {
 // podDone receives a chart name and a pod. It will check all containers in that pod and
 // get one named helm to check if it terminated and if it did so successfully.
 // If there's no helm container or if the container didn't terminate, it returns false.
-func podDone(chart string, newPod *corev1.Pod) (bool, error) {
+func podDone(chart string, newPod *v1.Pod) (bool, error) {
 	for _, container := range newPod.Status.ContainerStatuses {
 		if container.Name != "helm" {
 			continue
