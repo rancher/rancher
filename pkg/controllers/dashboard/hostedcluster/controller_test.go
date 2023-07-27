@@ -55,7 +55,7 @@ func Test_handler_onClusterChange(t *testing.T) {
 				manager.EXPECT().Ensure(
 					AksCrdChart.ReleaseNamespace,
 					AksCrdChart.ChartName,
-					settings.FleetMinVersion.Get(),
+					"",
 					"",
 					nil,
 					gomock.AssignableToTypeOf(b),
@@ -64,7 +64,7 @@ func Test_handler_onClusterChange(t *testing.T) {
 				manager.EXPECT().Ensure(
 					AksChart.ReleaseNamespace,
 					AksChart.ChartName,
-					settings.FleetMinVersion.Get(),
+					"",
 					"",
 					expectedValues,
 					gomock.AssignableToTypeOf(b),
@@ -99,7 +99,7 @@ func Test_handler_onClusterChange(t *testing.T) {
 				manager.EXPECT().Ensure(
 					AksCrdChart.ReleaseNamespace,
 					AksCrdChart.ChartName,
-					settings.FleetMinVersion.Get(),
+					"",
 					"",
 					nil,
 					gomock.AssignableToTypeOf(b),
@@ -108,7 +108,7 @@ func Test_handler_onClusterChange(t *testing.T) {
 				manager.EXPECT().Ensure(
 					AksChart.ReleaseNamespace,
 					AksChart.ChartName,
-					settings.FleetMinVersion.Get(),
+					"",
 					"",
 					expectedValues,
 					gomock.AssignableToTypeOf(b),
