@@ -3,8 +3,12 @@
 package mocks
 
 import (
-	mock "github.com/stretchr/testify/mock"
+	generic "github.com/rancher/wrangler/pkg/generic"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	mock "github.com/stretchr/testify/mock"
+
+	rest "k8s.io/client-go/rest"
 
 	types "k8s.io/apimachinery/pkg/types"
 
@@ -214,6 +218,32 @@ func (_m *PodClient) Watch(namespace string, opts metav1.ListOptions) (watch.Int
 
 	if rf, ok := ret.Get(1).(func(string, metav1.ListOptions) error); ok {
 		r1 = rf(namespace, opts)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// WithImpersonation provides a mock function with given fields: impersonate
+func (_m *PodClient) WithImpersonation(impersonate rest.ImpersonationConfig) (generic.ClientInterface[*v1.Pod, *v1.PodList], error) {
+	ret := _m.Called(impersonate)
+
+	var r0 generic.ClientInterface[*v1.Pod, *v1.PodList]
+	var r1 error
+	if rf, ok := ret.Get(0).(func(rest.ImpersonationConfig) (generic.ClientInterface[*v1.Pod, *v1.PodList], error)); ok {
+		return rf(impersonate)
+	}
+	if rf, ok := ret.Get(0).(func(rest.ImpersonationConfig) generic.ClientInterface[*v1.Pod, *v1.PodList]); ok {
+		r0 = rf(impersonate)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(generic.ClientInterface[*v1.Pod, *v1.PodList])
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(rest.ImpersonationConfig) error); ok {
+		r1 = rf(impersonate)
 	} else {
 		r1 = ret.Error(1)
 	}
