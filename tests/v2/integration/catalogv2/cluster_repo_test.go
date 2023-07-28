@@ -3,7 +3,6 @@ package integration
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -16,18 +15,14 @@ import (
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	"github.com/rancher/rancher/tests/framework/clients/rancher/catalog"
 	stevev1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
-	clusters "github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
-	clusterWait "github.com/rancher/rancher/tests/framework/pkg/wait"
-	"github.com/rancher/rancher/tests/integration/pkg/defaults"
-	"github.com/rancher/wrangler/pkg/data"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apimachinery/pkg/watch"
+	kwait "k8s.io/apimachinery/pkg/util/wait"
 )
 
 const (
@@ -37,9 +32,7 @@ const (
 	ChartsSmallForkGitRepoFirstBranch = "test-1"
 	ChartsSmallForkGitRepoLastBranch  = "main"
 
-	GitClusterRepoName      = "test-git-cluster-repo"
-	RancherChartsGitRepoURL = "https://git.rancher.io/charts"
-	RKE2ChartsGitRepoURL    = "https://git.rancher.io/rke2-charts"
+	RKE2ChartsGitRepoURL = "https://git.rancher.io/rke2-charts"
 
 	HTTPClusterRepoName = "test-http-cluster-repo"
 	LatestHTTPRepoURL   = "https://releases.rancher.com/server-charts/latest"
@@ -47,8 +40,7 @@ const (
 )
 
 var (
-	CICD              = false
-	ChartSmallForkDir = ""
+	ChartSmallForkDir = fmt.Sprintf("/go/src/github.com/rancher/rancher/build/testdata/management-state/git-repo/%s", ChartsSmallForkRepoName)
 	PollInterval      = time.Duration(500 * time.Millisecond)
 	PollTimeout       = time.Duration(5 * time.Minute)
 )
@@ -59,6 +51,15 @@ type ClusterRepoParams struct {
 	Type RepoType // Type of the ClusterRepo resource
 	URL1 string   // URL to use when creating the ClusterRepo resource
 	URL2 string   // URL to use when updating the ClusterRepo resource to a new URL
+}
+
+// ClusterRepoParams is used to pass params to func testClusterRepo for testing
+type ChartsSmallForkRepoParams struct {
+	Name    string   // Name of the ClusterRepo resource
+	Type    RepoType // Type of the ClusterRepo resource
+	URL     string
+	Branch1 string // First branch to test at charts-small-fork
+	Branch2 string // Last branch to test at charts-small-fork
 }
 
 type RepoType int64
@@ -75,15 +76,6 @@ type ClusterRepoTestSuite struct {
 	clusterID     string
 	catalogClient *catalog.Client
 	ctx           context.Context
-}
-
-// ClusterRepoParams is used to pass params to func testClusterRepo for testing
-type ChartsSmallForkRepoParams struct {
-	Name    string   // Name of the ClusterRepo resource
-	Type    RepoType // Type of the ClusterRepo resource
-	URL     string
-	Branch1 string // URL to use when creating the ClusterRepo resource
-	Branch2 string // URL to use when updating the ClusterRepo resource to a new URL
 }
 
 func TestClusterRepoTestSuite(t *testing.T) {
@@ -104,18 +96,7 @@ func (c *ClusterRepoTestSuite) SetupSuite() {
 	c.client, err = rancher.NewClient("", testSession)
 	require.NoError(c.T(), err)
 
-	if os.Getenv("LOCAL_MODE") == LocalClusterID {
-		CICD = false
-		c.clusterID = LocalClusterID
-		ChartSmallForkDir = fmt.Sprintf("../../../../management-state/git-repo/%s", ChartsSmallForkRepoName)
-	} else {
-		CICD = true
-		clusterName := c.client.RancherConfig.ClusterName
-		c.clusterID, err = clusters.GetClusterIDByName(c.client, clusterName)
-		require.NoError(c.T(), err)
-		ChartSmallForkDir = fmt.Sprintf("/go/src/github.com/rancher/rancher/bin/build/%s", ChartsSmallForkRepoName)
-	}
-
+	c.clusterID = LocalClusterID
 	c.catalogClient, err = c.client.GetClusterCatalogClient(c.clusterID)
 	require.NoError(c.T(), err)
 }
@@ -188,8 +169,13 @@ func (c *ClusterRepoTestSuite) testClusterRepo(params ClusterRepoParams) {
 // testSmallForkClusterRepo takes in ChartsSmallForkRepoParams
 // and asserts the current state of the local repository directory to the Spec and Status of created and updated ClusterRepo.
 func (c *ClusterRepoTestSuite) testSmallForkClusterRepo(params ChartsSmallForkRepoParams) {
+	var err error
+	var firstCommit, firstBranch string
+	var lastCommit, lastBranch string
+	var createdClusterRepo, testClusterRepo, updatedClusterRepo *v1.ClusterRepo
 
-	testClusterRepo, err := c.catalogClient.ClusterRepos().Create(c.ctx,
+	// Creates new ClusterRepo kubernetes custom resource
+	createdClusterRepo, err = c.catalogClient.ClusterRepos().Create(c.ctx,
 		&v1.ClusterRepo{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: ChartsSmallForkRepoName,
@@ -202,137 +188,65 @@ func (c *ClusterRepoTestSuite) testSmallForkClusterRepo(params ChartsSmallForkRe
 
 	require.NoError(c.T(), err)
 
+	// List all available installed Cluster Repos
 	installedClusterRepos, err := c.catalogClient.ClusterRepos().List(c.ctx, metav1.ListOptions{})
 	require.NoError(c.T(), err)
 
+	// Check if our created ClusterRepo(charts-small-fork) was created
 	success := false
 	for _, cr := range installedClusterRepos.Items {
-		logrus.Infof("Installed Cluster Repo: %s", cr.Name)
-		if cr.Name == testClusterRepo.Name {
+		logrus.Debugf("Installed Cluster Repo: %s", cr.Name)
+		if cr.Name == createdClusterRepo.Name {
 			success = true
 		}
 	}
 	require.Equal(c.T(), true, success)
-
-	watcherEnsure, err := c.catalogClient.ClusterRepos().Watch(c.ctx, metav1.ListOptions{
-		FieldSelector:  fmt.Sprintf("metadata.name=%s", ChartsSmallForkRepoName),
-		TimeoutSeconds: &defaults.QuickWatchTimeoutSeconds,
-	})
 	require.NoError(c.T(), err)
 
-	err = clusterWait.WatchWait(watcherEnsure, func(event watch.Event) (ensured bool, err error) {
-		if event.Type == watch.Error {
-			return false, fmt.Errorf("there was an error syncing the cluster repo charts-small-fork")
+	// Wait until ClusterRepo.Status.Commit reflects the first commit at the local repository
+	err = kwait.Poll(5*time.Second, 2*time.Minute, func() (done bool, err error) {
+		// Get the path to the local repository and assert it has no error
+		testClusterRepo, err = c.catalogClient.ClusterRepos().Get(c.ctx, createdClusterRepo.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
 		}
-		if event.Type == watch.Modified {
-			return checkStatusFromClusterRepo(event)
+		if testClusterRepo.Status.Commit != "" {
+			return true, nil
 		}
 		return false, nil
 	})
 	require.NoError(c.T(), err)
-
+	// we have waited for ClusterRepo status to update and the local repository to be created
 	repoPath, err := getCurrentRepoDirSmallFork()
-	require.NoError(c.T(), err)
-	localRepoCommit, localRepoBranch, err := getLocalRepoCurrentCommitAndBranch(repoPath)
-	require.NoError(c.T(), err)
-
-	testClusterRepo, err = c.catalogClient.ClusterRepos().Get(c.ctx, testClusterRepo.Name, metav1.GetOptions{})
-	require.NoError(c.T(), err)
-	assert.Equal(c.T(), localRepoBranch, testClusterRepo.Spec.GitBranch)
-	assert.Equal(c.T(), localRepoBranch, testClusterRepo.Status.Branch)
-	assert.Equal(c.T(), localRepoCommit, testClusterRepo.Status.Commit)
+	firstCommit, firstBranch, err = getLocalRepoCurrentCommitAndBranch(repoPath)
+	// Compare ClusterRepo Values with local repository
+	assert.Equal(c.T(), firstBranch, testClusterRepo.Spec.GitBranch)
+	assert.Equal(c.T(), firstBranch, testClusterRepo.Status.Branch)
+	assert.Equal(c.T(), firstCommit, testClusterRepo.Status.Commit)
 	assert.Equal(c.T(), int64(1), testClusterRepo.Status.ObservedGeneration)
 
+	// Updating ClusterRepo Spec Branch to newer one
 	testClusterRepo.Spec.GitBranch = ChartsSmallForkGitRepoLastBranch
-	updatedClusterRepo, err := c.catalogClient.ClusterRepos().Update(c.ctx, testClusterRepo.DeepCopy(), metav1.UpdateOptions{})
+	updatedClusterRepo, err = c.catalogClient.ClusterRepos().Update(c.ctx, testClusterRepo.DeepCopy(), metav1.UpdateOptions{})
 	require.NoError(c.T(), err)
 	assert.Equal(c.T(), ChartsSmallForkGitRepoLastBranch, updatedClusterRepo.Spec.GitBranch)
 
-	watcherUpdate, err := c.catalogClient.ClusterRepos().Watch(c.ctx, metav1.ListOptions{
-		FieldSelector:  fmt.Sprintf("metadata.name=%s", ChartsSmallForkRepoName),
-		TimeoutSeconds: &defaults.QuickWatchTimeoutSeconds,
-	})
-	require.NoError(c.T(), err)
-
-	err = clusterWait.WatchWait(watcherUpdate, func(event watch.Event) (ensured bool, err error) {
-		if event.Type == watch.Error {
-			return false, fmt.Errorf("there was an error syncing the cluster repo charts-small-fork")
+	// The Spec from ClusterRepo is updated almost instantlty, the status and local repository take more time
+	err = kwait.Poll(5*time.Second, 10*time.Minute, func() (done bool, err error) {
+		lastCommit, _, err := getLocalRepoCurrentCommitAndBranch(repoPath)
+		updatedClusterRepo, err = c.catalogClient.ClusterRepos().Get(c.ctx, testClusterRepo.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
 		}
-		if event.Type == watch.Modified {
-			return checkObservedGeneration(event)
+		// Assertions
+		if lastCommit == updatedClusterRepo.Status.Commit && lastCommit != firstCommit {
+			return true, nil
 		}
 		return false, nil
 	})
+	logrus.Debug("last commit: ", lastCommit)
+	logrus.Debug("last branch: ", lastBranch)
 	require.NoError(c.T(), err)
-
-	updatedRepoCommit, updatedRepoBranch, err := getLocalRepoCurrentCommitAndBranch(repoPath)
-	require.NoError(c.T(), err)
-
-	updatedClusterRepo, err = c.catalogClient.ClusterRepos().Get(c.ctx, testClusterRepo.Name, metav1.GetOptions{})
-	require.NoError(c.T(), err)
-	assert.Equal(c.T(), updatedRepoBranch, updatedClusterRepo.Spec.GitBranch)
-	assert.Equal(c.T(), updatedRepoBranch, updatedClusterRepo.Status.Branch)
-	assert.Equal(c.T(), updatedRepoCommit, updatedClusterRepo.Status.Commit)
-	assert.Equal(c.T(), int64(2), updatedClusterRepo.Status.ObservedGeneration)
-}
-
-func checkObservedGeneration(event watch.Event) (bool, error) {
-	crObj, err := data.Convert(event.Object.DeepCopyObject())
-	if err != nil {
-		return false, err
-	}
-
-	status := crObj.Map("status")
-	observed := status["observedGeneration"]
-
-	updated := false
-	observed, ok := observed.(interface{})
-	if !ok {
-		return false, fmt.Errorf("observed is not the expected type")
-	}
-
-	if obsNum, ok := observed.(json.Number); obsNum.String() == "2" && ok {
-		updated = true
-	}
-
-	return updated, nil
-}
-
-func checkStatusFromClusterRepo(event watch.Event) (bool, error) {
-	crObj, err := data.Convert(event.Object.DeepCopyObject())
-	if err != nil {
-		return false, err
-	}
-
-	status := crObj.Map("status")
-	conditions := status["conditions"]
-
-	ensured := false
-	conditionsSlice, ok := conditions.([]interface{})
-	if !ok {
-		return false, fmt.Errorf("conditions is not the expected type")
-	}
-
-	if len(conditionsSlice) > 1 {
-		for _, conditionsInterface := range conditionsSlice {
-			conditionMap, ok := conditionsInterface.(map[string]interface{})
-			if !ok {
-				return false, fmt.Errorf("type assertion failed for conditions")
-			}
-			status, ok := conditionMap["status"].(string)
-			if !ok {
-				return false, fmt.Errorf("type assertion failed for conditions")
-			}
-			conditionType, ok := conditionMap["type"].(string)
-			if !ok {
-				return false, fmt.Errorf("type assertion failed for conditions")
-			}
-			ensured = status == "True"
-			ensured = ensured && (conditionType == "FollowerDownloaded" || conditionType == "Downloaded")
-		}
-	}
-
-	return ensured, nil
 }
 
 // pollUntilDownloaded Polls until the ClusterRepo of the given name has been downloaded (by comparing prevDownloadTime against the current DownloadTime)
@@ -371,10 +285,6 @@ func (c *ClusterRepoTestSuite) getStatusFromClusterRepo(obj *stevev1.SteveAPIObj
 }
 
 func getCurrentRepoDirSmallFork() (string, error) {
-	if CICD {
-		return ChartSmallForkDir, nil
-	}
-	// Read the directory
 	directories, err := os.ReadDir(ChartSmallForkDir)
 	if err != nil {
 		return "", fmt.Errorf("failed to find local git repository directory: %w", err)
@@ -386,7 +296,6 @@ func getCurrentRepoDirSmallFork() (string, error) {
 }
 
 func getLocalRepoCurrentCommitAndBranch(repoPath string) (string, string, error) {
-
 	// Get commit hash
 	var commitOut bytes.Buffer
 	commitCmd := exec.Command("git", "-C", repoPath, "rev-parse", "HEAD")
