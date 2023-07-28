@@ -55,11 +55,9 @@ func main() {
 			logrus.Warnf("failed to reconcile kubelet, error: %v", err)
 		}
 
-		logrus.SetOutput(colorable.NewColorableStdout())
+		setLogrus()
+
 		logserver.StartServerWithDefaults()
-		if os.Getenv("CATTLE_DEBUG") == "true" || os.Getenv("RANCHER_DEBUG") == "true" {
-			logrus.SetLevel(logrus.DebugLevel)
-		}
 
 		initFeatures()
 
@@ -484,4 +482,19 @@ func reconcileKubelet(ctx context.Context) (bool, error) {
 		}
 	}
 	return false, nil
+}
+
+func setLogrus() {
+	logrus.SetOutput(colorable.NewColorableStdout())
+
+	if os.Getenv("CATTLE_TRACE") == "true" || os.Getenv("RANCHER_TRACE") == "true" {
+		logrus.SetLevel(logrus.TraceLevel)
+		return
+	}
+
+	if os.Getenv("CATTLE_DEBUG") == "true" || os.Getenv("RANCHER_DEBUG") == "true" {
+		logrus.SetLevel(logrus.DebugLevel)
+	}
+
+	return
 }
