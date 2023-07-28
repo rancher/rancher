@@ -66,7 +66,7 @@ func CreateNginxDeployment(client *rancher.Client, clusterID string, psact strin
 			return false, err
 		}
 
-		if *deployment.Spec.Replicas == deployment.Status.AvailableReplicas && psact == rancherPrivileged {
+		if *deployment.Spec.Replicas == deployment.Status.AvailableReplicas && (psact == "" || psact == rancherPrivileged) {
 			logrus.Infof("Deployment %s successfully created; this is expected for %s!", deployment.Name, psact)
 			return true, nil
 		} else if *deployment.Spec.Replicas != deployment.Status.AvailableReplicas && psact == rancherRestricted {

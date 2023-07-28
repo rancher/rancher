@@ -1,6 +1,8 @@
 package machineprovisioning
 
 import (
+	"context"
+	"fmt"
 	"os"
 	"strings"
 	"sync/atomic"
@@ -15,7 +17,6 @@ import (
 	"github.com/rancher/rancher/tests/v2prov/nodeconfig"
 	"github.com/rancher/rancher/tests/v2prov/operations"
 	"github.com/rancher/rancher/tests/v2prov/wait"
-	"github.com/rancher/wrangler/pkg/data"
 	"github.com/stretchr/testify/assert"
 	errgroup2 "golang.org/x/sync/errgroup"
 	corev1 "k8s.io/api/core/v1"
@@ -225,18 +226,13 @@ func Test_Provisioning_MP_MachineSetDeletePolicyOldestSet(t *testing.T) {
 	}
 
 	for _, machineSet := range machineSets.Items {
-		d, err := data.Convert(machineSet)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		assert.Equal(t, string(capi.OldestMachineSetDeletePolicy), d.String("Object", "spec", "deletePolicy"))
+		assert.Equal(t, string(capi.OldestMachineSetDeletePolicy), machineSet.Spec.DeletePolicy)
 	}
 	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
 	assert.NoError(t, err)
 }
 
-func Test_Provisioning_MP_ThreeNodesAllRolesScaledToOneThenDelete(t *testing.T) {
+func Test_Provisioning_MP_MultipleEtcdNodesScaledDownThenDelete(t *testing.T) {
 	clients, err := clients.New()
 	if err != nil {
 		t.Fatal(err)
@@ -245,17 +241,43 @@ func Test_Provisioning_MP_ThreeNodesAllRolesScaledToOneThenDelete(t *testing.T) 
 
 	c, err := cluster.New(clients, &provisioningv1api.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "test-three-nodes-all-roles-with-delete",
+			Name: "etcd-scaled-down",
 		},
 		Spec: provisioningv1api.ClusterSpec{
 			KubernetesVersion: defaults.SomeK8sVersion,
 			RKEConfig: &provisioningv1api.RKEConfig{
-				MachinePools: []provisioningv1api.RKEMachinePool{{
-					EtcdRole:         true,
-					ControlPlaneRole: true,
-					WorkerRole:       true,
-					Quantity:         &defaults.Three,
-				}},
+				MachinePools: []provisioningv1api.RKEMachinePool{
+					{
+						EtcdRole:         true,
+						ControlPlaneRole: false,
+						WorkerRole:       false,
+						Quantity:         &defaults.Two,
+					},
+					{
+						EtcdRole:         false,
+						ControlPlaneRole: true,
+						WorkerRole:       true,
+						Quantity:         &defaults.One,
+					}},
+			},
+			ClusterAgentDeploymentCustomization: &provisioningv1api.AgentDeploymentCustomization{
+				OverrideAffinity: &corev1.Affinity{
+					NodeAffinity: &corev1.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+							NodeSelectorTerms: []corev1.NodeSelectorTerm{
+								{
+									MatchExpressions: []corev1.NodeSelectorRequirement{
+										{
+											Key:      "node-role.kubernetes.io/control-plane",
+											Operator: corev1.NodeSelectorOpIn,
+											Values:   []string{"true"},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
 			},
 		},
 	})
@@ -268,13 +290,40 @@ func Test_Provisioning_MP_ThreeNodesAllRolesScaledToOneThenDelete(t *testing.T) 
 		t.Fatal(err)
 	}
 
-	c, err = operations.Scale(clients, c, 0, 2, true)
-	assert.NoError(t, err)
+	kc, err := operations.GetAndVerifyDownstreamClientset(clients, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// wait for all nodes to be ready
+	err = retry.OnError(defaults.DownstreamRetry, func(error) bool { return true }, func() error {
+		nodes, err := kc.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
+		if err != nil {
+			return err
+		}
+		if len(nodes.Items) != 3 {
+			return fmt.Errorf("nodes did not match 3: actual: %d", len(nodes.Items))
+		}
+		for _, n := range nodes.Items {
+			if !capr.Ready.IsTrue(n) {
+				return fmt.Errorf("node %s was not ready", n.Name)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	c, err = operations.Scale(clients, c, 0, 1, true)
-	assert.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	_, err = operations.GetAndVerifyDownstreamClientset(clients, c)
-	assert.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Delete the cluster and wait for cleanup.
 	err = clients.Provisioning.Cluster().Delete(c.Namespace, c.Name, &metav1.DeleteOptions{})

@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
@@ -83,16 +82,10 @@ func (g *ghProvider) getGithubConfigCR() (*v32.GithubConfig, error) {
 	storedGithubConfigMap := u.UnstructuredContent()
 
 	storedGithubConfig := &v32.GithubConfig{}
-	mapstructure.Decode(storedGithubConfigMap, storedGithubConfig)
-
-	metadataMap, ok := storedGithubConfigMap["metadata"].(map[string]interface{})
-	if !ok {
-		return nil, fmt.Errorf("failed to retrieve GithubConfig metadata, cannot read k8s Unstructured data")
+	err = common.Decode(storedGithubConfigMap, storedGithubConfig)
+	if err != nil {
+		return nil, fmt.Errorf("unable to decode Github Config: %w", err)
 	}
-
-	typemeta := &metav1.ObjectMeta{}
-	mapstructure.Decode(metadataMap, typemeta)
-	storedGithubConfig.ObjectMeta = *typemeta
 
 	if storedGithubConfig.ClientSecret != "" {
 		data, err := common.ReadFromSecretData(g.secrets, storedGithubConfig.ClientSecret)

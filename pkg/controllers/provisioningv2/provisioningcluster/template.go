@@ -353,8 +353,8 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 		}
 
 		machineSpecAnnotations := map[string]string{}
-		// Ignore drain if DrainBeforeDelete is unset or the pool is for etcd nodes
-		if !machinePool.DrainBeforeDelete || machinePool.EtcdRole {
+		// Ignore drain if DrainBeforeDelete is unset
+		if !machinePool.DrainBeforeDelete {
 			machineSpecAnnotations[capi.ExcludeNodeDrainingAnnotation] = "true"
 		}
 

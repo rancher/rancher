@@ -23,6 +23,7 @@ var (
 )
 
 // +genclient
+// +kubebuilder:skipversion
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type Project struct {
@@ -75,6 +76,7 @@ func (p *ProjectSpec) ObjClusterName() string {
 }
 
 // +genclient
+// +kubebuilder:skipversion
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -90,6 +92,7 @@ type GlobalRole struct {
 }
 
 // +genclient
+// +kubebuilder:skipversion
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -104,27 +107,79 @@ type GlobalRoleBinding struct {
 
 // +genclient
 // +genclient:nonNamespaced
+// +kubebuilder:resource:scope=Cluster
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// RoleTemplate holds configuration for a template that is used to create kubernetes Roles and ClusterRoles
+// (in the rbac.authorization.k8s.io group) for a cluster or project.
 type RoleTemplate struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	DisplayName           string              `json:"displayName,omitempty" norman:"required"`
-	Description           string              `json:"description"`
-	Rules                 []rbacv1.PolicyRule `json:"rules,omitempty"`
-	Builtin               bool                `json:"builtin" norman:"nocreate,noupdate"`
-	External              bool                `json:"external"`
-	Hidden                bool                `json:"hidden"`
-	Locked                bool                `json:"locked,omitempty" norman:"type=boolean"`
-	ClusterCreatorDefault bool                `json:"clusterCreatorDefault,omitempty" norman:"required"`
-	ProjectCreatorDefault bool                `json:"projectCreatorDefault,omitempty" norman:"required"`
-	Context               string              `json:"context" norman:"type=string,options=project|cluster"`
-	RoleTemplateNames     []string            `json:"roleTemplateNames,omitempty" norman:"type=array[reference[roleTemplate]]"`
-	Administrative        bool                `json:"administrative,omitempty"`
+	// DisplayName is the human-readable name displayed in the UI for this resource.
+	DisplayName string `json:"displayName,omitempty" norman:"required"`
+
+	// Description holds text that describes the resource.
+	// +optional
+	Description string `json:"description"`
+
+	// Rules hold all the PolicyRules for this RoleTemplate.
+	// +optional
+	Rules []rbacv1.PolicyRule `json:"rules,omitempty"`
+
+	// Builtin if true specifies that this RoleTemplate was created by Rancher and is immutable.
+	// Default to false.
+	// +optional
+	Builtin bool `json:"builtin" norman:"nocreate,noupdate"`
+
+	// External if true specifies that rules for this RoleTemplate should be gathered from a ClusterRole with the matching name.
+	// If set to true the Rules on the template will not be evaluated.
+	// External's value is only evaluated if the RoleTemplate's context is set to "cluster"
+	// Default to false.
+	// +optional
+	External bool `json:"external"`
+
+	// Hidden if true informs the Rancher UI not to display this RoleTemplate.
+	// Default to false.
+	// +optional
+	Hidden bool `json:"hidden"`
+
+	// Locked if true, new bindings will not be able to use this RoleTemplate.
+	// Default to false.
+	// +optional
+	Locked bool `json:"locked,omitempty" norman:"type=boolean"`
+
+	// ClusterCreatorDefault if true, a binding with this RoleTemplate will be created for a users when they create a new cluster.
+	// ClusterCreatorDefault is only evaluated if the context of the RoleTemplate is set to cluster.
+	// Default to false.
+	// +optional
+	ClusterCreatorDefault bool `json:"clusterCreatorDefault,omitempty" norman:"required"`
+
+	// ProjectCreatorDefault if true, a binding with this RoleTemplate will be created for a user when they create a new project.
+	// ProjectCreatorDefault is only evaluated if the context of the RoleTemplate is set to project.
+	// Default to false.
+	// +optional
+	ProjectCreatorDefault bool `json:"projectCreatorDefault,omitempty" norman:"required"`
+
+	// Context describes if the roleTemplate applies to clusters or projects.
+	// Valid values are "project", "cluster" or "".
+	// +kubebuilder:validation:Enum={"project","cluster",""}
+	Context string `json:"context,omitempty" norman:"type=string,options=project|cluster"`
+
+	// RoleTemplateNames list of RoleTemplate names that this RoleTemplate will inherit.
+	// This RoleTemplate will grant all rules defined in an inherited RoleTemplate.
+	// Inherited RoleTemplates must already exist.
+	// +optional
+	RoleTemplateNames []string `json:"roleTemplateNames,omitempty" norman:"type=array[reference[roleTemplate]]"`
+
+	// Administrative if false, and context is set to cluster this RoleTemplate will not grant access to "CatalogTemplates" and "CatalogTemplateVersions" for any project in the cluster.
+	// Default is false.
+	// +optional
+	Administrative bool `json:"administrative,omitempty"`
 }
 
 // +genclient
+// +kubebuilder:skipversion
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -137,6 +192,7 @@ type PodSecurityPolicyTemplate struct {
 }
 
 // +genclient
+// +kubebuilder:skipversion
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type PodSecurityPolicyTemplateProjectBinding struct {
@@ -149,20 +205,43 @@ type PodSecurityPolicyTemplateProjectBinding struct {
 }
 
 // +genclient
+// +kubebuilder:skipversion
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// ProjectRoleTemplateBinding is the object representing membership of a subject in a project with permissions
+// specified by a given role template.
 type ProjectRoleTemplateBinding struct {
-	types.Namespaced
+	types.Namespaced  `json:",inline"`
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	UserName           string `json:"userName,omitempty" norman:"noupdate,type=reference[user]"`
-	UserPrincipalName  string `json:"userPrincipalName,omitempty" norman:"noupdate,type=reference[principal]"`
-	GroupName          string `json:"groupName,omitempty" norman:"noupdate,type=reference[group]"`
+	// UserName is the name of the user subject added to the project. Immutable.
+	// +optional
+	UserName string `json:"userName,omitempty" norman:"noupdate,type=reference[user]"`
+
+	// UserPrincipalName is the name of the user principal subject added to the project. Immutable.
+	// +optional
+	UserPrincipalName string `json:"userPrincipalName,omitempty" norman:"noupdate,type=reference[principal]"`
+
+	// GroupName is the name of the group subject added to the project. Immutable.
+	// +optional
+	GroupName string `json:"groupName,omitempty" norman:"noupdate,type=reference[group]"`
+
+	// GroupPrincipalName is the name of the group principal subject added to the project. Immutable.
+	// +optional
 	GroupPrincipalName string `json:"groupPrincipalName,omitempty" norman:"noupdate,type=reference[principal]"`
-	ProjectName        string `json:"projectName,omitempty" norman:"required,noupdate,type=reference[project]"`
-	RoleTemplateName   string `json:"roleTemplateName,omitempty" norman:"required,noupdate,type=reference[roleTemplate]"`
-	ServiceAccount     string `json:"serviceAccount,omitempty" norman:"nocreate,noupdate"`
+
+	// ProjectName is the name of the project to which a subject is added. Immutable.
+	// +kubebuilder:validation:Required
+	ProjectName string `json:"projectName,omitempty" norman:"required,noupdate,type=reference[project]"`
+
+	// RoleTemplateName is the name of the role template that defines permissions to perform actions on resources in the project. Immutable.
+	// +kubebuilder:validation:Required
+	RoleTemplateName string `json:"roleTemplateName,omitempty" norman:"required,noupdate,type=reference[roleTemplate]"`
+
+	// ServiceAccount is the name of the service account bound as a subject. Immutable.
+	// +optional
+	ServiceAccount string `json:"serviceAccount,omitempty" norman:"nocreate,noupdate"`
 }
 
 func (p *ProjectRoleTemplateBinding) ObjClusterName() string {
@@ -173,6 +252,7 @@ func (p *ProjectRoleTemplateBinding) ObjClusterName() string {
 }
 
 // +genclient
+// +kubebuilder:skipversion
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type ClusterRoleTemplateBinding struct {

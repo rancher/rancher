@@ -316,6 +316,7 @@ func (p *Planner) generateEtcdSnapshotRestorePlan(controlPlane *rkev1.RKEControl
 		"server",
 		"--cluster-reset",
 		"--etcd-arg=advertise-client-urls=https://127.0.0.1:2379", // this is a workaround for: https://github.com/rancher/rke2/issues/4052 and can likely remain indefinitely (unless IPv6-only becomes a requirement)
+		"--etcd-disable-snapshots=false",                          // this is a workaround for https://github.com/k3s-io/k3s/issues/8031
 	}
 
 	var env []string
@@ -601,14 +602,17 @@ func (p *Planner) runEtcdRestoreInitNodeElection(controlPlane *rkev1.RKEControlP
 			return "", fmt.Errorf("unable to designate machine as label %s on snapshot %s/%s did not exist", capr.MachineIDLabel, snapshot.Namespace, snapshot.Name)
 		}
 		logrus.Infof("[planner] rkecluster %s/%s: electing init node for S3 snapshot %s/%s restoration", controlPlane.Namespace, controlPlane.Name, snapshot.Namespace, snapshot.Name)
-		return p.electInitNode(controlPlane, clusterPlan)
+		return p.electInitNode(controlPlane, clusterPlan, true)
 	}
 	// make sure that we only have one suitable init node, and elect it.
-	if len(collect(clusterPlan, canBeInitNode)) != 1 {
+	count := len(collect(clusterPlan, canBeInitNode))
+	if count == 0 {
+		return "", fmt.Errorf("no init node existed and no corresponding etcd snapshot CR found, no assumption can be made for the machine that contains the snapshot")
+	} else if count > 1 {
 		return "", fmt.Errorf("more than one init node existed and no corresponding etcd snapshot CR found, no assumption can be made for the machine that contains the snapshot")
 	}
 	logrus.Infof("[planner] rkecluster %s/%s: electing init node for local snapshot with no associated CR", controlPlane.Namespace, controlPlane.Name)
-	return p.electInitNode(controlPlane, clusterPlan)
+	return p.electInitNode(controlPlane, clusterPlan, true)
 }
 
 // runEtcdRestoreServiceStop generates service stop plans for every non-windows node in the cluster and
@@ -639,6 +643,8 @@ func (p *Planner) runEtcdRestoreServiceStop(controlPlane *rkev1.RKEControlPlane,
 		if err != nil {
 			return err
 		}
+		// Clean up previous restoration tracking attempts before starting this restoration.
+		stopPlan.Instructions = append(stopPlan.Instructions, generateIdempotencyCleanupInstruction("etcd-restore"))
 		if isEtcd(server) {
 			stopPlan.Instructions = append(stopPlan.Instructions, generateCreateEtcdTombstoneInstruction(controlPlane))
 		}

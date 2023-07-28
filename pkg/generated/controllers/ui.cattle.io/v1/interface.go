@@ -21,6 +21,7 @@ package v1
 import (
 	"github.com/rancher/lasso/pkg/controller"
 	v1 "github.com/rancher/rancher/pkg/apis/ui.cattle.io/v1"
+	"github.com/rancher/wrangler/pkg/generic"
 	"github.com/rancher/wrangler/pkg/schemes"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -43,6 +44,6 @@ type version struct {
 	controllerFactory controller.SharedControllerFactory
 }
 
-func (c *version) NavLink() NavLinkController {
-	return NewNavLinkController(schema.GroupVersionKind{Group: "ui.cattle.io", Version: "v1", Kind: "NavLink"}, "navlinks", true, c.controllerFactory)
+func (v *version) NavLink() NavLinkController {
+	return generic.NewController[*v1.NavLink, *v1.NavLinkList](schema.GroupVersionKind{Group: "ui.cattle.io", Version: "v1", Kind: "NavLink"}, "navlinks", true, v.controllerFactory)
 }

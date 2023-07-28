@@ -903,12 +903,12 @@ func (m *manager) checkReferencedRoles(roleTemplateName, roleTemplateContext str
 	return isOwnerRole, nil
 }
 
-func getLabelRequirements(bindingNamespace, bindingName string) ([]labels.Requirement, error) {
+func getLabelRequirements(objMeta metav1.ObjectMeta) ([]labels.Requirement, error) {
 	reqUpdatedLabel, err := labels.NewRequirement(rtbLabelUpdated, selection.DoesNotExist, []string{})
 	if err != nil {
 		return []labels.Requirement{}, err
 	}
-	reqNsAndNameLabel, err := labels.NewRequirement(bindingNamespace+"_"+bindingName, selection.DoesNotExist, []string{})
+	reqNsAndNameLabel, err := labels.NewRequirement(pkgrbac.GetRTBLabel(objMeta), selection.DoesNotExist, []string{})
 	if err != nil {
 		return []labels.Requirement{}, err
 	}

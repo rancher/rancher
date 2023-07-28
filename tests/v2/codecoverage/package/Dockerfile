@@ -1,4 +1,4 @@
-FROM registry.suse.com/bci/bci-base:15.4
+FROM registry.suse.com/bci/bci-base:15.5
 
 RUN zypper -n install --no-recommends git-core curl ca-certificates unzip xz gzip sed tar shadow gawk vim-small netcat-openbsd mkisofs && \
     zypper -n clean -a && rm -rf /tmp/* /var/tmp/* /usr/share/doc/packages/* && \
@@ -35,7 +35,7 @@ ENV CATTLE_ETCD_VERSION v3.5.1
 ENV LOGLEVEL_VERSION v0.1.5
 ENV TINI_VERSION v0.18.0
 ENV TELEMETRY_VERSION v0.5.20
-ENV DOCKER_MACHINE_LINODE_VERSION v0.1.8
+ENV DOCKER_MACHINE_LINODE_VERSION v0.1.11
 ENV LINODE_UI_DRIVER_VERSION v0.5.0
 # make sure the version number is consistent with the one at Line 100 of pkg/data/management/machinedriver_data.go
 ENV DOCKER_MACHINE_HARVESTER_VERSION v0.6.3
@@ -58,7 +58,7 @@ ENV CATTLE_SYSTEM_UPGRADE_CONTROLLER_CHART_VERSION 102.1.0+up0.5.0
 ENV CATTLE_FLEET_MIN_VERSION=102.1.0+up0.7.0-rc.3
 # Deprecated in favor of CATTLE_RANCHER_WEBHOOK_VERSION.
 ENV CATTLE_RANCHER_WEBHOOK_MIN_VERSION=''
-ENV CATTLE_RANCHER_WEBHOOK_VERSION=2.0.5+up0.3.5-rc6
+ENV CATTLE_RANCHER_WEBHOOK_VERSION=2.0.6+up0.3.6-rc2
 ENV CATTLE_CSP_ADAPTER_MIN_VERSION=2.0.2+up2.0.2-rc2
 
 RUN mkdir -p /var/lib/rancher-data/local-catalogs/system-library && \

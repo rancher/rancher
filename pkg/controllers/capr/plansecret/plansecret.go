@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	v1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
@@ -72,9 +73,27 @@ func (h *handler) OnChange(key string, secret *corev1.Secret) (*corev1.Secret, e
 	failedChecksum := string(secret.Data["failed-checksum"])
 	plan := secret.Data["plan"]
 
+	secretChanged := false
+	secret = secret.DeepCopy()
+
 	if appliedChecksum == planner.PlanHash(plan) && !bytes.Equal(plan, secret.Data["appliedPlan"]) {
-		secret = secret.DeepCopy()
 		secret.Data["appliedPlan"] = plan
+		secretChanged = true
+	}
+
+	if len(secret.Data["probe-statuses"]) > 0 {
+		_, healthy, err := planner.ParseProbeStatuses(secret.Data["probe-statuses"])
+		if err != nil {
+			return nil, err
+		}
+		if healthy && secret.Annotations[capr.PlanProbesPassedAnnotation] == "" {
+			// a non-zero value for this annotation indicates the probes for this specific plan have passed at least once
+			secret.Annotations[capr.PlanProbesPassedAnnotation] = time.Now().UTC().Format(time.RFC3339)
+			secretChanged = true
+		}
+	}
+
+	if secretChanged {
 		// don't return the secret at this point, we want to attempt to update the machine status later on
 		secret, err = h.secrets.Update(secret)
 		if err != nil {

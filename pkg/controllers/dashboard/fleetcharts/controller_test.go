@@ -12,11 +12,10 @@ import (
 	"github.com/rancher/rancher/pkg/features"
 	fleetconst "github.com/rancher/rancher/pkg/fleet"
 	"github.com/rancher/rancher/pkg/settings"
-	corev1 "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
+	ctrlfake "github.com/rancher/wrangler/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 )
 
 var (
@@ -40,10 +39,6 @@ func Test_ChartInstallation(t *testing.T) {
 			Name: settings.ServerURL.Name,
 		},
 	}
-	h := &handler{
-		chartsConfig: chart.RancherConfigGetter{ConfigCache: &mockCache{}},
-	}
-
 	tests := []struct {
 		name       string
 		newManager func(*gomock.Controller) chart.Manager
@@ -147,6 +142,12 @@ func Test_ChartInstallation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
+			configCache := ctrlfake.NewMockCacheInterface[*v1.ConfigMap](ctrl)
+			configCache.EXPECT().Get(gomock.Any(), "pass").Return(&v1.ConfigMap{Data: map[string]string{"priorityClassName": priorityClassName}}, nil).AnyTimes()
+			configCache.EXPECT().Get(gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("not found")).AnyTimes()
+			h := &handler{
+				chartsConfig: chart.RancherConfigGetter{ConfigCache: configCache},
+			}
 			h.manager = tt.newManager(ctrl)
 			_, err := h.onSetting("", setting)
 			if tt.wantErr {
@@ -156,31 +157,4 @@ func Test_ChartInstallation(t *testing.T) {
 			assert.NoError(t, err, "unexpected error")
 		})
 	}
-}
-
-type mockCache struct {
-	Maps []*v1.ConfigMap
-}
-
-func (m *mockCache) Get(namespace string, name string) (*v1.ConfigMap, error) {
-	if name != "pass" {
-		return nil, errNotFound
-	}
-	return &v1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
-		},
-		Data: map[string]string{"priorityClassName": priorityClassName},
-	}, nil
-}
-
-func (m *mockCache) List(namespace string, selector labels.Selector) ([]*v1.ConfigMap, error) {
-	return nil, errUnimplemented
-}
-
-func (m *mockCache) AddIndexer(indexName string, indexer corev1.ConfigMapIndexer) {}
-
-func (m *mockCache) GetByIndex(indexName, key string) ([]*v1.ConfigMap, error) {
-	return nil, errUnimplemented
 }

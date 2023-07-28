@@ -389,7 +389,7 @@ func (p *prtbLifecycle) reconcilePRTBUserClusterLabels(binding *v3.ProjectRoleTe
 	if err != nil {
 		return err
 	}
-	reqNsAndNameLabel, err := labels.NewRequirement(binding.Namespace+"_"+binding.Name, selection.DoesNotExist, []string{})
+	reqNsAndNameLabel, err := labels.NewRequirement(pkgrbac.GetRTBLabel(binding.ObjectMeta), selection.DoesNotExist, []string{})
 	if err != nil {
 		return err
 	}

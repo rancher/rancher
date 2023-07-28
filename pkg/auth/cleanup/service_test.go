@@ -9,20 +9,19 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/mock/gomock"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
-	controllers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/rancher/pkg/generated/norman/core/v1/fakes"
+	"github.com/rancher/wrangler/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	apitypes "k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/watch"
 )
 
 func TestRunCleanup(t *testing.T) {
@@ -107,7 +106,7 @@ func TestRunCleanup(t *testing.T) {
 		},
 	}
 
-	svc := newMockCleanupService(
+	svc := newMockCleanupService(t,
 		globalRoleBindingStore,
 		projectRoleTemplateBindingStore,
 		clusterRoleTemplateBindingStore,
@@ -138,254 +137,97 @@ func TestRunCleanup(t *testing.T) {
 	}
 }
 
-func newMockCleanupService(
+func newMockCleanupService(t *testing.T,
 	grbStore map[string]*v3.GlobalRoleBinding,
 	prtbStore map[string]*v3.ProjectRoleTemplateBinding,
 	crtbStore map[string]*v3.ClusterRoleTemplateBinding,
 	userStore map[string]*v3.User,
 	secretStore map[string]*v1.Secret) Service {
+	t.Helper()
+	ctrl := gomock.NewController(t)
+	grbCache := fake.NewMockNonNamespacedCacheInterface[*v3.GlobalRoleBinding](ctrl)
+	grbCache.EXPECT().List(gomock.Any()).DoAndReturn(func(_ labels.Selector) ([]*v3.GlobalRoleBinding, error) {
+		var lst []*v3.GlobalRoleBinding
+		for _, v := range grbStore {
+			lst = append(lst, v)
+		}
+		return lst, nil
+	}).AnyTimes()
+	grbCache.EXPECT().Get(gomock.Any()).DoAndReturn(func(name string) (*v3.GlobalRoleBinding, error) {
+		return grbStore[name], nil
+	}).AnyTimes()
+	grbClient := fake.NewMockNonNamespacedClientInterface[*v3.GlobalRoleBinding, *v3.GlobalRoleBindingList](ctrl)
+	grbClient.EXPECT().Delete(gomock.Any(), gomock.Any()).DoAndReturn(func(name string, _ *metav1.DeleteOptions) error {
+		delete(grbStore, name)
+		return nil
+	}).AnyTimes()
+
+	prtbCache := fake.NewMockCacheInterface[*v3.ProjectRoleTemplateBinding](ctrl)
+	prtbCache.EXPECT().List(gomock.Any(), gomock.Any()).DoAndReturn(func(_ string, _ labels.Selector) ([]*v3.ProjectRoleTemplateBinding, error) {
+		var lst []*v3.ProjectRoleTemplateBinding
+		for _, v := range prtbStore {
+			lst = append(lst, v)
+		}
+		return lst, nil
+	}).AnyTimes()
+	prtbCache.EXPECT().Get(gomock.Any(), gomock.Any()).DoAndReturn(func(namespace, name string) (*v3.ProjectRoleTemplateBinding, error) {
+		return prtbStore[namespace+":"+name], nil
+	}).AnyTimes()
+	prtbClient := fake.NewMockClientInterface[*v3.ProjectRoleTemplateBinding, *v3.ProjectRoleTemplateBindingList](ctrl)
+	prtbClient.EXPECT().Delete(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(namespace, name string, _ *metav1.DeleteOptions) error {
+		delete(prtbStore, namespace+":"+name)
+		return nil
+	}).AnyTimes()
+
+	crtbCache := fake.NewMockCacheInterface[*v3.ClusterRoleTemplateBinding](ctrl)
+	crtbCache.EXPECT().List(gomock.Any(), gomock.Any()).DoAndReturn(func(_ string, _ labels.Selector) ([]*v3.ClusterRoleTemplateBinding, error) {
+		var lst []*v3.ClusterRoleTemplateBinding
+		for _, v := range crtbStore {
+			lst = append(lst, v)
+		}
+		return lst, nil
+	}).AnyTimes()
+	crtbCache.EXPECT().Get(gomock.Any(), gomock.Any()).DoAndReturn(func(namespace, name string) (*v3.ClusterRoleTemplateBinding, error) {
+		return crtbStore[namespace+":"+name], nil
+	}).AnyTimes()
+	crtbClient := fake.NewMockClientInterface[*v3.ClusterRoleTemplateBinding, *v3.ClusterRoleTemplateBindingList](ctrl)
+	crtbClient.EXPECT().Delete(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(namespace, name string, _ *metav1.DeleteOptions) error {
+		delete(crtbStore, namespace+":"+name)
+		return nil
+	}).AnyTimes()
+
+	userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+	userCache.EXPECT().List(gomock.Any()).DoAndReturn(func(_ labels.Selector) ([]*v3.User, error) {
+		var lst []*v3.User
+		for _, v := range userStore {
+			lst = append(lst, v)
+		}
+		return lst, nil
+	}).AnyTimes()
+	userCache.EXPECT().Get(gomock.Any()).DoAndReturn(func(name string) (*v3.User, error) {
+		return userStore[name], nil
+	}).AnyTimes()
+	userClient := fake.NewMockNonNamespacedClientInterface[*v3.User, *v3.UserList](ctrl)
+	userClient.EXPECT().Delete(gomock.Any(), gomock.Any()).DoAndReturn(func(name string, _ *metav1.DeleteOptions) error {
+		delete(userStore, name)
+		return nil
+	}).AnyTimes()
+	userClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(user *v3.User) (*v3.User, error) {
+		userStore[user.Name] = user
+		return user, nil
+	})
+
 	return Service{
 		secretsInterface:                  getSecretInterfaceMock(secretStore),
-		globalRoleBindingsCache:           mockGlobalRoleBindingCache{grbStore},
-		globalRoleBindingsClient:          mockGlobalRoleBindingClient{grbStore},
-		projectRoleTemplateBindingsCache:  mockProjectRoleTemplateBindingCache{prtbStore},
-		projectRoleTemplateBindingsClient: mockProjectRoleTemplateBindingClient{prtbStore},
-		clusterRoleTemplateBindingsCache:  mockClusterRoleTemplateBindingCache{crtbStore},
-		clusterRoleTemplateBindingsClient: mockClusterRoleTemplateBindingClient{crtbStore},
-		userCache:                         mockUserCache{userStore},
-		userClient:                        mockUserClient{userStore},
+		globalRoleBindingsCache:           grbCache,
+		globalRoleBindingsClient:          grbClient,
+		projectRoleTemplateBindingsCache:  prtbCache,
+		projectRoleTemplateBindingsClient: prtbClient,
+		clusterRoleTemplateBindingsCache:  crtbCache,
+		clusterRoleTemplateBindingsClient: crtbClient,
+		userCache:                         userCache,
+		userClient:                        userClient,
 	}
-}
-
-type mockGlobalRoleBindingCache struct {
-	store map[string]*v3.GlobalRoleBinding
-}
-
-func (m mockGlobalRoleBindingCache) Get(name string) (*v3.GlobalRoleBinding, error) {
-	return m.store[name], nil
-}
-
-func (m mockGlobalRoleBindingCache) List(_ labels.Selector) ([]*v3.GlobalRoleBinding, error) {
-	var lst []*v3.GlobalRoleBinding
-	for _, v := range m.store {
-		lst = append(lst, v)
-	}
-	return lst, nil
-}
-
-func (m mockGlobalRoleBindingCache) AddIndexer(_ string, _ controllers.GlobalRoleBindingIndexer) {
-	panic("not implemented")
-}
-
-func (m mockGlobalRoleBindingCache) GetByIndex(_, _ string) ([]*v3.GlobalRoleBinding, error) {
-	panic("not implemented")
-}
-
-type mockGlobalRoleBindingClient struct {
-	store map[string]*v3.GlobalRoleBinding
-}
-
-func (m mockGlobalRoleBindingClient) Create(_ *v3.GlobalRoleBinding) (*v3.GlobalRoleBinding, error) {
-	panic("not implemented")
-}
-
-func (m mockGlobalRoleBindingClient) Update(_ *v3.GlobalRoleBinding) (*v3.GlobalRoleBinding, error) {
-	panic("not implemented")
-}
-
-func (m mockGlobalRoleBindingClient) Delete(name string, _ *metav1.DeleteOptions) error {
-	delete(m.store, name)
-	return nil
-}
-
-func (m mockGlobalRoleBindingClient) Get(_ string, _ metav1.GetOptions) (*v3.GlobalRoleBinding, error) {
-	panic("not implemented")
-}
-
-func (m mockGlobalRoleBindingClient) List(_ metav1.ListOptions) (*v3.GlobalRoleBindingList, error) {
-	panic("not implemented")
-}
-
-func (m mockGlobalRoleBindingClient) Watch(_ metav1.ListOptions) (watch.Interface, error) {
-	panic("not implemented")
-}
-
-func (m mockGlobalRoleBindingClient) Patch(_ string, _ apitypes.PatchType, _ []byte, _ ...string) (result *v3.GlobalRoleBinding, err error) {
-	panic("not implemented")
-}
-
-type mockProjectRoleTemplateBindingCache struct {
-	store map[string]*v3.ProjectRoleTemplateBinding
-}
-
-func (m mockProjectRoleTemplateBindingCache) Get(namespace, name string) (*v3.ProjectRoleTemplateBinding, error) {
-	return m.store[namespace+":"+name], nil
-}
-
-func (m mockProjectRoleTemplateBindingCache) List(_ string, _ labels.Selector) ([]*v3.ProjectRoleTemplateBinding, error) {
-	var lst []*v3.ProjectRoleTemplateBinding
-	for _, v := range m.store {
-		lst = append(lst, v)
-	}
-	return lst, nil
-}
-
-func (m mockProjectRoleTemplateBindingCache) AddIndexer(_ string, _ controllers.ProjectRoleTemplateBindingIndexer) {
-	panic("not implemented")
-}
-
-func (m mockProjectRoleTemplateBindingCache) GetByIndex(_, _ string) ([]*v3.ProjectRoleTemplateBinding, error) {
-	panic("not implemented")
-}
-
-type mockProjectRoleTemplateBindingClient struct {
-	store map[string]*v3.ProjectRoleTemplateBinding
-}
-
-func (m mockProjectRoleTemplateBindingClient) Create(_ *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error) {
-	panic("not implemented")
-}
-
-func (m mockProjectRoleTemplateBindingClient) Update(_ *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error) {
-	panic("not implemented")
-}
-
-func (m mockProjectRoleTemplateBindingClient) Delete(namespace, name string, _ *metav1.DeleteOptions) error {
-	delete(m.store, namespace+":"+name)
-	return nil
-}
-
-func (m mockProjectRoleTemplateBindingClient) Get(namespace, name string, _ metav1.GetOptions) (*v3.ProjectRoleTemplateBinding, error) {
-	return m.store[namespace+":"+name], nil
-}
-
-func (m mockProjectRoleTemplateBindingClient) List(_ string, _ metav1.ListOptions) (*v3.ProjectRoleTemplateBindingList, error) {
-	panic("not implemented")
-}
-
-func (m mockProjectRoleTemplateBindingClient) Watch(_ string, _ metav1.ListOptions) (watch.Interface, error) {
-	panic("not implemented")
-}
-
-func (m mockProjectRoleTemplateBindingClient) Patch(_, _ string, _ apitypes.PatchType, _ []byte, _ ...string) (result *v3.ProjectRoleTemplateBinding, err error) {
-	panic("not implemented")
-}
-
-type mockClusterRoleTemplateBindingCache struct {
-	store map[string]*v3.ClusterRoleTemplateBinding
-}
-
-func (m mockClusterRoleTemplateBindingCache) Get(namespace, name string) (*v3.ClusterRoleTemplateBinding, error) {
-	return m.store[namespace+":"+name], nil
-}
-
-func (m mockClusterRoleTemplateBindingCache) List(_ string, _ labels.Selector) ([]*v3.ClusterRoleTemplateBinding, error) {
-	var lst []*v3.ClusterRoleTemplateBinding
-	for _, v := range m.store {
-		lst = append(lst, v)
-	}
-	return lst, nil
-}
-
-func (m mockClusterRoleTemplateBindingCache) AddIndexer(_ string, _ controllers.ClusterRoleTemplateBindingIndexer) {
-	panic("not implemented")
-}
-
-func (m mockClusterRoleTemplateBindingCache) GetByIndex(_, _ string) ([]*v3.ClusterRoleTemplateBinding, error) {
-	panic("not implemented")
-}
-
-type mockClusterRoleTemplateBindingClient struct {
-	store map[string]*v3.ClusterRoleTemplateBinding
-}
-
-func (m mockClusterRoleTemplateBindingClient) Create(_ *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
-	panic("not implemented")
-}
-
-func (m mockClusterRoleTemplateBindingClient) Update(_ *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
-	panic("not implemented")
-}
-
-func (m mockClusterRoleTemplateBindingClient) Delete(namespace, name string, _ *metav1.DeleteOptions) error {
-	delete(m.store, namespace+":"+name)
-	return nil
-}
-
-func (m mockClusterRoleTemplateBindingClient) Get(_, _ string, _ metav1.GetOptions) (*v3.ClusterRoleTemplateBinding, error) {
-	panic("not implemented")
-}
-
-func (m mockClusterRoleTemplateBindingClient) List(_ string, _ metav1.ListOptions) (*v3.ClusterRoleTemplateBindingList, error) {
-	panic("not implemented")
-}
-
-func (m mockClusterRoleTemplateBindingClient) Watch(_ string, _ metav1.ListOptions) (watch.Interface, error) {
-	panic("not implemented")
-}
-
-func (m mockClusterRoleTemplateBindingClient) Patch(_, _ string, _ apitypes.PatchType, _ []byte, _ ...string) (result *v3.ClusterRoleTemplateBinding, err error) {
-	panic("not implemented")
-}
-
-type mockUserCache struct {
-	store map[string]*v3.User
-}
-
-func (m mockUserCache) Get(name string) (*v3.User, error) {
-	return m.store[name], nil
-}
-
-func (m mockUserCache) List(_ labels.Selector) ([]*v3.User, error) {
-	var lst []*v3.User
-	for _, v := range m.store {
-		lst = append(lst, v)
-	}
-	return lst, nil
-}
-
-func (m mockUserCache) AddIndexer(_ string, _ controllers.UserIndexer) {}
-
-func (m mockUserCache) GetByIndex(_, _ string) ([]*v3.User, error) {
-	panic("not implemented")
-}
-
-type mockUserClient struct {
-	store map[string]*v3.User
-}
-
-func (m mockUserClient) Create(_ *v3.User) (*v3.User, error) {
-	panic("not implemented")
-}
-
-func (m mockUserClient) Update(user *v3.User) (*v3.User, error) {
-	m.store[user.Name] = user
-	return user, nil
-}
-
-func (m mockUserClient) UpdateStatus(_ *v3.User) (*v3.User, error) {
-	panic("not implemented")
-}
-
-func (m mockUserClient) Delete(name string, _ *metav1.DeleteOptions) error {
-	delete(m.store, name)
-	return nil
-}
-
-func (m mockUserClient) Get(_ string, _ metav1.GetOptions) (*v3.User, error) {
-	panic("not implemented")
-}
-
-func (m mockUserClient) List(_ metav1.ListOptions) (*v3.UserList, error) {
-	panic("not implemented")
-}
-
-func (m mockUserClient) Watch(_ metav1.ListOptions) (watch.Interface, error) {
-	panic("not implemented")
-}
-
-func (m mockUserClient) Patch(_ string, _ apitypes.PatchType, _ []byte, _ ...string) (result *v3.User, err error) {
-	panic("not implemented")
 }
 
 func getSecretInterfaceMock(store map[string]*corev1.Secret) v1.SecretInterface {

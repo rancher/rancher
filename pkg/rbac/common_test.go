@@ -3,6 +3,7 @@ package rbac
 import (
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/rancher/norman/types"
@@ -187,5 +188,73 @@ func Test_RuleGivesResourceAccess(t *testing.T) {
 		if tcase.expected != givesAccess {
 			t.Errorf("got %t, expected %t, for rule %v resource %v", givesAccess, tcase.expected, tcase.rule, tcase.resourceName)
 		}
+	}
+}
+
+func TestGetRTBLabel(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name     string
+		metadata metav1.ObjectMeta
+		output   string
+	}{
+		{
+			name: "empty strings for name and namespace",
+			metadata: metav1.ObjectMeta{
+				Name:      "",
+				Namespace: "",
+			},
+			output: "_",
+		},
+		{
+			name: "short name and namespace",
+			metadata: metav1.ObjectMeta{
+				Name:      "foo",
+				Namespace: "default",
+			},
+			output: "default_foo",
+		},
+		{
+			name: "longer name with whole string being shorter than 63 characters",
+			metadata: metav1.ObjectMeta{
+				Name:      strings.Repeat("rottweiler", 5),
+				Namespace: "default",
+			},
+			output: "default_rottweilerrottweilerrottweilerrottweilerrottweiler",
+		},
+		{
+			name: "longer name with whole string being longer than 63 characters",
+			metadata: metav1.ObjectMeta{
+				Name:      strings.Repeat("rottweiler", 10),
+				Namespace: "default",
+			},
+			output: "default_rottweilerrottweilerrottweilerrottweilerrottweile-c4636",
+		},
+		{
+			name: "longer namespace with whole string being shorter than 63 characters",
+			metadata: metav1.ObjectMeta{
+				Name:      "rottweiler",
+				Namespace: strings.Repeat("default", 5),
+			},
+			output: "defaultdefaultdefaultdefaultdefault_rottweiler",
+		},
+		{
+			name: "longer namespace with whole string being longer than 63 characters",
+			metadata: metav1.ObjectMeta{
+				Name:      "rottweiler",
+				Namespace: strings.Repeat("default", 8),
+			},
+			output: "defaultdefaultdefaultdefaultdefaultdefaultdefaultdefault-829c4a",
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			if got := GetRTBLabel(test.metadata); got != test.output {
+				t.Errorf("expected %s, but got %s", test.output, got)
+			}
+		})
 	}
 }

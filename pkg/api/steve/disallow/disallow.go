@@ -12,6 +12,8 @@ import (
 var (
 	allowAll = map[string]bool{
 		"podsecurityadmissionconfigurationtemplates": true,
+		"projectroletemplatebindings":                true,
+		"clusterroletemplatebindings":                true,
 	}
 	allowPost = map[string]bool{
 		"settings": true,
