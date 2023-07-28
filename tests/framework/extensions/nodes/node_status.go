@@ -81,7 +81,7 @@ func IsRKE1EtcdNodeReplaced(client *rancher.Client, etcdNodeToDelete management.
 	return numOfEtcdNodesBeforeDeletion == numOfEtcdNodesAfterDeletion, err
 }
 
-func IsRKE2K3SNodeReplaced(client *rancher.Client, query url.Values, clusterName string, nodeLabel string, nodeToDelete v1.SteveAPIObject, numNodesBeforeDeletion int) (bool, error) {
+func IsRKE2K3SNodeReplaced(client *rancher.Client, query url.Values, clusterName, nodeLabel string, nodeToDelete v1.SteveAPIObject, numNodesBeforeDeletion int) (bool, error) {
 	numNodesAfterDeletion := 0
 	err := wait.Poll(PollInterval, PollTimeout, func() (done bool, err error) {
 		machines, err := client.Steve.SteveType(machineSteveResourceType).List(query)
@@ -92,7 +92,7 @@ func IsRKE2K3SNodeReplaced(client *rancher.Client, query url.Values, clusterName
 		numNodesAfterDeletion = 0
 		for _, machine := range machines.Data {
 			if machine.Labels[nodeLabel] == "true" && machine.Labels[clusterLabel] == clusterName {
-				logrus.Info(machine.Name)
+				logrus.Info(fmt.Sprintf("%s: %s", nodeLabel, machine.Name))
 				if machine.Name == nodeToDelete.Name {
 					return false, nil
 				}

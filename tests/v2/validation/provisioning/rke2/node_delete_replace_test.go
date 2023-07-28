@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
 	nodestat "github.com/rancher/rancher/tests/framework/extensions/nodes"
+	psadeploy "github.com/rancher/rancher/tests/framework/extensions/psact"
 	"github.com/rancher/rancher/tests/framework/extensions/workloads/pods"
 	"github.com/rancher/rancher/tests/framework/pkg/config"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
@@ -105,26 +106,40 @@ func (e *NodeDeleteAndReplace) TestNodeDeletionAndReplacement() {
 						}
 					}
 					previousNodeName = nodeToDelete.Name
-					logrus.Info(fmt.Sprintf("Deleting a %s node: %s ...", nodeLabel, nodeToDelete.Name))
+
+					logrus.Info(fmt.Sprintf("Deleting %s node: %s ...", nodeLabel, nodeToDelete.Name))
 					err = e.client.Steve.SteveType(machineSteveResourceType).Delete(&nodeToDelete)
 					require.NoError(e.T(), err)
 
-					clusterId, err := clusters.GetClusterIDByName(client, clusterResp.Name)
+					clusterID, err := clusters.GetClusterIDByName(client, clusterResp.Name)
 					require.NoError(e.T(), err)
 
-					err = clusters.WaitClusterToBeUpgraded(client, clusterId)
+					err = clusters.WaitClusterToBeUpgraded(client, clusterID)
 					require.NoError(e.T(), err)
 
-					err = nodestat.IsNodeReady(client, clusterId)
+					err = nodestat.IsNodeReady(client, clusterID)
 					require.NoError(e.T(), err)
 
 					isNodeReplaced, err := nodestat.IsRKE2K3SNodeReplaced(client, query, clusterResp.Name, nodeLabel, nodeToDelete, numNodesBeforeDeletions)
 					require.NoError(e.T(), err)
 					require.True(e.T(), isNodeReplaced)
 
-					podResults, podErrors := pods.StatusPods(client, clusterId)
+					if e.psact == string(provisioning.RancherPrivileged) || e.psact == string(provisioning.RancherRestricted) {
+						err = psadeploy.CheckPSACT(client, clusterResp.Name)
+						require.NoError(e.T(), err)
+
+						_, err = psadeploy.CreateNginxDeployment(client, clusterID, e.psact)
+						require.NoError(e.T(), err)
+					}
+
+					podResults, podErrors := pods.StatusPods(client, clusterID)
 					assert.NotEmpty(e.T(), podResults)
 					assert.Empty(e.T(), podErrors)
+
+					clusterToken, err := clusters.CheckServiceAccountTokenSecret(client, clusterResp.Name)
+					assert.NotEmpty(e.T(), clusterToken)
+					require.NoError(e.T(), err)
+
 				}
 			}
 		}
