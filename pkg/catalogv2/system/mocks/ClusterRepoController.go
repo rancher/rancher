@@ -14,13 +14,13 @@ import (
 
 	mock "github.com/stretchr/testify/mock"
 
+	rest "k8s.io/client-go/rest"
+
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 
 	time "time"
 
 	types "k8s.io/apimachinery/pkg/types"
-
-	v1 "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
 
 	watch "k8s.io/apimachinery/pkg/watch"
 )
@@ -41,15 +41,15 @@ func (_m *ClusterRepoController) AddGenericRemoveHandler(ctx context.Context, na
 }
 
 // Cache provides a mock function with given fields:
-func (_m *ClusterRepoController) Cache() v1.ClusterRepoCache {
+func (_m *ClusterRepoController) Cache() generic.NonNamespacedCacheInterface[*catalog_cattle_iov1.ClusterRepo] {
 	ret := _m.Called()
 
-	var r0 v1.ClusterRepoCache
-	if rf, ok := ret.Get(0).(func() v1.ClusterRepoCache); ok {
+	var r0 generic.NonNamespacedCacheInterface[*catalog_cattle_iov1.ClusterRepo]
+	if rf, ok := ret.Get(0).(func() generic.NonNamespacedCacheInterface[*catalog_cattle_iov1.ClusterRepo]); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(v1.ClusterRepoCache)
+			r0 = ret.Get(0).(generic.NonNamespacedCacheInterface[*catalog_cattle_iov1.ClusterRepo])
 		}
 	}
 
@@ -189,12 +189,12 @@ func (_m *ClusterRepoController) List(opts metav1.ListOptions) (*catalog_cattle_
 }
 
 // OnChange provides a mock function with given fields: ctx, name, sync
-func (_m *ClusterRepoController) OnChange(ctx context.Context, name string, sync v1.ClusterRepoHandler) {
+func (_m *ClusterRepoController) OnChange(ctx context.Context, name string, sync generic.ObjectHandler[*catalog_cattle_iov1.ClusterRepo]) {
 	_m.Called(ctx, name, sync)
 }
 
 // OnRemove provides a mock function with given fields: ctx, name, sync
-func (_m *ClusterRepoController) OnRemove(ctx context.Context, name string, sync v1.ClusterRepoHandler) {
+func (_m *ClusterRepoController) OnRemove(ctx context.Context, name string, sync generic.ObjectHandler[*catalog_cattle_iov1.ClusterRepo]) {
 	_m.Called(ctx, name, sync)
 }
 
@@ -318,6 +318,32 @@ func (_m *ClusterRepoController) Watch(opts metav1.ListOptions) (watch.Interface
 
 	if rf, ok := ret.Get(1).(func(metav1.ListOptions) error); ok {
 		r1 = rf(opts)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// WithImpersonation provides a mock function with given fields: impersonate
+func (_m *ClusterRepoController) WithImpersonation(impersonate rest.ImpersonationConfig) (generic.NonNamespacedClientInterface[*catalog_cattle_iov1.ClusterRepo, *catalog_cattle_iov1.ClusterRepoList], error) {
+	ret := _m.Called(impersonate)
+
+	var r0 generic.NonNamespacedClientInterface[*catalog_cattle_iov1.ClusterRepo, *catalog_cattle_iov1.ClusterRepoList]
+	var r1 error
+	if rf, ok := ret.Get(0).(func(rest.ImpersonationConfig) (generic.NonNamespacedClientInterface[*catalog_cattle_iov1.ClusterRepo, *catalog_cattle_iov1.ClusterRepoList], error)); ok {
+		return rf(impersonate)
+	}
+	if rf, ok := ret.Get(0).(func(rest.ImpersonationConfig) generic.NonNamespacedClientInterface[*catalog_cattle_iov1.ClusterRepo, *catalog_cattle_iov1.ClusterRepoList]); ok {
+		r0 = rf(impersonate)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(generic.NonNamespacedClientInterface[*catalog_cattle_iov1.ClusterRepo, *catalog_cattle_iov1.ClusterRepoList])
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(rest.ImpersonationConfig) error); ok {
+		r1 = rf(impersonate)
 	} else {
 		r1 = ret.Error(1)
 	}
