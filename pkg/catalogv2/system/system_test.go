@@ -584,7 +584,6 @@ func TestInstall(t *testing.T) {
 		} else {
 			versionMatcher = mock.Anything
 		}
-
 		contentMock, opsMock, podsMock, settingsMock, helmMock, clusterRepoMock :=
 			&mocks.ContentClient{}, &mocks.OperationClient{}, &mocks.PodClient{}, &mocks.SettingController{}, &mocks.HelmClient{}, &mocks.ClusterRepoController{}
 
