@@ -270,6 +270,7 @@ type repository interface {
 	fetchAndReset(commit plumbing.Hash, branch string) error
 	updateRefSpec(branch string)
 	fetch(branch string) error
+	checkout(branch plumbing.ReferenceName) (plumbing.Hash, error)
 	hardReset(reference plumbing.Hash) error
 	getLastCommitHash(branch string, commitHASH plumbing.Hash) (plumbing.Hash, error)
 }
@@ -382,11 +383,37 @@ func (ro *repoOperation) fetch(branch string) error {
 	return nil
 }
 
+func (ro *repoOperation) checkout(branch plumbing.ReferenceName) (plumbing.Hash, error) {
+
+	checkOpts := gogit.CheckoutOptions{
+		Branch: branch,
+	}
+
+	_, err := ro.localRepo.Branch(branch.Short())
+	switch {
+	case err == gogit.ErrBranchExists:
+		checkOpts.Force = true
+	case err == gogit.ErrBranchNotFound:
+		checkOpts.Create = true
+	case err != gogit.ErrBranchExists && err != gogit.ErrBranchNotFound && err != nil:
+		return plumbing.ZeroHash, fmt.Errorf("checkout failure to check branch: %w", err)
+	}
+
+	wt, err := ro.localRepo.Worktree()
+	if err != nil {
+		return plumbing.ZeroHash, fmt.Errorf("checkout failure to open worktree: %w", err)
+	}
+
+	err = wt.Checkout(&checkOpts)
+	if err != nil {
+		return plumbing.ZeroHash, fmt.Errorf("checkout failure: %w", err)
+	}
+
+	return ro.getCurrentCommit()
+}
+
 // hardReset performs a hard reset of the git repository to a specific commit.
 func (ro *repoOperation) hardReset(reference plumbing.Hash) error {
-
-	var err error
-	resetOpts := ro.resetOpts
 	/*
 		A Git commit is a snapshot of the files in your Git repository.
 		Each commit is identified by a unique SHA-1 hash code.
@@ -395,6 +422,10 @@ func (ro *repoOperation) hardReset(reference plumbing.Hash) error {
 		To perform a reset to a reference = Another pointer to a specific commit.
 		reference(branch, a tag, or another form of pointer in the Git system).
 	*/
+
+	var err error
+	resetOpts := ro.resetOpts
+
 	switch {
 	// When empty hash passed we reset to the HEAD reference
 	case reference.IsZero():

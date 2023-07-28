@@ -6,30 +6,31 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-// Ensure builds the configuration for a should-existing repo and makes sure it is cloned or reseted to the latest commit
-func Ensure(secret *corev1.Secret, namespace, name, gitURL, commit string, insecureSkipTLS bool, caBundle []byte) error {
-	if commit == "" {
-		return nil
-	}
-
+// Ensure builds the configuration for a should-existing repo and makes sure it is cloned or reseted to the latest commit of given branch
+func Ensure(secret *corev1.Secret, namespace, name, gitURL, branch string, insecureSkipTLS bool, caBundle []byte) error {
 	git, err := gitForRepo(secret, namespace, name, gitURL, insecureSkipTLS, caBundle)
 	if err != nil {
 		return err
 	}
 
-	return git.EnsureClonedRepo(commit)
+	return git.EnsureClonedRepo(branch)
 }
 
 // EnsureClonedRepo will check if repo is cloned, if not will clone and reset to the latest commit.
 // If reseting to the latest commit is not possible it will fetch and try to reset
-func (er *extendedRepo) EnsureClonedRepo(commit string) error {
+func (er *extendedRepo) EnsureClonedRepo(branch string) error {
 
 	err := er.cloneOrOpen("")
 	if err != nil {
 		return err
 	}
 
-	commitHASH := plumbing.NewHash(commit)
+	branchRef := plumbing.NewBranchReferenceName(branch)
+	// Here we need to checkout before hardReseting because gogit.Reset has no way to reset to a specific branch
+	commitHASH, err := er.checkout(branchRef)
+	if err != nil {
+		return err
+	}
 
 	// Try to reset to the given commit, if success exit
 	err = er.hardReset(commitHASH)
@@ -37,7 +38,7 @@ func (er *extendedRepo) EnsureClonedRepo(commit string) error {
 		return nil
 	}
 	// If we do not have the commit locally, fetch and reset
-	return er.fetchAndReset(commitHASH, "")
+	return er.fetchAndReset(commitHASH, branch)
 }
 
 // Head builds the configuration for a new repo which will be cloned for the first time
