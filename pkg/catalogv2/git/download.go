@@ -59,16 +59,13 @@ func Update(secret *corev1.Secret, namespace, name, gitURL, branch string, insec
 	return commit, err
 }
 
-func Ensure(secret *corev1.Secret, namespace, name, gitURL, commit string, insecureSkipTLS bool, caBundle []byte) error {
-	if commit == "" {
-		return nil
-	}
+func Ensure(secret *corev1.Secret, namespace, name, gitURL, branch string, insecureSkipTLS bool, caBundle []byte) error {
 	git, err := gitForRepo(secret, namespace, name, gitURL, insecureSkipTLS, caBundle)
 	if err != nil {
 		return err
 	}
 
-	return git.Ensure(commit)
+	return git.Ensure(branch)
 }
 
 func isBundled(git *git) bool {
