@@ -111,7 +111,7 @@ require (
 	github.com/rancher/dynamiclistener v0.3.5
 	github.com/rancher/eks-operator v1.2.2-rc3
 	github.com/rancher/fleet/pkg/apis v0.0.0-20230721155330-5040cf183feb
-	github.com/rancher/gke-operator v1.1.6-rc1
+	github.com/rancher/gke-operator v1.1.6-rc2
 	github.com/rancher/kubernetes-provider-detector v0.1.5
 	github.com/rancher/lasso v0.0.0-20230629200414-8a54b32e6792
 	github.com/rancher/machine v0.15.0-rancher99
