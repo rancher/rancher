@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/rancher/rancher/pkg/clustermanager"
+	"github.com/rancher/rancher/pkg/controllers/management/auth/globalroles"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
 	v1 "k8s.io/api/rbac/v1"
@@ -57,8 +58,6 @@ func RegisterIndexers(scaledContext *config.ScaledContext) error {
 
 func RegisterEarly(ctx context.Context, management *config.ManagementContext, clusterManager *clustermanager.Manager) {
 	prtb, crtb := newRTBLifecycles(management.WithAgent("mgmt-auth-crtb-prtb-controller"))
-	gr := newGlobalRoleLifecycle(management.WithAgent(grController))
-	grb := newGlobalRoleBindingLifecycle(management.WithAgent(grbController), clusterManager)
 	p, c := newPandCLifecycles(management)
 	u := newUserLifecycle(management, clusterManager)
 	n := newTokenController(management.WithAgent(tokenController))
@@ -71,8 +70,6 @@ func RegisterEarly(ctx context.Context, management *config.ManagementContext, cl
 
 	management.Management.ClusterRoleTemplateBindings("").AddLifecycle(ctx, ctrbMGMTController, crtb)
 	management.Management.ProjectRoleTemplateBindings("").AddLifecycle(ctx, ptrbMGMTController, prtb)
-	management.Management.GlobalRoles("").AddLifecycle(ctx, grController, gr)
-	management.Management.GlobalRoleBindings("").AddLifecycle(ctx, grbController, grb)
 	management.Management.Users("").AddLifecycle(ctx, userController, u)
 	management.Management.RoleTemplates("").AddLifecycle(ctx, roleTemplateLifecycleName, rt)
 
@@ -84,6 +81,7 @@ func RegisterEarly(ctx context.Context, management *config.ManagementContext, cl
 	management.Management.Settings("").AddHandler(ctx, authSettingController, s.sync)
 	management.Management.GlobalRoleBindings("").AddHandler(ctx, "legacy-grb-cleaner", grbLegacy.sync)
 	management.Management.RoleTemplates("").AddHandler(ctx, "legacy-rt-cleaner", rtLegacy.sync)
+	globalroles.Register(ctx, management, clusterManager)
 }
 
 func RegisterLate(ctx context.Context, management *config.ManagementContext) {

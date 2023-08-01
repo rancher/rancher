@@ -1,4 +1,4 @@
-package auth
+package globalroles
 
 import (
 	"reflect"
@@ -19,10 +19,10 @@ import (
 )
 
 var (
-	globalRoleLabel  = map[string]string{"authz.management.cattle.io/globalrole": "true"}
-	crNameAnnotation = "authz.management.cattle.io/cr-name"
-	clusterRoleKind  = "ClusterRole"
-	grController     = "mgmt-auth-gr-controller"
+	globalRoleLabel       = map[string]string{"authz.management.cattle.io/globalrole": "true"}
+	crNameAnnotation      = "authz.management.cattle.io/cr-name"
+	initialSyncAnnotation = "authz.management.cattle.io/initial-sync"
+	clusterRoleKind       = "ClusterRole"
 )
 
 func newGlobalRoleLifecycle(management *config.ManagementContext) *globalRoleLifecycle {
