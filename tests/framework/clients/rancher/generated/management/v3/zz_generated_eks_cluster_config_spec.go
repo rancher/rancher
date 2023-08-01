@@ -4,6 +4,7 @@ const (
 	EKSClusterConfigSpecType                        = "eksClusterConfigSpec"
 	EKSClusterConfigSpecFieldAmazonCredentialSecret = "amazonCredentialSecret"
 	EKSClusterConfigSpecFieldDisplayName            = "displayName"
+	EKSClusterConfigSpecFieldEBSCSIDriver           = "ebsCSIDriver"
 	EKSClusterConfigSpecFieldImported               = "imported"
 	EKSClusterConfigSpecFieldKmsKey                 = "kmsKey"
 	EKSClusterConfigSpecFieldKubernetesVersion      = "kubernetesVersion"
@@ -23,6 +24,7 @@ const (
 type EKSClusterConfigSpec struct {
 	AmazonCredentialSecret string             `json:"amazonCredentialSecret,omitempty" yaml:"amazonCredentialSecret,omitempty"`
 	DisplayName            string             `json:"displayName,omitempty" yaml:"displayName,omitempty"`
+	EBSCSIDriver           *bool              `json:"ebsCSIDriver,omitempty" yaml:"ebsCSIDriver,omitempty"`
 	Imported               bool               `json:"imported,omitempty" yaml:"imported,omitempty"`
 	KmsKey                 *string            `json:"kmsKey,omitempty" yaml:"kmsKey,omitempty"`
 	KubernetesVersion      *string            `json:"kubernetesVersion,omitempty" yaml:"kubernetesVersion,omitempty"`
