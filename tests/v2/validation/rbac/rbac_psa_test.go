@@ -376,7 +376,7 @@ func (rb *PSATestSuite) TestPsactRBAC() {
 	for _, tt := range tests {
 
 		rb.Run("Set up User with Cluster Role "+tt.name, func() {
-			newUser, err := createUser(rb.client, tt.member)
+			newUser, err := users.CreateUserWithRole(rb.client, users.UserConfig(), tt.member)
 			require.NoError(rb.T(), err)
 			rb.nonAdminUser = newUser
 			rb.T().Logf("Created user: %v", rb.nonAdminUser.Username)
