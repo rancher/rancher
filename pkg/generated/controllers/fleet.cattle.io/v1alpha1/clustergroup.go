@@ -29,28 +29,125 @@ import (
 	"github.com/rancher/wrangler/pkg/kv"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
 )
 
 // ClusterGroupController interface for managing ClusterGroup resources.
 type ClusterGroupController interface {
-	generic.ControllerInterface[*v1alpha1.ClusterGroup, *v1alpha1.ClusterGroupList]
+	generic.ControllerMeta
+	ClusterGroupClient
+
+	// OnChange runs the given handler when the controller detects a resource was changed.
+	OnChange(ctx context.Context, name string, sync ClusterGroupHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
+	OnRemove(ctx context.Context, name string, sync ClusterGroupHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
+	Enqueue(namespace, name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
+	EnqueueAfter(namespace, name string, duration time.Duration)
+
+	// Cache returns a cache for the resource type T.
+	Cache() ClusterGroupCache
 }
 
 // ClusterGroupClient interface for managing ClusterGroup resources in Kubernetes.
 type ClusterGroupClient interface {
-	generic.ClientInterface[*v1alpha1.ClusterGroup, *v1alpha1.ClusterGroupList]
+	// Create creates a new object and return the newly created Object or an error.
+	Create(*v1alpha1.ClusterGroup) (*v1alpha1.ClusterGroup, error)
+
+	// Update updates the object and return the newly updated Object or an error.
+	Update(*v1alpha1.ClusterGroup) (*v1alpha1.ClusterGroup, error)
+	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
+	// Will always return an error if the object does not have a status field.
+	UpdateStatus(*v1alpha1.ClusterGroup) (*v1alpha1.ClusterGroup, error)
+
+	// Delete deletes the Object in the given name.
+	Delete(namespace, name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
+	Get(namespace, name string, options metav1.GetOptions) (*v1alpha1.ClusterGroup, error)
+
+	// List will attempt to find multiple resources.
+	List(namespace string, opts metav1.ListOptions) (*v1alpha1.ClusterGroupList, error)
+
+	// Watch will start watching resources.
+	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
+	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.ClusterGroup, err error)
 }
 
 // ClusterGroupCache interface for retrieving ClusterGroup resources in memory.
 type ClusterGroupCache interface {
+	// Get returns the resources with the specified name from the cache.
+	Get(namespace, name string) (*v1alpha1.ClusterGroup, error)
+
+	// List will attempt to find resources from the Cache.
+	List(namespace string, selector labels.Selector) ([]*v1alpha1.ClusterGroup, error)
+
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
+	AddIndexer(indexName string, indexer ClusterGroupIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
+	GetByIndex(indexName, key string) ([]*v1alpha1.ClusterGroup, error)
+}
+
+// ClusterGroupHandler is function for performing any potential modifications to a ClusterGroup resource.
+type ClusterGroupHandler func(string, *v1alpha1.ClusterGroup) (*v1alpha1.ClusterGroup, error)
+
+// ClusterGroupIndexer computes a set of indexed values for the provided object.
+type ClusterGroupIndexer func(obj *v1alpha1.ClusterGroup) ([]string, error)
+
+// ClusterGroupGenericController wraps wrangler/pkg/generic.Controller so that the function definitions adhere to ClusterGroupController interface.
+type ClusterGroupGenericController struct {
+	generic.ControllerInterface[*v1alpha1.ClusterGroup, *v1alpha1.ClusterGroupList]
+}
+
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *ClusterGroupGenericController) OnChange(ctx context.Context, name string, sync ClusterGroupHandler) {
+	c.ControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v1alpha1.ClusterGroup](sync))
+}
+
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *ClusterGroupGenericController) OnRemove(ctx context.Context, name string, sync ClusterGroupHandler) {
+	c.ControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v1alpha1.ClusterGroup](sync))
+}
+
+// Cache returns a cache of resources in memory.
+func (c *ClusterGroupGenericController) Cache() ClusterGroupCache {
+	return &ClusterGroupGenericCache{
+		c.ControllerInterface.Cache(),
+	}
+}
+
+// ClusterGroupGenericCache wraps wrangler/pkg/generic.Cache so the function definitions adhere to ClusterGroupCache interface.
+type ClusterGroupGenericCache struct {
 	generic.CacheInterface[*v1alpha1.ClusterGroup]
+}
+
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c ClusterGroupGenericCache) AddIndexer(indexName string, indexer ClusterGroupIndexer) {
+	c.CacheInterface.AddIndexer(indexName, generic.Indexer[*v1alpha1.ClusterGroup](indexer))
 }
 
 type ClusterGroupStatusHandler func(obj *v1alpha1.ClusterGroup, status v1alpha1.ClusterGroupStatus) (v1alpha1.ClusterGroupStatus, error)
 
 type ClusterGroupGeneratingHandler func(obj *v1alpha1.ClusterGroup, status v1alpha1.ClusterGroupStatus) ([]runtime.Object, v1alpha1.ClusterGroupStatus, error)
+
+func FromClusterGroupHandlerToHandler(sync ClusterGroupHandler) generic.Handler {
+	return generic.FromObjectHandlerToHandler(generic.ObjectHandler[*v1alpha1.ClusterGroup](sync))
+}
 
 func RegisterClusterGroupStatusHandler(ctx context.Context, controller ClusterGroupController, condition condition.Cond, name string, handler ClusterGroupStatusHandler) {
 	statusHandler := &clusterGroupStatusHandler{
@@ -58,7 +155,7 @@ func RegisterClusterGroupStatusHandler(ctx context.Context, controller ClusterGr
 		condition: condition,
 		handler:   handler,
 	}
-	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
+	controller.AddGenericHandler(ctx, name, FromClusterGroupHandlerToHandler(statusHandler.sync))
 }
 
 func RegisterClusterGroupGeneratingHandler(ctx context.Context, controller ClusterGroupController, apply apply.Apply,

@@ -45,5 +45,7 @@ type version struct {
 }
 
 func (v *version) Plan() PlanController {
-	return generic.NewController[*v1.Plan, *v1.PlanList](schema.GroupVersionKind{Group: "upgrade.cattle.io", Version: "v1", Kind: "Plan"}, "plans", true, v.controllerFactory)
+	return &PlanGenericController{
+		generic.NewController[*v1.Plan, *v1.PlanList](schema.GroupVersionKind{Group: "upgrade.cattle.io", Version: "v1", Kind: "Plan"}, "plans", true, v.controllerFactory),
+	}
 }

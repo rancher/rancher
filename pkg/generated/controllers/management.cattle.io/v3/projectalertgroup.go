@@ -29,28 +29,125 @@ import (
 	"github.com/rancher/wrangler/pkg/kv"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
 )
 
 // ProjectAlertGroupController interface for managing ProjectAlertGroup resources.
 type ProjectAlertGroupController interface {
-	generic.ControllerInterface[*v3.ProjectAlertGroup, *v3.ProjectAlertGroupList]
+	generic.ControllerMeta
+	ProjectAlertGroupClient
+
+	// OnChange runs the given handler when the controller detects a resource was changed.
+	OnChange(ctx context.Context, name string, sync ProjectAlertGroupHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
+	OnRemove(ctx context.Context, name string, sync ProjectAlertGroupHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
+	Enqueue(namespace, name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
+	EnqueueAfter(namespace, name string, duration time.Duration)
+
+	// Cache returns a cache for the resource type T.
+	Cache() ProjectAlertGroupCache
 }
 
 // ProjectAlertGroupClient interface for managing ProjectAlertGroup resources in Kubernetes.
 type ProjectAlertGroupClient interface {
-	generic.ClientInterface[*v3.ProjectAlertGroup, *v3.ProjectAlertGroupList]
+	// Create creates a new object and return the newly created Object or an error.
+	Create(*v3.ProjectAlertGroup) (*v3.ProjectAlertGroup, error)
+
+	// Update updates the object and return the newly updated Object or an error.
+	Update(*v3.ProjectAlertGroup) (*v3.ProjectAlertGroup, error)
+	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
+	// Will always return an error if the object does not have a status field.
+	UpdateStatus(*v3.ProjectAlertGroup) (*v3.ProjectAlertGroup, error)
+
+	// Delete deletes the Object in the given name.
+	Delete(namespace, name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
+	Get(namespace, name string, options metav1.GetOptions) (*v3.ProjectAlertGroup, error)
+
+	// List will attempt to find multiple resources.
+	List(namespace string, opts metav1.ListOptions) (*v3.ProjectAlertGroupList, error)
+
+	// Watch will start watching resources.
+	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
+	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.ProjectAlertGroup, err error)
 }
 
 // ProjectAlertGroupCache interface for retrieving ProjectAlertGroup resources in memory.
 type ProjectAlertGroupCache interface {
+	// Get returns the resources with the specified name from the cache.
+	Get(namespace, name string) (*v3.ProjectAlertGroup, error)
+
+	// List will attempt to find resources from the Cache.
+	List(namespace string, selector labels.Selector) ([]*v3.ProjectAlertGroup, error)
+
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
+	AddIndexer(indexName string, indexer ProjectAlertGroupIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
+	GetByIndex(indexName, key string) ([]*v3.ProjectAlertGroup, error)
+}
+
+// ProjectAlertGroupHandler is function for performing any potential modifications to a ProjectAlertGroup resource.
+type ProjectAlertGroupHandler func(string, *v3.ProjectAlertGroup) (*v3.ProjectAlertGroup, error)
+
+// ProjectAlertGroupIndexer computes a set of indexed values for the provided object.
+type ProjectAlertGroupIndexer func(obj *v3.ProjectAlertGroup) ([]string, error)
+
+// ProjectAlertGroupGenericController wraps wrangler/pkg/generic.Controller so that the function definitions adhere to ProjectAlertGroupController interface.
+type ProjectAlertGroupGenericController struct {
+	generic.ControllerInterface[*v3.ProjectAlertGroup, *v3.ProjectAlertGroupList]
+}
+
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *ProjectAlertGroupGenericController) OnChange(ctx context.Context, name string, sync ProjectAlertGroupHandler) {
+	c.ControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.ProjectAlertGroup](sync))
+}
+
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *ProjectAlertGroupGenericController) OnRemove(ctx context.Context, name string, sync ProjectAlertGroupHandler) {
+	c.ControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.ProjectAlertGroup](sync))
+}
+
+// Cache returns a cache of resources in memory.
+func (c *ProjectAlertGroupGenericController) Cache() ProjectAlertGroupCache {
+	return &ProjectAlertGroupGenericCache{
+		c.ControllerInterface.Cache(),
+	}
+}
+
+// ProjectAlertGroupGenericCache wraps wrangler/pkg/generic.Cache so the function definitions adhere to ProjectAlertGroupCache interface.
+type ProjectAlertGroupGenericCache struct {
 	generic.CacheInterface[*v3.ProjectAlertGroup]
+}
+
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c ProjectAlertGroupGenericCache) AddIndexer(indexName string, indexer ProjectAlertGroupIndexer) {
+	c.CacheInterface.AddIndexer(indexName, generic.Indexer[*v3.ProjectAlertGroup](indexer))
 }
 
 type ProjectAlertGroupStatusHandler func(obj *v3.ProjectAlertGroup, status v3.AlertStatus) (v3.AlertStatus, error)
 
 type ProjectAlertGroupGeneratingHandler func(obj *v3.ProjectAlertGroup, status v3.AlertStatus) ([]runtime.Object, v3.AlertStatus, error)
+
+func FromProjectAlertGroupHandlerToHandler(sync ProjectAlertGroupHandler) generic.Handler {
+	return generic.FromObjectHandlerToHandler(generic.ObjectHandler[*v3.ProjectAlertGroup](sync))
+}
 
 func RegisterProjectAlertGroupStatusHandler(ctx context.Context, controller ProjectAlertGroupController, condition condition.Cond, name string, handler ProjectAlertGroupStatusHandler) {
 	statusHandler := &projectAlertGroupStatusHandler{
@@ -58,7 +155,7 @@ func RegisterProjectAlertGroupStatusHandler(ctx context.Context, controller Proj
 		condition: condition,
 		handler:   handler,
 	}
-	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
+	controller.AddGenericHandler(ctx, name, FromProjectAlertGroupHandlerToHandler(statusHandler.sync))
 }
 
 func RegisterProjectAlertGroupGeneratingHandler(ctx context.Context, controller ProjectAlertGroupController, apply apply.Apply,

@@ -19,21 +19,114 @@ limitations under the License.
 package v3
 
 import (
+	"context"
+	"time"
+
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/wrangler/pkg/generic"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
 )
 
 // MultiClusterAppRevisionController interface for managing MultiClusterAppRevision resources.
 type MultiClusterAppRevisionController interface {
-	generic.ControllerInterface[*v3.MultiClusterAppRevision, *v3.MultiClusterAppRevisionList]
+	generic.ControllerMeta
+	MultiClusterAppRevisionClient
+
+	// OnChange runs the given handler when the controller detects a resource was changed.
+	OnChange(ctx context.Context, name string, sync MultiClusterAppRevisionHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
+	OnRemove(ctx context.Context, name string, sync MultiClusterAppRevisionHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
+	Enqueue(namespace, name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
+	EnqueueAfter(namespace, name string, duration time.Duration)
+
+	// Cache returns a cache for the resource type T.
+	Cache() MultiClusterAppRevisionCache
 }
 
 // MultiClusterAppRevisionClient interface for managing MultiClusterAppRevision resources in Kubernetes.
 type MultiClusterAppRevisionClient interface {
-	generic.ClientInterface[*v3.MultiClusterAppRevision, *v3.MultiClusterAppRevisionList]
+	// Create creates a new object and return the newly created Object or an error.
+	Create(*v3.MultiClusterAppRevision) (*v3.MultiClusterAppRevision, error)
+
+	// Update updates the object and return the newly updated Object or an error.
+	Update(*v3.MultiClusterAppRevision) (*v3.MultiClusterAppRevision, error)
+
+	// Delete deletes the Object in the given name.
+	Delete(namespace, name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
+	Get(namespace, name string, options metav1.GetOptions) (*v3.MultiClusterAppRevision, error)
+
+	// List will attempt to find multiple resources.
+	List(namespace string, opts metav1.ListOptions) (*v3.MultiClusterAppRevisionList, error)
+
+	// Watch will start watching resources.
+	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
+	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.MultiClusterAppRevision, err error)
 }
 
 // MultiClusterAppRevisionCache interface for retrieving MultiClusterAppRevision resources in memory.
 type MultiClusterAppRevisionCache interface {
+	// Get returns the resources with the specified name from the cache.
+	Get(namespace, name string) (*v3.MultiClusterAppRevision, error)
+
+	// List will attempt to find resources from the Cache.
+	List(namespace string, selector labels.Selector) ([]*v3.MultiClusterAppRevision, error)
+
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
+	AddIndexer(indexName string, indexer MultiClusterAppRevisionIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
+	GetByIndex(indexName, key string) ([]*v3.MultiClusterAppRevision, error)
+}
+
+// MultiClusterAppRevisionHandler is function for performing any potential modifications to a MultiClusterAppRevision resource.
+type MultiClusterAppRevisionHandler func(string, *v3.MultiClusterAppRevision) (*v3.MultiClusterAppRevision, error)
+
+// MultiClusterAppRevisionIndexer computes a set of indexed values for the provided object.
+type MultiClusterAppRevisionIndexer func(obj *v3.MultiClusterAppRevision) ([]string, error)
+
+// MultiClusterAppRevisionGenericController wraps wrangler/pkg/generic.Controller so that the function definitions adhere to MultiClusterAppRevisionController interface.
+type MultiClusterAppRevisionGenericController struct {
+	generic.ControllerInterface[*v3.MultiClusterAppRevision, *v3.MultiClusterAppRevisionList]
+}
+
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *MultiClusterAppRevisionGenericController) OnChange(ctx context.Context, name string, sync MultiClusterAppRevisionHandler) {
+	c.ControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.MultiClusterAppRevision](sync))
+}
+
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *MultiClusterAppRevisionGenericController) OnRemove(ctx context.Context, name string, sync MultiClusterAppRevisionHandler) {
+	c.ControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.MultiClusterAppRevision](sync))
+}
+
+// Cache returns a cache of resources in memory.
+func (c *MultiClusterAppRevisionGenericController) Cache() MultiClusterAppRevisionCache {
+	return &MultiClusterAppRevisionGenericCache{
+		c.ControllerInterface.Cache(),
+	}
+}
+
+// MultiClusterAppRevisionGenericCache wraps wrangler/pkg/generic.Cache so the function definitions adhere to MultiClusterAppRevisionCache interface.
+type MultiClusterAppRevisionGenericCache struct {
 	generic.CacheInterface[*v3.MultiClusterAppRevision]
+}
+
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c MultiClusterAppRevisionGenericCache) AddIndexer(indexName string, indexer MultiClusterAppRevisionIndexer) {
+	c.CacheInterface.AddIndexer(indexName, generic.Indexer[*v3.MultiClusterAppRevision](indexer))
 }

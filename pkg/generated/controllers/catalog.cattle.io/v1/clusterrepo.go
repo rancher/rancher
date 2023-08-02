@@ -29,28 +29,125 @@ import (
 	"github.com/rancher/wrangler/pkg/kv"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
 )
 
 // ClusterRepoController interface for managing ClusterRepo resources.
 type ClusterRepoController interface {
-	generic.NonNamespacedControllerInterface[*v1.ClusterRepo, *v1.ClusterRepoList]
+	generic.ControllerMeta
+	ClusterRepoClient
+
+	// OnChange runs the given handler when the controller detects a resource was changed.
+	OnChange(ctx context.Context, name string, sync ClusterRepoHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
+	OnRemove(ctx context.Context, name string, sync ClusterRepoHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
+	Enqueue(name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
+	EnqueueAfter(name string, duration time.Duration)
+
+	// Cache returns a cache for the resource type T.
+	Cache() ClusterRepoCache
 }
 
 // ClusterRepoClient interface for managing ClusterRepo resources in Kubernetes.
 type ClusterRepoClient interface {
-	generic.NonNamespacedClientInterface[*v1.ClusterRepo, *v1.ClusterRepoList]
+	// Create creates a new object and return the newly created Object or an error.
+	Create(*v1.ClusterRepo) (*v1.ClusterRepo, error)
+
+	// Update updates the object and return the newly updated Object or an error.
+	Update(*v1.ClusterRepo) (*v1.ClusterRepo, error)
+	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
+	// Will always return an error if the object does not have a status field.
+	UpdateStatus(*v1.ClusterRepo) (*v1.ClusterRepo, error)
+
+	// Delete deletes the Object in the given name.
+	Delete(name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
+	Get(name string, options metav1.GetOptions) (*v1.ClusterRepo, error)
+
+	// List will attempt to find multiple resources.
+	List(opts metav1.ListOptions) (*v1.ClusterRepoList, error)
+
+	// Watch will start watching resources.
+	Watch(opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.ClusterRepo, err error)
 }
 
 // ClusterRepoCache interface for retrieving ClusterRepo resources in memory.
 type ClusterRepoCache interface {
+	// Get returns the resources with the specified name from the cache.
+	Get(name string) (*v1.ClusterRepo, error)
+
+	// List will attempt to find resources from the Cache.
+	List(selector labels.Selector) ([]*v1.ClusterRepo, error)
+
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
+	AddIndexer(indexName string, indexer ClusterRepoIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
+	GetByIndex(indexName, key string) ([]*v1.ClusterRepo, error)
+}
+
+// ClusterRepoHandler is function for performing any potential modifications to a ClusterRepo resource.
+type ClusterRepoHandler func(string, *v1.ClusterRepo) (*v1.ClusterRepo, error)
+
+// ClusterRepoIndexer computes a set of indexed values for the provided object.
+type ClusterRepoIndexer func(obj *v1.ClusterRepo) ([]string, error)
+
+// ClusterRepoGenericController wraps wrangler/pkg/generic.NonNamespacedController so that the function definitions adhere to ClusterRepoController interface.
+type ClusterRepoGenericController struct {
+	generic.NonNamespacedControllerInterface[*v1.ClusterRepo, *v1.ClusterRepoList]
+}
+
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *ClusterRepoGenericController) OnChange(ctx context.Context, name string, sync ClusterRepoHandler) {
+	c.NonNamespacedControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v1.ClusterRepo](sync))
+}
+
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *ClusterRepoGenericController) OnRemove(ctx context.Context, name string, sync ClusterRepoHandler) {
+	c.NonNamespacedControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v1.ClusterRepo](sync))
+}
+
+// Cache returns a cache of resources in memory.
+func (c *ClusterRepoGenericController) Cache() ClusterRepoCache {
+	return &ClusterRepoGenericCache{
+		c.NonNamespacedControllerInterface.Cache(),
+	}
+}
+
+// ClusterRepoGenericCache wraps wrangler/pkg/generic.NonNamespacedCache so the function definitions adhere to ClusterRepoCache interface.
+type ClusterRepoGenericCache struct {
 	generic.NonNamespacedCacheInterface[*v1.ClusterRepo]
+}
+
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c ClusterRepoGenericCache) AddIndexer(indexName string, indexer ClusterRepoIndexer) {
+	c.NonNamespacedCacheInterface.AddIndexer(indexName, generic.Indexer[*v1.ClusterRepo](indexer))
 }
 
 type ClusterRepoStatusHandler func(obj *v1.ClusterRepo, status v1.RepoStatus) (v1.RepoStatus, error)
 
 type ClusterRepoGeneratingHandler func(obj *v1.ClusterRepo, status v1.RepoStatus) ([]runtime.Object, v1.RepoStatus, error)
+
+func FromClusterRepoHandlerToHandler(sync ClusterRepoHandler) generic.Handler {
+	return generic.FromObjectHandlerToHandler(generic.ObjectHandler[*v1.ClusterRepo](sync))
+}
 
 func RegisterClusterRepoStatusHandler(ctx context.Context, controller ClusterRepoController, condition condition.Cond, name string, handler ClusterRepoStatusHandler) {
 	statusHandler := &clusterRepoStatusHandler{
@@ -58,7 +155,7 @@ func RegisterClusterRepoStatusHandler(ctx context.Context, controller ClusterRep
 		condition: condition,
 		handler:   handler,
 	}
-	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
+	controller.AddGenericHandler(ctx, name, FromClusterRepoHandlerToHandler(statusHandler.sync))
 }
 
 func RegisterClusterRepoGeneratingHandler(ctx context.Context, controller ClusterRepoController, apply apply.Apply,

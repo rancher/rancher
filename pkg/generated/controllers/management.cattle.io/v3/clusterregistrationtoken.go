@@ -29,28 +29,125 @@ import (
 	"github.com/rancher/wrangler/pkg/kv"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
 )
 
 // ClusterRegistrationTokenController interface for managing ClusterRegistrationToken resources.
 type ClusterRegistrationTokenController interface {
-	generic.ControllerInterface[*v3.ClusterRegistrationToken, *v3.ClusterRegistrationTokenList]
+	generic.ControllerMeta
+	ClusterRegistrationTokenClient
+
+	// OnChange runs the given handler when the controller detects a resource was changed.
+	OnChange(ctx context.Context, name string, sync ClusterRegistrationTokenHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
+	OnRemove(ctx context.Context, name string, sync ClusterRegistrationTokenHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
+	Enqueue(namespace, name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
+	EnqueueAfter(namespace, name string, duration time.Duration)
+
+	// Cache returns a cache for the resource type T.
+	Cache() ClusterRegistrationTokenCache
 }
 
 // ClusterRegistrationTokenClient interface for managing ClusterRegistrationToken resources in Kubernetes.
 type ClusterRegistrationTokenClient interface {
-	generic.ClientInterface[*v3.ClusterRegistrationToken, *v3.ClusterRegistrationTokenList]
+	// Create creates a new object and return the newly created Object or an error.
+	Create(*v3.ClusterRegistrationToken) (*v3.ClusterRegistrationToken, error)
+
+	// Update updates the object and return the newly updated Object or an error.
+	Update(*v3.ClusterRegistrationToken) (*v3.ClusterRegistrationToken, error)
+	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
+	// Will always return an error if the object does not have a status field.
+	UpdateStatus(*v3.ClusterRegistrationToken) (*v3.ClusterRegistrationToken, error)
+
+	// Delete deletes the Object in the given name.
+	Delete(namespace, name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
+	Get(namespace, name string, options metav1.GetOptions) (*v3.ClusterRegistrationToken, error)
+
+	// List will attempt to find multiple resources.
+	List(namespace string, opts metav1.ListOptions) (*v3.ClusterRegistrationTokenList, error)
+
+	// Watch will start watching resources.
+	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
+	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.ClusterRegistrationToken, err error)
 }
 
 // ClusterRegistrationTokenCache interface for retrieving ClusterRegistrationToken resources in memory.
 type ClusterRegistrationTokenCache interface {
+	// Get returns the resources with the specified name from the cache.
+	Get(namespace, name string) (*v3.ClusterRegistrationToken, error)
+
+	// List will attempt to find resources from the Cache.
+	List(namespace string, selector labels.Selector) ([]*v3.ClusterRegistrationToken, error)
+
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
+	AddIndexer(indexName string, indexer ClusterRegistrationTokenIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
+	GetByIndex(indexName, key string) ([]*v3.ClusterRegistrationToken, error)
+}
+
+// ClusterRegistrationTokenHandler is function for performing any potential modifications to a ClusterRegistrationToken resource.
+type ClusterRegistrationTokenHandler func(string, *v3.ClusterRegistrationToken) (*v3.ClusterRegistrationToken, error)
+
+// ClusterRegistrationTokenIndexer computes a set of indexed values for the provided object.
+type ClusterRegistrationTokenIndexer func(obj *v3.ClusterRegistrationToken) ([]string, error)
+
+// ClusterRegistrationTokenGenericController wraps wrangler/pkg/generic.Controller so that the function definitions adhere to ClusterRegistrationTokenController interface.
+type ClusterRegistrationTokenGenericController struct {
+	generic.ControllerInterface[*v3.ClusterRegistrationToken, *v3.ClusterRegistrationTokenList]
+}
+
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *ClusterRegistrationTokenGenericController) OnChange(ctx context.Context, name string, sync ClusterRegistrationTokenHandler) {
+	c.ControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.ClusterRegistrationToken](sync))
+}
+
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *ClusterRegistrationTokenGenericController) OnRemove(ctx context.Context, name string, sync ClusterRegistrationTokenHandler) {
+	c.ControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.ClusterRegistrationToken](sync))
+}
+
+// Cache returns a cache of resources in memory.
+func (c *ClusterRegistrationTokenGenericController) Cache() ClusterRegistrationTokenCache {
+	return &ClusterRegistrationTokenGenericCache{
+		c.ControllerInterface.Cache(),
+	}
+}
+
+// ClusterRegistrationTokenGenericCache wraps wrangler/pkg/generic.Cache so the function definitions adhere to ClusterRegistrationTokenCache interface.
+type ClusterRegistrationTokenGenericCache struct {
 	generic.CacheInterface[*v3.ClusterRegistrationToken]
+}
+
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c ClusterRegistrationTokenGenericCache) AddIndexer(indexName string, indexer ClusterRegistrationTokenIndexer) {
+	c.CacheInterface.AddIndexer(indexName, generic.Indexer[*v3.ClusterRegistrationToken](indexer))
 }
 
 type ClusterRegistrationTokenStatusHandler func(obj *v3.ClusterRegistrationToken, status v3.ClusterRegistrationTokenStatus) (v3.ClusterRegistrationTokenStatus, error)
 
 type ClusterRegistrationTokenGeneratingHandler func(obj *v3.ClusterRegistrationToken, status v3.ClusterRegistrationTokenStatus) ([]runtime.Object, v3.ClusterRegistrationTokenStatus, error)
+
+func FromClusterRegistrationTokenHandlerToHandler(sync ClusterRegistrationTokenHandler) generic.Handler {
+	return generic.FromObjectHandlerToHandler(generic.ObjectHandler[*v3.ClusterRegistrationToken](sync))
+}
 
 func RegisterClusterRegistrationTokenStatusHandler(ctx context.Context, controller ClusterRegistrationTokenController, condition condition.Cond, name string, handler ClusterRegistrationTokenStatusHandler) {
 	statusHandler := &clusterRegistrationTokenStatusHandler{
@@ -58,7 +155,7 @@ func RegisterClusterRegistrationTokenStatusHandler(ctx context.Context, controll
 		condition: condition,
 		handler:   handler,
 	}
-	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
+	controller.AddGenericHandler(ctx, name, FromClusterRegistrationTokenHandlerToHandler(statusHandler.sync))
 }
 
 func RegisterClusterRegistrationTokenGeneratingHandler(ctx context.Context, controller ClusterRegistrationTokenController, apply apply.Apply,

@@ -29,28 +29,125 @@ import (
 	"github.com/rancher/wrangler/pkg/kv"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
 )
 
 // AuthConfigController interface for managing AuthConfig resources.
 type AuthConfigController interface {
-	generic.NonNamespacedControllerInterface[*v3.AuthConfig, *v3.AuthConfigList]
+	generic.ControllerMeta
+	AuthConfigClient
+
+	// OnChange runs the given handler when the controller detects a resource was changed.
+	OnChange(ctx context.Context, name string, sync AuthConfigHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
+	OnRemove(ctx context.Context, name string, sync AuthConfigHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
+	Enqueue(name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
+	EnqueueAfter(name string, duration time.Duration)
+
+	// Cache returns a cache for the resource type T.
+	Cache() AuthConfigCache
 }
 
 // AuthConfigClient interface for managing AuthConfig resources in Kubernetes.
 type AuthConfigClient interface {
-	generic.NonNamespacedClientInterface[*v3.AuthConfig, *v3.AuthConfigList]
+	// Create creates a new object and return the newly created Object or an error.
+	Create(*v3.AuthConfig) (*v3.AuthConfig, error)
+
+	// Update updates the object and return the newly updated Object or an error.
+	Update(*v3.AuthConfig) (*v3.AuthConfig, error)
+	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
+	// Will always return an error if the object does not have a status field.
+	UpdateStatus(*v3.AuthConfig) (*v3.AuthConfig, error)
+
+	// Delete deletes the Object in the given name.
+	Delete(name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
+	Get(name string, options metav1.GetOptions) (*v3.AuthConfig, error)
+
+	// List will attempt to find multiple resources.
+	List(opts metav1.ListOptions) (*v3.AuthConfigList, error)
+
+	// Watch will start watching resources.
+	Watch(opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.AuthConfig, err error)
 }
 
 // AuthConfigCache interface for retrieving AuthConfig resources in memory.
 type AuthConfigCache interface {
+	// Get returns the resources with the specified name from the cache.
+	Get(name string) (*v3.AuthConfig, error)
+
+	// List will attempt to find resources from the Cache.
+	List(selector labels.Selector) ([]*v3.AuthConfig, error)
+
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
+	AddIndexer(indexName string, indexer AuthConfigIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
+	GetByIndex(indexName, key string) ([]*v3.AuthConfig, error)
+}
+
+// AuthConfigHandler is function for performing any potential modifications to a AuthConfig resource.
+type AuthConfigHandler func(string, *v3.AuthConfig) (*v3.AuthConfig, error)
+
+// AuthConfigIndexer computes a set of indexed values for the provided object.
+type AuthConfigIndexer func(obj *v3.AuthConfig) ([]string, error)
+
+// AuthConfigGenericController wraps wrangler/pkg/generic.NonNamespacedController so that the function definitions adhere to AuthConfigController interface.
+type AuthConfigGenericController struct {
+	generic.NonNamespacedControllerInterface[*v3.AuthConfig, *v3.AuthConfigList]
+}
+
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *AuthConfigGenericController) OnChange(ctx context.Context, name string, sync AuthConfigHandler) {
+	c.NonNamespacedControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.AuthConfig](sync))
+}
+
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *AuthConfigGenericController) OnRemove(ctx context.Context, name string, sync AuthConfigHandler) {
+	c.NonNamespacedControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.AuthConfig](sync))
+}
+
+// Cache returns a cache of resources in memory.
+func (c *AuthConfigGenericController) Cache() AuthConfigCache {
+	return &AuthConfigGenericCache{
+		c.NonNamespacedControllerInterface.Cache(),
+	}
+}
+
+// AuthConfigGenericCache wraps wrangler/pkg/generic.NonNamespacedCache so the function definitions adhere to AuthConfigCache interface.
+type AuthConfigGenericCache struct {
 	generic.NonNamespacedCacheInterface[*v3.AuthConfig]
+}
+
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c AuthConfigGenericCache) AddIndexer(indexName string, indexer AuthConfigIndexer) {
+	c.NonNamespacedCacheInterface.AddIndexer(indexName, generic.Indexer[*v3.AuthConfig](indexer))
 }
 
 type AuthConfigStatusHandler func(obj *v3.AuthConfig, status v3.AuthConfigStatus) (v3.AuthConfigStatus, error)
 
 type AuthConfigGeneratingHandler func(obj *v3.AuthConfig, status v3.AuthConfigStatus) ([]runtime.Object, v3.AuthConfigStatus, error)
+
+func FromAuthConfigHandlerToHandler(sync AuthConfigHandler) generic.Handler {
+	return generic.FromObjectHandlerToHandler(generic.ObjectHandler[*v3.AuthConfig](sync))
+}
 
 func RegisterAuthConfigStatusHandler(ctx context.Context, controller AuthConfigController, condition condition.Cond, name string, handler AuthConfigStatusHandler) {
 	statusHandler := &authConfigStatusHandler{
@@ -58,7 +155,7 @@ func RegisterAuthConfigStatusHandler(ctx context.Context, controller AuthConfigC
 		condition: condition,
 		handler:   handler,
 	}
-	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
+	controller.AddGenericHandler(ctx, name, FromAuthConfigHandlerToHandler(statusHandler.sync))
 }
 
 func RegisterAuthConfigGeneratingHandler(ctx context.Context, controller AuthConfigController, apply apply.Apply,

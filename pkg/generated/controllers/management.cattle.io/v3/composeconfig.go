@@ -29,28 +29,125 @@ import (
 	"github.com/rancher/wrangler/pkg/kv"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
 )
 
 // ComposeConfigController interface for managing ComposeConfig resources.
 type ComposeConfigController interface {
-	generic.NonNamespacedControllerInterface[*v3.ComposeConfig, *v3.ComposeConfigList]
+	generic.ControllerMeta
+	ComposeConfigClient
+
+	// OnChange runs the given handler when the controller detects a resource was changed.
+	OnChange(ctx context.Context, name string, sync ComposeConfigHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
+	OnRemove(ctx context.Context, name string, sync ComposeConfigHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
+	Enqueue(name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
+	EnqueueAfter(name string, duration time.Duration)
+
+	// Cache returns a cache for the resource type T.
+	Cache() ComposeConfigCache
 }
 
 // ComposeConfigClient interface for managing ComposeConfig resources in Kubernetes.
 type ComposeConfigClient interface {
-	generic.NonNamespacedClientInterface[*v3.ComposeConfig, *v3.ComposeConfigList]
+	// Create creates a new object and return the newly created Object or an error.
+	Create(*v3.ComposeConfig) (*v3.ComposeConfig, error)
+
+	// Update updates the object and return the newly updated Object or an error.
+	Update(*v3.ComposeConfig) (*v3.ComposeConfig, error)
+	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
+	// Will always return an error if the object does not have a status field.
+	UpdateStatus(*v3.ComposeConfig) (*v3.ComposeConfig, error)
+
+	// Delete deletes the Object in the given name.
+	Delete(name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
+	Get(name string, options metav1.GetOptions) (*v3.ComposeConfig, error)
+
+	// List will attempt to find multiple resources.
+	List(opts metav1.ListOptions) (*v3.ComposeConfigList, error)
+
+	// Watch will start watching resources.
+	Watch(opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.ComposeConfig, err error)
 }
 
 // ComposeConfigCache interface for retrieving ComposeConfig resources in memory.
 type ComposeConfigCache interface {
+	// Get returns the resources with the specified name from the cache.
+	Get(name string) (*v3.ComposeConfig, error)
+
+	// List will attempt to find resources from the Cache.
+	List(selector labels.Selector) ([]*v3.ComposeConfig, error)
+
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
+	AddIndexer(indexName string, indexer ComposeConfigIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
+	GetByIndex(indexName, key string) ([]*v3.ComposeConfig, error)
+}
+
+// ComposeConfigHandler is function for performing any potential modifications to a ComposeConfig resource.
+type ComposeConfigHandler func(string, *v3.ComposeConfig) (*v3.ComposeConfig, error)
+
+// ComposeConfigIndexer computes a set of indexed values for the provided object.
+type ComposeConfigIndexer func(obj *v3.ComposeConfig) ([]string, error)
+
+// ComposeConfigGenericController wraps wrangler/pkg/generic.NonNamespacedController so that the function definitions adhere to ComposeConfigController interface.
+type ComposeConfigGenericController struct {
+	generic.NonNamespacedControllerInterface[*v3.ComposeConfig, *v3.ComposeConfigList]
+}
+
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *ComposeConfigGenericController) OnChange(ctx context.Context, name string, sync ComposeConfigHandler) {
+	c.NonNamespacedControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.ComposeConfig](sync))
+}
+
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *ComposeConfigGenericController) OnRemove(ctx context.Context, name string, sync ComposeConfigHandler) {
+	c.NonNamespacedControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.ComposeConfig](sync))
+}
+
+// Cache returns a cache of resources in memory.
+func (c *ComposeConfigGenericController) Cache() ComposeConfigCache {
+	return &ComposeConfigGenericCache{
+		c.NonNamespacedControllerInterface.Cache(),
+	}
+}
+
+// ComposeConfigGenericCache wraps wrangler/pkg/generic.NonNamespacedCache so the function definitions adhere to ComposeConfigCache interface.
+type ComposeConfigGenericCache struct {
 	generic.NonNamespacedCacheInterface[*v3.ComposeConfig]
+}
+
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c ComposeConfigGenericCache) AddIndexer(indexName string, indexer ComposeConfigIndexer) {
+	c.NonNamespacedCacheInterface.AddIndexer(indexName, generic.Indexer[*v3.ComposeConfig](indexer))
 }
 
 type ComposeConfigStatusHandler func(obj *v3.ComposeConfig, status v3.ComposeStatus) (v3.ComposeStatus, error)
 
 type ComposeConfigGeneratingHandler func(obj *v3.ComposeConfig, status v3.ComposeStatus) ([]runtime.Object, v3.ComposeStatus, error)
+
+func FromComposeConfigHandlerToHandler(sync ComposeConfigHandler) generic.Handler {
+	return generic.FromObjectHandlerToHandler(generic.ObjectHandler[*v3.ComposeConfig](sync))
+}
 
 func RegisterComposeConfigStatusHandler(ctx context.Context, controller ComposeConfigController, condition condition.Cond, name string, handler ComposeConfigStatusHandler) {
 	statusHandler := &composeConfigStatusHandler{
@@ -58,7 +155,7 @@ func RegisterComposeConfigStatusHandler(ctx context.Context, controller ComposeC
 		condition: condition,
 		handler:   handler,
 	}
-	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
+	controller.AddGenericHandler(ctx, name, FromComposeConfigHandlerToHandler(statusHandler.sync))
 }
 
 func RegisterComposeConfigGeneratingHandler(ctx context.Context, controller ComposeConfigController, apply apply.Apply,

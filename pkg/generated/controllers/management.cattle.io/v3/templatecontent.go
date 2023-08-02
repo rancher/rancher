@@ -19,21 +19,114 @@ limitations under the License.
 package v3
 
 import (
+	"context"
+	"time"
+
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/wrangler/pkg/generic"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
 )
 
 // TemplateContentController interface for managing TemplateContent resources.
 type TemplateContentController interface {
-	generic.NonNamespacedControllerInterface[*v3.TemplateContent, *v3.TemplateContentList]
+	generic.ControllerMeta
+	TemplateContentClient
+
+	// OnChange runs the given handler when the controller detects a resource was changed.
+	OnChange(ctx context.Context, name string, sync TemplateContentHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
+	OnRemove(ctx context.Context, name string, sync TemplateContentHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
+	Enqueue(name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
+	EnqueueAfter(name string, duration time.Duration)
+
+	// Cache returns a cache for the resource type T.
+	Cache() TemplateContentCache
 }
 
 // TemplateContentClient interface for managing TemplateContent resources in Kubernetes.
 type TemplateContentClient interface {
-	generic.NonNamespacedClientInterface[*v3.TemplateContent, *v3.TemplateContentList]
+	// Create creates a new object and return the newly created Object or an error.
+	Create(*v3.TemplateContent) (*v3.TemplateContent, error)
+
+	// Update updates the object and return the newly updated Object or an error.
+	Update(*v3.TemplateContent) (*v3.TemplateContent, error)
+
+	// Delete deletes the Object in the given name.
+	Delete(name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
+	Get(name string, options metav1.GetOptions) (*v3.TemplateContent, error)
+
+	// List will attempt to find multiple resources.
+	List(opts metav1.ListOptions) (*v3.TemplateContentList, error)
+
+	// Watch will start watching resources.
+	Watch(opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.TemplateContent, err error)
 }
 
 // TemplateContentCache interface for retrieving TemplateContent resources in memory.
 type TemplateContentCache interface {
+	// Get returns the resources with the specified name from the cache.
+	Get(name string) (*v3.TemplateContent, error)
+
+	// List will attempt to find resources from the Cache.
+	List(selector labels.Selector) ([]*v3.TemplateContent, error)
+
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
+	AddIndexer(indexName string, indexer TemplateContentIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
+	GetByIndex(indexName, key string) ([]*v3.TemplateContent, error)
+}
+
+// TemplateContentHandler is function for performing any potential modifications to a TemplateContent resource.
+type TemplateContentHandler func(string, *v3.TemplateContent) (*v3.TemplateContent, error)
+
+// TemplateContentIndexer computes a set of indexed values for the provided object.
+type TemplateContentIndexer func(obj *v3.TemplateContent) ([]string, error)
+
+// TemplateContentGenericController wraps wrangler/pkg/generic.NonNamespacedController so that the function definitions adhere to TemplateContentController interface.
+type TemplateContentGenericController struct {
+	generic.NonNamespacedControllerInterface[*v3.TemplateContent, *v3.TemplateContentList]
+}
+
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *TemplateContentGenericController) OnChange(ctx context.Context, name string, sync TemplateContentHandler) {
+	c.NonNamespacedControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.TemplateContent](sync))
+}
+
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *TemplateContentGenericController) OnRemove(ctx context.Context, name string, sync TemplateContentHandler) {
+	c.NonNamespacedControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.TemplateContent](sync))
+}
+
+// Cache returns a cache of resources in memory.
+func (c *TemplateContentGenericController) Cache() TemplateContentCache {
+	return &TemplateContentGenericCache{
+		c.NonNamespacedControllerInterface.Cache(),
+	}
+}
+
+// TemplateContentGenericCache wraps wrangler/pkg/generic.NonNamespacedCache so the function definitions adhere to TemplateContentCache interface.
+type TemplateContentGenericCache struct {
 	generic.NonNamespacedCacheInterface[*v3.TemplateContent]
+}
+
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c TemplateContentGenericCache) AddIndexer(indexName string, indexer TemplateContentIndexer) {
+	c.NonNamespacedCacheInterface.AddIndexer(indexName, generic.Indexer[*v3.TemplateContent](indexer))
 }

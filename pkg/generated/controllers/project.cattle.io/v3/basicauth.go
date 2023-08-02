@@ -19,21 +19,114 @@ limitations under the License.
 package v3
 
 import (
+	"context"
+	"time"
+
 	v3 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
 	"github.com/rancher/wrangler/pkg/generic"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
 )
 
 // BasicAuthController interface for managing BasicAuth resources.
 type BasicAuthController interface {
-	generic.ControllerInterface[*v3.BasicAuth, *v3.BasicAuthList]
+	generic.ControllerMeta
+	BasicAuthClient
+
+	// OnChange runs the given handler when the controller detects a resource was changed.
+	OnChange(ctx context.Context, name string, sync BasicAuthHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
+	OnRemove(ctx context.Context, name string, sync BasicAuthHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
+	Enqueue(namespace, name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
+	EnqueueAfter(namespace, name string, duration time.Duration)
+
+	// Cache returns a cache for the resource type T.
+	Cache() BasicAuthCache
 }
 
 // BasicAuthClient interface for managing BasicAuth resources in Kubernetes.
 type BasicAuthClient interface {
-	generic.ClientInterface[*v3.BasicAuth, *v3.BasicAuthList]
+	// Create creates a new object and return the newly created Object or an error.
+	Create(*v3.BasicAuth) (*v3.BasicAuth, error)
+
+	// Update updates the object and return the newly updated Object or an error.
+	Update(*v3.BasicAuth) (*v3.BasicAuth, error)
+
+	// Delete deletes the Object in the given name.
+	Delete(namespace, name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
+	Get(namespace, name string, options metav1.GetOptions) (*v3.BasicAuth, error)
+
+	// List will attempt to find multiple resources.
+	List(namespace string, opts metav1.ListOptions) (*v3.BasicAuthList, error)
+
+	// Watch will start watching resources.
+	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
+	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.BasicAuth, err error)
 }
 
 // BasicAuthCache interface for retrieving BasicAuth resources in memory.
 type BasicAuthCache interface {
+	// Get returns the resources with the specified name from the cache.
+	Get(namespace, name string) (*v3.BasicAuth, error)
+
+	// List will attempt to find resources from the Cache.
+	List(namespace string, selector labels.Selector) ([]*v3.BasicAuth, error)
+
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
+	AddIndexer(indexName string, indexer BasicAuthIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
+	GetByIndex(indexName, key string) ([]*v3.BasicAuth, error)
+}
+
+// BasicAuthHandler is function for performing any potential modifications to a BasicAuth resource.
+type BasicAuthHandler func(string, *v3.BasicAuth) (*v3.BasicAuth, error)
+
+// BasicAuthIndexer computes a set of indexed values for the provided object.
+type BasicAuthIndexer func(obj *v3.BasicAuth) ([]string, error)
+
+// BasicAuthGenericController wraps wrangler/pkg/generic.Controller so that the function definitions adhere to BasicAuthController interface.
+type BasicAuthGenericController struct {
+	generic.ControllerInterface[*v3.BasicAuth, *v3.BasicAuthList]
+}
+
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *BasicAuthGenericController) OnChange(ctx context.Context, name string, sync BasicAuthHandler) {
+	c.ControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.BasicAuth](sync))
+}
+
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *BasicAuthGenericController) OnRemove(ctx context.Context, name string, sync BasicAuthHandler) {
+	c.ControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.BasicAuth](sync))
+}
+
+// Cache returns a cache of resources in memory.
+func (c *BasicAuthGenericController) Cache() BasicAuthCache {
+	return &BasicAuthGenericCache{
+		c.ControllerInterface.Cache(),
+	}
+}
+
+// BasicAuthGenericCache wraps wrangler/pkg/generic.Cache so the function definitions adhere to BasicAuthCache interface.
+type BasicAuthGenericCache struct {
 	generic.CacheInterface[*v3.BasicAuth]
+}
+
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c BasicAuthGenericCache) AddIndexer(indexName string, indexer BasicAuthIndexer) {
+	c.CacheInterface.AddIndexer(indexName, generic.Indexer[*v3.BasicAuth](indexer))
 }

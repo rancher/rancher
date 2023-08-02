@@ -29,28 +29,125 @@ import (
 	"github.com/rancher/wrangler/pkg/kv"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
 )
 
 // CatalogController interface for managing Catalog resources.
 type CatalogController interface {
-	generic.NonNamespacedControllerInterface[*v3.Catalog, *v3.CatalogList]
+	generic.ControllerMeta
+	CatalogClient
+
+	// OnChange runs the given handler when the controller detects a resource was changed.
+	OnChange(ctx context.Context, name string, sync CatalogHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
+	OnRemove(ctx context.Context, name string, sync CatalogHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
+	Enqueue(name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
+	EnqueueAfter(name string, duration time.Duration)
+
+	// Cache returns a cache for the resource type T.
+	Cache() CatalogCache
 }
 
 // CatalogClient interface for managing Catalog resources in Kubernetes.
 type CatalogClient interface {
-	generic.NonNamespacedClientInterface[*v3.Catalog, *v3.CatalogList]
+	// Create creates a new object and return the newly created Object or an error.
+	Create(*v3.Catalog) (*v3.Catalog, error)
+
+	// Update updates the object and return the newly updated Object or an error.
+	Update(*v3.Catalog) (*v3.Catalog, error)
+	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
+	// Will always return an error if the object does not have a status field.
+	UpdateStatus(*v3.Catalog) (*v3.Catalog, error)
+
+	// Delete deletes the Object in the given name.
+	Delete(name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
+	Get(name string, options metav1.GetOptions) (*v3.Catalog, error)
+
+	// List will attempt to find multiple resources.
+	List(opts metav1.ListOptions) (*v3.CatalogList, error)
+
+	// Watch will start watching resources.
+	Watch(opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.Catalog, err error)
 }
 
 // CatalogCache interface for retrieving Catalog resources in memory.
 type CatalogCache interface {
+	// Get returns the resources with the specified name from the cache.
+	Get(name string) (*v3.Catalog, error)
+
+	// List will attempt to find resources from the Cache.
+	List(selector labels.Selector) ([]*v3.Catalog, error)
+
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
+	AddIndexer(indexName string, indexer CatalogIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
+	GetByIndex(indexName, key string) ([]*v3.Catalog, error)
+}
+
+// CatalogHandler is function for performing any potential modifications to a Catalog resource.
+type CatalogHandler func(string, *v3.Catalog) (*v3.Catalog, error)
+
+// CatalogIndexer computes a set of indexed values for the provided object.
+type CatalogIndexer func(obj *v3.Catalog) ([]string, error)
+
+// CatalogGenericController wraps wrangler/pkg/generic.NonNamespacedController so that the function definitions adhere to CatalogController interface.
+type CatalogGenericController struct {
+	generic.NonNamespacedControllerInterface[*v3.Catalog, *v3.CatalogList]
+}
+
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *CatalogGenericController) OnChange(ctx context.Context, name string, sync CatalogHandler) {
+	c.NonNamespacedControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.Catalog](sync))
+}
+
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *CatalogGenericController) OnRemove(ctx context.Context, name string, sync CatalogHandler) {
+	c.NonNamespacedControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.Catalog](sync))
+}
+
+// Cache returns a cache of resources in memory.
+func (c *CatalogGenericController) Cache() CatalogCache {
+	return &CatalogGenericCache{
+		c.NonNamespacedControllerInterface.Cache(),
+	}
+}
+
+// CatalogGenericCache wraps wrangler/pkg/generic.NonNamespacedCache so the function definitions adhere to CatalogCache interface.
+type CatalogGenericCache struct {
 	generic.NonNamespacedCacheInterface[*v3.Catalog]
+}
+
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c CatalogGenericCache) AddIndexer(indexName string, indexer CatalogIndexer) {
+	c.NonNamespacedCacheInterface.AddIndexer(indexName, generic.Indexer[*v3.Catalog](indexer))
 }
 
 type CatalogStatusHandler func(obj *v3.Catalog, status v3.CatalogStatus) (v3.CatalogStatus, error)
 
 type CatalogGeneratingHandler func(obj *v3.Catalog, status v3.CatalogStatus) ([]runtime.Object, v3.CatalogStatus, error)
+
+func FromCatalogHandlerToHandler(sync CatalogHandler) generic.Handler {
+	return generic.FromObjectHandlerToHandler(generic.ObjectHandler[*v3.Catalog](sync))
+}
 
 func RegisterCatalogStatusHandler(ctx context.Context, controller CatalogController, condition condition.Cond, name string, handler CatalogStatusHandler) {
 	statusHandler := &catalogStatusHandler{
@@ -58,7 +155,7 @@ func RegisterCatalogStatusHandler(ctx context.Context, controller CatalogControl
 		condition: condition,
 		handler:   handler,
 	}
-	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
+	controller.AddGenericHandler(ctx, name, FromCatalogHandlerToHandler(statusHandler.sync))
 }
 
 func RegisterCatalogGeneratingHandler(ctx context.Context, controller CatalogController, apply apply.Apply,
