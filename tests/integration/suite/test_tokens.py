@@ -66,7 +66,7 @@ def test_kubeconfig_token_ttl(admin_mc, user_mc):
     # update kubeconfig ttl setting for test
     kubeconfig_ttl_mins = 0.01
     client.update_by_id_setting(
-        id="kubeconfig-token-ttl-minutes",
+        id="kubeconfig-default-token-ttl-minutes",
         value=kubeconfig_ttl_mins)
 
     # call login action for kubeconfig token
@@ -84,8 +84,8 @@ def test_kubeconfig_token_ttl(admin_mc, user_mc):
     assert token1 != token2
 
     # reset kubeconfig ttl setting
-    client.update_by_id_setting(id="kubeconfig-token-ttl-minutes",
-                                value="960")
+    client.update_by_id_setting(id="kubeconfig-default-token-ttl-minutes",
+                                value="43200")
 
     # enable kubeconfig generation setting
     client.update_by_id_setting(id="kubeconfig-generate-token", value="true")

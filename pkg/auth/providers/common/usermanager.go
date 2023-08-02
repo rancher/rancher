@@ -18,7 +18,6 @@ import (
 	tokenUtil "github.com/rancher/rancher/pkg/auth/tokens"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	rbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
-	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
 	"github.com/rancher/wrangler/pkg/randomtoken"
@@ -311,18 +310,12 @@ func (m *userManager) EnsureClusterToken(clusterName string, input user.TokenInp
 
 // newTokenForKubeconfig creates a new token for a generated kubeconfig.
 func (m *userManager) newTokenForKubeconfig(clusterName, tokenName, description, kind, userName string, userPrincipal v3.Principal) (string, error) {
-	// settings.KubeconfigTokenTTLMinutes is deprecated use tokens.GetKubeconfigDefaultTokenTTLInMilliSeconds() when the setting is removed
-	tokenTTL, err := tokens.ParseTokenTTL(settings.KubeconfigTokenTTLMinutes.Get())
+
+	tokenTTL, err := tokens.GetKubeconfigDefaultTokenTTLInMilliSeconds()
 	if err != nil {
-		return "", fmt.Errorf("failed to parse setting '%s': %w", settings.KubeconfigTokenTTLMinutes.Name, err)
+		return "", fmt.Errorf("failed to get default token TTL: %w", err)
 	}
 
-	tokenTTL, err = tokens.ClampToMaxTTL(tokenTTL)
-	if err != nil {
-		return "", fmt.Errorf("failed to validate token ttl %w", err)
-	}
-
-	ttlMilli := tokenTTL.Milliseconds()
 	logrus.Infof("Creating token for user %v", userName)
 	input := user.TokenInput{
 		TokenName:     tokenName,
@@ -330,7 +323,7 @@ func (m *userManager) newTokenForKubeconfig(clusterName, tokenName, description,
 		Kind:          kind,
 		UserName:      userName,
 		AuthProvider:  userPrincipal.Provider,
-		TTL:           &ttlMilli,
+		TTL:           tokenTTL,
 		Randomize:     true,
 		UserPrincipal: userPrincipal,
 	}
