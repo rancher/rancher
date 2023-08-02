@@ -36,6 +36,7 @@ import (
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	capiannotations "sigs.k8s.io/cluster-api/util/annotations"
 	"sigs.k8s.io/cluster-api/util/secret"
+	"sigs.k8s.io/yaml"
 )
 
 const (
@@ -111,7 +112,21 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 	}, clients.RKE.RKEBootstrap(), clients.Core.ServiceAccount(), clients.CAPI.Machine())
 }
 
-func (h *handler) getBootstrapSecret(namespace, name string, envVars []corev1.EnvVar, machine *capi.Machine) (*corev1.Secret, error) {
+type cloudInitFile struct {
+	Encoding    string `json:"encoding,omitempty"`
+	Content     string `json:"content"`
+	Owner       string `json:"owner,omitempty"`
+	Path        string `json:"path"`
+	Permissions string `json:"permissions,omitempty"`
+}
+
+type userData struct {
+	Hostname   string          `json:"hostname,omitempty"`
+	RunCmd     []string        `json:"runcmd,omitempty"`
+	WriteFiles []cloudInitFile `json:"write_files,omitempty"`
+}
+
+func (h *handler) getBootstrapSecret(namespace, name string, cp *rkev1.RKEControlPlane, machine *capi.Machine, bootstrap *rkev1.RKEBootstrap) (*corev1.Secret, error) {
 	sa, err := h.serviceAccountCache.Get(namespace, name)
 	if apierrors.IsNotFound(err) {
 		return nil, nil
@@ -132,12 +147,60 @@ func (h *handler) getBootstrapSecret(namespace, name string, envVars []corev1.En
 	}
 
 	is := installer.LinuxInstallScript
-	if os := machine.GetLabels()[capr.CattleOSLabel]; os == capr.WindowsMachineOS {
+	os := machine.GetLabels()[capr.CattleOSLabel]
+	if os == capr.WindowsMachineOS {
 		is = installer.WindowsInstallScript
 	}
+
+	envVars := make([]corev1.EnvVar, 0, len(cp.Spec.AgentEnvVars))
+	for _, env := range cp.Spec.AgentEnvVars {
+		envVars = append(envVars, corev1.EnvVar{
+			Name:  env.Name,
+			Value: env.Value,
+		})
+	}
+
 	data, err := is(context.WithValue(context.Background(), tls.InternalAPI, hasHostPort), base64.URLEncoding.EncodeToString(hash[:]), envVars, "")
 	if err != nil {
 		return nil, err
+	}
+
+	// rancher-machine currently only supports specifying cloud-init as a script for v2prov, and upstream capi providers
+	// need a way to set the provider ID as part of bootstrap
+	if prefix := bootstrap.Annotations[capr.ProviderIDPrefixAnnotation]; prefix != "" && machine.Spec.InfrastructureRef.APIVersion != capr.RKEMachineAPIVersion {
+		var userData userData
+
+		compressed, err := capr.CompressBytes(data)
+		if err != nil {
+			return nil, err
+		}
+
+		userData.WriteFiles = append(userData.WriteFiles,
+			cloudInitFile{
+				Content:     compressed,
+				Encoding:    "gzip+b64",
+				Path:        "/usr/local/custom_script/install.sh",
+				Permissions: "0644",
+			},
+			cloudInitFile{
+				Content:     fmt.Sprintf(`kubelet-arg+: 'provider-id=%s://{{ ds.meta_data["instance_id"] }}'`, prefix),
+				Path:        fmt.Sprintf("/etc/rancher/%s/config.yaml.d/40-provider-id.yaml", capr.GetRuntime(cp.Spec.KubernetesVersion)),
+				Permissions: "0644",
+			})
+
+		userData.Hostname = machine.Spec.InfrastructureRef.Name
+
+		userData.RunCmd = []string{"sh /usr/local/custom_script/install.sh"}
+		if os == capr.WindowsMachineOS {
+			userData.RunCmd = []string{"powershell C:\\install.ps1"}
+		}
+
+		data, err = yaml.Marshal(userData)
+		if err != nil {
+			return nil, err
+		}
+
+		data = append([]byte("## template: jinja\n#cloud-config\n"), data...)
 	}
 
 	return &corev1.Secret{
@@ -213,27 +276,6 @@ func (h *handler) assignPlanSecret(machine *capi.Machine, bootstrap *rkev1.RKEBo
 	return []runtime.Object{sa, secret, role, roleBinding}
 }
 
-func (h *handler) getEnvVar(bootstrap *rkev1.RKEBootstrap, capiCluster *capi.Cluster) ([]corev1.EnvVar, error) {
-	if capiCluster.Spec.ControlPlaneRef == nil || capiCluster.Spec.ControlPlaneRef.Kind != "RKEControlPlane" {
-		return nil, nil
-	}
-
-	cp, err := h.rkeControlPlanes.Get(bootstrap.Namespace, capiCluster.Spec.ControlPlaneRef.Name)
-	if err != nil {
-		return nil, err
-	}
-
-	var result []corev1.EnvVar
-	for _, env := range cp.Spec.AgentEnvVars {
-		result = append(result, corev1.EnvVar{
-			Name:  env.Name,
-			Value: env.Value,
-		})
-	}
-
-	return result, nil
-}
-
 // shouldCreateBootstrapSecret returns true if the generated handler should create/ensure the bootstrap secret's
 // existence, otherwise it wil be cleaned up. The bootstrap secret is created immediately in the Pending phase and
 // should be present until machine deletion.
@@ -250,7 +292,7 @@ func (h *handler) assignBootStrapSecret(machine *capi.Machine, bootstrap *rkev1.
 		return nil, nil, nil
 	}
 
-	envVars, err := h.getEnvVar(bootstrap, capiCluster)
+	cp, err := h.rkeControlPlanes.Get(bootstrap.Namespace, capiCluster.Spec.ControlPlaneRef.Name)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -269,7 +311,7 @@ func (h *handler) assignBootStrapSecret(machine *capi.Machine, bootstrap *rkev1.
 		},
 	}
 
-	bootstrapSecret, err := h.getBootstrapSecret(sa.Namespace, sa.Name, envVars, machine)
+	bootstrapSecret, err := h.getBootstrapSecret(sa.Namespace, sa.Name, cp, machine, bootstrap)
 	if err != nil {
 		return nil, nil, err
 	}

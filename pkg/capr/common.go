@@ -69,6 +69,7 @@ const (
 	PlanSecret                    = "rke.cattle.io/plan-secret-name"
 	PostDrainAnnotation           = "rke.cattle.io/post-drain"
 	PreDrainAnnotation            = "rke.cattle.io/pre-drain"
+	ProviderIDPrefixAnnotation    = "rke.cattle.io/provider-id-prefix"
 	RoleLabel                     = "rke.cattle.io/service-account-role"
 	TaintsAnnotation              = "rke.cattle.io/taints"
 	UnCordonAnnotation            = "rke.cattle.io/uncordon"
@@ -539,14 +540,19 @@ func SafeConcatName(maxLength int, name ...string) string {
 }
 
 // CompressInterface is a function that will marshal, gzip, then base64 encode the provided interface.
-func CompressInterface(v interface{}) (string, error) {
-	marshalledCluster, err := json.Marshal(v)
+func CompressInterface(v any) (string, error) {
+	b, err := json.Marshal(v)
 	if err != nil {
 		return "", err
 	}
+	return CompressBytes(b)
+}
+
+// CompressBytes is a function that will gzip, then base64 encode the provided byte array.
+func CompressBytes(in []byte) (string, error) {
 	var b bytes.Buffer
 	gz := gzip.NewWriter(&b)
-	if _, err := gz.Write(marshalledCluster); err != nil {
+	if _, err := gz.Write(in); err != nil {
 		return "", err
 	}
 	if err := gz.Flush(); err != nil {
@@ -560,24 +566,7 @@ func CompressInterface(v interface{}) (string, error) {
 
 // DecompressInterface is a function that will base64 decode, ungzip, and unmarshal a string into the provided interface.
 func DecompressInterface(inputb64 string, v any) error {
-	if inputb64 == "" {
-		return fmt.Errorf("empty base64 input")
-	}
-
-	decodedGzip, err := base64.StdEncoding.DecodeString(inputb64)
-	if err != nil {
-		return fmt.Errorf("error base64.DecodeString: %v", err)
-	}
-
-	buffer := bytes.NewBuffer(decodedGzip)
-
-	var gz io.Reader
-	gz, err = gzip.NewReader(buffer)
-	if err != nil {
-		return err
-	}
-
-	csBytes, err := io.ReadAll(gz)
+	csBytes, err := DecompressBytes(inputb64)
 	if err != nil {
 		return err
 	}
@@ -588,6 +577,32 @@ func DecompressInterface(inputb64 string, v any) error {
 	}
 
 	return nil
+}
+
+// DecompressBytes is a function that will base64 decode and ungzip a string.
+func DecompressBytes(inputb64 string) ([]byte, error) {
+	if inputb64 == "" {
+		return nil, fmt.Errorf("empty base64 input")
+	}
+
+	decodedGzip, err := base64.StdEncoding.DecodeString(inputb64)
+	if err != nil {
+		return nil, fmt.Errorf("error base64.DecodeString: %v", err)
+	}
+
+	buffer := bytes.NewBuffer(decodedGzip)
+
+	var gz io.Reader
+	gz, err = gzip.NewReader(buffer)
+	if err != nil {
+		return nil, err
+	}
+
+	csBytes, err := io.ReadAll(gz)
+	if err != nil {
+		return nil, err
+	}
+	return csBytes, nil
 }
 
 // DecompressClusterSpec is a function that will base64 decode, ungzip, and unmarshal a string into a cluster spec.

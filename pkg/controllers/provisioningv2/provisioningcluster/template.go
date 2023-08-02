@@ -276,7 +276,7 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 	}
 
 	if len(cluster.Spec.RKEConfig.MachinePools) > 0 {
-		result = append(result, &rkev1.RKEBootstrapTemplate{
+		bootstrapTemplate := &rkev1.RKEBootstrapTemplate{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: cluster.Namespace,
 				Name:      bootstrapName,
@@ -292,7 +292,11 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 					},
 				},
 			},
-		})
+		}
+		if v := cluster.Annotations[capr.ProviderIDPrefixAnnotation]; v != "" {
+			bootstrapTemplate.Annotations[capr.ProviderIDPrefixAnnotation] = v
+		}
+		result = append(result, bootstrapTemplate)
 	}
 
 	machinePoolNames := map[string]bool{}
