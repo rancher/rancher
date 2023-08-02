@@ -6,13 +6,14 @@ import (
 	"reflect"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/features"
 	managementv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/wrangler"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 )
 
 type handler struct {
@@ -80,12 +81,13 @@ func (h *handler) syncHarvesterFeature(obj *v3.Feature) error {
 			return fmt.Errorf("error fetching feature %s: %w", features.Harvester.Name(), err)
 		}
 		harvesterFeatureCopy := harvesterFeature.DeepCopy()
-		if !*harvesterFeatureCopy.Spec.Value {
+		if harvesterFeatureCopy.Spec.Value == nil || !*harvesterFeatureCopy.Spec.Value {
 			harvesterFeatureCopy.Spec.Value = &[]bool{true}[0]
 		}
 		if !reflect.DeepEqual(harvesterFeature, harvesterFeatureCopy) {
-			_, err := h.featuresClient.Update(harvesterFeatureCopy)
-			return fmt.Errorf("error updating Harvester feature %s: %w", obj.Name, err)
+			if _, err := h.featuresClient.Update(harvesterFeatureCopy); err != nil {
+				return fmt.Errorf("error updating Harvester feature %s: %w", obj.Name, err)
+			}
 		}
 	}
 
