@@ -29,28 +29,125 @@ import (
 	"github.com/rancher/wrangler/pkg/kv"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
 )
 
 // ProjectAlertRuleController interface for managing ProjectAlertRule resources.
 type ProjectAlertRuleController interface {
-	generic.ControllerInterface[*v3.ProjectAlertRule, *v3.ProjectAlertRuleList]
+	generic.ControllerMeta
+	ProjectAlertRuleClient
+
+	// OnChange runs the given handler when the controller detects a resource was changed.
+	OnChange(ctx context.Context, name string, sync ProjectAlertRuleHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
+	OnRemove(ctx context.Context, name string, sync ProjectAlertRuleHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
+	Enqueue(namespace, name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
+	EnqueueAfter(namespace, name string, duration time.Duration)
+
+	// Cache returns a cache for the resource type T.
+	Cache() ProjectAlertRuleCache
 }
 
 // ProjectAlertRuleClient interface for managing ProjectAlertRule resources in Kubernetes.
 type ProjectAlertRuleClient interface {
-	generic.ClientInterface[*v3.ProjectAlertRule, *v3.ProjectAlertRuleList]
+	// Create creates a new object and return the newly created Object or an error.
+	Create(*v3.ProjectAlertRule) (*v3.ProjectAlertRule, error)
+
+	// Update updates the object and return the newly updated Object or an error.
+	Update(*v3.ProjectAlertRule) (*v3.ProjectAlertRule, error)
+	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
+	// Will always return an error if the object does not have a status field.
+	UpdateStatus(*v3.ProjectAlertRule) (*v3.ProjectAlertRule, error)
+
+	// Delete deletes the Object in the given name.
+	Delete(namespace, name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
+	Get(namespace, name string, options metav1.GetOptions) (*v3.ProjectAlertRule, error)
+
+	// List will attempt to find multiple resources.
+	List(namespace string, opts metav1.ListOptions) (*v3.ProjectAlertRuleList, error)
+
+	// Watch will start watching resources.
+	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
+	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.ProjectAlertRule, err error)
 }
 
 // ProjectAlertRuleCache interface for retrieving ProjectAlertRule resources in memory.
 type ProjectAlertRuleCache interface {
+	// Get returns the resources with the specified name from the cache.
+	Get(namespace, name string) (*v3.ProjectAlertRule, error)
+
+	// List will attempt to find resources from the Cache.
+	List(namespace string, selector labels.Selector) ([]*v3.ProjectAlertRule, error)
+
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
+	AddIndexer(indexName string, indexer ProjectAlertRuleIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
+	GetByIndex(indexName, key string) ([]*v3.ProjectAlertRule, error)
+}
+
+// ProjectAlertRuleHandler is function for performing any potential modifications to a ProjectAlertRule resource.
+type ProjectAlertRuleHandler func(string, *v3.ProjectAlertRule) (*v3.ProjectAlertRule, error)
+
+// ProjectAlertRuleIndexer computes a set of indexed values for the provided object.
+type ProjectAlertRuleIndexer func(obj *v3.ProjectAlertRule) ([]string, error)
+
+// ProjectAlertRuleGenericController wraps wrangler/pkg/generic.Controller so that the function definitions adhere to ProjectAlertRuleController interface.
+type ProjectAlertRuleGenericController struct {
+	generic.ControllerInterface[*v3.ProjectAlertRule, *v3.ProjectAlertRuleList]
+}
+
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *ProjectAlertRuleGenericController) OnChange(ctx context.Context, name string, sync ProjectAlertRuleHandler) {
+	c.ControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.ProjectAlertRule](sync))
+}
+
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *ProjectAlertRuleGenericController) OnRemove(ctx context.Context, name string, sync ProjectAlertRuleHandler) {
+	c.ControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.ProjectAlertRule](sync))
+}
+
+// Cache returns a cache of resources in memory.
+func (c *ProjectAlertRuleGenericController) Cache() ProjectAlertRuleCache {
+	return &ProjectAlertRuleGenericCache{
+		c.ControllerInterface.Cache(),
+	}
+}
+
+// ProjectAlertRuleGenericCache wraps wrangler/pkg/generic.Cache so the function definitions adhere to ProjectAlertRuleCache interface.
+type ProjectAlertRuleGenericCache struct {
 	generic.CacheInterface[*v3.ProjectAlertRule]
+}
+
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c ProjectAlertRuleGenericCache) AddIndexer(indexName string, indexer ProjectAlertRuleIndexer) {
+	c.CacheInterface.AddIndexer(indexName, generic.Indexer[*v3.ProjectAlertRule](indexer))
 }
 
 type ProjectAlertRuleStatusHandler func(obj *v3.ProjectAlertRule, status v3.AlertStatus) (v3.AlertStatus, error)
 
 type ProjectAlertRuleGeneratingHandler func(obj *v3.ProjectAlertRule, status v3.AlertStatus) ([]runtime.Object, v3.AlertStatus, error)
+
+func FromProjectAlertRuleHandlerToHandler(sync ProjectAlertRuleHandler) generic.Handler {
+	return generic.FromObjectHandlerToHandler(generic.ObjectHandler[*v3.ProjectAlertRule](sync))
+}
 
 func RegisterProjectAlertRuleStatusHandler(ctx context.Context, controller ProjectAlertRuleController, condition condition.Cond, name string, handler ProjectAlertRuleStatusHandler) {
 	statusHandler := &projectAlertRuleStatusHandler{
@@ -58,7 +155,7 @@ func RegisterProjectAlertRuleStatusHandler(ctx context.Context, controller Proje
 		condition: condition,
 		handler:   handler,
 	}
-	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
+	controller.AddGenericHandler(ctx, name, FromProjectAlertRuleHandlerToHandler(statusHandler.sync))
 }
 
 func RegisterProjectAlertRuleGeneratingHandler(ctx context.Context, controller ProjectAlertRuleController, apply apply.Apply,

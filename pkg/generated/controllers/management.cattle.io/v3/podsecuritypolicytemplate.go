@@ -19,21 +19,114 @@ limitations under the License.
 package v3
 
 import (
+	"context"
+	"time"
+
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/wrangler/pkg/generic"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
 )
 
 // PodSecurityPolicyTemplateController interface for managing PodSecurityPolicyTemplate resources.
 type PodSecurityPolicyTemplateController interface {
-	generic.NonNamespacedControllerInterface[*v3.PodSecurityPolicyTemplate, *v3.PodSecurityPolicyTemplateList]
+	generic.ControllerMeta
+	PodSecurityPolicyTemplateClient
+
+	// OnChange runs the given handler when the controller detects a resource was changed.
+	OnChange(ctx context.Context, name string, sync PodSecurityPolicyTemplateHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
+	OnRemove(ctx context.Context, name string, sync PodSecurityPolicyTemplateHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
+	Enqueue(name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
+	EnqueueAfter(name string, duration time.Duration)
+
+	// Cache returns a cache for the resource type T.
+	Cache() PodSecurityPolicyTemplateCache
 }
 
 // PodSecurityPolicyTemplateClient interface for managing PodSecurityPolicyTemplate resources in Kubernetes.
 type PodSecurityPolicyTemplateClient interface {
-	generic.NonNamespacedClientInterface[*v3.PodSecurityPolicyTemplate, *v3.PodSecurityPolicyTemplateList]
+	// Create creates a new object and return the newly created Object or an error.
+	Create(*v3.PodSecurityPolicyTemplate) (*v3.PodSecurityPolicyTemplate, error)
+
+	// Update updates the object and return the newly updated Object or an error.
+	Update(*v3.PodSecurityPolicyTemplate) (*v3.PodSecurityPolicyTemplate, error)
+
+	// Delete deletes the Object in the given name.
+	Delete(name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
+	Get(name string, options metav1.GetOptions) (*v3.PodSecurityPolicyTemplate, error)
+
+	// List will attempt to find multiple resources.
+	List(opts metav1.ListOptions) (*v3.PodSecurityPolicyTemplateList, error)
+
+	// Watch will start watching resources.
+	Watch(opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.PodSecurityPolicyTemplate, err error)
 }
 
 // PodSecurityPolicyTemplateCache interface for retrieving PodSecurityPolicyTemplate resources in memory.
 type PodSecurityPolicyTemplateCache interface {
+	// Get returns the resources with the specified name from the cache.
+	Get(name string) (*v3.PodSecurityPolicyTemplate, error)
+
+	// List will attempt to find resources from the Cache.
+	List(selector labels.Selector) ([]*v3.PodSecurityPolicyTemplate, error)
+
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
+	AddIndexer(indexName string, indexer PodSecurityPolicyTemplateIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
+	GetByIndex(indexName, key string) ([]*v3.PodSecurityPolicyTemplate, error)
+}
+
+// PodSecurityPolicyTemplateHandler is function for performing any potential modifications to a PodSecurityPolicyTemplate resource.
+type PodSecurityPolicyTemplateHandler func(string, *v3.PodSecurityPolicyTemplate) (*v3.PodSecurityPolicyTemplate, error)
+
+// PodSecurityPolicyTemplateIndexer computes a set of indexed values for the provided object.
+type PodSecurityPolicyTemplateIndexer func(obj *v3.PodSecurityPolicyTemplate) ([]string, error)
+
+// PodSecurityPolicyTemplateGenericController wraps wrangler/pkg/generic.NonNamespacedController so that the function definitions adhere to PodSecurityPolicyTemplateController interface.
+type PodSecurityPolicyTemplateGenericController struct {
+	generic.NonNamespacedControllerInterface[*v3.PodSecurityPolicyTemplate, *v3.PodSecurityPolicyTemplateList]
+}
+
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *PodSecurityPolicyTemplateGenericController) OnChange(ctx context.Context, name string, sync PodSecurityPolicyTemplateHandler) {
+	c.NonNamespacedControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.PodSecurityPolicyTemplate](sync))
+}
+
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *PodSecurityPolicyTemplateGenericController) OnRemove(ctx context.Context, name string, sync PodSecurityPolicyTemplateHandler) {
+	c.NonNamespacedControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.PodSecurityPolicyTemplate](sync))
+}
+
+// Cache returns a cache of resources in memory.
+func (c *PodSecurityPolicyTemplateGenericController) Cache() PodSecurityPolicyTemplateCache {
+	return &PodSecurityPolicyTemplateGenericCache{
+		c.NonNamespacedControllerInterface.Cache(),
+	}
+}
+
+// PodSecurityPolicyTemplateGenericCache wraps wrangler/pkg/generic.NonNamespacedCache so the function definitions adhere to PodSecurityPolicyTemplateCache interface.
+type PodSecurityPolicyTemplateGenericCache struct {
 	generic.NonNamespacedCacheInterface[*v3.PodSecurityPolicyTemplate]
+}
+
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c PodSecurityPolicyTemplateGenericCache) AddIndexer(indexName string, indexer PodSecurityPolicyTemplateIndexer) {
+	c.NonNamespacedCacheInterface.AddIndexer(indexName, generic.Indexer[*v3.PodSecurityPolicyTemplate](indexer))
 }

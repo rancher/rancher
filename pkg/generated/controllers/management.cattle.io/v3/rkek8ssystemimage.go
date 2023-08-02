@@ -19,21 +19,114 @@ limitations under the License.
 package v3
 
 import (
+	"context"
+	"time"
+
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/wrangler/pkg/generic"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
 )
 
 // RkeK8sSystemImageController interface for managing RkeK8sSystemImage resources.
 type RkeK8sSystemImageController interface {
-	generic.ControllerInterface[*v3.RkeK8sSystemImage, *v3.RkeK8sSystemImageList]
+	generic.ControllerMeta
+	RkeK8sSystemImageClient
+
+	// OnChange runs the given handler when the controller detects a resource was changed.
+	OnChange(ctx context.Context, name string, sync RkeK8sSystemImageHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
+	OnRemove(ctx context.Context, name string, sync RkeK8sSystemImageHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
+	Enqueue(namespace, name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
+	EnqueueAfter(namespace, name string, duration time.Duration)
+
+	// Cache returns a cache for the resource type T.
+	Cache() RkeK8sSystemImageCache
 }
 
 // RkeK8sSystemImageClient interface for managing RkeK8sSystemImage resources in Kubernetes.
 type RkeK8sSystemImageClient interface {
-	generic.ClientInterface[*v3.RkeK8sSystemImage, *v3.RkeK8sSystemImageList]
+	// Create creates a new object and return the newly created Object or an error.
+	Create(*v3.RkeK8sSystemImage) (*v3.RkeK8sSystemImage, error)
+
+	// Update updates the object and return the newly updated Object or an error.
+	Update(*v3.RkeK8sSystemImage) (*v3.RkeK8sSystemImage, error)
+
+	// Delete deletes the Object in the given name.
+	Delete(namespace, name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
+	Get(namespace, name string, options metav1.GetOptions) (*v3.RkeK8sSystemImage, error)
+
+	// List will attempt to find multiple resources.
+	List(namespace string, opts metav1.ListOptions) (*v3.RkeK8sSystemImageList, error)
+
+	// Watch will start watching resources.
+	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
+	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.RkeK8sSystemImage, err error)
 }
 
 // RkeK8sSystemImageCache interface for retrieving RkeK8sSystemImage resources in memory.
 type RkeK8sSystemImageCache interface {
+	// Get returns the resources with the specified name from the cache.
+	Get(namespace, name string) (*v3.RkeK8sSystemImage, error)
+
+	// List will attempt to find resources from the Cache.
+	List(namespace string, selector labels.Selector) ([]*v3.RkeK8sSystemImage, error)
+
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
+	AddIndexer(indexName string, indexer RkeK8sSystemImageIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
+	GetByIndex(indexName, key string) ([]*v3.RkeK8sSystemImage, error)
+}
+
+// RkeK8sSystemImageHandler is function for performing any potential modifications to a RkeK8sSystemImage resource.
+type RkeK8sSystemImageHandler func(string, *v3.RkeK8sSystemImage) (*v3.RkeK8sSystemImage, error)
+
+// RkeK8sSystemImageIndexer computes a set of indexed values for the provided object.
+type RkeK8sSystemImageIndexer func(obj *v3.RkeK8sSystemImage) ([]string, error)
+
+// RkeK8sSystemImageGenericController wraps wrangler/pkg/generic.Controller so that the function definitions adhere to RkeK8sSystemImageController interface.
+type RkeK8sSystemImageGenericController struct {
+	generic.ControllerInterface[*v3.RkeK8sSystemImage, *v3.RkeK8sSystemImageList]
+}
+
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *RkeK8sSystemImageGenericController) OnChange(ctx context.Context, name string, sync RkeK8sSystemImageHandler) {
+	c.ControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.RkeK8sSystemImage](sync))
+}
+
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *RkeK8sSystemImageGenericController) OnRemove(ctx context.Context, name string, sync RkeK8sSystemImageHandler) {
+	c.ControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.RkeK8sSystemImage](sync))
+}
+
+// Cache returns a cache of resources in memory.
+func (c *RkeK8sSystemImageGenericController) Cache() RkeK8sSystemImageCache {
+	return &RkeK8sSystemImageGenericCache{
+		c.ControllerInterface.Cache(),
+	}
+}
+
+// RkeK8sSystemImageGenericCache wraps wrangler/pkg/generic.Cache so the function definitions adhere to RkeK8sSystemImageCache interface.
+type RkeK8sSystemImageGenericCache struct {
 	generic.CacheInterface[*v3.RkeK8sSystemImage]
+}
+
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c RkeK8sSystemImageGenericCache) AddIndexer(indexName string, indexer RkeK8sSystemImageIndexer) {
+	c.CacheInterface.AddIndexer(indexName, generic.Indexer[*v3.RkeK8sSystemImage](indexer))
 }

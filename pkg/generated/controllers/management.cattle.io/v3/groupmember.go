@@ -19,21 +19,114 @@ limitations under the License.
 package v3
 
 import (
+	"context"
+	"time"
+
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/wrangler/pkg/generic"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
 )
 
 // GroupMemberController interface for managing GroupMember resources.
 type GroupMemberController interface {
-	generic.NonNamespacedControllerInterface[*v3.GroupMember, *v3.GroupMemberList]
+	generic.ControllerMeta
+	GroupMemberClient
+
+	// OnChange runs the given handler when the controller detects a resource was changed.
+	OnChange(ctx context.Context, name string, sync GroupMemberHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
+	OnRemove(ctx context.Context, name string, sync GroupMemberHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
+	Enqueue(name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
+	EnqueueAfter(name string, duration time.Duration)
+
+	// Cache returns a cache for the resource type T.
+	Cache() GroupMemberCache
 }
 
 // GroupMemberClient interface for managing GroupMember resources in Kubernetes.
 type GroupMemberClient interface {
-	generic.NonNamespacedClientInterface[*v3.GroupMember, *v3.GroupMemberList]
+	// Create creates a new object and return the newly created Object or an error.
+	Create(*v3.GroupMember) (*v3.GroupMember, error)
+
+	// Update updates the object and return the newly updated Object or an error.
+	Update(*v3.GroupMember) (*v3.GroupMember, error)
+
+	// Delete deletes the Object in the given name.
+	Delete(name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
+	Get(name string, options metav1.GetOptions) (*v3.GroupMember, error)
+
+	// List will attempt to find multiple resources.
+	List(opts metav1.ListOptions) (*v3.GroupMemberList, error)
+
+	// Watch will start watching resources.
+	Watch(opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.GroupMember, err error)
 }
 
 // GroupMemberCache interface for retrieving GroupMember resources in memory.
 type GroupMemberCache interface {
+	// Get returns the resources with the specified name from the cache.
+	Get(name string) (*v3.GroupMember, error)
+
+	// List will attempt to find resources from the Cache.
+	List(selector labels.Selector) ([]*v3.GroupMember, error)
+
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
+	AddIndexer(indexName string, indexer GroupMemberIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
+	GetByIndex(indexName, key string) ([]*v3.GroupMember, error)
+}
+
+// GroupMemberHandler is function for performing any potential modifications to a GroupMember resource.
+type GroupMemberHandler func(string, *v3.GroupMember) (*v3.GroupMember, error)
+
+// GroupMemberIndexer computes a set of indexed values for the provided object.
+type GroupMemberIndexer func(obj *v3.GroupMember) ([]string, error)
+
+// GroupMemberGenericController wraps wrangler/pkg/generic.NonNamespacedController so that the function definitions adhere to GroupMemberController interface.
+type GroupMemberGenericController struct {
+	generic.NonNamespacedControllerInterface[*v3.GroupMember, *v3.GroupMemberList]
+}
+
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *GroupMemberGenericController) OnChange(ctx context.Context, name string, sync GroupMemberHandler) {
+	c.NonNamespacedControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.GroupMember](sync))
+}
+
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *GroupMemberGenericController) OnRemove(ctx context.Context, name string, sync GroupMemberHandler) {
+	c.NonNamespacedControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.GroupMember](sync))
+}
+
+// Cache returns a cache of resources in memory.
+func (c *GroupMemberGenericController) Cache() GroupMemberCache {
+	return &GroupMemberGenericCache{
+		c.NonNamespacedControllerInterface.Cache(),
+	}
+}
+
+// GroupMemberGenericCache wraps wrangler/pkg/generic.NonNamespacedCache so the function definitions adhere to GroupMemberCache interface.
+type GroupMemberGenericCache struct {
 	generic.NonNamespacedCacheInterface[*v3.GroupMember]
+}
+
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c GroupMemberGenericCache) AddIndexer(indexName string, indexer GroupMemberIndexer) {
+	c.NonNamespacedCacheInterface.AddIndexer(indexName, generic.Indexer[*v3.GroupMember](indexer))
 }

@@ -29,28 +29,125 @@ import (
 	"github.com/rancher/wrangler/pkg/kv"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
 )
 
 // RKEClusterController interface for managing RKECluster resources.
 type RKEClusterController interface {
-	generic.ControllerInterface[*v1.RKECluster, *v1.RKEClusterList]
+	generic.ControllerMeta
+	RKEClusterClient
+
+	// OnChange runs the given handler when the controller detects a resource was changed.
+	OnChange(ctx context.Context, name string, sync RKEClusterHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
+	OnRemove(ctx context.Context, name string, sync RKEClusterHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
+	Enqueue(namespace, name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
+	EnqueueAfter(namespace, name string, duration time.Duration)
+
+	// Cache returns a cache for the resource type T.
+	Cache() RKEClusterCache
 }
 
 // RKEClusterClient interface for managing RKECluster resources in Kubernetes.
 type RKEClusterClient interface {
-	generic.ClientInterface[*v1.RKECluster, *v1.RKEClusterList]
+	// Create creates a new object and return the newly created Object or an error.
+	Create(*v1.RKECluster) (*v1.RKECluster, error)
+
+	// Update updates the object and return the newly updated Object or an error.
+	Update(*v1.RKECluster) (*v1.RKECluster, error)
+	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
+	// Will always return an error if the object does not have a status field.
+	UpdateStatus(*v1.RKECluster) (*v1.RKECluster, error)
+
+	// Delete deletes the Object in the given name.
+	Delete(namespace, name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
+	Get(namespace, name string, options metav1.GetOptions) (*v1.RKECluster, error)
+
+	// List will attempt to find multiple resources.
+	List(namespace string, opts metav1.ListOptions) (*v1.RKEClusterList, error)
+
+	// Watch will start watching resources.
+	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
+	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.RKECluster, err error)
 }
 
 // RKEClusterCache interface for retrieving RKECluster resources in memory.
 type RKEClusterCache interface {
+	// Get returns the resources with the specified name from the cache.
+	Get(namespace, name string) (*v1.RKECluster, error)
+
+	// List will attempt to find resources from the Cache.
+	List(namespace string, selector labels.Selector) ([]*v1.RKECluster, error)
+
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
+	AddIndexer(indexName string, indexer RKEClusterIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
+	GetByIndex(indexName, key string) ([]*v1.RKECluster, error)
+}
+
+// RKEClusterHandler is function for performing any potential modifications to a RKECluster resource.
+type RKEClusterHandler func(string, *v1.RKECluster) (*v1.RKECluster, error)
+
+// RKEClusterIndexer computes a set of indexed values for the provided object.
+type RKEClusterIndexer func(obj *v1.RKECluster) ([]string, error)
+
+// RKEClusterGenericController wraps wrangler/pkg/generic.Controller so that the function definitions adhere to RKEClusterController interface.
+type RKEClusterGenericController struct {
+	generic.ControllerInterface[*v1.RKECluster, *v1.RKEClusterList]
+}
+
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *RKEClusterGenericController) OnChange(ctx context.Context, name string, sync RKEClusterHandler) {
+	c.ControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v1.RKECluster](sync))
+}
+
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *RKEClusterGenericController) OnRemove(ctx context.Context, name string, sync RKEClusterHandler) {
+	c.ControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v1.RKECluster](sync))
+}
+
+// Cache returns a cache of resources in memory.
+func (c *RKEClusterGenericController) Cache() RKEClusterCache {
+	return &RKEClusterGenericCache{
+		c.ControllerInterface.Cache(),
+	}
+}
+
+// RKEClusterGenericCache wraps wrangler/pkg/generic.Cache so the function definitions adhere to RKEClusterCache interface.
+type RKEClusterGenericCache struct {
 	generic.CacheInterface[*v1.RKECluster]
+}
+
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c RKEClusterGenericCache) AddIndexer(indexName string, indexer RKEClusterIndexer) {
+	c.CacheInterface.AddIndexer(indexName, generic.Indexer[*v1.RKECluster](indexer))
 }
 
 type RKEClusterStatusHandler func(obj *v1.RKECluster, status v1.RKEClusterStatus) (v1.RKEClusterStatus, error)
 
 type RKEClusterGeneratingHandler func(obj *v1.RKECluster, status v1.RKEClusterStatus) ([]runtime.Object, v1.RKEClusterStatus, error)
+
+func FromRKEClusterHandlerToHandler(sync RKEClusterHandler) generic.Handler {
+	return generic.FromObjectHandlerToHandler(generic.ObjectHandler[*v1.RKECluster](sync))
+}
 
 func RegisterRKEClusterStatusHandler(ctx context.Context, controller RKEClusterController, condition condition.Cond, name string, handler RKEClusterStatusHandler) {
 	statusHandler := &rKEClusterStatusHandler{
@@ -58,7 +155,7 @@ func RegisterRKEClusterStatusHandler(ctx context.Context, controller RKEClusterC
 		condition: condition,
 		handler:   handler,
 	}
-	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
+	controller.AddGenericHandler(ctx, name, FromRKEClusterHandlerToHandler(statusHandler.sync))
 }
 
 func RegisterRKEClusterGeneratingHandler(ctx context.Context, controller RKEClusterController, apply apply.Apply,

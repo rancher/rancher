@@ -3,8 +3,6 @@ package client
 const (
 	AciNetworkProviderType                                   = "aciNetworkProvider"
 	AciNetworkProviderFieldAEP                               = "aep"
-	AciNetworkProviderFieldAciMultipod                       = "aciMultipod"
-	AciNetworkProviderFieldAciMultipodUbuntu                 = "aciMultipodUbuntu"
 	AciNetworkProviderFieldAddExternalSubnetsToRdconfig      = "addExternalSubnetsToRdconfig"
 	AciNetworkProviderFieldApicHosts                         = "apicHosts"
 	AciNetworkProviderFieldApicRefreshTickerAdjust           = "apicRefreshTickerAdjust"
@@ -15,8 +13,6 @@ const (
 	AciNetworkProviderFieldApicUserName                      = "apicUserName"
 	AciNetworkProviderFieldCApic                             = "capic"
 	AciNetworkProviderFieldControllerLogLevel                = "controllerLogLevel"
-	AciNetworkProviderFieldDhcpDelay                         = "dhcpDelay"
-	AciNetworkProviderFieldDhcpRenewMaxRetryCount            = "dhcpRenewMaxRetryCount"
 	AciNetworkProviderFieldDisablePeriodicSnatGlobalInfoSync = "disablePeriodicSnatGlobalInfoSync"
 	AciNetworkProviderFieldDisableWaitForNetwork             = "disableWaitForNetwork"
 	AciNetworkProviderFieldDropLogEnable                     = "dropLogEnable"
@@ -52,7 +48,6 @@ const (
 	AciNetworkProviderFieldOpflexAgentLogLevel               = "opflexLogLevel"
 	AciNetworkProviderFieldOpflexAgentOpflexAsyncjsonEnabled = "opflexAgentOpflexAsyncjsonEnabled"
 	AciNetworkProviderFieldOpflexAgentOvsAsyncjsonEnabled    = "opflexAgentOvsAsyncjsonEnabled"
-	AciNetworkProviderFieldOpflexAgentPolicyRetryDelayTimer  = "opflexAgentPolicyRetryDelayTimer"
 	AciNetworkProviderFieldOpflexClientSSL                   = "opflexClientSsl"
 	AciNetworkProviderFieldOpflexDeviceDeleteTimeout         = "opflexDeviceDeleteTimeout"
 	AciNetworkProviderFieldOpflexMode                        = "opflexMode"
@@ -93,8 +88,6 @@ const (
 
 type AciNetworkProvider struct {
 	AEP                               string              `json:"aep,omitempty" yaml:"aep,omitempty"`
-	AciMultipod                       string              `json:"aciMultipod,omitempty" yaml:"aciMultipod,omitempty"`
-	AciMultipodUbuntu                 string              `json:"aciMultipodUbuntu,omitempty" yaml:"aciMultipodUbuntu,omitempty"`
 	AddExternalSubnetsToRdconfig      string              `json:"addExternalSubnetsToRdconfig,omitempty" yaml:"addExternalSubnetsToRdconfig,omitempty"`
 	ApicHosts                         []string            `json:"apicHosts,omitempty" yaml:"apicHosts,omitempty"`
 	ApicRefreshTickerAdjust           string              `json:"apicRefreshTickerAdjust,omitempty" yaml:"apicRefreshTickerAdjust,omitempty"`
@@ -105,8 +98,6 @@ type AciNetworkProvider struct {
 	ApicUserName                      string              `json:"apicUserName,omitempty" yaml:"apicUserName,omitempty"`
 	CApic                             string              `json:"capic,omitempty" yaml:"capic,omitempty"`
 	ControllerLogLevel                string              `json:"controllerLogLevel,omitempty" yaml:"controllerLogLevel,omitempty"`
-	DhcpDelay                         string              `json:"dhcpDelay,omitempty" yaml:"dhcpDelay,omitempty"`
-	DhcpRenewMaxRetryCount            string              `json:"dhcpRenewMaxRetryCount,omitempty" yaml:"dhcpRenewMaxRetryCount,omitempty"`
 	DisablePeriodicSnatGlobalInfoSync string              `json:"disablePeriodicSnatGlobalInfoSync,omitempty" yaml:"disablePeriodicSnatGlobalInfoSync,omitempty"`
 	DisableWaitForNetwork             string              `json:"disableWaitForNetwork,omitempty" yaml:"disableWaitForNetwork,omitempty"`
 	DropLogEnable                     string              `json:"dropLogEnable,omitempty" yaml:"dropLogEnable,omitempty"`
@@ -142,7 +133,6 @@ type AciNetworkProvider struct {
 	OpflexAgentLogLevel               string              `json:"opflexLogLevel,omitempty" yaml:"opflexLogLevel,omitempty"`
 	OpflexAgentOpflexAsyncjsonEnabled string              `json:"opflexAgentOpflexAsyncjsonEnabled,omitempty" yaml:"opflexAgentOpflexAsyncjsonEnabled,omitempty"`
 	OpflexAgentOvsAsyncjsonEnabled    string              `json:"opflexAgentOvsAsyncjsonEnabled,omitempty" yaml:"opflexAgentOvsAsyncjsonEnabled,omitempty"`
-	OpflexAgentPolicyRetryDelayTimer  string              `json:"opflexAgentPolicyRetryDelayTimer,omitempty" yaml:"opflexAgentPolicyRetryDelayTimer,omitempty"`
 	OpflexClientSSL                   string              `json:"opflexClientSsl,omitempty" yaml:"opflexClientSsl,omitempty"`
 	OpflexDeviceDeleteTimeout         string              `json:"opflexDeviceDeleteTimeout,omitempty" yaml:"opflexDeviceDeleteTimeout,omitempty"`
 	OpflexMode                        string              `json:"opflexMode,omitempty" yaml:"opflexMode,omitempty"`

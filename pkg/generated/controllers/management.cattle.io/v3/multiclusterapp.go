@@ -29,28 +29,125 @@ import (
 	"github.com/rancher/wrangler/pkg/kv"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
 )
 
 // MultiClusterAppController interface for managing MultiClusterApp resources.
 type MultiClusterAppController interface {
-	generic.ControllerInterface[*v3.MultiClusterApp, *v3.MultiClusterAppList]
+	generic.ControllerMeta
+	MultiClusterAppClient
+
+	// OnChange runs the given handler when the controller detects a resource was changed.
+	OnChange(ctx context.Context, name string, sync MultiClusterAppHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
+	OnRemove(ctx context.Context, name string, sync MultiClusterAppHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
+	Enqueue(namespace, name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
+	EnqueueAfter(namespace, name string, duration time.Duration)
+
+	// Cache returns a cache for the resource type T.
+	Cache() MultiClusterAppCache
 }
 
 // MultiClusterAppClient interface for managing MultiClusterApp resources in Kubernetes.
 type MultiClusterAppClient interface {
-	generic.ClientInterface[*v3.MultiClusterApp, *v3.MultiClusterAppList]
+	// Create creates a new object and return the newly created Object or an error.
+	Create(*v3.MultiClusterApp) (*v3.MultiClusterApp, error)
+
+	// Update updates the object and return the newly updated Object or an error.
+	Update(*v3.MultiClusterApp) (*v3.MultiClusterApp, error)
+	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
+	// Will always return an error if the object does not have a status field.
+	UpdateStatus(*v3.MultiClusterApp) (*v3.MultiClusterApp, error)
+
+	// Delete deletes the Object in the given name.
+	Delete(namespace, name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
+	Get(namespace, name string, options metav1.GetOptions) (*v3.MultiClusterApp, error)
+
+	// List will attempt to find multiple resources.
+	List(namespace string, opts metav1.ListOptions) (*v3.MultiClusterAppList, error)
+
+	// Watch will start watching resources.
+	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
+	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.MultiClusterApp, err error)
 }
 
 // MultiClusterAppCache interface for retrieving MultiClusterApp resources in memory.
 type MultiClusterAppCache interface {
+	// Get returns the resources with the specified name from the cache.
+	Get(namespace, name string) (*v3.MultiClusterApp, error)
+
+	// List will attempt to find resources from the Cache.
+	List(namespace string, selector labels.Selector) ([]*v3.MultiClusterApp, error)
+
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
+	AddIndexer(indexName string, indexer MultiClusterAppIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
+	GetByIndex(indexName, key string) ([]*v3.MultiClusterApp, error)
+}
+
+// MultiClusterAppHandler is function for performing any potential modifications to a MultiClusterApp resource.
+type MultiClusterAppHandler func(string, *v3.MultiClusterApp) (*v3.MultiClusterApp, error)
+
+// MultiClusterAppIndexer computes a set of indexed values for the provided object.
+type MultiClusterAppIndexer func(obj *v3.MultiClusterApp) ([]string, error)
+
+// MultiClusterAppGenericController wraps wrangler/pkg/generic.Controller so that the function definitions adhere to MultiClusterAppController interface.
+type MultiClusterAppGenericController struct {
+	generic.ControllerInterface[*v3.MultiClusterApp, *v3.MultiClusterAppList]
+}
+
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *MultiClusterAppGenericController) OnChange(ctx context.Context, name string, sync MultiClusterAppHandler) {
+	c.ControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.MultiClusterApp](sync))
+}
+
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *MultiClusterAppGenericController) OnRemove(ctx context.Context, name string, sync MultiClusterAppHandler) {
+	c.ControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.MultiClusterApp](sync))
+}
+
+// Cache returns a cache of resources in memory.
+func (c *MultiClusterAppGenericController) Cache() MultiClusterAppCache {
+	return &MultiClusterAppGenericCache{
+		c.ControllerInterface.Cache(),
+	}
+}
+
+// MultiClusterAppGenericCache wraps wrangler/pkg/generic.Cache so the function definitions adhere to MultiClusterAppCache interface.
+type MultiClusterAppGenericCache struct {
 	generic.CacheInterface[*v3.MultiClusterApp]
+}
+
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c MultiClusterAppGenericCache) AddIndexer(indexName string, indexer MultiClusterAppIndexer) {
+	c.CacheInterface.AddIndexer(indexName, generic.Indexer[*v3.MultiClusterApp](indexer))
 }
 
 type MultiClusterAppStatusHandler func(obj *v3.MultiClusterApp, status v3.MultiClusterAppStatus) (v3.MultiClusterAppStatus, error)
 
 type MultiClusterAppGeneratingHandler func(obj *v3.MultiClusterApp, status v3.MultiClusterAppStatus) ([]runtime.Object, v3.MultiClusterAppStatus, error)
+
+func FromMultiClusterAppHandlerToHandler(sync MultiClusterAppHandler) generic.Handler {
+	return generic.FromObjectHandlerToHandler(generic.ObjectHandler[*v3.MultiClusterApp](sync))
+}
 
 func RegisterMultiClusterAppStatusHandler(ctx context.Context, controller MultiClusterAppController, condition condition.Cond, name string, handler MultiClusterAppStatusHandler) {
 	statusHandler := &multiClusterAppStatusHandler{
@@ -58,7 +155,7 @@ func RegisterMultiClusterAppStatusHandler(ctx context.Context, controller MultiC
 		condition: condition,
 		handler:   handler,
 	}
-	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
+	controller.AddGenericHandler(ctx, name, FromMultiClusterAppHandlerToHandler(statusHandler.sync))
 }
 
 func RegisterMultiClusterAppGeneratingHandler(ctx context.Context, controller MultiClusterAppController, apply apply.Apply,

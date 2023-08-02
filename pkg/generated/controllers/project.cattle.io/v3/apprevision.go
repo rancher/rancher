@@ -29,28 +29,125 @@ import (
 	"github.com/rancher/wrangler/pkg/kv"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
 )
 
 // AppRevisionController interface for managing AppRevision resources.
 type AppRevisionController interface {
-	generic.ControllerInterface[*v3.AppRevision, *v3.AppRevisionList]
+	generic.ControllerMeta
+	AppRevisionClient
+
+	// OnChange runs the given handler when the controller detects a resource was changed.
+	OnChange(ctx context.Context, name string, sync AppRevisionHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
+	OnRemove(ctx context.Context, name string, sync AppRevisionHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
+	Enqueue(namespace, name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
+	EnqueueAfter(namespace, name string, duration time.Duration)
+
+	// Cache returns a cache for the resource type T.
+	Cache() AppRevisionCache
 }
 
 // AppRevisionClient interface for managing AppRevision resources in Kubernetes.
 type AppRevisionClient interface {
-	generic.ClientInterface[*v3.AppRevision, *v3.AppRevisionList]
+	// Create creates a new object and return the newly created Object or an error.
+	Create(*v3.AppRevision) (*v3.AppRevision, error)
+
+	// Update updates the object and return the newly updated Object or an error.
+	Update(*v3.AppRevision) (*v3.AppRevision, error)
+	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
+	// Will always return an error if the object does not have a status field.
+	UpdateStatus(*v3.AppRevision) (*v3.AppRevision, error)
+
+	// Delete deletes the Object in the given name.
+	Delete(namespace, name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
+	Get(namespace, name string, options metav1.GetOptions) (*v3.AppRevision, error)
+
+	// List will attempt to find multiple resources.
+	List(namespace string, opts metav1.ListOptions) (*v3.AppRevisionList, error)
+
+	// Watch will start watching resources.
+	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
+	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.AppRevision, err error)
 }
 
 // AppRevisionCache interface for retrieving AppRevision resources in memory.
 type AppRevisionCache interface {
+	// Get returns the resources with the specified name from the cache.
+	Get(namespace, name string) (*v3.AppRevision, error)
+
+	// List will attempt to find resources from the Cache.
+	List(namespace string, selector labels.Selector) ([]*v3.AppRevision, error)
+
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
+	AddIndexer(indexName string, indexer AppRevisionIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
+	GetByIndex(indexName, key string) ([]*v3.AppRevision, error)
+}
+
+// AppRevisionHandler is function for performing any potential modifications to a AppRevision resource.
+type AppRevisionHandler func(string, *v3.AppRevision) (*v3.AppRevision, error)
+
+// AppRevisionIndexer computes a set of indexed values for the provided object.
+type AppRevisionIndexer func(obj *v3.AppRevision) ([]string, error)
+
+// AppRevisionGenericController wraps wrangler/pkg/generic.Controller so that the function definitions adhere to AppRevisionController interface.
+type AppRevisionGenericController struct {
+	generic.ControllerInterface[*v3.AppRevision, *v3.AppRevisionList]
+}
+
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *AppRevisionGenericController) OnChange(ctx context.Context, name string, sync AppRevisionHandler) {
+	c.ControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.AppRevision](sync))
+}
+
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *AppRevisionGenericController) OnRemove(ctx context.Context, name string, sync AppRevisionHandler) {
+	c.ControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.AppRevision](sync))
+}
+
+// Cache returns a cache of resources in memory.
+func (c *AppRevisionGenericController) Cache() AppRevisionCache {
+	return &AppRevisionGenericCache{
+		c.ControllerInterface.Cache(),
+	}
+}
+
+// AppRevisionGenericCache wraps wrangler/pkg/generic.Cache so the function definitions adhere to AppRevisionCache interface.
+type AppRevisionGenericCache struct {
 	generic.CacheInterface[*v3.AppRevision]
+}
+
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c AppRevisionGenericCache) AddIndexer(indexName string, indexer AppRevisionIndexer) {
+	c.CacheInterface.AddIndexer(indexName, generic.Indexer[*v3.AppRevision](indexer))
 }
 
 type AppRevisionStatusHandler func(obj *v3.AppRevision, status v3.AppRevisionStatus) (v3.AppRevisionStatus, error)
 
 type AppRevisionGeneratingHandler func(obj *v3.AppRevision, status v3.AppRevisionStatus) ([]runtime.Object, v3.AppRevisionStatus, error)
+
+func FromAppRevisionHandlerToHandler(sync AppRevisionHandler) generic.Handler {
+	return generic.FromObjectHandlerToHandler(generic.ObjectHandler[*v3.AppRevision](sync))
+}
 
 func RegisterAppRevisionStatusHandler(ctx context.Context, controller AppRevisionController, condition condition.Cond, name string, handler AppRevisionStatusHandler) {
 	statusHandler := &appRevisionStatusHandler{
@@ -58,7 +155,7 @@ func RegisterAppRevisionStatusHandler(ctx context.Context, controller AppRevisio
 		condition: condition,
 		handler:   handler,
 	}
-	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
+	controller.AddGenericHandler(ctx, name, FromAppRevisionHandlerToHandler(statusHandler.sync))
 }
 
 func RegisterAppRevisionGeneratingHandler(ctx context.Context, controller AppRevisionController, apply apply.Apply,

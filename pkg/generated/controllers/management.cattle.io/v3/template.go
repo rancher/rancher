@@ -29,28 +29,125 @@ import (
 	"github.com/rancher/wrangler/pkg/kv"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
 )
 
 // TemplateController interface for managing Template resources.
 type TemplateController interface {
-	generic.NonNamespacedControllerInterface[*v3.Template, *v3.TemplateList]
+	generic.ControllerMeta
+	TemplateClient
+
+	// OnChange runs the given handler when the controller detects a resource was changed.
+	OnChange(ctx context.Context, name string, sync TemplateHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
+	OnRemove(ctx context.Context, name string, sync TemplateHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
+	Enqueue(name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
+	EnqueueAfter(name string, duration time.Duration)
+
+	// Cache returns a cache for the resource type T.
+	Cache() TemplateCache
 }
 
 // TemplateClient interface for managing Template resources in Kubernetes.
 type TemplateClient interface {
-	generic.NonNamespacedClientInterface[*v3.Template, *v3.TemplateList]
+	// Create creates a new object and return the newly created Object or an error.
+	Create(*v3.Template) (*v3.Template, error)
+
+	// Update updates the object and return the newly updated Object or an error.
+	Update(*v3.Template) (*v3.Template, error)
+	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
+	// Will always return an error if the object does not have a status field.
+	UpdateStatus(*v3.Template) (*v3.Template, error)
+
+	// Delete deletes the Object in the given name.
+	Delete(name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
+	Get(name string, options metav1.GetOptions) (*v3.Template, error)
+
+	// List will attempt to find multiple resources.
+	List(opts metav1.ListOptions) (*v3.TemplateList, error)
+
+	// Watch will start watching resources.
+	Watch(opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.Template, err error)
 }
 
 // TemplateCache interface for retrieving Template resources in memory.
 type TemplateCache interface {
+	// Get returns the resources with the specified name from the cache.
+	Get(name string) (*v3.Template, error)
+
+	// List will attempt to find resources from the Cache.
+	List(selector labels.Selector) ([]*v3.Template, error)
+
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
+	AddIndexer(indexName string, indexer TemplateIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
+	GetByIndex(indexName, key string) ([]*v3.Template, error)
+}
+
+// TemplateHandler is function for performing any potential modifications to a Template resource.
+type TemplateHandler func(string, *v3.Template) (*v3.Template, error)
+
+// TemplateIndexer computes a set of indexed values for the provided object.
+type TemplateIndexer func(obj *v3.Template) ([]string, error)
+
+// TemplateGenericController wraps wrangler/pkg/generic.NonNamespacedController so that the function definitions adhere to TemplateController interface.
+type TemplateGenericController struct {
+	generic.NonNamespacedControllerInterface[*v3.Template, *v3.TemplateList]
+}
+
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *TemplateGenericController) OnChange(ctx context.Context, name string, sync TemplateHandler) {
+	c.NonNamespacedControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.Template](sync))
+}
+
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *TemplateGenericController) OnRemove(ctx context.Context, name string, sync TemplateHandler) {
+	c.NonNamespacedControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.Template](sync))
+}
+
+// Cache returns a cache of resources in memory.
+func (c *TemplateGenericController) Cache() TemplateCache {
+	return &TemplateGenericCache{
+		c.NonNamespacedControllerInterface.Cache(),
+	}
+}
+
+// TemplateGenericCache wraps wrangler/pkg/generic.NonNamespacedCache so the function definitions adhere to TemplateCache interface.
+type TemplateGenericCache struct {
 	generic.NonNamespacedCacheInterface[*v3.Template]
+}
+
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c TemplateGenericCache) AddIndexer(indexName string, indexer TemplateIndexer) {
+	c.NonNamespacedCacheInterface.AddIndexer(indexName, generic.Indexer[*v3.Template](indexer))
 }
 
 type TemplateStatusHandler func(obj *v3.Template, status v3.TemplateStatus) (v3.TemplateStatus, error)
 
 type TemplateGeneratingHandler func(obj *v3.Template, status v3.TemplateStatus) ([]runtime.Object, v3.TemplateStatus, error)
+
+func FromTemplateHandlerToHandler(sync TemplateHandler) generic.Handler {
+	return generic.FromObjectHandlerToHandler(generic.ObjectHandler[*v3.Template](sync))
+}
 
 func RegisterTemplateStatusHandler(ctx context.Context, controller TemplateController, condition condition.Cond, name string, handler TemplateStatusHandler) {
 	statusHandler := &templateStatusHandler{
@@ -58,7 +155,7 @@ func RegisterTemplateStatusHandler(ctx context.Context, controller TemplateContr
 		condition: condition,
 		handler:   handler,
 	}
-	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
+	controller.AddGenericHandler(ctx, name, FromTemplateHandlerToHandler(statusHandler.sync))
 }
 
 func RegisterTemplateGeneratingHandler(ctx context.Context, controller TemplateController, apply apply.Apply,

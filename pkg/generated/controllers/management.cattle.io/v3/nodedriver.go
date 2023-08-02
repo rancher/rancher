@@ -29,28 +29,125 @@ import (
 	"github.com/rancher/wrangler/pkg/kv"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
 )
 
 // NodeDriverController interface for managing NodeDriver resources.
 type NodeDriverController interface {
-	generic.NonNamespacedControllerInterface[*v3.NodeDriver, *v3.NodeDriverList]
+	generic.ControllerMeta
+	NodeDriverClient
+
+	// OnChange runs the given handler when the controller detects a resource was changed.
+	OnChange(ctx context.Context, name string, sync NodeDriverHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
+	OnRemove(ctx context.Context, name string, sync NodeDriverHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
+	Enqueue(name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
+	EnqueueAfter(name string, duration time.Duration)
+
+	// Cache returns a cache for the resource type T.
+	Cache() NodeDriverCache
 }
 
 // NodeDriverClient interface for managing NodeDriver resources in Kubernetes.
 type NodeDriverClient interface {
-	generic.NonNamespacedClientInterface[*v3.NodeDriver, *v3.NodeDriverList]
+	// Create creates a new object and return the newly created Object or an error.
+	Create(*v3.NodeDriver) (*v3.NodeDriver, error)
+
+	// Update updates the object and return the newly updated Object or an error.
+	Update(*v3.NodeDriver) (*v3.NodeDriver, error)
+	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
+	// Will always return an error if the object does not have a status field.
+	UpdateStatus(*v3.NodeDriver) (*v3.NodeDriver, error)
+
+	// Delete deletes the Object in the given name.
+	Delete(name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
+	Get(name string, options metav1.GetOptions) (*v3.NodeDriver, error)
+
+	// List will attempt to find multiple resources.
+	List(opts metav1.ListOptions) (*v3.NodeDriverList, error)
+
+	// Watch will start watching resources.
+	Watch(opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.NodeDriver, err error)
 }
 
 // NodeDriverCache interface for retrieving NodeDriver resources in memory.
 type NodeDriverCache interface {
+	// Get returns the resources with the specified name from the cache.
+	Get(name string) (*v3.NodeDriver, error)
+
+	// List will attempt to find resources from the Cache.
+	List(selector labels.Selector) ([]*v3.NodeDriver, error)
+
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
+	AddIndexer(indexName string, indexer NodeDriverIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
+	GetByIndex(indexName, key string) ([]*v3.NodeDriver, error)
+}
+
+// NodeDriverHandler is function for performing any potential modifications to a NodeDriver resource.
+type NodeDriverHandler func(string, *v3.NodeDriver) (*v3.NodeDriver, error)
+
+// NodeDriverIndexer computes a set of indexed values for the provided object.
+type NodeDriverIndexer func(obj *v3.NodeDriver) ([]string, error)
+
+// NodeDriverGenericController wraps wrangler/pkg/generic.NonNamespacedController so that the function definitions adhere to NodeDriverController interface.
+type NodeDriverGenericController struct {
+	generic.NonNamespacedControllerInterface[*v3.NodeDriver, *v3.NodeDriverList]
+}
+
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *NodeDriverGenericController) OnChange(ctx context.Context, name string, sync NodeDriverHandler) {
+	c.NonNamespacedControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.NodeDriver](sync))
+}
+
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *NodeDriverGenericController) OnRemove(ctx context.Context, name string, sync NodeDriverHandler) {
+	c.NonNamespacedControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.NodeDriver](sync))
+}
+
+// Cache returns a cache of resources in memory.
+func (c *NodeDriverGenericController) Cache() NodeDriverCache {
+	return &NodeDriverGenericCache{
+		c.NonNamespacedControllerInterface.Cache(),
+	}
+}
+
+// NodeDriverGenericCache wraps wrangler/pkg/generic.NonNamespacedCache so the function definitions adhere to NodeDriverCache interface.
+type NodeDriverGenericCache struct {
 	generic.NonNamespacedCacheInterface[*v3.NodeDriver]
+}
+
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c NodeDriverGenericCache) AddIndexer(indexName string, indexer NodeDriverIndexer) {
+	c.NonNamespacedCacheInterface.AddIndexer(indexName, generic.Indexer[*v3.NodeDriver](indexer))
 }
 
 type NodeDriverStatusHandler func(obj *v3.NodeDriver, status v3.NodeDriverStatus) (v3.NodeDriverStatus, error)
 
 type NodeDriverGeneratingHandler func(obj *v3.NodeDriver, status v3.NodeDriverStatus) ([]runtime.Object, v3.NodeDriverStatus, error)
+
+func FromNodeDriverHandlerToHandler(sync NodeDriverHandler) generic.Handler {
+	return generic.FromObjectHandlerToHandler(generic.ObjectHandler[*v3.NodeDriver](sync))
+}
 
 func RegisterNodeDriverStatusHandler(ctx context.Context, controller NodeDriverController, condition condition.Cond, name string, handler NodeDriverStatusHandler) {
 	statusHandler := &nodeDriverStatusHandler{
@@ -58,7 +155,7 @@ func RegisterNodeDriverStatusHandler(ctx context.Context, controller NodeDriverC
 		condition: condition,
 		handler:   handler,
 	}
-	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
+	controller.AddGenericHandler(ctx, name, FromNodeDriverHandlerToHandler(statusHandler.sync))
 }
 
 func RegisterNodeDriverGeneratingHandler(ctx context.Context, controller NodeDriverController, apply apply.Apply,

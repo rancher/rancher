@@ -29,28 +29,125 @@ import (
 	"github.com/rancher/wrangler/pkg/kv"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
 )
 
 // CatalogTemplateController interface for managing CatalogTemplate resources.
 type CatalogTemplateController interface {
-	generic.ControllerInterface[*v3.CatalogTemplate, *v3.CatalogTemplateList]
+	generic.ControllerMeta
+	CatalogTemplateClient
+
+	// OnChange runs the given handler when the controller detects a resource was changed.
+	OnChange(ctx context.Context, name string, sync CatalogTemplateHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
+	OnRemove(ctx context.Context, name string, sync CatalogTemplateHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
+	Enqueue(namespace, name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
+	EnqueueAfter(namespace, name string, duration time.Duration)
+
+	// Cache returns a cache for the resource type T.
+	Cache() CatalogTemplateCache
 }
 
 // CatalogTemplateClient interface for managing CatalogTemplate resources in Kubernetes.
 type CatalogTemplateClient interface {
-	generic.ClientInterface[*v3.CatalogTemplate, *v3.CatalogTemplateList]
+	// Create creates a new object and return the newly created Object or an error.
+	Create(*v3.CatalogTemplate) (*v3.CatalogTemplate, error)
+
+	// Update updates the object and return the newly updated Object or an error.
+	Update(*v3.CatalogTemplate) (*v3.CatalogTemplate, error)
+	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
+	// Will always return an error if the object does not have a status field.
+	UpdateStatus(*v3.CatalogTemplate) (*v3.CatalogTemplate, error)
+
+	// Delete deletes the Object in the given name.
+	Delete(namespace, name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
+	Get(namespace, name string, options metav1.GetOptions) (*v3.CatalogTemplate, error)
+
+	// List will attempt to find multiple resources.
+	List(namespace string, opts metav1.ListOptions) (*v3.CatalogTemplateList, error)
+
+	// Watch will start watching resources.
+	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
+	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.CatalogTemplate, err error)
 }
 
 // CatalogTemplateCache interface for retrieving CatalogTemplate resources in memory.
 type CatalogTemplateCache interface {
+	// Get returns the resources with the specified name from the cache.
+	Get(namespace, name string) (*v3.CatalogTemplate, error)
+
+	// List will attempt to find resources from the Cache.
+	List(namespace string, selector labels.Selector) ([]*v3.CatalogTemplate, error)
+
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
+	AddIndexer(indexName string, indexer CatalogTemplateIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
+	GetByIndex(indexName, key string) ([]*v3.CatalogTemplate, error)
+}
+
+// CatalogTemplateHandler is function for performing any potential modifications to a CatalogTemplate resource.
+type CatalogTemplateHandler func(string, *v3.CatalogTemplate) (*v3.CatalogTemplate, error)
+
+// CatalogTemplateIndexer computes a set of indexed values for the provided object.
+type CatalogTemplateIndexer func(obj *v3.CatalogTemplate) ([]string, error)
+
+// CatalogTemplateGenericController wraps wrangler/pkg/generic.Controller so that the function definitions adhere to CatalogTemplateController interface.
+type CatalogTemplateGenericController struct {
+	generic.ControllerInterface[*v3.CatalogTemplate, *v3.CatalogTemplateList]
+}
+
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *CatalogTemplateGenericController) OnChange(ctx context.Context, name string, sync CatalogTemplateHandler) {
+	c.ControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.CatalogTemplate](sync))
+}
+
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *CatalogTemplateGenericController) OnRemove(ctx context.Context, name string, sync CatalogTemplateHandler) {
+	c.ControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.CatalogTemplate](sync))
+}
+
+// Cache returns a cache of resources in memory.
+func (c *CatalogTemplateGenericController) Cache() CatalogTemplateCache {
+	return &CatalogTemplateGenericCache{
+		c.ControllerInterface.Cache(),
+	}
+}
+
+// CatalogTemplateGenericCache wraps wrangler/pkg/generic.Cache so the function definitions adhere to CatalogTemplateCache interface.
+type CatalogTemplateGenericCache struct {
 	generic.CacheInterface[*v3.CatalogTemplate]
+}
+
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c CatalogTemplateGenericCache) AddIndexer(indexName string, indexer CatalogTemplateIndexer) {
+	c.CacheInterface.AddIndexer(indexName, generic.Indexer[*v3.CatalogTemplate](indexer))
 }
 
 type CatalogTemplateStatusHandler func(obj *v3.CatalogTemplate, status v3.TemplateStatus) (v3.TemplateStatus, error)
 
 type CatalogTemplateGeneratingHandler func(obj *v3.CatalogTemplate, status v3.TemplateStatus) ([]runtime.Object, v3.TemplateStatus, error)
+
+func FromCatalogTemplateHandlerToHandler(sync CatalogTemplateHandler) generic.Handler {
+	return generic.FromObjectHandlerToHandler(generic.ObjectHandler[*v3.CatalogTemplate](sync))
+}
 
 func RegisterCatalogTemplateStatusHandler(ctx context.Context, controller CatalogTemplateController, condition condition.Cond, name string, handler CatalogTemplateStatusHandler) {
 	statusHandler := &catalogTemplateStatusHandler{
@@ -58,7 +155,7 @@ func RegisterCatalogTemplateStatusHandler(ctx context.Context, controller Catalo
 		condition: condition,
 		handler:   handler,
 	}
-	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
+	controller.AddGenericHandler(ctx, name, FromCatalogTemplateHandlerToHandler(statusHandler.sync))
 }
 
 func RegisterCatalogTemplateGeneratingHandler(ctx context.Context, controller CatalogTemplateController, apply apply.Apply,
