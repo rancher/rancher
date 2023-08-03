@@ -1,8 +1,8 @@
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/doflamingo721/norman v1.26.5-rancher1 h1:4C6jeomTTmWy1+qTW/WCHiAS+62yn1jf1viAs6XInfA=
-github.com/doflamingo721/norman v1.26.5-rancher1/go.mod h1:s9KeKY9loI+d1mAvE+EG3rVG9l/8CnUEQgTxEimcexg=
+github.com/doflamingo721/norman v1.26.5-rancher2 h1:rhu7JQebVE2jCykvvrVnS+NJWgiMfUZEdeMKCKa6DBk=
+github.com/doflamingo721/norman v1.26.5-rancher2/go.mod h1:VcNORntPhgYS3Z8Tg0hm27iTO4LTo0Gr3Um36qwwCd8=
 github.com/ghodss/yaml v1.0.0 h1:wQHKEahhL6wmXdzwWG11gIVCkOv05bNOh+Rxn0yngAk=
 github.com/ghodss/yaml v1.0.0/go.mod h1:4dBDuWmgqj2HViK6kFavaiC9ZROes6MMH2rRYeMEF04=
 github.com/go-logr/logr v1.2.0/go.mod h1:jdQByPbusPIv2/zmleS9BjJVeZ6kBagPoEUsqbVz/1A=

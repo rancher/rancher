@@ -6,14 +6,14 @@ go 1.19
 // replace github.com/rancher/wrangler v1.1.1 => github.com/rancher/wrangler v1.1.1-0.20230705223603-201b4da5bdaf
 
 replace (
-	github.com/rancher/apiserver => github.com/doflamingo721/apiserver v1.26.5-rancher1
-	github.com/rancher/dynamiclistener => github.com/doflamingo721/dynamiclistener v1.26.5-rancher1
+	github.com/rancher/apiserver => github.com/doflamingo721/apiserver v1.26.5-rancher2
+	github.com/rancher/dynamiclistener => github.com/doflamingo721/dynamiclistener v1.26.5-rancher2
 	github.com/rancher/lasso => github.com/doflamingo721/lasso v1.26.5-rancher3
 	github.com/rancher/lasso/controller-runtime => github.com/doflamingo721/lasso/controller-runtime v1.26.5-rancher3
-	github.com/rancher/machine => github.com/doflamingo721/machine v1.26.5-rancher1
-	github.com/rancher/norman => github.com/doflamingo721/norman v1.26.5-rancher1
-	github.com/rancher/rke => github.com/rayandas/rke v1.27.2-rancher1
-	github.com/rancher/steve => github.com/doflamingo721/steve v1.26.5-rancher1
+	github.com/rancher/machine => github.com/doflamingo721/machine v1.26.5-rancher2
+	github.com/rancher/norman => github.com/doflamingo721/norman v1.26.5-rancher2
+	github.com/rancher/rke => github.com/rayandas/rke v1.27.2-rancher2
+	github.com/rancher/steve => github.com/doflamingo721/steve v1.26.5-rancher2
 	github.com/rancher/wrangler => github.com/doflamingo721/wrangler v1.26.5-rancher2
 )
 
@@ -68,7 +68,7 @@ replace (
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.26.5
 
 	sigs.k8s.io/aws-iam-authenticator => github.com/rancher/aws-iam-authenticator v0.5.9-0.20220713170329-78acb8c83863
-	sigs.k8s.io/cluster-api => sigs.k8s.io/cluster-api v1.4.3
+	sigs.k8s.io/cluster-api => sigs.k8s.io/cluster-api v1.4.4
 )
 
 require (
@@ -171,7 +171,7 @@ require (
 	k8s.io/kubernetes v1.25.4
 	k8s.io/utils v0.0.0-20230220204549-a5ecb0141aa5
 	sigs.k8s.io/aws-iam-authenticator v0.5.9
-	sigs.k8s.io/cluster-api v1.4.3
+	sigs.k8s.io/cluster-api v1.4.4
 	sigs.k8s.io/controller-runtime v0.14.5
 	sigs.k8s.io/yaml v1.3.0
 )
