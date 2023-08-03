@@ -4,7 +4,7 @@ go 1.19
 
 replace k8s.io/client-go => github.com/doflamingo721/client-go v1.26.5-rancher2
 
-replace github.com/rancher/norman => github.com/doflamingo721/norman v1.26.5-rancher1
+replace github.com/rancher/norman => github.com/doflamingo721/norman v1.26.5-rancher2
 
 require (
 	github.com/rancher/norman v0.0.0-20230426211126-d3552b018687
