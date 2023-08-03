@@ -4,7 +4,7 @@ set -ue
 for DIRECTORY in . ./pkg/apis ./pkg/client; do
     cd "$DIRECTORY"
     go mod tidy
-    go mod vendor
+    go mod verify
     cd "$OLDPWD"
 done
 
