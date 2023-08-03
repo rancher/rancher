@@ -115,8 +115,8 @@ github.com/doflamingo721/client-go v1.26.5-rancher2 h1:4skV6wW2CZFw4fzrpX6uMZvR5
 github.com/doflamingo721/client-go v1.26.5-rancher2/go.mod h1:lKaMsE8JvO6XadiF1ALec5rbon5Ieu6ya6ZWu/Z3X1I=
 github.com/doflamingo721/norman v1.26.5-rancher1 h1:4C6jeomTTmWy1+qTW/WCHiAS+62yn1jf1viAs6XInfA=
 github.com/doflamingo721/norman v1.26.5-rancher1/go.mod h1:s9KeKY9loI+d1mAvE+EG3rVG9l/8CnUEQgTxEimcexg=
-github.com/doflamingo721/wrangler v1.26.5-rancher1 h1:jKeZf/CzAd9Ti/+CXGIm4qVva1X8o95E9qX0/wDWMpA=
-github.com/doflamingo721/wrangler v1.26.5-rancher1/go.mod h1:sAqHJ2HttZVDW3eSe/hwtkJ2SHWAsgPHz6TriueV4Bs=
+github.com/doflamingo721/wrangler v1.26.5-rancher2 h1:98d6GBrFKalAR7Opry6fI/a+MpJbhs15LCG3/NWhUAQ=
+github.com/doflamingo721/wrangler v1.26.5-rancher2/go.mod h1:23PB5dwtpd0h8iOQPfN9HxJi5a3n6ixktqswZ+kkTqA=
 github.com/dustin/go-humanize v1.0.0/go.mod h1:HtrtbFcZ19U5GC7JDqmcUSB87Iq5E25KnS6fMYU6eOk=
 github.com/elazarl/goproxy v0.0.0-20180725130230-947c36da3153/go.mod h1:/Zj4wYkgs4iZTTu3o/KG3Itv/qCCa8VVMlb3i9OVuzc=
 github.com/emicklei/go-restful v0.0.0-20170410110728-ff4f55a20633/go.mod h1:otzb+WCGbkyDHkqmQmT5YD2WR4BBwUdeQoFo8l/7tVs=
@@ -1141,4 +1141,3 @@ sigs.k8s.io/structured-merge-diff/v4 v4.2.3/go.mod h1:qjx8mGObPmV2aSZepjQjbmb2ih
 sigs.k8s.io/yaml v1.2.0/go.mod h1:yfXDCHCao9+ENCvLSE62v9VSji2MKu5jeNfTrofGhJc=
 sigs.k8s.io/yaml v1.3.0 h1:a2VclLzOGrwOHDiV8EfBGhvjHvP46CtW5j6POvhYGGo=
 sigs.k8s.io/yaml v1.3.0/go.mod h1:GeOyir5tyXNByN85N/dRIT9es5UQNerPYEKK56eTBm8=
-vbom.ml/util v0.0.0-20160121211510-db5cfe13f5cc/go.mod h1:so/NYdZXCz+E3ZpW0uAoCj6uzU2+8OWDFv/HxUSs7kI=

@@ -8,13 +8,13 @@ go 1.19
 replace (
 	github.com/rancher/apiserver => github.com/doflamingo721/apiserver v1.26.5-rancher1
 	github.com/rancher/dynamiclistener => github.com/doflamingo721/dynamiclistener v1.26.5-rancher1
-	github.com/rancher/lasso => github.com/doflamingo721/lasso v1.26.5-rancher2
-	github.com/rancher/lasso/controller-runtime => github.com/doflamingo721/lasso/controller-runtime v1.26.5-rancher2
+	github.com/rancher/lasso => github.com/doflamingo721/lasso v1.26.5-rancher3
+	github.com/rancher/lasso/controller-runtime => github.com/doflamingo721/lasso/controller-runtime v1.26.5-rancher3
 	github.com/rancher/machine => github.com/doflamingo721/machine v1.26.5-rancher1
 	github.com/rancher/norman => github.com/doflamingo721/norman v1.26.5-rancher1
 	github.com/rancher/rke => github.com/rayandas/rke v1.27.2-rancher1
 	github.com/rancher/steve => github.com/doflamingo721/steve v1.26.5-rancher1
-	github.com/rancher/wrangler => github.com/doflamingo721/wrangler v1.26.5-rancher1
+	github.com/rancher/wrangler => github.com/doflamingo721/wrangler v1.26.5-rancher2
 )
 
 replace (
