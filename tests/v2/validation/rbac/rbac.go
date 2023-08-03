@@ -10,10 +10,10 @@ import (
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
+	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/namespaces"
 	"github.com/rancher/rancher/tests/framework/extensions/projects"
-	"github.com/rancher/rancher/tests/framework/extensions/users"
-	password "github.com/rancher/rancher/tests/framework/extensions/users/passwordgenerator"
+	nodepools "github.com/rancher/rancher/tests/framework/extensions/rke1/nodepools"
 	"github.com/rancher/rancher/tests/framework/extensions/workloads"
 	"github.com/rancher/rancher/tests/framework/pkg/config"
 	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
@@ -24,50 +24,33 @@ import (
 )
 
 const (
-	roleOwner                = "cluster-owner"
-	roleMember               = "cluster-member"
-	roleProjectOwner         = "project-owner"
-	roleProjectMember        = "project-member"
-	roleManageProjectMember  = "projectroletemplatebindings-manage"
-	roleProjectReadOnly      = "read-only"
-	restrictedAdmin          = "restricted-admin"
-	standardUser             = "user"
-	pssRestrictedPolicy      = "restricted"
-	pssBaselinePolicy        = "baseline"
-	pssPrivilegedPolicy      = "privileged"
-	psaWarn                  = "pod-security.kubernetes.io/warn"
-	psaAudit                 = "pod-security.kubernetes.io/audit"
-	psaEnforce               = "pod-security.kubernetes.io/enforce"
-	kubeConfigTokenSettingID = "kubeconfig-default-token-ttl-minutes"
-
-	isCattleLabeled = true
+	roleOwner                     = "cluster-owner"
+	roleMember                    = "cluster-member"
+	roleProjectOwner              = "project-owner"
+	roleProjectMember             = "project-member"
+	roleCustomManageProjectMember = "projectroletemplatebindings-manage"
+	roleCustomCreateNS            = "create-ns"
+	roleProjectReadOnly           = "read-only"
+	restrictedAdmin               = "restricted-admin"
+	standardUser                  = "user"
+	pssRestrictedPolicy           = "restricted"
+	pssBaselinePolicy             = "baseline"
+	pssPrivilegedPolicy           = "privileged"
+	psaWarn                       = "pod-security.kubernetes.io/warn"
+	psaAudit                      = "pod-security.kubernetes.io/audit"
+	psaEnforce                    = "pod-security.kubernetes.io/enforce"
+	kubeConfigTokenSettingID      = "kubeconfig-default-token-ttl-minutes"
+	psaRole                       = "updatepsa"
+	defaultNamespace              = "fleet-default"
+	isCattleLabeled               = true
 )
 
 type ClusterConfig struct {
-	nodeRoles            []string
+	nodesAndRoles        []nodepools.NodeRoles
 	externalNodeProvider provisioning.ExternalNodeProvider
 	kubernetesVersion    string
 	cni                  string
 	advancedOptions      provisioning.AdvancedOptions
-}
-
-func createUser(client *rancher.Client, role string) (*management.User, error) {
-	enabled := true
-	var username = namegen.AppendRandomString("testuser-")
-	var testpassword = password.GenerateUserPassword("testpass-")
-	user := &management.User{
-		Username: username,
-		Password: testpassword,
-		Name:     username,
-		Enabled:  &enabled,
-	}
-
-	newUser, err := users.CreateUserWithRole(client, user, role)
-	if err != nil {
-		return newUser, err
-	}
-	newUser.Password = user.Password
-	return newUser, err
 }
 
 func listProjects(client *rancher.Client, clusterID string) ([]string, error) {
@@ -162,7 +145,7 @@ func createDeploymentAndWait(steveclient *v1.Client, client *rancher.Client, clu
 		}
 		return false, nil
 	})
-	return deploymentResp, nil
+	return deploymentResp, err
 }
 
 func getAndConvertNamespace(namespace *v1.SteveAPIObject, steveAdminClient *v1.Client) (*coreV1.Namespace, error) {
@@ -224,11 +207,9 @@ func editGlobalSettings(steveclient *v1.Client, globalSetting *v1.SteveAPIObject
 }
 
 func getClusterConfig() *ClusterConfig {
-	nodeAndRoles := []string{
-		"--etcd",
-		"--controlplane",
-		"--worker",
-	}
+
+	nodeAndRoles := []nodepools.NodeRoles{provisioning.RKE1AllRolesPool}
+
 	userConfig := new(provisioning.Config)
 	config.LoadConfig(provisioning.ConfigurationFileKey, userConfig)
 
@@ -239,8 +220,79 @@ func getClusterConfig() *ClusterConfig {
 
 	externalNodeProvider := provisioning.ExternalNodeProviderSetup(nodeProviders)
 
-	clusterConfig := ClusterConfig{nodeRoles: nodeAndRoles, externalNodeProvider: externalNodeProvider,
+	clusterConfig := ClusterConfig{nodesAndRoles: nodeAndRoles, externalNodeProvider: externalNodeProvider,
 		kubernetesVersion: kubernetesVersion, cni: cni, advancedOptions: advancedOptions}
 
 	return &clusterConfig
+}
+
+func createRole(client *rancher.Client, context string, roleName string, rules []management.PolicyRule) (role *management.RoleTemplate, err error) {
+	role, err = client.Management.RoleTemplate.Create(
+		&management.RoleTemplate{
+			Context: "cluster",
+			Name:    "additional-psa-role",
+			Rules:   rules,
+		})
+	return
+
+}
+
+func editPsactCluster(client *rancher.Client, clustername string, namespace string, psact string) (clusterType string, err error) {
+	clusterID, err := clusters.GetClusterIDByName(client, clustername)
+	if err != nil {
+		return "", err
+	}
+	//Check if the downstream cluster is RKE2/K3S or RKE1
+	if strings.Contains(clusterID, "c-m-") {
+		clusterType = "RKE2K3S"
+		clusterObj, existingSteveAPIObj, err := clusters.GetProvisioningClusterByName(client, clustername, namespace)
+		if err != nil {
+			return "", err
+		}
+
+		clusterObj.Spec.DefaultPodSecurityAdmissionConfigurationTemplateName = psact
+		_, err = clusters.UpdateK3SRKE2Cluster(client, existingSteveAPIObj, clusterObj)
+		if err != nil {
+			return clusterType, err
+		}
+		updatedClusterObj, _, err := clusters.GetProvisioningClusterByName(client, clustername, namespace)
+		if err != nil {
+			return "", err
+		}
+		if updatedClusterObj.Spec.DefaultPodSecurityAdmissionConfigurationTemplateName != psact {
+			errorMsg := "psact value was not changed, Expected: " + psact + ", Actual: " + updatedClusterObj.Spec.DefaultPodSecurityAdmissionConfigurationTemplateName
+			return clusterType, errors.New(errorMsg)
+		}
+	} else {
+		clusterType = "RKE"
+		if psact == "" {
+			psact = " "
+		}
+		existingCluster, err := client.Management.Cluster.ByID(clusterID)
+		if err != nil {
+			return "", err
+		}
+
+		updatedCluster := &management.Cluster{
+			Name: existingCluster.Name,
+			DefaultPodSecurityAdmissionConfigurationTemplateName: psact,
+		}
+		_, err = client.Management.Cluster.Update(existingCluster, updatedCluster)
+		if err != nil {
+			return clusterType, err
+		}
+		clusters.WaitForActiveRKE1Cluster(client, clusterID)
+		modifiedCluster, err := client.Management.Cluster.ByID(clusterID)
+		if err != nil {
+			return "", err
+		}
+		if psact == " " {
+			psact = ""
+		}
+		if modifiedCluster.DefaultPodSecurityAdmissionConfigurationTemplateName != psact {
+			errorMsg := "psact value was not changed, Expected: " + psact + ", Actual: " + modifiedCluster.DefaultPodSecurityAdmissionConfigurationTemplateName
+			return clusterType, errors.New(errorMsg)
+		}
+	}
+	return clusterType, nil
 }

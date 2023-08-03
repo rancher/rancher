@@ -457,10 +457,7 @@ type convertFn func(i interface{}) (string, string, []rbacv1.Subject)
 
 func (m *manager) ensureBindings(ns string, roles map[string]*v3.RoleTemplate, binding metav1.Object, client *objectclient.ObjectClient,
 	create createFn, list listFn, convert convertFn) error {
-	meta, err := meta.Accessor(binding)
-	if err != nil {
-		return err
-	}
+	objMeta := meta.AsPartialObjectMetadata(binding).ObjectMeta
 
 	desiredRBs := map[string]runtime.Object{}
 	subject, err := pkgrbac.BuildSubjectFromRTB(binding)
@@ -468,11 +465,11 @@ func (m *manager) ensureBindings(ns string, roles map[string]*v3.RoleTemplate, b
 		return err
 	}
 	for roleName := range roles {
-		rbKey, objectMeta, subjects, roleRef := bindingParts(ns, roleName, meta.GetNamespace()+"_"+meta.GetName(), subject)
+		rbKey, objectMeta, subjects, roleRef := bindingParts(ns, roleName, objMeta, subject)
 		desiredRBs[rbKey] = create(objectMeta, subjects, roleRef)
 	}
 
-	set := labels.Set(map[string]string{rtbOwnerLabel: meta.GetNamespace() + "_" + meta.GetName()})
+	set := labels.Set(map[string]string{rtbOwnerLabel: pkgrbac.GetRTBLabel(objMeta)})
 	currentRBs, err := list(ns, set.AsSelector())
 	if err != nil {
 		return err
@@ -531,7 +528,7 @@ func (m *manager) ensureBindings(ns string, roles map[string]*v3.RoleTemplate, b
 	return nil
 }
 
-func bindingParts(namespace, roleName, parentNsAndName string, subject rbacv1.Subject) (string, metav1.ObjectMeta, []rbacv1.Subject, rbacv1.RoleRef) {
+func bindingParts(namespace, roleName string, objMeta metav1.ObjectMeta, subject rbacv1.Subject) (string, metav1.ObjectMeta, []rbacv1.Subject, rbacv1.RoleRef) {
 	key := rbRoleSubjectKey(roleName, subject)
 
 	roleRef := rbacv1.RoleRef{
@@ -549,7 +546,7 @@ func bindingParts(namespace, roleName, parentNsAndName string, subject rbacv1.Su
 	return key,
 		metav1.ObjectMeta{
 			Name:   name,
-			Labels: map[string]string{rtbOwnerLabel: parentNsAndName},
+			Labels: map[string]string{rtbOwnerLabel: pkgrbac.GetRTBLabel(objMeta)},
 		},
 		[]rbacv1.Subject{subject},
 		roleRef
@@ -600,7 +597,7 @@ func prtbByNsName(obj interface{}) ([]string, error) {
 	if !ok {
 		return []string{}, nil
 	}
-	return []string{prtb.Namespace + "_" + prtb.Name}, nil
+	return []string{pkgrbac.GetRTBLabel(prtb.ObjectMeta)}, nil
 }
 
 func crbRoleSubjectKeys(roleName string, subjects []rbacv1.Subject) []string {

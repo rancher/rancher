@@ -16,13 +16,11 @@ import (
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/pkg/data"
 	"github.com/rancher/wrangler/pkg/data/convert"
-	controllerapiextv1 "github.com/rancher/wrangler/pkg/generated/controllers/apiextensions.k8s.io/v1"
 	controllerv1 "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/pkg/summary"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/mod/semver"
 	v1 "k8s.io/api/core/v1"
-	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -59,12 +57,6 @@ func runMigrations(wranglerContext *wrangler.Context) error {
 
 	if features.MCM.Enabled() {
 		if err := forceSystemNamespaceAssignment(wranglerContext.Core.ConfigMap(), wranglerContext.Mgmt.Project()); err != nil {
-			return err
-		}
-	}
-
-	if features.EmbeddedClusterAPI.Enabled() {
-		if err := addWebhookConfigToCAPICRDs(wranglerContext.CRD.CustomResourceDefinition()); err != nil {
 			return err
 		}
 	}
@@ -243,47 +235,6 @@ func applyProjectConditionForNamespaceAssignment(label string, condition conditi
 			return err
 		}
 	}
-	return nil
-}
-
-func addWebhookConfigToCAPICRDs(crdClient controllerapiextv1.CustomResourceDefinitionClient) error {
-	crds, err := crdClient.List(metav1.ListOptions{
-		LabelSelector: "auth.cattle.io/cluster-indexed=true",
-	})
-	if err != nil {
-		return err
-	}
-	for _, crd := range crds.Items {
-		if crd.Spec.Group != "cluster.x-k8s.io" || (crd.Spec.Conversion != nil && crd.Spec.Conversion.Strategy != apiextv1.NoneConverter) {
-			continue
-		}
-		if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			latestCrd, err := crdClient.Get(crd.Name, metav1.GetOptions{})
-			if err != nil {
-				return err
-			}
-
-			latestCrd.Spec.Conversion = &apiextv1.CustomResourceConversion{
-				Strategy: apiextv1.WebhookConverter,
-				Webhook: &apiextv1.WebhookConversion{
-					ClientConfig: &apiextv1.WebhookClientConfig{
-						Service: &apiextv1.ServiceReference{
-							Namespace: "cattle-system",
-							Name:      "webhook-service",
-							Path:      &[]string{"/convert"}[0],
-							Port:      &[]int32{443}[0],
-						},
-					},
-					ConversionReviewVersions: []string{"v1", "v1beta1"},
-				},
-			}
-			_, err = crdClient.Update(&crd)
-			return err
-		}); err != nil {
-			return err
-		}
-	}
-
 	return nil
 }
 
@@ -506,32 +457,44 @@ func migrateMachinePoolsDynamicSchemaLabel(w *wrangler.Context) error {
 			if provCluster.Spec.RKEConfig == nil {
 				continue
 			}
-			// search for machine pools without the `dynamic-schema-spec` annotation and apply it
-			for i, machinePool := range provCluster.Spec.RKEConfig.MachinePools {
-				var spec v32.DynamicSchemaSpec
-				if machinePool.DynamicSchemaSpec != "" && json.Unmarshal([]byte(machinePool.DynamicSchemaSpec), &spec) == nil {
-					continue
+			if err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+				cluster, err := w.Provisioning.Cluster().Get(provCluster.Namespace, provCluster.Name, metav1.GetOptions{})
+				if k8serror.IsNotFound(err) {
+					return nil
+				} else if err != nil {
+					return err
 				}
-				nodeConfig := machinePool.NodeConfig
-				if nodeConfig == nil {
-					return fmt.Errorf("machine pool node config must not be nil")
+				cluster = cluster.DeepCopy()
+				// search for machine pools without the `dynamic-schema-spec` annotation and apply it
+				for i, machinePool := range cluster.Spec.RKEConfig.MachinePools {
+					var spec v32.DynamicSchemaSpec
+					if machinePool.DynamicSchemaSpec != "" && json.Unmarshal([]byte(machinePool.DynamicSchemaSpec), &spec) == nil {
+						continue
+					}
+					nodeConfig := machinePool.NodeConfig
+					if nodeConfig == nil {
+						return fmt.Errorf("machine pool node config must not be nil")
+					}
+					apiVersion := nodeConfig.APIVersion
+					if apiVersion != capr.DefaultMachineConfigAPIVersion && apiVersion != "" {
+						continue
+					}
+					ds, err := w.Mgmt.DynamicSchema().Get(strings.ToLower(nodeConfig.Kind), metav1.GetOptions{})
+					if err != nil {
+						return err
+					}
+					specJSON, err := json.Marshal(ds.Spec)
+					if err != nil {
+						return err
+					}
+					cluster.Spec.RKEConfig.MachinePools[i].DynamicSchemaSpec = string(specJSON)
 				}
-				apiVersion := nodeConfig.APIVersion
-				if apiVersion != capr.DefaultMachineConfigAPIVersion && apiVersion != "" {
-					continue
-				}
-				ds, err := w.Mgmt.DynamicSchema().Get(strings.ToLower(nodeConfig.Kind), metav1.GetOptions{})
+				_, err = w.Provisioning.Cluster().Update(cluster)
 				if err != nil {
 					return err
 				}
-				specJSON, err := json.Marshal(ds.Spec)
-				if err != nil {
-					return err
-				}
-				provCluster.Spec.RKEConfig.MachinePools[i].DynamicSchemaSpec = string(specJSON)
-			}
-			_, err = w.Provisioning.Cluster().Update(&provCluster)
-			if err != nil {
+				return nil
+			}); err != nil {
 				return err
 			}
 		}

@@ -6,7 +6,11 @@ import (
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters/bundledclusters"
+	nodestat "github.com/rancher/rancher/tests/framework/extensions/nodes"
+	psadeploy "github.com/rancher/rancher/tests/framework/extensions/psact"
+	"github.com/rancher/rancher/tests/framework/extensions/workloads/pods"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
@@ -46,7 +50,7 @@ func (u *UpgradeKubernetesTestSuite) TestUpgradeKubernetes() {
 				u.T().Skipf("Kubernetes upgrade is disabled for [%v]", cluster.Name)
 			}
 
-			u.testUpgradeSingleCluster(cluster.Name, cluster.VersionToUpgrade, cluster.isLatestVersion)
+			u.testUpgradeSingleCluster(cluster.Name, cluster.VersionToUpgrade, cluster.PSACT, cluster.isLatestVersion)
 		})
 	}
 }
@@ -55,7 +59,7 @@ func TestKubernetesUpgradeTestSuite(t *testing.T) {
 	suite.Run(t, new(UpgradeKubernetesTestSuite))
 }
 
-func (u *UpgradeKubernetesTestSuite) testUpgradeSingleCluster(clusterName, versionToUpgrade string, isLatestVersion bool) {
+func (u *UpgradeKubernetesTestSuite) testUpgradeSingleCluster(clusterName, versionToUpgrade, psact string, isLatestVersion bool) {
 	subSession := u.session.NewSession()
 	defer subSession.Cleanup()
 
@@ -106,4 +110,23 @@ func (u *UpgradeKubernetesTestSuite) testUpgradeSingleCluster(clusterName, versi
 		u.T().Logf("[%v]: Validating updated cluster's nodepools kubernetes versions", clusterName)
 		validateNodepoolVersions(u.T(), client, updatedCluster, version, !isCheckingCurrentCluster)
 	}
+
+	err = nodestat.IsNodeReady(client, clusterMeta.ID)
+	require.NoError(u.T(), err)
+
+	clusterToken, err := clusters.CheckServiceAccountTokenSecret(client, clusterName)
+	require.NoError(u.T(), err)
+	assert.NotEmpty(u.T(), clusterToken)
+
+	if psact == string(RancherPrivileged) || psact == string(RancherRestricted) {
+		err = psadeploy.CheckPSACT(client, clusterName)
+		require.NoError(u.T(), err)
+
+		_, err = psadeploy.CreateNginxDeployment(client, clusterMeta.ID, psact)
+		require.NoError(u.T(), err)
+	}
+
+	podResults, podErrors := pods.StatusPods(client, clusterMeta.ID)
+	assert.NotEmpty(u.T(), podResults)
+	assert.Empty(u.T(), podErrors)
 }

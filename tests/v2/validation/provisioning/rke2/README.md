@@ -31,10 +31,14 @@ provisioningInput is needed to the run the RKE2 tests, specifically kubernetesVe
       },
       {
         "worker": true,
+        "quantity": 2,
+      },
+      {
+        "windows": true,
         "quantity": 1,
       }
     ],
-    "rke2KubernetesVersion": ["v1.21.6+rke2r1"],
+    "rke2KubernetesVersion": ["v1.25.9+rke2r1"],
     "cni": ["calico"],
     "providers": ["linode", "aws", "do", "harvester"],
     "nodeProviders": ["ec2"],
@@ -223,9 +227,12 @@ Machine RKE2 config is the final piece needed for the config to run RKE2 provisi
 ```
 
 ## Custom Cluster
-For custom clusters, the below config is needed, only AWS/EC2 will work.
-**Ensure you have nodeProviders in provisioningInput**
+For custom clusters, no machineConfig or credentials are needed. Currently only supported for ec2.
 
+Dependencies:
+* **Ensure you have nodeProviders in provisioningInput**
+* make sure that all roles are entered at least once
+* windows pool(s) should always be last in the config
 ```json
 {
   "awsEC2Configs": {
@@ -245,7 +252,21 @@ For custom clusters, the below config is needed, only AWS/EC2 will work.
         "awsIAMProfile": "",
         "awsUser": "ubuntu",
         "volumeSize": 25,
-        "isWindows": false
+        "roles": ["etcd", "contolplane"]
+      },
+      {
+        "instanceType": "t3a.large",
+        "awsRegionAZ": "",
+        "awsAMI": "",
+        "awsSecurityGroups": [
+          ""
+        ],
+        "awsSSHKeyName": "",
+        "awsCICDInstanceTag": "rancher-validation",
+        "awsIAMProfile": "",
+        "awsUser": "ubuntu",
+        "volumeSize": 25,
+        "roles": ["worker"]
       },
       {
         "instanceType": "t3a.xlarge",
@@ -259,7 +280,7 @@ For custom clusters, the below config is needed, only AWS/EC2 will work.
         "awsIAMProfile": "",
         "awsUser": "Administrator",
         "volumeSize": 50,
-        "isWindows": true
+        "roles": ["windows"]
       }
     ]
   }

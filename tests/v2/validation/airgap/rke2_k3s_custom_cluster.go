@@ -40,7 +40,7 @@ func testProvisionAirgapRKE2K3SCustomCluster(t *testing.T, client *rancher.Clien
 
 	client, err = client.ReLogin()
 	require.NoError(t, err)
-	customCluster, err := client.Steve.SteveType(clusters.ProvisioningSteveResouceType).ByID(clusterResp.ID)
+	customCluster, err := client.Steve.SteveType(clusters.ProvisioningSteveResourceType).ByID(clusterResp.ID)
 	require.NoError(t, err)
 
 	clusterStatus := &apiv1.ClusterStatus{}

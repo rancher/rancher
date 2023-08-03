@@ -288,7 +288,7 @@ func (h *handler) OnRancherClusterChange(obj *rancherv1.Cluster, status rancherv
 
 	if len(obj.Finalizers) == 0 && obj.DeletionTimestamp.IsZero() {
 		// If the cluster doesn't have any finalizers, then we don't apply any objects to ensure the finalizer can be put on the cluster.
-		return nil, status, nil
+		return nil, status, generic.ErrSkip
 	}
 
 	rkeCP, err := h.getRKEControlPlaneForCluster(obj)

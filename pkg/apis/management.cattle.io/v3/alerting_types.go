@@ -8,6 +8,7 @@ import (
 )
 
 // +genclient
+// +kubebuilder:skipversion
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type ClusterAlert struct {
@@ -29,6 +30,7 @@ func (c *ClusterAlert) ObjClusterName() string {
 }
 
 // +genclient
+// +kubebuilder:skipversion
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type ProjectAlert struct {
@@ -127,6 +129,7 @@ type AlertStatus struct {
 }
 
 // +genclient
+// +kubebuilder:skipversion
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type ClusterAlertGroup struct {
@@ -148,6 +151,7 @@ func (c *ClusterAlertGroup) ObjClusterName() string {
 }
 
 // +genclient
+// +kubebuilder:skipversion
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type ProjectAlertGroup struct {
@@ -192,6 +196,7 @@ func (p *ProjectGroupSpec) ObjClusterName() string {
 }
 
 // +genclient
+// +kubebuilder:skipversion
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type ClusterAlertRule struct {
@@ -228,6 +233,7 @@ func (c *ClusterAlertRuleSpec) ObjClusterName() string {
 }
 
 // +genclient
+// +kubebuilder:skipversion
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type ProjectAlertRule struct {
@@ -327,6 +333,7 @@ type SystemServiceRule struct {
 }
 
 // +genclient
+// +kubebuilder:skipversion
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type Notifier struct {

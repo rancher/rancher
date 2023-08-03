@@ -1,15 +1,17 @@
-FROM registry.suse.com/bci/golang:1.19
+FROM registry.suse.com/bci/golang:1.20
 
 # Configure Go
 ENV GOPATH /root/go
 ENV PATH ${PATH}:/root/go/bin
 
-ENV WORKSPACE ${GOPATH}/src/github.com
+ENV WORKSPACE ${GOPATH}/src/github.com/rancher/rancher
+ENV WORKSPACE2 ${GOPATH}/src/github.com/rancherlabs/corral-packages
 
-WORKDIR $WORKSPACE/rancher/rancher
+WORKDIR $WORKSPACE
 
-ADD rancherlabs/corral-packages "$WORKSPACE"/rancherlabs/corral-packages
-ADD rancher "$WORKSPACE"/rancher
+COPY ["./rancher", "$WORKSPACE"]
+COPY ["./corral-packages", "$WORKSPACE2"]
+
 ENV CORRAL_VERSION="v1.1.1"
 
 RUN zypper -n install gcc binutils glibc-devel-static ca-certificates git-core wget curl unzip tar vim less file xz gzip sed gawk iproute2 iptables jq

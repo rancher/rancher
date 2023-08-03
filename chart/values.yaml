@@ -212,3 +212,7 @@ global:
 podDisruptionBudget:
   enabled: false
   minAvailable: 1
+
+# helm values to use when installing the rancher-webhook chart.
+# helm values set here will override all other global values used when installing the webhook such as priorityClassName and systemRegistry settings.
+webhook: ""

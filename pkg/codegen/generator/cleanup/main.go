@@ -20,6 +20,9 @@ func run() error {
 	if err := os.RemoveAll("./pkg/generated"); err != nil {
 		return err
 	}
+	if err := os.RemoveAll("./pkg/crds/yamls/generated"); err != nil {
+		return err
+	}
 	return filepath.Walk("./pkg/apis", func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err

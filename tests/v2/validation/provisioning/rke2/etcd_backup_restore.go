@@ -5,7 +5,6 @@ import (
 	"strings"
 	"time"
 
-	apisV1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	steveV1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
@@ -30,30 +29,16 @@ const (
 	ProvisioningSteveResouceType = "provisioning.cattle.io.cluster"
 	isCattleLabeled              = true
 	etcdnodeCount                = 3
+	maxContainerRestartCount     = 3
+	cattleSystem                 = "cattle-system"
+	podPrefix                    = "helm-operation"
+	s3BackupPrefix               = "on-demand-"
 )
-
-func createSnapshot(client *rancher.Client, clustername string, generation int, namespace string) error {
-	clusterObj, existingSteveAPIObj, err := getProvisioningClusterByName(client, clustername, namespace)
-	if err != nil {
-		return err
-	}
-
-	clusterObj.Spec.RKEConfig.ETCDSnapshotCreate = &rkev1.ETCDSnapshotCreate{
-		Generation: generation,
-	}
-
-	_, err = client.Steve.SteveType(clusters.ProvisioningSteveResouceType).Update(existingSteveAPIObj, clusterObj)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
 
 func restoreSnapshot(client *rancher.Client, clustername string, name string,
 	generation int, restoreconfig string, namespace string) error {
 
-	clusterObj, existingSteveAPIObj, err := getProvisioningClusterByName(client, clustername, namespace)
+	clusterObj, existingSteveAPIObj, err := clusters.GetProvisioningClusterByName(client, clustername, namespace)
 	if err != nil {
 		return err
 	}
@@ -64,7 +49,7 @@ func restoreSnapshot(client *rancher.Client, clustername string, name string,
 		RestoreRKEConfig: restoreconfig,
 	}
 
-	_, err = client.Steve.SteveType(clusters.ProvisioningSteveResouceType).Update(existingSteveAPIObj, clusterObj)
+	_, err = client.Steve.SteveType(clusters.ProvisioningSteveResourceType).Update(existingSteveAPIObj, clusterObj)
 	if err != nil {
 		return err
 	}
@@ -88,7 +73,7 @@ func getSnapshots(client *rancher.Client,
 
 }
 
-func createRKE2NodeDriverCluster(client *rancher.Client, provider *Provider, clusterName string, k8sVersion string, namespace string, cni string, advancedOptions provisioning.AdvancedOptions) (*steveV1.SteveAPIObject, error) {
+func createRKE2NodeDriverCluster(client *rancher.Client, provider *Provider, clusterName string, k8sVersion string, namespace string, cni string, advancedOptions provisioning.AdvancedOptions, s3Snapshot *rkev1.ETCDSnapshotS3) (*steveV1.SteveAPIObject, error) {
 
 	nodeRoles := []machinepools.NodeRoles{
 		{
@@ -126,35 +111,20 @@ func createRKE2NodeDriverCluster(client *rancher.Client, provider *Provider, clu
 	machinePools := machinepools.RKEMachinePoolSetup(nodeRoles, machineConfigResp)
 
 	cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, namespace, cni, cloudCredential.ID, k8sVersion, "", machinePools, advancedOptions)
-
+	cluster.Spec.RKEConfig.ETCD.S3 = s3Snapshot
 	return clusters.CreateK3SRKE2Cluster(client, cluster)
 
 }
 
-func getProvisioningClusterByName(client *rancher.Client, clusterName string, namespace string) (*apisV1.Cluster, *steveV1.SteveAPIObject, error) {
-	clusterObj, err := client.Steve.SteveType(ProvisioningSteveResouceType).ByID(namespace + "/" + clusterName)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	cluster := new(apisV1.Cluster)
-	err = steveV1.ConvertToK8sType(clusterObj, &cluster)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return cluster, clusterObj, nil
-}
-
 func upgradeClusterK8sVersion(client *rancher.Client, clustername string, k8sUpgradedVersion string, namespaceName string) error {
-	clusterObj, existingSteveAPIObj, err := getProvisioningClusterByName(client, clustername, namespaceName)
+	clusterObj, existingSteveAPIObj, err := clusters.GetProvisioningClusterByName(client, clustername, namespaceName)
 	if err != nil {
 		return err
 	}
 
 	clusterObj.Spec.KubernetesVersion = k8sUpgradedVersion
 
-	_, err = client.Steve.SteveType(clusters.ProvisioningSteveResouceType).Update(existingSteveAPIObj, clusterObj)
+	_, err = client.Steve.SteveType(clusters.ProvisioningSteveResourceType).Update(existingSteveAPIObj, clusterObj)
 	if err != nil {
 		return err
 	}
@@ -235,7 +205,7 @@ func watchAndWaitForPods(client *rancher.Client, clusterID string) error {
 }
 
 func upgradeClusterK8sVersionWithUpgradeStrategy(client *rancher.Client, clustername string, k8sUpgradedVersion string, namespaceName string) error {
-	clusterObj, existingSteveAPIObj, err := getProvisioningClusterByName(client, clustername, namespaceName)
+	clusterObj, existingSteveAPIObj, err := clusters.GetProvisioningClusterByName(client, clustername, namespaceName)
 	if err != nil {
 		return err
 	}
@@ -244,7 +214,7 @@ func upgradeClusterK8sVersionWithUpgradeStrategy(client *rancher.Client, cluster
 	clusterObj.Spec.RKEConfig.UpgradeStrategy.WorkerConcurrency = "20%"
 	clusterObj.Spec.KubernetesVersion = k8sUpgradedVersion
 
-	_, err = client.Steve.SteveType(clusters.ProvisioningSteveResouceType).Update(existingSteveAPIObj, clusterObj)
+	_, err = client.Steve.SteveType(clusters.ProvisioningSteveResourceType).Update(existingSteveAPIObj, clusterObj)
 	if err != nil {
 		return err
 	}

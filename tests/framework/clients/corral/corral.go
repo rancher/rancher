@@ -80,7 +80,7 @@ func CreateCorral(ts *session.Session, corralName, packageName string, debug boo
 		args = append(args, debugFlag)
 	}
 	args = append(args, corralName, packageName)
-	logrus.Infof("Creating corral with the following parameters: %", args)
+	logrus.Infof("Creating corral with the following parameters: %v", args)
 	// complicated, but running the command in a way that allows us to
 	// capture the output and error(s) and print it to the console
 	msg, err := exec.Command("corral", args...).CombinedOutput()

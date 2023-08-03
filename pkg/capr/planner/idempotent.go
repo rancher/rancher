@@ -18,20 +18,17 @@ hashedCmd=$3
 cmd=$4
 shift 4
 
-dataRoot="/var/lib/rancher/capr/idempotence/$key/$hashedCmd"
-hashFile="$dataRoot/hash"
-attemptFile="$dataRoot/attempt"
+dataRoot="/var/lib/rancher/capr/idempotence/$key/$hashedCmd/$targetHash"
+attemptFile="$dataRoot/last-attempt"
 
-currentHash=$(cat "$hashFile" || echo "")
 currentAttempt=$(cat "$attemptFile" || echo "-1")
 
-if [ "$currentHash" != "$targetHash" ] && [ "$currentAttempt" != "$CATTLE_AGENT_ATTEMPT_NUMBER" ]; then
+if [ "$currentAttempt" != "$CATTLE_AGENT_ATTEMPT_NUMBER" ]; then
 	mkdir -p "$dataRoot"
-	echo "$targetHash" > "$hashFile"
 	echo "$CATTLE_AGENT_ATTEMPT_NUMBER" > "$attemptFile"
 	exec "$cmd" "$@"
 else
-	echo "action has already been reconciled to the current hash $currentHash at attempt $currentAttempt"
+	echo "action has already been reconciled to the target hash $targetHash at attempt $currentAttempt"
 fi
 `
 
@@ -44,6 +41,21 @@ var idempotentScriptFile = plan.File{
 	Path:    idempotentActionScriptPath,
 	Dynamic: true,
 	Minor:   true,
+}
+
+// generateIdempotencyCleanupInstruction generates a one-time instruction that performs a cleanup of the given key.
+func generateIdempotencyCleanupInstruction(key string) plan.OneTimeInstruction {
+	if key == "" {
+		return plan.OneTimeInstruction{}
+	}
+	return plan.OneTimeInstruction{
+		Name:    "remove idempotency tracking",
+		Command: "/bin/sh",
+		Args: []string{
+			"-c",
+			fmt.Sprintf("rm -rf /var/lib/rancher/capr/idempotence/%s", key),
+		},
+	}
 }
 
 // idempotentInstruction generates an idempotent action instruction that will execute the given command + args exactly once.

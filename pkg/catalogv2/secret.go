@@ -6,6 +6,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
+// GetSecret returns the Secret from the cluster repo's clientSecret spec field
 func GetSecret(secrets corev1controllers.SecretCache, repoSpec *v1.RepoSpec, repoNamespace string) (*corev1.Secret, error) {
 	if repoSpec.ClientSecret == nil {
 		return nil, nil

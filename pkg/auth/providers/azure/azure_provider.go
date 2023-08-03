@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	lru "github.com/hashicorp/golang-lru"
-	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
@@ -33,9 +32,14 @@ const (
 	Name = clients.Name
 )
 
-type azureProvider struct {
+type unstructuredGetter interface {
+	Get(string, metav1.GetOptions) (runtime.Object, error)
+}
+
+type Provider struct {
 	ctx         context.Context
 	authConfigs v3.AuthConfigInterface
+	Retriever   unstructuredGetter
 	secrets     corev1.SecretInterface
 	userMGR     user.Manager
 	tokenMGR    *tokens.Manager
@@ -49,8 +53,9 @@ func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.
 		clients.GroupCache, _ = lru.New(10000)
 	}
 
-	return &azureProvider{
+	return &Provider{
 		ctx:         ctx,
+		Retriever:   mgmtCtx.Management.AuthConfigs("").ObjectClient().UnstructuredClient(),
 		authConfigs: mgmtCtx.Management.AuthConfigs(""),
 		secrets:     mgmtCtx.Core.Secrets(""),
 		userMGR:     userMGR,
@@ -58,28 +63,28 @@ func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.
 	}
 }
 
-func (ap *azureProvider) GetName() string {
+func (ap *Provider) GetName() string {
 	return Name
 }
 
-func (ap *azureProvider) AuthenticateUser(ctx context.Context, input interface{}) (v3.Principal, []v3.Principal, string, error) {
+func (ap *Provider) AuthenticateUser(ctx context.Context, input interface{}) (v3.Principal, []v3.Principal, string, error) {
 	login, ok := input.(*v32.AzureADLogin)
 	if !ok {
 		return v3.Principal{}, nil, "", errors.New("unexpected input type")
 	}
-	cfg, err := ap.getAzureConfigK8s()
+	cfg, err := ap.GetAzureConfigK8s()
 	if err != nil {
 		return v3.Principal{}, nil, "", err
 	}
 	return ap.loginUser(cfg, login, false)
 }
 
-func (ap *azureProvider) RefetchGroupPrincipals(principalID, secret string) ([]v3.Principal, error) {
-	cfg, err := ap.getAzureConfigK8s()
+func (ap *Provider) RefetchGroupPrincipals(principalID, secret string) ([]v3.Principal, error) {
+	cfg, err := ap.GetAzureConfigK8s()
 	if err != nil {
 		return nil, err
 	}
-	var useDeprecatedAzureADClient = isConfigDeprecated(cfg)
+	var useDeprecatedAzureADClient = IsConfigDeprecated(cfg)
 	azureClient, err := clients.NewAzureClientFromSecret(cfg, useDeprecatedAzureADClient, secret, ap.secrets)
 	if err != nil {
 		return nil, err
@@ -111,8 +116,8 @@ func (ap *azureProvider) RefetchGroupPrincipals(principalID, secret string) ([]v
 	return groupPrincipals, nil
 }
 
-func (ap *azureProvider) SearchPrincipals(name, principalType string, token v3.Token) ([]v3.Principal, error) {
-	cfg, err := ap.getAzureConfigK8s()
+func (ap *Provider) SearchPrincipals(name, principalType string, token v3.Token) ([]v3.Principal, error) {
+	cfg, err := ap.GetAzureConfigK8s()
 	if err != nil {
 		return nil, err
 	}
@@ -149,10 +154,10 @@ func (ap *azureProvider) SearchPrincipals(name, principalType string, token v3.T
 	return principals, ap.updateToken(azureClient, &token)
 }
 
-func (ap *azureProvider) GetPrincipal(principalID string, token v3.Token) (v3.Principal, error) {
+func (ap *Provider) GetPrincipal(principalID string, token v3.Token) (v3.Principal, error) {
 	var principal v3.Principal
 	var err error
-	cfg, err := ap.getAzureConfigK8s()
+	cfg, err := ap.GetAzureConfigK8s()
 	if err != nil {
 		return v3.Principal{}, err
 	}
@@ -181,12 +186,12 @@ func (ap *azureProvider) GetPrincipal(principalID string, token v3.Token) (v3.Pr
 	return principal, ap.updateToken(azureClient, &token)
 }
 
-func (ap *azureProvider) CustomizeSchema(schema *types.Schema) {
+func (ap *Provider) CustomizeSchema(schema *types.Schema) {
 	schema.ActionHandler = ap.actionHandler
 	schema.Formatter = ap.formatter
 }
 
-func (ap *azureProvider) TransformToAuthProvider(
+func (ap *Provider) TransformToAuthProvider(
 	authConfig map[string]interface{},
 ) (map[string]interface{}, error) {
 	p := common.TransformToAuthProvider(authConfig)
@@ -194,8 +199,8 @@ func (ap *azureProvider) TransformToAuthProvider(
 	return p, nil
 }
 
-func (ap *azureProvider) loginUser(config *v32.AzureADConfig, azureCredential *v32.AzureADLogin, test bool) (v3.Principal, []v3.Principal, string, error) {
-	var useDeprecatedAzureADClient = isConfigDeprecated(config)
+func (ap *Provider) loginUser(config *v32.AzureADConfig, azureCredential *v32.AzureADLogin, test bool) (v3.Principal, []v3.Principal, string, error) {
+	var useDeprecatedAzureADClient = IsConfigDeprecated(config)
 	azureClient, err := clients.NewAzureClientFromCredential(config, useDeprecatedAzureADClient, azureCredential, ap.secrets)
 	if err != nil {
 		return v3.Principal{}, nil, "", err
@@ -220,7 +225,7 @@ func (ap *azureProvider) loginUser(config *v32.AzureADConfig, azureCredential *v
 	return userPrincipal, groupPrincipals, providerToken, nil
 }
 
-func (ap *azureProvider) getUserPrincipal(client clients.AzureClient, principalID string, token v3.Token) (v3.Principal, error) {
+func (ap *Provider) getUserPrincipal(client clients.AzureClient, principalID string, token v3.Token) (v3.Principal, error) {
 	principal, err := client.GetUser(principalID)
 	if err != nil {
 		return v3.Principal{}, httperror.NewAPIError(httperror.NotFound, err.Error())
@@ -229,7 +234,7 @@ func (ap *azureProvider) getUserPrincipal(client clients.AzureClient, principalI
 	return principal, nil
 }
 
-func (ap *azureProvider) getGroupPrincipal(client clients.AzureClient, id string, token v3.Token) (v3.Principal, error) {
+func (ap *Provider) getGroupPrincipal(client clients.AzureClient, id string, token v3.Token) (v3.Principal, error) {
 	principal, err := client.GetGroup(id)
 	if err != nil {
 		return v3.Principal{}, httperror.NewAPIError(httperror.NotFound, err.Error())
@@ -238,7 +243,7 @@ func (ap *azureProvider) getGroupPrincipal(client clients.AzureClient, id string
 	return principal, nil
 }
 
-func (ap *azureProvider) searchUserPrincipalsByName(client clients.AzureClient, name string, token v3.Token) ([]v3.Principal, error) {
+func (ap *Provider) searchUserPrincipalsByName(client clients.AzureClient, name string, token v3.Token) ([]v3.Principal, error) {
 	filter := fmt.Sprintf("startswith(userPrincipalName,'%[1]s') or startswith(displayName,'%[1]s') or startswith(givenName,'%[1]s') or startswith(surname,'%[1]s')", name)
 	principals, err := client.ListUsers(filter)
 	if err != nil {
@@ -250,7 +255,7 @@ func (ap *azureProvider) searchUserPrincipalsByName(client clients.AzureClient, 
 	return principals, nil
 }
 
-func (ap *azureProvider) searchGroupPrincipalsByName(client clients.AzureClient, name string, token v3.Token) ([]v3.Principal, error) {
+func (ap *Provider) searchGroupPrincipalsByName(client clients.AzureClient, name string, token v3.Token) ([]v3.Principal, error) {
 	filter := fmt.Sprintf("startswith(displayName,'%[1]s') or startswith(mail,'%[1]s') or startswith(mailNickname,'%[1]s')", name)
 	principals, err := client.ListGroups(filter)
 	if err != nil {
@@ -262,9 +267,9 @@ func (ap *azureProvider) searchGroupPrincipalsByName(client clients.AzureClient,
 	return principals, nil
 }
 
-func (ap *azureProvider) newAzureClientFromToken(cfg *v32.AzureADConfig, token *v32.Token) (clients.AzureClient, error) {
+func (ap *Provider) newAzureClientFromToken(cfg *v32.AzureADConfig, token *v32.Token) (clients.AzureClient, error) {
 	var secret string
-	var deprecated = isConfigDeprecated(cfg)
+	var deprecated = IsConfigDeprecated(cfg)
 	if deprecated {
 		var err error
 		secret, err = ap.tokenMGR.GetSecret(token.UserID, Name, []*v3.Token{token})
@@ -275,10 +280,10 @@ func (ap *azureProvider) newAzureClientFromToken(cfg *v32.AzureADConfig, token *
 	return clients.NewAzureClientFromSecret(cfg, deprecated, secret, ap.secrets)
 }
 
-func (ap *azureProvider) saveAzureConfigK8s(config *v32.AzureADConfig) error {
+func (ap *Provider) saveAzureConfigK8s(config *v32.AzureADConfig) error {
 	// Copy the annotations.
 	annotations := config.ObjectMeta.Annotations
-	storedAzureConfig, err := ap.getAzureConfigK8s()
+	storedAzureConfig, err := ap.GetAzureConfigK8s()
 	if err != nil {
 		return err
 	}
@@ -310,8 +315,8 @@ func (ap *azureProvider) saveAzureConfigK8s(config *v32.AzureADConfig) error {
 	return nil
 }
 
-func (ap *azureProvider) getAzureConfigK8s() (*v32.AzureADConfig, error) {
-	authConfigObj, err := ap.authConfigs.ObjectClient().UnstructuredClient().Get(Name, metav1.GetOptions{})
+func (ap *Provider) GetAzureConfigK8s() (*v32.AzureADConfig, error) {
+	authConfigObj, err := ap.Retriever.Get(Name, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve AzureADConfig, error: %v", err)
 	}
@@ -323,18 +328,10 @@ func (ap *azureProvider) getAzureConfigK8s() (*v32.AzureADConfig, error) {
 	storedAzureADConfigMap := u.UnstructuredContent()
 
 	storedAzureADConfig := &v32.AzureADConfig{}
-	if err := mapstructure.Decode(storedAzureADConfigMap, storedAzureADConfig); err != nil {
-		return nil, err
+	err = common.Decode(storedAzureADConfigMap, storedAzureADConfig)
+	if err != nil {
+		return nil, fmt.Errorf("unable to decode Azure Config: %w", err)
 	}
-
-	metadataMap, ok := storedAzureADConfigMap["metadata"].(map[string]interface{})
-	if !ok {
-		return nil, fmt.Errorf("failed to retrieve AzureADConfig metadata, cannot read k8s Unstructured data")
-	}
-
-	objectMeta := &metav1.ObjectMeta{}
-	mapstructure.Decode(metadataMap, objectMeta)
-	storedAzureADConfig.ObjectMeta = *objectMeta
 
 	if storedAzureADConfig.ApplicationSecret != "" {
 		value, err := common.ReadFromSecret(ap.secrets, storedAzureADConfig.ApplicationSecret,
@@ -350,14 +347,14 @@ func (ap *azureProvider) getAzureConfigK8s() (*v32.AzureADConfig, error) {
 
 // updateToken compares the current Azure access token to the one stored in the secret and updates if needed.
 // This is relevant only for access tokens to the deprecated Azure AD Graph API.
-func (ap *azureProvider) updateToken(client clients.AzureClient, token *v3.Token) error {
+func (ap *Provider) updateToken(client clients.AzureClient, token *v3.Token) error {
 	// For the new flow via Microsoft Graph, the caching and updating of the token to the Microsoft Graph API
 	// is handled separately via the SDK client cache.
-	cfg, err := ap.getAzureConfigK8s()
+	cfg, err := ap.GetAzureConfigK8s()
 	if err != nil {
 		return err
 	}
-	if !isConfigDeprecated(cfg) {
+	if !IsConfigDeprecated(cfg) {
 		return nil
 	}
 
@@ -387,13 +384,13 @@ func (ap *azureProvider) updateToken(client clients.AzureClient, token *v3.Token
 
 func formAzureRedirectURL(config map[string]interface{}) string {
 	var ac v32.AzureADConfig
-	err := mapstructure.Decode(config, &ac)
+	err := common.Decode(config, &ac)
 	if err == nil {
 		// Extract the annotations from the map. This is needed because of the type structure of
 		// the Azure config and the Auth config it embeds. Full deserialization does not work for
 		// fields of the embedded Kubernetes types in this case.
 		ac.ObjectMeta.Annotations = extractAnnotationsFromAuthConfig(config)
-		if !isConfigDeprecated(&ac) {
+		if !IsConfigDeprecated(&ac) {
 			// Return the redirect URL for Microsoft Graph.
 			return fmt.Sprintf(
 				"%s?client_id=%s&redirect_uri=%s&response_type=code&scope=openid",
@@ -445,8 +442,8 @@ func parseAnnotations(metadata map[string]interface{}) map[string]string {
 	return annotations
 }
 
-func (ap *azureProvider) CanAccessWithGroupProviders(userPrincipalID string, groupPrincipals []v3.Principal) (bool, error) {
-	cfg, err := ap.getAzureConfigK8s()
+func (ap *Provider) CanAccessWithGroupProviders(userPrincipalID string, groupPrincipals []v3.Principal) (bool, error) {
+	cfg, err := ap.GetAzureConfigK8s()
 	if err != nil {
 		logrus.Errorf("Error fetching azure config: %v", err)
 		return false, err
@@ -479,7 +476,7 @@ func UpdateGroupCacheSize(size string) {
 	clients.GroupCache.Resize(i)
 }
 
-func (ap *azureProvider) GetUserExtraAttributes(userPrincipal v3.Principal) map[string][]string {
+func (ap *Provider) GetUserExtraAttributes(userPrincipal v3.Principal) map[string][]string {
 	extras := make(map[string][]string)
 	if userPrincipal.Name != "" {
 		extras[common.UserAttributePrincipalID] = []string{userPrincipal.Name}
@@ -491,8 +488,8 @@ func (ap *azureProvider) GetUserExtraAttributes(userPrincipal v3.Principal) map[
 }
 
 // IsDisabledProvider checks if the Azure AD auth provider is currently disabled in Rancher.
-func (ap *azureProvider) IsDisabledProvider() (bool, error) {
-	azureConfig, err := ap.getAzureConfigK8s()
+func (ap *Provider) IsDisabledProvider() (bool, error) {
+	azureConfig, err := ap.GetAzureConfigK8s()
 	if err != nil {
 		return false, err
 	}

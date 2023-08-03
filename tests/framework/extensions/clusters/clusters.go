@@ -16,9 +16,8 @@ import (
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
+	"github.com/rancher/rancher/tests/framework/extensions/defaults"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
-	"github.com/rancher/rancher/tests/integration/pkg/defaults"
-	"github.com/rancher/rancher/tests/v2/validation/provisioning"
 	rancherProvisioning "github.com/rancher/rancher/tests/v2/validation/provisioning"
 	"github.com/rancher/wrangler/pkg/summary"
 	"github.com/sirupsen/logrus"
@@ -31,8 +30,8 @@ import (
 )
 
 const (
-	ProvisioningSteveResouceType = "provisioning.cattle.io.cluster"
-	FleetSteveResourceType       = "fleet.cattle.io.cluster"
+	ProvisioningSteveResourceType = "provisioning.cattle.io.cluster"
+	FleetSteveResourceType        = "fleet.cattle.io.cluster"
 )
 
 // GetClusterIDByName is a helper function that returns the cluster ID by name
@@ -102,7 +101,7 @@ func IsHostedProvisioningClusterReady(event watch.Event) (ready bool, err error)
 	return false, nil
 }
 
-// Verify if a serviceAccountTokenSecret exists or not in the cluster.
+// CheckServiceAccountTokenSecret verifies if a serviceAccountTokenSecret exists or not in the cluster.
 func CheckServiceAccountTokenSecret(client *rancher.Client, clusterName string) (success bool, err error) {
 	clusterID, err := GetClusterIDByName(client, clusterName)
 	if err != nil {
@@ -124,7 +123,7 @@ func CheckServiceAccountTokenSecret(client *rancher.Client, clusterName string) 
 }
 
 // NewRKE1lusterConfig is a constructor for a v3.Cluster object, to be used by the rancher.Client.Provisioning client.
-func NewRKE1ClusterConfig(clusterName, cni, kubernetesVersion string, psact string, client *rancher.Client, advancedOptions provisioning.AdvancedOptions) *management.Cluster {
+func NewRKE1ClusterConfig(clusterName, cni, kubernetesVersion string, psact string, client *rancher.Client, advancedOptions rancherProvisioning.AdvancedOptions) *management.Cluster {
 	clusterConfig := &management.Cluster{
 		DockerRootDir:           "/var/lib/docker",
 		EnableClusterAlerting:   false,
@@ -147,6 +146,7 @@ func NewRKE1ClusterConfig(clusterName, cni, kubernetesVersion string, psact stri
 				Provider: "metrics-server",
 			},
 			Network: &management.NetworkConfig{
+				Plugin:  cni,
 				MTU:     0,
 				Options: map[string]string{},
 			},
@@ -626,7 +626,20 @@ func CreateRKE1Cluster(client *rancher.Client, rke1Cluster *management.Cluster) 
 		return nil, err
 	}
 
-	client, err = client.ReLogin()
+	err = kwait.Poll(500*time.Millisecond, 2*time.Minute, func() (done bool, err error) {
+		client, err = client.ReLogin()
+		if err != nil {
+			return false, err
+		}
+
+		_, err = client.Management.Cluster.ByID(cluster.ID)
+		if err != nil {
+			return false, nil
+		} else {
+			return true, nil
+		}
+	})
+
 	if err != nil {
 		return nil, err
 	}
@@ -676,7 +689,7 @@ func CreateRKE1Cluster(client *rancher.Client, rke1Cluster *management.Cluster) 
 // CreateK3SRKE2Cluster is a "helper" functions that takes a rancher client, and the rke2 cluster config as parameters. This function
 // registers a delete cluster fuction with a wait.WatchWait to ensure the cluster is removed cleanly.
 func CreateK3SRKE2Cluster(client *rancher.Client, rke2Cluster *apisV1.Cluster) (*v1.SteveAPIObject, error) {
-	cluster, err := client.Steve.SteveType(ProvisioningSteveResouceType).Create(rke2Cluster)
+	cluster, err := client.Steve.SteveType(ProvisioningSteveResourceType).Create(rke2Cluster)
 	if err != nil {
 		return nil, err
 	}
@@ -687,9 +700,9 @@ func CreateK3SRKE2Cluster(client *rancher.Client, rke2Cluster *apisV1.Cluster) (
 			return false, err
 		}
 
-		_, err = client.Steve.SteveType(ProvisioningSteveResouceType).ByID(cluster.ID)
+		_, err = client.Steve.SteveType(ProvisioningSteveResourceType).ByID(cluster.ID)
 		if err != nil {
-			return false, err
+			return false, nil
 		} else {
 			return true, nil
 		}
@@ -724,7 +737,7 @@ func CreateK3SRKE2Cluster(client *rancher.Client, rke2Cluster *apisV1.Cluster) (
 			return err
 		}
 
-		err = client.Steve.SteveType(ProvisioningSteveResouceType).Delete(cluster)
+		err = client.Steve.SteveType(ProvisioningSteveResourceType).Delete(cluster)
 		if err != nil {
 			return err
 		}
@@ -747,7 +760,7 @@ func CreateK3SRKE2Cluster(client *rancher.Client, rke2Cluster *apisV1.Cluster) (
 
 // UpdateK3SRKE2Cluster is a "helper" functions that takes a rancher client, old rke2/k3s cluster config, and the new rke2/k3s cluster config as parameters.
 func UpdateK3SRKE2Cluster(client *rancher.Client, cluster *v1.SteveAPIObject, updatedCluster *apisV1.Cluster) (*v1.SteveAPIObject, error) {
-	updateCluster, err := client.Steve.SteveType(ProvisioningSteveResouceType).ByID(cluster.ID)
+	updateCluster, err := client.Steve.SteveType(ProvisioningSteveResourceType).ByID(cluster.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -755,7 +768,7 @@ func UpdateK3SRKE2Cluster(client *rancher.Client, cluster *v1.SteveAPIObject, up
 	updatedCluster.ObjectMeta.ResourceVersion = updateCluster.ObjectMeta.ResourceVersion
 
 	logrus.Infof("Applying cluster YAML hardening changes...")
-	cluster, err = client.Steve.SteveType(ProvisioningSteveResouceType).Update(cluster, updatedCluster)
+	cluster, err = client.Steve.SteveType(ProvisioningSteveResourceType).Update(cluster, updatedCluster)
 	if err != nil {
 		return nil, err
 	}
@@ -766,7 +779,7 @@ func UpdateK3SRKE2Cluster(client *rancher.Client, cluster *v1.SteveAPIObject, up
 			return false, err
 		}
 
-		clusterResp, err := client.Steve.SteveType(ProvisioningSteveResouceType).ByID(cluster.ID)
+		clusterResp, err := client.Steve.SteveType(ProvisioningSteveResourceType).ByID(cluster.ID)
 		if err != nil {
 			return false, err
 		}
@@ -869,7 +882,7 @@ func isClusterInaccessible(messages []string) (isInaccessible bool) {
 }
 
 func logClusterInfoWithChanges(clusterID, clusterInfo string, summary summary.Summary) string {
-	newClusterInfo := fmt.Sprintf("ClusterID: %v, Message: %v, Error: %v, State: %v, Transiationing: %v", clusterID, summary.Message, summary.Error, summary.State, summary.Transitioning)
+	newClusterInfo := fmt.Sprintf("ClusterID: %v, Message: %v, Error: %v, State: %v, Transitioning: %v", clusterID, summary.Message, summary.Error, summary.State, summary.Transitioning)
 
 	if clusterInfo != newClusterInfo {
 		logrus.Infof(newClusterInfo)
@@ -881,7 +894,7 @@ func logClusterInfoWithChanges(clusterID, clusterInfo string, summary summary.Su
 
 func WatchAndWaitForCluster(steveClient *v1.Client, kubeProvisioningClient *kubeProvisioning.Client, ns string, clusterName string) error {
 	err := kwait.Poll(5*time.Second, 2*time.Minute, func() (done bool, err error) {
-		clusterResp, err := steveClient.SteveType(ProvisioningSteveResouceType).ByID(ns + "/" + clusterName)
+		clusterResp, err := steveClient.SteveType(ProvisioningSteveResourceType).ByID(ns + "/" + clusterName)
 		if err != nil {
 			return false, err
 		}
@@ -902,4 +915,43 @@ func WatchAndWaitForCluster(steveClient *v1.Client, kubeProvisioningClient *kube
 
 	err = wait.WatchWait(result, IsProvisioningClusterReady)
 	return err
+}
+
+// GetProvisioningClusterByName is a helper function to get cluster object with the cluster name
+func GetProvisioningClusterByName(client *rancher.Client, clusterName string, namespace string) (*apisV1.Cluster, *v1.SteveAPIObject, error) {
+	clusterObj, err := client.Steve.SteveType(ProvisioningSteveResourceType).ByID(namespace + "/" + clusterName)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	cluster := new(apisV1.Cluster)
+	err = v1.ConvertToK8sType(clusterObj, &cluster)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return cluster, clusterObj, nil
+}
+
+// WaitForActiveCluster is a "helper" function that waits for the cluster to reach the active state.
+// The function accepts a Rancher client and a cluster ID as parameters.
+func WaitForActiveRKE1Cluster(client *rancher.Client, clusterID string) error {
+	err := kwait.Poll(500*time.Millisecond, 30*time.Minute, func() (done bool, err error) {
+		client, err = client.ReLogin()
+		if err != nil {
+			return false, err
+		}
+		clusterResp, err := client.Management.Cluster.ByID(clusterID)
+		if err != nil {
+			return false, err
+		}
+		if clusterResp.State == "active" {
+			return true, nil
+		}
+		return false, nil
+	})
+	if err != nil {
+		return err
+	}
+	return nil
 }

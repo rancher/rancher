@@ -13,4 +13,5 @@ type Config struct {
 	CAFile        string `yaml:"caFile" default:""`
 	CACerts       string `yaml:"caCerts" default:""`
 	ClusterName   string `yaml:"clusterName" default:""`
+	ShellImage    string `yaml:"shellImage" default:""`
 }

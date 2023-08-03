@@ -35,7 +35,6 @@ func main() {
 		path := configPackage.CorralPackageImages[corralRancherHA.Name]
 		corralName := corralRancherHA.Name
 
-		logrus.Infof("PATH", path)
 		_, err = corral.CreateCorral(corralSession, corralName, path, true, configPackage.HasCleanup)
 		if err != nil {
 			logrus.Errorf("error creating corral: %v", err)
@@ -51,13 +50,13 @@ func main() {
 			if err != nil {
 				logrus.Errorf("error getting the corral's private key: %v", err)
 			}
-			logrus.Infof("Corral Private Key", privateKey)
+			logrus.Infof("Corral Private Key: %s", privateKey)
 
 			publicKey, err := corral.GetCorralEnvVar(corralName, "corral_public_key")
 			if err != nil {
 				logrus.Errorf("error getting the corral's public key: %v", err)
 			}
-			logrus.Infof("Corral Public Key", publicKey)
+			logrus.Infof("Corral Public Key: %s", publicKey)
 
 			err = corral.UpdateCorralConfig("corral_private_key", privateKey)
 			if err != nil {

@@ -22,17 +22,17 @@ provisioningInput is needed to the run the K3S tests, specifically kubernetesVer
 
 ```json
 "provisioningInput": {
+    // for custom clusters, len(nodesAndRoles) should be equal to len(awsEc2Config)
     "nodesAndRoles": [
       {
         "etcd": true,
         "controlplane": true,
-        "worker": true,
         "quantity": 1,
       },
       {
         "worker": true,
-        "quantity": 1,
-      }
+        "quantity": 2,
+      },
     ],
     "k3sKubernetesVersion": ["v1.24.4+k3s1"],
     "providers": ["linode", "aws", "azure", "harvester"],
@@ -198,24 +198,50 @@ Machine K3S config is the final piece needed for the config to run K3S provision
 ```
 
 ## Custom Cluster
-For custom clusters, the below config is needed, only AWS/EC2 will work.
-**Ensure you have nodeProviders in provisioningInput**
+For custom clusters, no machineConfig or credentials are needed. Currently only supported for ec2.
 
+Dependencies:
+* **Ensure you have nodeProviders in provisioningInput**
+* make sure that all roles are entered at least once
+* windows pool(s) should always be last in the config
 ```json
- "awsEC2Config": {
+{
+  "awsEC2Configs": {
     "region": "us-east-2",
-    "instanceType": "t3a.medium",
-    "awsRegionAZ": "",
-    "awsAMI": "",
-    "awsSecurityGroups": [""],
-    "awsAccessKeyID": "",
     "awsSecretAccessKey": "",
-    "awsSSHKeyName": "",
-    "awsCICDInstanceTag": "",
-    "awsIAMProfile": "",
-    "awsUser": "ubuntu",
-    "volumeSize": 50
-  },
+    "awsAccessKeyID": "",
+    "awsEC2Config": [
+      {
+        "instanceType": "t3a.medium",
+        "awsRegionAZ": "",
+        "awsAMI": "",
+        "awsSecurityGroups": [
+          ""
+        ],
+        "awsSSHKeyName": "",
+        "awsCICDInstanceTag": "rancher-validation",
+        "awsIAMProfile": "",
+        "awsUser": "ubuntu",
+        "volumeSize": 25,
+        "roles": ["worker"]
+      },
+      {
+        "instanceType": "t3a.large",
+        "awsRegionAZ": "",
+        "awsAMI": "",
+        "awsSecurityGroups": [
+          ""
+        ],
+        "awsSSHKeyName": "",
+        "awsCICDInstanceTag": "rancher-validation",
+        "awsIAMProfile": "",
+        "awsUser": "ubuntu",
+        "volumeSize": 25,
+        "roles": ["etcd", "contolplane"]
+      },
+    ]
+  }
+}
 ```
 
 ## Advanced Settings

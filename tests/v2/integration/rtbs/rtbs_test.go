@@ -91,7 +91,7 @@ func (p *RTBTestSuite) TestPRTBRoleTemplateInheritance() {
 	// Test that user can get a specified secret once granted the permission to do so via roletemplate inheritance bounded
 	// by a PRTB.
 
-	secret, err := secrets.CreateSecret(client, &corev1.Secret{ObjectMeta: metav1.ObjectMeta{GenerateName: "rtb-test-s-"}}, "local", createdNamespace.Name)
+	secret, err := secrets.CreateSecretForCluster(client, &corev1.Secret{ObjectMeta: metav1.ObjectMeta{GenerateName: "rtb-test-s-"}}, "local", createdNamespace.Name)
 	require.NoError(p.T(), err)
 
 	_, err = secrets.GetSecretByName(testUser, p.downstreamClusterID, createdNamespace.Name, secret.Name, metav1.GetOptions{})
@@ -150,7 +150,7 @@ func (p *RTBTestSuite) TestPRTBRoleTemplateInheritance() {
 	secret, err = secrets.GetSecretByName(testUser, p.downstreamClusterID, createdNamespace.Name, secret.Name, metav1.GetOptions{})
 	require.NoError(p.T(), err)
 
-	anotherSecret, err := secrets.CreateSecret(client, &corev1.Secret{ObjectMeta: metav1.ObjectMeta{GenerateName: "rtb-test-s-"}}, p.downstreamClusterID, createdNamespace.Name)
+	anotherSecret, err := secrets.CreateSecretForCluster(client, &corev1.Secret{ObjectMeta: metav1.ObjectMeta{GenerateName: "rtb-test-s-"}}, p.downstreamClusterID, createdNamespace.Name)
 	require.NoError(p.T(), err)
 
 	_, err = secrets.GetSecretByName(testUser, p.downstreamClusterID, createdNamespace.Name, anotherSecret.Name, metav1.GetOptions{})

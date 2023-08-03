@@ -100,10 +100,10 @@ func GenerateDefaultReleaseUpgradeConfig() {
 
 	configData, err := yaml.Marshal(&config)
 	if err != nil {
-		logrus.Fatalf("error marshaling", err)
+		logrus.Fatalf("error marshaling: %v", err)
 	}
 	err = os.WriteFile(configFileName, configData, 0644)
 	if err != nil {
-		logrus.Fatalf("error writing yaml", err)
+		logrus.Fatalf("error writing yaml: %v", err)
 	}
 }

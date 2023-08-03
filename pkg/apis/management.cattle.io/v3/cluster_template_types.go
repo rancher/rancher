@@ -31,6 +31,7 @@ type ClusterTemplateRevisionCondition struct {
 }
 
 // +genclient
+// +kubebuilder:skipversion
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type ClusterTemplate struct {
@@ -53,6 +54,7 @@ type ClusterTemplateSpec struct {
 }
 
 // +genclient
+// +kubebuilder:skipversion
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type ClusterTemplateRevision struct {

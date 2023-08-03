@@ -26,8 +26,10 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/dashboard/apiservice"
 	"github.com/rancher/rancher/pkg/controllers/dashboardapi"
 	managementauth "github.com/rancher/rancher/pkg/controllers/management/auth"
+	"github.com/rancher/rancher/pkg/controllers/nodedriver"
 	provisioningv2 "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
-	crds "github.com/rancher/rancher/pkg/crds/dashboard"
+	"github.com/rancher/rancher/pkg/crds"
+	dashboardcrds "github.com/rancher/rancher/pkg/crds/dashboard"
 	dashboarddata "github.com/rancher/rancher/pkg/data/dashboard"
 	"github.com/rancher/rancher/pkg/features"
 	mgmntv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -47,6 +49,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -137,7 +140,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 	wranglerContext.MultiClusterManager = newMCM(wranglerContext, opts)
 
 	// Initialize Features as early as possible
-	if err := crds.CreateFeatureCRD(ctx, restConfig); err != nil {
+	if err := dashboardcrds.CreateFeatureCRD(ctx, restConfig); err != nil {
 		return nil, err
 	}
 
@@ -155,8 +158,19 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		provisioningv2.RegisterIndexers(wranglerContext)
 	}
 
-	if err := crds.Create(ctx, restConfig); err != nil {
-		return nil, err
+	clientSet, err := clientset.NewForConfig(restConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create new clientset: %w", err)
+	}
+
+	// ensure migrated CRDs
+	if err := crds.EnsureRequired(ctx, clientSet.ApiextensionsV1().CustomResourceDefinitions()); err != nil {
+		return nil, fmt.Errorf("failed to ensure CRDs: %w", err)
+	}
+
+	// install all non migrated CRDs
+	if err := dashboardcrds.Create(ctx, restConfig); err != nil {
+		return nil, fmt.Errorf("failed to create CRDs: %w", err)
 	}
 
 	if features.MCM.Enabled() && !features.Fleet.Enabled() {
@@ -253,6 +267,8 @@ func (r *Rancher) Start(ctx context.Context) error {
 	}
 
 	if features.MCM.Enabled() {
+		// Registers handlers for all rancher replicas running in the local cluster, but not downstream agents
+		nodedriver.Register(ctx, r.Wrangler)
 		if err := r.Wrangler.MultiClusterManager.Start(ctx); err != nil {
 			return err
 		}

@@ -1,0 +1,29 @@
+policies:
+# should be ran on CRON to remove on every saturday morning / friday night
+# note: userkeys here is an override var.
+- name: remove-tagged-friday-instances
+  resource: aws.ec2
+  filters:
+      - 'tag:DeletesOnFriday': present
+      - not:
+        - 'tag:doNotDelete': present
+        - 'tag:DoNotDelete': present
+        - type: value
+          key: tag:Name
+          op: regex
+          value:  "^.*DONOTDELETEKEYS.*$"
+  actions:
+    - type: terminate
+- name: remove-tagged-friday-nlbs
+  resource: app-elb
+  filters:
+      - 'tag:DeletesOnFriday': present
+      - not:
+        - 'tag:doNotDelete': present
+        - 'tag:DoNotDelete': present
+        - type: value
+          key: tag:Name
+          op: regex
+          value:  "^.*DONOTDELETEKEYS.*$"
+  actions:
+    - type: delete

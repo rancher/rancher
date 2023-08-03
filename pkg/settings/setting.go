@@ -61,10 +61,10 @@ var (
 	CLIURLLinux                         = NewSetting("cli-url-linux", "https://releases.rancher.com/cli/v1.0.0-alpha8/rancher-linux-amd64-v1.0.0-alpha8.tar.gz")
 	CLIURLWindows                       = NewSetting("cli-url-windows", "https://releases.rancher.com/cli/v1.0.0-alpha8/rancher-windows-386-v1.0.0-alpha8.zip")
 	ClusterControllerStartCount         = NewSetting("cluster-controller-start-count", "50")
-	EngineInstallURL                    = NewSetting("engine-install-url", "https://releases.rancher.com/install-docker/23.0.sh")
+	EngineInstallURL                    = NewSetting("engine-install-url", "https://releases.rancher.com/install-docker/24.0.sh")
 	EngineISOURL                        = NewSetting("engine-iso-url", "https://releases.rancher.com/os/latest/rancheros-vmware.iso")
 	EngineNewestVersion                 = NewSetting("engine-newest-version", "v17.12.0")
-	EngineSupportedRange                = NewSetting("engine-supported-range", "~v1.11.2 || ~v1.12.0 || ~v1.13.0 || ~v17.03.0 || ~v17.06.0 || ~v17.09.0 || ~v18.06.0 || ~v18.09.0 || ~v19.03.0 || ~v20.10.0 || ~v23.0.0 ")
+	EngineSupportedRange                = NewSetting("engine-supported-range", "~v1.11.2 || ~v1.12.0 || ~v1.13.0 || ~v17.03.0 || ~v17.06.0 || ~v17.09.0 || ~v18.06.0 || ~v18.09.0 || ~v19.03.0 || ~v20.10.0 || ~v23.0.0 || ~v24.0.0 ")
 	FirstLogin                          = NewSetting("first-login", "true")
 	GlobalRegistryEnabled               = NewSetting("global-registry-enabled", "false")
 	GithubProxyAPIURL                   = NewSetting("github-proxy-api-url", "https://api.github.com")
@@ -96,7 +96,7 @@ var (
 	WinsAgentVersion                    = NewSetting("wins-agent-version", "")
 	CSIProxyAgentVersion                = NewSetting("csi-proxy-agent-version", "")
 	CSIProxyAgentURL                    = NewSetting("csi-proxy-agent-url", "https://acs-mirror.azureedge.net/csi-proxy/%[1]s/binaries/csi-proxy-%[1]s.tar.gz")
-	SystemAgentInstallScript            = NewSetting("system-agent-install-script", "https://raw.githubusercontent.com/rancher/system-agent/v0.3.3-rc4/install.sh")
+	SystemAgentInstallScript            = NewSetting("system-agent-install-script", "https://raw.githubusercontent.com/rancher/system-agent/v0.3.3/install.sh")
 	WinsAgentInstallScript              = NewSetting("wins-agent-install-script", "https://raw.githubusercontent.com/rancher/wins/v0.4.11/install.ps1")
 	SystemAgentInstallerImage           = NewSetting("system-agent-installer-image", "rancher/system-agent-installer-")
 	SystemAgentUpgradeImage             = NewSetting("system-agent-upgrade-image", "")
@@ -109,7 +109,7 @@ var (
 	WhitelistDomain                     = NewSetting("whitelist-domain", "forums.rancher.com")
 	WhitelistEnvironmentVars            = NewSetting("whitelist-envvars", "HTTP_PROXY,HTTPS_PROXY,NO_PROXY")
 	AuthUserInfoResyncCron              = NewSetting("auth-user-info-resync-cron", "0 0 * * *")
-	APIUIVersion                        = NewSetting("api-ui-version", "1.1.6")               // Please update the CATTLE_API_UI_VERSION in package/Dockerfile when updating the version here.
+	APIUIVersion                        = NewSetting("api-ui-version", "1.1.10")              // Please update the CATTLE_API_UI_VERSION in package/Dockerfile when updating the version here.
 	RotateCertsIfExpiringInDays         = NewSetting("rotate-certs-if-expiring-in-days", "7") // 7 days
 	ClusterTemplateEnforcement          = NewSetting("cluster-template-enforcement", "false")
 	InitialDockerRootDir                = NewSetting("initial-docker-root-dir", "/var/lib/docker")
@@ -118,7 +118,7 @@ var (
 	PartnerChartDefaultBranch           = NewSetting("partner-chart-default-branch", "main")
 	RKE2ChartDefaultBranch              = NewSetting("rke2-chart-default-branch", "main")
 	FleetDefaultWorkspaceName           = NewSetting("fleet-default-workspace-name", fleetconst.ClustersDefaultNamespace) // fleetWorkspaceName to assign to clusters with none
-	ShellImage                          = NewSetting("shell-image", "rancher/shell:v0.1.20-rc1")
+	ShellImage                          = NewSetting("shell-image", "rancher/shell:v0.1.21-rc1")
 	IgnoreNodeName                      = NewSetting("ignore-node-name", "") // nodes to ignore when syncing v1.node to v3.node
 	NoDefaultAdmin                      = NewSetting("no-default-admin", "")
 	RestrictedDefaultAdmin              = NewSetting("restricted-default-admin", "false") // When bootstrapping the admin for the first time, give them the global role restricted-admin
@@ -127,7 +127,7 @@ var (
 	EKSUpstreamRefresh                  = NewSetting("eks-refresh", "300")
 	GKEUpstreamRefresh                  = NewSetting("gke-refresh", "300")
 	HideLocalCluster                    = NewSetting("hide-local-cluster", "false")
-	MachineProvisionImage               = NewSetting("machine-provision-image", "rancher/machine:v0.15.0-rancher99")
+	MachineProvisionImage               = NewSetting("machine-provision-image", "rancher/machine:v0.15.0-rancher100")
 	SystemFeatureChartRefreshSeconds    = NewSetting("system-feature-chart-refresh-seconds", "21600")
 	ClusterAgentDefaultAffinity         = NewSetting("cluster-agent-default-affinity", ClusterAgentAffinity)
 	FleetAgentDefaultAffinity           = NewSetting("fleet-agent-default-affinity", FleetAgentAffinity)
@@ -145,6 +145,7 @@ var (
 	AuthUserSessionTTLMinutes = NewSetting("auth-user-session-ttl-minutes", "960") // 16 hours
 
 	// ConfigMapName name of the configmap that stores rancher configuration information.
+	// Deprecated: to be removed in 2.8.0
 	ConfigMapName = NewSetting("config-map-name", "rancher-config")
 
 	// CSPAdapterMinVersion is used to determine if an existing installation of the CSP adapter should be upgraded to a new version
@@ -241,6 +242,10 @@ var (
 
 	// UIPreferred Ensure that the new Dashboard is the default UI.
 	UIPreferred = NewSetting("ui-preferred", "vue")
+
+	// SkipHostedClusterChartInstallation controls whether the hosted cluster chart is installed on the server. Defaults to false.
+	// This setting is for development purposes only.
+	SkipHostedClusterChartInstallation = NewSetting("skip-hosted-cluster-chart-installation", os.Getenv("CATTLE_SKIP_HOSTED_CLUSTER_CHART_INSTALLATION"))
 )
 
 // FullShellImage returns the full private registry name of the rancher shell image.

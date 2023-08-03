@@ -22,5 +22,5 @@ type AWSEC2Config struct {
 	AWSIAMProfile      string   `json:"awsIAMProfile" yaml:"awsIAMProfile"`
 	AWSUser            string   `json:"awsUser" yaml:"awsUser"`
 	VolumeSize         int      `json:"volumeSize" yaml:"volumeSize"`
-	IsWindows          bool     `json:"isWindows" yaml:"isWindows"`
+	Roles              []string `json:"roles" yaml:"roles"`
 }

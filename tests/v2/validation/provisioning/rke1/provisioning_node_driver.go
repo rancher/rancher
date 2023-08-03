@@ -62,10 +62,6 @@ func TestProvisioningRKE1Cluster(t *testing.T, client *rancher.Client, provider 
 	require.NoError(t, err)
 	assert.NotEmpty(t, clusterToken)
 
-	podResults, podErrors := pods.StatusPods(client, clusterResp.ID)
-	assert.NotEmpty(t, podResults)
-	assert.Empty(t, podErrors)
-
 	if psact == string(provisioning.RancherPrivileged) || psact == string(provisioning.RancherRestricted) {
 		err = psadeploy.CheckPSACT(client, clusterName)
 		require.NoError(t, err)
@@ -73,6 +69,10 @@ func TestProvisioningRKE1Cluster(t *testing.T, client *rancher.Client, provider 
 		_, err = psadeploy.CreateNginxDeployment(client, clusterResp.ID, psact)
 		require.NoError(t, err)
 	}
+
+	podResults, podErrors := pods.StatusPods(client, clusterResp.ID)
+	assert.NotEmpty(t, podResults)
+	assert.Empty(t, podErrors)
 
 	return clusterResp, nil
 }

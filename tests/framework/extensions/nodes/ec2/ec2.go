@@ -1,10 +1,12 @@
 package ec2
 
 import (
+	"errors"
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
+	rancherEc2 "github.com/rancher/rancher/tests/framework/clients/ec2"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	"github.com/rancher/rancher/tests/framework/pkg/nodes"
 )
@@ -13,20 +15,27 @@ const (
 	nodeBaseName = "rancher-automation"
 )
 
-// CreateNodes creates `numOfInstances` (and/or `numOfWinInstances` when using multiple node configurations - e.g. Windows nodes) number of ec2 instances
-func CreateNodes(client *rancher.Client, numOfInstances int, numOfWinInstances int, multiconfig bool) (ec2Nodes []*nodes.Node, winEC2Nodes []*nodes.Node, err error) {
+// CreateNodes creates `quantityPerPool[n]` number of ec2 instances
+func CreateNodes(client *rancher.Client, rolesPerPool []string, quantityPerPool []int32) (ec2Nodes []*nodes.Node, err error) {
 	ec2Client, err := client.GetEC2Client()
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	for _, config := range ec2Client.ClientConfig.AWSEC2Config {
+	runningReservations := []*ec2.Reservation{}
+	reservationConfigs := []*rancherEc2.AWSEC2Config{}
+	// provisioning instances in reverse order to allow windows instances time to become ready
+	for i := len(quantityPerPool) - 1; i >= 0; i-- {
+		config := MatchRoleToConfig(rolesPerPool[i], ec2Client.ClientConfig.AWSEC2Config)
+		if config == nil {
+			return nil, errors.New("No matching nodesAndRole for AWSEC2Config with role:" + rolesPerPool[i])
+		}
 		sshName := getSSHKeyName(config.AWSSSHKeyName)
 		runInstancesInput := &ec2.RunInstancesInput{
 			ImageId:      aws.String(config.AWSAMI),
 			InstanceType: aws.String(config.InstanceType),
-			MinCount:     aws.Int64(int64(numOfInstances)),
-			MaxCount:     aws.Int64(int64(numOfInstances)),
+			MinCount:     aws.Int64(int64(quantityPerPool[i])),
+			MaxCount:     aws.Int64(int64(quantityPerPool[i])),
 			KeyName:      aws.String(sshName),
 			BlockDeviceMappings: []*ec2.BlockDeviceMapping{
 				{
@@ -68,12 +77,17 @@ func CreateNodes(client *rancher.Client, numOfInstances int, numOfWinInstances i
 
 		reservation, err := ec2Client.SVC.RunInstances(runInstancesInput)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
+		// instead of waiting on each node pool to complete provisioning, add to a queue and check run status later
+		runningReservations = append(runningReservations, reservation)
+		reservationConfigs = append(reservationConfigs, config)
+	}
 
+	for i := 0; i < len(quantityPerPool); i++ {
 		var listOfInstanceIds []*string
 
-		for _, instance := range reservation.Instances {
+		for _, instance := range runningReservations[i].Instances {
 			listOfInstanceIds = append(listOfInstanceIds, instance.InstanceId)
 		}
 
@@ -82,7 +96,7 @@ func CreateNodes(client *rancher.Client, numOfInstances int, numOfWinInstances i
 			InstanceIds: listOfInstanceIds,
 		})
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 
 		//wait until instance status is ok
@@ -90,74 +104,62 @@ func CreateNodes(client *rancher.Client, numOfInstances int, numOfWinInstances i
 			InstanceIds: listOfInstanceIds,
 		})
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 
-		// describe instance to get attributes=
+		// describe instance to get attributes
 		describe, err := ec2Client.SVC.DescribeInstances(&ec2.DescribeInstancesInput{
 			InstanceIds: listOfInstanceIds,
 		})
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 
 		readyInstances := describe.Reservations[0].Instances
 
-		sshKey, err := nodes.GetSSHKey(config.AWSSSHKeyName)
+		sshKey, err := nodes.GetSSHKey(reservationConfigs[i].AWSSSHKeyName)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 
 		for _, readyInstance := range readyInstances {
-
-			if multiconfig {
-				if config.AWSAMI == ec2Client.ClientConfig.AWSEC2Config[0].AWSAMI &&
-					config.AWSUser == ec2Client.ClientConfig.AWSEC2Config[0].AWSUser {
-					ec2Node := &nodes.Node{
-						NodeID:          *readyInstance.InstanceId,
-						PublicIPAddress: *readyInstance.PublicIpAddress,
-						SSHUser:         config.AWSUser,
-						SSHKey:          sshKey,
-					}
-					ec2Nodes = append(ec2Nodes, ec2Node)
-				}
-
-				if config.AWSAMI == ec2Client.ClientConfig.AWSEC2Config[1].AWSAMI &&
-					config.AWSUser == ec2Client.ClientConfig.AWSEC2Config[1].AWSUser {
-					ec2Node2 := &nodes.Node{
-						NodeID:          *readyInstance.InstanceId,
-						PublicIPAddress: *readyInstance.PublicIpAddress,
-						SSHUser:         config.AWSUser,
-						SSHKey:          sshKey,
-					}
-					winEC2Nodes = append(winEC2Nodes, ec2Node2)
-				}
-			} else {
-				ec2Node := &nodes.Node{
-					NodeID:          *readyInstance.InstanceId,
-					PublicIPAddress: *readyInstance.PublicIpAddress,
-					SSHUser:         config.AWSUser,
-					SSHKey:          sshKey,
-				}
-				ec2Nodes = append(ec2Nodes, ec2Node)
-				winEC2Nodes = nil
+			ec2Node := &nodes.Node{
+				NodeID:           *readyInstance.InstanceId,
+				PublicIPAddress:  *readyInstance.PublicIpAddress,
+				PrivateIPAddress: *readyInstance.PrivateIpAddress,
+				SSHUser:          reservationConfigs[i].AWSUser,
+				SSHKey:           sshKey,
 			}
-		}
-
-		client.Session.RegisterCleanupFunc(func() error {
-			return DeleteNodes(client, ec2Nodes, winEC2Nodes, multiconfig)
-		})
-
-		if !multiconfig {
-			break
+			// re-reverse the list so that the order is corrected
+			ec2Nodes = append([]*nodes.Node{ec2Node}, ec2Nodes...)
 		}
 	}
 
-	return ec2Nodes, winEC2Nodes, nil
+	client.Session.RegisterCleanupFunc(func() error {
+		return DeleteNodes(client, ec2Nodes)
+	})
+
+	return ec2Nodes, nil
+}
+
+// MatchRoleToConfig matches the role of nodesAndRoles to the ec2Config that allows this role.
+func MatchRoleToConfig(poolRole string, ec2Configs []rancherEc2.AWSEC2Config) *rancherEc2.AWSEC2Config {
+	for _, config := range ec2Configs {
+		hasMatch := false
+		for _, configRole := range config.Roles {
+			if strings.Contains(poolRole, configRole) {
+				hasMatch = true
+			}
+		}
+		if hasMatch {
+			return &config
+		}
+	}
+	return nil
 }
 
 // DeleteNodes terminates ec2 instances that have been created.
-func DeleteNodes(client *rancher.Client, nodes []*nodes.Node, nodes2 []*nodes.Node, multiconfig bool) error {
+func DeleteNodes(client *rancher.Client, nodes []*nodes.Node) error {
 	ec2Client, err := client.GetEC2Client()
 	if err != nil {
 		return err
@@ -166,11 +168,6 @@ func DeleteNodes(client *rancher.Client, nodes []*nodes.Node, nodes2 []*nodes.No
 	var instanceIDs []*string
 	for _, node := range nodes {
 		instanceIDs = append(instanceIDs, aws.String(node.NodeID))
-	}
-	if multiconfig {
-		for _, node2 := range nodes2 {
-			instanceIDs = append(instanceIDs, aws.String(node2.NodeID))
-		}
 	}
 
 	_, err = ec2Client.SVC.TerminateInstances(&ec2.TerminateInstancesInput{

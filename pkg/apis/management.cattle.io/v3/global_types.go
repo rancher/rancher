@@ -5,6 +5,7 @@ import (
 )
 
 // +genclient
+// +kubebuilder:skipversion
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -19,6 +20,7 @@ type Setting struct {
 }
 
 // +genclient
+// +kubebuilder:skipversion
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -40,3 +42,8 @@ type FeatureStatus struct {
 	Description string `json:"description"`
 	LockedValue *bool  `json:"lockedValue"`
 }
+
+const (
+	ExperimentalFeatureKey   = "feature.cattle.io/experimental"
+	ExperimentalFeatureValue = "true"
+)

@@ -13,7 +13,7 @@ import (
 	"github.com/rancher/norman/types"
 	rketypes "github.com/rancher/rke/types"
 	"github.com/sirupsen/logrus"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/version"
 )
@@ -93,6 +93,7 @@ const (
 )
 
 // +genclient
+// +kubebuilder:skipversion
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -254,6 +255,7 @@ func (m *MapStringInterface) DeepCopy() *MapStringInterface {
 }
 
 // +genclient
+// +kubebuilder:skipversion
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type ClusterRegistrationToken struct {

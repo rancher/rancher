@@ -25,7 +25,7 @@ import (
 
 var (
 	ProviderNames          = make(map[string]bool)
-	ProvidersWithSecrets   = make(map[string]bool)
+	providersWithSecrets   = make(map[string]bool)
 	UnrefreshableProviders = make(map[string]bool)
 	Providers              = make(map[string]common.AuthProvider)
 	LocalProvider          = "local"
@@ -62,14 +62,14 @@ func Configure(ctx context.Context, mgmt *config.ScaledContext) {
 
 	p = github.Configure(ctx, mgmt, userMGR, tokenMGR)
 	ProviderNames[github.Name] = true
-	ProvidersWithSecrets[github.Name] = true
+	providersWithSecrets[github.Name] = true
 	Providers[github.Name] = p
 	providersByType[client.GithubConfigType] = p
 	providersByType[publicclient.GithubProviderType] = p
 
 	p = azure.Configure(ctx, mgmt, userMGR, tokenMGR)
 	ProviderNames[azure.Name] = true
-	ProvidersWithSecrets[azure.Name] = true
+	providersWithSecrets[azure.Name] = true
 	Providers[azure.Name] = p
 	providersByType[client.AzureADConfigType] = p
 	providersByType[publicclient.AzureADProviderType] = p
@@ -129,21 +129,21 @@ func Configure(ctx context.Context, mgmt *config.ScaledContext) {
 
 	p = googleoauth.Configure(ctx, mgmt, userMGR, tokenMGR)
 	ProviderNames[googleoauth.Name] = true
-	ProvidersWithSecrets[googleoauth.Name] = true
+	providersWithSecrets[googleoauth.Name] = true
 	Providers[googleoauth.Name] = p
 	providersByType[client.GoogleOauthConfigType] = p
 	providersByType[publicclient.GoogleOAuthProviderType] = p
 
 	p = oidc.Configure(ctx, mgmt, userMGR, tokenMGR)
 	ProviderNames[oidc.Name] = true
-	ProvidersWithSecrets[oidc.Name] = true
+	providersWithSecrets[oidc.Name] = true
 	Providers[oidc.Name] = p
 	providersByType[client.OIDCConfigType] = p
 	providersByType[publicclient.OIDCProviderType] = p
 
 	p = keycloakoidc.Configure(ctx, mgmt, userMGR, tokenMGR)
 	ProviderNames[keycloakoidc.Name] = true
-	ProvidersWithSecrets[keycloakoidc.Name] = true
+	providersWithSecrets[keycloakoidc.Name] = true
 	Providers[keycloakoidc.Name] = p
 	providersByType[client.KeyCloakOIDCConfigType] = p
 	providersByType[publicclient.KeyCloakOIDCProviderType] = p
@@ -215,4 +215,29 @@ func IsDisabledProvider(providerName string) (bool, error) {
 		return false, err
 	}
 	return provider.IsDisabledProvider()
+}
+
+// ProviderHasPerUserSecrets returns true if a given provider is known to use per-user auth tokens stored in secrets.
+func ProviderHasPerUserSecrets(providerName string) (bool, error) {
+	// For Azure AD, check if it's configured to use the new or old flow. Only the old flow via Azure AD Graph uses per-user secrets.
+	if providerName == azure.Name {
+		p, ok := Providers[azure.Name]
+		if !ok {
+			return false, fmt.Errorf("error determining if auth provider uses per-user tokens: provider %s is unknown to Rancher", providerName)
+		}
+
+		azureProvider, ok := p.(*azure.Provider)
+		if !ok {
+			return false, fmt.Errorf("error determining if Azure AD auth provider uses per-user tokens: provider's type is invalid")
+		}
+
+		cfg, err := azureProvider.GetAzureConfigK8s()
+		if err != nil {
+			return false, fmt.Errorf("error determining if Azure AD auth provider uses per-user tokens because of an error to fetch its config: %w", err)
+		}
+
+		return azure.IsConfigDeprecated(cfg), nil
+	}
+
+	return providersWithSecrets[providerName], nil
 }

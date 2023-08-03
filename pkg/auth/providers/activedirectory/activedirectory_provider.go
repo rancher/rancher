@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -137,7 +136,7 @@ func (p *adProvider) GetPrincipal(principalID string, token v3.Token) (v3.Princi
 	if err != nil {
 		return v3.Principal{}, err
 	}
-	if token.Token != "" && p.isThisUserMe(token.UserPrincipal, *principal) {
+	if p.isThisUserMe(token.UserPrincipal, *principal) {
 		principal.Me = true
 	}
 	return *principal, err
@@ -164,16 +163,10 @@ func (p *adProvider) getActiveDirectoryConfig() (*v32.ActiveDirectoryConfig, *x5
 	storedADConfigMap := u.UnstructuredContent()
 
 	storedADConfig := &v32.ActiveDirectoryConfig{}
-	mapstructure.Decode(storedADConfigMap, storedADConfig)
-
-	metadataMap, ok := storedADConfigMap["metadata"].(map[string]interface{})
-	if !ok {
-		return nil, nil, fmt.Errorf("failed to retrieve ActiveDirectoryConfig metadata, cannot read k8s Unstructured data")
+	err = common.Decode(storedADConfigMap, storedADConfig)
+	if err != nil {
+		return nil, nil, fmt.Errorf("unable to decode Active Directory Config: %w", err)
 	}
-
-	typemeta := &metav1.ObjectMeta{}
-	mapstructure.Decode(metadataMap, typemeta)
-	storedADConfig.ObjectMeta = *typemeta
 
 	if p.certs != storedADConfig.Certificate || p.caPool == nil {
 		pool, err := newCAPool(storedADConfig.Certificate)

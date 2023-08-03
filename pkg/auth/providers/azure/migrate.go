@@ -17,7 +17,7 @@ import (
 // It also creates a new test Azure client to catch any errors before committing the migration.
 // If validation and applying work, then migrateToMicrosoftGraph deletes all secrets with access tokens to the
 // deprecated Azure AD Graph API.
-func (ap *azureProvider) migrateToMicrosoftGraph() error {
+func (ap *Provider) migrateToMicrosoftGraph() error {
 	cfg, err := ap.updateConfigAndTest()
 	if err != nil {
 		return err
@@ -30,8 +30,8 @@ func (ap *azureProvider) migrateToMicrosoftGraph() error {
 	return nil
 }
 
-func (ap *azureProvider) updateConfigAndTest() (*v32.AzureADConfig, error) {
-	cfg, err := ap.getAzureConfigK8s()
+func (ap *Provider) updateConfigAndTest() (*v32.AzureADConfig, error) {
+	cfg, err := ap.GetAzureConfigK8s()
 	if err != nil {
 		return nil, err
 	}
@@ -49,7 +49,7 @@ func (ap *azureProvider) updateConfigAndTest() (*v32.AzureADConfig, error) {
 	return cfg, nil
 }
 
-func (ap *azureProvider) applyUpdatedConfig(cfg *v32.AzureADConfig) error {
+func (ap *Provider) applyUpdatedConfig(cfg *v32.AzureADConfig) error {
 	if cfg.ObjectMeta.Annotations == nil {
 		cfg.ObjectMeta.Annotations = make(map[string]string)
 	}
@@ -57,7 +57,7 @@ func (ap *azureProvider) applyUpdatedConfig(cfg *v32.AzureADConfig) error {
 	return ap.saveAzureConfigK8s(cfg)
 }
 
-func (ap *azureProvider) deleteUserAccessTokens() {
+func (ap *Provider) deleteUserAccessTokens() {
 	if err := secrets.CleanupOAuthTokens(ap.secrets, ap.GetName()); err != nil {
 		logrus.Errorf("error during OAuth secrets clean up on Azure AD endpoint update: %v", err)
 	}

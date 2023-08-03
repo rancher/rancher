@@ -16,7 +16,7 @@ func main() {
 	}
 	configPackage := corral.CorralPackagesConfig()
 
-	path := configPackage.CorralPackageImages["aws-rke2-rancher-calico-v1.23.6-rke2r1-2.6.7"]
+	path := configPackage.CorralPackageImages["ranchertestcoverage"]
 	_, err = corral.CreateCorral(testSession, "ranchertestcoverage", path, true, configPackage.HasCleanup)
 	if err != nil {
 		logrus.Errorf("error creating corral: %v", err)

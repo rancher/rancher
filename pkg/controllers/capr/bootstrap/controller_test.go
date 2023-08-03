@@ -6,85 +6,18 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/golang/mock/gomock"
 	"github.com/rancher/rancher/pkg/capr"
-	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
-	v1wa "github.com/rancher/wrangler/pkg/generated/controllers/apps/v1"
-	v1w "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
+	ctrlfake "github.com/rancher/wrangler/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	v1apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes/fake"
-	"sigs.k8s.io/cluster-api/api/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
-
-type serviceAccountCacheMock struct{ mock.Mock }
-
-func (s *serviceAccountCacheMock) Get(namespace, name string) (*v1.ServiceAccount, error) {
-	args := s.Called(namespace, name)
-	return args.Get(0).(*v1.ServiceAccount), args.Error(1)
-}
-func (s *serviceAccountCacheMock) List(namespace string, selector labels.Selector) ([]*v1.ServiceAccount, error) {
-	args := s.Called(namespace, selector)
-	return args.Get(0).([]*v1.ServiceAccount), args.Error(1)
-}
-func (s *serviceAccountCacheMock) AddIndexer(indexName string, indexer v1w.ServiceAccountIndexer) {}
-func (s *serviceAccountCacheMock) GetByIndex(indexName, key string) ([]*v1.ServiceAccount, error) {
-	args := s.Called(indexName, key)
-	return args.Get(0).([]*v1.ServiceAccount), args.Error(1)
-}
-
-type secretCacheMock struct{ mock.Mock }
-
-func (s *secretCacheMock) Get(namespace, name string) (*v1.Secret, error) {
-	args := s.Called(namespace, name)
-	return args.Get(0).(*v1.Secret), args.Error(1)
-}
-func (s *secretCacheMock) List(namespace string, selector labels.Selector) ([]*v1.Secret, error) {
-	args := s.Called(namespace, selector)
-	return args.Get(0).([]*v1.Secret), args.Error(1)
-}
-func (s *secretCacheMock) AddIndexer(indexName string, indexer v1w.SecretIndexer) {}
-func (s *secretCacheMock) GetByIndex(indexName, key string) ([]*v1.Secret, error) {
-	args := s.Called(indexName, key)
-	return args.Get(0).([]*v1.Secret), args.Error(1)
-}
-
-type deploymentCacheMock struct{ mock.Mock }
-
-func (d *deploymentCacheMock) Get(namespace, name string) (*v1apps.Deployment, error) {
-	args := d.Called(namespace, name)
-	return args.Get(0).(*v1apps.Deployment), args.Error(1)
-}
-func (d *deploymentCacheMock) List(namespace string, selector labels.Selector) ([]*v1apps.Deployment, error) {
-	args := d.Called(namespace, selector)
-	return args.Get(0).([]*v1apps.Deployment), args.Error(1)
-}
-func (d *deploymentCacheMock) AddIndexer(indexName string, indexer v1wa.DeploymentIndexer) {}
-func (d *deploymentCacheMock) GetByIndex(indexName, key string) ([]*v1apps.Deployment, error) {
-	args := d.Called(indexName, key)
-	return args.Get(0).([]*v1apps.Deployment), args.Error(1)
-}
-
-type machineCacheMock struct{ mock.Mock }
-
-func (m *machineCacheMock) Get(namespace, name string) (*v1beta1.Machine, error) {
-	args := m.Called(namespace, name)
-	return args.Get(0).(*v1beta1.Machine), args.Error(1)
-}
-func (m *machineCacheMock) List(namespace string, selector labels.Selector) ([]*v1beta1.Machine, error) {
-	args := m.Called(namespace, selector)
-	return args.Get(0).([]*v1beta1.Machine), args.Error(1)
-}
-func (m *machineCacheMock) AddIndexer(indexName string, indexer capicontrollers.MachineIndexer) {}
-func (m *machineCacheMock) GetByIndex(indexName, key string) ([]*v1beta1.Machine, error) {
-	args := m.Called(indexName, key)
-	return args.Get(0).([]*v1beta1.Machine), args.Error(1)
-}
 
 func Test_getBootstrapSecret(t *testing.T) {
 	type args struct {
@@ -129,12 +62,12 @@ func Test_getBootstrapSecret(t *testing.T) {
 			expectHash := sha256.Sum256([]byte("thisismytokenandiwillprotectit"))
 			expectEncodedHash := base64.URLEncoding.EncodeToString(expectHash[:])
 			a := assert.New(t)
-
+			ctrl := gomock.NewController(t)
 			handler := handler{
-				serviceAccountCache: getServiceAccountCacheMock(tt.args.namespaceName, tt.args.secretName),
-				secretCache:         getSecretCacheMock(tt.args.namespaceName, tt.args.secretName),
-				deploymentCache:     getDeploymentCacheMock(),
-				machineCache:        getMachineCacheMock(tt.args.namespaceName, tt.args.os),
+				serviceAccountCache: getServiceAccountCacheMock(ctrl, tt.args.namespaceName, tt.args.secretName),
+				secretCache:         getSecretCacheMock(ctrl, tt.args.namespaceName, tt.args.secretName),
+				deploymentCache:     getDeploymentCacheMock(ctrl),
+				machineCache:        getMachineCacheMock(ctrl, tt.args.namespaceName, tt.args.os),
 				k8s:                 fake.NewSimpleClientset(),
 			}
 
@@ -143,11 +76,13 @@ func Test_getBootstrapSecret(t *testing.T) {
 			a.Nil(err)
 
 			serviceAccount, err := handler.serviceAccountCache.Get(tt.args.namespaceName, tt.args.secretName)
+			a.Nil(err)
 			machine, err := handler.machineCache.Get(tt.args.namespaceName, tt.args.os)
+			a.Nil(err)
 			secret, err := handler.getBootstrapSecret(tt.args.namespaceName, tt.args.secretName, []v1.EnvVar{}, machine)
+			a.Nil(err)
 
 			// assert
-			a.Nil(err)
 			a.NotNil(secret)
 			a.NotNil(serviceAccount)
 			a.NotNil(machine)
@@ -189,95 +124,154 @@ func Test_getBootstrapSecret(t *testing.T) {
 				a.Contains(data, "$env:CSI_PROXY_URL")
 				a.Contains(data, "$env:CSI_PROXY_VERSION")
 				a.Contains(data, "$env:CSI_PROXY_KUBELET_PATH")
-
 			}
 		})
 	}
 }
 
-func getMachineCacheMock(namespace, os string) *machineCacheMock {
-	mockMachineCache := new(machineCacheMock)
-	mockMachineCache.On("Get", namespace, capr.DefaultMachineOS).Return(&v1beta1.Machine{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      os,
-			Namespace: namespace,
-			Labels: map[string]string{
-				capr.ControlPlaneRoleLabel: "true",
-				capr.EtcdRoleLabel:         "true",
-				capr.WorkerRoleLabel:       "true",
-				capr.CattleOSLabel:         os,
+func getMachineCacheMock(ctrl *gomock.Controller, namespace, os string) *ctrlfake.MockCacheInterface[*capi.Machine] {
+	mockMachineCache := ctrlfake.NewMockCacheInterface[*capi.Machine](ctrl)
+	mockMachineCache.EXPECT().Get(namespace, capr.DefaultMachineOS).DoAndReturn(func(namespace, name string) (*capi.Machine, error) {
+		return &capi.Machine{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      os,
+				Namespace: namespace,
+				Labels: map[string]string{
+					capr.ControlPlaneRoleLabel: "true",
+					capr.EtcdRoleLabel:         "true",
+					capr.WorkerRoleLabel:       "true",
+					capr.CattleOSLabel:         os,
+				},
 			},
-		},
-	}, nil)
-	mockMachineCache.On("Get", namespace, capr.WindowsMachineOS).Return(&v1beta1.Machine{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      os,
-			Namespace: namespace,
-			Labels: map[string]string{
-				capr.ControlPlaneRoleLabel: "false",
-				capr.EtcdRoleLabel:         "false",
-				capr.WorkerRoleLabel:       "true",
-				capr.CattleOSLabel:         os,
+		}, nil
+	}).AnyTimes()
+
+	mockMachineCache.EXPECT().Get(namespace, capr.WindowsMachineOS).DoAndReturn(func(namespace, name string) (*capi.Machine, error) {
+		return &capi.Machine{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      os,
+				Namespace: namespace,
+				Labels: map[string]string{
+					capr.ControlPlaneRoleLabel: "false",
+					capr.EtcdRoleLabel:         "false",
+					capr.WorkerRoleLabel:       "true",
+					capr.CattleOSLabel:         os,
+				},
 			},
-		},
-	}, nil)
+		}, nil
+	}).AnyTimes()
 	return mockMachineCache
 }
 
-func getDeploymentCacheMock() *deploymentCacheMock {
-	mockDeploymentCache := new(deploymentCacheMock)
-	mockDeploymentCache.On("Get", namespace.System, "rancher").Return(&v1apps.Deployment{
-		Spec: v1apps.DeploymentSpec{
-			Template: v1.PodTemplateSpec{
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
-						{
-							Name: "rancher",
-							Ports: []v1.ContainerPort{
-								{
-									HostPort: 8080,
+func getDeploymentCacheMock(ctrl *gomock.Controller) *ctrlfake.MockCacheInterface[*v1apps.Deployment] {
+	mockDeploymentCache := ctrlfake.NewMockCacheInterface[*v1apps.Deployment](ctrl)
+	mockDeploymentCache.EXPECT().Get(namespace.System, "rancher").DoAndReturn(func(namespace, name string) (*v1apps.Deployment, error) {
+		return &v1apps.Deployment{
+			Spec: v1apps.DeploymentSpec{
+				Template: v1.PodTemplateSpec{
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{
+							{
+								Name: "rancher",
+								Ports: []v1.ContainerPort{
+									{
+										HostPort: 8080,
+									},
 								},
 							},
 						},
 					},
 				},
 			},
-		},
-	}, nil)
+		}, nil
+	}).AnyTimes()
 	return mockDeploymentCache
 }
 
-func getSecretCacheMock(namespace, secretName string) *secretCacheMock {
-	mockSecretCache := new(secretCacheMock)
-	mockSecretCache.On("Get", namespace, secretName).Return(&v1.Secret{
-		TypeMeta: metav1.TypeMeta{},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: secretName,
-		},
-		Immutable: nil,
-		Data: map[string][]byte{
-			"token": []byte("thisismytokenandiwillprotectit"),
-		},
-		StringData: nil,
-		Type:       "",
-	}, nil)
-
+func getSecretCacheMock(ctrl *gomock.Controller, namespace, secretName string) *ctrlfake.MockCacheInterface[*v1.Secret] {
+	mockSecretCache := ctrlfake.NewMockCacheInterface[*v1.Secret](ctrl)
+	mockSecretCache.EXPECT().Get(namespace, secretName).DoAndReturn(func(namespace, name string) (*v1.Secret, error) {
+		return &v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: namespace,
+				Name:      name,
+				Annotations: map[string]string{
+					"kubernetes.io/service-account.name": secretName,
+				},
+			},
+			Immutable: nil,
+			Data: map[string][]byte{
+				"token": []byte("thisismytokenandiwillprotectit"),
+			},
+			StringData: nil,
+			Type:       "kubernetes.io/service-account-token",
+		}, nil
+	}).AnyTimes()
 	return mockSecretCache
 }
 
-func getServiceAccountCacheMock(namespace, name string) *serviceAccountCacheMock {
-	mockServiceAccountCache := new(serviceAccountCacheMock)
-	mockServiceAccountCache.On("Get", namespace, name).Return(&v1.ServiceAccount{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: namespace,
-			Name:      name,
-		},
-		Secrets: []v1.ObjectReference{
-			{
+func getServiceAccountCacheMock(ctrl *gomock.Controller, namespace, name string) *ctrlfake.MockCacheInterface[*v1.ServiceAccount] {
+	mockServiceAccountCache := ctrlfake.NewMockCacheInterface[*v1.ServiceAccount](ctrl)
+	mockServiceAccountCache.EXPECT().Get(namespace, name).DoAndReturn(func(namespace, name string) (*v1.ServiceAccount, error) {
+		return &v1.ServiceAccount{
+			ObjectMeta: metav1.ObjectMeta{
 				Namespace: namespace,
 				Name:      name,
 			},
-		},
-	}, nil)
+			Secrets: []v1.ObjectReference{
+				{
+					Namespace: namespace,
+					Name:      name,
+				},
+			},
+		}, nil
+	}).AnyTimes()
 	return mockServiceAccountCache
+}
+
+func TestShouldCreateBootstrapSecret(t *testing.T) {
+	tests := []struct {
+		phase    capi.MachinePhase
+		expected bool
+	}{
+		{
+			phase:    capi.MachinePhasePending,
+			expected: true,
+		},
+		{
+			phase:    capi.MachinePhaseProvisioning,
+			expected: true,
+		},
+		{
+			phase:    capi.MachinePhaseProvisioned,
+			expected: true,
+		},
+		{
+			phase:    capi.MachinePhaseRunning,
+			expected: true,
+		},
+		{
+			phase:    capi.MachinePhaseDeleting,
+			expected: false,
+		},
+		{
+			phase:    capi.MachinePhaseDeleted,
+			expected: false,
+		},
+		{
+			phase:    capi.MachinePhaseFailed,
+			expected: false,
+		},
+		{
+			phase:    capi.MachinePhaseUnknown,
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(string(tt.phase), func(t *testing.T) {
+			actual := shouldCreateBootstrapSecret(tt.phase)
+			assert.Equal(t, tt.expected, actual)
+		})
+	}
 }

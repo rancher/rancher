@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
+	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/defaults"
 	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
@@ -22,7 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func TestProvisioningRKE2Cluster(t *testing.T, client *rancher.Client, provider Provider, nodesAndRoles []machinepools.NodeRoles, kubeVersion, cni, psact string, advancedOptions provisioning.AdvancedOptions) {
+func TestProvisioningRKE2Cluster(t *testing.T, client *rancher.Client, provider Provider, nodesAndRoles []machinepools.NodeRoles, kubeVersion, cni, psact string, advancedOptions provisioning.AdvancedOptions) *v1.SteveAPIObject {
 	cloudCredential, err := provider.CloudCredFunc(client)
 	require.NoError(t, err)
 
@@ -71,10 +72,6 @@ func TestProvisioningRKE2Cluster(t *testing.T, client *rancher.Client, provider 
 	require.NoError(t, err)
 	assert.NotEmpty(t, clusterToken)
 
-	podResults, podErrors := pods.StatusPods(client, clusterIDName)
-	assert.NotEmpty(t, podResults)
-	assert.Empty(t, podErrors)
-
 	if psact == string(provisioning.RancherPrivileged) || psact == string(provisioning.RancherRestricted) {
 		err = psadeploy.CheckPSACT(client, clusterName)
 		require.NoError(t, err)
@@ -82,4 +79,10 @@ func TestProvisioningRKE2Cluster(t *testing.T, client *rancher.Client, provider 
 		_, err = psadeploy.CreateNginxDeployment(client, clusterIDName, psact)
 		require.NoError(t, err)
 	}
+
+	podResults, podErrors := pods.StatusPods(client, clusterIDName)
+	assert.NotEmpty(t, podResults)
+	assert.Empty(t, podErrors)
+
+	return clusterResp
 }

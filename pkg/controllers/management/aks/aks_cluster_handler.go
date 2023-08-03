@@ -306,7 +306,10 @@ func (e *aksOperatorController) updateAKSClusterConfig(cluster *apimgmtv3.Cluste
 	for {
 		select {
 		case event := <-w.ResultChan():
-			aksClusterConfigDynamic = event.Object.(*unstructured.Unstructured)
+			var ok bool
+			if aksClusterConfigDynamic, ok = event.Object.(*unstructured.Unstructured); !ok {
+				return cluster, fmt.Errorf("unexpected nil cluster config")
+			}
 			status, _ := aksClusterConfigDynamic.Object["status"].(map[string]interface{})
 			if status["phase"] == "active" {
 				continue

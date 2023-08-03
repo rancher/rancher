@@ -1,6 +1,7 @@
 package custom
 
 import (
+	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"testing"
 	"time"
 
@@ -30,7 +31,13 @@ func Test_Operation_Custom_EtcdSnapshotCreationRestoreInPlace(t *testing.T) {
 			Name: "test-custom-etcd-snapshot-operations-inplace",
 		},
 		Spec: provisioningv1.ClusterSpec{
-			RKEConfig: &provisioningv1.RKEConfig{},
+			RKEConfig: &provisioningv1.RKEConfig{
+				RKEClusterSpecCommon: rkev1.RKEClusterSpecCommon{
+					ETCD: &rkev1.ETCD{
+						DisableSnapshots: true,
+					},
+				},
+			},
 		},
 	})
 	if err != nil {

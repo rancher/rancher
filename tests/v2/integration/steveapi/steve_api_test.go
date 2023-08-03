@@ -357,7 +357,7 @@ func (s *steveAPITestSuite) setupSuite(clusterName string) {
 			}
 			secret.ObjectMeta.SetLabels(labels)
 			err := retryRequest(func() error {
-				_, err := secrets.CreateSecret(s.client, secret, s.clusterID, n)
+				_, err := secrets.CreateSecretForCluster(s.client, secret, s.clusterID, n)
 				if apierrors.IsAlreadyExists(err) {
 					return nil
 				}

@@ -11,6 +11,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/defaults"
 	hardening "github.com/rancher/rancher/tests/framework/extensions/hardening/k3s"
+	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
 	nodestat "github.com/rancher/rancher/tests/framework/extensions/nodes"
 	"github.com/rancher/rancher/tests/framework/extensions/pipeline"
 	psadeploy "github.com/rancher/rancher/tests/framework/extensions/psact"
@@ -25,11 +26,31 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func TestProvisioningK3SCustomCluster(t *testing.T, client *rancher.Client, externalNodeProvider provisioning.ExternalNodeProvider, nodesAndRoles []string, kubeVersion string, hardened bool, psact string, advancedOptions provisioning.AdvancedOptions) {
+func TestProvisioningK3SCustomCluster(t *testing.T, client *rancher.Client, externalNodeProvider provisioning.ExternalNodeProvider, nodesAndRoles []machinepools.NodeRoles, kubeVersion string, hardened bool, psact string, advancedOptions provisioning.AdvancedOptions) {
 	namespace := "fleet-default"
+	rolesPerNode := []string{}
+	quantityPerPool := []int32{}
+	rolesPerPool := []string{}
+	for _, nodes := range nodesAndRoles {
+		var finalRoleCommand string
+		if nodes.ControlPlane {
+			finalRoleCommand += " --controlplane"
+		}
+		if nodes.Etcd {
+			finalRoleCommand += " --etcd"
+		}
+		if nodes.Worker {
+			finalRoleCommand += " --worker"
+		}
 
-	numNodes := len(nodesAndRoles)
-	nodes, _, err := externalNodeProvider.NodeCreationFunc(client, numNodes, 0, false)
+		quantityPerPool = append(quantityPerPool, nodes.Quantity)
+		rolesPerPool = append(rolesPerPool, finalRoleCommand)
+		for i := int32(0); i < nodes.Quantity; i++ {
+			rolesPerNode = append(rolesPerNode, finalRoleCommand)
+		}
+	}
+
+	nodes, err := externalNodeProvider.NodeCreationFunc(client, rolesPerPool, quantityPerPool)
 	require.NoError(t, err)
 
 	clusterName := namegen.AppendRandomString(externalNodeProvider.Name)
@@ -45,7 +66,7 @@ func TestProvisioningK3SCustomCluster(t *testing.T, client *rancher.Client, exte
 
 	client, err = client.ReLogin()
 	require.NoError(t, err)
-	customCluster, err := client.Steve.SteveType(clusters.ProvisioningSteveResouceType).ByID(clusterResp.ID)
+	customCluster, err := client.Steve.SteveType(clusters.ProvisioningSteveResourceType).ByID(clusterResp.ID)
 	require.NoError(t, err)
 
 	clusterStatus := &apiv1.ClusterStatus{}
@@ -57,7 +78,7 @@ func TestProvisioningK3SCustomCluster(t *testing.T, client *rancher.Client, exte
 
 	for key, node := range nodes {
 		t.Logf("Execute Registration Command for node %s", node.NodeID)
-		command := fmt.Sprintf("%s %s", token.InsecureNodeCommand, nodesAndRoles[key])
+		command := fmt.Sprintf("%s %s", token.InsecureNodeCommand, rolesPerNode[key])
 
 		output, err := node.ExecuteCommand(command)
 		require.NoError(t, err)
@@ -92,12 +113,8 @@ func TestProvisioningK3SCustomCluster(t *testing.T, client *rancher.Client, exte
 	require.NoError(t, err)
 	assert.NotEmpty(t, clusterToken)
 
-	podResults, podErrors := pods.StatusPods(client, clusterIDName)
-	assert.NotEmpty(t, podResults)
-	assert.Empty(t, podErrors)
-
 	if hardened && kubeVersion <= string(provisioning.HardenedKubeVersion) {
-		err = hardening.HardeningNodes(client, hardened, nodes, nodesAndRoles)
+		err = hardening.HardeningNodes(client, hardened, nodes, rolesPerNode)
 		require.NoError(t, err)
 
 		hardenCluster := clusters.HardenK3SRKE2ClusterConfig(clusterName, namespace, "", "", kubeVersion, psact, nil, provisioning.AdvancedOptions{})
@@ -113,4 +130,8 @@ func TestProvisioningK3SCustomCluster(t *testing.T, client *rancher.Client, exte
 		_, err = psadeploy.CreateNginxDeployment(client, clusterIDName, psact)
 		require.NoError(t, err)
 	}
+
+	podResults, podErrors := pods.StatusPods(client, clusterIDName)
+	assert.NotEmpty(t, podResults)
+	assert.Empty(t, podErrors)
 }

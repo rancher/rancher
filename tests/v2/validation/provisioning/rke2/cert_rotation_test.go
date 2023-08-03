@@ -88,7 +88,7 @@ func (r *V2ProvCertRotationTestSuite) testCertRotation(provider Provider, kubeVe
 			kubeProvisioningClient, err := r.client.GetKubeAPIProvisioningClient()
 			require.NoError(r.T(), err)
 
-			result, err := kubeProvisioningClient.Clusters("fleet-default").Watch(context.TODO(), metav1.ListOptions{
+			result, err := kubeProvisioningClient.Clusters(namespace).Watch(context.TODO(), metav1.ListOptions{
 				FieldSelector:  "metadata.name=" + cluster.ObjectMeta.Name,
 				TimeoutSeconds: &defaults.WatchTimeoutSeconds,
 			})
@@ -99,7 +99,7 @@ func (r *V2ProvCertRotationTestSuite) testCertRotation(provider Provider, kubeVe
 			require.NoError(r.T(), err)
 			assert.Equal(r.T(), clusterName, clusterResp.ObjectMeta.Name)
 
-			steveCluster, err := r.client.Steve.SteveType(clusters.ProvisioningSteveResouceType).ByID(clusterResp.ID)
+			steveCluster, err := r.client.Steve.SteveType(clusters.ProvisioningSteveResourceType).ByID(clusterResp.ID)
 			require.NoError(r.T(), err)
 			require.NotNil(r.T(), steveCluster.Status)
 
@@ -135,7 +135,7 @@ func (r *V2ProvCertRotationTestSuite) rotateCerts(id string, generation int64) e
 	kubeProvisioningClient, err := r.client.GetKubeAPIProvisioningClient()
 	require.NoError(r.T(), err)
 
-	cluster, err := r.client.Steve.SteveType(clusters.ProvisioningSteveResouceType).ByID(id)
+	cluster, err := r.client.Steve.SteveType(clusters.ProvisioningSteveResourceType).ByID(id)
 	if err != nil {
 		return err
 	}
@@ -152,7 +152,7 @@ func (r *V2ProvCertRotationTestSuite) rotateCerts(id string, generation int64) e
 
 	updatedCluster.Spec = *clusterSpec
 
-	cluster, err = r.client.Steve.SteveType(clusters.ProvisioningSteveResouceType).Update(cluster, updatedCluster)
+	cluster, err = r.client.Steve.SteveType(clusters.ProvisioningSteveResourceType).Update(cluster, updatedCluster)
 	if err != nil {
 		return err
 	}
@@ -173,7 +173,7 @@ func (r *V2ProvCertRotationTestSuite) rotateCerts(id string, generation int64) e
 		return err
 	}
 
-	clusterWait, err := kubeProvisioningClient.Clusters("fleet-default").Watch(context.TODO(), metav1.ListOptions{
+	clusterWait, err := kubeProvisioningClient.Clusters(namespace).Watch(context.TODO(), metav1.ListOptions{
 		FieldSelector:  "metadata.name=" + cluster.ObjectMeta.Name,
 		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
 	})
