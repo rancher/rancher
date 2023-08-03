@@ -29,125 +29,28 @@ import (
 	"github.com/rancher/wrangler/pkg/kv"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/watch"
 )
 
 // ClusterAlertRuleController interface for managing ClusterAlertRule resources.
 type ClusterAlertRuleController interface {
-	generic.ControllerMeta
-	ClusterAlertRuleClient
-
-	// OnChange runs the given handler when the controller detects a resource was changed.
-	OnChange(ctx context.Context, name string, sync ClusterAlertRuleHandler)
-
-	// OnRemove runs the given handler when the controller detects a resource was changed.
-	OnRemove(ctx context.Context, name string, sync ClusterAlertRuleHandler)
-
-	// Enqueue adds the resource with the given name to the worker queue of the controller.
-	Enqueue(namespace, name string)
-
-	// EnqueueAfter runs Enqueue after the provided duration.
-	EnqueueAfter(namespace, name string, duration time.Duration)
-
-	// Cache returns a cache for the resource type T.
-	Cache() ClusterAlertRuleCache
+	generic.ControllerInterface[*v3.ClusterAlertRule, *v3.ClusterAlertRuleList]
 }
 
 // ClusterAlertRuleClient interface for managing ClusterAlertRule resources in Kubernetes.
 type ClusterAlertRuleClient interface {
-	// Create creates a new object and return the newly created Object or an error.
-	Create(*v3.ClusterAlertRule) (*v3.ClusterAlertRule, error)
-
-	// Update updates the object and return the newly updated Object or an error.
-	Update(*v3.ClusterAlertRule) (*v3.ClusterAlertRule, error)
-	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
-	// Will always return an error if the object does not have a status field.
-	UpdateStatus(*v3.ClusterAlertRule) (*v3.ClusterAlertRule, error)
-
-	// Delete deletes the Object in the given name.
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-
-	// Get will attempt to retrieve the resource with the specified name.
-	Get(namespace, name string, options metav1.GetOptions) (*v3.ClusterAlertRule, error)
-
-	// List will attempt to find multiple resources.
-	List(namespace string, opts metav1.ListOptions) (*v3.ClusterAlertRuleList, error)
-
-	// Watch will start watching resources.
-	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
-
-	// Patch will patch the resource with the matching name.
-	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.ClusterAlertRule, err error)
+	generic.ClientInterface[*v3.ClusterAlertRule, *v3.ClusterAlertRuleList]
 }
 
 // ClusterAlertRuleCache interface for retrieving ClusterAlertRule resources in memory.
 type ClusterAlertRuleCache interface {
-	// Get returns the resources with the specified name from the cache.
-	Get(namespace, name string) (*v3.ClusterAlertRule, error)
-
-	// List will attempt to find resources from the Cache.
-	List(namespace string, selector labels.Selector) ([]*v3.ClusterAlertRule, error)
-
-	// AddIndexer adds  a new Indexer to the cache with the provided name.
-	// If you call this after you already have data in the store, the results are undefined.
-	AddIndexer(indexName string, indexer ClusterAlertRuleIndexer)
-
-	// GetByIndex returns the stored objects whose set of indexed values
-	// for the named index includes the given indexed value.
-	GetByIndex(indexName, key string) ([]*v3.ClusterAlertRule, error)
-}
-
-// ClusterAlertRuleHandler is function for performing any potential modifications to a ClusterAlertRule resource.
-type ClusterAlertRuleHandler func(string, *v3.ClusterAlertRule) (*v3.ClusterAlertRule, error)
-
-// ClusterAlertRuleIndexer computes a set of indexed values for the provided object.
-type ClusterAlertRuleIndexer func(obj *v3.ClusterAlertRule) ([]string, error)
-
-// ClusterAlertRuleGenericController wraps wrangler/pkg/generic.Controller so that the function definitions adhere to ClusterAlertRuleController interface.
-type ClusterAlertRuleGenericController struct {
-	generic.ControllerInterface[*v3.ClusterAlertRule, *v3.ClusterAlertRuleList]
-}
-
-// OnChange runs the given resource handler when the controller detects a resource was changed.
-func (c *ClusterAlertRuleGenericController) OnChange(ctx context.Context, name string, sync ClusterAlertRuleHandler) {
-	c.ControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.ClusterAlertRule](sync))
-}
-
-// OnRemove runs the given object handler when the controller detects a resource was changed.
-func (c *ClusterAlertRuleGenericController) OnRemove(ctx context.Context, name string, sync ClusterAlertRuleHandler) {
-	c.ControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.ClusterAlertRule](sync))
-}
-
-// Cache returns a cache of resources in memory.
-func (c *ClusterAlertRuleGenericController) Cache() ClusterAlertRuleCache {
-	return &ClusterAlertRuleGenericCache{
-		c.ControllerInterface.Cache(),
-	}
-}
-
-// ClusterAlertRuleGenericCache wraps wrangler/pkg/generic.Cache so the function definitions adhere to ClusterAlertRuleCache interface.
-type ClusterAlertRuleGenericCache struct {
 	generic.CacheInterface[*v3.ClusterAlertRule]
-}
-
-// AddIndexer adds  a new Indexer to the cache with the provided name.
-// If you call this after you already have data in the store, the results are undefined.
-func (c ClusterAlertRuleGenericCache) AddIndexer(indexName string, indexer ClusterAlertRuleIndexer) {
-	c.CacheInterface.AddIndexer(indexName, generic.Indexer[*v3.ClusterAlertRule](indexer))
 }
 
 type ClusterAlertRuleStatusHandler func(obj *v3.ClusterAlertRule, status v3.AlertStatus) (v3.AlertStatus, error)
 
 type ClusterAlertRuleGeneratingHandler func(obj *v3.ClusterAlertRule, status v3.AlertStatus) ([]runtime.Object, v3.AlertStatus, error)
-
-func FromClusterAlertRuleHandlerToHandler(sync ClusterAlertRuleHandler) generic.Handler {
-	return generic.FromObjectHandlerToHandler(generic.ObjectHandler[*v3.ClusterAlertRule](sync))
-}
 
 func RegisterClusterAlertRuleStatusHandler(ctx context.Context, controller ClusterAlertRuleController, condition condition.Cond, name string, handler ClusterAlertRuleStatusHandler) {
 	statusHandler := &clusterAlertRuleStatusHandler{
@@ -155,7 +58,7 @@ func RegisterClusterAlertRuleStatusHandler(ctx context.Context, controller Clust
 		condition: condition,
 		handler:   handler,
 	}
-	controller.AddGenericHandler(ctx, name, FromClusterAlertRuleHandlerToHandler(statusHandler.sync))
+	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
 }
 
 func RegisterClusterAlertRuleGeneratingHandler(ctx context.Context, controller ClusterAlertRuleController, apply apply.Apply,

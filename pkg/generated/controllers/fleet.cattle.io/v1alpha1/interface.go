@@ -47,19 +47,13 @@ type version struct {
 }
 
 func (v *version) Bundle() BundleController {
-	return &BundleGenericController{
-		generic.NewController[*v1alpha1.Bundle, *v1alpha1.BundleList](schema.GroupVersionKind{Group: "fleet.cattle.io", Version: "v1alpha1", Kind: "Bundle"}, "bundles", true, v.controllerFactory),
-	}
+	return generic.NewController[*v1alpha1.Bundle, *v1alpha1.BundleList](schema.GroupVersionKind{Group: "fleet.cattle.io", Version: "v1alpha1", Kind: "Bundle"}, "bundles", true, v.controllerFactory)
 }
 
 func (v *version) Cluster() ClusterController {
-	return &ClusterGenericController{
-		generic.NewController[*v1alpha1.Cluster, *v1alpha1.ClusterList](schema.GroupVersionKind{Group: "fleet.cattle.io", Version: "v1alpha1", Kind: "Cluster"}, "clusters", true, v.controllerFactory),
-	}
+	return generic.NewController[*v1alpha1.Cluster, *v1alpha1.ClusterList](schema.GroupVersionKind{Group: "fleet.cattle.io", Version: "v1alpha1", Kind: "Cluster"}, "clusters", true, v.controllerFactory)
 }
 
 func (v *version) ClusterGroup() ClusterGroupController {
-	return &ClusterGroupGenericController{
-		generic.NewController[*v1alpha1.ClusterGroup, *v1alpha1.ClusterGroupList](schema.GroupVersionKind{Group: "fleet.cattle.io", Version: "v1alpha1", Kind: "ClusterGroup"}, "clustergroups", true, v.controllerFactory),
-	}
+	return generic.NewController[*v1alpha1.ClusterGroup, *v1alpha1.ClusterGroupList](schema.GroupVersionKind{Group: "fleet.cattle.io", Version: "v1alpha1", Kind: "ClusterGroup"}, "clustergroups", true, v.controllerFactory)
 }

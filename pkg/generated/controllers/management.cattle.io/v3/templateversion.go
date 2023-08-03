@@ -29,125 +29,28 @@ import (
 	"github.com/rancher/wrangler/pkg/kv"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/watch"
 )
 
 // TemplateVersionController interface for managing TemplateVersion resources.
 type TemplateVersionController interface {
-	generic.ControllerMeta
-	TemplateVersionClient
-
-	// OnChange runs the given handler when the controller detects a resource was changed.
-	OnChange(ctx context.Context, name string, sync TemplateVersionHandler)
-
-	// OnRemove runs the given handler when the controller detects a resource was changed.
-	OnRemove(ctx context.Context, name string, sync TemplateVersionHandler)
-
-	// Enqueue adds the resource with the given name to the worker queue of the controller.
-	Enqueue(name string)
-
-	// EnqueueAfter runs Enqueue after the provided duration.
-	EnqueueAfter(name string, duration time.Duration)
-
-	// Cache returns a cache for the resource type T.
-	Cache() TemplateVersionCache
+	generic.NonNamespacedControllerInterface[*v3.TemplateVersion, *v3.TemplateVersionList]
 }
 
 // TemplateVersionClient interface for managing TemplateVersion resources in Kubernetes.
 type TemplateVersionClient interface {
-	// Create creates a new object and return the newly created Object or an error.
-	Create(*v3.TemplateVersion) (*v3.TemplateVersion, error)
-
-	// Update updates the object and return the newly updated Object or an error.
-	Update(*v3.TemplateVersion) (*v3.TemplateVersion, error)
-	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
-	// Will always return an error if the object does not have a status field.
-	UpdateStatus(*v3.TemplateVersion) (*v3.TemplateVersion, error)
-
-	// Delete deletes the Object in the given name.
-	Delete(name string, options *metav1.DeleteOptions) error
-
-	// Get will attempt to retrieve the resource with the specified name.
-	Get(name string, options metav1.GetOptions) (*v3.TemplateVersion, error)
-
-	// List will attempt to find multiple resources.
-	List(opts metav1.ListOptions) (*v3.TemplateVersionList, error)
-
-	// Watch will start watching resources.
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	// Patch will patch the resource with the matching name.
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.TemplateVersion, err error)
+	generic.NonNamespacedClientInterface[*v3.TemplateVersion, *v3.TemplateVersionList]
 }
 
 // TemplateVersionCache interface for retrieving TemplateVersion resources in memory.
 type TemplateVersionCache interface {
-	// Get returns the resources with the specified name from the cache.
-	Get(name string) (*v3.TemplateVersion, error)
-
-	// List will attempt to find resources from the Cache.
-	List(selector labels.Selector) ([]*v3.TemplateVersion, error)
-
-	// AddIndexer adds  a new Indexer to the cache with the provided name.
-	// If you call this after you already have data in the store, the results are undefined.
-	AddIndexer(indexName string, indexer TemplateVersionIndexer)
-
-	// GetByIndex returns the stored objects whose set of indexed values
-	// for the named index includes the given indexed value.
-	GetByIndex(indexName, key string) ([]*v3.TemplateVersion, error)
-}
-
-// TemplateVersionHandler is function for performing any potential modifications to a TemplateVersion resource.
-type TemplateVersionHandler func(string, *v3.TemplateVersion) (*v3.TemplateVersion, error)
-
-// TemplateVersionIndexer computes a set of indexed values for the provided object.
-type TemplateVersionIndexer func(obj *v3.TemplateVersion) ([]string, error)
-
-// TemplateVersionGenericController wraps wrangler/pkg/generic.NonNamespacedController so that the function definitions adhere to TemplateVersionController interface.
-type TemplateVersionGenericController struct {
-	generic.NonNamespacedControllerInterface[*v3.TemplateVersion, *v3.TemplateVersionList]
-}
-
-// OnChange runs the given resource handler when the controller detects a resource was changed.
-func (c *TemplateVersionGenericController) OnChange(ctx context.Context, name string, sync TemplateVersionHandler) {
-	c.NonNamespacedControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.TemplateVersion](sync))
-}
-
-// OnRemove runs the given object handler when the controller detects a resource was changed.
-func (c *TemplateVersionGenericController) OnRemove(ctx context.Context, name string, sync TemplateVersionHandler) {
-	c.NonNamespacedControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.TemplateVersion](sync))
-}
-
-// Cache returns a cache of resources in memory.
-func (c *TemplateVersionGenericController) Cache() TemplateVersionCache {
-	return &TemplateVersionGenericCache{
-		c.NonNamespacedControllerInterface.Cache(),
-	}
-}
-
-// TemplateVersionGenericCache wraps wrangler/pkg/generic.NonNamespacedCache so the function definitions adhere to TemplateVersionCache interface.
-type TemplateVersionGenericCache struct {
 	generic.NonNamespacedCacheInterface[*v3.TemplateVersion]
-}
-
-// AddIndexer adds  a new Indexer to the cache with the provided name.
-// If you call this after you already have data in the store, the results are undefined.
-func (c TemplateVersionGenericCache) AddIndexer(indexName string, indexer TemplateVersionIndexer) {
-	c.NonNamespacedCacheInterface.AddIndexer(indexName, generic.Indexer[*v3.TemplateVersion](indexer))
 }
 
 type TemplateVersionStatusHandler func(obj *v3.TemplateVersion, status v3.TemplateVersionStatus) (v3.TemplateVersionStatus, error)
 
 type TemplateVersionGeneratingHandler func(obj *v3.TemplateVersion, status v3.TemplateVersionStatus) ([]runtime.Object, v3.TemplateVersionStatus, error)
-
-func FromTemplateVersionHandlerToHandler(sync TemplateVersionHandler) generic.Handler {
-	return generic.FromObjectHandlerToHandler(generic.ObjectHandler[*v3.TemplateVersion](sync))
-}
 
 func RegisterTemplateVersionStatusHandler(ctx context.Context, controller TemplateVersionController, condition condition.Cond, name string, handler TemplateVersionStatusHandler) {
 	statusHandler := &templateVersionStatusHandler{
@@ -155,7 +58,7 @@ func RegisterTemplateVersionStatusHandler(ctx context.Context, controller Templa
 		condition: condition,
 		handler:   handler,
 	}
-	controller.AddGenericHandler(ctx, name, FromTemplateVersionHandlerToHandler(statusHandler.sync))
+	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
 }
 
 func RegisterTemplateVersionGeneratingHandler(ctx context.Context, controller TemplateVersionController, apply apply.Apply,

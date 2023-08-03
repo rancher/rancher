@@ -29,125 +29,28 @@ import (
 	"github.com/rancher/wrangler/pkg/kv"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/watch"
 )
 
 // AppController interface for managing App resources.
 type AppController interface {
-	generic.ControllerMeta
-	AppClient
-
-	// OnChange runs the given handler when the controller detects a resource was changed.
-	OnChange(ctx context.Context, name string, sync AppHandler)
-
-	// OnRemove runs the given handler when the controller detects a resource was changed.
-	OnRemove(ctx context.Context, name string, sync AppHandler)
-
-	// Enqueue adds the resource with the given name to the worker queue of the controller.
-	Enqueue(namespace, name string)
-
-	// EnqueueAfter runs Enqueue after the provided duration.
-	EnqueueAfter(namespace, name string, duration time.Duration)
-
-	// Cache returns a cache for the resource type T.
-	Cache() AppCache
+	generic.ControllerInterface[*v3.App, *v3.AppList]
 }
 
 // AppClient interface for managing App resources in Kubernetes.
 type AppClient interface {
-	// Create creates a new object and return the newly created Object or an error.
-	Create(*v3.App) (*v3.App, error)
-
-	// Update updates the object and return the newly updated Object or an error.
-	Update(*v3.App) (*v3.App, error)
-	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
-	// Will always return an error if the object does not have a status field.
-	UpdateStatus(*v3.App) (*v3.App, error)
-
-	// Delete deletes the Object in the given name.
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-
-	// Get will attempt to retrieve the resource with the specified name.
-	Get(namespace, name string, options metav1.GetOptions) (*v3.App, error)
-
-	// List will attempt to find multiple resources.
-	List(namespace string, opts metav1.ListOptions) (*v3.AppList, error)
-
-	// Watch will start watching resources.
-	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
-
-	// Patch will patch the resource with the matching name.
-	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.App, err error)
+	generic.ClientInterface[*v3.App, *v3.AppList]
 }
 
 // AppCache interface for retrieving App resources in memory.
 type AppCache interface {
-	// Get returns the resources with the specified name from the cache.
-	Get(namespace, name string) (*v3.App, error)
-
-	// List will attempt to find resources from the Cache.
-	List(namespace string, selector labels.Selector) ([]*v3.App, error)
-
-	// AddIndexer adds  a new Indexer to the cache with the provided name.
-	// If you call this after you already have data in the store, the results are undefined.
-	AddIndexer(indexName string, indexer AppIndexer)
-
-	// GetByIndex returns the stored objects whose set of indexed values
-	// for the named index includes the given indexed value.
-	GetByIndex(indexName, key string) ([]*v3.App, error)
-}
-
-// AppHandler is function for performing any potential modifications to a App resource.
-type AppHandler func(string, *v3.App) (*v3.App, error)
-
-// AppIndexer computes a set of indexed values for the provided object.
-type AppIndexer func(obj *v3.App) ([]string, error)
-
-// AppGenericController wraps wrangler/pkg/generic.Controller so that the function definitions adhere to AppController interface.
-type AppGenericController struct {
-	generic.ControllerInterface[*v3.App, *v3.AppList]
-}
-
-// OnChange runs the given resource handler when the controller detects a resource was changed.
-func (c *AppGenericController) OnChange(ctx context.Context, name string, sync AppHandler) {
-	c.ControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.App](sync))
-}
-
-// OnRemove runs the given object handler when the controller detects a resource was changed.
-func (c *AppGenericController) OnRemove(ctx context.Context, name string, sync AppHandler) {
-	c.ControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.App](sync))
-}
-
-// Cache returns a cache of resources in memory.
-func (c *AppGenericController) Cache() AppCache {
-	return &AppGenericCache{
-		c.ControllerInterface.Cache(),
-	}
-}
-
-// AppGenericCache wraps wrangler/pkg/generic.Cache so the function definitions adhere to AppCache interface.
-type AppGenericCache struct {
 	generic.CacheInterface[*v3.App]
-}
-
-// AddIndexer adds  a new Indexer to the cache with the provided name.
-// If you call this after you already have data in the store, the results are undefined.
-func (c AppGenericCache) AddIndexer(indexName string, indexer AppIndexer) {
-	c.CacheInterface.AddIndexer(indexName, generic.Indexer[*v3.App](indexer))
 }
 
 type AppStatusHandler func(obj *v3.App, status v3.AppStatus) (v3.AppStatus, error)
 
 type AppGeneratingHandler func(obj *v3.App, status v3.AppStatus) ([]runtime.Object, v3.AppStatus, error)
-
-func FromAppHandlerToHandler(sync AppHandler) generic.Handler {
-	return generic.FromObjectHandlerToHandler(generic.ObjectHandler[*v3.App](sync))
-}
 
 func RegisterAppStatusHandler(ctx context.Context, controller AppController, condition condition.Cond, name string, handler AppStatusHandler) {
 	statusHandler := &appStatusHandler{
@@ -155,7 +58,7 @@ func RegisterAppStatusHandler(ctx context.Context, controller AppController, con
 		condition: condition,
 		handler:   handler,
 	}
-	controller.AddGenericHandler(ctx, name, FromAppHandlerToHandler(statusHandler.sync))
+	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
 }
 
 func RegisterAppGeneratingHandler(ctx context.Context, controller AppController, apply apply.Apply,

@@ -48,25 +48,17 @@ type version struct {
 }
 
 func (v *version) Cluster() ClusterController {
-	return &ClusterGenericController{
-		generic.NewController[*v1beta1.Cluster, *v1beta1.ClusterList](schema.GroupVersionKind{Group: "cluster.x-k8s.io", Version: "v1beta1", Kind: "Cluster"}, "clusters", true, v.controllerFactory),
-	}
+	return generic.NewController[*v1beta1.Cluster, *v1beta1.ClusterList](schema.GroupVersionKind{Group: "cluster.x-k8s.io", Version: "v1beta1", Kind: "Cluster"}, "clusters", true, v.controllerFactory)
 }
 
 func (v *version) Machine() MachineController {
-	return &MachineGenericController{
-		generic.NewController[*v1beta1.Machine, *v1beta1.MachineList](schema.GroupVersionKind{Group: "cluster.x-k8s.io", Version: "v1beta1", Kind: "Machine"}, "machines", true, v.controllerFactory),
-	}
+	return generic.NewController[*v1beta1.Machine, *v1beta1.MachineList](schema.GroupVersionKind{Group: "cluster.x-k8s.io", Version: "v1beta1", Kind: "Machine"}, "machines", true, v.controllerFactory)
 }
 
 func (v *version) MachineDeployment() MachineDeploymentController {
-	return &MachineDeploymentGenericController{
-		generic.NewController[*v1beta1.MachineDeployment, *v1beta1.MachineDeploymentList](schema.GroupVersionKind{Group: "cluster.x-k8s.io", Version: "v1beta1", Kind: "MachineDeployment"}, "machinedeployments", true, v.controllerFactory),
-	}
+	return generic.NewController[*v1beta1.MachineDeployment, *v1beta1.MachineDeploymentList](schema.GroupVersionKind{Group: "cluster.x-k8s.io", Version: "v1beta1", Kind: "MachineDeployment"}, "machinedeployments", true, v.controllerFactory)
 }
 
 func (v *version) MachineSet() MachineSetController {
-	return &MachineSetGenericController{
-		generic.NewController[*v1beta1.MachineSet, *v1beta1.MachineSetList](schema.GroupVersionKind{Group: "cluster.x-k8s.io", Version: "v1beta1", Kind: "MachineSet"}, "machinesets", true, v.controllerFactory),
-	}
+	return generic.NewController[*v1beta1.MachineSet, *v1beta1.MachineSetList](schema.GroupVersionKind{Group: "cluster.x-k8s.io", Version: "v1beta1", Kind: "MachineSet"}, "machinesets", true, v.controllerFactory)
 }

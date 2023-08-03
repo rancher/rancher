@@ -28,126 +28,29 @@ import (
 	"github.com/rancher/wrangler/pkg/kv"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/watch"
 	v1beta1 "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
 // MachineSetController interface for managing MachineSet resources.
 type MachineSetController interface {
-	generic.ControllerMeta
-	MachineSetClient
-
-	// OnChange runs the given handler when the controller detects a resource was changed.
-	OnChange(ctx context.Context, name string, sync MachineSetHandler)
-
-	// OnRemove runs the given handler when the controller detects a resource was changed.
-	OnRemove(ctx context.Context, name string, sync MachineSetHandler)
-
-	// Enqueue adds the resource with the given name to the worker queue of the controller.
-	Enqueue(namespace, name string)
-
-	// EnqueueAfter runs Enqueue after the provided duration.
-	EnqueueAfter(namespace, name string, duration time.Duration)
-
-	// Cache returns a cache for the resource type T.
-	Cache() MachineSetCache
+	generic.ControllerInterface[*v1beta1.MachineSet, *v1beta1.MachineSetList]
 }
 
 // MachineSetClient interface for managing MachineSet resources in Kubernetes.
 type MachineSetClient interface {
-	// Create creates a new object and return the newly created Object or an error.
-	Create(*v1beta1.MachineSet) (*v1beta1.MachineSet, error)
-
-	// Update updates the object and return the newly updated Object or an error.
-	Update(*v1beta1.MachineSet) (*v1beta1.MachineSet, error)
-	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
-	// Will always return an error if the object does not have a status field.
-	UpdateStatus(*v1beta1.MachineSet) (*v1beta1.MachineSet, error)
-
-	// Delete deletes the Object in the given name.
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-
-	// Get will attempt to retrieve the resource with the specified name.
-	Get(namespace, name string, options metav1.GetOptions) (*v1beta1.MachineSet, error)
-
-	// List will attempt to find multiple resources.
-	List(namespace string, opts metav1.ListOptions) (*v1beta1.MachineSetList, error)
-
-	// Watch will start watching resources.
-	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
-
-	// Patch will patch the resource with the matching name.
-	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.MachineSet, err error)
+	generic.ClientInterface[*v1beta1.MachineSet, *v1beta1.MachineSetList]
 }
 
 // MachineSetCache interface for retrieving MachineSet resources in memory.
 type MachineSetCache interface {
-	// Get returns the resources with the specified name from the cache.
-	Get(namespace, name string) (*v1beta1.MachineSet, error)
-
-	// List will attempt to find resources from the Cache.
-	List(namespace string, selector labels.Selector) ([]*v1beta1.MachineSet, error)
-
-	// AddIndexer adds  a new Indexer to the cache with the provided name.
-	// If you call this after you already have data in the store, the results are undefined.
-	AddIndexer(indexName string, indexer MachineSetIndexer)
-
-	// GetByIndex returns the stored objects whose set of indexed values
-	// for the named index includes the given indexed value.
-	GetByIndex(indexName, key string) ([]*v1beta1.MachineSet, error)
-}
-
-// MachineSetHandler is function for performing any potential modifications to a MachineSet resource.
-type MachineSetHandler func(string, *v1beta1.MachineSet) (*v1beta1.MachineSet, error)
-
-// MachineSetIndexer computes a set of indexed values for the provided object.
-type MachineSetIndexer func(obj *v1beta1.MachineSet) ([]string, error)
-
-// MachineSetGenericController wraps wrangler/pkg/generic.Controller so that the function definitions adhere to MachineSetController interface.
-type MachineSetGenericController struct {
-	generic.ControllerInterface[*v1beta1.MachineSet, *v1beta1.MachineSetList]
-}
-
-// OnChange runs the given resource handler when the controller detects a resource was changed.
-func (c *MachineSetGenericController) OnChange(ctx context.Context, name string, sync MachineSetHandler) {
-	c.ControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v1beta1.MachineSet](sync))
-}
-
-// OnRemove runs the given object handler when the controller detects a resource was changed.
-func (c *MachineSetGenericController) OnRemove(ctx context.Context, name string, sync MachineSetHandler) {
-	c.ControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v1beta1.MachineSet](sync))
-}
-
-// Cache returns a cache of resources in memory.
-func (c *MachineSetGenericController) Cache() MachineSetCache {
-	return &MachineSetGenericCache{
-		c.ControllerInterface.Cache(),
-	}
-}
-
-// MachineSetGenericCache wraps wrangler/pkg/generic.Cache so the function definitions adhere to MachineSetCache interface.
-type MachineSetGenericCache struct {
 	generic.CacheInterface[*v1beta1.MachineSet]
-}
-
-// AddIndexer adds  a new Indexer to the cache with the provided name.
-// If you call this after you already have data in the store, the results are undefined.
-func (c MachineSetGenericCache) AddIndexer(indexName string, indexer MachineSetIndexer) {
-	c.CacheInterface.AddIndexer(indexName, generic.Indexer[*v1beta1.MachineSet](indexer))
 }
 
 type MachineSetStatusHandler func(obj *v1beta1.MachineSet, status v1beta1.MachineSetStatus) (v1beta1.MachineSetStatus, error)
 
 type MachineSetGeneratingHandler func(obj *v1beta1.MachineSet, status v1beta1.MachineSetStatus) ([]runtime.Object, v1beta1.MachineSetStatus, error)
-
-func FromMachineSetHandlerToHandler(sync MachineSetHandler) generic.Handler {
-	return generic.FromObjectHandlerToHandler(generic.ObjectHandler[*v1beta1.MachineSet](sync))
-}
 
 func RegisterMachineSetStatusHandler(ctx context.Context, controller MachineSetController, condition condition.Cond, name string, handler MachineSetStatusHandler) {
 	statusHandler := &machineSetStatusHandler{
@@ -155,7 +58,7 @@ func RegisterMachineSetStatusHandler(ctx context.Context, controller MachineSetC
 		condition: condition,
 		handler:   handler,
 	}
-	controller.AddGenericHandler(ctx, name, FromMachineSetHandlerToHandler(statusHandler.sync))
+	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
 }
 
 func RegisterMachineSetGeneratingHandler(ctx context.Context, controller MachineSetController, apply apply.Apply,

@@ -29,125 +29,28 @@ import (
 	"github.com/rancher/wrangler/pkg/kv"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/watch"
 )
 
 // FeatureController interface for managing Feature resources.
 type FeatureController interface {
-	generic.ControllerMeta
-	FeatureClient
-
-	// OnChange runs the given handler when the controller detects a resource was changed.
-	OnChange(ctx context.Context, name string, sync FeatureHandler)
-
-	// OnRemove runs the given handler when the controller detects a resource was changed.
-	OnRemove(ctx context.Context, name string, sync FeatureHandler)
-
-	// Enqueue adds the resource with the given name to the worker queue of the controller.
-	Enqueue(name string)
-
-	// EnqueueAfter runs Enqueue after the provided duration.
-	EnqueueAfter(name string, duration time.Duration)
-
-	// Cache returns a cache for the resource type T.
-	Cache() FeatureCache
+	generic.NonNamespacedControllerInterface[*v3.Feature, *v3.FeatureList]
 }
 
 // FeatureClient interface for managing Feature resources in Kubernetes.
 type FeatureClient interface {
-	// Create creates a new object and return the newly created Object or an error.
-	Create(*v3.Feature) (*v3.Feature, error)
-
-	// Update updates the object and return the newly updated Object or an error.
-	Update(*v3.Feature) (*v3.Feature, error)
-	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
-	// Will always return an error if the object does not have a status field.
-	UpdateStatus(*v3.Feature) (*v3.Feature, error)
-
-	// Delete deletes the Object in the given name.
-	Delete(name string, options *metav1.DeleteOptions) error
-
-	// Get will attempt to retrieve the resource with the specified name.
-	Get(name string, options metav1.GetOptions) (*v3.Feature, error)
-
-	// List will attempt to find multiple resources.
-	List(opts metav1.ListOptions) (*v3.FeatureList, error)
-
-	// Watch will start watching resources.
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	// Patch will patch the resource with the matching name.
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.Feature, err error)
+	generic.NonNamespacedClientInterface[*v3.Feature, *v3.FeatureList]
 }
 
 // FeatureCache interface for retrieving Feature resources in memory.
 type FeatureCache interface {
-	// Get returns the resources with the specified name from the cache.
-	Get(name string) (*v3.Feature, error)
-
-	// List will attempt to find resources from the Cache.
-	List(selector labels.Selector) ([]*v3.Feature, error)
-
-	// AddIndexer adds  a new Indexer to the cache with the provided name.
-	// If you call this after you already have data in the store, the results are undefined.
-	AddIndexer(indexName string, indexer FeatureIndexer)
-
-	// GetByIndex returns the stored objects whose set of indexed values
-	// for the named index includes the given indexed value.
-	GetByIndex(indexName, key string) ([]*v3.Feature, error)
-}
-
-// FeatureHandler is function for performing any potential modifications to a Feature resource.
-type FeatureHandler func(string, *v3.Feature) (*v3.Feature, error)
-
-// FeatureIndexer computes a set of indexed values for the provided object.
-type FeatureIndexer func(obj *v3.Feature) ([]string, error)
-
-// FeatureGenericController wraps wrangler/pkg/generic.NonNamespacedController so that the function definitions adhere to FeatureController interface.
-type FeatureGenericController struct {
-	generic.NonNamespacedControllerInterface[*v3.Feature, *v3.FeatureList]
-}
-
-// OnChange runs the given resource handler when the controller detects a resource was changed.
-func (c *FeatureGenericController) OnChange(ctx context.Context, name string, sync FeatureHandler) {
-	c.NonNamespacedControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.Feature](sync))
-}
-
-// OnRemove runs the given object handler when the controller detects a resource was changed.
-func (c *FeatureGenericController) OnRemove(ctx context.Context, name string, sync FeatureHandler) {
-	c.NonNamespacedControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.Feature](sync))
-}
-
-// Cache returns a cache of resources in memory.
-func (c *FeatureGenericController) Cache() FeatureCache {
-	return &FeatureGenericCache{
-		c.NonNamespacedControllerInterface.Cache(),
-	}
-}
-
-// FeatureGenericCache wraps wrangler/pkg/generic.NonNamespacedCache so the function definitions adhere to FeatureCache interface.
-type FeatureGenericCache struct {
 	generic.NonNamespacedCacheInterface[*v3.Feature]
-}
-
-// AddIndexer adds  a new Indexer to the cache with the provided name.
-// If you call this after you already have data in the store, the results are undefined.
-func (c FeatureGenericCache) AddIndexer(indexName string, indexer FeatureIndexer) {
-	c.NonNamespacedCacheInterface.AddIndexer(indexName, generic.Indexer[*v3.Feature](indexer))
 }
 
 type FeatureStatusHandler func(obj *v3.Feature, status v3.FeatureStatus) (v3.FeatureStatus, error)
 
 type FeatureGeneratingHandler func(obj *v3.Feature, status v3.FeatureStatus) ([]runtime.Object, v3.FeatureStatus, error)
-
-func FromFeatureHandlerToHandler(sync FeatureHandler) generic.Handler {
-	return generic.FromObjectHandlerToHandler(generic.ObjectHandler[*v3.Feature](sync))
-}
 
 func RegisterFeatureStatusHandler(ctx context.Context, controller FeatureController, condition condition.Cond, name string, handler FeatureStatusHandler) {
 	statusHandler := &featureStatusHandler{
@@ -155,7 +58,7 @@ func RegisterFeatureStatusHandler(ctx context.Context, controller FeatureControl
 		condition: condition,
 		handler:   handler,
 	}
-	controller.AddGenericHandler(ctx, name, FromFeatureHandlerToHandler(statusHandler.sync))
+	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
 }
 
 func RegisterFeatureGeneratingHandler(ctx context.Context, controller FeatureController, apply apply.Apply,

@@ -29,125 +29,28 @@ import (
 	"github.com/rancher/wrangler/pkg/kv"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/watch"
 )
 
 // ClusterAlertGroupController interface for managing ClusterAlertGroup resources.
 type ClusterAlertGroupController interface {
-	generic.ControllerMeta
-	ClusterAlertGroupClient
-
-	// OnChange runs the given handler when the controller detects a resource was changed.
-	OnChange(ctx context.Context, name string, sync ClusterAlertGroupHandler)
-
-	// OnRemove runs the given handler when the controller detects a resource was changed.
-	OnRemove(ctx context.Context, name string, sync ClusterAlertGroupHandler)
-
-	// Enqueue adds the resource with the given name to the worker queue of the controller.
-	Enqueue(namespace, name string)
-
-	// EnqueueAfter runs Enqueue after the provided duration.
-	EnqueueAfter(namespace, name string, duration time.Duration)
-
-	// Cache returns a cache for the resource type T.
-	Cache() ClusterAlertGroupCache
+	generic.ControllerInterface[*v3.ClusterAlertGroup, *v3.ClusterAlertGroupList]
 }
 
 // ClusterAlertGroupClient interface for managing ClusterAlertGroup resources in Kubernetes.
 type ClusterAlertGroupClient interface {
-	// Create creates a new object and return the newly created Object or an error.
-	Create(*v3.ClusterAlertGroup) (*v3.ClusterAlertGroup, error)
-
-	// Update updates the object and return the newly updated Object or an error.
-	Update(*v3.ClusterAlertGroup) (*v3.ClusterAlertGroup, error)
-	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
-	// Will always return an error if the object does not have a status field.
-	UpdateStatus(*v3.ClusterAlertGroup) (*v3.ClusterAlertGroup, error)
-
-	// Delete deletes the Object in the given name.
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-
-	// Get will attempt to retrieve the resource with the specified name.
-	Get(namespace, name string, options metav1.GetOptions) (*v3.ClusterAlertGroup, error)
-
-	// List will attempt to find multiple resources.
-	List(namespace string, opts metav1.ListOptions) (*v3.ClusterAlertGroupList, error)
-
-	// Watch will start watching resources.
-	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
-
-	// Patch will patch the resource with the matching name.
-	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.ClusterAlertGroup, err error)
+	generic.ClientInterface[*v3.ClusterAlertGroup, *v3.ClusterAlertGroupList]
 }
 
 // ClusterAlertGroupCache interface for retrieving ClusterAlertGroup resources in memory.
 type ClusterAlertGroupCache interface {
-	// Get returns the resources with the specified name from the cache.
-	Get(namespace, name string) (*v3.ClusterAlertGroup, error)
-
-	// List will attempt to find resources from the Cache.
-	List(namespace string, selector labels.Selector) ([]*v3.ClusterAlertGroup, error)
-
-	// AddIndexer adds  a new Indexer to the cache with the provided name.
-	// If you call this after you already have data in the store, the results are undefined.
-	AddIndexer(indexName string, indexer ClusterAlertGroupIndexer)
-
-	// GetByIndex returns the stored objects whose set of indexed values
-	// for the named index includes the given indexed value.
-	GetByIndex(indexName, key string) ([]*v3.ClusterAlertGroup, error)
-}
-
-// ClusterAlertGroupHandler is function for performing any potential modifications to a ClusterAlertGroup resource.
-type ClusterAlertGroupHandler func(string, *v3.ClusterAlertGroup) (*v3.ClusterAlertGroup, error)
-
-// ClusterAlertGroupIndexer computes a set of indexed values for the provided object.
-type ClusterAlertGroupIndexer func(obj *v3.ClusterAlertGroup) ([]string, error)
-
-// ClusterAlertGroupGenericController wraps wrangler/pkg/generic.Controller so that the function definitions adhere to ClusterAlertGroupController interface.
-type ClusterAlertGroupGenericController struct {
-	generic.ControllerInterface[*v3.ClusterAlertGroup, *v3.ClusterAlertGroupList]
-}
-
-// OnChange runs the given resource handler when the controller detects a resource was changed.
-func (c *ClusterAlertGroupGenericController) OnChange(ctx context.Context, name string, sync ClusterAlertGroupHandler) {
-	c.ControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.ClusterAlertGroup](sync))
-}
-
-// OnRemove runs the given object handler when the controller detects a resource was changed.
-func (c *ClusterAlertGroupGenericController) OnRemove(ctx context.Context, name string, sync ClusterAlertGroupHandler) {
-	c.ControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.ClusterAlertGroup](sync))
-}
-
-// Cache returns a cache of resources in memory.
-func (c *ClusterAlertGroupGenericController) Cache() ClusterAlertGroupCache {
-	return &ClusterAlertGroupGenericCache{
-		c.ControllerInterface.Cache(),
-	}
-}
-
-// ClusterAlertGroupGenericCache wraps wrangler/pkg/generic.Cache so the function definitions adhere to ClusterAlertGroupCache interface.
-type ClusterAlertGroupGenericCache struct {
 	generic.CacheInterface[*v3.ClusterAlertGroup]
-}
-
-// AddIndexer adds  a new Indexer to the cache with the provided name.
-// If you call this after you already have data in the store, the results are undefined.
-func (c ClusterAlertGroupGenericCache) AddIndexer(indexName string, indexer ClusterAlertGroupIndexer) {
-	c.CacheInterface.AddIndexer(indexName, generic.Indexer[*v3.ClusterAlertGroup](indexer))
 }
 
 type ClusterAlertGroupStatusHandler func(obj *v3.ClusterAlertGroup, status v3.AlertStatus) (v3.AlertStatus, error)
 
 type ClusterAlertGroupGeneratingHandler func(obj *v3.ClusterAlertGroup, status v3.AlertStatus) ([]runtime.Object, v3.AlertStatus, error)
-
-func FromClusterAlertGroupHandlerToHandler(sync ClusterAlertGroupHandler) generic.Handler {
-	return generic.FromObjectHandlerToHandler(generic.ObjectHandler[*v3.ClusterAlertGroup](sync))
-}
 
 func RegisterClusterAlertGroupStatusHandler(ctx context.Context, controller ClusterAlertGroupController, condition condition.Cond, name string, handler ClusterAlertGroupStatusHandler) {
 	statusHandler := &clusterAlertGroupStatusHandler{
@@ -155,7 +58,7 @@ func RegisterClusterAlertGroupStatusHandler(ctx context.Context, controller Clus
 		condition: condition,
 		handler:   handler,
 	}
-	controller.AddGenericHandler(ctx, name, FromClusterAlertGroupHandlerToHandler(statusHandler.sync))
+	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
 }
 
 func RegisterClusterAlertGroupGeneratingHandler(ctx context.Context, controller ClusterAlertGroupController, apply apply.Apply,

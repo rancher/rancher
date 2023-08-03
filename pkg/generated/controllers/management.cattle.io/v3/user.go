@@ -29,125 +29,28 @@ import (
 	"github.com/rancher/wrangler/pkg/kv"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/watch"
 )
 
 // UserController interface for managing User resources.
 type UserController interface {
-	generic.ControllerMeta
-	UserClient
-
-	// OnChange runs the given handler when the controller detects a resource was changed.
-	OnChange(ctx context.Context, name string, sync UserHandler)
-
-	// OnRemove runs the given handler when the controller detects a resource was changed.
-	OnRemove(ctx context.Context, name string, sync UserHandler)
-
-	// Enqueue adds the resource with the given name to the worker queue of the controller.
-	Enqueue(name string)
-
-	// EnqueueAfter runs Enqueue after the provided duration.
-	EnqueueAfter(name string, duration time.Duration)
-
-	// Cache returns a cache for the resource type T.
-	Cache() UserCache
+	generic.NonNamespacedControllerInterface[*v3.User, *v3.UserList]
 }
 
 // UserClient interface for managing User resources in Kubernetes.
 type UserClient interface {
-	// Create creates a new object and return the newly created Object or an error.
-	Create(*v3.User) (*v3.User, error)
-
-	// Update updates the object and return the newly updated Object or an error.
-	Update(*v3.User) (*v3.User, error)
-	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
-	// Will always return an error if the object does not have a status field.
-	UpdateStatus(*v3.User) (*v3.User, error)
-
-	// Delete deletes the Object in the given name.
-	Delete(name string, options *metav1.DeleteOptions) error
-
-	// Get will attempt to retrieve the resource with the specified name.
-	Get(name string, options metav1.GetOptions) (*v3.User, error)
-
-	// List will attempt to find multiple resources.
-	List(opts metav1.ListOptions) (*v3.UserList, error)
-
-	// Watch will start watching resources.
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	// Patch will patch the resource with the matching name.
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.User, err error)
+	generic.NonNamespacedClientInterface[*v3.User, *v3.UserList]
 }
 
 // UserCache interface for retrieving User resources in memory.
 type UserCache interface {
-	// Get returns the resources with the specified name from the cache.
-	Get(name string) (*v3.User, error)
-
-	// List will attempt to find resources from the Cache.
-	List(selector labels.Selector) ([]*v3.User, error)
-
-	// AddIndexer adds  a new Indexer to the cache with the provided name.
-	// If you call this after you already have data in the store, the results are undefined.
-	AddIndexer(indexName string, indexer UserIndexer)
-
-	// GetByIndex returns the stored objects whose set of indexed values
-	// for the named index includes the given indexed value.
-	GetByIndex(indexName, key string) ([]*v3.User, error)
-}
-
-// UserHandler is function for performing any potential modifications to a User resource.
-type UserHandler func(string, *v3.User) (*v3.User, error)
-
-// UserIndexer computes a set of indexed values for the provided object.
-type UserIndexer func(obj *v3.User) ([]string, error)
-
-// UserGenericController wraps wrangler/pkg/generic.NonNamespacedController so that the function definitions adhere to UserController interface.
-type UserGenericController struct {
-	generic.NonNamespacedControllerInterface[*v3.User, *v3.UserList]
-}
-
-// OnChange runs the given resource handler when the controller detects a resource was changed.
-func (c *UserGenericController) OnChange(ctx context.Context, name string, sync UserHandler) {
-	c.NonNamespacedControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.User](sync))
-}
-
-// OnRemove runs the given object handler when the controller detects a resource was changed.
-func (c *UserGenericController) OnRemove(ctx context.Context, name string, sync UserHandler) {
-	c.NonNamespacedControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.User](sync))
-}
-
-// Cache returns a cache of resources in memory.
-func (c *UserGenericController) Cache() UserCache {
-	return &UserGenericCache{
-		c.NonNamespacedControllerInterface.Cache(),
-	}
-}
-
-// UserGenericCache wraps wrangler/pkg/generic.NonNamespacedCache so the function definitions adhere to UserCache interface.
-type UserGenericCache struct {
 	generic.NonNamespacedCacheInterface[*v3.User]
-}
-
-// AddIndexer adds  a new Indexer to the cache with the provided name.
-// If you call this after you already have data in the store, the results are undefined.
-func (c UserGenericCache) AddIndexer(indexName string, indexer UserIndexer) {
-	c.NonNamespacedCacheInterface.AddIndexer(indexName, generic.Indexer[*v3.User](indexer))
 }
 
 type UserStatusHandler func(obj *v3.User, status v3.UserStatus) (v3.UserStatus, error)
 
 type UserGeneratingHandler func(obj *v3.User, status v3.UserStatus) ([]runtime.Object, v3.UserStatus, error)
-
-func FromUserHandlerToHandler(sync UserHandler) generic.Handler {
-	return generic.FromObjectHandlerToHandler(generic.ObjectHandler[*v3.User](sync))
-}
 
 func RegisterUserStatusHandler(ctx context.Context, controller UserController, condition condition.Cond, name string, handler UserStatusHandler) {
 	statusHandler := &userStatusHandler{
@@ -155,7 +58,7 @@ func RegisterUserStatusHandler(ctx context.Context, controller UserController, c
 		condition: condition,
 		handler:   handler,
 	}
-	controller.AddGenericHandler(ctx, name, FromUserHandlerToHandler(statusHandler.sync))
+	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
 }
 
 func RegisterUserGeneratingHandler(ctx context.Context, controller UserController, apply apply.Apply,

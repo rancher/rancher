@@ -19,114 +19,21 @@ limitations under the License.
 package v3
 
 import (
-	"context"
-	"time"
-
 	v3 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
 	"github.com/rancher/wrangler/pkg/generic"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/watch"
 )
 
 // NamespacedSSHAuthController interface for managing NamespacedSSHAuth resources.
 type NamespacedSSHAuthController interface {
-	generic.ControllerMeta
-	NamespacedSSHAuthClient
-
-	// OnChange runs the given handler when the controller detects a resource was changed.
-	OnChange(ctx context.Context, name string, sync NamespacedSSHAuthHandler)
-
-	// OnRemove runs the given handler when the controller detects a resource was changed.
-	OnRemove(ctx context.Context, name string, sync NamespacedSSHAuthHandler)
-
-	// Enqueue adds the resource with the given name to the worker queue of the controller.
-	Enqueue(namespace, name string)
-
-	// EnqueueAfter runs Enqueue after the provided duration.
-	EnqueueAfter(namespace, name string, duration time.Duration)
-
-	// Cache returns a cache for the resource type T.
-	Cache() NamespacedSSHAuthCache
+	generic.ControllerInterface[*v3.NamespacedSSHAuth, *v3.NamespacedSSHAuthList]
 }
 
 // NamespacedSSHAuthClient interface for managing NamespacedSSHAuth resources in Kubernetes.
 type NamespacedSSHAuthClient interface {
-	// Create creates a new object and return the newly created Object or an error.
-	Create(*v3.NamespacedSSHAuth) (*v3.NamespacedSSHAuth, error)
-
-	// Update updates the object and return the newly updated Object or an error.
-	Update(*v3.NamespacedSSHAuth) (*v3.NamespacedSSHAuth, error)
-
-	// Delete deletes the Object in the given name.
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-
-	// Get will attempt to retrieve the resource with the specified name.
-	Get(namespace, name string, options metav1.GetOptions) (*v3.NamespacedSSHAuth, error)
-
-	// List will attempt to find multiple resources.
-	List(namespace string, opts metav1.ListOptions) (*v3.NamespacedSSHAuthList, error)
-
-	// Watch will start watching resources.
-	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
-
-	// Patch will patch the resource with the matching name.
-	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.NamespacedSSHAuth, err error)
+	generic.ClientInterface[*v3.NamespacedSSHAuth, *v3.NamespacedSSHAuthList]
 }
 
 // NamespacedSSHAuthCache interface for retrieving NamespacedSSHAuth resources in memory.
 type NamespacedSSHAuthCache interface {
-	// Get returns the resources with the specified name from the cache.
-	Get(namespace, name string) (*v3.NamespacedSSHAuth, error)
-
-	// List will attempt to find resources from the Cache.
-	List(namespace string, selector labels.Selector) ([]*v3.NamespacedSSHAuth, error)
-
-	// AddIndexer adds  a new Indexer to the cache with the provided name.
-	// If you call this after you already have data in the store, the results are undefined.
-	AddIndexer(indexName string, indexer NamespacedSSHAuthIndexer)
-
-	// GetByIndex returns the stored objects whose set of indexed values
-	// for the named index includes the given indexed value.
-	GetByIndex(indexName, key string) ([]*v3.NamespacedSSHAuth, error)
-}
-
-// NamespacedSSHAuthHandler is function for performing any potential modifications to a NamespacedSSHAuth resource.
-type NamespacedSSHAuthHandler func(string, *v3.NamespacedSSHAuth) (*v3.NamespacedSSHAuth, error)
-
-// NamespacedSSHAuthIndexer computes a set of indexed values for the provided object.
-type NamespacedSSHAuthIndexer func(obj *v3.NamespacedSSHAuth) ([]string, error)
-
-// NamespacedSSHAuthGenericController wraps wrangler/pkg/generic.Controller so that the function definitions adhere to NamespacedSSHAuthController interface.
-type NamespacedSSHAuthGenericController struct {
-	generic.ControllerInterface[*v3.NamespacedSSHAuth, *v3.NamespacedSSHAuthList]
-}
-
-// OnChange runs the given resource handler when the controller detects a resource was changed.
-func (c *NamespacedSSHAuthGenericController) OnChange(ctx context.Context, name string, sync NamespacedSSHAuthHandler) {
-	c.ControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.NamespacedSSHAuth](sync))
-}
-
-// OnRemove runs the given object handler when the controller detects a resource was changed.
-func (c *NamespacedSSHAuthGenericController) OnRemove(ctx context.Context, name string, sync NamespacedSSHAuthHandler) {
-	c.ControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.NamespacedSSHAuth](sync))
-}
-
-// Cache returns a cache of resources in memory.
-func (c *NamespacedSSHAuthGenericController) Cache() NamespacedSSHAuthCache {
-	return &NamespacedSSHAuthGenericCache{
-		c.ControllerInterface.Cache(),
-	}
-}
-
-// NamespacedSSHAuthGenericCache wraps wrangler/pkg/generic.Cache so the function definitions adhere to NamespacedSSHAuthCache interface.
-type NamespacedSSHAuthGenericCache struct {
 	generic.CacheInterface[*v3.NamespacedSSHAuth]
-}
-
-// AddIndexer adds  a new Indexer to the cache with the provided name.
-// If you call this after you already have data in the store, the results are undefined.
-func (c NamespacedSSHAuthGenericCache) AddIndexer(indexName string, indexer NamespacedSSHAuthIndexer) {
-	c.CacheInterface.AddIndexer(indexName, generic.Indexer[*v3.NamespacedSSHAuth](indexer))
 }

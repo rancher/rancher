@@ -29,125 +29,28 @@ import (
 	"github.com/rancher/wrangler/pkg/kv"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/watch"
 )
 
 // GlobalDnsController interface for managing GlobalDns resources.
 type GlobalDnsController interface {
-	generic.ControllerMeta
-	GlobalDnsClient
-
-	// OnChange runs the given handler when the controller detects a resource was changed.
-	OnChange(ctx context.Context, name string, sync GlobalDnsHandler)
-
-	// OnRemove runs the given handler when the controller detects a resource was changed.
-	OnRemove(ctx context.Context, name string, sync GlobalDnsHandler)
-
-	// Enqueue adds the resource with the given name to the worker queue of the controller.
-	Enqueue(namespace, name string)
-
-	// EnqueueAfter runs Enqueue after the provided duration.
-	EnqueueAfter(namespace, name string, duration time.Duration)
-
-	// Cache returns a cache for the resource type T.
-	Cache() GlobalDnsCache
+	generic.ControllerInterface[*v3.GlobalDns, *v3.GlobalDnsList]
 }
 
 // GlobalDnsClient interface for managing GlobalDns resources in Kubernetes.
 type GlobalDnsClient interface {
-	// Create creates a new object and return the newly created Object or an error.
-	Create(*v3.GlobalDns) (*v3.GlobalDns, error)
-
-	// Update updates the object and return the newly updated Object or an error.
-	Update(*v3.GlobalDns) (*v3.GlobalDns, error)
-	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
-	// Will always return an error if the object does not have a status field.
-	UpdateStatus(*v3.GlobalDns) (*v3.GlobalDns, error)
-
-	// Delete deletes the Object in the given name.
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-
-	// Get will attempt to retrieve the resource with the specified name.
-	Get(namespace, name string, options metav1.GetOptions) (*v3.GlobalDns, error)
-
-	// List will attempt to find multiple resources.
-	List(namespace string, opts metav1.ListOptions) (*v3.GlobalDnsList, error)
-
-	// Watch will start watching resources.
-	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
-
-	// Patch will patch the resource with the matching name.
-	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.GlobalDns, err error)
+	generic.ClientInterface[*v3.GlobalDns, *v3.GlobalDnsList]
 }
 
 // GlobalDnsCache interface for retrieving GlobalDns resources in memory.
 type GlobalDnsCache interface {
-	// Get returns the resources with the specified name from the cache.
-	Get(namespace, name string) (*v3.GlobalDns, error)
-
-	// List will attempt to find resources from the Cache.
-	List(namespace string, selector labels.Selector) ([]*v3.GlobalDns, error)
-
-	// AddIndexer adds  a new Indexer to the cache with the provided name.
-	// If you call this after you already have data in the store, the results are undefined.
-	AddIndexer(indexName string, indexer GlobalDnsIndexer)
-
-	// GetByIndex returns the stored objects whose set of indexed values
-	// for the named index includes the given indexed value.
-	GetByIndex(indexName, key string) ([]*v3.GlobalDns, error)
-}
-
-// GlobalDnsHandler is function for performing any potential modifications to a GlobalDns resource.
-type GlobalDnsHandler func(string, *v3.GlobalDns) (*v3.GlobalDns, error)
-
-// GlobalDnsIndexer computes a set of indexed values for the provided object.
-type GlobalDnsIndexer func(obj *v3.GlobalDns) ([]string, error)
-
-// GlobalDnsGenericController wraps wrangler/pkg/generic.Controller so that the function definitions adhere to GlobalDnsController interface.
-type GlobalDnsGenericController struct {
-	generic.ControllerInterface[*v3.GlobalDns, *v3.GlobalDnsList]
-}
-
-// OnChange runs the given resource handler when the controller detects a resource was changed.
-func (c *GlobalDnsGenericController) OnChange(ctx context.Context, name string, sync GlobalDnsHandler) {
-	c.ControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.GlobalDns](sync))
-}
-
-// OnRemove runs the given object handler when the controller detects a resource was changed.
-func (c *GlobalDnsGenericController) OnRemove(ctx context.Context, name string, sync GlobalDnsHandler) {
-	c.ControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.GlobalDns](sync))
-}
-
-// Cache returns a cache of resources in memory.
-func (c *GlobalDnsGenericController) Cache() GlobalDnsCache {
-	return &GlobalDnsGenericCache{
-		c.ControllerInterface.Cache(),
-	}
-}
-
-// GlobalDnsGenericCache wraps wrangler/pkg/generic.Cache so the function definitions adhere to GlobalDnsCache interface.
-type GlobalDnsGenericCache struct {
 	generic.CacheInterface[*v3.GlobalDns]
-}
-
-// AddIndexer adds  a new Indexer to the cache with the provided name.
-// If you call this after you already have data in the store, the results are undefined.
-func (c GlobalDnsGenericCache) AddIndexer(indexName string, indexer GlobalDnsIndexer) {
-	c.CacheInterface.AddIndexer(indexName, generic.Indexer[*v3.GlobalDns](indexer))
 }
 
 type GlobalDnsStatusHandler func(obj *v3.GlobalDns, status v3.GlobalDNSStatus) (v3.GlobalDNSStatus, error)
 
 type GlobalDnsGeneratingHandler func(obj *v3.GlobalDns, status v3.GlobalDNSStatus) ([]runtime.Object, v3.GlobalDNSStatus, error)
-
-func FromGlobalDnsHandlerToHandler(sync GlobalDnsHandler) generic.Handler {
-	return generic.FromObjectHandlerToHandler(generic.ObjectHandler[*v3.GlobalDns](sync))
-}
 
 func RegisterGlobalDnsStatusHandler(ctx context.Context, controller GlobalDnsController, condition condition.Cond, name string, handler GlobalDnsStatusHandler) {
 	statusHandler := &globalDnsStatusHandler{
@@ -155,7 +58,7 @@ func RegisterGlobalDnsStatusHandler(ctx context.Context, controller GlobalDnsCon
 		condition: condition,
 		handler:   handler,
 	}
-	controller.AddGenericHandler(ctx, name, FromGlobalDnsHandlerToHandler(statusHandler.sync))
+	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
 }
 
 func RegisterGlobalDnsGeneratingHandler(ctx context.Context, controller GlobalDnsController, apply apply.Apply,

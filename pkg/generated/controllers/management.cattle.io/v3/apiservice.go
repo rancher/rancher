@@ -29,125 +29,28 @@ import (
 	"github.com/rancher/wrangler/pkg/kv"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/watch"
 )
 
 // APIServiceController interface for managing APIService resources.
 type APIServiceController interface {
-	generic.ControllerMeta
-	APIServiceClient
-
-	// OnChange runs the given handler when the controller detects a resource was changed.
-	OnChange(ctx context.Context, name string, sync APIServiceHandler)
-
-	// OnRemove runs the given handler when the controller detects a resource was changed.
-	OnRemove(ctx context.Context, name string, sync APIServiceHandler)
-
-	// Enqueue adds the resource with the given name to the worker queue of the controller.
-	Enqueue(name string)
-
-	// EnqueueAfter runs Enqueue after the provided duration.
-	EnqueueAfter(name string, duration time.Duration)
-
-	// Cache returns a cache for the resource type T.
-	Cache() APIServiceCache
+	generic.NonNamespacedControllerInterface[*v3.APIService, *v3.APIServiceList]
 }
 
 // APIServiceClient interface for managing APIService resources in Kubernetes.
 type APIServiceClient interface {
-	// Create creates a new object and return the newly created Object or an error.
-	Create(*v3.APIService) (*v3.APIService, error)
-
-	// Update updates the object and return the newly updated Object or an error.
-	Update(*v3.APIService) (*v3.APIService, error)
-	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
-	// Will always return an error if the object does not have a status field.
-	UpdateStatus(*v3.APIService) (*v3.APIService, error)
-
-	// Delete deletes the Object in the given name.
-	Delete(name string, options *metav1.DeleteOptions) error
-
-	// Get will attempt to retrieve the resource with the specified name.
-	Get(name string, options metav1.GetOptions) (*v3.APIService, error)
-
-	// List will attempt to find multiple resources.
-	List(opts metav1.ListOptions) (*v3.APIServiceList, error)
-
-	// Watch will start watching resources.
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	// Patch will patch the resource with the matching name.
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.APIService, err error)
+	generic.NonNamespacedClientInterface[*v3.APIService, *v3.APIServiceList]
 }
 
 // APIServiceCache interface for retrieving APIService resources in memory.
 type APIServiceCache interface {
-	// Get returns the resources with the specified name from the cache.
-	Get(name string) (*v3.APIService, error)
-
-	// List will attempt to find resources from the Cache.
-	List(selector labels.Selector) ([]*v3.APIService, error)
-
-	// AddIndexer adds  a new Indexer to the cache with the provided name.
-	// If you call this after you already have data in the store, the results are undefined.
-	AddIndexer(indexName string, indexer APIServiceIndexer)
-
-	// GetByIndex returns the stored objects whose set of indexed values
-	// for the named index includes the given indexed value.
-	GetByIndex(indexName, key string) ([]*v3.APIService, error)
-}
-
-// APIServiceHandler is function for performing any potential modifications to a APIService resource.
-type APIServiceHandler func(string, *v3.APIService) (*v3.APIService, error)
-
-// APIServiceIndexer computes a set of indexed values for the provided object.
-type APIServiceIndexer func(obj *v3.APIService) ([]string, error)
-
-// APIServiceGenericController wraps wrangler/pkg/generic.NonNamespacedController so that the function definitions adhere to APIServiceController interface.
-type APIServiceGenericController struct {
-	generic.NonNamespacedControllerInterface[*v3.APIService, *v3.APIServiceList]
-}
-
-// OnChange runs the given resource handler when the controller detects a resource was changed.
-func (c *APIServiceGenericController) OnChange(ctx context.Context, name string, sync APIServiceHandler) {
-	c.NonNamespacedControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.APIService](sync))
-}
-
-// OnRemove runs the given object handler when the controller detects a resource was changed.
-func (c *APIServiceGenericController) OnRemove(ctx context.Context, name string, sync APIServiceHandler) {
-	c.NonNamespacedControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.APIService](sync))
-}
-
-// Cache returns a cache of resources in memory.
-func (c *APIServiceGenericController) Cache() APIServiceCache {
-	return &APIServiceGenericCache{
-		c.NonNamespacedControllerInterface.Cache(),
-	}
-}
-
-// APIServiceGenericCache wraps wrangler/pkg/generic.NonNamespacedCache so the function definitions adhere to APIServiceCache interface.
-type APIServiceGenericCache struct {
 	generic.NonNamespacedCacheInterface[*v3.APIService]
-}
-
-// AddIndexer adds  a new Indexer to the cache with the provided name.
-// If you call this after you already have data in the store, the results are undefined.
-func (c APIServiceGenericCache) AddIndexer(indexName string, indexer APIServiceIndexer) {
-	c.NonNamespacedCacheInterface.AddIndexer(indexName, generic.Indexer[*v3.APIService](indexer))
 }
 
 type APIServiceStatusHandler func(obj *v3.APIService, status v3.APIServiceStatus) (v3.APIServiceStatus, error)
 
 type APIServiceGeneratingHandler func(obj *v3.APIService, status v3.APIServiceStatus) ([]runtime.Object, v3.APIServiceStatus, error)
-
-func FromAPIServiceHandlerToHandler(sync APIServiceHandler) generic.Handler {
-	return generic.FromObjectHandlerToHandler(generic.ObjectHandler[*v3.APIService](sync))
-}
 
 func RegisterAPIServiceStatusHandler(ctx context.Context, controller APIServiceController, condition condition.Cond, name string, handler APIServiceStatusHandler) {
 	statusHandler := &aPIServiceStatusHandler{
@@ -155,7 +58,7 @@ func RegisterAPIServiceStatusHandler(ctx context.Context, controller APIServiceC
 		condition: condition,
 		handler:   handler,
 	}
-	controller.AddGenericHandler(ctx, name, FromAPIServiceHandlerToHandler(statusHandler.sync))
+	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
 }
 
 func RegisterAPIServiceGeneratingHandler(ctx context.Context, controller APIServiceController, apply apply.Apply,

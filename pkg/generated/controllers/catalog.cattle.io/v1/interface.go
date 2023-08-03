@@ -47,19 +47,13 @@ type version struct {
 }
 
 func (v *version) App() AppController {
-	return &AppGenericController{
-		generic.NewController[*v1.App, *v1.AppList](schema.GroupVersionKind{Group: "catalog.cattle.io", Version: "v1", Kind: "App"}, "apps", true, v.controllerFactory),
-	}
+	return generic.NewController[*v1.App, *v1.AppList](schema.GroupVersionKind{Group: "catalog.cattle.io", Version: "v1", Kind: "App"}, "apps", true, v.controllerFactory)
 }
 
 func (v *version) ClusterRepo() ClusterRepoController {
-	return &ClusterRepoGenericController{
-		generic.NewNonNamespacedController[*v1.ClusterRepo, *v1.ClusterRepoList](schema.GroupVersionKind{Group: "catalog.cattle.io", Version: "v1", Kind: "ClusterRepo"}, "clusterrepos", v.controllerFactory),
-	}
+	return generic.NewNonNamespacedController[*v1.ClusterRepo, *v1.ClusterRepoList](schema.GroupVersionKind{Group: "catalog.cattle.io", Version: "v1", Kind: "ClusterRepo"}, "clusterrepos", v.controllerFactory)
 }
 
 func (v *version) Operation() OperationController {
-	return &OperationGenericController{
-		generic.NewController[*v1.Operation, *v1.OperationList](schema.GroupVersionKind{Group: "catalog.cattle.io", Version: "v1", Kind: "Operation"}, "operations", true, v.controllerFactory),
-	}
+	return generic.NewController[*v1.Operation, *v1.OperationList](schema.GroupVersionKind{Group: "catalog.cattle.io", Version: "v1", Kind: "Operation"}, "operations", true, v.controllerFactory)
 }

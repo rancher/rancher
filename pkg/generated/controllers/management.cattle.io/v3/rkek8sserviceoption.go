@@ -19,114 +19,21 @@ limitations under the License.
 package v3
 
 import (
-	"context"
-	"time"
-
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/wrangler/pkg/generic"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/watch"
 )
 
 // RkeK8sServiceOptionController interface for managing RkeK8sServiceOption resources.
 type RkeK8sServiceOptionController interface {
-	generic.ControllerMeta
-	RkeK8sServiceOptionClient
-
-	// OnChange runs the given handler when the controller detects a resource was changed.
-	OnChange(ctx context.Context, name string, sync RkeK8sServiceOptionHandler)
-
-	// OnRemove runs the given handler when the controller detects a resource was changed.
-	OnRemove(ctx context.Context, name string, sync RkeK8sServiceOptionHandler)
-
-	// Enqueue adds the resource with the given name to the worker queue of the controller.
-	Enqueue(namespace, name string)
-
-	// EnqueueAfter runs Enqueue after the provided duration.
-	EnqueueAfter(namespace, name string, duration time.Duration)
-
-	// Cache returns a cache for the resource type T.
-	Cache() RkeK8sServiceOptionCache
+	generic.ControllerInterface[*v3.RkeK8sServiceOption, *v3.RkeK8sServiceOptionList]
 }
 
 // RkeK8sServiceOptionClient interface for managing RkeK8sServiceOption resources in Kubernetes.
 type RkeK8sServiceOptionClient interface {
-	// Create creates a new object and return the newly created Object or an error.
-	Create(*v3.RkeK8sServiceOption) (*v3.RkeK8sServiceOption, error)
-
-	// Update updates the object and return the newly updated Object or an error.
-	Update(*v3.RkeK8sServiceOption) (*v3.RkeK8sServiceOption, error)
-
-	// Delete deletes the Object in the given name.
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-
-	// Get will attempt to retrieve the resource with the specified name.
-	Get(namespace, name string, options metav1.GetOptions) (*v3.RkeK8sServiceOption, error)
-
-	// List will attempt to find multiple resources.
-	List(namespace string, opts metav1.ListOptions) (*v3.RkeK8sServiceOptionList, error)
-
-	// Watch will start watching resources.
-	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
-
-	// Patch will patch the resource with the matching name.
-	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.RkeK8sServiceOption, err error)
+	generic.ClientInterface[*v3.RkeK8sServiceOption, *v3.RkeK8sServiceOptionList]
 }
 
 // RkeK8sServiceOptionCache interface for retrieving RkeK8sServiceOption resources in memory.
 type RkeK8sServiceOptionCache interface {
-	// Get returns the resources with the specified name from the cache.
-	Get(namespace, name string) (*v3.RkeK8sServiceOption, error)
-
-	// List will attempt to find resources from the Cache.
-	List(namespace string, selector labels.Selector) ([]*v3.RkeK8sServiceOption, error)
-
-	// AddIndexer adds  a new Indexer to the cache with the provided name.
-	// If you call this after you already have data in the store, the results are undefined.
-	AddIndexer(indexName string, indexer RkeK8sServiceOptionIndexer)
-
-	// GetByIndex returns the stored objects whose set of indexed values
-	// for the named index includes the given indexed value.
-	GetByIndex(indexName, key string) ([]*v3.RkeK8sServiceOption, error)
-}
-
-// RkeK8sServiceOptionHandler is function for performing any potential modifications to a RkeK8sServiceOption resource.
-type RkeK8sServiceOptionHandler func(string, *v3.RkeK8sServiceOption) (*v3.RkeK8sServiceOption, error)
-
-// RkeK8sServiceOptionIndexer computes a set of indexed values for the provided object.
-type RkeK8sServiceOptionIndexer func(obj *v3.RkeK8sServiceOption) ([]string, error)
-
-// RkeK8sServiceOptionGenericController wraps wrangler/pkg/generic.Controller so that the function definitions adhere to RkeK8sServiceOptionController interface.
-type RkeK8sServiceOptionGenericController struct {
-	generic.ControllerInterface[*v3.RkeK8sServiceOption, *v3.RkeK8sServiceOptionList]
-}
-
-// OnChange runs the given resource handler when the controller detects a resource was changed.
-func (c *RkeK8sServiceOptionGenericController) OnChange(ctx context.Context, name string, sync RkeK8sServiceOptionHandler) {
-	c.ControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.RkeK8sServiceOption](sync))
-}
-
-// OnRemove runs the given object handler when the controller detects a resource was changed.
-func (c *RkeK8sServiceOptionGenericController) OnRemove(ctx context.Context, name string, sync RkeK8sServiceOptionHandler) {
-	c.ControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.RkeK8sServiceOption](sync))
-}
-
-// Cache returns a cache of resources in memory.
-func (c *RkeK8sServiceOptionGenericController) Cache() RkeK8sServiceOptionCache {
-	return &RkeK8sServiceOptionGenericCache{
-		c.ControllerInterface.Cache(),
-	}
-}
-
-// RkeK8sServiceOptionGenericCache wraps wrangler/pkg/generic.Cache so the function definitions adhere to RkeK8sServiceOptionCache interface.
-type RkeK8sServiceOptionGenericCache struct {
 	generic.CacheInterface[*v3.RkeK8sServiceOption]
-}
-
-// AddIndexer adds  a new Indexer to the cache with the provided name.
-// If you call this after you already have data in the store, the results are undefined.
-func (c RkeK8sServiceOptionGenericCache) AddIndexer(indexName string, indexer RkeK8sServiceOptionIndexer) {
-	c.CacheInterface.AddIndexer(indexName, generic.Indexer[*v3.RkeK8sServiceOption](indexer))
 }

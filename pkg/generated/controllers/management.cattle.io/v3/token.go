@@ -19,114 +19,21 @@ limitations under the License.
 package v3
 
 import (
-	"context"
-	"time"
-
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/wrangler/pkg/generic"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/watch"
 )
 
 // TokenController interface for managing Token resources.
 type TokenController interface {
-	generic.ControllerMeta
-	TokenClient
-
-	// OnChange runs the given handler when the controller detects a resource was changed.
-	OnChange(ctx context.Context, name string, sync TokenHandler)
-
-	// OnRemove runs the given handler when the controller detects a resource was changed.
-	OnRemove(ctx context.Context, name string, sync TokenHandler)
-
-	// Enqueue adds the resource with the given name to the worker queue of the controller.
-	Enqueue(name string)
-
-	// EnqueueAfter runs Enqueue after the provided duration.
-	EnqueueAfter(name string, duration time.Duration)
-
-	// Cache returns a cache for the resource type T.
-	Cache() TokenCache
+	generic.NonNamespacedControllerInterface[*v3.Token, *v3.TokenList]
 }
 
 // TokenClient interface for managing Token resources in Kubernetes.
 type TokenClient interface {
-	// Create creates a new object and return the newly created Object or an error.
-	Create(*v3.Token) (*v3.Token, error)
-
-	// Update updates the object and return the newly updated Object or an error.
-	Update(*v3.Token) (*v3.Token, error)
-
-	// Delete deletes the Object in the given name.
-	Delete(name string, options *metav1.DeleteOptions) error
-
-	// Get will attempt to retrieve the resource with the specified name.
-	Get(name string, options metav1.GetOptions) (*v3.Token, error)
-
-	// List will attempt to find multiple resources.
-	List(opts metav1.ListOptions) (*v3.TokenList, error)
-
-	// Watch will start watching resources.
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	// Patch will patch the resource with the matching name.
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.Token, err error)
+	generic.NonNamespacedClientInterface[*v3.Token, *v3.TokenList]
 }
 
 // TokenCache interface for retrieving Token resources in memory.
 type TokenCache interface {
-	// Get returns the resources with the specified name from the cache.
-	Get(name string) (*v3.Token, error)
-
-	// List will attempt to find resources from the Cache.
-	List(selector labels.Selector) ([]*v3.Token, error)
-
-	// AddIndexer adds  a new Indexer to the cache with the provided name.
-	// If you call this after you already have data in the store, the results are undefined.
-	AddIndexer(indexName string, indexer TokenIndexer)
-
-	// GetByIndex returns the stored objects whose set of indexed values
-	// for the named index includes the given indexed value.
-	GetByIndex(indexName, key string) ([]*v3.Token, error)
-}
-
-// TokenHandler is function for performing any potential modifications to a Token resource.
-type TokenHandler func(string, *v3.Token) (*v3.Token, error)
-
-// TokenIndexer computes a set of indexed values for the provided object.
-type TokenIndexer func(obj *v3.Token) ([]string, error)
-
-// TokenGenericController wraps wrangler/pkg/generic.NonNamespacedController so that the function definitions adhere to TokenController interface.
-type TokenGenericController struct {
-	generic.NonNamespacedControllerInterface[*v3.Token, *v3.TokenList]
-}
-
-// OnChange runs the given resource handler when the controller detects a resource was changed.
-func (c *TokenGenericController) OnChange(ctx context.Context, name string, sync TokenHandler) {
-	c.NonNamespacedControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.Token](sync))
-}
-
-// OnRemove runs the given object handler when the controller detects a resource was changed.
-func (c *TokenGenericController) OnRemove(ctx context.Context, name string, sync TokenHandler) {
-	c.NonNamespacedControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.Token](sync))
-}
-
-// Cache returns a cache of resources in memory.
-func (c *TokenGenericController) Cache() TokenCache {
-	return &TokenGenericCache{
-		c.NonNamespacedControllerInterface.Cache(),
-	}
-}
-
-// TokenGenericCache wraps wrangler/pkg/generic.NonNamespacedCache so the function definitions adhere to TokenCache interface.
-type TokenGenericCache struct {
 	generic.NonNamespacedCacheInterface[*v3.Token]
-}
-
-// AddIndexer adds  a new Indexer to the cache with the provided name.
-// If you call this after you already have data in the store, the results are undefined.
-func (c TokenGenericCache) AddIndexer(indexName string, indexer TokenIndexer) {
-	c.NonNamespacedCacheInterface.AddIndexer(indexName, generic.Indexer[*v3.Token](indexer))
 }

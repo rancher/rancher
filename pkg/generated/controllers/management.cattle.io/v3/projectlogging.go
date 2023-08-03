@@ -29,125 +29,28 @@ import (
 	"github.com/rancher/wrangler/pkg/kv"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/watch"
 )
 
 // ProjectLoggingController interface for managing ProjectLogging resources.
 type ProjectLoggingController interface {
-	generic.ControllerMeta
-	ProjectLoggingClient
-
-	// OnChange runs the given handler when the controller detects a resource was changed.
-	OnChange(ctx context.Context, name string, sync ProjectLoggingHandler)
-
-	// OnRemove runs the given handler when the controller detects a resource was changed.
-	OnRemove(ctx context.Context, name string, sync ProjectLoggingHandler)
-
-	// Enqueue adds the resource with the given name to the worker queue of the controller.
-	Enqueue(namespace, name string)
-
-	// EnqueueAfter runs Enqueue after the provided duration.
-	EnqueueAfter(namespace, name string, duration time.Duration)
-
-	// Cache returns a cache for the resource type T.
-	Cache() ProjectLoggingCache
+	generic.ControllerInterface[*v3.ProjectLogging, *v3.ProjectLoggingList]
 }
 
 // ProjectLoggingClient interface for managing ProjectLogging resources in Kubernetes.
 type ProjectLoggingClient interface {
-	// Create creates a new object and return the newly created Object or an error.
-	Create(*v3.ProjectLogging) (*v3.ProjectLogging, error)
-
-	// Update updates the object and return the newly updated Object or an error.
-	Update(*v3.ProjectLogging) (*v3.ProjectLogging, error)
-	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
-	// Will always return an error if the object does not have a status field.
-	UpdateStatus(*v3.ProjectLogging) (*v3.ProjectLogging, error)
-
-	// Delete deletes the Object in the given name.
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-
-	// Get will attempt to retrieve the resource with the specified name.
-	Get(namespace, name string, options metav1.GetOptions) (*v3.ProjectLogging, error)
-
-	// List will attempt to find multiple resources.
-	List(namespace string, opts metav1.ListOptions) (*v3.ProjectLoggingList, error)
-
-	// Watch will start watching resources.
-	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
-
-	// Patch will patch the resource with the matching name.
-	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.ProjectLogging, err error)
+	generic.ClientInterface[*v3.ProjectLogging, *v3.ProjectLoggingList]
 }
 
 // ProjectLoggingCache interface for retrieving ProjectLogging resources in memory.
 type ProjectLoggingCache interface {
-	// Get returns the resources with the specified name from the cache.
-	Get(namespace, name string) (*v3.ProjectLogging, error)
-
-	// List will attempt to find resources from the Cache.
-	List(namespace string, selector labels.Selector) ([]*v3.ProjectLogging, error)
-
-	// AddIndexer adds  a new Indexer to the cache with the provided name.
-	// If you call this after you already have data in the store, the results are undefined.
-	AddIndexer(indexName string, indexer ProjectLoggingIndexer)
-
-	// GetByIndex returns the stored objects whose set of indexed values
-	// for the named index includes the given indexed value.
-	GetByIndex(indexName, key string) ([]*v3.ProjectLogging, error)
-}
-
-// ProjectLoggingHandler is function for performing any potential modifications to a ProjectLogging resource.
-type ProjectLoggingHandler func(string, *v3.ProjectLogging) (*v3.ProjectLogging, error)
-
-// ProjectLoggingIndexer computes a set of indexed values for the provided object.
-type ProjectLoggingIndexer func(obj *v3.ProjectLogging) ([]string, error)
-
-// ProjectLoggingGenericController wraps wrangler/pkg/generic.Controller so that the function definitions adhere to ProjectLoggingController interface.
-type ProjectLoggingGenericController struct {
-	generic.ControllerInterface[*v3.ProjectLogging, *v3.ProjectLoggingList]
-}
-
-// OnChange runs the given resource handler when the controller detects a resource was changed.
-func (c *ProjectLoggingGenericController) OnChange(ctx context.Context, name string, sync ProjectLoggingHandler) {
-	c.ControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.ProjectLogging](sync))
-}
-
-// OnRemove runs the given object handler when the controller detects a resource was changed.
-func (c *ProjectLoggingGenericController) OnRemove(ctx context.Context, name string, sync ProjectLoggingHandler) {
-	c.ControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.ProjectLogging](sync))
-}
-
-// Cache returns a cache of resources in memory.
-func (c *ProjectLoggingGenericController) Cache() ProjectLoggingCache {
-	return &ProjectLoggingGenericCache{
-		c.ControllerInterface.Cache(),
-	}
-}
-
-// ProjectLoggingGenericCache wraps wrangler/pkg/generic.Cache so the function definitions adhere to ProjectLoggingCache interface.
-type ProjectLoggingGenericCache struct {
 	generic.CacheInterface[*v3.ProjectLogging]
-}
-
-// AddIndexer adds  a new Indexer to the cache with the provided name.
-// If you call this after you already have data in the store, the results are undefined.
-func (c ProjectLoggingGenericCache) AddIndexer(indexName string, indexer ProjectLoggingIndexer) {
-	c.CacheInterface.AddIndexer(indexName, generic.Indexer[*v3.ProjectLogging](indexer))
 }
 
 type ProjectLoggingStatusHandler func(obj *v3.ProjectLogging, status v3.ProjectLoggingStatus) (v3.ProjectLoggingStatus, error)
 
 type ProjectLoggingGeneratingHandler func(obj *v3.ProjectLogging, status v3.ProjectLoggingStatus) ([]runtime.Object, v3.ProjectLoggingStatus, error)
-
-func FromProjectLoggingHandlerToHandler(sync ProjectLoggingHandler) generic.Handler {
-	return generic.FromObjectHandlerToHandler(generic.ObjectHandler[*v3.ProjectLogging](sync))
-}
 
 func RegisterProjectLoggingStatusHandler(ctx context.Context, controller ProjectLoggingController, condition condition.Cond, name string, handler ProjectLoggingStatusHandler) {
 	statusHandler := &projectLoggingStatusHandler{
@@ -155,7 +58,7 @@ func RegisterProjectLoggingStatusHandler(ctx context.Context, controller Project
 		condition: condition,
 		handler:   handler,
 	}
-	controller.AddGenericHandler(ctx, name, FromProjectLoggingHandlerToHandler(statusHandler.sync))
+	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
 }
 
 func RegisterProjectLoggingGeneratingHandler(ctx context.Context, controller ProjectLoggingController, apply apply.Apply,

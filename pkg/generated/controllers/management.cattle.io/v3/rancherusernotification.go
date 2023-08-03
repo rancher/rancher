@@ -19,114 +19,21 @@ limitations under the License.
 package v3
 
 import (
-	"context"
-	"time"
-
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/wrangler/pkg/generic"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/watch"
 )
 
 // RancherUserNotificationController interface for managing RancherUserNotification resources.
 type RancherUserNotificationController interface {
-	generic.ControllerMeta
-	RancherUserNotificationClient
-
-	// OnChange runs the given handler when the controller detects a resource was changed.
-	OnChange(ctx context.Context, name string, sync RancherUserNotificationHandler)
-
-	// OnRemove runs the given handler when the controller detects a resource was changed.
-	OnRemove(ctx context.Context, name string, sync RancherUserNotificationHandler)
-
-	// Enqueue adds the resource with the given name to the worker queue of the controller.
-	Enqueue(name string)
-
-	// EnqueueAfter runs Enqueue after the provided duration.
-	EnqueueAfter(name string, duration time.Duration)
-
-	// Cache returns a cache for the resource type T.
-	Cache() RancherUserNotificationCache
+	generic.NonNamespacedControllerInterface[*v3.RancherUserNotification, *v3.RancherUserNotificationList]
 }
 
 // RancherUserNotificationClient interface for managing RancherUserNotification resources in Kubernetes.
 type RancherUserNotificationClient interface {
-	// Create creates a new object and return the newly created Object or an error.
-	Create(*v3.RancherUserNotification) (*v3.RancherUserNotification, error)
-
-	// Update updates the object and return the newly updated Object or an error.
-	Update(*v3.RancherUserNotification) (*v3.RancherUserNotification, error)
-
-	// Delete deletes the Object in the given name.
-	Delete(name string, options *metav1.DeleteOptions) error
-
-	// Get will attempt to retrieve the resource with the specified name.
-	Get(name string, options metav1.GetOptions) (*v3.RancherUserNotification, error)
-
-	// List will attempt to find multiple resources.
-	List(opts metav1.ListOptions) (*v3.RancherUserNotificationList, error)
-
-	// Watch will start watching resources.
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	// Patch will patch the resource with the matching name.
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.RancherUserNotification, err error)
+	generic.NonNamespacedClientInterface[*v3.RancherUserNotification, *v3.RancherUserNotificationList]
 }
 
 // RancherUserNotificationCache interface for retrieving RancherUserNotification resources in memory.
 type RancherUserNotificationCache interface {
-	// Get returns the resources with the specified name from the cache.
-	Get(name string) (*v3.RancherUserNotification, error)
-
-	// List will attempt to find resources from the Cache.
-	List(selector labels.Selector) ([]*v3.RancherUserNotification, error)
-
-	// AddIndexer adds  a new Indexer to the cache with the provided name.
-	// If you call this after you already have data in the store, the results are undefined.
-	AddIndexer(indexName string, indexer RancherUserNotificationIndexer)
-
-	// GetByIndex returns the stored objects whose set of indexed values
-	// for the named index includes the given indexed value.
-	GetByIndex(indexName, key string) ([]*v3.RancherUserNotification, error)
-}
-
-// RancherUserNotificationHandler is function for performing any potential modifications to a RancherUserNotification resource.
-type RancherUserNotificationHandler func(string, *v3.RancherUserNotification) (*v3.RancherUserNotification, error)
-
-// RancherUserNotificationIndexer computes a set of indexed values for the provided object.
-type RancherUserNotificationIndexer func(obj *v3.RancherUserNotification) ([]string, error)
-
-// RancherUserNotificationGenericController wraps wrangler/pkg/generic.NonNamespacedController so that the function definitions adhere to RancherUserNotificationController interface.
-type RancherUserNotificationGenericController struct {
-	generic.NonNamespacedControllerInterface[*v3.RancherUserNotification, *v3.RancherUserNotificationList]
-}
-
-// OnChange runs the given resource handler when the controller detects a resource was changed.
-func (c *RancherUserNotificationGenericController) OnChange(ctx context.Context, name string, sync RancherUserNotificationHandler) {
-	c.NonNamespacedControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.RancherUserNotification](sync))
-}
-
-// OnRemove runs the given object handler when the controller detects a resource was changed.
-func (c *RancherUserNotificationGenericController) OnRemove(ctx context.Context, name string, sync RancherUserNotificationHandler) {
-	c.NonNamespacedControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.RancherUserNotification](sync))
-}
-
-// Cache returns a cache of resources in memory.
-func (c *RancherUserNotificationGenericController) Cache() RancherUserNotificationCache {
-	return &RancherUserNotificationGenericCache{
-		c.NonNamespacedControllerInterface.Cache(),
-	}
-}
-
-// RancherUserNotificationGenericCache wraps wrangler/pkg/generic.NonNamespacedCache so the function definitions adhere to RancherUserNotificationCache interface.
-type RancherUserNotificationGenericCache struct {
 	generic.NonNamespacedCacheInterface[*v3.RancherUserNotification]
-}
-
-// AddIndexer adds  a new Indexer to the cache with the provided name.
-// If you call this after you already have data in the store, the results are undefined.
-func (c RancherUserNotificationGenericCache) AddIndexer(indexName string, indexer RancherUserNotificationIndexer) {
-	c.NonNamespacedCacheInterface.AddIndexer(indexName, generic.Indexer[*v3.RancherUserNotification](indexer))
 }

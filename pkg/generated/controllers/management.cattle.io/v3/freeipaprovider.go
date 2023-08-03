@@ -19,114 +19,21 @@ limitations under the License.
 package v3
 
 import (
-	"context"
-	"time"
-
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/wrangler/pkg/generic"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/watch"
 )
 
 // FreeIpaProviderController interface for managing FreeIpaProvider resources.
 type FreeIpaProviderController interface {
-	generic.ControllerMeta
-	FreeIpaProviderClient
-
-	// OnChange runs the given handler when the controller detects a resource was changed.
-	OnChange(ctx context.Context, name string, sync FreeIpaProviderHandler)
-
-	// OnRemove runs the given handler when the controller detects a resource was changed.
-	OnRemove(ctx context.Context, name string, sync FreeIpaProviderHandler)
-
-	// Enqueue adds the resource with the given name to the worker queue of the controller.
-	Enqueue(name string)
-
-	// EnqueueAfter runs Enqueue after the provided duration.
-	EnqueueAfter(name string, duration time.Duration)
-
-	// Cache returns a cache for the resource type T.
-	Cache() FreeIpaProviderCache
+	generic.NonNamespacedControllerInterface[*v3.FreeIpaProvider, *v3.FreeIpaProviderList]
 }
 
 // FreeIpaProviderClient interface for managing FreeIpaProvider resources in Kubernetes.
 type FreeIpaProviderClient interface {
-	// Create creates a new object and return the newly created Object or an error.
-	Create(*v3.FreeIpaProvider) (*v3.FreeIpaProvider, error)
-
-	// Update updates the object and return the newly updated Object or an error.
-	Update(*v3.FreeIpaProvider) (*v3.FreeIpaProvider, error)
-
-	// Delete deletes the Object in the given name.
-	Delete(name string, options *metav1.DeleteOptions) error
-
-	// Get will attempt to retrieve the resource with the specified name.
-	Get(name string, options metav1.GetOptions) (*v3.FreeIpaProvider, error)
-
-	// List will attempt to find multiple resources.
-	List(opts metav1.ListOptions) (*v3.FreeIpaProviderList, error)
-
-	// Watch will start watching resources.
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	// Patch will patch the resource with the matching name.
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.FreeIpaProvider, err error)
+	generic.NonNamespacedClientInterface[*v3.FreeIpaProvider, *v3.FreeIpaProviderList]
 }
 
 // FreeIpaProviderCache interface for retrieving FreeIpaProvider resources in memory.
 type FreeIpaProviderCache interface {
-	// Get returns the resources with the specified name from the cache.
-	Get(name string) (*v3.FreeIpaProvider, error)
-
-	// List will attempt to find resources from the Cache.
-	List(selector labels.Selector) ([]*v3.FreeIpaProvider, error)
-
-	// AddIndexer adds  a new Indexer to the cache with the provided name.
-	// If you call this after you already have data in the store, the results are undefined.
-	AddIndexer(indexName string, indexer FreeIpaProviderIndexer)
-
-	// GetByIndex returns the stored objects whose set of indexed values
-	// for the named index includes the given indexed value.
-	GetByIndex(indexName, key string) ([]*v3.FreeIpaProvider, error)
-}
-
-// FreeIpaProviderHandler is function for performing any potential modifications to a FreeIpaProvider resource.
-type FreeIpaProviderHandler func(string, *v3.FreeIpaProvider) (*v3.FreeIpaProvider, error)
-
-// FreeIpaProviderIndexer computes a set of indexed values for the provided object.
-type FreeIpaProviderIndexer func(obj *v3.FreeIpaProvider) ([]string, error)
-
-// FreeIpaProviderGenericController wraps wrangler/pkg/generic.NonNamespacedController so that the function definitions adhere to FreeIpaProviderController interface.
-type FreeIpaProviderGenericController struct {
-	generic.NonNamespacedControllerInterface[*v3.FreeIpaProvider, *v3.FreeIpaProviderList]
-}
-
-// OnChange runs the given resource handler when the controller detects a resource was changed.
-func (c *FreeIpaProviderGenericController) OnChange(ctx context.Context, name string, sync FreeIpaProviderHandler) {
-	c.NonNamespacedControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.FreeIpaProvider](sync))
-}
-
-// OnRemove runs the given object handler when the controller detects a resource was changed.
-func (c *FreeIpaProviderGenericController) OnRemove(ctx context.Context, name string, sync FreeIpaProviderHandler) {
-	c.NonNamespacedControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.FreeIpaProvider](sync))
-}
-
-// Cache returns a cache of resources in memory.
-func (c *FreeIpaProviderGenericController) Cache() FreeIpaProviderCache {
-	return &FreeIpaProviderGenericCache{
-		c.NonNamespacedControllerInterface.Cache(),
-	}
-}
-
-// FreeIpaProviderGenericCache wraps wrangler/pkg/generic.NonNamespacedCache so the function definitions adhere to FreeIpaProviderCache interface.
-type FreeIpaProviderGenericCache struct {
 	generic.NonNamespacedCacheInterface[*v3.FreeIpaProvider]
-}
-
-// AddIndexer adds  a new Indexer to the cache with the provided name.
-// If you call this after you already have data in the store, the results are undefined.
-func (c FreeIpaProviderGenericCache) AddIndexer(indexName string, indexer FreeIpaProviderIndexer) {
-	c.NonNamespacedCacheInterface.AddIndexer(indexName, generic.Indexer[*v3.FreeIpaProvider](indexer))
 }

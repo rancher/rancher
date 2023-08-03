@@ -29,125 +29,28 @@ import (
 	"github.com/rancher/wrangler/pkg/kv"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/watch"
 )
 
 // ClusterController interface for managing Cluster resources.
 type ClusterController interface {
-	generic.ControllerMeta
-	ClusterClient
-
-	// OnChange runs the given handler when the controller detects a resource was changed.
-	OnChange(ctx context.Context, name string, sync ClusterHandler)
-
-	// OnRemove runs the given handler when the controller detects a resource was changed.
-	OnRemove(ctx context.Context, name string, sync ClusterHandler)
-
-	// Enqueue adds the resource with the given name to the worker queue of the controller.
-	Enqueue(name string)
-
-	// EnqueueAfter runs Enqueue after the provided duration.
-	EnqueueAfter(name string, duration time.Duration)
-
-	// Cache returns a cache for the resource type T.
-	Cache() ClusterCache
+	generic.NonNamespacedControllerInterface[*v3.Cluster, *v3.ClusterList]
 }
 
 // ClusterClient interface for managing Cluster resources in Kubernetes.
 type ClusterClient interface {
-	// Create creates a new object and return the newly created Object or an error.
-	Create(*v3.Cluster) (*v3.Cluster, error)
-
-	// Update updates the object and return the newly updated Object or an error.
-	Update(*v3.Cluster) (*v3.Cluster, error)
-	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
-	// Will always return an error if the object does not have a status field.
-	UpdateStatus(*v3.Cluster) (*v3.Cluster, error)
-
-	// Delete deletes the Object in the given name.
-	Delete(name string, options *metav1.DeleteOptions) error
-
-	// Get will attempt to retrieve the resource with the specified name.
-	Get(name string, options metav1.GetOptions) (*v3.Cluster, error)
-
-	// List will attempt to find multiple resources.
-	List(opts metav1.ListOptions) (*v3.ClusterList, error)
-
-	// Watch will start watching resources.
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	// Patch will patch the resource with the matching name.
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.Cluster, err error)
+	generic.NonNamespacedClientInterface[*v3.Cluster, *v3.ClusterList]
 }
 
 // ClusterCache interface for retrieving Cluster resources in memory.
 type ClusterCache interface {
-	// Get returns the resources with the specified name from the cache.
-	Get(name string) (*v3.Cluster, error)
-
-	// List will attempt to find resources from the Cache.
-	List(selector labels.Selector) ([]*v3.Cluster, error)
-
-	// AddIndexer adds  a new Indexer to the cache with the provided name.
-	// If you call this after you already have data in the store, the results are undefined.
-	AddIndexer(indexName string, indexer ClusterIndexer)
-
-	// GetByIndex returns the stored objects whose set of indexed values
-	// for the named index includes the given indexed value.
-	GetByIndex(indexName, key string) ([]*v3.Cluster, error)
-}
-
-// ClusterHandler is function for performing any potential modifications to a Cluster resource.
-type ClusterHandler func(string, *v3.Cluster) (*v3.Cluster, error)
-
-// ClusterIndexer computes a set of indexed values for the provided object.
-type ClusterIndexer func(obj *v3.Cluster) ([]string, error)
-
-// ClusterGenericController wraps wrangler/pkg/generic.NonNamespacedController so that the function definitions adhere to ClusterController interface.
-type ClusterGenericController struct {
-	generic.NonNamespacedControllerInterface[*v3.Cluster, *v3.ClusterList]
-}
-
-// OnChange runs the given resource handler when the controller detects a resource was changed.
-func (c *ClusterGenericController) OnChange(ctx context.Context, name string, sync ClusterHandler) {
-	c.NonNamespacedControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.Cluster](sync))
-}
-
-// OnRemove runs the given object handler when the controller detects a resource was changed.
-func (c *ClusterGenericController) OnRemove(ctx context.Context, name string, sync ClusterHandler) {
-	c.NonNamespacedControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.Cluster](sync))
-}
-
-// Cache returns a cache of resources in memory.
-func (c *ClusterGenericController) Cache() ClusterCache {
-	return &ClusterGenericCache{
-		c.NonNamespacedControllerInterface.Cache(),
-	}
-}
-
-// ClusterGenericCache wraps wrangler/pkg/generic.NonNamespacedCache so the function definitions adhere to ClusterCache interface.
-type ClusterGenericCache struct {
 	generic.NonNamespacedCacheInterface[*v3.Cluster]
-}
-
-// AddIndexer adds  a new Indexer to the cache with the provided name.
-// If you call this after you already have data in the store, the results are undefined.
-func (c ClusterGenericCache) AddIndexer(indexName string, indexer ClusterIndexer) {
-	c.NonNamespacedCacheInterface.AddIndexer(indexName, generic.Indexer[*v3.Cluster](indexer))
 }
 
 type ClusterStatusHandler func(obj *v3.Cluster, status v3.ClusterStatus) (v3.ClusterStatus, error)
 
 type ClusterGeneratingHandler func(obj *v3.Cluster, status v3.ClusterStatus) ([]runtime.Object, v3.ClusterStatus, error)
-
-func FromClusterHandlerToHandler(sync ClusterHandler) generic.Handler {
-	return generic.FromObjectHandlerToHandler(generic.ObjectHandler[*v3.Cluster](sync))
-}
 
 func RegisterClusterStatusHandler(ctx context.Context, controller ClusterController, condition condition.Cond, name string, handler ClusterStatusHandler) {
 	statusHandler := &clusterStatusHandler{
@@ -155,7 +58,7 @@ func RegisterClusterStatusHandler(ctx context.Context, controller ClusterControl
 		condition: condition,
 		handler:   handler,
 	}
-	controller.AddGenericHandler(ctx, name, FromClusterHandlerToHandler(statusHandler.sync))
+	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
 }
 
 func RegisterClusterGeneratingHandler(ctx context.Context, controller ClusterController, apply apply.Apply,

@@ -29,125 +29,28 @@ import (
 	"github.com/rancher/wrangler/pkg/kv"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/watch"
 )
 
 // KontainerDriverController interface for managing KontainerDriver resources.
 type KontainerDriverController interface {
-	generic.ControllerMeta
-	KontainerDriverClient
-
-	// OnChange runs the given handler when the controller detects a resource was changed.
-	OnChange(ctx context.Context, name string, sync KontainerDriverHandler)
-
-	// OnRemove runs the given handler when the controller detects a resource was changed.
-	OnRemove(ctx context.Context, name string, sync KontainerDriverHandler)
-
-	// Enqueue adds the resource with the given name to the worker queue of the controller.
-	Enqueue(name string)
-
-	// EnqueueAfter runs Enqueue after the provided duration.
-	EnqueueAfter(name string, duration time.Duration)
-
-	// Cache returns a cache for the resource type T.
-	Cache() KontainerDriverCache
+	generic.NonNamespacedControllerInterface[*v3.KontainerDriver, *v3.KontainerDriverList]
 }
 
 // KontainerDriverClient interface for managing KontainerDriver resources in Kubernetes.
 type KontainerDriverClient interface {
-	// Create creates a new object and return the newly created Object or an error.
-	Create(*v3.KontainerDriver) (*v3.KontainerDriver, error)
-
-	// Update updates the object and return the newly updated Object or an error.
-	Update(*v3.KontainerDriver) (*v3.KontainerDriver, error)
-	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
-	// Will always return an error if the object does not have a status field.
-	UpdateStatus(*v3.KontainerDriver) (*v3.KontainerDriver, error)
-
-	// Delete deletes the Object in the given name.
-	Delete(name string, options *metav1.DeleteOptions) error
-
-	// Get will attempt to retrieve the resource with the specified name.
-	Get(name string, options metav1.GetOptions) (*v3.KontainerDriver, error)
-
-	// List will attempt to find multiple resources.
-	List(opts metav1.ListOptions) (*v3.KontainerDriverList, error)
-
-	// Watch will start watching resources.
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	// Patch will patch the resource with the matching name.
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.KontainerDriver, err error)
+	generic.NonNamespacedClientInterface[*v3.KontainerDriver, *v3.KontainerDriverList]
 }
 
 // KontainerDriverCache interface for retrieving KontainerDriver resources in memory.
 type KontainerDriverCache interface {
-	// Get returns the resources with the specified name from the cache.
-	Get(name string) (*v3.KontainerDriver, error)
-
-	// List will attempt to find resources from the Cache.
-	List(selector labels.Selector) ([]*v3.KontainerDriver, error)
-
-	// AddIndexer adds  a new Indexer to the cache with the provided name.
-	// If you call this after you already have data in the store, the results are undefined.
-	AddIndexer(indexName string, indexer KontainerDriverIndexer)
-
-	// GetByIndex returns the stored objects whose set of indexed values
-	// for the named index includes the given indexed value.
-	GetByIndex(indexName, key string) ([]*v3.KontainerDriver, error)
-}
-
-// KontainerDriverHandler is function for performing any potential modifications to a KontainerDriver resource.
-type KontainerDriverHandler func(string, *v3.KontainerDriver) (*v3.KontainerDriver, error)
-
-// KontainerDriverIndexer computes a set of indexed values for the provided object.
-type KontainerDriverIndexer func(obj *v3.KontainerDriver) ([]string, error)
-
-// KontainerDriverGenericController wraps wrangler/pkg/generic.NonNamespacedController so that the function definitions adhere to KontainerDriverController interface.
-type KontainerDriverGenericController struct {
-	generic.NonNamespacedControllerInterface[*v3.KontainerDriver, *v3.KontainerDriverList]
-}
-
-// OnChange runs the given resource handler when the controller detects a resource was changed.
-func (c *KontainerDriverGenericController) OnChange(ctx context.Context, name string, sync KontainerDriverHandler) {
-	c.NonNamespacedControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.KontainerDriver](sync))
-}
-
-// OnRemove runs the given object handler when the controller detects a resource was changed.
-func (c *KontainerDriverGenericController) OnRemove(ctx context.Context, name string, sync KontainerDriverHandler) {
-	c.NonNamespacedControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.KontainerDriver](sync))
-}
-
-// Cache returns a cache of resources in memory.
-func (c *KontainerDriverGenericController) Cache() KontainerDriverCache {
-	return &KontainerDriverGenericCache{
-		c.NonNamespacedControllerInterface.Cache(),
-	}
-}
-
-// KontainerDriverGenericCache wraps wrangler/pkg/generic.NonNamespacedCache so the function definitions adhere to KontainerDriverCache interface.
-type KontainerDriverGenericCache struct {
 	generic.NonNamespacedCacheInterface[*v3.KontainerDriver]
-}
-
-// AddIndexer adds  a new Indexer to the cache with the provided name.
-// If you call this after you already have data in the store, the results are undefined.
-func (c KontainerDriverGenericCache) AddIndexer(indexName string, indexer KontainerDriverIndexer) {
-	c.NonNamespacedCacheInterface.AddIndexer(indexName, generic.Indexer[*v3.KontainerDriver](indexer))
 }
 
 type KontainerDriverStatusHandler func(obj *v3.KontainerDriver, status v3.KontainerDriverStatus) (v3.KontainerDriverStatus, error)
 
 type KontainerDriverGeneratingHandler func(obj *v3.KontainerDriver, status v3.KontainerDriverStatus) ([]runtime.Object, v3.KontainerDriverStatus, error)
-
-func FromKontainerDriverHandlerToHandler(sync KontainerDriverHandler) generic.Handler {
-	return generic.FromObjectHandlerToHandler(generic.ObjectHandler[*v3.KontainerDriver](sync))
-}
 
 func RegisterKontainerDriverStatusHandler(ctx context.Context, controller KontainerDriverController, condition condition.Cond, name string, handler KontainerDriverStatusHandler) {
 	statusHandler := &kontainerDriverStatusHandler{
@@ -155,7 +58,7 @@ func RegisterKontainerDriverStatusHandler(ctx context.Context, controller Kontai
 		condition: condition,
 		handler:   handler,
 	}
-	controller.AddGenericHandler(ctx, name, FromKontainerDriverHandlerToHandler(statusHandler.sync))
+	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
 }
 
 func RegisterKontainerDriverGeneratingHandler(ctx context.Context, controller KontainerDriverController, apply apply.Apply,

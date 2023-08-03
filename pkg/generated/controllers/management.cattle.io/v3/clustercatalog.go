@@ -19,114 +19,21 @@ limitations under the License.
 package v3
 
 import (
-	"context"
-	"time"
-
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/wrangler/pkg/generic"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/watch"
 )
 
 // ClusterCatalogController interface for managing ClusterCatalog resources.
 type ClusterCatalogController interface {
-	generic.ControllerMeta
-	ClusterCatalogClient
-
-	// OnChange runs the given handler when the controller detects a resource was changed.
-	OnChange(ctx context.Context, name string, sync ClusterCatalogHandler)
-
-	// OnRemove runs the given handler when the controller detects a resource was changed.
-	OnRemove(ctx context.Context, name string, sync ClusterCatalogHandler)
-
-	// Enqueue adds the resource with the given name to the worker queue of the controller.
-	Enqueue(namespace, name string)
-
-	// EnqueueAfter runs Enqueue after the provided duration.
-	EnqueueAfter(namespace, name string, duration time.Duration)
-
-	// Cache returns a cache for the resource type T.
-	Cache() ClusterCatalogCache
+	generic.ControllerInterface[*v3.ClusterCatalog, *v3.ClusterCatalogList]
 }
 
 // ClusterCatalogClient interface for managing ClusterCatalog resources in Kubernetes.
 type ClusterCatalogClient interface {
-	// Create creates a new object and return the newly created Object or an error.
-	Create(*v3.ClusterCatalog) (*v3.ClusterCatalog, error)
-
-	// Update updates the object and return the newly updated Object or an error.
-	Update(*v3.ClusterCatalog) (*v3.ClusterCatalog, error)
-
-	// Delete deletes the Object in the given name.
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-
-	// Get will attempt to retrieve the resource with the specified name.
-	Get(namespace, name string, options metav1.GetOptions) (*v3.ClusterCatalog, error)
-
-	// List will attempt to find multiple resources.
-	List(namespace string, opts metav1.ListOptions) (*v3.ClusterCatalogList, error)
-
-	// Watch will start watching resources.
-	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
-
-	// Patch will patch the resource with the matching name.
-	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.ClusterCatalog, err error)
+	generic.ClientInterface[*v3.ClusterCatalog, *v3.ClusterCatalogList]
 }
 
 // ClusterCatalogCache interface for retrieving ClusterCatalog resources in memory.
 type ClusterCatalogCache interface {
-	// Get returns the resources with the specified name from the cache.
-	Get(namespace, name string) (*v3.ClusterCatalog, error)
-
-	// List will attempt to find resources from the Cache.
-	List(namespace string, selector labels.Selector) ([]*v3.ClusterCatalog, error)
-
-	// AddIndexer adds  a new Indexer to the cache with the provided name.
-	// If you call this after you already have data in the store, the results are undefined.
-	AddIndexer(indexName string, indexer ClusterCatalogIndexer)
-
-	// GetByIndex returns the stored objects whose set of indexed values
-	// for the named index includes the given indexed value.
-	GetByIndex(indexName, key string) ([]*v3.ClusterCatalog, error)
-}
-
-// ClusterCatalogHandler is function for performing any potential modifications to a ClusterCatalog resource.
-type ClusterCatalogHandler func(string, *v3.ClusterCatalog) (*v3.ClusterCatalog, error)
-
-// ClusterCatalogIndexer computes a set of indexed values for the provided object.
-type ClusterCatalogIndexer func(obj *v3.ClusterCatalog) ([]string, error)
-
-// ClusterCatalogGenericController wraps wrangler/pkg/generic.Controller so that the function definitions adhere to ClusterCatalogController interface.
-type ClusterCatalogGenericController struct {
-	generic.ControllerInterface[*v3.ClusterCatalog, *v3.ClusterCatalogList]
-}
-
-// OnChange runs the given resource handler when the controller detects a resource was changed.
-func (c *ClusterCatalogGenericController) OnChange(ctx context.Context, name string, sync ClusterCatalogHandler) {
-	c.ControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.ClusterCatalog](sync))
-}
-
-// OnRemove runs the given object handler when the controller detects a resource was changed.
-func (c *ClusterCatalogGenericController) OnRemove(ctx context.Context, name string, sync ClusterCatalogHandler) {
-	c.ControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.ClusterCatalog](sync))
-}
-
-// Cache returns a cache of resources in memory.
-func (c *ClusterCatalogGenericController) Cache() ClusterCatalogCache {
-	return &ClusterCatalogGenericCache{
-		c.ControllerInterface.Cache(),
-	}
-}
-
-// ClusterCatalogGenericCache wraps wrangler/pkg/generic.Cache so the function definitions adhere to ClusterCatalogCache interface.
-type ClusterCatalogGenericCache struct {
 	generic.CacheInterface[*v3.ClusterCatalog]
-}
-
-// AddIndexer adds  a new Indexer to the cache with the provided name.
-// If you call this after you already have data in the store, the results are undefined.
-func (c ClusterCatalogGenericCache) AddIndexer(indexName string, indexer ClusterCatalogIndexer) {
-	c.CacheInterface.AddIndexer(indexName, generic.Indexer[*v3.ClusterCatalog](indexer))
 }

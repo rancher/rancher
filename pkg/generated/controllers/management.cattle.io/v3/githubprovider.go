@@ -19,114 +19,21 @@ limitations under the License.
 package v3
 
 import (
-	"context"
-	"time"
-
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/wrangler/pkg/generic"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/watch"
 )
 
 // GithubProviderController interface for managing GithubProvider resources.
 type GithubProviderController interface {
-	generic.ControllerMeta
-	GithubProviderClient
-
-	// OnChange runs the given handler when the controller detects a resource was changed.
-	OnChange(ctx context.Context, name string, sync GithubProviderHandler)
-
-	// OnRemove runs the given handler when the controller detects a resource was changed.
-	OnRemove(ctx context.Context, name string, sync GithubProviderHandler)
-
-	// Enqueue adds the resource with the given name to the worker queue of the controller.
-	Enqueue(name string)
-
-	// EnqueueAfter runs Enqueue after the provided duration.
-	EnqueueAfter(name string, duration time.Duration)
-
-	// Cache returns a cache for the resource type T.
-	Cache() GithubProviderCache
+	generic.NonNamespacedControllerInterface[*v3.GithubProvider, *v3.GithubProviderList]
 }
 
 // GithubProviderClient interface for managing GithubProvider resources in Kubernetes.
 type GithubProviderClient interface {
-	// Create creates a new object and return the newly created Object or an error.
-	Create(*v3.GithubProvider) (*v3.GithubProvider, error)
-
-	// Update updates the object and return the newly updated Object or an error.
-	Update(*v3.GithubProvider) (*v3.GithubProvider, error)
-
-	// Delete deletes the Object in the given name.
-	Delete(name string, options *metav1.DeleteOptions) error
-
-	// Get will attempt to retrieve the resource with the specified name.
-	Get(name string, options metav1.GetOptions) (*v3.GithubProvider, error)
-
-	// List will attempt to find multiple resources.
-	List(opts metav1.ListOptions) (*v3.GithubProviderList, error)
-
-	// Watch will start watching resources.
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	// Patch will patch the resource with the matching name.
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.GithubProvider, err error)
+	generic.NonNamespacedClientInterface[*v3.GithubProvider, *v3.GithubProviderList]
 }
 
 // GithubProviderCache interface for retrieving GithubProvider resources in memory.
 type GithubProviderCache interface {
-	// Get returns the resources with the specified name from the cache.
-	Get(name string) (*v3.GithubProvider, error)
-
-	// List will attempt to find resources from the Cache.
-	List(selector labels.Selector) ([]*v3.GithubProvider, error)
-
-	// AddIndexer adds  a new Indexer to the cache with the provided name.
-	// If you call this after you already have data in the store, the results are undefined.
-	AddIndexer(indexName string, indexer GithubProviderIndexer)
-
-	// GetByIndex returns the stored objects whose set of indexed values
-	// for the named index includes the given indexed value.
-	GetByIndex(indexName, key string) ([]*v3.GithubProvider, error)
-}
-
-// GithubProviderHandler is function for performing any potential modifications to a GithubProvider resource.
-type GithubProviderHandler func(string, *v3.GithubProvider) (*v3.GithubProvider, error)
-
-// GithubProviderIndexer computes a set of indexed values for the provided object.
-type GithubProviderIndexer func(obj *v3.GithubProvider) ([]string, error)
-
-// GithubProviderGenericController wraps wrangler/pkg/generic.NonNamespacedController so that the function definitions adhere to GithubProviderController interface.
-type GithubProviderGenericController struct {
-	generic.NonNamespacedControllerInterface[*v3.GithubProvider, *v3.GithubProviderList]
-}
-
-// OnChange runs the given resource handler when the controller detects a resource was changed.
-func (c *GithubProviderGenericController) OnChange(ctx context.Context, name string, sync GithubProviderHandler) {
-	c.NonNamespacedControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.GithubProvider](sync))
-}
-
-// OnRemove runs the given object handler when the controller detects a resource was changed.
-func (c *GithubProviderGenericController) OnRemove(ctx context.Context, name string, sync GithubProviderHandler) {
-	c.NonNamespacedControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.GithubProvider](sync))
-}
-
-// Cache returns a cache of resources in memory.
-func (c *GithubProviderGenericController) Cache() GithubProviderCache {
-	return &GithubProviderGenericCache{
-		c.NonNamespacedControllerInterface.Cache(),
-	}
-}
-
-// GithubProviderGenericCache wraps wrangler/pkg/generic.NonNamespacedCache so the function definitions adhere to GithubProviderCache interface.
-type GithubProviderGenericCache struct {
 	generic.NonNamespacedCacheInterface[*v3.GithubProvider]
-}
-
-// AddIndexer adds  a new Indexer to the cache with the provided name.
-// If you call this after you already have data in the store, the results are undefined.
-func (c GithubProviderGenericCache) AddIndexer(indexName string, indexer GithubProviderIndexer) {
-	c.NonNamespacedCacheInterface.AddIndexer(indexName, generic.Indexer[*v3.GithubProvider](indexer))
 }

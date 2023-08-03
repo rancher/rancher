@@ -19,114 +19,21 @@ limitations under the License.
 package v3
 
 import (
-	"context"
-	"time"
-
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/wrangler/pkg/generic"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/watch"
 )
 
 // OIDCProviderController interface for managing OIDCProvider resources.
 type OIDCProviderController interface {
-	generic.ControllerMeta
-	OIDCProviderClient
-
-	// OnChange runs the given handler when the controller detects a resource was changed.
-	OnChange(ctx context.Context, name string, sync OIDCProviderHandler)
-
-	// OnRemove runs the given handler when the controller detects a resource was changed.
-	OnRemove(ctx context.Context, name string, sync OIDCProviderHandler)
-
-	// Enqueue adds the resource with the given name to the worker queue of the controller.
-	Enqueue(name string)
-
-	// EnqueueAfter runs Enqueue after the provided duration.
-	EnqueueAfter(name string, duration time.Duration)
-
-	// Cache returns a cache for the resource type T.
-	Cache() OIDCProviderCache
+	generic.NonNamespacedControllerInterface[*v3.OIDCProvider, *v3.OIDCProviderList]
 }
 
 // OIDCProviderClient interface for managing OIDCProvider resources in Kubernetes.
 type OIDCProviderClient interface {
-	// Create creates a new object and return the newly created Object or an error.
-	Create(*v3.OIDCProvider) (*v3.OIDCProvider, error)
-
-	// Update updates the object and return the newly updated Object or an error.
-	Update(*v3.OIDCProvider) (*v3.OIDCProvider, error)
-
-	// Delete deletes the Object in the given name.
-	Delete(name string, options *metav1.DeleteOptions) error
-
-	// Get will attempt to retrieve the resource with the specified name.
-	Get(name string, options metav1.GetOptions) (*v3.OIDCProvider, error)
-
-	// List will attempt to find multiple resources.
-	List(opts metav1.ListOptions) (*v3.OIDCProviderList, error)
-
-	// Watch will start watching resources.
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	// Patch will patch the resource with the matching name.
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.OIDCProvider, err error)
+	generic.NonNamespacedClientInterface[*v3.OIDCProvider, *v3.OIDCProviderList]
 }
 
 // OIDCProviderCache interface for retrieving OIDCProvider resources in memory.
 type OIDCProviderCache interface {
-	// Get returns the resources with the specified name from the cache.
-	Get(name string) (*v3.OIDCProvider, error)
-
-	// List will attempt to find resources from the Cache.
-	List(selector labels.Selector) ([]*v3.OIDCProvider, error)
-
-	// AddIndexer adds  a new Indexer to the cache with the provided name.
-	// If you call this after you already have data in the store, the results are undefined.
-	AddIndexer(indexName string, indexer OIDCProviderIndexer)
-
-	// GetByIndex returns the stored objects whose set of indexed values
-	// for the named index includes the given indexed value.
-	GetByIndex(indexName, key string) ([]*v3.OIDCProvider, error)
-}
-
-// OIDCProviderHandler is function for performing any potential modifications to a OIDCProvider resource.
-type OIDCProviderHandler func(string, *v3.OIDCProvider) (*v3.OIDCProvider, error)
-
-// OIDCProviderIndexer computes a set of indexed values for the provided object.
-type OIDCProviderIndexer func(obj *v3.OIDCProvider) ([]string, error)
-
-// OIDCProviderGenericController wraps wrangler/pkg/generic.NonNamespacedController so that the function definitions adhere to OIDCProviderController interface.
-type OIDCProviderGenericController struct {
-	generic.NonNamespacedControllerInterface[*v3.OIDCProvider, *v3.OIDCProviderList]
-}
-
-// OnChange runs the given resource handler when the controller detects a resource was changed.
-func (c *OIDCProviderGenericController) OnChange(ctx context.Context, name string, sync OIDCProviderHandler) {
-	c.NonNamespacedControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.OIDCProvider](sync))
-}
-
-// OnRemove runs the given object handler when the controller detects a resource was changed.
-func (c *OIDCProviderGenericController) OnRemove(ctx context.Context, name string, sync OIDCProviderHandler) {
-	c.NonNamespacedControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.OIDCProvider](sync))
-}
-
-// Cache returns a cache of resources in memory.
-func (c *OIDCProviderGenericController) Cache() OIDCProviderCache {
-	return &OIDCProviderGenericCache{
-		c.NonNamespacedControllerInterface.Cache(),
-	}
-}
-
-// OIDCProviderGenericCache wraps wrangler/pkg/generic.NonNamespacedCache so the function definitions adhere to OIDCProviderCache interface.
-type OIDCProviderGenericCache struct {
 	generic.NonNamespacedCacheInterface[*v3.OIDCProvider]
-}
-
-// AddIndexer adds  a new Indexer to the cache with the provided name.
-// If you call this after you already have data in the store, the results are undefined.
-func (c OIDCProviderGenericCache) AddIndexer(indexName string, indexer OIDCProviderIndexer) {
-	c.NonNamespacedCacheInterface.AddIndexer(indexName, generic.Indexer[*v3.OIDCProvider](indexer))
 }

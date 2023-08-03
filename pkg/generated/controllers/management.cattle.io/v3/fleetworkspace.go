@@ -29,125 +29,28 @@ import (
 	"github.com/rancher/wrangler/pkg/kv"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/watch"
 )
 
 // FleetWorkspaceController interface for managing FleetWorkspace resources.
 type FleetWorkspaceController interface {
-	generic.ControllerMeta
-	FleetWorkspaceClient
-
-	// OnChange runs the given handler when the controller detects a resource was changed.
-	OnChange(ctx context.Context, name string, sync FleetWorkspaceHandler)
-
-	// OnRemove runs the given handler when the controller detects a resource was changed.
-	OnRemove(ctx context.Context, name string, sync FleetWorkspaceHandler)
-
-	// Enqueue adds the resource with the given name to the worker queue of the controller.
-	Enqueue(name string)
-
-	// EnqueueAfter runs Enqueue after the provided duration.
-	EnqueueAfter(name string, duration time.Duration)
-
-	// Cache returns a cache for the resource type T.
-	Cache() FleetWorkspaceCache
+	generic.NonNamespacedControllerInterface[*v3.FleetWorkspace, *v3.FleetWorkspaceList]
 }
 
 // FleetWorkspaceClient interface for managing FleetWorkspace resources in Kubernetes.
 type FleetWorkspaceClient interface {
-	// Create creates a new object and return the newly created Object or an error.
-	Create(*v3.FleetWorkspace) (*v3.FleetWorkspace, error)
-
-	// Update updates the object and return the newly updated Object or an error.
-	Update(*v3.FleetWorkspace) (*v3.FleetWorkspace, error)
-	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
-	// Will always return an error if the object does not have a status field.
-	UpdateStatus(*v3.FleetWorkspace) (*v3.FleetWorkspace, error)
-
-	// Delete deletes the Object in the given name.
-	Delete(name string, options *metav1.DeleteOptions) error
-
-	// Get will attempt to retrieve the resource with the specified name.
-	Get(name string, options metav1.GetOptions) (*v3.FleetWorkspace, error)
-
-	// List will attempt to find multiple resources.
-	List(opts metav1.ListOptions) (*v3.FleetWorkspaceList, error)
-
-	// Watch will start watching resources.
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	// Patch will patch the resource with the matching name.
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.FleetWorkspace, err error)
+	generic.NonNamespacedClientInterface[*v3.FleetWorkspace, *v3.FleetWorkspaceList]
 }
 
 // FleetWorkspaceCache interface for retrieving FleetWorkspace resources in memory.
 type FleetWorkspaceCache interface {
-	// Get returns the resources with the specified name from the cache.
-	Get(name string) (*v3.FleetWorkspace, error)
-
-	// List will attempt to find resources from the Cache.
-	List(selector labels.Selector) ([]*v3.FleetWorkspace, error)
-
-	// AddIndexer adds  a new Indexer to the cache with the provided name.
-	// If you call this after you already have data in the store, the results are undefined.
-	AddIndexer(indexName string, indexer FleetWorkspaceIndexer)
-
-	// GetByIndex returns the stored objects whose set of indexed values
-	// for the named index includes the given indexed value.
-	GetByIndex(indexName, key string) ([]*v3.FleetWorkspace, error)
-}
-
-// FleetWorkspaceHandler is function for performing any potential modifications to a FleetWorkspace resource.
-type FleetWorkspaceHandler func(string, *v3.FleetWorkspace) (*v3.FleetWorkspace, error)
-
-// FleetWorkspaceIndexer computes a set of indexed values for the provided object.
-type FleetWorkspaceIndexer func(obj *v3.FleetWorkspace) ([]string, error)
-
-// FleetWorkspaceGenericController wraps wrangler/pkg/generic.NonNamespacedController so that the function definitions adhere to FleetWorkspaceController interface.
-type FleetWorkspaceGenericController struct {
-	generic.NonNamespacedControllerInterface[*v3.FleetWorkspace, *v3.FleetWorkspaceList]
-}
-
-// OnChange runs the given resource handler when the controller detects a resource was changed.
-func (c *FleetWorkspaceGenericController) OnChange(ctx context.Context, name string, sync FleetWorkspaceHandler) {
-	c.NonNamespacedControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.FleetWorkspace](sync))
-}
-
-// OnRemove runs the given object handler when the controller detects a resource was changed.
-func (c *FleetWorkspaceGenericController) OnRemove(ctx context.Context, name string, sync FleetWorkspaceHandler) {
-	c.NonNamespacedControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.FleetWorkspace](sync))
-}
-
-// Cache returns a cache of resources in memory.
-func (c *FleetWorkspaceGenericController) Cache() FleetWorkspaceCache {
-	return &FleetWorkspaceGenericCache{
-		c.NonNamespacedControllerInterface.Cache(),
-	}
-}
-
-// FleetWorkspaceGenericCache wraps wrangler/pkg/generic.NonNamespacedCache so the function definitions adhere to FleetWorkspaceCache interface.
-type FleetWorkspaceGenericCache struct {
 	generic.NonNamespacedCacheInterface[*v3.FleetWorkspace]
-}
-
-// AddIndexer adds  a new Indexer to the cache with the provided name.
-// If you call this after you already have data in the store, the results are undefined.
-func (c FleetWorkspaceGenericCache) AddIndexer(indexName string, indexer FleetWorkspaceIndexer) {
-	c.NonNamespacedCacheInterface.AddIndexer(indexName, generic.Indexer[*v3.FleetWorkspace](indexer))
 }
 
 type FleetWorkspaceStatusHandler func(obj *v3.FleetWorkspace, status v3.FleetWorkspaceStatus) (v3.FleetWorkspaceStatus, error)
 
 type FleetWorkspaceGeneratingHandler func(obj *v3.FleetWorkspace, status v3.FleetWorkspaceStatus) ([]runtime.Object, v3.FleetWorkspaceStatus, error)
-
-func FromFleetWorkspaceHandlerToHandler(sync FleetWorkspaceHandler) generic.Handler {
-	return generic.FromObjectHandlerToHandler(generic.ObjectHandler[*v3.FleetWorkspace](sync))
-}
 
 func RegisterFleetWorkspaceStatusHandler(ctx context.Context, controller FleetWorkspaceController, condition condition.Cond, name string, handler FleetWorkspaceStatusHandler) {
 	statusHandler := &fleetWorkspaceStatusHandler{
@@ -155,7 +58,7 @@ func RegisterFleetWorkspaceStatusHandler(ctx context.Context, controller FleetWo
 		condition: condition,
 		handler:   handler,
 	}
-	controller.AddGenericHandler(ctx, name, FromFleetWorkspaceHandlerToHandler(statusHandler.sync))
+	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
 }
 
 func RegisterFleetWorkspaceGeneratingHandler(ctx context.Context, controller FleetWorkspaceController, apply apply.Apply,
