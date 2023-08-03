@@ -29,125 +29,28 @@ import (
 	"github.com/rancher/wrangler/pkg/kv"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/watch"
 )
 
 // BundleController interface for managing Bundle resources.
 type BundleController interface {
-	generic.ControllerMeta
-	BundleClient
-
-	// OnChange runs the given handler when the controller detects a resource was changed.
-	OnChange(ctx context.Context, name string, sync BundleHandler)
-
-	// OnRemove runs the given handler when the controller detects a resource was changed.
-	OnRemove(ctx context.Context, name string, sync BundleHandler)
-
-	// Enqueue adds the resource with the given name to the worker queue of the controller.
-	Enqueue(namespace, name string)
-
-	// EnqueueAfter runs Enqueue after the provided duration.
-	EnqueueAfter(namespace, name string, duration time.Duration)
-
-	// Cache returns a cache for the resource type T.
-	Cache() BundleCache
+	generic.ControllerInterface[*v1alpha1.Bundle, *v1alpha1.BundleList]
 }
 
 // BundleClient interface for managing Bundle resources in Kubernetes.
 type BundleClient interface {
-	// Create creates a new object and return the newly created Object or an error.
-	Create(*v1alpha1.Bundle) (*v1alpha1.Bundle, error)
-
-	// Update updates the object and return the newly updated Object or an error.
-	Update(*v1alpha1.Bundle) (*v1alpha1.Bundle, error)
-	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
-	// Will always return an error if the object does not have a status field.
-	UpdateStatus(*v1alpha1.Bundle) (*v1alpha1.Bundle, error)
-
-	// Delete deletes the Object in the given name.
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-
-	// Get will attempt to retrieve the resource with the specified name.
-	Get(namespace, name string, options metav1.GetOptions) (*v1alpha1.Bundle, error)
-
-	// List will attempt to find multiple resources.
-	List(namespace string, opts metav1.ListOptions) (*v1alpha1.BundleList, error)
-
-	// Watch will start watching resources.
-	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
-
-	// Patch will patch the resource with the matching name.
-	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.Bundle, err error)
+	generic.ClientInterface[*v1alpha1.Bundle, *v1alpha1.BundleList]
 }
 
 // BundleCache interface for retrieving Bundle resources in memory.
 type BundleCache interface {
-	// Get returns the resources with the specified name from the cache.
-	Get(namespace, name string) (*v1alpha1.Bundle, error)
-
-	// List will attempt to find resources from the Cache.
-	List(namespace string, selector labels.Selector) ([]*v1alpha1.Bundle, error)
-
-	// AddIndexer adds  a new Indexer to the cache with the provided name.
-	// If you call this after you already have data in the store, the results are undefined.
-	AddIndexer(indexName string, indexer BundleIndexer)
-
-	// GetByIndex returns the stored objects whose set of indexed values
-	// for the named index includes the given indexed value.
-	GetByIndex(indexName, key string) ([]*v1alpha1.Bundle, error)
-}
-
-// BundleHandler is function for performing any potential modifications to a Bundle resource.
-type BundleHandler func(string, *v1alpha1.Bundle) (*v1alpha1.Bundle, error)
-
-// BundleIndexer computes a set of indexed values for the provided object.
-type BundleIndexer func(obj *v1alpha1.Bundle) ([]string, error)
-
-// BundleGenericController wraps wrangler/pkg/generic.Controller so that the function definitions adhere to BundleController interface.
-type BundleGenericController struct {
-	generic.ControllerInterface[*v1alpha1.Bundle, *v1alpha1.BundleList]
-}
-
-// OnChange runs the given resource handler when the controller detects a resource was changed.
-func (c *BundleGenericController) OnChange(ctx context.Context, name string, sync BundleHandler) {
-	c.ControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v1alpha1.Bundle](sync))
-}
-
-// OnRemove runs the given object handler when the controller detects a resource was changed.
-func (c *BundleGenericController) OnRemove(ctx context.Context, name string, sync BundleHandler) {
-	c.ControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v1alpha1.Bundle](sync))
-}
-
-// Cache returns a cache of resources in memory.
-func (c *BundleGenericController) Cache() BundleCache {
-	return &BundleGenericCache{
-		c.ControllerInterface.Cache(),
-	}
-}
-
-// BundleGenericCache wraps wrangler/pkg/generic.Cache so the function definitions adhere to BundleCache interface.
-type BundleGenericCache struct {
 	generic.CacheInterface[*v1alpha1.Bundle]
-}
-
-// AddIndexer adds  a new Indexer to the cache with the provided name.
-// If you call this after you already have data in the store, the results are undefined.
-func (c BundleGenericCache) AddIndexer(indexName string, indexer BundleIndexer) {
-	c.CacheInterface.AddIndexer(indexName, generic.Indexer[*v1alpha1.Bundle](indexer))
 }
 
 type BundleStatusHandler func(obj *v1alpha1.Bundle, status v1alpha1.BundleStatus) (v1alpha1.BundleStatus, error)
 
 type BundleGeneratingHandler func(obj *v1alpha1.Bundle, status v1alpha1.BundleStatus) ([]runtime.Object, v1alpha1.BundleStatus, error)
-
-func FromBundleHandlerToHandler(sync BundleHandler) generic.Handler {
-	return generic.FromObjectHandlerToHandler(generic.ObjectHandler[*v1alpha1.Bundle](sync))
-}
 
 func RegisterBundleStatusHandler(ctx context.Context, controller BundleController, condition condition.Cond, name string, handler BundleStatusHandler) {
 	statusHandler := &bundleStatusHandler{
@@ -155,7 +58,7 @@ func RegisterBundleStatusHandler(ctx context.Context, controller BundleControlle
 		condition: condition,
 		handler:   handler,
 	}
-	controller.AddGenericHandler(ctx, name, FromBundleHandlerToHandler(statusHandler.sync))
+	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
 }
 
 func RegisterBundleGeneratingHandler(ctx context.Context, controller BundleController, apply apply.Apply,

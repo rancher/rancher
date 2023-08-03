@@ -28,126 +28,29 @@ import (
 	"github.com/rancher/wrangler/pkg/kv"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/watch"
 	v1beta1 "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
 // MachineDeploymentController interface for managing MachineDeployment resources.
 type MachineDeploymentController interface {
-	generic.ControllerMeta
-	MachineDeploymentClient
-
-	// OnChange runs the given handler when the controller detects a resource was changed.
-	OnChange(ctx context.Context, name string, sync MachineDeploymentHandler)
-
-	// OnRemove runs the given handler when the controller detects a resource was changed.
-	OnRemove(ctx context.Context, name string, sync MachineDeploymentHandler)
-
-	// Enqueue adds the resource with the given name to the worker queue of the controller.
-	Enqueue(namespace, name string)
-
-	// EnqueueAfter runs Enqueue after the provided duration.
-	EnqueueAfter(namespace, name string, duration time.Duration)
-
-	// Cache returns a cache for the resource type T.
-	Cache() MachineDeploymentCache
+	generic.ControllerInterface[*v1beta1.MachineDeployment, *v1beta1.MachineDeploymentList]
 }
 
 // MachineDeploymentClient interface for managing MachineDeployment resources in Kubernetes.
 type MachineDeploymentClient interface {
-	// Create creates a new object and return the newly created Object or an error.
-	Create(*v1beta1.MachineDeployment) (*v1beta1.MachineDeployment, error)
-
-	// Update updates the object and return the newly updated Object or an error.
-	Update(*v1beta1.MachineDeployment) (*v1beta1.MachineDeployment, error)
-	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
-	// Will always return an error if the object does not have a status field.
-	UpdateStatus(*v1beta1.MachineDeployment) (*v1beta1.MachineDeployment, error)
-
-	// Delete deletes the Object in the given name.
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-
-	// Get will attempt to retrieve the resource with the specified name.
-	Get(namespace, name string, options metav1.GetOptions) (*v1beta1.MachineDeployment, error)
-
-	// List will attempt to find multiple resources.
-	List(namespace string, opts metav1.ListOptions) (*v1beta1.MachineDeploymentList, error)
-
-	// Watch will start watching resources.
-	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
-
-	// Patch will patch the resource with the matching name.
-	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.MachineDeployment, err error)
+	generic.ClientInterface[*v1beta1.MachineDeployment, *v1beta1.MachineDeploymentList]
 }
 
 // MachineDeploymentCache interface for retrieving MachineDeployment resources in memory.
 type MachineDeploymentCache interface {
-	// Get returns the resources with the specified name from the cache.
-	Get(namespace, name string) (*v1beta1.MachineDeployment, error)
-
-	// List will attempt to find resources from the Cache.
-	List(namespace string, selector labels.Selector) ([]*v1beta1.MachineDeployment, error)
-
-	// AddIndexer adds  a new Indexer to the cache with the provided name.
-	// If you call this after you already have data in the store, the results are undefined.
-	AddIndexer(indexName string, indexer MachineDeploymentIndexer)
-
-	// GetByIndex returns the stored objects whose set of indexed values
-	// for the named index includes the given indexed value.
-	GetByIndex(indexName, key string) ([]*v1beta1.MachineDeployment, error)
-}
-
-// MachineDeploymentHandler is function for performing any potential modifications to a MachineDeployment resource.
-type MachineDeploymentHandler func(string, *v1beta1.MachineDeployment) (*v1beta1.MachineDeployment, error)
-
-// MachineDeploymentIndexer computes a set of indexed values for the provided object.
-type MachineDeploymentIndexer func(obj *v1beta1.MachineDeployment) ([]string, error)
-
-// MachineDeploymentGenericController wraps wrangler/pkg/generic.Controller so that the function definitions adhere to MachineDeploymentController interface.
-type MachineDeploymentGenericController struct {
-	generic.ControllerInterface[*v1beta1.MachineDeployment, *v1beta1.MachineDeploymentList]
-}
-
-// OnChange runs the given resource handler when the controller detects a resource was changed.
-func (c *MachineDeploymentGenericController) OnChange(ctx context.Context, name string, sync MachineDeploymentHandler) {
-	c.ControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v1beta1.MachineDeployment](sync))
-}
-
-// OnRemove runs the given object handler when the controller detects a resource was changed.
-func (c *MachineDeploymentGenericController) OnRemove(ctx context.Context, name string, sync MachineDeploymentHandler) {
-	c.ControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v1beta1.MachineDeployment](sync))
-}
-
-// Cache returns a cache of resources in memory.
-func (c *MachineDeploymentGenericController) Cache() MachineDeploymentCache {
-	return &MachineDeploymentGenericCache{
-		c.ControllerInterface.Cache(),
-	}
-}
-
-// MachineDeploymentGenericCache wraps wrangler/pkg/generic.Cache so the function definitions adhere to MachineDeploymentCache interface.
-type MachineDeploymentGenericCache struct {
 	generic.CacheInterface[*v1beta1.MachineDeployment]
-}
-
-// AddIndexer adds  a new Indexer to the cache with the provided name.
-// If you call this after you already have data in the store, the results are undefined.
-func (c MachineDeploymentGenericCache) AddIndexer(indexName string, indexer MachineDeploymentIndexer) {
-	c.CacheInterface.AddIndexer(indexName, generic.Indexer[*v1beta1.MachineDeployment](indexer))
 }
 
 type MachineDeploymentStatusHandler func(obj *v1beta1.MachineDeployment, status v1beta1.MachineDeploymentStatus) (v1beta1.MachineDeploymentStatus, error)
 
 type MachineDeploymentGeneratingHandler func(obj *v1beta1.MachineDeployment, status v1beta1.MachineDeploymentStatus) ([]runtime.Object, v1beta1.MachineDeploymentStatus, error)
-
-func FromMachineDeploymentHandlerToHandler(sync MachineDeploymentHandler) generic.Handler {
-	return generic.FromObjectHandlerToHandler(generic.ObjectHandler[*v1beta1.MachineDeployment](sync))
-}
 
 func RegisterMachineDeploymentStatusHandler(ctx context.Context, controller MachineDeploymentController, condition condition.Cond, name string, handler MachineDeploymentStatusHandler) {
 	statusHandler := &machineDeploymentStatusHandler{
@@ -155,7 +58,7 @@ func RegisterMachineDeploymentStatusHandler(ctx context.Context, controller Mach
 		condition: condition,
 		handler:   handler,
 	}
-	controller.AddGenericHandler(ctx, name, FromMachineDeploymentHandlerToHandler(statusHandler.sync))
+	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
 }
 
 func RegisterMachineDeploymentGeneratingHandler(ctx context.Context, controller MachineDeploymentController, apply apply.Apply,

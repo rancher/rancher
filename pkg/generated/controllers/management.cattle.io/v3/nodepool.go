@@ -29,125 +29,28 @@ import (
 	"github.com/rancher/wrangler/pkg/kv"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/watch"
 )
 
 // NodePoolController interface for managing NodePool resources.
 type NodePoolController interface {
-	generic.ControllerMeta
-	NodePoolClient
-
-	// OnChange runs the given handler when the controller detects a resource was changed.
-	OnChange(ctx context.Context, name string, sync NodePoolHandler)
-
-	// OnRemove runs the given handler when the controller detects a resource was changed.
-	OnRemove(ctx context.Context, name string, sync NodePoolHandler)
-
-	// Enqueue adds the resource with the given name to the worker queue of the controller.
-	Enqueue(namespace, name string)
-
-	// EnqueueAfter runs Enqueue after the provided duration.
-	EnqueueAfter(namespace, name string, duration time.Duration)
-
-	// Cache returns a cache for the resource type T.
-	Cache() NodePoolCache
+	generic.ControllerInterface[*v3.NodePool, *v3.NodePoolList]
 }
 
 // NodePoolClient interface for managing NodePool resources in Kubernetes.
 type NodePoolClient interface {
-	// Create creates a new object and return the newly created Object or an error.
-	Create(*v3.NodePool) (*v3.NodePool, error)
-
-	// Update updates the object and return the newly updated Object or an error.
-	Update(*v3.NodePool) (*v3.NodePool, error)
-	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
-	// Will always return an error if the object does not have a status field.
-	UpdateStatus(*v3.NodePool) (*v3.NodePool, error)
-
-	// Delete deletes the Object in the given name.
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-
-	// Get will attempt to retrieve the resource with the specified name.
-	Get(namespace, name string, options metav1.GetOptions) (*v3.NodePool, error)
-
-	// List will attempt to find multiple resources.
-	List(namespace string, opts metav1.ListOptions) (*v3.NodePoolList, error)
-
-	// Watch will start watching resources.
-	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
-
-	// Patch will patch the resource with the matching name.
-	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.NodePool, err error)
+	generic.ClientInterface[*v3.NodePool, *v3.NodePoolList]
 }
 
 // NodePoolCache interface for retrieving NodePool resources in memory.
 type NodePoolCache interface {
-	// Get returns the resources with the specified name from the cache.
-	Get(namespace, name string) (*v3.NodePool, error)
-
-	// List will attempt to find resources from the Cache.
-	List(namespace string, selector labels.Selector) ([]*v3.NodePool, error)
-
-	// AddIndexer adds  a new Indexer to the cache with the provided name.
-	// If you call this after you already have data in the store, the results are undefined.
-	AddIndexer(indexName string, indexer NodePoolIndexer)
-
-	// GetByIndex returns the stored objects whose set of indexed values
-	// for the named index includes the given indexed value.
-	GetByIndex(indexName, key string) ([]*v3.NodePool, error)
-}
-
-// NodePoolHandler is function for performing any potential modifications to a NodePool resource.
-type NodePoolHandler func(string, *v3.NodePool) (*v3.NodePool, error)
-
-// NodePoolIndexer computes a set of indexed values for the provided object.
-type NodePoolIndexer func(obj *v3.NodePool) ([]string, error)
-
-// NodePoolGenericController wraps wrangler/pkg/generic.Controller so that the function definitions adhere to NodePoolController interface.
-type NodePoolGenericController struct {
-	generic.ControllerInterface[*v3.NodePool, *v3.NodePoolList]
-}
-
-// OnChange runs the given resource handler when the controller detects a resource was changed.
-func (c *NodePoolGenericController) OnChange(ctx context.Context, name string, sync NodePoolHandler) {
-	c.ControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.NodePool](sync))
-}
-
-// OnRemove runs the given object handler when the controller detects a resource was changed.
-func (c *NodePoolGenericController) OnRemove(ctx context.Context, name string, sync NodePoolHandler) {
-	c.ControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.NodePool](sync))
-}
-
-// Cache returns a cache of resources in memory.
-func (c *NodePoolGenericController) Cache() NodePoolCache {
-	return &NodePoolGenericCache{
-		c.ControllerInterface.Cache(),
-	}
-}
-
-// NodePoolGenericCache wraps wrangler/pkg/generic.Cache so the function definitions adhere to NodePoolCache interface.
-type NodePoolGenericCache struct {
 	generic.CacheInterface[*v3.NodePool]
-}
-
-// AddIndexer adds  a new Indexer to the cache with the provided name.
-// If you call this after you already have data in the store, the results are undefined.
-func (c NodePoolGenericCache) AddIndexer(indexName string, indexer NodePoolIndexer) {
-	c.CacheInterface.AddIndexer(indexName, generic.Indexer[*v3.NodePool](indexer))
 }
 
 type NodePoolStatusHandler func(obj *v3.NodePool, status v3.NodePoolStatus) (v3.NodePoolStatus, error)
 
 type NodePoolGeneratingHandler func(obj *v3.NodePool, status v3.NodePoolStatus) ([]runtime.Object, v3.NodePoolStatus, error)
-
-func FromNodePoolHandlerToHandler(sync NodePoolHandler) generic.Handler {
-	return generic.FromObjectHandlerToHandler(generic.ObjectHandler[*v3.NodePool](sync))
-}
 
 func RegisterNodePoolStatusHandler(ctx context.Context, controller NodePoolController, condition condition.Cond, name string, handler NodePoolStatusHandler) {
 	statusHandler := &nodePoolStatusHandler{
@@ -155,7 +58,7 @@ func RegisterNodePoolStatusHandler(ctx context.Context, controller NodePoolContr
 		condition: condition,
 		handler:   handler,
 	}
-	controller.AddGenericHandler(ctx, name, FromNodePoolHandlerToHandler(statusHandler.sync))
+	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
 }
 
 func RegisterNodePoolGeneratingHandler(ctx context.Context, controller NodePoolController, apply apply.Apply,

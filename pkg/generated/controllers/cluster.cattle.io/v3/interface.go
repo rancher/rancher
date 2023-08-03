@@ -46,13 +46,9 @@ type version struct {
 }
 
 func (v *version) ClusterAuthToken() ClusterAuthTokenController {
-	return &ClusterAuthTokenGenericController{
-		generic.NewController[*v3.ClusterAuthToken, *v3.ClusterAuthTokenList](schema.GroupVersionKind{Group: "cluster.cattle.io", Version: "v3", Kind: "ClusterAuthToken"}, "clusterauthtokens", true, v.controllerFactory),
-	}
+	return generic.NewController[*v3.ClusterAuthToken, *v3.ClusterAuthTokenList](schema.GroupVersionKind{Group: "cluster.cattle.io", Version: "v3", Kind: "ClusterAuthToken"}, "clusterauthtokens", true, v.controllerFactory)
 }
 
 func (v *version) ClusterUserAttribute() ClusterUserAttributeController {
-	return &ClusterUserAttributeGenericController{
-		generic.NewController[*v3.ClusterUserAttribute, *v3.ClusterUserAttributeList](schema.GroupVersionKind{Group: "cluster.cattle.io", Version: "v3", Kind: "ClusterUserAttribute"}, "clusteruserattributes", true, v.controllerFactory),
-	}
+	return generic.NewController[*v3.ClusterUserAttribute, *v3.ClusterUserAttributeList](schema.GroupVersionKind{Group: "cluster.cattle.io", Version: "v3", Kind: "ClusterUserAttribute"}, "clusteruserattributes", true, v.controllerFactory)
 }

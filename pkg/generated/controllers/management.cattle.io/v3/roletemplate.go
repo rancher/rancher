@@ -19,114 +19,21 @@ limitations under the License.
 package v3
 
 import (
-	"context"
-	"time"
-
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/wrangler/pkg/generic"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/watch"
 )
 
 // RoleTemplateController interface for managing RoleTemplate resources.
 type RoleTemplateController interface {
-	generic.ControllerMeta
-	RoleTemplateClient
-
-	// OnChange runs the given handler when the controller detects a resource was changed.
-	OnChange(ctx context.Context, name string, sync RoleTemplateHandler)
-
-	// OnRemove runs the given handler when the controller detects a resource was changed.
-	OnRemove(ctx context.Context, name string, sync RoleTemplateHandler)
-
-	// Enqueue adds the resource with the given name to the worker queue of the controller.
-	Enqueue(name string)
-
-	// EnqueueAfter runs Enqueue after the provided duration.
-	EnqueueAfter(name string, duration time.Duration)
-
-	// Cache returns a cache for the resource type T.
-	Cache() RoleTemplateCache
+	generic.NonNamespacedControllerInterface[*v3.RoleTemplate, *v3.RoleTemplateList]
 }
 
 // RoleTemplateClient interface for managing RoleTemplate resources in Kubernetes.
 type RoleTemplateClient interface {
-	// Create creates a new object and return the newly created Object or an error.
-	Create(*v3.RoleTemplate) (*v3.RoleTemplate, error)
-
-	// Update updates the object and return the newly updated Object or an error.
-	Update(*v3.RoleTemplate) (*v3.RoleTemplate, error)
-
-	// Delete deletes the Object in the given name.
-	Delete(name string, options *metav1.DeleteOptions) error
-
-	// Get will attempt to retrieve the resource with the specified name.
-	Get(name string, options metav1.GetOptions) (*v3.RoleTemplate, error)
-
-	// List will attempt to find multiple resources.
-	List(opts metav1.ListOptions) (*v3.RoleTemplateList, error)
-
-	// Watch will start watching resources.
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	// Patch will patch the resource with the matching name.
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.RoleTemplate, err error)
+	generic.NonNamespacedClientInterface[*v3.RoleTemplate, *v3.RoleTemplateList]
 }
 
 // RoleTemplateCache interface for retrieving RoleTemplate resources in memory.
 type RoleTemplateCache interface {
-	// Get returns the resources with the specified name from the cache.
-	Get(name string) (*v3.RoleTemplate, error)
-
-	// List will attempt to find resources from the Cache.
-	List(selector labels.Selector) ([]*v3.RoleTemplate, error)
-
-	// AddIndexer adds  a new Indexer to the cache with the provided name.
-	// If you call this after you already have data in the store, the results are undefined.
-	AddIndexer(indexName string, indexer RoleTemplateIndexer)
-
-	// GetByIndex returns the stored objects whose set of indexed values
-	// for the named index includes the given indexed value.
-	GetByIndex(indexName, key string) ([]*v3.RoleTemplate, error)
-}
-
-// RoleTemplateHandler is function for performing any potential modifications to a RoleTemplate resource.
-type RoleTemplateHandler func(string, *v3.RoleTemplate) (*v3.RoleTemplate, error)
-
-// RoleTemplateIndexer computes a set of indexed values for the provided object.
-type RoleTemplateIndexer func(obj *v3.RoleTemplate) ([]string, error)
-
-// RoleTemplateGenericController wraps wrangler/pkg/generic.NonNamespacedController so that the function definitions adhere to RoleTemplateController interface.
-type RoleTemplateGenericController struct {
-	generic.NonNamespacedControllerInterface[*v3.RoleTemplate, *v3.RoleTemplateList]
-}
-
-// OnChange runs the given resource handler when the controller detects a resource was changed.
-func (c *RoleTemplateGenericController) OnChange(ctx context.Context, name string, sync RoleTemplateHandler) {
-	c.NonNamespacedControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.RoleTemplate](sync))
-}
-
-// OnRemove runs the given object handler when the controller detects a resource was changed.
-func (c *RoleTemplateGenericController) OnRemove(ctx context.Context, name string, sync RoleTemplateHandler) {
-	c.NonNamespacedControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.RoleTemplate](sync))
-}
-
-// Cache returns a cache of resources in memory.
-func (c *RoleTemplateGenericController) Cache() RoleTemplateCache {
-	return &RoleTemplateGenericCache{
-		c.NonNamespacedControllerInterface.Cache(),
-	}
-}
-
-// RoleTemplateGenericCache wraps wrangler/pkg/generic.NonNamespacedCache so the function definitions adhere to RoleTemplateCache interface.
-type RoleTemplateGenericCache struct {
 	generic.NonNamespacedCacheInterface[*v3.RoleTemplate]
-}
-
-// AddIndexer adds  a new Indexer to the cache with the provided name.
-// If you call this after you already have data in the store, the results are undefined.
-func (c RoleTemplateGenericCache) AddIndexer(indexName string, indexer RoleTemplateIndexer) {
-	c.NonNamespacedCacheInterface.AddIndexer(indexName, generic.Indexer[*v3.RoleTemplate](indexer))
 }

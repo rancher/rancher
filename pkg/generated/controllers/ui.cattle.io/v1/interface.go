@@ -45,7 +45,5 @@ type version struct {
 }
 
 func (v *version) NavLink() NavLinkController {
-	return &NavLinkGenericController{
-		generic.NewController[*v1.NavLink, *v1.NavLinkList](schema.GroupVersionKind{Group: "ui.cattle.io", Version: "v1", Kind: "NavLink"}, "navlinks", true, v.controllerFactory),
-	}
+	return generic.NewController[*v1.NavLink, *v1.NavLinkList](schema.GroupVersionKind{Group: "ui.cattle.io", Version: "v1", Kind: "NavLink"}, "navlinks", true, v.controllerFactory)
 }

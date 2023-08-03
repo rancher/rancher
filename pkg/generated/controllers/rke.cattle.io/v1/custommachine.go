@@ -29,125 +29,28 @@ import (
 	"github.com/rancher/wrangler/pkg/kv"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/watch"
 )
 
 // CustomMachineController interface for managing CustomMachine resources.
 type CustomMachineController interface {
-	generic.ControllerMeta
-	CustomMachineClient
-
-	// OnChange runs the given handler when the controller detects a resource was changed.
-	OnChange(ctx context.Context, name string, sync CustomMachineHandler)
-
-	// OnRemove runs the given handler when the controller detects a resource was changed.
-	OnRemove(ctx context.Context, name string, sync CustomMachineHandler)
-
-	// Enqueue adds the resource with the given name to the worker queue of the controller.
-	Enqueue(namespace, name string)
-
-	// EnqueueAfter runs Enqueue after the provided duration.
-	EnqueueAfter(namespace, name string, duration time.Duration)
-
-	// Cache returns a cache for the resource type T.
-	Cache() CustomMachineCache
+	generic.ControllerInterface[*v1.CustomMachine, *v1.CustomMachineList]
 }
 
 // CustomMachineClient interface for managing CustomMachine resources in Kubernetes.
 type CustomMachineClient interface {
-	// Create creates a new object and return the newly created Object or an error.
-	Create(*v1.CustomMachine) (*v1.CustomMachine, error)
-
-	// Update updates the object and return the newly updated Object or an error.
-	Update(*v1.CustomMachine) (*v1.CustomMachine, error)
-	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
-	// Will always return an error if the object does not have a status field.
-	UpdateStatus(*v1.CustomMachine) (*v1.CustomMachine, error)
-
-	// Delete deletes the Object in the given name.
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-
-	// Get will attempt to retrieve the resource with the specified name.
-	Get(namespace, name string, options metav1.GetOptions) (*v1.CustomMachine, error)
-
-	// List will attempt to find multiple resources.
-	List(namespace string, opts metav1.ListOptions) (*v1.CustomMachineList, error)
-
-	// Watch will start watching resources.
-	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
-
-	// Patch will patch the resource with the matching name.
-	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.CustomMachine, err error)
+	generic.ClientInterface[*v1.CustomMachine, *v1.CustomMachineList]
 }
 
 // CustomMachineCache interface for retrieving CustomMachine resources in memory.
 type CustomMachineCache interface {
-	// Get returns the resources with the specified name from the cache.
-	Get(namespace, name string) (*v1.CustomMachine, error)
-
-	// List will attempt to find resources from the Cache.
-	List(namespace string, selector labels.Selector) ([]*v1.CustomMachine, error)
-
-	// AddIndexer adds  a new Indexer to the cache with the provided name.
-	// If you call this after you already have data in the store, the results are undefined.
-	AddIndexer(indexName string, indexer CustomMachineIndexer)
-
-	// GetByIndex returns the stored objects whose set of indexed values
-	// for the named index includes the given indexed value.
-	GetByIndex(indexName, key string) ([]*v1.CustomMachine, error)
-}
-
-// CustomMachineHandler is function for performing any potential modifications to a CustomMachine resource.
-type CustomMachineHandler func(string, *v1.CustomMachine) (*v1.CustomMachine, error)
-
-// CustomMachineIndexer computes a set of indexed values for the provided object.
-type CustomMachineIndexer func(obj *v1.CustomMachine) ([]string, error)
-
-// CustomMachineGenericController wraps wrangler/pkg/generic.Controller so that the function definitions adhere to CustomMachineController interface.
-type CustomMachineGenericController struct {
-	generic.ControllerInterface[*v1.CustomMachine, *v1.CustomMachineList]
-}
-
-// OnChange runs the given resource handler when the controller detects a resource was changed.
-func (c *CustomMachineGenericController) OnChange(ctx context.Context, name string, sync CustomMachineHandler) {
-	c.ControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v1.CustomMachine](sync))
-}
-
-// OnRemove runs the given object handler when the controller detects a resource was changed.
-func (c *CustomMachineGenericController) OnRemove(ctx context.Context, name string, sync CustomMachineHandler) {
-	c.ControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v1.CustomMachine](sync))
-}
-
-// Cache returns a cache of resources in memory.
-func (c *CustomMachineGenericController) Cache() CustomMachineCache {
-	return &CustomMachineGenericCache{
-		c.ControllerInterface.Cache(),
-	}
-}
-
-// CustomMachineGenericCache wraps wrangler/pkg/generic.Cache so the function definitions adhere to CustomMachineCache interface.
-type CustomMachineGenericCache struct {
 	generic.CacheInterface[*v1.CustomMachine]
-}
-
-// AddIndexer adds  a new Indexer to the cache with the provided name.
-// If you call this after you already have data in the store, the results are undefined.
-func (c CustomMachineGenericCache) AddIndexer(indexName string, indexer CustomMachineIndexer) {
-	c.CacheInterface.AddIndexer(indexName, generic.Indexer[*v1.CustomMachine](indexer))
 }
 
 type CustomMachineStatusHandler func(obj *v1.CustomMachine, status v1.CustomMachineStatus) (v1.CustomMachineStatus, error)
 
 type CustomMachineGeneratingHandler func(obj *v1.CustomMachine, status v1.CustomMachineStatus) ([]runtime.Object, v1.CustomMachineStatus, error)
-
-func FromCustomMachineHandlerToHandler(sync CustomMachineHandler) generic.Handler {
-	return generic.FromObjectHandlerToHandler(generic.ObjectHandler[*v1.CustomMachine](sync))
-}
 
 func RegisterCustomMachineStatusHandler(ctx context.Context, controller CustomMachineController, condition condition.Cond, name string, handler CustomMachineStatusHandler) {
 	statusHandler := &customMachineStatusHandler{
@@ -155,7 +58,7 @@ func RegisterCustomMachineStatusHandler(ctx context.Context, controller CustomMa
 		condition: condition,
 		handler:   handler,
 	}
-	controller.AddGenericHandler(ctx, name, FromCustomMachineHandlerToHandler(statusHandler.sync))
+	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
 }
 
 func RegisterCustomMachineGeneratingHandler(ctx context.Context, controller CustomMachineController, apply apply.Apply,

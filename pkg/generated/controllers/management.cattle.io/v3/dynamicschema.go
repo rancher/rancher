@@ -29,125 +29,28 @@ import (
 	"github.com/rancher/wrangler/pkg/kv"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/watch"
 )
 
 // DynamicSchemaController interface for managing DynamicSchema resources.
 type DynamicSchemaController interface {
-	generic.ControllerMeta
-	DynamicSchemaClient
-
-	// OnChange runs the given handler when the controller detects a resource was changed.
-	OnChange(ctx context.Context, name string, sync DynamicSchemaHandler)
-
-	// OnRemove runs the given handler when the controller detects a resource was changed.
-	OnRemove(ctx context.Context, name string, sync DynamicSchemaHandler)
-
-	// Enqueue adds the resource with the given name to the worker queue of the controller.
-	Enqueue(name string)
-
-	// EnqueueAfter runs Enqueue after the provided duration.
-	EnqueueAfter(name string, duration time.Duration)
-
-	// Cache returns a cache for the resource type T.
-	Cache() DynamicSchemaCache
+	generic.NonNamespacedControllerInterface[*v3.DynamicSchema, *v3.DynamicSchemaList]
 }
 
 // DynamicSchemaClient interface for managing DynamicSchema resources in Kubernetes.
 type DynamicSchemaClient interface {
-	// Create creates a new object and return the newly created Object or an error.
-	Create(*v3.DynamicSchema) (*v3.DynamicSchema, error)
-
-	// Update updates the object and return the newly updated Object or an error.
-	Update(*v3.DynamicSchema) (*v3.DynamicSchema, error)
-	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
-	// Will always return an error if the object does not have a status field.
-	UpdateStatus(*v3.DynamicSchema) (*v3.DynamicSchema, error)
-
-	// Delete deletes the Object in the given name.
-	Delete(name string, options *metav1.DeleteOptions) error
-
-	// Get will attempt to retrieve the resource with the specified name.
-	Get(name string, options metav1.GetOptions) (*v3.DynamicSchema, error)
-
-	// List will attempt to find multiple resources.
-	List(opts metav1.ListOptions) (*v3.DynamicSchemaList, error)
-
-	// Watch will start watching resources.
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	// Patch will patch the resource with the matching name.
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.DynamicSchema, err error)
+	generic.NonNamespacedClientInterface[*v3.DynamicSchema, *v3.DynamicSchemaList]
 }
 
 // DynamicSchemaCache interface for retrieving DynamicSchema resources in memory.
 type DynamicSchemaCache interface {
-	// Get returns the resources with the specified name from the cache.
-	Get(name string) (*v3.DynamicSchema, error)
-
-	// List will attempt to find resources from the Cache.
-	List(selector labels.Selector) ([]*v3.DynamicSchema, error)
-
-	// AddIndexer adds  a new Indexer to the cache with the provided name.
-	// If you call this after you already have data in the store, the results are undefined.
-	AddIndexer(indexName string, indexer DynamicSchemaIndexer)
-
-	// GetByIndex returns the stored objects whose set of indexed values
-	// for the named index includes the given indexed value.
-	GetByIndex(indexName, key string) ([]*v3.DynamicSchema, error)
-}
-
-// DynamicSchemaHandler is function for performing any potential modifications to a DynamicSchema resource.
-type DynamicSchemaHandler func(string, *v3.DynamicSchema) (*v3.DynamicSchema, error)
-
-// DynamicSchemaIndexer computes a set of indexed values for the provided object.
-type DynamicSchemaIndexer func(obj *v3.DynamicSchema) ([]string, error)
-
-// DynamicSchemaGenericController wraps wrangler/pkg/generic.NonNamespacedController so that the function definitions adhere to DynamicSchemaController interface.
-type DynamicSchemaGenericController struct {
-	generic.NonNamespacedControllerInterface[*v3.DynamicSchema, *v3.DynamicSchemaList]
-}
-
-// OnChange runs the given resource handler when the controller detects a resource was changed.
-func (c *DynamicSchemaGenericController) OnChange(ctx context.Context, name string, sync DynamicSchemaHandler) {
-	c.NonNamespacedControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.DynamicSchema](sync))
-}
-
-// OnRemove runs the given object handler when the controller detects a resource was changed.
-func (c *DynamicSchemaGenericController) OnRemove(ctx context.Context, name string, sync DynamicSchemaHandler) {
-	c.NonNamespacedControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.DynamicSchema](sync))
-}
-
-// Cache returns a cache of resources in memory.
-func (c *DynamicSchemaGenericController) Cache() DynamicSchemaCache {
-	return &DynamicSchemaGenericCache{
-		c.NonNamespacedControllerInterface.Cache(),
-	}
-}
-
-// DynamicSchemaGenericCache wraps wrangler/pkg/generic.NonNamespacedCache so the function definitions adhere to DynamicSchemaCache interface.
-type DynamicSchemaGenericCache struct {
 	generic.NonNamespacedCacheInterface[*v3.DynamicSchema]
-}
-
-// AddIndexer adds  a new Indexer to the cache with the provided name.
-// If you call this after you already have data in the store, the results are undefined.
-func (c DynamicSchemaGenericCache) AddIndexer(indexName string, indexer DynamicSchemaIndexer) {
-	c.NonNamespacedCacheInterface.AddIndexer(indexName, generic.Indexer[*v3.DynamicSchema](indexer))
 }
 
 type DynamicSchemaStatusHandler func(obj *v3.DynamicSchema, status v3.DynamicSchemaStatus) (v3.DynamicSchemaStatus, error)
 
 type DynamicSchemaGeneratingHandler func(obj *v3.DynamicSchema, status v3.DynamicSchemaStatus) ([]runtime.Object, v3.DynamicSchemaStatus, error)
-
-func FromDynamicSchemaHandlerToHandler(sync DynamicSchemaHandler) generic.Handler {
-	return generic.FromObjectHandlerToHandler(generic.ObjectHandler[*v3.DynamicSchema](sync))
-}
 
 func RegisterDynamicSchemaStatusHandler(ctx context.Context, controller DynamicSchemaController, condition condition.Cond, name string, handler DynamicSchemaStatusHandler) {
 	statusHandler := &dynamicSchemaStatusHandler{
@@ -155,7 +58,7 @@ func RegisterDynamicSchemaStatusHandler(ctx context.Context, controller DynamicS
 		condition: condition,
 		handler:   handler,
 	}
-	controller.AddGenericHandler(ctx, name, FromDynamicSchemaHandlerToHandler(statusHandler.sync))
+	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
 }
 
 func RegisterDynamicSchemaGeneratingHandler(ctx context.Context, controller DynamicSchemaController, apply apply.Apply,

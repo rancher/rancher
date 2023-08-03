@@ -29,125 +29,28 @@ import (
 	"github.com/rancher/wrangler/pkg/kv"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/watch"
 )
 
 // ManagedChartController interface for managing ManagedChart resources.
 type ManagedChartController interface {
-	generic.ControllerMeta
-	ManagedChartClient
-
-	// OnChange runs the given handler when the controller detects a resource was changed.
-	OnChange(ctx context.Context, name string, sync ManagedChartHandler)
-
-	// OnRemove runs the given handler when the controller detects a resource was changed.
-	OnRemove(ctx context.Context, name string, sync ManagedChartHandler)
-
-	// Enqueue adds the resource with the given name to the worker queue of the controller.
-	Enqueue(namespace, name string)
-
-	// EnqueueAfter runs Enqueue after the provided duration.
-	EnqueueAfter(namespace, name string, duration time.Duration)
-
-	// Cache returns a cache for the resource type T.
-	Cache() ManagedChartCache
+	generic.ControllerInterface[*v3.ManagedChart, *v3.ManagedChartList]
 }
 
 // ManagedChartClient interface for managing ManagedChart resources in Kubernetes.
 type ManagedChartClient interface {
-	// Create creates a new object and return the newly created Object or an error.
-	Create(*v3.ManagedChart) (*v3.ManagedChart, error)
-
-	// Update updates the object and return the newly updated Object or an error.
-	Update(*v3.ManagedChart) (*v3.ManagedChart, error)
-	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
-	// Will always return an error if the object does not have a status field.
-	UpdateStatus(*v3.ManagedChart) (*v3.ManagedChart, error)
-
-	// Delete deletes the Object in the given name.
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-
-	// Get will attempt to retrieve the resource with the specified name.
-	Get(namespace, name string, options metav1.GetOptions) (*v3.ManagedChart, error)
-
-	// List will attempt to find multiple resources.
-	List(namespace string, opts metav1.ListOptions) (*v3.ManagedChartList, error)
-
-	// Watch will start watching resources.
-	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
-
-	// Patch will patch the resource with the matching name.
-	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.ManagedChart, err error)
+	generic.ClientInterface[*v3.ManagedChart, *v3.ManagedChartList]
 }
 
 // ManagedChartCache interface for retrieving ManagedChart resources in memory.
 type ManagedChartCache interface {
-	// Get returns the resources with the specified name from the cache.
-	Get(namespace, name string) (*v3.ManagedChart, error)
-
-	// List will attempt to find resources from the Cache.
-	List(namespace string, selector labels.Selector) ([]*v3.ManagedChart, error)
-
-	// AddIndexer adds  a new Indexer to the cache with the provided name.
-	// If you call this after you already have data in the store, the results are undefined.
-	AddIndexer(indexName string, indexer ManagedChartIndexer)
-
-	// GetByIndex returns the stored objects whose set of indexed values
-	// for the named index includes the given indexed value.
-	GetByIndex(indexName, key string) ([]*v3.ManagedChart, error)
-}
-
-// ManagedChartHandler is function for performing any potential modifications to a ManagedChart resource.
-type ManagedChartHandler func(string, *v3.ManagedChart) (*v3.ManagedChart, error)
-
-// ManagedChartIndexer computes a set of indexed values for the provided object.
-type ManagedChartIndexer func(obj *v3.ManagedChart) ([]string, error)
-
-// ManagedChartGenericController wraps wrangler/pkg/generic.Controller so that the function definitions adhere to ManagedChartController interface.
-type ManagedChartGenericController struct {
-	generic.ControllerInterface[*v3.ManagedChart, *v3.ManagedChartList]
-}
-
-// OnChange runs the given resource handler when the controller detects a resource was changed.
-func (c *ManagedChartGenericController) OnChange(ctx context.Context, name string, sync ManagedChartHandler) {
-	c.ControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.ManagedChart](sync))
-}
-
-// OnRemove runs the given object handler when the controller detects a resource was changed.
-func (c *ManagedChartGenericController) OnRemove(ctx context.Context, name string, sync ManagedChartHandler) {
-	c.ControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.ManagedChart](sync))
-}
-
-// Cache returns a cache of resources in memory.
-func (c *ManagedChartGenericController) Cache() ManagedChartCache {
-	return &ManagedChartGenericCache{
-		c.ControllerInterface.Cache(),
-	}
-}
-
-// ManagedChartGenericCache wraps wrangler/pkg/generic.Cache so the function definitions adhere to ManagedChartCache interface.
-type ManagedChartGenericCache struct {
 	generic.CacheInterface[*v3.ManagedChart]
-}
-
-// AddIndexer adds  a new Indexer to the cache with the provided name.
-// If you call this after you already have data in the store, the results are undefined.
-func (c ManagedChartGenericCache) AddIndexer(indexName string, indexer ManagedChartIndexer) {
-	c.CacheInterface.AddIndexer(indexName, generic.Indexer[*v3.ManagedChart](indexer))
 }
 
 type ManagedChartStatusHandler func(obj *v3.ManagedChart, status v3.ManagedChartStatus) (v3.ManagedChartStatus, error)
 
 type ManagedChartGeneratingHandler func(obj *v3.ManagedChart, status v3.ManagedChartStatus) ([]runtime.Object, v3.ManagedChartStatus, error)
-
-func FromManagedChartHandlerToHandler(sync ManagedChartHandler) generic.Handler {
-	return generic.FromObjectHandlerToHandler(generic.ObjectHandler[*v3.ManagedChart](sync))
-}
 
 func RegisterManagedChartStatusHandler(ctx context.Context, controller ManagedChartController, condition condition.Cond, name string, handler ManagedChartStatusHandler) {
 	statusHandler := &managedChartStatusHandler{
@@ -155,7 +58,7 @@ func RegisterManagedChartStatusHandler(ctx context.Context, controller ManagedCh
 		condition: condition,
 		handler:   handler,
 	}
-	controller.AddGenericHandler(ctx, name, FromManagedChartHandlerToHandler(statusHandler.sync))
+	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
 }
 
 func RegisterManagedChartGeneratingHandler(ctx context.Context, controller ManagedChartController, apply apply.Apply,

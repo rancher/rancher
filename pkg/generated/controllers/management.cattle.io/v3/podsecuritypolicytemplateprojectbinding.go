@@ -19,114 +19,21 @@ limitations under the License.
 package v3
 
 import (
-	"context"
-	"time"
-
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/wrangler/pkg/generic"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/watch"
 )
 
 // PodSecurityPolicyTemplateProjectBindingController interface for managing PodSecurityPolicyTemplateProjectBinding resources.
 type PodSecurityPolicyTemplateProjectBindingController interface {
-	generic.ControllerMeta
-	PodSecurityPolicyTemplateProjectBindingClient
-
-	// OnChange runs the given handler when the controller detects a resource was changed.
-	OnChange(ctx context.Context, name string, sync PodSecurityPolicyTemplateProjectBindingHandler)
-
-	// OnRemove runs the given handler when the controller detects a resource was changed.
-	OnRemove(ctx context.Context, name string, sync PodSecurityPolicyTemplateProjectBindingHandler)
-
-	// Enqueue adds the resource with the given name to the worker queue of the controller.
-	Enqueue(namespace, name string)
-
-	// EnqueueAfter runs Enqueue after the provided duration.
-	EnqueueAfter(namespace, name string, duration time.Duration)
-
-	// Cache returns a cache for the resource type T.
-	Cache() PodSecurityPolicyTemplateProjectBindingCache
+	generic.ControllerInterface[*v3.PodSecurityPolicyTemplateProjectBinding, *v3.PodSecurityPolicyTemplateProjectBindingList]
 }
 
 // PodSecurityPolicyTemplateProjectBindingClient interface for managing PodSecurityPolicyTemplateProjectBinding resources in Kubernetes.
 type PodSecurityPolicyTemplateProjectBindingClient interface {
-	// Create creates a new object and return the newly created Object or an error.
-	Create(*v3.PodSecurityPolicyTemplateProjectBinding) (*v3.PodSecurityPolicyTemplateProjectBinding, error)
-
-	// Update updates the object and return the newly updated Object or an error.
-	Update(*v3.PodSecurityPolicyTemplateProjectBinding) (*v3.PodSecurityPolicyTemplateProjectBinding, error)
-
-	// Delete deletes the Object in the given name.
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-
-	// Get will attempt to retrieve the resource with the specified name.
-	Get(namespace, name string, options metav1.GetOptions) (*v3.PodSecurityPolicyTemplateProjectBinding, error)
-
-	// List will attempt to find multiple resources.
-	List(namespace string, opts metav1.ListOptions) (*v3.PodSecurityPolicyTemplateProjectBindingList, error)
-
-	// Watch will start watching resources.
-	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
-
-	// Patch will patch the resource with the matching name.
-	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.PodSecurityPolicyTemplateProjectBinding, err error)
+	generic.ClientInterface[*v3.PodSecurityPolicyTemplateProjectBinding, *v3.PodSecurityPolicyTemplateProjectBindingList]
 }
 
 // PodSecurityPolicyTemplateProjectBindingCache interface for retrieving PodSecurityPolicyTemplateProjectBinding resources in memory.
 type PodSecurityPolicyTemplateProjectBindingCache interface {
-	// Get returns the resources with the specified name from the cache.
-	Get(namespace, name string) (*v3.PodSecurityPolicyTemplateProjectBinding, error)
-
-	// List will attempt to find resources from the Cache.
-	List(namespace string, selector labels.Selector) ([]*v3.PodSecurityPolicyTemplateProjectBinding, error)
-
-	// AddIndexer adds  a new Indexer to the cache with the provided name.
-	// If you call this after you already have data in the store, the results are undefined.
-	AddIndexer(indexName string, indexer PodSecurityPolicyTemplateProjectBindingIndexer)
-
-	// GetByIndex returns the stored objects whose set of indexed values
-	// for the named index includes the given indexed value.
-	GetByIndex(indexName, key string) ([]*v3.PodSecurityPolicyTemplateProjectBinding, error)
-}
-
-// PodSecurityPolicyTemplateProjectBindingHandler is function for performing any potential modifications to a PodSecurityPolicyTemplateProjectBinding resource.
-type PodSecurityPolicyTemplateProjectBindingHandler func(string, *v3.PodSecurityPolicyTemplateProjectBinding) (*v3.PodSecurityPolicyTemplateProjectBinding, error)
-
-// PodSecurityPolicyTemplateProjectBindingIndexer computes a set of indexed values for the provided object.
-type PodSecurityPolicyTemplateProjectBindingIndexer func(obj *v3.PodSecurityPolicyTemplateProjectBinding) ([]string, error)
-
-// PodSecurityPolicyTemplateProjectBindingGenericController wraps wrangler/pkg/generic.Controller so that the function definitions adhere to PodSecurityPolicyTemplateProjectBindingController interface.
-type PodSecurityPolicyTemplateProjectBindingGenericController struct {
-	generic.ControllerInterface[*v3.PodSecurityPolicyTemplateProjectBinding, *v3.PodSecurityPolicyTemplateProjectBindingList]
-}
-
-// OnChange runs the given resource handler when the controller detects a resource was changed.
-func (c *PodSecurityPolicyTemplateProjectBindingGenericController) OnChange(ctx context.Context, name string, sync PodSecurityPolicyTemplateProjectBindingHandler) {
-	c.ControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.PodSecurityPolicyTemplateProjectBinding](sync))
-}
-
-// OnRemove runs the given object handler when the controller detects a resource was changed.
-func (c *PodSecurityPolicyTemplateProjectBindingGenericController) OnRemove(ctx context.Context, name string, sync PodSecurityPolicyTemplateProjectBindingHandler) {
-	c.ControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.PodSecurityPolicyTemplateProjectBinding](sync))
-}
-
-// Cache returns a cache of resources in memory.
-func (c *PodSecurityPolicyTemplateProjectBindingGenericController) Cache() PodSecurityPolicyTemplateProjectBindingCache {
-	return &PodSecurityPolicyTemplateProjectBindingGenericCache{
-		c.ControllerInterface.Cache(),
-	}
-}
-
-// PodSecurityPolicyTemplateProjectBindingGenericCache wraps wrangler/pkg/generic.Cache so the function definitions adhere to PodSecurityPolicyTemplateProjectBindingCache interface.
-type PodSecurityPolicyTemplateProjectBindingGenericCache struct {
 	generic.CacheInterface[*v3.PodSecurityPolicyTemplateProjectBinding]
-}
-
-// AddIndexer adds  a new Indexer to the cache with the provided name.
-// If you call this after you already have data in the store, the results are undefined.
-func (c PodSecurityPolicyTemplateProjectBindingGenericCache) AddIndexer(indexName string, indexer PodSecurityPolicyTemplateProjectBindingIndexer) {
-	c.CacheInterface.AddIndexer(indexName, generic.Indexer[*v3.PodSecurityPolicyTemplateProjectBinding](indexer))
 }

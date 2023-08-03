@@ -19,114 +19,21 @@ limitations under the License.
 package v3
 
 import (
-	"context"
-	"time"
-
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/wrangler/pkg/generic"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/watch"
 )
 
 // AzureADProviderController interface for managing AzureADProvider resources.
 type AzureADProviderController interface {
-	generic.ControllerMeta
-	AzureADProviderClient
-
-	// OnChange runs the given handler when the controller detects a resource was changed.
-	OnChange(ctx context.Context, name string, sync AzureADProviderHandler)
-
-	// OnRemove runs the given handler when the controller detects a resource was changed.
-	OnRemove(ctx context.Context, name string, sync AzureADProviderHandler)
-
-	// Enqueue adds the resource with the given name to the worker queue of the controller.
-	Enqueue(name string)
-
-	// EnqueueAfter runs Enqueue after the provided duration.
-	EnqueueAfter(name string, duration time.Duration)
-
-	// Cache returns a cache for the resource type T.
-	Cache() AzureADProviderCache
+	generic.NonNamespacedControllerInterface[*v3.AzureADProvider, *v3.AzureADProviderList]
 }
 
 // AzureADProviderClient interface for managing AzureADProvider resources in Kubernetes.
 type AzureADProviderClient interface {
-	// Create creates a new object and return the newly created Object or an error.
-	Create(*v3.AzureADProvider) (*v3.AzureADProvider, error)
-
-	// Update updates the object and return the newly updated Object or an error.
-	Update(*v3.AzureADProvider) (*v3.AzureADProvider, error)
-
-	// Delete deletes the Object in the given name.
-	Delete(name string, options *metav1.DeleteOptions) error
-
-	// Get will attempt to retrieve the resource with the specified name.
-	Get(name string, options metav1.GetOptions) (*v3.AzureADProvider, error)
-
-	// List will attempt to find multiple resources.
-	List(opts metav1.ListOptions) (*v3.AzureADProviderList, error)
-
-	// Watch will start watching resources.
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	// Patch will patch the resource with the matching name.
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.AzureADProvider, err error)
+	generic.NonNamespacedClientInterface[*v3.AzureADProvider, *v3.AzureADProviderList]
 }
 
 // AzureADProviderCache interface for retrieving AzureADProvider resources in memory.
 type AzureADProviderCache interface {
-	// Get returns the resources with the specified name from the cache.
-	Get(name string) (*v3.AzureADProvider, error)
-
-	// List will attempt to find resources from the Cache.
-	List(selector labels.Selector) ([]*v3.AzureADProvider, error)
-
-	// AddIndexer adds  a new Indexer to the cache with the provided name.
-	// If you call this after you already have data in the store, the results are undefined.
-	AddIndexer(indexName string, indexer AzureADProviderIndexer)
-
-	// GetByIndex returns the stored objects whose set of indexed values
-	// for the named index includes the given indexed value.
-	GetByIndex(indexName, key string) ([]*v3.AzureADProvider, error)
-}
-
-// AzureADProviderHandler is function for performing any potential modifications to a AzureADProvider resource.
-type AzureADProviderHandler func(string, *v3.AzureADProvider) (*v3.AzureADProvider, error)
-
-// AzureADProviderIndexer computes a set of indexed values for the provided object.
-type AzureADProviderIndexer func(obj *v3.AzureADProvider) ([]string, error)
-
-// AzureADProviderGenericController wraps wrangler/pkg/generic.NonNamespacedController so that the function definitions adhere to AzureADProviderController interface.
-type AzureADProviderGenericController struct {
-	generic.NonNamespacedControllerInterface[*v3.AzureADProvider, *v3.AzureADProviderList]
-}
-
-// OnChange runs the given resource handler when the controller detects a resource was changed.
-func (c *AzureADProviderGenericController) OnChange(ctx context.Context, name string, sync AzureADProviderHandler) {
-	c.NonNamespacedControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.AzureADProvider](sync))
-}
-
-// OnRemove runs the given object handler when the controller detects a resource was changed.
-func (c *AzureADProviderGenericController) OnRemove(ctx context.Context, name string, sync AzureADProviderHandler) {
-	c.NonNamespacedControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.AzureADProvider](sync))
-}
-
-// Cache returns a cache of resources in memory.
-func (c *AzureADProviderGenericController) Cache() AzureADProviderCache {
-	return &AzureADProviderGenericCache{
-		c.NonNamespacedControllerInterface.Cache(),
-	}
-}
-
-// AzureADProviderGenericCache wraps wrangler/pkg/generic.NonNamespacedCache so the function definitions adhere to AzureADProviderCache interface.
-type AzureADProviderGenericCache struct {
 	generic.NonNamespacedCacheInterface[*v3.AzureADProvider]
-}
-
-// AddIndexer adds  a new Indexer to the cache with the provided name.
-// If you call this after you already have data in the store, the results are undefined.
-func (c AzureADProviderGenericCache) AddIndexer(indexName string, indexer AzureADProviderIndexer) {
-	c.NonNamespacedCacheInterface.AddIndexer(indexName, generic.Indexer[*v3.AzureADProvider](indexer))
 }

@@ -19,114 +19,21 @@ limitations under the License.
 package v3
 
 import (
-	"context"
-	"time"
-
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/wrangler/pkg/generic"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/watch"
 )
 
 // UserAttributeController interface for managing UserAttribute resources.
 type UserAttributeController interface {
-	generic.ControllerMeta
-	UserAttributeClient
-
-	// OnChange runs the given handler when the controller detects a resource was changed.
-	OnChange(ctx context.Context, name string, sync UserAttributeHandler)
-
-	// OnRemove runs the given handler when the controller detects a resource was changed.
-	OnRemove(ctx context.Context, name string, sync UserAttributeHandler)
-
-	// Enqueue adds the resource with the given name to the worker queue of the controller.
-	Enqueue(name string)
-
-	// EnqueueAfter runs Enqueue after the provided duration.
-	EnqueueAfter(name string, duration time.Duration)
-
-	// Cache returns a cache for the resource type T.
-	Cache() UserAttributeCache
+	generic.NonNamespacedControllerInterface[*v3.UserAttribute, *v3.UserAttributeList]
 }
 
 // UserAttributeClient interface for managing UserAttribute resources in Kubernetes.
 type UserAttributeClient interface {
-	// Create creates a new object and return the newly created Object or an error.
-	Create(*v3.UserAttribute) (*v3.UserAttribute, error)
-
-	// Update updates the object and return the newly updated Object or an error.
-	Update(*v3.UserAttribute) (*v3.UserAttribute, error)
-
-	// Delete deletes the Object in the given name.
-	Delete(name string, options *metav1.DeleteOptions) error
-
-	// Get will attempt to retrieve the resource with the specified name.
-	Get(name string, options metav1.GetOptions) (*v3.UserAttribute, error)
-
-	// List will attempt to find multiple resources.
-	List(opts metav1.ListOptions) (*v3.UserAttributeList, error)
-
-	// Watch will start watching resources.
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	// Patch will patch the resource with the matching name.
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.UserAttribute, err error)
+	generic.NonNamespacedClientInterface[*v3.UserAttribute, *v3.UserAttributeList]
 }
 
 // UserAttributeCache interface for retrieving UserAttribute resources in memory.
 type UserAttributeCache interface {
-	// Get returns the resources with the specified name from the cache.
-	Get(name string) (*v3.UserAttribute, error)
-
-	// List will attempt to find resources from the Cache.
-	List(selector labels.Selector) ([]*v3.UserAttribute, error)
-
-	// AddIndexer adds  a new Indexer to the cache with the provided name.
-	// If you call this after you already have data in the store, the results are undefined.
-	AddIndexer(indexName string, indexer UserAttributeIndexer)
-
-	// GetByIndex returns the stored objects whose set of indexed values
-	// for the named index includes the given indexed value.
-	GetByIndex(indexName, key string) ([]*v3.UserAttribute, error)
-}
-
-// UserAttributeHandler is function for performing any potential modifications to a UserAttribute resource.
-type UserAttributeHandler func(string, *v3.UserAttribute) (*v3.UserAttribute, error)
-
-// UserAttributeIndexer computes a set of indexed values for the provided object.
-type UserAttributeIndexer func(obj *v3.UserAttribute) ([]string, error)
-
-// UserAttributeGenericController wraps wrangler/pkg/generic.NonNamespacedController so that the function definitions adhere to UserAttributeController interface.
-type UserAttributeGenericController struct {
-	generic.NonNamespacedControllerInterface[*v3.UserAttribute, *v3.UserAttributeList]
-}
-
-// OnChange runs the given resource handler when the controller detects a resource was changed.
-func (c *UserAttributeGenericController) OnChange(ctx context.Context, name string, sync UserAttributeHandler) {
-	c.NonNamespacedControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.UserAttribute](sync))
-}
-
-// OnRemove runs the given object handler when the controller detects a resource was changed.
-func (c *UserAttributeGenericController) OnRemove(ctx context.Context, name string, sync UserAttributeHandler) {
-	c.NonNamespacedControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.UserAttribute](sync))
-}
-
-// Cache returns a cache of resources in memory.
-func (c *UserAttributeGenericController) Cache() UserAttributeCache {
-	return &UserAttributeGenericCache{
-		c.NonNamespacedControllerInterface.Cache(),
-	}
-}
-
-// UserAttributeGenericCache wraps wrangler/pkg/generic.NonNamespacedCache so the function definitions adhere to UserAttributeCache interface.
-type UserAttributeGenericCache struct {
 	generic.NonNamespacedCacheInterface[*v3.UserAttribute]
-}
-
-// AddIndexer adds  a new Indexer to the cache with the provided name.
-// If you call this after you already have data in the store, the results are undefined.
-func (c UserAttributeGenericCache) AddIndexer(indexName string, indexer UserAttributeIndexer) {
-	c.NonNamespacedCacheInterface.AddIndexer(indexName, generic.Indexer[*v3.UserAttribute](indexer))
 }

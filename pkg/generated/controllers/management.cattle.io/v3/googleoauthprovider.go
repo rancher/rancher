@@ -19,114 +19,21 @@ limitations under the License.
 package v3
 
 import (
-	"context"
-	"time"
-
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/wrangler/pkg/generic"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/watch"
 )
 
 // GoogleOAuthProviderController interface for managing GoogleOAuthProvider resources.
 type GoogleOAuthProviderController interface {
-	generic.ControllerMeta
-	GoogleOAuthProviderClient
-
-	// OnChange runs the given handler when the controller detects a resource was changed.
-	OnChange(ctx context.Context, name string, sync GoogleOAuthProviderHandler)
-
-	// OnRemove runs the given handler when the controller detects a resource was changed.
-	OnRemove(ctx context.Context, name string, sync GoogleOAuthProviderHandler)
-
-	// Enqueue adds the resource with the given name to the worker queue of the controller.
-	Enqueue(name string)
-
-	// EnqueueAfter runs Enqueue after the provided duration.
-	EnqueueAfter(name string, duration time.Duration)
-
-	// Cache returns a cache for the resource type T.
-	Cache() GoogleOAuthProviderCache
+	generic.NonNamespacedControllerInterface[*v3.GoogleOAuthProvider, *v3.GoogleOAuthProviderList]
 }
 
 // GoogleOAuthProviderClient interface for managing GoogleOAuthProvider resources in Kubernetes.
 type GoogleOAuthProviderClient interface {
-	// Create creates a new object and return the newly created Object or an error.
-	Create(*v3.GoogleOAuthProvider) (*v3.GoogleOAuthProvider, error)
-
-	// Update updates the object and return the newly updated Object or an error.
-	Update(*v3.GoogleOAuthProvider) (*v3.GoogleOAuthProvider, error)
-
-	// Delete deletes the Object in the given name.
-	Delete(name string, options *metav1.DeleteOptions) error
-
-	// Get will attempt to retrieve the resource with the specified name.
-	Get(name string, options metav1.GetOptions) (*v3.GoogleOAuthProvider, error)
-
-	// List will attempt to find multiple resources.
-	List(opts metav1.ListOptions) (*v3.GoogleOAuthProviderList, error)
-
-	// Watch will start watching resources.
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	// Patch will patch the resource with the matching name.
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.GoogleOAuthProvider, err error)
+	generic.NonNamespacedClientInterface[*v3.GoogleOAuthProvider, *v3.GoogleOAuthProviderList]
 }
 
 // GoogleOAuthProviderCache interface for retrieving GoogleOAuthProvider resources in memory.
 type GoogleOAuthProviderCache interface {
-	// Get returns the resources with the specified name from the cache.
-	Get(name string) (*v3.GoogleOAuthProvider, error)
-
-	// List will attempt to find resources from the Cache.
-	List(selector labels.Selector) ([]*v3.GoogleOAuthProvider, error)
-
-	// AddIndexer adds  a new Indexer to the cache with the provided name.
-	// If you call this after you already have data in the store, the results are undefined.
-	AddIndexer(indexName string, indexer GoogleOAuthProviderIndexer)
-
-	// GetByIndex returns the stored objects whose set of indexed values
-	// for the named index includes the given indexed value.
-	GetByIndex(indexName, key string) ([]*v3.GoogleOAuthProvider, error)
-}
-
-// GoogleOAuthProviderHandler is function for performing any potential modifications to a GoogleOAuthProvider resource.
-type GoogleOAuthProviderHandler func(string, *v3.GoogleOAuthProvider) (*v3.GoogleOAuthProvider, error)
-
-// GoogleOAuthProviderIndexer computes a set of indexed values for the provided object.
-type GoogleOAuthProviderIndexer func(obj *v3.GoogleOAuthProvider) ([]string, error)
-
-// GoogleOAuthProviderGenericController wraps wrangler/pkg/generic.NonNamespacedController so that the function definitions adhere to GoogleOAuthProviderController interface.
-type GoogleOAuthProviderGenericController struct {
-	generic.NonNamespacedControllerInterface[*v3.GoogleOAuthProvider, *v3.GoogleOAuthProviderList]
-}
-
-// OnChange runs the given resource handler when the controller detects a resource was changed.
-func (c *GoogleOAuthProviderGenericController) OnChange(ctx context.Context, name string, sync GoogleOAuthProviderHandler) {
-	c.NonNamespacedControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v3.GoogleOAuthProvider](sync))
-}
-
-// OnRemove runs the given object handler when the controller detects a resource was changed.
-func (c *GoogleOAuthProviderGenericController) OnRemove(ctx context.Context, name string, sync GoogleOAuthProviderHandler) {
-	c.NonNamespacedControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v3.GoogleOAuthProvider](sync))
-}
-
-// Cache returns a cache of resources in memory.
-func (c *GoogleOAuthProviderGenericController) Cache() GoogleOAuthProviderCache {
-	return &GoogleOAuthProviderGenericCache{
-		c.NonNamespacedControllerInterface.Cache(),
-	}
-}
-
-// GoogleOAuthProviderGenericCache wraps wrangler/pkg/generic.NonNamespacedCache so the function definitions adhere to GoogleOAuthProviderCache interface.
-type GoogleOAuthProviderGenericCache struct {
 	generic.NonNamespacedCacheInterface[*v3.GoogleOAuthProvider]
-}
-
-// AddIndexer adds  a new Indexer to the cache with the provided name.
-// If you call this after you already have data in the store, the results are undefined.
-func (c GoogleOAuthProviderGenericCache) AddIndexer(indexName string, indexer GoogleOAuthProviderIndexer) {
-	c.NonNamespacedCacheInterface.AddIndexer(indexName, generic.Indexer[*v3.GoogleOAuthProvider](indexer))
 }

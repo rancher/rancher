@@ -45,7 +45,5 @@ type version struct {
 }
 
 func (v *version) Cluster() ClusterController {
-	return &ClusterGenericController{
-		generic.NewController[*v1.Cluster, *v1.ClusterList](schema.GroupVersionKind{Group: "provisioning.cattle.io", Version: "v1", Kind: "Cluster"}, "clusters", true, v.controllerFactory),
-	}
+	return generic.NewController[*v1.Cluster, *v1.ClusterList](schema.GroupVersionKind{Group: "provisioning.cattle.io", Version: "v1", Kind: "Cluster"}, "clusters", true, v.controllerFactory)
 }
