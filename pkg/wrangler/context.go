@@ -22,6 +22,7 @@ import (
 	provisioningv1api "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1api "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/catalogv2/content"
+	helmcfg "github.com/rancher/rancher/pkg/catalogv2/helm"
 	"github.com/rancher/rancher/pkg/catalogv2/helmop"
 	"github.com/rancher/rancher/pkg/catalogv2/system"
 	"github.com/rancher/rancher/pkg/controllers"
@@ -386,9 +387,10 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		CachedDiscovery: cache,
 		RESTMapper:      restMapper,
 	}
+	helmClient := helmcfg.NewClient(restClientGetter)
 
-	systemCharts, err := system.NewManager(ctx, restClientGetter, content, helmop, core.Core().V1().Pod(),
-		mgmt.Management().V3().Setting(), ctlg.Catalog().V1().ClusterRepo())
+	systemCharts, err := system.NewManager(ctx, content, helmop, core.Core().V1().Pod(),
+		mgmt.Management().V3().Setting(), ctlg.Catalog().V1().ClusterRepo(), helmClient)
 	if err != nil {
 		return nil, err
 	}
