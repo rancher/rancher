@@ -244,6 +244,10 @@ func (r *Rancher) Start(ctx context.Context) error {
 			return err
 		}
 
+		if err := migrateCAPIKubeconfigs(r.Wrangler); err != nil {
+			return fmt.Errorf("running capi kubeconfig migration: %w", err)
+		}
+
 		return forceUpgradeLogout(r.Wrangler.Core.ConfigMap(), r.Wrangler.Mgmt.Token(), "v2.6.0")
 	})
 

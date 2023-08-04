@@ -35,6 +35,8 @@ const (
 
 	hashFormat = "$%d:%s:%s" // $version:salt:hash -> $1:abc:def
 	Version    = 2
+
+	ClusterLabelName = "cluster.x-k8s.io/cluster-name"
 )
 
 type Manager struct {
@@ -288,6 +290,9 @@ func (m *Manager) getKubeConfigData(cluster *v1.Cluster, secretName, managementC
 				Name:       cluster.Name,
 				UID:        cluster.UID,
 			}},
+			Labels: map[string]string{
+				ClusterLabelName: cluster.Name,
+			},
 		},
 		Data: map[string][]byte{
 			"value": data,
