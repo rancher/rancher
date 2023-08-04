@@ -451,8 +451,7 @@ func IterateWhitelistedEnvVars(handler func(name, value string)) {
 }
 
 // GetMachineProvisionImagePullPolicy will return the pull policy to be used on MachineProvisioning job.
-//
-//	If an invalid value is set it will return the default value v1.PullAlways
+// If an invalid value is set it will return the default value: v1.PullAlways
 func GetMachineProvisionImagePullPolicy() v1.PullPolicy {
 	switch v1.PullPolicy(MachineProvisionImagePullPolicy.Get()) {
 	case v1.PullAlways:
