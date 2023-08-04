@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"strconv"
 	"sync"
 	"time"
@@ -15,6 +14,8 @@ import (
 	"github.com/rancher/rancher/pkg/api/steve/catalog/types"
 	catalog "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/catalogv2/content"
+	"github.com/rancher/rancher/pkg/catalogv2/helmop"
 	catalogcontrollers "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
@@ -30,6 +31,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 )
 
 var (
@@ -56,23 +58,11 @@ type desired struct {
 	forceAdopt bool
 }
 
-type HelmClient interface {
-	ListReleases(namespace, name string, stateMask action.ListStates) ([]*release.Release, error)
-}
-
-type OperationClient interface {
-	Upgrade(ctx context.Context, user user.Info, namespace, name string, options io.Reader, imageOverride string) (*catalog.Operation, error)
-	Uninstall(ctx context.Context, user user.Info, namespace, name string, options io.Reader, imageOverride string) (*catalog.Operation, error)
-}
-
-type ContentClient interface {
-	Index(namespace, name string, skipFilter bool) (*repo.IndexFile, error)
-}
-
 type Manager struct {
 	ctx                   context.Context
-	operation             OperationClient
-	content               ContentClient
+	operation             *helmop.Operations
+	content               *content.Manager
+	restClientGetter      genericclioptions.RESTClientGetter
 	pods                  corecontrollers.PodClient
 	desiredCharts         map[desiredKey]map[string]interface{}
 	sync                  chan desired
@@ -81,21 +71,21 @@ type Manager struct {
 	settings              mgmtcontrollers.SettingController
 	trigger               chan struct{}
 	clusterRepos          catalogcontrollers.ClusterRepoController
-	helmClient            HelmClient
 }
 
 func NewManager(ctx context.Context,
-	contentManager ContentClient,
-	ops OperationClient,
+	restClientGetter genericclioptions.RESTClientGetter,
+	contentManager *content.Manager,
+	ops *helmop.Operations,
 	pods corecontrollers.PodClient,
 	settings mgmtcontrollers.SettingController,
-	clusterRepos catalogcontrollers.ClusterRepoController,
-	helmClient HelmClient) (*Manager, error) {
+	clusterRepos catalogcontrollers.ClusterRepoController) (*Manager, error) {
 
 	m := &Manager{
 		ctx:                   ctx,
 		operation:             ops,
 		content:               contentManager,
+		restClientGetter:      restClientGetter,
 		pods:                  pods,
 		sync:                  make(chan desired, 10),
 		desiredCharts:         map[desiredKey]map[string]interface{}{},
@@ -103,7 +93,6 @@ func NewManager(ctx context.Context,
 		settings:              settings,
 		trigger:               make(chan struct{}, 1),
 		clusterRepos:          clusterRepos,
-		helmClient:            helmClient,
 	}
 
 	return m, nil
@@ -254,6 +243,7 @@ func (m *Manager) install(namespace, name, minVersion, exactVersion string, valu
 	if err != nil {
 		return err
 	}
+
 	v := ">=0-a" // latest - this is special syntax to match everything including pre-releases build
 	var isExact bool
 	if exactVersion != "" {
@@ -264,8 +254,7 @@ func (m *Manager) install(namespace, name, minVersion, exactVersion string, valu
 	// It instead returns the latest version in the index.
 	chart, err := index.Get(name, v)
 	if err != nil {
-		// The helm library is using github.com/pkg/errors which is deprecated
-		return fmt.Errorf(err.Error())
+		return err
 	}
 	// Because of the behavior of `index.Get`, we need this check.
 	if exactVersion != "" && chart.Version != exactVersion {
@@ -375,7 +364,15 @@ func podDone(chart string, newPod *corev1.Pod) (bool, error) {
 }
 
 func (m *Manager) isInstalled(namespace, name, minVersion, desiredVersion string, isExact bool, desiredValue map[string]interface{}) (bool, string, map[string]interface{}, error) {
-	releases, err := m.helmClient.ListReleases(namespace, name, action.ListDeployed)
+	helmcfg := &action.Configuration{}
+	if err := helmcfg.Init(m.restClientGetter, namespace, "", logrus.Infof); err != nil {
+		return false, "", nil, err
+	}
+
+	l := action.NewList(helmcfg)
+	l.Filter = "^" + name + "$"
+
+	releases, err := l.Run()
 	if err != nil {
 		return false, "", nil, err
 	}
@@ -463,7 +460,16 @@ func desiredVersionAndValues(releases []*release.Release, minVersion, desiredVer
 }
 
 func (m *Manager) hasStatus(namespace, name string, stateMask action.ListStates) (bool, error) {
-	releases, err := m.helmClient.ListReleases(namespace, name, stateMask)
+	helmcfg := &action.Configuration{}
+	if err := helmcfg.Init(m.restClientGetter, namespace, "", logrus.Infof); err != nil {
+		return false, err
+	}
+
+	l := action.NewList(helmcfg)
+	l.Filter = "^" + name + "$"
+	l.StateMask = stateMask
+
+	releases, err := l.Run()
 	if err != nil {
 		return false, err
 	}
