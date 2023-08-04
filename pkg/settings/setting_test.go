@@ -3,6 +3,9 @@ package settings
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/sirupsen/logrus"
+	"io"
+	v1 "k8s.io/api/core/v1"
 	"os"
 	"testing"
 
@@ -75,4 +78,43 @@ func TestSystemFeatureChartRefreshSecondsDefault(t *testing.T) {
 		t.Errorf("The System Feature Chart Refresh Seconds of %q is not the expected value %q", got, expect)
 	}
 
+}
+
+func TestGetMachineProvisionImagePullPolicy(t *testing.T) {
+	defalutLogger := logrus.StandardLogger().Out
+	logrus.SetOutput(io.Discard)
+	defer func() {
+		logrus.SetOutput(defalutLogger)
+	}()
+
+	testCases := []struct {
+		settingValue string
+		want         v1.PullPolicy
+	}{
+		{
+			settingValue: "Always",
+			want:         v1.PullAlways,
+		},
+		{
+			settingValue: "Never",
+			want:         v1.PullNever,
+		},
+		{
+			settingValue: "IfNotPresent",
+			want:         v1.PullIfNotPresent,
+		},
+		{
+			settingValue: "wrongValue",
+			want:         v1.PullAlways,
+		},
+	}
+
+	for _, v := range testCases {
+		t.Run(v.settingValue, func(t *testing.T) {
+			if err := MachineProvisionImagePullPolicy.Set(v.settingValue); err != nil {
+				t.Errorf("Failed to test GetMachineProvisionImagePullPolicy(), unable to set the value: %v", err)
+			}
+			assert.Equalf(t, v.want, GetMachineProvisionImagePullPolicy(), fmt.Sprintf("test %s failed with value %s", v.settingValue, v.want))
+		})
+	}
 }
