@@ -103,7 +103,7 @@ func TestProvisioningRKE1CustomCluster(t *testing.T, client *rancher.Client, ext
 	require.NoError(t, err)
 	assert.NotEmpty(t, clusterToken)
 
-	etcdVersion, err := matrix.CheckETCDVersion(client, nodes, rolesPerPool)
+	etcdVersion, err := matrix.CheckETCDVersion(client, nodes, clusterResp.ID)
 	require.NoError(t, err)
 	assert.NotEmpty(t, etcdVersion)
 
