@@ -170,7 +170,7 @@ func GetGroupSearchAttributesForLDAP(ObjectClass string, config *v3.LdapConfig) 
 	return groupSeachAttributes
 }
 
-func AuthenticateServiceAccountUser(serviceAccountPassword string, serviceAccountUsername string, defaultLoginDomain string, lConn *ldapv3.Conn) error {
+func AuthenticateServiceAccountUser(serviceAccountPassword string, serviceAccountUsername string, defaultLoginDomain string, lConn ldapv3.Client) error {
 	logrus.Debug("Binding service account username password")
 	if serviceAccountPassword == "" {
 		return httperror.NewAPIError(httperror.MissingRequired, "service account password not provided")
@@ -245,7 +245,7 @@ func AttributesToPrincipal(attribs []*ldapv3.EntryAttribute, dnStr, scope, provi
 	return principal, nil
 }
 
-func GatherParentGroups(groupPrincipal v3.Principal, searchDomain string, groupScope string, config *ConfigAttributes, lConn *ldapv3.Conn,
+func GatherParentGroups(groupPrincipal v3.Principal, searchDomain string, groupScope string, config *ConfigAttributes, lConn ldapv3.Client,
 	groupMap map[string]bool, nestedGroupPrincipals *[]v3.Principal, searchAttributes []string) error {
 	groupMap[groupPrincipal.ObjectMeta.Name] = true
 	principals := []v3.Principal{}
