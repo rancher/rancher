@@ -81,10 +81,10 @@ func TestSystemFeatureChartRefreshSecondsDefault(t *testing.T) {
 }
 
 func TestGetMachineProvisionImagePullPolicy(t *testing.T) {
-	defalutLogger := logrus.StandardLogger().Out
-	logrus.SetOutput(io.Discard)
+	defaultLogger := logrus.StandardLogger().Out
+	logrus.SetOutput(io.Discard) // Done this way to avoid printing the error message during wrongValue test
 	defer func() {
-		logrus.SetOutput(defalutLogger)
+		logrus.SetOutput(defaultLogger)
 	}()
 
 	testCases := []struct {
