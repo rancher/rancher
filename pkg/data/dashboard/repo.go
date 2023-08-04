@@ -18,7 +18,7 @@ var (
 	prefix = "rancher-"
 )
 
-func addClusterRepo(wrangler *wrangler.Context, repoName, branchName string) error {
+func addRepo(wrangler *wrangler.Context, repoName, branchName string) error {
 	repo, err := wrangler.Catalog.ClusterRepo().Get(repoName, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		_, err = wrangler.Catalog.ClusterRepo().Create(&v1.ClusterRepo{
@@ -38,19 +38,17 @@ func addClusterRepo(wrangler *wrangler.Context, repoName, branchName string) err
 	return err
 }
 
-// addClusterRepos sets up default cluster helm repositories in Rancher.
-// It attempts to add or update the cluster repositories 'rancher-charts', 'rancher-partner-charts',
-// and, if the RKE2 feature is enabled, 'rancher-rke2-charts'.
-func addClusterRepos(ctx context.Context, wrangler *wrangler.Context) error {
-	if err := addClusterRepo(wrangler, "rancher-charts", settings.ChartDefaultBranch.Get()); err != nil {
+// addRepos upserts the rancher-charts, rancher-partner-charts and rancher-rke2-charts ClusterRepos
+func addRepos(ctx context.Context, wrangler *wrangler.Context) error {
+	if err := addRepo(wrangler, "rancher-charts", settings.ChartDefaultBranch.Get()); err != nil {
 		return err
 	}
-	if err := addClusterRepo(wrangler, "rancher-partner-charts", settings.PartnerChartDefaultBranch.Get()); err != nil {
+	if err := addRepo(wrangler, "rancher-partner-charts", settings.PartnerChartDefaultBranch.Get()); err != nil {
 		return err
 	}
 
 	if features.RKE2.Enabled() {
-		if err := addClusterRepo(wrangler, "rancher-rke2-charts", settings.RKE2ChartDefaultBranch.Get()); err != nil {
+		if err := addRepo(wrangler, "rancher-rke2-charts", settings.RKE2ChartDefaultBranch.Get()); err != nil {
 			return err
 		}
 	}
