@@ -13,8 +13,6 @@ import (
 
 	mock "github.com/stretchr/testify/mock"
 
-	rest "k8s.io/client-go/rest"
-
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 
 	time "time"
@@ -22,6 +20,8 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 
 	watch "k8s.io/apimachinery/pkg/watch"
 )
@@ -42,15 +42,15 @@ func (_m *SettingController) AddGenericRemoveHandler(ctx context.Context, name s
 }
 
 // Cache provides a mock function with given fields:
-func (_m *SettingController) Cache() generic.NonNamespacedCacheInterface[*management_cattle_iov3.Setting] {
+func (_m *SettingController) Cache() v3.SettingCache {
 	ret := _m.Called()
 
-	var r0 generic.NonNamespacedCacheInterface[*management_cattle_iov3.Setting]
-	if rf, ok := ret.Get(0).(func() generic.NonNamespacedCacheInterface[*management_cattle_iov3.Setting]); ok {
+	var r0 v3.SettingCache
+	if rf, ok := ret.Get(0).(func() v3.SettingCache); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(generic.NonNamespacedCacheInterface[*management_cattle_iov3.Setting])
+			r0 = ret.Get(0).(v3.SettingCache)
 		}
 	}
 
@@ -190,12 +190,12 @@ func (_m *SettingController) List(opts v1.ListOptions) (*management_cattle_iov3.
 }
 
 // OnChange provides a mock function with given fields: ctx, name, sync
-func (_m *SettingController) OnChange(ctx context.Context, name string, sync generic.ObjectHandler[*management_cattle_iov3.Setting]) {
+func (_m *SettingController) OnChange(ctx context.Context, name string, sync v3.SettingHandler) {
 	_m.Called(ctx, name, sync)
 }
 
 // OnRemove provides a mock function with given fields: ctx, name, sync
-func (_m *SettingController) OnRemove(ctx context.Context, name string, sync generic.ObjectHandler[*management_cattle_iov3.Setting]) {
+func (_m *SettingController) OnRemove(ctx context.Context, name string, sync v3.SettingHandler) {
 	_m.Called(ctx, name, sync)
 }
 
@@ -258,32 +258,6 @@ func (_m *SettingController) Update(_a0 *management_cattle_iov3.Setting) (*manag
 	return r0, r1
 }
 
-// UpdateStatus provides a mock function with given fields: _a0
-func (_m *SettingController) UpdateStatus(_a0 *management_cattle_iov3.Setting) (*management_cattle_iov3.Setting, error) {
-	ret := _m.Called(_a0)
-
-	var r0 *management_cattle_iov3.Setting
-	var r1 error
-	if rf, ok := ret.Get(0).(func(*management_cattle_iov3.Setting) (*management_cattle_iov3.Setting, error)); ok {
-		return rf(_a0)
-	}
-	if rf, ok := ret.Get(0).(func(*management_cattle_iov3.Setting) *management_cattle_iov3.Setting); ok {
-		r0 = rf(_a0)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*management_cattle_iov3.Setting)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(*management_cattle_iov3.Setting) error); ok {
-		r1 = rf(_a0)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // Updater provides a mock function with given fields:
 func (_m *SettingController) Updater() generic.Updater {
 	ret := _m.Called()
@@ -319,32 +293,6 @@ func (_m *SettingController) Watch(opts v1.ListOptions) (watch.Interface, error)
 
 	if rf, ok := ret.Get(1).(func(v1.ListOptions) error); ok {
 		r1 = rf(opts)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// WithImpersonation provides a mock function with given fields: impersonate
-func (_m *SettingController) WithImpersonation(impersonate rest.ImpersonationConfig) (generic.NonNamespacedClientInterface[*management_cattle_iov3.Setting, *management_cattle_iov3.SettingList], error) {
-	ret := _m.Called(impersonate)
-
-	var r0 generic.NonNamespacedClientInterface[*management_cattle_iov3.Setting, *management_cattle_iov3.SettingList]
-	var r1 error
-	if rf, ok := ret.Get(0).(func(rest.ImpersonationConfig) (generic.NonNamespacedClientInterface[*management_cattle_iov3.Setting, *management_cattle_iov3.SettingList], error)); ok {
-		return rf(impersonate)
-	}
-	if rf, ok := ret.Get(0).(func(rest.ImpersonationConfig) generic.NonNamespacedClientInterface[*management_cattle_iov3.Setting, *management_cattle_iov3.SettingList]); ok {
-		r0 = rf(impersonate)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(generic.NonNamespacedClientInterface[*management_cattle_iov3.Setting, *management_cattle_iov3.SettingList])
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(rest.ImpersonationConfig) error); ok {
-		r1 = rf(impersonate)
 	} else {
 		r1 = ret.Error(1)
 	}
