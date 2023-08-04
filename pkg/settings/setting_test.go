@@ -114,7 +114,8 @@ func TestGetMachineProvisionImagePullPolicy(t *testing.T) {
 			if err := MachineProvisionImagePullPolicy.Set(v.settingValue); err != nil {
 				t.Errorf("Failed to test GetMachineProvisionImagePullPolicy(), unable to set the value: %v", err)
 			}
-			assert.Equalf(t, v.want, GetMachineProvisionImagePullPolicy(), fmt.Sprintf("test %s failed with value %s", v.settingValue, v.want))
+			got := GetMachineProvisionImagePullPolicy()
+			assert.Equalf(t, v.want, got, fmt.Sprintf("test GetMachineProvisionImagePullPolicy() case: %s failed with value: %s, expecting: %s", v.settingValue, got, v.want))
 		})
 	}
 }
