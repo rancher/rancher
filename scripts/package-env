@@ -5,6 +5,8 @@ SYSTEM_CHART_REPO_DIR=build/system-charts
 SYSTEM_CHART_DEFAULT_BRANCH=${SYSTEM_CHART_DEFAULT_BRANCH:-"dev-v2.7"}
 CHART_REPO_DIR=build/charts
 CHART_DEFAULT_BRANCH=${CHART_DEFAULT_BRANCH:-"dev-v2.7"}
+CHART_TEST_REPO_DIR=build/charts-small-fork
+CHART_TEST_FIRST_BRANCH=${CHART_TEST_FIRST_BRANCH:-"test-1"}
 
 IMAGE=${REPO}/rancher:${TAG}
 AGENT_IMAGE=${REPO}/rancher-agent:${AGENT_TAG}
@@ -26,3 +28,4 @@ K3S_RELEASE_VERSIONS=$(jq -r '[.k3s.releases[] | select(.serverArgs) | .version]
 K3S_RELEASE_TAGS=( $(echo $K3S_RELEASE_VERSIONS | tr + -) )
 # Prefix image repo and name to tags.
 SYSTEM_AGENT_INSTALLER_K3S_IMAGES=( "${K3S_RELEASE_TAGS[@]/#/${REPO}/system-agent-installer-k3s:}" )
+

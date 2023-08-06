@@ -1,5 +1,6 @@
 package defaults
 
 var (
-	WatchTimeoutSeconds = int64(600) // 10 minutes.
+	QuickWatchTimeoutSeconds = int64(60)  // 1 minute
+	WatchTimeoutSeconds      = int64(600) // 10 minutes.
 )
