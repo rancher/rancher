@@ -105,7 +105,7 @@ require (
 	github.com/prometheus/client_golang v1.15.0
 	github.com/prometheus/client_model v0.3.0
 	github.com/prometheus/common v0.42.0
-	github.com/rancher/aks-operator v1.1.2
+	github.com/rancher/aks-operator v1.1.3-rc1
 	github.com/rancher/apiserver v0.0.0-20230515173455-c3b182bdbf7d
 	github.com/rancher/channelserver v0.5.1-0.20230719220800-0a37b73c7df8
 	github.com/rancher/dynamiclistener v0.3.5
@@ -347,7 +347,7 @@ require (
 	github.com/morikuni/aec v1.0.0 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f // indirect
-	github.com/onsi/gomega v1.27.8 // indirect
+	github.com/onsi/gomega v1.27.10 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.0-rc2 // indirect
 	github.com/opencontainers/runc v1.1.5 // indirect

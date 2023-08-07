@@ -1104,8 +1104,8 @@ github.com/onsi/gomega v1.16.0/go.mod h1:HnhC7FXeEQY45zxNK3PPoIUhzk/80Xly9PcubAl
 github.com/onsi/gomega v1.17.0/go.mod h1:HnhC7FXeEQY45zxNK3PPoIUhzk/80Xly9PcubAlGdZY=
 github.com/onsi/gomega v1.19.0/go.mod h1:LY+I3pBVzYsTBU1AnDwOSxaYi9WoWiqgwooUqq9yPro=
 github.com/onsi/gomega v1.20.1/go.mod h1:DtrZpjmvpn2mPm4YWQa0/ALMDj9v4YxLgojwPeREyVo=
-github.com/onsi/gomega v1.27.8 h1:gegWiwZjBsf2DgiSbf5hpokZ98JVDMcWkUiigk6/KXc=
-github.com/onsi/gomega v1.27.8/go.mod h1:2J8vzI/s+2shY9XHRApDkdgPo1TKT7P2u6fXeJKFnNQ=
+github.com/onsi/gomega v1.27.10 h1:naR28SdDFlqrG6kScpT8VWpu1xWY5nJRCF3XaYyBjhI=
+github.com/onsi/gomega v1.27.10/go.mod h1:RsS8tutOdbdgzbPtzzATp12yT7kM5I5aElG3evPbQ0M=
 github.com/opencontainers/go-digest v0.0.0-20180430190053-c9281466c8b2/go.mod h1:cMLVZDEM3+U2I4VmLI6N8jQYUd2OVphdqWwCJHrFt2s=
 github.com/opencontainers/go-digest v1.0.0-rc1/go.mod h1:cMLVZDEM3+U2I4VmLI6N8jQYUd2OVphdqWwCJHrFt2s=
 github.com/opencontainers/go-digest v1.0.0-rc1.0.20180430190053-c9281466c8b2/go.mod h1:cMLVZDEM3+U2I4VmLI6N8jQYUd2OVphdqWwCJHrFt2s=
@@ -1208,8 +1208,8 @@ github.com/prometheus/procfs v0.7.3/go.mod h1:cz+aTbrPOrUb4q7XlbU9ygM+/jj0fzG6c1
 github.com/prometheus/procfs v0.9.0 h1:wzCHvIvM5SxWqYvwgVL7yJY8Lz3PKn49KQtpgMYJfhI=
 github.com/prometheus/procfs v0.9.0/go.mod h1:+pB4zwohETzFnmlpe6yd2lSc+0/46IYZRB/chUwxUZY=
 github.com/prometheus/tsdb v0.7.1/go.mod h1:qhTCs0VvXwvX/y3TZrWD7rabWM+ijKTux40TwIPHuXU=
-github.com/rancher/aks-operator v1.1.2 h1:sMlOp64g3drY5YYqlB1kR6RoR8WtbNsroQlq2liDZi8=
-github.com/rancher/aks-operator v1.1.2/go.mod h1:K42em/NW4hkvpck3XtVSpa7lQRc2spBjZbqx1aSRWhk=
+github.com/rancher/aks-operator v1.1.3-rc1 h1:9AnFNHPlH7wvHoaR/ygYq+AMxkCdaumguph/66k+120=
+github.com/rancher/aks-operator v1.1.3-rc1/go.mod h1:Nax0949fsXlbbozwYQzr10echD8Y78DLP23dzWKpKOQ=
 github.com/rancher/apiserver v0.0.0-20230515173455-c3b182bdbf7d h1:RT8bn3teE6tsYcSRBli1yVINqrETVqiD8e5uqGg8nmc=
 github.com/rancher/apiserver v0.0.0-20230515173455-c3b182bdbf7d/go.mod h1:GSUg2KPauynfyEk9kqeHE5sFa/Zd8ilsmXqSSzqynQQ=
 github.com/rancher/aws-iam-authenticator v0.5.9-0.20220713170329-78acb8c83863 h1:7cVEMgwyiVhLyu/Ywuw58mkkh9cWpFE3+X8IrWncBxU=
