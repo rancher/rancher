@@ -479,6 +479,8 @@ func addUserRules(role *roleBuilder) *roleBuilder {
 		addRule().apiGroups("project.cattle.io").resources("sourcecoderepositories").verbs("*").
 		addRule().apiGroups("provisioning.cattle.io").resources("clusters").verbs("create").
 		addRule().apiGroups("rke-machine-config.cattle.io").resources("*").verbs("create").
+		// these permissions are required for rke2 `force-delete` to work as it's done by adding annotation to machine object
+		addRule().apiGroups("rke-machine.cattle.io").resources("*").verbs("get", "list", "update").
 		addRule().apiGroups("management.cattle.io").resources("rancherusernotifications").verbs("get", "list", "watch")
 
 	return role
