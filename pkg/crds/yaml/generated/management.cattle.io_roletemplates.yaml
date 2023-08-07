@@ -18,7 +18,8 @@ spec:
     schema:
       openAPIV3Schema:
         description: RoleTemplate holds configuration for a template that is used
-          to create roles and clusterRoles for a cluster or project.
+          to create kubernetes Roles and ClusterRoles (in the rbac.authorization.k8s.io
+          group) for a cluster or project.
         properties:
           administrative:
             description: Administrative if false, and context is set to cluster this
@@ -49,8 +50,7 @@ spec:
             - ""
             type: string
           description:
-            description: Description holds any text desired to better describe the
-              resource.
+            description: Description holds text that describes the resource.
             type: string
           displayName:
             description: DisplayName is the human-readable name displayed in the UI
@@ -92,7 +92,7 @@ spec:
               type: string
             type: array
           rules:
-            description: Rules holds all the PolicyRules for this RoleTemplate.
+            description: Rules hold all the PolicyRules for this RoleTemplate.
             items:
               description: PolicyRule holds information that describes a policy rule,
                 but does not contain information about who the rule applies to or

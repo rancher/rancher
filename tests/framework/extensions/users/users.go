@@ -1,7 +1,6 @@
 package users
 
 import (
-	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -12,10 +11,7 @@ import (
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
-	"github.com/rancher/rancher/tests/framework/extensions/defaults"
 	"github.com/rancher/rancher/tests/framework/extensions/kubeapi/rbac"
-	kubeapiSecrets "github.com/rancher/rancher/tests/framework/extensions/kubeapi/secrets"
-	"github.com/rancher/rancher/tests/framework/extensions/secrets"
 	password "github.com/rancher/rancher/tests/framework/extensions/users/passwordgenerator"
 	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
@@ -120,12 +116,13 @@ func AddProjectMember(rancherClient *rancher.Client, project *management.Project
 		return err
 	}
 
+	var prtb *management.ProjectRoleTemplateBinding
 	err = kwait.Poll(500*time.Millisecond, 2*time.Minute, func() (done bool, err error) {
-		projectRoleTemplate, err := rancherClient.Management.ProjectRoleTemplateBinding.ByID(roleTemplateResp.ID)
+		prtb, err = rancherClient.Management.ProjectRoleTemplateBinding.ByID(roleTemplateResp.ID)
 		if err != nil {
 			return false, err
 		}
-		if projectRoleTemplate != nil && projectRoleTemplate.UserID == user.ID && projectRoleTemplate.ProjectID == project.ID {
+		if prtb != nil && prtb.UserID == user.ID && prtb.ProjectID == project.ID {
 			return true, nil
 		}
 
@@ -134,57 +131,17 @@ func AddProjectMember(rancherClient *rancher.Client, project *management.Project
 	if err != nil {
 		return err
 	}
-
-	adminDynamicClient, err := adminClient.GetDownStreamClusterClient(project.ClusterID)
-	if err != nil {
-		return err
-	}
-
-	steveClient, err := adminClient.Steve.ProxyDownstream(project.ClusterID)
-	if err != nil {
-		return err
-	}
-
-	secretOpts := metav1.ListOptions{
-		FieldSelector:  "metadata.namespace=" + "cattle-impersonation-system",
-		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
-	}
-
-	var numOfActiveSecrets int
-	err = kwait.Poll(500*time.Millisecond, 2*time.Minute, func() (done bool, err error) {
-		secretsList, err := adminDynamicClient.Resource(kubeapiSecrets.SecretGroupVersionResource).List(context.TODO(), secretOpts)
-		if err != nil {
-			return false, err
-		}
-
-		for _, secret := range secretsList.Items {
-
-			if strings.Contains(secret.GetName(), user.ID) {
-				secretID := fmt.Sprintf("%s/%s", secret.GetNamespace(), secret.GetName())
-				steveSecret, err := steveClient.SteveType(secrets.SecretSteveType).ByID(secretID)
-				if err != nil {
-					return false, err
-				}
-
-				if steveSecret.ObjectMeta.State.Name == "active" {
-					numOfActiveSecrets += 1
-				}
-
-				if numOfActiveSecrets == 2 {
-					return true, nil
-				}
-			}
-		}
-
-		return false, nil
-	})
-
-	return err
+	return waitForPRTBRollout(adminClient, prtb, createOp)
 }
 
 // RemoveProjectMember is a helper function that removes the project role from `user`
 func RemoveProjectMember(rancherClient *rancher.Client, user *management.User) error {
 	roles, err := rancherClient.Management.ProjectRoleTemplateBinding.List(&types.ListOpts{})
+	if err != nil {
+		return err
+	}
+
+	adminClient, err := rancher.NewClient(rancherClient.RancherConfig.AdminToken, rancherClient.Session)
 	if err != nil {
 		return err
 	}
@@ -198,35 +155,11 @@ func RemoveProjectMember(rancherClient *rancher.Client, user *management.User) e
 		}
 	}
 
-	var backoff = kwait.Backoff{
-		Duration: 100 * time.Millisecond,
-		Factor:   1,
-		Jitter:   0,
-		Steps:    5,
-	}
 	err = rancherClient.Management.ProjectRoleTemplateBinding.Delete(&roleToDelete)
 	if err != nil {
 		return err
 	}
-	err = kwait.ExponentialBackoff(backoff, func() (done bool, err error) {
-		clusterID, projName := ref.Parse(roleToDelete.ProjectID)
-		req, err := labels.NewRequirement(rtbOwnerLabel, selection.Equals, []string{fmt.Sprintf("%s_%s", projName, roleToDelete.Name)})
-		if err != nil {
-			return false, err
-		}
-
-		downstreamRBs, err := rbac.ListRoleBindings(rancherClient, clusterID, "", metav1.ListOptions{
-			LabelSelector: labels.NewSelector().Add(*req).String(),
-		})
-		if err != nil {
-			return false, err
-		}
-		if len(downstreamRBs.Items) != 0 {
-			return false, nil
-		}
-		return true, nil
-	})
-	return err
+	return waitForPRTBRollout(adminClient, &roleToDelete, deleteOp)
 }
 
 // AddClusterRoleToUser is a helper function that adds a cluster role to `user`.
@@ -281,25 +214,32 @@ func AddClusterRoleToUser(rancherClient *rancher.Client, cluster *management.Clu
 		return err
 	}
 
+	var crtb *management.ClusterRoleTemplateBinding
 	err = kwait.Poll(600*time.Millisecond, 3*time.Minute, func() (done bool, err error) {
-		clusterRoleTemplate, err := rancherClient.Management.ClusterRoleTemplateBinding.ByID(roleTemplateResp.ID)
+		crtb, err = rancherClient.Management.ClusterRoleTemplateBinding.ByID(roleTemplateResp.ID)
 		if err != nil {
 			return false, err
 		}
-		if clusterRoleTemplate != nil {
+		if crtb != nil {
 			return true, nil
 		}
 
 		return false, nil
 	})
-
-	return err
-
+	if err != nil {
+		return err
+	}
+	return waitForCRTBRollout(adminClient, crtb, createOp)
 }
 
 // RemoveClusterRoleFromUser is a helper function that removes the user from cluster
 func RemoveClusterRoleFromUser(rancherClient *rancher.Client, user *management.User) error {
 	roles, err := rancherClient.Management.ClusterRoleTemplateBinding.List(&types.ListOpts{})
+	if err != nil {
+		return err
+	}
+
+	adminClient, err := rancher.NewClient(rancherClient.RancherConfig.AdminToken, rancherClient.Session)
 	if err != nil {
 		return err
 	}
@@ -316,32 +256,7 @@ func RemoveClusterRoleFromUser(rancherClient *rancher.Client, user *management.U
 	if err = rancherClient.Management.ClusterRoleTemplateBinding.Delete(&roleToDelete); err != nil {
 		return err
 	}
-
-	var backoff = kwait.Backoff{
-		Duration: 100 * time.Millisecond,
-		Factor:   1,
-		Jitter:   0,
-		Steps:    10,
-	}
-
-	err = kwait.ExponentialBackoff(backoff, func() (done bool, err error) {
-		req, err := labels.NewRequirement(rtbOwnerLabel, selection.Equals, []string{fmt.Sprintf("%s_%s", roleToDelete.ClusterID, roleToDelete.Name)})
-		if err != nil {
-			return false, err
-		}
-
-		downstreamCRBs, err := rbac.ListClusterRoleBindings(rancherClient, roleToDelete.ClusterID, metav1.ListOptions{
-			LabelSelector: labels.NewSelector().Add(*req).String(),
-		})
-		if err != nil {
-			return false, err
-		}
-		if len(downstreamCRBs.Items) != 0 {
-			return false, nil
-		}
-		return true, nil
-	})
-	return err
+	return waitForCRTBRollout(adminClient, &roleToDelete, deleteOp)
 }
 
 // GetUserIDByName is a helper function that returns the user ID by name
@@ -362,4 +277,63 @@ func GetUserIDByName(client *rancher.Client, username string) (string, error) {
 	}
 
 	return "", nil
+}
+
+type operationType int
+
+const (
+	createOp operationType = iota
+	deleteOp
+)
+
+func waitForCRTBRollout(client *rancher.Client, crtb *management.ClusterRoleTemplateBinding, opType operationType) error {
+	crtbNamespace, crtbName := ref.Parse(crtb.ID)
+	req, err := labels.NewRequirement(rtbOwnerLabel, selection.In, []string{fmt.Sprintf("%s_%s", crtbNamespace, crtbName)})
+	if err != nil {
+		return fmt.Errorf("unable to form label requirement for %s/%s: %w", crtbNamespace, crtbName, err)
+	}
+	selector := labels.NewSelector().Add(*req)
+	return waitForRTBRollout(client, crtbNamespace, crtbName, selector, crtb.ClusterID, opType)
+}
+
+func waitForPRTBRollout(client *rancher.Client, prtb *management.ProjectRoleTemplateBinding, opType operationType) error {
+	clusterID, _ := ref.Parse(prtb.ProjectID)
+	prtbNamespace, prtbName := ref.Parse(prtb.ID)
+	req, err := labels.NewRequirement(fmt.Sprintf("%s_%s", prtbNamespace, prtbName), selection.Exists, nil)
+	if err != nil {
+		return fmt.Errorf("unable to form label requirement for %s/%s: %w", prtbNamespace, prtbName, err)
+	}
+	selector := labels.NewSelector().Add(*req)
+	return waitForRTBRollout(client, prtbNamespace, prtbName, selector, clusterID, opType)
+}
+
+func waitForRTBRollout(client *rancher.Client, rtbNamespace string, rtbName string, selector labels.Selector, clusterID string, opType operationType) error {
+	// we expect rollout to happen within 5 seconds total
+	backoff := kwait.Backoff{
+		Duration: 500 * time.Millisecond,
+		Factor:   1,
+		Jitter:   0,
+		Steps:    11,
+	}
+	err := kwait.ExponentialBackoff(backoff, func() (done bool, err error) {
+		downstreamCRBs, err := rbac.ListClusterRoleBindings(client, clusterID, metav1.ListOptions{
+			LabelSelector: selector.String(),
+		})
+		if err != nil {
+			return false, err
+		}
+		switch opType {
+		case createOp:
+			return len(downstreamCRBs.Items) > 0, nil
+		case deleteOp:
+			return len(downstreamCRBs.Items) == 0, nil
+		default:
+			// unknown operation type, don't poll infinitely
+			return true, nil
+		}
+	})
+	if err != nil {
+		return fmt.Errorf("unable to determine the status of backing rbac for %s/%s in alloted duration: %w", rtbNamespace, rtbName, err)
+	}
+	return nil
 }

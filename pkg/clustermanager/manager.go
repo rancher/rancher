@@ -225,7 +225,7 @@ func (m *Manager) doStart(rec *record, clusterOwner bool) (exit error) {
 			return err
 		}
 	} else {
-		if err := clusterController.RegisterFollower(transaction, rec.cluster, m, m); err != nil {
+		if err := clusterController.RegisterFollower(rec.cluster); err != nil {
 			transaction.Rollback()
 			return err
 		}

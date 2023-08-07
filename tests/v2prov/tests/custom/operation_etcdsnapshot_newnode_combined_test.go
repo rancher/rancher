@@ -39,7 +39,13 @@ func Test_Operation_Custom_EtcdSnapshotOperationsOnNewCombinedNode(t *testing.T)
 			Name: "test-custom-etcd-snapshot-operations-on-new-combined-node",
 		},
 		Spec: provisioningv1.ClusterSpec{
-			RKEConfig: &provisioningv1.RKEConfig{},
+			RKEConfig: &provisioningv1.RKEConfig{
+				RKEClusterSpecCommon: rkev1.RKEClusterSpecCommon{
+					ETCD: &rkev1.ETCD{
+						DisableSnapshots: true,
+					},
+				},
+			},
 		},
 	})
 	if err != nil {

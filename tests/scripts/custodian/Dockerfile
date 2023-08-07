@@ -1,4 +1,4 @@
-FROM registry.suse.com/bci/python:3.10
+FROM ubuntu:22.04
 WORKDIR /usr/app/src
 
 ARG AWS_ACCESS_KEY_ID
@@ -25,17 +25,15 @@ ARG DONOTDELETE_KEYS
 ENV DONOTDELETE_KEYS=$DONOTDELETE_KEYS
 ENV CUSTODIAN_YAML=aws.yaml
 
-
-# RUN zypper install -y python3-venv python3-pip vim
+RUN apt-get update && apt-get install -y python3 python3-pip python3-venv apt-transport-https ca-certificates gnupg curl
+RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] http://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key --keyring /usr/share/keyrings/cloud.google.gpg  add - && apt-get update -y && apt-get install
+RUN curl -sL https://aka.ms/InstallAzureCLIDeb | bash
 RUN python3 -m venv custodian-venv
 RUN . custodian-venv/bin/activate
 RUN pip3 install c7n c7n_azure c7n_gcp c7n_mailer
 
 ADD ./* ./
-
-# get user keys, replace holder params in yaml files appropriately
 SHELL ["/bin/bash", "-c"] 
-# think about how to override the keys for the use case of adding tags
 
 CMD for i in `ls *.yaml`; \
     do cat $i | sed -e 's/USERKEYS/'"${USER_KEYS}"'/g' -i $i; done ; \

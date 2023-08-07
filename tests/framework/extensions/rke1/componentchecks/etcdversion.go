@@ -10,19 +10,36 @@ import (
 )
 
 // CheckETCDVersion will check the etcd version on the etcd node in the provisioned RKE1 cluster.
-func CheckETCDVersion(client *rancher.Client, nodes []*nodes.Node, nodeRoles []string) ([]string, error) {
+func CheckETCDVersion(client *rancher.Client, nodes []*nodes.Node, clusterID string) ([]string, error) {
+	steveClient, err := client.Steve.ProxyDownstream(clusterID)
+	if err != nil {
+		return nil, err
+	}
+
+	nodesList, err := steveClient.SteveType("node").List(nil)
+	if err != nil {
+		return nil, err
+	}
+
 	var etcdResult []string
 
-	for key, node := range nodes {
-		if strings.Contains(nodeRoles[key], "--etcd") {
-			command := fmt.Sprintf("docker exec etcd etcdctl version")
-			output, err := node.ExecuteCommand(command)
-			if err != nil {
-				return []string{}, err
-			}
+	for _, rancherNode := range nodesList.Data {
+		externalIP := rancherNode.Annotations["rke.cattle.io/external-ip"]
+		etcdRole := rancherNode.Labels["node-role.kubernetes.io/etcd"]
 
-			etcdResult = append(etcdResult, output)
-			logrus.Infof(output)
+		if etcdRole == "true" {
+			for _, node := range nodes {
+				if strings.Contains(node.PublicIPAddress, externalIP) {
+					command := fmt.Sprint("docker exec etcd etcdctl version")
+					output, err := node.ExecuteCommand(command)
+					if err != nil {
+						return []string{}, err
+					}
+
+					etcdResult = append(etcdResult, output)
+					logrus.Infof(output)
+				}
+			}
 		}
 	}
 

@@ -116,7 +116,7 @@ func (u *UpgradeWorkloadTestSuite) testPreUpgradeSingleCluster(clusterName strin
 	u.T().Logf("Validating daemonset[%v] available replicas number is equal to worker nodes number in the cluster [%v]", names.random["daemonsetName"], project.ClusterID)
 	validateDaemonset(u.T(), client, project.ClusterID, namespace.Name, names.random["daemonsetName"])
 
-	secretTemplate := secrets.NewSecretTemplate(names.random["secretName"], namespace.Name, map[string][]byte{"test": []byte("test")}, corev1.SecretTypeBasicAuth)
+	secretTemplate := secrets.NewSecretTemplate(names.random["secretName"], namespace.Name, map[string][]byte{"test": []byte("test")}, corev1.SecretTypeOpaque)
 
 	u.T().Logf("Creating a secret with name [%v]", names.random["secretName"])
 	createdSecret, err := steveClient.SteveType(secrets.SecretSteveType).Create(secretTemplate)
