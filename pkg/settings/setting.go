@@ -453,7 +453,8 @@ func IterateWhitelistedEnvVars(handler func(name, value string)) {
 // GetMachineProvisionImagePullPolicy will return the pull policy to be used on MachineProvisioning job.
 // If an invalid value is set it will return the default value: v1.PullAlways
 func GetMachineProvisionImagePullPolicy() v1.PullPolicy {
-	switch v1.PullPolicy(MachineProvisionImagePullPolicy.Get()) {
+	machineProvisionImagePullPolicy := MachineProvisionImagePullPolicy.Get()
+	switch v1.PullPolicy(machineProvisionImagePullPolicy) {
 	case v1.PullAlways:
 		return v1.PullAlways
 	case v1.PullIfNotPresent:
@@ -461,7 +462,7 @@ func GetMachineProvisionImagePullPolicy() v1.PullPolicy {
 	case v1.PullNever:
 		return v1.PullNever
 	default:
-		logrus.Errorf("failed to parse setting machine-provision-image-pull-policy, defaulting to: %s", v1.PullAlways)
+		logrus.Warnf("failed to parse setting machine-provision-image-pull-policy value: %s defaulting to: %s", machineProvisionImagePullPolicy, v1.PullAlways)
 		return v1.PullAlways
 	}
 }
