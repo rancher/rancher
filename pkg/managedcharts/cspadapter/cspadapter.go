@@ -19,7 +19,7 @@ const (
 	MLOChartName = "rancher-csp-adapter"
 	// PAYGChartNamespace is the namespace that we expect the adapter to be installed in,
 	// for the new Pay-As-You-Go (PAYG) license offering
-	PAYGChartNamespace = "cattle-csp-billing-adapter-system"
+	PAYGChartNamespace = "cattle-system"
 	// PAYGChartName is the name of the csp adapter chart for PAYG licensing.
 	PAYGChartName = "rancher-csp-billing-adapter"
 )
