@@ -88,34 +88,44 @@ func TestGetMachineProvisionImagePullPolicy(t *testing.T) {
 	}()
 
 	testCases := []struct {
-		settingValue string
-		want         v1.PullPolicy
+		name     string
+		input    string
+		expected v1.PullPolicy
 	}{
 		{
-			settingValue: "Always",
-			want:         v1.PullAlways,
+			name:     "Always",
+			input:    "Always",
+			expected: v1.PullAlways,
 		},
 		{
-			settingValue: "Never",
-			want:         v1.PullNever,
+			name:     "Never",
+			input:    "Never",
+			expected: v1.PullNever,
 		},
 		{
-			settingValue: "IfNotPresent",
-			want:         v1.PullIfNotPresent,
+			name:     "IfNotPresent",
+			input:    "IfNotPresent",
+			expected: v1.PullIfNotPresent,
 		},
 		{
-			settingValue: "wrongValue",
-			want:         v1.PullAlways,
+			name:     "Wrong Value",
+			input:    "wrongValue",
+			expected: v1.PullAlways,
+		},
+		{
+			name:     "Empty Value",
+			input:    "",
+			expected: v1.PullAlways,
 		},
 	}
 
 	for _, v := range testCases {
-		t.Run(v.settingValue, func(t *testing.T) {
-			if err := MachineProvisionImagePullPolicy.Set(v.settingValue); err != nil {
+		t.Run(v.name, func(t *testing.T) {
+			if err := MachineProvisionImagePullPolicy.Set(v.input); err != nil {
 				t.Errorf("Failed to test GetMachineProvisionImagePullPolicy(), unable to set the value: %v", err)
 			}
 			got := GetMachineProvisionImagePullPolicy()
-			assert.Equalf(t, v.want, got, fmt.Sprintf("test GetMachineProvisionImagePullPolicy() case: %s failed with value: %s, expecting: %s", v.settingValue, got, v.want))
+			assert.Equalf(t, v.expected, got, fmt.Sprintf("test GetMachineProvisionImagePullPolicy() case: %s, input: %s failed with value: %s, expecting: %s", v.name, v.input, got, v.expected))
 		})
 	}
 }
