@@ -133,6 +133,8 @@ COPY --from=rancher/k3s:v1.27.2-k3s1 \
     /bin/runc \
     /bin/which \
     /bin/aux/xtables-legacy-multi \
+    /bin/bandwidth \
+    /bin/firewall \
 /usr/bin/
 
 RUN ln -s /usr/bin/cni /usr/bin/bridge && \
