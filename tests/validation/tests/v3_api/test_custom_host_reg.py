@@ -9,7 +9,7 @@ HOST_NAME = os.environ.get('RANCHER_HOST_NAME', "testsa")
 RANCHER_SERVER_VERSION = os.environ.get('RANCHER_SERVER_VERSION',
                                         "master-head")
 rke_config = {"authentication": {"type": "authnConfig", "strategy": "x509"},
-              "ignoreDockerVersion": False,
+              "ignoreDockerVersion": True,
               "network": {"type": "networkConfig", "plugin": "canal"},
               "type": "rancherKubernetesEngineConfig"
               }
