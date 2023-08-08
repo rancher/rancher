@@ -16,8 +16,8 @@ require (
 	github.com/rancher/rke v1.4.8
 	github.com/rancher/wrangler v1.1.1
 	github.com/sirupsen/logrus v1.9.3
-	k8s.io/api v0.25.4
-	k8s.io/apimachinery v0.25.4
+	k8s.io/api v0.25.12
+	k8s.io/apimachinery v0.25.12
 	sigs.k8s.io/cluster-api v1.2.12
 )
 
@@ -75,7 +75,7 @@ require (
 	k8s.io/component-base v0.25.4 // indirect
 	k8s.io/klog/v2 v2.90.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20230308215209-15aac26d736a // indirect
-	k8s.io/kubernetes v1.15.0-alpha.0 // indirect
+	k8s.io/kubernetes v1.25.12 // indirect
 	k8s.io/utils v0.0.0-20230209194617-a36077c30491 // indirect
 	sigs.k8s.io/cli-utils v0.27.0 // indirect
 	sigs.k8s.io/controller-runtime v0.12.3 // indirect
