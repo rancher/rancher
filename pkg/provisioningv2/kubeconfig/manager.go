@@ -252,7 +252,7 @@ func (m *Manager) GetCRTBForClusterOwner(cluster *v1.Cluster, status v1.ClusterS
 // kubeConfigValid accepts a kubeconfig and corresponding data, and validates that the kubeconfig is valid for the
 // cluster in question. It returns two booleans, the first of which is whether an error occurred parsing the kubeconfig
 // or retrieving information related to the kubeconfig, and the second which indicates whether the kubeconfig is valid.
-func (m *Manager) kubeConfigValid(kcData []byte, cluster *v1.Cluster, currentServerURL, currentServerCA, currentManagementClusterName string) (bool, bool) {
+func (m *Manager) kubeConfigValid(kcData []byte, cluster *v1.Cluster, currentServerURL, currentServerCA, currentManagementClusterName string, secretLabels map[string]string) (bool, bool) {
 	if len(kcData) == 0 {
 		return true, false
 	}
@@ -290,6 +290,13 @@ func (m *Manager) kubeConfigValid(kcData []byte, cluster *v1.Cluster, currentSer
 		tokenMatches = err == nil
 	}
 
+	// Check if the required CAPI cluster label is present in the secretLabels map
+	capiClusterLabelValue, labelPresent := secretLabels[capi.ClusterLabelName]
+	if !labelPresent || capiClusterLabelValue != cluster.Name {
+		logrus.Tracef("[kubeconfigmanager] cluster %s/%s: kubeconfig secret failed validation due to missing or incorrect label", cluster.Namespace, cluster.Name)
+		return false, false
+	}
+
 	if serverURL != currentServerURL || !bytes.Equal([]byte(strings.TrimSpace(currentServerCA)), kc.Clusters["cluster"].CertificateAuthorityData) || managementCluster != currentManagementClusterName || !tokenMatches {
 		logrus.Tracef("[kubeconfigmanager] cluster %s/%s: kubeconfig secret failed validation, did not match provided data", cluster.Namespace, cluster.Name)
 		return false, false
@@ -306,7 +313,7 @@ func (m *Manager) getKubeConfigData(cluster *v1.Cluster, secretName, managementC
 
 	secret, err := m.secretCache.Get(cluster.Namespace, secretName)
 	if err == nil {
-		retrievalError, isValid := m.kubeConfigValid(secret.Data["value"], cluster, serverURL, cacert, managementClusterName)
+		retrievalError, isValid := m.kubeConfigValid(secret.Data["value"], cluster, serverURL, cacert, managementClusterName, secret.Labels)
 		if (!retrievalError && !isValid) || secret.Data == nil || secret.Data["token"] == nil || len(secret.OwnerReferences) == 0 {
 			logrus.Infof("[kubeconfigmanager] deleting kubeconfig secret for cluster %s/%s", cluster.Namespace, cluster.Name)
 			// Check if we require a new secret based on the token value and annotation(s). We delete the old secret since it may contain
