@@ -14,7 +14,7 @@ const (
 	Namespace                       = "fleet-default"
 	defaultRandStringLength         = 5
 	ConfigurationFileKey            = "provisioningInput"
-	HardenedKubeVersion     Version = "v1.24.99"
+	PSPKubeVersionLimit     Version = "v1.24.99"
 	RancherPrivileged       PSACT   = "rancher-privileged"
 	RancherRestricted       PSACT   = "rancher-restricted"
 )
