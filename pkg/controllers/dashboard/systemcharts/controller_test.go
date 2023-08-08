@@ -303,7 +303,7 @@ func Test_ChartInstallation(t *testing.T) {
 					"capi": map[string]interface{}{
 						"enabled": false,
 					},
-					"mcm": map[any]interface{}{
+					"mcm": map[string]interface{}{
 						"enabled": false,
 					},
 					"global": "",
