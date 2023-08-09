@@ -12,7 +12,7 @@ environment:
 
 steps:
 - name: provisioning-tests-pr
-  image: rancher/dapper:v0.5.8
+  image: rancher/dapper:v0.6.0
   commands:
   - dapper provisioning-tests
   privileged: true
@@ -23,7 +23,7 @@ steps:
     event:
     - pull_request
 - name: provisioning-tests-push
-  image: rancher/dapper:v0.5.8
+  image: rancher/dapper:v0.6.0
   commands:
   - dapper provisioning-tests
   privileged: true
@@ -64,7 +64,7 @@ environment:
 
 steps:
 - name: provisioning-tests-pr
-  image: rancher/dapper:v0.5.8
+  image: rancher/dapper:v0.6.0
   commands:
   - dapper provisioning-tests
   privileged: true
@@ -75,7 +75,7 @@ steps:
     event:
     - pull_request
 - name: provisioning-tests-push
-  image: rancher/dapper:v0.5.8
+  image: rancher/dapper:v0.6.0
   commands:
   - dapper provisioning-tests
   privileged: true
@@ -116,7 +116,7 @@ environment:
 
 steps:
   - name: provisioning-operations-tests-pr
-    image: rancher/dapper:v0.5.8
+    image: rancher/dapper:v0.6.0
     commands:
       - dapper provisioning-tests
     privileged: true
@@ -127,7 +127,7 @@ steps:
       event:
         - pull_request
   - name: provisioning-operations-tests-push
-    image: rancher/dapper:v0.5.8
+    image: rancher/dapper:v0.6.0
     commands:
       - dapper provisioning-tests
     privileged: true
@@ -168,7 +168,7 @@ environment:
 
 steps:
   - name: provisioning-operations-tests-pr
-    image: rancher/dapper:v0.5.8
+    image: rancher/dapper:v0.6.0
     commands:
       - dapper provisioning-tests
     privileged: true
@@ -179,7 +179,7 @@ steps:
       event:
         - pull_request
   - name: provisioning-operations-tests-push
-    image: rancher/dapper:v0.5.8
+    image: rancher/dapper:v0.6.0
     commands:
       - dapper provisioning-tests
     privileged: true
@@ -216,7 +216,7 @@ platform:
 
 steps:
 - name: build-pr
-  image: rancher/dapper:v0.5.8
+  image: rancher/dapper:v0.6.0
   commands:
   - dapper ci
   privileged: true
@@ -228,7 +228,7 @@ steps:
     - pull_request
 
 - name: build-push-tag
-  image: rancher/dapper:v0.5.8
+  image: rancher/dapper:v0.6.0
   commands:
   - dapper ci
   privileged: true
@@ -248,7 +248,7 @@ steps:
     - tag
 
 - name: fossa-amd64
-  image: rancher/dapper:v0.5.8
+  image: rancher/dapper:v0.6.0
   failure: ignore
   environment:
     FOSSA_API_KEY:
@@ -271,7 +271,7 @@ steps:
       - tag
 
 - name: stage-binaries
-  image: rancher/dapper:v0.5.8
+  image: rancher/dapper:v0.6.0
   commands:
   - "cp -r ./bin/* ./package/"
   when:
@@ -461,7 +461,7 @@ steps:
       - "refs/tags/*-*"
 
 - name: check-release-images-exists
-  image: rancher/dapper:v0.5.8
+  image: rancher/dapper:v0.6.0
   failure: ignore
   commands:
   - dapper check-release-images-exist
@@ -497,7 +497,7 @@ platform:
 
 steps:
 - name: build-pr
-  image: rancher/dapper:v0.5.8
+  image: rancher/dapper:v0.6.0
   commands:
   - dapper ci
   privileged: true
@@ -509,7 +509,7 @@ steps:
     - pull_request
 
 - name: build-push-tag
-  image: rancher/dapper:v0.5.8
+  image: rancher/dapper:v0.6.0
   commands:
   - dapper ci
   privileged: true
@@ -529,7 +529,7 @@ steps:
     - tag
 
 - name: stage-binaries
-  image: rancher/dapper:v0.5.8
+  image: rancher/dapper:v0.6.0
   commands:
   - "cp -r ./bin/* ./package/"
   when:
@@ -713,7 +713,7 @@ steps:
   - git checkout $DRONE_COMMIT -b origin/$DRONE_TARGET_BRANCH
 
 - name: build-pr
-  image: rancher/dapper:v0.5.8
+  image: rancher/dapper:v0.6.0
   failure: ignore
   commands:
   - dapper ci
@@ -726,7 +726,7 @@ steps:
     - pull_request
 
 - name: build-push-tag
-  image: rancher/dapper:v0.5.8
+  image: rancher/dapper:v0.6.0
   failure: ignore
   commands:
   - K3S_BUILDER=k3s_root dapper ci
@@ -747,7 +747,7 @@ steps:
     - tag
 
 - name: stage-binaries
-  image: rancher/dapper:v0.5.8
+  image: rancher/dapper:v0.6.0
   failure: ignore
   commands:
   - "cp -r ./bin/* ./package/"
@@ -949,7 +949,7 @@ clone:
 steps:
   - name: build-pr
     pull: always
-    image: rancher/dapper:v0.5.8
+    image: rancher/dapper:v0.6.0
     commands:
       - dapper.exe -f Dockerfile-windows.dapper -d ci
     volumes:
@@ -961,7 +961,7 @@ steps:
 
   - name: build-push-tag
     pull: always
-    image: rancher/dapper:v0.5.8
+    image: rancher/dapper:v0.6.0
     commands:
       - dapper.exe -f Dockerfile-windows.dapper -d ci
     volumes:
@@ -980,7 +980,7 @@ steps:
         - tag
 
   - name: stage-binaries
-    image: rancher/dapper:v0.5.8
+    image: rancher/dapper:v0.6.0
     commands:
       - "cp -r ./bin/* ./package/windows/"
     when:
@@ -1074,7 +1074,7 @@ clone:
 steps:
   - name: build-pr
     pull: always
-    image: rancher/dapper:v0.5.8
+    image: rancher/dapper:v0.6.0
     commands:
       - dapper.exe -f Dockerfile-windows.dapper -d ci
     volumes:
@@ -1086,7 +1086,7 @@ steps:
 
   - name: build-push-tag
     pull: always
-    image: rancher/dapper:v0.5.8
+    image: rancher/dapper:v0.6.0
     commands:
       - dapper.exe -f Dockerfile-windows.dapper -d ci
     volumes:
@@ -1105,7 +1105,7 @@ steps:
         - tag
 
   - name: stage-binaries
-    image: rancher/dapper:v0.5.8
+    image: rancher/dapper:v0.6.0
     commands:
       - "cp -r ./bin/* ./package/windows/"
     when:
@@ -1317,7 +1317,7 @@ steps:
     - tag
 
 - name: build-chart
-  image: rancher/dapper:v0.5.8
+  image: rancher/dapper:v0.6.0
   commands:
   - dapper chart/ci
   privileged: true
@@ -1526,7 +1526,7 @@ platform:
 
 steps:
 - name: chart-promote
-  image: rancher/dapper:v0.5.8
+  image: rancher/dapper:v0.6.0
   commands:
   - dapper chart/copy
   volumes:
