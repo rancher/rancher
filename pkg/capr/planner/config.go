@@ -340,14 +340,26 @@ func addAddresses(secrets corecontrollers.SecretCache, config map[string]interfa
 	}
 
 	setNodeExternalIP := ipAddress != "" && internalIPAddress != "" && ipAddress != internalIPAddress
+	// if , found in internalIPAddress then split
+	advertiseAddress := internalIPAddress
+	if strings.Contains(advertiseAddress, ",") {
+		advertiseAddress = strings.Split(advertiseAddress, ",")[0]
+	}
 
 	if setNodeExternalIP && !isOnlyWorker(entry) {
-		config["advertise-address"] = internalIPAddress
+		config["advertise-address"] = advertiseAddress
 		config["tls-san"] = append(convert.ToStringSlice(config["tls-san"]), ipAddress)
 	}
 
 	if internalIPAddress != "" {
-		config["node-ip"] = append(convert.ToStringSlice(config["node-ip"]), internalIPAddress)
+		if strings.Contains(internalIPAddress, ",") {
+			nodeIPs := strings.Split(internalIPAddress, ",")
+			for _, nodeIP := range nodeIPs {
+				config["node-ip"] = append(convert.ToStringSlice(config["node-ip"]), nodeIP)
+			}
+		} else {
+			config["node-ip"] = append(convert.ToStringSlice(config["node-ip"]), internalIPAddress)
+		}
 	}
 
 	// Cloud provider, if set, will handle external IP
