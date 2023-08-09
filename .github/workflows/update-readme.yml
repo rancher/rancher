@@ -69,7 +69,7 @@ jobs:
       id: cpr
       env:
         SOURCE_BRANCH: ${{ steps.branch.outputs.branch }}
-      uses: actions/github-script@v5.0.0
+      uses: actions/github-script@v5.2.0
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         script: |
