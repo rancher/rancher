@@ -51,6 +51,7 @@ spec:
       vmSize: Standard_DS2_v2
     podCidr: null
     privateCluster: false
+    privateDnsZone: null
     resourceGroup: aks-resource-group
     resourceLocation: eastus
     serviceCidr: null
@@ -67,6 +68,8 @@ spec:
     virtualNetwork: null
     virtualNetworkResourceGroup: null
     outboundType: null
+    managedIdentity: null
+    userAssignedIdentity: null
   answers: {}
   clusterSecrets: {}
   description: ""

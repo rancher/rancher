@@ -1070,8 +1070,8 @@ github.com/onsi/gomega v1.16.0/go.mod h1:HnhC7FXeEQY45zxNK3PPoIUhzk/80Xly9PcubAl
 github.com/onsi/gomega v1.17.0/go.mod h1:HnhC7FXeEQY45zxNK3PPoIUhzk/80Xly9PcubAlGdZY=
 github.com/onsi/gomega v1.19.0/go.mod h1:LY+I3pBVzYsTBU1AnDwOSxaYi9WoWiqgwooUqq9yPro=
 github.com/onsi/gomega v1.20.1/go.mod h1:DtrZpjmvpn2mPm4YWQa0/ALMDj9v4YxLgojwPeREyVo=
-github.com/onsi/gomega v1.27.8 h1:gegWiwZjBsf2DgiSbf5hpokZ98JVDMcWkUiigk6/KXc=
-github.com/onsi/gomega v1.27.8/go.mod h1:2J8vzI/s+2shY9XHRApDkdgPo1TKT7P2u6fXeJKFnNQ=
+github.com/onsi/gomega v1.27.10 h1:naR28SdDFlqrG6kScpT8VWpu1xWY5nJRCF3XaYyBjhI=
+github.com/onsi/gomega v1.27.10/go.mod h1:RsS8tutOdbdgzbPtzzATp12yT7kM5I5aElG3evPbQ0M=
 github.com/opencontainers/go-digest v0.0.0-20180430190053-c9281466c8b2/go.mod h1:cMLVZDEM3+U2I4VmLI6N8jQYUd2OVphdqWwCJHrFt2s=
 github.com/opencontainers/go-digest v1.0.0-rc1/go.mod h1:cMLVZDEM3+U2I4VmLI6N8jQYUd2OVphdqWwCJHrFt2s=
 github.com/opencontainers/go-digest v1.0.0-rc1.0.20180430190053-c9281466c8b2/go.mod h1:cMLVZDEM3+U2I4VmLI6N8jQYUd2OVphdqWwCJHrFt2s=
@@ -1172,8 +1172,8 @@ github.com/prometheus/procfs v0.7.3/go.mod h1:cz+aTbrPOrUb4q7XlbU9ygM+/jj0fzG6c1
 github.com/prometheus/procfs v0.9.0 h1:wzCHvIvM5SxWqYvwgVL7yJY8Lz3PKn49KQtpgMYJfhI=
 github.com/prometheus/procfs v0.9.0/go.mod h1:+pB4zwohETzFnmlpe6yd2lSc+0/46IYZRB/chUwxUZY=
 github.com/prometheus/tsdb v0.7.1/go.mod h1:qhTCs0VvXwvX/y3TZrWD7rabWM+ijKTux40TwIPHuXU=
-github.com/rancher/aks-operator v1.1.2 h1:sMlOp64g3drY5YYqlB1kR6RoR8WtbNsroQlq2liDZi8=
-github.com/rancher/aks-operator v1.1.2/go.mod h1:K42em/NW4hkvpck3XtVSpa7lQRc2spBjZbqx1aSRWhk=
+github.com/rancher/aks-operator v1.1.3-rc1 h1:9AnFNHPlH7wvHoaR/ygYq+AMxkCdaumguph/66k+120=
+github.com/rancher/aks-operator v1.1.3-rc1/go.mod h1:Nax0949fsXlbbozwYQzr10echD8Y78DLP23dzWKpKOQ=
 github.com/rancher/apiserver v0.0.0-20230515173455-c3b182bdbf7d h1:RT8bn3teE6tsYcSRBli1yVINqrETVqiD8e5uqGg8nmc=
 github.com/rancher/apiserver v0.0.0-20230515173455-c3b182bdbf7d/go.mod h1:GSUg2KPauynfyEk9kqeHE5sFa/Zd8ilsmXqSSzqynQQ=
 github.com/rancher/aws-iam-authenticator v0.5.9-0.20220713170329-78acb8c83863 h1:7cVEMgwyiVhLyu/Ywuw58mkkh9cWpFE3+X8IrWncBxU=
@@ -1186,10 +1186,10 @@ github.com/rancher/dynamiclistener v0.3.5 h1:5TaIHvkDGmZKvc96Huur16zfTKOiLhDtK4S
 github.com/rancher/dynamiclistener v0.3.5/go.mod h1:dW/YF6/m2+uEyJ5VtEcd9THxda599HP6N9dSXk81+k0=
 github.com/rancher/eks-operator v1.2.2-rc3 h1:zzf4JNCXJHPmI82bVFbJvywz346vWL9FFaBSrvNOhPQ=
 github.com/rancher/eks-operator v1.2.2-rc3/go.mod h1:/wyszmtekvefdRRuBSe0XVZln5BnVrFIeBFrNHCPawo=
-github.com/rancher/fleet/pkg/apis v0.0.0-20230721155330-5040cf183feb h1:2lL5TiXVKbgWtxiMXfnghx/54V8bK7dAmXHKyLFLBS8=
-github.com/rancher/fleet/pkg/apis v0.0.0-20230721155330-5040cf183feb/go.mod h1:TbpjMODeuFUJlHG8IfehZ4FBzgzpxwPwa+GwtFq2Tq0=
-github.com/rancher/gke-operator v1.1.6-rc1 h1:VMznbMabusNMar62NWZMNBNnL9zIRGBC3CEy/m4/exw=
-github.com/rancher/gke-operator v1.1.6-rc1/go.mod h1:IjcWkhYhRa23Oz8YgBgZUZzPtuPhHk7+ZW5m/gSuJU4=
+github.com/rancher/fleet/pkg/apis v0.0.0-20230804143405-ea40cfa4643f h1:f6t0PTTP+QT/878ZXx7iQpjkPj9YcGYSbVOkBLPCZQA=
+github.com/rancher/fleet/pkg/apis v0.0.0-20230804143405-ea40cfa4643f/go.mod h1:TbpjMODeuFUJlHG8IfehZ4FBzgzpxwPwa+GwtFq2Tq0=
+github.com/rancher/gke-operator v1.1.6-rc2 h1:ENFi2Cj2t/EwI7m6wSiZ8xYZWS3TpU0owY47pH9raXw=
+github.com/rancher/gke-operator v1.1.6-rc2/go.mod h1:Zcc1ROLHoyxI19eVZ3OdXco4S/B1TReOtm7shIxYxwg=
 github.com/rancher/helm/v3 v3.9.0-rancher1 h1:lqDYFI2AmkDn6Jwzu9A3YKr8EJ34ZmdahREF6lDk2pw=
 github.com/rancher/helm/v3 v3.9.0-rancher1/go.mod h1:fzZfyslcPAWwSdkXrXlpKexFeE2Dei8N27FFQWt+PN0=
 github.com/rancher/kubernetes-provider-detector v0.1.5 h1:hWRAsWuJOemzGjz/XrbTlM7QmfO4OedvFE3QwXiH60I=
@@ -1206,8 +1206,8 @@ github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a h1:6xqYlVz4uAX
 github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a/go.mod h1:YW8wJ/coee2n9ed937uPBWQArBaVlxs+5wkkS9KiyDc=
 github.com/rancher/remotedialer v0.2.6-0.20220624190122-ea57207bf2b8 h1:leqh0chjBsXhKWebxxFd5QPcoQLu51EpaHo04ce0o+8=
 github.com/rancher/remotedialer v0.2.6-0.20220624190122-ea57207bf2b8/go.mod h1:BwwztuvViX2JrLLUwDlsYt5DiyUwHLlzynRwkZLAY0Q=
-github.com/rancher/rke v1.4.8-rc2 h1:bmzGHwIYWdRGHXx+/XIAYUBpp5Qmo63o22cBQ1oamSM=
-github.com/rancher/rke v1.4.8-rc2/go.mod h1:2tq7a87T8d7o6WMDM6q5f6Nu0cL0Y0W3AT07d7Rb4/M=
+github.com/rancher/rke v1.4.8 h1:oCjK4LmSDxp72sIVqRXUbUBINGJDDOatC5HSmRB0wmM=
+github.com/rancher/rke v1.4.8/go.mod h1:2tq7a87T8d7o6WMDM6q5f6Nu0cL0Y0W3AT07d7Rb4/M=
 github.com/rancher/steve v0.0.0-20230717160251-d040cffef385 h1:xMR4LJY5C4LAkJbmVKYvu4BaCYXx2fu99a0K+gErpA0=
 github.com/rancher/steve v0.0.0-20230717160251-d040cffef385/go.mod h1:lCxhhsajJHMUnj0EU+3mbrucc6mHDYD94abDiWX6I/Y=
 github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007 h1:ru+mqGnxMmKeU0Q3XIDxkARvInDIqT1hH2amTcsjxI4=
