@@ -12,13 +12,22 @@ import (
 	"strings"
 )
 
+const (
+	stateDir  = "management-state/git-repo"
+	staticDir = "/var/lib/rancher-data/local-catalogs/v2"
+	localDir  = "../rancher-data/local-catalogs/v2" // identical to helm.InternalCatalog
+)
+
 func gitDir(namespace, name, gitURL string) string {
-	hashedURL := hash(gitURL)
-	staticDir := filepath.Join(staticDir, namespace, name, hashedURL)
+	staticDir := filepath.Join(staticDir, namespace, name, hash(gitURL))
 	if s, err := os.Stat(staticDir); err == nil && s.IsDir() {
 		return staticDir
 	}
-	return filepath.Join(stateDir, namespace, name, hashedURL)
+	localDir := filepath.Join(localDir, namespace, name, hash(gitURL))
+	if s, err := os.Stat(localDir); err == nil && s.IsDir() {
+		return localDir
+	}
+	return filepath.Join(stateDir, namespace, name, hash(gitURL))
 }
 
 // isBundled check if the repositories are bundled on local static directory

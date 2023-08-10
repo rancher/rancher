@@ -6,11 +6,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-const (
-	stateDir  = "management-state/git-repo"
-	staticDir = "/var/lib/rancher-data/local-catalogs/v2"
-)
-
 // Ensure builds the configuration for a should-existing repo and makes sure it is cloned or reseted to the latest commit
 func Ensure(secret *corev1.Secret, namespace, name, gitURL, commit string, insecureSkipTLS bool, caBundle []byte) error {
 	if commit == "" {
