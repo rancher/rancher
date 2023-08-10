@@ -484,9 +484,10 @@ func (ro *repoOperation) getLastCommitHash(branch string, commitHASH plumbing.Ha
 			// lastCommit has not changed
 			if commitHASH == ref.Hash() {
 				return commitHASH, nil
-			} else { // lastCommit changed
-				lastCommitHASH = ref.Hash()
 			}
+
+			// lastCommit changed
+			lastCommitHASH = ref.Hash()
 		}
 	}
 
