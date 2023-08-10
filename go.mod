@@ -110,7 +110,7 @@ require (
 	github.com/rancher/channelserver v0.5.1-0.20230719220800-0a37b73c7df8
 	github.com/rancher/dynamiclistener v0.3.5
 	github.com/rancher/eks-operator v1.2.2-rc3
-	github.com/rancher/fleet/pkg/apis v0.0.0-20230804143405-ea40cfa4643f
+	github.com/rancher/fleet/pkg/apis v0.0.0-20230810121238-9d0ee7f56848
 	github.com/rancher/gke-operator v1.1.6-rc2
 	github.com/rancher/kubernetes-provider-detector v0.1.5
 	github.com/rancher/lasso v0.0.0-20230629200414-8a54b32e6792
