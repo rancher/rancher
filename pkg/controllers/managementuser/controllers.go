@@ -38,7 +38,10 @@ func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.U
 	windows.Register(ctx, clusterRec, cluster)
 	nsserviceaccount.Register(ctx, cluster)
 	if features.RKE2.Enabled() {
-		snapshotbackpopulate.Register(ctx, cluster)
+		// Just register the snapshot controller  if the cluster is administrated by rancher. There is no point on creating ETCDSnapshots for
+		if administratedByRancher, ok := clusterRec.Annotations["provisioning.cattle.io/administrated"]; ok && administratedByRancher == "true" {
+			snapshotbackpopulate.Register(ctx, cluster)
+		}
 		pspdelete.Register(ctx, cluster)
 		machinerole.Register(ctx, cluster)
 	}
