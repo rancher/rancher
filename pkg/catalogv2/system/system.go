@@ -72,7 +72,7 @@ type OperationClient interface {
 
 type ContentClient interface {
 	// Index receives a repository's name and namespace and returns its index file.
-	Index(namespace, name string, skipFilter bool) (*repo.IndexFile, error)
+	Index(namespace, name, targetK8sVersion string, skipFilter bool) (*repo.IndexFile, error)
 }
 
 type Manager struct {
@@ -298,8 +298,13 @@ func (m *Manager) install(namespace, name, minVersion, exactVersion string, valu
 		return nil
 	}
 
+	timeout := settings.SystemManagedChartsOperationTimeout.Get()
+	t, err := time.ParseDuration(timeout)
+	if err != nil {
+		t = 5 * time.Minute
+	}
 	upgrade, err := json.Marshal(types.ChartUpgradeAction{
-		Timeout:    &metav1.Duration{Duration: 5 * time.Minute},
+		Timeout:    &metav1.Duration{Duration: t},
 		Wait:       true,
 		Install:    true,
 		MaxHistory: 5,
