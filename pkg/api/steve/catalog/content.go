@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/rancher/apiserver/pkg/types"
 	"github.com/rancher/rancher/pkg/catalogv2/content"
@@ -148,10 +149,13 @@ func (i *contentDownload) serveChart(apiContext *types.APIRequest, rw http.Respo
 	return err
 }
 
-// getIndex retrieves the index file from the Helm repository
+// getIndex retrieves the index file from the Helm repository.
+// It skips filter if the query parameter "skipFilter" is set to "true" in the API request.
 func (i *contentDownload) getIndex(apiContext *types.APIRequest) (*repo.IndexFile, error) {
 	namespace, name := nsAndName(apiContext)
-	return i.contentManager.Index(namespace, name, false)
+	rawValue := apiContext.Request.URL.Query().Get("skipFilter")
+	skipFilter := strings.ToLower(rawValue) == "true"
+	return i.contentManager.Index(namespace, name, skipFilter)
 }
 
 // nsAndName returns the namespace and name from the API context. If the
