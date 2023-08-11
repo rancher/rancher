@@ -17,6 +17,7 @@ import (
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
 	"github.com/rancher/rancher/tests/framework/extensions/defaults"
+	"github.com/rancher/rancher/tests/framework/extensions/workloads/pods"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
 	"github.com/rancher/wrangler/pkg/summary"
 	"github.com/sirupsen/logrus"
@@ -813,7 +814,6 @@ func UpdateK3SRKE2Cluster(client *rancher.Client, cluster *v1.SteveAPIObject, up
 
 	updatedCluster.ObjectMeta.ResourceVersion = updateCluster.ObjectMeta.ResourceVersion
 
-	logrus.Infof("Applying cluster YAML hardening changes...")
 	cluster, err = client.Steve.SteveType(ProvisioningSteveResourceType).Update(cluster, updatedCluster)
 	if err != nil {
 		return nil, err
@@ -830,12 +830,26 @@ func UpdateK3SRKE2Cluster(client *rancher.Client, cluster *v1.SteveAPIObject, up
 			return false, err
 		}
 
-		if clusterResp.ObjectMeta.State.Name == "active" {
-			logrus.Infof("Cluster YAML has successfully been updated!")
-			return true, nil
-		} else {
-			return false, nil
+		clusterStatus := &apisV1.ClusterStatus{}
+		err = v1.ConvertToK8sType(clusterResp.Status, clusterStatus)
+		if err != nil {
+			return false, err
 		}
+
+		if clusterResp.ObjectMeta.State.Name == "active" {
+			proxyClient, err := client.Steve.ProxyDownstream(clusterStatus.ClusterName)
+			if err != nil {
+				return false, err
+			}
+
+			_, err = proxyClient.SteveType(pods.PodResourceSteveType).List(nil)
+			if err != nil {
+				return false, nil
+			}
+			logrus.Infof("Cluster has been successfully been updated!")
+			return true, nil
+		}
+		return false, nil
 	})
 
 	if err != nil {

@@ -280,7 +280,12 @@ func editPsactCluster(client *rancher.Client, clustername string, namespace stri
 		if err != nil {
 			return clusterType, err
 		}
-		clusters.WaitForActiveRKE1Cluster(client, clusterID)
+
+		err = clusters.WaitForActiveRKE1Cluster(client, clusterID)
+		if err != nil {
+			return "", err
+		}
+
 		modifiedCluster, err := client.Management.Cluster.ByID(clusterID)
 		if err != nil {
 			return "", err
