@@ -267,11 +267,11 @@ type repository interface {
 	cloneOrOpen(branch string) error
 	plainOpen() error
 	getCurrentCommit() (plumbing.Hash, error)
-	fetchAndReset(commit plumbing.Hash, branch string) error
+	fetchAndReset(branch string) error
 	updateRefSpec(branch string)
 	fetch(branch string) error
 	checkout(branch plumbing.ReferenceName) (plumbing.Hash, error)
-	hardReset(reference plumbing.Hash) error
+	hardReset(reference string) error
 	getLastCommitHash(branch string, commitHASH plumbing.Hash) (plumbing.Hash, error)
 }
 
@@ -339,11 +339,12 @@ func (ro *repoOperation) getCurrentCommit() (plumbing.Hash, error) {
 
 // fetchAndReset is a convenience method that fetches updates from the remote repository
 // for a specific branch, and then resets the current branch to a specified commit.
-func (ro *repoOperation) fetchAndReset(commit plumbing.Hash, branch string) error {
+func (ro *repoOperation) fetchAndReset(branch string) error {
 	if err := ro.fetch(branch); err != nil {
 		return fmt.Errorf("fetchAndReset failure: %w", err)
 	}
-	return ro.hardReset(commit)
+	// before: g.reset("FETCH_HEAD")
+	return ro.hardReset(branch)
 }
 
 // updateRefSpec updates the reference specification (RefSpec) in the fetch options
@@ -413,30 +414,31 @@ func (ro *repoOperation) checkout(branch plumbing.ReferenceName) (plumbing.Hash,
 }
 
 // hardReset performs a hard reset of the git repository to a specific commit.
-func (ro *repoOperation) hardReset(reference plumbing.Hash) error {
-	/*
-		A Git commit is a snapshot of the files in your Git repository.
-		Each commit is identified by a unique SHA-1 hash code.
-
-		To perform a reset to a commit = moving the HEAD pointer to point to this commit.
-		To perform a reset to a reference = Another pointer to a specific commit.
-		reference(branch, a tag, or another form of pointer in the Git system).
-	*/
-
+func (ro *repoOperation) hardReset(reference string) error {
 	var err error
 	resetOpts := ro.resetOpts
 
 	switch {
-	// When empty hash passed we reset to the HEAD reference
-	case reference.IsZero():
-		resetOpts.Commit, err = ro.getCurrentCommit()
+	case isLocalBranch(reference):
+		branchRef, err := ro.localRepo.Reference(plumbing.ReferenceName(reference), true)
 		if err != nil {
-			return fmt.Errorf("hardReset HEAD reference fail: %v", err)
+			return fmt.Errorf("branch does not exist locally: %w", err)
 		}
-
-	// Reset to the commit reference
-	case !reference.IsZero():
-		resetOpts.Commit = reference
+		resetOpts.Commit = branchRef.Hash()
+	case reference == "HEAD":
+		commitHash, err := ro.getCurrentCommit()
+		if err != nil {
+			return fmt.Errorf("hardReset failure to get current commit: %w", err)
+		}
+		resetOpts.Commit = commitHash
+	// FETCH_HEAD
+	default:
+		branchRef, err := ro.localRepo.Reference(plumbing.NewRemoteReferenceName("origin", reference), false)
+		// branchRef, err := ro.localRepo.Reference(plumbing.ReferenceName(reference), false)
+		if err != nil {
+			return fmt.Errorf("hardReset failure to get branch reference: %w", err)
+		}
+		resetOpts.Commit = branchRef.Hash()
 	}
 
 	// Validate hashCommit and reset options

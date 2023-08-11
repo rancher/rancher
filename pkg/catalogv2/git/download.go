@@ -1,7 +1,8 @@
 package git
 
 import (
-	plumbing "github.com/go-git/go-git/v5/plumbing"
+	"fmt"
+
 	"github.com/rancher/rancher/pkg/settings"
 	corev1 "k8s.io/api/core/v1"
 )
@@ -16,8 +17,8 @@ func Ensure(secret *corev1.Secret, namespace, name, gitURL, branch string, insec
 	return git.EnsureClonedRepo(branch)
 }
 
-// EnsureClonedRepo will check if repo is cloned, if not will clone and reset to the latest commit.
-// If reseting to the latest commit is not possible it will fetch and try to reset
+// EnsureClonedRepo will check if repo is cloned, if not the method will clone and reset to the latest commit.
+// If reseting to the latest commit is not possible it will fetch and try to reset again
 func (er *extendedRepo) EnsureClonedRepo(branch string) error {
 
 	err := er.cloneOrOpen("")
@@ -25,20 +26,18 @@ func (er *extendedRepo) EnsureClonedRepo(branch string) error {
 		return err
 	}
 
-	branchRef := plumbing.NewBranchReferenceName(branch)
-	// Here we need to checkout before hardReseting because gogit.Reset has no way to reset to a specific branch
-	commitHASH, err := er.checkout(branchRef)
-	if err != nil {
-		return err
-	}
-
+	// before: g.reset(branch)
 	// Try to reset to the given commit, if success exit
-	err = er.hardReset(commitHASH)
+	localBranchFullName := fmt.Sprintf("refs/heads/%s", branch)
+	err = er.hardReset(localBranchFullName)
 	if err == nil {
 		return nil
 	}
+
+	// before: fetchAndReset(branch)
 	// If we do not have the commit locally, fetch and reset
-	return er.fetchAndReset(commitHASH, branch)
+	// return er.fetchAndReset(plumbing.ZeroHash, branch)
+	return er.fetchAndReset(branch)
 }
 
 // Head builds the configuration for a new repo which will be cloned for the first time
@@ -58,8 +57,8 @@ func (er *extendedRepo) CloneHead(branch string) (string, error) {
 		return "", err
 	}
 
-	zeroHash := plumbing.NewHash("")
-	err = er.hardReset(zeroHash)
+	// before: reset("HEAD")
+	err = er.hardReset("HEAD")
 	if err != nil {
 		return "", err
 	}
@@ -96,8 +95,8 @@ func (er *extendedRepo) UpdateToLatestRef(branch string) (string, error) {
 		return "", err
 	}
 
-	zeroHash := plumbing.NewHash("")
-	err = er.hardReset(zeroHash)
+	// before: reset("HEAD")
+	err = er.hardReset("HEAD")
 	if err != nil {
 		return "", err
 	}
@@ -112,7 +111,9 @@ func (er *extendedRepo) UpdateToLatestRef(branch string) (string, error) {
 		return commit.String(), err
 	}
 
-	err = er.fetchAndReset(lastCommit, branch)
+	// before: g.fetchAndReset(branch)
+	// err = er.fetchAndReset(lastCommit, branch)
+	err = er.fetchAndReset(branch)
 	if err != nil {
 		return commit.String(), err
 	}

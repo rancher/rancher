@@ -13,9 +13,10 @@ import (
 )
 
 const (
-	stateDir  = "management-state/git-repo"
-	staticDir = "/var/lib/rancher-data/local-catalogs/v2"
-	localDir  = "../rancher-data/local-catalogs/v2" // identical to helm.InternalCatalog
+	stateDir             = "management-state/git-repo"
+	staticDir            = "/var/lib/rancher-data/local-catalogs/v2"
+	localDir             = "../rancher-data/local-catalogs/v2" // identical to helm.InternalCatalog
+	localReferenceBranch = "refs/heads/"
 )
 
 func gitDir(namespace, name, gitURL string) string {
@@ -33,6 +34,10 @@ func gitDir(namespace, name, gitURL string) string {
 // isBundled check if the repositories are bundled on local static directory
 func isBundled(git *git) bool {
 	return strings.HasPrefix(git.Directory, staticDir)
+}
+
+func isLocalBranch(branch string) bool {
+	return strings.HasPrefix(branch, localReferenceBranch)
 }
 
 // isGitSSH checks if the url is parsable to ssh url standard
