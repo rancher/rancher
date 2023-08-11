@@ -587,7 +587,7 @@ func TestInstall(t *testing.T) {
 		contentMock, opsMock, podsMock, settingsMock, helmMock, clusterRepoMock :=
 			&mocks.ContentClient{}, &mocks.OperationClient{}, &mocks.PodClient{}, &mocks.SettingController{}, &mocks.HelmClient{}, &mocks.ClusterRepoController{}
 
-		contentMock.On("Index", "", "rancher-charts", true).Return(test.mocks.indexOutput, test.mocks.indexError)
+		contentMock.On("Index", "", "rancher-charts", "", true).Return(test.mocks.indexOutput, test.mocks.indexError)
 		helmMock.On("ListReleases", test.input.namespace, test.input.name, action.ListDeployed).Return(test.mocks.isInstalledReleasesOutput, test.mocks.isInstalledReleasesError)
 		helmMock.On("ListReleases", test.input.namespace, test.input.name, action.ListPendingInstall|action.ListPendingUpgrade|action.ListPendingRollback).Return(test.mocks.hasStatusOutput, test.mocks.hasStatusError)
 		opsMock.On("Upgrade", context.TODO(), installUser, "", "rancher-charts", versionMatcher, test.input.installImageOverride).Return(test.mocks.upgradeOutput, test.mocks.upgradeError)

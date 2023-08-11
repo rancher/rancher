@@ -12,25 +12,25 @@ type ContentClient struct {
 	mock.Mock
 }
 
-// Index provides a mock function with given fields: namespace, name, skipFilter
-func (_m *ContentClient) Index(namespace string, name string, skipFilter bool) (*repo.IndexFile, error) {
-	ret := _m.Called(namespace, name, skipFilter)
+// Index provides a mock function with given fields: namespace, name, targetK8sVersion, skipFilter
+func (_m *ContentClient) Index(namespace string, name string, targetK8sVersion string, skipFilter bool) (*repo.IndexFile, error) {
+	ret := _m.Called(namespace, name, targetK8sVersion, skipFilter)
 
 	var r0 *repo.IndexFile
 	var r1 error
-	if rf, ok := ret.Get(0).(func(string, string, bool) (*repo.IndexFile, error)); ok {
-		return rf(namespace, name, skipFilter)
+	if rf, ok := ret.Get(0).(func(string, string, string, bool) (*repo.IndexFile, error)); ok {
+		return rf(namespace, name, targetK8sVersion, skipFilter)
 	}
-	if rf, ok := ret.Get(0).(func(string, string, bool) *repo.IndexFile); ok {
-		r0 = rf(namespace, name, skipFilter)
+	if rf, ok := ret.Get(0).(func(string, string, string, bool) *repo.IndexFile); ok {
+		r0 = rf(namespace, name, targetK8sVersion, skipFilter)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*repo.IndexFile)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(string, string, bool) error); ok {
-		r1 = rf(namespace, name, skipFilter)
+	if rf, ok := ret.Get(1).(func(string, string, string, bool) error); ok {
+		r1 = rf(namespace, name, targetK8sVersion, skipFilter)
 	} else {
 		r1 = ret.Error(1)
 	}
