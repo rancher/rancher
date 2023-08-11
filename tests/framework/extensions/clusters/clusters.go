@@ -34,6 +34,22 @@ const (
 	FleetSteveResourceType        = "fleet.cattle.io.cluster"
 )
 
+// GetV1ProvisioningClusterByName is a helper function that returns the cluster ID by name
+func GetV1ProvisioningClusterByName(client *rancher.Client, clusterName string) (string, error) {
+	clusterList, err := client.Steve.SteveType(ProvisioningSteveResourceType).List(nil)
+	if err != nil {
+		return "", err
+	}
+
+	for _, cluster := range clusterList.Data {
+		if cluster.Name == clusterName {
+			return cluster.ID, nil
+		}
+	}
+
+	return "", nil
+}
+
 // GetClusterIDByName is a helper function that returns the cluster ID by name
 func GetClusterIDByName(client *rancher.Client, clusterName string) (string, error) {
 	clusterList, err := client.Management.Cluster.List(&types.ListOpts{})
