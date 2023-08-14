@@ -61,7 +61,6 @@ func (rb *RBTestSuite) SetupSuite() {
 
 func (rb *RBTestSuite) ValidateListCluster(role string) {
 
-	log.Info("Verify cluster members - Owner/member,  Project members - Owner/member are able to list clusters")
 	clusterList, err := rb.standardUserClient.Steve.SteveType(clusters.ProvisioningSteveResourceType).ListAll(nil)
 	require.NoError(rb.T(), err)
 	clusterStatus := &apiV1.ClusterStatus{}
@@ -81,7 +80,6 @@ func (rb *RBTestSuite) ValidateListCluster(role string) {
 
 func (rb *RBTestSuite) ValidateListProjects(role string) {
 
-	log.Info("Verify members of cluster are able to list the projects in a cluster")
 	//Get project list as an admin
 	projectlistAdmin, err := listProjects(rb.client, rb.cluster.ID)
 	require.NoError(rb.T(), err)
@@ -107,7 +105,6 @@ func (rb *RBTestSuite) ValidateListProjects(role string) {
 
 func (rb *RBTestSuite) ValidateCreateProjects(role string) {
 
-	log.Info("Validating if cluster members can create a project in the downstream cluster")
 	createProjectAsClusterMembers, err := createProject(rb.standardUserClient, rb.cluster.ID)
 	switch role {
 	case roleOwner, roleMember, restrictedAdmin:
@@ -208,7 +205,6 @@ func (rb *RBTestSuite) ValidateNS(role string) {
 
 func (rb *RBTestSuite) ValidateAddClusterRoles(role string) {
 
-	log.Info("Validating if project members are able to add other members in cluster")
 	errUserRole := users.AddClusterRoleToUser(rb.standardUserClient, rb.cluster, rb.additionalUser, roleOwner)
 
 	switch role {
@@ -226,7 +222,6 @@ func (rb *RBTestSuite) ValidateAddClusterRoles(role string) {
 
 func (rb *RBTestSuite) ValidateAddProjectRoles(role string) {
 
-	log.Info("Validating if project owners/ restricted admins/ project members are able to add another standard user as a project members")
 	errUserRole := users.AddProjectMember(rb.standardUserClient, rb.adminProject, rb.additionalUser, roleProjectOwner)
 
 	additionalUserClient, err := rb.additionalUserClient.ReLogin()
@@ -254,7 +249,6 @@ func (rb *RBTestSuite) ValidateAddProjectRoles(role string) {
 
 func (rb *RBTestSuite) ValidateDeleteProject(role string) {
 
-	log.Info("Validating if cluster members are able to delete the admin created project")
 	err := rb.standardUserClient.Management.Project.Delete(rb.adminProject)
 
 	switch role {
@@ -273,39 +267,17 @@ func (rb *RBTestSuite) ValidateDeleteProject(role string) {
 
 func (rb *RBTestSuite) ValidateRemoveClusterRoles() {
 
-	log.Info("Removing added cluster member from the cluster as an admin")
 	err := users.RemoveClusterRoleFromUser(rb.client, rb.standardUser)
 	require.NoError(rb.T(), err)
 }
 
 func (rb *RBTestSuite) ValidateRemoveProjectRoles() {
 
-	log.Info("Removing added project member from the cluster projects as an admin")
 	err := users.RemoveProjectMember(rb.client, rb.standardUser)
 	require.NoError(rb.T(), err)
 
 }
 
-func (rb *RBTestSuite) ValidateListGlobalSettings() {
-	adminListSettings, err := listGlobalSettings(rb.steveAdminClient)
-	require.NoError(rb.T(), err)
-	resAdminListSettings, err := listGlobalSettings(rb.steveStdUserclient)
-	require.NoError(rb.T(), err)
-
-	assert.Equal(rb.T(), len(adminListSettings), len(resAdminListSettings))
-	assert.Equal(rb.T(), adminListSettings, resAdminListSettings)
-}
-
-func (rb *RBTestSuite) ValidateEditGlobalSettings() {
-	kubeConfigTokenSetting, err := rb.steveStdUserclient.SteveType("management.cattle.io.setting").ByID(kubeConfigTokenSettingID)
-	require.NoError(rb.T(), err)
-
-	_, err = editGlobalSettings(rb.steveStdUserclient, kubeConfigTokenSetting, "3")
-	require.Error(rb.T(), err)
-	errMessage := strings.Split(err.Error(), ":")[0]
-	assert.Equal(rb.T(), "Resource type [management.cattle.io.setting] is not updatable", errMessage)
-
-}
 
 func (rb *RBTestSuite) TestRBAC() {
 	tests := []struct {
@@ -396,7 +368,7 @@ func (rb *RBTestSuite) TestRBAC() {
 		if !strings.Contains(tt.role, "cluster") {
 			rb.Run("Validating if member with role "+tt.name+" can add members to the cluster", func() {
 				//Set up additional user client to be added to the project
-				additionalUser, err := users.CreateUserWithRole(rb.client, users.UserConfig(), tt.member)
+				additionalUser, err := users.CreateUserWithRole(rb.client, users.UserConfig(), standardUser)
 				require.NoError(rb.T(), err)
 				rb.additionalUser = additionalUser
 				rb.additionalUserClient, err = rb.client.AsUser(rb.additionalUser)
