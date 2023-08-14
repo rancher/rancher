@@ -58,13 +58,13 @@ func (h *handler) OnChange(key string, secret *corev1.Secret) (*corev1.Secret, e
 	}
 
 	if v, ok := node.PeriodicOutput["etcd-snapshot-list-local"]; ok && v.ExitCode == 0 && len(v.Stdout) > 0 {
-		if err := h.reconcileEtcdSnapshotList(secret, false, v.Stdout); err != nil {
+		if err := h.reconcileEtcdSnapshotList(secret, false, v.Stdout, false); err != nil {
 			logrus.Errorf("[plansecret] error reconciling local snapshot list for secret %s/%s: %v", secret.Namespace, secret.Name, err)
 		}
 	}
 
-	if v, ok := node.PeriodicOutput["etcd-snapshot-list-s3"]; ok && v.ExitCode == 0 && len(v.Stdout) > 0 && secret.Labels[capr.InitNodeLabel] == "true" {
-		if err := h.reconcileEtcdSnapshotList(secret, true, v.Stdout); err != nil {
+	if v, ok := node.PeriodicOutput["etcd-snapshot-list-s3"]; ok && secret.Labels[capr.InitNodeLabel] == "true" {
+		if err := h.reconcileEtcdSnapshotList(secret, true, v.Stdout, v.ExitCode != 0); err != nil {
 			logrus.Errorf("[plansecret] error reconciling S3 snapshot list for secret %s/%s: %v", secret.Namespace, secret.Name, err)
 		}
 	}
@@ -166,7 +166,7 @@ func machineOwnerRef(machine capi.Machine) metav1.OwnerReference {
 	}
 }
 
-func (h *handler) reconcileEtcdSnapshotList(secret *corev1.Secret, s3 bool, listStdout []byte) error {
+func (h *handler) reconcileEtcdSnapshotList(secret *corev1.Secret, s3 bool, listStdout []byte, s3Error bool) error {
 	cnl := secret.Labels[capr.ClusterNameLabel]
 	if len(cnl) == 0 {
 		return fmt.Errorf("node secret did not have label %s", capr.ClusterNameLabel)
@@ -213,7 +213,7 @@ func (h *handler) reconcileEtcdSnapshotList(secret *corev1.Secret, s3 bool, list
 	indexedEtcdSnapshots := map[string]*v1.ETCDSnapshot{}
 
 	for _, v := range etcdSnapshots {
-		if _, ok := etcdSnapshotsOnNode[v.Name]; !ok && v.Status.Missing {
+		if _, ok := etcdSnapshotsOnNode[v.Name]; (!s3Error && !ok && v.Status.Missing) || (s3Error && v.Status.Missing && v.SnapshotFile.Status == "failed") {
 			// delete the etcd snapshot as it is missing
 			logrus.Infof("[plansecret] Deleting etcd snapshot %s/%s", v.Namespace, v.Name)
 			if err := h.etcdSnapshotsClient.Delete(v.Namespace, v.Name, &metav1.DeleteOptions{}); err != nil {
