@@ -6,6 +6,7 @@ import (
 
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	steveV1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
+	"github.com/rancher/rancher/tests/framework/extensions/provisioninginput"
 	"github.com/rancher/rancher/tests/framework/extensions/workloads"
 	namegenerator "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 	"github.com/sirupsen/logrus"
@@ -15,18 +16,16 @@ import (
 )
 
 const (
-	containerName     = "nginx"
-	deploymentName    = "nginx"
-	imageName         = "nginx"
-	namespace         = "default"
-	rancherPrivileged = "rancher-privileged"
-	rancherRestricted = "rancher-restricted"
-	workload          = "workload"
+	containerName  = "nginx"
+	deploymentName = "nginx"
+	imageName      = "nginx"
+	namespace      = "default"
+	workload       = "workload"
 )
 
 // CreateTestDeployment will create an nginx deployment into the default namespace. If the PSACT value is rancher-privileged, then the
 // deployment should successfully create. If the PSACT value is rancher-unprivileged, then the deployment should fail to create.
-func CreateNginxDeployment(client *rancher.Client, clusterID string, psact string) (*steveV1.SteveAPIObject, error) {
+func CreateNginxDeployment(client *rancher.Client, clusterID string, psact string) error {
 	labels := map[string]string{}
 	labels["workload.user.cattle.io/workloadselector"] = fmt.Sprintf("apps.deployment-%v-%v", namespace, workload)
 
@@ -36,7 +35,7 @@ func CreateNginxDeployment(client *rancher.Client, clusterID string, psact strin
 
 	steveclient, err := client.Steve.ProxyDownstream(clusterID)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// If the deployment already exists, then create a new deployment with a different name to avoid a naming conflict.
@@ -44,9 +43,10 @@ func CreateNginxDeployment(client *rancher.Client, clusterID string, psact strin
 		deploymentTemplate.Name = deploymentTemplate.Name + "-" + namegenerator.RandStringLower(5)
 	}
 
+	logrus.Infof("Creating deployment %s", deploymentTemplate.Name)
 	_, err = steveclient.SteveType(workloads.DeploymentSteveType).Create(deploymentTemplate)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	err = kwait.Poll(5*time.Second, 5*time.Minute, func() (done bool, err error) {
@@ -68,10 +68,10 @@ func CreateNginxDeployment(client *rancher.Client, clusterID string, psact strin
 			return false, err
 		}
 
-		if *deployment.Spec.Replicas == deployment.Status.AvailableReplicas && (psact == "" || psact == rancherPrivileged) {
+		if *deployment.Spec.Replicas == deployment.Status.AvailableReplicas && (psact == string(provisioninginput.RancherPrivileged) || psact == string(provisioninginput.RancherBaseline)) {
 			logrus.Infof("Deployment %s successfully created; this is expected for %s!", deployment.Name, psact)
 			return true, nil
-		} else if *deployment.Spec.Replicas != deployment.Status.AvailableReplicas && psact == rancherRestricted {
+		} else if *deployment.Spec.Replicas != deployment.Status.AvailableReplicas && psact == string(provisioninginput.RancherRestricted) {
 			logrus.Infof("Deployment %s failed to create; this is expected for %s!", deployment.Name, psact)
 			return true, nil
 		}
@@ -79,5 +79,16 @@ func CreateNginxDeployment(client *rancher.Client, clusterID string, psact strin
 		return false, nil
 	})
 
-	return nil, err
+	deploymentResp, err := steveclient.SteveType(workloads.DeploymentSteveType).ByID(deploymentTemplate.Namespace + "/" + deploymentTemplate.Name)
+	if err != nil {
+		return err
+	}
+
+	logrus.Infof("Deleting deployment %s", deploymentResp.Name)
+	err = steveclient.SteveType(workloads.DeploymentSteveType).Delete(deploymentResp)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

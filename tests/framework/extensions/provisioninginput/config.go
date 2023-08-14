@@ -17,6 +17,7 @@ const (
 	PSPKubeVersionLimit     Version = "v1.24.99"
 	RancherPrivileged       PSACT   = "rancher-privileged"
 	RancherRestricted       PSACT   = "rancher-restricted"
+	RancherBaseline         PSACT   = "rancher-baseline"
 )
 
 // ProviderName is string enum for provider names used in provisioning tests.

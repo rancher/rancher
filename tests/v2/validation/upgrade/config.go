@@ -11,11 +11,9 @@ import (
 type PSACT string
 
 const (
-	ConfigurationFileKey       = "upgradeInput" // ConfigurationFileKey is used to parse the configuration of upgrade tests.
-	localClusterID             = "local"        // localClusterID is a string to used ignore this cluster in comparisons
-	latestKey                  = "latest"       // latestKey is a string to determine automatically version pooling to the latest possible
-	RancherPrivileged    PSACT = "rancher-privileged"
-	RancherRestricted    PSACT = "rancher-restricted"
+	ConfigurationFileKey = "upgradeInput" // ConfigurationFileKey is used to parse the configuration of upgrade tests.
+	localClusterID       = "local"        // localClusterID is a string to used ignore this cluster in comparisons
+	latestKey            = "latest"       // latestKey is a string to determine automatically version pooling to the latest possible
 )
 
 type Clusters struct {

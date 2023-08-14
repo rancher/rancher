@@ -31,8 +31,10 @@ import (
 )
 
 const (
-	ProvisioningSteveResourceType = "provisioning.cattle.io.cluster"
-	FleetSteveResourceType        = "fleet.cattle.io.cluster"
+	ProvisioningSteveResourceType        = "provisioning.cattle.io.cluster"
+	FleetSteveResourceType               = "fleet.cattle.io.cluster"
+	PodSecurityAdmissionSteveResoureType = "management.cattle.io.podsecurityadmissionconfigurationtemplate"
+	baseline                             = "baseline"
 )
 
 // GetV1ProvisioningClusterByName is a helper function that returns the cluster ID by name
@@ -137,6 +139,63 @@ func CheckServiceAccountTokenSecret(client *rancher.Client, clusterName string) 
 		logrus.Warn("warning: serviceAccountTokenSecret does not exist in this cluster!")
 		return false, nil
 	}
+}
+
+// CreateRancherBaselinePSACT creates custom PSACT called rancher-baseline which sets each PSS to baseline.
+func CreateRancherBaselinePSACT(client *rancher.Client, psact string) error {
+	_, err := client.Steve.SteveType(PodSecurityAdmissionSteveResoureType).ByID(psact)
+	if err == nil {
+		return err
+	}
+
+	template := &v3.PodSecurityAdmissionConfigurationTemplate{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: psact,
+		},
+		Description: "This is a custom baseline Pod Security Admission Configuration Template. " +
+			"It defines a minimally restrictive policy which prevents known privilege escalations. " +
+			"This policy contains namespace level exemptions for Rancher components.",
+		Configuration: v3.PodSecurityAdmissionConfigurationTemplateSpec{
+			Defaults: v3.PodSecurityAdmissionConfigurationTemplateDefaults{
+				Enforce: baseline,
+				Audit:   baseline,
+				Warn:    baseline,
+			},
+			Exemptions: v3.PodSecurityAdmissionConfigurationTemplateExemptions{
+				Usernames:      []string{},
+				RuntimeClasses: []string{},
+				Namespaces: []string{
+					"ingress-nginx",
+					"kube-system",
+					"cattle-system",
+					"cattle-epinio-system",
+					"cattle-fleet-system",
+					"longhorn-system",
+					"cattle-neuvector-system",
+					"cattle-monitoring-system",
+					"rancher-alerting-drivers",
+					"cis-operator-system",
+					"cattle-csp-adapter-system",
+					"cattle-externalip-system",
+					"cattle-gatekeeper-system",
+					"istio-system",
+					"cattle-istio-system",
+					"cattle-logging-system",
+					"cattle-windows-gmsa-system",
+					"cattle-sriov-system",
+					"cattle-ui-plugin-system",
+					"tigera-operator",
+				},
+			},
+		},
+	}
+
+	_, err = client.Steve.SteveType(PodSecurityAdmissionSteveResoureType).Create(template)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // NewRKE1lusterConfig is a constructor for a v3.Cluster object, to be used by the rancher.Client.Provisioning client.

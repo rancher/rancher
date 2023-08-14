@@ -53,9 +53,6 @@ func VerifyRKE1Cluster(t *testing.T, client *rancher.Client, clustersConfig *clu
 	})
 	require.NoError(t, err)
 
-	err = nodestat.AllManagementNodeReady(client, cluster.ID)
-	require.NoError(t, err)
-
 	checkFunc := clusters.IsHostedProvisioningClusterReady
 	err = wait.WatchWait(watchInterface, checkFunc)
 	require.NoError(t, err)
@@ -66,14 +63,13 @@ func VerifyRKE1Cluster(t *testing.T, client *rancher.Client, clustersConfig *clu
 	require.NoError(t, err)
 	assert.NotEmpty(t, clusterToken)
 
-	podResults, podErrors := pods.StatusPods(client, cluster.ID)
-	assert.NotEmpty(t, podResults)
-	assert.Empty(t, podErrors)
+	err = nodestat.AllManagementNodeReady(client, cluster.ID)
+	require.NoError(t, err)
 
-	if clustersConfig.PSACT == string(provisioninginput.RancherPrivileged) || clustersConfig.PSACT == string(provisioninginput.RancherRestricted) {
+	if clustersConfig.PSACT == string(provisioninginput.RancherPrivileged) || clustersConfig.PSACT == string(provisioninginput.RancherRestricted) || clustersConfig.PSACT == string(provisioninginput.RancherBaseline) {
 		require.NotEmpty(t, cluster.DefaultPodSecurityAdmissionConfigurationTemplateName)
 
-		_, err = psadeploy.CreateNginxDeployment(client, cluster.ID, clustersConfig.PSACT)
+		err := psadeploy.CreateNginxDeployment(client, cluster.ID, clustersConfig.PSACT)
 		require.NoError(t, err)
 	}
 	if clustersConfig.Registries != nil {
@@ -90,6 +86,10 @@ func VerifyRKE1Cluster(t *testing.T, client *rancher.Client, clustersConfig *clu
 			VerifyACE(t, adminClient, cluster)
 		}
 	}
+
+	podResults, podErrors := pods.StatusPods(client, cluster.ID)
+	assert.NotEmpty(t, podResults)
+	assert.Empty(t, podErrors)
 }
 
 // VerifyCluster validates that a non-rke1 cluster and its resources are in a good state, matching a given config.
@@ -108,8 +108,6 @@ func VerifyCluster(t *testing.T, client *rancher.Client, cluster *steveV1.SteveA
 		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
 	})
 	require.NoError(t, err)
-	err = nodestat.AllMachineReady(client, cluster.ID)
-	require.NoError(t, err)
 
 	checkFunc := clusters.IsProvisioningClusterReady
 	err = wait.WatchWait(watchInterface, checkFunc)
@@ -119,13 +117,12 @@ func VerifyCluster(t *testing.T, client *rancher.Client, cluster *steveV1.SteveA
 	require.NoError(t, err)
 	assert.NotEmpty(t, clusterToken)
 
+	err = nodestat.AllMachineReady(client, cluster.ID)
+	require.NoError(t, err)
+
 	status := &provv1.ClusterStatus{}
 	err = steveV1.ConvertToK8sType(cluster.Status, status)
 	require.NoError(t, err)
-
-	podResults, podErrors := pods.StatusPods(client, status.ClusterName)
-	assert.Empty(t, podErrors)
-	assert.NotEmpty(t, podResults)
 
 	clusterSpec := &provv1.ClusterSpec{}
 	err = steveV1.ConvertToK8sType(cluster.Spec, clusterSpec)
@@ -135,11 +132,12 @@ func VerifyCluster(t *testing.T, client *rancher.Client, cluster *steveV1.SteveA
 	require.Equal(t, configKubeVersion, clusterSpec.KubernetesVersion)
 
 	if clusterSpec.DefaultPodSecurityAdmissionConfigurationTemplateName == string(provisioninginput.RancherPrivileged) ||
-		clusterSpec.DefaultPodSecurityAdmissionConfigurationTemplateName == string(provisioninginput.RancherRestricted) {
+		clusterSpec.DefaultPodSecurityAdmissionConfigurationTemplateName == string(provisioninginput.RancherRestricted) ||
+		clusterSpec.DefaultPodSecurityAdmissionConfigurationTemplateName == string(provisioninginput.RancherBaseline) {
 
 		require.NotEmpty(t, clusterSpec.DefaultPodSecurityAdmissionConfigurationTemplateName)
 
-		_, err = psadeploy.CreateNginxDeployment(client, status.ClusterName, clusterSpec.DefaultPodSecurityAdmissionConfigurationTemplateName)
+		err := psadeploy.CreateNginxDeployment(client, status.ClusterName, clusterSpec.DefaultPodSecurityAdmissionConfigurationTemplateName)
 		require.NoError(t, err)
 	}
 
@@ -156,6 +154,10 @@ func VerifyCluster(t *testing.T, client *rancher.Client, cluster *steveV1.SteveA
 		require.NoError(t, err)
 		VerifyACE(t, adminClient, mgmtClusterObject)
 	}
+
+	podResults, podErrors := pods.StatusPods(client, status.ClusterName)
+	assert.Empty(t, podErrors)
+	assert.NotEmpty(t, podResults)
 }
 
 // CertRotationCompleteCheckFunc returns a watch check function that checks if the certificate rotation is complete
