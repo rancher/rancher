@@ -39,7 +39,7 @@ func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.U
 	nsserviceaccount.Register(ctx, cluster)
 	if features.RKE2.Enabled() {
 		// Just register the snapshot controller  if the cluster is administrated by rancher.
-		if administratedByRancher, ok := clusterRec.Annotations["provisioning.cattle.io/administrated"]; ok && administratedByRancher == "true" {
+		if clusterRec.Annotations["provisioning.cattle.io/administrated"] == "true" {
 			snapshotbackpopulate.Register(ctx, cluster)
 		}
 		pspdelete.Register(ctx, cluster)
