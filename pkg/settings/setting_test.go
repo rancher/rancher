@@ -3,13 +3,13 @@ package settings
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/sirupsen/logrus"
 	"io"
-	v1 "k8s.io/api/core/v1"
 	"os"
 	"testing"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	v1 "k8s.io/api/core/v1"
 )
 
 func TestIsRelease(t *testing.T) {
