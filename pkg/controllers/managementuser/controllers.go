@@ -38,7 +38,7 @@ func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.U
 	windows.Register(ctx, clusterRec, cluster)
 	nsserviceaccount.Register(ctx, cluster)
 	if features.RKE2.Enabled() {
-		// Just register the snapshot controller  if the cluster is administrated by rancher.
+		// Just register the snapshot controller if the cluster is administrated by rancher.
 		if clusterRec.Annotations["provisioning.cattle.io/administrated"] == "true" {
 			snapshotbackpopulate.Register(ctx, cluster)
 		}
