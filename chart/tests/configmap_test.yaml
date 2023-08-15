@@ -5,7 +5,8 @@ templates:
 tests:
   - it: should set webhook value from string
     set:
-      webhook: 'hostNetwork: true
+      webhook: |-
+        hostNetwork: true
         newKey: newValue
         newlist:
           - list1
@@ -15,11 +16,11 @@ tests:
           entry1: 1
           entry2: 2
           entry3:
-            sub3: "sub"'
+            sub3: "sub"
     asserts:
       - equal:
           path: data.rancher-webhook
-          value: '
+          value: |-
             hostNetwork: true
             newKey: newValue
             newlist:
@@ -30,18 +31,22 @@ tests:
               entry1: 1
               entry2: 2
               entry3:
-                sub3: "sub"'
+                sub3: "sub"
 
   - it: should set webhook value from map
     set:
       webhook.hostNetwork: true
       webhook.newKey: 2
+      webhook.innerMap:
+        foo: bar
     asserts:
       - equal:
           path: data.rancher-webhook
-          value: "
+          value: |-
             hostNetwork: true
-            newKey: 2"
+            innerMap:
+              foo: bar
+            newKey: 2
 
   - it: should not set webhook values
     asserts:

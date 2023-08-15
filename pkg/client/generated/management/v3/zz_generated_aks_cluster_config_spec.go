@@ -16,6 +16,7 @@ const (
 	AKSClusterConfigSpecFieldLoadBalancerSKU             = "loadBalancerSku"
 	AKSClusterConfigSpecFieldLogAnalyticsWorkspaceGroup  = "logAnalyticsWorkspaceGroup"
 	AKSClusterConfigSpecFieldLogAnalyticsWorkspaceName   = "logAnalyticsWorkspaceName"
+	AKSClusterConfigSpecFieldManagedIdentity             = "managedIdentity"
 	AKSClusterConfigSpecFieldMonitoring                  = "monitoring"
 	AKSClusterConfigSpecFieldNetworkDNSServiceIP         = "dnsServiceIp"
 	AKSClusterConfigSpecFieldNetworkDockerBridgeCIDR     = "dockerBridgeCidr"
@@ -27,10 +28,12 @@ const (
 	AKSClusterConfigSpecFieldNodeResourceGroup           = "nodeResourceGroup"
 	AKSClusterConfigSpecFieldOutboundType                = "outboundType"
 	AKSClusterConfigSpecFieldPrivateCluster              = "privateCluster"
+	AKSClusterConfigSpecFieldPrivateDNSZone              = "privateDnsZone"
 	AKSClusterConfigSpecFieldResourceGroup               = "resourceGroup"
 	AKSClusterConfigSpecFieldResourceLocation            = "resourceLocation"
 	AKSClusterConfigSpecFieldSubnet                      = "subnet"
 	AKSClusterConfigSpecFieldTags                        = "tags"
+	AKSClusterConfigSpecFieldUserAssignedIdentity        = "userAssignedIdentity"
 	AKSClusterConfigSpecFieldVirtualNetwork              = "virtualNetwork"
 	AKSClusterConfigSpecFieldVirtualNetworkResourceGroup = "virtualNetworkResourceGroup"
 )
@@ -50,6 +53,7 @@ type AKSClusterConfigSpec struct {
 	LoadBalancerSKU             *string           `json:"loadBalancerSku,omitempty" yaml:"loadBalancerSku,omitempty"`
 	LogAnalyticsWorkspaceGroup  *string           `json:"logAnalyticsWorkspaceGroup,omitempty" yaml:"logAnalyticsWorkspaceGroup,omitempty"`
 	LogAnalyticsWorkspaceName   *string           `json:"logAnalyticsWorkspaceName,omitempty" yaml:"logAnalyticsWorkspaceName,omitempty"`
+	ManagedIdentity             **bool            `json:"managedIdentity,omitempty" yaml:"managedIdentity,omitempty"`
 	Monitoring                  *bool             `json:"monitoring,omitempty" yaml:"monitoring,omitempty"`
 	NetworkDNSServiceIP         *string           `json:"dnsServiceIp,omitempty" yaml:"dnsServiceIp,omitempty"`
 	NetworkDockerBridgeCIDR     *string           `json:"dockerBridgeCidr,omitempty" yaml:"dockerBridgeCidr,omitempty"`
@@ -61,10 +65,12 @@ type AKSClusterConfigSpec struct {
 	NodeResourceGroup           *string           `json:"nodeResourceGroup,omitempty" yaml:"nodeResourceGroup,omitempty"`
 	OutboundType                *string           `json:"outboundType,omitempty" yaml:"outboundType,omitempty"`
 	PrivateCluster              *bool             `json:"privateCluster,omitempty" yaml:"privateCluster,omitempty"`
+	PrivateDNSZone              *string           `json:"privateDnsZone,omitempty" yaml:"privateDnsZone,omitempty"`
 	ResourceGroup               string            `json:"resourceGroup,omitempty" yaml:"resourceGroup,omitempty"`
 	ResourceLocation            string            `json:"resourceLocation,omitempty" yaml:"resourceLocation,omitempty"`
 	Subnet                      *string           `json:"subnet,omitempty" yaml:"subnet,omitempty"`
 	Tags                        map[string]string `json:"tags,omitempty" yaml:"tags,omitempty"`
+	UserAssignedIdentity        *string           `json:"userAssignedIdentity,omitempty" yaml:"userAssignedIdentity,omitempty"`
 	VirtualNetwork              *string           `json:"virtualNetwork,omitempty" yaml:"virtualNetwork,omitempty"`
 	VirtualNetworkResourceGroup *string           `json:"virtualNetworkResourceGroup,omitempty" yaml:"virtualNetworkResourceGroup,omitempty"`
 }

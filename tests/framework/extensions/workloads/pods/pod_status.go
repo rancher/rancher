@@ -46,18 +46,30 @@ func StatusPods(client *rancher.Client, clusterID string) ([]string, []error) {
 				return false, err
 			}
 
+			if len(podStatus.ContainerStatuses) == 0 {
+				return false, nil
+			}
+
 			image := podStatus.ContainerStatuses[0].Image
 			phase := podStatus.Phase
+
 			if phase == corev1.PodFailed || phase == corev1.PodUnknown {
 				podErrors = append(podErrors, fmt.Errorf("ERROR: %s: %s", pod.Name, podStatus))
 				logrus.Infof("Pod %s: Not active | Image %s", pod.Name, image)
 				return false, nil
-			} else if phase == corev1.PodRunning {
+			}
+
+			if phase == corev1.PodRunning {
 				podResults = append(podResults, fmt.Sprintf("INFO: %s: %s\n", pod.Name, podStatus))
 				logrus.Infof("Pod %s: Active | Image: %s", pod.Name, image)
 			}
 		}
-		return true, nil
+
+		if len(podResults) > 0 && len(podErrors) == 0 {
+			return true, nil
+		}
+
+		return false, nil
 	})
 
 	if err != nil {
