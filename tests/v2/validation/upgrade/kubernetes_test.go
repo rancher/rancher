@@ -1,6 +1,7 @@
 package upgrade
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
@@ -13,6 +14,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+)
+
+const (
+	rke1KubeVersionCheck = "rancher"
+	rke2KubeVersionCheck = "rke2"
+	k3sKubeVersionCheck  = "k3s"
 )
 
 type UpgradeKubernetesTestSuite struct {
@@ -110,8 +117,11 @@ func (u *UpgradeKubernetesTestSuite) testUpgradeSingleCluster(clusterName, versi
 		u.T().Logf("[%v]: Validating updated cluster's nodepools kubernetes versions", clusterName)
 		validateNodepoolVersions(u.T(), client, updatedCluster, version, !isCheckingCurrentCluster)
 	}
-
-	err = nodestat.IsNodeReady(client, clusterMeta.ID)
+	if strings.Contains(versionToUpgrade, rke1KubeVersionCheck) {
+		err = nodestat.AllManagementNodeReady(client, clusterMeta.ID)
+	} else if strings.Contains(versionToUpgrade, rke2KubeVersionCheck) || strings.Contains(versionToUpgrade, k3sKubeVersionCheck) {
+		err = nodestat.AllMachineReady(client, clusterMeta.ID)
+	}
 	require.NoError(u.T(), err)
 
 	clusterToken, err := clusters.CheckServiceAccountTokenSecret(client, clusterName)
