@@ -246,6 +246,7 @@ var (
 	// SkipHostedClusterChartInstallation controls whether the hosted cluster chart is installed on the server. Defaults to false.
 	// This setting is for development purposes only.
 	SkipHostedClusterChartInstallation = NewSetting("skip-hosted-cluster-chart-installation", os.Getenv("CATTLE_SKIP_HOSTED_CLUSTER_CHART_INSTALLATION"))
+	MachineProvisionImagePullPolicy    = NewSetting("machine-provision-image-pull-policy", string(v1.PullAlways))
 )
 
 // FullShellImage returns the full private registry name of the rancher shell image.
@@ -446,5 +447,22 @@ func IterateWhitelistedEnvVars(handler func(name, value string)) {
 		if val := os.Getenv(wlVar); val != "" {
 			handler(wlVar, val)
 		}
+	}
+}
+
+// GetMachineProvisionImagePullPolicy will return the pull policy to be used on MachineProvisioning job.
+// If an invalid value is set it will return the default value: v1.PullAlways
+func GetMachineProvisionImagePullPolicy() v1.PullPolicy {
+	machineProvisionImagePullPolicy := MachineProvisionImagePullPolicy.Get()
+	switch v1.PullPolicy(machineProvisionImagePullPolicy) {
+	case v1.PullAlways:
+		return v1.PullAlways
+	case v1.PullIfNotPresent:
+		return v1.PullIfNotPresent
+	case v1.PullNever:
+		return v1.PullNever
+	default:
+		logrus.Warnf("failed to parse setting machine-provision-image-pull-policy value: %s defaulting to: %s", machineProvisionImagePullPolicy, v1.PullAlways)
+		return v1.PullAlways
 	}
 }
