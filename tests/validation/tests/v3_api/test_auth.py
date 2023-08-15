@@ -98,6 +98,39 @@ auth_setup_fname = \
     os.path.join(os.path.dirname(os.path.realpath(__file__)) + "/resource",
                  AUTH_PROVIDER.lower() + ".json")
 
+def test_add_multiple_users():
+    username_prefix = "chadnested"
+    auth_setup_data = setup["auth_setup_data"]
+
+    admin_user = auth_setup_data["admin_user"]
+    token = login(admin_user, PASSWORD)
+    client = get_client_for_token(token)
+
+    expected_status = "200"
+
+    for i in range(1, 1001):
+        username = username_prefix + str(i)
+        assign_user_to_cluster(client, principal_lookup(username, token),
+                               username, "cluster-owner")
+        login(username, PASSWORD, expected_status)
+
+    for i in range(1001, 2001):
+        username = username_prefix + str(i)
+        assign_user_to_cluster(client, principal_lookup(username, token),
+                               auth_setup_data["cluster_name"], "cluster-member")
+        login(username, PASSWORD, expected_status)
+
+    for i in range(2001, 3001):
+        username = username_prefix + str(i)
+        assign_user_to_project(client, principal_lookup(username, token),
+                               auth_setup_data["project_name"], "project-owner")
+        login(username, PASSWORD, expected_status)
+
+    for i in range(3001, 4001):
+        username = username_prefix + str(i)
+        assign_user_to_project(client, principal_lookup(username, token),
+                               auth_setup_data["project_name"], "project-member")
+        login(username, PASSWORD, expected_status)
 
 def test_access_control_required_set_access_mode_required():
     access_mode = "required"
