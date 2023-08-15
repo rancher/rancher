@@ -6,9 +6,9 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/clusters/eks"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters/gke"
 	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
+	"github.com/rancher/rancher/tests/framework/extensions/provisioninginput"
 	"github.com/rancher/rancher/tests/framework/extensions/rke1/nodetemplates"
 	"github.com/rancher/rancher/tests/framework/pkg/config"
-	"github.com/rancher/rancher/tests/v2/validation/provisioning"
 	"github.com/sirupsen/logrus"
 )
 
@@ -28,33 +28,33 @@ func UpdateRancherDownstreamClusterFields(cluster *RancherCluster, isCustom, isR
 // and if custom, additionally updates nodeProviders field.
 func UpdateProviderField(provider string, isCustom bool) {
 	switch provider {
-	case provisioning.AWSProviderName.String():
-		provisioningConfig := new(provisioning.Config)
-		config.LoadAndUpdateConfig(provisioning.ConfigurationFileKey, provisioningConfig, func() {
-			provisioningConfig.Providers = []string{provisioning.AWSProviderName.String()}
+	case provisioninginput.AWSProviderName.String():
+		provisioningConfig := new(provisioninginput.Config)
+		config.LoadAndUpdateConfig(provisioninginput.ConfigurationFileKey, provisioningConfig, func() {
+			provisioningConfig.Providers = []string{provisioninginput.AWSProviderName.String()}
 			if isCustom {
 				provisioningConfig.NodeProviders = []string{"ec2"}
 			}
 		})
-	case provisioning.AzureProviderName.String():
-		provisioningConfig := new(provisioning.Config)
-		config.LoadAndUpdateConfig(provisioning.ConfigurationFileKey, provisioningConfig, func() {
-			provisioningConfig.Providers = []string{provisioning.AzureProviderName.String()}
+	case provisioninginput.AzureProviderName.String():
+		provisioningConfig := new(provisioninginput.Config)
+		config.LoadAndUpdateConfig(provisioninginput.ConfigurationFileKey, provisioningConfig, func() {
+			provisioningConfig.Providers = []string{provisioninginput.AzureProviderName.String()}
 		})
-	case provisioning.DOProviderName.String():
-		provisioningConfig := new(provisioning.Config)
-		config.LoadAndUpdateConfig(provisioning.ConfigurationFileKey, provisioningConfig, func() {
-			provisioningConfig.Providers = []string{provisioning.DOProviderName.String()}
+	case provisioninginput.DOProviderName.String():
+		provisioningConfig := new(provisioninginput.Config)
+		config.LoadAndUpdateConfig(provisioninginput.ConfigurationFileKey, provisioningConfig, func() {
+			provisioningConfig.Providers = []string{provisioninginput.DOProviderName.String()}
 		})
-	case provisioning.HarvesterProviderName.String():
-		provisioningConfig := new(provisioning.Config)
-		config.LoadAndUpdateConfig(provisioning.ConfigurationFileKey, provisioningConfig, func() {
-			provisioningConfig.Providers = []string{provisioning.HarvesterProviderName.String()}
+	case provisioninginput.HarvesterProviderName.String():
+		provisioningConfig := new(provisioninginput.Config)
+		config.LoadAndUpdateConfig(provisioninginput.ConfigurationFileKey, provisioningConfig, func() {
+			provisioningConfig.Providers = []string{provisioninginput.HarvesterProviderName.String()}
 		})
-	case provisioning.LinodeProviderName.String():
-		provisioningConfig := new(provisioning.Config)
-		config.LoadAndUpdateConfig(provisioning.ConfigurationFileKey, provisioningConfig, func() {
-			provisioningConfig.Providers = []string{provisioning.LinodeProviderName.String()}
+	case provisioninginput.LinodeProviderName.String():
+		provisioningConfig := new(provisioninginput.Config)
+		config.LoadAndUpdateConfig(provisioninginput.ConfigurationFileKey, provisioningConfig, func() {
+			provisioningConfig.Providers = []string{provisioninginput.LinodeProviderName.String()}
 		})
 	default:
 		logrus.Error("Couldn't match provider")
@@ -65,7 +65,7 @@ func UpdateProviderField(provider string, isCustom bool) {
 // depending on the provider type.
 func UpdateRKE1ImageFields(provider, image, sshUser, volumeType string, isCustom bool) {
 	switch provider {
-	case provisioning.AWSProviderName.String():
+	case provisioninginput.AWSProviderName.String():
 		if !isCustom {
 			nodeTemplate := new(nodetemplates.AmazonEC2NodeTemplateConfig)
 			config.LoadAndUpdateConfig(nodetemplates.AmazonEC2NodeTemplateConfigurationFileKey, nodeTemplate, func() {
@@ -82,19 +82,19 @@ func UpdateRKE1ImageFields(provider, image, sshUser, volumeType string, isCustom
 				}
 			})
 		}
-	case provisioning.AzureProviderName.String():
+	case provisioninginput.AzureProviderName.String():
 		nodeTemplate := new(nodetemplates.AzureNodeTemplateConfig)
 		config.LoadAndUpdateConfig(nodetemplates.AzureNodeTemplateConfigurationFileKey, nodeTemplate, func() {
 			nodeTemplate.Image = image
 			nodeTemplate.SSHUser = sshUser
 		})
-	case provisioning.HarvesterProviderName.String():
+	case provisioninginput.HarvesterProviderName.String():
 		nodeTemplate := new(nodetemplates.HarvesterNodeTemplateConfig)
 		config.LoadAndUpdateConfig(nodetemplates.HarvesterNodeTemplateConfigurationFileKey, nodeTemplate, func() {
 			nodeTemplate.ImageName = image
 			nodeTemplate.SSHUser = sshUser
 		})
-	case provisioning.LinodeProviderName.String():
+	case provisioninginput.LinodeProviderName.String():
 		nodeTemplate := new(nodetemplates.LinodeNodeTemplateConfig)
 		config.LoadAndUpdateConfig(nodetemplates.LinodeNodeTemplateConfigurationFileKey, nodeTemplate, func() {
 			nodeTemplate.Image = image
@@ -109,7 +109,7 @@ func UpdateRKE1ImageFields(provider, image, sshUser, volumeType string, isCustom
 // depending on the provider type.
 func UpdateRKE2ImageFields(provider, image, sshUser, volumeType string, isCustom bool) {
 	switch provider {
-	case provisioning.AWSProviderName.String():
+	case provisioninginput.AWSProviderName.String():
 		if !isCustom {
 			machineConfig := new(machinepools.AWSMachineConfig)
 			config.LoadAndUpdateConfig(machinepools.AWSMachineConfigConfigurationFileKey, machineConfig, func() {
@@ -126,25 +126,25 @@ func UpdateRKE2ImageFields(provider, image, sshUser, volumeType string, isCustom
 				}
 			})
 		}
-	case provisioning.AzureProviderName.String():
+	case provisioninginput.AzureProviderName.String():
 		machineConfig := new(machinepools.AzureMachineConfig)
 		config.LoadAndUpdateConfig(machinepools.AzureMachineConfigConfigurationFileKey, machineConfig, func() {
 			machineConfig.Image = image
 			machineConfig.SSHUser = sshUser
 		})
-	case provisioning.DOProviderName.String():
+	case provisioninginput.DOProviderName.String():
 		machineConfig := new(machinepools.DOMachineConfig)
 		config.LoadAndUpdateConfig(machinepools.DOMachineConfigConfigurationFileKey, machineConfig, func() {
 			machineConfig.Image = image
 			machineConfig.SSHUser = sshUser
 		})
-	case provisioning.HarvesterProviderName.String():
+	case provisioninginput.HarvesterProviderName.String():
 		machineConfig := new(machinepools.HarvesterMachineConfig)
 		config.LoadAndUpdateConfig(machinepools.HarvesterMachineConfigConfigurationFileKey, machineConfig, func() {
 			machineConfig.ImageName = image
 			machineConfig.SSHUser = sshUser
 		})
-	case provisioning.LinodeProviderName.String():
+	case provisioninginput.LinodeProviderName.String():
 		machineConfig := new(machinepools.LinodeMachineConfig)
 		config.LoadAndUpdateConfig(machinepools.LinodeMachineConfigConfigurationFileKey, machineConfig, func() {
 			machineConfig.Image = image
@@ -159,17 +159,17 @@ func UpdateRKE2ImageFields(provider, image, sshUser, volumeType string, isCustom
 // depending on the provider type.
 func UpdateHostedKubernetesVField(provider, kubernetesVersion string) {
 	switch provider {
-	case provisioning.AWSProviderName.String():
+	case provisioninginput.AWSProviderName.String():
 		eksClusterConfig := new(eks.EKSClusterConfig)
 		config.LoadAndUpdateConfig(eks.EKSClusterConfigConfigurationFileKey, eksClusterConfig, func() {
 			eksClusterConfig.KubernetesVersion = &kubernetesVersion
 		})
-	case provisioning.AzureProviderName.String():
+	case provisioninginput.AzureProviderName.String():
 		aksClusterConfig := new(aks.AKSClusterConfig)
 		config.LoadAndUpdateConfig(aks.AKSClusterConfigConfigurationFileKey, aksClusterConfig, func() {
 			aksClusterConfig.KubernetesVersion = &kubernetesVersion
 		})
-	case provisioning.GoogleProviderName.String():
+	case provisioninginput.GoogleProviderName.String():
 		gkeClusterConfig := new(gke.GKEClusterConfig)
 		config.LoadAndUpdateConfig(gke.GKEClusterConfigConfigurationFileKey, gkeClusterConfig, func() {
 			gkeClusterConfig.KubernetesVersion = &kubernetesVersion

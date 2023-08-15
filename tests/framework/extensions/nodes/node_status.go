@@ -1,30 +1,31 @@
 package nodes
 
 import (
-	"net/url"
 	"time"
 
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
-	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 const (
-	active                   = "active"
+	activeState              = "active"
+	runningState             = "running"
+	errorState               = "error"
 	machineSteveResourceType = "cluster.x-k8s.io.machine"
+	machineSteveAnnotation   = "cluster.x-k8s.io/machine"
+	fleetNamespace           = "fleet-default"
 	etcdLabel                = "rke.cattle.io/etcd-role"
 	clusterLabel             = "cluster.x-k8s.io/cluster-name"
 	PollInterval             = time.Duration(5 * time.Second)
 	PollTimeout              = time.Duration(15 * time.Minute)
 )
 
-// IsNodeReady is a helper method that will loop and check if the node is ready in the RKE1 cluster.
+// AllManagementNodeReady is a helper method that will loop and check if the node is ready in the RKE1 cluster.
 // It will return an error if the node is not ready after set amount of time.
-func IsNodeReady(client *rancher.Client, ClusterID string) error {
-	err := wait.Poll(500*time.Millisecond, 30*time.Minute, func() (bool, error) {
+func AllManagementNodeReady(client *rancher.Client, ClusterID string) error {
+	err := wait.Poll(1*time.Second, 30*time.Minute, func() (bool, error) {
 		nodes, err := client.Management.Node.ListAll(&types.ListOpts{
 			Filters: map[string]interface{}{
 				"clusterId": ClusterID,
@@ -39,8 +40,11 @@ func IsNodeReady(client *rancher.Client, ClusterID string) error {
 			if err != nil {
 				return false, nil
 			}
-
-			if node.State != active {
+			if node.State == errorState {
+				logrus.Warnf("node %s is in error state", node.Name)
+				return false, nil
+			}
+			if node.State != activeState {
 				return false, nil
 			}
 		}
@@ -51,61 +55,62 @@ func IsNodeReady(client *rancher.Client, ClusterID string) error {
 	return err
 }
 
-func IsRKE1EtcdNodeReplaced(client *rancher.Client, etcdNodeToDelete management.Node, clusterResp *management.Cluster, numOfEtcdNodesBeforeDeletion int) (bool, error) {
-	numOfEtcdNodesAfterDeletion := 0
-
-	err := wait.Poll(PollInterval, PollTimeout, func() (done bool, err error) {
-		machines, err := client.Management.Node.List(&types.ListOpts{Filters: map[string]interface{}{
-			"clusterId": clusterResp.ID,
+// AllMachineReady is a helper method that will loop and check if the machine object of every node in a cluster is ready. Typically Used for RKE2/K3s Clusters.
+// It will return an error if the machine object is not ready after set amount of time.
+func AllMachineReady(client *rancher.Client, clusterID string) error {
+	err := wait.Poll(1*time.Second, 30*time.Minute, func() (bool, error) {
+		nodes, err := client.Management.Node.List(&types.ListOpts{Filters: map[string]interface{}{
+			"clusterId": clusterID,
 		}})
 		if err != nil {
 			return false, err
 		}
-		numOfEtcdNodesAfterDeletion = 0
-		for _, machine := range machines.Data {
-			if machine.Etcd {
-				if machine.ID == etcdNodeToDelete.ID {
-					return false, nil
-				}
-				numOfEtcdNodesAfterDeletion++
+		for _, node := range nodes.Data {
+			machine, err := client.Steve.SteveType(machineSteveResourceType).ByID(fleetNamespace + "/" + node.Annotations[machineSteveAnnotation])
+			if err != nil {
+				return false, err
+			}
+			if machine.State == nil {
+				logrus.Infof("Machine: %s state is nil", machine.Name)
+				return false, nil
+			}
+			if machine.State.Error {
+				logrus.Warnf("Machine: %s is in error state: %s", machine.Name, machine.State.Message)
+				return false, nil
+			}
+			if machine.State.Name != runningState {
+				return false, nil
 			}
 		}
-		logrus.Info("new etcd node : ")
-		for _, machine := range machines.Data {
-			if machine.Etcd {
-				logrus.Info(machine.NodeName)
-			}
-		}
+		logrus.Infof("All nodes in the cluster are in an active state!")
 		return true, nil
 	})
-	return numOfEtcdNodesBeforeDeletion == numOfEtcdNodesAfterDeletion, err
+	return err
 }
 
-func IsRKE2K3SEtcdNodeReplaced(client *rancher.Client, query url.Values, clusterName string, etcdNodeToDelete v1.SteveAPIObject, numOfEtcdNodesBeforeDeletion int) (bool, error) {
-	numOfEtcdNodesAfterDeletion := 0
+// IsNodeReplaced is a helper method that will loop and check if the node matching its type is replaced in a cluster.
+// It will return an error if the node is not replaced after set amount of time.
+func IsNodeReplaced(client *rancher.Client, oldMachineID string, clusterID string, numOfNodesBeforeDeletion int, isEtcd bool, isControlPlane bool, isWorker bool) (bool, error) {
+	numOfNodesAfterDeletion := 0
 
 	err := wait.Poll(PollInterval, PollTimeout, func() (done bool, err error) {
-		machines, err := client.Steve.SteveType(machineSteveResourceType).List(query)
+		machines, err := client.Management.Node.List(&types.ListOpts{Filters: map[string]interface{}{
+			"clusterId": clusterID,
+		}})
 		if err != nil {
 			return false, err
 		}
-
-		numOfEtcdNodesAfterDeletion = 0
+		numOfNodesAfterDeletion = 0
 		for _, machine := range machines.Data {
-			if machine.Labels[etcdLabel] == "true" && machine.Labels[clusterLabel] == clusterName {
-				if machine.Name == etcdNodeToDelete.Name {
+			if machine.Etcd == isEtcd && machine.ControlPlane == isControlPlane && machine.Worker == isWorker {
+				if machine.ID == oldMachineID {
 					return false, nil
 				}
-				numOfEtcdNodesAfterDeletion++
-			}
-		}
-		logrus.Info("new etcd node : ")
-		for _, machine := range machines.Data {
-			if machine.Labels[etcdLabel] == "true" && machine.Labels[clusterLabel] == clusterName {
-				logrus.Info(machine.Name)
+				logrus.Info("new node : ", machine.NodeName)
+				numOfNodesAfterDeletion++
 			}
 		}
 		return true, nil
 	})
-	return numOfEtcdNodesBeforeDeletion == numOfEtcdNodesAfterDeletion, err
+	return numOfNodesBeforeDeletion == numOfNodesAfterDeletion, err
 }
