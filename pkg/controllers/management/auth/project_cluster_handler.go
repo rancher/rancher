@@ -12,7 +12,9 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/condition"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/controllers"
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/systemimage"
+	wranglerv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	rrbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
@@ -54,7 +56,7 @@ func newPandCLifecycles(management *config.ManagementContext) (*projectLifecycle
 		crtbLister:           management.Management.ClusterRoleTemplateBindings("").Controller().Lister(),
 		crtbClient:           management.Management.ClusterRoleTemplateBindings(""),
 		projectLister:        management.Management.Projects("").Controller().Lister(),
-		projects:             management.Management.Projects(""),
+		projects:             management.Wrangler.Mgmt.Project(),
 		roleTemplateLister:   management.Management.RoleTemplates("").Controller().Lister(),
 		systemAccountManager: systemaccount.NewManager(management),
 		rbLister:             management.RBAC.RoleBindings("").Controller().Lister(),
@@ -246,6 +248,10 @@ func (l *clusterLifecycle) Remove(obj *v3.Cluster) (runtime.Object, error) {
 			returnErr = multierror.Append(returnErr, err)
 		}
 	}
+	err = l.mgr.deleteSystemProject(obj, clusterRemoveController)
+	if err != nil {
+		returnErr = multierror.Append(returnErr, err)
+	}
 	err = l.mgr.deleteNamespace(obj, clusterRemoveController)
 	if err != nil {
 		returnErr = multierror.Append(returnErr, err)
@@ -257,7 +263,7 @@ type mgr struct {
 	mgmt          *config.ManagementContext
 	nsLister      corev1.NamespaceLister
 	projectLister v3.ProjectLister
-	projects      v3.ProjectInterface
+	projects      wranglerv3.ProjectClient
 
 	prtbLister           v3.ProjectRoleTemplateBindingLister
 	crtbLister           v3.ClusterRoleTemplateBindingLister
@@ -290,7 +296,7 @@ func (m *mgr) createProject(name string, cond condition.Cond, obj runtime.Object
 		}
 
 		// Cache failed, try the API
-		projects2, err := m.projects.ListNamespaced(metaAccessor.GetName(), v1.ListOptions{LabelSelector: labels.String()})
+		projects2, err := m.projects.List(metaAccessor.GetName(), v1.ListOptions{LabelSelector: labels.String()})
 		if err != nil || len(projects2.Items) > 0 {
 			return obj, err
 		}
@@ -333,6 +339,32 @@ func (m *mgr) createProject(name string, cond condition.Cond, obj runtime.Object
 		}
 		return obj, nil
 	})
+}
+
+// deleteSystemProject deletes the system project(s) for a cluster in preparation for deleting the cluster namespace.
+// Normally, the webhook prevents deleting the system project, so Rancher needs to use the sudo user to force it.
+// Otherwise, the deleted namespace will be stuck terminating because it cannot garbage collect the project.
+func (m *mgr) deleteSystemProject(obj runtime.Object, controller string) error {
+	metaAccessor, err := meta.Accessor(obj)
+	if err != nil {
+		return err
+	}
+	projects, err := m.projectLister.List(metaAccessor.GetName(), systemProjectLabels.AsSelector())
+	if err != nil {
+		return err
+	}
+	bypassClient, err := m.projects.WithImpersonation(controllers.WebhookImpersonation())
+	if err != nil {
+		return err
+	}
+	for _, p := range projects {
+		logrus.Infof("[%s] Deleting project %s", controller, p.Name)
+		err = bypassClient.Delete(p.Namespace, p.Name, nil)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (m *mgr) reconcileCreatorRTB(obj runtime.Object) (runtime.Object, error) {
@@ -502,7 +534,7 @@ func (m *mgr) deleteNamespace(obj runtime.Object, controller string) error {
 		return nil
 	}
 	if ns.Status.Phase != v12.NamespaceTerminating {
-		logrus.Infof("[%v] Deleting namespace %v", controller, o.GetName())
+		logrus.Infof("[%s] Deleting namespace %s", controller, o.GetName())
 		err = nsClient.Delete(context.TODO(), o.GetName(), v1.DeleteOptions{})
 		if apierrors.IsNotFound(err) {
 			return nil
