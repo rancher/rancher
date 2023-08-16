@@ -118,7 +118,6 @@ func VerifyCluster(t *testing.T, client *rancher.Client, cluster *steveV1.SteveA
 	clusterToken, err := clusters.CheckServiceAccountTokenSecret(client, cluster.Name)
 	require.NoError(t, err)
 	assert.NotEmpty(t, clusterToken)
-	assert.NoError(t, err)
 
 	status := &provv1.ClusterStatus{}
 	err = steveV1.ConvertToK8sType(cluster.Status, status)
@@ -128,34 +127,31 @@ func VerifyCluster(t *testing.T, client *rancher.Client, cluster *steveV1.SteveA
 	assert.Empty(t, podErrors)
 	assert.NotEmpty(t, podResults)
 
-	configSpec := &provv1.ClusterSpec{}
-	err = steveV1.ConvertToK8sType(cluster.Spec, configSpec)
+	clusterSpec := &provv1.ClusterSpec{}
+	err = steveV1.ConvertToK8sType(cluster.Spec, clusterSpec)
 	require.NoError(t, err)
 
-	configKubeVersion := configSpec.KubernetesVersion
-	require.Equal(t, configKubeVersion, configSpec.KubernetesVersion)
+	configKubeVersion := clusterSpec.KubernetesVersion
+	require.Equal(t, configKubeVersion, clusterSpec.KubernetesVersion)
 
-	if configSpec.DefaultPodSecurityAdmissionConfigurationTemplateName == string(provisioninginput.RancherPrivileged) ||
-		configSpec.DefaultPodSecurityAdmissionConfigurationTemplateName == string(provisioninginput.RancherRestricted) {
-		clusterSpec := &provv1.ClusterSpec{}
-		err = steveV1.ConvertToK8sType(cluster.Spec, clusterSpec)
-		require.NoError(t, err)
+	if clusterSpec.DefaultPodSecurityAdmissionConfigurationTemplateName == string(provisioninginput.RancherPrivileged) ||
+		clusterSpec.DefaultPodSecurityAdmissionConfigurationTemplateName == string(provisioninginput.RancherRestricted) {
 
 		require.NotEmpty(t, clusterSpec.DefaultPodSecurityAdmissionConfigurationTemplateName)
 
-		_, err = psadeploy.CreateNginxDeployment(client, cluster.ID, configSpec.DefaultPodSecurityAdmissionConfigurationTemplateName)
+		_, err = psadeploy.CreateNginxDeployment(client, status.ClusterName, clusterSpec.DefaultPodSecurityAdmissionConfigurationTemplateName)
 		require.NoError(t, err)
 	}
 
-	if configSpec.RKEConfig.Registries != nil {
-		for registryName, _ := range configSpec.RKEConfig.Registries.Configs {
-			havePrefix, err := registries.CheckAllClusterPodsForRegistryPrefix(client, cluster.ID, registryName)
+	if clusterSpec.RKEConfig.Registries != nil {
+		for registryName := range clusterSpec.RKEConfig.Registries.Configs {
+			havePrefix, err := registries.CheckAllClusterPodsForRegistryPrefix(client, status.ClusterName, registryName)
 			require.NoError(t, err)
 			assert.True(t, havePrefix)
 		}
 	}
 
-	if configSpec.LocalClusterAuthEndpoint.Enabled {
+	if clusterSpec.LocalClusterAuthEndpoint.Enabled {
 		mgmtClusterObject, err := adminClient.Management.Cluster.ByID(status.ClusterName)
 		require.NoError(t, err)
 		VerifyACE(t, adminClient, mgmtClusterObject)
