@@ -2,6 +2,6 @@
 
 /usr/sbin/sshd -D &
 
-python app.py
+python3.11 app.py
 
 sleep infinity
