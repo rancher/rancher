@@ -1,3 +1,5 @@
+// Package agentupgrade includes a controller that upgrades the Cattle Cluster Agent and Cattle Node Agent for RKE
+// clusters.
 package agentupgrade
 
 import (
@@ -30,6 +32,8 @@ type handler struct {
 	daemonsetClient v1.DaemonSetInterface
 }
 
+// Register registers a handler to upgrade the Cattle Cluster Agent and Cattle Node Agent if necessary on change to any
+// deployment or daemon set in the management cluster. -- correct?
 func Register(ctx context.Context, context *config.ManagementContext) {
 	h := &handler{
 		deployments:     context.Apps.Deployments(""),
@@ -40,6 +44,7 @@ func Register(ctx context.Context, context *config.ManagementContext) {
 	context.Apps.DaemonSets("").Controller().AddHandler(ctx, "agent-upgrade", h.OnDaemonSetChange)
 }
 
+// OnDeploymentChange checks if it should delete a namespaced deployment and if so, deletes it.
 func (h *handler) OnDeploymentChange(key string, deploy *appsv1.Deployment) (runtime.Object, error) {
 	if deploy == nil || !shouldDelete(&deploy.ObjectMeta, &deploy.Spec.Template) {
 		return deploy, nil
@@ -47,6 +52,7 @@ func (h *handler) OnDeploymentChange(key string, deploy *appsv1.Deployment) (run
 	return deploy, h.deployments.DeleteNamespaced(deploy.Namespace, deploy.Name, nil)
 }
 
+// OnDaemonSetChange checks if it should delete a namespaced daemon set and if so, deletes it.
 func (h *handler) OnDaemonSetChange(key string, ds *appsv1.DaemonSet) (runtime.Object, error) {
 	if ds == nil || !shouldDelete(&ds.ObjectMeta, &ds.Spec.Template) {
 		return ds, nil
@@ -54,6 +60,8 @@ func (h *handler) OnDaemonSetChange(key string, ds *appsv1.DaemonSet) (runtime.O
 	return ds, h.daemonsetClient.DeleteNamespaced(ds.Namespace, ds.Name, nil)
 }
 
+// shouldDelete returns true if the CATTLE_SERVER: <SERVER_URL> env var is set on any container in the pod. This will
+// remove the deployment so Rancher can redeploy it. -- correct?
 func shouldDelete(meta *metav1.ObjectMeta, pod *corev1.PodTemplateSpec) bool {
 	if meta.Namespace != namespace {
 		return false

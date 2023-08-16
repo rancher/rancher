@@ -1,3 +1,4 @@
+// Package clusterstats includes a controller that aggregates cluster stats (CPU, memory) on management cluster nodes.
 package clusterstats
 
 import (
@@ -46,6 +47,7 @@ type ClusterNodeData struct {
 	ConditionNoMemoryPressureStatus v1.ConditionStatus
 }
 
+// Register registers a handler to aggregate stats on a management node when the object is synced or updated.
 func Register(ctx context.Context, management *config.ManagementContext, clusterManager *clustermanager.Manager) {
 	clustersClient := management.Management.Clusters("")
 	machinesClient := management.Management.Nodes("")
@@ -60,6 +62,7 @@ func Register(ctx context.Context, management *config.ManagementContext, cluster
 	machinesClient.AddHandler(ctx, "cluster-stats", s.machineChanged)
 }
 
+// sync calls aggregate to calculate cluster stats.
 func (s *StatsAggregator) sync(key string, cluster *v3.Cluster) (runtime.Object, error) {
 	if cluster == nil {
 		return nil, nil
@@ -68,6 +71,9 @@ func (s *StatsAggregator) sync(key string, cluster *v3.Cluster) (runtime.Object,
 	return nil, s.aggregate(cluster, cluster.Name)
 }
 
+// aggregate calculates the capacity, allocatable, requested CPU and memory, disk pressure, and memory pressure from
+// management worker nodes and sets aggregate values on the management cluster object. It also restarts the cluster
+// agent if needed to re-sync controllers with the API.
 func (s *StatsAggregator) aggregate(cluster *v3.Cluster, clusterName string) error {
 	allMachines, err := s.NodesLister.List(cluster.Name, labels.Everything())
 	if err != nil {
@@ -201,11 +207,14 @@ func (s *StatsAggregator) aggregate(cluster *v3.Cluster, clusterName string) err
 	return nil
 }
 
+// minorVersion returns the minor version of the management cluster.
 func minorVersion(cluster *v3.Cluster) (int, error) {
 	minorVersion := numericReg.ReplaceAllString(cluster.Status.Version.Minor, "")
 	return strconv.Atoi(minorVersion)
 }
 
+// updateVersion updates the minor version of the management cluster. It gets the server version with a timeout to
+// avoid the controller getting stuck waiting on a response.
 func (s *StatsAggregator) updateVersion(cluster *v3.Cluster) bool {
 	updated := false
 	userContext, err := s.ClusterManager.UserContextNoControllers(cluster.Name)
@@ -227,10 +236,9 @@ func (s *StatsAggregator) updateVersion(cluster *v3.Cluster) bool {
 	return updated
 }
 
-// restartAgentDeployment sets an annotation on the cluster agent deployment template
-// which will force a restart of the deployment. This is used when the cluster is
-// upgraded to >=1.22 to ensure that controllers that are not compatible with v1.22 APIs
-// are stopped, and controllers that are only compatible with v1.22 are started.
+// restartAgentDeployment sets an annotation on the cluster agent deployment template which will force a restart of the
+// deployment. This is used when the cluster is upgraded to >=1.22 to ensure that controllers that are not compatible
+// with v1.22 APIs are stopped, and controllers that are only compatible with v1.22 are started.
 func (s *StatsAggregator) restartAgentDeployment(cluster *v3.Cluster) error {
 	userContext, err := s.ClusterManager.UserContextNoControllers(cluster.Name)
 	if err != nil {
@@ -259,6 +267,7 @@ func (s *StatsAggregator) restartAgentDeployment(cluster *v3.Cluster) error {
 	return nil
 }
 
+// statusChanged returns true if any stats on the management cluster have changed and false if not.
 func statusChanged(existingCluster, newCluster *v32.ClusterStatus) bool {
 	if !reflect.DeepEqual(existingCluster.Conditions, newCluster.Conditions) {
 		return true
@@ -289,6 +298,7 @@ func statusChanged(existingCluster, newCluster *v32.ClusterStatus) bool {
 	return false
 }
 
+// resourceListChanged returns true if a ResourceList object has changed and false if not.
 func resourceListChanged(oldList, newList v1.ResourceList) bool {
 	if len(oldList) != len(newList) {
 		return true
@@ -303,6 +313,7 @@ func resourceListChanged(oldList, newList v1.ResourceList) bool {
 	return false
 }
 
+// callWithTimeout calls func with a timeout of 15 seconds.
 func callWithTimeout(do func()) {
 	done := make(chan struct{})
 	go func() {
@@ -316,6 +327,7 @@ func callWithTimeout(do func()) {
 	}
 }
 
+// machineChanged enqueues the machine because it's been updated.
 func (s *StatsAggregator) machineChanged(key string, machine *v3.Node) (runtime.Object, error) {
 	if machine != nil {
 		s.Clusters.Controller().Enqueue("", machine.Namespace)
@@ -323,6 +335,8 @@ func (s *StatsAggregator) machineChanged(key string, machine *v3.Node) (runtime.
 	return nil, nil
 }
 
+// isTaintedNoExecuteNoSchedule returns true if a management node is tainted but not with a NoExecute or NoSchedule
+// taint, false if not.
 func isTaintedNoExecuteNoSchedule(m *v3.Node) bool {
 	for _, taint := range m.Spec.InternalNodeSpec.Taints {
 		isETCDOrControlPlane := taint.Key == nodeRoleControlPlane || taint.Key == nodeRoleETCD ||

@@ -1,3 +1,4 @@
+// Package aks manages the state of Azure Kubernetes Service (AKS) clusters.
 package aks
 
 import (
@@ -45,6 +46,7 @@ type aksOperatorController struct {
 	secretClient corecontrollers.SecretClient
 }
 
+// Register registers a handler to update the management cluster object on change to an AKS Cluster Config object.
 func Register(ctx context.Context, wContext *wrangler.Context, mgmtCtx *config.ManagementContext) {
 	aksClusterConfigResource := schema.GroupVersionResource{
 		Group:    aksAPIGroup,
@@ -76,6 +78,14 @@ func Register(ctx context.Context, wContext *wrangler.Context, mgmtCtx *config.M
 	wContext.Mgmt.Cluster().OnChange(ctx, "aks-operator-controller", e.onClusterChange)
 }
 
+// onClusterChange runs on change to an AKSClusterConfig object which is deployed by the AKS operator to
+// create/update/delete the AKS cluster. Rancher watches both the upstream state and the AKSClusterConfig object to
+// keep the states synced.
+//
+// If there is a difference between the AKS spec on the management cluster object and the AKSClusterConfig, it
+// reconciles the state by copying the spec to the AKSClusterConfig. Then, it manages the local state of the AKS
+// cluster depending on the current phase: creating, active, updating, or default (waiting for an import/create to
+// start or a pre-creation failure to be resolved).
 func (e *aksOperatorController) onClusterChange(_ string, cluster *apimgmtv3.Cluster) (*apimgmtv3.Cluster, error) {
 	if cluster == nil || cluster.DeletionTimestamp != nil || cluster.Spec.AKSConfig == nil {
 		return cluster, nil
@@ -272,6 +282,7 @@ func (e *aksOperatorController) onClusterChange(_ string, cluster *apimgmtv3.Clu
 	}
 }
 
+// setInitialUpstreamSpec sets an upstream spec on the management cluster object when an AKS cluster is created.
 func (e *aksOperatorController) setInitialUpstreamSpec(cluster *apimgmtv3.Cluster) (*apimgmtv3.Cluster, error) {
 	logrus.Infof("setting initial upstreamSpec on cluster [%s]", cluster.Name)
 	upstreamSpec, err := clusterupstreamrefresher.BuildAKSUpstreamSpec(e.SecretsCache, e.secretClient, cluster)
@@ -283,7 +294,8 @@ func (e *aksOperatorController) setInitialUpstreamSpec(cluster *apimgmtv3.Cluste
 	return e.ClusterClient.Update(cluster)
 }
 
-// updateAKSClusterConfig updates the AKSClusterConfig object's spec with the cluster's AKSConfig if they are not equal..
+// updateAKSClusterConfig updates the AKSClusterConfig object spec with the management spec AKSConfig if they are not
+// equal.
 func (e *aksOperatorController) updateAKSClusterConfig(cluster *apimgmtv3.Cluster, aksClusterConfigDynamic *unstructured.Unstructured, spec map[string]interface{}) (*apimgmtv3.Cluster, error) {
 	list, err := e.DynamicClient.Namespace(namespace.GlobalNamespace).List(context.TODO(), v1.ListOptions{})
 	if err != nil {
@@ -328,7 +340,8 @@ func (e *aksOperatorController) updateAKSClusterConfig(cluster *apimgmtv3.Cluste
 	}
 }
 
-// generateAndSetServiceAccount uses the API endpoint and CA cert to generate a service account token. The token is then copied to the cluster status.
+// generateAndSetServiceAccount uses the API endpoint and CA cert to generate a service account token. The token is
+// then copied to the cluster status.
 func (e *aksOperatorController) generateAndSetServiceAccount(cluster *apimgmtv3.Cluster) (*apimgmtv3.Cluster, error) {
 	restConfig, err := e.getRestConfig(cluster)
 	if err != nil {
@@ -356,8 +369,8 @@ func (e *aksOperatorController) generateAndSetServiceAccount(cluster *apimgmtv3.
 	return e.ClusterClient.Update(cluster)
 }
 
-// buildAKSCCCreateObject returns an object that can be used with the kubernetes dynamic client to
-// create an AKSClusterConfig that matches the spec contained in the cluster's AKSConfig.
+// buildAKSCCCreateObject returns an object that can be used with the Kubernetes dynamic client to create an
+// AKSClusterConfig that matches AKSConfig spec on the management cluster object.
 func buildAKSCCCreateObject(cluster *apimgmtv3.Cluster) (*unstructured.Unstructured, error) {
 	aksClusterConfig := aksv1.AKSClusterConfig{
 		TypeMeta: v1.TypeMeta{
@@ -389,7 +402,7 @@ func buildAKSCCCreateObject(cluster *apimgmtv3.Cluster) (*unstructured.Unstructu
 	}, nil
 }
 
-// recordAppliedSpec sets the cluster's current spec as its appliedSpec
+// recordAppliedSpec sets the cluster's current spec as its appliedSpec.
 func (e *aksOperatorController) recordAppliedSpec(cluster *apimgmtv3.Cluster) (*apimgmtv3.Cluster, error) {
 	if reflect.DeepEqual(cluster.Status.AppliedSpec.AKSConfig, cluster.Spec.AKSConfig) {
 		return cluster, nil
@@ -402,15 +415,16 @@ func (e *aksOperatorController) recordAppliedSpec(cluster *apimgmtv3.Cluster) (*
 
 // generateSATokenWithPublicAPI tries to get a service account token from the cluster using the public API endpoint.
 // This function is called if the cluster has only privateEndpoint enabled and is not publicly available.
-// If Rancher is able to communicate with the cluster through its API endpoint even though it is private, then this function will retrieve
-// a service account token and the *bool returned will refer to a false value (doesn't have to tunnel).
+// If Rancher is able to communicate with the cluster through its API endpoint even though it is private, then this
+// function will retrieve a service account token and the *bool returned will refer to a false value
+// (doesn't have to tunnel).
 //
 // If the Rancher server cannot connect to the cluster's API endpoint, then one of the two errors below will happen.
-// In this case, we know that Rancher must use the cluster agent tunnel for communication. This function will return an empty service account token,
-// and the *bool return value will refer to a true value (must tunnel).
+// In this case, we know that Rancher must use the cluster agent tunnel for communication. This function will return an
+// empty service account token, and the *bool return value will refer to a true value (must tunnel).
 //
-// If an error different from the two below occur, then the *bool return value will be nil, indicating that Rancher was not able to determine if
-// tunneling is required to communicate with the cluster.
+// If an error different from the two below occur, then the *bool return value will be nil, indicating that Rancher was
+// not able to determine if tunneling is required to communicate with the cluster.
 func (e *aksOperatorController) generateSATokenWithPublicAPI(cluster *apimgmtv3.Cluster) (string, *bool, error) {
 	restConfig, err := e.getRestConfig(cluster)
 	if err != nil {
@@ -444,6 +458,7 @@ func (e *aksOperatorController) generateSATokenWithPublicAPI(cluster *apimgmtv3.
 	return serviceToken, requiresTunnel, err
 }
 
+// getRestConfig returns the AKS cluster kube config.
 func (e *aksOperatorController) getRestConfig(cluster *apimgmtv3.Cluster) (*rest.Config, error) {
 	ctx := context.Background()
 	restConfig, err := controller.GetClusterKubeConfig(ctx, e.SecretsCache, e.secretClient, cluster.Spec.AKSConfig)
