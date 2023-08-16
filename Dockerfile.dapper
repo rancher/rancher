@@ -104,7 +104,9 @@ RUN ln -s /usr/bin/cni /usr/bin/bridge && \
 
 RUN curl -sLf https://github.com/rancher/k3s/releases/download/${CATTLE_K3S_VERSION}/k3s-images.txt -o /usr/tmp/k3s-images.txt
 
-RUN zypper install -y python3-tox python3-base python3 libffi-devel libopenssl-devel
+# Python related dependencies for the Integration/Validation tests.
+RUN zypper install -y python311-pip python311-base python311 python311-devel libffi-devel libopenssl-devel && \
+    pip install tox
 
 ENV HELM_HOME /root/.helm
 ENV DAPPER_ENV REPO TAG CI DRONE_BUILD_NUMBER DRONE_TAG DRONE_COMMIT DRONE_BRANCH DRONE_BUILD_EVENT SYSTEM_CHART_DEFAULT_BRANCH FOSSA_API_KEY GOGET_MODULE GOGET_VERSION RELEASE_ACTION RELEASE_TYPE POSTRELEASE_RANCHER_VERSION POSTRELEASE_RANCHER_STABLE DEBUG V2PROV_TEST_DIST V2PROV_TEST_RUN_REGEX
