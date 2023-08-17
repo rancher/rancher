@@ -1,43 +1,11 @@
 #!/bin/sh
 set -ue
 
-check_go_mod() {
-    local directory="$1"
-    cd "$directory"
+for DIRECTORY in . ./pkg/apis ./pkg/client; do
+    cd "$DIRECTORY"
     go mod tidy
     go mod verify
     cd "$OLDPWD"
-}
-
-check_modules_diff() {
-    local module_file="$1"
-    local root_module_file="$2"
-    local bad_module=false
-
-    awk 'NR>1 && !/indirect/ && /rancher/ {print $1, $2}' "$module_file" > temp_modules.txt
-
-    while read -r module tag; do
-        roottag=$(awk -v module="$module" '$1 == module {print $2}' "$root_module_file")
-        echo "${module}:"
-        echo "${tag} (${root_module_file})"
-        echo "${roottag} (./go.mod)"
-        if [ "${tag}" != "${roottag}" ]; then
-            echo "${module} is different ('${tag}' vs '${roottag}')"
-            bad_module=true
-        fi
-    done < temp_modules.txt
-
-    rm -f temp_modules.txt
-
-    if [ "${bad_module}" = "true" ]; then
-        echo "Diff found between ${root_module_file} and ${module_file}"
-        exit 1
-    fi
-}
-
-
-for directory in . ./pkg/apis ./pkg/client; do
-    check_go_mod "$directory"
 done
 
 if [ -n "$(git status --porcelain)" ]; then
@@ -48,4 +16,24 @@ if [ -n "$(git status --porcelain)" ]; then
     exit 1
 fi
 
-check_modules_diff "pkg/apis/go.mod" "go.mod"
+# Check diff between ./go.mod and ./pkg/apis/go.mod
+badmodule="false"
+while read -r module tag; do
+  # Get tag from module in ./go.mod
+  roottag=$(sed '1,/^require/d' go.mod | grep "${module} " | awk '{ print $2 }')
+  echo "${module}:"
+  echo "${tag} (./pkg/apis/go.mod)"
+  echo "${roottag} (./go.mod)"
+  # Compare with tag from module in ./pkg/apis/go.mod
+  if [ "${tag}" != "${roottag}" ]; then
+    echo "${module} is different ('${tag}' vs '${roottag}')"
+    badmodule="true"
+  fi
+done << EOF
+$(sed '1,/require/d' pkg/apis/go.mod | head -n -1 | grep -v indirect | grep rancher |  awk '{ print $1,$2 }')
+EOF
+
+if [ "${badmodule}" = "true" ]; then
+  echo "Diff found between ./go.mod and ./pkg/apis/go.mod"
+  exit 1
+fi
