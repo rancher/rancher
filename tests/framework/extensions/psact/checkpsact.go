@@ -20,7 +20,7 @@ func CheckPSACT(client *rancher.Client, clusterName string) error {
 	}
 
 	if cluster.DefaultPodSecurityAdmissionConfigurationTemplateName == "" {
-		return fmt.Errorf("error: PSACT is not defined in this cluster!")
+		return fmt.Errorf("error: PSACT is not defined in this cluster")
 	}
 
 	return nil
