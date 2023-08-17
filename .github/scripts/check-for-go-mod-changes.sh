@@ -14,6 +14,8 @@ check_modules_diff() {
     local root_module_file="$2"
     local bad_module=false
 
+    awk 'NR>1 && !/indirect/ && /rancher/ {print $1, $2}' "$module_file" > temp_modules.txt
+
     while read -r module tag; do
         roottag=$(awk -v module="$module" '$1 == module {print $2}' "$root_module_file")
         echo "${module}:"
@@ -23,7 +25,9 @@ check_modules_diff() {
             echo "${module} is different ('${tag}' vs '${roottag}')"
             bad_module=true
         fi
-    done < <(awk 'NR>1 && !/indirect/ && /rancher/ {print $1, $2}' "$module_file")
+    done < temp_modules.txt
+
+    rm -f temp_modules.txt
 
     if [ "${bad_module}" = "true" ]; then
         echo "Diff found between ${root_module_file} and ${module_file}"
