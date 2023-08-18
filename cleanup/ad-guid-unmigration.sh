@@ -76,8 +76,8 @@ spec:
               #dryrun value: "true"
             #deletemissing - name: AD_DELETE_MISSING_GUID_USERS
               #deletemissing value: "true"
-            #- name: RANCHER_DEBUG
-            #  value: "true"
+            #debug - name: RANCHER_DEBUG
+            #debug   value: "true"
           image: agent_image
           imagePullPolicy: Always
           command: ["agent"]
@@ -125,6 +125,7 @@ show_usage() {
   echo -e "\t-h, --help              Display this help message"
   echo -e "\t-n, --dry-run           Display the resources that would be updated without making changes"
   echo -e "\t-d, --delete-missing    Permanently remove user objects whose GUID cannot be found in Active Directory"
+  echo -e "\t-v, --debug             Run with extra debug verbosity"
 }
 
 display_banner() {
@@ -139,6 +140,7 @@ display_banner() {
     echo "Dry run: $dry_run"
     echo "Delete missing: $delete_missing"
     echo "Agent image: $agent_image"
+    echo "Debug: $debug_mode"
     if [[ "$dry_run" = true ]] && [[ "$delete_missing" = true ]]
     then
         echo "Setting the dry-run option to true overrides the delete-missing option.  NO CHANGES WILL BE MADE."
@@ -146,7 +148,7 @@ display_banner() {
     echo "$border"
 }
 
-OPTS=$(getopt -o hnd -l help,dry-run,delete-missing -- "$@")
+OPTS=$(getopt -o hndv -l help,dry-run,delete-missing,debug -- "$@")
 if [ $? != 0 ]; then
   show_usage "Invalid option"
   exit 1
@@ -156,6 +158,7 @@ eval set -- "$OPTS"
 
 dry_run=false
 delete_missing=false
+debug_mode=false
 
 while true; do
   case "$1" in
@@ -169,6 +172,10 @@ while true; do
       ;;
     -d | --delete-missing)
       delete_missing=true
+      shift
+      ;;
+    -v | --debug)
+      debug_mode=true
       shift
       ;;
     --)
@@ -224,8 +231,14 @@ then
     yaml=$(sed -e 's/#dryrun // ' <<< "$yaml")
 elif [ "$delete_missing" = true ]
 then
-    # Instead uncomment the env var for missing user cleanup
+    # Uncomment the env var for missing user cleanup
     yaml=$(sed -e 's/#deletemissing // ' <<< "$yaml")
+fi
+
+if [ "$debug_mode" = true ]
+then
+    # Uncomment the env var for debug logging
+    yaml=$(sed -e 's/#debug // ' <<< "$yaml")
 fi
 
 echo "$yaml" | kubectl apply -f -
