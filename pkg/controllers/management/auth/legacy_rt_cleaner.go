@@ -19,7 +19,7 @@ func newLegacyRTCleaner(mgmt *config.ManagementContext) *rtCleaner {
 	}
 }
 
-// sync cleans up all roleTemplates to drop cluster-scoped lifecycle handler finalizers
+// sync cleans up all roleTemplates to drop cluster-scoped lifecycle handler finalizers.
 func (p *rtCleaner) sync(key string, obj *v3.RoleTemplate) (runtime.Object, error) {
 	if key == "" || obj == nil {
 		return nil, nil

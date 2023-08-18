@@ -41,6 +41,7 @@ type globalRoleLifecycle struct {
 	rClient  rbacv1.RoleInterface
 }
 
+// Create creates a  new GlobalRole for the cluster.
 func (gr *globalRoleLifecycle) Create(obj *v3.GlobalRole) (runtime.Object, error) {
 	var returnError error
 	err := gr.reconcileGlobalRole(obj)
@@ -54,6 +55,7 @@ func (gr *globalRoleLifecycle) Create(obj *v3.GlobalRole) (runtime.Object, error
 	return obj, returnError
 }
 
+// Updated updates the global and catalog role on the cluster.
 func (gr *globalRoleLifecycle) Updated(obj *v3.GlobalRole) (runtime.Object, error) {
 	var returnError error
 	err := gr.reconcileGlobalRole(obj)
@@ -72,6 +74,7 @@ func (gr *globalRoleLifecycle) Remove(obj *v3.GlobalRole) (runtime.Object, error
 	return nil, nil
 }
 
+// reconcileGlobalRole updates cluster role if the GlobalRole rules have changed.
 func (gr *globalRoleLifecycle) reconcileGlobalRole(globalRole *v3.GlobalRole) error {
 	crName := getCRName(globalRole)
 
@@ -114,6 +117,7 @@ func (gr *globalRoleLifecycle) reconcileGlobalRole(globalRole *v3.GlobalRole) er
 	return nil
 }
 
+// reconcileCatalogRole updates catalog rule with the GlobalRole rules.
 func (gr *globalRoleLifecycle) reconcileCatalogRole(globalRole *v3.GlobalRole) error {
 	// rules which give template/template version access need to have a specific namespaced role created, since the
 	// backend resources that they grant access to are namespaced resources
@@ -196,6 +200,7 @@ func (gr *globalRoleLifecycle) reconcileCatalogRole(globalRole *v3.GlobalRole) e
 	return nil
 }
 
+// getCRName returns the GlobalRole name if set as an annotation. Otherwise, generate a new one.
 func getCRName(globalRole *v3.GlobalRole) string {
 	if crName, ok := globalRole.Annotations[crNameAnnotation]; ok {
 		return crName
@@ -203,6 +208,7 @@ func getCRName(globalRole *v3.GlobalRole) string {
 	return generateCRName(globalRole.Name)
 }
 
+// generateCRName generates a new GlobalRole name.
 func generateCRName(name string) string {
 	return "cattle-globalrole-" + name
 }

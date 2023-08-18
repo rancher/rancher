@@ -19,7 +19,7 @@ func newLegacyGRBCleaner(m *config.ManagementContext) *grbCleaner {
 	}
 }
 
-// sync cleans up all GRBs to drop cluster-scoped lifecycle handler finalizers
+// sync cleans up all GRBs to drop cluster-scoped lifecycle handler finalizers.
 func (p *grbCleaner) sync(key string, obj *v3.GlobalRoleBinding) (runtime.Object, error) {
 	if key == "" || obj == nil {
 		return nil, nil
@@ -40,7 +40,7 @@ func (p *grbCleaner) sync(key string, obj *v3.GlobalRoleBinding) (runtime.Object
 	return p.mgmt.Management.GlobalRoleBindings("").Update(obj)
 }
 
-// cleanFinalizers takes a list of finalizers and removes any finalizer that has the matching prefix
+// cleanFinalizers takes a list of finalizers and removes any finalizer that has the matching prefix.
 func cleanFinalizers(finalizers []string, prefix string) []string {
 	var newFinalizers []string
 	for _, finalizer := range finalizers {
@@ -52,8 +52,8 @@ func cleanFinalizers(finalizers []string, prefix string) []string {
 	return newFinalizers
 }
 
-// cleanAnnotations takes an objects annotations and removes any annotation that has the matching prefix
-// returning a new map
+// cleanAnnotations takes an object's annotations, removes any annotation that has the matching prefix and returns
+// a new map.
 func cleanAnnotations(annotations map[string]string, prefix string) map[string]string {
 	newAnnos := make(map[string]string)
 	for k, v := range annotations {

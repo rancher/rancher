@@ -23,8 +23,7 @@ const (
 	// CleanupAnnotation exists to prevent admins from running the cleanup routine in two scenarios:
 	// 1. When the provider has not been enabled or deliberately disabled, and thus does not need cleanup.
 	// 2. When the value of the annotation is 'user-locked', set manually by admins in advance.
-	// Rancher will run cleanup only if the provider becomes disabled,
-	// and the annotation's value is 'unlocked'.
+	// Rancher will run cleanup only if the provider becomes disabled and the annotation's value is 'unlocked'.
 	CleanupAnnotation = "management.cattle.io/auth-provider-cleanup"
 
 	CleanupUnlocked      = "unlocked"
@@ -41,13 +40,14 @@ type authConfigController struct {
 	users         v3.UserLister
 	authRefresher providerrefresh.UserAuthRefresher
 	cleanup       CleanupService
-	// Note the use of the GenericClient here. AuthConfigs contain internal-only fields that deal with
-	// various auth providers. Those fields are not present everywhere, nor are they defined in the CRD. Given
-	// that, the regular client will "eat" those internal-only fields, so in this case, we use
-	// the unstructured client, losing some validation, but gaining the flexibility we require.
+	// Note the use of the GenericClient here. AuthConfigs contain internal-only fields that deal with various auth
+	// providers. Those fields are not present everywhere, nor are they defined in the CRD. Given that, the regular
+	// client will "eat" those internal-only fields, so in this case, we use the unstructured client, losing some
+	// validation, but gaining the flexibility we require.
 	authConfigsUnstructured objectclient.GenericClient
 }
 
+// newAuthConfigController creates a new controller to watch and update all AuthConfig resources.
 func newAuthConfigController(context context.Context, mgmt *config.ManagementContext, scaledContext *config.ScaledContext) *authConfigController {
 	controller := &authConfigController{
 		users:                   mgmt.Management.Users("").Controller().Lister(),
@@ -58,6 +58,7 @@ func newAuthConfigController(context context.Context, mgmt *config.ManagementCon
 	return controller
 }
 
+// getUnstructured returns an unstructured object with data of the AuthConfig provided.
 func (ac *authConfigController) getUnstructured(obj *v3.AuthConfig) (*unstructured.Unstructured, error) {
 	if obj == nil {
 		return nil, fmt.Errorf("cannot get a nil auth config")
@@ -73,6 +74,7 @@ func (ac *authConfigController) getUnstructured(obj *v3.AuthConfig) (*unstructur
 	return unstructuredObj, nil
 }
 
+// setCleanupAnnotation sets the value of annotation management.cattle.io/auth-provider-cleanup on an AuthConfig.
 func (ac *authConfigController) setCleanupAnnotation(unstructuredObj *unstructured.Unstructured, value string) {
 	annotations := unstructuredObj.GetAnnotations()
 	if annotations == nil {
@@ -82,9 +84,12 @@ func (ac *authConfigController) setCleanupAnnotation(unstructuredObj *unstructur
 	unstructuredObj.SetAnnotations(annotations)
 }
 
+// sync updates an AuthConfig if enabled and has updates, or if not enabled, removes all but essential metadata from
+// the AuthConfig and cleans up resources.
 func (ac *authConfigController) sync(key string, obj *v3.AuthConfig) (runtime.Object, error) {
 	// If obj is nil, the auth config has been deleted. Rancher currently does not handle deletions gracefully,
-	// meaning it does not perform resource cleanup. Admins should disable an auth provider instead of deleting its auth config.
+	// meaning it does not perform resource cleanup. Admins should disable an auth provider instead of deleting its
+	// auth config.
 	if obj == nil {
 		return nil, nil
 	}
@@ -149,15 +154,15 @@ func (ac *authConfigController) sync(key string, obj *v3.AuthConfig) (runtime.Ob
 	return obj, nil
 }
 
+// updateAuthConfig converts an unstructured object to an AuthConfig and returns it.
 func (ac *authConfigController) updateAuthConfig(unstructuredObj *unstructured.Unstructured, obj *v3.AuthConfig) (*v3.AuthConfig, error) {
 	uobj, err := ac.authConfigsUnstructured.Update(obj.Name, unstructuredObj)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update AuthConfig object: %w", err)
 	}
-	// We need to return an AuthConfig, but Update deals in terms of unstructured objects.
-	// Given that, we need to convert the unstructured object to an AuthConfig.
-	// Normally, we'd like to use mapstructure.Decode, but its handling of embedded structs
-	// does not give us the desired result in this instance, hence the use of json.
+	// We need to return an AuthConfig, but Update deals in terms of unstructured objects. Given that, we need to
+	// convert the unstructured object to an AuthConfig. Normally, we'd like to use map.Decode, but its handling of
+	// embedded structs will not give us the desired result, hence the use of json.
 	unObject, ok := uobj.(*unstructured.Unstructured)
 	if !ok {
 		return nil, fmt.Errorf("failed to read to unstructured data")
@@ -173,10 +178,12 @@ func (ac *authConfigController) updateAuthConfig(unstructuredObj *unstructured.U
 	return result, nil
 }
 
+// refreshUsers refreshes the user list for an AuthConfig, ensuring that defined users have the correct access
+// to resources.
 func (ac *authConfigController) refreshUsers(obj *v3.AuthConfig) error {
-	// if we have changed an auth config, refresh all users belonging to the auth config. This addresses:
-	// Disabling an auth provider - now we disable user access
-	// Removing a user from auth provider access - now we will immediately revoke access
+	// If we have changed an auth config, refresh all users belonging to the auth config. This addresses:
+	// 1. Disabling an auth provider - now we disable user access
+	// 2. Removing a user from auth provider access - now we will immediately revoke access
 	users, err := ac.users.List("", labels.Everything())
 	if err != nil {
 		return err
@@ -184,15 +191,15 @@ func (ac *authConfigController) refreshUsers(obj *v3.AuthConfig) error {
 	for _, user := range users {
 		principalID := providerrefresh.GetPrincipalIDForProvider(obj.Name, user)
 		if principalID != "" {
-			// if we have a principal on this provider, then we need to be refreshed to potentially invalidate
-			// access derived from this provider
+			// If we have a principal on this provider, then we need to be refreshed to potentially invalidate access
+			// derived from this provider
 			ac.authRefresher.TriggerUserRefresh(user.Name, true)
 		}
 	}
 	return nil
 }
 
-// resetAuthConfig takes an Auth Config as a map and deletes all entries except those with basic metadata fields.
+// resetAuthConfig takes an AuthConfig as a map and deletes all entries except those with basic metadata fields.
 func resetAuthConfig(cfg map[string]any) {
 	retainFields := map[string]bool{"apiVersion": true, "kind": true, "metadata": true, "type": true}
 	for field := range cfg {

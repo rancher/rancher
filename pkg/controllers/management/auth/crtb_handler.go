@@ -17,12 +17,18 @@ import (
 )
 
 const (
-	/* Prior to 2.5, the label "memberhsip-binding-owner" was set on the CRB/RBs for a roleTemplateBinding with the key being the roleTemplateBinding's UID.
-	2.5 onwards, instead of the roleTemplateBinding's UID, a combination of its namespace and name will be used in this label.
-	CRB/RBs on clusters upgraded from 2.4.x to 2.5 will continue to carry the original label with UID. To ensure permissions are managed properly on upgrade,
-	we need to change the label value as well.
-	So the older label value, MembershipBindingOwnerLegacy (<=2.4.x) will continue to be "memberhsip-binding-owner" (notice the spelling mistake),
-	and the new label, MembershipBindingOwner will be "membership-binding-owner" (a different label value with the right spelling)*/
+	/*
+		Prior to 2.5, the label "memberhsip-binding-owner" was set on the CRB/RBs for a roleTemplateBinding with the
+		key as the roleTemplateBinding UID. For 2.5 onwards, instead of the roleTemplateBinding UID, a combination of
+		its namespace and name will be used in this label.
+
+		CRB/RBs on clusters upgraded from 2.4.x to 2.5 will continue to carry the original label with UID. To ensure
+		permissions are managed properly on upgrade, we need to change the label value as well.
+
+		So the older label value, MembershipBindingOwnerLegacy (<=2.4.x) will continue to be "memberhsip-binding-owner"
+		(notice the spelling mistake), and the new label, MembershipBindingOwner will be "membership-binding-owner"
+		(a different label with the right spelling).
+	*/
 	MembershipBindingOwnerLegacy = "memberhsip-binding-owner"
 	MembershipBindingOwner       = "membership-binding-owner"
 	clusterResource              = "clusters"
@@ -61,6 +67,7 @@ type crtbLifecycle struct {
 	clusterLister v3.ClusterLister
 }
 
+// Create creates a ClusterRoleTemplateBinding (CRTB) and applies the k8s roles and bindings to the cluster.
 func (c *crtbLifecycle) Create(obj *v3.ClusterRoleTemplateBinding) (runtime.Object, error) {
 	obj, err := c.reconcileSubject(obj)
 	if err != nil {
@@ -71,6 +78,7 @@ func (c *crtbLifecycle) Create(obj *v3.ClusterRoleTemplateBinding) (runtime.Obje
 	return obj, err
 }
 
+// Updated updates user access, labels, and k8s roles and bindings for a CRTB.
 func (c *crtbLifecycle) Updated(obj *v3.ClusterRoleTemplateBinding) (runtime.Object, error) {
 	obj, err := c.reconcileSubject(obj)
 	if err != nil {
@@ -83,6 +91,7 @@ func (c *crtbLifecycle) Updated(obj *v3.ClusterRoleTemplateBinding) (runtime.Obj
 	return obj, err
 }
 
+// Remove removes user access, privileges, and permissions for a CRTB.
 func (c *crtbLifecycle) Remove(obj *v3.ClusterRoleTemplateBinding) (runtime.Object, error) {
 	if err := c.mgr.reconcileClusterMembershipBindingForDelete("", pkgrbac.GetRTBLabel(obj.ObjectMeta)); err != nil {
 		return nil, err
@@ -95,6 +104,7 @@ func (c *crtbLifecycle) Remove(obj *v3.ClusterRoleTemplateBinding) (runtime.Obje
 	return nil, err
 }
 
+// reconcileSubject sets a user on a CRTB if they are listed as a subject. Returns nil if the binding has no subject.
 func (c *crtbLifecycle) reconcileSubject(binding *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
 	if binding.GroupName != "" || binding.GroupPrincipalName != "" || (binding.UserPrincipalName != "" && binding.UserName != "") {
 		return binding, nil
@@ -130,9 +140,10 @@ func (c *crtbLifecycle) reconcileSubject(binding *v3.ClusterRoleTemplateBinding)
 
 // When a CRTB is created or updated, translate it into several k8s roles and bindings to actually enforce the RBAC
 // Specifically:
-// - ensure the subject can see the cluster in the mgmt API
-// - if the subject was granted owner permissions for the clsuter, ensure they can create/update/delete the cluster
-// - if the subject was granted privileges to mgmt plane resources that are scoped to the cluster, enforce those rules in the cluster's mgmt plane namespace
+//   - ensure the subject can see the cluster in the mgmt API
+//   - if the subject was granted owner permissions for the cluster, ensure they can create/update/delete the cluster
+//   - if the subject was granted privileges to mgmt plane resources that are scoped to the cluster, enforce those rules
+//     in the cluster's mgmt plane namespace
 func (c *crtbLifecycle) reconcileBindings(binding *v3.ClusterRoleTemplateBinding) error {
 	if binding.UserName == "" && binding.GroupPrincipalName == "" && binding.GroupName == "" {
 		return nil
@@ -183,6 +194,8 @@ func (c *crtbLifecycle) reconcileBindings(binding *v3.ClusterRoleTemplateBinding
 	return nil
 }
 
+// removeMGMTClusterScopedPrivilegesInProjectNamespace removes mgmt cluster scoped privileges for a provided CRTB in
+// a project namespace.
 func (c *crtbLifecycle) removeMGMTClusterScopedPrivilegesInProjectNamespace(binding *v3.ClusterRoleTemplateBinding) error {
 	projects, err := c.mgr.projectLister.List(binding.Namespace, labels.Everything())
 	if err != nil {
@@ -205,12 +218,16 @@ func (c *crtbLifecycle) removeMGMTClusterScopedPrivilegesInProjectNamespace(bind
 	return nil
 }
 
+// reconcileLabels updates labels for the provided CRTB.
+//
+// Prior to 2.5, for every CRTB, the following CRBs and RBs are created in the management clusters
+//  1. CRTB.UID is the label key for a CRB, CRTB.UID=memberhsip-binding-owner
+//  2. CRTB.UID is label key for the RB, CRTB.UID=crtb-in-project-binding-owner (in the namespace of each project in the
+//     cluster that the user has access to)
+//
+// Using above labels, list the CRB and RB and update them to add a label with namespace + name of CRTB.
 func (c *crtbLifecycle) reconcileLabels(binding *v3.ClusterRoleTemplateBinding) error {
-	/* Prior to 2.5, for every CRTB, following CRBs and RBs are created in the management clusters
-		1. CRTB.UID is the label key for a CRB, CRTB.UID=memberhsip-binding-owner
-	    2. CRTB.UID is label key for the RB, CRTB.UID=crtb-in-project-binding-owner (in the namespace of each project in the cluster that the user has access to)
-	Using above labels, list the CRB and RB and update them to add a label with ns+name of CRTB
-	*/
+
 	if binding.Labels[RtbCrbRbLabelsUpdated] == "true" {
 		return nil
 	}
