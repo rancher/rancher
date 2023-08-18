@@ -150,12 +150,16 @@ func (i *contentDownload) serveChart(apiContext *types.APIRequest, rw http.Respo
 }
 
 // getIndex retrieves the index file from the Helm repository.
-// It skips filter if the query parameter "skipFilter" is set to "true" in the API request.
+// By default, the index file contains versions filtered by rancher version and the local cluster's k8s version;
+// If "skipFilter" is set to "true" in the API request, the index file will contain all versions for all charts;
+// if "k8sVersion" is set, the index file will contain versions filtered by rancher version and the k8s version.
 func (i *contentDownload) getIndex(apiContext *types.APIRequest) (*repo.IndexFile, error) {
 	namespace, name := nsAndName(apiContext)
-	rawValue := apiContext.Request.URL.Query().Get("skipFilter")
+	query := apiContext.Request.URL.Query()
+	rawValue := query.Get("skipFilter")
 	skipFilter := strings.ToLower(rawValue) == "true"
-	return i.contentManager.Index(namespace, name, skipFilter)
+	targetClusterVersion := query.Get("k8sVersion")
+	return i.contentManager.Index(namespace, name, targetClusterVersion, skipFilter)
 }
 
 // nsAndName returns the namespace and name from the API context. If the
