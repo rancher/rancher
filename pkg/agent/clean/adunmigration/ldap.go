@@ -208,9 +208,6 @@ func adConfiguration(sc *config.ScaledContext) (*v3.ActiveDirectoryConfig, error
 
 	storedADConfig.ObjectMeta = *typemeta
 
-	logrus.Debugf("[%v] Should in theory have ActiveDirectory config data? Let's check!", migrateAdUserOperation)
-	logrus.Debugf("[%v] AD Service Account User: %v", migrateAdUserOperation, storedADConfig.ServiceAccountUsername)
-
 	if storedADConfig.ServiceAccountPassword != "" {
 		value, err := common.ReadFromSecret(secrets, storedADConfig.ServiceAccountPassword,
 			strings.ToLower(v3client.ActiveDirectoryConfigFieldServiceAccountPassword))
@@ -414,7 +411,7 @@ func migrateAllowedUserPrincipals(workunits *[]migrateUserWorkUnit, missingUsers
 	} else {
 		logrus.Infof("[%v] DRY RUN: new allowed user list will contain these principal IDs:", migrateAdUserOperation)
 		for _, principalID := range newPrincipalIDs {
-			logrus.Infof("[%v]   DRY RUN: '%v'", migrateAdUserOperation, principalID)
+			logrus.Infof("[%v] DRY RUN:   '%v'", migrateAdUserOperation, principalID)
 		}
 	}
 	return err
