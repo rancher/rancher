@@ -33,6 +33,7 @@ type ClusterSpec struct {
 	DefaultClusterRoleForProjectMembers                  string                        `json:"defaultClusterRoleForProjectMembers,omitempty" norman:"type=reference[roleTemplate]"`
 	EnableNetworkPolicy                                  *bool                         `json:"enableNetworkPolicy,omitempty" norman:"default=false"`
 	FleetAgentDeploymentCustomization                    *AgentDeploymentCustomization `json:"fleetAgentDeploymentCustomization,omitempty"`
+	SSHTests                                             []string                      `json:"sshTests,omitempty"`
 
 	RedeploySystemAgentGeneration int64 `json:"redeploySystemAgentGeneration,omitempty"`
 }

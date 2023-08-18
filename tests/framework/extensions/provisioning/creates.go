@@ -293,9 +293,13 @@ func CreateProvisioningRKE1Cluster(client *rancher.Client, provider RKE1Provider
 		pipeline.UpdateConfigClusterName(clusterName)
 	}
 
-	_, err = nodepools.NodePoolSetup(client, *clustersConfig.NodesAndRolesRKE1, clusterResp.ID, nodeTemplate.ID)
+	nodePools, err := nodepools.NodePoolSetup(client, *clustersConfig.NodesAndRolesRKE1, clusterResp.ID, nodeTemplate.ID)
 	if err != nil {
 		return nil, err
+	}
+
+	if clustersConfig.DrainBeforeDelete {
+		nodePools.DrainBeforeDelete = clustersConfig.DrainBeforeDelete
 	}
 
 	createdCluster, err := client.Management.Cluster.ByID(clusterResp.ID)
