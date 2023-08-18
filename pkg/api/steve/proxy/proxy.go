@@ -9,6 +9,7 @@ import (
 	"time"
 
 	gmux "github.com/gorilla/mux"
+	"github.com/rancher/rancher/pkg/api/steve/disallow"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
@@ -17,6 +18,7 @@ import (
 	"github.com/rancher/steve/pkg/proxy"
 	"github.com/sirupsen/logrus"
 	authzv1 "k8s.io/api/authorization/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
@@ -26,8 +28,9 @@ import (
 )
 
 type Handler struct {
-	authorizer    authorizer.Authorizer
-	dialerFactory ClusterDialerFactory
+	authorizer         authorizer.Authorizer
+	dialerFactory      ClusterDialerFactory
+	requestInfoFactory request.RequestInfoFactory
 }
 
 type ClusterDialerFactory func(clusterID string) remotedialer.Dialer
@@ -114,8 +117,9 @@ func NewProxyHandler(authorizer authorizer.Authorizer,
 	dialerFactory ClusterDialerFactory,
 	clusters v3.ClusterCache) *Handler {
 	return &Handler{
-		authorizer:    authorizer,
-		dialerFactory: dialerFactory,
+		authorizer:         authorizer,
+		dialerFactory:      dialerFactory,
+		requestInfoFactory: request.RequestInfoFactory{APIPrefixes: sets.NewString("apis", "api"), GrouplessAPIPrefixes: sets.NewString("api")},
 	}
 }
 
@@ -143,14 +147,16 @@ func (h *Handler) authLocalCluster(router *gmux.Router) func(rw http.ResponseWri
 	}
 }
 
+// matchManagementCRDs matches paths that are for management CRDs that are not in the allow-list of specific management resources.
+// To decide what to match, it tries to extract request information from the URL path and examine the group and resource.
 func (h *Handler) matchManagementCRDs() gmux.MatcherFunc {
 	return func(req *http.Request, match *gmux.RouteMatch) bool {
-		splitPath := strings.Split(req.URL.Path, "/")
-		if len(splitPath) < 3 {
+		info, err := h.requestInfoFactory.NewRequestInfo(req)
+		if err != nil {
+			// This isn't a K8s request, don't match it.
 			return false
 		}
-		apiGroup := splitPath[2]
-		return apiGroup == managementv3.GroupName
+		return info.APIGroup == managementv3.GroupName && info.Resource != "" && !disallow.AllowAll[info.Resource]
 	}
 }
 

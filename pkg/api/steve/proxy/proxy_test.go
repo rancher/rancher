@@ -5,11 +5,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"strings"
 	"testing"
 
@@ -29,6 +30,7 @@ import (
 )
 
 func TestLocalCluster(t *testing.T) {
+	t.Parallel()
 	const defaultResponseCode = 210 // so far an unused code, works to not set off any edge cases (is also in 200s)
 	const defaultResponseMessage = "Default response"
 	const defaultToken = "01020305081321345589" // token for testing, has shortened, random-like value
@@ -41,51 +43,177 @@ func TestLocalCluster(t *testing.T) {
 		desiredResponseMessage string
 	}{
 		{
-			name:                   "basic test case, no match",
+			name:                   "no matching path",
 			requestPath:            "/v1/not/a/path",
 			userCanAccessLocal:     false,
 			desiredResponseCode:    defaultResponseCode,
 			desiredResponseMessage: defaultResponseMessage,
 		},
 		{
-			name:                   "management crds with local cluster access",
+			name:                   "management crd allowed with local cluster access",
 			requestPath:            "/apis/management.cattle.io/v3/test-crd",
 			userCanAccessLocal:     true,
 			desiredResponseCode:    defaultResponseCode,
 			desiredResponseMessage: defaultResponseMessage,
 		},
 		{
-			name:                   "management crds without local cluster access",
-			requestPath:            "/apis/management.cattle.io/v3/test-crd",
+			name:                   "management crd disallowed without local cluster access",
+			requestPath:            "/apis/management.cattle.io/v3/fake-crd",
 			userCanAccessLocal:     false,
 			desiredResponseCode:    http.StatusForbidden,
 			desiredResponseMessage: "",
 		},
 		{
-			name:                   "core types without local cluster access",
+			name:                   "management crd disallowed with individual resource without local cluster access",
+			requestPath:            "/apis/management.cattle.io/v3/fake-crd/hello",
+			userCanAccessLocal:     false,
+			desiredResponseCode:    http.StatusForbidden,
+			desiredResponseMessage: "",
+		},
+		{
+			name:                   "management crd disallowed with individual resource's status without local cluster access",
+			requestPath:            "/apis/management.cattle.io/v3/fake-crd/hello/status",
+			userCanAccessLocal:     false,
+			desiredResponseCode:    http.StatusForbidden,
+			desiredResponseMessage: "",
+		},
+		{
+			name:                   "management crd allowed without local cluster access",
+			requestPath:            "/apis/management.cattle.io/v3/podsecurityadmissionconfigurationtemplates",
+			userCanAccessLocal:     false,
+			desiredResponseCode:    defaultResponseCode,
+			desiredResponseMessage: defaultResponseMessage,
+		},
+		{
+			name:                   "management crd allowed without local cluster access with trailing slash",
+			requestPath:            "/apis/management.cattle.io/v3/podsecurityadmissionconfigurationtemplates/",
+			userCanAccessLocal:     false,
+			desiredResponseCode:    defaultResponseCode,
+			desiredResponseMessage: defaultResponseMessage,
+		},
+		{
+			name:                   "management crd allowed with local cluster access",
+			requestPath:            "/apis/management.cattle.io/v3/podsecurityadmissionconfigurationtemplates",
+			userCanAccessLocal:     true,
+			desiredResponseCode:    defaultResponseCode,
+			desiredResponseMessage: defaultResponseMessage,
+		},
+		{
+			name:                   "management crd allowed with individual resource without local cluster access",
+			requestPath:            "/apis/management.cattle.io/v3/podsecurityadmissionconfigurationtemplates/mytemplate",
+			userCanAccessLocal:     false,
+			desiredResponseCode:    defaultResponseCode,
+			desiredResponseMessage: defaultResponseMessage,
+		},
+		{
+			name:                   "management crd allowed with individual resource's status without local cluster access",
+			requestPath:            "/apis/management.cattle.io/v3/podsecurityadmissionconfigurationtemplates/mytemplate/status",
+			userCanAccessLocal:     false,
+			desiredResponseCode:    defaultResponseCode,
+			desiredResponseMessage: defaultResponseMessage,
+		},
+		{
+			name:                   "core type without local cluster access",
 			requestPath:            "/api/v1/pods",
 			userCanAccessLocal:     false,
 			desiredResponseCode:    defaultResponseCode,
 			desiredResponseMessage: defaultResponseMessage,
 		},
 		{
-			name:                   "core types with local cluster access",
+			name:                   "core type with local cluster access",
 			requestPath:            "/api/v1/pods",
 			userCanAccessLocal:     true,
 			desiredResponseCode:    defaultResponseCode,
 			desiredResponseMessage: defaultResponseMessage,
 		},
 		{
-			name:                   "non-mgmt types without local cluster access",
+			name:                   "non management type without local cluster access",
 			requestPath:            "/apis/provisioning.cattle.io/v1/clusters",
 			userCanAccessLocal:     false,
 			desiredResponseCode:    defaultResponseCode,
 			desiredResponseMessage: defaultResponseMessage,
 		},
 		{
-			name:                   "non-mgmt types with local cluster access",
+			name:                   "non management type with local cluster access",
 			requestPath:            "/apis/provisioning.cattle.io/v1/clusters",
 			userCanAccessLocal:     true,
+			desiredResponseCode:    defaultResponseCode,
+			desiredResponseMessage: defaultResponseMessage,
+		},
+		{
+			name:                   "discovery call for management resource without local cluster access",
+			requestPath:            "/apis/management.cattle.io/v3",
+			userCanAccessLocal:     false,
+			desiredResponseCode:    defaultResponseCode,
+			desiredResponseMessage: defaultResponseMessage,
+		},
+		{
+			name:                   "discovery call for management resource with local cluster access",
+			requestPath:            "/apis/management.cattle.io/v3",
+			userCanAccessLocal:     true,
+			desiredResponseCode:    defaultResponseCode,
+			desiredResponseMessage: defaultResponseMessage,
+		},
+		{
+			name:                   "discovery call for core resource without local cluster access",
+			requestPath:            "/api/v1",
+			userCanAccessLocal:     false,
+			desiredResponseCode:    defaultResponseCode,
+			desiredResponseMessage: defaultResponseMessage,
+		},
+		{
+			name:                   "discovery call for core resource with local cluster access",
+			requestPath:            "/api/v1",
+			userCanAccessLocal:     true,
+			desiredResponseCode:    defaultResponseCode,
+			desiredResponseMessage: defaultResponseMessage,
+		},
+		{
+			name:                   "management resource of v000 version with local cluster access",
+			requestPath:            "/apis/management.cattle.io/v000/podsecurityadmissionconfigurationtemplates",
+			userCanAccessLocal:     false,
+			desiredResponseCode:    defaultResponseCode,
+			desiredResponseMessage: defaultResponseMessage,
+		},
+		{
+			name:                   "management resource of v000 version without local cluster access",
+			requestPath:            "/apis/management.cattle.io/v000/podsecurityadmissionconfigurationtemplates",
+			userCanAccessLocal:     true,
+			desiredResponseCode:    defaultResponseCode,
+			desiredResponseMessage: defaultResponseMessage,
+		},
+		{
+			name:                   "bad path without local cluster access",
+			requestPath:            "/apis/management.cattle.io/v3/podsecurityadmissionconfigurationtemplates/hello/world/foo/bar",
+			userCanAccessLocal:     false,
+			desiredResponseCode:    defaultResponseCode,
+			desiredResponseMessage: defaultResponseMessage,
+		},
+		{
+			name:                   "bad path with local cluster access",
+			requestPath:            "/apis/management.cattle.io/v3/podsecurityadmissionconfigurationtemplates/hello/world/foo/bar/baz",
+			userCanAccessLocal:     true,
+			desiredResponseCode:    defaultResponseCode,
+			desiredResponseMessage: defaultResponseMessage,
+		},
+		{
+			name:                   "special support path without cluster access",
+			requestPath:            "/healthz",
+			userCanAccessLocal:     false,
+			desiredResponseCode:    defaultResponseCode,
+			desiredResponseMessage: defaultResponseMessage,
+		},
+		{
+			name:                   "special support path with cluster access",
+			requestPath:            "/healthz",
+			userCanAccessLocal:     true,
+			desiredResponseCode:    defaultResponseCode,
+			desiredResponseMessage: defaultResponseMessage,
+		},
+		{
+			name:                   "short path",
+			requestPath:            "/apis/hello",
+			userCanAccessLocal:     false,
 			desiredResponseCode:    defaultResponseCode,
 			desiredResponseMessage: defaultResponseMessage,
 		},
@@ -248,7 +376,7 @@ func NewSARServer(reviewer *testReviewer, rootPath string) (*httptest.Server, er
 			return
 		}
 		var review authv1.SubjectAccessReview
-		bodyData, _ := ioutil.ReadAll(r.Body)
+		bodyData, _ := io.ReadAll(r.Body)
 		if err := json.Unmarshal(bodyData, &review); err != nil {
 			http.Error(w, fmt.Sprintf("failed to decode body %s", err), http.StatusBadRequest)
 			return
@@ -317,10 +445,11 @@ func RestClientForURL(serverURL string, token string) (rest.Interface, error) {
 			},
 		},
 	}
-	tempfile, err := ioutil.TempFile("", "")
+	tempfile, err := os.CreateTemp("", "")
 	if err != nil {
 		return nil, err
 	}
+	defer os.Remove(tempfile.Name())
 	if err := json.NewEncoder(tempfile).Encode(config); err != nil {
 		return nil, err
 	}
@@ -328,10 +457,10 @@ func RestClientForURL(serverURL string, token string) (rest.Interface, error) {
 	loadingRules.ExplicitPath = tempfile.Name()
 	loader := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, &clientcmd.ConfigOverrides{})
 	restConfig, err := loader.ClientConfig()
-	restConfig.GroupVersion = &v1.SchemeGroupVersion
-	restConfig.ContentConfig.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
 	if err != nil {
 		return nil, err
 	}
+	restConfig.GroupVersion = &v1.SchemeGroupVersion
+	restConfig.ContentConfig.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
 	return rest.UnversionedRESTClientFor(restConfig)
 }
