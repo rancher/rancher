@@ -198,8 +198,7 @@ func migrateCRTBs(workunit *migrateUserWorkUnit, sc *config.ScaledContext, dryRu
 	for _, oldCrtb := range workunit.activeDirectoryCRTBs {
 		if dryRun {
 			logrus.Infof("[%v] DRY RUN: would migrate CRTB '%v' from GUID principal '%v' to DN principal '%v'. "+
-				"Additionally, an annotation, %v, would be added containing the principal being migrated from and"+
-				"labels, %v and %v, that will contain the name of the previous CRTB and indicate that this CRTB has been migrated.",
+				"Annotation, %v, and labels %v and %v would be added, including the name of the previous CRTB instance",
 				migrateCrtbsOperation, oldCrtb.Name, oldCrtb.UserPrincipalName, dnPrincipalID, adGUIDMigrationAnnotation, migrationPreviousName, adGUIDMigrationLabel)
 		} else {
 			err := updateCRTB(crtbInterface, &oldCrtb, workunit.originalUser.Name, dnPrincipalID)
@@ -214,8 +213,7 @@ func migrateCRTBs(workunit *migrateUserWorkUnit, sc *config.ScaledContext, dryRu
 	for _, oldCrtb := range workunit.duplicateLocalCRTBs {
 		if dryRun {
 			logrus.Infof("[%v] DRY RUN: would migrate CRTB '%v' from duplicate local user '%v' to original user '%v'"+
-				"Additionally, an annotation, %v, would be added containing the principal being migrated from and"+
-				"labels, %v and %v, that will contain the name of the previous CRTB and indicate that this CRTB has been migrated.",
+				"Annotation, %v, and labels %v and %v would be added, including the name of the previous CRTB instance",
 				migrateCrtbsOperation, oldCrtb.Name, oldCrtb.UserPrincipalName, localPrincipalID, adGUIDMigrationAnnotation, migrationPreviousName, adGUIDMigrationLabel)
 		} else {
 			err := updateCRTB(crtbInterface, &oldCrtb, workunit.originalUser.Name, localPrincipalID)
@@ -302,8 +300,7 @@ func migratePRTBs(workunit *migrateUserWorkUnit, sc *config.ScaledContext, dryRu
 	for _, oldPrtb := range workunit.activeDirectoryPRTBs {
 		if dryRun {
 			logrus.Infof("[%v] DRY RUN: would migrate PRTB '%v' from GUID principal '%v' to DN principal '%v'. "+
-				"Additionally, an annotation, %v, would be added containing the principal being migrated from and"+
-				"labels, %v and %v, that will contain the name of the previous PRTB and indicate that this PRTB has been migrated.",
+				"Annotation, %v, and labels %v and %v would be added, including the name of the previous PRTB instance",
 				migratePrtbsOperation, oldPrtb.Name, oldPrtb.UserPrincipalName, dnPrincipalID, adGUIDMigrationAnnotation, migrationPreviousName, adGUIDMigrationLabel)
 
 		} else {
@@ -318,9 +315,8 @@ func migratePRTBs(workunit *migrateUserWorkUnit, sc *config.ScaledContext, dryRu
 	localPrincipalID := localPrefix + workunit.originalUser.Name
 	for _, oldPrtb := range workunit.duplicateLocalPRTBs {
 		if dryRun {
-			logrus.Infof("[%v] DRY RUN: would migrate PRTB '%v' from duplicate local user '%v' to original user '%v'"+
-				"Additionally, an annotation, %v, would be added containing the principal being migrated from and"+
-				"labels, %v and %v, that will contain the name of the previous PRTB and indicate that this PRTB has been migrated.",
+			logrus.Infof("[%v] DRY RUN: would migrate PRTB '%v' from duplicate local user '%v' to original user '%v'. "+
+				"Annotation, %v, and labels %v and %v would be added, including the name of the previous PRTB instance",
 				migratePrtbsOperation, oldPrtb.Name, oldPrtb.UserPrincipalName, localPrincipalID, adGUIDMigrationAnnotation, migrationPreviousName, adGUIDMigrationLabel)
 
 		} else {
@@ -344,8 +340,8 @@ func migrateGRBs(workunit *migrateUserWorkUnit, sc *config.ScaledContext, dryRun
 
 	for _, oldGrb := range workunit.duplicateLocalGRBs {
 		if dryRun {
-			logrus.Infof("[%v] DRY RUN: would migrate GRB '%v' from duplicate local user '%v' to original user '%v'"+
-				"Additionally, labels %v and %v will be added. These contain the name of the previous GRB and indicate that this GRB has been migrated.",
+			logrus.Infof("[%v] DRY RUN: would migrate GRB '%v' from duplicate local user '%v' to original user '%v'. "+
+				"Labels %v and %v would be added, including the name of the previous GRB instance",
 				migrateGrbsOperation, oldGrb.Name, oldGrb.UserName, workunit.originalUser.Name, migrationPreviousName, adGUIDMigrationLabel)
 		} else {
 			newLabels := oldGrb.Labels
