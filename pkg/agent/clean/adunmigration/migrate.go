@@ -181,6 +181,8 @@ func UnmigrateAdGUIDUsers(clientConfig *restclient.Config, dryRun bool, deleteMi
 		}
 	}
 
+	logrus.Infof("[%v] beginning ad-guid unmigration", migrateAdUserOperation)
+
 	users, err := sc.Management.Users("").List(metav1.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("unable to fetch user list: %v", err)
@@ -261,7 +263,7 @@ func UnmigrateAdGUIDUsers(clientConfig *restclient.Config, dryRun bool, deleteMi
 			progress := fmt.Sprintf("%.0f%%", percentDone)
 			err = updateMigrationStatus(sc, migrationStatusPercentage, progress)
 			if err != nil {
-				logrus.Errorf("unable to update migration status: %v", err)
+				logrus.Errorf("[%v] unable to update migration status: %v", migrateAdUserOperation, err)
 			}
 		}
 	}
@@ -270,6 +272,12 @@ func UnmigrateAdGUIDUsers(clientConfig *restclient.Config, dryRun bool, deleteMi
 	if err != nil {
 		finalStatus = activedirectory.StatusMigrationFailed
 		return err
+	}
+
+	if dryRun {
+		logrus.Infof("[%v] end of ad-guid unmigration", migrateAdUserOperation)
+	} else {
+		logrus.Infof("[%v] end of ad-guid unmigration, results saved to configmap '%v'", migrateAdUserOperation, activedirectory.StatusConfigMapName)
 	}
 
 	return nil
@@ -497,6 +505,6 @@ func updateUnmigratedUsers(user string, status string, reset bool, sc *config.Sc
 	}
 	err = updateADConfigMigrationStatus(cm.Data, sc)
 	if err != nil {
-		logrus.Errorf("unable to update AuthConfig status: %v", err)
+		logrus.Errorf("[%v] unable to update AuthConfig status: %v", migrateAdUserOperation, err)
 	}
 }
