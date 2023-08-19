@@ -127,13 +127,16 @@ func updateCRTB(crtbInterface v3norman.ClusterRoleTemplateBindingInterface, oldC
 	if newAnnotations == nil {
 		newAnnotations = make(map[string]string)
 	}
-	newAnnotations[adGUIDMigrationAnnotation] = oldCrtb.UserPrincipalName
+
 	newLabels := oldCrtb.Labels
 	if newLabels == nil {
 		newLabels = make(map[string]string)
 	}
 	newLabels[migrationPreviousName] = oldCrtb.Name
 	newLabels[adGUIDMigrationLabel] = migratedLabelValue
+
+	// For RBAC reasons, we will delay adding annotations until after the resource is created
+
 	newCrtb := &v3.ClusterRoleTemplateBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:         "",
@@ -158,11 +161,13 @@ func updateCRTB(crtbInterface v3norman.ClusterRoleTemplateBindingInterface, oldC
 		Steps:    10,
 	}
 
+	var createdCrtb *v3.ClusterRoleTemplateBinding
 	err := wait.ExponentialBackoff(backoff, func() (finished bool, err error) {
-		_, err = crtbInterface.Create(newCrtb)
+		// Note: this does NOT trigger an RBAC sync correctly
+		createdCrtb, err = crtbInterface.Create(newCrtb)
 		if err != nil {
 			if apierrors.IsInternalError(err) {
-				logrus.Errorf("[%v] internal error while creating crtb, will backoff and retry: %v", migrateCrtbsOperation, err)
+				logrus.Errorf("[%v] internal error while creating CRTB, will backoff and retry: %v", migrateCrtbsOperation, err)
 				return false, err
 			}
 			return true, fmt.Errorf("[%v] unable to create new CRTB: %w", migrateCrtbsOperation, err)
@@ -170,14 +175,16 @@ func updateCRTB(crtbInterface v3norman.ClusterRoleTemplateBindingInterface, oldC
 		return true, nil
 	})
 	if err != nil {
-		return fmt.Errorf("[%v] permanent error when creating crtb, giving up: %v", migrateCrtbsOperation, err)
+		return fmt.Errorf("[%v] permanent error when creating CRTB, giving up: %v", migrateCrtbsOperation, err)
 	}
 
 	err = wait.ExponentialBackoff(backoff, func() (finished bool, err error) {
+		// Note: this DOES trigger an RBAC sync which removes the binding in downstream clusters
+		// It does NOT automatically re-queue the newly created binding from above
 		err = crtbInterface.DeleteNamespaced(oldCrtb.Namespace, oldCrtb.Name, &metav1.DeleteOptions{})
 		if err != nil {
 			if apierrors.IsInternalError(err) {
-				logrus.Errorf("[%v] internal error while deleting crtb, will backoff and retry: %v", migrateCrtbsOperation, err)
+				logrus.Errorf("[%v] internal error while deleting CRTB, will backoff and retry: %v", migrateCrtbsOperation, err)
 				return false, err
 			}
 			return true, fmt.Errorf("[%v] unable to delete old CRTB: %w", migrateCrtbsOperation, err)
@@ -185,7 +192,33 @@ func updateCRTB(crtbInterface v3norman.ClusterRoleTemplateBindingInterface, oldC
 		return true, nil
 	})
 	if err != nil {
-		return fmt.Errorf("[%v] permanent error when deleting crtb, giving up: %v", migrateCrtbsOperation, err)
+		return fmt.Errorf("[%v] permanent error when deleting CRTB, giving up: %v", migrateCrtbsOperation, err)
+	}
+
+	// Adding the annotation here has the side effect of triggering a downstream RBAC sync for our newly created
+	// binding, which is why we perform it last
+
+	newAnnotations[adGUIDMigrationAnnotation] = oldCrtb.UserPrincipalName
+
+	err = wait.ExponentialBackoff(backoff, func() (finished bool, err error) {
+		updatedCrtb, err := crtbInterface.GetNamespaced(oldCrtb.Namespace, createdCrtb.Name, metav1.GetOptions{})
+		if err != nil {
+			return true, fmt.Errorf("[%v] unable to get newly created CRTB: %w", migrateCrtbsOperation, err)
+		}
+
+		updatedCrtb.Annotations = newAnnotations
+		_, err = crtbInterface.Update(updatedCrtb)
+		if err != nil {
+			if apierrors.IsInternalError(err) {
+				logrus.Errorf("[%v] internal error while updating CRTB, will backoff and retry: %v", migrateCrtbsOperation, err)
+				return false, err
+			}
+			return true, fmt.Errorf("[%v] unable to update new CRTB: %w", migrateCrtbsOperation, err)
+		}
+		return true, nil
+	})
+	if err != nil {
+		return fmt.Errorf("[%v] permanent error when updating CRTB, giving up: %v", migrateCrtbsOperation, err)
 	}
 
 	return nil
@@ -229,13 +262,15 @@ func updatePRTB(prtbInterface v3norman.ProjectRoleTemplateBindingInterface, oldP
 	if newAnnotations == nil {
 		newAnnotations = make(map[string]string)
 	}
-	newAnnotations[adGUIDMigrationAnnotation] = oldPrtb.UserPrincipalName
 	newLabels := oldPrtb.Labels
 	if newLabels == nil {
 		newLabels = make(map[string]string)
 	}
 	newLabels[migrationPreviousName] = oldPrtb.Name
 	newLabels[adGUIDMigrationLabel] = migratedLabelValue
+
+	// For RBAC reasons, we will delay adding annotations until after the resource is created
+
 	newPrtb := &v3.ProjectRoleTemplateBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:         "",
@@ -260,8 +295,10 @@ func updatePRTB(prtbInterface v3norman.ProjectRoleTemplateBindingInterface, oldP
 		Steps:    10,
 	}
 
+	var createdPrtb *v3.ProjectRoleTemplateBinding
 	err := wait.ExponentialBackoff(backoff, func() (finished bool, err error) {
-		_, err = prtbInterface.Create(newPrtb)
+		// Note: this does NOT trigger an RBAC sync correctly
+		createdPrtb, err = prtbInterface.Create(newPrtb)
 		if err != nil {
 			if apierrors.IsInternalError(err) {
 				logrus.Errorf("[%v] internal error while creating prtb, will backoff and retry: %v", migratePrtbsOperation, err)
@@ -276,6 +313,8 @@ func updatePRTB(prtbInterface v3norman.ProjectRoleTemplateBindingInterface, oldP
 	}
 
 	err = wait.ExponentialBackoff(backoff, func() (finished bool, err error) {
+		// Note: this DOES trigger an RBAC sync which removes the binding in downstream clusters
+		// It does NOT automatically re-queue the newly created binding from above
 		err = prtbInterface.DeleteNamespaced(oldPrtb.Namespace, oldPrtb.Name, &metav1.DeleteOptions{})
 		if err != nil {
 			if apierrors.IsInternalError(err) {
@@ -288,6 +327,31 @@ func updatePRTB(prtbInterface v3norman.ProjectRoleTemplateBindingInterface, oldP
 	})
 	if err != nil {
 		return fmt.Errorf("[%v] permanent error when deleting prtb, giving up: %v", migratePrtbsOperation, err)
+	}
+
+	// Adding the annotation here has the side effect of triggering a downstream RBAC sync for our newly created
+	// binding, which is why we perform it last
+	newAnnotations[adGUIDMigrationAnnotation] = oldPrtb.UserPrincipalName
+
+	err = wait.ExponentialBackoff(backoff, func() (finished bool, err error) {
+		updatedPrtb, err := prtbInterface.GetNamespaced(oldPrtb.Namespace, createdPrtb.Name, metav1.GetOptions{})
+		if err != nil {
+			return true, fmt.Errorf("[%v] unable to get newly created PRTB: %w", migratePrtbsOperation, err)
+		}
+
+		updatedPrtb.Annotations = newAnnotations
+		_, err = prtbInterface.Update(updatedPrtb)
+		if err != nil {
+			if apierrors.IsInternalError(err) {
+				logrus.Errorf("[%v] internal error while updating PRTB, will backoff and retry: %v", migratePrtbsOperation, err)
+				return false, err
+			}
+			return true, fmt.Errorf("[%v] unable to update new PRTB: %w", migratePrtbsOperation, err)
+		}
+		return true, nil
+	})
+	if err != nil {
+		return fmt.Errorf("[%v] permanent error when updating PRTB, giving up: %v", migratePrtbsOperation, err)
 	}
 
 	return nil
@@ -344,6 +408,13 @@ func migrateGRBs(workunit *migrateUserWorkUnit, sc *config.ScaledContext, dryRun
 				"Labels %v and %v would be added, including the name of the previous GRB instance",
 				migrateGrbsOperation, oldGrb.Name, oldGrb.UserName, workunit.originalUser.Name, migrationPreviousName, adGUIDMigrationLabel)
 		} else {
+			newAnnotations := oldGrb.Annotations
+			if newAnnotations == nil {
+				newAnnotations = make(map[string]string)
+			}
+
+			// For RBAC reasons, we will delay adding annotations until after the resource is created
+
 			newLabels := oldGrb.Labels
 			if newLabels == nil {
 				newLabels = make(map[string]string)
@@ -355,7 +426,7 @@ func migrateGRBs(workunit *migrateUserWorkUnit, sc *config.ScaledContext, dryRun
 				ObjectMeta: metav1.ObjectMeta{
 					Name:         "",
 					GenerateName: "grb-",
-					Annotations:  oldGrb.Annotations,
+					Annotations:  newAnnotations,
 					Labels:       newLabels,
 				},
 				GlobalRoleName:     oldGrb.GlobalRoleName,
@@ -363,8 +434,10 @@ func migrateGRBs(workunit *migrateUserWorkUnit, sc *config.ScaledContext, dryRun
 				UserName:           workunit.originalUser.Name,
 			}
 
+			var createdGrb *v3.GlobalRoleBinding
 			err := wait.ExponentialBackoff(backoff, func() (finished bool, err error) {
-				_, err = grbInterface.Create(newGrb)
+				// Note: this does NOT trigger an RBAC sync correctly
+				createdGrb, err = grbInterface.Create(newGrb)
 				if err != nil {
 					if apierrors.IsInternalError(err) {
 						logrus.Errorf("[%v] internal error while creating GRB, will backoff and retry: %v", migrateGrbsOperation, err)
@@ -380,6 +453,8 @@ func migrateGRBs(workunit *migrateUserWorkUnit, sc *config.ScaledContext, dryRun
 			}
 
 			err = wait.ExponentialBackoff(backoff, func() (finished bool, err error) {
+				// Note: this DOES trigger an RBAC sync which removes the binding in downstream clusters
+				// It does NOT automatically re-queue the newly created binding from above
 				err = sc.Management.GlobalRoleBindings("").Delete(oldGrb.Name, &metav1.DeleteOptions{})
 				if err != nil {
 					if apierrors.IsInternalError(err) {
@@ -392,6 +467,30 @@ func migrateGRBs(workunit *migrateUserWorkUnit, sc *config.ScaledContext, dryRun
 			})
 			if err != nil {
 				logrus.Errorf("[%v] permanent error when deleting GRB, giving up: %v", migrateGrbsOperation, err)
+				continue
+			}
+
+			// Adding the annotation here has the side effect of triggering a downstream RBAC sync for our newly created
+			// binding, which is why we perform it last
+			newAnnotations[adGUIDMigrationAnnotation] = oldGrb.UserName
+			err = wait.ExponentialBackoff(backoff, func() (finished bool, err error) {
+				updatedGrb, err := sc.Management.GlobalRoleBindings("").GetNamespaced(oldGrb.Namespace, createdGrb.Name, metav1.GetOptions{})
+				if err != nil {
+					return true, fmt.Errorf("[%v] unable to get newly created GRB: %w", migrateGrbsOperation, err)
+				}
+				updatedGrb.Annotations = newAnnotations
+				_, err = sc.Management.GlobalRoleBindings("").Update(updatedGrb)
+				if err != nil {
+					if apierrors.IsInternalError(err) {
+						logrus.Errorf("[%v] internal error while updating GRB, will backoff and retry: %v", migrateGrbsOperation, err)
+						return false, err
+					}
+					return true, fmt.Errorf("[%v] unable to update GRB: %w", migrateGrbsOperation, err)
+				}
+				return true, nil
+			})
+			if err != nil {
+				logrus.Errorf("[%v] permanent error when updating GRB, giving up: %v", migrateGrbsOperation, err)
 			}
 		}
 	}
