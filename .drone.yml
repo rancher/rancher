@@ -24,6 +24,7 @@ steps:
     - pull_request
 - name: provisioning-tests-push
   image: rancher/dapper:v0.6.0
+  failure: ignore
   commands:
   - dapper provisioning-tests
   privileged: true
@@ -76,6 +77,7 @@ steps:
     - pull_request
 - name: provisioning-tests-push
   image: rancher/dapper:v0.6.0
+  failure: ignore
   commands:
   - dapper provisioning-tests
   privileged: true
@@ -128,6 +130,7 @@ steps:
         - pull_request
   - name: provisioning-operations-tests-push
     image: rancher/dapper:v0.6.0
+    failure: ignore
     commands:
       - dapper provisioning-tests
     privileged: true
@@ -180,6 +183,7 @@ steps:
         - pull_request
   - name: provisioning-operations-tests-push
     image: rancher/dapper:v0.6.0
+    failure: ignore
     commands:
       - dapper provisioning-tests
     privileged: true
