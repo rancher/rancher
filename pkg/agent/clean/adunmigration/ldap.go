@@ -379,14 +379,14 @@ func migrateAllowedUserPrincipals(workunits *[]migrateUserWorkUnit, missingUsers
 						newPrincipalIDs = append(newPrincipalIDs, principalID)
 					} else {
 						dn, _, err := findLdapUserWithRetries(guid, &sharedLConn, originalAdConfig)
-						if errors.Is(err, LdapConnectionPermanentlyFailed{}) || errors.Is(err, LdapFoundDuplicateGUID{}) {
-							// Whelp; keep this one as-is and yell about it
-							logrus.Errorf("[%v] ldap connection error when checking distinguished name for guid-based principal %v, skipping: %v", migrateAdUserOperation, principalID, err)
-							newPrincipalIDs = append(newPrincipalIDs, principalID)
-						} else if errors.Is(err, LdapErrorNotFound{}) {
+						if errors.Is(err, LdapErrorNotFound{}) {
 							if !deleteMissingUsers {
 								newPrincipalIDs = append(newPrincipalIDs, principalID)
 							}
+						} else if err != nil {
+							// Whelp; keep this one as-is and yell about it
+							logrus.Errorf("[%v] ldap error when checking distinguished name for guid-based principal %v, skipping: %v", migrateAdUserOperation, principalID, err)
+							newPrincipalIDs = append(newPrincipalIDs, principalID)
 						} else {
 							newPrincipalID := activeDirectoryPrefix + dn
 							knownDnIDs[newPrincipalID] = newPrincipalID
