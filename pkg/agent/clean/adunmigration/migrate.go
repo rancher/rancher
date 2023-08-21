@@ -359,17 +359,17 @@ func identifyMigrationWorkUnits(users *v3.UserList, adConfig *v3.ActiveDirectory
 				continue
 			}
 			dn, principal, err := findLdapUserWithRetries(guid, &sharedLConn, adConfig)
-			if errors.Is(err, LdapConnectionPermanentlyFailed{}) {
-				logrus.Warnf("[%v] LDAP connection has permanently failed! will continue to migrate previously identified users", identifyAdUserOperation)
-				skippedUsers = append(skippedUsers, skippedUserWorkUnit{guid: guid, originalUser: userCopy})
-				ldapPermanentlyFailed = true
-			} else if errors.Is(err, LdapFoundDuplicateGUID{}) {
+			if errors.Is(err, LdapFoundDuplicateGUID{}) {
 				logrus.Errorf("[%v] LDAP returned multiple users with GUID '%v'. this should not be possible, and may indicate a configuration error! this user will be skipped", identifyAdUserOperation, guid)
 				skippedUsers = append(skippedUsers, skippedUserWorkUnit{guid: guid, originalUser: userCopy})
 			} else if errors.Is(err, LdapErrorNotFound{}) {
 				logrus.Debugf("[%v] user %v is GUID-based (%v) and the Active Directory server doesn't know about it. marking it as missing", identifyAdUserOperation, user.Name, guid)
 				knownGUIDMissingUnits[guid] = len(missingUsers)
 				missingUsers = append(missingUsers, missingUserWorkUnit{guid: guid, originalUser: userCopy})
+			} else if err != nil {
+				logrus.Warnf("[%v] LDAP connection has permanently failed! will continue to migrate previously identified users", identifyAdUserOperation)
+				skippedUsers = append(skippedUsers, skippedUserWorkUnit{guid: guid, originalUser: userCopy})
+				ldapPermanentlyFailed = true
 			} else {
 				logrus.Debugf("[%v] user %v is GUID-based (%v) and the Active Directory server knows it by the Distinguished Name '%v'", identifyAdUserOperation, user.Name, guid, dn)
 				knownGUIDWorkUnits[guid] = len(usersToMigrate)
