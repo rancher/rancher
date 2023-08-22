@@ -20,13 +20,11 @@ func Ensure(secret *corev1.Secret, namespace, name, gitURL, branch string, insec
 // EnsureClonedRepo will check if repo is cloned, if not the method will clone and reset to the latest commit.
 // If reseting to the latest commit is not possible it will fetch and try to reset again
 func (er *extendedRepo) EnsureClonedRepo(branch string) error {
-
 	err := er.cloneOrOpen("")
 	if err != nil {
 		return err
 	}
 
-	// before: g.reset(branch)
 	// Try to reset to the given commit, if success exit
 	localBranchFullName := fmt.Sprintf("refs/heads/%s", branch)
 	err = er.hardReset(localBranchFullName)
@@ -34,9 +32,7 @@ func (er *extendedRepo) EnsureClonedRepo(branch string) error {
 		return nil
 	}
 
-	// before: fetchAndReset(branch)
 	// If we do not have the commit locally, fetch and reset
-	// return er.fetchAndReset(plumbing.ZeroHash, branch)
 	return er.fetchAndReset(branch)
 }
 
@@ -57,7 +53,6 @@ func (er *extendedRepo) CloneHead(branch string) (string, error) {
 		return "", err
 	}
 
-	// before: reset("HEAD")
 	err = er.hardReset("HEAD")
 	if err != nil {
 		return "", err
@@ -95,7 +90,6 @@ func (er *extendedRepo) UpdateToLatestRef(branch string) (string, error) {
 		return "", err
 	}
 
-	// before: reset("HEAD")
 	err = er.hardReset("HEAD")
 	if err != nil {
 		return "", err
@@ -111,8 +105,6 @@ func (er *extendedRepo) UpdateToLatestRef(branch string) (string, error) {
 		return commit.String(), err
 	}
 
-	// before: g.fetchAndReset(branch)
-	// err = er.fetchAndReset(lastCommit, branch)
 	err = er.fetchAndReset(branch)
 	if err != nil {
 		return commit.String(), err
