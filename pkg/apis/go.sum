@@ -497,8 +497,8 @@ github.com/rancher/lasso v0.0.0-20230629200414-8a54b32e6792 h1:IaPhDqppVYX2v/nCR
 github.com/rancher/lasso v0.0.0-20230629200414-8a54b32e6792/go.mod h1:dNcwXjcqgdOuKFIVETNAPURRh3e5PAi/nWUjj+MLVZA=
 github.com/rancher/norman v0.0.0-20230426211126-d3552b018687 h1:9Bf4fZBIdkidKTqHFsJXMlnzflxx3h4ZAEH/n6HMuyI=
 github.com/rancher/norman v0.0.0-20230426211126-d3552b018687/go.mod h1:7MyWxfCmPl6N/UFLu4neLH6nwTFgQQF5rxtUGyZvPFE=
-github.com/rancher/rke v1.4.8 h1:oCjK4LmSDxp72sIVqRXUbUBINGJDDOatC5HSmRB0wmM=
-github.com/rancher/rke v1.4.8/go.mod h1:2tq7a87T8d7o6WMDM6q5f6Nu0cL0Y0W3AT07d7Rb4/M=
+github.com/rancher/rke v1.4.10-rc1 h1:zZihOBX39gHWsOR4bRLdqjgth79YX+57UL1nnwewydM=
+github.com/rancher/rke v1.4.10-rc1/go.mod h1:wUwsm6dXyzzxWlVwmPPR5XMWX6ICjAdWJ+l45ZqV+P0=
 github.com/rancher/wrangler v1.1.1-0.20230629203936-0e36fee7aea5 h1:d6NAZl3UInlO5E/q82oLWCRCoMEGh5J9jv2H0f8oGSA=
 github.com/rancher/wrangler v1.1.1-0.20230629203936-0e36fee7aea5/go.mod h1:wcqKmq5FJT34ijBgDMswlx7vOkbkw7LEqaaz6f4XTig=
 github.com/rogpeppe/fastuuid v0.0.0-20150106093220-6724a57986af/go.mod h1:XWv6SoW27p1b0cqNHllgS5HIMJraePCO15w5zCzIWYg=
@@ -1139,8 +1139,8 @@ k8s.io/kube-openapi v0.0.0-20220803162953-67bda5d908f1/go.mod h1:C/N6wCaBHeBHkHU
 k8s.io/kube-openapi v0.0.0-20230308215209-15aac26d736a h1:gmovKNur38vgoWfGtP5QOGNOA7ki4n6qNYoFAgMlNvg=
 k8s.io/kube-openapi v0.0.0-20230308215209-15aac26d736a/go.mod h1:y5VtZWM9sHHc2ZodIH/6SHzXj+TPU5USoA8lcIeKEKY=
 k8s.io/kubectl v0.22.2/go.mod h1:BApg2j0edxLArCOfO0ievI27EeTQqBDMNU9VQH734iQ=
-k8s.io/kubernetes v1.25.12 h1:KSvhgELGV/GOYRqxbuhzrxPpU2ON4Xp1/k08E2v/7SY=
-k8s.io/kubernetes v1.25.12/go.mod h1:CjSm5tJyKxHyGhK5aAID68YMErzDhAjWLL7Nd7NMonU=
+k8s.io/kubernetes v1.15.0-alpha.0 h1:gIwzzIgt0BX8fznDZRxdZv2837cEmVetI54aUfzkPk8=
+k8s.io/kubernetes v1.15.0-alpha.0/go.mod h1:ocZa8+6APFNC2tX1DZASIbocyYT5jHzqFVsY5aoB7Jk=
 k8s.io/metrics v0.22.2/go.mod h1:GUcsBtpsqQD1tKFS/2wCKu4ZBowwRncLOJH1rgWs3uw=
 k8s.io/utils v0.0.0-20210802155522-efc7438f0176/go.mod h1:jPW/WVKK9YHAvNhRxK0md/EJ228hCsBRufyofKtW8HA=
 k8s.io/utils v0.0.0-20210819203725-bdf08cb9a70a/go.mod h1:jPW/WVKK9YHAvNhRxK0md/EJ228hCsBRufyofKtW8HA=
