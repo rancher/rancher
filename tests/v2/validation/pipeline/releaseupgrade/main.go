@@ -93,13 +93,13 @@ func main() {
 	//make cattle-configs dir
 	err := config.NewConfigurationsDir(dirName)
 	if err != nil {
-		logrus.Fatalf("error while creating configs dir", err)
+		logrus.Fatal("error while creating configs dir", err)
 	}
 
 	//copy common configuration for individual configs
 	copiedConfig, err := os.ReadFile(configPath)
 	if err != nil {
-		logrus.Fatalf("error while copying upgrade config", err)
+		logrus.Fatal("error while copying upgrade config", err)
 	}
 
 	clusters := new(pipeline.Clusters)
@@ -116,7 +116,7 @@ func main() {
 			newConfigName := config.NewConfigFileName(dirName, rke1FileName, customFileName, v.Provider, cni, fmt.Sprint(i))
 			err := NewRancherClusterConfiguration(v, newConfigName, isCustom, isRKE1, isRKE2, copiedConfig, cni, testPackage, runCommand)
 			if err != nil {
-				logrus.Infof("error while generating a rancher cluster config", err)
+				logrus.Info("error while generating a rancher cluster config", err)
 				continue
 			}
 		}
@@ -133,7 +133,7 @@ func main() {
 			newConfigName := config.NewConfigFileName(dirName, rke1FileName, nodeProviderFileName, v.Provider, cni, fmt.Sprint(i))
 			err := NewRancherClusterConfiguration(v, newConfigName, isCustom, isRKE1, isRKE2, copiedConfig, cni, testPackage, runCommand)
 			if err != nil {
-				logrus.Infof("error while generating a rancher cluster config", err)
+				logrus.Info("error while generating a rancher cluster config", err)
 				continue
 			}
 		}
@@ -150,7 +150,7 @@ func main() {
 			newConfigName := config.NewConfigFileName(dirName, rke2FileName, customFileName, v.Provider, cni, fmt.Sprint(i))
 			err := NewRancherClusterConfiguration(v, newConfigName, isCustom, isRKE1, isRKE2, copiedConfig, cni, testPackage, runCommand)
 			if err != nil {
-				logrus.Infof("error while generating a rancher cluster config", err)
+				logrus.Info("error while generating a rancher cluster config", err)
 				continue
 			}
 		}
@@ -167,7 +167,7 @@ func main() {
 			newConfigName := config.NewConfigFileName(dirName, rke2FileName, nodeProviderFileName, v.Provider, cni, fmt.Sprint(i))
 			err := NewRancherClusterConfiguration(v, newConfigName, isCustom, isRKE1, isRKE2, copiedConfig, cni, testPackage, runCommand)
 			if err != nil {
-				logrus.Infof("error while generating a rancher cluster config", err)
+				logrus.Info("error while generating a rancher cluster config", err)
 				continue
 			}
 		}
@@ -184,7 +184,7 @@ func main() {
 			newConfigName := config.NewConfigFileName(dirName, k3sFileName, customFileName, v.Provider, cni, fmt.Sprint(i))
 			err := NewRancherClusterConfiguration(v, newConfigName, isCustom, isRKE1, isRKE2, copiedConfig, cni, testPackage, runCommand)
 			if err != nil {
-				logrus.Infof("error while generating a rancher cluster config", err)
+				logrus.Info("error while generating a rancher cluster config", err)
 				continue
 			}
 		}
@@ -201,7 +201,7 @@ func main() {
 			newConfigName := config.NewConfigFileName(dirName, k3sFileName, nodeProviderFileName, v.Provider, cni, fmt.Sprint(i))
 			err := NewRancherClusterConfiguration(v, newConfigName, isCustom, isRKE1, isRKE2, copiedConfig, cni, testPackage, runCommand)
 			if err != nil {
-				logrus.Infof("error while generating a rancher cluster config", err)
+				logrus.Info("error while generating a rancher cluster config", err)
 				continue
 			}
 		}
@@ -268,13 +268,13 @@ func main() {
 func NewRancherClusterConfiguration(cluster pipeline.RancherCluster, newConfigName config.ConfigFileName, isCustom, isRKE1, isRKE2 bool, copiedConfig []byte, cni, provTestPackage, runCommand string) (err error) {
 	err = newConfigName.NewFile(copiedConfig)
 	if err != nil {
-		logrus.Infof("error while writing populated config", err)
+		logrus.Info("error while writing populated config", err)
 		return err
 	}
 
 	err = newConfigName.SetEnvironmentKey()
 	if err != nil {
-		logrus.Infof("error while setting new config as env var", err)
+		logrus.Info("error while setting new config as env var", err)
 		return err
 	}
 

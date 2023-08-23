@@ -23,7 +23,6 @@ type CorralPackages struct {
 	HasCleanup          bool              `json:"hasCleanup" yaml:"hasCleanup" default:"true"`
 	HasDebug            bool              `json:"hasDebug" yaml:"hasDebug" default:"false"`
 	HasCustomRepo       string            `json:"hasCustomRepo" yaml:"hasCustomRepo"`
-	HasSetCorralSSHKeys bool              `json:"hasSetCorralSSHKeys" yaml:"hasSetCorralSSHKeys" default:"false"`
 }
 
 // CorralPackagesConfig is a function that reads in the corral package object from the config file

@@ -274,10 +274,14 @@ func VerifyHostnameLength(t *testing.T, client *rancher.Client, clusterObject *s
 
 // VerifyUpgrade validates that a cluster has been upgraded to a given version
 func VerifyUpgrade(t *testing.T, updatedCluster *bundledclusters.BundledCluster, upgradedVersion string) {
-	clusterSpec := &provv1.ClusterSpec{}
-	err := steveV1.ConvertToK8sType(updatedCluster.V1.Spec, clusterSpec)
-	require.NoError(t, err)
-	assert.Equalf(t, upgradedVersion, clusterSpec.KubernetesVersion, "[%v]: %v", updatedCluster.Meta.Name, logMessageKubernetesVersion)
+	if updatedCluster.V3 != nil {
+		assert.Equalf(t, upgradedVersion, updatedCluster.V3.RancherKubernetesEngineConfig.Version, "[%v]: %v", updatedCluster.Meta.Name, logMessageKubernetesVersion)
+	} else {
+		clusterSpec := &provv1.ClusterSpec{}
+		err := steveV1.ConvertToK8sType(updatedCluster.V1.Spec, clusterSpec)
+		require.NoError(t, err)
+		assert.Equalf(t, upgradedVersion, clusterSpec.KubernetesVersion, "[%v]: %v", updatedCluster.Meta.Name, logMessageKubernetesVersion)
+	}
 }
 
 // VerifySnapshots waits for a cluster's snapshots to be ready and validates that the correct number of snapshots have been taken
