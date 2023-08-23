@@ -57,7 +57,9 @@ func CreateNginxDeployment(client *rancher.Client, clusterID string, psact strin
 
 		deploymentResp, err := steveclient.SteveType(workloads.DeploymentSteveType).ByID(deploymentTemplate.Namespace + "/" + deploymentTemplate.Name)
 		if err != nil {
-			return false, err
+			// We don't want to return the error so we don't exit the poll too soon.
+			// There could be delay of when the deployment is created.
+			return false, nil
 		}
 
 		deployment := &appv1.Deployment{}
@@ -74,7 +76,7 @@ func CreateNginxDeployment(client *rancher.Client, clusterID string, psact strin
 			return true, nil
 		}
 
-		return false, err
+		return false, nil
 	})
 
 	return nil, err

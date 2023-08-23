@@ -27,7 +27,7 @@ func StatusPods(client *rancher.Client, clusterID string) ([]string, []error) {
 	var podErrors []error
 
 	steveClient := downstreamClient.SteveType(PodResourceSteveType)
-	err = kwait.Poll(1*time.Second, 10*time.Minute, func() (done bool, err error) {
+	err = kwait.Poll(5*time.Second, 15*time.Minute, func() (done bool, err error) {
 		podResults = []string{}
 		podErrors = []error{}
 
@@ -40,24 +40,25 @@ func StatusPods(client *rancher.Client, clusterID string) ([]string, []error) {
 		podResults = append(podResults, "Pod's Status: \n")
 
 		for _, pod := range pods.Data {
-			podStatus := &corev1.PodStatus{}
-			err = v1.ConvertToK8sType(pod.Status, podStatus)
+			podResult, podError, err := CheckPodStatus(&pod)
 			if err != nil {
-				return false, err
-			}
-
-			image := podStatus.ContainerStatuses[0].Image
-			phase := podStatus.Phase
-			if phase == corev1.PodFailed || phase == corev1.PodUnknown {
-				podErrors = append(podErrors, fmt.Errorf("ERROR: %s: %s", pod.Name, podStatus))
-				logrus.Infof("Pod %s: Not active | Image %s", pod.Name, image)
+				// not returning the error in this case, as it could cause a false positive if we start polling too early.
 				return false, nil
-			} else if phase == corev1.PodRunning {
-				podResults = append(podResults, fmt.Sprintf("INFO: %s: %s\n", pod.Name, podStatus))
-				logrus.Infof("Pod %s: Active | Image: %s", pod.Name, image)
+			}
+			if podError != nil {
+				podErrors = append(podErrors, podError)
+				return false, nil
+			}
+			if podResult != "" {
+				podResults = append(podResults, podResult)
 			}
 		}
-		return true, nil
+
+		if len(podResults) > 0 && len(podErrors) == 0 {
+			return true, nil
+		}
+
+		return false, nil
 	})
 
 	if err != nil {
@@ -65,4 +66,37 @@ func StatusPods(client *rancher.Client, clusterID string) ([]string, []error) {
 	}
 
 	return podResults, podErrors
+}
+
+// CheckPodStatus is a helper function that uses the steve client to check the status of a single pod
+func CheckPodStatus(pod *v1.SteveAPIObject) (podResults string, podError error, err error) {
+	podStatus := &corev1.PodStatus{}
+	err = v1.ConvertToK8sType(pod.Status, podStatus)
+	if err != nil {
+		return "", nil, err
+	}
+	if podStatus.ContainerStatuses == nil || len(podStatus.ContainerStatuses) == 0 {
+		return fmt.Sprintf("WARN: %s: Container Status is Empty \n", pod.Name), nil, nil
+	}
+
+	image := podStatus.ContainerStatuses[0].Image
+	phase := podStatus.Phase
+
+	if phase == corev1.PodFailed || phase == corev1.PodUnknown {
+		logrus.Infof("Pod %s: Not active | Image %s", pod.Name, image)
+		// Do not report as error if pod is in failed state due to container termination
+		for _, containerStatus := range podStatus.ContainerStatuses {
+			if containerStatus.State.Terminated == nil {
+				return "", fmt.Errorf("ERROR: %s: %s", pod.Name, podStatus), nil
+			}
+		}
+		return fmt.Sprintf("INFO: TERMINATED %s: %s\n", pod.Name, podStatus), nil, nil
+	}
+
+	if phase == corev1.PodRunning {
+		logrus.Infof("Pod %s: Active | Image: %s", pod.Name, image)
+		return fmt.Sprintf("INFO: %s: %s\n", pod.Name, podStatus), nil, nil
+	}
+
+	return "", nil, nil
 }

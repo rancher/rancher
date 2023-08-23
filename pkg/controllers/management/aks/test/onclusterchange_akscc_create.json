@@ -41,6 +41,7 @@
     ],
     "podCidr": null,
     "privateCluster": false,
+    "privateDnsZone": null,
     "resourceGroup": "aks-resource-group",
     "resourceLocation": "eastus",
     "serviceCidr": null,
@@ -48,7 +49,9 @@
     "tags": {},
     "virtualNetwork": null,
     "virtualNetworkResourceGroup": null,
-    "outboundType": null
+    "outboundType": null,
+    "managedIdentity": null,
+    "userAssignedIdentity": null
   },
   "status": {
     "failureMessage": "",

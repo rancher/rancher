@@ -3,10 +3,13 @@ package settings
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"testing"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	v1 "k8s.io/api/core/v1"
 )
 
 func TestIsRelease(t *testing.T) {
@@ -75,4 +78,54 @@ func TestSystemFeatureChartRefreshSecondsDefault(t *testing.T) {
 		t.Errorf("The System Feature Chart Refresh Seconds of %q is not the expected value %q", got, expect)
 	}
 
+}
+
+func TestGetMachineProvisionImagePullPolicy(t *testing.T) {
+	defaultLogger := logrus.StandardLogger().Out
+	logrus.SetOutput(io.Discard) // Done this way to avoid printing the error message during wrongValue test
+	defer func() {
+		logrus.SetOutput(defaultLogger)
+	}()
+
+	testCases := []struct {
+		name     string
+		input    string
+		expected v1.PullPolicy
+	}{
+		{
+			name:     "Always",
+			input:    "Always",
+			expected: v1.PullAlways,
+		},
+		{
+			name:     "Never",
+			input:    "Never",
+			expected: v1.PullNever,
+		},
+		{
+			name:     "IfNotPresent",
+			input:    "IfNotPresent",
+			expected: v1.PullIfNotPresent,
+		},
+		{
+			name:     "Wrong Value",
+			input:    "wrongValue",
+			expected: v1.PullAlways,
+		},
+		{
+			name:     "Empty Value",
+			input:    "",
+			expected: v1.PullAlways,
+		},
+	}
+
+	for _, v := range testCases {
+		t.Run(v.name, func(t *testing.T) {
+			if err := MachineProvisionImagePullPolicy.Set(v.input); err != nil {
+				t.Errorf("Failed to test GetMachineProvisionImagePullPolicy(), unable to set the value: %v", err)
+			}
+			got := GetMachineProvisionImagePullPolicy()
+			assert.Equalf(t, v.expected, got, fmt.Sprintf("test GetMachineProvisionImagePullPolicy() case: %s, input: %s failed with value: %s, expecting: %s", v.name, v.input, got, v.expected))
+		})
+	}
 }

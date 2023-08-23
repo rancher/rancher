@@ -10,9 +10,11 @@ import (
 	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/projects"
+	"github.com/rancher/rancher/tests/framework/extensions/provisioning"
+	"github.com/rancher/rancher/tests/framework/extensions/provisioninginput"
 	"github.com/rancher/rancher/tests/framework/extensions/users"
+	"github.com/rancher/rancher/tests/framework/pkg/config"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
-	"github.com/rancher/rancher/tests/v2/validation/provisioning/rke1"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -26,7 +28,6 @@ type RBACAdditionalTestSuite struct {
 	standardUserClient    *rancher.Client
 	session               *session.Session
 	cluster               *management.Cluster
-	adminProject          *management.Project
 	steveAdminClient      *v1.Client
 	steveStdUserclient    *v1.Client
 	additionalUser        *management.User
@@ -54,7 +55,6 @@ func (rb *RBACAdditionalTestSuite) SetupSuite() {
 	require.NoError(rb.T(), err, "Error getting cluster ID")
 	rb.cluster, err = rb.client.Management.Cluster.ByID(clusterID)
 	require.NoError(rb.T(), err)
-
 }
 
 func (rb *RBACAdditionalTestSuite) ValidateAddStdUserAsProjectOwner() {
@@ -209,8 +209,8 @@ func (rb *RBACAdditionalTestSuite) TestRBACAdditional() {
 		name   string
 		member string
 	}{
-		{"Standard User", standardUser},
-		{"Restricted Admin", restrictedAdmin},
+		{"Standard User RBAC Additional", standardUser},
+		{"Restricted Admin RBAC Additional", restrictedAdmin},
 	}
 
 	for _, tt := range tests {
@@ -259,10 +259,20 @@ func (rb *RBACAdditionalTestSuite) TestRBACAdditional() {
 			})
 
 		} else {
+			// There's some logic in here that is only known to the user who wrote this test.
+			// Why is it special cased for restrictedAdmin? Do we have it documented that you must provide a config
+			// if testing restrictedAdmin?
 			rb.Run("Validating if "+restrictedAdmin+" can create an RKE1 cluster", func() {
-				clusterConfig := getClusterConfig()
-				rke1.TestProvisioningRKE1CustomCluster(rb.T(), rb.standardUserClient, clusterConfig.externalNodeProvider,
-					clusterConfig.nodesAndRoles, "", clusterConfig.kubernetesVersion, clusterConfig.cni, clusterConfig.advancedOptions)
+				userConfig := new(provisioninginput.Config)
+				config.LoadConfig(provisioninginput.ConfigurationFileKey, userConfig)
+				nodeProviders := userConfig.NodeProviders[0]
+				externalNodeProvider := provisioning.ExternalNodeProviderSetup(nodeProviders)
+				clusterConfig := clusters.ConvertConfigToClusterConfig(userConfig)
+				clusterConfig.KubernetesVersion = userConfig.K3SKubernetesVersions[0]
+				clusterConfig.CNI = userConfig.CNIs[0]
+				clusterObject, _, err := provisioning.CreateProvisioningRKE1CustomCluster(rb.client, externalNodeProvider, clusterConfig)
+				require.NoError(rb.T(), err)
+				provisioning.VerifyRKE1Cluster(rb.T(), rb.client, clusterConfig, clusterObject)
 			})
 
 			rb.Run("Validating if "+restrictedAdmin+" can list global settings", func() {

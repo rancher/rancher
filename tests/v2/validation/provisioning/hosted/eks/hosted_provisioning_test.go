@@ -11,6 +11,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/defaults"
 	nodestat "github.com/rancher/rancher/tests/framework/extensions/nodes"
 	"github.com/rancher/rancher/tests/framework/extensions/pipeline"
+	"github.com/rancher/rancher/tests/framework/extensions/provisioninginput"
 	"github.com/rancher/rancher/tests/framework/extensions/users"
 	password "github.com/rancher/rancher/tests/framework/extensions/users/passwordgenerator"
 	"github.com/rancher/rancher/tests/framework/extensions/workloads/pods"
@@ -18,7 +19,6 @@ import (
 	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
-	"github.com/rancher/rancher/tests/v2/validation/provisioning"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -72,8 +72,8 @@ func (h *HostedEKSClusterProvisioningTestSuite) TestProvisioningHostedEKS() {
 		client      *rancher.Client
 		clusterName string
 	}{
-		{provisioning.AdminClientName.String(), h.client, ""},
-		{provisioning.StandardClientName.String(), h.standardUserClient, ""},
+		{provisioninginput.AdminClientName.String(), h.client, ""},
+		{provisioninginput.StandardClientName.String(), h.standardUserClient, ""},
 	}
 
 	for _, tt := range tests {
@@ -118,7 +118,7 @@ func (h *HostedEKSClusterProvisioningTestSuite) testProvisioningHostedEKSCluster
 	require.NoError(h.T(), err)
 	assert.NotEmpty(h.T(), clusterToken)
 
-	err = nodestat.IsNodeReady(rancherClient, clusterResp.ID)
+	err = nodestat.AllManagementNodeReady(rancherClient, clusterResp.ID)
 	require.NoError(h.T(), err)
 
 	podResults, podErrors := pods.StatusPods(rancherClient, clusterResp.ID)

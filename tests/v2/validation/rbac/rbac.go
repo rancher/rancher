@@ -13,11 +13,12 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/namespaces"
 	"github.com/rancher/rancher/tests/framework/extensions/projects"
+	"github.com/rancher/rancher/tests/framework/extensions/provisioning"
+	"github.com/rancher/rancher/tests/framework/extensions/provisioninginput"
 	nodepools "github.com/rancher/rancher/tests/framework/extensions/rke1/nodepools"
 	"github.com/rancher/rancher/tests/framework/extensions/workloads"
 	"github.com/rancher/rancher/tests/framework/pkg/config"
 	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
-	"github.com/rancher/rancher/tests/v2/validation/provisioning"
 	appv1 "k8s.io/api/apps/v1"
 	coreV1 "k8s.io/api/core/v1"
 	kwait "k8s.io/apimachinery/pkg/util/wait"
@@ -50,7 +51,6 @@ type ClusterConfig struct {
 	externalNodeProvider provisioning.ExternalNodeProvider
 	kubernetesVersion    string
 	cni                  string
-	advancedOptions      provisioning.AdvancedOptions
 }
 
 func listProjects(client *rancher.Client, clusterID string) ([]string, error) {
@@ -208,20 +208,19 @@ func editGlobalSettings(steveclient *v1.Client, globalSetting *v1.SteveAPIObject
 
 func getClusterConfig() *ClusterConfig {
 
-	nodeAndRoles := []nodepools.NodeRoles{provisioning.RKE1AllRolesPool}
+	nodeAndRoles := []nodepools.NodeRoles{provisioninginput.RKE1AllRolesPool}
 
-	userConfig := new(provisioning.Config)
-	config.LoadConfig(provisioning.ConfigurationFileKey, userConfig)
+	userConfig := new(provisioninginput.Config)
+	config.LoadConfig(provisioninginput.ConfigurationFileKey, userConfig)
 
 	kubernetesVersion := userConfig.RKE1KubernetesVersions[0]
 	cni := userConfig.CNIs[0]
-	advancedOptions := userConfig.AdvancedOptions
 	nodeProviders := userConfig.NodeProviders[0]
 
 	externalNodeProvider := provisioning.ExternalNodeProviderSetup(nodeProviders)
 
 	clusterConfig := ClusterConfig{nodesAndRoles: nodeAndRoles, externalNodeProvider: externalNodeProvider,
-		kubernetesVersion: kubernetesVersion, cni: cni, advancedOptions: advancedOptions}
+		kubernetesVersion: kubernetesVersion, cni: cni}
 
 	return &clusterConfig
 }
@@ -281,7 +280,12 @@ func editPsactCluster(client *rancher.Client, clustername string, namespace stri
 		if err != nil {
 			return clusterType, err
 		}
-		clusters.WaitForActiveRKE1Cluster(client, clusterID)
+
+		err = clusters.WaitForActiveRKE1Cluster(client, clusterID)
+		if err != nil {
+			return "", err
+		}
+
 		modifiedCluster, err := client.Management.Cluster.ByID(clusterID)
 		if err != nil {
 			return "", err

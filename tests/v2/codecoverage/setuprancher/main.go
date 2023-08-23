@@ -14,6 +14,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/defaults"
 	"github.com/rancher/rancher/tests/framework/extensions/kubeapi/workloads/deployments"
 	"github.com/rancher/rancher/tests/framework/extensions/pipeline"
+	"github.com/rancher/rancher/tests/framework/extensions/provisioninginput"
 	nodepools "github.com/rancher/rancher/tests/framework/extensions/rke1/nodepools"
 	aws "github.com/rancher/rancher/tests/framework/extensions/rke1/nodetemplates/aws"
 	"github.com/rancher/rancher/tests/framework/extensions/token"
@@ -24,7 +25,6 @@ import (
 	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
-	"github.com/rancher/rancher/tests/v2/validation/provisioning"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 	appv1 "k8s.io/api/apps/v1"
@@ -85,12 +85,8 @@ func main() {
 	config.UpdateConfig(rancher.ConfigurationFileKey, rancherConfig)
 	//provision clusters for test
 	session := session.NewSession()
-	clustersConfig := new(provisioning.Config)
-	config.LoadConfig(provisioning.ConfigurationFileKey, clustersConfig)
-	kubernetesVersions := clustersConfig.RKE1KubernetesVersions
-	cnis := clustersConfig.CNIs
-	nodesAndRoles := clustersConfig.NodesAndRolesRKE1
-	advancedOptions := clustersConfig.AdvancedOptions
+	clustersConfig := new(provisioninginput.Config)
+	config.LoadConfig(provisioninginput.ConfigurationFileKey, clustersConfig)
 
 	client, err := rancher.NewClient("", session)
 	if err != nil {
@@ -125,13 +121,13 @@ func main() {
 	}
 
 	// create admin cluster
-	adminClusterNames, err := createTestCluster(client, client, 1, "admintestcluster", cnis[0], kubernetesVersions[0], nodesAndRoles, advancedOptions)
+	adminClusterNames, err := createTestCluster(client, client, 1, "admintestcluster", clustersConfig)
 	if err != nil {
 		logrus.Fatalf("error creating admin user cluster: %v", err)
 	}
 
 	// create standard user clusters
-	standardClusterNames, err := createTestCluster(standardUserClient, client, 2, "standardtestcluster", cnis[0], kubernetesVersions[0], nodesAndRoles, advancedOptions)
+	standardClusterNames, err := createTestCluster(standardUserClient, client, 2, "standardtestcluster", clustersConfig)
 	if err != nil {
 		logrus.Fatalf("error creating standard user clusters: %v", err)
 	}
@@ -272,7 +268,7 @@ func updateRancherDeployment(kubeconfig []byte) error {
 	return err
 }
 
-func createTestCluster(client, adminClient *rancher.Client, numClusters int, clusterNameBase, cni, kubeVersion string, nodesAndRoles []nodepools.NodeRoles, advancedOptions provisioning.AdvancedOptions) ([]string, error) {
+func createTestCluster(client, adminClient *rancher.Client, numClusters int, clusterNameBase string, clustersConfig *provisioninginput.Config) ([]string, error) {
 	clusterNames := []string{}
 	for i := 0; i < numClusters; i++ {
 		nodeTemplateResp, err := aws.CreateAWSNodeTemplate(client)
@@ -282,7 +278,10 @@ func createTestCluster(client, adminClient *rancher.Client, numClusters int, clu
 
 		clusterName := namegen.AppendRandomString(clusterNameBase)
 		clusterNames = append(clusterNames, clusterName)
-		cluster := clusters.NewRKE1ClusterConfig(clusterName, cni, kubeVersion, "", client, advancedOptions)
+		testClusterConfig := clusters.ConvertConfigToClusterConfig(clustersConfig)
+		testClusterConfig.KubernetesVersion = clustersConfig.RKE1KubernetesVersions[0]
+		testClusterConfig.CNI = clustersConfig.CNIs[0]
+		cluster := clusters.NewRKE1ClusterConfig(clusterName, client, testClusterConfig)
 
 		clusterResp, err := clusters.CreateRKE1Cluster(client, cluster)
 		if err != nil {
@@ -290,7 +289,7 @@ func createTestCluster(client, adminClient *rancher.Client, numClusters int, clu
 		}
 
 		err = kwait.Poll(500*time.Millisecond, 10*time.Minute, func() (done bool, err error) {
-			_, err = nodepools.NodePoolSetup(client, nodesAndRoles, clusterResp.ID, nodeTemplateResp.ID)
+			_, err = nodepools.NodePoolSetup(client, clustersConfig.NodesAndRolesRKE1, clusterResp.ID, nodeTemplateResp.ID)
 			if err != nil {
 				return false, nil
 			}

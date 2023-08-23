@@ -44,6 +44,9 @@ type PSATestSuite struct {
 }
 
 func (rb *PSATestSuite) TearDownSuite() {
+	// reset the PSACT
+	_, err := editPsactCluster(rb.client, rb.clusterName, defaultNamespace, "rancher-privileged")
+	require.NoError(rb.T(), err)
 	rb.session.Cleanup()
 }
 
