@@ -25,6 +25,7 @@ const (
 	RKE1CustomCluster    = "rke1Custom"
 	RKE1ProvisionCluster = "rke1"
 	RKE1AirgapCluster    = "rke1Airgap"
+	CorralProvider       = "corral"
 )
 
 // RunTestPermutations runs through all relevant perumutations in a given config file, including node providers, k8s versions, and CNIs
@@ -41,6 +42,8 @@ func RunTestPermutations(s *suite.Suite, testNamePrefix string, client *rancher.
 
 	if strings.Contains(clusterType, "Custom") {
 		providers = clustersConfig.NodeProviders
+	} else if strings.Contains(clusterType, "Airgap") {
+		providers = []string{"Corral"}
 	} else {
 		providers = clustersConfig.Providers
 	}
@@ -137,8 +140,14 @@ func GetClusterProvider(clusterType string, nodeProviderName string, clustersCon
 	case RKE1CustomCluster:
 		customProvider = provisioning.ExternalNodeProviderSetup(nodeProviderName)
 		kubeVersions = clustersConfig.RKE1KubernetesVersions
+	case K3SAirgapCluster:
+		kubeVersions = clustersConfig.K3SKubernetesVersions
+	case RKE1AirgapCluster:
+		kubeVersions = clustersConfig.RKE1KubernetesVersions
+	case RKE2AirgapCluster:
+		kubeVersions = clustersConfig.RKE2KubernetesVersions
 	default:
-		customProvider = provisioning.ExternalNodeProviderSetup(nodeProviderName)
+		panic("Cluster type not found")
 	}
 	return &nodeProvider, &rke1NodeProvider, &customProvider, kubeVersions
 }
