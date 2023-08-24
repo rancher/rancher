@@ -133,7 +133,7 @@ func (r *V2ProvEncryptionKeyRotationTestSuite) TestEncryptionKeyRotation() {
 	subSession := r.session.NewSession()
 	defer subSession.Cleanup()
 
-	id, err := clusters.GetClusterIDByName(r.client, r.clusterName)
+	id, err := clusters.GetV1ProvisioningClusterByName(r.client, r.clusterName)
 	require.NoError(r.T(), err)
 
 	prefix := "encryption-key-rotation-"
@@ -152,10 +152,14 @@ func (r *V2ProvEncryptionKeyRotationTestSuite) TestEncryptionKeyRotation() {
 func IsAtLeast(t *testing.T, client *rancher.Client, namespace, name string, phase rkev1.RotateEncryptionKeysPhase) kwait.ConditionFunc {
 	return func() (ready bool, err error) {
 		kubeRKEClient, err := client.GetKubeAPIRKEClient()
-		require.NoError(t, err)
+		if err != nil {
+			return false, err
+		}
 
 		controlPlane, err := kubeRKEClient.RKEControlPlanes(namespace).Get(context.TODO(), name, metav1.GetOptions{})
-		require.NoError(t, err)
+		if err != nil {
+			return false, err
+		}
 
 		if controlPlane.Status.RotateEncryptionKeysPhase == rkev1.RotateEncryptionKeysPhaseFailed {
 			t.Errorf("Encryption key rotation failed waiting to reach %s", phase)
