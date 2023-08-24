@@ -31,7 +31,7 @@ const (
 
 var (
 	// Rancher istio chart kiali path
-	kialiPath = "api/v1/namespaces/istio-system/services/http:kiali:20001/proxy/kiali/"
+	kialiPath = "api/v1/namespaces/istio-system/services/http:kiali:20001/proxy/console/"
 	// Rancher istio chart tracing path
 	tracingPath = "api/v1/namespaces/istio-system/services/http:tracing:16686/proxy/jaeger/search"
 )
