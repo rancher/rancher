@@ -91,7 +91,7 @@ func (r *RKE2ACETestSuite) TestProvisioningRKE2ClusterACE() {
 		{"Multiple Control Planes - Admin", nodeRoles0, r.client},
 		{"Multiple Control Planes - Standard", nodeRoles0, r.standardUserClient},
 	}
-	require.NotEmpty(r.T(), r.clustersConfig.Networking.LocalClusterAuthEndpoint)
+	require.NotNil(r.T(), r.clustersConfig.Networking.LocalClusterAuthEndpoint)
 	// Test is obsolete when ACE is not set.
 	for _, tt := range tests {
 		subSession := r.session.NewSession()
