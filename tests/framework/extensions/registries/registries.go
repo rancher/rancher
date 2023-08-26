@@ -33,10 +33,11 @@ func CheckAllClusterPodsForRegistryPrefix(client *rancher.Client, clusterID, reg
 			return false, err
 		}
 		for _, container := range podSpec.Containers {
-			log.Infoln(container.Image)
 			if !strings.Contains(container.Image, registryPrefix) {
+				log.Warnf("pod/containerImage %s/%s is not using the correct registry prefix", pod.Name, container.Image)
 				return false, nil
 			}
+			log.Infoln(container.Image)
 		}
 	}
 	return true, nil
