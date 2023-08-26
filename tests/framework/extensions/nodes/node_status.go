@@ -82,7 +82,7 @@ func AllMachineReady(client *rancher.Client, clusterID string) error {
 				return false, nil
 			}
 		}
-		logrus.Infof("All nodes in the cluster are in an active state!")
+		logrus.Infof("All nodes in the cluster are running!")
 		return true, nil
 	})
 	return err
