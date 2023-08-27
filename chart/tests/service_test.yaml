@@ -20,6 +20,13 @@ tests:
   asserts:
   - isNull:
       path: spec.type
+- it : should set NodePort port
+  set:
+    service.nodePort: 30000
+  asserts:
+  - equal:
+      path: spec.ports[0].nodePort
+      value: 30000
 - it: should set provided service annotation correctly
   set:
     service.annotations:

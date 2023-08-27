@@ -20,6 +20,9 @@ spec:
     targetPort: 80
     protocol: TCP
     name: http
+    {{- if .Values.service.nodePort }}
+    nodePort: {{ .Values.service.nodePort }}
+    {{- end }}
   - port: 443
     targetPort: 444
     protocol: TCP

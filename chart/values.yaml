@@ -76,6 +76,8 @@ ingress:
 # Override to use NodePort or LoadBalancer service type - default is ClusterIP
 service:
   type: ""
+  # If type=nodePort, optionally define a port to expose
+  nodePort: ""
   annotations: {}
 
 ### LetsEncrypt config ###
