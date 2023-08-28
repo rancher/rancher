@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/url"
 	"strings"
 	"sync"
@@ -89,11 +88,10 @@ func NewManager(
 }
 
 // Index (thread-safe) retrieves the Helm repository information for a specific namespace and name.
-// fetches the related ConfigMap, kubernetes version and the caching of the index file.
-// If the index file is not cached or if it has been updated,
-// the function reads the ConfigMap and unmarshals the data into an index file.
-// Otherwise it will return the IndexFile
-func (c *Manager) Index(namespace, name string, skipFilter bool) (*repo.IndexFile, error) {
+// By default, it uses rancher version and the local cluster's k8s version to filter available versions in the returned index file;
+// If skipFilter is true, it will return the entire unfiltered index file;
+// if a valid targetK8sVersion is provided, it will filter versions based on rancher version and the target k8s version.
+func (c *Manager) Index(namespace, name, targetK8sVersion string, skipFilter bool) (*repo.IndexFile, error) {
 	r, err := c.getRepo(namespace, name)
 	if err != nil {
 		return nil, err
@@ -103,13 +101,19 @@ func (c *Manager) Index(namespace, name string, skipFilter bool) (*repo.IndexFil
 	if err != nil {
 		return nil, err
 	}
-
-	k8sVersion, err := c.k8sVersion()
-	if err != nil {
-		return nil, err
+	var k8sVersion *semver.Version
+	if targetK8sVersion != "" {
+		k8sVersion, err = semver.NewVersion(targetK8sVersion)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		k8sVersion, err = c.k8sVersion()
+		if err != nil {
+			return nil, err
+		}
 	}
-
-	// Check IndexCache and if it is up-to-date
+	// Check IndexCache and if it is up-to-date.
 	c.lock.RLock()
 	if cache, ok := c.IndexCache[fmt.Sprintf("%s/%s", r.status.IndexConfigMapNamespace, r.status.IndexConfigMapName)]; ok {
 		if cm.ResourceVersion == cache.revision {
@@ -134,7 +138,7 @@ func (c *Manager) Index(namespace, name string, skipFilter bool) (*repo.IndexFil
 	}
 	defer gz.Close()
 
-	data, err = ioutil.ReadAll(gz)
+	data, err = io.ReadAll(gz)
 	if err != nil {
 		return nil, err
 	}
@@ -160,7 +164,7 @@ func (c *Manager) Index(namespace, name string, skipFilter bool) (*repo.IndexFil
 // If the chart's icon is not an HTTP or HTTPS URL, retrieves the icon from the repo's Git repository.
 // Otherwise, retrieves the icon via HTTP from the chart's URL and returns it as an io.ReadCloser with the proper Secret.
 func (c *Manager) Icon(namespace, name, chartName, version string) (io.ReadCloser, string, error) {
-	index, err := c.Index(namespace, name, true)
+	index, err := c.Index(namespace, name, "", true)
 	if err != nil {
 		return nil, "", err
 	}
@@ -200,7 +204,7 @@ func (c *Manager) Icon(namespace, name, chartName, version string) (io.ReadClose
 //
 // The function returns an io.ReadCloser which represents the chart content.
 func (c *Manager) Chart(namespace, name, chartName, version string, skipFilter bool) (io.ReadCloser, error) {
-	index, err := c.Index(namespace, name, skipFilter)
+	index, err := c.Index(namespace, name, "", skipFilter)
 	if err != nil {
 		return nil, err
 	}

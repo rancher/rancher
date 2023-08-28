@@ -239,7 +239,7 @@ func (m *Manager) Remove(namespace, name string) {
 }
 
 func (m *Manager) install(namespace, name, minVersion, exactVersion string, values map[string]interface{}, forceAdopt bool, installImageOverride string) error {
-	index, err := m.content.Index("", "rancher-charts", true)
+	index, err := m.content.Index("", "rancher-charts", "", true)
 	if err != nil {
 		return err
 	}
