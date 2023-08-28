@@ -8,11 +8,9 @@ import (
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
-	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
 	provisioning "github.com/rancher/rancher/tests/framework/extensions/provisioning"
 	"github.com/rancher/rancher/tests/framework/extensions/provisioninginput"
 	"github.com/rancher/rancher/tests/framework/extensions/registries"
-	nodepools "github.com/rancher/rancher/tests/framework/extensions/rke1/nodepools"
 	"github.com/rancher/rancher/tests/framework/extensions/workloads/pods"
 	"github.com/rancher/rancher/tests/framework/pkg/config"
 	"github.com/rancher/rancher/tests/framework/pkg/environmentflag"
@@ -37,25 +35,13 @@ type RegistryTestSuite struct {
 	suite.Suite
 	session                        *session.Session
 	client                         *rancher.Client
-	clusterAuthID                  string
-	clusterNoAuthID                string
 	clusterLocalID                 string
-	clusterAuthRegistryHost        string
-	clusterNoAuthRegistryHost      string
-	clusterWithGlobalID            string
 	localClusterGlobalRegistryHost string
 	rancherUsesRegistry            bool
 	clustersConfig                 *provisioninginput.Config
-	cnis                           []string
-	providers                      []string
-	k3sKubernetesVersions          []string
-	rkeKubernetesVersions          []string
-	rke2KubernetesVersions         []string
 	privateRegistriesAuth          []management.PrivateRegistry
 	privateRegistriesNoAuth        []management.PrivateRegistry
 	privateEcr                     []management.PrivateRegistry
-	rkeNodesAndRoles               []nodepools.NodeRoles
-	k3sRke2NodesAndRoles           []machinepools.NodeRoles
 }
 
 func (rt *RegistryTestSuite) TearDownSuite() {
@@ -235,13 +221,15 @@ func (rt *RegistryTestSuite) TestRegistriesRKE() {
 			testConfig := clusters.ConvertConfigToClusterConfig(rt.clustersConfig)
 			testConfig.KubernetesVersion = rt.clustersConfig.RKE1KubernetesVersions[0]
 			testConfig.CNI = rt.clustersConfig.CNIs[0]
-			testConfig.Registries.RKE1Registries = tt.registry
 
+			if testConfig.Registries == nil {
+				testConfig.Registries = &provisioninginput.Registries{}
+			}
+			testConfig.Registries.RKE1Registries = tt.registry
 			_, rke1Provider, _, _ := permutations.GetClusterProvider(permutations.RKE1ProvisionCluster, (*testConfig.Providers)[0], rt.clustersConfig)
 
 			nodeTemplate, err := rke1Provider.NodeTemplateFunc(subClient)
 			require.NoError(rt.T(), err)
-
 			clusterObject, err := provisioning.CreateProvisioningRKE1Cluster(subClient, *rke1Provider, testConfig, nodeTemplate)
 			require.NoError(rt.T(), err)
 
@@ -292,9 +280,7 @@ func (rt *RegistryTestSuite) TestRegistriesK3S() {
 			testConfig.KubernetesVersion = rt.clustersConfig.K3SKubernetesVersions[0]
 			testConfig.CNI = rt.clustersConfig.CNIs[0]
 			testConfig = rt.configureRKE2K3SRegistry(tt.registry, testConfig)
-
 			k3sProvider, _, _, _ := permutations.GetClusterProvider(permutations.K3SProvisionCluster, (*testConfig.Providers)[0], rt.clustersConfig)
-
 			clusterObject, err := provisioning.CreateProvisioningCluster(subClient, *k3sProvider, testConfig, nil)
 			require.NoError(rt.T(), err)
 
@@ -372,14 +358,19 @@ func (rt *RegistryTestSuite) TestRegistriesRKE2() {
 }
 
 func (rt *RegistryTestSuite) configureRKE2K3SRegistry(registryName string, testConfig *clusters.ClusterConfig) *clusters.ClusterConfig {
-	testConfig.Registries.RKE2Registries = &rkev1.Registry{
-		Configs: map[string]rkev1.RegistryConfig{
-			registryName: {},
+	testConfig.Registries = &provisioninginput.Registries{
+		RKE2Registries: &rkev1.Registry{
+			Configs: map[string]rkev1.RegistryConfig{
+				registryName: {},
+			},
 		},
 	}
 	if registryName == rt.privateRegistriesAuth[0].URL {
 		testConfig.Registries.RKE2Password = rt.privateRegistriesAuth[0].Password
 		testConfig.Registries.RKE2Username = rt.privateRegistriesAuth[0].User
+	}
+	if testConfig.Advanced == nil {
+		testConfig.Advanced = &provisioninginput.Advanced{}
 	}
 	testConfig.Advanced.MachineSelectors = &[]rkev1.RKESystemConfig{
 		{
@@ -391,6 +382,7 @@ func (rt *RegistryTestSuite) configureRKE2K3SRegistry(registryName string, testC
 			},
 		},
 	}
+	logrus.Infof("returning registry")
 	return testConfig
 }
 
