@@ -70,6 +70,9 @@ func (a *AirGapRKE2CustomClusterTestSuite) SetupSuite() {
 		registryFQDN, err := corral.GetCorralEnvVar(corralRancherHA.Name, corralRegistryFQDN)
 		require.NoError(a.T(), err)
 		logrus.Infof("registry fqdn is %s", registryFQDN)
+
+		err = corral.SetCorralSSHKeys(corralRancherHA.Name)
+		require.NoError(a.T(), err)
 		a.registryFQDN = registryFQDN
 	} else {
 		a.registryFQDN = registriesConfig.ExistingNoAuthRegistryURL
@@ -87,7 +90,7 @@ func (a *AirGapRKE2CustomClusterTestSuite) TestProvisioningRKE2CustomCluster() {
 		{provisioninginput.AdminClientName.String() + "-" + permutations.RKE2AirgapCluster + "-", a.client},
 	}
 	for _, tt := range tests {
-		permutations.RunTestPermutations(&a.Suite, tt.name, tt.client, a.clustersConfig, permutations.RKE2ProvisionCluster, nil, a.corralPackage)
+		permutations.RunTestPermutations(&a.Suite, tt.name, tt.client, a.clustersConfig, permutations.RKE2AirgapCluster, nil, a.corralPackage)
 	}
 
 }
