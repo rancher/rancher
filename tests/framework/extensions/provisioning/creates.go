@@ -76,8 +76,9 @@ func CreateProvisioningCluster(client *rancher.Client, provider Provider, cluste
 				if err != nil {
 					return nil, err
 				}
-				for _, registry := range clustersConfig.Registries.RKE2Registries.Configs {
+				for registryName, registry := range clustersConfig.Registries.RKE2Registries.Configs {
 					registry.AuthConfigSecretName = registrySecret.Name
+					clustersConfig.Registries.RKE2Registries.Configs[registryName] = registry
 				}
 			}
 		}
