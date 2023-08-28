@@ -349,7 +349,7 @@ func CreateProvisioningRKE1CustomCluster(client *rancher.Client, externalNodePro
 // CreateProvisioningAirgapCustomCluster provisions a non-rke1 cluster using corral to gather its nodes, then runs verify checks
 func CreateProvisioningAirgapCustomCluster(client *rancher.Client, clustersConfig *clusters.ClusterConfig, corralPackages *corral.CorralPackages) (*v1.SteveAPIObject, error) {
 	setLogrusFormatter()
-	rolesPerNode := []string{}
+	rolesPerNode := map[int32]string{}
 	for _, nodes := range *clustersConfig.NodesAndRoles {
 		var finalRoleCommand string
 		if nodes.ControlPlane {
@@ -364,9 +364,8 @@ func CreateProvisioningAirgapCustomCluster(client *rancher.Client, clustersConfi
 		if nodes.Windows {
 			finalRoleCommand += " --windows"
 		}
-		for i := int32(0); i < nodes.Quantity; i++ {
-			rolesPerNode = append(rolesPerNode, finalRoleCommand)
-		}
+
+		rolesPerNode[nodes.Quantity] = finalRoleCommand
 	}
 
 	clusterName := namegen.AppendRandomString(rke2k3sAirgapCustomCluster)
@@ -400,8 +399,8 @@ func CreateProvisioningAirgapCustomCluster(client *rancher.Client, clustersConfi
 	}
 
 	logrus.Infof("Register Custom Cluster Through Corral")
-	for numNodes, roles := range rolesPerNode {
-		err = corral.UpdateCorralConfig("node_count", fmt.Sprint(numNodes))
+	for quantity, roles := range rolesPerNode {
+		err = corral.UpdateCorralConfig("node_count", fmt.Sprint(quantity))
 		if err != nil {
 			return nil, err
 		}
@@ -434,7 +433,7 @@ func CreateProvisioningAirgapCustomCluster(client *rancher.Client, clustersConfi
 func CreateProvisioningRKE1AirgapCustomCluster(client *rancher.Client, clustersConfig *clusters.ClusterConfig, corralPackages *corral.CorralPackages) (*management.Cluster, error) {
 	setLogrusFormatter()
 	clusterName := namegen.AppendRandomString(rke1AirgapCustomCluster)
-	rolesPerNode := []string{}
+	rolesPerNode := map[int64]string{}
 	for _, nodes := range *clustersConfig.NodesAndRolesRKE1 {
 		var finalRoleCommand string
 		if nodes.ControlPlane {
@@ -446,9 +445,8 @@ func CreateProvisioningRKE1AirgapCustomCluster(client *rancher.Client, clustersC
 		if nodes.Worker {
 			finalRoleCommand += " --worker"
 		}
-		for i := int64(0); i < nodes.Quantity; i++ {
-			rolesPerNode = append(rolesPerNode, finalRoleCommand)
-		}
+
+		rolesPerNode[nodes.Quantity] = finalRoleCommand
 	}
 	cluster := clusters.NewRKE1ClusterConfig(clusterName, client, clustersConfig)
 	clusterResp, err := clusters.CreateRKE1Cluster(client, cluster)
@@ -472,8 +470,8 @@ func CreateProvisioningRKE1AirgapCustomCluster(client *rancher.Client, clustersC
 	}
 
 	logrus.Infof("Register Custom Cluster Through Corral")
-	for numNodes, roles := range rolesPerNode {
-		err = corral.UpdateCorralConfig("node_count", fmt.Sprint(numNodes))
+	for quantity, roles := range rolesPerNode {
+		err = corral.UpdateCorralConfig("node_count", fmt.Sprint(quantity))
 		if err != nil {
 			return nil, err
 		}

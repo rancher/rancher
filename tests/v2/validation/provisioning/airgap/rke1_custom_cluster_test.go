@@ -71,6 +71,9 @@ func (a *AirGapRKE1CustomClusterTestSuite) SetupSuite() {
 		registryFQDN, err := corral.GetCorralEnvVar(corralRancherHA.Name, corralRegistryFQDN)
 		require.NoError(a.T(), err)
 		logrus.Infof("registry fqdn is %s", registryFQDN)
+
+		err = corral.SetCorralSSHKeys(corralRancherHA.Name)
+		require.NoError(a.T(), err)
 		a.registryFQDN = registryFQDN
 	} else {
 		a.registryFQDN = registriesConfig.ExistingNoAuthRegistryURL
@@ -88,7 +91,7 @@ func (a *AirGapRKE1CustomClusterTestSuite) TestProvisioningRKE1CustomCluster() {
 		{provisioninginput.AdminClientName.String() + "-" + permutations.RKE1AirgapCluster + "-", a.client},
 	}
 	for _, tt := range tests {
-		permutations.RunTestPermutations(&a.Suite, tt.name, tt.client, a.clustersConfig, permutations.RKE1ProvisionCluster, nil, a.corralPackage)
+		permutations.RunTestPermutations(&a.Suite, tt.name, tt.client, a.clustersConfig, permutations.RKE1AirgapCluster, nil, a.corralPackage)
 	}
 
 }
@@ -96,7 +99,7 @@ func (a *AirGapRKE1CustomClusterTestSuite) TestProvisioningRKE1CustomCluster() {
 func (a *AirGapRKE1CustomClusterTestSuite) TestProvisioningUpgradeRKE1CustomCluster() {
 	a.clustersConfig.NodesAndRolesRKE1 = []nodepools.NodeRoles{provisioninginput.RKE1AllRolesPool}
 
-	rke1Versions, err := kubernetesversions.ListK3SAllVersions(a.client)
+	rke1Versions, err := kubernetesversions.ListRKE1AllVersions(a.client)
 	require.NoError(a.T(), err)
 
 	numOfRKE1Versions := len(rke1Versions)

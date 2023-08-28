@@ -2,6 +2,7 @@ package corral
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"os/exec"
 	"regexp"
@@ -13,8 +14,10 @@ import (
 )
 
 const (
-	debugFlag       = "--trace"
-	skipCleanupFlag = "--skip-cleanup"
+	debugFlag           = "--trace"
+	skipCleanupFlag     = "--skip-cleanup"
+	corralPrivateSSHKey = "corral_private_key"
+	corralPublicSSHKey  = "corral_public_key"
 )
 
 // GetCorralEnvVar gets corral environment variables
@@ -190,4 +193,26 @@ func DeleteAllCorrals() error {
 		}
 	}
 	return nil
+}
+
+func SetCorralSSHKeys(corralName string) error {
+	privateSSHkey, err := GetCorralEnvVar(corralName, corralPrivateSSHKey)
+	if err != nil {
+		return err
+	}
+
+	privateSSHkey = strings.Replace(privateSSHkey, "\n", "\\n", -1)
+	privateSSHkey = fmt.Sprintf("\"%s\"", privateSSHkey)
+
+	err = UpdateCorralConfig(corralPrivateSSHKey, privateSSHkey)
+	if err != nil {
+		return err
+	}
+
+	publicSSHkey, err := GetCorralEnvVar(corralName, corralPublicSSHKey)
+	if err != nil {
+		return err
+	}
+
+	return UpdateCorralConfig(corralPublicSSHKey, publicSSHkey)
 }
