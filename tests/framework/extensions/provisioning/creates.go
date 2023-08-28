@@ -14,10 +14,10 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/defaults"
 	"github.com/rancher/rancher/tests/framework/extensions/etcdsnapshot"
-	hardening "github.com/rancher/rancher/tests/framework/extensions/hardening/rke2"
+	k3sHardening "github.com/rancher/rancher/tests/framework/extensions/hardening/k3s"
+	rke2Hardening "github.com/rancher/rancher/tests/framework/extensions/hardening/rke2"
 	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
 	"github.com/rancher/rancher/tests/framework/extensions/pipeline"
-	"github.com/rancher/rancher/tests/framework/extensions/provisioninginput"
 	nodepools "github.com/rancher/rancher/tests/framework/extensions/rke1/nodepools"
 	"github.com/rancher/rancher/tests/framework/extensions/rke1/nodetemplates"
 	"github.com/rancher/rancher/tests/framework/extensions/secrets"
@@ -228,23 +228,30 @@ func CreateProvisioningCustomCluster(client *rancher.Client, externalNodeProvide
 		}
 	}
 
-	if clustersConfig.Hardened && clustersConfig.KubernetesVersion <= string(provisioninginput.HardenedKubeVersion) {
-		err = hardening.HardeningNodes(client, clustersConfig.Hardened, nodes, rolesPerNode)
-		if err != nil {
-			return nil, err
-		}
+	if clustersConfig.Hardened {
+		var hardenCluster *apiv1.Cluster
+		if strings.Contains(clustersConfig.KubernetesVersion, clusters.K3SClusterType.String()) {
+			err = k3sHardening.HardeningNodes(client, clustersConfig.Hardened, nodes, rolesPerNode, clustersConfig.KubernetesVersion)
+			if err != nil {
+				return nil, err
+			}
 
-		hardenCluster := clusters.HardenK3SRKE2ClusterConfig(clusterName, namespace, clustersConfig, nil, "")
+			hardenCluster = clusters.HardenK3SClusterConfig(clusterName, namespace, clustersConfig, nil, "")
+		} else {
+			err = rke2Hardening.HardeningNodes(client, clustersConfig.Hardened, nodes, rolesPerNode)
+			if err != nil {
+				return nil, err
+			}
+
+			hardenCluster = clusters.HardenRKE2ClusterConfig(clusterName, namespace, clustersConfig, nil, "")
+		}
 
 		_, err := clusters.UpdateK3SRKE2Cluster(client, clusterResp, hardenCluster)
 		if err != nil {
 			return nil, err
 		}
 
-		err = hardening.PostHardeningConfig(client, clustersConfig.Hardened, nodes, rolesPerNode)
-		if err != nil {
-			return nil, err
-		}
+		logrus.Infof("Cluster has been successfully hardened!")
 	}
 
 	createdCluster, err := client.Steve.SteveType(clusters.ProvisioningSteveResourceType).ByID(namespace + "/" + clusterName)

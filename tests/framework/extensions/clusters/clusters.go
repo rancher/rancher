@@ -17,6 +17,7 @@ import (
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
 	"github.com/rancher/rancher/tests/framework/extensions/defaults"
+	"github.com/rancher/rancher/tests/framework/extensions/provisioninginput"
 	"github.com/rancher/rancher/tests/framework/extensions/workloads/pods"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
 	"github.com/rancher/wrangler/pkg/summary"
@@ -637,11 +638,11 @@ func AgentAffinityConfigHelper(advancedClusterAffinity *management.Affinity) *co
 	return agentAffinity
 }
 
-// HardenK3SRKE2ClusterConfig is a constructor for a apisV1.Cluster object, to be used by the rancher.Client.Provisioning client.
-func HardenK3SRKE2ClusterConfig(clusterName, namespace string, clustersConfig *ClusterConfig, machinePools []apisV1.RKEMachinePool, cloudCredentialSecretName string) *apisV1.Cluster {
+// HardenK3SClusterConfig is a constructor for a apisV1.Cluster object, to be used by the rancher.Client.Provisioning client.
+func HardenK3SClusterConfig(clusterName, namespace string, clustersConfig *ClusterConfig, machinePools []apisV1.RKEMachinePool, cloudCredentialSecretName string) *apisV1.Cluster {
 	v1Cluster := NewK3SRKE2ClusterConfig(clusterName, namespace, clustersConfig, machinePools, cloudCredentialSecretName)
 
-	if strings.Contains(v1Cluster.Spec.KubernetesVersion, "k3s") {
+	if clustersConfig.KubernetesVersion <= string(provisioninginput.PSPKubeVersionLimit) {
 		v1Cluster.Spec.RKEConfig.MachineGlobalConfig.Data["kube-apiserver-arg"] = []string{
 			"enable-admission-plugins=NodeRestriction,PodSecurityPolicy,ServiceAccount",
 			"audit-policy-file=/var/lib/rancher/k3s/server/audit.yaml",
@@ -652,14 +653,45 @@ func HardenK3SRKE2ClusterConfig(clusterName, namespace string, clustersConfig *C
 			"request-timeout=300s",
 			"service-account-lookup=true",
 		}
+	} else {
+		v1Cluster.Spec.RKEConfig.MachineGlobalConfig.Data["kube-apiserver-arg"] = []string{
+			"admission-control-config-file=/var/lib/rancher/k3s/server/psa.yaml",
+			"audit-policy-file=/var/lib/rancher/k3s/server/audit.yaml",
+			"audit-log-path=/var/lib/rancher/k3s/server/logs/audit.log",
+			"audit-log-maxage=30",
+			"audit-log-maxbackup=10",
+			"audit-log-maxsize=100",
+			"request-timeout=300s",
+			"service-account-lookup=true",
+		}
+	}
 
+	v1Cluster.Spec.RKEConfig.MachineSelectorConfig = []rkev1.RKESystemConfig{
+		{
+			Config: rkev1.GenericMap{
+				Data: map[string]interface{}{
+					"kubelet-arg": []string{
+						"make-iptables-util-chains=true",
+					},
+					"protect-kernel-defaults": true,
+				},
+			},
+		},
+	}
+
+	return v1Cluster
+}
+
+// HardenRKE2ClusterConfig is a constructor for a apisV1.Cluster object, to be used by the rancher.Client.Provisioning client.
+func HardenRKE2ClusterConfig(clusterName, namespace string, clustersConfig *ClusterConfig, machinePools []apisV1.RKEMachinePool, cloudCredentialSecretName string) *apisV1.Cluster {
+	v1Cluster := NewK3SRKE2ClusterConfig(clusterName, namespace, clustersConfig, machinePools, cloudCredentialSecretName)
+
+	if clustersConfig.KubernetesVersion <= string(provisioninginput.PSPKubeVersionLimit) {
 		v1Cluster.Spec.RKEConfig.MachineSelectorConfig = []rkev1.RKESystemConfig{
 			{
 				Config: rkev1.GenericMap{
 					Data: map[string]interface{}{
-						"kubelet-arg": []string{
-							"make-iptables-util-chains=true",
-						},
+						"profile":                 "cis-1.6",
 						"protect-kernel-defaults": true,
 					},
 				},
@@ -670,7 +702,7 @@ func HardenK3SRKE2ClusterConfig(clusterName, namespace string, clustersConfig *C
 			{
 				Config: rkev1.GenericMap{
 					Data: map[string]interface{}{
-						"profile":                 "cis-1.6",
+						"profile":                 "cis-1.23",
 						"protect-kernel-defaults": true,
 					},
 				},
@@ -862,7 +894,7 @@ func UpdateK3SRKE2Cluster(client *rancher.Client, cluster *v1.SteveAPIObject, up
 			if err != nil {
 				return false, nil
 			}
-			logrus.Infof("Cluster has been successfully been updated!")
+			logrus.Infof("Cluster has been successfully updated!")
 			return true, nil
 		}
 		return false, nil
