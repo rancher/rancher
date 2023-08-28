@@ -143,7 +143,7 @@ func (h *handler) getArgsEnvAndStatus(infra *infraObject, args map[string]interf
 		}
 		cmd = append(cmd, toArgs(driver, args, rancherCluster.Status.ClusterName)...)
 	} else {
-		cmd = append(cmd, "rm", "-y")
+		cmd = append(cmd, "rm", "-y", "--update-config")
 		jobBackoffLimit = 3
 	}
 

@@ -67,8 +67,20 @@ func buildCreateCommand(node *v3.Node, configMap map[string]interface{}) []strin
 	cmd = append(cmd, buildEngineOpts("--engine-registry-mirror", node.Status.NodeTemplateSpec.EngineRegistryMirror)...)
 	cmd = append(cmd, buildEngineOpts("--engine-storage-driver", []string{node.Status.NodeTemplateSpec.EngineStorageDriver})...)
 
+	// Append driver-specific flags to the command.
+	cmd = append(cmd, buildDriverFlags(sDriver, configMap)...)
+
+	// Add the hostname to the command.
+	cmd = append(cmd, node.Spec.RequestedHostname)
+	return cmd
+}
+
+// buildDriverFlags extracts driver-specific configuration from the given configmap and turns it into CLI flags.
+func buildDriverFlags(driverName string, configMap map[string]interface{}) []string {
+	cmd := make([]string, 0)
+
 	for k, v := range configMap {
-		dmField := "--" + sDriver + "-" + strings.ToLower(regExHyphen.ReplaceAllString(k, "${1}-${2}"))
+		dmField := "--" + driverName + "-" + strings.ToLower(regExHyphen.ReplaceAllString(k, "${1}-${2}"))
 		if v == nil {
 			continue
 		}
@@ -92,8 +104,7 @@ func buildCreateCommand(node *v3.Node, configMap map[string]interface{}) []strin
 			}
 		}
 	}
-	logrus.Tracef("create cmd %v", cmd)
-	cmd = append(cmd, node.Spec.RequestedHostname)
+
 	return cmd
 }
 
@@ -290,8 +301,11 @@ func nodeExists(nodeDir string, node *v3.Node) (bool, error) {
 	return false, nil
 }
 
-func deleteNode(nodeDir string, node *v3.Node) error {
-	command, err := buildCommand(nodeDir, node, []string{"rm", "-f", node.Spec.RequestedHostname})
+func deleteNode(nodeDir string, node *v3.Node, configMap map[string]interface{}) error {
+	driverName := strings.ToLower(node.Status.NodeTemplateSpec.Driver)
+	args := append([]string{"rm", "-f", "--update-config"}, buildDriverFlags(driverName, configMap)...)
+	args = append(args, node.Spec.RequestedHostname)
+	command, err := buildCommand(nodeDir, node, args)
 	if err != nil {
 		return err
 	}
