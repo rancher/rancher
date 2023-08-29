@@ -45,30 +45,6 @@ func main() {
 			logrus.Errorf("error getting the bootstrap password: %v", err)
 		}
 
-		if configPackage.HasSetCorralSSHKeys {
-			privateKey, err := corral.GetCorralEnvVar(corralName, "corral_private_key")
-			if err != nil {
-				logrus.Errorf("error getting the corral's private key: %v", err)
-			}
-			logrus.Infof("Corral Private Key: %s", privateKey)
-
-			publicKey, err := corral.GetCorralEnvVar(corralName, "corral_public_key")
-			if err != nil {
-				logrus.Errorf("error getting the corral's public key: %v", err)
-			}
-			logrus.Infof("Corral Public Key: %s", publicKey)
-
-			err = corral.UpdateCorralConfig("corral_private_key", privateKey)
-			if err != nil {
-				logrus.Errorf("error setting the corral's private key: %v", err)
-			}
-
-			err = corral.UpdateCorralConfig("corral_public_key", publicKey)
-			if err != nil {
-				logrus.Errorf("error setting the corral's public key: %v", err)
-			}
-		}
-
 		rancherConfig := new(rancher.Config)
 		config.LoadConfig(rancher.ConfigurationFileKey, rancherConfig)
 
