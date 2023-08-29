@@ -238,6 +238,7 @@ var OriginMap = map[string]string{
 	"tekton-utils":                                            "https://github.com/rancher/build-tekton",
 	"thanosio-thanos":                                         "https://github.com/thanos-io/thanos",
 	"ui-plugin-operator":                                      "https://github.com/rancher/ui-plugin-operator",
+	"ui-plugin-catalog":                                       "https://github.com/rancher/ui-plugin-charts",
 	"weave-kube":                                              "https://github.com/weaveworks-experiments/weave-kube",
 	"weave-npc":                                               "https://github.com/weaveworks/weave",
 	"webhook-receiver":                                        "https://github.com/rancher/webhook-receiver",

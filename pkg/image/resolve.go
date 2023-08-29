@@ -79,6 +79,12 @@ func GetImages(exportConfig ExportConfig, externalImages map[string][]string, im
 		return nil, nil, errors.Wrap(err, "failed to fetch images from system")
 	}
 
+	// fetch images from extension catalog images
+	extensions := ExtensionConfig(0)
+	if err := extensions.FetchExtensionImages(imagesSet); err != nil {
+		return nil, nil, errors.Wrap(err, "failed to fetch images from extensions")
+	}
+
 	setRequirementImages(exportConfig.OsType, imagesSet)
 
 	// set rancher images from args
