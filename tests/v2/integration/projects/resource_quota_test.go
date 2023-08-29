@@ -221,7 +221,7 @@ func (s *ResourceQuotaSuite) TestRemoveQuotaFromProjectWithNamespacePropagation(
 			return false, nil
 		}
 		if len(quotas.Items) != 1 {
-			return false, nil
+			return false, fmt.Errorf("expected 1 quota in the namespace, but got %d", len(quotas.Items))
 		}
 		resourceList = quotas.Items[0].Spec.Hard
 		if !reflect.DeepEqual(want, resourceList) {
@@ -328,7 +328,7 @@ func (s *ResourceQuotaSuite) TestAddQuotaFromProjectWithNamespacePropagation() {
 			return false, nil
 		}
 		if len(quotas.Items) != 1 {
-			return false, fmt.Errorf("Expected 1 quota in the namespace, but got %d", len(quotas.Items))
+			return false, fmt.Errorf("expected 1 quota in the namespace, but got %d", len(quotas.Items))
 		}
 		resourceList = quotas.Items[0].Spec.Hard
 		if !reflect.DeepEqual(want, resourceList) {
