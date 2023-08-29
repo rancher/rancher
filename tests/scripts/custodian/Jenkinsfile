@@ -59,10 +59,12 @@ node {
         dir ("./tests/scripts/custodian/") {
           stage('Build Docker Image') {
             try {
-              sh "docker build -t ${imageName} -f Dockerfile . --build-arg AWS_ACCESS_KEY_ID=\"${AWS_ACCESS_KEY_ID}\" --build-arg AWS_SECRET_ACCESS_KEY=\"${AWS_SECRET_ACCESS_KEY}\" --build-arg AZURE_AKS_SUBSCRIPTION_ID=\"${AZURE_AKS_SUBSCRIPTION_ID}\" --build-arg AZURE_TENANT_ID=\"${AZURE_TENANT_ID}\" --build-arg AZURE_CLIENT_ID=\"${AZURE_CLIENT_ID}\" --build-arg AZURE_CLIENT_SECRET=\"${AZURE_CLIENT_SECRET}\" --build-arg GOOGLE_APPLICATION_CREDENTIALS=\"${RANCHER_GKE_CREDENTIAL}\" --build-arg GOOGLE_CLOUD_PROJECT=\"${GOOGLE_CLOUD_PROJECT}\" --build-arg RANCHER_LINODE_ACCESSKEY=\"${RANCHER_LINODE_ACCESSKEY}\""
+              writeFile file: 'google_credentials.json', text: ${RANCHER_GKE_CREDENTIAL}
+              sh "docker build -t ${imageName} -f Dockerfile . --build-arg AWS_ACCESS_KEY_ID=\"${AWS_ACCESS_KEY_ID}\" --build-arg AWS_SECRET_ACCESS_KEY=\"${AWS_SECRET_ACCESS_KEY}\" --build-arg AZURE_AKS_SUBSCRIPTION_ID=\"${AZURE_AKS_SUBSCRIPTION_ID}\" --build-arg AZURE_TENANT_ID=\"${AZURE_TENANT_ID}\" --build-arg AZURE_CLIENT_ID=\"${AZURE_CLIENT_ID}\" --build-arg AZURE_CLIENT_SECRET=\"${AZURE_CLIENT_SECRET}\" --build-arg RANCHER_LINODE_ACCESSKEY=\"${RANCHER_LINODE_ACCESSKEY}\""
             }
           catch(err) {
                   echo 'Docker Build had partial failures...'
+                  echo "${err}"
             }
           }
           stage('Run Docker Image for Adding Tags') {
