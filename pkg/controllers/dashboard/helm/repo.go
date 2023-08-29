@@ -150,7 +150,7 @@ func (r *repoHandler) ensure(repoSpec *catalog.RepoSpec, status catalog.RepoStat
 		return status, err
 	}
 
-	return status, repo.Ensure(repoSpec.GitBranch)
+	return status, repo.Ensure(status.Branch)
 }
 
 func (r *repoHandler) createOrUpdateMap(namespace, name string, index *repo.IndexFile, owner metav1.OwnerReference) (*corev1.ConfigMap, error) {
@@ -233,12 +233,15 @@ func (r *repoHandler) download(repoSpec *catalog.RepoSpec, status catalog.RepoSt
 	}
 
 	downloadTime := metav1.Now()
+	// Decide if we need to perform a download operation
 	if repoSpec.GitRepo != "" {
 		repo, err := git.BuildRepoConfig(secret, metadata.Namespace, metadata.Name, repoSpec.GitRepo, repoSpec.InsecureSkipTLSverify, repoSpec.CABundle)
 		if err != nil {
 			return status, err
 		}
-
+		// We need a download operation
+		// if we don't have a Index ConfigMap name, that means, we have not cloned the repository yet.
+		// if we have one, we just need to update it
 		if status.IndexConfigMapName == "" {
 			commit, err = repo.Head(repoSpec.GitBranch)
 			if err != nil {
@@ -247,6 +250,9 @@ func (r *repoHandler) download(repoSpec *catalog.RepoSpec, status catalog.RepoSt
 			status.URL = repoSpec.GitRepo
 			status.Branch = repoSpec.GitBranch
 			index, err = git.BuildOrGetIndex(metadata.Namespace, metadata.Name, repoSpec.GitRepo)
+			if err != nil || index == nil {
+				return status, err
+			}
 		} else {
 			commit, err = repo.CheckUpdate(repoSpec.GitBranch, settings.SystemCatalog.Get())
 			if err != nil {
@@ -259,8 +265,10 @@ func (r *repoHandler) download(repoSpec *catalog.RepoSpec, status catalog.RepoSt
 				return status, nil
 			}
 			index, err = git.BuildOrGetIndex(metadata.Namespace, metadata.Name, repoSpec.GitRepo)
+			if err != nil || index == nil {
+				return status, err
+			}
 		}
-
 	} else if repoSpec.URL != "" {
 		status.URL = repoSpec.URL
 		status.Branch = ""

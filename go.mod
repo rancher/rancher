@@ -165,7 +165,6 @@ require (
 require (
 	github.com/containers/image/v5 v5.25.0
 	github.com/go-git/go-git/v5 v5.8.1
-	gotest.tools v2.2.0+incompatible
 )
 
 require (

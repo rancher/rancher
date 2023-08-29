@@ -90,7 +90,7 @@ func TestBuildRepoConfig(t *testing.T) {
 		{"#2.2 HTTPS Secret: Failure", &corev1.Secret{
 			Type: corev1.SecretTypeBasicAuth,
 			Data: secretBasicHTTPSNoPasswordAuth,
-		}, "cattle-test-namespace", "charts-test", "https://somerandom.git", false, []byte{}, fmt.Errorf("username and password not provided")},
+		}, "cattle-test-namespace", "charts-test", "https://somerandom.git", false, []byte{}, fmt.Errorf("username or password not provided")},
 
 		{"#3.1 SSH Secret: Success", &corev1.Secret{
 			Type: corev1.SecretTypeSSHAuth,
