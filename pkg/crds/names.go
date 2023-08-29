@@ -275,7 +275,7 @@ var MigratedResources = map[string]bool{
 	"projectmonitorgraphs.management.cattle.io":                       false,
 	"projectnetworkpolicies.management.cattle.io":                     false,
 	"projectroletemplatebindings.management.cattle.io":                false,
-	"projects.management.cattle.io":                                   false,
+	"projects.management.cattle.io":                                   true,
 	"rancherusernotifications.management.cattle.io":                   false,
 	"rkeaddons.management.cattle.io":                                  false,
 	"rkebootstraps.rke.cattle.io":                                     false,

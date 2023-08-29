@@ -23,23 +23,26 @@ var (
 )
 
 // +genclient
-// +kubebuilder:skipversion
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Project is a group of namespaces.
-// Projects are be used to create a multi-tenant environment within a Kubernetes cluster by managing namespace operations,
+// Projects are used to create a multi-tenant environment within a Kubernetes cluster by managing namespace operations,
 // such as role assignments or quotas, as a group.
 type Project struct {
-	types.Namespaced
+	types.Namespaced `json:",inline"`
+	metav1.TypeMeta  `json:",inline"`
 
-	metav1.TypeMeta   `json:",inline"`
+	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
+	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	// Spec is the specification of the desired configuration for the project.
+	// +optional
 	Spec ProjectSpec `json:"spec,omitempty"`
 
 	// Status is the most recently observed status of the project.
-	Status ProjectStatus `json:"status"`
+	// +optional
+	Status ProjectStatus `json:"status,omitempty"`
 }
 
 func (p *Project) ObjClusterName() string {
@@ -49,49 +52,59 @@ func (p *Project) ObjClusterName() string {
 // ProjectStatus represents the most recently observed status of the project.
 type ProjectStatus struct {
 	// Conditions are a set of indicators about aspects of the project.
-	Conditions []ProjectCondition `json:"conditions"`
+	// +optional
+	Conditions []ProjectCondition `json:"conditions,omitempty"`
 
 	// PodSecurityPolicyTemplateName is the pod security policy template associated with the project.
-	PodSecurityPolicyTemplateName string `json:"podSecurityPolicyTemplateId"`
+	// +optional
+	PodSecurityPolicyTemplateName string `json:"podSecurityPolicyTemplateId,omitempty"`
 
 	// MonitoringStatus is the status of the Monitoring V1 app.
+	// +optional
 	MonitoringStatus *MonitoringStatus `json:"monitoringStatus,omitempty" norman:"nocreate,noupdate"`
 }
 
 // ProjectCondition is the status of an aspect of the project.
 type ProjectCondition struct {
 	// Type of project condition.
+	// +kubebuilder:validation:Required
 	Type string `json:"type"`
 
 	// Status of the condition, one of True, False, Unknown.
+	// +kubebuilder:validation:Required
 	Status v1.ConditionStatus `json:"status"`
 
 	// The last time this condition was updated.
+	// +optional
 	LastUpdateTime string `json:"lastUpdateTime,omitempty"`
 
 	// Last time the condition transitioned from one status to another.
+	// +optional
 	LastTransitionTime string `json:"lastTransitionTime,omitempty"`
 
 	// The reason for the condition's last transition.
+	// +optional
 	Reason string `json:"reason,omitempty"`
 
-	// Human-readable message indicating details about last transition
+	// Human-readable message indicating details about last transition.
+	// +optional
 	Message string `json:"message,omitempty"`
 }
 
 // ProjectSpec is a description of the project.
 type ProjectSpec struct {
-	// DisplayName is the human-readable name for the project. Required.
+
+	// DisplayName is the human-readable name for the project.
 	// +kubebuilder:validation:Required
-	DisplayName string `json:"displayName,omitempty" norman:"required"`
+	DisplayName string `json:"displayName" norman:"required"`
 
 	// Description is a human-readable description of the project.
 	// +optional
-	Description string `json:"description"`
+	Description string `json:"description,omitempty"`
 
-	// ClusterName is the name of the cluster the project belongs to. Required.
+	// ClusterName is the name of the cluster the project belongs to.
 	// +kubebuilder:validation:Required
-	ClusterName string `json:"clusterName,omitempty" norman:"required,type=reference[cluster]"`
+	ClusterName string `json:"clusterName" norman:"required,type=reference[cluster]"`
 
 	// ResourceQuota is a specification for the total amount of quota for standard resources that will be shared by all namespaces in the project.
 	// Must provide NamespaceDefaultResourceQuota if ResourceQuota is specified.
@@ -114,7 +127,7 @@ type ProjectSpec struct {
 	// Deprecated. Use the Monitoring V2 app instead.
 	// Defaults to false.
 	// +optional
-	EnableProjectMonitoring bool `json:"enableProjectMonitoring" norman:"default=false"`
+	EnableProjectMonitoring bool `json:"enableProjectMonitoring,omitempty" norman:"default=false"`
 }
 
 func (p *ProjectSpec) ObjClusterName() string {
