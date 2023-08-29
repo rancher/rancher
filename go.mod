@@ -164,8 +164,8 @@ require (
 
 require (
 	github.com/containers/image/v5 v5.25.0
-	github.com/gliderlabs/ssh v0.3.5
 	github.com/go-git/go-git/v5 v5.8.1
+	gotest.tools v2.2.0+incompatible
 )
 
 require (
@@ -175,7 +175,6 @@ require (
 	github.com/VividCortex/ewma v1.2.0 // indirect
 	github.com/acarl005/stripansi v0.0.0-20180116102854-5a71ef0e047d // indirect
 	github.com/acomagu/bufpipe v1.0.4 // indirect
-	github.com/anmitsu/go-shlex v0.0.0-20200514113438-38f4b401e2be // indirect
 	github.com/cloudflare/circl v1.3.3 // indirect
 	github.com/containerd/stargz-snapshotter/estargz v0.14.3 // indirect
 	github.com/containers/libtrust v0.0.0-20230121012942-c1716e8a8d01 // indirect
