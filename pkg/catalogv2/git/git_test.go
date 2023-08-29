@@ -1,14 +1,11 @@
 package git
 
 import (
+	"fmt"
 	"testing"
 
-	"github.com/gliderlabs/ssh"
-	plumbing "github.com/go-git/go-git/v5/plumbing"
-	plumbingHTTP "github.com/go-git/go-git/v5/plumbing/transport/http"
-	plumbingSSH "github.com/go-git/go-git/v5/plumbing/transport/ssh"
-	gomock "github.com/golang/mock/gomock"
 	"github.com/pkg/errors"
+	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -50,372 +47,95 @@ const known_hosts_dummy_test string = `github.com ssh-rsa AAAAB3NzaC1yc2EAAAABIw
 // The goal here is to test the critical parts.
 // What happens if the wrong type of credentials are provided.
 // Ensure that the configuration is setted when valid credentials are provided
-func TestSetRepoCredentials(t *testing.T) {
+func TestBuildRepoConfig(t *testing.T) {
+
+	// # Used on test #2.1 adn #2.2
+	const randomUser = "random_user"
+	const randomPassword = "random_password"
+	secretBasicHTTPSAuth := map[string][]byte{
+		corev1.BasicAuthUsernameKey: []byte(randomUser),
+		corev1.BasicAuthPasswordKey: []byte(randomPassword),
+	}
+	secretBasicHTTPSNoPasswordAuth := map[string][]byte{
+		corev1.BasicAuthUsernameKey: []byte(randomUser),
+	}
+
+	// Used on test #3.1 and #3.2
+	secretSSHAuth := map[string][]byte{
+		corev1.SSHAuthPrivateKey: []byte(id_rsa_test_random),
+	}
+	secretSSHKnowHostsAuth := map[string][]byte{
+		corev1.SSHAuthPrivateKey: []byte(id_rsa_test_random),
+		"known_hosts":            []byte(known_hosts_dummy_test),
+	}
 
 	// Prepare the test cases
 	testCases := []struct {
-		name       string
-		secret     *corev1.Secret
-		username   string
-		password   string
-		sshKey     string
-		knownHosts string
-		expectErr  bool
+		test            string
+		secret          *corev1.Secret
+		namespace       string
+		name            string
+		gitURL          string
+		insecureSkipTLS bool
+		caBundle        []byte
+		expectErr       error
 	}{
-		{"#1 No Auth: Success", nil, "", "", "", "", false},
-		{"#2.1 Basic Auth: Success", &corev1.Secret{Type: corev1.SecretTypeBasicAuth}, "random_user", "random_password", "", "", false},
-		{"#2.2 Basic Auth: Failure", &corev1.Secret{Type: corev1.SecretTypeBasicAuth}, "", "", "", "", true},
-		{"#3.1 SSH Auth: Success", &corev1.Secret{Type: corev1.SecretTypeSSHAuth}, "", "", id_rsa_test_random, known_hosts_dummy_test, false},
-		{"#3.2 SSH Auth: Failure", &corev1.Secret{Type: corev1.SecretTypeSSHAuth}, "", "", "", known_hosts_dummy_test, true},
+		{"#1 No Secret: Success", nil, "cattle-test-namespace", "charts-test", "https://somerandom.git", false, []byte{}, nil},
+
+		{"#2.1 HTTPS Secret: Success", &corev1.Secret{
+			Type: corev1.SecretTypeBasicAuth,
+			Data: secretBasicHTTPSAuth,
+		}, "cattle-test-namespace", "charts-test", "https://somerandom.git", false, []byte{}, nil},
+
+		{"#2.2 HTTPS Secret: Failure", &corev1.Secret{
+			Type: corev1.SecretTypeBasicAuth,
+			Data: secretBasicHTTPSNoPasswordAuth,
+		}, "cattle-test-namespace", "charts-test", "https://somerandom.git", false, []byte{}, fmt.Errorf("username and password not provided")},
+
+		{"#3.1 SSH Secret: Success", &corev1.Secret{
+			Type: corev1.SecretTypeSSHAuth,
+			Data: secretSSHAuth,
+		}, "cattle-test-namespace", "charts-test", "https://somerandom.git", false, []byte{}, nil},
+
+		{"#3.2 SSH && Known Hosts Secret: Success", &corev1.Secret{
+			Type: corev1.SecretTypeSSHAuth,
+			Data: secretSSHKnowHostsAuth,
+		}, "cattle-test-namespace", "charts-test", "https://somerandom.git", false, []byte{}, nil},
 	}
 
 	// Run the testCases
 	for _, tc := range testCases {
-		if tc.secret != nil {
-			tc.secret.Data = map[string][]byte{
-				corev1.BasicAuthUsernameKey: []byte(tc.username),
-				corev1.BasicAuthPasswordKey: []byte(tc.password),
-				corev1.SSHAuthPrivateKey:    []byte(tc.sshKey),
-				"known_hosts":               []byte(tc.knownHosts),
-			}
-		}
-
-		config := &git{
-			secret: tc.secret,
-		}
-
-		// Create new repoOperation
-		ro := &repoOperation{
-			config: config,
-		}
-
-		// Run the function
-		err := ro.setRepoCredentials()
-
+		repo, err := BuildRepoConfig(tc.secret, tc.namespace, tc.name, tc.gitURL, tc.insecureSkipTLS, tc.caBundle)
 		// Check the error
-		if tc.expectErr && err == nil {
-			t.Errorf("Expected an error for case %+v, but got nil", tc)
-		} else if !tc.expectErr && err != nil {
-			t.Errorf("Did not expect an error for case %+v, but got: %v", tc, err)
+		if tc.expectErr == nil && tc.expectErr != err {
+			t.Errorf("Expected error: %v |But got: %v", tc.expectErr, err)
+		}
+		// Only testing error in some cases
+		if err != nil {
+			assert.EqualError(t, tc.expectErr, err.Error())
+			continue
 		}
 
-		auth := ro.GetAuth()
-		switch authType := auth.(type) {
-		case *plumbingHTTP.BasicAuth:
-			if tc.secret.Type == corev1.SecretTypeBasicAuth {
-				if authType.Username != tc.username || authType.Password != tc.password {
-					t.Errorf("Expected username/password: %s/%s, but got: %s/%s",
-						tc.username, tc.password, authType.Username, authType.Password)
-				}
-
-			}
-		case *plumbingSSH.PublicKeys:
-			if tc.secret.Type == corev1.SecretTypeSSHAuth {
-				if authType.User != "git" {
-					t.Errorf("Expected user: %s, but got: %s", "git", authType.User)
-				}
-				// Check if Signer is non-nil and of type ssh.Signer
-				_, ok := authType.Signer.(ssh.Signer)
-				if !ok || authType.Signer == nil {
-					t.Errorf("Failed to parse SSH private key")
-				}
-				// Check that HostKeyCallback is not nil
-				if authType.HostKeyCallbackHelper.HostKeyCallback == nil {
-					t.Errorf("HostKeyCallback is nil")
-				}
+		// testing authentication methods
+		if tc.secret == nil {
+			assert.Nil(t, repo.auth, "Auth object should be nil")
+		} else {
+			assert.NotNil(t, repo.auth, "Auth object should not be nil")
+			switch tc.secret.Type {
+			case corev1.SecretTypeBasicAuth:
+				storedAuth := repo.auth.String()
+				assert.Equal(t, storedAuth, fmt.Sprintf("http-basic-auth - %s:*******", randomUser))
+			case corev1.SecretTypeSSHAuth:
+				storedAuth := repo.auth.String()
+				assert.Equal(t, storedAuth, "user: git, name: ssh-public-keys")
 			}
 		}
+		// testing local repository configurations
+		assert.Contains(t, repo.Directory, tc.namespace, "Directory %s should contain the namespace %s", repo.Directory, tc.namespace)
+		assert.Contains(t, repo.Directory, tc.name, "Directory %s should contain the chart name %s", repo.Directory, tc.name)
+		assert.Equal(t, repo.URL, tc.gitURL)
+		assert.Equal(t, repo.insecureTLSVerify, tc.insecureSkipTLS)
+		assert.Equal(t, repo.caBundle, tc.caBundle)
 
-	} // switch end
+	}
 } // test end
-
-func Test_EnsureClonedRepo(t *testing.T) {
-	testCases := []struct {
-		name               string
-		call_openOrClone   bool
-		call_hardReset     bool
-		call_fetchAndReset bool
-		openOrClone_err    error
-		hardReset_err      error
-		fetchAndReset_err  error
-		expected_err       error
-	}{
-		{
-			name:               "#1 TestCase: Success - Open, Reset And Exit",
-			call_openOrClone:   true,
-			call_hardReset:     true,
-			call_fetchAndReset: false,
-			openOrClone_err:    nil,
-			hardReset_err:      nil,
-			// fetchAndReset_err:,
-			expected_err: nil,
-		},
-		{
-			name:               "#2 TestCase: Success - Open, Reset And FetchReset",
-			call_openOrClone:   true,
-			call_hardReset:     true,
-			call_fetchAndReset: true,
-			openOrClone_err:    nil,
-			hardReset_err:      errTestCustom,
-			fetchAndReset_err:  nil,
-			expected_err:       nil,
-		},
-		{
-			name:               "#3 TestCase: Failure - Clone And Fail",
-			call_openOrClone:   true,
-			call_hardReset:     false,
-			call_fetchAndReset: false,
-			openOrClone_err:    errTestCustom,
-			// hardReset_err:          nil,
-			// fetchAndReset_err:  nil,
-			expected_err: errTestCustom,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-
-			// Set up Mock controller
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
-
-			mockRepo := NewMockrepository(ctrl)
-
-			// Set Expectations according to calls
-			if tc.call_openOrClone {
-				mockRepo.EXPECT().cloneOrOpen(gomock.Any()).Return(tc.openOrClone_err)
-			}
-			if tc.call_hardReset {
-				mockRepo.EXPECT().hardReset(gomock.Any()).Return(tc.hardReset_err)
-			}
-			if tc.call_fetchAndReset {
-				mockRepo.EXPECT().fetchAndReset(gomock.Any()).Return(tc.fetchAndReset_err)
-			}
-
-			// config, _ := newGitForRepoTest()
-			// ro, _ := newRepoOperation(config)
-			git := newRepository(&extendedRepo{mockRepo})
-			commit := "imagine_some_crazy_sha_here"
-			err := git.EnsureClonedRepo(commit)
-			if (err != nil && err.Error() != tc.expected_err.Error()) || (err == nil && tc.expected_err != nil) {
-				t.Errorf("got error: %v, want %v", err, tc.expected_err)
-			}
-		})
-	}
-}
-
-func Test_CloneHead(t *testing.T) {
-	someCommitHash := plumbing.NewHash("9c5a25675676b680898f933681abde88f53dba95")
-
-	testCases := []struct {
-		name                  string
-		call_cloneOrOpen      bool
-		call_hardReset        bool
-		call_getCurrentCommit bool
-		openOrClone_err       error
-		hardReset_err         error
-		getCurrentCommit_resp plumbing.Hash
-		getCurrentCommit_err  error
-		expected_commit       string
-		expected_err          error
-	}{
-		{
-			name:                  "#1 TestCase: Success - First Clone || Dont Clone",
-			call_cloneOrOpen:      true,
-			call_hardReset:        true,
-			call_getCurrentCommit: true,
-			openOrClone_err:       nil,
-			hardReset_err:         nil,
-			getCurrentCommit_resp: someCommitHash,
-			getCurrentCommit_err:  nil,
-			expected_commit:       someCommitHash.String(),
-			expected_err:          nil,
-		},
-		{
-			name:                  "#2 TestCase: Failure - hardReset(!clone)",
-			call_cloneOrOpen:      true,
-			call_hardReset:        true,
-			call_getCurrentCommit: false,
-			openOrClone_err:       nil,
-			hardReset_err:         errTestCustom,
-			// getCurrentCommit_resp: commitHash,
-			// getCurrentCommit_err:  nil,
-			expected_commit: "",
-			expected_err:    errTestCustom,
-		},
-		{
-			name:                  "#3 TestCase: Failure - cloneOrOpen(err)",
-			call_cloneOrOpen:      true,
-			call_hardReset:        false,
-			call_getCurrentCommit: false,
-			openOrClone_err:       errTestCustom,
-			// hardReset_err:         errTestCustom,
-			// getCurrentCommit_resp: commitHash,
-			// getCurrentCommit_err:  nil,
-			expected_commit: "",
-			expected_err:    errTestCustom,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-
-			// Set up Mock controller
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
-
-			mockRepo := NewMockrepository(ctrl)
-
-			// Set Expectations according to calls
-			if tc.call_cloneOrOpen {
-				mockRepo.EXPECT().cloneOrOpen(gomock.Any()).Return(tc.openOrClone_err)
-			}
-			if tc.call_hardReset {
-				mockRepo.EXPECT().hardReset(gomock.Any()).Return(tc.hardReset_err)
-			}
-			if tc.call_getCurrentCommit {
-				mockRepo.EXPECT().getCurrentCommit().Return(tc.getCurrentCommit_resp, tc.getCurrentCommit_err)
-			}
-
-			git := newRepository(&extendedRepo{mockRepo})
-			branch := "main"
-			commit, err := git.CloneHead(branch)
-			if (err != nil && err.Error() != tc.expected_err.Error()) || (err == nil && tc.expected_err != nil) {
-				t.Errorf("got error: %v, want %v", err, tc.expected_err)
-			}
-
-			if commit != tc.expected_commit {
-				t.Errorf("CloneHead() = %v; want '%v'", commit, tc.expected_commit)
-			}
-		})
-	}
-}
-
-func Test_UpdateToLatestRef(t *testing.T) {
-	currentCommitHash := plumbing.NewHash("9c5a25675676b680898f933681abde88f53dba95")
-	newCommitHash := plumbing.NewHash("9c5a25675676b680898f933681abde88f53dba99")
-
-	testCases := []struct {
-		name                   string
-		call_cloneOrOpen       bool
-		call_hardReset         bool
-		call_getCurrentCommit  bool
-		call_getLastCommitHash bool
-		call_fetchAndReset     bool
-		call_getCurrentCommit2 bool
-		openOrClone_err        error
-		hardReset_err          error
-		getCurrentCommit_resp  plumbing.Hash
-		getCurrentCommit_err   error
-		getLastCommitHash_resp plumbing.Hash
-		getLastCommitHash_err  error
-		fetchAndReset_err      error
-		getCurrentCommit2_resp plumbing.Hash
-		getCurrentCommit2_err  error
-		expected_commit        string
-		expected_err           error
-	}{
-		{
-			name:                   "#1 TestCase: Success - remote commit HASH not changed",
-			call_cloneOrOpen:       true,
-			call_hardReset:         true,
-			call_getCurrentCommit:  true,
-			call_getLastCommitHash: true,
-			call_fetchAndReset:     false,
-			call_getCurrentCommit2: false,
-			openOrClone_err:        nil,
-			hardReset_err:          nil,
-			getCurrentCommit_resp:  currentCommitHash,
-			getCurrentCommit_err:   nil,
-			getLastCommitHash_resp: currentCommitHash,
-			getLastCommitHash_err:  nil,
-			// fetchAndReset_err:  nil,
-			// getCurrentCommit2_resp: currentCommitHash,
-			// getCurrentCommit2_err:  nil,
-			expected_commit: "9c5a25675676b680898f933681abde88f53dba95",
-			expected_err:    nil,
-		},
-		{
-			name:                   "#2 TestCase: Success - remoteSHA changed",
-			call_cloneOrOpen:       true,
-			call_hardReset:         true,
-			call_getCurrentCommit:  true,
-			call_getLastCommitHash: true,
-			call_fetchAndReset:     true,
-			call_getCurrentCommit2: true,
-			openOrClone_err:        nil,
-			hardReset_err:          nil,
-			getCurrentCommit_resp:  currentCommitHash,
-			getCurrentCommit_err:   nil,
-			getLastCommitHash_resp: newCommitHash,
-			getLastCommitHash_err:  nil,
-			fetchAndReset_err:      nil,
-			getCurrentCommit2_resp: newCommitHash,
-			getCurrentCommit2_err:  nil,
-			expected_commit:        newCommitHash.String(),
-			expected_err:           nil,
-		},
-		{
-			name:                   "#3 TestCase: Success - fetchAndResetHead error",
-			call_cloneOrOpen:       true,
-			call_hardReset:         true,
-			call_getCurrentCommit:  true,
-			call_getLastCommitHash: true,
-			call_fetchAndReset:     true,
-			call_getCurrentCommit2: false,
-			openOrClone_err:        nil,
-			hardReset_err:          nil,
-			getCurrentCommit_resp:  currentCommitHash,
-			getCurrentCommit_err:   nil,
-			getLastCommitHash_resp: newCommitHash,
-			getLastCommitHash_err:  nil,
-			fetchAndReset_err:      errTestCustom,
-			// getCurrentCommit2_resp: "some-random-sha",
-			// getCurrentCommit2_err:  nil,
-			expected_commit: currentCommitHash.String(),
-			expected_err:    errTestCustom,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-
-			// Set up Mock controller
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
-
-			mockRepo := NewMockrepository(ctrl)
-
-			// Set Expectations according to calls
-			if tc.call_cloneOrOpen {
-				mockRepo.EXPECT().cloneOrOpen(gomock.Any()).Return(tc.openOrClone_err)
-			}
-			if tc.call_hardReset {
-				mockRepo.EXPECT().hardReset(gomock.Any()).Return(tc.hardReset_err)
-			}
-			if tc.call_getCurrentCommit {
-				mockRepo.EXPECT().getCurrentCommit().Return(tc.getCurrentCommit_resp, tc.getCurrentCommit_err)
-			}
-			if tc.call_getLastCommitHash {
-				mockRepo.EXPECT().getLastCommitHash(gomock.Any(), gomock.Any()).Return(tc.getLastCommitHash_resp, tc.getLastCommitHash_err)
-			}
-			if tc.call_fetchAndReset {
-				mockRepo.EXPECT().fetchAndReset(gomock.Any()).Return(tc.fetchAndReset_err)
-			}
-			if tc.call_getCurrentCommit2 {
-				mockRepo.EXPECT().getCurrentCommit().Return(tc.getCurrentCommit2_resp, tc.getCurrentCommit2_err)
-			}
-
-			git := newRepository(&extendedRepo{mockRepo})
-			branch := "main"
-			commit, err := git.UpdateToLatestRef(branch)
-			if (err != nil && err.Error() != tc.expected_err.Error()) || (err == nil && tc.expected_err != nil) {
-				t.Errorf("got error: %v, want %v", err, tc.expected_err)
-			}
-
-			if commit != tc.expected_commit {
-				t.Errorf("UpdateToLatestRef() = %v; want '%v'", commit, tc.expected_commit)
-			}
-		})
-	}
-}
