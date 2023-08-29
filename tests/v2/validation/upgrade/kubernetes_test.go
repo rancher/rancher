@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters/bundledclusters"
 	nodestat "github.com/rancher/rancher/tests/framework/extensions/nodes"
+	"github.com/rancher/rancher/tests/framework/extensions/provisioninginput"
 	psadeploy "github.com/rancher/rancher/tests/framework/extensions/psact"
 	"github.com/rancher/rancher/tests/framework/extensions/workloads/pods"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
@@ -128,11 +129,8 @@ func (u *UpgradeKubernetesTestSuite) testUpgradeSingleCluster(clusterName, versi
 	require.NoError(u.T(), err)
 	assert.NotEmpty(u.T(), clusterToken)
 
-	if psact == string(RancherPrivileged) || psact == string(RancherRestricted) {
-		err = psadeploy.CheckPSACT(client, clusterName)
-		require.NoError(u.T(), err)
-
-		_, err = psadeploy.CreateNginxDeployment(client, clusterMeta.ID, psact)
+	if psact == string(provisioninginput.RancherPrivileged) || psact == string(provisioninginput.RancherRestricted) || psact == string(provisioninginput.RancherBaseline) {
+		err := psadeploy.CreateNginxDeployment(client, clusterMeta.ID, psact)
 		require.NoError(u.T(), err)
 	}
 
