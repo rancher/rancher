@@ -95,8 +95,10 @@ func (w *WebhookTestSuite) TestWebhookChart() {
 	})
 
 	w.Run("Verify webhook pod logs", func() {
+		
+		steveClient, err := w.client.Steve.ProxyDownstream(clusterID)
+		require.NoError(w.T(), err)
 
-		steveClient := w.client.Steve
 		pods, err := steveClient.SteveType(pods.PodResourceSteveType).NamespacedSteveClient(charts.RancherWebhookNamespace).List(nil)
 		require.NoError(w.T(), err)
 
