@@ -14,6 +14,7 @@ import (
 	helmhttp "github.com/rancher/rancher/pkg/catalogv2/http"
 	catalogcontrollers "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
 	namespaces "github.com/rancher/rancher/pkg/namespace"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/wrangler/pkg/apply"
 	"github.com/rancher/wrangler/pkg/condition"
 	corev1controllers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
@@ -144,7 +145,12 @@ func (r *repoHandler) ensure(repoSpec *catalog.RepoSpec, status catalog.RepoStat
 		return status, err
 	}
 
-	return status, git.Ensure(secret, metadata.Namespace, metadata.Name, status.URL, status.Branch, repoSpec.InsecureSkipTLSverify, repoSpec.CABundle)
+	repo, err := git.BuildRepoConfig(secret, metadata.Namespace, metadata.Name, status.URL, repoSpec.InsecureSkipTLSverify, repoSpec.CABundle)
+	if err != nil {
+		return status, err
+	}
+
+	return status, repo.Ensure(repoSpec.GitBranch)
 }
 
 func (r *repoHandler) createOrUpdateMap(namespace, name string, index *repo.IndexFile, owner metav1.OwnerReference) (*corev1.ConfigMap, error) {
@@ -227,26 +233,34 @@ func (r *repoHandler) download(repoSpec *catalog.RepoSpec, status catalog.RepoSt
 	}
 
 	downloadTime := metav1.Now()
-	if repoSpec.GitRepo != "" && status.IndexConfigMapName == "" {
-		commit, err = git.Head(secret, metadata.Namespace, metadata.Name, repoSpec.GitRepo, repoSpec.GitBranch, repoSpec.InsecureSkipTLSverify, repoSpec.CABundle)
+	if repoSpec.GitRepo != "" {
+		repo, err := git.BuildRepoConfig(secret, metadata.Namespace, metadata.Name, repoSpec.GitRepo, repoSpec.InsecureSkipTLSverify, repoSpec.CABundle)
 		if err != nil {
 			return status, err
 		}
-		status.URL = repoSpec.GitRepo
-		status.Branch = repoSpec.GitBranch
-		index, err = git.BuildOrGetIndex(metadata.Namespace, metadata.Name, repoSpec.GitRepo)
-	} else if repoSpec.GitRepo != "" {
-		commit, err = git.Update(secret, metadata.Namespace, metadata.Name, repoSpec.GitRepo, repoSpec.GitBranch, repoSpec.InsecureSkipTLSverify, repoSpec.CABundle)
-		if err != nil {
-			return status, err
+
+		if status.IndexConfigMapName == "" {
+			commit, err = repo.Head(repoSpec.GitBranch)
+			if err != nil {
+				return status, err
+			}
+			status.URL = repoSpec.GitRepo
+			status.Branch = repoSpec.GitBranch
+			index, err = git.BuildOrGetIndex(metadata.Namespace, metadata.Name, repoSpec.GitRepo)
+		} else {
+			commit, err = repo.CheckUpdate(repoSpec.GitBranch, settings.SystemCatalog.Get())
+			if err != nil {
+				return status, err
+			}
+			status.URL = repoSpec.GitRepo
+			status.Branch = repoSpec.GitBranch
+			if status.Commit == commit {
+				status.DownloadTime = downloadTime
+				return status, nil
+			}
+			index, err = git.BuildOrGetIndex(metadata.Namespace, metadata.Name, repoSpec.GitRepo)
 		}
-		status.URL = repoSpec.GitRepo
-		status.Branch = repoSpec.GitBranch
-		if status.Commit == commit {
-			status.DownloadTime = downloadTime
-			return status, nil
-		}
-		index, err = git.BuildOrGetIndex(metadata.Namespace, metadata.Name, repoSpec.GitRepo)
+
 	} else if repoSpec.URL != "" {
 		status.URL = repoSpec.URL
 		status.Branch = ""
