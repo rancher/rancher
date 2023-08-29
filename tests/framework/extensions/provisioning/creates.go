@@ -18,6 +18,7 @@ import (
 	rke2Hardening "github.com/rancher/rancher/tests/framework/extensions/hardening/rke2"
 	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
 	"github.com/rancher/rancher/tests/framework/extensions/pipeline"
+	"github.com/rancher/rancher/tests/framework/extensions/provisioninginput"
 	nodepools "github.com/rancher/rancher/tests/framework/extensions/rke1/nodepools"
 	"github.com/rancher/rancher/tests/framework/extensions/rke1/nodetemplates"
 	"github.com/rancher/rancher/tests/framework/extensions/secrets"
@@ -47,6 +48,13 @@ func CreateProvisioningCluster(client *rancher.Client, provider Provider, cluste
 	cloudCredential, err := provider.CloudCredFunc(client)
 	if err != nil {
 		return nil, err
+	}
+
+	if clustersConfig.PSACT == string(provisioninginput.RancherBaseline) {
+		err = clusters.CreateRancherBaselinePSACT(client, clustersConfig.PSACT)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	clusterName := namegen.AppendRandomString(provider.Name.String())
@@ -139,6 +147,13 @@ func CreateProvisioningCustomCluster(client *rancher.Client, externalNodeProvide
 		rolesPerPool = append(rolesPerPool, finalRoleCommand)
 		for i := int32(0); i < nodes.Quantity; i++ {
 			rolesPerNode = append(rolesPerNode, finalRoleCommand)
+		}
+	}
+
+	if clustersConfig.PSACT == string(provisioninginput.RancherBaseline) {
+		err := clusters.CreateRancherBaselinePSACT(client, clustersConfig.PSACT)
+		if err != nil {
+			return nil, err
 		}
 	}
 
@@ -260,6 +275,13 @@ func CreateProvisioningCustomCluster(client *rancher.Client, externalNodeProvide
 
 // CreateProvisioningRKE1Cluster provisions an rke1 cluster, then runs verify checks
 func CreateProvisioningRKE1Cluster(client *rancher.Client, provider RKE1Provider, clustersConfig *clusters.ClusterConfig, nodeTemplate *nodetemplates.NodeTemplate) (*management.Cluster, error) {
+	if clustersConfig.PSACT == string(provisioninginput.RancherBaseline) {
+		err := clusters.CreateRancherBaselinePSACT(client, clustersConfig.PSACT)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	clusterName := namegen.AppendRandomString(provider.Name.String())
 	cluster := clusters.NewRKE1ClusterConfig(clusterName, client, clustersConfig)
 	clusterResp, err := clusters.CreateRKE1Cluster(client, cluster)
@@ -302,6 +324,13 @@ func CreateProvisioningRKE1CustomCluster(client *rancher.Client, externalNodePro
 		rolesPerPool = append(rolesPerPool, finalRoleCommand)
 		for i := int64(0); i < nodes.Quantity; i++ {
 			rolesPerNode = append(rolesPerNode, finalRoleCommand)
+		}
+	}
+
+	if clustersConfig.PSACT == string(provisioninginput.RancherBaseline) {
+		err := clusters.CreateRancherBaselinePSACT(client, clustersConfig.PSACT)
+		if err != nil {
+			return nil, nil, err
 		}
 	}
 
@@ -374,6 +403,13 @@ func CreateProvisioningAirgapCustomCluster(client *rancher.Client, clustersConfi
 		}
 
 		rolesPerNode[nodes.Quantity] = finalRoleCommand
+	}
+
+	if clustersConfig.PSACT == string(provisioninginput.RancherBaseline) {
+		err := clusters.CreateRancherBaselinePSACT(client, clustersConfig.PSACT)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	clusterName := namegen.AppendRandomString(rke2k3sAirgapCustomCluster)
@@ -456,6 +492,14 @@ func CreateProvisioningRKE1AirgapCustomCluster(client *rancher.Client, clustersC
 
 		rolesPerNode[nodes.Quantity] = finalRoleCommand
 	}
+
+	if clustersConfig.PSACT == string(provisioninginput.RancherBaseline) {
+		err := clusters.CreateRancherBaselinePSACT(client, clustersConfig.PSACT)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	cluster := clusters.NewRKE1ClusterConfig(clusterName, client, clustersConfig)
 	clusterResp, err := clusters.CreateRKE1Cluster(client, cluster)
 	if err != nil {

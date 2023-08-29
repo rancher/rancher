@@ -261,7 +261,7 @@ func (rb *PSATestSuite) ValidateEditPsactCluster(role string, psact string) {
 	switch role {
 	case roleOwner, restrictedAdmin:
 		require.NoError(rb.T(), err)
-		_, err = psadeploy.CreateNginxDeployment(rb.nonAdminUserClient, rb.clusterID, psact)
+		err = psadeploy.CreateNginxDeployment(rb.nonAdminUserClient, rb.clusterID, psact)
 		require.NoError(rb.T(), err)
 	case roleMember, roleProjectOwner, roleProjectMember, roleProjectReadOnly:
 		require.Error(rb.T(), err)
