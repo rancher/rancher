@@ -1,6 +1,7 @@
 package machineprovision
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/rancher/rancher/pkg/capr"
@@ -174,6 +175,66 @@ func TestGetHostname(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			hostname := getHostname(infraObject{meta: &tt.data})
 			assert.Equal(t, tt.expected, hostname)
+		})
+	}
+}
+
+func TestAddAwsClusterOwnedTag(t *testing.T) {
+	testClusterId := "c-m-1234567"
+	tests := []struct {
+		name     string
+		args     map[string]any
+		expected map[string]any
+	}{
+		{
+			name: "no tags",
+			args: map[string]any{},
+			expected: map[string]any{
+				"tags": fmt.Sprintf("kubernetes.io/cluster/%s,owned", testClusterId),
+			},
+		},
+		{
+			name: "existing owned tag",
+			args: map[string]any{
+				"tags": "kubernetes.io/cluster/testing,owned",
+			},
+			expected: map[string]any{
+				"tags": "kubernetes.io/cluster/testing,owned",
+			},
+		},
+		{
+			name: "existing shared tag",
+			args: map[string]any{
+				"tags": "kubernetes.io/cluster/testing,shared",
+			},
+			expected: map[string]any{
+				"tags": "kubernetes.io/cluster/testing,shared",
+			},
+		},
+		{
+			name: "unrelated tags",
+			args: map[string]any{
+				"tags": "rancher.cattle.io/testing,true",
+			},
+			expected: map[string]any{
+				"tags": fmt.Sprintf("rancher.cattle.io/testing,true,kubernetes.io/cluster/%s,owned", testClusterId),
+			},
+		},
+		{
+			name: "unrelated and owned tags",
+			args: map[string]any{
+				"tags": "kubernetes.io/cluster/testing,owned,rancher.cattle.io/testing,true",
+			},
+			expected: map[string]any{
+				"tags": "kubernetes.io/cluster/testing,owned,rancher.cattle.io/testing,true",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			addAwsClusterOwnedTag(tt.args, testClusterId)
+			assert.Equal(t, tt.expected, tt.args)
 		})
 	}
 }

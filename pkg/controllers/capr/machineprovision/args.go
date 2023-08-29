@@ -244,14 +244,22 @@ func GetCloudCredentialSecret(secrets corecontrollers.SecretCache, namespace, na
 	return secrets.Get(namespace, name)
 }
 
-func toArgs(driverName string, args map[string]interface{}, clusterID string) (cmd []string) {
-	if driverName == "amazonec2" {
-		tagValue := fmt.Sprintf("kubernetes.io/cluster/%s,owned", clusterID)
-		if tags, ok := args["tags"]; !ok || convert.ToString(tags) == "" {
-			args["tags"] = tagValue
-		} else {
-			args["tags"] = convert.ToString(tags) + "," + tagValue
+func addAwsClusterOwnedTag(args map[string]any, clusterID string) {
+	tagValue := fmt.Sprintf("kubernetes.io/cluster/%s,owned", clusterID)
+	if tags, ok := args["tags"]; !ok || convert.ToString(tags) == "" {
+		args["tags"] = tagValue
+	} else {
+		tagString := convert.ToString(tags)
+		if !strings.Contains(tagString, "kubernetes.io/cluster/") {
+			logrus.Tracef("Adding %s to machine args", tagValue)
+			args["tags"] = tagString + "," + tagValue
 		}
+	}
+}
+
+func toArgs(driverName string, args map[string]any, clusterID string) (cmd []string) {
+	if driverName == "amazonec2" {
+		addAwsClusterOwnedTag(args, clusterID)
 	}
 
 	for k, v := range args {
