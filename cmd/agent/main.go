@@ -24,16 +24,18 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/hashicorp/go-multierror"
 	"github.com/mattn/go-colorable"
+	"github.com/rancher/remotedialer"
+	"github.com/rancher/wrangler/pkg/signals"
+	"github.com/sirupsen/logrus"
+
 	"github.com/rancher/rancher/pkg/agent/clean"
+	"github.com/rancher/rancher/pkg/agent/clean/adunmigration"
 	"github.com/rancher/rancher/pkg/agent/cluster"
 	"github.com/rancher/rancher/pkg/agent/node"
 	"github.com/rancher/rancher/pkg/agent/rancher"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/logserver"
 	"github.com/rancher/rancher/pkg/rkenodeconfigclient"
-	"github.com/rancher/remotedialer"
-	"github.com/rancher/wrangler/pkg/signals"
-	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -78,6 +80,10 @@ func main() {
 				bindingErr = multierror.Append(bindingErr, err)
 			}
 			err = bindingErr
+		} else if os.Getenv("AD_GUID_CLEANUP") == "true" {
+			dryrun := os.Getenv("DRY_RUN") == "true"
+			deleteMissingUsers := os.Getenv("AD_DELETE_MISSING_GUID_USERS") == "true"
+			err = adunmigration.UnmigrateAdGUIDUsers(nil, dryrun, deleteMissingUsers)
 		} else {
 			err = run(ctx)
 		}
