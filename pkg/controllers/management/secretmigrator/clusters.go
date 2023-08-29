@@ -645,7 +645,8 @@ func cleanQuestions(cluster *apimgmtv3.Cluster) {
 			}
 			delete(answers.Values, key)
 		}
-		if cluster.Spec.RancherKubernetesEngineConfig.CloudProvider.VsphereCloudProvider != nil {
+		if cluster.Spec.RancherKubernetesEngineConfig != nil &&
+			cluster.Spec.RancherKubernetesEngineConfig.CloudProvider.VsphereCloudProvider != nil {
 			vcenters := cluster.Spec.RancherKubernetesEngineConfig.CloudProvider.VsphereCloudProvider.VirtualCenter
 			for k := range vcenters {
 				key := fmt.Sprintf(VcenterAnswersPath, k)
