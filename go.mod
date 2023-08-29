@@ -121,7 +121,6 @@ require (
 	github.com/rancher/norman v0.0.0-20230831160711-5de27f66385d
 	github.com/rancher/rancher/pkg/apis v0.0.0
 	github.com/rancher/rancher/pkg/client v0.0.0
-	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 	github.com/rancher/remotedialer v0.3.0
 	github.com/rancher/rke v1.5.0-rc5
 	github.com/rancher/steve v0.0.0-20230901044548-5df31b9c15cc

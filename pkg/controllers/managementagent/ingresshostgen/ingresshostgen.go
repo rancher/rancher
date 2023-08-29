@@ -8,7 +8,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 
-	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/approuter"
 	"github.com/rancher/rancher/pkg/ingresswrapper"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -63,7 +62,7 @@ func (i *IngressHostGen) sync(key string, ingress ingresswrapper.Ingress) (runti
 
 	changed := false
 	for _, rule := range obj.Spec.Rules {
-		if (isGeneratedDomain(obj, rule.Host, ipDomain) || rule.Host == ipDomain) && rule.Host != xipHost && ipDomain != approuter.RdnsIPDomain {
+		if (isGeneratedDomain(obj, rule.Host, ipDomain) || rule.Host == ipDomain) && rule.Host != xipHost {
 			changed = true
 			break
 		}
