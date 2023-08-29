@@ -76,6 +76,8 @@ spec:
               #dryrun value: "true"
             #deletemissing - name: AD_DELETE_MISSING_GUID_USERS
               #deletemissing value: "true"
+            #- name: RANCHER_DEBUG
+            #  value: "true"
           image: agent_image
           imagePullPolicy: Always
           command: ["agent"]
