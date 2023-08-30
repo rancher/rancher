@@ -102,8 +102,7 @@ func migrateTokens(workunit *migrateUserWorkUnit, sc *config.ScaledContext, dryR
 	for _, userToken := range workunit.activeDirectoryTokens {
 		if dryRun {
 			logrus.Infof("[%v] DRY RUN: would migrate token '%v' from GUID principal '%v' to DN principal '%v'. "+
-				"Additionally, it would add an annotation, %v, indicating the former principalID of this token "+
-				"and a label, %v, to indicate that this token has been migrated",
+				"Would add annotation, %v, and label, %v, to indicate migration status",
 				migrateTokensOperation, userToken.Name, userToken.UserPrincipal.Name, dnPrincipalID, adGUIDMigrationAnnotation, adGUIDMigrationLabel)
 		} else {
 			err := updateToken(tokenInterface, userToken, dnPrincipalID, workunit.guid, workunit.originalUser, workunit.principal)

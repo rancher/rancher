@@ -13,7 +13,7 @@ import (
 )
 
 func describePlannedChanges(workunit migrateUserWorkUnit) {
-	logrus.Infof("DRY RUN: changes to user '%v' have NOT been saved.", workunit.originalUser.Name)
+	logrus.Debugf("[%v] DRY RUN: changes to user '%v' have NOT been saved.", migrateAdUserOperation, workunit.originalUser.Name)
 	if len(workunit.duplicateUsers) > 0 {
 		logrus.Infof("[%v] DRY RUN: duplicate users were identified", migrateAdUserOperation)
 		for _, duplicateUser := range workunit.duplicateUsers {
@@ -63,16 +63,16 @@ func replaceGUIDPrincipalWithDn(user *v3.User, dn string, guid string, dryRun bo
 	if dryRun {
 		// In dry run mode we will merely print the computed list and leave the original user object alone
 		logrus.Infof("[%v] DRY RUN: User '%v' with GUID '%v' would have new principals:", migrateAdUserOperation,
-			guid, user.Name)
+			user.Name, guid)
 		for _, principalID := range principalIDs {
-			logrus.Infof("[%v] DRY RUN:    '%v'", migrateAdUserOperation, principalID)
+			logrus.Infof("[%v] DRY RUN:   '%v'", migrateAdUserOperation, principalID)
 		}
 	} else {
 		user.PrincipalIDs = principalIDs
 		logrus.Debugf("[%v] User '%v' with GUID %v will have new principals:", migrateAdUserOperation,
-			guid, user.Name)
+			user.Name, guid)
 		for _, principalID := range user.PrincipalIDs {
-			logrus.Debugf("[%v]     '%v'", migrateAdUserOperation, principalID)
+			logrus.Debugf("[%v]    '%v'", migrateAdUserOperation, principalID)
 		}
 	}
 }
@@ -89,15 +89,6 @@ func isAdUser(user *v3.User) bool {
 func adPrincipalID(user *v3.User) string {
 	for _, principalID := range user.PrincipalIDs {
 		if strings.HasPrefix(principalID, activeDirectoryPrefix) {
-			return principalID
-		}
-	}
-	return ""
-}
-
-func localPrincipalID(user *v3.User) string {
-	for _, principalID := range user.PrincipalIDs {
-		if strings.HasPrefix(principalID, localPrefix) {
 			return principalID
 		}
 	}
