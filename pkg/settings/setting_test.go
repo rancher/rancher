@@ -12,6 +12,25 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
+func TestFullShellImage(t *testing.T) {
+	originalShellImage := ShellImage.Get()
+	originalDefaultRegistry := SystemDefaultRegistry.Get()
+
+	err := ShellImage.Set("image")
+	assert.NoError(t, err)
+	err = SystemDefaultRegistry.Set("")
+	assert.NoError(t, err)
+	assert.Equal(t, "image", FullShellImage())
+	SystemDefaultRegistry.Set("prefix")
+	assert.Equal(t, "prefix/image", FullShellImage())
+
+	// Reset the settings for other tests
+	err = ShellImage.Set(originalShellImage)
+	assert.NoError(t, err)
+	err = SystemDefaultRegistry.Set(originalDefaultRegistry)
+	assert.NoError(t, err)
+}
+
 func TestIsRelease(t *testing.T) {
 	inputs := map[string]bool{
 		"dev":         false,
@@ -55,7 +74,6 @@ func TestSystemDefaultRegistryDefault(t *testing.T) {
 	if got != expect {
 		t.Errorf("The System Default Registry of %q is not the expected value %q", got, expect)
 	}
-
 }
 
 // TestSystemFeatureChartRefreshSecondsDefault tests that the default refresh time is either
@@ -127,5 +145,44 @@ func TestGetMachineProvisionImagePullPolicy(t *testing.T) {
 			got := GetMachineProvisionImagePullPolicy()
 			assert.Equalf(t, v.expected, got, fmt.Sprintf("test GetMachineProvisionImagePullPolicy() case: %s, input: %s failed with value: %s, expecting: %s", v.name, v.input, got, v.expected))
 		})
+	}
+}
+
+func TestGetInt(t *testing.T) {
+	t.Parallel()
+	fakeIntSetting := NewSetting("int", "1")
+	fakeStringSetting := NewSetting("string", "one")
+
+	err := fakeIntSetting.Set("2")
+	assert.NoError(t, err)
+	assert.Equal(t, 2, fakeIntSetting.GetInt())
+
+	err = fakeIntSetting.Set("two")
+	assert.NoError(t, err)
+	assert.Equal(t, 1, fakeIntSetting.GetInt())
+
+	err = fakeStringSetting.Set("2")
+	assert.NoError(t, err)
+	assert.Equal(t, 2, fakeStringSetting.GetInt())
+
+	err = fakeStringSetting.Set("two")
+	assert.NoError(t, err)
+	assert.Equal(t, 0, fakeStringSetting.GetInt())
+}
+
+func TestGetRancherVersion(t *testing.T) {
+	inputs := map[string]string{
+		"dev-version":    RancherVersionDev,
+		"master-version": RancherVersionDev,
+		"version-head":   RancherVersionDev,
+		"v2.7.X":         "2.7.X",
+		"2.7.X":          "2.7.X",
+	}
+
+	for key, value := range inputs {
+		err := ServerVersion.Set(key)
+		assert.NoError(t, err)
+		result := GetRancherVersion()
+		assert.Equal(t, value, result)
 	}
 }
