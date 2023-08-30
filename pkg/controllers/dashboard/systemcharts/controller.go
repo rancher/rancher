@@ -31,10 +31,9 @@ var (
 		chart.ProvisioningCAPIChartName: "rancher/mirrored-cluster-api-controller",
 	}
 	watchedSettings = map[string]struct{}{
-		settings.RancherWebhookMinVersion.Name: {},
-		settings.RancherWebhookVersion.Name:    {},
-		settings.SystemDefaultRegistry.Name:    {},
-		settings.ShellImage.Name:               {},
+		settings.RancherWebhookVersion.Name: {},
+		settings.SystemDefaultRegistry.Name: {},
+		settings.ShellImage.Name:            {},
 	}
 )
 
@@ -122,9 +121,6 @@ func (h *handler) onRepo(key string, repo *catalog.ClusterRepo) (*catalog.Cluste
 		// chart definition, but is now part of the chart definition
 		minVersion := chartDef.MinVersionSetting.Get()
 		exactVersion := chartDef.ExactVersionSetting.Get()
-		if chartDef.ChartName == chart.WebhookChartName && minVersion != "" {
-			exactVersion = ""
-		}
 		forceAdopt := chartDef.ChartName == chart.WebhookChartName || chartDef.ChartName == chart.ProvisioningCAPIChartName
 		if err := h.manager.Ensure(chartDef.ReleaseNamespace, chartDef.ChartName, minVersion, exactVersion, values, forceAdopt, installImageOverride); err != nil {
 			return repo, err
@@ -139,7 +135,6 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 		{
 			ReleaseNamespace:    namespace.System,
 			ChartName:           chart.WebhookChartName,
-			MinVersionSetting:   settings.RancherWebhookMinVersion,
 			ExactVersionSetting: settings.RancherWebhookVersion,
 			Values: func() map[string]interface{} {
 				values := map[string]interface{}{

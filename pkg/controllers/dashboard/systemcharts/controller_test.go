@@ -35,10 +35,9 @@ var (
 			chart.WebhookChartName: testYAML,
 		},
 	}
-	emptyConfig        = &v1.ConfigMap{}
-	originalMinVersion = settings.RancherWebhookMinVersion.Get()
-	originalVersion    = settings.RancherWebhookVersion.Get()
-	originalMCM        = features.MCM.Enabled()
+	emptyConfig     = &v1.ConfigMap{}
+	originalVersion = settings.RancherWebhookVersion.Get()
+	originalMCM     = features.MCM.Enabled()
 )
 
 const testYAML = `---
@@ -235,63 +234,6 @@ func Test_ChartInstallation(t *testing.T) {
 			registryOverride: "rancher-test.io",
 		},
 		{
-			name: "installation with min version override",
-			setup: func(mocks testMocks) {
-				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
-				mocks.configCache.EXPECT().Get(gomock.Any(), chart.CustomValueMapName).Return(emptyConfig, nil).Times(4)
-				settings.RancherWebhookMinVersion.Set("2.0.1")
-				settings.RancherWebhookVersion.Set("2.0.4")
-				expectedValues := map[string]interface{}{
-					"capi": map[string]interface{}{
-						"enabled": false,
-					},
-					"mcm": map[string]interface{}{
-						"enabled": features.MCM.Enabled(),
-					},
-					"global": map[string]interface{}{
-						"cattle": map[string]interface{}{
-							"systemDefaultRegistry": "",
-						},
-					},
-					"image": map[string]interface{}{
-						"repository": "rancher-test.io/rancher/rancher-webhook",
-					},
-				}
-				mocks.manager.EXPECT().Ensure(
-					namespace.System,
-					"rancher-webhook",
-					"2.0.1",
-					"",
-					expectedValues,
-					gomock.AssignableToTypeOf(false),
-					"rancher-test.io/"+settings.ShellImage.Get(),
-				).Return(nil)
-
-				expectedProvCAPIValues := map[string]interface{}{
-					"global": map[string]interface{}{
-						"cattle": map[string]interface{}{
-							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
-						},
-					},
-					"image": map[string]interface{}{
-						"repository": "rancher-test.io/rancher/mirrored-cluster-api-controller",
-					},
-				}
-				mocks.manager.EXPECT().Ensure(
-					namespace.ProvisioningCAPINamespace,
-					"rancher-provisioning-capi",
-					"",
-					"",
-					expectedProvCAPIValues,
-					gomock.AssignableToTypeOf(false),
-					"rancher-test.io/"+settings.ShellImage.Get(),
-				).Return(nil)
-
-				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
-			},
-			registryOverride: "rancher-test.io",
-		},
-		{
 			name: "installation with webhook values",
 			setup: func(mocks testMocks) {
 				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
@@ -344,7 +286,6 @@ func Test_ChartInstallation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// reset setting to default values before each test
-			settings.RancherWebhookMinVersion.Set(originalMinVersion)
 			settings.RancherWebhookVersion.Set(originalVersion)
 			features.MCM.Set(originalMCM)
 
@@ -477,13 +418,6 @@ func Test_relatedSettings(t *testing.T) {
 			name: "rancher version",
 			changedObj: &v3.Setting{ObjectMeta: metav1.ObjectMeta{
 				Name: settings.RancherWebhookVersion.Name,
-			}},
-			want: []relatedresource.Key{{Name: repoName, Namespace: ""}},
-		},
-		{
-			name: "rancher min version",
-			changedObj: &v3.Setting{ObjectMeta: metav1.ObjectMeta{
-				Name: settings.RancherWebhookMinVersion.Name,
 			}},
 			want: []relatedresource.Key{{Name: repoName, Namespace: ""}},
 		},

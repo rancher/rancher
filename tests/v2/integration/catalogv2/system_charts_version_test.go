@@ -71,14 +71,12 @@ func (w *SystemChartsVersionSuite) SetupSuite() {
 	require.NoError(w.T(), err)
 
 	require.NoError(w.T(), w.updateSetting("rancher-webhook-version", w.latestWebhookVersion))
-	require.NoError(w.T(), w.updateSetting("rancher-webhook-min-version", ""))
 	require.NoError(w.T(), w.updateSetting("system-feature-chart-refresh-seconds", "10"))
 }
 
 func (w *SystemChartsVersionSuite) resetSettings() {
 	w.T().Helper()
 	require.NoError(w.T(), w.updateSetting("rancher-webhook-version", w.latestWebhookVersion))
-	require.NoError(w.T(), w.updateSetting("rancher-webhook-min-version", ""))
 	require.NoError(w.T(), w.updateSetting("system-feature-chart-refresh-seconds", "10"))
 
 	// need to recreate the rancher-webhook pod because there are rbac issues without doing so.
@@ -160,46 +158,6 @@ func (w *SystemChartsVersionSuite) TestInstallWebhook() {
 		}
 		if v := newRelease.Chart.Metadata.Version; v != exactVersion {
 			w.T().Logf("%s version %s does not yet match expected %s", newRelease.Chart.Name(), v, exactVersion)
-			return false, nil
-		}
-		return true, nil
-	})
-	w.Require().NoError(err)
-}
-
-// TODO (maxsokolovsky) remove once the rancher-webhook-min-version setting is fully removed.
-func (w *SystemChartsVersionSuite) TestInstallWebhookMinVersion() {
-	defer w.resetSettings()
-
-	const minVersion = "2.0.3+up0.3.3"
-	w.Require().NoError(w.uninstallApp("cattle-system", "rancher-webhook"))
-	w.Require().NoError(w.updateSetting("rancher-webhook-min-version", minVersion))
-
-	watcher, err := w.catalogClient.Apps("cattle-system").Watch(context.TODO(), metav1.ListOptions{
-		FieldSelector:  "metadata.name=" + "rancher-webhook",
-		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
-	})
-	w.Require().NoError(err)
-
-	err = wait.WatchWait(watcher, func(event watch.Event) (ready bool, err error) {
-		if event.Type == watch.Error {
-			return false, fmt.Errorf("there was an error installing the rancher-webhook chart")
-		} else if event.Type == watch.Added {
-			return true, nil
-		}
-		return false, nil
-	})
-	w.Require().NoError(err)
-
-	// Allow the new release to fully deploy. Otherwise, the client won't find it among current releases.
-	var newRelease *release.Release
-	err = kwait.Poll(10*time.Second, 2*time.Minute, func() (done bool, err error) {
-		newRelease, err = w.fetchRelease("cattle-system", "rancher-webhook")
-		if err != nil {
-			return false, nil
-		}
-		if v := newRelease.Chart.Metadata.Version; v != w.latestWebhookVersion {
-			w.T().Logf("%s version %s does not yet match expected %s", newRelease.Chart.Name(), v, w.latestWebhookVersion)
 			return false, nil
 		}
 		return true, nil
