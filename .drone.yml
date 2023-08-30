@@ -1664,7 +1664,7 @@ platform:
 
 steps:
 - name: docker-image-promote
-  image: quay.io/skopeo/stable:v1.1.1
+  image: quay.io/skopeo/stable:v1.13.2
   commands:
   - echo $${DOCKER_PASSWORD} | skopeo login docker.io --username $${DOCKER_USERNAME} --password-stdin
   - skopeo copy docker://rancher/rancher:$${SOURCE_TAG} docker://rancher/rancher:$${DESTINATION_TAG} --all
