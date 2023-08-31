@@ -17,7 +17,7 @@ node {
   if ("${env.CUSTODIAN_YAML}" != "null" && "${env.CUSTODIAN_YAML}" != "") {
     yamlToRun="${env.CUSTODIAN_YAML}"
   }
-  def branch = "release/v2.7"
+  def branch = "release/v2.8"
   if ("${env.branch}" != "null" && "${env.branch}" != "") {
     branch = "${env.branch}"
   }
