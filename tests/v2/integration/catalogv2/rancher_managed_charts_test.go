@@ -31,6 +31,8 @@ import (
 	"time"
 )
 
+var propagation = metav1.DeletePropagationForeground
+
 type RancherManagedChartsTest struct {
 	suite.Suite
 	client           *rancher.Client
@@ -39,6 +41,8 @@ type RancherManagedChartsTest struct {
 	catalogClient    *catalog.Client
 	cluster          *client.Cluster
 	corev1           corev1.CoreV1Interface
+	originalBranch   string
+	originalGitRepo  string
 }
 
 func (w *RancherManagedChartsTest) TearDownSuite() {
@@ -74,22 +78,42 @@ func (w *RancherManagedChartsTest) SetupSuite() {
 	require.NoError(w.T(), err)
 	w.cluster = c
 	w.Require().NoError(w.updateSetting("system-managed-charts-operation-timeout", "50s"))
+	clusterRepo, err := w.catalogClient.ClusterRepos().Get(context.TODO(), "rancher-charts", metav1.GetOptions{})
+	w.Require().NoError(err)
+	w.originalBranch = clusterRepo.Spec.GitBranch
+	w.originalGitRepo = clusterRepo.Spec.GitRepo
 }
 
 func (w *RancherManagedChartsTest) resetSettings() {
-	w.T().Helper()
-	w.Require().NoError(w.catalogClient.Operations("cattle-system").DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{}))
 	w.Require().NoError(w.resetManagementCluster())
+	list, err := w.catalogClient.Operations("cattle-system").List(context.TODO(), metav1.ListOptions{})
+	w.Require().NoError(err)
+	for _, item := range list.Items {
+		if item.Status.Release == "rancher-aks-operator" || item.Status.Release == "rancher-aks-operator-crd" {
+			w.Require().NoError(w.catalogClient.Operations("cattle-system").Delete(context.TODO(), item.Name, metav1.DeleteOptions{PropagationPolicy: &propagation}))
+		}
+	}
+	err = kwait.Poll(2*time.Second, time.Minute, func() (done bool, err error) {
+		list, err := w.catalogClient.Operations("cattle-system").List(context.TODO(), metav1.ListOptions{})
+		w.Require().NoError(err)
+		for _, item := range list.Items {
+			if item.Status.Release == "rancher-aks-operator" || item.Status.Release == "rancher-aks-operator-crd" {
+				return false, nil
+			}
+		}
+		return true, nil
+	})
+	w.Require().NoError(err)
 	w.Require().NoError(w.uninstallApp("cattle-system", "rancher-aks-operator"))
 	w.Require().NoError(w.uninstallApp("cattle-system", "rancher-aks-operator-crd"))
 	clusterRepo, err := w.catalogClient.ClusterRepos().Get(context.TODO(), "rancher-charts", metav1.GetOptions{})
 	w.Require().NoError(err)
-	if clusterRepo.Spec.GitRepo != "https://github.com/rancher/charts" || clusterRepo.Spec.GitBranch != "release-v2.7" {
-		clusterRepo.Spec.GitRepo = "https://github.com/rancher/charts"
-		clusterRepo.Spec.GitBranch = "release-v2.7"
+	if clusterRepo.Spec.GitRepo != w.originalGitRepo {
+		clusterRepo.Spec.GitRepo = w.originalGitRepo
+		clusterRepo.Spec.GitBranch = w.originalBranch
+		downloadTime := clusterRepo.Status.DownloadTime
 		clusterRepo, err = w.catalogClient.ClusterRepos().Update(context.TODO(), clusterRepo, metav1.UpdateOptions{})
 		w.Require().NoError(err)
-		downloadTime := clusterRepo.Status.DownloadTime
 		w.Require().NoError(w.pollUntilDownloaded("rancher-charts", downloadTime))
 	}
 }
@@ -118,12 +142,15 @@ func (w *RancherManagedChartsTest) TestUpgradeChartToLatestVersion() {
 	w.Require().NoError(err)
 	origCfg := cfgMap.DeepCopy()
 
-	// GETTING INDEX FROM CONFIGMAP AND MODIFYING iT
+	// GETTING INDEX FROM CONFIGMAP AND MODIFYING IT
 	latestVersion := w.updateConfigMap(cfgMap)
 
 	//UPDATING THE CONFIGMAP
 	cfgMap, err = w.corev1.ConfigMaps(clusterRepo.Status.IndexConfigMapNamespace).Update(context.TODO(), cfgMap, metav1.UpdateOptions{})
 	w.Require().NoError(err)
+
+	//KWait for config map to be updated
+	w.Require().NoError(w.WaitForConfigMap(clusterRepo.Status.IndexConfigMapNamespace, clusterRepo.Status.IndexConfigMapName, latestVersion))
 
 	//Updating the cluster
 	w.Require().NoError(w.updateManagementCluster())
@@ -156,6 +183,9 @@ func (w *RancherManagedChartsTest) TestUpgradeChartToLatestVersion() {
 func (w *RancherManagedChartsTest) TestUpgradeToWorkingVersion() {
 	defer w.resetSettings()
 	ctx := context.Background()
+	w.Require().Nil(w.cluster.AKSConfig)
+	_, err := w.catalogClient.Apps("cattle-system").Get(ctx, "rancher-aks-charts", metav1.GetOptions{})
+	w.Require().Error(err)
 
 	clusterRepo, err := w.catalogClient.ClusterRepos().Get(ctx, "rancher-charts", metav1.GetOptions{})
 	w.Require().NoError(err)
@@ -163,7 +193,6 @@ func (w *RancherManagedChartsTest) TestUpgradeToWorkingVersion() {
 	clusterRepo.Spec.GitBranch = "aks-integration-test-1"
 	clusterRepo, err = w.catalogClient.ClusterRepos().Update(ctx, clusterRepo, metav1.UpdateOptions{})
 	w.Require().NoError(err)
-
 	downloadTime := clusterRepo.Status.DownloadTime
 	w.Require().NoError(w.pollUntilDownloaded("rancher-charts", downloadTime))
 	cfgMap, err := w.corev1.ConfigMaps(clusterRepo.Status.IndexConfigMapNamespace).Get(context.TODO(), clusterRepo.Status.IndexConfigMapName, metav1.GetOptions{})
@@ -172,22 +201,21 @@ func (w *RancherManagedChartsTest) TestUpgradeToWorkingVersion() {
 
 	// GETTING INDEX FROM CONFIGMAP AND MODIFYING iT
 	latestVersion := w.updateConfigMap(cfgMap)
-
 	//UPDATING THE CONFIGMAP
 	cfgMap, err = w.corev1.ConfigMaps(clusterRepo.Status.IndexConfigMapNamespace).Update(context.TODO(), cfgMap, metav1.UpdateOptions{})
 	w.Require().NoError(err)
 
-	ops := w.catalogClient.Operations("cattle-system")
-	list, err := ops.List(ctx, metav1.ListOptions{})
+	//KWait for config map to be updated
+	w.Require().NoError(w.WaitForConfigMap(clusterRepo.Status.IndexConfigMapNamespace, clusterRepo.Status.IndexConfigMapName, latestVersion))
+	list, err := w.catalogClient.Operations("cattle-system").List(ctx, metav1.ListOptions{})
 	w.Require().NoError(err)
 	numberOfOps := countNumberOfOperations(list, "rancher-aks-operator", time.Now())
-
 	//Updating the cluster
 	w.Require().NoError(w.updateManagementCluster())
 
 	_, at, err := w.waitForAksChart(rv1.StatusFailed, "rancher-aks-operator", 0)
 	w.Require().NoError(err)
-	list, err = ops.List(ctx, metav1.ListOptions{})
+	list, err = w.catalogClient.Operations("cattle-system").List(ctx, metav1.ListOptions{})
 	w.Require().NoError(err)
 	w.Require().Equal(numberOfOps+1, countNumberOfOperations(list, "rancher-aks-operator", at))
 
@@ -195,7 +223,6 @@ func (w *RancherManagedChartsTest) TestUpgradeToWorkingVersion() {
 	cfgMap.BinaryData["content"] = origCfg.BinaryData["content"]
 	cfgMap, err = w.corev1.ConfigMaps(clusterRepo.Status.IndexConfigMapNamespace).Update(context.TODO(), cfgMap, metav1.UpdateOptions{})
 	w.Require().NoError(err)
-
 	clusterRepo, err = w.catalogClient.ClusterRepos().Get(ctx, "rancher-charts", metav1.GetOptions{})
 	w.Require().NoError(err)
 	clusterRepo.Spec.ForceUpdate = &metav1.Time{Time: time.Now()}
@@ -225,10 +252,13 @@ func (w *RancherManagedChartsTest) TestUpgradeToBrokenVersion() {
 	origCfg := cfgMap.DeepCopy()
 
 	// GETTING INDEX FROM CONFIGMAP AND MODIFYING iT
-	_ = w.updateConfigMap(cfgMap)
+	latestVersion := w.updateConfigMap(cfgMap)
 	//UPDATING THE CONFIGMAP
 	cfgMap, err = w.corev1.ConfigMaps(clusterRepo.Status.IndexConfigMapNamespace).Update(context.TODO(), cfgMap, metav1.UpdateOptions{})
 	w.Require().NoError(err)
+
+	//KWait for config map to be updated
+	w.Require().NoError(w.WaitForConfigMap(clusterRepo.Status.IndexConfigMapNamespace, clusterRepo.Status.IndexConfigMapName, latestVersion))
 
 	//Updating the cluster
 	w.Require().NoError(w.updateManagementCluster())
@@ -269,6 +299,22 @@ func countNumberOfOperations(ops *rv1.OperationList, name string, at time.Time) 
 	return count
 }
 
+func (w *RancherManagedChartsTest) WaitForConfigMap(namespace, name, latestVersion string) error {
+	return kwait.Poll(1*time.Second, 3*time.Minute, func() (done bool, err error) {
+		cfgMap, err := w.corev1.ConfigMaps(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+		w.Require().NoError(err)
+		gz, err := gzip.NewReader(bytes.NewBuffer(cfgMap.BinaryData["content"]))
+		w.Require().NoError(err)
+		defer gz.Close()
+		data, err := io.ReadAll(gz)
+		w.Require().NoError(err)
+		index := &repo.IndexFile{}
+		w.Require().NoError(json.Unmarshal(data, index))
+		index.SortEntries()
+		return index.Entries["rancher-aks-operator"][0].Version < latestVersion, nil
+	})
+}
+
 func (w *RancherManagedChartsTest) updateConfigMap(cfgMap *v1.ConfigMap) string {
 	gz, err := gzip.NewReader(bytes.NewBuffer(cfgMap.BinaryData["content"]))
 	w.Require().NoError(err)
@@ -304,28 +350,42 @@ func (w *RancherManagedChartsTest) waitForAksChart(status rv1.Status, name strin
 		if err != nil {
 			return false, err
 		}
-
 		if app.Spec.Info.Status == status && app.Spec.Version > previousVersion {
-			at = time.Now().UTC()
+			at = time.Now().Add(-(2 * PollInterval)).UTC()
 			return true, nil
 		}
 		return false, nil
 	})
+	w.Require().NoError(err)
 	return app, at, err
 }
 
 func (w *RancherManagedChartsTest) updateManagementCluster() error {
 	w.cluster.AKSConfig = &client.AKSClusterConfigSpec{}
-	_, err := w.client.Management.Cluster.Replace(w.cluster)
+	c, err := w.client.Management.Cluster.Replace(w.cluster)
+	w.cluster = c
 	return err
 }
 
 func (w *RancherManagedChartsTest) resetManagementCluster() error {
+	err := kwait.Poll(5*time.Second, 2*time.Minute, func() (done bool, err error) {
+		list, err := w.corev1.Secrets("cattle-system").List(context.TODO(), metav1.ListOptions{LabelSelector: "name=rancher-aks-operator"})
+		w.Require().NoError(err)
+		if len(list.Items) == 0 {
+			return true, nil
+		}
+		for _, s := range list.Items {
+			w.Require().NoError(w.corev1.Secrets("cattle-system").Delete(context.Background(), s.Name, metav1.DeleteOptions{PropagationPolicy: &propagation}))
+		}
+		return false, nil
+	})
+	w.Require().NoError(err)
 	w.cluster.AKSConfig = nil
 	w.cluster.AppliedSpec.AKSConfig = nil
-	_, err := w.client.Management.Cluster.Replace(w.cluster)
-	err = kwait.Poll(2*time.Second, time.Minute, func() (done bool, err error) {
-		c, err := w.client.Management.Cluster.ByID("local")
+	c, err := w.client.Management.Cluster.Replace(w.cluster)
+	w.Require().NoError(err)
+	err = kwait.Poll(5*time.Second, 2*time.Minute, func() (done bool, err error) {
+		c, err = w.client.Management.Cluster.ByID("local")
 		if err != nil {
 			return false, err
 		}
@@ -334,6 +394,7 @@ func (w *RancherManagedChartsTest) resetManagementCluster() error {
 		}
 		return false, nil
 	})
+	w.cluster = c
 	return err
 }
 
@@ -360,9 +421,9 @@ func (w *RancherManagedChartsTest) uninstallApp(namespace, chartName string) err
 		return err
 	}
 	l := action.NewList(&cfg)
-	releases, err := l.Run()
-	l.StateMask = action.ListAll
+	l.All = true
 	l.SetStateMask()
+	releases, err := l.Run()
 	if err != nil {
 		return fmt.Errorf("failed to fetch all releases in the %s namespace: %w", namespace, err)
 	}
@@ -371,12 +432,13 @@ func (w *RancherManagedChartsTest) uninstallApp(namespace, chartName string) err
 			err = kwait.Poll(10*time.Second, time.Minute, func() (done bool, err error) {
 				act := action.NewUninstall(&cfg)
 				act.Wait = true
+				act.Timeout = time.Minute
 				if _, err = act.Run(r.Name); err != nil {
 					return false, nil
 				}
 				return true, nil
 			})
-			return err
+			w.Require().NoError(err)
 		}
 	}
 	return nil
@@ -396,6 +458,5 @@ func (w *RancherManagedChartsTest) pollUntilDownloaded(ClusterRepoName string, p
 
 		return clusterRepo.Status.DownloadTime != prevDownloadTime, nil
 	})
-
 	return err
 }
