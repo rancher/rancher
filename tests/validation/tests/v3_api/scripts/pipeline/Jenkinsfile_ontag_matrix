@@ -40,7 +40,7 @@ if ( true == via_webhook() && (!(rancher_version ==~ rancher_version_regex)) ) {
   currentBuild.result = lastBuildResult()
 } else {
   if (rancher_version.startsWith("v2.2") || rancher_version.startsWith("v2.3") || rancher_version == "master-head") {
-    branch = "release/v2.6"
+    branch = "release/v2.8"
   }
   if (env.BRANCH) {
     branch = "${BRANCH}"

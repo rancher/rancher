@@ -54,7 +54,7 @@ if ( true == via_webhook() && (!(rancher_version ==~ rancher_version_regex)) ) {
 } else {
   def branch = "v2.1"
   if (rancher_version.startsWith("v2.2") || rancher_version == "master" ) {
-    branch = "release/v2.6"
+    branch = "release/v2.8"
   }
   node {
     wrap([$class: 'AnsiColorBuildWrapper', 'colorMapName': 'XTerm', 'defaultFg': 2, 'defaultBg':1]) {
