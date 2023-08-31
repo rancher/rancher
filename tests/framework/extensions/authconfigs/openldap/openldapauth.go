@@ -14,7 +14,8 @@ type OpenLDAPCredentialConfig struct {
 	UserSearchBase                  string   `json:"userSearchBase"`
 	Port                            int      `json:"port"`
 	TLS                             bool     `json:"tls"`
-	// Certificate would typically be loaded from a file or another source. Commenting out for this example.
+	// Certificate would typically be loaded from a file or another source - commenting out til openldap
+	// is configured with a cert
 	// Certificate                  string `json:"certificate"`
 	TestUsername string `json:"testUsername"`
 	TestPassword string `json:"testPassword"`
@@ -48,3 +49,11 @@ func CreateOpenLDAPAuthConfig(rancherClient *rancher.Client) (*management.AuthCo
 	}
 	return resp, nil
 }
+
+//check how the do was done for tokens - do action?
+//change it to doaction and use the config that israel sent me.
+//authprovider
+//openldap_test
+//use go freefrom job to test on jenkins to see it running
+//might have to add a build tag
+//use the jenkins job to add to go job with create cluster.
