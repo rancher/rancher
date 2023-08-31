@@ -79,68 +79,68 @@ func (rb *PSATestSuite) SetupSuite() {
 	rb.psaRole = psaRollUpdate
 }
 
-func (rb *PSATestSuite) ValidatePSA(role string, customRole bool) {
+func (rb *PSATestSuite) validatePSA(t *testing.T, role string, customRole bool) {
 	labels := map[string]string{
 		psaWarn:    pssPrivilegedPolicy,
 		psaEnforce: pssPrivilegedPolicy,
 		psaAudit:   pssPrivilegedPolicy,
 	}
 
-	rb.T().Logf("Validate updating the PSA labels as %v", role)
+	t.Logf("Validate updating the PSA labels as %v", role)
 
 	updateNS, err := getAndConvertNamespace(rb.adminNamespace, rb.steveAdminClient)
-	require.NoError(rb.T(), err)
+	require.NoError(t, err)
 	updateNS.Labels = labels
 
 	response, err := rb.steveNonAdminClient.SteveType(namespaces.NamespaceSteveType).Update(rb.adminNamespace, updateNS)
 
 	switch role {
 	case restrictedAdmin, roleOwner:
-		require.NoError(rb.T(), err)
+		require.NoError(t, err)
 		expectedLabels := getPSALabels(response, labels)
-		assert.Equal(rb.T(), labels, expectedLabels)
+		assert.Equal(t, labels, expectedLabels)
 	case roleMember, roleProjectReadOnly:
-		require.Error(rb.T(), err)
+		require.Error(t, err)
 		errMessage := strings.Split(err.Error(), ":")[0]
-		assert.Equal(rb.T(), "Resource type [namespace] is not updatable", errMessage)
+		assert.Equal(t, "Resource type [namespace] is not updatable", errMessage)
 	case roleProjectOwner, roleProjectMember, roleCustomCreateNS:
-		require.Error(rb.T(), err)
+		require.Error(t, err)
 		errStatus := strings.Split(err.Error(), ".")[1]
 		rgx := regexp.MustCompile(`\[(.*?)\]`)
 		errorMsg := rgx.FindStringSubmatch(errStatus)
-		assert.Equal(rb.T(), "403 Forbidden", errorMsg[1])
+		assert.Equal(t, "403 Forbidden", errorMsg[1])
 	}
 
-	rb.T().Logf("Validate deletion of the PSA labels as %v", role)
+	t.Logf("Validate deletion of the PSA labels as %v", role)
 
 	deleteLabels(labels)
 
 	deleteLabelsNS, err := getAndConvertNamespace(rb.adminNamespace, rb.steveAdminClient)
-	require.NoError(rb.T(), err)
+	require.NoError(t, err)
 	deleteLabelsNS.Labels = labels
 
 	_, err = rb.steveNonAdminClient.SteveType(namespaces.NamespaceSteveType).Update(rb.adminNamespace, deleteLabelsNS)
 	switch role {
 	case restrictedAdmin, roleOwner:
-		require.NoError(rb.T(), err)
+		require.NoError(t, err)
 		expectedLabels := getPSALabels(response, labels)
-		assert.Equal(rb.T(), 0, len(expectedLabels))
+		assert.Equal(t, 0, len(expectedLabels))
 		if !customRole {
 			_, err = createDeploymentAndWait(rb.steveNonAdminClient, rb.client, rb.cluster.ID, containerName, containerImage, rb.adminNamespace.Name)
-			require.NoError(rb.T(), err)
+			require.NoError(t, err)
 		}
 	case roleMember, roleProjectReadOnly:
-		require.Error(rb.T(), err)
+		require.Error(t, err)
 		errMessage := strings.Split(err.Error(), ":")[0]
-		assert.Equal(rb.T(), "Resource type [namespace] is not updatable", errMessage)
+		assert.Equal(t, "Resource type [namespace] is not updatable", errMessage)
 	case roleProjectOwner, roleProjectMember, roleCustomCreateNS:
 		errStatus := strings.Split(err.Error(), ".")[1]
 		rgx := regexp.MustCompile(`\[(.*?)\]`)
 		errorMsg := rgx.FindStringSubmatch(errStatus)
-		assert.Equal(rb.T(), "403 Forbidden", errorMsg[1])
+		assert.Equal(t, "403 Forbidden", errorMsg[1])
 	}
 
-	rb.T().Logf("Validate creation of new namespace with PSA labels as %v", role)
+	t.Logf("Validate creation of new namespace with PSA labels as %v", role)
 
 	labels = map[string]string{
 		psaWarn:    pssBaselinePolicy,
@@ -152,126 +152,126 @@ func (rb *PSATestSuite) ValidatePSA(role string, customRole bool) {
 
 	switch role {
 	case restrictedAdmin, roleOwner:
-		require.NoError(rb.T(), err)
+		require.NoError(t, err)
 		expectedLabels := getPSALabels(response, labels)
-		assert.Equal(rb.T(), labels, expectedLabels)
+		assert.Equal(t, labels, expectedLabels)
 		if !customRole {
 			_, err = createDeploymentAndWait(rb.steveNonAdminClient, rb.client, rb.cluster.ID, containerName, containerImage, namespaceCreate.Name)
-			require.NoError(rb.T(), err)
+			require.NoError(t, err)
 		}
 	case roleProjectOwner, roleProjectMember, roleCustomCreateNS:
-		require.Error(rb.T(), err)
+		require.Error(t, err)
 		errStatus := strings.Split(err.Error(), ".")[1]
 		rgx := regexp.MustCompile(`\[(.*?)\]`)
 		errorMsg := rgx.FindStringSubmatch(errStatus)
-		assert.Equal(rb.T(), "403 Forbidden", errorMsg[1])
+		assert.Equal(t, "403 Forbidden", errorMsg[1])
 	case roleMember, roleProjectReadOnly:
-		require.Error(rb.T(), err)
+		require.Error(t, err)
 		errMessage := strings.Split(err.Error(), ":")[0]
-		assert.Equal(rb.T(), "Resource type [namespace] is not creatable", errMessage)
+		assert.Equal(t, "Resource type [namespace] is not creatable", errMessage)
 	}
 }
 
-func (rb *PSATestSuite) ValidateAdditionalPSA(role string) {
+func (rb *PSATestSuite) validateAdditionalPSA(t *testing.T, role string) {
 	createProjectAsNonAdmin, err := createProject(rb.nonAdminUserClient, rb.cluster.ID)
-	require.NoError(rb.T(), err)
+	require.NoError(t, err)
 	rb.stdUserProject = createProjectAsNonAdmin
 
 	relogin, err := rb.nonAdminUserClient.ReLogin()
-	require.NoError(rb.T(), err)
+	require.NoError(t, err)
 	rb.nonAdminUserClient = relogin
 
 	steveStdUserclient, err := rb.nonAdminUserClient.Steve.ProxyDownstream(rb.cluster.ID)
-	require.NoError(rb.T(), err)
+	require.NoError(t, err)
 	rb.steveNonAdminClient = steveStdUserclient
 
 	namespaceName := namegen.AppendRandomString("testns-")
 	createNamespace, err := namespaces.CreateNamespace(rb.nonAdminUserClient, namespaceName, "{}",
 		map[string]string{}, map[string]string{}, rb.stdUserProject)
-	require.NoError(rb.T(), err)
+	require.NoError(t, err)
 	rb.stdUserNamespace = createNamespace
 
-	rb.T().Logf("Validate editing new namespace in a cluster member created project with PSA labels as %v", role)
+	t.Logf("Validate editing new namespace in a cluster member created project with PSA labels as %v", role)
 	labels := map[string]string{
 		psaWarn:    pssRestrictedPolicy,
 		psaEnforce: pssRestrictedPolicy,
 		psaAudit:   pssRestrictedPolicy,
 	}
 	updateNS, err := getAndConvertNamespace(rb.stdUserNamespace, rb.steveAdminClient)
-	require.NoError(rb.T(), err)
+	require.NoError(t, err)
 	updateNS.Labels = labels
 
 	relogin, err = rb.nonAdminUserClient.ReLogin()
-	require.NoError(rb.T(), err)
+	require.NoError(t, err)
 	rb.nonAdminUserClient = relogin
 
 	steveStdUserclient, err = rb.nonAdminUserClient.Steve.ProxyDownstream(rb.cluster.ID)
-	require.NoError(rb.T(), err)
+	require.NoError(t, err)
 	rb.steveNonAdminClient = steveStdUserclient
 
 	response, err := rb.steveNonAdminClient.SteveType(namespaces.NamespaceSteveType).Update(rb.stdUserNamespace, updateNS)
 
 	switch role {
 	case roleOwner, psaRole:
-		require.NoError(rb.T(), err)
+		require.NoError(t, err)
 		expectedLabels := getPSALabels(response, labels)
-		assert.Equal(rb.T(), labels, expectedLabels)
+		assert.Equal(t, labels, expectedLabels)
 		_, err = createDeploymentAndWait(rb.steveNonAdminClient, rb.client, rb.cluster.ID, containerName, containerImage, rb.stdUserNamespace.Name)
-		require.Error(rb.T(), err)
+		require.Error(t, err)
 	case roleMember:
-		require.Error(rb.T(), err)
+		require.Error(t, err)
 		errStatus := strings.Split(err.Error(), ".")[1]
 		rgx := regexp.MustCompile(`\[(.*?)\]`)
 		errorMsg := rgx.FindStringSubmatch(errStatus)
-		assert.Equal(rb.T(), "403 Forbidden", errorMsg[1])
+		assert.Equal(t, "403 Forbidden", errorMsg[1])
 		updateNS, err := getAndConvertNamespace(rb.stdUserNamespace, rb.steveAdminClient)
-		require.NoError(rb.T(), err)
+		require.NoError(t, err)
 		updateNS.Labels = labels
 		_, err = rb.steveAdminClient.SteveType(namespaces.NamespaceSteveType).Update(rb.stdUserNamespace, updateNS)
-		require.NoError(rb.T(), err)
+		require.NoError(t, err)
 	}
 
-	rb.T().Logf("Validate deletion of PSA labels in namespace in a cluster member created project as %v", role)
+	t.Logf("Validate deletion of PSA labels in namespace in a cluster member created project as %v", role)
 
 	deleteLabels(labels)
 	deleteLabelsNS, err := getAndConvertNamespace(rb.stdUserNamespace, rb.steveAdminClient)
-	require.NoError(rb.T(), err)
+	require.NoError(t, err)
 	deleteLabelsNS.Labels = labels
 
 	_, err = rb.steveNonAdminClient.SteveType(namespaces.NamespaceSteveType).Update(rb.stdUserNamespace, deleteLabelsNS)
 
 	switch role {
 	case roleOwner, psaRole:
-		require.NoError(rb.T(), err)
+		require.NoError(t, err)
 		expectedLabels := getPSALabels(response, labels)
-		assert.Equal(rb.T(), labels, expectedLabels)
+		assert.Equal(t, labels, expectedLabels)
 		_, err = createDeploymentAndWait(rb.steveNonAdminClient, rb.client, rb.cluster.ID, containerName, containerImage, rb.stdUserNamespace.Name)
-		require.NoError(rb.T(), err)
+		require.NoError(t, err)
 	case roleMember:
-		require.Error(rb.T(), err)
+		require.Error(t, err)
 		errStatus := strings.Split(err.Error(), ".")[1]
 		rgx := regexp.MustCompile(`\[(.*?)\]`)
 		errorMsg := rgx.FindStringSubmatch(errStatus)
-		assert.Equal(rb.T(), "403 Forbidden", errorMsg[1])
+		assert.Equal(t, "403 Forbidden", errorMsg[1])
 	}
 }
 
-func (rb *PSATestSuite) ValidateEditPsactCluster(role string, psact string) {
+func (rb *PSATestSuite) validateEditPsactCluster(t *testing.T, role string, psact string) {
 	clusterType, err := editPsactCluster(rb.nonAdminUserClient, rb.clusterName, defaultNamespace, psact)
 	switch role {
 	case roleOwner, restrictedAdmin:
-		require.NoError(rb.T(), err)
+		require.NoError(t, err)
 		err = psadeploy.CreateNginxDeployment(rb.nonAdminUserClient, rb.clusterID, psact)
-		require.NoError(rb.T(), err)
+		require.NoError(t, err)
 	case roleMember, roleProjectOwner, roleProjectMember, roleProjectReadOnly:
-		require.Error(rb.T(), err)
+		require.Error(t, err)
 		if clusterType == "RKE2K3S" {
-			assert.Equal(rb.T(), "Resource type [provisioning.cattle.io.cluster] is not updatable", err.Error())
+			assert.Equal(t, "Resource type [provisioning.cattle.io.cluster] is not updatable", err.Error())
 		} else {
 			errStatus := strings.Split(err.Error(), ".")[1]
 			rgx := regexp.MustCompile(`\[(.*?)\]`)
 			errorMsg := rgx.FindStringSubmatch(errStatus)
-			assert.Equal(rb.T(), "403 Forbidden", errorMsg[1])
+			assert.Equal(t, "403 Forbidden", errorMsg[1])
 		}
 	}
 }
@@ -344,12 +344,12 @@ func (rb *PSATestSuite) TestPSA() {
 
 		rb.Run("Testcase - Validate if members with roles "+role+"can add/edit/delete labesl from admin created namespace", func() {
 
-			rb.ValidatePSA(role, customRole)
+			rb.validatePSA(rb.T(), role, customRole)
 		})
 
 		if strings.Contains(role, "cluster") {
 			rb.Run("Additional testcase - Validate if members with roles "+role+"can add/edit/delete labels from admin created namespace", func() {
-				rb.ValidateAdditionalPSA(role)
+				rb.validateAdditionalPSA(rb.T(), role)
 			})
 		}
 
@@ -357,7 +357,7 @@ func (rb *PSATestSuite) TestPSA() {
 			rb.Run("Additional testcase - Validate if "+role+" with an additional role update-psa can add/edit/delete labels from admin created namespace", func() {
 				err := users.AddClusterRoleToUser(rb.client, rb.cluster, rb.nonAdminUser, rb.psaRole.ID)
 				require.NoError(rb.T(), err)
-				rb.ValidatePSA(psaRole, customRole)
+				rb.validatePSA(rb.T(), psaRole, customRole)
 			})
 		}
 	}
@@ -410,10 +410,10 @@ func (rb *PSATestSuite) TestPsactRBAC() {
 
 		rb.T().Logf("Starting validations for %v", tt.role)
 		rb.Run("Test case - Edit cluster as a "+tt.name+" and disable psact.", func() {
-			rb.ValidateEditPsactCluster(tt.role, "")
+			rb.validateEditPsactCluster(rb.T(), tt.role, "")
 		})
 		rb.Run("Test case - Edit cluster as a "+tt.name+" and set psact to rancher-restricted.", func() {
-			rb.ValidateEditPsactCluster(tt.role, "rancher-restricted")
+			rb.validateEditPsactCluster(rb.T(), tt.role, "rancher-restricted")
 		})
 	}
 }

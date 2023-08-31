@@ -50,18 +50,18 @@ func (rb *ETCDRbacBackupTestSuite) SetupSuite() {
 	require.NoError(rb.T(), err)
 }
 
-func (rb *ETCDRbacBackupTestSuite) ValidateEtcdSnapshotCluster(role string) {
+func (rb *ETCDRbacBackupTestSuite) validateEtcdSnapshotCluster(t *testing.T, role string) {
 
 	log.Infof("Creating a snapshot of the cluster as %v", role)
 
 	err := etcdsnapshot.CreateSnapshot(rb.standardUserClient, rb.clusterName)
 	switch role {
 	case roleOwner, restrictedAdmin:
-		require.NoError(rb.T(), err)
+		require.NoError(t, err)
 
 	case roleMember, roleProjectOwner, roleProjectMember:
-		require.Error(rb.T(), err)
-		assert.Equal(rb.T(), "Resource type [provisioning.cattle.io.cluster] is not updatable", err.Error())
+		require.Error(t, err)
+		assert.Equal(t, "Resource type [provisioning.cattle.io.cluster] is not updatable", err.Error())
 	}
 }
 
@@ -119,7 +119,7 @@ func (rb *ETCDRbacBackupTestSuite) TestETCDRbac() {
 		rb.T().Logf("Starting validations for %v", tt.role)
 
 		rb.Run("Test case - Take Etcd snapshot of a cluster as a "+tt.name, func() {
-			rb.ValidateEtcdSnapshotCluster(tt.role)
+			rb.validateEtcdSnapshotCluster(rb.T(), tt.role)
 		})
 
 	}
