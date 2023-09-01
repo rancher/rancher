@@ -24,6 +24,7 @@ const (
 	ContainerFieldProcMount                = "procMount"
 	ContainerFieldReadOnly                 = "readOnly"
 	ContainerFieldReadinessProbe           = "readinessProbe"
+	ContainerFieldResizePolicy             = "resizePolicy"
 	ContainerFieldResources                = "resources"
 	ContainerFieldRestartCount             = "restartCount"
 	ContainerFieldRunAsGroup               = "runAsGroup"
@@ -68,6 +69,7 @@ type Container struct {
 	ProcMount                string                         `json:"procMount,omitempty" yaml:"procMount,omitempty"`
 	ReadOnly                 *bool                          `json:"readOnly,omitempty" yaml:"readOnly,omitempty"`
 	ReadinessProbe           *Probe                         `json:"readinessProbe,omitempty" yaml:"readinessProbe,omitempty"`
+	ResizePolicy             []ContainerResizePolicy        `json:"resizePolicy,omitempty" yaml:"resizePolicy,omitempty"`
 	Resources                *ResourceRequirements          `json:"resources,omitempty" yaml:"resources,omitempty"`
 	RestartCount             int64                          `json:"restartCount,omitempty" yaml:"restartCount,omitempty"`
 	RunAsGroup               *int64                         `json:"runAsGroup,omitempty" yaml:"runAsGroup,omitempty"`

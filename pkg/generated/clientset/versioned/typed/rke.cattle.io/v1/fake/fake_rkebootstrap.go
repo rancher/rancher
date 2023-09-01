@@ -21,10 +21,9 @@ package fake
 import (
 	"context"
 
-	rkecattleiov1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -36,25 +35,25 @@ type FakeRKEBootstraps struct {
 	ns   string
 }
 
-var rkebootstrapsResource = schema.GroupVersionResource{Group: "rke.cattle.io", Version: "v1", Resource: "rkebootstraps"}
+var rkebootstrapsResource = v1.SchemeGroupVersion.WithResource("rkebootstraps")
 
-var rkebootstrapsKind = schema.GroupVersionKind{Group: "rke.cattle.io", Version: "v1", Kind: "RKEBootstrap"}
+var rkebootstrapsKind = v1.SchemeGroupVersion.WithKind("RKEBootstrap")
 
 // Get takes name of the rKEBootstrap, and returns the corresponding rKEBootstrap object, and an error if there is any.
-func (c *FakeRKEBootstraps) Get(ctx context.Context, name string, options v1.GetOptions) (result *rkecattleiov1.RKEBootstrap, err error) {
+func (c *FakeRKEBootstraps) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.RKEBootstrap, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(rkebootstrapsResource, c.ns, name), &rkecattleiov1.RKEBootstrap{})
+		Invokes(testing.NewGetAction(rkebootstrapsResource, c.ns, name), &v1.RKEBootstrap{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*rkecattleiov1.RKEBootstrap), err
+	return obj.(*v1.RKEBootstrap), err
 }
 
 // List takes label and field selectors, and returns the list of RKEBootstraps that match those selectors.
-func (c *FakeRKEBootstraps) List(ctx context.Context, opts v1.ListOptions) (result *rkecattleiov1.RKEBootstrapList, err error) {
+func (c *FakeRKEBootstraps) List(ctx context.Context, opts metav1.ListOptions) (result *v1.RKEBootstrapList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(rkebootstrapsResource, rkebootstrapsKind, c.ns, opts), &rkecattleiov1.RKEBootstrapList{})
+		Invokes(testing.NewListAction(rkebootstrapsResource, rkebootstrapsKind, c.ns, opts), &v1.RKEBootstrapList{})
 
 	if obj == nil {
 		return nil, err
@@ -64,8 +63,8 @@ func (c *FakeRKEBootstraps) List(ctx context.Context, opts v1.ListOptions) (resu
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &rkecattleiov1.RKEBootstrapList{ListMeta: obj.(*rkecattleiov1.RKEBootstrapList).ListMeta}
-	for _, item := range obj.(*rkecattleiov1.RKEBootstrapList).Items {
+	list := &v1.RKEBootstrapList{ListMeta: obj.(*v1.RKEBootstrapList).ListMeta}
+	for _, item := range obj.(*v1.RKEBootstrapList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -74,69 +73,69 @@ func (c *FakeRKEBootstraps) List(ctx context.Context, opts v1.ListOptions) (resu
 }
 
 // Watch returns a watch.Interface that watches the requested rKEBootstraps.
-func (c *FakeRKEBootstraps) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeRKEBootstraps) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(rkebootstrapsResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a rKEBootstrap and creates it.  Returns the server's representation of the rKEBootstrap, and an error, if there is any.
-func (c *FakeRKEBootstraps) Create(ctx context.Context, rKEBootstrap *rkecattleiov1.RKEBootstrap, opts v1.CreateOptions) (result *rkecattleiov1.RKEBootstrap, err error) {
+func (c *FakeRKEBootstraps) Create(ctx context.Context, rKEBootstrap *v1.RKEBootstrap, opts metav1.CreateOptions) (result *v1.RKEBootstrap, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(rkebootstrapsResource, c.ns, rKEBootstrap), &rkecattleiov1.RKEBootstrap{})
+		Invokes(testing.NewCreateAction(rkebootstrapsResource, c.ns, rKEBootstrap), &v1.RKEBootstrap{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*rkecattleiov1.RKEBootstrap), err
+	return obj.(*v1.RKEBootstrap), err
 }
 
 // Update takes the representation of a rKEBootstrap and updates it. Returns the server's representation of the rKEBootstrap, and an error, if there is any.
-func (c *FakeRKEBootstraps) Update(ctx context.Context, rKEBootstrap *rkecattleiov1.RKEBootstrap, opts v1.UpdateOptions) (result *rkecattleiov1.RKEBootstrap, err error) {
+func (c *FakeRKEBootstraps) Update(ctx context.Context, rKEBootstrap *v1.RKEBootstrap, opts metav1.UpdateOptions) (result *v1.RKEBootstrap, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(rkebootstrapsResource, c.ns, rKEBootstrap), &rkecattleiov1.RKEBootstrap{})
+		Invokes(testing.NewUpdateAction(rkebootstrapsResource, c.ns, rKEBootstrap), &v1.RKEBootstrap{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*rkecattleiov1.RKEBootstrap), err
+	return obj.(*v1.RKEBootstrap), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeRKEBootstraps) UpdateStatus(ctx context.Context, rKEBootstrap *rkecattleiov1.RKEBootstrap, opts v1.UpdateOptions) (*rkecattleiov1.RKEBootstrap, error) {
+func (c *FakeRKEBootstraps) UpdateStatus(ctx context.Context, rKEBootstrap *v1.RKEBootstrap, opts metav1.UpdateOptions) (*v1.RKEBootstrap, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(rkebootstrapsResource, "status", c.ns, rKEBootstrap), &rkecattleiov1.RKEBootstrap{})
+		Invokes(testing.NewUpdateSubresourceAction(rkebootstrapsResource, "status", c.ns, rKEBootstrap), &v1.RKEBootstrap{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*rkecattleiov1.RKEBootstrap), err
+	return obj.(*v1.RKEBootstrap), err
 }
 
 // Delete takes name of the rKEBootstrap and deletes it. Returns an error if one occurs.
-func (c *FakeRKEBootstraps) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
+func (c *FakeRKEBootstraps) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteActionWithOptions(rkebootstrapsResource, c.ns, name, opts), &rkecattleiov1.RKEBootstrap{})
+		Invokes(testing.NewDeleteActionWithOptions(rkebootstrapsResource, c.ns, name, opts), &v1.RKEBootstrap{})
 
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeRKEBootstraps) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+func (c *FakeRKEBootstraps) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(rkebootstrapsResource, c.ns, listOpts)
 
-	_, err := c.Fake.Invokes(action, &rkecattleiov1.RKEBootstrapList{})
+	_, err := c.Fake.Invokes(action, &v1.RKEBootstrapList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched rKEBootstrap.
-func (c *FakeRKEBootstraps) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *rkecattleiov1.RKEBootstrap, err error) {
+func (c *FakeRKEBootstraps) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.RKEBootstrap, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(rkebootstrapsResource, c.ns, name, pt, data, subresources...), &rkecattleiov1.RKEBootstrap{})
+		Invokes(testing.NewPatchSubresourceAction(rkebootstrapsResource, c.ns, name, pt, data, subresources...), &v1.RKEBootstrap{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*rkecattleiov1.RKEBootstrap), err
+	return obj.(*v1.RKEBootstrap), err
 }
