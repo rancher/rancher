@@ -16,7 +16,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-const RancherVersionDev = "2.7.99"
+const RancherVersionDev = "2.8.99"
 
 var (
 	releasePattern = regexp.MustCompile("^v[0-9]")
