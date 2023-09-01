@@ -14,6 +14,7 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/rancher/rancher/pkg/controllers/management/auth"
+	"github.com/rancher/rancher/pkg/controllers/management/auth/globalroles"
 	mgmt "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/namespace"
@@ -201,7 +202,7 @@ func (bc *orphanBindingsCleanup) cleanOrphanedCatalogRolesAndRolebindings() erro
 	}
 	logrus.Infof("[%v] Processing %d rolebindings", orphanCatalogBindingsOperation, len(rbs.Items))
 	for _, rb := range rbs.Items {
-		if rb.RoleRef.Name != auth.GlobalCatalogRole {
+		if rb.RoleRef.Name != globalroles.GlobalCatalogRole {
 			continue
 		}
 
@@ -217,12 +218,12 @@ func (bc *orphanBindingsCleanup) cleanOrphanedCatalogRolesAndRolebindings() erro
 	}
 
 	if dryRun {
-		logrus.Infof("[%v] dryRun is enabled, skipping deletion for orphaned role: %s/%s", orphanCatalogBindingsOperation, namespace.GlobalNamespace, auth.GlobalCatalogRole)
+		logrus.Infof("[%v] dryRun is enabled, skipping deletion for orphaned role: %s/%s", orphanCatalogBindingsOperation, namespace.GlobalNamespace, globalroles.GlobalCatalogRole)
 	} else {
-		logrus.Infof("[%v] Deleting orphaned role %s", orphanCatalogBindingsOperation, auth.GlobalCatalogRole)
-		err = bc.roles.Delete(namespace.GlobalNamespace, auth.GlobalCatalogRole, &metav1.DeleteOptions{})
+		logrus.Infof("[%v] Deleting orphaned role %s", orphanCatalogBindingsOperation, globalroles.GlobalCatalogRole)
+		err = bc.roles.Delete(namespace.GlobalNamespace, globalroles.GlobalCatalogRole, &metav1.DeleteOptions{})
 		if err != nil && !k8serrors.IsNotFound(err) {
-			logrus.Warnf("[%v] Error when deleting role %s, %s", orphanCatalogBindingsOperation, auth.GlobalCatalogRole, err.Error())
+			logrus.Warnf("[%v] Error when deleting role %s, %s", orphanCatalogBindingsOperation, globalroles.GlobalCatalogRole, err.Error())
 			return err
 		}
 	}

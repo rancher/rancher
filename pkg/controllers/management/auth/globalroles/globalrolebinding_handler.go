@@ -1,4 +1,4 @@
-package auth
+package globalroles
 
 import (
 	"fmt"
@@ -6,8 +6,9 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
-	"github.com/rancher/norman/httperror"
 	"github.com/rancher/rancher/pkg/clustermanager"
+	"github.com/rancher/rancher/pkg/controllers"
+	mgmtcontroller "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	rbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/rancher/pkg/namespace"
@@ -30,15 +31,18 @@ const (
 	catalogTemplateResourceRule        = "catalogtemplates"
 	catalogTemplateVersionResourceRule = "catalogtemplateversions"
 	crbNameAnnotation                  = "authz.management.cattle.io/crb-name"
+	crtbGrbOwnerIndex                  = "authz.management.cattle.io/crtb-owner"
 	crbNamePrefix                      = "cattle-globalrolebinding-"
 	GlobalCatalogRole                  = "global-catalog"
 	globalCatalogRoleBinding           = "global-catalog-binding"
-	grbController                      = "mgmt-auth-grb-controller"
 	TemplateResourceRule               = "templates"
 	TemplateVersionResourceRule        = "templateversions"
+	localClusterName                   = "local"
+	grbOwnerLabel                      = "authz.management.cattle.io/grb-owner"
 )
 
 func newGlobalRoleBindingLifecycle(management *config.ManagementContext, clusterManager *clustermanager.Manager) *globalRoleBindingLifecycle {
+	management.Wrangler.Mgmt.ClusterRoleTemplateBinding().Cache().AddIndexer(crtbGrbOwnerIndex, crtbGrbOwnerIndexer)
 	return &globalRoleBindingLifecycle{
 		clusters:          management.Management.Clusters(""),
 		clusterLister:     management.Management.Clusters("").Controller().Lister(),
@@ -48,12 +52,24 @@ func newGlobalRoleBindingLifecycle(management *config.ManagementContext, cluster
 		crbClient:         management.RBAC.ClusterRoleBindings(""),
 		crbLister:         management.RBAC.ClusterRoleBindings("").Controller().Lister(),
 		crLister:          management.RBAC.ClusterRoles("").Controller().Lister(),
+		crtbClient:        management.Management.ClusterRoleTemplateBindings(""),
+		crtbCache:         management.Wrangler.Mgmt.ClusterRoleTemplateBinding().Cache(),
 		grLister:          management.Management.GlobalRoles("").Controller().Lister(),
 		roles:             management.RBAC.Roles(""),
 		roleLister:        management.RBAC.Roles("").Controller().Lister(),
 		roleBindings:      management.RBAC.RoleBindings(""),
 		roleBindingLister: management.RBAC.RoleBindings("").Controller().Lister(),
 	}
+}
+
+// crtbGrbOwnerIndexer indexes a CRTB to a key identifying the target cluster and owning GRB
+func crtbGrbOwnerIndexer(crtb *v3.ClusterRoleTemplateBinding) ([]string, error) {
+	// the label, unlike the owner ref, is protected by the webhook, so we use it as a source of truth
+	grbOwner, ok := crtb.Labels[grbOwnerLabel]
+	if !ok {
+		return nil, nil
+	}
+	return []string{fmt.Sprintf("%s/%s", crtb.ClusterName, grbOwner)}, nil
 }
 
 type globalRoleBindingLifecycle struct {
@@ -65,6 +81,8 @@ type globalRoleBindingLifecycle struct {
 	crLister          rbacv1.ClusterRoleLister
 	crbClient         rbacv1.ClusterRoleBindingInterface
 	crbLister         rbacv1.ClusterRoleBindingLister
+	crtbCache         mgmtcontroller.ClusterRoleTemplateBindingCache
+	crtbClient        v3.ClusterRoleTemplateBindingInterface
 	grLister          v3.GlobalRoleLister
 	roles             rbacv1.RoleInterface
 	roleLister        rbacv1.RoleLister
@@ -73,12 +91,20 @@ type globalRoleBindingLifecycle struct {
 }
 
 func (grb *globalRoleBindingLifecycle) Create(obj *v3.GlobalRoleBinding) (runtime.Object, error) {
-	err := grb.reconcileGlobalRoleBinding(obj)
+	err := grb.reconcileClusterPermissions(obj)
+	if err != nil {
+		return nil, err
+	}
+	err = grb.reconcileGlobalRoleBinding(obj)
 	return obj, err
 }
 
 func (grb *globalRoleBindingLifecycle) Updated(obj *v3.GlobalRoleBinding) (runtime.Object, error) {
-	err := grb.reconcileGlobalRoleBinding(obj)
+	err := grb.reconcileClusterPermissions(obj)
+	if err != nil {
+		return nil, err
+	}
+	err = grb.reconcileGlobalRoleBinding(obj)
 	return obj, err
 }
 
@@ -104,7 +130,7 @@ func (grb *globalRoleBindingLifecycle) deleteAdminBinding(obj *v3.GlobalRoleBind
 		userContext, err := grb.clusterManager.UserContext(cluster.Name)
 		if err != nil {
 			// ClusterUnavailable error indicates the record can't talk to the downstream cluster
-			if !IsClusterUnavailable(err) {
+			if !clustermanager.IsClusterUnavailableErr(err) {
 				allErrors = append(allErrors, err)
 			}
 			continue
@@ -135,6 +161,145 @@ func (grb *globalRoleBindingLifecycle) deleteAdminBinding(obj *v3.GlobalRoleBind
 		return fmt.Errorf("errors deleting admin global role binding: %v", allErrors)
 	}
 	return nil
+}
+
+// reconcileClusterPermissions grants permissions for the binding in all downstream (non-local) clusters. Will also
+// remove invalid bindings (bindings not for active RoleTemplates or for invalid subjects).
+func (grb *globalRoleBindingLifecycle) reconcileClusterPermissions(globalRoleBinding *v3.GlobalRoleBinding) error {
+	globalRole, err := grb.grLister.Get("", globalRoleBinding.GlobalRoleName)
+	if err != nil {
+		return fmt.Errorf("unable to get globalRole %s: %w", globalRoleBinding.Name, err)
+	}
+	clusters, err := grb.clusterLister.List("", labels.Everything())
+	if err != nil {
+		return fmt.Errorf("unable to list clusters when reconciling globalRoleBinding %s: %w", globalRoleBinding.Name, err)
+	}
+
+	var missedClusters bool
+	for _, cluster := range clusters {
+		// we don't sync permissions for the local cluster, but we do want to purge user-created permissions
+		if cluster.Name == localClusterName {
+			err := grb.purgeCorruptRoles(nil, cluster, globalRoleBinding)
+			if err != nil {
+				// failure to remove bad bindings shouldn't affect our ability to sync new permissions, so we log and keep processing
+				logrus.Errorf("unable to purge roles for cluster %s and grb %s, some bindings may remain: %s", cluster.Name, globalRoleBinding.Name, err.Error())
+				missedClusters = true
+			}
+			// inheritedClusterRoles only apply on non-local clusters, so skip the local cluster
+			continue
+		}
+		err := grb.purgeCorruptRoles(globalRole.InheritedClusterRoles, cluster, globalRoleBinding)
+		if err != nil {
+			// failure to remove bad bindings shouldn't affect our ability to sync new permissions, so we log and keep processing
+			logrus.Errorf("unable to purge roles for cluster %s and grb %s, some bindings may remain: %s", cluster.Name, globalRoleBinding.Name, err.Error())
+			missedClusters = true
+		}
+		missingRTs, err := grb.findMissingRTs(globalRole.InheritedClusterRoles, cluster, globalRoleBinding)
+		if err != nil {
+			logrus.Errorf("unable to find missing roles for cluster %s and grb %s, some permissions may be missing: %s", cluster.Name, globalRoleBinding.Name, err.Error())
+			missedClusters = true
+			continue
+		}
+		// at this point, the only remaining items are roleTemplates that we don't have a CRTB for in this cluster
+		for _, wantRT := range missingRTs {
+			// create a crtb in the backing namespace for the cluster
+			logrus.Infof("creating backing crtb for grb %s in cluster %s for roleTemplate %s", globalRoleBinding.Name, cluster.Name, wantRT)
+			_, err = grb.crtbClient.Create(&v3.ClusterRoleTemplateBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					GenerateName: "crtb-grb-",
+					Namespace:    cluster.Name,
+					// the owner ref needs to be mutable by the k8s garbage collector but we need
+					// a way to identify what CRTBs are from GRBs unambiguously for validation
+					Labels: map[string]string{
+						grbOwnerLabel:               globalRoleBinding.Name,
+						controllers.K8sManagedByKey: controllers.ManagerValue,
+					},
+					OwnerReferences: []metav1.OwnerReference{
+						{
+							APIVersion: v3.GlobalRoleBindingGroupVersionKind.GroupVersion().String(),
+							Kind:       v3.GlobalRoleBindingGroupVersionKind.Kind,
+							Name:       globalRoleBinding.Name,
+							UID:        globalRoleBinding.UID,
+						},
+					},
+				},
+				ClusterName:        cluster.Name,
+				RoleTemplateName:   wantRT,
+				UserName:           globalRoleBinding.UserName,
+				GroupPrincipalName: globalRoleBinding.GroupPrincipalName,
+			})
+			// we don't immediately return so that we can create as many CRTBs as we can
+			if err != nil {
+				logrus.Errorf("failed to create crtb for globalRoleBinding %s in cluster %s: %s", globalRoleBinding.Name, cluster.Name, err.Error())
+				missedClusters = true
+			}
+		}
+	}
+	if missedClusters {
+		return fmt.Errorf("unable to reconcile backing crtbs for globalRoleBinding %s, some permissions may be missing", globalRoleBinding.Name)
+	}
+	return nil
+}
+
+// purgeCorruptRoles removes any CRTBs which were created for this role in the past, but are no longer valid, either
+// because they aren't for a currently requested RoleTemplate, or because they have been corrupted by user intervention.
+// Will return an error if a binding can't be deleted
+func (grb *globalRoleBindingLifecycle) purgeCorruptRoles(wantRTs []string, cluster *v3.Cluster, binding *v3.GlobalRoleBinding) error {
+	currentCRTBs, err := grb.crtbCache.GetByIndex(crtbGrbOwnerIndex, fmt.Sprintf("%s/%s", cluster.Name, binding.Name))
+	if err != nil {
+		return fmt.Errorf("unable to get CRTBs for cluster %s: %w", cluster.Name, err)
+	}
+	var deleteErr error
+	seenRTs := map[string]struct{}{}
+	for _, crtb := range currentCRTBs {
+		foundRT := false
+		for _, roleTemplate := range wantRTs {
+			if roleTemplate == crtb.RoleTemplateName {
+				foundRT = true
+				break
+			}
+		}
+		_, seen := seenRTs[crtb.RoleTemplateName]
+		// if the RT isn't one of the ones that we requested, or is corrupt, or refers to the same RT as a prior
+		// valid RT, then we remove it.
+		if !foundRT || !isCRTBValid(crtb, cluster, binding) || seen {
+			// CRTBs can't update some of these fields, so the safest method is to delete/re-create
+			err := grb.crtbClient.DeleteNamespaced(crtb.Namespace, crtb.Name, &metav1.DeleteOptions{})
+			if err != nil {
+				// failure to delete one crtb does not prevent our ability to delete other crtbs, or to determine
+				// which rts we want to remove
+				crtbErr := fmt.Errorf("unable to delete backing crtb %s for globalRoleBinding %s: %w", crtb.Name, binding.Name, err)
+				deleteErr = multierror.Append(deleteErr, crtbErr)
+			}
+		} else {
+			seenRTs[crtb.RoleTemplateName] = struct{}{}
+		}
+	}
+	return deleteErr
+}
+
+// findMissingRTs finds which RoleTemplates were in wantRTs but don't have a valid binding for this cluster yet
+func (grb *globalRoleBindingLifecycle) findMissingRTs(wantRTs []string, cluster *v3.Cluster, binding *v3.GlobalRoleBinding) ([]string, error) {
+	currentRTs := map[string]struct{}{}
+	for _, wantRT := range wantRTs {
+		currentRTs[wantRT] = struct{}{}
+	}
+	currentCRTBs, err := grb.crtbCache.GetByIndex(crtbGrbOwnerIndex, fmt.Sprintf("%s/%s", cluster.Name, binding.Name))
+	if err != nil {
+		return nil, fmt.Errorf("unable to get CRTBs for cluster %s: %w", cluster.Name, err)
+	}
+	for _, crtb := range currentCRTBs {
+		_, rtOk := currentRTs[crtb.RoleTemplateName]
+		if rtOk && isCRTBValid(crtb, cluster, binding) {
+			delete(currentRTs, crtb.RoleTemplateName)
+		}
+	}
+	missingRTs := make([]string, 0, len(currentRTs))
+	for missingRT := range currentRTs {
+		missingRTs = append(missingRTs, missingRT)
+	}
+	return missingRTs, nil
+
 }
 
 func (grb *globalRoleBindingLifecycle) reconcileGlobalRoleBinding(globalRoleBinding *v3.GlobalRoleBinding) error {
@@ -411,9 +576,12 @@ func (grb *globalRoleBindingLifecycle) grantRestrictedAdminUserClusterPermission
 	return returnErr
 }
 
-func IsClusterUnavailable(err error) bool {
-	if apiError, ok := err.(*httperror.APIError); ok {
-		return apiError.Code == httperror.ClusterUnavailable
-	}
-	return false
+// isCRTBValid determines if a given CRTB is up to date for a given cluster and owning global role binding. Should
+// only be used in the context of CRTBs owned by GRBs
+func isCRTBValid(crtb *v3.ClusterRoleTemplateBinding, cluster *v3.Cluster, binding *v3.GlobalRoleBinding) bool {
+	return crtb != nil && cluster != nil && binding != nil &&
+		crtb.ClusterName == cluster.Name &&
+		crtb.UserName == binding.UserName &&
+		crtb.GroupPrincipalName == binding.GroupPrincipalName &&
+		crtb.DeletionTimestamp == nil
 }

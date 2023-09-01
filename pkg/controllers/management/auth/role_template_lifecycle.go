@@ -83,7 +83,7 @@ func (rtl *roleTemplateLifecycle) Remove(obj *v3.RoleTemplate) (runtime.Object, 
 		userContext, err := rtl.clusterManager.UserContext(cluster.Name)
 		if err != nil {
 			// ClusterUnavailable error indicates the record can't talk to the downstream cluster
-			if !IsClusterUnavailable(err) {
+			if !clustermanager.IsClusterUnavailableErr(err) {
 				allErrors = append(allErrors, err)
 			}
 			continue

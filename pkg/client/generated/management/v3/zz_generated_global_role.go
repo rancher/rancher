@@ -5,35 +5,37 @@ import (
 )
 
 const (
-	GlobalRoleType                 = "globalRole"
-	GlobalRoleFieldAnnotations     = "annotations"
-	GlobalRoleFieldBuiltin         = "builtin"
-	GlobalRoleFieldCreated         = "created"
-	GlobalRoleFieldCreatorID       = "creatorId"
-	GlobalRoleFieldDescription     = "description"
-	GlobalRoleFieldLabels          = "labels"
-	GlobalRoleFieldName            = "name"
-	GlobalRoleFieldNewUserDefault  = "newUserDefault"
-	GlobalRoleFieldOwnerReferences = "ownerReferences"
-	GlobalRoleFieldRemoved         = "removed"
-	GlobalRoleFieldRules           = "rules"
-	GlobalRoleFieldUUID            = "uuid"
+	GlobalRoleType                       = "globalRole"
+	GlobalRoleFieldAnnotations           = "annotations"
+	GlobalRoleFieldBuiltin               = "builtin"
+	GlobalRoleFieldCreated               = "created"
+	GlobalRoleFieldCreatorID             = "creatorId"
+	GlobalRoleFieldDescription           = "description"
+	GlobalRoleFieldInheritedClusterRoles = "inheritedClusterRoles"
+	GlobalRoleFieldLabels                = "labels"
+	GlobalRoleFieldName                  = "name"
+	GlobalRoleFieldNewUserDefault        = "newUserDefault"
+	GlobalRoleFieldOwnerReferences       = "ownerReferences"
+	GlobalRoleFieldRemoved               = "removed"
+	GlobalRoleFieldRules                 = "rules"
+	GlobalRoleFieldUUID                  = "uuid"
 )
 
 type GlobalRole struct {
 	types.Resource
-	Annotations     map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
-	Builtin         bool              `json:"builtin,omitempty" yaml:"builtin,omitempty"`
-	Created         string            `json:"created,omitempty" yaml:"created,omitempty"`
-	CreatorID       string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
-	Description     string            `json:"description,omitempty" yaml:"description,omitempty"`
-	Labels          map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
-	Name            string            `json:"name,omitempty" yaml:"name,omitempty"`
-	NewUserDefault  bool              `json:"newUserDefault,omitempty" yaml:"newUserDefault,omitempty"`
-	OwnerReferences []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
-	Removed         string            `json:"removed,omitempty" yaml:"removed,omitempty"`
-	Rules           []PolicyRule      `json:"rules,omitempty" yaml:"rules,omitempty"`
-	UUID            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	Annotations           map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	Builtin               bool              `json:"builtin,omitempty" yaml:"builtin,omitempty"`
+	Created               string            `json:"created,omitempty" yaml:"created,omitempty"`
+	CreatorID             string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	Description           string            `json:"description,omitempty" yaml:"description,omitempty"`
+	InheritedClusterRoles []string          `json:"inheritedClusterRoles,omitempty" yaml:"inheritedClusterRoles,omitempty"`
+	Labels                map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Name                  string            `json:"name,omitempty" yaml:"name,omitempty"`
+	NewUserDefault        bool              `json:"newUserDefault,omitempty" yaml:"newUserDefault,omitempty"`
+	OwnerReferences       []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
+	Removed               string            `json:"removed,omitempty" yaml:"removed,omitempty"`
+	Rules                 []PolicyRule      `json:"rules,omitempty" yaml:"rules,omitempty"`
+	UUID                  string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
 
 type GlobalRoleCollection struct {

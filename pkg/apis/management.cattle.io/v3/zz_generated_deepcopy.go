@@ -4120,6 +4120,11 @@ func (in *GlobalRole) DeepCopyInto(out *GlobalRole) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.InheritedClusterRoles != nil {
+		in, out := &in.InheritedClusterRoles, &out.InheritedClusterRoles
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

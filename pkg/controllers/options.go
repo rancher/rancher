@@ -14,9 +14,11 @@ import (
 type controllerContextType string
 
 const (
-	User       controllerContextType = "user"
-	Scaled     controllerContextType = "scaled"
-	Management controllerContextType = "mgmt"
+	User            controllerContextType = "user"
+	Scaled          controllerContextType = "scaled"
+	Management      controllerContextType = "mgmt"
+	K8sManagedByKey                       = "app.kubernetes.io/managed-by"
+	ManagerValue                          = "rancher"
 )
 
 // GetOptsFromEnv configures a SharedControllersFactoryOptions using env var and return a pointer to it.
