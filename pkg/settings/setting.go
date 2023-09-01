@@ -164,13 +164,6 @@ var (
 	// If set to false the kubeconfig will contain a command to login to Rancher.
 	KubeconfigGenerateToken = NewSetting("kubeconfig-generate-token", "true")
 
-	// KubeconfigTokenTTLMinutes currently is used to set the TTL for kubeconfigs created through the CLI.
-	// This can be done with the token command or via kubectl when kubeconfig-generate-token is false.
-	// This TTL is used regardless of the value of kubeconfig-default-ttl-minutes.
-	//
-	// Deprecated: On removal use kubeconfig-default-ttl-minutes for all kubeconfigs.
-	KubeconfigTokenTTLMinutes = NewSetting("kubeconfig-token-ttl-minutes", "960") // 16 hours
-
 	// RancherWebhookVersion is the exact version of the webhook that Rancher will install.
 	RancherWebhookVersion = NewSetting("rancher-webhook-version", "")
 
