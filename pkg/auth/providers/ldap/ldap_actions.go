@@ -78,7 +78,14 @@ func (p *ldapProvider) testAndApply(actionName string, action *types.Action, req
 	if len(config.Servers) < 1 {
 		return httperror.NewAPIError(httperror.InvalidBodyContent, "must supply a server")
 	}
-	userPrincipal, groupPrincipals, err := p.loginUser(login, config, caPool)
+
+	lConn, err := ldap.Connect(config, caPool)
+	if err != nil {
+		return err
+	}
+	defer lConn.Close()
+
+	userPrincipal, groupPrincipals, err := p.loginUser(lConn, login, config, caPool)
 	if err != nil {
 		return err
 	}
@@ -101,7 +108,7 @@ func (p *ldapProvider) testAndApply(actionName string, action *types.Action, req
 }
 
 func (p *ldapProvider) saveLDAPConfig(config *v3.LdapConfig) error {
-	storedConfig, _, err := p.getLDAPConfig()
+	storedConfig, _, err := p.getLDAPConfig(p.authConfigs.ObjectClient().UnstructuredClient())
 	if err != nil {
 		return err
 	}
