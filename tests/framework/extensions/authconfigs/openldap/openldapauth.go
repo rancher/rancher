@@ -28,7 +28,7 @@ func CreateOpenLDAPAuthConfig(rancherClient *rancher.Client) (*management.AuthCo
 	openLdapCredentialConfig := OpenLDAPCredentialConfig{
 		Servers:                         []string{"openldapqa.qa.rancher.space"},
 		ServiceAccountDistinguishedName: "cn=admin,dc=qa,dc=rancher,dc=space",
-		ServiceAccountPassword:          "cattle@123",
+		ServiceAccountPassword:          "<password>",
 		UserSearchBase:                  "dc=qa,dc=rancher,dc=space",
 		Port:                            389,
 		TLS:                             false,
@@ -49,11 +49,3 @@ func CreateOpenLDAPAuthConfig(rancherClient *rancher.Client) (*management.AuthCo
 	}
 	return resp, nil
 }
-
-//check how the do was done for tokens - do action?
-//change it to doaction and use the config that israel sent me.
-//authprovider
-//openldap_test
-//use go freefrom job to test on jenkins to see it running
-//might have to add a build tag
-//use the jenkins job to add to go job with create cluster.
