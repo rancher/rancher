@@ -340,16 +340,17 @@ func (s *AuthzSuite) createRoleTemplate(name string, rules []rbacv1.PolicyRule, 
 	return rt, err
 }
 
-func (s *AuthzSuite) pspWatcher(c *check.C) watch.Interface {
-	pspClient := s.clusterClient.ExtensionsV1beta1().PodSecurityPolicies()
-	pList, err := pspClient.List(context.TODO(), metav1.ListOptions{})
-	c.Assert(err, check.IsNil)
-	pListMeta, err := meta.ListAccessor(pList)
-	c.Assert(err, check.IsNil)
-	pspWatch, err := pspClient.Watch(context.TODO(), metav1.ListOptions{ResourceVersion: pListMeta.GetResourceVersion()})
-	c.Assert(err, check.IsNil)
-	return pspWatch
-}
+// TODO: since psp support is removed, it should also be removed.
+// func (s *AuthzSuite) pspWatcher(c *check.C) watch.Interface {
+// 	pspClient := s.clusterClient.ExtensionsV1beta1().PodSecurityPolicies()
+// 	pList, err := pspClient.List(context.TODO(), metav1.ListOptions{})
+// 	c.Assert(err, check.IsNil)
+// 	pListMeta, err := meta.ListAccessor(pList)
+// 	c.Assert(err, check.IsNil)
+// 	pspWatch, err := pspClient.Watch(context.TODO(), metav1.ListOptions{ResourceVersion: pListMeta.GetResourceVersion()})
+// 	c.Assert(err, check.IsNil)
+// 	return pspWatch
+// }
 
 func (s *AuthzSuite) clusterBindingWatcher(c *check.C) watch.Interface {
 	bindingClient := s.clusterClient.RbacV1().ClusterRoleBindings()

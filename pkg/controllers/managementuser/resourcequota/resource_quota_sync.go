@@ -12,6 +12,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	namespaceutil "github.com/rancher/rancher/pkg/namespace"
 	validate "github.com/rancher/rancher/pkg/resourcequota"
+	"github.com/rancher/rancher/pkg/utils"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -19,7 +20,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientcache "k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/pkg/kubelet/util/format"
 )
 
 const (
@@ -360,7 +360,7 @@ func (c *SyncController) validateAndSetNamespaceQuota(ns *corev1.Namespace, quot
 
 	var msg string
 	if !isFit && exceeded != nil {
-		msg = fmt.Sprintf("Resource quota [%v] exceeds project limit", format.ResourceList(exceeded))
+		msg = fmt.Sprintf("Resource quota [%v] exceeds project limit", utils.FormatResourceList(exceeded))
 	}
 
 	validated, err := c.setValidated(updatedNs, isFit, msg)
