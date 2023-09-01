@@ -3,7 +3,9 @@ package integration
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"testing"
+	"time"
 
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
@@ -17,6 +19,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kwait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 )
 
@@ -203,16 +206,35 @@ func (s *ResourceQuotaSuite) TestRemoveQuotaFromProjectWithNamespacePropagation(
 	err = steveResourceQuotas.CheckResourceActiveState(client, quotaID)
 	s.Require().NoError(err)
 
-	quotas, err = resourcequotas.ListResourceQuotas(client, localClusterID, resourceQuotaNamespaceName, metav1.ListOptions{})
-	s.Require().NoError(err)
-	s.Require().NotNil(quotas)
-	s.Require().Lenf(quotas.Items, 1, "Expected 1 quota in the namespace, but got %d", len(quotas.Items))
-
-	resourceList := quotas.Items[0].Spec.Hard
+	// Wait a little while for the resourcequota to be updated.
+	// The quota controller sometimes gets conflict error trying to update the namespace annotation and needs time to retry.
 	want := v1.ResourceList{
 		v1.ResourceConfigMaps: resource.MustParse("5"),
 	}
-	s.Require().Equal(want, resourceList, "Expected the CPU limits to be removed, but config maps limit to remain")
+	var resourceList v1.ResourceList
+	err = kwait.Poll(500*time.Millisecond, 10*time.Second, func() (done bool, err error) {
+		quotas, err = resourcequotas.ListResourceQuotas(client, localClusterID, resourceQuotaNamespaceName, metav1.ListOptions{})
+		if err != nil {
+			return false, err
+		}
+		if quotas == nil {
+			return false, nil
+		}
+		if len(quotas.Items) != 1 {
+			return false, fmt.Errorf("expected 1 quota in the namespace, but got %d", len(quotas.Items))
+		}
+		resourceList = quotas.Items[0].Spec.Hard
+		if !reflect.DeepEqual(want, resourceList) {
+			return false, nil
+		}
+		return true, nil
+	})
+	if err != nil {
+		// if it was a timeout error, check why it never succeeded so it can be reported as output
+		s.Require().NotNil(quotas)
+		s.Require().Lenf(quotas.Items, 1, "Expected 1 quota in the namespace, but got %d", len(quotas.Items))
+		s.Require().Equal(want, resourceList, "Expected the CPU limits to be removed, but config maps limit to remain")
+	}
 	s.Require().NoError(err)
 
 	// Now remove the last resource limit from the project.
@@ -290,17 +312,36 @@ func (s *ResourceQuotaSuite) TestAddQuotaFromProjectWithNamespacePropagation() {
 	err = steveResourceQuotas.CheckResourceActiveState(client, quotaID)
 	s.Require().NoError(err)
 
-	quotas, err = resourcequotas.ListResourceQuotas(client, localClusterID, resourceQuotaNamespaceName, metav1.ListOptions{})
-	s.Require().NoError(err)
-	s.Require().NotNil(quotas)
-	s.Require().Lenf(quotas.Items, 1, "Expected 1 quota in the namespace, but got %d", len(quotas.Items))
-
-	resourceList := quotas.Items[0].Spec.Hard
+	// Wait a little while for the resourcequota to be updated.
+	// The quota controller sometimes gets conflict error trying to update the namespace annotation and needs time to retry.
 	want := v1.ResourceList{
 		v1.ResourceLimitsCPU: resource.MustParse("200m"),
 		v1.ResourceSecrets:   resource.MustParse("10"),
 	}
-	s.Require().Equal(want, resourceList)
+	var resourceList v1.ResourceList
+	err = kwait.Poll(500*time.Millisecond, 10*time.Second, func() (done bool, err error) {
+		quotas, err = resourcequotas.ListResourceQuotas(client, localClusterID, resourceQuotaNamespaceName, metav1.ListOptions{})
+		if err != nil {
+			return false, err
+		}
+		if quotas == nil {
+			return false, nil
+		}
+		if len(quotas.Items) != 1 {
+			return false, fmt.Errorf("expected 1 quota in the namespace, but got %d", len(quotas.Items))
+		}
+		resourceList = quotas.Items[0].Spec.Hard
+		if !reflect.DeepEqual(want, resourceList) {
+			return false, nil
+		}
+		return true, nil
+	})
+	if err != nil {
+		// if it was a timeout error, check why it never succeeded so it can be reported as output
+		s.Require().NotNil(quotas)
+		s.Require().Lenf(quotas.Items, 1, "Expected 1 quota in the namespace, but got %d", len(quotas.Items))
+		s.Require().Equal(want, resourceList, "Expected the secrets limits to be added")
+	}
 	s.Require().NoError(err)
 }
 

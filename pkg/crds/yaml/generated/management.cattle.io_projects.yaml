@@ -1,0 +1,348 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.12.0
+  name: projects.management.cattle.io
+spec:
+  group: management.cattle.io
+  names:
+    kind: Project
+    listKind: ProjectList
+    plural: projects
+    singular: project
+  scope: Namespaced
+  versions:
+  - name: v3
+    schema:
+      openAPIV3Schema:
+        description: Project is a group of namespaces. Projects are used to create
+          a multi-tenant environment within a Kubernetes cluster by managing namespace
+          operations, such as role assignments or quotas, as a group.
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: Spec is the specification of the desired configuration for
+              the project.
+            properties:
+              clusterName:
+                description: ClusterName is the name of the cluster the project belongs
+                  to.
+                type: string
+              containerDefaultResourceLimit:
+                description: ContainerDefaultResourceLimit is a specification for
+                  the default LimitRange for the namespace. See https://kubernetes.io/docs/concepts/policy/limit-range/
+                  for more details.
+                properties:
+                  limitsCpu:
+                    description: LimitsCPU is the CPU limits across all pods in a
+                      non-terminal state.
+                    type: string
+                  limitsMemory:
+                    description: LimitsMemory is the memory limits across all pods
+                      in a non-terminal state.
+                    type: string
+                  requestsCpu:
+                    description: RequestsCPU is the CPU requests limit across all
+                      pods in a non-terminal state.
+                    type: string
+                  requestsMemory:
+                    description: RequestsMemory is the memory requests limit across
+                      all pods in a non-terminal state.
+                    type: string
+                type: object
+              description:
+                description: Description is a human-readable description of the project.
+                type: string
+              displayName:
+                description: DisplayName is the human-readable name for the project.
+                type: string
+              enableProjectMonitoring:
+                description: EnableProjectMonitoring indicates whether Monitoring
+                  V1 should be enabled for this project. Deprecated. Use the Monitoring
+                  V2 app instead. Defaults to false.
+                type: boolean
+              namespaceDefaultResourceQuota:
+                description: NamespaceDefaultResourceQuota is a specification of the
+                  default ResourceQuota that a namespace will receive if none is provided.
+                  Must provide ResourceQuota if NamespaceDefaultResourceQuota is specified.
+                  See https://kubernetes.io/docs/concepts/policy/resource-quotas/
+                  for more details.
+                properties:
+                  limit:
+                    description: Limit is the default quota limits applied to new
+                      namespaces.
+                    properties:
+                      configMaps:
+                        description: ConfigMaps is the total number of ReplicationControllers
+                          that can exist in the namespace.
+                        type: string
+                      limitsCpu:
+                        description: LimitsCPU is the CPU limits across all pods in
+                          a non-terminal state.
+                        type: string
+                      limitsMemory:
+                        description: LimitsMemory is the memory limits across all
+                          pods in a non-terminal state.
+                        type: string
+                      persistentVolumeClaims:
+                        description: PersistentVolumeClaims is the total number of
+                          PersistentVolumeClaims that can exist in the namespace.
+                        type: string
+                      pods:
+                        description: Pods is the total number of Pods in a non-terminal
+                          state that can exist in the namespace. A pod is in a terminal
+                          state if .status.phase in (Failed, Succeeded) is true.
+                        type: string
+                      replicationControllers:
+                        description: ReplicationControllers is total number of ReplicationControllers
+                          that can exist in the namespace.
+                        type: string
+                      requestsCpu:
+                        description: RequestsCPU is the CPU requests limit across
+                          all pods in a non-terminal state.
+                        type: string
+                      requestsMemory:
+                        description: RequestsMemory is the memory requests limit across
+                          all pods in a non-terminal state.
+                        type: string
+                      requestsStorage:
+                        description: RequestsStorage is the storage requests limit
+                          across all persistent volume claims.
+                        type: string
+                      secrets:
+                        description: Secrets is the total number of ReplicationControllers
+                          that can exist in the namespace.
+                        type: string
+                      services:
+                        description: Services is the total number of Services that
+                          can exist in the namespace.
+                        type: string
+                      servicesLoadBalancers:
+                        description: ServicesLoadBalancers is the total number of
+                          Services of type LoadBalancer that can exist in the namespace.
+                        type: string
+                      servicesNodePorts:
+                        description: ServiceNodePorts is the total number of Services
+                          of type NodePort that can exist in the namespace.
+                        type: string
+                    type: object
+                type: object
+              resourceQuota:
+                description: ResourceQuota is a specification for the total amount
+                  of quota for standard resources that will be shared by all namespaces
+                  in the project. Must provide NamespaceDefaultResourceQuota if ResourceQuota
+                  is specified. See https://kubernetes.io/docs/concepts/policy/resource-quotas/
+                  for more details.
+                properties:
+                  limit:
+                    description: Limit is the total allowable quota limits shared
+                      by all namespaces in the project.
+                    properties:
+                      configMaps:
+                        description: ConfigMaps is the total number of ReplicationControllers
+                          that can exist in the namespace.
+                        type: string
+                      limitsCpu:
+                        description: LimitsCPU is the CPU limits across all pods in
+                          a non-terminal state.
+                        type: string
+                      limitsMemory:
+                        description: LimitsMemory is the memory limits across all
+                          pods in a non-terminal state.
+                        type: string
+                      persistentVolumeClaims:
+                        description: PersistentVolumeClaims is the total number of
+                          PersistentVolumeClaims that can exist in the namespace.
+                        type: string
+                      pods:
+                        description: Pods is the total number of Pods in a non-terminal
+                          state that can exist in the namespace. A pod is in a terminal
+                          state if .status.phase in (Failed, Succeeded) is true.
+                        type: string
+                      replicationControllers:
+                        description: ReplicationControllers is total number of ReplicationControllers
+                          that can exist in the namespace.
+                        type: string
+                      requestsCpu:
+                        description: RequestsCPU is the CPU requests limit across
+                          all pods in a non-terminal state.
+                        type: string
+                      requestsMemory:
+                        description: RequestsMemory is the memory requests limit across
+                          all pods in a non-terminal state.
+                        type: string
+                      requestsStorage:
+                        description: RequestsStorage is the storage requests limit
+                          across all persistent volume claims.
+                        type: string
+                      secrets:
+                        description: Secrets is the total number of ReplicationControllers
+                          that can exist in the namespace.
+                        type: string
+                      services:
+                        description: Services is the total number of Services that
+                          can exist in the namespace.
+                        type: string
+                      servicesLoadBalancers:
+                        description: ServicesLoadBalancers is the total number of
+                          Services of type LoadBalancer that can exist in the namespace.
+                        type: string
+                      servicesNodePorts:
+                        description: ServiceNodePorts is the total number of Services
+                          of type NodePort that can exist in the namespace.
+                        type: string
+                    type: object
+                  usedLimit:
+                    description: UsedLimit is the currently allocated quota for all
+                      namespaces in the project.
+                    properties:
+                      configMaps:
+                        description: ConfigMaps is the total number of ReplicationControllers
+                          that can exist in the namespace.
+                        type: string
+                      limitsCpu:
+                        description: LimitsCPU is the CPU limits across all pods in
+                          a non-terminal state.
+                        type: string
+                      limitsMemory:
+                        description: LimitsMemory is the memory limits across all
+                          pods in a non-terminal state.
+                        type: string
+                      persistentVolumeClaims:
+                        description: PersistentVolumeClaims is the total number of
+                          PersistentVolumeClaims that can exist in the namespace.
+                        type: string
+                      pods:
+                        description: Pods is the total number of Pods in a non-terminal
+                          state that can exist in the namespace. A pod is in a terminal
+                          state if .status.phase in (Failed, Succeeded) is true.
+                        type: string
+                      replicationControllers:
+                        description: ReplicationControllers is total number of ReplicationControllers
+                          that can exist in the namespace.
+                        type: string
+                      requestsCpu:
+                        description: RequestsCPU is the CPU requests limit across
+                          all pods in a non-terminal state.
+                        type: string
+                      requestsMemory:
+                        description: RequestsMemory is the memory requests limit across
+                          all pods in a non-terminal state.
+                        type: string
+                      requestsStorage:
+                        description: RequestsStorage is the storage requests limit
+                          across all persistent volume claims.
+                        type: string
+                      secrets:
+                        description: Secrets is the total number of ReplicationControllers
+                          that can exist in the namespace.
+                        type: string
+                      services:
+                        description: Services is the total number of Services that
+                          can exist in the namespace.
+                        type: string
+                      servicesLoadBalancers:
+                        description: ServicesLoadBalancers is the total number of
+                          Services of type LoadBalancer that can exist in the namespace.
+                        type: string
+                      servicesNodePorts:
+                        description: ServiceNodePorts is the total number of Services
+                          of type NodePort that can exist in the namespace.
+                        type: string
+                    type: object
+                type: object
+            required:
+            - clusterName
+            - displayName
+            type: object
+          status:
+            description: Status is the most recently observed status of the project.
+            properties:
+              conditions:
+                description: Conditions are a set of indicators about aspects of the
+                  project.
+                items:
+                  description: ProjectCondition is the status of an aspect of the
+                    project.
+                  properties:
+                    lastTransitionTime:
+                      description: Last time the condition transitioned from one status
+                        to another.
+                      type: string
+                    lastUpdateTime:
+                      description: The last time this condition was updated.
+                      type: string
+                    message:
+                      description: Human-readable message indicating details about
+                        last transition.
+                      type: string
+                    reason:
+                      description: The reason for the condition's last transition.
+                      type: string
+                    status:
+                      description: Status of the condition, one of True, False, Unknown.
+                      type: string
+                    type:
+                      description: Type of project condition.
+                      type: string
+                  required:
+                  - status
+                  - type
+                  type: object
+                type: array
+              monitoringStatus:
+                description: MonitoringStatus is the status of the Monitoring V1 app.
+                properties:
+                  conditions:
+                    items:
+                      properties:
+                        lastTransitionTime:
+                          description: Last time the condition transitioned from one
+                            status to another.
+                          type: string
+                        lastUpdateTime:
+                          description: The last time this condition was updated.
+                          type: string
+                        message:
+                          description: Human-readable message indicating details about
+                            last transition
+                          type: string
+                        reason:
+                          description: The reason for the condition's last transition.
+                          type: string
+                        status:
+                          description: Status of the condition, one of True, False,
+                            Unknown.
+                          type: string
+                        type:
+                          description: Type of cluster condition.
+                          type: string
+                      required:
+                      - status
+                      - type
+                      type: object
+                    type: array
+                  grafanaEndpoint:
+                    type: string
+                type: object
+              podSecurityPolicyTemplateId:
+                description: PodSecurityPolicyTemplateName is the pod security policy
+                  template associated with the project.
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true

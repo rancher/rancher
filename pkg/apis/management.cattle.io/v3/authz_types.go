@@ -23,52 +23,111 @@ var (
 )
 
 // +genclient
-// +kubebuilder:skipversion
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// Project is a group of namespaces.
+// Projects are used to create a multi-tenant environment within a Kubernetes cluster by managing namespace operations,
+// such as role assignments or quotas, as a group.
 type Project struct {
-	types.Namespaced
+	types.Namespaced `json:",inline"`
+	metav1.TypeMeta  `json:",inline"`
 
-	metav1.TypeMeta   `json:",inline"`
+	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
+	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   ProjectSpec   `json:"spec,omitempty"`
-	Status ProjectStatus `json:"status"`
+	// Spec is the specification of the desired configuration for the project.
+	// +optional
+	Spec ProjectSpec `json:"spec,omitempty"`
+
+	// Status is the most recently observed status of the project.
+	// +optional
+	Status ProjectStatus `json:"status,omitempty"`
 }
 
 func (p *Project) ObjClusterName() string {
 	return p.Spec.ObjClusterName()
 }
 
+// ProjectStatus represents the most recently observed status of the project.
 type ProjectStatus struct {
-	Conditions                    []ProjectCondition `json:"conditions"`
-	PodSecurityPolicyTemplateName string             `json:"podSecurityPolicyTemplateId"`
-	MonitoringStatus              *MonitoringStatus  `json:"monitoringStatus,omitempty" norman:"nocreate,noupdate"`
+	// Conditions are a set of indicators about aspects of the project.
+	// +optional
+	Conditions []ProjectCondition `json:"conditions,omitempty"`
+
+	// PodSecurityPolicyTemplateName is the pod security policy template associated with the project.
+	// +optional
+	PodSecurityPolicyTemplateName string `json:"podSecurityPolicyTemplateId,omitempty"`
+
+	// MonitoringStatus is the status of the Monitoring V1 app.
+	// +optional
+	MonitoringStatus *MonitoringStatus `json:"monitoringStatus,omitempty" norman:"nocreate,noupdate"`
 }
 
+// ProjectCondition is the status of an aspect of the project.
 type ProjectCondition struct {
 	// Type of project condition.
+	// +kubebuilder:validation:Required
 	Type string `json:"type"`
+
 	// Status of the condition, one of True, False, Unknown.
+	// +kubebuilder:validation:Required
 	Status v1.ConditionStatus `json:"status"`
+
 	// The last time this condition was updated.
+	// +optional
 	LastUpdateTime string `json:"lastUpdateTime,omitempty"`
+
 	// Last time the condition transitioned from one status to another.
+	// +optional
 	LastTransitionTime string `json:"lastTransitionTime,omitempty"`
+
 	// The reason for the condition's last transition.
+	// +optional
 	Reason string `json:"reason,omitempty"`
-	// Human-readable message indicating details about last transition
+
+	// Human-readable message indicating details about last transition.
+	// +optional
 	Message string `json:"message,omitempty"`
 }
 
+// ProjectSpec is a description of the project.
 type ProjectSpec struct {
-	DisplayName                   string                  `json:"displayName,omitempty" norman:"required"`
-	Description                   string                  `json:"description"`
-	ClusterName                   string                  `json:"clusterName,omitempty" norman:"required,type=reference[cluster]"`
-	ResourceQuota                 *ProjectResourceQuota   `json:"resourceQuota,omitempty"`
+
+	// DisplayName is the human-readable name for the project.
+	// +kubebuilder:validation:Required
+	DisplayName string `json:"displayName" norman:"required"`
+
+	// Description is a human-readable description of the project.
+	// +optional
+	Description string `json:"description,omitempty"`
+
+	// ClusterName is the name of the cluster the project belongs to.
+	// +kubebuilder:validation:Required
+	ClusterName string `json:"clusterName" norman:"required,type=reference[cluster]"`
+
+	// ResourceQuota is a specification for the total amount of quota for standard resources that will be shared by all namespaces in the project.
+	// Must provide NamespaceDefaultResourceQuota if ResourceQuota is specified.
+	// See https://kubernetes.io/docs/concepts/policy/resource-quotas/ for more details.
+	// +optional
+	ResourceQuota *ProjectResourceQuota `json:"resourceQuota,omitempty"`
+
+	// NamespaceDefaultResourceQuota is a specification of the default ResourceQuota that a namespace will receive if none is provided.
+	// Must provide ResourceQuota if NamespaceDefaultResourceQuota is specified.
+	// See https://kubernetes.io/docs/concepts/policy/resource-quotas/ for more details.
+	// +optional
 	NamespaceDefaultResourceQuota *NamespaceResourceQuota `json:"namespaceDefaultResourceQuota,omitempty"`
+
+	// ContainerDefaultResourceLimit is a specification for the default LimitRange for the namespace.
+	// See https://kubernetes.io/docs/concepts/policy/limit-range/ for more details.
+	// +optional
 	ContainerDefaultResourceLimit *ContainerResourceLimit `json:"containerDefaultResourceLimit,omitempty"`
-	EnableProjectMonitoring       bool                    `json:"enableProjectMonitoring" norman:"default=false"`
+
+	// EnableProjectMonitoring indicates whether Monitoring V1 should be enabled for this project.
+	// Deprecated. Use the Monitoring V2 app instead.
+	// Defaults to false.
+	// +optional
+	EnableProjectMonitoring bool `json:"enableProjectMonitoring,omitempty" norman:"default=false"`
 }
 
 func (p *ProjectSpec) ObjClusterName() string {

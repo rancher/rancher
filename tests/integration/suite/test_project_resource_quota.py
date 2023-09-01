@@ -476,7 +476,8 @@ def test_container_resource_limit(admin_cc, admin_pc):
     # reset the container limit
     p = admin_cc.management.client.update(p,
                                           containerDefaultResourceLimit=None)
-    assert p.containerDefaultResourceLimit is None
+
+    assert not hasattr(p, 'containerDefaultResourceLimit')
 
     ns = admin_cc.management.client.update(ns,
                                            containerDefaultResourceLimit=None)
