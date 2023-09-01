@@ -67,6 +67,7 @@ func RegisterEarly(ctx context.Context, management *config.ManagementContext, cl
 	rt := newRoleTemplateLifecycle(management, clusterManager)
 	grbLegacy := newLegacyGRBCleaner(management)
 	rtLegacy := newLegacyRTCleaner(management)
+	prtbServiceAccountFinder := newPRTBServiceAccountController(management)
 
 	management.Management.ClusterRoleTemplateBindings("").AddLifecycle(ctx, ctrbMGMTController, crtb)
 	management.Management.ProjectRoleTemplateBindings("").AddLifecycle(ctx, ptrbMGMTController, prtb)
@@ -75,6 +76,7 @@ func RegisterEarly(ctx context.Context, management *config.ManagementContext, cl
 
 	management.Management.Clusters("").AddHandler(ctx, clusterCreateController, c.sync)
 	management.Management.Projects("").AddHandler(ctx, projectCreateController, p.sync)
+	management.Management.ProjectRoleTemplateBindings("").AddHandler(ctx, prtbServiceAccountControllerName, prtbServiceAccountFinder.sync)
 	management.Management.Tokens("").AddHandler(ctx, tokenController, n.sync)
 	management.Management.AuthConfigs("").AddHandler(ctx, authConfigControllerName, ac.sync)
 	management.Management.UserAttributes("").AddHandler(ctx, userAttributeController, ua.sync)
