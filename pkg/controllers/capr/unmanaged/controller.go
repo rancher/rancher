@@ -143,7 +143,7 @@ func (h *handler) createMachineObjects(capiCluster *capi.Cluster, machineName st
 
 	if data.Bool("role-control-plane") {
 		labels[capr.ControlPlaneRoleLabel] = "true"
-		labels[capi.MachineControlPlaneLabelName] = "true"
+		labels[capi.MachineControlPlaneNameLabel] = "true"
 	}
 	if data.Bool("role-etcd") {
 		labels[capr.EtcdRoleLabel] = "true"
@@ -163,7 +163,7 @@ func (h *handler) createMachineObjects(capiCluster *capi.Cluster, machineName st
 
 	labels[capr.MachineIDLabel] = data.String("id")
 	labels[capr.ClusterNameLabel] = capiCluster.Name
-	labels[capi.ClusterLabelName] = capiCluster.Name
+	labels[capi.ClusterNameLabel] = capiCluster.Name
 
 	labelsMap := map[string]string{}
 	for _, str := range strings.Split(data.String("labels"), ",") {

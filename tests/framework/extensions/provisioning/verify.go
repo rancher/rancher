@@ -218,7 +218,7 @@ func VerifyHostnameLength(t *testing.T, client *rancher.Client, clusterObject *s
 
 	for _, mp := range clusterSpec.RKEConfig.MachinePools {
 		n := wranglername.SafeConcatName(clusterObject.Name, mp.Name)
-		query, err := url.ParseQuery(fmt.Sprintf("labelSelector=%s=%s&fieldSelector=metadata.name=%s", capi.ClusterLabelName, clusterObject.Name, n))
+		query, err := url.ParseQuery(fmt.Sprintf("labelSelector=%s=%s&fieldSelector=metadata.name=%s", capi.ClusterNameLabel, clusterObject.Name, n))
 		require.NoError(t, err)
 
 		machineDeploymentsResp, err := client.Steve.SteveType("cluster.x-k8s.io.machinedeployment").List(query)
@@ -229,7 +229,7 @@ func VerifyHostnameLength(t *testing.T, client *rancher.Client, clusterObject *s
 		md := &capi.MachineDeployment{}
 		require.NoError(t, steveV1.ConvertToK8sType(machineDeploymentsResp.Data[0].JSONResp, md))
 
-		query2, err := url.ParseQuery(fmt.Sprintf("labelSelector=%s=%s", capi.MachineDeploymentLabelName, md.Name))
+		query2, err := url.ParseQuery(fmt.Sprintf("labelSelector=%s=%s", capi.MachineDeploymentNameLabel, md.Name))
 		require.NoError(t, err)
 
 		machineResp, err := client.Steve.SteveType("cluster.x-k8s.io.machine").List(query2)
