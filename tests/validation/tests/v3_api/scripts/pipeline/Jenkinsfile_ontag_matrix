@@ -196,9 +196,17 @@ if ( true == via_webhook() && (!(rancher_version ==~ rancher_version_regex)) ) {
                           RKE_VERSION = "v1.4.4"
                         }
                         if (!env.RANCHER_K3S_VERSION) {
+                          RANCHER_K3S_VERSION = "v1.26.4+k3s1"
+                        }
+                      }     
+                      else if (rancher_version.startsWith("v2.8")){
+                        if (!env.RKE_VERSION) {
+                          RKE_VERSION = "v1.5.0-rc4"
+                        }
+                        if (!env.RANCHER_K3S_VERSION) {
                           RANCHER_K3S_VERSION = "v1.27.4+k3s1"
                         }
-                      }                   
+                      }              
 
                       params = [ string(name: 'CATTLE_TEST_URL', value: "${CATTLE_TEST_URL}"),
                                 string(name: 'ADMIN_TOKEN', value: "${ADMIN_TOKEN}"),
