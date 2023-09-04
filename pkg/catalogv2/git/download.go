@@ -2,19 +2,23 @@ package git
 
 import (
 	"fmt"
+
+	plumbing "github.com/go-git/go-git/v5/plumbing"
 )
 
 // Ensure will check if repo is cloned, if not the method will clone and reset to the latest commit.
 // If reseting to the latest commit is not possible it will fetch and try to reset again
 func (r *Repository) Ensure(branch string) error {
+	// clone at the current HEAD pointing branch
+	// if the HEAD pointing branch is supposed to change, then it should be done at Update or Head method
 	err := r.cloneOrOpen("")
 	if err != nil {
-		return fmt.Errorf("Ensure failure: %w", err)
+		return fmt.Errorf("failed to clone or open repository: %w", err)
 	}
 
 	// Try to reset to the given branch, if success exit
-	localBranchFullName := fmt.Sprintf("refs/heads/%s", branch)
-	err = r.hardReset(localBranchFullName)
+	localBranchFullName := plumbing.NewBranchReferenceName(branch)
+	err = r.hardReset(localBranchFullName.String())
 	if err == nil {
 		return nil
 	}
@@ -22,7 +26,7 @@ func (r *Repository) Ensure(branch string) error {
 	// If we do not have the branch locally, fetch and reset
 	err = r.fetchAndReset(branch)
 	if err != nil {
-		return fmt.Errorf("Ensure failure: %w", err)
+		return fmt.Errorf("failed to fetch and/or reset at branch: %w", err)
 	}
 	return nil
 }
@@ -31,17 +35,17 @@ func (r *Repository) Ensure(branch string) error {
 func (r *Repository) Head(branch string) (string, error) {
 	err := r.cloneOrOpen(branch)
 	if err != nil {
-		return "", fmt.Errorf("Head failure: %w", err)
+		return "", fmt.Errorf("failed to clone or open repository: %w", err)
 	}
 
-	err = r.hardReset("HEAD")
+	err = r.hardReset(string(plumbing.HEAD))
 	if err != nil {
-		return "", fmt.Errorf("Head failure: %w", err)
+		return "", fmt.Errorf("failed to hard reset at HEAD: %w", err)
 	}
 
 	commit, err := r.getCurrentCommit()
 	if err != nil {
-		return commit.String(), fmt.Errorf("Head failure: %w", err)
+		return commit.String(), fmt.Errorf("failed to get current commit: %w", err)
 	}
 	return commit.String(), nil
 }
@@ -67,22 +71,22 @@ func (r *Repository) CheckUpdate(branch, systemCatalogMode string) (string, erro
 func (r *Repository) Update(branch string) (string, error) {
 	err := r.cloneOrOpen(branch)
 	if err != nil {
-		return "", fmt.Errorf("Update failure: %w", err)
+		return "", fmt.Errorf("failed to clone or open: %w", err)
 	}
 
-	err = r.hardReset("HEAD")
+	err = r.hardReset(string(plumbing.HEAD))
 	if err != nil {
-		return "", fmt.Errorf("Update failure: %w", err)
+		return "", fmt.Errorf("failed to hard reset at HEAD: %w", err)
 	}
 
 	commit, err := r.getCurrentCommit()
 	if err != nil {
-		return commit.String(), fmt.Errorf("Update failure: %w", err)
+		return commit.String(), fmt.Errorf("failed to get current commit: %w", err)
 	}
 
 	lastCommit, err := r.getLastCommitHash(branch, commit)
 	if err != nil {
-		return commit.String(), fmt.Errorf("Update failure: %w", err)
+		return commit.String(), fmt.Errorf("failed to retrieve latest commit hash: %w", err)
 	}
 	if lastCommit == commit {
 		return commit.String(), nil
@@ -90,12 +94,12 @@ func (r *Repository) Update(branch string) (string, error) {
 
 	err = r.fetchAndReset(branch)
 	if err != nil {
-		return "", fmt.Errorf("Update failure: %w", err)
+		return "", fmt.Errorf("failed to fetch and/or reset at branch: %w", err)
 	}
 
 	lastCommitRef, err := r.getCurrentCommit()
 	if err != nil {
-		return lastCommitRef.String(), fmt.Errorf("Update failure: %w", err)
+		return lastCommitRef.String(), fmt.Errorf("failed to get current commit: %w", err)
 	}
 	return lastCommitRef.String(), nil
 }
