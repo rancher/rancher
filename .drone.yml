@@ -691,6 +691,107 @@ trigger:
     - promote
 ---
 kind: pipeline
+name: mapps-linux-amd64
+
+platform:
+  os: linux
+  arch: amd64
+
+steps:
+  - name: build-pr
+    image: rancher/dapper:v0.6.0
+    commands:
+      - dapper mapps-ci
+    privileged: true
+    volumes:
+      - name: docker
+        path: /var/run/docker.sock
+    when:
+      event:
+        - pull_request
+
+  - name: build-push-tag
+    image: rancher/dapper:v0.6.0
+    commands:
+      - dapper mapps-test
+    privileged: true
+    volumes:
+      - name: docker
+        path: /var/run/docker.sock
+    when:
+      instance:
+        - drone-publish.rancher.io
+      ref:
+        include:
+          - "refs/heads/master"
+          - "refs/heads/release/v*"
+          - "refs/tags/v*"
+      event:
+        - push
+        - tag
+
+volumes:
+  - name: docker
+    host:
+      path: /var/run/docker.sock
+
+trigger:
+  event:
+    exclude:
+      - promote
+
+---
+kind: pipeline
+name: mapps-linux-arm64
+
+platform:
+  os: linux
+  arch: arm64
+
+steps:
+  - name: build-pr
+    image: rancher/dapper:v0.6.0
+    commands:
+      - dapper mapps-ci
+    privileged: true
+    volumes:
+      - name: docker
+        path: /var/run/docker.sock
+    when:
+      event:
+        - pull_request
+
+  - name: build-push-tag
+    image: rancher/dapper:v0.6.0
+    commands:
+      - dapper mapps-test
+    privileged: true
+    volumes:
+      - name: docker
+        path: /var/run/docker.sock
+    when:
+      instance:
+        - drone-publish.rancher.io
+      ref:
+        include:
+          - "refs/heads/master"
+          - "refs/heads/release/v*"
+          - "refs/tags/v*"
+      event:
+        - push
+        - tag
+
+volumes:
+  - name: docker
+    host:
+      path: /var/run/docker.sock
+
+trigger:
+  event:
+    exclude:
+      - promote
+---
+kind: pipeline
 name: default-linux-s390x
 
 platform:

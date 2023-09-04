@@ -1,5 +1,8 @@
 #!/bin/bash
 set -e
+if ./scripts/only-ui-bumps.sh; then
+    exit 0
+fi
 
 cleanup()
 {
@@ -15,15 +18,7 @@ cleanup()
     return $EXIT
 }
 
-# skipping tests for s390x since k3s doesn't support s390x yet
-if [ ${ARCH} == s390x ]; then
-    exit 0
-fi
-
 cd $(dirname $0)/..
-
-echo Running unit tests
-go test -cover -tags=test ./pkg/...
 
 if [ ${ARCH} == arm64 ] || [ ${ARCH} == s390x ]; then
     export ETCD_UNSUPPORTED_ARCH=${ARCH}
@@ -63,7 +58,7 @@ if [ -z "${SOME_K8S_VERSION}" ]; then
 export SOME_K8S_VERSION=$(curl -sS https://raw.githubusercontent.com/rancher/kontainer-driver-metadata/dev-v2.7/data/data.json | jq -r ".$DIST.releases[-1].version")
 fi
 
-echo Starting rancher server for test
+echo "Starting rancher server for mapps-test"
 touch /tmp/rancher.log
 
 mkdir -p /var/lib/rancher/$DIST/agent/images
@@ -116,8 +111,8 @@ dump_rancher_logs()
 
 # uncomment to get startup logs. Don't leave them on because it slows drone down too
 # much
-#tail -F /tmp/rancher.log &
-#TPID=$!
+tail -F /tmp/rancher.log &
+TPID=$!
 
 trap "exit 1" 42
 PWRAPPROC="$$"
@@ -128,7 +123,7 @@ RANCHER_RUN_PID=$!
 trap cleanup exit
 
 echo "Waiting for Rancher to be healthy"
-./scripts/retry --sleep 2 "curl -sf -o /dev/null http://localhost:8080/ping"
+./scripts/retry --sleep 2 --timeout 300 "curl -sf -o /dev/null http://localhost:8080/ping"
 
 echo "Waiting up to 5 minutes for rancher-webhook deployment"
 ./scripts/retry \
@@ -159,15 +154,9 @@ export CATTLE_TEST_CONFIG=$(pwd)/config.yaml # used by integration tests and tes
 }
 
 echo Running go integration tests
-go test -v -failfast $(go list ./tests/v2/integration/... | grep -v /tests/v2/integration/catalogv2/) || {
+go test -v -failfast ./tests/v2/integration/catalogv2/... || {
   dump_rancher_logs
   exit 1
 }
-
-echo Running tox tests
-INT_TESTS_STARTED=true
-cd ./tests/integration
-tox -e rancher -- -m "not nonparallel" -n $(nproc)
-tox -e rancher -- -m nonparallel
 
 tail -f /tmp/rancher-test.log &
