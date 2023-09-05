@@ -80,7 +80,9 @@ func GetImages(exportConfig ExportConfig, externalImages map[string][]string, im
 	}
 
 	// fetch images from extension catalog images
-	extensions := ExtensionConfig(0)
+	extensions := ExtensionsConfig{
+		GithubEndpoints: ExtensionEndpoints,
+	}
 	if err := extensions.FetchExtensionImages(imagesSet); err != nil {
 		return nil, nil, errors.Wrap(err, "failed to fetch images from extensions")
 	}
