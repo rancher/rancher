@@ -78,6 +78,7 @@ func (w *RancherManagedChartsTest) SetupSuite() {
 	require.NoError(w.T(), err)
 	w.cluster = c
 	w.Require().NoError(w.updateSetting("system-managed-charts-operation-timeout", "50s"))
+	w.Require().NoError(w.updateSetting("system-feature-chart-refresh-seconds", "21600"))
 	clusterRepo, err := w.catalogClient.ClusterRepos().Get(context.TODO(), "rancher-charts", metav1.GetOptions{})
 	w.Require().NoError(err)
 	w.originalBranch = clusterRepo.Spec.GitBranch
@@ -368,18 +369,6 @@ func (w *RancherManagedChartsTest) updateManagementCluster() error {
 }
 
 func (w *RancherManagedChartsTest) resetManagementCluster() error {
-	err := kwait.Poll(5*time.Second, 2*time.Minute, func() (done bool, err error) {
-		list, err := w.corev1.Secrets("cattle-system").List(context.TODO(), metav1.ListOptions{LabelSelector: "name=rancher-aks-operator"})
-		w.Require().NoError(err)
-		if len(list.Items) == 0 {
-			return true, nil
-		}
-		for _, s := range list.Items {
-			w.Require().NoError(w.corev1.Secrets("cattle-system").Delete(context.Background(), s.Name, metav1.DeleteOptions{PropagationPolicy: &propagation}))
-		}
-		return false, nil
-	})
-	w.Require().NoError(err)
 	w.cluster.AKSConfig = nil
 	w.cluster.AppliedSpec.AKSConfig = nil
 	c, err := w.client.Management.Cluster.Replace(w.cluster)
@@ -394,8 +383,21 @@ func (w *RancherManagedChartsTest) resetManagementCluster() error {
 		}
 		return false, nil
 	})
+	w.Require().NoError(err)
 	w.cluster = c
-	return err
+	err = kwait.Poll(5*time.Second, 2*time.Minute, func() (done bool, err error) {
+		list, err := w.corev1.Secrets("cattle-system").List(context.TODO(), metav1.ListOptions{LabelSelector: "name in (rancher-aks-operator, rancher-aks-operator-crd)"})
+		w.Require().NoError(err)
+		if len(list.Items) == 0 {
+			return true, nil
+		}
+		for _, s := range list.Items {
+			w.Require().NoError(w.corev1.Secrets("cattle-system").Delete(context.Background(), s.Name, metav1.DeleteOptions{PropagationPolicy: &propagation}))
+		}
+		return false, nil
+	})
+	w.Require().NoError(err)
+	return nil
 }
 
 func (w *RancherManagedChartsTest) updateSetting(name, value string) error {
