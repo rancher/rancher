@@ -49,7 +49,7 @@ var (
 		"cattle-elemental-system",
 	}
 
-	AgentImage                          = NewSetting("agent-image", "rancher/rancher-agent:v2.7-head")
+	AgentImage                          = NewSetting("agent-image", "rancher/rancher-agent:v2.8-head")
 	AgentRolloutTimeout                 = NewSetting("agent-rollout-timeout", "300s")
 	AgentRolloutWait                    = NewSetting("agent-rollout-wait", "true")
 	AuthImage                           = NewSetting("auth-image", v32.ToolsSystemImages.AuthSystemImages.KubeAPIAuth)
