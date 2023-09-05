@@ -1,0 +1,68 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.12.0
+  name: projectroletemplatebindings.management.cattle.io
+spec:
+  group: management.cattle.io
+  names:
+    kind: ProjectRoleTemplateBinding
+    listKind: ProjectRoleTemplateBindingList
+    plural: projectroletemplatebindings
+    singular: projectroletemplatebinding
+  scope: Namespaced
+  versions:
+  - name: v3
+    schema:
+      openAPIV3Schema:
+        description: ProjectRoleTemplateBinding is the object representing membership
+          of a subject in a project with permissions specified by a given role template.
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          groupName:
+            description: GroupName is the name of the group subject added to the project.
+              Immutable.
+            type: string
+          groupPrincipalName:
+            description: GroupPrincipalName is the name of the group principal subject
+              added to the project. Immutable.
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          projectName:
+            description: ProjectName is the name of the project to which a subject
+              is added. Immutable.
+            type: string
+          roleTemplateName:
+            description: RoleTemplateName is the name of the role template that defines
+              permissions to perform actions on resources in the project. Immutable.
+            type: string
+          serviceAccount:
+            description: ServiceAccount is the name of the service account bound as
+              a subject. Immutable. Deprecated.
+            type: string
+          userName:
+            description: UserName is the name of the user subject added to the project.
+              Immutable.
+            type: string
+          userPrincipalName:
+            description: UserPrincipalName is the name of the user principal subject
+              added to the project. Immutable.
+            type: string
+        required:
+        - projectName
+        - roleTemplateName
+        type: object
+    served: true
+    storage: true
