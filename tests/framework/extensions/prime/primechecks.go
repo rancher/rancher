@@ -2,14 +2,10 @@ package primechecks
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	client "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
-	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
 	"github.com/rancher/rancher/tests/framework/extensions/rancherversion"
-	"github.com/sirupsen/logrus"
-	corev1 "k8s.io/api/core/v1"
 )
 
 const (
@@ -42,42 +38,4 @@ func CheckSystemDefaultRegistry(isPrime bool, primeRegistry string, registry *cl
 	}
 
 	return nil
-}
-
-// CheckLocalClusterRancherImages checks if the Rancher images are set to the expected registry.
-func CheckLocalClusterRancherImages(client *rancher.Client, isPrime bool, rancherVersion, primeRegistry, clusterID string) ([]string, []error) {
-	downstreamClient, err := client.Steve.ProxyDownstream(clusterID)
-	if err != nil {
-		return nil, []error{err}
-	}
-
-	steveClient := downstreamClient.SteveType(PodResourceSteveType)
-
-	pods, err := steveClient.List(nil)
-	if err != nil {
-		return nil, []error{err}
-	}
-
-	var imageResults []string
-	var imageErrors []error
-
-	for _, pod := range pods.Data {
-		podStatus := &corev1.PodStatus{}
-		err = v1.ConvertToK8sType(pod.Status, podStatus)
-		if err != nil {
-			return nil, []error{err}
-		}
-
-		image := podStatus.ContainerStatuses[0].Image
-
-		if (strings.Contains(image, primeRegistry) && isPrime) || (strings.Contains(image, rancherImage) && !isPrime) {
-			imageResults = append(imageResults, fmt.Sprintf("INFO: %s: %s\n", pod.Name, image))
-			logrus.Infof("Pod %s is using image: %s", pod.Name, image)
-		} else if strings.Contains(image, rancherImage) && isPrime {
-			imageErrors = append(imageErrors, fmt.Errorf("ERROR: %s: %s", pod.Name, image))
-			logrus.Infof("Pod %s is using image: %s", pod.Name, image)
-		}
-	}
-
-	return imageResults, imageErrors
 }
