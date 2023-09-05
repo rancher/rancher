@@ -235,7 +235,7 @@ func (r *Repository) cloneOrOpen(branch string) error {
 		}
 		// serious problem warning
 		if openErr == gogit.ErrRepositoryNotExists && cloneErr == gogit.ErrRepositoryAlreadyExists {
-			return fmt.Errorf("serious failure, conflicting error, could not clone or open the repository: open error: %w and clone error: %w", openErr, cloneErr)
+			return fmt.Errorf("serious failure, neither open or clone succeeded: %w", cloneErr)
 		}
 		r.repoGogit = repoGogit
 		return nil
