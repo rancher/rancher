@@ -45,7 +45,7 @@ func Resolve(image string) string {
 	return ResolveWithCluster(image, nil)
 }
 
-// ResolveWithCluster returns the image concatenated with the URL of the private registry specified.
+// ResolveWithCluster returns the image concatenated with the URL of the private registry specified, adding rancher/ if is a private repo.
 // It will use the cluster level registry if one is found, or the system default registry if no cluster level registry is found.
 // If either is not found, it returns the image.
 func ResolveWithCluster(image string, cluster *v3.Cluster) string {
