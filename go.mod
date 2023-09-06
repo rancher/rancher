@@ -1,6 +1,6 @@
 module github.com/rancher/rancher
 
-go 1.19
+go 1.21
 
 // on release remove this wrangler replace and use the latest tag
 replace github.com/rancher/wrangler v1.1.1 => github.com/rancher/wrangler v1.1.1-0.20230705223603-201b4da5bdaf

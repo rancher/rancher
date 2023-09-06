@@ -1,6 +1,6 @@
 module github.com/rancher/rancher/pkg/apis
 
-go 1.19
+go 1.21
 
 // wrangler bracnhes need to be updated before replace can be removed
 replace github.com/rancher/wrangler v1.1.1 => github.com/rancher/wrangler v1.1.1-0.20230629203936-0e36fee7aea5
