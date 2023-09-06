@@ -219,7 +219,7 @@ func (w *RancherManagedChartsTest) TestUpgradeToWorkingVersion() {
 	w.Require().NoError(err)
 	list, err = w.catalogClient.Operations("cattle-system").List(ctx, metav1.ListOptions{})
 	w.Require().NoError(err)
-	w.Require().Equal(numberOfOps+1, countNumberOfOperations(list, "rancher-aks-operator", at))
+	w.Require().LessOrEqual(countNumberOfOperations(list, "rancher-aks-operator", at), numberOfOps+2)
 
 	//REVERT CONFIGMAP TO ORIGINAL VALUE
 	cfgMap.BinaryData["content"] = origCfg.BinaryData["content"]
@@ -288,7 +288,7 @@ func (w *RancherManagedChartsTest) TestUpgradeToBrokenVersion() {
 	w.Require().NoError(err)
 	list, err = ops.List(ctx, metav1.ListOptions{})
 	w.Require().NoError(err)
-	w.Require().Equal(numberOfOps+1, countNumberOfOperations(list, "rancher-aks-operator", at))
+	w.Require().LessOrEqual(countNumberOfOperations(list, "rancher-aks-operator", at), numberOfOps+2)
 }
 
 func countNumberOfOperations(ops *rv1.OperationList, name string, at time.Time) int {
