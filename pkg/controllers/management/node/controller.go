@@ -275,7 +275,18 @@ func (m *Lifecycle) Remove(machine *apimgmtv3.Node) (obj runtime.Object, err err
 			if err = m.drainNode(machine); err != nil {
 				return machine, err
 			}
-			if err = deleteNode(config.Dir(), machine); err != nil {
+
+			driverConfig, err := config.DriverConfig()
+			if err != nil {
+				return nil, err
+			}
+
+			configRawMap := map[string]interface{}{}
+			if err := json.Unmarshal([]byte(driverConfig), &configRawMap); err != nil {
+				return obj, errors.Wrap(err, "failed to unmarshal node config")
+			}
+
+			if err = deleteNode(config.Dir(), machine, configRawMap); err != nil {
 				return machine, err
 			}
 			logrus.Infof("[node-controller] Removing node %s done", machine.Spec.RequestedHostname)
