@@ -51,7 +51,8 @@ func TestConvertMirroredImages(t *testing.T) {
 
 func TestResolveWithCluster(t *testing.T) {
 	if os.Getenv("CATTLE_BASE_REGISTRY") != "" {
-		fmt.Println("Skiping TestResolveWithCluster. Can't run the tests with CATTLE_BASE_REGISTRY set")
+		fmt.Println("Skipping TestResolveWithCluster. Can't run the tests with CATTLE_BASE_REGISTRY set")
+		return
 	}
 
 	clusterWithPrivateRegistry := func(s string) *v3.Cluster {
@@ -177,6 +178,56 @@ func TestResolveWithCluster(t *testing.T) {
 				t.Errorf("Failed to test TestResolveWithCluster(), unable to set SystemDefaultRegistry with the value: %v", err)
 			}
 			assertlib.Equalf(t, tt.expected, ResolveWithCluster(tt.input.image, tt.input.cluster), "ResolveWithCluster(%v, %v)", tt.input.image, tt.input.cluster)
+		})
+	}
+}
+
+func TestResolve(t *testing.T) {
+	if os.Getenv("CATTLE_BASE_REGISTRY") != "" {
+		fmt.Println("Skipping TestResolve. Can't run the tests with CATTLE_BASE_REGISTRY set")
+		return
+	}
+
+	type input struct {
+		image              string
+		CattleBaseRegistry string
+	}
+	tests := []struct {
+		name     string
+		input    input
+		expected string
+	}{
+		{
+			name: "No default",
+			input: input{
+				image:              "imagename",
+				CattleBaseRegistry: "",
+			},
+			expected: "imagename",
+		},
+		{
+			name: "Default without rancher",
+			input: input{
+				image:              "imagename",
+				CattleBaseRegistry: "default-registry.com",
+			},
+			expected: "default-registry.com/rancher/imagename",
+		},
+		{
+			name: "Default wit rancher",
+			input: input{
+				image:              "rancher/imagename",
+				CattleBaseRegistry: "default-registry.com",
+			},
+			expected: "default-registry.com/rancher/imagename",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := settings.SystemDefaultRegistry.Set(tt.input.CattleBaseRegistry); err != nil {
+				t.Errorf("Failed to test TestResolveWithCluster(), unable to set SystemDefaultRegistry with the value: %v", err)
+			}
+			assertlib.Equalf(t, tt.expected, Resolve(tt.input.image), "Resolve(%v)", tt.input.image)
 		})
 	}
 }
