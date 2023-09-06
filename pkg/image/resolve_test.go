@@ -172,13 +172,22 @@ func TestResolveWithCluster(t *testing.T) {
 			expected: "cluster-url.com/rancher/imagename",
 		},
 	}
+
+	if err := settings.SystemDefaultRegistry.Set(""); err != nil {
+		t.Errorf("Failed to test TestResolveWithCluster(), unable to set SystemDefaultRegistry with the err: %v", err)
+	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if err := settings.SystemDefaultRegistry.Set(tt.input.CattleBaseRegistry); err != nil {
-				t.Errorf("Failed to test TestResolveWithCluster(), unable to set SystemDefaultRegistry with the value: %v", err)
+				t.Errorf("Failed to test TestResolveWithCluster(), unable to set SystemDefaultRegistry. err: %v", err)
 			}
 			assertlib.Equalf(t, tt.expected, ResolveWithCluster(tt.input.image, tt.input.cluster), "ResolveWithCluster(%v, %v)", tt.input.image, tt.input.cluster)
 		})
+	}
+
+	if err := settings.SystemDefaultRegistry.Set(""); err != nil {
+		t.Errorf("Failed to clean up TestResolveWithCluster(), unable to set SystemDefaultRegistry with the err: %v", err)
 	}
 }
 
@@ -222,12 +231,22 @@ func TestResolve(t *testing.T) {
 			expected: "default-registry.com/rancher/imagename",
 		},
 	}
+
+	if err := settings.SystemDefaultRegistry.Set(""); err != nil {
+		t.Errorf("Failed to test TestResolveWithCluster(), unable to clean SystemDefaultRegistry. Err: %v", err)
+	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if err := settings.SystemDefaultRegistry.Set(tt.input.CattleBaseRegistry); err != nil {
-				t.Errorf("Failed to test TestResolveWithCluster(), unable to set SystemDefaultRegistry with the value: %v", err)
+				t.Errorf("Failed to test TestResolveWithCluster(), unable to set SystemDefaultRegistry. Err: %v", err)
 			}
 			assertlib.Equalf(t, tt.expected, Resolve(tt.input.image), "Resolve(%v)", tt.input.image)
 		})
 	}
+
+	if err := settings.SystemDefaultRegistry.Set(""); err != nil {
+		t.Errorf("Failed to clean up TestResolve(), unable to clean SystemDefaultRegistry. Err: %v", err)
+	}
+
 }
