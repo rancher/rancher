@@ -110,13 +110,11 @@ require (
 	github.com/rancher/channelserver v0.5.1-0.20230719220800-0a37b73c7df8
 	github.com/rancher/dynamiclistener v0.3.5
 	github.com/rancher/eks-operator v1.2.2-rc3
-	github.com/rancher/fleet/pkg/apis v0.0.0-20230810121238-9d0ee7f56848
+	github.com/rancher/fleet/pkg/apis v0.0.0-20230821130910-23e1c146755a
 	github.com/rancher/gke-operator v1.1.6-rc2
 	github.com/rancher/kubernetes-provider-detector v0.1.5
 	github.com/rancher/lasso v0.0.0-20230830164424-d684fdeb6f29
-	github.com/rancher/machine v0.15.0-rancher99
 	github.com/rancher/norman v0.0.0-20230426211126-d3552b018687
-	github.com/rancher/rancher/pkg/apis v0.0.0
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 	github.com/rancher/remotedialer v0.2.6-0.20220624190122-ea57207bf2b8
@@ -162,7 +160,11 @@ require (
 	sigs.k8s.io/yaml v1.3.0
 )
 
-require github.com/containers/image/v5 v5.25.0
+require (
+	github.com/containers/image/v5 v5.25.0
+	github.com/rancher/machine v0.15.0-rancher102
+	github.com/rancher/rancher/pkg/apis v0.0.0-20230317204402-a49d36c7e628
+)
 
 require (
 	cloud.google.com/go/compute/metadata v0.2.3 // indirect
