@@ -8,7 +8,7 @@ env:
   MAIN_BRANCH: origin/master
   GOARCH: amd64
   CGO_ENABLED: 0
-  SETUP_GO_VERSION: '1.19.*'
+  SETUP_GO_VERSION: '1.21.*'
 
 jobs:
   check-changes:
