@@ -214,7 +214,7 @@ func TestResolve(t *testing.T) {
 			expected: "default-registry.com/rancher/imagename",
 		},
 		{
-			name: "Default wit rancher",
+			name: "Default with rancher",
 			input: input{
 				image:              "rancher/imagename",
 				CattleBaseRegistry: "default-registry.com",
