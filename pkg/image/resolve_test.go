@@ -161,6 +161,15 @@ func TestResolveWithCluster(t *testing.T) {
 			},
 			expected: "cluster-url.com/rancher/imagename",
 		},
+		{
+			name: "Cluster with URL, and default registry, with rancher/ on image",
+			input: input{
+				image:              "rancher/imagename",
+				CattleBaseRegistry: "registry-url",
+				cluster:            clusterWithPrivateRegistry("cluster-url.com"),
+			},
+			expected: "cluster-url.com/rancher/imagename",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
