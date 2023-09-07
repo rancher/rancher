@@ -29,6 +29,7 @@ type ClusterConfig struct {
 	Registries           *provisioningInput.Registries            `json:"registries" yaml:"registries"`
 	UpgradeStrategy      *rkev1.ClusterUpgradeStrategy            `json:"upgradeStrategy" yaml:"upgradeStrategy"`
 	Advanced             *provisioningInput.Advanced              `json:"advanced" yaml:"advanced"`
+	ClusterSSHTests      []string                                 `json:"clusterSSHTests" yaml:"clusterSSHTests"`
 }
 
 // ConvertConfigToClusterConfig converts the config from (user) provisioning input to a cluster config
@@ -52,6 +53,7 @@ func ConvertConfigToClusterConfig(clustersConfig *provisioningInput.Config) *Clu
 	newConfig.Hardened = clustersConfig.Hardened
 	newConfig.PSACT = clustersConfig.PSACT
 	newConfig.PNI = clustersConfig.PNI
+	newConfig.ClusterSSHTests = clustersConfig.ClusterSSHTests
 
 	return &newConfig
 }
