@@ -305,6 +305,7 @@ type ProjectRoleTemplateBinding struct {
 	RoleTemplateName string `json:"roleTemplateName,omitempty" norman:"required,noupdate,type=reference[roleTemplate]"`
 
 	// ServiceAccount is the name of the service account bound as a subject. Immutable.
+	// Deprecated.
 	// +optional
 	ServiceAccount string `json:"serviceAccount,omitempty" norman:"nocreate,noupdate"`
 }

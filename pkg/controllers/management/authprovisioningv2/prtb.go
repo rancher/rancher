@@ -19,7 +19,7 @@ import (
 const PRTBRoleBindingID = "auth-prov-v2-prtb-rolebinding"
 
 func (h *handler) OnPRTB(key string, prtb *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error) {
-	if prtb == nil || prtb.DeletionTimestamp != nil || prtb.RoleTemplateName == "" || prtb.ProjectName == "" {
+	if prtb == nil || prtb.DeletionTimestamp != nil || prtb.RoleTemplateName == "" || prtb.ProjectName == "" || prtb.ServiceAccount != "" {
 		return prtb, nil
 	}
 
