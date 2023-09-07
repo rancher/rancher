@@ -396,6 +396,10 @@ func NewK3SRKE2ClusterConfig(clusterName, namespace string, clustersConfig *Clus
 		spec.DefaultPodSecurityAdmissionConfigurationTemplateName = clustersConfig.PSACT
 	}
 
+	if clustersConfig.SSHTests != nil {
+		spec.SSHTests = clustersConfig.SSHTests
+	}
+
 	v1Cluster := &apisV1.Cluster{
 		TypeMeta:   typeMeta,
 		ObjectMeta: objectMeta,

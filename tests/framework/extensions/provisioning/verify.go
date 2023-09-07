@@ -20,8 +20,11 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/provisioninginput"
 	psadeploy "github.com/rancher/rancher/tests/framework/extensions/psact"
 	"github.com/rancher/rancher/tests/framework/extensions/registries"
+	"github.com/rancher/rancher/tests/framework/extensions/sshkeys"
 	"github.com/rancher/rancher/tests/framework/extensions/workloads/pods"
+	"github.com/rancher/rancher/tests/framework/pkg/nodes"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
+	"github.com/rancher/rancher/tests/v2/validation/provisioning"
 	"github.com/rancher/rancher/tests/v2prov/defaults"
 	wranglername "github.com/rancher/wrangler/pkg/name"
 	"github.com/stretchr/testify/assert"
@@ -158,6 +161,10 @@ func VerifyCluster(t *testing.T, client *rancher.Client, cluster *steveV1.SteveA
 	podResults, podErrors := pods.StatusPods(client, status.ClusterName)
 	assert.Empty(t, podErrors)
 	assert.NotEmpty(t, podResults)
+
+	if clusterSpec.SSHTests != nil {
+		VerifySSHTests(t, client, cluster, clusterSpec)
+	}
 }
 
 // CertRotationCompleteCheckFunc returns a watch check function that checks if the certificate rotation is complete
@@ -334,4 +341,33 @@ func GetSnapshots(client *rancher.Client, localclusterID string, clusterName str
 	}
 	return snapshots, nil
 
+}
+
+// VerifySSHTests validates the ssh tests listed in the config on each node of the cluster
+func VerifySSHTests(t *testing.T, client *rancher.Client, clusterObject *steveV1.SteveAPIObject, clusterSpec *provv1.ClusterSpec) {
+	localclusterID := clusterObject.ID
+	sshUser := clusterObject.JSONResp["sshUser"]
+
+	steveclient, err := client.Steve.ProxyDownstream(localclusterID)
+	require.NoError(t, err)
+	nodesSteveObjList, err := steveclient.SteveType("nodes").List(nil)
+	require.NoError(t, err)
+
+	for _, tests := range clusterSpec.SSHTests {
+		for _, rancherNode := range nodesSteveObjList.Data {
+			machineName := rancherNode.Annotations["cluster.x-k8s.io/machine"]
+			sshkey, err := sshkeys.DownloadSSHKeys(client, machineName)
+			require.NoError(t, err)
+			assert.NotEmpty(t, sshkey)
+			clusterNode := &nodes.Node{
+				NodeID:          rancherNode.ID,
+				PublicIPAddress: rancherNode.Annotations["rke2.io/external-ip"],
+				SSHUser:         sshUser.(string),
+				SSHKey:          sshkey,
+			}
+
+			provisioning.CallSSHTestByName(t, tests, client, clusterNode)
+
+		}
+	}
 }

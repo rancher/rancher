@@ -171,4 +171,5 @@ type Config struct {
 	Registries             *Registries                              `json:"registries" yaml:"registries"`
 	UpgradeStrategy        *rkev1.ClusterUpgradeStrategy            `json:"upgradeStrategy" yaml:"upgradeStrategy"`
 	Advanced               *Advanced                                `json:"advanced" yaml:"advanced"`
+	SSHTests               []string                                 `json:"sshTests" yaml:"sshTests"`
 }

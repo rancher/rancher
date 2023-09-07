@@ -43,7 +43,8 @@ provisioningInput is needed to the run the RKE2 tests, specifically kubernetesVe
     "providers": ["linode", "aws", "do", "harvester"],
     "nodeProviders": ["ec2"],
     "hardened": true,
-    "psact": ""
+    "psact": "",
+    "sshTests": ["CheckCPU"]
   }
 ```
 
