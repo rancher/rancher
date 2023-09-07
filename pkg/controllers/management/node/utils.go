@@ -302,8 +302,15 @@ func nodeExists(nodeDir string, node *v3.Node) (bool, error) {
 }
 
 func deleteNode(nodeDir string, node *v3.Node, configMap map[string]interface{}) error {
+	// We're passing the `--update-config` flag here along with driver-specific flags to tell Rancher Machine
+	// to reload the driver-specific flags we pass via CLI flags. They need to be reloaded to account for cases
+	// were configuration used by Rancher machine (namely cloud credentials) change while the machine is still running.
+	// If we didn't do this, a user could create a machine and change the cloud credential it uses, leaving Rancher
+	// unable to remove the machine afterward because Rancher machine will always use the old credential it stored on
+	// machine creation.
 	driverName := strings.ToLower(node.Status.NodeTemplateSpec.Driver)
 	args := append([]string{"rm", "-f", "--update-config"}, buildDriverFlags(driverName, configMap)...)
+
 	args = append(args, node.Spec.RequestedHostname)
 	command, err := buildCommand(nodeDir, node, args)
 	if err != nil {
