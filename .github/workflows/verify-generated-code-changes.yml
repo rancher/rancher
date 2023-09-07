@@ -3,6 +3,9 @@ name: Verify generated code changes
 on:
   workflow_dispatch:
   pull_request:
+  push:
+    branches:
+    - 'release/*'
 
 env:
   MAIN_BRANCH: origin/master
