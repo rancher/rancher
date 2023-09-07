@@ -194,7 +194,7 @@ func WatchAndWaitDeploymentForAnnotation(client *rancher.Client, clusterID, name
 		return err
 	}
 
-	wait.WatchWait(watchAppInterface, func(event watch.Event) (ready bool, err error) {
+	err = wait.WatchWait(watchAppInterface, func(event watch.Event) (ready bool, err error) {
 		deploymentsUnstructured := event.Object.(*unstructured.Unstructured)
 		deployment := &appv1.Deployment{}
 
@@ -208,6 +208,9 @@ func WatchAndWaitDeploymentForAnnotation(client *rancher.Client, clusterID, name
 		}
 		return false, nil
 	})
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
