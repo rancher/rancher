@@ -28,8 +28,8 @@ for image in $(cat $IMAGES_FILE); do
         done
     else
         for arch in "${archs[@]}"; do
-            IMAGE_ARCH=$(skopeo --override-arch $arch inspect "docker://${image}" --format "{{ .Architecture }}")
-            if [ "${IMAGE_ARCH}" = "${arch}" ]; then
+            INSPECT_JSON=$(skopeo --override-arch $arch inspect "docker://${image}")
+            if echo "${INSPECT_JSON}" | jq -e --arg ARCH "$arch" '.Architecture == $ARCH' >/dev/null 2>&1; then
                 echo "Image: ${image}, arch ${arch}, FOUND"
                 DIGEST=$(skopeo --override-arch $arch inspect "docker://${image}" --raw | sha256sum | awk '{ print $1 }')
                 echo "docker.io/${image} sha256:${DIGEST}" >> "${DIGEST_TEMPLATE_FILENAME}-${arch}.txt"
