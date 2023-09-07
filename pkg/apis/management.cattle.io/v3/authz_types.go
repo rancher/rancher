@@ -270,7 +270,6 @@ type PodSecurityPolicyTemplateProjectBinding struct {
 }
 
 // +genclient
-// +kubebuilder:skipversion
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ProjectRoleTemplateBinding is the object representing membership of a subject in a project with permissions
@@ -298,11 +297,11 @@ type ProjectRoleTemplateBinding struct {
 
 	// ProjectName is the name of the project to which a subject is added. Immutable.
 	// +kubebuilder:validation:Required
-	ProjectName string `json:"projectName,omitempty" norman:"required,noupdate,type=reference[project]"`
+	ProjectName string `json:"projectName" norman:"required,noupdate,type=reference[project]"`
 
 	// RoleTemplateName is the name of the role template that defines permissions to perform actions on resources in the project. Immutable.
 	// +kubebuilder:validation:Required
-	RoleTemplateName string `json:"roleTemplateName,omitempty" norman:"required,noupdate,type=reference[roleTemplate]"`
+	RoleTemplateName string `json:"roleTemplateName" norman:"required,noupdate,type=reference[roleTemplate]"`
 
 	// ServiceAccount is the name of the service account bound as a subject. Immutable.
 	// Deprecated.

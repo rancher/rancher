@@ -15,7 +15,8 @@ var (
 	AllowAll = map[string]bool{
 		"clusterroletemplatebindings":                true,
 		"podsecurityadmissionconfigurationtemplates": true,
-		"projects": true,
+		"projects":                    true,
+		"projectroletemplatebindings": true,
 	}
 	allowPost = map[string]bool{
 		"settings": true,
