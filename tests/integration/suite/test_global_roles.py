@@ -24,7 +24,7 @@ def test_builtin_default_can_be_edited(admin_mc, revert_gr):
                                                    newUserDefault=True,
                                                    builtin=True)
     assert new_gr.name == gr.name
-    assert new_gr.get("description") == gr.description
+    assert not hasattr(new_gr, "description")
     assert new_gr.rules is not None
     assert new_gr.get("builtin") is True
 
@@ -123,13 +123,14 @@ def revert_gr(admin_mc, request):
             reverted_gr = admin_mc.client.update_by_id_global_role(
                 id=old_gr.id,
                 displayName=old_gr.name,
-                description=old_gr.description,
+                description=getattr(old_gr, "description", None),
                 rules=old_gr.rules,
                 newUserDefault=old_gr.newUserDefault,
                 builtin=old_gr.builtin)
 
             assert reverted_gr.name == old_gr.name
-            assert reverted_gr.get("description") == old_gr.description
+            assert reverted_gr.get("description", None) == \
+                old_gr.get("description", None)
             assert reverted_gr.rules[0].data_dict() == old_gr.rules[0].\
                 data_dict()
             assert reverted_gr.get("builtin") is old_gr.builtin

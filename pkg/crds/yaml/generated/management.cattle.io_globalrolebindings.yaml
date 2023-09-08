@@ -1,0 +1,49 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.12.0
+  name: globalrolebindings.management.cattle.io
+spec:
+  group: management.cattle.io
+  names:
+    kind: GlobalRoleBinding
+    listKind: GlobalRoleBindingList
+    plural: globalrolebindings
+    singular: globalrolebinding
+  scope: Cluster
+  versions:
+  - name: v3
+    schema:
+      openAPIV3Schema:
+        description: GlobalRoleBinding binds a given subject user or group to a GlobalRole.
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          globalRoleName:
+            description: GlobalRoleName is the name of the Global Role that the subject
+              will be bound to. Immutable.
+            type: string
+          groupPrincipalName:
+            description: GroupPrincipalName is the name of the group principal subject
+              to be bound. Immutable.
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          userName:
+            description: UserName is the name of the user subject to be bound. Immutable.
+            type: string
+        required:
+        - globalRoleName
+        type: object
+    served: true
+    storage: true
