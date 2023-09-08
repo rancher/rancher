@@ -350,7 +350,7 @@ def install_rancher(type=RANCHER_HA_CERT_OPTION, repo=RANCHER_HELM_REPO,
         "--namespace cattle-system " + \
         "--set hostname=" + RANCHER_HA_HOSTNAME
 
-    if version.parse(RANCHER_CHART_VERSION) > version.parse("2.7.1"):
+    if version.parse(RANCHER_CHART_VERSION) > version.parse("2.7.1") or RANCHER_CHART_VERSION.find("head") > -1:
         helm_rancher_cmd = helm_rancher_cmd + " --set global.cattle.psp.enabled=" + str(RANCHER_PSP_ENABLED).lower()
 
     if type == 'letsencrypt':
