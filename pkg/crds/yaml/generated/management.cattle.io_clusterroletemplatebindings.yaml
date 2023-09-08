@@ -30,12 +30,12 @@ spec:
               is added. Immutable.
             type: string
           groupName:
-            description: GroupName is the name of the group subject added to the project.
+            description: GroupName is the name of the group subject added to the cluster.
               Immutable.
             type: string
           groupPrincipalName:
             description: GroupPrincipalName is the name of the group principal subject
-              added to the project. Immutable.
+              added to the cluster. Immutable.
             type: string
           kind:
             description: 'Kind is a string value representing the REST resource this
@@ -46,15 +46,15 @@ spec:
             type: object
           roleTemplateName:
             description: RoleTemplateName is the name of the role template that defines
-              permissions to perform actions on resources in the project. Immutable.
+              permissions to perform actions on resources in the cluster. Immutable.
             type: string
           userName:
-            description: UserName is the name of the user subject added to the project.
+            description: UserName is the name of the user subject added to the cluster.
               Immutable.
             type: string
           userPrincipalName:
             description: UserPrincipalName is the name of the user principal subject
-              added to the project. Immutable.
+              added to the cluster. Immutable.
             type: string
         required:
         - clusterName

@@ -322,23 +322,26 @@ func (p *ProjectRoleTemplateBinding) ObjClusterName() string {
 // ClusterRoleTemplateBinding is the object representing membership of a subject in a cluster with permissions
 // specified by a given role template.
 type ClusterRoleTemplateBinding struct {
-	types.Namespaced  `json:",inline"`
-	metav1.TypeMeta   `json:",inline"`
+	types.Namespaced `json:",inline"`
+	metav1.TypeMeta  `json:",inline"`
+
+	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
+	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	// UserName is the name of the user subject added to the project. Immutable.
+	// UserName is the name of the user subject added to the cluster. Immutable.
 	// +optional
 	UserName string `json:"userName,omitempty" norman:"noupdate,type=reference[user]"`
 
-	// UserPrincipalName is the name of the user principal subject added to the project. Immutable.
+	// UserPrincipalName is the name of the user principal subject added to the cluster. Immutable.
 	// +optional
 	UserPrincipalName string `json:"userPrincipalName,omitempty" norman:"noupdate,type=reference[principal]"`
 
-	// GroupName is the name of the group subject added to the project. Immutable.
+	// GroupName is the name of the group subject added to the cluster. Immutable.
 	// +optional
 	GroupName string `json:"groupName,omitempty" norman:"noupdate,type=reference[group]"`
 
-	// GroupPrincipalName is the name of the group principal subject added to the project. Immutable.
+	// GroupPrincipalName is the name of the group principal subject added to the cluster. Immutable.
 	// +optional
 	GroupPrincipalName string `json:"groupPrincipalName,omitempty" norman:"noupdate,type=reference[principal]"`
 
@@ -346,7 +349,7 @@ type ClusterRoleTemplateBinding struct {
 	// +kubebuilder:validation:Required
 	ClusterName string `json:"clusterName" norman:"required,noupdate,type=reference[cluster]"`
 
-	// RoleTemplateName is the name of the role template that defines permissions to perform actions on resources in the project. Immutable.
+	// RoleTemplateName is the name of the role template that defines permissions to perform actions on resources in the cluster. Immutable.
 	// +kubebuilder:validation:Required
 	RoleTemplateName string `json:"roleTemplateName" norman:"required,noupdate,type=reference[roleTemplate]"`
 }
