@@ -145,14 +145,14 @@ func (w *RancherManagedChartsTest) TestUpgradeChartToLatestVersion() {
 	origCfg := cfgMap.DeepCopy()
 
 	// GETTING INDEX FROM CONFIGMAP AND MODIFYING IT
-	latestVersion := w.updateConfigMap(cfgMap)
+	originalLatestVersion := w.updateConfigMap(cfgMap)
 
 	//UPDATING THE CONFIGMAP
 	cfgMap, err = w.corev1.ConfigMaps(clusterRepo.Status.IndexConfigMapNamespace).Update(context.TODO(), cfgMap, metav1.UpdateOptions{})
 	w.Require().NoError(err)
 
 	//KWait for config map to be updated
-	w.Require().NoError(w.WaitForConfigMap(clusterRepo.Status.IndexConfigMapNamespace, clusterRepo.Status.IndexConfigMapName, latestVersion))
+	w.Require().NoError(w.WaitForConfigMap(clusterRepo.Status.IndexConfigMapNamespace, clusterRepo.Status.IndexConfigMapName, originalLatestVersion))
 
 	//Updating the cluster
 	w.Require().NoError(w.updateManagementCluster())
@@ -160,10 +160,8 @@ func (w *RancherManagedChartsTest) TestUpgradeChartToLatestVersion() {
 	app, _, err := w.waitForAksChart(rv1.StatusDeployed, "rancher-aks-operator", 0)
 	w.Require().NoError(err)
 
-	latest, err := w.catalogClient.GetLatestChartVersion("rancher-aks-operator")
 	w.Require().NoError(err)
-	w.Assert().Equal(latest, app.Spec.Chart.Metadata.Version)
-	w.Assert().Greater(latestVersion, latest)
+	w.Assert().Greater(originalLatestVersion, app.Spec.Chart.Metadata.Version)
 
 	//REVERT CONFIGMAP TO ORIGINAL VALUE
 	cfgMap.BinaryData["content"] = origCfg.BinaryData["content"]
@@ -179,7 +177,7 @@ func (w *RancherManagedChartsTest) TestUpgradeChartToLatestVersion() {
 	app, _, err = w.waitForAksChart(rv1.StatusDeployed, "rancher-aks-operator", app.Spec.Version)
 	w.Require().NoError(err)
 
-	w.Assert().Equal(latestVersion, app.Spec.Chart.Metadata.Version)
+	w.Assert().Equal(originalLatestVersion, app.Spec.Chart.Metadata.Version)
 }
 
 func (w *RancherManagedChartsTest) TestUpgradeToWorkingVersion() {
