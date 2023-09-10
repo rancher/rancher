@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
 	_ "net/http/pprof"
@@ -267,7 +266,7 @@ func run(ctx context.Context) error {
 			}
 			caFileLocation := "/etc/kubernetes/ssl/certs/serverca"
 			if _, err := os.Stat(caFileLocation); err == nil {
-				caFile, err := ioutil.ReadFile(caFileLocation)
+				caFile, err := os.ReadFile(caFileLocation)
 				if err != nil {
 					return err
 				}

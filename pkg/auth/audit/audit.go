@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"regexp"
 	"strings"
@@ -249,11 +248,11 @@ func readBodyWithoutLosingContent(req *http.Request) ([]byte, error) {
 		return nil, nil
 	}
 
-	bodyBytes, err := ioutil.ReadAll(req.Body)
+	bodyBytes, err := io.ReadAll(req.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read request body: %w", err)
 	}
-	req.Body = ioutil.NopCloser(bytes.NewBuffer(bodyBytes))
+	req.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 
 	return bodyBytes, nil
 }
@@ -459,7 +458,7 @@ func decompressZLib(data []byte) ([]byte, error) {
 }
 
 func decompress(readCloser io.ReadCloser) ([]byte, error) {
-	rawData, err := ioutil.ReadAll(readCloser)
+	rawData, err := io.ReadAll(readCloser)
 	if err != nil {
 		retErr := fmt.Errorf("failed to read compressed response: %w", err)
 		closeErr := readCloser.Close()

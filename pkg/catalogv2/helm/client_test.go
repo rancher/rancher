@@ -3,6 +3,7 @@ package helm
 import (
 	"bytes"
 	"encoding/gob"
+	"io"
 	"reflect"
 	"testing"
 
@@ -14,7 +15,6 @@ import (
 	"helm.sh/helm/v3/pkg/release"
 	"helm.sh/helm/v3/pkg/storage"
 	"helm.sh/helm/v3/pkg/storage/driver"
-	"io/ioutil"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	testing2 "k8s.io/kubectl/pkg/cmd/testing"
 )
@@ -105,7 +105,7 @@ func TestListReleases(t *testing.T) {
 
 		mockCfg := &action.Configuration{
 			Releases:       storage.Init(driver.NewMemory()),
-			KubeClient:     &kubefake.FailingKubeClient{PrintingKubeClient: kubefake.PrintingKubeClient{Out: ioutil.Discard}},
+			KubeClient:     &kubefake.FailingKubeClient{PrintingKubeClient: kubefake.PrintingKubeClient{Out: io.Discard}},
 			Capabilities:   chartutil.DefaultCapabilities,
 			RegistryClient: r,
 			Log: func(format string, v ...interface{}) {

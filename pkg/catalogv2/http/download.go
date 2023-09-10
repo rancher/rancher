@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"path"
@@ -52,17 +51,17 @@ func Icon(secret *corev1.Secret, repoURL string, caBundle []byte, insecureSkipTL
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		defer ioutil.ReadAll(resp.Body)
+		defer io.ReadAll(resp.Body)
 		return nil, "", validation.ErrorCode{
 			Status: resp.StatusCode,
 		}
 	}
 
-	data, err := ioutil.ReadAll(resp.Body)
+	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, "", err
 	}
-	return ioutil.NopCloser(bytes.NewBuffer(data)), path.Ext(u.Path), nil
+	return io.NopCloser(bytes.NewBuffer(data)), path.Ext(u.Path), nil
 }
 
 func Chart(secret *corev1.Secret, repoURL string, caBundle []byte, insecureSkipTLSVerify bool, disableSameOriginCheck bool, chart *repo.ChartVersion) (io.ReadCloser, error) {
@@ -100,8 +99,8 @@ func Chart(secret *corev1.Secret, repoURL string, caBundle []byte, insecureSkipT
 	}
 	defer resp.Body.Close()
 
-	data, err := ioutil.ReadAll(resp.Body)
-	return ioutil.NopCloser(bytes.NewBuffer(data)), err
+	data, err := io.ReadAll(resp.Body)
+	return io.NopCloser(bytes.NewBuffer(data)), err
 }
 
 func DownloadIndex(secret *corev1.Secret, repoURL string, caBundle []byte, insecureSkipTLSVerify bool, disableSameOriginCheck bool) (*repo.IndexFile, error) {
@@ -134,7 +133,7 @@ func DownloadIndex(secret *corev1.Secret, repoURL string, caBundle []byte, insec
 	}
 	defer resp.Body.Close()
 
-	bytes, err := ioutil.ReadAll(resp.Body)
+	bytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}

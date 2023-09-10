@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path"
@@ -317,7 +316,7 @@ func deleteNode(nodeDir string, node *v3.Node) error {
 
 func getSSHPrivateKey(nodeDir, keyName string, node *v3.Node) (string, error) {
 	keyPath := filepath.Join(nodeDir, "machines", node.Spec.RequestedHostname, keyName)
-	data, err := ioutil.ReadFile(keyPath)
+	data, err := os.ReadFile(keyPath)
 	if err != nil {
 		return "", nil
 	}

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strings"
@@ -292,7 +291,7 @@ func (g *GClient) postToGithub(url string, form url.Values) ([]byte, error) {
 		return nil, fmt.Errorf("Request failed, got status code: %d. Response: %s",
 			resp.StatusCode, body.Bytes())
 	}
-	return ioutil.ReadAll(resp.Body)
+	return io.ReadAll(resp.Body)
 }
 
 func (g *GClient) getFromGithub(githubAccessToken string, url string) ([]byte, string, error) {
@@ -321,7 +320,7 @@ func (g *GClient) getFromGithub(githubAccessToken string, url string) ([]byte, s
 	}
 
 	nextURL := g.nextGithubPage(resp)
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	return b, nextURL, err
 }
 

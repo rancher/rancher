@@ -3,7 +3,7 @@ package cluster
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -65,7 +65,7 @@ func (a ActionHandler) editMonitoring(actionName string, action *types.Action, a
 		return httperror.NewAPIError(httperror.InvalidState, "disabling Monitoring")
 	}
 
-	data, err := ioutil.ReadAll(apiContext.Request.Body)
+	data, err := io.ReadAll(apiContext.Request.Body)
 	if err != nil {
 		return httperror.WrapAPIError(err, httperror.InvalidBodyContent, "unable to read request content")
 	}
@@ -104,7 +104,7 @@ func (a ActionHandler) enableMonitoring(actionName string, action *types.Action,
 		return nil
 	}
 
-	data, err := ioutil.ReadAll(apiContext.Request.Body)
+	data, err := io.ReadAll(apiContext.Request.Body)
 	if err != nil {
 		return httperror.WrapAPIError(err, httperror.InvalidBodyContent, "unable to read request content")
 	}

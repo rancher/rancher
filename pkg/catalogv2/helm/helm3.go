@@ -9,7 +9,7 @@ import (
 	"compress/gzip"
 	"encoding/base64"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -144,7 +144,7 @@ func decodeHelm3(data string) (*release.Release, error) {
 		if err != nil {
 			return nil, err
 		}
-		b2, err := ioutil.ReadAll(r)
+		b2, err := io.ReadAll(r)
 		if err != nil {
 			return nil, err
 		}

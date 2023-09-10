@@ -11,7 +11,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/httputil"
 	"path/filepath"
@@ -618,7 +617,7 @@ func injectAnnotation(data []byte, annotations map[string]string) ([]byte, error
 			break
 		}
 
-		data, err := ioutil.ReadAll(tar)
+		data, err := io.ReadAll(tar)
 		if err != nil {
 			return nil, err
 		}
@@ -699,7 +698,7 @@ func (s *Operations) getChartCommand(namespace, name, chartName, chartVersion st
 	if err != nil {
 		return Command{}, err
 	}
-	chartData, err := ioutil.ReadAll(chart)
+	chartData, err := io.ReadAll(chart)
 	chart.Close()
 	if err != nil {
 		return Command{}, err

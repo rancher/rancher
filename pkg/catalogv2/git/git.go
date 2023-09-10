@@ -7,7 +7,6 @@ import (
 	"crypto/x509"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
@@ -333,7 +332,7 @@ func (g *git) gitCmd(output io.Writer, args ...string) error {
 	}
 
 	if len(g.knownHosts) != 0 {
-		f, err := ioutil.TempFile("", "known_hosts")
+		f, err := os.CreateTemp("", "known_hosts")
 		if err != nil {
 			return err
 		}
@@ -358,7 +357,7 @@ func (g *git) gitCmd(output io.Writer, args ...string) error {
 	}
 
 	if len(g.caBundle) > 0 {
-		f, err := ioutil.TempFile("", "ca-pem-")
+		f, err := os.CreateTemp("", "ca-pem-")
 		if err != nil {
 			return err
 		}
@@ -387,7 +386,7 @@ func (g *git) injectAgent(cmd *exec.Cmd) (io.Closer, error) {
 		return nil, err
 	}
 
-	tmpDir, err := ioutil.TempDir("", "ssh-agent")
+	tmpDir, err := os.MkdirTemp("", "ssh-agent")
 	if err != nil {
 		return nil, err
 	}

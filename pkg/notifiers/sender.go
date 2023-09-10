@@ -10,7 +10,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"mime/multipart"
 	"net"
 	"net/http"
@@ -185,7 +184,7 @@ func TestWechat(secret, agent, corp, receiverType, receiver, msg string, cfg *v3
 	}
 	defer resp.Body.Close()
 
-	requestBytes, err := ioutil.ReadAll(resp.Body)
+	requestBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return err
 	}
@@ -233,7 +232,7 @@ func TestWechat(secret, agent, corp, receiverType, receiver, msg string, cfg *v3
 		return fmt.Errorf("HTTP status code is %d, not included in the 2xx success HTTP status codes", resp.StatusCode)
 	}
 
-	requestBytes, err = ioutil.ReadAll(resp.Body)
+	requestBytes, err = io.ReadAll(resp.Body)
 	if err != nil {
 		return err
 	}
@@ -283,7 +282,7 @@ func TestDingtalk(url, secret, msg string, cfg *v32.HTTPClientConfig, dialer dia
 		return fmt.Errorf("HTTP status code is %d, not included in the 2xx success HTTP status codes", resp.StatusCode)
 	}
 
-	respBytes, err := ioutil.ReadAll(resp.Body)
+	respBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return err
 	}
@@ -394,7 +393,7 @@ func TestSlack(url, channel, msg string, cfg *v32.HTTPClientConfig, dialer diale
 	}
 	defer resp.Body.Close()
 
-	res, err := ioutil.ReadAll(resp.Body)
+	res, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return err
 	}

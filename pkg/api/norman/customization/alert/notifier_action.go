@@ -3,7 +3,7 @@ package alert
 import (
 	"context"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 
@@ -43,7 +43,7 @@ func (h *Handler) NotifierActionHandler(actionName string, action *types.Action,
 }
 
 func (h *Handler) testNotifier(ctx context.Context, actionName string, action *types.Action, apiContext *types.APIContext) error {
-	data, err := ioutil.ReadAll(apiContext.Request.Body)
+	data, err := io.ReadAll(apiContext.Request.Body)
 	if err != nil {
 		return errors.Wrap(err, "reading request body error")
 	}

@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"io"
-	"io/ioutil"
 	"time"
 
 	yaml2 "github.com/ghodss/yaml"
@@ -37,7 +36,7 @@ func findNamespaceCreates(inputYAML string) ([]string, error) {
 
 	reader := yaml.NewDocumentDecoder(noopCloser{Reader: bytes.NewBufferString(inputYAML)})
 	for {
-		next, readErr := ioutil.ReadAll(reader)
+		next, readErr := io.ReadAll(reader)
 		if readErr != nil && readErr != io.ErrShortBuffer {
 			return nil, readErr
 		}

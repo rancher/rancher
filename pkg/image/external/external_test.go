@@ -2,7 +2,7 @@ package external
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -101,7 +101,7 @@ func TestGetExternalImages(t *testing.T) {
 			if err != nil {
 				t.Errorf("failed to get KDM data.json from url %v", tt.args.kdmUrl)
 			}
-			resp, err := ioutil.ReadAll(get.Body)
+			resp, err := io.ReadAll(get.Body)
 			if err != nil {
 				t.Errorf("failed to read response from url %v", tt.args.kdmUrl)
 			}

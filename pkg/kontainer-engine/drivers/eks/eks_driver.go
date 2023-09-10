@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strconv"
 	"strings"
@@ -1041,7 +1040,7 @@ region=%v`,
 			state.Region)
 	}
 
-	err = ioutil.WriteFile(awsCredentialsPath, []byte(credentialsContent), 0644)
+	err = os.WriteFile(awsCredentialsPath, []byte(credentialsContent), 0644)
 	if err != nil {
 		return "", fmt.Errorf("error writing credentials file: %v", err)
 	}

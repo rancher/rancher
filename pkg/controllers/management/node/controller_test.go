@@ -2,7 +2,6 @@ package node
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strconv"
 	"testing"
@@ -53,7 +52,7 @@ func TestAliasToPath(t *testing.T) {
 			require.Nil(err)
 
 			// assert the file contents starts with our expected string
-			b, err := ioutil.ReadFile(filePath)
+			b, err := os.ReadFile(filePath)
 			require.Nil(err)
 			assert.Contains(string(b), "fakecontent")
 			os.Remove(filePath)

@@ -5,7 +5,6 @@ import (
 	"compress/gzip"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -364,7 +363,7 @@ func decodeValuesFile(path string) (map[interface{}]interface{}, error) {
 }
 
 func decodeYAMLFile(r io.Reader, target interface{}) error {
-	data, err := ioutil.ReadAll(r)
+	data, err := io.ReadAll(r)
 	if err != nil {
 		return err
 	}

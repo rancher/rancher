@@ -3,7 +3,7 @@ package publicapi
 import (
 	"context"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -102,7 +102,7 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 	var providerToken string
 	logrus.Debugf("Create Token Invoked")
 
-	bytes, err := ioutil.ReadAll(request.Request.Body)
+	bytes, err := io.ReadAll(request.Request.Body)
 	if err != nil {
 		logrus.Errorf("login failed with error: %v", err)
 		return v3.Token{}, "", "", httperror.NewAPIError(httperror.InvalidBodyContent, "")

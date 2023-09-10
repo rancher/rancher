@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"strings"
@@ -114,7 +113,7 @@ func getenv(env string) (string, error) {
 }
 
 func readKey(key string) (string, error) {
-	bytes, err := ioutil.ReadFile(path.Join(rancherCredentialsFolder, key))
+	bytes, err := os.ReadFile(path.Join(rancherCredentialsFolder, key))
 	if err != nil {
 		return "", err
 	}

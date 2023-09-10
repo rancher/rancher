@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"reflect"
 	"sort"
@@ -70,7 +69,7 @@ func (md *MetadataController) loadDataFromLocal() (kdm.Data, error) {
 		return kdm.Data{}, nil
 	}
 	logrus.Infof("Retrieve data.json from local path %v", DataJSONLocation)
-	data, err := ioutil.ReadFile(DataJSONLocation)
+	data, err := os.ReadFile(DataJSONLocation)
 	if err != nil {
 		return kdm.Data{}, err
 	}

@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"regexp"
 	"time"
@@ -182,7 +182,7 @@ func (m *AlertManager) GetAlertList() ([]*APIAlert, error) {
 	}
 	defer resp.Body.Close()
 
-	requestBytes, err := ioutil.ReadAll(resp.Body)
+	requestBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -250,7 +250,7 @@ func (m *AlertManager) AddSilenceRule(matcherName, matcherValue string) error {
 	}
 	defer resp.Body.Close()
 
-	_, err = ioutil.ReadAll(resp.Body)
+	_, err = io.ReadAll(resp.Body)
 	if err != nil {
 		return err
 	}
@@ -283,7 +283,7 @@ func (m *AlertManager) RemoveSilenceRule(matcherName, matcherValue string) error
 	}
 	defer resp.Body.Close()
 
-	requestBytes, err := ioutil.ReadAll(resp.Body)
+	requestBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return err
 	}
@@ -309,7 +309,7 @@ func (m *AlertManager) RemoveSilenceRule(matcherName, matcherValue string) error
 			}
 			defer delResp.Body.Close()
 
-			_, err = ioutil.ReadAll(delResp.Body)
+			_, err = io.ReadAll(delResp.Body)
 			if err != nil {
 				return err
 			}
@@ -350,7 +350,7 @@ func (m *AlertManager) SendAlert(labels map[string]string) error {
 	}
 	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return err
 	}

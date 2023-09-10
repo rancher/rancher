@@ -2,7 +2,6 @@ package rancher
 
 import (
 	"context"
-	"io/ioutil"
 	"os"
 	"sync"
 
@@ -138,7 +137,7 @@ func setupSteveAggregation() error {
 		"token":              []byte("stv-cluster-" + token),
 	}
 
-	ca, err := ioutil.ReadFile("/etc/kubernetes/ssl/certs/serverca")
+	ca, err := os.ReadFile("/etc/kubernetes/ssl/certs/serverca")
 	if os.IsNotExist(err) {
 	} else if err != nil {
 		return err

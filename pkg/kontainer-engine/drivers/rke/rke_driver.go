@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -125,7 +124,7 @@ func (d *Driver) GetDriverUpdateOptions(ctx context.Context) (*types.DriverFlags
 func getYAML(driverOptions *types.DriverOptions) (string, error) {
 	// first look up the file path then look up raw rkeConfig
 	if path, ok := driverOptions.StringOptions["config-file-path"]; ok {
-		data, err := ioutil.ReadFile(path)
+		data, err := os.ReadFile(path)
 		if err != nil {
 			return "", err
 		}
@@ -430,7 +429,7 @@ func (d *Driver) RemoveLegacyServiceAccount(ctx context.Context, info *types.Clu
 
 func (d *Driver) restore(info *types.ClusterInfo) (string, error) {
 	os.MkdirAll(rancherPath, 0700)
-	dir, err := ioutil.TempDir(rancherPath, "rke-")
+	dir, err := os.MkdirTemp(rancherPath, "rke-")
 	if err != nil {
 		return "", err
 	}
@@ -438,11 +437,11 @@ func (d *Driver) restore(info *types.ClusterInfo) (string, error) {
 	if info != nil {
 		state := info.Metadata["state"]
 		if state != "" {
-			ioutil.WriteFile(kubeConfig(dir), []byte(state), 0600)
+			os.WriteFile(kubeConfig(dir), []byte(state), 0600)
 		}
 		fullState := info.Metadata["fullState"]
 		if fullState != "" {
-			ioutil.WriteFile(clusterState(dir), []byte(fullState), 0600)
+			os.WriteFile(clusterState(dir), []byte(fullState), 0600)
 		}
 	}
 
@@ -451,14 +450,14 @@ func (d *Driver) restore(info *types.ClusterInfo) (string, error) {
 
 func (d *Driver) save(info *types.ClusterInfo, stateDir string) *types.ClusterInfo {
 	if info != nil {
-		b, err := ioutil.ReadFile(kubeConfig(stateDir))
+		b, err := os.ReadFile(kubeConfig(stateDir))
 		if err == nil {
 			if info.Metadata == nil {
 				info.Metadata = map[string]string{}
 			}
 			info.Metadata["state"] = string(b)
 		}
-		s, err := ioutil.ReadFile(clusterState(stateDir))
+		s, err := os.ReadFile(clusterState(stateDir))
 		if err == nil {
 			info.Metadata["fullState"] = string(s)
 		}

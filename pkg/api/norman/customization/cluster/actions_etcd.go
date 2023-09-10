@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -66,7 +66,7 @@ func (a ActionHandler) RestoreFromEtcdBackupHandler(actionName string, action *t
 		"message": "restoring etcdbackup for the cluster",
 	}
 
-	data, err := ioutil.ReadAll(apiContext.Request.Body)
+	data, err := io.ReadAll(apiContext.Request.Body)
 	if err != nil {
 		response["message"] = "reading request body error"
 		apiContext.WriteResponse(http.StatusInternalServerError, response)
