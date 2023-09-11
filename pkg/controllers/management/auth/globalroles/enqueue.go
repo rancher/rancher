@@ -41,10 +41,6 @@ func (g *globalRBACEnqueuer) enqueueGRBs(_, _ string, obj runtime.Object) ([]rel
 		logrus.Errorf("unable to convert object: %[1]v, type: %[1]T to a global role", obj)
 		return nil, nil
 	}
-	if len(globalRole.InheritedClusterRoles) == 0 {
-		// don't enqueue GRBs if we don't inherit any clusterRoles, nothing for the GRB controller to do
-		return nil, nil
-	}
 	bindings, err := g.grbCache.GetByIndex(grbGrIndex, globalRole.Name)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get grbs for gr %s from indexer: %w", globalRole.Name, err)

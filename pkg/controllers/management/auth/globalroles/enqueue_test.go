@@ -35,7 +35,20 @@ func Test_enqueueGRBs(t *testing.T) {
 					Name: "test-gr",
 				},
 			},
-			wantKeys: nil,
+			stateSetup: func(state testState) {
+				grbs := []*v3.GlobalRoleBinding{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "test-grb-1",
+						},
+						GlobalRoleName: "test-gr",
+						UserName:       "u-123xyz",
+					},
+				}
+				state.grbCacheMock.EXPECT().GetByIndex(grbGrIndex, "test-gr").Return(grbs, nil)
+
+			},
+			wantKeys: []relatedresource.Key{{Name: "test-grb-1"}},
 		},
 		{
 			name: "empty inherited roles",
@@ -45,7 +58,20 @@ func Test_enqueueGRBs(t *testing.T) {
 				},
 				InheritedClusterRoles: []string{},
 			},
-			wantKeys: nil,
+			stateSetup: func(state testState) {
+				grbs := []*v3.GlobalRoleBinding{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "test-grb-1",
+						},
+						GlobalRoleName: "test-gr",
+						UserName:       "u-123xyz",
+					},
+				}
+				state.grbCacheMock.EXPECT().GetByIndex(grbGrIndex, "test-gr").Return(grbs, nil)
+
+			},
+			wantKeys: []relatedresource.Key{{Name: "test-grb-1"}},
 		},
 
 		{
