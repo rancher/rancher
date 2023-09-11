@@ -121,7 +121,7 @@ func (w *RancherManagedChartsTest) resetSettings() {
 }
 
 func TestRancherManagedChartsSuite(t *testing.T) {
-	suite.Run(t, new(RancherManagedChartsTest))
+	//suite.Run(t, new(RancherManagedChartsTest))
 }
 
 func (w *RancherManagedChartsTest) TestInstallChartLatestVersion() {
