@@ -227,7 +227,7 @@ func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {
 			return false, errors.Wrapf(err, "object %v is not valid project role template binding", prtb)
 		}
 
-		if prtb.UserName == "" && prtb.GroupPrincipalName == "" && prtb.GroupName == "" && prtb.ServiceAccount == "" {
+		if prtb.UserName == "" && prtb.GroupPrincipalName == "" && prtb.GroupName == "" {
 			continue
 		}
 

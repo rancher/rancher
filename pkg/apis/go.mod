@@ -9,9 +9,9 @@ replace k8s.io/client-go => github.com/rancher/client-go v1.25.4-rancher1
 
 require (
 	github.com/rancher/aks-operator v1.2.0-rc2
-	github.com/rancher/eks-operator v1.2.2-rc3
-	github.com/rancher/fleet/pkg/apis v0.0.0-20230810121238-9d0ee7f56848
-	github.com/rancher/gke-operator v1.1.6-rc2
+	github.com/rancher/eks-operator v1.3.0-rc2
+	github.com/rancher/fleet/pkg/apis v0.0.0-20230821130910-23e1c146755a
+	github.com/rancher/gke-operator v1.2.0-rc1
 	github.com/rancher/norman v0.0.0-20230426211126-d3552b018687
 	github.com/rancher/rke v1.5.0-rc2
 	github.com/rancher/wrangler v1.1.1
@@ -58,7 +58,7 @@ require (
 	github.com/rancher/lasso v0.0.0-20230629200414-8a54b32e6792 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	golang.org/x/net v0.14.0 // indirect
-	golang.org/x/oauth2 v0.10.0 // indirect
+	golang.org/x/oauth2 v0.11.0 // indirect
 	golang.org/x/sys v0.11.0 // indirect
 	golang.org/x/term v0.11.0 // indirect
 	golang.org/x/text v0.12.0 // indirect

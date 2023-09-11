@@ -1,8 +1,11 @@
 package v1
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"net/url"
 	"regexp"
 	"time"
@@ -29,11 +32,22 @@ type State struct {
 	Transitioning bool   `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 }
 
+// Relationship is the Steve specific field in the rancher Steve API
+type Relationship struct {
+	FromID   string `json:"fromId,omitempty" yaml:"fromId,omitempty"`
+	FromType string `json:"fromType,omitempty" yaml:"fromType,omitempty"`
+	Rel      string `json:"rel,omitempty" yaml:"rel,omitempty"`
+	State    string `json:"state,omitempty" yaml:"state,omitempty"`
+	Message  string `json:"message,omitempty" yaml:"message,omitempty"`
+}
+
 // ObjectMeta is the native k8s object meta field that kubernetes objects used, with the added
 // Steve API State field.
 type ObjectMeta struct {
 	metav1.ObjectMeta
-	State *State `json:"state,omitempty" yaml:"state,omitempty"`
+	State         *State          `json:"state,omitempty" yaml:"state,omitempty"`
+	Relationships *[]Relationship `json:"relationships,omitempty" yaml:"relationships,omitempty"`
+	Fields        []any           `json:"fields,omitempty" yaml:"fields,omitempty"`
 }
 
 // SteveAPIObject is the generic object used in the v1/steve API call responses
@@ -281,6 +295,45 @@ func (c *NamespacedSteveClient) Create(container any) (*SteveAPIObject, error) {
 
 func (c *NamespacedSteveClient) Update(existing *SteveAPIObject, updates any) (*SteveAPIObject, error) {
 	return c.SteveClient.Update(existing, updates)
+}
+
+func (c *NamespacedSteveClient) PerformPutCaptureHeaders(host, token, name string, payload interface{}) (http.Header, []byte, error) {
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error marshalling payload: %v", err)
+	}
+
+	url := fmt.Sprintf("https://%v/v1/%v/%v/%v", host, c.steveType, c.namespace, name)
+	req, err := http.NewRequest(http.MethodPut, url, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, nil, fmt.Errorf("error creating request: %v", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+
+	var httpClient = &http.Client{}
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error executing request: %v", err)
+	}
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 300 {
+		return resp.Header, nil, fmt.Errorf("received HTTP error: %s", resp.Status)
+	}
+
+	byteContent, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return resp.Header, nil, fmt.Errorf("error reading response body: %v", err)
+	}
+
+	if len(byteContent) == 0 {
+		return resp.Header, nil, fmt.Errorf("received empty response")
+	}
+
+	return resp.Header, byteContent, nil
 }
 
 func (c *NamespacedSteveClient) Replace(obj *SteveAPIObject) (*SteveAPIObject, error) {

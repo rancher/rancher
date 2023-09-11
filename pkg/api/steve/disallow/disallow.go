@@ -14,8 +14,11 @@ var (
 	// AllowAll is a set of resources for which Rancher doesn't require authentication to perform any operation.
 	AllowAll = map[string]bool{
 		"clusterroletemplatebindings":                true,
+		"globalrolebindings":                         true,
+		"globalroles":                                true,
 		"podsecurityadmissionconfigurationtemplates": true,
-		"projects": true,
+		"projects":                                   true,
+		"projectroletemplatebindings":                true,
 	}
 	allowPost = map[string]bool{
 		"settings": true,

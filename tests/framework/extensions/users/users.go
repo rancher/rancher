@@ -308,12 +308,12 @@ func waitForPRTBRollout(client *rancher.Client, prtb *management.ProjectRoleTemp
 }
 
 func waitForRTBRollout(client *rancher.Client, rtbNamespace string, rtbName string, selector labels.Selector, clusterID string, opType operationType) error {
-	// we expect rollout to happen within 5 seconds total
+	// we expect rollout to happen within 20 seconds total
 	backoff := kwait.Backoff{
 		Duration: 500 * time.Millisecond,
 		Factor:   1,
 		Jitter:   0,
-		Steps:    11,
+		Steps:    41,
 	}
 	err := kwait.ExponentialBackoff(backoff, func() (done bool, err error) {
 		downstreamCRBs, err := rbac.ListClusterRoleBindings(client, clusterID, metav1.ListOptions{

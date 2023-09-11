@@ -135,19 +135,37 @@ func (p *ProjectSpec) ObjClusterName() string {
 }
 
 // +genclient
-// +kubebuilder:skipversion
 // +genclient:nonNamespaced
+// +kubebuilder:resource:scope=Cluster
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// GlobalRole defines rules that can be applied to the local cluster and or every downstream cluster.
 type GlobalRole struct {
-	metav1.TypeMeta   `json:",inline"`
+	metav1.TypeMeta `json:",inline"`
+
+	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
+	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	DisplayName    string              `json:"displayName,omitempty" norman:"required"`
-	Description    string              `json:"description"`
-	Rules          []rbacv1.PolicyRule `json:"rules,omitempty"`
-	NewUserDefault bool                `json:"newUserDefault,omitempty" norman:"required"`
-	Builtin        bool                `json:"builtin" norman:"nocreate,noupdate"`
+	// DisplayName is the human-readable name displayed in the UI for this resource.
+	// +optional
+	DisplayName string `json:"displayName,omitempty" norman:"required"`
+
+	// Description holds text that describes the resource.
+	// +optional
+	Description string `json:"description,omitempty"`
+
+	// Rules holds a list of PolicyRules that are applied to the local cluster only.
+	// +optional
+	Rules []rbacv1.PolicyRule `json:"rules,omitempty"`
+
+	// NewUserDefault specifies that all new users created should be bound to this GlobalRole if true.
+	// +optional
+	NewUserDefault bool `json:"newUserDefault,omitempty" norman:"required"`
+
+	// Builtin specifies that this GlobalRole was created by Rancher if true. Immutable.
+	// +optional
+	Builtin bool `json:"builtin,omitempty" norman:"nocreate,noupdate"`
 
 	// InheritedClusterRoles are the names of RoleTemplates whose permissions are granted by this GlobalRole in every
 	// cluster besides the local cluster. To grant permissions in the local cluster, use the Rules or NamespacedRules
@@ -157,17 +175,29 @@ type GlobalRole struct {
 }
 
 // +genclient
-// +kubebuilder:skipversion
 // +genclient:nonNamespaced
+// +kubebuilder:resource:scope=Cluster
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// GlobalRoleBinding binds a given subject user or group to a GlobalRole.
 type GlobalRoleBinding struct {
-	metav1.TypeMeta   `json:",inline"`
+	metav1.TypeMeta `json:",inline"`
+
+	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
+	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	UserName           string `json:"userName,omitempty" norman:"noupdate,type=reference[user]"`
+	// UserName is the name of the user subject to be bound. Immutable.
+	// +optional
+	UserName string `json:"userName,omitempty" norman:"noupdate,type=reference[user]"`
+
+	// GroupPrincipalName is the name of the group principal subject to be bound. Immutable.
+	// +optional
 	GroupPrincipalName string `json:"groupPrincipalName,omitempty" norman:"noupdate,type=reference[principal]"`
-	GlobalRoleName     string `json:"globalRoleName,omitempty" norman:"required,noupdate,type=reference[globalRole]"`
+
+	// GlobalRoleName is the name of the Global Role that the subject will be bound to. Immutable.
+	// +kubebuilder:validation:Required
+	GlobalRoleName string `json:"globalRoleName" norman:"required,noupdate,type=reference[globalRole]"`
 }
 
 // +genclient
@@ -270,7 +300,6 @@ type PodSecurityPolicyTemplateProjectBinding struct {
 }
 
 // +genclient
-// +kubebuilder:skipversion
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ProjectRoleTemplateBinding is the object representing membership of a subject in a project with permissions
@@ -298,13 +327,14 @@ type ProjectRoleTemplateBinding struct {
 
 	// ProjectName is the name of the project to which a subject is added. Immutable.
 	// +kubebuilder:validation:Required
-	ProjectName string `json:"projectName,omitempty" norman:"required,noupdate,type=reference[project]"`
+	ProjectName string `json:"projectName" norman:"required,noupdate,type=reference[project]"`
 
 	// RoleTemplateName is the name of the role template that defines permissions to perform actions on resources in the project. Immutable.
 	// +kubebuilder:validation:Required
-	RoleTemplateName string `json:"roleTemplateName,omitempty" norman:"required,noupdate,type=reference[roleTemplate]"`
+	RoleTemplateName string `json:"roleTemplateName" norman:"required,noupdate,type=reference[roleTemplate]"`
 
 	// ServiceAccount is the name of the service account bound as a subject. Immutable.
+	// Deprecated.
 	// +optional
 	ServiceAccount string `json:"serviceAccount,omitempty" norman:"nocreate,noupdate"`
 }

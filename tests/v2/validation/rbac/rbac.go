@@ -13,11 +13,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/namespaces"
 	"github.com/rancher/rancher/tests/framework/extensions/projects"
-	"github.com/rancher/rancher/tests/framework/extensions/provisioning"
-	"github.com/rancher/rancher/tests/framework/extensions/provisioninginput"
-	nodepools "github.com/rancher/rancher/tests/framework/extensions/rke1/nodepools"
 	"github.com/rancher/rancher/tests/framework/extensions/workloads"
-	"github.com/rancher/rancher/tests/framework/pkg/config"
 	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 	appv1 "k8s.io/api/apps/v1"
 	coreV1 "k8s.io/api/core/v1"
@@ -45,13 +41,6 @@ const (
 	defaultNamespace              = "fleet-default"
 	isCattleLabeled               = true
 )
-
-type ClusterConfig struct {
-	nodesAndRoles        []nodepools.NodeRoles
-	externalNodeProvider provisioning.ExternalNodeProvider
-	kubernetesVersion    string
-	cni                  string
-}
 
 func listProjects(client *rancher.Client, clusterID string) ([]string, error) {
 	projectList, err := projects.GetProjectList(client, clusterID)
@@ -204,25 +193,6 @@ func editGlobalSettings(steveclient *v1.Client, globalSetting *v1.SteveAPIObject
 		return nil, err
 	}
 	return updateGlobalSetting, nil
-}
-
-func getClusterConfig() *ClusterConfig {
-
-	nodeAndRoles := []nodepools.NodeRoles{provisioninginput.RKE1AllRolesPool}
-
-	userConfig := new(provisioninginput.Config)
-	config.LoadConfig(provisioninginput.ConfigurationFileKey, userConfig)
-
-	kubernetesVersion := userConfig.RKE1KubernetesVersions[0]
-	cni := userConfig.CNIs[0]
-	nodeProviders := userConfig.NodeProviders[0]
-
-	externalNodeProvider := provisioning.ExternalNodeProviderSetup(nodeProviders)
-
-	clusterConfig := ClusterConfig{nodesAndRoles: nodeAndRoles, externalNodeProvider: externalNodeProvider,
-		kubernetesVersion: kubernetesVersion, cni: cni}
-
-	return &clusterConfig
 }
 
 func createRole(client *rancher.Client, context string, roleName string, rules []management.PolicyRule) (role *management.RoleTemplate, err error) {

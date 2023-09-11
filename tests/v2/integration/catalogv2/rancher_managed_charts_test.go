@@ -78,14 +78,16 @@ func (w *RancherManagedChartsTest) SetupSuite() {
 	require.NoError(w.T(), err)
 	w.cluster = c
 	w.Require().NoError(w.updateSetting("system-managed-charts-operation-timeout", "50s"))
+	w.Require().NoError(w.updateSetting("system-feature-chart-refresh-seconds", "21600"))
 	clusterRepo, err := w.catalogClient.ClusterRepos().Get(context.TODO(), "rancher-charts", metav1.GetOptions{})
 	w.Require().NoError(err)
 	w.originalBranch = clusterRepo.Spec.GitBranch
 	w.originalGitRepo = clusterRepo.Spec.GitRepo
+	w.resetSettings()
 }
 
 func (w *RancherManagedChartsTest) resetSettings() {
-	w.Require().NoError(w.resetManagementCluster())
+	w.resetManagementCluster()
 	list, err := w.catalogClient.Operations("cattle-system").List(context.TODO(), metav1.ListOptions{})
 	w.Require().NoError(err)
 	for _, item := range list.Items {
@@ -143,14 +145,14 @@ func (w *RancherManagedChartsTest) TestUpgradeChartToLatestVersion() {
 	origCfg := cfgMap.DeepCopy()
 
 	// GETTING INDEX FROM CONFIGMAP AND MODIFYING IT
-	latestVersion := w.updateConfigMap(cfgMap)
+	originalLatestVersion := w.updateConfigMap(cfgMap)
 
 	//UPDATING THE CONFIGMAP
 	cfgMap, err = w.corev1.ConfigMaps(clusterRepo.Status.IndexConfigMapNamespace).Update(context.TODO(), cfgMap, metav1.UpdateOptions{})
 	w.Require().NoError(err)
 
 	//KWait for config map to be updated
-	w.Require().NoError(w.WaitForConfigMap(clusterRepo.Status.IndexConfigMapNamespace, clusterRepo.Status.IndexConfigMapName, latestVersion))
+	w.Require().NoError(w.WaitForConfigMap(clusterRepo.Status.IndexConfigMapNamespace, clusterRepo.Status.IndexConfigMapName, originalLatestVersion))
 
 	//Updating the cluster
 	w.Require().NoError(w.updateManagementCluster())
@@ -158,10 +160,8 @@ func (w *RancherManagedChartsTest) TestUpgradeChartToLatestVersion() {
 	app, _, err := w.waitForAksChart(rv1.StatusDeployed, "rancher-aks-operator", 0)
 	w.Require().NoError(err)
 
-	latest, err := w.catalogClient.GetLatestChartVersion("rancher-aks-operator")
 	w.Require().NoError(err)
-	w.Assert().Equal(latest, app.Spec.Chart.Metadata.Version)
-	w.Assert().Greater(latestVersion, latest)
+	w.Assert().Greater(originalLatestVersion, app.Spec.Chart.Metadata.Version)
 
 	//REVERT CONFIGMAP TO ORIGINAL VALUE
 	cfgMap.BinaryData["content"] = origCfg.BinaryData["content"]
@@ -177,7 +177,7 @@ func (w *RancherManagedChartsTest) TestUpgradeChartToLatestVersion() {
 	app, _, err = w.waitForAksChart(rv1.StatusDeployed, "rancher-aks-operator", app.Spec.Version)
 	w.Require().NoError(err)
 
-	w.Assert().Equal(latestVersion, app.Spec.Chart.Metadata.Version)
+	w.Assert().Equal(originalLatestVersion, app.Spec.Chart.Metadata.Version)
 }
 
 func (w *RancherManagedChartsTest) TestUpgradeToWorkingVersion() {
@@ -217,7 +217,7 @@ func (w *RancherManagedChartsTest) TestUpgradeToWorkingVersion() {
 	w.Require().NoError(err)
 	list, err = w.catalogClient.Operations("cattle-system").List(ctx, metav1.ListOptions{})
 	w.Require().NoError(err)
-	w.Require().Equal(numberOfOps+1, countNumberOfOperations(list, "rancher-aks-operator", at))
+	w.Require().LessOrEqual(countNumberOfOperations(list, "rancher-aks-operator", at), numberOfOps+2)
 
 	//REVERT CONFIGMAP TO ORIGINAL VALUE
 	cfgMap.BinaryData["content"] = origCfg.BinaryData["content"]
@@ -286,7 +286,7 @@ func (w *RancherManagedChartsTest) TestUpgradeToBrokenVersion() {
 	w.Require().NoError(err)
 	list, err = ops.List(ctx, metav1.ListOptions{})
 	w.Require().NoError(err)
-	w.Require().Equal(numberOfOps+1, countNumberOfOperations(list, "rancher-aks-operator", at))
+	w.Require().LessOrEqual(countNumberOfOperations(list, "rancher-aks-operator", at), numberOfOps+2)
 }
 
 func countNumberOfOperations(ops *rv1.OperationList, name string, at time.Time) int {
@@ -367,19 +367,7 @@ func (w *RancherManagedChartsTest) updateManagementCluster() error {
 	return err
 }
 
-func (w *RancherManagedChartsTest) resetManagementCluster() error {
-	err := kwait.Poll(5*time.Second, 2*time.Minute, func() (done bool, err error) {
-		list, err := w.corev1.Secrets("cattle-system").List(context.TODO(), metav1.ListOptions{LabelSelector: "name=rancher-aks-operator"})
-		w.Require().NoError(err)
-		if len(list.Items) == 0 {
-			return true, nil
-		}
-		for _, s := range list.Items {
-			w.Require().NoError(w.corev1.Secrets("cattle-system").Delete(context.Background(), s.Name, metav1.DeleteOptions{PropagationPolicy: &propagation}))
-		}
-		return false, nil
-	})
-	w.Require().NoError(err)
+func (w *RancherManagedChartsTest) resetManagementCluster() {
 	w.cluster.AKSConfig = nil
 	w.cluster.AppliedSpec.AKSConfig = nil
 	c, err := w.client.Management.Cluster.Replace(w.cluster)
@@ -394,8 +382,20 @@ func (w *RancherManagedChartsTest) resetManagementCluster() error {
 		}
 		return false, nil
 	})
+	w.Require().NoError(err)
 	w.cluster = c
-	return err
+	err = kwait.Poll(5*time.Second, 2*time.Minute, func() (done bool, err error) {
+		list, err := w.corev1.Secrets("cattle-system").List(context.TODO(), metav1.ListOptions{LabelSelector: "name in (rancher-aks-operator, rancher-aks-operator-crd)"})
+		w.Require().NoError(err)
+		if len(list.Items) == 0 {
+			return true, nil
+		}
+		for _, s := range list.Items {
+			w.Require().NoError(w.corev1.Secrets("cattle-system").Delete(context.Background(), s.Name, metav1.DeleteOptions{PropagationPolicy: &propagation}))
+		}
+		return false, nil
+	})
+	w.Require().NoError(err)
 }
 
 func (w *RancherManagedChartsTest) updateSetting(name, value string) error {

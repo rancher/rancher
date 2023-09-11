@@ -20,7 +20,7 @@ ARG VERSION=dev
 LABEL io.cattle.agent true
 ENV AGENT_IMAGE rancher/rancher-agent:${VERSION}
 # For now, this value needs to be manually synced with the one in the main Dockerfile. This pins downstream webhook's version.
-ENV CATTLE_RANCHER_WEBHOOK_VERSION=103.0.0+up0.4.0-rc2
+ENV CATTLE_RANCHER_WEBHOOK_VERSION=103.0.0+up0.4.0-rc5
 ENV SSL_CERT_DIR /etc/kubernetes/ssl/certs
 COPY --from=rancher /var/lib/rancher-data /var/lib/rancher-data
 COPY --from=rancher /usr/bin/tini /usr/bin/
