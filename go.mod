@@ -105,11 +105,11 @@ require (
 	github.com/prometheus/client_golang v1.15.0
 	github.com/prometheus/client_model v0.3.0
 	github.com/prometheus/common v0.42.0
-	github.com/rancher/aks-operator v1.0.1-rc9
+	github.com/rancher/aks-operator v1.2.0-rc2
 	github.com/rancher/apiserver v0.0.0-20230515173455-c3b182bdbf7d
 	github.com/rancher/channelserver v0.5.1-0.20230719220800-0a37b73c7df8
 	github.com/rancher/dynamiclistener v0.3.6-rc2
-	github.com/rancher/eks-operator v1.2.0
+	github.com/rancher/eks-operator v1.3.0-rc2
 	github.com/rancher/fleet/pkg/apis v0.0.0-20230810121238-9d0ee7f56848
 	github.com/rancher/gke-operator v1.2.0-rc1
 	github.com/rancher/kubernetes-provider-detector v0.1.5
@@ -160,7 +160,11 @@ require (
 	sigs.k8s.io/yaml v1.3.0
 )
 
-require github.com/containers/image/v5 v5.25.0
+require (
+	github.com/containers/image/v5 v5.25.0
+	github.com/rancher/machine v0.15.0-rancher102
+	github.com/rancher/rancher/pkg/apis v0.0.0-20230317204402-a49d36c7e628
+)
 
 require (
 	cloud.google.com/go/compute/metadata v0.2.3 // indirect
