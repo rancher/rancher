@@ -765,7 +765,7 @@ func (m *manager) reconcileManagementPlaneRole(namespace string, resourceToVerbs
 			for _, rule := range role.Rules {
 				if slice.ContainsString(rule.Resources, resource) || slice.ContainsString(rule.Resources, "*") {
 					for _, v := range rule.Verbs {
-						if rule.APIGroups[0] == newVerbs[v] {
+						if group, ok := newVerbs[v]; ok && rule.APIGroups[0] == group {
 							currentVerbs[v] = rule.APIGroups[0]
 						} else if rule.APIGroups[0] == "*" || newVerbs[v] == "*" {
 							currentVerbs[v] = newVerbs[v]
