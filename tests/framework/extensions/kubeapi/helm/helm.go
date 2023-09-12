@@ -33,7 +33,7 @@ func InstallRancher(ts *session.Session, restConfig *rest.Config) error {
 	}
 
 	// Install cert-manager chart
-	err = InstallCertManager(restConfig)
+	err = InstallCertManager(ts, restConfig)
 	if err != nil {
 		return err
 	}
