@@ -145,7 +145,7 @@ func TestGeneratePrivateRegistryDockerConfig(t *testing.T) {
 			},
 		},
 		{
-			name:           "v2prov with upstream registry and public registry",
+			name:           "v2prov public registry with upstream registry",
 			expectedUrl:    "0123456789abcdef.dkr.ecr.us-east-1.amazonaws.com",
 			expectedConfig: "",
 			expectedError:  "",
