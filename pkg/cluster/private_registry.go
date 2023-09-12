@@ -67,8 +67,8 @@ func GetPrivateClusterLevelRegistry(cluster *v3.Cluster) *rketypes.PrivateRegist
 // clusters, as the function will reassemble them anyway.
 func GeneratePrivateRegistryEncodedDockerConfig(cluster *v3.Cluster, secretLister v1.SecretLister) (string, string, error) {
 	var err error
-	// Declare here so we don't need to check if the rke1OrMgmtClusterRegistry exists wile working with v2prov
-	var rke1OrMgmtClusterRegistryUrl string
+	// Declare here so we don't need to check if the rkeClusterRegistryOrGlobalSystemDefault exists wile working with v2prov
+	var rkeClusterUrlOrGlobalSystemDefault string
 
 	if cluster == nil {
 		return "", "", nil
@@ -88,20 +88,20 @@ func GeneratePrivateRegistryEncodedDockerConfig(cluster *v3.Cluster, secretListe
 
 	// Private registry will only be defined on the cluster if it is an RKE1 cluster, mgmt clusters generated from
 	// provisioning clusters do not have a populated `RancherKubernetesEngineConfig`.
-	if rke1OrMgmtClusterRegistry := GetPrivateRegistry(cluster); rke1OrMgmtClusterRegistry != nil {
-		rke1OrMgmtClusterRegistryUrl = rke1OrMgmtClusterRegistry.URL
+	if rkeClusterRegistryOrGlobalSystemDefault := GetPrivateRegistry(cluster); rkeClusterRegistryOrGlobalSystemDefault != nil {
+		rkeClusterUrlOrGlobalSystemDefault = rkeClusterRegistryOrGlobalSystemDefault.URL
 		// check for RKE1 ECR credentials first
-		if rke1OrMgmtClusterRegistry.ECRCredentialPlugin != nil {
+		if rkeClusterRegistryOrGlobalSystemDefault.ECRCredentialPlugin != nil {
 			// generate ecr authConfig
-			authConfig, err := util.ECRCredentialPlugin(rke1OrMgmtClusterRegistry.ECRCredentialPlugin, rke1OrMgmtClusterRegistry.URL)
+			authConfig, err := util.ECRCredentialPlugin(rkeClusterRegistryOrGlobalSystemDefault.ECRCredentialPlugin, rkeClusterRegistryOrGlobalSystemDefault.URL)
 			if err != nil {
-				return rke1OrMgmtClusterRegistry.URL, "", err
+				return rkeClusterRegistryOrGlobalSystemDefault.URL, "", err
 			}
 			encodedJSON, err := json.Marshal(authConfig)
 			if err != nil {
-				return rke1OrMgmtClusterRegistry.URL, "", err
+				return rkeClusterRegistryOrGlobalSystemDefault.URL, "", err
 			}
-			return rke1OrMgmtClusterRegistry.URL, base64.StdEncoding.EncodeToString(encodedJSON), nil
+			return rkeClusterRegistryOrGlobalSystemDefault.URL, base64.StdEncoding.EncodeToString(encodedJSON), nil
 		}
 
 		// If we have a Secret we try to check the rke1 provisioning, otherwise we go directly to the v2prov check.
@@ -110,11 +110,11 @@ func GeneratePrivateRegistryEncodedDockerConfig(cluster *v3.Cluster, secretListe
 			// check for the RKE1 registry secret, returning it if it exists.
 			registrySecret, err := secretLister.Get(namespace.GlobalNamespace, registrySecretName)
 			if err == nil {
-				return rke1OrMgmtClusterRegistry.URL, base64.StdEncoding.EncodeToString(registrySecret.Data[corev1.DockerConfigJsonKey]), nil
+				return rkeClusterRegistryOrGlobalSystemDefault.URL, base64.StdEncoding.EncodeToString(registrySecret.Data[corev1.DockerConfigJsonKey]), nil
 			}
 			// If it doesn't exist (secret not found error) we need to check for a v2prov cluster.
 			if err != nil && !apierrors.IsNotFound(err) {
-				return rke1OrMgmtClusterRegistry.URL, "", err
+				return rkeClusterRegistryOrGlobalSystemDefault.URL, "", err
 			}
 		}
 	}
@@ -127,7 +127,7 @@ func GeneratePrivateRegistryEncodedDockerConfig(cluster *v3.Cluster, secretListe
 	v2ProvRegistryUrl := cluster.GetSecret(v3.ClusterPrivateRegistryURL)
 	// If we don't have a secretName nor a downstream PrivateRegistryURL on the v2Prov we return the RKE1/default registry URL.
 	if v2ProvRegistryUrl == "" {
-		return rke1OrMgmtClusterRegistryUrl, "", nil
+		return rkeClusterUrlOrGlobalSystemDefault, "", nil
 	}
 
 	// if we have a v2Prov registry URL, and we don't have a secret we just return the downstream URL.
