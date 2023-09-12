@@ -1184,8 +1184,6 @@ github.com/rancher/channelserver v0.5.1-0.20230719220800-0a37b73c7df8 h1:Dyg8vyY
 github.com/rancher/channelserver v0.5.1-0.20230719220800-0a37b73c7df8/go.mod h1:Ra21yfic6jHRp9+lelgupPeZw0fwpPZ/kPAY3UFQo+I=
 github.com/rancher/client-go v1.25.4-rancher1 h1:9MlBC8QbgngUkhNzMR8rZmmCIj6WNRHFOnYiwC2Kty4=
 github.com/rancher/client-go v1.25.4-rancher1/go.mod h1:8trHCAC83XKY0wsBIpbirZU4NTUpbuhc2JnI7OruGZw=
-github.com/rancher/dynamiclistener v0.3.6-rc2 h1:Y1nai+Xv+4qqlB3c+hmrY2uBo1EcCDU9kmN5hbnmZhA=
-github.com/rancher/dynamiclistener v0.3.6-rc2/go.mod h1:wOh62hdJIgyqTdD/VAHO77UPKAbUsJJ5gYRjzgBL3Wo=
 github.com/rancher/eks-operator v1.3.0-rc2 h1:Poua1CXexs0h/C0dRllBsaehdc61H+L4xc4e7oxT5tY=
 github.com/rancher/eks-operator v1.3.0-rc2/go.mod h1:30gJm9FbNBdzMX300ibhtlU72BgkjDuW1bX/u4FC0ns=
 github.com/rancher/fleet/pkg/apis v0.0.0-20230810121238-9d0ee7f56848 h1:FNZEI+rCC+u5RVE4dyH7EX8ltlZ74zBowUOviMoGk5c=
@@ -1218,6 +1216,8 @@ github.com/rancher/wrangler v0.6.1/go.mod h1:L4HtjPeX8iqLgsxfJgz+JjKMcX2q3qbRXSe
 github.com/rancher/wrangler v1.1.1-0.20230705223603-201b4da5bdaf h1:XKUtcI795sLmX+joUkvSoX0EbbpAVk1SO6nCPA16xZk=
 github.com/rancher/wrangler v1.1.1-0.20230705223603-201b4da5bdaf/go.mod h1:wcqKmq5FJT34ijBgDMswlx7vOkbkw7LEqaaz6f4XTig=
 github.com/rasky/go-xdr v0.0.0-20170217172119-4930550ba2e2/go.mod h1:Nfe4efndBz4TibWycNE+lqyJZiMX4ycx+QKV8Ta0f/o=
+github.com/rayandas/dynamiclistener v1.27.5 h1:5LBrSMYYnj68YrfFebYFFt8vVZYUfn4RdrHbg9CgWuE=
+github.com/rayandas/dynamiclistener v1.27.5/go.mod h1:aYVbiuo2VQDHydq5RgF1EtAWCll9A7hDiP0NZ//r2rc=
 github.com/remyoudompheng/bigfft v0.0.0-20170806203942-52369c62f446/go.mod h1:uYEyJGbgTkfkS4+E/PavXkNJcbFIpEtjt2B0KDQ5+9M=
 github.com/rivo/uniseg v0.2.0/go.mod h1:J6wj4VEh+S6ZtnVlnTBMWIodfgj8LQOQFoIToxlJtxc=
 github.com/rivo/uniseg v0.4.4 h1:8TfxU8dW6PdqD27gjM8MVNuicgxIjxpm4K7x4jp8sis=

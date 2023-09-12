@@ -5,6 +5,8 @@ go 1.19
 // on release remove this wrangler replace and use the latest tag
 replace github.com/rancher/wrangler v1.1.1 => github.com/rancher/wrangler v1.1.1-0.20230705223603-201b4da5bdaf
 
+replace github.com/rancher/dynamiclistener => github.com/rayandas/dynamiclistener v1.27.5
+
 replace (
 	github.com/docker/distribution => github.com/docker/distribution v2.8.2+incompatible // oras dep requires a replace is set
 	github.com/docker/docker => github.com/docker/docker v20.10.25+incompatible // oras dep requires a replace is set
