@@ -25,15 +25,13 @@ import (
 )
 
 func RunSnapshotCreateTest(t *testing.T, clients *clients.Clients, c *v1.Cluster, configMap corev1.ConfigMap, targetNode string) *rkev1.ETCDSnapshot {
-	var dumpDebugData = true
 	defer func() {
-		if dumpDebugData {
+		if t.Failed() {
 			data, newErr := cluster.GatherDebugData(clients, c)
 			if newErr != nil {
 				logrus.Error(newErr)
 			}
-			logrus.Errorf("cluster %s etcd snapshot creation operation failed", c.Name)
-			logrus.Errorf("cluster %s test data bundle: \n%s", c.Name, data)
+			fmt.Printf("cluster %s etcd snapshot creation operation failed\ncluster %s test data bundle: \n%s", c.Name, c.Name, data)
 		}
 	}()
 
@@ -100,7 +98,6 @@ func RunSnapshotCreateTest(t *testing.T, clients *clients.Clients, c *v1.Cluster
 		return rkeControlPlane.Status.ETCDSnapshotCreatePhase == rkev1.ETCDSnapshotPhaseFinished, nil
 	})
 	if err != nil {
-		dumpDebugData = false
 		t.Fatal(err)
 	}
 
@@ -157,20 +154,17 @@ func RunSnapshotCreateTest(t *testing.T, clients *clients.Clients, c *v1.Cluster
 
 	// The client will return a configmap object but it will not have anything populated.
 	assert.Equal(t, "", newCM.Name)
-	dumpDebugData = false
 	return snapshot
 }
 
 func RunSnapshotRestoreTest(t *testing.T, clients *clients.Clients, c *v1.Cluster, snapshotName string, expectedConfigMap corev1.ConfigMap, expectedNodeCount int) {
-	var dumpDebugData = true
 	defer func() {
-		if dumpDebugData {
+		if t.Failed() {
 			data, newErr := cluster.GatherDebugData(clients, c)
 			if newErr != nil {
 				logrus.Error(newErr)
 			}
-			logrus.Errorf("cluster %s etcd snapshot restore operation failed", c.Name)
-			logrus.Errorf("cluster %s test data bundle: \n%s", c.Name, data)
+			fmt.Printf("cluster %s etcd snapshot restore operation failed\ncluster %s test data bundle: \n%s", c.Name, c.Name, data)
 		}
 	}()
 
