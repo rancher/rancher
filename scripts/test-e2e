@@ -1,0 +1,10 @@
+#!/bin/bash
+set -e
+
+# skipping tests for s390x since k3s doesn't support s390x yet
+if [ ${ARCH} == s390x ]; then
+    exit 0
+fi
+
+# Run end to end tests 
+ginkgo ../tests/v2/e2e
