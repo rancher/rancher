@@ -103,6 +103,7 @@ func GeneratePrivateRegistryEncodedDockerConfig(cluster *v3.Cluster, secretListe
 		// If we have a registrySecret we try to use it. Otherwise, we test v2prov.
 		// If we don't have a secret but have a downstream registry we need to check it on v2.
 		if registrySecretName != "" {
+			// check for the RKE1 registry secret next
 			registrySecret, err := secretLister.Get(namespace.GlobalNamespace, registrySecretName)
 			if err == nil {
 				return registry.URL, base64.StdEncoding.EncodeToString(registrySecret.Data[corev1.DockerConfigJsonKey]), nil
@@ -111,7 +112,6 @@ func GeneratePrivateRegistryEncodedDockerConfig(cluster *v3.Cluster, secretListe
 				return registry.URL, "", err
 			}
 		}
-		// check for the RKE1 registry secret next
 	}
 
 	// cluster.GetSecret("PrivateRegistryURL") will be empty if the cluster is
