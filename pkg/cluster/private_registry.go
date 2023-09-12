@@ -84,7 +84,8 @@ func GeneratePrivateRegistryEncodedDockerConfig(cluster *v3.Cluster, secretListe
 
 	// Private registry will only be defined on the cluster if it is an RKE1 cluster, mgmt clusters generated from
 	// provisioning clusters do not have a populated `RancherKubernetesEngineConfig`.
-	if registry := GetPrivateRegistry(cluster); registry != nil {
+	registry := GetPrivateRegistry(cluster)
+	if registry != nil {
 		// check for RKE1 ECR credentials first
 		if registry.ECRCredentialPlugin != nil {
 			// generate ecr authConfig
@@ -99,19 +100,18 @@ func GeneratePrivateRegistryEncodedDockerConfig(cluster *v3.Cluster, secretListe
 			return registry.URL, base64.StdEncoding.EncodeToString(encodedJSON), nil
 		}
 
-		// no private registry secret, generate authconfig based on existing fields
-		if registrySecretName == "" {
-			return registry.URL, "", nil
+		// If we have a registrySecret we try to use it. Otherwise, we test v2prov.
+		// If we don't have a secret but have a downstream registry we need to check it on v2.
+		if registrySecretName != "" {
+			registrySecret, err := secretLister.Get(namespace.GlobalNamespace, registrySecretName)
+			if err == nil {
+				return registry.URL, base64.StdEncoding.EncodeToString(registrySecret.Data[corev1.DockerConfigJsonKey]), nil
+			}
+			if err != nil && !apierrors.IsNotFound(err) { // ignore secret not found errors as we need to check v2prov clusters
+				return registry.URL, "", err
+			}
 		}
-
 		// check for the RKE1 registry secret next
-		registrySecret, err := secretLister.Get(namespace.GlobalNamespace, registrySecretName)
-		if err == nil {
-			return registry.URL, base64.StdEncoding.EncodeToString(registrySecret.Data[corev1.DockerConfigJsonKey]), nil
-		}
-		if err != nil && !apierrors.IsNotFound(err) { // ignore secret not found errors as we need to check v2prov clusters
-			return registry.URL, "", err
-		}
 	}
 
 	// cluster.GetSecret("PrivateRegistryURL") will be empty if the cluster is
@@ -121,7 +121,8 @@ func GeneratePrivateRegistryEncodedDockerConfig(cluster *v3.Cluster, secretListe
 	// Without it, we cannot generate the registry credentials (.dockerconfigjson)
 	registryURL := cluster.GetSecret(v3.ClusterPrivateRegistryURL)
 	if registryURL == "" {
-		return "", "", nil
+		// If we don't have a secret on the RKE1 nor a PrivateRegistryURL on the v2Prov we return the RKE1/default registry.
+		return registry.URL, "", nil
 	}
 
 	if registrySecretName == "" { // no private registry configured
