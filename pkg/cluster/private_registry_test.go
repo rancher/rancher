@@ -166,6 +166,25 @@ func TestGeneratePrivateRegistryDockerConfig(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:           "Upstrem registry and no downstream one",
+			expectedUrl:    "0123456789abcdef.dkr.ecr.us-east-1.amazonaws.com",
+			expectedConfig: "",
+			expectedError:  "",
+			// cluster.Spec.RancherKubernetesEngineConfig.PrivateRegistries
+			cluster: &v3.Cluster{
+				Spec: v3.ClusterSpec{
+					ClusterSpecBase: v3.ClusterSpecBase{
+						RancherKubernetesEngineConfig: &rketypes.RancherKubernetesEngineConfig{
+							PrivateRegistries: []rketypes.PrivateRegistry{{
+								URL: "0123456789abcdef.dkr.ecr.us-east-1.amazonaws.com",
+							}},
+						},
+					},
+					FleetWorkspaceName: "fleet-default",
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
