@@ -10,14 +10,14 @@ replace k8s.io/client-go => github.com/rancher/client-go v1.25.4-rancher1
 require (
 	github.com/rancher/aks-operator v1.2.0-rc2
 	github.com/rancher/eks-operator v1.3.0-rc2
-	github.com/rancher/fleet/pkg/apis v0.0.0-20230821130910-23e1c146755a
+	github.com/rancher/fleet/pkg/apis v0.0.0-20230912105714-0d26f206b3c5
 	github.com/rancher/gke-operator v1.2.0-rc1
 	github.com/rancher/norman v0.0.0-20230426211126-d3552b018687
 	github.com/rancher/rke v1.5.0-rc2
 	github.com/rancher/wrangler v1.1.1
 	github.com/sirupsen/logrus v1.9.3
-	k8s.io/api v0.25.12
-	k8s.io/apimachinery v0.25.12
+	k8s.io/api v0.27.4
+	k8s.io/apimachinery v0.27.4
 	sigs.k8s.io/cluster-api v1.2.12
 )
 
@@ -44,7 +44,6 @@ require (
 	github.com/imdario/mergo v0.3.12 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/kr/pretty v0.3.0 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.2 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
@@ -74,7 +73,7 @@ require (
 	k8s.io/client-go v12.0.0+incompatible // indirect
 	k8s.io/component-base v0.25.4 // indirect
 	k8s.io/klog/v2 v2.90.1 // indirect
-	k8s.io/kube-openapi v0.0.0-20230308215209-15aac26d736a // indirect
+	k8s.io/kube-openapi v0.0.0-20230501164219-8b0f38b5fd1f // indirect
 	k8s.io/kubernetes v1.15.0-alpha.0 // indirect
 	k8s.io/utils v0.0.0-20230209194617-a36077c30491 // indirect
 	sigs.k8s.io/cli-utils v0.27.0 // indirect
