@@ -1001,8 +1001,8 @@ github.com/prometheus/procfs v0.8.0/go.mod h1:z7EfXMXOkbkqb9IINtpCn86r/to3BnA0ua
 github.com/prometheus/procfs v0.10.1 h1:kYK1Va/YMlutzCGazswoHKo//tZVlFpKYh+PymziUAg=
 github.com/prometheus/procfs v0.10.1/go.mod h1:nwNm2aOCAYw8uTR/9bWRREkZFxAUcWzPHWJq+XBB/FM=
 github.com/prometheus/tsdb v0.7.1/go.mod h1:qhTCs0VvXwvX/y3TZrWD7rabWM+ijKTux40TwIPHuXU=
-github.com/rancher/aks-operator v1.2.0-rc2 h1:zP1VEzAc/jZ7FyeiQcQ+pkFUxDySrKoN+RdSnnj7LnE=
-github.com/rancher/aks-operator v1.2.0-rc2/go.mod h1:ga4p9r8nTUuSRqkYLTBgA5OlPf19iT/i9Qa3kXH7H7Y=
+github.com/rancher/aks-operator v1.2.0-rc3 h1:EoTUWGIgCk4ffkx3Eq/RQSqanbGKpRKtXTqEusPp9yk=
+github.com/rancher/aks-operator v1.2.0-rc3/go.mod h1:ga4p9r8nTUuSRqkYLTBgA5OlPf19iT/i9Qa3kXH7H7Y=
 github.com/rancher/apiserver v0.0.0-20230831052300-120e615b17ba h1:ceAHvddZkuNbUTuMgqxYAcUSQ/+YtJQO9Z1PHjmQZBY=
 github.com/rancher/apiserver v0.0.0-20230831052300-120e615b17ba/go.mod h1:1m5KKYXq6iMZFQ5kiC9rBgVLfGRNR8E+lp88f5tEAsI=
 github.com/rancher/aws-iam-authenticator v0.5.9-0.20220713170329-78acb8c83863 h1:7cVEMgwyiVhLyu/Ywuw58mkkh9cWpFE3+X8IrWncBxU=
