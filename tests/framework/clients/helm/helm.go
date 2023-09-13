@@ -7,7 +7,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/pkg/session"
 )
 
-var helmCmd = "helm_v3"
+var helmCmd = "helm"
 
 // InstallChart installs a helm chart using helm CLI.
 // Send the helm set command strings such as "--set", "installCRDs=true"

@@ -25,7 +25,7 @@ var importTimeout = int64(60 * 20)
 
 // CreateK3DCluster creates a minimal k3d cluster and returns a rest config for connecting to the newly created cluster.
 // If a name is not given a random one will be generated.
-func CreateK3DCluster(ts *session.Session, name, hostname string, servers, agents int) (*rest.Config, error) {
+func CreateK3DCluster(ts *session.Session, name, hostname string, servers, agents int, version string) (*rest.Config, error) {
 	k3dConfig := new(Config)
 	config.LoadConfig(ConfigurationFileKey, k3dConfig)
 
@@ -42,6 +42,7 @@ func CreateK3DCluster(ts *session.Session, name, hostname string, servers, agent
 		"--no-lb",
 		fmt.Sprintf("--servers=%d", servers),
 		fmt.Sprintf("--agents=%d", agents),
+		fmt.Sprintf("--image=rancher/k3s:%s", version),
 		"--kubeconfig-update-default=true",
 		"--kubeconfig-switch-context=true",
 		fmt.Sprintf("--timeout=%d", k3dConfig.createTimeout),
@@ -92,7 +93,7 @@ func ImportImage(image, clusterName string) error {
 }
 
 // CreateAndImportK3DCluster creates a new k3d cluster and imports it into rancher.
-func CreateAndImportK3DCluster(client *rancher.Client, name, image, hostname string, servers, agents int, importImage bool) (*apisV1.Cluster, error) {
+func CreateAndImportK3DCluster(client *rancher.Client, name, image, hostname string, servers, agents int, importImage bool, version string) (*apisV1.Cluster, error) {
 	var err error
 
 	name = defaultName(name)
@@ -112,7 +113,7 @@ func CreateAndImportK3DCluster(client *rancher.Client, name, image, hostname str
 
 	// create the k3d cluster
 	logrus.Infof("Creating K3D cluster...")
-	downRest, err := CreateK3DCluster(client.Session, name, hostname, servers, agents)
+	downRest, err := CreateK3DCluster(client.Session, name, hostname, servers, agents, version)
 	if err != nil {
 		_ = client.Steve.SteveType(clusters.ProvisioningSteveResourceType).Delete(clusterObj)
 		return nil, errors.Wrap(err, "CreateAndImportK3DCluster: failed to create k3d cluster")
