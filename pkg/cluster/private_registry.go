@@ -124,28 +124,28 @@ func GeneratePrivateRegistryEncodedDockerConfig(cluster *v3.Cluster, secretListe
 	// For RKE2 with a cluster level registry configured, this is the
 	// only reference to the registry URL available on the v3.Cluster.
 	// Without it, we cannot generate the registry credentials (.dockerconfigjson)
-	v2ProvRegistryUrl := cluster.GetSecret(v3.ClusterPrivateRegistryURL)
+	v2ProvRegistryURL := cluster.GetSecret(v3.ClusterPrivateRegistryURL)
 	// If we don't have a secretName nor a downstream PrivateRegistryURL on the v2Prov we return the RKE1/default registry URL.
-	if v2ProvRegistryUrl == "" {
+	if v2ProvRegistryURL == "" {
 		return rkeClusterURLOrGlobalSystemDefault, "", nil
 	}
 
 	// if we have a v2Prov registry URL, and we don't have a secret we just return the downstream URL.
 	if registrySecretName == "" {
-		return v2ProvRegistryUrl, "", nil
+		return v2ProvRegistryURL, "", nil
 	}
 
 	// If we have a registrySecret and a  downstream Registry URL  we try to get the secret from the v2prov.
 	registrySecret, err := secretLister.Get(cluster.Spec.FleetWorkspaceName, registrySecretName)
 	if err != nil {
-		return v2ProvRegistryUrl, "", err
+		return v2ProvRegistryURL, "", err
 	}
 
 	username := string(registrySecret.Data["username"])
 	password := string(registrySecret.Data["password"])
 	authConfig := credentialprovider.DockerConfigJSON{
 		Auths: credentialprovider.DockerConfig{
-			v2ProvRegistryUrl: credentialprovider.DockerConfigEntry{
+			v2ProvRegistryURL: credentialprovider.DockerConfigEntry{
 				Username: username,
 				Password: password,
 			},
@@ -154,8 +154,8 @@ func GeneratePrivateRegistryEncodedDockerConfig(cluster *v3.Cluster, secretListe
 
 	registryJSON, err := json.Marshal(authConfig)
 	if err != nil {
-		return v2ProvRegistryUrl, "", err
+		return v2ProvRegistryURL, "", err
 	}
 
-	return v2ProvRegistryUrl, base64.StdEncoding.EncodeToString(registryJSON), nil
+	return v2ProvRegistryURL, base64.StdEncoding.EncodeToString(registryJSON), nil
 }
