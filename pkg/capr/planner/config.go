@@ -136,7 +136,7 @@ func addRoleConfig(config map[string]interface{}, controlPlane *rkev1.RKEControl
 	// to run.
 	if isControlPlane(entry) {
 		logrus.Debug("addRoleConfig rendering arguments and mounts for kube-controller-manager")
-		certDirArg, certDirMount := renderArgAndMount(controlPlane.Spec.MachineGlobalConfig.Data[KubeControllerManagerArg], controlPlane.Spec.MachineGlobalConfig.Data[KubeControllerManagerExtraMount], runtime, DefaultKubeControllerManagerDefaultSecurePort, DefaultKubeControllerManagerCertDir)
+		certDirArg, certDirMount := renderArgAndMount(config[KubeControllerManagerArg], config[KubeControllerManagerExtraMount], runtime, DefaultKubeControllerManagerDefaultSecurePort, DefaultKubeControllerManagerCertDir)
 		config[KubeControllerManagerArg] = certDirArg
 		if runtime == capr.RuntimeRKE2 {
 			config[KubeControllerManagerExtraMount] = certDirMount

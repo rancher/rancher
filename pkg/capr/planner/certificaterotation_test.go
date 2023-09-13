@@ -198,7 +198,7 @@ func Test_rotateCertificatesPlan(t *testing.T) {
 			setup:               genericSetup,
 			machineGlobalConfig: &rkev1.GenericMap{
 				Data: map[string]interface{}{
-					KubeControllerManagerArg: []string{"cert-dir=/mycustomdir"},
+					KubeControllerManagerArg: []any{"cert-dir=/mycustomdir"},
 				},
 			},
 			expected: expected{
@@ -220,6 +220,8 @@ func Test_rotateCertificatesPlan(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		// copy test case for persistence in parallel runs
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			mockPlanner := newMockPlanner(t, InfoFunctions{
 				SystemAgentImage: func() string { return "system-agent" },
@@ -231,13 +233,9 @@ func Test_rotateCertificatesPlan(t *testing.T) {
 			controlPlane := createTestControlPlane(tt.version)
 			if tt.machineGlobalConfig != nil {
 				controlPlane.Spec.MachineGlobalConfig = *tt.machineGlobalConfig
-			} else {
-				controlPlane.Spec.MachineGlobalConfig = rkev1.GenericMap{
-					Data: map[string]interface{}{},
-				}
 			}
-
 			controlPlane.Spec.ManagementClusterName = "somecluster"
+			controlPlane.Spec.RotateCertificates = &rkev1.RotateCertificates{}
 			if tt.rotateCertificates != nil {
 				controlPlane.Spec.RotateCertificates = tt.rotateCertificates
 			} else {
@@ -248,10 +246,11 @@ func Test_rotateCertificatesPlan(t *testing.T) {
 				entry.Machine.Labels[capr.ControlPlaneRoleLabel] = "true"
 				entry.Metadata.Labels[capr.ControlPlaneRoleLabel] = "true"
 			} else {
-				// to avoid implausible join server error
-				entry.Metadata.Annotations = map[string]string{
-					capr.JoinedToAnnotation: tt.expected.joinServer,
+				// worker nodes ignore passed in join server and rely only on annotation
+				if entry.Metadata.Annotations == nil {
+					entry.Metadata.Annotations = map[string]string{}
 				}
+				entry.Metadata.Annotations[capr.JoinedToAnnotation] = tt.expected.joinServer
 			}
 
 			ts := plan.Secret{
