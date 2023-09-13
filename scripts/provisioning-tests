@@ -54,6 +54,10 @@ if [ -z "${SOME_K8S_VERSION}" ]; then
 export SOME_K8S_VERSION=$(curl -sS https://raw.githubusercontent.com/rancher/kontainer-driver-metadata/dev-v2.7/data/data.json | jq -r ".$DIST.releases[-1].version")
 fi
 
+if [ "${DIST}" = "rke2" ]; then
+  export SOME_K8S_VERSION=v1.26.7+rke2r1
+fi
+
 echo "Starting rancher server for provisioning-tests using $SOME_K8S_VERSION"
 touch /tmp/rancher.log
 
