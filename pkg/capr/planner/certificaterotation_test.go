@@ -221,7 +221,6 @@ func Test_rotateCertificatesPlan(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			//t.Parallel()
 			mockPlanner := newMockPlanner(t, InfoFunctions{
 				SystemAgentImage: func() string { return "system-agent" },
 				ImageResolver:    image.ResolveWithControlPlane,
