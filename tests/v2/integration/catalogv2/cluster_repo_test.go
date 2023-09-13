@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -173,8 +174,10 @@ func (c *ClusterRepoTestSuite) testSmallForkClusterRepo(params ChartsSmallForkRe
 	var firstCommit, firstBranch string
 	var lastCommit, lastBranch string
 	var createdClusterRepo, testClusterRepo, updatedClusterRepo *v1.ClusterRepo
+	var wg sync.WaitGroup
 
-	// Creates new ClusterRepo kubernetes custom resource
+	// Operations as Admin
+	// Creates a new ClusterRepo Kubernetes custom resource
 	createdClusterRepo, err = c.catalogClient.ClusterRepos().Create(c.ctx,
 		&v1.ClusterRepo{
 			ObjectMeta: metav1.ObjectMeta{
@@ -188,11 +191,15 @@ func (c *ClusterRepoTestSuite) testSmallForkClusterRepo(params ChartsSmallForkRe
 
 	require.NoError(c.T(), err)
 
+	// Test RBAC concurrently after creating the test cluster catalog "charts-small-fork"
+	wg.Add(1)
+	go c.testRBACClusterRepo(&wg)
+
 	// List all available installed Cluster Repos
 	installedClusterRepos, err := c.catalogClient.ClusterRepos().List(c.ctx, metav1.ListOptions{})
 	require.NoError(c.T(), err)
 
-	// Check if our created ClusterRepo(charts-small-fork) was created
+	// Check if our created ClusterRepo (charts-small-fork) was created
 	success := false
 	for _, cr := range installedClusterRepos.Items {
 		logrus.Debugf("Installed Cluster Repo: %s", cr.Name)
@@ -216,24 +223,29 @@ func (c *ClusterRepoTestSuite) testSmallForkClusterRepo(params ChartsSmallForkRe
 		return false, nil
 	})
 	require.NoError(c.T(), err)
-	// we have waited for ClusterRepo status to update and the local repository to be created
+
+	// We have waited for ClusterRepo status to update and the local repository to be created
 	repoPath, err := getCurrentRepoDirSmallFork()
+	require.NoError(c.T(), err)
 	firstCommit, firstBranch, err = getLocalRepoCurrentCommitAndBranch(repoPath)
-	// Compare ClusterRepo Values with local repository
+	require.NoError(c.T(), err)
+
+	// Compare ClusterRepo Values with the local repository
 	assert.Equal(c.T(), firstBranch, testClusterRepo.Spec.GitBranch)
 	assert.Equal(c.T(), firstBranch, testClusterRepo.Status.Branch)
 	assert.Equal(c.T(), firstCommit, testClusterRepo.Status.Commit)
 	assert.Equal(c.T(), int64(1), testClusterRepo.Status.ObservedGeneration)
 
-	// Updating ClusterRepo Spec Branch to newer one
+	// Updating ClusterRepo Spec Branch to a newer one
 	testClusterRepo.Spec.GitBranch = ChartsSmallForkGitRepoLastBranch
 	updatedClusterRepo, err = c.catalogClient.ClusterRepos().Update(c.ctx, testClusterRepo.DeepCopy(), metav1.UpdateOptions{})
 	require.NoError(c.T(), err)
 	assert.Equal(c.T(), ChartsSmallForkGitRepoLastBranch, updatedClusterRepo.Spec.GitBranch)
 
-	// The Spec from ClusterRepo is updated almost instantlty, the status and local repository take more time
+	// The Spec from ClusterRepo is updated almost instantly, the status and local repository take more time
 	err = kwait.Poll(5*time.Second, 10*time.Minute, func() (done bool, err error) {
 		lastCommit, _, err := getLocalRepoCurrentCommitAndBranch(repoPath)
+		require.NoError(c.T(), err)
 		updatedClusterRepo, err = c.catalogClient.ClusterRepos().Get(c.ctx, testClusterRepo.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -247,6 +259,19 @@ func (c *ClusterRepoTestSuite) testSmallForkClusterRepo(params ChartsSmallForkRe
 	logrus.Debug("last commit: ", lastCommit)
 	logrus.Debug("last branch: ", lastBranch)
 	require.NoError(c.T(), err)
+	// Wait for both tests finishing
+	wg.Wait()
+}
+
+// testRBACClusterRepo tests RBAC (Role-Based Access Control) functionality for Cluster Repositories.
+// It creates roles, users with roles, Cluster RoleTemplate Bindings, and performs RBAC checks.
+func (c *ClusterRepoTestSuite) testRBACClusterRepo(wg *sync.WaitGroup) {
+	defer wg.Done()
+	// Create role templates
+	// Create users with roles
+	// Create Cluster RoleTemplate Bindings
+	// Test user1's access to Cluster Repositories
+	// Test user2's access to Cluster Repositories
 }
 
 // pollUntilDownloaded Polls until the ClusterRepo of the given name has been downloaded (by comparing prevDownloadTime against the current DownloadTime)
