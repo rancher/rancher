@@ -105,8 +105,6 @@ func (c *ClusterRepoTestSuite) SetupSuite() {
 	c.clusterID = LocalClusterID
 	c.catalogClient, err = c.client.GetClusterCatalogClient(c.clusterID)
 	require.NoError(c.T(), err)
-
-	ChartSmallForkDir = fmt.Sprintf("../../../../management-state/git-repo/%s", ChartsSmallForkRepoName)
 }
 
 // TestHTTPRepo tests CREATE, UPDATE, and DELETE operations of HTTP ClusterRepo resources
