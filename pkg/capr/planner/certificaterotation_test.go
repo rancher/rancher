@@ -221,7 +221,7 @@ func Test_rotateCertificatesPlan(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
+			//t.Parallel()
 			mockPlanner := newMockPlanner(t, InfoFunctions{
 				SystemAgentImage: func() string { return "system-agent" },
 				ImageResolver:    image.ResolveWithControlPlane,
@@ -251,7 +251,7 @@ func Test_rotateCertificatesPlan(t *testing.T) {
 			} else {
 				// to avoid implausible join server error
 				entry.Metadata.Annotations = map[string]string{
-					capr.JoinedToAnnotation: controlPlane.GetName(),
+					capr.JoinedToAnnotation: tt.expected.joinServer,
 				}
 			}
 
