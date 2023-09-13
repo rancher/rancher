@@ -25,6 +25,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	kwait "k8s.io/apimachinery/pkg/util/wait"
@@ -104,6 +105,8 @@ func (c *ClusterRepoTestSuite) SetupSuite() {
 	c.clusterID = LocalClusterID
 	c.catalogClient, err = c.client.GetClusterCatalogClient(c.clusterID)
 	require.NoError(c.T(), err)
+
+	ChartSmallForkDir = fmt.Sprintf("../../../../management-state/git-repo/%s", ChartsSmallForkRepoName)
 }
 
 // TestHTTPRepo tests CREATE, UPDATE, and DELETE operations of HTTP ClusterRepo resources
@@ -272,10 +275,37 @@ func (c *ClusterRepoTestSuite) testSmallForkClusterRepo(params ChartsSmallForkRe
 func (c *ClusterRepoTestSuite) testRBACClusterRepo(wg *sync.WaitGroup) {
 	defer wg.Done()
 	// Create role templates
+	roleName1 := "catalog-view-target"
+	roleName2 := "catalog-view-all"
+	role1, role2 := c.createRoleTemplates(roleName1, roleName2)
 	// Create users with roles
+	user1 := c.createUserWithDefaultGlobalRole("rbac-catalog-user-test-1")
+	user2 := c.createUserWithDefaultGlobalRole("rbac-catalog-user-test-2")
 	// Create Cluster RoleTemplate Bindings
+	c.createClusterRoleTemplateBindings(user1.ID, user2.ID, role1.ID, role2.ID)
+
+	ctx := context.Background()
 	// Test user1's access to Cluster Repositories
+	testUser1, err := c.client.AsUser(user1)
+	require.NoError(c.T(), err)
+	_, err = testUser1.Catalog.ClusterRepos().List(ctx, metav1.ListOptions{})
+	var expectedErrorCode int32 = 403
+	var expectedErrorReason string = "Forbidden"
+	statusErr, ok := err.(*errors.StatusError)
+	require.True(c.T(), ok, "Expected error of type StatusError, but got a different error type.")
+	require.Equal(c.T(), expectedErrorCode, statusErr.ErrStatus.Code, "Expected error Code to be %d, but got %d.", expectedErrorCode, statusErr.ErrStatus.Code)
+	require.Equal(c.T(), expectedErrorReason, string(statusErr.ErrStatus.Reason), "Expected error Reason to be %s, but got %s.", expectedErrorReason, string(statusErr.ErrStatus.Reason))
+
+	user1ClusterRepos, err := testUser1.Catalog.ClusterRepos().Get(ctx, ChartsSmallForkRepoName, metav1.GetOptions{})
+	_ = user1ClusterRepos
+	require.NoError(c.T(), err)
+	require.Equal(c.T(), user1ClusterRepos.Name, string(ChartsSmallForkRepoName))
 	// Test user2's access to Cluster Repositories
+	testUser2, err := c.client.AsUser(user2)
+	require.NoError(c.T(), err)
+	user2ClusterRepos, err := testUser2.Catalog.ClusterRepos().List(ctx, metav1.ListOptions{})
+	require.NoError(c.T(), err)
+	require.GreaterOrEqual(c.T(), len(user2ClusterRepos.Items), 4)
 }
 
 // createUserWithDefaultGlobalRole creates a new user with the specified username
