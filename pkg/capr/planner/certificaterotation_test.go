@@ -118,7 +118,7 @@ func Test_rotateCertificatesPlan(t *testing.T) {
 					},
 					[]string{},
 				)}[0],
-				otiCount:   9, // the extra removal instructions are for removing the static pod manifests for RKE2
+				otiCount:   10, // the extra removal instructions are for removing the static pod manifests for RKE2
 				joinServer: "my-magic-joinserver",
 			},
 		},
@@ -129,14 +129,14 @@ func Test_rotateCertificatesPlan(t *testing.T) {
 			joinServer:          "my-magic-joinserver",
 			setup:               genericSetup,
 			expected: expected{
-				otiIndex: 1,
+				otiIndex: 3,
 				oti: &[]plan.OneTimeInstruction{idempotentInstruction(
 					"certificate-rotation/rm-ks-cert",
 					strconv.FormatInt(int64(0), 10),
 					"rm",
 					[]string{
 						"-f",
-						"/var/lib/rancher/rke2/server/tls/kube-scheduler/kube-scheduler.crt",
+						"/var/lib/rancher/k3s/server/tls/kube-scheduler/kube-scheduler.crt",
 					},
 					[]string{},
 				)}[0],
@@ -151,7 +151,7 @@ func Test_rotateCertificatesPlan(t *testing.T) {
 			joinServer:          "my-magic-joinserver",
 			setup:               genericSetup,
 			expected: expected{
-				otiIndex: 1,
+				otiIndex: 4,
 				oti: &[]plan.OneTimeInstruction{idempotentInstruction(
 					"certificate-rotation/rm-ks-cert",
 					strconv.FormatInt(int64(0), 10),
@@ -162,7 +162,7 @@ func Test_rotateCertificatesPlan(t *testing.T) {
 					},
 					[]string{},
 				)}[0],
-				otiCount:   9, // the extra removal instructions are for removing the static pod manifests for RKE2
+				otiCount:   10, // the extra removal instructions are for removing the static pod manifests for RKE2
 				joinServer: "my-magic-joinserver",
 			},
 		},
@@ -174,7 +174,7 @@ func Test_rotateCertificatesPlan(t *testing.T) {
 			expected: expected{
 				otiIndex:   1,
 				oti:        &[]plan.OneTimeInstruction{idempotentRestartInstructions("certificate-rotation/restart", strconv.FormatInt(int64(0), 10), capr.GetRuntimeAgentUnit("v1.25.7+rke2r1"))[1]}[0],
-				otiCount:   1,
+				otiCount:   2,
 				joinServer: "",
 			},
 		},
@@ -220,6 +220,8 @@ func Test_rotateCertificatesPlan(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		// copy test case for persistence in parallel runs
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			mockPlanner := newMockPlanner(t, InfoFunctions{
@@ -230,8 +232,11 @@ func Test_rotateCertificatesPlan(t *testing.T) {
 				tt.setup(mockPlanner)
 			}
 			controlPlane := createTestControlPlane(tt.version)
-			controlPlane.Spec.MachineGlobalConfig = *tt.machineGlobalConfig
+			if tt.machineGlobalConfig != nil {
+				controlPlane.Spec.MachineGlobalConfig = *tt.machineGlobalConfig
+			}
 			controlPlane.Spec.ManagementClusterName = "somecluster"
+			controlPlane.Spec.RotateCertificates = &rkev1.RotateCertificates{}
 			if tt.rotateCertificates != nil {
 				controlPlane.Spec.RotateCertificates = tt.rotateCertificates
 			}
@@ -239,13 +244,19 @@ func Test_rotateCertificatesPlan(t *testing.T) {
 			if tt.entryIsControlPlane {
 				entry.Machine.Labels[capr.ControlPlaneRoleLabel] = "true"
 				entry.Metadata.Labels[capr.ControlPlaneRoleLabel] = "true"
+			} else {
+				// worker nodes ignore passed in join server and rely only on annotation
+				if entry.Metadata.Annotations == nil {
+					entry.Metadata.Annotations = map[string]string{}
+				}
+				entry.Metadata.Annotations[capr.JoinedToAnnotation] = tt.expected.joinServer
 			}
 
 			ts := plan.Secret{
 				ServerToken: "lol",
 			}
 
-			np, joined, err := mockPlanner.planner.rotateCertificatesPlan(controlPlane, ts, &rkev1.RotateCertificates{}, entry, tt.joinServer)
+			np, joined, err := mockPlanner.planner.rotateCertificatesPlan(controlPlane, ts, controlPlane.Spec.RotateCertificates, entry, tt.joinServer)
 			if tt.expected.oti != nil {
 				assert.Equal(t, *tt.expected.oti, np.Instructions[tt.expected.otiIndex])
 			}
