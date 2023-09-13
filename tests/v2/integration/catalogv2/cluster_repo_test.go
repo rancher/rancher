@@ -343,6 +343,27 @@ func (c *ClusterRepoTestSuite) createRoleTemplates(roleName1, roleName2 string) 
 	return roleTemplate1, roleTemplate2
 }
 
+// createClusterRoleTemplateBindings creates ClusterRoleTemplateBindings for two users with corresponding roles.
+func (c *ClusterRepoTestSuite) createClusterRoleTemplateBindings(user1ID, user2ID, role1ID, role2ID string) {
+	// Create ClusterRoleTemplateBinding for user1 and role1
+	_, err := c.client.Management.ClusterRoleTemplateBinding.Create(&management.ClusterRoleTemplateBinding{
+		Name:            "cluster-role-template-binding-1",
+		ClusterID:       c.clusterID,
+		RoleTemplateID:  role1ID,
+		UserPrincipalID: fmt.Sprintf("%s://%s", c.clusterID, user1ID),
+	})
+	require.NoError(c.T(), err)
+
+	// Create ClusterRoleTemplateBinding for user2 and role2
+	_, err = c.client.Management.ClusterRoleTemplateBinding.Create(&management.ClusterRoleTemplateBinding{
+		Name:            "cluster-role-template-binding-2",
+		ClusterID:       c.clusterID,
+		RoleTemplateID:  role2ID,
+		UserPrincipalID: fmt.Sprintf("%s://%s", c.clusterID, user2ID),
+	})
+	require.NoError(c.T(), err)
+}
+
 // pollUntilDownloaded Polls until the ClusterRepo of the given name has been downloaded (by comparing prevDownloadTime against the current DownloadTime)
 func (c *ClusterRepoTestSuite) pollUntilDownloaded(ClusterRepoName string, prevDownloadTime metav1.Time) (*stevev1.SteveAPIObject, error) {
 	var clusterRepo *stevev1.SteveAPIObject
