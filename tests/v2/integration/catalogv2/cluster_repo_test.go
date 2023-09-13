@@ -12,6 +12,10 @@ import (
 	"testing"
 	"time"
 
+	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
+	users "github.com/rancher/rancher/tests/framework/extensions/users"
+	password "github.com/rancher/rancher/tests/framework/extensions/users/passwordgenerator"
+
 	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	"github.com/rancher/rancher/tests/framework/clients/rancher/catalog"
@@ -272,6 +276,71 @@ func (c *ClusterRepoTestSuite) testRBACClusterRepo(wg *sync.WaitGroup) {
 	// Create Cluster RoleTemplate Bindings
 	// Test user1's access to Cluster Repositories
 	// Test user2's access to Cluster Repositories
+}
+
+// createUserWithDefaultGlobalRole creates a new user with the specified username
+// and assigns them the "user-base" General Role Template, which grants only the login permission.
+// It generates a random password for the user and returns the created user object.
+func (c *ClusterRepoTestSuite) createUserWithDefaultGlobalRole(userName string) *management.User {
+	// Enable the user account
+	enabled := true
+
+	// Generate a random test password for the user
+	var testPassword = password.GenerateUserPassword("testpass-")
+
+	// Create a new user object with the provided username, password, and name
+	user := &management.User{
+		Username: userName,
+		Password: testPassword,
+		Name:     userName,
+		Enabled:  &enabled,
+	}
+
+	// Create the new user with the "user-base" role
+	newUser, err := users.CreateUserWithRole(c.client, user, "user-base")
+	require.NoError(c.T(), err)
+
+	// Set the user's password to the generated password
+	newUser.Password = user.Password
+
+	// Return the created user object
+	return newUser
+}
+
+// createRoleTemplates creates two Role Templates with slightly different sets of rules for testing purposes.
+// It takes two role names as input and returns pointers to the created Role Template objects.
+func (c *ClusterRepoTestSuite) createRoleTemplates(roleName1, roleName2 string) (*management.RoleTemplate, *management.RoleTemplate) {
+	// Create the first Role Template with target resourceNames
+	roleTemplate1, err := c.client.Management.RoleTemplate.Create(&management.RoleTemplate{
+		Context: "cluster",
+		Name:    roleName1,
+		Rules: []management.PolicyRule{
+			{
+				APIGroups:     []string{"catalog.cattle.io"},
+				Resources:     []string{"clusterrepos"},
+				ResourceNames: []string{ChartsSmallForkRepoName},
+				Verbs:         []string{"get", "list", "watch"},
+			},
+		},
+	})
+	require.NoError(c.T(), err)
+
+	// Create the second Role Template
+	roleTemplate2, err := c.client.Management.RoleTemplate.Create(&management.RoleTemplate{
+		Context: "cluster",
+		Name:    roleName2,
+		Rules: []management.PolicyRule{
+			{
+				APIGroups:     []string{"catalog.cattle.io"},
+				Resources:     []string{"clusterrepos"},
+				ResourceNames: []string{},
+				Verbs:         []string{"get", "list", "watch"},
+			},
+		},
+	})
+	require.NoError(c.T(), err)
+
+	return roleTemplate1, roleTemplate2
 }
 
 // pollUntilDownloaded Polls until the ClusterRepo of the given name has been downloaded (by comparing prevDownloadTime against the current DownloadTime)
