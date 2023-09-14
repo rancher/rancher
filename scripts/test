@@ -159,7 +159,7 @@ export CATTLE_TEST_CONFIG=$(pwd)/config.yaml # used by integration tests and tes
 }
 
 echo Running go integration tests
-go test -v -failfast ./tests/v2/integration/... || {
+go test -v -failfast -p 1 ./tests/v2/integration/... || {
   dump_rancher_logs
   exit 1
 }
