@@ -111,7 +111,7 @@ func TestGeneratePrivateRegistryDockerConfig(t *testing.T) {
 			},
 		},
 		{
-			name:           "v2prov private registry with upstream registry",
+			name:           "global system default registry and no cluster default registry with corev1.Secret",
 			expectedUrl:    "0123456789abcdef.dkr.ecr.us-east-1.amazonaws.com",
 			expectedConfig: base64.StdEncoding.EncodeToString([]byte(`{"auths":{"0123456789abcdef.dkr.ecr.us-east-1.amazonaws.com":{"username":"testuser","password":"password","auth":"dGVzdHVzZXI6cGFzc3dvcmQ="}}}`)),
 			expectedError:  "",
@@ -145,11 +145,10 @@ func TestGeneratePrivateRegistryDockerConfig(t *testing.T) {
 			},
 		},
 		{
-			name:           "v2prov public registry with upstream registry",
+			name:           "global system default registry and cluster default registry without corev1.Secret",
 			expectedUrl:    "0123456789abcdef.dkr.ecr.us-east-1.amazonaws.com",
 			expectedConfig: "",
 			expectedError:  "",
-			// cluster.Spec.RancherKubernetesEngineConfig.PrivateRegistries
 			cluster: &v3.Cluster{
 				Spec: v3.ClusterSpec{
 					ClusterSpecBase: v3.ClusterSpecBase{
@@ -167,11 +166,10 @@ func TestGeneratePrivateRegistryDockerConfig(t *testing.T) {
 			},
 		},
 		{
-			name:           "Upstrem registry and no downstream one",
+			name:           "global system default registry and no cluster default registry",
 			expectedUrl:    "0123456789abcdef.dkr.ecr.us-east-1.amazonaws.com",
 			expectedConfig: "",
 			expectedError:  "",
-			// cluster.Spec.RancherKubernetesEngineConfig.PrivateRegistries
 			cluster: &v3.Cluster{
 				Spec: v3.ClusterSpec{
 					ClusterSpecBase: v3.ClusterSpecBase{
