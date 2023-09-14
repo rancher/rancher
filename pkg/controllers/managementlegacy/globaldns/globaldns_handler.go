@@ -14,7 +14,6 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/rancher/rancher/pkg/ingresswrapper"
-	apiv1 "k8s.io/api/core/v1"
 	kextv1beta1 "k8s.io/api/extensions/v1beta1"
 	knetworkingv1 "k8s.io/api/networking/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -338,7 +337,7 @@ func (n *GDController) updateIngressForDNS(ingress ingresswrapper.Ingress, obj *
 
 	return nil
 }
-func (n *GDController) ifEndpointsDiffer(ingressEps []apiv1.LoadBalancerIngress, endpoints []string) bool {
+func (n *GDController) ifEndpointsDiffer(ingressEps []knetworkingv1.IngressLoadBalancerIngress, endpoints []string) bool {
 	if len(ingressEps) != len(endpoints) {
 		return true
 	}
@@ -352,7 +351,7 @@ func (n *GDController) ifEndpointsDiffer(ingressEps []apiv1.LoadBalancerIngress,
 	return false
 }
 
-func (n *GDController) gatherIngressEndpoints(ingressEps []apiv1.LoadBalancerIngress) map[string]bool {
+func (n *GDController) gatherIngressEndpoints(ingressEps []knetworkingv1.IngressLoadBalancerIngress) map[string]bool {
 	mapIngEndpoints := make(map[string]bool)
 	for _, ep := range ingressEps {
 		if ep.IP != "" {
@@ -365,13 +364,13 @@ func (n *GDController) gatherIngressEndpoints(ingressEps []apiv1.LoadBalancerIng
 }
 
 // sliceToStatus converts a slice of IP and/or hostnames to LoadBalancerIngress
-func (n *GDController) sliceToStatus(endpoints []string) []apiv1.LoadBalancerIngress {
-	lbi := []apiv1.LoadBalancerIngress{}
+func (n *GDController) sliceToStatus(endpoints []string) []knetworkingv1.IngressLoadBalancerIngress {
+	lbi := []knetworkingv1.IngressLoadBalancerIngress{}
 	for _, ep := range endpoints {
 		if net.ParseIP(ep) == nil {
-			lbi = append(lbi, apiv1.LoadBalancerIngress{Hostname: ep})
+			lbi = append(lbi, knetworkingv1.IngressLoadBalancerIngress{Hostname: ep})
 		} else {
-			lbi = append(lbi, apiv1.LoadBalancerIngress{IP: ep})
+			lbi = append(lbi, knetworkingv1.IngressLoadBalancerIngress{IP: ep})
 		}
 	}
 	return lbi

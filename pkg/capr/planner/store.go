@@ -75,7 +75,7 @@ func (p *PlanStore) Load(cluster *capi.Cluster, rkeControlPlane *rkev1.RKEContro
 	var anyPlanDelivered bool
 
 	machines, err := p.machineCache.List(cluster.Namespace, labels.SelectorFromSet(map[string]string{
-		capi.ClusterLabelName: cluster.Name,
+		capi.ClusterNameLabel: cluster.Name,
 	}))
 	if err != nil {
 		return nil, anyPlanDelivered, err

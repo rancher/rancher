@@ -5,7 +5,7 @@ cd $(dirname $0)/../../../../
 
 source $(dirname $0)/scripts/version
 
-CATTLE_KDM_BRANCH=dev-v2.7
+CATTLE_KDM_BRANCH=dev-v2.8
 
 mkdir -p bin
 
