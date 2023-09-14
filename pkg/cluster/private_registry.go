@@ -125,17 +125,22 @@ func GeneratePrivateRegistryEncodedDockerConfig(cluster *v3.Cluster, secretListe
 	// only reference to the registry URL available on the v3.Cluster.
 	// Without it, we cannot generate the registry credentials (.dockerconfigjson)
 	v2ProvRegistryURL := cluster.GetSecret(v3.ClusterPrivateRegistryURL)
-	// If we don't have a secretName nor a downstream PrivateRegistryURL on the v2Prov we return the RKE1/default registry URL.
+	// At this point we know that we don't have a RKE1 registry with authentication
+	// if we don't get a v2ProvRegistryURL we can just return the image set on v1 Prov or the global system default one.
 	if v2ProvRegistryURL == "" {
 		return rkeClusterURLOrGlobalSystemDefault, "", nil
 	}
 
-	// if we have a v2Prov registry URL, and we don't have a secret we just return the downstream URL.
+	// If we reach this point we know that we have a registry URL set on the v2prov downstream cluster.
+	// If it is a rke1 cluster that requires an authorization, a rke1 cluster without authorization or a v2prov cluster
+	// without a registry URL the function would have already returned.
+	// This last check is to see if the registry requires an authorization, if it doesn't we just return the v2ProvRegistryURL.
 	if registrySecretName == "" {
 		return v2ProvRegistryURL, "", nil
 	}
 
-	// If we have a registrySecret and a  downstream Registry URL  we try to get the secret from the v2prov.
+	// If we have a registrySecretName (registry requires authentication) and this function reached this point
+	// it is a v2 prov cluster. We need to decode that information to return it.
 	registrySecret, err := secretLister.Get(cluster.Spec.FleetWorkspaceName, registrySecretName)
 	if err != nil {
 		return v2ProvRegistryURL, "", err
