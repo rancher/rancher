@@ -108,7 +108,7 @@ require (
 	github.com/prometheus/client_golang v1.16.0
 	github.com/prometheus/client_model v0.4.0
 	github.com/prometheus/common v0.44.0
-	github.com/rancher/aks-operator v1.2.0-rc2
+	github.com/rancher/aks-operator v1.2.0-rc3
 	github.com/rancher/apiserver v0.0.0-20230831052300-120e615b17ba
 	github.com/rancher/channelserver v0.5.1-0.20230719220800-0a37b73c7df8
 	github.com/rancher/dynamiclistener v0.3.6-rc3-deadlock-fix-revert
