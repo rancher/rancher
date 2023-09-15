@@ -7,7 +7,6 @@ import (
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters/kubernetesversions"
-	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
 	"github.com/rancher/rancher/tests/framework/extensions/provisioninginput"
 	"github.com/rancher/rancher/tests/framework/extensions/users"
 	password "github.com/rancher/rancher/tests/framework/extensions/users/passwordgenerator"
@@ -24,7 +23,7 @@ type CustomClusterProvisioningTestSuite struct {
 	client             *rancher.Client
 	session            *session.Session
 	standardUserClient *rancher.Client
-	clustersConfig     *provisioninginput.Config
+	provisioningConfig *provisioninginput.Config
 	isWindows          bool
 }
 
@@ -36,12 +35,12 @@ func (c *CustomClusterProvisioningTestSuite) SetupSuite() {
 	testSession := session.NewSession()
 	c.session = testSession
 
-	c.clustersConfig = new(provisioninginput.Config)
-	config.LoadConfig(provisioninginput.ConfigurationFileKey, c.clustersConfig)
+	c.provisioningConfig = new(provisioninginput.Config)
+	config.LoadConfig(provisioninginput.ConfigurationFileKey, c.provisioningConfig)
 
 	c.isWindows = false
-	for _, pool := range c.clustersConfig.NodesAndRoles {
-		if pool.Windows {
+	for _, pool := range c.provisioningConfig.MachinePools {
+		if pool.NodeRoles.Windows {
 			c.isWindows = true
 			break
 		}
@@ -52,7 +51,7 @@ func (c *CustomClusterProvisioningTestSuite) SetupSuite() {
 
 	c.client = client
 
-	c.clustersConfig.RKE2KubernetesVersions, err = kubernetesversions.Default(c.client, clusters.RKE2ClusterType.String(), c.clustersConfig.RKE2KubernetesVersions)
+	c.provisioningConfig.RKE2KubernetesVersions, err = kubernetesversions.Default(c.client, clusters.RKE2ClusterType.String(), c.provisioningConfig.RKE2KubernetesVersions)
 	require.NoError(c.T(), err)
 
 	enabled := true
@@ -77,16 +76,16 @@ func (c *CustomClusterProvisioningTestSuite) SetupSuite() {
 }
 
 func (c *CustomClusterProvisioningTestSuite) TestProvisioningRKE2CustomCluster() {
-	nodeRolesAll := []machinepools.NodeRoles{provisioninginput.AllRolesPool}
-	nodeRolesShared := []machinepools.NodeRoles{provisioninginput.EtcdControlPlanePool, provisioninginput.WorkerPool}
-	nodeRolesDedicated := []machinepools.NodeRoles{provisioninginput.EtcdPool, provisioninginput.ControlPlanePool, provisioninginput.WorkerPool}
-	nodeRolesDedicatedWindows := []machinepools.NodeRoles{provisioninginput.EtcdPool, provisioninginput.ControlPlanePool, provisioninginput.WorkerPool, provisioninginput.WindowsPool}
+	nodeRolesAll := []provisioninginput.MachinePools{provisioninginput.AllRolesMachinePool}
+	nodeRolesShared := []provisioninginput.MachinePools{provisioninginput.EtcdControlPlaneMachinePool, provisioninginput.WorkerMachinePool}
+	nodeRolesDedicated := []provisioninginput.MachinePools{provisioninginput.EtcdMachinePool, provisioninginput.ControlPlaneMachinePool, provisioninginput.WorkerMachinePool}
+	nodeRolesDedicatedWindows := []provisioninginput.MachinePools{provisioninginput.EtcdMachinePool, provisioninginput.ControlPlaneMachinePool, provisioninginput.WorkerMachinePool, provisioninginput.WindowsMachinePool}
 
 	tests := []struct {
-		name      string
-		client    *rancher.Client
-		nodeRoles []machinepools.NodeRoles
-		isWindows bool
+		name         string
+		client       *rancher.Client
+		machinePools []provisioninginput.MachinePools
+		isWindows    bool
 	}{
 		{"1 Node all roles " + provisioninginput.AdminClientName.String(), c.client, nodeRolesAll, false},
 		{"1 Node all roles " + provisioninginput.StandardClientName.String(), c.standardUserClient, nodeRolesAll, false},
@@ -101,7 +100,8 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningRKE2CustomCluster()
 		testSession := session.NewSession()
 		defer testSession.Cleanup()
 		if (c.isWindows == tt.isWindows) || (c.isWindows && !tt.isWindows) {
-			permutations.RunTestPermutations(&c.Suite, tt.name, tt.client, c.clustersConfig, permutations.RKE2CustomCluster, nil, nil)
+			c.provisioningConfig.MachinePools = tt.machinePools
+			permutations.RunTestPermutations(&c.Suite, tt.name, tt.client, c.provisioningConfig, permutations.RKE2CustomCluster, nil, nil)
 		} else {
 			c.T().Skip("Skipping Windows tests")
 		}
@@ -109,7 +109,7 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningRKE2CustomCluster()
 }
 
 func (c *CustomClusterProvisioningTestSuite) TestProvisioningRKE2CustomClusterDynamicInput() {
-	if len(c.clustersConfig.NodesAndRoles) == 0 {
+	if len(c.provisioningConfig.MachinePools) == 0 {
 		c.T().Skip()
 	}
 
@@ -126,7 +126,7 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningRKE2CustomClusterDy
 		_, err := tt.client.WithSession(testSession)
 		require.NoError(c.T(), err)
 
-		permutations.RunTestPermutations(&c.Suite, tt.name, tt.client, c.clustersConfig, permutations.RKE2CustomCluster, nil, nil)
+		permutations.RunTestPermutations(&c.Suite, tt.name, tt.client, c.provisioningConfig, permutations.RKE2CustomCluster, nil, nil)
 	}
 }
 

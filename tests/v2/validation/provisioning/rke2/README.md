@@ -22,23 +22,42 @@ provisioningInput is needed to the run the RKE2 tests, specifically kubernetesVe
 
 ```json
 "provisioningInput": {
-    "nodesAndRoles": [
+    "machinePools": [
       {
-        "etcd": true,
-        "controlplane": true,
-        "worker": true,
-        "quantity": 1,
+        "nodeRoles": {
+          "etcd": true,
+          "controlplane": true,
+          "worker": false,
+          "quantity": 1,
+        },
       },
       {
-        "worker": true,
-        "quantity": 2,
+        "nodeRoles": {
+          "worker": true,
+          "quantity": 2,
+        },
+        "nodeLabels" {
+          "label1": "value1",
+          "label2": "value2",
+        },
+        "nodeTaints" [
+          { "key": "TestKey",
+            "value": "testValue",
+            "effect": "NoSchedule",
+          }
+        ],
+        "specifyPrivateIP": false,
+        "specifyPublicIP": true,
+        "nodeNamePrefix": "qa",
       },
       {
-        "windows": true,
-        "quantity": 1,
-      }
+        "nodeRoles": {
+          "windows": true,
+          "quantity": 1,
+        }
+      },
     ],
-    "rke2KubernetesVersion": ["v1.25.9+rke2r1"],
+    "rke2KubernetesVersion": ["v1.26.8+rke2r1"],
     "cni": ["calico"],
     "providers": ["linode", "aws", "do", "harvester"],
     "nodeProviders": ["ec2"],
@@ -229,11 +248,14 @@ Machine RKE2 config is the final piece needed for the config to run RKE2 provisi
 
 ## Custom Cluster
 For custom clusters, no machineConfig or credentials are needed. Currently only supported for ec2.
+`-run ^TestCustomClusterRKE2ProvisioningTestSuite/TestProvisioningRKE2CustomClusterDynamicInput$`
+`-run ^TestCustomClusterRKE2ProvisioningTestSuite/TestProvisioningRKE2CustomCluster$`
 
 Dependencies:
-* **Ensure you have nodeProviders in provisioningInput**
-* make sure that all roles are entered at least once
-* windows pool(s) should always be last in the config
+* **Ensure you have machinePools defined in provisioningInput**
+* make sure that all roles are entered at least once in machinePools.nodeRoles
+* ensure nodeProviders is set
+* windows pool(s) should always be the last machinePool
 ```json
 {
   "awsEC2Configs": {

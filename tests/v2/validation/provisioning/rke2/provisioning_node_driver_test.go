@@ -24,7 +24,7 @@ type RKE2NodeDriverProvisioningTestSuite struct {
 	client             *rancher.Client
 	session            *session.Session
 	standardUserClient *rancher.Client
-	clustersConfig     *provisioninginput.Config
+	provisioningConfig *provisioninginput.Config
 }
 
 func (r *RKE2NodeDriverProvisioningTestSuite) TearDownSuite() {
@@ -34,15 +34,15 @@ func (r *RKE2NodeDriverProvisioningTestSuite) TearDownSuite() {
 func (r *RKE2NodeDriverProvisioningTestSuite) SetupSuite() {
 	testSession := session.NewSession()
 	r.session = testSession
-	r.clustersConfig = new(provisioninginput.Config)
-	config.LoadConfig(provisioninginput.ConfigurationFileKey, r.clustersConfig)
+	r.provisioningConfig = new(provisioninginput.Config)
+	config.LoadConfig(provisioninginput.ConfigurationFileKey, r.provisioningConfig)
 
 	client, err := rancher.NewClient("", testSession)
 	require.NoError(r.T(), err)
 	r.client = client
 
-	r.clustersConfig.RKE2KubernetesVersions, err = kubernetesversions.Default(
-		r.client, clusters.RKE2ClusterType.String(), r.clustersConfig.RKE2KubernetesVersions)
+	r.provisioningConfig.RKE2KubernetesVersions, err = kubernetesversions.Default(
+		r.client, clusters.RKE2ClusterType.String(), r.provisioningConfig.RKE2KubernetesVersions)
 	require.NoError(r.T(), err)
 
 	enabled := true
@@ -126,12 +126,12 @@ func (r *RKE2NodeDriverProvisioningTestSuite) TestProvisioningRKE2Cluster() {
 	}
 
 	for _, tt := range tests {
-		permutations.RunTestPermutations(&r.Suite, tt.name, tt.client, r.clustersConfig, permutations.RKE2ProvisionCluster, nil, nil)
+		permutations.RunTestPermutations(&r.Suite, tt.name, tt.client, r.provisioningConfig, permutations.RKE2ProvisionCluster, nil, nil)
 	}
 }
 
 func (r *RKE2NodeDriverProvisioningTestSuite) TestProvisioningRKE2ClusterDynamicInput() {
-	if len(r.clustersConfig.NodesAndRoles) == 0 {
+	if len(r.provisioningConfig.MachinePools) == 0 {
 		r.T().Skip()
 	}
 
@@ -144,7 +144,7 @@ func (r *RKE2NodeDriverProvisioningTestSuite) TestProvisioningRKE2ClusterDynamic
 	}
 
 	for _, tt := range tests {
-		permutations.RunTestPermutations(&r.Suite, tt.name, tt.client, r.clustersConfig, permutations.RKE2ProvisionCluster, nil, nil)
+		permutations.RunTestPermutations(&r.Suite, tt.name, tt.client, r.provisioningConfig, permutations.RKE2ProvisionCluster, nil, nil)
 	}
 }
 

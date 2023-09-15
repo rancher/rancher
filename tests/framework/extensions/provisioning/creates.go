@@ -91,8 +91,11 @@ func CreateProvisioningCluster(client *rancher.Client, provider Provider, cluste
 			}
 		}
 	}
-
-	machinePools := machinepools.CreateAllMachinePools(*clustersConfig.NodesAndRoles, machineConfigResp, hostnameTruncation)
+	var nodeRoles []machinepools.NodeRoles
+	for _, pools := range clustersConfig.MachinePools {
+		nodeRoles = append(nodeRoles, pools.NodeRoles)
+	}
+	machinePools := machinepools.CreateAllMachinePools(nodeRoles, machineConfigResp, hostnameTruncation)
 	cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, namespace, clustersConfig, machinePools, cloudCredential.ID)
 
 	for _, truncatedPool := range hostnameTruncation {
@@ -124,28 +127,28 @@ func CreateProvisioningCluster(client *rancher.Client, provider Provider, cluste
 }
 
 // CreateProvisioningCustomCluster provisions a non-rke1 cluster using a 3rd party client for its nodes, then runs verify checks
-func CreateProvisioningCustomCluster(client *rancher.Client, externalNodeProvider ExternalNodeProvider, clustersConfig *clusters.ClusterConfig) (*v1.SteveAPIObject, error) {
+func CreateProvisioningCustomCluster(client *rancher.Client, externalNodeProvider *ExternalNodeProvider, clustersConfig *clusters.ClusterConfig) (*v1.SteveAPIObject, error) {
 	setLogrusFormatter()
 	rolesPerNode := []string{}
 	quantityPerPool := []int32{}
 	rolesPerPool := []string{}
-	for _, nodes := range *clustersConfig.NodesAndRoles {
+	for _, pool := range clustersConfig.MachinePools {
 		var finalRoleCommand string
-		if nodes.ControlPlane {
+		if pool.NodeRoles.ControlPlane {
 			finalRoleCommand += " --controlplane"
 		}
-		if nodes.Etcd {
+		if pool.NodeRoles.Etcd {
 			finalRoleCommand += " --etcd"
 		}
-		if nodes.Worker {
+		if pool.NodeRoles.Worker {
 			finalRoleCommand += " --worker"
 		}
-		if nodes.Windows {
+		if pool.NodeRoles.Windows {
 			finalRoleCommand += " --windows"
 		}
-		quantityPerPool = append(quantityPerPool, nodes.Quantity)
+		quantityPerPool = append(quantityPerPool, pool.NodeRoles.Quantity)
 		rolesPerPool = append(rolesPerPool, finalRoleCommand)
-		for i := int32(0); i < nodes.Quantity; i++ {
+		for i := int32(0); i < pool.NodeRoles.Quantity; i++ {
 			rolesPerNode = append(rolesPerNode, finalRoleCommand)
 		}
 	}
@@ -211,36 +214,61 @@ func CreateProvisioningCustomCluster(client *rancher.Client, externalNodeProvide
 
 	checkFunc := clusters.IsProvisioningClusterReady
 	var command string
-	for key, node := range nodes {
-		logrus.Infof("Execute Registration Command for node %s", node.NodeID)
-		if strings.Contains(rolesPerNode[key], "windows") {
+	totalNodesObserved := 0
+	for poolIndex, poolRole := range rolesPerPool {
+		if strings.Contains(poolRole, "windows") {
+			totalNodesObserved += int(quantityPerPool[poolIndex])
 			continue
 		}
-		logrus.Infof("Linux pool detected, using bash")
-		command := fmt.Sprintf("%s %s --address %s", token.InsecureNodeCommand, rolesPerNode[key], node.PublicIPAddress)
-		logrus.Infof("Command: %s", command)
-		output, err := node.ExecuteCommand(command)
-		if err != nil {
-			return nil, err
-		}
-		logrus.Infof(output)
-	}
-	err = wait.WatchWait(result, checkFunc)
-	if err != nil {
-		return nil, err
-	}
+		for nodeIndex := 0; nodeIndex < int(quantityPerPool[poolIndex]); nodeIndex++ {
+			node := nodes[totalNodesObserved+nodeIndex]
 
-	for key, node := range nodes {
-		if strings.Contains(rolesPerNode[key], "windows") {
-			logrus.Infof("Windows pool detected, using powershell.exe")
-			command = fmt.Sprintf("powershell.exe %s -Address %s", token.InsecureWindowsNodeCommand, node.PublicIPAddress)
+			logrus.Infof("Execute Registration Command for node %s", node.NodeID)
+			logrus.Infof("Linux pool detected, using bash...")
+
+			command = fmt.Sprintf("%s %s", token.InsecureNodeCommand, poolRole)
+			if clustersConfig.MachinePools[poolIndex].IsSecure {
+				command = fmt.Sprintf("%s %s", token.NodeCommand, poolRole)
+			}
+			command = createRegistrationCommand(command, node.PublicIPAddress, node.PrivateIPAddress, clustersConfig.MachinePools[poolIndex])
 			logrus.Infof("Command: %s", command)
+
 			output, err := node.ExecuteCommand(command)
 			if err != nil {
 				return nil, err
 			}
 			logrus.Infof(output)
 		}
+		totalNodesObserved += int(quantityPerPool[poolIndex])
+	}
+
+	err = wait.WatchWait(result, checkFunc)
+	if err != nil {
+		return nil, err
+	}
+	totalNodesObserved = 0
+	for poolIndex := 0; poolIndex < len(rolesPerPool); poolIndex++ {
+		if strings.Contains(rolesPerPool[poolIndex], "windows") {
+			for nodeIndex := 0; nodeIndex < int(quantityPerPool[poolIndex]); nodeIndex++ {
+				node := nodes[totalNodesObserved+nodeIndex]
+
+				logrus.Infof("Execute Registration Command for node %s", node.NodeID)
+				logrus.Infof("Windows pool detected, using powershell.exe...")
+				command = fmt.Sprintf("powershell.exe %s ", token.InsecureWindowsNodeCommand)
+				if clustersConfig.MachinePools[poolIndex].IsSecure {
+					command = fmt.Sprintf("powershell.exe %s ", token.WindowsNodeCommand)
+				}
+				command = createWindowsRegistrationCommand(command, node.PublicIPAddress, node.PrivateIPAddress, clustersConfig.MachinePools[poolIndex])
+				logrus.Infof("Command: %s", command)
+
+				output, err := node.ExecuteCommand(command)
+				if err != nil {
+					return nil, err
+				}
+				logrus.Infof(output)
+			}
+		}
+		totalNodesObserved += int(quantityPerPool[poolIndex])
 	}
 
 	if clustersConfig.Hardened {
@@ -293,7 +321,11 @@ func CreateProvisioningRKE1Cluster(client *rancher.Client, provider RKE1Provider
 		pipeline.UpdateConfigClusterName(clusterName)
 	}
 
-	_, err = nodepools.NodePoolSetup(client, *clustersConfig.NodesAndRolesRKE1, clusterResp.ID, nodeTemplate.ID)
+	var nodeRoles []nodepools.NodeRoles
+	for _, nodes := range clustersConfig.NodePools {
+		nodeRoles = append(nodeRoles, nodes.NodeRoles)
+	}
+	_, err = nodepools.NodePoolSetup(client, nodeRoles, clusterResp.ID, nodeTemplate.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -303,26 +335,26 @@ func CreateProvisioningRKE1Cluster(client *rancher.Client, provider RKE1Provider
 }
 
 // CreateProvisioningRKE1CustomCluster provisions an rke1 cluster using a 3rd party client for its nodes, then runs verify checks
-func CreateProvisioningRKE1CustomCluster(client *rancher.Client, externalNodeProvider ExternalNodeProvider, clustersConfig *clusters.ClusterConfig) (*management.Cluster, []*nodes.Node, error) {
+func CreateProvisioningRKE1CustomCluster(client *rancher.Client, externalNodeProvider *ExternalNodeProvider, clustersConfig *clusters.ClusterConfig) (*management.Cluster, []*nodes.Node, error) {
 	setLogrusFormatter()
 	rolesPerNode := []string{}
 	quantityPerPool := []int32{}
 	rolesPerPool := []string{}
-	for _, nodes := range *clustersConfig.NodesAndRolesRKE1 {
+	for _, pool := range clustersConfig.NodePools {
 		var finalRoleCommand string
-		if nodes.ControlPlane {
+		if pool.NodeRoles.ControlPlane {
 			finalRoleCommand += " --controlplane"
 		}
-		if nodes.Etcd {
+		if pool.NodeRoles.Etcd {
 			finalRoleCommand += " --etcd"
 		}
-		if nodes.Worker {
+		if pool.NodeRoles.Worker {
 			finalRoleCommand += " --worker"
 		}
 
-		quantityPerPool = append(quantityPerPool, int32(nodes.Quantity))
+		quantityPerPool = append(quantityPerPool, int32(pool.NodeRoles.Quantity))
 		rolesPerPool = append(rolesPerPool, finalRoleCommand)
-		for i := int64(0); i < nodes.Quantity; i++ {
+		for i := int64(0); i < pool.NodeRoles.Quantity; i++ {
 			rolesPerNode = append(rolesPerNode, finalRoleCommand)
 		}
 	}
@@ -366,16 +398,26 @@ func CreateProvisioningRKE1CustomCluster(client *rancher.Client, externalNodePro
 		return nil, nil, err
 	}
 
-	for key, node := range nodes {
-		logrus.Infof("Execute Registration Command for node %s", node.NodeID)
-		command := fmt.Sprintf("%s %s --address %s --internal-address %s",
-			token.NodeCommand, rolesPerNode[key], node.PublicIPAddress, node.PrivateIPAddress)
+	var command string
+	totalNodesObserved := 0
+	for poolIndex, poolRole := range rolesPerPool {
+		for nodeIndex := 0; nodeIndex < int(quantityPerPool[poolIndex]); nodeIndex++ {
+			node := nodes[totalNodesObserved+nodeIndex]
 
-		output, err := node.ExecuteCommand(command)
-		if err != nil {
-			return nil, nil, err
+			logrus.Infof("Execute Registration Command for node %s", node.NodeID)
+			logrus.Infof("Linux pool detected, using bash...")
+
+			command = fmt.Sprintf("%s %s", token.NodeCommand, poolRole)
+			command = createRKE1RegistrationCommand(command, node.PublicIPAddress, node.PrivateIPAddress, clustersConfig.NodePools[poolIndex])
+			logrus.Infof("Command: %s", command)
+
+			output, err := node.ExecuteCommand(command)
+			if err != nil {
+				return nil, nil, err
+			}
+			logrus.Infof(output)
 		}
-		logrus.Infof(output)
+		totalNodesObserved += int(quantityPerPool[poolIndex])
 	}
 
 	createdCluster, err := client.Management.Cluster.ByID(clusterResp.ID)
@@ -387,22 +429,22 @@ func CreateProvisioningRKE1CustomCluster(client *rancher.Client, externalNodePro
 func CreateProvisioningAirgapCustomCluster(client *rancher.Client, clustersConfig *clusters.ClusterConfig, corralPackages *corral.Packages) (*v1.SteveAPIObject, error) {
 	setLogrusFormatter()
 	rolesPerNode := map[int32]string{}
-	for _, nodes := range *clustersConfig.NodesAndRoles {
+	for _, pool := range clustersConfig.MachinePools {
 		var finalRoleCommand string
-		if nodes.ControlPlane {
+		if pool.NodeRoles.ControlPlane {
 			finalRoleCommand += " --controlplane"
 		}
-		if nodes.Etcd {
+		if pool.NodeRoles.Etcd {
 			finalRoleCommand += " --etcd"
 		}
-		if nodes.Worker {
+		if pool.NodeRoles.Worker {
 			finalRoleCommand += " --worker"
 		}
-		if nodes.Windows {
+		if pool.NodeRoles.Windows {
 			finalRoleCommand += " --windows"
 		}
 
-		rolesPerNode[nodes.Quantity] = finalRoleCommand
+		rolesPerNode[pool.NodeRoles.Quantity] = finalRoleCommand
 	}
 
 	if clustersConfig.PSACT == string(provisioninginput.RancherBaseline) {
@@ -478,19 +520,19 @@ func CreateProvisioningRKE1AirgapCustomCluster(client *rancher.Client, clustersC
 	setLogrusFormatter()
 	clusterName := namegen.AppendRandomString(rke1AirgapCustomCluster)
 	rolesPerNode := map[int64]string{}
-	for _, nodes := range *clustersConfig.NodesAndRolesRKE1 {
+	for _, pool := range clustersConfig.NodePools {
 		var finalRoleCommand string
-		if nodes.ControlPlane {
+		if pool.NodeRoles.ControlPlane {
 			finalRoleCommand += " --controlplane"
 		}
-		if nodes.Etcd {
+		if pool.NodeRoles.Etcd {
 			finalRoleCommand += " --etcd"
 		}
-		if nodes.Worker {
+		if pool.NodeRoles.Worker {
 			finalRoleCommand += " --worker"
 		}
 
-		rolesPerNode[nodes.Quantity] = finalRoleCommand
+		rolesPerNode[pool.NodeRoles.Quantity] = finalRoleCommand
 	}
 
 	if clustersConfig.PSACT == string(provisioninginput.RancherBaseline) {
@@ -556,4 +598,76 @@ func setLogrusFormatter() {
 	formatter := &logrus.TextFormatter{}
 	formatter.DisableQuote = true
 	logrus.SetFormatter(formatter)
+}
+
+// createRKE1RegistrationCommand is a helper for rke1 custom clusters to create the registration command with advanced options configured per node
+func createRKE1RegistrationCommand(command, publicIP, privateIP string, nodePool provisioninginput.NodePools) string {
+	if nodePool.SpecifyCustomPublicIP {
+		command += fmt.Sprintf(" --address %s", publicIP)
+	}
+	if nodePool.SpecifyCustomPrivateIP {
+		command += fmt.Sprintf(" --internal-address %s", privateIP)
+	}
+	if nodePool.CustomNodeNameSuffix != "" {
+		command += fmt.Sprintf(" --node-name %s", namegen.AppendRandomString(nodePool.CustomNodeNameSuffix))
+	}
+	for labelKey, labelValue := range nodePool.NodeLabels {
+		command += fmt.Sprintf(" --label %s=%s", labelKey, labelValue)
+	}
+	for _, taint := range nodePool.NodeTaints {
+		command += fmt.Sprintf(" --taints %s=%s:%s", taint.Key, taint.Value, taint.Effect)
+	}
+	return command
+}
+
+// createRegistrationCommand is a helper for rke2/k3s custom clusters to create the registration command with advanced options configured per node
+func createRegistrationCommand(command, publicIP, privateIP string, machinePool provisioninginput.MachinePools) string {
+	if machinePool.SpecifyCustomPublicIP {
+		command += fmt.Sprintf(" --address %s", publicIP)
+	}
+	if machinePool.SpecifyCustomPrivateIP {
+		command += fmt.Sprintf(" --internal-address %s", privateIP)
+	}
+	if machinePool.CustomNodeNameSuffix != "" {
+		command += fmt.Sprintf(" --node-name %s", namegen.AppendRandomString(machinePool.CustomNodeNameSuffix))
+	}
+	for labelKey, labelValue := range machinePool.NodeLabels {
+		command += fmt.Sprintf(" --label %s=%s", labelKey, labelValue)
+	}
+	for _, taint := range machinePool.NodeTaints {
+		command += fmt.Sprintf(" --taints %s=%s:%s", taint.Key, taint.Value, taint.Effect)
+	}
+	return command
+}
+
+// createWindowsRegistrationCommand is a helper for rke2 windows custom clusters to create the registration command with advanced options configured per node
+func createWindowsRegistrationCommand(command, publicIP, privateIP string, machinePool provisioninginput.MachinePools) string {
+	if machinePool.SpecifyCustomPublicIP {
+		command += fmt.Sprintf(" -Address '%s'", publicIP)
+	}
+	if machinePool.SpecifyCustomPrivateIP {
+		command += fmt.Sprintf(" -InternalAddress '%s'", privateIP)
+	}
+	if machinePool.CustomNodeNameSuffix != "" {
+		command += fmt.Sprintf(" -NodeName '%s'", namegen.AppendRandomString(machinePool.CustomNodeNameSuffix))
+	}
+	// powershell requires only 1 flag per command, so we need to append the custom labels and taints together which is different from linux
+	if len(machinePool.NodeLabels) > 0 {
+		// there is an existing label for all windows nodes, so we need to insert the custom labels after the existing label
+		labelIndex := strings.Index(command, " -Label '") + len(" -Label '")
+		customLabels := ""
+		for labelKey, labelValue := range machinePool.NodeLabels {
+			customLabels += fmt.Sprintf("%s=%s,", labelKey, labelValue)
+		}
+		command = command[:labelIndex] + customLabels + command[labelIndex:]
+	}
+	if len(machinePool.NodeTaints) > 0 {
+		var customTaints string
+		for _, taint := range machinePool.NodeTaints {
+			customTaints += fmt.Sprintf("%s=%s:%s,", taint.Key, taint.Value, taint.Effect)
+		}
+		wrappedTaints := fmt.Sprintf(" -Taint '%s'", customTaints)
+		command += wrappedTaints
+	}
+	return command
 }
