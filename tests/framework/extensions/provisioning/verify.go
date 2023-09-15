@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	apisV1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
@@ -218,7 +217,7 @@ func VerifyDeleteRKE2K3SCluster(t *testing.T, client *rancher.Client, clusterID 
 	require.NoError(t, err)
 
 	err = wait.WatchWait(watchInterface, func(event watch.Event) (ready bool, err error) {
-		cluster := event.Object.(*apisV1.Cluster)
+		cluster := event.Object.(*provv1.Cluster)
 		if event.Type == watch.Error {
 			return false, fmt.Errorf("error: unable to delete cluster %s", cluster.ObjectMeta.Name)
 		} else if event.Type == watch.Deleted {

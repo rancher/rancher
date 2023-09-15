@@ -23,18 +23,36 @@ provisioningInput is needed to the run the K3S tests, specifically kubernetesVer
 ```json
 "provisioningInput": {
     // for custom clusters, len(nodesAndRoles) should be equal to len(awsEc2Config)
-    "nodesAndRoles": [
+        "machinePools": [
       {
-        "etcd": true,
-        "controlplane": true,
-        "quantity": 1,
+        "nodeRoles": {
+          "etcd": true,
+          "controlplane": true,
+          "worker": false,
+          "quantity": 1,
+        },
       },
       {
-        "worker": true,
-        "quantity": 2,
+        "nodeRoles": {
+          "worker": true,
+          "quantity": 2,
+        },
+        "nodeLabels" {
+          "label1": "value1",
+          "label2": "value2",
+        },
+        "nodeTaints" [
+          { "key": "TestKey",
+            "value": "testValue",
+            "effect": "NoSchedule",
+          }
+        ],
+        "specifyPrivateIP": false,
+        "specifyPublicIP": true,
+        "nodeNamePrefix": "qa",
       },
     ],
-    "k3sKubernetesVersion": ["v1.24.4+k3s1"],
+    "k3sKubernetesVersion": ["v1.26.8+k3s1"],
     "providers": ["linode", "aws", "azure", "harvester"],
     "nodeProviders": ["ec2"],
     "hardened": true,
@@ -201,9 +219,10 @@ Machine K3S config is the final piece needed for the config to run K3S provision
 For custom clusters, no machineConfig or credentials are needed. Currently only supported for ec2.
 
 Dependencies:
-* **Ensure you have nodeProviders in provisioningInput**
-* make sure that all roles are entered at least once
-* windows pool(s) should always be last in the config
+* **Ensure you have machinePools in provisioningInput**
+* make sure that all roles are entered at least once in machinePools.nodeRoles
+* ensure that nodeProviders is set
+
 ```json
 {
   "awsEC2Configs": {
