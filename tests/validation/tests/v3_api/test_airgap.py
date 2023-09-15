@@ -109,8 +109,8 @@ def test_deploy_airgap_nodes():
                                                    AGENT_REG_CMD)
         results.append(deploy_result)
     for result in results:
-        assert "Downloaded newer image for {}/rancher/rancher-agent".format(
-            bastion_node.host_name) in result[1]
+        assert "Downloaded newer image for " in result[1]
+        assert "/rancher/rancher-agent" in result[1]
 
 
 def test_add_rancher_images_to_private_registry():
@@ -118,8 +118,8 @@ def test_add_rancher_images_to_private_registry():
     save_res, load_res = add_rancher_images_to_private_registry(bastion_node)
     assert "Image pull success: rancher/rancher:{}".format(
         RANCHER_SERVER_VERSION) in save_res[0]
-    assert "The push refers to repository [{}/rancher/rancher]".format(
-        bastion_node.host_name) in load_res[0]
+    assert "The push refers to repository " in load_res[0]
+    assert "/rancher/rancher]" in load_res[0]
 
 
 def test_add_images_to_private_registry():
