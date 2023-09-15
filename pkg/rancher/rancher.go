@@ -306,13 +306,25 @@ func (r *Rancher) ListenAndServe(ctx context.Context) error {
 
 	r.startAggregation(ctx)
 	go r.Steve.StartAggregation(ctx)
-	if err := tls.ListenAndServe(ctx, r.Wrangler.RESTConfig,
+	if err := tls.ListenAndServe(ctx,
+		r.Wrangler.RESTConfig,
 		r.Auth(r.Handler),
 		r.opts.BindHost,
 		r.opts.HTTPSListenPort,
 		r.opts.HTTPListenPort,
 		r.opts.ACMEDomains,
 		r.opts.NoCACerts); err != nil {
+		logrus.WithFields(map[string]interface{}{
+			"r.Wrangler.RESTConfig":  r.Wrangler.RESTConfig,
+			"r.Auth":                 r.Auth,
+			"r.Handler":              r.Handler,
+			"r.opts.BindHost":        r.opts.BindHost,
+			"r.opts.HTTPSListenPort": r.opts.HTTPSListenPort,
+			"r.opts.HTTPListenPort":  r.opts.HTTPListenPort,
+			"r.opts.ACMEDomains":     r.opts.ACMEDomains,
+			"r.opts.NoCACerts":       r.opts.NoCACerts,
+			"err":                    fmt.Sprintf("%+v", err),
+		}).Error("Failed to listen and serve rancher rancher-316")
 		return err
 	}
 
