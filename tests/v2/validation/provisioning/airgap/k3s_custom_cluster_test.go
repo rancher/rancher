@@ -7,7 +7,6 @@ import (
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters/kubernetesversions"
-	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
 	provisioning "github.com/rancher/rancher/tests/framework/extensions/provisioning"
 	"github.com/rancher/rancher/tests/framework/extensions/provisioninginput"
 	"github.com/rancher/rancher/tests/framework/pkg/config"
@@ -81,7 +80,7 @@ func (a *AirGapK3SCustomClusterTestSuite) SetupSuite() {
 }
 
 func (a *AirGapK3SCustomClusterTestSuite) TestProvisioningK3SCustomCluster() {
-	a.clustersConfig.NodesAndRoles = []machinepools.NodeRoles{provisioninginput.AllRolesPool}
+	a.clustersConfig.MachinePools = []provisioninginput.MachinePools{provisioninginput.AllRolesMachinePool}
 
 	tests := []struct {
 		name   string
@@ -96,7 +95,7 @@ func (a *AirGapK3SCustomClusterTestSuite) TestProvisioningK3SCustomCluster() {
 }
 
 func (a *AirGapK3SCustomClusterTestSuite) TestProvisioningUpgradeK3SCustomCluster() {
-	a.clustersConfig.NodesAndRoles = []machinepools.NodeRoles{provisioninginput.AllRolesPool}
+	a.clustersConfig.MachinePools = []provisioninginput.MachinePools{provisioninginput.AllRolesMachinePool}
 
 	k3sVersions, err := kubernetesversions.ListK3SAllVersions(a.client)
 	require.NoError(a.T(), err)

@@ -29,7 +29,7 @@ const (
 )
 
 // RunTestPermutations runs through all relevant perumutations in a given config file, including node providers, k8s versions, and CNIs
-func RunTestPermutations(s *suite.Suite, testNamePrefix string, client *rancher.Client, clustersConfig *provisioninginput.Config, clusterType string, hostnameTruncation []machinepools.HostnameTruncation, corralPackages *corral.CorralPackages) {
+func RunTestPermutations(s *suite.Suite, testNamePrefix string, client *rancher.Client, provisioningConfig *provisioninginput.Config, clusterType string, hostnameTruncation []machinepools.HostnameTruncation, corralPackages *corral.CorralPackages) {
 	var name string
 	var providers []string
 	var testClusterConfig *clusters.ClusterConfig
@@ -41,17 +41,17 @@ func RunTestPermutations(s *suite.Suite, testNamePrefix string, client *rancher.
 	require.NoError(s.T(), err)
 
 	if strings.Contains(clusterType, "Custom") {
-		providers = clustersConfig.NodeProviders
+		providers = provisioningConfig.NodeProviders
 	} else if strings.Contains(clusterType, "Airgap") {
 		providers = []string{"Corral"}
 	} else {
-		providers = clustersConfig.Providers
+		providers = provisioningConfig.Providers
 	}
 	for _, nodeProviderName := range providers {
-		nodeProvider, rke1Provider, customProvider, kubeVersions := GetClusterProvider(clusterType, nodeProviderName, clustersConfig)
+		nodeProvider, rke1Provider, customProvider, kubeVersions := GetClusterProvider(clusterType, nodeProviderName, provisioningConfig)
 		for _, kubeVersion := range kubeVersions {
-			for _, cni := range clustersConfig.CNIs {
-				testClusterConfig = clusters.ConvertConfigToClusterConfig(clustersConfig)
+			for _, cni := range provisioningConfig.CNIs {
+				testClusterConfig = clusters.ConvertConfigToClusterConfig(provisioningConfig)
 				testClusterConfig.CNI = cni
 				name = testNamePrefix + " Node Provider: " + nodeProviderName + " Kubernetes version: " + kubeVersion + " cni: " + cni
 				s.Run(name, func() {
@@ -76,14 +76,14 @@ func RunTestPermutations(s *suite.Suite, testNamePrefix string, client *rancher.
 					case RKE2CustomCluster, K3SCustomCluster:
 						testClusterConfig.KubernetesVersion = kubeVersion
 
-						clusterObject, err := provisioning.CreateProvisioningCustomCluster(client, *customProvider, testClusterConfig)
+						clusterObject, err := provisioning.CreateProvisioningCustomCluster(client, customProvider, testClusterConfig)
 						require.NoError(s.T(), err)
 
 						provisioning.VerifyCluster(s.T(), client, testClusterConfig, clusterObject)
 
 					case RKE1CustomCluster:
 						testClusterConfig.KubernetesVersion = kubeVersion
-						clusterObject, nodes, err := provisioning.CreateProvisioningRKE1CustomCluster(client, *customProvider, testClusterConfig)
+						clusterObject, nodes, err := provisioning.CreateProvisioningRKE1CustomCluster(client, customProvider, testClusterConfig)
 						require.NoError(s.T(), err)
 
 						provisioning.VerifyRKE1Cluster(s.T(), client, testClusterConfig, clusterObject)
@@ -115,7 +115,7 @@ func RunTestPermutations(s *suite.Suite, testNamePrefix string, client *rancher.
 	}
 }
 
-func GetClusterProvider(clusterType string, nodeProviderName string, clustersConfig *provisioninginput.Config) (*provisioning.Provider, *provisioning.RKE1Provider, *provisioning.ExternalNodeProvider, []string) {
+func GetClusterProvider(clusterType string, nodeProviderName string, provisioningConfig *provisioninginput.Config) (*provisioning.Provider, *provisioning.RKE1Provider, *provisioning.ExternalNodeProvider, []string) {
 	var nodeProvider provisioning.Provider
 	var rke1NodeProvider provisioning.RKE1Provider
 	var customProvider provisioning.ExternalNodeProvider
@@ -124,28 +124,28 @@ func GetClusterProvider(clusterType string, nodeProviderName string, clustersCon
 	switch clusterType {
 	case RKE2ProvisionCluster:
 		nodeProvider = provisioning.CreateProvider(nodeProviderName)
-		kubeVersions = clustersConfig.RKE2KubernetesVersions
+		kubeVersions = provisioningConfig.RKE2KubernetesVersions
 	case K3SProvisionCluster:
 		nodeProvider = provisioning.CreateProvider(nodeProviderName)
-		kubeVersions = clustersConfig.K3SKubernetesVersions
+		kubeVersions = provisioningConfig.K3SKubernetesVersions
 	case RKE1ProvisionCluster:
 		rke1NodeProvider = provisioning.CreateRKE1Provider(nodeProviderName)
-		kubeVersions = clustersConfig.RKE1KubernetesVersions
+		kubeVersions = provisioningConfig.RKE1KubernetesVersions
 	case RKE2CustomCluster:
 		customProvider = provisioning.ExternalNodeProviderSetup(nodeProviderName)
-		kubeVersions = clustersConfig.RKE2KubernetesVersions
+		kubeVersions = provisioningConfig.RKE2KubernetesVersions
 	case K3SCustomCluster:
 		customProvider = provisioning.ExternalNodeProviderSetup(nodeProviderName)
-		kubeVersions = clustersConfig.K3SKubernetesVersions
+		kubeVersions = provisioningConfig.K3SKubernetesVersions
 	case RKE1CustomCluster:
 		customProvider = provisioning.ExternalNodeProviderSetup(nodeProviderName)
-		kubeVersions = clustersConfig.RKE1KubernetesVersions
+		kubeVersions = provisioningConfig.RKE1KubernetesVersions
 	case K3SAirgapCluster:
-		kubeVersions = clustersConfig.K3SKubernetesVersions
+		kubeVersions = provisioningConfig.K3SKubernetesVersions
 	case RKE1AirgapCluster:
-		kubeVersions = clustersConfig.RKE1KubernetesVersions
+		kubeVersions = provisioningConfig.RKE1KubernetesVersions
 	case RKE2AirgapCluster:
-		kubeVersions = clustersConfig.RKE2KubernetesVersions
+		kubeVersions = provisioningConfig.RKE2KubernetesVersions
 	default:
 		panic("Cluster type not found")
 	}

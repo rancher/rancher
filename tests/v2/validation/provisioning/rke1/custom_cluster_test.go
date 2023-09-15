@@ -8,7 +8,6 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters/kubernetesversions"
 	"github.com/rancher/rancher/tests/framework/extensions/provisioninginput"
-	nodepools "github.com/rancher/rancher/tests/framework/extensions/rke1/nodepools"
 	"github.com/rancher/rancher/tests/framework/extensions/users"
 	password "github.com/rancher/rancher/tests/framework/extensions/users/passwordgenerator"
 	"github.com/rancher/rancher/tests/framework/pkg/config"
@@ -24,7 +23,7 @@ type CustomClusterProvisioningTestSuite struct {
 	client             *rancher.Client
 	session            *session.Session
 	standardUserClient *rancher.Client
-	clustersConfig     *provisioninginput.Config
+	provisioningConfig *provisioninginput.Config
 }
 
 func (c *CustomClusterProvisioningTestSuite) TearDownSuite() {
@@ -35,15 +34,15 @@ func (c *CustomClusterProvisioningTestSuite) SetupSuite() {
 	testSession := session.NewSession()
 	c.session = testSession
 
-	c.clustersConfig = new(provisioninginput.Config)
-	config.LoadConfig(provisioninginput.ConfigurationFileKey, c.clustersConfig)
+	c.provisioningConfig = new(provisioninginput.Config)
+	config.LoadConfig(provisioninginput.ConfigurationFileKey, c.provisioningConfig)
 
 	client, err := rancher.NewClient("", testSession)
 	require.NoError(c.T(), err)
 
 	c.client = client
 
-	c.clustersConfig.RKE1KubernetesVersions, err = kubernetesversions.Default(c.client, clusters.RKE1ClusterType.String(), c.clustersConfig.RKE1KubernetesVersions)
+	c.provisioningConfig.RKE1KubernetesVersions, err = kubernetesversions.Default(c.client, clusters.RKE1ClusterType.String(), c.provisioningConfig.RKE1KubernetesVersions)
 	require.NoError(c.T(), err)
 
 	enabled := true
@@ -68,15 +67,15 @@ func (c *CustomClusterProvisioningTestSuite) SetupSuite() {
 }
 
 func (c *CustomClusterProvisioningTestSuite) TestProvisioningRKE1CustomCluster() {
-	nodeRolesAll := []nodepools.NodeRoles{provisioninginput.RKE1AllRolesPool}
-	nodeRolesShared := []nodepools.NodeRoles{provisioninginput.RKE1EtcdControlPlanePool, provisioninginput.RKE1WorkerPool}
-	nodeRolesDedicated := []nodepools.NodeRoles{provisioninginput.RKE1EtcdPool, provisioninginput.RKE1ControlPlanePool, provisioninginput.RKE1WorkerPool}
+	nodeRolesAll := []provisioninginput.NodePools{provisioninginput.AllRolesNodePool}
+	nodeRolesShared := []provisioninginput.NodePools{provisioninginput.EtcdControlPlaneNodePool, provisioninginput.WorkerNodePool}
+	nodeRolesDedicated := []provisioninginput.NodePools{provisioninginput.EtcdNodePool, provisioninginput.ControlPlaneNodePool, provisioninginput.WorkerNodePool}
 
-	require.GreaterOrEqual(c.T(), len(c.clustersConfig.CNIs), 1)
+	require.GreaterOrEqual(c.T(), len(c.provisioningConfig.CNIs), 1)
 
 	tests := []struct {
 		name      string
-		nodeRoles []nodepools.NodeRoles
+		nodePools []provisioninginput.NodePools
 		client    *rancher.Client
 	}{
 		{"1 Node all roles " + provisioninginput.AdminClientName.String(), nodeRolesAll, c.client},
@@ -87,15 +86,15 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningRKE1CustomCluster()
 		{"3 nodes - 1 role per node " + provisioninginput.StandardClientName.String(), nodeRolesDedicated, c.standardUserClient},
 	}
 	for _, tt := range tests {
-		c.clustersConfig.NodesAndRolesRKE1 = tt.nodeRoles
-		permutations.RunTestPermutations(&c.Suite, tt.name, tt.client, c.clustersConfig, permutations.RKE1CustomCluster, nil, nil)
+		c.provisioningConfig.NodePools = tt.nodePools
+		permutations.RunTestPermutations(&c.Suite, tt.name, tt.client, c.provisioningConfig, permutations.RKE1CustomCluster, nil, nil)
 	}
 }
 
 func (c *CustomClusterProvisioningTestSuite) TestProvisioningRKE1CustomClusterDynamicInput() {
-	require.GreaterOrEqual(c.T(), len(c.clustersConfig.CNIs), 1)
+	require.GreaterOrEqual(c.T(), len(c.provisioningConfig.CNIs), 1)
 
-	if len(c.clustersConfig.NodesAndRolesRKE1) == 0 {
+	if len(c.provisioningConfig.NodePools) == 0 {
 		c.T().Skip()
 	}
 
@@ -107,7 +106,7 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningRKE1CustomClusterDy
 		{provisioninginput.StandardClientName.String(), c.standardUserClient},
 	}
 	for _, tt := range tests {
-		permutations.RunTestPermutations(&c.Suite, tt.name, tt.client, c.clustersConfig, permutations.RKE1CustomCluster, nil, nil)
+		permutations.RunTestPermutations(&c.Suite, tt.name, tt.client, c.provisioningConfig, permutations.RKE1CustomCluster, nil, nil)
 	}
 }
 

@@ -9,7 +9,6 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/clusters/kubernetesversions"
 	provisioning "github.com/rancher/rancher/tests/framework/extensions/provisioning"
 	"github.com/rancher/rancher/tests/framework/extensions/provisioninginput"
-	nodepools "github.com/rancher/rancher/tests/framework/extensions/rke1/nodepools"
 	"github.com/rancher/rancher/tests/framework/pkg/config"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
 	"github.com/rancher/rancher/tests/v2/validation/pipeline/rancherha/corralha"
@@ -82,7 +81,7 @@ func (a *AirGapRKE1CustomClusterTestSuite) SetupSuite() {
 }
 
 func (a *AirGapRKE1CustomClusterTestSuite) TestProvisioningRKE1CustomCluster() {
-	a.clustersConfig.NodesAndRolesRKE1 = []nodepools.NodeRoles{provisioninginput.RKE1AllRolesPool}
+	a.clustersConfig.NodePools = []provisioninginput.NodePools{provisioninginput.AllRolesNodePool}
 
 	tests := []struct {
 		name   string
@@ -97,7 +96,7 @@ func (a *AirGapRKE1CustomClusterTestSuite) TestProvisioningRKE1CustomCluster() {
 }
 
 func (a *AirGapRKE1CustomClusterTestSuite) TestProvisioningUpgradeRKE1CustomCluster() {
-	a.clustersConfig.NodesAndRolesRKE1 = []nodepools.NodeRoles{provisioninginput.RKE1AllRolesPool}
+	a.clustersConfig.NodePools = []provisioninginput.NodePools{provisioninginput.AllRolesNodePool}
 
 	rke1Versions, err := kubernetesversions.ListRKE1AllVersions(a.client)
 	require.NoError(a.T(), err)

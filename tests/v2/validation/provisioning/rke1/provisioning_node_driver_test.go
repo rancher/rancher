@@ -8,7 +8,6 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters/kubernetesversions"
 	"github.com/rancher/rancher/tests/framework/extensions/provisioninginput"
-	nodepools "github.com/rancher/rancher/tests/framework/extensions/rke1/nodepools"
 	"github.com/rancher/rancher/tests/framework/extensions/users"
 	password "github.com/rancher/rancher/tests/framework/extensions/users/passwordgenerator"
 	"github.com/rancher/rancher/tests/framework/pkg/config"
@@ -24,7 +23,7 @@ type RKE1NodeDriverProvisioningTestSuite struct {
 	client             *rancher.Client
 	standardUserClient *rancher.Client
 	session            *session.Session
-	clustersConfig     *provisioninginput.Config
+	provisioningConfig *provisioninginput.Config
 }
 
 func (r *RKE1NodeDriverProvisioningTestSuite) TearDownSuite() {
@@ -35,15 +34,16 @@ func (r *RKE1NodeDriverProvisioningTestSuite) SetupSuite() {
 	testSession := session.NewSession()
 	r.session = testSession
 
-	r.clustersConfig = new(provisioninginput.Config)
-	config.LoadConfig(provisioninginput.ConfigurationFileKey, r.clustersConfig)
+	r.provisioningConfig = new(provisioninginput.Config)
+	config.LoadConfig(provisioninginput.ConfigurationFileKey, r.provisioningConfig)
 
 	client, err := rancher.NewClient("", testSession)
 	require.NoError(r.T(), err)
 
 	r.client = client
 
-	r.clustersConfig.RKE1KubernetesVersions, err = kubernetesversions.Default(r.client, clusters.RKE1ClusterType.String(), r.clustersConfig.RKE1KubernetesVersions)
+	r.provisioningConfig.RKE1KubernetesVersions, err = kubernetesversions.Default(
+		r.client, clusters.RKE1ClusterType.String(), r.provisioningConfig.RKE1KubernetesVersions)
 	require.NoError(r.T(), err)
 
 	enabled := true
@@ -68,71 +68,30 @@ func (r *RKE1NodeDriverProvisioningTestSuite) SetupSuite() {
 }
 
 func (r *RKE1NodeDriverProvisioningTestSuite) TestProvisioningRKE1Cluster() {
-	nodeRoles0 := []nodepools.NodeRoles{
-		{
-			ControlPlane: true,
-			Etcd:         true,
-			Worker:       true,
-			Quantity:     1,
-		},
-	}
-
-	nodeRoles1 := []nodepools.NodeRoles{
-		{
-			ControlPlane: true,
-			Etcd:         true,
-			Worker:       false,
-			Quantity:     1,
-		},
-		{
-			ControlPlane: false,
-			Etcd:         false,
-			Worker:       true,
-			Quantity:     1,
-		},
-	}
-
-	nodeRoles2 := []nodepools.NodeRoles{
-		{
-			ControlPlane: true,
-			Etcd:         false,
-			Worker:       false,
-			Quantity:     1,
-		},
-		{
-			ControlPlane: false,
-			Etcd:         true,
-			Worker:       false,
-			Quantity:     1,
-		},
-		{
-			ControlPlane: false,
-			Etcd:         false,
-			Worker:       true,
-			Quantity:     1,
-		},
-	}
-
+	nodeRolesAll := []provisioninginput.NodePools{provisioninginput.AllRolesNodePool}
+	nodeRolesShared := []provisioninginput.NodePools{provisioninginput.EtcdControlPlaneNodePool, provisioninginput.WorkerNodePool}
+	nodeRolesDedicated := []provisioninginput.NodePools{provisioninginput.EtcdNodePool, provisioninginput.ControlPlaneNodePool, provisioninginput.WorkerNodePool}
 	tests := []struct {
 		name      string
-		nodeRoles []nodepools.NodeRoles
+		nodePools []provisioninginput.NodePools
 		client    *rancher.Client
 	}{
-		{"1 Node all roles " + provisioninginput.AdminClientName.String(), nodeRoles0, r.client},
-		{"1 Node all roles " + provisioninginput.StandardClientName.String(), nodeRoles0, r.standardUserClient},
-		{"2 nodes - etcd/cp roles per 1 node " + provisioninginput.AdminClientName.String(), nodeRoles1, r.client},
-		{"2 nodes - etcd/cp roles per 1 node " + provisioninginput.StandardClientName.String(), nodeRoles1, r.standardUserClient},
-		{"3 nodes - 1 role per node " + provisioninginput.AdminClientName.String(), nodeRoles2, r.client},
-		{"3 nodes - 1 role per node " + provisioninginput.StandardClientName.String(), nodeRoles2, r.standardUserClient},
+		{"1 Node all roles " + provisioninginput.AdminClientName.String(), nodeRolesAll, r.client},
+		{"1 Node all roles " + provisioninginput.StandardClientName.String(), nodeRolesAll, r.standardUserClient},
+		{"2 nodes - etcd/cp roles per 1 node " + provisioninginput.AdminClientName.String(), nodeRolesShared, r.client},
+		{"2 nodes - etcd/cp roles per 1 node " + provisioninginput.StandardClientName.String(), nodeRolesShared, r.standardUserClient},
+		{"3 nodes - 1 role per node " + provisioninginput.AdminClientName.String(), nodeRolesDedicated, r.client},
+		{"3 nodes - 1 role per node " + provisioninginput.StandardClientName.String(), nodeRolesDedicated, r.standardUserClient},
 	}
 	for _, tt := range tests {
-		r.clustersConfig.NodesAndRolesRKE1 = tt.nodeRoles
-		permutations.RunTestPermutations(&r.Suite, tt.name, tt.client, r.clustersConfig, permutations.RKE1ProvisionCluster, nil, nil)
+		r.provisioningConfig.NodePools = tt.nodePools
+		permutations.RunTestPermutations(&r.Suite, tt.name, tt.client, r.provisioningConfig, permutations.RKE1ProvisionCluster, nil, nil)
 	}
 }
 
 func (r *RKE1NodeDriverProvisioningTestSuite) TestProvisioningRKE1ClusterDynamicInput() {
-	if len(r.clustersConfig.NodesAndRolesRKE1) == 0 {
+
+	if len(r.provisioningConfig.NodePools) == 0 {
 		r.T().Skip()
 	}
 
@@ -144,7 +103,7 @@ func (r *RKE1NodeDriverProvisioningTestSuite) TestProvisioningRKE1ClusterDynamic
 		{provisioninginput.StandardClientName.String(), r.standardUserClient},
 	}
 	for _, tt := range tests {
-		permutations.RunTestPermutations(&r.Suite, tt.name, tt.client, r.clustersConfig, permutations.RKE1ProvisionCluster, nil, nil)
+		permutations.RunTestPermutations(&r.Suite, tt.name, tt.client, r.provisioningConfig, permutations.RKE1ProvisionCluster, nil, nil)
 	}
 }
 
