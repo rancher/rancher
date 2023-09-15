@@ -216,7 +216,7 @@ var MigratedResources = map[string]bool{
 	"clusterloggings.management.cattle.io":                            false,
 	"clustermonitorgraphs.management.cattle.io":                       false,
 	"clusterregistrationtokens.management.cattle.io":                  false,
-	"clusterrepoes.catalog.cattle.io":                                 false,
+	"clusterrepos.catalog.cattle.io":                                  true,
 	"clusterresourcesetbindings.addons.cluster.x-k8s.io":              false,
 	"clusterroletemplatebindings.management.cattle.io":                true,
 	"clusters.cluster.x-k8s.io":                                       false,
