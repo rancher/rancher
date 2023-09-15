@@ -276,7 +276,7 @@ func migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(w *wrangler.Context) err
 		}
 
 		for _, provCluster := range provClusters.Items {
-			machines, err := w.CAPI.Machine().List(provCluster.Namespace, metav1.ListOptions{LabelSelector: labels.Set{capi.ClusterLabelName: provCluster.Name}.String()})
+			machines, err := w.CAPI.Machine().List(provCluster.Namespace, metav1.ListOptions{LabelSelector: labels.Set{capi.ClusterNameLabel: provCluster.Name}.String()})
 			if err != nil {
 				return err
 			}
@@ -329,7 +329,7 @@ func migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(w *wrangler.Context) err
 					if bootstrap.Spec.ClusterName == "" {
 						// If the bootstrap spec cluster name is blank, we need to update the bootstrap spec to the correct value
 						// This is to handle old rkebootstrap objects for unmanaged clusters that did not have the spec properly set
-						if v, ok := bootstrap.Labels[capi.ClusterLabelName]; ok && v != "" {
+						if v, ok := bootstrap.Labels[capi.ClusterNameLabel]; ok && v != "" {
 							bootstrap.Spec.ClusterName = v
 						}
 					}

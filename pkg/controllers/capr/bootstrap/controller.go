@@ -284,7 +284,7 @@ func (h *handler) OnChange(_ string, bootstrap *rkev1.RKEBootstrap) (*rkev1.RKEB
 
 	// If the bootstrap spec cluster name is blank, we need to update the bootstrap spec to the correct value
 	// This is to handle old rkebootstrap objects for unmanaged clusters that did not have the spec properly set
-	if v, ok := bootstrap.Labels[capi.ClusterLabelName]; ok && v != "" && bootstrap.Spec.ClusterName != v {
+	if v, ok := bootstrap.Labels[capi.ClusterNameLabel]; ok && v != "" && bootstrap.Spec.ClusterName != v {
 		logrus.Debugf("[rkebootstrap] %s/%s: setting cluster name", bootstrap.Namespace, bootstrap.Name)
 		bootstrap = bootstrap.DeepCopy()
 		bootstrap.Spec.ClusterName = v
@@ -447,7 +447,7 @@ func (h *handler) reconcileMachinePreTerminateAnnotation(bootstrap *rkev1.RKEBoo
 	}
 
 	if bootstrap.Spec.ClusterName == "" {
-		logrus.Warnf("[rkebootstrap] %s/%s: CAPI cluster label %s was not found in bootstrap labels, ensuring machine pre-terminate annotation is removed", bootstrap.Namespace, bootstrap.Name, capi.ClusterLabelName)
+		logrus.Warnf("[rkebootstrap] %s/%s: CAPI cluster label %s was not found in bootstrap labels, ensuring machine pre-terminate annotation is removed", bootstrap.Namespace, bootstrap.Name, capi.ClusterNameLabel)
 		return h.ensureMachinePreTerminateAnnotationRemoved(bootstrap, machine)
 	}
 
@@ -494,7 +494,7 @@ func (h *handler) reconcileMachinePreTerminateAnnotation(bootstrap *rkev1.RKEBoo
 			// validate that no other nodes are joined to this node, otherwise removing it will cause a bunch of nodes to start crashing.
 			joinURL := planSecret.Annotations[capr.JoinURLAnnotation]
 			planSecrets, err := h.secretCache.List(bootstrap.Namespace, labels.SelectorFromSet(map[string]string{
-				capi.ClusterLabelName: bootstrap.Spec.ClusterName,
+				capi.ClusterNameLabel: bootstrap.Spec.ClusterName,
 			}))
 			if err != nil {
 				return bootstrap, fmt.Errorf("error encountered list plansecrets to ensure node was not joined: %v", err)

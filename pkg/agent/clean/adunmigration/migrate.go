@@ -160,7 +160,8 @@ func UnmigrateAdGUIDUsers(clientConfig *restclient.Config, dryRun bool, deleteMi
 	if !dryRun {
 		err = updateMigrationStatus(sc, activedirectory.StatusMigrationField, activedirectory.StatusMigrationRunning)
 		if err != nil {
-			return fmt.Errorf("unable to update migration status configmap: %v", err)
+			logrus.Errorf("[%v] unable to update migration status configmap: %v", migrateAdUserOperation, err)
+			return err
 		}
 		updateUnmigratedUsers("", migrateStatusSkipped, true, sc)
 		updateUnmigratedUsers("", migrateStatusMissing, true, sc)
@@ -185,7 +186,8 @@ func UnmigrateAdGUIDUsers(clientConfig *restclient.Config, dryRun bool, deleteMi
 
 	users, err := sc.Management.Users("").List(metav1.ListOptions{})
 	if err != nil {
-		return fmt.Errorf("unable to fetch user list: %v", err)
+		logrus.Errorf("[%v] unable to fetch user list: %v", migrateAdUserOperation, err)
+		return err
 	}
 
 	usersToMigrate, missingUsers, skippedUsers := identifyMigrationWorkUnits(users, adConfig)
@@ -270,6 +272,7 @@ func UnmigrateAdGUIDUsers(clientConfig *restclient.Config, dryRun bool, deleteMi
 
 	err = migrateAllowedUserPrincipals(&usersToMigrate, &missingUsers, sc, dryRun, deleteMissingUsers)
 	if err != nil {
+		logrus.Errorf("[%v] unable to migrate allowed users: %v", migrateAdUserOperation, err)
 		finalStatus = activedirectory.StatusMigrationFailed
 		return err
 	}

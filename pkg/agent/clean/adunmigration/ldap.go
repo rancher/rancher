@@ -245,10 +245,12 @@ func prepareClientContexts(clientConfig *restclient.Config) (*config.ScaledConte
 
 	sc, err := scaledContext(restConfig)
 	if err != nil {
+		logrus.Errorf("[%v] failed to create scaled context: %v", migrateAdUserOperation, err)
 		return nil, nil, err
 	}
 	adConfig, err := adConfiguration(sc)
 	if err != nil {
+		logrus.Errorf("[%v] failed to acquire ad configuration: %v", migrateAdUserOperation, err)
 		return nil, nil, err
 	}
 

@@ -16,7 +16,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-const RancherVersionDev = "2.7.99"
+const RancherVersionDev = "2.8.99"
 
 var (
 	releasePattern = regexp.MustCompile("^v[0-9]")
@@ -49,7 +49,7 @@ var (
 		"cattle-elemental-system",
 	}
 
-	AgentImage                          = NewSetting("agent-image", "rancher/rancher-agent:v2.7-head")
+	AgentImage                          = NewSetting("agent-image", "rancher/rancher-agent:v2.8-head")
 	AgentRolloutTimeout                 = NewSetting("agent-rollout-timeout", "300s")
 	AgentRolloutWait                    = NewSetting("agent-rollout-wait", "true")
 	AuthImage                           = NewSetting("auth-image", v32.ToolsSystemImages.AuthSystemImages.KubeAPIAuth)
@@ -81,12 +81,11 @@ var (
 	KubernetesVersionToSystemImages     = NewSetting("k8s-version-to-images", "")
 	KubernetesVersionsCurrent           = NewSetting("k8s-versions-current", "")
 	KubernetesVersionsDeprecated        = NewSetting("k8s-versions-deprecated", "")
-	KDMBranch                           = NewSetting("kdm-branch", "dev-v2.7")
+	KDMBranch                           = NewSetting("kdm-branch", "dev-v2.8")
 	MachineVersion                      = NewSetting("machine-version", "dev")
 	Namespace                           = NewSetting("namespace", os.Getenv("CATTLE_NAMESPACE"))
 	PasswordMinLength                   = NewSetting("password-min-length", "12")
 	PeerServices                        = NewSetting("peer-service", os.Getenv("CATTLE_PEER_SERVICE"))
-	RDNSServerBaseURL                   = NewSetting("rdns-base-url", "https://api.lb.rancher.cloud/v1")
 	RkeVersion                          = NewSetting("rke-version", "")
 	RkeMetadataConfig                   = NewSetting("rke-metadata-config", getMetadataConfig())
 	ServerImage                         = NewSetting("server-image", "rancher/rancher")

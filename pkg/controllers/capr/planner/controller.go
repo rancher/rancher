@@ -54,7 +54,7 @@ func Register(ctx context.Context, clients *wrangler.Context, planner *caprplann
 			}
 			return relatedResources, nil
 		} else if machine, ok := obj.(*capi.Machine); ok {
-			clusterName := machine.Labels[capi.ClusterLabelName]
+			clusterName := machine.Labels[capi.ClusterNameLabel]
 			if clusterName != "" {
 				logrus.Tracef("[planner] rkecluster %s/%s enqueue triggered by machine %s/%s", machine.Namespace, clusterName, machine.Namespace, machine.Name)
 				return []relatedresource.Key{{

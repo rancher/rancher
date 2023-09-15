@@ -8,8 +8,13 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
+
+	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
+	users "github.com/rancher/rancher/tests/framework/extensions/users"
+	password "github.com/rancher/rancher/tests/framework/extensions/users/passwordgenerator"
 
 	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
@@ -20,6 +25,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	kwait "k8s.io/apimachinery/pkg/util/wait"
@@ -173,8 +179,10 @@ func (c *ClusterRepoTestSuite) testSmallForkClusterRepo(params ChartsSmallForkRe
 	var firstCommit, firstBranch string
 	var lastCommit, lastBranch string
 	var createdClusterRepo, testClusterRepo, updatedClusterRepo *v1.ClusterRepo
+	var wg sync.WaitGroup
 
-	// Creates new ClusterRepo kubernetes custom resource
+	// Operations as Admin
+	// Creates a new ClusterRepo Kubernetes custom resource
 	createdClusterRepo, err = c.catalogClient.ClusterRepos().Create(c.ctx,
 		&v1.ClusterRepo{
 			ObjectMeta: metav1.ObjectMeta{
@@ -188,11 +196,15 @@ func (c *ClusterRepoTestSuite) testSmallForkClusterRepo(params ChartsSmallForkRe
 
 	require.NoError(c.T(), err)
 
+	// Test RBAC concurrently after creating the test cluster catalog "charts-small-fork"
+	wg.Add(1)
+	go c.testRBACClusterRepo(&wg)
+
 	// List all available installed Cluster Repos
 	installedClusterRepos, err := c.catalogClient.ClusterRepos().List(c.ctx, metav1.ListOptions{})
 	require.NoError(c.T(), err)
 
-	// Check if our created ClusterRepo(charts-small-fork) was created
+	// Check if our created ClusterRepo (charts-small-fork) was created
 	success := false
 	for _, cr := range installedClusterRepos.Items {
 		logrus.Debugf("Installed Cluster Repo: %s", cr.Name)
@@ -216,24 +228,29 @@ func (c *ClusterRepoTestSuite) testSmallForkClusterRepo(params ChartsSmallForkRe
 		return false, nil
 	})
 	require.NoError(c.T(), err)
-	// we have waited for ClusterRepo status to update and the local repository to be created
+
+	// We have waited for ClusterRepo status to update and the local repository to be created
 	repoPath, err := getCurrentRepoDirSmallFork()
+	require.NoError(c.T(), err)
 	firstCommit, firstBranch, err = getLocalRepoCurrentCommitAndBranch(repoPath)
-	// Compare ClusterRepo Values with local repository
+	require.NoError(c.T(), err)
+
+	// Compare ClusterRepo Values with the local repository
 	assert.Equal(c.T(), firstBranch, testClusterRepo.Spec.GitBranch)
 	assert.Equal(c.T(), firstBranch, testClusterRepo.Status.Branch)
 	assert.Equal(c.T(), firstCommit, testClusterRepo.Status.Commit)
 	assert.Equal(c.T(), int64(1), testClusterRepo.Status.ObservedGeneration)
 
-	// Updating ClusterRepo Spec Branch to newer one
+	// Updating ClusterRepo Spec Branch to a newer one
 	testClusterRepo.Spec.GitBranch = ChartsSmallForkGitRepoLastBranch
 	updatedClusterRepo, err = c.catalogClient.ClusterRepos().Update(c.ctx, testClusterRepo.DeepCopy(), metav1.UpdateOptions{})
 	require.NoError(c.T(), err)
 	assert.Equal(c.T(), ChartsSmallForkGitRepoLastBranch, updatedClusterRepo.Spec.GitBranch)
 
-	// The Spec from ClusterRepo is updated almost instantlty, the status and local repository take more time
+	// The Spec from ClusterRepo is updated almost instantly, the status and local repository take more time
 	err = kwait.Poll(5*time.Second, 10*time.Minute, func() (done bool, err error) {
 		lastCommit, _, err := getLocalRepoCurrentCommitAndBranch(repoPath)
+		require.NoError(c.T(), err)
 		updatedClusterRepo, err = c.catalogClient.ClusterRepos().Get(c.ctx, testClusterRepo.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -246,6 +263,132 @@ func (c *ClusterRepoTestSuite) testSmallForkClusterRepo(params ChartsSmallForkRe
 	})
 	logrus.Debug("last commit: ", lastCommit)
 	logrus.Debug("last branch: ", lastBranch)
+	require.NoError(c.T(), err)
+	// Wait for both tests finishing
+	wg.Wait()
+}
+
+// testRBACClusterRepo tests RBAC (Role-Based Access Control) functionality for Cluster Repositories.
+// It creates roles, users with roles, Cluster RoleTemplate Bindings, and performs RBAC checks.
+func (c *ClusterRepoTestSuite) testRBACClusterRepo(wg *sync.WaitGroup) {
+	defer wg.Done()
+	// Create role templates
+	roleName1 := "catalog-view-target"
+	roleName2 := "catalog-view-all"
+	role1, role2 := c.createRoleTemplates(roleName1, roleName2)
+	// Create users with roles
+	user1 := c.createUserWithDefaultGlobalRole("rbac-catalog-user-test-1")
+	user2 := c.createUserWithDefaultGlobalRole("rbac-catalog-user-test-2")
+	// Create Cluster RoleTemplate Bindings
+	c.createClusterRoleTemplateBindings(user1.ID, user2.ID, role1.ID, role2.ID)
+
+	ctx := context.Background()
+	// Test user1's access to Cluster Repositories
+	testUser1, err := c.client.AsUser(user1)
+	require.NoError(c.T(), err)
+	_, err = testUser1.Catalog.ClusterRepos().List(ctx, metav1.ListOptions{})
+	var expectedErrorCode int32 = 403
+	var expectedErrorReason string = "Forbidden"
+	statusErr, ok := err.(*errors.StatusError)
+	require.True(c.T(), ok, "Expected error of type StatusError, but got a different error type.")
+	require.Equal(c.T(), expectedErrorCode, statusErr.ErrStatus.Code, "Expected error Code to be %d, but got %d.", expectedErrorCode, statusErr.ErrStatus.Code)
+	require.Equal(c.T(), expectedErrorReason, string(statusErr.ErrStatus.Reason), "Expected error Reason to be %s, but got %s.", expectedErrorReason, string(statusErr.ErrStatus.Reason))
+
+	user1ClusterRepos, err := testUser1.Catalog.ClusterRepos().Get(ctx, ChartsSmallForkRepoName, metav1.GetOptions{})
+	_ = user1ClusterRepos
+	require.NoError(c.T(), err)
+	require.Equal(c.T(), user1ClusterRepos.Name, string(ChartsSmallForkRepoName))
+	// Test user2's access to Cluster Repositories
+	testUser2, err := c.client.AsUser(user2)
+	require.NoError(c.T(), err)
+	user2ClusterRepos, err := testUser2.Catalog.ClusterRepos().List(ctx, metav1.ListOptions{})
+	require.NoError(c.T(), err)
+	require.GreaterOrEqual(c.T(), len(user2ClusterRepos.Items), 4)
+}
+
+// createUserWithDefaultGlobalRole creates a new user with the specified username
+// and assigns them the "user-base" General Role Template, which grants only the login permission.
+// It generates a random password for the user and returns the created user object.
+func (c *ClusterRepoTestSuite) createUserWithDefaultGlobalRole(userName string) *management.User {
+	// Enable the user account
+	enabled := true
+
+	// Generate a random test password for the user
+	var testPassword = password.GenerateUserPassword("testpass-")
+
+	// Create a new user object with the provided username, password, and name
+	user := &management.User{
+		Username: userName,
+		Password: testPassword,
+		Name:     userName,
+		Enabled:  &enabled,
+	}
+
+	// Create the new user with the "user-base" role
+	newUser, err := users.CreateUserWithRole(c.client, user, "user-base")
+	require.NoError(c.T(), err)
+
+	// Set the user's password to the generated password
+	newUser.Password = user.Password
+
+	// Return the created user object
+	return newUser
+}
+
+// createRoleTemplates creates two Role Templates with slightly different sets of rules for testing purposes.
+// It takes two role names as input and returns pointers to the created Role Template objects.
+func (c *ClusterRepoTestSuite) createRoleTemplates(roleName1, roleName2 string) (*management.RoleTemplate, *management.RoleTemplate) {
+	// Create the first Role Template with target resourceNames
+	roleTemplate1, err := c.client.Management.RoleTemplate.Create(&management.RoleTemplate{
+		Context: "cluster",
+		Name:    roleName1,
+		Rules: []management.PolicyRule{
+			{
+				APIGroups:     []string{"catalog.cattle.io"},
+				Resources:     []string{"clusterrepos"},
+				ResourceNames: []string{ChartsSmallForkRepoName},
+				Verbs:         []string{"get", "list", "watch"},
+			},
+		},
+	})
+	require.NoError(c.T(), err)
+
+	// Create the second Role Template
+	roleTemplate2, err := c.client.Management.RoleTemplate.Create(&management.RoleTemplate{
+		Context: "cluster",
+		Name:    roleName2,
+		Rules: []management.PolicyRule{
+			{
+				APIGroups:     []string{"catalog.cattle.io"},
+				Resources:     []string{"clusterrepos"},
+				ResourceNames: []string{},
+				Verbs:         []string{"get", "list", "watch"},
+			},
+		},
+	})
+	require.NoError(c.T(), err)
+
+	return roleTemplate1, roleTemplate2
+}
+
+// createClusterRoleTemplateBindings creates ClusterRoleTemplateBindings for two users with corresponding roles.
+func (c *ClusterRepoTestSuite) createClusterRoleTemplateBindings(user1ID, user2ID, role1ID, role2ID string) {
+	// Create ClusterRoleTemplateBinding for user1 and role1
+	_, err := c.client.Management.ClusterRoleTemplateBinding.Create(&management.ClusterRoleTemplateBinding{
+		Name:            "cluster-role-template-binding-1",
+		ClusterID:       c.clusterID,
+		RoleTemplateID:  role1ID,
+		UserPrincipalID: fmt.Sprintf("%s://%s", c.clusterID, user1ID),
+	})
+	require.NoError(c.T(), err)
+
+	// Create ClusterRoleTemplateBinding for user2 and role2
+	_, err = c.client.Management.ClusterRoleTemplateBinding.Create(&management.ClusterRoleTemplateBinding{
+		Name:            "cluster-role-template-binding-2",
+		ClusterID:       c.clusterID,
+		RoleTemplateID:  role2ID,
+		UserPrincipalID: fmt.Sprintf("%s://%s", c.clusterID, user2ID),
+	})
 	require.NoError(c.T(), err)
 }
 
