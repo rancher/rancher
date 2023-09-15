@@ -1,0 +1,185 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.12.0
+  name: clusterrepos.catalog.cattle.io
+spec:
+  group: catalog.cattle.io
+  names:
+    kind: ClusterRepo
+    listKind: ClusterRepoList
+    plural: clusterrepos
+    singular: clusterrepo
+  scope: Cluster
+  versions:
+  - name: v1
+    schema:
+      openAPIV3Schema:
+        description: ClusterRepo represents a particular helm repository and also
+          contains details about its location and credentials to connect to it for
+          fetching charts hosted in that particular helm repository.
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: 'Contains details about the helm repository that needs to
+              be used. More info: kubectl explain clusterrepo.spec'
+            properties:
+              basicAuthSecretName:
+                description: BasicAuthSecretName is the client secret to be used to
+                  connect to the helm repository.
+                type: string
+              caBundle:
+                description: CABundle is a PEM encoded CA bundle which will be used
+                  to validate the repo's certificate. If unspecified, system trust
+                  roots will be used.
+                format: byte
+                type: string
+              clientSecret:
+                description: ClientSecret is the client secret to be used when connecting
+                  to a helm repository. The expected secret type is "kubernetes.io/basic-auth"
+                  or "kubernetes.io/tls" for Helm repositories and "kubernetes.io/basic-auth"
+                  or "kubernetes.io/ssh-auth" for Github helm repositories.
+                properties:
+                  name:
+                    description: Name is the name of the secret.
+                    type: string
+                  namespace:
+                    description: Namespace is the namespace where the secret resides.
+                    type: string
+                type: object
+              disableSameOriginCheck:
+                description: DisableSameOriginCheck if true attaches the Basic Auth
+                  Header to all helm client API calls regardless of whether the destination
+                  of the API call matches the origin of the repository's URL. Defaults
+                  to false, which keeps the SameOrigin check enabled. Setting this
+                  to true is not recommended in production environments due to the
+                  security implications.
+                type: boolean
+              enabled:
+                description: If disabled the repo clone will not be updated or allowed
+                  to be installed from.
+                type: boolean
+              forceUpdate:
+                description: ForceUpdate will cause the helm repository index file
+                  stored in Rancher to be updated from the Helm repository URL. This
+                  means if there are changes in the helm repository they will be pulled
+                  into Rancher manager.
+                format: date-time
+                type: string
+              gitBranch:
+                description: GitBranch is the git branch where the helm repository
+                  is hosted.
+                type: string
+              gitRepo:
+                description: GitRepo is the git repo to clone which contains the helm
+                  repository.
+                type: string
+              insecureSkipTLSVerify:
+                description: InsecureSkipTLSverify will disable the TLS verification
+                  when downloading the helm repository's index file. Defaults is false.
+                  Enabling this is not recommended for production due to the security
+                  implications.
+                type: boolean
+              serviceAccount:
+                description: ServiceAccount when specified will be used in creating
+                  helm operation pods which in turn run the helm install or uninstall
+                  commands for a chart.
+                type: string
+              serviceAccountNamespace:
+                description: ServiceAccountNamespace is the namespace of the service
+                  account to use.
+                type: string
+              url:
+                description: URL is the http URL of the helm repository to connect
+                  to.
+                type: string
+            type: object
+          status:
+            description: 'Contains details of the helm repository that is currently
+              being used in the cluster. More info: kubectl explain clusterrepo.status'
+            properties:
+              branch:
+                description: Branch is the Git branch in the git repository used to
+                  fetch the helm repository.
+                type: string
+              commit:
+                description: Commit is the latest commit in the cloned git repository
+                  by Rancher.
+                type: string
+              conditions:
+                description: Conditions contain information about when the status
+                  conditions were updated and to what.
+                items:
+                  properties:
+                    lastTransitionTime:
+                      description: Last time the condition transitioned from one status
+                        to another.
+                      type: string
+                    lastUpdateTime:
+                      description: The last time this condition was updated.
+                      type: string
+                    message:
+                      description: Human-readable message indicating details about
+                        last transition
+                      type: string
+                    reason:
+                      description: The reason for the condition's last transition.
+                      type: string
+                    status:
+                      description: Status of the condition, one of True, False, Unknown.
+                      type: string
+                    type:
+                      description: Type of cluster condition.
+                      type: string
+                  required:
+                  - status
+                  - type
+                  type: object
+                type: array
+              downloadTime:
+                description: DownloadTime is the time when the index was last downloaded.
+                format: date-time
+                type: string
+              indexConfigMapName:
+                description: IndexConfigMapName is the name of the configmap which
+                  stores the helm repository index.
+                type: string
+              indexConfigMapNamespace:
+                description: IndexConfigMapNamespace is the namespace of the helm
+                  repository index configmap in which it resides.
+                type: string
+              indexConfigMapResourceVersion:
+                description: IndexConfigMapResourceVersion is the resourceversion
+                  of the helm repository index configmap.
+                type: string
+              observedGeneration:
+                description: ObservedGeneration is used by Rancher controller to track
+                  the latest generation of the resource that it triggered on.
+                format: int64
+                type: integer
+              url:
+                description: URL used for fetching the helm repository index file.
+                type: string
+            required:
+            - observedGeneration
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
