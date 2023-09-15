@@ -98,6 +98,7 @@ func New(clients *clients.Clients, cluster *provisioningv1api.Cluster) (*provisi
 	}
 
 	clients.OnClose(func() {
+		logrus.Errorf("[FELIPE] Triggering a delet on cluster ")
 		clients.Provisioning.Cluster().Delete(c.Namespace, c.Name, &metav1.DeleteOptions{})
 	})
 
