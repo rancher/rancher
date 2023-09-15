@@ -7,7 +7,6 @@ import (
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters/kubernetesversions"
-	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
 	"github.com/rancher/rancher/tests/framework/extensions/provisioninginput"
 	"github.com/rancher/rancher/tests/framework/extensions/users"
 	password "github.com/rancher/rancher/tests/framework/extensions/users/passwordgenerator"
@@ -24,7 +23,7 @@ type CustomClusterProvisioningTestSuite struct {
 	client             *rancher.Client
 	session            *session.Session
 	standardUserClient *rancher.Client
-	clustersConfig     *provisioninginput.Config
+	provisioningConfig *provisioninginput.Config
 }
 
 func (c *CustomClusterProvisioningTestSuite) TearDownSuite() {
@@ -35,15 +34,15 @@ func (c *CustomClusterProvisioningTestSuite) SetupSuite() {
 	testSession := session.NewSession()
 	c.session = testSession
 
-	c.clustersConfig = new(provisioninginput.Config)
-	config.LoadConfig(provisioninginput.ConfigurationFileKey, c.clustersConfig)
+	c.provisioningConfig = new(provisioninginput.Config)
+	config.LoadConfig(provisioninginput.ConfigurationFileKey, c.provisioningConfig)
 
 	client, err := rancher.NewClient("", testSession)
 	require.NoError(c.T(), err)
 
 	c.client = client
 
-	c.clustersConfig.K3SKubernetesVersions, err = kubernetesversions.Default(c.client, clusters.K3SClusterType.String(), c.clustersConfig.K3SKubernetesVersions)
+	c.provisioningConfig.K3SKubernetesVersions, err = kubernetesversions.Default(c.client, clusters.K3SClusterType.String(), c.provisioningConfig.K3SKubernetesVersions)
 	require.NoError(c.T(), err)
 
 	enabled := true
@@ -68,14 +67,14 @@ func (c *CustomClusterProvisioningTestSuite) SetupSuite() {
 }
 
 func (c *CustomClusterProvisioningTestSuite) TestProvisioningK3SCustomCluster() {
-	nodeRolesAll := []machinepools.NodeRoles{provisioninginput.AllRolesPool}
-	nodeRolesShared := []machinepools.NodeRoles{provisioninginput.EtcdControlPlanePool, provisioninginput.WorkerPool}
-	nodeRolesDedicated := []machinepools.NodeRoles{provisioninginput.EtcdPool, provisioninginput.ControlPlanePool, provisioninginput.WorkerPool}
+	nodeRolesAll := []provisioninginput.MachinePools{provisioninginput.AllRolesMachinePool}
+	nodeRolesShared := []provisioninginput.MachinePools{provisioninginput.EtcdControlPlaneMachinePool, provisioninginput.WorkerMachinePool}
+	nodeRolesDedicated := []provisioninginput.MachinePools{provisioninginput.EtcdMachinePool, provisioninginput.ControlPlaneMachinePool, provisioninginput.WorkerMachinePool}
 
 	tests := []struct {
-		name      string
-		client    *rancher.Client
-		nodeRoles []machinepools.NodeRoles
+		name         string
+		client       *rancher.Client
+		machinePools []provisioninginput.MachinePools
 	}{
 		{"1 Node all roles " + provisioninginput.AdminClientName.String(), c.client, nodeRolesAll},
 		{"1 Node all roles " + provisioninginput.StandardClientName.String(), c.standardUserClient, nodeRolesAll},
@@ -85,21 +84,21 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningK3SCustomCluster() 
 		{"3 nodes - 1 role per node " + provisioninginput.StandardClientName.String(), c.standardUserClient, nodeRolesDedicated},
 	}
 	for _, tt := range tests {
-		c.clustersConfig.NodesAndRoles = tt.nodeRoles
-		permutations.RunTestPermutations(&c.Suite, tt.name, tt.client, c.clustersConfig, permutations.K3SCustomCluster, nil, nil)
+		c.provisioningConfig.MachinePools = tt.machinePools
+		permutations.RunTestPermutations(&c.Suite, tt.name, tt.client, c.provisioningConfig, permutations.K3SCustomCluster, nil, nil)
 	}
 }
 
 func (c *CustomClusterProvisioningTestSuite) TestProvisioningK3SCustomClusterDynamicInput() {
 	isWindows := false
-	for _, pool := range c.clustersConfig.NodesAndRoles {
-		if pool.Windows {
+	for _, pool := range c.provisioningConfig.MachinePools {
+		if pool.NodeRoles.Windows {
 			isWindows = true
 			break
 		}
 	}
 	require.False(c.T(), isWindows, "Windows nodes are not supported for k3s Clusters")
-	if len(c.clustersConfig.NodesAndRoles) == 0 {
+	if len(c.provisioningConfig.MachinePools) == 0 {
 		c.T().Skip()
 	}
 
@@ -111,7 +110,7 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningK3SCustomClusterDyn
 		{provisioninginput.StandardClientName.String(), c.standardUserClient},
 	}
 	for _, tt := range tests {
-		permutations.RunTestPermutations(&c.Suite, tt.name, tt.client, c.clustersConfig, permutations.K3SCustomCluster, nil, nil)
+		permutations.RunTestPermutations(&c.Suite, tt.name, tt.client, c.provisioningConfig, permutations.K3SCustomCluster, nil, nil)
 	}
 }
 
