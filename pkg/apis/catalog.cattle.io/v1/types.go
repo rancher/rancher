@@ -7,6 +7,8 @@ import (
 
 // +genclient
 // +genclient:nonNamespaced
+// +kubebuilder:resource:scope=Cluster,path=clusterrepos
+// +kubebuilder:subresource:status
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type ClusterRepo struct {
