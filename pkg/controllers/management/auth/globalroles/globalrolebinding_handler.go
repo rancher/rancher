@@ -91,21 +91,30 @@ type globalRoleBindingLifecycle struct {
 }
 
 func (grb *globalRoleBindingLifecycle) Create(obj *v3.GlobalRoleBinding) (runtime.Object, error) {
+	var returnError error
 	err := grb.reconcileClusterPermissions(obj)
 	if err != nil {
-		return nil, err
+		returnError = multierror.Append(returnError, err)
 	}
+
 	err = grb.reconcileGlobalRoleBinding(obj)
-	return obj, err
+	if err != nil {
+		returnError = multierror.Append(returnError, err)
+	}
+	return obj, returnError
 }
 
 func (grb *globalRoleBindingLifecycle) Updated(obj *v3.GlobalRoleBinding) (runtime.Object, error) {
+	var returnError error
 	err := grb.reconcileClusterPermissions(obj)
 	if err != nil {
-		return nil, err
+		returnError = multierror.Append(returnError, err)
 	}
 	err = grb.reconcileGlobalRoleBinding(obj)
-	return obj, err
+	if err != nil {
+		returnError = multierror.Append(returnError, err)
+	}
+	return obj, returnError
 }
 
 func (grb *globalRoleBindingLifecycle) Remove(obj *v3.GlobalRoleBinding) (runtime.Object, error) {
