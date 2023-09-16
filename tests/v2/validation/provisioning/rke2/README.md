@@ -35,6 +35,7 @@ provisioningInput is needed to the run the RKE2 tests, specifically kubernetesVe
         "nodeRoles": {
           "worker": true,
           "quantity": 2,
+          "drainBeforeDelete": true,
         },
         "nodeLabels" {
           "label1": "value1",
@@ -65,8 +66,7 @@ provisioningInput is needed to the run the RKE2 tests, specifically kubernetesVe
     "providers": ["linode", "aws", "do", "harvester"],
     "nodeProviders": ["ec2"],
     "hardened": true,
-    "psact": "",
-    "clusterSSHTests": ["CheckCPU"]
+    "psact": ""
   }
 ```
 

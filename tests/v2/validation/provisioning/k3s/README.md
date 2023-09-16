@@ -36,6 +36,7 @@ provisioningInput is needed to the run the K3S tests, specifically kubernetesVer
         "nodeRoles": {
           "worker": true,
           "quantity": 2,
+          "drainBeforeDelete": true,
         },
         "nodeLabels" {
           "label1": "value1",
