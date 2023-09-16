@@ -33,6 +33,7 @@ provisioningInput is needed to the run the RKE1 tests, specifically kubernetesVe
         "nodeRoles" {
           "worker": true,
           "quantity": 2,
+          "drainBeforeDelete": true,
         },
         "nodeLabels" {
           "label1": "value1",
