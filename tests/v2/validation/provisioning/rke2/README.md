@@ -30,6 +30,7 @@ provisioningInput:
   - nodeRoles:
       worker: true
       quantity: 2
+      drainBeforeDelete: true
   - nodeRoles:
       windows: true
       quantity: 1

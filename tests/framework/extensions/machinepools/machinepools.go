@@ -87,19 +87,20 @@ func updateMachinePoolQuantity(client *rancher.Client, cluster *v1.SteveAPIObjec
 }
 
 // NewRKEMachinePool is a constructor that sets up a apisV1.RKEMachinePool object to be used to provision a cluster.
-func NewRKEMachinePool(controlPlaneRole, etcdRole, workerRole bool, poolName string, quantity int32, machineConfig *v1.SteveAPIObject, hostnameLengthLimit int) apisV1.RKEMachinePool {
+func NewRKEMachinePool(controlPlaneRole, etcdRole, workerRole bool, poolName string, quantity int32, machineConfig *v1.SteveAPIObject, hostnameLengthLimit int, drainBeforeDelete bool) apisV1.RKEMachinePool {
 	machineConfigRef := &corev1.ObjectReference{
 		Kind: machineConfig.Kind,
 		Name: machineConfig.Name,
 	}
 
 	machinePool := apisV1.RKEMachinePool{
-		ControlPlaneRole: controlPlaneRole,
-		EtcdRole:         etcdRole,
-		WorkerRole:       workerRole,
-		NodeConfig:       machineConfigRef,
-		Name:             poolName,
-		Quantity:         &quantity,
+		ControlPlaneRole:  controlPlaneRole,
+		EtcdRole:          etcdRole,
+		WorkerRole:        workerRole,
+		NodeConfig:        machineConfigRef,
+		Name:              poolName,
+		Quantity:          &quantity,
+		DrainBeforeDelete: drainBeforeDelete,
 	}
 
 	if hostnameLengthLimit > 0 {
@@ -110,11 +111,12 @@ func NewRKEMachinePool(controlPlaneRole, etcdRole, workerRole bool, poolName str
 }
 
 type NodeRoles struct {
-	ControlPlane bool  `json:"controlplane,omitempty" yaml:"controlplane,omitempty"`
-	Etcd         bool  `json:"etcd,omitempty" yaml:"etcd,omitempty"`
-	Worker       bool  `json:"worker,omitempty" yaml:"worker,omitempty"`
-	Windows      bool  `json:"windows,omitempty" yaml:"windows,omitempty"`
-	Quantity     int32 `json:"quantity" yaml:"quantity"`
+	ControlPlane      bool  `json:"controlplane,omitempty" yaml:"controlplane,omitempty"`
+	Etcd              bool  `json:"etcd,omitempty" yaml:"etcd,omitempty"`
+	Worker            bool  `json:"worker,omitempty" yaml:"worker,omitempty"`
+	Windows           bool  `json:"windows,omitempty" yaml:"windows,omitempty"`
+	Quantity          int32 `json:"quantity" yaml:"quantity"`
+	DrainBeforeDelete bool  `json:"drainBeforeDelete,omitempty" yaml:"drainBeforeDelete,omitempty"`
 }
 
 // HostnameTruncation is a struct that is used to set the hostname length limit for a cluster or its pools during provisioning
@@ -171,10 +173,10 @@ func CreateAllMachinePools(nodeRoles []NodeRoles, machineConfig *v1.SteveAPIObje
 		}
 
 		if !roles.Windows {
-			machinePool := NewRKEMachinePool(roles.ControlPlane, roles.Etcd, roles.Worker, poolName, roles.Quantity, machineConfig, hostnameLengthLimit)
+			machinePool := NewRKEMachinePool(roles.ControlPlane, roles.Etcd, roles.Worker, poolName, roles.Quantity, machineConfig, hostnameLengthLimit, roles.DrainBeforeDelete)
 			machinePools = append(machinePools, machinePool)
 		} else {
-			machinePool := NewRKEMachinePool(false, false, roles.Windows, poolName, roles.Quantity, machineConfig, hostnameLengthLimit)
+			machinePool := NewRKEMachinePool(false, false, roles.Windows, poolName, roles.Quantity, machineConfig, hostnameLengthLimit, roles.DrainBeforeDelete)
 			machinePools = append(machinePools, machinePool)
 		}
 	}

@@ -29,6 +29,7 @@ provisioningInput:
   - nodeRoles:
       worker: true
       quantity: 2
+      drainBeforeDelete: true
   flags:
     desiredflags: "Long" #These flags are for running TestProvisioningRKE1Cluster or TestProvisioningRKE1CustomCluster it is not needed for the dynamic tests. Long will run the full table, where as short will run the short version of this test.
   rke1KubernetesVersion: ["v1.26.8-rancher1-1"]
