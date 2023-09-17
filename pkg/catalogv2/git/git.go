@@ -128,6 +128,16 @@ func (r *Repository) setRepoCredentials() error {
 
 		parts := strings.Split(r.URL, "@")
 		r.username = parts[0]
+		if len(parts) == 2 {
+			if strings.HasPrefix(parts[0], "ssh://") {
+				// Remove "ssh://" prefix
+				r.username = parts[0][len("ssh://"):]
+			} else {
+				r.username = parts[0]
+			}
+		} else {
+			return fmt.Errorf("invalid ssh url: %v", r.URL)
+		}
 
 		// PublicKeys implements transport.AuthMethod interface
 		r.auth = &plumbingSSH.PublicKeys{
