@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -125,9 +126,12 @@ func (r *Repository) setRepoCredentials() error {
 			return fmt.Errorf("failed to parse ssh private key: %w", err)
 		}
 
+		parts := strings.Split(r.URL, "@")
+		r.username = parts[0]
+
 		// PublicKeys implements transport.AuthMethod interface
 		r.auth = &plumbingSSH.PublicKeys{
-			User:   "git",
+			User:   r.username,
 			Signer: signer,
 		}
 
@@ -232,7 +236,7 @@ func (r *Repository) cloneOrOpen(branch string) error {
 	} else if openErr == gogit.ErrRepositoryNotExists {
 		repoGogit, cloneErr := gogit.PlainClone(r.Directory, false, cloneOptions)
 		if cloneErr != nil && cloneErr != gogit.ErrRepositoryAlreadyExists {
-			return fmt.Errorf("plainClone failure: %w", err)
+			return fmt.Errorf("plainClone failure: %w", cloneErr)
 		}
 		// serious problem warning
 		if openErr == gogit.ErrRepositoryNotExists && cloneErr == gogit.ErrRepositoryAlreadyExists {
