@@ -1,5 +1,9 @@
 // mocks created with the following commands
 // mockgen --build_flags=--mod=mod -package restrictedadminrbac -destination ./mockIndexer_test.go k8s.io/client-go/tools/cache Indexer
+//
+//mockgen --build_flags=--mod=mod -package restrictedadminrbac -destination ./mockLister_test.go github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1 RoleBindingLister,RoleBindingInterface
+//
+
 package restrictedadminrbac
 
 import (
@@ -434,9 +438,13 @@ func newMockController(t *testing.T) *mockController {
 	crtbCtrl := fake.NewMockControllerInterface[*v3.ClusterRoleTemplateBinding, *v3.ClusterRoleTemplateBindingList](ctrl)
 	grbCache := fake.NewMockNonNamespacedCacheInterface[*v3.GlobalRoleBinding](ctrl)
 	grbIndexer := NewMockIndexer(ctrl)
+	rbLister := NewMockRoleBindingLister(ctrl)
+	rbInterface := NewMockRoleBindingInterface(ctrl)
 	return &mockController{
 		t:                t,
 		mockIndexer:      grbIndexer,
+		mockRBInterface:  rbInterface,
+		mockRBLister:     rbLister,
 		mockClusterCache: clusterCache,
 		mockCRTBCache:    crtbCache,
 		mockCRTBCtrl:     crtbCtrl,
@@ -451,6 +459,8 @@ type mockController struct {
 	mockCRTBCache    *fake.MockCacheInterface[*v3.ClusterRoleTemplateBinding]
 	mockCRTBCtrl     *fake.MockControllerInterface[*v3.ClusterRoleTemplateBinding, *v3.ClusterRoleTemplateBindingList]
 	mockGRBCache     *fake.MockNonNamespacedCacheInterface[*v3.GlobalRoleBinding]
+	mockRBInterface  *MockRoleBindingInterface
+	mockRBLister     *MockRoleBindingLister
 }
 
 func (m *mockController) rbacController() *rbaccontroller {
@@ -460,5 +470,7 @@ func (m *mockController) rbacController() *rbaccontroller {
 		crtbCache:    m.mockCRTBCache,
 		crtbCtrl:     m.mockCRTBCtrl,
 		grbCache:     m.mockGRBCache,
+		roleBindings: m.mockRBInterface,
+		rbLister:     m.mockRBLister,
 	}
 }
