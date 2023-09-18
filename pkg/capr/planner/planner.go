@@ -1168,6 +1168,13 @@ func (p *Planner) ensureRKEStateSecret(controlPlane *rkev1.RKEControlPlane, newC
 	}
 
 	name := name.SafeConcatName(controlPlane.Name, "rke", "state")
+	if p.secretClient != nil {
+		s, e := p.secretClient.Get(controlPlane.Namespace, name, metav1.GetOptions{})
+		logrus.WithField("secret", s).WithField("err", e).Errorf("DEBUG -- FELIPE - Without cache")
+	} else {
+		logrus.Errorf("DEBUG - FELIPIE  -  Nill secretClient")
+	}
+
 	secret, err := p.secretCache.Get(controlPlane.Namespace, name) // FELIPE GET FROM CACHE !!!!
 	if apierror.IsNotFound(err) {
 		if !newCluster {
