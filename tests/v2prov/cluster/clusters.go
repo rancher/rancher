@@ -39,7 +39,7 @@ const ConflictMessageRegex = `\[K8s\] encountered an error while attempting to u
 const SaneConflictMessageThreshold = 3
 
 func New(clients *clients.Clients, cluster *provisioningv1api.Cluster) (*provisioningv1api.Cluster, error) {
-	cluster = cluster.DeepCopy()
+	// cluster = cluster.DeepCopy()
 	if cluster.Namespace == "" {
 		newNs, err := namespace.Random(clients)
 		if err != nil {
@@ -140,9 +140,6 @@ func WaitForCreate(clients *clients.Clients, c *provisioningv1api.Cluster) (_ *p
 
 	err = wait.Object(clients.Ctx, clients.Provisioning.Cluster().Watch, c, func(obj runtime.Object) (bool, error) {
 		c = obj.(*provisioningv1api.Cluster)
-		return c.Status.ClusterName != "" && c.Status.Ready && c.Status.ObservedGeneration == c.Generation && capr.Ready.IsTrue(c) && capr.Provisioned.IsTrue(c), nil
-	})
-	if err != nil {
 		logrus.WithFields(map[string]interface{}{
 			"c.Status.ClusterName":        c.Status.ClusterName,
 			"c.Status.Ready":              c.Status.Ready,
@@ -151,6 +148,9 @@ func WaitForCreate(clients *clients.Clients, c *provisioningv1api.Cluster) (_ *p
 			"capr.Ready.IsTrue(c)":        capr.Ready.IsTrue(c),
 			"capr.Provisioned.IsTrue(c)":  capr.Provisioned.IsTrue(c),
 		}).Error("Debbuging - FElIPE")
+		return c.Status.ClusterName != "" && c.Status.Ready && c.Status.ObservedGeneration == c.Generation && capr.Ready.IsTrue(c) && capr.Provisioned.IsTrue(c), nil
+	})
+	if err != nil {
 
 		return nil, fmt.Errorf("prov cluster is not ready: %w", err)
 	}
