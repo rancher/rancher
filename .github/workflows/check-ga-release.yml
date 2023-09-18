@@ -1,0 +1,22 @@
+name: Check GA release
+
+on:
+  workflow_dispatch:
+  release:
+    types: [prereleased]
+
+env:
+  RELEASE_TITLE: ${{ github.event.release.name }}
+
+jobs:
+  check-changes:
+    runs-on: ubuntu-latest
+
+    steps:
+      -
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      -
+        name: Verify dependencies files in a GA release
+        run: ./.github/scripts/check-ga-release-deps.sh
