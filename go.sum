@@ -334,8 +334,6 @@ github.com/fatih/color v1.9.0/go.mod h1:eQcE1qtQxscV5RaZvpXrrb8Drkc3/DdQ+uUYCNjL
 github.com/fatih/color v1.13.0/go.mod h1:kLAiJbzzSOZDVNGyDpeOxJ47H46qBXwg5ILebYFFOfk=
 github.com/fatih/color v1.15.0 h1:kOqh6YHBtK8aywxGerMG2Eq3H6Qgoqeo13Bk2Mv/nBs=
 github.com/fatih/color v1.15.0/go.mod h1:0h5ZqXfHYED7Bhv2ZJamyIOUej9KtShiJESRwBDUSsw=
-github.com/felipe-colussi/dynamiclistener v0.0.0-20230915181552-8819e93d9186 h1:vS2GOIUV4bLu6A0vOVWqi7FVJpoq898rvsw+0+eBlyc=
-github.com/felipe-colussi/dynamiclistener v0.0.0-20230915181552-8819e93d9186/go.mod h1:VqBaJNi+bZmre0+gi+2Jb6jbn7ovHzRueW+M7QhVKsk=
 github.com/felixge/httpsnoop v1.0.1/go.mod h1:m8KPJKqk1gH5J9DgRY2ASl2lWCfGKXixSwevea8zH2U=
 github.com/felixge/httpsnoop v1.0.3 h1:s/nj+GCswXYzN5v2DpNMuMQYe+0DDwt5WVCU6CWBdXk=
 github.com/felixge/httpsnoop v1.0.3/go.mod h1:m8KPJKqk1gH5J9DgRY2ASl2lWCfGKXixSwevea8zH2U=
@@ -1043,6 +1041,8 @@ github.com/rancher/channelserver v0.5.1-0.20230719220800-0a37b73c7df8 h1:Dyg8vyY
 github.com/rancher/channelserver v0.5.1-0.20230719220800-0a37b73c7df8/go.mod h1:Ra21yfic6jHRp9+lelgupPeZw0fwpPZ/kPAY3UFQo+I=
 github.com/rancher/client-go v1.27.4-rancher1 h1:1W1A0bV6KXYbu1z+KIezlfLsHPc1wiasAM42BICVKBM=
 github.com/rancher/client-go v1.27.4-rancher1/go.mod h1:ragcly7lUlN0SRPk5/ZkGnDjPknzb37TICq07WhI6Xc=
+github.com/rancher/dynamiclistener v0.3.6-rc3-deadlock-fix-revert h1:xGaKPIm+JyHl6hdkIosMLeuQ2fI2uLjNp94RMlqNqNc=
+github.com/rancher/dynamiclistener v0.3.6-rc3-deadlock-fix-revert/go.mod h1:VqBaJNi+bZmre0+gi+2Jb6jbn7ovHzRueW+M7QhVKsk=
 github.com/rancher/eks-operator v1.3.0-rc2 h1:Poua1CXexs0h/C0dRllBsaehdc61H+L4xc4e7oxT5tY=
 github.com/rancher/eks-operator v1.3.0-rc2/go.mod h1:30gJm9FbNBdzMX300ibhtlU72BgkjDuW1bX/u4FC0ns=
 github.com/rancher/fleet/pkg/apis v0.0.0-20230912105714-0d26f206b3c5 h1:yDuAy1A4VlBEZTG23lNJgTk1INCEMa0YQ67XPGtR6J8=
