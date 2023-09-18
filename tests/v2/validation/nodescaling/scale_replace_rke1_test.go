@@ -1,4 +1,4 @@
-package scaling
+package nodescaling
 
 import (
 	"testing"
