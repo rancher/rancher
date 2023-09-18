@@ -40,10 +40,14 @@ func isLocalBranch(branch string) bool {
 	return strings.HasPrefix(branch, localReferenceBranch)
 }
 
-// isGitSSH checks if the url is parsable to ssh url standard
+// isGitSSH checks if the URL is in the SSH URL format.
 func isGitSSH(gitURL string) (bool, error) {
-	// Matches URLs with the format [anything]@[anything]:[anything]
-	return regexp.MatchString("(.+)@(.+):(.+)", gitURL)
+	// Define two regular expressions to match the two URL patterns
+	pattern1 := `^.+@.+:.+$`                    // [anything]@[anything]:[anything]
+	pattern2 := `^ssh://[^@]+@[^:]+:\d+/.+/.+$` // ssh://<user>@<mydomain.example>:<port>/<path>/<repository-name>
+
+	// Check if the URL matches either of the patterns
+	return regexp.MatchString(pattern1+"|"+pattern2, gitURL)
 }
 
 func hash(gitURL string) string {
