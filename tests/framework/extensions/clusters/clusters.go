@@ -12,7 +12,6 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	apisV1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
-	kubeProvisioning "github.com/rancher/rancher/tests/framework/clients/provisioning"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
@@ -1092,9 +1091,9 @@ func logClusterInfoWithChanges(clusterID, clusterInfo string, summary summary.Su
 	return clusterInfo
 }
 
-func WatchAndWaitForCluster(steveClient *v1.Client, kubeProvisioningClient *kubeProvisioning.Client, ns string, clusterName string) error {
+func WatchAndWaitForCluster(client *rancher.Client, ns string, clusterName string) error {
 	err := kwait.Poll(5*time.Second, 2*time.Minute, func() (done bool, err error) {
-		clusterResp, err := steveClient.SteveType(ProvisioningSteveResourceType).ByID(ns + "/" + clusterName)
+		clusterResp, err := client.Steve.SteveType(ProvisioningSteveResourceType).ByID(ns + "/" + clusterName)
 		if err != nil {
 			return false, err
 		}
@@ -1105,6 +1104,16 @@ func WatchAndWaitForCluster(steveClient *v1.Client, kubeProvisioningClient *kube
 		return err
 	}
 	logrus.Infof("waiting for cluster to be up.............")
+
+	adminClient, err := rancher.NewClient(client.RancherConfig.AdminToken, client.Session)
+	if err != nil {
+		return err
+	}
+	kubeProvisioningClient, err := adminClient.GetKubeAPIProvisioningClient()
+	if err != nil {
+		return err
+	}
+
 	result, err := kubeProvisioningClient.Clusters(ns).Watch(context.TODO(), metav1.ListOptions{
 		FieldSelector:  "metadata.name=" + clusterName,
 		TimeoutSeconds: &defaults.WatchTimeoutSeconds,

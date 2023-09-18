@@ -7,6 +7,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
+	"github.com/rancher/rancher/tests/framework/extensions/defaults"
 	nodestat "github.com/rancher/rancher/tests/framework/extensions/nodes"
 	"github.com/rancher/rancher/tests/framework/extensions/workloads/pods"
 	"github.com/sirupsen/logrus"
@@ -57,7 +58,7 @@ func ReplaceNodes(t *testing.T, client *rancher.Client, clusterName string, isEt
 	err = clusters.WaitClusterToBeUpgraded(client, clusterID)
 	require.NoError(t, err)
 
-	err = nodestat.AllMachineReady(client, clusterID)
+	err = nodestat.AllMachineReady(client, clusterID, defaults.ThirtyMinuteTimeout)
 	require.NoError(t, err)
 
 	isNodeReplaced, err := nodestat.IsNodeReplaced(client, machineToDelete.ID, clusterID, numOfNodesBeforeDeletion, isEtcd, isControlPlane, isWorker)
@@ -78,7 +79,7 @@ func ReplaceRKE1Nodes(t *testing.T, client *rancher.Client, clusterName string, 
 	err = clusters.WaitClusterToBeUpgraded(client, clusterID)
 	require.NoError(t, err)
 
-	err = nodestat.AllManagementNodeReady(client, clusterID)
+	err = nodestat.AllManagementNodeReady(client, clusterID, defaults.ThirtyMinuteTimeout)
 	require.NoError(t, err)
 
 	isNodeReplaced, err := nodestat.IsNodeReplaced(client, nodeToDelete.ID, clusterID, numOfNodesBeforeDeletion, isEtcd, isControlPlane, isWorker)
