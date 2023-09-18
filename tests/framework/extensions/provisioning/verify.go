@@ -16,6 +16,8 @@ import (
 	steveV1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters/bundledclusters"
+	"github.com/rancher/rancher/tests/framework/extensions/defaults"
+	kubeapinodes "github.com/rancher/rancher/tests/framework/extensions/kubeapi/nodes"
 	"github.com/rancher/rancher/tests/framework/extensions/kubeconfig"
 	nodestat "github.com/rancher/rancher/tests/framework/extensions/nodes"
 	"github.com/rancher/rancher/tests/framework/extensions/provisioninginput"
@@ -25,7 +27,6 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/workloads/pods"
 	"github.com/rancher/rancher/tests/framework/pkg/nodes"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
-	"github.com/rancher/rancher/tests/v2prov/defaults"
 	wranglername "github.com/rancher/wrangler/pkg/name"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -42,7 +43,6 @@ const (
 	logMessageKubernetesVersion = "Validating the current version is the upgraded one"
 	hostnameLimit               = 63
 	machineNameAnnotation       = "cluster.x-k8s.io/machine"
-	publicIPAnnotation          = "rke2.io/external-ip"
 )
 
 // VerifyRKE1Cluster validates that the RKE1 cluster and its resources are in a good state, matching a given config.
@@ -69,7 +69,7 @@ func VerifyRKE1Cluster(t *testing.T, client *rancher.Client, clustersConfig *clu
 	require.NoError(t, err)
 	assert.NotEmpty(t, clusterToken)
 
-	err = nodestat.AllManagementNodeReady(client, cluster.ID)
+	err = nodestat.AllManagementNodeReady(client, cluster.ID, defaults.ThirtyMinuteTimeout)
 	require.NoError(t, err)
 
 	if clustersConfig.PSACT == string(provisioninginput.RancherPrivileged) || clustersConfig.PSACT == string(provisioninginput.RancherRestricted) || clustersConfig.PSACT == string(provisioninginput.RancherBaseline) {
@@ -123,7 +123,7 @@ func VerifyCluster(t *testing.T, client *rancher.Client, clustersConfig *cluster
 	require.NoError(t, err)
 	assert.NotEmpty(t, clusterToken)
 
-	err = nodestat.AllMachineReady(client, cluster.ID)
+	err = nodestat.AllMachineReady(client, cluster.ID, defaults.ThirtyMinuteTimeout)
 	require.NoError(t, err)
 
 	status := &provv1.ClusterStatus{}
@@ -193,7 +193,7 @@ func VerifyHostedCluster(t *testing.T, client *rancher.Client, cluster *manageme
 	require.NoError(t, err)
 	assert.NotEmpty(t, clusterToken)
 
-	err = nodestat.AllManagementNodeReady(client, cluster.ID)
+	err = nodestat.AllManagementNodeReady(client, cluster.ID, defaults.ThirtyMinuteTimeout)
 	require.NoError(t, err)
 
 	podResults, podErrors := pods.StatusPods(client, cluster.ID)
@@ -338,7 +338,7 @@ func VerifyHostnameLength(t *testing.T, client *rancher.Client, clusterObject *s
 		query2, err := url.ParseQuery(fmt.Sprintf("labelSelector=%s=%s", capi.MachineDeploymentLabelName, md.Name))
 		require.NoError(t, err)
 
-		machineResp, err := client.Steve.SteveType("cluster.x-k8s.io.machine").List(query2)
+		machineResp, err := client.Steve.SteveType(machineNameAnnotation).List(query2)
 		require.NoError(t, err)
 
 		assert.True(t, len(machineResp.Data) > 0)
@@ -443,7 +443,7 @@ func GetSnapshots(client *rancher.Client, localclusterID string, clusterName str
 }
 
 // VerifySSHTests validates the ssh tests listed in the config on each node of the cluster
-func VerifySSHTests(t *testing.T, client *rancher.Client, clusterObject *steveV1.SteveAPIObject, sshTests []string, clusterID string) {
+func VerifySSHTests(t *testing.T, client *rancher.Client, clusterObject *steveV1.SteveAPIObject, sshTests []provisioninginput.SSHTestCase, clusterID string) {
 	client, err := client.ReLogin()
 	require.NoError(t, err)
 
@@ -451,9 +451,9 @@ func VerifySSHTests(t *testing.T, client *rancher.Client, clusterObject *steveV1
 	err = steveV1.ConvertToK8sType(clusterObject.Spec, clusterSpec)
 	require.NoError(t, err)
 
-	steveclient, err := client.Steve.ProxyDownstream(clusterID)
+	steveClient, err := client.Steve.ProxyDownstream(clusterID)
 	require.NoError(t, err)
-	nodesSteveObjList, err := steveclient.SteveType("node").List(nil)
+	nodesSteveObjList, err := steveClient.SteveType("node").List(nil)
 	require.NoError(t, err)
 
 	dynamicSchema := clusterSpec.RKEConfig.MachinePools[0].DynamicSchemaSpec
@@ -463,21 +463,27 @@ func VerifySSHTests(t *testing.T, client *rancher.Client, clusterObject *steveV1
 
 	sshUser := data.ResourceFields.SSHUser.Default.StringValue
 	for _, tests := range sshTests {
-		for _, rancherNode := range nodesSteveObjList.Data {
-			machineName := rancherNode.Annotations[machineNameAnnotation]
+		for _, node := range nodesSteveObjList.Data {
+			machineName := node.Annotations[machineNameAnnotation]
 			sshkey, err := sshkeys.DownloadSSHKeys(client, machineName)
 			require.NoError(t, err)
 			assert.NotEmpty(t, sshkey)
+
+			newNode := &corev1.Node{}
+			err = steveV1.ConvertToK8sType(node.JSONResp, newNode)
+			require.NoError(t, err)
+			nodeIP := kubeapinodes.GetNodeIP(newNode, corev1.NodeExternalIP)
+
 			clusterNode := &nodes.Node{
-				NodeID:          rancherNode.ID,
-				PublicIPAddress: rancherNode.Annotations[publicIPAnnotation],
+				NodeID:          node.ID,
+				PublicIPAddress: nodeIP,
 				SSHUser:         sshUser,
 				SSHKey:          sshkey,
 			}
 
-			CallSSHTestByName(tests, clusterNode)
+			err = CallSSHTestByName(tests, clusterNode, client, clusterID, machineName)
+			require.NoError(t, err)
 
 		}
 	}
-
 }

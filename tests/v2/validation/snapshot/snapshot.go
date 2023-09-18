@@ -10,14 +10,12 @@ import (
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	steveV1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
-	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/etcdsnapshot"
 	"github.com/rancher/rancher/tests/framework/extensions/ingresses"
 	"github.com/rancher/rancher/tests/framework/extensions/provisioning"
 	"github.com/rancher/rancher/tests/framework/extensions/workloads"
 	"github.com/rancher/rancher/tests/framework/extensions/workloads/pods"
-	podV1 "github.com/rancher/rancher/tests/framework/extensions/workloads/pods"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -86,10 +84,8 @@ func snapshotRestore(t *testing.T, client *rancher.Client, clusterName string, u
 
 	initialKubernetesVersion := clusterObject.Spec.KubernetesVersion
 	logrus.Infof("creating kube provisioning client.............")
-	kubeProvisioningClient, err := client.GetKubeAPIProvisioningClient()
-	require.NoError(t, err)
 
-	err = clusters.WatchAndWaitForCluster(client.Steve, kubeProvisioningClient, "fleet-default", clusterName)
+	err = clusters.WatchAndWaitForCluster(client, namespace, clusterName)
 	require.NoError(t, err)
 
 	podResults, podErrors := pods.StatusPods(client, clusterID)
@@ -184,19 +180,19 @@ func MatchNodeToAnyEtcdRole(t *testing.T, client *rancher.Client, clusterID stri
 	return numOfNodes, lastMatchingNode
 }
 
-func createIngress(client *v1.Client, ingressName string, serviceName string) (*v1.SteveAPIObject, error) {
+func createIngress(client *steveV1.Client, ingressName string, serviceName string) (*steveV1.SteveAPIObject, error) {
 	podClient := client.SteveType("pod")
 	err := kwait.Poll(15*time.Second, 5*time.Minute, func() (done bool, err error) {
-		pods, err := podClient.List(nil)
+		newPods, err := podClient.List(nil)
 		if err != nil {
 			return false, nil
 		}
-		if len(pods.Data) != 0 {
+		if len(newPods.Data) != 0 {
 			return true, nil
 		}
-		for _, pod := range pods.Data {
+		for _, pod := range newPods.Data {
 			if strings.Contains(pod.Name, "rke2-ingress-nginx") || strings.Contains(pod.Name, "rancher-webhook") {
-				_, podError, err := podV1.CheckPodStatus(&pod)
+				_, podError, err := pods.CheckPodStatus(&pod)
 				if err != nil {
 					return false, err
 				}
