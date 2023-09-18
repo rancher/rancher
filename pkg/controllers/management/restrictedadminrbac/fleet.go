@@ -2,6 +2,7 @@ package restrictedadminrbac
 
 import (
 	"fmt"
+	"reflect"
 
 	"github.com/hashicorp/go-multierror"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -50,42 +51,72 @@ func (r *rbaccontroller) ensureRestricedAdminForFleet(key string, obj *v3.Global
 }
 
 func (r *rbaccontroller) ensureRolebinding(namespace string, subject k8srbac.Subject, grb *v3.GlobalRoleBinding) error {
-	rbName := fmt.Sprintf("%s-fleetworkspace-%s", grb.Name, rbac.RestrictedAdminClusterRoleBinding)
-	rb := &k8srbac.RoleBinding{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      rbName,
-			Namespace: namespace,
-			Labels:    map[string]string{rbac.RestrictedAdminClusterRoleBinding: "true"},
-			OwnerReferences: []metav1.OwnerReference{
-				{
-					APIVersion: grb.TypeMeta.APIVersion,
-					Kind:       grb.TypeMeta.Kind,
-					UID:        grb.UID,
-					Name:       grb.Name,
-				},
-			},
-		},
-		RoleRef: k8srbac.RoleRef{
-			Name: "fleetworkspace-admin",
-			Kind: "ClusterRole",
-		},
-		Subjects: []k8srbac.Subject{
-			subject,
+	name := fmt.Sprintf("%s-fleetworkspace-%s", grb.Name, rbac.RestrictedAdminClusterRoleBinding)
+	ownerRefs := []metav1.OwnerReference{
+		{
+			APIVersion: grb.TypeMeta.APIVersion,
+			Kind:       grb.TypeMeta.Kind,
+			UID:        grb.UID,
+			Name:       grb.Name,
 		},
 	}
-	_, err := r.rbLister.Get(namespace, rbName)
+	roleRef := k8srbac.RoleRef{
+		Name: "fleetworkspace-admin",
+		Kind: "ClusterRole",
+	}
+	subjects := []k8srbac.Subject{
+		subject,
+	}
+
+	rb, err := r.rbLister.Get(namespace, name)
 	if err != nil && !k8serrors.IsNotFound(err) {
+		// list call failed for unknown reason, give up
 		return err
-	} else if k8serrors.IsNotFound(err) {
-		_, err = r.roleBindings.Create(rb)
+	}
+
+	// role binding not found, create it
+	if err != nil && k8serrors.IsNotFound(err) {
+		_, err = r.roleBindings.Create(&k8srbac.RoleBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            name,
+				Namespace:       namespace,
+				Labels:          map[string]string{rbac.RestrictedAdminClusterRoleBinding: "true"},
+				OwnerReferences: ownerRefs,
+			},
+			RoleRef:  roleRef,
+			Subjects: subjects,
+		})
 		if err != nil && !k8serrors.IsAlreadyExists(err) {
 			return err
 		}
-	} else {
-		_, err := r.roleBindings.Update(rb)
-		if err != nil {
-			return err
-		}
+		return nil
+	}
+
+	// role binding found, possibly in dirty state. Make sure relevant fields
+	// are set right
+	dirty := false
+
+	label, ok := rb.Labels[rbac.RestrictedAdminClusterRoleBinding]
+	if !ok || label != "true" {
+		rb.Labels[rbac.RestrictedAdminClusterRoleBinding] = "true"
+		dirty = true
+	}
+	if !reflect.DeepEqual(rb.OwnerReferences, ownerRefs) {
+		rb.OwnerReferences = ownerRefs
+		dirty = true
+	}
+	if !reflect.DeepEqual(rb.RoleRef, roleRef) {
+		rb.RoleRef = roleRef
+		dirty = true
+	}
+	if !reflect.DeepEqual(rb.Subjects, subjects) {
+		rb.Subjects = subjects
+		dirty = true
+	}
+
+	if dirty {
+		_, err = r.roleBindings.Update(rb)
+		return err
 	}
 	return nil
 }
