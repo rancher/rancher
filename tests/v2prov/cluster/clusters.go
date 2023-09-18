@@ -39,7 +39,7 @@ const ConflictMessageRegex = `\[K8s\] encountered an error while attempting to u
 const SaneConflictMessageThreshold = 3
 
 func New(clients *clients.Clients, cluster *provisioningv1api.Cluster) (*provisioningv1api.Cluster, error) {
-	// cluster = cluster.DeepCopy()
+	cluster = cluster.DeepCopy()
 	if cluster.Namespace == "" {
 		newNs, err := namespace.Random(clients)
 		if err != nil {

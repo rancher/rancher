@@ -5,8 +5,11 @@ go 1.20
 // on release remove this wrangler replace and use the latest tag
 replace github.com/rancher/wrangler v1.1.1 => github.com/rancher/wrangler v1.1.1-0.20230831050635-df1bd5aae9df
 
-//replace github.com/rancher/dynamiclistener v0.3.6-rc3-deadlock-fix-revert => github.com/felipe-colussi/dynamiclistener v0.0.0-20230915181552-8819e93d9186
-replace github.com/rancher/dynamiclistener v0.3.6-rc3-deadlock-fix-revert => github.com/felipe-colussi/dynamiclistener v0.0.0-20230831052350-0132d96ec2c5
+// Working \/
+replace github.com/rancher/dynamiclistener v0.3.6-rc3-deadlock-fix-revert => github.com/felipe-colussi/dynamiclistener v0.0.0-20230915181552-8819e93d9186
+
+// \/  Not Working
+//replace github.com/rancher/dynamiclistener v0.3.6-rc3-deadlock-fix-revert => github.com/felipe-colussi/dynamiclistener v0.0.0-20230831052350-0132d96ec2c5
 
 replace (
 	github.com/containerd/containerd => github.com/containerd/containerd v1.6.22 // for compatibilty with docker 20.10.x
