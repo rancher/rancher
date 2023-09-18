@@ -249,7 +249,7 @@ func (c *ClusterRepoTestSuite) testSmallForkClusterRepo(params ChartsSmallForkRe
 
 	// The Spec from ClusterRepo is updated almost instantly, the status and local repository take more time
 	err = kwait.Poll(5*time.Second, 10*time.Minute, func() (done bool, err error) {
-		lastCommit, _, err := getLocalRepoCurrentCommitAndBranch(repoPath)
+		lastCommit, lastBranch, err := getLocalRepoCurrentCommitAndBranch(repoPath)
 		require.NoError(c.T(), err)
 		updatedClusterRepo, err = c.catalogClient.ClusterRepos().Get(c.ctx, testClusterRepo.Name, metav1.GetOptions{})
 		if err != nil {
@@ -257,7 +257,9 @@ func (c *ClusterRepoTestSuite) testSmallForkClusterRepo(params ChartsSmallForkRe
 		}
 		// Assertions
 		if lastCommit == updatedClusterRepo.Status.Commit && lastCommit != firstCommit {
-			return true, nil
+			if lastBranch == updatedClusterRepo.Status.Branch && lastBranch != firstBranch {
+				return true, nil
+			}
 		}
 		return false, nil
 	})
