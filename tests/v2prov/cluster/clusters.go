@@ -147,6 +147,7 @@ func WaitForCreate(clients *clients.Clients, c *provisioningv1api.Cluster) (_ *p
 			"c.Generation":                c.Generation,
 			"capr.Ready.IsTrue(c)":        capr.Ready.IsTrue(c),
 			"capr.Provisioned.IsTrue(c)":  capr.Provisioned.IsTrue(c),
+			"Status.ClientSecretName":     c.Status.ClientSecretName,
 			"conditions":                  c.Status.Conditions,
 		}).Error("Debbuging - FElIPE")
 		return c.Status.ClusterName != "" && c.Status.Ready && c.Status.ObservedGeneration == c.Generation && capr.Ready.IsTrue(c) && capr.Provisioned.IsTrue(c), nil

@@ -299,6 +299,8 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlan
 	capr.Provisioned.Reason(&status, "")
 
 	_, clusterSecretTokens, err := p.ensureRKEStateSecret(cp, !anyPlansDelivered)
+
+	logrus.WithField("clusterSecretTokens", clusterSecretTokens).Errorf("DEBUG - FELIPE - EMPTY CACHE !!")
 	if err != nil {
 		return status, err
 	}
@@ -881,6 +883,9 @@ type reconcilable struct {
 
 func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, clusterPlan *plan.Plan, required bool,
 	tierName string, include, exclude roleFilter, maxUnavailable string, forcedJoinURL string, drainOptions rkev1.DrainOptions) error {
+
+	logrus.WithField("Secret", tokensSecret).Errorf("DEBUG - FELIPE -  ")
+
 	var (
 		ready, outOfSync, nonReady, errMachines, draining, uncordoned []string
 		messages                                                      = map[string][]string{}
@@ -1163,7 +1168,7 @@ func (p *Planner) ensureRKEStateSecret(controlPlane *rkev1.RKEControlPlane, newC
 	}
 
 	name := name.SafeConcatName(controlPlane.Name, "rke", "state")
-	secret, err := p.secretCache.Get(controlPlane.Namespace, name)
+	secret, err := p.secretCache.Get(controlPlane.Namespace, name) // FELIPE GET FROM CACHE !!!!
 	if apierror.IsNotFound(err) {
 		if !newCluster {
 			return "", plan.Secret{}, fmt.Errorf("newCluster was false and secret does not exist: %w", err)

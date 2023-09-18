@@ -711,6 +711,7 @@ func (h *handler) migrateSecret(cluster *apimgmtv3.Cluster, secretName, secretCl
 	return cluster, nil
 }
 
+// FELIPE IF CLUSTER IS TRUE -> Migrate    THIS PART MAY BE GET TRIGGERED WRONG
 func (h *handler) migrateClusterSecrets(cluster *apimgmtv3.Cluster) (*apimgmtv3.Cluster, error) {
 	if apimgmtv3.ClusterConditionSecretsMigrated.IsTrue(cluster) {
 		return cluster, nil
