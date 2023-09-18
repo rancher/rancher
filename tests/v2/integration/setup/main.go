@@ -215,7 +215,7 @@ func main() {
 	}
 	logrus.WithField("dump", func() string {
 		r := bytes.Buffer{}
-		spew.Fdump(r, c)
+		spew.Fdump(&r, c)
 		return r.String()
 	}()).Errorf("FELIPE-DEBUG-DUMP")
 	logrus.Info("Waiting for test cluster to be ready")
