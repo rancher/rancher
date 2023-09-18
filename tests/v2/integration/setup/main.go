@@ -221,6 +221,12 @@ func main() {
 	logrus.Info("Waiting for test cluster to be ready")
 	c, err = cluster.WaitForCreate(clusterClients, c)
 	if err != nil {
+		a := clusterClients.Provisioning.Cluster().Get(c.Namespace, c.Name)
+		logrus.WithField("dump", func() string {
+			r := bytes.Buffer{}
+			spew.Fdump(&r, a)
+			return r.String()
+		}()).Errorf("FELIPE-DEBUG-DUMP-GET")
 		logrus.Fatalf("Error waiting for test cluster to be ready: %v", err)
 	}
 
