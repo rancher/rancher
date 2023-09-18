@@ -78,29 +78,38 @@ func TestBuildRepoConfig(t *testing.T) {
 		gitURL          string
 		insecureSkipTLS bool
 		caBundle        []byte
+		user            string
 		expectErr       error
 	}{
-		{"#1 No Secret: Success", nil, "cattle-test-namespace", "charts-test", "https://somerandom.git", false, []byte{}, nil},
+		{"#1 No Secret: Success", nil, "cattle-test-namespace", "charts-test", "https://somerandom.git", false, []byte{}, "", nil},
 
 		{"#2.1 HTTPS Secret: Success", &corev1.Secret{
 			Type: corev1.SecretTypeBasicAuth,
 			Data: secretBasicHTTPSAuth,
-		}, "cattle-test-namespace", "charts-test", "https://somerandom.git", false, []byte{}, nil},
+		}, "cattle-test-namespace", "charts-test", "https://somerandom.git", false, []byte{}, "", nil},
 
 		{"#2.2 HTTPS Secret: Failure", &corev1.Secret{
 			Type: corev1.SecretTypeBasicAuth,
 			Data: secretBasicHTTPSNoPasswordAuth,
-		}, "cattle-test-namespace", "charts-test", "https://somerandom.git", false, []byte{}, fmt.Errorf("username or password not provided")},
+		}, "cattle-test-namespace", "charts-test", "https://somerandom.git", false, []byte{}, "", fmt.Errorf("username or password not provided")},
 
 		{"#3.1 SSH Secret: Success", &corev1.Secret{
 			Type: corev1.SecretTypeSSHAuth,
 			Data: secretSSHAuth,
-		}, "cattle-test-namespace", "charts-test", "https://somerandom.git", false, []byte{}, nil},
+		}, "cattle-test-namespace", "charts-test", "user@server:project.git", false, []byte{}, "user", nil},
 
 		{"#3.2 SSH && Known Hosts Secret: Success", &corev1.Secret{
 			Type: corev1.SecretTypeSSHAuth,
 			Data: secretSSHKnowHostsAuth,
-		}, "cattle-test-namespace", "charts-test", "https://somerandom.git", false, []byte{}, nil},
+		}, "cattle-test-namespace", "charts-test", "ssh://user@mydomain.example:443/repository-name", false, []byte{}, "user", nil},
+		{"#3.3 SSH Secret: Error invalid URL", &corev1.Secret{
+			Type: corev1.SecretTypeSSHAuth,
+			Data: secretSSHAuth,
+		}, "cattle-test-namespace", "charts-test", "ssh://user@mydomain.example@repository-name", false, []byte{}, "user", fmt.Errorf("invalid git URL scheme ssh, only http(s) or ssh supported")},
+		{"#3.4 SSH Secret: Error invalid URL", &corev1.Secret{
+			Type: corev1.SecretTypeSSHAuth,
+			Data: secretSSHAuth,
+		}, "cattle-test-namespace", "charts-test", "ssh://user@mydomain.example:443@repository-name", false, []byte{}, "user", fmt.Errorf("invalid ssh url: ssh://user@mydomain.example:443@repository-name")},
 	}
 
 	// Run the testCases
@@ -108,12 +117,16 @@ func TestBuildRepoConfig(t *testing.T) {
 		repo, err := BuildRepoConfig(tc.secret, tc.namespace, tc.name, tc.gitURL, tc.insecureSkipTLS, tc.caBundle)
 		// Check the error
 		if tc.expectErr == nil && tc.expectErr != err {
-			t.Errorf("Expected error: %v |But got: %v", tc.expectErr, err)
+			t.Errorf("Test: %s, Expected error: %v |But got: %v", tc.test, tc.expectErr, err)
 		}
 		// Only testing error in some cases
-		if err != nil {
-			assert.EqualError(t, tc.expectErr, err.Error())
-			continue
+		if tc.expectErr != nil {
+			if err != nil {
+				assert.EqualError(t, tc.expectErr, err.Error())
+				continue
+			} else {
+				t.Errorf("Test: %s, Expected error: %v |But got: %v", tc.test, tc.expectErr, nil)
+			}
 		}
 
 		// testing authentication methods
@@ -127,7 +140,7 @@ func TestBuildRepoConfig(t *testing.T) {
 				assert.Equal(t, storedAuth, fmt.Sprintf("http-basic-auth - %s:*******", randomUser))
 			case corev1.SecretTypeSSHAuth:
 				storedAuth := repo.auth.String()
-				assert.Equal(t, storedAuth, "user: git, name: ssh-public-keys")
+				assert.Equal(t, storedAuth, fmt.Sprintf("user: %s, name: ssh-public-keys", tc.user))
 			}
 		}
 		// testing local repository configurations
