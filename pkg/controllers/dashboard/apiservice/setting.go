@@ -25,7 +25,7 @@ func (h *handler) SetupInternalServerURL(key string, setting *v3.Setting) (*v3.S
 	}
 
 	logrus.WithFields(map[string]interface{}{"settings.InternalCACerts.Get()": settings.InternalCACerts.Get(),
-		"internalCA": internalCA})
+		"internalCA": internalCA}).Error("Debug - FElipe - Api server")
 
 	// purposely update CA before URL, because we only wait for internalURL != "" when checking if it's initialized
 	if settings.InternalCACerts.Get() != internalCA {
