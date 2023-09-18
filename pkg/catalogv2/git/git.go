@@ -62,7 +62,7 @@ func BuildRepoConfig(secret *corev1.Secret, namespace, name, gitURL string, inse
 			return nil, fmt.Errorf("failed to parse URL %s: %w", gitURL, err)
 		}
 		if u.Scheme != "http" && u.Scheme != "https" {
-			return nil, fmt.Errorf("invalid git URL scheme %s, only http(s) supported", u.Scheme)
+			return nil, fmt.Errorf("invalid git URL scheme %s, only http(s) or ssh supported", u.Scheme)
 		}
 	}
 	dir := gitDir(namespace, name, gitURL)
@@ -164,7 +164,7 @@ func (r *Repository) setRepoCredentials() error {
 			}
 
 			r.auth = &plumbingSSH.PublicKeys{
-				User:                  "git",
+				User:                  r.username,
 				Signer:                signer,
 				HostKeyCallbackHelper: plumbingSSH.HostKeyCallbackHelper{HostKeyCallback: hostKeyCB},
 			}
