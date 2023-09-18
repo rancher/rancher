@@ -67,7 +67,7 @@ func GetPrivateClusterLevelRegistry(cluster *v3.Cluster) *rketypes.PrivateRegist
 // clusters, as the function will reassemble them anyway.
 func GeneratePrivateRegistryEncodedDockerConfig(cluster *v3.Cluster, secretLister v1.SecretLister) (string, string, error) {
 	var err error
-	// Declare here so we don't need to check if the rkeClusterRegistryOrGlobalSystemDefault exists wile working with v2prov
+	// Declare here so we don't need to check if the rkeClusterRegistryOrGlobalSystemDefault exists while working with v2prov
 	var rkeClusterURLOrGlobalSystemDefault string
 
 	if cluster == nil {
