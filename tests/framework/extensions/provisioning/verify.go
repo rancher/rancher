@@ -170,6 +170,37 @@ func VerifyCluster(t *testing.T, client *rancher.Client, clustersConfig *cluster
 	}
 }
 
+// VerifyHostedCluster validates that the hosted cluster and its resources are in a good state, matching a given config.
+func VerifyHostedCluster(t *testing.T, client *rancher.Client, cluster *management.Cluster) {
+	client, err := client.ReLogin()
+	require.NoError(t, err)
+
+	adminClient, err := rancher.NewClient(client.RancherConfig.AdminToken, client.Session)
+	require.NoError(t, err)
+
+	watchInterface, err := adminClient.GetManagementWatchInterface(management.ClusterType, metav1.ListOptions{
+		FieldSelector:  "metadata.name=" + cluster.ID,
+		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+	})
+	require.NoError(t, err)
+
+	checkFunc := clusters.IsHostedProvisioningClusterReady
+
+	err = wait.WatchWait(watchInterface, checkFunc)
+	require.NoError(t, err)
+
+	clusterToken, err := clusters.CheckServiceAccountTokenSecret(client, cluster.Name)
+	require.NoError(t, err)
+	assert.NotEmpty(t, clusterToken)
+
+	err = nodestat.AllManagementNodeReady(client, cluster.ID)
+	require.NoError(t, err)
+
+	podResults, podErrors := pods.StatusPods(client, cluster.ID)
+	assert.NotEmpty(t, podResults)
+	assert.Empty(t, podErrors)
+}
+
 // VerifyDeleteRKE1Cluster validates that a rke1 cluster and its resources are deleted.
 func VerifyDeleteRKE1Cluster(t *testing.T, client *rancher.Client, clusterID string) {
 	cluster, err := client.Management.Cluster.ByID(clusterID)
