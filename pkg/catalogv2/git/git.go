@@ -231,7 +231,7 @@ func (r *Repository) cloneOrOpen(branch string) error {
 	} else if openErr == gogit.ErrRepositoryNotExists {
 		repoGogit, cloneErr := gogit.PlainClone(r.Directory, false, cloneOptions)
 		if cloneErr != nil && cloneErr != gogit.ErrRepositoryAlreadyExists {
-			return fmt.Errorf("plainClone failure: %w", err)
+			return fmt.Errorf("plainClone failure: %w", cloneErr)
 		}
 		// serious problem warning
 		if openErr == gogit.ErrRepositoryNotExists && cloneErr == gogit.ErrRepositoryAlreadyExists {
@@ -268,11 +268,16 @@ func (r *Repository) getCurrentCommit() (plumbing.Hash, error) {
 	return headRef.Hash(), nil
 }
 
-// fetchAndReset is a convenience method that fetches updates from the remote repository
+// fetchCheckoutAndReset is a convenience method that fetches updates from the remote repository
 // for a specific branch, and then resets the current branch to a specified commit.
-func (r *Repository) fetchAndReset(branch string) error {
+func (r *Repository) fetchCheckoutAndReset(branch string) error {
 	if err := r.fetch(branch); err != nil {
-		return fmt.Errorf("fetchAndReset failure: %w", err)
+		return fmt.Errorf("fetchCheckoutAndReset failure: %w", err)
+	}
+
+	err := r.checkout(branch)
+	if err != nil {
+		return fmt.Errorf("checkout failure: %w", err)
 	}
 
 	return r.hardReset(branch)
@@ -315,7 +320,7 @@ func (r *Repository) fetch(branch string) error {
 	return nil
 }
 
-// hardReset performs a hard reset of the git repository to a specific commit.
+// hardReset performs a hard reset of the git repository to a specific commit or branch
 func (r *Repository) hardReset(reference string) error {
 	var err error
 	resetOpts := r.resetOpts
@@ -393,4 +398,40 @@ func (r *Repository) getLastCommitHash(branch string, commitHASH plumbing.Hash) 
 	}
 
 	return lastCommitHASH, nil
+}
+
+func (r *Repository) checkout(branch string) error {
+	branchRef := plumbing.NewBranchReferenceName(branch)
+	checkOpts := gogit.CheckoutOptions{
+		Branch: branchRef,
+	}
+
+	_, err := r.repoGogit.Reference(branchRef, false)
+	switch {
+	case err == nil:
+		// local branch exists
+		checkOpts.Force = true
+		checkOpts.Create = false
+	case err == plumbing.ErrReferenceNotFound:
+		checkOpts.Create = true
+	case err != plumbing.ErrReferenceNotFound && err != nil:
+		return fmt.Errorf("checkout failure to check branch: %w", err)
+	}
+
+	err = checkOpts.Validate()
+	if err != nil {
+		return fmt.Errorf("checkout options validation failure: %w", err)
+	}
+
+	wt, err := r.repoGogit.Worktree()
+	if err != nil {
+		return fmt.Errorf("checkout failure to open worktree: %w", err)
+	}
+
+	err = wt.Checkout(&checkOpts)
+	if err != nil {
+		return fmt.Errorf("checkout failure: %w", err)
+	}
+
+	return nil
 }

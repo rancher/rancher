@@ -24,7 +24,7 @@ func (r *Repository) Ensure(branch string) error {
 	}
 
 	// If we do not have the branch locally, fetch and reset
-	err = r.fetchAndReset(branch)
+	err = r.fetchCheckoutAndReset(branch)
 	if err != nil {
 		return fmt.Errorf("failed to fetch and/or reset at branch: %w", err)
 	}
@@ -92,7 +92,7 @@ func (r *Repository) Update(branch string) (string, error) {
 		return commit.String(), nil
 	}
 
-	err = r.fetchAndReset(branch)
+	err = r.fetchCheckoutAndReset(branch)
 	if err != nil {
 		return "", fmt.Errorf("failed to fetch and/or reset at branch: %w", err)
 	}
