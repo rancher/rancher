@@ -96,6 +96,23 @@ func BuildRepoConfig(secret *corev1.Secret, namespace, name, gitURL string, inse
 	return repo, nil
 }
 
+func (r *Repository) parseSSHURL() error {
+	parts := strings.Split(r.URL, "@")
+	r.username = parts[0]
+	if len(parts) == 2 {
+		if strings.HasPrefix(parts[0], "ssh://") {
+			// Remove "ssh://" prefix
+			r.username = parts[0][len("ssh://"):]
+		} else {
+			r.username = parts[0]
+		}
+	} else {
+		return fmt.Errorf("invalid ssh url: %v", r.URL)
+	}
+
+	return nil
+}
+
 // setRepoCredentials detects which type of authentication and communication protocol
 // and configurates the git repo communications accordingly.
 func (r *Repository) setRepoCredentials() error {
@@ -126,17 +143,8 @@ func (r *Repository) setRepoCredentials() error {
 			return fmt.Errorf("failed to parse ssh private key: %w", err)
 		}
 
-		parts := strings.Split(r.URL, "@")
-		r.username = parts[0]
-		if len(parts) == 2 {
-			if strings.HasPrefix(parts[0], "ssh://") {
-				// Remove "ssh://" prefix
-				r.username = parts[0][len("ssh://"):]
-			} else {
-				r.username = parts[0]
-			}
-		} else {
-			return fmt.Errorf("invalid ssh url: %v", r.URL)
+		if err := r.parseSSHURL(); err != nil {
+			return err
 		}
 
 		// PublicKeys implements transport.AuthMethod interface
