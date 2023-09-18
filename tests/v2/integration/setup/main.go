@@ -221,7 +221,7 @@ func main() {
 	logrus.Info("Waiting for test cluster to be ready")
 	c, err = cluster.WaitForCreate(clusterClients, c)
 	if err != nil {
-		a := clusterClients.Provisioning.Cluster().Get(c.Namespace, c.Name)
+		a := clusterClients.Provisioning.Cluster().Get(c.Namespace, c.Name, metav1.GetOptions{})
 		logrus.WithField("dump", func() string {
 			r := bytes.Buffer{}
 			spew.Fdump(&r, a)
