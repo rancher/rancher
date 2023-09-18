@@ -7,11 +7,13 @@ import (
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
+	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 )
 
 const RancherServiceName = "rancher"
 
+// TODO - ERROR.
 func (h *handler) SetupInternalServerURL(key string, setting *v3.Setting) (*v3.Setting, error) {
 	if key != settings.ServerURL.Name {
 		return setting, nil
@@ -21,6 +23,9 @@ func (h *handler) SetupInternalServerURL(key string, setting *v3.Setting) (*v3.S
 	if err != nil {
 		return nil, err
 	}
+
+	logrus.WithFields(map[string]interface{}{"settings.InternalCACerts.Get()": settings.InternalCACerts.Get(),
+		"internalCA": internalCA})
 
 	// purposely update CA before URL, because we only wait for internalURL != "" when checking if it's initialized
 	if settings.InternalCACerts.Get() != internalCA {

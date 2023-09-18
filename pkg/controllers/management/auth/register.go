@@ -56,6 +56,7 @@ func RegisterIndexers(scaledContext *config.ScaledContext) error {
 	})
 }
 
+// FELIPE - AQUI ?
 func RegisterEarly(ctx context.Context, management *config.ManagementContext, clusterManager *clustermanager.Manager) {
 	prtb, crtb := newRTBLifecycles(management.WithAgent("mgmt-auth-crtb-prtb-controller"))
 	p, c := newPandCLifecycles(management)
