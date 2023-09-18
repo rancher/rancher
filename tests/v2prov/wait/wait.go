@@ -82,8 +82,12 @@ func Object(ctx context.Context, watchFunc WatchFunc, obj runtime.Object, cb fun
 
 	return retryWatch(ctx, func() (watch.Interface, error) {
 		return watchFunc(meta.GetNamespace(), metav1.ListOptions{
-			FieldSelector:  "metadata.name=" + meta.GetName(),
-			TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+			FieldSelector: "metadata.name=" + meta.GetName(),
+			TimeoutSeconds: func() *int64 {
+				logrus.Errorf("DEBUG - FELIPE rety Watch, fieldSelector: %s", "metadata.name="+meta.GetName())
+				i := int64(10)
+				return &i
+			}(),
 		})
 	}, cb)
 }

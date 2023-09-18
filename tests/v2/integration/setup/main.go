@@ -6,6 +6,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"net"
@@ -17,6 +18,7 @@ import (
 	"github.com/containers/image/v5/transports/alltransports"
 	"github.com/containers/image/v5/types"
 	"github.com/creasty/defaults"
+	"github.com/davecgh/go-spew/spew"
 	provisioningv1api "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	v1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	rancherClient "github.com/rancher/rancher/tests/framework/clients/rancher"
@@ -211,7 +213,11 @@ func main() {
 	if err != nil {
 		logrus.Fatalf("Error creating integration test cluster: %v", err)
 	}
-
+	logrus.WithField("dump", func() string {
+		r := bytes.Buffer{}
+		spew.Fdump(r, c)
+		return r.String()
+	}()).Errorf("FELIPE-DEBUG-DUMP")
 	logrus.Info("Waiting for test cluster to be ready")
 	c, err = cluster.WaitForCreate(clusterClients, c)
 	if err != nil {

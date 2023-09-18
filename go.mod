@@ -5,7 +5,8 @@ go 1.20
 // on release remove this wrangler replace and use the latest tag
 replace github.com/rancher/wrangler v1.1.1 => github.com/rancher/wrangler v1.1.1-0.20230831050635-df1bd5aae9df
 
-replace github.com/rancher/dynamiclistener v0.3.6-rc3-deadlock-fix-revert => github.com/felipe-colussi/dynamiclistener v0.0.0-20230915181552-8819e93d9186
+//replace github.com/rancher/dynamiclistener v0.3.6-rc3-deadlock-fix-revert => github.com/felipe-colussi/dynamiclistener v0.0.0-20230915181552-8819e93d9186
+replace github.com/rancher/dynamiclistener v0.3.6-rc3-deadlock-fix-revert => github.com/rancher/dynamiclistener v0.3.6-rc2
 
 replace (
 	github.com/containerd/containerd => github.com/containerd/containerd v1.6.22 // for compatibilty with docker 20.10.x
@@ -78,7 +79,7 @@ require (
 	github.com/coreos/go-semver v0.3.1
 	github.com/creasty/defaults v1.5.2
 	github.com/crewjam/saml v0.4.13
-	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/davecgh/go-spew v1.1.1
 	github.com/docker/distribution v2.8.2+incompatible
 	github.com/docker/docker v23.0.6+incompatible
 	github.com/docker/go-connections v0.4.0

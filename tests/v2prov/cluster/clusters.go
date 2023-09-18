@@ -143,6 +143,15 @@ func WaitForCreate(clients *clients.Clients, c *provisioningv1api.Cluster) (_ *p
 		return c.Status.ClusterName != "" && c.Status.Ready && c.Status.ObservedGeneration == c.Generation && capr.Ready.IsTrue(c) && capr.Provisioned.IsTrue(c), nil
 	})
 	if err != nil {
+		logrus.WithFields(map[string]interface{}{
+			"c.Status.ClusterName":        c.Status.ClusterName,
+			"c.Status.Ready":              c.Status.Ready,
+			"c.Status.ObservedGeneration": c.Status.ObservedGeneration,
+			"c.Generation":                c.Generation,
+			"capr.Ready.IsTrue(c)":        capr.Ready.IsTrue(c),
+			"capr.Provisioned.IsTrue(c)":  capr.Provisioned.IsTrue(c),
+		}).Error("Debbuging - FElIPE")
+
 		return nil, fmt.Errorf("prov cluster is not ready: %w", err)
 	}
 
