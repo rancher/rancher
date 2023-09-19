@@ -9,18 +9,35 @@ import (
 // +genclient:nonNamespaced
 // +kubebuilder:resource:scope=Cluster,path=clusterrepos
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="HTTP URL",type=string,JSONPath=`.spec.url`
+// +kubebuilder:printcolumn:name="Git Repo",type=string,JSONPath=`.spec.gitRepo`
+// +kubebuilder:printcolumn:name="Git Branch",type=string,JSONPath=`.spec.gitBranch`
+// +kubebuilder:printcolumn:name="Download Time",type=string,JSONPath=`.status.downloadTime`
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// ClusterRepo represents a particular Helm repository. It contains details
+// about the chart location and the credentials needed for fetching charts
+// hosted in that particular Helm repository.
 type ClusterRepo struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
-	Spec              RepoSpec   `json:"spec"`
-	Status            RepoStatus `json:"status"`
+
+	// RepoSec contains details about the Helm repository that needs to be used.
+	// More info: kubectl explain clusterrepo.spec
+	Spec RepoSpec `json:"spec"`
+
+	// RepoStatus contains details of the Helm repository that is currently being used in the cluster.
+	// More info: kubectl explain clusterrepo.status
+	// +optional
+	Status RepoStatus `json:"status,omitempty"`
 }
 
-// SecretReference a reference to a secret object
+// SecretReference references a Secret object which contains the credentials.
 type SecretReference struct {
-	Name      string `json:"name,omitempty"`
+	// Name is the name of the secret.
+	Name string `json:"name,omitempty"`
+
+	// Namespace is the namespace where the secret resides.
 	Namespace string `json:"namespace,omitempty"`
 }
 
@@ -31,17 +48,18 @@ type ExponentialBackOffValues struct {
 	MaxRetries int `json:"maxRetries,omitempty"`
 }
 
+// RepoSpec contains details about the helm repository that needs to be used.
 type RepoSpec struct {
-	// URL can be a HTTP URL i.e https://charts.rancher.io or an OCI URL i.e oci://dp.apps.rancher.io/charts/etcd.
+	// URL is the HTTP or OCI URL of the helm repository to connect to.
 	URL string `json:"url,omitempty"`
 
 	// InsecurePlainHTTP is only valid for OCI URL's and allows insecure connections to registries without enforcing TLS checks.
 	InsecurePlainHTTP bool `json:"insecurePlainHttp,omitempty"`
 
-	// GitRepo a git repo to clone and index as the helm repo
+	// GitRepo is the git repo to clone which contains the helm repository.
 	GitRepo string `json:"gitRepo,omitempty"`
 
-	// GitBranch The git branch to follow
+	// GitBranch is the git branch where the helm repository is hosted.
 	GitBranch string `json:"gitBranch,omitempty"`
 
 	// ExponentialBackOffValues are values given to the Rancher manager to handle
@@ -52,34 +70,38 @@ type RepoSpec struct {
 	// If unspecified, system trust roots will be used.
 	CABundle []byte `json:"caBundle,omitempty"`
 
-	// InsecureSkipTLSverify will use insecure HTTPS to download the repo's index.
+	// InsecureSkipTLSverify will disable the TLS verification when downloading the Helm repository's index file.
+	// Defaults is false. Enabling this is not recommended for production due to the security implications.
 	InsecureSkipTLSverify bool `json:"insecureSkipTLSVerify,omitempty"`
 
-	// ClientSecretName is the client secret to be used to connect to the repo
-	// It is expected the secret be of type "kubernetes.io/basic-auth" or "kubernetes.io/tls" for Helm repos
-	// and "kubernetes.io/basic-auth" or "kubernetes.io/ssh-auth" for git repos.
-	// For a repo the Namespace file will be ignored
+	// ClientSecret is the client secret to be used when connecting to a Helm repository.
+	// The expected secret type is "kubernetes.io/basic-auth" or "kubernetes.io/tls" for HTTP Helm repositories,
+	// only "kubernetes.io/basic-auth" for OCI Helm repostories and "kubernetes.io/basic-auth"
+	// or "kubernetes.io/ssh-auth" for Github Helm repositories.
 	ClientSecret *SecretReference `json:"clientSecret,omitempty"`
 
-	// BasicAuthSecretName is the client secret to be used to connect to the repo
+	// BasicAuthSecretName is the client secret to be used to connect to the Helm repository.
 	BasicAuthSecretName string `json:"basicAuthSecretName,omitempty"`
 
-	// ForceUpdate will cause the repo index to be downloaded if it was last download before the specified time
-	// If ForceUpdate is greater than time.Now() it will not trigger an update
+	// ForceUpdate will cause the Helm repository index file stored in Rancher
+	// to be updated from the Helm repository URL. This means if there are changes
+	// in the Helm repository they will be pulled into Rancher manager.
 	ForceUpdate *metav1.Time `json:"forceUpdate,omitempty"`
 
-	// ServiceAccount this service account will be used to deploy charts instead of the end users credentials
+	// ServiceAccount when specified will be used in creating Helm operation pods which in turn
+	// run the Helm install or uninstall commands for a chart.
 	ServiceAccount string `json:"serviceAccount,omitempty"`
 
-	// ServiceAccountNamespace namespace of the service account to use. This value is used only on
-	// ClusterRepo and will be ignored on Repo
+	// ServiceAccountNamespace is the namespace of the service account to use.
 	ServiceAccountNamespace string `json:"serviceAccountNamespace,omitempty"`
 
-	// If disabled the repo clone will not be updated or allowed to be installed from
+	// If disabled the repo clone will not be updated or allowed to be installed from.
 	Enabled *bool `json:"enabled,omitempty"`
 
-	// DisableSameOriginCheck attaches the Basic Auth Header to all helm client API calls, regardless of whether the destination of the API call matches the origin of the repository's URL
-	// This field is not supported for OCI based URLs
+	// DisableSameOriginCheck if true attaches the Basic Auth Header to all Helm client API calls
+	// regardless of whether the destination of the API call matches the origin of the repository's URL.
+	// Defaults to false, which keeps the SameOrigin check enabled. Setting this to true is not recommended
+	// in production environments due to the security implications.
 	DisableSameOriginCheck bool `json:"disableSameOriginCheck,omitempty"`
 }
 
@@ -91,26 +113,34 @@ const (
 	OCIDownloaded          RepoCondition = "OCIDownloaded"
 )
 
+// RepoStatus contains details of the Helm repository that is currently being used in the cluster.
 type RepoStatus struct {
+	// ObservedGeneration is used by Rancher controller to track the latest generation of the resource that it triggered on.
 	ObservedGeneration int64 `json:"observedGeneration"`
 
-	// IndexConfigMapName is the configmap with the store index in it
-	IndexConfigMapName            string `json:"indexConfigMapName,omitempty"`
-	IndexConfigMapNamespace       string `json:"indexConfigMapNamespace,omitempty"`
+	// IndexConfigMapName is the name of the configmap which stores the Helm repository index.
+	IndexConfigMapName string `json:"indexConfigMapName,omitempty"`
+
+	// IndexConfigMapNamespace is the namespace of the Helm repository index configmap in which it resides.
+	IndexConfigMapNamespace string `json:"indexConfigMapNamespace,omitempty"`
+
+	// IndexConfigMapResourceVersion is the resourceversion of the Helm repository index configmap.
 	IndexConfigMapResourceVersion string `json:"indexConfigMapResourceVersion,omitempty"`
 
-	// DownloadTime the time when the index was last downloaded
+	// DownloadTime is the time when the index was last downloaded.
 	DownloadTime metav1.Time `json:"downloadTime,omitempty"`
 
-	// The URL used for the last successful index
+	// URL used for fetching the Helm repository index file.
 	URL string `json:"url,omitempty"`
 
-	// The branch used for the last successful index
+	// Branch is the Git branch in the git repository used to fetch the Helm repository.
 	Branch string `json:"branch,omitempty"`
 
-	// The git commit used to generate the index
+	// Commit is the latest commit in the cloned git repository by Rancher.
 	Commit string `json:"commit,omitempty"`
 
+	// Conditions contain information about when the status conditions were updated and
+	// to what.
 	Conditions []genericcondition.GenericCondition `json:"conditions,omitempty"`
 
 	// Number of times the handler will retry if it gets a 429 error
