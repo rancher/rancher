@@ -46,7 +46,7 @@ func killTestServices(client *rancher.Client, clusterID string, podNames []strin
 	cmd := []string{
 		"/bin/sh",
 		"-c",
-		fmt.Sprintf("curl -s localhost%s", killserver.KillServerPort),
+		fmt.Sprintf("curl -s localhost%s", killserver.Port),
 	}
 
 	kubeConfig, err := kubeconfig.GetKubeconfig(client, clusterID)

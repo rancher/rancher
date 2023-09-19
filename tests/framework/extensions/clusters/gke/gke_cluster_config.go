@@ -10,8 +10,8 @@ const (
 	GKEClusterConfigConfigurationFileKey = "gkeClusterConfig"
 )
 
-// GKEClusterConfig is the configuration needed to create an GKE host cluster
-type GKEClusterConfig struct {
+// ClusterConfig is the configuration needed to create an GKE host cluster
+type ClusterConfig struct {
 	ClusterAddons                  *ClusterAddons                  `json:"clusterAddons,omitempty" yaml:"clusterAddons,omitempty"`
 	ClusterIpv4CidrBlock           *string                         `json:"clusterIpv4Cidr,omitempty" yaml:"clusterIpv4Cidr,omitempty"`
 	EnableKubernetesAlpha          *bool                           `json:"enableKubernetesAlpha,omitempty" yaml:"enableKubernetesAlpha,omitempty"`
@@ -33,14 +33,14 @@ type GKEClusterConfig struct {
 	Zone                           string                          `json:"zone" yaml:"zone"`
 }
 
-// ClusterAddons is the configuration for the GKEClusterConfig ClusterAddons
+// ClusterAddons is the configuration for the ClusterConfig ClusterAddons
 type ClusterAddons struct {
 	HTTPLoadBalancing        bool `json:"httpLoadBalancing" yaml:"httpLoadBalancing"`
 	HorizontalPodAutoscaling bool `json:"horizontalPodAutoscaling" yaml:"horizontalPodAutoscaling"`
 	NetworkPolicyConfig      bool `json:"networkPolicyConfig" yaml:"networkPolicyConfig"`
 }
 
-// IPAllocationPolicy is the configuration for the GKEClusterConfig IPAllocationPolicy
+// IPAllocationPolicy is the configuration for the ClusterConfig IPAllocationPolicy
 type IPAllocationPolicy struct {
 	ClusterIpv4CidrBlock       string `json:"clusterIpv4CidrBlock" yaml:"clusterIpv4CidrBlock"`
 	ClusterSecondaryRangeName  string `json:"clusterSecondaryRangeName" yaml:"clusterSecondaryRangeName"`
@@ -52,7 +52,7 @@ type IPAllocationPolicy struct {
 	UseIPAliases               bool   `json:"useIpAliases" yaml:"useIpAliases"`
 }
 
-// MasterAuthorizedNetworksConfig is the configuration for the GKEClusterConfig MasterAuthorizedNetworksConfig
+// MasterAuthorizedNetworksConfig is the configuration for the ClusterConfig MasterAuthorizedNetworksConfig
 type MasterAuthorizedNetworksConfig struct {
 	CidrBlocks []CidrBlock `json:"cidrBlocks" yaml:"cidrBlocks"`
 	Enabled    bool        `json:"enabled" yaml:"enabled"`
@@ -64,7 +64,7 @@ type CidrBlock struct {
 	DisplayName string `json:"displayName" yaml:"displayName"`
 }
 
-// NodePool is the configuration needed for the GKEClusterConfig NodePools
+// NodePool is the configuration needed for the ClusterConfig NodePools
 type NodePool struct {
 	Autoscaling       *Autoscaling        `json:"autoscaling,omitempty" yaml:"autoscaling,omitempty"`
 	Config            *NodeConfig         `json:"config,omitempty" yaml:"config,omitempty"`
@@ -109,7 +109,7 @@ type NodePoolManagement struct {
 	AutoUpgrade bool `json:"autoUpgrade" yaml:"autoUpgrade"`
 }
 
-// PrivateClusterConfig is the configuration needed for the GKEClusterConfig PrivateClusterConfig
+// PrivateClusterConfig is the configuration needed for the ClusterConfig PrivateClusterConfig
 type PrivateClusterConfig struct {
 	EnablePrivateEndpoint bool   `json:"enablePrivateEndpoint" yaml:"enablePrivateEndpoint"`
 	EnablePrivateNodes    bool   `json:"enablePrivateNodes" yaml:"enablePrivateNodes"`
@@ -229,7 +229,7 @@ func privateClusterConfigBuilder(privateClusterConfig *PrivateClusterConfig) *ma
 }
 
 func gkeHostClusterConfig(clusterName, cloudCredentialID string) *management.GKEClusterConfigSpec {
-	var gkeClusterConfig GKEClusterConfig
+	var gkeClusterConfig ClusterConfig
 	config.LoadConfig(GKEClusterConfigConfigurationFileKey, &gkeClusterConfig)
 
 	return &management.GKEClusterConfigSpec{

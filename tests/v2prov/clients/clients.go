@@ -57,24 +57,27 @@ func NewForConfig(ctx context.Context, config clientcmd.ClientConfig) (*Clients,
 
 	rest, err := config.ClientConfig()
 	if err != nil {
+		cancel()
 		return nil, err
 	}
 
 	rest.Timeout = 30 * time.Minute
 	rest.RateLimiter = ratelimit.None
 
-	context, err := wrangler.NewContext(ctx, config, rest)
+	wranglerCtx, err := wrangler.NewContext(ctx, config, rest)
 	if err != nil {
+		cancel()
 		return nil, err
 	}
 
 	dynamic, err := dynamic.NewForConfig(rest)
 	if err != nil {
+		cancel()
 		return nil, err
 	}
 
 	return &Clients{
-		Context: context,
+		Context: wranglerCtx,
 		Dynamic: dynamic,
 		Ctx:     ctx,
 		cancel:  cancel,

@@ -24,13 +24,13 @@ func (r *CorralStandaloneTestSuite) SetupSuite() {
 	testSession := session.NewSession()
 	r.session = testSession
 
-	corralConfig := corral.CorralConfigurations()
+	corralConfig := corral.Configurations()
 	err := corral.SetupCorralConfig(corralConfig.CorralConfigVars, corralConfig.CorralConfigUser, corralConfig.CorralSSHPath)
 	require.NoError(r.T(), err, "error reading corral configs")
 }
 
 func (r *CorralStandaloneTestSuite) TestGenericCorralPackage() {
-	corralPackage := corral.CorralPackagesConfig()
+	corralPackage := corral.PackagesConfig()
 	// Expecting in the future, we will be mainly running from publically available corral images
 	if corralPackage.HasCustomRepo != "" {
 		err := corral.SetCustomRepo(corralPackage.HasCustomRepo)

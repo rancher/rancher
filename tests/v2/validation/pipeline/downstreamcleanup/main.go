@@ -28,7 +28,7 @@ var (
 	adminPassword = os.Getenv("ADMIN_PASSWORD")
 	host          = os.Getenv("HA_HOST")
 
-	configFileName = config.ConfigFileName("cattle-config.yaml")
+	configFileName = config.FileName("cattle-config.yaml")
 )
 
 func main() {
@@ -52,7 +52,7 @@ func main() {
 		return true, nil
 	})
 	if err != nil {
-		logrus.Errorf("error creating admin token", err)
+		logrus.Errorf("error creating admin token: %v", err)
 	}
 	rancherConfig.AdminToken = adminToken.Token
 
@@ -62,26 +62,26 @@ func main() {
 	}
 	configData, err := yaml.Marshal(configWrapped)
 	if err != nil {
-		logrus.Errorf("error marshaling", err)
+		logrus.Errorf("error marshaling: %v", err)
 	}
 	err = configFileName.NewFile(configData)
 	if err != nil {
-		logrus.Fatalf("error writing yaml", err)
+		logrus.Fatalf("error writing yaml: %v", err)
 	}
 	err = configFileName.SetEnvironmentKey()
 	if err != nil {
-		logrus.Fatalf("error while setting environment path", err)
+		logrus.Fatalf("error while setting environment path: %v", err)
 	}
 
 	session := session.NewSession()
 	client, err := rancher.NewClient("", session)
 	if err != nil {
-		logrus.Errorf("error creating client", err)
+		logrus.Errorf("error creating client: %v", err)
 	}
 
 	clusterList, err := client.Management.Cluster.List(&types.ListOpts{})
 	if err != nil {
-		logrus.Errorf("error getting cluster list", err)
+		logrus.Errorf("error getting cluster list: %v", err)
 	}
 
 	for _, c := range clusterList.Data {

@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	provisioningv1api "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
@@ -599,7 +599,7 @@ func EnsureMinimalConflictsWithThreshold(clients *clients.Clients, c *provisioni
 				return err
 			}
 			if count > threshold {
-				return fmt.Errorf("pod %s/%s had %d occurances of conflicts which was greater than the threshold of %d", pod.Namespace, pod.Name, count, threshold)
+				return fmt.Errorf("pod %s/%s had %d occurrences of conflicts which was greater than the threshold of %d", pod.Namespace, pod.Name, count, threshold)
 			}
 		}
 	}
@@ -625,7 +625,7 @@ func EnsureMinimalConflictsWithThreshold(clients *clients.Clients, c *provisioni
 					return err
 				}
 				if count > threshold {
-					return fmt.Errorf("pod %s/%s had %d occurances of conflicts which was greater than the threshold of %d", im.GetNamespace(), podName, count, threshold)
+					return fmt.Errorf("pod %s/%s had %d occurrences of conflicts which was greater than the threshold of %d", im.GetNamespace(), podName, count, threshold)
 				}
 			}
 		}

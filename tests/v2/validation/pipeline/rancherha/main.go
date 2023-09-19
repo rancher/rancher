@@ -17,13 +17,13 @@ func main() {
 
 	corralSession := session.NewSession()
 
-	corralConfig := corral.CorralConfigurations()
+	corralConfig := corral.Configurations()
 	err := corral.SetupCorralConfig(corralConfig.CorralConfigVars, corralConfig.CorralConfigUser, corralConfig.CorralSSHPath)
 	if err != nil {
 		logrus.Fatalf("error setting up corral: %v", err)
 	}
 
-	configPackage := corral.CorralPackagesConfig()
+	configPackage := corral.PackagesConfig()
 
 	environmentFlags := environmentflag.NewEnvironmentFlags()
 	environmentflag.LoadEnvironmentFlags(environmentflag.ConfigurationFileKey, environmentFlags)

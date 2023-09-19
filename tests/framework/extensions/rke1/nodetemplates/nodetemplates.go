@@ -30,7 +30,7 @@ type NodeTemplate struct {
 	LinodeNodeTemplateConfig        *LinodeNodeTemplateConfig        `json:"linodeConfig" yaml:"linodeConfig,omitempty"`
 	VmwareVsphereNodeTemplateConfig *VmwareVsphereNodeTemplateConfig `json:"vmwarevsphereConfig" yaml:"vmwarevsphereConfig,omitempty"`
 	Name                            string                           `json:"name,omitempty" yaml:"name,omitempty"`
-	NamespaceId                     string                           `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
+	NamespaceID                     string                           `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
 	Removed                         string                           `json:"removed,omitempty" yaml:"removed,omitempty"`
 	State                           string                           `json:"state,omitempty" yaml:"state,omitempty"`
 	Transitioning                   string                           `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`

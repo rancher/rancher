@@ -21,9 +21,9 @@
     "run": {
         "skip-dirs": [
             "vendor",
-            "tests",
             "pkg/client",
-            "pkg/generated"
+            "pkg/generated",
+            "tests/framework/clients/rancher/generated"
         ],
         "tests": false,
         "timeout": "10m"

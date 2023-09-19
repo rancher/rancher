@@ -19,7 +19,7 @@ func GenerateGatekeeperConfigYaml(excludedNamespaces []string, processes []strin
 	}
 
 	confYaml := ConfigYaml{
-		ApiVersion: apiVersion,
+		APIVersion: apiVersion,
 		Kind:       kind,
 		Metadata:   confMetadata,
 		Spec:       confSpec,
