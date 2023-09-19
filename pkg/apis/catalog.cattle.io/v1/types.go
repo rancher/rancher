@@ -11,60 +11,78 @@ import (
 // +kubebuilder:subresource:status
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// ClusterRepo represents a particular helm repository and also contains
+// details about its location and credentials to connect to it for fetching
+// charts hosted in that particular helm repository.
 type ClusterRepo struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
-	Spec              RepoSpec   `json:"spec"`
-	Status            RepoStatus `json:"status"`
+
+	// Contains details about the helm repository that needs to be used.
+	// More info: kubectl explain clusterrepo.spec
+	Spec RepoSpec `json:"spec"`
+
+	// Contains details of the helm repository that is currently being used in the cluster.
+	// More info: kubectl explain clusterrepo.status
+	// +optional
+	Status RepoStatus `json:"status,omitempty"`
 }
 
-// SecretReference a reference to a secret object
+// SecretReference references to a secret object which contains the credentials.
 type SecretReference struct {
-	Name      string `json:"name,omitempty"`
+	// Name is the name of the secret.
+	Name string `json:"name,omitempty"`
+
+	// Namespace is the namespace where the secret resides.
 	Namespace string `json:"namespace,omitempty"`
 }
 
+// RepoSpec contains details about the helm repository that needs to be used.
 type RepoSpec struct {
-	// URL A http URL of the repo to connect to
+	// URL is the http URL of the helm repository to connect to.
 	URL string `json:"url,omitempty"`
 
-	// GitRepo a git repo to clone and index as the helm repo
+	// GitRepo is the git repo to clone which contains the helm repository.
 	GitRepo string `json:"gitRepo,omitempty"`
 
-	// GitBranch The git branch to follow
+	// GitBranch is the git branch where the helm repository is hosted.
 	GitBranch string `json:"gitBranch,omitempty"`
 
 	// CABundle is a PEM encoded CA bundle which will be used to validate the repo's certificate.
 	// If unspecified, system trust roots will be used.
 	CABundle []byte `json:"caBundle,omitempty"`
 
-	// InsecureSkipTLSverify will use insecure HTTPS to download the repo's index.
+	// InsecureSkipTLSverify will disable the TLS verification when downloading the helm repository's index file.
+	// Defaults is false. Enabling this is not recommended for production due to the security implications.
 	InsecureSkipTLSverify bool `json:"insecureSkipTLSVerify,omitempty"`
 
-	// ClientSecretName is the client secret to be used to connect to the repo
-	// It is expected the secret be of type "kubernetes.io/basic-auth" or "kubernetes.io/tls" for Helm repos
-	// and "kubernetes.io/basic-auth" or "kubernetes.io/ssh-auth" for git repos.
-	// For a repo the Namespace file will be ignored
+	// ClientSecret is the client secret to be used when connecting to a helm repository.
+	// The expected secret type is "kubernetes.io/basic-auth" or "kubernetes.io/tls" for Helm repositories
+	// and "kubernetes.io/basic-auth" or "kubernetes.io/ssh-auth" for Github helm repositories.
 	ClientSecret *SecretReference `json:"clientSecret,omitempty"`
 
-	// BasicAuthSecretName is the client secret to be used to connect to the repo
+	// BasicAuthSecretName is the client secret to be used to connect to the helm repository.
 	BasicAuthSecretName string `json:"basicAuthSecretName,omitempty"`
 
-	// ForceUpdate will cause the repo index to be downloaded if it was last download before the specified time
-	// If ForceUpdate is greater than time.Now() it will not trigger an update
+	// ForceUpdate will cause the helm repository index file stored in Rancher
+	// to be updated from the Helm repository URL. This means if there are changes
+	// in the helm repository they will be pulled into Rancher manager.
 	ForceUpdate *metav1.Time `json:"forceUpdate,omitempty"`
 
-	// ServiceAccount this service account will be used to deploy charts instead of the end users credentials
+	// ServiceAccount when specified will be used in creating helm operation pods which in turn
+	// run the helm install or uninstall commands for a chart.
 	ServiceAccount string `json:"serviceAccount,omitempty"`
 
-	// ServiceAccountNamespace namespace of the service account to use. This value is used only on
-	// ClusterRepo and will be ignored on Repo
+	// ServiceAccountNamespace is the namespace of the service account to use.
 	ServiceAccountNamespace string `json:"serviceAccountNamespace,omitempty"`
 
-	// If disabled the repo clone will not be updated or allowed to be installed from
+	// If disabled the repo clone will not be updated or allowed to be installed from.
 	Enabled *bool `json:"enabled,omitempty"`
 
-	// DisableSameOriginCheck attaches the Basic Auth Header to all helm client API calls, regardless of whether the destination of the API call matches the origin of the repository's URL
+	// DisableSameOriginCheck if true attaches the Basic Auth Header to all helm client API calls
+	// regardless of whether the destination of the API call matches the origin of the repository's URL.
+	// Defaults to false, which keeps the SameOrigin check enabled. Setting this to true is not recommended
+	// in production environments due to the security implications.
 	DisableSameOriginCheck bool `json:"disableSameOriginCheck,omitempty"`
 }
 
@@ -75,26 +93,34 @@ const (
 	FollowerRepoDownloaded RepoCondition = "FollowerDownloaded"
 )
 
+// RepoStatus contains details of the helm repository that is currently being used in the cluster.
 type RepoStatus struct {
+	// ObservedGeneration is used by Rancher controller to track the latest generation of the resource that it triggered on.
 	ObservedGeneration int64 `json:"observedGeneration"`
 
-	// IndexConfigMapName is the configmap with the store index in it
-	IndexConfigMapName            string `json:"indexConfigMapName,omitempty"`
-	IndexConfigMapNamespace       string `json:"indexConfigMapNamespace,omitempty"`
+	// IndexConfigMapName is the name of the configmap which stores the helm repository index.
+	IndexConfigMapName string `json:"indexConfigMapName,omitempty"`
+
+	// IndexConfigMapNamespace is the namespace of the helm repository index configmap in which it resides.
+	IndexConfigMapNamespace string `json:"indexConfigMapNamespace,omitempty"`
+
+	// IndexConfigMapResourceVersion is the resourceversion of the helm repository index configmap.
 	IndexConfigMapResourceVersion string `json:"indexConfigMapResourceVersion,omitempty"`
 
-	// DownloadTime the time when the index was last downloaded
+	// DownloadTime is the time when the index was last downloaded.
 	DownloadTime metav1.Time `json:"downloadTime,omitempty"`
 
-	// The URL used for the last successful index
+	// URL used for fetching the helm repository index file.
 	URL string `json:"url,omitempty"`
 
-	// The branch used for the last successful index
+	// Branch is the Git branch in the git repository used to fetch the helm repository.
 	Branch string `json:"branch,omitempty"`
 
-	// The git commit used to generate the index
+	// Commit is the latest commit in the cloned git repository by Rancher.
 	Commit string `json:"commit,omitempty"`
 
+	// Conditions contain information about when the status conditions were updated and
+	// to what.
 	Conditions []genericcondition.GenericCondition `json:"conditions,omitempty"`
 }
 
