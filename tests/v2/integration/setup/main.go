@@ -60,6 +60,9 @@ func main() {
 
 	hostURL := fmt.Sprintf("%s:8443", ipAddress.String())
 
+	logrus.Info("Sleeping for a second before first api call")
+	time.Sleep(1 * time.Second)
+
 	var userToken *management.Token
 
 	err = kwait.Poll(500*time.Millisecond, 5*time.Minute, func() (done bool, err error) {
