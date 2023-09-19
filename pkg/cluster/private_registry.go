@@ -67,6 +67,9 @@ func GetPrivateClusterLevelRegistry(cluster *v3.Cluster) *rketypes.PrivateRegist
 // clusters, as the function will reassemble them anyway.
 func GeneratePrivateRegistryEncodedDockerConfig(cluster *v3.Cluster, secretLister v1.SecretLister) (string, string, error) {
 	var err error
+	// Declare here so we don't need to check if the rkeClusterRegistryOrGlobalSystemDefault exists while working with v2prov
+	var rkeClusterURLOrGlobalSystemDefault string
+
 	if cluster == nil {
 		return "", "", nil
 	}
@@ -80,37 +83,39 @@ func GeneratePrivateRegistryEncodedDockerConfig(cluster *v3.Cluster, secretListe
 		return "", "", err
 	}
 
+	// The PrivateRegistrySecret have the same name both for v1 or v2 provisioning clusters despite having different structures
 	registrySecretName := cluster.GetSecret(v3.ClusterPrivateRegistrySecret)
 
 	// Private registry will only be defined on the cluster if it is an RKE1 cluster, mgmt clusters generated from
 	// provisioning clusters do not have a populated `RancherKubernetesEngineConfig`.
-	if registry := GetPrivateRegistry(cluster); registry != nil {
+	if rkeClusterRegistryOrGlobalSystemDefault := GetPrivateRegistry(cluster); rkeClusterRegistryOrGlobalSystemDefault != nil {
+		rkeClusterURLOrGlobalSystemDefault = rkeClusterRegistryOrGlobalSystemDefault.URL
 		// check for RKE1 ECR credentials first
-		if registry.ECRCredentialPlugin != nil {
+		if rkeClusterRegistryOrGlobalSystemDefault.ECRCredentialPlugin != nil {
 			// generate ecr authConfig
-			authConfig, err := util.ECRCredentialPlugin(registry.ECRCredentialPlugin, registry.URL)
+			authConfig, err := util.ECRCredentialPlugin(rkeClusterRegistryOrGlobalSystemDefault.ECRCredentialPlugin, rkeClusterRegistryOrGlobalSystemDefault.URL)
 			if err != nil {
-				return registry.URL, "", err
+				return rkeClusterRegistryOrGlobalSystemDefault.URL, "", err
 			}
 			encodedJSON, err := json.Marshal(authConfig)
 			if err != nil {
-				return registry.URL, "", err
+				return rkeClusterRegistryOrGlobalSystemDefault.URL, "", err
 			}
-			return registry.URL, base64.StdEncoding.EncodeToString(encodedJSON), nil
+			return rkeClusterRegistryOrGlobalSystemDefault.URL, base64.StdEncoding.EncodeToString(encodedJSON), nil
 		}
 
-		// no private registry secret, generate authconfig based on existing fields
-		if registrySecretName == "" {
-			return registry.URL, "", nil
-		}
-
-		// check for the RKE1 registry secret next
-		registrySecret, err := secretLister.Get(namespace.GlobalNamespace, registrySecretName)
-		if err == nil {
-			return registry.URL, base64.StdEncoding.EncodeToString(registrySecret.Data[corev1.DockerConfigJsonKey]), nil
-		}
-		if err != nil && !apierrors.IsNotFound(err) { // ignore secret not found errors as we need to check v2prov clusters
-			return registry.URL, "", err
+		// If we have a Secret we try to check the rke1 provisioning, otherwise we go directly to the v2prov check.
+		// This is done this way to always check if there is a downstream registry.
+		if registrySecretName != "" {
+			// check for the RKE1 registry secret, returning it if it exists.
+			registrySecret, err := secretLister.Get(namespace.GlobalNamespace, registrySecretName)
+			if err == nil {
+				return rkeClusterRegistryOrGlobalSystemDefault.URL, base64.StdEncoding.EncodeToString(registrySecret.Data[corev1.DockerConfigJsonKey]), nil
+			}
+			// If it doesn't exist (secret not found error) we need to check for a v2prov cluster.
+			if err != nil && !apierrors.IsNotFound(err) {
+				return rkeClusterRegistryOrGlobalSystemDefault.URL, "", err
+			}
 		}
 	}
 
@@ -119,25 +124,33 @@ func GeneratePrivateRegistryEncodedDockerConfig(cluster *v3.Cluster, secretListe
 	// For RKE2 with a cluster level registry configured, this is the
 	// only reference to the registry URL available on the v3.Cluster.
 	// Without it, we cannot generate the registry credentials (.dockerconfigjson)
-	registryURL := cluster.GetSecret(v3.ClusterPrivateRegistryURL)
-	if registryURL == "" {
-		return "", "", nil
+	v2ProvRegistryURL := cluster.GetSecret(v3.ClusterPrivateRegistryURL)
+	// At this point we know that we don't have a RKE1 registry with authentication
+	// if we don't get a v2ProvRegistryURL we can just return the image set on v1 Prov or the global system default one.
+	if v2ProvRegistryURL == "" {
+		return rkeClusterURLOrGlobalSystemDefault, "", nil
 	}
 
-	if registrySecretName == "" { // no private registry configured
-		return registryURL, "", nil
+	// If we reach this point we know that we have a registry URL set on the v2prov downstream cluster.
+	// If it is a rke1 cluster that requires an authorization, a rke1 cluster without authorization or a v2prov cluster
+	// without a registry URL the function would have already returned.
+	// This last check is to see if the registry requires an authorization, if it doesn't we just return the v2ProvRegistryURL.
+	if registrySecretName == "" {
+		return v2ProvRegistryURL, "", nil
 	}
 
+	// If we have a registrySecretName (registry requires authentication) and this function reached this point
+	// it is a v2 prov cluster. We need to decode that information to return it.
 	registrySecret, err := secretLister.Get(cluster.Spec.FleetWorkspaceName, registrySecretName)
 	if err != nil {
-		return registryURL, "", err
+		return v2ProvRegistryURL, "", err
 	}
 
 	username := string(registrySecret.Data["username"])
 	password := string(registrySecret.Data["password"])
 	authConfig := credentialprovider.DockerConfigJSON{
 		Auths: credentialprovider.DockerConfig{
-			registryURL: credentialprovider.DockerConfigEntry{
+			v2ProvRegistryURL: credentialprovider.DockerConfigEntry{
 				Username: username,
 				Password: password,
 			},
@@ -146,8 +159,8 @@ func GeneratePrivateRegistryEncodedDockerConfig(cluster *v3.Cluster, secretListe
 
 	registryJSON, err := json.Marshal(authConfig)
 	if err != nil {
-		return registryURL, "", err
+		return v2ProvRegistryURL, "", err
 	}
 
-	return registryURL, base64.StdEncoding.EncodeToString(registryJSON), nil
+	return v2ProvRegistryURL, base64.StdEncoding.EncodeToString(registryJSON), nil
 }

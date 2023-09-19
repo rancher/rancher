@@ -110,6 +110,79 @@ func TestGeneratePrivateRegistryDockerConfig(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:           "global system default registry and no cluster default registry with secret",
+			expectedUrl:    "0123456789abcdef.dkr.ecr.us-east-1.amazonaws.com",
+			expectedConfig: base64.StdEncoding.EncodeToString([]byte(`{"auths":{"0123456789abcdef.dkr.ecr.us-east-1.amazonaws.com":{"username":"testuser","password":"password","auth":"dGVzdHVzZXI6cGFzc3dvcmQ="}}}`)),
+			expectedError:  "",
+			cluster: &v3.Cluster{
+				Spec: v3.ClusterSpec{
+					ClusterSpecBase: v3.ClusterSpecBase{
+						RancherKubernetesEngineConfig: &rketypes.RancherKubernetesEngineConfig{
+							PrivateRegistries: []rketypes.PrivateRegistry{{
+								URL: "upstream-registry.com",
+							}},
+						},
+						ClusterSecrets: v3.ClusterSecrets{
+							PrivateRegistrySecret: "test-secret",
+							PrivateRegistryURL:    "0123456789abcdef.dkr.ecr.us-east-1.amazonaws.com",
+						},
+					},
+					FleetWorkspaceName: "fleet-default",
+				},
+			},
+			secrets: []*corev1.Secret{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "fleet-default",
+						Name:      "test-secret",
+					},
+					Data: map[string][]byte{
+						"username": []byte("testuser"),
+						"password": []byte("password"),
+					},
+				},
+			},
+		},
+		{
+			name:           "global system default registry and cluster default registry without secret",
+			expectedUrl:    "0123456789abcdef.dkr.ecr.us-east-1.amazonaws.com",
+			expectedConfig: "",
+			expectedError:  "",
+			cluster: &v3.Cluster{
+				Spec: v3.ClusterSpec{
+					ClusterSpecBase: v3.ClusterSpecBase{
+						RancherKubernetesEngineConfig: &rketypes.RancherKubernetesEngineConfig{
+							PrivateRegistries: []rketypes.PrivateRegistry{{
+								URL: "upstream-registry.com",
+							}},
+						},
+						ClusterSecrets: v3.ClusterSecrets{
+							PrivateRegistryURL: "0123456789abcdef.dkr.ecr.us-east-1.amazonaws.com",
+						},
+					},
+					FleetWorkspaceName: "fleet-default",
+				},
+			},
+		},
+		{
+			name:           "global system default registry and no cluster default registry",
+			expectedUrl:    "0123456789abcdef.dkr.ecr.us-east-1.amazonaws.com",
+			expectedConfig: "",
+			expectedError:  "",
+			cluster: &v3.Cluster{
+				Spec: v3.ClusterSpec{
+					ClusterSpecBase: v3.ClusterSpecBase{
+						RancherKubernetesEngineConfig: &rketypes.RancherKubernetesEngineConfig{
+							PrivateRegistries: []rketypes.PrivateRegistry{{
+								URL: "0123456789abcdef.dkr.ecr.us-east-1.amazonaws.com",
+							}},
+						},
+					},
+					FleetWorkspaceName: "fleet-default",
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
