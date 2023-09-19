@@ -17,6 +17,8 @@ node {
     def configsDir = "cattle-configs"
     def patchedConfigsDir = "patched-cattle-configs"
     def testResultsOut = "results.xml"
+    def qaseRun = "testrun"
+    def testRunConfig = "testrunconfig.yaml"
     def envFile = ".env"
     def rancherConfig = "rancher_env.config"
     def branch = "release/v2.7"
@@ -72,7 +74,8 @@ node {
                           string(credentialsId: 'RANCHER_VALID_TLS_CERT', variable: 'RANCHER_VALID_TLS_CERT'),
                           string(credentialsId: 'RANCHER_VALID_TLS_KEY', variable: 'RANCHER_VALID_TLS_KEY'),
                           string(credentialsId: 'RANCHER_BYO_TLS_CERT', variable: 'RANCHER_BYO_TLS_CERT'),
-                          string(credentialsId: 'RANCHER_BYO_TLS_KEY', variable: 'RANCHER_BYO_TLS_KEY')]) {
+                          string(credentialsId: 'RANCHER_BYO_TLS_KEY', variable: 'RANCHER_BYO_TLS_KEY'),
+                          string(credentialsId: 'QASE_AUTOMATION_TOKEN', variable: 'QASE_AUTOMATION_TOKEN')]) {
           
         withEnv(paramsMap) {
           stage('Checkout') {
@@ -131,7 +134,7 @@ node {
             stage("Build Environment") {
               try {
                 sh "docker run -v ${validationVolume}:/root --name ${buildTestContainer} -t --env-file ${envFile} " +
-                "${imageName} sh -c \"${workPath}pipeline/scripts/setup_environment.sh\""
+                "${imageName} sh -c \"${workPath}pipeline/scripts/setup_environment.sh;${workPath}pipeline/scripts/build_qase_auto_testrun.sh\""
               } catch(err) {
                   sh "docker stop ${buildTestContainer}"
                   sh "docker rm -v ${buildTestContainer}"
@@ -207,15 +210,22 @@ node {
                     
                     // copy updated config file from the build test container
                     sh "docker cp ${buildTestContainer}:${workPath}${filename} ./"
-                    
+                    sh "docker cp ${buildTestContainer}:${workPath}${qaseRun} ./"
+                    sh "./${qaseRun} --startRun=true"
+
+                    def testRunID = sh (  
+                      script: "./yq '.id'  ./${testRunConfig}",
+                      returnStdout: true
+                    ).trim()
+
                     def mainRancherConfigPath = "./${filename}"
 
-                    sh "./yq e '.rancher.cleanup = true' -i ${mainRancherConfigPath}"
+                    sh "./yq e '.rancher.Cleanup = true' -i ${mainRancherConfigPath}"
                     configFiles.each {
                       try {
                         def configPath = "./${patchedConfigsDir}/$it"
 
-                        def tags = sh (  
+                        def tags = sh (
                           script: "./yq '.testCases.tags'  ${configPath}",
                           returnStdout: true
                         ).trim()
@@ -226,7 +236,7 @@ node {
                         ).trim()
 
                         def clusterName = sh (  
-                          script: "./yq '.rancher.clusterName' ${configPath}",
+                          script: "./yq '.rancher.ClusterName' ${configPath}",
                           returnStdout: true
                         ).trim()
 
@@ -239,6 +249,7 @@ node {
                           text(name: 'CONFIG', value: configYaml),
                           string(name: 'REPO', value: "${rancherRepo}"),
                           string(name: 'BRANCH', value: "${branch}"),
+                          string(name: 'TEST_RUN_ID', value: "${testRunID}"),
                           string(name: 'TEST_PACKAGE', value: "${env.TEST_PACKAGE}"),
                           string(name: 'GOTEST_TESTCASE', value: "${runFlag} -p 1"),
                           string(name: 'TAGS', value: tags),
@@ -260,6 +271,7 @@ node {
                         text(name: 'CONFIG', value: configYaml),
                         string(name: 'REPO', value: "${rancherRepo}"),
                         string(name: 'BRANCH', value: "${branch}"),
+                        string(name: 'TEST_RUN', value: "${env.TEST_RUN}"),
                         string(name: 'TEST_PACKAGE', value: "${env.TEST_PACKAGE}"),
                         string(name: 'TAGS', value: "${env.TAGS}"),
                         string(name: 'GOTEST_TESTCASE', value: "${env.GOTEST_TESTCASE} -p 1"),
@@ -272,6 +284,7 @@ node {
                   } catch(err) {
                     echo "Test validations had failures: " + err
                   }
+                sh "./${qaseRun} --startRun=false"
               }
             } catch(err) {
               echo "Failures " + err
