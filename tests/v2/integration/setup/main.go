@@ -102,8 +102,6 @@ func main() {
 	if err != nil {
 		logrus.Fatalf("Error creating clients: %v", err)
 	}
-	fmt.Println("FELIPE --- Sleeping 10s after clusterClient")
-	time.Sleep(10 * time.Second)
 
 	logrus.Info("Creating test namespace")
 	ns, err := namespace.Random(clusterClients)
@@ -215,9 +213,6 @@ func main() {
 	if err != nil {
 		logrus.Fatalf("Error creating integration test cluster: %v", err)
 	}
-
-	fmt.Println("FELIPE --- Sleeping 20s after clusterCreate")
-	time.Sleep(20 * time.Second)
 
 	logrus.WithField("dump", func() string {
 		r := bytes.Buffer{}
