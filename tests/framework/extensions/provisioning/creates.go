@@ -246,14 +246,14 @@ func CreateProvisioningCustomCluster(client *rancher.Client, externalNodeProvide
 	if clustersConfig.Hardened {
 		var hardenCluster *apiv1.Cluster
 		if strings.Contains(clustersConfig.KubernetesVersion, clusters.K3SClusterType.String()) {
-			err = k3sHardening.HardeningNodes(client, clustersConfig.Hardened, nodes, rolesPerNode, clustersConfig.KubernetesVersion)
+			err = k3sHardening.HardenNodes(nodes, rolesPerNode, clustersConfig.KubernetesVersion)
 			if err != nil {
 				return nil, err
 			}
 
 			hardenCluster = clusters.HardenK3SClusterConfig(clusterName, namespace, clustersConfig, nil, "")
 		} else {
-			err = rke2Hardening.HardeningNodes(client, clustersConfig.Hardened, nodes, rolesPerNode)
+			err = rke2Hardening.HardenNodes(nodes, rolesPerNode)
 			if err != nil {
 				return nil, err
 			}
@@ -384,7 +384,7 @@ func CreateProvisioningRKE1CustomCluster(client *rancher.Client, externalNodePro
 }
 
 // CreateProvisioningAirgapCustomCluster provisions a non-rke1 cluster using corral to gather its nodes, then runs verify checks
-func CreateProvisioningAirgapCustomCluster(client *rancher.Client, clustersConfig *clusters.ClusterConfig, corralPackages *corral.CorralPackages) (*v1.SteveAPIObject, error) {
+func CreateProvisioningAirgapCustomCluster(client *rancher.Client, clustersConfig *clusters.ClusterConfig, corralPackages *corral.Packages) (*v1.SteveAPIObject, error) {
 	setLogrusFormatter()
 	rolesPerNode := map[int32]string{}
 	for _, nodes := range *clustersConfig.NodesAndRoles {
@@ -474,7 +474,7 @@ func CreateProvisioningAirgapCustomCluster(client *rancher.Client, clustersConfi
 }
 
 // CreateProvisioningRKE1AirgapCustomCluster provisions an rke1 cluster using corral to gather its nodes, then runs verify checks
-func CreateProvisioningRKE1AirgapCustomCluster(client *rancher.Client, clustersConfig *clusters.ClusterConfig, corralPackages *corral.CorralPackages) (*management.Cluster, error) {
+func CreateProvisioningRKE1AirgapCustomCluster(client *rancher.Client, clustersConfig *clusters.ClusterConfig, corralPackages *corral.Packages) (*management.Cluster, error) {
 	setLogrusFormatter()
 	clusterName := namegen.AppendRandomString(rke1AirgapCustomCluster)
 	rolesPerNode := map[int64]string{}

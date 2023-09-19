@@ -50,7 +50,7 @@ const (
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	killServer := killserver.NewKillServer(killserver.KillServerPort, cancel)
+	killServer := killserver.NewKillServer(killserver.Port, cancel)
 
 	go killServer.Start()
 	go runAgent(ctx)

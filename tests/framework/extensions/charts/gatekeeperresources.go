@@ -12,7 +12,7 @@ type Metadata struct {
 
 // ConfigYaml all the structs that make up a gatekeeper Config are nested in this struct, Configs and Constraints are similar K8s objects, but require different Specs
 type ConfigYaml struct {
-	ApiVersion string     `yaml:"apiVersion"`
+	APIVersion string     `yaml:"apiVersion"`
 	Kind       string     `yaml:"kind"`
 	Metadata   Metadata   `yaml:"metadata"`
 	Spec       ConfigSpec `yaml:"spec"`
@@ -31,7 +31,7 @@ type ConfigMatch []struct {
 
 // ConstraintYaml All the structs that make up a gatekeeper Constraint are nested in this struct, Configs and Constraints are similar K8s objects, but require different Specs
 type ConstraintYaml struct {
-	ApiVersion string         `yaml:"apiVersion"`
+	APIVersion string         `yaml:"apiVersion"`
 	Kind       string         `yaml:"kind"`
 	Metadata   Metadata       `yaml:"metadata"`
 	Spec       ConstraintSpec `yaml:"spec"`
@@ -52,7 +52,7 @@ type ConstraintMatch struct {
 
 // ConstraintKinds field
 type ConstraintKinds []struct {
-	ApiGroups []string `yaml:"apiGroups"`
+	APIGroups []string `yaml:"apiGroups"`
 	Kinds     []string `yaml:"kinds"`
 }
 

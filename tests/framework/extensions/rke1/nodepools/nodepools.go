@@ -23,7 +23,7 @@ type NodeRoles struct {
 	Quantity     int64 `json:"quantity" yaml:"quantity"`
 }
 
-// NodePoolSetup is a helper method that will loop and setup muliple node pools with the defined node roles from the `nodeRoles` parameter
+// NodePoolSetup is a helper method that will loop and setup multiple node pools with the defined node roles from the `nodeRoles` parameter
 // `nodeRoles` would be in this format
 //
 //	  []map[string]bool{
@@ -116,9 +116,8 @@ func updateNodePoolQuantity(client *rancher.Client, cluster *management.Cluster,
 		if clusterResp.State == active && nodestat.AllManagementNodeReady(client, clusterResp.ID) == nil {
 			logrus.Infof("Node pool is scaled!")
 			return true, nil
-		} else {
-			return false, nil
 		}
+		return false, nil
 	})
 	if err != nil {
 		return nil, err

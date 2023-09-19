@@ -208,7 +208,7 @@ func main() {
 	}
 
 	for i, v := range clusters.HostedClusters {
-		var newConfigName config.ConfigFileName
+		var newConfigName config.FileName
 
 		switch v.Provider {
 		case provisioninginput.AWSProviderName.String():
@@ -265,7 +265,7 @@ func main() {
 	}
 }
 
-func NewRancherClusterConfiguration(cluster pipeline.RancherCluster, newConfigName config.ConfigFileName, isCustom, isRKE1, isRKE2 bool, copiedConfig []byte, cni, provTestPackage, runCommand string) (err error) {
+func NewRancherClusterConfiguration(cluster pipeline.RancherCluster, newConfigName config.FileName, isCustom, isRKE1, isRKE2 bool, copiedConfig []byte, cni, provTestPackage, runCommand string) (err error) {
 	err = newConfigName.NewFile(copiedConfig)
 	if err != nil {
 		logrus.Info("error while writing populated config", err)

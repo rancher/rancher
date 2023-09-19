@@ -48,7 +48,7 @@ const (
 	concurrencyDefaultValue      = "10%"
 )
 
-func SnapshotRestore(t *testing.T, client *rancher.Client, clusterName string, upgrade string, strategy bool) {
+func Restore(t *testing.T, client *rancher.Client, clusterName string, upgrade string, strategy bool) {
 	clusterID, err := clusters.GetClusterIDByName(client, clusterName)
 	require.NoError(t, err)
 	require.NotEmptyf(t, clusterID, "cluster id is empty")

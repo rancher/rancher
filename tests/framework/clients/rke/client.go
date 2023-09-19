@@ -14,7 +14,7 @@ type Client struct {
 }
 
 // RKEControlPlane is a struct that embeds RKEControlPlaneInterface and has session.Session as an attribute to keep track of the resources created by RKEControlPlaneInterface
-type RKEControlPlane struct {
+type RKEControlPlane struct { // nolint:all
 	rkeClientV1.RKEControlPlaneInterface
 	ts *session.Session
 }
