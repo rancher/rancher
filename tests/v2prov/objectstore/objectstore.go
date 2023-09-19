@@ -348,11 +348,11 @@ func getPod(clients *clients.Clients, namespace, objectStore string) (*corev1.Po
 	return pod, err
 }
 
-type ObjectStoreInfo struct {
+type Info struct {
 	AccessKey, SecretKey, Bucket, Endpoint, Cert, CloudCredentialName string
 }
 
-func GetObjectStore(clients *clients.Clients, namespace, identifier, bucket string) (ObjectStoreInfo, error) {
+func GetObjectStore(clients *clients.Clients, namespace, identifier, bucket string) (Info, error) {
 	objectStoreLock.Lock()
 	defer objectStoreLock.Unlock()
 	hid := name.Hex(identifier, 5)
@@ -360,33 +360,33 @@ func GetObjectStore(clients *clients.Clients, namespace, identifier, bucket stri
 
 	cs, err := createCredSecret(clients, namespace, objectStore)
 	if err != nil {
-		return ObjectStoreInfo{}, err
+		return Info{}, err
 	}
 
 	ccName := name.SafeConcatName("cc", objectStore)
 	cc, err := createCloudCredentialSecret(clients, namespace, ccName, cs)
 	if err != nil {
-		return ObjectStoreInfo{}, err
+		return Info{}, err
 	}
 
 	_, err = createHelperConfigmap(clients, namespace, objectStore, bucket)
 	if err != nil {
-		return ObjectStoreInfo{}, err
+		return Info{}, err
 	}
 
 	svc, err := createService(clients, namespace, objectStore)
 	if err != nil {
-		return ObjectStoreInfo{}, err
+		return Info{}, err
 	}
 
 	tls, err := createTLSSecret(clients, namespace, objectStore, fmt.Sprintf(objectStoreServiceNameTemplate, objectStore, namespace), svc.Spec.ClusterIP)
 	if err != nil {
-		return ObjectStoreInfo{}, err
+		return Info{}, err
 	}
 
 	pod, err := getPod(clients, namespace, objectStore)
 	if err != nil {
-		return ObjectStoreInfo{}, err
+		return Info{}, err
 	}
 
 	err = wait.Object(clients.Ctx, clients.Core.Pod().Watch, pod, func(obj runtime.Object) (bool, error) {
@@ -394,10 +394,10 @@ func GetObjectStore(clients *clients.Clients, namespace, identifier, bucket stri
 		return pod.Status.PodIP != "" && pod.Status.Phase == corev1.PodRunning, nil
 	})
 	if err != nil {
-		return ObjectStoreInfo{}, err
+		return Info{}, err
 	}
 
-	return ObjectStoreInfo{
+	return Info{
 		AccessKey:           string(cs.Data[secretKeyCredAccessKey]),
 		SecretKey:           string(cs.Data[secretKeyCredSecretKey]),
 		Bucket:              bucket,

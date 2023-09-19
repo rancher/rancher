@@ -2,32 +2,35 @@ package rancherversion
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strconv"
 )
 
-/* Requests the rancher version from the rancher server, parses the returned
- * json and returns a Struct object, or an error.
- */
-func RequestRancherVersion(rancher_url string) (*Config, error) {
-	var http_url = "https://" + rancher_url + "/rancherversion"
-	req, err := http.Get(http_url)
+// RequestRancherVersion Requests the rancher version from the rancher server, parses the returned json and returns a
+// Config object, or an error.
+func RequestRancherVersion(rancherURL string) (*Config, error) {
+	var httpURL = "https://" + rancherURL + "/rancherversion"
+	req, err := http.Get(httpURL)
 	if err != nil {
 		return nil, err
 	}
-	byte_object, err := ioutil.ReadAll(req.Body)
-	if err != nil || byte_object == nil {
+
+	byteObject, err := io.ReadAll(req.Body)
+	if err != nil || byteObject == nil {
 		return nil, err
 	}
+
 	var jsonObject map[string]interface{}
-	err = json.Unmarshal(byte_object, &jsonObject)
+	err = json.Unmarshal(byteObject, &jsonObject)
 	if err != nil {
 		return nil, err
 	}
-	config_object := new(Config)
-	config_object.IsPrime, _ = strconv.ParseBool(jsonObject["RancherPrime"].(string))
-	config_object.RancherVersion = jsonObject["Version"].(string)
-	config_object.GitCommit = jsonObject["GitCommit"].(string)
-	return config_object, nil
+
+	configObject := new(Config)
+	configObject.IsPrime, _ = strconv.ParseBool(jsonObject["RancherPrime"].(string))
+	configObject.RancherVersion = jsonObject["Version"].(string)
+	configObject.GitCommit = jsonObject["GitCommit"].(string)
+
+	return configObject, nil
 }

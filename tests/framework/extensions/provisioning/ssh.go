@@ -18,7 +18,7 @@ const (
 	checkCPU    = "CheckCPU"
 )
 
-// This func tests the ssh tests specified in the provisioninginput config clusterSSHTests field.
+// CallSSHTestByName tests the ssh tests specified in the provisioninginput config clusterSSHTests field.
 // For example CheckCPU checks the cpu usage of the cluster agent. If the usage is too high the func will return a warning.
 func CallSSHTestByName(testName string, node *nodes.Node) error {
 	switch testName {
@@ -28,12 +28,12 @@ func CallSSHTestByName(testName string, node *nodes.Node) error {
 		if err != nil {
 			return err
 		}
-		str_output := output[:strings.IndexByte(output, '\n')]
-		logrus.Info("CheckCPU test on node " + node.PublicIPAddress + " | Cluster agent cpu usage is: " + str_output + "%")
+		strOutput := output[:strings.IndexByte(output, '\n')]
+		logrus.Info("CheckCPU test on node " + node.PublicIPAddress + " | Cluster agent cpu usage is: " + strOutput + "%")
 
-		output_int, err := strconv.ParseFloat(strings.TrimSpace(str_output), 32)
-		if output_int > cpuUsageVar {
-			logrus.Warn("Cluster agent cpu usage is too high on node" + node.PublicIPAddress + " | Current cpu usage is: " + str_output + "%")
+		outputInt, err := strconv.ParseFloat(strings.TrimSpace(strOutput), 32)
+		if outputInt > cpuUsageVar {
+			logrus.Warn("Cluster agent cpu usage is too high on node" + node.PublicIPAddress + " | Current cpu usage is: " + strOutput + "%")
 		}
 		if err != nil {
 			return err

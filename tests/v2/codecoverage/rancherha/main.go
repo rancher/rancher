@@ -9,12 +9,12 @@ import (
 func main() {
 	testSession := session.NewSession()
 
-	corralConfig := corral.CorralConfigurations()
+	corralConfig := corral.Configurations()
 	err := corral.SetupCorralConfig(corralConfig.CorralConfigVars, corralConfig.CorralConfigUser, corralConfig.CorralSSHPath)
 	if err != nil {
 		logrus.Fatalf("error setting up corral: %v", err)
 	}
-	configPackage := corral.CorralPackagesConfig()
+	configPackage := corral.PackagesConfig()
 
 	path := configPackage.CorralPackageImages["ranchertestcoverage"]
 	_, err = corral.CreateCorral(testSession, "ranchertestcoverage", path, true, configPackage.HasCleanup)

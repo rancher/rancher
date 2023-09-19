@@ -49,7 +49,7 @@ func validateKubernetesVersions(t *testing.T, client *rancher.Client, bc *bundle
 	t.Helper()
 
 	cluster, err := bc.Get(client)
-	require.NoErrorf(t, err, "[%v]: Error occured while validating kubernetes version", bc.Meta.Name)
+	require.NoErrorf(t, err, "[%v]: Error occurred while validating kubernetes version", bc.Meta.Name)
 
 	if isUsingCurrentCluster {
 		cluster = bc
@@ -94,7 +94,7 @@ func validateNodepoolVersions(t *testing.T, client *rancher.Client, bc *bundledc
 	t.Helper()
 
 	cluster, err := bc.Get(client)
-	require.NoErrorf(t, err, "[%v]: Error occured while validating nodepool versions", bc.Meta.Name)
+	require.NoErrorf(t, err, "[%v]: Error occurred while validating nodepool versions", bc.Meta.Name)
 
 	if isUsingCurrentCluster {
 		cluster = bc
