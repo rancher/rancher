@@ -16,28 +16,26 @@ func NewConfigurationsDir(dirName string) (err error) {
 		if strings.Contains(err.Error(), "file exists") {
 			logrus.Info("configs dir already exists ", err)
 			return nil
-		} else {
-			return
 		}
 	}
 
 	return
 }
 
-type ConfigFileName string
+type FileName string
 
 // NewConfigFileName is a constructor function that creates a configuration yaml file name
-// that returns ConfigFileName.
-func NewConfigFileName(dirName string, params ...string) ConfigFileName {
+// that returns FileName.
+func NewConfigFileName(dirName string, params ...string) FileName {
 	fileName := strings.Join(params, "-")
 
 	fileNameFull := fmt.Sprintf("%v/%v.yaml", dirName, fileName)
 
-	return ConfigFileName(fileNameFull)
+	return FileName(fileNameFull)
 }
 
 // NewFile is a method that creates a configuration yaml file with the received file name.
-func (cF ConfigFileName) NewFile(data []byte) (err error) {
+func (cF FileName) NewFile(data []byte) (err error) {
 	err = os.WriteFile(string(cF), data, 0644)
 	if err != nil {
 		return
@@ -47,7 +45,7 @@ func (cF ConfigFileName) NewFile(data []byte) (err error) {
 }
 
 // SetEnvironmentKey is a method that sets cattle config environment variable to the received file name.
-func (cF ConfigFileName) SetEnvironmentKey() (err error) {
+func (cF FileName) SetEnvironmentKey() (err error) {
 	configEnvironmentKey := "CATTLE_TEST_CONFIG"
 
 	configPath, err := cF.GetWDFilePath()
@@ -62,7 +60,7 @@ func (cF ConfigFileName) SetEnvironmentKey() (err error) {
 }
 
 // GetWDFilePath is a method that returns the received file name joined with wd path.
-func (cF ConfigFileName) GetWDFilePath() (string, error) {
+func (cF FileName) GetWDFilePath() (string, error) {
 	wd, err := os.Getwd()
 	logrus.Info("wd:", wd)
 	if err != nil {

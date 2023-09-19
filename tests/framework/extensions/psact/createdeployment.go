@@ -78,6 +78,9 @@ func CreateNginxDeployment(client *rancher.Client, clusterID string, psact strin
 
 		return false, nil
 	})
+	if err != nil {
+		return err
+	}
 
 	deploymentResp, err := steveclient.SteveType(workloads.DeploymentSteveType).ByID(deploymentTemplate.Namespace + "/" + deploymentTemplate.Name)
 	if err != nil {

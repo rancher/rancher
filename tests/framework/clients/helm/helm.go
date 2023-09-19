@@ -95,7 +95,7 @@ func UninstallChart(releaseName, namespace string, args ...string) error {
 	return nil
 }
 
-// AddHelmRepo adds the specified helm repoistory using the helm repo add command.
+// AddHelmRepo adds the specified helm repository using the helm repo add command.
 func AddHelmRepo(name, url string) error {
 	msg, err := exec.Command(helmCmd, "repo", "add", name, url).CombinedOutput()
 	if err != nil {

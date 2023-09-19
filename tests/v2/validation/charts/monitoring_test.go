@@ -197,7 +197,7 @@ func (m *MonitoringTestSuite) TestMonitoringChart() {
 	require.NoError(m.T(), err)
 
 	m.T().Logf("Getting alert manager secret to edit receiver")
-	alertManagerSecretResp, err := steveclient.SteveType(secrets.SecretSteveType).ByID(alertManagerSecretId)
+	alertManagerSecretResp, err := steveclient.SteveType(secrets.SecretSteveType).ByID(alertManagerSecretID)
 	require.NoError(m.T(), err)
 
 	alertManagerSecret := &corev1.Secret{}
@@ -219,7 +219,7 @@ func (m *MonitoringTestSuite) TestMonitoringChart() {
 	require.NoError(m.T(), err)
 
 	m.T().Logf("Getting alert manager secret to edit routes")
-	alertManagerSecretResp, err = steveclient.SteveType(secrets.SecretSteveType).ByID(alertManagerSecretId)
+	alertManagerSecretResp, err = steveclient.SteveType(secrets.SecretSteveType).ByID(alertManagerSecretID)
 	require.NoError(m.T(), err)
 
 	err = v1.ConvertToK8sType(alertManagerSecretResp.JSONResp, alertManagerSecret)

@@ -5,5 +5,5 @@ const GoogleCredentialConfigurationFileKey = "googleCredentials"
 
 // GoogleCredentialConfig is configuration need to create a google cloud credential
 type GoogleCredentialConfig struct {
-	AuthEncodedJson string `json:"authEncodedJson" yaml:"authEncodedJson"`
+	AuthEncodedJSON string `json:"authEncodedJson" yaml:"authEncodedJson"`
 }

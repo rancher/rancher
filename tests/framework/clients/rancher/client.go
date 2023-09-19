@@ -267,8 +267,8 @@ func (c *Client) SwitchContext(context string, clientConfig *clientcmd.ClientCon
 }
 
 // GetEC2Client is a helper function that instantiates an aws ec2 client to communicate with the ec2 instances on aws.
-func (c *Client) GetEC2Client() (*ec2.EC2Client, error) {
-	return ec2.NewEC2Client()
+func (c *Client) GetEC2Client() (*ec2.Client, error) {
+	return ec2.NewClient()
 }
 
 // GetManagementWatchInterface is a functions used to get a watch.Interface from a resource created by the Management Client.
