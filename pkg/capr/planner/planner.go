@@ -904,7 +904,7 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret pl
 		if err != nil {
 			return err
 		}
-		logrus.Errorf("FELIPE  - [planner] rkecluster %s/%s reconcile tier %s - rendering desired plan for machine %s/%s with join URL: (%s), secret: %s/%S", controlPlane.Namespace, controlPlane.Name, tierName, entry.Machine.Namespace, entry.Machine.Name, joinURL, tokensSecret.AgentToken, tokensSecret.ServerToken)
+		logrus.Errorf("FELIPE  - [planner] rkecluster %s/%s reconcile tier %s - rendering desired plan for machine %s/%s with join URL: (%s), secret: %s/%s", controlPlane.Namespace, controlPlane.Name, tierName, entry.Machine.Namespace, entry.Machine.Name, joinURL, tokensSecret.AgentToken, tokensSecret.ServerToken)
 		logrus.Debugf("[planner] rkecluster %s/%s reconcile tier %s - rendering desired plan for machine %s/%s with join URL: (%s)", controlPlane.Namespace, controlPlane.Name, tierName, entry.Machine.Namespace, entry.Machine.Name, joinURL)
 		plan, joinedURL, err := p.desiredPlan(controlPlane, tokensSecret, entry, joinURL)
 		if err != nil {
