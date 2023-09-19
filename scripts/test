@@ -150,8 +150,6 @@ echo "Waiting up to 5 minutes for rancher-provisioning-capi deployment"
 
 echo Running build-integration-setup
 ./tests/v2/integration/scripts/build-integration-setup
-# sleep for 60 to check if the problem is in upstream
-sleep 60
 
 echo Running integrationsetup
 export CATTLE_TEST_CONFIG=$(pwd)/config.yaml # used by integration tests and test setup
