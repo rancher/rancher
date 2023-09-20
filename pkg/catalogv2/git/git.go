@@ -261,8 +261,8 @@ func (r *Repository) setRepoOptions() {
 	}
 }
 
-// cloneOrOpen executes the clone operation of a git repository at given branch with depth = 1 if it does not exist.
-// If exists, just open the local repository and assign it to ro.localRepo
+// cloneOrOpen executes the clone operation of a Git repository at the given branch with depth = 1 if it does not exist.
+// If it exists, it just opens the local repository and assigns it to ro.localRepo.
 func (r *Repository) cloneOrOpen(branch string) error {
 	cloneOptions := r.cloneOpts
 	if branch != "" {
@@ -278,7 +278,7 @@ func (r *Repository) cloneOrOpen(branch string) error {
 	if openErr != nil && openErr != gogit.ErrRepositoryNotExists {
 		return fmt.Errorf("plainOpen failure: %w", err)
 	} else if openErr == gogit.ErrRepositoryNotExists {
-		repoGogit, cloneErr := gogit.PlainClone(r.Directory, false, cloneOptions)
+		localGit, cloneErr := gogit.PlainClone(r.Directory, false, cloneOptions)
 		if cloneErr != nil && cloneErr != gogit.ErrRepositoryAlreadyExists {
 			return fmt.Errorf("plainClone failure: %w", cloneErr)
 		}
@@ -286,14 +286,14 @@ func (r *Repository) cloneOrOpen(branch string) error {
 		if openErr == gogit.ErrRepositoryNotExists && cloneErr == gogit.ErrRepositoryAlreadyExists {
 			return fmt.Errorf("serious failure, neither open or clone succeeded: %w", cloneErr)
 		}
-		r.repoGogit = repoGogit
+		r.localGit = localGit
 		return nil
 	}
 
 	return nil
 }
 
-// plainOpen opens an existing local git repository on the specified folder not walking parent directories looking for '.git/'
+// plainOpen opens an existing local Git repository on the specified folder without walking parent directories looking for '.git/'.
 func (r *Repository) plainOpen() error {
 	openOptions := gogit.PlainOpenOptions{
 		DetectDotGit: false,
@@ -303,13 +303,13 @@ func (r *Repository) plainOpen() error {
 		return err
 	}
 
-	r.repoGogit = localRepository
+	r.localGit = localRepository
 	return nil
 }
 
 // getCurrentCommit returns the commit hash of the HEAD from the current branch
 func (r *Repository) getCurrentCommit() (plumbing.Hash, error) {
-	headRef, err := r.repoGogit.Head()
+	headRef, err := r.localGit.Head()
 	if err != nil {
 		return plumbing.ZeroHash, fmt.Errorf("getCurrentCommit failure: %w", err)
 	}
@@ -318,7 +318,7 @@ func (r *Repository) getCurrentCommit() (plumbing.Hash, error) {
 }
 
 // fetchAndReset is a convenience method that fetches updates from the remote repository
-// for a specific branch, and then resets the current branch to a specified commit.
+// for a specific branch and then resets the current branch to a specified commit.
 func (r *Repository) fetchAndReset(branch string) error {
 	if err := r.fetch(branch); err != nil {
 		return fmt.Errorf("fetchAndReset failure: %w", err)
@@ -332,7 +332,7 @@ func (r *Repository) fetchAndReset(branch string) error {
 //   - If a branch name is provided, it sets the RefSpec to fetch that specific branch.
 //   - Otherwise, it sets the RefSpec to fetch all branches.
 //
-// fetching the last commit of one branch is faster than fetching from all branches.
+// Fetching the last commit of one branch is faster than fetching from all branches.
 func (r *Repository) updateRefSpec(branch string) {
 	var newRefSpec string
 
@@ -350,13 +350,13 @@ func (r *Repository) updateRefSpec(branch string) {
 }
 
 // fetch fetches updates from the remote repository for a specific branch.
-// If the fetch operation is already up-to-date, this is not treated as an error.
-// Any other error that occurs during fetch is returned.
+// If the fetch operation is already up-to-date(NoErrAlreadyUpToDate or ErrEmptyUploadPackRequest),
+// this is not treated as an error, any other error that occurs during fetch is returned.
 func (r *Repository) fetch(branch string) error {
 	r.updateRefSpec(branch)
 	fetchOptions := r.fetchOpts
 
-	err := r.repoGogit.Fetch(fetchOptions)
+	err := r.localGit.Fetch(fetchOptions)
 	if err != nil && err != gogit.NoErrAlreadyUpToDate && err != transport.ErrEmptyUploadPackRequest {
 		return fmt.Errorf("fetch failure: %w", err)
 	}
@@ -364,14 +364,17 @@ func (r *Repository) fetch(branch string) error {
 	return nil
 }
 
-// hardReset performs a hard reset of the git repository to a specific commit.
+// hardReset performs a hard reset of the Git repository to a specific reference.
+//   - HEAD (local latest commit)
+//   - local branch reference ("refs/heads/<some-branch>")
+//   - remote branch reference
 func (r *Repository) hardReset(reference string) error {
 	var err error
 	resetOpts := r.resetOpts
 
 	switch {
 	case isLocalBranch(reference):
-		branchRef, err := r.repoGogit.Reference(plumbing.ReferenceName(reference), true)
+		branchRef, err := r.localGit.Reference(plumbing.ReferenceName(reference), true)
 		if err != nil {
 			return fmt.Errorf("hardReset failure, branch does not exist locally: %w", err)
 		}
@@ -383,7 +386,7 @@ func (r *Repository) hardReset(reference string) error {
 		}
 		resetOpts.Commit = commitHash
 	default:
-		branchRef, err := r.repoGogit.Reference(plumbing.NewRemoteReferenceName("origin", reference), false)
+		branchRef, err := r.localGit.Reference(plumbing.NewRemoteReferenceName("origin", reference), false)
 		if err != nil {
 			return fmt.Errorf("hardReset failure to get branch reference: %w", err)
 		}
@@ -391,13 +394,13 @@ func (r *Repository) hardReset(reference string) error {
 	}
 
 	// Validate hashCommit and reset options
-	err = resetOpts.Validate(r.repoGogit)
+	err = resetOpts.Validate(r.localGit)
 	if err != nil {
 		return fmt.Errorf("hardReset validation failure: %w", err)
 	}
 
 	// Open new worktree
-	wt, err := r.repoGogit.Worktree()
+	wt, err := r.localGit.Worktree()
 	if err != nil {
 		return fmt.Errorf("hardReset failure on WorkTree: %w", err)
 	}
@@ -418,24 +421,23 @@ func (r *Repository) hardReset(reference string) error {
 //   - If an error occurs while fetching the reference list, an error is returned.
 func (r *Repository) getLastCommitHash(branch string, commitHASH plumbing.Hash) (plumbing.Hash, error) {
 	var lastCommitHASH plumbing.Hash
-
-	remote, err := r.repoGogit.Remote(r.cloneOpts.RemoteName)
+	// get remote repository
+	remote, err := r.localGit.Remote(r.cloneOpts.RemoteName)
 	if err != nil {
 		return commitHASH, err
 	}
-
+	// list all remote repository references
 	references, err := remote.List(r.listOpts)
 	if err != nil {
 		return commitHASH, err
 	}
-
+	// Iterate and compare current commit Hash with remote commit Hashes
 	for _, ref := range references {
 		if ref.Name().IsBranch() && ref.Name().Short() == branch {
 			// lastCommit has not changed
 			if commitHASH == ref.Hash() {
 				return commitHASH, nil
 			}
-
 			// lastCommit changed
 			lastCommitHASH = ref.Hash()
 		}
