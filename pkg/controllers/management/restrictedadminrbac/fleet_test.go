@@ -4,7 +4,9 @@ import (
 	"testing"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1/fakes"
 	"github.com/rancher/rancher/pkg/rbac"
+	"github.com/stretchr/testify/assert"
 	k8srbac "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -66,41 +68,53 @@ func Test_rbaccontroller_ensureRolebinding(t *testing.T) {
 		{
 			name: "no previously existing rolebinding",
 			setup: func(c *mockController) {
-				c.mockRBLister.EXPECT().
-					Get(namespace, name).
-					Return(nil, &errors.StatusError{ErrStatus: metav1.Status{Reason: metav1.StatusReasonNotFound}})
+				c.mockRBLister = &fakes.RoleBindingListerMock{
+					GetFunc: func(namespace string, name string) (*k8srbac.RoleBinding, error) {
+						return nil, &errors.StatusError{ErrStatus: metav1.Status{Reason: metav1.StatusReasonNotFound}}
+					},
+				}
 
-				c.mockRBInterface.EXPECT().
-					Create(expected).
-					Return(expected, nil)
+				c.mockRBInterface = &fakes.RoleBindingInterfaceMock{
+					CreateFunc: func(rb *k8srbac.RoleBinding) (*k8srbac.RoleBinding, error) {
+						assert.Equal(t, rb, expected)
+						return expected, nil
+					},
+				}
 			},
 			wantErr: false,
 		},
 		{
 			name: "one previously existing incorrect rolebinding",
 			setup: func(c *mockController) {
-				c.mockRBLister.EXPECT().
-					Get(namespace, name).
-					Return(&k8srbac.RoleBinding{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      name,
-							Namespace: namespace,
-							Labels:    map[string]string{},
-						},
-					}, nil)
+				c.mockRBLister = &fakes.RoleBindingListerMock{
+					GetFunc: func(namespace string, name string) (*k8srbac.RoleBinding, error) {
+						return &k8srbac.RoleBinding{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      name,
+								Namespace: namespace,
+								Labels:    map[string]string{},
+							},
+						}, nil
+					},
+				}
 
-				c.mockRBInterface.EXPECT().
-					Update(expected).
-					Return(expected, nil)
+				c.mockRBInterface = &fakes.RoleBindingInterfaceMock{
+					UpdateFunc: func(rb *k8srbac.RoleBinding) (*k8srbac.RoleBinding, error) {
+						assert.Equal(t, rb, expected)
+						return expected, nil
+					},
+				}
 			},
 			wantErr: false,
 		},
 		{
 			name: "one previously existing correct rolebinding",
 			setup: func(c *mockController) {
-				c.mockRBLister.EXPECT().
-					Get(namespace, name).
-					Return(expected, nil)
+				c.mockRBLister = &fakes.RoleBindingListerMock{
+					GetFunc: func(namespace string, name string) (*k8srbac.RoleBinding, error) {
+						return expected, nil
+					},
+				}
 			},
 			wantErr: false,
 		},
