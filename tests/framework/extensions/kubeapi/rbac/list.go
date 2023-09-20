@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/rancher/rancher/pkg/api/scheme"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -61,4 +62,59 @@ func ListClusterRoleBindings(client *rancher.Client, clusterName string, listOpt
 	}
 
 	return crbList, nil
+}
+
+// ListGlobalRoleBindings is a helper function that uses the dynamic client to list globalrolebindings from local cluster.
+// ListGlobalRoleBindings accepts ListOptions for specifying desired parameters for listed objects.
+func ListGlobalRoleBindings(client *rancher.Client, clusterName string, listOpt metav1.ListOptions) (*v3.GlobalRoleBindingList, error) {
+	dynamicClient, err := client.GetDownStreamClusterClient(clusterName)
+	if err != nil {
+		return nil, err
+	}
+
+	unstructuredList, err := dynamicClient.Resource(GlobalRoleBindingGroupVersionResource).List(context.Background(), listOpt)
+	if err != nil {
+		return nil, err
+	}
+
+	grbList := new(v3.GlobalRoleBindingList)
+	for _, unstructuredCRB := range unstructuredList.Items {
+		grb := &v3.GlobalRoleBinding{}
+		err := scheme.Scheme.Convert(&unstructuredCRB, grb, unstructuredCRB.GroupVersionKind())
+		if err != nil {
+			return nil, err
+		}
+
+		grbList.Items = append(grbList.Items, *grb)
+	}
+
+	return grbList, nil
+}
+
+
+// ListClusterRoleTemplateBindings is a helper function that uses the dynamic client to list clusterroletemplatebindings from local cluster.
+// ListClusterRoleTemplateBindings accepts ListOptions for specifying desired parameters for listed objects.
+func ListClusterRoleTemplateBindings(client *rancher.Client, clusterName string, listOpt metav1.ListOptions) (*v3.ClusterRoleTemplateBindingList, error) {
+	dynamicClient, err := client.GetDownStreamClusterClient(clusterName)
+	if err != nil {
+		return nil, err
+	}
+
+	unstructuredList, err := dynamicClient.Resource(ClusterRoleTemplateBindingGroupVersionResource).Namespace("").List(context.Background(), listOpt)
+	if err != nil {
+		return nil, err
+	}
+
+	crtbList := new(v3.ClusterRoleTemplateBindingList)
+	for _, unstructuredCRB := range unstructuredList.Items {
+		crtb := &v3.ClusterRoleTemplateBinding{}
+		err := scheme.Scheme.Convert(&unstructuredCRB, crtb, unstructuredCRB.GroupVersionKind())
+		if err != nil {
+			return nil, err
+		}
+
+		crtbList.Items = append(crtbList.Items, *crtb)
+	}
+
+	return crtbList, nil
 }
