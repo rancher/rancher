@@ -25,7 +25,9 @@ const RancherVersionAnnotationKey = "catalog.cattle.io/rancher-version"
 // Rancher version constraints to allow support for multiple version lines of a chart in airgap setups. If a chart is
 // not defined here, only the latest version of it will be checked for images.
 // Note: CRD charts need to be added as well.
-var chartsToCheckConstraints = map[string]struct{}{}
+var chartsToCheckConstraints = map[string]struct{}{
+	"rancher-istio": {},
+}
 var systemChartsToCheckConstraints = map[string]struct{}{
 	"rancher-monitoring": {},
 }
