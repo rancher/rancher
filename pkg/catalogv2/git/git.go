@@ -139,7 +139,7 @@ func (r *Repository) setRepoCredentials() error {
 		// Retrieve the username from the URL
 		r.username, err = parseUserFromSSHURL(r.URL)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to parse user from SSH URL: %w", err)
 		}
 		// Create an AuthMethod using the parsed private key
 		r.auth = &plumbingSSH.PublicKeys{
