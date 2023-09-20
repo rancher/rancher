@@ -12,21 +12,21 @@ import (
 	"strconv"
 	"strings"
 
+	mgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/controllers/management/drivers"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	namespace2 "github.com/rancher/rancher/pkg/namespace"
+	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/wrangler/pkg/data"
 	"github.com/rancher/wrangler/pkg/data/convert"
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/pkg/generic"
 	"github.com/rancher/wrangler/pkg/kv"
-	name2 "github.com/rancher/wrangler/pkg/name"
+	wranglername "github.com/rancher/wrangler/pkg/name"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
-	apierror "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -73,7 +73,7 @@ func (h *handler) getArgsEnvAndStatus(infra *infraObject, args map[string]interf
 	)
 
 	nd, err := h.nodeDriverCache.Get(driver)
-	if !create && apierror.IsNotFound(err) {
+	if !create && apierrors.IsNotFound(err) {
 		url = infra.data.String("status", "driverURL")
 		hash = infra.data.String("status", "driverHash")
 	} else if err != nil {
@@ -87,7 +87,7 @@ func (h *handler) getArgsEnvAndStatus(infra *infraObject, args map[string]interf
 
 	envSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name2.SafeConcatName(infra.meta.GetName(), "machine", "driver", "secret"),
+			Name:      wranglername.SafeConcatName(infra.meta.GetName(), "machine", "driver", "secret"),
 			Namespace: infra.meta.GetNamespace(),
 		},
 		Data: getWhitelistedEnvVars(),
@@ -187,7 +187,7 @@ func (h *handler) getBootstrapSecret(machine *capi.Machine) (string, error) {
 	gvk := schema.FromAPIVersionAndKind(machine.Spec.Bootstrap.ConfigRef.APIVersion,
 		machine.Spec.Bootstrap.ConfigRef.Kind)
 	bootstrap, err := h.dynamic.Get(gvk, machine.Namespace, machine.Spec.Bootstrap.ConfigRef.Name)
-	if apierror.IsNotFound(err) {
+	if apierrors.IsNotFound(err) {
 		return "", nil
 	} else if err != nil {
 		return "", err
@@ -236,12 +236,12 @@ func (h *handler) getSecretData(machine *capi.Machine, obj data.Object, create b
 	return bootstrapName, cloudCredentialSecretName, result, nil
 }
 
-func GetCloudCredentialSecret(secrets corecontrollers.SecretCache, namespace, name string) (*corev1.Secret, error) {
+func GetCloudCredentialSecret(secrets corecontrollers.SecretCache, ns, name string) (*corev1.Secret, error) {
 	globalNS, globalName := kv.Split(name, ":")
-	if globalName != "" && globalNS == namespace2.GlobalNamespace {
+	if globalName != "" && globalNS == namespace.GlobalNamespace {
 		return secrets.Get(globalNS, globalName)
 	}
-	return secrets.Get(namespace, name)
+	return secrets.Get(ns, name)
 }
 
 func addAwsClusterOwnedTag(args map[string]any, clusterID string) {
@@ -304,7 +304,7 @@ func getNodeDriverName(typeMeta meta.Type) string {
 
 // getDriverDownloadURL checks for a local version of the driver to download for air-gapped installs.
 // If no local version is found or CATTLE_DEV_MODE is set, then the URL from the node driver is returned.
-func getDriverDownloadURL(nd *v3.NodeDriver) (string, string, error) {
+func getDriverDownloadURL(nd *mgmtv3.NodeDriver) (string, string, error) {
 	if os.Getenv("CATTLE_DEV_MODE") != "" {
 		return nd.Spec.URL, nd.Spec.Checksum, nil
 	}
@@ -391,7 +391,7 @@ func getInstanceName(infra infraObject) string {
 	// cloud-init will split the hostname on '.' and set the hostname to the first chunk. This causes an issue where all
 	// nodes in a machine pool may have the same node name in Kubernetes. Converting the '.' to '-' here prevents this.
 	instanceName := strings.ReplaceAll(infra.meta.GetName(), ".", "-")
-	instanceName = name2.SafeConcatName(instanceName)
+	instanceName = wranglername.SafeConcatName(instanceName)
 
 	return instanceName
 }
