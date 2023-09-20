@@ -69,13 +69,13 @@ func (r *rbaccontroller) ensureRolebinding(namespace string, subject k8srbac.Sub
 	}
 
 	rb, err := r.rbLister.Get(namespace, name)
-	if err != nil && !k8serrors.IsNotFound(err) {
-		// list call failed for unknown reason, give up
-		return err
-	}
+	if err != nil {
+		if !k8serrors.IsNotFound(err) {
+			// list call failed for unknown reason, give up
+			return err
+		}
 
-	// role binding not found, create it
-	if err != nil && k8serrors.IsNotFound(err) {
+		// role binding not found, create it
 		_, err = r.roleBindings.Create(&k8srbac.RoleBinding{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:            name,
@@ -91,7 +91,7 @@ func (r *rbaccontroller) ensureRolebinding(namespace string, subject k8srbac.Sub
 		}
 		return nil
 	}
-
+	
 	// role binding found, possibly in dirty state. Make sure relevant fields
 	// are set right
 	dirty := false
