@@ -190,29 +190,46 @@ func UnmigrateAdGUIDUsers(clientConfig *restclient.Config, dryRun bool, deleteMi
 		return err
 	}
 
-	usersToMigrate, missingUsers, skippedUsers := identifyMigrationWorkUnits(users, adConfig)
+	lConn := sharedLdapConnection{adConfig: adConfig}
+	usersToMigrate, missingUsers, skippedUsers := identifyMigrationWorkUnits(users, lConn)
 	// If any of the below functions fail, there is either a permissions problem or a more serious issue with the
 	// Rancher API. We should bail in this case and not attempt to process users.
-	err = collectTokens(&usersToMigrate, sc)
+
+	tokenInterface := sc.Management.Tokens("")
+	tokenList, err := tokenInterface.List(metav1.ListOptions{})
 	if err != nil {
 		finalStatus = activedirectory.StatusMigrationFailed
+		logrus.Errorf("[%v] unable to fetch token objects: %v", migrateAdUserOperation, err)
 		return err
 	}
-	err = collectCRTBs(&usersToMigrate, sc)
+	identifyTokens(&usersToMigrate, tokenList)
+
+	crtbInterface := sc.Management.ClusterRoleTemplateBindings("")
+	crtbList, err := crtbInterface.List(metav1.ListOptions{})
 	if err != nil {
 		finalStatus = activedirectory.StatusMigrationFailed
+		logrus.Errorf("[%v] unable to fetch CRTB objects: %v", migrateAdUserOperation, err)
 		return err
 	}
-	err = collectPRTBs(&usersToMigrate, sc)
+	identifyCRTBs(&usersToMigrate, crtbList)
+
+	prtbInterface := sc.Management.ProjectRoleTemplateBindings("")
+	prtbList, err := prtbInterface.List(metav1.ListOptions{})
 	if err != nil {
 		finalStatus = activedirectory.StatusMigrationFailed
+		logrus.Errorf("[%v] unable to fetch PRTB objects: %v", migrateAdUserOperation, err)
 		return err
 	}
-	err = collectGRBs(&usersToMigrate, sc)
+	identifyPRTBs(&usersToMigrate, prtbList)
+
+	grbInterface := sc.Management.GlobalRoleBindings("")
+	grbList, err := grbInterface.List(metav1.ListOptions{})
 	if err != nil {
 		finalStatus = activedirectory.StatusMigrationFailed
+		logrus.Errorf("[%v] unable to fetch GRB objects: %v", migrateAdUserOperation, err)
 		return err
 	}
+	identifyGRBs(&usersToMigrate, grbList)
 
 	if len(missingUsers) > 0 {
 		finalStatus = activedirectory.StatusMigrationFinishedWithMissing
@@ -292,7 +309,7 @@ func UnmigrateAdGUIDUsers(clientConfig *restclient.Config, dryRun bool, deleteMi
 //	usersToMigrate contains GUID-based original users and any duplicates (GUID or DN based) that we wish to merge
 //	missingUsers contains GUID-based users who could not be found in Active Directory
 //	skippedUsers contains GUID-based users that could not be processed, usually due to an LDAP connection failure
-func identifyMigrationWorkUnits(users *v3.UserList, adConfig *v3.ActiveDirectoryConfig) (
+func identifyMigrationWorkUnits(users *v3.UserList, lConn retryableLdapConnection) (
 	[]migrateUserWorkUnit, []missingUserWorkUnit, []skippedUserWorkUnit) {
 	// Note: we *could* make the ldap connection on the spot here, but we're accepting it as a parameter specifically
 	// so that this function is easier to test. This setup allows us to mock the ldap connection and thus more easily
@@ -361,7 +378,7 @@ func identifyMigrationWorkUnits(users *v3.UserList, adConfig *v3.ActiveDirectory
 				missingUsers[i].duplicateUsers = append(missingUsers[i].duplicateUsers, userCopy)
 				continue
 			}
-			dn, principal, err := findLdapUserWithRetries(guid, &sharedLConn, adConfig)
+			dn, principal, err := lConn.findLdapUserWithRetries(guid)
 			if errors.Is(err, LdapFoundDuplicateGUID{}) {
 				logrus.Errorf("[%v] LDAP returned multiple users with GUID '%v'. this should not be possible, and may indicate a configuration error! this user will be skipped", identifyAdUserOperation, guid)
 				skippedUsers = append(skippedUsers, skippedUserWorkUnit{guid: guid, originalUser: userCopy})
