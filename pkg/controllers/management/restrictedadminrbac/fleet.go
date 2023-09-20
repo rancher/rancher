@@ -92,29 +92,18 @@ func (r *rbaccontroller) ensureRolebinding(namespace string, subject k8srbac.Sub
 		return nil
 	}
 
-	// role binding found, possibly in dirty state. Make sure relevant fields
-	// are set right
-	dirty := false
-
+	// role binding found, possibly in dirty state. Make sure relevant fields are set right
 	label, ok := rb.Labels[rbac.RestrictedAdminClusterRoleBinding]
-	if !ok || label != "true" {
-		rb.Labels[rbac.RestrictedAdminClusterRoleBinding] = "true"
-		dirty = true
-	}
-	if !reflect.DeepEqual(rb.OwnerReferences, ownerRefs) {
-		rb.OwnerReferences = ownerRefs
-		dirty = true
-	}
-	if !reflect.DeepEqual(rb.RoleRef, roleRef) {
-		rb.RoleRef = roleRef
-		dirty = true
-	}
-	if !reflect.DeepEqual(rb.Subjects, subjects) {
-		rb.Subjects = subjects
-		dirty = true
-	}
+	if !ok || label != "true" ||
+		!reflect.DeepEqual(rb.OwnerReferences, ownerRefs) ||
+		!reflect.DeepEqual(rb.RoleRef, roleRef) ||
+		!reflect.DeepEqual(rb.Subjects, subjects) {
 
-	if dirty {
+		rb.Labels[rbac.RestrictedAdminClusterRoleBinding] = "true"
+		rb.OwnerReferences = ownerRefs
+		rb.RoleRef = roleRef
+		rb.Subjects = subjects
+
 		_, err = r.roleBindings.Update(rb)
 		return err
 	}
