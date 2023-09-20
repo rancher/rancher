@@ -33,6 +33,10 @@ import (
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
+const (
+	awsClusterTagPrefix = "kubernetes.io/cluster/"
+)
+
 var (
 	regExHyphen     = regexp.MustCompile("([a-z])([A-Z])")
 	envNameOverride = map[string]string{
@@ -65,7 +69,7 @@ type driverArgs struct {
 	BackoffLimit        int32
 }
 
-func (h *handler) getArgsEnvAndStatus(infra *infraObject, args map[string]interface{}, driver string, create bool) (driverArgs, error) {
+func (h *handler) getArgsEnvAndStatus(infra *infraObject, args map[string]any, driver string, create bool) (driverArgs, error) {
 	var (
 		url, hash, cloudCredentialSecretName string
 		jobBackoffLimit                      int32
@@ -244,14 +248,22 @@ func GetCloudCredentialSecret(secrets corecontrollers.SecretCache, ns, name stri
 	return secrets.Get(ns, name)
 }
 
+// addAwsClusterOwnedTag will add a tag to the machine arguments of an AWS machine of the form
+// "kubernetes.io/cluster/c-m-xxxxxxx,owned" if an owned or shared tag is not already present, which is required for
+// cloud provider integration.
+// If a user supplies their own tag it is assumed that the default behavior is not needed
+// as it is impossible to have an "owned" tag on a resource with another "owned" or "shared tag.
+// If args is empty, the value is always added, otherwise it is only added if there is no conflict.
+// args is always updated in place.
 func addAwsClusterOwnedTag(args map[string]any, clusterID string) {
-	tagValue := fmt.Sprintf("kubernetes.io/cluster/%s,owned", clusterID)
+	tagValue := fmt.Sprintf("%s%s,owned", awsClusterTagPrefix, clusterID)
 	if tags, ok := args["tags"]; !ok || convert.ToString(tags) == "" {
 		args["tags"] = tagValue
+		logrus.Tracef("Adding cluster id tag [%s] to machine args", tagValue)
 	} else {
 		tagString := convert.ToString(tags)
-		if !strings.Contains(tagString, "kubernetes.io/cluster/") {
-			logrus.Tracef("Adding %s to machine args", tagValue)
+		if !strings.Contains(tagString, awsClusterTagPrefix) {
+			logrus.Tracef("Appending cluster id tag [%s] to machine args", tagValue)
 			args["tags"] = tagString + "," + tagValue
 		}
 	}
