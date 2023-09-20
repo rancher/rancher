@@ -1,15 +1,14 @@
 package git
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
-	"strings"
 
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+
 	"golang.org/x/crypto/ssh"
-	"golang.org/x/crypto/ssh/agent"
 	corev1 "k8s.io/api/core/v1"
 
 	// gogit packages
@@ -21,41 +20,53 @@ import (
 	plumbingSSH "github.com/go-git/go-git/v5/plumbing/transport/ssh"
 )
 
-// repository holds the config of a git repository and the repo instance.
+// repository holds the configuration of a git repository and the repo instance.
 type Repository struct {
+	secret            *corev1.Secret // Kubernetes secret holding credentials
 	URL               string
 	Directory         string
 	username          string
 	password          string
-	agent             *agent.Agent
 	caBundle          []byte
-	insecureTLSVerify bool
-	secret            *corev1.Secret
 	knownHosts        []byte
-	repoGogit         *gogit.Repository
-	auth              transport.AuthMethod
-	cloneOpts         *gogit.CloneOptions
-	fetchOpts         *gogit.FetchOptions
-	listOpts          *gogit.ListOptions
-	resetOpts         *gogit.ResetOptions
+	insecureTLSVerify bool
+	// go-git package objects
+	auth      transport.AuthMethod
+	localGit  *gogit.Repository
+	cloneOpts *gogit.CloneOptions
+	fetchOpts *gogit.FetchOptions
+	listOpts  *gogit.ListOptions
+	resetOpts *gogit.ResetOptions
 }
 
 // BuildRepoConfig constructs and returns a new repository object for the given repository.
-// It requires a secret for authentication, the namespace, the name of the repository,
-// the gitURL, a flag indicating if TLS verification should be skipped, and a CA bundle for SSL.
-// If the Git URL uses the SSH protocol, it checks if the URL is a valid SSH URL.
-// If the Git URL uses HTTP or HTTPS, it parses and verifies the URL.
+// If the Git URL uses the SSH protocol, it checks if the URL is a valid SSH URL and parses the user from it.
+// If the Git URL uses HTTP(S), it parses and verifies the URL.
 // It then constructs a directory path for the git repository.
-// If a CA bundle is provided, it converts the CA bundle from DER to PEM format, since Git requires PEM format.
+// If a CA bundle is provided, it converts the CA bundle from DER to PEM format since Git requires PEM format.
 // In this case, insecureSkipTLS is set to false since a CA bundle is provided for secure communication.
 // Finally, it returns a new git object configured with these settings,
 // or an error if any step in this process fails.
 func BuildRepoConfig(secret *corev1.Secret, namespace, name, gitURL string, insecureSkipTLS bool, caBundle []byte) (*Repository, error) {
 
+	repo := &Repository{
+		URL:               gitURL,
+		insecureTLSVerify: insecureSkipTLS,
+		secret:            secret,
+		localGit:          &gogit.Repository{},
+		cloneOpts:         &gogit.CloneOptions{},
+		fetchOpts:         &gogit.FetchOptions{},
+		listOpts:          &gogit.ListOptions{},
+		resetOpts:         &gogit.ResetOptions{},
+	}
+
+	// Check which supported communication protocol will be used (HTTP(S)/SSH)
 	isGitSSH, err := isGitSSH(gitURL)
 	if err != nil {
 		logrus.Error(fmt.Errorf("failed to verify the type of URL %s: %w", gitURL, err))
 	}
+
+	// HTTP(S)
 	if !isGitSSH {
 		u, err := url.Parse(gitURL)
 		if err != nil {
@@ -64,71 +75,53 @@ func BuildRepoConfig(secret *corev1.Secret, namespace, name, gitURL string, inse
 		if u.Scheme != "http" && u.Scheme != "https" {
 			return nil, fmt.Errorf("invalid git URL scheme %s, only http(s) or ssh supported", u.Scheme)
 		}
+	} else {
+		// SSH without Secret, get keys from local system OS
+		if repo.secret == nil {
+			err := repo.checkDefaultSSHAgent()
+			if err != nil {
+				return repo, err
+			}
+		}
 	}
-	dir := gitDir(namespace, name, gitURL)
+	// build Rancher git helm repository directory path pattern
+	repo.Directory = gitDir(namespace, name, gitURL)
 
-	// convert caBundle to PEM format because git requires correct line breaks, header and footer.
+	// check if a CA Bundle was provided
 	if len(caBundle) > 0 {
-		caBundle = convertDERToPEM(caBundle)
-		insecureSkipTLS = false
+		// convert caBundle to PEM format
+		repo.caBundle = convertDERToPEM(caBundle)
+		repo.insecureTLSVerify = false
 	}
 
-	repo := &Repository{
-		URL:               gitURL,
-		Directory:         dir,
-		caBundle:          caBundle,
-		insecureTLSVerify: insecureSkipTLS,
-		secret:            secret,
-		repoGogit:         &gogit.Repository{},
-		cloneOpts:         &gogit.CloneOptions{},
-		fetchOpts:         &gogit.FetchOptions{},
-		listOpts:          &gogit.ListOptions{},
-		resetOpts:         &gogit.ResetOptions{},
-	}
-
-	// credentials must be set before options
+	// Check and extract sensitive credentials if necessary
 	err = repo.setRepoCredentials()
 	if err != nil {
 		return repo, err
 	}
+	// Apply the extracted credentials to the git repo operation options
 	repo.setRepoOptions()
-
 	return repo, nil
 }
 
-func (r *Repository) parseSSHURL() error {
-	parts := strings.Split(r.URL, "@")
-	r.username = parts[0]
-	if len(parts) == 2 {
-		if strings.HasPrefix(parts[0], "ssh://") {
-			// Remove "ssh://" prefix
-			r.username = parts[0][len("ssh://"):]
-		} else {
-			r.username = parts[0]
-		}
-	} else {
-		return fmt.Errorf("invalid ssh url: %v", r.URL)
-	}
-
-	return nil
-}
-
-// setRepoCredentials detects which type of authentication and communication protocol
-// and configurates the git repo communications accordingly.
+// setRepoCredentials detects which type of authentication from the Kubernetes secret
+// and configures the git repo authentication interfaces accordingly.
 func (r *Repository) setRepoCredentials() error {
+	// If no secret provided then we will not be using any authentication credentials
 	if r.secret == nil {
 		return nil
 	}
 
+	// There is a secret, parse sensitive credentials from it
 	switch r.secret.Type {
-	case corev1.SecretTypeBasicAuth: // BASIC HTTP(S) AUTHENTICATION
-		// get the credentials set in kubernetes
+	case corev1.SecretTypeBasicAuth: // HTTP(S) AUTHENTICATION
+		// extract data from Kubernetes secret
 		username := string(r.secret.Data[corev1.BasicAuthUsernameKey])
 		password := string(r.secret.Data[corev1.BasicAuthPasswordKey])
 		if len(password) == 0 || len(username) == 0 {
 			return fmt.Errorf("username or password not provided")
 		}
-		// BasicAuth implements transport.AuthMethod interface
+		// Set up authentication interface
 		r.auth = &plumbingHTTP.BasicAuth{
 			Username: username,
 			Password: password,
@@ -136,26 +129,28 @@ func (r *Repository) setRepoCredentials() error {
 		return nil
 
 	case corev1.SecretTypeSSHAuth: // SSH AUTHENTICATION
-		// Make signer from private keys
+		// Kubernetes secret
 		pemBytes := r.secret.Data[corev1.SSHAuthPrivateKey]
+		// Make signer from private keys
 		signer, err := ssh.ParsePrivateKey(pemBytes)
 		if err != nil {
 			return fmt.Errorf("failed to parse ssh private key: %w", err)
 		}
-
-		if err := r.parseSSHURL(); err != nil {
+		// Retrieve the username from the URL
+		r.username, err = parseUserFromSSHURL(r.URL)
+		if err != nil {
 			return err
 		}
-
-		// PublicKeys implements transport.AuthMethod interface
+		// Create an AuthMethod using the parsed private key
 		r.auth = &plumbingSSH.PublicKeys{
 			User:   r.username,
 			Signer: signer,
 		}
 
-		// Create temporary known_hosts file
+		// Check Kubernetes secret for Known Hosts data
 		hostsBytes := r.secret.Data["known_hosts"]
 		if len(hostsBytes) > 0 {
+			// Create temporary known_hosts file
 			f, err := os.CreateTemp("", "known_hosts")
 			if err != nil {
 				return fmt.Errorf("failed to create temporary known_hosts file: %w", err)
@@ -166,18 +161,18 @@ func (r *Repository) setRepoCredentials() error {
 				return fmt.Errorf("failed to write knonw_hosts file: %w", err)
 			}
 			// Create callback from recently created temporary file
+			// This will hold the known hosts in-memory so we can delete the file
 			hostKeyCB, err := plumbingSSH.NewKnownHostsCallback(f.Name())
 			if err != nil {
 				return fmt.Errorf("setRepoCredentials at known hosts failure: %w", err)
 			}
-
 			r.auth = &plumbingSSH.PublicKeys{
 				User:                  r.username,
 				Signer:                signer,
 				HostKeyCallbackHelper: plumbingSSH.HostKeyCallbackHelper{HostKeyCallback: hostKeyCB},
 			}
 
-			// Clean known_hosts file after setting up the callback
+			// Close and delete known_hosts file after setting up the callback
 			err = f.Close()
 			if err != nil {
 				return fmt.Errorf("failed to close known hosts file: %w", err)
