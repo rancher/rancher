@@ -72,7 +72,7 @@ func (r *rbaccontroller) ensureRolebinding(namespace string, subject k8srbac.Sub
 	if err != nil {
 		if !k8serrors.IsNotFound(err) {
 			// list call failed for unknown reason, give up
-			return err
+			return fmt.Errorf("unable to list backing role %s/%s: %w", namespace, name, err)
 		}
 
 		// role binding not found, create it
@@ -91,7 +91,7 @@ func (r *rbaccontroller) ensureRolebinding(namespace string, subject k8srbac.Sub
 		}
 		return nil
 	}
-	
+
 	// role binding found, possibly in dirty state. Make sure relevant fields
 	// are set right
 	dirty := false
