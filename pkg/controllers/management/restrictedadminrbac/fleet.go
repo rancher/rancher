@@ -87,7 +87,7 @@ func (r *rbaccontroller) ensureRolebinding(namespace string, subject k8srbac.Sub
 			Subjects: subjects,
 		})
 		if err != nil && !k8serrors.IsAlreadyExists(err) {
-			return err
+			return fmt.Errorf("unable to create backing role %s/%s: %w", namespace, name, err)
 		}
 		return nil
 	}
