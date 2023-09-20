@@ -1,6 +1,7 @@
 package globalrolesv2
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -19,6 +20,7 @@ import (
 	"github.com/rancher/shepherd/extensions/provisioning"
 	"github.com/rancher/shepherd/extensions/provisioninginput"
 
+	"github.com/rancher/shepherd/extensions/users"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -29,6 +31,7 @@ import (
 const (
 	roleOwner          = "cluster-owner"
 	roleMember         = "cluster-member"
+	roleProjectOwner   = "project-owner"
 	roleCrtbView       = "clusterroletemplatebindings-view"
 	roleProjectsCreate = "projects-create"
 	roleProjectsView   = "projects-view"
@@ -36,6 +39,9 @@ const (
 	localcluster       = "local"
 	crtbOwnerLabel     = "authz.management.cattle.io/grb-owner"
 	namespace          = "fleet-default"
+	localPrefix        = "local://"
+	clusterContext     = "cluster"
+	projectContext     = "project"
 	bindingLabel       = "membership-binding-owner"
 )
 
@@ -208,4 +214,48 @@ func createDownstreamCluster(client *rancher.Client, clusterType string) (*manag
 	}
 
 	return clusterObject, steveObject, testClusterConfig, nil
+}
+
+func createGlobalRole(client *rancher.Client, inheritedClusterrole []string) (*v3.GlobalRole, error) {
+	globalRole.Name = namegen.AppendRandomString("testgr")
+	globalRole.InheritedClusterRoles = inheritedClusterrole
+	createdGlobalRole, err := rbac.CreateGlobalRole(client, &globalRole)
+	return createdGlobalRole, err
+}
+
+func createGlobalRoleAndUser(client *rancher.Client, inheritedClusterrole []string) (*management.User, error) {
+	globalRole, err := createGlobalRole(client, inheritedClusterrole)
+	if err != nil {
+		return nil, err
+	}
+
+	createdUser, err := users.CreateUserWithRole(client, users.UserConfig(), standardUser, globalRole.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	return createdUser, err
+}
+
+func crtbStatus(client *rancher.Client, crtbName string, selector labels.Selector) error {
+	ctx, cancel := context.WithTimeout(context.Background(), defaults.TwoMinuteTimeout)
+	defer cancel()
+
+	err := kwait.PollUntilContextCancel(ctx, defaults.FiveHundredMillisecondTimeout, false, func(ctx context.Context) (done bool, err error) {
+		crtbs, err := rbac.ListClusterRoleTemplateBindings(client, metav1.ListOptions{
+			LabelSelector: selector.String(),
+		})
+		if err != nil {
+			return false, err
+		}
+
+		for _, newcrtb := range crtbs.Items {
+			if crtbName == newcrtb.Name {
+				return false, nil
+			}
+		}
+		return true, nil
+	})
+
+	return err
 }
