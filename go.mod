@@ -117,12 +117,11 @@ require (
 	github.com/rancher/dynamiclistener v0.3.6-rc3-deadlock-fix-revert
 	github.com/rancher/eks-operator v1.3.0-rc3
 	github.com/rancher/fleet/pkg/apis v0.0.0-20230912105714-0d26f206b3c5
-	github.com/rancher/gke-operator v1.2.0-rc1
+	github.com/rancher/gke-operator v1.2.0-rc2
 	github.com/rancher/kubernetes-provider-detector v0.1.5
 	github.com/rancher/lasso v0.0.0-20230830164424-d684fdeb6f29
 	github.com/rancher/machine v0.15.0-rancher103
 	github.com/rancher/norman v0.0.0-20230831160711-5de27f66385d
-	github.com/rancher/rancher/pkg/apis v0.0.0
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/remotedialer v0.3.0
 	github.com/rancher/rke v1.5.0-rc5
@@ -170,6 +169,7 @@ require (
 require (
 	github.com/containers/image/v5 v5.25.0
 	github.com/go-git/go-git/v5 v5.8.1
+	github.com/rancher/rancher/pkg/apis v0.0.0-20230915232223-a9ea4ce4a5ba
 )
 
 require (
