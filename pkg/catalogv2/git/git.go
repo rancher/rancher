@@ -182,16 +182,47 @@ func (r *Repository) setRepoCredentials() error {
 				return fmt.Errorf("failed to remove temporar known_hosts file: %w", err)
 			}
 		}
-
+		// SSH AUTHENTICATION END
 		return nil
 	}
-
 	// if all else failed, something nasty happened
 	return errors.New("could not set repository credentials")
 }
 
+// checkDefaultSSHAgent checks if there are SSH keys located at the system's default path,
+// parses these keys, retrieves the username from the URL, and implements an AuthMethod interface
+// for go-git using the parsed private key. If successful, it sets the AuthMethod in the Repository.
+// It returns an error if SSH keys are not found, fail to parse, or if the URL has an unsupported scheme.
+func (r *Repository) checkDefaultSSHAgent() error {
+	// Attempt to read system SSH keys
+	sysPvtKey, err := checkOSDefaultSSHKeys()
+	if err != nil {
+		return fmt.Errorf("no ssh keys provided neither by secret or at default system path: %w", err)
+	}
+
+	// Parse the system's private key
+	signer, err := ssh.ParsePrivateKey(sysPvtKey)
+	if err != nil {
+		return fmt.Errorf("failed to parse ssh private key: %w", err)
+	}
+
+	// Retrieve the username from the URL
+	r.username, err = parseUserFromSSHURL(r.URL)
+	if err != nil {
+		return fmt.Errorf("invalid git URL scheme, only http(s) or ssh supported")
+	}
+
+	// Create an AuthMethod using the parsed private key
+	r.auth = &plumbingSSH.PublicKeys{
+		User:   r.username,
+		Signer: signer,
+	}
+
+	return nil
+}
+
 // setRepoOptions assigns the options configured before in credentials.
-// hard-code other needed configurations like Depth for faster cloning.
+// Hard-code other needed configurations like Depth for faster cloning.
 func (r *Repository) setRepoOptions() {
 	// Clone Options
 	r.cloneOpts.URL = r.URL
