@@ -2,6 +2,7 @@ package git
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/pkg/errors"

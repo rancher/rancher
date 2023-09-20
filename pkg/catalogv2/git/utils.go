@@ -57,13 +57,42 @@ func isLocalBranch(branch string) bool {
 	return strings.HasPrefix(branch, localReferenceBranch)
 }
 
+// validateGitURL checks if the provided URL uses one of the supported protocols:
+//   - HTTP(S)
+//   - SSH
+//
+// It also validates if the SSH URL is well-formed.
+//
+// Returns a boolean value indicating the communication protocol:
+//   - false for HTTP(S)
+//   - true for SSH
+//
+// If the URL is invalid or uses an unsupported protocol, an error is returned.
+func validateGitURL(gitURL string) (bool, error) {
+	// check for https and ssh prefix first
+	isHTTP := strings.HasPrefix(gitURL, "http://") || strings.HasPrefix(gitURL, "https://")
+	if isHTTP {
+		return false, nil
+	}
+	// It has to be a valid URL, if it is not, throw an error
+	return isGitSSH(gitURL) // SSH
+}
+
 // isGitSSH checks if the URL is in the SSH URL format using regular expressions.
 // [anything]@[anything]:[anything]
 // ssh://<user>@<mydomain.example>:<port>/<path>/<repository-name>
 func isGitSSH(gitURL string) (bool, error) {
-	pattern1 := `^.+@.+:.+$`
-	pattern2 := `^ssh://[^@]+@[^:]+:\d+/.+/.+$`
-	return regexp.MatchString(pattern1+"|"+pattern2, gitURL)
+	pattern1 := `^[^:/]+@[^:]+:.+$`
+	pattern2 := `^ssh://[^@]+@[^:]+:\d+/.+$`
+	validSSH, err := regexp.MatchString(pattern1+"|"+pattern2, gitURL)
+	if err != nil {
+		return true, fmt.Errorf("regexp failed: %w", err)
+	}
+	if !validSSH {
+		return true, fmt.Errorf("only http(s) or ssh protocols supported")
+	}
+	// valid SSH URL
+	return true, nil
 }
 
 // convertDERToPEM converts a DER-encoded certificate (src) into a PEM-encoded

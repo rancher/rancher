@@ -3,7 +3,6 @@ package git
 import (
 	"errors"
 	"fmt"
-	"net/url"
 	"os"
 
 	"github.com/sirupsen/logrus"
@@ -61,27 +60,16 @@ func BuildRepoConfig(secret *corev1.Secret, namespace, name, gitURL string, inse
 	}
 
 	// Check which supported communication protocol will be used (HTTP(S)/SSH)
-	isGitSSH, err := isGitSSH(gitURL)
+	isSSH, err := validateGitURL(gitURL)
 	if err != nil {
-		logrus.Error(fmt.Errorf("failed to verify the type of URL %s: %w", gitURL, err))
+		return repo, fmt.Errorf("invalid URL: %s; error: %w", gitURL, err)
 	}
 
-	// HTTP(S)
-	if !isGitSSH {
-		u, err := url.Parse(gitURL)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse URL %s: %w", gitURL, err)
-		}
-		if u.Scheme != "http" && u.Scheme != "https" {
-			return nil, fmt.Errorf("invalid git URL scheme %s, only http(s) or ssh supported", u.Scheme)
-		}
-	} else {
+	if isSSH && repo.secret == nil {
 		// SSH without Secret, get keys from local system OS
-		if repo.secret == nil {
-			err := repo.checkDefaultSSHAgent()
-			if err != nil {
-				return repo, err
-			}
+		err := repo.checkDefaultSSHAgent()
+		if err != nil {
+			return repo, err
 		}
 	}
 	// build Rancher git helm repository directory path pattern
