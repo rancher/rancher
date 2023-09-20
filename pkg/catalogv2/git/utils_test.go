@@ -1,38 +1,92 @@
 package git
 
 import (
+	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	assertlib "github.com/stretchr/testify/assert"
 )
 
-func Test_isGitSSH(t *testing.T) {
+// // True cases
+// {"customusername@github.com:user/repo.git", true},
+// {"customusername@gitlab.com:user/repo.git", true},
+// {"customusername@gitlab.com:user/repo", true},
+// {"customusername@gitlab.com:user/repo-with-dashes.git", true},
+// {"git@github.com:user/repo.git", true},
+// {"git@gitlab.com:user/repo-with-dashes.git", true},
+// {"git@gitlab.com:user/repo", true},
+// // False cases
+// {"https://github.com/user/repo.git", false},
+// {"http://gitlab.com/user/repo.git", false},
+// {"http://gitlab.com/user/repo", false},
+// {"http://gitlab.com", false},
+// {"git@gitlab.com", false},
+
+func Test_validateGitURL(t *testing.T) {
 	testCases := []struct {
-		gitURL   string
-		expected bool
+		gitURL        string
+		expectedValid bool
+		expectedError error
 	}{
-		// True cases
-		{"customusername@github.com:user/repo.git", true},
-		{"customusername@gitlab.com:user/repo.git", true},
-		{"customusername@gitlab.com:user/repo", true},
-		{"customusername@gitlab.com:user/repo-with-dashes.git", true},
-		{"git@github.com:user/repo.git", true},
-		{"git@gitlab.com:user/repo-with-dashes.git", true},
-		{"git@gitlab.com:user/repo", true},
-		// False cases
-		{"https://github.com/user/repo.git", false},
-		{"http://gitlab.com/user/repo.git", false},
-		{"http://gitlab.com/user/repo", false},
-		{"http://gitlab.com", false},
-		{"git@gitlab.com", false},
+		// Valid URL's
+		{
+			gitURL:        "customusername@github.com:user/repo.git",
+			expectedValid: true,
+			expectedError: nil,
+		},
+		{
+			gitURL:        "customusername@gitlab.com:user/repo.git",
+			expectedValid: true,
+			expectedError: nil,
+		},
+		{
+			gitURL:        "customusername@gitlab.com:user/repo",
+			expectedValid: true,
+			expectedError: nil,
+		},
+		{
+			gitURL:        "customusername@gitlab.com:user/repo-with-dashes.git",
+			expectedValid: true,
+			expectedError: nil,
+		},
+		{
+			gitURL:        "git@github.com:user/repo.git",
+			expectedValid: true,
+			expectedError: nil,
+		},
+		{
+			gitURL:        "git@gitlab.com:user/repo-with-dashes.git",
+			expectedValid: true,
+			expectedError: nil,
+		},
+		{
+			gitURL:        "git@gitlab.com:user/repo",
+			expectedValid: true,
+			expectedError: nil,
+		},
+		// Invalid URL's
+		{
+			gitURL:        "ftp://admantium@gitlab.com:user/repo",
+			expectedError: fmt.Errorf("only http(s) or ssh protocols supported"),
+		},
+		{
+			gitURL:        "https://admantium@gitlab.com:user/repo",
+			expectedError: fmt.Errorf("only http(s) or ssh protocols supported"),
+		},
+		{
+			gitURL:        "https://admantium#gitlab.com:user/repo",
+			expectedError: fmt.Errorf("only http(s) or ssh protocols supported"),
+		},
 	}
 	assert := assertlib.New(t)
 	for _, tc := range testCases {
-		actual, err := isGitSSH(tc.gitURL)
+		valid, err := validateGitURL(tc.gitURL)
 		if err != nil {
-			t.Errorf("unexpected error: %s", err)
+			assert.EqualErrorf(tc.expectedError, err.Error(), "testcase: %v", tc)
+			continue
 		}
-		assert.Equalf(tc.expected, actual, "testcase: %v", tc)
+		assert.Equalf(tc.expectedValid, valid, "testcase: %v", tc)
 	}
 }
 
@@ -53,5 +107,49 @@ func Test_gitDir(t *testing.T) {
 	for _, tc := range testCases {
 		actual := gitDir(tc.namespace, tc.name, tc.gitURL)
 		assert.Equalf(tc.expected, actual, "testcase: %v", tc)
+	}
+}
+
+func Test_parseUserFromSSHURL(t *testing.T) {
+
+	testCases := []struct {
+		test             string
+		URL              string
+		expectedUsername string
+		expectedError    error
+	}{
+		{
+			test:             "1.0 Valid compact SSH URL Success",
+			URL:              "user@server:project.git",
+			expectedUsername: "user",
+			expectedError:    nil,
+		},
+		{
+			test:             "1.1 Valid compact SSH URL Success",
+			URL:              "ssh://user@mydomain.example:443/repository-name",
+			expectedUsername: "user",
+			expectedError:    nil,
+		},
+		{
+			test:             "2.0 Invalid compact SSH URL",
+			URL:              "user@mydomain.example@443/repository-name",
+			expectedUsername: "user",
+			expectedError:    fmt.Errorf("invalid ssh url: user@mydomain.example@443/repository-name"),
+		},
+		{
+			test:             "2.1 Invalid compact SSH URL No @ character",
+			URL:              "user#mydomain.example:443/repository-name",
+			expectedUsername: "user",
+			expectedError:    fmt.Errorf("invalid ssh url: user#mydomain.example:443/repository-name"),
+		},
+	}
+
+	for _, tc := range testCases {
+		user, err := parseUserFromSSHURL(tc.URL)
+		if err != nil {
+			assert.EqualError(t, tc.expectedError, err.Error())
+			continue
+		}
+		assert.Equal(t, tc.expectedUsername, user)
 	}
 }
