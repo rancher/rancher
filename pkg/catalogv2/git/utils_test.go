@@ -8,21 +8,6 @@ import (
 	assertlib "github.com/stretchr/testify/assert"
 )
 
-// // True cases
-// {"customusername@github.com:user/repo.git", true},
-// {"customusername@gitlab.com:user/repo.git", true},
-// {"customusername@gitlab.com:user/repo", true},
-// {"customusername@gitlab.com:user/repo-with-dashes.git", true},
-// {"git@github.com:user/repo.git", true},
-// {"git@gitlab.com:user/repo-with-dashes.git", true},
-// {"git@gitlab.com:user/repo", true},
-// // False cases
-// {"https://github.com/user/repo.git", false},
-// {"http://gitlab.com/user/repo.git", false},
-// {"http://gitlab.com/user/repo", false},
-// {"http://gitlab.com", false},
-// {"git@gitlab.com", false},
-
 func Test_validateGitURL(t *testing.T) {
 	testCases := []struct {
 		gitURL        string
@@ -30,11 +15,6 @@ func Test_validateGitURL(t *testing.T) {
 		expectedError error
 	}{
 		// Valid URL's
-		{
-			gitURL:        "customusername@github.com:user/repo.git",
-			expectedValid: true,
-			expectedError: nil,
-		},
 		{
 			gitURL:        "customusername@gitlab.com:user/repo.git",
 			expectedValid: true,

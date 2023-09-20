@@ -44,7 +44,7 @@ S1Lv7p9e+yDv4V/nAAAAGm5pY2tAbG9jYWxob3N0LmxvY2FsZG9tYWlu
 const known_hosts_dummy_test string = `github.com ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAq2A7hRGmdnm9tUDbO9IDSwBK6TbQa+PXYPCPy6rbTrTtw7PHkccKrpp0yVhp5HdEIcKr6pLlVDBfOLX9QUsyCOV0wzfjIJNlGEYsdlLJizHhbn2mUjvSAHQqZETYP81eFzLQNnPHt4EVVUh7VfDESU84KezmD5QlWpXLmvU31/yMf+Se8xhHTvKSCZIFImWwoG6mbUoWf9nzpIoaSjB+weqqUUmpaaasXVal72J+UX2B+2RPW3RcT0eOzQgqlJL3RKrTJvdsjE3JEAvGq3lGHSZXy28G3skua2SmVi/w4yCE6gbODqnTWlg7+wC604ydGXA8VJiS5ap43JXiUFFAaQ==
 	`
 
-// TestSetRepoCredentials
+// TestBuildRepoConfig
 // The goal here is to test the critical parts.
 // What happens if the wrong type of credentials are provided.
 // Ensure that the configuration is setted when valid credentials are provided

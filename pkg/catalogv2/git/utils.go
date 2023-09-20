@@ -114,17 +114,15 @@ func parseUserFromSSHURL(URL string) (user string, err error) {
 	parts := strings.Split(URL, "@")
 	user = parts[0]
 	if len(parts) == 2 {
-		if strings.HasPrefix(parts[0], "ssh://") {
+		if strings.HasPrefix(user, "ssh://") {
 			// Remove "ssh://" prefix
-			user = parts[0][len("ssh://"):]
-		} else {
-			user = parts[0]
+			user = user[len("ssh://"):]
 		}
 	} else {
 		return "", fmt.Errorf("invalid ssh url: %v", URL)
 	}
 
-	return user, nil
+	return
 }
 
 // checkOSDefaultSSHKeys will look at the OS default $HOME/.ssh directory
