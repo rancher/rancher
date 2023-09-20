@@ -77,26 +77,54 @@ func convertDERToPEM(src []byte) []byte {
 	})
 }
 
-// formatGitURL is used by remoteSHAChange
-func formatGitURL(endpoint, branch string) string {
-	u, err := url.Parse(endpoint)
-	if err != nil {
-		return ""
-	}
-
-	pathParts := strings.Split(u.Path, "/")
-	switch u.Hostname() {
-	case "github.com":
-		if len(pathParts) >= 3 {
-			org := pathParts[1]
-			repo := strings.TrimSuffix(pathParts[2], ".git")
-			return fmt.Sprintf("https://api.github.com/repos/%s/%s/commits/%s", org, repo, branch)
+// parseUserFromSSHURL will receive a valid SSH url and extract the user from it
+// ssh://[user@]server/project.git
+// [user@]server:project.git
+func parseUserFromSSHURL(URL string) (user string, err error) {
+	// separate string parts from "@" character
+	parts := strings.Split(URL, "@")
+	user = parts[0]
+	if len(parts) == 2 {
+		if strings.HasPrefix(parts[0], "ssh://") {
+			// Remove "ssh://" prefix
+			user = parts[0][len("ssh://"):]
+		} else {
+			user = parts[0]
 		}
-	case "git.rancher.io":
-		repo := strings.TrimSuffix(pathParts[1], ".git")
-		u.Path = fmt.Sprintf("/repos/%s/commits/%s", repo, branch)
-		return u.String()
+	} else {
+		return "", fmt.Errorf("invalid ssh url: %v", URL)
 	}
 
-	return ""
+	return user, nil
+}
+
+// checkOSDefaultSSHKeys will look at the OS default $HOME/.ssh directory
+// for existing SSH Keys with the default names and return the private key slice of bytes for parsing
+func checkOSDefaultSSHKeys() ([]byte, error) {
+	// Get the home directory of the current user
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return []byte{}, fmt.Errorf("error getting user home directory: %w", err)
+	}
+
+	// Construct the path to the SSH private and public keys
+	publicKeyPath := filepath.Join(homeDir, ".ssh", "id_rsa.pub")
+	privateKeyPath := filepath.Join(homeDir, ".ssh", "id_rsa")
+
+	// Read the contents of both files but only return the private one
+	pvtKeyBytes, err := os.ReadFile(privateKeyPath)
+	if err != nil {
+		return []byte{}, err
+	}
+	pubKeyBytes, err := os.ReadFile(publicKeyPath)
+	if err != nil {
+		return []byte{}, err
+	}
+
+	// Keys must not be empty
+	if len(pvtKeyBytes) == 0 || len(pubKeyBytes) == 0 {
+		return []byte{}, fmt.Errorf("empty ssh keys given")
+	}
+
+	return pvtKeyBytes, nil
 }
