@@ -1,9 +1,5 @@
 // mocks created with the following commands
 // mockgen --build_flags=--mod=mod -package restrictedadminrbac -destination ./mockIndexer_test.go k8s.io/client-go/tools/cache Indexer
-//
-//mockgen --build_flags=--mod=mod -package restrictedadminrbac -destination ./mockLister_test.go github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1 RoleBindingLister,RoleBindingInterface
-//
-
 package restrictedadminrbac
 
 import (
@@ -12,6 +8,7 @@ import (
 
 	"github.com/golang/mock/gomock"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1/fakes"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/wrangler/pkg/generic/fake"
 	"github.com/rancher/wrangler/pkg/relatedresource"
@@ -438,13 +435,9 @@ func newMockController(t *testing.T) *mockController {
 	crtbCtrl := fake.NewMockControllerInterface[*v3.ClusterRoleTemplateBinding, *v3.ClusterRoleTemplateBindingList](ctrl)
 	grbCache := fake.NewMockNonNamespacedCacheInterface[*v3.GlobalRoleBinding](ctrl)
 	grbIndexer := NewMockIndexer(ctrl)
-	rbLister := NewMockRoleBindingLister(ctrl)
-	rbInterface := NewMockRoleBindingInterface(ctrl)
 	return &mockController{
 		t:                t,
 		mockIndexer:      grbIndexer,
-		mockRBInterface:  rbInterface,
-		mockRBLister:     rbLister,
 		mockClusterCache: clusterCache,
 		mockCRTBCache:    crtbCache,
 		mockCRTBCtrl:     crtbCtrl,
@@ -459,8 +452,8 @@ type mockController struct {
 	mockCRTBCache    *fake.MockCacheInterface[*v3.ClusterRoleTemplateBinding]
 	mockCRTBCtrl     *fake.MockControllerInterface[*v3.ClusterRoleTemplateBinding, *v3.ClusterRoleTemplateBindingList]
 	mockGRBCache     *fake.MockNonNamespacedCacheInterface[*v3.GlobalRoleBinding]
-	mockRBInterface  *MockRoleBindingInterface
-	mockRBLister     *MockRoleBindingLister
+	mockRBInterface  *fakes.RoleBindingInterfaceMock
+	mockRBLister     *fakes.RoleBindingListerMock
 }
 
 func (m *mockController) rbacController() *rbaccontroller {
