@@ -264,7 +264,9 @@ func Test_rbaccontroller_ensureRolebinding(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			mockCtrl := newMockController(t)
 			tt.setup(mockCtrl)
 			r := mockCtrl.rbacController()
