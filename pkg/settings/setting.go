@@ -86,7 +86,6 @@ var (
 	Namespace                           = NewSetting("namespace", os.Getenv("CATTLE_NAMESPACE"))
 	PasswordMinLength                   = NewSetting("password-min-length", "12")
 	PeerServices                        = NewSetting("peer-service", os.Getenv("CATTLE_PEER_SERVICE"))
-	RDNSServerBaseURL                   = NewSetting("rdns-base-url", "https://api.lb.rancher.cloud/v1")
 	RkeVersion                          = NewSetting("rke-version", "")
 	RkeMetadataConfig                   = NewSetting("rke-metadata-config", getMetadataConfig())
 	ServerImage                         = NewSetting("server-image", "rancher/rancher")

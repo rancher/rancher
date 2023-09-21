@@ -101,7 +101,7 @@ func (r *HostnameTruncationTestSuite) TestProvisioningRKE2ClusterTruncation() {
 				clusterObject, err := provisioning.CreateProvisioningCluster(r.client, *rke2Provider, testConfig, hostnamePools)
 				require.NoError(r.T(), err)
 
-				provisioning.VerifyCluster(r.T(), r.client, clusterObject)
+				provisioning.VerifyCluster(r.T(), r.client, testConfig, clusterObject)
 				provisioning.VerifyHostnameLength(r.T(), r.client, clusterObject)
 			})
 		}

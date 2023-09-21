@@ -2,12 +2,14 @@ package provisioning
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"strings"
 	"testing"
 	"time"
 
+	apisV1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
@@ -20,10 +22,13 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/provisioninginput"
 	psadeploy "github.com/rancher/rancher/tests/framework/extensions/psact"
 	"github.com/rancher/rancher/tests/framework/extensions/registries"
+	"github.com/rancher/rancher/tests/framework/extensions/sshkeys"
 	"github.com/rancher/rancher/tests/framework/extensions/workloads/pods"
+	"github.com/rancher/rancher/tests/framework/pkg/nodes"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
 	"github.com/rancher/rancher/tests/v2prov/defaults"
 	wranglername "github.com/rancher/wrangler/pkg/name"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -37,6 +42,8 @@ import (
 const (
 	logMessageKubernetesVersion = "Validating the current version is the upgraded one"
 	hostnameLimit               = 63
+	machineNameAnnotation       = "cluster.x-k8s.io/machine"
+	publicIPAnnotation          = "rke2.io/external-ip"
 )
 
 // VerifyRKE1Cluster validates that the RKE1 cluster and its resources are in a good state, matching a given config.
@@ -93,7 +100,7 @@ func VerifyRKE1Cluster(t *testing.T, client *rancher.Client, clustersConfig *clu
 }
 
 // VerifyCluster validates that a non-rke1 cluster and its resources are in a good state, matching a given config.
-func VerifyCluster(t *testing.T, client *rancher.Client, cluster *steveV1.SteveAPIObject) {
+func VerifyCluster(t *testing.T, client *rancher.Client, clustersConfig *clusters.ClusterConfig, cluster *steveV1.SteveAPIObject) {
 	client, err := client.ReLogin()
 	require.NoError(t, err)
 
@@ -158,6 +165,75 @@ func VerifyCluster(t *testing.T, client *rancher.Client, cluster *steveV1.SteveA
 	podResults, podErrors := pods.StatusPods(client, status.ClusterName)
 	assert.Empty(t, podErrors)
 	assert.NotEmpty(t, podResults)
+
+	if clustersConfig.ClusterSSHTests != nil {
+		VerifySSHTests(t, client, cluster, clustersConfig.ClusterSSHTests, status.ClusterName)
+	}
+}
+
+// VerifyDeleteRKE1Cluster validates that a rke1 cluster and its resources are deleted.
+func VerifyDeleteRKE1Cluster(t *testing.T, client *rancher.Client, clusterID string) {
+	cluster, err := client.Management.Cluster.ByID(clusterID)
+	require.NoError(t, err)
+
+	adminClient, err := rancher.NewClient(client.RancherConfig.AdminToken, client.Session)
+	require.NoError(t, err)
+
+	watchInterface, err := adminClient.GetManagementWatchInterface(management.ClusterType, metav1.ListOptions{
+		FieldSelector:  "metadata.name=" + clusterID,
+		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+	})
+	require.NoError(t, err)
+
+	err = wait.WatchWait(watchInterface, func(event watch.Event) (ready bool, err error) {
+		if event.Type == watch.Error {
+			return false, fmt.Errorf("error: unable to delete cluster %s", cluster.Name)
+		} else if event.Type == watch.Deleted {
+			logrus.Infof("Cluster %s deleted!", cluster.Name)
+			return true, nil
+		}
+		return false, nil
+	})
+	require.NoError(t, err)
+
+	err = nodestat.AllNodeDeleted(client, clusterID)
+	require.NoError(t, err)
+}
+
+// VerifyDeleteRKE2K3SCluster validates that a non-rke1 cluster and its resources are deleted.
+func VerifyDeleteRKE2K3SCluster(t *testing.T, client *rancher.Client, clusterID string) {
+	cluster, err := client.Steve.SteveType("provisioning.cattle.io.cluster").ByID(clusterID)
+	require.NoError(t, err)
+
+	adminClient, err := rancher.NewClient(client.RancherConfig.AdminToken, client.Session)
+	require.NoError(t, err)
+
+	provKubeClient, err := adminClient.GetKubeAPIProvisioningClient()
+	require.NoError(t, err)
+
+	watchInterface, err := provKubeClient.Clusters(namespace).Watch(context.TODO(), metav1.ListOptions{
+		FieldSelector:  "metadata.name=" + cluster.Name,
+		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+	})
+	require.NoError(t, err)
+
+	err = wait.WatchWait(watchInterface, func(event watch.Event) (ready bool, err error) {
+		cluster := event.Object.(*apisV1.Cluster)
+		if event.Type == watch.Error {
+			return false, fmt.Errorf("error: unable to delete cluster %s", cluster.ObjectMeta.Name)
+		} else if event.Type == watch.Deleted {
+			logrus.Infof("Cluster %s deleted!", cluster.ObjectMeta.Name)
+			return true, nil
+		} else if cluster == nil {
+			logrus.Infof("Cluster %s deleted!", cluster.ObjectMeta.Name)
+			return true, nil
+		}
+		return false, nil
+	})
+	require.NoError(t, err)
+
+	err = nodestat.AllNodeDeleted(client, clusterID)
+	require.NoError(t, err)
 }
 
 // CertRotationCompleteCheckFunc returns a watch check function that checks if the certificate rotation is complete
@@ -333,5 +409,45 @@ func GetSnapshots(client *rancher.Client, localclusterID string, clusterName str
 		}
 	}
 	return snapshots, nil
+
+}
+
+// VerifySSHTests validates the ssh tests listed in the config on each node of the cluster
+func VerifySSHTests(t *testing.T, client *rancher.Client, clusterObject *steveV1.SteveAPIObject, sshTests []string, clusterID string) {
+	client, err := client.ReLogin()
+	require.NoError(t, err)
+
+	clusterSpec := &provv1.ClusterSpec{}
+	err = steveV1.ConvertToK8sType(clusterObject.Spec, clusterSpec)
+	require.NoError(t, err)
+
+	steveclient, err := client.Steve.ProxyDownstream(clusterID)
+	require.NoError(t, err)
+	nodesSteveObjList, err := steveclient.SteveType("node").List(nil)
+	require.NoError(t, err)
+
+	dynamicSchema := clusterSpec.RKEConfig.MachinePools[0].DynamicSchemaSpec
+	var data clusters.DynamicSchemaSpec
+	err = json.Unmarshal([]byte(dynamicSchema), &data)
+	require.NoError(t, err)
+
+	sshUser := data.ResourceFields.SSHUser.Default.StringValue
+	for _, tests := range sshTests {
+		for _, rancherNode := range nodesSteveObjList.Data {
+			machineName := rancherNode.Annotations[machineNameAnnotation]
+			sshkey, err := sshkeys.DownloadSSHKeys(client, machineName)
+			require.NoError(t, err)
+			assert.NotEmpty(t, sshkey)
+			clusterNode := &nodes.Node{
+				NodeID:          rancherNode.ID,
+				PublicIPAddress: rancherNode.Annotations[publicIPAnnotation],
+				SSHUser:         sshUser,
+				SSHKey:          sshkey,
+			}
+
+			CallSSHTestByName(tests, clusterNode)
+
+		}
+	}
 
 }
