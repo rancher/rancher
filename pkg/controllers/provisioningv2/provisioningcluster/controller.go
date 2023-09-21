@@ -253,6 +253,10 @@ func reconcileClusterSpecEtcdRestore(cluster *rancherv1.Cluster, desiredSpec ran
 		changed = true
 		cluster.Spec.RKEConfig.AdditionalManifest = desiredSpec.RKEConfig.AdditionalManifest
 	}
+	if cluster.Spec.RKEConfig.Networking != desiredSpec.RKEConfig.Networking {
+		changed = true
+		cluster.Spec.RKEConfig.Networking = desiredSpec.RKEConfig.Networking
+	}
 	if cluster.Spec.KubernetesVersion != desiredSpec.KubernetesVersion {
 		changed = true
 		cluster.Spec.KubernetesVersion = desiredSpec.KubernetesVersion

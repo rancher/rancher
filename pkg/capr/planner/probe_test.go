@@ -106,6 +106,7 @@ func TestReplaceCACertAndPortForProbes(t *testing.T) {
 		name        string
 		probe       plan.Probe
 		cacert      string
+		address     string
 		port        string
 		expected    plan.Probe
 		expectedErr error
@@ -114,6 +115,7 @@ func TestReplaceCACertAndPortForProbes(t *testing.T) {
 			name:        "empty cacert",
 			probe:       plan.Probe{},
 			cacert:      "",
+			address:     "",
 			port:        "",
 			expected:    plan.Probe{},
 			expectedErr: errEmptyCACert,
@@ -122,20 +124,31 @@ func TestReplaceCACertAndPortForProbes(t *testing.T) {
 			name:        "empty port",
 			probe:       plan.Probe{},
 			cacert:      "test",
+			address:     "rancher.com",
 			port:        "",
 			expected:    plan.Probe{},
 			expectedErr: errEmptyPort,
+		},
+		{
+			name:        "empty address",
+			probe:       plan.Probe{},
+			cacert:      "test",
+			address:     "",
+			port:        "1234",
+			expected:    plan.Probe{},
+			expectedErr: errEmptyAddress,
 		},
 		{
 			name: "URL with specifier",
 			probe: plan.Probe{
 				HTTPGetAction: plan.HTTPGetAction{
 					CACert: "test",
-					URL:    "https://rancher.com:%s",
+					URL:    "https://%s:%s",
 				},
 			},
-			cacert: "test",
-			port:   "1234",
+			cacert:  "test",
+			address: "rancher.com",
+			port:    "1234",
 			expected: plan.Probe{
 				HTTPGetAction: plan.HTTPGetAction{
 					CACert: "test",
@@ -148,7 +161,7 @@ func TestReplaceCACertAndPortForProbes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if probe, err := replaceCACertAndPortForProbes(tt.probe, tt.cacert, tt.port); err != nil {
+			if probe, err := replaceCACertAndPortForProbes(tt.probe, tt.cacert, tt.address, tt.port); err != nil {
 				assert.ErrorIs(t, err, tt.expectedErr)
 			} else {
 				assert.Equal(t, tt.expected, probe)
@@ -157,7 +170,7 @@ func TestReplaceCACertAndPortForProbes(t *testing.T) {
 	}
 }
 
-func TestReplaceRuntimeForProbes(t *testing.T) {
+func TestRenderProbes(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    map[string]plan.Probe
@@ -228,7 +241,106 @@ func TestReplaceRuntimeForProbes(t *testing.T) {
 	}
 }
 
-func TestReplaceRuntime(t *testing.T) {
+func TestReplaceURLForProbes(t *testing.T) {
+	tests := []struct {
+		name            string
+		input           map[string]plan.Probe
+		loopbackAddress string
+		expected        map[string]plan.Probe
+	}{
+		{
+			name:            "nil",
+			input:           nil,
+			loopbackAddress: "",
+			expected:        map[string]plan.Probe{},
+		},
+		{
+			name:            "no probes",
+			input:           map[string]plan.Probe{},
+			loopbackAddress: "",
+			expected:        map[string]plan.Probe{},
+		},
+		{
+			name: "simple probe",
+			input: map[string]plan.Probe{
+				"a": {
+					HTTPGetAction: plan.HTTPGetAction{
+						URL: "https://127.0.0.1:1234/test",
+					},
+				},
+			},
+			loopbackAddress: "",
+			expected: map[string]plan.Probe{
+				"a": {
+					HTTPGetAction: plan.HTTPGetAction{
+						URL: "https://127.0.0.1:1234/test",
+					},
+				},
+			},
+		},
+		{
+			name: "replace ipv4 probe",
+			input: map[string]plan.Probe{
+				"a": {
+					HTTPGetAction: plan.HTTPGetAction{
+						URL: "https://%s:1234/test",
+					},
+				},
+			},
+			loopbackAddress: "127.0.0.1",
+			expected: map[string]plan.Probe{
+				"a": {
+					HTTPGetAction: plan.HTTPGetAction{
+						URL: "https://127.0.0.1:1234/test",
+					},
+				},
+			},
+		},
+		{
+			name: "replace ipv6 probe",
+			input: map[string]plan.Probe{
+				"a": {
+					HTTPGetAction: plan.HTTPGetAction{
+						URL: "https://%s:1234/test",
+					},
+				},
+			},
+			loopbackAddress: "[::1]",
+			expected: map[string]plan.Probe{
+				"a": {
+					HTTPGetAction: plan.HTTPGetAction{
+						URL: "https://[::1]:1234/test",
+					},
+				},
+			},
+		},
+		{
+			name: "replace dual probe",
+			input: map[string]plan.Probe{
+				"a": {
+					HTTPGetAction: plan.HTTPGetAction{
+						URL: "https://%s:1234/test",
+					},
+				},
+			},
+			loopbackAddress: "localhost",
+			expected: map[string]plan.Probe{
+				"a": {
+					HTTPGetAction: plan.HTTPGetAction{
+						URL: "https://localhost:1234/test",
+					},
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, replaceURLForProbes(tt.input, tt.loopbackAddress))
+		})
+	}
+}
+
+func TestReplaceIfFormatSpecifier(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
@@ -269,7 +381,7 @@ func TestReplaceRuntime(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.expected, replaceRuntime(tt.input, tt.runtime))
+			assert.Equal(t, tt.expected, replaceIfFormatSpecifier(tt.input, tt.runtime))
 		})
 	}
 }

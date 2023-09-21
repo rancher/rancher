@@ -225,6 +225,20 @@ func GetRuntimeSupervisorPort(kubernetesVersion string) int {
 	return 6443
 }
 
+func GetLoopbackAddress(controlPlane *rkev1.RKEControlPlane) string {
+	stackPreference := rkev1.DefaultStackPreference
+	if networking := controlPlane.Spec.Networking; networking != nil && networking.StackPreference != "" {
+		stackPreference = networking.StackPreference
+	}
+	if stackPreference == rkev1.SingleStackIPv6Preference {
+		return "[::1]"
+	}
+	if stackPreference == rkev1.DualStackPreference {
+		return "localhost"
+	}
+	return "127.0.0.1"
+}
+
 func IsOwnedByMachine(bootstrapCache rkecontroller.RKEBootstrapCache, machineName string, sa *corev1.ServiceAccount) (bool, error) {
 	for _, owner := range sa.OwnerReferences {
 		if owner.Kind == "RKEBootstrap" {

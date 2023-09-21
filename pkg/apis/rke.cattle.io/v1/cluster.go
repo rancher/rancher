@@ -22,6 +22,38 @@ type RKEClusterStatus struct {
 	Ready      bool                                `json:"ready,omitempty"`
 }
 
+type NetworkingStackPreference string
+
+const (
+	// DualStackPreference signifies a dual stack networking strategy, defaulting "localhost" for communication on the
+	// loopback interface
+	DualStackPreference = NetworkingStackPreference("dual")
+
+	// SingleStackIPv4Preference signifies a single stack IPv4 networking strategy, defaulting "127.0.0.1" for
+	// communication on the loopback interface
+	SingleStackIPv4Preference = NetworkingStackPreference("ipv4")
+
+	// SingleStackIPv6Preference signifies a single stack IPv6 networking strategy, defaulting "::1" for
+	// communication on the loopback interface
+	SingleStackIPv6Preference = NetworkingStackPreference("ipv6")
+
+	// DefaultStackPreference is the stack preference used when no preference is defined, or is invalid. Defaults to
+	// "127.0.0.1" to support existing behavior.
+	DefaultStackPreference = SingleStackIPv4Preference
+)
+
+// Networking contains information regarding the desired and actual networking stack of the cluster.
+type Networking struct {
+	// Specifies which networking stack to prefer for external cluster communication. In practice, this is used by the
+	// planner to render the various probes to force IPv4, IPv6, or default to localhost. There is currently no
+	// sanitization or validation as cluster configuration can be specified with machineGlobalConfig and
+	// machineSelectorConfig, which although easy to instrument to determine a potential interface, user defined
+	// configuration can be specified in the `/etc/rancher/<rke2/k3s>/config.yaml.d` directory either manually or via
+	// cloud-init, and there is currently no mechanism to extract the completely rendered configuration via the planner
+	// nor various engines themselves.
+	StackPreference NetworkingStackPreference `json:"stackPreference,omitempty"`
+}
+
 type RKEClusterSpecCommon struct {
 	UpgradeStrategy       ClusterUpgradeStrategy `json:"upgradeStrategy,omitempty"`
 	ChartValues           GenericMap             `json:"chartValues,omitempty" wrangler:"nullable"`
@@ -31,6 +63,10 @@ type RKEClusterSpecCommon struct {
 	AdditionalManifest    string                 `json:"additionalManifest,omitempty"`
 	Registries            *Registry              `json:"registries,omitempty"`
 	ETCD                  *ETCD                  `json:"etcd,omitempty"`
+
+	// Networking contains information regarding the desired and actual networking stack of the cluster.
+	Networking *Networking `json:"networking,omitempty"`
+
 	// Increment to force all nodes to re-provision
 	ProvisionGeneration int `json:"provisionGeneration,omitempty"`
 }

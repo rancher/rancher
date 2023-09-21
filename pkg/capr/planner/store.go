@@ -514,7 +514,7 @@ func assignAndCheckPlan(store *PlanStore, msg string, entry *planEntry, newPlan 
 	return nil
 }
 
-func (p *PlanStore) setMachineJoinURL(entry *planEntry, capiCluster *capi.Cluster, rkeControlPlane *rkev1.RKEControlPlane) error {
+func (p *PlanStore) setMachineJoinURL(entry *planEntry, capiCluster *capi.Cluster, controlPlane *rkev1.RKEControlPlane) error {
 	var (
 		err     error
 		joinURL string
@@ -526,7 +526,7 @@ func (p *PlanStore) setMachineJoinURL(entry *planEntry, capiCluster *capi.Cluste
 	}
 
 	if IsEtcdOnlyInitNode(entry) {
-		joinURL, err = getJoinURLFromOutput(entry, capiCluster, rkeControlPlane)
+		joinURL, err = getJoinURLFromOutput(entry, capiCluster, controlPlane)
 		if err != nil || joinURL == "" {
 			return err
 		}
@@ -547,7 +547,7 @@ func (p *PlanStore) setMachineJoinURL(entry *planEntry, capiCluster *capi.Cluste
 			}
 		}
 
-		joinURL = joinURLFromAddress(address, capr.GetRuntimeSupervisorPort(rkeControlPlane.Spec.KubernetesVersion))
+		joinURL = joinURLFromAddress(address, capr.GetRuntimeSupervisorPort(controlPlane.Spec.KubernetesVersion))
 	}
 
 	if joinURL != "" && entry.Metadata.Annotations[capr.JoinURLAnnotation] != joinURL {
