@@ -133,5 +133,75 @@ func TestIdentifyCRTBs(t *testing.T) {
 			assert.Equal(t, test.wantDuplicateLocalCrtbs, len(workunitList[0].duplicateLocalCRTBs), "expected duplicate Local-based CRTBs must match")
 		})
 	}
+}
 
+func TestIdentifyPRTBs(t *testing.T) {
+	//t.Parallel()
+
+	tests := []struct {
+		name                    string
+		workunit                migrateUserWorkUnit
+		prtbs                   []v3.ProjectRoleTemplateBinding
+		wantAdPrtbs             int
+		wantDuplicateLocalPrtbs int
+	}{
+		{
+			name:     "Guid-based PRTB referencing Original GUID-based user will be migrated",
+			workunit: guidOriginalWorkunit(),
+			prtbs: []v3.ProjectRoleTemplateBinding{
+				{UserName: testGuidLocalName, UserPrincipalName: testGuidPrincipal},
+			},
+			wantAdPrtbs:             1,
+			wantDuplicateLocalPrtbs: 0,
+		},
+		{
+			name:     "Local-based PRTB referencing Original GUID-based user will not be migrated",
+			workunit: guidOriginalWorkunit(),
+			prtbs: []v3.ProjectRoleTemplateBinding{
+				{UserName: testGuidLocalName, UserPrincipalName: testGuidLocalPrincipal},
+			},
+			wantAdPrtbs:             0,
+			wantDuplicateLocalPrtbs: 0,
+		},
+		{
+			name:     "Guid-based PRTB referencing Duplicate GUID-based user will be migrated",
+			workunit: guidOriginalGuidDuplicateWorkunit(),
+			prtbs: []v3.ProjectRoleTemplateBinding{
+				{UserName: testDuplicateGuidLocalName, UserPrincipalName: testGuidPrincipal},
+			},
+			wantAdPrtbs:             1,
+			wantDuplicateLocalPrtbs: 0,
+		},
+		{
+			name:     "Local-based PRTB referencing Duplicate GUID-based user will be migrated",
+			workunit: guidOriginalGuidDuplicateWorkunit(),
+			prtbs: []v3.ProjectRoleTemplateBinding{
+				{UserName: testDuplicateGuidLocalName, UserPrincipalName: testDuplicateGuidLocalPrincipal},
+			},
+			wantAdPrtbs:             0,
+			wantDuplicateLocalPrtbs: 1,
+		},
+		{
+			name:     "DN-based PRTB referencing Original DN-based user will not be migrated",
+			workunit: dnOriginalGuidDuplicateWorkunit(),
+			prtbs: []v3.ProjectRoleTemplateBinding{
+				{UserName: testDnLocalName, UserPrincipalName: testDnLocalPrincipal},
+			},
+			wantAdPrtbs:             0,
+			wantDuplicateLocalPrtbs: 0,
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			//t.Parallel()
+			prtbList := v3.ProjectRoleTemplateBindingList{Items: test.prtbs}
+			workunitList := []migrateUserWorkUnit{test.workunit}
+			identifyPRTBs(&workunitList, &prtbList)
+
+			assert.Equal(t, test.wantAdPrtbs, len(workunitList[0].activeDirectoryPRTBs), "expected AD-based PRTBs must match")
+			assert.Equal(t, test.wantDuplicateLocalPrtbs, len(workunitList[0].duplicateLocalPRTBs), "expected duplicate Local-based PRTBs must match")
+		})
+	}
 }
