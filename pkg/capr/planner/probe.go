@@ -19,7 +19,7 @@ var (
 			SuccessThreshold:    1,
 			FailureThreshold:    2,
 			HTTPGetAction: plan.HTTPGetAction{
-				URL: "http://localhost:9099/liveness",
+				URL: "http://%s:9099/liveness",
 			},
 		},
 		"etcd": {
@@ -28,7 +28,7 @@ var (
 			SuccessThreshold:    1,
 			FailureThreshold:    2,
 			HTTPGetAction: plan.HTTPGetAction{
-				URL: "http://localhost:2381/health",
+				URL: "http://%s:2381/health",
 			},
 		},
 		"kube-apiserver": {
@@ -37,7 +37,7 @@ var (
 			SuccessThreshold:    1,
 			FailureThreshold:    2,
 			HTTPGetAction: plan.HTTPGetAction{
-				URL:        "https://localhost:6443/readyz",
+				URL:        "https://%s:6443/readyz",
 				CACert:     "/var/lib/rancher/%s/server/tls/server-ca.crt",
 				ClientCert: "/var/lib/rancher/%s/server/tls/client-kube-apiserver.crt",
 				ClientKey:  "/var/lib/rancher/%s/server/tls/client-kube-apiserver.key",
@@ -49,7 +49,7 @@ var (
 			SuccessThreshold:    1,
 			FailureThreshold:    2,
 			HTTPGetAction: plan.HTTPGetAction{
-				URL: "https://localhost:%s/healthz",
+				URL: "https://%s:%s/healthz",
 			},
 		},
 		"kube-controller-manager": {
@@ -58,7 +58,7 @@ var (
 			SuccessThreshold:    1,
 			FailureThreshold:    2,
 			HTTPGetAction: plan.HTTPGetAction{
-				URL: "https://localhost:%s/healthz",
+				URL: "https://%s:%s/healthz",
 			},
 		},
 		"kubelet": {
@@ -67,12 +67,13 @@ var (
 			SuccessThreshold:    1,
 			FailureThreshold:    2,
 			HTTPGetAction: plan.HTTPGetAction{
-				URL: "http://localhost:10248/healthz",
+				URL: "http://%s:10248/healthz",
 			},
 		},
 	}
-	errEmptyCACert = errors.New("cacert cannot be empty")
-	errEmptyPort   = errors.New("port cannot be empty")
+	errEmptyCACert  = errors.New("cacert cannot be empty")
+	errEmptyPort    = errors.New("port cannot be empty")
+	errEmptyAddress = errors.New("address cannot be empty")
 )
 
 // isCalico returns true if the cni is calico or calico+multus, and returns false otherwise.
@@ -90,7 +91,7 @@ func isCalico(controlPlane *rkev1.RKEControlPlane, runtime string) bool {
 
 // renderSecureProbe takes the existing argument value and renders a secure probe using the argument values and an error
 // if one occurred.
-func renderSecureProbe(arg any, rawProbe plan.Probe, runtime string, defaultSecurePort string, defaultCertDir string, defaultCert string) (plan.Probe, error) {
+func renderSecureProbe(arg any, rawProbe plan.Probe, runtime string, loopbackAddress, defaultSecurePort string, defaultCertDir string, defaultCert string) (plan.Probe, error) {
 	securePort := getArgValue(arg, SecurePortArgument, "=")
 	if securePort == "" {
 		// If the user set a custom --secure-port, set --secure-port to an empty string, so we don't override
@@ -110,7 +111,7 @@ func renderSecureProbe(arg any, rawProbe plan.Probe, runtime string, defaultSecu
 		// Our goal here is to generate the tlsCert. If we get to this point, we know we will be using the defaultCert
 		TLSCert = certDir + "/" + defaultCert
 	}
-	return replaceCACertAndPortForProbes(rawProbe, TLSCert, securePort)
+	return replaceCACertAndPortForProbes(rawProbe, TLSCert, loopbackAddress, securePort)
 }
 
 // generateProbes generates probes for the machine (based on type of machine) to the nodePlan and returns the probes and
@@ -144,49 +145,67 @@ func (p *Planner) generateProbes(controlPlane *rkev1.RKEControlPlane, entry *pla
 
 	probes = replaceRuntimeForProbes(probes, runtime)
 
+	loopbackAddress := capr.GetLoopbackAddress(controlPlane)
+
 	if isControlPlane(entry) {
-		kcmProbe, err := renderSecureProbe(config[KubeControllerManagerArg], probes["kube-controller-manager"], runtime, DefaultKubeControllerManagerDefaultSecurePort, DefaultKubeControllerManagerCertDir, DefaultKubeControllerManagerCert)
+		kcmProbe, err := renderSecureProbe(config[KubeControllerManagerArg], probes["kube-controller-manager"], runtime, loopbackAddress, DefaultKubeControllerManagerDefaultSecurePort, DefaultKubeControllerManagerCertDir, DefaultKubeControllerManagerCert)
 		if err != nil {
 			return probes, err
 		}
 		probes["kube-controller-manager"] = kcmProbe
 
-		ksProbe, err := renderSecureProbe(config[KubeSchedulerArg], probes["kube-scheduler"], runtime, DefaultKubeSchedulerDefaultSecurePort, DefaultKubeSchedulerCertDir, DefaultKubeSchedulerCert)
+		ksProbe, err := renderSecureProbe(config[KubeSchedulerArg], probes["kube-scheduler"], runtime, loopbackAddress, DefaultKubeSchedulerDefaultSecurePort, DefaultKubeSchedulerCertDir, DefaultKubeSchedulerCert)
 		if err != nil {
 			return probes, err
 		}
 		probes["kube-scheduler"] = ksProbe
 	}
+
+	probes = replaceURLForProbes(probes, loopbackAddress)
+
 	return probes, nil
 }
 
 // replaceCACertAndPortForProbes adds/replaces the CACert and URL with rendered values based on the values provided.
-func replaceCACertAndPortForProbes(probe plan.Probe, cacert, port string) (plan.Probe, error) {
+func replaceCACertAndPortForProbes(probe plan.Probe, cacert, host, port string) (plan.Probe, error) {
 	if cacert == "" {
 		return plan.Probe{}, errEmptyCACert
 	}
 	if port == "" {
 		return plan.Probe{}, errEmptyPort
 	}
+	if host == "" {
+		return plan.Probe{}, errEmptyAddress
+	}
 	probe.HTTPGetAction.CACert = cacert
-	probe.HTTPGetAction.URL = fmt.Sprintf(probe.HTTPGetAction.URL, port)
+	probe.HTTPGetAction.URL = fmt.Sprintf(probe.HTTPGetAction.URL, host, port)
 	return probe, nil
 }
 
 // replaceRuntimeForProbes will insert the k8s runtime for all probes based on the runtime provider.
 func replaceRuntimeForProbes(probes map[string]plan.Probe, runtime string) map[string]plan.Probe {
-	result := map[string]plan.Probe{}
+	result := make(map[string]plan.Probe, len(probes))
 	for k, v := range probes {
-		v.HTTPGetAction.CACert = replaceRuntime(v.HTTPGetAction.CACert, runtime)
-		v.HTTPGetAction.ClientCert = replaceRuntime(v.HTTPGetAction.ClientCert, runtime)
-		v.HTTPGetAction.ClientKey = replaceRuntime(v.HTTPGetAction.ClientKey, runtime)
+		v.HTTPGetAction.CACert = replaceIfFormatSpecifier(v.HTTPGetAction.CACert, runtime)
+		v.HTTPGetAction.ClientCert = replaceIfFormatSpecifier(v.HTTPGetAction.ClientCert, runtime)
+		v.HTTPGetAction.ClientKey = replaceIfFormatSpecifier(v.HTTPGetAction.ClientKey, runtime)
 		result[k] = v
 	}
 	return result
 }
 
-// replaceRuntime will insert the runtime of the k8s engine if the string str has a string format specifier.
-func replaceRuntime(str string, runtime string) string {
+// replaceURLForProbes will insert the loopback host for all probes based on stack preference.
+func replaceURLForProbes(probes map[string]plan.Probe, loopbackAddress string) map[string]plan.Probe {
+	result := make(map[string]plan.Probe, len(probes))
+	for k, v := range probes {
+		v.HTTPGetAction.URL = replaceIfFormatSpecifier(v.HTTPGetAction.URL, loopbackAddress)
+		result[k] = v
+	}
+	return result
+}
+
+// replaceIfFormatSpecifier will insert the runtime of the k8s engine if the string str has a string format specifier.
+func replaceIfFormatSpecifier(str string, runtime string) string {
 	if !strings.Contains(str, "%s") {
 		return str
 	}
