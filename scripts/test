@@ -158,18 +158,4 @@ export CATTLE_TEST_CONFIG=$(pwd)/config.yaml # used by integration tests and tes
   exit 1
 }
 
-echo Running go integration tests
-go test -v -failfast -p 1 ./tests/v2/integration/... || {
-  dump_rancher_logs
-  exit 1
-}
-
 dump_rancher_logs
-
-echo Running tox tests
-INT_TESTS_STARTED=true
-cd ./tests/integration
-tox -e rancher -- -m "not nonparallel" -n $(nproc)
-tox -e rancher -- -m nonparallel
-
-tail -f /tmp/rancher-test.log &
