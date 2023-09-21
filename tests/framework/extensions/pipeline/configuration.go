@@ -160,17 +160,17 @@ func UpdateRKE2ImageFields(provider, image, sshUser, volumeType string, isCustom
 func UpdateHostedKubernetesVField(provider, kubernetesVersion string) {
 	switch provider {
 	case provisioninginput.AWSProviderName.String():
-		eksClusterConfig := new(eks.EKSClusterConfig)
+		eksClusterConfig := new(eks.ClusterConfig)
 		config.LoadAndUpdateConfig(eks.EKSClusterConfigConfigurationFileKey, eksClusterConfig, func() {
 			eksClusterConfig.KubernetesVersion = &kubernetesVersion
 		})
 	case provisioninginput.AzureProviderName.String():
-		aksClusterConfig := new(aks.AKSClusterConfig)
+		aksClusterConfig := new(aks.ClusterConfig)
 		config.LoadAndUpdateConfig(aks.AKSClusterConfigConfigurationFileKey, aksClusterConfig, func() {
 			aksClusterConfig.KubernetesVersion = &kubernetesVersion
 		})
 	case provisioninginput.GoogleProviderName.String():
-		gkeClusterConfig := new(gke.GKEClusterConfig)
+		gkeClusterConfig := new(gke.ClusterConfig)
 		config.LoadAndUpdateConfig(gke.GKEClusterConfigConfigurationFileKey, gkeClusterConfig, func() {
 			gkeClusterConfig.KubernetesVersion = &kubernetesVersion
 		})

@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
 	_ "net/http/pprof"
@@ -50,7 +49,7 @@ const (
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	killServer := killserver.NewKillServer(killserver.KillServerPort, cancel)
+	killServer := killserver.NewKillServer(killserver.Port, cancel)
 
 	go killServer.Start()
 	go runAgent(ctx)
@@ -280,7 +279,7 @@ func run(ctx context.Context) error {
 			}
 			caFileLocation := "/etc/kubernetes/ssl/certs/serverca"
 			if _, err := os.Stat(caFileLocation); err == nil {
-				caFile, err := ioutil.ReadFile(caFileLocation)
+				caFile, err := os.ReadFile(caFileLocation)
 				if err != nil {
 					return err
 				}

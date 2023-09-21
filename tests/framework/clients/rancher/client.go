@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 
 	"github.com/pkg/errors"
@@ -150,7 +150,7 @@ func (c *Client) doAction(endpoint, action string, body []byte, output interface
 		return httperror.NewAPIErrorLong(resp.StatusCode, resp.Status, url)
 	}
 
-	byteContent, err := ioutil.ReadAll(resp.Body)
+	byteContent, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return err
 	}
@@ -267,8 +267,8 @@ func (c *Client) SwitchContext(context string, clientConfig *clientcmd.ClientCon
 }
 
 // GetEC2Client is a helper function that instantiates an aws ec2 client to communicate with the ec2 instances on aws.
-func (c *Client) GetEC2Client() (*ec2.EC2Client, error) {
-	return ec2.NewEC2Client()
+func (c *Client) GetEC2Client() (*ec2.Client, error) {
+	return ec2.NewClient()
 }
 
 // GetManagementWatchInterface is a functions used to get a watch.Interface from a resource created by the Management Client.

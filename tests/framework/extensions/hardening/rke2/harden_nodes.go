@@ -5,12 +5,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	"github.com/rancher/rancher/tests/framework/pkg/nodes"
 	"github.com/sirupsen/logrus"
 )
 
-func HardeningNodes(client *rancher.Client, hardened bool, nodes []*nodes.Node, nodeRoles []string) error {
+func HardenNodes(nodes []*nodes.Node, nodeRoles []string) error {
 	logrus.Infof("Starting to harden nodes")
 	for key, node := range nodes {
 		logrus.Infof("Setting kernel parameters on node %s", node.NodeID)
