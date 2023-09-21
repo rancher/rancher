@@ -6,6 +6,7 @@ import (
 )
 
 const openLdapConfigNameBase = "openLdapAuthConfig"
+const ConfigurationFileKey = "authProvider"
 
 type OpenLDAPCredentialConfig struct {
 	Servers                         []string `json:"servers"`
@@ -21,11 +22,16 @@ type OpenLDAPCredentialConfig struct {
 	TestPassword string `json:"testPassword"`
 }
 
+type Config2 struct {
+	OpenLdapUser     string `yaml:"openLdapUser"`
+	OpenLdapUserPass string `yaml:"openLdapUserPass"`
+}
+
 // CreateOpenLDAPAuthConfig is a helper function that creates
 // an openLDAP auth config, enables it, and returns the AuthConfig response
 func CreateOpenLDAPAuthConfig(rancherClient *rancher.Client) (*management.AuthConfig, error) {
 	// Hardcoding the values for this config
-	openLdapCredentialConfig := OpenLDAPCredentialConfig{
+	/*	openLdapCredentialConfig := OpenLDAPCredentialConfig{
 		Servers:                         []string{"openldapqa.qa.rancher.space"},
 		ServiceAccountDistinguishedName: "cn=admin,dc=qa,dc=rancher,dc=space",
 		ServiceAccountPassword:          "<password>",
@@ -34,12 +40,12 @@ func CreateOpenLDAPAuthConfig(rancherClient *rancher.Client) (*management.AuthCo
 		TLS:                             false,
 		TestUsername:                    "testuser1",
 		TestPassword:                    "Tacos86!",
-	}
+	} */
 
 	authConfig := management.AuthConfig{
-		Name:                     openLdapConfigNameBase,
-		OpenLDAPCredentialConfig: &openLdapCredentialConfig,
-		Enabled:                  true,
+		Name: openLdapConfigNameBase,
+		//OpenLDAPCredentialConfig: &openLdapCredentialConfig,
+		Enabled: true,
 	}
 
 	resp := &management.AuthConfig{}

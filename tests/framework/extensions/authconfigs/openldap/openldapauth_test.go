@@ -1,16 +1,18 @@
 package openldapauth
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
+	"github.com/rancher/rancher/tests/framework/pkg/config"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
 
-type openLdapTest struct {
+type OpenLdapTest struct {
 	suite.Suite
 	testUser *management.User
 	client   *rancher.Client
@@ -18,8 +20,8 @@ type openLdapTest struct {
 	session  *session.Session
 }
 
-func (d *openLdapTest) SetupSuite() {
-	testSession := session.NewSession(d.T())
+func (d *OpenLdapTest) SetupSuite() {
+	testSession := session.NewSession()
 
 	client, err := rancher.NewClient("", testSession)
 	require.NoError(d.T(), err)
@@ -32,25 +34,45 @@ func (d *openLdapTest) SetupSuite() {
 	}
 
 	testProject, err := client.Management.Project.Create(projectConfig)
-	require.NoError(p.T(), err)
+	require.NoError(d.T(), err)
 
 	d.project = testProject
+	/*
+		upgradeConfig := new(Config2)
+		config.LoadConfig(ConfigurationFileKey, upgradeConfig)
+		fmt.Print(upgradeConfig.OpenLdapUser)
+		fmt.Print(upgradeConfig.OpenLdapUserPass) */
 
-	enabled := true
+	//enabled := true
 
-	user := &management.User{
+	/*user := &management.User{
 		Username: "testusername",
 		Password: "passwordpasswordd",
 		Name:     "displayname",
 		Enabled:  &enabled,
-	}
+	}*/
+
+	//client.AsUser(user)
 
 }
-func (d *openLdapTest) TearDownSuite() {
+func (d *OpenLdapTest) TearDownSuite() {
 	d.session.Cleanup()
 }
 
-func TestCreateOpenLDAPAuthConfig(t *testing.T) {
+func (d *OpenLdapTest) TestEnableOpenLDAP() {
+	testSession := session.NewSession()
+	d.session = testSession
+
+	client, err := rancher.NewClient("", testSession)
+	require.NoError(d.T(), err)
+
+	upgradeConfig := new(Config2)
+	config.LoadConfig(ConfigurationFileKey, upgradeConfig)
+	fmt.Print(upgradeConfig.OpenLdapUser)
+	fmt.Print(upgradeConfig.OpenLdapUserPass)
+	fmt.Print(client)
+	fmt.Print(d.testUser)
+
 	/*
 		rancherClient, err := rancher.NewRancherClient()
 		require.NoError(t, err)
@@ -66,4 +88,6 @@ func TestCreateOpenLDAPAuthConfig(t *testing.T) {
 	*/
 }
 
-//need to add a suite a teardown and a config = somewehre?
+func TestOpenLdapTestSuite(t *testing.T) {
+	suite.Run(t, new(OpenLdapTest))
+}
