@@ -44,6 +44,7 @@ type handler struct {
 	clusterRegistrationTokens v3.ClusterRegistrationTokenCache
 	bundles                   fleetcontrollers.BundleClient
 	rkeControlPlane           v1.RKEControlPlaneController
+	provClusters              rocontrollers.ClusterCache
 }
 
 func Register(ctx context.Context, clients *wrangler.Context) {
@@ -51,6 +52,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 		clusterRegistrationTokens: clients.Mgmt.ClusterRegistrationToken().Cache(),
 		bundles:                   clients.Fleet.Bundle(),
 		rkeControlPlane:           clients.RKE.RKEControlPlane(),
+		provClusters:              clients.Provisioning.Cluster().Cache(),
 	}
 
 	v1.RegisterRKEControlPlaneStatusHandler(ctx, clients.RKE.RKEControlPlane(),
@@ -122,9 +124,13 @@ func (h *handler) OnChange(cluster *rancherv1.Cluster, status rancherv1.ClusterS
 		return nil, status, err
 	}
 
+	if cluster.Status.FleetWorkspaceName == "" {
+		return nil, status, err
+	}
+
 	result = append(result, &v1alpha1.Bundle{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: cluster.Namespace,
+			Namespace: cluster.Status.FleetWorkspaceName,
 			Name:      capr.SafeConcatName(capr.MaxHelmReleaseNameLength, cluster.Name, "managed", "system", "agent"),
 		},
 		Spec: v1alpha1.BundleSpec{

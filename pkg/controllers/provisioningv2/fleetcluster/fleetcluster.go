@@ -121,6 +121,10 @@ func (h *handler) createCluster(cluster *provv1.Cluster, status provv1.ClusterSt
 		return nil, status, generic.ErrSkip
 	}
 
+	if mgmtCluster.Spec.FleetWorkspaceName == "" {
+		return nil, status, generic.ErrSkip
+	}
+
 	// this removes any annotations containing "cattle.io" or starting with "kubectl.kubernetes.io"
 	labels := yaml.CleanAnnotationsForExport(mgmtCluster.Labels)
 	labels["management.cattle.io/cluster-name"] = mgmtCluster.Name
@@ -158,17 +162,18 @@ func (h *handler) createCluster(cluster *provv1.Cluster, status provv1.ClusterSt
 	return append(objs, &fleet.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cluster.Name,
-			Namespace: cluster.Namespace,
+			Namespace: mgmtCluster.Spec.FleetWorkspaceName,
 			Labels:    labels,
 		},
 		Spec: fleet.ClusterSpec{
-			KubeConfigSecret: clientSecret,
-			AgentEnvVars:     mgmtCluster.Spec.AgentEnvVars,
-			AgentNamespace:   agentNamespace,
-			PrivateRepoURL:   h.getPrivateRepoURL(cluster, mgmtCluster),
-			AgentTolerations: mgmtcluster.GetFleetAgentTolerations(mgmtCluster),
-			AgentAffinity:    agentAffinity,
-			AgentResources:   mgmtcluster.GetFleetAgentResourceRequirements(mgmtCluster),
+			KubeConfigSecret:          clientSecret,
+			KubeConfigSecretNamespace: cluster.Namespace,
+			AgentEnvVars:              mgmtCluster.Spec.AgentEnvVars,
+			AgentNamespace:            agentNamespace,
+			PrivateRepoURL:            h.getPrivateRepoURL(cluster, mgmtCluster),
+			AgentTolerations:          mgmtcluster.GetFleetAgentTolerations(mgmtCluster),
+			AgentAffinity:             agentAffinity,
+			AgentResources:            mgmtcluster.GetFleetAgentResourceRequirements(mgmtCluster),
 		},
 	}), status, nil
 }

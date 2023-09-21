@@ -107,13 +107,18 @@ var (
 		true,
 		true,
 		true)
-
 	HarvesterBaremetalContainerWorkload = newFeature(
 		"harvester-baremetal-container-workload",
 		"[Experimental]: Deploy container workloads to underlying harvester cluster",
 		false,
 		true,
 		true)
+	ProvisioningV2FleetWorkspaceBackPopulation = newFeature(
+		"provisioningv2-fleet-workspace-back-population",
+		"[Experimental]: Allow Fleet workspace name to be changed on clusters administrated by provisioning v2",
+		false,
+		false,
+		false)
 )
 
 type Feature struct {
