@@ -300,7 +300,6 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlan
 
 	_, clusterSecretTokens, err := p.ensureRKEStateSecret(cp, !anyPlansDelivered)
 
-	logrus.WithFields(map[string]interface{}{"clusterSecretTokens": clusterSecretTokens}).Errorf("DEBUG - FELIPE - EMPTY CACHE !!")
 	if err != nil {
 		return status, err
 	}
@@ -884,8 +883,6 @@ type reconcilable struct {
 func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, clusterPlan *plan.Plan, required bool,
 	tierName string, include, exclude roleFilter, maxUnavailable string, forcedJoinURL string, drainOptions rkev1.DrainOptions) error {
 
-	logrus.WithFields(map[string]interface{}{"s": tokensSecret}).Errorf("DEBUG - FELIPE -  ")
-
 	var (
 		ready, outOfSync, nonReady, errMachines, draining, uncordoned []string
 		messages                                                      = map[string][]string{}
@@ -904,8 +901,6 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret pl
 		if err != nil {
 			return err
 		}
-		logrus.Errorf("FELIPE  - [planner] rkecluster %s/%s reconcile tier %s - rendering desired plan for machine %s/%s with join URL: (%s), secret: %s/%s", controlPlane.Namespace, controlPlane.Name, tierName, entry.Machine.Namespace, entry.Machine.Name, joinURL, tokensSecret.AgentToken, tokensSecret.ServerToken)
-		logrus.Debugf("[planner] rkecluster %s/%s reconcile tier %s - rendering desired plan for machine %s/%s with join URL: (%s)", controlPlane.Namespace, controlPlane.Name, tierName, entry.Machine.Namespace, entry.Machine.Name, joinURL)
 		plan, joinedURL, err := p.desiredPlan(controlPlane, tokensSecret, entry, joinURL)
 		if err != nil {
 			return err
@@ -1168,13 +1163,6 @@ func (p *Planner) ensureRKEStateSecret(controlPlane *rkev1.RKEControlPlane, newC
 	}
 
 	name := name.SafeConcatName(controlPlane.Name, "rke", "state")
-	if p.secretClient != nil {
-		s, e := p.secretClient.Get(controlPlane.Namespace, name, metav1.GetOptions{})
-		logrus.WithFields(map[string]interface{}{"secret": s, "err": e, "isnill": s == nil}).Errorf("DEBUG -- FELIPE - Without cache")
-
-	} else {
-		logrus.Errorf("DEBUG - FELIPIE  -  Nill secretClient")
-	}
 
 	secret, err := p.secretCache.Get(controlPlane.Namespace, name) // FELIPE GET FROM CACHE !!!!
 	if apierror.IsNotFound(err) {
