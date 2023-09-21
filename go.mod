@@ -6,7 +6,7 @@ go 1.20
 replace github.com/rancher/wrangler v1.1.1 => github.com/rancher/wrangler v1.1.1-0.20230831050635-df1bd5aae9df
 
 // \/  Not Working
-replace github.com/rancher/dynamiclistener v0.3.6-rc3-deadlock-fix-revert => github.com/felipe-colussi/dynamiclistener v0.0.0-20230921162844-fa3989251ad1
+replace github.com/rancher/dynamiclistener v0.3.6-rc3-deadlock-fix-revert => github.com/felipe-colussi/dynamiclistener v0.0.0-20230921163534-9bd4fbd18c0a
 
 replace (
 	github.com/containerd/containerd => github.com/containerd/containerd v1.6.22 // for compatibilty with docker 20.10.x
