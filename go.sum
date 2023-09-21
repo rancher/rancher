@@ -334,8 +334,8 @@ github.com/fatih/color v1.9.0/go.mod h1:eQcE1qtQxscV5RaZvpXrrb8Drkc3/DdQ+uUYCNjL
 github.com/fatih/color v1.13.0/go.mod h1:kLAiJbzzSOZDVNGyDpeOxJ47H46qBXwg5ILebYFFOfk=
 github.com/fatih/color v1.15.0 h1:kOqh6YHBtK8aywxGerMG2Eq3H6Qgoqeo13Bk2Mv/nBs=
 github.com/fatih/color v1.15.0/go.mod h1:0h5ZqXfHYED7Bhv2ZJamyIOUej9KtShiJESRwBDUSsw=
-github.com/felipe-colussi/dynamiclistener v0.0.0-20230921140452-b75eefc179bc h1:WHik7zCiIyz00FeceIYggOwLY1M6OB3vV/AMLSu311A=
-github.com/felipe-colussi/dynamiclistener v0.0.0-20230921140452-b75eefc179bc/go.mod h1:VqBaJNi+bZmre0+gi+2Jb6jbn7ovHzRueW+M7QhVKsk=
+github.com/felipe-colussi/dynamiclistener v0.0.0-20230915181552-8819e93d9186 h1:vS2GOIUV4bLu6A0vOVWqi7FVJpoq898rvsw+0+eBlyc=
+github.com/felipe-colussi/dynamiclistener v0.0.0-20230915181552-8819e93d9186/go.mod h1:VqBaJNi+bZmre0+gi+2Jb6jbn7ovHzRueW+M7QhVKsk=
 github.com/felixge/httpsnoop v1.0.1/go.mod h1:m8KPJKqk1gH5J9DgRY2ASl2lWCfGKXixSwevea8zH2U=
 github.com/felixge/httpsnoop v1.0.3 h1:s/nj+GCswXYzN5v2DpNMuMQYe+0DDwt5WVCU6CWBdXk=
 github.com/felixge/httpsnoop v1.0.3/go.mod h1:m8KPJKqk1gH5J9DgRY2ASl2lWCfGKXixSwevea8zH2U=
