@@ -79,7 +79,7 @@ func Test_rbaccontroller_ensureRolebinding(t *testing.T) {
 
 				c.mockRBInterface = &fakes.RoleBindingInterfaceMock{
 					CreateFunc: func(rb *k8srbac.RoleBinding) (*k8srbac.RoleBinding, error) {
-						assert.Equal(t, rb, expected)
+						assert.Equal(c.t, rb, expected)
 						return expected, nil
 					},
 				}
@@ -106,7 +106,7 @@ func Test_rbaccontroller_ensureRolebinding(t *testing.T) {
 
 				c.mockRBInterface = &fakes.RoleBindingInterfaceMock{
 					UpdateFunc: func(rb *k8srbac.RoleBinding) (*k8srbac.RoleBinding, error) {
-						assert.Equal(t, rb, expected)
+						assert.Equal(c.t, rb, expected)
 						return expected, nil
 					},
 				}
@@ -133,7 +133,7 @@ func Test_rbaccontroller_ensureRolebinding(t *testing.T) {
 
 				c.mockRBInterface = &fakes.RoleBindingInterfaceMock{
 					UpdateFunc: func(rb *k8srbac.RoleBinding) (*k8srbac.RoleBinding, error) {
-						assert.Equal(t, rb, expected)
+						assert.Equal(c.t, rb, expected)
 						return expected, nil
 					},
 				}
@@ -160,7 +160,7 @@ func Test_rbaccontroller_ensureRolebinding(t *testing.T) {
 
 				c.mockRBInterface = &fakes.RoleBindingInterfaceMock{
 					UpdateFunc: func(rb *k8srbac.RoleBinding) (*k8srbac.RoleBinding, error) {
-						assert.Equal(t, rb, expected)
+						assert.Equal(c.t, rb, expected)
 						return expected, nil
 					},
 				}
@@ -187,7 +187,7 @@ func Test_rbaccontroller_ensureRolebinding(t *testing.T) {
 
 				c.mockRBInterface = &fakes.RoleBindingInterfaceMock{
 					UpdateFunc: func(rb *k8srbac.RoleBinding) (*k8srbac.RoleBinding, error) {
-						assert.Equal(t, rb, expected)
+						assert.Equal(c.t, rb, expected)
 						return expected, nil
 					},
 				}
