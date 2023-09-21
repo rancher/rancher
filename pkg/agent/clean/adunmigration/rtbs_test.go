@@ -65,7 +65,7 @@ func dnOriginalGuidDuplicateWorkunit() migrateUserWorkUnit {
 }
 
 func TestIdentifyCRTBs(t *testing.T) {
-	//t.Parallel()
+	t.Parallel()
 
 	tests := []struct {
 		name                    string
@@ -124,7 +124,7 @@ func TestIdentifyCRTBs(t *testing.T) {
 	for _, test := range tests {
 		test := test
 		t.Run(test.name, func(t *testing.T) {
-			//t.Parallel()
+			t.Parallel()
 			crtbList := v3.ClusterRoleTemplateBindingList{Items: test.crtbs}
 			workunitList := []migrateUserWorkUnit{test.workunit}
 			identifyCRTBs(&workunitList, &crtbList)
@@ -136,7 +136,7 @@ func TestIdentifyCRTBs(t *testing.T) {
 }
 
 func TestIdentifyPRTBs(t *testing.T) {
-	//t.Parallel()
+	t.Parallel()
 
 	tests := []struct {
 		name                    string
@@ -195,13 +195,53 @@ func TestIdentifyPRTBs(t *testing.T) {
 	for _, test := range tests {
 		test := test
 		t.Run(test.name, func(t *testing.T) {
-			//t.Parallel()
+			t.Parallel()
 			prtbList := v3.ProjectRoleTemplateBindingList{Items: test.prtbs}
 			workunitList := []migrateUserWorkUnit{test.workunit}
 			identifyPRTBs(&workunitList, &prtbList)
 
 			assert.Equal(t, test.wantAdPrtbs, len(workunitList[0].activeDirectoryPRTBs), "expected AD-based PRTBs must match")
 			assert.Equal(t, test.wantDuplicateLocalPrtbs, len(workunitList[0].duplicateLocalPRTBs), "expected duplicate Local-based PRTBs must match")
+		})
+	}
+}
+
+func TestIdentifyGRBs(t *testing.T) {
+	//t.Parallel()
+
+	tests := []struct {
+		name                   string
+		workunit               migrateUserWorkUnit
+		grbs                   []v3.GlobalRoleBinding
+		wantDuplicateLocalGrbs int
+	}{
+		{
+			name:     "GRB referencing Original user will not be migrated",
+			workunit: guidOriginalGuidDuplicateWorkunit(),
+			grbs: []v3.GlobalRoleBinding{
+				{UserName: testGuidLocalName},
+			},
+			wantDuplicateLocalGrbs: 0,
+		},
+		{
+			name:     "GRB referencing Duplicate user will be migrated",
+			workunit: guidOriginalGuidDuplicateWorkunit(),
+			grbs: []v3.GlobalRoleBinding{
+				{UserName: testDuplicateGuidLocalName},
+			},
+			wantDuplicateLocalGrbs: 1,
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			grbList := v3.GlobalRoleBindingList{Items: test.grbs}
+			workunitList := []migrateUserWorkUnit{test.workunit}
+			identifyGRBs(&workunitList, &grbList)
+
+			assert.Equal(t, test.wantDuplicateLocalGrbs, len(workunitList[0].duplicateLocalGRBs), "expected duplicate GRBs must match")
 		})
 	}
 }
