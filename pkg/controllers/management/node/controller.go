@@ -281,7 +281,7 @@ func (m *Lifecycle) Remove(machine *apimgmtv3.Node) (obj runtime.Object, err err
 				return nil, err
 			}
 
-			configRawMap := map[string]interface{}{}
+			configRawMap := map[string]any{}
 			if err := json.Unmarshal([]byte(driverConfig), &configRawMap); err != nil {
 				return obj, errors.Wrap(err, "failed to unmarshal node config")
 			}
@@ -677,7 +677,7 @@ func (m *Lifecycle) refreshNodeConfig(nc *nodeconfig.NodeConfig, obj *apimgmtv3.
 	if template.Spec.Driver == amazonec2 {
 		setEc2ClusterIDTag(rawConfig, obj.Namespace)
 		logrus.Debug("[node-controller] refreshNodeConfig: Updating amazonec2 machine config")
-		//TODO: Update to not be amazon specific, this needs to be moved to the driver
+		// TODO: Update to not be amazon specific, this needs to be moved to the driver
 		update, err = nc.UpdateAmazonAuth(rawConfig)
 		if err != nil {
 			return err

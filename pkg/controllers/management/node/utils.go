@@ -76,7 +76,7 @@ func buildCreateCommand(node *v3.Node, configMap map[string]interface{}) []strin
 }
 
 // buildDriverFlags extracts driver-specific configuration from the given configmap and turns it into CLI flags.
-func buildDriverFlags(driverName string, configMap map[string]interface{}) []string {
+func buildDriverFlags(driverName string, configMap map[string]any) []string {
 	cmd := make([]string, 0)
 
 	for k, v := range configMap {
@@ -301,7 +301,7 @@ func nodeExists(nodeDir string, node *v3.Node) (bool, error) {
 	return false, nil
 }
 
-func deleteNode(nodeDir string, node *v3.Node, configMap map[string]interface{}) error {
+func deleteNode(nodeDir string, node *v3.Node, configMap map[string]any) error {
 	// We're passing the `--update-config` flag here along with driver-specific flags to tell Rancher Machine
 	// to reload the driver-specific flags we pass via CLI flags. They need to be reloaded to account for cases
 	// were configuration used by Rancher machine (namely cloud credentials) change while the machine is still running.
