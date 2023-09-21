@@ -1,7 +1,6 @@
 package adunmigration
 
 import (
-	"io"
 	"testing"
 
 	"github.com/sirupsen/logrus"
@@ -22,7 +21,6 @@ func TestEscapeUUID(t *testing.T) {
 
 func TestIsGUID(t *testing.T) {
 	hook := logrusTest.NewGlobal()
-	logrus.SetOutput(io.Discard)
 
 	tests := []struct {
 		name            string
@@ -50,7 +48,7 @@ func TestIsGUID(t *testing.T) {
 		},
 		{
 			name:            "Invalid principal",
-			principalId:     "wat",
+			principalId:     "fail-on-purpose",
 			wantResult:      false,
 			wantLoggedError: true,
 		},

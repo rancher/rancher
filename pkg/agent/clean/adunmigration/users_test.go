@@ -83,7 +83,7 @@ func TestGetExternalId(t *testing.T) {
 		},
 		{
 			name:        "Invalid principal",
-			principalId: "wat",
+			principalId: "fail-on-purpose",
 			wantResult:  "",
 			wantError:   true,
 		},
@@ -133,7 +133,7 @@ func TestGetScope(t *testing.T) {
 		},
 		{
 			name:        "Invalid principal",
-			principalId: "wat",
+			principalId: "fail-on-purpose",
 			wantResult:  "",
 			wantError:   true,
 		},
