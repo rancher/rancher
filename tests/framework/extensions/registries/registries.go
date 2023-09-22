@@ -52,7 +52,7 @@ func CheckPodStatusImageSource(client *rancher.Client, clusterName, registryFQDN
 		return false, []error{err}
 	}
 
-	_, podErrors := pods.StatusPods(client, clusterID)
+	podErrors := pods.StatusPods(client, clusterID)
 	if len(podErrors) != 0 {
 		return false, []error{fmt.Errorf("error: pod(s) are in an error state  %v", podErrors)}
 	}
