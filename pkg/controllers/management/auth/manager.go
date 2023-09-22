@@ -19,6 +19,7 @@ import (
 	"github.com/rancher/rancher/pkg/user"
 	"github.com/rancher/wrangler/pkg/apply"
 	"github.com/sirupsen/logrus"
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -54,7 +55,9 @@ func newRTBLifecycles(management *config.ManagementContext) (*prtbLifecycle, *cr
 			crbLister:     management.RBAC.ClusterRoleBindings("").Controller().Lister(),
 			crbClient:     management.RBAC.ClusterRoleBindings(""),
 			crLister:      management.RBAC.ClusterRoles("").Controller().Lister(),
+			nsLister:      management.Core.Namespaces("").Controller().Lister(),
 			rLister:       management.RBAC.Roles("").Controller().Lister(),
+			rClient:       management.RBAC.Roles(""),
 			rbLister:      management.RBAC.RoleBindings("").Controller().Lister(),
 			rbClient:      management.RBAC.RoleBindings(""),
 			rtLister:      management.Management.RoleTemplates("").Controller().Lister(),
@@ -75,7 +78,9 @@ func newRTBLifecycles(management *config.ManagementContext) (*prtbLifecycle, *cr
 			crbLister:     management.RBAC.ClusterRoleBindings("").Controller().Lister(),
 			crbClient:     management.RBAC.ClusterRoleBindings(""),
 			crLister:      management.RBAC.ClusterRoles("").Controller().Lister(),
+			nsLister:      management.Core.Namespaces("").Controller().Lister(),
 			rLister:       management.RBAC.Roles("").Controller().Lister(),
+			rClient:       management.RBAC.Roles(""),
 			rbLister:      management.RBAC.RoleBindings("").Controller().Lister(),
 			rbClient:      management.RBAC.RoleBindings(""),
 			rtLister:      management.Management.RoleTemplates("").Controller().Lister(),
@@ -95,6 +100,7 @@ type manager struct {
 	projectLister  v3.ProjectLister
 	crLister       typesrbacv1.ClusterRoleLister
 	rLister        typesrbacv1.RoleLister
+	rClient        typesrbacv1.RoleInterface
 	rbLister       typesrbacv1.RoleBindingLister
 	rbClient       typesrbacv1.RoleBindingInterface
 	crbLister      typesrbacv1.ClusterRoleBindingLister
@@ -456,7 +462,7 @@ func (m *manager) removeAuthV2Permissions(setID string, owner runtime.Object) er
 	return returnErr
 }
 
-// Certain resources (projects, machines, prtbs, crtbs, clusterevents, etc) exist in the mangement plane but are scoped to clusters or
+// Certain resources (projects, machines, prtbs, crtbs, clusterevents, etc) exist in the management plane but are scoped to clusters or
 // projects. They need special RBAC handling because the need to be authorized just inside of the namespace that backs the project
 // or cluster they belong to.
 func (m *manager) grantManagementPlanePrivileges(roleTemplateName string, resources map[string]string, subject v1.Subject, binding interface{}) error {
@@ -476,7 +482,6 @@ func (m *manager) grantManagementPlanePrivileges(roleTemplateName string, resour
 	}
 
 	desiredRBs := map[string]*v1.RoleBinding{}
-	roleBindings := m.mgmt.RBAC.RoleBindings(namespace)
 	for _, role := range roles {
 		resourceToVerbs := map[string]map[string]string{}
 		for resource, apiGroup := range resources {
@@ -527,7 +532,7 @@ func (m *manager) grantManagementPlanePrivileges(roleTemplateName string, resour
 		currentRBs[rb.Name] = rb
 	}
 
-	return m.reconcileDesiredMGMTPlaneRoleBindings(currentRBs, desiredRBs, roleBindings)
+	return m.reconcileDesiredMGMTPlaneRoleBindings(currentRBs, desiredRBs, namespace)
 }
 
 // grantManagementClusterScopedPrivilegesInProjectNamespace ensures that rolebindings for roles like cluster-owner (that should be able to fully
@@ -541,7 +546,6 @@ func (m *manager) grantManagementClusterScopedPrivilegesInProjectNamespace(roleT
 	}
 
 	desiredRBs := map[string]*v1.RoleBinding{}
-	roleBindings := m.mgmt.RBAC.RoleBindings(projectNamespace)
 	bindingKey := pkgrbac.GetRTBLabel(binding.ObjectMeta)
 	for _, role := range roles {
 		resourceToVerbs := map[string]map[string]string{}
@@ -595,7 +599,7 @@ func (m *manager) grantManagementClusterScopedPrivilegesInProjectNamespace(roleT
 		currentRBs[rb.Name] = rb
 	}
 
-	return m.reconcileDesiredMGMTPlaneRoleBindings(currentRBs, desiredRBs, roleBindings)
+	return m.reconcileDesiredMGMTPlaneRoleBindings(currentRBs, desiredRBs, projectNamespace)
 }
 
 // grantManagementProjectScopedPrivilegesInClusterNamespace ensures that project roles grant permissions to certain cluster-scoped
@@ -608,7 +612,6 @@ func (m *manager) grantManagementProjectScopedPrivilegesInClusterNamespace(roleT
 	}
 
 	desiredRBs := map[string]*v1.RoleBinding{}
-	roleBindings := m.mgmt.RBAC.RoleBindings(clusterNamespace)
 	bindingKey := pkgrbac.GetRTBLabel(binding.ObjectMeta)
 	for _, role := range roles {
 		resourceToVerbs := map[string]map[string]string{}
@@ -657,7 +660,7 @@ func (m *manager) grantManagementProjectScopedPrivilegesInClusterNamespace(roleT
 		currentRBs[rb.Name] = rb
 	}
 
-	return m.reconcileDesiredMGMTPlaneRoleBindings(currentRBs, desiredRBs, roleBindings)
+	return m.reconcileDesiredMGMTPlaneRoleBindings(currentRBs, desiredRBs, clusterNamespace)
 }
 
 func (m *manager) gatherAndDedupeRoles(roleTemplateName string) (map[string]*v3.RoleTemplate, error) {
@@ -681,7 +684,9 @@ func (m *manager) gatherAndDedupeRoles(roleTemplateName string) (map[string]*v3.
 	return roles, nil
 }
 
-func (m *manager) reconcileDesiredMGMTPlaneRoleBindings(currentRBs, desiredRBs map[string]*v1.RoleBinding, roleBindings typesrbacv1.RoleBindingInterface) error {
+// reconcileDesiredMGMTPlaneRoleBindings ensures that the desired management plane role bindings
+// exist and delete any that should not exist
+func (m *manager) reconcileDesiredMGMTPlaneRoleBindings(currentRBs, desiredRBs map[string]*v1.RoleBinding, namespace string) error {
 	rbsToDelete := map[string]bool{}
 	processed := map[string]bool{}
 	for _, rb := range currentRBs {
@@ -698,17 +703,27 @@ func (m *manager) reconcileDesiredMGMTPlaneRoleBindings(currentRBs, desiredRBs m
 		}
 	}
 
-	for _, rb := range desiredRBs {
-		logrus.Infof("[%v] Creating roleBinding for subject %v with role %v in namespace %v", m.controller, rb.Subjects[0].Name, rb.RoleRef.Name, rb.Namespace)
-		_, err := roleBindings.Create(rb)
-		if err != nil && !apierrors.IsAlreadyExists(err) {
+	for name := range rbsToDelete {
+		logrus.Infof("[%v] Deleting roleBinding %v", m.controller, name)
+		if err := m.rbClient.DeleteNamespaced(namespace, name, &metav1.DeleteOptions{}); err != nil {
 			return err
 		}
 	}
 
-	for name := range rbsToDelete {
-		logrus.Infof("[%v] Deleting roleBinding %v", m.controller, name)
-		if err := roleBindings.Delete(name, &metav1.DeleteOptions{}); err != nil {
+	// If the namespace is terminating don't create RoleBindings
+	ns, err := m.nsLister.Get("", namespace)
+	if err != nil {
+		return errors.Wrapf(err, "couldn't get namespace %v", namespace)
+	}
+	if ns.Status.Phase == corev1.NamespaceTerminating {
+		logrus.Warnf("[%v] Namespace %v is terminating, not creating roleBindings", m.controller, namespace)
+		return nil
+	}
+
+	for _, rb := range desiredRBs {
+		logrus.Infof("[%v] Creating roleBinding for subject %v with role %v in namespace %v", m.controller, rb.Subjects[0].Name, rb.RoleRef.Name, rb.Namespace)
+		_, err := m.rbClient.Create(rb)
+		if err != nil && !apierrors.IsAlreadyExists(err) {
 			return err
 		}
 	}
@@ -755,11 +770,14 @@ func checkGroup(apiGroup string, rule v1.PolicyRule) bool {
 	return false
 }
 
+// reconcileManagementPlaneRole ensures that the management plane role exists and has the right rules.
+// If not, update or create it as needed.
 func (m *manager) reconcileManagementPlaneRole(namespace string, resourceToVerbs map[string]map[string]string, rt *v3.RoleTemplate) error {
-	roleCli := m.mgmt.RBAC.Roles(namespace)
 	update := false
 	if role, err := m.rLister.Get(namespace, rt.Name); err == nil && role != nil {
 		newRole := role.DeepCopy()
+		// If the permissions specified by resourceToVerbs is a subset of the existing
+		// rules of the Role, don't update
 		for resource, newVerbs := range resourceToVerbs {
 			currentVerbs := map[string]string{}
 			for _, rule := range role.Rules {
@@ -787,14 +805,23 @@ func (m *manager) reconcileManagementPlaneRole(namespace string, resourceToVerbs
 				if !added {
 					newRole.Rules = append(newRole.Rules, buildRule(resource, newVerbs))
 				}
-
 			}
 		}
 		if update {
 			logrus.Infof("[%v] Updating role %v in namespace %v", m.controller, newRole.Name, namespace)
-			_, err := roleCli.Update(newRole)
+			_, err := m.rClient.Update(newRole)
 			return err
 		}
+		return nil
+	}
+
+	// If the namespace is terminating, don't create a Role in it
+	ns, err := m.nsLister.Get("", namespace)
+	if err != nil {
+		return errors.Wrapf(err, "couldn't get namespace %v", namespace)
+	}
+	if ns.Status.Phase == corev1.NamespaceTerminating {
+		logrus.Warnf("[%v] Namespace %v is terminating, not creating role", m.controller, namespace)
 		return nil
 	}
 
@@ -803,9 +830,10 @@ func (m *manager) reconcileManagementPlaneRole(namespace string, resourceToVerbs
 		rules = append(rules, buildRule(resource, newVerbs))
 	}
 	logrus.Infof("[%v] Creating role %v in namespace %v", m.controller, rt.Name, namespace)
-	_, err := roleCli.Create(&v1.Role{
+	_, err = m.rClient.Create(&v1.Role{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: rt.Name,
+			Name:      rt.Name,
+			Namespace: namespace,
 		},
 		Rules: rules,
 	})
