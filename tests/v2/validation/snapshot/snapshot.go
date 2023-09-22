@@ -17,7 +17,6 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/provisioning"
 	"github.com/rancher/rancher/tests/framework/extensions/workloads"
 	"github.com/rancher/rancher/tests/framework/extensions/workloads/pods"
-	podV1 "github.com/rancher/rancher/tests/framework/extensions/workloads/pods"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -92,8 +91,7 @@ func snapshotRestore(t *testing.T, client *rancher.Client, clusterName string, u
 	err = clusters.WatchAndWaitForCluster(client.Steve, kubeProvisioningClient, "fleet-default", clusterName)
 	require.NoError(t, err)
 
-	podResults, podErrors := pods.StatusPods(client, clusterID)
-	assert.NotEmpty(t, podResults)
+	podErrors := pods.StatusPods(client, clusterID)
 	assert.Empty(t, podErrors)
 	require.NoError(t, err)
 	require.Equal(t, initialKubernetesVersion, clusterObject.Spec.KubernetesVersion)
@@ -121,8 +119,7 @@ func snapshotRestore(t *testing.T, client *rancher.Client, clusterName string, u
 		err = clusters.WaitClusterToBeUpgraded(client, clusterID)
 		require.NoError(t, err)
 
-		podResults, podErrors = pods.StatusPods(client, clusterID)
-		assert.NotEmpty(t, podResults)
+		podErrors = pods.StatusPods(client, clusterID)
 		assert.Empty(t, podErrors)
 		require.NoError(t, err)
 		require.Equal(t, upgrade, clusterObject.Spec.KubernetesVersion)
@@ -143,8 +140,7 @@ func snapshotRestore(t *testing.T, client *rancher.Client, clusterName string, u
 	err = clusters.WaitClusterToBeUpgraded(client, clusterID)
 	require.NoError(t, err)
 
-	podResults, podErrors = pods.StatusPods(client, clusterID)
-	assert.NotEmpty(t, podResults)
+	podErrors = pods.StatusPods(client, clusterID)
 	assert.Empty(t, podErrors)
 	require.NoError(t, err)
 	require.Equal(t, initialKubernetesVersion, clusterObject.Spec.KubernetesVersion)
@@ -196,14 +192,11 @@ func createIngress(client *v1.Client, ingressName string, serviceName string) (*
 		}
 		for _, pod := range pods.Data {
 			if strings.Contains(pod.Name, "rke2-ingress-nginx") || strings.Contains(pod.Name, "rancher-webhook") {
-				_, podError, err := podV1.CheckPodStatus(&pod)
-				if err != nil {
-					return false, err
-				}
+				isReady, podError := pods.IsPodReady(&pod)
 				if podError != nil {
 					return false, nil
 				}
-				return true, nil
+				return isReady, nil
 			}
 		}
 		return false, nil

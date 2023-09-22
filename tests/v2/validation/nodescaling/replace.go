@@ -86,7 +86,6 @@ func ReplaceRKE1Nodes(t *testing.T, client *rancher.Client, clusterName string, 
 
 	require.True(t, isNodeReplaced)
 
-	podResults, podErrors := pods.StatusPods(client, clusterID)
-	assert.NotEmpty(t, podResults)
+	podErrors := pods.StatusPods(client, clusterID)
 	assert.Empty(t, podErrors)
 }

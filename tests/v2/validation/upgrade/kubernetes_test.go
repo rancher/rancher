@@ -134,7 +134,6 @@ func (u *UpgradeKubernetesTestSuite) testUpgradeSingleCluster(clusterName, versi
 		require.NoError(u.T(), err)
 	}
 
-	podResults, podErrors := pods.StatusPods(client, clusterMeta.ID)
-	assert.NotEmpty(u.T(), podResults)
+	podErrors := pods.StatusPods(client, clusterMeta.ID)
 	assert.Empty(u.T(), podErrors)
 }

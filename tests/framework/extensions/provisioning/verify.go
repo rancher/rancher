@@ -93,8 +93,7 @@ func VerifyRKE1Cluster(t *testing.T, client *rancher.Client, clustersConfig *clu
 		}
 	}
 
-	podResults, podErrors := pods.StatusPods(client, cluster.ID)
-	assert.NotEmpty(t, podResults)
+	podErrors := pods.StatusPods(client, cluster.ID)
 	assert.Empty(t, podErrors)
 }
 
@@ -161,9 +160,8 @@ func VerifyCluster(t *testing.T, client *rancher.Client, clustersConfig *cluster
 		VerifyACE(t, adminClient, mgmtClusterObject)
 	}
 
-	podResults, podErrors := pods.StatusPods(client, status.ClusterName)
+	podErrors := pods.StatusPods(client, status.ClusterName)
 	assert.Empty(t, podErrors)
-	assert.NotEmpty(t, podResults)
 
 	if clustersConfig.ClusterSSHTests != nil {
 		VerifySSHTests(t, client, cluster, clustersConfig.ClusterSSHTests, status.ClusterName)
@@ -196,8 +194,7 @@ func VerifyHostedCluster(t *testing.T, client *rancher.Client, cluster *manageme
 	err = nodestat.AllManagementNodeReady(client, cluster.ID)
 	require.NoError(t, err)
 
-	podResults, podErrors := pods.StatusPods(client, cluster.ID)
-	assert.NotEmpty(t, podResults)
+	podErrors := pods.StatusPods(client, cluster.ID)
 	assert.Empty(t, podErrors)
 }
 

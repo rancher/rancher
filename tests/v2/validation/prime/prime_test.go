@@ -77,9 +77,8 @@ func (t *PrimeTestSuite) TestSystemDefaultRegistry() {
 }
 
 func (t *PrimeTestSuite) TestLocalClusterRancherImages() {
-	podResults, podErrors := pods.StatusPods(t.client, localCluster)
+	podErrors := pods.StatusPods(t.client, localCluster)
 	assert.Empty(t.T(), podErrors)
-	assert.NotEmpty(t.T(), podResults)
 }
 
 func TestPrimeTestSuite(t *testing.T) {
