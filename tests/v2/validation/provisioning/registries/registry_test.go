@@ -255,8 +255,7 @@ func (rt *RegistryTestSuite) TestRegistriesRKE() {
 		provisioning.VerifyRKE1Cluster(rt.T(), subClient, testConfig, clusterObject)
 	}
 
-	podResults, podErrors := pods.StatusPods(rt.client, rt.clusterLocalID)
-	assert.NotEmpty(rt.T(), podResults)
+	podErrors := pods.StatusPods(rt.client, rt.clusterLocalID)
 	assert.Empty(rt.T(), podErrors)
 	registries.CheckAllClusterPodsForRegistryPrefix(rt.client, rt.clusterLocalID, rt.localClusterGlobalRegistryHost)
 }
@@ -304,8 +303,7 @@ func (rt *RegistryTestSuite) TestRegistriesK3S() {
 		provisioning.VerifyCluster(rt.T(), subClient, testConfig, clusterObject)
 	}
 
-	podResults, podErrors := pods.StatusPods(rt.client, rt.clusterLocalID)
-	assert.NotEmpty(rt.T(), podResults)
+	podErrors := pods.StatusPods(rt.client, rt.clusterLocalID)
 	assert.Empty(rt.T(), podErrors)
 	registries.CheckAllClusterPodsForRegistryPrefix(rt.client, rt.clusterLocalID, rt.localClusterGlobalRegistryHost)
 }
@@ -353,8 +351,7 @@ func (rt *RegistryTestSuite) TestRegistriesRKE2() {
 		provisioning.VerifyCluster(rt.T(), subClient, testConfig, clusterObject)
 	}
 
-	podResults, podErrors := pods.StatusPods(rt.client, rt.clusterLocalID)
-	assert.NotEmpty(rt.T(), podResults)
+	podErrors := pods.StatusPods(rt.client, rt.clusterLocalID)
 	assert.Empty(rt.T(), podErrors)
 	registries.CheckAllClusterPodsForRegistryPrefix(rt.client, rt.clusterLocalID, rt.localClusterGlobalRegistryHost)
 }
