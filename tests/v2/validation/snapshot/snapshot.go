@@ -88,8 +88,7 @@ func snapshotRestore(t *testing.T, client *rancher.Client, clusterName string, u
 	err = clusters.WatchAndWaitForCluster(client, steveID)
 	require.NoError(t, err)
 
-	podResults, podErrors := pods.StatusPods(client, clusterID)
-	assert.NotEmpty(t, podResults)
+	podErrors := pods.StatusPods(client, clusterID)
 	assert.Empty(t, podErrors)
 	require.NoError(t, err)
 	require.Equal(t, initialKubernetesVersion, clusterObject.Spec.KubernetesVersion)
@@ -129,8 +128,7 @@ func snapshotRestore(t *testing.T, client *rancher.Client, clusterName string, u
 		err = clusters.WaitClusterToBeUpgraded(client, clusterID)
 		require.NoError(t, err)
 
-		podResults, podErrors = pods.StatusPods(client, clusterID)
-		assert.NotEmpty(t, podResults)
+		podErrors = pods.StatusPods(client, clusterID)
 		assert.Empty(t, podErrors)
 		require.NoError(t, err)
 		require.Equal(t, upgradeKubernetesVersion, clusterObject.Spec.KubernetesVersion)
@@ -152,8 +150,7 @@ func snapshotRestore(t *testing.T, client *rancher.Client, clusterName string, u
 	err = clusters.WaitClusterToBeUpgraded(client, clusterID)
 	require.NoError(t, err)
 
-	podResults, podErrors = pods.StatusPods(client, clusterID)
-	assert.NotEmpty(t, podResults)
+	podErrors = pods.StatusPods(client, clusterID)
 	assert.Empty(t, podErrors)
 	require.NoError(t, err)
 	require.Equal(t, initialKubernetesVersion, clusterObject.Spec.KubernetesVersion)
@@ -215,14 +212,11 @@ func createIngress(client *steveV1.Client, ingressName string, serviceName strin
 		}
 		for _, pod := range newPods.Data {
 			if strings.Contains(pod.Name, "rke2-ingress-nginx") || strings.Contains(pod.Name, "rancher-webhook") {
-				_, podError, err := pods.CheckPodStatus(&pod)
-				if err != nil {
-					return false, err
-				}
+				isReady, podError := pods.IsPodReady(&pod)
 				if podError != nil {
 					return false, nil
 				}
-				return true, nil
+				return isReady, nil
 			}
 		}
 		return false, nil
