@@ -6,7 +6,6 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
-	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/settings"
 
 	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
@@ -44,15 +43,6 @@ func addClusterRepo(wrangler *wrangler.Context, repoName, branchName string) err
 func addClusterRepos(ctx context.Context, wrangler *wrangler.Context) error {
 	if err := addClusterRepo(wrangler, "rancher-charts", settings.ChartDefaultBranch.Get()); err != nil {
 		return err
-	}
-	if err := addClusterRepo(wrangler, "rancher-partner-charts", settings.PartnerChartDefaultBranch.Get()); err != nil {
-		return err
-	}
-
-	if features.RKE2.Enabled() {
-		if err := addClusterRepo(wrangler, "rancher-rke2-charts", settings.RKE2ChartDefaultBranch.Get()); err != nil {
-			return err
-		}
 	}
 
 	return nil
