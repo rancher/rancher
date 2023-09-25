@@ -131,6 +131,8 @@ func TestBuildRepoConfig(t *testing.T) {
 			}
 		}
 		// testing local repository configurations
+		assert.Equal(t, repo.fetchOpts.Depth, 1)
+		assert.Equal(t, repo.cloneOpts.Depth, 1)
 		assert.Contains(t, repo.Directory, tc.namespace, "Directory %s should contain the namespace %s", repo.Directory, tc.namespace)
 		assert.Contains(t, repo.Directory, tc.name, "Directory %s should contain the chart name %s", repo.Directory, tc.name)
 		assert.Equal(t, repo.URL, tc.gitURL)
