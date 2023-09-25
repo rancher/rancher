@@ -227,11 +227,11 @@ func (r *Repository) cloneOrOpen(branch string) error {
 
 	openErr := r.plainOpen()
 	if openErr != nil && openErr != gogit.ErrRepositoryNotExists {
-		return fmt.Errorf("plainOpen failure: %w", err)
+		return fmt.Errorf("plainOpen failure: %w", openErr)
 	} else if openErr == gogit.ErrRepositoryNotExists {
 		repoGogit, cloneErr := gogit.PlainClone(r.Directory, false, cloneOptions)
 		if cloneErr != nil && cloneErr != gogit.ErrRepositoryAlreadyExists {
-			return fmt.Errorf("plainClone failure: %w", err)
+			return fmt.Errorf("plainClone failure: %w", cloneErr)
 		}
 		// serious problem warning
 		if openErr == gogit.ErrRepositoryNotExists && cloneErr == gogit.ErrRepositoryAlreadyExists {
