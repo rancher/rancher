@@ -21,7 +21,7 @@ node {
     def codeCoverageDir = "github.com/rancher/rancher/tests/v2/codecoverage/ranchercover"
     def codeCoverageTest = "-run TestRetrieveCoverageReports"
     def rancherConfig = "rancher_env.config"
-    def branch = "release/v2.7"
+    def branch = "release/v2.8"
     def defaultBranch = branch
     def unitTestCoverfile = "unittestcover.out"
     def unitTestHTMLfile = "coverage.html"

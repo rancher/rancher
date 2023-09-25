@@ -54,7 +54,7 @@ node {
   def envFile = ".env"
   def rancherConfig = "rancher_env.config"
 
-  def branch = "release/v2.6"
+  def branch = "release/v2.8"
   if ("${env.branch}" != "null" && "${env.branch}" != "") {
     branch = "${env.branch}"
   }
