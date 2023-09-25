@@ -33,6 +33,7 @@ const (
 	LinodeProviderName    ProviderName = "linode"
 	GoogleProviderName    ProviderName = "google"
 	VsphereProviderName   ProviderName = "vsphere"
+	ExternalProviderName  ProviderName = "external"
 )
 
 var AllRolesMachinePool = MachinePools{
@@ -194,6 +195,7 @@ type NodePools struct {
 type Config struct {
 	NodePools              []NodePools                              `json:"nodePools" yaml:"nodePools"`
 	MachinePools           []MachinePools                           `json:"machinePools" yaml:"machinePools"`
+	CloudProvider          string                                   `json:"cloudProvider" yaml:"cloudProvider"`
 	Providers              []string                                 `json:"providers" yaml:"providers"`
 	NodeProviders          []string                                 `json:"nodeProviders" yaml:"nodeProviders"`
 	Hardened               bool                                     `json:"hardened" yaml:"hardened"`
