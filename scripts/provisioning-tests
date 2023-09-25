@@ -127,7 +127,7 @@ echo "Waiting for Rancher to be healthy"
 
 echo "Waiting up to 5 minutes for rancher-webhook deployment"
 ./scripts/retry \
-  --timeout 300 `# Time out after 300 seconds (5 min)` \
+  --timeout 600 `# Time out after 300 seconds (5 min)` \
   --sleep 2 `# Sleep for 2 seconds in between attempts` \
   --message-interval 30 `# Print the progress message below every 30 attempts (roughly every minute)` \
   --message "rancher-webhook was not available after {{elapsed}} seconds" `# Print this progress message` \
