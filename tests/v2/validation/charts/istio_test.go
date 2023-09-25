@@ -16,6 +16,7 @@ import (
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	"github.com/rancher/rancher/tests/framework/extensions/charts"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
+	"github.com/rancher/rancher/tests/framework/extensions/ingresses"
 	"github.com/rancher/rancher/tests/framework/extensions/namespaces"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
 	"github.com/stretchr/testify/assert"
@@ -179,13 +180,13 @@ func (i *IstioTestSuite) TestIstioChart() {
 	require.NoError(i.T(), err)
 
 	i.T().Log("Validating kiali and jaeger endpoints are accessible")
-	kialiResult, err := charts.GetChartCaseEndpoint(client, client.RancherConfig.Host, kialiPath, true)
+	kialiResult, err := ingresses.IsIngressExternallyAccessible(client, client.RancherConfig.Host, kialiPath, true)
 	require.NoError(i.T(), err)
-	assert.True(i.T(), kialiResult.Ok)
+	assert.True(i.T(), kialiResult)
 
-	tracingResult, err := charts.GetChartCaseEndpoint(client, client.RancherConfig.Host, tracingPath, true)
+	tracingResult, err := ingresses.IsIngressExternallyAccessible(client, client.RancherConfig.Host, tracingPath, true)
 	require.NoError(i.T(), err)
-	assert.True(i.T(), tracingResult.Ok)
+	assert.True(i.T(), tracingResult)
 
 	// Get a random worker node' public external IP of a specific cluster
 	nodeCollection, err := client.Management.Node.List(&types.ListOpts{Filters: map[string]interface{}{
@@ -200,9 +201,9 @@ func (i *IstioTestSuite) TestIstioChart() {
 	istioGatewayHost := randWorkerNodePublicIP + ":" + exampleAppPort
 
 	i.T().Log("Validating example app is accessible")
-	exampleAppResult, err := charts.GetChartCaseEndpoint(client, istioGatewayHost, exampleAppProductPagePath, false)
+	exampleAppResult, err := ingresses.IsIngressExternallyAccessible(client, istioGatewayHost, exampleAppProductPagePath, false)
 	require.NoError(i.T(), err)
-	assert.True(i.T(), exampleAppResult.Ok)
+	assert.True(i.T(), exampleAppResult)
 
 	i.T().Log("Validating example app has three different reviews bodies")
 	doesContainFirstPart, err := getChartCaseEndpointUntilBodyHas(client, istioGatewayHost, exampleAppProductPagePath, firstReviewBodyPart)

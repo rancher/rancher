@@ -167,7 +167,7 @@ func newPodTemplateWithSecretEnvironmentVariable(secretName string) corev1.PodTe
 // waitUntilIngressIsAccessible waits until the ingress is accessible
 func waitUntilIngressIsAccessible(client *rancher.Client, hostname string) (bool, error) {
 	err := kubewait.Poll(500*time.Millisecond, 2*time.Minute, func() (done bool, err error) {
-		isIngressAccessible, err := ingresses.AccessIngressExternally(client, hostname, false)
+		isIngressAccessible, err := ingresses.IsIngressExternallyAccessible(client, hostname, "", false)
 		if err != nil {
 			return false, err
 		}

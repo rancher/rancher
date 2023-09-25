@@ -2,9 +2,6 @@ package charts
 
 import (
 	"context"
-	"fmt"
-	"io"
-	"net/http"
 
 	"github.com/rancher/rancher/pkg/api/scheme"
 	catalogv1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
@@ -329,42 +326,4 @@ func WatchAndWaitStatefulSets(client *rancher.Client, clusterID, namespace strin
 	}
 
 	return nil
-}
-
-// GetChartCaseEndpoint is a helper function that takes host path and TLS option as args,
-// applies TLS option and authorization to management client' method that returns a boolean for healthy response and the request body.
-func GetChartCaseEndpoint(client *rancher.Client, host, path string, isWithTLS bool) (*GetChartCaseEndpointResult, error) {
-	protocol := "http"
-
-	if isWithTLS {
-		protocol = "https"
-	}
-
-	url := fmt.Sprintf("%s://%s/%s", protocol, host, path)
-
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Authorization", "Bearer "+client.RancherConfig.AdminToken)
-
-	resp, err := client.Management.APIBaseClient.Ops.Client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	bodyString := string(bodyBytes)
-
-	isHealthy := resp.StatusCode == http.StatusOK
-
-	return &GetChartCaseEndpointResult{
-		Ok:   isHealthy,
-		Body: bodyString,
-	}, nil
 }

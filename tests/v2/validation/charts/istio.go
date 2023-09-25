@@ -1,6 +1,8 @@
 package charts
 
 import (
+	"io"
+	"net/http"
 	"strings"
 	"time"
 	"unicode"
@@ -8,6 +10,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
 	"github.com/rancher/rancher/tests/framework/extensions/charts"
+	"github.com/rancher/rancher/tests/framework/extensions/ingresses"
 	"github.com/rancher/rancher/tests/framework/extensions/workloads"
 	appv1 "k8s.io/api/apps/v1"
 	kubewait "k8s.io/apimachinery/pkg/util/wait"
@@ -61,12 +64,17 @@ func getChartCaseEndpointUntilBodyHas(client *rancher.Client, host, path, bodyPa
 	}
 
 	err = kubewait.Poll(500*time.Millisecond, 2*time.Minute, func() (ongoing bool, err error) {
-		result, err := charts.GetChartCaseEndpoint(client, host, path, false)
+		result, err := ingresses.GetExternalIngressResponse(client, host, path, false)
 		if err != nil {
 			return ongoing, err
 		}
 
-		trimmedBody := trimAllSpaces(result.Body)
+		bodyString, err := convertHTTPBodyToString(result)
+		if err != nil {
+			return !ongoing, err
+		}
+
+		trimmedBody := trimAllSpaces(bodyString)
 		if strings.Contains(trimmedBody, bodyPart) {
 			found = true
 			return !ongoing, nil
@@ -104,4 +112,15 @@ func listIstioDeployments(steveclient *v1.Client) (deploymentSpecList []*appv1.D
 	}
 
 	return deploymentSpecList, nil
+}
+
+// convertHTTPBodyToString converts the body of an http response to a string
+func convertHTTPBodyToString(resp *http.Response) (string, error) {
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	bodyString := string(bodyBytes)
+	return bodyString, nil
 }
