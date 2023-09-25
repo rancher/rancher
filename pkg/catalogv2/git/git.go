@@ -186,6 +186,7 @@ func (r *Repository) setRepoOptions() {
 	r.fetchOpts.RemoteURL = r.URL
 	r.fetchOpts.InsecureSkipTLS = r.insecureTLSVerify
 	r.fetchOpts.Tags = gogit.NoTags
+	r.fetchOpts.Depth = 1
 
 	// List Options
 	r.listOpts.InsecureSkipTLS = r.insecureTLSVerify
