@@ -34,7 +34,7 @@ func CreateOpenLDAPAuthConfig(rancherClient *rancher.Client) (*management.AuthCo
 	/*	openLdapCredentialConfig := OpenLDAPCredentialConfig{
 		Servers:                         []string{"openldapqa.qa.rancher.space"},
 		ServiceAccountDistinguishedName: "cn=admin,dc=qa,dc=rancher,dc=space",
-		ServiceAccountPassword:          "<password>",
+		ServiceAccountPassword:          "<password>", map to
 		UserSearchBase:                  "dc=qa,dc=rancher,dc=space",
 		Port:                            389,
 		TLS:                             false,
