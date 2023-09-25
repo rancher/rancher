@@ -19,6 +19,9 @@ RUN zypper -n install gcc binutils glibc-devel-static ca-certificates git-core w
 # use containerd from k3s image, not from bci
 RUN zypper install -y -f docker && rpm -e --nodeps --noscripts containerd
 
+# prevents `detected dubious ownership in repository` git error due to uid/gid not matching when using bind mounts
+RUN git config -f /etc/gitconfig --add safe.directory /go/src/github.com/rancher/rancher
+
 RUN curl -sLf https://github.com/rancher/machine/releases/download/${CATTLE_MACHINE_VERSION}/rancher-machine-${ARCH}.tar.gz | tar xvzf - -C /usr/bin
 RUN if [ "${ARCH}" != "s390x" ]; then \
         curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | TAG=${K3D_VERSION} bash; \
