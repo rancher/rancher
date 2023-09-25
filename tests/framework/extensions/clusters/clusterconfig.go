@@ -13,6 +13,7 @@ type ClusterConfig struct {
 	PNI                  bool                                     `json:"pni" yaml:"pni"`
 	NodePools            []provisioningInput.NodePools            `json:"nodepools" yaml:"nodepools"`
 	MachinePools         []provisioningInput.MachinePools         `json:"machinepools" yaml:"machinepools"`
+	CloudProvider        string                                   `json:"cloudProvider" yaml:"cloudProvider"`
 	Providers            *[]string                                `json:"providers" yaml:"providers"`
 	NodeProviders        *[]string                                `json:"nodeProviders" yaml:"nodeProviders"`
 	Hardened             bool                                     `json:"hardened" yaml:"hardened"`
@@ -47,6 +48,7 @@ func ConvertConfigToClusterConfig(provisioningConfig *provisioningInput.Config) 
 	newConfig.LabelsAndAnnotations = provisioningConfig.LabelsAndAnnotations
 	newConfig.Registries = provisioningConfig.Registries
 	newConfig.UpgradeStrategy = provisioningConfig.UpgradeStrategy
+	newConfig.CloudProvider = provisioningConfig.CloudProvider
 
 	newConfig.Hardened = provisioningConfig.Hardened
 	newConfig.PSACT = provisioningConfig.PSACT

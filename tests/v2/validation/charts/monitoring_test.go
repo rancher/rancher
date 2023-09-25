@@ -15,6 +15,7 @@ import (
 	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
 	"github.com/rancher/rancher/tests/framework/extensions/charts"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
+	"github.com/rancher/rancher/tests/framework/extensions/ingresses"
 	"github.com/rancher/rancher/tests/framework/extensions/namespaces"
 	"github.com/rancher/rancher/tests/framework/extensions/projects"
 	"github.com/rancher/rancher/tests/framework/extensions/secrets"
@@ -131,9 +132,9 @@ func (m *MonitoringTestSuite) TestMonitoringChart() {
 	paths := []string{alertManagerPath, grafanaPath, prometheusGraphPath, prometheusRulesPath, prometheusTargetsPath}
 	for _, path := range paths {
 		m.T().Logf("Validating %s is accessible", path)
-		result, err := charts.GetChartCaseEndpoint(client, client.RancherConfig.Host, path, true)
+		result, err := ingresses.IsIngressExternallyAccessible(client, client.RancherConfig.Host, path, true)
 		assert.NoError(m.T(), err)
-		assert.True(m.T(), result.Ok)
+		assert.True(m.T(), result)
 	}
 
 	m.T().Log("Validating all Prometheus active targets are up")
@@ -239,9 +240,9 @@ func (m *MonitoringTestSuite) TestMonitoringChart() {
 
 	m.T().Logf("Validating traefik is accessible externally")
 	host := fmt.Sprintf("%v:%v", randWorkerNodePublicIP, webhookReceiverServiceSpec.Ports[0].NodePort)
-	result, err := charts.GetChartCaseEndpoint(client, host, "dashboard", false)
+	result, err := ingresses.IsIngressExternallyAccessible(client, host, "dashboard", false)
 	assert.NoError(m.T(), err)
-	assert.True(m.T(), result.Ok)
+	assert.True(m.T(), result)
 
 	m.T().Logf("Validating alertmanager sent alert to webhook receiver")
 	err = charts.WatchAndWaitDeploymentForAnnotation(client, m.project.ClusterID, webhookReceiverNamespace.Name, alertWebhookReceiverDeploymentResp.Name, webhookReceiverAnnotationKey, webhookReceiverAnnotationValue)
