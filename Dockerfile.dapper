@@ -13,7 +13,7 @@ ENV HELM_UNITTEST_VERSION 0.3.2
 ENV K3D_VERSION v5.4.6
 
 # kontainer-driver-metadata branch to be set for specific branch other than dev/master, logic at rancher/rancher/pkg/settings/setting.go
-ENV CATTLE_KDM_BRANCH=dev-v2.7
+ENV CATTLE_KDM_BRANCH=release-v2.7
 
 RUN zypper -n install gcc binutils glibc-devel-static ca-certificates git-core wget curl unzip tar vim less file xz gzip sed gawk iproute2 iptables jq skopeo
 # use containerd from k3s image, not from bci
