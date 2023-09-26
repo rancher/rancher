@@ -72,7 +72,7 @@ func (p *ProjectUserTestSuite) TestCreateNamespaceProjectMember() {
 	client, err := p.client.WithSession(subSession)
 	require.NoError(p.T(), err)
 
-	err = users.AddProjectMember(client, p.project, p.testUser, "project-member")
+	err = users.AddProjectMember(client, p.project, p.testUser, "project-member", nil)
 	require.NoError(p.T(), err)
 
 	testUser, err := client.AsUser(p.testUser)
@@ -90,7 +90,7 @@ func (p *ProjectUserTestSuite) TestCreateNamespaceProjectOwner() {
 	client, err := p.client.WithSession(subSession)
 	require.NoError(p.T(), err)
 
-	err = users.AddProjectMember(client, p.project, p.testUser, "project-owner")
+	err = users.AddProjectMember(client, p.project, p.testUser, "project-owner", nil)
 	require.NoError(p.T(), err)
 
 	testUser, err := client.AsUser(p.testUser)
