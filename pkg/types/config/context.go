@@ -43,6 +43,8 @@ import (
 	"github.com/rancher/rancher/pkg/user"
 	"github.com/rancher/rancher/pkg/wrangler"
 	steve "github.com/rancher/steve/pkg/server"
+	"github.com/rancher/wrangler/pkg/generated/controllers/core"
+	wcorev1 "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/pkg/generated/controllers/rbac"
 	wrbacv1 "github.com/rancher/wrangler/pkg/generated/controllers/rbac/v1"
 	"github.com/rancher/wrangler/pkg/generic"
@@ -223,6 +225,7 @@ type UserContext struct {
 	Policy         policyv1beta1.Interface
 
 	RBACw          wrbacv1.Interface
+	Corew          wcorev1.Interface
 	KindNamespaces map[schema.GroupVersionKind]string
 }
 
@@ -444,6 +447,11 @@ func NewUserContext(scaledContext *ScaledContext, config rest.Config, clusterNam
 		return nil, err
 	}
 	context.RBACw = rbacw.Rbac().V1()
+	corew, err := core.NewFactoryFromConfigWithOptions(&wranglerConf, opts)
+	if err != nil {
+		return nil, err
+	}
+	context.Corew = corew.Core().V1()
 
 	ctlg, err := catalog.NewFactoryFromConfigWithOptions(&context.RESTConfig, &catalog.FactoryOptions{SharedControllerFactory: controllerFactory})
 	if err != nil {
