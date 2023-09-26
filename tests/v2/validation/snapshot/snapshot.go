@@ -226,7 +226,7 @@ func createIngress(client *v1.Client, ingressName string, serviceName string) (*
 }
 
 func createDeployment(steveclient *steveV1.Client, wlName string) (*steveV1.SteveAPIObject, error) {
-	containerTemplate := workloads.NewContainer(containerName, containerImage, corev1.PullAlways, []corev1.VolumeMount{}, []corev1.EnvFromSource{})
+	containerTemplate := workloads.NewContainer(containerName, containerImage, corev1.PullAlways, []corev1.VolumeMount{}, []corev1.EnvFromSource{}, nil, nil, nil)
 	podTemplate := workloads.NewPodTemplate([]corev1.Container{containerTemplate}, []corev1.Volume{}, []corev1.LocalObjectReference{}, nil)
 	deployment := workloads.NewDeploymentTemplate(wlName, defaultNamespace, podTemplate, isCattleLabeled, nil)
 
