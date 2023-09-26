@@ -26,8 +26,8 @@ spec:
               internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
             type: string
           clusterName:
-            description: ClusterName is the name of the cluster to which a subject
-              is added. Immutable.
+            description: ClusterName is the metadata.name of the cluster to which
+              a subject is added. Must match the namespace. Immutable.
             type: string
           groupName:
             description: GroupName is the name of the group subject added to the cluster.

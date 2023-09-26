@@ -43,8 +43,7 @@ func (r *RKE1NodeDriverProvisioningTestSuite) SetupSuite() {
 
 	r.client = client
 
-	r.clustersConfig.RKE1KubernetesVersions, err = kubernetesversions.Default(
-		r.client, clusters.RKE1ClusterType.String(), r.clustersConfig.RKE1KubernetesVersions)
+	r.clustersConfig.RKE1KubernetesVersions, err = kubernetesversions.Default(r.client, clusters.RKE1ClusterType.String(), r.clustersConfig.RKE1KubernetesVersions)
 	require.NoError(r.T(), err)
 
 	enabled := true
@@ -133,7 +132,6 @@ func (r *RKE1NodeDriverProvisioningTestSuite) TestProvisioningRKE1Cluster() {
 }
 
 func (r *RKE1NodeDriverProvisioningTestSuite) TestProvisioningRKE1ClusterDynamicInput() {
-
 	if len(r.clustersConfig.NodesAndRolesRKE1) == 0 {
 		r.T().Skip()
 	}

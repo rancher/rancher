@@ -1,7 +1,7 @@
 package operations
 
 import (
-	"github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/tests/v2prov/clients"
 	"github.com/rancher/rancher/tests/v2prov/cluster"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

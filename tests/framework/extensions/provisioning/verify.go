@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	apisV1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
@@ -27,6 +28,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
 	"github.com/rancher/rancher/tests/v2prov/defaults"
 	wranglername "github.com/rancher/wrangler/pkg/name"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -167,6 +169,71 @@ func VerifyCluster(t *testing.T, client *rancher.Client, clustersConfig *cluster
 	if clustersConfig.ClusterSSHTests != nil {
 		VerifySSHTests(t, client, cluster, clustersConfig.ClusterSSHTests, status.ClusterName)
 	}
+}
+
+// VerifyDeleteRKE1Cluster validates that a rke1 cluster and its resources are deleted.
+func VerifyDeleteRKE1Cluster(t *testing.T, client *rancher.Client, clusterID string) {
+	cluster, err := client.Management.Cluster.ByID(clusterID)
+	require.NoError(t, err)
+
+	adminClient, err := rancher.NewClient(client.RancherConfig.AdminToken, client.Session)
+	require.NoError(t, err)
+
+	watchInterface, err := adminClient.GetManagementWatchInterface(management.ClusterType, metav1.ListOptions{
+		FieldSelector:  "metadata.name=" + clusterID,
+		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+	})
+	require.NoError(t, err)
+
+	err = wait.WatchWait(watchInterface, func(event watch.Event) (ready bool, err error) {
+		if event.Type == watch.Error {
+			return false, fmt.Errorf("error: unable to delete cluster %s", cluster.Name)
+		} else if event.Type == watch.Deleted {
+			logrus.Infof("Cluster %s deleted!", cluster.Name)
+			return true, nil
+		}
+		return false, nil
+	})
+	require.NoError(t, err)
+
+	err = nodestat.AllNodeDeleted(client, clusterID)
+	require.NoError(t, err)
+}
+
+// VerifyDeleteRKE2K3SCluster validates that a non-rke1 cluster and its resources are deleted.
+func VerifyDeleteRKE2K3SCluster(t *testing.T, client *rancher.Client, clusterID string) {
+	cluster, err := client.Steve.SteveType("provisioning.cattle.io.cluster").ByID(clusterID)
+	require.NoError(t, err)
+
+	adminClient, err := rancher.NewClient(client.RancherConfig.AdminToken, client.Session)
+	require.NoError(t, err)
+
+	provKubeClient, err := adminClient.GetKubeAPIProvisioningClient()
+	require.NoError(t, err)
+
+	watchInterface, err := provKubeClient.Clusters(namespace).Watch(context.TODO(), metav1.ListOptions{
+		FieldSelector:  "metadata.name=" + cluster.Name,
+		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+	})
+	require.NoError(t, err)
+
+	err = wait.WatchWait(watchInterface, func(event watch.Event) (ready bool, err error) {
+		cluster := event.Object.(*apisV1.Cluster)
+		if event.Type == watch.Error {
+			return false, fmt.Errorf("error: unable to delete cluster %s", cluster.ObjectMeta.Name)
+		} else if event.Type == watch.Deleted {
+			logrus.Infof("Cluster %s deleted!", cluster.ObjectMeta.Name)
+			return true, nil
+		} else if cluster == nil {
+			logrus.Infof("Cluster %s deleted!", cluster.ObjectMeta.Name)
+			return true, nil
+		}
+		return false, nil
+	})
+	require.NoError(t, err)
+
+	err = nodestat.AllNodeDeleted(client, clusterID)
+	require.NoError(t, err)
 }
 
 // CertRotationCompleteCheckFunc returns a watch check function that checks if the certificate rotation is complete

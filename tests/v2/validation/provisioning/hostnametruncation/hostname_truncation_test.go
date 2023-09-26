@@ -41,6 +41,9 @@ func (r *HostnameTruncationTestSuite) SetupSuite() {
 	r.client = client
 }
 
+// TestProvisioningRKE2ClusterTruncation consist of several test that loop through three limits
+// for hostnames. The test starts at a minimum length limit of 10 characters, then a maximum length
+// limit of 63 characters and finally a middle length limit of 31 characters
 func (r *HostnameTruncationTestSuite) TestProvisioningRKE2ClusterTruncation() {
 	tests := []struct {
 		name                        string
@@ -74,7 +77,7 @@ func (r *HostnameTruncationTestSuite) TestProvisioningRKE2ClusterTruncation() {
 		{
 			name:                        "Cluster and machine pool level truncation - 31 characters",
 			machinePoolNameLengths:      []int{10, 31, 63},
-			hostnameLengthLimits:        []int{31, 31},
+			hostnameLengthLimits:        []int{31, 31, 31},
 			defaultHostnameLengthLimits: []int{10, 63, 31},
 		},
 	}
@@ -101,7 +104,7 @@ func (r *HostnameTruncationTestSuite) TestProvisioningRKE2ClusterTruncation() {
 				clusterObject, err := provisioning.CreateProvisioningCluster(r.client, *rke2Provider, testConfig, hostnamePools)
 				require.NoError(r.T(), err)
 
-				provisioning.VerifyCluster(r.T(), r.client, clusterObject)
+				provisioning.VerifyCluster(r.T(), r.client, testConfig, clusterObject)
 				provisioning.VerifyHostnameLength(r.T(), r.client, clusterObject)
 			})
 		}

@@ -10,8 +10,8 @@ const (
 	EKSClusterConfigConfigurationFileKey = "eksClusterConfig"
 )
 
-// EKSClusterConfig is the configuration needed to create an EKS host cluster
-type EKSClusterConfig struct {
+// ClusterConfig is the configuration needed to create an EKS host cluster
+type ClusterConfig struct {
 	KmsKey              *string            `json:"kmsKey,omitempty" yaml:"kmsKey,omitempty"`
 	KubernetesVersion   *string            `json:"kubernetesVersion,omitempty" yaml:"kubernetesVersion,omitempty"`
 	LoggingTypes        []string           `json:"loggingTypes" yaml:"loggingTypes"`
@@ -92,7 +92,7 @@ func nodeGroupsConstructor(nodeGroupsConfig *[]NodeGroupConfig, kubernetesVersio
 }
 
 func eksHostClusterConfig(displayName, cloudCredentialID string) *management.EKSClusterConfigSpec {
-	var eksClusterConfig EKSClusterConfig
+	var eksClusterConfig ClusterConfig
 	config.LoadConfig(EKSClusterConfigConfigurationFileKey, &eksClusterConfig)
 
 	return &management.EKSClusterConfigSpec{

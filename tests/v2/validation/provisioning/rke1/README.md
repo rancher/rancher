@@ -294,7 +294,7 @@ Please read up on general k8s to get an idea of correct formatting for:
 
 ```json
 "advancedOptions": {
-    "flusterAgentCustomization": { // change this to fleetAgentCustomization for fleet agent
+    "clusterAgentCustomization": { // change this to fleetAgentCustomization for fleet agent
         "appendTolerations": [
             {
                 "key": "Testkey",

@@ -11,7 +11,7 @@ node {
   def buildDockerContainer = "build-code-cover-docker-container"
   def envFile = ".env"
   def rancherConfig = "rancher_env.config"
-  def branch = "release/v2.7"
+  def branch = "release/v2.8"
   def coverfile = "cover.out"
   if ("${env.BRANCH}" != "null" && "${env.BRANCH}" != "") {
     branch = "${env.BRANCH}"

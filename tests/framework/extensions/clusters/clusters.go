@@ -132,13 +132,13 @@ func CheckServiceAccountTokenSecret(client *rancher.Client, clusterName string) 
 		return false, err
 	}
 
-	if cluster.ServiceAccountTokenSecret != "" {
-		logrus.Infof("serviceAccountTokenSecret in this cluster is: %s", cluster.ServiceAccountTokenSecret)
-		return true, nil
-	} else {
+	if cluster.ServiceAccountTokenSecret == "" {
 		logrus.Warn("warning: serviceAccountTokenSecret does not exist in this cluster!")
 		return false, nil
 	}
+
+	logrus.Infof("serviceAccountTokenSecret in this cluster is: %s", cluster.ServiceAccountTokenSecret)
+	return true, nil
 }
 
 // CreateRancherBaselinePSACT creates custom PSACT called rancher-baseline which sets each PSS to baseline.
@@ -237,9 +237,9 @@ func NewRKE1ClusterConfig(clusterName string, client *rancher.Client, clustersCo
 			newConfig.RancherKubernetesEngineConfig.PrivateRegistries = clustersConfig.Registries.RKE1Registries
 			for _, registry := range clustersConfig.Registries.RKE1Registries {
 				if registry.ECRCredentialPlugin != nil {
-					awsAccessKeyId := fmt.Sprintf("AWS_ACCESS_KEY_ID=%s", registry.ECRCredentialPlugin.AwsAccessKeyID)
+					awsAccessKeyID := fmt.Sprintf("AWS_ACCESS_KEY_ID=%s", registry.ECRCredentialPlugin.AwsAccessKeyID)
 					awsSecretAccessKey := fmt.Sprintf("AWS_SECRET_ACCESS_KEY=%s", registry.ECRCredentialPlugin.AwsSecretAccessKey)
-					extraEnv := []string{awsAccessKeyId, awsSecretAccessKey}
+					extraEnv := []string{awsAccessKeyID, awsSecretAccessKey}
 					newConfig.RancherKubernetesEngineConfig.Services = &management.RKEConfigServices{
 						Kubelet: &management.KubeletService{
 							ExtraEnv: extraEnv,
@@ -789,9 +789,8 @@ func CreateRKE1Cluster(client *rancher.Client, rke1Cluster *management.Cluster) 
 		_, err = client.Management.Cluster.ByID(cluster.ID)
 		if err != nil {
 			return false, nil
-		} else {
-			return true, nil
 		}
+		return true, nil
 	})
 
 	if err != nil {
@@ -857,9 +856,9 @@ func CreateK3SRKE2Cluster(client *rancher.Client, rke2Cluster *apisV1.Cluster) (
 		_, err = client.Steve.SteveType(ProvisioningSteveResourceType).ByID(cluster.ID)
 		if err != nil {
 			return false, nil
-		} else {
-			return true, nil
 		}
+
+		return true, nil
 	})
 
 	if err != nil {
@@ -910,6 +909,40 @@ func CreateK3SRKE2Cluster(client *rancher.Client, rke2Cluster *apisV1.Cluster) (
 	})
 
 	return cluster, nil
+}
+
+// DeleteKE1Cluster is a "helper" functions that takes a rancher client, and the rke1 cluster ID as parameters to delete
+// the cluster.
+func DeleteRKE1Cluster(client *rancher.Client, clusterID string) error {
+	cluster, err := client.Management.Cluster.ByID(clusterID)
+	if err != nil {
+		return err
+	}
+
+	logrus.Infof("Deleting cluster %s...", cluster.Name)
+	err = client.Management.Cluster.Delete(cluster)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// DeleteK3SRKE2Cluster is a "helper" functions that takes a rancher client, and the non-rke1 cluster ID as parameters to delete
+// the cluster.
+func DeleteK3SRKE2Cluster(client *rancher.Client, clusterID string) error {
+	cluster, err := client.Steve.SteveType(ProvisioningSteveResourceType).ByID(clusterID)
+	if err != nil {
+		return err
+	}
+
+	logrus.Infof("Deleting cluster %s...", cluster.Name)
+	err = client.Steve.SteveType(ProvisioningSteveResourceType).Delete(cluster)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // UpdateK3SRKE2Cluster is a "helper" functions that takes a rancher client, old rke2/k3s cluster config, and the new rke2/k3s cluster config as parameters.

@@ -16,7 +16,7 @@ const (
 type LinodeMachineConfig struct {
 	AuthorizedUsers string `json:"authorizedUsers" yaml:"authorizedUsers"`
 	DockerPort      string `json:"dockerPort" yaml:"dockerPort"`
-	CreatePrivateIp bool   `json:"createPrivateIp" yaml:"createPrivateIp"`
+	CreatePrivateIP bool   `json:"createPrivateIp" yaml:"createPrivateIp"`
 	Image           string `json:"image" yaml:"image"`
 	InstanceType    string `json:"instanceType" yaml:"instanceType"`
 	Region          string `json:"region" yaml:"region"`
@@ -42,7 +42,7 @@ func NewLinodeMachineConfig(generatedPoolName, namespace string) *unstructured.U
 	machineConfig.SetGenerateName(generatedPoolName)
 	machineConfig.SetNamespace(namespace)
 	machineConfig.Object["authorizedUsers"] = linodeMachineConfig.AuthorizedUsers
-	machineConfig.Object["createPrivateIp"] = linodeMachineConfig.CreatePrivateIp
+	machineConfig.Object["createPrivateIp"] = linodeMachineConfig.CreatePrivateIP
 	machineConfig.Object["dockerPort"] = linodeMachineConfig.DockerPort
 	machineConfig.Object["image"] = linodeMachineConfig.Image
 	machineConfig.Object["instanceType"] = linodeMachineConfig.InstanceType

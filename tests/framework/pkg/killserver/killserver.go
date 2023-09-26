@@ -8,16 +8,16 @@ import (
 )
 
 const (
-	KillServerPort = ":19999"
+	Port = ":19999"
 )
 
-// KillerServer is struct used to cancel a context of web service, that listens on a specific port.
+// KillServer is struct used to cancel a context of web service, that listens on a specific port.
 type KillServer struct {
 	Server http.Server
 	cancel context.CancelFunc
 }
 
-// NewKillServer initializes a KillServer at a specfic address/port and the cancel context of said web service.
+// NewKillServer initializes a KillServer at a specific address/port and the cancel context of said web service.
 func NewKillServer(addr string, cancel context.CancelFunc) *KillServer {
 	return &KillServer{
 		Server: http.Server{

@@ -24,7 +24,7 @@ type AirGapRKE2CustomClusterTestSuite struct {
 	suite.Suite
 	client         *rancher.Client
 	session        *session.Session
-	corralPackage  *corral.CorralPackages
+	corralPackage  *corral.Packages
 	clustersConfig *provisioninginput.Config
 	registryFQDN   string
 }
@@ -53,11 +53,11 @@ func (a *AirGapRKE2CustomClusterTestSuite) SetupSuite() {
 	listOfCorrals, err := corral.ListCorral()
 	require.NoError(a.T(), err)
 
-	corralConfig := corral.CorralConfigurations()
+	corralConfig := corral.Configurations()
 	err = corral.SetupCorralConfig(corralConfig.CorralConfigVars, corralConfig.CorralConfigUser, corralConfig.CorralSSHPath)
 	require.NoError(a.T(), err)
 
-	a.corralPackage = corral.CorralPackagesConfig()
+	a.corralPackage = corral.PackagesConfig()
 
 	_, corralExist := listOfCorrals[corralRancherHA.Name]
 	if corralExist {
@@ -113,7 +113,7 @@ func (a *AirGapRKE2CustomClusterTestSuite) TestProvisioningUpgradeRKE2CustomClus
 	clusterObject, err := provisioning.CreateProvisioningAirgapCustomCluster(a.client, testConfig, a.corralPackage)
 	require.NoError(a.T(), err)
 
-	provisioning.VerifyCluster(a.T(), a.client, clusterObject)
+	provisioning.VerifyCluster(a.T(), a.client, testConfig, clusterObject)
 
 	upgradedCluster, err := provisioning.UpgradeClusterK8sVersion(a.client, &clusterObject.Name, &rke2Versions[numOfRKE2Versions-1])
 	require.NoError(a.T(), err)

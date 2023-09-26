@@ -55,8 +55,8 @@ ENV CATTLE_SYSTEM_AGENT_UPGRADE_IMAGE rancher/system-agent:${CATTLE_SYSTEM_AGENT
 ENV CATTLE_SYSTEM_UPGRADE_CONTROLLER_CHART_VERSION 103.0.0+up0.6.0
 
 # System charts minimal version
-ENV CATTLE_FLEET_MIN_VERSION=103.0.0+up0.9.0-rc.1
-ENV CATTLE_RANCHER_WEBHOOK_VERSION=103.0.0+up0.4.0-rc6
+ENV CATTLE_FLEET_MIN_VERSION=103.1.0+up0.9.0-rc.3
+ENV CATTLE_RANCHER_WEBHOOK_VERSION=103.0.0+up0.4.0-rc7
 ENV CATTLE_CSP_ADAPTER_MIN_VERSION=103.0.0+up3.0.0-rc1
 
 RUN mkdir -p /var/lib/rancher-data/local-catalogs/system-library && \
@@ -163,9 +163,9 @@ RUN curl -sLf ${!TINI_URL} > /usr/bin/tini && \
     chmod +x /usr/bin/tini /usr/bin/telemetry && \
     mkdir -p /var/lib/rancher-data/driver-metadata
 
-ENV CATTLE_UI_VERSION 2.7.7-rc2
-ENV CATTLE_DASHBOARD_UI_VERSION v2.7.7-rc2
-ENV CATTLE_CLI_VERSION v2.7.6-rc1
+ENV CATTLE_UI_VERSION 2.8.0-alpha1
+ENV CATTLE_DASHBOARD_UI_VERSION v2.8.0-alpha1
+ENV CATTLE_CLI_VERSION v2.8.0-rc1
 
 # Base UI brand used as a fallback env setting (not user facing) to indicate this is a non-prime install
 ENV CATTLE_BASE_UI_BRAND=

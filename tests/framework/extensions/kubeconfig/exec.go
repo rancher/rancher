@@ -24,7 +24,7 @@ const (
 
 var podGroupVersion = corev1.SchemeGroupVersion.WithResource("pods").GroupVersion()
 
-// LogStreamer is a struct that acts like io.Writer inorder to to retireve Stdout from an kubectl exec command in pod
+// LogStreamer is a struct that acts like io.Writer inorder to retrieve Stdout from a kubectl exec command in pod
 type LogStreamer struct {
 	b bytes.Buffer
 }

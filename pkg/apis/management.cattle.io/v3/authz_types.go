@@ -375,7 +375,8 @@ type ClusterRoleTemplateBinding struct {
 	// +optional
 	GroupPrincipalName string `json:"groupPrincipalName,omitempty" norman:"noupdate,type=reference[principal]"`
 
-	// ClusterName is the name of the cluster to which a subject is added. Immutable.
+	// ClusterName is the metadata.name of the cluster to which a subject is added.
+	// Must match the namespace. Immutable.
 	// +kubebuilder:validation:Required
 	ClusterName string `json:"clusterName" norman:"required,noupdate,type=reference[cluster]"`
 

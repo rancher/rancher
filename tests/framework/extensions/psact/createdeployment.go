@@ -29,7 +29,7 @@ func CreateNginxDeployment(client *rancher.Client, clusterID string, psact strin
 	labels := map[string]string{}
 	labels["workload.user.cattle.io/workloadselector"] = fmt.Sprintf("apps.deployment-%v-%v", namespace, workload)
 
-	containerTemplate := workloads.NewContainer(containerName, imageName, v1.PullAlways, []v1.VolumeMount{}, []v1.EnvFromSource{})
+	containerTemplate := workloads.NewContainer(containerName, imageName, v1.PullAlways, []v1.VolumeMount{}, []v1.EnvFromSource{}, nil, nil, nil)
 	podTemplate := workloads.NewPodTemplate([]v1.Container{containerTemplate}, []v1.Volume{}, []v1.LocalObjectReference{}, labels)
 	deploymentTemplate := workloads.NewDeploymentTemplate(deploymentName, namespace, podTemplate, true, labels)
 
@@ -78,6 +78,9 @@ func CreateNginxDeployment(client *rancher.Client, clusterID string, psact strin
 
 		return false, nil
 	})
+	if err != nil {
+		return err
+	}
 
 	deploymentResp, err := steveclient.SteveType(workloads.DeploymentSteveType).ByID(deploymentTemplate.Namespace + "/" + deploymentTemplate.Name)
 	if err != nil {
