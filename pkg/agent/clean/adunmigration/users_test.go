@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestIsAdUser(t *testing.T) {
@@ -47,9 +48,7 @@ func TestIsAdUser(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			result := isAdUser(&test.user)
-			if result != test.wantResult {
-				t.Errorf("expected isAdUser to be %v, but got %v", test.wantResult, result)
-			}
+			assert.Equal(t, test.wantResult, result)
 		})
 	}
 }
@@ -94,12 +93,12 @@ func TestGetExternalId(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			result, err := getExternalID(test.principalId)
-			if test.wantError && err == nil {
-				t.Errorf("expected error for invalid principalId %v", test.principalId)
+			if test.wantError {
+				assert.Error(t, err, "expected error")
+			} else {
+				assert.NoError(t, err, "unexpected error")
 			}
-			if result != test.wantResult {
-				t.Errorf("expected getExternalID to be %v, but got %v", test.wantResult, result)
-			}
+			assert.Equal(t, test.wantResult, result)
 		})
 	}
 }
@@ -144,12 +143,12 @@ func TestGetScope(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			result, err := getScope(test.principalId)
-			if test.wantError && err == nil {
-				t.Errorf("expected error for invalid principalId %v", test.principalId)
+			if test.wantError {
+				assert.Error(t, err, "expected error")
+			} else {
+				assert.NoError(t, err, "unexpected error")
 			}
-			if result != test.wantResult {
-				t.Errorf("expected getExternalID to be %v, but got %v", test.wantResult, result)
-			}
+			assert.Equal(t, test.wantResult, result)
 		})
 	}
 }

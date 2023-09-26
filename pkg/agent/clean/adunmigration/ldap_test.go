@@ -9,17 +9,17 @@ import (
 )
 
 func TestEscapeUUID(t *testing.T) {
+	t.Parallel()
 	// Note: Because Rancher wrote these strings, the input format we care about is somewhat
 	// constrained, and we're not spending too much effort dealing with edge cases.
 	guidString := "953d82a03d47a5498330293e386dfce1"
 	wantEscapedString := "\\95\\3d\\82\\a0\\3d\\47\\a5\\49\\83\\30\\29\\3e\\38\\6d\\fc\\e1"
 	result := escapeUUID(guidString)
-	if result != wantEscapedString {
-		t.Errorf("expected escapeUUID to be %v, but got %v", wantEscapedString, result)
-	}
+	assert.Equal(t, wantEscapedString, result)
 }
 
 func TestIsGUID(t *testing.T) {
+	// Note: because logrus state is global, we cannot use t.Parallel here
 	hook := logrusTest.NewGlobal()
 
 	tests := []struct {
