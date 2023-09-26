@@ -52,6 +52,12 @@ func TestIsGUID(t *testing.T) {
 			wantResult:      false,
 			wantLoggedError: true,
 		},
+		{
+			name:            "Empty String",
+			principalId:     "",
+			wantResult:      false,
+			wantLoggedError: true,
+		},
 	}
 
 	for _, test := range tests {

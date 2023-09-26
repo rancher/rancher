@@ -86,6 +86,12 @@ func TestGetExternalId(t *testing.T) {
 			wantResult:  "",
 			wantError:   true,
 		},
+		{
+			name:        "Empty String",
+			principalId: "",
+			wantResult:  "",
+			wantError:   true,
+		},
 	}
 
 	for _, test := range tests {
@@ -133,6 +139,12 @@ func TestGetScope(t *testing.T) {
 		{
 			name:        "Invalid principal",
 			principalId: "fail-on-purpose",
+			wantResult:  "",
+			wantError:   true,
+		},
+		{
+			name:        "Empty String",
+			principalId: "",
 			wantResult:  "",
 			wantError:   true,
 		},
