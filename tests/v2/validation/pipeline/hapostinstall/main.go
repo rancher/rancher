@@ -25,7 +25,7 @@ var (
 
 	clusterID = "local"
 
-	configFileName       = config.ConfigFileName("cattle-config.yaml")
+	configFileName       = config.FileName("cattle-config.yaml")
 	environmentsFileName = "environments.groovy"
 
 	tokenEnvironmentKey      = "HA_TOKEN"
@@ -57,7 +57,7 @@ func main() {
 		return true, nil
 	})
 	if err != nil {
-		logrus.Fatalf("error creating admin token", err)
+		logrus.Fatalf("error creating admin token: %v", err)
 	}
 	rancherConfig.AdminToken = adminToken.Token
 
@@ -67,36 +67,36 @@ func main() {
 	}
 	configData, err := yaml.Marshal(configWrapped)
 	if err != nil {
-		logrus.Fatalf("error marshaling", err)
+		logrus.Fatalf("error marshaling: %v", err)
 	}
 	err = configFileName.NewFile(configData)
 	if err != nil {
-		logrus.Fatalf("error writing yaml", err)
+		logrus.Fatalf("error writing yaml: %v", err)
 	}
 	err = configFileName.SetEnvironmentKey()
 	if err != nil {
-		logrus.Fatalf("error while setting environment path", err)
+		logrus.Fatalf("error while setting environment path: %v", err)
 	}
 
 	//generate kubeconfig
 	session := session.NewSession()
 	client, err := rancher.NewClient("", session)
 	if err != nil {
-		logrus.Fatalf("error creating client", err)
+		logrus.Fatalf("error creating client: %v", err)
 	}
 
 	err = pipeline.UpdateEULA(client, clusterID)
 	if err != nil {
-		logrus.Fatalf("error updating EULA", err)
+		logrus.Fatalf("error updating EULA: %v", err)
 	}
 
 	cluster, err := client.Management.Cluster.ByID(clusterID)
 	if err != nil {
-		logrus.Fatalf("error getting cluster", err)
+		logrus.Fatalf("error getting cluster: %v", err)
 	}
 	kubeconfig, err := client.Management.Cluster.ActionGenerateKubeconfig(cluster)
 	if err != nil {
-		logrus.Fatalf("error getting kubeconfig", err)
+		logrus.Fatalf("error getting kubeconfig: %v", err)
 	}
 
 	//create groovy environments file
@@ -106,7 +106,7 @@ func main() {
 	environmentsData := strings.Join([]string{tokenEnvironment, kubeconfigEnvironment}, "\n")
 	err = os.WriteFile(environmentsFileName, []byte(environmentsData), 0644)
 	if err != nil {
-		logrus.Fatalf("error writing yaml", err)
+		logrus.Fatalf("error writing yaml: %v", err)
 	}
 
 }

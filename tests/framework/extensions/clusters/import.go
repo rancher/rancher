@@ -230,13 +230,13 @@ func IsImportedClusterReady(event watch.Event) (ready bool, err error) {
 	var numSuccess int
 	for _, condition := range cluster.Status.Conditions {
 		if condition.Type == "Ready" && condition.Status == corev1.ConditionTrue {
-			numSuccess += 1
+			numSuccess++
 		}
 		if condition.Type == "SystemAccountCreated" && condition.Status == corev1.ConditionTrue {
-			numSuccess += 1
+			numSuccess++
 		}
 		if condition.Type == "ServiceAccountSecretsMigrated" && condition.Status == corev1.ConditionTrue {
-			numSuccess += 1
+			numSuccess++
 		}
 	}
 

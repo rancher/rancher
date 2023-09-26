@@ -53,7 +53,7 @@ func GetPodLogs(client *rancher.Client, clusterID string, podName string, namesp
 	for reader.Scan() {
 		logs = logs + fmt.Sprintf("%s\n", reader.Text())
 	}
-	
+
 	if err := reader.Err(); err != nil {
 		return "", fmt.Errorf("error reading pod logs for pod %s/%s: %v", namespace, podName, err)
 	}

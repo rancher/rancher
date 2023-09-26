@@ -108,18 +108,17 @@ require (
 	github.com/prometheus/client_golang v1.16.0
 	github.com/prometheus/client_model v0.4.0
 	github.com/prometheus/common v0.44.0
-	github.com/rancher/aks-operator v1.2.0-rc3
+	github.com/rancher/aks-operator v1.2.0-rc4
 	github.com/rancher/apiserver v0.0.0-20230831052300-120e615b17ba
 	github.com/rancher/channelserver v0.5.1-0.20230719220800-0a37b73c7df8
 	github.com/rancher/dynamiclistener v0.3.6-rc3-deadlock-fix-revert
-	github.com/rancher/eks-operator v1.3.0-rc2
-	github.com/rancher/fleet/pkg/apis v0.0.0-20230912105714-0d26f206b3c5
-	github.com/rancher/gke-operator v1.2.0-rc1
+	github.com/rancher/eks-operator v1.3.0-rc3
+	github.com/rancher/fleet/pkg/apis v0.0.0-20230926084554-a0460d1b10f5
+	github.com/rancher/gke-operator v1.2.0-rc2
 	github.com/rancher/kubernetes-provider-detector v0.1.5
 	github.com/rancher/lasso v0.0.0-20230830164424-d684fdeb6f29
 	github.com/rancher/machine v0.15.0-rancher103
 	github.com/rancher/norman v0.0.0-20230831160711-5de27f66385d
-	github.com/rancher/rancher/pkg/apis v0.0.0
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/remotedialer v0.3.0
 	github.com/rancher/rke v1.5.0-rc5
@@ -146,10 +145,10 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/yaml.v2 v2.4.0
 	helm.sh/helm/v3 v3.9.0
-	k8s.io/api v0.27.4
-	k8s.io/apiextensions-apiserver v0.27.4
-	k8s.io/apimachinery v0.27.4
-	k8s.io/apiserver v0.27.4
+	k8s.io/api v0.27.5
+	k8s.io/apiextensions-apiserver v0.27.5
+	k8s.io/apimachinery v0.27.5
+	k8s.io/apiserver v0.27.5
 	k8s.io/cli-runtime v0.27.4
 	k8s.io/client-go v12.0.0+incompatible
 	k8s.io/gengo v0.0.0-20230306165830-ab3349d207d4
@@ -167,6 +166,7 @@ require (
 require (
 	github.com/containers/image/v5 v5.25.0
 	github.com/go-git/go-git/v5 v5.8.1
+	github.com/rancher/rancher/pkg/apis v0.0.0-20230915232223-a9ea4ce4a5ba
 )
 
 require (
@@ -419,8 +419,8 @@ require (
 	gopkg.in/square/go-jose.v2 v2.6.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/cluster-bootstrap v0.27.2 // indirect
-	k8s.io/code-generator v0.27.4 // indirect
-	k8s.io/component-base v0.27.4 // indirect
+	k8s.io/code-generator v0.27.5 // indirect
+	k8s.io/component-base v0.27.5 // indirect
 	k8s.io/component-helpers v0.27.4 // indirect
 	k8s.io/klog v1.0.0 // indirect
 	k8s.io/klog/v2 v2.100.1 // indirect

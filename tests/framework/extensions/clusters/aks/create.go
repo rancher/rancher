@@ -7,7 +7,7 @@ import (
 
 // CreateAKSHostedCluster is a helper function that creates an AKS hosted cluster.
 func CreateAKSHostedCluster(client *rancher.Client, displayName, cloudCredentialID string, enableClusterAlerting, enableClusterMonitoring, enableNetworkPolicy, windowsPreferedCluster bool, labels map[string]string) (*management.Cluster, error) {
-	aksHostCluster := AKSHostClusterConfig(displayName, cloudCredentialID)
+	aksHostCluster := HostClusterConfig(displayName, cloudCredentialID)
 	cluster := &management.Cluster{
 		AKSConfig:               aksHostCluster,
 		DockerRootDir:           "/var/lib/docker",

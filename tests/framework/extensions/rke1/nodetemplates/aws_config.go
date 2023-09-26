@@ -31,7 +31,7 @@ type AmazonEC2NodeTemplateConfig struct {
 	SpotPrice               string   `json:"spotPrice" yaml:"spotPrice"`
 	SSHKeyContexts          string   `json:"sshKeyContexts" yaml:"sshKeyContexts"`
 	SSHUser                 string   `json:"sshUser" yaml:"sshUser"`
-	SubnetId                string   `json:"subnetId" yaml:"subnetId"`
+	SubnetID                string   `json:"subnetId" yaml:"subnetId"`
 	Tags                    string   `json:"tags" yaml:"tags"`
 	Type                    string   `json:"type" yaml:"type"`
 	UsePrivateAddress       bool     `json:"usePrivateAddress" yaml:"usePrivateAddress"`

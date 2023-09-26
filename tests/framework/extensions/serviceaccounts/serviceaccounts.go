@@ -13,9 +13,9 @@ const (
 	ServiceAccountSteveType = "serviceaccount"
 )
 
-func IsServiceAccountReady(rancherClient *rancher.Client, clusterId, namespace, serviceAccountName string) error {
+func IsServiceAccountReady(rancherClient *rancher.Client, clusterID, namespace, serviceAccountName string) error {
 	userAccountID := fmt.Sprintf("%s/%s", namespace, serviceAccountName)
-	steveClient, err := rancherClient.Steve.ProxyDownstream(clusterId)
+	steveClient, err := rancherClient.Steve.ProxyDownstream(clusterID)
 	if err != nil {
 		return err
 	}
@@ -25,9 +25,8 @@ func IsServiceAccountReady(rancherClient *rancher.Client, clusterId, namespace, 
 		if err != nil {
 			if strings.Contains(err.Error(), "Status [404 Not Found]") {
 				return false, nil
-			} else {
-				return false, err
 			}
+			return false, err
 		} else if serviceAccount.State.Name == "active" {
 			return true, nil
 		}

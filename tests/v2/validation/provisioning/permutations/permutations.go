@@ -29,7 +29,7 @@ const (
 )
 
 // RunTestPermutations runs through all relevant perumutations in a given config file, including node providers, k8s versions, and CNIs
-func RunTestPermutations(s *suite.Suite, testNamePrefix string, client *rancher.Client, clustersConfig *provisioninginput.Config, clusterType string, hostnameTruncation []machinepools.HostnameTruncation, corralPackages *corral.CorralPackages) {
+func RunTestPermutations(s *suite.Suite, testNamePrefix string, client *rancher.Client, clustersConfig *provisioninginput.Config, clusterType string, hostnameTruncation []machinepools.HostnameTruncation, corralPackages *corral.Packages) {
 	var name string
 	var providers []string
 	var testClusterConfig *clusters.ClusterConfig
