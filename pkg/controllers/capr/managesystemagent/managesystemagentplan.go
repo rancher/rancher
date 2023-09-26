@@ -100,7 +100,7 @@ func (h *handler) syncSystemUpgradeControllerStatus(obj *rkev1.RKEControlPlane, 
 		return status, err
 	}
 	if cluster.Status.FleetWorkspaceName == "" {
-		return status, fmt.Errorf("fleet workspace name for clusters.provisioning.cattle.io %s/%s was blank", cluster.Namespace, cluster.Name)
+		return status, fmt.Errorf("unable to sync system upgrade controller status for [%s] [%s/%s], status.FleetWorkspaceName was blank", cluster.TypeMeta.String(), cluster.Namespace, cluster.Name)
 	}
 
 	bundleName := capr.SafeConcatName(capr.MaxHelmReleaseNameLength, "mcc", capr.SafeConcatName(48, obj.Name, "managed", "system-upgrade-controller"))

@@ -83,6 +83,12 @@ func (h *handler) OnChange(cluster *rancherv1.Cluster, status rancherv1.ClusterS
 		return nil, status, nil
 	}
 
+	// Intentionally return an ErrSkip to prevent unnecessarily thrashing the corresponding bundle
+	// if the status field for fleetworkspacename has not yet been updated
+	if cluster.Status.FleetWorkspaceName == "" {
+		return nil, status, generic.ErrSkip
+	}
+
 	var (
 		secretName = "stv-aggregation"
 		result     []runtime.Object
@@ -121,10 +127,6 @@ func (h *handler) OnChange(cluster *rancherv1.Cluster, status rancherv1.ClusterS
 
 	resources, err := ToResources(installer(cluster, secretName))
 	if err != nil {
-		return nil, status, err
-	}
-
-	if cluster.Status.FleetWorkspaceName == "" {
 		return nil, status, err
 	}
 

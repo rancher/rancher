@@ -122,7 +122,8 @@ func (h *handler) createCluster(cluster *provv1.Cluster, status provv1.ClusterSt
 	}
 
 	if mgmtCluster.Spec.FleetWorkspaceName == "" {
-		return nil, status, generic.ErrSkip
+		// Only create a cluster if the fleet workspace name is set on the management cluster object, otherwise, apply an empty set of objects.
+		return nil, status, nil
 	}
 
 	// this removes any annotations containing "cattle.io" or starting with "kubectl.kubernetes.io"
