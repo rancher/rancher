@@ -120,7 +120,7 @@ func (h *handler) getBootstrapSecret(namespace, name string, envVars []corev1.En
 	if err != nil {
 		return nil, err
 	}
-	secret, err := serviceaccounttoken.EnsureSecretForServiceAccount(context.Background(), h.secretCache.Get, h.k8s, sa)
+	secret, err := serviceaccounttoken.EnsureSecretForServiceAccount(context.Background(), h.secretCache, h.k8s, sa)
 	if err != nil {
 		return nil, err
 	}
