@@ -1,30 +1,28 @@
 package integration
 
 import (
-	"context"
-	"fmt"
 	"testing"
 
 	"github.com/rancher/rancher/pkg/api/scheme"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
+	extauthz "github.com/rancher/rancher/tests/framework/extensions/kubeapi/authorization"
 	extnamespaces "github.com/rancher/rancher/tests/framework/extensions/kubeapi/namespaces"
-	"github.com/rancher/rancher/tests/framework/extensions/kubeapi/rbac"
 	"github.com/rancher/rancher/tests/framework/extensions/kubeapi/secrets"
 	"github.com/rancher/rancher/tests/framework/extensions/users"
 	password "github.com/rancher/rancher/tests/framework/extensions/users/passwordgenerator"
 	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
-	"github.com/rancher/rancher/tests/framework/pkg/wait"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"golang.org/x/sync/errgroup"
+	authzv1 "k8s.io/api/authorization/v1"
 	corev1 "k8s.io/api/core/v1"
-	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/watch"
 )
+
+func init() {
+	authzv1.SchemeBuilder.AddToScheme(scheme.Scheme.Scheme)
+}
 
 type RTBTestSuite struct {
 	suite.Suite
@@ -120,7 +118,14 @@ func (p *RTBTestSuite) TestPRTBRoleTemplateInheritance() {
 		})
 	require.NoError(p.T(), err)
 
-	err = users.AddProjectMember(client, p.project, p.testUser, rtA.ID)
+	err = users.AddProjectMember(client, p.project, p.testUser, rtA.ID, []*authzv1.ResourceAttributes{
+		{
+			Verb:      "get",
+			Resource:  "secrets",
+			Name:      secret.Name,
+			Namespace: createdNamespace.Name,
+		},
+	})
 	require.NoError(p.T(), err)
 
 	secret, err = secrets.GetSecretByName(testUser, p.downstreamClusterID, createdNamespace.Name, secret.Name, metav1.GetOptions{})
@@ -144,7 +149,14 @@ func (p *RTBTestSuite) TestPRTBRoleTemplateInheritance() {
 	_, err = secrets.GetSecretByName(testUser, p.downstreamClusterID, createdNamespace.Name, secret.Name, metav1.GetOptions{})
 	require.Error(p.T(), err)
 
-	err = users.AddProjectMember(client, p.project, p.testUser, rtC.ID)
+	err = users.AddProjectMember(client, p.project, p.testUser, rtC.ID, []*authzv1.ResourceAttributes{
+		{
+			Verb:      "get",
+			Resource:  "secrets",
+			Name:      secret.Name,
+			Namespace: createdNamespace.Name,
+		},
+	})
 	require.NoError(p.T(), err)
 
 	secret, err = secrets.GetSecretByName(testUser, p.downstreamClusterID, createdNamespace.Name, secret.Name, metav1.GetOptions{})
@@ -165,38 +177,24 @@ func (p *RTBTestSuite) TestPRTBRoleTemplateInheritance() {
 		ResourceNames: []string{anotherSecret.Name},
 		Verbs:         []string{"get"},
 	})
-	dynamicClient, err := client.GetRancherDynamicClient()
-	require.NoError(p.T(), err)
-	var eg errgroup.Group
-	timeout := int64(15)
-
-	watchInterface, err := dynamicClient.Resource(rbac.ClusterRoleGroupVersionResource).Watch(context.TODO(), metav1.ListOptions{
-		FieldSelector:  "metadata.name=" + rtB.ID,
-		TimeoutSeconds: &timeout,
-	})
-	eg.Go(func() error {
-		err = wait.WatchWait(watchInterface, func(event watch.Event) (bool, error) {
-			if event.Type == watch.Error {
-				return false, fmt.Errorf("there was an error deleting cluster")
-			}
-			unstructuredCR := event.Object.(*unstructured.Unstructured)
-			cr := new(rbacv1.ClusterRole)
-			err := scheme.Scheme.Convert(unstructuredCR, cr, unstructuredCR.GroupVersionKind())
-			if err != nil {
-				return false, err
-			}
-			if len(cr.Rules) == 2 {
-				return true, nil
-			}
-			return false, nil
-		})
-		return err
-	})
 
 	_, err = client.Management.RoleTemplate.Update(rtB, updatedRTB)
 	require.NoError(p.T(), err)
 
-	err = eg.Wait()
+	err = extauthz.WaitForAllowed(testUser, p.downstreamClusterID, []*authzv1.ResourceAttributes{
+		{
+			Verb:      "get",
+			Resource:  "secrets",
+			Name:      secret.Name,
+			Namespace: createdNamespace.Name,
+		},
+		{
+			Verb:      "get",
+			Resource:  "secrets",
+			Name:      anotherSecret.Name,
+			Namespace: createdNamespace.Name,
+		},
+	})
 	require.NoError(p.T(), err)
 
 	_, err = secrets.GetSecretByName(testUser, p.downstreamClusterID, createdNamespace.Name, anotherSecret.Name, metav1.GetOptions{})
@@ -247,7 +245,14 @@ func (p *RTBTestSuite) TestCRTBRoleTemplateInheritance() {
 
 	localCluster, err := p.client.Management.Cluster.ByID(p.downstreamClusterID)
 	require.NoError(p.T(), err)
-	err = users.AddClusterRoleToUser(client, localCluster, p.testUser, rtA.ID)
+
+	err = users.AddClusterRoleToUser(client, localCluster, p.testUser, rtA.ID, []*authzv1.ResourceAttributes{
+		{
+			Verb:     "get",
+			Resource: "namespaces",
+			Name:     ns.Name,
+		},
+	})
 	require.NoError(p.T(), err)
 
 	_, err = extnamespaces.GetNamespaceByName(testUser, p.downstreamClusterID, ns.Name)
@@ -271,7 +276,13 @@ func (p *RTBTestSuite) TestCRTBRoleTemplateInheritance() {
 	_, err = extnamespaces.GetNamespaceByName(testUser, p.downstreamClusterID, ns.Name)
 	require.Error(p.T(), err)
 
-	err = users.AddClusterRoleToUser(client, localCluster, p.testUser, rtC.ID)
+	err = users.AddClusterRoleToUser(client, localCluster, p.testUser, rtC.ID, []*authzv1.ResourceAttributes{
+		{
+			Verb:     "get",
+			Resource: "namespaces",
+			Name:     ns.Name,
+		},
+	})
 	require.NoError(p.T(), err)
 
 	_, err = extnamespaces.GetNamespaceByName(testUser, p.downstreamClusterID, ns.Name)
@@ -293,38 +304,21 @@ func (p *RTBTestSuite) TestCRTBRoleTemplateInheritance() {
 		Verbs:         []string{"get"},
 	})
 
-	dynamicClient, err := client.GetRancherDynamicClient()
-	require.NoError(p.T(), err)
-	var eg errgroup.Group
-	timeout := int64(15)
-
-	watchInterface, err := dynamicClient.Resource(rbac.ClusterRoleGroupVersionResource).Watch(context.TODO(), metav1.ListOptions{
-		FieldSelector:  "metadata.name=" + rtB.ID,
-		TimeoutSeconds: &timeout,
-	})
-	eg.Go(func() error {
-		err = wait.WatchWait(watchInterface, func(event watch.Event) (bool, error) {
-			if event.Type == watch.Error {
-				return false, fmt.Errorf("there was an error deleting cluster")
-			}
-			unstructuredCR := event.Object.(*unstructured.Unstructured)
-			cr := new(rbacv1.ClusterRole)
-			err := scheme.Scheme.Convert(unstructuredCR, cr, unstructuredCR.GroupVersionKind())
-			if err != nil {
-				return false, err
-			}
-			if len(cr.Rules) == 2 {
-				return true, nil
-			}
-			return false, nil
-		})
-		return err
-	})
-
 	_, err = client.Management.RoleTemplate.Update(rtB, updatedRTB)
 	require.NoError(p.T(), err)
 
-	err = eg.Wait()
+	err = extauthz.WaitForAllowed(testUser, p.downstreamClusterID, []*authzv1.ResourceAttributes{
+		{
+			Verb:     "get",
+			Resource: "namespaces",
+			Name:     ns.Name,
+		},
+		{
+			Verb:     "get",
+			Resource: "namespaces",
+			Name:     anotherNS.Name,
+		},
+	})
 	require.NoError(p.T(), err)
 
 	_, err = extnamespaces.GetNamespaceByName(testUser, p.downstreamClusterID, anotherNS.Name)

@@ -73,6 +73,9 @@ type ResourceClient struct {
 }
 
 var (
+	// some GVKs are special and cannot be cleaned up because they do not exist
+	// after being created (eg: SelfSubjectAccessReview). We'll not register
+	// cleanup functions when creating objects of these kinds.
 	noCleanupGVKs = []schema.GroupVersionKind{
 		{
 			Group:   "authorization.k8s.io",
@@ -112,7 +115,7 @@ func (c *ResourceClient) Create(ctx context.Context, obj *unstructured.Unstructu
 			}
 			gvk := unstructuredObj.GetObjectKind().GroupVersionKind()
 
-			return fmt.Errorf("%v (%v): %w", name, gvk, err)
+			return fmt.Errorf("unable to delete (%v) %v: %w", gvk, name, err)
 		})
 	}
 
