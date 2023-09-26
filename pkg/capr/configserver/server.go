@@ -414,9 +414,11 @@ func (r *RKE2ConfigServer) findSA(req *http.Request) (string, *corev1.Secret, er
 	}
 
 	logrus.Debugf("[rke2configserver] %s/%s starting token secret watch for planSA %s/%s", machineNamespace, machineName, planSA.Namespace, planSA.Name)
-	// start watch for the planSA corresponding secret, using a field selector.
+	// start watch for the planSA corresponding secret, using a label selector.
 	respSecret, err := r.secrets.Watch(machineNamespace, metav1.ListOptions{
-		FieldSelector: fmt.Sprintf("metadata.name=%s", serviceaccounttoken.ServiceAccountSecretName(planSA)),
+		LabelSelector: labels.Set{
+			serviceaccounttoken.ServiceAccountSecretLabel: planSA.Name,
+		}.String(),
 	})
 	if err != nil {
 		return "", nil, err

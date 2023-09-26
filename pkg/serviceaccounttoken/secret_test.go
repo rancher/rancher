@@ -19,9 +19,6 @@ func TestEnsureSecretForServiceAccount(t *testing.T) {
 			Name:      "test",
 			Namespace: "default",
 		},
-		Secrets: []v1.ObjectReference{{
-			Name: "test-token-abcde",
-		}},
 	}
 	defaultWantSecret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -29,6 +26,9 @@ func TestEnsureSecretForServiceAccount(t *testing.T) {
 			Namespace: "default",
 			Annotations: map[string]string{
 				"kubernetes.io/service-account.name": "test",
+			},
+			Labels: map[string]string{
+				"cattle.io/service-account.name": "test",
 			},
 		},
 		Data: map[string][]byte{
@@ -62,9 +62,6 @@ func TestEnsureSecretForServiceAccount(t *testing.T) {
 					Name:      "test",
 					Namespace: "default",
 				},
-				Secrets: []v1.ObjectReference{{
-					Name: "test-token-abcde",
-				}},
 			},
 			wantSA: defaultWantSA,
 			existingSecret: &v1.Secret{
@@ -73,6 +70,9 @@ func TestEnsureSecretForServiceAccount(t *testing.T) {
 					Namespace: "default",
 					Annotations: map[string]string{
 						"kubernetes.io/service-account.name": "test",
+					},
+					Labels: map[string]string{
+						"cattle.io/service-account.name": "test",
 					},
 				},
 				Data: map[string][]byte{
@@ -93,9 +93,6 @@ func TestEnsureSecretForServiceAccount(t *testing.T) {
 					Name:      "test",
 					Namespace: "default",
 				},
-				Secrets: []v1.ObjectReference{{
-					Name: "wrong",
-				}},
 			},
 			wantSA:     defaultWantSA,
 			wantSecret: defaultWantSecret,
@@ -107,9 +104,6 @@ func TestEnsureSecretForServiceAccount(t *testing.T) {
 					Name:      "test",
 					Namespace: "default",
 				},
-				Secrets: []v1.ObjectReference{{
-					Name: "test-token-xyz",
-				}},
 			},
 			wantSA: defaultWantSA,
 			existingSecret: &v1.Secret{
@@ -118,6 +112,9 @@ func TestEnsureSecretForServiceAccount(t *testing.T) {
 					Namespace: "default",
 					Annotations: map[string]string{
 						"kubernetes.io/service-account.name": "test",
+					},
+					Labels: map[string]string{
+						"cattle.io/service-account.name": "test",
 					},
 				},
 				Data: map[string][]byte{
@@ -134,9 +131,6 @@ func TestEnsureSecretForServiceAccount(t *testing.T) {
 					Name:      "test",
 					Namespace: "default",
 				},
-				Secrets: []v1.ObjectReference{{
-					Name: "test-token-xyz",
-				}},
 			},
 			wantSA: defaultWantSA,
 			existingSecret: &v1.Secret{
@@ -145,6 +139,9 @@ func TestEnsureSecretForServiceAccount(t *testing.T) {
 					Namespace: "default",
 					Annotations: map[string]string{
 						"kubernetes.io/service-account.name": "wrong",
+					},
+					Labels: map[string]string{
+						"cattle.io/service-account.name": "wrong",
 					},
 				},
 				Data: map[string][]byte{
