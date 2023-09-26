@@ -168,8 +168,7 @@ type GlobalRole struct {
 	Builtin bool `json:"builtin,omitempty" norman:"nocreate,noupdate"`
 
 	// InheritedClusterRoles are the names of RoleTemplates whose permissions are granted by this GlobalRole in every
-	// cluster besides the local cluster. To grant permissions in the local cluster, use the Rules or NamespacedRules
-	// fields.
+	// cluster besides the local cluster. To grant permissions in the local cluster, use the Rules field.
 	// +optional
 	InheritedClusterRoles []string `json:"inheritedClusterRoles,omitempty"`
 }
