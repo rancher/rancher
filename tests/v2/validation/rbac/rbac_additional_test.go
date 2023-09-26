@@ -64,7 +64,7 @@ func (rb *RBACAdditionalTestSuite) ValidateAddStdUserAsProjectOwner() {
 	rb.standardUserCOProject = createProjectAsCO
 
 	log.Info("Validating if cluster owner can add a user as project owner in a project")
-	err = users.AddProjectMember(rb.standardUserClient, rb.standardUserCOProject, rb.additionalUser, roleProjectOwner)
+	err = users.AddProjectMember(rb.standardUserClient, rb.standardUserCOProject, rb.additionalUser, roleProjectOwner, nil)
 	require.NoError(rb.T(), err)
 	userGetProject, err := projects.GetProjectList(rb.additionalUserClient, rb.cluster.ID)
 	require.NoError(rb.T(), err)
@@ -79,7 +79,7 @@ func (rb *RBACAdditionalTestSuite) ValidateAddStdUserAsProjectOwner() {
 func (rb *RBACAdditionalTestSuite) ValidateAddMemberAsClusterRoles() {
 
 	log.Info("Validating if cluster owners should be able to add another standard user as a cluster owner")
-	errUserRole := users.AddClusterRoleToUser(rb.standardUserClient, rb.cluster, rb.additionalUser, roleOwner)
+	errUserRole := users.AddClusterRoleToUser(rb.standardUserClient, rb.cluster, rb.additionalUser, roleOwner, nil)
 	require.NoError(rb.T(), errUserRole)
 	additionalUserClient, err := rb.additionalUserClient.ReLogin()
 	require.NoError(rb.T(), err)
@@ -97,7 +97,7 @@ func (rb *RBACAdditionalTestSuite) ValidateAddMemberAsClusterRoles() {
 func (rb *RBACAdditionalTestSuite) ValidateAddCMAsProjectOwner() {
 
 	log.Info("Validating if cluster manage member should be able to add as a project member")
-	errUserRole := users.AddClusterRoleToUser(rb.standardUserClient, rb.cluster, rb.additionalUser, roleMember)
+	errUserRole := users.AddClusterRoleToUser(rb.standardUserClient, rb.cluster, rb.additionalUser, roleMember, nil)
 	require.NoError(rb.T(), errUserRole)
 	additionalUserClient, err := rb.additionalUserClient.ReLogin()
 	require.NoError(rb.T(), err)
@@ -107,7 +107,7 @@ func (rb *RBACAdditionalTestSuite) ValidateAddCMAsProjectOwner() {
 	require.NoError(rb.T(), err)
 	assert.Equal(rb.T(), 1, len(clusterList.Data))
 
-	err = users.AddProjectMember(rb.standardUserClient, rb.standardUserCOProject, rb.additionalUser, roleProjectOwner)
+	err = users.AddProjectMember(rb.standardUserClient, rb.standardUserCOProject, rb.additionalUser, roleProjectOwner, nil)
 	require.NoError(rb.T(), err)
 	userGetProject, err := projects.GetProjectList(rb.additionalUserClient, rb.cluster.ID)
 	require.NoError(rb.T(), err)
@@ -121,7 +121,7 @@ func (rb *RBACAdditionalTestSuite) ValidateAddPOsAsProjectOwner() {
 	rb.standardUserCOProject = createProjectAsCO
 
 	log.Info("Validating if Project Owner can add another Project Owner")
-	errUserRole := users.AddProjectMember(rb.standardUserClient, rb.standardUserCOProject, rb.additionalUser, roleProjectOwner)
+	errUserRole := users.AddProjectMember(rb.standardUserClient, rb.standardUserCOProject, rb.additionalUser, roleProjectOwner, nil)
 	require.NoError(rb.T(), errUserRole)
 	rb.additionalUserClient, err = rb.additionalUserClient.ReLogin()
 	require.NoError(rb.T(), err)
@@ -131,7 +131,7 @@ func (rb *RBACAdditionalTestSuite) ValidateAddPOsAsProjectOwner() {
 	addNewUserAsPOClient, err := rb.client.AsUser(addNewUserAsPO)
 	require.NoError(rb.T(), err)
 
-	errUserRole2 := users.AddProjectMember(rb.additionalUserClient, rb.standardUserCOProject, addNewUserAsPO, roleProjectOwner)
+	errUserRole2 := users.AddProjectMember(rb.additionalUserClient, rb.standardUserCOProject, addNewUserAsPO, roleProjectOwner, nil)
 	require.NoError(rb.T(), errUserRole2)
 
 	addNewUserAsPOClient, err = addNewUserAsPOClient.ReLogin()
@@ -157,7 +157,7 @@ func (rb *RBACAdditionalTestSuite) ValidateCannotAddMPMsAsProjectOwner() {
 	rb.standardUserCOProject = createProjectAsCO
 
 	log.Info("Validating if Manage Project Member cannot add Project Owner")
-	errUserRole := users.AddProjectMember(rb.standardUserClient, rb.standardUserCOProject, rb.additionalUser, roleCustomManageProjectMember)
+	errUserRole := users.AddProjectMember(rb.standardUserClient, rb.standardUserCOProject, rb.additionalUser, roleCustomManageProjectMember, nil)
 	require.NoError(rb.T(), errUserRole)
 	rb.additionalUserClient, err = rb.additionalUserClient.ReLogin()
 	require.NoError(rb.T(), err)
@@ -167,7 +167,7 @@ func (rb *RBACAdditionalTestSuite) ValidateCannotAddMPMsAsProjectOwner() {
 	addNewUserAsPOClient, err := rb.client.AsUser(addNewUserAsPO)
 	require.NoError(rb.T(), err)
 
-	errUserRole2 := users.AddProjectMember(rb.additionalUserClient, rb.standardUserCOProject, addNewUserAsPO, roleProjectOwner)
+	errUserRole2 := users.AddProjectMember(rb.additionalUserClient, rb.standardUserCOProject, addNewUserAsPO, roleProjectOwner, nil)
 	require.Error(rb.T(), errUserRole2)
 	errStatus := strings.Split(errUserRole2.Error(), ".")[1]
 	rgx := regexp.MustCompile(`\[(.*?)\]`)
@@ -226,7 +226,7 @@ func (rb *RBACAdditionalTestSuite) TestRBACAdditional() {
 		if tt.member == standardUser {
 			rb.T().Logf("Adding user as " + roleOwner + " to the downstream cluster.")
 			//Adding created user to the downstream clusters with the role cluster Owner.
-			err := users.AddClusterRoleToUser(rb.client, rb.cluster, rb.standardUser, roleOwner)
+			err := users.AddClusterRoleToUser(rb.client, rb.cluster, rb.standardUser, roleOwner, nil)
 			require.NoError(rb.T(), err)
 			rb.standardUserClient, err = rb.standardUserClient.ReLogin()
 			require.NoError(rb.T(), err)
