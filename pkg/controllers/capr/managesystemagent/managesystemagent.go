@@ -44,6 +44,7 @@ type handler struct {
 	clusterRegistrationTokens v3.ClusterRegistrationTokenCache
 	bundles                   fleetcontrollers.BundleClient
 	rkeControlPlane           v1.RKEControlPlaneController
+	provClusters              rocontrollers.ClusterCache
 }
 
 func Register(ctx context.Context, clients *wrangler.Context) {
@@ -51,6 +52,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 		clusterRegistrationTokens: clients.Mgmt.ClusterRegistrationToken().Cache(),
 		bundles:                   clients.Fleet.Bundle(),
 		rkeControlPlane:           clients.RKE.RKEControlPlane(),
+		provClusters:              clients.Provisioning.Cluster().Cache(),
 	}
 
 	v1.RegisterRKEControlPlaneStatusHandler(ctx, clients.RKE.RKEControlPlane(),
@@ -79,6 +81,12 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 func (h *handler) OnChange(cluster *rancherv1.Cluster, status rancherv1.ClusterStatus) ([]runtime.Object, rancherv1.ClusterStatus, error) {
 	if cluster.Spec.RKEConfig == nil || settings.SystemAgentUpgradeImage.Get() == "" {
 		return nil, status, nil
+	}
+
+	// Intentionally return an ErrSkip to prevent unnecessarily thrashing the corresponding bundle
+	// if the status field for fleetworkspacename has not yet been updated
+	if cluster.Status.FleetWorkspaceName == "" {
+		return nil, status, generic.ErrSkip
 	}
 
 	var (
@@ -124,7 +132,7 @@ func (h *handler) OnChange(cluster *rancherv1.Cluster, status rancherv1.ClusterS
 
 	result = append(result, &v1alpha1.Bundle{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: cluster.Namespace,
+			Namespace: cluster.Status.FleetWorkspaceName,
 			Name:      capr.SafeConcatName(capr.MaxHelmReleaseNameLength, cluster.Name, "managed", "system", "agent"),
 		},
 		Spec: v1alpha1.BundleSpec{
