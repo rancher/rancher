@@ -38,10 +38,12 @@ import (
 )
 
 const (
-	ByCluster        = "by-cluster"
-	ByCloudCred      = "by-cloud-cred"
-	creatorIDAnn     = "field.cattle.io/creatorId"
-	administratedAnn = "provisioning.cattle.io/administrated"
+	ByCluster             = "by-cluster"
+	ByCloudCred           = "by-cloud-cred"
+	creatorIDAnn          = "field.cattle.io/creatorId"
+	administratedAnn      = "provisioning.cattle.io/administrated"
+	mgmtClusterNameAnn    = "provisioning.cattle.io/management-cluster-name"
+	fleetWorkspaceNameAnn = "provisioning.cattle.io/fleet-workspace-name"
 )
 
 var (
@@ -300,7 +302,6 @@ func mgmtClusterName() (string, error) {
 func (h *handler) createNewCluster(cluster *v1.Cluster, status v1.ClusterStatus, spec v3.ClusterSpec) ([]runtime.Object, v1.ClusterStatus, error) {
 	spec.DisplayName = cluster.Name
 	spec.Description = cluster.Annotations["field.cattle.io/description"]
-	spec.FleetWorkspaceName = cluster.Namespace
 	spec.DefaultPodSecurityPolicyTemplateName = cluster.Spec.DefaultPodSecurityPolicyTemplateName
 	spec.DefaultPodSecurityAdmissionConfigurationTemplateName = cluster.Spec.DefaultPodSecurityAdmissionConfigurationTemplateName
 	spec.DefaultClusterRoleForProjectMembers = cluster.Spec.DefaultClusterRoleForProjectMembers
@@ -357,7 +358,11 @@ func (h *handler) createNewCluster(cluster *v1.Cluster, status v1.ClusterStatus,
 		Spec: spec,
 	}
 
-	if newCluster.Name == "" {
+	if mgmtClusterNameAnnVal, ok := cluster.Annotations[mgmtClusterNameAnn]; ok && mgmtClusterNameAnnVal != "" && newCluster.Name == "" {
+		// If the management cluster name annotation is set to a non-empty value, and the mgmt cluster name has not been set yet, set the cluster name to the mgmt cluster name.
+		newCluster.Name = mgmtClusterNameAnnVal
+	} else if newCluster.Name == "" {
+		// If the management cluster name annotation is not set and the cluster name has not yet been generated, generate and set a new mgmt cluster name.
 		mgmtName, err := mgmtClusterName()
 		if err != nil {
 			return nil, status, err
@@ -371,6 +376,23 @@ func (h *handler) createNewCluster(cluster *v1.Cluster, status v1.ClusterStatus,
 
 	delete(cluster.Annotations, creatorIDAnn)
 
+	if features.ProvisioningV2FleetWorkspaceBackPopulation.Enabled() {
+		if forcedFleetWorkspaceName, ok := cluster.Annotations[fleetWorkspaceNameAnn]; ok && forcedFleetWorkspaceName != "" { // force set the fleet workspace name
+			newCluster.Spec.FleetWorkspaceName = forcedFleetWorkspaceName
+		} else {
+			if err := h.backpopulateMgmtClusterFleetWorkspaceName(newCluster); err != nil {
+				return nil, status, err
+			}
+			if newCluster.Spec.FleetWorkspaceName == "" { // fall back to using the provisioning cluster namespace as the fleet workspace name
+				newCluster.Spec.FleetWorkspaceName = cluster.Namespace
+			}
+		}
+	} else {
+		newCluster.Spec.FleetWorkspaceName = cluster.Namespace
+	}
+
+	status.FleetWorkspaceName = newCluster.Spec.FleetWorkspaceName
+
 	normalizedCluster, err := NormalizeCluster(newCluster, cluster.Spec.RKEConfig == nil)
 	if err != nil {
 		return nil, status, err
@@ -379,6 +401,21 @@ func (h *handler) createNewCluster(cluster *v1.Cluster, status v1.ClusterStatus,
 	return h.updateStatus([]runtime.Object{
 		normalizedCluster,
 	}, cluster, status, newCluster)
+}
+
+// backpopulateMgmtClusterFleetWorkspaceName backpopulates the fleet workspace name field from the v3 management cluster object onto the new desired object
+func (h *handler) backpopulateMgmtClusterFleetWorkspaceName(rCluster *v3.Cluster) error {
+	if rCluster == nil {
+		return nil
+	}
+	existing, err := h.mgmtClusterCache.Get(rCluster.Name)
+	if err != nil && !apierror.IsNotFound(err) {
+		return err
+	}
+	if existing != nil {
+		rCluster.Spec.FleetWorkspaceName = existing.Spec.FleetWorkspaceName
+	}
+	return nil
 }
 
 // updateStatus will update the status on the clusters.provisioning.cattle.io/v1 object.
