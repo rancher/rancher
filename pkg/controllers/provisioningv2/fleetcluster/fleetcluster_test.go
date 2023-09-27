@@ -104,7 +104,9 @@ func TestClusterCustomization(t *testing.T) {
 				"cluster-name": newMgmtCluster(
 					"cluster-name",
 					labels,
-					apimgmtv3.ClusterSpec{},
+					apimgmtv3.ClusterSpec{
+						FleetWorkspaceName: "fleet-default",
+					},
 				),
 			}),
 			&fleet.Cluster{
@@ -122,6 +124,7 @@ func TestClusterCustomization(t *testing.T) {
 					"cluster-name",
 					labels,
 					apimgmtv3.ClusterSpec{
+						FleetWorkspaceName: "fleet-default",
 						ClusterSpecBase: apimgmtv3.ClusterSpecBase{
 							FleetAgentDeploymentCustomization: &apimgmtv3.AgentDeploymentCustomization{
 								OverrideAffinity:             &linuxAffinity,
@@ -149,6 +152,7 @@ func TestClusterCustomization(t *testing.T) {
 					"cluster-name",
 					labels,
 					apimgmtv3.ClusterSpec{
+						FleetWorkspaceName: "fleet-default",
 						ClusterSpecBase: apimgmtv3.ClusterSpecBase{
 							FleetAgentDeploymentCustomization: &apimgmtv3.AgentDeploymentCustomization{
 								OverrideAffinity:             nil,
@@ -223,7 +227,10 @@ func TestCreateCluster(t *testing.T) {
 					map[string]string{
 						"cluster-group": "cluster-group-name",
 					},
-					apimgmtv3.ClusterSpec{Internal: false},
+					apimgmtv3.ClusterSpec{
+						FleetWorkspaceName: "fleet-default",
+						Internal:           false,
+					},
 				),
 			}),
 			1,
@@ -247,7 +254,10 @@ func TestCreateCluster(t *testing.T) {
 					map[string]string{
 						"cluster-group": "default",
 					},
-					apimgmtv3.ClusterSpec{Internal: true},
+					apimgmtv3.ClusterSpec{
+						FleetWorkspaceName: "fleet-default",
+						Internal:           true,
+					},
 				),
 			}),
 			2,

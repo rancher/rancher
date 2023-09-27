@@ -46,6 +46,7 @@ type AgentDeploymentCustomization struct {
 type ClusterStatus struct {
 	Ready              bool                                `json:"ready,omitempty"`
 	ClusterName        string                              `json:"clusterName,omitempty"`
+	FleetWorkspaceName string                              `json:"fleetWorkspaceName,omitempty"`
 	ClientSecretName   string                              `json:"clientSecretName,omitempty"`
 	AgentDeployed      bool                                `json:"agentDeployed,omitempty"`
 	ObservedGeneration int64                               `json:"observedGeneration"`

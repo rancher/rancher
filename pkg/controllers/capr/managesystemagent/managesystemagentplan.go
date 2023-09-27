@@ -25,6 +25,10 @@ func (h *handler) OnChangeInstallSUC(cluster *rancherv1.Cluster, status rancherv
 		return nil, status, nil
 	}
 
+	if cluster.Status.FleetWorkspaceName == "" {
+		return nil, status, nil
+	}
+
 	currentVersion, err := semver.NewVersion(cluster.Spec.KubernetesVersion)
 	if err != nil {
 		return nil, status, err
@@ -42,7 +46,7 @@ func (h *handler) OnChangeInstallSUC(cluster *rancherv1.Cluster, status rancherv
 	// b) upon creation of this resource the prefix 'mcc-' will be added to the release name, hence the limiting to 48 characters
 	mcc := &v3.ManagedChart{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: cluster.Namespace,
+			Namespace: cluster.Status.FleetWorkspaceName,
 			Name:      capr.SafeConcatName(48, cluster.Name, "managed", "system-upgrade-controller"),
 		},
 		Spec: v3.ManagedChartSpec{
@@ -91,8 +95,16 @@ type SUCMetadata struct {
 // version of Kubernetes. It applies a condition onto the control-plane object to be used by the planner when handling Kubernetes upgrades.
 func (h *handler) syncSystemUpgradeControllerStatus(obj *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus) (rkev1.RKEControlPlaneStatus, error) {
 	// perform the same name limiting as in the OnChangeInstallSUC and the managedchart controller
+	cluster, err := h.provClusters.Get(obj.Namespace, obj.Name)
+	if err != nil {
+		return status, err
+	}
+	if cluster.Status.FleetWorkspaceName == "" {
+		return status, fmt.Errorf("unable to sync system upgrade controller status for [%s] [%s/%s], status.FleetWorkspaceName was blank", cluster.TypeMeta.String(), cluster.Namespace, cluster.Name)
+	}
+
 	bundleName := capr.SafeConcatName(capr.MaxHelmReleaseNameLength, "mcc", capr.SafeConcatName(48, obj.Name, "managed", "system-upgrade-controller"))
-	sucBundle, err := h.bundles.Get(obj.Namespace, bundleName, metav1.GetOptions{})
+	sucBundle, err := h.bundles.Get(cluster.Status.FleetWorkspaceName, bundleName, metav1.GetOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// if we couldn't find the bundle then we know it's not ready
