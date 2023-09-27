@@ -147,13 +147,7 @@ func (h *handler) getArgsEnvAndStatus(infra *infraObject, args map[string]any, d
 		}
 		cmd = append(cmd, toArgs(driver, args, rancherCluster.Status.ClusterName)...)
 	} else {
-		// We're passing the `--update-config` flag here along with driver-specific flags to tell Rancher Machine
-		// to reload the driver-specific flags we pass via envvars. They need to be reloaded to account for cases
-		// were configuration used by Rancher machine (namely cloud credentials) change while the machine is still running.
-		// If we didn't do this, a user could create a machine and change the cloud credential it uses, leaving Rancher
-		// unable to remove the machine afterward because Rancher machine will always use the old credential it stored on
-		// machine creation.
-		cmd = append(cmd, "rm", "-y", "--update-config")
+		cmd = append(cmd, "rm", "-y")
 		jobBackoffLimit = 3
 	}
 
