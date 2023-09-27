@@ -1,0 +1,14 @@
+# The [build.yaml](../build.yaml) file is the single source of truth. It lists all values by name and value.
+# Implementation ref https://github.com/rancher/rancher/pull/42000
+
+# Final release envs
+FINAL_RC_FILES:
+  - "Dockerfile.dapper"
+  - "go.mod"
+  - "./package/Dockerfile"
+  - "./pkg/apis/go.mod"
+  - "./pkg/settings/setting.go"
+  - "./scripts/package-env"
+FINAL_RC_PARTIAL_COMMIT_MESSAGE: last commit for final rc
+FINAL_RC_PRERELEASE_TITLE: Pre-release v2\.8\. # for version v2.7 replace: Pre-release v2\.7\.
+FINAL_RC_PRERELEASE_REGEX: "[0-9]{1,100}-rc[1-9][0-9]{0,1}$"
