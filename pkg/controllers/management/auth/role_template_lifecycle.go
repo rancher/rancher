@@ -32,6 +32,8 @@ type roleTemplateLifecycle struct {
 	clusterManager *clustermanager.Manager
 }
 
+// newRoleTemplateLifecycle creates a new RoleTemplateLifecycle with clients and indexers for a
+// ProjectRoleTemplateBinding, a ClusterRoleTemplateBinding, and roles.
 func newRoleTemplateLifecycle(management *config.ManagementContext, clusterManager *clustermanager.Manager) v3.RoleTemplateLifecycle {
 	prtbInformer := management.Management.ProjectRoleTemplateBindings("").Controller().Informer()
 	crtbInformer := management.Management.ClusterRoleTemplateBindings("").Controller().Informer()
@@ -49,15 +51,17 @@ func newRoleTemplateLifecycle(management *config.ManagementContext, clusterManag
 	return rtl
 }
 
+// Create enqueues the RoleTemplateBindings for a given RoleTemplate.
 func (rtl *roleTemplateLifecycle) Create(obj *v3.RoleTemplate) (runtime.Object, error) {
 	return rtl.enqueueRtbs(obj)
 }
 
+// Updated enqueues the RoleTemplateBindings for a given RoleTemplate.
 func (rtl *roleTemplateLifecycle) Updated(obj *v3.RoleTemplate) (runtime.Object, error) {
 	return rtl.enqueueRtbs(obj)
 }
 
-// enqueueRtbs enqueues crtbs and prtbs associated to the role template.
+// enqueueRtbs enqueues ClusterRoleTemplateBindings and ProjectRoleTemplateBindings associated with the role template.
 func (rtl *roleTemplateLifecycle) enqueueRtbs(obj *v3.RoleTemplate) (runtime.Object, error) {
 	if err := rtl.enqueuePrtbs(obj); err != nil {
 		return nil, err
@@ -70,6 +74,9 @@ func (rtl *roleTemplateLifecycle) enqueueRtbs(obj *v3.RoleTemplate) (runtime.Obj
 	return nil, nil
 }
 
+// Remove removes the user context cluster roles associated with a RoleTemplate. This function is executed for all
+// downstream clusters and bypasses API/IsNotFound role errors to remove as many roles as possible so the template
+// can be cleaned up.
 func (rtl *roleTemplateLifecycle) Remove(obj *v3.RoleTemplate) (runtime.Object, error) {
 	clusters, err := rtl.clusters.List(metav1.ListOptions{})
 	if err != nil {
@@ -115,8 +122,8 @@ func (rtl *roleTemplateLifecycle) Remove(obj *v3.RoleTemplate) (runtime.Object, 
 	return obj, rtl.removeAuthV2Roles(obj)
 }
 
-// removeAuthV2Roles finds any roles based off the owner annotation from the incoming roleTemplate.
-// This is similar to an ownerReference but this is used across namespaces which ownerReferences does not support.
+// removeAuthV2Roles removes roles based off the owner annotation from the given roleTemplate. This is similar to an
+// ownerReference but this is used across namespaces which ownerReferences does not support.
 func (rtl *roleTemplateLifecycle) removeAuthV2Roles(roleTemplate *v3.RoleTemplate) error {
 	// Get the selector for the dependent roles
 	selector, err := apply.GetSelectorFromOwner("auth-prov-v2-roletemplate", roleTemplate)
@@ -133,7 +140,7 @@ func (rtl *roleTemplateLifecycle) removeAuthV2Roles(roleTemplate *v3.RoleTemplat
 	for _, role := range roles {
 		err := rtl.roles.DeleteNamespaced(role.Namespace, role.Name, &metav1.DeleteOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
-			// Combine all errors so we try our best to delete everything in the first run
+			// Combine all errors to try to delete everything in the first run
 			returnErr = multierror.Append(returnErr, err)
 		}
 	}
@@ -141,7 +148,8 @@ func (rtl *roleTemplateLifecycle) removeAuthV2Roles(roleTemplate *v3.RoleTemplat
 	return returnErr
 }
 
-// enqueue any prtbs linked to this roleTemplate in order to re-sync them via reconcileBindings
+// enqueuePrtbs enqueues all ProjectRoleTemplateBindings linked to this roleTemplate in order to re-sync them via
+// reconcileBindings.
 func (rtl *roleTemplateLifecycle) enqueuePrtbs(updatedRT *v3.RoleTemplate) error {
 	prtbs, err := rtl.prtbIndexer.ByIndex(prtbByRoleTemplateIndex, updatedRT.Name)
 	if err != nil {
@@ -155,7 +163,8 @@ func (rtl *roleTemplateLifecycle) enqueuePrtbs(updatedRT *v3.RoleTemplate) error
 	return nil
 }
 
-// enqueue any crtbs linked to this roleTemplate in order to re-sync them via reconcileBindings
+// enqueueCrtbs enqueues all ClusterRoleTemplateBindings linked to this roleTemplate in order to re-sync them via
+// reconcileBindings.
 func (rtl *roleTemplateLifecycle) enqueueCrtbs(updatedRT *v3.RoleTemplate) error {
 	crtbs, err := rtl.crtbIndexer.ByIndex(crtbByRoleTemplateIndex, updatedRT.Name)
 	if err != nil {
@@ -169,6 +178,7 @@ func (rtl *roleTemplateLifecycle) enqueueCrtbs(updatedRT *v3.RoleTemplate) error
 	return nil
 }
 
+// prtbByRoleTemplate returns a list of ProjectRoleTemplateBindings by RoleTemplate name.
 func prtbByRoleTemplate(obj interface{}) ([]string, error) {
 	prtb, ok := obj.(*v3.ProjectRoleTemplateBinding)
 	if !ok {
@@ -177,6 +187,7 @@ func prtbByRoleTemplate(obj interface{}) ([]string, error) {
 	return []string{prtb.RoleTemplateName}, nil
 }
 
+// crtbByRoleTemplate returns a list of ClusterRoleTemplateBindings by RoleTemplate name.
 func crtbByRoleTemplate(obj interface{}) ([]string, error) {
 	crtb, ok := obj.(*v3.ClusterRoleTemplateBinding)
 	if !ok {

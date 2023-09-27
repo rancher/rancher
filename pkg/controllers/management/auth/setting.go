@@ -16,6 +16,7 @@ type SettingController struct {
 	settings v3.SettingInterface
 }
 
+// newAuthSettingController creates a new SettingController to manage auth settings.
 func newAuthSettingController(mgmt *config.ManagementContext) *SettingController {
 	n := &SettingController{
 		settings: mgmt.Management.Settings(""),

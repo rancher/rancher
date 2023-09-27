@@ -667,6 +667,8 @@ func (m *manager) grantManagementProjectScopedPrivilegesInClusterNamespace(roleT
 	return m.reconcileDesiredMGMTPlaneRoleBindings(currentRBs, desiredRBs, roleBindings)
 }
 
+// gatherAndDedupeRoles de-dupes all roles associated with the given RoleTemplate name and returns a map of the
+// de-duped roles.
 func (m *manager) gatherAndDedupeRoles(roleTemplateName string) (map[string]*v3.RoleTemplate, error) {
 	rt, err := m.rtLister.Get("", roleTemplateName)
 	if err != nil {
@@ -677,22 +679,24 @@ func (m *manager) gatherAndDedupeRoles(roleTemplateName string) (map[string]*v3.
 		return nil, err
 	}
 
-	//de-dupe
+	// de-dupe
 	roles := map[string]*v3.RoleTemplate{}
 	for _, role := range allRoles {
 		roles[role.Name] = role
 	}
 
-	//toLower
+	// toLower
 	rbac.ToLowerRoleTemplates(roles)
 	return roles, nil
 }
 
+// reconcileDesiredMGMTPlaneRoleBindings checks the desired RoleBindings against ones in the mgmt plane and creates
+// and/or deletes RoleBindings to reconcile the state.
 func (m *manager) reconcileDesiredMGMTPlaneRoleBindings(currentRBs, desiredRBs map[string]*v1.RoleBinding, roleBindings typesrbacv1.RoleBindingInterface) error {
 	rbsToDelete := map[string]bool{}
 	processed := map[string]bool{}
 	for _, rb := range currentRBs {
-		// protect against an rb being in the list more than once (shouldn't happen, but just to be safe)
+		// protect against a roleBinding being in the list more than once (shouldn't happen, but just to be safe)
 		if ok := processed[rb.Name]; ok {
 			continue
 		}
@@ -826,8 +830,8 @@ func (m *manager) reconcileManagementPlaneRole(namespace string, resourceToVerbs
 	return nil
 }
 
-// gatherRoleTemplates is a recursive function that gathers all roleTemplatesNames that the given RoleTemplate has
-// reference to / will inherit. Cool!
+// gatherRoleTemplates is a recursive function that gathers all roleTemplateNames that the given RoleTemplate has
+// reference to or will inherit. Cool!
 func (m *manager) gatherRoleTemplates(rt *v3.RoleTemplate, roleTemplates map[string]*v3.RoleTemplate) error {
 	roleTemplates[rt.Name] = rt
 

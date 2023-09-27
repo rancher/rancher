@@ -34,9 +34,13 @@ import (
 	"github.com/rancher/rancher/pkg/wrangler"
 )
 
+// Register calls functions in all controller packages to register the associated handlers. This func registers auth
+// controllers early to create backing namespaces, then registers the user controllers and sets them to watch caches,
+// and finally registers Cluster and Project controllers.
 func Register(ctx context.Context, management *config.ManagementContext, manager *clustermanager.Manager, wrangler *wrangler.Context) {
 	// auth handlers need to run early to create namespaces that back clusters and projects
-	// also, these handlers are purely in the mgmt plane, so they are lightweight compared to those that interact with machines and clusters
+	// also, these handlers are purely in the mgmt plane, so they are lightweight compared to those that interact with
+	// machines and clusters
 	auth.RegisterEarly(ctx, management, manager)
 	usercontrollers.RegisterEarly(ctx, management, manager)
 

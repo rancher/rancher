@@ -16,12 +16,16 @@ type prtbServiceAccountController struct {
 	prtbClient wranglerv3.ProjectRoleTemplateBindingClient
 }
 
+// newPRTBServiceAccountController creates a new ProjectRoleTemplateBinding account controller.
 func newPRTBServiceAccountController(mgmt *config.ManagementContext) *prtbServiceAccountController {
 	return &prtbServiceAccountController{
 		prtbClient: mgmt.Wrangler.Mgmt.ProjectRoleTemplateBinding(),
 	}
 }
 
+// sync updates a ProjectRoleTemplateBinding on the management cluster and sets the management.cattle.io/serviceAccount
+// annotation = name of the ServiceAccount subject. This ensures the correct Service Account gets permissions defined
+// in the PRTB.
 func (c prtbServiceAccountController) sync(_ string, prtb *apiv3.ProjectRoleTemplateBinding) (runtime.Object, error) {
 	if prtb == nil {
 		return prtb, nil

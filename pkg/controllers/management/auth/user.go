@@ -51,6 +51,9 @@ const (
 	userController    = "mgmt-auth-users-controller"
 )
 
+// newUserLifecycle creates a new User with ProjectRoleTemplateBinding, ClusterRoleTemplateBinding, GlobalRoleBinding,
+// and token controllers and indexers. A User will include all these resources by default and need controllers
+// initiated to manage them.
 func newUserLifecycle(management *config.ManagementContext, clusterManager *clustermanager.Manager) *userLifecycle {
 	lfc := &userLifecycle{
 		prtb:            management.Management.ProjectRoleTemplateBindings(""),
@@ -82,6 +85,7 @@ func newUserLifecycle(management *config.ManagementContext, clusterManager *clus
 	return lfc
 }
 
+// grbByUserRefFunc returns a list of GlobalRoleBinding usernames.
 func grbByUserRefFunc(obj interface{}) ([]string, error) {
 	globalRoleBinding, ok := obj.(*v3.GlobalRoleBinding)
 	if !ok {
@@ -91,6 +95,7 @@ func grbByUserRefFunc(obj interface{}) ([]string, error) {
 	return []string{globalRoleBinding.UserName}, nil
 }
 
+// prtbByUserRefFunc returns a list of ProjectRoleBinding usernames.
 func prtbByUserRefFunc(obj interface{}) ([]string, error) {
 	projectRoleBinding, ok := obj.(*v3.ProjectRoleTemplateBinding)
 	if !ok || projectRoleBinding.UserName == "" {
@@ -100,6 +105,7 @@ func prtbByUserRefFunc(obj interface{}) ([]string, error) {
 	return []string{projectRoleBinding.UserName}, nil
 }
 
+// crtbByUserRefFunc returns a list of ClusterRoleBinding usernames.
 func crtbByUserRefFunc(obj interface{}) ([]string, error) {
 	clusterRoleBinding, ok := obj.(*v3.ClusterRoleTemplateBinding)
 	if !ok || clusterRoleBinding.UserName == "" {
@@ -109,6 +115,7 @@ func crtbByUserRefFunc(obj interface{}) ([]string, error) {
 	return []string{clusterRoleBinding.UserName}, nil
 }
 
+// tokenByUserRefFunc returns a list of token userIDs.
 func tokenByUserRefFunc(obj interface{}) ([]string, error) {
 	token, ok := obj.(*v3.Token)
 	if !ok {
@@ -118,6 +125,7 @@ func tokenByUserRefFunc(obj interface{}) ([]string, error) {
 	return []string{token.UserID}, nil
 }
 
+// Create creates a new user.
 func (l *userLifecycle) Create(user *v3.User) (runtime.Object, error) {
 	var match = false
 	for _, id := range user.PrincipalIDs {
@@ -131,8 +139,8 @@ func (l *userLifecycle) Create(user *v3.User) (runtime.Object, error) {
 		user.PrincipalIDs = append(user.PrincipalIDs, "local://"+user.Name)
 	}
 
-	// creatorIDAnn indicates it was created through the API, create the new
-	// user bindings and add the annotation UserConditionInitialRolesPopulated
+	// creatorIDAnn indicates it was created through the API, create the new user bindings and add the annotation
+	// UserConditionInitialRolesPopulated
 	if user.ObjectMeta.Annotations[creatorIDAnn] != "" {
 		u, err := v32.UserConditionInitialRolesPopulated.DoUntilTrue(user, func() (runtime.Object, error) {
 			err := l.userManager.CreateNewUserClusterRoleBinding(user.Name, user.UID)
@@ -150,6 +158,7 @@ func (l *userLifecycle) Create(user *v3.User) (runtime.Object, error) {
 	return user, nil
 }
 
+// Updated updates a user via CreateNewUserClusterRoleBinding.
 func (l *userLifecycle) Updated(user *v3.User) (runtime.Object, error) {
 	err := l.userManager.CreateNewUserClusterRoleBinding(user.Name, user.UID)
 	if err != nil {
@@ -158,6 +167,8 @@ func (l *userLifecycle) Updated(user *v3.User) (runtime.Object, error) {
 	return user, nil
 }
 
+// Remove removes all ClusterRoles, ProjectRoles, GlobalRoles, and Tokens associated with a user and then cleans up
+// the User object.
 func (l *userLifecycle) Remove(user *v3.User) (runtime.Object, error) {
 	clusterRoles, err := l.getCRTBByUserName(user.Name)
 	if err != nil {
@@ -222,6 +233,7 @@ func (l *userLifecycle) Remove(user *v3.User) (runtime.Object, error) {
 	return user, nil
 }
 
+// getCRTBByUserName returns a list of ClusterRoleTemplateBindings by UserName.
 func (l *userLifecycle) getCRTBByUserName(username string) ([]*v3.ClusterRoleTemplateBinding, error) {
 	obj, err := l.crtbIndexer.ByIndex(crtbByUserRefKey, username)
 	if err != nil {
@@ -241,6 +253,7 @@ func (l *userLifecycle) getCRTBByUserName(username string) ([]*v3.ClusterRoleTem
 	return crtbs, nil
 }
 
+// getPRTBByUserName returns a list of ProjectRoleTemplateBindings by UserName.
 func (l *userLifecycle) getPRTBByUserName(username string) ([]*v3.ProjectRoleTemplateBinding, error) {
 	objs, err := l.prtbIndexer.ByIndex(prtbByUserRefKey, username)
 	if err != nil {
@@ -260,6 +273,7 @@ func (l *userLifecycle) getPRTBByUserName(username string) ([]*v3.ProjectRoleTem
 	return prtbs, nil
 }
 
+// getGRBByUserName returns a list of GlobalRoleBindings by UserName.
 func (l *userLifecycle) getGRBByUserName(username string) ([]*v3.GlobalRoleBinding, error) {
 	objs, err := l.grbIndexer.ByIndex(grbByUserRefKey, username)
 	if err != nil {
@@ -279,6 +293,7 @@ func (l *userLifecycle) getGRBByUserName(username string) ([]*v3.GlobalRoleBindi
 	return grbs, nil
 }
 
+// getTokensByUserName returns a list of tokens by UserName.
 func (l *userLifecycle) getTokensByUserName(username string) ([]*v3.Token, error) {
 	objs, err := l.tokenIndexer.ByIndex(tokenByUserRefKey, username)
 	if err != nil {
@@ -298,6 +313,7 @@ func (l *userLifecycle) getTokensByUserName(username string) ([]*v3.Token, error
 	return tokens, nil
 }
 
+// deleteAllCRTB deletes a ClusterRole and its associated ClusterRoleTemplateBindings.
 func (l *userLifecycle) deleteAllCRTB(crtbs []*v3.ClusterRoleTemplateBinding) error {
 	for _, crtb := range crtbs {
 		var err error
@@ -316,6 +332,7 @@ func (l *userLifecycle) deleteAllCRTB(crtbs []*v3.ClusterRoleTemplateBinding) er
 	return nil
 }
 
+// deleteAllPRTB deletes a ProjectRole and its associated ProjectRoleTemplateBindings.
 func (l *userLifecycle) deleteAllPRTB(prtbs []*v3.ProjectRoleTemplateBinding) error {
 	for _, prtb := range prtbs {
 		var err error
@@ -334,6 +351,7 @@ func (l *userLifecycle) deleteAllPRTB(prtbs []*v3.ProjectRoleTemplateBinding) er
 	return nil
 }
 
+// deleteAllGRB deletes all GlobalRoleBindings across all clusters.
 func (l *userLifecycle) deleteAllGRB(grbs []*v3.GlobalRoleBinding) error {
 	// some GRBs can refer to GRs which inherit cluster Roles. Rancher's service account lacks the permission
 	// to delete these GRBs directly, so it needs to bypass the webhook
@@ -353,6 +371,7 @@ func (l *userLifecycle) deleteAllGRB(grbs []*v3.GlobalRoleBinding) error {
 	return nil
 }
 
+// deleteClusterUserAttributes deletes the UserAttributes for a set of clusters associated with a list of tokens.
 func (l *userLifecycle) deleteClusterUserAttributes(username string, tokens []*v3.Token) error {
 	if len(tokens) == 0 {
 		return nil
@@ -383,6 +402,7 @@ func (l *userLifecycle) deleteClusterUserAttributes(username string, tokens []*v
 	return nil
 }
 
+// deleteAllTokens deletes all of the given tokens.
 func (l *userLifecycle) deleteAllTokens(tokens []*v3.Token) error {
 	for _, token := range tokens {
 		logrus.Infof("[%v] Deleting token %v for user %v", userController, token.Name, token.UserID)
@@ -395,6 +415,7 @@ func (l *userLifecycle) deleteAllTokens(tokens []*v3.Token) error {
 	return nil
 }
 
+// deleteUserNamespace deletes the namespace backing a given user.
 func (l *userLifecycle) deleteUserNamespace(username string) error {
 	namespace, err := l.namespaceLister.Get("", username)
 	if err != nil {
@@ -418,6 +439,7 @@ func (l *userLifecycle) deleteUserNamespace(username string) error {
 	return nil
 }
 
+// deleteUserSecret deletes the secret backing a given user.
 func (l *userLifecycle) deleteUserSecret(username string) error {
 	_, err := l.secretsLister.Get("cattle-system", username+"-secret")
 	if err != nil {
@@ -431,6 +453,7 @@ func (l *userLifecycle) deleteUserSecret(username string) error {
 	return l.secrets.DeleteNamespaced("cattle-system", username+"-secret", &metav1.DeleteOptions{})
 }
 
+// removeLegacyFinalizers removes the `controller.cattle.io/cat-user-controller` finalizer from the given user.
 func (l *userLifecycle) removeLegacyFinalizers(user *v3.User) (*v3.User, error) {
 	finalizers := user.GetFinalizers()
 	for i, finalizer := range finalizers {

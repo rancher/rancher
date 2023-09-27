@@ -11,6 +11,8 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
+// RegisterWranglerIndexers registers wrangler indexers for RoleBindingByRoleAndSubject, RoleBindingByOwner, and
+// MembershipBindingOwner.
 func RegisterWranglerIndexers(config *wrangler.Context) {
 	config.RBAC.ClusterRoleBinding().Cache().AddIndexer(rbByRoleAndSubjectIndex, rbByClusterRoleAndSubject)
 	config.RBAC.ClusterRoleBinding().Cache().AddIndexer(membershipBindingOwnerIndex, func(obj *v1.ClusterRoleBinding) ([]string, error) {
@@ -24,6 +26,8 @@ func RegisterWranglerIndexers(config *wrangler.Context) {
 	})
 }
 
+// RegisterIndexers registers indexers for ProjectRoleTemplateBinding and ClusterRoleTemplateBinding in the management
+// cluster.
 func RegisterIndexers(scaledContext *config.ScaledContext) error {
 	prtbInformer := scaledContext.Management.ProjectRoleTemplateBindings("").Controller().Informer()
 	prtbIndexers := map[string]cache.IndexFunc{
@@ -56,6 +60,7 @@ func RegisterIndexers(scaledContext *config.ScaledContext) error {
 	})
 }
 
+// RegisterEarly registers handlers for all the user controllers.
 func RegisterEarly(ctx context.Context, management *config.ManagementContext, clusterManager *clustermanager.Manager) {
 	prtb, crtb := newRTBLifecycles(management.WithAgent("mgmt-auth-crtb-prtb-controller"))
 	p, c := newPandCLifecycles(management)
@@ -86,6 +91,7 @@ func RegisterEarly(ctx context.Context, management *config.ManagementContext, cl
 	globalroles.Register(ctx, management, clusterManager)
 }
 
+// RegisterLate registers the Project and Cluster controllers.
 func RegisterLate(ctx context.Context, management *config.ManagementContext) {
 	p, c := newPandCLifecycles(management)
 	management.Management.Projects("").AddLifecycle(ctx, projectRemoveController, p)

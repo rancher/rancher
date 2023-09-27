@@ -17,6 +17,7 @@ type UserAttributeController struct {
 	userAttributes v3.UserAttributeInterface
 }
 
+// newUserAttributeController creates a new UserAttributeController to manage user attributes.
 func newUserAttributeController(mgmt *config.ManagementContext) *UserAttributeController {
 	ua := &UserAttributeController{
 		userAttributes: mgmt.Management.UserAttributes(""),

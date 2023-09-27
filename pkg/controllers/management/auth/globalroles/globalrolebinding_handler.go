@@ -6,6 +6,7 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
+	"github.com/rancher/norman/httperror"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers"
 	mgmtcontroller "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
@@ -598,7 +599,7 @@ func (grb *globalRoleBindingLifecycle) grantRestrictedAdminUserClusterPermission
 	return returnErr
 }
 
-// isCRTBValid determines if a given CRTB is up to date for a given cluster and owning global role binding. Should
+// isCRTBValid determines if a given CRTB is up-to-date for a given cluster and owning global role binding. Should
 // only be used in the context of CRTBs owned by GRBs
 func isCRTBValid(crtb *v3.ClusterRoleTemplateBinding, cluster *v3.Cluster, binding *v3.GlobalRoleBinding) bool {
 	return crtb != nil && cluster != nil && binding != nil &&
@@ -606,6 +607,8 @@ func isCRTBValid(crtb *v3.ClusterRoleTemplateBinding, cluster *v3.Cluster, bindi
 		crtb.UserName == binding.UserName &&
 		crtb.GroupPrincipalName == binding.GroupPrincipalName &&
 		crtb.DeletionTimestamp == nil
+}
+
 // IsClusterUnavailable returns true if the cluster is not reachable, false otherwise.
 func IsClusterUnavailable(err error) bool {
 	if apiError, ok := err.(*httperror.APIError); ok {

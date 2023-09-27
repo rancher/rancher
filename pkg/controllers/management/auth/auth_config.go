@@ -47,7 +47,8 @@ type authConfigController struct {
 	authConfigsUnstructured objectclient.GenericClient
 }
 
-// newAuthConfigController creates a new controller to watch and update all AuthConfig resources.
+// newAuthConfigController creates an authConfigController struct which registers a new User controller and clients to
+// watch and update all AuthConfig resources.
 func newAuthConfigController(context context.Context, mgmt *config.ManagementContext, scaledContext *config.ScaledContext) *authConfigController {
 	controller := &authConfigController{
 		users:                   mgmt.Management.Users("").Controller().Lister(),
@@ -154,7 +155,8 @@ func (ac *authConfigController) sync(key string, obj *v3.AuthConfig) (runtime.Ob
 	return obj, nil
 }
 
-// updateAuthConfig converts an unstructured object to an AuthConfig and returns it.
+// updateAuthConfig updates the provided v3.AuthConfig with the contents of the provided unstructuredObj, then returns
+// the updated v3.AuthConfig.
 func (ac *authConfigController) updateAuthConfig(unstructuredObj *unstructured.Unstructured, obj *v3.AuthConfig) (*v3.AuthConfig, error) {
 	uobj, err := ac.authConfigsUnstructured.Update(obj.Name, unstructuredObj)
 	if err != nil {

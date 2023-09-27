@@ -313,7 +313,7 @@ func resourceListChanged(oldList, newList v1.ResourceList) bool {
 	return false
 }
 
-// callWithTimeout calls func with a timeout of 15 seconds.
+// callWithTimeout calls do with a timeout of 15 seconds.
 func callWithTimeout(do func()) {
 	done := make(chan struct{})
 	go func() {

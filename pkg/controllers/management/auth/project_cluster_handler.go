@@ -76,6 +76,7 @@ type projectLifecycle struct {
 	mgr *mgr
 }
 
+// sync reconciles the state of a Project in the management cluster.
 func (l *projectLifecycle) sync(key string, orig *apisv3.Project) (runtime.Object, error) {
 	if orig == nil || orig.DeletionTimestamp != nil {
 		projectID := ""
@@ -122,14 +123,14 @@ func (l *projectLifecycle) sync(key string, orig *apisv3.Project) (runtime.Objec
 	return obj, nil
 }
 
+// enqueueCrtbs enqueues all ClusterRoleTemplateBindings in the project's cluster so the CRTB controller picks them up
+// and generates RoleBindings for each CRTB in that cluster.
 func (l *projectLifecycle) enqueueCrtbs(project *apisv3.Project) error {
-	// get all crtbs in current project's cluster
 	clusterID := project.Namespace
 	crtbs, err := l.mgr.crtbLister.List(clusterID, labels.Everything())
 	if err != nil {
 		return err
 	}
-	// enqueue them so crtb controller picks them up and lists all projects and generates rolebindings for each crtb in the projects
 	for _, crtb := range crtbs {
 		l.mgr.crtbClient.Controller().Enqueue(clusterID, crtb.Name)
 	}
@@ -146,6 +147,8 @@ func (l *projectLifecycle) Updated(obj *apisv3.Project) (runtime.Object, error) 
 	return obj, nil
 }
 
+// Remove removes a Project. A Project is a Rancher concept that defines a group of namespaces. This code removes the
+// set of namespaces and RoleBindings in the given Project.
 func (l *projectLifecycle) Remove(obj *apisv3.Project) (runtime.Object, error) {
 	var returnErr error
 	set := labels.Set{rbac.RestrictedAdminProjectRoleBinding: "true"}
@@ -170,6 +173,7 @@ type clusterLifecycle struct {
 	mgr *mgr
 }
 
+// sync reconciles the state of a Project for a cluster.
 func (l *clusterLifecycle) sync(key string, orig *apisv3.Cluster) (runtime.Object, error) {
 	if orig == nil || !orig.DeletionTimestamp.IsZero() {
 		return orig, nil
@@ -231,6 +235,9 @@ func (l *clusterLifecycle) Updated(obj *apisv3.Cluster) (runtime.Object, error) 
 	return obj, nil
 }
 
+// Remove removes a Project and its finalizers, RoleBindings, namespaces, and the system project (which is required
+// to be removed before Rancher can remove the cluster namespace. Otherwise, it will get stuck terminating -- see
+// deleteSystemProject for details).
 func (l *clusterLifecycle) Remove(obj *apisv3.Cluster) (runtime.Object, error) {
 	if len(obj.Finalizers) > 1 {
 		logrus.Debugf("Skipping rbac cleanup for cluster [%s] until all other finalizers are removed.", obj.Name)
@@ -276,14 +283,17 @@ type mgr struct {
 	roleBindings         rrbacv1.RoleBindingInterface
 }
 
+// createDefaultProject creates a default Project.
 func (m *mgr) createDefaultProject(obj runtime.Object) (runtime.Object, error) {
 	return m.createProject(project.Default, v32.ClusterConditionDefaultProjectCreated, obj, defaultProjectLabels)
 }
 
+// createSystemProject creates a system Project.
 func (m *mgr) createSystemProject(obj runtime.Object) (runtime.Object, error) {
 	return m.createProject(project.System, v32.ClusterConditionSystemProjectCreated, obj, systemProjectLabels)
 }
 
+// createProject creates a Project with a given name and set of labels.
 func (m *mgr) createProject(name string, cond condition.Cond, obj runtime.Object, labels labels.Set) (runtime.Object, error) {
 	return cond.DoUntilTrue(obj, func() (runtime.Object, error) {
 		metaAccessor, err := meta.Accessor(obj)
@@ -365,6 +375,10 @@ func (m *mgr) deleteSystemProject(cluster *apisv3.Cluster, controller string) er
 	return deleteError
 }
 
+// reconcileCreatorRTB reconciles the state of a creator RoleTemplateBinding (runs within a Project sync). Checks if
+// the initial roles are populated, checks annotations and adds default bindings if necessary, and creates a
+// ProjectRoleBinding if it doesn't exist to bind the RoleTemplate to the Project. It takes these actions for a
+// Project or a Cluster depending on the obj passed in.
 func (m *mgr) reconcileCreatorRTB(obj runtime.Object) (runtime.Object, error) {
 	return v32.CreatorMadeOwner.DoUntilTrue(obj, func() (runtime.Object, error) {
 		metaAccessor, err := meta.Accessor(obj)
@@ -392,9 +406,8 @@ func (m *mgr) reconcileCreatorRTB(obj runtime.Object) (runtime.Object, error) {
 				break
 			}
 
-			// If the project does not have the annotation it indicates the
-			// project is from a previous rancher version so don't add the
-			// default bindings.
+			// If the project does not have the annotation it indicates the project is from a previous rancher version
+			// so don't add the default bindings.
 			roleJSON, ok := project.Annotations[roleTemplatesRequired]
 			if !ok {
 				return project, nil
@@ -510,7 +523,7 @@ func (m *mgr) reconcileCreatorRTB(obj runtime.Object) (runtime.Object, error) {
 
 			updateCondition := reflect.DeepEqual(roleMap["required"], createdRoles)
 
-			err = m.updateClusterAnnotationandCondition(cluster, string(d), updateCondition)
+			err = m.updateClusterAnnotationAndCondition(cluster, string(d), updateCondition)
 			if err != nil {
 				return obj, err
 			}
@@ -520,6 +533,7 @@ func (m *mgr) reconcileCreatorRTB(obj runtime.Object) (runtime.Object, error) {
 	})
 }
 
+// deleteNamespace deletes a namespace.
 func (m *mgr) deleteNamespace(obj runtime.Object, controller string) error {
 	o, err := meta.Accessor(obj)
 	if err != nil {
@@ -541,6 +555,7 @@ func (m *mgr) deleteNamespace(obj runtime.Object, controller string) error {
 	return err
 }
 
+// reconcileResourceToNamespace creates a system-namespace for a resource Name and Kind.
 func (m *mgr) reconcileResourceToNamespace(obj runtime.Object, controller string) (runtime.Object, error) {
 	return v32.NamespaceBackedResource.Do(obj, func() (runtime.Object, error) {
 		o, err := meta.Accessor(obj)
@@ -573,13 +588,14 @@ func (m *mgr) reconcileResourceToNamespace(obj runtime.Object, controller string
 	})
 }
 
+// addRTAnnotation adds a RoleTemplate annotation to a Project or Cluster context.
 func (m *mgr) addRTAnnotation(obj runtime.Object, context string) (runtime.Object, error) {
 	meta, err := meta.Accessor(obj)
 	if err != nil {
 		return obj, err
 	}
 
-	// If the annotation is already there move along
+	// If the annotation is already there, move along
 	if _, ok := meta.GetAnnotations()[roleTemplatesRequired]; ok {
 		return obj, nil
 	}
@@ -601,8 +617,8 @@ func (m *mgr) addRTAnnotation(obj runtime.Object, context string) (runtime.Objec
 
 	switch context {
 	case "project":
-		// If we are in restricted mode, ensure the default projects are not granting
-		// permissions to the restricted-admin
+		// If we are in restricted mode, ensure the default projects are not granting permissions to the
+		// restricted-admin
 		if restrictedAdmin {
 			proj := obj.(*apisv3.Project)
 			if proj.Spec.ClusterName == "local" && (proj.Spec.DisplayName == "Default" || proj.Spec.DisplayName == "System") {
@@ -616,8 +632,8 @@ func (m *mgr) addRTAnnotation(obj runtime.Object, context string) (runtime.Objec
 			}
 		}
 	case "cluster":
-		// If we are in restricted mode, ensure we don't give the default restricted-admin
-		// the default permissions in the cluster
+		// If we are in restricted mode, ensure we don't give the default restricted-admin the default permissions in
+		// the cluster
 		if restrictedAdmin && meta.GetName() == "local" {
 			break
 		}
@@ -642,7 +658,10 @@ func (m *mgr) addRTAnnotation(obj runtime.Object, context string) (runtime.Objec
 	return obj, nil
 }
 
-func (m *mgr) updateClusterAnnotationandCondition(cluster *apisv3.Cluster, anno string, updateCondition bool) error {
+// updateClusterAnnotationAndCondition updates a cluster annotation authz.management.cattle.io/creator-role-bindings
+// with the given value anno, and updates the 'InitialRolesPopulated' condition with the given value updateCondition
+// which will be true or false.
+func (m *mgr) updateClusterAnnotationAndCondition(cluster *apisv3.Cluster, anno string, updateCondition bool) error {
 	sleep := 100
 	for i := 0; i <= 3; i++ {
 		c, err := m.mgmt.Management.Clusters("").Get(cluster.Name, v1.GetOptions{})

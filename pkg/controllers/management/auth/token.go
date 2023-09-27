@@ -19,6 +19,7 @@ type TokenController struct {
 	userAttributesLister v3.UserAttributeLister
 }
 
+// newTokenController creates a new TokenController to manage authentication tokens.
 func newTokenController(mgmt *config.ManagementContext) *TokenController {
 	n := &TokenController{
 		tokens:               mgmt.Management.Tokens(""),
@@ -64,8 +65,8 @@ func (t *TokenController) sync(key string, obj *v3.Token) (runtime.Object, error
 		obj = newObj
 	}
 
-	// trigger corresponding UserAttribute resource to refresh if token potentially
-	// provides new information that is missing from the UserAttribute resource
+	// trigger corresponding UserAttribute resource to refresh if token potentially provides new information that is
+	// missing from the UserAttribute resource
 	refreshUserAttributes, err := t.userAttributesNeedsRefresh(obj.UserID)
 	if err != nil {
 		return obj, err
@@ -77,9 +78,8 @@ func (t *TokenController) sync(key string, obj *v3.Token) (runtime.Object, error
 		}
 	}
 
-	// DO NOT remove until tokenHashing is always
-	// expected. Anything below this will only execute
-	// if tokenHashing is enabled
+	// DO NOT remove until tokenHashing is always expected. Anything below this will only execute if tokenHashing is
+	// enabled
 	if !features.TokenHashing.Enabled() {
 		return obj, nil
 	}
@@ -99,6 +99,8 @@ func (t *TokenController) sync(key string, obj *v3.Token) (runtime.Object, error
 	return obj, nil
 }
 
+// userAttributesNeedsRefresh returns true if TokenController.userAttributes has extra info to print in audit logs,
+// stored per auth provider. If not, returns false.
 func (t *TokenController) userAttributesNeedsRefresh(user string) (bool, error) {
 	if user == "" {
 		return false, nil
@@ -114,6 +116,7 @@ func (t *TokenController) userAttributesNeedsRefresh(user string) (bool, error) 
 	return userAttribute.ExtraByProvider == nil, nil
 }
 
+// triggerUserAttributesRefresh updates userAttributes with NeedsRefresh = true to refresh the attributes.
 func (t *TokenController) triggerUserAttributesRefresh(user string) error {
 	userAttribute, err := t.userAttributesLister.Get("", user)
 	if err != nil {

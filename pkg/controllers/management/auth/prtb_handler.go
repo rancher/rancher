@@ -49,6 +49,7 @@ type prtbLifecycle struct {
 	clusterLister v3.ClusterLister
 }
 
+// Create creates a ProjectRoleTemplateBinding.
 func (p *prtbLifecycle) Create(obj *v3.ProjectRoleTemplateBinding) (runtime.Object, error) {
 	if obj.ServiceAccount != "" {
 		return obj, nil
@@ -61,6 +62,7 @@ func (p *prtbLifecycle) Create(obj *v3.ProjectRoleTemplateBinding) (runtime.Obje
 	return obj, err
 }
 
+// Updated updates a ProjectRoleTemplateBinding.
 func (p *prtbLifecycle) Updated(obj *v3.ProjectRoleTemplateBinding) (runtime.Object, error) {
 	if obj.ServiceAccount != "" {
 		return obj, nil
@@ -76,6 +78,7 @@ func (p *prtbLifecycle) Updated(obj *v3.ProjectRoleTemplateBinding) (runtime.Obj
 	return obj, err
 }
 
+// Remove removes a ProjectRoleTemplateBinding.
 func (p *prtbLifecycle) Remove(obj *v3.ProjectRoleTemplateBinding) (runtime.Object, error) {
 	parts := strings.SplitN(obj.ProjectName, ":", 2)
 	if len(parts) < 2 {
@@ -100,6 +103,8 @@ func (p *prtbLifecycle) Remove(obj *v3.ProjectRoleTemplateBinding) (runtime.Obje
 	return nil, err
 }
 
+// reconcileSubject reconciles a Subject with the ProjectRoleTemplateBinding it gives permissions to by adding missing
+// UserName or UserPrincipleName.
 func (p *prtbLifecycle) reconcileSubject(binding *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error) {
 	if binding.GroupName != "" || binding.GroupPrincipalName != "" || (binding.UserPrincipalName != "" && binding.UserName != "") {
 		return binding, nil
@@ -135,9 +140,10 @@ func (p *prtbLifecycle) reconcileSubject(binding *v3.ProjectRoleTemplateBinding)
 
 // When a PRTB is created or updated, translate it into several k8s roles and bindings to actually enforce the RBAC.
 // Specifically:
-// - ensure the subject can see the project and its parent cluster in the mgmt API
-// - if the subject was granted owner permissions for the project, ensure they can create/update/delete the project
-// - if the subject was granted privileges to mgmt plane resources that are scoped to the project, enforce those rules in the project's mgmt plane namespace
+//   - ensure the subject can see the project and its parent cluster in the mgmt API
+//   - if the subject was granted owner permissions for the project, ensure they can create/update/delete the project
+//   - if the subject was granted privileges to mgmt plane resources that are scoped to the project, enforce those rules
+//     in the project's mgmt plane namespace
 func (p *prtbLifecycle) reconcileBindings(binding *v3.ProjectRoleTemplateBinding) error {
 	if binding.UserName == "" && binding.GroupPrincipalName == "" && binding.GroupName == "" {
 		return nil
@@ -196,8 +202,9 @@ func (p *prtbLifecycle) reconcileBindings(binding *v3.ProjectRoleTemplateBinding
 	return p.mgr.grantManagementPlanePrivileges(binding.RoleTemplateName, projectManagmentPlaneResources, subject, binding)
 }
 
-// removeMGMTProjectScopedPrivilegesInClusterNamespace revokes access that project roles were granted to certain cluster scoped resources like
-// catalogtemplates, when the prtb is deleted, by deleting the rolebinding created for this prtb in the cluster's namespace
+// removeMGMTProjectScopedPrivilegesInClusterNamespace revokes access that project roles were granted to certain
+// cluster scoped resources like catalogtemplates, when the PRTB is deleted, by deleting the RoleBinding created for
+// this PRTB in the cluster's namespace.
 func (p *prtbLifecycle) removeMGMTProjectScopedPrivilegesInClusterNamespace(binding *v3.ProjectRoleTemplateBinding, clusterName string) error {
 	set := labels.Set(map[string]string{pkgrbac.GetRTBLabel(binding.ObjectMeta): PrtbInClusterBindingOwner})
 	rbs, err := p.mgr.rbLister.List(clusterName, set.AsSelector())
@@ -226,11 +233,15 @@ func (p *prtbLifecycle) removeMGMTProjectScopedPrivilegesInClusterNamespace(bind
 	return nil
 }
 
+// reconcileLabels creates ClusterRoleBindings and RoleBindings for the given ProjectRoleTemplateBinding, making
+// sure to retry on conflict errors
 func (p *prtbLifecycle) reconcileLabels(binding *v3.ProjectRoleTemplateBinding) error {
-	/* Prior to 2.5, for every PRTB, following CRBs and RBs are created in the management clusters
-		1. PRTB.UID is the label key for a CRB, PRTB.UID=memberhsip-binding-owner
-	    2. PRTB.UID is label key for the RB, PRTB.UID=memberhsip-binding-owner
-	    3. PRTB.UID is label key for RB, PRTB.UID=prtb-in-cluster-binding-owner
+	/*
+		Prior to 2.5, for every ProjectRoleTemplateBinding, the following ClusterRoleBindings and RoleBindings are
+		created in the management cluster
+			1. PRTB.UID is the label key for a CRB, PRTB.UID=membership-binding-owner
+			2. PRTB.UID is label key for the RB, PRTB.UID=membership-binding-owner
+			3. PRTB.UID is label key for RB, PRTB.UID=prtb-in-cluster-binding-owner
 	*/
 	if binding.Labels[RtbCrbRbLabelsUpdated] == "true" {
 		return nil

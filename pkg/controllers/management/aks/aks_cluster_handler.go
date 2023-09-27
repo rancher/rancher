@@ -282,7 +282,9 @@ func (e *aksOperatorController) onClusterChange(_ string, cluster *apimgmtv3.Clu
 	}
 }
 
-// setInitialUpstreamSpec sets an upstream spec on the management cluster object when an AKS cluster is created.
+// setInitialUpstreamSpec sets an upstream spec on the management cluster object when an AKS cluster is created. The
+// ClusterUpstreamRefresher builds the upstream spec via a direct call to the AKS operator, a CRD that communicates
+// with the upstream cluster.
 func (e *aksOperatorController) setInitialUpstreamSpec(cluster *apimgmtv3.Cluster) (*apimgmtv3.Cluster, error) {
 	logrus.Infof("setting initial upstreamSpec on cluster [%s]", cluster.Name)
 	upstreamSpec, err := clusterupstreamrefresher.BuildAKSUpstreamSpec(e.SecretsCache, e.secretClient, cluster)
