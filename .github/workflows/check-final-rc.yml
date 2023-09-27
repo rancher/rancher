@@ -1,0 +1,25 @@
+name: Final release actions
+
+on:
+  workflow_dispatch:
+  release:
+    types: [prereleased]
+  pull_request:
+
+env:
+  RELEASE_TITLE: ${{ github.event.release.name || '' }}
+
+jobs:
+  check-deps-and-tags:
+    runs-on: ubuntu-latest
+
+    steps:
+      -
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          ref: ${{ env.GITHUB_SHA }}
+      -
+        name: Verify dependencies files in a final release candi
+        run: ./.github/scripts/check-final-rc-deps.sh
+  
