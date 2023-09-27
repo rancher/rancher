@@ -2,6 +2,7 @@ package dynamic
 
 import (
 	"context"
+	"fmt"
 
 	"k8s.io/client-go/rest"
 
@@ -85,7 +86,13 @@ func (c *ResourceClient) Create(ctx context.Context, obj *unstructured.Unstructu
 			return nil
 		}
 
-		return err
+		name := unstructuredObj.GetName()
+		if unstructuredObj.GetNamespace() != "" {
+			name = unstructuredObj.GetNamespace() + "/" + name
+		}
+		gvk := unstructuredObj.GetObjectKind().GroupVersionKind()
+
+		return fmt.Errorf("%v (%v): %w", name, gvk, err)
 	})
 
 	return unstructuredObj, err
