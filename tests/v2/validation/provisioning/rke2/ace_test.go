@@ -22,7 +22,7 @@ type RKE2ACETestSuite struct {
 	client             *rancher.Client
 	session            *session.Session
 	standardUserClient *rancher.Client
-	clustersConfig     *provisioninginput.Config
+	provisioningConfig *provisioninginput.Config
 }
 
 func (r *RKE2ACETestSuite) TearDownSuite() {
@@ -32,8 +32,8 @@ func (r *RKE2ACETestSuite) TearDownSuite() {
 func (r *RKE2ACETestSuite) SetupSuite() {
 	testSession := session.NewSession()
 	r.session = testSession
-	r.clustersConfig = new(provisioninginput.Config)
-	config.LoadConfig(provisioninginput.ConfigurationFileKey, r.clustersConfig)
+	r.provisioningConfig = new(provisioninginput.Config)
+	config.LoadConfig(provisioninginput.ConfigurationFileKey, r.provisioningConfig)
 
 	client, err := rancher.NewClient("", testSession)
 	require.NoError(r.T(), err)
@@ -62,36 +62,42 @@ func (r *RKE2ACETestSuite) SetupSuite() {
 }
 
 func (r *RKE2ACETestSuite) TestProvisioningRKE2ClusterACE() {
-	nodeRoles0 := []machinepools.NodeRoles{
+	nodeRoles0 := []provisioninginput.MachinePools{
 		{
-			ControlPlane: true,
-			Etcd:         false,
-			Worker:       false,
-			Quantity:     3,
+			NodeRoles: machinepools.NodeRoles{
+				ControlPlane: true,
+				Etcd:         false,
+				Worker:       false,
+				Quantity:     3,
+			},
 		},
 		{
-			ControlPlane: false,
-			Etcd:         true,
-			Worker:       false,
-			Quantity:     1,
+			NodeRoles: machinepools.NodeRoles{
+				ControlPlane: false,
+				Etcd:         true,
+				Worker:       false,
+				Quantity:     1,
+			},
 		},
 		{
-			ControlPlane: false,
-			Etcd:         false,
-			Worker:       true,
-			Quantity:     1,
+			NodeRoles: machinepools.NodeRoles{
+				ControlPlane: false,
+				Etcd:         false,
+				Worker:       true,
+				Quantity:     1,
+			},
 		},
 	}
 
 	tests := []struct {
-		name      string
-		nodeRoles []machinepools.NodeRoles
-		client    *rancher.Client
+		name         string
+		machinePools []provisioninginput.MachinePools
+		client       *rancher.Client
 	}{
 		{"Multiple Control Planes - Admin", nodeRoles0, r.client},
 		{"Multiple Control Planes - Standard", nodeRoles0, r.standardUserClient},
 	}
-	require.NotNil(r.T(), r.clustersConfig.Networking.LocalClusterAuthEndpoint)
+	require.NotNil(r.T(), r.provisioningConfig.Networking.LocalClusterAuthEndpoint)
 	// Test is obsolete when ACE is not set.
 	for _, tt := range tests {
 		subSession := r.session.NewSession()
@@ -99,8 +105,8 @@ func (r *RKE2ACETestSuite) TestProvisioningRKE2ClusterACE() {
 
 		client, err := tt.client.WithSession(subSession)
 		require.NoError(r.T(), err)
-		r.clustersConfig.NodesAndRoles = tt.nodeRoles
-		permutations.RunTestPermutations(&r.Suite, tt.name, client, r.clustersConfig, permutations.RKE2ProvisionCluster, nil, nil)
+		r.provisioningConfig.MachinePools = tt.machinePools
+		permutations.RunTestPermutations(&r.Suite, tt.name, client, r.provisioningConfig, permutations.RKE2ProvisionCluster, nil, nil)
 	}
 }
 

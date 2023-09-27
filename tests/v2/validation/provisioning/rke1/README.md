@@ -21,18 +21,35 @@ provisioningInput is needed to the run the RKE1 tests, specifically kubernetesVe
 
 ```json
 "provisioningInput": {
-    "nodesAndRolesRKE1": [ 
+    "nodePools": [ 
       {
-        "etcd": true,
-        "controlplane": true,
-        "quantity": 1,
+        "nodeRoles" {
+          "etcd": true,
+          "controlplane": true,
+          "quantity": 1,
+        },
       },
       {
-        "worker": true,
-        "quantity": 2,
+        "nodeRoles" {
+          "worker": true,
+          "quantity": 2,
+        },
+        "nodeLabels" {
+          "label1": "value1",
+          "label2": "value2",
+        },
+        "nodeTaints" [
+          { "key": "TestKey",
+            "value": "testValue",
+            "effect": "NoSchedule",
+          },
+        ],
+        "specifyPrivateIP": false,
+        "specifyPublicIP": true,
+        "nodeNamePrefix": "qa",
       },
     ],
-    "rke1KubernetesVersion": ["v1.24.2-rancher1-1"],
+    "rke1KubernetesVersion": ["v1.26.8-rancher1-1"],
     "providers": ["linode", "aws", "azure", "harvester"],
     "nodeProviders": ["ec2"],
     "psact": ""
@@ -209,11 +226,14 @@ RKE1 specifically needs a node template config to run properly. These are the in
 ```
 
 ## Custom Cluster
-For custom clusters, no nodeTemplateConfig or credentials are required. 
+For custom clusters, no nodeTemplateConfig or credentials are required. Currently only supported for ec2.
+`-run ^TestCustomClusterRKE1ProvisioningTestSuite/TestProvisioningRKE1CustomClusterDynamicInput$`
+`-run ^TestCustomClusterRKE1ProvisioningTestSuite/TestProvisioningRKE1CustomCluster$`
 
 Dependencies:
-* **Ensure you have nodeProviders in provisioningInput**
-* make sure that all roles are entered at least once
+* **Ensure you have nodeDrivers set in provisioningInput**
+* make sure that all roles are entered at least once in nodePools.nodeRoles
+* ensure nodeProviders is set
 * use AMIs that already have Docker installed and the service is enabled on boot
 
 ```json

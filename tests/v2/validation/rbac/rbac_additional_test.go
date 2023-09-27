@@ -12,7 +12,6 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/projects"
 	"github.com/rancher/rancher/tests/framework/extensions/provisioning"
 	"github.com/rancher/rancher/tests/framework/extensions/provisioninginput"
-	nodepools "github.com/rancher/rancher/tests/framework/extensions/rke1/nodepools"
 	"github.com/rancher/rancher/tests/framework/extensions/users"
 	"github.com/rancher/rancher/tests/framework/pkg/config"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
@@ -267,13 +266,15 @@ func (rb *RBACAdditionalTestSuite) TestRBACAdditional() {
 				userConfig := new(provisioninginput.Config)
 				config.LoadConfig(provisioninginput.ConfigurationFileKey, userConfig)
 				nodeProviders := userConfig.NodeProviders[0]
-				nodeAndRoles := []nodepools.NodeRoles{provisioninginput.RKE1AllRolesPool}
+				nodeAndRoles := []provisioninginput.NodePools{
+					provisioninginput.AllRolesNodePool,
+				}
 				externalNodeProvider := provisioning.ExternalNodeProviderSetup(nodeProviders)
 				clusterConfig := clusters.ConvertConfigToClusterConfig(userConfig)
-				clusterConfig.NodesAndRolesRKE1 = &nodeAndRoles
+				clusterConfig.NodePools = nodeAndRoles
 				clusterConfig.KubernetesVersion = userConfig.RKE1KubernetesVersions[0]
 				clusterConfig.CNI = userConfig.CNIs[0]
-				clusterObject, _, err := provisioning.CreateProvisioningRKE1CustomCluster(rb.client, externalNodeProvider, clusterConfig)
+				clusterObject, _, err := provisioning.CreateProvisioningRKE1CustomCluster(rb.client, &externalNodeProvider, clusterConfig)
 				require.NoError(rb.T(), err)
 				provisioning.VerifyRKE1Cluster(rb.T(), rb.client, clusterConfig, clusterObject)
 			})

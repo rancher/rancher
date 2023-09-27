@@ -289,7 +289,11 @@ func createTestCluster(client, adminClient *rancher.Client, numClusters int, clu
 		}
 
 		err = kwait.Poll(500*time.Millisecond, 10*time.Minute, func() (done bool, err error) {
-			_, err = nodepools.NodePoolSetup(client, clustersConfig.NodesAndRolesRKE1, clusterResp.ID, nodeTemplateResp.ID)
+			var nodeRoles []nodepools.NodeRoles
+			for _, nodepool := range clustersConfig.NodePools {
+				nodeRoles = append(nodeRoles, nodepool.NodeRoles)
+			}
+			_, err = nodepools.NodePoolSetup(client, nodeRoles, clusterResp.ID, nodeTemplateResp.ID)
 			if err != nil {
 				return false, nil
 			}
