@@ -1041,8 +1041,6 @@ github.com/rancher/channelserver v0.5.1-0.20230719220800-0a37b73c7df8 h1:Dyg8vyY
 github.com/rancher/channelserver v0.5.1-0.20230719220800-0a37b73c7df8/go.mod h1:Ra21yfic6jHRp9+lelgupPeZw0fwpPZ/kPAY3UFQo+I=
 github.com/rancher/client-go v1.27.4-rancher1 h1:1W1A0bV6KXYbu1z+KIezlfLsHPc1wiasAM42BICVKBM=
 github.com/rancher/client-go v1.27.4-rancher1/go.mod h1:ragcly7lUlN0SRPk5/ZkGnDjPknzb37TICq07WhI6Xc=
-github.com/rancher/dynamiclistener v0.3.6-rc3-deadlock-fix-revert h1:xGaKPIm+JyHl6hdkIosMLeuQ2fI2uLjNp94RMlqNqNc=
-github.com/rancher/dynamiclistener v0.3.6-rc3-deadlock-fix-revert/go.mod h1:VqBaJNi+bZmre0+gi+2Jb6jbn7ovHzRueW+M7QhVKsk=
 github.com/rancher/eks-operator v1.3.0-rc3 h1:+esw+A1iNaqSqV/fyk08XIwgm0lhqhjcvvvcnyiwDEs=
 github.com/rancher/eks-operator v1.3.0-rc3/go.mod h1:yxqWKlUXPdHWiUCjpUzGWSTMDhj3m74Ex2L9HNAGRFE=
 github.com/rancher/fleet/pkg/apis v0.0.0-20230926084554-a0460d1b10f5 h1:HpAjPiLZCGId6kMQ0t6JyLkuqKr08j+fUpH+rym3BHQ=
@@ -1204,6 +1202,8 @@ github.com/ulikunitz/xz v0.5.11/go.mod h1:nbz6k7qbPmH4IRqmfOplQw/tblSgqTqBwxkY0o
 github.com/urfave/cli v1.22.12/go.mod h1:sSBEIC79qR6OvcmsD4U3KABeOTxDqQtdDnaFuUN30b8=
 github.com/urfave/cli v1.22.14 h1:ebbhrRiGK2i4naQJr+1Xj92HXZCrK7MsyTS/ob3HnAk=
 github.com/urfave/cli v1.22.14/go.mod h1:X0eDS6pD6Exaclxm99NJ3FiCDRED7vIHpx2mDOHLvkA=
+github.com/vardhaman22/dynamiclistener v0.0.0-20230927030950-6fd41d636358 h1:lHM6wdwbldRnNyBchwxpLmdO+81X0mQjiCCZtFPYuNc=
+github.com/vardhaman22/dynamiclistener v0.0.0-20230927030950-6fd41d636358/go.mod h1:VqBaJNi+bZmre0+gi+2Jb6jbn7ovHzRueW+M7QhVKsk=
 github.com/vbatts/tar-split v0.11.3 h1:hLFqsOLQ1SsppQNTMpkpPXClLDfC2A3Zgy9OUU+RVck=
 github.com/vbatts/tar-split v0.11.3/go.mod h1:9QlHN18E+fEH7RdG+QAJJcuya3rqT7eXSTY7wGrAokY=
 github.com/vbauerster/mpb/v8 v8.3.0 h1:xw2eMJ6v5NP8Rd7yOVzU6OqnRPrS1yWAoLTrWe7W4Nc=
