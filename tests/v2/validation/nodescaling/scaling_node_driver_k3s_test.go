@@ -80,14 +80,14 @@ func (s *K3SNodeScalingTestSuite) TestScalingK3SNodePools() {
 }
 
 func (s *K3SNodeScalingTestSuite) TestScalingK3SNodePoolsDynamicInput() {
-	if s.scalingConfig.NodesAndRoles == nil {
+	if s.scalingConfig.MachinePools.NodeRoles == nil {
 		s.T().Skip()
 	}
 
 	clusterID, err := clusters.GetV1ProvisioningClusterByName(s.client, s.client.RancherConfig.ClusterName)
 	require.NoError(s.T(), err)
 
-	ScalingRKE2K3SNodePools(s.T(), s.client, clusterID, *s.scalingConfig.NodesAndRoles)
+	ScalingRKE2K3SNodePools(s.T(), s.client, clusterID, *s.scalingConfig.MachinePools.NodeRoles)
 }
 
 // In order for 'go test' to run this suite, we need to create

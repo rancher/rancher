@@ -11,7 +11,13 @@ import (
 
 	apiv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
+	"github.com/rancher/rancher/tests/framework/extensions/cloudcredentials/aws"
+	"github.com/rancher/rancher/tests/framework/extensions/cloudcredentials/azure"
+	"github.com/rancher/rancher/tests/framework/extensions/cloudcredentials/google"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
+	"github.com/rancher/rancher/tests/framework/extensions/clusters/aks"
+	"github.com/rancher/rancher/tests/framework/extensions/clusters/eks"
+	"github.com/rancher/rancher/tests/framework/extensions/clusters/gke"
 	"github.com/rancher/rancher/tests/framework/extensions/defaults"
 	"github.com/rancher/rancher/tests/framework/extensions/etcdsnapshot"
 	k3sHardening "github.com/rancher/rancher/tests/framework/extensions/hardening/k3s"
@@ -592,6 +598,81 @@ func CreateProvisioningRKE1AirgapCustomCluster(client *rancher.Client, clustersC
 	}
 	createdCluster, err := client.Management.Cluster.ByID(clusterResp.ID)
 	return createdCluster, err
+}
+
+// CreateProvisioningAKSHostedCluster provisions an AKS cluster, then runs verify checks
+func CreateProvisioningAKSHostedCluster(client *rancher.Client) (*management.Cluster, error) {
+	cloudCredential, err := azure.CreateAzureCloudCredentials(client)
+	if err != nil {
+		return nil, err
+	}
+
+	clusterName := namegen.AppendRandomString("akshostcluster")
+	clusterResp, err := aks.CreateAKSHostedCluster(client, clusterName, cloudCredential.ID, false, false, false, false, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if client.Flags.GetValue(environmentflag.UpdateClusterName) {
+		pipeline.UpdateConfigClusterName(clusterName)
+	}
+
+	client, err = client.ReLogin()
+	if err != nil {
+		return nil, err
+	}
+
+	return client.Management.Cluster.ByID(clusterResp.ID)
+}
+
+// CreateProvisioningEKSHostedCluster provisions an EKS cluster, then runs verify checks
+func CreateProvisioningEKSHostedCluster(client *rancher.Client) (*management.Cluster, error) {
+	cloudCredential, err := aws.CreateAWSCloudCredentials(client)
+	if err != nil {
+		return nil, err
+	}
+
+	clusterName := namegen.AppendRandomString("ekshostcluster")
+	clusterResp, err := eks.CreateEKSHostedCluster(client, clusterName, cloudCredential.ID, false, false, false, false, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if client.Flags.GetValue(environmentflag.UpdateClusterName) {
+		pipeline.UpdateConfigClusterName(clusterName)
+	}
+
+	client, err = client.ReLogin()
+	if err != nil {
+		return nil, err
+	}
+
+	return client.Management.Cluster.ByID(clusterResp.ID)
+}
+
+// CreateProvisioningGKEHostedCluster provisions an GKE cluster, then runs verify checks
+func CreateProvisioningGKEHostedCluster(client *rancher.Client) (*management.Cluster, error) {
+	cloudCredential, err := google.CreateGoogleCloudCredentials(client)
+	if err != nil {
+		return nil, err
+	}
+
+	clusterName := namegen.AppendRandomString("gkehostcluster")
+	clusterResp, err := gke.CreateGKEHostedCluster(client, clusterName, cloudCredential.ID, false, false, false, false, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if client.Flags.GetValue(environmentflag.UpdateClusterName) {
+		pipeline.UpdateConfigClusterName(clusterName)
+	}
+
+	client, err = client.ReLogin()
+	if err != nil {
+		return nil, err
+	}
+
+	return client.Management.Cluster.ByID(clusterResp.ID)
 }
 
 func setLogrusFormatter() {
