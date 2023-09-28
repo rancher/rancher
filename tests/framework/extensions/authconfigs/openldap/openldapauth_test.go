@@ -15,6 +15,8 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
+// main test struct - includes test suite, user, rancher client, project and a session
+// this is used for the end-to-end tests
 type OpenLdapTest struct {
 	suite.Suite
 	testUser *management.User
@@ -23,12 +25,14 @@ type OpenLdapTest struct {
 	session  *session.Session
 }
 
-// APIResponse represents the outcome of the SendAPICall function
+// APIResponse represents the outcome of the API function - build func for 200 401
 type APIResponse struct {
 	StatusCode int
 	Body       string
 }
 
+// executes before any tests; new session, client and project created (testproject)
+// will uncomment code to read config2 - not yet implemented
 func (d *OpenLdapTest) SetupSuite() {
 	testSession := session.NewSession()
 
@@ -64,10 +68,14 @@ func (d *OpenLdapTest) SetupSuite() {
 	//client.AsUser(user)
 
 }
+
+// cleanup the session, ensure any resources are released
 func (d *OpenLdapTest) TearDownSuite() {
 	d.session.Cleanup()
 }
 
+// initializes new session and rancher client (?)
+// commented out some config reading and assertions i was trying
 func (d *OpenLdapTest) TestEnableOpenLDAP() {
 	testSession := session.NewSession()
 	d.session = testSession
@@ -77,54 +85,131 @@ func (d *OpenLdapTest) TestEnableOpenLDAP() {
 
 	upgradeConfig := new(Config2)
 	config.LoadConfig(ConfigurationFileKey, upgradeConfig)
-	//MakeOpenLdapAPICALL(url, token, body)
+	//sendAPICall(url, token, body)
 	fmt.Print(upgradeConfig.OpenLdapUser)
 	fmt.Print(upgradeConfig.OpenLdapUserPass)
 	fmt.Print(client)
 	fmt.Print(d.testUser)
-
-	/*
-		rancherClient, err := rancher.NewRancherClient()
-		require.NoError(t, err)
-
-		authConfig, err := CreateOpenLDAPAuthConfig(rancherClient)
-		require.NoError(t, err)
-	*/
-	/*
-		assert.Equal(t, openLdapConfigNameBase, authConfig.Name)
-		assert.NotNil(t, authConfig.OpenLDAPCredentialConfig)
-		assert.Equal(t, []string{"openldapqa.qa.rancher.space"}, authConfig.OpenLDAPCredentialConfig.Servers)
-		assert.Equal(t, "cn=admin,dc=qa,rancher,dc=space", authConfig.OpenLDAPCredentialConfig.ServiceAccountDistinguishedName)
-	*/
 }
 
-func (d *OpenLdapTest) MakeOpenLdapAPICall() {
-	host := "ron276c" // Consider fetching this from `d` if it's a property of OpenLdapTest.
-	url := fmt.Sprintf("https://%s.qa.rancher.space/v3-public/localProviders/local?action=login", host)
-	token := "token-sss6h:bsz527k7jcpr8bbjmw22wlg5w8vqzlq5w9snwpzfx7xzb8fm6hqqsp" // Similarly, fetch from `d` if required.
+// trying to build a body
+func prepareRequestBody(url string) []byte {
+	requestBody := `
+	{
+		"enabled": true,
+		"ldapConfig": {
+			"actions": {
+				"testAndApply": "https://ron280alpha1b.qa.rancher.space/v3/openLdapConfigs/openldap?action=testAndApply"
+			},
+			"annotations": {
+				"management.cattle.io/auth-provider-cleanup": "rancher-locked"
+			},
+			"baseType": "authConfig",
+			"connectionTimeout": 5000,
+			"creatorId": null,
+			"enabled": true,
+			"groupDNAttribute": "entryDN",
+			"groupMemberMappingAttribute": "member",
+			"groupMemberUserAttribute": "entryDN",
+			"groupNameAttribute": "cn",
+			"groupObjectClass": "groupOfNames",
+			"groupSearchAttribute": "cn",
+			"id": "openldap",
+			"labels": {
+				"cattle.io/creator": "norman"
+			},
+			"links": {
+				"self": "https://ron280alpha1b.qa.rancher.space/v3/openLdapConfigs/openldap",
+				"update": "https://ron280alpha1b.qa.rancher.space/v3/openLdapConfigs/openldap"
+			},
+			"name": "openldap",
+			"nestedGroupMembershipEnabled": false,
+			"port": 389,
+			"starttls": false,
+			"tls": false,
+			"type": "openLdapConfig",
+			"userDisabledBitMask": 0,
+			"userLoginAttribute": "uid",
+			"userMemberAttribute": "memberOf",
+			"userNameAttribute": "cn",
+			"userObjectClass": "inetOrgPerson",
+			"userSearchAttribute": "uid|sn|givenName",
+			"uuid": "c30859dd-f103-446b-ad81-9633f2da0438",
+			"__clone": true,
+			"servers": [
+				"openldapqa.qa.rancher.space"
+			],
+			"accessMode": "unrestricted",
+			"disabledStatusBitmask": 0,
+			"serviceAccountDistinguishedName": "cn=admin,dc=qa,dc=rancher,dc=space",
+			"serviceAccountPassword": "cattle@123",
+			"userSearchBase": "dc=qa,dc=rancher,dc=space",
+			"groupSearchBase": ""
+		},
+		"username": "testuser1",
+		"password": "Tacos86!"
+	}
+    `
+	return []byte(requestBody)
+}
 
-	// Adjust the body as per your requirements. I'm using the one from the example.
-	body := []byte(`{"description": "postman", "responseType": "token", "username": "admin", "password": "N7q-*fs+Ut&Wb_Y"}`)
+// new code to invoke makeopenldapapicall()
+func (d *OpenLdapTest) TestOpenLdapAPI() {
+	url := "https://ron280alpha1b.qa.rancher.space/v3/openLdapConfigs/openldap?action=testAndApply"
+	token := "token-ttnmk:mvkn4csbfsk48tbdfbqg5r6pqp6rxvc8rrv4x46n72jcssww52l7dq"
+	//body := prepareRequestBody(url)
+	//resp, err := d.EnableOpenLdap(url, token, body)
+	resp, err := d.DisableOpenLDAP(url, token)
+	//body := prepareRequestBody(url)
+	//resp, err := d.EnableOpenLdap(url, token, body)
+	// Assert there's no error
+	require.NoError(d.T(), err)
 
-	resp, err := MakeOpenLdapAPICALL(url, token, body)
+	// Assert that the response code is 200 OK
+	require.Equal(d.T(), http.StatusOK, resp.StatusCode)
+
+	// You can also assert on other parts of the response as needed
+	// require.Contains(d.T(), resp.Body, "Expected content in body")
+}
+
+// attempting api call
+func (d *OpenLdapTest) EnableOpenLdap(url string, token string, body []byte) (*APIResponse, error) {
+
+	// Call the SendAPICall function using the passed arguments
+	resp, err := SendAPICall(url, token, body)
 	if err != nil {
-		// Handle error
+		// Handle error and return
 		fmt.Println("Error:", err)
-		return
+		return nil, err
 	}
 
-	// Inspect the APIResponse
+	// Inspect the APIResponse and print
 	if resp.StatusCode == http.StatusOK {
 		fmt.Println("API call was successful!")
 	} else {
 		fmt.Printf("API call failed with status code: %d\n", resp.StatusCode)
+		fmt.Println("Response Body:", resp.Body)
 	}
-	fmt.Println("Response Body:", resp.Body)
+	return resp, nil
+}
+
+// this code tries to disable the auth provider with a specific api call
+func (d *OpenLdapTest) DisableOpenLDAP(host string, token string) (*APIResponse, error) {
+	// Construct the URL
+	//host := "ron280alpha1b.qa.rancher.space"
+	url := "https://ron280alpha1b.qa.rancher.space/v3/openLdapConfigs/openldap?action=disable"
+
+	// Create the request body
+	body := []byte(`{"action": "disable"}`)
+
+	// Use the SendAPICall function to send the request
+	return SendAPICall(url, token, body)
 }
 
 // SendAPICall sends a POST request to a given URL with a provided bearer token and body.
 // It returns an APIResponse containing the status code and response body.
-func MakeOpenLdapAPICALL(url, token string, body []byte) (*APIResponse, error) {
+// This is a generic function to make a POST API call to a given URL with a bearer token and JSON body.
+func SendAPICall(url, token string, body []byte) (*APIResponse, error) {
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
@@ -152,28 +237,6 @@ func MakeOpenLdapAPICALL(url, token string, body []byte) (*APIResponse, error) {
 		StatusCode: resp.StatusCode,
 		Body:       string(respBody),
 	}, nil
-}
-
-func APIFunction() {
-	host := "ron276c"
-	url := fmt.Sprintf("https://%s.qa.rancher.space/v3-public/localProviders/local?action=login", host)
-	token := "token-sss6h:bsz527k7jcpr8bbjmw22wlg5w8vqzlq5w9snwpzfx7xzb8fm6hqqsp"
-	body := []byte(`{"description": "postman", "responseType": "token", "username": "admin", "password": "N7q-*fs+Ut&Wb_Y"}`)
-
-	resp, err := MakeOpenLdapAPICALL(url, token, body)
-	if err != nil {
-		// Handle error
-		fmt.Println("Error:", err)
-		return
-	}
-
-	// Inspect the APIResponse
-	if resp.StatusCode == http.StatusOK {
-		fmt.Println("API call was successful!")
-	} else {
-		fmt.Printf("API call failed with status code: %d\n", resp.StatusCode)
-	}
-	fmt.Println("Response Body:", resp.Body)
 }
 
 func TestOpenLdapTestSuite(t *testing.T) {

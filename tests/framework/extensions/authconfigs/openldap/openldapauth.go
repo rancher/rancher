@@ -23,8 +23,14 @@ type OpenLDAPCredentialConfig struct {
 }
 
 type Config2 struct {
-	OpenLdapUser     string `yaml:"openLdapUser"`
-	OpenLdapUserPass string `yaml:"openLdapUserPass"`
+	OpenLdapUser                    string `yaml:"testAndEnableUser"`
+	OpenLdapUserPass                string `yaml:"testAndEnablePass"`
+	Servers                         string `yaml:"servers"`
+	ServiceAccountDistinguishedName string `yaml:"ServiceAccountDistinguishedName"`
+	ServiceAccountPassword          string `yaml:"ServiceAccountPassword"`
+	UserSearchBase                  string `yaml:"UserSearchBase"`
+	Port                            string `yaml:"389"`
+	TLS                             string `yaml:"TLS"`
 }
 
 // CreateOpenLDAPAuthConfig is a helper function that creates
