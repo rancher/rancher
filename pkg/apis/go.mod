@@ -2,10 +2,11 @@ module github.com/rancher/rancher/pkg/apis
 
 go 1.20
 
-// wrangler bracnhes need to be updated before replace can be removed
-replace github.com/rancher/wrangler v1.1.1 => github.com/rancher/wrangler v1.1.1-0.20230831050635-df1bd5aae9df
-
-replace k8s.io/client-go => github.com/rancher/client-go v1.27.4-rancher1
+replace (
+	// wrangler bracnhes need to be updated before replace can be removed
+	github.com/rancher/wrangler v1.1.1 => github.com/rancher/wrangler v1.1.1-0.20230831050635-df1bd5aae9df
+	k8s.io/client-go => github.com/rancher/client-go v1.27.4-rancher1
+)
 
 require (
 	github.com/rancher/aks-operator v1.2.0-rc4
