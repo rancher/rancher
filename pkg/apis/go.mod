@@ -13,11 +13,11 @@ require (
 	github.com/rancher/fleet/pkg/apis v0.0.0-20230926084554-a0460d1b10f5
 	github.com/rancher/gke-operator v1.2.0-rc2
 	github.com/rancher/norman v0.0.0-20230831160711-5de27f66385d
-	github.com/rancher/rke v1.5.0-rc5
+	github.com/rancher/rke v1.5.0-rc8
 	github.com/rancher/wrangler v1.1.1
 	github.com/sirupsen/logrus v1.9.3
-	k8s.io/api v0.27.5
-	k8s.io/apimachinery v0.27.5
+	k8s.io/api v0.27.6
+	k8s.io/apimachinery v0.27.6
 	sigs.k8s.io/cluster-api v1.5.0
 )
 
@@ -70,12 +70,12 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/apiextensions-apiserver v0.27.5 // indirect
-	k8s.io/apiserver v0.27.5 // indirect
+	k8s.io/apiserver v0.27.6 // indirect
 	k8s.io/client-go v12.0.0+incompatible // indirect
-	k8s.io/component-base v0.27.5 // indirect
+	k8s.io/component-base v0.27.6 // indirect
 	k8s.io/klog/v2 v2.100.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20230530175149-33f04d5d6b58 // indirect
-	k8s.io/kubernetes v1.15.0-alpha.0 // indirect
+	k8s.io/kubernetes v1.27.6 // indirect
 	k8s.io/utils v0.0.0-20230505201702-9f6742963106 // indirect
 	sigs.k8s.io/cli-utils v0.27.0 // indirect
 	sigs.k8s.io/controller-runtime v0.15.0 // indirect
