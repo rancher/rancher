@@ -14,7 +14,7 @@ import (
 
 // ScalingAKSNodePools is a helper function that tests scaling of an AKS node pool by adding a new one and then deleting it.
 func ScalingAKSNodePools(client *rancher.Client, oldCluster *management.Cluster, displayName string, cloudCredential *cloudcredentials.CloudCredential) (*management.Cluster, error) {
-	aksHostCluster := aks.AKSHostClusterConfig(displayName, cloudCredential.ID)
+	aksHostCluster := aks.HostClusterConfig(displayName, cloudCredential.ID)
 	nodePool, err := np.CreateNodePool(aksHostCluster)
 	if err != nil {
 		return nil, err

@@ -49,9 +49,9 @@ func CreateUserWithRole(rancherClient *rancher.Client, user *management.User, ro
 	createdUser, err := rancherClient.Management.User.Create(user)
 	if err != nil {
 		return nil, err
-	} else {
-		createdUser.Password = user.Password
 	}
+
+	createdUser.Password = user.Password
 
 	for _, role := range roles {
 		roleBinding := &management.GlobalRoleBinding{

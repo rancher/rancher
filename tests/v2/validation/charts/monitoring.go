@@ -31,7 +31,7 @@ const (
 	// Secret path that contains encoded alert manager config
 	secretPath = "alertmanager.yaml"
 	// Secret ID that points alert manager secret
-	alertManagerSecretId = charts.RancherMonitoringNamespace + "/" + charts.RancherMonitoringAlertSecret
+	alertManagerSecretID = charts.RancherMonitoringNamespace + "/" + charts.RancherMonitoringAlertSecret
 	// Default random string length for random name generation
 	defaultRandStringLength = 5
 	// Webhook deployment annotation key that is being watched

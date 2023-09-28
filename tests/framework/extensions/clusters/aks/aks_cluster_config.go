@@ -10,8 +10,8 @@ const (
 	AKSClusterConfigConfigurationFileKey = "aksClusterConfig"
 )
 
-// AKSClusterConfig is the configuration needed to create an AKS host cluster
-type AKSClusterConfig struct {
+// ClusterConfig is the configuration needed to create an AKS host cluster
+type ClusterConfig struct {
 	AuthorizedIPRanges          *[]string         `json:"authorizedIpRanges,omitempty" yaml:"authorizedIpRanges,omitempty"`
 	AzureCredentialSecret       string            `json:"azureCredentialSecret" yaml:"azureCredentialSecret"`
 	DNSPrefix                   *string           `json:"dnsPrefix,omitempty" yaml:"dnsPrefix,omitempty"`
@@ -28,7 +28,7 @@ type AKSClusterConfig struct {
 	NetworkPodCIDR              *string           `json:"podCidr,omitempty" yaml:"podCidr,omitempty"`
 	NetworkPolicy               *string           `json:"networkPolicy,omitempty" yaml:"networkPolicy,omitempty"`
 	NetworkServiceCIDR          *string           `json:"serviceCidr,omitempty" yaml:"serviceCidr,omitempty"`
-	NodePools                   *[]AKSNodePool    `json:"nodePools,omitempty" yaml:"nodePools,omitempty"`
+	NodePools                   *[]NodePool       `json:"nodePools,omitempty" yaml:"nodePools,omitempty"`
 	PrivateCluster              *bool             `json:"privateCluster,omitempty" yaml:"privateCluster,omitempty"`
 	ResourceGroup               string            `json:"resourceGroup" yaml:"resourceGroup"`
 	ResourceLocation            string            `json:"resourceLocation" yaml:"resourceLocation"`
@@ -38,8 +38,8 @@ type AKSClusterConfig struct {
 	VirtualNetworkResourceGroup *string           `json:"virtualNetworkResourceGroup,omitempty" yaml:"virtualNetworkResourceGroup,omitempty"`
 }
 
-// AKSNodePool is the configuration needed to an AKS node pool
-type AKSNodePool struct {
+// NodePool is the configuration needed to an AKS node pool
+type NodePool struct {
 	AvailabilityZones   *[]string `json:"availabilityZones,omitempty" yaml:"availabilityZones,omitempty"`
 	EnableAutoScaling   *bool     `json:"enableAutoScaling,omitempty" yaml:"enableAutoScaling,omitempty"`
 	MaxPods             *int64    `json:"maxPods,omitempty" yaml:"maxPods,omitempty"`
@@ -55,7 +55,7 @@ type AKSNodePool struct {
 	VMSize              string    `json:"vmSize" yaml:"vmSize"`
 }
 
-func aksNodePoolConstructor(aksNodePoolConfigs *[]AKSNodePool, kubernetesVersion string) []management.AKSNodePool {
+func aksNodePoolConstructor(aksNodePoolConfigs *[]NodePool, kubernetesVersion string) []management.AKSNodePool {
 	var aksNodePools []management.AKSNodePool
 	for _, aksNodePoolConfig := range *aksNodePoolConfigs {
 		aksNodePool := management.AKSNodePool{
@@ -78,8 +78,8 @@ func aksNodePoolConstructor(aksNodePoolConfigs *[]AKSNodePool, kubernetesVersion
 	return aksNodePools
 }
 
-func AKSHostClusterConfig(displayName, cloudCredentialID string) *management.AKSClusterConfigSpec {
-	var aksClusterConfig AKSClusterConfig
+func HostClusterConfig(displayName, cloudCredentialID string) *management.AKSClusterConfigSpec {
+	var aksClusterConfig ClusterConfig
 	config.LoadConfig(AKSClusterConfigConfigurationFileKey, &aksClusterConfig)
 
 	return &management.AKSClusterConfigSpec{

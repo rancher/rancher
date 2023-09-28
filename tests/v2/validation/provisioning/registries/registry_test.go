@@ -56,13 +56,13 @@ func (rt *RegistryTestSuite) SetupSuite() {
 	require.NoError(rt.T(), err)
 	rt.client = client
 
-	corralConfig := corral.CorralConfigurations()
+	corralConfig := corral.Configurations()
 	registriesConfig := new(Registries)
 	config.LoadConfig(RegistriesConfigKey, registriesConfig)
 
 	err = corral.SetupCorralConfig(corralConfig.CorralConfigVars, corralConfig.CorralConfigUser, corralConfig.CorralSSHPath)
 	require.NoError(rt.T(), err)
-	configPackage := corral.CorralPackagesConfig()
+	configPackage := corral.PackagesConfig()
 
 	globalRegistryFqdn := ""
 	registryDisabledFqdn := ""

@@ -20,13 +20,13 @@ func newChartUninstallAction() *types.ChartUninstallAction {
 }
 
 // newChartInstallAction is a private constructor that creates a payload for chart install action with given namespace, projectId and chartInstalls.
-func newChartInstallAction(namespace, projectId string, chartInstalls []types.ChartInstall) *types.ChartInstallAction {
+func newChartInstallAction(namespace, projectID string, chartInstalls []types.ChartInstall) *types.ChartInstallAction {
 	return &types.ChartInstallAction{
 		DisableHooks:             false,
 		Timeout:                  &metav1.Duration{Duration: 600 * time.Second},
 		Wait:                     true,
 		Namespace:                namespace,
-		ProjectID:                projectId,
+		ProjectID:                projectID,
 		DisableOpenAPIValidation: false,
 		Charts:                   chartInstalls,
 	}
@@ -47,7 +47,7 @@ func newChartUpgradeAction(namespace string, chartUpgrades []types.ChartUpgrade)
 }
 
 // newChartInstallAction is a private constructor that creates a chart install with given chart values that can be used for chart install action.
-func newChartInstall(name, version, clusterId, clusterName, url, defaultRegistry string, chartValues map[string]interface{}) *types.ChartInstall {
+func newChartInstall(name, version, clusterID, clusterName, url, defaultRegistry string, chartValues map[string]interface{}) *types.ChartInstall {
 	chartInstall := types.ChartInstall{
 		Annotations: map[string]string{
 			"catalog.cattle.io/ui-source-repo":      "rancher-charts",
@@ -59,7 +59,7 @@ func newChartInstall(name, version, clusterId, clusterName, url, defaultRegistry
 		Values: v3.MapStringInterface{
 			"global": map[string]interface{}{
 				"cattle": map[string]string{
-					"clusterId":             clusterId,
+					"clusterId":             clusterID,
 					"clusterName":           clusterName,
 					"rkePathPrefix":         "",
 					"rkeWindowsPathPrefix":  "",
@@ -79,7 +79,7 @@ func newChartInstall(name, version, clusterId, clusterName, url, defaultRegistry
 }
 
 // newChartUpgradeAction is a private constructor that creates a chart upgrade with given chart values that can be used for chart upgrade action.
-func newChartUpgrade(name, version, clusterId, clusterName, url, defaultRegistry string, chartValues map[string]interface{}) *types.ChartUpgrade {
+func newChartUpgrade(name, version, clusterID, clusterName, url, defaultRegistry string, chartValues map[string]interface{}) *types.ChartUpgrade {
 	chartUpgrade := types.ChartUpgrade{
 		Annotations: map[string]string{
 			"catalog.cattle.io/ui-source-repo":      "rancher-charts",
@@ -91,7 +91,7 @@ func newChartUpgrade(name, version, clusterId, clusterName, url, defaultRegistry
 		Values: v3.MapStringInterface{
 			"global": map[string]interface{}{
 				"cattle": map[string]string{
-					"clusterId":             clusterId,
+					"clusterId":             clusterID,
 					"clusterName":           clusterName,
 					"rkePathPrefix":         "",
 					"rkeWindowsPathPrefix":  "",

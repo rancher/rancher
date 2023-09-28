@@ -8,7 +8,7 @@ import (
 func GenerateGatekeeperConstraintYaml(apiGroups []string, excludedNamespaces []string, kinds []string, name string, namespaces []string, enforcementAction string, apiVersion string, kind string) (string, error) {
 
 	nSKinds := ConstraintKinds{
-		{ApiGroups: apiGroups},
+		{APIGroups: apiGroups},
 		{Kinds: kinds},
 	}
 
@@ -32,7 +32,7 @@ func GenerateGatekeeperConstraintYaml(apiGroups []string, excludedNamespaces []s
 	}
 
 	allowedNamespaces := ConstraintYaml{
-		ApiVersion: apiVersion,
+		APIVersion: apiVersion,
 		Kind:       kind,
 		Metadata:   nSMetadata,
 		Spec:       nSSpec,

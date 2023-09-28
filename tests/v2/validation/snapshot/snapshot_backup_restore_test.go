@@ -45,7 +45,7 @@ func (r *RKE2SnapshotRestoreTestSuite) SetupSuite() {
 
 func (r *RKE2SnapshotRestoreTestSuite) TestOnlySnapshotRestore() {
 	r.Run("rke2-snapshot-restore", func() {
-		SnapshotRestore(r.T(), r.client, r.client.RancherConfig.ClusterName, "", false)
+		snapshotRestore(r.T(), r.client, r.client.RancherConfig.ClusterName, "", false)
 	})
 }
 
@@ -57,7 +57,7 @@ func (r *RKE2SnapshotRestoreTestSuite) TestSnapshotRestoreWithK8sUpgrade() {
 		upgrade = r.clustersConfig.RKE2KubernetesVersions[1]
 	}
 	r.Run("rke2-snapshot-restore-with-k8s-upgrade", func() {
-		SnapshotRestore(r.T(), r.client, r.client.RancherConfig.ClusterName, upgrade, false)
+		snapshotRestore(r.T(), r.client, r.client.RancherConfig.ClusterName, upgrade, false)
 	})
 }
 
@@ -69,7 +69,7 @@ func (r *RKE2SnapshotRestoreTestSuite) TestSnapshotRestoreWithUpgradeStrategy() 
 		upgrade = r.clustersConfig.RKE2KubernetesVersions[1]
 	}
 	r.Run("rke2-snapshot-restore-with-upgrade-strategy", func() {
-		SnapshotRestore(r.T(), r.client, r.client.RancherConfig.ClusterName, upgrade, true)
+		snapshotRestore(r.T(), r.client, r.client.RancherConfig.ClusterName, upgrade, true)
 	})
 }
 

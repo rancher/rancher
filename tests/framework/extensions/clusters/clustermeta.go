@@ -25,18 +25,21 @@ const (
 	KubernetesProviderGKE  KubernetesProvider = gke
 )
 
-// ClusterMeta is a struct that contains a cluster's meta:
-//  - ID is used for value of cluster's ID.
-//  - Name is a used for cluster's name.
-//  - Provider is used for cluster's provider.
-//  - IsHosted is used for cluster's hosted information.
-//  - IsImported is used for cluster's imported information.
+// ClusterMeta is a struct that contains a cluster's meta
 type ClusterMeta struct {
-	ID       string
-	Name     string
+	// ID used for value of cluster's ID
+	ID string
+
+	// Name used for cluster's name.
+	Name string
+
+	// Provider is used for cluster's provider.
 	Provider KubernetesProvider
 
-	IsHosted   bool
+	// IsHosted is used for cluster's hosted information.
+	IsHosted bool
+
+	// IsImported is used for cluster's imported information.
 	IsImported bool
 }
 
