@@ -121,7 +121,7 @@ require (
 	github.com/rancher/norman v0.0.0-20230831160711-5de27f66385d
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/remotedialer v0.3.0
-	github.com/rancher/rke v1.5.0-rc5
+	github.com/rancher/rke v1.5.0-rc8
 	github.com/rancher/steve v0.0.0-20230901044548-5df31b9c15cc
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007
 	github.com/rancher/wrangler v1.1.1
@@ -145,17 +145,17 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/yaml.v2 v2.4.0
 	helm.sh/helm/v3 v3.9.0
-	k8s.io/api v0.27.5
+	k8s.io/api v0.27.6
 	k8s.io/apiextensions-apiserver v0.27.5
-	k8s.io/apimachinery v0.27.5
-	k8s.io/apiserver v0.27.5
-	k8s.io/cli-runtime v0.27.4
+	k8s.io/apimachinery v0.27.6
+	k8s.io/apiserver v0.27.6
+	k8s.io/cli-runtime v0.27.6
 	k8s.io/client-go v12.0.0+incompatible
 	k8s.io/gengo v0.0.0-20230306165830-ab3349d207d4
 	k8s.io/helm v2.16.7+incompatible
 	k8s.io/kube-aggregator v0.27.4
-	k8s.io/kubectl v0.27.4
-	k8s.io/kubernetes v1.27.4
+	k8s.io/kubectl v0.27.6
+	k8s.io/kubernetes v1.27.6
 	k8s.io/utils v0.0.0-20230505201702-9f6742963106
 	sigs.k8s.io/aws-iam-authenticator v0.5.9
 	sigs.k8s.io/cluster-api v1.5.0
@@ -252,7 +252,7 @@ require (
 	k8s.io/controller-manager v0.27.4 // indirect
 	k8s.io/kms v0.27.4 // indirect
 	k8s.io/kubelet v0.27.4 // indirect
-	k8s.io/pod-security-admission v0.27.4 // indirect
+	k8s.io/pod-security-admission v0.27.6 // indirect
 )
 
 require (
@@ -368,7 +368,7 @@ require (
 	github.com/onsi/gomega v1.27.10 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.0-rc3 // indirect
-	github.com/opencontainers/runc v1.1.7 // indirect
+	github.com/opencontainers/runc v1.1.9 // indirect
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
 	github.com/pkg/sftp v1.13.5
 	github.com/pmezard/go-difflib v1.0.0 // indirect
@@ -420,7 +420,7 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/cluster-bootstrap v0.27.2 // indirect
 	k8s.io/code-generator v0.27.5 // indirect
-	k8s.io/component-base v0.27.5 // indirect
+	k8s.io/component-base v0.27.6 // indirect
 	k8s.io/component-helpers v0.27.4 // indirect
 	k8s.io/klog v1.0.0 // indirect
 	k8s.io/klog/v2 v2.100.1 // indirect
