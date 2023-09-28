@@ -13,7 +13,7 @@ replace (
 	github.com/matryer/moq => github.com/rancher/moq v0.0.0-20200712062324-13d1f37d2d77
 	github.com/opencontainers/runc => github.com/opencontainers/runc v1.1.5
 
-	github.com/rancher/machine => github.com/rancher/machine v0.15.0-rancher100 // aks-operator requires rancher99 but rancher100 should not break it.
+	github.com/rancher/machine => github.com/rancher/machine v0.15.0-rancher106
 	github.com/rancher/rancher/pkg/apis => ./pkg/apis
 	github.com/rancher/rancher/pkg/client => ./pkg/client
 
@@ -113,7 +113,7 @@ require (
 	github.com/rancher/fleet/pkg/apis v0.0.0-20230821130910-23e1c146755a
 	github.com/rancher/gke-operator v1.1.6
 	github.com/rancher/kubernetes-provider-detector v0.1.5
-	github.com/rancher/lasso v0.0.0-20230810170912-a86ba6c749aa
+	github.com/rancher/lasso v0.0.0-20230830164424-d684fdeb6f29
 	github.com/rancher/machine v0.15.0-rancher99
 	github.com/rancher/norman v0.0.0-20230811152901-078862e5648c
 	github.com/rancher/rancher/pkg/apis v0.0.0
@@ -144,9 +144,9 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/yaml.v2 v2.4.0
 	helm.sh/helm/v3 v3.9.0
-	k8s.io/api v0.26.1
+	k8s.io/api v0.27.4
 	k8s.io/apiextensions-apiserver v0.25.12
-	k8s.io/apimachinery v0.26.1
+	k8s.io/apimachinery v0.27.4
 	k8s.io/apiserver v0.25.12
 	k8s.io/cli-runtime v0.25.12
 	k8s.io/client-go v12.0.0+incompatible
@@ -394,7 +394,7 @@ require (
 	k8s.io/component-helpers v0.25.12 // indirect
 	k8s.io/klog v1.0.0 // indirect
 	k8s.io/klog/v2 v2.90.1 // indirect
-	k8s.io/kube-openapi v0.0.0-20230308215209-15aac26d736a // indirect
+	k8s.io/kube-openapi v0.0.0-20230501164219-8b0f38b5fd1f // indirect
 	oras.land/oras-go v1.1.0 // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.37 // indirect
 	sigs.k8s.io/cli-utils v0.27.0 // indirect
