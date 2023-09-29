@@ -327,10 +327,10 @@ func (rb *PSATestSuite) TestPSA() {
 			log.Info("Adding user as " + role + " to the downstream cluster.")
 			if role != restrictedAdmin {
 				if strings.Contains(role, "project") || role == roleProjectReadOnly || role == roleCustomCreateNS {
-					err := users.AddProjectMember(rb.client, rb.adminProject, rb.nonAdminUser, role)
+					err := users.AddProjectMember(rb.client, rb.adminProject, rb.nonAdminUser, role, nil)
 					require.NoError(rb.T(), err)
 				} else {
-					err := users.AddClusterRoleToUser(rb.client, rb.cluster, rb.nonAdminUser, role)
+					err := users.AddClusterRoleToUser(rb.client, rb.cluster, rb.nonAdminUser, role, nil)
 					require.NoError(rb.T(), err)
 				}
 				rb.nonAdminUserClient, err = rb.nonAdminUserClient.ReLogin()
@@ -355,7 +355,7 @@ func (rb *PSATestSuite) TestPSA() {
 
 		if strings.Contains(role, "project") || role == roleCustomCreateNS {
 			rb.Run("Additional testcase - Validate if "+role+" with an additional role update-psa can add/edit/delete labels from admin created namespace", func() {
-				err := users.AddClusterRoleToUser(rb.client, rb.cluster, rb.nonAdminUser, rb.psaRole.ID)
+				err := users.AddClusterRoleToUser(rb.client, rb.cluster, rb.nonAdminUser, rb.psaRole.ID, nil)
 				require.NoError(rb.T(), err)
 				rb.ValidatePSA(psaRole, customRole)
 			})
@@ -396,10 +396,10 @@ func (rb *PSATestSuite) TestPsactRBAC() {
 		rb.Run("Adding user as "+tt.name+" to the downstream cluster.", func() {
 			if tt.member == standardUser {
 				if strings.Contains(tt.role, "project") || tt.role == roleProjectReadOnly {
-					err := users.AddProjectMember(rb.client, rb.adminProject, rb.nonAdminUser, tt.role)
+					err := users.AddProjectMember(rb.client, rb.adminProject, rb.nonAdminUser, tt.role, nil)
 					require.NoError(rb.T(), err)
 				} else {
-					err := users.AddClusterRoleToUser(rb.client, rb.cluster, rb.nonAdminUser, tt.role)
+					err := users.AddClusterRoleToUser(rb.client, rb.cluster, rb.nonAdminUser, tt.role, nil)
 					require.NoError(rb.T(), err)
 				}
 			}
