@@ -721,6 +721,9 @@ func (p *Planner) forceDeleteAllDeletingEtcdMachines(cp *rkev1.RKEControlPlane, 
 		}
 		logrus.Infof("[planner] rkecluster %s/%s: force deleting etcd machine %s/%s as cluster was not sane and machine was deleting", cp.Namespace, cp.Name, deletingEtcdNode.Machine.Namespace, deletingEtcdNode.Machine.Name)
 		// Update the CAPI machine annotation for exclude node draining and set it to true to get the CAPI controllers to not try to drain this node.
+		if deletingEtcdNode.Machine.Annotations == nil {
+			deletingEtcdNode.Machine.Annotations = map[string]string{}
+		}
 		deletingEtcdNode.Machine.Annotations[capi.ExcludeNodeDrainingAnnotation] = "true"
 		var err error
 		deletingEtcdNode.Machine, err = p.machines.Update(deletingEtcdNode.Machine)
@@ -735,6 +738,9 @@ func (p *Planner) forceDeleteAllDeletingEtcdMachines(cp *rkev1.RKEControlPlane, 
 		rb = rb.DeepCopy()
 		// Annotate the rkebootstrap with a "force remove" annotation. This will short-circuit the "safe etcd removal"
 		// logic because at this point we are completely taking the cluster down.
+		if rb.Annotations == nil {
+			rb.Annotations = map[string]string{}
+		}
 		rb.Annotations[capr.ForceRemoveEtcdAnnotation] = "true"
 		_, err = p.rkeBootstrap.Update(rb)
 		if err != nil {
