@@ -50,7 +50,7 @@ func TestGeneratePrivateRegistryDockerConfig(t *testing.T) {
 		{
 			name:           "rke1 private registry",
 			expectedUrl:    "0123456789abcdef.dkr.ecr.us-east-1.amazonaws.com",
-			expectedConfig: base64.StdEncoding.EncodeToString([]byte("testConfig")), // should be directly copied from RKE1 secret
+			expectedConfig: base64.URLEncoding.EncodeToString([]byte("testConfig")), // should be directly copied from RKE1 secret
 			expectedError:  "",
 			cluster: &v3.Cluster{
 				Spec: v3.ClusterSpec{
@@ -84,7 +84,7 @@ func TestGeneratePrivateRegistryDockerConfig(t *testing.T) {
 		{
 			name:           "v2prov private registry",
 			expectedUrl:    "0123456789abcdef.dkr.ecr.us-east-1.amazonaws.com",
-			expectedConfig: base64.StdEncoding.EncodeToString([]byte(`{"auths":{"0123456789abcdef.dkr.ecr.us-east-1.amazonaws.com":{"username":"testuser","password":"password","auth":"dGVzdHVzZXI6cGFzc3dvcmQ="}}}`)),
+			expectedConfig: base64.URLEncoding.EncodeToString([]byte(`{"auths":{"0123456789abcdef.dkr.ecr.us-east-1.amazonaws.com":{"username":"testuser","password":"password","auth":"dGVzdHVzZXI6cGFzc3dvcmQ="}}}`)),
 			expectedError:  "",
 			cluster: &v3.Cluster{
 				Spec: v3.ClusterSpec{
