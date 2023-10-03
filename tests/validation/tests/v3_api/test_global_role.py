@@ -4,7 +4,7 @@ import pytest
 
 # values used to create a catalog
 BRANCH = "dev"
-URL = "https://git.rancher.io/system-charts"
+URL = "https://github.com/rancher/system-charts"
 
 
 def test_global_role_create_1(remove_resource):

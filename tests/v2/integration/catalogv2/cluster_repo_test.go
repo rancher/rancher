@@ -38,7 +38,7 @@ const (
 	ChartsSmallForkGitRepoFirstBranch = "test-1"
 	ChartsSmallForkGitRepoLastBranch  = "main"
 
-	RKE2ChartsGitRepoURL = "https://git.rancher.io/rke2-charts"
+	RKE2ChartsGitRepoURL = "https://github.com/rancher/rke2-charts"
 
 	HTTPClusterRepoName = "test-http-cluster-repo"
 	LatestHTTPRepoURL   = "https://releases.rancher.com/server-charts/latest"

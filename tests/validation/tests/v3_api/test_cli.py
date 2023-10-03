@@ -15,7 +15,7 @@ if_test_multicluster = pytest.mark.skipif(ast.literal_eval(
     os.environ.get('RANCHER_SKIP_MULTICLUSTER', "False")),
     reason='Multi-Cluster tests are skipped in the interest of time/cost.')
 
-SYSTEM_CHART_URL = "https://git.rancher.io/system-charts"
+SYSTEM_CHART_URL = "https://github.com/rancher/system-charts"
 SYSTEM_CHART_BRANCH = os.environ.get("RANCHER_SYSTEM_CHART_BRANCH", "dev")
 OPENEBS_CHART = 'openebs'
 OPENEBS_CHART_VERSION = '1.5.0'
