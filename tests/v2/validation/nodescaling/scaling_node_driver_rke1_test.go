@@ -80,10 +80,14 @@ func (s *RKE1NodeScalingTestSuite) TestScalingRKE1NodePools() {
 }
 
 func (s *RKE1NodeScalingTestSuite) TestScalingRKE1NodePoolsDynamicInput() {
+	if s.scalingConfig.NodePools.NodeRoles == nil {
+		s.T().Skip()
+	}
+
 	clusterID, err := clusters.GetClusterIDByName(s.client, s.client.RancherConfig.ClusterName)
 	require.NoError(s.T(), err)
 
-	ScalingRKE1NodePools(s.T(), s.client, clusterID, *s.scalingConfig.NodesAndRolesRKE1)
+	ScalingRKE1NodePools(s.T(), s.client, clusterID, *s.scalingConfig.NodePools.NodeRoles)
 }
 
 // In order for 'go test' to run this suite, we need to create
