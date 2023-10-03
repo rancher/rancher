@@ -137,82 +137,82 @@ func (c TestClientName) String() string {
 }
 
 type AddOnConfig struct {
-	ChartValues        *rkev1.GenericMap `json:"chartValues" yaml:"chartValues"`
-	AdditionalManifest string            `json:"additionalManifest" yaml:"additionalManifest"`
+	ChartValues        *rkev1.GenericMap `json:"chartValues,omitempty" yaml:"chartValues,omitempty"`
+	AdditionalManifest string            `json:"additionalManifest,omitempty" yaml:"additionalManifest,omitempty"`
 }
 
 type LabelsAndAnnotations struct {
-	Labels      map[string]string `json:"labels" yaml:"labels"`
-	Annotations map[string]string `json:"annotations" yaml:"annotations"`
+	Labels      map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 }
 
 type Networking struct {
-	ClusterCIDR              string                          `json:"clusterCIDR" yaml:"clusterCIDR"`
-	ClusterDNS               string                          `json:"clusterDNS" yaml:"clusterDNS"`
-	ClusterDomain            string                          `json:"clusterDomain" yaml:"clusterDomain"`
-	ServiceCIDR              string                          `json:"serviceCIDR" yaml:"serviceCIDR"`
-	NodePortServicePortRange string                          `json:"nodePortServicePortRange" yaml:"nodePortServicePortRange"`
-	TLSSan                   []string                        `json:"tlsSan" yaml:"tlsSan"`
-	LocalClusterAuthEndpoint *rkev1.LocalClusterAuthEndpoint `json:"localClusterAuthEndpoint" yaml:"localClusterAuthEndpoint"`
+	ClusterCIDR              string                          `json:"clusterCIDR,omitempty" yaml:"clusterCIDR,omitempty"`
+	ClusterDNS               string                          `json:"clusterDNS,omitempty" yaml:"clusterDNS,omitempty"`
+	ClusterDomain            string                          `json:"clusterDomain,omitempty" yaml:"clusterDomain,omitempty"`
+	ServiceCIDR              string                          `json:"serviceCIDR,omitempty" yaml:"serviceCIDR,omitempty"`
+	NodePortServicePortRange string                          `json:"nodePortServicePortRange,omitempty" yaml:"nodePortServicePortRange,omitempty"`
+	TLSSan                   []string                        `json:"tlsSan,omitempty" yaml:"tlsSan,omitempty"`
+	LocalClusterAuthEndpoint *rkev1.LocalClusterAuthEndpoint `json:"localClusterAuthEndpoint,omitempty" yaml:"localClusterAuthEndpoint,omitempty"`
 }
 
 type Advanced struct {
 	// examples of machineSelector configs: "protect-kernel-defaults": false, "system-default-registry": registryHostname,
-	MachineSelectors          *[]rkev1.RKESystemConfig `json:"machineSelectors" yaml:"machineSelectors"`
-	MachineGlobalConfig       *rkev1.GenericMap        `json:"machineGlobalConfig" yaml:"machineGlobalConfig"`
-	KubeControllerManagerArgs []string                 `json:"kubeControllerManagerArgs" yaml:"kubeControllerManagerArgs"`
-	KubeSchedulerArgs         []string                 `json:"kubeSchedulerArgs" yaml:"kubeSchedulerArgs"`
-	KubeAPIServerArgs         []string                 `json:"kubeAPIServerArgs" yaml:"kubeAPIServerArgs"`
+	MachineSelectors          *[]rkev1.RKESystemConfig `json:"machineSelectors,omitempty" yaml:"machineSelectors,omitempty"`
+	MachineGlobalConfig       *rkev1.GenericMap        `json:"machineGlobalConfig,omitempty" yaml:"machineGlobalConfig,omitempty"`
+	KubeControllerManagerArgs []string                 `json:"kubeControllerManagerArgs,omitempty" yaml:"kubeControllerManagerArgs,omitempty"`
+	KubeSchedulerArgs         []string                 `json:"kubeSchedulerArgs,omitempty" yaml:"kubeSchedulerArgs,omitempty"`
+	KubeAPIServerArgs         []string                 `json:"kubeAPIServerArgs,omitempty" yaml:"kubeAPIServerArgs,omitempty"`
 }
 
 type Registries struct {
-	RKE1Registries []management.PrivateRegistry `json:"rke1Registries" yaml:"rke1Registries"`
-	RKE2Registries *rkev1.Registry              `json:"rke2Registries" yaml:"rke2Registries"`
-	RKE2Password   string                       `json:"rke2Password" yaml:"rke2Password"`
-	RKE2Username   string                       `json:"rke2Username" yaml:"rke2Username"`
+	RKE1Registries []management.PrivateRegistry `json:"rke1Registries,omitempty" yaml:"rke1Registries,omitempty"`
+	RKE2Registries *rkev1.Registry              `json:"rke2Registries,omitempty" yaml:"rke2Registries,omitempty"`
+	RKE2Password   string                       `json:"rke2Password,omitempty" yaml:"rke2Password,omitempty"`
+	RKE2Username   string                       `json:"rke2Username,omitempty" yaml:"rke2Username,omitempty"`
 }
 
 type Pools struct {
-	NodeLabels             map[string]string `json:"nodeLabels" yaml:"nodeLabels"`
-	NodeTaints             []corev1.Taint    `json:"nodeTaints" yaml:"nodeTaints"`
-	SpecifyCustomPrivateIP bool              `json:"specifyPrivateIP" yaml:"specifyPrivateIP"`
-	SpecifyCustomPublicIP  bool              `json:"specifyPublicIP" yaml:"specifyPublicIP" default:"true"`
-	CustomNodeNameSuffix   string            `json:"nodeNameSuffix" yaml:"nodeNameSuffix"`
+	NodeLabels             map[string]string `json:"nodeLabels,omitempty" yaml:"nodeLabels,omitempty"`
+	NodeTaints             []corev1.Taint    `json:"nodeTaints,omitempty" yaml:"nodeTaints,omitempty"`
+	SpecifyCustomPrivateIP bool              `json:"specifyPrivateIP,omitempty" yaml:"specifyPrivateIP,omitempty"`
+	SpecifyCustomPublicIP  bool              `json:"specifyPublicIP,omitempty" yaml:"specifyPublicIP,omitempty" default:"true"`
+	CustomNodeNameSuffix   string            `json:"nodeNameSuffix,omitempty" yaml:"nodeNameSuffix,omitempty"`
 }
 
 type MachinePools struct {
 	Pools
-	NodeRoles machinepools.NodeRoles `json:"nodeRoles" yaml:"nodeRoles" default:"[]"`
-	IsSecure  bool                   `json:"isSecure" yaml:"isSecure" default:"false"`
+	NodeRoles machinepools.NodeRoles `json:"nodeRoles,omitempty" yaml:"nodeRoles,omitempty" default:"[]"`
+	IsSecure  bool                   `json:"isSecure,omitempty" yaml:"isSecure,omitempty" default:"false"`
 }
 
 type NodePools struct {
 	Pools
-	NodeRoles nodepools.NodeRoles `json:"nodeRoles" yaml:"nodeRoles" default:"[]"`
+	NodeRoles nodepools.NodeRoles `json:"nodeRoles,omitempty" yaml:"nodeRoles,omitempty" default:"[]"`
 }
 
 type Config struct {
-	NodePools              []NodePools                              `json:"nodePools" yaml:"nodePools"`
-	MachinePools           []MachinePools                           `json:"machinePools" yaml:"machinePools"`
-	Providers              []string                                 `json:"providers" yaml:"providers"`
-	NodeProviders          []string                                 `json:"nodeProviders" yaml:"nodeProviders"`
-	Hardened               bool                                     `json:"hardened" yaml:"hardened"`
-	AddOnConfig            *AddOnConfig                             `json:"addonConfig" yaml:"addonConfig"`
-	K3SKubernetesVersions  []string                                 `json:"k3sKubernetesVersion" yaml:"k3sKubernetesVersion"`
-	RKE1KubernetesVersions []string                                 `json:"rke1KubernetesVersion" yaml:"rke1KubernetesVersion"`
-	RKE2KubernetesVersions []string                                 `json:"rke2KubernetesVersion" yaml:"rke2KubernetesVersion"`
-	CNIs                   []string                                 `json:"cni" yaml:"cni"`
-	PSACT                  string                                   `json:"psact" yaml:"psact"`
-	PNI                    bool                                     `json:"pni" yaml:"pni"`
-	AgentEnvVars           *[]rkev1.EnvVar                          `json:"agentEnvVars" yaml:"agentEnvVars"`
-	AgentEnvVarsRKE1       *[]management.EnvVar                     `json:"agentEnvVarsRKE1" yaml:"agentEnvVarsRKE1"`
-	ClusterAgent           *management.AgentDeploymentCustomization `json:"clusterAgent" yaml:"clusterAgent"`
-	FleetAgent             *management.AgentDeploymentCustomization `json:"fleetAgent" yaml:"fleetAgent"`
-	Etcd                   *rkev1.ETCD                              `json:"etcd" yaml:"etcd"`
-	LabelsAndAnnotations   *LabelsAndAnnotations                    `json:"labelsAndAnnotations" yaml:"labelsAndAnnotations"`
-	Networking             *Networking                              `json:"networking" yaml:"networking"`
-	Registries             *Registries                              `json:"registries" yaml:"registries"`
-	UpgradeStrategy        *rkev1.ClusterUpgradeStrategy            `json:"upgradeStrategy" yaml:"upgradeStrategy"`
-	Advanced               *Advanced                                `json:"advanced" yaml:"advanced"`
-	ClusterSSHTests        []SSHTestCase                            `json:"clusterSSHTests" yaml:"clusterSSHTests"`
+	NodePools              []NodePools                              `json:"nodePools,omitempty" yaml:"nodePools,omitempty"`
+	MachinePools           []MachinePools                           `json:"machinePools,omitempty" yaml:"machinePools,omitempty"`
+	Providers              []string                                 `json:"providers,omitempty" yaml:"providers,omitempty"`
+	NodeProviders          []string                                 `json:"nodeProviders,omitempty" yaml:"nodeProviders,omitempty"`
+	Hardened               bool                                     `json:"hardened,omitempty" yaml:"hardened,omitempty"`
+	AddOnConfig            *AddOnConfig                             `json:"addonConfig,omitempty" yaml:"addonConfig,omitempty"`
+	K3SKubernetesVersions  []string                                 `json:"k3sKubernetesVersion,omitempty" yaml:"k3sKubernetesVersion,omitempty"`
+	RKE1KubernetesVersions []string                                 `json:"rke1KubernetesVersion,omitempty" yaml:"rke1KubernetesVersion,omitempty"`
+	RKE2KubernetesVersions []string                                 `json:"rke2KubernetesVersion,omitempty" yaml:"rke2KubernetesVersion,omitempty"`
+	CNIs                   []string                                 `json:"cni,omitempty" yaml:"cni,omitempty"`
+	PSACT                  string                                   `json:"psact,omitempty" yaml:"psact,omitempty"`
+	PNI                    bool                                     `json:"pni,omitempty" yaml:"pni,omitempty"`
+	AgentEnvVars           *[]rkev1.EnvVar                          `json:"agentEnvVars,omitempty" yaml:"agentEnvVars,omitempty"`
+	AgentEnvVarsRKE1       *[]management.EnvVar                     `json:"agentEnvVarsRKE1,omitempty" yaml:"agentEnvVarsRKE1,omitempty"`
+	ClusterAgent           *management.AgentDeploymentCustomization `json:"clusterAgent,omitempty" yaml:"clusterAgent,omitempty"`
+	FleetAgent             *management.AgentDeploymentCustomization `json:"fleetAgent,omitempty" yaml:"fleetAgent,omitempty"`
+	Etcd                   *rkev1.ETCD                              `json:"etcd,omitempty" yaml:"etcd,omitempty"`
+	LabelsAndAnnotations   *LabelsAndAnnotations                    `json:"labelsAndAnnotations,omitempty" yaml:"labelsAndAnnotations,omitempty"`
+	Networking             *Networking                              `json:"networking,omitempty" yaml:"networking,omitempty"`
+	Registries             *Registries                              `json:"registries,omitempty" yaml:"registries,omitempty"`
+	UpgradeStrategy        *rkev1.ClusterUpgradeStrategy            `json:"upgradeStrategy,omitempty" yaml:"upgradeStrategy,omitempty"`
+	Advanced               *Advanced                                `json:"advanced,omitempty" yaml:"advanced,omitempty"`
+	ClusterSSHTests        []SSHTestCase                            `json:"clusterSSHTests,omitempty" yaml:"clusterSSHTests,omitempty"`
 }
