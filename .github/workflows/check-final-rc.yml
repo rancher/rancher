@@ -20,6 +20,6 @@ jobs:
           fetch-depth: 0
           ref: ${{ env.GITHUB_SHA }}
       -
-        name: Verify dependencies files in a final release candi
+        name: Verify dependencies files in a final release candidate
         run: ./.github/scripts/check-final-rc-deps.sh
   
