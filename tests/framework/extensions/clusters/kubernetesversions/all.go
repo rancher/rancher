@@ -10,9 +10,7 @@ import (
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
-	"github.com/pkg/errors"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	v3 "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 )
 
 const (
@@ -159,21 +157,17 @@ func ListGKEAllVersions(client *rancher.Client, projectID, cloudCredentialID, zo
 }
 
 // ListAKSAllVersions is a function that uses the management client base and aks meta endpoint to list and return all AKS versions.
-func ListAKSAllVersions(client *rancher.Client, cluster *v3.Cluster) (allAvailableVersions []string, err error) {
-	url := fmt.Sprintf("%s://%s/%s", "https", client.RancherConfig.Host, "meta/aksVersions")
+func ListAKSAllVersions(client *rancher.Client, cloudCredentialID, region string) (allAvailableVersions []string, err error) {
+	url := fmt.Sprintf("%s://%s/%s", "https", client.RancherConfig.Host, aksVersionPath)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return
 	}
 	req.Header.Add("Authorization", "Bearer "+client.RancherConfig.AdminToken)
 
-	if cluster.AKSConfig == nil {
-		return nil, errors.Wrapf(err, "cluster %s has no gke config", cluster.Name)
-	}
-
 	q := req.URL.Query()
-	q.Add("cloudCredentialId", cluster.AKSConfig.AzureCredentialSecret)
-	q.Add("region", cluster.AKSConfig.ResourceLocation)
+	q.Add("cloudCredentialId", cloudCredentialID)
+	q.Add("region", region)
 	req.URL.RawQuery = q.Encode()
 
 	bodyBytes, err := getRequest(req, client)
