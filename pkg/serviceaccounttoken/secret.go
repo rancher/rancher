@@ -5,62 +5,63 @@ import (
 	"fmt"
 	"time"
 
+	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
-	apierror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
+	clientv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
-const serviceAccountSecretAnnotation = "kubernetes.io/service-account.name"
+const (
+	// ServiceAccountSecretLabel is the label used to search for the secret belonging to a service account.
+	ServiceAccountSecretLabel = "cattle.io/service-account.name"
 
-// secretGetter is an abstraction over any kind of secret getter.
+	serviceAccountSecretAnnotation = "kubernetes.io/service-account.name"
+)
+
+// secretLister is an abstraction over any kind of secret lister.
 // The caller can use any cache or client it has available, whether that is from norman, wrangler, or client-go,
 // as long as it can wrap it in a simplified lambda with this signature.
-type secretGetter func(namespace, name string) (*v1.Secret, error)
+type secretLister func(namespace string, selector labels.Selector) ([]*v1.Secret, error)
 
 // EnsureSecretForServiceAccount gets or creates a service account token Secret for the provided Service Account.
 // For k8s <1.24, the secret is automatically generated for the service account. For >=1.24, we need to generate it explicitly.
-func EnsureSecretForServiceAccount(ctx context.Context, secretGetter secretGetter, clientSet kubernetes.Interface, sa *v1.ServiceAccount) (*v1.Secret, error) {
-	if secretGetter == nil {
-		secretGetter = func(namespace, name string) (*v1.Secret, error) {
-			return clientSet.CoreV1().Secrets(namespace).Get(ctx, name, metav1.GetOptions{})
-		}
-	}
+func EnsureSecretForServiceAccount(ctx context.Context, secretsCache corecontrollers.SecretCache, clientSet kubernetes.Interface, sa *v1.ServiceAccount) (*v1.Secret, error) {
 	if sa == nil {
 		return nil, fmt.Errorf("could not ensure secret for invalid service account")
 	}
 	secretClient := clientSet.CoreV1().Secrets(sa.Namespace)
-	saClient := clientSet.CoreV1().ServiceAccounts(sa.Namespace)
-	secretName := ServiceAccountSecretName(sa)
-	var secret *v1.Secret
-	var err error
-	if secretName != "" {
-		secret, err = secretGetter(sa.Namespace, secretName)
-		if err != nil && !apierror.IsNotFound(err) {
-			return nil, fmt.Errorf("error ensuring secret for service account [%s:%s]: %w", sa.Namespace, sa.Name, err)
+	var secretLister secretLister
+	if secretsCache != nil {
+		secretLister = secretsCache.List
+	} else {
+		secretLister = func(_ string, selector labels.Selector) ([]*v1.Secret, error) {
+			secretList, err := secretClient.List(ctx, metav1.ListOptions{
+				LabelSelector: selector.String(),
+			})
+			if err != nil {
+				return nil, err
+			}
+			result := make([]*v1.Secret, len(secretList.Items))
+			for i := range secretList.Items {
+				result[i] = &secretList.Items[i]
+			}
+			return result, nil
 		}
 	}
-	if secret == nil || !isSecretForServiceAccount(secret, sa) {
+	secret, err := ServiceAccountSecret(ctx, sa, secretLister, secretClient)
+	if err != nil {
+		return nil, fmt.Errorf("error looking up secret for service account [%s:%s]: %w", sa.Namespace, sa.Name, err)
+	}
+	if secret == nil {
 		sc := SecretTemplate(sa)
 		secret, err = secretClient.Create(ctx, sc, metav1.CreateOptions{})
 		if err != nil {
 			return nil, fmt.Errorf("error ensuring secret for service account [%s:%s]: %w", sa.Namespace, sa.Name, err)
 		}
-		// k8s >=1.24 does not store a reference to the secret, but we need it to refer back to later
-		saCopy := sa.DeepCopy()
-		saCopy.Secrets = []v1.ObjectReference{{Name: secret.Name}}
-		saCopy, err = saClient.Update(ctx, saCopy, metav1.UpdateOptions{})
-		if err != nil {
-			// clean up the secret we just created
-			cleanupErr := secretClient.Delete(ctx, secret.Name, metav1.DeleteOptions{})
-			if cleanupErr != nil && !apierror.IsNotFound(cleanupErr) {
-				return nil, fmt.Errorf("encountered error while handling service account update error: %v, original error: %w", cleanupErr, err)
-			}
-			return nil, fmt.Errorf("error ensuring secret for service account [%s:%s]: %w", sa.Namespace, sa.Name, err)
-		}
-		*sa = *saCopy
 	}
 	if len(secret.Data[v1.ServiceAccountTokenKey]) > 0 {
 		return secret, nil
@@ -106,6 +107,9 @@ func SecretTemplate(sa *v1.ServiceAccount) *v1.Secret {
 			Annotations: map[string]string{
 				serviceAccountSecretAnnotation: sa.Name,
 			},
+			Labels: map[string]string{
+				ServiceAccountSecretLabel: sa.Name,
+			},
 		},
 		Type: v1.SecretTypeServiceAccountToken,
 	}
@@ -117,13 +121,39 @@ func serviceAccountSecretPrefix(sa *v1.ServiceAccount) string {
 	return fmt.Sprintf("%s-token-", sa.Name)
 }
 
-// ServiceAccountSecretName returns the secret name for the given Service Account.
-// If there are more than one, it returns the first.
-func ServiceAccountSecretName(sa *v1.ServiceAccount) string {
-	if len(sa.Secrets) < 1 {
-		return ""
+// ServiceAccountSecret returns the secret for the given Service Account.
+// If there are more than one, it returns the first. Can return a nil secret
+// and a nil error if no secret is found
+func ServiceAccountSecret(ctx context.Context, sa *v1.ServiceAccount, secretLister secretLister, secretClient clientv1.SecretInterface) (*v1.Secret, error) {
+	if sa == nil {
+		return nil, fmt.Errorf("cannot get secret for nil service account")
 	}
-	return sa.Secrets[0].Name
+	secrets, err := secretLister(sa.Namespace, labels.SelectorFromSet(map[string]string{
+		ServiceAccountSecretLabel: sa.Name,
+	}))
+	if err != nil {
+		return nil, fmt.Errorf("could not get secrets for service account: %w", err)
+	}
+	if len(secrets) < 1 {
+		return nil, nil
+	}
+	var result *v1.Secret
+	for _, s := range secrets {
+		if isSecretForServiceAccount(s, sa) {
+			if result == nil {
+				result = s
+			}
+			continue
+		}
+		logrus.Warnf("EnsureSecretForServiceAccount: secret [%s:%s] is invalid for service account [%s], deleting", s.Namespace, s.Name, sa.Name)
+		err = secretClient.Delete(ctx, s.Name, metav1.DeleteOptions{})
+		if err != nil {
+			// we don't want to return the delete failure since the success/failure of the cleanup shouldn't affect
+			// the ability of the caller to use any identified, valid secret
+			logrus.Errorf("unable to delete secret [%s:%s]: %v", s.Namespace, s.Name, err)
+		}
+	}
+	return result, nil
 }
 
 func isSecretForServiceAccount(secret *v1.Secret, sa *v1.ServiceAccount) bool {

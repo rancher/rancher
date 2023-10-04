@@ -295,7 +295,7 @@ func GetPlanServiceAccountTokenSecret(secretClient corecontrollers.SecretControl
 	if planSA == nil {
 		return nil, false, fmt.Errorf("planSA was nil")
 	}
-	secret, err := serviceaccounttoken.EnsureSecretForServiceAccount(context.Background(), secretClient.Cache().Get, k8s, planSA)
+	secret, err := serviceaccounttoken.EnsureSecretForServiceAccount(context.Background(), secretClient.Cache(), k8s, planSA)
 	if err != nil {
 		return nil, false, fmt.Errorf("error ensuring secret for service account [%s:%s]: %w", planSA.Namespace, planSA.Name, err)
 	}
