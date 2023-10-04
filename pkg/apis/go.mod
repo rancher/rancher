@@ -7,6 +7,19 @@ replace github.com/rancher/wrangler v1.1.1 => github.com/rancher/wrangler v1.1.1
 
 replace k8s.io/client-go => github.com/rancher/client-go v1.25.4-rancher1
 
+replace (
+	// Replace some k8s modules with specific versions to get rid of the "unknown revision v0.0.0" error caused by the k8s.io/kubernetes module
+	// Upstream Issue: https://github.com/kubernetes/kubernetes/issues/79384
+	k8s.io/api => k8s.io/api v0.25.12
+	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.25.12
+	k8s.io/apimachinery => k8s.io/apimachinery v0.25.12
+	k8s.io/apiserver => k8s.io/apiserver v0.25.12
+	k8s.io/cli-runtime => k8s.io/cli-runtime v0.25.12
+	k8s.io/component-base => k8s.io/component-base v0.25.12
+	k8s.io/kubectl => k8s.io/kubectl v0.25.12
+	k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.25.12
+)
+
 require (
 	github.com/rancher/aks-operator v1.1.3
 	github.com/rancher/eks-operator v1.2.2
