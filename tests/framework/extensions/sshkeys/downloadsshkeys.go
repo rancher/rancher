@@ -20,27 +20,27 @@ func DownloadSSHKeys(client *rancher.Client, machinePoolNodeName string) ([]byte
 	machinePoolNodeNameName := fmt.Sprintf("fleet-default/%s", machinePoolNodeName)
 	machine, err := client.Steve.SteveType(ClusterMachineConstraintResourceSteveType).ByID(machinePoolNodeNameName)
 	if err != nil {
-		return []byte{}, err
+		return nil, err
 	}
 
 	sshKeyLink := machine.Links["sshkeys"]
 
 	req, err := http.NewRequest("GET", sshKeyLink, nil)
 	if err != nil {
-		return []byte{}, err
+		return nil, err
 	}
 
 	req.Header.Add("Authorization", "Bearer "+client.RancherConfig.AdminToken)
 
 	resp, err := client.Management.APIBaseClient.Ops.Client.Do(req)
 	if err != nil {
-		return []byte{}, err
+		return nil, err
 	}
 	defer resp.Body.Close()
 
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return []byte{}, err
+		return nil, err
 	}
 
 	privateSSHKeyRegEx := regexp.MustCompile(privateKeySSHKeyRegExPattern)
