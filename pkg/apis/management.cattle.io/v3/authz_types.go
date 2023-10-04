@@ -102,7 +102,7 @@ type ProjectSpec struct {
 	// +optional
 	Description string `json:"description,omitempty"`
 
-	// ClusterName is the name of the cluster the project belongs to.
+	// ClusterName is the name of the cluster the project belongs to. Immutable.
 	// +kubebuilder:validation:Required
 	ClusterName string `json:"clusterName" norman:"required,type=reference[cluster]"`
 
