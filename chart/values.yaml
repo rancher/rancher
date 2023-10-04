@@ -103,6 +103,11 @@ rancherImage: rancher/rancher
 # Defaults to .Chart.appVersion
 # rancherImageTag: v2.0.7
 
+# Optionally use rancher image hash instead of image tag.
+# When present, it will be used instead of rancherImageTag.
+# 
+# rancherImageDigest: <sha256 image digest>
+
 # Override imagePullPolicy for rancher server images
 # options: Always, Never, IfNotPresent
 # Defaults to IfNotPresent
