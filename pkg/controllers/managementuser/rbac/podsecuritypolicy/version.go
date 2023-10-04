@@ -21,7 +21,10 @@ func checkClusterVersion(clusterName string, clusterLister v3.ClusterLister) err
 	if cluster.Status.Version == nil {
 		return fmt.Errorf("cannot validate Kubernetes version for podsecuritypolicy capability: cluster [%s] status version is not available yet", clusterName)
 	}
-	if mVersion.Compare(cluster.Status.Version.String(), "v1.25", ">=") {
+	if len(cluster.Status.Version.String()) < 5 {
+		return fmt.Errorf("cannot validate Kubernetes version for podsecuritypolicy capability: cluster [%s] status version [%s] is too small", clusterName, cluster.Status.Version.String())
+	}
+	if mVersion.Compare(cluster.Status.Version.String()[0:5], "v1.25", ">=") {
 		return errVersionIncompatible
 	}
 	return nil
