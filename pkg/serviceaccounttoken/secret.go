@@ -122,7 +122,8 @@ func serviceAccountSecretPrefix(sa *v1.ServiceAccount) string {
 }
 
 // ServiceAccountSecret returns the secret for the given Service Account.
-// If there are more than one, it returns the first.
+// If there are more than one, it returns the first. Can return a nil secret
+// and a nil error if no secret is found
 func ServiceAccountSecret(ctx context.Context, sa *v1.ServiceAccount, secretLister secretLister, secretClient clientv1.SecretInterface) (*v1.Secret, error) {
 	if sa == nil {
 		return nil, fmt.Errorf("cannot get secret for nil service account")
@@ -139,13 +140,17 @@ func ServiceAccountSecret(ctx context.Context, sa *v1.ServiceAccount, secretList
 	var result *v1.Secret
 	for _, s := range secrets {
 		if isSecretForServiceAccount(s, sa) {
-			result = s
+			if result == nil {
+				result = s
+			}
 			continue
 		}
 		logrus.Warnf("EnsureSecretForServiceAccount: secret [%s:%s] is invalid for service account [%s], deleting", s.Namespace, s.Name, sa.Name)
 		err = secretClient.Delete(ctx, s.Name, metav1.DeleteOptions{})
 		if err != nil {
-			return nil, err
+			// we don't want to return the delete failure since the success/failure of the cleanup shouldn't affect
+			// the ability of the caller to use any identified, valid secret
+			logrus.Errorf("unable to delete secret [%s:%s]: %v", s.Namespace, s.Name, err)
 		}
 	}
 	return result, nil
