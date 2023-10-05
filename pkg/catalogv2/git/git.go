@@ -29,6 +29,7 @@ type Repository struct {
 	caBundle          []byte
 	knownHosts        []byte
 	insecureTLSVerify bool
+	protocol          string
 	// go-git package objects
 	auth      transport.AuthMethod
 	localGit  *gogit.Repository
@@ -47,6 +48,7 @@ type Repository struct {
 // Finally, it returns a new git object configured with these settings,
 // or an error if any step in this process fails.
 func BuildRepoConfig(secret *corev1.Secret, namespace, name, gitURL string, insecureSkipTLS bool, caBundle []byte) (*Repository, error) {
+	var err error
 
 	repo := &Repository{
 		URL:               gitURL,
@@ -60,12 +62,12 @@ func BuildRepoConfig(secret *corev1.Secret, namespace, name, gitURL string, inse
 	}
 
 	// Check which supported communication protocol will be used (HTTP(S)/SSH)
-	isSSH, err := validateGitURL(gitURL)
+	repo.protocol, err = validateGitURL(gitURL)
 	if err != nil {
 		return repo, fmt.Errorf("invalid URL: %s; error: %w", gitURL, err)
 	}
 
-	if isSSH && repo.secret == nil {
+	if repo.protocol == SSH && repo.secret == nil {
 		// SSH without Secret, get keys from local system OS
 		err := repo.checkDefaultSSHAgent()
 		if err != nil {
@@ -101,8 +103,8 @@ func (r *Repository) setRepoCredentials() error {
 	}
 
 	// There is a secret, parse sensitive credentials from it
-	switch r.secret.Type {
-	case corev1.SecretTypeBasicAuth: // HTTP(S) AUTHENTICATION
+	switch {
+	case r.secret.Type == corev1.SecretTypeBasicAuth && r.protocol == HTTPS: // HTTP(S) AUTHENTICATION
 		// extract data from Kubernetes secret
 		username := string(r.secret.Data[corev1.BasicAuthUsernameKey])
 		password := string(r.secret.Data[corev1.BasicAuthPasswordKey])
@@ -116,7 +118,7 @@ func (r *Repository) setRepoCredentials() error {
 		}
 		return nil
 
-	case corev1.SecretTypeSSHAuth: // SSH AUTHENTICATION
+	case r.secret.Type == corev1.SecretTypeSSHAuth && r.protocol == SSH: // SSH AUTHENTICATION
 		// Kubernetes secret
 		pemBytes := r.secret.Data[corev1.SSHAuthPrivateKey]
 		// Make signer from private keys
@@ -170,7 +172,7 @@ func (r *Repository) setRepoCredentials() error {
 				return fmt.Errorf("failed to remove temporar known_hosts file: %w", err)
 			}
 		}
-		// SSH AUTHENTICATION END
+
 		return nil
 	}
 	// if all else failed, something nasty happened

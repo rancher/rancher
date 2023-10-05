@@ -11,51 +11,43 @@ import (
 func Test_validateGitURL(t *testing.T) {
 	testCases := []struct {
 		gitURL        string
-		expectedValid bool
+		expectedValid string
 		expectedError error
 	}{
 		// Valid URL's
 		{
 			gitURL:        "customusername@gitlab.com:user/repo.git",
-			expectedValid: true,
+			expectedValid: "SSH",
 			expectedError: nil,
 		},
 		{
 			gitURL:        "customusername@gitlab.com:user/repo",
-			expectedValid: true,
+			expectedValid: "SSH",
 			expectedError: nil,
 		},
 		{
 			gitURL:        "customusername@gitlab.com:user/repo-with-dashes.git",
-			expectedValid: true,
+			expectedValid: "SSH",
 			expectedError: nil,
 		},
 		{
 			gitURL:        "git@github.com:user/repo.git",
-			expectedValid: true,
+			expectedValid: "SSH",
 			expectedError: nil,
 		},
 		{
 			gitURL:        "git@gitlab.com:user/repo-with-dashes.git",
-			expectedValid: true,
+			expectedValid: "SSH",
 			expectedError: nil,
 		},
 		{
 			gitURL:        "git@gitlab.com:user/repo",
-			expectedValid: true,
+			expectedValid: "SSH",
 			expectedError: nil,
 		},
 		// Invalid URL's
 		{
 			gitURL:        "ftp://admantium@gitlab.com:user/repo",
-			expectedError: fmt.Errorf("only http(s) or ssh protocols supported"),
-		},
-		{
-			gitURL:        "https://admantium@gitlab.com:user/repo",
-			expectedError: fmt.Errorf("only http(s) or ssh protocols supported"),
-		},
-		{
-			gitURL:        "https://admantium#gitlab.com:user/repo",
 			expectedError: fmt.Errorf("only http(s) or ssh protocols supported"),
 		},
 	}

@@ -16,6 +16,8 @@ const (
 	staticDir            = "/var/lib/rancher-data/local-catalogs/v2"
 	localDir             = "../rancher-data/local-catalogs/v2" // identical to helm.InternalCatalog
 	localReferenceBranch = "refs/heads/"
+	HTTPS                = "HTTP(S)"
+	SSH                  = "SSH"
 )
 
 // gitDir calculates the directory path where a Git repository's data should be stored or retrieved based on
@@ -63,19 +65,27 @@ func isLocalBranch(branch string) bool {
 //
 // It also validates if the SSH URL is well-formed.
 //
-// Returns a boolean value indicating the communication protocol:
-//   - false for HTTP(S)
-//   - true for SSH
+// Returns a string value indicating the communication protocol:
+//   - HTTPS
+//   - SSH
 //
 // If the URL is invalid or uses an unsupported protocol, an error is returned.
-func validateGitURL(gitURL string) (bool, error) {
+func validateGitURL(gitURL string) (string, error) {
 	// check for https and ssh prefix first
 	isHTTP := strings.HasPrefix(gitURL, "http://") || strings.HasPrefix(gitURL, "https://")
 	if isHTTP {
-		return false, nil
+		return HTTPS, nil
 	}
 	// It has to be a valid URL, if it is not, throw an error
-	return isGitSSH(gitURL) // SSH
+	isSSH, err := isGitSSH(gitURL)
+	if err != nil {
+		return SSH, err
+	}
+	if !isSSH {
+		return "", fmt.Errorf("only http(s) or ssh protocols supported")
+	}
+
+	return SSH, nil
 }
 
 // isGitSSH checks if the URL is in the SSH URL format using regular expressions.
@@ -88,11 +98,8 @@ func isGitSSH(gitURL string) (bool, error) {
 	if err != nil {
 		return true, fmt.Errorf("regexp failed: %w", err)
 	}
-	if !validSSH {
-		return true, fmt.Errorf("only http(s) or ssh protocols supported")
-	}
-	// valid SSH URL
-	return true, nil
+
+	return validSSH, nil
 }
 
 // convertDERToPEM converts a DER-encoded certificate (src) into a PEM-encoded
@@ -114,10 +121,7 @@ func parseUserFromSSHURL(URL string) (user string, err error) {
 	parts := strings.Split(URL, "@")
 	user = parts[0]
 	if len(parts) == 2 {
-		if strings.HasPrefix(user, "ssh://") {
-			// Remove "ssh://" prefix
-			user = user[len("ssh://"):]
-		}
+		user = strings.TrimPrefix(user, "ssh://")
 	} else {
 		return "", fmt.Errorf("invalid ssh url: %v", URL)
 	}
