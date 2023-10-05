@@ -103,10 +103,10 @@ func (rb *ETCDRbacBackupTestSuite) TestETCDRbac() {
 
 			if tt.member == standardUser {
 				if strings.Contains(tt.role, "project") {
-					err := users.AddProjectMember(rb.client, rb.adminProject, rb.standardUser, tt.role)
+					err := users.AddProjectMember(rb.client, rb.adminProject, rb.standardUser, tt.role, nil)
 					require.NoError(rb.T(), err)
 				} else {
-					err := users.AddClusterRoleToUser(rb.client, rb.cluster, rb.standardUser, tt.role)
+					err := users.AddClusterRoleToUser(rb.client, rb.cluster, rb.standardUser, tt.role, nil)
 					require.NoError(rb.T(), err)
 				}
 			}

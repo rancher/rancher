@@ -1,14 +1,12 @@
-
-
-
 ## Hosted Provider Provisioning Configs
 
-For your config, you will need everything in the Prerequisites section on the previous readme along with and at least one [Cloud Credential](#cloud-credentials) and [Hosted Provider Config](#hosted-provider-configs). 
+For your config, you will need everything in the [Prerequisites](../README.md) section on the previous readme along with and at least one [Cloud Credential](#cloud-credentials) and [Hosted Provider Config](#hosted-provider-configs). 
 
 Your GO test_package should be set to `provisioning/hosted`.
 Your GO suite should be set to `-run ^TestHostedClusterProvisioningTestSuite$`.
 Please see below for more details for your config. 
 
+## Table of Contents
 1. [Prerequisites](../README.md)
 2. [Cloud Credential](#cloud-credentials)
 3. [Hosted Provider Config](#hosted-provider-configs)
@@ -49,7 +47,7 @@ Below are example configs needed for the different hosted providers including GK
 "eksClusterConfig": {
   "imported": false,
   "kmsKey": "",
-  "kubernetesVersion": "1.21",
+  "kubernetesVersion": "1.26",
   "loggingTypes": [],
   "nodeGroups": [
     {
@@ -81,12 +79,15 @@ Below are example configs needed for the different hosted providers including GK
   "tags": {}
 },
 ```
+
+See an example on running this test: `run ^TestHostedEKSClusterProvisioningTestSuite/TestProvisioningHostedEKS$`
+
 ### AKS Cluster Config
 ```json
 "aksClusterConfig": {
   "dnsPrefix": "-dns",
   "imported": false,
-  "kubernetesVersion": "1.24.6",
+  "kubernetesVersion": "1.26.6",
   "linuxAdminUsername": "azureuser",
   "loadBalancerSku": "Standard",
   "networkPlugin": "kubenet",
@@ -112,6 +113,9 @@ Below are example configs needed for the different hosted providers including GK
   "tags": {}
 }
 ```
+
+See an example on running this test: `run ^TestHostedAKSClusterProvisioningTestSuite/TestProvisioningHostedAKS$`
+
 ### GKE Cluster Config
 Note that the following are required and should be updated:
 * kubernetesVersion
@@ -146,7 +150,7 @@ Note that the following are required and should be updated:
     "subnetworkName": null,
     "useIpAliases": true
   },
-  "kubernetesVersion": "1.21.9-gke.1002",
+  "kubernetesVersion": "1.26.8-gke.200",
   "labels": {"key": "value"},
   "locations": ["us-central1-c"],
   "location": "us-central1-c"
@@ -205,3 +209,5 @@ Note that the following are required and should be updated:
   "zone": "us-central1-c"
 }
 ```
+
+See an example on running this test: `run ^TestHostedGKEClusterProvisioningTestSuite/TestProvisioningHostedGKE$`

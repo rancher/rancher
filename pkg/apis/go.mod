@@ -2,15 +2,24 @@ module github.com/rancher/rancher/pkg/apis
 
 go 1.20
 
-// wrangler bracnhes need to be updated before replace can be removed
-replace github.com/rancher/wrangler v1.1.1 => github.com/rancher/wrangler v1.1.1-0.20230831050635-df1bd5aae9df
-
-replace k8s.io/client-go => github.com/rancher/client-go v1.27.4-rancher1
+replace (
+	// wrangler bracnhes need to be updated before replace can be removed
+	github.com/rancher/wrangler v1.1.1 => github.com/rancher/wrangler v1.1.1-0.20230831050635-df1bd5aae9df
+	k8s.io/api => k8s.io/api v0.27.6
+	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.27.6
+	k8s.io/apimachinery => k8s.io/apimachinery v0.27.6
+	k8s.io/apiserver => k8s.io/apiserver v0.27.6
+	k8s.io/cli-runtime => k8s.io/cli-runtime v0.27.6
+	k8s.io/client-go => github.com/rancher/client-go v1.27.4-rancher1
+	k8s.io/component-base => k8s.io/component-base v0.27.6
+	k8s.io/kubectl => k8s.io/kubectl v0.27.6
+	k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.27.6
+)
 
 require (
 	github.com/rancher/aks-operator v1.2.0-rc4
 	github.com/rancher/eks-operator v1.3.0-rc3
-	github.com/rancher/fleet/pkg/apis v0.0.0-20230926084554-a0460d1b10f5
+	github.com/rancher/fleet/pkg/apis v0.0.0-20231004072816-12ebe5b9b323
 	github.com/rancher/gke-operator v1.2.0-rc2
 	github.com/rancher/norman v0.0.0-20230831160711-5de27f66385d
 	github.com/rancher/rke v1.5.0-rc8

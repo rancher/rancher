@@ -39,7 +39,7 @@ spec:
             properties:
               clusterName:
                 description: ClusterName is the name of the cluster the project belongs
-                  to.
+                  to. Immutable.
                 type: string
               containerDefaultResourceLimit:
                 description: ContainerDefaultResourceLimit is a specification for

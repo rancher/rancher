@@ -408,13 +408,13 @@ func (s *steveAPITestSuite) setupSuite(clusterName string) {
 		for _, binding := range access {
 			switch b := binding.(type) {
 			case management.ClusterRoleTemplateBinding:
-				err = users.AddClusterRoleToUser(client, mgmtCluster, userObj, b.RoleTemplateID)
+				err = users.AddClusterRoleToUser(client, mgmtCluster, userObj, b.RoleTemplateID, nil)
 				require.NoError(s.T(), err)
 			case management.ProjectRoleTemplateBinding:
-				err = users.AddProjectMember(client, projectMap[b.ProjectID], userObj, b.RoleTemplateID)
+				err = users.AddProjectMember(client, projectMap[b.ProjectID], userObj, b.RoleTemplateID, nil)
 				require.NoError(s.T(), err)
 			case rbacv1.RoleBinding:
-				_ = users.AddClusterRoleToUser(client, mgmtCluster, userObj, "cluster-member")
+				_ = users.AddClusterRoleToUser(client, mgmtCluster, userObj, "cluster-member", nil)
 				subject := rbacv1.Subject{
 					Kind: "User",
 					Name: userObj.ID,

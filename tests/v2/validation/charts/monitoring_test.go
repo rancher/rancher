@@ -205,7 +205,7 @@ func (m *MonitoringTestSuite) TestMonitoringChart() {
 	require.NoError(m.T(), err)
 
 	m.T().Logf("Editing alert manager secret receivers")
-	encodedAlertConfigWithReceiver, err := editAlertReceiver(alertManagerSecret.Data[secretPath], hostWithProtocol, urlOfHost)
+	encodedAlertConfigWithReceiver, err := editAlertReceiver(alertManagerSecret.Data[secretPath], urlOfHost)
 	require.NoError(m.T(), err)
 
 	alertManagerSecret.Data[secretPath] = encodedAlertConfigWithReceiver
@@ -226,7 +226,7 @@ func (m *MonitoringTestSuite) TestMonitoringChart() {
 	require.NoError(m.T(), err)
 
 	m.T().Logf("Editing alert manager secret routes")
-	encodedAlertConfigWithRoute, err := editAlertRoute(alertManagerSecret.Data[secretPath], hostWithProtocol, urlOfHost)
+	encodedAlertConfigWithRoute, err := editAlertRoute(alertManagerSecret.Data[secretPath])
 	require.NoError(m.T(), err)
 
 	alertManagerSecret.Data[secretPath] = encodedAlertConfigWithRoute

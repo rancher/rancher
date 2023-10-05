@@ -95,7 +95,8 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("catalog.cattle.io").resources("clusterrepos").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("clustertemplates").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("clustertemplaterevisions").verbs("*").
-		addRule().apiGroups("management.cattle.io").resources("globalroles", "globalrolebindings").verbs("*").
+		addRule().apiGroups("management.cattle.io").resources("globalrolebindings").verbs("*").
+		addRule().apiGroups("management.cattle.io").resources("globalroles").verbs("delete", "deletecollection", "get", "list", "patch", "create", "update", "watch").
 		addRule().apiGroups("management.cattle.io").resources("users", "userattribute", "groups", "groupmembers").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("podsecuritypolicytemplates").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("podsecurityadmissionconfigurationtemplates").verbs("*").

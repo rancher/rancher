@@ -11,10 +11,12 @@ import (
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
+	extauthz "github.com/rancher/rancher/tests/framework/extensions/kubeapi/authorization"
 	"github.com/rancher/rancher/tests/framework/extensions/kubeapi/rbac"
 	password "github.com/rancher/rancher/tests/framework/extensions/users/passwordgenerator"
 	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
+	authzv1 "k8s.io/api/authorization/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
@@ -68,8 +70,12 @@ func CreateUserWithRole(rancherClient *rancher.Client, user *management.User, ro
 	return createdUser, nil
 }
 
-// AddProjectMember is a helper function that adds a project role to `user`. It uses the watch.WatchWait ensure BackingNamespaceCreated is true
-func AddProjectMember(rancherClient *rancher.Client, project *management.Project, user *management.User, projectRole string) error {
+// AddProjectMember is a helper function that adds a project role to `user`. It uses the watch.WatchWait to ensure BackingNamespaceCreated is true.
+// If a list of ResourceAttributes is given, then the function blocks until all
+// attributes are allowed by SelfSubjectAccessReviews OR the function times out.
+func AddProjectMember(rancherClient *rancher.Client, project *management.Project,
+	user *management.User, projectRole string, attrs []*authzv1.ResourceAttributes) error {
+
 	role := &management.ProjectRoleTemplateBinding{
 		ProjectID:       project.ID,
 		UserPrincipalID: user.PrincipalIDs[0],
@@ -131,7 +137,17 @@ func AddProjectMember(rancherClient *rancher.Client, project *management.Project
 	if err != nil {
 		return err
 	}
-	return waitForPRTBRollout(adminClient, prtb, createOp)
+
+	err = waitForPRTBRollout(adminClient, prtb, createOp)
+	if err != nil {
+		return err
+	}
+
+	err = waitForAllowed(rancherClient, project.ClusterID, user, attrs)
+	if err != nil {
+		return fmt.Errorf("waiting for privileges: %w", err)
+	}
+	return nil
 }
 
 // RemoveProjectMember is a helper function that removes the project role from `user`
@@ -163,7 +179,11 @@ func RemoveProjectMember(rancherClient *rancher.Client, user *management.User) e
 }
 
 // AddClusterRoleToUser is a helper function that adds a cluster role to `user`.
-func AddClusterRoleToUser(rancherClient *rancher.Client, cluster *management.Cluster, user *management.User, clusterRole string) error {
+// If a list of ResourceAttributes is given, then the function blocks until all
+// attributes are allowed by SelfSubjectAccessReviews OR the function times out.
+func AddClusterRoleToUser(rancherClient *rancher.Client, cluster *management.Cluster,
+	user *management.User, clusterRole string, attrs []*authzv1.ResourceAttributes) error {
+
 	role := &management.ClusterRoleTemplateBinding{
 		ClusterID:       cluster.Resource.ID,
 		UserPrincipalID: user.PrincipalIDs[0],
@@ -229,7 +249,17 @@ func AddClusterRoleToUser(rancherClient *rancher.Client, cluster *management.Clu
 	if err != nil {
 		return err
 	}
-	return waitForCRTBRollout(adminClient, crtb, createOp)
+
+	err = waitForCRTBRollout(adminClient, crtb, createOp)
+	if err != nil {
+		return err
+	}
+
+	err = waitForAllowed(rancherClient, cluster.ID, user, attrs)
+	if err != nil {
+		return fmt.Errorf("waiting for privileges: %w", err)
+	}
+	return nil
 }
 
 // RemoveClusterRoleFromUser is a helper function that removes the user from cluster
@@ -336,4 +366,17 @@ func waitForRTBRollout(client *rancher.Client, rtbNamespace string, rtbName stri
 		return fmt.Errorf("unable to determine the status of backing rbac for %s/%s in alloted duration: %w", rtbNamespace, rtbName, err)
 	}
 	return nil
+}
+
+func waitForAllowed(rancherClient *rancher.Client, clusterID string, user *management.User, attrs []*authzv1.ResourceAttributes) error {
+	if len(attrs) == 0 {
+		return nil
+	}
+
+	userClient, err := rancherClient.AsUser(user)
+	if err != nil {
+		return fmt.Errorf("client as user %s: %w", user.Name, err)
+	}
+
+	return extauthz.WaitForAllowed(userClient, clusterID, attrs)
 }

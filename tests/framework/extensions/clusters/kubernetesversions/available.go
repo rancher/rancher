@@ -237,7 +237,7 @@ func ListAKSAvailableVersions(client *rancher.Client, cluster *v3.Cluster) (avai
 	}
 
 	var validMasterVersions []*semver.Version
-	allAvailableVersions, err := ListAKSAllVersions(client, cluster)
+	allAvailableVersions, err := ListAKSAllVersions(client, cluster.AKSConfig.AzureCredentialSecret, cluster.AKSConfig.ResourceLocation)
 
 	for _, version := range allAvailableVersions {
 		v, err := semver.NewVersion(version)
