@@ -119,6 +119,8 @@ var OriginMap = map[string]string{
 	"mirrored-curlimages-curl":                                "https://github.com/curl/curl-docker",
 	"mirrored-dexidp-dex":                                     "https://github.com/dexidp/dex",
 	"mirrored-directxman12-k8s-prometheus-adapter":            "https://hub.docker.com/r/directxman12/k8s-prometheus-adapter/tags",
+	"mirrored-elemental-operator":                             "https://github.com/rancher/elemental-operator",
+	"mirrored-elemental-seedimage-builder":                    "https://github.com/rancher/elemental-operator",
 	"mirrored-epinio-epinio-server":                           "https://github.com/epinio/epinio",
 	"mirrored-epinio-epinio-ui":                               "https://github.com/kubeops/config-syncer",
 	"mirrored-epinio-epinio-unpacker":                         "https://github.com/epinio/epinio",
