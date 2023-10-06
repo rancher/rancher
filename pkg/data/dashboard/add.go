@@ -33,10 +33,6 @@ func Add(ctx context.Context, wrangler *wrangler.Context, addLocal, removeLocal,
 		return err
 	}
 
-	if err := addClusterRepos(ctx, wrangler); err != nil {
-		return err
-	}
-
 	if err := AddFleetRoles(wrangler); err != nil {
 		return err
 	}

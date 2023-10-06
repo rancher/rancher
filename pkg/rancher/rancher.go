@@ -258,6 +258,9 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 }
 
 func (r *Rancher) Start(ctx context.Context) error {
+	if err := dashboardapi.Add(ctx, r.Wrangler); err != nil {
+		return err
+	}
 	if err := dashboardapi.Register(ctx, r.Wrangler); err != nil {
 		return err
 	}
