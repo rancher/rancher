@@ -271,12 +271,12 @@ func (r *Repository) getCurrentCommit() (plumbing.Hash, error) {
 
 // fetchAndReset is a convenience method that fetches updates from the remote repository
 // for a specific branch, and then resets the current branch to a specified commit.
-func (r *Repository) fetchAndReset(branch string) error {
+func (r *Repository) fetchAndReset(commit, branch string) error {
 	if err := r.fetch(branch); err != nil {
 		return fmt.Errorf("fetchAndReset failure: %w", err)
 	}
 
-	return r.hardReset(branch)
+	return r.hardReset(commit, branch)
 }
 
 // updateRefSpec updates the reference specification (RefSpec) in the fetch options
@@ -305,7 +305,9 @@ func (r *Repository) updateRefSpec(branch string) {
 // If the fetch operation is already up-to-date, this is not treated as an error.
 // Any other error that occurs during fetch is returned.
 func (r *Repository) fetch(branch string) error {
-	r.updateRefSpec(branch)
+	if branch != "" {
+		r.updateRefSpec(branch)
+	}
 	fetchOptions := r.fetchOpts
 
 	err := r.repoGogit.Fetch(fetchOptions)
@@ -317,29 +319,39 @@ func (r *Repository) fetch(branch string) error {
 }
 
 // hardReset performs a hard reset of the git repository to a specific commit.
-func (r *Repository) hardReset(reference string) error {
+func (r *Repository) hardReset(commit, branch string) error {
 	var err error
 	resetOpts := r.resetOpts
 
-	switch {
-	case isLocalBranch(reference):
-		branchRef, err := r.repoGogit.Reference(plumbing.ReferenceName(reference), true)
-		if err != nil {
-			return fmt.Errorf("hardReset failure, branch does not exist locally: %w", err)
+	if branch != "" {
+		switch {
+		// if it is a local branch
+		case isLocalBranch(branch):
+			branchRef, err := r.repoGogit.Reference(plumbing.ReferenceName(reference), true)
+			if err != nil {
+				return fmt.Errorf("hardReset failure, branch does not exist locally: %w", err)
+			}
+			resetOpts.Commit = branchRef.Hash()
+		// if it is HEAD
+		case branch == plumbing.HEAD.String():
+			commitHash, err := r.getCurrentCommit()
+			if err != nil {
+				return fmt.Errorf("hardReset failure to get current commit: %w", err)
+			}
+			resetOpts.Commit = commitHash
+		// if only the branch name is specified
+		default:
+			branchRef, err := r.repoGogit.Reference(plumbing.NewRemoteReferenceName("origin", branch), false)
+			if err != nil {
+				return fmt.Errorf("hardReset failure to get branch reference: %w", err)
+			}
+			resetOpts.Commit = branchRef.Hash()
 		}
-		resetOpts.Commit = branchRef.Hash()
-	case reference == plumbing.HEAD.String():
-		commitHash, err := r.getCurrentCommit()
-		if err != nil {
-			return fmt.Errorf("hardReset failure to get current commit: %w", err)
-		}
-		resetOpts.Commit = commitHash
-	default:
-		branchRef, err := r.repoGogit.Reference(plumbing.NewRemoteReferenceName("origin", reference), false)
-		if err != nil {
-			return fmt.Errorf("hardReset failure to get branch reference: %w", err)
-		}
-		resetOpts.Commit = branchRef.Hash()
+	}
+
+	if commit != "" {
+		// if it is a commit
+		resetOpts.Commit = plumbing.NewHash(commit)
 	}
 
 	// Validate hashCommit and reset options

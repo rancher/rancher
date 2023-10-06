@@ -6,9 +6,9 @@ import (
 	plumbing "github.com/go-git/go-git/v5/plumbing"
 )
 
-// Ensure will check if repo is cloned, if not the method will clone and reset to the latest commit.
-// If reseting to the latest commit is not possible it will fetch and try to reset again
-func (r *Repository) Ensure(branch string) error {
+// Ensure will check if repo is cloned, if not the method will clone and reset to the status commit.
+// If reseting to the status commit is not possible it will fetch and try to reset again
+func (r *Repository) Ensure(commit, branch string) error {
 	// clone at the current HEAD pointing branch
 	// if the HEAD pointing branch is supposed to change, then it should be done at Update or Head method
 	err := r.cloneOrOpen("")
@@ -16,15 +16,14 @@ func (r *Repository) Ensure(branch string) error {
 		return fmt.Errorf("failed to clone or open repository: %w", err)
 	}
 
-	// Try to reset to the given branch, if success exit
-	localBranchFullName := plumbing.NewBranchReferenceName(branch)
-	err = r.hardReset(localBranchFullName.String())
+	// Try to reset to the status commit, if success exit
+	err = r.hardReset(commit, "")
 	if err == nil {
 		return nil
 	}
 
-	// If we do not have the branch locally, fetch and reset
-	err = r.fetchAndReset(branch)
+	// If we do not have the commit locally, fetch and reset
+	err = r.fetchAndReset(commit, branch)
 	if err != nil {
 		return fmt.Errorf("failed to fetch and/or reset at branch: %w", err)
 	}
@@ -92,7 +91,7 @@ func (r *Repository) Update(branch string) (string, error) {
 		return commit.String(), nil
 	}
 
-	err = r.fetchAndReset(branch)
+	err = r.fetchAndReset("", branch)
 	if err != nil {
 		return "", fmt.Errorf("failed to fetch and/or reset at branch: %w", err)
 	}
