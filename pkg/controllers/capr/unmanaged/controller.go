@@ -143,7 +143,6 @@ func (h *handler) createMachineObjects(capiCluster *capi.Cluster, machineName st
 
 	if data.Bool("role-control-plane") {
 		labels[capr.ControlPlaneRoleLabel] = "true"
-		labels[capi.MachineControlPlaneNameLabel] = "true"
 	}
 	if data.Bool("role-etcd") {
 		labels[capr.EtcdRoleLabel] = "true"
