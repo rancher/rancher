@@ -419,7 +419,7 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 
 		if machinePool.ControlPlaneRole {
 			machineDeployment.Spec.Template.Labels[capr.ControlPlaneRoleLabel] = "true"
-			machineDeployment.Spec.Template.Labels[capi.MachineControlPlaneNameLabel] = "true"
+			machineDeployment.Spec.Template.Labels[capi.MachineControlPlaneLabel] = "true"
 		}
 
 		if machinePool.WorkerRole {

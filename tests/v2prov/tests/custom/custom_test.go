@@ -16,7 +16,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func Test_Provisioning_Custom_OneNode(t *testing.T) {
+func Test_Provisioning_Custom_OneNodeWithDelete(t *testing.T) {
 	if strings.ToLower(os.Getenv("DIST")) == "rke2" {
 		t.Skip()
 	}
@@ -76,6 +76,18 @@ func Test_Provisioning_Custom_OneNode(t *testing.T) {
 		t.Error(err)
 	}
 	assert.Equal(t, labels, map[string]string{"cattle.io/os": "linux", "foo": "bar", "ball": "life"})
+
+	// Delete the cluster and wait for cleanup.
+	err = clients.Provisioning.Cluster().Delete(c.Namespace, c.Name, &metav1.DeleteOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	c, err = cluster.WaitForDelete(clients, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
 	assert.NoError(t, err)
 }
