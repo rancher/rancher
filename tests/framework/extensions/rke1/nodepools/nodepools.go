@@ -126,8 +126,7 @@ func updateNodePoolQuantity(client *rancher.Client, cluster *management.Cluster,
 	return updatedNodePool, nil
 }
 
-// ScaleNodePoolNodes is a helper method that will add a new node pool to the existing RKE1 cluster, based on the nodeRoles
-// configuration. Once done, it will scale the node pool, scale it back down and then delete the node pool.
+// ScaleNodePoolNodes is a helper method that will scale the node pool to the desired quantity.
 func ScaleNodePoolNodes(client *rancher.Client, cluster *management.Cluster, node *management.Node, nodeRoles NodeRoles) (*management.NodePool, error) {
 	updatedNodePool, err := updateNodePoolQuantity(client, cluster, node, nodeRoles)
 	if err != nil {
