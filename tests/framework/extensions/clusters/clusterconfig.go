@@ -3,9 +3,7 @@ package clusters
 import (
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
-	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
 	provisioningInput "github.com/rancher/rancher/tests/framework/extensions/provisioninginput"
-	nodepools "github.com/rancher/rancher/tests/framework/extensions/rke1/nodepools"
 )
 
 type ClusterConfig struct {
@@ -13,8 +11,8 @@ type ClusterConfig struct {
 	CNI                  string                                   `json:"cni" yaml:"cni"`
 	PSACT                string                                   `json:"psact" yaml:"psact"`
 	PNI                  bool                                     `json:"pni" yaml:"pni"`
-	NodesAndRoles        *[]machinepools.NodeRoles                `json:"nodesAndRoles" yaml:"nodesAndRoles" default:"[]"`
-	NodesAndRolesRKE1    *[]nodepools.NodeRoles                   `json:"nodesAndRolesRKE1" yaml:"nodesAndRolesRKE1" default:"[]"`
+	NodePools            []provisioningInput.NodePools            `json:"nodepools" yaml:"nodepools"`
+	MachinePools         []provisioningInput.MachinePools         `json:"machinepools" yaml:"machinepools"`
 	Providers            *[]string                                `json:"providers" yaml:"providers"`
 	NodeProviders        *[]string                                `json:"nodeProviders" yaml:"nodeProviders"`
 	Hardened             bool                                     `json:"hardened" yaml:"hardened"`
@@ -33,27 +31,27 @@ type ClusterConfig struct {
 }
 
 // ConvertConfigToClusterConfig converts the config from (user) provisioning input to a cluster config
-func ConvertConfigToClusterConfig(clustersConfig *provisioningInput.Config) *ClusterConfig {
+func ConvertConfigToClusterConfig(provisioningConfig *provisioningInput.Config) *ClusterConfig {
 	var newConfig ClusterConfig
-	newConfig.AddOnConfig = clustersConfig.AddOnConfig
-	newConfig.NodesAndRoles = &clustersConfig.NodesAndRoles
-	newConfig.NodesAndRolesRKE1 = &clustersConfig.NodesAndRolesRKE1
-	newConfig.AgentEnvVars = clustersConfig.AgentEnvVars
-	newConfig.Networking = clustersConfig.Networking
-	newConfig.Advanced = clustersConfig.Advanced
-	newConfig.Providers = &clustersConfig.Providers
-	newConfig.NodeProviders = &clustersConfig.NodeProviders
-	newConfig.ClusterAgent = clustersConfig.ClusterAgent
-	newConfig.FleetAgent = clustersConfig.FleetAgent
-	newConfig.Etcd = clustersConfig.Etcd
-	newConfig.LabelsAndAnnotations = clustersConfig.LabelsAndAnnotations
-	newConfig.Registries = clustersConfig.Registries
-	newConfig.UpgradeStrategy = clustersConfig.UpgradeStrategy
+	newConfig.AddOnConfig = provisioningConfig.AddOnConfig
+	newConfig.MachinePools = provisioningConfig.MachinePools
+	newConfig.NodePools = provisioningConfig.NodePools
+	newConfig.AgentEnvVars = provisioningConfig.AgentEnvVars
+	newConfig.Networking = provisioningConfig.Networking
+	newConfig.Advanced = provisioningConfig.Advanced
+	newConfig.Providers = &provisioningConfig.Providers
+	newConfig.NodeProviders = &provisioningConfig.NodeProviders
+	newConfig.ClusterAgent = provisioningConfig.ClusterAgent
+	newConfig.FleetAgent = provisioningConfig.FleetAgent
+	newConfig.Etcd = provisioningConfig.Etcd
+	newConfig.LabelsAndAnnotations = provisioningConfig.LabelsAndAnnotations
+	newConfig.Registries = provisioningConfig.Registries
+	newConfig.UpgradeStrategy = provisioningConfig.UpgradeStrategy
 
-	newConfig.Hardened = clustersConfig.Hardened
-	newConfig.PSACT = clustersConfig.PSACT
-	newConfig.PNI = clustersConfig.PNI
-	newConfig.ClusterSSHTests = clustersConfig.ClusterSSHTests
+	newConfig.Hardened = provisioningConfig.Hardened
+	newConfig.PSACT = provisioningConfig.PSACT
+	newConfig.PNI = provisioningConfig.PNI
+	newConfig.ClusterSSHTests = provisioningConfig.ClusterSSHTests
 
 	return &newConfig
 }

@@ -16,10 +16,10 @@ import (
 
 type KdmChecksTestSuite struct {
 	suite.Suite
-	session        *session.Session
-	client         *rancher.Client
-	ns             string
-	clustersConfig *provisioninginput.Config
+	session            *session.Session
+	client             *rancher.Client
+	ns                 string
+	provisioningConfig *provisioninginput.Config
 }
 
 const (
@@ -37,8 +37,8 @@ func (k *KdmChecksTestSuite) SetupSuite() {
 
 	k.ns = defaultNamespace
 
-	k.clustersConfig = new(provisioninginput.Config)
-	config.LoadConfig(provisioninginput.ConfigurationFileKey, k.clustersConfig)
+	k.provisioningConfig = new(provisioninginput.Config)
+	config.LoadConfig(provisioninginput.ConfigurationFileKey, k.provisioningConfig)
 
 	client, err := rancher.NewClient("", testSession)
 	require.NoError(k.T(), err)
@@ -48,26 +48,26 @@ func (k *KdmChecksTestSuite) SetupSuite() {
 
 func (k *KdmChecksTestSuite) TestRKE1K8sVersions() {
 	logrus.Infof("checking for valid k8s versions..")
-	require.GreaterOrEqual(k.T(), len(k.clustersConfig.RKE1KubernetesVersions), 1)
+	require.GreaterOrEqual(k.T(), len(k.provisioningConfig.RKE1KubernetesVersions), 1)
 	// fetching all available k8s versions from rancher
 	releasedK8sVersions, _ := kubernetesversions.ListRKE1AllVersions(k.client)
-	logrus.Info("expected k8s versions : ", k.clustersConfig.RKE1KubernetesVersions)
+	logrus.Info("expected k8s versions : ", k.provisioningConfig.RKE1KubernetesVersions)
 	logrus.Info("k8s versions available on rancher server : ", releasedK8sVersions)
-	for _, expectedK8sVersion := range k.clustersConfig.RKE1KubernetesVersions {
+	for _, expectedK8sVersion := range k.provisioningConfig.RKE1KubernetesVersions {
 		require.Contains(k.T(), releasedK8sVersions, expectedK8sVersion)
 	}
 }
 
 func (k *KdmChecksTestSuite) TestProvisioningSingleNodeRKE1Clusters() {
-	require.GreaterOrEqual(k.T(), len(k.clustersConfig.Providers), 1)
-	require.GreaterOrEqual(k.T(), len(k.clustersConfig.CNIs), 1)
+	require.GreaterOrEqual(k.T(), len(k.provisioningConfig.Providers), 1)
+	require.GreaterOrEqual(k.T(), len(k.provisioningConfig.CNIs), 1)
 
 	subSession := k.session.NewSession()
 	defer subSession.Cleanup()
 
 	client, err := k.client.WithSession(subSession)
 	require.NoError(k.T(), err)
-	permutations.RunTestPermutations(&k.Suite, "oobRelease-", client, k.clustersConfig, permutations.RKE1ProvisionCluster, nil, nil)
+	permutations.RunTestPermutations(&k.Suite, "oobRelease-", client, k.provisioningConfig, permutations.RKE1ProvisionCluster, nil, nil)
 
 }
 

@@ -7,7 +7,6 @@ import (
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters/kubernetesversions"
-	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
 	provisioning "github.com/rancher/rancher/tests/framework/extensions/provisioning"
 	"github.com/rancher/rancher/tests/framework/extensions/provisioninginput"
 	"github.com/rancher/rancher/tests/framework/pkg/config"
@@ -81,7 +80,7 @@ func (a *AirGapRKE2CustomClusterTestSuite) SetupSuite() {
 }
 
 func (a *AirGapRKE2CustomClusterTestSuite) TestProvisioningRKE2CustomCluster() {
-	a.clustersConfig.NodesAndRoles = []machinepools.NodeRoles{provisioninginput.AllRolesPool}
+	a.clustersConfig.MachinePools = []provisioninginput.MachinePools{provisioninginput.AllRolesMachinePool}
 
 	tests := []struct {
 		name   string
@@ -96,7 +95,7 @@ func (a *AirGapRKE2CustomClusterTestSuite) TestProvisioningRKE2CustomCluster() {
 }
 
 func (a *AirGapRKE2CustomClusterTestSuite) TestProvisioningUpgradeRKE2CustomCluster() {
-	a.clustersConfig.NodesAndRoles = []machinepools.NodeRoles{provisioninginput.AllRolesPool}
+	a.clustersConfig.MachinePools = []provisioninginput.MachinePools{provisioninginput.AllRolesMachinePool}
 
 	rke2Versions, err := kubernetesversions.ListRKE2AllVersions(a.client)
 	require.NoError(a.T(), err)
