@@ -468,9 +468,7 @@ func completeLimit(existingLimit *v32.ContainerResourceLimit, defaultLimit *v32.
 		return nil, err
 	}
 	for key, value := range existingLimitMap {
-		if _, ok := newLimitMap[key]; ok {
-			newLimitMap[key] = value
-		}
+		newLimitMap[key] = value
 	}
 
 	if reflect.DeepEqual(existingLimitMap, newLimitMap) {
