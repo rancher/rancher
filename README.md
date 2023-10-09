@@ -12,7 +12,7 @@ Rancher is an open source container management platform built for organizations 
 
 ## Latest Release
 * v2.7
-  * Latest - v2.7.7 - `rancher/rancher:v2.7.7` / `rancher/rancher:latest` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.7.7).
+  * Latest - v2.7.8 - `rancher/rancher:v2.7.8` / `rancher/rancher:latest` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.7.8).
   * Stable - v2.7.6 - `rancher/rancher:v2.7.6` / `rancher/rancher:stable` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.7.6).
 * v2.6
   * Latest - v2.6.13 - `rancher/rancher:v2.6.13` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.6.13).
