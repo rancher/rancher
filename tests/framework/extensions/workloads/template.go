@@ -4,18 +4,22 @@ import (
 	"fmt"
 
 	appv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // NewContainer is a contructor that creates a container for a pod template i.e. corev1.PodTemplateSpec
-func NewContainer(containerName, image string, imagePullPolicy corev1.PullPolicy, volumeMounts []corev1.VolumeMount, envFrom []corev1.EnvFromSource) corev1.Container {
+func NewContainer(containerName, image string, imagePullPolicy corev1.PullPolicy, volumeMounts []corev1.VolumeMount, envFrom []corev1.EnvFromSource, command []string, securityContext *corev1.SecurityContext, args []string) corev1.Container {
 	return corev1.Container{
 		Name:            containerName,
 		Image:           image,
 		ImagePullPolicy: imagePullPolicy,
 		VolumeMounts:    volumeMounts,
 		EnvFrom:         envFrom,
+		Command:         command,
+		Args:            args,
+		SecurityContext: securityContext,
 	}
 }
 
@@ -86,4 +90,31 @@ func NewDaemonSetTemplate(daemonsetName string, namespace string, template corev
 			Template: template,
 		},
 	}
+}
+
+// NewJobTemplate is a constructor that creates a job template.
+func NewJobTemplate(jobName string, namespace string) *batchv1.Job {
+	return &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: jobName,
+		},
+		Spec: batchv1.JobSpec{
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					RestartPolicy:      "Never",
+					ServiceAccountName: "",
+					Containers:         []corev1.Container{},
+					Volumes: []corev1.Volume{
+						{
+							Name: "config",
+							VolumeSource: corev1.VolumeSource{
+								EmptyDir: &corev1.EmptyDirVolumeSource{},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
 }
