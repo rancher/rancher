@@ -6,11 +6,11 @@ import (
 	plumbing "github.com/go-git/go-git/v5/plumbing"
 )
 
-// Ensure will check if repo is cloned, if not the method will clone and reset to the latest commit.
-// If reseting to the latest commit is not possible it will fetch and try to reset again
+// Ensure will check if repo is cloned, if not the method will clone and checkout to the ClusterRepo.Status.Commit.
+// If checking out to the given commit is not possible it will fetch and try to checkout again
 func (r *Repository) Ensure(commit string) error {
-	// clone at the current HEAD pointing branch
-	// if the HEAD pointing branch is supposed to change, then it should be done at Update or Head method
+	// fresh clone or open
+	// if the HEAD pointing commit is supposed to change, then it should be done at Update or Head method
 	err := r.cloneOrOpen("")
 	if err != nil {
 		return fmt.Errorf("failed to clone or open repository: %w", err)
@@ -50,8 +50,8 @@ func (r *Repository) Head(branch string) (string, error) {
 }
 
 // CheckUpdate will check if rancher is in bundled mode,
-// if it is not in bundled mode, will make an update.
-// if it is in bundled mode, will just call Head method.
+// if it is not in bundled mode, it will make an update.
+// if it is in bundled mode, will just call Head method since we never update on this mode.
 func (r *Repository) CheckUpdate(branch, systemCatalogMode string) (string, error) {
 	if isBundled(r.Directory) && systemCatalogMode == "bundled" {
 		return r.Head(branch)
