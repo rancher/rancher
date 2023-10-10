@@ -8,7 +8,7 @@ import (
 
 // Ensure will check if repo is cloned, if not the method will clone and reset to the latest commit.
 // If reseting to the latest commit is not possible it will fetch and try to reset again
-func (r *Repository) Ensure(branch string) error {
+func (r *Repository) Ensure(commit string) error {
 	// clone at the current HEAD pointing branch
 	// if the HEAD pointing branch is supposed to change, then it should be done at Update or Head method
 	err := r.cloneOrOpen("")
@@ -17,14 +17,13 @@ func (r *Repository) Ensure(branch string) error {
 	}
 
 	// Try to reset to the given branch, if success exit
-	localBranchFullName := plumbing.NewBranchReferenceName(branch)
-	err = r.hardReset(localBranchFullName.String())
+	err = r.checkoutCommit(commit)
 	if err == nil {
 		return nil
 	}
 
-	// If we do not have the branch locally, fetch and reset
-	err = r.fetchAndReset(branch)
+	// If we do not have the commit locally, fetch and reset to it
+	err = r.fetchAndReset(commit)
 	if err != nil {
 		return fmt.Errorf("failed to fetch and/or reset at branch: %w", err)
 	}
