@@ -1,4 +1,4 @@
-//go:build (validation || infra.rke1 || cluster.nodedriver || extended) && !infra.any && !infra.aks && !infra.eks && !infra.gke && !infra.rke2k3s && !cluster.any && !cluster.custom && !sanity && !stress
+//go:build (validation || infra.rke1 || cluster.custom || stress) && !infra.any && !infra.aks && !infra.eks && !infra.gke && !infra.rke2k3s && !cluster.any && !cluster.nodedriver && !sanity && !extended
 
 package nodescaling
 
@@ -15,18 +15,18 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-type RKE1NodeScalingTestSuite struct {
+type RKE1CustomClusterNodeScalingTestSuite struct {
 	suite.Suite
 	client        *rancher.Client
 	session       *session.Session
 	scalingConfig *scalinginput.Config
 }
 
-func (s *RKE1NodeScalingTestSuite) TearDownSuite() {
+func (s *RKE1CustomClusterNodeScalingTestSuite) TearDownSuite() {
 	s.session.Cleanup()
 }
 
-func (s *RKE1NodeScalingTestSuite) SetupSuite() {
+func (s *RKE1CustomClusterNodeScalingTestSuite) SetupSuite() {
 	testSession := session.NewSession()
 	s.session = testSession
 
@@ -39,13 +39,19 @@ func (s *RKE1NodeScalingTestSuite) SetupSuite() {
 	s.client = client
 }
 
-func (s *RKE1NodeScalingTestSuite) TestScalingRKE1NodePools() {
+func (s *RKE1CustomClusterNodeScalingTestSuite) TestScalingRKE1CustomClusterNodes() {
 	nodeRolesEtcd := nodepools.NodeRoles{
 		Etcd:     true,
 		Quantity: 1,
 	}
 
 	nodeRolesControlPlane := nodepools.NodeRoles{
+		ControlPlane: true,
+		Quantity:     1,
+	}
+
+	nodeRolesEtcdControlPlane := nodepools.NodeRoles{
+		Etcd:         true,
 		ControlPlane: true,
 		Quantity:     1,
 	}
@@ -66,9 +72,10 @@ func (s *RKE1NodeScalingTestSuite) TestScalingRKE1NodePools() {
 		client    *rancher.Client
 	}{
 		{"Scaling control plane by 1", nodeRolesControlPlane, s.client},
-		{"Scaling etcd node by 1", nodeRolesEtcd, s.client},
+		{"Scaling etcd by 1", nodeRolesEtcd, s.client},
+		{"Scaling etcd and control plane by 1", nodeRolesEtcdControlPlane, s.client},
 		{"Scaling worker by 1", nodeRolesWorker, s.client},
-		{"Scaling worker node machine by 2", nodeRolesTwoWorkers, s.client},
+		{"Scaling worker by 2", nodeRolesTwoWorkers, s.client},
 	}
 
 	for _, tt := range tests {
@@ -76,24 +83,24 @@ func (s *RKE1NodeScalingTestSuite) TestScalingRKE1NodePools() {
 		require.NoError(s.T(), err)
 
 		s.Run(tt.name, func() {
-			scalingRKE1NodePools(s.T(), s.client, clusterID, tt.nodeRoles)
+			scalingRKE1CustomClusterPools(s.T(), s.client, clusterID, s.scalingConfig.NodeProvider, tt.nodeRoles)
 		})
 	}
 }
 
-func (s *RKE1NodeScalingTestSuite) TestScalingRKE1NodePoolsDynamicInput() {
-	if s.scalingConfig.NodePools.NodeRoles == nil {
+func (s *RKE1CustomClusterNodeScalingTestSuite) TestScalingRKE1CustomClusterNodesDynamicInput() {
+	if s.scalingConfig.MachinePools.NodeRoles == nil {
 		s.T().Skip()
 	}
 
 	clusterID, err := clusters.GetClusterIDByName(s.client, s.client.RancherConfig.ClusterName)
 	require.NoError(s.T(), err)
 
-	scalingRKE1NodePools(s.T(), s.client, clusterID, *s.scalingConfig.NodePools.NodeRoles)
+	scalingRKE1CustomClusterPools(s.T(), s.client, clusterID, s.scalingConfig.NodeProvider, *s.scalingConfig.NodePools.NodeRoles)
 }
 
 // In order for 'go test' to run this suite, we need to create
 // a normal test function and pass our suite to suite.Run
-func TestRKE1NodeScalingTestSuite(t *testing.T) {
-	suite.Run(t, new(RKE1NodeScalingTestSuite))
+func TestRKE1CustomClusterNodeScalingTestSuite(t *testing.T) {
+	suite.Run(t, new(RKE1CustomClusterNodeScalingTestSuite))
 }
