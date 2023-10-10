@@ -269,8 +269,8 @@ func (r *Repository) getCurrentCommit() (plumbing.Hash, error) {
 	return headRef.Hash(), nil
 }
 
+// checkoutCommit will checkout to a given commit and leave the local repo at a Detached HEAD state.
 func (r *Repository) checkoutCommit(commit string) error {
-
 	checkOpts := gogit.CheckoutOptions{
 		Hash: plumbing.NewHash(commit),
 	}
@@ -289,7 +289,7 @@ func (r *Repository) checkoutCommit(commit string) error {
 }
 
 // fetchAndReset is a convenience method that fetches updates from the remote repository
-// for a specific branch, and then resets the current branch to a specified commit.
+// for a specific reference(commit or branch), and then resets the current reference.
 func (r *Repository) fetchAndReset(reference string) error {
 	if err := r.fetch(reference); err != nil {
 		return fmt.Errorf("fetchAndReset failure: %w", err)
@@ -300,16 +300,15 @@ func (r *Repository) fetchAndReset(reference string) error {
 // updateRefSpec updates the reference specification (RefSpec) in the fetch options
 // of the repository operation.
 //   - If a branch name is provided, it sets the RefSpec to fetch that specific branch.
-//   - Otherwise, it sets the RefSpec to fetch all branches.
-//
-// fetching the last commit of one branch is faster than fetching from all branches.
+//   - If a commit is provided, it sets the RefSpec to fetch that specific commit.
+//   - If nothing is provided or a invalid commit Hash it will throw an error.
 func (r *Repository) updateRefSpec(reference string) error {
 	var newRefSpec string
 
 	mode := checkReference(reference)
 	switch mode {
 	case CommitMode:
-		newRefSpec = fmt.Sprintf("+%s*:refs/remotes/origin/*", reference)
+		newRefSpec = fmt.Sprintf("+%s:refs/remotes/origin/*", reference)
 	case BranchMode:
 		newRefSpec = fmt.Sprintf("+refs/heads/%s:refs/remotes/origin/%s", reference, reference)
 	case "":
@@ -324,14 +323,17 @@ func (r *Repository) updateRefSpec(reference string) error {
 	return nil
 }
 
-// fetch fetches updates from the remote repository for a specific branch.
+// fetch fetches updates from the remote repository for a specific (branch or commit).
 // If the fetch operation is already up-to-date, this is not treated as an error.
 // Any other error that occurs during fetch is returned.
 func (r *Repository) fetch(reference string) error {
-	r.updateRefSpec(reference)
+	err := r.updateRefSpec(reference)
+	if err != nil {
+		return fmt.Errorf("fetch failed on updating refspec: %w", err)
+	}
 	fetchOptions := r.fetchOpts
 
-	err := r.repoGogit.Fetch(fetchOptions)
+	err = r.repoGogit.Fetch(fetchOptions)
 	if err != nil && err != gogit.NoErrAlreadyUpToDate && err != transport.ErrEmptyUploadPackRequest {
 		return fmt.Errorf("fetch failure: %w", err)
 	}
@@ -339,7 +341,7 @@ func (r *Repository) fetch(reference string) error {
 	return nil
 }
 
-// hardReset performs a hard reset of the git repository to a specific commit.
+// hardReset performs a hard reset of the git repository to a specific commit or branch.
 func (r *Repository) hardReset(reference string) error {
 	var err error
 	resetOpts := r.resetOpts
@@ -357,9 +359,10 @@ func (r *Repository) hardReset(reference string) error {
 			return fmt.Errorf("hardReset failure to get current commit: %w", err)
 		}
 		resetOpts.Commit = commitHash
-	case isValidCommitHash(reference):
+	case plumbing.IsHash(reference):
 		resetOpts.Commit = plumbing.NewHash(reference)
 	default:
+		// When we don't have the branch locally, get the remote reference for it and make a local reference
 		branchRef, err := r.repoGogit.Reference(plumbing.NewRemoteReferenceName("origin", reference), false)
 		if err != nil {
 			return fmt.Errorf("hardReset failure to get branch reference: %w", err)
@@ -367,7 +370,7 @@ func (r *Repository) hardReset(reference string) error {
 		resetOpts.Commit = branchRef.Hash()
 	}
 
-	// Validate hashCommit and reset options
+	// Validate reset options
 	err = resetOpts.Validate(r.repoGogit)
 	if err != nil {
 		return fmt.Errorf("hardReset validation failure: %w", err)

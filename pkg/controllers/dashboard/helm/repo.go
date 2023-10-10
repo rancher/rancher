@@ -134,7 +134,7 @@ func toOwnerObject(namespace string, owner metav1.OwnerReference) runtime.Object
 // checks are made to determine whether the repo exists and is ready.
 func (r *repoHandler) ensure(repoSpec *catalog.RepoSpec, status catalog.RepoStatus, metadata *metav1.ObjectMeta) (catalog.RepoStatus, error) {
 	// related ClusterRepo Status is not updated by download handler yet
-	if status.Branch == "" || status.Branch != repoSpec.GitBranch {
+	if status.Commit == "" {
 		return status, nil
 	}
 

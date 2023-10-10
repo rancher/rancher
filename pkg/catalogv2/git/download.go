@@ -7,7 +7,7 @@ import (
 )
 
 // Ensure will check if repo is cloned, if not the method will clone and checkout to the ClusterRepo.Status.Commit.
-// If checking out to the given commit is not possible it will fetch and try to checkout again
+// If checking out to the given commit is not possible it will fetch and reset to the commit.
 func (r *Repository) Ensure(commit string) error {
 	// fresh clone or open
 	// if the HEAD pointing commit is supposed to change, then it should be done at Update or Head method
@@ -16,7 +16,7 @@ func (r *Repository) Ensure(commit string) error {
 		return fmt.Errorf("failed to clone or open repository: %w", err)
 	}
 
-	// Try to reset to the given branch, if success exit
+	// Try to checkout to the given commit, if success exit
 	err = r.checkoutCommit(commit)
 	if err == nil {
 		return nil

@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	plumbing "github.com/go-git/go-git/v5/plumbing"
 )
 
 const (
@@ -42,31 +44,12 @@ func isLocalBranch(branch string) bool {
 	return strings.HasPrefix(branch, localReferenceBranch)
 }
 
-// isValidCommitHash checks if the provided input string is a valid git commit hash
-//   - true: if valid
-//   - false; if invalid
-func isValidCommitHash(input string) bool {
-	// Define a regular expression pattern for Git commit hashes.
-	commitHashPattern := "^[0-9a-fA-F]{40}$"
-
-	// Compile the regular expression pattern.
-	regex, err := regexp.Compile(commitHashPattern)
-	if err != nil {
-		// Handle regex compilation error, if any.
-		fmt.Println("Error compiling regex:", err)
-		return false
-	}
-
-	// Use the regular expression to match the input string.
-	return regex.MatchString(input)
-}
-
 // checkReference will test if the provided reference is a commit or a branch.
 // Returns a constant string telling what the reference is.
 //   - "commit"; Valid Commit Hash;
 //   - "branch";
 func checkReference(reference string) string {
-	commit := isValidCommitHash(reference)
+	commit := plumbing.IsHash(reference)
 	if commit {
 		return CommitMode
 	}
