@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+set -e
+
 cd $(dirname $0)/.. 
 mkdir -p bin
 
@@ -9,6 +11,10 @@ if [ -z "${DRONE_TAG}" ]; then
     exit 0
 fi
 
+skopeoinspect() {
+    skopeo inspect --retry-times 15 "$@"
+}
+
 DIGEST_TEMPLATE_FILENAME="./bin/rancher-images-digests-linux"
 IMAGES_FILE=$(mktemp)
 IMAGES_URL="https://github.com/rancher/rancher/releases/download/${DRONE_TAG}/rancher-images.txt"
@@ -16,7 +22,7 @@ IMAGES_URL="https://github.com/rancher/rancher/releases/download/${DRONE_TAG}/ra
 wget --retry-connrefused --waitretry=1 --read-timeout=20 --timeout=15 -t 10 $IMAGES_URL -O $IMAGES_FILE
 
 for image in $(cat $IMAGES_FILE); do
-    INSPECT_JSON=$(skopeo inspect "docker://${image}" --raw)
+    INSPECT_JSON=$(skopeoinspect "docker://${image}" --raw)
     MEDIATYPE=$(echo "${INSPECT_JSON}" | jq -r .mediaType)
     echo "Image: ${image}, mediaType: ${MEDIATYPE}"
     if [ "${MEDIATYPE}" = "application/vnd.docker.distribution.manifest.list.v2+json" ] || [ "${MEDIATYPE}" = "application/vnd.oci.image.index.v1+json" ]; then
@@ -28,10 +34,10 @@ for image in $(cat $IMAGES_FILE); do
         done
     else
         for arch in "${archs[@]}"; do
-            INSPECT_JSON=$(skopeo --override-arch $arch inspect "docker://${image}")
+            INSPECT_JSON=$(skopeoinspect --override-arch $arch "docker://${image}")
             if echo "${INSPECT_JSON}" | jq -e --arg ARCH "$arch" '.Architecture == $ARCH' >/dev/null 2>&1; then
                 echo "Image: ${image}, arch ${arch}, FOUND"
-                DIGEST=$(skopeo --override-arch $arch inspect "docker://${image}" --raw | sha256sum | awk '{ print $1 }')
+                DIGEST=$(skopeoinspect --override-arch $arch "docker://${image}" --raw | sha256sum | awk '{ print $1 }')
                 echo "docker.io/${image} sha256:${DIGEST}" >> "${DIGEST_TEMPLATE_FILENAME}-${arch}.txt"
             else
                 echo "Image: ${image}, arch ${arch}, NOT_FOUND"
