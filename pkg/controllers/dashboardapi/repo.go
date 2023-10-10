@@ -1,4 +1,4 @@
-package dashboard
+package dashboardapi
 
 import (
 	"context"
@@ -30,9 +30,19 @@ func addClusterRepo(wrangler *wrangler.Context, repoName, branchName string) err
 				GitBranch: branchName,
 			},
 		})
-	} else if err == nil && repo.Spec.GitBranch != branchName {
-		repo.Spec.GitBranch = branchName
-		_, err = wrangler.Catalog.ClusterRepo().Update(repo)
+	} else if err == nil {
+		if repo.Spec.GitBranch != branchName {
+			repo.Spec.GitBranch = branchName
+			repo, err = wrangler.Catalog.ClusterRepo().Update(repo)
+			if err != nil {
+				return err
+			}
+		}
+
+		if repo.Status.Commit != "" {
+			repo.Status.Commit = ""
+			_, err = wrangler.Catalog.ClusterRepo().UpdateStatus(repo)
+		}
 	}
 
 	return err
