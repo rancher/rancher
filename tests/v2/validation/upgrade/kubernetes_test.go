@@ -7,6 +7,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters/bundledclusters"
+	"github.com/rancher/rancher/tests/framework/extensions/defaults"
 	nodestat "github.com/rancher/rancher/tests/framework/extensions/nodes"
 	"github.com/rancher/rancher/tests/framework/extensions/provisioninginput"
 	psadeploy "github.com/rancher/rancher/tests/framework/extensions/psact"
@@ -119,9 +120,9 @@ func (u *UpgradeKubernetesTestSuite) testUpgradeSingleCluster(clusterName, versi
 		validateNodepoolVersions(u.T(), client, updatedCluster, version, !isCheckingCurrentCluster)
 	}
 	if strings.Contains(versionToUpgrade, rke1KubeVersionCheck) {
-		err = nodestat.AllManagementNodeReady(client, clusterMeta.ID)
+		err = nodestat.AllManagementNodeReady(client, clusterMeta.ID, defaults.ThirtyMinuteTimeout)
 	} else if strings.Contains(versionToUpgrade, rke2KubeVersionCheck) || strings.Contains(versionToUpgrade, k3sKubeVersionCheck) {
-		err = nodestat.AllMachineReady(client, clusterMeta.ID)
+		err = nodestat.AllMachineReady(client, clusterMeta.ID, defaults.TenMinuteTimeout)
 	}
 	require.NoError(u.T(), err)
 
