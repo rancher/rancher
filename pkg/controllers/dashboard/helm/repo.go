@@ -150,7 +150,7 @@ func (r *repoHandler) ensure(repoSpec *catalog.RepoSpec, status catalog.RepoStat
 		return status, err
 	}
 
-	return status, repo.Ensure(status.Commit)
+	return status, repo.Ensure(status.Commit, status.Branch)
 }
 
 func (r *repoHandler) createOrUpdateMap(namespace, name string, index *repo.IndexFile, owner metav1.OwnerReference) (*corev1.ConfigMap, error) {

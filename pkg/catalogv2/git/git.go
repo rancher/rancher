@@ -297,29 +297,43 @@ func (r *Repository) fetchAndReset(reference string) error {
 	return r.hardReset(reference)
 }
 
+// fetchAndReset is a convenience method that fetches updates from the remote repository
+// for a specific reference(commit or branch), and then resets the current reference.
+func (r *Repository) fetchAndResetByCommitAndBranch(commit, branch string) error {
+	if err := r.fetchByCommitAndBranch(commit, branch); err != nil {
+		return fmt.Errorf("fetchAndReset failure: %w", err)
+	}
+	return r.hardReset(commit)
+}
+
 // updateRefSpec updates the reference specification (RefSpec) in the fetch options
 // of the repository operation.
 //   - If a branch name is provided, it sets the RefSpec to fetch that specific branch.
 //   - If a commit is provided, it sets the RefSpec to fetch that specific commit.
 //   - If nothing is provided or a invalid commit Hash it will throw an error.
-func (r *Repository) updateRefSpec(reference string) error {
-	var newRefSpec string
+func (r *Repository) updateRefSpec(reference string) {
 
-	mode := checkReference(reference)
-	switch mode {
-	case CommitMode:
-		newRefSpec = fmt.Sprintf("+%s:refs/remotes/origin/*", reference)
-	case BranchMode:
-		newRefSpec = fmt.Sprintf("+refs/heads/%s:refs/remotes/origin/%s", reference, reference)
-	case "":
-		return fmt.Errorf("could not update refspec, provide a branch or a valid commit")
-	}
+	newRefSpec := fmt.Sprintf("+refs/heads/%s:refs/remotes/origin/%s", reference, reference)
 
 	if len(r.fetchOpts.RefSpecs) > 0 {
 		r.fetchOpts.RefSpecs[0] = config.RefSpec(newRefSpec)
 	} else {
 		r.fetchOpts.RefSpecs = []config.RefSpec{config.RefSpec(newRefSpec)}
 	}
+}
+
+// fetch fetches updates from the remote repository for a specific (branch or commit).
+// If the fetch operation is already up-to-date, this is not treated as an error.
+// Any other error that occurs during fetch is returned.
+func (r *Repository) fetchByCommitAndBranch(commit, branch string) error {
+	fetchOptions := r.fetchOpts
+	fetchOptions.RefSpecs = []config.RefSpec{config.RefSpec(fmt.Sprintf("+%s:refs/remotes/origin/%s", commit, branch))}
+
+	err := r.repoGogit.Fetch(fetchOptions)
+	if err != nil && err != gogit.NoErrAlreadyUpToDate && err != transport.ErrEmptyUploadPackRequest {
+		return fmt.Errorf("fetch failure: %w", err)
+	}
+
 	return nil
 }
 
@@ -327,13 +341,10 @@ func (r *Repository) updateRefSpec(reference string) error {
 // If the fetch operation is already up-to-date, this is not treated as an error.
 // Any other error that occurs during fetch is returned.
 func (r *Repository) fetch(reference string) error {
-	err := r.updateRefSpec(reference)
-	if err != nil {
-		return fmt.Errorf("fetch failed on updating refspec: %w", err)
-	}
+	r.updateRefSpec(reference)
 	fetchOptions := r.fetchOpts
 
-	err = r.repoGogit.Fetch(fetchOptions)
+	err := r.repoGogit.Fetch(fetchOptions)
 	if err != nil && err != gogit.NoErrAlreadyUpToDate && err != transport.ErrEmptyUploadPackRequest {
 		return fmt.Errorf("fetch failure: %w", err)
 	}

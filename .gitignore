@@ -35,3 +35,5 @@ all.yaml
 kustomization.yaml
 kontainer-engine
 **/coverage.out
+Dockerfile.dapper*
+rancher_debug

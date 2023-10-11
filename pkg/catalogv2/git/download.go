@@ -8,7 +8,7 @@ import (
 
 // Ensure will check if repo is cloned, if not the method will clone and checkout to the ClusterRepo.Status.Commit.
 // If checking out to the given commit is not possible it will fetch and reset to the commit.
-func (r *Repository) Ensure(commit string) error {
+func (r *Repository) Ensure(commit, branch string) error {
 	// fresh clone or open
 	// if the HEAD pointing commit is supposed to change, then it should be done at Update or Head method
 	err := r.cloneOrOpen("")
@@ -23,7 +23,7 @@ func (r *Repository) Ensure(commit string) error {
 	}
 
 	// If we do not have the commit locally, fetch and reset to it
-	err = r.fetchAndReset(commit)
+	err = r.fetchAndResetByCommitAndBranch(commit, branch)
 	if err != nil {
 		return fmt.Errorf("failed to fetch and/or reset at branch: %w", err)
 	}

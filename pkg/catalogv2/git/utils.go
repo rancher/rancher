@@ -10,8 +10,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-
-	plumbing "github.com/go-git/go-git/v5/plumbing"
 )
 
 const (
@@ -42,18 +40,6 @@ func isBundled(directory string) bool {
 
 func isLocalBranch(branch string) bool {
 	return strings.HasPrefix(branch, localReferenceBranch)
-}
-
-// checkReference will test if the provided reference is a commit or a branch.
-// Returns a constant string telling what the reference is.
-//   - "commit"; Valid Commit Hash;
-//   - "branch";
-func checkReference(reference string) string {
-	commit := plumbing.IsHash(reference)
-	if commit {
-		return CommitMode
-	}
-	return BranchMode
 }
 
 // isGitSSH checks if the url is parsable to ssh url standard
