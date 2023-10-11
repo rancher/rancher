@@ -55,8 +55,8 @@ func (r *Repository) Head(branch string) (string, error) {
 }
 
 // CheckUpdate will check if rancher is in bundled mode,
-// if it is not in bundled mode, will make an update.
-// if it is in bundled mode, will just call Head method.
+// if it is not in bundled mode, it will make an update.
+// if it is in bundled mode, will just call Head method since we never update on this mode.
 func (r *Repository) CheckUpdate(branch, systemCatalogMode string) (string, error) {
 	if isBundled(r.Directory) && systemCatalogMode == "bundled" {
 		return r.Head(branch)

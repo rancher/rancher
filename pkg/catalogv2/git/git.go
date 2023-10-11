@@ -301,7 +301,7 @@ func (r *Repository) updateRefSpec(branch string) {
 	}
 }
 
-// fetch fetches updates from the remote repository for a specific branch.
+// fetch fetches updates from the remote repository for a specific (branch).
 // If the fetch operation is already up-to-date, this is not treated as an error.
 // Any other error that occurs during fetch is returned.
 func (r *Repository) fetch(branch string) error {
@@ -316,7 +316,7 @@ func (r *Repository) fetch(branch string) error {
 	return nil
 }
 
-// hardReset performs a hard reset of the git repository to a specific commit.
+// hardReset performs a hard reset of the git repository to a specific commit or branch or HEAD reference.
 func (r *Repository) hardReset(reference string) error {
 	var err error
 	resetOpts := r.resetOpts
@@ -342,7 +342,7 @@ func (r *Repository) hardReset(reference string) error {
 		resetOpts.Commit = branchRef.Hash()
 	}
 
-	// Validate hashCommit and reset options
+	// Validate reset options
 	err = resetOpts.Validate(r.repoGogit)
 	if err != nil {
 		return fmt.Errorf("hardReset validation failure: %w", err)
