@@ -325,7 +325,10 @@ func (r *Repository) hardReset(reference string) error {
 			return fmt.Errorf("hardReset failure to get current commit: %w", err)
 		}
 		resetOpts.Commit = commitHash
+	case plumbing.IsHash(reference):
+		resetOpts.Commit = plumbing.NewHash(reference)
 	default:
+		// When we don't have the branch locally, get the remote reference for it and make a local reference
 		branchRef, err := r.repoGogit.Reference(plumbing.NewRemoteReferenceName("origin", reference), false)
 		if err != nil {
 			return fmt.Errorf("hardReset failure to get branch reference: %w", err)
