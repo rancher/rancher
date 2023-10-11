@@ -215,7 +215,7 @@ func (npmgr *netpolMgr) handleHostNetwork(clusterNamespace string) error {
 		podCIDRFirstIP, _, err := net.ParseCIDR(node.Spec.PodCIDR)
 		if err != nil {
 			logrus.Debugf("netpolMgr: handleHostNetwork: node=%+v", node)
-			logrus.Errorf("netpolMgr: handleHostNetwork: couldn't parse PodCIDR(%v) for node %v err=%v", node.Spec.PodCIDR, node.Name, err)
+			logrus.Warnf("netpolMgr: handleHostNetwork: couldn't parse PodCIDR(%v) for node %v err=%v", node.Spec.PodCIDR, node.Name, err)
 			continue
 		}
 		ipBlock := knetworkingv1.IPBlock{
