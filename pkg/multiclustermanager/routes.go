@@ -93,12 +93,14 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 	unauthed.PathPrefix("/v3-public").Handler(publicAPI)
 
 	// Authenticated routes
+	impersonatingAuth := auth.ToMiddleware(requests.NewImpersonatingAuth(sar.NewSubjectAccessReview(clusterManager)))
+	saAuth := auth.ToMiddleware(requests.NewDownstreamTokenReviewAuth(scaledContext))
+
 	authed := mux.NewRouter()
 	authed.UseEncodedPath()
-	impersonatingAuth := auth.ToMiddleware(requests.NewImpersonatingAuth(sar.NewSubjectAccessReview(clusterManager)))
 	accessControlHandler := rbac.NewAccessControlHandler()
 
-	authed.Use(mux.MiddlewareFunc(impersonatingAuth))
+	authed.Use(mux.MiddlewareFunc(saAuth.Chain(impersonatingAuth)))
 	authed.Use(mux.MiddlewareFunc(accessControlHandler))
 	authed.Use(requests.NewAuthenticatedFilter)
 
@@ -109,7 +111,7 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 	authed.Path("/v3/tokenreview").Methods(http.MethodPost).Handler(&webhook.TokenReviewer{})
 	authed.Path("/metrics/{clusterID}").Handler(metricsHandler)
 	authed.Path(supportconfigs.Endpoint).Handler(&supportConfigGenerator)
-	authed.PathPrefix("/k8s/clusters/").Handler(k8sProxy)
+	authed.PathPrefix("/k8s/clusters/{clusterID}").Handler(k8sProxy)
 	authed.PathPrefix("/meta/proxy").Handler(metaProxy)
 	authed.PathPrefix("/v1-telemetry").Handler(telemetry.NewProxy())
 	authed.PathPrefix("/v3/identit").Handler(tokenAPI)
@@ -128,6 +130,7 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 
 	unauthed.NotFoundHandler = authed
 	authed.NotFoundHandler = metricsAuthed
+
 	return func(next http.Handler) http.Handler {
 		metricsAuthed.NotFoundHandler = next
 		return unauthed
