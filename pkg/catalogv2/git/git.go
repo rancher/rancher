@@ -270,29 +270,20 @@ func (r *Repository) getCurrentCommit() (plumbing.Hash, error) {
 }
 
 // fetchAndReset is a convenience method that fetches updates from the remote repository
-// for a specific branch, and then resets the current branch to a specified commit.
+// for a specific branch, and then resets the current branch.
 func (r *Repository) fetchAndReset(branch string) error {
 	if err := r.fetch(branch); err != nil {
 		return fmt.Errorf("fetchAndReset failure: %w", err)
 	}
-
 	return r.hardReset(branch)
 }
 
-// updateRefSpec updates the reference specification (RefSpec) in the fetch options
+// updateRefSpec updates the branch specification (RefSpec) in the fetch options
 // of the repository operation.
 //   - If a branch name is provided, it sets the RefSpec to fetch that specific branch.
-//   - Otherwise, it sets the RefSpec to fetch all branches.
-//
-// fetching the last commit of one branch is faster than fetching from all branches.
 func (r *Repository) updateRefSpec(branch string) {
-	var newRefSpec string
 
-	if branch != "" {
-		newRefSpec = fmt.Sprintf("+refs/heads/%s:refs/remotes/origin/%s", branch, branch)
-	} else {
-		newRefSpec = "+refs/heads/*:refs/remotes/origin/*"
-	}
+	newRefSpec := fmt.Sprintf("+refs/heads/%s:refs/remotes/origin/%s", branch, branch)
 
 	if len(r.fetchOpts.RefSpecs) > 0 {
 		r.fetchOpts.RefSpecs[0] = config.RefSpec(newRefSpec)
