@@ -95,12 +95,17 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 	// Authenticated routes
 	impersonatingAuth := auth.ToMiddleware(requests.NewImpersonatingAuth(sar.NewSubjectAccessReview(clusterManager)))
 	saAuth := auth.ToMiddleware(requests.NewDownstreamTokenReviewAuth(scaledContext))
+	accessControlHandler := rbac.NewAccessControlHandler()
+
+	saauthed := mux.NewRouter()
+	saauthed.UseEncodedPath()
+	saauthed.PathPrefix("/k8s/clusters/{clusterID}/apis/authentication.k8s.io/v1/tokenreviews").Handler(k8sProxy)
+	saauthed.Use(mux.MiddlewareFunc(saAuth.Chain(impersonatingAuth)))
 
 	authed := mux.NewRouter()
 	authed.UseEncodedPath()
-	accessControlHandler := rbac.NewAccessControlHandler()
 
-	authed.Use(mux.MiddlewareFunc(saAuth.Chain(impersonatingAuth)))
+	authed.Use(mux.MiddlewareFunc(impersonatingAuth))
 	authed.Use(mux.MiddlewareFunc(accessControlHandler))
 	authed.Use(requests.NewAuthenticatedFilter)
 
@@ -111,7 +116,7 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 	authed.Path("/v3/tokenreview").Methods(http.MethodPost).Handler(&webhook.TokenReviewer{})
 	authed.Path("/metrics/{clusterID}").Handler(metricsHandler)
 	authed.Path(supportconfigs.Endpoint).Handler(&supportConfigGenerator)
-	authed.PathPrefix("/k8s/clusters/{clusterID}").Handler(k8sProxy)
+	authed.PathPrefix("/k8s/clusters/").Handler(k8sProxy)
 	authed.PathPrefix("/meta/proxy").Handler(metaProxy)
 	authed.PathPrefix("/v1-telemetry").Handler(telemetry.NewProxy())
 	authed.PathPrefix("/v3/identit").Handler(tokenAPI)
@@ -128,7 +133,8 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 
 	metricsAuthed.Path("/metrics").Handler(metricsHandler)
 
-	unauthed.NotFoundHandler = authed
+	unauthed.NotFoundHandler = saauthed
+	saauthed.NotFoundHandler = authed
 	authed.NotFoundHandler = metricsAuthed
 
 	return func(next http.Handler) http.Handler {

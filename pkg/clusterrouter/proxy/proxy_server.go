@@ -237,12 +237,15 @@ func (r *RemoteService) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 		log.Println("proxy-server", req.URL.Path, userInfo.GetName())
 
-		token, err := r.getImpersonatorAccountToken(userInfo)
-		if err != nil && !strings.Contains(err.Error(), dialer2.ErrAgentDisconnected.Error()) {
-			er.Error(rw, req, fmt.Errorf("unable to create impersonator account: %w", err))
-			return
+		if !strings.HasPrefix(userInfo.GetName(), "system:serviceaccount:") {
+			token, err := r.getImpersonatorAccountToken(userInfo)
+			if err != nil && !strings.Contains(err.Error(), dialer2.ErrAgentDisconnected.Error()) {
+				er.Error(rw, req, fmt.Errorf("unable to create impersonator account: %w", err))
+				return
+			}
+
+			req.Header.Set("Authorization", "Bearer "+token)
 		}
-		req.Header.Set("Authorization", "Bearer "+token)
 	}
 
 	if httpstream.IsUpgradeRequest(req) {
