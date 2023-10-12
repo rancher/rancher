@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/rancher/rancher/pkg/auth/audit"
+	authcontext "github.com/rancher/rancher/pkg/auth/context"
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/util"
 	"github.com/sirupsen/logrus"
@@ -29,7 +30,7 @@ func (h authHeaderHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) 
 		return
 	}
 
-	//clean extra that is not part of userInfo
+	// clean extra that is not part of userInfo
 	for header := range req.Header {
 		if strings.HasPrefix(header, "Impersonate-Extra-") {
 			key := strings.TrimPrefix(header, "Impersonate-Extra-")
@@ -39,12 +40,9 @@ func (h authHeaderHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) 
 		}
 	}
 
-	var saAuthed bool
-	if userExtra := userInfo.GetExtra(); userExtra != nil {
-		_, saAuthed = userExtra["sa-auth"]
-	}
-
-	if !saAuthed {
+	if !authcontext.IsSAAuthenticated(req.Context()) {
+		// If the request is not authenticated as a service account,
+		// we need to set impersonation headers.
 		req.Header.Set("Impersonate-User", userInfo.GetName())
 		req.Header.Del("Impersonate-Group")
 		for _, group := range userInfo.GetGroups() {
