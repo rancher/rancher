@@ -4,9 +4,9 @@ import (
 	"context"
 	"strings"
 
+	"github.com/rancher/rancher/pkg/features"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
-	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/settings"
 
 	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
