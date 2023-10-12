@@ -249,6 +249,10 @@ func (r *repoHandler) download(repoSpec *catalog.RepoSpec, status catalog.RepoSt
 			}
 			status.URL = repoSpec.GitRepo
 			status.Branch = repoSpec.GitBranch
+			index, err = git.BuildOrGetIndex(metadata.Namespace, metadata.Name, repoSpec.GitRepo)
+			if err != nil || index == nil {
+				return status, err
+			}
 		} else {
 			commit, err = repo.CheckUpdate(repoSpec.GitBranch, settings.SystemCatalog.Get())
 			if err != nil {
@@ -260,11 +264,10 @@ func (r *repoHandler) download(repoSpec *catalog.RepoSpec, status catalog.RepoSt
 				status.DownloadTime = downloadTime
 				return status, nil
 			}
-		}
-		// regardless of which download operation took place, build or get the new index
-		index, err = git.BuildOrGetIndex(metadata.Namespace, metadata.Name, repoSpec.GitRepo)
-		if err != nil || index == nil {
-			return status, err
+			index, err = git.BuildOrGetIndex(metadata.Namespace, metadata.Name, repoSpec.GitRepo)
+			if err != nil || index == nil {
+				return status, err
+			}
 		}
 	} else if repoSpec.URL != "" {
 		status.URL = repoSpec.URL
