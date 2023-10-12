@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/pkg/errors"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
@@ -21,7 +22,7 @@ import (
 )
 
 // repository holds the config of a git repository and the repo instance.
-type Repository struct {
+type repository struct {
 	URL               string
 	Directory         string
 	username          string
@@ -30,26 +31,29 @@ type Repository struct {
 	caBundle          []byte
 	insecureTLSVerify bool
 	secret            *corev1.Secret
+	headers           map[string]string
 	knownHosts        []byte
 	repoGogit         *gogit.Repository
-	auth              transport.AuthMethod
+	auth              transport.AuthMethod // interface
 	cloneOpts         *gogit.CloneOptions
 	fetchOpts         *gogit.FetchOptions
+	checkoutOpts      *gogit.CheckoutOptions
 	listOpts          *gogit.ListOptions
 	resetOpts         *gogit.ResetOptions
 }
 
 // BuildRepoConfig constructs and returns a new repository object for the given repository.
-// It requires a secret for authentication, the namespace, the name of the repository,
+// It requires a secret for authentication, the namespace, name of the repository,
 // the gitURL, a flag indicating if TLS verification should be skipped, and a CA bundle for SSL.
 // If the Git URL uses the SSH protocol, it checks if the URL is a valid SSH URL.
 // If the Git URL uses HTTP or HTTPS, it parses and verifies the URL.
 // It then constructs a directory path for the git repository.
+// It also sets an X-Install-Uuid header if an installation UUID is available.
 // If a CA bundle is provided, it converts the CA bundle from DER to PEM format, since Git requires PEM format.
 // In this case, insecureSkipTLS is set to false since a CA bundle is provided for secure communication.
 // Finally, it returns a new git object configured with these settings,
 // or an error if any step in this process fails.
-func BuildRepoConfig(secret *corev1.Secret, namespace, name, gitURL string, insecureSkipTLS bool, caBundle []byte) (*Repository, error) {
+func BuildRepoConfig(secret *corev1.Secret, namespace, name, gitURL string, insecureSkipTLS bool, caBundle []byte) (*repository, error) {
 	isGitSSH, err := isGitSSH(gitURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to verify the type of URL %s: %w", gitURL, err)
@@ -64,27 +68,32 @@ func BuildRepoConfig(secret *corev1.Secret, namespace, name, gitURL string, inse
 		}
 	}
 	dir := gitDir(namespace, name, gitURL)
-
+	headers := map[string]string{}
+	if settings.InstallUUID.Get() != "" {
+		headers["X-Install-Uuid"] = settings.InstallUUID.Get()
+	}
 	// convert caBundle to PEM format because git requires correct line breaks, header and footer.
 	if len(caBundle) > 0 {
 		caBundle = convertDERToPEM(caBundle)
 		insecureSkipTLS = false
 	}
 
-	repo := &Repository{
+	repo := &repository{
 		URL:               gitURL,
 		Directory:         dir,
 		caBundle:          caBundle,
 		insecureTLSVerify: insecureSkipTLS,
 		secret:            secret,
+		headers:           headers,
 		repoGogit:         &gogit.Repository{},
 		cloneOpts:         &gogit.CloneOptions{},
+		checkoutOpts:      &gogit.CheckoutOptions{},
 		fetchOpts:         &gogit.FetchOptions{},
 		listOpts:          &gogit.ListOptions{},
 		resetOpts:         &gogit.ResetOptions{},
 	}
 
-	// credentials must be set before options
+	// credentials must be setted before options
 	err = repo.setRepoCredentials()
 	if err != nil {
 		return repo, err
@@ -96,18 +105,21 @@ func BuildRepoConfig(secret *corev1.Secret, namespace, name, gitURL string, inse
 
 // setRepoCredentials detects which type of authentication and communication protocol
 // and configurates the git repo communications accordingly
-func (r *Repository) setRepoCredentials() error {
+func (r *repository) setRepoCredentials() error {
 	if r.secret == nil {
 		return nil
 	}
 
+	var username string
+	var password string
+
 	switch r.secret.Type {
 	case corev1.SecretTypeBasicAuth: // BASIC HTTP(S) AUTHENTICATION
-		// get the credentials set in kubernetes
-		username := string(r.secret.Data[corev1.BasicAuthUsernameKey])
-		password := string(r.secret.Data[corev1.BasicAuthPasswordKey])
+		// get the credentials setted in kubernetes
+		username = string(r.secret.Data[corev1.BasicAuthUsernameKey])
+		password = string(r.secret.Data[corev1.BasicAuthPasswordKey])
 		if len(password) == 0 || len(username) == 0 {
-			return fmt.Errorf("username or password not provided")
+			return fmt.Errorf("username and password not provided")
 		}
 		// BasicAuth implements transport.AuthMethod interface
 		r.auth = &plumbingHTTP.BasicAuth{
@@ -145,7 +157,7 @@ func (r *Repository) setRepoCredentials() error {
 			// Create callback from recently created temporary file
 			hostKeyCB, err := plumbingSSH.NewKnownHostsCallback(f.Name())
 			if err != nil {
-				return fmt.Errorf("setRepoCredentials at known hosts failure: %w", err)
+				return err
 			}
 
 			r.auth = &plumbingSSH.PublicKeys{
@@ -174,7 +186,7 @@ func (r *Repository) setRepoCredentials() error {
 
 // setRepoOptions assigns the options configured before in credentials.
 // hard-code other needed configurations like Depth for faster cloning.
-func (r *Repository) setRepoOptions() {
+func (r *repository) setRepoOptions() {
 	// Clone Options
 	r.cloneOpts.URL = r.URL
 	r.cloneOpts.Depth = 1
@@ -188,6 +200,10 @@ func (r *Repository) setRepoOptions() {
 	r.fetchOpts.InsecureSkipTLS = r.insecureTLSVerify
 	r.fetchOpts.Tags = gogit.NoTags
 	r.fetchOpts.Depth = 1
+
+	// Checkout Options
+	r.checkoutOpts.Force = true
+	r.checkoutOpts.Create = true
 
 	// List Options
 	r.listOpts.InsecureSkipTLS = r.insecureTLSVerify
@@ -215,8 +231,8 @@ func (r *Repository) setRepoOptions() {
 }
 
 // cloneOrOpen executes the clone operation of a git repository at given branch with depth = 1 if it does not exist.
-// If exists, just open the local repository and assign it to ro.localRepo
-func (r *Repository) cloneOrOpen(branch string) error {
+// If if exists, just open the local repository and assign it to ro.localRepo
+func (r *repository) cloneOrOpen(branch string) error {
 	var err error
 	cloneOptions := r.cloneOpts
 	if branch != "" {
@@ -229,6 +245,7 @@ func (r *Repository) cloneOrOpen(branch string) error {
 	}
 
 	err = r.plainOpen()
+
 	if err == gogit.ErrRepositoryNotExists {
 		r.repoGogit, err = gogit.PlainClone(r.Directory, false, cloneOptions)
 		if err != nil && err != gogit.ErrRepositoryAlreadyExists {
@@ -236,15 +253,12 @@ func (r *Repository) cloneOrOpen(branch string) error {
 		}
 		return nil
 	}
-	if err != nil {
-		return fmt.Errorf("plainOpen failure: %w", err)
-	}
 
-	return nil
+	return err
 }
 
 // plainOpen opens an existing local git repository on the specified folder not walking parent directories looking for '.git/'
-func (r *Repository) plainOpen() error {
+func (r *repository) plainOpen() error {
 	openOptions := gogit.PlainOpenOptions{
 		DetectDotGit: false,
 	}
@@ -258,7 +272,7 @@ func (r *Repository) plainOpen() error {
 }
 
 // getCurrentCommit returns the commit hash of the HEAD from the current branch
-func (r *Repository) getCurrentCommit() (plumbing.Hash, error) {
+func (r *repository) getCurrentCommit() (plumbing.Hash, error) {
 	headRef, err := r.repoGogit.Head()
 	if err != nil {
 		return plumbing.Hash{}, fmt.Errorf("getCurrentCommit failure: %w", err)
@@ -269,7 +283,7 @@ func (r *Repository) getCurrentCommit() (plumbing.Hash, error) {
 
 // fetchAndReset is a convenience method that fetches updates from the remote repository
 // for a specific branch, and then resets the current branch to a specified commit.
-func (r *Repository) fetchAndReset(branch string) error {
+func (r *repository) fetchAndReset(branch string) error {
 	if err := r.fetch(branch); err != nil {
 		return fmt.Errorf("fetchAndReset failure: %w", err)
 	}
@@ -283,7 +297,7 @@ func (r *Repository) fetchAndReset(branch string) error {
 //   - Otherwise, it sets the RefSpec to fetch all branches.
 //
 // fetching the last commit of one branch is faster than fetching from all branches.
-func (r *Repository) updateRefSpec(branch string) {
+func (r *repository) updateRefSpec(branch string) {
 	var newRefSpec string
 
 	if branch != "" {
@@ -302,7 +316,7 @@ func (r *Repository) updateRefSpec(branch string) {
 // fetch fetches updates from the remote repository for a specific branch.
 // If the fetch operation is already up-to-date, this is not treated as an error.
 // Any other error that occurs during fetch is returned.
-func (r *Repository) fetch(branch string) error {
+func (r *repository) fetch(branch string) error {
 	r.updateRefSpec(branch)
 	fetchOptions := r.fetchOpts
 
@@ -314,8 +328,37 @@ func (r *Repository) fetch(branch string) error {
 	return nil
 }
 
+func (r *repository) checkout(branch plumbing.ReferenceName) (plumbing.Hash, error) {
+
+	checkOpts := gogit.CheckoutOptions{
+		Branch: branch,
+	}
+
+	_, err := r.repoGogit.Branch(branch.Short())
+	switch {
+	case err == gogit.ErrBranchExists:
+		checkOpts.Force = true
+	case err == gogit.ErrBranchNotFound:
+		checkOpts.Create = true
+	case err != gogit.ErrBranchExists && err != gogit.ErrBranchNotFound && err != nil:
+		return plumbing.ZeroHash, fmt.Errorf("checkout failure to check branch: %w", err)
+	}
+
+	wt, err := r.repoGogit.Worktree()
+	if err != nil {
+		return plumbing.ZeroHash, fmt.Errorf("checkout failure to open worktree: %w", err)
+	}
+
+	err = wt.Checkout(&checkOpts)
+	if err != nil {
+		return plumbing.ZeroHash, fmt.Errorf("checkout failure: %w", err)
+	}
+
+	return r.getCurrentCommit()
+}
+
 // hardReset performs a hard reset of the git repository to a specific commit.
-func (r *Repository) hardReset(reference string) error {
+func (r *repository) hardReset(reference string) error {
 	var err error
 	resetOpts := r.resetOpts
 
@@ -323,7 +366,7 @@ func (r *Repository) hardReset(reference string) error {
 	case isLocalBranch(reference):
 		branchRef, err := r.repoGogit.Reference(plumbing.ReferenceName(reference), true)
 		if err != nil {
-			return fmt.Errorf("hardReset failure, branch does not exist locally: %w", err)
+			return fmt.Errorf("branch does not exist locally: %w", err)
 		}
 		resetOpts.Commit = branchRef.Hash()
 	case reference == "HEAD":
@@ -332,8 +375,10 @@ func (r *Repository) hardReset(reference string) error {
 			return fmt.Errorf("hardReset failure to get current commit: %w", err)
 		}
 		resetOpts.Commit = commitHash
+	// FETCH_HEAD
 	default:
 		branchRef, err := r.repoGogit.Reference(plumbing.NewRemoteReferenceName("origin", reference), false)
+		// branchRef, err := ro.localRepo.Reference(plumbing.ReferenceName(reference), false)
 		if err != nil {
 			return fmt.Errorf("hardReset failure to get branch reference: %w", err)
 		}
@@ -366,7 +411,7 @@ func (r *Repository) hardReset(reference string) error {
 //   - If the hash has not changed, it returns the same commit hash.
 //   - If it has changed, it returns the updated commit hash.
 //   - If an error occurs while fetching the reference list, an error is returned.
-func (r *Repository) getLastCommitHash(branch string, commitHASH plumbing.Hash) (plumbing.Hash, error) {
+func (r *repository) getLastCommitHash(branch string, commitHASH plumbing.Hash) (plumbing.Hash, error) {
 
 	var lastCommitHASH plumbing.Hash
 
