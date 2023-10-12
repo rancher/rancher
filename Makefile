@@ -8,7 +8,7 @@ TARGETS := $(shell ls scripts)
 	@mv .dapper.tmp .dapper
 
 $(TARGETS): .dapper
-	@if [ "$@" = "post-release-checks" ] || [ "$@" = "list-gomod-updates" ] || [ "$@" = "check-chart-kdm-source-values" ]; then \
+	@if [ "$@" = "check-chart-kdm-source-values" ]; then \
 		./.dapper -q --no-out $@; \
 	else \
 		./.dapper $@; \
