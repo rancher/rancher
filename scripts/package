@@ -21,7 +21,7 @@ if [ ${ARCH} == s390x ]; then
     ETCD_UNSUPPORTED_ARCH=s390x
 fi
 
-docker build --build-arg VERSION=${TAG} --build-arg ETCD_UNSUPPORTED_ARCH=${ETCD_UNSUPPORTED_ARCH} --build-arg ARCH=${ARCH} --build-arg IMAGE_REPO=${REPO} --build-arg SYSTEM_CHART_DEFAULT_BRANCH=${SYSTEM_CHART_DEFAULT_BRANCH} --build-arg CHART_DEFAULT_BRANCH=${CHART_DEFAULT_BRANCH} --build-arg CHART_TEST_FIRST_BRANCH=${CHART_TEST_FIRST_BRANCH} -t ${IMAGE} .
+docker build --build-arg VERSION=${TAG} --build-arg ETCD_UNSUPPORTED_ARCH=${ETCD_UNSUPPORTED_ARCH} --build-arg ARCH=${ARCH} --build-arg IMAGE_REPO=${REPO} --build-arg SYSTEM_CHART_DEFAULT_BRANCH=${SYSTEM_CHART_DEFAULT_BRANCH} --build-arg CHART_DEFAULT_BRANCH=${CHART_DEFAULT_BRANCH} -t ${IMAGE} .
 
 docker build --build-arg VERSION=${TAG} --build-arg ARCH=${ARCH} --build-arg RANCHER_TAG=${TAG} --build-arg RANCHER_REPO=${REPO} -t ${AGENT_IMAGE} -f Dockerfile.agent .
 
@@ -40,10 +40,6 @@ fi
 
 if [ ! -d $CHART_REPO_DIR ]; then
     git clone --branch $CHART_DEFAULT_BRANCH https://github.com/rancher/charts $CHART_REPO_DIR
-fi
-
-if [ ! -d $CHART_TEST_REPO_DIR ]; then
-    git clone --depth=1 --branch $CHART_TEST_FIRST_BRANCH https://github.com/rancher/charts-small-fork $CHART_TEST_REPO_DIR
 fi
 
 if [ ${ARCH} == amd64 ]; then
