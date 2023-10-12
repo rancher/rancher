@@ -68,6 +68,12 @@ func Ensure(secret *corev1.Secret, namespace, name, gitURL, commit string, insec
 		return err
 	}
 
+	// If the repositories are rancher managed and if bundled is set
+	// don't fetch anything from upstream.
+	if isBundled(git) && settings.SystemCatalog.Get() == "bundled" {
+		return nil
+	}
+
 	return git.Ensure(commit)
 }
 
