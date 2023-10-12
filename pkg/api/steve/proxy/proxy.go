@@ -3,7 +3,6 @@ package proxy
 import (
 	"context"
 	"fmt"
-	"log"
 	"net"
 	"net/http"
 	"strings"
@@ -73,11 +72,7 @@ func NewProxyMiddleware(sar v1.AuthorizationV1Interface,
 	mux.Path("/v1/management.cattle.io.clusters/{clusterID}").Queries("link", "shell").HandlerFunc(routeToShellProxy("link", "shell", localSupport, localCluster, mux, proxyHandler))
 	mux.Path("/v1/management.cattle.io.clusters/{clusterID}").Queries("action", "apply").HandlerFunc(routeToShellProxy("action", "apply", localSupport, localCluster, mux, proxyHandler))
 	mux.Path("/v3/clusters/{clusterID}").Queries("shell", "true").HandlerFunc(routeToShellProxy("link", "shell", localSupport, localCluster, mux, proxyHandler))
-	// mux.Path("/{prefix:k8s/clusters/[^/]+}{suffix:/v1.*}").MatcherFunc(proxyHandler.MatchNonLegacy("/k8s/clusters/")).Handler(proxyHandler)
-	mux.Path("/{prefix:k8s/clusters/[^/]+}{suffix:/v1.*}").MatcherFunc(proxyHandler.MatchNonLegacy("/k8s/clusters/")).Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.Println("steve-k8s", r.URL.Path)
-		proxyHandler.ServeHTTP(w, r)
-	}))
+	mux.Path("/{prefix:k8s/clusters/[^/]+}{suffix:/v1.*}").MatcherFunc(proxyHandler.MatchNonLegacy("/k8s/clusters/")).Handler(proxyHandler)
 
 	return func(handler http.Handler) http.Handler {
 		return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
