@@ -5,7 +5,6 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"fmt"
-	"log"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -234,8 +233,6 @@ func (r *RemoteService) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 			er.Error(rw, req, validation.Unauthorized)
 			return
 		}
-
-		log.Println("proxy-server", req.URL.Path, userInfo.GetName(), userInfo.GetUID(), userInfo.GetGroups(), userInfo.GetExtra())
 
 		var saAuthed bool
 		if userExtra := userInfo.GetExtra(); userExtra != nil {

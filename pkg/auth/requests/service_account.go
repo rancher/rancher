@@ -1,7 +1,6 @@
 package requests
 
 import (
-	"log"
 	"net/http"
 	"strings"
 
@@ -37,14 +36,10 @@ func NewDownstreamTokenReviewAuth(scaledContext *config.ScaledContext) auth.Auth
 
 // Authenticate ...
 func (t *DownstreamTokenReviewAuth) Authenticate(req *http.Request) (user.Info, bool, error) {
-	log.Println("service-account-auth", req.URL.Path)
-
 	info, hasAuth := request.UserFrom(req.Context())
 	if info.GetName() != "system:cattle:error" {
 		return info, hasAuth, nil
 	}
-
-	log.Println("service-account-auth", "authenticating")
 
 	rawToken := tokens.GetTokenAuthFromRequest(req)
 
