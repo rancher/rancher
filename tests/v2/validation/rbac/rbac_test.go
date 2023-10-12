@@ -206,7 +206,7 @@ func (rb *RBTestSuite) ValidateNS(role string) {
 
 func (rb *RBTestSuite) ValidateAddClusterRoles(role string) {
 
-	errUserRole := users.AddClusterRoleToUser(rb.standardUserClient, rb.cluster, rb.additionalUser, roleOwner)
+	errUserRole := users.AddClusterRoleToUser(rb.standardUserClient, rb.cluster, rb.additionalUser, roleOwner, nil)
 
 	switch role {
 	case roleProjectOwner, roleProjectMember:
@@ -222,7 +222,7 @@ func (rb *RBTestSuite) ValidateAddClusterRoles(role string) {
 
 func (rb *RBTestSuite) ValidateAddProjectRoles(role string) {
 
-	errUserRole := users.AddProjectMember(rb.standardUserClient, rb.adminProject, rb.additionalUser, roleProjectOwner)
+	errUserRole := users.AddProjectMember(rb.standardUserClient, rb.adminProject, rb.additionalUser, roleProjectOwner, nil)
 
 	additionalUserClient, err := rb.additionalUserClient.ReLogin()
 	require.NoError(rb.T(), err)
@@ -333,10 +333,10 @@ func (rb *RBTestSuite) TestRBAC() {
 
 			if tt.member == standardUser {
 				if strings.Contains(tt.role, "project") {
-					err := users.AddProjectMember(rb.client, rb.adminProject, rb.standardUser, tt.role)
+					err := users.AddProjectMember(rb.client, rb.adminProject, rb.standardUser, tt.role, nil)
 					require.NoError(rb.T(), err)
 				} else {
-					err := users.AddClusterRoleToUser(rb.client, rb.cluster, rb.standardUser, tt.role)
+					err := users.AddClusterRoleToUser(rb.client, rb.cluster, rb.standardUser, tt.role, nil)
 					require.NoError(rb.T(), err)
 				}
 			}
