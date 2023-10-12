@@ -50,10 +50,9 @@ type Repository struct {
 // Finally, it returns a new git object configured with these settings,
 // or an error if any step in this process fails.
 func BuildRepoConfig(secret *corev1.Secret, namespace, name, gitURL string, insecureSkipTLS bool, caBundle []byte) (*Repository, error) {
-
 	isGitSSH, err := isGitSSH(gitURL)
 	if err != nil {
-		logrus.Error(fmt.Errorf("failed to verify the type of URL %s: %w", gitURL, err))
+		return nil, fmt.Errorf("failed to verify the type of URL %s: %w", gitURL, err)
 	}
 	if !isGitSSH {
 		u, err := url.Parse(gitURL)
@@ -136,7 +135,7 @@ func (r *Repository) setRepoCredentials() error {
 		if len(hostsBytes) > 0 {
 			f, err := os.CreateTemp("", "known_hosts")
 			if err != nil {
-				return fmt.Errorf("failed to create temporary known_hosts file: %w", err)
+				return fmt.Errorf("failed to create temporar known_hosts file: %w", err)
 			}
 			// Write received knownhosts from kubernetes secret
 			_, err = f.Write(hostsBytes)
@@ -218,30 +217,27 @@ func (r *Repository) setRepoOptions() {
 // cloneOrOpen executes the clone operation of a git repository at given branch with depth = 1 if it does not exist.
 // If exists, just open the local repository and assign it to ro.localRepo
 func (r *Repository) cloneOrOpen(branch string) error {
+	var err error
 	cloneOptions := r.cloneOpts
 	if branch != "" {
 		cloneOptions.ReferenceName = plumbing.NewBranchReferenceName(branch)
 	}
 
-	err := cloneOptions.Validate()
+	err = cloneOptions.Validate()
 	if err != nil {
 		return fmt.Errorf("plainClone validation failure: %w", err)
 	}
 
-	openErr := r.plainOpen()
-	if openErr != nil && openErr != gogit.ErrRepositoryNotExists {
-		return fmt.Errorf("plainOpen failure: %w", err)
-	} else if openErr == gogit.ErrRepositoryNotExists {
-		repoGogit, cloneErr := gogit.PlainClone(r.Directory, false, cloneOptions)
-		if cloneErr != nil && cloneErr != gogit.ErrRepositoryAlreadyExists {
+	err = r.plainOpen()
+	if err == gogit.ErrRepositoryNotExists {
+		r.repoGogit, err = gogit.PlainClone(r.Directory, false, cloneOptions)
+		if err != nil && err != gogit.ErrRepositoryAlreadyExists {
 			return fmt.Errorf("plainClone failure: %w", err)
 		}
-		// serious problem warning
-		if openErr == gogit.ErrRepositoryNotExists && cloneErr == gogit.ErrRepositoryAlreadyExists {
-			return fmt.Errorf("serious failure, conflicting error, could not clone or open the repository: open error: %w and clone error: %w", openErr, cloneErr)
-		}
-		r.repoGogit = repoGogit
 		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("plainOpen failure: %w", err)
 	}
 
 	return nil
@@ -265,7 +261,7 @@ func (r *Repository) plainOpen() error {
 func (r *Repository) getCurrentCommit() (plumbing.Hash, error) {
 	headRef, err := r.repoGogit.Head()
 	if err != nil {
-		return plumbing.ZeroHash, fmt.Errorf("getCurrentCommit failure: %w", err)
+		return plumbing.Hash{}, fmt.Errorf("getCurrentCommit failure: %w", err)
 	}
 
 	return headRef.Hash(), nil
@@ -330,7 +326,7 @@ func (r *Repository) hardReset(reference string) error {
 			return fmt.Errorf("hardReset failure, branch does not exist locally: %w", err)
 		}
 		resetOpts.Commit = branchRef.Hash()
-	case reference == plumbing.HEAD.String():
+	case reference == "HEAD":
 		commitHash, err := r.getCurrentCommit()
 		if err != nil {
 			return fmt.Errorf("hardReset failure to get current commit: %w", err)
@@ -371,6 +367,7 @@ func (r *Repository) hardReset(reference string) error {
 //   - If it has changed, it returns the updated commit hash.
 //   - If an error occurs while fetching the reference list, an error is returned.
 func (r *Repository) getLastCommitHash(branch string, commitHASH plumbing.Hash) (plumbing.Hash, error) {
+
 	var lastCommitHASH plumbing.Hash
 
 	remote, err := r.repoGogit.Remote(r.cloneOpts.RemoteName)
