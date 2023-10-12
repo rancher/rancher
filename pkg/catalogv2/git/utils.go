@@ -32,8 +32,8 @@ func gitDir(namespace, name, gitURL string) string {
 }
 
 // isBundled check if the repositories are bundled on local static directory
-func isBundled(directory string) bool {
-	return strings.HasPrefix(directory, staticDir) || strings.HasPrefix(directory, localDir)
+func isBundled(git *git) bool {
+	return strings.HasPrefix(git.Directory, staticDir) || strings.HasPrefix(git.Directory, localDir)
 }
 
 func isLocalBranch(branch string) bool {
