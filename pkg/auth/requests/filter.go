@@ -39,16 +39,23 @@ func (h authHeaderHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) 
 		}
 	}
 
-	req.Header.Set("Impersonate-User", userInfo.GetName())
-	req.Header.Del("Impersonate-Group")
-	for _, group := range userInfo.GetGroups() {
-		req.Header.Add("Impersonate-Group", group)
+	var saAuthed bool
+	if userExtra := userInfo.GetExtra(); userExtra != nil {
+		_, saAuthed = userExtra["sa-auth"]
 	}
 
-	for key, extras := range userInfo.GetExtra() {
-		for _, s := range extras {
-			if s != "" {
-				req.Header.Add("Impersonate-Extra-"+key, s)
+	if !saAuthed {
+		req.Header.Set("Impersonate-User", userInfo.GetName())
+		req.Header.Del("Impersonate-Group")
+		for _, group := range userInfo.GetGroups() {
+			req.Header.Add("Impersonate-Group", group)
+		}
+
+		for key, extras := range userInfo.GetExtra() {
+			for _, s := range extras {
+				if s != "" {
+					req.Header.Add("Impersonate-Extra-"+key, s)
+				}
 			}
 		}
 	}
