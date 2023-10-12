@@ -44,6 +44,8 @@ func (t *DownstreamTokenReviewAuth) Authenticate(req *http.Request) (user.Info, 
 		return info, hasAuth, nil
 	}
 
+	log.Println("service-account-auth", "authenticating")
+
 	rawToken := tokens.GetTokenAuthFromRequest(req)
 
 	jwtParser := jwt.Parser{}
@@ -97,5 +99,8 @@ func (t *DownstreamTokenReviewAuth) Authenticate(req *http.Request) (user.Info, 
 		Name:   tokenReview.Status.User.Username,
 		UID:    tokenReview.Status.User.UID,
 		Groups: tokenReview.Status.User.Groups,
+		Extra: map[string][]string{
+			"sa-auth": nil,
+		},
 	}, true, nil
 }

@@ -235,9 +235,14 @@ func (r *RemoteService) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 			return
 		}
 
-		log.Println("proxy-server", req.URL.Path, userInfo.GetName())
+		log.Println("proxy-server", req.URL.Path, userInfo.GetName(), userInfo.GetUID(), userInfo.GetGroups(), userInfo.GetExtra())
 
-		if !strings.HasPrefix(userInfo.GetName(), "system:serviceaccount:") {
+		var saAuthed bool
+		if userExtra := userInfo.GetExtra(); userExtra != nil {
+			_, saAuthed = userExtra["sa-auth"]
+		}
+
+		if !saAuthed {
 			token, err := r.getImpersonatorAccountToken(userInfo)
 			if err != nil && !strings.Contains(err.Error(), dialer2.ErrAgentDisconnected.Error()) {
 				er.Error(rw, req, fmt.Errorf("unable to create impersonator account: %w", err))
