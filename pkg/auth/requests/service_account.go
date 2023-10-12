@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/golang-jwt/jwt"
+	jwtv4 "github.com/golang-jwt/jwt/v4"
 	"github.com/gorilla/mux"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/clustermanager"
@@ -43,8 +43,8 @@ func (t *DownstreamTokenReviewAuth) Authenticate(req *http.Request) (user.Info, 
 
 	rawToken := tokens.GetTokenAuthFromRequest(req)
 
-	jwtParser := jwt.Parser{}
-	claims := jwt.StandardClaims{}
+	jwtParser := jwtv4.Parser{}
+	claims := jwtv4.RegisteredClaims{}
 	_, _, err := jwtParser.ParseUnverified(rawToken, &claims)
 	if err != nil {
 		return info, false, err
