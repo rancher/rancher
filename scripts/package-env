@@ -26,4 +26,3 @@ K3S_RELEASE_VERSIONS=$(jq -r '[.k3s.releases[] | select(.serverArgs) | .version]
 K3S_RELEASE_TAGS=( $(echo $K3S_RELEASE_VERSIONS | tr + -) )
 # Prefix image repo and name to tags.
 SYSTEM_AGENT_INSTALLER_K3S_IMAGES=( "${K3S_RELEASE_TAGS[@]/#/${REPO}/system-agent-installer-k3s:}" )
-
