@@ -207,6 +207,7 @@ var OriginMap = map[string]string{
 	"mirrored-sig-storage-snapshot-controller":                "https://github.com/kubernetes-csi/external-snapshotter",
 	"mirrored-sig-storage-snapshot-validation-webhook":        "https://github.com/kubernetes-csi/external-snapshotter",
 	"mirrored-sigwindowstools-k8s-gmsa-webhook":               "https://github.com/kubernetes-sigs/windows-gmsa/tree/master/admission-webhook",
+	"mirrored-gmsa-webhook-k8s-gmsa-webhook":                  "https://github.com/kubernetes-sigs/windows-gmsa/tree/master/admission-webhook",
 	"mirrored-sonobuoy-sonobuoy":                              "https://github.com/vmware-tanzu/sonobuoy",
 	"mirrored-thanos-thanos":                                  "https://github.com/thanos-io/thanos",
 	"mirrored-thanosio-thanos":                                "https://github.com/thanos-io/thanos",
