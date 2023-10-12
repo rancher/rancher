@@ -1,125 +1,124 @@
 package git
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/pem"
 	"fmt"
+	"net/url"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strings"
 
 	"github.com/rancher/rancher/pkg/settings"
 	corev1 "k8s.io/api/core/v1"
 )
 
-// Ensure builds the configuration for a should-existing repo and makes sure it is cloned or reseted to the latest commit of given branch
-func Ensure(secret *corev1.Secret, namespace, name, gitURL, branch string, insecureSkipTLS bool, caBundle []byte) error {
-	git, err := gitForRepo(secret, namespace, name, gitURL, insecureSkipTLS, caBundle)
-	if err != nil {
-		return err
-	}
+const (
+	stateDir  = "management-state/git-repo"
+	staticDir = "/var/lib/rancher-data/local-catalogs/v2"
+	localDir  = "../rancher-data/local-catalogs/v2" // identical to helm.InternalCatalog
+)
 
-	return git.EnsureClonedRepo(branch)
+func gitDir(namespace, name, gitURL string) string {
+	staticDir := filepath.Join(staticDir, namespace, name, hash(gitURL))
+	if s, err := os.Stat(staticDir); err == nil && s.IsDir() {
+		return staticDir
+	}
+	localDir := filepath.Join(localDir, namespace, name, hash(gitURL))
+	if s, err := os.Stat(localDir); err == nil && s.IsDir() {
+		return localDir
+	}
+	return filepath.Join(stateDir, namespace, name, hash(gitURL))
 }
 
-// EnsureClonedRepo will check if repo is cloned, if not the method will clone and reset to the latest commit.
-// If reseting to the latest commit is not possible it will fetch and try to reset again
-func (er *extendedRepo) EnsureClonedRepo(branch string) error {
-
-	err := er.cloneOrOpen("")
-	if err != nil {
-		return err
-	}
-
-	// before: g.reset(branch)
-	// Try to reset to the given commit, if success exit
-	localBranchFullName := fmt.Sprintf("refs/heads/%s", branch)
-	err = er.hardReset(localBranchFullName)
-	if err == nil {
-		return nil
-	}
-
-	// before: fetchAndReset(branch)
-	// If we do not have the commit locally, fetch and reset
-	// return er.fetchAndReset(plumbing.ZeroHash, branch)
-	return er.fetchAndReset(branch)
-}
-
-// Head builds the configuration for a new repo which will be cloned for the first time
 func Head(secret *corev1.Secret, namespace, name, gitURL, branch string, insecureSkipTLS bool, caBundle []byte) (string, error) {
 	git, err := gitForRepo(secret, namespace, name, gitURL, insecureSkipTLS, caBundle)
 	if err != nil {
 		return "", err
 	}
 
-	return git.CloneHead(branch)
+	return git.Head(branch)
 }
 
-// CloneHead clones the HEAD of a git branch and return the commit hash of the HEAD.
-func (er *extendedRepo) CloneHead(branch string) (string, error) {
-	err := er.cloneOrOpen(branch)
-	if err != nil {
-		return "", err
-	}
-
-	// before: reset("HEAD")
-	err = er.hardReset("HEAD")
-	if err != nil {
-		return "", err
-	}
-
-	commit, err := er.getCurrentCommit()
-	return commit.String(), err
-}
-
-// Update builds the configuration to update an existing repository
 func Update(secret *corev1.Secret, namespace, name, gitURL, branch string, insecureSkipTLS bool, caBundle []byte) (string, error) {
 	git, err := gitForRepo(secret, namespace, name, gitURL, insecureSkipTLS, caBundle)
 	if err != nil {
 		return "", err
 	}
 
-	if isBundled(git.GetConfig()) && settings.SystemCatalog.Get() == "bundled" {
+	if isBundled(git) && settings.SystemCatalog.Get() == "bundled" {
 		return Head(secret, namespace, name, gitURL, branch, insecureSkipTLS, caBundle)
 	}
 
-	commit, err := git.UpdateToLatestRef(branch)
-
-	if err != nil && isBundled(git.GetConfig()) {
+	commit, err := git.Update(branch)
+	if err != nil && isBundled(git) {
 		return Head(secret, namespace, name, gitURL, branch, insecureSkipTLS, caBundle)
 	}
-
 	return commit, err
 }
 
-// UpdateToLatestRef will check if repository exists, if exists will check for latest commit and update to it.
-// If the repository does not exist will try cloning again.
-func (er *extendedRepo) UpdateToLatestRef(branch string) (string, error) {
-	err := er.cloneOrOpen(branch)
+func Ensure(secret *corev1.Secret, namespace, name, gitURL, branch string, insecureSkipTLS bool, caBundle []byte) error {
+	git, err := gitForRepo(secret, namespace, name, gitURL, insecureSkipTLS, caBundle)
 	if err != nil {
-		return "", err
+		return err
 	}
 
-	// before: reset("HEAD")
-	err = er.hardReset("HEAD")
+	return git.Ensure(branch)
+}
+
+func isBundled(git *git) bool {
+	return strings.HasPrefix(git.Directory, staticDir) || strings.HasPrefix(git.Directory, localDir)
+}
+
+func gitForRepo(secret *corev1.Secret, namespace, name, gitURL string, insecureSkipTLS bool, caBundle []byte) (*git, error) {
+	isGitSSH, err := isGitSSH(gitURL)
 	if err != nil {
-		return "", err
+		return nil, fmt.Errorf("failed to verify the type of URL %s: %w", gitURL, err)
 	}
-
-	commit, err := er.getCurrentCommit()
-	if err != nil {
-		return commit.String(), err
+	if !isGitSSH {
+		u, err := url.Parse(gitURL)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse URL %s: %w", gitURL, err)
+		}
+		if u.Scheme != "http" && u.Scheme != "https" {
+			return nil, fmt.Errorf("invalid git URL scheme %s, only http(s) and git supported", u.Scheme)
+		}
 	}
-
-	lastCommit, err := er.getLastCommitHash(branch, commit)
-	if err != nil || lastCommit == commit {
-		return commit.String(), err
+	dir := gitDir(namespace, name, gitURL)
+	headers := map[string]string{}
+	if settings.InstallUUID.Get() != "" {
+		headers["X-Install-Uuid"] = settings.InstallUUID.Get()
 	}
-
-	// before: g.fetchAndReset(branch)
-	// err = er.fetchAndReset(lastCommit, branch)
-	err = er.fetchAndReset(branch)
-	if err != nil {
-		return commit.String(), err
+	// convert caBundle to PEM format because git requires correct line breaks, header and footer.
+	if len(caBundle) > 0 {
+		caBundle = convertDERToPEM(caBundle)
+		insecureSkipTLS = false
 	}
+	return newGit(dir, gitURL, &Options{
+		Credential:        secret,
+		Headers:           headers,
+		InsecureTLSVerify: insecureSkipTLS,
+		CABundle:          caBundle,
+	})
+}
 
-	lastCommitRef, err := er.getCurrentCommit()
-	lastCommitHashStr := lastCommitRef.String()
+func isGitSSH(gitURL string) (bool, error) {
+	// Matches URLs with the format [anything]@[anything]:[anything]
+	return regexp.MatchString("(.+)@(.+):(.+)", gitURL)
+}
 
-	return lastCommitHashStr, err
+func hash(gitURL string) string {
+	b := sha256.Sum256([]byte(gitURL))
+	return hex.EncodeToString(b[:])
+}
+
+// convertDERToPEM converts a src DER certificate into PEM with line breaks, header, and footer.
+func convertDERToPEM(src []byte) []byte {
+	return pem.EncodeToMemory(&pem.Block{
+		Type:    "CERTIFICATE",
+		Headers: map[string]string{},
+		Bytes:   src,
+	})
 }
