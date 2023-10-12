@@ -184,6 +184,8 @@ func (r *Repository) setRepoOptions() {
 
 	// Fetch Options
 	r.fetchOpts.RemoteURL = r.URL
+	r.fetchOpts.Depth = 1
+	r.fetchOpts.Force = true
 	r.fetchOpts.InsecureSkipTLS = r.insecureTLSVerify
 	r.fetchOpts.Tags = gogit.NoTags
 	r.fetchOpts.Depth = 1
@@ -309,7 +311,7 @@ func (r *Repository) fetch(branch string) error {
 	fetchOptions := r.fetchOpts
 
 	err := r.repoGogit.Fetch(fetchOptions)
-	if err != nil && err != gogit.NoErrAlreadyUpToDate && err != transport.ErrEmptyUploadPackRequest {
+	if err != nil && err != gogit.NoErrAlreadyUpToDate {
 		return fmt.Errorf("fetch failure: %w", err)
 	}
 
