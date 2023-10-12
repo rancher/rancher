@@ -88,7 +88,7 @@ require (
 	github.com/google/gnostic v0.5.7-v3refs
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/gorilla/mux v1.8.0
-	github.com/gorilla/websocket v1.4.2
+	github.com/gorilla/websocket v1.5.0
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/heptio/authenticator v0.0.0-20180409043135-d282f87a1972
@@ -113,9 +113,9 @@ require (
 	github.com/rancher/fleet/pkg/apis v0.0.0-20230821130910-23e1c146755a
 	github.com/rancher/gke-operator v1.1.6
 	github.com/rancher/kubernetes-provider-detector v0.1.5
-	github.com/rancher/lasso v0.0.0-20230629200414-8a54b32e6792
+	github.com/rancher/lasso v0.0.0-20230810170912-a86ba6c749aa
 	github.com/rancher/machine v0.15.0-rancher99
-	github.com/rancher/norman v0.0.0-20230426211126-d3552b018687
+	github.com/rancher/norman v0.0.0-20230811152901-078862e5648c
 	github.com/rancher/rancher/pkg/apis v0.0.0
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
@@ -131,13 +131,13 @@ require (
 	github.com/urfave/cli v1.22.12
 	github.com/vishvananda/netlink v1.1.1-0.20210330154013-f5de75959ad5
 	github.com/vmware/govmomi v0.30.4
-	golang.org/x/crypto v0.11.0
-	golang.org/x/mod v0.10.0
-	golang.org/x/net v0.12.0
+	golang.org/x/crypto v0.12.0
+	golang.org/x/mod v0.12.0
+	golang.org/x/net v0.14.0
 	golang.org/x/oauth2 v0.10.0
 	golang.org/x/sync v0.3.0
-	golang.org/x/text v0.11.0 // indirect
-	golang.org/x/tools v0.9.3 // indirect
+	golang.org/x/text v0.12.0 // indirect
+	golang.org/x/tools v0.12.0 // indirect
 	google.golang.org/api v0.130.0
 	google.golang.org/grpc v1.56.1
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c
@@ -150,7 +150,7 @@ require (
 	k8s.io/apiserver v0.25.12
 	k8s.io/cli-runtime v0.25.12
 	k8s.io/client-go v12.0.0+incompatible
-	k8s.io/gengo v0.0.0-20220902162205-c0856e24416d
+	k8s.io/gengo v0.0.0-20230306165830-ab3349d207d4
 	k8s.io/helm v2.16.7+incompatible
 	k8s.io/kube-aggregator v0.25.12
 	k8s.io/kubectl v0.25.12
@@ -308,7 +308,7 @@ require (
 	github.com/lib/pq v1.10.4 // indirect
 	github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
-	github.com/matryer/moq v0.0.0-20200607124540-4638a53893e6 // indirect
+	github.com/matryer/moq v0.3.2 // indirect
 	github.com/mattermost/xml-roundtrip-validator v0.1.0 // indirect
 	github.com/mattn/go-isatty v0.0.16 // indirect
 	github.com/mattn/go-runewidth v0.0.14 // indirect
@@ -377,8 +377,8 @@ require (
 	go.uber.org/atomic v1.10.0 // indirect
 	go.uber.org/multierr v1.9.0 // indirect
 	go.uber.org/zap v1.24.0 // indirect
-	golang.org/x/sys v0.10.0 // indirect
-	golang.org/x/term v0.10.0 // indirect
+	golang.org/x/sys v0.11.0 // indirect
+	golang.org/x/term v0.11.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.2.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
