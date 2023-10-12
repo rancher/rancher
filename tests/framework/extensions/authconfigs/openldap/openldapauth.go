@@ -8,6 +8,9 @@ import (
 const openLdapConfigNameBase = "openLdapAuthConfig"
 const ConfigurationFileKey = "authProvider"
 
+//const Description = "UI session"
+//const ResponseType = "UI session"
+
 type OpenLDAPCredentialConfig struct {
 	Servers                         []string `json:"servers"`
 	ServiceAccountDistinguishedName string   `json:"serviceAccountDistinguishedName"`
@@ -23,6 +26,7 @@ type OpenLDAPCredentialConfig struct {
 }
 
 type Config2 struct {
+	Host                            string `yaml:"host"`
 	OpenLdapUser                    string `yaml:"testAndEnableUser"`
 	OpenLdapUserPass                string `yaml:"testAndEnablePass"`
 	Servers                         string `yaml:"servers"`
@@ -31,6 +35,7 @@ type Config2 struct {
 	UserSearchBase                  string `yaml:"UserSearchBase"`
 	Port                            string `yaml:"389"`
 	TLS                             string `yaml:"TLS"`
+	LoginUser                       string `yaml:"LoginUser"`
 }
 
 // CreateOpenLDAPAuthConfig is a helper function that creates
