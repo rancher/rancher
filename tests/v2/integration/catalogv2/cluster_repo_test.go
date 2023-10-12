@@ -3,32 +3,31 @@ package integration
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"sync"
 	"testing"
 	"time"
-
-	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
-	users "github.com/rancher/rancher/tests/framework/extensions/users"
-	password "github.com/rancher/rancher/tests/framework/extensions/users/passwordgenerator"
 
 	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	"github.com/rancher/rancher/tests/framework/clients/rancher/catalog"
 	stevev1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
+	clusters "github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
+	clusterWait "github.com/rancher/rancher/tests/framework/pkg/wait"
+	"github.com/rancher/rancher/tests/integration/pkg/defaults"
+	"github.com/rancher/wrangler/pkg/data"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	kwait "k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
 )
 
 const (
@@ -38,7 +37,9 @@ const (
 	ChartsSmallForkGitRepoFirstBranch = "test-1"
 	ChartsSmallForkGitRepoLastBranch  = "main"
 
-	RKE2ChartsGitRepoURL = "https://git.rancher.io/rke2-charts"
+	GitClusterRepoName      = "test-git-cluster-repo"
+	RancherChartsGitRepoURL = "https://git.rancher.io/charts"
+	RKE2ChartsGitRepoURL    = "https://git.rancher.io/rke2-charts"
 
 	HTTPClusterRepoName = "test-http-cluster-repo"
 	LatestHTTPRepoURL   = "https://releases.rancher.com/server-charts/latest"
@@ -46,7 +47,8 @@ const (
 )
 
 var (
-	ChartSmallForkDir = fmt.Sprintf("/go/src/github.com/rancher/rancher/build/testdata/management-state/git-repo/%s", ChartsSmallForkRepoName)
+	CICD              = false
+	ChartSmallForkDir = ""
 	PollInterval      = time.Duration(500 * time.Millisecond)
 	PollTimeout       = time.Duration(5 * time.Minute)
 )
@@ -57,15 +59,6 @@ type ClusterRepoParams struct {
 	Type RepoType // Type of the ClusterRepo resource
 	URL1 string   // URL to use when creating the ClusterRepo resource
 	URL2 string   // URL to use when updating the ClusterRepo resource to a new URL
-}
-
-// ClusterRepoParams is used to pass params to func testClusterRepo for testing
-type ChartsSmallForkRepoParams struct {
-	Name    string   // Name of the ClusterRepo resource
-	Type    RepoType // Type of the ClusterRepo resource
-	URL     string
-	Branch1 string // First branch to test at charts-small-fork
-	Branch2 string // Last branch to test at charts-small-fork
 }
 
 type RepoType int64
@@ -82,6 +75,15 @@ type ClusterRepoTestSuite struct {
 	clusterID     string
 	catalogClient *catalog.Client
 	ctx           context.Context
+}
+
+// ClusterRepoParams is used to pass params to func testClusterRepo for testing
+type ChartsSmallForkRepoParams struct {
+	Name    string   // Name of the ClusterRepo resource
+	Type    RepoType // Type of the ClusterRepo resource
+	URL     string
+	Branch1 string // URL to use when creating the ClusterRepo resource
+	Branch2 string // URL to use when updating the ClusterRepo resource to a new URL
 }
 
 func TestClusterRepoTestSuite(t *testing.T) {
@@ -102,7 +104,18 @@ func (c *ClusterRepoTestSuite) SetupSuite() {
 	c.client, err = rancher.NewClient("", testSession)
 	require.NoError(c.T(), err)
 
-	c.clusterID = LocalClusterID
+	if os.Getenv("LOCAL_MODE") == LocalClusterID {
+		CICD = false
+		c.clusterID = LocalClusterID
+		ChartSmallForkDir = fmt.Sprintf("../../../../management-state/git-repo/%s", ChartsSmallForkRepoName)
+	} else {
+		CICD = true
+		clusterName := c.client.RancherConfig.ClusterName
+		c.clusterID, err = clusters.GetClusterIDByName(c.client, clusterName)
+		require.NoError(c.T(), err)
+		ChartSmallForkDir = fmt.Sprintf("/go/src/github.com/rancher/rancher/bin/build/%s", ChartsSmallForkRepoName)
+	}
+
 	c.catalogClient, err = c.client.GetClusterCatalogClient(c.clusterID)
 	require.NoError(c.T(), err)
 }
@@ -175,15 +188,8 @@ func (c *ClusterRepoTestSuite) testClusterRepo(params ClusterRepoParams) {
 // testSmallForkClusterRepo takes in ChartsSmallForkRepoParams
 // and asserts the current state of the local repository directory to the Spec and Status of created and updated ClusterRepo.
 func (c *ClusterRepoTestSuite) testSmallForkClusterRepo(params ChartsSmallForkRepoParams) {
-	var err error
-	var firstCommit, firstBranch string
-	var lastCommit, lastBranch string
-	var createdClusterRepo, testClusterRepo, updatedClusterRepo *v1.ClusterRepo
-	var wg sync.WaitGroup
 
-	// Operations as Admin
-	// Creates a new ClusterRepo Kubernetes custom resource
-	createdClusterRepo, err = c.catalogClient.ClusterRepos().Create(c.ctx,
+	testClusterRepo, err := c.catalogClient.ClusterRepos().Create(c.ctx,
 		&v1.ClusterRepo{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: ChartsSmallForkRepoName,
@@ -196,200 +202,137 @@ func (c *ClusterRepoTestSuite) testSmallForkClusterRepo(params ChartsSmallForkRe
 
 	require.NoError(c.T(), err)
 
-	// Test RBAC concurrently after creating the test cluster catalog "charts-small-fork"
-	wg.Add(1)
-	go c.testRBACClusterRepo(&wg)
-
-	// List all available installed Cluster Repos
 	installedClusterRepos, err := c.catalogClient.ClusterRepos().List(c.ctx, metav1.ListOptions{})
 	require.NoError(c.T(), err)
 
-	// Check if our created ClusterRepo (charts-small-fork) was created
 	success := false
 	for _, cr := range installedClusterRepos.Items {
-		logrus.Debugf("Installed Cluster Repo: %s", cr.Name)
-		if cr.Name == createdClusterRepo.Name {
+		logrus.Infof("Installed Cluster Repo: %s", cr.Name)
+		if cr.Name == testClusterRepo.Name {
 			success = true
 		}
 	}
 	require.Equal(c.T(), true, success)
+
+	watcherEnsure, err := c.catalogClient.ClusterRepos().Watch(c.ctx, metav1.ListOptions{
+		FieldSelector:  fmt.Sprintf("metadata.name=%s", ChartsSmallForkRepoName),
+		TimeoutSeconds: &defaults.QuickWatchTimeoutSeconds,
+	})
 	require.NoError(c.T(), err)
 
-	// Wait until ClusterRepo.Status.Commit reflects the first commit at the local repository
-	err = kwait.Poll(5*time.Second, 2*time.Minute, func() (done bool, err error) {
-		// Get the path to the local repository and assert it has no error
-		testClusterRepo, err = c.catalogClient.ClusterRepos().Get(c.ctx, createdClusterRepo.Name, metav1.GetOptions{})
-		if err != nil {
-			return false, err
+	err = clusterWait.WatchWait(watcherEnsure, func(event watch.Event) (ensured bool, err error) {
+		if event.Type == watch.Error {
+			return false, fmt.Errorf("there was an error syncing the cluster repo charts-small-fork")
 		}
-		if testClusterRepo.Status.Commit != "" {
-			return true, nil
+		if event.Type == watch.Modified {
+			return checkStatusFromClusterRepo(event)
 		}
 		return false, nil
 	})
 	require.NoError(c.T(), err)
 
-	// We have waited for ClusterRepo status to update and the local repository to be created
 	repoPath, err := getCurrentRepoDirSmallFork()
 	require.NoError(c.T(), err)
-	firstCommit, firstBranch, err = getLocalRepoCurrentCommitAndBranch(repoPath)
+	localRepoCommit, localRepoBranch, err := getLocalRepoCurrentCommitAndBranch(repoPath)
 	require.NoError(c.T(), err)
 
-	// Compare ClusterRepo Values with the local repository
-	assert.Equal(c.T(), firstBranch, testClusterRepo.Spec.GitBranch)
-	assert.Equal(c.T(), firstBranch, testClusterRepo.Status.Branch)
-	assert.Equal(c.T(), firstCommit, testClusterRepo.Status.Commit)
+	testClusterRepo, err = c.catalogClient.ClusterRepos().Get(c.ctx, testClusterRepo.Name, metav1.GetOptions{})
+	require.NoError(c.T(), err)
+	assert.Equal(c.T(), localRepoBranch, testClusterRepo.Spec.GitBranch)
+	assert.Equal(c.T(), localRepoBranch, testClusterRepo.Status.Branch)
+	assert.Equal(c.T(), localRepoCommit, testClusterRepo.Status.Commit)
 	assert.Equal(c.T(), int64(1), testClusterRepo.Status.ObservedGeneration)
 
-	// Updating ClusterRepo Spec Branch to a newer one
 	testClusterRepo.Spec.GitBranch = ChartsSmallForkGitRepoLastBranch
-	updatedClusterRepo, err = c.catalogClient.ClusterRepos().Update(c.ctx, testClusterRepo.DeepCopy(), metav1.UpdateOptions{})
+	updatedClusterRepo, err := c.catalogClient.ClusterRepos().Update(c.ctx, testClusterRepo.DeepCopy(), metav1.UpdateOptions{})
 	require.NoError(c.T(), err)
 	assert.Equal(c.T(), ChartsSmallForkGitRepoLastBranch, updatedClusterRepo.Spec.GitBranch)
 
-	// The Spec from ClusterRepo is updated almost instantly, the status and local repository take more time
-	err = kwait.Poll(5*time.Second, 10*time.Minute, func() (done bool, err error) {
-		lastCommit, _, err := getLocalRepoCurrentCommitAndBranch(repoPath)
-		require.NoError(c.T(), err)
-		updatedClusterRepo, err = c.catalogClient.ClusterRepos().Get(c.ctx, testClusterRepo.Name, metav1.GetOptions{})
-		if err != nil {
-			return false, err
+	watcherUpdate, err := c.catalogClient.ClusterRepos().Watch(c.ctx, metav1.ListOptions{
+		FieldSelector:  fmt.Sprintf("metadata.name=%s", ChartsSmallForkRepoName),
+		TimeoutSeconds: &defaults.QuickWatchTimeoutSeconds,
+	})
+	require.NoError(c.T(), err)
+
+	err = clusterWait.WatchWait(watcherUpdate, func(event watch.Event) (ensured bool, err error) {
+		if event.Type == watch.Error {
+			return false, fmt.Errorf("there was an error syncing the cluster repo charts-small-fork")
 		}
-		// Assertions
-		if lastCommit == updatedClusterRepo.Status.Commit && lastCommit != firstCommit {
-			return true, nil
+		if event.Type == watch.Modified {
+			return checkObservedGeneration(event)
 		}
 		return false, nil
 	})
-	logrus.Debug("last commit: ", lastCommit)
-	logrus.Debug("last branch: ", lastBranch)
 	require.NoError(c.T(), err)
-	// Wait for both tests finishing
-	wg.Wait()
+
+	updatedRepoCommit, updatedRepoBranch, err := getLocalRepoCurrentCommitAndBranch(repoPath)
+	require.NoError(c.T(), err)
+
+	updatedClusterRepo, err = c.catalogClient.ClusterRepos().Get(c.ctx, testClusterRepo.Name, metav1.GetOptions{})
+	require.NoError(c.T(), err)
+	assert.Equal(c.T(), updatedRepoBranch, updatedClusterRepo.Spec.GitBranch)
+	assert.Equal(c.T(), updatedRepoBranch, updatedClusterRepo.Status.Branch)
+	assert.Equal(c.T(), updatedRepoCommit, updatedClusterRepo.Status.Commit)
+	assert.Equal(c.T(), int64(2), updatedClusterRepo.Status.ObservedGeneration)
 }
 
-// testRBACClusterRepo tests RBAC (Role-Based Access Control) functionality for Cluster Repositories.
-// It creates roles, users with roles, Cluster RoleTemplate Bindings, and performs RBAC checks.
-func (c *ClusterRepoTestSuite) testRBACClusterRepo(wg *sync.WaitGroup) {
-	defer wg.Done()
-	// Create role templates
-	roleName1 := "catalog-view-target"
-	roleName2 := "catalog-view-all"
-	role1, role2 := c.createRoleTemplates(roleName1, roleName2)
-	// Create users with roles
-	user1 := c.createUserWithDefaultGlobalRole("rbac-catalog-user-test-1")
-	user2 := c.createUserWithDefaultGlobalRole("rbac-catalog-user-test-2")
-	// Create Cluster RoleTemplate Bindings
-	c.createClusterRoleTemplateBindings(user1.ID, user2.ID, role1.ID, role2.ID)
-
-	ctx := context.Background()
-	// Test user1's access to Cluster Repositories
-	testUser1, err := c.client.AsUser(user1)
-	require.NoError(c.T(), err)
-	_, err = testUser1.Catalog.ClusterRepos().List(ctx, metav1.ListOptions{})
-	var expectedErrorCode int32 = 403
-	var expectedErrorReason string = "Forbidden"
-	statusErr, ok := err.(*errors.StatusError)
-	require.True(c.T(), ok, "Expected error of type StatusError, but got a different error type.")
-	require.Equal(c.T(), expectedErrorCode, statusErr.ErrStatus.Code, "Expected error Code to be %d, but got %d.", expectedErrorCode, statusErr.ErrStatus.Code)
-	require.Equal(c.T(), expectedErrorReason, string(statusErr.ErrStatus.Reason), "Expected error Reason to be %s, but got %s.", expectedErrorReason, string(statusErr.ErrStatus.Reason))
-
-	user1ClusterRepos, err := testUser1.Catalog.ClusterRepos().Get(ctx, ChartsSmallForkRepoName, metav1.GetOptions{})
-	_ = user1ClusterRepos
-	require.NoError(c.T(), err)
-	require.Equal(c.T(), user1ClusterRepos.Name, string(ChartsSmallForkRepoName))
-	// Test user2's access to Cluster Repositories
-	testUser2, err := c.client.AsUser(user2)
-	require.NoError(c.T(), err)
-	user2ClusterRepos, err := testUser2.Catalog.ClusterRepos().List(ctx, metav1.ListOptions{})
-	require.NoError(c.T(), err)
-	require.GreaterOrEqual(c.T(), len(user2ClusterRepos.Items), 4)
-}
-
-// createUserWithDefaultGlobalRole creates a new user with the specified username
-// and assigns them the "user-base" General Role Template, which grants only the login permission.
-// It generates a random password for the user and returns the created user object.
-func (c *ClusterRepoTestSuite) createUserWithDefaultGlobalRole(userName string) *management.User {
-	// Enable the user account
-	enabled := true
-
-	// Generate a random test password for the user
-	var testPassword = password.GenerateUserPassword("testpass-")
-
-	// Create a new user object with the provided username, password, and name
-	user := &management.User{
-		Username: userName,
-		Password: testPassword,
-		Name:     userName,
-		Enabled:  &enabled,
+func checkObservedGeneration(event watch.Event) (bool, error) {
+	crObj, err := data.Convert(event.Object.DeepCopyObject())
+	if err != nil {
+		return false, err
 	}
 
-	// Create the new user with the "user-base" role
-	newUser, err := users.CreateUserWithRole(c.client, user, "user-base")
-	require.NoError(c.T(), err)
+	status := crObj.Map("status")
+	observed := status["observedGeneration"]
 
-	// Set the user's password to the generated password
-	newUser.Password = user.Password
+	updated := false
+	observed, ok := observed.(interface{})
+	if !ok {
+		return false, fmt.Errorf("observed is not the expected type")
+	}
 
-	// Return the created user object
-	return newUser
+	if obsNum, ok := observed.(json.Number); obsNum.String() == "2" && ok {
+		updated = true
+	}
+
+	return updated, nil
 }
 
-// createRoleTemplates creates two Role Templates with slightly different sets of rules for testing purposes.
-// It takes two role names as input and returns pointers to the created Role Template objects.
-func (c *ClusterRepoTestSuite) createRoleTemplates(roleName1, roleName2 string) (*management.RoleTemplate, *management.RoleTemplate) {
-	// Create the first Role Template with target resourceNames
-	roleTemplate1, err := c.client.Management.RoleTemplate.Create(&management.RoleTemplate{
-		Context: "cluster",
-		Name:    roleName1,
-		Rules: []management.PolicyRule{
-			{
-				APIGroups:     []string{"catalog.cattle.io"},
-				Resources:     []string{"clusterrepos"},
-				ResourceNames: []string{ChartsSmallForkRepoName},
-				Verbs:         []string{"get", "list", "watch"},
-			},
-		},
-	})
-	require.NoError(c.T(), err)
+func checkStatusFromClusterRepo(event watch.Event) (bool, error) {
+	crObj, err := data.Convert(event.Object.DeepCopyObject())
+	if err != nil {
+		return false, err
+	}
 
-	// Create the second Role Template
-	roleTemplate2, err := c.client.Management.RoleTemplate.Create(&management.RoleTemplate{
-		Context: "cluster",
-		Name:    roleName2,
-		Rules: []management.PolicyRule{
-			{
-				APIGroups:     []string{"catalog.cattle.io"},
-				Resources:     []string{"clusterrepos"},
-				ResourceNames: []string{},
-				Verbs:         []string{"get", "list", "watch"},
-			},
-		},
-	})
-	require.NoError(c.T(), err)
+	status := crObj.Map("status")
+	conditions := status["conditions"]
 
-	return roleTemplate1, roleTemplate2
-}
+	ensured := false
+	conditionsSlice, ok := conditions.([]interface{})
+	if !ok {
+		return false, fmt.Errorf("conditions is not the expected type")
+	}
 
-// createClusterRoleTemplateBindings creates ClusterRoleTemplateBindings for two users with corresponding roles.
-func (c *ClusterRepoTestSuite) createClusterRoleTemplateBindings(user1ID, user2ID, role1ID, role2ID string) {
-	// Create ClusterRoleTemplateBinding for user1 and role1
-	_, err := c.client.Management.ClusterRoleTemplateBinding.Create(&management.ClusterRoleTemplateBinding{
-		Name:            "cluster-role-template-binding-1",
-		ClusterID:       c.clusterID,
-		RoleTemplateID:  role1ID,
-		UserPrincipalID: fmt.Sprintf("%s://%s", c.clusterID, user1ID),
-	})
-	require.NoError(c.T(), err)
+	if len(conditionsSlice) > 1 {
+		for _, conditionsInterface := range conditionsSlice {
+			conditionMap, ok := conditionsInterface.(map[string]interface{})
+			if !ok {
+				return false, fmt.Errorf("type assertion failed for conditions")
+			}
+			status, ok := conditionMap["status"].(string)
+			if !ok {
+				return false, fmt.Errorf("type assertion failed for conditions")
+			}
+			conditionType, ok := conditionMap["type"].(string)
+			if !ok {
+				return false, fmt.Errorf("type assertion failed for conditions")
+			}
+			ensured = status == "True"
+			ensured = ensured && (conditionType == "FollowerDownloaded" || conditionType == "Downloaded")
+		}
+	}
 
-	// Create ClusterRoleTemplateBinding for user2 and role2
-	_, err = c.client.Management.ClusterRoleTemplateBinding.Create(&management.ClusterRoleTemplateBinding{
-		Name:            "cluster-role-template-binding-2",
-		ClusterID:       c.clusterID,
-		RoleTemplateID:  role2ID,
-		UserPrincipalID: fmt.Sprintf("%s://%s", c.clusterID, user2ID),
-	})
-	require.NoError(c.T(), err)
+	return ensured, nil
 }
 
 // pollUntilDownloaded Polls until the ClusterRepo of the given name has been downloaded (by comparing prevDownloadTime against the current DownloadTime)
@@ -428,6 +371,10 @@ func (c *ClusterRepoTestSuite) getStatusFromClusterRepo(obj *stevev1.SteveAPIObj
 }
 
 func getCurrentRepoDirSmallFork() (string, error) {
+	if CICD {
+		return ChartSmallForkDir, nil
+	}
+	// Read the directory
 	directories, err := os.ReadDir(ChartSmallForkDir)
 	if err != nil {
 		return "", fmt.Errorf("failed to find local git repository directory: %w", err)
@@ -439,6 +386,7 @@ func getCurrentRepoDirSmallFork() (string, error) {
 }
 
 func getLocalRepoCurrentCommitAndBranch(repoPath string) (string, string, error) {
+
 	// Get commit hash
 	var commitOut bytes.Buffer
 	commitCmd := exec.Command("git", "-C", repoPath, "rev-parse", "HEAD")

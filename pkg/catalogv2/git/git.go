@@ -121,7 +121,7 @@ func (g *git) Update(branch string) (string, error) {
 		return commit, err
 	}
 
-	if err := g.fetchAndReset(branch); err != nil {
+	if err := g.fetchResetAndCheckout(branch); err != nil {
 		return "", err
 	}
 
@@ -129,16 +129,16 @@ func (g *git) Update(branch string) (string, error) {
 }
 
 // Ensure runs git clone, clean DIRTY contents and fetch the latest commit
-func (g *git) Ensure(branch string) error {
+func (g *git) Ensure(commit string) error {
 	if err := g.clone(""); err != nil {
 		return err
 	}
 
-	if err := g.reset(branch); err == nil {
+	if err := g.reset(commit); err == nil {
 		return nil
 	}
 
-	return g.fetchAndReset(branch)
+	return g.fetchResetAndCheckout(branch)
 }
 
 func (g *git) httpClientWithCreds() (*http.Client, error) {
@@ -301,11 +301,18 @@ func (g *git) clone(branch string) error {
 	return g.Clone(branch)
 }
 
-func (g *git) fetchAndReset(rev string) error {
+func (g *git) fetchResetAndCheckout(rev string) error {
 	if err := g.git("-C", g.Directory, "fetch", "origin", "--", rev); err != nil {
 		return err
 	}
-	return g.reset("FETCH_HEAD")
+	if err := g.reset("FETCH_HEAD"); err != nil {
+		return err
+	}
+	return g.forceCheckout(rev)
+}
+
+func (g *git) forceCheckout(rev string) error {
+	return g.git("-C", g.Directory, "checkout", "--force", "-b", rev)
 }
 
 func (g *git) reset(rev string) error {
