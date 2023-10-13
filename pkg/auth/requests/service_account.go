@@ -23,14 +23,18 @@ import (
 
 const serviceAccountSubjectPrefix = "system:serviceaccount:"
 
-type restConfigGetter func(cluster *mgmtv3.Cluster, context *config.ScaledContext, secretLister corev1.SecretLister) (*rest.Config, error)
+type (
+	restConfigGetter  func(cluster *mgmtv3.Cluster, context *config.ScaledContext, secretLister corev1.SecretLister) (*rest.Config, error)
+	authClientCreator func(config *rest.Config) (authv1.AuthenticationV1Interface, error)
+)
 
 // ServiceAccountAuth is an authenticator that authenticates requests using the downstream service account's JWT.
 type ServiceAccountAuth struct {
-	scaledContext    *config.ScaledContext
-	clusterLister    mgmtv3.ClusterLister
-	secretLister     corev1.SecretLister
-	restConfigGetter restConfigGetter
+	scaledContext     *config.ScaledContext
+	clusterLister     mgmtv3.ClusterLister
+	secretLister      corev1.SecretLister
+	restConfigGetter  restConfigGetter
+	authClientCreator authClientCreator
 }
 
 // NewServiceAccountAuth creates a new instance of ServiceAccountAuth.
@@ -43,6 +47,9 @@ func NewServiceAccountAuth(
 		clusterLister:    scaledContext.Management.Clusters("").Controller().Lister(),
 		secretLister:     scaledContext.Core.Secrets("").Controller().Lister(),
 		restConfigGetter: restConfigGetter,
+		authClientCreator: func(config *rest.Config) (authv1.AuthenticationV1Interface, error) {
+			return authv1.NewForConfig(config)
+		},
 	}
 }
 
@@ -92,7 +99,7 @@ func (t *ServiceAccountAuth) Authenticate(req *http.Request) (user.Info, bool, e
 		return info, false, err
 	}
 
-	authClient, err := authv1.NewForConfig(kubeConfig)
+	authClient, err := t.authClientCreator(kubeConfig)
 	if err != nil {
 		logrus.Debugf("saauth: error creating authentication client: %v", err)
 		return info, false, err
