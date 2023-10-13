@@ -4,55 +4,59 @@ import (
 	"fmt"
 	"testing"
 
-	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/version"
 )
 
-func newClusterListerWithVersion(kubernetesVersion string) *fakes.ClusterListerMock {
+func newClusterLister(kubernetesVersion string) *fakes.ClusterListerMock {
 	return &fakes.ClusterListerMock{
-		GetFunc: func(namespace, name string) (*mgmtv3.Cluster, error) {
-			if name == "test" {
-				cluster := mgmtv3.Cluster{
-					Status: apimgmtv3.ClusterStatus{
-						Version: &version.Info{
-							GitVersion: kubernetesVersion,
-						},
-					},
-				}
-				return &cluster, nil
+		GetFunc: func(namespace, name string) (*v3.Cluster, error) {
+			if name == "invalid" {
+				return nil, fmt.Errorf("invalid cluster: %s", name)
+			} else if name == "not ready" {
+				return &v3.Cluster{Status: v3.ClusterStatus{}}, nil
+			} else {
+				return &v3.Cluster{Status: v3.ClusterStatus{Version: &version.Info{GitVersion: kubernetesVersion}}}, nil
 			}
-			return nil, fmt.Errorf("invalid cluster: %s", name)
 		},
 	}
 }
 
-func TestCheckClusterVersion(t *testing.T) {
+func TestCheckClusterVersionFailsForVersionsThatCannotBeParsed(t *testing.T) {
+	t.Parallel()
+	tests := []string{"", "⌘⌘⌘", "v1.2", "v1.24", "v1.24.a", "1.24", "1.24.a"}
+	for _, v := range tests {
+		v := v
+		t.Run(v, func(t *testing.T) {
+			t.Parallel()
+			clusterLister := newClusterLister(v)
+			err := checkClusterVersion("test", clusterLister)
+			require.Error(t, err)
+			require.NotErrorIs(t, err, errVersionIncompatible)
+		})
+	}
+}
 
-	tests := []*struct {
+func TestCheckClusterVersionInspectsValidVersionsForCompatibilityWithPSP(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
 		version string
 		wantErr bool
-		setup   func()
 	}{
-		// tests for version string size
+		// regular version strings
 		{
-			version: "",
-			wantErr: true,
-		},
-		{
-			version: "v1.24",
+			version: "1.24.9",
 			wantErr: false,
 		},
-		{
-			version: "v1.2",
-			wantErr: true,
-		},
-		// rke1 version strings
 		{
 			version: "v1.24.9",
 			wantErr: false,
+		},
+		{
+			version: "1.25.9",
+			wantErr: true,
 		},
 		{
 			version: "v1.25.9",
@@ -75,6 +79,19 @@ func TestCheckClusterVersion(t *testing.T) {
 			version: "v1.26.9+k3s1",
 			wantErr: true,
 		},
+		// rke1 version strings
+		{
+			version: "v1.24.9-rancher1-1",
+			wantErr: false,
+		},
+		{
+			version: "v1.25.9-rancher1-1",
+			wantErr: true,
+		},
+		{
+			version: "v1.26.9-rancher1-1",
+			wantErr: true,
+		},
 		// rke2 version strings
 		{
 			version: "v1.24.9+rke2r1",
@@ -90,16 +107,37 @@ func TestCheckClusterVersion(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.version, func(t *testing.T) {
-			clusterLister := newClusterListerWithVersion(tt.version)
-			println(tt.version)
+			t.Parallel()
+			clusterLister := newClusterLister(tt.version)
 			err := checkClusterVersion("test", clusterLister)
 			if tt.wantErr {
-				println(err.Error())
-				assert.Error(t, err, "Expected checkClusterVersion to raise error.")
-				return
+				require.Error(t, err)
+				require.ErrorIs(t, err, errVersionIncompatible)
+			}
+			if !tt.wantErr {
+				require.NoError(t, err)
 			}
 		})
 	}
+}
 
+func TestCheckClusterVersionFailsWhenItCannotFetchVersion(t *testing.T) {
+	t.Parallel()
+	t.Run("version check fails when it can't get cluster", func(t *testing.T) {
+		t.Parallel()
+		clusterLister := newClusterLister("")
+		err := checkClusterVersion("invalid", clusterLister)
+		require.Error(t, err)
+		require.NotErrorIs(t, err, errVersionIncompatible)
+	})
+
+	t.Run("version check fails when the version is not yet known", func(t *testing.T) {
+		t.Parallel()
+		clusterLister := newClusterLister("")
+		err := checkClusterVersion("not ready", clusterLister)
+		require.Error(t, err)
+		require.NotErrorIs(t, err, errVersionIncompatible)
+	})
 }
