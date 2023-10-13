@@ -402,11 +402,11 @@ func generateManifestRemovalInstruction(runtime string, entry *planEntry) (bool,
 	}
 }
 
-// generateKubeProxyRemovalInstruction generates a rm -rf command for the kube-proxy pod-manifest.
+// generateKubeProxyRemovalInstruction generates a rm -f command for the kube-proxy pod-manifest to be run on RKE2.
 // This was created based on this issue: https://github.com/rancher/rancher/issues/42895
 // Despite not fixing all problems after deleting it the "waiting for calico" issue got fixed.
 func generateKubeProxyRemovalInstruction(runtime string, entry *planEntry) (bool, plan.OneTimeInstruction) {
-	if entry == nil || runtime == "" {
+	if entry == nil || runtime != capr.RuntimeRKE2 {
 		return false, plan.OneTimeInstruction{}
 	}
 	return true, plan.OneTimeInstruction{
@@ -414,7 +414,7 @@ func generateKubeProxyRemovalInstruction(runtime string, entry *planEntry) (bool
 		Command: "/bin/sh",
 		Args: []string{
 			"-c",
-			fmt.Sprintf("rm -rf /var/lib/rancher/%s/agent/pod-manifests/kube-proxy.yaml", runtime),
+			fmt.Sprintf("rm -f /var/lib/rancher/%s/agent/pod-manifests/kube-proxy.yaml", runtime),
 		},
 	}
 }
