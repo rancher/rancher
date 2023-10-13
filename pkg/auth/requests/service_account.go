@@ -6,11 +6,6 @@ import (
 
 	jwtv4 "github.com/golang-jwt/jwt/v4"
 	"github.com/gorilla/mux"
-	authcontext "github.com/rancher/rancher/pkg/auth/context"
-	"github.com/rancher/rancher/pkg/auth/tokens"
-	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
-	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/steve/pkg/auth"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/authentication/v1"
@@ -19,6 +14,12 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/request"
 	authv1 "k8s.io/client-go/kubernetes/typed/authentication/v1"
 	"k8s.io/client-go/rest"
+
+	authcontext "github.com/rancher/rancher/pkg/auth/context"
+	"github.com/rancher/rancher/pkg/auth/tokens"
+	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/types/config"
 )
 
 const serviceAccountSubjectPrefix = "system:serviceaccount:"
@@ -33,7 +34,7 @@ type ServiceAccountAuth struct {
 	restConfigGetter restConfigGetter
 }
 
-// Creates a new instance of ServiceAccountAuth.
+// NewServiceAccountAuth creates a new instance of ServiceAccountAuth.
 func NewServiceAccountAuth(
 	scaledContext *config.ScaledContext,
 	restConfigGetter restConfigGetter,
@@ -66,6 +67,11 @@ func (t *ServiceAccountAuth) Authenticate(req *http.Request) (user.Info, bool, e
 
 	if !strings.HasPrefix(claims.Subject, serviceAccountSubjectPrefix) {
 		logrus.Debugf("saauth: JWT sub is not a service account: %v", err)
+		return info, false, nil
+	}
+
+	if isTokenExpired(claims.ExpiresAt) {
+		logrus.Debugf("saauth: Service Account JWT is expired. Expiration time was: %v", claims.ExpiresAt)
 		return info, false, nil
 	}
 
@@ -119,4 +125,14 @@ func (t *ServiceAccountAuth) Authenticate(req *http.Request) (user.Info, bool, e
 		UID:    tokenReview.Status.User.UID,
 		Groups: tokenReview.Status.User.Groups,
 	}, true, nil
+}
+
+// isTokenExpired takes the expiration time from a JWT and returns true if it is expired, otherwise it returns false
+func isTokenExpired(expirationTime *jwtv4.NumericDate) bool {
+	if expirationTime == nil {
+		// Token does not have an expiration time, so it is not expired
+		return false
+	}
+	currentTime := jwtv4.TimeFunc()
+	return currentTime.After(expirationTime.Time)
 }
