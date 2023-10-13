@@ -6,6 +6,11 @@ import (
 
 	jwtv4 "github.com/golang-jwt/jwt/v4"
 	"github.com/gorilla/mux"
+	authcontext "github.com/rancher/rancher/pkg/auth/context"
+	"github.com/rancher/rancher/pkg/auth/tokens"
+	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/steve/pkg/auth"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/authentication/v1"
@@ -14,12 +19,6 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/request"
 	authv1 "k8s.io/client-go/kubernetes/typed/authentication/v1"
 	"k8s.io/client-go/rest"
-
-	authcontext "github.com/rancher/rancher/pkg/auth/context"
-	"github.com/rancher/rancher/pkg/auth/tokens"
-	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
-	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/types/config"
 )
 
 const serviceAccountSubjectPrefix = "system:serviceaccount:"
@@ -87,7 +86,6 @@ func (t *ServiceAccountAuth) Authenticate(req *http.Request) (user.Info, bool, e
 		return info, false, err
 	}
 
-	// TODO: See if we can cache the config.
 	// Get rest config for the cluster and instantiate an authentication client.
 	kubeConfig, err := t.restConfigGetter(cluster, t.scaledContext, t.secretLister)
 	if kubeConfig == nil || err != nil {
@@ -127,12 +125,13 @@ func (t *ServiceAccountAuth) Authenticate(req *http.Request) (user.Info, bool, e
 	}, true, nil
 }
 
-// isTokenExpired takes the expiration time from a JWT and returns true if it is expired, otherwise it returns false
+// isTokenExpired takes the expiration time from a JWT and returns true if it is expired, otherwise it returns false.
 func isTokenExpired(expirationTime *jwtv4.NumericDate) bool {
 	if expirationTime == nil {
-		// Token does not have an expiration time, so it is not expired
+		// Token does not have an expiration time, so it is not expired.
 		return false
 	}
+
 	currentTime := jwtv4.TimeFunc()
 	return currentTime.After(expirationTime.Time)
 }

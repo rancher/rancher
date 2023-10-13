@@ -7,7 +7,7 @@ import (
 	jwtv4 "github.com/golang-jwt/jwt/v4"
 )
 
-func Test_isTokenExpired(t *testing.T) {
+func TestIsTokenExpired(t *testing.T) {
 	tests := []struct {
 		name           string
 		expirationTime *jwtv4.NumericDate
@@ -28,6 +28,7 @@ func Test_isTokenExpired(t *testing.T) {
 			want:           false,
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := isTokenExpired(tt.expirationTime); got != tt.want {
