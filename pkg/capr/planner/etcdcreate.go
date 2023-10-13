@@ -130,16 +130,7 @@ func (p *Planner) createEtcdSnapshot(controlPlane *rkev1.RKEControlPlane, status
 
 	// Don't create an etcd snapshot if the cluster is not initialized or bootstrapped.
 	if !status.Initialized || !capr.Bootstrapped.IsTrue(&status) {
-		return status, nil
-	}
-
-	found, joinServer, _, err := p.findInitNode(controlPlane, clusterPlan)
-	if err != nil {
-		logrus.Errorf("[planner] rkecluster %s/%s: error encountered while searching for init node during etcd snapshot creation: %v", controlPlane.Namespace, controlPlane.Name, err)
-		return status, err
-	}
-	if !found || joinServer == "" {
-		logrus.Warnf("[planner] rkecluster %s/%s: skipping etcd snapshot creation as cluster does not have an init node", controlPlane.Namespace, controlPlane.Name)
+		logrus.Warnf("[planner] rkecluster %s/%s: skipping etcd snapshot creation as cluster has not yet been initialized or bootstrapped", controlPlane.Namespace, controlPlane.Name)
 		return status, nil
 	}
 
@@ -153,6 +144,15 @@ func (p *Planner) createEtcdSnapshot(controlPlane *rkev1.RKEControlPlane, status
 	case rkev1.ETCDSnapshotPhaseStarted:
 		var stateSet bool
 		var finErrs []error
+		found, joinServer, _, err := p.findInitNode(controlPlane, clusterPlan)
+		if err != nil {
+			logrus.Errorf("[planner] rkecluster %s/%s: error encountered while searching for init node during etcd snapshot creation: %v", controlPlane.Namespace, controlPlane.Name, err)
+			return status, err
+		}
+		if !found || joinServer == "" {
+			logrus.Warnf("[planner] rkecluster %s/%s: skipping etcd snapshot creation as cluster does not have an init node", controlPlane.Namespace, controlPlane.Name)
+			return status, nil
+		}
 		if errs := p.runEtcdSnapshotCreate(controlPlane, tokensSecret, clusterPlan, joinServer); len(errs) > 0 {
 			for _, err := range errs {
 				if err == nil {
