@@ -1,7 +1,6 @@
 package git
 
 import (
-	"bufio"
 	"bytes"
 	"crypto/tls"
 	"crypto/x509"
@@ -59,26 +58,6 @@ type git struct {
 	secret            *corev1.Secret
 	headers           map[string]string
 	knownHosts        []byte
-}
-
-// LsRemote runs ls-remote on git repo and returns the HEAD commit SHA
-func (g *git) LsRemote(branch string, commit string) (string, error) {
-	if changed, err := g.remoteSHAChanged(branch, commit); err != nil || !changed {
-		return commit, err
-	}
-
-	output := &bytes.Buffer{}
-	if err := g.gitCmd(output, "ls-remote", "--", g.URL, formatRefForBranch(branch)); err != nil {
-		return "", err
-	}
-
-	var lines []string
-	s := bufio.NewScanner(output)
-	for s.Scan() {
-		lines = append(lines, s.Text())
-	}
-
-	return firstField(lines, fmt.Sprintf("no commit for branch: %s", branch))
 }
 
 // Head runs git clone on directory(if not exist), reset dirty content and return the HEAD commit
