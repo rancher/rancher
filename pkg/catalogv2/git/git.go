@@ -32,6 +32,18 @@ type Options struct {
 	Headers           map[string]string
 }
 
+type git struct {
+	URL               string
+	Directory         string
+	password          string
+	agent             *agent.Agent
+	caBundle          []byte
+	insecureTLSVerify bool
+	secret            *corev1.Secret
+	headers           map[string]string
+	knownHosts        []byte
+}
+
 func newGit(directory, url string, opts *Options) (*git, error) {
 	if opts == nil {
 		opts = &Options{}
@@ -48,24 +60,84 @@ func newGit(directory, url string, opts *Options) (*git, error) {
 	return g, g.setCredential(opts.Credential)
 }
 
-type git struct {
-	URL               string
-	Directory         string
-	password          string
-	agent             *agent.Agent
-	caBundle          []byte
-	insecureTLSVerify bool
-	secret            *corev1.Secret
-	headers           map[string]string
-	knownHosts        []byte
+func (g *git) setCredential(cred *corev1.Secret) error {
+	if cred == nil {
+		return nil
+	}
+
+	if cred.Type == corev1.SecretTypeBasicAuth {
+		username, password := cred.Data[corev1.BasicAuthUsernameKey], cred.Data[corev1.BasicAuthPasswordKey]
+		if len(password) == 0 && len(username) == 0 {
+			return nil
+		}
+
+		u, err := url.Parse(g.URL)
+		if err != nil {
+			return err
+		}
+		u.User = url.User(string(username))
+		g.URL = u.String()
+		g.password = string(password)
+	} else if cred.Type == corev1.SecretTypeSSHAuth {
+		key, err := ssh.ParseRawPrivateKey(cred.Data[corev1.SSHAuthPrivateKey])
+		if err != nil {
+			return err
+		}
+		sshAgent := agent.NewKeyring()
+		err = sshAgent.Add(agent.AddedKey{
+			PrivateKey: key,
+		})
+		if err != nil {
+			return err
+		}
+		g.knownHosts = cred.Data["known_hosts"]
+		g.agent = &sshAgent
+	}
+
+	return nil
 }
 
-// Clone runs git clone with depth 1
-func (g *git) Clone(branch string) error {
-	if branch == "" {
-		return g.git("clone", "--depth=1", "-n", "--", g.URL, g.Directory)
+func (g *git) injectAgent(cmd *exec.Cmd) (io.Closer, error) {
+	r, err := randomtoken.Generate()
+	if err != nil {
+		return nil, err
 	}
-	return g.git("clone", "--depth=1", "-n", "--branch="+branch, "--", g.URL, g.Directory)
+
+	tmpDir, err := ioutil.TempDir("", "ssh-agent")
+	if err != nil {
+		return nil, err
+	}
+
+	addr := &net.UnixAddr{
+		Name: filepath.Join(tmpDir, r),
+		Net:  "unix",
+	}
+
+	l, err := net.ListenUnix(addr.Net, addr)
+	if err != nil {
+		return nil, err
+	}
+
+	cmd.Env = append(cmd.Env, "SSH_AUTH_SOCK="+addr.Name)
+
+	go func() {
+		defer os.RemoveAll(tmpDir)
+		defer l.Close()
+		for {
+			conn, err := l.Accept()
+			if err != nil {
+				if !k8snet.IsProbableEOF(err) {
+					logrus.Errorf("failed to accept ssh-agent client connection: %v", err)
+				}
+				return
+			}
+			if err := agent.ServeAgent(*g.agent, conn); err != nil && err != io.EOF {
+				logrus.Errorf("failed to handle ssh-agent client connection: %v", err)
+			}
+		}
+	}()
+
+	return l, nil
 }
 
 func (g *git) httpClientWithCreds() (*http.Client, error) {
@@ -119,6 +191,42 @@ func (g *git) httpClientWithCreds() (*http.Client, error) {
 	}
 
 	return client, nil
+}
+
+// Clone runs git clone with depth 1
+func (g *git) Clone(branch string) error {
+	if branch == "" {
+		return g.git("clone", "--depth=1", "-n", "--", g.URL, g.Directory)
+	}
+	return g.git("clone", "--depth=1", "-n", "--branch="+branch, "--", g.URL, g.Directory)
+}
+
+func (g *git) clone(branch string) error {
+	gitDir := filepath.Join(g.Directory, ".git")
+	if dir, err := os.Stat(gitDir); err == nil && dir.IsDir() {
+		return nil
+	}
+
+	if err := os.RemoveAll(g.Directory); err != nil {
+		return fmt.Errorf("failed to remove directory %s: %v", g.Directory, err)
+	}
+
+	return g.Clone(branch)
+}
+
+func (g *git) fetchAndReset(rev string) error {
+	if err := g.git("-C", g.Directory, "fetch", "origin", "--", rev); err != nil {
+		return err
+	}
+	return g.reset("FETCH_HEAD")
+}
+
+func (g *git) reset(rev string) error {
+	return g.git("-C", g.Directory, "reset", "--hard", rev)
+}
+
+func (g *git) currentCommit() (string, error) {
+	return g.gitOutput("-C", g.Directory, "rev-parse", "HEAD")
 }
 
 func (g *git) remoteSHAChanged(branch, sha string) (bool, error) {
@@ -176,71 +284,6 @@ func (g *git) gitOutput(args ...string) (string, error) {
 	output := &bytes.Buffer{}
 	err := g.gitCmd(output, args...)
 	return strings.TrimSpace(output.String()), err
-}
-
-func (g *git) setCredential(cred *corev1.Secret) error {
-	if cred == nil {
-		return nil
-	}
-
-	if cred.Type == corev1.SecretTypeBasicAuth {
-		username, password := cred.Data[corev1.BasicAuthUsernameKey], cred.Data[corev1.BasicAuthPasswordKey]
-		if len(password) == 0 && len(username) == 0 {
-			return nil
-		}
-
-		u, err := url.Parse(g.URL)
-		if err != nil {
-			return err
-		}
-		u.User = url.User(string(username))
-		g.URL = u.String()
-		g.password = string(password)
-	} else if cred.Type == corev1.SecretTypeSSHAuth {
-		key, err := ssh.ParseRawPrivateKey(cred.Data[corev1.SSHAuthPrivateKey])
-		if err != nil {
-			return err
-		}
-		sshAgent := agent.NewKeyring()
-		err = sshAgent.Add(agent.AddedKey{
-			PrivateKey: key,
-		})
-		if err != nil {
-			return err
-		}
-		g.knownHosts = cred.Data["known_hosts"]
-		g.agent = &sshAgent
-	}
-
-	return nil
-}
-
-func (g *git) clone(branch string) error {
-	gitDir := filepath.Join(g.Directory, ".git")
-	if dir, err := os.Stat(gitDir); err == nil && dir.IsDir() {
-		return nil
-	}
-
-	if err := os.RemoveAll(g.Directory); err != nil {
-		return fmt.Errorf("failed to remove directory %s: %v", g.Directory, err)
-	}
-
-	return g.Clone(branch)
-}
-
-func (g *git) fetchAndReset(rev string) error {
-	if err := g.git("-C", g.Directory, "fetch", "origin", "--", rev); err != nil {
-		return err
-	}
-	return g.reset("FETCH_HEAD")
-}
-
-func (g *git) reset(rev string) error {
-	return g.git("-C", g.Directory, "reset", "--hard", rev)
-}
-
-func (g *git) currentCommit() (string, error) {
-	return g.gitOutput("-C", g.Directory, "rev-parse", "HEAD")
 }
 
 func (g *git) gitCmd(output io.Writer, args ...string) error {
@@ -306,47 +349,4 @@ func (g *git) gitCmd(output io.Writer, args ...string) error {
 		return fmt.Errorf("git %s error: %w, detail: %v", strings.Join(args, " "), err, stderrBuf.String())
 	}
 	return nil
-}
-
-func (g *git) injectAgent(cmd *exec.Cmd) (io.Closer, error) {
-	r, err := randomtoken.Generate()
-	if err != nil {
-		return nil, err
-	}
-
-	tmpDir, err := ioutil.TempDir("", "ssh-agent")
-	if err != nil {
-		return nil, err
-	}
-
-	addr := &net.UnixAddr{
-		Name: filepath.Join(tmpDir, r),
-		Net:  "unix",
-	}
-
-	l, err := net.ListenUnix(addr.Net, addr)
-	if err != nil {
-		return nil, err
-	}
-
-	cmd.Env = append(cmd.Env, "SSH_AUTH_SOCK="+addr.Name)
-
-	go func() {
-		defer os.RemoveAll(tmpDir)
-		defer l.Close()
-		for {
-			conn, err := l.Accept()
-			if err != nil {
-				if !k8snet.IsProbableEOF(err) {
-					logrus.Errorf("failed to accept ssh-agent client connection: %v", err)
-				}
-				return
-			}
-			if err := agent.ServeAgent(*g.agent, conn); err != nil && err != io.EOF {
-				logrus.Errorf("failed to handle ssh-agent client connection: %v", err)
-			}
-		}
-	}()
-
-	return l, nil
 }
