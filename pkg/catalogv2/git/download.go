@@ -8,6 +8,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
+// Ensure runs git clone, clean DIRTY contents and fetch the latest commit
 func Ensure(secret *corev1.Secret, namespace, name, gitURL, commit string, insecureSkipTLS bool, caBundle []byte) error {
 	if commit == "" {
 		return nil
@@ -23,7 +24,18 @@ func Ensure(secret *corev1.Secret, namespace, name, gitURL, commit string, insec
 		return nil
 	}
 
-	return git.Ensure(commit)
+	if err := git.clone(""); err != nil {
+		return err
+	}
+
+	if err := git.reset(commit); err == nil {
+		return nil
+	}
+
+	if err := git.fetchAndReset(commit); err != nil {
+		return err
+	}
+	return nil
 }
 
 // Head runs git clone on directory(if not exist), reset dirty content and return the HEAD commit
