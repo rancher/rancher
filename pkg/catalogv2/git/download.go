@@ -1,37 +1,12 @@
 package git
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
-	"encoding/pem"
 	"fmt"
 	"net/url"
-	"os"
-	"path/filepath"
-	"regexp"
-	"strings"
 
 	"github.com/rancher/rancher/pkg/settings"
 	corev1 "k8s.io/api/core/v1"
 )
-
-const (
-	stateDir  = "management-state/git-repo"
-	staticDir = "/var/lib/rancher-data/local-catalogs/v2"
-	localDir  = "../rancher-data/local-catalogs/v2" // identical to helm.InternalCatalog
-)
-
-func gitDir(namespace, name, gitURL string) string {
-	staticDir := filepath.Join(staticDir, namespace, name, hash(gitURL))
-	if s, err := os.Stat(staticDir); err == nil && s.IsDir() {
-		return staticDir
-	}
-	localDir := filepath.Join(localDir, namespace, name, hash(gitURL))
-	if s, err := os.Stat(localDir); err == nil && s.IsDir() {
-		return localDir
-	}
-	return filepath.Join(stateDir, namespace, name, hash(gitURL))
-}
 
 func Head(secret *corev1.Secret, namespace, name, gitURL, branch string, insecureSkipTLS bool, caBundle []byte) (string, error) {
 	git, err := gitForRepo(secret, namespace, name, gitURL, insecureSkipTLS, caBundle)
@@ -71,10 +46,6 @@ func Ensure(secret *corev1.Secret, namespace, name, gitURL, commit string, insec
 	return git.Ensure(commit)
 }
 
-func isBundled(git *git) bool {
-	return strings.HasPrefix(git.Directory, staticDir) || strings.HasPrefix(git.Directory, localDir)
-}
-
 func gitForRepo(secret *corev1.Secret, namespace, name, gitURL string, insecureSkipTLS bool, caBundle []byte) (*git, error) {
 	isGitSSH, err := isGitSSH(gitURL)
 	if err != nil {
@@ -104,24 +75,5 @@ func gitForRepo(secret *corev1.Secret, namespace, name, gitURL string, insecureS
 		Headers:           headers,
 		InsecureTLSVerify: insecureSkipTLS,
 		CABundle:          caBundle,
-	})
-}
-
-func isGitSSH(gitURL string) (bool, error) {
-	// Matches URLs with the format [anything]@[anything]:[anything]
-	return regexp.MatchString("(.+)@(.+):(.+)", gitURL)
-}
-
-func hash(gitURL string) string {
-	b := sha256.Sum256([]byte(gitURL))
-	return hex.EncodeToString(b[:])
-}
-
-// convertDERToPEM converts a src DER certificate into PEM with line breaks, header, and footer.
-func convertDERToPEM(src []byte) []byte {
-	return pem.EncodeToMemory(&pem.Block{
-		Type:    "CERTIFICATE",
-		Headers: map[string]string{},
-		Bytes:   src,
 	})
 }
