@@ -60,19 +60,6 @@ type git struct {
 	knownHosts        []byte
 }
 
-// Head runs git clone on directory(if not exist), reset dirty content and return the HEAD commit
-func (g *git) Head(branch string) (string, error) {
-	if err := g.clone(branch); err != nil {
-		return "", err
-	}
-
-	if err := g.reset("HEAD"); err != nil {
-		return "", err
-	}
-
-	return g.currentCommit()
-}
-
 // Clone runs git clone with depth 1
 func (g *git) Clone(branch string) error {
 	if branch == "" {
