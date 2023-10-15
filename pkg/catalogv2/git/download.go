@@ -12,7 +12,7 @@ import (
 func Ensure(secret *corev1.Secret, namespace, name, gitURL, commit string, insecureSkipTLS bool, caBundle []byte) error {
 	git, err := gitForRepo(secret, namespace, name, gitURL, insecureSkipTLS, caBundle)
 	if err != nil {
-		return err
+		return fmt.Errorf("ensure failure: %w", err)
 	}
 
 	// If the repositories are rancher managed and if bundled is set
@@ -22,7 +22,7 @@ func Ensure(secret *corev1.Secret, namespace, name, gitURL, commit string, insec
 	}
 
 	if err := git.clone(""); err != nil {
-		return err
+		return fmt.Errorf("ensure failure: %w", err)
 	}
 
 	if err := git.reset(commit); err == nil {
@@ -30,7 +30,7 @@ func Ensure(secret *corev1.Secret, namespace, name, gitURL, commit string, insec
 	}
 
 	if err := git.fetchAndReset(commit); err != nil {
-		return err
+		return fmt.Errorf("ensure failure: %w", err)
 	}
 	return nil
 }
@@ -39,20 +39,20 @@ func Ensure(secret *corev1.Secret, namespace, name, gitURL, commit string, insec
 func Head(secret *corev1.Secret, namespace, name, gitURL, branch string, insecureSkipTLS bool, caBundle []byte) (string, error) {
 	git, err := gitForRepo(secret, namespace, name, gitURL, insecureSkipTLS, caBundle)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("head failure: %w", err)
 	}
 
 	if err := git.clone(branch); err != nil {
-		return "", err
+		return "", fmt.Errorf("head failure: %w", err)
 	}
 
 	if err := git.reset("HEAD"); err != nil {
-		return "", err
+		return "", fmt.Errorf("head failure: %w", err)
 	}
 
 	commit, err := git.currentCommit()
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("head failure: %w", err)
 	}
 
 	return commit, nil
@@ -62,7 +62,7 @@ func Head(secret *corev1.Secret, namespace, name, gitURL, branch string, insecur
 func Update(secret *corev1.Secret, namespace, name, gitURL, branch string, insecureSkipTLS bool, caBundle []byte) (string, error) {
 	git, err := gitForRepo(secret, namespace, name, gitURL, insecureSkipTLS, caBundle)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("update failure: %w", err)
 	}
 
 	if isBundled(git) && settings.SystemCatalog.Get() == "bundled" {
@@ -74,27 +74,27 @@ func Update(secret *corev1.Secret, namespace, name, gitURL, branch string, insec
 	}
 
 	if err := git.reset("HEAD"); err != nil {
-		return "", err
+		return "", fmt.Errorf("update failure: %w", err)
 	}
 
 	commit, err := git.currentCommit()
 	if err != nil {
-		return commit, err
+		return commit, fmt.Errorf("update failure: %w", err)
 	}
 
 	if changed, err := git.remoteSHAChanged(branch, commit); err != nil || !changed {
-		return commit, err
+		return commit, fmt.Errorf("update failure: %w", err)
 	}
 
 	if err := git.fetchAndReset(branch); err != nil {
-		return "", err
+		return "", fmt.Errorf("update failure: %w", err)
 	}
 
 	lastCommit, err := git.currentCommit()
 	if err != nil && isBundled(git) {
 		return Head(secret, namespace, name, gitURL, branch, insecureSkipTLS, caBundle)
 	}
-	return lastCommit, err
+	return lastCommit, fmt.Errorf("update failure: %w", err)
 }
 
 func gitForRepo(secret *corev1.Secret, namespace, name, gitURL string, insecureSkipTLS bool, caBundle []byte) (*git, error) {
