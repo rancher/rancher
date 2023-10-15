@@ -94,19 +94,6 @@ func (g *git) Update(branch string) (string, error) {
 	return g.currentCommit()
 }
 
-// Ensure runs git clone, clean DIRTY contents and fetch the latest commit
-func (g *git) Ensure(commit string) error {
-	if err := g.clone(""); err != nil {
-		return err
-	}
-
-	if err := g.reset(commit); err == nil {
-		return nil
-	}
-
-	return g.fetchAndReset(commit)
-}
-
 func (g *git) httpClientWithCreds() (*http.Client, error) {
 	var (
 		username  string
