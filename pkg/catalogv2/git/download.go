@@ -10,9 +10,6 @@ import (
 
 // Ensure runs git clone, clean DIRTY contents and fetch the latest commit
 func Ensure(secret *corev1.Secret, namespace, name, gitURL, commit string, insecureSkipTLS bool, caBundle []byte) error {
-	if commit == "" {
-		return nil
-	}
 	git, err := gitForRepo(secret, namespace, name, gitURL, insecureSkipTLS, caBundle)
 	if err != nil {
 		return err
