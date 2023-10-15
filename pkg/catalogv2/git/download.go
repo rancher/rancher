@@ -61,6 +61,7 @@ func Head(secret *corev1.Secret, namespace, name, gitURL, branch string, insecur
 	return commit, nil
 }
 
+// Update updates git repo if remote sha has changed
 func Update(secret *corev1.Secret, namespace, name, gitURL, branch string, insecureSkipTLS bool, caBundle []byte) (string, error) {
 	git, err := gitForRepo(secret, namespace, name, gitURL, insecureSkipTLS, caBundle)
 	if err != nil {
@@ -71,11 +72,32 @@ func Update(secret *corev1.Secret, namespace, name, gitURL, branch string, insec
 		return Head(secret, namespace, name, gitURL, branch, insecureSkipTLS, caBundle)
 	}
 
-	commit, err := git.Update(branch)
+	if err := git.clone(branch); err != nil {
+		return "", nil
+	}
+
+	if err := git.reset("HEAD"); err != nil {
+		return "", err
+	}
+
+	commit, err := git.currentCommit()
+	if err != nil {
+		return commit, err
+	}
+
+	if changed, err := git.remoteSHAChanged(branch, commit); err != nil || !changed {
+		return commit, err
+	}
+
+	if err := git.fetchAndReset(branch); err != nil {
+		return "", err
+	}
+
+	lastCommit, err := git.currentCommit()
 	if err != nil && isBundled(git) {
 		return Head(secret, namespace, name, gitURL, branch, insecureSkipTLS, caBundle)
 	}
-	return commit, err
+	return lastCommit, err
 }
 
 func gitForRepo(secret *corev1.Secret, namespace, name, gitURL string, insecureSkipTLS bool, caBundle []byte) (*git, error) {

@@ -68,32 +68,6 @@ func (g *git) Clone(branch string) error {
 	return g.git("clone", "--depth=1", "-n", "--branch="+branch, "--", g.URL, g.Directory)
 }
 
-// Update updates git repo if remote sha has changed
-func (g *git) Update(branch string) (string, error) {
-	if err := g.clone(branch); err != nil {
-		return "", nil
-	}
-
-	if err := g.reset("HEAD"); err != nil {
-		return "", err
-	}
-
-	commit, err := g.currentCommit()
-	if err != nil {
-		return commit, err
-	}
-
-	if changed, err := g.remoteSHAChanged(branch, commit); err != nil || !changed {
-		return commit, err
-	}
-
-	if err := g.fetchAndReset(branch); err != nil {
-		return "", err
-	}
-
-	return g.currentCommit()
-}
-
 func (g *git) httpClientWithCreds() (*http.Client, error) {
 	var (
 		username  string
