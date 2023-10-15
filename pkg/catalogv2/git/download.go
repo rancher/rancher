@@ -8,6 +8,24 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
+func Ensure(secret *corev1.Secret, namespace, name, gitURL, commit string, insecureSkipTLS bool, caBundle []byte) error {
+	if commit == "" {
+		return nil
+	}
+	git, err := gitForRepo(secret, namespace, name, gitURL, insecureSkipTLS, caBundle)
+	if err != nil {
+		return err
+	}
+
+	// If the repositories are rancher managed and if bundled is set
+	// don't fetch anything from upstream.
+	if isBundled(git) && settings.SystemCatalog.Get() == "bundled" {
+		return nil
+	}
+
+	return git.Ensure(commit)
+}
+
 func Head(secret *corev1.Secret, namespace, name, gitURL, branch string, insecureSkipTLS bool, caBundle []byte) (string, error) {
 	git, err := gitForRepo(secret, namespace, name, gitURL, insecureSkipTLS, caBundle)
 	if err != nil {
@@ -32,24 +50,6 @@ func Update(secret *corev1.Secret, namespace, name, gitURL, branch string, insec
 		return Head(secret, namespace, name, gitURL, branch, insecureSkipTLS, caBundle)
 	}
 	return commit, err
-}
-
-func Ensure(secret *corev1.Secret, namespace, name, gitURL, commit string, insecureSkipTLS bool, caBundle []byte) error {
-	if commit == "" {
-		return nil
-	}
-	git, err := gitForRepo(secret, namespace, name, gitURL, insecureSkipTLS, caBundle)
-	if err != nil {
-		return err
-	}
-
-	// If the repositories are rancher managed and if bundled is set
-	// don't fetch anything from upstream.
-	if isBundled(git) && settings.SystemCatalog.Get() == "bundled" {
-		return nil
-	}
-
-	return git.Ensure(commit)
 }
 
 func gitForRepo(secret *corev1.Secret, namespace, name, gitURL string, insecureSkipTLS bool, caBundle []byte) (*git, error) {
