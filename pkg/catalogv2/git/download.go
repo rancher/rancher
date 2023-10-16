@@ -82,8 +82,12 @@ func Update(secret *corev1.Secret, namespace, name, gitURL, branch string, insec
 		return commit, fmt.Errorf("update failure: %w", err)
 	}
 
-	if changed, err := git.remoteSHAChanged(branch, commit); err != nil || !changed {
+	changed, err := git.remoteSHAChanged(branch, commit)
+	if err != nil {
 		return commit, fmt.Errorf("update failure: %w", err)
+	}
+	if !changed {
+		return commit, nil
 	}
 
 	if err := git.fetchAndReset(branch); err != nil {
@@ -94,7 +98,7 @@ func Update(secret *corev1.Secret, namespace, name, gitURL, branch string, insec
 	if err != nil && isBundled(git) {
 		return Head(secret, namespace, name, gitURL, branch, insecureSkipTLS, caBundle)
 	}
-	return lastCommit, fmt.Errorf("update failure: %w", err)
+	return lastCommit, nil
 }
 
 func gitForRepo(secret *corev1.Secret, namespace, name, gitURL string, insecureSkipTLS bool, caBundle []byte) (*git, error) {
