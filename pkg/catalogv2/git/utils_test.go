@@ -19,12 +19,14 @@ func Test_isGitSSH(t *testing.T) {
 		{"git@github.com:user/repo.git", true},
 		{"git@gitlab.com:user/repo-with-dashes.git", true},
 		{"git@gitlab.com:user/repo", true},
+		{"ssh://git@git.domain.com:443/repo", true},
 		// False cases
 		{"https://github.com/user/repo.git", false},
 		{"http://gitlab.com/user/repo.git", false},
 		{"http://gitlab.com/user/repo", false},
 		{"http://gitlab.com", false},
 		{"git@gitlab.com", false},
+		{"ftp://git@gitlab.com:22/repo", false},
 	}
 	assert := assertlib.New(t)
 	for _, tc := range testCases {
