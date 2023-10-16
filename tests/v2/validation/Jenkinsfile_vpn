@@ -115,7 +115,7 @@ node {
           if (env.EXTERNAL_ENCODED_VPN) {
             runArgs = runArgs + "openvpn --daemon --config external.ovpn && sleep 10 && "
           }
-          runArgs = runArgs + "/root/go/bin/gotestsum --format standard-verbose --packages=${testsDir} --junitfile ${testResultsOut} -- ${GOTEST_TESTCASE} -timeout=${timeout} -v"
+          runArgs = runArgs + "/root/go/bin/gotestsum --format standard-verbose --packages=${testsDir} --junitfile ${testResultsOut} -- -tags=${TAGS} ${GOTEST_TESTCASE} -timeout=${timeout} -v"
           stage('Run Validation Tests') {
             sh "docker run --name ${testContainer} -t --env-file ${envFile} --privileged " +
               "${imageName} sh -c \"${runArgs}\""

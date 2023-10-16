@@ -1,3 +1,5 @@
+//go:build (validation || infra.any || cluster.any || sanity) && !stress && !extended
+
 package crdgeneration
 
 import (
@@ -74,7 +76,7 @@ func (crd *CRDGenTestSuite) SetupSuite() {
 func (crd *CRDGenTestSuite) sequentialTestCRD() {
 	crdsList, err := listCRDS(crd.client, crd.clusterID)
 	require.NoError(crd.T(), err)
-	crd.Run("Verify the count of crds deployed and the crds on the cluster " +crd.clusterName, func() {
+	crd.Run("Verify the count of crds deployed and the crds on the cluster "+crd.clusterName, func() {
 		validateCRDList(crd.T(), crdsList, crd.crds, crd.clusterName)
 	})
 	crd.Run("Verify description fields of crds are non-empty", func() {

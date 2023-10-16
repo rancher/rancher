@@ -1,3 +1,5 @@
+//go:build (validation || infra.gke || extended) && !infra.any && !infra.aks && !infra.eks && !infra.rke2k3s && !infra.rke1 && !cluster.any && !cluster.custom && !cluster.nodedriver && !sanity && !stress
+
 package nodescaling
 
 import (
@@ -60,7 +62,7 @@ func (s *GKENodeScalingTestSuite) TestScalingGKENodePools() {
 		require.NoError(s.T(), err)
 
 		s.Run(tt.name, func() {
-			ScalingGKENodePools(s.T(), s.client, clusterID, &tt.gkeNodes)
+			scalingGKENodePools(s.T(), s.client, clusterID, &tt.gkeNodes)
 		})
 	}
 }
@@ -73,7 +75,7 @@ func (s *GKENodeScalingTestSuite) TestScalingGKENodePoolsDynamicInput() {
 	clusterID, err := clusters.GetClusterIDByName(s.client, s.client.RancherConfig.ClusterName)
 	require.NoError(s.T(), err)
 
-	ScalingGKENodePools(s.T(), s.client, clusterID, s.scalingConfig.GKENodePool)
+	scalingGKENodePools(s.T(), s.client, clusterID, s.scalingConfig.GKENodePool)
 }
 
 // In order for 'go test' to run this suite, we need to create

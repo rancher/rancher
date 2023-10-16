@@ -1,3 +1,5 @@
+//go:build (validation || infra.any || cluster.any || stress) && !sanity && !extended
+
 package charts
 
 import (
@@ -95,7 +97,7 @@ func (w *WebhookTestSuite) TestWebhookChart() {
 	})
 
 	w.Run("Verify webhook pod logs", func() {
-		
+
 		steveClient, err := w.client.Steve.ProxyDownstream(clusterID)
 		require.NoError(w.T(), err)
 

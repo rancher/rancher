@@ -57,6 +57,9 @@ provisioningInput is needed to the run the RKE2 tests, specifically kubernetesVe
         }
       },
     ],
+    "flags": {
+      "desiredflags": "Short|Long" //These flags are for running TestProvisioningRKE2Cluster or TestProvisioningRKE2CustomCluster it is not needed for the dynamic tests.
+    },
     "rke2KubernetesVersion": ["v1.26.8+rke2r1"],
     "cni": ["calico"],
     "providers": ["linode", "aws", "do", "harvester"],

@@ -343,7 +343,6 @@ func CreateProvisioningRKE1Cluster(client *rancher.Client, provider RKE1Provider
 // CreateProvisioningRKE1CustomCluster provisions an rke1 cluster using a 3rd party client for its nodes, then runs verify checks
 func CreateProvisioningRKE1CustomCluster(client *rancher.Client, externalNodeProvider *ExternalNodeProvider, clustersConfig *clusters.ClusterConfig) (*management.Cluster, []*nodes.Node, error) {
 	setLogrusFormatter()
-	rolesPerNode := []string{}
 	quantityPerPool := []int32{}
 	rolesPerPool := []string{}
 	for _, pool := range clustersConfig.NodePools {
@@ -360,9 +359,6 @@ func CreateProvisioningRKE1CustomCluster(client *rancher.Client, externalNodePro
 
 		quantityPerPool = append(quantityPerPool, int32(pool.NodeRoles.Quantity))
 		rolesPerPool = append(rolesPerPool, finalRoleCommand)
-		for i := int64(0); i < pool.NodeRoles.Quantity; i++ {
-			rolesPerNode = append(rolesPerNode, finalRoleCommand)
-		}
 	}
 
 	if clustersConfig.PSACT == string(provisioninginput.RancherBaseline) {

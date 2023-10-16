@@ -1,3 +1,5 @@
+//go:build (validation || infra.any || cluster.any || stress) && !sanity && !extended
+
 package rbac
 
 import (
@@ -65,7 +67,7 @@ func (rb *ETCDRbacBackupTestSuite) ValidateEtcdSnapshotCluster(role string) {
 	}
 }
 
-func (rb *ETCDRbacBackupTestSuite) TestETCDRbac() {
+func (rb *ETCDRbacBackupTestSuite) TestETCDRBAC() {
 	clusterID, err := clusters.GetClusterIDByName(rb.client, rb.clusterName)
 	require.NoError(rb.T(), err)
 	if !(strings.Contains(clusterID, "c-m-")) {
@@ -125,6 +127,6 @@ func (rb *ETCDRbacBackupTestSuite) TestETCDRbac() {
 	}
 }
 
-func TestETCDRbacBackupTestSuite(t *testing.T) {
+func TestETCDRBACBackupTestSuite(t *testing.T) {
 	suite.Run(t, new(ETCDRbacBackupTestSuite))
 }

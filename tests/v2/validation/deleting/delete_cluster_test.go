@@ -1,3 +1,5 @@
+//go:build (infra.rke2k3s || validation) && !infra.any && !infra.aks && !infra.eks && !infra.gke && !infra.rke1 && !stress && !sanity && !extended
+
 package deleting
 
 import (
@@ -11,17 +13,17 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-type K3SClusterDeleteTestSuite struct {
+type ClusterDeleteTestSuite struct {
 	suite.Suite
 	client  *rancher.Client
 	session *session.Session
 }
 
-func (c *K3SClusterDeleteTestSuite) TearDownSuite() {
+func (c *ClusterDeleteTestSuite) TearDownSuite() {
 	c.session.Cleanup()
 }
 
-func (c *K3SClusterDeleteTestSuite) SetupSuite() {
+func (c *ClusterDeleteTestSuite) SetupSuite() {
 	testSession := session.NewSession()
 	c.session = testSession
 
@@ -31,7 +33,7 @@ func (c *K3SClusterDeleteTestSuite) SetupSuite() {
 	c.client = client
 }
 
-func (c *K3SClusterDeleteTestSuite) TestDeletingK3SCluster() {
+func (c *ClusterDeleteTestSuite) TestDeletingCluster() {
 	clusterID, err := clusters.GetV1ProvisioningClusterByName(c.client, c.client.RancherConfig.ClusterName)
 	require.NoError(c.T(), err)
 
@@ -41,6 +43,6 @@ func (c *K3SClusterDeleteTestSuite) TestDeletingK3SCluster() {
 
 // In order for 'go test' to run this suite, we need to create
 // a normal test function and pass our suite to suite.Run
-func TestK3SClusterDeleteTestSuite(t *testing.T) {
-	suite.Run(t, new(K3SClusterDeleteTestSuite))
+func TestClusterDeleteTestSuite(t *testing.T) {
+	suite.Run(t, new(ClusterDeleteTestSuite))
 }
