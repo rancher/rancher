@@ -64,7 +64,8 @@ func (g *git) setCredential(cred *corev1.Secret) error {
 		return nil
 	}
 
-	if cred.Type == corev1.SecretTypeBasicAuth {
+	switch cred.Type {
+	case corev1.SecretTypeBasicAuth:
 		username, password := cred.Data[corev1.BasicAuthUsernameKey], cred.Data[corev1.BasicAuthPasswordKey]
 		if len(password) == 0 && len(username) == 0 {
 			return nil
@@ -77,7 +78,7 @@ func (g *git) setCredential(cred *corev1.Secret) error {
 		u.User = url.User(string(username))
 		g.URL = u.String()
 		g.password = string(password)
-	} else if cred.Type == corev1.SecretTypeSSHAuth {
+	case corev1.SecretTypeSSHAuth:
 		key, err := ssh.ParseRawPrivateKey(cred.Data[corev1.SSHAuthPrivateKey])
 		if err != nil {
 			return err
