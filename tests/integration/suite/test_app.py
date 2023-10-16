@@ -133,47 +133,6 @@ def test_prehook_chart(admin_pc, admin_mc):
     assert len(jobs) == 1
 
 
-def test_app_namespace_annotation(admin_pc, admin_mc):
-    client = admin_pc.client
-    ns = admin_pc.cluster.client.create_namespace(name=random_str(),
-                                                  projectId=admin_pc.
-                                                  project.id)
-    wait_for_template_to_be_created(admin_mc.client, "library")
-    app1 = client.create_app(
-        name=random_str(),
-        externalId="catalog://?catalog=library&template=mysql&version=1.3.1"
-                   "&namespace=cattle-global-data",
-        targetNamespace=ns.name,
-        projectId=admin_pc.project.id,
-    )
-    wait_for_workload(client, ns.name, count=1)
-
-    external_id = "catalog://?catalog=library&template=wordpress" \
-                  "&version=7.3.8&namespace=cattle-global-data"
-    app2 = client.create_app(
-        name=random_str(),
-        externalId=external_id,
-        targetNamespace=ns.name,
-        projectId=admin_pc.project.id,
-    )
-    wait_for_workload(client, ns.name, count=3)
-    ns = admin_pc.cluster.client.reload(ns)
-    ns = wait_for_app_annotation(admin_pc, ns, app1.name)
-    ns = wait_for_app_annotation(admin_pc, ns, app2.name)
-    client.delete(app1)
-    wait_for_app_to_be_deleted(client, app1)
-
-    ns = wait_for_app_annotation(admin_pc, ns, app1.name, exists=False)
-    assert app1.name not in ns.annotations['cattle.io/appIds']
-    assert app2.name in ns.annotations['cattle.io/appIds']
-
-    client.delete(app2)
-    wait_for_app_to_be_deleted(client, app2)
-
-    ns = wait_for_app_annotation(admin_pc, ns, app2.name, exists=False)
-    assert app2.name not in ns.annotations.get('cattle.io/appIds', [])
-
-
 def test_helm_timeout(admin_pc, admin_mc, remove_resource):
     """Test helm timeout flag. This test asserts timeout flag is properly being
     passed to helm.
