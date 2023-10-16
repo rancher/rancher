@@ -1,3 +1,5 @@
+//go:build (validation || infra.aks || extended) && !infra.any && !infra.eks && !infra.gke && !infra.rke2k3s && !infra.rke1 && !cluster.any && !cluster.custom && !cluster.nodedriver && !sanity && !stress
+
 package nodescaling
 
 import (
@@ -60,7 +62,7 @@ func (s *AKSNodeScalingTestSuite) TestScalingAKSNodePools() {
 		require.NoError(s.T(), err)
 
 		s.Run(tt.name, func() {
-			ScalingAKSNodePools(s.T(), s.client, clusterID, &tt.aksNodes)
+			scalingAKSNodePools(s.T(), s.client, clusterID, &tt.aksNodes)
 		})
 	}
 }
@@ -73,7 +75,7 @@ func (s *AKSNodeScalingTestSuite) TestScalingAKSNodePoolsDynamicInput() {
 	clusterID, err := clusters.GetClusterIDByName(s.client, s.client.RancherConfig.ClusterName)
 	require.NoError(s.T(), err)
 
-	ScalingAKSNodePools(s.T(), s.client, clusterID, s.scalingConfig.AKSNodePool)
+	scalingAKSNodePools(s.T(), s.client, clusterID, s.scalingConfig.AKSNodePool)
 }
 
 // In order for 'go test' to run this suite, we need to create

@@ -21,7 +21,7 @@ const (
 var oneNode int64 = 1
 var twoNodes int64 = 2
 
-func ScalingRKE2K3SNodePools(t *testing.T, client *rancher.Client, clusterID string, nodeRoles machinepools.NodeRoles) {
+func scalingRKE2K3SNodePools(t *testing.T, client *rancher.Client, clusterID string, nodeRoles machinepools.NodeRoles) {
 	cluster, err := client.Steve.SteveType(ProvisioningSteveResourceType).ByID(clusterID)
 	require.NoError(t, err)
 
@@ -37,7 +37,7 @@ func ScalingRKE2K3SNodePools(t *testing.T, client *rancher.Client, clusterID str
 	pods.VerifyReadyDaemonsetPods(t, client, scaledClusterResp)
 }
 
-func ScalingRKE1NodePools(t *testing.T, client *rancher.Client, clusterID string, nodeRoles rke1.NodeRoles) {
+func scalingRKE1NodePools(t *testing.T, client *rancher.Client, clusterID string, nodeRoles rke1.NodeRoles) {
 	cluster, err := client.Management.Cluster.ByID(clusterID)
 	require.NoError(t, err)
 
@@ -52,7 +52,7 @@ func ScalingRKE1NodePools(t *testing.T, client *rancher.Client, clusterID string
 	require.NoError(t, err)
 }
 
-func ScalingAKSNodePools(t *testing.T, client *rancher.Client, clusterID string, nodePool *aks.NodePool) {
+func scalingAKSNodePools(t *testing.T, client *rancher.Client, clusterID string, nodePool *aks.NodePool) {
 	cluster, err := client.Management.Cluster.ByID(clusterID)
 	require.NoError(t, err)
 
@@ -64,7 +64,7 @@ func ScalingAKSNodePools(t *testing.T, client *rancher.Client, clusterID string,
 	require.NoError(t, err)
 }
 
-func ScalingEKSNodePools(t *testing.T, client *rancher.Client, clusterID string, nodePool *eks.NodeGroupConfig) {
+func scalingEKSNodePools(t *testing.T, client *rancher.Client, clusterID string, nodePool *eks.NodeGroupConfig) {
 	cluster, err := client.Management.Cluster.ByID(clusterID)
 	require.NoError(t, err)
 
@@ -76,7 +76,7 @@ func ScalingEKSNodePools(t *testing.T, client *rancher.Client, clusterID string,
 	require.NoError(t, err)
 }
 
-func ScalingGKENodePools(t *testing.T, client *rancher.Client, clusterID string, nodePool *gke.NodePool) {
+func scalingGKENodePools(t *testing.T, client *rancher.Client, clusterID string, nodePool *gke.NodePool) {
 	cluster, err := client.Management.Cluster.ByID(clusterID)
 	require.NoError(t, err)
 
