@@ -33,7 +33,7 @@ type Config2 struct {
 	ServiceAccountDistinguishedName string `yaml:"ServiceAccountDistinguishedName"`
 	ServiceAccountPassword          string `yaml:"ServiceAccountPassword"`
 	UserSearchBase                  string `yaml:"UserSearchBase"`
-	Port                            string `yaml:"389"`
+	Port                            string `yaml:"port"`
 	TLS                             string `yaml:"TLS"`
 	LoginUser                       string `yaml:"LoginUser"`
 }

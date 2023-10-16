@@ -12,6 +12,7 @@ import (
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	"github.com/rancher/rancher/tests/framework/pkg/config"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
@@ -83,8 +84,10 @@ type Payload struct {
 }
 
 func (d *OpenLdapTest) SetupSuite() {
-	testSession := session.NewSession()
 
+	testSession := session.NewSession()
+	d.session = testSession
+	logrus.Info("setup suite")
 	client, err := rancher.NewClient("", testSession)
 	require.NoError(d.T(), err)
 
@@ -107,30 +110,31 @@ func (d *OpenLdapTest) TearDownSuite() {
 
 func (d *OpenLdapTest) TestOpenLdapAPI() {
 	testSession := session.NewSession()
-	d.session = testSession
+	defer testSession.Cleanup()
 
 	upgradeConfig := new(Config2)
 	config.LoadConfig(ConfigurationFileKey, upgradeConfig)
 
 	fmt.Print(d.client.RancherConfig.ClusterName)
 	fmt.Print(d.client.RancherConfig.Host)
+
 	fmt.Print(upgradeConfig.Host)
 	fmt.Print(upgradeConfig.LoginUser)
-	url := "https://ron1011.qa.rancher.space/v3/openLdapConfigs/openldap?action=testAndApply"
-	token := "token-dptrc:gh2spvgp47r4pjvgtxh8rsnhzhfc4rpjn528b2vvxp4d2b2gbrwvtb"
+	url := "https://ron1016.qa.rancher.space/v3/openLdapConfigs/openldap?action=testAndApply"
+	token := "token-vs9qg:pg8g9jcksx4pw6h7xh7448c6m94h8nmc45ln88q6wr9gfk57qvftp5"
 
 	resp, err := d.EnableOpenLdap(url, token)
-
 	require.NoError(d.T(), err)
 
 	validStatus := resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusCreated || resp.StatusCode == http.StatusInternalServerError
 	errorMessage := fmt.Sprintf("Expected status code 200, 201, or 500, but got %d", resp.StatusCode)
 
 	if resp.StatusCode == http.StatusInternalServerError {
-		errorMessage = "openldap user cannot login when openldap disabled"
+		errorMessage = "openldap user can't login when openldap disabled"
 	}
 
 	require.True(d.T(), validStatus, errorMessage)
+
 }
 
 func (d *OpenLdapTest) EnableOpenLdap(url string, token string) (*APIResponse, error) {
@@ -138,7 +142,7 @@ func (d *OpenLdapTest) EnableOpenLdap(url string, token string) (*APIResponse, e
 		Enabled: true,
 		LdapConfig: LdapConfig{
 			Actions: map[string]string{
-				"testAndApply": "https://ron1011.qa.rancher.space/v3/openLdapConfigs/openldap?action=testAndApply",
+				"testAndApply": "https://ron1016.qa.rancher.space/v3/openLdapConfigs/openldap?action=testAndApply",
 			},
 			Annotations: map[string]string{
 				"management.cattle.io/auth-provider-cleanup": "rancher-locked",
@@ -158,8 +162,8 @@ func (d *OpenLdapTest) EnableOpenLdap(url string, token string) (*APIResponse, e
 				"cattle.io/creator": "norman",
 			},
 			Links: map[string]string{
-				"self":   "https://ron1011.qa.rancher.space/v3/openLdapConfigs/openldap",
-				"update": "https://ron1011.qa.rancher.space/v3/openLdapConfigs/openldap",
+				"self":   "https://ron1016.qa.rancher.space/v3/openLdapConfigs/openldap",
+				"update": "https://ron1016.qa.rancher.space/v3/openLdapConfigs/openldap",
 			},
 			Name:                            "openldap",
 			NestedGroupMembershipEnabled:    false,
@@ -187,15 +191,15 @@ func (d *OpenLdapTest) EnableOpenLdap(url string, token string) (*APIResponse, e
 		Password: "Tacos86!",
 	}
 
-	jsonData, err := json.MarshalIndent(payloadInstance, "", "  ")
+	body, err := json.MarshalIndent(payloadInstance, "", "  ")
 	if err != nil {
 		fmt.Println("Error marshalling:", err)
 		return nil, err
 	}
 
-	fmt.Println(string(jsonData))
+	fmt.Println(string(body))
 
-	resp, err := SendAPICall(url, token, jsonData)
+	resp, err := SendAPICall(url, token, body)
 	if err != nil {
 		fmt.Println("Error:", err)
 		return nil, err
@@ -211,8 +215,8 @@ func (d *OpenLdapTest) EnableOpenLdap(url string, token string) (*APIResponse, e
 
 }
 func (d *OpenLdapTest) LoginOpenLDAP(host string, token string, body []byte) (*APIResponse, error) {
-	url := "https://ron1011.qa.rancher.space/v3-public/openLdapProviders/openldap?action=login"
-	token = "token-79pxw:jn42hgllv6ggxwn6ltgxqncr6h4l8nhcrf7swp5mz9hv9lchrv96xc"
+	url := "https://ron1016.qa.rancher.space/v3-public/openLdapProviders/openldap?action=login"
+	token = "token-vs9qg:pg8g9jcksx4pw6h7xh7448c6m94h8nmc45ln88q6wr9gfk57qvftp5"
 
 	body = []byte(`{
 		"description": "postman",
@@ -225,7 +229,7 @@ func (d *OpenLdapTest) LoginOpenLDAP(host string, token string, body []byte) (*A
 }
 
 func (d *OpenLdapTest) DisableOpenLDAP(url string, token string) (*APIResponse, error) {
-	url = "https://ron1011.qa.rancher.space/v3/openLdapConfigs/openldap?action=disable"
+	url = "https://ron1016.qa.rancher.space/v3/openLdapConfigs/openldap?action=disable"
 	body := []byte(`{"action": "disable"}`)
 
 	resp, err := SendAPICall(url, token, body)
@@ -248,7 +252,7 @@ func SendAPICall(url, token string, body []byte) (*APIResponse, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
-
+	fmt.Println(url, token, body)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
 
