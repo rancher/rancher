@@ -1,6 +1,7 @@
 package requests
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -84,7 +85,7 @@ func (t *ServiceAccountAuth) Authenticate(req *http.Request) (user.Info, bool, e
 	// Make sure the cluster exists.
 	clusterID := mux.Vars(req)["clusterID"]
 	if clusterID == "" {
-		return info, hasAuth, nil
+		return info, hasAuth, fmt.Errorf("no clusterID found in request")
 	}
 
 	cluster, err := t.clusterLister.Get("", clusterID)
@@ -129,7 +130,7 @@ func (t *ServiceAccountAuth) Authenticate(req *http.Request) (user.Info, bool, e
 		Name:   tokenReview.Status.User.Username,
 		UID:    tokenReview.Status.User.UID,
 		Groups: tokenReview.Status.User.Groups,
-	}, true, nil
+	}, tokenReview.Status.Authenticated, nil
 }
 
 // isTokenExpired takes the expiration time from a JWT and returns true if it is expired, otherwise it returns false.
