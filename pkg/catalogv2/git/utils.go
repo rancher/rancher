@@ -37,9 +37,18 @@ func isBundled(git *git) bool {
 	return strings.HasPrefix(git.Directory, staticDir) || strings.HasPrefix(git.Directory, localDir)
 }
 
+// isGitSSH checks if the URL is in the SSH URL format using regular expressions.
+// [anything]@[anything]:[anything]
+// ssh://<user>@<mydomain.example>:<port>/<path>/<repository-name>
 func isGitSSH(gitURL string) (bool, error) {
-	// Matches URLs with the format [anything]@[anything]:[anything]
-	return regexp.MatchString("(.+)@(.+):(.+)", gitURL)
+	pattern1 := `^[^:/]+@[^:]+:.+$`
+	pattern2 := `^ssh://[^@]+@[^:]+:\d+/.+$`
+	validSSH, err := regexp.MatchString(pattern1+"|"+pattern2, gitURL)
+	if err != nil {
+		return true, fmt.Errorf("regexp failed: %w", err)
+	}
+
+	return validSSH, nil
 }
 
 func hash(gitURL string) string {
