@@ -61,9 +61,9 @@ func (m *clusterManager) sync(key string, obj *v3.Cluster) (runtime.Object, erro
 		return nil, nil
 	}
 
-	err := checkClusterVersion(m.clusterName, m.clusterLister)
+	err := CheckClusterVersion(m.clusterName, m.clusterLister)
 	if err != nil {
-		if errors.Is(err, errVersionIncompatible) {
+		if errors.Is(err, ErrClusterVersionIncompatible) {
 			if obj.Status.AppliedPodSecurityPolicyTemplateName != "" {
 				obj = obj.DeepCopy()
 				obj.Status.AppliedPodSecurityPolicyTemplateName = ""
@@ -74,7 +74,7 @@ func (m *clusterManager) sync(key string, obj *v3.Cluster) (runtime.Object, erro
 			}
 			return obj, nil
 		}
-		return obj, fmt.Errorf(clusterVersionCheckErrorString, err)
+		return obj, fmt.Errorf("error checking cluster version for Cluster controller: %w", err)
 	}
 
 	if obj.Spec.DefaultPodSecurityPolicyTemplateName != "" {
