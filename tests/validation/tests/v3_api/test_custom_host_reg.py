@@ -47,7 +47,8 @@ def test_deploy_rancher_server():
     if "v2.5" in RANCHER_SERVER_VERSION or \
             "master" in RANCHER_SERVER_VERSION or \
             "v2.6" in RANCHER_SERVER_VERSION or \
-            "v2.7" in RANCHER_SERVER_VERSION:
+            "v2.7" in RANCHER_SERVER_VERSION or \
+            "v2.8" in RANCHER_SERVER_VERSION:
         RANCHER_SERVER_CMD = \
             'sudo docker run -d --privileged --name="rancher-server" ' \
             '--restart=unless-stopped -p 80:80 -p 443:443  ' \
