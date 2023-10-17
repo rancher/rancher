@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"testing"
 	"time"
@@ -153,7 +153,7 @@ func (d *OpenLdapTest) TestOpenLdapAPI() {
 	resp, err = d.DisableOpenLDAP(url, token)
 	require.NoError(d.T(), err)
 
-	time.Sleep(2 * time.Second) //waiting for server to be ready
+	time.Sleep(1 * time.Second) //waiting for server to be ready
 
 	//try login again - this one should fail
 	resp, err = d.LoginOpenLDAP(host, token, []byte(resp.Body))
@@ -300,9 +300,10 @@ func SendAPICall(url, token string, body []byte) (*APIResponse, error) {
 	}
 	defer resp.Body.Close()
 
-	respBody, err := ioutil.ReadAll(resp.Body)
+	respBody, err := io.ReadAll(resp.Body)
+
 	if err != nil {
-		return nil, fmt.Errorf("error reading response body: %w", err)
+		return nil, fmt.Errorf("error reading the response body: %w", err)
 	}
 
 	return &APIResponse{
