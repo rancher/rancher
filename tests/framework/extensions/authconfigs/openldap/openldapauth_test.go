@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"testing"
 	"time"
+	"time"
 
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
@@ -20,6 +21,11 @@ import (
 
 type OpenLdapTest struct {
 	suite.Suite
+	testUser      *management.User
+	client        *rancher.Client
+	project       *management.Project
+	session       *session.Session
+	upgradeConfig *Config2
 	testUser      *management.User
 	client        *rancher.Client
 	project       *management.Project
@@ -108,6 +114,10 @@ func (d *OpenLdapTest) SetupSuite() {
 	// Initialize the upgradeConfig field from struct
 	d.upgradeConfig = new(Config2)
 	config.LoadConfig(ConfigurationFileKey, d.upgradeConfig)
+
+	// Initialize the upgradeConfig field from struct
+	d.upgradeConfig = new(Config2)
+	config.LoadConfig(ConfigurationFileKey, d.upgradeConfig)
 }
 
 func (d *OpenLdapTest) TearDownSuite() {
@@ -117,6 +127,13 @@ func (d *OpenLdapTest) TearDownSuite() {
 func (d *OpenLdapTest) TestOpenLdapAPI() {
 	testSession := session.NewSession()
 	defer testSession.Cleanup()
+	host := d.upgradeConfig.Host
+	token := d.upgradeConfig.Token
+	testURI := "/v3/openLdapConfigs/openldap?action=testAndApply"
+	protocol := "https://"
+	url := protocol + host + testURI
+
+	//enable the openldap config
 	host := d.upgradeConfig.Host
 	token := d.upgradeConfig.Token
 	testURI := "/v3/openLdapConfigs/openldap?action=testAndApply"
@@ -179,6 +196,7 @@ func (d *OpenLdapTest) EnableOpenLdap(url string, token string) (*APIResponse, e
 		LdapConfig: LdapConfig{
 			Actions: map[string]string{
 				"testAndApply": d.upgradeConfig.Host + "/v3/openLdapConfigs/openldap?action=testAndApply",
+				"testAndApply": d.upgradeConfig.Host + "/v3/openLdapConfigs/openldap?action=testAndApply",
 			},
 			Annotations: map[string]string{
 				"management.cattle.io/auth-provider-cleanup": "rancher-locked",
@@ -198,6 +216,8 @@ func (d *OpenLdapTest) EnableOpenLdap(url string, token string) (*APIResponse, e
 				"cattle.io/creator": "norman",
 			},
 			Links: map[string]string{
+				"self":   d.upgradeConfig.Host + "/v3/openLdapConfigs/openldap",
+				"update": d.upgradeConfig.Host + "/v3/openLdapConfigs/openldap",
 				"self":   d.upgradeConfig.Host + "/v3/openLdapConfigs/openldap",
 				"update": d.upgradeConfig.Host + "/v3/openLdapConfigs/openldap",
 			},
@@ -221,8 +241,13 @@ func (d *OpenLdapTest) EnableOpenLdap(url string, token string) (*APIResponse, e
 			ServiceAccountDistinguishedName: d.upgradeConfig.ServiceAccountDistinguishedName,
 			ServiceAccountPassword:          d.upgradeConfig.ServiceAccountPassword,
 			UserSearchBase:                  d.upgradeConfig.UserSearchBase,
+			ServiceAccountDistinguishedName: d.upgradeConfig.ServiceAccountDistinguishedName,
+			ServiceAccountPassword:          d.upgradeConfig.ServiceAccountPassword,
+			UserSearchBase:                  d.upgradeConfig.UserSearchBase,
 			GroupSearchBase:                 "",
 		},
+		Username: d.upgradeConfig.OpenLdapUser,
+		Password: d.upgradeConfig.LoginPass,
 		Username: d.upgradeConfig.OpenLdapUser,
 		Password: d.upgradeConfig.LoginPass,
 	}
@@ -252,7 +277,17 @@ func (d *OpenLdapTest) LoginOpenLDAP(host string, token string, body []byte) (*A
 	https := "https://"
 	uri := "/v3-public/openLdapProviders/openldap?action=login"
 	url := https + host + uri
+	https := "https://"
+	uri := "/v3-public/openLdapProviders/openldap?action=login"
+	url := https + host + uri
 
+	// Use string formatting to replace placeholders with actual values
+	requestBody := fmt.Sprintf(`{
+        "description": "postman",
+        "responseType": "token",
+        "username": "%s",
+        "password": "%s"
+    }`, d.upgradeConfig.LoginUser, d.upgradeConfig.LoginPass)
 	// Use string formatting to replace placeholders with actual values
 	requestBody := fmt.Sprintf(`{
         "description": "postman",
@@ -262,12 +297,17 @@ func (d *OpenLdapTest) LoginOpenLDAP(host string, token string, body []byte) (*A
     }`, d.upgradeConfig.LoginUser, d.upgradeConfig.LoginPass)
 
 	return SendAPICall(url, token, []byte(requestBody))
+	return SendAPICall(url, token, []byte(requestBody))
 }
 
 func (d *OpenLdapTest) DisableOpenLDAP(host string, token string) (*APIResponse, error) {
 	https := "https://"
 	uri := "/v3/openLdapConfigs/openldap?action=disable"
+func (d *OpenLdapTest) DisableOpenLDAP(host string, token string) (*APIResponse, error) {
+	https := "https://"
+	uri := "/v3/openLdapConfigs/openldap?action=disable"
 	body := []byte(`{"action": "disable"}`)
+	url := https + d.upgradeConfig.Host + uri
 	url := https + d.upgradeConfig.Host + uri
 	resp, err := SendAPICall(url, token, body)
 	if err != nil {
@@ -277,7 +317,9 @@ func (d *OpenLdapTest) DisableOpenLDAP(host string, token string) (*APIResponse,
 
 	if resp.StatusCode == http.StatusOK {
 		fmt.Println("openldap config disabled!")
+		fmt.Println("openldap config disabled!")
 	} else {
+		fmt.Printf("disable api call failed with status code: %d\n", resp.StatusCode)
 		fmt.Printf("disable api call failed with status code: %d\n", resp.StatusCode)
 		fmt.Println("Response Body:", resp.Body)
 	}
@@ -288,7 +330,9 @@ func SendAPICall(url, token string, body []byte) (*APIResponse, error) {
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
 	if err != nil {
 		return nil, fmt.Errorf("error creating  request: %w", err)
+		return nil, fmt.Errorf("error creating  request: %w", err)
 	}
+
 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
