@@ -8,9 +8,6 @@ import (
 const openLdapConfigNameBase = "openLdapAuthConfig"
 const ConfigurationFileKey = "authProvider"
 
-//const Description = "UI session"
-//const ResponseType = "UI session"
-
 type OpenLDAPCredentialConfig struct {
 	Servers                         []string `json:"servers"`
 	ServiceAccountDistinguishedName string   `json:"serviceAccountDistinguishedName"`
@@ -27,6 +24,7 @@ type OpenLDAPCredentialConfig struct {
 
 type Config2 struct {
 	Host                            string `yaml:"host"`
+	Token                           string `yaml:"token"`
 	OpenLdapUser                    string `yaml:"testAndEnableUser"`
 	OpenLdapUserPass                string `yaml:"testAndEnablePass"`
 	Servers                         string `yaml:"servers"`
@@ -36,26 +34,15 @@ type Config2 struct {
 	Port                            string `yaml:"port"`
 	TLS                             string `yaml:"TLS"`
 	LoginUser                       string `yaml:"LoginUser"`
+	LoginPass                       string `yaml:"LoginPass"`
 }
 
 // CreateOpenLDAPAuthConfig is a helper function that creates
 // an openLDAP auth config, enables it, and returns the AuthConfig response
 func CreateOpenLDAPAuthConfig(rancherClient *rancher.Client) (*management.AuthConfig, error) {
-	// Hardcoding the values for this config
-	/*	openLdapCredentialConfig := OpenLDAPCredentialConfig{
-		Servers:                         []string{"openldapqa.qa.rancher.space"},
-		ServiceAccountDistinguishedName: "cn=admin,dc=qa,dc=rancher,dc=space",
-		ServiceAccountPassword:          "<password>", map to
-		UserSearchBase:                  "dc=qa,dc=rancher,dc=space",
-		Port:                            389,
-		TLS:                             false,
-		TestUsername:                    "testuser1",
-		TestPassword:                    "Tacos86!",
-	} */
 
 	authConfig := management.AuthConfig{
-		Name: openLdapConfigNameBase,
-		//OpenLDAPCredentialConfig: &openLdapCredentialConfig,
+		Name:    openLdapConfigNameBase,
 		Enabled: true,
 	}
 
