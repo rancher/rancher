@@ -110,7 +110,7 @@ func (k *K3SNodeDriverProvisioningTestSuite) TestProvisioningK3SClusterDynamicIn
 		client *rancher.Client
 	}{
 		{provisioninginput.AdminClientName.String(), k.client},
-		// {provisioninginput.StandardClientName.String(), k.standardUserClient},
+		{provisioninginput.StandardClientName.String(), k.standardUserClient},
 	}
 
 	for _, tt := range tests {
