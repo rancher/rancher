@@ -22,14 +22,13 @@ import (
 )
 
 const (
-	cpuUsageVar                                            = 100 // 100 is just a placeholder until we can determine an actual number. Even with cpu usage spiking it should not go past 100% cpu usage and previous issues concerning this were hitting around 130% and above
-	checkCPU                 provisioninginput.SSHTestCase = "CheckCPU"
-	checkCPUCommand                                        = "ps -C agent -o %cpu --no-header"
-	nodeReboot               provisioninginput.SSHTestCase = "NodeReboot"
-	activeState                                            = "active"
-	runningState                                           = "running"
-	machineSteveResourceType                               = "cluster.x-k8s.io.machine"
-	fleetNamespace                                         = "fleet-default"
+	cpuUsageVar                                   = 100 // 100 is just a placeholder until we can determine an actual number. Even with cpu usage spiking it should not go past 100% cpu usage and previous issues concerning this were hitting around 130% and above
+	checkCPU        provisioninginput.SSHTestCase = "CheckCPU"
+	checkCPUCommand                               = "ps -C agent -o %cpu --no-header"
+	nodeReboot      provisioninginput.SSHTestCase = "NodeReboot"
+	activeState                                   = "active"
+	runningState                                  = "running"
+	fleetNamespace                                = "fleet-default"
 )
 
 // CallSSHTestByName tests the ssh tests specified in the provisioninginput config clusterSSHTests field.
