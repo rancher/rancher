@@ -40,15 +40,42 @@ func isBundled(git *git) bool {
 // isGitSSH checks if the URL is in the SSH URL format using regular expressions.
 // [anything]@[anything]:[anything]
 // ssh://<user>@<mydomain.example>:<port>/<path>/<repository-name>
-func isGitSSH(gitURL string) (bool, error) {
-	pattern1 := `^[^:/]+@[^:]+:.+$`
+func isGitSSH(gitURL string) bool {
+	pattern1 := `^[^:/]+@[^:]+:[a-zA-Z]+/[^/]+$`
 	pattern2 := `^ssh://[^@]+@[^:]+:\d+/.+$`
-	validSSH, err := regexp.MatchString(pattern1+"|"+pattern2, gitURL)
+
+	// Check if the input matches either of the two patterns.
+	valid, err := regexp.MatchString(pattern1, gitURL)
 	if err != nil {
-		return true, fmt.Errorf("regexp failed: %w", err)
+		return false
+	}
+	if valid {
+		return true
+	}
+	valid, err = regexp.MatchString(pattern2, gitURL)
+	if err != nil {
+		return false
 	}
 
-	return validSSH, nil
+	return valid
+}
+
+// validateGitURL will validate if the provided URL is in one of the expected patterns
+// for the supported protocols http(s) or ssh.
+//   - if Valid: returns nil
+//   - if Invalid: returns an error
+func validateGitURL(gitURL string) error {
+	valid := isGitSSH(gitURL)
+	if valid {
+		return nil
+	}
+	// not ssh; validate http(s)
+	u, err := url.Parse(gitURL)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
+		return fmt.Errorf("invalid git URL: %s", gitURL)
+	}
+
+	return nil
 }
 
 func hash(gitURL string) string {
