@@ -17,6 +17,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters/bundledclusters"
 	"github.com/rancher/rancher/tests/framework/extensions/defaults"
+	"github.com/rancher/rancher/tests/framework/extensions/etcdsnapshot"
 	kubeapinodes "github.com/rancher/rancher/tests/framework/extensions/kubeapi/nodes"
 	"github.com/rancher/rancher/tests/framework/extensions/kubeconfig"
 	nodestat "github.com/rancher/rancher/tests/framework/extensions/nodes"
@@ -44,6 +45,7 @@ const (
 	hostnameLimit               = 63
 	machineNameAnnotation       = "cluster.x-k8s.io/machine"
 	machineSteveResourceType    = "cluster.x-k8s.io.machine"
+	onDemandPrefix              = "on-demand-"
 )
 
 // VerifyRKE1Cluster validates that the RKE1 cluster and its resources are in a good state, matching a given config.
@@ -391,53 +393,56 @@ func VerifyUpgrade(t *testing.T, updatedCluster *bundledclusters.BundledCluster,
 }
 
 // VerifySnapshots waits for a cluster's snapshots to be ready and validates that the correct number of snapshots have been taken
-func VerifySnapshots(client *rancher.Client, localclusterID string, clusterName string, expectedSnapshotLength int) (string, error) {
+func VerifySnapshots(client *rancher.Client, localclusterID string, clusterName string, expectedSnapshotLength int, isRKE1 bool) (string, error) {
 	client, err := client.ReLogin()
 	if err != nil {
 		return "", err
 	}
 	var snapshotToBeRestored string
+	var snapshotList []string
+	s3Prefix := onDemandPrefix + clusterName
 
-	err = kwait.Poll(5*time.Second, 5*time.Minute, func() (done bool, err error) {
-		snapshotList, err := GetSnapshots(client, localclusterID, clusterName)
-		if err != nil {
-			return false, err
+	err = kwait.Poll(5*time.Second, defaults.FiveMinuteTimeout, func() (done bool, err error) {
+		if isRKE1 {
+			snapshotList, err = etcdsnapshot.GetRKE1Snapshots(client, clusterName)
+			if err != nil {
+				return false, err
+			}
+		} else {
+			snapshotList, err = etcdsnapshot.GetRKE2K3SSnapshots(client, localclusterID, clusterName)
+			if err != nil {
+				return false, err
+			}
 		}
+
 		if len(snapshotList) == 0 {
 			return false, fmt.Errorf("no snapshots found")
+		}
+
+		// Indexed from 0 for S3 checks to ensure that the local backup location does not have the s3Prefix.
+		// Needed to ensure that the correct S3 snapshot is restored.
+		if strings.Contains(snapshotList[0], s3Prefix) {
+			snapshotToBeRestored = snapshotList[len(snapshotList)-1]
+			return true, nil
 		}
 
 		if len(snapshotList) == expectedSnapshotLength {
 			snapshotToBeRestored = snapshotList[0]
 			return true, nil
 		}
-		if len(snapshotList) > expectedSnapshotLength {
+
+		if len(snapshotList) > expectedSnapshotLength && isRKE1 {
+			snapshotToBeRestored = snapshotList[0]
+			return true, nil
+		}
+
+		if len(snapshotList) > expectedSnapshotLength && !isRKE1 {
 			return false, fmt.Errorf("more snapshots than expected")
 		}
 
 		return false, nil
 	})
 	return snapshotToBeRestored, err
-}
-
-// getSnapshots is a helper function to get the snapshots for a cluster
-func GetSnapshots(client *rancher.Client, localclusterID string, clusterName string) ([]string, error) {
-	steveclient, err := client.Steve.ProxyDownstream(localclusterID)
-	if err != nil {
-		return nil, err
-	}
-	snapshotSteveObjList, err := steveclient.SteveType("rke.cattle.io.etcdsnapshot").List(nil)
-	if err != nil {
-		return nil, err
-	}
-	snapshots := []string{}
-	for _, snapshot := range snapshotSteveObjList.Data {
-		if strings.Contains(snapshot.ObjectMeta.Name, clusterName) {
-			snapshots = append(snapshots, snapshot.Name)
-		}
-	}
-	return snapshots, nil
-
 }
 
 // VerifySSHTests validates the ssh tests listed in the config on each node of the cluster
@@ -484,4 +489,5 @@ func VerifySSHTests(t *testing.T, client *rancher.Client, clusterObject *steveV1
 
 		}
 	}
+
 }

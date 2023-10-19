@@ -41,6 +41,17 @@ provisioningInput:
   nodeProviders: ["ec2"]
   hardened: false
   psact: ""
+  etcd:
+    disableSnapshot: false
+    snapshotScheduleCron: "0 */5 * * *"
+    snapshotRetain: 3
+    s3:
+      bucket: ""
+      endpoint: ""
+      endpointCA: ""
+      folder: ""
+      region: "us-east-2"
+      skipSSLVerify: true
 ```
 
 ## Cloud Credentials
