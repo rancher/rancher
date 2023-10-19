@@ -6,14 +6,11 @@ import (
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
-	"github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type SteveAPITestSuite struct {
@@ -36,14 +33,10 @@ func (s *SteveAPITestSuite) SetupSuite() {
   s.client = client
 }
 
-var(
-  configmapName = namegenerator.AppendRandomString(("steve-configmap"))
-  updatedConfigmapName= namegenerator.AppendRandomString(("updated-configmap"))
-)
+
 
 func (s *SteveAPITestSuite) TestConfigMapCreate() {
   subSession := s.session.NewSession()
-  s.session = subSession
   defer subSession.Cleanup()
 
   client, err := rancher.NewClient("", subSession)
@@ -63,21 +56,12 @@ func (s *SteveAPITestSuite) TestConfigMapCreate() {
     configMapClient := s.client.Steve.SteveType("configmap")
 
     // create
-    const configmapNamespace = "default"
-
-    configMapObj, err := configMapClient.Create(corev1.ConfigMap{
-      ObjectMeta: metav1.ObjectMeta{
-        Name:        configmapName,
-        Namespace:   configmapNamespace,
-        Annotations: map[string]string{"anno1": "automated annotation", "field.cattle.io/description": "automated configmap description"},
-        Labels:      map[string]string{"label1": "autoLabel"},
-      },
-      Data: map[string]string{"foo": "bar"},
-    })
+    configmapNamespace := namespace
+    configmapObj := createConfigmap(*configMapClient, configmapName, configmapNamespace, annotations, labels, data)
     require.NoError(s.T(), err)
 
     // Check that the configmap has been created
-    configmapByID, err := configMapClient.ByID(configMapObj.ID)
+    configmapByID, err := configMapClient.ByID(configmapObj.ID)
     require.NoError(s.T(), err)
     assert.Contains(s.T(), configmapByID.JSONResp["id"], configmapName)
   })
@@ -85,7 +69,6 @@ func (s *SteveAPITestSuite) TestConfigMapCreate() {
 
 func (s *SteveAPITestSuite) TestConfigMapUpdate(){
   subSession := s.session.NewSession()
-  s.session = subSession
   defer subSession.Cleanup()
 
   client, err := rancher.NewClient("", subSession)
@@ -105,32 +88,21 @@ func (s *SteveAPITestSuite) TestConfigMapUpdate(){
     configMapClient := s.client.Steve.SteveType("configmap")
 
     // create
-    const configmapNamespace = "default"
-
-    configMapObj, err := configMapClient.Create(corev1.ConfigMap{
-      ObjectMeta: metav1.ObjectMeta{
-        Name:        configmapName,
-        Namespace:   configmapNamespace,
-        Annotations: map[string]string{"anno1": "automated annotation", "field.cattle.io/description": "automated configmap description"},
-        Labels:      map[string]string{"label1": "autoLabel"},
-      },
-      Data: map[string]string{"foo": "bar"},
-    })
+    configmapNamespace := namespace
+    configmapObj := createConfigmap(*configMapClient, configmapName, configmapNamespace, annotations, labels, data)
     require.NoError(s.T(), err)
 
-    // Check that the configmap has been created
-    configmapByID, err := configMapClient.ByID(configMapObj.ID)
-    require.NoError(s.T(), err)
-    assert.Contains(s.T(), configmapByID.JSONResp["id"], configmapName)
-    
     // Update action
-    configMapObj, err = configMapClient.Update(configmapByID, configmapByID.JSONResp["id"]{})
+    updatedConfigMapObj, err := updateConfigmapAnnotations(*configMapClient, configmapObj, updatedAnnotations)
     require.NoError(s.T(), err)
 
-    // Check for updated name
-    configmapByID, err = configMapClient.ByID(configMapObj.ID)
-    require.NoError(s.T(), err)
-    assert.Contains(s.T(), configmapByID.JSONResp["id"], updatedConfigmapName)
+    // Check for updated annotation
+    for i := 0; i < len(updatedConfigMapObj.ObjectMeta.Annotations); i++ {
+      assert.Contains(s.T(), updatedConfigMapObj.ObjectMeta.Annotations, "anno2")
+      assert.Contains(s.T(), updatedConfigMapObj.ObjectMeta.Annotations["anno2"], "new automated annotation")
+      assert.Contains(s.T(), updatedConfigMapObj.ObjectMeta.Annotations, "field.cattle.io/description")
+      assert.Contains(s.T(), updatedConfigMapObj.ObjectMeta.Annotations["field.cattle.io/description"], "new automated configmap description")
+    }
   })
 }
 
@@ -152,39 +124,24 @@ func (s *SteveAPITestSuite) TestConfigmapDelete(){
   s.cluster, err = s.client.Management.Cluster.ByID(clusterID)
   require.NoError(s.T(), err)
 
-  s.Run("Configmap Update Operation.", func() {
+  s.Run("Configmap Delete Operation.", func() {
     configMapClient := s.client.Steve.SteveType("configmap")
 
     // create
-    const configmapNamespace = "default"
-
-    configMapObj, err := configMapClient.Create(corev1.ConfigMap{
-      ObjectMeta: metav1.ObjectMeta{
-        Name:        configmapName,
-        Namespace:   configmapNamespace,
-        Annotations: map[string]string{"anno1": "automated annotation", "field.cattle.io/description": "automated configmap description"},
-        Labels:      map[string]string{"label1": "autoLabel"},
-      },
-      Data: map[string]string{"foo": "bar"},
-    })
+    configmapNamespace := namespace
+    configmapObj := createConfigmap(*configMapClient, configmapName, configmapNamespace, annotations, labels, data)
     require.NoError(s.T(), err)
 
-    // Check that the configmap has been created
-    configmapByID, err := configMapClient.ByID(configMapObj.ID)
-    require.NoError(s.T(), err)
-    assert.Contains(s.T(), configmapByID.JSONResp["id"], configmapName)
-
-    // delete
-    err = configMapClient.Delete(configmapByID)
+    //delete
+    err = deleteConfigmap(*configMapClient, configmapObj)
     require.NoError(s.T(), err)
 
     // validate deletion
-    configmapByID, err = configMapClient.ByID(configMapObj.ID)
+    configmapByID, err := configMapClient.ByID(configmapObj.ID)
     require.Error(s.T(), err)
     assert.Nil(s.T(), configmapByID)
   })
 }
-
 
 func TestConfigMapsSuite(t *testing.T) {
   suite.Run(t, new(SteveAPITestSuite))

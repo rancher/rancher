@@ -195,7 +195,7 @@ type NodePools struct {
 type Config struct {
 	NodePools              []NodePools                              `json:"nodePools,omitempty" yaml:"nodePools,omitempty"`
 	MachinePools           []MachinePools                           `json:"machinePools,omitempty" yaml:"machinePools,omitempty"`
-	CloudProvider          string                                   `json:"cloudProvider" yaml:"cloudProvider"`
+	CloudProvider          string                                   `json:"cloudProvider,omitempty" yaml:"cloudProvider,omitempty"`
 	Providers              []string                                 `json:"providers,omitempty" yaml:"providers,omitempty"`
 	NodeProviders          []string                                 `json:"nodeProviders,omitempty" yaml:"nodeProviders,omitempty"`
 	Hardened               bool                                     `json:"hardened,omitempty" yaml:"hardened,omitempty"`
@@ -210,7 +210,8 @@ type Config struct {
 	AgentEnvVarsRKE1       *[]management.EnvVar                     `json:"agentEnvVarsRKE1,omitempty" yaml:"agentEnvVarsRKE1,omitempty"`
 	ClusterAgent           *management.AgentDeploymentCustomization `json:"clusterAgent,omitempty" yaml:"clusterAgent,omitempty"`
 	FleetAgent             *management.AgentDeploymentCustomization `json:"fleetAgent,omitempty" yaml:"fleetAgent,omitempty"`
-	Etcd                   *rkev1.ETCD                              `json:"etcd,omitempty" yaml:"etcd,omitempty"`
+	ETCD                   *rkev1.ETCD                              `json:"etcd,omitempty" yaml:"etcd,omitempty"`
+	ETCDRKE1               *management.ETCDService                  `json:"etcdRKE1,omitempty" yaml:"etcdRKE1,omitempty"`
 	LabelsAndAnnotations   *LabelsAndAnnotations                    `json:"labelsAndAnnotations,omitempty" yaml:"labelsAndAnnotations,omitempty"`
 	Networking             *Networking                              `json:"networking,omitempty" yaml:"networking,omitempty"`
 	Registries             *Registries                              `json:"registries,omitempty" yaml:"registries,omitempty"`
