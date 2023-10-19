@@ -2,7 +2,6 @@ package git
 
 import (
 	"fmt"
-	"net/url"
 
 	"github.com/rancher/rancher/pkg/settings"
 	corev1 "k8s.io/api/core/v1"
@@ -102,19 +101,11 @@ func Update(secret *corev1.Secret, namespace, name, gitURL, branch string, insec
 }
 
 func gitForRepo(secret *corev1.Secret, namespace, name, gitURL string, insecureSkipTLS bool, caBundle []byte) (*git, error) {
-	isGitSSH, err := isGitSSH(gitURL)
+	err := validateGitURL(gitURL)
 	if err != nil {
-		return nil, fmt.Errorf("failed to verify the type of URL %s: %w", gitURL, err)
+		return nil, fmt.Errorf("%w: only http(s) or ssh supported", err)
 	}
-	if !isGitSSH {
-		u, err := url.Parse(gitURL)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse URL %s: %w", gitURL, err)
-		}
-		if u.Scheme != "http" && u.Scheme != "https" {
-			return nil, fmt.Errorf("invalid git URL scheme %s, only http(s) and git supported", u.Scheme)
-		}
-	}
+
 	dir := gitDir(namespace, name, gitURL)
 	headers := map[string]string{}
 	if settings.InstallUUID.Get() != "" {
