@@ -30,6 +30,7 @@ provisioningInput:
   - nodeRoles:
       worker: true
       quantity: 2
+      drainBeforeDelete: true
   - nodeRoles:
       windows: true
       quantity: 1
@@ -42,6 +43,17 @@ provisioningInput:
   hardened: false
   psact: ""
   clusterSSHTests: [""]
+  etcd:
+    disableSnapshot: false
+    snapshotScheduleCron: "0 */5 * * *"
+    snapshotRetain: 3
+    s3:
+      bucket: ""
+      endpoint: ""
+      endpointCA: ""
+      folder: ""
+      region: "us-east-2"
+      skipSSLVerify: true
 ```
 
 ## Cloud Credentials

@@ -22,7 +22,8 @@ type ClusterConfig struct {
 	AgentEnvVarsRKE1     *[]management.EnvVar                     `json:"agentEnvVarsRKE1" yaml:"agentEnvVarsRKE1"`
 	ClusterAgent         *management.AgentDeploymentCustomization `json:"clusterAgent" yaml:"clusterAgent"`
 	FleetAgent           *management.AgentDeploymentCustomization `json:"fleetAgent" yaml:"fleetAgent"`
-	Etcd                 *rkev1.ETCD                              `json:"etcd" yaml:"etcd"`
+	ETCD                 *rkev1.ETCD                              `json:"etcd" yaml:"etcd"`
+	ETCDRKE1             *management.ETCDService                  `json:"etcdRKE1" yaml:"etcdRKE1"`
 	LabelsAndAnnotations *provisioningInput.LabelsAndAnnotations  `json:"labelsAndAnnotations" yaml:"labelsAndAnnotations"`
 	Networking           *provisioningInput.Networking            `json:"networking" yaml:"networking"`
 	Registries           *provisioningInput.Registries            `json:"registries" yaml:"registries"`
@@ -44,7 +45,8 @@ func ConvertConfigToClusterConfig(provisioningConfig *provisioningInput.Config) 
 	newConfig.NodeProviders = &provisioningConfig.NodeProviders
 	newConfig.ClusterAgent = provisioningConfig.ClusterAgent
 	newConfig.FleetAgent = provisioningConfig.FleetAgent
-	newConfig.Etcd = provisioningConfig.Etcd
+	newConfig.ETCD = provisioningConfig.ETCD
+	newConfig.ETCDRKE1 = provisioningConfig.ETCDRKE1
 	newConfig.LabelsAndAnnotations = provisioningConfig.LabelsAndAnnotations
 	newConfig.Registries = provisioningConfig.Registries
 	newConfig.UpgradeStrategy = provisioningConfig.UpgradeStrategy
