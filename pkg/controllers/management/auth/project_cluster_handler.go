@@ -147,8 +147,7 @@ func (l *projectLifecycle) Updated(obj *apisv3.Project) (runtime.Object, error) 
 	return obj, nil
 }
 
-// Remove removes a Project. A Project is a Rancher concept that defines a group of namespaces. This code removes the
-// set of namespaces and RoleBindings in the given Project.
+// Remove removes the set of namespaces and RoleBindings in the given project.
 func (l *projectLifecycle) Remove(obj *apisv3.Project) (runtime.Object, error) {
 	var returnErr error
 	set := labels.Set{rbac.RestrictedAdminProjectRoleBinding: "true"}
@@ -173,7 +172,7 @@ type clusterLifecycle struct {
 	mgr *mgr
 }
 
-// sync reconciles the state of a Project for a cluster.
+// sync reconciles the state of a Cluster in the management cluster.
 func (l *clusterLifecycle) sync(key string, orig *apisv3.Cluster) (runtime.Object, error) {
 	if orig == nil || !orig.DeletionTimestamp.IsZero() {
 		return orig, nil

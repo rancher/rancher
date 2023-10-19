@@ -67,7 +67,7 @@ type crtbLifecycle struct {
 	clusterLister v3.ClusterLister
 }
 
-// Create creates a ClusterRoleTemplateBinding (CRTB) and applies the k8s roles and bindings to the cluster.
+// Create ensures a ClusterRoleTemplateBinding (CRTB) has the correct Subject, Roles and RoleBindings on create.
 func (c *crtbLifecycle) Create(obj *v3.ClusterRoleTemplateBinding) (runtime.Object, error) {
 	obj, err := c.reconcileSubject(obj)
 	if err != nil {
@@ -78,7 +78,8 @@ func (c *crtbLifecycle) Create(obj *v3.ClusterRoleTemplateBinding) (runtime.Obje
 	return obj, err
 }
 
-// Updated updates user access, labels, and k8s roles and bindings for a CRTB.
+// Updated ensures a ClusterRoleTemplateBinding (CRTB) has the correct Subject, Labels, Roles and RoleBindings on
+// update.
 func (c *crtbLifecycle) Updated(obj *v3.ClusterRoleTemplateBinding) (runtime.Object, error) {
 	obj, err := c.reconcileSubject(obj)
 	if err != nil {
@@ -104,7 +105,8 @@ func (c *crtbLifecycle) Remove(obj *v3.ClusterRoleTemplateBinding) (runtime.Obje
 	return nil, err
 }
 
-// reconcileSubject sets a user on a CRTB if they are listed as a subject. Returns nil if the binding has no subject.
+// reconcileSubject sets a user on a CRTB if they are listed as a subject. Returns an error if the binding has no
+// subject.
 func (c *crtbLifecycle) reconcileSubject(binding *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
 	if binding.GroupName != "" || binding.GroupPrincipalName != "" || (binding.UserPrincipalName != "" && binding.UserName != "") {
 		return binding, nil
@@ -138,7 +140,9 @@ func (c *crtbLifecycle) reconcileSubject(binding *v3.ClusterRoleTemplateBinding)
 	return nil, errors.Errorf("Binding %v has no subject", binding.Name)
 }
 
-// When a CRTB is created or updated, translate it into several k8s roles and bindings to actually enforce the RBAC
+// reconcileBindings reconciles a CRTB.
+//
+// When a CRTB is created or updated, translate it into several k8s roles and bindings to actually enforce the RBAC.
 // Specifically:
 //   - ensure the subject can see the cluster in the mgmt API
 //   - if the subject was granted owner permissions for the cluster, ensure they can create/update/delete the cluster
@@ -194,7 +198,7 @@ func (c *crtbLifecycle) reconcileBindings(binding *v3.ClusterRoleTemplateBinding
 	return nil
 }
 
-// removeMGMTClusterScopedPrivilegesInProjectNamespace removes mgmt cluster scoped privileges for a provided CRTB in
+// removeMGMTClusterScopedPrivilegesInProjectNamespace removes mgmt cluster scoped RoleBindings for a provided CRTB in
 // a project namespace.
 func (c *crtbLifecycle) removeMGMTClusterScopedPrivilegesInProjectNamespace(binding *v3.ClusterRoleTemplateBinding) error {
 	projects, err := c.mgr.projectLister.List(binding.Namespace, labels.Everything())
@@ -219,15 +223,13 @@ func (c *crtbLifecycle) removeMGMTClusterScopedPrivilegesInProjectNamespace(bind
 }
 
 // reconcileLabels updates labels for the provided CRTB.
-//
-// Prior to 2.5, for every CRTB, the following CRBs and RBs are created in the management clusters
-//  1. CRTB.UID is the label key for a CRB, CRTB.UID=memberhsip-binding-owner
-//  2. CRTB.UID is label key for the RB, CRTB.UID=crtb-in-project-binding-owner (in the namespace of each project in the
-//     cluster that the user has access to)
-//
-// Using above labels, list the CRB and RB and update them to add a label with namespace + name of CRTB.
 func (c *crtbLifecycle) reconcileLabels(binding *v3.ClusterRoleTemplateBinding) error {
-
+	/* Prior to 2.5, for every CRTB, the following CRBs and RBs are created in the management clusters
+	   1. CRTB.UID is the label key for a CRB, CRTB.UID=membership-binding-owner
+	   2. CRTB.UID is label key for the RB, CRTB.UID=crtb-in-project-binding-owner (in the namespace of each project in
+	      the cluster that the user has access to)
+	Using above labels, list the CRB and RB and update them to add a label with namespace + name of CRTB.
+	*/
 	if binding.Labels[RtbCrbRbLabelsUpdated] == "true" {
 		return nil
 	}

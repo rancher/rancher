@@ -41,7 +41,7 @@ type globalRoleLifecycle struct {
 	rClient  rbacv1.RoleInterface
 }
 
-// Create creates a  new GlobalRole for the cluster.
+// Create reconciles the GlobalRole's auxiliary resources upon creation.
 func (gr *globalRoleLifecycle) Create(obj *v3.GlobalRole) (runtime.Object, error) {
 	var returnError error
 	err := gr.reconcileGlobalRole(obj)
@@ -55,7 +55,7 @@ func (gr *globalRoleLifecycle) Create(obj *v3.GlobalRole) (runtime.Object, error
 	return obj, returnError
 }
 
-// Updated updates the global and catalog role on the cluster.
+// Updated reconciles the GlobalRole's auxiliary resources upon update.
 func (gr *globalRoleLifecycle) Updated(obj *v3.GlobalRole) (runtime.Object, error) {
 	var returnError error
 	err := gr.reconcileGlobalRole(obj)
@@ -74,7 +74,7 @@ func (gr *globalRoleLifecycle) Remove(obj *v3.GlobalRole) (runtime.Object, error
 	return nil, nil
 }
 
-// reconcileGlobalRole updates cluster role if the GlobalRole rules have changed.
+// reconcileGlobalRole ensures the GlobalRole's corresponding cluster role exists and has the right rules.
 func (gr *globalRoleLifecycle) reconcileGlobalRole(globalRole *v3.GlobalRole) error {
 	crName := getCRName(globalRole)
 
@@ -117,7 +117,7 @@ func (gr *globalRoleLifecycle) reconcileGlobalRole(globalRole *v3.GlobalRole) er
 	return nil
 }
 
-// reconcileCatalogRole updates catalog rule with the GlobalRole rules.
+// reconcileCatalogRole ensures the GlobalRole has a corresponding Role with all necessary catalog rules.
 func (gr *globalRoleLifecycle) reconcileCatalogRole(globalRole *v3.GlobalRole) error {
 	// rules which give template/template version access need to have a specific namespaced role created, since the
 	// backend resources that they grant access to are namespaced resources

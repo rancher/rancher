@@ -1,5 +1,3 @@
-// Package auth contains handlers and helpful functions for managing authentication. This includes token cleanup and
-// managing Rancher's RBAC kubernetes resources: ClusterRoleTemplateBindings and ProjectRoleTemplateBindings.
 package auth
 
 import (

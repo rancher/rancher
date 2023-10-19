@@ -23,7 +23,7 @@ func getRBOwnerKey(rb *v1.RoleBinding) []string {
 	return owners
 }
 
-// rbRoleSubjectKey returns a RoleBinding subject key with unique values.
+// rbRoleSubjectKey returns a RoleBinding subject key.
 func rbRoleSubjectKey(roleName string, subject v1.Subject) string {
 	return roleName + "." + subject.Kind + "." + subject.Name
 }
@@ -39,7 +39,6 @@ func rbRoleSubjectKeys(roleName string, subjects []v1.Subject) []string {
 
 // indexByMembershipBindingOwner returns an index list of {namespace, key} where the value in {key, value} is a
 // MembershipBindingOwner.
-// todo: This parses an API object and displays all the owner keys for the namespace the k8s object is in?
 func indexByMembershipBindingOwner(obj interface{}) ([]string, error) {
 	ro, ok := obj.(runtime.Object)
 	if !ok {

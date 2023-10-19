@@ -114,7 +114,7 @@ type manager struct {
 
 // ensureClusterMembershipBinding - When a CRTB is created that gives a subject permissions in a project or cluster, we
 // need to create a "membership" binding that gives the subject access to the cluster custom resource itself. This is
-// painfully similar to ensureProjectMemberBinding, but writing one function that handles both is overly complex.
+// painfully similar to ensureProjectMembershipBinding, but writing one function that handles both is overly complex.
 func (m *manager) ensureClusterMembershipBinding(roleName, rtbNsAndName string, cluster *v3.Cluster, makeOwner bool, subject v1.Subject) error {
 	if err := m.createClusterMembershipRole(roleName, cluster, makeOwner); err != nil {
 		return err
@@ -302,8 +302,8 @@ func (m *manager) createProjectMembershipRole(roleName, namespace string, projec
 	return nil
 }
 
-// createMembershipRole creates a membership role for the given object and role that specifies whether the subject
-// has owner access.
+// createMembershipRole creates a membership Role or ClusterRole for the given resource. Can specify if this is an
+// owner role (ie give all verbs).
 func (m *manager) createMembershipRole(resourceType, roleName string, makeOwner bool, ownerObject interface{}, client *objectclient.ObjectClient, clusterRole bool) error {
 	metaObj, err := meta.Accessor(ownerObject)
 	if err != nil {

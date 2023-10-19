@@ -49,7 +49,7 @@ type prtbLifecycle struct {
 	clusterLister v3.ClusterLister
 }
 
-// Create creates a ProjectRoleTemplateBinding.
+// Create ensures a ProjectRoleTemplateBinding (CRTB) has the correct Subject, Roles and RoleBindings on create.
 func (p *prtbLifecycle) Create(obj *v3.ProjectRoleTemplateBinding) (runtime.Object, error) {
 	if obj.ServiceAccount != "" {
 		return obj, nil
@@ -62,7 +62,8 @@ func (p *prtbLifecycle) Create(obj *v3.ProjectRoleTemplateBinding) (runtime.Obje
 	return obj, err
 }
 
-// Updated updates a ProjectRoleTemplateBinding.
+// Updated ensures a ProjectRoleTemplateBinding (CRTB) has the correct Subject, Labels, Roles and RoleBindings on
+// update.
 func (p *prtbLifecycle) Updated(obj *v3.ProjectRoleTemplateBinding) (runtime.Object, error) {
 	if obj.ServiceAccount != "" {
 		return obj, nil
@@ -78,7 +79,7 @@ func (p *prtbLifecycle) Updated(obj *v3.ProjectRoleTemplateBinding) (runtime.Obj
 	return obj, err
 }
 
-// Remove removes a ProjectRoleTemplateBinding.
+// Remove removes user access, privileges, and permissions for a PRTB.
 func (p *prtbLifecycle) Remove(obj *v3.ProjectRoleTemplateBinding) (runtime.Object, error) {
 	parts := strings.SplitN(obj.ProjectName, ":", 2)
 	if len(parts) < 2 {
