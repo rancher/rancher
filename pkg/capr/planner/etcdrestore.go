@@ -347,9 +347,6 @@ func (p *Planner) generateEtcdSnapshotRestorePlan(controlPlane *rkev1.RKEControl
 		if generated, instruction := generateManifestRemovalInstruction(runtime, entry); generated {
 			nodePlan.Instructions = append(nodePlan.Instructions, convertToIdempotentInstruction("etcd-restore/restore-manifest-removal", fmt.Sprintf("%v", controlPlane.Status.ETCDSnapshotRestore), instruction))
 		}
-		if generated, instruction := generateKubeProxyRemovalInstruction(runtime, entry); generated {
-			nodePlan.Instructions = append(nodePlan.Instructions, convertToIdempotentInstruction("etcd-restore/restore-kube-proxy-manifest-removal", fmt.Sprintf("%v", controlPlane.Status.ETCDSnapshotRestore), instruction))
-		}
 	}
 
 	// make sure to install the desired version before performing restore
@@ -380,9 +377,6 @@ func (p *Planner) generateStopServiceAndKillAllPlan(controlPlane *rkev1.RKEContr
 		if generated, instruction := generateManifestRemovalInstruction(runtime, server); generated {
 			nodePlan.Instructions = append(nodePlan.Instructions, instruction)
 		}
-		if generated, instruction := generateKubeProxyRemovalInstruction(runtime, server); generated {
-			nodePlan.Instructions = append(nodePlan.Instructions, instruction)
-		}
 	}
 	return nodePlan, joinedServer, nil
 }
@@ -398,23 +392,6 @@ func generateManifestRemovalInstruction(runtime string, entry *planEntry) (bool,
 		Args: []string{
 			"-c",
 			fmt.Sprintf("rm -rf /var/lib/rancher/%s/server/manifests/%s-*.yaml", runtime, runtime),
-		},
-	}
-}
-
-// generateKubeProxyRemovalInstruction generates a rm -f command for the kube-proxy pod-manifest to be run on RKE2.
-// This was created based on this issue: https://github.com/rancher/rancher/issues/42895
-// Despite not fixing all problems after deleting it the "waiting for calico" issue got fixed.
-func generateKubeProxyRemovalInstruction(runtime string, entry *planEntry) (bool, plan.OneTimeInstruction) {
-	if entry == nil || runtime != capr.RuntimeRKE2 {
-		return false, plan.OneTimeInstruction{}
-	}
-	return true, plan.OneTimeInstruction{
-		Name:    "remove kube-proxy manifest",
-		Command: "/bin/sh",
-		Args: []string{
-			"-c",
-			fmt.Sprintf("rm -f /var/lib/rancher/%s/agent/pod-manifests/kube-proxy.yaml", runtime),
 		},
 	}
 }
