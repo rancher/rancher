@@ -838,7 +838,7 @@ func DeleteRKE2K3SCustomClusterNodes(client *rancher.Client, clusterID string, c
 					return false, nil
 				})
 				if err != nil {
-					return nil
+					return err
 				}
 			}
 		}
