@@ -1,6 +1,6 @@
 #!groovy
 node {
-    def rootPath = "/go/src/github.com/rancher/rancher/tests/v2/validation/"
+    def rootPath = "/root/go/src/github.com/rancher/rancher/tests/v2/validation/"
     def job_name = "${JOB_NAME}"
     if (job_name.contains('/')) { 
       job_names = job_name.split('/')
@@ -133,7 +133,7 @@ node {
               stage ('post upgrade tests') {
                 try {
                   sh "docker run --name ${upgradeTestContainer} -t --env-file ${envFile} " +
-                    "${imageName} sh -c \"/go/bin/gotestsum --format standard-verbose --packages=${testsDir} --junitfile ${testResultsOut} -- ${GOTEST_TESTCASE_2} -timeout=${timeout} -v\""
+                    "${imageName} sh -c \"/root/go/bin/gotestsum --format standard-verbose --packages=${testsDir} --junitfile ${testResultsOut} -- ${GOTEST_TESTCASE_2} -timeout=${timeout} -v\""
                 } catch(err) {
                   echo 'Test run had failures. Collecting results...'
                 }

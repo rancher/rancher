@@ -2152,7 +2152,8 @@ def set_url_password_token(rancher_url, server_url=None, version=""):
     print(auth_url)
     if "master" in version or \
             "2.6" in version or \
-            "2.7" in version:
+            "2.7" in version or \
+            "2.8" in version:
         rpassword = ADMIN_PASSWORD
         print("on 2.6 or later")
     retries = 5
