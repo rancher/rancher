@@ -38,4 +38,5 @@ type Config struct {
 	AKSNodePool  *aks.NodePool        `json:"aksNodePool" yaml:"aksNodePool"`
 	EKSNodePool  *eks.NodeGroupConfig `json:"eksNodePool" yaml:"eksNodePool"`
 	GKENodePool  *gke.NodePool        `json:"gkeNodePool" yaml:"gkeNodePool"`
+	NodeProvider string               `json:"nodeProvider" yaml:"nodeProvider"`
 }
