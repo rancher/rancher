@@ -10,7 +10,6 @@ import (
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
-	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/token"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kwait "k8s.io/apimachinery/pkg/util/wait"
@@ -47,12 +46,10 @@ func CreateAdminToken(password string, rancherConfig *rancher.Config) (string, e
 // PostRancherInstall is a function that updates EULA after the rancher installation
 // and sets new admin password to the admin user
 func PostRancherInstall(adminClient *rancher.Client, adminPassword string) error {
-	clusterID, err := clusters.GetClusterIDByName(adminClient, clusterName)
+	err := UpdateEULA(adminClient)
 	if err != nil {
 		return err
 	}
-
-	UpdateEULA(adminClient, clusterID)
 
 	var userList *management.UserCollection
 	err = kwait.Poll(500*time.Millisecond, 2*time.Minute, func() (done bool, err error) {
@@ -82,13 +79,8 @@ func PostRancherInstall(adminClient *rancher.Client, adminPassword string) error
 }
 
 // UpdateEULA is a function that updates EULA after the rancher installation
-func UpdateEULA(adminClient *rancher.Client, clusterID string) error {
-	clusterID, err := clusters.GetClusterIDByName(adminClient, clusterID)
-	if err != nil {
-		return err
-	}
-
-	steveClient, err := adminClient.Steve.ProxyDownstream(clusterID)
+func UpdateEULA(adminClient *rancher.Client) error {
+	steveClient, err := adminClient.Steve.ProxyDownstream(clusterName)
 	if err != nil {
 		return err
 	}
@@ -120,10 +112,32 @@ func UpdateEULA(adminClient *rancher.Client, clusterID string) error {
 		Value:   timeStamp,
 	}
 
-	_, err = steveClient.SteveType("management.cattle.io.setting").Create(settingEULA)
-	if err != nil && strings.Contains(err.Error(), "409 Conflict") {
-		return nil
-	}
+	var pollError error
+	err = kwait.Poll(500*time.Millisecond, 2*time.Minute, func() (done bool, err error) {
+		_, err = steveClient.SteveType("management.cattle.io.setting").Create(settingEULA)
 
-	return err
+		if err != nil && !strings.Contains(err.Error(), "409 Conflict") {
+			pollError = err
+			return false, nil
+		}
+
+		urlSetting := &v3.Setting{}
+		urlSettingResp, err := steveClient.SteveType("management.cattle.io.setting").ByID("server-url")
+		if err != nil {
+			return false, err
+		}
+
+		err = v1.ConvertToK8sType(urlSettingResp.JSONResp, urlSetting)
+		if err != nil {
+			return false, err
+		}
+
+		if urlSetting.Value == fmt.Sprintf("https://%s", adminClient.RancherConfig.Host) {
+			return true, nil
+		}
+
+		return false, nil
+	})
+
+	return fmt.Errorf("%v and %v", err, pollError)
 }
