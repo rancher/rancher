@@ -28,7 +28,7 @@ func main() {
 
 	client, err := rancher.NewClient("", testSession)
 	if err != nil {
-		logrus.Fatalf("error creating admin client: %v", err)
+		logrus.Errorf("error creating admin client: %v", err)
 	}
 
 	var clusterList *v1.SteveCollection

@@ -22,6 +22,8 @@ node {
     def branch = "release/v2.8"
     def corralBranch = "main"
     def config = env.CONFIG
+    def rancherToken = ""
+    def filename = "config.yaml"
     def individualJob = (jobName =~ /(go-recurring-[a-z]+)/)[0][1]
     individualJob = "${individualJob}-individual-job"
 
@@ -113,10 +115,8 @@ node {
                 }
               }
               dir("./rancher/tests/v2/validation") {
-                def filename = "config.yaml"
-
                 writeFile file: filename, text: config
-                env.CATTLE_TEST_CONFIG = "${workPath}"+filename
+                env.CATTLE_TEST_CONFIG = "${workPath}${filename}"
               }
               dir ("./") {
                 sh "./rancher/tests/v2/validation/configure.sh"
@@ -205,11 +205,10 @@ node {
                   try {
                     jobs = [:]
                     
-                    // use main config file
-                    def fileName = "config.yaml"
-                    writeFile file: fileName, text: config
+                    // copy updated config file from the build test container
+                    sh "docker cp ${buildTestContainer}:${workPath}${filename} ./"
                     
-                    def mainRancherConfigPath = "./${fileName}"
+                    def mainRancherConfigPath = "./${filename}"
 
                     sh "./yq e '.rancher.cleanup = true' -i ${mainRancherConfigPath}"
                     configFiles.each {
