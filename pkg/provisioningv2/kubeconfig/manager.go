@@ -293,7 +293,7 @@ func (m *Manager) kubeConfigValid(kcData []byte, cluster *v1.Cluster, currentSer
 	}
 
 	// Check if the required CAPI cluster label is present in the secretLabels map
-	capiClusterLabelValue, labelPresent := secretLabels[capi.ClusterLabelName]
+	capiClusterLabelValue, labelPresent := secretLabels[capi.ClusterNameLabel]
 	if !labelPresent || capiClusterLabelValue != cluster.Name {
 		logrus.Tracef("[kubeconfigmanager] cluster %s/%s: kubeconfig secret failed validation due to missing or incorrect label", cluster.Namespace, cluster.Name)
 		return false, false
@@ -380,7 +380,7 @@ func (m *Manager) getKubeConfigData(cluster *v1.Cluster, secretName, managementC
 				UID:        cluster.UID,
 			}},
 			Labels: map[string]string{
-				capi.ClusterLabelName: cluster.Name,
+				capi.ClusterNameLabel: cluster.Name,
 			},
 		},
 		Data: map[string][]byte{

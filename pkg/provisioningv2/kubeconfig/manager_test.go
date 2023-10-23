@@ -102,7 +102,7 @@ func Test_kubeConfigValid(t *testing.T) {
 			storedToken: &token,
 			cluster:     &cluster,
 			secretLabels: map[string]string{
-				capi.ClusterLabelName: "c-m-1234xyz",
+				capi.ClusterNameLabel: "c-m-1234xyz",
 			},
 
 			wantError: false,
@@ -124,7 +124,7 @@ func Test_kubeConfigValid(t *testing.T) {
 			storedToken: hashToken(&token, false),
 			cluster:     &cluster,
 			secretLabels: map[string]string{
-				capi.ClusterLabelName: "c-m-1234xyz",
+				capi.ClusterNameLabel: "c-m-1234xyz",
 			},
 
 			wantError: false,
@@ -146,7 +146,7 @@ func Test_kubeConfigValid(t *testing.T) {
 			storedToken: &token,
 			cluster:     &cluster,
 			secretLabels: map[string]string{
-				capi.ClusterLabelName: "c-m-1234xyz",
+				capi.ClusterNameLabel: "c-m-1234xyz",
 			},
 
 			wantError: false,
@@ -168,7 +168,7 @@ func Test_kubeConfigValid(t *testing.T) {
 			storedToken: hashToken(&token, false),
 			cluster:     &cluster,
 			secretLabels: map[string]string{
-				capi.ClusterLabelName: "c-m-1234xyz",
+				capi.ClusterNameLabel: "c-m-1234xyz",
 			},
 
 			wantError: false,
@@ -190,7 +190,7 @@ func Test_kubeConfigValid(t *testing.T) {
 			storedToken: &token,
 			cluster:     &cluster,
 			secretLabels: map[string]string{
-				capi.ClusterLabelName: "c-m-1234xyz",
+				capi.ClusterNameLabel: "c-m-1234xyz",
 			},
 
 			wantError: false,
@@ -212,7 +212,7 @@ func Test_kubeConfigValid(t *testing.T) {
 			storedToken: &token,
 			cluster:     &cluster,
 			secretLabels: map[string]string{
-				capi.ClusterLabelName: "c-m-1234xyz",
+				capi.ClusterNameLabel: "c-m-1234xyz",
 			},
 
 			wantError: false,
@@ -234,7 +234,7 @@ func Test_kubeConfigValid(t *testing.T) {
 			storedToken: &token,
 			cluster:     &cluster,
 			secretLabels: map[string]string{
-				capi.ClusterLabelName: "c-m-1234xyz",
+				capi.ClusterNameLabel: "c-m-1234xyz",
 			},
 
 			wantError: false,
@@ -251,7 +251,7 @@ func Test_kubeConfigValid(t *testing.T) {
 			storedToken: &token,
 			cluster:     &cluster,
 			secretLabels: map[string]string{
-				capi.ClusterLabelName: "c-m-1234xyz",
+				capi.ClusterNameLabel: "c-m-1234xyz",
 			},
 
 			wantError: true,
@@ -269,7 +269,7 @@ func Test_kubeConfigValid(t *testing.T) {
 			cluster:           &cluster,
 			invalidKubeconfig: true,
 			secretLabels: map[string]string{
-				capi.ClusterLabelName: "c-m-1234xyz",
+				capi.ClusterNameLabel: "c-m-1234xyz",
 			},
 
 			wantError: true,
@@ -291,7 +291,7 @@ func Test_kubeConfigValid(t *testing.T) {
 			storedToken: &token,
 			cluster:     &cluster,
 			secretLabels: map[string]string{
-				capi.ClusterLabelName: "c-m-1234xyz",
+				capi.ClusterNameLabel: "c-m-1234xyz",
 			},
 
 			wantError: false,
@@ -313,7 +313,7 @@ func Test_kubeConfigValid(t *testing.T) {
 			storedToken: &token,
 			cluster:     &cluster,
 			secretLabels: map[string]string{
-				capi.ClusterLabelName: "random-cluster-name",
+				capi.ClusterNameLabel: "random-cluster-name",
 			},
 
 			wantError: false,
@@ -356,7 +356,7 @@ func Test_kubeConfigValid(t *testing.T) {
 			cluster:          &cluster,
 			invalidServerURL: true,
 			secretLabels: map[string]string{
-				capi.ClusterLabelName: "c-m-1234xyz",
+				capi.ClusterNameLabel: "c-m-1234xyz",
 			},
 
 			wantError: true,
@@ -377,7 +377,7 @@ func Test_kubeConfigValid(t *testing.T) {
 			storedToken: hashToken(&token, true),
 			cluster:     &cluster,
 			secretLabels: map[string]string{
-				capi.ClusterLabelName: "c-m-1234xyz",
+				capi.ClusterNameLabel: "c-m-1234xyz",
 			},
 
 			wantError: true,
@@ -397,7 +397,7 @@ func Test_kubeConfigValid(t *testing.T) {
 			},
 			cluster: &cluster,
 			secretLabels: map[string]string{
-				capi.ClusterLabelName: "c-m-1234xyz",
+				capi.ClusterNameLabel: "c-m-1234xyz",
 			},
 			tokenCacheError: fmt.Errorf("server unavailable"),
 

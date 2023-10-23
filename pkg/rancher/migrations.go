@@ -534,7 +534,7 @@ func migrateCAPIKubeconfigs(w *wrangler.Context) error {
 				return fmt.Errorf("getting secret %s/%s: %w", ns.Name, secretName, err)
 			}
 
-			_, ok := secret.Labels[capi.ClusterLabelName]
+			_, ok := secret.Labels[capi.ClusterNameLabel]
 			if ok {
 				logrus.Tracef("kubeconfig secret %s/%s already has the capi cluster label", ns.Name, secret.Name)
 				continue
@@ -545,7 +545,7 @@ func migrateCAPIKubeconfigs(w *wrangler.Context) error {
 				if secretCopy.Labels == nil {
 					secretCopy.Labels = map[string]string{}
 				}
-				secretCopy.Labels[capi.ClusterLabelName] = cluster.Name
+				secretCopy.Labels[capi.ClusterNameLabel] = cluster.Name
 
 				if _, updateErr := w.Core.Secret().Update(secretCopy); updateErr != nil {
 					return fmt.Errorf("updating secret %s/%s to add capi label: %w", ns.Name, secret.Name, err)
