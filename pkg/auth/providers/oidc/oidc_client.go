@@ -4,8 +4,9 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"github.com/pkg/errors"
 	"net/http"
+
+	"github.com/pkg/errors"
 
 	"github.com/coreos/go-oidc/v3/oidc"
 )
