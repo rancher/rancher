@@ -112,7 +112,7 @@ require (
 	github.com/rancher/apiserver v0.0.0-20230831052300-120e615b17ba
 	github.com/rancher/channelserver v0.5.1-0.20230719220800-0a37b73c7df8
 	github.com/rancher/dynamiclistener v0.3.6
-	github.com/rancher/eks-operator v1.3.0-rc4
+	github.com/rancher/eks-operator v1.3.0
 	github.com/rancher/fleet/pkg/apis v0.0.0-20231017140638-93432f288e79
 	github.com/rancher/gke-operator v1.2.0-rc2
 	github.com/rancher/kubernetes-provider-detector v0.1.5
