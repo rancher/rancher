@@ -7,6 +7,7 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
+	"github.com/rancher/rancher/tests/framework/extensions/defaults"
 	nodestat "github.com/rancher/rancher/tests/framework/extensions/nodes"
 	"github.com/sirupsen/logrus"
 	kwait "k8s.io/apimachinery/pkg/util/wait"
@@ -113,7 +114,7 @@ func updateNodePoolQuantity(client *rancher.Client, cluster *management.Cluster,
 			return false, err
 		}
 
-		if clusterResp.State == active && nodestat.AllManagementNodeReady(client, clusterResp.ID) == nil {
+		if clusterResp.State == active && nodestat.AllManagementNodeReady(client, clusterResp.ID, defaults.ThirtyMinuteTimeout) == nil {
 			logrus.Infof("Node pool is scaled!")
 			return true, nil
 		}

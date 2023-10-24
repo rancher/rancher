@@ -1,3 +1,5 @@
+//go:build (validation || infra.rke1 || cluster.nodedriver || extended) && !infra.any && !infra.aks && !infra.eks && !infra.gke && !infra.rke2k3s && !cluster.any && !cluster.custom && !sanity && !stress
+
 package nodescaling
 
 import (
@@ -63,10 +65,10 @@ func (s *RKE1NodeScalingTestSuite) TestScalingRKE1NodePools() {
 		nodeRoles nodepools.NodeRoles
 		client    *rancher.Client
 	}{
-		{"Scaling control plane machine pool by 1", nodeRolesEtcd, s.client},
-		{"Scaling etcd node machine pool by 1", nodeRolesControlPlane, s.client},
-		{"Scaling worker node machine pool by 1", nodeRolesWorker, s.client},
-		{"Scaling worker node machine pool by 2", nodeRolesTwoWorkers, s.client},
+		{"Scaling control plane pool by 1", nodeRolesEtcd, s.client},
+		{"Scaling etcd node pool by 1", nodeRolesControlPlane, s.client},
+		{"Scaling worker node pool by 1", nodeRolesWorker, s.client},
+		{"Scaling worker node pool by 2", nodeRolesTwoWorkers, s.client},
 	}
 
 	for _, tt := range tests {
@@ -74,7 +76,7 @@ func (s *RKE1NodeScalingTestSuite) TestScalingRKE1NodePools() {
 		require.NoError(s.T(), err)
 
 		s.Run(tt.name, func() {
-			ScalingRKE1NodePools(s.T(), s.client, clusterID, tt.nodeRoles)
+			scalingRKE1NodePools(s.T(), s.client, clusterID, tt.nodeRoles)
 		})
 	}
 }
@@ -87,7 +89,7 @@ func (s *RKE1NodeScalingTestSuite) TestScalingRKE1NodePoolsDynamicInput() {
 	clusterID, err := clusters.GetClusterIDByName(s.client, s.client.RancherConfig.ClusterName)
 	require.NoError(s.T(), err)
 
-	ScalingRKE1NodePools(s.T(), s.client, clusterID, *s.scalingConfig.NodePools.NodeRoles)
+	scalingRKE1NodePools(s.T(), s.client, clusterID, *s.scalingConfig.NodePools.NodeRoles)
 }
 
 // In order for 'go test' to run this suite, we need to create

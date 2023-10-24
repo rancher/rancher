@@ -29,7 +29,7 @@ ENV CATTLE_PARTNER_CHART_DEFAULT_BRANCH=$PARTNER_CHART_DEFAULT_BRANCH
 ENV CATTLE_RKE2_CHART_DEFAULT_BRANCH=$RKE2_CHART_DEFAULT_BRANCH
 ENV CATTLE_HELM_VERSION v2.16.8-rancher2
 ENV CATTLE_MACHINE_VERSION v0.15.0-rancher106
-ENV CATTLE_K3S_VERSION v1.27.5+k3s1
+ENV CATTLE_K3S_VERSION v1.27.6+k3s1
 ENV CATTLE_MACHINE_PROVISION_IMAGE rancher/machine:${CATTLE_MACHINE_VERSION}
 ENV CATTLE_ETCD_VERSION v3.5.1
 ENV LOGLEVEL_VERSION v0.1.5
@@ -55,9 +55,11 @@ ENV CATTLE_SYSTEM_AGENT_UPGRADE_IMAGE rancher/system-agent:${CATTLE_SYSTEM_AGENT
 ENV CATTLE_SYSTEM_UPGRADE_CONTROLLER_CHART_VERSION 103.0.0+up0.6.0
 
 # System charts minimal version
-ENV CATTLE_FLEET_MIN_VERSION=103.1.0+up0.9.0-rc.4
-ENV CATTLE_RANCHER_WEBHOOK_VERSION=103.0.0+up0.4.0-rc10
-ENV CATTLE_CSP_ADAPTER_MIN_VERSION=103.0.0+up3.0.0-rc2
+# Deprecated in favor of CATTLE_FLEET_VERSION
+ENV CATTLE_FLEET_MIN_VERSION=""
+ENV CATTLE_FLEET_VERSION=103.1.0+up0.9.0-rc.4
+ENV CATTLE_RANCHER_WEBHOOK_VERSION=103.0.0+up0.4.0
+ENV CATTLE_CSP_ADAPTER_MIN_VERSION=103.0.0+up3.0.0
 
 RUN mkdir -p /var/lib/rancher-data/local-catalogs/system-library && \
     mkdir -p /var/lib/rancher-data/local-catalogs/library && \
@@ -116,7 +118,7 @@ RUN curl ${HELM_URL_V3} | tar xvzf - --strip-components=1 -C /usr/bin && \
     chmod +x /usr/bin/kustomize
 
 # Set up K3s: copy the necessary binaries from the K3s image.
-COPY --from=rancher/k3s:v1.27.5-k3s1 \
+COPY --from=rancher/k3s:v1.27.6-k3s1 \
     /bin/blkid \
     /bin/bandwidth \
     /bin/cni \
@@ -165,7 +167,7 @@ RUN curl -sLf ${!TINI_URL} > /usr/bin/tini && \
 
 ENV CATTLE_UI_VERSION 2.8.0-alpha2
 ENV CATTLE_DASHBOARD_UI_VERSION v2.8.0-alpha2
-ENV CATTLE_CLI_VERSION v2.8.0-rc2
+ENV CATTLE_CLI_VERSION v2.8.0
 
 # Base UI brand used as a fallback env setting (not user facing) to indicate this is a non-prime install
 ENV CATTLE_BASE_UI_BRAND=

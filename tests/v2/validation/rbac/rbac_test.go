@@ -1,3 +1,5 @@
+//go:build (validation || infra.any || cluster.any || sanity) && !stress && !extended
+
 package rbac
 
 import (

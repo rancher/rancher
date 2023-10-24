@@ -31,6 +31,14 @@ var (
 		ReleaseNamespace: fleetconst.ReleaseLegacyNamespace,
 		ChartName:        fleetconst.ChartName,
 	}
+
+	watchedSettings = map[string]struct{}{
+		settings.ServerURL.Name:             {},
+		settings.CACerts.Name:               {},
+		settings.SystemDefaultRegistry.Name: {},
+		settings.FleetMinVersion.Name:       {},
+		settings.FleetVersion.Name:          {},
+	}
 )
 
 func Register(ctx context.Context, wContext *wrangler.Context) error {
@@ -63,9 +71,7 @@ func (h *handler) onSetting(key string, setting *v3.Setting) (*v3.Setting, error
 		return nil, nil
 	}
 
-	if setting.Name != settings.ServerURL.Name &&
-		setting.Name != settings.CACerts.Name &&
-		setting.Name != settings.SystemDefaultRegistry.Name {
+	if _, isWatched := watchedSettings[setting.Name]; !isWatched {
 		return setting, nil
 	}
 
@@ -76,7 +82,20 @@ func (h *handler) onSetting(key string, setting *v3.Setting) (*v3.Setting, error
 	}
 	h.Unlock()
 
-	err := h.manager.Ensure(fleetCRDChart.ReleaseNamespace, fleetCRDChart.ChartName, settings.FleetMinVersion.Get(), "", nil, true, "")
+	fleetVersion := settings.FleetVersion.Get()
+	// Keep Fleet min version precedence for backward compatibility.
+	if fleetMinVersion := settings.FleetMinVersion.Get(); fleetMinVersion != "" {
+		fleetVersion = fleetMinVersion
+	}
+
+	err := h.manager.Ensure(
+		fleetCRDChart.ReleaseNamespace,
+		fleetCRDChart.ChartName,
+		fleetVersion,
+		"",
+		nil,
+		true,
+		"")
 	if err != nil {
 		return setting, err
 	}
@@ -125,5 +144,13 @@ func (h *handler) onSetting(key string, setting *v3.Setting) (*v3.Setting, error
 		fleetChartValues["gitjob"] = gitjobChartValues
 	}
 
-	return setting, h.manager.Ensure(fleetChart.ReleaseNamespace, fleetChart.ChartName, settings.FleetMinVersion.Get(), "", fleetChartValues, true, "")
+	return setting,
+		h.manager.Ensure(
+			fleetChart.ReleaseNamespace,
+			fleetChart.ChartName,
+			fleetVersion,
+			"",
+			fleetChartValues,
+			true,
+			"")
 }

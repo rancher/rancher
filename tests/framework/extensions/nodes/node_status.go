@@ -24,8 +24,8 @@ const (
 
 // AllManagementNodeReady is a helper method that will loop and check if the node is ready in the RKE1 cluster.
 // It will return an error if the node is not ready after set amount of time.
-func AllManagementNodeReady(client *rancher.Client, ClusterID string) error {
-	err := wait.Poll(1*time.Second, 30*time.Minute, func() (bool, error) {
+func AllManagementNodeReady(client *rancher.Client, ClusterID string, timeout time.Duration) error {
+	err := wait.Poll(1*time.Second, timeout, func() (bool, error) {
 		nodes, err := client.Management.Node.ListAll(&types.ListOpts{
 			Filters: map[string]interface{}{
 				"clusterId": ClusterID,
@@ -57,8 +57,8 @@ func AllManagementNodeReady(client *rancher.Client, ClusterID string) error {
 
 // AllMachineReady is a helper method that will loop and check if the machine object of every node in a cluster is ready. Typically Used for RKE2/K3s Clusters.
 // It will return an error if the machine object is not ready after set amount of time.
-func AllMachineReady(client *rancher.Client, clusterID string) error {
-	err := wait.Poll(1*time.Second, 30*time.Minute, func() (bool, error) {
+func AllMachineReady(client *rancher.Client, clusterID string, timeout time.Duration) error {
+	err := wait.Poll(1*time.Second, timeout, func() (bool, error) {
 		nodes, err := client.Management.Node.List(&types.ListOpts{Filters: map[string]interface{}{
 			"clusterId": clusterID,
 		}})

@@ -1,6 +1,0 @@
-#!/bin/bash
-gomodfile=$(mktemp)
-echo "Gathering go module list with updates available"
-go list -u -m -json all > "$gomodfile"
-
-jq -r 'select(.Update != null) | select(.Indirect != true) | select(.Path | test("rancher")?) | "\(.Path) needs update (Have: \(.Version), Available: \(.Update.Version))"' "$gomodfile"

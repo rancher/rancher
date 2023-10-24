@@ -118,7 +118,7 @@ var (
 	PartnerChartDefaultBranch           = NewSetting("partner-chart-default-branch", "main")
 	RKE2ChartDefaultBranch              = NewSetting("rke2-chart-default-branch", "main")
 	FleetDefaultWorkspaceName           = NewSetting("fleet-default-workspace-name", fleetconst.ClustersDefaultNamespace) // fleetWorkspaceName to assign to clusters with none
-	ShellImage                          = NewSetting("shell-image", "rancher/shell:v0.1.21-rc1")
+	ShellImage                          = NewSetting("shell-image", "rancher/shell:v0.1.22")
 	IgnoreNodeName                      = NewSetting("ignore-node-name", "") // nodes to ignore when syncing v1.node to v3.node
 	NoDefaultAdmin                      = NewSetting("no-default-admin", "")
 	RestrictedDefaultAdmin              = NewSetting("restricted-default-admin", "false") // When bootstrapping the admin for the first time, give them the global role restricted-admin
@@ -152,8 +152,12 @@ var (
 	// has no effect if the csp adapter is not installed.
 	CSPAdapterMinVersion = NewSetting("csp-adapter-min-version", "")
 
-	// FleetMinVersion is the minimum version of the fleet chart that rancher will install.
+	// FleetMinVersion is the minimum version of the Fleet chart that Rancher will install.
+	// Deprecated in favor of FleetVersion, kept for backward compatibility purposes.
 	FleetMinVersion = NewSetting("fleet-min-version", "")
+
+	// FleetVersion is the exact version of the Fleet chart that Rancher will install.
+	FleetVersion = NewSetting("fleet-version", "")
 
 	// KubeconfigDefaultTokenTTLMinutes is the default time to live applied to kubeconfigs created for users.
 	// This setting will take effect regardless of the kubeconfig-generate-token status.
@@ -414,7 +418,7 @@ func DefaultAgentSettingsAsEnvVars() []v1.EnvVar {
 	return envVars
 }
 
-// GetRancherVersion will return a the stored server version without the 'v' prefix.
+// GetRancherVersion will return the stored server version without the 'v' prefix.
 func GetRancherVersion() string {
 	rancherVersion := ServerVersion.Get()
 	if strings.HasPrefix(rancherVersion, "dev") || strings.HasPrefix(rancherVersion, "master") || strings.HasSuffix(rancherVersion, "-head") {
