@@ -2,6 +2,7 @@ package v1
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -312,7 +313,13 @@ func (c *NamespacedSteveClient) PerformPutCaptureHeaders(host, token, name strin
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
 
-	var httpClient = &http.Client{}
+	// Create a custom HTTP client with custom transport settings to skip certificate verification
+	tr := &http.Transport{}
+	if c.apiClient.Opts.Insecure {
+		tr.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	}
+
+	var httpClient = &http.Client{Transport: tr}
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error executing request: %v", err)
