@@ -238,7 +238,7 @@ func (m *manager) ensureProjectMembershipBinding(roleName, rtbNsAndName, namespa
 	}
 
 	if len(objs) == 0 {
-		logrus.Infof("[%v] Creating roleBinding for membership in project %v for subject %v", m.controller, project.Name, subject.Name)
+		logrus.Infof("[%v] Creating RoleBinding for membership in project %v for subject %v", m.controller, project.Name, subject.Name)
 		roleRef := v1.RoleRef{
 			Kind: "Role",
 			Name: roleName,
@@ -284,7 +284,7 @@ func (m *manager) ensureProjectMembershipBinding(roleName, rtbNsAndName, namespa
 	return err
 }
 
-// createClusterMembershipRole creates a role that lets the bound subject see (if they are an ordinary member) the
+// createClusterMembershipRole creates a Role that lets the bound subject see (if they are an ordinary member) the
 // project or cluster in the mgmt API (or CRUD the project/cluster if they are an owner).
 func (m *manager) createClusterMembershipRole(roleName string, cluster *v3.Cluster, makeOwner bool) error {
 	if cr, _ := m.crLister.Get("", roleName); cr == nil {
@@ -293,7 +293,7 @@ func (m *manager) createClusterMembershipRole(roleName string, cluster *v3.Clust
 	return nil
 }
 
-// createProjectMembershipRole creates a role that lets the bound subject see (if they are an ordinary member) the
+// createProjectMembershipRole creates a Role that lets the bound subject see (if they are an ordinary member) the
 // project in the mgmt API (or CRUD the project if they are an owner).
 func (m *manager) createProjectMembershipRole(roleName, namespace string, project *v3.Project, makeOwner bool) error {
 	if cr, _ := m.rLister.Get(namespace, roleName); cr == nil {
@@ -303,7 +303,7 @@ func (m *manager) createProjectMembershipRole(roleName, namespace string, projec
 }
 
 // createMembershipRole creates a membership Role or ClusterRole for the given resource. Can specify if this is an
-// owner role (ie give all verbs).
+// owner Role (ie give all verbs).
 func (m *manager) createMembershipRole(resourceType, roleName string, makeOwner bool, ownerObject interface{}, client *objectclient.ObjectClient, clusterRole bool) error {
 	metaObj, err := meta.Accessor(ownerObject)
 	if err != nil {
@@ -411,7 +411,7 @@ func (m *manager) reconcileMembershipBindingForDelete(namespace, roleToKeep, rtb
 			if k == rtbNsAndName && v == MembershipBindingOwner {
 				delete(objMeta.GetLabels(), k)
 			} else if v == MembershipBindingOwner {
-				// Another rtb is also linked to this roleBinding so don't delete
+				// Another RoleTemplateBinding is also linked to this RoleBinding so don't delete
 				otherOwners = true
 			}
 		}
@@ -435,10 +435,10 @@ func (m *manager) reconcileMembershipBindingForDelete(namespace, roleToKeep, rtb
 	return nil
 }
 
-// removeAuthV2Permissions finds any roleBindings based off the owner annotation from the incoming owner. This is
+// removeAuthV2Permissions finds any RoleBindings based off the owner annotation from the incoming owner. This is
 // similar to an ownerReference but is used across namespaces which ownerReferences does not support.
 func (m *manager) removeAuthV2Permissions(setID string, owner runtime.Object) error {
-	// Get the selector for the dependent roleBindings
+	// Get the selector for the dependent RoleBindings
 	selector, err := apply.GetSelectorFromOwner(setID, owner)
 	if err != nil {
 		return err
@@ -535,7 +535,7 @@ func (m *manager) grantManagementPlanePrivileges(roleTemplateName string, resour
 	return m.reconcileDesiredMGMTPlaneRoleBindings(currentRBs, desiredRBs, roleBindings)
 }
 
-// grantManagementClusterScopedPrivilegesInProjectNamespace ensures that RoleBindings for roles like cluster-owner
+// grantManagementClusterScopedPrivilegesInProjectNamespace ensures that RoleBindings for Roles like cluster-owner
 // (that should be able to fully manage all projects in a cluster) grant proper permissions to project-scoped resources.
 // Specifically, this satisfies the use case that a cluster owner should be able to manage the members of all projects
 // in their cluster.
@@ -553,7 +553,7 @@ func (m *manager) grantManagementClusterScopedPrivilegesInProjectNamespace(roleT
 		resourceToVerbs := map[string]map[string]string{}
 		for resource, apiGroup := range resources {
 			// Adding this check because we want cluster-owners to have access to catalogtemplates/versions of all
-			// projects, but no other cluster roles need to access catalogtemplates of projects they do not belong to
+			// projects, but no other cluster Roles need to access catalogtemplates of projects they do not belong to
 			if !role.Administrative && commonClusterAndProjectMgmtPlaneResources[resource] {
 				continue
 
@@ -604,7 +604,7 @@ func (m *manager) grantManagementClusterScopedPrivilegesInProjectNamespace(roleT
 	return m.reconcileDesiredMGMTPlaneRoleBindings(currentRBs, desiredRBs, roleBindings)
 }
 
-// grantManagementProjectScopedPrivilegesInClusterNamespace ensures that project roles grant permissions to certain
+// grantManagementProjectScopedPrivilegesInClusterNamespace ensures that project Roles grant permissions to certain
 // cluster-scoped resources(notifier, clusterpipelines). These resources exist in a cluster namespace but need to be
 // shared between projects.
 func (m *manager) grantManagementProjectScopedPrivilegesInClusterNamespace(roleTemplateName, clusterNamespace string, resources map[string]string,
@@ -667,8 +667,8 @@ func (m *manager) grantManagementProjectScopedPrivilegesInClusterNamespace(roleT
 	return m.reconcileDesiredMGMTPlaneRoleBindings(currentRBs, desiredRBs, roleBindings)
 }
 
-// gatherAndDedupeRoles de-dupes all roles associated with the given RoleTemplate name and returns a map of the
-// de-duped roles.
+// gatherAndDedupeRoles de-dupes all Roles associated with the given RoleTemplate name and returns a map of the
+// de-duped Roles.
 func (m *manager) gatherAndDedupeRoles(roleTemplateName string) (map[string]*v3.RoleTemplate, error) {
 	rt, err := m.rtLister.Get("", roleTemplateName)
 	if err != nil {
@@ -696,7 +696,7 @@ func (m *manager) reconcileDesiredMGMTPlaneRoleBindings(currentRBs, desiredRBs m
 	rbsToDelete := map[string]bool{}
 	processed := map[string]bool{}
 	for _, rb := range currentRBs {
-		// protect against a roleBinding being in the list more than once (shouldn't happen, but just to be safe)
+		// protect against a RoleBinding being in the list more than once (shouldn't happen, but just to be safe)
 		if ok := processed[rb.Name]; ok {
 			continue
 		}
@@ -727,7 +727,7 @@ func (m *manager) reconcileDesiredMGMTPlaneRoleBindings(currentRBs, desiredRBs m
 	return nil
 }
 
-// checkForManagementPlaneRules returns the verbs from roleTemplate rules that grant access to a management plane
+// checkForManagementPlaneRules returns the verbs from RoleTemplate rules that grant access to a management plane
 // resource.
 func (m *manager) checkForManagementPlaneRules(role *v3.RoleTemplate, managementPlaneResource string, apiGroup string) (map[string]string, error) {
 	var rules []v1.PolicyRule
@@ -768,7 +768,7 @@ func checkGroup(apiGroup string, rule v1.PolicyRule) bool {
 	return false
 }
 
-// reconcileManagementPlaneRole updates all role rules for the management plane.
+// reconcileManagementPlaneRole updates all Role rules for the management plane.
 func (m *manager) reconcileManagementPlaneRole(namespace string, resourceToVerbs map[string]map[string]string, rt *v3.RoleTemplate) error {
 	roleCli := m.mgmt.RBAC.Roles(namespace)
 	update := false
@@ -830,7 +830,7 @@ func (m *manager) reconcileManagementPlaneRole(namespace string, resourceToVerbs
 	return nil
 }
 
-// gatherRoleTemplates is a recursive function that gathers all roleTemplateNames that the given RoleTemplate has
+// gatherRoleTemplates is a recursive function that gathers all RoleTemplateNames that the given RoleTemplate has
 // reference to or will inherit. Cool!
 func (m *manager) gatherRoleTemplates(rt *v3.RoleTemplate, roleTemplates map[string]*v3.RoleTemplate) error {
 	roleTemplates[rt.Name] = rt
@@ -848,14 +848,14 @@ func (m *manager) gatherRoleTemplates(rt *v3.RoleTemplate, roleTemplates map[str
 	return nil
 }
 
-// buildRule builds a policy rule with given input.
+// buildRule builds a PolicyRule with given resource and verbs.
 func buildRule(resource string, verbs map[string]string) v1.PolicyRule {
 	var vs []string
 	var apiGroup string
 	for v, g := range verbs {
 		vs = append(vs, v)
 		// This is not efficient but our list of verbs will always be > 10 and we don't know the verbs to access the
-		// apiGroup. Checking for empty string also won't help since core api group is empty string
+		// apiGroup. Checking for empty string also won't help since core api group is empty string.
 		apiGroup = g
 	}
 
@@ -869,7 +869,7 @@ func buildRule(resource string, verbs map[string]string) v1.PolicyRule {
 	}
 }
 
-// checkReferencedRoles checks referenced roles for circular recursive calls, circular dependencies, etc. and other
+// checkReferencedRoles checks referenced Roles for circular recursive calls, circular dependencies, etc. and other
 // reference issues.
 func (m *manager) checkReferencedRoles(roleTemplateName, roleTemplateContext string, depthCounter int) (bool, error) {
 	if depthCounter == rolesCircularSoftLimit {
@@ -908,7 +908,7 @@ func (m *manager) checkReferencedRoles(roleTemplateName, roleTemplateContext str
 	isOwnerRole := false
 	if len(roleTemplate.RoleTemplateNames) > 0 {
 		depthCounter++
-		// get referenced roletemplate
+		// get referenced RoleTemplate
 		for _, rtName := range roleTemplate.RoleTemplateNames {
 			isOwnerRole, err = m.checkReferencedRoles(rtName, roleTemplateContext, depthCounter)
 			if err != nil {
