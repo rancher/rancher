@@ -18,10 +18,11 @@ const (
 )
 
 type NodeRoles struct {
-	ControlPlane bool  `json:"controlplane,omitempty" yaml:"controlplane,omitempty"`
-	Etcd         bool  `json:"etcd,omitempty" yaml:"etcd,omitempty"`
-	Worker       bool  `json:"worker,omitempty" yaml:"worker,omitempty"`
-	Quantity     int64 `json:"quantity" yaml:"quantity"`
+	ControlPlane      bool  `json:"controlplane,omitempty" yaml:"controlplane,omitempty"`
+	Etcd              bool  `json:"etcd,omitempty" yaml:"etcd,omitempty"`
+	Worker            bool  `json:"worker,omitempty" yaml:"worker,omitempty"`
+	Quantity          int64 `json:"quantity" yaml:"quantity"`
+	DrainBeforeDelete bool  `json:"drainBeforeDelete,omitempty" yaml:"drainBeforeDelete,omitempty"`
 }
 
 // NodePoolSetup is a helper method that will loop and setup multiple node pools with the defined node roles from the `nodeRoles` parameter
@@ -54,6 +55,7 @@ func NodePoolSetup(client *rancher.Client, nodeRoles []NodeRoles, ClusterID, Nod
 		nodePoolConfig.Worker = roles.Worker
 		nodePoolConfig.Quantity = roles.Quantity
 		nodePoolConfig.HostnamePrefix = "auto-rke1-" + strconv.Itoa(index) + ClusterID
+		nodePoolConfig.DrainBeforeDelete = roles.DrainBeforeDelete
 
 		_, err := client.Management.NodePool.Create(&nodePoolConfig)
 
