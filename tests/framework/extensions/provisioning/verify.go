@@ -43,6 +43,7 @@ const (
 	logMessageKubernetesVersion = "Validating the current version is the upgraded one"
 	hostnameLimit               = 63
 	machineNameAnnotation       = "cluster.x-k8s.io/machine"
+	machineSteveResourceType    = "cluster.x-k8s.io.machine"
 )
 
 // VerifyRKE1Cluster validates that the RKE1 cluster and its resources are in a good state, matching a given config.
@@ -338,7 +339,7 @@ func VerifyHostnameLength(t *testing.T, client *rancher.Client, clusterObject *s
 		query2, err := url.ParseQuery(fmt.Sprintf("labelSelector=%s=%s", capi.MachineDeploymentLabelName, md.Name))
 		require.NoError(t, err)
 
-		machineResp, err := client.Steve.SteveType(machineNameAnnotation).List(query2)
+		machineResp, err := client.Steve.SteveType(machineSteveResourceType).List(query2)
 		require.NoError(t, err)
 
 		assert.True(t, len(machineResp.Data) > 0)
