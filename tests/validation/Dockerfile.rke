@@ -8,7 +8,7 @@ WORKDIR $WORKSPACE
 COPY [".", "$WORKSPACE"]
 
 RUN wget https://github.com/rancher/rke/releases/download/$RKE_VERSION/rke_linux-amd64 && \
-    wget https://storage.googleapis.com/kubernetes-release/release/$KUBECTL_VERSION/bin/linux/amd64/kubectl && \
+    wget https://dl.k8s.io/release/$KUBECTL_VERSION/bin/linux/amd64/kubectl && \
     mv rke_linux-amd64 /bin/rke && \
     chmod +x /bin/rke  && \
     mv kubectl /bin/kubectl && \

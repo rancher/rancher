@@ -16,7 +16,7 @@ ARG VPN_ENCODED_LOGIN
 
 COPY [".", "$WORKSPACE"]
 
-RUN wget https://storage.googleapis.com/kubernetes-release/release/$KUBECTL_VERSION/bin/linux/amd64/kubectl && \
+RUN wget https://dl.k8s.io/release/$KUBECTL_VERSION/bin/linux/amd64/kubectl && \
     mv kubectl /bin/kubectl && \
     chmod +x /bin/kubectl  && \
     wget https://github.com/rancher/rke/releases/download/$RKE_VERSION/rke_linux-amd64 && \
