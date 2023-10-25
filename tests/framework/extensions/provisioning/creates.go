@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
+	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/tests/framework/clients/corral"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	"github.com/sirupsen/logrus"
@@ -23,6 +25,7 @@ import (
 	k3sHardening "github.com/rancher/rancher/tests/framework/extensions/hardening/k3s"
 	rke2Hardening "github.com/rancher/rancher/tests/framework/extensions/hardening/rke2"
 	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
+	nodestat "github.com/rancher/rancher/tests/framework/extensions/nodes"
 	"github.com/rancher/rancher/tests/framework/extensions/pipeline"
 	"github.com/rancher/rancher/tests/framework/extensions/provisioninginput"
 	nodepools "github.com/rancher/rancher/tests/framework/extensions/rke1/nodepools"
@@ -37,10 +40,13 @@ import (
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kwait "k8s.io/apimachinery/pkg/util/wait"
 )
 
 const (
-	namespace = "fleet-default"
+	active     = "active"
+	internalIP = "rke2.io/internal-ip"
+	namespace  = "fleet-default"
 
 	rke2k3sAirgapCustomCluster           = "rke2k3sairgapcustomcluster"
 	rke2k3sNodeCorralName                = "rke2k3sregisterNode"
@@ -747,4 +753,175 @@ func createWindowsRegistrationCommand(command, publicIP, privateIP string, machi
 		command += wrappedTaints
 	}
 	return command
+}
+
+// AddRKE2K3SCustomClusterNodes is a helper method that will add nodes to the custom RKE2/K3S custom cluster.
+func AddRKE2K3SCustomClusterNodes(client *rancher.Client, cluster *v1.SteveAPIObject, nodes []*nodes.Node, rolesPerNode []string) error {
+	clusterStatus := &apiv1.ClusterStatus{}
+	err := v1.ConvertToK8sType(cluster.Status, clusterStatus)
+	if err != nil {
+		return err
+	}
+
+	token, err := tokenregistration.GetRegistrationToken(client, clusterStatus.ClusterName)
+	if err != nil {
+		return err
+	}
+
+	var command string
+	for key, node := range nodes {
+		logrus.Infof("Adding node %s to cluster %s", node.NodeID, cluster.Name)
+		if strings.Contains(rolesPerNode[key], "windows") {
+			command = fmt.Sprintf("powershell.exe %s -Address %s", token.InsecureWindowsNodeCommand, node.PublicIPAddress)
+		} else {
+			command = fmt.Sprintf("%s %s --address %s", token.InsecureNodeCommand, rolesPerNode[key], node.PublicIPAddress)
+		}
+
+		output, err := node.ExecuteCommand(command)
+		if err != nil {
+			return err
+		}
+
+		logrus.Infof(output)
+	}
+
+	err = kwait.Poll(500*time.Millisecond, defaults.TenMinuteTimeout, func() (done bool, err error) {
+		clusterResp, err := client.Steve.SteveType(clusters.ProvisioningSteveResourceType).ByID(cluster.ID)
+		if err != nil {
+			return false, err
+		}
+
+		if clusterResp.ObjectMeta.State.Name == active && nodestat.AllManagementNodeReady(client, cluster.ID, defaults.ThirtyMinuteTimeout) == nil {
+			return true, nil
+		}
+		return false, nil
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// DeleteRKE2K3SCustomClusterNodes is a method that will delete nodes from the custom RKE2/K3S custom cluster.
+func DeleteRKE2K3SCustomClusterNodes(client *rancher.Client, clusterID string, cluster *v1.SteveAPIObject, nodesToDelete []*nodes.Node) error {
+	steveclient, err := client.Steve.ProxyDownstream(clusterID)
+	if err != nil {
+		return err
+	}
+
+	nodesSteveObjList, err := steveclient.SteveType("node").List(nil)
+	if err != nil {
+		return err
+	}
+
+	for _, nodeToDelete := range nodesToDelete {
+		for _, node := range nodesSteveObjList.Data {
+			if node.Annotations[internalIP] == nodeToDelete.PrivateIPAddress {
+				machine, err := client.Steve.SteveType(machineSteveResourceType).ByID(namespace + "/" + node.Annotations[machineNameAnnotation])
+				if err != nil {
+					return err
+				}
+
+				logrus.Infof("Deleting node %s from cluster %s", nodeToDelete.NodeID, cluster.Name)
+				err = client.Steve.SteveType(machineSteveResourceType).Delete(machine)
+				if err != nil {
+					return err
+				}
+
+				err = kwait.Poll(500*time.Millisecond, defaults.TenMinuteTimeout, func() (done bool, err error) {
+					_, err = client.Steve.SteveType(machineSteveResourceType).ByID(machine.ID)
+					if err != nil {
+						logrus.Infof("Node has successfully been deleted!")
+						return true, nil
+					}
+					return false, nil
+				})
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+// AddRKE1CustomClusterNodes is a method that will add nodes to the custom RKE1 custom cluster.
+func AddRKE1CustomClusterNodes(client *rancher.Client, cluster *management.Cluster, nodes []*nodes.Node, rolesPerNode []string) error {
+	token, err := tokenregistration.GetRegistrationToken(client, cluster.ID)
+	if err != nil {
+		return err
+	}
+
+	var command string
+	for key, node := range nodes {
+		logrus.Infof("Adding node %s to cluster %s", node.NodeID, cluster.Name)
+		command = fmt.Sprintf("%s %s --address %s", token.NodeCommand, rolesPerNode[key], node.PublicIPAddress)
+
+		output, err := node.ExecuteCommand(command)
+		if err != nil {
+			return err
+		}
+
+		logrus.Infof(output)
+	}
+
+	err = kwait.Poll(500*time.Millisecond, defaults.TenMinuteTimeout, func() (done bool, err error) {
+		clusterResp, err := client.Management.Cluster.ByID(cluster.ID)
+		if err != nil {
+			return false, err
+		}
+
+		if clusterResp.State == active && nodestat.AllManagementNodeReady(client, cluster.ID, defaults.ThirtyMinuteTimeout) == nil {
+			return true, nil
+		}
+		return false, nil
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// DeleteRKE1CustomClusterNodes is a helper method that will delete nodes from the custom RKE1 custom cluster.
+func DeleteRKE1CustomClusterNodes(client *rancher.Client, cluster *management.Cluster, nodesToDelete []*nodes.Node) error {
+	nodes, err := client.Management.Node.ListAll(&types.ListOpts{Filters: map[string]interface{}{
+		"clusterId": cluster.ID,
+	}})
+	if err != nil {
+		return err
+	}
+
+	for _, nodeToDelete := range nodesToDelete {
+		for _, node := range nodes.Data {
+			if node.ExternalIPAddress == nodeToDelete.PublicIPAddress {
+				machine, err := client.Management.Node.ByID(node.ID)
+				if err != nil {
+					return err
+				}
+
+				logrus.Infof("Deleting node %s from cluster %s", nodeToDelete.NodeID, cluster.Name)
+				err = client.Management.Node.Delete(machine)
+				if err != nil {
+					return err
+				}
+
+				err = kwait.Poll(500*time.Millisecond, defaults.TenMinuteTimeout, func() (done bool, err error) {
+					_, err = client.Management.Node.ByID(machine.ID)
+					if err != nil {
+						logrus.Infof("Node has successfully been deleted!")
+						return true, nil
+					}
+					return false, nil
+				})
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	return nil
 }

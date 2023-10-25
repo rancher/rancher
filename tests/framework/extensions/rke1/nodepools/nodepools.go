@@ -108,7 +108,7 @@ func updateNodePoolQuantity(client *rancher.Client, cluster *management.Cluster,
 		return nil, err
 	}
 
-	err = kwait.Poll(500*time.Millisecond, 10*time.Minute, func() (done bool, err error) {
+	err = kwait.Poll(500*time.Millisecond, defaults.TenMinuteTimeout, func() (done bool, err error) {
 		clusterResp, err := client.Management.Cluster.ByID(cluster.ID)
 		if err != nil {
 			return false, err

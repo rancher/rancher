@@ -15,10 +15,12 @@ const (
 )
 
 type NodeCreationFunc func(client *rancher.Client, rolesPerPool []string, quantityPerPool []int32) (nodes []*nodes.Node, err error)
+type NodeDeletionFunc func(client *rancher.Client, nodes []*nodes.Node) error
 
 type ExternalNodeProvider struct {
 	Name             string
 	NodeCreationFunc NodeCreationFunc
+	NodeDeletionFunc NodeDeletionFunc
 }
 
 // ExternalNodeProviderSetup is a helper function that setups an ExternalNodeProvider object is a wrapper
@@ -29,6 +31,7 @@ func ExternalNodeProviderSetup(providerType string) ExternalNodeProvider {
 		return ExternalNodeProvider{
 			Name:             providerType,
 			NodeCreationFunc: ec2.CreateNodes,
+			NodeDeletionFunc: ec2.DeleteNodes,
 		}
 	case fromConfig:
 		return ExternalNodeProvider{
@@ -48,6 +51,9 @@ func ExternalNodeProviderSetup(providerType string) ExternalNodeProvider {
 					node.SSHKey = sshKey
 				}
 				return nodesList, nil
+			},
+			NodeDeletionFunc: func(client *rancher.Client, nodes []*nodes.Node) error {
+				return ec2.DeleteNodes(client, nodes)
 			},
 		}
 	default:

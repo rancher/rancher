@@ -1,6 +1,8 @@
 # Node Scaling
 
-These tests are designed to accept an existing cluster that the user has access to. If you do not have a downstream cluster in Rancher, you should create one first before running this test. 
+These tests are designed to accept an existing cluster that the user has access to. If you do not have a downstream cluster in Rancher, you should create one first before running this test.
+
+Please see below for more details for your config. Please note that the config can be in either JSON or YAML (all examples are illustrated in YAML).
 
 ## Table of Contents
 1. [Getting Started](#Getting-Started)
@@ -9,15 +11,13 @@ These tests are designed to accept an existing cluster that the user has access 
 
 ## Getting Started
 In your config file, set the following:
-```json
-"rancher": { 
-  "host": "rancher_server_address",
-  "adminToken": "rancher_admin_token",
-  "userToken": "your_rancher_user_token",
-  "clusterName": "cluster_to_run_tests_on",
-  "insecure": true/optional,
-  "cleanup": false/optional,
-}
+```yaml
+rancher:
+  host: "rancher_server_address"
+  adminToken: "rancher_admin_token"
+  clusterName: "cluster_to_run_tests_on"
+  insecure: true/optional
+  cleanup: false/optional
 ```
 
 ## Node Replacing
@@ -41,79 +41,67 @@ Typically, a cluster with the following 3 pools is used for testing:
 }
   ```
 
-See below some examples on how to run the node replacment tests:
+These tests utilize Go build tags. Due to this, see the below examples on how to run the tests:
 
 ### RKE1
-`-run ^TestRKE1NodeScaleDownAndUp/TestEtcdScaleDownAndUp$`
-`-run ^TestRKE1NodeScaleDownAndUp/TestControlPlaneScaleDownAndUp$`
-`-run ^TestRKE1NodeScaleDownAndUp/TestWorkerScaleDownAndUp$`
+`gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/nodescaling --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestRKE1NodeScaleDownAndUp/TestEtcdScaleDownAndUp"` \
+`gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/nodescaling --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestRKE1NodeScaleDownAndUp/TestControlPlaneScaleDownAndUp"` \
+`gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/nodescaling --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestRKE1NodeScaleDownAndUp/TestWorkerScaleDownAndUp"`
 
 ### RKE2 | K3S
-`-run ^TestNodeScaleDownAndUp/TestEtcdScaleDownAndUp$`
-`-run ^TestNodeScaleDownAndUp/TestControlPlaneScaleDownAndUp$`
-`-run ^TestNodeScaleDownAndUp/TestWorkerScaleDownAndUp$`
+`gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/nodescaling --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestNodeScaleDownAndUp/TestEtcdScaleDownAndUp"` \
+`gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/nodescaling --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestNodeScaleDownAndUp/TestControlPlaneScaleDownAndUp"` \
+`gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/nodescaling --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestNodeScaleDownAndUp/TestWorkerScaleDownAndUp"`
 
 ## Scaling Existing Node Pools
 Similar to the `provisioning` tests, the node scaling tests have static test cases as well as dynamicInput tests you can specify. In order to run the dynamicInput tests, you will need to define the `scalingInput` block in your config file. This block defines the quantity you would like the pool to be scaled up/down to. See an example below:
-```json
-"scalingInput": {
-    "nodePools": [ 
-      {
-        "nodeRoles": {
-          "worker": true,
-          "quantity": 2
-        }
-      },
-    ],
-    "machinePools": [
-      {
-        "nodeRoles": {
-          "etcd": true,
-          "quantity": 1
-        }
-      }
-    ]
-    "aksNodePool": [
-      {
-        "nodeCount": 1,
-      }
-    ],
-    "eksNodePool": [
-      {
-        "desiredSize": 1,
-      }
-    ],
-    "gkeNodePool": [
-      {
-        "initialNodeCount": 1,
-      }
-    ]
-  }
+```yaml
+scalingInput:
+  nodePools:
+    nodeRoles:
+      worker: true
+      quantity: 2
+  machinePools:
+    nodeRoles:
+      etcd: true
+      quantity: 1
+scalingInput:
+  nodeProvider: "ec2"
+  nodePools:
+    nodeRoles:
+      worker: true
+      quantity: 2
+  machinePools:
+    nodeRoles:
+      etcd: true
+      quantity: 1
+  aksNodePool:
+    nodeCount: 1
+  eksNodePool:
+    desiredSize: 1
+  gkeNodePool:
+    initialNodeCount: 1
 ```
 NOTE: When scaling AKS and EKS, you will need to make sure that the `maxCount` and `maxSize` parameter is greater than the desired scale amount, respectively. For example, if you wish to have 6 total EKS nodes, then the `maxSize` parameter needs to be at least 7. This is not a limitation of the automation, but rather how EkS specifically handles nodegroups.
 
-See below some examples on how to run the node scaling tests:
+These tests utilize Go build tags. Due to this, see the below examples on how to run the tests:
 
 ### RKE1
-`-run ^TestRKE1NodeScalingTestSuite/TestScalingRKE1NodePools$`
-`-run ^TestRKE1NodeScalingTestSuite/TestScalingRKE1NodePoolsDynamicInput$`
+`gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/nodescaling --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestRKE1NodeScalingTestSuite/TestScalingRKE1NodePools"` \
+`gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/nodescaling --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestRKE1NodeScalingTestSuite/TestScalingRKE1NodePoolsDynamicInput"`
 
-### RKE2
-`-run ^TestRKE2NodeScalingTestSuite/TestScalingRKE2NodePools$`
-`-run ^TestRKE2NodeScalingTestSuite/TestScalingRKE2NodePoolsDynamicInput$`
-
-### K3S
-`-run ^TestK3SNodeScalingTestSuite/TestScalingK3SNodePools$`
-`-run ^TestK3SNodeScalingTestSuite/TestScalingK3SNodePoolsDynamicInput$`
+### RKE2 | K3S
+`gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/nodescaling --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestRKE2NodeScalingTestSuite/TestRKE2NodeScalingTestSuite"` \
+`gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/nodescaling --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestRKE2NodeScalingTestSuite/TestScalingRKE2NodePoolsDynamicInput"`
 
 ### AKS
-`-run ^TestAKSNodeScalingTestSuite/TestScalingAKSNodePools$`
-`-run ^TestAKSNodeScalingTestSuite/TestScalingAKSNodePoolsDynamicInput$`
+`gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/nodescaling --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestAKSNodeScalingTestSuite/TestScalingAKSNodePools"` \
+`gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/nodescaling --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestAKSNodeScalingTestSuite/TestScalingAKSNodePoolsDynamicInput"`
 
 ### EKS
-`-run ^TestEKSNodeScalingTestSuite/TestScalingEKSNodePools$`
-`-run ^TestEKSNodeScalingTestSuite/TestScalingEKSNodePoolsDynamicInput$`
+`gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/nodescaling --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestEKSNodeScalingTestSuite/TestScalingEKSNodePools"` \
+`gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/nodescaling --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestEKSNodeScalingTestSuite/TestScalingEKSNodePoolsDynamicInput"`
 
 ### GKE
-`-run ^TestGKENodeScalingTestSuite/TestScalingGKENodePools$`
-`-run ^TestGKENodeScalingTestSuite/TestScalingGKENodePoolsDynamicInput$`
+`gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/nodescaling --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestGKENodeScalingTestSuite/TestScalingGKENodePools"` \
+`gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/nodescaling --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestGKENodeScalingTestSuite/TestScalingGKENodePoolsDynamicInput"`
