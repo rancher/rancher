@@ -7,7 +7,8 @@ kube-apiserver-arg:
   - 'audit-log-maxsize=100'
   - 'request-timeout=300s'
   - 'service-account-lookup=true'
-  - 'enable-admission-plugins=NodeRestriction,PodSecurityPolicy,NamespaceLifecycle,ServiceAccount'
+  - 'enable-admission-plugins=NodeRestriction,NamespaceLifecycle,ServiceAccount'
+  - 'admission-control-config-file=/etc/rancher/k3s/custom-psa.yaml'
 kube-controller-manager-arg:
   - 'terminated-pod-gc-threshold=10'
   - 'use-service-account-credentials=true'
