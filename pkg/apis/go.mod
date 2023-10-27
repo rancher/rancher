@@ -12,7 +12,7 @@ require (
 	github.com/rancher/eks-operator v1.2.2
 	github.com/rancher/fleet/pkg/apis v0.0.0-20230821130910-23e1c146755a
 	github.com/rancher/gke-operator v1.1.6
-	github.com/rancher/norman v0.0.0-20230426211126-d3552b018687
+	github.com/rancher/norman v0.0.0-20230811152901-078862e5648c
 	github.com/rancher/rke v1.4.10
 	github.com/rancher/wrangler v1.1.1
 	github.com/sirupsen/logrus v1.9.3
@@ -55,13 +55,13 @@ require (
 	github.com/prometheus/client_model v0.3.0 // indirect
 	github.com/prometheus/common v0.37.0 // indirect
 	github.com/prometheus/procfs v0.8.0 // indirect
-	github.com/rancher/lasso v0.0.0-20230629200414-8a54b32e6792 // indirect
+	github.com/rancher/lasso v0.0.0-20230810170912-a86ba6c749aa // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
-	golang.org/x/net v0.12.0 // indirect
+	golang.org/x/net v0.14.0 // indirect
 	golang.org/x/oauth2 v0.10.0 // indirect
-	golang.org/x/sys v0.10.0 // indirect
-	golang.org/x/term v0.10.0 // indirect
-	golang.org/x/text v0.11.0 // indirect
+	golang.org/x/sys v0.11.0 // indirect
+	golang.org/x/term v0.11.0 // indirect
+	golang.org/x/text v0.12.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.2.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
@@ -69,7 +69,7 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	k8s.io/apiextensions-apiserver v0.25.4 // indirect
+	k8s.io/apiextensions-apiserver v0.25.12 // indirect
 	k8s.io/apiserver v0.25.12 // indirect
 	k8s.io/client-go v12.0.0+incompatible // indirect
 	k8s.io/component-base v0.25.12 // indirect
