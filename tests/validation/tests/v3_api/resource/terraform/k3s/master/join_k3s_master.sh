@@ -29,10 +29,8 @@ then
   conversion=$(calc $version*1)
   if (( $(echo "$conversion >= 1.25" | bc -l) ))
   then
-    sed -i "s/enforce: \"privileged\"/enforce: \"${14}\"/g" /tmp/custom-psa.yaml
     cat /tmp/cis_v125_masterconfig.yaml >> /etc/rancher/k3s/config.yaml
     cat /tmp/v125_policy.yaml > /var/lib/rancher/k3s/server/manifests/policy.yaml
-    cat /tmp/custom-psa.yaml > /var/lib/rancher/k3s/server/custom-psa.yaml
   else
     cat /tmp/cis_masterconfig.yaml >> /etc/rancher/k3s/config.yaml
     cat /tmp/policy.yaml > /var/lib/rancher/k3s/server/manifests/policy.yaml
