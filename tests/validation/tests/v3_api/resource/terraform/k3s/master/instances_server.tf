@@ -102,11 +102,6 @@ resource "aws_instance" "master" {
   }
 
   provisioner "file" {
-    source = "custom-psa.yaml"
-    destination = "/tmp/custom-psa.yaml"
-  }
-
-  provisioner "file" {
     source = "audit.yaml"
     destination = "/tmp/audit.yaml"
   }
@@ -230,11 +225,6 @@ resource "aws_instance" "master2-ha" {
   provisioner "file" {
     source = "audit.yaml"
     destination = "/tmp/audit.yaml"
-  }
-
-  provisioner "file" {
-    source = "custom-psa.yaml"
-    destination = "/tmp/custom-psa.yaml"
   }
 
   provisioner "file" {
