@@ -13,6 +13,7 @@ import (
 	nodestat "github.com/rancher/rancher/tests/framework/extensions/nodes"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kwait "k8s.io/apimachinery/pkg/util/wait"
 )
 
@@ -87,20 +88,24 @@ func updateMachinePoolQuantity(client *rancher.Client, cluster *v1.SteveAPIObjec
 }
 
 // NewRKEMachinePool is a constructor that sets up a apisV1.RKEMachinePool object to be used to provision a cluster.
-func NewRKEMachinePool(controlPlaneRole, etcdRole, workerRole bool, poolName string, quantity int32, machineConfig *v1.SteveAPIObject, hostnameLengthLimit int, drainBeforeDelete bool) apisV1.RKEMachinePool {
+func NewRKEMachinePool(controlPlaneRole, etcdRole, workerRole bool, poolName string, quantity int32, machineConfig *v1.SteveAPIObject, hostnameLengthLimit int, drainBeforeDelete bool, nodeStartupTimeout *metav1.Duration, unhealthyNodeTimeout *metav1.Duration, maxUnhealthy *string, unhealthyRange *string) apisV1.RKEMachinePool {
 	machineConfigRef := &corev1.ObjectReference{
 		Kind: machineConfig.Kind,
 		Name: machineConfig.Name,
 	}
 
 	machinePool := apisV1.RKEMachinePool{
-		ControlPlaneRole:  controlPlaneRole,
-		EtcdRole:          etcdRole,
-		WorkerRole:        workerRole,
-		NodeConfig:        machineConfigRef,
-		Name:              poolName,
-		Quantity:          &quantity,
-		DrainBeforeDelete: drainBeforeDelete,
+		ControlPlaneRole:     controlPlaneRole,
+		EtcdRole:             etcdRole,
+		WorkerRole:           workerRole,
+		NodeConfig:           machineConfigRef,
+		Name:                 poolName,
+		Quantity:             &quantity,
+		DrainBeforeDelete:    drainBeforeDelete,
+		NodeStartupTimeout:   nodeStartupTimeout,
+		UnhealthyNodeTimeout: unhealthyNodeTimeout,
+		MaxUnhealthy:         maxUnhealthy,
+		UnhealthyRange:       unhealthyRange,
 	}
 
 	if hostnameLengthLimit > 0 {
@@ -111,12 +116,20 @@ func NewRKEMachinePool(controlPlaneRole, etcdRole, workerRole bool, poolName str
 }
 
 type NodeRoles struct {
-	ControlPlane      bool  `json:"controlplane,omitempty" yaml:"controlplane,omitempty"`
-	Etcd              bool  `json:"etcd,omitempty" yaml:"etcd,omitempty"`
-	Worker            bool  `json:"worker,omitempty" yaml:"worker,omitempty"`
-	Windows           bool  `json:"windows,omitempty" yaml:"windows,omitempty"`
-	Quantity          int32 `json:"quantity" yaml:"quantity"`
-	DrainBeforeDelete bool  `json:"drainBeforeDelete" yaml:"drainBeforeDelete"`
+	ControlPlane bool  `json:"controlplane,omitempty" yaml:"controlplane,omitempty"`
+	Etcd         bool  `json:"etcd,omitempty" yaml:"etcd,omitempty"`
+	Worker       bool  `json:"worker,omitempty" yaml:"worker,omitempty"`
+	Windows      bool  `json:"windows,omitempty" yaml:"windows,omitempty"`
+	Quantity     int32 `json:"quantity" yaml:"quantity"`
+}
+
+type NodeConfig struct {
+	NodeRoles
+	DrainBeforeDelete    bool             `json:"drainBeforeDelete" yaml:"drainBeforeDelete"`
+	NodeStartupTimeout   *metav1.Duration `json:"nodeStartupTimeout,omitempty" yaml:"nodeStartupTimeout,omitempty"`
+	UnhealthyNodeTimeout *metav1.Duration `json:"unhealthyNodeTimeout,omitempty" yaml:"unhealthyNodeTimeout,omitempty"`
+	MaxUnhealthy         *string          `json:"maxUnhealthy,omitempty" yaml:"maxUnhealthy,omitempty"`
+	UnhealthyRange       *string          `json:"unhealthyRange,omitempty" yaml:"unhealthyRange,omitempty"`
 }
 
 // HostnameTruncation is a struct that is used to set the hostname length limit for a cluster or its pools during provisioning
@@ -161,22 +174,22 @@ func (n NodeRoles) String() string {
 //	      Quantity:     1,
 //	 },
 //	}
-func CreateAllMachinePools(nodeRoles []NodeRoles, machineConfig *v1.SteveAPIObject, hostnameLengthLimits []HostnameTruncation) []apisV1.RKEMachinePool {
-	machinePools := make([]apisV1.RKEMachinePool, 0, len(nodeRoles))
+func CreateAllMachinePools(nodeConfig []NodeConfig, machineConfig *v1.SteveAPIObject, hostnameLengthLimits []HostnameTruncation) []apisV1.RKEMachinePool {
+	machinePools := make([]apisV1.RKEMachinePool, 0, len(nodeConfig))
 	hostnameLengthLimit := 0
 
-	for index, roles := range nodeRoles {
+	for index, config := range nodeConfig {
 		poolName := "pool" + strconv.Itoa(index)
 		if hostnameLengthLimits != nil && len(hostnameLengthLimits) >= index {
 			hostnameLengthLimit = hostnameLengthLimits[index].PoolNameLengthLimit
 			poolName = hostnameLengthLimits[index].Name
 		}
 
-		if !roles.Windows {
-			machinePool := NewRKEMachinePool(roles.ControlPlane, roles.Etcd, roles.Worker, poolName, roles.Quantity, machineConfig, hostnameLengthLimit, roles.DrainBeforeDelete)
+		if !config.Windows {
+			machinePool := NewRKEMachinePool(config.ControlPlane, config.Etcd, config.Worker, poolName, config.Quantity, machineConfig, hostnameLengthLimit, config.DrainBeforeDelete, config.NodeStartupTimeout, config.UnhealthyNodeTimeout, config.MaxUnhealthy, config.UnhealthyRange)
 			machinePools = append(machinePools, machinePool)
 		} else {
-			machinePool := NewRKEMachinePool(false, false, roles.Windows, poolName, roles.Quantity, machineConfig, hostnameLengthLimit, roles.DrainBeforeDelete)
+			machinePool := NewRKEMachinePool(false, false, config.Windows, poolName, config.Quantity, machineConfig, hostnameLengthLimit, config.DrainBeforeDelete, config.NodeStartupTimeout, config.UnhealthyNodeTimeout, config.MaxUnhealthy, config.UnhealthyRange)
 			machinePools = append(machinePools, machinePool)
 		}
 	}
