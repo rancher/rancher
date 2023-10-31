@@ -29,6 +29,7 @@ const (
 	fleetdefault         = "fleet-default"
 	crdJSONFilePath      = "../resources/crds.json"
 	roleTemplateJSONPath = "../resources/roleTemplate.json"
+	localCluster         = "local"
 )
 
 func mapCRD(crdList []string) map[string][]string {
