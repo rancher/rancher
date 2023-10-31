@@ -93,3 +93,19 @@ rules:
   - list
   - get
   - delete
+- apiGroups:
+  - ""
+  resources:
+  - services
+  verbs:
+  - list
+  - get 
+- apiGroups:
+  - admissionregistration.k8s.io
+  resources:
+  - mutatingwebhookconfigurations
+  - validatingwebhookconfigurations
+  verbs:
+  - list
+  - get
+  - delete
