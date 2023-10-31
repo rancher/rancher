@@ -10,16 +10,6 @@ Rancher is an open source container management platform built for organizations 
 
 > Looking for Rancher 1.6.x info? [Click here](https://github.com/rancher/rancher/blob/master/README_1_6.md)
 
-## Latest Release
-* v2.6
-  * Latest - v2.6.13 - `rancher/rancher:v2.6.13` / `rancher/rancher:latest` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.6.13).
-  * Stable - v2.6.13 - `rancher/rancher:v2.6.13` / `rancher/rancher:stable` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.6.13).
-* v2.5
-  * Latest - v2.5.17 - `rancher/rancher:v2.5.17` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.5.17).
-  * Stable - v2.5.17 - `rancher/rancher:v2.5.17` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.5.17).
-
-To get automated notifications of our latest release, you can watch the announcements category in our [forums](http://forums.rancher.com/c/announcements), or subscribe to the RSS feed `https://forums.rancher.com/c/announcements.rss`.
-
 ## Quick Start
 
     sudo docker run -d --restart=unless-stopped -p 80:80 -p 443:443 --privileged rancher/rancher
