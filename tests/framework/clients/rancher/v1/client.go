@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"sort"
 	"time"
 
 	"github.com/rancher/apiserver/pkg/types"
@@ -255,6 +256,16 @@ func (sc *SteveCollection) Next() (*SteveCollection, error) {
 		return resp, err
 	}
 	return nil, nil
+}
+
+func (sc *SteveCollection) Names() (names []string) {
+	for _, item := range sc.Data {
+		names = append(names, item.Name)
+	}
+
+	sort.Strings(names)
+
+	return
 }
 
 func (c *SteveClient) ByID(id string) (*SteveAPIObject, error) {
