@@ -85,7 +85,7 @@ func main() {
 		logrus.Fatalf("error creating client: %v", err)
 	}
 
-	err = pipeline.UpdateEULA(client, clusterID)
+	err = pipeline.UpdateEULA(client)
 	if err != nil {
 		logrus.Fatalf("error updating EULA: %v", err)
 	}
