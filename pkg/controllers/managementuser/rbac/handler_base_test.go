@@ -28,7 +28,7 @@ var (
 			RoleTemplateNames: []string{"non-recursive"},
 		},
 	}
-	createNSRoleTemplace = &v3.RoleTemplate{
+	createNSRoleTemplate = &v3.RoleTemplate{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "create-ns",
 		},
@@ -43,16 +43,19 @@ var (
 	}
 )
 
-type crErrs struct {
+type clientErrs struct {
 	getError    error
 	updateError error
 	createError error
 }
 
-func SetupManager(roleTemplates map[string]*v3.RoleTemplate, clusterRoles map[string]*v1.ClusterRole, roles map[string]*v1.Role, projects map[string]*v3.Project, crErrs crErrs) *manager {
+func setupManager(roleTemplates map[string]*v3.RoleTemplate, clusterRoles map[string]*v1.ClusterRole, roles map[string]*v1.Role, projects map[string]*v3.Project, crErrs, rtErrs, rErrs clientErrs) *manager {
 	return &manager{
 		rtLister: &fakes.RoleTemplateListerMock{
 			GetFunc: func(namespace string, name string) (*v3.RoleTemplate, error) {
+				if rtErrs.getError != nil {
+					return nil, rtErrs.getError
+				}
 				rt, ok := roleTemplates[name]
 				if !ok {
 					return nil, errors.NewNotFound(v3.RoleTemplateGroupVersionResource.GroupResource(), name)
@@ -69,6 +72,9 @@ func SetupManager(roleTemplates map[string]*v3.RoleTemplate, clusterRoles map[st
 		},
 		crLister: &fakes2.ClusterRoleListerMock{
 			GetFunc: func(namespace string, name string) (*v1.ClusterRole, error) {
+				if crErrs.getError != nil {
+					return nil, crErrs.getError
+				}
 				cr, ok := clusterRoles[name]
 				if !ok {
 					return nil, errors.NewNotFound(v3.RoleTemplateGroupVersionResource.GroupResource(), name)
@@ -85,6 +91,9 @@ func SetupManager(roleTemplates map[string]*v3.RoleTemplate, clusterRoles map[st
 		},
 		clusterRoles: &fakes2.ClusterRoleInterfaceMock{
 			GetFunc: func(name string, opts metav1.GetOptions) (*v1.ClusterRole, error) {
+				if crErrs.getError != nil {
+					return nil, crErrs.getError
+				}
 				cr, ok := clusterRoles[name]
 				if !ok {
 					return nil, errors.NewNotFound(v3.RoleTemplateGroupVersionResource.GroupResource(), name)
@@ -92,6 +101,9 @@ func SetupManager(roleTemplates map[string]*v3.RoleTemplate, clusterRoles map[st
 				return cr.DeepCopy(), nil
 			},
 			UpdateFunc: func(cr *v1.ClusterRole) (*v1.ClusterRole, error) {
+				if crErrs.updateError != nil {
+					return nil, crErrs.updateError
+				}
 				_, ok := clusterRoles[cr.Name]
 				if !ok {
 					return nil, errors.NewNotFound(v3.RoleTemplateGroupVersionResource.GroupResource(), cr.Name)
@@ -100,6 +112,9 @@ func SetupManager(roleTemplates map[string]*v3.RoleTemplate, clusterRoles map[st
 				return clusterRoles[cr.Name].DeepCopy(), nil
 			},
 			CreateFunc: func(cr *v1.ClusterRole) (*v1.ClusterRole, error) {
+				if crErrs.createError != nil {
+					return nil, crErrs.createError
+				}
 				_, ok := clusterRoles[cr.Name]
 				if ok {
 					return nil, errors.NewAlreadyExists(v3.RoleTemplateGroupVersionResource.GroupResource(), cr.Name)
@@ -110,6 +125,9 @@ func SetupManager(roleTemplates map[string]*v3.RoleTemplate, clusterRoles map[st
 		},
 		rLister: &fakes2.RoleListerMock{
 			GetFunc: func(namespace string, name string) (*v1.Role, error) {
+				if rErrs.getError != nil {
+					return nil, rErrs.getError
+				}
 				key := fmt.Sprintf("%s:%s", namespace, name)
 				r, ok := roles[key]
 				if !ok {
@@ -158,7 +176,7 @@ func SetupManager(roleTemplates map[string]*v3.RoleTemplate, clusterRoles map[st
 }
 
 func Test_gatherRoles(t *testing.T) {
-	manager := SetupManager(recursiveTestRoleTemplates, make(map[string]*v1.ClusterRole), make(map[string]*v1.Role), make(map[string]*v3.Project), crErrs{})
+	m := setupManager(recursiveTestRoleTemplates, make(map[string]*v1.ClusterRole), make(map[string]*v1.Role), make(map[string]*v3.Project), clientErrs{}, clientErrs{}, clientErrs{})
 
 	emptyRoleTemplates := make(map[string]*v3.RoleTemplate)
 	type args struct {
@@ -202,7 +220,7 @@ func Test_gatherRoles(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := manager.gatherRoles(tt.args.rt, tt.args.roleTemplates, tt.args.depthCounter)
+			err := m.gatherRoles(tt.args.rt, tt.args.roleTemplates, tt.args.depthCounter)
 			if tt.wantErr {
 				assert.Error(t, err, "expected an error, received none")
 			} else {

@@ -110,8 +110,7 @@ func (m *manager) ensureGlobalResourcesRolesForPRTB(projectName string, rts map[
 			if hasNamespaceGroup && hasNamespaceResources && len(rule.ResourceNames) == 0 {
 				if slice.ContainsString(rule.Verbs, "*") || slice.ContainsString(rule.Verbs, "create") {
 					roleVerb = "*"
-					roles = append(roles, "create-ns") //added
-					// can use a flag to execute following block
+					roles = append(roles, "create-ns")
 					if nsRole, _ := m.crLister.Get("", "create-ns"); nsRole == nil {
 						createNSRT, err := m.rtLister.Get("", "create-ns")
 						if err != nil {
