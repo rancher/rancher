@@ -230,11 +230,14 @@ func (a *APIOperations) DoCreate(schemaType string, createObj interface{}, respO
 	}
 
 	a.Session.RegisterCleanupFunc(func() error {
-		err := a.DoResourceDelete(schemaType, &resource)
-		if err != nil && (strings.Contains(err.Error(), "404 Not Found") || strings.Contains(err.Error(), "failed to find self URL of [&{  map[] map[]}]")) {
-			return nil
+		if !(schemaType == "cloudCredential") { // Skip resource deletion if resource is a cloud credential
+			err := a.DoResourceDelete(schemaType, &resource)
+			if err != nil && (strings.Contains(err.Error(), "404 Not Found") || strings.Contains(err.Error(), "failed to find self URL of [&{  map[] map[]}]")) {
+				return nil
+			}
+			return err
 		}
-		return err
+		return nil
 	})
 
 	return nil
