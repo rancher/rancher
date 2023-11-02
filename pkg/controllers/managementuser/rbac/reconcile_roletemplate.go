@@ -105,7 +105,9 @@ func (m *manager) ensureGlobalResourcesRolesForPRTB(projectName string, rts map[
 	var roleVerb, roleSuffix string
 	for _, r := range rts {
 		for _, rule := range r.Rules {
-			if slice.ContainsString(rule.Resources, "namespaces") && slice.ContainsString(rule.APIGroups, "") && len(rule.ResourceNames) == 0 {
+			hasNamespaceResources := slice.ContainsString(rule.Resources, "namespaces") || slice.ContainsString(rule.Resources, "*")
+			hasNamespaceGroup := slice.ContainsString(rule.APIGroups, "") || slice.ContainsString(rule.APIGroups, "*")
+			if hasNamespaceGroup && hasNamespaceResources && len(rule.ResourceNames) == 0 {
 				if slice.ContainsString(rule.Verbs, "*") || slice.ContainsString(rule.Verbs, "create") {
 					roleVerb = "*"
 					roles = append(roles, "create-ns") //added
