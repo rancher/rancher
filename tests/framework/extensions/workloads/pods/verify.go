@@ -7,7 +7,6 @@ import (
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	projectv3 "github.com/rancher/rancher/pkg/client/generated/project/v3"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	steveV1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
 	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -22,7 +21,7 @@ const (
 // state
 func VerifyReadyDaemonsetPods(t *testing.T, client *rancher.Client, cluster *v1.SteveAPIObject) {
 	status := &provv1.ClusterStatus{}
-	err := steveV1.ConvertToK8sType(cluster.Status, status)
+	err := v1.ConvertToK8sType(cluster.Status, status)
 	require.NoError(t, err)
 
 	daemonsetequals := false
