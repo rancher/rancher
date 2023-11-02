@@ -15,7 +15,7 @@ const (
 
 // CheckUIBrand checks the UI brand of Rancher Prime. If the Rancher instance is not Rancher Prime, the UI brand should be blank.
 func CheckUIBrand(client *rancher.Client, isPrime bool, rancherBrand *client.Setting, brand string) error {
-	if isPrime && brand != rancherBrand.Value {
+	if isPrime && brand != rancherBrand.Default {
 		return fmt.Errorf("error: Rancher Prime UI brand %s does not match defined UI brand %s", rancherBrand.Value, brand)
 	}
 
