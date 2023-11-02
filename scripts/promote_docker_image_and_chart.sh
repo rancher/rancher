@@ -53,11 +53,18 @@ done
 echo "No build number found for docker image tag: ${source_tag}"
 echo "Promoting Chart ${source_tag} to ${destination_tag}"
 
-build_number=$(drone build ls rancher/rancher --event tag --format "{{.Number}},{{.Ref}}"| grep ${1}$ |cut -d',' -f1|head -1)
-if [[ -n ${build_number} ]];then 
-  drone build promote rancher/rancher ${build_number} promote-stable
-  exit 0
-fi
+page=1
+until [ $page -gt 100 ]; do
+  echo "Finding build number for tag ${source_tag}"
+  build_number=$(drone build ls rancher/rancher --event tag --format "{{.Number}},{{.Ref}}"| grep ${1}$ |cut -d',' -f1|head -1)
+  if [[ -n ${build_number} ]];then
+    echo "Found build number ${build_number} for tag ${source_tag}"
+    drone build promote rancher/rancher ${build_number} promote-stable
+    exit 0
+  fi
+  ((page++))
+  sleep 1
+done
 
 echo "No Build Found for TAG: ${1}"
 
