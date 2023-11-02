@@ -29,6 +29,8 @@ fi
 source_tag=$1
 destination_tag=$2
 
+page_limit=100
+
 if [[ ! $destination_tag =~ ^(stable|latest|donotuse)$ ]]; then
   echo "Docker tag needs to be stable or latest (or donotuse for testing), not ${destination_tag}"
   exit 1
@@ -37,7 +39,7 @@ fi
 echo "Promoting Docker Image ${source_tag} to ${destination_tag}"
 
 page=1
-until [ $page -gt 100 ]; do
+until [ $page -gt $page_limit ]; do
   echo "Finding build number for tag ${source_tag}"
   build_number=$(drone build ls rancher/rancher --page $page --event tag --format "{{.Number}},{{.Ref}}"| grep ${source_tag}$ |cut -d',' -f1|head -1)
   if [[ -n ${build_number} ]]; then
@@ -54,7 +56,7 @@ echo "No build number found for docker image tag: ${source_tag}"
 echo "Promoting Chart ${source_tag} to ${destination_tag}"
 
 page=1
-until [ $page -gt 100 ]; do
+until [ $page -gt $page_limit ]; do
   echo "Finding build number for tag ${source_tag}"
   build_number=$(drone build ls rancher/rancher --event tag --format "{{.Number}},{{.Ref}}"| grep ${1}$ |cut -d',' -f1|head -1)
   if [[ -n ${build_number} ]];then
@@ -69,3 +71,4 @@ done
 echo "No Build Found for TAG: ${1}"
 
 exit 1
+ 
