@@ -1,7 +1,7 @@
 package nodetemplates
 
 // The json/yaml config key for the VSphere node template config
-const VmwareVsphereNodeTemplateConfigurationFileKey = "vmwarevsphereNodeTemplate"
+const VmwareVsphereNodeTemplateConfigurationFileKey = "vmwarevsphereConfig"
 
 // VmwareVsphereNodeTemplateConfig is configuration need to create a VSphere node template
 type VmwareVsphereNodeTemplateConfig struct {

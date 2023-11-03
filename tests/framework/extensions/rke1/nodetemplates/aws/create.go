@@ -21,8 +21,16 @@ func CreateAWSNodeTemplate(rancherClient *rancher.Client) (*nodetemplates.NodeTe
 		AmazonEC2NodeTemplateConfig: &amazonEC2NodeTemplateConfig,
 	}
 
+	nodeTemplateConfig := &nodetemplates.NodeTemplate{}
+	config.LoadConfig(nodetemplates.NodeTemplateConfigurationFileKey, nodeTemplateConfig)
+
+	nodeTemplateFinal, err := nodeTemplate.MergeOverride(nodeTemplateConfig, nodetemplates.AmazonEC2NodeTemplateConfigurationFileKey)
+	if err != nil {
+		return nil, err
+	}
+
 	resp := &nodetemplates.NodeTemplate{}
-	err := rancherClient.Management.APIBaseClient.Ops.DoCreate(management.NodeTemplateType, nodeTemplate, resp)
+	err = rancherClient.Management.APIBaseClient.Ops.DoCreate(management.NodeTemplateType, *nodeTemplateFinal, resp)
 	if err != nil {
 		return nil, err
 	}

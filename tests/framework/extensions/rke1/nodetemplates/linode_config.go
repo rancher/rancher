@@ -1,7 +1,7 @@
 package nodetemplates
 
 // The json/yaml config key for the Linode node template config
-const LinodeNodeTemplateConfigurationFileKey = "linodeNodeTemplate"
+const LinodeNodeTemplateConfigurationFileKey = "linodeConfig"
 
 // LinodeNodeTemplateConfig is configuration need to create a Linode node template
 type LinodeNodeTemplateConfig struct {
