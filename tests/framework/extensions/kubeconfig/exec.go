@@ -2,6 +2,7 @@ package kubeconfig
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -73,7 +74,7 @@ func KubectlExec(restConfig *restclient.Config, podName, namespace string, comma
 	}
 
 	logStreamer := &LogStreamer{}
-	err = exec.Stream(remotecommand.StreamOptions{
+	err = exec.StreamWithContext(context.TODO(), remotecommand.StreamOptions{
 		Stdin:  nil,
 		Stdout: logStreamer,
 		Stderr: os.Stderr,
