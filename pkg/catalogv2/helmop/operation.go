@@ -38,7 +38,6 @@ import (
 	"github.com/rancher/wrangler/pkg/name"
 	"github.com/rancher/wrangler/pkg/schemas/validation"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -232,8 +231,8 @@ func decodeParams(req *http.Request, target runtime.Object) error {
 }
 
 // proxyLogRequest proxies the given http.Request to get the logs of the given k8s pod and write it to the given http.ResponseWriter
-func (s *Operations) proxyLogRequest(rw http.ResponseWriter, req *http.Request, pod *v1.Pod, client kubernetes.Interface) error {
-	logOptions := &v1.PodLogOptions{}
+func (s *Operations) proxyLogRequest(rw http.ResponseWriter, req *http.Request, pod *corev1.Pod, client kubernetes.Interface) error {
+	logOptions := &corev1.PodLogOptions{}
 	if err := decodeParams(req, logOptions); err != nil {
 		return err
 	}
@@ -618,7 +617,7 @@ func injectAnnotation(data []byte, annotations map[string]string) ([]byte, error
 			break
 		}
 
-		data, err := ioutil.ReadAll(tar)
+		data, err := io.ReadAll(tar)
 		if err != nil {
 			return nil, err
 		}
@@ -709,6 +708,9 @@ func (s *Operations) getChartCommand(namespace, name, chartName, chartVersion st
 	if err != nil {
 		return Command{}, err
 	}
+
+	// secret key names doesn't accept strings with '/' character
+	chartName = strings.Replace(chartName, "/", "-", -1)
 
 	c := Command{
 		ValuesFile: fmt.Sprintf("values-%s-%s.yaml", chartName, sanitizeVersion(chartVersion)),
@@ -910,7 +912,7 @@ func (s *Operations) createRoleAndRoleBindings(op *catalog.Operation, user strin
 // It can also set the field.cattle.io/projectId annotation on the namespace if a non-empty projectID is provided.
 // It creates a watch on the namespace and waits for the v3.ProjectConditionInitialRolesPopulated condition
 // If the condition is not met within 30 seconds, it returns an error
-func (s *Operations) createNamespace(ctx context.Context, namespace, projectID string) (*v1.Namespace, error) {
+func (s *Operations) createNamespace(ctx context.Context, namespace, projectID string) (*corev1.Namespace, error) {
 	apiContext := types.GetAPIContext(ctx)
 	client, err := s.cg.K8sInterface(apiContext)
 	if err != nil {
@@ -922,7 +924,7 @@ func (s *Operations) createNamespace(ctx context.Context, namespace, projectID s
 		annotations["field.cattle.io/projectId"] = strings.ReplaceAll(projectID, "/", ":")
 	}
 	// We just always try to create an ignore the error. This is because you might have create but not get privileges
-	_, _ = client.CoreV1().Namespaces().Create(ctx, &v1.Namespace{
+	_, _ = client.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        namespace,
 			Annotations: annotations,
@@ -954,7 +956,7 @@ func (s *Operations) createNamespace(ctx context.Context, namespace, projectID s
 	}()
 
 	for event := range w.ResultChan() {
-		if ns, ok := event.Object.(*v1.Namespace); ok {
+		if ns, ok := event.Object.(*corev1.Namespace); ok {
 			if ok, err := namespaces.IsNamespaceConditionSet(ns, string(v3.ProjectConditionInitialRolesPopulated), true); err != nil {
 				return ns, err
 			} else if ok {
@@ -971,40 +973,40 @@ func (s *Operations) createNamespace(ctx context.Context, namespace, projectID s
 // The created pod has default tolerations and node selectors.
 // If the kustomize flag is true, the created pod is modified to be able to run the kustomize.sh script.
 // Returns a pod object and a pod options object representing the helm operation pod and it's options
-func (s *Operations) createPod(secretData map[string][]byte, kustomize bool, imageOverride string) (*v1.Pod, *podimpersonation.PodOptions) {
+func (s *Operations) createPod(secretData map[string][]byte, kustomize bool, imageOverride string) (*corev1.Pod, *podimpersonation.PodOptions) {
 	image := imageOverride
 	if image == "" {
 		image = settings.FullShellImage()
 	}
-	secret := &v1.Secret{
+	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "helm-operation-",
 			Namespace:    s.namespace,
 		},
 		Data: secretData,
 	}
-	pod := &v1.Pod{
+	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "helm-operation-",
 			Namespace:    s.namespace,
 		},
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
+		Spec: corev1.PodSpec{
+			Volumes: []corev1.Volume{
 				{
 					Name: "data",
-					VolumeSource: v1.VolumeSource{
-						Secret: &v1.SecretVolumeSource{
+					VolumeSource: corev1.VolumeSource{
+						Secret: &corev1.SecretVolumeSource{
 							SecretName: "helm-operation-",
 						},
 					},
 				},
 			},
 			TerminationGracePeriodSeconds: new(int64),
-			RestartPolicy:                 v1.RestartPolicyNever,
+			RestartPolicy:                 corev1.RestartPolicyNever,
 			NodeSelector: map[string]string{
 				"kubernetes.io/os": "linux",
 			},
-			Tolerations: []v1.Toleration{
+			Tolerations: []corev1.Toleration{
 				{
 					Key:      "cattle.io/os",
 					Operator: corev1.TolerationOpEqual,
@@ -1030,10 +1032,10 @@ func (s *Operations) createPod(secretData map[string][]byte, kustomize bool, ima
 					Effect:   "NoSchedule",
 				},
 			},
-			Containers: []v1.Container{
+			Containers: []corev1.Container{
 				{
 					Name: "helm",
-					Env: []v1.EnvVar{
+					Env: []corev1.EnvVar{
 						{
 							Name:  "KUBECONFIG",
 							Value: "/home/shell/.kube/config",
@@ -1043,10 +1045,10 @@ func (s *Operations) createPod(secretData map[string][]byte, kustomize bool, ima
 					TTY:             true,
 					StdinOnce:       true,
 					Image:           image,
-					ImagePullPolicy: v1.PullIfNotPresent,
+					ImagePullPolicy: corev1.PullIfNotPresent,
 					Command:         []string{"helm-cmd"},
 					WorkingDir:      helmDataPath,
-					VolumeMounts: []v1.VolumeMount{
+					VolumeMounts: []corev1.VolumeMount{
 						{
 							Name:      "data",
 							MountPath: helmDataPath,
@@ -1064,19 +1066,19 @@ func (s *Operations) createPod(secretData map[string][]byte, kustomize bool, ima
 	// changed with the readOnly field or the defaultMode field.
 	// See: https://github.com/kubernetes/kubernetes/issues/62099.
 	if kustomize {
-		pod.Spec.Volumes = append(pod.Spec.Volumes, v1.Volume{
+		pod.Spec.Volumes = append(pod.Spec.Volumes, corev1.Volume{
 			Name: "helm-run",
-			VolumeSource: v1.VolumeSource{
-				EmptyDir: &v1.EmptyDirVolumeSource{},
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
 			},
 		})
-		pod.Spec.Containers[0].VolumeMounts = append(pod.Spec.Containers[0].VolumeMounts, v1.VolumeMount{
+		pod.Spec.Containers[0].VolumeMounts = append(pod.Spec.Containers[0].VolumeMounts, corev1.VolumeMount{
 			Name:      "helm-run",
 			MountPath: helmRunPath,
 		})
-		pod.Spec.Containers[0].Lifecycle = &v1.Lifecycle{
-			PostStart: &v1.LifecycleHandler{
-				Exec: &v1.ExecAction{
+		pod.Spec.Containers[0].Lifecycle = &corev1.Lifecycle{
+			PostStart: &corev1.LifecycleHandler{
+				Exec: &corev1.ExecAction{
 					Command: []string{"/bin/sh", "-c", fmt.Sprintf("cp -r %s/. %s", helmDataPath, helmRunPath)},
 				},
 			},
@@ -1084,7 +1086,7 @@ func (s *Operations) createPod(secretData map[string][]byte, kustomize bool, ima
 		pod.Spec.Containers[0].WorkingDir = helmRunPath
 	}
 	return pod, &podimpersonation.PodOptions{
-		SecretsToCreate: []*v1.Secret{
+		SecretsToCreate: []*corev1.Secret{
 			secret,
 		},
 		ImageOverride: imageOverride,

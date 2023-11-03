@@ -12,7 +12,6 @@ replace (
 
 	github.com/knative/pkg => github.com/rancher/pkg v0.0.0-20190514055449-b30ab9de040e
 	github.com/matryer/moq => github.com/rancher/moq v0.0.0-20200712062324-13d1f37d2d77
-	github.com/opencontainers/image-spec => github.com/opencontainers/image-spec v1.1.0-rc2 // needed for containers/image/v5
 
 	github.com/rancher/rancher/pkg/apis => ./pkg/apis
 	github.com/rancher/rancher/pkg/client => ./pkg/client
@@ -137,9 +136,9 @@ require (
 	golang.org/x/mod v0.12.0
 	golang.org/x/net v0.17.0
 	golang.org/x/oauth2 v0.11.0
-	golang.org/x/sync v0.3.0
+	golang.org/x/sync v0.4.0
 	golang.org/x/text v0.13.0
-	golang.org/x/tools v0.12.0 // indirect
+	golang.org/x/tools v0.12.1-0.20230825192346-2191a27a6dc5 // indirect
 	google.golang.org/api v0.138.0
 	google.golang.org/grpc v1.57.1
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c
@@ -165,10 +164,12 @@ require (
 )
 
 require (
+	github.com/Masterminds/semver v1.5.0
 	github.com/antihax/optional v1.0.0
 	github.com/containers/image/v5 v5.25.0
 	github.com/rancher/rancher/pkg/apis v0.0.0-20230915232223-a9ea4ce4a5ba
-	go.qase.io/client v0.0.0-20231114201952-65195ec001fa
+	go.qase.io/client v0.0.0-00010101000000-000000000000
+	oras.land/oras-go/v2 v2.3.1
 )
 
 require (
@@ -241,6 +242,7 @@ require (
 	k8s.io/kms v0.27.4 // indirect
 	k8s.io/kubelet v0.27.4 // indirect
 	k8s.io/pod-security-admission v0.27.6 // indirect
+	oras.land/oras-go v1.2.3 // indirect
 )
 
 require (
@@ -355,7 +357,7 @@ require (
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f // indirect
 	github.com/onsi/gomega v1.27.10 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
-	github.com/opencontainers/image-spec v1.1.0-rc3 // indirect
+	github.com/opencontainers/image-spec v1.1.0-rc5
 	github.com/opencontainers/runc v1.1.9 // indirect
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
 	github.com/pkg/sftp v1.13.5
@@ -413,7 +415,6 @@ require (
 	k8s.io/klog v1.0.0 // indirect
 	k8s.io/klog/v2 v2.100.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20230530175149-33f04d5d6b58 // indirect
-	oras.land/oras-go v1.2.3 // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.1.2 // indirect
 	sigs.k8s.io/cli-utils v0.27.0 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
