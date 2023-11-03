@@ -8,6 +8,7 @@ import (
 
 	"github.com/golang/mock/gomock"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1/fakes"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/wrangler/pkg/generic/fake"
 	"github.com/rancher/wrangler/pkg/relatedresource"
@@ -451,6 +452,8 @@ type mockController struct {
 	mockCRTBCache    *fake.MockCacheInterface[*v3.ClusterRoleTemplateBinding]
 	mockCRTBCtrl     *fake.MockControllerInterface[*v3.ClusterRoleTemplateBinding, *v3.ClusterRoleTemplateBindingList]
 	mockGRBCache     *fake.MockNonNamespacedCacheInterface[*v3.GlobalRoleBinding]
+	mockRBInterface  *fakes.RoleBindingInterfaceMock
+	mockRBLister     *fakes.RoleBindingListerMock
 }
 
 func (m *mockController) rbacController() *rbaccontroller {
@@ -460,5 +463,7 @@ func (m *mockController) rbacController() *rbaccontroller {
 		crtbCache:    m.mockCRTBCache,
 		crtbCtrl:     m.mockCRTBCtrl,
 		grbCache:     m.mockGRBCache,
+		roleBindings: m.mockRBInterface,
+		rbLister:     m.mockRBLister,
 	}
 }
