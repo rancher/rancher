@@ -34,6 +34,18 @@ const (
 	FleetSteveResourceType               = "fleet.cattle.io.cluster"
 	PodSecurityAdmissionSteveResoureType = "management.cattle.io.podsecurityadmissionconfigurationtemplate"
 	baseline                             = "baseline"
+
+	etcdRole         = "etcd-role"
+	controlPlaneRole = "control-plane-role"
+	workerRole       = "worker-role"
+
+	externalCloudProviderString = "cloud-provider=external"
+	kubeletArgKey               = "kubelet-arg"
+	kubeletAPIServerArgKey      = "kubeapi-server-arg"
+	kubeControllerManagerArgKey = "kube-controller-manager-arg"
+	cloudProviderAnnotationName = "cloud-provider-name"
+	disableCloudController      = "disable-cloud-controller"
+	protectKernelDefaults       = "protect-kernel-defaults"
 )
 
 // GetV1ProvisioningClusterByName is a helper function that returns the cluster ID by name
@@ -369,6 +381,10 @@ func NewK3SRKE2ClusterConfig(clusterName, namespace string, clustersConfig *Clus
 		registries = clustersConfig.Registries.RKE2Registries
 	}
 
+	if clustersConfig.CloudProvider == provisioninginput.AWSProviderName.String() {
+		machineSelectorConfigs = append(machineSelectorConfigs, awsOutOfTreeSystemConfig()...)
+	}
+
 	rkeSpecCommon := rkev1.RKEClusterSpecCommon{
 		UpgradeStrategy:       upgradeStrategy,
 		ChartValues:           chartValuesMap,
@@ -382,6 +398,7 @@ func NewK3SRKE2ClusterConfig(clusterName, namespace string, clustersConfig *Clus
 		RKEClusterSpecCommon: rkeSpecCommon,
 		MachinePools:         machinePools,
 	}
+
 	spec := apisV1.ClusterSpec{
 		CloudCredentialSecretName:           cloudCredentialSecretName,
 		KubernetesVersion:                   clustersConfig.KubernetesVersion,
@@ -402,6 +419,52 @@ func NewK3SRKE2ClusterConfig(clusterName, namespace string, clustersConfig *Clus
 	}
 
 	return v1Cluster
+}
+
+// awsOutOfTreeSystemConfig constructs the proper rkeSystemConfig slice for enabling the aws cloud provider
+// out-of-tree services
+func awsOutOfTreeSystemConfig() (rkeConfig []rkev1.RKESystemConfig) {
+	roles := []string{etcdRole, controlPlaneRole, workerRole}
+
+	for _, role := range roles {
+		selector := &metav1.LabelSelector{
+			MatchLabels: map[string]string{
+				"rke.cattle.io/" + role: "true",
+			},
+		}
+		configData := map[string]interface{}{}
+
+		configData[kubeletArgKey] = []string{externalCloudProviderString}
+
+		if role == controlPlaneRole {
+			configData[kubeletAPIServerArgKey] = []string{externalCloudProviderString}
+			configData[kubeControllerManagerArgKey] = []string{externalCloudProviderString}
+		}
+
+		if role == workerRole || role == controlPlaneRole {
+			configData[disableCloudController] = true
+		}
+
+		rkeConfig = append(rkeConfig, RKESystemConfigTemplate(configData, selector))
+	}
+
+	configData := map[string]interface{}{
+		cloudProviderAnnotationName: provisioninginput.AWSProviderName,
+		protectKernelDefaults:       false,
+	}
+
+	rkeConfig = append(rkeConfig, RKESystemConfigTemplate(configData, nil))
+	return
+}
+
+// RKESYstemConfigTemplate constructs an RKESystemConfig object given config data and a selector
+func RKESystemConfigTemplate(config map[string]interface{}, selector *metav1.LabelSelector) rkev1.RKESystemConfig {
+	return rkev1.RKESystemConfig{
+		Config: rkev1.GenericMap{
+			Data: config,
+		},
+		MachineLabelSelector: selector,
+	}
 }
 
 // ResourceConfigHelper is a "helper" function that is used to convert the management.ResourceRequirements struct
@@ -731,7 +794,7 @@ func HardenK3SClusterConfig(clusterName, namespace string, clustersConfig *Clust
 					"kubelet-arg": []string{
 						"make-iptables-util-chains=true",
 					},
-					"protect-kernel-defaults": true,
+					protectKernelDefaults: true,
 				},
 			},
 		},
@@ -749,8 +812,8 @@ func HardenRKE2ClusterConfig(clusterName, namespace string, clustersConfig *Clus
 			{
 				Config: rkev1.GenericMap{
 					Data: map[string]interface{}{
-						"profile":                 "cis-1.6",
-						"protect-kernel-defaults": true,
+						"profile":             "cis-1.6",
+						protectKernelDefaults: true,
 					},
 				},
 			},

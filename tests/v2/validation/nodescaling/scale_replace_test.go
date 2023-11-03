@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
+	"github.com/rancher/rancher/tests/framework/extensions/clusters"
+	"github.com/rancher/rancher/tests/framework/extensions/provisioning"
 	"github.com/rancher/rancher/tests/framework/extensions/provisioninginput"
 	"github.com/rancher/rancher/tests/framework/pkg/config"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
@@ -55,6 +57,16 @@ func (s *NodeScaleDownAndUp) TestControlPlaneScaleDownAndUp() {
 func (s *NodeScaleDownAndUp) TestWorkerScaleDownAndUp() {
 	s.Run("rke2-worker-node-scale-down-and-up", func() {
 		ReplaceNodes(s.T(), s.client, s.client.RancherConfig.ClusterName, false, false, true)
+	})
+}
+
+func (s *NodeScaleDownAndUp) TestValidate() {
+	s.Run("rke2-validate", func() {
+		_, stevecluster, err := clusters.GetProvisioningClusterByName(s.client, s.client.RancherConfig.ClusterName, provisioninginput.Namespace)
+		require.NoError(s.T(), err)
+
+		clusterConfig := clusters.ConvertConfigToClusterConfig(s.clustersConfig)
+		provisioning.VerifyCluster(s.T(), s.client, clusterConfig, stevecluster)
 	})
 }
 
