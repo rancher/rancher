@@ -29,7 +29,7 @@ import (
 	"github.com/rancher/rancher/pkg/types/config/dialer"
 	rkecluster "github.com/rancher/rke/cluster"
 	rketypes "github.com/rancher/rke/types"
-	"github.com/rancher/wrangler/pkg/ticker"
+	"github.com/rancher/wrangler/v2/pkg/ticker"
 	log "github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"

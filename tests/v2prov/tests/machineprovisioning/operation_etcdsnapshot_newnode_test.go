@@ -10,7 +10,7 @@ import (
 	"github.com/rancher/rancher/tests/v2prov/namespace"
 	"github.com/rancher/rancher/tests/v2prov/objectstore"
 	"github.com/rancher/rancher/tests/v2prov/operations"
-	"github.com/rancher/wrangler/pkg/name"
+	"github.com/rancher/wrangler/v2/pkg/name"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

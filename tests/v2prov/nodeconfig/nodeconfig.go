@@ -7,7 +7,7 @@ import (
 	"github.com/rancher/rancher/tests/v2prov/clients"
 	"github.com/rancher/rancher/tests/v2prov/defaults"
 	"github.com/rancher/rancher/tests/v2prov/wait"
-	"github.com/rancher/wrangler/pkg/condition"
+	"github.com/rancher/wrangler/v2/pkg/condition"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"

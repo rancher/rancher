@@ -33,7 +33,7 @@ import (
 	"github.com/rancher/rancher/pkg/rkenodeconfigserver"
 	"github.com/rancher/rancher/tests/framework/pkg/killserver"
 	"github.com/rancher/remotedialer"
-	"github.com/rancher/wrangler/pkg/signals"
+	"github.com/rancher/wrangler/v2/pkg/signals"
 	"github.com/sirupsen/logrus"
 )
 
