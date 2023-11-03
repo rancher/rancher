@@ -17,6 +17,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/charts"
 	"github.com/rancher/rancher/tests/framework/extensions/clusterrolebindings"
 	"github.com/rancher/rancher/tests/framework/extensions/configmaps"
+	"github.com/rancher/rancher/tests/framework/extensions/ingresses"
 	"github.com/rancher/rancher/tests/framework/extensions/serviceaccounts"
 	"github.com/rancher/rancher/tests/framework/extensions/workloads"
 	"github.com/rancher/rancher/tests/framework/pkg/namegenerator"
@@ -95,12 +96,17 @@ func waitUnknownPrometheusTargets(client *rancher.Client) error {
 	checkUnknownPrometheusTargets := func() (bool, error) {
 		var statusInit bool
 		var unknownTargets []string
-		resultAPI, err := charts.GetChartCaseEndpoint(client, client.RancherConfig.Host, prometheusTargetsPathAPI, true)
+		resultAPI, err := ingresses.GetExternalIngressResponse(client, client.RancherConfig.Host, prometheusTargetsPathAPI, true)
+		if err != nil {
+			return statusInit, err
+		}
+
+		bodyString, err := convertHTTPBodyToString(resultAPI)
 		if err != nil {
 			return statusInit, err
 		}
 		var mapResponse map[string]interface{}
-		if err = json.Unmarshal([]byte(resultAPI.Body), &mapResponse); err != nil {
+		if err = json.Unmarshal([]byte(bodyString), &mapResponse); err != nil {
 			return statusInit, err
 		}
 		if mapResponse["status"] != "success" {
@@ -149,13 +155,18 @@ func checkPrometheusTargets(client *rancher.Client) (bool, error) {
 		return statusInit, err
 	}
 
-	resultAPI, err := charts.GetChartCaseEndpoint(client, client.RancherConfig.Host, prometheusTargetsPathAPI, true)
+	resultAPI, err := ingresses.GetExternalIngressResponse(client, client.RancherConfig.Host, prometheusTargetsPathAPI, true)
+	if err != nil {
+		return statusInit, err
+	}
+
+	bodyString, err := convertHTTPBodyToString(resultAPI)
 	if err != nil {
 		return statusInit, err
 	}
 
 	var mapResponse map[string]interface{}
-	if err = json.Unmarshal([]byte(resultAPI.Body), &mapResponse); err != nil {
+	if err = json.Unmarshal([]byte(bodyString), &mapResponse); err != nil {
 		return statusInit, err
 	}
 
