@@ -257,17 +257,25 @@ func (m *Manager) Remove(namespace, name string) {
 	}
 }
 
-// install tries to install a new version of a chart. If the exact version is provided, it will try to install it
-// otherwise it will try to install the latest version available. If a release with the version to be installed is already installed,
-// or it's pending install, upgrade or rollback this does nothing.
-// The operation created is always an upgrade, even in the case of an installation. In that case, the Install flag will be used.
+// install tries to install a new version of a chart.
+// If the exact version is provided, it will try to install it regardless of whether minVersion is provided.
+// If minVersion is provided on its own, it will try to install it only if the current version is earlier than
+// minVersion.
+// A failure to find a chart for a provided version leads to an error being thrown, without any change in state.
+// If no version is provided, it will try to install the latest version available.
+// If a release with the version to be installed is already installed, or is pending install, upgrade or rollback, this
+// does nothing.
 func (m *Manager) install(namespace, name, minVersion, exactVersion string, values map[string]interface{}, forceAdopt bool, installImageOverride string) error {
 	index, err := m.content.Index("", "rancher-charts", true)
 	if err != nil {
 		return err
 	}
-	v := ">=0-a" // latest - this is special syntax to match everything including pre-releases build
+
+	const latestVersionMatcher = ">=0-a" // latest - special syntax to match everything including pre-release builds
+
+	v := latestVersionMatcher
 	var isExact bool
+
 	if exactVersion != "" {
 		v = exactVersion
 		isExact = true
@@ -285,8 +293,8 @@ func (m *Manager) install(namespace, name, minVersion, exactVersion string, valu
 		return fmt.Errorf(err.Error())
 	}
 	// Because of the behavior of `index.Get`, we need this check.
-	if isExact && chart.Version != v {
-		return fmt.Errorf("specified exact version %s doesn't exist in the index", exactVersion)
+	if v != latestVersionMatcher && chart.Version != v {
+		return fmt.Errorf("specified version %s doesn't exist in the index", v)
 	}
 
 	// If the chart version is already installed, we do nothing

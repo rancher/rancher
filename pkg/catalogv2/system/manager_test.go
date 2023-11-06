@@ -307,10 +307,13 @@ func TestInstallCharts(t *testing.T) {
 			},
 			desiredCharts: map[desiredKey]map[string]any{
 				{
-					namespace:    "cattle-fleet-system",
-					name:         "fleet",
-					minVersion:   "2.0.0",
-					exactVersion: "2.0.0",
+					namespace: "cattle-fleet-system",
+					name:      "fleet",
+					// major, minor and patch segments match a version from the index, which is
+					// where Helm could return a matching version based on those segments, but not
+					// strictly equal to the specified one
+					minVersion: "3.0.0+up1.2.3",
+					// no exact version
 				}: {},
 				{
 					namespace:    "cattle-system",
@@ -324,7 +327,7 @@ func TestInstallCharts(t *testing.T) {
 				"fleet":           false,
 				"rancher-webhook": true,
 			},
-			expectedErr: errors.New("no chart version found"),
+			expectedErr: errors.New("specified version 3.0.0+up1.2.3 doesn't exist in the index"),
 		},
 	}
 
