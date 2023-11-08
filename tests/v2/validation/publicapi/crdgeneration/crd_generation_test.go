@@ -8,10 +8,7 @@ import (
 	"os"
 	"testing"
 
-	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
-	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
 
 	"github.com/stretchr/testify/require"
@@ -21,12 +18,9 @@ import (
 
 type CRDGenTestSuite struct {
 	suite.Suite
-	client      *rancher.Client
-	session     *session.Session
-	cluster     *management.Cluster
-	crds        map[string][]string
-	clusterAuth bool
-	clusterV1   *v1.Cluster
+	client  *rancher.Client
+	session *session.Session
+	crds    map[string][]string
 }
 
 func (crd *CRDGenTestSuite) TearDownSuite() {
@@ -46,29 +40,26 @@ func (crd *CRDGenTestSuite) SetupSuite() {
 	err = json.Unmarshal(readJson, &crd.crds)
 	require.NoError(crd.T(), err)
 
-	clusterType, err := clusters.NewClusterMeta(crd.client, crd.clusterName)
-	require.NoError(crd.T(), err)
-	crd.clusterAuth = false
-
-	kubeClient, err := crd.client.GetKubeAPIProvisioningClient()
-	require.NoError(crd.T(), err)
-
-	crd.clusterV1, err = kubeClient.Clusters(fleetlocal).Get(context.TODO(), localCluster, metav1.GetOptions{})
-	require.NoError(crd.T(), err)
-
 }
 
 func (crd *CRDGenTestSuite) sequentialTestCRD() {
+	kubeClient, err := crd.client.GetKubeAPIProvisioningClient()
+	require.NoError(crd.T(), err)
+
+	clusterV1, err := kubeClient.Clusters(fleetlocal).Get(context.TODO(), localCluster, metav1.GetOptions{})
+	require.NoError(crd.T(), err)
+
 	crdsList, err := listCRDS(crd.client, localCluster)
 	require.NoError(crd.T(), err)
-	crd.Run("Verify the count of crds deployed and the crds on the cluster "+crd.clusterName, func() {
+
+	crd.Run("Verify the count of crds deployed and the crds on the cluster "+localCluster, func() {
 		validateCRDList(crd.T(), crdsList, crd.crds, localCluster)
 	})
 	crd.Run("Verify description fields of crds are non-empty", func() {
-		validateCRDDescription(crd.T(), crd.client, crd.clusterV1, localCluster)
+		validateCRDDescription(crd.T(), crd.client, clusterV1, localCluster)
 	})
 	crd.Run("Verify kubectl validate for role templates", func() {
-		validateRoleCreation(crd.T(), crd.client, crd.clusterV1, localCluster)
+		validateRoleCreation(crd.T(), crd.client, clusterV1, localCluster)
 	})
 }
 
