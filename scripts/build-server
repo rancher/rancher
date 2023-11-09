@@ -24,6 +24,7 @@ RKE_VERSION="$(grep -m1 'github.com/rancher/rke' go.mod | awk '{print $2}')"
 DEFAULT_VALUES="{\"rke-version\":\"${RKE_VERSION}\"}"
 
 CGO_ENABLED=0 go build -tags k8s \
+  -cover \
   -gcflags="all=${GCFLAGS}" \
   -ldflags \
   "-X github.com/rancher/rancher/pkg/version.Version=$VERSION

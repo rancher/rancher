@@ -164,6 +164,12 @@ go test -v -failfast -p 1 ./tests/v2/integration/... || {
   exit 1
 }
 
+go test -v -failfast -p1 ./tests/v2/codecoverage/ranchercover -run 'TestRetrieveCoverageReports' || {
+  dump_rancher_logs
+  exit 1
+}
+./tests/v2/codecoverage/scripts/merge_coverage_reports.sh
+
 echo Running tox tests
 INT_TESTS_STARTED=true
 cd ./tests/integration
