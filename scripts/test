@@ -175,7 +175,7 @@ cd ./tests/integration
 tox -e rancher -- -m "not nonparallel" -n $(nproc)
 tox -e rancher -- -m nonparallel
 
-tail -f /tmp/rancher-test.log &
+# tail -f /tmp/rancher-test.log &
 
 ls -al
 
