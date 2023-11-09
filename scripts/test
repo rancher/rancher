@@ -168,7 +168,6 @@ go test -v -failfast -p1 ./tests/v2/codecoverage/ranchercover -run 'TestRetrieve
   dump_rancher_logs
   exit 1
 }
-./tests/v2/codecoverage/scripts/merge_coverage_reports.sh
 
 echo Running tox tests
 INT_TESTS_STARTED=true
@@ -177,3 +176,15 @@ tox -e rancher -- -m "not nonparallel" -n $(nproc)
 tox -e rancher -- -m nonparallel
 
 tail -f /tmp/rancher-test.log &
+
+ls -al
+
+dirlist=(`ls -p | tr '\n' ',' | tr -d '/' | sed 's/.$//'`) 
+mkdir merged
+go tool covdata merge -i=${dirlist}  -o merged
+
+go tool covdata textfmt -i=merged -o profile.txt
+# Output Total Coverage 
+go tool cover -func=profile.txt | grep -E '^total\:' | sed -E 's/\s+/ /g'
+
+go tool cover -html profile.txt -o merged.html
