@@ -20,7 +20,6 @@ type SteveAPITestSuite struct {
   client            *rancher.Client
   session           *session.Session
   cluster           *management.Cluster
-  userClients       map[string]*rancher.Client
 }
 
 func (s *SteveAPITestSuite) TearDownSuite() {
@@ -34,8 +33,6 @@ func (s *SteveAPITestSuite) SetupSuite() {
   client, err := rancher.NewClient("", testSession)
   require.NoError(s.T(), err)
   s.client = client
-
-  s.userClients = make(map[string]*rancher.Client)
 }
 
 func (s *SteveAPITestSuite) TestConfigMapCrud() {
