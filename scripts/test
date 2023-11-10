@@ -170,6 +170,8 @@ cd ./tests/integration
 tox -e rancher -- -m "not nonparallel" -n $(nproc)
 tox -e rancher -- -m nonparallel
 
+cd $(dirname $0)/..
+
 go test -v -failfast -p1 ./tests/v2/codecoverage/ranchercover -run 'TestRetrieveCoverageReports' || {
   dump_rancher_logs
   exit 1
