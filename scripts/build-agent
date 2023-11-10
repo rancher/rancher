@@ -18,4 +18,4 @@ if [ "$(uname)" != "Darwin" ]; then
   fi
 fi
 
-CGO_ENABLED=0 go build -tags k8s -cover -gcflags="all=${GCFLAGS}" -ldflags "-X main.VERSION=$VERSION $LINKFLAGS" -o bin/agent ./cmd/agent
+CGO_ENABLED=0 go build -tags k8s -cover -gcflags="all=${GCFLAGS}" -ldflags "-X main.VERSION=$VERSION $LINKFLAGS" -o bin/agent ./tests/v2/codecoverage/agent
