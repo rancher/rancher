@@ -164,23 +164,26 @@ go test -v -failfast -p 1 ./tests/v2/integration/... || {
   exit 1
 }
 
-go test -v -failfast -p1 ./tests/v2/codecoverage/ranchercover -run 'TestRetrieveCoverageReports' || {
-  dump_rancher_logs
-  exit 1
-}
-
 echo Running tox tests
 INT_TESTS_STARTED=true
 cd ./tests/integration
 tox -e rancher -- -m "not nonparallel" -n $(nproc)
 tox -e rancher -- -m nonparallel
 
+go test -v -failfast -p1 ./tests/v2/codecoverage/ranchercover -run 'TestRetrieveCoverageReports' || {
+  dump_rancher_logs
+  exit 1
+}
+
 # tail -f /tmp/rancher-test.log &
 
-ls -al
+cd tests/v2/codecoverage/ranchercover/cover
+ls  -al
 
 dirlist=(`ls -p | tr '\n' ',' | tr -d '/' | sed 's/.$//'`) 
 mkdir merged
+
+ls
 go tool covdata merge -i=${dirlist}  -o merged
 
 go tool covdata textfmt -i=merged -o profile.txt
