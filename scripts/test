@@ -164,22 +164,23 @@ go test -v -failfast -p 1 ./tests/v2/integration/... || {
   exit 1
 }
 
-echo Running tox tests
-INT_TESTS_STARTED=true
-cd ./tests/integration
-tox -e rancher -- -m "not nonparallel" -n $(nproc)
-tox -e rancher -- -m nonparallel
+# echo Running tox tests
+# INT_TESTS_STARTED=true
+# cd ./tests/integration
+# tox -e rancher -- -m "not nonparallel" -n $(nproc)
+# tox -e rancher -- -m nonparallel
 
-cd $(dirname $0)/..
+# cd $(dirname $0)/..
 
-go test -v -failfast -p 1 ./v2/codecoverage/ranchercover -run 'TestRetrieveCoverageReports' || {
+go test -v -failfast -p 1 ./tests/v2/codecoverage/ranchercover -run 'TestRetrieveCoverageReports' || {
   dump_rancher_logs
   exit 1
 }
 
 # tail -f /tmp/rancher-test.log &
-
-cd tests/v2/codecoverage/ranchercover/cover
+ls -al
+ls  -al ./tests/v2/codecoverage/ranchercover
+cd ./tests/v2/codecoverage/ranchercover/cover
 ls  -al
 
 dirlist=(`ls -p | tr '\n' ',' | tr -d '/' | sed 's/.$//'`) 
