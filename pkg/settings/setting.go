@@ -145,6 +145,10 @@ var (
 	// AuthUserSessionTTLMinutes represents the time to live for tokens used for login sessions in minutes.
 	AuthUserSessionTTLMinutes = NewSetting("auth-user-session-ttl-minutes", "960") // 16 hours
 
+	// ChartDefaultURL represents the default URL for the system charts repo. It should only be set for test or
+	// debug purposes.
+	ChartDefaultURL = NewSetting("chart-default-url", "https://git.rancher.io/")
+
 	// ConfigMapName name of the configmap that stores rancher configuration information.
 	// Deprecated: to be removed in 2.8.0
 	ConfigMapName = NewSetting("config-map-name", "rancher-config")
