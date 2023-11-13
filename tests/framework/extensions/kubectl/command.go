@@ -5,6 +5,8 @@ import (
 	"net"
 	"strings"
 
+	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
+
 	apisV1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	"github.com/rancher/rancher/tests/framework/extensions/kubeconfig"
@@ -18,9 +20,9 @@ import (
 
 const volumeName = "config"
 
-// Apply is a helper function that call a helper to create a Job and executing kubectl apply by copying the yaml
+// Command is a helper function that call a helper to create a Job and executing kubectl by copying the yaml
 // in the pod. It returns the output from the pod logs.
-func Apply(client *rancher.Client, cluster *apisV1.Cluster, yamlContent *management.ImportClusterYamlInput, clusterID string) (string, error) {
+func Command(client *rancher.Client, cluster *apisV1.Cluster, yamlContent *management.ImportClusterYamlInput, clusterID string, command []string) (string, error) {
 	var user int64
 	var group int64
 	imageSetting, err := client.Management.Setting.ByID(rancherShellSettingID)
@@ -28,7 +30,8 @@ func Apply(client *rancher.Client, cluster *apisV1.Cluster, yamlContent *managem
 		return "", err
 	}
 
-	jobName := JobName + "-apply"
+	id := namegen.RandStringLower(6)
+	jobName := fmt.Sprintf("%v-%v", JobName, id)
 
 	initVolumeMount := []corev1.VolumeMount{
 		{
@@ -60,13 +63,13 @@ func Apply(client *rancher.Client, cluster *apisV1.Cluster, yamlContent *managem
 
 	jobTemplate := workloads.NewJobTemplate(jobName, Namespace)
 
-	initContainerCommand := []string{"sh", "-c", fmt.Sprintf("echo \"%s\" > /config/my-pod.yaml", strings.ReplaceAll(yamlContent.YAML, "\"", "\\\""))}
-	initContainer := workloads.NewContainer("copy-yaml", imageSetting.Value, corev1.PullAlways, initVolumeMount, nil, initContainerCommand, nil, nil)
-	jobTemplate.Spec.Template.Spec.InitContainers = append(jobTemplate.Spec.Template.Spec.InitContainers, initContainer)
+	if yamlContent != nil {
+		initContainerCommand := []string{"sh", "-c", fmt.Sprintf("echo \"%s\" > /config/my-pod.yaml", strings.ReplaceAll(yamlContent.YAML, "\"", "\\\""))}
+		initContainer := workloads.NewContainer("copy-yaml", imageSetting.Value, corev1.PullAlways, initVolumeMount, nil, initContainerCommand, nil, nil)
+		jobTemplate.Spec.Template.Spec.InitContainers = append(jobTemplate.Spec.Template.Spec.InitContainers, initContainer)
+	}
 
-	command := []string{"kubectl", "apply", "-f", "/root/.kube/my-pod.yaml"}
 	container := workloads.NewContainer(jobName, imageSetting.Value, corev1.PullAlways, volumeMount, nil, command, securityContext, nil)
-
 	jobTemplate.Spec.Template.Spec.Containers = append(jobTemplate.Spec.Template.Spec.Containers, container)
 	jobTemplate.Spec.Template.Spec.Volumes = volumes
 	err = CreateJobAndRunKubectlCommands(clusterID, jobName, jobTemplate, client)
@@ -82,7 +85,7 @@ func Apply(client *rancher.Client, cluster *apisV1.Cluster, yamlContent *managem
 
 	var podName string
 	for _, pod := range pods.Data {
-		if strings.Contains(pod.Name, jobName) {
+		if strings.Contains(pod.Name, id) {
 			podName = pod.Name
 			break
 		}

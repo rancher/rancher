@@ -114,7 +114,8 @@ func validateRoleCreation(t *testing.T, client *rancher.Client, clusterV1 *v1.Cl
 		YAML: string(role),
 	}
 
-	podLogs, err := kubectl.Apply(client, clusterV1, yamlInput, clusterID)
+	command := []string{"kubectl", "apply", "-f", "/root/.kube/my-pod.yaml"}
+	podLogs, err := kubectl.Command(client, clusterV1, yamlInput, clusterID, command)
 	require.NoError(t, err)
 	errorLogs := "Unsupported value: \"invalid\": supported values: \"project\", \"cluster\""
 
