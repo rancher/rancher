@@ -3,17 +3,14 @@ package systemimage
 import (
 	"context"
 
-	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/alert"
 	"github.com/rancher/rancher/pkg/types/config"
 )
 
 func Register(ctx context.Context, cluster *config.UserContext) {
-	starter := cluster.DeferredStart(ctx, func(ctx context.Context) error {
+	_ = cluster.DeferredStart(ctx, func(ctx context.Context) error {
 		registerDeferred(ctx, cluster)
 		return nil
 	})
-
-	alert.AddStarter(ctx, cluster, starter)
 }
 
 func registerDeferred(ctx context.Context, cluster *config.UserContext) {
