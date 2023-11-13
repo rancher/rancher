@@ -56,7 +56,7 @@ func (rb *ETCDRbacBackupTestSuite) ValidateEtcdSnapshotCluster(role string) {
 
 	log.Infof("Creating a snapshot of the cluster as %v", role)
 
-	err := etcdsnapshot.CreateSnapshot(rb.standardUserClient, rb.clusterName)
+	err := etcdsnapshot.CreateRKE2K3SSnapshot(rb.standardUserClient, rb.clusterName)
 	switch role {
 	case roleOwner, restrictedAdmin:
 		require.NoError(rb.T(), err)

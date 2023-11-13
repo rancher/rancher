@@ -30,10 +30,11 @@ import (
 )
 
 const (
-	ProvisioningSteveResourceType        = "provisioning.cattle.io.cluster"
+	active                               = "active"
+	baseline                             = "baseline"
 	FleetSteveResourceType               = "fleet.cattle.io.cluster"
 	PodSecurityAdmissionSteveResoureType = "management.cattle.io.podsecurityadmissionconfigurationtemplate"
-	baseline                             = "baseline"
+	ProvisioningSteveResourceType        = "provisioning.cattle.io.cluster"
 
 	etcdRole         = "etcd-role"
 	controlPlaneRole = "control-plane-role"
@@ -211,6 +212,7 @@ func CreateRancherBaselinePSACT(client *rancher.Client, psact string) error {
 
 // NewRKE1lusterConfig is a constructor for a v3.Cluster object, to be used by the rancher.Client.Provisioning client.
 func NewRKE1ClusterConfig(clusterName string, client *rancher.Client, clustersConfig *ClusterConfig) *management.Cluster {
+	backupConfigEnabled := true
 	newConfig := &management.Cluster{
 		DockerRootDir:           "/var/lib/docker",
 		EnableClusterAlerting:   false,
@@ -237,6 +239,17 @@ func NewRKE1ClusterConfig(clusterName string, client *rancher.Client, clustersCo
 				MTU:     0,
 				Options: map[string]string{},
 			},
+			Services: &management.RKEConfigServices{
+				Etcd: &management.ETCDService{
+					BackupConfig: &management.BackupConfig{
+						Enabled:       &backupConfigEnabled,
+						IntervalHours: 12,
+						Retention:     6,
+						SafeTimestamp: true,
+						Timeout:       120,
+					},
+				},
+			},
 			Version: clustersConfig.KubernetesVersion,
 		},
 	}
@@ -260,6 +273,10 @@ func NewRKE1ClusterConfig(clusterName string, client *rancher.Client, clustersCo
 				}
 			}
 		}
+	}
+
+	if clustersConfig.ETCDRKE1 != nil {
+		newConfig.RancherKubernetesEngineConfig.Services.Etcd = clustersConfig.ETCDRKE1
 	}
 
 	if clustersConfig.PSACT != "" {
@@ -286,8 +303,11 @@ func NewK3SRKE2ClusterConfig(clusterName, namespace string, clustersConfig *Clus
 		SnapshotRetention:    5,
 		SnapshotScheduleCron: "0 */5 * * *",
 	}
-	if clustersConfig.Etcd != nil {
-		etcd = clustersConfig.Etcd
+	if clustersConfig.ETCD != nil {
+		etcd = clustersConfig.ETCD
+		if etcd.S3 != nil {
+			etcd.S3.CloudCredentialName = cloudCredentialSecretName
+		}
 	}
 
 	chartValuesMap := rkev1.GenericMap{
@@ -1038,7 +1058,7 @@ func UpdateK3SRKE2Cluster(client *rancher.Client, cluster *v1.SteveAPIObject, up
 			return false, err
 		}
 
-		if clusterResp.ObjectMeta.State.Name == "active" {
+		if clusterResp.ObjectMeta.State.Name == active {
 			proxyClient, err := client.Steve.ProxyDownstream(clusterStatus.ClusterName)
 			if err != nil {
 				return false, err
@@ -1219,7 +1239,7 @@ func WaitForActiveRKE1Cluster(client *rancher.Client, clusterID string) error {
 		if err != nil {
 			return false, err
 		}
-		if clusterResp.State == "active" {
+		if clusterResp.State == active {
 			return true, nil
 		}
 		return false, nil

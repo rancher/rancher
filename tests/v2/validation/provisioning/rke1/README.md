@@ -37,6 +37,21 @@ provisioningInput:
   providers: ["linode", "aws", "do", "harvester"]
   nodeProviders: ["ec2"]
   psact: ""
+  etcdRKE1:
+    backupConfig:
+      enabled: true
+      intervalHours: 12
+      safeTimestamp: true
+      timeout: 120
+      s3BackupConfig:
+        accessKey: ""
+        bucketName: ""
+        endpoint: ""
+        folder: ""
+        region: ""
+        secretKey: ""
+    retention: "72h"
+    snapshot: false
 ```
 
 ## NodeTemplateConfigs
