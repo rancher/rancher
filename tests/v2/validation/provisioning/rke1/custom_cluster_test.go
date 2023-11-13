@@ -97,7 +97,7 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningRKE1CustomCluster()
 
 		provisioningConfig := *c.provisioningConfig
 		provisioningConfig.NodePools = tt.nodePools
-		permutations.RunTestPermutations(&c.Suite, tt.name, tt.client, c.provisioningConfig, permutations.RKE1CustomCluster, nil, nil)
+		permutations.RunTestPermutations(&c.Suite, tt.name, tt.client, &provisioningConfig, permutations.RKE1CustomCluster, nil, nil)
 	}
 }
 
