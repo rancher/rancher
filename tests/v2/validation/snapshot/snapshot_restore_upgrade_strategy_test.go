@@ -41,19 +41,29 @@ func (s *SnapshotRestoreUpgradeStrategyTestSuite) SetupSuite() {
 
 func (s *SnapshotRestoreUpgradeStrategyTestSuite) TestSnapshotRestoreUpgradeStrategy() {
 	snapshotRestoreK8sVersion := &etcdsnapshot.Config{
-		UpgradeKubernetesVersion: s.clustersConfig.UpgradeKubernetesVersion,
-		SnapshotRestore:          "kubernetesVersion",
+		UpgradeKubernetesVersion:     s.clustersConfig.UpgradeKubernetesVersion,
+		SnapshotRestore:              "kubernetesVersion",
+		ControlPlaneConcurrencyValue: "15%",
+		ControlPlaneUnavailableValue: "1",
+		WorkerConcurrencyValue:       "20%",
+		WorkerUnavailableValue:       "10%",
+		RecurringRestores:            1,
 	}
 
 	snapshotRestoreAll := &etcdsnapshot.Config{
-		UpgradeKubernetesVersion: s.clustersConfig.UpgradeKubernetesVersion,
-		SnapshotRestore:          "all",
+		UpgradeKubernetesVersion:     s.clustersConfig.UpgradeKubernetesVersion,
+		SnapshotRestore:              "all",
+		ControlPlaneConcurrencyValue: "15%",
+		ControlPlaneUnavailableValue: "1",
+		WorkerConcurrencyValue:       "20%",
+		WorkerUnavailableValue:       "10%",
+		RecurringRestores:            1,
 	}
 
 	tests := []struct {
-		name        string
-		etcdRestore *etcdsnapshot.Config
-		client      *rancher.Client
+		name         string
+		etcdSnapshot *etcdsnapshot.Config
+		client       *rancher.Client
 	}{
 		{"Restore Kubernetes version and etcd", snapshotRestoreK8sVersion, s.client},
 		{"Restore cluster config, Kubernetes version and etcd", snapshotRestoreAll, s.client},
@@ -61,13 +71,13 @@ func (s *SnapshotRestoreUpgradeStrategyTestSuite) TestSnapshotRestoreUpgradeStra
 
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			snapshotRestore(s.T(), s.client, s.client.RancherConfig.ClusterName, s.clustersConfig, true)
+			snapshotRestore(s.T(), s.client, s.client.RancherConfig.ClusterName, tt.etcdSnapshot)
 		})
 	}
 }
 
 func (s *SnapshotRestoreUpgradeStrategyTestSuite) TestSnapshotRestoreUpgradeStrategyDynamicInput() {
-	snapshotRestore(s.T(), s.client, s.client.RancherConfig.ClusterName, s.clustersConfig, true)
+	snapshotRestore(s.T(), s.client, s.client.RancherConfig.ClusterName, s.clustersConfig)
 }
 
 // In order for 'go test' to run this suite, we need to create
