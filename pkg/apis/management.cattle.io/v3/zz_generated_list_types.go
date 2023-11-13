@@ -213,57 +213,6 @@ func NewCluster(namespace, name string, obj Cluster) *Cluster {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// ClusterAlertList is a list of ClusterAlert resources
-type ClusterAlertList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []ClusterAlert `json:"items"`
-}
-
-func NewClusterAlert(namespace, name string, obj ClusterAlert) *ClusterAlert {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("ClusterAlert").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// ClusterAlertGroupList is a list of ClusterAlertGroup resources
-type ClusterAlertGroupList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []ClusterAlertGroup `json:"items"`
-}
-
-func NewClusterAlertGroup(namespace, name string, obj ClusterAlertGroup) *ClusterAlertGroup {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("ClusterAlertGroup").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// ClusterAlertRuleList is a list of ClusterAlertRule resources
-type ClusterAlertRuleList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []ClusterAlertRule `json:"items"`
-}
-
-func NewClusterAlertRule(namespace, name string, obj ClusterAlertRule) *ClusterAlertRule {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("ClusterAlertRule").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
 // ClusterLoggingList is a list of ClusterLogging resources
 type ClusterLoggingList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -774,23 +723,6 @@ func NewNodeTemplate(namespace, name string, obj NodeTemplate) *NodeTemplate {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// NotifierList is a list of Notifier resources
-type NotifierList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []Notifier `json:"items"`
-}
-
-func NewNotifier(namespace, name string, obj Notifier) *Notifier {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("Notifier").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
 // OIDCProviderList is a list of OIDCProvider resources
 type OIDCProviderList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -920,57 +852,6 @@ type ProjectList struct {
 
 func NewProject(namespace, name string, obj Project) *Project {
 	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("Project").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// ProjectAlertList is a list of ProjectAlert resources
-type ProjectAlertList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []ProjectAlert `json:"items"`
-}
-
-func NewProjectAlert(namespace, name string, obj ProjectAlert) *ProjectAlert {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("ProjectAlert").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// ProjectAlertGroupList is a list of ProjectAlertGroup resources
-type ProjectAlertGroupList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []ProjectAlertGroup `json:"items"`
-}
-
-func NewProjectAlertGroup(namespace, name string, obj ProjectAlertGroup) *ProjectAlertGroup {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("ProjectAlertGroup").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// ProjectAlertRuleList is a list of ProjectAlertRule resources
-type ProjectAlertRuleList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []ProjectAlertRule `json:"items"`
-}
-
-func NewProjectAlertRule(namespace, name string, obj ProjectAlertRule) *ProjectAlertRule {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("ProjectAlertRule").ToAPIVersionAndKind()
 	obj.Name = name
 	obj.Namespace = namespace
 	return &obj

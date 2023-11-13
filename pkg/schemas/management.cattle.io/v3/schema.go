@@ -40,7 +40,6 @@ var (
 		Init(projectNetworkPolicyTypes).
 		Init(globalTypes).
 		Init(rkeTypes).
-		Init(alertTypes).
 		Init(composeType).
 		Init(projectCatalogTypes).
 		Init(clusterCatalogTypes).
@@ -702,60 +701,6 @@ func globalTypes(schema *types.Schemas) *types.Schemas {
 				return f
 			})
 		})
-}
-
-func alertTypes(schema *types.Schemas) *types.Schemas {
-	return schema.
-		AddMapperForType(&Version, v3.Notifier{},
-			&m.Embed{Field: "status"},
-			m.DisplayName{}).
-		MustImport(&Version, v3.ClusterAlert{}).
-		MustImport(&Version, v3.ProjectAlert{}).
-		MustImport(&Version, v3.Notification{}).
-		MustImportAndCustomize(&Version, v3.Notifier{}, func(schema *types.Schema) {
-			schema.CollectionActions = map[string]types.Action{
-				"send": {
-					Input: "notification",
-				},
-			}
-			schema.ResourceActions = map[string]types.Action{
-				"send": {
-					Input: "notification",
-				},
-			}
-		}).
-		MustImport(&Version, v3.AlertStatus{}).
-		AddMapperForType(&Version, v3.ClusterAlertGroup{},
-			&m.Embed{Field: "status"},
-			m.DisplayName{}).
-		AddMapperForType(&Version, v3.ProjectAlertGroup{},
-			&m.Embed{Field: "status"},
-			m.DisplayName{}).
-		AddMapperForType(&Version, v3.ClusterAlertRule{},
-			&m.Embed{Field: "status"},
-			m.DisplayName{}).
-		AddMapperForType(&Version, v3.ProjectAlertRule{},
-			&m.Embed{Field: "status"},
-			m.DisplayName{}).
-		MustImport(&Version, v3.ClusterAlertGroup{}).
-		MustImport(&Version, v3.ProjectAlertGroup{}).
-		MustImportAndCustomize(&Version, v3.ClusterAlertRule{}, func(schema *types.Schema) {
-			schema.ResourceActions = map[string]types.Action{
-				"activate":   {},
-				"deactivate": {},
-				"mute":       {},
-				"unmute":     {},
-			}
-		}).
-		MustImportAndCustomize(&Version, v3.ProjectAlertRule{}, func(schema *types.Schema) {
-			schema.ResourceActions = map[string]types.Action{
-				"activate":   {},
-				"deactivate": {},
-				"mute":       {},
-				"unmute":     {},
-			}
-		})
-
 }
 
 func composeType(schemas *types.Schemas) *types.Schemas {

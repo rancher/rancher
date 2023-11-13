@@ -39,9 +39,6 @@ var (
 	CatalogTemplateVersionResourceName                    = "catalogtemplateversions"
 	CloudCredentialResourceName                           = "cloudcredentials"
 	ClusterResourceName                                   = "clusters"
-	ClusterAlertResourceName                              = "clusteralerts"
-	ClusterAlertGroupResourceName                         = "clusteralertgroups"
-	ClusterAlertRuleResourceName                          = "clusteralertrules"
 	ClusterCatalogResourceName                            = "clustercatalogs"
 	ClusterLoggingResourceName                            = "clusterloggings"
 	ClusterMonitorGraphResourceName                       = "clustermonitorgraphs"
@@ -73,7 +70,6 @@ var (
 	NodeDriverResourceName                                = "nodedrivers"
 	NodePoolResourceName                                  = "nodepools"
 	NodeTemplateResourceName                              = "nodetemplates"
-	NotifierResourceName                                  = "notifiers"
 	OIDCProviderResourceName                              = "oidcproviders"
 	OpenLdapProviderResourceName                          = "openldapproviders"
 	PodSecurityAdmissionConfigurationTemplateResourceName = "podsecurityadmissionconfigurationtemplates"
@@ -82,9 +78,6 @@ var (
 	PreferenceResourceName                                = "preferences"
 	PrincipalResourceName                                 = "principals"
 	ProjectResourceName                                   = "projects"
-	ProjectAlertResourceName                              = "projectalerts"
-	ProjectAlertGroupResourceName                         = "projectalertgroups"
-	ProjectAlertRuleResourceName                          = "projectalertrules"
 	ProjectCatalogResourceName                            = "projectcatalogs"
 	ProjectLoggingResourceName                            = "projectloggings"
 	ProjectMonitorGraphResourceName                       = "projectmonitorgraphs"
@@ -149,12 +142,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&CloudCredentialList{},
 		&Cluster{},
 		&ClusterList{},
-		&ClusterAlert{},
-		&ClusterAlertList{},
-		&ClusterAlertGroup{},
-		&ClusterAlertGroupList{},
-		&ClusterAlertRule{},
-		&ClusterAlertRuleList{},
 		&ClusterCatalog{},
 		&ClusterCatalogList{},
 		&ClusterLogging{},
@@ -217,8 +204,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&NodePoolList{},
 		&NodeTemplate{},
 		&NodeTemplateList{},
-		&Notifier{},
-		&NotifierList{},
 		&OIDCProvider{},
 		&OIDCProviderList{},
 		&OpenLdapProvider{},
@@ -235,12 +220,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&PrincipalList{},
 		&Project{},
 		&ProjectList{},
-		&ProjectAlert{},
-		&ProjectAlertList{},
-		&ProjectAlertGroup{},
-		&ProjectAlertGroupList{},
-		&ProjectAlertRule{},
-		&ProjectAlertRuleList{},
 		&ProjectCatalog{},
 		&ProjectCatalogList{},
 		&ProjectLogging{},
