@@ -42,9 +42,6 @@ type Interface interface {
 	CatalogTemplateVersion() CatalogTemplateVersionController
 	CloudCredential() CloudCredentialController
 	Cluster() ClusterController
-	ClusterAlert() ClusterAlertController
-	ClusterAlertGroup() ClusterAlertGroupController
-	ClusterAlertRule() ClusterAlertRuleController
 	ClusterCatalog() ClusterCatalogController
 	ClusterLogging() ClusterLoggingController
 	ClusterMonitorGraph() ClusterMonitorGraphController
@@ -76,7 +73,6 @@ type Interface interface {
 	NodeDriver() NodeDriverController
 	NodePool() NodePoolController
 	NodeTemplate() NodeTemplateController
-	Notifier() NotifierController
 	OIDCProvider() OIDCProviderController
 	OpenLdapProvider() OpenLdapProviderController
 	PodSecurityAdmissionConfigurationTemplate() PodSecurityAdmissionConfigurationTemplateController
@@ -85,9 +81,6 @@ type Interface interface {
 	Preference() PreferenceController
 	Principal() PrincipalController
 	Project() ProjectController
-	ProjectAlert() ProjectAlertController
-	ProjectAlertGroup() ProjectAlertGroupController
-	ProjectAlertRule() ProjectAlertRuleController
 	ProjectCatalog() ProjectCatalogController
 	ProjectLogging() ProjectLoggingController
 	ProjectMonitorGraph() ProjectMonitorGraphController
@@ -161,18 +154,6 @@ func (v *version) CloudCredential() CloudCredentialController {
 
 func (v *version) Cluster() ClusterController {
 	return generic.NewNonNamespacedController[*v3.Cluster, *v3.ClusterList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "Cluster"}, "clusters", v.controllerFactory)
-}
-
-func (v *version) ClusterAlert() ClusterAlertController {
-	return generic.NewController[*v3.ClusterAlert, *v3.ClusterAlertList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ClusterAlert"}, "clusteralerts", true, v.controllerFactory)
-}
-
-func (v *version) ClusterAlertGroup() ClusterAlertGroupController {
-	return generic.NewController[*v3.ClusterAlertGroup, *v3.ClusterAlertGroupList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ClusterAlertGroup"}, "clusteralertgroups", true, v.controllerFactory)
-}
-
-func (v *version) ClusterAlertRule() ClusterAlertRuleController {
-	return generic.NewController[*v3.ClusterAlertRule, *v3.ClusterAlertRuleList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ClusterAlertRule"}, "clusteralertrules", true, v.controllerFactory)
 }
 
 func (v *version) ClusterCatalog() ClusterCatalogController {
@@ -299,10 +280,6 @@ func (v *version) NodeTemplate() NodeTemplateController {
 	return generic.NewController[*v3.NodeTemplate, *v3.NodeTemplateList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "NodeTemplate"}, "nodetemplates", true, v.controllerFactory)
 }
 
-func (v *version) Notifier() NotifierController {
-	return generic.NewController[*v3.Notifier, *v3.NotifierList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "Notifier"}, "notifiers", true, v.controllerFactory)
-}
-
 func (v *version) OIDCProvider() OIDCProviderController {
 	return generic.NewNonNamespacedController[*v3.OIDCProvider, *v3.OIDCProviderList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "OIDCProvider"}, "oidcproviders", v.controllerFactory)
 }
@@ -333,18 +310,6 @@ func (v *version) Principal() PrincipalController {
 
 func (v *version) Project() ProjectController {
 	return generic.NewController[*v3.Project, *v3.ProjectList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "Project"}, "projects", true, v.controllerFactory)
-}
-
-func (v *version) ProjectAlert() ProjectAlertController {
-	return generic.NewController[*v3.ProjectAlert, *v3.ProjectAlertList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ProjectAlert"}, "projectalerts", true, v.controllerFactory)
-}
-
-func (v *version) ProjectAlertGroup() ProjectAlertGroupController {
-	return generic.NewController[*v3.ProjectAlertGroup, *v3.ProjectAlertGroupList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ProjectAlertGroup"}, "projectalertgroups", true, v.controllerFactory)
-}
-
-func (v *version) ProjectAlertRule() ProjectAlertRuleController {
-	return generic.NewController[*v3.ProjectAlertRule, *v3.ProjectAlertRuleList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ProjectAlertRule"}, "projectalertrules", true, v.controllerFactory)
 }
 
 func (v *version) ProjectCatalog() ProjectCatalogController {
