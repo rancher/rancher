@@ -99,10 +99,6 @@ func init() {
 	// unstructured object and allow the missing fields to be included.
 	Scheme.ExcludeGVK(management.SchemeGroupVersion.WithKind("ClusterList"))
 	Scheme.ExcludeGVK(management.SchemeGroupVersion.WithKind("NodeTemplateList"))
-	Scheme.ExcludeGVK(management.SchemeGroupVersion.WithKind("ClusterAlertRuleList"))
-	Scheme.ExcludeGVK(management.SchemeGroupVersion.WithKind("ClusterAlertGroupList"))
-	Scheme.ExcludeGVK(management.SchemeGroupVersion.WithKind("ProjectAlertRuleList"))
-	Scheme.ExcludeGVK(management.SchemeGroupVersion.WithKind("ProjectAlertGroupList"))
 	Scheme.ExcludeGVK(management.SchemeGroupVersion.WithKind("ClusterMonitorGraphList"))
 	Scheme.ExcludeGVK(management.SchemeGroupVersion.WithKind("ProjectMonitorGraphList"))
 

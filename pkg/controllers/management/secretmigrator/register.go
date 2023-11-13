@@ -21,8 +21,6 @@ type handler struct {
 	clusters                 v3.ClusterInterface
 	provisioningClusters     provv1.ClusterController
 	clusterTemplateRevisions v3.ClusterTemplateRevisionInterface
-	notifierLister           v3.NotifierLister
-	notifiers                v3.NotifierInterface
 	catalogLister            v3.CatalogLister
 	catalogs                 v3.CatalogInterface
 	clusterCatalogLister     v3.ClusterCatalogLister
@@ -56,8 +54,6 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 		clusters:                 management.Management.Clusters(""),
 		provisioningClusters:     management.Wrangler.Provisioning.Cluster(),
 		clusterTemplateRevisions: management.Management.ClusterTemplateRevisions(""),
-		notifierLister:           management.Management.Notifiers("").Controller().Lister(),
-		notifiers:                management.Management.Notifiers(""),
 		catalogLister:            management.Management.Catalogs("").Controller().Lister(),
 		catalogs:                 management.Management.Catalogs(""),
 		clusterCatalogLister:     management.Management.ClusterCatalogs("").Controller().Lister(),

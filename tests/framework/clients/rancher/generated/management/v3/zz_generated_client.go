@@ -42,13 +42,6 @@ type Client struct {
 	ProjectLogging                          ProjectLoggingOperations
 	Setting                                 SettingOperations
 	Feature                                 FeatureOperations
-	ClusterAlert                            ClusterAlertOperations
-	ProjectAlert                            ProjectAlertOperations
-	Notifier                                NotifierOperations
-	ClusterAlertGroup                       ClusterAlertGroupOperations
-	ProjectAlertGroup                       ProjectAlertGroupOperations
-	ClusterAlertRule                        ClusterAlertRuleOperations
-	ProjectAlertRule                        ProjectAlertRuleOperations
 	ComposeConfig                           ComposeConfigOperations
 	ProjectCatalog                          ProjectCatalogOperations
 	ClusterCatalog                          ClusterCatalogOperations
@@ -117,13 +110,6 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 	client.ProjectLogging = newProjectLoggingClient(client)
 	client.Setting = newSettingClient(client)
 	client.Feature = newFeatureClient(client)
-	client.ClusterAlert = newClusterAlertClient(client)
-	client.ProjectAlert = newProjectAlertClient(client)
-	client.Notifier = newNotifierClient(client)
-	client.ClusterAlertGroup = newClusterAlertGroupClient(client)
-	client.ProjectAlertGroup = newProjectAlertGroupClient(client)
-	client.ClusterAlertRule = newClusterAlertRuleClient(client)
-	client.ProjectAlertRule = newProjectAlertRuleClient(client)
 	client.ComposeConfig = newComposeConfigClient(client)
 	client.ProjectCatalog = newProjectCatalogClient(client)
 	client.ClusterCatalog = newClusterCatalogClient(client)
