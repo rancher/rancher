@@ -43,25 +43,26 @@ func (s *SnapshotRestoreTestSuite) TestSnapshotRestoreETCDOnly() {
 	snapshotRestoreNone := &etcdsnapshot.Config{
 		UpgradeKubernetesVersion: "",
 		SnapshotRestore:          "none",
+		RecurringRestores:        1,
 	}
 
 	tests := []struct {
-		name        string
-		etcdRestore *etcdsnapshot.Config
-		client      *rancher.Client
+		name         string
+		etcdSnapshot *etcdsnapshot.Config
+		client       *rancher.Client
 	}{
 		{"Restore etcd only", snapshotRestoreNone, s.client},
 	}
 
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			snapshotRestore(s.T(), s.client, s.client.RancherConfig.ClusterName, tt.etcdRestore, false)
+			snapshotRestore(s.T(), s.client, s.client.RancherConfig.ClusterName, tt.etcdSnapshot)
 		})
 	}
 }
 
 func (s *SnapshotRestoreTestSuite) TestSnapshotRestoreETCDOnlyDynamicInput() {
-	snapshotRestore(s.T(), s.client, s.client.RancherConfig.ClusterName, s.clustersConfig, false)
+	snapshotRestore(s.T(), s.client, s.client.RancherConfig.ClusterName, s.clustersConfig)
 }
 
 // In order for 'go test' to run this suite, we need to create
