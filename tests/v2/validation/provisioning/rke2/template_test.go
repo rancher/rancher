@@ -86,7 +86,7 @@ func (r *ClusterTemplateTestSuite) TestProvisionClusterTemplate() {
 		log.Info(err)
 	}
 	time.Sleep(5 * time.Second)
-	err = mycomponent.Revert(true, 30, false)
+	//err = mycomponent.Revert(true, 30, false)
 	if err != nil {
 		log.Info(err)
 	}

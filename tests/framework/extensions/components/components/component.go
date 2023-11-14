@@ -1,8 +1,13 @@
 package components
 
 import (
+	"context"
+	"time"
+
+	"github.com/rancher/machine/libmachine/log"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 type Component interface {
@@ -24,6 +29,24 @@ func (gc *GenericCreate) Apply(poll bool, poll_interval int, async bool) (err er
 			return err
 		}
 		gc.objs = append(gc.objs, *resp)
+
+		waiting := false
+		waitErr := wait.PollUntilContextTimeout(context.TODO(), 500*time.Millisecond, 30*time.Minute, true, func(ctx context.Context) (done bool, err error) {
+			if resp.State.Name == "active" {
+				log.Info("%v is active")
+				return true, nil
+			}
+
+			if !waiting {
+				log.Info("waiting")
+				waiting = true
+			}
+
+			return false, nil
+		})
+		if waitErr != nil {
+			log.Info("%+v ")
+		}
 	}
 	return nil
 }
