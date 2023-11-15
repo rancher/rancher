@@ -28,6 +28,7 @@ import (
 
 const (
 	projectIDLabel             = "field.cattle.io/projectId"
+	projectScopedLabel         = "cattle.io/project-scoped"
 	create                     = "create"
 	update                     = "update"
 	projectNamespaceAnnotation = "management.cattle.io/system-namespace"
@@ -108,8 +109,8 @@ func registerDeferred(ctx context.Context, cluster *config.UserContext) {
 		}
 
 		if obj.Labels != nil {
-			if obj.Labels["cattle.io/creator"] == "norman" {
-				logrus.Tracef("secretsController: AddHandler: obj [%s] labels in [%s] contain cattle.io/creator=norman, calling sync", obj.Name, cluster.ClusterName)
+			if obj.Labels["cattle.io/creator"] == "norman" || obj.Labels[projectScopedLabel] == "original" {
+				logrus.Tracef("secretsController: AddHandler: obj [%s] in cluster [%s] has a label for a project-scoped secret, calling sync", obj.Name, cluster.ClusterName)
 				return sync(key, obj)
 			}
 		}
@@ -299,6 +300,8 @@ func getNamespacedSecret(obj *corev1.Secret, namespace string) *corev1.Secret {
 	copyMap(namespacedSecret.Annotations, obj.Annotations)
 	copyMap(namespacedSecret.Labels, obj.Labels)
 	namespacedSecret.Annotations[userSecretAnnotation] = "true"
+	namespacedSecret.Labels[projectScopedLabel] = "copy"
+	delete(namespacedSecret.Labels, "cattle.io/creator")
 	return namespacedSecret
 }
 
