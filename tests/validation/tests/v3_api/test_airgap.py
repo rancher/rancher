@@ -550,12 +550,7 @@ def optionally_add_cluster_to_rancher(bastion_node, ag_nodes, prep="none"):
 
 def deploy_airgap_rancher(bastion_node):
     ag_node = prepare_airgap_node(bastion_node, 1)[0]
-    if "v2.5" in RANCHER_SERVER_VERSION or \
-            "v2.6" in RANCHER_SERVER_VERSION or \
-            "master" in RANCHER_SERVER_VERSION:
-        privileged = "--privileged"
-    else:
-        privileged = ""
+    privileged = "--privileged"
     if RANCHER_HA_CERT_OPTION == 'byo-valid':
         write_cert_command = "cat <<EOT >> fullchain.pem\n{}\nEOT".format(
             base64.b64decode(RANCHER_VALID_TLS_CERT).decode("utf-8"))
