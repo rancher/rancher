@@ -153,7 +153,8 @@ func (d *OpenLdapTest) TestOpenLdapAPI() {
 	resp, err = d.DisableOpenLDAP(url, token)
 	require.NoError(d.T(), err)
 
-	time.Sleep(1 * time.Second) //waiting for server to be ready
+	time.Sleep(1
+		 * time.Second) //waiting for server to be ready
 
 	//try login again - this one should fail
 	resp, err = d.LoginOpenLDAP(host, token, []byte(resp.Body))
