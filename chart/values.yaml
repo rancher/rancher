@@ -60,6 +60,9 @@ ingress:
   includeDefaultExtraAnnotations: true
   extraAnnotations: {}
   ingressClassName: ""
+  # Some classes might work better when changed to 'Prefix'
+  pathType: ImplementationSpecific
+  path: "/"
   # backend port number
   servicePort: 80
 
