@@ -107,7 +107,7 @@ func InitializeSamlServiceProvider(configToSet *v32.SamlConfig, name string) err
 	if configToSet.SpCert != "" {
 		block, _ := pem.Decode([]byte(configToSet.SpCert))
 		if block == nil {
-			return fmt.Errorf("SAML: failed to parse PEM block containing the private key")
+			return fmt.Errorf("SAML: failed to parse PEM block containing the certificate")
 		}
 
 		cert, err = x509.ParseCertificate(block.Bytes)
