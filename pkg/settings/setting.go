@@ -116,8 +116,6 @@ var (
 	SystemCatalog                       = NewSetting("system-catalog", "external") // Options are 'external' or 'bundled'
 	ChartDefaultBranch                  = NewSetting("chart-default-branch", "dev-v2.9")
 	SystemManagedChartsOperationTimeout = NewSetting("system-managed-charts-operation-timeout", "300s")
-	PartnerChartDefaultBranch           = NewSetting("partner-chart-default-branch", "main")
-	RKE2ChartDefaultBranch              = NewSetting("rke2-chart-default-branch", "main")
 	FleetDefaultWorkspaceName           = NewSetting("fleet-default-workspace-name", fleetconst.ClustersDefaultNamespace) // fleetWorkspaceName to assign to clusters with none
 	ShellImage                          = NewSetting("shell-image", buildconfig.DefaultShellVersion)
 	IgnoreNodeName                      = NewSetting("ignore-node-name", "") // nodes to ignore when syncing v1.node to v3.node
@@ -181,12 +179,18 @@ var (
 	// If set to false the kubeconfig will contain a command to login to Rancher.
 	KubeconfigGenerateToken = NewSetting("kubeconfig-generate-token", "true")
 
+	// PartnerChartDefaultBranch represents the default branch for the partner charts repo.
+	PartnerChartDefaultBranch = NewSetting("partner-chart-default-branch", "main")
+
 	// PartnerChartDefaultURL represents the default URL for the partner charts repo. It should only be set for test
 	// or debug purposes.
 	PartnerChartDefaultURL = NewSetting("partner-chart-default-url", "https://git.rancher.io/")
 
 	// RancherWebhookVersion is the exact version of the webhook that Rancher will install.
 	RancherWebhookVersion = NewSetting("rancher-webhook-version", "")
+
+	// RKE2ChartDefaultBranch represents the default branch for the RKE2 charts repo.
+	RKE2ChartDefaultBranch = NewSetting("rke2-chart-default-branch", "main")
 
 	// RKE2ChartDefaultURL represents the default URL for the RKE2 charts repo. It should only be set for test or
 	// debug purposes.
