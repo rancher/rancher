@@ -30,6 +30,7 @@ type ClusterConfig struct {
 	UpgradeStrategy      *rkev1.ClusterUpgradeStrategy            `json:"upgradeStrategy" yaml:"upgradeStrategy"`
 	Advanced             *provisioningInput.Advanced              `json:"advanced" yaml:"advanced"`
 	ClusterSSHTests      []provisioningInput.SSHTestCase          `json:"clusterSSHTests" yaml:"clusterSSHTests"`
+	CRIDockerd           bool                                     `json:"criDockerd" yaml:"criDockerd"`
 }
 
 // ConvertConfigToClusterConfig converts the config from (user) provisioning input to a cluster config

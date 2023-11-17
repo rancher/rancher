@@ -6,6 +6,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"testing"
+	"time"
+
 	rv1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
@@ -19,7 +23,6 @@ import (
 	"github.com/stretchr/testify/suite"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/repo"
-	"io"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,8 +30,6 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/kubernetes"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
-	"testing"
-	"time"
 )
 
 var propagation = metav1.DeletePropagationForeground
@@ -130,7 +131,7 @@ func (w *RancherManagedChartsTest) TestInstallChartLatestVersion() {
 	w.Require().NoError(w.updateManagementCluster())
 	app, _, err := w.waitForAksChart(rv1.StatusDeployed, "rancher-aks-operator", 0)
 	w.Require().NoError(err)
-	latest, err := w.catalogClient.GetLatestChartVersion("rancher-aks-operator")
+	latest, err := w.catalogClient.GetLatestChartVersion("rancher-aks-operator", catalog.RancherChartRepo)
 	w.Require().NoError(err)
 	w.Assert().Equal(app.Spec.Chart.Metadata.Version, latest)
 }

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
+	"github.com/rancher/rancher/tests/framework/clients/rancher/catalog"
 	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
 	"github.com/rancher/rancher/tests/framework/extensions/charts"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
@@ -259,7 +260,7 @@ func (u *UpgradeWorkloadTestSuite) testPreUpgradeSingleCluster(clusterName strin
 		if !loggingChart.IsAlreadyInstalled {
 			clusterName, err := clusters.GetClusterNameByID(client, project.ClusterID)
 			require.NoError(u.T(), err)
-			latestLoggingVersion, err := client.Catalog.GetLatestChartVersion(charts.RancherLoggingName)
+			latestLoggingVersion, err := client.Catalog.GetLatestChartVersion(charts.RancherLoggingName, catalog.RancherChartRepo)
 			require.NoError(u.T(), err)
 
 			loggingChartInstallOption := &charts.InstallOptions{
