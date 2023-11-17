@@ -12,16 +12,24 @@ env:
   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
-  check-deps-and-tags:
+  pre-check-pr:
     runs-on: ubuntu-latest
     steps:
-      - name: validate pr title
+      - id: check-step-id 
+        name: validate pr title
         run: |
           PR_TITLE="${{ github.event.pull_request.title || '' }}"
           if [[ ! "$PR_TITLE" == *"PR FOR FINAL RC"* ]]; then
             echo "skipping..."
-            exit 0
-          fi       
+            echo "::set-output name=is-final-rc::true"
+          fi
+          echo "::set-output name=is-final-rc::false"   
+
+  check-deps-and-tags:
+    runs-on: ubuntu-latest
+    needs: validate-pr-title
+    if: needs.validate-pr-title.outputs.is-final-rc == 'true'
+    steps:
       -
         uses: actions/checkout@v4
         if: success() 
