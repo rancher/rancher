@@ -12,10 +12,10 @@ env:
   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
-  pre-check-pr:
+  validate-pr-title:
     runs-on: ubuntu-latest
     steps:
-      - id: check-step-id 
+      -  
         name: validate pr title
         run: |
           PR_TITLE="${{ github.event.pull_request.title || '' }}"
