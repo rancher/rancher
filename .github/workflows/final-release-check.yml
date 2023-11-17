@@ -14,8 +14,11 @@ env:
 jobs:
   validate-pr-title:
     runs-on: ubuntu-latest
+    outputs:
+      is-final-rc: ${{ steps.validate-pr-title-id.outputs.is-final-rc }}
     steps:
-      -  
+      - 
+        id: validate-pr-title-id
         name: validate pr title
         run: |
           PR_TITLE="${{ github.event.pull_request.title || '' }}"
@@ -32,7 +35,6 @@ jobs:
     steps:
       -
         uses: actions/checkout@v4
-        if: success() 
         with:
           fetch-depth: 0
           ref: ${{ env.GITHUB_SHA }}
