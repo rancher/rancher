@@ -21,9 +21,9 @@ jobs:
           PR_TITLE="${{ github.event.pull_request.title || '' }}"
           if [[ ! "$PR_TITLE" == *"PR FOR FINAL RC"* ]]; then
             echo "skipping..."
-            echo "::set-output name=is-final-rc::true"
+            echo "is-final-rc=true" >> $GITHUB_OUTPUT
           fi
-          echo "::set-output name=is-final-rc::false"   
+          echo "is-final-rc=false" >> $GITHUB_OUTPUT
 
   check-deps-and-tags:
     runs-on: ubuntu-latest
