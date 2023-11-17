@@ -57,12 +57,12 @@ func addRepos(ctx context.Context, wrangler *wrangler.Context) error {
 	if err := addRepo(wrangler, "rancher-charts", settings.ChartDefaultURL.Get(), settings.ChartDefaultBranch.Get()); err != nil {
 		return err
 	}
-	if err := addRepo(wrangler, "rancher-partner-charts", defaultURL, settings.PartnerChartDefaultBranch.Get()); err != nil {
+	if err := addRepo(wrangler, "rancher-partner-charts", settings.PartnerChartDefaultURL.Get(), settings.PartnerChartDefaultBranch.Get()); err != nil {
 		return err
 	}
 
 	if features.RKE2.Enabled() {
-		if err := addRepo(wrangler, "rancher-rke2-charts", defaultURL, settings.RKE2ChartDefaultBranch.Get()); err != nil {
+		if err := addRepo(wrangler, "rancher-rke2-charts", setings.RKE2ChartDefaultURL.Get(), settings.RKE2ChartDefaultBranch.Get()); err != nil {
 			return err
 		}
 	}

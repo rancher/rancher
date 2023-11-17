@@ -181,8 +181,16 @@ var (
 	// If set to false the kubeconfig will contain a command to login to Rancher.
 	KubeconfigGenerateToken = NewSetting("kubeconfig-generate-token", "true")
 
+	// PartnerChartDefaultURL represents the default URL for the partner charts repo. It should only be set for test
+	// or debug purposes.
+	PartnerChartDefaultURL = NewSetting("partner-chart-default-url", "https://git.rancher.io/")
+
 	// RancherWebhookVersion is the exact version of the webhook that Rancher will install.
 	RancherWebhookVersion = NewSetting("rancher-webhook-version", "")
+
+	// RKE2ChartDefaultURL represents the default URL for the RKE2 charts repo. It should only be set for test or
+	// debug purposes.
+	RKE2ChartDefaultURL = NewSetting("rke2-chart-default-url", "https://git.rancher.io/")
 
 	// SystemDefaultRegistry is the default contrainer registry used for images.
 	// The environmental variable "CATTLE_BASE_REGISTRY" controls the default value of this setting.
