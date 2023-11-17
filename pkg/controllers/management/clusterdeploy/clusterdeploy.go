@@ -129,8 +129,8 @@ func (cd *clusterDeploy) doSync(cluster *apimgmtv3.Cluster) error {
 
 	// Skip further work if clusterconnected controller has determined agent not connected
 	if apimgmtv3.ClusterConditionReady.IsFalse(cluster) && apimgmtv3.ClusterConditionReady.GetReason(cluster) == "Disconnected" {
-		logrus.Tracef("clusterDeploy: doSync: cluster [%s] is not connected", cluster.Name)
-		return nil
+		logrus.Tracef("clusterDeploy: doSync: cluster [%s] agent is not connected", cluster.Name)
+		return errors.New("cluster agent not connected")
 	}
 
 	nodes, err := cd.nodeLister.List(cluster.Name, labels.Everything())
