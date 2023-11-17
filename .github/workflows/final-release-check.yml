@@ -21,9 +21,10 @@ jobs:
           if [[ ! "$PR_TITLE" == *"PR FOR FINAL RC"* ]]; then
             echo "skipping..."
             exit 0
-          fi
+          fi       
       -
         uses: actions/checkout@v4
+        if: success() 
         with:
           fetch-depth: 0
           ref: ${{ env.GITHUB_SHA }}
