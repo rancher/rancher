@@ -8,6 +8,9 @@ on:
       - edited
       - synchronize
 
+env:
+  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
 jobs:
   check-deps-and-tags:
     runs-on: ubuntu-latest
