@@ -1,0 +1,35 @@
+name: Final release actions
+
+on:
+  workflow_dispatch:
+  pull_request:
+      types:
+      - opened
+      - edited
+      - synchronize
+
+jobs:
+  check-deps-and-tags:
+    runs-on: ubuntu-latest
+    steps:
+      -
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ env.GITHUB_SHA }}
+      - name: setup ecm-distro-tools
+        uses: johnatasr/ecm-distro-tools@v0.25.2
+        with:
+          version: v0.25.2
+      - name: check final rcs and dev dependencies
+        run: |
+          PR_TITLE="${{ github.event.pull_request.title || '' }}"
+          if [[ ! "$PR_TITLE" == *"PR FOR FINAL RC"* ]]; then
+            echo "skipping..."
+            exit 0
+          fi
+          FILES=Dockerfile.dapper,go.mod,/package/Dockerfile,/pkg/apis/go.mod,/pkg/settings/setting.go,/scripts/package-env
+          HASH_COMMIT=${{ env.GITHUB_SHA }}
+          OS=$(uname -s)
+          AR=$(uname -m)
+          rancher_release-${OS,,}-${AR} check-rancher-rc-deps -c ${HASH_COMMIT} -f S{FILES}
