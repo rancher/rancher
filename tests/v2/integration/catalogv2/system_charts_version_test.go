@@ -67,7 +67,7 @@ func (w *SystemChartsVersionSuite) SetupSuite() {
 	w.restClientGetter, err = kubeconfig.NewRestGetter(restConfig, *kubeConfig)
 	require.NoError(w.T(), err)
 
-	w.latestWebhookVersion, err = w.catalogClient.GetLatestChartVersion(rancherWebhook)
+	w.latestWebhookVersion, err = w.catalogClient.GetLatestChartVersion(rancherWebhook, catalog.RancherChartRepo)
 	require.NoError(w.T(), err)
 
 	require.NoError(w.T(), w.updateSetting("rancher-webhook-version", w.latestWebhookVersion))
@@ -200,7 +200,7 @@ func (w *SystemChartsVersionSuite) TestInstallFleet() {
 	})
 	w.Require().NoError(err)
 
-	latest, err := w.catalogClient.GetLatestChartVersion("fleet")
+	latest, err := w.catalogClient.GetLatestChartVersion("fleet", catalog.RancherChartRepo)
 	w.Require().NoError(err)
 
 	// Ensure Rancher deployed the latest version when the minimum version is below the latest.

@@ -11,6 +11,7 @@ import (
 
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
+	"github.com/rancher/rancher/tests/framework/clients/rancher/catalog"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
 	"github.com/rancher/rancher/tests/framework/extensions/charts"
@@ -72,7 +73,7 @@ func (m *MonitoringTestSuite) SetupSuite() {
 	prometheusTargetsPath = fmt.Sprintf("k8s/clusters/%s/%s", clusterID, prometheusTargetsPath)
 
 	// Get latest versions of the monitoring chart
-	latestMonitoringVersion, err := client.Catalog.GetLatestChartVersion(charts.RancherMonitoringName)
+	latestMonitoringVersion, err := client.Catalog.GetLatestChartVersion(charts.RancherMonitoringName, catalog.RancherChartRepo)
 	require.NoError(m.T(), err)
 
 	// Get project system projectId
@@ -261,7 +262,7 @@ func (m *MonitoringTestSuite) TestUpgradeMonitoringChart() {
 	require.NoError(m.T(), err)
 
 	// Change monitoring install option version to previous version of the latest version
-	versionsList, err := client.Catalog.GetListChartVersions(charts.RancherMonitoringName)
+	versionsList, err := client.Catalog.GetListChartVersions(charts.RancherMonitoringName, catalog.RancherChartRepo)
 	require.NoError(m.T(), err)
 	require.Greaterf(m.T(), len(versionsList), 1, "There should be at least 2 versions of the monitoring chart")
 	versionLatest := versionsList[0]
@@ -297,7 +298,7 @@ func (m *MonitoringTestSuite) TestUpgradeMonitoringChart() {
 	chartVersionPreUpgrade := monitoringChartPreUpgrade.ChartDetails.Spec.Chart.Metadata.Version
 	assert.Contains(m.T(), versionsList[1:], chartVersionPreUpgrade)
 
-	m.chartInstallOptions.Version, err = client.Catalog.GetLatestChartVersion(charts.RancherMonitoringName)
+	m.chartInstallOptions.Version, err = client.Catalog.GetLatestChartVersion(charts.RancherMonitoringName, catalog.RancherChartRepo)
 	require.NoError(m.T(), err)
 
 	m.T().Log("Upgrading monitoring chart with the latest version")

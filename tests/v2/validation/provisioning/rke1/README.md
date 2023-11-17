@@ -37,6 +37,7 @@ provisioningInput:
   providers: ["linode", "aws", "do", "harvester"]
   nodeProviders: ["ec2"]
   psact: ""
+  criDockerd: false
   etcdRKE1:
     backupConfig:
       enabled: true

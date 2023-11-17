@@ -7,6 +7,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/steve/catalog/types"
 	catalogv1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
+	"github.com/rancher/rancher/tests/framework/clients/rancher/catalog"
 	"github.com/rancher/rancher/tests/framework/extensions/defaults"
 	kubenamespaces "github.com/rancher/rancher/tests/framework/extensions/kubeapi/namespaces"
 	"github.com/rancher/rancher/tests/framework/extensions/namespaces"
@@ -158,7 +159,7 @@ func InstallRancherGatekeeperChart(client *rancher.Client, installOptions *Insta
 		})
 	})
 
-	err = catalogClient.InstallChart(chartInstallAction)
+	err = catalogClient.InstallChart(chartInstallAction, catalog.RancherChartRepo)
 	if err != nil {
 		return err
 	}
@@ -189,8 +190,8 @@ func InstallRancherGatekeeperChart(client *rancher.Client, installOptions *Insta
 
 // newGatekeeperChartInstallAction is a helper function that returns an array of newChartInstallActions for installing the gatekeeper and gatekeepr-crd charts
 func newGatekeeperChartInstallAction(p *payloadOpts) *types.ChartInstallAction {
-	chartInstall := newChartInstall(p.Name, p.InstallOptions.Version, p.InstallOptions.ClusterID, p.InstallOptions.ClusterName, p.Host, p.DefaultRegistry, nil)
-	chartInstallCRD := newChartInstall(p.Name+"-crd", p.InstallOptions.Version, p.InstallOptions.ClusterID, p.InstallOptions.ClusterName, p.Host, p.DefaultRegistry, nil)
+	chartInstall := newChartInstall(p.Name, p.InstallOptions.Version, p.InstallOptions.ClusterID, p.InstallOptions.ClusterName, p.Host, rancherChartsName, p.ProjectID, p.DefaultRegistry, nil)
+	chartInstallCRD := newChartInstall(p.Name+"-crd", p.InstallOptions.Version, p.InstallOptions.ClusterID, p.InstallOptions.ClusterName, p.Host, rancherChartsName, p.ProjectID, p.DefaultRegistry, nil)
 
 	chartInstalls := []types.ChartInstall{*chartInstallCRD, *chartInstall}
 
@@ -226,7 +227,7 @@ func UpgradeRancherGatekeeperChart(client *rancher.Client, installOptions *Insta
 		return err
 	}
 
-	err = catalogClient.UpgradeChart(chartUpgradeAction)
+	err = catalogClient.UpgradeChart(chartUpgradeAction, catalog.RancherChartRepo)
 	if err != nil {
 		return err
 	}
