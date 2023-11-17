@@ -1,0 +1,55 @@
+name: Set KDM Branch References
+on:
+  workflow_dispatch:
+    inputs:
+      baseBranch:
+        description: "Rancher base branch"
+        required: true
+        type: string
+      newKdmBranch:
+        description: "New KDM branch"
+        required: true
+        type: string
+      createPR:
+        description: "Create PR"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  set-kdm-branch-references:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: setup ecm-distro-tools
+        uses: rancher/ecm-distro-tools@v0.26.0
+        with:
+          version: v0.26.0
+      - name: set kdm branch references
+        run: |
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+
+          CREATE_PR=0
+          if [ "${{ inputs.createPR }}" = "true" ]; then
+            CREATE_PR=1
+          fi
+
+          args=()
+          args+=( "--fork-path" )
+          args+=( "${GITHUB_WORKSPACE}" )
+          args+=( "--base-branch" )
+          args+=( "${{ inputs.baseBranch }}" )
+          args+=( "--new-kdm-branch" )
+          args+=( "${{ inputs.newKdmBranch }}" )
+          (( CREATE_PR == 1 )) && args+=( '--create-pr' )
+          rancher_release set-kdm-branch-refs "${args[@]}"
