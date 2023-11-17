@@ -25,6 +25,7 @@ jobs:
           if [[ "$PR_TITLE" == *"PR FOR FINAL RC"* ]]; then
             echo "skipping..."
             echo "is-final-rc=true" >> $GITHUB_OUTPUT
+            exit 0
           fi
           echo "is-final-rc=false" >> $GITHUB_OUTPUT
 
