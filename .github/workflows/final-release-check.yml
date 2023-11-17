@@ -22,7 +22,7 @@ jobs:
         name: validate pr title
         run: |
           PR_TITLE="${{ github.event.pull_request.title || '' }}"
-          if [[ ! "$PR_TITLE" == *"PR FOR FINAL RC"* ]]; then
+          if [[ "$PR_TITLE" == *"PR FOR FINAL RC"* ]]; then
             echo "skipping..."
             echo "is-final-rc=true" >> $GITHUB_OUTPUT
           fi
