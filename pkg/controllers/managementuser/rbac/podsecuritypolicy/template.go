@@ -68,12 +68,12 @@ func (p *psptHandler) sync(key string, obj *v3.PodSecurityPolicyTemplate) (runti
 		return nil, nil
 	}
 
-	err := checkClusterVersion(p.clusterName, p.clusterLister)
+	err := CheckClusterVersion(p.clusterName, p.clusterLister)
 	if err != nil {
-		if errors.Is(err, errVersionIncompatible) {
+		if errors.Is(err, ErrClusterVersionIncompatible) {
 			return obj, nil
 		}
-		return obj, fmt.Errorf(clusterVersionCheckErrorString, err)
+		return obj, fmt.Errorf("error checking cluster version for PodSecurityPolicyTemplate controller: %w", err)
 	}
 
 	if _, ok := obj.Annotations[podSecurityPolicyTemplateUpgrade]; !ok {
