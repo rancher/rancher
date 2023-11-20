@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rancher/machine/libmachine/log"
 	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
@@ -14,6 +13,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/pkg/config"
 	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
+	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -81,16 +81,15 @@ func (r *ClusterTemplateTestSuite) TestProvisionClusterTemplate() {
 		ObjType:  repoType,
 		Client:   r.client,
 	}
-	err := mycomponent.Apply(true, 30, false)
+	err := mycomponent.Apply(true, 500*time.Millisecond, 30*time.Minute)
 	if err != nil {
 		log.Info(err)
 	}
-	time.Sleep(5 * time.Second)
-	//err = mycomponent.Revert(true, 30, false)
+	time.Sleep(10 * time.Second)
+	err = mycomponent.Revert(false, 500*time.Millisecond, 30*time.Minute)
 	if err != nil {
 		log.Info(err)
 	}
-	log.Info("Entering main")
 }
 
 // In order for 'go test' to run this suite, we need to create
