@@ -1,19 +1,19 @@
 package rke2
 
 import (
+	"strconv"
 	"testing"
 	"time"
 
+	"github.com/rancher/machine/libmachine/log"
 	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	"github.com/rancher/rancher/tests/framework/extensions/components/components"
 	"github.com/rancher/rancher/tests/framework/extensions/users"
 	password "github.com/rancher/rancher/tests/framework/extensions/users/passwordgenerator"
-	"github.com/rancher/rancher/tests/framework/pkg/config"
 	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
-	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,7 +28,7 @@ type ClusterTemplateTestSuite struct {
 	client             *rancher.Client
 	session            *session.Session
 	standardUserClient *rancher.Client
-	repoSpec           *v1.RepoSpec
+	repoSpecs          []v1.RepoSpec
 }
 
 func (r *ClusterTemplateTestSuite) TearDownSuite() {
@@ -38,8 +38,8 @@ func (r *ClusterTemplateTestSuite) TearDownSuite() {
 func (r *ClusterTemplateTestSuite) SetupSuite() {
 	testSession := session.NewSession()
 	r.session = testSession
-	r.repoSpec = new(v1.RepoSpec)
-	config.LoadConfig("repospec", r.repoSpec)
+
+	//config.LoadConfig("repospecs", r.repoSpecs)
 
 	client, err := rancher.NewClient("", testSession)
 	require.NoError(r.T(), err)
@@ -67,26 +67,37 @@ func (r *ClusterTemplateTestSuite) SetupSuite() {
 }
 
 func (r *ClusterTemplateTestSuite) TestProvisionClusterTemplate() {
-	repo := v1.ClusterRepo{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "my-repo",
-		},
-		Spec: *r.repoSpec,
+	//generate obj meta currently this is super messy due to a bug with our load config :(
+	repo1 := v1.RepoSpec{
+		GitRepo:               "https://github.com/susesgartner/rancher.git",
+		GitBranch:             "release/v2.8",
+		InsecureSkipTLSverify: true,
 	}
-	//created, err := components.GenericCreate(r.client, repo, repoType)
-	var interfaceSlice []interface{} = make([]interface{}, 1)
-	interfaceSlice[0] = repo
+	repo2 := v1.RepoSpec{
+		GitRepo:               "https://github.com/rancher/tfp-automation.git",
+		GitBranch:             "main",
+		InsecureSkipTLSverify: true,
+	}
+	r.repoSpecs = append(r.repoSpecs, repo1, repo2)
+	var interfaceSlice []interface{} = make([]interface{}, len(r.repoSpecs))
+	for i, objSpec := range r.repoSpecs {
+		interfaceSlice[i] = v1.ClusterRepo{
+			ObjectMeta: metav1.ObjectMeta{Name: "test-repo" + strconv.Itoa(i)},
+			Spec:       objSpec,
+		}
+	}
+
 	mycomponent := components.GenericCreate{
 		ObjSpecs: interfaceSlice,
 		ObjType:  repoType,
 		Client:   r.client,
 	}
-	err := mycomponent.Apply(true, 500*time.Millisecond, 30*time.Minute)
+	err := mycomponent.Apply(true, 500*time.Millisecond, 30*time.Second)
 	if err != nil {
 		log.Info(err)
 	}
-	time.Sleep(10 * time.Second)
-	err = mycomponent.Revert(false, 500*time.Millisecond, 30*time.Minute)
+	time.Sleep(time.Second * 10)
+	err = mycomponent.Revert(false, 500*time.Millisecond, 30*time.Second)
 	if err != nil {
 		log.Info(err)
 	}
