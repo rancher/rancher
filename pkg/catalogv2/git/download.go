@@ -101,9 +101,9 @@ func Update(secret *corev1.Secret, namespace, name, gitURL, branch string, insec
 }
 
 func gitForRepo(secret *corev1.Secret, namespace, name, gitURL string, insecureSkipTLS bool, caBundle []byte) (*git, error) {
-	err := validateGitURL(gitURL)
+	err := validateURL(gitURL)
 	if err != nil {
-		return nil, fmt.Errorf("%w: only http(s) or ssh supported", err)
+		return nil, fmt.Errorf("%w: only http(s) or ssh:// supported", err)
 	}
 
 	dir := gitDir(namespace, name, gitURL)

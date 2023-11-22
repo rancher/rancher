@@ -60,11 +60,11 @@ func isGitSSH(gitURL string) bool {
 	return valid
 }
 
-// validateGitURL will validate if the provided URL is in one of the expected patterns
+// validateURL will validate if the provided URL is in one of the expected patterns
 // for the supported protocols http(s) or ssh.
 //   - if Valid: returns nil
 //   - if Invalid: returns an error
-func validateGitURL(gitURL string) error {
+func validateURL(gitURL string) error {
 	valid := isGitSSH(gitURL)
 	if valid {
 		return nil
