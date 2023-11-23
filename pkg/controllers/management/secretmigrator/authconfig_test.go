@@ -166,6 +166,11 @@ type unstructuredConfig struct {
 	values map[string]any
 }
 
+// EachListItemWithAlloc implements runtime.Unstructured.
+func (*unstructuredConfig) EachListItemWithAlloc(func(runtime.Object) error) error {
+	panic("implement me")
+}
+
 func (c *unstructuredConfig) UnstructuredContent() map[string]interface{} {
 	return c.values
 }

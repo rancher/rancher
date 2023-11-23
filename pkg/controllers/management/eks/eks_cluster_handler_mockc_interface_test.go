@@ -4,7 +4,7 @@ import (
 	"context"
 	"net"
 
-	openapi2 "github.com/google/gnostic/openapiv2"
+	openapi2 "github.com/google/gnostic-models/openapiv2"
 	"github.com/rancher/rancher/pkg/types/config/dialer"
 	meta1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
