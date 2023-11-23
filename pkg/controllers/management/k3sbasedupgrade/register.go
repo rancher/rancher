@@ -16,13 +16,13 @@ import (
 )
 
 type handler struct {
+	ctx                    context.Context
 	systemUpgradeNamespace string
 	clusterCache           wranglerv3.ClusterCache
 	clusterClient          wranglerv3.ClusterClient
 	catalogManager         manager2.CatalogManager
 	apps                   projectv3.AppInterface
 	appLister              projectv3.AppLister
-	templateLister         v3.CatalogTemplateLister
 	nodeLister             v3.NodeLister
 	systemAccountManager   *systemaccount.Manager
 	manager                *clustermanager.Manager
@@ -38,6 +38,7 @@ const (
 
 func Register(ctx context.Context, wContext *wrangler.Context, mgmtCtx *config.ManagementContext, manager *clustermanager.Manager) {
 	h := &handler{
+		ctx:                    ctx,
 		systemUpgradeNamespace: systemUpgradeNS,
 		clusterCache:           wContext.Mgmt.Cluster().Cache(),
 		clusterClient:          wContext.Mgmt.Cluster(),
@@ -45,7 +46,6 @@ func Register(ctx context.Context, wContext *wrangler.Context, mgmtCtx *config.M
 		clusterEnqueueAfter:    wContext.Mgmt.Cluster().EnqueueAfter,
 		apps:                   mgmtCtx.Project.Apps(metav1.NamespaceAll),
 		appLister:              mgmtCtx.Project.Apps("").Controller().Lister(),
-		templateLister:         mgmtCtx.Management.CatalogTemplates("").Controller().Lister(),
 		nodeLister:             mgmtCtx.Management.Nodes("").Controller().Lister(),
 		systemAccountManager:   systemaccount.NewManager(mgmtCtx),
 		manager:                manager,

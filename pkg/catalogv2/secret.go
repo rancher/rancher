@@ -2,12 +2,17 @@ package catalogv2
 
 import (
 	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
-	corev1controllers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	corev1 "k8s.io/api/core/v1"
 )
 
+// TODO - CHECK WHERE SHOULD I PUT THIS INTERFACES !
+
+type SecretGetterNoOption interface {
+	Get(namespace, name string) (*corev1.Secret, error)
+}
+
 // GetSecret returns the Secret from the cluster repo's clientSecret spec field
-func GetSecret(secrets corev1controllers.SecretCache, repoSpec *v1.RepoSpec, repoNamespace string) (*corev1.Secret, error) {
+func GetSecret(secrets SecretGetterNoOption, repoSpec *v1.RepoSpec, repoNamespace string) (*corev1.Secret, error) {
 	if repoSpec.ClientSecret == nil {
 		return nil, nil
 	}
