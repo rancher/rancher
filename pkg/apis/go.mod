@@ -3,8 +3,11 @@ module github.com/rancher/rancher/pkg/apis
 go 1.20
 
 replace (
+	github.com/rancher/aks-operator => github.com/chiukapoor/aks-operator v1.2.0-rc1.0.20231010094840-297c8e7d210d
+	github.com/rancher/eks-operator => github.com/chiukapoor/eks-operator v1.3.0-rc1.0.20231010101059-155564c3594a
+	github.com/rancher/gke-operator => github.com/chiukapoor/gke-operator v1.2.0-rc1.0.20231010103656-076270b7415e
 	github.com/rancher/norman => github.com/chiukapoor/norman v0.0.0-20231003122040-15904b7dad89
-	github.com/rancher/rke => github.com/chiukapoor/rke v1.5.0-rc5.0.20231005175106-15c1ed3f214b
+	github.com/rancher/rke => github.com/chiukapoor/rke v1.28.2-rancher1-4
 	github.com/rancher/wrangler/v2 => github.com/chiukapoor/wrangler/v2 v2.1.1-0.20231003114316-368f2fa09afc
 	k8s.io/client-go => github.com/chiukapoor/client-go v1.28.2-rancher1
 )
@@ -50,7 +53,7 @@ require (
 	sigs.k8s.io/cluster-api v1.5.2
 )
 
-require github.com/rancher/wrangler v1.1.1
+require github.com/rancher/wrangler v1.1.1 // indirect
 
 require (
 	github.com/beorn7/perks v1.0.1 // indirect

@@ -3,12 +3,16 @@ module github.com/rancher/rancher
 go 1.20
 
 replace (
+	github.com/rancher/aks-operator => github.com/chiukapoor/aks-operator v1.2.0-rc1.0.20231010094840-297c8e7d210d
 	github.com/rancher/apiserver => github.com/chiukapoor/apiserver v0.0.0-20231003125547-cfd45a6c94cd
+	github.com/rancher/channelserver => github.com/chiukapoor/channelserver v0.6.1-0.20231010085535-d9ab680205f2
 	github.com/rancher/dynamiclistener => github.com/chiukapoor/dynamiclistener v0.3.7-0.20231003132619-8ee173c71b00
+	github.com/rancher/eks-operator => github.com/chiukapoor/eks-operator v1.3.0-rc1.0.20231010101059-155564c3594a
+	github.com/rancher/gke-operator => github.com/chiukapoor/gke-operator v1.2.0-rc1.0.20231010103656-076270b7415e
 	github.com/rancher/lasso => github.com/chiukapoor/lasso v0.0.0-20231003111843-cc610dcb35eb
 	github.com/rancher/machine => github.com/chiukapoor/machine v0.15.0-rancher99.0.20231004061315-fed30aedd7f6
 	github.com/rancher/norman => github.com/chiukapoor/norman v0.0.0-20231003122040-15904b7dad89
-	github.com/rancher/rke => github.com/chiukapoor/rke v1.5.0-rc5.0.20231005175106-15c1ed3f214b
+	github.com/rancher/rke => github.com/chiukapoor/rke v1.28.2-rancher1-4
 	github.com/rancher/steve => github.com/chiukapoor/steve v0.0.0-20231003134615-6819861adeb2
 	github.com/rancher/wrangler/v2 => github.com/chiukapoor/wrangler/v2 v2.1.1-0.20231003114316-368f2fa09afc
 	k8s.io/client-go => github.com/chiukapoor/client-go v1.28.2-rancher1
@@ -82,7 +86,7 @@ require (
 	github.com/AzureAD/microsoft-authentication-library-for-go v0.5.1
 	github.com/Masterminds/semver/v3 v3.2.1
 	github.com/Masterminds/sprig/v3 v3.2.3
-	github.com/aws/aws-sdk-go v1.44.322
+	github.com/aws/aws-sdk-go v1.45.6
 	github.com/bep/debounce v1.2.0
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/coreos/go-iptables v0.6.0

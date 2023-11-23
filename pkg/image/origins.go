@@ -26,6 +26,7 @@ var OriginMap = map[string]string{
 	"calico-cni":                                              "https://github.com/rancher/calico-cni",
 	"cis-operator":                                            "https://github.com/rancher/cis-operator",
 	"cnideploy":                                               "https://github.com/containernetworking/plugins",
+	"coreos-etcd":                                             "https://quay.io/coreos/etcd:v3.5.9-amd64",
 	"coreos-kube-state-metrics":                               "https://github.com/kubernetes/kube-state-metrics",
 	"coreos-prometheus-config-reloader":                       "https://github.com/prometheus-operator/prometheus-operator/pkgs/container/prometheus-config-reloader",
 	"coreos-prometheus-operator":                              "https://github.com/prometheus-operator/prometheus-operator",
