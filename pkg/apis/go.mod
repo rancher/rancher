@@ -53,8 +53,6 @@ require (
 	sigs.k8s.io/cluster-api v1.5.2
 )
 
-require github.com/rancher/wrangler/v2 v2.1.1-0.20230906224618-0a0c44968689
-
 require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/blang/semver v3.5.1+incompatible // indirect

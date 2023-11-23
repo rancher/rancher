@@ -1,3 +1,5 @@
+github.com/chiukapoor/norman v0.0.0-20231003122040-15904b7dad89 h1:x1wZZBBNe+HpDhYzkxI+iahK8uF1wzaPYQNpOCDVsUA=
+github.com/chiukapoor/norman v0.0.0-20231003122040-15904b7dad89/go.mod h1:2AmWDIiWGUT8Wk7cGddRYPCi3NFkIk0HIFs91w9e7Wk=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
