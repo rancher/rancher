@@ -30,10 +30,7 @@ func Test_isGitSSH(t *testing.T) {
 	}
 	assert := assertlib.New(t)
 	for _, tc := range testCases {
-		actual, err := isGitSSH(tc.gitURL)
-		if err != nil {
-			t.Errorf("unexpected error: %s", err)
-		}
+		actual := isGitSSH(tc.gitURL)
 		assert.Equalf(tc.expected, actual, "testcase: %v", tc)
 	}
 }
