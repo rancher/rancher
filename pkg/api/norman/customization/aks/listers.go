@@ -57,6 +57,7 @@ func NewVirtualMachineSKUClient(cap *Capabilities) (*skus.ResourceSkusClient, er
 
 	skusClient := skus.NewResourceSkusClient(cap.SubscriptionID)
 	skusClient.Authorizer = authorizer
+	skusClient.BaseURI = cap.BaseURL
 
 	return &skusClient, nil
 }
@@ -67,7 +68,7 @@ func NewVirtualMachineClient(cap *Capabilities) (*compute.VirtualMachineSizesCli
 		return nil, err
 	}
 
-	virtualMachine := compute.NewVirtualMachineSizesClient(cap.SubscriptionID)
+	virtualMachine := compute.NewVirtualMachineSizesClientWithBaseURI(cap.BaseURL, cap.SubscriptionID)
 	virtualMachine.Authorizer = authorizer
 
 	return &virtualMachine, nil
@@ -115,7 +116,7 @@ func NewSubscriptionServiceClient(cap *Capabilities) (*subscription.Subscription
 		return nil, err
 	}
 
-	subscriptionService := subscription.NewSubscriptionsClient()
+	subscriptionService := subscription.NewSubscriptionsClientWithBaseURI(cap.BaseURL)
 	subscriptionService.Authorizer = authorizer
 
 	return &subscriptionService, nil
