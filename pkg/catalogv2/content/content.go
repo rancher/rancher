@@ -44,8 +44,12 @@ import (
 
 // TODO:
 //  * CHECK IF I  CAN DO THIS WAY: there is no need for cache interface, we just need a "Get", therefore I changed the interface.
-//  * IMO is not worth to instantiate the cache of the downstream using this interface for this. We can cast the "Client" interface to use Get without options.
-//  * Check where to create this interfaces, for avoiding import cicles I also created one on catalogv2/secrets.go, should I create a package? What rules do we use?
+//  * IMO is not worth to instantiate the cache of the downstream wile installing using the upstreamcluster; I created this interfaces for this.
+//      We can cast the "Client" interface to use Get without options.
+//  * Check where to create this interfaces, for avoiding import cicles I also created one on catalogv2/secrets.go,
+//      should I create a package? What rules do we use?
+//  *  Should I have an Generic and specific interfaces or can i have directly the ones that I need (this will
+//      make more sense if we unifie this interfaces with the one from secret)
 
 // GenericNoOptionGetter  generic implementation of a "Get" this should be used to retrieve an object given a namespace
 // and name. The generic.CacheInterface[T runtime.Object] already implements it, the client interface must be changed to
@@ -72,12 +76,12 @@ type ClusterRepoNoNamespaceNoOptionGetter interface {
 // The Manager struct uses clientsets provided by the wrangler library
 // to interact with the Kubernetes API and quickly fetch instances of ConfigMaps, Secrets, and ClusterRepos.
 type Manager struct {
-	configMaps   ConfigMapNoOptionGetter              // clientset for getting ConfigMaps, this can be a cache or a client.
-	secrets      catalogv2.SecretGetterNoOption       // clientset for getting Secrets this can be a cache or a client.
-	clusterRepos ClusterRepoNoNamespaceNoOptionGetter // clientset for getting ClusterRepo custom resources this can be a cache or a client.
-	discovery    discovery.DiscoveryInterface         // An interface to the Kubernetes Discovery API. Provides information about the Kubernetes API server.
-	IndexCache   map[string]indexCache                // cache for Helm repository index files. Used to store and retrieve index files for faster access.
-	lock         sync.RWMutex                         // read-write mutex used to ensure that some Manager's operations are thread-safe.
+	configMaps   ConfigMapNoOptionGetter                // clientset for getting ConfigMaps, this can be a cache or a client.
+	secrets      catalogv2.SecretNoOptionGetterNoOption // clientset for getting Secrets this can be a cache or a client.
+	clusterRepos ClusterRepoNoNamespaceNoOptionGetter   // clientset for getting ClusterRepo custom resources this can be a cache or a client.
+	discovery    discovery.DiscoveryInterface           // An interface to the Kubernetes Discovery API. Provides information about the Kubernetes API server.
+	IndexCache   map[string]indexCache                  // cache for Helm repository index files. Used to store and retrieve index files for faster access.
+	lock         sync.RWMutex                           // read-write mutex used to ensure that some Manager's operations are thread-safe.
 }
 
 // indexCache - used to cache helm chart indexes
@@ -98,7 +102,7 @@ type repoDef struct {
 func NewManager(
 	discovery discovery.DiscoveryInterface,
 	configMaps ConfigMapNoOptionGetter,
-	secrets catalogv2.SecretGetterNoOption,
+	secrets catalogv2.SecretNoOptionGetterNoOption,
 	clusterRepos ClusterRepoNoNamespaceNoOptionGetter) *Manager {
 	return &Manager{
 		discovery:    discovery,

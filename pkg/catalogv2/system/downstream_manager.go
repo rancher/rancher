@@ -14,7 +14,7 @@ import (
 )
 
 // DownstreamManager is an implementation of Manager that allows the upstream cluster to interact with the downstream one.
-// It doesn't start any controller, nor loops to ensure that the charts are up-to-date.
+// It doesn't start any controller, nor loops. It DOESN'T ensure that the charts are kept up-to-date.
 // Only the functions Ensure (used to install) and Manager.Uninstall should be used.
 type DownstreamManager struct {
 	Manager
@@ -47,7 +47,7 @@ func NewDownstreamManager(ctx context.Context,
 // Start this function shouldn't be used, the DownstreamManager doesn't start controllers nor have the logic to keep
 // the charts up to date. Use Ensure directly to install the charts.
 func (d *DownstreamManager) Start(_ context.Context) {
-	log.Error("The DownstreamManager shouldn't be started, calling ensure directly will ensure that the chart is installed.")
+	log.Error("The DownstreamManager shouldn't be started, calling ensure directly will install the required chart.")
 	return
 }
 

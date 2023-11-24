@@ -13,6 +13,8 @@ import (
 	"github.com/rancher/rancher/pkg/catalogv2/system"
 	"github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/project"
+	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -21,6 +23,7 @@ import (
 	"github.com/rancher/wrangler/pkg/generated/controllers/core"
 	"github.com/rancher/wrangler/pkg/generated/controllers/rbac"
 	"github.com/rancher/wrangler/pkg/generic"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/restmapper"
@@ -72,7 +75,6 @@ func (h *handler) onClusterChange(key string, cluster *v3.Cluster) (*v3.Cluster,
 	if err != nil {
 		return cluster, err
 	}
-	// TODO - FELIPE OLHAR AQUI !!!!!
 	if !isNewer {
 		needsUpgrade, err := h.nodesNeedUpgrade(cluster, updateVersion)
 		if err != nil {
@@ -94,23 +96,16 @@ func (h *handler) onClusterChange(key string, cluster *v3.Cluster) (*v3.Cluster,
 	cluster, err = h.modifyClusterCondition(cluster, planv1.Plan{}, planv1.Plan{}, strategy)
 	if err != nil {
 		return cluster, err
+
 	}
 
 	// create or update k3supgradecontroller if necessary
 	if err = h.deployK3sBasedUpgradeController(cluster.Name, updateVersion, isK3s, isRke2); err != nil {
+		// TODO   Shouldn't an error here modify the cluster status from updating to erro?
+		// Dosen't this reutrn make the cluster to get "stuck" on updating ?
 		return cluster, err
 	}
 
-	//  DownstreamContext.CreateHelm() //
-	//  Check if it is created (LOOP)
-	//  ->  CHECK FOR THE APPS
-	//  (___  ___)
-	//  deploy plans
-	//
-	// Ignore completly Webook.
-	// UPGRADE K3 to use the
-
-	// deploy plans into downstream cluster
 	if err = h.deployPlans(cluster, isK3s, isRke2); err != nil {
 		return cluster, err
 	}
@@ -121,13 +116,16 @@ func (h *handler) onClusterChange(key string, cluster *v3.Cluster) (*v3.Cluster,
 // deployK3sBaseUpgradeController creates a rancher k3s/rke2 upgrader controller if one does not exist.
 // Updates k3s upgrader controller if one exists and is not the newest available version.
 func (h *handler) deployK3sBasedUpgradeController(clusterName, updateVersion string, isK3s, isRke2 bool) error {
-	// TODO _ CHECK HOW THIS WILL INTERACT WITH THE ONE FROM APPS, DO I NEED TO UNINSTALL? ???
 
 	userCtx, err := h.manager.UserContextNoControllers(clusterName)
 	if err != nil {
 		return err
 	}
-	// TODO - Validate if I should use distinct context or If
+
+	// TODO _ CHECK HOW THIS WILL INTERACT WITH THE ONE FROM APPS, DO I NEED TO UNINSTALL? ???
+	//   Can i just call delete and ignore the error if it is not found or all errors?
+	_ = deleteOldApp(userCtx, clusterName, isK3s, isRke2)
+
 	m, err := h.newDownstreamManagerFromUserContext(userCtx)
 	if err != nil {
 		panic(err.Error())
@@ -139,19 +137,13 @@ func (h *handler) deployK3sBasedUpgradeController(clusterName, updateVersion str
 		return err
 	}
 
-	// TODO - Do we need to keep the appname or can we change to the new one?
-	appname := "system-upgrade-controller"
-	switch {
-	case isK3s:
-		appname = "rancher-k3s-upgrader"
-	case isRke2:
-		appname = "rancher-rke2-upgrader"
-	}
-
+	//	TODO - I don't think it is possible to get the systemDefaultRegistry from the cluster, rancher gets it from Spec.RKEConfig witch
+	//	 dosen't exist for imported ones.
+	//	   The image.GetPrivateRepoURLFromCluster(cluster) will return the Default for clusters without spec.RKE witch is the case for imported clusters.
 	value := map[string]interface{}{
 		"global": map[string]interface{}{
 			"cattle": map[string]interface{}{
-				"systemDefaultRegistry": "", // "TODO - GET FROM CLUSTER V1
+				"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
 				"psp": map[string]interface{}{
 					"enabled": !is125OrAbove,
 				},
@@ -159,7 +151,9 @@ func (h *handler) deployK3sBasedUpgradeController(clusterName, updateVersion str
 		},
 	}
 
-	if err := m.Ensure("cattle-system", appname,
+	// Ensure won't install if the requested chart is already installed with the same args.
+	// it will only return when the deployment is done or if an error happens.
+	if err := m.Ensure("cattle-system", "system-upgrade-controller",
 		"", settings.SystemUpgradeControllerChartVersion.Get(), value, true, ""); err != nil {
 		fmt.Println("Failed to ENSURE with err %s", err.Error())
 		return err
@@ -228,6 +222,7 @@ func checkDeployed(app *v33.App) bool {
 // As this will interact with the downstream cluster and will be created on every interaction of the control loop that needs it
 // the Handler won't use cache, instead it will directly fetch the information of the downstream cluster.
 func (h *handler) newDownstreamManagerFromUserContext(userCtx *config.UserContext) (*system.DownstreamManager, error) {
+
 	// TODO - VALIDATE THE LOGIC THAT IS NOT WORTH TO USE CACHE !!!
 
 	opts := &generic.FactoryOptions{
@@ -235,7 +230,7 @@ func (h *handler) newDownstreamManagerFromUserContext(userCtx *config.UserContex
 		SharedControllerFactory: userCtx.ControllerFactory,
 	}
 
-	// TODO - Validate if this is worth doing or if I should use the function that instantiate everything?
+	// TODO - Validate if this is worth Or if I should use the function that instantiate everything?
 	coreInterface, err := core.NewFactoryFromConfigWithOptions(&userCtx.RESTConfig, opts)
 	if err != nil {
 		return nil, err
@@ -258,7 +253,7 @@ func (h *handler) newDownstreamManagerFromUserContext(userCtx *config.UserContex
 
 	content := content.NewManager(
 		userCtx.K8sClient.Discovery(),
-		system.ConfigMapNoOptGetter{ConfigMapClient: coreInterface.Core().V1().ConfigMap()}, // TODO - use generics???
+		system.ConfigMapNoOptGetter{ConfigMapClient: coreInterface.Core().V1().ConfigMap()},
 		system.SecretNoOptGetter{SecretClient: coreInterface.Core().V1().Secret()},
 		system.HelmNoNamespaceNoOptGetter{ClusterRepoController: helm.Catalog().V1().ClusterRepo()},
 	)
@@ -282,4 +277,28 @@ func (h *handler) newDownstreamManagerFromUserContext(userCtx *config.UserContex
 	helmClient := helmcfg.NewClient(restClientGetter)
 
 	return system.NewDownstreamManager(h.ctx, content, helmop, coreInterface.Core().V1().Pod(), helmClient)
+}
+
+// deleteOldApp will try to delete the v3.app rancher-xxx-upgrader that used to manage the system-upgrade-controller
+func deleteOldApp(userCtx *config.UserContext, clusterName string, isK3s, isRke2 bool) error {
+	projectLister := userCtx.Management.Management.Projects("").Controller().Lister()
+	systemProject, err := project.GetSystemProject(clusterName, projectLister)
+	if err != nil {
+		return err
+	}
+
+	systemProjectID := ref.Ref(systemProject)
+	_, systemProjectName := ref.Parse(systemProjectID)
+
+	appClient := userCtx.Management.Project.Apps(systemProjectName)
+	var appname string
+	switch {
+	case isK3s:
+		appname = "rancher-k3s-upgrader"
+	case isRke2:
+		appname = "rancher-rke2-upgrader"
+	}
+	err = appClient.Delete(appname, &v1.DeleteOptions{})
+	return err
+
 }

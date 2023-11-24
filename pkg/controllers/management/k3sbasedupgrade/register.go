@@ -7,6 +7,7 @@ import (
 	manager2 "github.com/rancher/rancher/pkg/catalog/manager"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	wranglerv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	wranglerv1 "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	projectv3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/systemaccount"
@@ -20,6 +21,7 @@ type handler struct {
 	systemUpgradeNamespace string
 	clusterCache           wranglerv3.ClusterCache
 	clusterClient          wranglerv3.ClusterClient
+	clusterV1Cache         wranglerv1.ClusterCache
 	catalogManager         manager2.CatalogManager
 	apps                   projectv3.AppInterface
 	appLister              projectv3.AppLister
@@ -42,13 +44,14 @@ func Register(ctx context.Context, wContext *wrangler.Context, mgmtCtx *config.M
 		systemUpgradeNamespace: systemUpgradeNS,
 		clusterCache:           wContext.Mgmt.Cluster().Cache(),
 		clusterClient:          wContext.Mgmt.Cluster(),
+		clusterV1Cache:         wContext.Provisioning.Cluster().Cache(),
 		catalogManager:         mgmtCtx.CatalogManager,
-		clusterEnqueueAfter:    wContext.Mgmt.Cluster().EnqueueAfter,
 		apps:                   mgmtCtx.Project.Apps(metav1.NamespaceAll),
 		appLister:              mgmtCtx.Project.Apps("").Controller().Lister(),
 		nodeLister:             mgmtCtx.Management.Nodes("").Controller().Lister(),
 		systemAccountManager:   systemaccount.NewManager(mgmtCtx),
 		manager:                manager,
+		clusterEnqueueAfter:    wContext.Mgmt.Cluster().EnqueueAfter,
 	}
 	wContext.Mgmt.Cluster().OnChange(ctx, "k3s-upgrade-controller", h.onClusterChange)
 }

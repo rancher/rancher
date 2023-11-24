@@ -7,12 +7,13 @@ import (
 
 // TODO - CHECK WHERE SHOULD I PUT THIS INTERFACES !
 
-type SecretGetterNoOption interface {
+// SecretNoOptionGetterNoOption requires a Get(namespace, name string) (*corev1.Secret, error), cache implements this by default
+type SecretNoOptionGetterNoOption interface {
 	Get(namespace, name string) (*corev1.Secret, error)
 }
 
 // GetSecret returns the Secret from the cluster repo's clientSecret spec field
-func GetSecret(secrets SecretGetterNoOption, repoSpec *v1.RepoSpec, repoNamespace string) (*corev1.Secret, error) {
+func GetSecret(secrets SecretNoOptionGetterNoOption, repoSpec *v1.RepoSpec, repoNamespace string) (*corev1.Secret, error) {
 	if repoSpec.ClientSecret == nil {
 		return nil, nil
 	}
