@@ -23,6 +23,7 @@ import (
 	"github.com/rancher/wrangler/pkg/generated/controllers/core"
 	"github.com/rancher/wrangler/pkg/generated/controllers/rbac"
 	"github.com/rancher/wrangler/pkg/generic"
+	log "github.com/sirupsen/logrus"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/discovery/cached/memory"
@@ -155,9 +156,8 @@ func (h *handler) deployK3sBasedUpgradeController(clusterName, updateVersion str
 	// it will only return when the deployment is done or if an error happens.
 	if err := m.Ensure("cattle-system", "system-upgrade-controller",
 		"", settings.SystemUpgradeControllerChartVersion.Get(), value, true, ""); err != nil {
-		fmt.Println("Failed to ENSURE with err %s", err.Error())
+		log.Errorf("Failed to install the system-upgrade-controller with error: %s", err.Error())
 		return err
-
 	}
 
 	return nil
