@@ -128,7 +128,7 @@ func (h *handler) deployK3sBasedUpgradeController(clusterName, updateVersion str
 
 	m, err := h.newDownstreamManagerFromUserContext(userCtx)
 	if err != nil {
-		panic(err.Error())
+		return err
 	}
 
 	// determine what version of Kubernetes we are updating to
