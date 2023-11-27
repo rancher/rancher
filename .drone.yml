@@ -159,7 +159,7 @@ trigger:
       - promote
 ---
 kind: pipeline
-name: provisioning-operations-tests-rke2
+name: provisioning-operations-test-setA-rke2
 
 platform:
   os: linux
@@ -167,7 +167,60 @@ platform:
 
 environment:
   V2PROV_TEST_DIST: "rke2"
-  V2PROV_TEST_RUN_REGEX: "^Test_Operation_.*$"
+  V2PROV_TEST_RUN_REGEX: "^Test_Operation_SetA_.*$"
+
+steps:
+  - name: provisioning-operations-tests-pr
+    image: rancher/dapper:v0.6.0
+    commands:
+      - dapper provisioning-tests
+    privileged: true
+    volumes:
+      - name: docker
+        path: /var/run/docker.sock
+    when:
+      event:
+        - pull_request
+  - name: provisioning-operations-tests-push
+    image: rancher/dapper:v0.6.0
+    failure: ignore
+    commands:
+      - dapper provisioning-tests
+    privileged: true
+    volumes:
+      - name: docker
+        path: /var/run/docker.sock
+    when:
+      instance:
+        - drone-publish.rancher.io
+      ref:
+        include:
+          - "refs/heads/master"
+          - "refs/heads/release/v*"
+          - "refs/tags/v*"
+      event:
+        - push
+
+volumes:
+  - name: docker
+    host:
+      path: /var/run/docker.sock
+
+trigger:
+  event:
+    exclude:
+      - promote
+---
+kind: pipeline
+name: provisioning-operations-test-setB-rke2
+
+platform:
+  os: linux
+  arch: amd64
+
+environment:
+  V2PROV_TEST_DIST: "rke2"
+  V2PROV_TEST_RUN_REGEX: "^Test_Operation_SetB_.*$"
 
 steps:
   - name: provisioning-operations-tests-pr
