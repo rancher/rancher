@@ -511,12 +511,12 @@ github.com/prometheus/procfs v0.8.0/go.mod h1:z7EfXMXOkbkqb9IINtpCn86r/to3BnA0ua
 github.com/prometheus/procfs v0.10.1 h1:kYK1Va/YMlutzCGazswoHKo//tZVlFpKYh+PymziUAg=
 github.com/prometheus/procfs v0.10.1/go.mod h1:nwNm2aOCAYw8uTR/9bWRREkZFxAUcWzPHWJq+XBB/FM=
 github.com/prometheus/tsdb v0.7.1/go.mod h1:qhTCs0VvXwvX/y3TZrWD7rabWM+ijKTux40TwIPHuXU=
-github.com/rancher/aks-operator v1.2.0 h1:cNB84j23Ng7GUkqIt8I1TUfkpPdA5SQ2uyosPNJM5G4=
-github.com/rancher/aks-operator v1.2.0/go.mod h1:CIU0AgI4DHYKEG3P3tHyEM/5QEud7upDOiYL6j5D/qE=
+github.com/rancher/aks-operator v1.2.0-rc3 h1:EoTUWGIgCk4ffkx3Eq/RQSqanbGKpRKtXTqEusPp9yk=
+github.com/rancher/aks-operator v1.2.0-rc3/go.mod h1:ga4p9r8nTUuSRqkYLTBgA5OlPf19iT/i9Qa3kXH7H7Y=
 github.com/rancher/client-go v1.27.4-rancher1 h1:1W1A0bV6KXYbu1z+KIezlfLsHPc1wiasAM42BICVKBM=
 github.com/rancher/client-go v1.27.4-rancher1/go.mod h1:ragcly7lUlN0SRPk5/ZkGnDjPknzb37TICq07WhI6Xc=
-github.com/rancher/eks-operator v1.3.0 h1:Hou6VJHNjnT3yCQsI/i6nWYNCGlwZWjX/Wue41X95Do=
-github.com/rancher/eks-operator v1.3.0/go.mod h1:yxqWKlUXPdHWiUCjpUzGWSTMDhj3m74Ex2L9HNAGRFE=
+github.com/rancher/eks-operator v1.3.0-rc2 h1:Poua1CXexs0h/C0dRllBsaehdc61H+L4xc4e7oxT5tY=
+github.com/rancher/eks-operator v1.3.0-rc2/go.mod h1:30gJm9FbNBdzMX300ibhtlU72BgkjDuW1bX/u4FC0ns=
 github.com/rancher/fleet/pkg/apis v0.0.0-20231017140638-93432f288e79 h1:vfrBGudEydmRw7bq85KWquPZki7PjsjzaLozWtbKmCw=
 github.com/rancher/fleet/pkg/apis v0.0.0-20231017140638-93432f288e79/go.mod h1:vqAYcX2NEkVb0AmUlY7luhh1TKIqbE2KRuERCKxW9pE=
 github.com/rancher/gke-operator v1.2.0 h1:Byd7IYDlg8T6Dk+bqj8QOXOWnTH5+s9pRairBCiTEx0=
@@ -525,8 +525,8 @@ github.com/rancher/lasso v0.0.0-20230830164424-d684fdeb6f29 h1:+kige/h8/LnzWgPjB
 github.com/rancher/lasso v0.0.0-20230830164424-d684fdeb6f29/go.mod h1:kgk9kJVMj9FIrrXU0iyM6u/9Je4bEjPImqswkTVaKsQ=
 github.com/rancher/norman v0.0.0-20230831160711-5de27f66385d h1:Ft/iTH91TlE2oBGmpkdO4I8o8cvUmCnytdwu52a/tN4=
 github.com/rancher/norman v0.0.0-20230831160711-5de27f66385d/go.mod h1:Sm2Xqai+aecgmJ86ygyEe+TdPMLkauEpykSstBAu4Ko=
-github.com/rancher/rke v1.5.0-rc9 h1:mtnpYGrTTGsMaZHmvp9dsy28fR9QpsQGSGDcJCw7gqg=
-github.com/rancher/rke v1.5.0-rc9/go.mod h1:wZaVWzW46OTuGvyxgRHXGUyJ/QP0zOkKESO9hBOwTaY=
+github.com/rancher/rke v1.5.0-rc11 h1:rp5/qeuGaIpg+f3wxCHQi0RB+k+c0doVojCRM6NyKEg=
+github.com/rancher/rke v1.5.0-rc11/go.mod h1:wZaVWzW46OTuGvyxgRHXGUyJ/QP0zOkKESO9hBOwTaY=
 github.com/rancher/wrangler v1.1.1-0.20230831050635-df1bd5aae9df h1:WJ+aaUICHPX8HeLmHE9JL/RFHhilMfcJlqmhgpc7gJU=
 github.com/rancher/wrangler v1.1.1-0.20230831050635-df1bd5aae9df/go.mod h1:4T80p+rLh2OLbjCjdExIjRHKNBgK9NUAd7eIU/gRPKk=
 github.com/rogpeppe/fastuuid v0.0.0-20150106093220-6724a57986af/go.mod h1:XWv6SoW27p1b0cqNHllgS5HIMJraePCO15w5zCzIWYg=
