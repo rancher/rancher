@@ -59,8 +59,8 @@ printf '%s\n' "$(grep -n -E "_MIN_VERSION" ./package/Dockerfile | grep ENV | gre
 K8SVERSIONSFILE=./bin/rancher-rke-k8s-versions.txt
 
 if [[ -f "$K8SVERSIONSFILE" ]]; then
-    echo "# RKE Kubernetes versions" >> "$COMPONENTSFILE"
-    cat "$K8SVERSIONSFILE" >> "$COMPONENTSFILE"
+    echo "# RKE Kubernetes versions" >> $COMPONENTSFILE
+    cat $K8SVERSIONSFILE >> $COMPONENTSFILE
 fi
 
 generate_section "dev-v2.[0-9]+" "KDM References with dev branch" "kdm"
