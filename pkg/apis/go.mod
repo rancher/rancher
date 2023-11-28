@@ -3,6 +3,7 @@ module github.com/rancher/rancher/pkg/apis
 go 1.20
 
 replace (
+	github.com/rancher/rke => github.com/rancher/rke v1.5.0-rc11
 	// wrangler bracnhes need to be updated before replace can be removed
 	github.com/rancher/wrangler v1.1.1 => github.com/rancher/wrangler v1.1.1-0.20230831050635-df1bd5aae9df
 	k8s.io/api => k8s.io/api v0.27.6
@@ -11,9 +12,21 @@ replace (
 	k8s.io/apiserver => k8s.io/apiserver v0.27.6
 	k8s.io/cli-runtime => k8s.io/cli-runtime v0.27.6
 	k8s.io/client-go => github.com/rancher/client-go v1.27.4-rancher1
+	k8s.io/cloud-provider => k8s.io/cloud-provider v0.27.6
 	k8s.io/component-base => k8s.io/component-base v0.27.6
+	k8s.io/controller-manager => k8s.io/controller-manager v0.27.6
+	k8s.io/cri-api => k8s.io/cri-api v0.27.6
+	k8s.io/csi-translation-lib => k8s.io/csi-translation-lib v0.27.6
+	k8s.io/dynamic-resource-allocation => k8s.io/dynamic-resource-allocation v0.27.6
+	k8s.io/kube-controller-manager => k8s.io/kube-controller-manager v0.27.6
+	k8s.io/kube-proxy => k8s.io/kube-proxy v0.27.6
+	k8s.io/kube-scheduler => k8s.io/kube-scheduler v0.27.6
 	k8s.io/kubectl => k8s.io/kubectl v0.27.6
+	k8s.io/kubelet => k8s.io/kubelet v0.27.6
+	k8s.io/legacy-cloud-providers => k8s.io/legacy-cloud-providers v0.27.6
+	k8s.io/mount-utils => k8s.io/mount-utils v0.27.6
 	k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.27.6
+	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.27.6
 )
 
 require (
