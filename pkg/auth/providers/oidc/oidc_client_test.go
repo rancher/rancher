@@ -10,7 +10,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
-	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
 	"golang.org/x/oauth2"
 	"math/big"
 	"net"
@@ -157,17 +157,8 @@ func TestGetClientCertificates(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			got, err := getClientCertificates(tc.cert, tc.key)
-			if err == nil && tc.shouldFail {
-				t.Fatalf("was expecting an error for \"%s\" but didn't get one", tc.name)
-			}
-
-			if err != nil && !tc.shouldFail {
-				t.Fatalf("got an error but wasn't expecting one\n\tgot: %s", err)
-			}
-
-			if cmp.Diff(got, tc.wantCerts) != "" {
-				t.Fatalf("cert did not match desired\n\tgot: %+v\n\twant: %+v", got, tc.wantCerts)
-			}
+			assert.Equal(t, err != nil, tc.shouldFail)
+			assert.Equal(t, tc.wantCerts, got, "cert did not match desired")
 		})
 	}
 }
@@ -191,10 +182,12 @@ func TestGetHTTPClient(t *testing.T) {
 	}
 
 	pool, _ := x509.SystemCertPool()
+	poolWithCert, _ := x509.SystemCertPool()
 	cert, err := tls.X509KeyPair(clientCertBytes, clientKeyBytes)
 	if err != nil {
 		t.Fatalf("unable to parse generated certs")
 	}
+	poolWithCert.AppendCertsFromPEM(clientCertBytes)
 
 	testCases := []struct {
 		name       string
@@ -217,7 +210,7 @@ func TestGetHTTPClient(t *testing.T) {
 			cert:       string(clientCertBytes),
 			key:        string(clientKeyBytes),
 			shouldFail: false,
-			wantPool:   pool,
+			wantPool:   poolWithCert,
 			wantCerts:  []tls.Certificate{cert},
 		},
 		{
@@ -249,14 +242,7 @@ func TestGetHTTPClient(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			got, err := getHTTPClient(tc.cert, tc.key)
-			if err == nil && tc.shouldFail {
-				t.Fatalf("was expecting an error for \"%s\" but didn't get one", tc.name)
-			}
-
-			if err != nil && !tc.shouldFail {
-				t.Fatalf("got an error but wasn't expecting one\n\tgot: %s", err)
-			}
-
+			assert.Equal(t, err != nil, tc.shouldFail)
 			if tc.shouldFail && err != nil {
 				return
 			}
@@ -266,9 +252,7 @@ func TestGetHTTPClient(t *testing.T) {
 				t.Fatalf("system cert pool did not match desired")
 			}
 
-			if cmp.Diff(gotTransport.TLSClientConfig.Certificates, tc.wantCerts) != "" {
-				t.Fatalf("cert did not match desired\n\tgot: %+v\n\twant: %+v", got, tc.wantCerts)
-			}
+			assert.Equal(t, tc.wantCerts, gotTransport.TLSClientConfig.Certificates, "cert did not match desired")
 		})
 	}
 }
@@ -332,14 +316,7 @@ func TestAddCertKeyToContext(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx, err := AddCertKeyToContext(context.Background(), tc.cert, tc.key)
-			if err == nil && tc.shouldFail {
-				t.Fatalf("was expecting an error for \"%s\" but didn't get one", tc.name)
-			}
-
-			if err != nil && !tc.shouldFail {
-				t.Fatalf("got an error but wasn't expecting one\n\tgot: %s", err)
-			}
-
+			assert.Equal(t, err != nil, tc.shouldFail)
 			if tc.shouldFail && err != nil {
 				return
 			}
