@@ -30,7 +30,7 @@ generate_section() {
     local label="$2"
     local type="$3"
     {
-        echo " "
+        echo ""
         echo "# $label"
     } >> "$COMPONENTSFILE"
 
