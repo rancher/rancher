@@ -20,8 +20,6 @@ import (
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/steve/pkg/client"
 	planv1 "github.com/rancher/system-upgrade-controller/pkg/apis/upgrade.cattle.io/v1"
-	"github.com/rancher/wrangler/pkg/generated/controllers/core"
-	"github.com/rancher/wrangler/pkg/generated/controllers/rbac"
 	"github.com/rancher/wrangler/pkg/generic"
 	log "github.com/sirupsen/logrus"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -223,25 +221,8 @@ func checkDeployed(app *v33.App) bool {
 // the Handler won't use cache, instead it will directly fetch the information of the downstream cluster.
 func (h *handler) newDownstreamManagerFromUserContext(userCtx *config.UserContext) (*system.DownstreamManager, error) {
 
-	// TODO - VALIDATE THE LOGIC THAT IS NOT WORTH TO USE CACHE !!!
-
-	opts := &generic.FactoryOptions{
-		// SharedCacheFactory:      userCtx.ControllerFactory.SharedCacheFactory(), TODO Validate if we need this, IMO not worth to use cache, Check how it is used, maybe I misunderstood
-		SharedControllerFactory: userCtx.ControllerFactory,
-	}
-
-	// TODO - Validate if this is worth Or if I should use the function that instantiate everything?
-	coreInterface, err := core.NewFactoryFromConfigWithOptions(&userCtx.RESTConfig, opts)
-	if err != nil {
-		return nil, err
-	}
-
-	helm, err := catalog.NewFactoryFromConfigWithOptions(&userCtx.RESTConfig, opts)
-	if err != nil {
-		return nil, err
-	}
-
-	rbac, err := rbac.NewFactoryFromConfigWithOptions(&userCtx.RESTConfig, opts)
+	helm, err := catalog.NewFactoryFromConfigWithOptions(&userCtx.RESTConfig,
+		&generic.FactoryOptions{SharedControllerFactory: userCtx.ControllerFactory})
 	if err != nil {
 		return nil, err
 	}
@@ -253,16 +234,16 @@ func (h *handler) newDownstreamManagerFromUserContext(userCtx *config.UserContex
 
 	content := content.NewManager(
 		userCtx.K8sClient.Discovery(),
-		system.ConfigMapNoOptGetter{ConfigMapClient: coreInterface.Core().V1().ConfigMap()},
-		system.SecretNoOptGetter{SecretClient: coreInterface.Core().V1().Secret()},
+		system.ConfigMapNoOptGetter{ConfigMapClient: userCtx.Corew.ConfigMap()},
+		system.SecretNoOptGetter{SecretClient: userCtx.Corew.Secret()},
 		system.HelmNoNamespaceNoOptGetter{ClusterRepoController: helm.Catalog().V1().ClusterRepo()},
 	)
 
 	helmop := helmop.NewOperations(cg,
 		helm.Catalog().V1(),
-		rbac.Rbac().V1(),
+		userCtx.RBACw,
 		content,
-		coreInterface.Core().V1().Pod(),
+		userCtx.Corew.Pod(),
 	)
 
 	cache := memory.NewMemCacheClient(userCtx.K8sClient.Discovery())
@@ -276,7 +257,7 @@ func (h *handler) newDownstreamManagerFromUserContext(userCtx *config.UserContex
 	}
 	helmClient := helmcfg.NewClient(restClientGetter)
 
-	return system.NewDownstreamManager(h.ctx, content, helmop, coreInterface.Core().V1().Pod(), helmClient)
+	return system.NewDownstreamManager(h.ctx, content, helmop, userCtx.Corew.Pod(), helmClient)
 }
 
 // deleteOldApp will try to delete the v3.app rancher-xxx-upgrader that used to manage the system-upgrade-controller
