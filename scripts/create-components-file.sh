@@ -4,7 +4,7 @@ set -e -x
 
 echo "Creating ./bin/rancher-components.txt"
 
-cd $(dirname $0)/..
+cd "$(dirname "$0")/.."
 
 mkdir -p bin
 
@@ -29,8 +29,10 @@ generate_section() {
     local pattern="$1"
     local label="$2"
     local type="$3"
-    echo "" >> "$COMPONENTSFILE"
-    echo "# $label" >> "$COMPONENTSFILE"
+    {
+        echo " "
+        echo "# $label"
+    } >> "$COMPONENTSFILE"
 
     for file in "${FILES[@]}"; do
         if [[ "$file" == "./scripts/package-env" ]]; then
@@ -48,15 +50,20 @@ done | sort -u >> "$COMPONENTSFILE"
 
 generate_section "rc[.]?[0-9]+" "Components with -rc"
 
-echo "" >> $COMPONENTSFILE
-echo "# Min version components with -rc" >> $COMPONENTSFILE
+{ 
+    echo ""
+    echo "# Min version components with -rc" 
+} >> $COMPONENTSFILE
 printf '%s\n' "$(grep -n -E "_MIN_VERSION" ./package/Dockerfile | grep ENV | grep CATTLE |sed 's/CATTLE_//g' | sed 's/=/ /g' |  awk -F':' '{ sub(/^[ \t]+/, "", $2); print "* " $2 " (file /package/Dockerfile, line " $1 ")" }' | sort | grep "\-rc")" >> $COMPONENTSFILE
 
 K8SVERSIONSFILE=./bin/rancher-rke-k8s-versions.txt
 
 if [[ -f "$K8SVERSIONSFILE" ]]; then
-    echo "# RKE Kubernetes versions" >> $COMPONENTSFILE
-    cat $K8SVERSIONSFILE >> $COMPONENTSFILE
+    { 
+        echo ""
+        echo "# RKE Kubernetes versions"
+        cat $K8SVERSIONSFILE 
+    } >> $COMPONENTSFILE
 fi
 
 generate_section "dev-v2.[0-9]+" "KDM References with dev branch" "kdm"
