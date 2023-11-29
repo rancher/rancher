@@ -29,28 +29,24 @@ generate_section() {
     local pattern="$1"
     local label="$2"
     local type="$3"
-
     echo "" >> "$COMPONENTSFILE"
     echo "# $label" >> "$COMPONENTSFILE"
 
-    if [[ $type ]]; then
-        for file in "${FILES[@]}"; do
-            grep -h -n -E "$pattern" "$file" | grep -i -E "$type" | awk -F':' -v file="$file" -v label="$label" '{ sub(/^[ \t]+/, "", $2); sub(/[ \t]+/, " ", $2); print "* " $2 " (file " file ", line " $1 ")" }'
-        done | sort -u >> "$COMPONENTSFILE"
-        return; 
-    fi
-
     for file in "${FILES[@]}"; do
-        grep -h -n -E "$pattern" "$file" | awk -F':' -v file="$file" -v label="$label" '{ sub(/^[ \t]+/, "", $2); sub(/[ \t]+/, " ", $2); print "* " $2 " (file " file ", line " $1 ")" }'
+        if [[ "$file" == "./scripts/package-env" ]]; then
+            grep -h -n -E "$pattern" "$file" | grep -i -E "$type" | sed -E "s|^([^:]*):(.*)|\* \2 (file $file, line \1)|"
+        else
+            grep -h -n -E "$pattern" "$file" | grep -i -E "$type" | grep -v "// indirect" | awk -F':' -v file="$file" -v label="$label" '{ sub(/^[ \t]+/, "", $2); sub(/[ \t]+/, " ", $2); print "* " $2 " (file " file ", line " $1 ")" }'
+        fi
     done | sort -u >> "$COMPONENTSFILE"
 }
 
 echo "# Images with -rc" > "$COMPONENTSFILE"
 for file in "${IMAGE_FILES[@]}"; do
-    grep -h -n -E "rc[0-9]+" "$file" | awk -F':' -v file="$file" '{ sub(/^[ \t]+/, "", $2); sub(/[ \t]+/, " ", $2); print "* " $2 " (file " file ", line " $1 ")" }'
+    grep -h -n -E "rc[.]?[0-9]+" "$file" | awk -F':' -v file="$file" '{ sub(/^[ \t]+/, "", $2); sub(/[ \t]+/, " ", $2); print "* " $2 " (file " file ", line " $1 ")" }'
 done | sort -u >> "$COMPONENTSFILE"
 
-generate_section "rc[0-9]+" "Components with -rc"
+generate_section "rc[.]?[0-9]+" "Components with -rc"
 
 echo "" >> $COMPONENTSFILE
 echo "# Min version components with -rc" >> $COMPONENTSFILE
