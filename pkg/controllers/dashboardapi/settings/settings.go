@@ -10,6 +10,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	managementcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
+	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -148,5 +149,53 @@ func (s *settingsProvider) SetAll(settingsMap map[string]settings.Setting) error
 
 	s.fallback = fallback
 
+	if err := s.cleanupUnknownSettings(settingsMap); err != nil {
+		logrus.Errorf("Error cleaning up unknown settings: %v", err)
+	}
+
 	return nil
+}
+
+const unknownSettingLabelKey = "cattle.io/unknown"
+
+// cleanupUnknownSettings lists all the settings in the cluster and cleans up all unknown (e.g. deprecated) settings.
+// At the moment, we just mark such settings with a label.
+// In the future release we'll be removing them.
+func (s *settingsProvider) cleanupUnknownSettings(settingsMap map[string]settings.Setting) error {
+	list, err := s.settings.List(metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+
+	for _, item := range list.Items {
+		if _, ok := settingsMap[item.Name]; ok {
+			continue
+		}
+
+		if err := s.markSettingAsUnknown(item.Name); err != nil {
+			logrus.Errorf("Error adding label for setting %s: %v", item.Name, err)
+			continue
+		}
+	}
+
+	return nil
+}
+
+// markSettingAsUnknown adds a label to the setting to mark it as unknown.
+func (s *settingsProvider) markSettingAsUnknown(name string) error {
+	logrus.Warnf("Unknown setting %s", name)
+
+	st, err := s.settings.Get(name, metav1.GetOptions{}) // Deliberately re-fetch the setting.
+	if err != nil {
+		return err
+	}
+
+	if st.Labels == nil {
+		st.Labels = map[string]string{}
+	}
+	st.Labels[unknownSettingLabelKey] = "true"
+
+	_, err = s.settings.Update(st)
+
+	return err
 }
