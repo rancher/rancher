@@ -25,21 +25,27 @@ func getHTTPClient(certificate, key string) (*http.Client, error) {
 		return nil, err
 	}
 
-	tlsConfig := &tls.Config{}
 	if certificate != "" && key != "" {
 		certs, err := getClientCertificates(certificate, key)
 		if err != nil {
 			return nil, err
 		}
-		tlsConfig.Certificates = certs
+
 		pool.AppendCertsFromPEM([]byte(certificate))
+		return &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{
+					RootCAs:      pool,
+					Certificates: certs,
+				},
+			},
+		}, nil
 	}
 
-	tlsConfig.RootCAs = pool
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.TLSClientConfig.RootCAs = pool
 	return &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: tlsConfig,
-		},
+		Transport: transport,
 	}, nil
 }
 
