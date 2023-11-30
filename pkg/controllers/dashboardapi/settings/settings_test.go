@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/utils/pointer"
 )
 
 type testCase struct {
@@ -51,6 +52,15 @@ func TestSetAll(t *testing.T) {
 		return s, nil
 	}).AnyTimes()
 
+	settingClient.EXPECT().List(gomock.Any()).DoAndReturn(func(opts metav1.ListOptions) (*v3.SettingList, error) {
+		var items []v3.Setting
+		for _, setting := range settingsETCD {
+			items = append(items, *setting)
+		}
+
+		return &v3.SettingList{Items: items}, nil
+	}).Times(1)
+
 	settingMap := make(map[string]settings.Setting)
 	for _, test := range testCases {
 		settingMap[test.newSetting.Name] = test.newSetting
@@ -62,8 +72,18 @@ func TestSetAll(t *testing.T) {
 
 		settingsETCD[test.newSetting.Name] = test.existingSetting
 	}
+
+	settingsETCD["unknown"] = &v3.Setting{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "unknown",
+		},
+		Value:   "unknown",
+		Default: "unknown",
+	}
+
 	err := testSettingsProvider.SetAll(settingMap)
 	assert.Nil(t, err, "set all should not return an error")
+
 	for _, test := range testCases {
 		finalSetting, err := testSettingsProvider.settings.Get(test.newSetting.Name, metav1.GetOptions{})
 		assert.Nil(t, err)
@@ -97,6 +117,10 @@ func TestSetAll(t *testing.T) {
 
 		assert.Equal(t, expectedFallbackVal, fallbackValue, fallbackFailMsg)
 	}
+
+	assert.NotNil(t, settingsETCD["unknown"].Labels)
+	assert.Equal(t, settingsETCD["unknown"].Labels["cattle.io/unknown"], "true")
+
 	cannotCreateClient := fake.NewMockNonNamespacedControllerInterface[*v3.Setting, *v3.SettingList](gomock.NewController(t))
 	testSettingsProvider = settingsProvider{
 		settings: cannotCreateClient,
@@ -174,6 +198,10 @@ func TestSetAll(t *testing.T) {
 		return s, nil
 	}).AnyTimes()
 
+	alreadyExistsCreateClient.EXPECT().List(gomock.Any()).DoAndReturn(func(opts metav1.ListOptions) (*v3.SettingList, error) {
+		return &v3.SettingList{}, nil
+	}).Times(1)
+
 	settingsETCD = make(map[string]*v3.Setting)
 
 	err = testSettingsProvider.SetAll(settingMap)
@@ -185,7 +213,7 @@ func populateTestCases() []*testCase {
 	testCases := []*testCase{
 		{
 			description: "test an existing setting with val and empty source being reconfigured with env var uses the value from env var",
-			envVar:      stringPtr("notempty"),
+			envVar:      pointer.String("notempty"),
 			newDefVal:   "abc",
 			existingSetting: &v3.Setting{
 				Value:   "somethingelse",
@@ -214,7 +242,7 @@ func populateTestCases() []*testCase {
 		{
 			description: "test an existing setting with val and \"env\" source being reconfigured with env var updates value to the new env var value",
 			newDefVal:   "abc",
-			envVar:      stringPtr("notempty"),
+			envVar:      pointer.String("notempty"),
 			existingSetting: &v3.Setting{
 				Value:   "somethingelse",
 				Default: "abc",
@@ -225,12 +253,12 @@ func populateTestCases() []*testCase {
 			description: "test a setting that doesn't exist with val and \"env\" source being configured with env var creates setting with" +
 				" env var value and \"env\" source",
 			newDefVal: "abc",
-			envVar:    stringPtr("notempty"),
+			envVar:    pointer.String("notempty"),
 		},
 		{
 			description: "test that setting an empty string value using an environment variable works when the env var was not used prior",
 			newDefVal:   "abc",
-			envVar:      stringPtr(""),
+			envVar:      pointer.String(""),
 			existingSetting: &v3.Setting{
 				Value:   "somethingelse",
 				Default: "abc",
@@ -239,7 +267,7 @@ func populateTestCases() []*testCase {
 		{
 			description: "test that setting an empty string value using an environment variable works when the env var was used prior.",
 			newDefVal:   "abc",
-			envVar:      stringPtr(""),
+			envVar:      pointer.String(""),
 			existingSetting: &v3.Setting{
 				Value:   "somethingelse",
 				Default: "abc",
@@ -258,8 +286,4 @@ func populateTestCases() []*testCase {
 		test.existingSetting.Name = settingName
 	}
 	return testCases
-}
-
-func stringPtr(val string) *string {
-	return &val
 }
