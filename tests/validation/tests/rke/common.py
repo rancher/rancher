@@ -147,13 +147,16 @@ def wait_for_etcd_cluster_health(node, etcd_private_ip=False):
         )
     else:
         etcd_tls_cmd = (
-            'ETCDCTL_API=3 etcdctl endpoint health --cluster'
+            'etcdctl endpoint health --cluster'
         )
 
     print(etcd_tls_cmd)
     start_time = time.time()
     while start_time - time.time() < 120:
-        result = node.docker_exec('etcd', "sh -c '" + etcd_tls_cmd + "'")
+        if k8s_rancher_version <= k8s_fixed_version:
+            result = node.docker_exec('etcd', "sh -c '" + etcd_tls_cmd + "'")
+        else:
+            result = node.docker_exec('etcd', etcd_tls_cmd)
         print("**RESULT**")
         print(result)
         if k8s_rancher_version <= k8s_fixed_version:
