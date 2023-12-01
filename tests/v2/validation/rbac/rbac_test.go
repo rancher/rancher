@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
 	"github.com/rancher/shepherd/extensions/clusters"
+	"github.com/rancher/shepherd/extensions/projects"
 	"github.com/rancher/shepherd/extensions/rbac"
 	"github.com/rancher/shepherd/extensions/users"
 	"github.com/rancher/shepherd/pkg/config"
@@ -48,19 +49,19 @@ func (rb *RBTestSuite) SetupSuite() {
 
 }
 
-func (rb *RBTestSuite) sequentialTestRBAC(role, member string, user *management.User) {
+func (rb *RBTestSuite) sequentialTestRBAC(role rbac.Role, member string, user *management.User) {
 	standardClient, err := rb.client.AsUser(user)
 	require.NoError(rb.T(), err)
 
-	adminProject, err := createProject(rb.client, rb.cluster.ID)
+	adminProject, err := rb.client.Management.Project.Create(projects.NewProjectConfig(rb.cluster.ID))
 	require.NoError(rb.T(), err)
 
-	if member == standardUser {
-		if strings.Contains(role, "project") {
-			err := users.AddProjectMember(rb.client, adminProject, user, role, nil)
+	if member == rbac.ClusterMember.String() {
+		if strings.Contains(role.String(), "project") {
+			err := users.AddProjectMember(rb.client, adminProject, user, role.String(), nil)
 			require.NoError(rb.T(), err)
 		} else {
-			err := users.AddClusterRoleToUser(rb.client, rb.cluster, user, role, nil)
+			err := users.AddClusterRoleToUser(rb.client, rb.cluster, user, role.String(), nil)
 			require.NoError(rb.T(), err)
 		}
 	}
@@ -68,43 +69,43 @@ func (rb *RBTestSuite) sequentialTestRBAC(role, member string, user *management.
 	standardClient, err = standardClient.ReLogin()
 	require.NoError(rb.T(), err)
 
-	additionalUser, err := users.CreateUserWithRole(rb.client, users.UserConfig(), standardUser)
+	additionalUser, err := users.CreateUserWithRole(rb.client, users.UserConfig(), rbac.StandardUser.String())
 	require.NoError(rb.T(), err)
 
-	rb.Run("Validating Global Role Binding is created for "+role, func() {
+	rb.Run("Validating Global Role Binding is created for "+role.String(), func() {
 		rbac.VerifyGlobalRoleBindingsForUser(rb.T(), user, rb.client)
 	})
-	rb.Run("Validating if "+role+" can list any downstream clusters", func() {
+	rb.Run("Validating if "+role.String()+" can list any downstream clusters", func() {
 		rbac.VerifyUserCanListCluster(rb.T(), rb.client, standardClient, rb.cluster.ID, role)
 	})
-	rb.Run("Validating if members with role "+role+" are able to list all projects", func() {
-		rbac.VerifyUserCanListProject(rb.T(), rb.client, standardClient, rb.cluster.ID, role, adminProject.Name)
+	rb.Run("Validating if members with role "+role.String()+" are able to list all projects", func() {
+		rbac.VerifyUserCanListProject(rb.T(), rb.client, standardClient, rb.cluster.ID, adminProject.Name, role)
 	})
-	rb.Run("Validating if members with role "+role+" is able to create a project in the cluster", func() {
+	rb.Run("Validating if members with role "+role.String()+" is able to create a project in the cluster", func() {
 		rbac.VerifyUserCanCreateProjects(rb.T(), rb.client, standardClient, rb.cluster.ID, role)
 	})
-	rb.Run("Validate namespaces checks for members with role "+role, func() {
+	rb.Run("Validate namespaces checks for members with role "+role.String(), func() {
 		rbac.VerifyUserCanCreateNamespace(rb.T(), rb.client, standardClient, adminProject, rb.cluster.ID, role)
 	})
-	rb.Run("Validating if "+role+" can lists all namespaces in a cluster.", func() {
+	rb.Run("Validating if "+role.String()+" can lists all namespaces in a cluster.", func() {
 		rbac.VerifyUserCanListNamespace(rb.T(), rb.client, standardClient, adminProject, rb.cluster.ID, role)
 	})
-	rb.Run("Validating if "+role+" can delete a namespace from a project they own.", func() {
+	rb.Run("Validating if "+role.String()+" can delete a namespace from a project they own.", func() {
 		rbac.VerifyUserCanDeleteNamespace(rb.T(), rb.client, standardClient, adminProject, rb.cluster.ID, role)
 	})
-	rb.Run("Validating if member with role "+role+" can add members to the cluster", func() {
+	rb.Run("Validating if member with role "+role.String()+" can add members to the cluster", func() {
 		rbac.VerifyUserCanAddClusterRoles(rb.T(), rb.client, standardClient, rb.cluster, role)
 	})
-	rb.Run("Validating if member with role "+role+" can add members to the project", func() {
-		if strings.Contains(role, "project") {
-			rbac.VerifyUserCanAddProjectRoles(rb.T(), standardClient, adminProject, additionalUser, roleProjectOwner, rb.cluster.ID, role)
+	rb.Run("Validating if member with role "+role.String()+" can add members to the project", func() {
+		if strings.Contains(role.String(), "project") {
+			rbac.VerifyUserCanAddProjectRoles(rb.T(), standardClient, adminProject, additionalUser, rbac.ProjectOwner.String(), rb.cluster.ID, role)
 		}
 	})
-	rb.Run("Validating if member with role "+role+" can delete a project they are not owner of ", func() {
+	rb.Run("Validating if member with role "+role.String()+" can delete a project they are not owner of ", func() {
 		rbac.VerifyUserCanDeleteProject(rb.T(), standardClient, adminProject, role)
 	})
-	rb.Run("Validating if member with role "+role+" is removed from the cluster and returns nil clusters", func() {
-		if strings.Contains(role, "cluster") {
+	rb.Run("Validating if member with role "+role.String()+" is removed from the cluster and returns nil clusters", func() {
+		if strings.Contains(role.String(), "cluster") {
 			rbac.VerifyUserCanRemoveClusterRoles(rb.T(), rb.client, user)
 		}
 	})
@@ -113,14 +114,14 @@ func (rb *RBTestSuite) sequentialTestRBAC(role, member string, user *management.
 func (rb *RBTestSuite) TestRBAC() {
 	tests := []struct {
 		name   string
-		role   string
+		role   rbac.Role
 		member string
 	}{
-		{"Cluster Owner", roleOwner, standardUser},
-		{"Cluster Member", roleMember, standardUser},
-		{"Project Owner", roleProjectOwner, standardUser},
-		{"Project Member", roleProjectMember, standardUser},
-		{"Restricted Admin", restrictedAdmin, restrictedAdmin},
+		{"Cluster Owner", rbac.ClusterOwner, rbac.StandardUser.String()},
+		{"Cluster Member", rbac.ClusterMember, rbac.StandardUser.String()},
+		{"Project Owner", rbac.ProjectOwner, rbac.StandardUser.String()},
+		{"Project Member", rbac.ProjectMember, rbac.StandardUser.String()},
+		{"Restricted Admin", rbac.RestrictedAdmin, rbac.RestrictedAdmin.String()},
 	}
 
 	for _, tt := range tests {
@@ -142,11 +143,11 @@ func (rb *RBTestSuite) TestRBAC() {
 
 func (rb *RBTestSuite) TestRBACDynamicInput() {
 	roles := map[string]string{
-		"cluster-owner":    roleOwner,
-		"cluster-member":   roleMember,
-		"project-owner":    roleProjectOwner,
-		"project-member":   roleProjectMember,
-		"restricted-admin": restrictedAdmin,
+		"cluster-owner":    rbac.ClusterOwner.String(),
+		"cluster-member":   rbac.ClusterMember.String(),
+		"project-owner":    rbac.ProjectOwner.String(),
+		"project-member":   rbac.ProjectMember.String(),
+		"restricted-admin": rbac.RestrictedAdmin.String(),
 	}
 	var member string
 	userConfig := new(rbac.Config)
@@ -163,17 +164,17 @@ func (rb *RBTestSuite) TestRBACDynamicInput() {
 	if userConfig.Role == "" {
 		rb.T().Skip()
 	} else {
-		val, ok := roles[role]
+		val, ok := roles[role.String()]
 		if !ok {
 			rb.FailNow("Incorrect usage of roles. Please go through the readme for correct role configurations")
 		}
-		role = val
+		role = rbac.Role(val)
 	}
 
-	if role == restrictedAdmin {
-		member = restrictedAdmin
+	if role == rbac.RestrictedAdmin {
+		member = rbac.RestrictedAdmin.String()
 	} else {
-		member = standardUser
+		member = rbac.StandardUser.String()
 	}
 	rb.sequentialTestRBAC(role, member, user)
 
