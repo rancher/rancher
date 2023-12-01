@@ -479,6 +479,7 @@ func VerifySSHTests(t *testing.T, client *rancher.Client, clusterObject *steveV1
 
 			clusterNode := &nodes.Node{
 				NodeID:          node.ID,
+				NodeLabels:      node.Labels,
 				PublicIPAddress: nodeIP,
 				SSHUser:         sshUser,
 				SSHKey:          sshkey,

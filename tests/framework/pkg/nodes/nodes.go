@@ -25,11 +25,12 @@ type SSHPath struct {
 
 // Node is a configuration of node that is from an outside cloud provider
 type Node struct {
-	NodeID           string `json:"nodeID" yaml:"nodeID"`
-	PublicIPAddress  string `json:"publicIPAddress" yaml:"publicIPAddress"`
-	PrivateIPAddress string `json:"privateIPAddress" yaml:"privateIPAddress"`
-	SSHUser          string `json:"sshUser" yaml:"sshUser"`
-	SSHKeyName       string `json:"sshKeyName" yaml:"sshKeyName"`
+	NodeID           string            `json:"nodeID" yaml:"nodeID"`
+	NodeLabels       map[string]string `json:"nodeLabels" yaml:"nodeLabels"`
+	PublicIPAddress  string            `json:"publicIPAddress" yaml:"publicIPAddress"`
+	PrivateIPAddress string            `json:"privateIPAddress" yaml:"privateIPAddress"`
+	SSHUser          string            `json:"sshUser" yaml:"sshUser"`
+	SSHKeyName       string            `json:"sshKeyName" yaml:"sshKeyName"`
 	SSHKey           []byte
 }
 
