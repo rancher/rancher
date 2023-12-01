@@ -11,8 +11,9 @@ import (
 	managementcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/sirupsen/logrus"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/retry"
 )
 
 func Register(settingController managementcontrollers.SettingController) error {
@@ -35,17 +36,24 @@ func (s *settingsProvider) Get(name string) string {
 	if value != "" {
 		return value
 	}
+
 	obj, err := s.settingCache.Get(name)
 	if err != nil {
+		logrus.Errorf("Error getting setting %s: %v", name, err)
+
 		val, err := s.settings.Get(name, metav1.GetOptions{})
 		if err != nil {
 			return s.fallback[name]
 		}
 		obj = val
+	} else {
+		logrus.Infof("Using cached setting %s", name)
 	}
+
 	if obj.Value == "" {
 		return obj.Default
 	}
+
 	return obj.Value
 }
 
@@ -91,7 +99,7 @@ func (s *settingsProvider) SetAll(settingsMap map[string]settings.Setting) error
 		envValue, envOk := os.LookupEnv(key)
 
 		obj, err := s.settings.Get(setting.Name, metav1.GetOptions{})
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			newSetting := &v3.Setting{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: setting.Name,
@@ -110,7 +118,7 @@ func (s *settingsProvider) SetAll(settingsMap map[string]settings.Setting) error
 			_, err := s.settings.Create(newSetting)
 			// Rancher will race in an HA setup to try and create the settings
 			// so if it exists just move on.
-			if err != nil && !errors.IsAlreadyExists(err) {
+			if err != nil && !apierrors.IsAlreadyExists(err) {
 				return err
 			}
 		} else if err != nil {
@@ -162,18 +170,19 @@ const unknownSettingLabelKey = "cattle.io/unknown"
 // At the moment, we just mark such settings with a label.
 // In the future release we'll be removing them.
 func (s *settingsProvider) cleanupUnknownSettings(settingsMap map[string]settings.Setting) error {
+	// The settings cache is not yet available at this point, thus using the client directly.
 	list, err := s.settings.List(metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
 
-	for _, item := range list.Items {
-		if _, ok := settingsMap[item.Name]; ok {
+	for _, setting := range list.Items {
+		if _, ok := settingsMap[setting.Name]; ok {
 			continue
 		}
 
-		if err := s.markSettingAsUnknown(item.Name); err != nil {
-			logrus.Errorf("Error adding label for setting %s: %v", item.Name, err)
+		if err := s.markSettingAsUnknown(&setting); err != nil {
+			logrus.Errorf("Error adding label %s to setting %s: %v", unknownSettingLabelKey, setting.Name, err)
 			continue
 		}
 	}
@@ -182,20 +191,33 @@ func (s *settingsProvider) cleanupUnknownSettings(settingsMap map[string]setting
 }
 
 // markSettingAsUnknown adds a label to the setting to mark it as unknown.
-func (s *settingsProvider) markSettingAsUnknown(name string) error {
-	logrus.Warnf("Unknown setting %s", name)
+func (s *settingsProvider) markSettingAsUnknown(setting *v3.Setting) error {
+	logrus.Warnf("Unknown setting %s", setting.Name)
 
-	st, err := s.settings.Get(name, metav1.GetOptions{}) // Deliberately re-fetch the setting.
-	if err != nil {
+	var try int
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		defer func() { try++ }()
+
+		var err error
+
+		if try > 0 { // Refetch only if the first attempt to update failed.
+			setting, err = s.settings.Get(setting.Name, metav1.GetOptions{})
+			if err != nil {
+				if apierrors.IsNotFound(err) { // The setting is no longer, move on.
+					return nil
+				}
+				return err
+			}
+		}
+
+		if setting.Labels == nil {
+			setting.Labels = map[string]string{}
+		}
+		setting.Labels[unknownSettingLabelKey] = "true"
+
+		_, err = s.settings.Update(setting)
 		return err
-	}
-
-	if st.Labels == nil {
-		st.Labels = map[string]string{}
-	}
-	st.Labels[unknownSettingLabelKey] = "true"
-
-	_, err = s.settings.Update(st)
+	})
 
 	return err
 }

@@ -10,8 +10,7 @@ import (
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/wrangler/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
-
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/utils/pointer"
@@ -25,9 +24,9 @@ type testCase struct {
 	existingSetting *v3.Setting
 }
 
-var settingsETCD = make(map[string]*v3.Setting)
-
 func TestSetAll(t *testing.T) {
+	settingsETCD := make(map[string]*v3.Setting)
+
 	settingClient := fake.NewMockNonNamespacedControllerInterface[*v3.Setting, *v3.SettingList](gomock.NewController(t))
 	testSettingsProvider := settingsProvider{
 		settings: settingClient,
@@ -37,7 +36,7 @@ func TestSetAll(t *testing.T) {
 	settingClient.EXPECT().Get(gomock.Any(), gomock.Any()).DoAndReturn(func(name string, options metav1.GetOptions) (*v3.Setting, error) {
 		val := settingsETCD[name]
 		if val == nil {
-			return nil, errors.NewNotFound(schema.GroupResource{}, name)
+			return nil, apierrors.NewNotFound(schema.GroupResource{}, name)
 		}
 		return val, nil
 	}).AnyTimes()
@@ -128,14 +127,14 @@ func TestSetAll(t *testing.T) {
 	cannotCreateClient.EXPECT().Get(gomock.Any(), gomock.Any()).DoAndReturn(func(name string, options metav1.GetOptions) (*v3.Setting, error) {
 		val := settingsETCD[name]
 		if val == nil {
-			return nil, errors.NewNotFound(schema.GroupResource{}, name)
+			return nil, apierrors.NewNotFound(schema.GroupResource{}, name)
 		}
 		return val, nil
 	}).AnyTimes()
 
 	// Test when setting client's Create method fails
 	cannotCreateClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(setting *v3.Setting) (*v3.Setting, error) {
-		return nil, errors.NewServiceUnavailable("some error")
+		return nil, apierrors.NewServiceUnavailable("some error")
 	}).AnyTimes()
 
 	cannotCreateClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(s *v3.Setting) (*v3.Setting, error) {
@@ -155,7 +154,7 @@ func TestSetAll(t *testing.T) {
 	cannotUpdateClient.EXPECT().Get(gomock.Any(), gomock.Any()).DoAndReturn(func(name string, options metav1.GetOptions) (*v3.Setting, error) {
 		val := settingsETCD[name]
 		if val == nil {
-			return nil, errors.NewNotFound(schema.GroupResource{}, name)
+			return nil, apierrors.NewNotFound(schema.GroupResource{}, name)
 		}
 		return val, nil
 	}).AnyTimes()
@@ -167,7 +166,7 @@ func TestSetAll(t *testing.T) {
 
 	// Test when setting client's Update method fails
 	cannotUpdateClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(s *v3.Setting) (*v3.Setting, error) {
-		return nil, errors.NewServiceUnavailable("some error")
+		return nil, apierrors.NewServiceUnavailable("some error")
 	}).AnyTimes()
 
 	settingsETCD = make(map[string]*v3.Setting)
@@ -183,14 +182,14 @@ func TestSetAll(t *testing.T) {
 	alreadyExistsCreateClient.EXPECT().Get(gomock.Any(), gomock.Any()).DoAndReturn(func(name string, options metav1.GetOptions) (*v3.Setting, error) {
 		val := settingsETCD[name]
 		if val == nil {
-			return nil, errors.NewNotFound(schema.GroupResource{}, name)
+			return nil, apierrors.NewNotFound(schema.GroupResource{}, name)
 		}
 		return val, nil
 	}).AnyTimes()
 
 	// Test when setting client's Update method fails with AlreadyExists error
 	alreadyExistsCreateClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(setting *v3.Setting) (*v3.Setting, error) {
-		return nil, errors.NewAlreadyExists(schema.GroupResource{}, "some error")
+		return nil, apierrors.NewAlreadyExists(schema.GroupResource{}, "some error")
 	}).AnyTimes()
 
 	alreadyExistsCreateClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(s *v3.Setting) (*v3.Setting, error) {
@@ -286,4 +285,51 @@ func populateTestCases() []*testCase {
 		test.existingSetting.Name = settingName
 	}
 	return testCases
+}
+
+func TestMarkSettingAsUnknownRetry(t *testing.T) {
+	settingsETCD := map[string]v3.Setting{
+		"unknown": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "unknown",
+			},
+			Value:   "unknown",
+			Default: "unknown",
+		},
+	}
+
+	client := fake.NewMockNonNamespacedControllerInterface[*v3.Setting, *v3.SettingList](gomock.NewController(t))
+
+	client.EXPECT().Get(gomock.Any(), gomock.Any()).DoAndReturn(func(name string, options metav1.GetOptions) (*v3.Setting, error) {
+		val, ok := settingsETCD[name]
+		if !ok {
+			return nil, apierrors.NewNotFound(schema.GroupResource{}, name)
+		}
+
+		return &val, nil
+	}).Times(1)
+
+	var updateRun int
+	client.EXPECT().Update(gomock.Any()).DoAndReturn(func(s *v3.Setting) (*v3.Setting, error) {
+		defer func() { updateRun++ }()
+
+		if updateRun == 0 { // Fail the the first update to force retry.
+			return nil, apierrors.NewConflict(schema.GroupResource{}, s.Name, fmt.Errorf("some error"))
+		}
+
+		settingsETCD[s.Name] = *s
+		return s, nil
+	}).Times(2)
+
+	provider := settingsProvider{
+		settings: client,
+	}
+
+	unknown := settingsETCD["unknown"]
+
+	err := provider.markSettingAsUnknown(&unknown)
+	assert.Nil(t, err)
+
+	assert.NotNil(t, settingsETCD["unknown"].Labels)
+	assert.Equal(t, settingsETCD["unknown"].Labels["cattle.io/unknown"], "true")
 }
