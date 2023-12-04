@@ -23,7 +23,7 @@ type Client struct {
 }
 
 // NewForConfig creates a new dynamic client or returns an error.
-func NewForConfig(ts *session.Session, inConfig *rest.Config) (dynamic.Interface, error) {
+func NewForConfig(ts *session.Session, inConfig *rest.Config) (*Client, error) {
 	logrus.Debugf("Dynamic Client Host:%s", inConfig.Host)
 
 	dynamicClient, err := dynamic.NewForConfig(inConfig)
@@ -44,7 +44,7 @@ func NewForConfig(ts *session.Session, inConfig *rest.Config) (dynamic.Interface
 //		  Version:  "v3",
 //		  Resource: "users",
 //	 }
-func (d *Client) Resource(resource schema.GroupVersionResource) dynamic.NamespaceableResourceInterface {
+func (d *Client) Resource(resource schema.GroupVersionResource) *NamespaceableResourceClient {
 	return &NamespaceableResourceClient{
 		NamespaceableResourceInterface: d.Interface.Resource(resource),
 		ts:                             d.ts,
@@ -59,7 +59,7 @@ type NamespaceableResourceClient struct {
 }
 
 // Namespace returns a dynamic.ResourceInterface that is embedded in ResourceClient, so ultimately its Create is overwritten.
-func (d *NamespaceableResourceClient) Namespace(s string) dynamic.ResourceInterface {
+func (d *NamespaceableResourceClient) Namespace(s string) *ResourceClient {
 	return &ResourceClient{
 		ResourceInterface: d.NamespaceableResourceInterface.Namespace(s),
 		ts:                d.ts,

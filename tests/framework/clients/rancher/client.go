@@ -16,6 +16,7 @@ import (
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
 
+	rancherDynamic "github.com/rancher/rancher/tests/framework/clients/dynamic"
 	kubeProvisioning "github.com/rancher/rancher/tests/framework/clients/provisioning"
 	kubeRKE "github.com/rancher/rancher/tests/framework/clients/rke"
 	"github.com/rancher/rancher/tests/framework/pkg/clientbase"
@@ -25,7 +26,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
@@ -202,7 +202,7 @@ func (c *Client) GetClusterCatalogClient(clusterID string) (*catalog.Client, err
 }
 
 // GetRancherDynamicClient is a helper function that instantiates a dynamic client to communicate with the rancher host.
-func (c *Client) GetRancherDynamicClient() (dynamic.Interface, error) {
+func (c *Client) GetRancherDynamicClient() (*rancherDynamic.Client, error) {
 	dynamic, err := frameworkDynamic.NewForConfig(c.Session, c.restConfig)
 	if err != nil {
 		return nil, err
@@ -231,7 +231,7 @@ func (c *Client) GetKubeAPIRKEClient() (*kubeRKE.Client, error) {
 }
 
 // GetDownStreamClusterClient is a helper function that instantiates a dynamic client to communicate with a specific cluster.
-func (c *Client) GetDownStreamClusterClient(clusterID string) (dynamic.Interface, error) {
+func (c *Client) GetDownStreamClusterClient(clusterID string) (*rancherDynamic.Client, error) {
 	restConfig := *c.restConfig
 	restConfig.Host = fmt.Sprintf("https://%s/k8s/clusters/%s", c.restConfig.Host, clusterID)
 
@@ -243,7 +243,7 @@ func (c *Client) GetDownStreamClusterClient(clusterID string) (dynamic.Interface
 }
 
 // SwitchContext is a helper function that changes the current context to `context` and instantiates a dynamic client
-func (c *Client) SwitchContext(context string, clientConfig *clientcmd.ClientConfig) (dynamic.Interface, error) {
+func (c *Client) SwitchContext(context string, clientConfig *clientcmd.ClientConfig) (*rancherDynamic.Client, error) {
 	overrides := clientcmd.ConfigOverrides{CurrentContext: context}
 
 	rawConfig, err := (*clientConfig).RawConfig()

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	apiv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	rancherDynamic "github.com/rancher/rancher/tests/framework/clients/dynamic"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
@@ -17,7 +18,6 @@ import (
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kwait "k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/dynamic"
 )
 
 var podGroupVersionResource = corev1.SchemeGroupVersion.WithResource("pods")
@@ -30,7 +30,7 @@ const (
 	outputDir             = "cover"
 )
 
-func checkServiceIsRunning(dynamicClient dynamic.Interface) error {
+func checkServiceIsRunning(dynamicClient rancherDynamic.Client) error {
 	return kwait.Poll(500*time.Millisecond, 2*time.Minute, func() (done bool, err error) {
 		_, err = dynamicClient.Resource(podGroupVersionResource).Namespace(cattleSystemNameSpace).List(context.Background(), metav1.ListOptions{})
 		if k8sErrors.IsInternalError(err) || k8sErrors.IsServiceUnavailable(err) {
@@ -120,7 +120,7 @@ func KillRancherTestServicesRetrieveCoverage(client *rancher.Client) error {
 		return err
 	}
 
-	err = checkServiceIsRunning(dynamicClient)
+	err = checkServiceIsRunning(*dynamicClient)
 	if err != nil {
 		return err
 	}
@@ -169,7 +169,7 @@ func KillAgentTestServicesRetrieveCoverage(client *rancher.Client) error {
 				return err
 			}
 
-			err = checkServiceIsRunning(dynamicClient)
+			err = checkServiceIsRunning(*dynamicClient)
 			if err != nil {
 				return err
 			}
