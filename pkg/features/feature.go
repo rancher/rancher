@@ -119,6 +119,12 @@ var (
 		false,
 		false,
 		true)
+	AuthMTLSRespectProxy = newFeature(
+		"auth-mtls-respect-proxy",
+		"[Experimental]: Respect HTTP proxy settings when mTLS is configured on authentication configs",
+		false,
+		false,
+		true)
 )
 
 type Feature struct {

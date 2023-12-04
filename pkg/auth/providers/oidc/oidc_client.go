@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/coreos/go-oidc/v3/oidc"
+	"github.com/rancher/rancher/pkg/features"
 )
 
 func AddCertKeyToContext(ctx context.Context, certificate, key string) (context.Context, error) {
@@ -29,12 +30,18 @@ func GetClientWithCertKey(httpClient *http.Client, certificate, key string) erro
 		}
 		caCertPool := x509.NewCertPool()
 		caCertPool.AppendCertsFromPEM([]byte(certificate))
-		httpClient.Transport = &http.Transport{
+		transport := &http.Transport{
 			TLSClientConfig: &tls.Config{
 				RootCAs:      caCertPool,
 				Certificates: []tls.Certificate{keyPair},
 			},
 		}
+
+		if features.AuthMTLSRespectProxy.Enabled() {
+			transport.Proxy = http.ProxyFromEnvironment
+		}
+
+		httpClient.Transport = transport
 	}
 	return nil
 }
