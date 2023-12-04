@@ -113,3 +113,25 @@ func CreateGlobalRoleBinding(client *rancher.Client, globalRoleBinding *v3.Globa
 
 	return newGlobalRoleBinding, nil
 }
+
+// CreateProjectRoleTemplateBinding is a helper function that uses the dynamic client to create a project role template binding.
+func CreateProjectRoleTemplateBinding(client *rancher.Client, prtb *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error) {
+	dynamicClient, err := client.GetDownStreamClusterClient(localcluster)
+	if err != nil {
+		return nil, err
+	}
+
+	ProjectRoleTemplateBindingResource := dynamicClient.Resource(ProjectRoleTemplateBindingGroupVersionResource).Namespace(prtb.Namespace)
+	unstructuredResp, err := ProjectRoleTemplateBindingResource.Create(context.TODO(), unstructured.MustToUnstructured(prtb), metav1.CreateOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	newprtb := &v3.ProjectRoleTemplateBinding{}
+	err = scheme.Scheme.Convert(unstructuredResp, newprtb, unstructuredResp.GroupVersionKind())
+	if err != nil {
+		return nil, err
+	}
+
+	return newprtb, nil
+}
