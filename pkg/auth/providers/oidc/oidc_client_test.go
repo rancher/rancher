@@ -11,6 +11,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/oauth2"
 	"math/big"
 	"net"
@@ -87,83 +88,7 @@ func createClientCert(ca *x509.Certificate, rootKey *rsa.PrivateKey) ([]byte, []
 	return certPEM, keyPEM, nil
 }
 
-func TestGetClientCertificates(t *testing.T) {
-	rootCA, rootKey, err := createCert(true)
-	if err != nil {
-		t.Fatalf("unable to create test CA Key: %s", err)
-	}
-
-	rootCABytes, err := x509.CreateCertificate(rand.Reader, rootCA, rootCA, &rootKey.PublicKey, rootKey)
-	if err != nil {
-		t.Fatalf("unable to parse generated CA certs")
-	}
-
-	_, rootKeyPem := getPEMBytes(rootCABytes, rootKey)
-
-	clientCertBytes, clientKeyBytes, err := createClientCert(rootCA, rootKey)
-	if err != nil {
-		t.Fatalf("unable to generate test client cert")
-	}
-
-	cert, err := tls.X509KeyPair(clientCertBytes, clientKeyBytes)
-	if err != nil {
-		t.Fatalf("unable to parse generated certs")
-	}
-
-	testCases := []struct {
-		name       string
-		cert       string
-		key        string
-		shouldFail bool
-		wantCerts  []tls.Certificate
-	}{
-		{
-			name:       "no cert or key",
-			cert:       "",
-			key:        "",
-			shouldFail: true,
-			wantCerts:  nil,
-		},
-		{
-			name:       "valid cert and key",
-			cert:       string(clientCertBytes),
-			key:        string(clientKeyBytes),
-			shouldFail: false,
-			wantCerts:  []tls.Certificate{cert},
-		},
-		{
-			name:       "valid cert with no key",
-			cert:       string(clientCertBytes),
-			key:        "",
-			shouldFail: true,
-			wantCerts:  nil,
-		},
-		{
-			name:       "no cert with valid key",
-			cert:       "",
-			key:        string(clientKeyBytes),
-			shouldFail: true,
-			wantCerts:  nil,
-		},
-		{
-			name:       "mismatched cert and key",
-			cert:       string(clientCertBytes),
-			key:        string(rootKeyPem),
-			shouldFail: true,
-			wantCerts:  nil,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			got, err := getClientCertificates(tc.cert, tc.key)
-			assert.Equal(t, err != nil, tc.shouldFail)
-			assert.Equal(t, tc.wantCerts, got, "cert did not match desired")
-		})
-	}
-}
-
-func TestGetHTTPClient(t *testing.T) {
+func TestAddCertKeyToContext(t *testing.T) {
 	rootCA, rootKey, err := createCert(true)
 	if err != nil {
 		t.Fatalf("unable to create test CA Key: %s", err)
@@ -241,11 +166,14 @@ func TestGetHTTPClient(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := getHTTPClient(tc.cert, tc.key)
+			ctx, err := AddCertKeyToContext(context.Background(), tc.cert, tc.key)
 			assert.Equal(t, err != nil, tc.shouldFail)
 			if tc.shouldFail && err != nil {
 				return
 			}
+
+			got, ok := ctx.Value(oauth2.HTTPClient).(*http.Client)
+			require.True(t, ok, "expected to find an http client accessible in the context but didn't")
 
 			gotTransport := got.Transport.(*http.Transport)
 			if !gotTransport.TLSClientConfig.RootCAs.Equal(tc.wantPool) {
@@ -253,77 +181,6 @@ func TestGetHTTPClient(t *testing.T) {
 			}
 
 			assert.Equal(t, tc.wantCerts, gotTransport.TLSClientConfig.Certificates, "cert did not match desired")
-		})
-	}
-}
-
-func TestAddCertKeyToContext(t *testing.T) {
-	rootCA, rootKey, err := createCert(true)
-	if err != nil {
-		t.Fatalf("unable to create test CA Key: %s", err)
-	}
-
-	rootCABytes, err := x509.CreateCertificate(rand.Reader, rootCA, rootCA, &rootKey.PublicKey, rootKey)
-	if err != nil {
-		t.Fatalf("unable to parse generated CA certs")
-	}
-
-	_, rootKeyPem := getPEMBytes(rootCABytes, rootKey)
-
-	clientCertBytes, clientKeyBytes, err := createClientCert(rootCA, rootKey)
-	if err != nil {
-		t.Fatalf("unable to generate test client cert")
-	}
-
-	testCases := []struct {
-		name       string
-		cert       string
-		key        string
-		shouldFail bool
-	}{
-		{
-			name:       "no cert or key",
-			cert:       "",
-			key:        "",
-			shouldFail: false,
-		},
-		{
-			name:       "valid cert and key",
-			cert:       string(clientCertBytes),
-			key:        string(clientKeyBytes),
-			shouldFail: false,
-		},
-		{
-			name:       "valid cert with no key",
-			cert:       string(clientCertBytes),
-			key:        "",
-			shouldFail: false,
-		},
-		{
-			name:       "no cert with valid key",
-			cert:       "",
-			key:        string(clientKeyBytes),
-			shouldFail: false,
-		},
-		{
-			name:       "mismatched cert and key",
-			cert:       string(clientCertBytes),
-			key:        string(rootKeyPem),
-			shouldFail: true,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			ctx, err := AddCertKeyToContext(context.Background(), tc.cert, tc.key)
-			assert.Equal(t, err != nil, tc.shouldFail)
-			if tc.shouldFail && err != nil {
-				return
-			}
-
-			if _, ok := ctx.Value(oauth2.HTTPClient).(*http.Client); !ok {
-				t.Fatalf("expected to find an http client accessible in the context but didn't")
-			}
 		})
 	}
 }
