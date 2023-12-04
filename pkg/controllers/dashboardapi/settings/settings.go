@@ -39,15 +39,11 @@ func (s *settingsProvider) Get(name string) string {
 
 	obj, err := s.settingCache.Get(name)
 	if err != nil {
-		logrus.Errorf("Error getting setting %s: %v", name, err)
-
 		val, err := s.settings.Get(name, metav1.GetOptions{})
 		if err != nil {
 			return s.fallback[name]
 		}
 		obj = val
-	} else {
-		logrus.Infof("Using cached setting %s", name)
 	}
 
 	if obj.Value == "" {
