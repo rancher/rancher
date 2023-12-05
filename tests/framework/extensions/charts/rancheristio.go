@@ -7,6 +7,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/steve/catalog/types"
 	catalogv1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
+	"github.com/rancher/rancher/tests/framework/clients/rancher/catalog"
 	"github.com/rancher/rancher/tests/framework/extensions/defaults"
 	kubenamespaces "github.com/rancher/rancher/tests/framework/extensions/kubeapi/namespaces"
 	"github.com/rancher/rancher/tests/framework/extensions/namespaces"
@@ -123,7 +124,7 @@ func InstallRancherIstioChart(client *rancher.Client, installOptions *InstallOpt
 		})
 	})
 
-	err = catalogClient.InstallChart(chartInstallAction)
+	err = catalogClient.InstallChart(chartInstallAction, catalog.RancherChartRepo)
 	if err != nil {
 		return err
 	}
@@ -177,7 +178,7 @@ func newIstioChartInstallAction(p *payloadOpts, rancherIstioOpts *RancherIstioOp
 			"enabled": rancherIstioOpts.CNI,
 		},
 	}
-	chartInstall := newChartInstall(p.Name, p.InstallOptions.Version, p.InstallOptions.ClusterID, p.InstallOptions.ClusterName, p.Host, p.DefaultRegistry, istioValues)
+	chartInstall := newChartInstall(p.Name, p.InstallOptions.Version, p.InstallOptions.ClusterID, p.InstallOptions.ClusterName, p.Host, rancherChartsName, p.ProjectID, p.DefaultRegistry, istioValues)
 	chartInstalls := []types.ChartInstall{*chartInstall}
 
 	chartInstallAction := newChartInstallAction(p.Namespace, p.InstallOptions.ProjectID, chartInstalls)
@@ -212,7 +213,7 @@ func UpgradeRancherIstioChart(client *rancher.Client, installOptions *InstallOpt
 		return err
 	}
 
-	err = catalogClient.UpgradeChart(chartUpgradeAction)
+	err = catalogClient.UpgradeChart(chartUpgradeAction, catalog.RancherChartRepo)
 	if err != nil {
 		return err
 	}
