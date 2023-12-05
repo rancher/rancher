@@ -113,6 +113,12 @@ var (
 		false,
 		false,
 		true)
+	UIPlugin = newFeature(
+		"uiplugin",
+		"Enable UI Plugins when starting Rancher",
+		true,
+		false,
+		true)
 )
 
 type Feature struct {

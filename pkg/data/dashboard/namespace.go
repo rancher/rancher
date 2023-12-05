@@ -34,5 +34,18 @@ func addCattleGlobalNamespaces(ctx context.Context, k8s kubernetes.Interface) er
 			},
 		}, metav1.CreateOptions{})
 	}
+	if features.UIPlugin.Enabled() {
+		_, err := k8s.CoreV1().Namespaces().Get(ctx, namespace.UIPluginNamespace, metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			_, err = k8s.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: namespace.UIPluginNamespace,
+				},
+			}, metav1.CreateOptions{})
+		}
+		if err != nil {
+			return err
+		}
+	}
 	return err
 }
