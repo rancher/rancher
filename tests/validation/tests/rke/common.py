@@ -140,20 +140,20 @@ def wait_for_etcd_cluster_health(node, etcd_private_ip=False):
         endpoints = node.private_ip_address
     if k8s_rancher_version <= k8s_fixed_version:
         etcd_tls_cmd = (
-                'ETCDCTL_API=2 etcdctl --endpoints "https://' + endpoints + ':2379" '
+                'etcdctl --endpoints "https://' + endpoints + ':2379" '
                  ' --ca-file /etc/kubernetes/ssl/kube-ca.pem --cert-file '
                  ' $ETCDCTL_CERT --key-file '
-                 ' $ETCDCTL_KEY cluster-health'
+                 ' $ETCDCTL_KEY cluster-health ETCDCTL_API=2'
         )
     else:
         etcd_tls_cmd = (
-            'ETCDCTL_API=3 etcdctl endpoint health --cluster'
+            'etcdctl endpoint health --cluster ETCDCTL_API=3'
         )
 
     print(etcd_tls_cmd)
     start_time = time.time()
     while start_time - time.time() < 120:
-        result = node.docker_exec('etcd', "sh -c '" + etcd_tls_cmd + "'")
+        result = node.docker_exec('etcd', etcd_tls_cmd)
         print("**RESULT**")
         print(result)
         if k8s_rancher_version <= k8s_fixed_version:
