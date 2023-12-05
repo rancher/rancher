@@ -11,6 +11,7 @@ import (
 	fleetconst "github.com/rancher/rancher/pkg/fleet"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
+	"github.com/rancher/wrangler/pkg/data"
 	"github.com/rancher/wrangler/pkg/relatedresource"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -143,6 +144,13 @@ func (h *handler) onSetting(key string, setting *v3.Setting) (*v3.Setting, error
 	if len(gitjobChartValues) > 0 {
 		fleetChartValues["gitjob"] = gitjobChartValues
 	}
+
+	extraValues, err := h.chartsConfig.GetChartValues(fleetconst.ChartName)
+	if err != nil && !chart.IsNotFoundError(err) {
+		// Missing extra config is okay, return the error otherwise
+		return nil, err
+	}
+	fleetChartValues = data.MergeMaps(fleetChartValues, extraValues)
 
 	return setting,
 		h.manager.Ensure(
