@@ -31,6 +31,7 @@ var (
 	AppResourceName         = "apps"
 	ClusterRepoResourceName = "clusterrepos"
 	OperationResourceName   = "operations"
+	UIPluginResourceName    = "uiplugins"
 )
 
 // SchemeGroupVersion is group version used to register these objects
@@ -60,6 +61,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&ClusterRepoList{},
 		&Operation{},
 		&OperationList{},
+		&UIPlugin{},
+		&UIPluginList{},
 	)
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil

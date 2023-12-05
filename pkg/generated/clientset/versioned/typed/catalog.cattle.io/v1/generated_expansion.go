@@ -23,3 +23,5 @@ type AppExpansion interface{}
 type ClusterRepoExpansion interface{}
 
 type OperationExpansion interface{}
+
+type UIPluginExpansion interface{}

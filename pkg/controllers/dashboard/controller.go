@@ -2,6 +2,8 @@ package dashboard
 
 import (
 	"context"
+	"github.com/rancher/rancher/pkg/controllers/dashboard/plugin"
+	"github.com/rancher/rancher/pkg/namespace"
 
 	"github.com/rancher/rancher/pkg/controllers/capr"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/apiservice"
@@ -46,6 +48,10 @@ func Register(ctx context.Context, wrangler *wrangler.Context, embedded bool, re
 	}
 
 	clusterconnected.Register(ctx, wrangler)
+
+	if features.UIPlugin.Enabled() {
+		plugin.Register(ctx, namespace.UIPluginNamespace, wrangler.Catalog.UIPlugin(), wrangler.Catalog.UIPlugin().Cache())
+	}
 
 	if features.MCM.Enabled() {
 		hostedcluster.Register(ctx, wrangler)

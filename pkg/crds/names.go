@@ -29,6 +29,9 @@ func RequiredCRDs() []string {
 	if features.MonitoringV1.Enabled() {
 		requiredCRDS = append(requiredCRDS, MonitoringV1CRDs()...)
 	}
+	if features.UIPlugin.Enabled() {
+		requiredCRDS = append(requiredCRDS, UIPluginsCRD()...)
+	}
 	return requiredCRDS
 }
 
@@ -191,6 +194,13 @@ func MCMCRDs() []string {
 	}
 }
 
+// UIPluginsCRD returns a list of CRD names needed to enable UIPlugins
+func UIPluginsCRD() []string {
+	return []string{
+		"uiplugins.catalog.cattle.io",
+	}
+}
+
 // MigratedResources map list of resource that have been migrated after all resource have a CRD this can be removed.
 var MigratedResources = map[string]bool{
 	"activedirectoryproviders.management.cattle.io":                   false,
@@ -296,5 +306,6 @@ var MigratedResources = map[string]bool{
 	"tokens.management.cattle.io":                                     false,
 	"userattributes.management.cattle.io":                             false,
 	"users.management.cattle.io":                                      false,
+	"uiplugins.catalog.cattle.io":                                     true,
 	"workloads.project.cattle.io":                                     false,
 }

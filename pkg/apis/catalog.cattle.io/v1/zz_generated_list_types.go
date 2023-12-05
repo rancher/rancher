@@ -74,3 +74,20 @@ func NewOperation(namespace, name string, obj Operation) *Operation {
 	obj.Namespace = namespace
 	return &obj
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// UIPluginList is a list of UIPlugin resources
+type UIPluginList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+
+	Items []UIPlugin `json:"items"`
+}
+
+func NewUIPlugin(namespace, name string, obj UIPlugin) *UIPlugin {
+	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("UIPlugin").ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
