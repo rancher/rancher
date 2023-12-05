@@ -18,6 +18,11 @@ import (
 
 const priorityClassKey = "priorityClassName"
 
+const (
+	fleetChartValuesConfigMapNamespace = "cattle-system"
+	fleetChartValuesConfigMapName      = "fleet-extra-values"
+)
+
 var (
 	fleetCRDChart = chart.Definition{
 		ReleaseNamespace: fleetconst.ReleaseNamespace,
@@ -119,6 +124,15 @@ func (h *handler) onSetting(key string, setting *v3.Setting) (*v3.Setting, error
 		},
 	}
 
+	if extraValues, err := h.chartsConfig.GetChartValues(chart.FleetChartName); err != nil {
+		// Missing extra config is okay, return the error otherwise
+		if !chart.IsNotFoundError(err) {
+			return nil, err
+		}
+	} else {
+		coalesceMap(fleetChartValues, extraValues)
+	}
+
 	gitjobChartValues := make(map[string]interface{})
 
 	if envVal, ok := os.LookupEnv("HTTP_PROXY"); ok {
@@ -153,4 +167,25 @@ func (h *handler) onSetting(key string, setting *v3.Setting) (*v3.Setting, error
 			fleetChartValues,
 			true,
 			"")
+}
+
+// coalesceMap copies src values into dst. If one of the values is a map, it uses recursion
+// TODO: replace with Helm's chartutil.CoalesceTables when the helm fork is updated: https://github.com/helm/helm/blob/main/pkg/chartutil/coalesce.go#L255
+func coalesceMap(dst, src map[string]any) {
+	for key := range src {
+		if _, ok := dst[key]; !ok {
+			dst[key] = src[key]
+			continue
+		}
+
+		switch srcValue := src[key].(type) {
+		case map[string]interface{}:
+			if dstMap, isMap := dst[key].(map[string]any); isMap {
+				coalesceMap(dstMap, srcValue)
+				continue
+			}
+		default:
+			dst[key] = srcValue
+		}
+	}
 }
