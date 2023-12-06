@@ -30,8 +30,7 @@ spec:
     {{- else }}
     solvers:
     - http01:
-        ingress:
-          class: {{ .Values.letsEncrypt.ingress.class }}
+        ingress: {{- .Values.letsEncrypt.ingress | toYaml | trim | nindent 10 }}
     {{- end }}
   {{- end -}}
 {{- end -}}
