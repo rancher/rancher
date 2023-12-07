@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
+	management "github.com/rancher/rancher/pkg/apis/management.cattle.io"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/wrangler/pkg/generic/fake"
@@ -114,11 +115,12 @@ func TestSetAll(t *testing.T) {
 		}
 
 		assert.Equal(t, expectedFallbackVal, fallbackValue, fallbackFailMsg)
+		assert.NotContains(t, finalSetting.Labels, unknownSettingLabelKey)
 	}
 
 	unknown := store["unknown"]
 	assert.NotNil(t, unknown.Labels)
-	assert.Equal(t, unknown.Labels["cattle.io/unknown"], "true")
+	assert.Equal(t, unknown.Labels[unknownSettingLabelKey], "true")
 
 	// Test when setting client's Create method fails.
 	cannotCreateClient := fake.NewMockNonNamespacedControllerInterface[*v3.Setting, *v3.SettingList](gomock.NewController(t))
@@ -265,12 +267,16 @@ func TestMarkSettingAsUnknownRetry(t *testing.T) {
 		},
 	}
 
+	groupResource := schema.GroupResource{
+		Group:    management.GroupName,
+		Resource: v3.SettingResourceName,
+	}
 	client := fake.NewMockNonNamespacedControllerInterface[*v3.Setting, *v3.SettingList](gomock.NewController(t))
 
 	client.EXPECT().Get(gomock.Any(), gomock.Any()).DoAndReturn(func(name string, options metav1.GetOptions) (*v3.Setting, error) {
 		val, ok := store[name]
 		if !ok {
-			return nil, apierrors.NewNotFound(schema.GroupResource{}, name)
+			return nil, apierrors.NewNotFound(groupResource, name)
 		}
 
 		return &val, nil
@@ -281,7 +287,7 @@ func TestMarkSettingAsUnknownRetry(t *testing.T) {
 		defer func() { updateRun++ }()
 
 		if updateRun == 0 { // Fail the the first update to force retry.
-			return nil, apierrors.NewConflict(schema.GroupResource{}, s.Name, fmt.Errorf("some error"))
+			return nil, apierrors.NewConflict(groupResource, s.Name, fmt.Errorf("some error"))
 		}
 
 		store[s.Name] = *s
