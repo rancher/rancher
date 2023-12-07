@@ -161,10 +161,10 @@ func (c FSCache) isCached(name, version string) (bool, error) {
 
 func fsCacheFilepathGlob(pattern string) ([]string, error) {
 	files, err := filepath.Glob(pattern)
-	logrus.Debugf("files matching glob pattern [%s] found in filesystem cache: %+v", pattern, files)
 	if err != nil {
 		return nil, err
 	}
+	logrus.Debugf("files matching glob pattern [%s] found in filesystem cache: %+v", pattern, files)
 
 	return files, nil
 }
