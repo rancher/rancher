@@ -16,8 +16,8 @@ WORKDIR /var/lib/rancher
 ARG ARCH=amd64
 ARG ETCD_UNSUPPORTED_ARCH
 ARG IMAGE_REPO=rancher
-ARG SYSTEM_CHART_DEFAULT_BRANCH=release-v2.8
-ARG CHART_DEFAULT_BRANCH=release-v2.8
+ARG SYSTEM_CHART_DEFAULT_BRANCH=dev-v2.8
+ARG CHART_DEFAULT_BRANCH=dev-v2.8
 ARG PARTNER_CHART_DEFAULT_BRANCH=main
 ARG RKE2_CHART_DEFAULT_BRANCH=main
 # kontainer-driver-metadata branch to be set for specific branch other than dev/master, logic at rancher/rancher/pkg/settings/setting.go
