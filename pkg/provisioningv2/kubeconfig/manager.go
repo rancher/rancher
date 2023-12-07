@@ -30,6 +30,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
 const (
@@ -368,6 +369,9 @@ func (m *Manager) getKubeConfigData(cluster *v1.Cluster, secretName, managementC
 				Name:       cluster.Name,
 				UID:        cluster.UID,
 			}},
+			Labels: map[string]string{
+				capi.ClusterNameLabel: cluster.Name,
+			},
 		},
 		Data: map[string][]byte{
 			"value": data,
