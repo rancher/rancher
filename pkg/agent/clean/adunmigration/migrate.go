@@ -325,10 +325,6 @@ func identifyMigrationWorkUnits(users *v3.UserList, lConn retryableLdapConnectio
 	knownGUIDMissingUnits := map[string]int{}
 	knownDnWorkUnits := map[string]int{}
 
-	// We'll reuse a shared ldap connection to speed up lookups. We need to declare that here, but we'll defer
-	// starting the connection until the first time a lookup is performed
-	sharedLConn := sharedLdapConnection{}
-
 	// Now we'll make two passes over the list of all users. First we need to identify any GUID based users, and
 	// sort them into "found" and "not found" lists. At this stage we might have GUID-based duplicates, and we'll
 	// detect and sort those accordingly
@@ -398,10 +394,6 @@ func identifyMigrationWorkUnits(users *v3.UserList, lConn retryableLdapConnectio
 				usersToMigrate = append(usersToMigrate, migrateUserWorkUnit{guid: guid, distinguishedName: dn, principal: principal, originalUser: userCopy, duplicateUsers: emptyDuplicateList})
 			}
 		}
-	}
-
-	if sharedLConn.isOpen {
-		sharedLConn.lConn.Close()
 	}
 
 	if len(usersToMigrate) == 0 {
