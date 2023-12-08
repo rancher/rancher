@@ -73,6 +73,10 @@ func runMigrations(wranglerContext *wrangler.Context) error {
 		}
 	}
 
+	if err := migrateCAPIKubeconfigs(wranglerContext); err != nil {
+		return fmt.Errorf("failed running capi kubeconfig migration: %w", err)
+	}
+
 	return nil
 }
 
@@ -539,4 +543,61 @@ func insertOrUpdateCondition(d data.Object, desiredCondition summary.Condition) 
 	d.SetNested(conditions, "status", "conditions")
 
 	return true, nil
+}
+
+func migrateCAPIKubeconfigs(w *wrangler.Context) error {
+	logrus.Info("Running CAPI secret migration")
+
+	namespaces, err := w.Core.Namespace().List(metav1.ListOptions{})
+	if err != nil {
+		return fmt.Errorf("listing namespaces: %w", err)
+	}
+
+	for _, ns := range namespaces.Items {
+		clusters, err := w.RKE.RKECluster().List(ns.Name, metav1.ListOptions{})
+		if err != nil {
+			return fmt.Errorf("listing rke2 clusters in namespace %s: %w", ns.Name, err)
+		}
+
+		for _, cluster := range clusters.Items {
+			secretName := fmt.Sprintf("%s-kubeconfig", cluster.Name)
+
+			secret, err := w.Core.Secret().Get(ns.Name, secretName, metav1.GetOptions{})
+			if err != nil {
+				if k8serror.IsNotFound(err) {
+					continue
+				}
+
+				return fmt.Errorf("getting secret %s/%s: %w", ns.Name, secretName, err)
+			}
+
+			_, ok := secret.Labels[capi.ClusterNameLabel]
+			if ok {
+				logrus.Tracef("kubeconfig secret %s/%s already has the capi cluster label", ns.Name, secret.Name)
+				continue
+			}
+
+			if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+				secretCopy := secret.DeepCopy()
+				if secretCopy.Labels == nil {
+					secretCopy.Labels = map[string]string{}
+				}
+				secretCopy.Labels[capi.ClusterNameLabel] = cluster.Name
+
+				if _, updateErr := w.Core.Secret().Update(secretCopy); updateErr != nil {
+					return fmt.Errorf("updating secret %s/%s to add capi label: %w", ns.Name, secret.Name, err)
+				}
+
+				logrus.Debugf("Updated kubeconfig secret %s/%s with CAPI cluster label", ns.Name, secret.Name)
+
+				return nil
+			}); err != nil {
+				return err
+			}
+		}
+	}
+
+	logrus.Info("Finished migrating CAPI kubeconfig secrets")
+
+	return nil
 }
