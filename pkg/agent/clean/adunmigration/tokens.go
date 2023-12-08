@@ -15,14 +15,7 @@ import (
 	"github.com/rancher/rancher/pkg/types/config"
 )
 
-func collectTokens(workunits *[]migrateUserWorkUnit, sc *config.ScaledContext) error {
-	tokenInterface := sc.Management.Tokens("")
-	tokenList, err := tokenInterface.List(metav1.ListOptions{})
-	if err != nil {
-		logrus.Errorf("[%v] unable to fetch token objects: %v", migrateAdUserOperation, err)
-		return err
-	}
-
+func identifyTokens(workunits *[]migrateUserWorkUnit, tokenList *v3.TokenList) {
 	adWorkUnitsByPrincipal, duplicateLocalWorkUnitsByPrincipal := principalsToMigrate(workunits)
 
 	for _, token := range tokenList.Items {
@@ -42,8 +35,6 @@ func collectTokens(workunits *[]migrateUserWorkUnit, sc *config.ScaledContext) e
 			}
 		}
 	}
-
-	return nil
 }
 
 func updateToken(tokenInterface v3norman.TokenInterface, userToken v3.Token, newPrincipalID string, guid string, targetUser *v3.User, targetPrincipal *v3.Principal) error {

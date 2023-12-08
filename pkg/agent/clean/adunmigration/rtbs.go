@@ -35,14 +35,7 @@ func principalsToMigrate(workunits *[]migrateUserWorkUnit) (adWorkUnitsByPrincip
 	return adWorkUnitsByPrincipal, duplicateLocalWorkUnitsByPrincipal
 }
 
-func collectCRTBs(workunits *[]migrateUserWorkUnit, sc *config.ScaledContext) error {
-	crtbInterface := sc.Management.ClusterRoleTemplateBindings("")
-	crtbList, err := crtbInterface.List(metav1.ListOptions{})
-	if err != nil {
-		logrus.Errorf("[%v] unable to fetch CRTB objects: %v", migrateAdUserOperation, err)
-		return err
-	}
-
+func identifyCRTBs(workunits *[]migrateUserWorkUnit, crtbList *v3.ClusterRoleTemplateBindingList) {
 	adWorkUnitsByPrincipal, duplicateLocalWorkUnitsByPrincipal := principalsToMigrate(workunits)
 
 	for _, crtb := range crtbList.Items {
@@ -62,18 +55,9 @@ func collectCRTBs(workunits *[]migrateUserWorkUnit, sc *config.ScaledContext) er
 			}
 		}
 	}
-
-	return nil
 }
 
-func collectPRTBs(workunits *[]migrateUserWorkUnit, sc *config.ScaledContext) error {
-	prtbInterface := sc.Management.ProjectRoleTemplateBindings("")
-	prtbList, err := prtbInterface.List(metav1.ListOptions{})
-	if err != nil {
-		logrus.Errorf("[%v] unable to fetch PRTB objects: %v", migrateAdUserOperation, err)
-		return err
-	}
-
+func identifyPRTBs(workunits *[]migrateUserWorkUnit, prtbList *v3.ProjectRoleTemplateBindingList) {
 	adWorkUnitsByPrincipal, duplicateLocalWorkUnitsByPrincipal := principalsToMigrate(workunits)
 
 	for _, prtb := range prtbList.Items {
@@ -93,18 +77,9 @@ func collectPRTBs(workunits *[]migrateUserWorkUnit, sc *config.ScaledContext) er
 			}
 		}
 	}
-
-	return nil
 }
 
-func collectGRBs(workunits *[]migrateUserWorkUnit, sc *config.ScaledContext) error {
-	grbInterface := sc.Management.GlobalRoleBindings("")
-	grbList, err := grbInterface.List(metav1.ListOptions{})
-	if err != nil {
-		logrus.Errorf("[%v] unable to fetch GRB objects: %v", migrateAdUserOperation, err)
-		return err
-	}
-
+func identifyGRBs(workunits *[]migrateUserWorkUnit, grbList *v3.GlobalRoleBindingList) {
 	duplicateLocalWorkUnitsByName := map[string]int{}
 
 	for _, workunit := range *workunits {
@@ -118,8 +93,6 @@ func collectGRBs(workunits *[]migrateUserWorkUnit, sc *config.ScaledContext) err
 			(*workunits)[index].duplicateLocalGRBs = append((*workunits)[index].duplicateLocalGRBs, grb)
 		}
 	}
-
-	return nil
 }
 
 func updateCRTB(crtbInterface v3norman.ClusterRoleTemplateBindingInterface, oldCrtb *v3.ClusterRoleTemplateBinding, userName string, principalID string) error {
