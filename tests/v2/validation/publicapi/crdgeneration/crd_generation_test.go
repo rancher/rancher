@@ -8,8 +8,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	"github.com/rancher/rancher/tests/framework/pkg/session"
+	"github.com/rancher/shepherd/clients/rancher"
+	"github.com/rancher/shepherd/pkg/session"
 
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"

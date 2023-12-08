@@ -4,13 +4,13 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	"github.com/rancher/rancher/tests/framework/extensions/pipeline"
-	"github.com/rancher/rancher/tests/framework/extensions/provisioninginput"
-	"github.com/rancher/rancher/tests/framework/pkg/config"
-	"github.com/rancher/rancher/tests/framework/pkg/environmentflag"
-	"github.com/rancher/rancher/tests/framework/pkg/file"
 	"github.com/rancher/rancher/tests/v2/validation/upgrade"
+	"github.com/rancher/shepherd/clients/rancher"
+	"github.com/rancher/shepherd/extensions/pipeline"
+	"github.com/rancher/shepherd/extensions/provisioninginput"
+	"github.com/rancher/shepherd/pkg/config"
+	"github.com/rancher/shepherd/pkg/environmentflag"
+	"github.com/rancher/shepherd/pkg/file"
 	"github.com/sirupsen/logrus"
 )
 

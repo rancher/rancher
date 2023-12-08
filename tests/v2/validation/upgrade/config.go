@@ -3,9 +3,10 @@ package upgrade
 import (
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
-	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	"github.com/rancher/rancher/tests/framework/pkg/config"
-	"github.com/rancher/rancher/tests/framework/pkg/environmentflag"
+	"github.com/rancher/shepherd/clients/rancher"
+	"github.com/rancher/shepherd/extensions/pipeline"
+	"github.com/rancher/shepherd/pkg/config"
+	"github.com/rancher/shepherd/pkg/environmentflag"
 )
 
 type PSACT string
@@ -17,17 +18,12 @@ const (
 )
 
 type Cluster struct {
-	Name              string   `json:"name" yaml:"name" default:""`
-	VersionToUpgrade  string   `json:"versionToUpgrade" yaml:"versionToUpgrade" default:""`
-	PSACT             string   `json:"psact" yaml:"psact" default:""`
-	FeaturesToTest    Features `json:"enabledFeatures" yaml:"enabledFeatures" default:""`
+	Name              string            `json:"name" yaml:"name" default:""`
+	VersionToUpgrade  string            `json:"versionToUpgrade" yaml:"versionToUpgrade" default:""`
+	PSACT             string            `json:"psact" yaml:"psact" default:""`
+	FeaturesToTest    pipeline.Features `json:"enabledFeatures" yaml:"enabledFeatures" default:""`
 	isLatestVersion   bool
 	isUpgradeDisabled bool
-}
-
-type Features struct {
-	Chart   *bool `json:"chart" yaml:"chart" default:"false"`
-	Ingress *bool `json:"ingress" yaml:"ingress" default:"false"`
 }
 
 type Config struct {
@@ -119,7 +115,7 @@ func loadUpgradeWorkloadConfig(client *rancher.Client) (clusters []Cluster, err 
 			cluster.Name = clusterList[i]
 			ingress := false
 			chart := false
-			cluster.FeaturesToTest = Features{
+			cluster.FeaturesToTest = pipeline.Features{
 				Ingress: &ingress,
 				Chart:   &chart,
 			}

@@ -3,15 +3,15 @@ package nodescaling
 import (
 	"testing"
 
-	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	"github.com/rancher/rancher/tests/framework/extensions/clusters"
-	"github.com/rancher/rancher/tests/framework/extensions/clusters/aks"
-	"github.com/rancher/rancher/tests/framework/extensions/clusters/eks"
-	"github.com/rancher/rancher/tests/framework/extensions/clusters/gke"
-	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
-	"github.com/rancher/rancher/tests/framework/extensions/provisioning"
-	rke1 "github.com/rancher/rancher/tests/framework/extensions/rke1/nodepools"
-	"github.com/rancher/rancher/tests/framework/extensions/workloads/pods"
+	"github.com/rancher/shepherd/clients/rancher"
+	"github.com/rancher/shepherd/extensions/clusters"
+	"github.com/rancher/shepherd/extensions/clusters/aks"
+	"github.com/rancher/shepherd/extensions/clusters/eks"
+	"github.com/rancher/shepherd/extensions/clusters/gke"
+	"github.com/rancher/shepherd/extensions/machinepools"
+	"github.com/rancher/shepherd/extensions/provisioning"
+	rke1 "github.com/rancher/shepherd/extensions/rke1/nodepools"
+	"github.com/rancher/shepherd/extensions/workloads/pods"
 	"github.com/stretchr/testify/require"
 )
 
