@@ -13,7 +13,6 @@ import (
 	nodestat "github.com/rancher/shepherd/extensions/nodes"
 	"github.com/rancher/shepherd/extensions/provisioninginput"
 	psadeploy "github.com/rancher/shepherd/extensions/psact"
-	"github.com/rancher/shepherd/extensions/upgradeinput"
 	"github.com/rancher/shepherd/extensions/workloads/pods"
 	"github.com/rancher/shepherd/pkg/session"
 	"github.com/stretchr/testify/assert"

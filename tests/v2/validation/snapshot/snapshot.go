@@ -6,7 +6,6 @@ import (
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/apps/v1"
-	scaling "github.com/rancher/rancher/tests/v2/validation/nodescaling"
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
 	"github.com/rancher/shepherd/extensions/clusters"

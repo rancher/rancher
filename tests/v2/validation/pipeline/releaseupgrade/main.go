@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/rancher/rancher/tests/v2/validation/upgrade"
 	"github.com/rancher/shepherd/clients/rancher"
 	"github.com/rancher/shepherd/extensions/pipeline"
 	"github.com/rancher/shepherd/extensions/provisioninginput"
-	"github.com/rancher/shepherd/extensions/upgradeinput"
 	"github.com/rancher/shepherd/pkg/config"
 	"github.com/rancher/shepherd/pkg/environmentflag"
 	"github.com/rancher/shepherd/pkg/file"
