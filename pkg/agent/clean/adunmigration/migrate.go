@@ -193,26 +193,42 @@ func UnmigrateAdGUIDUsers(clientConfig *restclient.Config, dryRun bool, deleteMi
 	usersToMigrate, missingUsers, skippedUsers := identifyMigrationWorkUnits(users, adConfig)
 	// If any of the below functions fail, there is either a permissions problem or a more serious issue with the
 	// Rancher API. We should bail in this case and not attempt to process users.
-	err = collectTokens(&usersToMigrate, sc)
+
+	tokenInterface := sc.Management.Tokens("")
+	tokenList, err := tokenInterface.List(metav1.ListOptions{})
 	if err != nil {
 		finalStatus = activedirectory.StatusMigrationFailed
+		logrus.Errorf("[%v] unable to fetch token objects: %v", migrateAdUserOperation, err)
 		return err
 	}
-	err = collectCRTBs(&usersToMigrate, sc)
+	identifyTokens(&usersToMigrate, tokenList)
+
+	crtbInterface := sc.Management.ClusterRoleTemplateBindings("")
+	crtbList, err := crtbInterface.List(metav1.ListOptions{})
 	if err != nil {
 		finalStatus = activedirectory.StatusMigrationFailed
+		logrus.Errorf("[%v] unable to fetch CRTB objects: %v", migrateAdUserOperation, err)
 		return err
 	}
-	err = collectPRTBs(&usersToMigrate, sc)
+	identifyCRTBs(&usersToMigrate, crtbList)
+
+	prtbInterface := sc.Management.ProjectRoleTemplateBindings("")
+	prtbList, err := prtbInterface.List(metav1.ListOptions{})
 	if err != nil {
 		finalStatus = activedirectory.StatusMigrationFailed
+		logrus.Errorf("[%v] unable to fetch PRTB objects: %v", migrateAdUserOperation, err)
 		return err
 	}
-	err = collectGRBs(&usersToMigrate, sc)
+	identifyPRTBs(&usersToMigrate, prtbList)
+
+	grbInterface := sc.Management.GlobalRoleBindings("")
+	grbList, err := grbInterface.List(metav1.ListOptions{})
 	if err != nil {
 		finalStatus = activedirectory.StatusMigrationFailed
+		logrus.Errorf("[%v] unable to fetch GRB objects: %v", migrateAdUserOperation, err)
 		return err
 	}
+	identifyGRBs(&usersToMigrate, grbList)
 
 	if len(missingUsers) > 0 {
 		finalStatus = activedirectory.StatusMigrationFinishedWithMissing
