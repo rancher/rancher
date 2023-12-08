@@ -25,12 +25,31 @@ func redirectAuth(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	input := struct {
-		To string `json:"to,omitempty"`
+		To        string `json:"to,omitempty"`
+		PublicKey string `json:"publicKey"`
+		RequestID string `json:"requestId"`
 	}{}
 	if err := json.Unmarshal(bytes, &input); err != nil || authToTarget[input.To] == "" {
 		emberIndexUnlessAPI().ServeHTTP(rw, req)
 		return
 	}
+
+	http.SetCookie(rw, &http.Cookie{
+		Name:     "oauth_Rancher_PublicKey",
+		Value:    input.PublicKey,
+		MaxAge:   90,
+		HttpOnly: true,
+		Secure:   true,
+		// Path: "/"
+	})
+	http.SetCookie(rw, &http.Cookie{
+		Name:     "oauth_Rancher_RequestId",
+		Value:    input.RequestID,
+		MaxAge:   90,
+		HttpOnly: true,
+		Secure:   true,
+		// Path: "/"
+	})
 
 	u := url.URL{
 		Path:     authToTarget[input.To],

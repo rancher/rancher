@@ -2,7 +2,12 @@ package publicapi
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strconv"
@@ -27,10 +32,12 @@ import (
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3public"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/namespace"
 	schema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3public"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
 	"github.com/sirupsen/logrus"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -42,6 +49,7 @@ func newLoginHandler(ctx context.Context, mgmt *config.ScaledContext) *loginHand
 		scaledContext: mgmt,
 		userMGR:       mgmt.UserManager,
 		tokenMGR:      tokens.NewManager(ctx, mgmt),
+		samlTokens:    mgmt.Management.SamlTokens(""),
 		clusterLister: mgmt.Management.Clusters("").Controller().Lister(),
 		secretLister:  mgmt.Core.Secrets("").Controller().Lister(),
 	}
@@ -51,6 +59,7 @@ type loginHandler struct {
 	scaledContext *config.ScaledContext
 	userMGR       user.Manager
 	tokenMGR      *tokens.Manager
+	samlTokens    v3.SamlTokenInterface
 	clusterLister v3.ClusterLister
 	secretLister  v1.SecretLister
 }
@@ -213,6 +222,49 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 			return v3.Token{}, "", "", err
 		}
 		return *token, tokenValue, responseType, nil
+	}
+
+	if requestID, err := request.Request.Cookie("oauth_Rancher_RequestId"); err == nil {
+		publicKey, _ := request.Request.Cookie("oauth_Rancher_PublicKey")
+
+		token, tokenValue, err := tokens.GetKubeConfigToken(currUser.Name, responseType, h.userMGR, userPrincipal)
+		if err != nil {
+			return v3.Token{}, "", "", err
+		}
+
+		keyBytes, err := base64.StdEncoding.DecodeString(publicKey.Value)
+		if err != nil {
+			return v3.Token{}, "", "", err
+		}
+		pubKey := &rsa.PublicKey{}
+		err = json.Unmarshal(keyBytes, pubKey)
+		if err != nil {
+			return v3.Token{}, "", "", err
+		}
+		encryptedToken, err := rsa.EncryptOAEP(
+			sha256.New(),
+			rand.Reader,
+			pubKey,
+			[]byte(fmt.Sprintf("%s:%s", token.ObjectMeta.Name, tokenValue)),
+			nil)
+		if err != nil {
+			return v3.Token{}, "", "", err
+		}
+		encoded := base64.StdEncoding.EncodeToString(encryptedToken)
+
+		samlToken := &v3.SamlToken{
+			Token:     encoded,
+			ExpiresAt: token.ExpiresAt,
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      requestID.Value,
+				Namespace: namespace.GlobalNamespace,
+			},
+		}
+
+		_, err = h.samlTokens.Create(samlToken)
+		if err != nil {
+			return v3.Token{}, "", "", err
+		}
 	}
 
 	userExtraInfo := providers.GetUserExtraAttributes(providerName, userPrincipal)
