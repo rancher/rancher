@@ -1,8 +1,8 @@
 package main
 
 import (
-	"github.com/rancher/rancher/tests/framework/clients/corral"
-	"github.com/rancher/rancher/tests/framework/pkg/session"
+	"github.com/rancher/shepherd/clients/corral"
+	"github.com/rancher/shepherd/pkg/session"
 	"github.com/sirupsen/logrus"
 )
 

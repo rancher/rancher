@@ -9,11 +9,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	apiv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
-	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
-	"github.com/rancher/rancher/tests/framework/extensions/clusters"
-	"github.com/rancher/rancher/tests/framework/extensions/clusters/bundledclusters"
-	kcluster "github.com/rancher/rancher/tests/framework/extensions/kubeapi/cluster"
+	"github.com/rancher/shepherd/clients/rancher"
+	v1 "github.com/rancher/shepherd/clients/rancher/v1"
+	"github.com/rancher/shepherd/extensions/clusters"
+	"github.com/rancher/shepherd/extensions/clusters/bundledclusters"
+	kcluster "github.com/rancher/shepherd/extensions/kubeapi/cluster"
 	kwait "k8s.io/apimachinery/pkg/util/wait"
 )
 

@@ -7,11 +7,11 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
-	"github.com/rancher/rancher/tests/framework/extensions/charts"
-	"github.com/rancher/rancher/tests/framework/extensions/ingresses"
-	"github.com/rancher/rancher/tests/framework/extensions/workloads"
+	"github.com/rancher/shepherd/clients/rancher"
+	v1 "github.com/rancher/shepherd/clients/rancher/v1"
+	"github.com/rancher/shepherd/extensions/charts"
+	"github.com/rancher/shepherd/extensions/ingresses"
+	"github.com/rancher/shepherd/extensions/workloads"
 	appv1 "k8s.io/api/apps/v1"
 	kubewait "k8s.io/apimachinery/pkg/util/wait"
 )

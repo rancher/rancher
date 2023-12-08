@@ -5,11 +5,11 @@ package token
 import (
 	"testing"
 
-	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	fv3 "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
-	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
-	"github.com/rancher/rancher/tests/framework/extensions/kubeapi/tokens"
-	"github.com/rancher/rancher/tests/framework/pkg/session"
+	"github.com/rancher/shepherd/clients/rancher"
+	fv3 "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
+	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
+	"github.com/rancher/shepherd/extensions/kubeapi/tokens"
+	"github.com/rancher/shepherd/pkg/session"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"

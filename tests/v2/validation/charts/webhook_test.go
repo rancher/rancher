@@ -6,15 +6,15 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	"github.com/rancher/rancher/tests/framework/clients/rancher/catalog"
-	"github.com/rancher/rancher/tests/framework/extensions/charts"
-	"github.com/rancher/rancher/tests/framework/extensions/clusters"
-	"github.com/rancher/rancher/tests/framework/extensions/kubeconfig"
-	"github.com/rancher/rancher/tests/framework/extensions/workloads/pods"
+	"github.com/rancher/shepherd/clients/rancher"
+	"github.com/rancher/shepherd/clients/rancher/catalog"
+	"github.com/rancher/shepherd/extensions/charts"
+	"github.com/rancher/shepherd/extensions/clusters"
+	"github.com/rancher/shepherd/extensions/kubeconfig"
+	"github.com/rancher/shepherd/extensions/workloads/pods"
 
-	"github.com/rancher/rancher/tests/framework/extensions/users"
-	"github.com/rancher/rancher/tests/framework/pkg/session"
+	"github.com/rancher/shepherd/extensions/users"
+	"github.com/rancher/shepherd/pkg/session"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"

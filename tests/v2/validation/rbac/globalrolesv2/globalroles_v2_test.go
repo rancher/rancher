@@ -9,18 +9,18 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
-	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
-	"github.com/rancher/rancher/tests/framework/pkg/session"
+	"github.com/rancher/shepherd/clients/rancher"
+	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
+	namegen "github.com/rancher/shepherd/pkg/namegenerator"
+	"github.com/rancher/shepherd/pkg/session"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 
-	"github.com/rancher/rancher/tests/framework/extensions/clusters"
-	"github.com/rancher/rancher/tests/framework/extensions/defaults"
-	"github.com/rancher/rancher/tests/framework/extensions/kubeapi/rbac"
-	"github.com/rancher/rancher/tests/framework/extensions/provisioning"
-	"github.com/rancher/rancher/tests/framework/extensions/users"
+	"github.com/rancher/shepherd/extensions/clusters"
+	"github.com/rancher/shepherd/extensions/defaults"
+	"github.com/rancher/shepherd/extensions/kubeapi/rbac"
+	"github.com/rancher/shepherd/extensions/provisioning"
+	"github.com/rancher/shepherd/extensions/users"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kwait "k8s.io/apimachinery/pkg/util/wait"

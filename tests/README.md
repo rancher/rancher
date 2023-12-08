@@ -10,7 +10,7 @@ The Rancher Test Framework provides tools for writing integrations and validatio
 To run rancher integration tests you will need:
 - a running instance of rancher with an accessible url
 - a rancher access token for the admin user
-- [golang 1.17](https://go.dev/doc/install)
+- [golang 1.21](https://go.dev/doc/install)
 - [k3d](https://k3d.io/v5.1.0/)
 
 #### Validation
@@ -26,25 +26,9 @@ Integration tests - Don't require any external configuration or access to any ot
 
 Validation tests - Require access to external services, and needs to a config file to run them.
 
-### Extensions
+## Framework
 
-Extensions are functions that complete common operations used by tests.  Extensions should not require much configuration or support multiple behaviors.  Extensions should be simple enough that they can be used in many tests without needing to be tested themselves.
-
-### Clients
-
-Clients are used to create the resources in the tests. The advantage of the cients is they register the cleanups with sessions, making resource cleanup trivial. There are three clients; the rancher client, dynamic client, and the k3d client. The rancher client is used to create resources on a rancher instance. Given a host url, and a bearer token the rancher client communicates directly with the rancher instance. The dynamic client is used as means of communication on a downstream cluster, and used for kubernete resource management on that cluster. The k3d client is used to create a minimal k3d cluster, this is to give the integration tests the ability to test against a downstream cluster.
-
-### Wait
-
-Wait is used to monitor resources, and wait for specified conditions. There are multiple ways to wait for a resource. There is WatchWait that uses the watch.Interface of a resource to wait until the check function returns true. For more generic polling or waiting, the "k8s.io/apimachinery/pkg/util/wait" package can be used.
-
-### Sessions
-
-Sessions are used to track resources created by tests.  A session allows cleanup functions to be registered while it is open.  Once a session is closed the cleanup functions will be called latest to oldest.  Sessions should be closed after a set of tests that use the same resources is completed.  This eliminates the need for each test to create and tear down its own resources allowing for more efficient reuse of some resources.  When pared with a client sessions are a powerful tool that can track and cleanup any resource a tests creates with no additional work from the developer.
-
-### Configuration
-
-Configuration is loaded from the yaml or json file described in `CATTLE_TEST_CONFIG`.  Configuration objects are loaded from their associated key in the configuration file.  Default values can also be set on configuration objects.
+Shepherd is our testing framework and is located https://github.com/rancher/shepherd. For more info please visit the repo.
 
 
 ## How to Write Tests
