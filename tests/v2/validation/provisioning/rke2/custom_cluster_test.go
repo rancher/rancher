@@ -43,7 +43,7 @@ func (c *CustomClusterProvisioningTestSuite) SetupSuite() {
 
 	c.isWindows = false
 	for _, pool := range c.provisioningConfig.MachinePools {
-		if pool.NodeRoles.Windows {
+		if pool.MachinePoolConfig.Windows {
 			c.isWindows = true
 			break
 		}
