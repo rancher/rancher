@@ -43,11 +43,13 @@ func (s *SnapshotRestoreK8sUpgradeTestSuite) TestSnapshotRestoreK8sUpgrade() {
 	snapshotRestoreK8sVersion := &etcdsnapshot.Config{
 		UpgradeKubernetesVersion: s.clustersConfig.UpgradeKubernetesVersion,
 		SnapshotRestore:          "kubernetesVersion",
+		RecurringRestores:        1,
 	}
 
 	snapshotRestoreAll := &etcdsnapshot.Config{
 		UpgradeKubernetesVersion: s.clustersConfig.UpgradeKubernetesVersion,
 		SnapshotRestore:          "all",
+		RecurringRestores:        1,
 	}
 
 	tests := []struct {
@@ -61,13 +63,13 @@ func (s *SnapshotRestoreK8sUpgradeTestSuite) TestSnapshotRestoreK8sUpgrade() {
 
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			snapshotRestore(s.T(), s.client, s.client.RancherConfig.ClusterName, tt.etcdSnapshot, false)
+			snapshotRestore(s.T(), s.client, s.client.RancherConfig.ClusterName, tt.etcdSnapshot)
 		})
 	}
 }
 
 func (s *SnapshotRestoreK8sUpgradeTestSuite) TestSnapshotRestoreK8sUpgradeDynamicInput() {
-	snapshotRestore(s.T(), s.client, s.client.RancherConfig.ClusterName, s.clustersConfig, false)
+	snapshotRestore(s.T(), s.client, s.client.RancherConfig.ClusterName, s.clustersConfig)
 }
 
 // In order for 'go test' to run this suite, we need to create
