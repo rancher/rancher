@@ -216,18 +216,11 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 		return v3.Token{}, "", "", httperror.NewAPIError(httperror.PermissionDenied, "Permission Denied")
 	}
 
-	if strings.HasPrefix(responseType, tokens.KubeconfigResponseType) {
-		token, tokenValue, err := tokens.GetKubeConfigToken(currUser.Name, responseType, h.userMGR, userPrincipal)
-		if err != nil {
-			return v3.Token{}, "", "", err
-		}
-		return *token, tokenValue, responseType, nil
-	}
-
 	if requestID, err := request.Request.Cookie("oauth_Rancher_RequestId"); err == nil {
+		responseType, _ := request.Request.Cookie("oauth_Rancher_ResponseType")
 		publicKey, _ := request.Request.Cookie("oauth_Rancher_PublicKey")
 
-		token, tokenValue, err := tokens.GetKubeConfigToken(currUser.Name, responseType, h.userMGR, userPrincipal)
+		token, tokenValue, err := tokens.GetKubeConfigToken(currUser.Name, responseType.Value, h.userMGR, userPrincipal)
 		if err != nil {
 			return v3.Token{}, "", "", err
 		}
@@ -265,6 +258,14 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 		if err != nil {
 			return v3.Token{}, "", "", err
 		}
+	}
+
+	if strings.HasPrefix(responseType, tokens.KubeconfigResponseType) {
+		token, tokenValue, err := tokens.GetKubeConfigToken(currUser.Name, responseType, h.userMGR, userPrincipal)
+		if err != nil {
+			return v3.Token{}, "", "", err
+		}
+		return *token, tokenValue, responseType, nil
 	}
 
 	userExtraInfo := providers.GetUserExtraAttributes(providerName, userPrincipal)
