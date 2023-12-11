@@ -23,11 +23,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-// Test_Operation_Custom_EtcdSnapshotOperationsOnNewCombinedNode creates a custom 2 node cluster with a worker and
+// Test_Operation_SetB_Custom_EtcdSnapshotOperationsOnNewCombinedNode creates a custom 2 node cluster with a worker and
 // controlplane+etcd node, creates a configmap, takes a snapshot of the cluster, deletes the configmap, then deletes the etcd machine/node
 // It then creates a new controlplane+etcd node and restores from local snapshot file. This validates that it is possible to restore
 // a snapshot on a completely new etcd node from file (without a corresponding snapshot file)
-func Test_Operation_Custom_EtcdSnapshotOperationsOnNewCombinedNode(t *testing.T) {
+func Test_Operation_SetB_Custom_EtcdSnapshotOperationsOnNewCombinedNode(t *testing.T) {
 	clients, err := clients.New()
 	if err != nil {
 		t.Fatal(err)
