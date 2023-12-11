@@ -43,30 +43,36 @@ func redirectAuth(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	http.SetCookie(rw, &http.Cookie{
-		Name:     "oauth_Rancher_PublicKey",
-		Value:    input.PublicKey,
-		MaxAge:   90,
-		HttpOnly: true,
-		Secure:   true,
-		// Path: "/"
-	})
-	http.SetCookie(rw, &http.Cookie{
-		Name:     "oauth_Rancher_RequestId",
-		Value:    input.RequestID,
-		MaxAge:   90,
-		HttpOnly: true,
-		Secure:   true,
-		// Path: "/"
-	})
-	http.SetCookie(rw, &http.Cookie{
-		Name:     "oauth_Rancher_ResponseType",
-		Value:    input.ResponseType,
-		MaxAge:   90,
-		HttpOnly: true,
-		Secure:   true,
-		// Path: "/"
-	})
+	if input.PublicKey != "" {
+		http.SetCookie(rw, &http.Cookie{
+			Name:     "oauth_Rancher_PublicKey",
+			Value:    input.PublicKey,
+			MaxAge:   90,
+			HttpOnly: true,
+			Secure:   true,
+			// Path: "/"
+		})
+	}
+	if input.RequestID != "" {
+		http.SetCookie(rw, &http.Cookie{
+			Name:     "oauth_Rancher_RequestId",
+			Value:    input.RequestID,
+			MaxAge:   90,
+			HttpOnly: true,
+			Secure:   true,
+			// Path: "/"
+		})
+	}
+	if input.ResponseType != "" {
+		http.SetCookie(rw, &http.Cookie{
+			Name:     "oauth_Rancher_ResponseType",
+			Value:    input.ResponseType,
+			MaxAge:   90,
+			HttpOnly: true,
+			Secure:   true,
+			// Path: "/"
+		})
+	}
 
 	u := url.URL{
 		Path:     authToTarget[input.To],

@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
@@ -217,6 +218,17 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 	}
 
 	if requestID, err := request.Request.Cookie("oauth_Rancher_RequestId"); err == nil {
+		samlTokenName := requestID.Value
+
+		// We should share code with saml_client_cookies stuff
+		// All fields are necessary for deleting a cookie
+		requestID.Expires = time.Now().Add(-7 * 24 * time.Hour)
+		requestID.HttpOnly = true
+		requestID.Secure = true
+		requestID.Path = "/"
+		fmt.Println("Deleting cookie", requestID)
+		http.SetCookie(request.Response, requestID)
+
 		responseType, _ := request.Request.Cookie("oauth_Rancher_ResponseType")
 		publicKey, _ := request.Request.Cookie("oauth_Rancher_PublicKey")
 
@@ -249,7 +261,7 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 			Token:     encoded,
 			ExpiresAt: token.ExpiresAt,
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      requestID.Value,
+				Name:      samlTokenName,
 				Namespace: namespace.GlobalNamespace,
 			},
 		}
