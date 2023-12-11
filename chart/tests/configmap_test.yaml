@@ -53,6 +53,38 @@ tests:
       - notExists:
           path: data.rancher-webhook
 
+  - it: should set fleet values from string
+    set:
+      fleet: |-
+        leaderElection: 
+          leaseDuration: 20s
+    asserts:
+      - equal:
+          path: data.fleet
+          value: |-
+            leaderElection:
+              leaseDuration: 20s
+
+  - it: should set fleet values from map
+    set:
+      fleet.leaderElection.leaseDuration: 20s
+      fleet.bootstrap.enabled: false
+      fleet.debug: true
+    asserts:
+      - equal:
+          path: data.fleet
+          value: |-
+            bootstrap:
+              enabled: false
+            debug: true
+            leaderElection:
+              leaseDuration: 20s
+
+  - it: should not set fleet values
+    asserts:
+      - notExists:
+          path: data.fleet
+
   - it: should set priorityClassName
     set:
       priorityClassName: "super"
