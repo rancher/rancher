@@ -54,6 +54,7 @@ type Interface interface {
 	ClusterTemplateRevision() ClusterTemplateRevisionController
 	ComposeConfig() ComposeConfigController
 	DynamicSchema() DynamicSchemaController
+	EncryptedToken() EncryptedTokenController
 	EtcdBackup() EtcdBackupController
 	Feature() FeatureController
 	FleetWorkspace() FleetWorkspaceController
@@ -99,7 +100,6 @@ type Interface interface {
 	RkeK8sSystemImage() RkeK8sSystemImageController
 	RoleTemplate() RoleTemplateController
 	SamlProvider() SamlProviderController
-	SamlToken() SamlTokenController
 	Setting() SettingController
 	Template() TemplateController
 	TemplateContent() TemplateContentController
@@ -209,6 +209,10 @@ func (v *version) ComposeConfig() ComposeConfigController {
 
 func (v *version) DynamicSchema() DynamicSchemaController {
 	return generic.NewNonNamespacedController[*v3.DynamicSchema, *v3.DynamicSchemaList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "DynamicSchema"}, "dynamicschemas", v.controllerFactory)
+}
+
+func (v *version) EncryptedToken() EncryptedTokenController {
+	return generic.NewNonNamespacedController[*v3.EncryptedToken, *v3.EncryptedTokenList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "EncryptedToken"}, "encryptedtokens", v.controllerFactory)
 }
 
 func (v *version) EtcdBackup() EtcdBackupController {
@@ -389,10 +393,6 @@ func (v *version) RoleTemplate() RoleTemplateController {
 
 func (v *version) SamlProvider() SamlProviderController {
 	return generic.NewNonNamespacedController[*v3.SamlProvider, *v3.SamlProviderList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "SamlProvider"}, "samlproviders", v.controllerFactory)
-}
-
-func (v *version) SamlToken() SamlTokenController {
-	return generic.NewNonNamespacedController[*v3.SamlToken, *v3.SamlTokenList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "SamlToken"}, "samltokens", v.controllerFactory)
 }
 
 func (v *version) Setting() SettingController {

@@ -23,17 +23,17 @@ import (
 	"github.com/rancher/wrangler/pkg/generic"
 )
 
-// SamlTokenController interface for managing SamlToken resources.
-type SamlTokenController interface {
-	generic.NonNamespacedControllerInterface[*v3.SamlToken, *v3.SamlTokenList]
+// EncryptedTokenController interface for managing EncryptedToken resources.
+type EncryptedTokenController interface {
+	generic.NonNamespacedControllerInterface[*v3.EncryptedToken, *v3.EncryptedTokenList]
 }
 
-// SamlTokenClient interface for managing SamlToken resources in Kubernetes.
-type SamlTokenClient interface {
-	generic.NonNamespacedClientInterface[*v3.SamlToken, *v3.SamlTokenList]
+// EncryptedTokenClient interface for managing EncryptedToken resources in Kubernetes.
+type EncryptedTokenClient interface {
+	generic.NonNamespacedClientInterface[*v3.EncryptedToken, *v3.EncryptedTokenList]
 }
 
-// SamlTokenCache interface for retrieving SamlToken resources in memory.
-type SamlTokenCache interface {
-	generic.NonNamespacedCacheInterface[*v3.SamlToken]
+// EncryptedTokenCache interface for retrieving EncryptedToken resources in memory.
+type EncryptedTokenCache interface {
+	generic.NonNamespacedCacheInterface[*v3.EncryptedToken]
 }

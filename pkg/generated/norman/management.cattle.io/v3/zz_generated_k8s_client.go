@@ -34,7 +34,7 @@ type Interface interface {
 	TemplateContentsGetter
 	GroupsGetter
 	GroupMembersGetter
-	SamlTokensGetter
+	EncryptedTokensGetter
 	PrincipalsGetter
 	UsersGetter
 	AuthConfigsGetter
@@ -431,14 +431,14 @@ func (c *Client) GroupMembers(namespace string) GroupMemberInterface {
 	}
 }
 
-type SamlTokensGetter interface {
-	SamlTokens(namespace string) SamlTokenInterface
+type EncryptedTokensGetter interface {
+	EncryptedTokens(namespace string) EncryptedTokenInterface
 }
 
-func (c *Client) SamlTokens(namespace string) SamlTokenInterface {
-	sharedClient := c.clientFactory.ForResourceKind(SamlTokenGroupVersionResource, SamlTokenGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &SamlTokenResource, SamlTokenGroupVersionKind, samlTokenFactory{})
-	return &samlTokenClient{
+func (c *Client) EncryptedTokens(namespace string) EncryptedTokenInterface {
+	sharedClient := c.clientFactory.ForResourceKind(EncryptedTokenGroupVersionResource, EncryptedTokenGroupVersionKind.Kind, true)
+	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &EncryptedTokenResource, EncryptedTokenGroupVersionKind, encryptedTokenFactory{})
+	return &encryptedTokenClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,

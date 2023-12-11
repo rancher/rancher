@@ -18,19 +18,19 @@ const intervalSeconds int64 = 3600
 
 func StartPurgeDaemon(ctx context.Context, mgmt *config.ManagementContext) {
 	p := &purger{
-		tokenLister:      mgmt.Management.Tokens("").Controller().Lister(),
-		tokens:           mgmt.Management.Tokens(""),
-		samlTokensLister: mgmt.Management.SamlTokens("").Controller().Lister(),
-		samlTokens:       mgmt.Management.SamlTokens(""),
+		tokenLister:           mgmt.Management.Tokens("").Controller().Lister(),
+		tokens:                mgmt.Management.Tokens(""),
+		encryptedTokensLister: mgmt.Management.EncryptedTokens("").Controller().Lister(),
+		encryptedTokens:       mgmt.Management.EncryptedTokens(""),
 	}
 	go wait.JitterUntil(p.purge, time.Duration(intervalSeconds)*time.Second, .1, true, ctx.Done())
 }
 
 type purger struct {
-	tokenLister      v3.TokenLister
-	tokens           v3.TokenInterface
-	samlTokens       v3.SamlTokenInterface
-	samlTokensLister v3.SamlTokenLister
+	tokenLister           v3.TokenLister
+	tokens                v3.TokenInterface
+	encryptedTokens       v3.EncryptedTokenInterface
+	encryptedTokensLister v3.EncryptedTokenLister
 }
 
 func (p *purger) purge() {
@@ -54,17 +54,17 @@ func (p *purger) purge() {
 		logrus.Infof("Purged %v expired tokens", count)
 	}
 
-	// saml tokens store encrypted token for login request from rancher cli
-	samlTokens, err := p.samlTokensLister.List(namespace.GlobalNamespace, labels.Everything())
+	// EncryptedTokens store encrypted tokens for login request from rancher cli
+	encryptedTokens, err := p.encryptedTokensLister.List(namespace.GlobalNamespace, labels.Everything())
 	if err != nil {
 		return
 	}
 
 	count = 0
-	for _, token := range samlTokens {
+	for _, token := range encryptedTokens {
 		// avoid delete immediately after creation, login request might be pending
 		if token.CreationTimestamp.Add(15 * time.Minute).Before(time.Now()) {
-			err = p.samlTokens.Delete(token.ObjectMeta.Name, &metav1.DeleteOptions{})
+			err = p.encryptedTokens.Delete(token.ObjectMeta.Name, &metav1.DeleteOptions{})
 			if err != nil && !clientbase.IsNotFound(err) {
 				logrus.Errorf("Error: while deleting expired token %v: %v", err, token.Name)
 				continue
@@ -73,6 +73,6 @@ func (p *purger) purge() {
 		}
 	}
 	if count > 0 {
-		logrus.Infof("Purged %v saml tokens", count)
+		logrus.Infof("Purged %v encrypted tokens", count)
 	}
 }

@@ -400,6 +400,23 @@ func NewDynamicSchema(namespace, name string, obj DynamicSchema) *DynamicSchema 
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// EncryptedTokenList is a list of EncryptedToken resources
+type EncryptedTokenList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+
+	Items []EncryptedToken `json:"items"`
+}
+
+func NewEncryptedToken(namespace, name string, obj EncryptedToken) *EncryptedToken {
+	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("EncryptedToken").ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // EtcdBackupList is a list of EtcdBackup resources
 type EtcdBackupList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -1141,23 +1158,6 @@ type SamlProviderList struct {
 
 func NewSamlProvider(namespace, name string, obj SamlProvider) *SamlProvider {
 	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("SamlProvider").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// SamlTokenList is a list of SamlToken resources
-type SamlTokenList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []SamlToken `json:"items"`
-}
-
-func NewSamlToken(namespace, name string, obj SamlToken) *SamlToken {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("SamlToken").ToAPIVersionAndKind()
 	obj.Name = name
 	obj.Namespace = namespace
 	return &obj

@@ -209,12 +209,20 @@ type AuthConfigConditions struct {
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-type SamlToken struct {
+// EncryptedToken contains a token that has been encrypted. They don't require
+// being authenticated to fetch them. The typical usage is Rancher CLI
+// generating a keypair, making the login flow create an encrypted token with
+// the public key from the CLI and then the CLI obtaining and decrypting the
+// token. EncryptedTokens are purged periodically.
+type EncryptedToken struct {
 	types.Namespaced
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Token     string `json:"token" norman:"writeOnly,noupdate"`
+	// Encrypted Rancher token
+	Token string `json:"token" norman:"writeOnly,noupdate"`
+
+	// Expiration time for this token
 	ExpiresAt string `json:"expiresAt"`
 }
 
