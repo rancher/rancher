@@ -218,4 +218,5 @@ type Config struct {
 	UpgradeStrategy        *rkev1.ClusterUpgradeStrategy            `json:"upgradeStrategy,omitempty" yaml:"upgradeStrategy,omitempty"`
 	Advanced               *Advanced                                `json:"advanced,omitempty" yaml:"advanced,omitempty"`
 	ClusterSSHTests        []SSHTestCase                            `json:"clusterSSHTests,omitempty" yaml:"clusterSSHTests,omitempty"`
+	CRIDockerd             bool                                     `json:"criDockerd,omitempty" yaml:"criDockerd,omitempty"`
 }

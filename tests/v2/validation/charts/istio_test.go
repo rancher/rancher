@@ -13,6 +13,7 @@ import (
 
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
+	"github.com/rancher/rancher/tests/framework/clients/rancher/catalog"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	"github.com/rancher/rancher/tests/framework/extensions/charts"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
@@ -61,9 +62,9 @@ func (i *IstioTestSuite) SetupSuite() {
 	}
 
 	// Get latest versions of monitoring & istio charts
-	latestIstioVersion, err := client.Catalog.GetLatestChartVersion(charts.RancherIstioName)
+	latestIstioVersion, err := client.Catalog.GetLatestChartVersion(charts.RancherIstioName, catalog.RancherChartRepo)
 	require.NoError(i.T(), err)
-	latestMonitoringVersion, err := client.Catalog.GetLatestChartVersion(charts.RancherMonitoringName)
+	latestMonitoringVersion, err := client.Catalog.GetLatestChartVersion(charts.RancherMonitoringName, catalog.RancherChartRepo)
 	require.NoError(i.T(), err)
 
 	// Create project
@@ -252,7 +253,7 @@ func (i *IstioTestSuite) TestUpgradeIstioChart() {
 	}
 
 	// Change istio install option version to previous version of the latest version
-	versionsList, err := client.Catalog.GetListChartVersions(charts.RancherIstioName)
+	versionsList, err := client.Catalog.GetListChartVersions(charts.RancherIstioName, catalog.RancherChartRepo)
 	require.NoError(i.T(), err)
 	require.Greaterf(i.T(), len(versionsList), 1, "There should be at least 2 versions of the istio chart")
 	versionLatest := versionsList[0]
@@ -300,7 +301,7 @@ func (i *IstioTestSuite) TestUpgradeIstioChart() {
 		require.Containsf(i.T(), imageVersion, istioVersionPreUpgrade, "Pilot & Ingressgateways images don't use the correct istio image version")
 	}
 
-	i.chartInstallOptions.istio.Version, err = client.Catalog.GetLatestChartVersion(charts.RancherIstioName)
+	i.chartInstallOptions.istio.Version, err = client.Catalog.GetLatestChartVersion(charts.RancherIstioName, catalog.RancherChartRepo)
 	require.NoError(i.T(), err)
 
 	i.T().Log("Upgrading istio chart with the latest version")

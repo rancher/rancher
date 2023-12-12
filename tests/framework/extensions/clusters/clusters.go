@@ -32,6 +32,7 @@ import (
 const (
 	active                               = "active"
 	baseline                             = "baseline"
+	externalAws                          = "external-aws"
 	FleetSteveResourceType               = "fleet.cattle.io.cluster"
 	PodSecurityAdmissionSteveResoureType = "management.cattle.io.podsecurityadmissionconfigurationtemplate"
 	ProvisioningSteveResourceType        = "provisioning.cattle.io.cluster"
@@ -213,6 +214,10 @@ func CreateRancherBaselinePSACT(client *rancher.Client, psact string) error {
 // NewRKE1lusterConfig is a constructor for a v3.Cluster object, to be used by the rancher.Client.Provisioning client.
 func NewRKE1ClusterConfig(clusterName string, client *rancher.Client, clustersConfig *ClusterConfig) *management.Cluster {
 	backupConfigEnabled := true
+	criDockerBool := false
+	if clustersConfig.CRIDockerd {
+		criDockerBool = true
+	}
 	newConfig := &management.Cluster{
 		DockerRootDir:           "/var/lib/docker",
 		EnableClusterAlerting:   false,
@@ -228,6 +233,7 @@ func NewRKE1ClusterConfig(clusterName string, client *rancher.Client, clustersCo
 					"stubDomains": "cluster.local",
 				},
 			},
+			EnableCRIDockerd: &criDockerBool,
 			Ingress: &management.IngressConfig{
 				Provider: "nginx",
 			},
@@ -272,6 +278,16 @@ func NewRKE1ClusterConfig(clusterName string, client *rancher.Client, clustersCo
 					break
 				}
 			}
+		}
+	}
+
+	if clustersConfig.CloudProvider != "" {
+		newConfig.RancherKubernetesEngineConfig.CloudProvider = &management.CloudProvider{
+			Name: clustersConfig.CloudProvider,
+		}
+		if clustersConfig.CloudProvider == externalAws {
+			trueBoolean := true
+			newConfig.RancherKubernetesEngineConfig.CloudProvider.UseInstanceMetadataHostname = &trueBoolean
 		}
 	}
 

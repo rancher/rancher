@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
+	"github.com/rancher/rancher/tests/framework/clients/rancher/catalog"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
 	"github.com/rancher/rancher/tests/framework/extensions/charts"
@@ -49,7 +50,7 @@ func (g *GateKeeperTestSuite) SetupSuite() {
 	require.NoError(g.T(), err)
 
 	// get latest version of gatekeeper chart
-	latestGatekeeperVersion, err := client.Catalog.GetLatestChartVersion(charts.RancherGatekeeperName)
+	latestGatekeeperVersion, err := client.Catalog.GetLatestChartVersion(charts.RancherGatekeeperName, catalog.RancherChartRepo)
 	require.NoError(g.T(), err)
 
 	// Create project
@@ -146,7 +147,7 @@ func (g *GateKeeperTestSuite) TestUpgradeGatekeeperChart() {
 	require.NoError(g.T(), err)
 
 	// Change gatekeeper install option version to previous version of the latest version
-	versionsList, err := client.Catalog.GetListChartVersions(charts.RancherGatekeeperName)
+	versionsList, err := client.Catalog.GetListChartVersions(charts.RancherGatekeeperName, catalog.RancherChartRepo)
 	require.NoError(g.T(), err)
 
 	if len(versionsList) < 2 {
@@ -188,7 +189,7 @@ func (g *GateKeeperTestSuite) TestUpgradeGatekeeperChart() {
 	chartVersionPreUpgrade := gatekeeperChartPreUpgrade.ChartDetails.Spec.Chart.Metadata.Version
 	require.Contains(g.T(), versionsList[1:], chartVersionPreUpgrade)
 
-	g.gatekeeperChartInstallOptions.Version, err = client.Catalog.GetLatestChartVersion(charts.RancherGatekeeperName)
+	g.gatekeeperChartInstallOptions.Version, err = client.Catalog.GetLatestChartVersion(charts.RancherGatekeeperName, catalog.RancherChartRepo)
 	require.NoError(g.T(), err)
 
 	g.T().Log("Upgrading gatekeeper chart to the latest version")
