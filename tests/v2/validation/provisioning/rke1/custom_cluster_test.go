@@ -97,6 +97,7 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningRKE1CustomCluster()
 
 		provisioningConfig := *c.provisioningConfig
 		provisioningConfig.NodePools = tt.nodePools
+		provisioningConfig.NodePools[0].SpecifyCustomPublicIP = true
 		permutations.RunTestPermutations(&c.Suite, tt.name, tt.client, &provisioningConfig, permutations.RKE1CustomCluster, nil, nil)
 	}
 }
