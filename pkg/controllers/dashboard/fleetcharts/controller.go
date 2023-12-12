@@ -119,15 +119,6 @@ func (h *handler) onSetting(key string, setting *v3.Setting) (*v3.Setting, error
 		},
 	}
 
-	if extraValues, err := h.chartsConfig.GetChartValues(fleetconst.ChartName); err != nil {
-		// Missing extra config is okay, return the error otherwise
-		if !chart.IsNotFoundError(err) {
-			return nil, err
-		}
-	} else {
-		coalesceMap(fleetChartValues, extraValues)
-	}
-
 	gitjobChartValues := make(map[string]interface{})
 
 	if envVal, ok := os.LookupEnv("HTTP_PROXY"); ok {
@@ -151,6 +142,15 @@ func (h *handler) onSetting(key string, setting *v3.Setting) (*v3.Setting, error
 
 	if len(gitjobChartValues) > 0 {
 		fleetChartValues["gitjob"] = gitjobChartValues
+	}
+
+	if extraValues, err := h.chartsConfig.GetChartValues(fleetconst.ChartName); err != nil {
+		// Missing extra config is okay, return the error otherwise
+		if !chart.IsNotFoundError(err) {
+			return nil, err
+		}
+	} else {
+		coalesceMap(fleetChartValues, extraValues)
 	}
 
 	return setting,

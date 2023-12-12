@@ -213,6 +213,8 @@ leaderElection:
   leaseDuration: 2s
 bootstrap:
   enabled: true
+gitjob:
+  debug: true
 `},
 			newManager: func(ctrl *gomock.Controller) chart.Manager {
 				settings.ConfigMapName.Set("pass")
@@ -236,6 +238,7 @@ bootstrap:
 					},
 					"gitjob": map[string]interface{}{
 						"priorityClassName": priorityClassName,
+						"debug":             true,
 					},
 					"priorityClassName": priorityClassName,
 					"leaderElection": map[string]interface{}{
