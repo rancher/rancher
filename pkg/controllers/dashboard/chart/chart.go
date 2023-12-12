@@ -24,9 +24,6 @@ const (
 
 	// ProvisioningCAPIChartName name of the chart for rancher-provisioning-capi.
 	ProvisioningCAPIChartName = "rancher-provisioning-capi"
-
-	// FleetChartName name of the chart for fleet.
-	FleetChartName = "fleet"
 )
 
 var errKeyNotFound = errors.New("key not found")

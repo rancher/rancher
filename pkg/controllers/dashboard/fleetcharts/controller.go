@@ -124,7 +124,7 @@ func (h *handler) onSetting(key string, setting *v3.Setting) (*v3.Setting, error
 		},
 	}
 
-	if extraValues, err := h.chartsConfig.GetChartValues(chart.FleetChartName); err != nil {
+	if extraValues, err := h.chartsConfig.GetChartValues(fleetconst.ChartName); err != nil {
 		// Missing extra config is okay, return the error otherwise
 		if !chart.IsNotFoundError(err) {
 			return nil, err
