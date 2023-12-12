@@ -18,11 +18,6 @@ import (
 
 const priorityClassKey = "priorityClassName"
 
-const (
-	fleetChartValuesConfigMapNamespace = "cattle-system"
-	fleetChartValuesConfigMapName      = "fleet-extra-values"
-)
-
 var (
 	fleetCRDChart = chart.Definition{
 		ReleaseNamespace: fleetconst.ReleaseNamespace,
