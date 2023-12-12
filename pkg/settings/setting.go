@@ -287,7 +287,8 @@ func init() {
 
 // Provider is an interfaced used to get and set Settings.
 // NOTE: The behavior for treating unknown settings is undefined.
-// A provider may choose not to retain and/or drop unknown settings.
+// A provider may choose to remove settings which it has a record of,
+// but are not provided in SetAll call.
 type Provider interface {
 	Get(name string) string
 	Set(name, value string) error
