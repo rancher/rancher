@@ -75,6 +75,22 @@ func (c *Client) InstallChart(chart *types.ChartInstallAction) error {
 	return result.Error()
 }
 
+// InstallChartFromRepo installs the chart according to the parameter `chart` and `repoName`
+func (c *Client) InstallChartFromRepo(chart *types.ChartInstallAction, repoName string) error {
+	bodyContent, err := json.Marshal(chart)
+	if err != nil {
+		return err
+	}
+
+	result := c.RESTClient().Post().
+		AbsPath(fmt.Sprintf("v1/catalog.cattle.io.clusterrepos/%s", repoName)).Param("action", "install").
+		VersionedParams(&metav1.CreateOptions{}, scheme.ParameterCodec).
+		Body(bodyContent).
+		Do(context.TODO())
+
+	return result.Error()
+}
+
 // UpgradeChart upgrades the chart according to the parameter `chart`
 func (c *Client) UpgradeChart(chart *types.ChartUpgradeAction) error {
 	bodyContent, err := json.Marshal(chart)

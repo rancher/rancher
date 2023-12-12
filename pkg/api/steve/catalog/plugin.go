@@ -3,14 +3,15 @@ package catalog
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/gorilla/mux"
-	"github.com/rancher/rancher/pkg/controllers/dashboard/plugin"
-	"github.com/sirupsen/logrus"
-	"k8s.io/apiserver/pkg/endpoints/request"
 	"net/http"
 	"net/http/httputil"
 	neturl "net/url"
 	"strings"
+
+	"github.com/gorilla/mux"
+	"github.com/rancher/rancher/pkg/controllers/dashboard/plugin"
+	"github.com/sirupsen/logrus"
+	"k8s.io/apiserver/pkg/endpoints/request"
 )
 
 func SetupUIPluginHandlers(router *mux.Router) {
