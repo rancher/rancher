@@ -303,5 +303,5 @@ func TestMarkSettingAsUnknownRetry(t *testing.T) {
 	err := provider.markSettingAsUnknown(&unknown)
 	assert.Nil(t, err)
 	assert.NotNil(t, store["unknown"].Labels)
-	assert.Equal(t, store["unknown"].Labels["cattle.io/unknown"], "true")
+	assert.Equal(t, store["unknown"].Labels[unknownSettingLabelKey], "true")
 }
