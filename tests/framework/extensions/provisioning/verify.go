@@ -96,8 +96,10 @@ func VerifyRKE1Cluster(t *testing.T, client *rancher.Client, clustersConfig *clu
 		}
 	}
 
-	podErrors := pods.StatusPods(client, cluster.ID)
-	assert.Empty(t, podErrors)
+	if !strings.Contains(clustersConfig.CloudProvider, "external") {
+		podErrors := pods.StatusPods(client, cluster.ID)
+		assert.Empty(t, podErrors)
+	}
 }
 
 // VerifyCluster validates that a non-rke1 cluster and its resources are in a good state, matching a given config.

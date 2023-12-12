@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
+	"github.com/rancher/rancher/tests/framework/clients/rancher/catalog"
 	"github.com/rancher/rancher/tests/framework/extensions/charts"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/kubeconfig"
@@ -44,7 +45,7 @@ func (w *WebhookTestSuite) SetupSuite() {
 
 	// Get clusterName from config yaml
 	w.clusterList = client.RancherConfig.ClusterName
-	w.chartVersion, err = client.Catalog.GetLatestChartVersion(charts.RancherWebhookName)
+	w.chartVersion, err = client.Catalog.GetLatestChartVersion(charts.RancherWebhookName, catalog.RancherChartRepo)
 	require.NoError(w.T(), err)
 
 }

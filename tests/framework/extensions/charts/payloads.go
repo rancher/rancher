@@ -47,10 +47,10 @@ func newChartUpgradeAction(namespace string, chartUpgrades []types.ChartUpgrade)
 }
 
 // newChartInstallAction is a private constructor that creates a chart install with given chart values that can be used for chart install action.
-func newChartInstall(name, version, clusterID, clusterName, url, defaultRegistry string, chartValues map[string]interface{}) *types.ChartInstall {
+func newChartInstall(name, version, clusterID, clusterName, url, repoName, projectID, defaultRegistry string, chartValues map[string]interface{}) *types.ChartInstall {
 	chartInstall := types.ChartInstall{
 		Annotations: map[string]string{
-			"catalog.cattle.io/ui-source-repo":      "rancher-charts",
+			"catalog.cattle.io/ui-source-repo":      repoName,
 			"catalog.cattle.io/ui-source-repo-type": "cluster",
 		},
 		ChartName:   name,
@@ -65,6 +65,7 @@ func newChartInstall(name, version, clusterID, clusterName, url, defaultRegistry
 					"rkeWindowsPathPrefix":  "",
 					"systemDefaultRegistry": defaultRegistry,
 					"url":                   url,
+					"systemProjectId":       projectID,
 				},
 				"systemDefaultRegistry": defaultRegistry,
 			},

@@ -6,6 +6,7 @@ import (
 
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
+	"github.com/rancher/rancher/tests/framework/extensions/defaults"
 	corev1 "k8s.io/api/core/v1"
 	kwait "k8s.io/apimachinery/pkg/util/wait"
 )
@@ -25,7 +26,7 @@ func StatusPods(client *rancher.Client, clusterID string) []error {
 	var podErrors []error
 
 	steveClient := downstreamClient.SteveType(PodResourceSteveType)
-	err = kwait.Poll(5*time.Second, 15*time.Minute, func() (done bool, err error) {
+	err = kwait.Poll(5*time.Second, defaults.FifteenMinuteTimeout, func() (done bool, err error) {
 		// emptying pod errors every time we poll so that we don't return stale errors
 		podErrors = []error{}
 
