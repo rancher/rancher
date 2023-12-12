@@ -325,9 +325,6 @@ func NewK3SRKE2ClusterConfig(clusterName, namespace string, clustersConfig *Clus
 	}
 	if clustersConfig.ETCD != nil {
 		etcd = clustersConfig.ETCD
-		if etcd.S3 != nil {
-			etcd.S3.CloudCredentialName = cloudCredentialSecretName
-		}
 	}
 
 	chartValuesMap := rkev1.GenericMap{
