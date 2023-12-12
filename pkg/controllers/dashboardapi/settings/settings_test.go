@@ -256,7 +256,7 @@ func populateTestCases() []*testCase {
 	return testCases
 }
 
-func TestMarkSettingAsUnknownRetry(t *testing.T) {
+func TestSettingUnknownLabelIsRetried(t *testing.T) {
 	store := map[string]v3.Setting{
 		"unknown": {
 			ObjectMeta: metav1.ObjectMeta{
@@ -273,6 +273,15 @@ func TestMarkSettingAsUnknownRetry(t *testing.T) {
 	}
 	client := fake.NewMockNonNamespacedControllerInterface[*v3.Setting, *v3.SettingList](gomock.NewController(t))
 
+	client.EXPECT().List(gomock.Any()).DoAndReturn(func(opts metav1.ListOptions) (*v3.SettingList, error) {
+		var items []v3.Setting
+		for _, setting := range store {
+			items = append(items, setting)
+		}
+
+		return &v3.SettingList{Items: items}, nil
+	}).Times(1)
+
 	client.EXPECT().Get(gomock.Any(), gomock.Any()).DoAndReturn(func(name string, options metav1.GetOptions) (*v3.Setting, error) {
 		val, ok := store[name]
 		if !ok {
@@ -282,11 +291,11 @@ func TestMarkSettingAsUnknownRetry(t *testing.T) {
 		return &val, nil
 	}).Times(1)
 
-	var updateRun int
+	isFirstUpdate := true
 	client.EXPECT().Update(gomock.Any()).DoAndReturn(func(s *v3.Setting) (*v3.Setting, error) {
-		defer func() { updateRun++ }()
+		defer func() { isFirstUpdate = false }()
 
-		if updateRun == 0 { // Fail the the first update to force retry.
+		if isFirstUpdate { // Fail the the first update to force retry.
 			return nil, apierrors.NewConflict(groupResource, s.Name, fmt.Errorf("some error"))
 		}
 
@@ -298,10 +307,8 @@ func TestMarkSettingAsUnknownRetry(t *testing.T) {
 		settings: client,
 	}
 
-	unknown := store["unknown"]
+	err := provider.SetAll(nil)
 
-	err := provider.markSettingAsUnknown(&unknown)
 	assert.Nil(t, err)
-	assert.NotNil(t, store["unknown"].Labels)
-	assert.Equal(t, store["unknown"].Labels[unknownSettingLabelKey], "true")
+	assert.Equal(t, "true", store["unknown"].Labels[unknownSettingLabelKey])
 }
