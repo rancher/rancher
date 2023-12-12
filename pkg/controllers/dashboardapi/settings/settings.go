@@ -190,13 +190,13 @@ func (s *settingsProvider) cleanupUnknownSettings(settingsMap map[string]setting
 func (s *settingsProvider) markSettingAsUnknown(setting *v3.Setting) error {
 	logrus.Warnf("Unknown setting %s", setting.Name)
 
-	isFirstAttmpt := true
+	isFirstAttempt := true
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		defer func() { isFirstAttmpt = false }()
+		defer func() { isFirstAttempt = false }()
 
 		var err error
 
-		if !isFirstAttmpt { // Refetch only if the first attempt to update failed.
+		if !isFirstAttempt { // Refetch only if the first attempt to update failed.
 			setting, err = s.settings.Get(setting.Name, metav1.GetOptions{})
 			if err != nil {
 				if apierrors.IsNotFound(err) { // The setting is no longer, move on.
