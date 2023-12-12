@@ -24,9 +24,9 @@ func CheckETCDVersion(client *rancher.Client, nodes []*nodes.Node, clusterID str
 
 	for _, rancherNode := range nodesList.Data {
 		externalIP := rancherNode.Annotations["rke.cattle.io/external-ip"]
-		etcdRole := rancherNode.Labels["node-role.kubernetes.io/etcd"]
+		etcdRole := rancherNode.Labels["node-role.kubernetes.io/etcd"] == "true"
 
-		if etcdRole == "true" {
+		if etcdRole {
 			for _, node := range nodes {
 				if strings.Contains(node.PublicIPAddress, externalIP) {
 					command := "docker exec etcd etcdctl version"
