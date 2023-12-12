@@ -85,8 +85,8 @@ func (s *settingsProvider) SetIfUnset(name, value string) error {
 
 // SetAll iterates through a map of settings.Setting and updates corresponding settings in k8s
 // to match any values set for them via their respective CATTLE_<setting-name> env var, their
-// source to "env" if configured by an env var, and their default to match the setting in the
-// map.
+// source to "env" if configured by an env var, and their default to match the setting in the map.
+// NOTE: It also lists all settings in k8s and cleans up unknown (not present in settingsMap) ones.
 func (s *settingsProvider) SetAll(settingsMap map[string]settings.Setting) error {
 	fallback := map[string]string{}
 
@@ -162,9 +162,9 @@ func (s *settingsProvider) SetAll(settingsMap map[string]settings.Setting) error
 
 const unknownSettingLabelKey = "cattle.io/unknown"
 
-// cleanupUnknownSettings lists all the settings in the cluster and cleans up all unknown (e.g. deprecated) settings.
-// At the moment, we just mark such settings with a label.
-// In the future release we'll be removing them.
+// cleanupUnknownSettings lists all settings in the cluster and cleans up all unknown (e.g. deprecated) settings.
+// At the moment, we just mark such settings with a label so that such settings can be easily identified.
+// In the future unknown settings may be deleted instead.
 func (s *settingsProvider) cleanupUnknownSettings(settingsMap map[string]settings.Setting) error {
 	// The settings cache is not yet available at this point, thus using the client directly.
 	list, err := s.settings.List(metav1.ListOptions{})
