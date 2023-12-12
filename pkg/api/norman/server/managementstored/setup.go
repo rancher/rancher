@@ -106,7 +106,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.RkeK8sServiceOptionType,
 		client.RkeAddonType,
 		client.RoleTemplateType,
-		client.SamlTokenType,
+		client.EncryptedTokenType,
 		client.SettingType,
 		client.TokenType,
 		client.UserAttributeType,

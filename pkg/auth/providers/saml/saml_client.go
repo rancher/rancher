@@ -396,7 +396,7 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 		requestID := s.clientState.GetState(r, "Rancher_RequestID")
 		log.Debugf("SAML: requestID: %s", requestID)
 		if requestID != "" {
-			// generate kubeconfig saml token
+			// generate kubeconfig encrypted token
 			responseType := s.clientState.GetState(r, "Rancher_ResponseType")
 			publicKey := s.clientState.GetState(r, "Rancher_PublicKey")
 
@@ -420,7 +420,7 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 				http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)
 				return
 			}
-			encryptedToken, err := rsa.EncryptOAEP(
+			newEncryptedToken, err := rsa.EncryptOAEP(
 				sha256.New(),
 				rand.Reader,
 				pubKey,
@@ -431,9 +431,9 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 				http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)
 				return
 			}
-			encoded := base64.StdEncoding.EncodeToString(encryptedToken)
+			encoded := base64.StdEncoding.EncodeToString(newEncryptedToken)
 
-			samlToken := &v3.SamlToken{
+			encryptedToken := &v3.EncryptedToken{
 				Token:     encoded,
 				ExpiresAt: token.ExpiresAt,
 				ObjectMeta: v1.ObjectMeta{
@@ -442,7 +442,7 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 				},
 			}
 
-			_, err = s.samlTokens.Create(samlToken)
+			_, err = s.encryptedTokens.Create(encryptedToken)
 			if err != nil {
 				log.Errorf("SAML: createToken err %v", err)
 				http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)

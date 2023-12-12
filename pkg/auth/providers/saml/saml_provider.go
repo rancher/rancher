@@ -39,7 +39,7 @@ type Provider struct {
 	ctx             context.Context
 	authConfigs     v3.AuthConfigInterface
 	secrets         corev1.SecretInterface
-	samlTokens      v3.SamlTokenInterface
+	encryptedTokens v3.EncryptedTokenInterface
 	userMGR         user.Manager
 	tokenMGR        *tokens.Manager
 	serviceProvider *saml.ServiceProvider
@@ -54,15 +54,15 @@ var SamlProviders = make(map[string]*Provider)
 
 func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *tokens.Manager, name string) common.AuthProvider {
 	samlp := &Provider{
-		ctx:         ctx,
-		authConfigs: mgmtCtx.Management.AuthConfigs(""),
-		secrets:     mgmtCtx.Core.Secrets(""),
-		samlTokens:  mgmtCtx.Management.SamlTokens(""),
-		userMGR:     userMGR,
-		tokenMGR:    tokenMGR,
-		name:        name,
-		userType:    name + "_user",
-		groupType:   name + "_group",
+		ctx:             ctx,
+		authConfigs:     mgmtCtx.Management.AuthConfigs(""),
+		secrets:         mgmtCtx.Core.Secrets(""),
+		encryptedTokens: mgmtCtx.Management.EncryptedTokens(""),
+		userMGR:         userMGR,
+		tokenMGR:        tokenMGR,
+		name:            name,
+		userType:        name + "_user",
+		groupType:       name + "_group",
 	}
 
 	if samlp.hasLdapGroupSearch() {

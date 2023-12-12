@@ -83,13 +83,13 @@ func (s *authProvidersStore) Update(apiContext *types.APIContext, schema *types.
 
 func setAuthTokensStore(schema *types.Schema, apiContext *config.ScaledContext) {
 	schema.Store = &authTokensStore{
-		tokens: apiContext.Management.SamlTokens(""),
+		tokens: apiContext.Management.EncryptedTokens(""),
 	}
 }
 
 type authTokensStore struct {
 	empty.Store
-	tokens v3.SamlTokenInterface
+	tokens v3.EncryptedTokenInterface
 }
 
 func (t *authTokensStore) ByID(apiContext *types.APIContext, schema *types.Schema, id string) (map[string]interface{}, error) {
@@ -121,7 +121,7 @@ func (t *authTokensStore) Delete(apiContext *types.APIContext, schema *types.Sch
 	return nil, nil
 }
 
-func transformToAuthToken(token *v3.SamlToken) map[string]interface{} {
+func transformToAuthToken(token *v3.EncryptedToken) map[string]interface{} {
 	generated := map[string]interface{}{}
 	if token == nil {
 		return generated

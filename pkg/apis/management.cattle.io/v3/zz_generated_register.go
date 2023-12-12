@@ -51,6 +51,7 @@ var (
 	ClusterTemplateRevisionResourceName                   = "clustertemplaterevisions"
 	ComposeConfigResourceName                             = "composeconfigs"
 	DynamicSchemaResourceName                             = "dynamicschemas"
+	EncryptedTokenResourceName                            = "encryptedtokens"
 	EtcdBackupResourceName                                = "etcdbackups"
 	FeatureResourceName                                   = "features"
 	FleetWorkspaceResourceName                            = "fleetworkspaces"
@@ -96,7 +97,6 @@ var (
 	RkeK8sSystemImageResourceName                         = "rkek8ssystemimages"
 	RoleTemplateResourceName                              = "roletemplates"
 	SamlProviderResourceName                              = "samlproviders"
-	SamlTokenResourceName                                 = "samltokens"
 	SettingResourceName                                   = "settings"
 	TemplateResourceName                                  = "templates"
 	TemplateContentResourceName                           = "templatecontents"
@@ -173,6 +173,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&ComposeConfigList{},
 		&DynamicSchema{},
 		&DynamicSchemaList{},
+		&EncryptedToken{},
+		&EncryptedTokenList{},
 		&EtcdBackup{},
 		&EtcdBackupList{},
 		&Feature{},
@@ -263,8 +265,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&RoleTemplateList{},
 		&SamlProvider{},
 		&SamlProviderList{},
-		&SamlToken{},
-		&SamlTokenList{},
 		&Setting{},
 		&SettingList{},
 		&Template{},

@@ -19,38 +19,38 @@ import (
 )
 
 var (
-	lockSamlTokenListerMockGet  sync.RWMutex
-	lockSamlTokenListerMockList sync.RWMutex
+	lockEncryptedTokenListerMockGet  sync.RWMutex
+	lockEncryptedTokenListerMockList sync.RWMutex
 )
 
-// Ensure, that SamlTokenListerMock does implement v31.SamlTokenLister.
+// Ensure, that EncryptedTokenListerMock does implement v31.EncryptedTokenLister.
 // If this is not the case, regenerate this file with moq.
-var _ v31.SamlTokenLister = &SamlTokenListerMock{}
+var _ v31.EncryptedTokenLister = &EncryptedTokenListerMock{}
 
-// SamlTokenListerMock is a mock implementation of v31.SamlTokenLister.
+// EncryptedTokenListerMock is a mock implementation of v31.EncryptedTokenLister.
 //
-//	    func TestSomethingThatUsesSamlTokenLister(t *testing.T) {
+//	    func TestSomethingThatUsesEncryptedTokenLister(t *testing.T) {
 //
-//	        // make and configure a mocked v31.SamlTokenLister
-//	        mockedSamlTokenLister := &SamlTokenListerMock{
-//	            GetFunc: func(namespace string, name string) (*v3.SamlToken, error) {
+//	        // make and configure a mocked v31.EncryptedTokenLister
+//	        mockedEncryptedTokenLister := &EncryptedTokenListerMock{
+//	            GetFunc: func(namespace string, name string) (*v3.EncryptedToken, error) {
 //		               panic("mock out the Get method")
 //	            },
-//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v3.SamlToken, error) {
+//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v3.EncryptedToken, error) {
 //		               panic("mock out the List method")
 //	            },
 //	        }
 //
-//	        // use mockedSamlTokenLister in code that requires v31.SamlTokenLister
+//	        // use mockedEncryptedTokenLister in code that requires v31.EncryptedTokenLister
 //	        // and then make assertions.
 //
 //	    }
-type SamlTokenListerMock struct {
+type EncryptedTokenListerMock struct {
 	// GetFunc mocks the Get method.
-	GetFunc func(namespace string, name string) (*v3.SamlToken, error)
+	GetFunc func(namespace string, name string) (*v3.EncryptedToken, error)
 
 	// ListFunc mocks the List method.
-	ListFunc func(namespace string, selector labels.Selector) ([]*v3.SamlToken, error)
+	ListFunc func(namespace string, selector labels.Selector) ([]*v3.EncryptedToken, error)
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -72,9 +72,9 @@ type SamlTokenListerMock struct {
 }
 
 // Get calls GetFunc.
-func (mock *SamlTokenListerMock) Get(namespace string, name string) (*v3.SamlToken, error) {
+func (mock *EncryptedTokenListerMock) Get(namespace string, name string) (*v3.EncryptedToken, error) {
 	if mock.GetFunc == nil {
-		panic("SamlTokenListerMock.GetFunc: method is nil but SamlTokenLister.Get was just called")
+		panic("EncryptedTokenListerMock.GetFunc: method is nil but EncryptedTokenLister.Get was just called")
 	}
 	callInfo := struct {
 		Namespace string
@@ -83,17 +83,17 @@ func (mock *SamlTokenListerMock) Get(namespace string, name string) (*v3.SamlTok
 		Namespace: namespace,
 		Name:      name,
 	}
-	lockSamlTokenListerMockGet.Lock()
+	lockEncryptedTokenListerMockGet.Lock()
 	mock.calls.Get = append(mock.calls.Get, callInfo)
-	lockSamlTokenListerMockGet.Unlock()
+	lockEncryptedTokenListerMockGet.Unlock()
 	return mock.GetFunc(namespace, name)
 }
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
 //
-//	len(mockedSamlTokenLister.GetCalls())
-func (mock *SamlTokenListerMock) GetCalls() []struct {
+//	len(mockedEncryptedTokenLister.GetCalls())
+func (mock *EncryptedTokenListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
 } {
@@ -101,16 +101,16 @@ func (mock *SamlTokenListerMock) GetCalls() []struct {
 		Namespace string
 		Name      string
 	}
-	lockSamlTokenListerMockGet.RLock()
+	lockEncryptedTokenListerMockGet.RLock()
 	calls = mock.calls.Get
-	lockSamlTokenListerMockGet.RUnlock()
+	lockEncryptedTokenListerMockGet.RUnlock()
 	return calls
 }
 
 // List calls ListFunc.
-func (mock *SamlTokenListerMock) List(namespace string, selector labels.Selector) ([]*v3.SamlToken, error) {
+func (mock *EncryptedTokenListerMock) List(namespace string, selector labels.Selector) ([]*v3.EncryptedToken, error) {
 	if mock.ListFunc == nil {
-		panic("SamlTokenListerMock.ListFunc: method is nil but SamlTokenLister.List was just called")
+		panic("EncryptedTokenListerMock.ListFunc: method is nil but EncryptedTokenLister.List was just called")
 	}
 	callInfo := struct {
 		Namespace string
@@ -119,17 +119,17 @@ func (mock *SamlTokenListerMock) List(namespace string, selector labels.Selector
 		Namespace: namespace,
 		Selector:  selector,
 	}
-	lockSamlTokenListerMockList.Lock()
+	lockEncryptedTokenListerMockList.Lock()
 	mock.calls.List = append(mock.calls.List, callInfo)
-	lockSamlTokenListerMockList.Unlock()
+	lockEncryptedTokenListerMockList.Unlock()
 	return mock.ListFunc(namespace, selector)
 }
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
 //
-//	len(mockedSamlTokenLister.ListCalls())
-func (mock *SamlTokenListerMock) ListCalls() []struct {
+//	len(mockedEncryptedTokenLister.ListCalls())
+func (mock *EncryptedTokenListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
 } {
@@ -137,44 +137,44 @@ func (mock *SamlTokenListerMock) ListCalls() []struct {
 		Namespace string
 		Selector  labels.Selector
 	}
-	lockSamlTokenListerMockList.RLock()
+	lockEncryptedTokenListerMockList.RLock()
 	calls = mock.calls.List
-	lockSamlTokenListerMockList.RUnlock()
+	lockEncryptedTokenListerMockList.RUnlock()
 	return calls
 }
 
 var (
-	lockSamlTokenControllerMockAddClusterScopedFeatureHandler sync.RWMutex
-	lockSamlTokenControllerMockAddClusterScopedHandler        sync.RWMutex
-	lockSamlTokenControllerMockAddFeatureHandler              sync.RWMutex
-	lockSamlTokenControllerMockAddHandler                     sync.RWMutex
-	lockSamlTokenControllerMockEnqueue                        sync.RWMutex
-	lockSamlTokenControllerMockEnqueueAfter                   sync.RWMutex
-	lockSamlTokenControllerMockGeneric                        sync.RWMutex
-	lockSamlTokenControllerMockInformer                       sync.RWMutex
-	lockSamlTokenControllerMockLister                         sync.RWMutex
+	lockEncryptedTokenControllerMockAddClusterScopedFeatureHandler sync.RWMutex
+	lockEncryptedTokenControllerMockAddClusterScopedHandler        sync.RWMutex
+	lockEncryptedTokenControllerMockAddFeatureHandler              sync.RWMutex
+	lockEncryptedTokenControllerMockAddHandler                     sync.RWMutex
+	lockEncryptedTokenControllerMockEnqueue                        sync.RWMutex
+	lockEncryptedTokenControllerMockEnqueueAfter                   sync.RWMutex
+	lockEncryptedTokenControllerMockGeneric                        sync.RWMutex
+	lockEncryptedTokenControllerMockInformer                       sync.RWMutex
+	lockEncryptedTokenControllerMockLister                         sync.RWMutex
 )
 
-// Ensure, that SamlTokenControllerMock does implement v31.SamlTokenController.
+// Ensure, that EncryptedTokenControllerMock does implement v31.EncryptedTokenController.
 // If this is not the case, regenerate this file with moq.
-var _ v31.SamlTokenController = &SamlTokenControllerMock{}
+var _ v31.EncryptedTokenController = &EncryptedTokenControllerMock{}
 
-// SamlTokenControllerMock is a mock implementation of v31.SamlTokenController.
+// EncryptedTokenControllerMock is a mock implementation of v31.EncryptedTokenController.
 //
-//	    func TestSomethingThatUsesSamlTokenController(t *testing.T) {
+//	    func TestSomethingThatUsesEncryptedTokenController(t *testing.T) {
 //
-//	        // make and configure a mocked v31.SamlTokenController
-//	        mockedSamlTokenController := &SamlTokenControllerMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.SamlTokenHandlerFunc)  {
+//	        // make and configure a mocked v31.EncryptedTokenController
+//	        mockedEncryptedTokenController := &EncryptedTokenControllerMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.EncryptedTokenHandlerFunc)  {
 //		               panic("mock out the AddClusterScopedFeatureHandler method")
 //	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.SamlTokenHandlerFunc)  {
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.EncryptedTokenHandlerFunc)  {
 //		               panic("mock out the AddClusterScopedHandler method")
 //	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.SamlTokenHandlerFunc)  {
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.EncryptedTokenHandlerFunc)  {
 //		               panic("mock out the AddFeatureHandler method")
 //	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, handler v31.SamlTokenHandlerFunc)  {
+//	            AddHandlerFunc: func(ctx context.Context, name string, handler v31.EncryptedTokenHandlerFunc)  {
 //		               panic("mock out the AddHandler method")
 //	            },
 //	            EnqueueFunc: func(namespace string, name string)  {
@@ -189,27 +189,27 @@ var _ v31.SamlTokenController = &SamlTokenControllerMock{}
 //	            InformerFunc: func() cache.SharedIndexInformer {
 //		               panic("mock out the Informer method")
 //	            },
-//	            ListerFunc: func() v31.SamlTokenLister {
+//	            ListerFunc: func() v31.EncryptedTokenLister {
 //		               panic("mock out the Lister method")
 //	            },
 //	        }
 //
-//	        // use mockedSamlTokenController in code that requires v31.SamlTokenController
+//	        // use mockedEncryptedTokenController in code that requires v31.EncryptedTokenController
 //	        // and then make assertions.
 //
 //	    }
-type SamlTokenControllerMock struct {
+type EncryptedTokenControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
-	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.SamlTokenHandlerFunc)
+	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.EncryptedTokenHandlerFunc)
 
 	// AddClusterScopedHandlerFunc mocks the AddClusterScopedHandler method.
-	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, handler v31.SamlTokenHandlerFunc)
+	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, handler v31.EncryptedTokenHandlerFunc)
 
 	// AddFeatureHandlerFunc mocks the AddFeatureHandler method.
-	AddFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.SamlTokenHandlerFunc)
+	AddFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.EncryptedTokenHandlerFunc)
 
 	// AddHandlerFunc mocks the AddHandler method.
-	AddHandlerFunc func(ctx context.Context, name string, handler v31.SamlTokenHandlerFunc)
+	AddHandlerFunc func(ctx context.Context, name string, handler v31.EncryptedTokenHandlerFunc)
 
 	// EnqueueFunc mocks the Enqueue method.
 	EnqueueFunc func(namespace string, name string)
@@ -224,7 +224,7 @@ type SamlTokenControllerMock struct {
 	InformerFunc func() cache.SharedIndexInformer
 
 	// ListerFunc mocks the Lister method.
-	ListerFunc func() v31.SamlTokenLister
+	ListerFunc func() v31.EncryptedTokenLister
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -239,7 +239,7 @@ type SamlTokenControllerMock struct {
 			// ClusterName is the clusterName argument value.
 			ClusterName string
 			// Handler is the handler argument value.
-			Handler v31.SamlTokenHandlerFunc
+			Handler v31.EncryptedTokenHandlerFunc
 		}
 		// AddClusterScopedHandler holds details about calls to the AddClusterScopedHandler method.
 		AddClusterScopedHandler []struct {
@@ -250,7 +250,7 @@ type SamlTokenControllerMock struct {
 			// ClusterName is the clusterName argument value.
 			ClusterName string
 			// Handler is the handler argument value.
-			Handler v31.SamlTokenHandlerFunc
+			Handler v31.EncryptedTokenHandlerFunc
 		}
 		// AddFeatureHandler holds details about calls to the AddFeatureHandler method.
 		AddFeatureHandler []struct {
@@ -261,7 +261,7 @@ type SamlTokenControllerMock struct {
 			// Name is the name argument value.
 			Name string
 			// Sync is the sync argument value.
-			Sync v31.SamlTokenHandlerFunc
+			Sync v31.EncryptedTokenHandlerFunc
 		}
 		// AddHandler holds details about calls to the AddHandler method.
 		AddHandler []struct {
@@ -270,7 +270,7 @@ type SamlTokenControllerMock struct {
 			// Name is the name argument value.
 			Name string
 			// Handler is the handler argument value.
-			Handler v31.SamlTokenHandlerFunc
+			Handler v31.EncryptedTokenHandlerFunc
 		}
 		// Enqueue holds details about calls to the Enqueue method.
 		Enqueue []struct {
@@ -301,16 +301,16 @@ type SamlTokenControllerMock struct {
 }
 
 // AddClusterScopedFeatureHandler calls AddClusterScopedFeatureHandlerFunc.
-func (mock *SamlTokenControllerMock) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.SamlTokenHandlerFunc) {
+func (mock *EncryptedTokenControllerMock) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.EncryptedTokenHandlerFunc) {
 	if mock.AddClusterScopedFeatureHandlerFunc == nil {
-		panic("SamlTokenControllerMock.AddClusterScopedFeatureHandlerFunc: method is nil but SamlTokenController.AddClusterScopedFeatureHandler was just called")
+		panic("EncryptedTokenControllerMock.AddClusterScopedFeatureHandlerFunc: method is nil but EncryptedTokenController.AddClusterScopedFeatureHandler was just called")
 	}
 	callInfo := struct {
 		Ctx         context.Context
 		Enabled     func() bool
 		Name        string
 		ClusterName string
-		Handler     v31.SamlTokenHandlerFunc
+		Handler     v31.EncryptedTokenHandlerFunc
 	}{
 		Ctx:         ctx,
 		Enabled:     enabled,
@@ -318,168 +318,168 @@ func (mock *SamlTokenControllerMock) AddClusterScopedFeatureHandler(ctx context.
 		ClusterName: clusterName,
 		Handler:     handler,
 	}
-	lockSamlTokenControllerMockAddClusterScopedFeatureHandler.Lock()
+	lockEncryptedTokenControllerMockAddClusterScopedFeatureHandler.Lock()
 	mock.calls.AddClusterScopedFeatureHandler = append(mock.calls.AddClusterScopedFeatureHandler, callInfo)
-	lockSamlTokenControllerMockAddClusterScopedFeatureHandler.Unlock()
+	lockEncryptedTokenControllerMockAddClusterScopedFeatureHandler.Unlock()
 	mock.AddClusterScopedFeatureHandlerFunc(ctx, enabled, name, clusterName, handler)
 }
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
 //
-//	len(mockedSamlTokenController.AddClusterScopedFeatureHandlerCalls())
-func (mock *SamlTokenControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
+//	len(mockedEncryptedTokenController.AddClusterScopedFeatureHandlerCalls())
+func (mock *EncryptedTokenControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
 	Name        string
 	ClusterName string
-	Handler     v31.SamlTokenHandlerFunc
+	Handler     v31.EncryptedTokenHandlerFunc
 } {
 	var calls []struct {
 		Ctx         context.Context
 		Enabled     func() bool
 		Name        string
 		ClusterName string
-		Handler     v31.SamlTokenHandlerFunc
+		Handler     v31.EncryptedTokenHandlerFunc
 	}
-	lockSamlTokenControllerMockAddClusterScopedFeatureHandler.RLock()
+	lockEncryptedTokenControllerMockAddClusterScopedFeatureHandler.RLock()
 	calls = mock.calls.AddClusterScopedFeatureHandler
-	lockSamlTokenControllerMockAddClusterScopedFeatureHandler.RUnlock()
+	lockEncryptedTokenControllerMockAddClusterScopedFeatureHandler.RUnlock()
 	return calls
 }
 
 // AddClusterScopedHandler calls AddClusterScopedHandlerFunc.
-func (mock *SamlTokenControllerMock) AddClusterScopedHandler(ctx context.Context, name string, clusterName string, handler v31.SamlTokenHandlerFunc) {
+func (mock *EncryptedTokenControllerMock) AddClusterScopedHandler(ctx context.Context, name string, clusterName string, handler v31.EncryptedTokenHandlerFunc) {
 	if mock.AddClusterScopedHandlerFunc == nil {
-		panic("SamlTokenControllerMock.AddClusterScopedHandlerFunc: method is nil but SamlTokenController.AddClusterScopedHandler was just called")
+		panic("EncryptedTokenControllerMock.AddClusterScopedHandlerFunc: method is nil but EncryptedTokenController.AddClusterScopedHandler was just called")
 	}
 	callInfo := struct {
 		Ctx         context.Context
 		Name        string
 		ClusterName string
-		Handler     v31.SamlTokenHandlerFunc
+		Handler     v31.EncryptedTokenHandlerFunc
 	}{
 		Ctx:         ctx,
 		Name:        name,
 		ClusterName: clusterName,
 		Handler:     handler,
 	}
-	lockSamlTokenControllerMockAddClusterScopedHandler.Lock()
+	lockEncryptedTokenControllerMockAddClusterScopedHandler.Lock()
 	mock.calls.AddClusterScopedHandler = append(mock.calls.AddClusterScopedHandler, callInfo)
-	lockSamlTokenControllerMockAddClusterScopedHandler.Unlock()
+	lockEncryptedTokenControllerMockAddClusterScopedHandler.Unlock()
 	mock.AddClusterScopedHandlerFunc(ctx, name, clusterName, handler)
 }
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
 //
-//	len(mockedSamlTokenController.AddClusterScopedHandlerCalls())
-func (mock *SamlTokenControllerMock) AddClusterScopedHandlerCalls() []struct {
+//	len(mockedEncryptedTokenController.AddClusterScopedHandlerCalls())
+func (mock *EncryptedTokenControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
 	ClusterName string
-	Handler     v31.SamlTokenHandlerFunc
+	Handler     v31.EncryptedTokenHandlerFunc
 } {
 	var calls []struct {
 		Ctx         context.Context
 		Name        string
 		ClusterName string
-		Handler     v31.SamlTokenHandlerFunc
+		Handler     v31.EncryptedTokenHandlerFunc
 	}
-	lockSamlTokenControllerMockAddClusterScopedHandler.RLock()
+	lockEncryptedTokenControllerMockAddClusterScopedHandler.RLock()
 	calls = mock.calls.AddClusterScopedHandler
-	lockSamlTokenControllerMockAddClusterScopedHandler.RUnlock()
+	lockEncryptedTokenControllerMockAddClusterScopedHandler.RUnlock()
 	return calls
 }
 
 // AddFeatureHandler calls AddFeatureHandlerFunc.
-func (mock *SamlTokenControllerMock) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.SamlTokenHandlerFunc) {
+func (mock *EncryptedTokenControllerMock) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.EncryptedTokenHandlerFunc) {
 	if mock.AddFeatureHandlerFunc == nil {
-		panic("SamlTokenControllerMock.AddFeatureHandlerFunc: method is nil but SamlTokenController.AddFeatureHandler was just called")
+		panic("EncryptedTokenControllerMock.AddFeatureHandlerFunc: method is nil but EncryptedTokenController.AddFeatureHandler was just called")
 	}
 	callInfo := struct {
 		Ctx     context.Context
 		Enabled func() bool
 		Name    string
-		Sync    v31.SamlTokenHandlerFunc
+		Sync    v31.EncryptedTokenHandlerFunc
 	}{
 		Ctx:     ctx,
 		Enabled: enabled,
 		Name:    name,
 		Sync:    syncMoqParam,
 	}
-	lockSamlTokenControllerMockAddFeatureHandler.Lock()
+	lockEncryptedTokenControllerMockAddFeatureHandler.Lock()
 	mock.calls.AddFeatureHandler = append(mock.calls.AddFeatureHandler, callInfo)
-	lockSamlTokenControllerMockAddFeatureHandler.Unlock()
+	lockEncryptedTokenControllerMockAddFeatureHandler.Unlock()
 	mock.AddFeatureHandlerFunc(ctx, enabled, name, syncMoqParam)
 }
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
 //
-//	len(mockedSamlTokenController.AddFeatureHandlerCalls())
-func (mock *SamlTokenControllerMock) AddFeatureHandlerCalls() []struct {
+//	len(mockedEncryptedTokenController.AddFeatureHandlerCalls())
+func (mock *EncryptedTokenControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
 	Name    string
-	Sync    v31.SamlTokenHandlerFunc
+	Sync    v31.EncryptedTokenHandlerFunc
 } {
 	var calls []struct {
 		Ctx     context.Context
 		Enabled func() bool
 		Name    string
-		Sync    v31.SamlTokenHandlerFunc
+		Sync    v31.EncryptedTokenHandlerFunc
 	}
-	lockSamlTokenControllerMockAddFeatureHandler.RLock()
+	lockEncryptedTokenControllerMockAddFeatureHandler.RLock()
 	calls = mock.calls.AddFeatureHandler
-	lockSamlTokenControllerMockAddFeatureHandler.RUnlock()
+	lockEncryptedTokenControllerMockAddFeatureHandler.RUnlock()
 	return calls
 }
 
 // AddHandler calls AddHandlerFunc.
-func (mock *SamlTokenControllerMock) AddHandler(ctx context.Context, name string, handler v31.SamlTokenHandlerFunc) {
+func (mock *EncryptedTokenControllerMock) AddHandler(ctx context.Context, name string, handler v31.EncryptedTokenHandlerFunc) {
 	if mock.AddHandlerFunc == nil {
-		panic("SamlTokenControllerMock.AddHandlerFunc: method is nil but SamlTokenController.AddHandler was just called")
+		panic("EncryptedTokenControllerMock.AddHandlerFunc: method is nil but EncryptedTokenController.AddHandler was just called")
 	}
 	callInfo := struct {
 		Ctx     context.Context
 		Name    string
-		Handler v31.SamlTokenHandlerFunc
+		Handler v31.EncryptedTokenHandlerFunc
 	}{
 		Ctx:     ctx,
 		Name:    name,
 		Handler: handler,
 	}
-	lockSamlTokenControllerMockAddHandler.Lock()
+	lockEncryptedTokenControllerMockAddHandler.Lock()
 	mock.calls.AddHandler = append(mock.calls.AddHandler, callInfo)
-	lockSamlTokenControllerMockAddHandler.Unlock()
+	lockEncryptedTokenControllerMockAddHandler.Unlock()
 	mock.AddHandlerFunc(ctx, name, handler)
 }
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
 //
-//	len(mockedSamlTokenController.AddHandlerCalls())
-func (mock *SamlTokenControllerMock) AddHandlerCalls() []struct {
+//	len(mockedEncryptedTokenController.AddHandlerCalls())
+func (mock *EncryptedTokenControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
-	Handler v31.SamlTokenHandlerFunc
+	Handler v31.EncryptedTokenHandlerFunc
 } {
 	var calls []struct {
 		Ctx     context.Context
 		Name    string
-		Handler v31.SamlTokenHandlerFunc
+		Handler v31.EncryptedTokenHandlerFunc
 	}
-	lockSamlTokenControllerMockAddHandler.RLock()
+	lockEncryptedTokenControllerMockAddHandler.RLock()
 	calls = mock.calls.AddHandler
-	lockSamlTokenControllerMockAddHandler.RUnlock()
+	lockEncryptedTokenControllerMockAddHandler.RUnlock()
 	return calls
 }
 
 // Enqueue calls EnqueueFunc.
-func (mock *SamlTokenControllerMock) Enqueue(namespace string, name string) {
+func (mock *EncryptedTokenControllerMock) Enqueue(namespace string, name string) {
 	if mock.EnqueueFunc == nil {
-		panic("SamlTokenControllerMock.EnqueueFunc: method is nil but SamlTokenController.Enqueue was just called")
+		panic("EncryptedTokenControllerMock.EnqueueFunc: method is nil but EncryptedTokenController.Enqueue was just called")
 	}
 	callInfo := struct {
 		Namespace string
@@ -488,17 +488,17 @@ func (mock *SamlTokenControllerMock) Enqueue(namespace string, name string) {
 		Namespace: namespace,
 		Name:      name,
 	}
-	lockSamlTokenControllerMockEnqueue.Lock()
+	lockEncryptedTokenControllerMockEnqueue.Lock()
 	mock.calls.Enqueue = append(mock.calls.Enqueue, callInfo)
-	lockSamlTokenControllerMockEnqueue.Unlock()
+	lockEncryptedTokenControllerMockEnqueue.Unlock()
 	mock.EnqueueFunc(namespace, name)
 }
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
 //
-//	len(mockedSamlTokenController.EnqueueCalls())
-func (mock *SamlTokenControllerMock) EnqueueCalls() []struct {
+//	len(mockedEncryptedTokenController.EnqueueCalls())
+func (mock *EncryptedTokenControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
 } {
@@ -506,16 +506,16 @@ func (mock *SamlTokenControllerMock) EnqueueCalls() []struct {
 		Namespace string
 		Name      string
 	}
-	lockSamlTokenControllerMockEnqueue.RLock()
+	lockEncryptedTokenControllerMockEnqueue.RLock()
 	calls = mock.calls.Enqueue
-	lockSamlTokenControllerMockEnqueue.RUnlock()
+	lockEncryptedTokenControllerMockEnqueue.RUnlock()
 	return calls
 }
 
 // EnqueueAfter calls EnqueueAfterFunc.
-func (mock *SamlTokenControllerMock) EnqueueAfter(namespace string, name string, after time.Duration) {
+func (mock *EncryptedTokenControllerMock) EnqueueAfter(namespace string, name string, after time.Duration) {
 	if mock.EnqueueAfterFunc == nil {
-		panic("SamlTokenControllerMock.EnqueueAfterFunc: method is nil but SamlTokenController.EnqueueAfter was just called")
+		panic("EncryptedTokenControllerMock.EnqueueAfterFunc: method is nil but EncryptedTokenController.EnqueueAfter was just called")
 	}
 	callInfo := struct {
 		Namespace string
@@ -526,17 +526,17 @@ func (mock *SamlTokenControllerMock) EnqueueAfter(namespace string, name string,
 		Name:      name,
 		After:     after,
 	}
-	lockSamlTokenControllerMockEnqueueAfter.Lock()
+	lockEncryptedTokenControllerMockEnqueueAfter.Lock()
 	mock.calls.EnqueueAfter = append(mock.calls.EnqueueAfter, callInfo)
-	lockSamlTokenControllerMockEnqueueAfter.Unlock()
+	lockEncryptedTokenControllerMockEnqueueAfter.Unlock()
 	mock.EnqueueAfterFunc(namespace, name, after)
 }
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
 //
-//	len(mockedSamlTokenController.EnqueueAfterCalls())
-func (mock *SamlTokenControllerMock) EnqueueAfterCalls() []struct {
+//	len(mockedEncryptedTokenController.EnqueueAfterCalls())
+func (mock *EncryptedTokenControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
 	After     time.Duration
@@ -546,154 +546,154 @@ func (mock *SamlTokenControllerMock) EnqueueAfterCalls() []struct {
 		Name      string
 		After     time.Duration
 	}
-	lockSamlTokenControllerMockEnqueueAfter.RLock()
+	lockEncryptedTokenControllerMockEnqueueAfter.RLock()
 	calls = mock.calls.EnqueueAfter
-	lockSamlTokenControllerMockEnqueueAfter.RUnlock()
+	lockEncryptedTokenControllerMockEnqueueAfter.RUnlock()
 	return calls
 }
 
 // Generic calls GenericFunc.
-func (mock *SamlTokenControllerMock) Generic() controller.GenericController {
+func (mock *EncryptedTokenControllerMock) Generic() controller.GenericController {
 	if mock.GenericFunc == nil {
-		panic("SamlTokenControllerMock.GenericFunc: method is nil but SamlTokenController.Generic was just called")
+		panic("EncryptedTokenControllerMock.GenericFunc: method is nil but EncryptedTokenController.Generic was just called")
 	}
 	callInfo := struct {
 	}{}
-	lockSamlTokenControllerMockGeneric.Lock()
+	lockEncryptedTokenControllerMockGeneric.Lock()
 	mock.calls.Generic = append(mock.calls.Generic, callInfo)
-	lockSamlTokenControllerMockGeneric.Unlock()
+	lockEncryptedTokenControllerMockGeneric.Unlock()
 	return mock.GenericFunc()
 }
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
 //
-//	len(mockedSamlTokenController.GenericCalls())
-func (mock *SamlTokenControllerMock) GenericCalls() []struct {
+//	len(mockedEncryptedTokenController.GenericCalls())
+func (mock *EncryptedTokenControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
 	}
-	lockSamlTokenControllerMockGeneric.RLock()
+	lockEncryptedTokenControllerMockGeneric.RLock()
 	calls = mock.calls.Generic
-	lockSamlTokenControllerMockGeneric.RUnlock()
+	lockEncryptedTokenControllerMockGeneric.RUnlock()
 	return calls
 }
 
 // Informer calls InformerFunc.
-func (mock *SamlTokenControllerMock) Informer() cache.SharedIndexInformer {
+func (mock *EncryptedTokenControllerMock) Informer() cache.SharedIndexInformer {
 	if mock.InformerFunc == nil {
-		panic("SamlTokenControllerMock.InformerFunc: method is nil but SamlTokenController.Informer was just called")
+		panic("EncryptedTokenControllerMock.InformerFunc: method is nil but EncryptedTokenController.Informer was just called")
 	}
 	callInfo := struct {
 	}{}
-	lockSamlTokenControllerMockInformer.Lock()
+	lockEncryptedTokenControllerMockInformer.Lock()
 	mock.calls.Informer = append(mock.calls.Informer, callInfo)
-	lockSamlTokenControllerMockInformer.Unlock()
+	lockEncryptedTokenControllerMockInformer.Unlock()
 	return mock.InformerFunc()
 }
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
 //
-//	len(mockedSamlTokenController.InformerCalls())
-func (mock *SamlTokenControllerMock) InformerCalls() []struct {
+//	len(mockedEncryptedTokenController.InformerCalls())
+func (mock *EncryptedTokenControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
 	}
-	lockSamlTokenControllerMockInformer.RLock()
+	lockEncryptedTokenControllerMockInformer.RLock()
 	calls = mock.calls.Informer
-	lockSamlTokenControllerMockInformer.RUnlock()
+	lockEncryptedTokenControllerMockInformer.RUnlock()
 	return calls
 }
 
 // Lister calls ListerFunc.
-func (mock *SamlTokenControllerMock) Lister() v31.SamlTokenLister {
+func (mock *EncryptedTokenControllerMock) Lister() v31.EncryptedTokenLister {
 	if mock.ListerFunc == nil {
-		panic("SamlTokenControllerMock.ListerFunc: method is nil but SamlTokenController.Lister was just called")
+		panic("EncryptedTokenControllerMock.ListerFunc: method is nil but EncryptedTokenController.Lister was just called")
 	}
 	callInfo := struct {
 	}{}
-	lockSamlTokenControllerMockLister.Lock()
+	lockEncryptedTokenControllerMockLister.Lock()
 	mock.calls.Lister = append(mock.calls.Lister, callInfo)
-	lockSamlTokenControllerMockLister.Unlock()
+	lockEncryptedTokenControllerMockLister.Unlock()
 	return mock.ListerFunc()
 }
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
 //
-//	len(mockedSamlTokenController.ListerCalls())
-func (mock *SamlTokenControllerMock) ListerCalls() []struct {
+//	len(mockedEncryptedTokenController.ListerCalls())
+func (mock *EncryptedTokenControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
 	}
-	lockSamlTokenControllerMockLister.RLock()
+	lockEncryptedTokenControllerMockLister.RLock()
 	calls = mock.calls.Lister
-	lockSamlTokenControllerMockLister.RUnlock()
+	lockEncryptedTokenControllerMockLister.RUnlock()
 	return calls
 }
 
 var (
-	lockSamlTokenInterfaceMockAddClusterScopedFeatureHandler   sync.RWMutex
-	lockSamlTokenInterfaceMockAddClusterScopedFeatureLifecycle sync.RWMutex
-	lockSamlTokenInterfaceMockAddClusterScopedHandler          sync.RWMutex
-	lockSamlTokenInterfaceMockAddClusterScopedLifecycle        sync.RWMutex
-	lockSamlTokenInterfaceMockAddFeatureHandler                sync.RWMutex
-	lockSamlTokenInterfaceMockAddFeatureLifecycle              sync.RWMutex
-	lockSamlTokenInterfaceMockAddHandler                       sync.RWMutex
-	lockSamlTokenInterfaceMockAddLifecycle                     sync.RWMutex
-	lockSamlTokenInterfaceMockController                       sync.RWMutex
-	lockSamlTokenInterfaceMockCreate                           sync.RWMutex
-	lockSamlTokenInterfaceMockDelete                           sync.RWMutex
-	lockSamlTokenInterfaceMockDeleteCollection                 sync.RWMutex
-	lockSamlTokenInterfaceMockDeleteNamespaced                 sync.RWMutex
-	lockSamlTokenInterfaceMockGet                              sync.RWMutex
-	lockSamlTokenInterfaceMockGetNamespaced                    sync.RWMutex
-	lockSamlTokenInterfaceMockList                             sync.RWMutex
-	lockSamlTokenInterfaceMockListNamespaced                   sync.RWMutex
-	lockSamlTokenInterfaceMockObjectClient                     sync.RWMutex
-	lockSamlTokenInterfaceMockUpdate                           sync.RWMutex
-	lockSamlTokenInterfaceMockWatch                            sync.RWMutex
+	lockEncryptedTokenInterfaceMockAddClusterScopedFeatureHandler   sync.RWMutex
+	lockEncryptedTokenInterfaceMockAddClusterScopedFeatureLifecycle sync.RWMutex
+	lockEncryptedTokenInterfaceMockAddClusterScopedHandler          sync.RWMutex
+	lockEncryptedTokenInterfaceMockAddClusterScopedLifecycle        sync.RWMutex
+	lockEncryptedTokenInterfaceMockAddFeatureHandler                sync.RWMutex
+	lockEncryptedTokenInterfaceMockAddFeatureLifecycle              sync.RWMutex
+	lockEncryptedTokenInterfaceMockAddHandler                       sync.RWMutex
+	lockEncryptedTokenInterfaceMockAddLifecycle                     sync.RWMutex
+	lockEncryptedTokenInterfaceMockController                       sync.RWMutex
+	lockEncryptedTokenInterfaceMockCreate                           sync.RWMutex
+	lockEncryptedTokenInterfaceMockDelete                           sync.RWMutex
+	lockEncryptedTokenInterfaceMockDeleteCollection                 sync.RWMutex
+	lockEncryptedTokenInterfaceMockDeleteNamespaced                 sync.RWMutex
+	lockEncryptedTokenInterfaceMockGet                              sync.RWMutex
+	lockEncryptedTokenInterfaceMockGetNamespaced                    sync.RWMutex
+	lockEncryptedTokenInterfaceMockList                             sync.RWMutex
+	lockEncryptedTokenInterfaceMockListNamespaced                   sync.RWMutex
+	lockEncryptedTokenInterfaceMockObjectClient                     sync.RWMutex
+	lockEncryptedTokenInterfaceMockUpdate                           sync.RWMutex
+	lockEncryptedTokenInterfaceMockWatch                            sync.RWMutex
 )
 
-// Ensure, that SamlTokenInterfaceMock does implement v31.SamlTokenInterface.
+// Ensure, that EncryptedTokenInterfaceMock does implement v31.EncryptedTokenInterface.
 // If this is not the case, regenerate this file with moq.
-var _ v31.SamlTokenInterface = &SamlTokenInterfaceMock{}
+var _ v31.EncryptedTokenInterface = &EncryptedTokenInterfaceMock{}
 
-// SamlTokenInterfaceMock is a mock implementation of v31.SamlTokenInterface.
+// EncryptedTokenInterfaceMock is a mock implementation of v31.EncryptedTokenInterface.
 //
-//	    func TestSomethingThatUsesSamlTokenInterface(t *testing.T) {
+//	    func TestSomethingThatUsesEncryptedTokenInterface(t *testing.T) {
 //
-//	        // make and configure a mocked v31.SamlTokenInterface
-//	        mockedSamlTokenInterface := &SamlTokenInterfaceMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.SamlTokenHandlerFunc)  {
+//	        // make and configure a mocked v31.EncryptedTokenInterface
+//	        mockedEncryptedTokenInterface := &EncryptedTokenInterfaceMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.EncryptedTokenHandlerFunc)  {
 //		               panic("mock out the AddClusterScopedFeatureHandler method")
 //	            },
-//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.SamlTokenLifecycle)  {
+//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.EncryptedTokenLifecycle)  {
 //		               panic("mock out the AddClusterScopedFeatureLifecycle method")
 //	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.SamlTokenHandlerFunc)  {
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.EncryptedTokenHandlerFunc)  {
 //		               panic("mock out the AddClusterScopedHandler method")
 //	            },
-//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.SamlTokenLifecycle)  {
+//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.EncryptedTokenLifecycle)  {
 //		               panic("mock out the AddClusterScopedLifecycle method")
 //	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.SamlTokenHandlerFunc)  {
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.EncryptedTokenHandlerFunc)  {
 //		               panic("mock out the AddFeatureHandler method")
 //	            },
-//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.SamlTokenLifecycle)  {
+//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.EncryptedTokenLifecycle)  {
 //		               panic("mock out the AddFeatureLifecycle method")
 //	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.SamlTokenHandlerFunc)  {
+//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.EncryptedTokenHandlerFunc)  {
 //		               panic("mock out the AddHandler method")
 //	            },
-//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.SamlTokenLifecycle)  {
+//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.EncryptedTokenLifecycle)  {
 //		               panic("mock out the AddLifecycle method")
 //	            },
-//	            ControllerFunc: func() v31.SamlTokenController {
+//	            ControllerFunc: func() v31.EncryptedTokenController {
 //		               panic("mock out the Controller method")
 //	            },
-//	            CreateFunc: func(in1 *v3.SamlToken) (*v3.SamlToken, error) {
+//	            CreateFunc: func(in1 *v3.EncryptedToken) (*v3.EncryptedToken, error) {
 //		               panic("mock out the Create method")
 //	            },
 //	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
@@ -705,22 +705,22 @@ var _ v31.SamlTokenInterface = &SamlTokenInterfaceMock{}
 //	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
 //		               panic("mock out the DeleteNamespaced method")
 //	            },
-//	            GetFunc: func(name string, opts metav1.GetOptions) (*v3.SamlToken, error) {
+//	            GetFunc: func(name string, opts metav1.GetOptions) (*v3.EncryptedToken, error) {
 //		               panic("mock out the Get method")
 //	            },
-//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.SamlToken, error) {
+//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.EncryptedToken, error) {
 //		               panic("mock out the GetNamespaced method")
 //	            },
-//	            ListFunc: func(opts metav1.ListOptions) (*v3.SamlTokenList, error) {
+//	            ListFunc: func(opts metav1.ListOptions) (*v3.EncryptedTokenList, error) {
 //		               panic("mock out the List method")
 //	            },
-//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.SamlTokenList, error) {
+//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.EncryptedTokenList, error) {
 //		               panic("mock out the ListNamespaced method")
 //	            },
 //	            ObjectClientFunc: func() *objectclient.ObjectClient {
 //		               panic("mock out the ObjectClient method")
 //	            },
-//	            UpdateFunc: func(in1 *v3.SamlToken) (*v3.SamlToken, error) {
+//	            UpdateFunc: func(in1 *v3.EncryptedToken) (*v3.EncryptedToken, error) {
 //		               panic("mock out the Update method")
 //	            },
 //	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
@@ -728,40 +728,40 @@ var _ v31.SamlTokenInterface = &SamlTokenInterfaceMock{}
 //	            },
 //	        }
 //
-//	        // use mockedSamlTokenInterface in code that requires v31.SamlTokenInterface
+//	        // use mockedEncryptedTokenInterface in code that requires v31.EncryptedTokenInterface
 //	        // and then make assertions.
 //
 //	    }
-type SamlTokenInterfaceMock struct {
+type EncryptedTokenInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
-	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.SamlTokenHandlerFunc)
+	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.EncryptedTokenHandlerFunc)
 
 	// AddClusterScopedFeatureLifecycleFunc mocks the AddClusterScopedFeatureLifecycle method.
-	AddClusterScopedFeatureLifecycleFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.SamlTokenLifecycle)
+	AddClusterScopedFeatureLifecycleFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.EncryptedTokenLifecycle)
 
 	// AddClusterScopedHandlerFunc mocks the AddClusterScopedHandler method.
-	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, syncMoqParam v31.SamlTokenHandlerFunc)
+	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, syncMoqParam v31.EncryptedTokenHandlerFunc)
 
 	// AddClusterScopedLifecycleFunc mocks the AddClusterScopedLifecycle method.
-	AddClusterScopedLifecycleFunc func(ctx context.Context, name string, clusterName string, lifecycle v31.SamlTokenLifecycle)
+	AddClusterScopedLifecycleFunc func(ctx context.Context, name string, clusterName string, lifecycle v31.EncryptedTokenLifecycle)
 
 	// AddFeatureHandlerFunc mocks the AddFeatureHandler method.
-	AddFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.SamlTokenHandlerFunc)
+	AddFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.EncryptedTokenHandlerFunc)
 
 	// AddFeatureLifecycleFunc mocks the AddFeatureLifecycle method.
-	AddFeatureLifecycleFunc func(ctx context.Context, enabled func() bool, name string, lifecycle v31.SamlTokenLifecycle)
+	AddFeatureLifecycleFunc func(ctx context.Context, enabled func() bool, name string, lifecycle v31.EncryptedTokenLifecycle)
 
 	// AddHandlerFunc mocks the AddHandler method.
-	AddHandlerFunc func(ctx context.Context, name string, syncMoqParam v31.SamlTokenHandlerFunc)
+	AddHandlerFunc func(ctx context.Context, name string, syncMoqParam v31.EncryptedTokenHandlerFunc)
 
 	// AddLifecycleFunc mocks the AddLifecycle method.
-	AddLifecycleFunc func(ctx context.Context, name string, lifecycle v31.SamlTokenLifecycle)
+	AddLifecycleFunc func(ctx context.Context, name string, lifecycle v31.EncryptedTokenLifecycle)
 
 	// ControllerFunc mocks the Controller method.
-	ControllerFunc func() v31.SamlTokenController
+	ControllerFunc func() v31.EncryptedTokenController
 
 	// CreateFunc mocks the Create method.
-	CreateFunc func(in1 *v3.SamlToken) (*v3.SamlToken, error)
+	CreateFunc func(in1 *v3.EncryptedToken) (*v3.EncryptedToken, error)
 
 	// DeleteFunc mocks the Delete method.
 	DeleteFunc func(name string, options *metav1.DeleteOptions) error
@@ -773,22 +773,22 @@ type SamlTokenInterfaceMock struct {
 	DeleteNamespacedFunc func(namespace string, name string, options *metav1.DeleteOptions) error
 
 	// GetFunc mocks the Get method.
-	GetFunc func(name string, opts metav1.GetOptions) (*v3.SamlToken, error)
+	GetFunc func(name string, opts metav1.GetOptions) (*v3.EncryptedToken, error)
 
 	// GetNamespacedFunc mocks the GetNamespaced method.
-	GetNamespacedFunc func(namespace string, name string, opts metav1.GetOptions) (*v3.SamlToken, error)
+	GetNamespacedFunc func(namespace string, name string, opts metav1.GetOptions) (*v3.EncryptedToken, error)
 
 	// ListFunc mocks the List method.
-	ListFunc func(opts metav1.ListOptions) (*v3.SamlTokenList, error)
+	ListFunc func(opts metav1.ListOptions) (*v3.EncryptedTokenList, error)
 
 	// ListNamespacedFunc mocks the ListNamespaced method.
-	ListNamespacedFunc func(namespace string, opts metav1.ListOptions) (*v3.SamlTokenList, error)
+	ListNamespacedFunc func(namespace string, opts metav1.ListOptions) (*v3.EncryptedTokenList, error)
 
 	// ObjectClientFunc mocks the ObjectClient method.
 	ObjectClientFunc func() *objectclient.ObjectClient
 
 	// UpdateFunc mocks the Update method.
-	UpdateFunc func(in1 *v3.SamlToken) (*v3.SamlToken, error)
+	UpdateFunc func(in1 *v3.EncryptedToken) (*v3.EncryptedToken, error)
 
 	// WatchFunc mocks the Watch method.
 	WatchFunc func(opts metav1.ListOptions) (watch.Interface, error)
@@ -806,7 +806,7 @@ type SamlTokenInterfaceMock struct {
 			// ClusterName is the clusterName argument value.
 			ClusterName string
 			// Sync is the sync argument value.
-			Sync v31.SamlTokenHandlerFunc
+			Sync v31.EncryptedTokenHandlerFunc
 		}
 		// AddClusterScopedFeatureLifecycle holds details about calls to the AddClusterScopedFeatureLifecycle method.
 		AddClusterScopedFeatureLifecycle []struct {
@@ -819,7 +819,7 @@ type SamlTokenInterfaceMock struct {
 			// ClusterName is the clusterName argument value.
 			ClusterName string
 			// Lifecycle is the lifecycle argument value.
-			Lifecycle v31.SamlTokenLifecycle
+			Lifecycle v31.EncryptedTokenLifecycle
 		}
 		// AddClusterScopedHandler holds details about calls to the AddClusterScopedHandler method.
 		AddClusterScopedHandler []struct {
@@ -830,7 +830,7 @@ type SamlTokenInterfaceMock struct {
 			// ClusterName is the clusterName argument value.
 			ClusterName string
 			// Sync is the sync argument value.
-			Sync v31.SamlTokenHandlerFunc
+			Sync v31.EncryptedTokenHandlerFunc
 		}
 		// AddClusterScopedLifecycle holds details about calls to the AddClusterScopedLifecycle method.
 		AddClusterScopedLifecycle []struct {
@@ -841,7 +841,7 @@ type SamlTokenInterfaceMock struct {
 			// ClusterName is the clusterName argument value.
 			ClusterName string
 			// Lifecycle is the lifecycle argument value.
-			Lifecycle v31.SamlTokenLifecycle
+			Lifecycle v31.EncryptedTokenLifecycle
 		}
 		// AddFeatureHandler holds details about calls to the AddFeatureHandler method.
 		AddFeatureHandler []struct {
@@ -852,7 +852,7 @@ type SamlTokenInterfaceMock struct {
 			// Name is the name argument value.
 			Name string
 			// Sync is the sync argument value.
-			Sync v31.SamlTokenHandlerFunc
+			Sync v31.EncryptedTokenHandlerFunc
 		}
 		// AddFeatureLifecycle holds details about calls to the AddFeatureLifecycle method.
 		AddFeatureLifecycle []struct {
@@ -863,7 +863,7 @@ type SamlTokenInterfaceMock struct {
 			// Name is the name argument value.
 			Name string
 			// Lifecycle is the lifecycle argument value.
-			Lifecycle v31.SamlTokenLifecycle
+			Lifecycle v31.EncryptedTokenLifecycle
 		}
 		// AddHandler holds details about calls to the AddHandler method.
 		AddHandler []struct {
@@ -872,7 +872,7 @@ type SamlTokenInterfaceMock struct {
 			// Name is the name argument value.
 			Name string
 			// Sync is the sync argument value.
-			Sync v31.SamlTokenHandlerFunc
+			Sync v31.EncryptedTokenHandlerFunc
 		}
 		// AddLifecycle holds details about calls to the AddLifecycle method.
 		AddLifecycle []struct {
@@ -881,7 +881,7 @@ type SamlTokenInterfaceMock struct {
 			// Name is the name argument value.
 			Name string
 			// Lifecycle is the lifecycle argument value.
-			Lifecycle v31.SamlTokenLifecycle
+			Lifecycle v31.EncryptedTokenLifecycle
 		}
 		// Controller holds details about calls to the Controller method.
 		Controller []struct {
@@ -889,7 +889,7 @@ type SamlTokenInterfaceMock struct {
 		// Create holds details about calls to the Create method.
 		Create []struct {
 			// In1 is the in1 argument value.
-			In1 *v3.SamlToken
+			In1 *v3.EncryptedToken
 		}
 		// Delete holds details about calls to the Delete method.
 		Delete []struct {
@@ -948,7 +948,7 @@ type SamlTokenInterfaceMock struct {
 		// Update holds details about calls to the Update method.
 		Update []struct {
 			// In1 is the in1 argument value.
-			In1 *v3.SamlToken
+			In1 *v3.EncryptedToken
 		}
 		// Watch holds details about calls to the Watch method.
 		Watch []struct {
@@ -959,16 +959,16 @@ type SamlTokenInterfaceMock struct {
 }
 
 // AddClusterScopedFeatureHandler calls AddClusterScopedFeatureHandlerFunc.
-func (mock *SamlTokenInterfaceMock) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.SamlTokenHandlerFunc) {
+func (mock *EncryptedTokenInterfaceMock) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.EncryptedTokenHandlerFunc) {
 	if mock.AddClusterScopedFeatureHandlerFunc == nil {
-		panic("SamlTokenInterfaceMock.AddClusterScopedFeatureHandlerFunc: method is nil but SamlTokenInterface.AddClusterScopedFeatureHandler was just called")
+		panic("EncryptedTokenInterfaceMock.AddClusterScopedFeatureHandlerFunc: method is nil but EncryptedTokenInterface.AddClusterScopedFeatureHandler was just called")
 	}
 	callInfo := struct {
 		Ctx         context.Context
 		Enabled     func() bool
 		Name        string
 		ClusterName string
-		Sync        v31.SamlTokenHandlerFunc
+		Sync        v31.EncryptedTokenHandlerFunc
 	}{
 		Ctx:         ctx,
 		Enabled:     enabled,
@@ -976,47 +976,47 @@ func (mock *SamlTokenInterfaceMock) AddClusterScopedFeatureHandler(ctx context.C
 		ClusterName: clusterName,
 		Sync:        syncMoqParam,
 	}
-	lockSamlTokenInterfaceMockAddClusterScopedFeatureHandler.Lock()
+	lockEncryptedTokenInterfaceMockAddClusterScopedFeatureHandler.Lock()
 	mock.calls.AddClusterScopedFeatureHandler = append(mock.calls.AddClusterScopedFeatureHandler, callInfo)
-	lockSamlTokenInterfaceMockAddClusterScopedFeatureHandler.Unlock()
+	lockEncryptedTokenInterfaceMockAddClusterScopedFeatureHandler.Unlock()
 	mock.AddClusterScopedFeatureHandlerFunc(ctx, enabled, name, clusterName, syncMoqParam)
 }
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
 //
-//	len(mockedSamlTokenInterface.AddClusterScopedFeatureHandlerCalls())
-func (mock *SamlTokenInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
+//	len(mockedEncryptedTokenInterface.AddClusterScopedFeatureHandlerCalls())
+func (mock *EncryptedTokenInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
 	Name        string
 	ClusterName string
-	Sync        v31.SamlTokenHandlerFunc
+	Sync        v31.EncryptedTokenHandlerFunc
 } {
 	var calls []struct {
 		Ctx         context.Context
 		Enabled     func() bool
 		Name        string
 		ClusterName string
-		Sync        v31.SamlTokenHandlerFunc
+		Sync        v31.EncryptedTokenHandlerFunc
 	}
-	lockSamlTokenInterfaceMockAddClusterScopedFeatureHandler.RLock()
+	lockEncryptedTokenInterfaceMockAddClusterScopedFeatureHandler.RLock()
 	calls = mock.calls.AddClusterScopedFeatureHandler
-	lockSamlTokenInterfaceMockAddClusterScopedFeatureHandler.RUnlock()
+	lockEncryptedTokenInterfaceMockAddClusterScopedFeatureHandler.RUnlock()
 	return calls
 }
 
 // AddClusterScopedFeatureLifecycle calls AddClusterScopedFeatureLifecycleFunc.
-func (mock *SamlTokenInterfaceMock) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.SamlTokenLifecycle) {
+func (mock *EncryptedTokenInterfaceMock) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.EncryptedTokenLifecycle) {
 	if mock.AddClusterScopedFeatureLifecycleFunc == nil {
-		panic("SamlTokenInterfaceMock.AddClusterScopedFeatureLifecycleFunc: method is nil but SamlTokenInterface.AddClusterScopedFeatureLifecycle was just called")
+		panic("EncryptedTokenInterfaceMock.AddClusterScopedFeatureLifecycleFunc: method is nil but EncryptedTokenInterface.AddClusterScopedFeatureLifecycle was just called")
 	}
 	callInfo := struct {
 		Ctx         context.Context
 		Enabled     func() bool
 		Name        string
 		ClusterName string
-		Lifecycle   v31.SamlTokenLifecycle
+		Lifecycle   v31.EncryptedTokenLifecycle
 	}{
 		Ctx:         ctx,
 		Enabled:     enabled,
@@ -1024,355 +1024,355 @@ func (mock *SamlTokenInterfaceMock) AddClusterScopedFeatureLifecycle(ctx context
 		ClusterName: clusterName,
 		Lifecycle:   lifecycle,
 	}
-	lockSamlTokenInterfaceMockAddClusterScopedFeatureLifecycle.Lock()
+	lockEncryptedTokenInterfaceMockAddClusterScopedFeatureLifecycle.Lock()
 	mock.calls.AddClusterScopedFeatureLifecycle = append(mock.calls.AddClusterScopedFeatureLifecycle, callInfo)
-	lockSamlTokenInterfaceMockAddClusterScopedFeatureLifecycle.Unlock()
+	lockEncryptedTokenInterfaceMockAddClusterScopedFeatureLifecycle.Unlock()
 	mock.AddClusterScopedFeatureLifecycleFunc(ctx, enabled, name, clusterName, lifecycle)
 }
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
 //
-//	len(mockedSamlTokenInterface.AddClusterScopedFeatureLifecycleCalls())
-func (mock *SamlTokenInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
+//	len(mockedEncryptedTokenInterface.AddClusterScopedFeatureLifecycleCalls())
+func (mock *EncryptedTokenInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
 	Name        string
 	ClusterName string
-	Lifecycle   v31.SamlTokenLifecycle
+	Lifecycle   v31.EncryptedTokenLifecycle
 } {
 	var calls []struct {
 		Ctx         context.Context
 		Enabled     func() bool
 		Name        string
 		ClusterName string
-		Lifecycle   v31.SamlTokenLifecycle
+		Lifecycle   v31.EncryptedTokenLifecycle
 	}
-	lockSamlTokenInterfaceMockAddClusterScopedFeatureLifecycle.RLock()
+	lockEncryptedTokenInterfaceMockAddClusterScopedFeatureLifecycle.RLock()
 	calls = mock.calls.AddClusterScopedFeatureLifecycle
-	lockSamlTokenInterfaceMockAddClusterScopedFeatureLifecycle.RUnlock()
+	lockEncryptedTokenInterfaceMockAddClusterScopedFeatureLifecycle.RUnlock()
 	return calls
 }
 
 // AddClusterScopedHandler calls AddClusterScopedHandlerFunc.
-func (mock *SamlTokenInterfaceMock) AddClusterScopedHandler(ctx context.Context, name string, clusterName string, syncMoqParam v31.SamlTokenHandlerFunc) {
+func (mock *EncryptedTokenInterfaceMock) AddClusterScopedHandler(ctx context.Context, name string, clusterName string, syncMoqParam v31.EncryptedTokenHandlerFunc) {
 	if mock.AddClusterScopedHandlerFunc == nil {
-		panic("SamlTokenInterfaceMock.AddClusterScopedHandlerFunc: method is nil but SamlTokenInterface.AddClusterScopedHandler was just called")
+		panic("EncryptedTokenInterfaceMock.AddClusterScopedHandlerFunc: method is nil but EncryptedTokenInterface.AddClusterScopedHandler was just called")
 	}
 	callInfo := struct {
 		Ctx         context.Context
 		Name        string
 		ClusterName string
-		Sync        v31.SamlTokenHandlerFunc
+		Sync        v31.EncryptedTokenHandlerFunc
 	}{
 		Ctx:         ctx,
 		Name:        name,
 		ClusterName: clusterName,
 		Sync:        syncMoqParam,
 	}
-	lockSamlTokenInterfaceMockAddClusterScopedHandler.Lock()
+	lockEncryptedTokenInterfaceMockAddClusterScopedHandler.Lock()
 	mock.calls.AddClusterScopedHandler = append(mock.calls.AddClusterScopedHandler, callInfo)
-	lockSamlTokenInterfaceMockAddClusterScopedHandler.Unlock()
+	lockEncryptedTokenInterfaceMockAddClusterScopedHandler.Unlock()
 	mock.AddClusterScopedHandlerFunc(ctx, name, clusterName, syncMoqParam)
 }
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
 //
-//	len(mockedSamlTokenInterface.AddClusterScopedHandlerCalls())
-func (mock *SamlTokenInterfaceMock) AddClusterScopedHandlerCalls() []struct {
+//	len(mockedEncryptedTokenInterface.AddClusterScopedHandlerCalls())
+func (mock *EncryptedTokenInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
 	ClusterName string
-	Sync        v31.SamlTokenHandlerFunc
+	Sync        v31.EncryptedTokenHandlerFunc
 } {
 	var calls []struct {
 		Ctx         context.Context
 		Name        string
 		ClusterName string
-		Sync        v31.SamlTokenHandlerFunc
+		Sync        v31.EncryptedTokenHandlerFunc
 	}
-	lockSamlTokenInterfaceMockAddClusterScopedHandler.RLock()
+	lockEncryptedTokenInterfaceMockAddClusterScopedHandler.RLock()
 	calls = mock.calls.AddClusterScopedHandler
-	lockSamlTokenInterfaceMockAddClusterScopedHandler.RUnlock()
+	lockEncryptedTokenInterfaceMockAddClusterScopedHandler.RUnlock()
 	return calls
 }
 
 // AddClusterScopedLifecycle calls AddClusterScopedLifecycleFunc.
-func (mock *SamlTokenInterfaceMock) AddClusterScopedLifecycle(ctx context.Context, name string, clusterName string, lifecycle v31.SamlTokenLifecycle) {
+func (mock *EncryptedTokenInterfaceMock) AddClusterScopedLifecycle(ctx context.Context, name string, clusterName string, lifecycle v31.EncryptedTokenLifecycle) {
 	if mock.AddClusterScopedLifecycleFunc == nil {
-		panic("SamlTokenInterfaceMock.AddClusterScopedLifecycleFunc: method is nil but SamlTokenInterface.AddClusterScopedLifecycle was just called")
+		panic("EncryptedTokenInterfaceMock.AddClusterScopedLifecycleFunc: method is nil but EncryptedTokenInterface.AddClusterScopedLifecycle was just called")
 	}
 	callInfo := struct {
 		Ctx         context.Context
 		Name        string
 		ClusterName string
-		Lifecycle   v31.SamlTokenLifecycle
+		Lifecycle   v31.EncryptedTokenLifecycle
 	}{
 		Ctx:         ctx,
 		Name:        name,
 		ClusterName: clusterName,
 		Lifecycle:   lifecycle,
 	}
-	lockSamlTokenInterfaceMockAddClusterScopedLifecycle.Lock()
+	lockEncryptedTokenInterfaceMockAddClusterScopedLifecycle.Lock()
 	mock.calls.AddClusterScopedLifecycle = append(mock.calls.AddClusterScopedLifecycle, callInfo)
-	lockSamlTokenInterfaceMockAddClusterScopedLifecycle.Unlock()
+	lockEncryptedTokenInterfaceMockAddClusterScopedLifecycle.Unlock()
 	mock.AddClusterScopedLifecycleFunc(ctx, name, clusterName, lifecycle)
 }
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
 //
-//	len(mockedSamlTokenInterface.AddClusterScopedLifecycleCalls())
-func (mock *SamlTokenInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
+//	len(mockedEncryptedTokenInterface.AddClusterScopedLifecycleCalls())
+func (mock *EncryptedTokenInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
 	ClusterName string
-	Lifecycle   v31.SamlTokenLifecycle
+	Lifecycle   v31.EncryptedTokenLifecycle
 } {
 	var calls []struct {
 		Ctx         context.Context
 		Name        string
 		ClusterName string
-		Lifecycle   v31.SamlTokenLifecycle
+		Lifecycle   v31.EncryptedTokenLifecycle
 	}
-	lockSamlTokenInterfaceMockAddClusterScopedLifecycle.RLock()
+	lockEncryptedTokenInterfaceMockAddClusterScopedLifecycle.RLock()
 	calls = mock.calls.AddClusterScopedLifecycle
-	lockSamlTokenInterfaceMockAddClusterScopedLifecycle.RUnlock()
+	lockEncryptedTokenInterfaceMockAddClusterScopedLifecycle.RUnlock()
 	return calls
 }
 
 // AddFeatureHandler calls AddFeatureHandlerFunc.
-func (mock *SamlTokenInterfaceMock) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.SamlTokenHandlerFunc) {
+func (mock *EncryptedTokenInterfaceMock) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.EncryptedTokenHandlerFunc) {
 	if mock.AddFeatureHandlerFunc == nil {
-		panic("SamlTokenInterfaceMock.AddFeatureHandlerFunc: method is nil but SamlTokenInterface.AddFeatureHandler was just called")
+		panic("EncryptedTokenInterfaceMock.AddFeatureHandlerFunc: method is nil but EncryptedTokenInterface.AddFeatureHandler was just called")
 	}
 	callInfo := struct {
 		Ctx     context.Context
 		Enabled func() bool
 		Name    string
-		Sync    v31.SamlTokenHandlerFunc
+		Sync    v31.EncryptedTokenHandlerFunc
 	}{
 		Ctx:     ctx,
 		Enabled: enabled,
 		Name:    name,
 		Sync:    syncMoqParam,
 	}
-	lockSamlTokenInterfaceMockAddFeatureHandler.Lock()
+	lockEncryptedTokenInterfaceMockAddFeatureHandler.Lock()
 	mock.calls.AddFeatureHandler = append(mock.calls.AddFeatureHandler, callInfo)
-	lockSamlTokenInterfaceMockAddFeatureHandler.Unlock()
+	lockEncryptedTokenInterfaceMockAddFeatureHandler.Unlock()
 	mock.AddFeatureHandlerFunc(ctx, enabled, name, syncMoqParam)
 }
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
 //
-//	len(mockedSamlTokenInterface.AddFeatureHandlerCalls())
-func (mock *SamlTokenInterfaceMock) AddFeatureHandlerCalls() []struct {
+//	len(mockedEncryptedTokenInterface.AddFeatureHandlerCalls())
+func (mock *EncryptedTokenInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
 	Name    string
-	Sync    v31.SamlTokenHandlerFunc
+	Sync    v31.EncryptedTokenHandlerFunc
 } {
 	var calls []struct {
 		Ctx     context.Context
 		Enabled func() bool
 		Name    string
-		Sync    v31.SamlTokenHandlerFunc
+		Sync    v31.EncryptedTokenHandlerFunc
 	}
-	lockSamlTokenInterfaceMockAddFeatureHandler.RLock()
+	lockEncryptedTokenInterfaceMockAddFeatureHandler.RLock()
 	calls = mock.calls.AddFeatureHandler
-	lockSamlTokenInterfaceMockAddFeatureHandler.RUnlock()
+	lockEncryptedTokenInterfaceMockAddFeatureHandler.RUnlock()
 	return calls
 }
 
 // AddFeatureLifecycle calls AddFeatureLifecycleFunc.
-func (mock *SamlTokenInterfaceMock) AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle v31.SamlTokenLifecycle) {
+func (mock *EncryptedTokenInterfaceMock) AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle v31.EncryptedTokenLifecycle) {
 	if mock.AddFeatureLifecycleFunc == nil {
-		panic("SamlTokenInterfaceMock.AddFeatureLifecycleFunc: method is nil but SamlTokenInterface.AddFeatureLifecycle was just called")
+		panic("EncryptedTokenInterfaceMock.AddFeatureLifecycleFunc: method is nil but EncryptedTokenInterface.AddFeatureLifecycle was just called")
 	}
 	callInfo := struct {
 		Ctx       context.Context
 		Enabled   func() bool
 		Name      string
-		Lifecycle v31.SamlTokenLifecycle
+		Lifecycle v31.EncryptedTokenLifecycle
 	}{
 		Ctx:       ctx,
 		Enabled:   enabled,
 		Name:      name,
 		Lifecycle: lifecycle,
 	}
-	lockSamlTokenInterfaceMockAddFeatureLifecycle.Lock()
+	lockEncryptedTokenInterfaceMockAddFeatureLifecycle.Lock()
 	mock.calls.AddFeatureLifecycle = append(mock.calls.AddFeatureLifecycle, callInfo)
-	lockSamlTokenInterfaceMockAddFeatureLifecycle.Unlock()
+	lockEncryptedTokenInterfaceMockAddFeatureLifecycle.Unlock()
 	mock.AddFeatureLifecycleFunc(ctx, enabled, name, lifecycle)
 }
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
 //
-//	len(mockedSamlTokenInterface.AddFeatureLifecycleCalls())
-func (mock *SamlTokenInterfaceMock) AddFeatureLifecycleCalls() []struct {
+//	len(mockedEncryptedTokenInterface.AddFeatureLifecycleCalls())
+func (mock *EncryptedTokenInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
 	Name      string
-	Lifecycle v31.SamlTokenLifecycle
+	Lifecycle v31.EncryptedTokenLifecycle
 } {
 	var calls []struct {
 		Ctx       context.Context
 		Enabled   func() bool
 		Name      string
-		Lifecycle v31.SamlTokenLifecycle
+		Lifecycle v31.EncryptedTokenLifecycle
 	}
-	lockSamlTokenInterfaceMockAddFeatureLifecycle.RLock()
+	lockEncryptedTokenInterfaceMockAddFeatureLifecycle.RLock()
 	calls = mock.calls.AddFeatureLifecycle
-	lockSamlTokenInterfaceMockAddFeatureLifecycle.RUnlock()
+	lockEncryptedTokenInterfaceMockAddFeatureLifecycle.RUnlock()
 	return calls
 }
 
 // AddHandler calls AddHandlerFunc.
-func (mock *SamlTokenInterfaceMock) AddHandler(ctx context.Context, name string, syncMoqParam v31.SamlTokenHandlerFunc) {
+func (mock *EncryptedTokenInterfaceMock) AddHandler(ctx context.Context, name string, syncMoqParam v31.EncryptedTokenHandlerFunc) {
 	if mock.AddHandlerFunc == nil {
-		panic("SamlTokenInterfaceMock.AddHandlerFunc: method is nil but SamlTokenInterface.AddHandler was just called")
+		panic("EncryptedTokenInterfaceMock.AddHandlerFunc: method is nil but EncryptedTokenInterface.AddHandler was just called")
 	}
 	callInfo := struct {
 		Ctx  context.Context
 		Name string
-		Sync v31.SamlTokenHandlerFunc
+		Sync v31.EncryptedTokenHandlerFunc
 	}{
 		Ctx:  ctx,
 		Name: name,
 		Sync: syncMoqParam,
 	}
-	lockSamlTokenInterfaceMockAddHandler.Lock()
+	lockEncryptedTokenInterfaceMockAddHandler.Lock()
 	mock.calls.AddHandler = append(mock.calls.AddHandler, callInfo)
-	lockSamlTokenInterfaceMockAddHandler.Unlock()
+	lockEncryptedTokenInterfaceMockAddHandler.Unlock()
 	mock.AddHandlerFunc(ctx, name, syncMoqParam)
 }
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
 //
-//	len(mockedSamlTokenInterface.AddHandlerCalls())
-func (mock *SamlTokenInterfaceMock) AddHandlerCalls() []struct {
+//	len(mockedEncryptedTokenInterface.AddHandlerCalls())
+func (mock *EncryptedTokenInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
-	Sync v31.SamlTokenHandlerFunc
+	Sync v31.EncryptedTokenHandlerFunc
 } {
 	var calls []struct {
 		Ctx  context.Context
 		Name string
-		Sync v31.SamlTokenHandlerFunc
+		Sync v31.EncryptedTokenHandlerFunc
 	}
-	lockSamlTokenInterfaceMockAddHandler.RLock()
+	lockEncryptedTokenInterfaceMockAddHandler.RLock()
 	calls = mock.calls.AddHandler
-	lockSamlTokenInterfaceMockAddHandler.RUnlock()
+	lockEncryptedTokenInterfaceMockAddHandler.RUnlock()
 	return calls
 }
 
 // AddLifecycle calls AddLifecycleFunc.
-func (mock *SamlTokenInterfaceMock) AddLifecycle(ctx context.Context, name string, lifecycle v31.SamlTokenLifecycle) {
+func (mock *EncryptedTokenInterfaceMock) AddLifecycle(ctx context.Context, name string, lifecycle v31.EncryptedTokenLifecycle) {
 	if mock.AddLifecycleFunc == nil {
-		panic("SamlTokenInterfaceMock.AddLifecycleFunc: method is nil but SamlTokenInterface.AddLifecycle was just called")
+		panic("EncryptedTokenInterfaceMock.AddLifecycleFunc: method is nil but EncryptedTokenInterface.AddLifecycle was just called")
 	}
 	callInfo := struct {
 		Ctx       context.Context
 		Name      string
-		Lifecycle v31.SamlTokenLifecycle
+		Lifecycle v31.EncryptedTokenLifecycle
 	}{
 		Ctx:       ctx,
 		Name:      name,
 		Lifecycle: lifecycle,
 	}
-	lockSamlTokenInterfaceMockAddLifecycle.Lock()
+	lockEncryptedTokenInterfaceMockAddLifecycle.Lock()
 	mock.calls.AddLifecycle = append(mock.calls.AddLifecycle, callInfo)
-	lockSamlTokenInterfaceMockAddLifecycle.Unlock()
+	lockEncryptedTokenInterfaceMockAddLifecycle.Unlock()
 	mock.AddLifecycleFunc(ctx, name, lifecycle)
 }
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
 //
-//	len(mockedSamlTokenInterface.AddLifecycleCalls())
-func (mock *SamlTokenInterfaceMock) AddLifecycleCalls() []struct {
+//	len(mockedEncryptedTokenInterface.AddLifecycleCalls())
+func (mock *EncryptedTokenInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
-	Lifecycle v31.SamlTokenLifecycle
+	Lifecycle v31.EncryptedTokenLifecycle
 } {
 	var calls []struct {
 		Ctx       context.Context
 		Name      string
-		Lifecycle v31.SamlTokenLifecycle
+		Lifecycle v31.EncryptedTokenLifecycle
 	}
-	lockSamlTokenInterfaceMockAddLifecycle.RLock()
+	lockEncryptedTokenInterfaceMockAddLifecycle.RLock()
 	calls = mock.calls.AddLifecycle
-	lockSamlTokenInterfaceMockAddLifecycle.RUnlock()
+	lockEncryptedTokenInterfaceMockAddLifecycle.RUnlock()
 	return calls
 }
 
 // Controller calls ControllerFunc.
-func (mock *SamlTokenInterfaceMock) Controller() v31.SamlTokenController {
+func (mock *EncryptedTokenInterfaceMock) Controller() v31.EncryptedTokenController {
 	if mock.ControllerFunc == nil {
-		panic("SamlTokenInterfaceMock.ControllerFunc: method is nil but SamlTokenInterface.Controller was just called")
+		panic("EncryptedTokenInterfaceMock.ControllerFunc: method is nil but EncryptedTokenInterface.Controller was just called")
 	}
 	callInfo := struct {
 	}{}
-	lockSamlTokenInterfaceMockController.Lock()
+	lockEncryptedTokenInterfaceMockController.Lock()
 	mock.calls.Controller = append(mock.calls.Controller, callInfo)
-	lockSamlTokenInterfaceMockController.Unlock()
+	lockEncryptedTokenInterfaceMockController.Unlock()
 	return mock.ControllerFunc()
 }
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
 //
-//	len(mockedSamlTokenInterface.ControllerCalls())
-func (mock *SamlTokenInterfaceMock) ControllerCalls() []struct {
+//	len(mockedEncryptedTokenInterface.ControllerCalls())
+func (mock *EncryptedTokenInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
 	}
-	lockSamlTokenInterfaceMockController.RLock()
+	lockEncryptedTokenInterfaceMockController.RLock()
 	calls = mock.calls.Controller
-	lockSamlTokenInterfaceMockController.RUnlock()
+	lockEncryptedTokenInterfaceMockController.RUnlock()
 	return calls
 }
 
 // Create calls CreateFunc.
-func (mock *SamlTokenInterfaceMock) Create(in1 *v3.SamlToken) (*v3.SamlToken, error) {
+func (mock *EncryptedTokenInterfaceMock) Create(in1 *v3.EncryptedToken) (*v3.EncryptedToken, error) {
 	if mock.CreateFunc == nil {
-		panic("SamlTokenInterfaceMock.CreateFunc: method is nil but SamlTokenInterface.Create was just called")
+		panic("EncryptedTokenInterfaceMock.CreateFunc: method is nil but EncryptedTokenInterface.Create was just called")
 	}
 	callInfo := struct {
-		In1 *v3.SamlToken
+		In1 *v3.EncryptedToken
 	}{
 		In1: in1,
 	}
-	lockSamlTokenInterfaceMockCreate.Lock()
+	lockEncryptedTokenInterfaceMockCreate.Lock()
 	mock.calls.Create = append(mock.calls.Create, callInfo)
-	lockSamlTokenInterfaceMockCreate.Unlock()
+	lockEncryptedTokenInterfaceMockCreate.Unlock()
 	return mock.CreateFunc(in1)
 }
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
 //
-//	len(mockedSamlTokenInterface.CreateCalls())
-func (mock *SamlTokenInterfaceMock) CreateCalls() []struct {
-	In1 *v3.SamlToken
+//	len(mockedEncryptedTokenInterface.CreateCalls())
+func (mock *EncryptedTokenInterfaceMock) CreateCalls() []struct {
+	In1 *v3.EncryptedToken
 } {
 	var calls []struct {
-		In1 *v3.SamlToken
+		In1 *v3.EncryptedToken
 	}
-	lockSamlTokenInterfaceMockCreate.RLock()
+	lockEncryptedTokenInterfaceMockCreate.RLock()
 	calls = mock.calls.Create
-	lockSamlTokenInterfaceMockCreate.RUnlock()
+	lockEncryptedTokenInterfaceMockCreate.RUnlock()
 	return calls
 }
 
 // Delete calls DeleteFunc.
-func (mock *SamlTokenInterfaceMock) Delete(name string, options *metav1.DeleteOptions) error {
+func (mock *EncryptedTokenInterfaceMock) Delete(name string, options *metav1.DeleteOptions) error {
 	if mock.DeleteFunc == nil {
-		panic("SamlTokenInterfaceMock.DeleteFunc: method is nil but SamlTokenInterface.Delete was just called")
+		panic("EncryptedTokenInterfaceMock.DeleteFunc: method is nil but EncryptedTokenInterface.Delete was just called")
 	}
 	callInfo := struct {
 		Name    string
@@ -1381,17 +1381,17 @@ func (mock *SamlTokenInterfaceMock) Delete(name string, options *metav1.DeleteOp
 		Name:    name,
 		Options: options,
 	}
-	lockSamlTokenInterfaceMockDelete.Lock()
+	lockEncryptedTokenInterfaceMockDelete.Lock()
 	mock.calls.Delete = append(mock.calls.Delete, callInfo)
-	lockSamlTokenInterfaceMockDelete.Unlock()
+	lockEncryptedTokenInterfaceMockDelete.Unlock()
 	return mock.DeleteFunc(name, options)
 }
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
 //
-//	len(mockedSamlTokenInterface.DeleteCalls())
-func (mock *SamlTokenInterfaceMock) DeleteCalls() []struct {
+//	len(mockedEncryptedTokenInterface.DeleteCalls())
+func (mock *EncryptedTokenInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
 } {
@@ -1399,16 +1399,16 @@ func (mock *SamlTokenInterfaceMock) DeleteCalls() []struct {
 		Name    string
 		Options *metav1.DeleteOptions
 	}
-	lockSamlTokenInterfaceMockDelete.RLock()
+	lockEncryptedTokenInterfaceMockDelete.RLock()
 	calls = mock.calls.Delete
-	lockSamlTokenInterfaceMockDelete.RUnlock()
+	lockEncryptedTokenInterfaceMockDelete.RUnlock()
 	return calls
 }
 
 // DeleteCollection calls DeleteCollectionFunc.
-func (mock *SamlTokenInterfaceMock) DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+func (mock *EncryptedTokenInterfaceMock) DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	if mock.DeleteCollectionFunc == nil {
-		panic("SamlTokenInterfaceMock.DeleteCollectionFunc: method is nil but SamlTokenInterface.DeleteCollection was just called")
+		panic("EncryptedTokenInterfaceMock.DeleteCollectionFunc: method is nil but EncryptedTokenInterface.DeleteCollection was just called")
 	}
 	callInfo := struct {
 		DeleteOpts *metav1.DeleteOptions
@@ -1417,17 +1417,17 @@ func (mock *SamlTokenInterfaceMock) DeleteCollection(deleteOpts *metav1.DeleteOp
 		DeleteOpts: deleteOpts,
 		ListOpts:   listOpts,
 	}
-	lockSamlTokenInterfaceMockDeleteCollection.Lock()
+	lockEncryptedTokenInterfaceMockDeleteCollection.Lock()
 	mock.calls.DeleteCollection = append(mock.calls.DeleteCollection, callInfo)
-	lockSamlTokenInterfaceMockDeleteCollection.Unlock()
+	lockEncryptedTokenInterfaceMockDeleteCollection.Unlock()
 	return mock.DeleteCollectionFunc(deleteOpts, listOpts)
 }
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
 //
-//	len(mockedSamlTokenInterface.DeleteCollectionCalls())
-func (mock *SamlTokenInterfaceMock) DeleteCollectionCalls() []struct {
+//	len(mockedEncryptedTokenInterface.DeleteCollectionCalls())
+func (mock *EncryptedTokenInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
 } {
@@ -1435,16 +1435,16 @@ func (mock *SamlTokenInterfaceMock) DeleteCollectionCalls() []struct {
 		DeleteOpts *metav1.DeleteOptions
 		ListOpts   metav1.ListOptions
 	}
-	lockSamlTokenInterfaceMockDeleteCollection.RLock()
+	lockEncryptedTokenInterfaceMockDeleteCollection.RLock()
 	calls = mock.calls.DeleteCollection
-	lockSamlTokenInterfaceMockDeleteCollection.RUnlock()
+	lockEncryptedTokenInterfaceMockDeleteCollection.RUnlock()
 	return calls
 }
 
 // DeleteNamespaced calls DeleteNamespacedFunc.
-func (mock *SamlTokenInterfaceMock) DeleteNamespaced(namespace string, name string, options *metav1.DeleteOptions) error {
+func (mock *EncryptedTokenInterfaceMock) DeleteNamespaced(namespace string, name string, options *metav1.DeleteOptions) error {
 	if mock.DeleteNamespacedFunc == nil {
-		panic("SamlTokenInterfaceMock.DeleteNamespacedFunc: method is nil but SamlTokenInterface.DeleteNamespaced was just called")
+		panic("EncryptedTokenInterfaceMock.DeleteNamespacedFunc: method is nil but EncryptedTokenInterface.DeleteNamespaced was just called")
 	}
 	callInfo := struct {
 		Namespace string
@@ -1455,17 +1455,17 @@ func (mock *SamlTokenInterfaceMock) DeleteNamespaced(namespace string, name stri
 		Name:      name,
 		Options:   options,
 	}
-	lockSamlTokenInterfaceMockDeleteNamespaced.Lock()
+	lockEncryptedTokenInterfaceMockDeleteNamespaced.Lock()
 	mock.calls.DeleteNamespaced = append(mock.calls.DeleteNamespaced, callInfo)
-	lockSamlTokenInterfaceMockDeleteNamespaced.Unlock()
+	lockEncryptedTokenInterfaceMockDeleteNamespaced.Unlock()
 	return mock.DeleteNamespacedFunc(namespace, name, options)
 }
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
 //
-//	len(mockedSamlTokenInterface.DeleteNamespacedCalls())
-func (mock *SamlTokenInterfaceMock) DeleteNamespacedCalls() []struct {
+//	len(mockedEncryptedTokenInterface.DeleteNamespacedCalls())
+func (mock *EncryptedTokenInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
 	Options   *metav1.DeleteOptions
@@ -1475,16 +1475,16 @@ func (mock *SamlTokenInterfaceMock) DeleteNamespacedCalls() []struct {
 		Name      string
 		Options   *metav1.DeleteOptions
 	}
-	lockSamlTokenInterfaceMockDeleteNamespaced.RLock()
+	lockEncryptedTokenInterfaceMockDeleteNamespaced.RLock()
 	calls = mock.calls.DeleteNamespaced
-	lockSamlTokenInterfaceMockDeleteNamespaced.RUnlock()
+	lockEncryptedTokenInterfaceMockDeleteNamespaced.RUnlock()
 	return calls
 }
 
 // Get calls GetFunc.
-func (mock *SamlTokenInterfaceMock) Get(name string, opts metav1.GetOptions) (*v3.SamlToken, error) {
+func (mock *EncryptedTokenInterfaceMock) Get(name string, opts metav1.GetOptions) (*v3.EncryptedToken, error) {
 	if mock.GetFunc == nil {
-		panic("SamlTokenInterfaceMock.GetFunc: method is nil but SamlTokenInterface.Get was just called")
+		panic("EncryptedTokenInterfaceMock.GetFunc: method is nil but EncryptedTokenInterface.Get was just called")
 	}
 	callInfo := struct {
 		Name string
@@ -1493,17 +1493,17 @@ func (mock *SamlTokenInterfaceMock) Get(name string, opts metav1.GetOptions) (*v
 		Name: name,
 		Opts: opts,
 	}
-	lockSamlTokenInterfaceMockGet.Lock()
+	lockEncryptedTokenInterfaceMockGet.Lock()
 	mock.calls.Get = append(mock.calls.Get, callInfo)
-	lockSamlTokenInterfaceMockGet.Unlock()
+	lockEncryptedTokenInterfaceMockGet.Unlock()
 	return mock.GetFunc(name, opts)
 }
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
 //
-//	len(mockedSamlTokenInterface.GetCalls())
-func (mock *SamlTokenInterfaceMock) GetCalls() []struct {
+//	len(mockedEncryptedTokenInterface.GetCalls())
+func (mock *EncryptedTokenInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
 } {
@@ -1511,16 +1511,16 @@ func (mock *SamlTokenInterfaceMock) GetCalls() []struct {
 		Name string
 		Opts metav1.GetOptions
 	}
-	lockSamlTokenInterfaceMockGet.RLock()
+	lockEncryptedTokenInterfaceMockGet.RLock()
 	calls = mock.calls.Get
-	lockSamlTokenInterfaceMockGet.RUnlock()
+	lockEncryptedTokenInterfaceMockGet.RUnlock()
 	return calls
 }
 
 // GetNamespaced calls GetNamespacedFunc.
-func (mock *SamlTokenInterfaceMock) GetNamespaced(namespace string, name string, opts metav1.GetOptions) (*v3.SamlToken, error) {
+func (mock *EncryptedTokenInterfaceMock) GetNamespaced(namespace string, name string, opts metav1.GetOptions) (*v3.EncryptedToken, error) {
 	if mock.GetNamespacedFunc == nil {
-		panic("SamlTokenInterfaceMock.GetNamespacedFunc: method is nil but SamlTokenInterface.GetNamespaced was just called")
+		panic("EncryptedTokenInterfaceMock.GetNamespacedFunc: method is nil but EncryptedTokenInterface.GetNamespaced was just called")
 	}
 	callInfo := struct {
 		Namespace string
@@ -1531,17 +1531,17 @@ func (mock *SamlTokenInterfaceMock) GetNamespaced(namespace string, name string,
 		Name:      name,
 		Opts:      opts,
 	}
-	lockSamlTokenInterfaceMockGetNamespaced.Lock()
+	lockEncryptedTokenInterfaceMockGetNamespaced.Lock()
 	mock.calls.GetNamespaced = append(mock.calls.GetNamespaced, callInfo)
-	lockSamlTokenInterfaceMockGetNamespaced.Unlock()
+	lockEncryptedTokenInterfaceMockGetNamespaced.Unlock()
 	return mock.GetNamespacedFunc(namespace, name, opts)
 }
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
 //
-//	len(mockedSamlTokenInterface.GetNamespacedCalls())
-func (mock *SamlTokenInterfaceMock) GetNamespacedCalls() []struct {
+//	len(mockedEncryptedTokenInterface.GetNamespacedCalls())
+func (mock *EncryptedTokenInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
 	Opts      metav1.GetOptions
@@ -1551,48 +1551,48 @@ func (mock *SamlTokenInterfaceMock) GetNamespacedCalls() []struct {
 		Name      string
 		Opts      metav1.GetOptions
 	}
-	lockSamlTokenInterfaceMockGetNamespaced.RLock()
+	lockEncryptedTokenInterfaceMockGetNamespaced.RLock()
 	calls = mock.calls.GetNamespaced
-	lockSamlTokenInterfaceMockGetNamespaced.RUnlock()
+	lockEncryptedTokenInterfaceMockGetNamespaced.RUnlock()
 	return calls
 }
 
 // List calls ListFunc.
-func (mock *SamlTokenInterfaceMock) List(opts metav1.ListOptions) (*v3.SamlTokenList, error) {
+func (mock *EncryptedTokenInterfaceMock) List(opts metav1.ListOptions) (*v3.EncryptedTokenList, error) {
 	if mock.ListFunc == nil {
-		panic("SamlTokenInterfaceMock.ListFunc: method is nil but SamlTokenInterface.List was just called")
+		panic("EncryptedTokenInterfaceMock.ListFunc: method is nil but EncryptedTokenInterface.List was just called")
 	}
 	callInfo := struct {
 		Opts metav1.ListOptions
 	}{
 		Opts: opts,
 	}
-	lockSamlTokenInterfaceMockList.Lock()
+	lockEncryptedTokenInterfaceMockList.Lock()
 	mock.calls.List = append(mock.calls.List, callInfo)
-	lockSamlTokenInterfaceMockList.Unlock()
+	lockEncryptedTokenInterfaceMockList.Unlock()
 	return mock.ListFunc(opts)
 }
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
 //
-//	len(mockedSamlTokenInterface.ListCalls())
-func (mock *SamlTokenInterfaceMock) ListCalls() []struct {
+//	len(mockedEncryptedTokenInterface.ListCalls())
+func (mock *EncryptedTokenInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
 	var calls []struct {
 		Opts metav1.ListOptions
 	}
-	lockSamlTokenInterfaceMockList.RLock()
+	lockEncryptedTokenInterfaceMockList.RLock()
 	calls = mock.calls.List
-	lockSamlTokenInterfaceMockList.RUnlock()
+	lockEncryptedTokenInterfaceMockList.RUnlock()
 	return calls
 }
 
 // ListNamespaced calls ListNamespacedFunc.
-func (mock *SamlTokenInterfaceMock) ListNamespaced(namespace string, opts metav1.ListOptions) (*v3.SamlTokenList, error) {
+func (mock *EncryptedTokenInterfaceMock) ListNamespaced(namespace string, opts metav1.ListOptions) (*v3.EncryptedTokenList, error) {
 	if mock.ListNamespacedFunc == nil {
-		panic("SamlTokenInterfaceMock.ListNamespacedFunc: method is nil but SamlTokenInterface.ListNamespaced was just called")
+		panic("EncryptedTokenInterfaceMock.ListNamespacedFunc: method is nil but EncryptedTokenInterface.ListNamespaced was just called")
 	}
 	callInfo := struct {
 		Namespace string
@@ -1601,17 +1601,17 @@ func (mock *SamlTokenInterfaceMock) ListNamespaced(namespace string, opts metav1
 		Namespace: namespace,
 		Opts:      opts,
 	}
-	lockSamlTokenInterfaceMockListNamespaced.Lock()
+	lockEncryptedTokenInterfaceMockListNamespaced.Lock()
 	mock.calls.ListNamespaced = append(mock.calls.ListNamespaced, callInfo)
-	lockSamlTokenInterfaceMockListNamespaced.Unlock()
+	lockEncryptedTokenInterfaceMockListNamespaced.Unlock()
 	return mock.ListNamespacedFunc(namespace, opts)
 }
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
 //
-//	len(mockedSamlTokenInterface.ListNamespacedCalls())
-func (mock *SamlTokenInterfaceMock) ListNamespacedCalls() []struct {
+//	len(mockedEncryptedTokenInterface.ListNamespacedCalls())
+func (mock *EncryptedTokenInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
 } {
@@ -1619,168 +1619,168 @@ func (mock *SamlTokenInterfaceMock) ListNamespacedCalls() []struct {
 		Namespace string
 		Opts      metav1.ListOptions
 	}
-	lockSamlTokenInterfaceMockListNamespaced.RLock()
+	lockEncryptedTokenInterfaceMockListNamespaced.RLock()
 	calls = mock.calls.ListNamespaced
-	lockSamlTokenInterfaceMockListNamespaced.RUnlock()
+	lockEncryptedTokenInterfaceMockListNamespaced.RUnlock()
 	return calls
 }
 
 // ObjectClient calls ObjectClientFunc.
-func (mock *SamlTokenInterfaceMock) ObjectClient() *objectclient.ObjectClient {
+func (mock *EncryptedTokenInterfaceMock) ObjectClient() *objectclient.ObjectClient {
 	if mock.ObjectClientFunc == nil {
-		panic("SamlTokenInterfaceMock.ObjectClientFunc: method is nil but SamlTokenInterface.ObjectClient was just called")
+		panic("EncryptedTokenInterfaceMock.ObjectClientFunc: method is nil but EncryptedTokenInterface.ObjectClient was just called")
 	}
 	callInfo := struct {
 	}{}
-	lockSamlTokenInterfaceMockObjectClient.Lock()
+	lockEncryptedTokenInterfaceMockObjectClient.Lock()
 	mock.calls.ObjectClient = append(mock.calls.ObjectClient, callInfo)
-	lockSamlTokenInterfaceMockObjectClient.Unlock()
+	lockEncryptedTokenInterfaceMockObjectClient.Unlock()
 	return mock.ObjectClientFunc()
 }
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
 //
-//	len(mockedSamlTokenInterface.ObjectClientCalls())
-func (mock *SamlTokenInterfaceMock) ObjectClientCalls() []struct {
+//	len(mockedEncryptedTokenInterface.ObjectClientCalls())
+func (mock *EncryptedTokenInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
 	}
-	lockSamlTokenInterfaceMockObjectClient.RLock()
+	lockEncryptedTokenInterfaceMockObjectClient.RLock()
 	calls = mock.calls.ObjectClient
-	lockSamlTokenInterfaceMockObjectClient.RUnlock()
+	lockEncryptedTokenInterfaceMockObjectClient.RUnlock()
 	return calls
 }
 
 // Update calls UpdateFunc.
-func (mock *SamlTokenInterfaceMock) Update(in1 *v3.SamlToken) (*v3.SamlToken, error) {
+func (mock *EncryptedTokenInterfaceMock) Update(in1 *v3.EncryptedToken) (*v3.EncryptedToken, error) {
 	if mock.UpdateFunc == nil {
-		panic("SamlTokenInterfaceMock.UpdateFunc: method is nil but SamlTokenInterface.Update was just called")
+		panic("EncryptedTokenInterfaceMock.UpdateFunc: method is nil but EncryptedTokenInterface.Update was just called")
 	}
 	callInfo := struct {
-		In1 *v3.SamlToken
+		In1 *v3.EncryptedToken
 	}{
 		In1: in1,
 	}
-	lockSamlTokenInterfaceMockUpdate.Lock()
+	lockEncryptedTokenInterfaceMockUpdate.Lock()
 	mock.calls.Update = append(mock.calls.Update, callInfo)
-	lockSamlTokenInterfaceMockUpdate.Unlock()
+	lockEncryptedTokenInterfaceMockUpdate.Unlock()
 	return mock.UpdateFunc(in1)
 }
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
 //
-//	len(mockedSamlTokenInterface.UpdateCalls())
-func (mock *SamlTokenInterfaceMock) UpdateCalls() []struct {
-	In1 *v3.SamlToken
+//	len(mockedEncryptedTokenInterface.UpdateCalls())
+func (mock *EncryptedTokenInterfaceMock) UpdateCalls() []struct {
+	In1 *v3.EncryptedToken
 } {
 	var calls []struct {
-		In1 *v3.SamlToken
+		In1 *v3.EncryptedToken
 	}
-	lockSamlTokenInterfaceMockUpdate.RLock()
+	lockEncryptedTokenInterfaceMockUpdate.RLock()
 	calls = mock.calls.Update
-	lockSamlTokenInterfaceMockUpdate.RUnlock()
+	lockEncryptedTokenInterfaceMockUpdate.RUnlock()
 	return calls
 }
 
 // Watch calls WatchFunc.
-func (mock *SamlTokenInterfaceMock) Watch(opts metav1.ListOptions) (watch.Interface, error) {
+func (mock *EncryptedTokenInterfaceMock) Watch(opts metav1.ListOptions) (watch.Interface, error) {
 	if mock.WatchFunc == nil {
-		panic("SamlTokenInterfaceMock.WatchFunc: method is nil but SamlTokenInterface.Watch was just called")
+		panic("EncryptedTokenInterfaceMock.WatchFunc: method is nil but EncryptedTokenInterface.Watch was just called")
 	}
 	callInfo := struct {
 		Opts metav1.ListOptions
 	}{
 		Opts: opts,
 	}
-	lockSamlTokenInterfaceMockWatch.Lock()
+	lockEncryptedTokenInterfaceMockWatch.Lock()
 	mock.calls.Watch = append(mock.calls.Watch, callInfo)
-	lockSamlTokenInterfaceMockWatch.Unlock()
+	lockEncryptedTokenInterfaceMockWatch.Unlock()
 	return mock.WatchFunc(opts)
 }
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
 //
-//	len(mockedSamlTokenInterface.WatchCalls())
-func (mock *SamlTokenInterfaceMock) WatchCalls() []struct {
+//	len(mockedEncryptedTokenInterface.WatchCalls())
+func (mock *EncryptedTokenInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
 	var calls []struct {
 		Opts metav1.ListOptions
 	}
-	lockSamlTokenInterfaceMockWatch.RLock()
+	lockEncryptedTokenInterfaceMockWatch.RLock()
 	calls = mock.calls.Watch
-	lockSamlTokenInterfaceMockWatch.RUnlock()
+	lockEncryptedTokenInterfaceMockWatch.RUnlock()
 	return calls
 }
 
 var (
-	lockSamlTokensGetterMockSamlTokens sync.RWMutex
+	lockEncryptedTokensGetterMockEncryptedTokens sync.RWMutex
 )
 
-// Ensure, that SamlTokensGetterMock does implement v31.SamlTokensGetter.
+// Ensure, that EncryptedTokensGetterMock does implement v31.EncryptedTokensGetter.
 // If this is not the case, regenerate this file with moq.
-var _ v31.SamlTokensGetter = &SamlTokensGetterMock{}
+var _ v31.EncryptedTokensGetter = &EncryptedTokensGetterMock{}
 
-// SamlTokensGetterMock is a mock implementation of v31.SamlTokensGetter.
+// EncryptedTokensGetterMock is a mock implementation of v31.EncryptedTokensGetter.
 //
-//	    func TestSomethingThatUsesSamlTokensGetter(t *testing.T) {
+//	    func TestSomethingThatUsesEncryptedTokensGetter(t *testing.T) {
 //
-//	        // make and configure a mocked v31.SamlTokensGetter
-//	        mockedSamlTokensGetter := &SamlTokensGetterMock{
-//	            SamlTokensFunc: func(namespace string) v31.SamlTokenInterface {
-//		               panic("mock out the SamlTokens method")
+//	        // make and configure a mocked v31.EncryptedTokensGetter
+//	        mockedEncryptedTokensGetter := &EncryptedTokensGetterMock{
+//	            EncryptedTokensFunc: func(namespace string) v31.EncryptedTokenInterface {
+//		               panic("mock out the EncryptedTokens method")
 //	            },
 //	        }
 //
-//	        // use mockedSamlTokensGetter in code that requires v31.SamlTokensGetter
+//	        // use mockedEncryptedTokensGetter in code that requires v31.EncryptedTokensGetter
 //	        // and then make assertions.
 //
 //	    }
-type SamlTokensGetterMock struct {
-	// SamlTokensFunc mocks the SamlTokens method.
-	SamlTokensFunc func(namespace string) v31.SamlTokenInterface
+type EncryptedTokensGetterMock struct {
+	// EncryptedTokensFunc mocks the EncryptedTokens method.
+	EncryptedTokensFunc func(namespace string) v31.EncryptedTokenInterface
 
 	// calls tracks calls to the methods.
 	calls struct {
-		// SamlTokens holds details about calls to the SamlTokens method.
-		SamlTokens []struct {
+		// EncryptedTokens holds details about calls to the EncryptedTokens method.
+		EncryptedTokens []struct {
 			// Namespace is the namespace argument value.
 			Namespace string
 		}
 	}
 }
 
-// SamlTokens calls SamlTokensFunc.
-func (mock *SamlTokensGetterMock) SamlTokens(namespace string) v31.SamlTokenInterface {
-	if mock.SamlTokensFunc == nil {
-		panic("SamlTokensGetterMock.SamlTokensFunc: method is nil but SamlTokensGetter.SamlTokens was just called")
+// EncryptedTokens calls EncryptedTokensFunc.
+func (mock *EncryptedTokensGetterMock) EncryptedTokens(namespace string) v31.EncryptedTokenInterface {
+	if mock.EncryptedTokensFunc == nil {
+		panic("EncryptedTokensGetterMock.EncryptedTokensFunc: method is nil but EncryptedTokensGetter.EncryptedTokens was just called")
 	}
 	callInfo := struct {
 		Namespace string
 	}{
 		Namespace: namespace,
 	}
-	lockSamlTokensGetterMockSamlTokens.Lock()
-	mock.calls.SamlTokens = append(mock.calls.SamlTokens, callInfo)
-	lockSamlTokensGetterMockSamlTokens.Unlock()
-	return mock.SamlTokensFunc(namespace)
+	lockEncryptedTokensGetterMockEncryptedTokens.Lock()
+	mock.calls.EncryptedTokens = append(mock.calls.EncryptedTokens, callInfo)
+	lockEncryptedTokensGetterMockEncryptedTokens.Unlock()
+	return mock.EncryptedTokensFunc(namespace)
 }
 
-// SamlTokensCalls gets all the calls that were made to SamlTokens.
+// EncryptedTokensCalls gets all the calls that were made to EncryptedTokens.
 // Check the length with:
 //
-//	len(mockedSamlTokensGetter.SamlTokensCalls())
-func (mock *SamlTokensGetterMock) SamlTokensCalls() []struct {
+//	len(mockedEncryptedTokensGetter.EncryptedTokensCalls())
+func (mock *EncryptedTokensGetterMock) EncryptedTokensCalls() []struct {
 	Namespace string
 } {
 	var calls []struct {
 		Namespace string
 	}
-	lockSamlTokensGetterMockSamlTokens.RLock()
-	calls = mock.calls.SamlTokens
-	lockSamlTokensGetterMockSamlTokens.RUnlock()
+	lockEncryptedTokensGetterMockEncryptedTokens.RLock()
+	calls = mock.calls.EncryptedTokens
+	lockEncryptedTokensGetterMockEncryptedTokens.RUnlock()
 	return calls
 }

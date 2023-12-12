@@ -47,22 +47,22 @@ const (
 
 func newLoginHandler(ctx context.Context, mgmt *config.ScaledContext) *loginHandler {
 	return &loginHandler{
-		scaledContext: mgmt,
-		userMGR:       mgmt.UserManager,
-		tokenMGR:      tokens.NewManager(ctx, mgmt),
-		samlTokens:    mgmt.Management.SamlTokens(""),
-		clusterLister: mgmt.Management.Clusters("").Controller().Lister(),
-		secretLister:  mgmt.Core.Secrets("").Controller().Lister(),
+		scaledContext:   mgmt,
+		userMGR:         mgmt.UserManager,
+		tokenMGR:        tokens.NewManager(ctx, mgmt),
+		encryptedTokens: mgmt.Management.EncryptedTokens(""),
+		clusterLister:   mgmt.Management.Clusters("").Controller().Lister(),
+		secretLister:    mgmt.Core.Secrets("").Controller().Lister(),
 	}
 }
 
 type loginHandler struct {
-	scaledContext *config.ScaledContext
-	userMGR       user.Manager
-	tokenMGR      *tokens.Manager
-	samlTokens    v3.SamlTokenInterface
-	clusterLister v3.ClusterLister
-	secretLister  v1.SecretLister
+	scaledContext   *config.ScaledContext
+	userMGR         user.Manager
+	tokenMGR        *tokens.Manager
+	encryptedTokens v3.EncryptedTokenInterface
+	clusterLister   v3.ClusterLister
+	secretLister    v1.SecretLister
 }
 
 func (h *loginHandler) login(actionName string, action *types.Action, request *types.APIContext) error {
@@ -218,7 +218,7 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 	}
 
 	if requestID, err := request.Request.Cookie("oauth_Rancher_RequestId"); err == nil {
-		samlTokenName := requestID.Value
+		encryptedTokenName := requestID.Value
 
 		// We should share code with saml_client_cookies stuff
 		// All fields are necessary for deleting a cookie
@@ -246,7 +246,7 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 		if err != nil {
 			return v3.Token{}, "", "", err
 		}
-		encryptedToken, err := rsa.EncryptOAEP(
+		newEncryptedToken, err := rsa.EncryptOAEP(
 			sha256.New(),
 			rand.Reader,
 			pubKey,
@@ -255,18 +255,18 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 		if err != nil {
 			return v3.Token{}, "", "", err
 		}
-		encoded := base64.StdEncoding.EncodeToString(encryptedToken)
+		encoded := base64.StdEncoding.EncodeToString(newEncryptedToken)
 
-		samlToken := &v3.SamlToken{
+		encryptedToken := &v3.EncryptedToken{
 			Token:     encoded,
 			ExpiresAt: token.ExpiresAt,
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      samlTokenName,
+				Name:      encryptedTokenName,
 				Namespace: namespace.GlobalNamespace,
 			},
 		}
 
-		_, err = h.samlTokens.Create(samlToken)
+		_, err = h.encryptedTokens.Create(encryptedToken)
 		if err != nil {
 			return v3.Token{}, "", "", err
 		}
