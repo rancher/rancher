@@ -2,6 +2,7 @@ package dashboard
 
 import (
 	"context"
+
 	"github.com/rancher/rancher/pkg/controllers/dashboard/plugin"
 	"github.com/rancher/rancher/pkg/namespace"
 
