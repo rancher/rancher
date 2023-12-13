@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e
 
+source $(dirname $0)/../../../../scripts/export-config
+
 ARCH=${ARCH:-"amd64"}
 REPO=ranchertest
 TAG=v2.7-head
@@ -22,10 +24,23 @@ IMAGE=${REPO}/rancher:${TAG}
 AGENT_IMAGE=${REPO}/rancher-agent:${TAG}
 
 echo "building rancher test docker image"
-docker build --build-arg VERSION=${TAG} --build-arg ARCH=${ARCH} --build-arg IMAGE_REPO=${REPO} -t ${IMAGE} -f Dockerfile . --no-cache
+docker build \
+  --build-arg VERSION=${TAG} \
+  --build-arg ARCH=${ARCH} \
+  --build-arg IMAGE_REPO=${REPO} \
+  --build-arg CATTLE_RANCHER_WEBHOOK_VERSION="${CATTLE_RANCHER_WEBHOOK_VERSION}" \
+  --build-arg CATTLE_CSP_ADAPTER_MIN_VERSION="${CATTLE_CSP_ADAPTER_MIN_VERSION}" \
+  --build-arg CATTLE_FLEET_VERSION="${CATTLE_FLEET_VERSION}" \
+  -t ${IMAGE} -f Dockerfile . --no-cache
 
 echo "building agent test docker image"
-docker build --build-arg VERSION=${TAG} --build-arg ARCH=${ARCH} --build-arg RANCHER_TAG=${TAG} --build-arg RANCHER_REPO=${REPO} -t ${AGENT_IMAGE} -f Dockerfile.agent . --no-cache
+docker build \
+  --build-arg VERSION=${TAG} \
+  --build-arg ARCH=${ARCH} \
+  --build-arg RANCHER_TAG=${TAG} \
+  --build-arg RANCHER_REPO=${REPO} \
+  --build-arg CATTLE_RANCHER_WEBHOOK_VERSION="${CATTLE_RANCHER_WEBHOOK_VERSION}" \
+  -t ${AGENT_IMAGE} -f Dockerfile.agent . --no-cache
 
 echo ${DOCKERHUB_PASSWORD} | docker login --username ${DOCKERHUB_USERNAME} --password-stdin
 

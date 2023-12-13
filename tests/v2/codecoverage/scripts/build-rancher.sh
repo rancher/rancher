@@ -4,6 +4,7 @@ set -ex
 cd $(dirname $0)/../../../../
 
 source $(dirname $0)/scripts/version
+source $(dirname $0)/scripts/export-config
 
 CATTLE_KDM_BRANCH=dev-v2.8
 
