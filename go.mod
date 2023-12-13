@@ -24,6 +24,7 @@ replace (
 	go.opentelemetry.io/otel/sdk => go.opentelemetry.io/otel/sdk v0.20.0
 	go.opentelemetry.io/otel/trace => go.opentelemetry.io/otel/trace v0.20.0
 	go.opentelemetry.io/proto/otlp => go.opentelemetry.io/proto/otlp v0.7.0
+	go.qase.io/client => github.com/rancher/qase-go/client v0.0.0-20231114201952-65195ec001fa
 
 	helm.sh/helm/v3 => github.com/rancher/helm/v3 v3.9.0-rancher1
 	k8s.io/api => k8s.io/api v0.25.12
@@ -162,7 +163,11 @@ require (
 	sigs.k8s.io/yaml v1.3.0
 )
 
-require github.com/containers/image/v5 v5.25.0
+require (
+	github.com/antihax/optional v1.0.0
+	github.com/containers/image/v5 v5.25.0
+	go.qase.io/client v0.0.0-20231114201952-65195ec001fa
+)
 
 require (
 	cloud.google.com/go/compute/metadata v0.2.3 // indirect

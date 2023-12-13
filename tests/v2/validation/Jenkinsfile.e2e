@@ -14,6 +14,7 @@ node {
     def validationVolume = "ValidationSharedVolume-${job_name}${env.BUILD_NUMBER}"
     def testsDir = "/root/go/src/github.com/rancher/rancher/tests/v2/validation/${env.TEST_PACKAGE}"
     def testResultsOut = "results.xml"
+    def testResultsJSON = "results.json"
     def envFile = ".env"
     def rancherConfig = "rancher_env.config"
     def branch = "release/v2.7"
@@ -65,6 +66,7 @@ node {
                           string(credentialsId: 'RANCHER_VALID_TLS_CERT', variable: 'RANCHER_VALID_TLS_CERT'),
                           string(credentialsId: 'RANCHER_VALID_TLS_KEY', variable: 'RANCHER_VALID_TLS_KEY'),
                           string(credentialsId: 'RANCHER_BYO_TLS_CERT', variable: 'RANCHER_BYO_TLS_CERT'),
+                          string(credentialsId: 'QASE_AUTOMATION_TOKEN', variable: 'QASE_AUTOMATION_TOKEN'),
                           string(credentialsId: 'RANCHER_BYO_TLS_KEY', variable: 'RANCHER_BYO_TLS_KEY')]) {
           
         withEnv(paramsMap) {
@@ -134,7 +136,9 @@ node {
             stage('Run Validation Tests') {
               try {
                 sh "docker run --volumes-from ${buildTestContainer} --name ${golangTestContainer} -t --env-file ${envFile} " +
-                "${golangImageName} sh -c \"gotestsum --format standard-verbose --packages=${testsDir} --junitfile ${testResultsOut} -- -tags=${TAGS} ${GOTEST_TESTCASE} -timeout=${timeout} -v\""
+                "${golangImageName} sh -c \"gotestsum --format standard-verbose --packages=${testsDir} --junitfile ${testResultsOut}  --jsonfile ${testResultsJSON} -- -tags=${TAGS} ${GOTEST_TESTCASE} -timeout=${timeout} -v" +
+                ".${rootPath}pipeline/scripts/build_qase_reporter.sh;" +
+                ".${rootPath}reporter\""
               } catch(err) {
                 echo 'Validation tests had failures. Aborting'
               }
@@ -160,6 +164,8 @@ node {
             stage('Test Report') {
               try {
                 sh "docker cp ${golangTestContainer}:${rootPath}${testResultsOut} ."
+                sh "docker cp ${golangTestContainer}:${rootPath}${testResultsJSON} ./tests/v2/validation/pipeline/"
+                sh "./rancher/tests/v2/validation/pipeline/reporter"
                 step([$class: 'JUnitResultArchiver', testResults: "**/${testResultsOut}"])
               } catch (err) {
                 sh "docker stop ${buildTestContainer}"
