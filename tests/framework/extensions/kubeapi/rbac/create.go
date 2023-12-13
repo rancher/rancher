@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/rancher/rancher/pkg/api/scheme"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	"github.com/rancher/rancher/tests/framework/extensions/unstructured"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -67,4 +68,48 @@ func CreateRoleBinding(client *rancher.Client, clusterName, roleBindingName, nam
 	}
 
 	return newRoleBinding, nil
+}
+
+// CreateGlobalRole is a helper function that uses the dynamic client to create a global role in the local cluster.
+func CreateGlobalRole(client *rancher.Client, globalRole *v3.GlobalRole) (*v3.GlobalRole, error) {
+	dynamicClient, err := client.GetDownStreamClusterClient(localcluster)
+	if err != nil {
+		return nil, err
+	}
+
+	globalRoleResource := dynamicClient.Resource(GlobalRoleGroupVersionResource)
+	unstructuredResp, err := globalRoleResource.Create(context.TODO(), unstructured.MustToUnstructured(globalRole), metav1.CreateOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	newGlobalRole := &v3.GlobalRole{}
+	err = scheme.Scheme.Convert(unstructuredResp, newGlobalRole, unstructuredResp.GroupVersionKind())
+	if err != nil {
+		return nil, err
+	}
+
+	return newGlobalRole, nil
+}
+
+// CreateGlobalRoleBinding is a helper function that uses the dynamic client to create a global role binding for a specific user.
+func CreateGlobalRoleBinding(client *rancher.Client, globalRoleBinding *v3.GlobalRoleBinding) (*v3.GlobalRoleBinding, error) {
+	dynamicClient, err := client.GetDownStreamClusterClient(localcluster)
+	if err != nil {
+		return nil, err
+	}
+
+	globalRoleBindingResource := dynamicClient.Resource(GlobalRoleBindingGroupVersionResource)
+	unstructuredResp, err := globalRoleBindingResource.Create(context.TODO(), unstructured.MustToUnstructured(globalRoleBinding), metav1.CreateOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	newGlobalRoleBinding := &v3.GlobalRoleBinding{}
+	err = scheme.Scheme.Convert(unstructuredResp, newGlobalRoleBinding, unstructuredResp.GroupVersionKind())
+	if err != nil {
+		return nil, err
+	}
+
+	return newGlobalRoleBinding, nil
 }

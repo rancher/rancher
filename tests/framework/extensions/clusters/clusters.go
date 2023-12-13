@@ -41,13 +41,15 @@ const (
 	controlPlaneRole = "control-plane-role"
 	workerRole       = "worker-role"
 
-	externalCloudProviderString = "cloud-provider=external"
-	kubeletArgKey               = "kubelet-arg"
-	kubeletAPIServerArgKey      = "kubeapi-server-arg"
-	kubeControllerManagerArgKey = "kube-controller-manager-arg"
-	cloudProviderAnnotationName = "cloud-provider-name"
-	disableCloudController      = "disable-cloud-controller"
-	protectKernelDefaults       = "protect-kernel-defaults"
+	externalCloudProviderString  = "cloud-provider=external"
+	kubeletArgKey                = "kubelet-arg"
+	kubeletAPIServerArgKey       = "kubeapi-server-arg"
+	kubeControllerManagerArgKey  = "kube-controller-manager-arg"
+	cloudProviderAnnotationName  = "cloud-provider-name"
+	disableCloudController       = "disable-cloud-controller"
+	protectKernelDefaults        = "protect-kernel-defaults"
+	localcluster                 = "fleet-local/local"
+	ErrMsgListDownstreamClusters = "Couldn't list downstream clusters"
 )
 
 // GetV1ProvisioningClusterByName is a helper function that returns the cluster ID by name
@@ -1264,4 +1266,19 @@ func WaitForActiveRKE1Cluster(client *rancher.Client, clusterID string) error {
 		return err
 	}
 	return nil
+}
+
+// ListDownstreamClusters is a helper function to get the name of the downstream clusters
+func ListDownstreamClusters(client *rancher.Client) (clusterNames []string, err error) {
+	clusterList, err := client.Steve.SteveType(ProvisioningSteveResourceType).ListAll(nil)
+	if err != nil {
+		return nil, errors.Wrap(err, ErrMsgListDownstreamClusters)
+	}
+	for i, c := range clusterList.Data {
+		isLocalCluster := c.ID == localcluster
+		if !isLocalCluster {
+			clusterNames = append(clusterNames, clusterList.Data[i].Name)
+		}
+	}
+	return
 }
