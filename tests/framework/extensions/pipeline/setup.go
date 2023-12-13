@@ -86,9 +86,18 @@ func UpdateEULA(adminClient *rancher.Client) error {
 	}
 
 	urlSetting := &v3.Setting{}
-	urlSettingResp, err := steveClient.SteveType("management.cattle.io.setting").ByID("server-url")
+	var urlSettingResp *v1.SteveAPIObject
+	var serverURL error
+	err = kwait.Poll(500*time.Millisecond, 2*time.Minute, func() (done bool, err error) {
+		urlSettingResp, err = steveClient.SteveType("management.cattle.io.setting").ByID("server-url")
+		if err != nil {
+			serverURL = err
+			return false, nil
+		}
+		return true, nil
+	})
 	if err != nil {
-		return err
+		return fmt.Errorf("%v and %v", err, serverURL)
 	}
 
 	err = v1.ConvertToK8sType(urlSettingResp.JSONResp, urlSetting)
@@ -138,6 +147,9 @@ func UpdateEULA(adminClient *rancher.Client) error {
 
 		return false, nil
 	})
+	if err != nil {
+		return fmt.Errorf("%v and %v", err, pollError)
+	}
 
-	return fmt.Errorf("%v and %v", err, pollError)
+	return nil
 }

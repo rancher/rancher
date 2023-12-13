@@ -11,6 +11,9 @@ node {
     def imageName = "rancher-validation-${job_name}${env.BUILD_NUMBER}"
     def testsDir = "github.com/rancher/rancher/tests/v2/validation/${env.TEST_PACKAGE}"
     def testResultsOut = "results.xml"
+    def upgradeTestResultsOut = "results_upgrade.xml"
+    def localPipelinePath = "./tests/v2/validation/pipeline/"
+    def testResultsJSON = "results.json"
     def envFile = ".env"
     def rancherConfig = "rancher_env.config"
     def branch = "release/v2.8"
@@ -78,6 +81,7 @@ node {
                           string(credentialsId: 'RANCHER_VALID_TLS_KEY', variable: 'RANCHER_VALID_TLS_KEY'),
                           string(credentialsId: 'RANCHER_BYO_TLS_CERT', variable: 'RANCHER_BYO_TLS_CERT'),
                           string(credentialsId: 'RANCHER_BYO_TLS_KEY', variable: 'RANCHER_BYO_TLS_KEY'),
+                          string(credentialsId: 'QASE_AUTOMATION_TOKEN', variable: 'QASE_AUTOMATION_TOKEN'),
                           string(credentialsId: 'RANCHER_LINODE_ACCESSKEY', variable: "RANCHER_LINODE_ACCESSKEY")]) {
 
         withEnv(paramsMap) {
@@ -115,7 +119,9 @@ node {
                 try {
                   echo envFile
                   sh "docker run --name ${testContainer} -t --env-file ${envFile} " +
-                  "${imageName} sh -c \"/go/bin/gotestsum --format standard-verbose --packages=${testsDir} --junitfile ${testResultsOut} -- ${GOTEST_TESTCASE} -timeout=${timeout} -v\""
+                  "${imageName} sh -c \"/go/bin/gotestsum --format standard-verbose --packages=${testsDir} --junitfile ${testResultsOut} -- ${GOTEST_TESTCASE} -timeout=${timeout} -v" +
+                  ".${rootPath}pipeline/scripts/build_qase_reporter.sh;" +
+                  ".${rootPath}reporter\""
                 } catch(err) {
                   echo 'Test run had failures. Collecting results...'
                 }
@@ -133,7 +139,9 @@ node {
               stage ('post upgrade tests') {
                 try {
                   sh "docker run --name ${upgradeTestContainer} -t --env-file ${envFile} " +
-                    "${imageName} sh -c \"/root/go/bin/gotestsum --format standard-verbose --packages=${testsDir} --junitfile ${testResultsOut} -- ${GOTEST_TESTCASE_2} -timeout=${timeout} -v\""
+                    "${imageName} sh -c \"/root/go/bin/gotestsum --format standard-verbose --packages=${testsDir} --junitfile ${upgradeTestResultsOut} -- ${GOTEST_TESTCASE_2} -timeout=${timeout} -v" +
+                    ".${rootPath}pipeline/scripts/build_qase_reporter.sh;" +
+                    ".${rootPath}reporter\""
                 } catch(err) {
                   echo 'Test run had failures. Collecting results...'
                 }
@@ -149,7 +157,10 @@ node {
                      
               stage('Test Report') {
                 sh "docker cp ${testContainer}:${rootPath}${testResultsOut} ."
+                sh "docker cp ${upgradeTestContainer}:${rootPath}${upgradeTestResultsOut} ."
+                sh "./rancher/tests/v2/validation/pipeline/reporter"
                 step([$class: 'JUnitResultArchiver', testResults: "**/${testResultsOut}"])
+                step([$class: 'JUnitResultArchiver', testResults: "**/${upgradeTestResultsOut}"])
                 sh "docker stop ${testContainer}"
                 sh "docker rm -v ${testContainer}"
                 sh "docker stop ${upgradeTestContainer}"
