@@ -24,10 +24,6 @@ import (
 	"k8s.io/client-go/util/retry"
 )
 
-type snapshotFile struct {
-	Name string `json:"name"`
-}
-
 func RunSnapshotCreateTest(t *testing.T, clients *clients.Clients, c *v1.Cluster, configMap corev1.ConfigMap, targetNode string) *rkev1.ETCDSnapshot {
 	defer func() {
 		if t.Failed() {
