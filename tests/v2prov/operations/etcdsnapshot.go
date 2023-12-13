@@ -225,5 +225,13 @@ func RunSnapshotRestoreTest(t *testing.T, clients *clients.Clients, c *v1.Cluste
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t, expectedNodeCount, len(allNodes.Items))
+
+	// Nodes can be left in a `Deleting` state, so only check that our expected node count equals the number of nodes that are not deleting.
+	nonDeletingNodes := 0
+	for _, n := range allNodes.Items {
+		if n.GetDeletionTimestamp() == nil {
+			nonDeletingNodes++
+		}
+	}
+	assert.Equal(t, expectedNodeCount, nonDeletingNodes)
 }
