@@ -182,7 +182,7 @@ func RunSnapshotCreateTest(t *testing.T, clients *clients.Clients, c *v1.Cluster
 					// Workaround in response to K3s/RKE2 bug around etcd snapshot configmap existence: https://github.com/k3s-io/k3s/issues/9047
 					// Ensure that there are at least 2 snapshots for the given target node, as the first snapshot is not usable.
 					spec, err := capr.ParseSnapshotClusterSpecOrError(&s)
-					if err != nil || spec == nil {
+					if err != nil || spec == nil || s.SnapshotFile.CreatedAt == nil {
 						continue // ignore errors parsing the snapshot
 					}
 					// Only count snapshots that were created after the first snapshots were taken.
