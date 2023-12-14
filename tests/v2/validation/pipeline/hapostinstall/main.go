@@ -13,6 +13,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/pipeline"
 	"github.com/rancher/rancher/tests/framework/extensions/token"
 	"github.com/rancher/rancher/tests/framework/pkg/config"
+	"github.com/rancher/rancher/tests/framework/pkg/file"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
@@ -25,7 +26,7 @@ var (
 
 	clusterID = "local"
 
-	configFileName       = config.FileName("cattle-config.yaml")
+	configFileName       = file.Name("cattle-config.yaml")
 	environmentsFileName = "environments.groovy"
 
 	tokenEnvironmentKey      = "HA_TOKEN"
@@ -69,11 +70,11 @@ func main() {
 	if err != nil {
 		logrus.Fatalf("error marshaling: %v", err)
 	}
-	err = configFileName.NewFile(configData)
+	_, err = configFileName.NewFile(configData)
 	if err != nil {
 		logrus.Fatalf("error writing yaml: %v", err)
 	}
-	err = configFileName.SetEnvironmentKey()
+	err = configFileName.SetEnvironmentKey(config.ConfigEnvironmentKey)
 	if err != nil {
 		logrus.Fatalf("error while setting environment path: %v", err)
 	}

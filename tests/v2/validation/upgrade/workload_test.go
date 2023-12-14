@@ -29,7 +29,7 @@ type UpgradeWorkloadTestSuite struct {
 	suite.Suite
 	session  *session.Session
 	client   *rancher.Client
-	clusters []Clusters
+	clusters []Cluster
 }
 
 func (u *UpgradeWorkloadTestSuite) TearDownSuite() {

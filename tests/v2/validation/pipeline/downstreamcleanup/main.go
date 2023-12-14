@@ -11,6 +11,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/defaults"
 	"github.com/rancher/rancher/tests/framework/extensions/token"
 	"github.com/rancher/rancher/tests/framework/pkg/config"
+	"github.com/rancher/rancher/tests/framework/pkg/file"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
 	"github.com/sirupsen/logrus"
@@ -28,7 +29,7 @@ var (
 	adminPassword = os.Getenv("ADMIN_PASSWORD")
 	host          = os.Getenv("HA_HOST")
 
-	configFileName = config.FileName("cattle-config.yaml")
+	configFileName = file.Name("cattle-config.yaml")
 )
 
 func main() {
@@ -64,11 +65,11 @@ func main() {
 	if err != nil {
 		logrus.Errorf("error marshaling: %v", err)
 	}
-	err = configFileName.NewFile(configData)
+	_, err = configFileName.NewFile(configData)
 	if err != nil {
 		logrus.Fatalf("error writing yaml: %v", err)
 	}
-	err = configFileName.SetEnvironmentKey()
+	err = configFileName.SetEnvironmentKey(config.ConfigEnvironmentKey)
 	if err != nil {
 		logrus.Fatalf("error while setting environment path: %v", err)
 	}

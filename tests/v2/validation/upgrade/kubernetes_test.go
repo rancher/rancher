@@ -30,7 +30,7 @@ type UpgradeKubernetesTestSuite struct {
 	suite.Suite
 	session  *session.Session
 	client   *rancher.Client
-	clusters []Clusters
+	clusters []Cluster
 }
 
 func (u *UpgradeKubernetesTestSuite) TearDownSuite() {
@@ -56,13 +56,23 @@ func (u *UpgradeKubernetesTestSuite) SetupSuite() {
 func (u *UpgradeKubernetesTestSuite) TestUpgradeKubernetes() {
 	for _, cluster := range u.clusters {
 		cluster := cluster
-		u.Run(cluster.Name, func() {
-			if cluster.isUpgradeDisabled {
-				u.T().Skipf("Kubernetes upgrade is disabled for [%v]", cluster.Name)
-			}
+		if cluster.Name == local {
+			u.Run(cluster.Name, func() {
+				if cluster.isUpgradeDisabled {
+					u.T().Skipf("Kubernetes upgrade is disabled for [%v]", cluster.Name)
+				}
 
-			u.testUpgradeSingleCluster(cluster.Name, cluster.VersionToUpgrade, cluster.PSACT, cluster.isLatestVersion)
-		})
+				u.testUpgradeLocalCluster(cluster.Name, cluster.VersionToUpgrade, cluster.isLatestVersion)
+			})
+		} else {
+			u.Run(cluster.Name, func() {
+				if cluster.isUpgradeDisabled {
+					u.T().Skipf("Kubernetes upgrade is disabled for [%v]", cluster.Name)
+				}
+
+				u.testUpgradeSingleCluster(cluster.Name, cluster.VersionToUpgrade, cluster.PSACT, cluster.isLatestVersion)
+			})
+		}
 	}
 }
 
@@ -80,7 +90,7 @@ func (u *UpgradeKubernetesTestSuite) testUpgradeSingleCluster(clusterName, versi
 	clusterMeta, err := clusters.NewClusterMeta(client, clusterName)
 	require.NoError(u.T(), err)
 	require.NotNilf(u.T(), clusterMeta, "Couldn't get the cluster meta")
-	u.T().Logf("[%v]: Provider is: %v, Hosted: %v, Imported: %v ", clusterName, clusterMeta.Provider, clusterMeta.IsHosted, clusterMeta.IsImported)
+	u.T().Logf("[%v]: Provider is: %v, Hosted: %v, Imported: %v , Local: %v", clusterName, clusterMeta.Provider, clusterMeta.IsHosted, clusterMeta.IsImported, clusterMeta.IsLocal)
 
 	initCluster, err := bundledclusters.NewWithClusterMeta(clusterMeta)
 	require.NoError(u.T(), err)
@@ -102,9 +112,9 @@ func (u *UpgradeKubernetesTestSuite) testUpgradeSingleCluster(clusterName, versi
 	u.T().Logf("[%v]: Validating sent update request for kubernetes version of the cluster", clusterName)
 	validateKubernetesVersions(u.T(), client, updatedCluster, version, isCheckingCurrentCluster)
 
+	u.T().Logf("[%v]: Waiting cluster to be upgraded and ready", clusterName)
 	err = clusters.WaitClusterToBeUpgraded(client, clusterMeta.ID)
 	require.NoError(u.T(), err)
-	u.T().Logf("[%v]: Waiting cluster to be upgraded and ready", clusterName)
 
 	u.T().Logf("[%v]: Validating updated cluster's kubernetes version", clusterName)
 	validateKubernetesVersions(u.T(), client, updatedCluster, version, !isCheckingCurrentCluster)
@@ -121,6 +131,7 @@ func (u *UpgradeKubernetesTestSuite) testUpgradeSingleCluster(clusterName, versi
 		u.T().Logf("[%v]: Validating updated cluster's nodepools kubernetes versions", clusterName)
 		validateNodepoolVersions(u.T(), client, updatedCluster, version, !isCheckingCurrentCluster)
 	}
+
 	if strings.Contains(versionToUpgrade, rke1KubeVersionCheck) {
 		err = nodestat.AllManagementNodeReady(client, clusterMeta.ID, defaults.ThirtyMinuteTimeout)
 	} else if strings.Contains(versionToUpgrade, rke2KubeVersionCheck) || strings.Contains(versionToUpgrade, k3sKubeVersionCheck) {
@@ -139,4 +150,41 @@ func (u *UpgradeKubernetesTestSuite) testUpgradeSingleCluster(clusterName, versi
 
 	podErrors := pods.StatusPods(client, clusterMeta.ID)
 	assert.Empty(u.T(), podErrors)
+}
+
+func (u *UpgradeKubernetesTestSuite) testUpgradeLocalCluster(clusterName, versionToUpgrade string, isLatestVersion bool) {
+	subSession := u.session.NewSession()
+	defer subSession.Cleanup()
+
+	client, err := u.client.WithSession(subSession)
+	require.NoError(u.T(), err)
+
+	clusterMeta, err := clusters.NewClusterMeta(client, clusterName)
+	require.NoError(u.T(), err)
+	require.NotNilf(u.T(), clusterMeta, "Couldn't get the cluster meta")
+	u.T().Logf("[%v]: Provider is: %v, Hosted: %v, Imported: %v , Local: %v", clusterName, clusterMeta.Provider, clusterMeta.IsHosted, clusterMeta.IsImported, clusterMeta.IsLocal)
+
+	initCluster, err := bundledclusters.NewWithClusterMeta(clusterMeta)
+	require.NoError(u.T(), err)
+
+	cluster, err := initCluster.Get(client)
+	require.NoError(u.T(), err)
+
+	versions, err := cluster.ListAvailableVersions(client)
+	require.NoError(u.T(), err)
+	u.T().Logf("[%v]: Available versions for the cluster: %v", clusterName, versions)
+
+	version := getVersion(u.T(), clusterName, versions, isLatestVersion, versionToUpgrade)
+	require.NotNilf(u.T(), version, "Couldn't get the version")
+	u.T().Logf("[%v]: Selected version: %v", clusterName, *version)
+
+	updatedCluster, err := cluster.UpdateKubernetesVersion(client, version)
+	require.NoError(u.T(), err)
+
+	u.T().Logf("[%v]: Validating sent update request for kubernetes version of the cluster", clusterName)
+	validateKubernetesVersions(u.T(), client, updatedCluster, version, isCheckingCurrentCluster)
+
+	u.T().Logf("[%v]: Waiting cluster to be upgraded and ready", clusterName)
+	err = waitUntilLocalStable(client, clusterName)
+	require.NoError(u.T(), err)
 }
