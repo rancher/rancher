@@ -2,24 +2,26 @@ package kontainerdrivermetadata
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"strings"
 
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/git"
-	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rke/types/kdm"
 	"github.com/rancher/wrangler/pkg/randomtoken"
 	"github.com/sirupsen/logrus"
 )
 
+var ErrURLNotFound = errors.New("url not found in settings")
+
 func parseURL(rkeData map[string]interface{}) (*MetadataURL, error) {
 	url := &MetadataURL{}
 	path, ok := rkeData["url"]
 	if !ok {
-		return nil, fmt.Errorf("url not present in settings %s", settings.RkeMetadataConfig.Get())
+		return nil, ErrURLNotFound
 	}
 	url.path = convert.ToString(path)
 	branch, ok := rkeData["branch"]
@@ -56,7 +58,7 @@ func getDataHTTP(url string) (kdm.Data, error) {
 		return data, fmt.Errorf("driverMetadata statusCode %v", resp.StatusCode)
 	}
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return data, fmt.Errorf("driverMetadata read response body error %v", err)
 	}
@@ -93,7 +95,7 @@ func getDataGit(urlPath, branch string) (kdm.Data, error) {
 	}
 	defer file.Close()
 
-	buf, err := ioutil.ReadAll(file)
+	buf, err := io.ReadAll(file)
 	if err != nil {
 		return data, fmt.Errorf("error reading file %s %v", filePath, err)
 	}

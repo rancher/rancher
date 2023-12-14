@@ -4,6 +4,7 @@ package settings
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 	"regexp"
 	"strconv"
@@ -88,7 +89,7 @@ var (
 	PasswordMinLength                   = NewSetting("password-min-length", "12")
 	PeerServices                        = NewSetting("peer-service", os.Getenv("CATTLE_PEER_SERVICE"))
 	RkeVersion                          = NewSetting("rke-version", "")
-	RkeMetadataConfig                   = NewSetting("rke-metadata-config", getMetadataConfig())
+	RkeMetadataConfig                   = NewSetting("rke-metadata-config", defaultMetadataConfig())
 	ServerImage                         = NewSetting("server-image", "rancher/rancher")
 	ServerURL                           = NewSetting("server-url", "")
 	ServerVersion                       = NewSetting("server-version", "dev")
@@ -372,11 +373,25 @@ func GetEnvKey(key string) string {
 	return "CATTLE_" + strings.ToUpper(strings.Replace(key, "-", "_", -1))
 }
 
-func getMetadataConfig() string {
+type MetadataConfig struct {
+	URL                    string `json:"url"`
+	Path                   string `json:"path"`
+	RefreshIntervalMinutes int    `json:"refresh-interval-minutes"`
+}
+
+func defaultMetadataConfig() string {
 	branch := KDMBranch.Get()
-	data := map[string]interface{}{
-		"url":                      fmt.Sprintf("https://releases.rancher.com/kontainer-driver-metadata/%s/data.json", branch),
-		"refresh-interval-minutes": "1440",
+	data := MetadataConfig{
+		Path:                   "/var/lib/rancher-data/driver-metadata/data.json",
+		RefreshIntervalMinutes: 1440,
+	}
+	if branch != "" {
+		raw := fmt.Sprintf("https://releases.rancher.com/kontainer-driver-metadata/%s/data.json", branch)
+		if u, err := url.Parse(raw); err != nil {
+			logrus.Errorf("error parsing kdm url %s: %v", u, err)
+		} else {
+			data.URL = raw
+		}
 	}
 	ans, err := json.Marshal(data)
 	if err != nil {

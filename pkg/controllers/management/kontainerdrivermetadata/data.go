@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"reflect"
 	"sort"
@@ -14,8 +13,8 @@ import (
 	mVersion "github.com/mcuadros/go-version"
 	"github.com/rancher/norman/types/convert"
 	setting2 "github.com/rancher/rancher/pkg/api/norman/store/setting"
+	managementv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/channelserver"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
 	rketypes "github.com/rancher/rke/types"
@@ -70,7 +69,7 @@ func (md *MetadataController) loadDataFromLocal() (kdm.Data, error) {
 		return kdm.Data{}, nil
 	}
 	logrus.Infof("Retrieve data.json from local path %v", DataJSONLocation)
-	data, err := ioutil.ReadFile(DataJSONLocation)
+	data, err := os.ReadFile(DataJSONLocation)
 	if err != nil {
 		return kdm.Data{}, err
 	}
@@ -218,7 +217,7 @@ func (md *MetadataController) createOrUpdateSystemImageCRD(k8sVersion string, sy
 		if !errors.IsNotFound(err) {
 			return err
 		}
-		sysImage = &v3.RkeK8sSystemImage{
+		sysImage = &managementv3.RkeK8sSystemImage{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      k8sVersion,
 				Namespace: namespace.GlobalNamespace,
@@ -265,7 +264,7 @@ func (md *MetadataController) createOrUpdateServiceOptionCRD(k8sVersion string, 
 		if !errors.IsNotFound(err) {
 			return err
 		}
-		svcOption = &v3.RkeK8sServiceOption{
+		svcOption = &managementv3.RkeK8sServiceOption{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      name,
 				Namespace: namespace.GlobalNamespace,
@@ -284,7 +283,7 @@ func (md *MetadataController) createOrUpdateServiceOptionCRD(k8sVersion string, 
 		}
 		return nil
 	}
-	var svcOptionCopy *v3.RkeK8sServiceOption
+	var svcOptionCopy *managementv3.RkeK8sServiceOption
 	dataEqual := reflect.DeepEqual(svcOption.ServiceOptions, serviceOptions)
 	labelsEqual := labelEqual(svcOption.Labels, exists)
 	if dataEqual && labelsEqual {
@@ -314,7 +313,7 @@ func (md *MetadataController) createOrUpdateAddonCRD(addonName, template string,
 		if !errors.IsNotFound(err) {
 			return err
 		}
-		addon = &v3.RkeAddon{
+		addon = &managementv3.RkeAddon{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      addonName,
 				Namespace: namespace.GlobalNamespace,
@@ -328,12 +327,12 @@ func (md *MetadataController) createOrUpdateAddonCRD(addonName, template string,
 		if exists {
 			addon.Labels = existLabel
 		}
-		if _, err := md.Addons.Create(addon); err != nil && !errors.IsAlreadyExists(err) {
+		if _, err = md.Addons.Create(addon); err != nil && !errors.IsAlreadyExists(err) {
 			return err
 		}
 		return nil
 	}
-	var addonCopy *v3.RkeAddon
+	var addonCopy *managementv3.RkeAddon
 	dataEqual := reflect.DeepEqual(addon.Template, template)
 	labelsEqual := labelEqual(addon.Labels, exists)
 	if dataEqual && labelsEqual {
@@ -371,7 +370,7 @@ func getLabelMap(k8sVersion string, data map[string]map[string]string,
 		for k8sRange, key := range addonData {
 			testRange, err := semver.ParseRange(k8sRange)
 			if err != nil {
-				logrus.Errorf("getPluginData: range for %s not sem-ver %v %v", addon, testRange, err)
+				logrus.Errorf("getPluginData: range for %s not sem-ver %s: %v", addon, k8sRange, err)
 				continue
 			}
 			if testRange(toMatch) {
@@ -424,15 +423,15 @@ func getRKEVendorOptions(options map[string]rketypes.KubernetesServicesOptions) 
 	return keys
 }
 
-func (md *MetadataController) getRKEAddon(name string) (*v3.RkeAddon, error) {
+func (md *MetadataController) getRKEAddon(name string) (*managementv3.RkeAddon, error) {
 	return md.AddonsLister.Get(namespace.GlobalNamespace, name)
 }
 
-func (md *MetadataController) getRKEServiceOption(k8sVersion string, osType OSType) (*v3.RkeK8sServiceOption, error) {
+func (md *MetadataController) getRKEServiceOption(k8sVersion string, osType OSType) (*managementv3.RkeK8sServiceOption, error) {
 	return md.ServiceOptionsLister.Get(namespace.GlobalNamespace, getVersionNameWithOsType(k8sVersion, osType))
 }
 
-func (md *MetadataController) getRKESystemImage(k8sVersion string) (*v3.RkeK8sSystemImage, error) {
+func (md *MetadataController) getRKESystemImage(k8sVersion string) (*managementv3.RkeK8sSystemImage, error) {
 	return md.SystemImagesLister.Get(namespace.GlobalNamespace, k8sVersion)
 }
 

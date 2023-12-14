@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
 	"sync"
 	"time"
 
@@ -15,7 +14,6 @@ import (
 	"github.com/rancher/channelserver/pkg/server"
 	"github.com/rancher/rancher/pkg/catalog/utils"
 	"github.com/rancher/rancher/pkg/settings"
-	"github.com/rancher/wrangler/pkg/data"
 	"github.com/rancher/wrangler/pkg/schemas"
 	"github.com/sirupsen/logrus"
 )
@@ -26,19 +24,17 @@ var (
 	action      chan string
 )
 
-func GetURLAndInterval() (string, time.Duration) {
-	val := map[string]interface{}{}
-	if err := json.Unmarshal([]byte(settings.RkeMetadataConfig.Get()), &val); err != nil {
+func getMetadataConfig() settings.MetadataConfig {
+	config := settings.MetadataConfig{}
+	if err := json.Unmarshal([]byte(settings.RkeMetadataConfig.Get()), &config); err != nil {
 		logrus.Errorf("failed to parse %s value: %v", settings.RkeMetadataConfig.Name, err)
-		return "", 0
+		return config
 	}
-	url := data.Object(val).String("url")
-	minutes, _ := strconv.Atoi(data.Object(val).String("refresh-interval-minutes"))
-	if minutes <= 0 {
-		minutes = 1440
+	if config.RefreshIntervalMinutes <= 0 {
+		config.RefreshIntervalMinutes = 1440
 	}
 
-	return url, time.Duration(minutes) * time.Minute
+	return config
 }
 
 // getChannelServerArg will return with an argument to pass to channel server
@@ -61,8 +57,8 @@ func (d *DynamicInterval) Wait(ctx context.Context) bool {
 	for {
 		select {
 		case <-time.After(time.Second):
-			_, duration := GetURLAndInterval()
-			if start.Add(duration).Before(time.Now()) {
+			duration := getMetadataConfig().RefreshIntervalMinutes
+			if start.Add(time.Minute * time.Duration(duration)).Before(time.Now()) {
 				return true
 			}
 			continue
@@ -81,13 +77,6 @@ func (d *DynamicInterval) Wait(ctx context.Context) bool {
 func Refresh() {
 	action <- "k3s"
 	action <- "rke2"
-}
-
-type DynamicSource struct{}
-
-func (d *DynamicSource) URL() string {
-	url, _ := GetURLAndInterval()
-	return url
 }
 
 func GetReleaseConfigByRuntimeAndVersion(ctx context.Context, runtime, kubernetesVersion string) model.Release {
@@ -111,9 +100,13 @@ func GetReleaseConfigByRuntimeAndVersion(ctx context.Context, runtime, kubernete
 
 func GetReleaseConfigByRuntime(ctx context.Context, runtime string) *config.Config {
 	configsInit.Do(func() {
-		urls := []config.Source{
-			&DynamicSource{},
-			config.StringSource("/var/lib/rancher-data/driver-metadata/data.json"),
+		urls := make([]config.Source, 0)
+		m := getMetadataConfig()
+		if m.URL != "" {
+			urls = append(urls, config.StringSource(m.URL))
+		}
+		if m.Path != "" {
+			urls = append(urls, config.StringSource(m.Path))
 		}
 		configs = map[string]*config.Config{
 			"k3s":  config.NewConfig(ctx, "k3s", &DynamicInterval{"k3s"}, getChannelServerArg(), "rancher", urls),
