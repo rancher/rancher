@@ -94,8 +94,8 @@ func RunSnapshotCreateTest(t *testing.T, clients *clients.Clients, c *v1.Cluster
 		t.Fatal(err)
 	}
 
-	_, err = cluster.WaitForControlPlane(clients, c, "etcd snapshot creation", func(rkeControlPlane *rkev1.RKEControlPlane) (bool, error) {
-		return rkeControlPlane.Status.ETCDSnapshotCreate != nil && rkeControlPlane.Status.ETCDSnapshotCreate.Generation == 1 && rkeControlPlane.Status.ETCDSnapshotCreatePhase == rkev1.ETCDSnapshotPhaseFinished, nil
+	_, err = cluster.WaitForControlPlane(clients, c, "first etcd snapshot creation", func(rkeControlPlane *rkev1.RKEControlPlane) (bool, error) {
+		return rkeControlPlane.Status.ETCDSnapshotCreate != nil && rkeControlPlane.Status.ETCDSnapshotCreate.Generation == 1 && rkeControlPlane.Status.ETCDSnapshotCreatePhase == rkev1.ETCDSnapshotPhaseFinished && capr.Ready.IsTrue(rkeControlPlane), nil
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -151,8 +151,8 @@ func RunSnapshotCreateTest(t *testing.T, clients *clients.Clients, c *v1.Cluster
 		t.Fatal(err)
 	}
 
-	_, err = cluster.WaitForControlPlane(clients, c, "etcd snapshot creation", func(rkeControlPlane *rkev1.RKEControlPlane) (bool, error) {
-		return rkeControlPlane.Status.ETCDSnapshotCreate != nil && rkeControlPlane.Status.ETCDSnapshotCreate.Generation == 2 && rkeControlPlane.Status.ETCDSnapshotCreatePhase == rkev1.ETCDSnapshotPhaseFinished, nil
+	_, err = cluster.WaitForControlPlane(clients, c, "second etcd snapshot creation", func(rkeControlPlane *rkev1.RKEControlPlane) (bool, error) {
+		return rkeControlPlane.Status.ETCDSnapshotCreate != nil && rkeControlPlane.Status.ETCDSnapshotCreate.Generation == 2 && rkeControlPlane.Status.ETCDSnapshotCreatePhase == rkev1.ETCDSnapshotPhaseFinished && capr.Ready.IsTrue(rkeControlPlane), nil
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -255,7 +255,7 @@ func RunSnapshotRestoreTest(t *testing.T, clients *clients.Clients, c *v1.Cluste
 	}
 
 	_, err = cluster.WaitForControlPlane(clients, c, "etcd snapshot restore", func(rkeControlPlane *rkev1.RKEControlPlane) (bool, error) {
-		return rkeControlPlane.Status.ETCDSnapshotRestorePhase == rkev1.ETCDSnapshotPhaseFinished, nil
+		return rkeControlPlane.Status.ETCDSnapshotRestorePhase == rkev1.ETCDSnapshotPhaseFinished && capr.Ready.IsTrue(rkeControlPlane), nil
 	})
 	if err != nil {
 		t.Fatal(err)
