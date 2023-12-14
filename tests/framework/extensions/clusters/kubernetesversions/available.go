@@ -47,6 +47,39 @@ func ListRKE1AvailableVersions(client *rancher.Client, cluster *v3.Cluster) (ava
 	return
 }
 
+// ListRKE1ImportedAvailableVersions is a function to list and return only available imported RKE1 versions for a specific cluster.
+func ListRKE1ImportedAvailableVersions(client *rancher.Client, cluster *v3.Cluster) (availableVersions []string, err error) {
+	var allAvailableVersions []*semver.Version
+	allRKE1Versions, err := ListRKE1AllVersions(client)
+	if err != nil {
+		return
+	}
+
+	for _, v := range allRKE1Versions {
+		rkeVersion, err := semver.NewVersion(strings.TrimPrefix(v, "v"))
+		if err != nil {
+			logrus.Errorf("couldn't turn %v to a semantic version", rkeVersion)
+			continue
+		}
+
+		allAvailableVersions = append(allAvailableVersions, rkeVersion)
+	}
+
+	currentVersion, err := semver.NewVersion(strings.TrimPrefix(cluster.Version.GitVersion, "v"))
+	if err != nil {
+		return
+	}
+
+	for _, v := range allAvailableVersions {
+		if v.Compare(currentVersion) == 0 || v.Compare(currentVersion) == -1 {
+			continue
+		}
+		availableVersions = append(availableVersions, fmt.Sprint("v", v.String()))
+	}
+
+	return
+}
+
 // ListRKE2AvailableVersions is a function to list and return only available RKE2 versions for a specific cluster.
 func ListRKE2AvailableVersions(client *rancher.Client, cluster *v1.SteveAPIObject) (availableVersions []string, err error) {
 	var allAvailableVersions []*semver.Version

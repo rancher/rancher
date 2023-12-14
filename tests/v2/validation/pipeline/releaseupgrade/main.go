@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/provisioninginput"
 	"github.com/rancher/rancher/tests/framework/pkg/config"
 	"github.com/rancher/rancher/tests/framework/pkg/environmentflag"
+	"github.com/rancher/rancher/tests/framework/pkg/file"
 	"github.com/rancher/rancher/tests/v2/validation/upgrade"
 	"github.com/sirupsen/logrus"
 )
@@ -89,7 +90,7 @@ func main() {
 	config.UpdateConfig(environmentflag.ConfigurationFileKey, environmentFlags)
 
 	//make cattle-configs dir
-	err := config.NewConfigurationsDir(dirName)
+	err := file.NewDir(dirName)
 	if err != nil {
 		logrus.Fatal("error while creating configs dir", err)
 	}
@@ -206,7 +207,7 @@ func main() {
 	}
 
 	for i, v := range clusters.HostedClusters {
-		var newConfigName config.FileName
+		var newConfigName file.Name
 
 		switch v.Provider {
 		case provisioninginput.AWSProviderName.String():
@@ -221,7 +222,7 @@ func main() {
 
 		newConfigName.NewFile(copiedConfig)
 
-		newConfigName.SetEnvironmentKey()
+		newConfigName.SetEnvironmentKey(config.ConfigEnvironmentKey)
 
 		pipeline.UpdateHostedKubernetesVField(v.Provider, v.KubernetesVersion)
 
@@ -252,7 +253,7 @@ func main() {
 
 		upgradeConfig := new(upgrade.Config)
 		config.LoadAndUpdateConfig(upgrade.ConfigurationFileKey, upgradeConfig, func() {
-			clusters := []upgrade.Clusters{
+			clusters := []upgrade.Cluster{
 				{
 					VersionToUpgrade: v.KubernetesVersionToUpgrade,
 					FeaturesToTest:   v.FeaturesToTest,
@@ -263,14 +264,14 @@ func main() {
 	}
 }
 
-func NewRancherClusterConfiguration(cluster pipeline.RancherCluster, newConfigName config.FileName, isCustom, isRKE1, isRKE2 bool, copiedConfig []byte, cni, provTestPackage, runCommand, tags, runFlag string) (err error) {
-	err = newConfigName.NewFile(copiedConfig)
+func NewRancherClusterConfiguration(cluster pipeline.RancherCluster, newConfigName file.Name, isCustom, isRKE1, isRKE2 bool, copiedConfig []byte, cni, provTestPackage, runCommand, tags, runFlag string) (err error) {
+	_, err = newConfigName.NewFile(copiedConfig)
 	if err != nil {
 		logrus.Info("error while writing populated config", err)
 		return err
 	}
 
-	err = newConfigName.SetEnvironmentKey()
+	err = newConfigName.SetEnvironmentKey(config.ConfigEnvironmentKey)
 	if err != nil {
 		logrus.Info("error while setting new config as env var", err)
 		return err
@@ -299,7 +300,7 @@ func NewRancherClusterConfiguration(cluster pipeline.RancherCluster, newConfigNa
 
 	upgradeConfig := new(upgrade.Config)
 	config.LoadAndUpdateConfig(upgrade.ConfigurationFileKey, upgradeConfig, func() {
-		clusters := []upgrade.Clusters{
+		clusters := []upgrade.Cluster{
 			{
 				VersionToUpgrade: cluster.KubernetesVersionToUpgrade,
 				FeaturesToTest:   cluster.FeaturesToTest,

@@ -9,6 +9,8 @@ import (
 type KubernetesProvider string
 
 const (
+	local = "local"
+
 	rke  = "rke"
 	k3s  = "k3s"
 	rke2 = "rke2"
@@ -41,6 +43,9 @@ type ClusterMeta struct {
 
 	// IsImported is used for cluster's imported information.
 	IsImported bool
+
+	// IsLocal is used for cluster's local information.
+	IsLocal bool
 }
 
 // NewClusterMeta is a function to initialize new ClusterMeta for a specific cluster.
@@ -64,6 +69,8 @@ func NewClusterMeta(client *rancher.Client, clusterName string) (clusterMeta *Cl
 	}
 
 	clusterMeta.IsHosted = IsHostedProvider(clusterMeta.Provider)
+
+	clusterMeta.IsLocal = clusterMeta.Name == local
 
 	return
 }

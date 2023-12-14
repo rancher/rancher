@@ -16,7 +16,7 @@ const (
 	latestKey            = "latest"       // latestKey is a string to determine automatically version pooling to the latest possible
 )
 
-type Clusters struct {
+type Cluster struct {
 	Name              string   `json:"name" yaml:"name" default:""`
 	VersionToUpgrade  string   `json:"versionToUpgrade" yaml:"versionToUpgrade" default:""`
 	PSACT             string   `json:"psact" yaml:"psact" default:""`
@@ -31,7 +31,7 @@ type Features struct {
 }
 
 type Config struct {
-	Clusters []Clusters `json:"clusters" yaml:"clusters" default:"[]"`
+	Clusters []Cluster `json:"clusters" yaml:"clusters" default:"[]"`
 }
 
 // loadUpgradeKubernetesConfig is a test helper function to get required slice of ClustersToUpgrade struct. Returns error if any.
@@ -40,7 +40,7 @@ type Config struct {
 //  2. An additional config field called update with slice of ClustersToUpgrade struct,
 //     for choosing some clusters to upgrade (version is optional, by default, empty string skips the test
 //     and "latest" upgrades to the latest available.)
-func loadUpgradeKubernetesConfig(client *rancher.Client) (clusters []Clusters, err error) {
+func loadUpgradeKubernetesConfig(client *rancher.Client) (clusters []Cluster, err error) {
 	upgradeConfig := new(Config)
 	config.LoadConfig(ConfigurationFileKey, upgradeConfig)
 
@@ -61,7 +61,7 @@ func loadUpgradeKubernetesConfig(client *rancher.Client) (clusters []Clusters, e
 		}
 
 		for i := range clusterList {
-			cluster := new(Clusters)
+			cluster := new(Cluster)
 
 			cluster.Name = clusterList[i]
 			cluster.isLatestVersion = true
@@ -70,7 +70,7 @@ func loadUpgradeKubernetesConfig(client *rancher.Client) (clusters []Clusters, e
 		}
 	} else if isUpgradeSomeClusters {
 		for _, c := range upgradeConfig.Clusters {
-			cluster := new(Clusters)
+			cluster := new(Cluster)
 
 			cluster.Name = c.Name
 			cluster.VersionToUpgrade = c.VersionToUpgrade
@@ -93,7 +93,7 @@ func loadUpgradeKubernetesConfig(client *rancher.Client) (clusters []Clusters, e
 	return
 }
 
-func loadUpgradeWorkloadConfig(client *rancher.Client) (clusters []Clusters, err error) {
+func loadUpgradeWorkloadConfig(client *rancher.Client) (clusters []Cluster, err error) {
 	upgradeConfig := new(Config)
 	config.LoadConfig(ConfigurationFileKey, upgradeConfig)
 
@@ -114,7 +114,7 @@ func loadUpgradeWorkloadConfig(client *rancher.Client) (clusters []Clusters, err
 		}
 
 		for i := range clusterList {
-			cluster := new(Clusters)
+			cluster := new(Cluster)
 
 			cluster.Name = clusterList[i]
 			ingress := false
@@ -128,7 +128,7 @@ func loadUpgradeWorkloadConfig(client *rancher.Client) (clusters []Clusters, err
 		}
 	} else if isUpgradeSomeClusters {
 		for _, c := range upgradeConfig.Clusters {
-			cluster := new(Clusters)
+			cluster := new(Cluster)
 
 			cluster.Name = c.Name
 			cluster.FeaturesToTest = c.FeaturesToTest

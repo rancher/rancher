@@ -313,3 +313,62 @@ func (c *Client) login(user *management.User) (*management.Token, error) {
 
 	return token, nil
 }
+
+// IsConnected is a helper function that pings rancher ping endpoint with the management, steve and rest clients.
+// Returns boolean value depending on if all the clients are able to get pong respond.
+func (c *Client) IsConnected() (isConnected bool, err error) {
+	mngmntPong, err := c.ping(c.Management.APIBaseClient.Ops.Client)
+	if err != nil {
+		return
+	}
+
+	stevePong, err := c.ping(c.Steve.APIBaseClient.Ops.Client)
+	if err != nil {
+		return
+	}
+
+	restHTTP, err := rest.HTTPClientFor(c.restConfig)
+	if err != nil {
+		return false, err
+	}
+	restPong, err := c.ping(restHTTP)
+	if err != nil {
+		return
+	}
+
+	isConnected = mngmntPong == stevePong == restPong != isConnected
+	return
+}
+
+// ping uses http client to ping rancher ping endpoint, returns boolean value if pong is returned
+func (c *Client) ping(httpClient *http.Client) (bool, error) {
+	url := "https://" + c.restConfig.Host + "/ping"
+	pong := "pong"
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return false, err
+	}
+
+	req.Header.Add("Authorization", "Bearer "+c.restConfig.BearerToken)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return false, err
+	}
+
+	if resp != nil {
+		defer resp.Body.Close()
+
+		bodyBytes, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return false, err
+		}
+		if len(bodyBytes) > 0 {
+			return string(bodyBytes) == pong, err
+		}
+	}
+
+	return false, err
+}

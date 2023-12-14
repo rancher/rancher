@@ -9,10 +9,13 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
+// ConfigEnvironmentKey is a const that stores cattle config's environment key.
+const ConfigEnvironmentKey = "CATTLE_TEST_CONFIG"
+
 // LoadConfig reads the file defined by  the `CATTLE_TEST_CONFIG` environment variable and loads the object found at the given key onto the given configuration reference.
 // The functions takes a pointer of the object.
 func LoadConfig(key string, config interface{}) {
-	configPath := os.Getenv("CATTLE_TEST_CONFIG")
+	configPath := os.Getenv(ConfigEnvironmentKey)
 
 	if configPath == "" {
 		yaml.Unmarshal([]byte("{}"), config)
@@ -49,7 +52,7 @@ func LoadConfig(key string, config interface{}) {
 
 // UpdateConfig is function that updates the CATTLE_TEST_CONFIG yaml/json that the framework uses.
 func UpdateConfig(key string, config interface{}) {
-	configPath := os.Getenv("CATTLE_TEST_CONFIG")
+	configPath := os.Getenv(ConfigEnvironmentKey)
 
 	if configPath == "" {
 		yaml.Unmarshal([]byte("{}"), config)
