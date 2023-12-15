@@ -45,6 +45,7 @@ func addRepo(wrangler *wrangler.Context, repoName, repoURL, branchName string) e
 			},
 		})
 	} else if err == nil && (repo.Spec.GitRepo != repoURL || repo.Spec.GitBranch != branchName) {
+		repo.Spec.GitRepo = repoURL
 		repo.Spec.GitBranch = branchName
 		_, err = wrangler.Catalog.ClusterRepo().Update(repo)
 	}
