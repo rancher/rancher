@@ -20,18 +20,18 @@ Open your browser to https://localhost
 
 ## Installation
 
-See [Installing/Upgrading Rancher](https://rancher.com/docs/rancher/v2.8/en/installation/) for all installation options.
+See [Installing/Upgrading Rancher](https://ranchermanager.docs.rancher.com/v2.8/pages-for-subheaders/installation-and-upgrade) for all installation options.
 
 ### Minimum Requirements
 
 * Operating Systems
   * Please see [Support Matrix](https://rancher.com/support-matrix/) for specific OS versions for each Rancher version. Note that the link will default to the support matrix for the latest version of Rancher. Use the left navigation menu to select a different Rancher version. 
 * Hardware & Software
-  * Please see [Installation Requirements](https://rancher.com/docs/rancher/v2.8/en/installation/requirements/) for hardware and software requirements.
+  * Please see [Installation Requirements](https://ranchermanager.docs.rancher.com/v2.8/pages-for-subheaders/installation-requirements) for hardware and software requirements.
 
 ### Using Rancher
 
-To learn more about using Rancher, please refer to our [Rancher Documentation](https://rancher.com/docs/rancher/v2.8/en/).
+To learn more about using Rancher, please refer to our [Rancher Documentation](https://ranchermanager.docs.rancher.com/v2.8).
 
 ## Source Code
 
