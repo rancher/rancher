@@ -5,10 +5,10 @@ package provisioning
 // process running on an individual node.
 
 import (
+	"context"
 	"errors"
 	"strconv"
 	"strings"
-
 	"time"
 
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
@@ -22,54 +22,67 @@ import (
 )
 
 const (
-	cpuUsageVar                                            = 100 // 100 is just a placeholder until we can determine an actual number. Even with cpu usage spiking it should not go past 100% cpu usage and previous issues concerning this were hitting around 130% and above
-	checkCPU                 provisioninginput.SSHTestCase = "CheckCPU"
-	checkCPUCommand                                        = "ps -C agent -o %cpu --no-header"
-	nodeReboot               provisioninginput.SSHTestCase = "NodeReboot"
-	activeState                                            = "active"
-	runningState                                           = "running"
-	machineSteveResourceType                               = "cluster.x-k8s.io.machine"
-	fleetNamespace                                         = "fleet-default"
+	cpuUsageTolerance = 100 // this value represents 100 core usage which should not happen at any time.
+	rancherDir        = "/var/lib/rancher/"
+
+	checkCPUCommand   = "ps -A -o '%c %C' --no-header"
+	rebootNodeCommand = "sudo reboot"
+
+	checkCPU   provisioninginput.SSHTestCase = "CheckCPU"
+	nodeReboot provisioninginput.SSHTestCase = "NodeReboot"
+	auditLog   provisioninginput.SSHTestCase = "AuditLog"
+
+	activeState       = "active"
+	runningState      = "running"
+	fleetNamespace    = "fleet-default"
+	controlPlaneLabel = "node-role.kubernetes.io/control-plane"
 )
 
 // CallSSHTestByName tests the ssh tests specified in the provisioninginput config clusterSSHTests field.
-// For example CheckCPU checks the cpu usage of the cluster agent. If the usage is too high the func will return a warning.
 func CallSSHTestByName(testCase provisioninginput.SSHTestCase, node *nodes.Node, client *rancher.Client, clusterID string, machineName string) error {
 	switch testCase {
+	//checks the cpu usage of all processes on the node. If the usage is too high the function will return a warning.
 	case checkCPU:
 		logrus.Infof("Running CheckCPU test on node %s", node.PublicIPAddress)
 		output, err := node.ExecuteCommand(checkCPUCommand)
-		if err != nil {
-			return err
+		if err != nil && !errors.Is(err, &ssh.ExitMissingError{}) {
+			return errors.New(err.Error() + output)
 		}
-		strOutput := output[:strings.IndexByte(output, '\n')]
-		logrus.Info("CheckCPU test on node " + node.PublicIPAddress + " | Cluster agent cpu usage is: " + strOutput + "%")
+		lines := strings.Split(output, "\n")
+		logrus.Info("Checking all node processes CPU usage")
+		for _, line := range lines {
+			processFields := strings.Fields(line)
+			if len(processFields) > 0 {
+				CPUUsageInt, err := strconv.ParseFloat(strings.TrimSpace(processFields[1]), 32)
+				if err != nil {
+					return errors.New(err.Error() + output)
+				}
+				if CPUUsageInt >= cpuUsageTolerance {
+					logrus.Warnf("Process: %s | CPUUsage: %f", processFields[0], CPUUsageInt)
+				}
+			}
+		}
 
-		outputInt, err := strconv.ParseFloat(strings.TrimSpace(strOutput), 32)
-		if outputInt > cpuUsageVar {
-			logrus.Warn("Cluster agent cpu usage is too high on node" + node.PublicIPAddress + " | Current cpu usage is: " + strOutput + "%")
-		}
-		if err != nil {
-			return err
-		}
+	//This test reboots the node and verifies it comes back up in the correct state.
 	case nodeReboot:
 		logrus.Infof("Running NodeReboot test on node %s", node.PublicIPAddress)
-		command := "sudo reboot"
-		_, err := node.ExecuteCommand(command)
+		output, err := node.ExecuteCommand(rebootNodeCommand)
 		if err != nil && !errors.Is(err, &ssh.ExitMissingError{}) {
-			return err
+			return errors.New(err.Error() + output)
 		}
-		// Verify machine shuts down within five minutes, shutting down should not take longer than that depending on the ami
-		err = wait.Poll(1*time.Second, defaults.FiveMinuteTimeout, func() (bool, error) {
-			newNode, err := client.Steve.SteveType(machineSteveResourceType).ByID(fleetNamespace + "/" + machineName)
-			if err != nil {
-				return false, err
-			}
-			if newNode.State.Name == runningState {
-				return false, nil
-			}
-			return true, nil
-		})
+
+		err = wait.PollUntilContextTimeout(context.TODO(), 1*time.Second, defaults.FiveMinuteTimeout, true,
+			func(ctx context.Context) (done bool, err error) {
+				newNode, err := client.Steve.SteveType(machineSteveResourceType).ByID(fleetNamespace + "/" + machineName)
+				if err != nil {
+					return false, err
+				}
+
+				if newNode.State.Name == runningState {
+					return false, nil
+				}
+				return true, nil
+			})
 		if err != nil {
 			logrus.Errorf("Node %s was unable to reboot successfully | Cluster %s is still in active state", node.PublicIPAddress, clusterID)
 			return err
@@ -82,6 +95,35 @@ func CallSSHTestByName(testCase provisioninginput.SSHTestCase, node *nodes.Node,
 		}
 
 		return err
+
+	//This test checks if the audit log file is properly created on the node (skipped if its not a control plane node).
+	//For k3s you will need to configure the audit log dir to: /var/lib/rancher/k3s/etc/config-files/audit-policy-file
+	case auditLog:
+		mgmtcluster, err := client.Management.Cluster.ByID(clusterID)
+		if err != nil {
+			return err
+		}
+		auditLogDir := rancherDir + mgmtcluster.Provider + "/etc/config-files/audit-policy-file"
+		checkAuditLogCommand := "ls " + auditLogDir
+		if node.NodeLabels[controlPlaneLabel] != "true" {
+			logrus.Infof("Node %s is not a control-plane node, skipping", node.PublicIPAddress)
+			return nil
+		}
+
+		logrus.Infof("Running audit log test on node %s", node.PublicIPAddress)
+		output, err := node.ExecuteCommand(checkAuditLogCommand)
+		if err != nil && !errors.Is(err, &ssh.ExitMissingError{}) {
+			return errors.New(err.Error() + output)
+		}
+
+		strOutput := output[:strings.IndexByte(output, '\n')]
+		if strings.TrimSpace(strOutput) != auditLogDir {
+			return errors.New("no audit log file found")
+		}
+
+		logrus.Infof("Successfully found audit log file %s on node %s", strOutput, node.PublicIPAddress)
+		return nil
+
 	default:
 		err := errors.New("Invalid SSH test: " + string(testCase) + " is spelled incorrectly or does not exist.")
 		return err
