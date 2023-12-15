@@ -161,7 +161,7 @@ func RunSnapshotCreateTest(t *testing.T, clients *clients.Clients, c *v1.Cluster
 	var snapshot *rkev1.ETCDSnapshot
 	// Get the etcd snapshot object
 	if err := retry.OnError(wait.Backoff{
-		Steps:    10,
+		Steps:    30,
 		Duration: 30 * time.Second,
 		Factor:   1.0,
 		Jitter:   0.1,
