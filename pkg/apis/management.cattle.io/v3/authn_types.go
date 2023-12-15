@@ -454,7 +454,7 @@ type OIDCConfig struct {
 
 	ClientID           string `json:"clientId" norman:"required"`
 	ClientSecret       string `json:"clientSecret,omitempty" norman:"required,type=password"`
-	Scopes             string `json:"scope" norman:"required,notnullable"`
+	Scopes             string `json:"scope"`
 	AuthEndpoint       string `json:"authEndpoint,omitempty" norman:"required,notnullable"`
 	Issuer             string `json:"issuer" norman:"required,notnullable"`
 	Certificate        string `json:"certificate,omitempty"`
