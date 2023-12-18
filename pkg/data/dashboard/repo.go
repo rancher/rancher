@@ -28,7 +28,7 @@ func addRepo(wrangler *wrangler.Context, repoName, repoURL, branchName string) e
 		logrus.Warnf(
 			"Charts URL for %q set to %q, which is not the default (%q). "+
 				"If Rancher has issues finding charts, consider resetting this to the default value",
-                        repoName,
+			repoName,
 			repoURL,
 			defaultURL,
 		)
