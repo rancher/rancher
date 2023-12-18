@@ -6,6 +6,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+var isDefFalse = newFeature("isfalse", "", false, false, true)
+
 // TestApplyArgumentDefaults ensure that applyArgumentsDefault accepts argument
 // of the form "features=feature1=bool,feature2=bool" and nothing else
 func TestApplyArgumentDefaults(t *testing.T) {
@@ -33,7 +35,7 @@ func TestApplyArgumentDefaults(t *testing.T) {
 
 func TestInitializeNil(t *testing.T) {
 	assert := assert.New(t)
-	assert.False(IsDefFalse.Enabled())
+	assert.False(isDefFalse.Enabled())
 	InitializeFeatures(nil, "isfalse=true")
-	assert.True(IsDefFalse.Enabled())
+	assert.True(isDefFalse.Enabled())
 }
