@@ -176,7 +176,7 @@ func TestGetChartValue(t *testing.T) {
 			configCache := fake.NewMockCacheInterface[*v1.ConfigMap](ctrl)
 			test.setup(configCache)
 			getter := chart.RancherConfigGetter{configCache}
-			got, err := getter.GetChartValues(tt.chartName)
+			got, err := getter.GetChartValues(test.chartName)
 			if test.wantErr {
 				assert.Equal(t, test.notFound, chart.IsNotFoundError(err))
 				assert.Error(t, err, "Expected test to error.")
