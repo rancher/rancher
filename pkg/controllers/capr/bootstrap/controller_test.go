@@ -75,6 +75,10 @@ func Test_getBootstrapSecret(t *testing.T) {
 			//act
 			err := settings.ServerURL.Set("localhost")
 			a.Nil(err)
+			err = settings.SystemAgentInstallScript.Set("https://raw.githubusercontent.com/rancher/system-agent/main/install.sh")
+			a.Nil(err)
+			err = settings.SystemAgentInstallerImage.Set("rancher/system-agent-installer-")
+			a.Nil(err)
 
 			serviceAccount, err := handler.serviceAccountCache.Get(tt.args.namespaceName, tt.args.secretName)
 			a.Nil(err)
