@@ -5,7 +5,9 @@ import (
 	"crypto/sha256"
 	"encoding/base32"
 	"fmt"
+	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -159,9 +161,10 @@ func RunSnapshotCreateTest(t *testing.T, clients *clients.Clients, c *v1.Cluster
 	}
 
 	var snapshot *rkev1.ETCDSnapshot
+	re := regexp.MustCompile(".*-([0-9]+)$")
 	// Get the etcd snapshot object
 	if err := retry.OnError(wait.Backoff{
-		Steps:    10,
+		Steps:    30,
 		Duration: 30 * time.Second,
 		Factor:   1.0,
 		Jitter:   0.1,
@@ -177,6 +180,7 @@ func RunSnapshotCreateTest(t *testing.T, clients *clients.Clients, c *v1.Cluster
 				return err
 			}
 			var snapshots []*rkev1.ETCDSnapshot
+			// Parse the snapshot time from the snapshot file name
 			for _, s := range snapshotsList.Items {
 				if s.SnapshotFile.NodeName == targetNode && s.SnapshotFile.Size > 0 {
 					// Workaround in response to K3s/RKE2 bug around etcd snapshot configmap existence: https://github.com/k3s-io/k3s/issues/9047
@@ -185,8 +189,22 @@ func RunSnapshotCreateTest(t *testing.T, clients *clients.Clients, c *v1.Cluster
 					if err != nil || spec == nil {
 						continue // ignore errors parsing the snapshot
 					}
+					// Parse the unix time out of the snapshot file name as CreatedAt is not set on S3 snapshots on older K3s/RKE2 versions
+					matches := re.FindStringSubmatch(s.SnapshotFile.Name)
+					if len(matches) != 2 {
+						continue
+					}
+					rawTime, err := strconv.ParseInt(matches[1], 10, 64)
+					if err != nil {
+						continue
+					}
+					snapshotTime := metav1.NewTime(time.Unix(rawTime, 0))
 					// Only count snapshots that were created after the first snapshots were taken.
-					if s.SnapshotFile.CreatedAt.After(snapshotsValidTime) {
+					if snapshotTime.After(snapshotsValidTime) {
+						sCopy := s.DeepCopy()
+						if sCopy.SnapshotFile.CreatedAt == nil {
+							sCopy.SnapshotFile.CreatedAt = &snapshotTime
+						}
 						snapshots = append(snapshots, s.DeepCopy())
 					}
 				}
