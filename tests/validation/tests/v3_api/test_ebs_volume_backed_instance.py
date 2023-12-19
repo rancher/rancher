@@ -68,7 +68,7 @@ def check_if_volumes_are_encrypted(aws_nodes):
             assert volume['Encrypted']
 
 
-@pytest.fixture('module')
+@pytest.fixture(scope='module')
 def client():
     """
     A user client to be used in tests
@@ -133,7 +133,7 @@ def node_template_ec2_with_encryption(client):
     _attempt_delete_node_template(client, node_template)
 
 
-@pytest.fixture('module')
+@pytest.fixture(scope='module')
 def encrypted_cluster_nodepool(client, node_template_ec2_with_encryption):
     """
     Returns a cluster with a single nodepool of encrypted EBS volume backed EC2 instances
