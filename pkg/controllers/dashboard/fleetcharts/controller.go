@@ -11,6 +11,7 @@ import (
 	fleetconst "github.com/rancher/rancher/pkg/fleet"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
+	"github.com/rancher/wrangler/pkg/data"
 	"github.com/rancher/wrangler/pkg/relatedresource"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -150,7 +151,7 @@ func (h *handler) onSetting(key string, setting *v3.Setting) (*v3.Setting, error
 			return nil, err
 		}
 	} else {
-		coalesceMap(fleetChartValues, extraValues)
+		fleetChartValues = data.MergeMaps(fleetChartValues, extraValues)
 	}
 
 	return setting,
@@ -162,25 +163,4 @@ func (h *handler) onSetting(key string, setting *v3.Setting) (*v3.Setting, error
 			fleetChartValues,
 			true,
 			"")
-}
-
-// coalesceMap copies src values into dst. If one of the values is a map, it uses recursion
-// TODO: replace with Helm's chartutil.CoalesceTables when the helm fork is updated: https://github.com/helm/helm/blob/main/pkg/chartutil/coalesce.go#L255
-func coalesceMap(dst, src map[string]any) {
-	for key := range src {
-		if _, ok := dst[key]; !ok {
-			dst[key] = src[key]
-			continue
-		}
-
-		switch srcValue := src[key].(type) {
-		case map[string]interface{}:
-			if dstMap, isMap := dst[key].(map[string]any); isMap {
-				coalesceMap(dstMap, srcValue)
-				continue
-			}
-		default:
-			dst[key] = srcValue
-		}
-	}
 }
