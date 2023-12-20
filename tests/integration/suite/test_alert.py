@@ -53,7 +53,7 @@ def mock_receiver_alert():
     server = MockReceiveAlert(port=MOCK_RECEIVER_ALERT_PORT)
     server.start()
     yield server
-    server.shutdown_server()
+    server.stop()
 
 
 def test_add_notifier(admin_mc, remove_resource, mock_receiver_alert):
