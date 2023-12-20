@@ -281,6 +281,11 @@ func toArgs(driverName string, args map[string]any, clusterID string) (cmd []str
 	}
 
 	for k, v := range args {
+		// Don't render providerID into the arguments, as this is only a cluster-api required field.
+		if k == "providerID" {
+			continue
+		}
+
 		dmField := "--" + driverName + "-" + strings.ToLower(regExHyphen.ReplaceAllString(k, "${1}-${2}"))
 		if v == nil {
 			continue
