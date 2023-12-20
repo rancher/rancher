@@ -3,6 +3,7 @@ package projects
 import (
 	"errors"
 	"fmt"
+	"reflect"
 	"regexp"
 	"strings"
 	"time"
@@ -10,11 +11,19 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
+	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
+	"github.com/rancher/rancher/tests/framework/extensions/charts"
+	"github.com/rancher/rancher/tests/framework/extensions/constants"
 	"github.com/rancher/rancher/tests/framework/extensions/defaults"
 	projectsApi "github.com/rancher/rancher/tests/framework/extensions/kubeapi/projects"
 	rbacApi "github.com/rancher/rancher/tests/framework/extensions/kubeapi/rbac"
+	secretsApi "github.com/rancher/rancher/tests/framework/extensions/kubeapi/secrets"
 	"github.com/rancher/rancher/tests/framework/extensions/kubeconfig"
+	"github.com/rancher/rancher/tests/framework/extensions/namespaces"
+	"github.com/rancher/rancher/tests/framework/extensions/projects"
+	"github.com/rancher/rancher/tests/framework/extensions/workloads"
 	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kwait "k8s.io/apimachinery/pkg/util/wait"
 )
@@ -43,6 +52,17 @@ var prtb = v3.ProjectRoleTemplateBinding{
 	ProjectName:       "",
 	RoleTemplateName:  "",
 	UserPrincipalName: "",
+}
+
+var projectscopedsecret = &corev1.Secret{
+	ObjectMeta: metav1.ObjectMeta{
+		Name:        "",
+		Labels:      map[string]string{},
+		Annotations: map[string]string{},
+	},
+	Data: map[string][]byte{
+		"hello": []byte("world"),
+	},
 }
 
 func createProject(client *rancher.Client, clusterName string) (*v3.Project, error) {
@@ -136,13 +156,132 @@ func checkPodLogsForErrors(client *rancher.Client, cluster string, podName strin
 	return nil
 }
 
-func updateProjectNamespaceFinalizer(client *rancher.Client, project *v3.Project, finalizer []string) (*v3.Project, error) {
-	project.ObjectMeta.Finalizers = finalizer
+func updateProjectNamespaceFinalizer(client *rancher.Client, Project *v3.Project, finalizer []string) (*v3.Project, error) {
+	Project.ObjectMeta.Finalizers = finalizer
 
-	updatedProject, err := projectsApi.UpdateProject(client, project)
+	updatedProject, err := projectsApi.UpdateProject(client, Project)
 	if err != nil {
 		return nil, err
 	}
 
 	return updatedProject, nil
+}
+
+func createProjectScopedSecret(client *rancher.Client, project *v3.Project) (*corev1.Secret, error) {
+	projectscopedsecret.Name = namegen.AppendRandomString("testprojscopedsecret")
+	annotationValue := project.Namespace + ":" + project.Name
+	projectscopedsecret.Annotations[constants.ProjectIDAnnotation] = annotationValue
+	projectscopedsecret.Labels[constants.ProjectScopedLabel] = constants.ProjectScopedLabelValue
+
+	createdProjectScopedSecret, err := secretsApi.CreateSecretForCluster(client, projectscopedsecret, constants.LocalCluster, project.Name)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return createdProjectScopedSecret, nil
+}
+
+func createNamespaces(client *rancher.Client, namespaceCount int, project *v3.Project) ([]*corev1.Namespace, error) {
+	projectObj, err := projects.GetProjectByName(client, project.Namespace, project.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	var namespaceList []*corev1.Namespace
+
+	for i := 0; i < namespaceCount; i++ {
+		namespaceName := namegen.AppendRandomString("testns")
+		namespace, err := namespaces.CreateNamespace(client, namespaceName, "{}", map[string]string{}, map[string]string{}, projectObj)
+
+		if err != nil {
+			return nil, err
+		}
+
+		namespaceObj := &corev1.Namespace{}
+		err = v1.ConvertToK8sType(namespace.JSONResp, namespaceObj)
+		if err != nil {
+			return nil, err
+		}
+
+		namespaceList = append(namespaceList, namespaceObj)
+	}
+
+	return namespaceList, nil
+}
+
+func validateProjectSecretLabelsAndAnnotations(projectScopedSecret *corev1.Secret, annotationValue string) error {
+
+	expectedLabel := constants.ProjectScopedLabel + ": " + constants.ProjectScopedLabelValue
+	actualLabel, labelExists := projectScopedSecret.Labels[constants.ProjectScopedLabel]
+	if !(labelExists && actualLabel == expectedLabel) {
+		return fmt.Errorf("project scoped secret does not have label '%s'", expectedLabel)
+	}
+
+	expectedAnnotation := constants.ProjectIDAnnotation + ": " + annotationValue
+	actualAnnotation, annotationExists := projectScopedSecret.Annotations[constants.ProjectIDAnnotation]
+	if !(annotationExists && actualAnnotation == expectedAnnotation) {
+		return fmt.Errorf("project scoped secret does not have annotation '%s'", expectedAnnotation)
+	}
+
+	return nil
+}
+
+func validatePropagatedNamespaceSecret(client *rancher.Client, projectScopedSecret *corev1.Secret, namespaceList []*corev1.Namespace) error {
+	for _, namespace := range namespaceList {
+		annotationValue := projectScopedSecret.Annotations[constants.ProjectIDAnnotation]
+		clusterID := strings.Split(annotationValue, ":")[0]
+		secretName := projectScopedSecret.Name
+
+		namespaceSecret, err := secretsApi.GetSecretByName(client, clusterID, namespace.Name, secretName, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		hasProjectScopedLabel := namespaceSecret.Labels[constants.ProjectScopedLabel] == constants.ProjectScopedLabelValue
+		hasProjectIDAnnotation := namespaceSecret.Annotations[constants.ProjectIDAnnotation] == projectScopedSecret.Namespace+":"+projectScopedSecret.Name
+		_, hasCreatorLabel := namespaceSecret.Labels[constants.NormanCreatorLabel]
+
+		if !hasProjectScopedLabel || !hasProjectIDAnnotation || hasCreatorLabel {
+			errorMessage := "Validation failed for namespace: " + namespace.Name + "\n"
+			if !hasProjectScopedLabel {
+				errorMessage += "Missing or incorrect 'cattle.io/project-scoped' label\n"
+			}
+			if !hasProjectIDAnnotation {
+				errorMessage += "Missing or incorrect 'field.cattle.io/projectId' annotation\n"
+			}
+			if hasCreatorLabel {
+				errorMessage += "'cattle.io/creator' label should not exist\n"
+			}
+			return errors.New(errorMessage)
+		}
+
+		if !reflect.DeepEqual(projectScopedSecret.Data, namespaceSecret.Data) {
+			return fmt.Errorf("secret data mismatch for secret '%s' in namespace '%s'", secretName, namespace.Name)
+		}
+	}
+
+	return nil
+}
+
+func CreateDeploymentWithEnvSecret(client *rancher.Client, clusterID string, namespace *corev1.Namespace, secret *corev1.Secret) error {
+	deploymentName := namegen.AppendRandomString("testdeployment")
+	steveClient, err := client.Steve.ProxyDownstream(clusterID)
+	if err != nil {
+		return err
+	}
+
+	podTemplateWithSecretEnvironmentVariable := workloads.NewPodTemplateWithSecretEnvironmentVariable(secret.Name)
+	deploymentEnvironmentWithSecretTemplate := workloads.NewDeploymentTemplate(deploymentName, namespace.Name, podTemplateWithSecretEnvironmentVariable, true, nil)
+	_, err = steveClient.SteveType(workloads.DeploymentSteveType).Create(deploymentEnvironmentWithSecretTemplate)
+	if err != nil {
+		return err
+	}
+
+	err = charts.WatchAndWaitDeployments(client, clusterID, namespace.Name, metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

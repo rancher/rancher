@@ -3,6 +3,7 @@ package workloads
 import (
 	"fmt"
 
+	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 	appv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -117,4 +118,23 @@ func NewJobTemplate(jobName string, namespace string) *batchv1.Job {
 		},
 	}
 
+}
+
+// NewPodTemplateWithSecretEnvironmentVariable is a constructor that returns pod template spec with envFrom option for workload creations
+func NewPodTemplateWithSecretEnvironmentVariable(secretName string) corev1.PodTemplateSpec {
+	containerName := namegen.AppendRandomString("testcontainer")
+	containerImage := "nginx"
+
+	pullPolicy := corev1.PullAlways
+	envFrom := []corev1.EnvFromSource{
+		{
+			SecretRef: &corev1.SecretEnvSource{
+				LocalObjectReference: corev1.LocalObjectReference{Name: secretName},
+			},
+		},
+	}
+	container := NewContainer(containerName, containerImage, pullPolicy, nil, envFrom, nil, nil, nil)
+	containers := []corev1.Container{container}
+
+	return NewPodTemplate(containers, nil, nil, nil)
 }
