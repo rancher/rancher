@@ -7,7 +7,7 @@ flake8==3.5.0
 invoke==1.2.0
 Jinja2==3.0.0
 kubernetes==12.0.1
-paramiko==2.10.1
+paramiko==3.4.0
 python-digitalocean==1.13.2
 PyYAML==5.4.1
 packaging==20.9
