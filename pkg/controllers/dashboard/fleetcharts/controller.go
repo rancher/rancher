@@ -145,14 +145,12 @@ func (h *handler) onSetting(key string, setting *v3.Setting) (*v3.Setting, error
 		fleetChartValues["gitjob"] = gitjobChartValues
 	}
 
-	if extraValues, err := h.chartsConfig.GetChartValues(fleetconst.ChartName); err != nil {
+	extraValues, err := h.chartsConfig.GetChartValues(fleetconst.ChartName)
+	if err != nil && !chart.IsNotFoundError(err) {
 		// Missing extra config is okay, return the error otherwise
-		if !chart.IsNotFoundError(err) {
-			return nil, err
-		}
-	} else {
-		fleetChartValues = data.MergeMaps(fleetChartValues, extraValues)
+		return nil, err
 	}
+	fleetChartValues = data.MergeMaps(fleetChartValues, extraValues)
 
 	return setting,
 		h.manager.Ensure(
