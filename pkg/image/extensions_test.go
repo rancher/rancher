@@ -78,7 +78,10 @@ func TestFetchExtensionImages(t *testing.T) {
 	defer server.Close()
 
 	endpoints := []GithubEndpoint{{URL: server.URL}}
-	extensions := ExtensionsConfig{GithubEndpoints: endpoints}
+	exportConfig := ExportConfig{
+		GithubEndpoints: endpoints,
+	}
+	extensions := ExtensionsConfig{exportConfig}
 
 	imagesSet := map[string]map[string]struct{}{}
 
@@ -112,7 +115,10 @@ func TestFetchExtensionImages_NoSuitableRelease(t *testing.T) {
 	defer server.Close()
 
 	endpoints := []GithubEndpoint{{URL: server.URL}}
-	extensions := ExtensionsConfig{GithubEndpoints: endpoints}
+	exportConfig := ExportConfig{
+		GithubEndpoints: endpoints,
+	}
+	extensions := ExtensionsConfig{exportConfig}
 
 	imagesSet := map[string]map[string]struct{}{}
 
