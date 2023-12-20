@@ -140,6 +140,7 @@ func GatherTargetImagesAndSources(systemChartsPath, chartsPath string, imagesFro
 		ChartsPath:       chartsPath,
 		OsType:           img.Linux,
 		RancherVersion:   rancherVersion,
+		GithubEndpoints:  img.ExtensionEndpoints,
 	}
 	targetImages, targetImagesAndSources, err := img.GetImages(exportConfig, externalLinuxImages, linuxImagesFromArgs, linuxInfo.RKESystemImages)
 	if err != nil {
