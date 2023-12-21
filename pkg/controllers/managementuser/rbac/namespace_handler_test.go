@@ -252,8 +252,9 @@ func TestReconcileNamespaceProjectClusterRole(t *testing.T) {
 }
 
 func TestCreateProjectNSRole(t *testing.T) {
+	t.Parallel()
 	crs := make(map[string]*v1.ClusterRole)
-	m := SetupManager(make(map[string]*v3.RoleTemplate), crs, make(map[string]*v1.Role), make(map[string]*v3.Project), clientErrs{}, clientErrs{}, clientErrs{})
+	m := setupManager(make(map[string]*v3.RoleTemplate), crs, make(map[string]*v1.Role), make(map[string]*v3.Project), clientErrs{}, clientErrs{}, clientErrs{})
 	type testCase struct {
 		description   string
 		verb          string
@@ -352,7 +353,8 @@ func TestCreateProjectNSRole(t *testing.T) {
 		assert.Equal(t, test.expectedCR, crs[test.expectedCR.Name], test.description)
 		delete(crs, test.expectedCR.Name)
 	}
-	m = SetupManager(make(map[string]*v3.RoleTemplate), crs, make(map[string]*v1.Role), make(map[string]*v3.Project), clientErrs{createError: errors.NewInternalError(fmt.Errorf("some error"))}, clientErrs{}, clientErrs{})
+
+	m = setupManager(make(map[string]*v3.RoleTemplate), crs, make(map[string]*v1.Role), make(map[string]*v3.Project), clientErrs{createError: errors.NewInternalError(fmt.Errorf("some error"))}, clientErrs{}, clientErrs{})
 	description := "test should return non-AlreadyExists error"
 	err := m.createProjectNSRole(fmt.Sprintf(projectNSGetClusterRoleNameFmt, "p-123xyz", "edit"), "*", "", "p-123xyz")
 	assert.NotNil(t, err, description)
