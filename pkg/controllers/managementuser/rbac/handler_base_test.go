@@ -49,7 +49,7 @@ type clientErrs struct {
 	createError error
 }
 
-func SetupManager(roleTemplates map[string]*v3.RoleTemplate, clusterRoles map[string]*v1.ClusterRole, roles map[string]*v1.Role, projects map[string]*v3.Project, crErrs, rtErrs, rErrs clientErrs) *manager {
+func setupManager(roleTemplates map[string]*v3.RoleTemplate, clusterRoles map[string]*v1.ClusterRole, roles map[string]*v1.Role, projects map[string]*v3.Project, crErrs, rtErrs, rErrs clientErrs) *manager {
 	return &manager{
 		rtLister: &fakes.RoleTemplateListerMock{
 			GetFunc: func(namespace string, name string) (*v3.RoleTemplate, error) {
@@ -176,7 +176,7 @@ func SetupManager(roleTemplates map[string]*v3.RoleTemplate, clusterRoles map[st
 }
 
 func Test_gatherRoles(t *testing.T) {
-	m := SetupManager(recursiveTestRoleTemplates, make(map[string]*v1.ClusterRole), make(map[string]*v1.Role), make(map[string]*v3.Project), clientErrs{}, clientErrs{}, clientErrs{})
+	m := setupManager(recursiveTestRoleTemplates, make(map[string]*v1.ClusterRole), make(map[string]*v1.Role), make(map[string]*v3.Project), clientErrs{}, clientErrs{}, clientErrs{})
 
 	emptyRoleTemplates := make(map[string]*v3.RoleTemplate)
 	type args struct {
