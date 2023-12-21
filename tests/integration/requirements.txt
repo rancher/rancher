@@ -13,4 +13,4 @@ requests==2.31.0
 kubernetes==12.0.1
 jinja2>=2.10
 cryptography==41.0.3
-werkzeug==2.3.7
+werkzeug==2.3.8
