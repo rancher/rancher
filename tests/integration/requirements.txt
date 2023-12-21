@@ -1,6 +1,6 @@
 git+https://github.com/rancher/client-python.git@1ecfc3e6a300f5f336da4e4416c46c50d544fd77
 websocket-client==0.56.0
-PyJWT==2.4.0
+PyJWT==2.8.0
 
 flask==2.2.5
 pytest==6.2.5
