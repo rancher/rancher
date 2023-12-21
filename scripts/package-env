@@ -1,5 +1,7 @@
 #!/bin/bash
 
+source $(dirname $0)/export-config
+
 ARCH=${ARCH:-"amd64"}
 SYSTEM_CHART_REPO_DIR=build/system-charts
 SYSTEM_CHART_DEFAULT_BRANCH=${SYSTEM_CHART_DEFAULT_BRANCH:-"dev-v2.9"}
