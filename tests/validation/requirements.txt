@@ -2,7 +2,7 @@ pytest==6.2.5
 pytest-repeat==0.8.0
 pytest-xdist==2.0.0
 boto3==1.21.46
-cryptography==41.0.3
+cryptography==41.0.6
 flake8==3.5.0
 invoke==1.2.0
 Jinja2==3.0.0
