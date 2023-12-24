@@ -2,12 +2,12 @@ package planner
 
 import (
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"sort"
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
+	"gopkg.in/yaml.v2"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -76,7 +76,7 @@ func (p *Planner) renderRegistries(runtime, namespace string, registry *rkev1.Re
 		configs[registryName] = registryConfig
 	}
 
-	data.registriesFileRaw, err = json.Marshal(map[string]interface{}{
+	data.registriesFileRaw, err := yaml.Marshal(map[string]interface{}{
 		"mirrors": registry.Mirrors,
 		"configs": configs,
 	})
