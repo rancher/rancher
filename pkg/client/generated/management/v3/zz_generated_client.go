@@ -50,9 +50,6 @@ type Client struct {
 	GlobalDnsProvider                         GlobalDnsProviderOperations
 	KontainerDriver                           KontainerDriverOperations
 	EtcdBackup                                EtcdBackupOperations
-	MonitorMetric                             MonitorMetricOperations
-	ClusterMonitorGraph                       ClusterMonitorGraphOperations
-	ProjectMonitorGraph                       ProjectMonitorGraphOperations
 	CloudCredential                           CloudCredentialOperations
 	ManagementSecret                          ManagementSecretOperations
 	ClusterTemplate                           ClusterTemplateOperations
@@ -117,9 +114,6 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 	client.GlobalDnsProvider = newGlobalDnsProviderClient(client)
 	client.KontainerDriver = newKontainerDriverClient(client)
 	client.EtcdBackup = newEtcdBackupClient(client)
-	client.MonitorMetric = newMonitorMetricClient(client)
-	client.ClusterMonitorGraph = newClusterMonitorGraphClient(client)
-	client.ProjectMonitorGraph = newProjectMonitorGraphClient(client)
 	client.CloudCredential = newCloudCredentialClient(client)
 	client.ManagementSecret = newManagementSecretClient(client)
 	client.ClusterTemplate = newClusterTemplateClient(client)

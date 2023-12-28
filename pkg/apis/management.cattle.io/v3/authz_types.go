@@ -17,8 +17,6 @@ var (
 	DefaultNetworkPolicyCreated               condition.Cond = "DefaultNetworkPolicyCreated"
 	ProjectConditionDefaultNamespacesAssigned condition.Cond = "DefaultNamespacesAssigned"
 	ProjectConditionInitialRolesPopulated     condition.Cond = "InitialRolesPopulated"
-	ProjectConditionMonitoringEnabled         condition.Cond = "MonitoringEnabled"
-	ProjectConditionMetricExpressionDeployed  condition.Cond = "MetricExpressionDeployed"
 	ProjectConditionSystemNamespacesAssigned  condition.Cond = "SystemNamespacesAssigned"
 )
 
@@ -58,10 +56,6 @@ type ProjectStatus struct {
 	// PodSecurityPolicyTemplateName is the pod security policy template associated with the project.
 	// +optional
 	PodSecurityPolicyTemplateName string `json:"podSecurityPolicyTemplateId,omitempty"`
-
-	// MonitoringStatus is the status of the Monitoring V1 app.
-	// +optional
-	MonitoringStatus *MonitoringStatus `json:"monitoringStatus,omitempty" norman:"nocreate,noupdate"`
 }
 
 // ProjectCondition is the status of an aspect of the project.
@@ -122,12 +116,6 @@ type ProjectSpec struct {
 	// See https://kubernetes.io/docs/concepts/policy/limit-range/ for more details.
 	// +optional
 	ContainerDefaultResourceLimit *ContainerResourceLimit `json:"containerDefaultResourceLimit,omitempty"`
-
-	// EnableProjectMonitoring indicates whether Monitoring V1 should be enabled for this project.
-	// Deprecated. Use the Monitoring V2 app instead.
-	// Defaults to false.
-	// +optional
-	EnableProjectMonitoring bool `json:"enableProjectMonitoring,omitempty" norman:"default=false"`
 }
 
 func (p *ProjectSpec) ObjClusterName() string {

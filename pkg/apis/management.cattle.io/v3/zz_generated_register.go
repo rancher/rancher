@@ -41,7 +41,6 @@ var (
 	ClusterResourceName                                   = "clusters"
 	ClusterCatalogResourceName                            = "clustercatalogs"
 	ClusterLoggingResourceName                            = "clusterloggings"
-	ClusterMonitorGraphResourceName                       = "clustermonitorgraphs"
 	ClusterRegistrationTokenResourceName                  = "clusterregistrationtokens"
 	ClusterRoleTemplateBindingResourceName                = "clusterroletemplatebindings"
 	ClusterTemplateResourceName                           = "clustertemplates"
@@ -63,7 +62,6 @@ var (
 	KontainerDriverResourceName                           = "kontainerdrivers"
 	LocalProviderResourceName                             = "localproviders"
 	ManagedChartResourceName                              = "managedcharts"
-	MonitorMetricResourceName                             = "monitormetrics"
 	MultiClusterAppResourceName                           = "multiclusterapps"
 	MultiClusterAppRevisionResourceName                   = "multiclusterapprevisions"
 	NodeResourceName                                      = "nodes"
@@ -80,7 +78,6 @@ var (
 	ProjectResourceName                                   = "projects"
 	ProjectCatalogResourceName                            = "projectcatalogs"
 	ProjectLoggingResourceName                            = "projectloggings"
-	ProjectMonitorGraphResourceName                       = "projectmonitorgraphs"
 	ProjectNetworkPolicyResourceName                      = "projectnetworkpolicies"
 	ProjectRoleTemplateBindingResourceName                = "projectroletemplatebindings"
 	RancherUserNotificationResourceName                   = "rancherusernotifications"
@@ -146,8 +143,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&ClusterCatalogList{},
 		&ClusterLogging{},
 		&ClusterLoggingList{},
-		&ClusterMonitorGraph{},
-		&ClusterMonitorGraphList{},
 		&ClusterRegistrationToken{},
 		&ClusterRegistrationTokenList{},
 		&ClusterRoleTemplateBinding{},
@@ -190,8 +185,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&LocalProviderList{},
 		&ManagedChart{},
 		&ManagedChartList{},
-		&MonitorMetric{},
-		&MonitorMetricList{},
 		&MultiClusterApp{},
 		&MultiClusterAppList{},
 		&MultiClusterAppRevision{},
@@ -224,8 +217,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&ProjectCatalogList{},
 		&ProjectLogging{},
 		&ProjectLoggingList{},
-		&ProjectMonitorGraph{},
-		&ProjectMonitorGraphList{},
 		&ProjectNetworkPolicy{},
 		&ProjectNetworkPolicyList{},
 		&ProjectRoleTemplateBinding{},

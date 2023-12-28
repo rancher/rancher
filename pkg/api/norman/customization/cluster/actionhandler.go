@@ -79,23 +79,6 @@ func (a ActionHandler) ClusterActionHandler(actionName string, action *types.Act
 		return a.ImportYamlHandler(actionName, action, apiContext)
 	case v32.ClusterActionExportYaml:
 		return a.ExportYamlHandler(actionName, action, apiContext)
-	case v32.ClusterActionViewMonitoring:
-		return a.viewMonitoring(actionName, action, apiContext)
-	case v32.ClusterActionEditMonitoring:
-		if !canUpdateCluster(apiContext) {
-			return httperror.NewAPIError(httperror.PermissionDenied, "can not access")
-		}
-		return a.editMonitoring(actionName, action, apiContext)
-	case v32.ClusterActionEnableMonitoring:
-		if !canUpdateCluster(apiContext) {
-			return httperror.NewAPIError(httperror.PermissionDenied, "can not access")
-		}
-		return a.enableMonitoring(actionName, action, apiContext)
-	case v32.ClusterActionDisableMonitoring:
-		if !canUpdateCluster(apiContext) {
-			return httperror.NewAPIError(httperror.PermissionDenied, "can not access")
-		}
-		return a.disableMonitoring(actionName, action, apiContext)
 	case v32.ClusterActionBackupEtcd:
 		if !canBackupEtcd(apiContext, apiContext.ID) {
 			return httperror.NewAPIError(httperror.PermissionDenied, "can not backup etcd")
