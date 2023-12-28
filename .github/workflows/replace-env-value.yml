@@ -45,7 +45,7 @@ jobs:
         id: branch
         run: |
           BRANCH="githubaction-replace-envvar-$(date +%Y-%m-%d-%H-%M-%S)"
-          echo "::set-output name=branch::$BRANCH"
+          echo "branch=$BRANCH" >> $GITHUB_OUTPUT
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git config --global user.name "github-actions[bot]"
           git checkout -b "$BRANCH"

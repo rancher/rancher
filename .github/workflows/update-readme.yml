@@ -9,88 +9,88 @@ jobs:
   update-readme:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
-    - name: Get chart index.yaml files
-      run: |
-       wget https://github.com/mikefarah/yq/releases/download/v4.25.1/yq_linux_amd64 -O /usr/bin/yq && chmod +x /usr/bin/yq
-       wget -O latest.index.yaml https://releases.rancher.com/server-charts/latest/index.yaml
-       wget -O stable.index.yaml https://releases.rancher.com/server-charts/stable/index.yaml
-    - name: Update README file
-      run: |
-       tmpfile=$(mktemp)
-       unset latest
-       unset stable
-       for rancher_major_minor in 2.8 2.7 2.6; do
-        latest2x=$(yq  ".entries.rancher[].appVersion | select(test(\"^v${rancher_major_minor}\") and select(. != \"*-rc*\"))" 'latest.index.yaml' | head -1)
-        stable2x=$(yq  ".entries.rancher[].appVersion | select(test(\"^v${rancher_major_minor}\") and select(. != \"*-rc*\"))" 'stable.index.yaml' | head -1)
-        [[ -z ${latest2x} ]] && [[ -z ${stable2x} ]] && continue
-        echo "* v${rancher_major_minor}" >> $tmpfile
-        if [[ -n ${latest2x} ]]; then
-          if [[ -n ${latest} ]]; then
-            echo "  * Latest - ${latest2x} - \`rancher/rancher:${latest2x}\` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/${latest2x})." >> $tmpfile
+      - uses: actions/checkout@v2
+      - name: Get chart index.yaml files
+        run: |
+          wget https://github.com/mikefarah/yq/releases/download/v4.25.1/yq_linux_amd64 -O /usr/bin/yq && chmod +x /usr/bin/yq
+          wget -O latest.index.yaml https://releases.rancher.com/server-charts/latest/index.yaml
+          wget -O stable.index.yaml https://releases.rancher.com/server-charts/stable/index.yaml
+      - name: Update README file
+        run: |
+          tmpfile=$(mktemp)
+          unset latest
+          unset stable
+          for rancher_major_minor in 2.8 2.7 2.6; do
+           latest2x=$(yq  ".entries.rancher[].appVersion | select(test(\"^v${rancher_major_minor}\") and select(. != \"*-rc*\"))" 'latest.index.yaml' | head -1)
+           stable2x=$(yq  ".entries.rancher[].appVersion | select(test(\"^v${rancher_major_minor}\") and select(. != \"*-rc*\"))" 'stable.index.yaml' | head -1)
+           [[ -z ${latest2x} ]] && [[ -z ${stable2x} ]] && continue
+           echo "* v${rancher_major_minor}" >> $tmpfile
+           if [[ -n ${latest2x} ]]; then
+             if [[ -n ${latest} ]]; then
+               echo "  * Latest - ${latest2x} - \`rancher/rancher:${latest2x}\` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/${latest2x})." >> $tmpfile
+             else
+               echo "  * Latest - ${latest2x} - \`rancher/rancher:${latest2x}\` / \`rancher/rancher:latest\` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/${latest2x})." >> $tmpfile
+             fi
+           fi
+           if [[ -n ${stable2x} ]]; then
+             if [[ -n ${stable} ]]; then
+               echo "  * Stable - ${stable2x} - \`rancher/rancher:${stable2x}\` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/${stable2x})." >> $tmpfile
+             else
+               echo "  * Stable - ${stable2x} - \`rancher/rancher:${stable2x}\` / \`rancher/rancher:stable\` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/${stable2x})." >> $tmpfile
+             fi
+           fi
+           latest=${latest2x}
+           stable=${stable2x}
+          done
+          sed -e '/## Latest Release/r '"$tmpfile"'' -e 's/CURRENTYEAR/'"$(date +%Y)"'/g' README-template.md > README.md
+      - name: Check for repository changes
+        run: |
+          if git diff --name-only --exit-code; then
+            echo "No changes found in repository after updating README"
+            echo "changes_exist=false" >> $GITHUB_ENV
           else
-            echo "  * Latest - ${latest2x} - \`rancher/rancher:${latest2x}\` / \`rancher/rancher:latest\` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/${latest2x})." >> $tmpfile
+            echo "Changes found in repository after updating README:"
+            git diff --name-only
+            echo "changes_exist=true" >> $GITHUB_ENV
           fi
-        fi
-        if [[ -n ${stable2x} ]]; then
-          if [[ -n ${stable} ]]; then
-            echo "  * Stable - ${stable2x} - \`rancher/rancher:${stable2x}\` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/${stable2x})." >> $tmpfile
-          else
-            echo "  * Stable - ${stable2x} - \`rancher/rancher:${stable2x}\` / \`rancher/rancher:stable\` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/${stable2x})." >> $tmpfile
-          fi
-        fi
-        latest=${latest2x}
-        stable=${stable2x}
-       done
-       sed -e '/## Latest Release/r '"$tmpfile"'' -e 's/CURRENTYEAR/'"$(date +%Y)"'/g' README-template.md > README.md
-    - name: Check for repository changes
-      run: |
-        if git diff --name-only --exit-code; then
-          echo "No changes found in repository after updating README"
-          echo "changes_exist=false" >> $GITHUB_ENV
-        else
-          echo "Changes found in repository after updating README:"
-          git diff --name-only
-          echo "changes_exist=true" >> $GITHUB_ENV
-        fi
-    - name: Create branch, commit and push
-      if: ${{ env.changes_exist == 'true' }}
-      id: branch
-      run: |
-        BRANCH="githubaction-update-readme-$(date +%Y-%m-%d-%H-%M-%S)"
-        echo "::set-output name=branch::$BRANCH"
-        git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
-        git config --global user.name "github-actions[bot]"
-        git checkout -b "$BRANCH"
-        git commit -a -m "update README with latest/stable"
-        git push origin "$BRANCH"
-    - name: Create Pull Request
-      if: ${{ env.changes_exist == 'true' }}
-      id: cpr
-      env:
-        SOURCE_BRANCH: ${{ steps.branch.outputs.branch }}
-      uses: actions/github-script@v5.0.0
-      with:
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-        script: |
-          let body = 'Auto-generated by GitHub Actions'
+      - name: Create branch, commit and push
+        if: ${{ env.changes_exist == 'true' }}
+        id: branch
+        run: |
+          BRANCH="githubaction-update-readme-$(date +%Y-%m-%d-%H-%M-%S)"
+          echo "branch=$BRANCH" >> $GITHUB_OUTPUT
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+          git checkout -b "$BRANCH"
+          git commit -a -m "update README with latest/stable"
+          git push origin "$BRANCH"
+      - name: Create Pull Request
+        if: ${{ env.changes_exist == 'true' }}
+        id: cpr
+        env:
+          SOURCE_BRANCH: ${{ steps.branch.outputs.branch }}
+        uses: actions/github-script@v5.0.0
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            let body = 'Auto-generated by GitHub Actions'
 
-          const { data: pr } = await github.rest.pulls.create({
-            title: `[${{ github.ref_name }}] update README with latest/stable`,
-            body: body,
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            base: "${{ github.ref_name }}",
-            head: `${ process.env.SOURCE_BRANCH }`
-          });
-          await github.rest.issues.addLabels({
-            ...context.repo,
-            issue_number: pr.number,
-            labels: ["status/auto-created"],
-          });
-          console.log('Created new pull request');
-          return pr.html_url;
-    - name: Check outputs
-      if: ${{ env.changes_exist == 'true' }}
-      run: |
-        echo "Pull Request URL - ${{ steps.cpr.outputs.result }}"
+            const { data: pr } = await github.rest.pulls.create({
+              title: `[${{ github.ref_name }}] update README with latest/stable`,
+              body: body,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              base: "${{ github.ref_name }}",
+              head: `${ process.env.SOURCE_BRANCH }`
+            });
+            await github.rest.issues.addLabels({
+              ...context.repo,
+              issue_number: pr.number,
+              labels: ["status/auto-created"],
+            });
+            console.log('Created new pull request');
+            return pr.html_url;
+      - name: Check outputs
+        if: ${{ env.changes_exist == 'true' }}
+        run: |
+          echo "Pull Request URL - ${{ steps.cpr.outputs.result }}"
