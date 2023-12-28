@@ -76,7 +76,7 @@ require (
 	github.com/crewjam/saml v0.4.13
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/docker/distribution v2.8.2+incompatible
-	github.com/docker/docker v23.0.6+incompatible
+	github.com/docker/docker v23.0.8+incompatible
 	github.com/docker/go-connections v0.4.0
 	github.com/ehazlett/simplelog v0.0.0-20200226020431-d374894e92a4
 	github.com/evanphx/json-patch v4.12.0+incompatible
