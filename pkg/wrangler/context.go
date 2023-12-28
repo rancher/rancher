@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"sync"
 
-	prommonitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	fleetv1alpha1api "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/lasso/pkg/dynamic"
@@ -95,7 +94,6 @@ var (
 		scheme.AddToScheme,
 		apiextensionsv1.AddToScheme,
 		apiregistrationv12.AddToScheme,
-		prommonitoringv1.AddToScheme,
 		catalogv1.AddToScheme,
 	}
 	AddToScheme = localSchemeBuilder.AddToScheme

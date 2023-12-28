@@ -57,9 +57,6 @@ type Config struct {
 	GlobalDnsProviders                         map[string]managementClient.GlobalDnsProvider                         `json:"globalDnsProviders,omitempty" yaml:"globalDnsProviders,omitempty"`
 	KontainerDrivers                           map[string]managementClient.KontainerDriver                           `json:"kontainerDrivers,omitempty" yaml:"kontainerDrivers,omitempty"`
 	EtcdBackups                                map[string]managementClient.EtcdBackup                                `json:"etcdBackups,omitempty" yaml:"etcdBackups,omitempty"`
-	MonitorMetrics                             map[string]managementClient.MonitorMetric                             `json:"monitorMetrics,omitempty" yaml:"monitorMetrics,omitempty"`
-	ClusterMonitorGraphs                       map[string]managementClient.ClusterMonitorGraph                       `json:"clusterMonitorGraphs,omitempty" yaml:"clusterMonitorGraphs,omitempty"`
-	ProjectMonitorGraphs                       map[string]managementClient.ProjectMonitorGraph                       `json:"projectMonitorGraphs,omitempty" yaml:"projectMonitorGraphs,omitempty"`
 	CloudCredentials                           map[string]managementClient.CloudCredential                           `json:"cloudCredentials,omitempty" yaml:"cloudCredentials,omitempty"`
 	ManagementSecrets                          map[string]managementClient.ManagementSecret                          `json:"managementSecrets,omitempty" yaml:"managementSecrets,omitempty"`
 	ClusterTemplates                           map[string]managementClient.ClusterTemplate                           `json:"clusterTemplates,omitempty" yaml:"clusterTemplates,omitempty"`
@@ -105,9 +102,5 @@ type Config struct {
 	Workloads                      map[string]projectClient.Workload                      `json:"workloads,omitempty" yaml:"workloads,omitempty"`
 	Apps                           map[string]projectClient.App                           `json:"apps,omitempty" yaml:"apps,omitempty"`
 	AppRevisions                   map[string]projectClient.AppRevision                   `json:"appRevisions,omitempty" yaml:"appRevisions,omitempty"`
-	Prometheuss                    map[string]projectClient.Prometheus                    `json:"prometheuses,omitempty" yaml:"prometheuses,omitempty"`
-	ServiceMonitors                map[string]projectClient.ServiceMonitor                `json:"serviceMonitors,omitempty" yaml:"serviceMonitors,omitempty"`
-	PrometheusRules                map[string]projectClient.PrometheusRule                `json:"prometheusRules,omitempty" yaml:"prometheusRules,omitempty"`
-	Alertmanagers                  map[string]projectClient.Alertmanager                  `json:"alertmanagers,omitempty" yaml:"alertmanagers,omitempty"`
 	HorizontalPodAutoscalers       map[string]projectClient.HorizontalPodAutoscaler       `json:"horizontalPodAutoscalers,omitempty" yaml:"horizontalPodAutoscalers,omitempty"`
 }

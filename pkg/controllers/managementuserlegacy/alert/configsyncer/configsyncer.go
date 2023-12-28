@@ -281,7 +281,7 @@ func (d *ConfigSyncer) getNotifier(id string, notifiers []*v3.Notifier) *v3.Noti
 func (d *ConfigSyncer) addProjectAlert2Operator(clusterDisplayName string, projectGroups map[string]map[string][]*v3.ProjectAlertRule, keys []string) error {
 	for _, projectName := range keys {
 		groupRules := projectGroups[projectName]
-		_, namespace := monitorutil.ProjectMonitoringInfo(projectName)
+		namespace := fmt.Sprintf("%s-%s", "cattle-prometheus", projectName)
 		promRule := d.operatorCRDManager.GetDefaultPrometheusRule(namespace, projectName)
 
 		projectID := fmt.Sprintf("%s:%s", d.clusterName, projectName)
@@ -320,7 +320,7 @@ func (d *ConfigSyncer) addProjectAlert2Operator(clusterDisplayName string, proje
 }
 
 func (d *ConfigSyncer) addClusterAlert2Operator(clusterDisplayName string, groupRules map[string][]*v3.ClusterAlertRule, keys []string) error {
-	_, namespace := monitorutil.ClusterMonitoringInfo()
+	namespace := "cattle-prometheus"
 	promRule := d.operatorCRDManager.GetDefaultPrometheusRule(namespace, d.clusterName)
 
 	for _, groupID := range keys {
@@ -734,7 +734,8 @@ func (d *ConfigSyncer) syncWebhookConfig(notifiers []*v3.Notifier, cAlertGroupsM
 		recipients = append(recipients, group.Spec.Recipients...)
 	}
 
-	webhookSecreteName, altermanagerAppNamespace := monitorutil.SecretWebhook()
+	webhookSecreteName := "webhook-receiver"
+	altermanagerAppNamespace := "cattle-prometheus"
 	secretClient := d.secretsGetter.Secrets(altermanagerAppNamespace)
 	configSecret, err := secretClient.Get(webhookSecreteName, metav1.GetOptions{})
 	if err != nil {

@@ -47,7 +47,6 @@ type Interface interface {
 	ClusterAlertRule() ClusterAlertRuleController
 	ClusterCatalog() ClusterCatalogController
 	ClusterLogging() ClusterLoggingController
-	ClusterMonitorGraph() ClusterMonitorGraphController
 	ClusterRegistrationToken() ClusterRegistrationTokenController
 	ClusterRoleTemplateBinding() ClusterRoleTemplateBindingController
 	ClusterTemplate() ClusterTemplateController
@@ -69,7 +68,6 @@ type Interface interface {
 	KontainerDriver() KontainerDriverController
 	LocalProvider() LocalProviderController
 	ManagedChart() ManagedChartController
-	MonitorMetric() MonitorMetricController
 	MultiClusterApp() MultiClusterAppController
 	MultiClusterAppRevision() MultiClusterAppRevisionController
 	Node() NodeController
@@ -90,7 +88,6 @@ type Interface interface {
 	ProjectAlertRule() ProjectAlertRuleController
 	ProjectCatalog() ProjectCatalogController
 	ProjectLogging() ProjectLoggingController
-	ProjectMonitorGraph() ProjectMonitorGraphController
 	ProjectNetworkPolicy() ProjectNetworkPolicyController
 	ProjectRoleTemplateBinding() ProjectRoleTemplateBindingController
 	RancherUserNotification() RancherUserNotificationController
@@ -183,10 +180,6 @@ func (v *version) ClusterLogging() ClusterLoggingController {
 	return generic.NewController[*v3.ClusterLogging, *v3.ClusterLoggingList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ClusterLogging"}, "clusterloggings", true, v.controllerFactory)
 }
 
-func (v *version) ClusterMonitorGraph() ClusterMonitorGraphController {
-	return generic.NewController[*v3.ClusterMonitorGraph, *v3.ClusterMonitorGraphList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ClusterMonitorGraph"}, "clustermonitorgraphs", true, v.controllerFactory)
-}
-
 func (v *version) ClusterRegistrationToken() ClusterRegistrationTokenController {
 	return generic.NewController[*v3.ClusterRegistrationToken, *v3.ClusterRegistrationTokenList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ClusterRegistrationToken"}, "clusterregistrationtokens", true, v.controllerFactory)
 }
@@ -271,10 +264,6 @@ func (v *version) ManagedChart() ManagedChartController {
 	return generic.NewController[*v3.ManagedChart, *v3.ManagedChartList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ManagedChart"}, "managedcharts", true, v.controllerFactory)
 }
 
-func (v *version) MonitorMetric() MonitorMetricController {
-	return generic.NewController[*v3.MonitorMetric, *v3.MonitorMetricList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "MonitorMetric"}, "monitormetrics", true, v.controllerFactory)
-}
-
 func (v *version) MultiClusterApp() MultiClusterAppController {
 	return generic.NewController[*v3.MultiClusterApp, *v3.MultiClusterAppList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "MultiClusterApp"}, "multiclusterapps", true, v.controllerFactory)
 }
@@ -353,10 +342,6 @@ func (v *version) ProjectCatalog() ProjectCatalogController {
 
 func (v *version) ProjectLogging() ProjectLoggingController {
 	return generic.NewController[*v3.ProjectLogging, *v3.ProjectLoggingList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ProjectLogging"}, "projectloggings", true, v.controllerFactory)
-}
-
-func (v *version) ProjectMonitorGraph() ProjectMonitorGraphController {
-	return generic.NewController[*v3.ProjectMonitorGraph, *v3.ProjectMonitorGraphList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ProjectMonitorGraph"}, "projectmonitorgraphs", true, v.controllerFactory)
 }
 
 func (v *version) ProjectNetworkPolicy() ProjectNetworkPolicyController {

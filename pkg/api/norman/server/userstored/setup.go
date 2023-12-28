@@ -55,10 +55,6 @@ func Setup(ctx context.Context, mgmt *config.ScaledContext, clusterManager *clus
 	addProxyStore(ctx, schemas, mgmt, clusterClient.APIServiceType, "apiregistration.k8s.io/v1", nil)
 	addProxyStore(ctx, schemas, mgmt, client.HorizontalPodAutoscalerType, "autoscaling/v2", nil)
 	addProxyStore(ctx, schemas, mgmt, clusterClient.StorageClassType, "storage.k8s.io/v1", nil)
-	addProxyStore(ctx, schemas, mgmt, client.PrometheusType, "monitoring.coreos.com/v1", nil)
-	addProxyStore(ctx, schemas, mgmt, client.PrometheusRuleType, "monitoring.coreos.com/v1", nil)
-	addProxyStore(ctx, schemas, mgmt, client.AlertmanagerType, "monitoring.coreos.com/v1", nil)
-	addProxyStore(ctx, schemas, mgmt, client.ServiceMonitorType, "monitoring.coreos.com/v1", nil)
 
 	Secret(ctx, mgmt, schemas)
 	Service(ctx, schemas, mgmt)

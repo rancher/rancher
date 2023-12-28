@@ -241,8 +241,6 @@ func clusterTypes(schemas *types.Schemas) *types.Schemas {
 		MustImport(&Version, v3.RotateEncryptionKeyOutput{}).
 		MustImport(&Version, v3.ImportYamlOutput{}).
 		MustImport(&Version, v3.ExportOutput{}).
-		MustImport(&Version, v3.MonitoringInput{}).
-		MustImport(&Version, v3.MonitoringOutput{}).
 		MustImport(&Version, v3.RestoreFromEtcdBackupInput{}).
 		MustImport(&Version, v3.SaveAsTemplateInput{}).
 		MustImport(&Version, v3.SaveAsTemplateOutput{}).
@@ -329,16 +327,6 @@ func clusterTypes(schemas *types.Schemas) *types.Schemas {
 			}
 			schema.ResourceActions[v3.ClusterActionExportYaml] = types.Action{
 				Output: "exportOutput",
-			}
-			schema.ResourceActions[v3.ClusterActionEnableMonitoring] = types.Action{
-				Input: "monitoringInput",
-			}
-			schema.ResourceActions[v3.ClusterActionDisableMonitoring] = types.Action{}
-			schema.ResourceActions[v3.ClusterActionViewMonitoring] = types.Action{
-				Output: "monitoringOutput",
-			}
-			schema.ResourceActions[v3.ClusterActionEditMonitoring] = types.Action{
-				Input: "monitoringInput",
 			}
 			schema.ResourceActions[v3.ClusterActionBackupEtcd] = types.Action{}
 			schema.ResourceActions[v3.ClusterActionRestoreFromEtcdBackup] = types.Action{

@@ -29,10 +29,6 @@ const (
 	ClusterActionGenerateKubeconfig    = "generateKubeconfig"
 	ClusterActionImportYaml            = "importYaml"
 	ClusterActionExportYaml            = "exportYaml"
-	ClusterActionViewMonitoring        = "viewMonitoring"
-	ClusterActionEditMonitoring        = "editMonitoring"
-	ClusterActionEnableMonitoring      = "enableMonitoring"
-	ClusterActionDisableMonitoring     = "disableMonitoring"
 	ClusterActionBackupEtcd            = "backupEtcd"
 	ClusterActionRestoreFromEtcdBackup = "restoreFromEtcdBackup"
 	ClusterActionRotateCertificates    = "rotateCertificates"
@@ -68,8 +64,6 @@ const (
 	ClusterConditionGlobalAdminsSynced                   condition.Cond = "GlobalAdminsSynced"
 	ClusterConditionInitialRolesPopulated                condition.Cond = "InitialRolesPopulated"
 	ClusterConditionServiceAccountMigrated               condition.Cond = "ServiceAccountMigrated"
-	ClusterConditionPrometheusOperatorDeployed           condition.Cond = "PrometheusOperatorDeployed"
-	ClusterConditionMonitoringEnabled                    condition.Cond = "MonitoringEnabled"
 	ClusterConditionAlertingEnabled                      condition.Cond = "AlertingEnabled"
 	ClusterConditionSecretsMigrated                      condition.Cond = "SecretsMigrated"
 	ClusterConditionServiceAccountSecretsMigrated        condition.Cond = "ServiceAccountSecretsMigrated"
@@ -122,7 +116,6 @@ type ClusterSpecBase struct {
 	DockerRootDir                                        string                                  `json:"dockerRootDir,omitempty" norman:"default=/var/lib/docker"`
 	EnableNetworkPolicy                                  *bool                                   `json:"enableNetworkPolicy" norman:"default=false"`
 	EnableClusterAlerting                                bool                                    `json:"enableClusterAlerting" norman:"default=false"`
-	EnableClusterMonitoring                              bool                                    `json:"enableClusterMonitoring" norman:"default=false"`
 	WindowsPreferedCluster                               bool                                    `json:"windowsPreferedCluster" norman:"noupdate"`
 	LocalClusterAuthEndpoint                             LocalClusterAuthEndpoint                `json:"localClusterAuthEndpoint,omitempty"`
 	ClusterSecrets                                       ClusterSecrets                          `json:"clusterSecrets" norman:"nocreate,noupdate"`
@@ -189,7 +182,6 @@ type ClusterStatus struct {
 	AppliedPodSecurityPolicyTemplateName string                    `json:"appliedPodSecurityPolicyTemplateId"`
 	AppliedEnableNetworkPolicy           bool                      `json:"appliedEnableNetworkPolicy" norman:"nocreate,noupdate,default=false"`
 	Capabilities                         Capabilities              `json:"capabilities,omitempty"`
-	MonitoringStatus                     *MonitoringStatus         `json:"monitoringStatus,omitempty" norman:"nocreate,noupdate"`
 	NodeVersion                          int                       `json:"nodeVersion,omitempty"`
 	NodeCount                            int                       `json:"nodeCount,omitempty" norman:"nocreate,noupdate"`
 	LinuxWorkerCount                     int                       `json:"linuxWorkerCount,omitempty" norman:"nocreate,noupdate"`
@@ -341,18 +333,6 @@ type LoadBalancerCapabilities struct {
 type IngressCapabilities struct {
 	IngressProvider      string `json:"ingressProvider,omitempty"`
 	CustomDefaultBackend *bool  `json:"customDefaultBackend,omitempty"`
-}
-
-type MonitoringInput struct {
-	Version          string            `json:"version,omitempty"`
-	Answers          map[string]string `json:"answers,omitempty"`
-	AnswersSetString map[string]string `json:"answersSetString,omitempty"`
-}
-
-type MonitoringOutput struct {
-	Version          string            `json:"version,omitempty"`
-	Answers          map[string]string `json:"answers,omitempty"`
-	AnswersSetString map[string]string `json:"answersSetString,omitempty"`
 }
 
 type RestoreFromEtcdBackupInput struct {

@@ -745,9 +745,6 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 		data = clusterUpdate
 
 		// keep monitoring and alerting flags on the cluster as is, no turning off these flags from templaterevision.
-		if !clusterTemplateRevision.Spec.ClusterConfig.EnableClusterMonitoring {
-			data[managementv3.ClusterSpecFieldEnableClusterMonitoring] = existingCluster[managementv3.ClusterSpecFieldEnableClusterMonitoring]
-		}
 		if !clusterTemplateRevision.Spec.ClusterConfig.EnableClusterAlerting {
 			data[managementv3.ClusterSpecFieldEnableClusterAlerting] = existingCluster[managementv3.ClusterSpecFieldEnableClusterAlerting]
 		}

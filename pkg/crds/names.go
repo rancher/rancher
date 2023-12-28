@@ -26,9 +26,6 @@ func RequiredCRDs() []string {
 	if features.Auth.Enabled() {
 		requiredCRDS = append(requiredCRDS, AuthCRDs()...)
 	}
-	if features.MonitoringV1.Enabled() {
-		requiredCRDS = append(requiredCRDS, MonitoringV1CRDs()...)
-	}
 	return requiredCRDS
 }
 
@@ -113,16 +110,6 @@ func ClusterAuthCRDs() []string {
 	return []string{
 		"clusterauthtokens.cluster.cattle.io",
 		"clusteruserattributes.cluster.cattle.io",
-	}
-}
-
-// MonitoringV1CRDs returns a list of CRD names needed for MonitoringV1.
-func MonitoringV1CRDs() []string {
-	return []string{
-		"alertmanagers.monitoring.coreos.com",
-		"prometheuses.monitoring.coreos.com",
-		"prometheusrules.monitoring.coreos.com",
-		"servicemonitors.monitoring.coreos.com",
 	}
 }
 

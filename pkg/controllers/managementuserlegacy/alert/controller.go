@@ -15,7 +15,6 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/alert/statesyncer"
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/alert/watcher"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	monitorutil "github.com/rancher/rancher/pkg/monitoring"
 	"github.com/rancher/rancher/pkg/types/config"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -203,7 +202,7 @@ func (l *alertGroupCleaner) Clean(clusterGroup *v3.ClusterAlertGroup, projectGro
 		}
 
 		if len(groups.Items) == 0 {
-			_, namespace := monitorutil.ClusterMonitoringInfo()
+			namespace := "cattle-prometheus"
 			if err := l.operatorCRDManager.DeletePrometheusRule(namespace, l.clusterName); err != nil {
 				return err
 			}
@@ -239,7 +238,7 @@ func (l *alertGroupCleaner) Clean(clusterGroup *v3.ClusterAlertGroup, projectGro
 		}
 
 		if len(groups.Items) == 0 {
-			_, namespace := monitorutil.ProjectMonitoringInfo(projectName)
+			namespace := fmt.Sprintf("%s-%s", "cattle-prometheus", projectName)
 			if err := l.operatorCRDManager.DeletePrometheusRule(namespace, projectName); err != nil {
 				return err
 			}

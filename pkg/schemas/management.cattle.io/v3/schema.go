@@ -48,7 +48,6 @@ var (
 		Init(globalDNSTypes).
 		Init(kontainerTypes).
 		Init(etcdBackupTypes).
-		Init(monitorTypes).
 		Init(credTypes).
 		Init(mgmtSecretTypes).
 		Init(clusterTemplateTypes).
@@ -239,8 +238,6 @@ func clusterTypes(schemas *types.Schemas) *types.Schemas {
 		MustImport(&Version, v3.RotateEncryptionKeyOutput{}).
 		MustImport(&Version, v3.ImportYamlOutput{}).
 		MustImport(&Version, v3.ExportOutput{}).
-		MustImport(&Version, v3.MonitoringInput{}).
-		MustImport(&Version, v3.MonitoringOutput{}).
 		MustImport(&Version, v3.RestoreFromEtcdBackupInput{}).
 		MustImport(&Version, v3.SaveAsTemplateInput{}).
 		MustImport(&Version, v3.SaveAsTemplateOutput{}).
@@ -273,16 +270,6 @@ func clusterTypes(schemas *types.Schemas) *types.Schemas {
 			}
 			schema.ResourceActions[v3.ClusterActionExportYaml] = types.Action{
 				Output: "exportOutput",
-			}
-			schema.ResourceActions[v3.ClusterActionEnableMonitoring] = types.Action{
-				Input: "monitoringInput",
-			}
-			schema.ResourceActions[v3.ClusterActionDisableMonitoring] = types.Action{}
-			schema.ResourceActions[v3.ClusterActionViewMonitoring] = types.Action{
-				Output: "monitoringOutput",
-			}
-			schema.ResourceActions[v3.ClusterActionEditMonitoring] = types.Action{
-				Input: "monitoringInput",
 			}
 			schema.ResourceActions[v3.ClusterActionBackupEtcd] = types.Action{}
 			schema.ResourceActions[v3.ClusterActionRestoreFromEtcdBackup] = types.Action{
@@ -323,8 +310,6 @@ func authzTypes(schemas *types.Schemas) *types.Schemas {
 		).
 		MustImport(&Version, v3.SetPodSecurityPolicyTemplateInput{}).
 		MustImport(&Version, v3.ImportYamlOutput{}).
-		MustImport(&Version, v3.MonitoringInput{}).
-		MustImport(&Version, v3.MonitoringOutput{}).
 		MustImportAndCustomize(&Version, v3.Project{}, func(schema *types.Schema) {
 			schema.ResourceActions = map[string]types.Action{
 				"setpodsecuritypolicytemplate": {
@@ -332,16 +317,6 @@ func authzTypes(schemas *types.Schemas) *types.Schemas {
 					Output: "project",
 				},
 				"exportYaml": {},
-				"enableMonitoring": {
-					Input: "monitoringInput",
-				},
-				"disableMonitoring": {},
-				"viewMonitoring": {
-					Output: "monitoringOutput",
-				},
-				"editMonitoring": {
-					Input: "monitoringInput",
-				},
 			}
 		}).
 		MustImport(&Version, v3.GlobalRole{}).
@@ -859,56 +834,6 @@ func kontainerTypes(schemas *types.Schemas) *types.Schemas {
 			}
 			schema.CollectionActions = map[string]types.Action{
 				"refresh": {},
-			}
-		})
-}
-
-func monitorTypes(schemas *types.Schemas) *types.Schemas {
-	return schemas.
-		MustImport(&Version, v3.QueryGraphInput{}).
-		MustImport(&Version, v3.QueryClusterGraphOutput{}).
-		MustImport(&Version, v3.QueryProjectGraphOutput{}).
-		MustImport(&Version, v3.QueryClusterMetricInput{}).
-		MustImport(&Version, v3.QueryProjectMetricInput{}).
-		MustImport(&Version, v3.QueryMetricOutput{}).
-		MustImport(&Version, v3.ClusterMetricNamesInput{}).
-		MustImport(&Version, v3.ProjectMetricNamesInput{}).
-		MustImport(&Version, v3.MetricNamesOutput{}).
-		MustImport(&Version, v3.TimeSeries{}).
-		MustImportAndCustomize(&Version, v3.MonitorMetric{}, func(schema *types.Schema) {
-			schema.CollectionActions = map[string]types.Action{
-				"querycluster": {
-					Input:  "queryClusterMetricInput",
-					Output: "queryMetricOutput",
-				},
-				"listclustermetricname": {
-					Input:  "clusterMetricNamesInput",
-					Output: "metricNamesOutput",
-				},
-				"queryproject": {
-					Input:  "queryProjectMetricInput",
-					Output: "queryMetricOutput",
-				},
-				"listprojectmetricname": {
-					Input:  "projectMetricNamesInput",
-					Output: "metricNamesOutput",
-				},
-			}
-		}).
-		MustImportAndCustomize(&Version, v3.ClusterMonitorGraph{}, func(schema *types.Schema) {
-			schema.CollectionActions = map[string]types.Action{
-				"query": {
-					Input:  "queryGraphInput",
-					Output: "queryClusterGraphOutput",
-				},
-			}
-		}).
-		MustImportAndCustomize(&Version, v3.ProjectMonitorGraph{}, func(schema *types.Schema) {
-			schema.CollectionActions = map[string]types.Action{
-				"query": {
-					Input:  "queryGraphInput",
-					Output: "queryProjectGraphOutput",
-				},
 			}
 		})
 }

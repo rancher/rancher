@@ -3,7 +3,6 @@ package manager
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"sort"
 	"strings"
 
@@ -11,7 +10,6 @@ import (
 
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
-	rmonitoringv1 "github.com/rancher/rancher/pkg/generated/norman/monitoring.coreos.com/v1"
 	monitorutil "github.com/rancher/rancher/pkg/monitoring"
 	"github.com/rancher/rancher/pkg/types/config"
 	corev1 "k8s.io/api/core/v1"
@@ -43,16 +41,14 @@ var (
 )
 
 type PromOperatorCRDManager struct {
-	clusterName     string
-	namespaces      v1.NamespaceInterface
-	prometheusRules rmonitoringv1.PrometheusRuleInterface
+	clusterName string
+	namespaces  v1.NamespaceInterface
 }
 
 func NewPrometheusCRDManager(ctx context.Context, cluster *config.UserContext) *PromOperatorCRDManager {
 	return &PromOperatorCRDManager{
-		clusterName:     cluster.ClusterName,
-		namespaces:      cluster.Core.Namespaces(metav1.NamespaceAll),
-		prometheusRules: cluster.Monitoring.PrometheusRules(metav1.NamespaceAll),
+		clusterName: cluster.ClusterName,
+		namespaces:  cluster.Core.Namespaces(metav1.NamespaceAll),
 	}
 }
 
@@ -69,9 +65,7 @@ func (c *PromOperatorCRDManager) GetDefaultPrometheusRule(namespace, name string
 }
 
 func (c *PromOperatorCRDManager) DeletePrometheusRule(namespace, name string) error {
-	if err := c.prometheusRules.DeleteNamespaced(namespace, name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
-		return fmt.Errorf("delete prometheus rule %s:%s failed, %v", namespace, name, err)
-	}
+
 	return nil
 }
 
@@ -89,32 +83,9 @@ func (c *PromOperatorCRDManager) SyncPrometheusRule(promRule *monitoringv1.Prome
 		return fmt.Errorf("get namespace %s for prometheus rule %s:%s failed, %v", ns.Name, promRule.Namespace, promRule.Name, err)
 	}
 
-	old, err := c.prometheusRules.GetNamespaced(promRule.Namespace, promRule.Name, metav1.GetOptions{})
-	if err != nil {
-		if !apierrors.IsNotFound(err) {
-			return fmt.Errorf("get prometheus rule %s:%s failed, %v", promRule.Namespace, promRule.Name, err)
-		}
-
-		if _, err = c.prometheusRules.Create(promRule); err != nil && !apierrors.IsAlreadyExists(err) {
-			return fmt.Errorf("create prometheus rule %s:%s failed, %v", promRule.Namespace, promRule.Name, err)
-		}
-		return nil
-	}
-
 	sortedNewGroups := promRule.Spec.Groups
-	sortedOldGroups := old.Spec.Groups
 	sortGroups(sortedNewGroups)
-	sortGroups(sortedOldGroups)
 
-	if !reflect.DeepEqual(sortedOldGroups, sortedNewGroups) {
-
-		updated := old.DeepCopy()
-		updated.Spec.Groups = sortedNewGroups
-
-		if _, err = c.prometheusRules.Update(updated); err != nil {
-			return fmt.Errorf("update prometheus rule %s:%s failed, %v", updated.Namespace, updated.Name, err)
-		}
-	}
 	return nil
 }
 

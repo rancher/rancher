@@ -281,23 +281,6 @@ func NewClusterLogging(namespace, name string, obj ClusterLogging) *ClusterLoggi
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// ClusterMonitorGraphList is a list of ClusterMonitorGraph resources
-type ClusterMonitorGraphList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []ClusterMonitorGraph `json:"items"`
-}
-
-func NewClusterMonitorGraph(namespace, name string, obj ClusterMonitorGraph) *ClusterMonitorGraph {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("ClusterMonitorGraph").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
 // ClusterRegistrationTokenList is a list of ClusterRegistrationToken resources
 type ClusterRegistrationTokenList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -655,23 +638,6 @@ func NewManagedChart(namespace, name string, obj ManagedChart) *ManagedChart {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// MonitorMetricList is a list of MonitorMetric resources
-type MonitorMetricList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []MonitorMetric `json:"items"`
-}
-
-func NewMonitorMetric(namespace, name string, obj MonitorMetric) *MonitorMetric {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("MonitorMetric").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
 // MultiClusterAppList is a list of MultiClusterApp resources
 type MultiClusterAppList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -988,23 +954,6 @@ type ProjectLoggingList struct {
 
 func NewProjectLogging(namespace, name string, obj ProjectLogging) *ProjectLogging {
 	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("ProjectLogging").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// ProjectMonitorGraphList is a list of ProjectMonitorGraph resources
-type ProjectMonitorGraphList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []ProjectMonitorGraph `json:"items"`
-}
-
-func NewProjectMonitorGraph(namespace, name string, obj ProjectMonitorGraph) *ProjectMonitorGraph {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("ProjectMonitorGraph").ToAPIVersionAndKind()
 	obj.Name = name
 	obj.Namespace = namespace
 	return &obj

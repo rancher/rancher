@@ -135,14 +135,6 @@ func (d *Deployer) sync() error {
 	newCluster.Spec.EnableClusterAlerting = needDeploy
 
 	if needDeploy {
-		operatorAppName, operatorAppNamespace := monitorutil.SystemMonitoringInfo()
-		operatorWorkload, err := d.appDeployer.deployments.GetNamespaced(operatorAppNamespace, fmt.Sprintf("prometheus-operator-%s", operatorAppName), metav1.GetOptions{})
-		if err != nil && !apierrors.IsNotFound(err) {
-			return fmt.Errorf("get deployment %s/prometheus-operator-%s failed, %v", operatorAppNamespace, operatorAppName, err)
-		}
-		if operatorWorkload == nil || operatorWorkload.DeletionTimestamp != nil {
-			d.clusters.Controller().Enqueue(metav1.NamespaceAll, d.clusterName)
-		}
 
 		if !reflect.DeepEqual(cluster, newCluster) {
 			cluster, err := d.clusters.Update(newCluster)
@@ -353,7 +345,7 @@ func (d *appDeployer) deploy(appName, appTargetNamespace, systemProjectID string
 			Annotations: map[string]string{
 				creatorIDAnn: creator.Name,
 			},
-			Labels:    monitorutil.OwnedLabels(appName, appTargetNamespace, systemProjectID, monitorutil.SystemLevel),
+			Labels:    map[string]string{},
 			Name:      appName,
 			Namespace: systemProjectName,
 		},
