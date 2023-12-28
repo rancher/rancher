@@ -21,7 +21,6 @@ import (
 	"github.com/rancher/rancher/pkg/api/norman/customization/globalrole"
 	"github.com/rancher/rancher/pkg/api/norman/customization/globalrolebinding"
 	"github.com/rancher/rancher/pkg/api/norman/customization/kontainerdriver"
-	"github.com/rancher/rancher/pkg/api/norman/customization/monitor"
 	"github.com/rancher/rancher/pkg/api/norman/customization/multiclusterapp"
 	"github.com/rancher/rancher/pkg/api/norman/customization/namespacedresource"
 	"github.com/rancher/rancher/pkg/api/norman/customization/node"
@@ -118,13 +117,10 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.CatalogTemplateType,
 		client.CatalogTemplateVersionType,
 		client.ClusterCatalogType,
-		client.ClusterMonitorGraphType,
 		client.ComposeConfigType,
 		client.MultiClusterAppType,
 		client.MultiClusterAppRevisionType,
-		client.MonitorMetricType,
 		client.ProjectCatalogType,
-		client.ProjectMonitorGraphType,
 		client.TemplateType,
 		client.TemplateVersionType,
 		client.TemplateContentType,
@@ -173,7 +169,6 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	ClusterCatalog(schemas, apiContext)
 	App(schemas, apiContext, clusterManager)
 	TemplateContent(schemas)
-	Monitor(schemas, apiContext, clusterManager)
 	MultiClusterApps(schemas, apiContext)
 	GlobalDNSs(schemas, apiContext, localClusterEnabled)
 	GlobalDNSProviders(schemas, apiContext, localClusterEnabled)
@@ -536,24 +531,6 @@ func Feature(schemas *types.Schemas, management *config.ScaledContext) {
 	schema.Validator = validator.Validator
 	schema.Formatter = feature.Formatter
 	schema.Store = featStore.New(schema.Store)
-}
-
-func Monitor(schemas *types.Schemas, management *config.ScaledContext, clusterManager *clustermanager.Manager) {
-	clusterGraphHandler := monitor.NewClusterGraphHandler(management.Dialer, clusterManager)
-	projectGraphHandler := monitor.NewProjectGraphHandler(management.Dialer, clusterManager)
-	metricHandler := monitor.NewMetricHandler(management.Dialer, clusterManager)
-
-	schema := schemas.Schema(&managementschema.Version, client.ClusterMonitorGraphType)
-	schema.CollectionFormatter = monitor.QueryGraphCollectionFormatter
-	schema.ActionHandler = clusterGraphHandler.QuerySeriesAction
-
-	schema = schemas.Schema(&managementschema.Version, client.ProjectMonitorGraphType)
-	schema.CollectionFormatter = monitor.QueryGraphCollectionFormatter
-	schema.ActionHandler = projectGraphHandler.QuerySeriesAction
-
-	schema = schemas.Schema(&managementschema.Version, client.MonitorMetricType)
-	schema.CollectionFormatter = monitor.MetricCollectionFormatter
-	schema.ActionHandler = metricHandler.Action
 }
 
 func Project(schemas *types.Schemas, management *config.ScaledContext) {

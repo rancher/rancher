@@ -3,8 +3,6 @@ package main
 import (
 	"os"
 
-	"github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring"
-	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	fleet "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	"github.com/rancher/norman/types"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -26,7 +24,6 @@ import (
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	k8sschema "k8s.io/apimachinery/pkg/runtime/schema"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
@@ -191,16 +188,6 @@ func main() {
 		[]interface{}{
 			storagev1.StorageClass{},
 		},
-	)
-	generator.GenerateNativeTypes(
-		k8sschema.GroupVersion{Group: monitoring.GroupName, Version: monitoringv1.Version},
-		[]interface{}{
-			monitoringv1.Prometheus{},
-			monitoringv1.Alertmanager{},
-			monitoringv1.PrometheusRule{},
-			monitoringv1.ServiceMonitor{},
-		},
-		nil,
 	)
 	generator.GenerateNativeTypes(scalingv2.SchemeGroupVersion,
 		[]interface{}{
