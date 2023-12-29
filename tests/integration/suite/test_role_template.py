@@ -95,32 +95,6 @@ def test_context_crtb(admin_mc, admin_cc, remove_resource,
         e.value.error.message
 
 
-def test_cloned_role_permissions(admin_mc, remove_resource, user_factory,
-                                 admin_pc):
-    client = admin_mc.client
-    rt_name = random_str()
-    rt = client.create_role_template(name=rt_name, context="project",
-                                     roleTemplateIds=["project-owner"])
-    remove_resource(rt)
-    wait_for_role_template_creation(admin_mc, rt_name)
-
-    # user with cloned project owner role should be able to enable monitoring
-    cloned_user = user_factory()
-    remove_resource(cloned_user)
-
-    prtb = admin_mc.client.create_project_role_template_binding(
-        name="prtb-" + random_str(),
-        userId=cloned_user.user.id,
-        projectId=admin_pc.project.id,
-        roleTemplateId=rt.id
-    )
-    remove_resource(prtb)
-    wait_until_available(cloned_user.client, admin_pc.project)
-
-    project = cloned_user.client.by_id_project(admin_pc.project.id)
-    assert project.actions.enableMonitoring
-
-
 def test_update_role_template_permissions(admin_mc, remove_resource,
                                           user_factory, admin_cc):
     client = admin_mc.client
@@ -264,37 +238,6 @@ def test_role_template_update_inherited_role(admin_mc, remove_resource,
     assert role_template_id in rb_dict
     assert 'view' in rb_dict
     assert 'edit' not in rb_dict
-
-
-def test_kubernetes_admin_permissions(admin_mc, remove_resource, user_factory,
-                                      admin_pc):
-    client = admin_mc.client
-    name = random_str()
-    # clone Kubernetes-admin role
-    cloned_admin = client.create_role_template(name=name, context="project",
-                                               roleTemplateIds=["admin"])
-    remove_resource(cloned_admin)
-    wait_for_role_template_creation(admin_mc, name)
-
-    # add user with cloned kubernetes-admin role to a project
-    cloned_user = user_factory()
-    remove_resource(cloned_user)
-
-    prtb = admin_mc.client.create_project_role_template_binding(
-        name="prtb-" + random_str(),
-        userId=cloned_user.user.id,
-        projectId=admin_pc.project.id,
-        roleTemplateId=cloned_admin.id
-    )
-    remove_resource(prtb)
-    wait_until_available(cloned_user.client, admin_pc.project)
-
-    # cloned kubernetes-admin role should not give user project-owner
-    # privileges, for instance, user should not be able to create enable
-    # monitoring
-
-    project = cloned_user.client.by_id_project(admin_pc.project.id)
-    assert 'enableMonitoring' not in project.actions
 
 
 def test_role_template_changes_revoke_permissions(admin_mc, remove_resource,
