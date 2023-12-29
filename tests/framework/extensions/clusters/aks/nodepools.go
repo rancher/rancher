@@ -24,14 +24,13 @@ func updateNodePoolQuantity(client *rancher.Client, cluster *management.Cluster,
 	*aksConfig.NodePools[0].Count += *nodePool.NodeCount
 
 	aksHostCluster := &management.Cluster{
-		AKSConfig:               aksConfig,
-		DockerRootDir:           "/var/lib/docker",
-		EnableClusterAlerting:   clusterResp.EnableClusterAlerting,
-		EnableClusterMonitoring: clusterResp.EnableClusterMonitoring,
-		EnableNetworkPolicy:     clusterResp.EnableNetworkPolicy,
-		Labels:                  clusterResp.Labels,
-		Name:                    clusterResp.Name,
-		WindowsPreferedCluster:  clusterResp.WindowsPreferedCluster,
+		AKSConfig:              aksConfig,
+		DockerRootDir:          "/var/lib/docker",
+		EnableClusterAlerting:  clusterResp.EnableClusterAlerting,
+		EnableNetworkPolicy:    clusterResp.EnableNetworkPolicy,
+		Labels:                 clusterResp.Labels,
+		Name:                   clusterResp.Name,
+		WindowsPreferedCluster: clusterResp.WindowsPreferedCluster,
 	}
 
 	logrus.Infof("Scaling the agentpool to %v total nodes", *aksConfig.NodePools[0].Count)

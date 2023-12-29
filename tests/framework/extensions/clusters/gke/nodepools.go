@@ -24,14 +24,13 @@ func updateNodePoolQuantity(client *rancher.Client, cluster *management.Cluster,
 	*gkeConfig.NodePools[0].InitialNodeCount += *nodePool.InitialNodeCount
 
 	gkeHostCluster := &management.Cluster{
-		DockerRootDir:           "/var/lib/docker",
-		EnableClusterAlerting:   clusterResp.EnableClusterAlerting,
-		EnableClusterMonitoring: clusterResp.EnableClusterMonitoring,
-		EnableNetworkPolicy:     clusterResp.EnableNetworkPolicy,
-		GKEConfig:               gkeConfig,
-		Labels:                  clusterResp.Labels,
-		Name:                    clusterResp.Name,
-		WindowsPreferedCluster:  clusterResp.WindowsPreferedCluster,
+		DockerRootDir:          "/var/lib/docker",
+		EnableClusterAlerting:  clusterResp.EnableClusterAlerting,
+		EnableNetworkPolicy:    clusterResp.EnableNetworkPolicy,
+		GKEConfig:              gkeConfig,
+		Labels:                 clusterResp.Labels,
+		Name:                   clusterResp.Name,
+		WindowsPreferedCluster: clusterResp.WindowsPreferedCluster,
 	}
 
 	logrus.Infof("Scaling the node pool to %v total nodes", *gkeConfig.NodePools[0].InitialNodeCount)

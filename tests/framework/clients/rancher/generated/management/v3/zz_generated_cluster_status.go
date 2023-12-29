@@ -29,7 +29,6 @@ const (
 	ClusterStatusFieldIstioEnabled                               = "istioEnabled"
 	ClusterStatusFieldLimits                                     = "limits"
 	ClusterStatusFieldLinuxWorkerCount                           = "linuxWorkerCount"
-	ClusterStatusFieldMonitoringStatus                           = "monitoringStatus"
 	ClusterStatusFieldNodeCount                                  = "nodeCount"
 	ClusterStatusFieldNodeVersion                                = "nodeVersion"
 	ClusterStatusFieldOpenStackSecret                            = "openStackSecret"
@@ -73,7 +72,6 @@ type ClusterStatus struct {
 	IstioEnabled                               bool                          `json:"istioEnabled,omitempty" yaml:"istioEnabled,omitempty"`
 	Limits                                     map[string]string             `json:"limits,omitempty" yaml:"limits,omitempty"`
 	LinuxWorkerCount                           int64                         `json:"linuxWorkerCount,omitempty" yaml:"linuxWorkerCount,omitempty"`
-	MonitoringStatus                           *MonitoringStatus             `json:"monitoringStatus,omitempty" yaml:"monitoringStatus,omitempty"`
 	NodeCount                                  int64                         `json:"nodeCount,omitempty" yaml:"nodeCount,omitempty"`
 	NodeVersion                                int64                         `json:"nodeVersion,omitempty" yaml:"nodeVersion,omitempty"`
 	OpenStackSecret                            string                        `json:"openStackSecret,omitempty" yaml:"openStackSecret,omitempty"`

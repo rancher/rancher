@@ -9,14 +9,13 @@ import (
 func CreateEKSHostedCluster(client *rancher.Client, displayName, cloudCredentialID string, enableClusterAlerting, enableClusterMonitoring, enableNetworkPolicy, windowsPreferedCluster bool, labels map[string]string) (*management.Cluster, error) {
 	eksHostCluster := eksHostClusterConfig(displayName, cloudCredentialID)
 	cluster := &management.Cluster{
-		DockerRootDir:           "/var/lib/docker",
-		EKSConfig:               eksHostCluster,
-		Name:                    displayName,
-		EnableClusterAlerting:   enableClusterAlerting,
-		EnableClusterMonitoring: enableClusterMonitoring,
-		EnableNetworkPolicy:     &enableNetworkPolicy,
-		Labels:                  labels,
-		WindowsPreferedCluster:  windowsPreferedCluster,
+		DockerRootDir:          "/var/lib/docker",
+		EKSConfig:              eksHostCluster,
+		Name:                   displayName,
+		EnableClusterAlerting:  enableClusterAlerting,
+		EnableNetworkPolicy:    &enableNetworkPolicy,
+		Labels:                 labels,
+		WindowsPreferedCluster: windowsPreferedCluster,
 	}
 
 	clusterResp, err := client.Management.Cluster.Create(cluster)

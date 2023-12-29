@@ -2,6 +2,7 @@ package monitoring
 
 import (
 	"fmt"
+
 	"github.com/rancher/norman/types"
 )
 

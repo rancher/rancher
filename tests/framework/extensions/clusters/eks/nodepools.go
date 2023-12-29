@@ -24,14 +24,13 @@ func updateNodePoolQuantity(client *rancher.Client, cluster *management.Cluster,
 	*eksConfig.NodeGroups[0].DesiredSize += *nodePool.DesiredSize
 
 	eksHostCluster := &management.Cluster{
-		DockerRootDir:           "/var/lib/docker",
-		EKSConfig:               eksConfig,
-		EnableClusterAlerting:   clusterResp.EnableClusterAlerting,
-		EnableClusterMonitoring: clusterResp.EnableClusterMonitoring,
-		EnableNetworkPolicy:     clusterResp.EnableNetworkPolicy,
-		Labels:                  clusterResp.Labels,
-		Name:                    clusterResp.Name,
-		WindowsPreferedCluster:  clusterResp.WindowsPreferedCluster,
+		DockerRootDir:          "/var/lib/docker",
+		EKSConfig:              eksConfig,
+		EnableClusterAlerting:  clusterResp.EnableClusterAlerting,
+		EnableNetworkPolicy:    clusterResp.EnableNetworkPolicy,
+		Labels:                 clusterResp.Labels,
+		Name:                   clusterResp.Name,
+		WindowsPreferedCluster: clusterResp.WindowsPreferedCluster,
 	}
 
 	logrus.Infof("Scaling the node group to %v total nodes", *eksConfig.NodeGroups[0].DesiredSize)

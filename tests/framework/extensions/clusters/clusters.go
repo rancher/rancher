@@ -225,9 +225,8 @@ func NewRKE1ClusterConfig(clusterName string, client *rancher.Client, clustersCo
 		criDockerBool = true
 	}
 	newConfig := &management.Cluster{
-		DockerRootDir:           "/var/lib/docker",
-		EnableClusterAlerting:   false,
-		EnableClusterMonitoring: false,
+		DockerRootDir:         "/var/lib/docker",
+		EnableClusterAlerting: false,
 		LocalClusterAuthEndpoint: &management.LocalClusterAuthEndpoint{
 			Enabled: true,
 		},
