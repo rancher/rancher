@@ -8,11 +8,9 @@ assignees: ''
 ---
 
 **Flaky Test**
-
-```
-<!--File what test failed in automation. 
+<!--File what test failed in automation in a code block. 
 Make sure to assign the appropriate engineering team.-->
-```
+
 
 **Release Branch**
 
