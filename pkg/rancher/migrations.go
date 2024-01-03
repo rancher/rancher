@@ -71,10 +71,9 @@ func runMigrations(wranglerContext *wrangler.Context) error {
 		if err := migrateMachinePoolsDynamicSchemaLabel(wranglerContext); err != nil {
 			return err
 		}
-	}
-
-	if err := migrateCAPIKubeconfigs(wranglerContext); err != nil {
-		return fmt.Errorf("failed running capi kubeconfig migration: %w", err)
+		if err := migrateCAPIKubeconfigs(wranglerContext); err != nil {
+			return fmt.Errorf("failed running capi kubeconfig migration: %w", err)
+		}
 	}
 
 	return nil
