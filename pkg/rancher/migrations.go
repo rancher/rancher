@@ -548,57 +548,60 @@ func insertOrUpdateCondition(d data.Object, desiredCondition summary.Condition) 
 func migrateCAPIKubeconfigs(w *wrangler.Context) error {
 	logrus.Info("Running CAPI secret migration")
 
-	namespaces, err := w.Core.Namespace().List(metav1.ListOptions{})
+	mgmtClusters, err := w.Mgmt.Cluster().List(metav1.ListOptions{})
 	if err != nil {
-		logrus.Info("Failed listing namespaces")
-		return fmt.Errorf("listing namespaces: %w", err)
+		return err
 	}
 
-	logrus.Info("Looping around namespaces")
-	for _, ns := range namespaces.Items {
-		logrus.Infof("Running migrations for namespace %s", ns.Name)
-		clusters, err := w.RKE.RKECluster().List(ns.Name, metav1.ListOptions{})
-		if err != nil {
-			logrus.Infof("Failed listing rke clusters in namespace %s", ns.Name)
-			return fmt.Errorf("listing rke2 clusters in namespace %s: %w", ns.Name, err)
+	for _, mgmtCluster := range mgmtClusters.Items {
+		logrus.Infof("Checking if migration for cluster %s is needed", mgmtCluster.Name)
+		provClusters, err := w.Provisioning.Cluster().List(mgmtCluster.Spec.FleetWorkspaceName, metav1.ListOptions{})
+		if k8serror.IsNotFound(err) || len(provClusters.Items) == 0 {
+			continue
+		} else if err != nil {
+			return err
 		}
+		for _, provCluster := range provClusters.Items {
+			if provCluster.Spec.RKEConfig == nil {
+				continue
+			}
+			logrus.Infof("Running migration for cluster %s", provCluster.Name)
 
-		for _, cluster := range clusters.Items {
-			logrus.Infof("Running migrations for cluster %s", cluster.Name)
-			// 	secretName := fmt.Sprintf("%s-kubeconfig", cluster.Name)
+			if err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+				secretName := fmt.Sprintf("%s-kubeconfig", provCluster.Name)
 
-			// 	secret, err := w.Core.Secret().Get(ns.Name, secretName, metav1.GetOptions{})
-			// 	if err != nil {
-			// 		if k8serror.IsNotFound(err) {
-			// 			continue
-			// 		}
+				secret, err := w.Core.Secret().Get(provCluster.Namespace, secretName, metav1.GetOptions{})
+				if err != nil {
+					if k8serror.IsNotFound(err) {
+						return nil
+					}
 
-			// 		return fmt.Errorf("getting secret %s/%s: %w", ns.Name, secretName, err)
-			// 	}
+					return fmt.Errorf("getting secret %s/%s: %w", provCluster.Namespace, secretName, err)
+				}
 
-			// 	_, ok := secret.Labels[capi.ClusterNameLabel]
-			// 	if ok {
-			// 		logrus.Tracef("kubeconfig secret %s/%s already has the capi cluster label", ns.Name, secret.Name)
-			// 		continue
-			// 	}
+				_, ok := secret.Labels[capi.ClusterNameLabel]
+				if ok {
+					logrus.Tracef("kubeconfig secret %s/%s already has the capi cluster label", provCluster.Namespace, secret.Name)
+					return nil
+				}
 
-			// 	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-			// 		secretCopy := secret.DeepCopy()
-			// 		if secretCopy.Labels == nil {
-			// 			secretCopy.Labels = map[string]string{}
-			// 		}
-			// 		secretCopy.Labels[capi.ClusterNameLabel] = cluster.Name
+				secretCopy := secret.DeepCopy()
+				if secretCopy.Labels == nil {
+					secretCopy.Labels = map[string]string{}
+				}
+				secretCopy.Labels[capi.ClusterNameLabel] = provCluster.Name
 
-			// 		if _, updateErr := w.Core.Secret().Update(secretCopy); updateErr != nil {
-			// 			return fmt.Errorf("updating secret %s/%s to add capi label: %w", ns.Name, secret.Name, err)
-			// 		}
+				if _, updateErr := w.Core.Secret().Update(secretCopy); updateErr != nil {
+					return fmt.Errorf("updating secret %s/%s to add capi label: %w", provCluster.Namespace, secret.Name, err)
+				}
 
-			// 		logrus.Debugf("Updated kubeconfig secret %s/%s with CAPI cluster label", ns.Name, secret.Name)
+				logrus.Debugf("Updated kubeconfig secret %s/%s with CAPI cluster label", provCluster.Namespace, secret.Name)
 
-			// 		return nil
-			// 	}); err != nil {
-			// 		return err
-			// 	}
+				return nil
+
+			}); err != nil {
+				return err
+			}
 		}
 	}
 
