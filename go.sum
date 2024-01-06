@@ -74,8 +74,8 @@ github.com/Azure/go-autorest/autorest/date v0.3.0/go.mod h1:BI0uouVdmngYNUzGWeSY
 github.com/Azure/go-autorest/autorest/mocks v0.4.1/go.mod h1:LTp+uSrOhSkaKrUy935gNZuuIPPVsHlr9DSOxSayd+k=
 github.com/Azure/go-autorest/autorest/mocks v0.4.2 h1:PGN4EDXnuQbojHbU0UWoNvmu9AGVwYHG9/fkDYhtAfw=
 github.com/Azure/go-autorest/autorest/mocks v0.4.2/go.mod h1:Vy7OitM9Kei0i1Oj+LvyAWMXJHeKH1MVlzFugfVrmyU=
-github.com/Azure/go-autorest/autorest/to v0.4.1-0.20210111195520-9fc88b15294e h1:WtrRUJ/WPh/04d6LjOGTEDm8Sy3DI9knJgd+81tYRhM=
-github.com/Azure/go-autorest/autorest/to v0.4.1-0.20210111195520-9fc88b15294e/go.mod h1:fE8iZBn7LQR7zH/9XU2NcPR4o9jEImooCeWJcYV/zLE=
+github.com/Azure/go-autorest/autorest/to v0.4.1-0.20240104002855-4c0e21ca2bbb h1:QvqY5WysgpoF6Jeve74w7OX5gaKMvd5s2TKhsZwWHV4=
+github.com/Azure/go-autorest/autorest/to v0.4.1-0.20240104002855-4c0e21ca2bbb/go.mod h1:DSh3VxN6gfEglfL5RXwMuwLQrHEayq9JF/NUe+DkxCI=
 github.com/Azure/go-autorest/autorest/validation v0.3.2-0.20210111195520-9fc88b15294e h1:HoowCmmnS+grm3frwGZE+1tXa4ssmy1lgSac+BfteTg=
 github.com/Azure/go-autorest/autorest/validation v0.3.2-0.20210111195520-9fc88b15294e/go.mod h1:yhLgjC0Wda5DYXl6JAsWyUe4KVNffhoDhG0zVzUMo3E=
 github.com/Azure/go-autorest/logger v0.2.1 h1:IG7i4p/mDa2Ce4TRyAO8IHnVhAVF3RFU+ZtXWSmf4Tg=
