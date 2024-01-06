@@ -156,7 +156,7 @@ require (
 	k8s.io/helm v2.16.7+incompatible
 	k8s.io/kube-aggregator v0.27.4
 	k8s.io/kubectl v0.27.6
-	k8s.io/kubernetes v1.27.6
+	k8s.io/kubernetes v1.27.8
 	k8s.io/utils v0.0.0-20230505201702-9f6742963106
 	sigs.k8s.io/aws-iam-authenticator v0.5.9
 	sigs.k8s.io/cluster-api v1.5.0
