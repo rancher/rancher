@@ -15,6 +15,7 @@ import (
 	ctrlfake "github.com/rancher/wrangler/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -42,9 +43,10 @@ func Test_ChartInstallation(t *testing.T) {
 		settings.FleetVersion.Name,
 	}
 	tests := []struct {
-		name       string
-		newManager func(*gomock.Controller) chart.Manager
-		wantErr    bool
+		name          string
+		newManager    func(*gomock.Controller) chart.Manager
+		rancherConfig map[string]string
+		wantErr       bool
 	}{
 		{
 			name: "normal installation",
@@ -203,13 +205,90 @@ func Test_ChartInstallation(t *testing.T) {
 				return manager
 			},
 		},
+		{
+			name: "installation with additional values",
+			rancherConfig: map[string]string{
+				"fleet": `
+leaderElection:
+  leaseDuration: 2s
+bootstrap:
+  enabled: true
+gitjob:
+  debug: true
+`},
+			newManager: func(ctrl *gomock.Controller) chart.Manager {
+				settings.ConfigMapName.Set("pass")
+				settings.FleetMinVersion.Set("")
+
+				manager := fake.NewMockManager(ctrl)
+				expectedValues := map[string]interface{}{
+					"apiServerURL": settings.ServerURL.Get(),
+					"apiServerCA":  settings.CACerts.Get(),
+					"global": map[string]interface{}{
+						"cattle": map[string]interface{}{
+							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+						},
+					},
+					"bootstrap": map[string]interface{}{
+						"enabled":        true,
+						"agentNamespace": fleetconst.ReleaseLocalNamespace,
+					},
+					"gitops": map[string]interface{}{
+						"enabled": features.Gitops.Enabled(),
+					},
+					"gitjob": map[string]interface{}{
+						"priorityClassName": priorityClassName,
+						"debug":             true,
+					},
+					"priorityClassName": priorityClassName,
+					"leaderElection": map[string]interface{}{
+						"leaseDuration": "2s",
+					},
+				}
+
+				exactVersion := "0.7.0"
+				settings.FleetVersion.Set(exactVersion)
+
+				var b bool
+				manager.EXPECT().Ensure(
+					fleetconst.ReleaseNamespace,
+					fleetconst.CRDChartName,
+					exactVersion,
+					"",
+					nil,
+					gomock.AssignableToTypeOf(b),
+					"",
+				).Return(nil).Times(len(stgs))
+				manager.EXPECT().Ensure(
+					fleetconst.ReleaseNamespace,
+					fleetconst.ChartName,
+					exactVersion,
+					"",
+					expectedValues,
+					gomock.AssignableToTypeOf(b),
+					"",
+				).Return(nil).Times(len(stgs))
+
+				manager.EXPECT().Uninstall(fleetconst.ReleaseLegacyNamespace, fleetconst.ChartName).Return(nil).Times(len(stgs))
+				return manager
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			configCache := ctrlfake.NewMockCacheInterface[*v1.ConfigMap](ctrl)
-			configCache.EXPECT().Get(gomock.Any(), "pass").Return(&v1.ConfigMap{Data: map[string]string{"priorityClassName": priorityClassName}}, nil).AnyTimes()
-			configCache.EXPECT().Get(gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("not found")).AnyTimes()
+			configCache.EXPECT().
+				Get(gomock.Any(), gomock.Any()).
+				DoAndReturn(func(ns, name string) (*v1.ConfigMap, error) {
+					if name == "pass" {
+						return &v1.ConfigMap{Data: map[string]string{"priorityClassName": priorityClassName}}, nil
+					}
+					if name == "rancher-config" && tt.rancherConfig != nil {
+						return &v1.ConfigMap{Data: tt.rancherConfig}, nil
+					}
+					return nil, apierrors.NewNotFound(v1.Resource("Configmap"), name)
+				}).AnyTimes()
 			h := &handler{
 				chartsConfig: chart.RancherConfigGetter{ConfigCache: configCache},
 			}
