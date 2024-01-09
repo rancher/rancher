@@ -175,8 +175,8 @@ def overwrite_tls_certs(external_node):
 def get_registry_resources(external_node):
     get_resources_command = \
         'scp -q -i {}/{}.pem -o StrictHostKeyChecking=no ' \
-        '-o UserKnownHostsFile=/dev/null -r {}/airgap/basic-registry/ ' \
-        '{}@{}:~/basic-registry/'.format(
+        '-o UserKnownHostsFile=/dev/null -r {}/airgap/basic-registry ' \
+        '{}@{}:~/basic-registry'.format(
             SSH_KEY_DIR, external_node.ssh_key_name, RESOURCE_DIR,
             AWS_USER, external_node.host_name)
     run_command(get_resources_command, log_out=False)
