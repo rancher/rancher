@@ -226,6 +226,11 @@ func Register(ctx context.Context, scaledContext *config.ScaledContext) {
 	prometheus.MustRegister(numNodes)
 	prometheus.MustRegister(numCores)
 
+	// cache metrics
+	prometheus.MustRegister(
+		config.DeferredCachesCounter,
+		config.DeferredCachesActiveCounter)
+
 	gc := metricGarbageCollector{
 		clusterLister:  scaledContext.Management.Clusters("").Controller().Lister(),
 		nodeLister:     scaledContext.Management.Nodes("").Controller().Lister(),

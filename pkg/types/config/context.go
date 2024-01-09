@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rancher/lasso/pkg/cache"
 	"github.com/rancher/lasso/pkg/client"
 	"github.com/rancher/lasso/pkg/controller"
@@ -58,6 +59,23 @@ import (
 var (
 	UserStorageContext       types.StorageContext = "user"
 	ManagementStorageContext types.StorageContext = "mgmt"
+)
+
+var (
+	DeferredCachesCounter = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Subsystem: "usercontext",
+			Name:      "deferred_cache_count",
+			Help:      "Number of deferred caches that have been created",
+		},
+	)
+	DeferredCachesActiveCounter = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Subsystem: "usercontext",
+			Name:      "deferred_cache_active_count",
+			Help:      "Number of deferred caches that have been started",
+		},
+	)
 )
 
 type ScaledContext struct {
@@ -243,9 +261,11 @@ func (c *ManagementContext) WithAgent(userAgent string) *ManagementContext {
 }
 
 func (w *UserContext) DeferredStart(ctx context.Context, register func(ctx context.Context) error) func() error {
+	DeferredCachesCounter.Inc()
 	f := w.deferredStartAsync(ctx, register)
 	return func() error {
 		go f()
+		DeferredCachesActiveCounter.Inc()
 		return nil
 	}
 }
