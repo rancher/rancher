@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
 	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
 	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator/assemblers"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -14,6 +15,11 @@ import (
 	rkeservices "github.com/rancher/rke/services"
 	rketypes "github.com/rancher/rke/types"
 	"github.com/sirupsen/logrus"
+)
+
+const (
+	restoreKey     = "CATTLE_ETCD_RESTORE_GENERATION"
+	kubeletProcess = "kubelet"
 )
 
 func (uh *upgradeHandler) nonWorkerPlan(node *v3.Node, cluster *v3.Cluster) (*rketypes.RKEConfigNodePlan, error) {
@@ -89,7 +95,7 @@ func (uh *upgradeHandler) workerPlan(node *v3.Node, cluster *v3.Cluster) (*rkety
 	rkeConfig := appliedSpec.RancherKubernetesEngineConfig.DeepCopy()
 	nodeserver.FilterHostForSpec(rkeConfig, node)
 
-	logrus.Debugf("The number of nodes sent to the plan: %v", len(rkeConfig.Nodes))
+	logrus.Debugf("[workerplan] The number of nodes sent to the plan: %v", len(rkeConfig.Nodes))
 	svcOptions, err := uh.getServiceOptions(rkeConfig.Version, hostDockerInfo.OSType)
 	if err != nil {
 		return nil, err
@@ -100,7 +106,7 @@ func (uh *upgradeHandler) workerPlan(node *v3.Node, cluster *v3.Cluster) (*rkety
 		return nil, err
 	}
 
-	logrus.Debugf("getDockerInfo for node [%s] dockerInfo [%s]", node.Name, hostDockerInfo.DockerRootDir)
+	logrus.Debugf("[workerplan] getDockerInfo for node [%s] dockerInfo [%s]", node.Name, hostDockerInfo.DockerRootDir)
 
 	np := &rketypes.RKEConfigNodePlan{}
 
@@ -119,6 +125,31 @@ func (uh *upgradeHandler) workerPlan(node *v3.Node, cluster *v3.Cluster) (*rkety
 					return np, err
 				}
 			}
+			if cluster.Annotations[clusterprovisioner.RkeRestoreAnnotation] == "true" {
+				// This is for the node agent to be able to detect changes in the node plan for kubelet,
+				// and therefore to recreate the kubelet container on worker nodes after RKE restores an etcd snapshot.
+				// The value is not meant to represent the node version, it is chosen because it increases linearly.
+				newEnvVar := fmt.Sprintf("%s=%d", restoreKey, cluster.Status.NodeVersion)
+				logrus.Debugf("[workerplan] adding/updating env var [%s] on node [%s]", newEnvVar, node.Name)
+				np.Processes[kubeletProcess] = AddEnvVarToProcess(np.Processes[kubeletProcess], newEnvVar)
+			} else {
+				// A normal, non-restoring-etcd-snapshot, updating on the cluster drops the above env var from the new plan,
+				// which results in a change in the plan that, in theory, should trigger the redeployment of the kubelet container.
+				// However, currently it does not happen which is a bug (GH-43308).
+				// Adding the env var back is to avoid regression in the future when the bug is fixed.
+				if node.Status.NodePlan != nil && node.Status.NodePlan.Plan != nil {
+					oldProcess, found := node.Status.NodePlan.Plan.Processes[kubeletProcess]
+					if found {
+						for _, env := range oldProcess.Env {
+							if strings.HasPrefix(env, restoreKey) {
+								np.Processes[kubeletProcess] = AddEnvVarToProcess(np.Processes[kubeletProcess], env)
+								break
+							}
+						}
+					}
+				}
+			}
+
 			np.Processes = nodeserver.AppendTaintsToKubeletArgs(np.Processes, node.Status.NodeConfig.Taints)
 			np.Files = tempNode.Files
 
@@ -126,7 +157,7 @@ func (uh *upgradeHandler) workerPlan(node *v3.Node, cluster *v3.Cluster) (*rkety
 		}
 	}
 
-	return nil, fmt.Errorf("failed to find plan for %s", hostAddress)
+	return nil, fmt.Errorf("[workerplan] failed to find plan for %s", hostAddress)
 
 }
 
@@ -317,4 +348,25 @@ func sliceToMap(s []string) map[string]bool {
 		m[v] = true
 	}
 	return m
+}
+
+// AddEnvVarToProcess adds or overwrites the existing env var in target process
+func AddEnvVarToProcess(process rketypes.Process, newEnvVar string) rketypes.Process {
+	if process.Name == "" || process.Image == "" || newEnvVar == "" {
+		return process
+	}
+	targetKey := strings.SplitN(newEnvVar, "=", 2)[0]
+	found := false
+	for i, env := range process.Env {
+		k := strings.SplitN(env, "=", 2)[0]
+		if k == targetKey {
+			process.Env[i] = newEnvVar
+			found = true
+			break
+		}
+	}
+	if !found {
+		process.Env = append(process.Env, newEnvVar)
+	}
+	return process
 }
