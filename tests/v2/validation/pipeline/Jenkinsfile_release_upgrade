@@ -287,7 +287,7 @@ node {
                        def containerName = "${job_name}${env.BUILD_NUMBER}_$it-provisioning"
                        try {
                          sh "docker run --name ${containerName} -t -e CATTLE_TEST_CONFIG=\"${absoluteConfigPath}\" " +
-                       "${imageName} sh -c \"/root/go/bin/gotestsum --format standard-verbose --packages=\"${testsDir}${testPackage}\" --junitfile ${testResultsOut} -- ${testCase} -timeout=\"60m\" -v\""
+                       "${imageName} sh -c \"/root/go/bin/gotestsum --format standard-verbose --packages=\"${testsDir}${testPackage}\" --junitfile ${testResultsOut} -- -tags=validation ${testCase} -timeout=\"60m\" -v\""
 
                         dir("./${patchedConfigsDir}") {
                           sh "docker cp ${containerName}:${rootPath}${configsDir}/$it ."
