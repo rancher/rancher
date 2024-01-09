@@ -952,7 +952,7 @@ def node_template_az():
             "dockerPort": "2376",
             "environment": "AzurePublicCloud",
             "faultDomainCount": "3",
-            "image": "canonical:UbuntuServer:18.04-LTS:latest",
+            "image": "Canonical:0001-com-ubuntu-server-jammy:22_04-lts:latest",
             "location": "westus",
             "managedDisks": False,
             "noPublicIp": False,
