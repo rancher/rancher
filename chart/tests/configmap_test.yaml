@@ -53,6 +53,54 @@ tests:
       - notExists:
           path: data.rancher-webhook
 
+  - it: should set fleet values from string
+    set:
+      fleet: |-
+        newKey: newValue
+        newlist:
+          - list1
+          - list2
+          - list3
+        newMap:
+          entry1: 1
+          entry2: 2
+          entry3:
+            sub3: "sub"
+    asserts:
+      - equal:
+          path: data.fleet
+          value: |-
+            newKey: newValue
+            newlist:
+              - list1
+              - list2
+              - list3
+            newMap:
+              entry1: 1
+              entry2: 2
+              entry3:
+                sub3: "sub"
+
+  - it: should set fleet values from map
+    set:
+      fleet.debug: true
+      fleet.newKey: 2
+      fleet.innerMap:
+        foo: bar
+    asserts:
+      - equal:
+          path: data.fleet
+          value: |-
+            debug: true
+            innerMap:
+              foo: bar
+            newKey: 2
+
+  - it: should not set fleet values
+    asserts:
+      - notExists:
+          path: data.fleet
+
   - it: should set priorityClassName
     set:
       priorityClassName: "super"
