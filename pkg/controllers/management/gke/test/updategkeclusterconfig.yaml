@@ -97,6 +97,8 @@ spec:
     region: ""
     subnetwork: default
     zone: us-central1-c
+    autopilotConfig:
+      enabled: false
   internal: false
   localClusterAuthEndpoint:
     enabled: false
@@ -194,6 +196,8 @@ status:
       region: ""
       subnetwork: default
       zone: us-central1-c
+      autopilotConfig:
+        enabled: false
     internal: false
     localClusterAuthEndpoint:
       enabled: false
@@ -321,6 +325,8 @@ status:
       region: ""
       subnetwork: default
       zone: us-central1-c
+      autopilotConfig:
+        enabled: false
   limits:
     cpu: 287m
     memory: 5433Mi

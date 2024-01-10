@@ -82,6 +82,7 @@ spec:
     region: ""
     subnetwork: default
     zone: us-central1-c
+    autopilotConfig: {}
   internal: false
   localClusterAuthEndpoint:
     enabled: false
