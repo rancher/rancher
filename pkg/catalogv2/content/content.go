@@ -436,6 +436,6 @@ func isHTTP(iconURL string) bool {
 // is from the default rancher official helm catalog and if rancher is operating at bundled mode
 // which means Rancher is at an airgapped environment
 func isRancherAndBundledCatalog(repo repoDef) bool {
-	gitDir := git.RepoDir(repo.metadata.Namespace, repo.metadata.Name, repo.spec.GitRepo)
+	gitDir := git.RepoDir(repo.metadata.Namespace, repo.metadata.Name, repo.status.URL)
 	return (git.IsBundled(gitDir) && settings.SystemCatalog.Get() == "bundled")
 }
