@@ -1,15 +1,21 @@
 package content
 
 import (
+	"fmt"
+	"os"
 	"reflect"
 	"testing"
 	"time"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/rancher/rancher/pkg/catalogv2/git"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/stretchr/testify/assert"
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/repo"
+
+	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestFilterReleasesSemver(t *testing.T) {
@@ -519,4 +525,92 @@ func TestFilteringReleaseKubeVersionAnnotation(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestAirgappedAndBundledIcons(t *testing.T) {
+	// TODO: This test is not complete, it needs to be updated after issue #43958 is resolved
+	// by adding a check for repo.spec.GitRepo
+	changeDefaultRepo := func(name, namespace string) *repoDef {
+		repo := repoDef{
+			typedata: &metav1.TypeMeta{
+				Kind:       "ClusterRepo",
+				APIVersion: "catalog.cattle.io/v1",
+			},
+			metadata: &metav1.ObjectMeta{
+				Name: "rancher-charts",
+			},
+			spec: &v1.RepoSpec{
+				GitRepo:   "https://git.rancher.io/charts",
+				GitBranch: "master",
+			},
+			status: &v1.RepoStatus{
+				URL:                     "https://git.rancher.io/charts",
+				Branch:                  "main",
+				IndexConfigMapNamespace: "cattle-system",
+				Commit:                  "8ecc234c3b2cf1adfeeb36f33ee4679c8c44fd4c",
+			},
+		}
+		if name != "" {
+			repo.metadata.Name = name
+		}
+		if namespace != "" {
+			repo.metadata.Namespace = namespace
+		}
+		return &repo
+	}
+
+	testCases := []struct {
+		// input
+		test                 string
+		repo                 *repoDef
+		settingSystemCatalog string
+		// output
+		expectedResult bool
+	}{
+		{test: "#1.0: pass bundled-mode", repo: changeDefaultRepo("", ""), settingSystemCatalog: "bundled", expectedResult: true},
+		{test: "#1.1: pass bundled-mode", repo: changeDefaultRepo("rancher-partner-charts", ""), settingSystemCatalog: "bundled", expectedResult: true},
+		{test: "#1.2: pass bundled-mode", repo: changeDefaultRepo("rancher-rke2-charts", ""), settingSystemCatalog: "bundled", expectedResult: true},
+		{test: "#1.3: block bundled-mode", repo: changeDefaultRepo("", "some-namespace"), settingSystemCatalog: "bundled", expectedResult: false},
+		{test: "#1.4: block bundled-mode", repo: changeDefaultRepo("not-any-rancher-charts", ""), settingSystemCatalog: "bundled", expectedResult: false},
+		{test: "#2.0: block external-mode", repo: changeDefaultRepo("not-any-rancher-charts", ""), settingSystemCatalog: "external", expectedResult: false},
+		{test: "#2.1: block external-mode", repo: changeDefaultRepo("rancher-charts", ""), settingSystemCatalog: "external", expectedResult: false},
+	}
+
+	assert := assert.New(t)
+	for _, tc := range testCases {
+		settings.SystemCatalog.Set(tc.settingSystemCatalog)
+		var dir string
+		// Rancher does not allow to change the name of the official rancher charts(charts, partner, rke2)
+		if tc.repo.metadata.Name == "rancher-charts" ||
+			tc.repo.metadata.Name == "rancher-partner-charts" ||
+			tc.repo.metadata.Name == "rancher-rke2-charts" {
+
+			dir = fmt.Sprintf("../rancher-data/local-catalogs/v2/%s/%s", tc.repo.metadata.Name, git.Hash(tc.repo.spec.GitRepo))
+			err := createDir(dir)
+			assert.Nil(err, tc.test)
+			defer deleteDir(dir)
+		}
+		result := isRancherAndBundledCatalog(*tc.repo)
+		assert.Equal(tc.expectedResult, result, tc.test)
+	}
+
+	deleteDir("../rancher-data")
+}
+
+func createDir(dir string) error {
+	err := os.MkdirAll(dir, 0755)
+	if err != nil {
+		fmt.Println("Error:", err)
+		return err
+	}
+	return nil
+}
+
+func deleteDir(dir string) error {
+	err := os.RemoveAll(dir)
+	if err != nil {
+		fmt.Println("Error:", err)
+		return err
+	}
+	return nil
 }
