@@ -67,10 +67,10 @@
     },
     "masterAuthorizedNetworks": {},
     "locations": [],
-    "maintenanceWindow": ""
+    "maintenanceWindow": "",
+    "autopilotConfig": {}
   },
   "status": {
-    "phase": "",
-    "failureMessage": ""
+    "phase": ""
   }
 }

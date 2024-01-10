@@ -1,9 +1,10 @@
 package gke
 
 import (
-	"github.com/rancher/rancher/pkg/capr"
 	"reflect"
 	"testing"
+
+	"github.com/rancher/rancher/pkg/capr"
 
 	"github.com/Azure/go-autorest/autorest/to"
 	v1 "github.com/rancher/gke-operator/pkg/apis/gke.cattle.io/v1"
