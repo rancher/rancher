@@ -16,7 +16,7 @@ func Ensure(secret *corev1.Secret, namespace, name, gitURL, commit string, insec
 
 	// If the repositories are rancher managed and if bundled is set
 	// don't fetch anything from upstream.
-	if isBundled(git) && settings.SystemCatalog.Get() == "bundled" {
+	if IsBundled(git.Directory) && settings.SystemCatalog.Get() == "bundled" {
 		return nil
 	}
 
@@ -64,7 +64,7 @@ func Update(secret *corev1.Secret, namespace, name, gitURL, branch string, insec
 		return "", fmt.Errorf("update failure: %w", err)
 	}
 
-	if isBundled(git) && settings.SystemCatalog.Get() == "bundled" {
+	if IsBundled(git.Directory) && settings.SystemCatalog.Get() == "bundled" {
 		return Head(secret, namespace, name, gitURL, branch, insecureSkipTLS, caBundle)
 	}
 
@@ -94,7 +94,7 @@ func Update(secret *corev1.Secret, namespace, name, gitURL, branch string, insec
 	}
 
 	lastCommit, err := git.currentCommit()
-	if err != nil && isBundled(git) {
+	if err != nil && IsBundled(git.Directory) {
 		return Head(secret, namespace, name, gitURL, branch, insecureSkipTLS, caBundle)
 	}
 	return lastCommit, nil
@@ -106,7 +106,7 @@ func gitForRepo(secret *corev1.Secret, namespace, name, gitURL string, insecureS
 		return nil, fmt.Errorf("%w: only http(s) or ssh:// supported", err)
 	}
 
-	dir := gitDir(namespace, name, gitURL)
+	dir := RepoDir(namespace, name, gitURL)
 	headers := map[string]string{}
 	if settings.InstallUUID.Get() != "" {
 		headers["X-Install-Uuid"] = settings.InstallUUID.Get()
