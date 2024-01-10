@@ -4125,6 +4125,23 @@ func (in *GlobalRole) DeepCopyInto(out *GlobalRole) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.NamespacedRules != nil {
+		in, out := &in.NamespacedRules, &out.NamespacedRules
+		*out = make(map[string][]rbacv1.PolicyRule, len(*in))
+		for key, val := range *in {
+			var outVal []rbacv1.PolicyRule
+			if val == nil {
+				(*out)[key] = nil
+			} else {
+				in, out := &val, &outVal
+				*out = make([]rbacv1.PolicyRule, len(*in))
+				for i := range *in {
+					(*in)[i].DeepCopyInto(&(*out)[i])
+				}
+			}
+			(*out)[key] = outVal
+		}
+	}
 	return
 }
 

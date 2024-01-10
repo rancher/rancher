@@ -171,6 +171,13 @@ type GlobalRole struct {
 	// cluster besides the local cluster. To grant permissions in the local cluster, use the Rules field.
 	// +optional
 	InheritedClusterRoles []string `json:"inheritedClusterRoles,omitempty"`
+
+	// NamespacedRules are the rules that are active in each namespace of this GlobalRole.
+	// These are applied to the local cluster only.
+	// * has no special meaning in the keys - these keys are read as raw strings
+	// and must exactly match with one existing namespace.
+	// +optional
+	NamespacedRules map[string][]rbacv1.PolicyRule `json:"namespacedRules,omitempty"`
 }
 
 // +genclient
