@@ -546,27 +546,27 @@ func insertOrUpdateCondition(d data.Object, desiredCondition summary.Condition) 
 }
 
 func migrateCAPIKubeconfigs(w *wrangler.Context) error {
-	logrus.Info("Running CAPI secret migration")
+	logrus.Info("Running provisioningv2 CAPI kubeconfig secret migration")
 
-	mgmtClusters, err := w.Mgmt.Cluster().List(metav1.ListOptions{})
+	namespaces, err := w.Core.Namespace().List(metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
 
-	for _, mgmtCluster := range mgmtClusters.Items {
-		logrus.Tracef("Checking if migration for cluster %s is needed", mgmtCluster.Name)
-
-		provClusters, err := w.Provisioning.Cluster().List(mgmtCluster.Spec.FleetWorkspaceName, metav1.ListOptions{})
+	for _, ns := range namespaces.Items {
+		provClusters, err := w.Provisioning.Cluster().List(ns.Name, metav1.ListOptions{})
 		if k8serror.IsNotFound(err) || len(provClusters.Items) == 0 {
+			logrus.Tracef("No provisioningv2 clusters in namespace %s", ns.Name)
 			continue
 		} else if err != nil {
 			return err
 		}
 		for _, provCluster := range provClusters.Items {
 			if provCluster.Spec.RKEConfig == nil {
+				logrus.Tracef("No provisioningv2 clusters in namespace %s", ns.Name)
 				continue
 			}
-			logrus.Tracef("Running migration for cluster %s", provCluster.Name)
+			logrus.Tracef("Running provisioningv2 CAPI kubeconfig secret migration for cluster %s", provCluster.Name)
 
 			if err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
 				secretName := fmt.Sprintf("%s-kubeconfig", provCluster.Name)
@@ -606,7 +606,7 @@ func migrateCAPIKubeconfigs(w *wrangler.Context) error {
 		}
 	}
 
-	logrus.Info("Finished migrating CAPI kubeconfig secrets")
+	logrus.Info("Finished migrating provisioningv2 CAPI kubeconfig secrets")
 
 	return nil
 }
