@@ -13,7 +13,7 @@ replace (
 	github.com/matryer/moq => github.com/rancher/moq v0.0.0-20200712062324-13d1f37d2d77
 	github.com/opencontainers/runc => github.com/opencontainers/runc v1.1.5
 
-	github.com/rancher/machine => github.com/rancher/machine v0.15.0-rancher108
+	github.com/rancher/machine => github.com/rancher/machine v0.15.0-rancher109
 	github.com/rancher/rancher/pkg/apis => ./pkg/apis
 	github.com/rancher/rancher/pkg/client => ./pkg/client
 
@@ -115,7 +115,7 @@ require (
 	github.com/rancher/gke-operator v1.1.6
 	github.com/rancher/kubernetes-provider-detector v0.1.5
 	github.com/rancher/lasso v0.0.0-20230830164424-d684fdeb6f29
-	github.com/rancher/machine v0.15.0-rancher108
+	github.com/rancher/machine v0.15.0-rancher109
 	github.com/rancher/norman v0.0.0-20230811152901-078862e5648c
 	github.com/rancher/rancher/pkg/apis v0.0.0
 	github.com/rancher/rancher/pkg/client v0.0.0
