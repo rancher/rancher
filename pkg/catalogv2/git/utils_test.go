@@ -50,7 +50,7 @@ func Test_gitDir(t *testing.T) {
 		// NOTE(manno): cannot test the other cases without poluting the filesystem
 	}
 	for _, tc := range testCases {
-		actual := gitDir(tc.namespace, tc.name, tc.gitURL)
+		actual := RepoDir(tc.namespace, tc.name, tc.gitURL)
 		assert.Equalf(tc.expected, actual, "testcase: %v", tc)
 	}
 }
