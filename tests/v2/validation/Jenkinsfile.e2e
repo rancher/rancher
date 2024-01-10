@@ -136,9 +136,9 @@ node {
             stage('Run Validation Tests') {
               try {
                 sh "docker run --volumes-from ${buildTestContainer} --name ${golangTestContainer} -t --env-file ${envFile} " +
-                "${golangImageName} sh -c \"gotestsum --format standard-verbose --packages=${testsDir} --junitfile ${testResultsOut}  --jsonfile ${testResultsJSON} -- -tags=${TAGS} ${GOTEST_TESTCASE} -timeout=${timeout} -v" +
-                ".${rootPath}pipeline/scripts/build_qase_reporter.sh;" +
-                ".${rootPath}reporter\""
+                "${golangImageName} sh -c \"gotestsum --format standard-verbose --packages=${testsDir} --junitfile ${testResultsOut}  --jsonfile ${testResultsJSON} -- -tags=${TAGS} ${GOTEST_TESTCASE} -timeout=${timeout} -v;" +
+                "${workPath}pipeline/scripts/build_qase_reporter.sh;" +
+                "${workPath}reporter\""
               } catch(err) {
                 echo 'Validation tests had failures. Aborting'
               }
@@ -164,8 +164,6 @@ node {
             stage('Test Report') {
               try {
                 sh "docker cp ${golangTestContainer}:${rootPath}${testResultsOut} ."
-                sh "docker cp ${golangTestContainer}:${rootPath}${testResultsJSON} ./tests/v2/validation/pipeline/"
-                sh "./rancher/tests/v2/validation/pipeline/reporter"
                 step([$class: 'JUnitResultArchiver', testResults: "**/${testResultsOut}"])
               } catch (err) {
                 sh "docker stop ${buildTestContainer}"
