@@ -4,7 +4,7 @@
 
 case $RELEASE_TYPE in
   rc)
-    REQUIRED_VALUE="dev-v2.8"
+    REQUIRED_VALUE="dev-v2.9"
     ;;
   final-rc)
     REQUIRED_VALUE="release-v2.8"
