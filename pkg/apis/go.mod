@@ -8,7 +8,7 @@ replace (
 	github.com/rancher/gke-operator => github.com/chiukapoor/gke-operator v1.2.0-rc1.0.20231010103656-076270b7415e
 	github.com/rancher/lasso => github.com/chiukapoor/lasso v0.0.0-20231221135158-60fc8272e89b
 	github.com/rancher/norman => github.com/chiukapoor/norman v0.0.0-20231221141953-5e228989dd69
-	github.com/rancher/rke => github.com/chiukapoor/rke v1.28.2-rancher1-4
+	github.com/rancher/rke => github.com/chiukapoor/rke v1.5.0-rc5.0.20240110041315-0e20ca14d423
 	github.com/rancher/wrangler/v2 => github.com/chiukapoor/wrangler/v2 v2.1.1-0.20231221140509-f00647b9ebd3
 	k8s.io/client-go => github.com/chiukapoor/client-go v1.28.2-rancher1
 )
@@ -109,7 +109,7 @@ require (
 	k8s.io/component-base v0.28.5 // indirect
 	k8s.io/klog/v2 v2.100.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20230717233707-2695361300d9 // indirect
-	k8s.io/kubernetes v1.28.2 // indirect
+	k8s.io/kubernetes v1.28.5 // indirect
 	k8s.io/utils v0.0.0-20230505201702-9f6742963106 // indirect
 	sigs.k8s.io/cli-utils v0.28.0 // indirect
 	sigs.k8s.io/controller-runtime v0.15.1 // indirect

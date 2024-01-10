@@ -767,8 +767,8 @@ github.com/chiukapoor/machine v0.15.0-rancher99.0.20231221153614-6db16c8a83e1 h1
 github.com/chiukapoor/machine v0.15.0-rancher99.0.20231221153614-6db16c8a83e1/go.mod h1:YjmRy9ZdOPJwk/LKQ2UeDiRM+E0eLkXAO5pi6RisYEU=
 github.com/chiukapoor/norman v0.0.0-20231221141953-5e228989dd69 h1:YCH4K0YdxwhwJLJWxTnsji7Txn1rQFzfUqMW8HHR/w0=
 github.com/chiukapoor/norman v0.0.0-20231221141953-5e228989dd69/go.mod h1:qPK2givwOvNXla1EhQa2sXaHaJfP42InI6I1Xy3kBG8=
-github.com/chiukapoor/rke v1.28.2-rancher1-4 h1:IJs/yUi4S8YlEeuMu2Da2yS4sl35hS/+3PMwtq1UgTo=
-github.com/chiukapoor/rke v1.28.2-rancher1-4/go.mod h1:S9eHTiK8TJqa6JqRco2PnuH8bQJXiHXQ1kUEsT1O5eE=
+github.com/chiukapoor/rke v1.5.0-rc5.0.20240110041315-0e20ca14d423 h1:pBYJsd6M/tFr3v0PCcSooPlGLlt80XdCqfaSV37BlEE=
+github.com/chiukapoor/rke v1.5.0-rc5.0.20240110041315-0e20ca14d423/go.mod h1:8ct7SURAcx+3oizyK3LaTPAfNMUpOV7GF7klJBwi0R4=
 github.com/chiukapoor/steve v0.0.0-20231221152211-fa7f1b79a995 h1:hwZwYTlQonSk2WpHtfaowIiN0r346n7+d+LfdVIw5ug=
 github.com/chiukapoor/steve v0.0.0-20231221152211-fa7f1b79a995/go.mod h1:v1fi6gEsLvtoTeisJzLsYq9HroAV4e51vqyFOmM+O0g=
 github.com/chiukapoor/wrangler/v2 v2.1.1-0.20231221140509-f00647b9ebd3 h1:MXIl3h5DnbgYn3t9L+Jpsh1ikAC8xCQ8fxp8YagOrBQ=

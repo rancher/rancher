@@ -12,7 +12,7 @@ replace (
 	github.com/rancher/lasso => github.com/chiukapoor/lasso v0.0.0-20231221135158-60fc8272e89b
 	github.com/rancher/machine => github.com/chiukapoor/machine v0.15.0-rancher99.0.20231221153614-6db16c8a83e1
 	github.com/rancher/norman => github.com/chiukapoor/norman v0.0.0-20231221141953-5e228989dd69
-	github.com/rancher/rke => github.com/chiukapoor/rke v1.28.2-rancher1-4
+	github.com/rancher/rke => github.com/chiukapoor/rke v1.5.0-rc5.0.20240110041315-0e20ca14d423
 	github.com/rancher/steve => github.com/chiukapoor/steve v0.0.0-20231221152211-fa7f1b79a995
 	github.com/rancher/wrangler/v2 => github.com/chiukapoor/wrangler/v2 v2.1.1-0.20231221140509-f00647b9ebd3
 	k8s.io/client-go => github.com/chiukapoor/client-go v0.28.5-rancher1-1
@@ -171,8 +171,8 @@ require (
 	k8s.io/gengo v0.0.0-20230306165830-ab3349d207d4
 	k8s.io/helm v2.16.7+incompatible
 	k8s.io/kube-aggregator v0.28.5
-	k8s.io/kubectl v0.28.2
-	k8s.io/kubernetes v1.28.2
+	k8s.io/kubectl v0.28.5
+	k8s.io/kubernetes v1.28.5
 	k8s.io/utils v0.0.0-20230505201702-9f6742963106
 	sigs.k8s.io/aws-iam-authenticator v0.5.9
 	sigs.k8s.io/cluster-api v1.5.2
@@ -258,7 +258,7 @@ require (
 	k8s.io/controller-manager v0.28.5 // indirect
 	k8s.io/kms v0.28.5 // indirect
 	k8s.io/kubelet v0.27.4 // indirect
-	k8s.io/pod-security-admission v0.28.2 // indirect
+	k8s.io/pod-security-admission v0.28.5 // indirect
 )
 
 require (
