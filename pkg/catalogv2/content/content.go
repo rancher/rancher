@@ -181,8 +181,18 @@ func (c *Manager) Icon(namespace, name, chartName, version string) (io.ReadClose
 
 	// If the chart icon is not an HTTP URL and the repository has a commit status,
 	// attempt to get the icon from the git repository.
+	// If the chart icon is not an HTTP URL and the repository has a commit status,
+	// attempt to get the icon from the git repository.
 	if !isHTTP(chart.Icon) && repo.status.Commit != "" {
 		return git.Icon(namespace, name, repo.status.URL, chart)
+	}
+
+	// Check if the repository from the chart is bundled and is at an airgapped environment
+	rancherBundled := isRancherAndBundledCatalog(repo)
+	if rancherBundled {
+		// If the icon is not available in the git repository, use the fallback icon for airgapped environments.
+		// which will be handled by the UI, as long as this returns a nil io.ReadCloser and nil error.
+		return nil, "", nil
 	}
 
 	// Check if the repository from the chart is bundled and is at an airgapped environment
@@ -436,6 +446,6 @@ func isHTTP(iconURL string) bool {
 // is from the default rancher official helm catalog and if rancher is operating at bundled mode
 // which means Rancher is at an airgapped environment
 func isRancherAndBundledCatalog(repo repoDef) bool {
-	gitDir := git.RepoDir(repo.metadata.Namespace, repo.metadata.Name, repo.status.URL)
+	gitDir := git.RepoDir(repo.metadata.Namespace, repo.metadata.Name, repo.spec.GitRepo)
 	return (git.IsBundled(gitDir) && settings.SystemCatalog.Get() == "bundled")
 }
