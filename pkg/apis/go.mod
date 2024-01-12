@@ -10,7 +10,7 @@ replace (
 	github.com/rancher/norman => github.com/chiukapoor/norman v0.0.0-20231221141953-5e228989dd69
 	github.com/rancher/rke => github.com/chiukapoor/rke v1.5.0-rc5.0.20240110041315-0e20ca14d423
 	github.com/rancher/wrangler/v2 => github.com/chiukapoor/wrangler/v2 v2.1.1-0.20231221140509-f00647b9ebd3
-	k8s.io/client-go => github.com/chiukapoor/client-go v1.28.2-rancher1
+	k8s.io/client-go => github.com/chiukapoor/client-go v0.28.5-rancher1-1
 )
 
 replace (

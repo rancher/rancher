@@ -8,8 +8,8 @@ github.com/cespare/xxhash/v2 v2.2.0 h1:DC2CZ1Ep5Y4k3ZQ899DldepgrayRUGE6BBZ/cd9Cj
 github.com/cespare/xxhash/v2 v2.2.0/go.mod h1:VGX0DQ3Q6kWi7AoAeZDth3/j3BFtOZR5XLFGgcrjCOs=
 github.com/chiukapoor/aks-operator v1.2.0-rc1.0.20231010094840-297c8e7d210d h1:JphCK4s/3FRoUnivXp4Nm4dtGf448NJz932C277xIho=
 github.com/chiukapoor/aks-operator v1.2.0-rc1.0.20231010094840-297c8e7d210d/go.mod h1:NjAGLzK4yHsQ1PBPpdhMSrZnmdzPhnrlrLpyV7opLF8=
-github.com/chiukapoor/client-go v1.28.2-rancher1 h1:WGHnzanE43X/G6Wg8qyRW7muXFCN4htDHh7HAhS+oZo=
-github.com/chiukapoor/client-go v1.28.2-rancher1/go.mod h1:sMkApowspLuc7omj1FOSUxSoqjr+d5Q0Yc0LOFnYFJY=
+github.com/chiukapoor/client-go v0.28.5-rancher1-1 h1:sgMsmVq4w2BTigjtSMOqwPN0mPPf2t3vHL0EUGVRLo4=
+github.com/chiukapoor/client-go v0.28.5-rancher1-1/go.mod h1:+pt086yx1i0HAlHzM9S+RZQDqdlzuXFl4hY01uhpcpA=
 github.com/chiukapoor/eks-operator v1.3.0-rc1.0.20231010101059-155564c3594a h1:ZEreoc1ru/dwozjFTFQIdR4a6RYc1Q/zPbIS9slM8TQ=
 github.com/chiukapoor/eks-operator v1.3.0-rc1.0.20231010101059-155564c3594a/go.mod h1:ubvYHBzorGFU7Fj2XlZgVBT5gK2zeouWAMhcanPAbxs=
 github.com/chiukapoor/gke-operator v1.2.0-rc1.0.20240112081418-ae8fd015a0e5 h1:+riN/CEGSTNHJrztO8cv5yv1RMXAhIjf79XwC6N8poA=
