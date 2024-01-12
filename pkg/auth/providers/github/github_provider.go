@@ -2,8 +2,10 @@ package github
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 
@@ -66,8 +68,37 @@ func (g *ghProvider) CustomizeSchema(schema *types.Schema) {
 
 func (g *ghProvider) TransformToAuthProvider(authConfig map[string]interface{}) (map[string]interface{}, error) {
 	p := common.TransformToAuthProvider(authConfig)
-	p[publicclient.GithubProviderFieldRedirectURL] = formGithubRedirectURLFromMap(authConfig)
+
+	hostname, _ := authConfig[client.GithubConfigFieldHostname].(string)
+	redirectUrl := formGithubRedirectURLFromMap(authConfig)
+
+	p[publicclient.GithubProviderFieldRedirectURL] = redirectUrl
+	p[publicclient.GithubProviderFieldScopes] = []string{"user"}
+	p[publicclient.GithubProviderFieldEndpoints] = uglyObjToMap(makeGithubEndpoints(hostname))
+	p[publicclient.GithubProviderFieldAuthClientInfo] = uglyObjToMap(v32.OAuthAuthorizationInfo{
+		ClientID:     os.Getenv("CATTLE_OAUTH_AUTH_CLIENT_ID"),
+		ClientSecret: os.Getenv("CATTLE_OAUTH_AUTH_CLIENT_SECRET"),
+		RedirectURL:  "http://localhost:53000",
+	})
+	p[publicclient.GithubProviderFieldDeviceClientInfo] = uglyObjToMap(v32.OAuthDeviceInfo{
+		ClientID: os.Getenv("CATTLE_OAUTH_DEVICE_CLIENT_ID"),
+	})
 	return p, nil
+}
+
+func uglyObjToMap(v any) map[string]any {
+	bytes, _ := json.Marshal(v)
+	result := make(map[string]any)
+	_ = json.Unmarshal(bytes, &result)
+	return result
+}
+
+func makeGithubEndpoints(hostname string) v32.OAuthEndpoint {
+	return v32.OAuthEndpoint{
+		AuthURL:       fmt.Sprintf("https://%s/login/oauth/authorize", hostname),
+		TokenURL:      fmt.Sprintf("https://%s/login/oauth/access_token", hostname),
+		DeviceAuthURL: fmt.Sprintf("https://%s/login/device/code", hostname),
+	}
 }
 
 func (g *ghProvider) getGithubConfigCR() (*v32.GithubConfig, error) {
@@ -176,12 +207,19 @@ func (g *ghProvider) LoginUser(host string, githubCredential *v32.GithubLogin, c
 	}
 
 	config = choseClientID(host, config)
-	securityCode := githubCredential.Code
+	if githubCredential.AccessToken == "" && githubCredential.Code == "" {
+		return v3.Principal{}, nil, "", fmt.Errorf("neither code nor access token is provided")
+	}
 
-	accessToken, err := g.githubClient.getAccessToken(securityCode, config)
-	if err != nil {
-		logrus.Infof("Error generating accessToken from github %v", err)
-		return v3.Principal{}, nil, "", err
+	accessToken := githubCredential.AccessToken
+	if githubCredential.Code != "" {
+		securityCode := githubCredential.Code
+
+		accessToken, err = g.githubClient.getAccessToken(securityCode, config)
+		if err != nil {
+			logrus.Infof("Error generating accessToken from github %v", err)
+			return v3.Principal{}, nil, "", err
+		}
 	}
 
 	user, err := g.githubClient.getUser(accessToken, config)

@@ -4,6 +4,23 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+type OAuthEndpoint struct {
+	AuthURL       string `json:"authUrl"`
+	DeviceAuthURL string `json:"deviceAuthUrl"`
+	TokenURL      string `json:"tokenUrl"`
+}
+
+type OAuthAuthorizationInfo struct {
+	ClientID     string `json:"clientId"`
+	ClientSecret string `json:"clientSecret"`
+	RedirectURL  string `json:"redirectUrl"`
+}
+
+type OAuthDeviceInfo struct {
+	ClientID     string `json:"clientId"`
+	ClientSecret string `json:"clientSecret"`
+}
+
 // +genclient
 // +kubebuilder:skipversion
 // +genclient:nonNamespaced
@@ -14,6 +31,17 @@ type AuthProvider struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	Type string `json:"type"`
+
+	Scopes    []string      `json:"scopes"`
+	Endpoints OAuthEndpoint `json:"endpoints"`
+
+	// AuthClientInfo is the info required for the Authorization Code grant. It
+	// is optional because not every provider supports it.
+	AuthClientInfo *OAuthAuthorizationInfo `json:"authClientInfo,omitempty"`
+
+	// DeviceClientInfo is the info required for the Device Code grant.
+	// It is optional because not every provider supports it.
+	DeviceClientInfo *OAuthDeviceInfo `json:"deviceClientInfo,omitempty"`
 }
 
 // +genclient
@@ -62,12 +90,19 @@ type GithubProvider struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	AuthProvider      `json:",inline"`
 
+	// RedirectURL is for the UI flow which will be different than the CLI one
 	RedirectURL string `json:"redirectUrl"`
 }
 
 type GithubLogin struct {
 	GenericLogin `json:",inline"`
-	Code         string `json:"code" norman:"type=string,required"`
+
+	// AccessToken is the Oauth 2.0 access token received after an
+	// authentication flow.
+	AccessToken string `json:"access_token" norman:"type=string"`
+
+	// Deprecated: Send us an access token instead.
+	Code string `json:"code" norman:"type=string"`
 }
 
 // +genclient
@@ -85,7 +120,13 @@ type GoogleOAuthProvider struct {
 
 type GoogleOauthLogin struct {
 	GenericLogin `json:",inline"`
-	Code         string `json:"code" norman:"type=string,required"`
+
+	// AccessToken is the Oauth 2.0 access token received after an
+	// authentication flow.
+	AccessToken string `json:"access_token" norman:"type=string"`
+
+	// Deprecated: Send us an access token instead.
+	Code string `json:"code" norman:"type=string,required"`
 }
 
 // +genclient

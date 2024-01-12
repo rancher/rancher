@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -87,18 +88,28 @@ func (g *googleOauthProvider) loginUser(c context.Context, googleOAuthCredential
 		}
 	}
 
-	logrus.Debugf("[Google OAuth] loginuser: Using code to get oauth token")
-	securityCode := googleOAuthCredential.Code
+	if googleOAuthCredential.AccessToken == "" && googleOAuthCredential.Code == "" {
+		return v3.Principal{}, nil, "", fmt.Errorf("neither code nor access token is provided")
+	}
+
 	oauth2Config, err := google.ConfigFromJSON([]byte(config.OauthCredential), scopes...)
 	if err != nil {
 		return userPrincipal, groupPrincipals, "", err
 	}
-	// Exchange the code for oauthToken
-	gOAuthToken, err := oauth2Config.Exchange(c, securityCode)
-	if err != nil {
-		return userPrincipal, groupPrincipals, "", err
+
+	gOAuthToken := &oauth2.Token{
+		AccessToken: googleOAuthCredential.AccessToken,
 	}
-	logrus.Debugf("[Google OAuth] loginuser: Exchanged code for oauth token")
+	if googleOAuthCredential.Code != "" {
+		logrus.Debugf("[Google OAuth] loginuser: Using code to get oauth token")
+		securityCode := googleOAuthCredential.Code
+		// Exchange the code for oauthToken
+		gOAuthToken, err = oauth2Config.Exchange(c, securityCode)
+		if err != nil {
+			return userPrincipal, groupPrincipals, "", err
+		}
+		logrus.Debugf("[Google OAuth] loginuser: Exchanged code for oauth token")
+	}
 
 	// init the admin directory service
 	adminSvc, err := g.getDirectoryService(c, config.AdminEmail, []byte(config.ServiceAccountCredential), oauth2Config.TokenSource(c, gOAuthToken))
@@ -249,7 +260,34 @@ func (g *googleOauthProvider) TransformToAuthProvider(authConfig map[string]inte
 		return nil, err
 	}
 	p[publicclient.GoogleOAuthProviderFieldRedirectURL] = val
+	p[publicclient.GoogleOAuthProviderFieldScopes] = []string{"openid", "profile", "email"}
+	p[publicclient.GoogleOAuthProviderFieldEndpoints] = uglyObjToMap(makeGoogleEndpoints())
+	p[publicclient.GoogleOAuthProviderFieldAuthClientInfo] = uglyObjToMap(v32.OAuthAuthorizationInfo{
+		ClientID:     os.Getenv("CATTLE_OAUTH_AUTH_CLIENT_ID"),
+		ClientSecret: os.Getenv("CATTLE_OAUTH_AUTH_CLIENT_SECRET"),
+		RedirectURL:  "http://localhost:53000",
+	})
+	p[publicclient.GoogleOAuthProviderFieldDeviceClientInfo] = uglyObjToMap(v32.OAuthDeviceInfo{
+		ClientID:     os.Getenv("CATTLE_OAUTH_DEVICE_CLIENT_ID"),
+		ClientSecret: os.Getenv("CATTLE_OAUTH_DEVICE_CLIENT_SECRET"),
+	})
+
 	return p, nil
+}
+
+func uglyObjToMap(v any) map[string]any {
+	bytes, _ := json.Marshal(v)
+	result := make(map[string]any)
+	_ = json.Unmarshal(bytes, &result)
+	return result
+}
+
+func makeGoogleEndpoints() v32.OAuthEndpoint {
+	return v32.OAuthEndpoint{
+		AuthURL:       "https://accounts.google.com/o/oauth2/auth",
+		TokenURL:      "https://oauth2.googleapis.com/token",
+		DeviceAuthURL: "https://oauth2.googleapis.com/device/code",
+	}
 }
 
 func (g *googleOauthProvider) RefetchGroupPrincipals(principalID string, secret string) ([]v3.Principal, error) {
