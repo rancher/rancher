@@ -71,9 +71,6 @@ func runMigrations(wranglerContext *wrangler.Context) error {
 		if err := migrateMachinePoolsDynamicSchemaLabel(wranglerContext); err != nil {
 			return err
 		}
-		if err := migrateCAPIKubeconfigs(wranglerContext); err != nil {
-			return fmt.Errorf("running capi kubeconfig migration: %w", err)
-		}
 	}
 
 	return nil
@@ -542,70 +539,4 @@ func insertOrUpdateCondition(d data.Object, desiredCondition summary.Condition) 
 	d.SetNested(conditions, "status", "conditions")
 
 	return true, nil
-}
-
-func migrateCAPIKubeconfigs(w *wrangler.Context) error {
-	logrus.Info("Running provisioningv2 CAPI kubeconfig secret migration")
-
-	namespaces, err := w.Core.Namespace().List(metav1.ListOptions{})
-	if err != nil {
-		return err
-	}
-
-	for _, ns := range namespaces.Items {
-		provClusters, err := w.Provisioning.Cluster().List(ns.Name, metav1.ListOptions{})
-		if k8serror.IsNotFound(err) || len(provClusters.Items) == 0 {
-			logrus.Tracef("No provisioningv2 clusters in namespace %s", ns.Name)
-			continue
-		} else if err != nil {
-			return err
-		}
-		for _, provCluster := range provClusters.Items {
-			if provCluster.Spec.RKEConfig == nil {
-				logrus.Tracef("No provisioningv2 clusters in namespace %s", ns.Name)
-				continue
-			}
-			logrus.Tracef("Running provisioningv2 CAPI kubeconfig secret migration for cluster %s", provCluster.Name)
-
-			if err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-				secretName := fmt.Sprintf("%s-kubeconfig", provCluster.Name)
-
-				secret, err := w.Core.Secret().Get(provCluster.Namespace, secretName, metav1.GetOptions{})
-				if err != nil {
-					if k8serror.IsNotFound(err) {
-						return nil
-					}
-
-					return fmt.Errorf("getting secret %s/%s: %w", provCluster.Namespace, secretName, err)
-				}
-
-				_, ok := secret.Labels[capi.ClusterNameLabel]
-				if ok {
-					logrus.Tracef("kubeconfig secret %s/%s already has the capi cluster label", provCluster.Namespace, secret.Name)
-					return nil
-				}
-
-				secretCopy := secret.DeepCopy()
-				if secretCopy.Labels == nil {
-					secretCopy.Labels = map[string]string{}
-				}
-				secretCopy.Labels[capi.ClusterNameLabel] = provCluster.Name
-
-				if _, updateErr := w.Core.Secret().Update(secretCopy); updateErr != nil {
-					return fmt.Errorf("updating secret %s/%s to add capi label: %w", provCluster.Namespace, secret.Name, err)
-				}
-
-				logrus.Debugf("Updated kubeconfig secret %s/%s with CAPI cluster label", provCluster.Namespace, secret.Name)
-
-				return nil
-
-			}); err != nil {
-				return err
-			}
-		}
-	}
-
-	logrus.Info("Finished migrating provisioningv2 CAPI kubeconfig secrets")
-
-	return nil
 }
