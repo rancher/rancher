@@ -22,7 +22,7 @@ require (
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
-	github.com/rancher/wrangler/v2 v2.1.1-0.20230906224618-0a0c44968689 // indirect
+	github.com/rancher/wrangler v1.1.1-0.20230831050635-df1bd5aae9df // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	golang.org/x/sys v0.15.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
