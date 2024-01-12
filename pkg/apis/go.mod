@@ -1,31 +1,42 @@
 module github.com/rancher/rancher/pkg/apis
 
-go 1.20
-
-replace github.com/rancher/rke => github.com/chiukapoor/rke v1.5.0-rc5.0.20240213203043-d6798a8c1c74
+go 1.21
 
 replace (
-	k8s.io/api => k8s.io/api v0.28.6
-	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.28.6
-	k8s.io/apimachinery => k8s.io/apimachinery v0.28.6
-	k8s.io/apiserver => k8s.io/apiserver v0.28.6
-	k8s.io/cli-runtime => k8s.io/cli-runtime v0.28.6
-	k8s.io/client-go => github.com/rancher/client-go v1.28.6-rancher1
-	k8s.io/cloud-provider => k8s.io/cloud-provider v0.28.6
-	k8s.io/component-base => k8s.io/component-base v0.28.6
-	k8s.io/controller-manager => k8s.io/controller-manager v0.28.6
-	k8s.io/cri-api => k8s.io/cri-api v0.28.6
-	k8s.io/csi-translation-lib => k8s.io/csi-translation-lib v0.28.6
-	k8s.io/dynamic-resource-allocation => k8s.io/dynamic-resource-allocation v0.28.6
-	k8s.io/kube-controller-manager => k8s.io/kube-controller-manager v0.28.6
-	k8s.io/kube-proxy => k8s.io/kube-proxy v0.28.6
-	k8s.io/kube-scheduler => k8s.io/kube-scheduler v0.28.6
-	k8s.io/kubectl => k8s.io/kubectl v0.28.6
-	k8s.io/kubelet => k8s.io/kubelet v0.28.6
-	k8s.io/legacy-cloud-providers => k8s.io/legacy-cloud-providers v0.28.6
-	k8s.io/mount-utils => k8s.io/mount-utils v0.28.6
-	k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.28.6
-	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.28.6
+	github.com/rancher/aks-operator => github.com/krunalhinguu/aks-operator v1.29.0-rancher2
+	github.com/rancher/eks-operator => github.com/krunalhinguu/eks-operator v1.29.0-rancher3
+	github.com/rancher/gke-operator => github.com/krunalhinguu/gke-operator v1.29.0-rancher2
+	github.com/rancher/lasso => github.com/krunalhinguu/lasso v1.29.0-rancher1
+	github.com/rancher/norman => github.com/krunalhinguu/norman v1.29.0-rancher2
+	github.com/rancher/rke => github.com/krunalhinguu/rke v1.29.0-rancher2
+	github.com/rancher/wrangler/v2 => github.com/krunalhinguu/wrangler/v2 v2.29.0-rancher1
+	k8s.io/client-go => github.com/krunalhinguu/client-go v1.29.0-rancher1
+)
+
+replace (
+	// wrangler bracnhes need to be updated before replace can be removed
+	// github.com/rancher/wrangler v1.1.1 => github.com/rancher/wrangler v1.1.1-0.20230831050635-df1bd5aae9df
+	k8s.io/api => k8s.io/api v0.29.0
+	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.29.0
+	k8s.io/apimachinery => k8s.io/apimachinery v0.29.0
+	k8s.io/apiserver => k8s.io/apiserver v0.29.0
+	k8s.io/cli-runtime => k8s.io/cli-runtime v0.29.0
+	// k8s.io/client-go => github.com/rancher/client-go v1.27.4-rancher1
+	k8s.io/cloud-provider => k8s.io/cloud-provider v0.29.0
+	k8s.io/component-base => k8s.io/component-base v0.29.0
+	k8s.io/controller-manager => k8s.io/controller-manager v0.29.0
+	k8s.io/cri-api => k8s.io/cri-api v0.29.0
+	k8s.io/csi-translation-lib => k8s.io/csi-translation-lib v0.29.0
+	k8s.io/dynamic-resource-allocation => k8s.io/dynamic-resource-allocation v0.29.0
+	k8s.io/kube-controller-manager => k8s.io/kube-controller-manager v0.29.0
+	k8s.io/kube-proxy => k8s.io/kube-proxy v0.29.0
+	k8s.io/kube-scheduler => k8s.io/kube-scheduler v0.29.0
+	k8s.io/kubectl => k8s.io/kubectl v0.29.0
+	k8s.io/kubelet => k8s.io/kubelet v0.29.0
+	k8s.io/legacy-cloud-providers => k8s.io/legacy-cloud-providers v0.29.0
+	k8s.io/mount-utils => k8s.io/mount-utils v0.29.0
+	k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.29.0
+	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.29.0
 )
 
 require (
@@ -37,9 +48,9 @@ require (
 	github.com/rancher/rke v1.5.3
 	github.com/rancher/wrangler/v2 v2.1.3
 	github.com/sirupsen/logrus v1.9.3
-	k8s.io/api v0.28.6
-	k8s.io/apimachinery v0.28.6
-	sigs.k8s.io/cluster-api v1.5.5
+	k8s.io/api v0.29.0
+	k8s.io/apimachinery v0.29.0
+	sigs.k8s.io/cluster-api v1.5.2
 )
 
 require (
@@ -50,7 +61,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/emicklei/go-restful/v3 v3.11.0 // indirect
 	github.com/evanphx/json-patch/v5 v5.6.0 // indirect
-	github.com/fsnotify/fsnotify v1.6.0 // indirect
+	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/ghodss/yaml v1.0.0 // indirect
 	github.com/go-logr/logr v1.3.0 // indirect
 	github.com/go-openapi/jsonpointer v0.19.6 // indirect
@@ -91,17 +102,17 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	k8s.io/apiextensions-apiserver v0.28.6 // indirect
-	k8s.io/apiserver v0.28.6 // indirect
+	k8s.io/apiextensions-apiserver v0.29.0 // indirect
+	k8s.io/apiserver v0.29.0 // indirect
 	k8s.io/client-go v12.0.0+incompatible // indirect
-	k8s.io/component-base v0.28.6 // indirect
-	k8s.io/klog/v2 v2.100.1 // indirect
-	k8s.io/kube-openapi v0.0.0-20230717233707-2695361300d9 // indirect
-	k8s.io/kubernetes v1.28.6 // indirect
-	k8s.io/utils v0.0.0-20230505201702-9f6742963106 // indirect
+	k8s.io/component-base v0.29.0 // indirect
+	k8s.io/klog/v2 v2.110.1 // indirect
+	k8s.io/kube-openapi v0.0.0-20231010175941-2dd684a91f00 // indirect
+	k8s.io/kubernetes v1.28.2 // indirect
+	k8s.io/utils v0.0.0-20230726121419-3b25d923346b // indirect
 	sigs.k8s.io/cli-utils v0.28.0 // indirect
 	sigs.k8s.io/controller-runtime v0.15.3 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
-	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
-	sigs.k8s.io/yaml v1.4.0 // indirect
+	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
+	sigs.k8s.io/yaml v1.3.0 // indirect
 )
