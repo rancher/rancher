@@ -204,7 +204,7 @@ if ( true == via_webhook() && (!(rancher_version ==~ rancher_version_regex)) ) {
                           RKE_VERSION = "v1.5.0-rc4"
                         }
                         if (!env.RANCHER_K3S_VERSION) {
-                          RANCHER_K3S_VERSION = "v1.28.2+k3s1"
+                          RANCHER_K3S_VERSION = "v1.29.0+k3s1"
                         }
                       }              
 
