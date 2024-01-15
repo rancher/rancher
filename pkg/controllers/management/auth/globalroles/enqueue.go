@@ -104,6 +104,8 @@ func (g *globalRBACEnqueuer) clusterEnqueueGRs(_, _ string, obj runtime.Object) 
 		if len(globalRole.InheritedClusterRoles) == 0 {
 			continue
 		}
+		// Set the status as InProgress since we have to reconcile the global role
+		globalRole.Status.Summary = SummaryInProgress
 		rolesToSync = append(rolesToSync, relatedresource.Key{Name: globalRole.Name})
 	}
 	// attempt to update the cluster with a sync annotation - this is costly since it will re-enqueue all grs
@@ -178,6 +180,8 @@ func (g *globalRBACEnqueuer) roleEnqueueGR(_, _ string, obj runtime.Object) ([]r
 
 	grNames := make([]relatedresource.Key, 0, len(grs))
 	for _, gr := range grs {
+		// Set the status as InProgress since we have to reconcile the global role
+		gr.Status.Summary = SummaryInProgress
 		grNames = append(grNames, relatedresource.Key{Name: gr.Name})
 	}
 	return grNames, nil
@@ -229,6 +233,8 @@ func (g *globalRBACEnqueuer) namespaceEnqueueGR(_, _ string, obj runtime.Object)
 	}
 	grNames := make([]relatedresource.Key, 0, len(grs))
 	for _, gr := range grs {
+		// Set the status as InProgress since we have to reconcile the global role
+		gr.Status.Summary = SummaryInProgress
 		grNames = append(grNames, relatedresource.Key{Name: gr.Name})
 	}
 	return grNames, nil
