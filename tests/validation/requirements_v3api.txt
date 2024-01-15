@@ -1,6 +1,6 @@
 git+https://github.com/rancher/client-python.git@master#egg=client-python
 boto3==1.21.46
-cryptography==41.0.3
+cryptography==41.0.6
 flake8==3.5.0
 invoke==1.2.0
 Jinja2==3.1.3
