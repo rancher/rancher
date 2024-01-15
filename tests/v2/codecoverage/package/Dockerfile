@@ -1,8 +1,25 @@
-FROM registry.suse.com/bci/bci-base:15.5
+FROM registry.suse.com/bci/bci-micro:15.5 AS final
 
-RUN zypper -n install --no-recommends git-core curl ca-certificates unzip xz gzip sed tar shadow gawk vim-small netcat-openbsd mkisofs && \
-    zypper -n clean -a && rm -rf /tmp/* /var/tmp/* /usr/share/doc/packages/* && \
-    useradd rancher && \
+# Temporary build stage image
+FROM registry.suse.com/bci/bci-base:15.5 AS builder
+
+# Install system packages using builder image that has zypper
+COPY --from=final / /chroot/
+
+# Install some packages with zypper in the chroot of the final micro image
+RUN zypper --installroot /chroot -n --gpg-auto-import-keys in --no-recommends \
+    git-core curl ca-certificates unzip xz gzip sed tar shadow gawk vim-small \
+    netcat-openbsd mkisofs openssh-clients && \
+    zypper --installroot /chroot clean -a && \
+    rm -rf /chroot/var/cache/zypp/* /chroot/var/log/zypp/* /chroot/tmp/* /chroot/var/tmp/* /chroot/usr/share/doc/packages/*
+
+# Main stage using bco-micro as the base image
+FROM final
+
+# Copy binaries and configuration files from builder to micro
+COPY --from=builder /chroot/ /
+
+RUN useradd rancher && \
     mkdir -p /var/lib/rancher /var/lib/cattle /opt/jail /opt/drivers/management-state/bin && \
     chown -R rancher /var/lib/rancher /var/lib/cattle /usr/local/bin
 
