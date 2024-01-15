@@ -1,9 +1,12 @@
 package catalog
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"encoding/xml"
 	"fmt"
+	"image/png"
 
 	"github.com/rancher/rancher/pkg/api/steve/catalog/types"
 	scheme "github.com/rancher/rancher/pkg/generated/clientset/versioned/scheme"
@@ -22,7 +25,70 @@ const (
 	rancherAppsURL   = "v1/catalog.cattle.io.apps/"
 	upgrade          = "upgrade"
 	uninstall        = "uninstall"
+	chartName        = "chartName"
+	icon             = "icon"
 )
+
+// FetchChartIcon - fetches the chart icon from the given repo, chart and version and validates the result
+func (c *Client) FetchChartIcon(repo, chart, version string) error {
+	resp := c.RESTClient().Get().
+		AbsPath(chartsURL+repo).
+		Param(chartName, chart).Param(link, icon).
+		VersionedParams(&metav1.GetOptions{}, scheme.ParameterCodec).
+		Do(context.Background())
+
+	var contentType string
+	resp.ContentType(&contentType)
+
+	result, err := resp.Raw()
+	if err != nil {
+		return err
+	}
+
+	if contentType == "image/svg+xml" {
+		var xmlData interface{}
+		err = xml.Unmarshal(result, &xmlData)
+		if err != nil {
+			// If XML parsing fails, this is not a valid svg
+			return err
+		}
+		return nil // Valid SVG
+	}
+
+	// Try to decode as PNG
+	_, err = png.Decode(bytes.NewReader(result))
+	if err != nil {
+		return err // Not an valid image
+	}
+
+	// valid PNG image
+	return nil
+}
+
+// GetChartsFromClusterRepo will return all the installable charts from a given cluster repo name
+func (c *Client) GetChartsFromClusterRepo(repoName string) (map[string]interface{}, error) {
+	result, err := c.RESTClient().Get().
+		AbsPath(chartsURL+repoName).Param(link, index).
+		VersionedParams(&metav1.GetOptions{}, scheme.ParameterCodec).
+		Do(context.Background()).Raw()
+
+	if err != nil {
+		return map[string]interface{}{}, err
+	}
+
+	var mapResponse map[string]interface{}
+	if err = json.Unmarshal(result, &mapResponse); err != nil {
+		return map[string]interface{}{}, err
+	}
+
+	charts, ok := mapResponse["entries"].(map[string]interface{})
+	if !ok {
+		return map[string]interface{}{}, fmt.Errorf("failed to convert charts to map[string]interface{}")
+	}
+
+	return charts, nil
+
+}
 
 // GetListChartVersions is used to get the list of versions of `chartName` from a given `repoName`
 func (c *Client) GetListChartVersions(chartName, repoName string) ([]string, error) {
