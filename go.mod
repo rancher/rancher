@@ -403,3 +403,7 @@ require (
 	sigs.k8s.io/kustomize/kyaml v0.13.9 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
 )
+
+// See https://github.com/rancher/lasso/pull/57
+// go mod edit -replace=github.com/rancher/lasso=github.com/aruiz14/lasso@decorate-cache-memory-profile
+replace github.com/rancher/lasso => github.com/aruiz14/lasso v0.0.0-20240118142830-5a0b7b270c6e

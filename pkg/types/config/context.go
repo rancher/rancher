@@ -410,6 +410,8 @@ func NewUserContext(scaledContext *ScaledContext, config rest.Config, clusterNam
 
 	cacheFactory := cache.NewSharedCachedFactory(clientFactory, &cache.SharedCacheFactoryOptions{
 		KindNamespace: context.KindNamespaces,
+		IsUserContext: true,
+		IsDownstream:  clusterName != "local",
 	})
 
 	controllerFactory := controller.NewSharedControllerFactory(cacheFactory, controllers.GetOptsFromEnv(controllers.User))
