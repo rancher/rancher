@@ -2,10 +2,13 @@ package catalog
 
 import (
 	"bytes"
+	"bytes"
 	"context"
 	"encoding/json"
 	"encoding/xml"
+	"encoding/xml"
 	"fmt"
+	"image/png"
 	"image/png"
 
 	"github.com/rancher/rancher/pkg/api/steve/catalog/types"
@@ -30,7 +33,7 @@ const (
 )
 
 // FetchChartIcon - fetches the chart icon from the given repo, chart and version and validates the result
-func (c *Client) FetchChartIcon(repo, chart, version string) (int, error) {
+func (c *Client) FetchChartIcon(repo, chart, version string) error {
 	resp := c.RESTClient().Get().
 		AbsPath(chartsURL+repo).
 		Param(chartName, chart).Param(link, icon).
@@ -42,11 +45,7 @@ func (c *Client) FetchChartIcon(repo, chart, version string) (int, error) {
 
 	result, err := resp.Raw()
 	if err != nil {
-		return 0, err
-	}
-
-	if len(result) == 0 {
-		return 0, nil // No icon
+		return err
 	}
 
 	if contentType == "image/svg+xml" {
@@ -54,19 +53,19 @@ func (c *Client) FetchChartIcon(repo, chart, version string) (int, error) {
 		err = xml.Unmarshal(result, &xmlData)
 		if err != nil {
 			// If XML parsing fails, this is not a valid svg
-			return 0, err
+			return err
 		}
-		return len(result), nil // Valid SVG
+		return nil // Valid SVG
 	}
 
 	// Try to decode as PNG
 	_, err = png.Decode(bytes.NewReader(result))
 	if err != nil {
-		return 0, err // Not an valid image
+		return err // Not an valid image
 	}
 
 	// valid PNG image
-	return len(result), nil
+	return nil
 }
 
 // GetChartsFromClusterRepo will return all the installable charts from a given cluster repo name
