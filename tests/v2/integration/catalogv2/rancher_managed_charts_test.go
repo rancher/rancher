@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
 	"testing"
 	"time"
 
@@ -123,6 +124,29 @@ func (w *RancherManagedChartsTest) resetSettings() {
 
 func TestRancherManagedChartsSuite(t *testing.T) {
 	suite.Run(t, new(RancherManagedChartsTest))
+}
+
+func (w *RancherManagedChartsTest) TestServeIcons() {
+	defer w.resetSettings()
+
+	// https://RANCHER_DOMAIN:8443/v1/catalog.cattle.io.clusterrepos/rancher-charts?link=index
+	charts, err := w.catalogClient.GetChartsFromClusterRepo("rancher-charts")
+	w.Require().NoError(err)
+	w.Assert().Greater(len(charts), 1)
+
+	chartsAndLatestVersions := extractChartsAndLatestVersions(charts)
+
+	// https://RANCHER_DOMAIN:8443/v1/catalog.cattle.io.clusterrepos/rancher-charts?chartName=<SOME_CHART>&link=icon&version=<SOME_VERSION>
+	err = w.catalogClient.FetchChartIcon("rancher-charts", "rancher-istio", chartsAndLatestVersions["rancher-istio"])
+	w.Require().NoError(err)
+	err = w.catalogClient.FetchChartIcon("rancher-charts", "rancher-project-monitoring", chartsAndLatestVersions["rancher-project-monitoring"])
+	w.Require().NoError(err)
+	err = w.catalogClient.FetchChartIcon("rancher-charts", "longhorn", chartsAndLatestVersions["longhorn"])
+	w.Require().NoError(err)
+	err = w.catalogClient.FetchChartIcon("rancher-charts", "rancher-monitoring", chartsAndLatestVersions["rancher-monitoring"])
+	w.Require().NoError(err)
+	err = w.catalogClient.FetchChartIcon("rancher-charts", "prometheus-federator", chartsAndLatestVersions["prometheus-federator"])
+	w.Require().NoError(err)
 }
 
 func (w *RancherManagedChartsTest) TestInstallChartLatestVersion() {
@@ -460,4 +484,23 @@ func (w *RancherManagedChartsTest) pollUntilDownloaded(ClusterRepoName string, p
 		return clusterRepo.Status.DownloadTime != prevDownloadTime, nil
 	})
 	return err
+}
+
+// extractChartsAndLatestVersions returns a map of chartName -> latestVersion
+func extractChartsAndLatestVersions(charts map[string]interface{}) map[string]string {
+	chartVersions := make(map[string]string)
+	for chartName, chartVersionsList := range charts {
+		// exclude charts for crd's
+		if strings.HasSuffix(chartName, "-crd") {
+			continue
+		}
+		chartVersionsList := chartVersionsList.([]interface{})
+		// exclude charts with the hidden annotation
+		_, hidden := chartVersionsList[0].(map[string]interface{})["annotations"].(map[string]interface{})["catalog.cattle.io/hidden"]
+		if hidden {
+			continue
+		}
+		chartVersions[chartName] = chartVersionsList[0].(map[string]interface{})["version"].(string)
+	}
+	return chartVersions
 }
