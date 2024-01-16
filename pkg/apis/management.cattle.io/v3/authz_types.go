@@ -55,10 +55,6 @@ type ProjectStatus struct {
 	// +optional
 	Conditions []ProjectCondition `json:"conditions,omitempty"`
 
-	// PodSecurityPolicyTemplateName is the pod security policy template associated with the project.
-	// +optional
-	PodSecurityPolicyTemplateName string `json:"podSecurityPolicyTemplateId,omitempty"`
-
 	// MonitoringStatus is the status of the Monitoring V1 app.
 	// +optional
 	MonitoringStatus *MonitoringStatus `json:"monitoringStatus,omitempty" norman:"nocreate,noupdate"`
@@ -273,32 +269,6 @@ type RoleTemplate struct {
 }
 
 // +genclient
-// +kubebuilder:skipversion
-// +genclient:nonNamespaced
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-type PodSecurityPolicyTemplate struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-
-	Description string                         `json:"description"`
-	Spec        policyv1.PodSecurityPolicySpec `json:"spec,omitempty"`
-}
-
-// +genclient
-// +kubebuilder:skipversion
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-type PodSecurityPolicyTemplateProjectBinding struct {
-	types.Namespaced
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-
-	PodSecurityPolicyTemplateName string `json:"podSecurityPolicyTemplateId" norman:"required,type=reference[podSecurityPolicyTemplate]"`
-	TargetProjectName             string `json:"targetProjectId" norman:"required,type=reference[project]"`
-}
-
-// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ProjectRoleTemplateBinding is the object representing membership of a subject in a project with permissions
@@ -386,8 +356,4 @@ type ClusterRoleTemplateBinding struct {
 
 func (c *ClusterRoleTemplateBinding) ObjClusterName() string {
 	return c.ClusterName
-}
-
-type SetPodSecurityPolicyTemplateInput struct {
-	PodSecurityPolicyTemplateName string `json:"podSecurityPolicyTemplateId" norman:"type=reference[podSecurityPolicyTemplate]"`
 }
