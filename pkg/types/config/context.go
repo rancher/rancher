@@ -311,7 +311,7 @@ func (w *UserContext) UserOnlyContext() *UserOnlyContext {
 		Monitoring:  w.Monitoring,
 		Cluster:     w.Cluster,
 		Storage:     w.Storage,
-		Policy:      w.Policy,
+		// Policy:      w.Policy,
 	}
 }
 
