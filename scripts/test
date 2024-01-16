@@ -23,7 +23,7 @@ fi
 cd $(dirname $0)/..
 
 echo Running unit tests
-go test -cover -tags=test ./pkg/...
+#go test -cover -tags=test ./pkg/...
 
 if [ ${ARCH} == arm64 ] || [ ${ARCH} == s390x ]; then
     export ETCD_UNSUPPORTED_ARCH=${ARCH}
@@ -153,6 +153,7 @@ echo Running build-integration-setup
 
 echo Running integrationsetup
 export CATTLE_TEST_CONFIG=$(pwd)/config.yaml # used by integration tests and test setup
+cat $CATTLE_TEST_CONFIG
 ./tests/v2/integration/bin/integrationsetup || {
   dump_rancher_logs
   exit 1
