@@ -20,8 +20,10 @@ import (
 	mgmtschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/utils"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	quota "k8s.io/apiserver/pkg/quota/v1"
 )
 
 const roleTemplatesRequired = "authz.management.cattle.io/creator-role-bindings"
@@ -58,6 +60,9 @@ func (s *projectStore) Create(apiContext *types.APIContext, schema *types.Schema
 	if err := s.validateResourceQuota(apiContext, data, ""); err != nil {
 		return nil, err
 	}
+	if err := s.validateContainerDefaultResourceLimit(data); err != nil {
+		return nil, err
+	}
 
 	values.PutValue(data, annotation, "annotations", roleTemplatesRequired)
 
@@ -66,6 +71,9 @@ func (s *projectStore) Create(apiContext *types.APIContext, schema *types.Schema
 
 func (s *projectStore) Update(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, id string) (map[string]interface{}, error) {
 	if err := s.validateResourceQuota(apiContext, data, id); err != nil {
+		return nil, err
+	}
+	if err := s.validateContainerDefaultResourceLimit(data); err != nil {
 		return nil, err
 	}
 
@@ -105,6 +113,32 @@ func (s *projectStore) createProjectAnnotation() (string, error) {
 	}
 
 	return string(d), nil
+}
+
+func (s *projectStore) validateContainerDefaultResourceLimit(data map[string]interface{}) error {
+	rawLimit, ok := data["containerDefaultResourceLimit"]
+	if !ok {
+		return nil
+	}
+	var resourceList corev1.ResourceList
+	if err := convert.ToObj(rawLimit, &resourceList); err != nil {
+		return fmt.Errorf("failed to parse container default resource limit: %w", err)
+	}
+	if negativeResources := quota.IsNegative(resourceList); len(negativeResources) > 0 {
+		return fmt.Errorf("resource requests and limits can't have negative values, adjust the request/limit configurations for the following resources: %v", negativeResources)
+	}
+	requests := corev1.ResourceList{
+		"cpu":    resourceList["requestsCpu"],
+		"memory": resourceList["requestsMemory"],
+	}
+	limits := corev1.ResourceList{
+		"cpu":    resourceList["limitsCpu"],
+		"memory": resourceList["limitsMemory"],
+	}
+	if ok, invalidResources := quota.LessThanOrEqual(requests, limits); !ok {
+		return fmt.Errorf("resource requests can't be greater than limits, the request/limit configurations for the following resources are wrong: %v", invalidResources)
+	}
+	return nil
 }
 
 func (s *projectStore) validateResourceQuota(apiContext *types.APIContext, data map[string]interface{}, id string) error {
