@@ -106,6 +106,9 @@ class AmazonWebServices(CloudProviderBase):
             volume_size = AWS_WINDOWS_VOLUME_SIZE
             instance_type = AWS_WINDOWS_INSTANCE_TYPE
 
+        ipv6_addresses = 0
+        if public_ip:
+            ipv6_addresses += 1
         if key_name:
             # if cert private key
             if key_name.endswith('.pem'):
@@ -139,7 +142,8 @@ class AmazonWebServices(CloudProviderBase):
                 "NetworkInterfaces": [
                     {'DeviceIndex': 0,
                      'AssociatePublicIpAddress': public_ip,
-                     'Groups': [AWS_SECURITY_GROUP]
+                     'Groups': [AWS_SECURITY_GROUP],
+                     'Ipv6AddressCount': ipv6_addresses
                      }
                 ],
                 "Placement": {'AvailabilityZone': AWS_REGION_AZ},
