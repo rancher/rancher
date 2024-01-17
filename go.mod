@@ -157,7 +157,7 @@ require (
 	k8s.io/kube-aggregator v0.27.9
 	k8s.io/kubectl v0.27.9
 	k8s.io/kubernetes v1.27.9
-	k8s.io/utils v0.0.0-20230505201702-9f6742963106
+	k8s.io/utils v0.0.0-20240102154912-e7106e64919e
 	sigs.k8s.io/aws-iam-authenticator v0.5.9
 	sigs.k8s.io/cluster-api v1.5.0
 	sigs.k8s.io/controller-runtime v0.15.1
