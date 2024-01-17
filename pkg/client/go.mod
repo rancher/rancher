@@ -10,6 +10,8 @@ replace (
 
 replace k8s.io/client-go => github.com/rancher/client-go v1.28.6-rancher1
 
+replace github.com/rancher/wrangler/v2 => github.com/krunalhinguu/wrangler/v2 v2.29.0-rancher1
+
 require (
 	github.com/rancher/norman v0.0.0-20230831160711-5de27f66385d
 	k8s.io/apimachinery v0.29.0
