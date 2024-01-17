@@ -58,6 +58,11 @@ if [ ! -d $CHART_REPO_DIR ]; then
     git clone --branch rancher-v1.29.0 https://github.com/krunalhinguu/charts $CHART_REPO_DIR
 fi
 
+if [ ! -d $SMALL_FORK_REPO_DIR ]; then
+    mkdir -p $SMALL_FORK_REPO_DIR
+    git clone --branch main https://github.com/rancher/charts-small-fork $SMALL_FORK_REPO_DIR
+fi
+
 if [ ${ARCH} == amd64 ]; then
     # Move this out of ARCH check for local dev on non-amd64 hardware.
     TAG=$TAG REPO=${REPO} go run ../pkg/image/export/main.go $SYSTEM_CHART_REPO_DIR $CHART_REPO_DIR $IMAGE $AGENT_IMAGE $SYSTEM_AGENT_UPGRADE_IMAGE $WINS_AGENT_UPGRADE_IMAGE ${SYSTEM_AGENT_INSTALLER_RKE2_IMAGES[@]} ${SYSTEM_AGENT_INSTALLER_K3S_IMAGES[@]}
