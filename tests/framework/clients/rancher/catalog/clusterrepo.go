@@ -30,7 +30,7 @@ const (
 )
 
 // FetchChartIcon - fetches the chart icon from the given repo, chart and version and validates the result
-func (c *Client) FetchChartIcon(repo, chart, version string) error {
+func (c *Client) FetchChartIcon(repo, chart, version string) (int, error) {
 	resp := c.RESTClient().Get().
 		AbsPath(chartsURL+repo).
 		Param(chartName, chart).Param(link, icon).
@@ -42,7 +42,11 @@ func (c *Client) FetchChartIcon(repo, chart, version string) error {
 
 	result, err := resp.Raw()
 	if err != nil {
-		return err
+		return 0, err
+	}
+
+	if len(result) == 0 {
+		return 0, nil // No icon
 	}
 
 	if contentType == "image/svg+xml" {
@@ -50,19 +54,19 @@ func (c *Client) FetchChartIcon(repo, chart, version string) error {
 		err = xml.Unmarshal(result, &xmlData)
 		if err != nil {
 			// If XML parsing fails, this is not a valid svg
-			return err
+			return 0, err
 		}
-		return nil // Valid SVG
+		return len(result), nil // Valid SVG
 	}
 
 	// Try to decode as PNG
 	_, err = png.Decode(bytes.NewReader(result))
 	if err != nil {
-		return err // Not an valid image
+		return 0, err // Not an valid image
 	}
 
 	// valid PNG image
-	return nil
+	return len(result), nil
 }
 
 // GetChartsFromClusterRepo will return all the installable charts from a given cluster repo name
