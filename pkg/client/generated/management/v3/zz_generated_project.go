@@ -79,8 +79,6 @@ type ProjectOperations interface {
 
 	ActionExportYaml(resource *Project) error
 
-	ActionSetpodsecuritypolicytemplate(resource *Project, input *SetPodSecurityPolicyTemplateInput) (*Project, error)
-
 	ActionViewMonitoring(resource *Project) (*MonitoringOutput, error)
 }
 
@@ -171,12 +169,6 @@ func (c *ProjectClient) ActionEnableMonitoring(resource *Project, input *Monitor
 func (c *ProjectClient) ActionExportYaml(resource *Project) error {
 	err := c.apiClient.Ops.DoAction(ProjectType, "exportYaml", &resource.Resource, nil, nil)
 	return err
-}
-
-func (c *ProjectClient) ActionSetpodsecuritypolicytemplate(resource *Project, input *SetPodSecurityPolicyTemplateInput) (*Project, error) {
-	resp := &Project{}
-	err := c.apiClient.Ops.DoAction(ProjectType, "setpodsecuritypolicytemplate", &resource.Resource, input, resp)
-	return resp, err
 }
 
 func (c *ProjectClient) ActionViewMonitoring(resource *Project) (*MonitoringOutput, error) {
