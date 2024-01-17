@@ -337,7 +337,7 @@ def add_repo_create_namespace(repo=RANCHER_HELM_REPO, url=RANCHER_HELM_URL):
 
 
 def install_rancher(type=RANCHER_HA_CERT_OPTION, repo=RANCHER_HELM_REPO,
-                    upgrade=False, extra_settings=None):
+                    upgrade=False, extra_settings=[]):
     operation = "install"
 
     if upgrade:
