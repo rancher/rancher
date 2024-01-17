@@ -187,13 +187,15 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 			return cluster, fmt.Errorf(apimgmtv3.ClusterConditionUpdated.GetMessage(cluster))
 		}
 
-		// cluster must have at least one managed nodegroup. It is possible for a cluster
-		// agent to be deployed without one, but having a managed nodegroup makes it easy
-		// for rancher to validate its ability to do so.
+		// EKS cluster must have at least one node to run cluster agent. The best way to verify
+		// if a cluster has self-managed node or nodegroup is to check if the cluster agent was deployed.
+		// Issue: https://github.com/rancher/eks-operator/issues/301
 		addNgMessage := "Cluster must have at least one managed nodegroup."
 		noNodeGroupsOnSpec := len(cluster.Spec.EKSConfig.NodeGroups) == 0
 		noNodeGroupsOnUpstreamSpec := len(cluster.Status.EKSStatus.UpstreamSpec.NodeGroups) == 0
-		if (cluster.Spec.EKSConfig.NodeGroups != nil && noNodeGroupsOnSpec) || (cluster.Spec.EKSConfig.NodeGroups == nil && noNodeGroupsOnUpstreamSpec) {
+		if !apimgmtv3.ClusterConditionAgentDeployed.IsTrue(cluster) &&
+			((cluster.Spec.EKSConfig.NodeGroups != nil && noNodeGroupsOnSpec) ||
+				(cluster.Spec.EKSConfig.NodeGroups == nil && noNodeGroupsOnUpstreamSpec)) {
 			cluster, err = e.SetFalse(cluster, apimgmtv3.ClusterConditionWaiting, addNgMessage)
 			if err != nil {
 				return cluster, err
