@@ -191,8 +191,8 @@ def deploy_bastion_server():
     # Get resources for private registry and generate self signed certs
     get_resources_command = \
         'scp -q -i {}/{}.pem -o StrictHostKeyChecking=no ' \
-        '-o UserKnownHostsFile=/dev/null -r {}/airgap/basic-registry/ ' \
-        '{}@{}:~/basic-registry/'.format(
+        '-o UserKnownHostsFile=/dev/null -r {}/airgap/basic-registry ' \
+        '{}@{}:~/basic-registry'.format(
             SSH_KEY_DIR, bastion_node.ssh_key_name, RESOURCE_DIR,
             AWS_USER, bastion_node.host_name)
     run_command(get_resources_command, log_out=False)
