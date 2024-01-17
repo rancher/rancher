@@ -13,7 +13,6 @@ import (
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/util/retry"
 )
 
 func Register(settingController managementcontrollers.SettingController) error {
@@ -160,10 +159,7 @@ func (s *settingsProvider) SetAll(settingsMap map[string]settings.Setting) error
 	return nil
 }
 
-const unknownSettingLabelKey = "cattle.io/unknown"
-
-// cleanupUnknownSettings lists all settings in the cluster and cleans up all unknown (e.g. deprecated) settings.
-// Such settings are marked as unknown with a label so that they can be easily identified and may be removed in the future.
+// cleanupUnknownSettings lists all settings in the cluster and deletesall unknown (e.g. deprecated) settings.
 func (s *settingsProvider) cleanupUnknownSettings(settingsMap map[string]settings.Setting) error {
 	// The settings cache is not yet available at this point, thus using the client directly.
 	list, err := s.settings.List(metav1.ListOptions{})
@@ -176,43 +172,14 @@ func (s *settingsProvider) cleanupUnknownSettings(settingsMap map[string]setting
 			continue
 		}
 
-		if err := s.markSettingAsUnknown(&setting); err != nil {
-			logrus.Errorf("Error adding label %s to setting %s: %v", unknownSettingLabelKey, setting.Name, err)
+		err = s.settings.Delete(setting.Name, &metav1.DeleteOptions{})
+		if err != nil {
+			logrus.Errorf("Error deleting unknown setting %s: %v", setting.Name, err)
 			continue
 		}
+
+		logrus.Warnf("Deleted unknown setting %s", setting.Name)
 	}
 
 	return nil
-}
-
-// markSettingAsUnknown adds a label to the setting to mark it as unknown.
-func (s *settingsProvider) markSettingAsUnknown(setting *v3.Setting) error {
-	logrus.Warnf("Unknown setting %s", setting.Name)
-
-	isFirstAttempt := true
-	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		defer func() { isFirstAttempt = false }()
-
-		var err error
-
-		if !isFirstAttempt { // Refetch only if the first attempt to update failed.
-			setting, err = s.settings.Get(setting.Name, metav1.GetOptions{})
-			if err != nil {
-				if apierrors.IsNotFound(err) { // The setting is no longer, move on.
-					return nil
-				}
-				return err
-			}
-		}
-
-		if setting.Labels == nil {
-			setting.Labels = map[string]string{}
-		}
-		setting.Labels[unknownSettingLabelKey] = "true"
-
-		_, err = s.settings.Update(setting)
-		return err
-	})
-
-	return err
 }

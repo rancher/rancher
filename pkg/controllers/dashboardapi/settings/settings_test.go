@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
-	management "github.com/rancher/rancher/pkg/apis/management.cattle.io"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/wrangler/pkg/generic/fake"
@@ -55,6 +54,10 @@ func TestSetAll(t *testing.T) {
 		}
 
 		return &v3.SettingList{Items: items}, nil
+	}).Times(1)
+	client.EXPECT().Delete(gomock.Any(), gomock.Any()).DoAndReturn(func(name string, opts *metav1.DeleteOptions) error {
+		delete(store, name)
+		return nil
 	}).Times(1)
 
 	settingMap := make(map[string]settings.Setting)
@@ -115,12 +118,15 @@ func TestSetAll(t *testing.T) {
 		}
 
 		assert.Equal(t, expectedFallbackVal, fallbackValue, fallbackFailMsg)
-		assert.NotContains(t, finalSetting.Labels, unknownSettingLabelKey)
 	}
 
-	unknown := store["unknown"]
-	assert.NotNil(t, unknown.Labels)
-	assert.Equal(t, unknown.Labels[unknownSettingLabelKey], "true")
+	assert.NotContains(t, store, "unknown")
+
+	// Make sure the store doesn't contain any settings with the unknown label.
+	const unknownSettingLabelKey = "cattle.io/unknown"
+	for _, setting := range store {
+		assert.NotContains(t, setting.Labels, unknownSettingLabelKey)
+	}
 
 	// Test when setting client's Create method fails.
 	cannotCreateClient := fake.NewMockNonNamespacedControllerInterface[*v3.Setting, *v3.SettingList](gomock.NewController(t))
@@ -254,61 +260,4 @@ func populateTestCases() []*testCase {
 	}
 
 	return testCases
-}
-
-func TestSettingUnknownLabelIsRetried(t *testing.T) {
-	store := map[string]v3.Setting{
-		"unknown": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "unknown",
-			},
-			Value:   "unknown",
-			Default: "unknown",
-		},
-	}
-
-	groupResource := schema.GroupResource{
-		Group:    management.GroupName,
-		Resource: v3.SettingResourceName,
-	}
-	client := fake.NewMockNonNamespacedControllerInterface[*v3.Setting, *v3.SettingList](gomock.NewController(t))
-
-	client.EXPECT().List(gomock.Any()).DoAndReturn(func(opts metav1.ListOptions) (*v3.SettingList, error) {
-		var items []v3.Setting
-		for _, setting := range store {
-			items = append(items, setting)
-		}
-
-		return &v3.SettingList{Items: items}, nil
-	}).Times(1)
-
-	client.EXPECT().Get(gomock.Any(), gomock.Any()).DoAndReturn(func(name string, options metav1.GetOptions) (*v3.Setting, error) {
-		val, ok := store[name]
-		if !ok {
-			return nil, apierrors.NewNotFound(groupResource, name)
-		}
-
-		return &val, nil
-	}).Times(1)
-
-	isFirstUpdate := true
-	client.EXPECT().Update(gomock.Any()).DoAndReturn(func(s *v3.Setting) (*v3.Setting, error) {
-		defer func() { isFirstUpdate = false }()
-
-		if isFirstUpdate { // Fail the the first update to force retry.
-			return nil, apierrors.NewConflict(groupResource, s.Name, fmt.Errorf("some error"))
-		}
-
-		store[s.Name] = *s
-		return s, nil
-	}).Times(2)
-
-	provider := settingsProvider{
-		settings: client,
-	}
-
-	err := provider.SetAll(nil)
-
-	assert.Nil(t, err)
-	assert.Equal(t, "true", store["unknown"].Labels[unknownSettingLabelKey])
 }
