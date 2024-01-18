@@ -160,6 +160,15 @@ var (
 	// FleetVersion is the exact version of the Fleet chart that Rancher will install.
 	FleetVersion = NewSetting("fleet-version", "")
 
+	// AksOperatorVersion is the exact version of the aks-operator and aks-operator-crd charts that Rancher will install.
+	AksOperatorVersion = NewSetting("aks-operator-version", "")
+
+	// EksOperatorVersion is the exact version of the eks-operator and eks-operator-crd chart that Rancher will install.
+	EksOperatorVersion = NewSetting("eks-operator-version", "")
+
+	// GkeOperatorVersion is the exact version of the gke-operator and gke-operator-crd chart that Rancher will install.
+	GkeOperatorVersion = NewSetting("gke-operator-version", "")
+
 	// KubeconfigDefaultTokenTTLMinutes is the default time to live applied to kubeconfigs created for users.
 	// This setting will take effect regardless of the kubeconfig-generate-token status.
 	KubeconfigDefaultTokenTTLMinutes = NewSetting("kubeconfig-default-token-ttl-minutes", "43200") // 30 days

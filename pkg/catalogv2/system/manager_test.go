@@ -121,6 +121,42 @@ func TestInstallCharts(t *testing.T) {
 				Status: release.StatusDeployed,
 			},
 		}
+		aksOperatorChartV1 = release.Release{
+			Namespace: "cattle-fleet-system",
+			Name:      "aks-operator",
+			Chart: &chart.Chart{
+				Metadata: &chart.Metadata{
+					Version: "1.0.0",
+				},
+			},
+			Info: &release.Info{
+				Status: release.StatusDeployed,
+			},
+		}
+		aksOperatorChartV2 = release.Release{
+			Namespace: "cattle-fleet-system",
+			Name:      "aks-operator",
+			Chart: &chart.Chart{
+				Metadata: &chart.Metadata{
+					Version: "2.0.0",
+				},
+			},
+			Info: &release.Info{
+				Status: release.StatusDeployed,
+			},
+		}
+		aksOperatorChartV3 = release.Release{
+			Namespace: "cattle-fleet-system",
+			Name:      "aks-operator",
+			Chart: &chart.Chart{
+				Metadata: &chart.Metadata{
+					Version: "3.0.0",
+				},
+			},
+			Info: &release.Info{
+				Status: release.StatusDeployed,
+			},
+		}
 		fleetRepoV1 = repo.ChartVersion{
 			Metadata: &chart.Metadata{
 				Version: "1.0.0",
@@ -134,6 +170,24 @@ func TestInstallCharts(t *testing.T) {
 			URLs: []string{"foo"},
 		}
 		fleetRepoV3 = repo.ChartVersion{
+			Metadata: &chart.Metadata{
+				Version: "3.0.0",
+			},
+			URLs: []string{"foo"},
+		}
+		aksOperatorRepoV1 = repo.ChartVersion{
+			Metadata: &chart.Metadata{
+				Version: "1.0.0",
+			},
+			URLs: []string{"foo"},
+		}
+		aksOperatorRepoV2 = repo.ChartVersion{
+			Metadata: &chart.Metadata{
+				Version: "2.0.0",
+			},
+			URLs: []string{"foo"},
+		}
+		aksOperatorRepoV3 = repo.ChartVersion{
 			Metadata: &chart.Metadata{
 				Version: "3.0.0",
 			},
@@ -164,10 +218,11 @@ func TestInstallCharts(t *testing.T) {
 	}{
 		{
 			name:     "Updates charts to desired version",
-			releases: []*release.Release{&rancherChartV1, &fleetChartV1},
+			releases: []*release.Release{&rancherChartV1, &fleetChartV1, &aksOperatorChartV1},
 			indexedReleases: map[string]repo.ChartVersions{
 				"fleet":           {&fleetRepoV1, &fleetRepoV2},
 				"rancher-webhook": {&rancherRepoV1, &rancherRepoV2},
+				"aks-operator":    {&aksOperatorRepoV1, &aksOperatorRepoV2},
 			},
 			desiredCharts: map[desiredKey]map[string]any{
 				{
@@ -179,6 +234,12 @@ func TestInstallCharts(t *testing.T) {
 				{
 					namespace:    "cattle-system",
 					name:         "rancher-webhook",
+					minVersion:   "1.0.0",
+					exactVersion: "2.0.0",
+				}: {},
+				{
+					namespace:    "cattle-system",
+					name:         "aks-operator",
 					minVersion:   "1.0.0",
 					exactVersion: "2.0.0",
 				}: {},
@@ -187,14 +248,16 @@ func TestInstallCharts(t *testing.T) {
 			expectInstalls: map[string]bool{
 				"rancher-webhook": true,
 				"fleet":           true,
+				"aks-operator":    true,
 			},
 		},
 		{
 			name:     "Keeps installed release matching desired version",
-			releases: []*release.Release{&fleetChartV2, &rancherChartV1},
+			releases: []*release.Release{&fleetChartV2, &rancherChartV1, &aksOperatorChartV2},
 			indexedReleases: map[string]repo.ChartVersions{
 				"fleet":           {&fleetRepoV1, &fleetRepoV2},
 				"rancher-webhook": {&rancherRepoV1, &rancherRepoV2},
+				"aks-operator":    {&aksOperatorRepoV1, &aksOperatorRepoV2},
 			},
 			desiredCharts: map[desiredKey]map[string]any{
 				{
@@ -209,19 +272,27 @@ func TestInstallCharts(t *testing.T) {
 					minVersion:   "1.0.0",
 					exactVersion: "2.0.0",
 				}: {},
+				{
+					namespace:    "cattle-system",
+					name:         "aks-operator",
+					minVersion:   "1.0.0",
+					exactVersion: "2.0.0",
+				}: {},
 			},
 			forceAdopt: false,
 			expectInstalls: map[string]bool{
 				"fleet":           false,
 				"rancher-webhook": true,
+				"aks-operator":    true,
 			},
 		},
 		{
 			name:     "Keeps installed release, more recent than desired version",
-			releases: []*release.Release{&rancherChartV1, &fleetChartV3},
+			releases: []*release.Release{&rancherChartV1, &fleetChartV3, &aksOperatorChartV3},
 			indexedReleases: map[string]repo.ChartVersions{
 				"fleet":           {&fleetRepoV1, &fleetRepoV2, &fleetRepoV3},
 				"rancher-webhook": {&rancherRepoV1, &rancherRepoV2},
+				"aks-operator":    {&aksOperatorRepoV1, &aksOperatorRepoV2, &aksOperatorRepoV3},
 			},
 			desiredCharts: map[desiredKey]map[string]any{
 				{
@@ -236,20 +307,28 @@ func TestInstallCharts(t *testing.T) {
 					minVersion:   "1.0.0",
 					exactVersion: "2.0.0",
 				}: {},
+				{
+					namespace:    "cattle-system",
+					name:         "aks-operator",
+					minVersion:   "1.0.0",
+					exactVersion: "2.0.0",
+				}: {},
 			},
 			forceAdopt: false,
 			expectInstalls: map[string]bool{
 				"fleet":           false,
 				"rancher-webhook": true,
+				"aks-operator":    true,
 			},
 		},
 		{
 			// This use case can occur when restoring to an older Rancher version.
 			name:     "Downgrades installed release, more recent than desired version",
-			releases: []*release.Release{&rancherChartV1, &fleetChartV3},
+			releases: []*release.Release{&rancherChartV1, &fleetChartV3, &aksOperatorChartV3},
 			indexedReleases: map[string]repo.ChartVersions{
 				"fleet":           {&fleetRepoV1, &fleetRepoV2, &fleetRepoV3},
 				"rancher-webhook": {&rancherRepoV1, &rancherRepoV2},
+				"aks-operator":    {&aksOperatorRepoV1, &aksOperatorRepoV2, &aksOperatorRepoV3},
 			},
 			desiredCharts: map[desiredKey]map[string]any{
 				{
@@ -264,11 +343,18 @@ func TestInstallCharts(t *testing.T) {
 					minVersion:   "1.0.0",
 					exactVersion: "2.0.0",
 				}: {},
+				{
+					namespace:    "cattle-system",
+					name:         "aks-operator",
+					minVersion:   "1.0.0",
+					exactVersion: "2.0.0",
+				}: {},
 			},
 			forceAdopt: false,
 			expectInstalls: map[string]bool{
 				"fleet":           true,
 				"rancher-webhook": true,
+				"aks-operator":    true,
 			},
 		},
 		{
@@ -277,6 +363,7 @@ func TestInstallCharts(t *testing.T) {
 			indexedReleases: map[string]repo.ChartVersions{
 				"fleet":           {&fleetRepoV1, &fleetRepoV2},
 				"rancher-webhook": {&rancherRepoV1, &rancherRepoV2},
+				"aks-operator":    {&aksOperatorRepoV1, &aksOperatorRepoV2},
 			},
 			desiredCharts: map[desiredKey]map[string]any{
 				{
@@ -291,11 +378,18 @@ func TestInstallCharts(t *testing.T) {
 					minVersion:   "1.0.0",
 					exactVersion: "2.0.0",
 				}: {},
+				{
+					namespace:    "cattle-system",
+					name:         "aks-operator",
+					minVersion:   "1.0.0",
+					exactVersion: "2.0.0",
+				}: {},
 			},
 			forceAdopt: false,
 			expectInstalls: map[string]bool{
 				"fleet":           true,
 				"rancher-webhook": true,
+				"aks-operator":    true,
 			},
 		},
 		{
@@ -304,6 +398,7 @@ func TestInstallCharts(t *testing.T) {
 			indexedReleases: map[string]repo.ChartVersions{
 				"fleet":           {&fleetRepoV1, &fleetRepoV3},
 				"rancher-webhook": {&rancherRepoV1, &rancherRepoV2},
+				"aks-operator":    {&aksOperatorRepoV1, &aksOperatorRepoV3},
 			},
 			desiredCharts: map[desiredKey]map[string]any{
 				{
@@ -318,11 +413,18 @@ func TestInstallCharts(t *testing.T) {
 					minVersion:   "1.0.0",
 					exactVersion: "2.0.0",
 				}: {},
+				{
+					namespace:    "cattle-system",
+					name:         "aks-operator",
+					minVersion:   "1.0.0",
+					exactVersion: "2.0.0",
+				}: {},
 			},
 			forceAdopt: false,
 			expectInstalls: map[string]bool{
 				"fleet":           false,
 				"rancher-webhook": true,
+				"aks-operator":    false,
 			},
 			expectedErr: errors.New("no chart version found"),
 		},

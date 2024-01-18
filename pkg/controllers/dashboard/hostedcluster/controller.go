@@ -93,18 +93,32 @@ func (h handler) onClusterChange(key string, cluster *v3.Cluster) (*v3.Cluster, 
 	}
 
 	var toInstallCrdChart, toInstallChart *chart.Definition
-	var provider string
+	var provider, toInstallCrdChartVersion, toInstallChartVersion string
+	toInstallCrdChartVersion = ""
+	toInstallChartVersion = ""
 	if cluster.Spec.AKSConfig != nil {
 		toInstallCrdChart = &AksCrdChart
 		toInstallChart = &AksChart
+		if aksOperatorVersion := settings.AksOperatorVersion.Get(); aksOperatorVersion != "" {
+			toInstallCrdChartVersion = aksOperatorVersion
+			toInstallChartVersion = aksOperatorVersion
+		}
 		provider = "aks"
 	} else if cluster.Spec.EKSConfig != nil {
 		toInstallCrdChart = &EksCrdChart
 		toInstallChart = &EksChart
+		if eksOperatorVersion := settings.EksOperatorVersion.Get(); eksOperatorVersion != "" {
+			toInstallCrdChartVersion = eksOperatorVersion
+			toInstallChartVersion = eksOperatorVersion
+		}
 		provider = "eks"
 	} else if cluster.Spec.GKEConfig != nil {
 		toInstallCrdChart = &GkeCrdChart
 		toInstallChart = &GkeChart
+		if gkeOperatorVersion := settings.GkeOperatorVersion.Get(); gkeOperatorVersion != "" {
+			toInstallCrdChartVersion = gkeOperatorVersion
+			toInstallChartVersion = gkeOperatorVersion
+		}
 		provider = "gke"
 	}
 
@@ -116,7 +130,14 @@ func (h handler) onClusterChange(key string, cluster *v3.Cluster) (*v3.Cluster, 
 		return cluster, err
 	}
 
-	if err := h.manager.Ensure(toInstallCrdChart.ReleaseNamespace, toInstallCrdChart.ChartName, "", "", nil, true, ""); err != nil {
+	if err := h.manager.Ensure(
+		toInstallCrdChart.ReleaseNamespace,
+		toInstallCrdChart.ChartName,
+		toInstallCrdChartVersion,
+		"",
+		nil,
+		true,
+		""); err != nil {
 		return cluster, err
 	}
 
@@ -147,7 +168,14 @@ func (h handler) onClusterChange(key string, cluster *v3.Cluster) (*v3.Cluster, 
 		chartValues[priorityClassKey] = priorityClassName
 	}
 
-	if err := h.manager.Ensure(toInstallChart.ReleaseNamespace, toInstallChart.ChartName, "", "", chartValues, true, ""); err != nil {
+	if err := h.manager.Ensure(
+		toInstallChart.ReleaseNamespace,
+		toInstallChart.ChartName,
+		toInstallChartVersion,
+		"",
+		chartValues,
+		true,
+		""); err != nil {
 		return cluster, err
 	}
 
