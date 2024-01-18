@@ -114,7 +114,7 @@ var (
 	ClusterTemplateEnforcement          = NewSetting("cluster-template-enforcement", "false")
 	InitialDockerRootDir                = NewSetting("initial-docker-root-dir", "/var/lib/docker")
 	SystemCatalog                       = NewSetting("system-catalog", "external") // Options are 'external' or 'bundled'
-	ChartDefaultBranch                  = NewSetting("chart-default-branch", "dev-v2.8")
+	ChartDefaultBranch                  = NewSetting("chart-default-branch", "release-v2.8")
 	SystemManagedChartsOperationTimeout = NewSetting("system-managed-charts-operation-timeout", "300s")
 	PartnerChartDefaultBranch           = NewSetting("partner-chart-default-branch", "main")
 	RKE2ChartDefaultBranch              = NewSetting("rke2-chart-default-branch", "main")
