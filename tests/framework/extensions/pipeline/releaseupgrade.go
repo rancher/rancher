@@ -51,14 +51,16 @@ const HAConfigKey = "ha"
 
 // HAConfig is a struct that contains related information about the HA that's going to be created and upgraded.
 type HAConfig struct {
-	Host                  string `yaml:"host" json:"host"`
-	ChartVersion          string `yaml:"chartVersion" json:"chartVersion"`
-	ChartVersionToUpgrade string `yaml:"chartVersionToUpgrade" json:"chartVersionToUpgrade"`
-	ImageTag              string `yaml:"imageTag" json:"imageTag"`
-	ImageTagToUpgrade     string `yaml:"imageTagToUpgrade" json:"imageTagToUpgrade"`
-	CertOption            string `yaml:"certOption" json:"certOption"`
-	Insecure              *bool  `yaml:"insecure" json:"insecure" default:"true"`
-	Cleanup               *bool  `yaml:"cleanup" json:"cleanup" default:"true"`
+	Host                       string `yaml:"host" json:"host"`
+	ChartVersion               string `yaml:"chartVersion" json:"chartVersion"`
+	ChartVersionToUpgrade      string `yaml:"chartVersionToUpgrade" json:"chartVersionToUpgrade"`
+	ImageTag                   string `yaml:"imageTag" json:"imageTag"`
+	ImageTagToUpgrade          string `yaml:"imageTagToUpgrade" json:"imageTagToUpgrade"`
+	CertOption                 string `yaml:"certOption" json:"certOption"`
+	Insecure                   *bool  `yaml:"insecure" json:"insecure" default:"true"`
+	Cleanup                    *bool  `yaml:"cleanup" json:"cleanup" default:"true"`
+	HelmExtraSettings          string `yaml:"helmExtraSettings" json:"helmExtraSettings"`
+	HelmExtraSettingsToUpgrade string `yaml:"helmExtraSettingsToUpgrade" json:"helmExtraSettingsToUpgrade"`
 }
 
 // ClustersConfigKey is the key name of Clusters values in the cattle config
