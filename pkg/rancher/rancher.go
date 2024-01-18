@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	responsewriter "github.com/rancher/apiserver/pkg/middleware"
+	"github.com/rancher/lasso/pkg/cache"
 	"github.com/rancher/rancher/pkg/api/norman/customization/kontainerdriver"
 	"github.com/rancher/rancher/pkg/api/norman/customization/podsecuritypolicytemplate"
 	steveapi "github.com/rancher/rancher/pkg/api/steve"
@@ -269,7 +270,7 @@ func (r *Rancher) Start(ctx context.Context) error {
 	if features.MCM.Enabled() {
 		// Registers handlers for all rancher replicas running in the local cluster, but not downstream agents
 		nodedriver.Register(ctx, r.Wrangler)
-		if err := r.Wrangler.MultiClusterManager.Start(ctx); err != nil {
+		if err := r.Wrangler.MultiClusterManager.Start(cache.WithContextID(ctx, "multicluster_manager")); err != nil {
 			return err
 		}
 	}
@@ -287,7 +288,7 @@ func (r *Rancher) Start(ctx context.Context) error {
 		return runMigrations(r.Wrangler)
 	})
 
-	if err := r.authServer.Start(ctx, false); err != nil {
+	if err := r.authServer.Start(cache.WithContextID(ctx, "authserver"), false); err != nil {
 		return err
 	}
 

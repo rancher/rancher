@@ -476,7 +476,7 @@ func (w *UserContext) Start(ctx context.Context) error {
 	if err := w.Management.ControllerFactory.Start(w.runContext, 50); err != nil {
 		return err
 	}
-	return w.ControllerFactory.Start(ctx, 5)
+	return w.ControllerFactory.Start(cache.WithClusterName(ctx, w.ClusterName), 5)
 }
 
 func NewUserOnlyContext(config *wrangler.Context) (*UserOnlyContext, error) {
