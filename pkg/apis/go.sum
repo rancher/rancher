@@ -74,6 +74,8 @@ github.com/armon/consul-api v0.0.0-20180202201655-eb2c6b5be1b6/go.mod h1:grANhF5
 github.com/armon/go-metrics v0.0.0-20180917152333-f0300d1749da/go.mod h1:Q73ZrmVTwzkszR9V5SSuryQ31EELlFMUz1kKyl939pY=
 github.com/armon/go-radix v0.0.0-20180808171621-7fddfc383310/go.mod h1:ufUuZ+zHj4x4TnLV4JWEpy2hxWSpsRywHrMgIH9cCH8=
 github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5/go.mod h1:wHh0iHkYZB8zMSxRWpUBQtwG5a7fFgvEO+odwuTv2gs=
+github.com/aruiz14/lasso v0.0.0-20240118142830-5a0b7b270c6e h1:NI9n8H8udLs/IUe/2Uevia3HQyoLT2hHnCR0Txy4lTU=
+github.com/aruiz14/lasso v0.0.0-20240118142830-5a0b7b270c6e/go.mod h1:dNcwXjcqgdOuKFIVETNAPURRh3e5PAi/nWUjj+MLVZA=
 github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a/go.mod h1:lB+ZfQJz7igIIfQNfa7Ml4HSf2uFQQRzpGGRXenZAgY=
 github.com/benbjohnson/clock v1.0.3/go.mod h1:bGMdMPoPVvcYyt1gHDf4J2KE153Yf9BuiUKYMaxlTDM=
 github.com/benbjohnson/clock v1.1.0/go.mod h1:J11/hYXuz8f4ySSvYwY0FKfm+ezbsZBKZxNJlLklBHA=
@@ -493,8 +495,6 @@ github.com/rancher/fleet/pkg/apis v0.0.0-20230821130910-23e1c146755a h1:NfXE4/Lp
 github.com/rancher/fleet/pkg/apis v0.0.0-20230821130910-23e1c146755a/go.mod h1:LAwUj8qIFnHtH6tj2bEkanIi5jkyzjFK3e3xYUfSY4s=
 github.com/rancher/gke-operator v1.1.6 h1:iAgeCeswAAp0dDzEvJIJhIhgvVgw0LdboBBiXjRIVIY=
 github.com/rancher/gke-operator v1.1.6/go.mod h1:aLjE0vjglT9yKbgLbLDSTkNGRb2YkZzHTh/ANIQ1b/Y=
-github.com/rancher/lasso v0.0.0-20230629200414-8a54b32e6792 h1:IaPhDqppVYX2v/nCR8j2i0nqOLD5yggzzy39QUlcqDw=
-github.com/rancher/lasso v0.0.0-20230629200414-8a54b32e6792/go.mod h1:dNcwXjcqgdOuKFIVETNAPURRh3e5PAi/nWUjj+MLVZA=
 github.com/rancher/norman v0.0.0-20230426211126-d3552b018687 h1:9Bf4fZBIdkidKTqHFsJXMlnzflxx3h4ZAEH/n6HMuyI=
 github.com/rancher/norman v0.0.0-20230426211126-d3552b018687/go.mod h1:7MyWxfCmPl6N/UFLu4neLH6nwTFgQQF5rxtUGyZvPFE=
 github.com/rancher/rke v1.4.10 h1:JP3j9mPjPojopN73Qwu5efKw9PQ7od+GKrHpVJLW3fg=

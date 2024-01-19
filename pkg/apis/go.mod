@@ -83,3 +83,5 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
+
+replace github.com/rancher/lasso => github.com/aruiz14/lasso v0.0.0-20240118142830-5a0b7b270c6e
