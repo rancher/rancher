@@ -3,8 +3,6 @@ package scheme
 import (
 	"fmt"
 
-	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
-	monitoringv1alpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	fleet "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	catalog "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	cluster "github.com/rancher/rancher/pkg/apis/cluster.cattle.io/v3"
@@ -62,8 +60,6 @@ var builders = []runtime.SchemeBuilder{
 	cluster.SchemeBuilder,
 	catalog.SchemeBuilder,
 	fleet.SchemeBuilder,
-	monitoringv1.SchemeBuilder,
-	monitoringv1alpha1.SchemeBuilder,
 	planv1.SchemeBuilder,
 	appsv1.SchemeBuilder,
 	appsv1beta1.SchemeBuilder,
@@ -103,8 +99,6 @@ func init() {
 	Scheme.ExcludeGVK(management.SchemeGroupVersion.WithKind("ClusterAlertGroupList"))
 	Scheme.ExcludeGVK(management.SchemeGroupVersion.WithKind("ProjectAlertRuleList"))
 	Scheme.ExcludeGVK(management.SchemeGroupVersion.WithKind("ProjectAlertGroupList"))
-	Scheme.ExcludeGVK(management.SchemeGroupVersion.WithKind("ClusterMonitorGraphList"))
-	Scheme.ExcludeGVK(management.SchemeGroupVersion.WithKind("ProjectMonitorGraphList"))
 
 }
 

@@ -2,22 +2,16 @@ package deployer
 
 import (
 	"fmt"
-	"reflect"
-	"strings"
 	"time"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	v33 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/rancher/pkg/catalog/manager"
 	alertutil "github.com/rancher/rancher/pkg/controllers/managementuserlegacy/alert/common"
-	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/helm/common"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	projectv3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
-	monitorutil "github.com/rancher/rancher/pkg/monitoring"
-	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/types/config"
 
@@ -83,43 +77,10 @@ func (l *AlertService) Init(cluster *config.UserContext) {
 }
 
 func (l *AlertService) Version() (string, error) {
-	return fmt.Sprintf("%s-%s", monitorutil.RancherMonitoringTemplateName, initVersion), nil
+	return "", nil
 }
 
 func (l *AlertService) Upgrade(currentVersion string) (string, error) {
-	template, err := l.templateLister.Get(namespace.GlobalNamespace, monitorutil.RancherMonitoringTemplateName)
-	if err != nil {
-		return "", fmt.Errorf("get template %s:%s failed, %v", namespace.GlobalNamespace, monitorutil.RancherMonitoringTemplateName, err)
-	}
-
-	templateVersion, err := l.catalogManager.LatestAvailableTemplateVersion(template, l.clusterName)
-	if err != nil {
-		return "", err
-	}
-
-	systemCatalogName := template.Spec.CatalogID
-	newExternalID := templateVersion.ExternalID
-
-	newVersion, _, err := common.ParseExternalID(newExternalID)
-	if err != nil {
-		return "", err
-	}
-
-	appName, _ := monitorutil.ClusterAlertManagerInfo()
-	//migrate legacy
-	if !strings.Contains(currentVersion, monitorutil.RancherMonitoringTemplateName) {
-		if err := l.migrateLegacyClusterAlert(); err != nil {
-			return "", err
-		}
-
-		if err := l.migrateLegacyProjectAlert(); err != nil {
-			return "", err
-		}
-
-		if err := l.removeLegacyAlerting(); err != nil {
-			return "", err
-		}
-	}
 
 	//remove finalizer from legacy ProjectAlert
 	if err := l.removeFinalizerFromLegacyAlerting(); err != nil {
@@ -140,47 +101,9 @@ func (l *AlertService) Upgrade(currentVersion string) (string, error) {
 	if systemProject == nil {
 		return "", fmt.Errorf("get system project failed")
 	}
-	app, err := l.appLister.Get(systemProject.Name, appName)
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			return newVersion, nil
-		}
-		return "", fmt.Errorf("get app %s:%s failed, %v", systemProject.Name, appName, err)
-	}
-	newApp := app.DeepCopy()
-	newApp.Spec.ExternalID = newExternalID
-	if newApp.Spec.Answers == nil {
-		newApp.Spec.Answers = make(map[string]string)
-	}
-	newApp.Spec.Answers["operator.enabled"] = "false"
 
-	if !reflect.DeepEqual(newApp, app) {
-		// check cluster ready before upgrade, because helm will not retry if got cluster not ready error
-		cluster, err := l.clusterLister.Get(metav1.NamespaceAll, l.clusterName)
-		if err != nil {
-			return "", fmt.Errorf("get cluster %s failed, %v", l.clusterName, err)
-		}
-		if !v32.ClusterConditionReady.IsTrue(cluster) {
-			return "", fmt.Errorf("cluster %v not ready", l.clusterName)
-		}
+	return "", nil
 
-		systemCatalog, err := l.catalogLister.Get(metav1.NamespaceAll, systemCatalogName)
-		if err != nil {
-			return "", fmt.Errorf("get catalog %s failed, %v", systemCatalogName, err)
-		}
-
-		if !v32.CatalogConditionUpgraded.IsTrue(systemCatalog) || !v32.CatalogConditionRefreshed.IsTrue(systemCatalog) || !v32.CatalogConditionDiskCached.IsTrue(systemCatalog) {
-			return "", fmt.Errorf("catalog %v not ready", systemCatalogName)
-		}
-
-		// add force upgrade to handle chart compatibility in different version
-		v33.AppConditionForceUpgrade.Unknown(newApp)
-
-		if _, err = l.apps.Update(newApp); err != nil {
-			return "", fmt.Errorf("update app %s:%s failed, %v", app.Namespace, app.Name, err)
-		}
-	}
-	return newVersion, nil
 }
 
 func (l *AlertService) migrateLegacyClusterAlert() error {

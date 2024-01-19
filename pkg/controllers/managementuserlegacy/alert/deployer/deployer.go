@@ -17,9 +17,7 @@ import (
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	projectv3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
-	monitorutil "github.com/rancher/rancher/pkg/monitoring"
 	"github.com/rancher/rancher/pkg/namespace"
-	projectutil "github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -113,59 +111,12 @@ func (d *Deployer) ClusterRuleSync(key string, alert *mgmtv3.ClusterAlertRule) (
 
 // //deploy or clean up resources(alertmanager deployment, service, namespace) required by alerting.
 func (d *Deployer) sync() error {
-	appName, appTargetNamespace := monitorutil.ClusterAlertManagerInfo()
-
-	systemProject, err := projectutil.GetSystemProject(d.clusterName, d.projectLister)
-	if err != nil {
-		return err
-	}
-
-	systemProjectID := ref.Ref(systemProject)
-
-	needDeploy, needWebhookReceiver, err := d.needDeploy()
-	if err != nil {
-		return fmt.Errorf("check alertmanager deployment failed, %v", err)
-	}
 
 	cluster, err := d.clusterLister.Get("", d.clusterName)
 	if err != nil {
 		return fmt.Errorf("get cluster %s failed, %v", d.clusterName, err)
 	}
 	newCluster := cluster.DeepCopy()
-	newCluster.Spec.EnableClusterAlerting = needDeploy
-
-	if needDeploy {
-		operatorAppName, operatorAppNamespace := monitorutil.SystemMonitoringInfo()
-		operatorWorkload, err := d.appDeployer.deployments.GetNamespaced(operatorAppNamespace, fmt.Sprintf("prometheus-operator-%s", operatorAppName), metav1.GetOptions{})
-		if err != nil && !apierrors.IsNotFound(err) {
-			return fmt.Errorf("get deployment %s/prometheus-operator-%s failed, %v", operatorAppNamespace, operatorAppName, err)
-		}
-		if operatorWorkload == nil || operatorWorkload.DeletionTimestamp != nil {
-			d.clusters.Controller().Enqueue(metav1.NamespaceAll, d.clusterName)
-		}
-
-		if !reflect.DeepEqual(cluster, newCluster) {
-			cluster, err := d.clusters.Update(newCluster)
-			if err != nil {
-				return fmt.Errorf("update cluster %v failed, %v", d.clusterName, err)
-			}
-
-			newCluster = cluster.DeepCopy()
-		}
-
-		if d.alertManager.IsDeploy, err = d.appDeployer.deploy(appName, appTargetNamespace, systemProjectID, needWebhookReceiver, d.clusterLister, d.clusterName); err != nil {
-			return fmt.Errorf("deploy alertmanager failed, %v", err)
-		}
-
-		if err = d.appDeployer.isDeploySuccess(newCluster, alertutil.GetAlertManagerDaemonsetName(appName), appTargetNamespace); err != nil {
-			return err
-		}
-	} else {
-		if d.alertManager.IsDeploy, err = d.appDeployer.cleanup(appName, appTargetNamespace, systemProjectID); err != nil {
-			return fmt.Errorf("clean up alertmanager failed, %v", err)
-		}
-		v32.ClusterConditionAlertingEnabled.False(newCluster)
-	}
 
 	if !reflect.DeepEqual(cluster, newCluster) {
 		_, err = d.clusters.Update(newCluster)
@@ -334,15 +285,6 @@ func (d *appDeployer) deploy(appName, appTargetNamespace, systemProjectID string
 		return true, nil
 	}
 
-	template, err := d.templateLister.Get(namespace.GlobalNamespace, monitorutil.RancherMonitoringTemplateName)
-	if err != nil {
-		return false, fmt.Errorf("get template %s:%s failed, %v", namespace.GlobalNamespace, monitorutil.RancherMonitoringTemplateName, err)
-	}
-	templateVersion, err := d.catalogManager.LatestAvailableTemplateVersion(template, clusterName)
-	if err != nil {
-		return false, err
-	}
-
 	creator, err := d.systemAccountManager.GetSystemUser(clusterName)
 	if err != nil {
 		return false, err
@@ -353,7 +295,6 @@ func (d *appDeployer) deploy(appName, appTargetNamespace, systemProjectID string
 			Annotations: map[string]string{
 				creatorIDAnn: creator.Name,
 			},
-			Labels:    monitorutil.OwnedLabels(appName, appTargetNamespace, systemProjectID, monitorutil.SystemLevel),
 			Name:      appName,
 			Namespace: systemProjectName,
 		},
@@ -361,14 +302,12 @@ func (d *appDeployer) deploy(appName, appTargetNamespace, systemProjectID string
 			Answers: map[string]string{
 				"alertmanager.enabled":                "true",
 				"alertmanager.serviceMonitor.enabled": "true",
-				"alertmanager.apiGroup":               monitorutil.APIVersion.Group,
 				"alertmanager.enabledRBAC":            "false",
 				"alertmanager.configFromSecret":       secret.Name,
 				"operator.enabled":                    "false",
 				WebhookReceiverEnable:                 enableWebhookReceiver,
 			},
 			Description:     "Alertmanager for Rancher Monitoring",
-			ExternalID:      templateVersion.ExternalID,
 			ProjectName:     systemProjectID,
 			TargetNamespace: appTargetNamespace,
 		},

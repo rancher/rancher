@@ -62,9 +62,6 @@ type Interface interface {
 	GlobalDnsProvidersGetter
 	KontainerDriversGetter
 	EtcdBackupsGetter
-	MonitorMetricsGetter
-	ClusterMonitorGraphsGetter
-	ProjectMonitorGraphsGetter
 	CloudCredentialsGetter
 	ClusterTemplatesGetter
 	ClusterTemplateRevisionsGetter
@@ -817,48 +814,6 @@ func (c *Client) EtcdBackups(namespace string) EtcdBackupInterface {
 	sharedClient := c.clientFactory.ForResourceKind(EtcdBackupGroupVersionResource, EtcdBackupGroupVersionKind.Kind, true)
 	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &EtcdBackupResource, EtcdBackupGroupVersionKind, etcdBackupFactory{})
 	return &etcdBackupClient{
-		ns:           namespace,
-		client:       c,
-		objectClient: objectClient,
-	}
-}
-
-type MonitorMetricsGetter interface {
-	MonitorMetrics(namespace string) MonitorMetricInterface
-}
-
-func (c *Client) MonitorMetrics(namespace string) MonitorMetricInterface {
-	sharedClient := c.clientFactory.ForResourceKind(MonitorMetricGroupVersionResource, MonitorMetricGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &MonitorMetricResource, MonitorMetricGroupVersionKind, monitorMetricFactory{})
-	return &monitorMetricClient{
-		ns:           namespace,
-		client:       c,
-		objectClient: objectClient,
-	}
-}
-
-type ClusterMonitorGraphsGetter interface {
-	ClusterMonitorGraphs(namespace string) ClusterMonitorGraphInterface
-}
-
-func (c *Client) ClusterMonitorGraphs(namespace string) ClusterMonitorGraphInterface {
-	sharedClient := c.clientFactory.ForResourceKind(ClusterMonitorGraphGroupVersionResource, ClusterMonitorGraphGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &ClusterMonitorGraphResource, ClusterMonitorGraphGroupVersionKind, clusterMonitorGraphFactory{})
-	return &clusterMonitorGraphClient{
-		ns:           namespace,
-		client:       c,
-		objectClient: objectClient,
-	}
-}
-
-type ProjectMonitorGraphsGetter interface {
-	ProjectMonitorGraphs(namespace string) ProjectMonitorGraphInterface
-}
-
-func (c *Client) ProjectMonitorGraphs(namespace string) ProjectMonitorGraphInterface {
-	sharedClient := c.clientFactory.ForResourceKind(ProjectMonitorGraphGroupVersionResource, ProjectMonitorGraphGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &ProjectMonitorGraphResource, ProjectMonitorGraphGroupVersionKind, projectMonitorGraphFactory{})
-	return &projectMonitorGraphClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,

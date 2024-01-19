@@ -1,5 +1,5 @@
 /*
-Copyright 2023 Rancher Labs, Inc.
+Copyright 2024 Rancher Labs, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -44,7 +44,6 @@ var (
 	ClusterAlertRuleResourceName                          = "clusteralertrules"
 	ClusterCatalogResourceName                            = "clustercatalogs"
 	ClusterLoggingResourceName                            = "clusterloggings"
-	ClusterMonitorGraphResourceName                       = "clustermonitorgraphs"
 	ClusterRegistrationTokenResourceName                  = "clusterregistrationtokens"
 	ClusterRoleTemplateBindingResourceName                = "clusterroletemplatebindings"
 	ClusterTemplateResourceName                           = "clustertemplates"
@@ -66,7 +65,6 @@ var (
 	KontainerDriverResourceName                           = "kontainerdrivers"
 	LocalProviderResourceName                             = "localproviders"
 	ManagedChartResourceName                              = "managedcharts"
-	MonitorMetricResourceName                             = "monitormetrics"
 	MultiClusterAppResourceName                           = "multiclusterapps"
 	MultiClusterAppRevisionResourceName                   = "multiclusterapprevisions"
 	NodeResourceName                                      = "nodes"
@@ -87,7 +85,6 @@ var (
 	ProjectAlertRuleResourceName                          = "projectalertrules"
 	ProjectCatalogResourceName                            = "projectcatalogs"
 	ProjectLoggingResourceName                            = "projectloggings"
-	ProjectMonitorGraphResourceName                       = "projectmonitorgraphs"
 	ProjectNetworkPolicyResourceName                      = "projectnetworkpolicies"
 	ProjectRoleTemplateBindingResourceName                = "projectroletemplatebindings"
 	RancherUserNotificationResourceName                   = "rancherusernotifications"
@@ -159,8 +156,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&ClusterCatalogList{},
 		&ClusterLogging{},
 		&ClusterLoggingList{},
-		&ClusterMonitorGraph{},
-		&ClusterMonitorGraphList{},
 		&ClusterRegistrationToken{},
 		&ClusterRegistrationTokenList{},
 		&ClusterRoleTemplateBinding{},
@@ -203,8 +198,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&LocalProviderList{},
 		&ManagedChart{},
 		&ManagedChartList{},
-		&MonitorMetric{},
-		&MonitorMetricList{},
 		&MultiClusterApp{},
 		&MultiClusterAppList{},
 		&MultiClusterAppRevision{},
@@ -245,8 +238,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&ProjectCatalogList{},
 		&ProjectLogging{},
 		&ProjectLoggingList{},
-		&ProjectMonitorGraph{},
-		&ProjectMonitorGraphList{},
 		&ProjectNetworkPolicy{},
 		&ProjectNetworkPolicyList{},
 		&ProjectRoleTemplateBinding{},

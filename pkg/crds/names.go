@@ -26,9 +26,6 @@ func RequiredCRDs() []string {
 	if features.Auth.Enabled() {
 		requiredCRDS = append(requiredCRDS, AuthCRDs()...)
 	}
-	if features.MonitoringV1.Enabled() {
-		requiredCRDS = append(requiredCRDS, MonitoringV1CRDs()...)
-	}
 	return requiredCRDS
 }
 

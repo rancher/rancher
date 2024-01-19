@@ -6,7 +6,6 @@ import (
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/features"
-	"github.com/rancher/rancher/pkg/ref"
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/alert/configsyncer"
@@ -15,11 +14,9 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/alert/statesyncer"
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/alert/watcher"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	monitorutil "github.com/rancher/rancher/pkg/monitoring"
 	"github.com/rancher/rancher/pkg/types/config"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -196,18 +193,6 @@ func (l *alertGroupCleaner) Clean(clusterGroup *v3.ClusterAlertGroup, projectGro
 			}
 		}
 
-		selector := fields.OneTermNotEqualSelector("metadata.name", clusterGroup.Name)
-		groups, err := l.clusterAlertGroups.List(metav1.ListOptions{FieldSelector: selector.String()})
-		if err != nil {
-			return fmt.Errorf("list cluster alert group failed while clean, %v", err)
-		}
-
-		if len(groups.Items) == 0 {
-			_, namespace := monitorutil.ClusterMonitoringInfo()
-			if err := l.operatorCRDManager.DeletePrometheusRule(namespace, l.clusterName); err != nil {
-				return err
-			}
-		}
 		return nil
 	}
 
@@ -226,22 +211,6 @@ func (l *alertGroupCleaner) Clean(clusterGroup *v3.ClusterAlertGroup, projectGro
 						return err
 					}
 				}
-			}
-		}
-		_, projectName := ref.Parse(projectGroup.Spec.ProjectName)
-
-		s1 := fields.OneTermEqualSelector("metadata.namespace", projectName)
-		s2 := fields.OneTermNotEqualSelector("metadata.name", projectGroup.Name)
-		selector := fields.AndSelectors(s2, s1)
-		groups, err := l.projectAlertGroups.List(metav1.ListOptions{FieldSelector: selector.String()})
-		if err != nil {
-			return fmt.Errorf("list project alert group failed while clean, %v", err)
-		}
-
-		if len(groups.Items) == 0 {
-			_, namespace := monitorutil.ProjectMonitoringInfo(projectName)
-			if err := l.operatorCRDManager.DeletePrometheusRule(namespace, projectName); err != nil {
-				return err
 			}
 		}
 

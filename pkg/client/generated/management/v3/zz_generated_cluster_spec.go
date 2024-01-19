@@ -23,7 +23,6 @@ const (
 	ClusterSpecFieldDockerRootDir                                        = "dockerRootDir"
 	ClusterSpecFieldEKSConfig                                            = "eksConfig"
 	ClusterSpecFieldEnableClusterAlerting                                = "enableClusterAlerting"
-	ClusterSpecFieldEnableClusterMonitoring                              = "enableClusterMonitoring"
 	ClusterSpecFieldEnableNetworkPolicy                                  = "enableNetworkPolicy"
 	ClusterSpecFieldFleetAgentDeploymentCustomization                    = "fleetAgentDeploymentCustomization"
 	ClusterSpecFieldFleetWorkspaceName                                   = "fleetWorkspaceName"
@@ -61,7 +60,6 @@ type ClusterSpec struct {
 	DockerRootDir                                        string                         `json:"dockerRootDir,omitempty" yaml:"dockerRootDir,omitempty"`
 	EKSConfig                                            *EKSClusterConfigSpec          `json:"eksConfig,omitempty" yaml:"eksConfig,omitempty"`
 	EnableClusterAlerting                                bool                           `json:"enableClusterAlerting,omitempty" yaml:"enableClusterAlerting,omitempty"`
-	EnableClusterMonitoring                              bool                           `json:"enableClusterMonitoring,omitempty" yaml:"enableClusterMonitoring,omitempty"`
 	EnableNetworkPolicy                                  *bool                          `json:"enableNetworkPolicy,omitempty" yaml:"enableNetworkPolicy,omitempty"`
 	FleetAgentDeploymentCustomization                    *AgentDeploymentCustomization  `json:"fleetAgentDeploymentCustomization,omitempty" yaml:"fleetAgentDeploymentCustomization,omitempty"`
 	FleetWorkspaceName                                   string                         `json:"fleetWorkspaceName,omitempty" yaml:"fleetWorkspaceName,omitempty"`

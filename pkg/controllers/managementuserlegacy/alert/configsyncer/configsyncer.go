@@ -1,7 +1,6 @@
 package configsyncer
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"net/url"
@@ -17,20 +16,16 @@ import (
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/alert/common"
 	alertconfig "github.com/rancher/rancher/pkg/controllers/managementuserlegacy/alert/config"
-	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/alert/deployer"
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/alert/manager"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	projectv3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
-	monitorutil "github.com/rancher/rancher/pkg/monitoring"
 	notifierutil "github.com/rancher/rancher/pkg/notifiers"
 	"github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/types/config"
 
 	"github.com/sirupsen/logrus"
-	"gopkg.in/yaml.v2"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -231,33 +226,6 @@ func (d *ConfigSyncer) sync() error {
 		return err
 	}
 
-	data, err := yaml.Marshal(config)
-	if err != nil {
-		return errors.Wrapf(err, "Marshal secrets")
-	}
-
-	altermanagerAppName, altermanagerAppNamespace := monitorutil.ClusterAlertManagerInfo()
-	secretClient := d.secretsGetter.Secrets(altermanagerAppNamespace)
-	secretName := common.GetAlertManagerSecretName(altermanagerAppName)
-	configSecret, err := secretClient.Get(secretName, metav1.GetOptions{})
-	if err != nil {
-		return errors.Wrapf(err, "Get secrets")
-	}
-
-	if string(configSecret.Data["alertmanager.yaml"]) != string(data) || string(configSecret.Data["notification.tmpl"]) != deployer.NotificationTmpl {
-		newConfigSecret := configSecret.DeepCopy()
-		newConfigSecret.Data["alertmanager.yaml"] = data
-		newConfigSecret.Data["notification.tmpl"] = []byte(deployer.NotificationTmpl)
-
-		_, err = secretClient.Update(newConfigSecret)
-		if err != nil {
-			return errors.Wrapf(err, "Update secrets")
-		}
-
-	} else {
-		logrus.Debug("The config stay the same, will not update the secret")
-	}
-
 	if webhookReceiverEnabled {
 		if err := d.syncWebhookConfig(notifiers, cAlertGroupsMap, pAlertGroupsMap); err != nil {
 			return errors.Wrapf(err, "Update Webhook Receiver Config")
@@ -281,8 +249,6 @@ func (d *ConfigSyncer) getNotifier(id string, notifiers []*v3.Notifier) *v3.Noti
 func (d *ConfigSyncer) addProjectAlert2Operator(clusterDisplayName string, projectGroups map[string]map[string][]*v3.ProjectAlertRule, keys []string) error {
 	for _, projectName := range keys {
 		groupRules := projectGroups[projectName]
-		_, namespace := monitorutil.ProjectMonitoringInfo(projectName)
-		promRule := d.operatorCRDManager.GetDefaultPrometheusRule(namespace, projectName)
 
 		projectID := fmt.Sprintf("%s:%s", d.clusterName, projectName)
 		projectDisplayName := common.GetProjectDisplayName(projectID, d.projectLister)
@@ -304,15 +270,6 @@ func (d *ConfigSyncer) addProjectAlert2Operator(clusterDisplayName string, proje
 				}
 			}
 
-			if len(ruleGroup.Rules) > 0 {
-				d.operatorCRDManager.AddRuleGroup(promRule, *ruleGroup)
-			}
-		}
-
-		if len(promRule.Spec.Groups) > 0 {
-			if err := d.operatorCRDManager.SyncPrometheusRule(promRule); err != nil {
-				return err
-			}
 		}
 	}
 
@@ -320,9 +277,6 @@ func (d *ConfigSyncer) addProjectAlert2Operator(clusterDisplayName string, proje
 }
 
 func (d *ConfigSyncer) addClusterAlert2Operator(clusterDisplayName string, groupRules map[string][]*v3.ClusterAlertRule, keys []string) error {
-	_, namespace := monitorutil.ClusterMonitoringInfo()
-	promRule := d.operatorCRDManager.GetDefaultPrometheusRule(namespace, d.clusterName)
-
 	for _, groupID := range keys {
 		ruleGroup := d.operatorCRDManager.GetRuleGroup(groupID)
 		alertRules := groupRules[groupID]
@@ -333,13 +287,6 @@ func (d *ConfigSyncer) addClusterAlert2Operator(clusterDisplayName string, group
 				d.operatorCRDManager.AddRule(ruleGroup, promRule)
 			}
 		}
-		if len(ruleGroup.Rules) > 0 {
-			d.operatorCRDManager.AddRuleGroup(promRule, *ruleGroup)
-		}
-	}
-
-	if len(promRule.Spec.Groups) > 0 {
-		return d.operatorCRDManager.SyncPrometheusRule(promRule)
 	}
 
 	return nil
@@ -660,24 +607,6 @@ func (d *ConfigSyncer) addRecipients(notifiers []*v3.Notifier, receiver *alertco
 }
 
 func (d *ConfigSyncer) isAppDeploy(appNamespace string) (bool, bool, error) {
-	appName, _ := monitorutil.ClusterAlertManagerInfo()
-	app, err := d.appLister.Get(appNamespace, appName)
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			return false, false, nil
-		}
-
-		return false, false, errors.Wrapf(err, "get app %s failed", appName)
-	}
-
-	if app.DeletionTimestamp != nil {
-		return false, false, nil
-	}
-
-	if webhookReceiverEnabled, ok := app.Spec.Answers[deployer.WebhookReceiverEnable]; ok && webhookReceiverEnabled == "true" {
-		return true, true, nil
-	}
-
 	return true, false, nil
 }
 
@@ -734,15 +663,6 @@ func (d *ConfigSyncer) syncWebhookConfig(notifiers []*v3.Notifier, cAlertGroupsM
 		recipients = append(recipients, group.Spec.Recipients...)
 	}
 
-	webhookSecreteName, altermanagerAppNamespace := monitorutil.SecretWebhook()
-	secretClient := d.secretsGetter.Secrets(altermanagerAppNamespace)
-	configSecret, err := secretClient.Get(webhookSecreteName, metav1.GetOptions{})
-	if err != nil {
-		return errors.Wrapf(err, "Get secret")
-	}
-
-	oldConfig := configSecret.Data["config.yaml"]
-
 	providers := make(map[string]*Provider)
 	receivers := make(map[string]*Receiver)
 	for _, r := range recipients {
@@ -789,21 +709,9 @@ func (d *ConfigSyncer) syncWebhookConfig(notifiers []*v3.Notifier, cAlertGroupsM
 		}
 	}
 
-	config := WebhookReceiverConfig{
+	_ = WebhookReceiverConfig{
 		Providers: providers,
 		Receivers: receivers,
 	}
-
-	newConfig, err := yaml.Marshal(config)
-	if err != nil {
-		return errors.Wrapf(err, "Marshal secrets")
-	}
-	if !bytes.Equal(oldConfig, newConfig) {
-		configSecret.Data["config.yaml"] = newConfig
-		if _, err = secretClient.Update(configSecret); err != nil {
-			return errors.Wrapf(err, "Update secret")
-		}
-	}
-
 	return nil
 }

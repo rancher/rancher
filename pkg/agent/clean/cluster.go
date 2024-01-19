@@ -27,7 +27,6 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/usercontrollers"
 	"github.com/rancher/rancher/pkg/controllers/managementagent/nslabels"
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/helm"
-	"github.com/rancher/rancher/pkg/monitoring"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/sirupsen/logrus"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
@@ -66,10 +65,6 @@ var (
 		"cattle-provisioning-capi-system",
 		"cattle-impersonation-system",
 	}
-
-	getNSFuncs = []getNSFunc{
-		getProjectMonitoringNamespaces,
-	}
 )
 
 type getNSFunc func(*kubernetes.Clientset) ([]string, error)
@@ -107,14 +102,6 @@ func Cluster() error {
 	var errors []error
 	var toRemove = make([]string, len(nsToRemove))
 	copy(toRemove, nsToRemove)
-
-	for _, f := range getNSFuncs {
-		list, err := f(client)
-		if err != nil {
-			errors = append(errors, err)
-		}
-		toRemove = append(toRemove, list...)
-	}
 
 	for _, ns := range toRemove {
 		if err := removeNamespace(ns, client); err != nil {
@@ -436,25 +423,6 @@ func processErrors(errs []error) error {
 		errorString += fmt.Sprintf("%s ", err)
 	}
 	return errors.New(errorString)
-}
-
-func getProjectMonitoringNamespaces(client *kubernetes.Clientset) ([]string, error) {
-	var list []string
-	nsList, err := client.CoreV1().Namespaces().List(context.TODO(), metav1.ListOptions{})
-	if err != nil {
-		return nil, err
-	}
-	for _, ns := range nsList.Items {
-		value, ok := ns.Labels[nslabels.ProjectIDFieldLabel]
-		if !ok {
-			continue
-		}
-		if _, nsname := monitoring.ProjectMonitoringInfo(value); ns.Name != nsname {
-			continue
-		}
-		list = append(list, ns.Name)
-	}
-	return list, nil
 }
 
 func isRancherInstalled(k8s kubernetes.Interface) (bool, error) {

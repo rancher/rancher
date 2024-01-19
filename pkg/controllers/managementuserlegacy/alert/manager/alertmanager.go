@@ -11,7 +11,6 @@ import (
 
 	"github.com/prometheus/common/model"
 	alertconfig "github.com/rancher/rancher/pkg/controllers/managementuserlegacy/alert/config"
-	monitorutil "github.com/rancher/rancher/pkg/monitoring"
 
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -108,15 +107,7 @@ func NewAlertManager(cluster *config.UserContext) *AlertManager {
 }
 
 func (m *AlertManager) GetAlertManagerEndpoint() (string, error) {
-	name, namespace, port := monitorutil.ClusterAlertManagerEndpoint()
-
-	svc, err := m.svcLister.Get(namespace, name)
-	if err != nil {
-		return "", fmt.Errorf("Failed to get service for alertmanager, %v", err)
-	}
-
-	url := "http://" + svc.Name + "." + svc.Namespace + ".svc:" + port
-	return url, nil
+	return "", nil
 }
 
 func GetAlertManagerDefaultConfig() *alertconfig.Config {
