@@ -108,10 +108,12 @@ func (i *contentDownload) serveIcon(apiContext *types.APIRequest, rw http.Respon
 	if err != nil {
 		return err
 	}
-	defer chart.Close()
+	if chart != nil {
+		setIconHeaders(rw, suffix)
+		_, err = io.Copy(rw, chart)
+		defer chart.Close()
+	}
 
-	setIconHeaders(rw, suffix)
-	_, err = io.Copy(rw, chart)
 	return err
 }
 

@@ -21,20 +21,22 @@ const (
 	localDir  = "../rancher-data/local-catalogs/v2" // identical to helm.InternalCatalog
 )
 
-func gitDir(namespace, name, gitURL string) string {
-	staticDir := filepath.Join(staticDir, namespace, name, hash(gitURL))
+// RepoDir returns the directory where the git repo is cloned.
+func RepoDir(namespace, name, gitURL string) string {
+	staticDir := filepath.Join(staticDir, namespace, name, Hash(gitURL))
 	if s, err := os.Stat(staticDir); err == nil && s.IsDir() {
 		return staticDir
 	}
-	localDir := filepath.Join(localDir, namespace, name, hash(gitURL))
+	localDir := filepath.Join(localDir, namespace, name, Hash(gitURL))
 	if s, err := os.Stat(localDir); err == nil && s.IsDir() {
 		return localDir
 	}
-	return filepath.Join(stateDir, namespace, name, hash(gitURL))
+	return filepath.Join(stateDir, namespace, name, Hash(gitURL))
 }
 
-func isBundled(git *git) bool {
-	return strings.HasPrefix(git.Directory, staticDir) || strings.HasPrefix(git.Directory, localDir)
+// IsBundled checks the directory to see if it is a bundled catalog repository.
+func IsBundled(dir string) bool {
+	return strings.HasPrefix(dir, staticDir) || strings.HasPrefix(dir, localDir)
 }
 
 // isGitSSH checks if the URL is in the SSH URL format using regular expressions.
@@ -78,7 +80,8 @@ func validateURL(gitURL string) error {
 	return nil
 }
 
-func hash(gitURL string) string {
+// Hash returns a hash of the git URL.
+func Hash(gitURL string) string {
 	b := sha256.Sum256([]byte(gitURL))
 	return hex.EncodeToString(b[:])
 }

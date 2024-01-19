@@ -13,16 +13,15 @@ import (
 	"helm.sh/helm/v3/pkg/repo"
 )
 
+// Icon will return the icon for a chartName version in a local repository by getting the relative path
 func Icon(namespace, name, gitURL string, chartVersion *repo.ChartVersion) (io.ReadCloser, string, error) {
 	if len(chartVersion.Icon) == 0 {
 		return nil, "", fmt.Errorf("failed to find chartName %s version %s: %w", chartVersion.Name, chartVersion.Version, validation.NotFound)
 	}
 
-	dir := gitDir(namespace, name, gitURL)
+	dir := RepoDir(namespace, name, gitURL)
 	icon := chartVersion.Icon
-	if strings.HasPrefix(icon, "file://") && len(chartVersion.URLs[0]) > 0 {
-		icon = filepath.Join(chartVersion.URLs[0], strings.TrimPrefix(icon, "file://"))
-	}
+
 	file, err := relative(dir, gitURL, icon)
 	if err != nil {
 		return nil, "", err
@@ -33,7 +32,7 @@ func Icon(namespace, name, gitURL string, chartVersion *repo.ChartVersion) (io.R
 }
 
 func Chart(namespace, name, gitURL string, chartVersion *repo.ChartVersion) (io.ReadCloser, error) {
-	dir := gitDir(namespace, name, gitURL)
+	dir := RepoDir(namespace, name, gitURL)
 
 	if len(chartVersion.URLs) == 0 {
 		return nil, fmt.Errorf("failed to find chartName %s version %s: %w", chartVersion.Name, chartVersion.Version, validation.NotFound)
