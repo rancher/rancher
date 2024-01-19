@@ -243,7 +243,7 @@ node {
                  string(name: 'RKE_VERSION', value: "${env.RKE_VERSION}"),
                  string(name: 'RANCHER_HA_HARDENED', value: "${env.RANCHER_HA_HARDENED}"),
                  string(name: 'RANCHER_PSP_ENABLED', value: "${env.RANCHER_PSP_ENABLED}"),
-                 string(name: 'RANCHER_HELM_EXTRA_SETTINGS', value: "${env.RANCHER_HELM_EXTRA_SETTINGS}"),
+                 string(name: 'RANCHER_HELM_EXTRA_SETTINGS', value: "${env.RANCHER_HELM_EXTRA_SETTINGS}")
                 ]
 
               build job: 'rancher-v3_ha_deploy', parameters: deployParams
@@ -380,8 +380,8 @@ node {
                 string(name: 'RANCHER_IMAGE_TAG', value: "${env.HA_IMAGE_TAG_TO_UPGRADE}"),
                 string(name: 'RANCHER_HELM_REPO', value: "${env.HA_HELM_REPO}"),
                 string(name: 'RANCHER_HA_CERT_OPTION', value: "${env.HA_CERT_OPTION}"),
-                string(name: 'RANCHER_HA_KUBECONFIG', value: "${env.HA_KUBECONFIG}")
-                string(name: 'RANCHER_HELM_EXTRA_SETTINGS', value: "${envRANCHER_HELM_EXTRA_SETTINGS_TO_UPGRADE}")
+                string(name: 'RANCHER_HA_KUBECONFIG', value: "${env.HA_KUBECONFIG}"),
+                string(name: 'RANCHER_HELM_EXTRA_SETTINGS', value: "${env.RANCHER_HELM_EXTRA_SETTINGS_TO_UPGRADE}")
                ]
 
                 build job: 'rancher-v3_ha_upgrade', parameters: upgradeParams
