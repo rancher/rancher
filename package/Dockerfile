@@ -38,7 +38,7 @@ ENV TELEMETRY_VERSION v0.6.2
 ENV DOCKER_MACHINE_LINODE_VERSION v0.1.11
 ENV LINODE_UI_DRIVER_VERSION v0.5.0
 # make sure the version number is consistent with the one at Line 100 of pkg/data/management/machinedriver_data.go
-ENV DOCKER_MACHINE_HARVESTER_VERSION v0.6.5
+ENV DOCKER_MACHINE_HARVESTER_VERSION v0.6.7
 ENV CATTLE_KDM_BRANCH ${CATTLE_KDM_BRANCH}
 ENV HELM_VERSION v3.12.3
 ENV KUSTOMIZE_VERSION v5.0.1
@@ -145,7 +145,7 @@ COPY --from=rancher/k3s:v1.27.6-k3s1 \
     /bin/runc \
     /bin/which \
     /bin/aux/xtables-legacy-multi \
-/usr/bin/
+    /usr/bin/
 
 RUN ln -s /usr/bin/cni /usr/bin/bridge && \
     ln -s /usr/bin/cni /usr/bin/flannel && \
