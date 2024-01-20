@@ -43,7 +43,8 @@ spec:
   - host: {{ .Values.hostname }}  # hostname to access rancher server
     http:
       paths:
-      {{- range default ["/"] .Values.ingress.paths }}
+      {{- $defaultPaths := list "/" }}
+      {{- range default $defaultPaths .Values.ingress.paths }}
       - backend:
           {{- if or (.Capabilities.APIVersions.Has "networking.k8s.io/v1/Ingress") (not (.Capabilities.APIVersions.Has "networking.k8s.io/v1beta1/Ingress")) }}
           service:
@@ -58,6 +59,7 @@ spec:
         pathType: ImplementationSpecific
         path: {{ . }}
         {{- end }}
+      {{- end }}
 {{- if eq .Values.tls "ingress" }}
   tls:
   - hosts:
