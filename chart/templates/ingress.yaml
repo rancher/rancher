@@ -43,7 +43,7 @@ spec:
   - host: {{ .Values.hostname }}  # hostname to access rancher server
     http:
       paths:
-      {{- range .Values.ingress.paths }}
+      {{- range default ["/"] .Values.ingress.paths }}
       - backend:
           {{- if or (.Capabilities.APIVersions.Has "networking.k8s.io/v1/Ingress") (not (.Capabilities.APIVersions.Has "networking.k8s.io/v1beta1/Ingress")) }}
           service:
