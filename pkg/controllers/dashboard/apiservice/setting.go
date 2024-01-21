@@ -2,6 +2,7 @@ package apiservice
 
 import (
 	"fmt"
+	"strings"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/features"
@@ -82,6 +83,9 @@ func (h *handler) getInternalServerAndURL() (string, string, error) {
 
 	if clusterIPService {
 		clusterIP, err := h.getClusterIP()
+		if strings.Contains(clusterIP, ":") {
+			return fmt.Sprintf("https://[%s]", clusterIP), internalCA, err
+		}
 		return fmt.Sprintf("https://%s", clusterIP), internalCA, err
 	}
 
