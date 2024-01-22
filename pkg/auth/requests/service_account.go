@@ -16,7 +16,9 @@ import (
 	"github.com/rancher/steve/pkg/auth"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/authentication/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	authv1 "k8s.io/client-go/kubernetes/typed/authentication/v1"
@@ -24,8 +26,7 @@ import (
 )
 
 const (
-	serviceAccountSubjectPrefix = "system:serviceaccount:"
-	settingsObjectName          = "clusterproxyconfig"
+	settingsObjectName = "clusterproxyconfig"
 )
 
 type (
@@ -74,12 +75,15 @@ func (t *ServiceAccountAuth) Authenticate(req *http.Request) (user.Info, bool, e
 	// Check the cluster setting value to determine whether we will continue the auth process
 	settings, err := t.clusterProxyConfigsGetter.Get(clusterID, settingsObjectName)
 	if err != nil {
-		logrus.Warnf("rejecting downstream proxy request for %s, unable to fetch ClusterProxySettings object for cluster", req.URL.Path)
+		// Not found is "normal" and we won't bother logging anything
+		if !apierrors.IsNotFound(err) {
+			logrus.Debugf("rejecting downstream proxy request for %s, unable to fetch ClusterProxySettings object for cluster", req.URL.Path)
+		}
 		return &user.DefaultInfo{}, false, nil
 	}
 
 	if !settings.Enabled {
-		logrus.Warnf("rejecting downstream proxy request for %s, current setting is enabled: %v", req.URL.Path, settings.Enabled)
+		logrus.Debugf("rejecting downstream proxy request for %s, current setting is enabled: %v", req.URL.Path, settings.Enabled)
 		return &user.DefaultInfo{}, false, nil
 	}
 
@@ -88,13 +92,15 @@ func (t *ServiceAccountAuth) Authenticate(req *http.Request) (user.Info, bool, e
 
 	jwtParser := jwtv4.Parser{}
 	claims := jwtv4.RegisteredClaims{}
+	// Using ParseUnverified is deliberate here to look at the basic info in the token.
+	// Later on, we do a real TokenReview against the downstream cluster to actually verify the JWT.
 	_, _, err = jwtParser.ParseUnverified(rawToken, &claims)
 	if err != nil {
-		logrus.Debugf("saauth: error parsing JWT: %v", err)
+		logrus.Debug("saauth: error parsing JWT")
 		return info, false, err
 	}
 
-	if !strings.HasPrefix(claims.Subject, serviceAccountSubjectPrefix) {
+	if !strings.HasPrefix(claims.Subject, serviceaccount.ServiceAccountUsernamePrefix) {
 		logrus.Debugf("saauth: JWT sub is not a service account: %v", err)
 		return info, false, nil
 	}
@@ -106,20 +112,21 @@ func (t *ServiceAccountAuth) Authenticate(req *http.Request) (user.Info, bool, e
 
 	cluster, err := t.clusterLister.Get("", clusterID)
 	if err != nil {
-		logrus.Debugf("saauth: error getting cluster: %v", err)
-		return info, false, err
+		logrus.Errorf("saauth: error getting cluster: %v", err)
+		return info, false, fmt.Errorf("failed to get downstream cluster")
 	}
 
 	// Get rest config for the cluster and instantiate an authentication client.
 	kubeConfig, err := t.restConfigGetter(cluster, t.scaledContext, t.secretLister)
 	if kubeConfig == nil || err != nil {
-		return info, false, err
+		logrus.Errorf("saauth: failed to fetch downstream kubeconfig: %v", err)
+		return info, false, fmt.Errorf("failed to get kubeconfig when validating token for downstream cluster")
 	}
 
 	authClient, err := t.authClientCreator(kubeConfig)
 	if err != nil {
-		logrus.Debugf("saauth: error creating authentication client: %v", err)
-		return info, false, err
+		logrus.Errorf("saauth: error creating authentication client: %v", err)
+		return info, false, fmt.Errorf("failed to get authentication client for downstream cluster")
 	}
 
 	tokenReview := &v1.TokenReview{

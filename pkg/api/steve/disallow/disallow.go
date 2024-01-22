@@ -11,8 +11,9 @@ import (
 
 // The resource names must be plural.
 var (
-	// AllowAll is a set of resources for which Rancher doesn't require authentication to perform any operation.
+	// AllowAll is a set of resources for which Rancher doesn't require admin level access to manipulate directly through kubectl.
 	AllowAll = map[string]bool{
+		"clusterproxyconfigs":                        true,
 		"clusterroletemplatebindings":                true,
 		"globalrolebindings":                         true,
 		"globalroles":                                true,

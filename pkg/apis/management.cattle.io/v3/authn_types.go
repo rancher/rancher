@@ -481,6 +481,7 @@ type KeyCloakOIDCConfig struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ClusterProxyConfig determines which downstream requests will be proxied to the downstream cluster for requests that contain service account tokens.
+// Objects of this type are created in the namespace of the target cluster.  If no object exists, the feature will be disabled by default.
 type ClusterProxyConfig struct {
 	types.Namespaced  `json:",inline"`
 	metav1.TypeMeta   `json:",inline"`

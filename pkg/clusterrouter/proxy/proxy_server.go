@@ -238,6 +238,8 @@ func (r *RemoteService) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		if !authcontext.IsSAAuthenticated(req.Context()) {
 			// If the request is not authenticated as a service account,
 			// we need to use an impersonation token.
+			// This is because the impersonator service account does exist on the downstream cluster, and
+			// it has sufficient permissions to perform the TokenReview.
 			token, err := r.getImpersonatorAccountToken(userInfo)
 			if err != nil && !strings.Contains(err.Error(), dialer2.ErrAgentDisconnected.Error()) {
 				er.Error(rw, req, fmt.Errorf("unable to create impersonator account: %w", err))
