@@ -7,6 +7,8 @@ replace github.com/rancher/wrangler v1.1.1 => github.com/rancher/wrangler v1.1.1
 
 replace github.com/rancher/steve => github.com/moio/steve v0.0.0-20240301090544-d30a8a68fc76
 
+replace github.com/manicminer/hamilton => github.com/moio/hamilton v0.46.0-debug-41809-1
+
 replace (
 	github.com/containerd/containerd => github.com/containerd/containerd v1.6.22 // for compatibilty with docker 20.10.x
 	github.com/docker/distribution => github.com/docker/distribution v2.8.2+incompatible // rancher-machine requires a replace is set
