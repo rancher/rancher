@@ -2,6 +2,8 @@ module github.com/rancher/rancher
 
 go 1.19
 
+replace github.com/manicminer/hamilton => github.com/moio/hamilton v0.0.0-20240122162713-24857c1e5759
+
 replace github.com/rancher/steve => github.com/rancher/steve v0.0.0-20231222173734-898644971b85
 
 replace (
