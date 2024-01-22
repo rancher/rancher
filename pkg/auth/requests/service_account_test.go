@@ -1,7 +1,6 @@
 package requests
 
 import (
-	"fmt"
 	"net/http"
 	"testing"
 	"time"
@@ -18,6 +17,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/authentication/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/authentication/user"
 	k8sRequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -223,12 +223,14 @@ func TestAuthenticate(t *testing.T) {
 		test := test
 		ctrl := gomock.NewController(t)
 		cpsCache := wranglerfake.NewMockCacheInterface[*v3api.ClusterProxyConfig](ctrl)
-		cpsCache.EXPECT().Get(gomock.Any(), gomock.Any()).DoAndReturn(func(namespace, name string) (*v3api.ClusterProxyConfig, error) {
+		cpsCache.EXPECT().List(gomock.Any(), gomock.Any()).DoAndReturn(func(namespace string, _ labels.Selector) ([]*v3api.ClusterProxyConfig, error) {
 			if test.omitProxyConfig {
-				return nil, fmt.Errorf("config not found")
+				return nil, nil
 			}
-			return &v3api.ClusterProxyConfig{
-				Enabled: test.settingEnabled,
+			return []*v3api.ClusterProxyConfig{
+				{
+					Enabled: test.settingEnabled,
+				},
 			}, nil
 		}).AnyTimes()
 		t.Run(test.name, func(t *testing.T) {

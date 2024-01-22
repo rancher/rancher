@@ -16,17 +16,13 @@ import (
 	"github.com/rancher/steve/pkg/auth"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/authentication/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	authv1 "k8s.io/client-go/kubernetes/typed/authentication/v1"
 	"k8s.io/client-go/rest"
-)
-
-const (
-	settingsObjectName = "clusterproxyconfig"
 )
 
 type (
@@ -73,17 +69,22 @@ func (t *ServiceAccountAuth) Authenticate(req *http.Request) (user.Info, bool, e
 		return info, hasAuth, fmt.Errorf("no clusterID found in request")
 	}
 	// Check the cluster setting value to determine whether we will continue the auth process
-	settings, err := t.clusterProxyConfigsGetter.Get(clusterID, settingsObjectName)
+	settings, err := t.clusterProxyConfigsGetter.List(clusterID, labels.NewSelector())
 	if err != nil {
-		// Not found is "normal" and we won't bother logging anything
-		if !apierrors.IsNotFound(err) {
-			logrus.Debugf("rejecting downstream proxy request for %s, unable to fetch ClusterProxySettings object for cluster", req.URL.Path)
-		}
+		logrus.Debugf("rejecting downstream proxy request for %s, unable to fetch ClusterProxySettings object for cluster", req.URL.Path)
+		return &user.DefaultInfo{}, false, nil
+	}
+	if settings == nil {
+		logrus.Debugf("rejecting downstream proxy request for %s, no ClusterProxySettings object exists for cluster", req.URL.Path)
+		return &user.DefaultInfo{}, false, nil
+	}
+	if len(settings) > 1 {
+		logrus.Errorf("multiple clusterproxyconfigs found for cluster, which is a misconfiguration, feature is disabled")
 		return &user.DefaultInfo{}, false, nil
 	}
 
-	if !settings.Enabled {
-		logrus.Debugf("rejecting downstream proxy request for %s, current setting is enabled: %v", req.URL.Path, settings.Enabled)
+	if !settings[0].Enabled {
+		logrus.Debugf("rejecting downstream proxy request for %s, current setting is enabled: %v", req.URL.Path, settings[0].Enabled)
 		return &user.DefaultInfo{}, false, nil
 	}
 
