@@ -1,4 +1,4 @@
-FROM registry.suse.com/bci/golang:1.19
+FROM registry.suse.com/bci/golang:1.20
 
 ARG DAPPER_HOST_ARCH
 ENV HOST_ARCH=${DAPPER_HOST_ARCH} ARCH=${DAPPER_HOST_ARCH}
@@ -25,7 +25,7 @@ RUN if [ "${ARCH}" != "s390x" ]; then \
     fi
 
 RUN if [ "${ARCH}" == "amd64" ]; then \
-        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.49.0; \
+        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.52.0; \
         curl -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/fossas/spectrometer/master/install.sh | sh; \
     fi
 

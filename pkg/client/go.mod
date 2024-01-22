@@ -1,6 +1,6 @@
 module github.com/rancher/rancher/pkg/client
 
-go 1.19
+go 1.20
 
 replace k8s.io/client-go => github.com/rancher/client-go v1.25.4-rancher1
 
