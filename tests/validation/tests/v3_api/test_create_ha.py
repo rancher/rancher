@@ -163,6 +163,8 @@ def test_install_rancher_ha(precheck_certificate_options):
     wait_for_status_code(url=auth_url, expected_code=200)
     admin_client = set_url_and_password(RANCHER_SERVER_URL)
     cluster = get_cluster_by_name(admin_client, "local")
+    time.sleep(120)
+    
     validate_cluster_state(admin_client, cluster, False)
     print("Local HA Rancher cluster created successfully! "
           "Access the UI via:\n{}".format(RANCHER_SERVER_URL))
