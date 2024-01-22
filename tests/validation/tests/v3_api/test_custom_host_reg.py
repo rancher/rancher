@@ -20,6 +20,7 @@ RANCHER_CLUSTER_NAME = os.environ.get('RANCHER_CLUSTER_NAME', "")
 RANCHER_ELASTIC_SEARCH_ENDPOINT = os.environ.get(
     'RANCHER_ELASTIC_SEARCH_ENDPOINT', "")
 K8S_VERSION = os.environ.get('RANCHER_K8S_VERSION', "")
+RANCHER_REPOSITORY_IMAGE = os.environ.get('RANCHER_REPOSITORY_IMAGE', "rancher/rancher")
 
 
 def test_add_custom_host():
@@ -44,21 +45,13 @@ def test_delete_keypair():
 
 
 def test_deploy_rancher_server():
-    if "v2.5" in  RANCHER_SERVER_VERSION or \
-        "master" in RANCHER_SERVER_VERSION or \
-        "v2.6" in RANCHER_SERVER_VERSION or \
-        "v2.7" in RANCHER_SERVER_VERSION:
-        RANCHER_SERVER_CMD = \
-            'sudo docker run -d --privileged --name="rancher-server" ' \
-            '--restart=unless-stopped -p 80:80 -p 443:443  ' \
-            '-e CATTLE_BOOTSTRAP_PASSWORD="{}" ' \
-            'rancher/rancher'.format(ADMIN_PASSWORD)
-    else:
-        RANCHER_SERVER_CMD = \
-            'sudo docker run -d --name="rancher-server" ' \
-            '--restart=unless-stopped -p 80:80 -p 443:443  ' \
-            'rancher/rancher'
-    RANCHER_SERVER_CMD += ":" + RANCHER_SERVER_VERSION + " --trace"
+
+    RANCHER_SERVER_CMD = \
+        'sudo docker run -d --privileged --name="rancher-server" ' \
+        '--restart=unless-stopped -p 80:80 -p 443:443  ' \
+        '-e CATTLE_BOOTSTRAP_PASSWORD="{}" ' \
+        '{}:{} --trace'.format(ADMIN_PASSWORD,RANCHER_REPOSITORY_IMAGE,RANCHER_SERVER_VERSION)
+
     print(RANCHER_SERVER_CMD)
     aws_nodes = AmazonWebServices().create_multiple_nodes(
         1, random_test_name("testsa" + HOST_NAME))
