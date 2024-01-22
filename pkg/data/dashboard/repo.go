@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/rancher/rancher/pkg/features"
+	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
 	"github.com/rancher/rancher/pkg/settings"
@@ -14,11 +15,25 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const defaultURL = "https://git.rancher.io/"
+
 var (
 	prefix = "rancher-"
 )
 
-func addRepo(wrangler *wrangler.Context, repoName, branchName string) error {
+func addRepo(wrangler *wrangler.Context, repoName, repoURL, branchName string) error {
+	if repoURL == "" || repoURL == defaultURL {
+		repoURL = defaultURL + strings.TrimPrefix(repoName, prefix)
+	} else {
+		logrus.Warnf(
+			"Charts URL for %q set to %q, which is not the default (%q). "+
+				"If Rancher has issues finding charts, consider resetting this to the default value",
+			repoName,
+			repoURL,
+			defaultURL,
+		)
+	}
+
 	repo, err := wrangler.Catalog.ClusterRepo().Get(repoName, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		_, err = wrangler.Catalog.ClusterRepo().Create(&v1.ClusterRepo{
@@ -26,11 +41,12 @@ func addRepo(wrangler *wrangler.Context, repoName, branchName string) error {
 				Name: repoName,
 			},
 			Spec: v1.RepoSpec{
-				GitRepo:   "https://git.rancher.io/" + strings.TrimPrefix(repoName, prefix),
+				GitRepo:   repoURL,
 				GitBranch: branchName,
 			},
 		})
-	} else if err == nil && repo.Spec.GitBranch != branchName {
+	} else if err == nil && (repo.Spec.GitRepo != repoURL || repo.Spec.GitBranch != branchName) {
+		repo.Spec.GitRepo = repoURL
 		repo.Spec.GitBranch = branchName
 		_, err = wrangler.Catalog.ClusterRepo().Update(repo)
 	}
@@ -40,15 +56,31 @@ func addRepo(wrangler *wrangler.Context, repoName, branchName string) error {
 
 // addRepos upserts the rancher-charts, rancher-partner-charts and rancher-rke2-charts ClusterRepos
 func addRepos(ctx context.Context, wrangler *wrangler.Context) error {
-	if err := addRepo(wrangler, "rancher-charts", settings.ChartDefaultBranch.Get()); err != nil {
+	if err := addRepo(
+		wrangler,
+		"rancher-charts",
+		settings.ChartDefaultURL.Get(),
+		settings.ChartDefaultBranch.Get(),
+	); err != nil {
 		return err
 	}
-	if err := addRepo(wrangler, "rancher-partner-charts", settings.PartnerChartDefaultBranch.Get()); err != nil {
+
+	if err := addRepo(
+		wrangler,
+		"rancher-partner-charts",
+		settings.PartnerChartDefaultURL.Get(),
+		settings.PartnerChartDefaultBranch.Get(),
+	); err != nil {
 		return err
 	}
 
 	if features.RKE2.Enabled() {
-		if err := addRepo(wrangler, "rancher-rke2-charts", settings.RKE2ChartDefaultBranch.Get()); err != nil {
+		if err := addRepo(
+			wrangler,
+			"rancher-rke2-charts",
+			settings.RKE2ChartDefaultURL.Get(),
+			settings.RKE2ChartDefaultBranch.Get(),
+		); err != nil {
 			return err
 		}
 	}
