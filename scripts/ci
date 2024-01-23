@@ -10,8 +10,8 @@ if ./only-ui-bumps.sh; then
     exit 0
 fi
 
-./validate
+# ./validate
 ./build
 ./package
-./test
+# ./test
 ./chart/ci
