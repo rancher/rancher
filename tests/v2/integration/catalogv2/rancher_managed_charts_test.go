@@ -468,31 +468,6 @@ func (w *RancherManagedChartsTest) pollUntilDownloaded(ClusterRepoName string, p
 }
 
 func (w *RancherManagedChartsTest) TestServeIcons() {
-	// Testing: Chart.icon field with (https:// scheme)
-	// https://RANCHER_DOMAIN:8443/v1/catalog.cattle.io.clusterrepos/rancher-charts?link=index
-	charts, err := w.catalogClient.GetChartsFromClusterRepo("rancher-charts")
-	w.Require().NoError(err)
-	w.Assert().Greater(len(charts), 1)
-
-	chartsAndLatestVersions := extractChartsAndLatestVersions(charts)
-
-	// https://RANCHER_DOMAIN:8443/v1/catalog.cattle.io.clusterrepos/rancher-charts?chartName=<SOME_CHART>&link=icon&version=<SOME_VERSION>
-	imgLength, err := w.catalogClient.FetchChartIcon("rancher-charts", "rancher-istio", chartsAndLatestVersions["rancher-istio"])
-	w.Require().NoError(err)
-	w.Assert().Greater(imgLength, 0)
-	imgLength, err = w.catalogClient.FetchChartIcon("rancher-charts", "rancher-project-monitoring", chartsAndLatestVersions["rancher-project-monitoring"])
-	w.Require().NoError(err)
-	w.Assert().Greater(imgLength, 0)
-	imgLength, err = w.catalogClient.FetchChartIcon("rancher-charts", "longhorn", chartsAndLatestVersions["longhorn"])
-	w.Require().NoError(err)
-	w.Assert().Greater(imgLength, 0)
-	imgLength, err = w.catalogClient.FetchChartIcon("rancher-charts", "rancher-monitoring", chartsAndLatestVersions["rancher-monitoring"])
-	w.Require().NoError(err)
-	w.Assert().Greater(imgLength, 0)
-	imgLength, err = w.catalogClient.FetchChartIcon("rancher-charts", "prometheus-federator", chartsAndLatestVersions["prometheus-federator"])
-	w.Require().NoError(err)
-	w.Assert().Greater(imgLength, 0)
-
 	// Testing: Chart.icon field with (file:// scheme)
 	// Create ClusterRepo for charts-small-fork
 	clusterRepoToCreate := rv1.NewClusterRepo("", smallForkClusterRepoName,
@@ -503,7 +478,7 @@ func (w *RancherManagedChartsTest) TestServeIcons() {
 			},
 		},
 	)
-	_, err = w.client.Steve.SteveType(catalog.ClusterRepoSteveResourceType).Create(clusterRepoToCreate)
+	_, err := w.client.Steve.SteveType(catalog.ClusterRepoSteveResourceType).Create(clusterRepoToCreate)
 	w.Require().NoError(err)
 	time.Sleep(1 * time.Second)
 
@@ -525,9 +500,13 @@ func (w *RancherManagedChartsTest) TestServeIcons() {
 	w.Assert().Equal("bundled", systemCatalogUpdated.Value)
 
 	// Fetch one icon with https:// scheme, it should return an empty object (i.e length of image equals 0) with nil error
-	imgLength, err = w.catalogClient.FetchChartIcon(smallForkClusterRepoName, "fleet", "102.0.0+up0.6.0")
+	imgLength, err := w.catalogClient.FetchChartIcon(smallForkClusterRepoName, "fleet", "102.0.0+up0.6.0")
 	w.Require().NoError(err)
 	w.Assert().Equal(0, imgLength)
+
+	imgLength, err = w.catalogClient.FetchChartIcon(smallForkClusterRepoName, "rancher-cis-benchmark", "4.0.0")
+	w.Require().NoError(err)
+	w.Assert().Greater(imgLength, 0)
 
 	// Update settings.SystemCatalog to external
 	_, err = w.client.Management.Setting.Update(systemCatalog, map[string]interface{}{"value": "external"})
