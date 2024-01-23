@@ -16,7 +16,7 @@ replace (
 	github.com/rancher/steve => github.com/krunalhinguu/steve v1.29.0-rancher2
 	github.com/rancher/wrangler/v2 => github.com/krunalhinguu/wrangler/v2 v2.29.0-rancher1
 	k8s.io/client-go => github.com/krunalhinguu/client-go v1.29.0-rancher1
-	k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20230717233707-2695361300d9
+	k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20231010175941-2dd684a91f00
 
 )
 
