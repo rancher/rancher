@@ -12,7 +12,7 @@ replace (
 	github.com/rancher/lasso => github.com/krunalhinguu/lasso v1.29.0-rancher1
 	github.com/rancher/machine => github.com/krunalhinguu/machine v1.29.0-rancher2
 	github.com/rancher/norman => github.com/krunalhinguu/norman v1.29.0-rancher2
-	github.com/rancher/rke => github.com/krunalhinguu/rke v1.29.0-rancher2
+	github.com/rancher/rke => github.com/krunalhinguu/rke v1.29.0-rancher3
 	github.com/rancher/steve => github.com/krunalhinguu/steve v1.29.0-rancher2
 	github.com/rancher/wrangler/v2 => github.com/krunalhinguu/wrangler/v2 v2.29.0-rancher1
 	k8s.io/client-go => github.com/krunalhinguu/client-go v1.29.0-rancher1
@@ -68,7 +68,7 @@ replace (
 	k8s.io/kube-scheduler => k8s.io/kube-scheduler v0.29.0
 	k8s.io/kubectl => k8s.io/kubectl v0.29.0
 	k8s.io/kubelet => k8s.io/kubelet v0.29.0
-	k8s.io/kubernetes => k8s.io/kubernetes v1.28.5
+	k8s.io/kubernetes => k8s.io/kubernetes v1.29.0
 	k8s.io/legacy-cloud-providers => k8s.io/legacy-cloud-providers v0.29.0
 	k8s.io/metrics => k8s.io/metrics v0.29.0
 	k8s.io/mount-utils => k8s.io/mount-utils v0.29.0
@@ -173,7 +173,7 @@ require (
 	k8s.io/helm v2.16.7+incompatible
 	k8s.io/kube-aggregator v0.29.0
 	k8s.io/kubectl v0.28.2
-	k8s.io/kubernetes v1.28.2
+	k8s.io/kubernetes v1.29.0
 	k8s.io/utils v0.0.0-20240102154912-e7106e64919e
 	sigs.k8s.io/aws-iam-authenticator v0.5.9
 	sigs.k8s.io/cluster-api v1.5.2
@@ -202,6 +202,7 @@ require (
 	github.com/containers/ocicrypt v1.1.7 // indirect
 	github.com/containers/storage v1.46.0 // indirect
 	github.com/cyberphone/json-canonicalization v0.0.0-20220623050100-57a0ce2678a7 // indirect
+	github.com/distribution/reference v0.5.0 // indirect
 	github.com/evanphx/json-patch/v5 v5.6.0 // indirect
 	github.com/go-jose/go-jose/v3 v3.0.0 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
@@ -375,7 +376,7 @@ require (
 	github.com/onsi/gomega v1.29.0 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.0-rc3 // indirect
-	github.com/opencontainers/runc v1.1.9 // indirect
+	github.com/opencontainers/runc v1.1.10 // indirect
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
 	github.com/pkg/sftp v1.13.5
 	github.com/pmezard/go-difflib v1.0.0 // indirect
