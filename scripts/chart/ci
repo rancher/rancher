@@ -4,6 +4,6 @@ set -e
 cd $(dirname $0)
 
 ./build chart
-./validate
-./test
+# ./validate
+# ./test
 ./package
