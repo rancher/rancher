@@ -150,10 +150,13 @@ func (t *ServiceAccountAuth) Authenticate(req *http.Request) (user.Info, bool, e
 	// Let others know that this request is authenticated using a service account.
 	*req = *req.WithContext(authcontext.SetSAAuthenticated(req.Context()))
 
+	extraMap := convertExtra(tokenReview.Status.User.Extra)
+
 	return &user.DefaultInfo{
 		Name:   tokenReview.Status.User.Username,
 		UID:    tokenReview.Status.User.UID,
 		Groups: tokenReview.Status.User.Groups,
+		Extra:  extraMap,
 	}, tokenReview.Status.Authenticated, nil
 }
 
@@ -166,4 +169,13 @@ func isTokenExpired(expirationTime *jwtv4.NumericDate) bool {
 
 	currentTime := jwtv4.TimeFunc()
 	return currentTime.After(expirationTime.Time)
+}
+
+// convertExtra converts the Extra value from a tokenResponse to map[string][]string
+func convertExtra(extra map[string]v1.ExtraValue) map[string][]string {
+	result := make(map[string][]string)
+	for key, values := range extra {
+		result[key] = values
+	}
+	return result
 }

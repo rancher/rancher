@@ -2,6 +2,7 @@ package requests
 
 import (
 	"net/http"
+	"reflect"
 	"testing"
 	"time"
 
@@ -301,4 +302,47 @@ func makeJWT(claims jwtv4.Claims) string {
 	sampleSecretKey := []byte("testingkeyfortestpurposes")
 	tokenString, _ := token.SignedString(sampleSecretKey)
 	return tokenString
+}
+
+func TestConvertExtra(t *testing.T) {
+	tests := []struct {
+		name  string
+		input map[string]v1.ExtraValue
+		want  map[string][]string
+	}{
+		{
+			name:  "Empty Input",
+			input: map[string]v1.ExtraValue{},
+			want:  map[string][]string{},
+		},
+		{
+			name: "Single Key-Value",
+			input: map[string]v1.ExtraValue{
+				"key1": {"value1"},
+			},
+			want: map[string][]string{
+				"key1": {"value1"},
+			},
+		},
+		{
+			name: "Multiple Key-Values",
+			input: map[string]v1.ExtraValue{
+				"key1": {"value1", "value2"},
+				"key2": {"value3"},
+			},
+			want: map[string][]string{
+				"key1": {"value1", "value2"},
+				"key2": {"value3"},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := convertExtra(tt.input)
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("convertExtra() = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }
