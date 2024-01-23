@@ -45,7 +45,7 @@ func CreatePersistentVolumeClaim(client *rancher.Client, clusterName, persistent
 
 	if persistentVolume != nil {
 		storageClassName := ""
-		persistentVolumeClaim.Spec.Resources = corev1.ResourceRequirements{
+		persistentVolumeClaim.Spec.Resources = corev1.VolumeResourceRequirements{
 			Requests: corev1.ResourceList{
 				corev1.ResourceStorage: *persistentVolume.Spec.Capacity.Storage(),
 			},
