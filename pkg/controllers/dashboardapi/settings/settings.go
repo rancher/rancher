@@ -159,7 +159,7 @@ func (s *settingsProvider) SetAll(settingsMap map[string]settings.Setting) error
 	return nil
 }
 
-// cleanupUnknownSettings lists all settings in the cluster and deletesall unknown (e.g. deprecated) settings.
+// cleanupUnknownSettings lists all settings in the cluster and deletes all unknown (e.g. deprecated) settings.
 func (s *settingsProvider) cleanupUnknownSettings(settingsMap map[string]settings.Setting) error {
 	// The settings cache is not yet available at this point, thus using the client directly.
 	list, err := s.settings.List(metav1.ListOptions{})
