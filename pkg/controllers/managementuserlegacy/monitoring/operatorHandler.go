@@ -41,7 +41,7 @@ func (h *operatorHandler) syncCluster(key string, obj *mgmtv3.Cluster) (runtime.
 	var returnErr, updateErr error
 	var newObj runtime.Object
 	//should deploy
-	if obj.Spec.EnableClusterAlerting || obj.Spec.EnableClusterMonitoring {
+	if obj.Spec.EnableClusterMonitoring {
 		newObj, returnErr = v32.ClusterConditionPrometheusOperatorDeployed.Do(cpy, func() (runtime.Object, error) {
 			return cpy, deploySystemMonitor(cpy, h.app, h.catalogManager, h.clusterName)
 		})
@@ -78,7 +78,7 @@ func (h *operatorHandler) syncProject(key string, project *mgmtv3.Project) (runt
 	var returnErr error
 	var newObj runtime.Object
 	//should deploy
-	if cluster.Spec.EnableClusterAlerting || project.Spec.EnableProjectMonitoring {
+	if project.Spec.EnableProjectMonitoring {
 		newObj, returnErr = v32.ClusterConditionPrometheusOperatorDeployed.Do(cluster, func() (runtime.Object, error) {
 			return cpyCluster, deploySystemMonitor(cpyCluster, h.app, h.catalogManager, cluster.Name)
 		})
