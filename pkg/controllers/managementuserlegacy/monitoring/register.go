@@ -54,7 +54,7 @@ func Register(ctx context.Context, agentContext *config.UserContext) {
 		if obj == nil {
 			return nil, nil
 		}
-		if obj.Name == agentContext.ClusterName && (obj.Spec.EnableClusterMonitoring || obj.Spec.EnableClusterAlerting) {
+		if obj.Name == agentContext.ClusterName && obj.Spec.EnableClusterMonitoring {
 			return obj, starterPrometheusOperatorDeferred()
 		}
 		return obj, nil
