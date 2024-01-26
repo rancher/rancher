@@ -110,7 +110,7 @@ require (
 	github.com/prometheus/client_model v0.4.0
 	github.com/prometheus/common v0.44.0
 	github.com/rancher/aks-operator v1.3.0-rc1
-	github.com/rancher/apiserver v0.0.0-20230831052300-120e615b17ba
+	github.com/rancher/apiserver v0.0.0-20240124133512-e93bfa07e5f1
 	github.com/rancher/channelserver v0.5.1-0.20230719220800-0a37b73c7df8
 	github.com/rancher/dynamiclistener v0.3.6
 	github.com/rancher/eks-operator v1.4.0-rc1
@@ -212,6 +212,7 @@ require (
 	github.com/opencontainers/selinux v1.11.0 // indirect
 	github.com/ostreedev/ostree-go v0.0.0-20210805093236-719684c64e4f // indirect
 	github.com/proglottis/gpgme v0.1.3 // indirect
+	github.com/rancher/wrangler/v2 v2.0.2 // indirect
 	github.com/sigstore/fulcio v1.2.0 // indirect
 	github.com/sigstore/rekor v1.1.1 // indirect
 	github.com/sigstore/sigstore v1.6.3 // indirect
