@@ -24,8 +24,11 @@ type SecretReference struct {
 }
 
 type RepoSpec struct {
-	// URL A http URL of the repo to connect to
+	// URL can be a HTTP URL i.e https://charts.rancher.io or an OCI URL i.e oci://dp.apps.rancher.io/charts/etcd.
 	URL string `json:"url,omitempty"`
+
+	// InsecurePlainHTTP is only valid for OCI URL's and allows insecure connections to registries without enforcing TLS checks.
+	InsecurePlainHTTP bool `json:"insecurePlainHttp,omitempty"`
 
 	// GitRepo a git repo to clone and index as the helm repo
 	GitRepo string `json:"gitRepo,omitempty"`
@@ -64,6 +67,7 @@ type RepoSpec struct {
 	Enabled *bool `json:"enabled,omitempty"`
 
 	// DisableSameOriginCheck attaches the Basic Auth Header to all helm client API calls, regardless of whether the destination of the API call matches the origin of the repository's URL
+	// This field is not supported for OCI based URLs
 	DisableSameOriginCheck bool `json:"disableSameOriginCheck,omitempty"`
 }
 

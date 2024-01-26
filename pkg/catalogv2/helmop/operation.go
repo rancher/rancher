@@ -589,6 +589,10 @@ func (c Command) renderArgs() ([]string, error) {
 	return append([]string{c.Operation}, args...), nil
 }
 
+func sanitizeCommandKeyNames(name string) string {
+	return strings.Replace(name, "/", "-", -1)
+}
+
 func sanitizeVersion(chartVersion string) string {
 	return badChars.ReplaceAllString(chartVersion, "-")
 }
@@ -710,9 +714,12 @@ func (s *Operations) getChartCommand(namespace, name, chartName, chartVersion st
 		return Command{}, err
 	}
 
+	valuesFileName := sanitizeCommandKeyNames(fmt.Sprintf("values-%s-%s.yaml", chartName, sanitizeVersion(chartVersion)))
+	chartFileName := sanitizeCommandKeyNames(fmt.Sprintf("%s-%s.tgz", chartName, sanitizeVersion(chartVersion)))
+
 	c := Command{
-		ValuesFile: fmt.Sprintf("values-%s-%s.yaml", chartName, sanitizeVersion(chartVersion)),
-		ChartFile:  fmt.Sprintf("%s-%s.tgz", chartName, sanitizeVersion(chartVersion)),
+		ValuesFile: valuesFileName,
+		ChartFile:  chartFileName,
 		Chart:      chartData,
 		Kustomize:  s.enableKustomize(annotations, upgrade),
 	}
