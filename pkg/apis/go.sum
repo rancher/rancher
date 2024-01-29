@@ -154,8 +154,8 @@ github.com/rancher/norman v0.0.0-20240205154641-a6a6cf569608 h1:azL/n2grvuyGqmDv
 github.com/rancher/norman v0.0.0-20240205154641-a6a6cf569608/go.mod h1:Sm2Xqai+aecgmJ86ygyEe+TdPMLkauEpykSstBAu4Ko=
 github.com/rancher/rke v1.5.3 h1:7mGn+NIL7KXk99NwWYBgoByh2+IfVCdws5ad3X/JIZY=
 github.com/rancher/rke v1.5.3/go.mod h1:wZaVWzW46OTuGvyxgRHXGUyJ/QP0zOkKESO9hBOwTaY=
-github.com/rancher/wrangler v1.1.1-0.20230831050635-df1bd5aae9df h1:WJ+aaUICHPX8HeLmHE9JL/RFHhilMfcJlqmhgpc7gJU=
-github.com/rancher/wrangler v1.1.1-0.20230831050635-df1bd5aae9df/go.mod h1:4T80p+rLh2OLbjCjdExIjRHKNBgK9NUAd7eIU/gRPKk=
+github.com/rancher/wrangler v1.1.1 h1:wmqUwqc2M7ADfXnBCJTFkTB5ZREWpD78rnZMzmxwMvM=
+github.com/rancher/wrangler v1.1.1/go.mod h1:ioVbKupzcBOdzsl55MvEDN0R1wdGggj8iNCYGFI5JvM=
 github.com/rancher/wrangler/v2 v2.1.3 h1:ggCPFD14emodJjR4Pi6mcDGgtNo04tjCKZ71S76uWg8=
 github.com/rancher/wrangler/v2 v2.1.3/go.mod h1:af5OaGU/COgreQh1mRbKiUI64draT2NN34uk+PALFY8=
 github.com/rogpeppe/fastuuid v1.2.0/go.mod h1:jVj6XXZzXRy/MSR5jhDC/2q6DgLz+nrA6LYCDYWNEvQ=
@@ -182,9 +182,9 @@ github.com/xeipuuv/gojsonschema v1.2.0/go.mod h1:anYRn/JVcOK2ZgGU+IjEV4nwlhoK5sQ
 github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.2.1/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 go.opentelemetry.io/proto/otlp v0.7.0/go.mod h1:PqfVotwruBrMGOCsRd/89rSnXhoiJIqeYNgFYFoEGnI=
-go.uber.org/atomic v1.9.0 h1:ECmE8Bn/WFTYwEW/bpKD3M8VtR/zQVbavAoalC1PYyE=
+go.uber.org/atomic v1.10.0 h1:9qC72Qh0+3MqyJbAn8YU5xVq1frD8bn3JtD2oXtafVQ=
 go.uber.org/goleak v1.2.1 h1:NBol2c7O1ZokfZ0LEU9K6Whx/KnwvepVetCUhtKja4A=
-go.uber.org/multierr v1.8.0 h1:dg6GjLku4EH+249NNmoIciG9N/jURbDG+pFlTkhzIC8=
+go.uber.org/multierr v1.11.0 h1:blXXJkSxSSfBVBlC76pxqeO+LN3aDfLQo+309xJstO0=
 go.uber.org/zap v1.24.0 h1:FiJd5l1UOLj0wCgbSE0rwwXHzEdAZS6hiiSnxJN/D60=
 golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=
 golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550/go.mod h1:yigFU9vqHzYiE8UmvKecakEJjdnWj3jj499lnFckfCI=
@@ -309,8 +309,8 @@ honnef.co/go/tools v0.0.0-20190102054323-c2f93a96b099/go.mod h1:rf3lG4BRIbNafJWh
 honnef.co/go/tools v0.0.0-20190523083050-ea95bdfd59fc/go.mod h1:rf3lG4BRIbNafJWhAfAdb/ePZxsR/4RtNHQocxwk9r4=
 k8s.io/api v0.27.6 h1:PBWu/lywJe2qQcshMjubzcBg7+XDZOo7O8JJAWuYtUo=
 k8s.io/api v0.27.6/go.mod h1:AQYj0UsFCp3qJE7bOVnUuy4orCsXVkvHefnbYQiNWgk=
-k8s.io/apiextensions-apiserver v0.27.6 h1:mOwSBJtThZhpJr+8gEkc3wFDIjq87E3JspR5mtZxIg8=
-k8s.io/apiextensions-apiserver v0.27.6/go.mod h1:AVNlLYRrESG5Poo6ASRUhY2pvoKPcNt8y/IuZ4lx3o8=
+k8s.io/apiextensions-apiserver v0.28.6 h1:myB3iG/3v3jqCg28JDbOefu4sH2/erNEXgytRzJKBOo=
+k8s.io/apiextensions-apiserver v0.28.6/go.mod h1:qlp6xRKBgyRhe5AYc81TQpLx4kLNK8/sGQUOwMkVjRk=
 k8s.io/apimachinery v0.27.6 h1:mGU8jmBq5o8mWBov+mLjdTBcU+etTE19waies4AQ6NE=
 k8s.io/apimachinery v0.27.6/go.mod h1:XNfZ6xklnMCOGGFNqXG7bUrQCoR04dh/E7FprV6pb+E=
 k8s.io/apiserver v0.27.6 h1:r/eHN8r3lG2buggHrVMy++kKhHlHn1HWSX1dqDtes54=

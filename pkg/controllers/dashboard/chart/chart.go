@@ -7,7 +7,7 @@ import (
 
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
-	corev1 "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
+	corev1 "github.com/rancher/wrangler/v2/pkg/generated/controllers/core/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/yaml"
 )

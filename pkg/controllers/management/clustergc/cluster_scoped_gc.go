@@ -10,7 +10,7 @@ import (
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
-	"github.com/rancher/wrangler/pkg/generic"
+	"github.com/rancher/wrangler/v2/pkg/generic"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 	"k8s.io/apimachinery/pkg/api/errors"

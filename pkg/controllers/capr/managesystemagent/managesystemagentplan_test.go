@@ -3,16 +3,17 @@ package managesystemagent
 import (
 	"encoding/base64"
 	"encoding/json"
-	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"testing"
 	"time"
+
+	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 
 	"github.com/golang/mock/gomock"
 	"github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	fleetv1alpha1 "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
-	"github.com/rancher/wrangler/pkg/generic/fake"
+	"github.com/rancher/wrangler/v2/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )

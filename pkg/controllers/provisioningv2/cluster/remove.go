@@ -7,7 +7,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
-	"github.com/rancher/wrangler/pkg/generic"
+	"github.com/rancher/wrangler/v2/pkg/generic"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
