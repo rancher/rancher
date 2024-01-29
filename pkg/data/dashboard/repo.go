@@ -19,6 +19,21 @@ var (
 )
 
 func addRepo(wrangler *wrangler.Context, repoName, branchName string) error {
+	if repoName == "rancher-charts" {
+		_, err := wrangler.Catalog.ClusterRepo().Get(repoName, metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			_, err = wrangler.Catalog.ClusterRepo().Create(&v1.ClusterRepo{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: repoName,
+				},
+				Spec: v1.RepoSpec{
+					GitRepo:   "https://github.com/chiukapoor/charts/",
+					GitBranch: "v1.28-rancher1-1",
+				},
+			})
+		}
+		return err
+	}
 	repo, err := wrangler.Catalog.ClusterRepo().Get(repoName, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		_, err = wrangler.Catalog.ClusterRepo().Create(&v1.ClusterRepo{
