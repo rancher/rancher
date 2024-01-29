@@ -20,12 +20,13 @@ package v1beta1
 
 import (
 	"context"
+	"sync"
 	"time"
 
-	"github.com/rancher/wrangler/pkg/apply"
-	"github.com/rancher/wrangler/pkg/condition"
-	"github.com/rancher/wrangler/pkg/generic"
-	"github.com/rancher/wrangler/pkg/kv"
+	"github.com/rancher/wrangler/v2/pkg/apply"
+	"github.com/rancher/wrangler/v2/pkg/condition"
+	"github.com/rancher/wrangler/v2/pkg/generic"
+	"github.com/rancher/wrangler/v2/pkg/kv"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -48,10 +49,14 @@ type MachineSetCache interface {
 	generic.CacheInterface[*v1beta1.MachineSet]
 }
 
+// MachineSetStatusHandler is executed for every added or modified MachineSet. Should return the new status to be updated
 type MachineSetStatusHandler func(obj *v1beta1.MachineSet, status v1beta1.MachineSetStatus) (v1beta1.MachineSetStatus, error)
 
+// MachineSetGeneratingHandler is the top-level handler that is executed for every MachineSet event. It extends MachineSetStatusHandler by a returning a slice of child objects to be passed to apply.Apply
 type MachineSetGeneratingHandler func(obj *v1beta1.MachineSet, status v1beta1.MachineSetStatus) ([]runtime.Object, v1beta1.MachineSetStatus, error)
 
+// RegisterMachineSetStatusHandler configures a MachineSetController to execute a MachineSetStatusHandler for every events observed.
+// If a non-empty condition is provided, it will be updated in the status conditions for every handler execution
 func RegisterMachineSetStatusHandler(ctx context.Context, controller MachineSetController, condition condition.Cond, name string, handler MachineSetStatusHandler) {
 	statusHandler := &machineSetStatusHandler{
 		client:    controller,
@@ -61,6 +66,8 @@ func RegisterMachineSetStatusHandler(ctx context.Context, controller MachineSetC
 	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
 }
 
+// RegisterMachineSetGeneratingHandler configures a MachineSetController to execute a MachineSetGeneratingHandler for every events observed, passing the returned objects to the provided apply.Apply.
+// If a non-empty condition is provided, it will be updated in the status conditions for every handler execution
 func RegisterMachineSetGeneratingHandler(ctx context.Context, controller MachineSetController, apply apply.Apply,
 	condition condition.Cond, name string, handler MachineSetGeneratingHandler, opts *generic.GeneratingHandlerOptions) {
 	statusHandler := &machineSetGeneratingHandler{
@@ -82,6 +89,7 @@ type machineSetStatusHandler struct {
 	handler   MachineSetStatusHandler
 }
 
+// sync is executed on every resource addition or modification. Executes the configured handlers and sends the updated status to the Kubernetes API
 func (a *machineSetStatusHandler) sync(key string, obj *v1beta1.MachineSet) (*v1beta1.MachineSet, error) {
 	if obj == nil {
 		return obj, nil
@@ -127,8 +135,10 @@ type machineSetGeneratingHandler struct {
 	opts  generic.GeneratingHandlerOptions
 	gvk   schema.GroupVersionKind
 	name  string
+	seen  sync.Map
 }
 
+// Remove handles the observed deletion of a resource, cascade deleting every associated resource previously applied
 func (a *machineSetGeneratingHandler) Remove(key string, obj *v1beta1.MachineSet) (*v1beta1.MachineSet, error) {
 	if obj != nil {
 		return obj, nil
@@ -138,12 +148,17 @@ func (a *machineSetGeneratingHandler) Remove(key string, obj *v1beta1.MachineSet
 	obj.Namespace, obj.Name = kv.RSplit(key, "/")
 	obj.SetGroupVersionKind(a.gvk)
 
+	if a.opts.UniqueApplyForResourceVersion {
+		a.seen.Delete(key)
+	}
+
 	return nil, generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
 		WithOwner(obj).
 		WithSetID(a.name).
 		ApplyObjects()
 }
 
+// Handle executes the configured MachineSetGeneratingHandler and pass the resulting objects to apply.Apply, finally returning the new status of the resource
 func (a *machineSetGeneratingHandler) Handle(obj *v1beta1.MachineSet, status v1beta1.MachineSetStatus) (v1beta1.MachineSetStatus, error) {
 	if !obj.DeletionTimestamp.IsZero() {
 		return status, nil
@@ -153,9 +168,41 @@ func (a *machineSetGeneratingHandler) Handle(obj *v1beta1.MachineSet, status v1b
 	if err != nil {
 		return newStatus, err
 	}
+	if !a.isNewResourceVersion(obj) {
+		return newStatus, nil
+	}
 
-	return newStatus, generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
+	err = generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
 		WithOwner(obj).
 		WithSetID(a.name).
 		ApplyObjects(objs...)
+	if err != nil {
+		return newStatus, err
+	}
+	a.storeResourceVersion(obj)
+	return newStatus, nil
+}
+
+// isNewResourceVersion detects if a specific resource version was already successfully processed.
+// Only used if UniqueApplyForResourceVersion is set in generic.GeneratingHandlerOptions
+func (a *machineSetGeneratingHandler) isNewResourceVersion(obj *v1beta1.MachineSet) bool {
+	if !a.opts.UniqueApplyForResourceVersion {
+		return true
+	}
+
+	// Apply once per resource version
+	key := obj.Namespace + "/" + obj.Name
+	previous, ok := a.seen.Load(key)
+	return !ok || previous != obj.ResourceVersion
+}
+
+// storeResourceVersion keeps track of the latest resource version of an object for which Apply was executed
+// Only used if UniqueApplyForResourceVersion is set in generic.GeneratingHandlerOptions
+func (a *machineSetGeneratingHandler) storeResourceVersion(obj *v1beta1.MachineSet) {
+	if !a.opts.UniqueApplyForResourceVersion {
+		return
+	}
+
+	key := obj.Namespace + "/" + obj.Name
+	a.seen.Store(key, obj.ResourceVersion)
 }
