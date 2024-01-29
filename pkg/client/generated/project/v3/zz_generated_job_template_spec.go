@@ -4,6 +4,7 @@ const (
 	JobTemplateSpecType                               = "jobTemplateSpec"
 	JobTemplateSpecFieldActiveDeadlineSeconds         = "activeDeadlineSeconds"
 	JobTemplateSpecFieldAutomountServiceAccountToken  = "automountServiceAccountToken"
+	JobTemplateSpecFieldBackoffLimitPerIndex          = "backoffLimitPerIndex"
 	JobTemplateSpecFieldCompletionMode                = "completionMode"
 	JobTemplateSpecFieldContainers                    = "containers"
 	JobTemplateSpecFieldDNSConfig                     = "dnsConfig"
@@ -22,11 +23,13 @@ const (
 	JobTemplateSpecFieldImagePullSecrets              = "imagePullSecrets"
 	JobTemplateSpecFieldJobConfig                     = "jobConfig"
 	JobTemplateSpecFieldJobMetadata                   = "jobMetadata"
+	JobTemplateSpecFieldMaxFailedIndexes              = "maxFailedIndexes"
 	JobTemplateSpecFieldNodeID                        = "nodeId"
 	JobTemplateSpecFieldOS                            = "os"
 	JobTemplateSpecFieldObjectMeta                    = "metadata"
 	JobTemplateSpecFieldOverhead                      = "overhead"
 	JobTemplateSpecFieldPodFailurePolicy              = "podFailurePolicy"
+	JobTemplateSpecFieldPodReplacementPolicy          = "podReplacementPolicy"
 	JobTemplateSpecFieldPreemptionPolicy              = "preemptionPolicy"
 	JobTemplateSpecFieldReadinessGates                = "readinessGates"
 	JobTemplateSpecFieldResourceClaims                = "resourceClaims"
@@ -55,6 +58,7 @@ const (
 type JobTemplateSpec struct {
 	ActiveDeadlineSeconds         *int64                         `json:"activeDeadlineSeconds,omitempty" yaml:"activeDeadlineSeconds,omitempty"`
 	AutomountServiceAccountToken  *bool                          `json:"automountServiceAccountToken,omitempty" yaml:"automountServiceAccountToken,omitempty"`
+	BackoffLimitPerIndex          *int64                         `json:"backoffLimitPerIndex,omitempty" yaml:"backoffLimitPerIndex,omitempty"`
 	CompletionMode                string                         `json:"completionMode,omitempty" yaml:"completionMode,omitempty"`
 	Containers                    []Container                    `json:"containers,omitempty" yaml:"containers,omitempty"`
 	DNSConfig                     *PodDNSConfig                  `json:"dnsConfig,omitempty" yaml:"dnsConfig,omitempty"`
@@ -73,11 +77,13 @@ type JobTemplateSpec struct {
 	ImagePullSecrets              []LocalObjectReference         `json:"imagePullSecrets,omitempty" yaml:"imagePullSecrets,omitempty"`
 	JobConfig                     *JobConfig                     `json:"jobConfig,omitempty" yaml:"jobConfig,omitempty"`
 	JobMetadata                   *ObjectMeta                    `json:"jobMetadata,omitempty" yaml:"jobMetadata,omitempty"`
+	MaxFailedIndexes              *int64                         `json:"maxFailedIndexes,omitempty" yaml:"maxFailedIndexes,omitempty"`
 	NodeID                        string                         `json:"nodeId,omitempty" yaml:"nodeId,omitempty"`
 	OS                            *PodOS                         `json:"os,omitempty" yaml:"os,omitempty"`
 	ObjectMeta                    *ObjectMeta                    `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 	Overhead                      map[string]string              `json:"overhead,omitempty" yaml:"overhead,omitempty"`
 	PodFailurePolicy              *PodFailurePolicy              `json:"podFailurePolicy,omitempty" yaml:"podFailurePolicy,omitempty"`
+	PodReplacementPolicy          string                         `json:"podReplacementPolicy,omitempty" yaml:"podReplacementPolicy,omitempty"`
 	PreemptionPolicy              string                         `json:"preemptionPolicy,omitempty" yaml:"preemptionPolicy,omitempty"`
 	ReadinessGates                []PodReadinessGate             `json:"readinessGates,omitempty" yaml:"readinessGates,omitempty"`
 	ResourceClaims                []PodResourceClaim             `json:"resourceClaims,omitempty" yaml:"resourceClaims,omitempty"`
