@@ -47,7 +47,7 @@ replace (
 	k8s.io/kms => k8s.io/kms v0.28.6
 	k8s.io/kube-aggregator => k8s.io/kube-aggregator v0.28.6
 	k8s.io/kube-controller-manager => k8s.io/kube-controller-manager v0.28.6
-	k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20230501164219-8b0f38b5fd1f
+	k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20230717233707-2695361300d9
 	k8s.io/kube-proxy => k8s.io/kube-proxy v0.28.6
 	k8s.io/kube-scheduler => k8s.io/kube-scheduler v0.28.6
 	k8s.io/kubectl => k8s.io/kubectl v0.28.6
@@ -92,7 +92,6 @@ require (
 	github.com/golang-jwt/jwt v3.2.1+incompatible
 	github.com/golang/mock v1.6.0
 	github.com/golang/protobuf v1.5.3
-	github.com/google/gnostic v0.6.9
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/gorilla/mux v1.8.0
 	github.com/gorilla/websocket v1.5.0
@@ -170,6 +169,7 @@ require (
 require (
 	github.com/antihax/optional v1.0.0
 	github.com/containers/image/v5 v5.25.0
+	github.com/google/gnostic-models v0.6.8
 	github.com/rancher/rancher/pkg/apis v0.0.0-20240213233515-935d309ebad4
 	github.com/rancher/shepherd v0.0.0-20240212210630-64631f2d67a0
 	go.qase.io/client v0.0.0-20231114201952-65195ec001fa
@@ -198,7 +198,6 @@ require (
 	github.com/go-openapi/strfmt v0.21.7 // indirect
 	github.com/go-openapi/validate v0.22.1 // indirect
 	github.com/google/cel-go v0.16.1 // indirect
-	github.com/google/gnostic-models v0.6.8 // indirect
 	github.com/google/go-containerregistry v0.14.0 // indirect
 	github.com/google/go-intervals v0.0.2 // indirect
 	github.com/google/s2a-go v0.1.7 // indirect
