@@ -144,13 +144,14 @@ type mockUnstructured struct {
 	content map[string]interface{}
 }
 
-func (m *mockUnstructured) NewEmptyInstance() runtime.Unstructured              { return nil }
-func (m *mockUnstructured) UnstructuredContent() map[string]interface{}         { return m.content }
-func (m *mockUnstructured) SetUnstructuredContent(input map[string]interface{}) { m.content = input }
-func (m *mockUnstructured) IsList() bool                                        { return false }
-func (m *mockUnstructured) EachListItem(func(runtime.Object) error) error       { return nil }
-func (m *mockUnstructured) GetObjectKind() schema.ObjectKind                    { return nil }
-func (m *mockUnstructured) DeepCopyObject() runtime.Object                      { return nil }
+func (m *mockUnstructured) NewEmptyInstance() runtime.Unstructured                 { return nil }
+func (m *mockUnstructured) UnstructuredContent() map[string]interface{}            { return m.content }
+func (m *mockUnstructured) SetUnstructuredContent(input map[string]interface{})    { m.content = input }
+func (m *mockUnstructured) IsList() bool                                           { return false }
+func (m *mockUnstructured) EachListItem(func(runtime.Object) error) error          { return nil }
+func (m *mockUnstructured) EachListItemWithAlloc(func(runtime.Object) error) error { return nil }
+func (m *mockUnstructured) GetObjectKind() schema.ObjectKind                       { return nil }
+func (m *mockUnstructured) DeepCopyObject() runtime.Object                         { return nil }
 
 type fakeProvider struct{}
 
