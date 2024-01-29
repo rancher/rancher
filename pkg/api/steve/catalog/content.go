@@ -10,7 +10,7 @@ import (
 
 	"github.com/rancher/apiserver/pkg/types"
 	"github.com/rancher/rancher/pkg/catalogv2/content"
-	"github.com/rancher/wrangler/pkg/schemas/validation"
+	"github.com/rancher/wrangler/v2/pkg/schemas/validation"
 	"helm.sh/helm/v3/pkg/repo"
 )
 

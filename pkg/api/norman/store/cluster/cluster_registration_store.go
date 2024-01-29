@@ -2,7 +2,7 @@ package cluster
 
 import (
 	"github.com/rancher/norman/types"
-	"github.com/rancher/wrangler/pkg/randomtoken"
+	"github.com/rancher/wrangler/v2/pkg/randomtoken"
 )
 
 type RegistrationTokenStore struct {

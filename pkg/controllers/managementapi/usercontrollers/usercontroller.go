@@ -17,7 +17,7 @@ import (
 	"github.com/rancher/rancher/pkg/metrics"
 	tpeermanager "github.com/rancher/rancher/pkg/peermanager"
 	"github.com/rancher/rancher/pkg/types/config"
-	"github.com/rancher/wrangler/pkg/relatedresource"
+	"github.com/rancher/wrangler/v2/pkg/relatedresource"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"

@@ -8,7 +8,7 @@ import (
 	"github.com/rancher/steve/pkg/stores/partition"
 	"github.com/rancher/steve/pkg/stores/selector"
 	"github.com/rancher/steve/pkg/stores/switchschema"
-	"github.com/rancher/wrangler/pkg/schemas/validation"
+	"github.com/rancher/wrangler/v2/pkg/schemas/validation"
 	"k8s.io/apimachinery/pkg/labels"
 )
 

@@ -17,7 +17,7 @@ import (
 	pkgrbac "github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
-	"github.com/rancher/wrangler/pkg/apply"
+	"github.com/rancher/wrangler/v2/pkg/apply"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
