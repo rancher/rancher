@@ -10,7 +10,7 @@ import (
 	"path"
 	"strings"
 
-	"github.com/rancher/wrangler/pkg/schemas/validation"
+	"github.com/rancher/wrangler/v2/pkg/schemas/validation"
 
 	"sigs.k8s.io/yaml"
 
