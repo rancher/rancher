@@ -178,6 +178,11 @@ func (c *unstructuredConfig) GetObjectKind() schema.ObjectKind {
 	panic("implement me")
 }
 
+// EachListItemWithAlloc implements runtime.Unstructured.
+func (*unstructuredConfig) EachListItemWithAlloc(func(runtime.Object) error) error {
+	panic("implement me")
+}
+
 func (c *unstructuredConfig) DeepCopyObject() runtime.Object {
 	panic("implement me")
 }
