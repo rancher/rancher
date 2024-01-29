@@ -19,7 +19,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/provisioninginput"
 	"github.com/rancher/rancher/tests/framework/extensions/workloads/pods"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
-	"github.com/rancher/wrangler/pkg/summary"
+	"github.com/rancher/wrangler/v2/pkg/summary"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"

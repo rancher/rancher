@@ -12,7 +12,7 @@ import (
 	"github.com/rancher/rancher/pkg/features"
 	fleetconst "github.com/rancher/rancher/pkg/fleet"
 	"github.com/rancher/rancher/pkg/settings"
-	ctrlfake "github.com/rancher/wrangler/pkg/generic/fake"
+	ctrlfake "github.com/rancher/wrangler/v2/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"

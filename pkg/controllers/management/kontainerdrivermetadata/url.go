@@ -11,7 +11,7 @@ import (
 	"github.com/rancher/rancher/pkg/git"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rke/types/kdm"
-	"github.com/rancher/wrangler/pkg/randomtoken"
+	"github.com/rancher/wrangler/v2/pkg/randomtoken"
 	"github.com/sirupsen/logrus"
 )
 
