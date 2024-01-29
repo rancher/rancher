@@ -70,7 +70,6 @@
     "maintenanceWindow": ""
   },
   "status": {
-    "phase": "",
-    "failureMessage": ""
+    "phase": ""
   }
 }
