@@ -46,8 +46,8 @@ ENV CATTLE_CHART_DEFAULT_BRANCH=$CHART_DEFAULT_BRANCH
 ENV CATTLE_PARTNER_CHART_DEFAULT_BRANCH=$PARTNER_CHART_DEFAULT_BRANCH
 ENV CATTLE_RKE2_CHART_DEFAULT_BRANCH=$RKE2_CHART_DEFAULT_BRANCH
 ENV CATTLE_HELM_VERSION v2.16.8-rancher2
-ENV CATTLE_MACHINE_VERSION v0.15.0-rancher109
-ENV CATTLE_K3S_VERSION v1.27.10+k3s2
+ENV CATTLE_MACHINE_VERSION v0.15.0-rancher110
+ENV CATTLE_K3S_VERSION v1.28.6+k3s2
 ENV CATTLE_MACHINE_PROVISION_IMAGE rancher/machine:${CATTLE_MACHINE_VERSION}
 ENV CATTLE_ETCD_VERSION v3.5.12
 ENV LOGLEVEL_VERSION v0.1.5
@@ -155,7 +155,7 @@ RUN curl ${HELM_URL_V3} | tar xvzf - --strip-components=1 -C /usr/bin && \
     chmod +x /usr/bin/kustomize
 
 # Set up K3s: copy the necessary binaries from the K3s image.
-COPY --from=rancher/k3s:v1.27.10-k3s2 \
+COPY --from=rancher/k3s:v1.28.6-k3s2 \
     /bin/blkid \
     /bin/bandwidth \
     /bin/cni \
