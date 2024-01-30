@@ -3,18 +3,15 @@ package client
 const (
 	AciNetworkProviderType                                      = "aciNetworkProvider"
 	AciNetworkProviderFieldAEP                                  = "aep"
-	AciNetworkProviderFieldAccProvisionOperatorMemoryLimit      = "accProvisionOperatorMemoryLimit"
-	AciNetworkProviderFieldAccProvisionOperatorMemoryRequest    = "accProvisionOperatorMemoryRequest"
 	AciNetworkProviderFieldAciContainersControllerMemoryLimit   = "aciContainersControllerMemoryLimit"
 	AciNetworkProviderFieldAciContainersControllerMemoryRequest = "aciContainersControllerMemoryRequest"
 	AciNetworkProviderFieldAciContainersHostMemoryLimit         = "aciContainersHostMemoryLimit"
 	AciNetworkProviderFieldAciContainersHostMemoryRequest       = "aciContainersHostMemoryRequest"
 	AciNetworkProviderFieldAciContainersMemoryLimit             = "aciContainersMemoryLimit"
 	AciNetworkProviderFieldAciContainersMemoryRequest           = "aciContainersMemoryRequest"
-	AciNetworkProviderFieldAciContainersOperatorMemoryLimit     = "aciContainersOperatorMemoryLimit"
-	AciNetworkProviderFieldAciContainersOperatorMemoryRequest   = "aciContainersOperatorMemoryRequest"
 	AciNetworkProviderFieldAciMultipod                          = "aciMultipod"
 	AciNetworkProviderFieldAciMultipodUbuntu                    = "aciMultipodUbuntu"
+	AciNetworkProviderFieldAddExternalContractToDefaultEpg      = "addExternalContractToDefaultEpg"
 	AciNetworkProviderFieldAddExternalSubnetsToRdconfig         = "addExternalSubnetsToRdconfig"
 	AciNetworkProviderFieldApicHosts                            = "apicHosts"
 	AciNetworkProviderFieldApicRefreshTickerAdjust              = "apicRefreshTickerAdjust"
@@ -33,6 +30,7 @@ const (
 	AciNetworkProviderFieldDurationWaitForNetwork               = "durationWaitForNetwork"
 	AciNetworkProviderFieldDynamicExternalSubnet                = "externDynamic"
 	AciNetworkProviderFieldEnableEndpointSlice                  = "enableEndpointSlice"
+	AciNetworkProviderFieldEnableOpflexAgentReconnect           = "enableOpflexAgentReconnect"
 	AciNetworkProviderFieldEncapType                            = "encapType"
 	AciNetworkProviderFieldEpRegistry                           = "epRegistry"
 	AciNetworkProviderFieldGbpPodSubnet                         = "gbpPodSubnet"
@@ -59,6 +57,7 @@ const (
 	AciNetworkProviderFieldNoPriorityClass                      = "noPriorityClass"
 	AciNetworkProviderFieldNoWaitForServiceEpReadiness          = "noWaitForServiceEpReadiness"
 	AciNetworkProviderFieldNodePodIfEnable                      = "nodePodIfEnable"
+	AciNetworkProviderFieldNodeSnatRedirectExclude              = "nodeSnatRedirectExclude"
 	AciNetworkProviderFieldNodeSubnet                           = "nodeSubnet"
 	AciNetworkProviderFieldOVSMemoryLimit                       = "ovsMemoryLimit"
 	AciNetworkProviderFieldOVSMemoryRequest                     = "ovsMemoryRequest"
@@ -68,10 +67,12 @@ const (
 	AciNetworkProviderFieldOpflexAgentOpflexAsyncjsonEnabled    = "opflexAgentOpflexAsyncjsonEnabled"
 	AciNetworkProviderFieldOpflexAgentOvsAsyncjsonEnabled       = "opflexAgentOvsAsyncjsonEnabled"
 	AciNetworkProviderFieldOpflexAgentPolicyRetryDelayTimer     = "opflexAgentPolicyRetryDelayTimer"
+	AciNetworkProviderFieldOpflexAgentStatistics                = "opflexAgentStatistics"
 	AciNetworkProviderFieldOpflexClientSSL                      = "opflexClientSsl"
 	AciNetworkProviderFieldOpflexDeviceDeleteTimeout            = "opflexDeviceDeleteTimeout"
 	AciNetworkProviderFieldOpflexDeviceReconnectWaitTimeout     = "opflexDeviceReconnectWaitTimeout"
 	AciNetworkProviderFieldOpflexMode                           = "opflexMode"
+	AciNetworkProviderFieldOpflexOpensslCompat                  = "opflexOpensslCompat"
 	AciNetworkProviderFieldOpflexServerPort                     = "opflexServerPort"
 	AciNetworkProviderFieldOverlayVRFName                       = "overlayVrfName"
 	AciNetworkProviderFieldPBRTrackingNonSnat                   = "pbrTrackingNonSnat"
@@ -95,6 +96,7 @@ const (
 	AciNetworkProviderFieldSystemIdentifier                     = "systemId"
 	AciNetworkProviderFieldTenant                               = "tenant"
 	AciNetworkProviderFieldToken                                = "token"
+	AciNetworkProviderFieldTolerationSeconds                    = "tolerationSeconds"
 	AciNetworkProviderFieldUseAciAnywhereCRD                    = "useAciAnywhereCrd"
 	AciNetworkProviderFieldUseAciCniPriorityClass               = "useAciCniPriorityClass"
 	AciNetworkProviderFieldUseClusterRole                       = "useClusterRole"
@@ -110,18 +112,15 @@ const (
 
 type AciNetworkProvider struct {
 	AEP                                  string              `json:"aep,omitempty" yaml:"aep,omitempty"`
-	AccProvisionOperatorMemoryLimit      string              `json:"accProvisionOperatorMemoryLimit,omitempty" yaml:"accProvisionOperatorMemoryLimit,omitempty"`
-	AccProvisionOperatorMemoryRequest    string              `json:"accProvisionOperatorMemoryRequest,omitempty" yaml:"accProvisionOperatorMemoryRequest,omitempty"`
 	AciContainersControllerMemoryLimit   string              `json:"aciContainersControllerMemoryLimit,omitempty" yaml:"aciContainersControllerMemoryLimit,omitempty"`
 	AciContainersControllerMemoryRequest string              `json:"aciContainersControllerMemoryRequest,omitempty" yaml:"aciContainersControllerMemoryRequest,omitempty"`
 	AciContainersHostMemoryLimit         string              `json:"aciContainersHostMemoryLimit,omitempty" yaml:"aciContainersHostMemoryLimit,omitempty"`
 	AciContainersHostMemoryRequest       string              `json:"aciContainersHostMemoryRequest,omitempty" yaml:"aciContainersHostMemoryRequest,omitempty"`
 	AciContainersMemoryLimit             string              `json:"aciContainersMemoryLimit,omitempty" yaml:"aciContainersMemoryLimit,omitempty"`
 	AciContainersMemoryRequest           string              `json:"aciContainersMemoryRequest,omitempty" yaml:"aciContainersMemoryRequest,omitempty"`
-	AciContainersOperatorMemoryLimit     string              `json:"aciContainersOperatorMemoryLimit,omitempty" yaml:"aciContainersOperatorMemoryLimit,omitempty"`
-	AciContainersOperatorMemoryRequest   string              `json:"aciContainersOperatorMemoryRequest,omitempty" yaml:"aciContainersOperatorMemoryRequest,omitempty"`
 	AciMultipod                          string              `json:"aciMultipod,omitempty" yaml:"aciMultipod,omitempty"`
 	AciMultipodUbuntu                    string              `json:"aciMultipodUbuntu,omitempty" yaml:"aciMultipodUbuntu,omitempty"`
+	AddExternalContractToDefaultEpg      string              `json:"addExternalContractToDefaultEpg,omitempty" yaml:"addExternalContractToDefaultEpg,omitempty"`
 	AddExternalSubnetsToRdconfig         string              `json:"addExternalSubnetsToRdconfig,omitempty" yaml:"addExternalSubnetsToRdconfig,omitempty"`
 	ApicHosts                            []string            `json:"apicHosts,omitempty" yaml:"apicHosts,omitempty"`
 	ApicRefreshTickerAdjust              string              `json:"apicRefreshTickerAdjust,omitempty" yaml:"apicRefreshTickerAdjust,omitempty"`
@@ -140,6 +139,7 @@ type AciNetworkProvider struct {
 	DurationWaitForNetwork               string              `json:"durationWaitForNetwork,omitempty" yaml:"durationWaitForNetwork,omitempty"`
 	DynamicExternalSubnet                string              `json:"externDynamic,omitempty" yaml:"externDynamic,omitempty"`
 	EnableEndpointSlice                  string              `json:"enableEndpointSlice,omitempty" yaml:"enableEndpointSlice,omitempty"`
+	EnableOpflexAgentReconnect           string              `json:"enableOpflexAgentReconnect,omitempty" yaml:"enableOpflexAgentReconnect,omitempty"`
 	EncapType                            string              `json:"encapType,omitempty" yaml:"encapType,omitempty"`
 	EpRegistry                           string              `json:"epRegistry,omitempty" yaml:"epRegistry,omitempty"`
 	GbpPodSubnet                         string              `json:"gbpPodSubnet,omitempty" yaml:"gbpPodSubnet,omitempty"`
@@ -166,6 +166,7 @@ type AciNetworkProvider struct {
 	NoPriorityClass                      string              `json:"noPriorityClass,omitempty" yaml:"noPriorityClass,omitempty"`
 	NoWaitForServiceEpReadiness          string              `json:"noWaitForServiceEpReadiness,omitempty" yaml:"noWaitForServiceEpReadiness,omitempty"`
 	NodePodIfEnable                      string              `json:"nodePodIfEnable,omitempty" yaml:"nodePodIfEnable,omitempty"`
+	NodeSnatRedirectExclude              []map[string]string `json:"nodeSnatRedirectExclude,omitempty" yaml:"nodeSnatRedirectExclude,omitempty"`
 	NodeSubnet                           string              `json:"nodeSubnet,omitempty" yaml:"nodeSubnet,omitempty"`
 	OVSMemoryLimit                       string              `json:"ovsMemoryLimit,omitempty" yaml:"ovsMemoryLimit,omitempty"`
 	OVSMemoryRequest                     string              `json:"ovsMemoryRequest,omitempty" yaml:"ovsMemoryRequest,omitempty"`
@@ -175,10 +176,12 @@ type AciNetworkProvider struct {
 	OpflexAgentOpflexAsyncjsonEnabled    string              `json:"opflexAgentOpflexAsyncjsonEnabled,omitempty" yaml:"opflexAgentOpflexAsyncjsonEnabled,omitempty"`
 	OpflexAgentOvsAsyncjsonEnabled       string              `json:"opflexAgentOvsAsyncjsonEnabled,omitempty" yaml:"opflexAgentOvsAsyncjsonEnabled,omitempty"`
 	OpflexAgentPolicyRetryDelayTimer     string              `json:"opflexAgentPolicyRetryDelayTimer,omitempty" yaml:"opflexAgentPolicyRetryDelayTimer,omitempty"`
+	OpflexAgentStatistics                string              `json:"opflexAgentStatistics,omitempty" yaml:"opflexAgentStatistics,omitempty"`
 	OpflexClientSSL                      string              `json:"opflexClientSsl,omitempty" yaml:"opflexClientSsl,omitempty"`
 	OpflexDeviceDeleteTimeout            string              `json:"opflexDeviceDeleteTimeout,omitempty" yaml:"opflexDeviceDeleteTimeout,omitempty"`
 	OpflexDeviceReconnectWaitTimeout     string              `json:"opflexDeviceReconnectWaitTimeout,omitempty" yaml:"opflexDeviceReconnectWaitTimeout,omitempty"`
 	OpflexMode                           string              `json:"opflexMode,omitempty" yaml:"opflexMode,omitempty"`
+	OpflexOpensslCompat                  string              `json:"opflexOpensslCompat,omitempty" yaml:"opflexOpensslCompat,omitempty"`
 	OpflexServerPort                     string              `json:"opflexServerPort,omitempty" yaml:"opflexServerPort,omitempty"`
 	OverlayVRFName                       string              `json:"overlayVrfName,omitempty" yaml:"overlayVrfName,omitempty"`
 	PBRTrackingNonSnat                   string              `json:"pbrTrackingNonSnat,omitempty" yaml:"pbrTrackingNonSnat,omitempty"`
@@ -202,6 +205,7 @@ type AciNetworkProvider struct {
 	SystemIdentifier                     string              `json:"systemId,omitempty" yaml:"systemId,omitempty"`
 	Tenant                               string              `json:"tenant,omitempty" yaml:"tenant,omitempty"`
 	Token                                string              `json:"token,omitempty" yaml:"token,omitempty"`
+	TolerationSeconds                    string              `json:"tolerationSeconds,omitempty" yaml:"tolerationSeconds,omitempty"`
 	UseAciAnywhereCRD                    string              `json:"useAciAnywhereCrd,omitempty" yaml:"useAciAnywhereCrd,omitempty"`
 	UseAciCniPriorityClass               string              `json:"useAciCniPriorityClass,omitempty" yaml:"useAciCniPriorityClass,omitempty"`
 	UseClusterRole                       string              `json:"useClusterRole,omitempty" yaml:"useClusterRole,omitempty"`
