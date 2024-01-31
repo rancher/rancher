@@ -16,6 +16,17 @@ type AuthProvider struct {
 	Type string `json:"type"`
 }
 
+type OAuthInfo struct {
+	OAuthEndpoint `json:",inline"`
+	Scopes        []string `json:"scopes"`
+}
+
+type OAuthEndpoint struct {
+	AuthURL       string `json:"authUrl"`
+	DeviceAuthURL string `json:"deviceAuthUrl"`
+	TokenURL      string `json:"tokenUrl"`
+}
+
 // +genclient
 // +kubebuilder:skipversion
 // +genclient:nonNamespaced
@@ -112,6 +123,8 @@ type AzureADProvider struct {
 	AuthProvider      `json:",inline"`
 
 	RedirectURL string `json:"redirectUrl"`
+
+	OAuthInfo `json:",inline"`
 }
 
 // +genclient
