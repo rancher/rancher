@@ -21,13 +21,13 @@ import (
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
-	authv1 "k8s.io/client-go/kubernetes/typed/authentication/v1"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
 
 type (
 	restConfigGetter  func(cluster *mgmtv3.Cluster, context *config.ScaledContext, secretLister corev1.SecretLister) (*rest.Config, error)
-	authClientCreator func(config *rest.Config) (authv1.AuthenticationV1Interface, error)
+	authClientCreator func(clusterID string) (kubernetes.Interface, error)
 )
 
 // ServiceAccountAuth is an authenticator that authenticates requests using the downstream service account's JWT.
@@ -50,8 +50,8 @@ func NewServiceAccountAuth(
 		clusterLister:    scaledContext.Management.Clusters("").Controller().Lister(),
 		secretLister:     scaledContext.Core.Secrets("").Controller().Lister(),
 		restConfigGetter: restConfigGetter,
-		authClientCreator: func(config *rest.Config) (authv1.AuthenticationV1Interface, error) {
-			return authv1.NewForConfig(config)
+		authClientCreator: func(clusterID string) (kubernetes.Interface, error) {
+			return scaledContext.Wrangler.MultiClusterManager.K8sClient(clusterID)
 		},
 		clusterProxyConfigsGetter: scaledContext.Wrangler.Mgmt.ClusterProxyConfig().Cache(),
 	}
@@ -111,23 +111,11 @@ func (t *ServiceAccountAuth) Authenticate(req *http.Request) (user.Info, bool, e
 		return info, false, nil
 	}
 
-	cluster, err := t.clusterLister.Get("", clusterID)
+	// Get a client for the downstream cluster.
+	downstreamAuthClient, err := t.authClientCreator(clusterID)
 	if err != nil {
-		logrus.Errorf("saauth: error getting cluster: %v", err)
-		return info, false, fmt.Errorf("failed to get downstream cluster")
-	}
-
-	// Get rest config for the cluster and instantiate an authentication client.
-	kubeConfig, err := t.restConfigGetter(cluster, t.scaledContext, t.secretLister)
-	if kubeConfig == nil || err != nil {
 		logrus.Errorf("saauth: failed to fetch downstream kubeconfig: %v", err)
-		return info, false, fmt.Errorf("failed to get kubeconfig when validating token for downstream cluster")
-	}
-
-	authClient, err := t.authClientCreator(kubeConfig)
-	if err != nil {
-		logrus.Errorf("saauth: error creating authentication client: %v", err)
-		return info, false, fmt.Errorf("failed to get authentication client for downstream cluster")
+		return info, false, fmt.Errorf("failed to get downstream auth client when validating token for downstream cluster")
 	}
 
 	tokenReview := &v1.TokenReview{
@@ -141,7 +129,7 @@ func (t *ServiceAccountAuth) Authenticate(req *http.Request) (user.Info, bool, e
 	}
 
 	// Make the token review request to the downstream cluster.
-	tokenReview, err = authClient.TokenReviews().Create(req.Context(), tokenReview, metav1.CreateOptions{})
+	tokenReview, err = downstreamAuthClient.AuthenticationV1().TokenReviews().Create(req.Context(), tokenReview, metav1.CreateOptions{})
 	if err != nil {
 		logrus.Debugf("saauth: error creating a tokenreview request: %v", err)
 		return info, false, nil

@@ -22,8 +22,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/authentication/user"
 	k8sRequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
-	authv1 "k8s.io/client-go/kubernetes/typed/authentication/v1"
 	"k8s.io/client-go/rest"
 	k8stesting "k8s.io/client-go/testing"
 )
@@ -247,7 +247,7 @@ func TestAuthenticate(t *testing.T) {
 				restConfigGetter: func(cluster *v3.Cluster, context *config.ScaledContext, secretLister corev1.SecretLister) (*rest.Config, error) {
 					return &rest.Config{}, nil
 				},
-				authClientCreator: func(config *rest.Config) (authv1.AuthenticationV1Interface, error) {
+				authClientCreator: func(clusterID string) (kubernetes.Interface, error) {
 					authclient := fake.NewSimpleClientset()
 					// Use PrependReactor because there is a default Reactor for */* that will trump ours if we just use AddReactor
 					authclient.Fake.PrependReactor("create", "tokenreviews", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
@@ -266,7 +266,7 @@ func TestAuthenticate(t *testing.T) {
 						}
 						return true, tokenReview, nil
 					})
-					return authclient.AuthenticationV1(), nil
+					return authclient, nil
 				},
 				clusterProxyConfigsGetter: cpsCache,
 			}
