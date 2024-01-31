@@ -57,6 +57,8 @@ const (
 	ClusterConditionDefaultProjectCreated condition.Cond = "DefaultProjectCreated"
 	// ClusterConditionSystemProjectCreated true when system project has been created
 	ClusterConditionSystemProjectCreated condition.Cond = "SystemProjectCreated"
+	// FleetWorkspacesSystemProjectCreated true when fleetworkspaces project has been created
+	FleetWorkspacesSystemProjectCreated condition.Cond = "FleetWorkspacesProjectCreated"
 	// Deprecated: ClusterConditionDefaultNamespaceAssigned true when cluster's default namespace has been initially assigned
 	ClusterConditionDefaultNamespaceAssigned condition.Cond = "DefaultNamespaceAssigned"
 	// Deprecated: ClusterConditionSystemNamespacesAssigned true when cluster's system namespaces has been initially assigned to

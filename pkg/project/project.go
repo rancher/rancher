@@ -8,8 +8,9 @@ import (
 )
 
 const (
-	System  = "System"
-	Default = "Default"
+	System          = "System"
+	Default         = "Default"
+	FleetWorkspaces = "FleetWorkspaces"
 )
 
 const (
@@ -18,7 +19,8 @@ const (
 )
 
 var (
-	SystemProjectLabel = map[string]string{"authz.management.cattle.io/system-project": "true"}
+	SystemProjectLabel          = map[string]string{"authz.management.cattle.io/system-project": "true"}
+	FleetWorkspacesProjectLabel = map[string]string{"authz.management.cattle.io/fleet-workspaces-project": "true"}
 )
 
 func GetSystemProject(clusterName string, projectLister mgmtv3.ProjectLister) (*mgmtv3.Project, error) {

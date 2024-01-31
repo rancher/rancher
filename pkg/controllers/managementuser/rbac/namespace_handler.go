@@ -182,7 +182,7 @@ func (n *nsLifecycle) GetSystemProjectName() (string, error) {
 }
 
 func IsFleetNamespace(ns *v1.Namespace) bool {
-	return ns.Name == fleetconst.ClustersLocalNamespace || ns.Name == fleetconst.ClustersDefaultNamespace || ns.Name == fleetconst.ReleaseClustersNamespace || ns.Labels["fleet.cattle.io/managed"] == "true"
+	return ns.Name == fleetconst.ClustersLocalNamespace || ns.Name == fleetconst.ReleaseClustersNamespace || ns.Labels["fleet.cattle.io/managed"] == "true"
 }
 
 func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {

@@ -2,11 +2,16 @@ package fleetworkspace
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/pkg/errors"
 	fleet "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	mgmt "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/controllers/managementagent/nslabels"
 	"github.com/rancher/rancher/pkg/features"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/rancher/pkg/wrangler"
 	v1 "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/pkg/generic"
@@ -15,17 +20,20 @@ import (
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
 var (
-	managed = "provisioning.cattle.io/managed"
+	managed                             = "provisioning.cattle.io/managed"
+	errorFleetWorkspacesProjectNotFound = errors.New("can't find FleetWorkspaces project")
 )
 
 type handle struct {
 	workspaceCache mgmtcontrollers.FleetWorkspaceCache
 	namespaceCache v1.NamespaceCache
 	workspaces     mgmtcontrollers.FleetWorkspaceClient
+	projectsCache  mgmtcontrollers.ProjectCache
 }
 
 func Register(ctx context.Context, clients *wrangler.Context) {
@@ -33,6 +41,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 		workspaceCache: clients.Mgmt.FleetWorkspace().Cache(),
 		workspaces:     clients.Mgmt.FleetWorkspace(),
 		namespaceCache: clients.Core.Namespace().Cache(),
+		projectsCache:  clients.Mgmt.Project().Cache(),
 	}
 
 	if features.MCM.Enabled() {
@@ -79,12 +88,19 @@ func (h *handle) OnSetting(key string, setting *mgmt.Setting) (*mgmt.Setting, er
 	if value == "" {
 		return setting, nil
 	}
+	project, err := getFleetWorkspacesProject(h.projectsCache)
+	if err != nil {
+		return setting, err
+	}
 
-	_, err := h.workspaceCache.Get(value)
+	_, err = h.workspaceCache.Get(value)
 	if apierror.IsNotFound(err) {
 		_, err = h.workspaces.Create(&mgmt.FleetWorkspace{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: value,
+				Annotations: map[string]string{
+					nslabels.ProjectIDFieldLabel: fmt.Sprintf("%v:%v", project.Spec.ClusterName, project.Name),
+				},
 			},
 		})
 	}
@@ -97,11 +113,19 @@ func (h *handle) OnChange(workspace *mgmt.FleetWorkspace, status mgmt.FleetWorks
 		return nil, status, nil
 	}
 
+	project, err := getFleetWorkspacesProject(h.projectsCache)
+	if err != nil {
+		return nil, mgmt.FleetWorkspaceStatus{}, err
+	}
+
 	return []runtime.Object{
 		&corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   workspace.Name,
 				Labels: yaml.CleanAnnotationsForExport(workspace.Labels),
+				Annotations: map[string]string{
+					nslabels.ProjectIDFieldLabel: fmt.Sprintf("%v:%v", project.Spec.ClusterName, project.Name),
+				},
 			},
 		},
 	}, status, nil
@@ -143,4 +167,17 @@ func (h *handle) onFleetObject(obj runtime.Object) error {
 	}
 
 	return err
+}
+
+func getFleetWorkspacesProject(projectLister mgmtv3.ProjectLister) (*mgmt.Project, error) {
+	projects, err := projectLister.List("local", labels.Set(project.FleetWorkspacesProjectLabel).AsSelector())
+	if err != nil {
+		return nil, errors.Wrapf(err, "list project failed")
+	}
+
+	if len(projects) == 0 {
+		return nil, errorFleetWorkspacesProjectNotFound
+	}
+
+	return projects[0], nil
 }

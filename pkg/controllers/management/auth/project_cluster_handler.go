@@ -47,6 +47,7 @@ const (
 
 var defaultProjectLabels = labels.Set(map[string]string{"authz.management.cattle.io/default-project": "true"})
 var systemProjectLabels = labels.Set(map[string]string{"authz.management.cattle.io/system-project": "true"})
+var fleetWorkspacesProjectLabels = labels.Set(project.FleetWorkspacesProjectLabel)
 var crtbCreatorOwnerAnnotations = map[string]string{creatorOwnerBindingAnnotation: "true"}
 
 func newPandCLifecycles(management *config.ManagementContext) (*projectLifecycle, *clusterLifecycle) {
@@ -190,6 +191,14 @@ func (l *clusterLifecycle) sync(key string, orig *apisv3.Cluster) (runtime.Objec
 	if err != nil {
 		return nil, err
 	}
+
+	if orig.Name == "local" {
+		obj, err = l.mgr.createFleetWorkspaceProject(obj)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	obj, err = l.mgr.addRTAnnotation(obj, "cluster")
 	if err != nil {
 		return nil, err
@@ -282,6 +291,10 @@ func (m *mgr) createDefaultProject(obj runtime.Object) (runtime.Object, error) {
 
 func (m *mgr) createSystemProject(obj runtime.Object) (runtime.Object, error) {
 	return m.createProject(project.System, v32.ClusterConditionSystemProjectCreated, obj, systemProjectLabels)
+}
+
+func (m *mgr) createFleetWorkspaceProject(obj runtime.Object) (runtime.Object, error) {
+	return m.createProject(project.FleetWorkspaces, v32.FleetWorkspacesSystemProjectCreated, obj, fleetWorkspacesProjectLabels)
 }
 
 func (m *mgr) createProject(name string, cond condition.Cond, obj runtime.Object, labels labels.Set) (runtime.Object, error) {
