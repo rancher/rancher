@@ -16,15 +16,19 @@ type AuthProvider struct {
 	Type string `json:"type"`
 }
 
+func (a *AuthProvider) GetType() string {
+	return a.Type
+}
+
 type OAuthInfo struct {
 	OAuthEndpoint `json:",inline"`
 	Scopes        []string `json:"scopes"`
 }
 
 type OAuthEndpoint struct {
-	AuthURL       string `json:"authUrl"`
-	DeviceAuthURL string `json:"deviceAuthUrl"`
-	TokenURL      string `json:"tokenUrl"`
+	AuthURL       string `json:"authUrl,omitempty"`
+	DeviceAuthURL string `json:"deviceAuthUrl,omitempty"`
+	TokenURL      string `json:"tokenUrl,omitempty"`
 }
 
 // +genclient
@@ -123,8 +127,9 @@ type AzureADProvider struct {
 	AuthProvider      `json:",inline"`
 
 	RedirectURL string `json:"redirectUrl"`
-
-	OAuthInfo `json:",inline"`
+	TenantID    string `json:"tenantId,omitempty"`
+	ClientID    string `json:"clientId,omitempty"`
+	OAuthInfo   `json:",inline"`
 }
 
 // +genclient
@@ -143,7 +148,7 @@ type SamlProvider struct {
 type AzureADLogin struct {
 	GenericLogin `json:",inline"`
 	Code         string `json:"code" norman:"type=string,required"`
-	Token        string `json:"token,omitempty"`
+	IDToken      string `json:"token,omitempty"`
 }
 
 // +genclient

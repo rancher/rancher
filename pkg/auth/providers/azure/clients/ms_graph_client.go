@@ -114,7 +114,7 @@ func (c azureMSGraphClient) LoginUser(config *v32.AzureADConfig, credential *v32
 	logrus.Debugf("[%s] Started token swap with AzureAD", providerLogPrefix)
 
 	var oid string
-	if credential.Token != "" {
+	if credential.IDToken != "" {
 		issuer := fmt.Sprintf("%s%s/v2.0", config.Endpoint, config.TenantID)
 		provider, err := oidc.NewProvider(context.Background(), issuer)
 		if err != nil {
@@ -122,7 +122,7 @@ func (c azureMSGraphClient) LoginUser(config *v32.AzureADConfig, credential *v32
 		}
 
 		verifier := provider.Verifier(&oidc.Config{ClientID: config.ApplicationID})
-		token, err := verifier.Verify(context.Background(), credential.Token)
+		token, err := verifier.Verify(context.Background(), credential.IDToken)
 		if err != nil {
 			return v3.Principal{}, nil, "", err
 		}
