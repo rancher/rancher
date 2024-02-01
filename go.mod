@@ -188,7 +188,7 @@ require (
 	github.com/containers/image/v5 v5.25.0
 	github.com/google/gnostic-models v0.6.8
 	github.com/rancher/rancher/pkg/apis v0.0.0-20230915232223-a9ea4ce4a5ba
-	github.com/rancher/shepherd v0.0.0-20240205165104-af35b26e7527
+	github.com/rancher/shepherd v0.0.0-20240208174721-9b2ae7879fae
 	go.qase.io/client v0.0.0-20231114201952-65195ec001fa
 )
 
