@@ -1,5 +1,5 @@
 /*
-Copyright 2023 Rancher Labs, Inc.
+Copyright 2024 Rancher Labs, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,10 +21,9 @@ package fake
 import (
 	"context"
 
-	rkecattleiov1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -36,25 +35,25 @@ type FakeRKEBootstrapTemplates struct {
 	ns   string
 }
 
-var rkebootstraptemplatesResource = schema.GroupVersionResource{Group: "rke.cattle.io", Version: "v1", Resource: "rkebootstraptemplates"}
+var rkebootstraptemplatesResource = v1.SchemeGroupVersion.WithResource("rkebootstraptemplates")
 
-var rkebootstraptemplatesKind = schema.GroupVersionKind{Group: "rke.cattle.io", Version: "v1", Kind: "RKEBootstrapTemplate"}
+var rkebootstraptemplatesKind = v1.SchemeGroupVersion.WithKind("RKEBootstrapTemplate")
 
 // Get takes name of the rKEBootstrapTemplate, and returns the corresponding rKEBootstrapTemplate object, and an error if there is any.
-func (c *FakeRKEBootstrapTemplates) Get(ctx context.Context, name string, options v1.GetOptions) (result *rkecattleiov1.RKEBootstrapTemplate, err error) {
+func (c *FakeRKEBootstrapTemplates) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.RKEBootstrapTemplate, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(rkebootstraptemplatesResource, c.ns, name), &rkecattleiov1.RKEBootstrapTemplate{})
+		Invokes(testing.NewGetAction(rkebootstraptemplatesResource, c.ns, name), &v1.RKEBootstrapTemplate{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*rkecattleiov1.RKEBootstrapTemplate), err
+	return obj.(*v1.RKEBootstrapTemplate), err
 }
 
 // List takes label and field selectors, and returns the list of RKEBootstrapTemplates that match those selectors.
-func (c *FakeRKEBootstrapTemplates) List(ctx context.Context, opts v1.ListOptions) (result *rkecattleiov1.RKEBootstrapTemplateList, err error) {
+func (c *FakeRKEBootstrapTemplates) List(ctx context.Context, opts metav1.ListOptions) (result *v1.RKEBootstrapTemplateList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(rkebootstraptemplatesResource, rkebootstraptemplatesKind, c.ns, opts), &rkecattleiov1.RKEBootstrapTemplateList{})
+		Invokes(testing.NewListAction(rkebootstraptemplatesResource, rkebootstraptemplatesKind, c.ns, opts), &v1.RKEBootstrapTemplateList{})
 
 	if obj == nil {
 		return nil, err
@@ -64,8 +63,8 @@ func (c *FakeRKEBootstrapTemplates) List(ctx context.Context, opts v1.ListOption
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &rkecattleiov1.RKEBootstrapTemplateList{ListMeta: obj.(*rkecattleiov1.RKEBootstrapTemplateList).ListMeta}
-	for _, item := range obj.(*rkecattleiov1.RKEBootstrapTemplateList).Items {
+	list := &v1.RKEBootstrapTemplateList{ListMeta: obj.(*v1.RKEBootstrapTemplateList).ListMeta}
+	for _, item := range obj.(*v1.RKEBootstrapTemplateList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -74,57 +73,57 @@ func (c *FakeRKEBootstrapTemplates) List(ctx context.Context, opts v1.ListOption
 }
 
 // Watch returns a watch.Interface that watches the requested rKEBootstrapTemplates.
-func (c *FakeRKEBootstrapTemplates) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeRKEBootstrapTemplates) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(rkebootstraptemplatesResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a rKEBootstrapTemplate and creates it.  Returns the server's representation of the rKEBootstrapTemplate, and an error, if there is any.
-func (c *FakeRKEBootstrapTemplates) Create(ctx context.Context, rKEBootstrapTemplate *rkecattleiov1.RKEBootstrapTemplate, opts v1.CreateOptions) (result *rkecattleiov1.RKEBootstrapTemplate, err error) {
+func (c *FakeRKEBootstrapTemplates) Create(ctx context.Context, rKEBootstrapTemplate *v1.RKEBootstrapTemplate, opts metav1.CreateOptions) (result *v1.RKEBootstrapTemplate, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(rkebootstraptemplatesResource, c.ns, rKEBootstrapTemplate), &rkecattleiov1.RKEBootstrapTemplate{})
+		Invokes(testing.NewCreateAction(rkebootstraptemplatesResource, c.ns, rKEBootstrapTemplate), &v1.RKEBootstrapTemplate{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*rkecattleiov1.RKEBootstrapTemplate), err
+	return obj.(*v1.RKEBootstrapTemplate), err
 }
 
 // Update takes the representation of a rKEBootstrapTemplate and updates it. Returns the server's representation of the rKEBootstrapTemplate, and an error, if there is any.
-func (c *FakeRKEBootstrapTemplates) Update(ctx context.Context, rKEBootstrapTemplate *rkecattleiov1.RKEBootstrapTemplate, opts v1.UpdateOptions) (result *rkecattleiov1.RKEBootstrapTemplate, err error) {
+func (c *FakeRKEBootstrapTemplates) Update(ctx context.Context, rKEBootstrapTemplate *v1.RKEBootstrapTemplate, opts metav1.UpdateOptions) (result *v1.RKEBootstrapTemplate, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(rkebootstraptemplatesResource, c.ns, rKEBootstrapTemplate), &rkecattleiov1.RKEBootstrapTemplate{})
+		Invokes(testing.NewUpdateAction(rkebootstraptemplatesResource, c.ns, rKEBootstrapTemplate), &v1.RKEBootstrapTemplate{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*rkecattleiov1.RKEBootstrapTemplate), err
+	return obj.(*v1.RKEBootstrapTemplate), err
 }
 
 // Delete takes name of the rKEBootstrapTemplate and deletes it. Returns an error if one occurs.
-func (c *FakeRKEBootstrapTemplates) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
+func (c *FakeRKEBootstrapTemplates) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteActionWithOptions(rkebootstraptemplatesResource, c.ns, name, opts), &rkecattleiov1.RKEBootstrapTemplate{})
+		Invokes(testing.NewDeleteActionWithOptions(rkebootstraptemplatesResource, c.ns, name, opts), &v1.RKEBootstrapTemplate{})
 
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeRKEBootstrapTemplates) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+func (c *FakeRKEBootstrapTemplates) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(rkebootstraptemplatesResource, c.ns, listOpts)
 
-	_, err := c.Fake.Invokes(action, &rkecattleiov1.RKEBootstrapTemplateList{})
+	_, err := c.Fake.Invokes(action, &v1.RKEBootstrapTemplateList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched rKEBootstrapTemplate.
-func (c *FakeRKEBootstrapTemplates) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *rkecattleiov1.RKEBootstrapTemplate, err error) {
+func (c *FakeRKEBootstrapTemplates) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.RKEBootstrapTemplate, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(rkebootstraptemplatesResource, c.ns, name, pt, data, subresources...), &rkecattleiov1.RKEBootstrapTemplate{})
+		Invokes(testing.NewPatchSubresourceAction(rkebootstraptemplatesResource, c.ns, name, pt, data, subresources...), &v1.RKEBootstrapTemplate{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*rkecattleiov1.RKEBootstrapTemplate), err
+	return obj.(*v1.RKEBootstrapTemplate), err
 }

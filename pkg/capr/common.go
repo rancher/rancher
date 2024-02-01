@@ -281,7 +281,7 @@ func GetPlanServiceAccountTokenSecret(secretClient corecontrollers.SecretControl
 	if planSA == nil {
 		return nil, false, fmt.Errorf("planSA was nil")
 	}
-	secret, err := serviceaccounttoken.EnsureSecretForServiceAccount(context.Background(), secretClient.Cache().Get, k8s, planSA)
+	secret, err := serviceaccounttoken.EnsureSecretForServiceAccount(context.Background(), secretClient.Cache(), k8s, planSA)
 	if err != nil {
 		return nil, false, fmt.Errorf("error ensuring secret for service account [%s:%s]: %w", planSA.Namespace, planSA.Name, err)
 	}
@@ -341,7 +341,7 @@ func GetMachineDeletionStatus(machines []*capi.Machine) (string, error) {
 
 // GetMachineFromNode attempts to find the corresponding machine for an etcd snapshot that is found in the configmap. If the machine list is successful, it will return true on the boolean, otherwise, it can be assumed that a false, nil, and defined error indicate the machine does not exist.
 func GetMachineFromNode(machineCache capicontrollers.MachineCache, nodeName string, cluster *provv1.Cluster) (bool, *capi.Machine, error) {
-	ls, err := labels.Parse(fmt.Sprintf("%s=%s", capi.ClusterLabelName, cluster.Name))
+	ls, err := labels.Parse(fmt.Sprintf("%s=%s", capi.ClusterNameLabel, cluster.Name))
 	if err != nil {
 		return false, nil, err
 	}
@@ -430,11 +430,11 @@ func GetCAPIClusterFromLabel(obj runtime.Object, cache capicontrollers.ClusterCa
 	if err != nil {
 		return nil, err
 	}
-	clusterName := data.String("metadata", "labels", capi.ClusterLabelName)
+	clusterName := data.String("metadata", "labels", capi.ClusterNameLabel)
 	if clusterName != "" {
 		return cache.Get(data.String("metadata", "namespace"), clusterName)
 	}
-	return nil, fmt.Errorf("%s label not present on %s: %s/%s", capi.ClusterLabelName, obj.GetObjectKind().GroupVersionKind().Kind, data.String("metadata", "namespace"), data.String("metadata", "name"))
+	return nil, fmt.Errorf("%s label not present on %s: %s/%s", capi.ClusterNameLabel, obj.GetObjectKind().GroupVersionKind().Kind, data.String("metadata", "namespace"), data.String("metadata", "name"))
 }
 
 // GetOwnerCAPICluster takes an obj and will attempt to find the capi cluster owner reference.

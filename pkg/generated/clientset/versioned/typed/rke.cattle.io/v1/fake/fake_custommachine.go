@@ -1,5 +1,5 @@
 /*
-Copyright 2023 Rancher Labs, Inc.
+Copyright 2024 Rancher Labs, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,10 +21,9 @@ package fake
 import (
 	"context"
 
-	rkecattleiov1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -36,25 +35,25 @@ type FakeCustomMachines struct {
 	ns   string
 }
 
-var custommachinesResource = schema.GroupVersionResource{Group: "rke.cattle.io", Version: "v1", Resource: "custommachines"}
+var custommachinesResource = v1.SchemeGroupVersion.WithResource("custommachines")
 
-var custommachinesKind = schema.GroupVersionKind{Group: "rke.cattle.io", Version: "v1", Kind: "CustomMachine"}
+var custommachinesKind = v1.SchemeGroupVersion.WithKind("CustomMachine")
 
 // Get takes name of the customMachine, and returns the corresponding customMachine object, and an error if there is any.
-func (c *FakeCustomMachines) Get(ctx context.Context, name string, options v1.GetOptions) (result *rkecattleiov1.CustomMachine, err error) {
+func (c *FakeCustomMachines) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.CustomMachine, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(custommachinesResource, c.ns, name), &rkecattleiov1.CustomMachine{})
+		Invokes(testing.NewGetAction(custommachinesResource, c.ns, name), &v1.CustomMachine{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*rkecattleiov1.CustomMachine), err
+	return obj.(*v1.CustomMachine), err
 }
 
 // List takes label and field selectors, and returns the list of CustomMachines that match those selectors.
-func (c *FakeCustomMachines) List(ctx context.Context, opts v1.ListOptions) (result *rkecattleiov1.CustomMachineList, err error) {
+func (c *FakeCustomMachines) List(ctx context.Context, opts metav1.ListOptions) (result *v1.CustomMachineList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(custommachinesResource, custommachinesKind, c.ns, opts), &rkecattleiov1.CustomMachineList{})
+		Invokes(testing.NewListAction(custommachinesResource, custommachinesKind, c.ns, opts), &v1.CustomMachineList{})
 
 	if obj == nil {
 		return nil, err
@@ -64,8 +63,8 @@ func (c *FakeCustomMachines) List(ctx context.Context, opts v1.ListOptions) (res
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &rkecattleiov1.CustomMachineList{ListMeta: obj.(*rkecattleiov1.CustomMachineList).ListMeta}
-	for _, item := range obj.(*rkecattleiov1.CustomMachineList).Items {
+	list := &v1.CustomMachineList{ListMeta: obj.(*v1.CustomMachineList).ListMeta}
+	for _, item := range obj.(*v1.CustomMachineList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -74,69 +73,69 @@ func (c *FakeCustomMachines) List(ctx context.Context, opts v1.ListOptions) (res
 }
 
 // Watch returns a watch.Interface that watches the requested customMachines.
-func (c *FakeCustomMachines) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeCustomMachines) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(custommachinesResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a customMachine and creates it.  Returns the server's representation of the customMachine, and an error, if there is any.
-func (c *FakeCustomMachines) Create(ctx context.Context, customMachine *rkecattleiov1.CustomMachine, opts v1.CreateOptions) (result *rkecattleiov1.CustomMachine, err error) {
+func (c *FakeCustomMachines) Create(ctx context.Context, customMachine *v1.CustomMachine, opts metav1.CreateOptions) (result *v1.CustomMachine, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(custommachinesResource, c.ns, customMachine), &rkecattleiov1.CustomMachine{})
+		Invokes(testing.NewCreateAction(custommachinesResource, c.ns, customMachine), &v1.CustomMachine{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*rkecattleiov1.CustomMachine), err
+	return obj.(*v1.CustomMachine), err
 }
 
 // Update takes the representation of a customMachine and updates it. Returns the server's representation of the customMachine, and an error, if there is any.
-func (c *FakeCustomMachines) Update(ctx context.Context, customMachine *rkecattleiov1.CustomMachine, opts v1.UpdateOptions) (result *rkecattleiov1.CustomMachine, err error) {
+func (c *FakeCustomMachines) Update(ctx context.Context, customMachine *v1.CustomMachine, opts metav1.UpdateOptions) (result *v1.CustomMachine, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(custommachinesResource, c.ns, customMachine), &rkecattleiov1.CustomMachine{})
+		Invokes(testing.NewUpdateAction(custommachinesResource, c.ns, customMachine), &v1.CustomMachine{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*rkecattleiov1.CustomMachine), err
+	return obj.(*v1.CustomMachine), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeCustomMachines) UpdateStatus(ctx context.Context, customMachine *rkecattleiov1.CustomMachine, opts v1.UpdateOptions) (*rkecattleiov1.CustomMachine, error) {
+func (c *FakeCustomMachines) UpdateStatus(ctx context.Context, customMachine *v1.CustomMachine, opts metav1.UpdateOptions) (*v1.CustomMachine, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(custommachinesResource, "status", c.ns, customMachine), &rkecattleiov1.CustomMachine{})
+		Invokes(testing.NewUpdateSubresourceAction(custommachinesResource, "status", c.ns, customMachine), &v1.CustomMachine{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*rkecattleiov1.CustomMachine), err
+	return obj.(*v1.CustomMachine), err
 }
 
 // Delete takes name of the customMachine and deletes it. Returns an error if one occurs.
-func (c *FakeCustomMachines) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
+func (c *FakeCustomMachines) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteActionWithOptions(custommachinesResource, c.ns, name, opts), &rkecattleiov1.CustomMachine{})
+		Invokes(testing.NewDeleteActionWithOptions(custommachinesResource, c.ns, name, opts), &v1.CustomMachine{})
 
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeCustomMachines) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+func (c *FakeCustomMachines) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(custommachinesResource, c.ns, listOpts)
 
-	_, err := c.Fake.Invokes(action, &rkecattleiov1.CustomMachineList{})
+	_, err := c.Fake.Invokes(action, &v1.CustomMachineList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched customMachine.
-func (c *FakeCustomMachines) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *rkecattleiov1.CustomMachine, err error) {
+func (c *FakeCustomMachines) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.CustomMachine, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(custommachinesResource, c.ns, name, pt, data, subresources...), &rkecattleiov1.CustomMachine{})
+		Invokes(testing.NewPatchSubresourceAction(custommachinesResource, c.ns, name, pt, data, subresources...), &v1.CustomMachine{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*rkecattleiov1.CustomMachine), err
+	return obj.(*v1.CustomMachine), err
 }

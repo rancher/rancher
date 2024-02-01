@@ -198,7 +198,7 @@ if ( true == via_webhook() && (!(rancher_version ==~ rancher_version_regex)) ) {
                         if (!env.RANCHER_K3S_VERSION) {
                           RANCHER_K3S_VERSION = "v1.26.4+k3s1"
                         }
-                      }                   
+                      }
 
                       params = [ string(name: 'CATTLE_TEST_URL', value: "${CATTLE_TEST_URL}"),
                                 string(name: 'ADMIN_TOKEN', value: "${ADMIN_TOKEN}"),

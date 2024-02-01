@@ -11,6 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/openapi"
 	"k8s.io/client-go/rest"
@@ -604,5 +605,9 @@ func (m MockDiscovery) OpenAPISchema() (*openapi2.Document, error) {
 }
 
 func (m MockDiscovery) OpenAPIV3() openapi.Client {
+	panic("implement me")
+}
+
+func (m MockDiscovery) WithLegacy() discovery.DiscoveryInterface {
 	panic("implement me")
 }
