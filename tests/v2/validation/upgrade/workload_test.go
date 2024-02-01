@@ -5,17 +5,18 @@ package upgrade
 import (
 	"testing"
 
-	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	"github.com/rancher/rancher/tests/framework/clients/rancher/catalog"
-	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
-	"github.com/rancher/rancher/tests/framework/extensions/charts"
-	"github.com/rancher/rancher/tests/framework/extensions/clusters"
-	"github.com/rancher/rancher/tests/framework/extensions/ingresses"
-	"github.com/rancher/rancher/tests/framework/extensions/namespaces"
-	"github.com/rancher/rancher/tests/framework/extensions/secrets"
-	"github.com/rancher/rancher/tests/framework/extensions/services"
-	"github.com/rancher/rancher/tests/framework/extensions/workloads"
-	"github.com/rancher/rancher/tests/framework/pkg/session"
+	"github.com/rancher/shepherd/clients/rancher"
+	"github.com/rancher/shepherd/clients/rancher/catalog"
+	v1 "github.com/rancher/shepherd/clients/rancher/v1"
+	"github.com/rancher/shepherd/extensions/charts"
+	"github.com/rancher/shepherd/extensions/clusters"
+	"github.com/rancher/shepherd/extensions/ingresses"
+	"github.com/rancher/shepherd/extensions/namespaces"
+	"github.com/rancher/shepherd/extensions/pipeline"
+	"github.com/rancher/shepherd/extensions/secrets"
+	"github.com/rancher/shepherd/extensions/services"
+	"github.com/rancher/shepherd/extensions/workloads"
+	"github.com/rancher/shepherd/pkg/session"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -73,7 +74,7 @@ func TestWorkloadUpgradeTestSuite(t *testing.T) {
 	suite.Run(t, new(UpgradeWorkloadTestSuite))
 }
 
-func (u *UpgradeWorkloadTestSuite) testPreUpgradeSingleCluster(clusterName string, featuresToTest Features, names *resourceNames) {
+func (u *UpgradeWorkloadTestSuite) testPreUpgradeSingleCluster(clusterName string, featuresToTest pipeline.Features, names *resourceNames) {
 	isCattleLabeled := true
 
 	subSession := u.session.NewSession()
@@ -281,7 +282,7 @@ func (u *UpgradeWorkloadTestSuite) testPreUpgradeSingleCluster(clusterName strin
 	}
 }
 
-func (u *UpgradeWorkloadTestSuite) testPostUpgradeSingleCluster(clusterName string, featuresToTest Features, names *resourceNames) {
+func (u *UpgradeWorkloadTestSuite) testPostUpgradeSingleCluster(clusterName string, featuresToTest pipeline.Features, names *resourceNames) {
 	subSession := u.session.NewSession()
 	defer subSession.Cleanup()
 

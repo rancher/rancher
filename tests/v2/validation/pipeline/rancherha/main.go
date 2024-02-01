@@ -1,13 +1,13 @@
 package main
 
 import (
-	"github.com/rancher/rancher/tests/framework/clients/corral"
-	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	"github.com/rancher/rancher/tests/framework/extensions/pipeline"
-	"github.com/rancher/rancher/tests/framework/pkg/config"
-	"github.com/rancher/rancher/tests/framework/pkg/environmentflag"
-	"github.com/rancher/rancher/tests/framework/pkg/session"
 	"github.com/rancher/rancher/tests/v2/validation/pipeline/rancherha/corralha"
+	"github.com/rancher/shepherd/clients/corral"
+	"github.com/rancher/shepherd/clients/rancher"
+	"github.com/rancher/shepherd/extensions/pipeline"
+	"github.com/rancher/shepherd/pkg/config"
+	"github.com/rancher/shepherd/pkg/environmentflag"
+	"github.com/rancher/shepherd/pkg/session"
 	"github.com/sirupsen/logrus"
 )
 
