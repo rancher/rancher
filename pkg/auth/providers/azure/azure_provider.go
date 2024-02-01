@@ -23,6 +23,7 @@ import (
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/oauth2/microsoft"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -196,6 +197,16 @@ func (ap *Provider) TransformToAuthProvider(
 ) (map[string]interface{}, error) {
 	p := common.TransformToAuthProvider(authConfig)
 	p[publicclient.AzureADProviderFieldRedirectURL] = formAzureRedirectURL(authConfig)
+
+	tenantID, _ := authConfig["tenantId"].(string)
+	p[publicclient.AzureADProviderFieldTenantID] = tenantID
+	p[publicclient.AzureADProviderFieldScopes] = []string{"openid", "profile", "email"}
+
+	ep := microsoft.AzureADEndpoint(tenantID)
+	p[publicclient.AzureADProviderFieldAuthURL] = ep.AuthURL
+	p[publicclient.AzureADProviderFieldDeviceAuthURL] = ep.DeviceAuthURL
+	p[publicclient.AzureADProviderFieldTokenURL] = ep.TokenURL
+
 	return p, nil
 }
 

@@ -8,6 +8,7 @@ import (
 
 	"github.com/AzureAD/microsoft-authentication-library-for-go/apps/cache"
 	"github.com/AzureAD/microsoft-authentication-library-for-go/apps/confidential"
+	"github.com/coreos/go-oidc"
 	"github.com/manicminer/hamilton/environments"
 	"github.com/manicminer/hamilton/msgraph"
 	"github.com/manicminer/hamilton/odata"
@@ -112,10 +113,37 @@ func (c azureMSGraphClient) ListGroupMemberships(id string) ([]string, error) {
 func (c azureMSGraphClient) LoginUser(config *v32.AzureADConfig, credential *v32.AzureADLogin) (v3.Principal, []v3.Principal, string, error) {
 	logrus.Debugf("[%s] Started token swap with AzureAD", providerLogPrefix)
 
-	// Acquire the OID just to verify the user.
-	oid, err := oidFromAuthCode(credential.Code, config)
-	if err != nil {
-		return v3.Principal{}, nil, "", err
+	var oid string
+	if credential.IDToken != "" {
+		issuer := fmt.Sprintf("%s%s/v2.0", config.Endpoint, config.TenantID)
+		provider, err := oidc.NewProvider(context.Background(), issuer)
+		if err != nil {
+			return v3.Principal{}, nil, "", err
+		}
+
+		verifier := provider.Verifier(&oidc.Config{ClientID: config.ApplicationID})
+		token, err := verifier.Verify(context.Background(), credential.IDToken)
+		if err != nil {
+			return v3.Principal{}, nil, "", err
+		}
+
+		type azureClaims struct {
+			OID string `json:"oid"`
+		}
+		claims := azureClaims{}
+		err = token.Claims(&claims)
+		if err != nil {
+			return v3.Principal{}, nil, "", err
+		}
+
+		oid = claims.OID
+	} else {
+		// Acquire the OID just to verify the user.
+		oidFromCode, err := oidFromAuthCode(credential.Code, config)
+		if err != nil {
+			return v3.Principal{}, nil, "", err
+		}
+		oid = oidFromCode
 	}
 	logrus.Debugf("[%s] Completed token swap with AzureAD", providerLogPrefix)
 
