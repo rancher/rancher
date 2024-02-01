@@ -5,13 +5,13 @@ package crtb
 import (
 	"testing"
 
-	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
-	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
+	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
+	namegen "github.com/rancher/shepherd/pkg/namegenerator"
 
-	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	"github.com/rancher/rancher/tests/framework/extensions/clusters"
-	"github.com/rancher/rancher/tests/framework/extensions/users"
-	"github.com/rancher/rancher/tests/framework/pkg/session"
+	"github.com/rancher/shepherd/clients/rancher"
+	"github.com/rancher/shepherd/extensions/clusters"
+	"github.com/rancher/shepherd/extensions/users"
+	"github.com/rancher/shepherd/pkg/session"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
