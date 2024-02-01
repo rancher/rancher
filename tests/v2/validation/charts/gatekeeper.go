@@ -3,9 +3,9 @@ package charts
 import (
 	"time"
 
-	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
-	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
+	"github.com/rancher/shepherd/clients/rancher"
+	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
+	v1 "github.com/rancher/shepherd/clients/rancher/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 

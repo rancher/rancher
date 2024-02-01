@@ -21,6 +21,7 @@ const (
 	automationSuiteID    = int32(14)
 	failStatus           = "fail"
 	passStatus           = "pass"
+	skipStatus           = "skip"
 	automationTestNameID = 15
 	testSourceID         = 14
 	testSource           = "GoValidation"
@@ -118,6 +119,8 @@ func parseCorrectTestCases(testCases []testcase.GoTestOutput) map[string]*testca
 		} else if testCase.Action == "output" && strings.Contains(testCase.Test, "/") {
 			goTestCase := finalTestCases[testCase.Test]
 			goTestCase.StackTrace += testCase.Output
+		} else if testCase.Action == skipStatus {
+			delete(finalTestCases, testCase.Test)
 		} else if (testCase.Action == failStatus || testCase.Action == passStatus) && strings.Contains(testCase.Test, "/") {
 			goTestCase := finalTestCases[testCase.Test]
 
@@ -194,19 +197,23 @@ func writeTestCaseToQase(client *qase.APIClient, testCase testcase.GoTestCase) (
 
 func updateTestInRun(client *qase.APIClient, testCase testcase.GoTestCase, qaseTestCaseID, testRunID int64) error {
 	status := fmt.Sprintf("%sed", testCase.Status)
-	elasedTime, err := strconv.ParseFloat(testCase.Elapsed, 64)
-	if err != nil {
-		return err
+	var elapsedTime float64
+	if testCase.Elapsed != "" {
+		var err error
+		elapsedTime, err = strconv.ParseFloat(testCase.Elapsed, 64)
+		if err != nil {
+			return err
+		}
 	}
 
 	resultBody := qase.ResultCreate{
 		CaseId:  qaseTestCaseID,
 		Status:  status,
 		Comment: testCase.StackTrace,
-		Time:    int64(elasedTime),
+		Time:    int64(elapsedTime),
 	}
 
-	_, _, err = client.ResultsApi.CreateResult(context.TODO(), resultBody, qasedefaults.RancherManagerProjectID, testRunID)
+	_, _, err := client.ResultsApi.CreateResult(context.TODO(), resultBody, qasedefaults.RancherManagerProjectID, testRunID)
 	if err != nil {
 		return err
 	}

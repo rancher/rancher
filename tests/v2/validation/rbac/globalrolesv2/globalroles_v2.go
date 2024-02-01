@@ -6,18 +6,18 @@ import (
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 
-	"github.com/rancher/rancher/tests/framework/pkg/config"
-	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
+	"github.com/rancher/shepherd/pkg/config"
+	namegen "github.com/rancher/shepherd/pkg/namegenerator"
 
-	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
-	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
+	"github.com/rancher/shepherd/clients/rancher"
+	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
+	v1 "github.com/rancher/shepherd/clients/rancher/v1"
 
-	"github.com/rancher/rancher/tests/framework/extensions/clusters"
-	"github.com/rancher/rancher/tests/framework/extensions/defaults"
-	"github.com/rancher/rancher/tests/framework/extensions/kubeapi/rbac"
-	"github.com/rancher/rancher/tests/framework/extensions/provisioning"
-	"github.com/rancher/rancher/tests/framework/extensions/provisioninginput"
+	"github.com/rancher/shepherd/extensions/clusters"
+	"github.com/rancher/shepherd/extensions/defaults"
+	"github.com/rancher/shepherd/extensions/kubeapi/rbac"
+	"github.com/rancher/shepherd/extensions/provisioning"
+	"github.com/rancher/shepherd/extensions/provisioninginput"
 
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

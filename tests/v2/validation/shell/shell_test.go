@@ -6,13 +6,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/rancher/rancher/tests/framework/clients/rancher"
+	"github.com/rancher/shepherd/clients/rancher"
 
-	"github.com/rancher/rancher/tests/framework/pkg/session"
+	"github.com/rancher/shepherd/pkg/session"
 
-	steveV1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
-	"github.com/rancher/rancher/tests/framework/extensions/settings"
-	"github.com/rancher/rancher/tests/framework/extensions/workloads/pods"
+	steveV1 "github.com/rancher/shepherd/clients/rancher/v1"
+	"github.com/rancher/shepherd/extensions/settings"
+	"github.com/rancher/shepherd/extensions/workloads/pods"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"

@@ -3,9 +3,9 @@ package main
 import (
 	"testing"
 
-	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	"github.com/rancher/rancher/tests/framework/extensions/codecoverage"
-	"github.com/rancher/rancher/tests/framework/pkg/session"
+	"github.com/rancher/shepherd/clients/rancher"
+	"github.com/rancher/shepherd/extensions/codecoverage"
+	"github.com/rancher/shepherd/pkg/session"
 	"github.com/stretchr/testify/require"
 )
 
