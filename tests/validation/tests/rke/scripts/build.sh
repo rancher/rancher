@@ -5,7 +5,7 @@ set -eu
 
 DEBUG="${DEBUG:-false}"
 RKE_VERSION="${RKE_VERSION:-v1.0.2}"
-KUBECTL_VERSION="${KUBECTL_VERSION:-v1.16.6}"
+KUBECTL_VERSION="${KUBECTL_VERSION:-v1.27.10}"
 
 if [ "false" != "${DEBUG}" ]; then
     echo "Environment:"

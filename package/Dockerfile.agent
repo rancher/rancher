@@ -24,7 +24,7 @@ FROM final
 COPY --from=builder /chroot/ /
 
 ARG ARCH=amd64
-ENV KUBECTL_VERSION v1.25.12
+ENV KUBECTL_VERSION v1.27.10
 
 RUN curl -sLf https://storage.googleapis.com/kubernetes-release/release/${KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl > /usr/bin/kubectl && \
     chmod +x /usr/bin/kubectl
