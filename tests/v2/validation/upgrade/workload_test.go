@@ -12,9 +12,9 @@ import (
 	"github.com/rancher/shepherd/extensions/clusters"
 	"github.com/rancher/shepherd/extensions/ingresses"
 	"github.com/rancher/shepherd/extensions/namespaces"
-	"github.com/rancher/shepherd/extensions/pipeline"
 	"github.com/rancher/shepherd/extensions/secrets"
 	"github.com/rancher/shepherd/extensions/services"
+	"github.com/rancher/shepherd/extensions/upgradeinput"
 	"github.com/rancher/shepherd/extensions/workloads"
 	"github.com/rancher/shepherd/pkg/session"
 	"github.com/stretchr/testify/assert"
@@ -74,7 +74,7 @@ func TestWorkloadUpgradeTestSuite(t *testing.T) {
 	suite.Run(t, new(UpgradeWorkloadTestSuite))
 }
 
-func (u *UpgradeWorkloadTestSuite) testPreUpgradeSingleCluster(clusterName string, featuresToTest pipeline.Features, names *resourceNames) {
+func (u *UpgradeWorkloadTestSuite) testPreUpgradeSingleCluster(clusterName string, featuresToTest upgradeinput.Features, names *resourceNames) {
 	isCattleLabeled := true
 
 	subSession := u.session.NewSession()
@@ -282,7 +282,7 @@ func (u *UpgradeWorkloadTestSuite) testPreUpgradeSingleCluster(clusterName strin
 	}
 }
 
-func (u *UpgradeWorkloadTestSuite) testPostUpgradeSingleCluster(clusterName string, featuresToTest pipeline.Features, names *resourceNames) {
+func (u *UpgradeWorkloadTestSuite) testPostUpgradeSingleCluster(clusterName string, featuresToTest upgradeinput.Features, names *resourceNames) {
 	subSession := u.session.NewSession()
 	defer subSession.Cleanup()
 
