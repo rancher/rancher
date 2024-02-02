@@ -94,12 +94,12 @@ func (l *lifecycle) sync(obj *v3.PodSecurityPolicyTemplateProjectBinding) (runti
 		return obj, nil
 	}
 
-	err := checkClusterVersion(l.clusterName, l.clusterLister)
+	err := CheckClusterVersion(l.clusterName, l.clusterLister)
 	if err != nil {
-		if errors.Is(err, errVersionIncompatible) {
+		if errors.Is(err, ErrClusterVersionIncompatible) {
 			return obj, nil
 		}
-		return obj, fmt.Errorf(clusterVersionCheckErrorString, err)
+		return obj, fmt.Errorf("error checking cluster version for PodSecurityPolicyTemplateProjectBinding controller: %w", err)
 	}
 
 	podSecurityPolicyName := fmt.Sprintf("%v-psp", obj.PodSecurityPolicyTemplateName)
