@@ -57,8 +57,51 @@ func (e LdapConnectionPermanentlyFailed) Error() string {
 }
 
 type sharedLdapConnection struct {
-	lConn  *ldapv3.Conn
-	isOpen bool
+	lConn    *ldapv3.Conn
+	isOpen   bool
+	adConfig *v3.ActiveDirectoryConfig
+}
+
+type retryableLdapConnection interface {
+	findLdapUserWithRetries(guid string) (string, *v3.Principal, error)
+}
+
+func (sLConn sharedLdapConnection) findLdapUserWithRetries(guid string) (string, *v3.Principal, error) {
+	// These settings range from 2 seconds for minor blips to around a full minute for repeated failures
+	backoff := wait.Backoff{
+		Duration: 2 * time.Second,
+		Factor:   1.5, // duration multiplied by this for each retry
+		Jitter:   0.1, // random variance, just in case other parts of rancher are using LDAP while we work
+		Steps:    10,  // number of retries before we consider this failure to be permanent
+	}
+
+	var distinguishedName string
+	var principal *v3.Principal
+	err := wait.ExponentialBackoff(backoff, func() (finished bool, err error) {
+		if !sLConn.isOpen {
+			sLConn.lConn, err = ldapConnection(sLConn.adConfig)
+			if err != nil {
+				logrus.Warnf("[%v] LDAP connection failed: '%v', retrying...", migrateAdUserOperation, err)
+				return false, err
+			}
+			sLConn.isOpen = true
+		}
+
+		distinguishedName, principal, err = findLdapUser(guid, sLConn.lConn, sLConn.adConfig)
+		if err == nil || errors.Is(err, LdapErrorNotFound{}) || errors.Is(err, LdapFoundDuplicateGUID{}) {
+			return true, err
+		}
+
+		// any other error type almost certainly indicates a connection failure. Close and re-open the connection
+		// before retrying
+		logrus.Warnf("[%v] LDAP connection failed: '%v', retrying...", migrateAdUserOperation, err)
+		sLConn.lConn.Close()
+		sLConn.isOpen = false
+
+		return false, err
+	})
+
+	return distinguishedName, principal, err
 }
 
 func ldapConnection(config *v3.ActiveDirectoryConfig) (*ldapv3.Conn, error) {
@@ -129,44 +172,6 @@ func findLdapUser(guid string, lConn *ldapv3.Conn, adConfig *v3.ActiveDirectoryC
 	}
 
 	return entry.DN, principal, nil
-}
-
-func findLdapUserWithRetries(guid string, sLConn *sharedLdapConnection, adConfig *v3.ActiveDirectoryConfig) (string, *v3.Principal, error) {
-	// These settings range from 2 seconds for minor blips to around a full minute for repeated failures
-	backoff := wait.Backoff{
-		Duration: 2 * time.Second,
-		Factor:   1.5, // duration multiplied by this for each retry
-		Jitter:   0.1, // random variance, just in case other parts of rancher are using LDAP while we work
-		Steps:    10,  // number of retries before we consider this failure to be permanent
-	}
-
-	var distinguishedName string
-	var principal *v3.Principal
-	err := wait.ExponentialBackoff(backoff, func() (finished bool, err error) {
-		if !sLConn.isOpen {
-			sLConn.lConn, err = ldapConnection(adConfig)
-			if err != nil {
-				logrus.Warnf("[%v] LDAP connection failed: '%v', retrying...", migrateAdUserOperation, err)
-				return false, err
-			}
-			sLConn.isOpen = true
-		}
-
-		distinguishedName, principal, err = findLdapUser(guid, sLConn.lConn, adConfig)
-		if err == nil || errors.Is(err, LdapErrorNotFound{}) || errors.Is(err, LdapFoundDuplicateGUID{}) {
-			return true, err
-		}
-
-		// any other error type almost certainly indicates a connection failure. Close and re-open the connection
-		// before retrying
-		logrus.Warnf("[%v] LDAP connection failed: '%v', retrying...", migrateAdUserOperation, err)
-		sLConn.lConn.Close()
-		sLConn.isOpen = false
-
-		return false, err
-	})
-
-	return distinguishedName, principal, err
 }
 
 func adConfiguration(sc *config.ScaledContext) (*v3.ActiveDirectoryConfig, error) {
@@ -301,9 +306,6 @@ func updateADConfigMigrationStatus(status map[string]string, sc *config.ScaledCo
 }
 
 func migrateAllowedUserPrincipals(workunits *[]migrateUserWorkUnit, missingUsers *[]missingUserWorkUnit, sc *config.ScaledContext, dryRun bool, deleteMissingUsers bool) error {
-	// because we might process users in this list that have never logged in, we may need to perform LDAP
-	// lookups on the spot to see what their associated DN should be
-	sharedLConn := sharedLdapConnection{}
 	// this needs its own copy of the ad config, decoded with the ldap credentials fetched, so do that here
 	originalAdConfig, err := adConfiguration(sc)
 	if err != nil {
@@ -340,6 +342,10 @@ func migrateAllowedUserPrincipals(workunits *[]migrateUserWorkUnit, missingUsers
 	// we can deduplicate this list while we're at it, so we don't accidentally end up with twice the DNs
 	var newPrincipalIDs []string
 	var knownDnIDs = map[string]string{}
+
+	// because we might process users in this list that have never logged in, we may need to perform LDAP
+	// lookups on the spot to see what their associated DN should be
+	sharedLConn := sharedLdapConnection{adConfig: originalAdConfig}
 
 	for _, item := range listOfMaybeStrings {
 		principalID, ok := item.(string)
@@ -380,7 +386,7 @@ func migrateAllowedUserPrincipals(workunits *[]migrateUserWorkUnit, missingUsers
 						logrus.Errorf("[%v] found invalid principal ID in allowed user list, refusing to process: %v", migrateAdUserOperation, err)
 						newPrincipalIDs = append(newPrincipalIDs, principalID)
 					} else {
-						dn, _, err := findLdapUserWithRetries(guid, &sharedLConn, originalAdConfig)
+						dn, _, err := sharedLConn.findLdapUserWithRetries(guid)
 						if errors.Is(err, LdapErrorNotFound{}) {
 							if !deleteMissingUsers {
 								newPrincipalIDs = append(newPrincipalIDs, principalID)
