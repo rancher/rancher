@@ -270,95 +270,95 @@ steps:
       - push
       - tag
 
-- name: stage-binaries
-  image: rancher/dapper:v0.6.0
-  commands:
-  - "cp -r ./bin/* ./package/"
-  when:
-    instance:
-      - drone-publish.rancher.io
-    ref:
-      include:
-        - "refs/heads/master"
-        - "refs/heads/release/v*"
-        - "refs/tags/v*"
-    event:
-    - push
-    - tag
+#- name: stage-binaries
+#  image: rancher/dapper:v0.6.0
+#  commands:
+#  - "cp -r ./bin/* ./package/"
+#  when:
+#    instance:
+#      - drone-publish.rancher.io
+#    ref:
+#      include:
+#        - "refs/heads/master"
+#        - "refs/heads/release/v*"
+#        - "refs/tags/v*"
+#    event:
+#    - push
+#    - tag
 
-- name: docker-publish-head
-  image: plugins/docker
-  settings:
-    purge: false
-    build_args:
-    - ARCH=amd64
-    - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-head
-    context: package/
-    custom_dns: 1.1.1.1
-    dockerfile: package/Dockerfile
-    tag: ${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-linux-amd64
-    password:
-      from_secret: docker_password
-    repo: rancher/rancher
-    username:
-      from_secret: docker_username
-  when:
-    ref:
-      include:
-      - "refs/heads/master"
-      - "refs/heads/release/v*"
-    event:
-    - push
+#- name: docker-publish-head
+#  image: plugins/docker
+#  settings:
+#    purge: false
+#    build_args:
+#    - ARCH=amd64
+#    - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-head
+#    context: package/
+#    custom_dns: 1.1.1.1
+#    dockerfile: package/Dockerfile
+#    tag: ${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-linux-amd64
+#    password:
+#      from_secret: docker_password
+#    repo: rancher/rancher
+#    username:
+#      from_secret: docker_username
+#  when:
+#    ref:
+#      include:
+#      - "refs/heads/master"
+#      - "refs/heads/release/v*"
+#    event:
+#    - push
+#
+#- name: docker-publish-head-installer
+#  image: plugins/docker
+#  settings:
+#    purge: false
+#    build_args:
+#    - ARCH=amd64
+#    - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-head
+#    - RANCHER_TAG=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-linux-amd64
+#    context: package/
+#    custom_dns: 1.1.1.1
+#    dockerfile: package/Dockerfile.installer
+#    tag: ${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-linux-amd64
+#    password:
+#      from_secret: docker_password
+#    repo: rancher/system-agent-installer-rancher
+#    username:
+#      from_secret: docker_username
+#  when:
+#    ref:
+#      include:
+#      - "refs/heads/master"
+#      - "refs/heads/release/v*"
+#    event:
+#    - push
 
-- name: docker-publish-head-installer
-  image: plugins/docker
-  settings:
-    purge: false
-    build_args:
-    - ARCH=amd64
-    - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-head
-    - RANCHER_TAG=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-linux-amd64
-    context: package/
-    custom_dns: 1.1.1.1
-    dockerfile: package/Dockerfile.installer
-    tag: ${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-linux-amd64
-    password:
-      from_secret: docker_password
-    repo: rancher/system-agent-installer-rancher
-    username:
-      from_secret: docker_username
-  when:
-    ref:
-      include:
-      - "refs/heads/master"
-      - "refs/heads/release/v*"
-    event:
-    - push
-
-- name: docker-publish-head-agent
-  image: plugins/docker
-  settings:
-    purge: false
-    build_args:
-    - ARCH=amd64
-    - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-head
-    - RANCHER_TAG=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-linux-amd64
-    context: package/
-    custom_dns: 1.1.1.1
-    dockerfile: package/Dockerfile.agent
-    tag: ${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-linux-amd64
-    password:
-      from_secret: docker_password
-    repo: rancher/rancher-agent
-    username:
-      from_secret: docker_username
-  when:
-    ref:
-      include:
-      - "refs/heads/master"
-      - "refs/heads/release/v*"
-    event:
-    - push
+#- name: docker-publish-head-agent
+#  image: plugins/docker
+#  settings:
+#    purge: false
+#    build_args:
+#    - ARCH=amd64
+#    - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-head
+#    - RANCHER_TAG=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-linux-amd64
+#    context: package/
+#    custom_dns: 1.1.1.1
+#    dockerfile: package/Dockerfile.agent
+#    tag: ${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-linux-amd64
+#    password:
+#      from_secret: docker_password
+#    repo: rancher/rancher-agent
+#    username:
+#      from_secret: docker_username
+#  when:
+#    ref:
+#      include:
+#      - "refs/heads/master"
+#      - "refs/heads/release/v*"
+#    event:
+#    - push
 
 - name: docker-publish
   image: plugins/docker
@@ -508,115 +508,115 @@ steps:
     event:
     - pull_request
 
-- name: build-push-tag
-  image: rancher/dapper:v0.6.0
-  commands:
-  - dapper ci
-  privileged: true
-  volumes:
-  - name: docker
-    path: /var/run/docker.sock
-  when:
-    instance:
-      - drone-publish.rancher.io
-    ref:
-      include:
-        - "refs/heads/master"
-        - "refs/heads/release/v*"
-        - "refs/tags/v*"
-    event:
-    - push
-    - tag
+#- name: build-push-tag
+#  image: rancher/dapper:v0.6.0
+#  commands:
+#  - dapper ci
+#  privileged: true
+#  volumes:
+#  - name: docker
+#    path: /var/run/docker.sock
+#  when:
+#    instance:
+#      - drone-publish.rancher.io
+#    ref:
+#      include:
+#        - "refs/heads/master"
+#        - "refs/heads/release/v*"
+#        - "refs/tags/v*"
+#    event:
+#    - push
+#    - tag
 
-- name: stage-binaries
-  image: rancher/dapper:v0.6.0
-  commands:
-  - "cp -r ./bin/* ./package/"
-  when:
-    instance:
-      - drone-publish.rancher.io
-    ref:
-      include:
-        - "refs/heads/master"
-        - "refs/heads/release/v*"
-        - "refs/tags/v*"
-    event:
-    - push
-    - tag
+#- name: stage-binaries
+#  image: rancher/dapper:v0.6.0
+#  commands:
+#  - "cp -r ./bin/* ./package/"
+#  when:
+#    instance:
+#      - drone-publish.rancher.io
+#    ref:
+#      include:
+#        - "refs/heads/master"
+#        - "refs/heads/release/v*"
+#        - "refs/tags/v*"
+#    event:
+#    - push
+#    - tag
 
-- name: docker-publish-head
-  image: plugins/docker
-  settings:
-    purge: false
-    build_args:
-    - ARCH=arm64
-    - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-head
-    context: package/
-    custom_dns: 1.1.1.1
-    dockerfile: package/Dockerfile
-    tag: ${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-linux-arm64
-    password:
-      from_secret: docker_password
-    repo: rancher/rancher
-    username:
-      from_secret: docker_username
-  when:
-    ref:
-      include:
-      - "refs/heads/master"
-      - "refs/heads/release/v*"
-    event:
-    - push
+#- name: docker-publish-head
+#  image: plugins/docker
+#  settings:
+#    purge: false
+#    build_args:
+#    - ARCH=arm64
+#    - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-head
+#    context: package/
+#    custom_dns: 1.1.1.1
+#    dockerfile: package/Dockerfile
+#    tag: ${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-linux-arm64
+#    password:
+#      from_secret: docker_password
+#    repo: rancher/rancher
+#    username:
+#      from_secret: docker_username
+#  when:
+#    ref:
+#      include:
+#      - "refs/heads/master"
+#      - "refs/heads/release/v*"
+#    event:
+#    - push
 
-- name: docker-publish-head-installer
-  image: plugins/docker
-  settings:
-    purge: false
-    build_args:
-    - ARCH=arm64
-    - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-head
-    - RANCHER_TAG=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-linux-arm64
-    context: package/
-    custom_dns: 1.1.1.1
-    dockerfile: package/Dockerfile.installer
-    tag: ${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-linux-arm64
-    password:
-      from_secret: docker_password
-    repo: rancher/system-agent-installer-rancher
-    username:
-      from_secret: docker_username
-  when:
-    ref:
-      include:
-      - "refs/heads/master"
-      - "refs/heads/release/v*"
-    event:
-    - push
+#- name: docker-publish-head-installer
+#  image: plugins/docker
+#  settings:
+#    purge: false
+#    build_args:
+#    - ARCH=arm64
+#    - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-head
+#    - RANCHER_TAG=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-linux-arm64
+#    context: package/
+#    custom_dns: 1.1.1.1
+#    dockerfile: package/Dockerfile.installer
+#    tag: ${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-linux-arm64
+#    password:
+#      from_secret: docker_password
+#    repo: rancher/system-agent-installer-rancher
+#    username:
+#      from_secret: docker_username
+#  when:
+#    ref:
+#      include:
+#      - "refs/heads/master"
+#      - "refs/heads/release/v*"
+#    event:
+#    - push
 
-- name: docker-publish-head-agent
-  image: plugins/docker
-  settings:
-    purge: false
-    build_args:
-    - ARCH=arm64
-    - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-head
-    - RANCHER_TAG=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-linux-arm64
-    context: package/
-    custom_dns: 1.1.1.1
-    dockerfile: package/Dockerfile.agent
-    tag: ${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-linux-arm64
-    password:
-      from_secret: docker_password
-    repo: rancher/rancher-agent
-    username:
-      from_secret: docker_username
-  when:
-    ref:
-      include:
-      - "refs/heads/master"
-      - "refs/heads/release/v*"
-    event:
-    - push
+#- name: docker-publish-head-agent
+#  image: plugins/docker
+#  settings:
+#    purge: false
+#    build_args:
+#    - ARCH=arm64
+#    - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-head
+#    - RANCHER_TAG=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-linux-arm64
+#    context: package/
+#    custom_dns: 1.1.1.1
+#    dockerfile: package/Dockerfile.agent
+#    tag: ${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-linux-arm64
+#    password:
+#      from_secret: docker_password
+#    repo: rancher/rancher-agent
+#    username:
+#      from_secret: docker_username
+#  when:
+#    ref:
+#      include:
+#      - "refs/heads/master"
+#      - "refs/heads/release/v*"
+#    event:
+#    - push
 
 - name: docker-publish
   image: plugins/docker
@@ -716,69 +716,69 @@ steps:
       event:
         - pull_request
 
-  - name: build-push-tag
-    pull: always
-    image: rancher/dapper:v0.6.0
-    commands:
-      - dapper.exe -f Dockerfile-windows.dapper -d ci
-    volumes:
-      - name: docker_pipe
-        path: \\\\.\\pipe\\docker_engine
-    when:
-      instance:
-        - drone-publish.rancher.io
-      ref:
-        include:
-          - "refs/heads/master"
-          - "refs/heads/release/v*"
-          - "refs/tags/v*"
-      event:
-        - push
-        - tag
+#  - name: build-push-tag
+#    pull: always
+#    image: rancher/dapper:v0.6.0
+#    commands:
+#      - dapper.exe -f Dockerfile-windows.dapper -d ci
+#    volumes:
+#      - name: docker_pipe
+#        path: \\\\.\\pipe\\docker_engine
+#    when:
+#      instance:
+#        - drone-publish.rancher.io
+#      ref:
+#        include:
+#          - "refs/heads/master"
+#          - "refs/heads/release/v*"
+#          - "refs/tags/v*"
+#      event:
+#        - push
+#        - tag
 
-  - name: stage-binaries
-    image: rancher/dapper:v0.6.0
-    commands:
-      - "cp -r ./bin/* ./package/windows/"
-    when:
-      instance:
-        - drone-publish.rancher.io
-      ref:
-        include:
-          - "refs/heads/master"
-          - "refs/heads/release/v*"
-          - "refs/tags/v*"
-      event:
-        - push
-        - tag
+#  - name: stage-binaries
+#    image: rancher/dapper:v0.6.0
+#    commands:
+#      - "cp -r ./bin/* ./package/windows/"
+#    when:
+#      instance:
+#        - drone-publish.rancher.io
+#      ref:
+#        include:
+#          - "refs/heads/master"
+#          - "refs/heads/release/v*"
+#          - "refs/tags/v*"
+#      event:
+#        - push
+#        - tag
 
-  - name: docker-publish-head-agent
-    image: plugins/docker:windows-1809-amd64
-    settings:
-      purge: false
-      build_args:
-        - SERVERCORE_VERSION=1809
-        - ARCH=amd64
-        - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-head
-      context: package/windows
-      custom_dns: 1.1.1.1
-      dockerfile: package/windows/Dockerfile.agent
-      password:
-        from_secret: docker_password
-      repo: rancher/rancher-agent
-      tag: ${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-windows-1809
-      username:
-        from_secret: docker_username
-    volumes:
-      - name: docker_pipe
-        path: \\\\.\\pipe\\docker_engine
-    when:
-      ref:
-        include:
-        - "refs/heads/master"
-        - "refs/heads/release/v*"
-      event:
-        - push
+#  - name: docker-publish-head-agent
+#    image: plugins/docker:windows-1809-amd64
+#    settings:
+#      purge: false
+#      build_args:
+#        - SERVERCORE_VERSION=1809
+#        - ARCH=amd64
+#        - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-head
+#      context: package/windows
+#      custom_dns: 1.1.1.1
+#      dockerfile: package/windows/Dockerfile.agent
+#      password:
+#        from_secret: docker_password
+#      repo: rancher/rancher-agent
+#      tag: ${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-windows-1809
+#      username:
+#        from_secret: docker_username
+#    volumes:
+#      - name: docker_pipe
+#        path: \\\\.\\pipe\\docker_engine
+#    when:
+#      ref:
+#        include:
+#        - "refs/heads/master"
+#        - "refs/heads/release/v*"
+#      event:
+#        - push
 
   - name: docker-publish-agent
     image: plugins/docker:windows-1809-amd64
@@ -841,69 +841,69 @@ steps:
       event:
         - pull_request
 
-  - name: build-push-tag
-    pull: always
-    image: rancher/dapper:v0.6.0
-    commands:
-      - dapper.exe -f Dockerfile-windows.dapper -d ci
-    volumes:
-      - name: docker_pipe
-        path: \\\\.\\pipe\\docker_engine
-    when:
-      instance:
-        - drone-publish.rancher.io
-      ref:
-        include:
-          - "refs/heads/master"
-          - "refs/heads/release/v*"
-          - "refs/tags/v*"
-      event:
-        - push
-        - tag
+#  - name: build-push-tag
+#    pull: always
+#    image: rancher/dapper:v0.6.0
+#    commands:
+#      - dapper.exe -f Dockerfile-windows.dapper -d ci
+#    volumes:
+#      - name: docker_pipe
+#        path: \\\\.\\pipe\\docker_engine
+#    when:
+#      instance:
+#        - drone-publish.rancher.io
+#      ref:
+#        include:
+#          - "refs/heads/master"
+#          - "refs/heads/release/v*"
+#          - "refs/tags/v*"
+#      event:
+#        - push
+#        - tag
 
-  - name: stage-binaries
-    image: rancher/dapper:v0.6.0
-    commands:
-      - "cp -r ./bin/* ./package/windows/"
-    when:
-      instance:
-        - drone-publish.rancher.io
-      ref:
-        include:
-          - "refs/heads/master"
-          - "refs/heads/release/v*"
-          - "refs/tags/v*"
-      event:
-        - push
-        - tag
+#  - name: stage-binaries
+#    image: rancher/dapper:v0.6.0
+#    commands:
+#      - "cp -r ./bin/* ./package/windows/"
+#    when:
+#      instance:
+#        - drone-publish.rancher.io
+#      ref:
+#        include:
+#          - "refs/heads/master"
+#          - "refs/heads/release/v*"
+#          - "refs/tags/v*"
+#      event:
+#        - push
+#        - tag
 
-  - name: docker-publish-head-agent
-    image: rancher/drone-images:docker-amd64-ltsc2022
-    settings:
-      purge: false
-      build_args:
-        - SERVERCORE_VERSION=ltsc2022
-        - ARCH=amd64
-        - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-head
-      context: package/windows
-      custom_dns: 1.1.1.1
-      dockerfile: package/windows/Dockerfile.agent
-      password:
-        from_secret: docker_password
-      repo: rancher/rancher-agent
-      tag: ${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-windows-ltsc2022
-      username:
-        from_secret: docker_username
-    volumes:
-      - name: docker_pipe
-        path: \\\\.\\pipe\\docker_engine
-    when:
-      ref:
-        include:
-          - "refs/heads/master"
-          - "refs/heads/release/v*"
-      event:
-        - push
+#  - name: docker-publish-head-agent
+#    image: rancher/drone-images:docker-amd64-ltsc2022
+#    settings:
+#      purge: false
+#      build_args:
+#        - SERVERCORE_VERSION=ltsc2022
+#        - ARCH=amd64
+#        - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-head
+#      context: package/windows
+#      custom_dns: 1.1.1.1
+#      dockerfile: package/windows/Dockerfile.agent
+#      password:
+#        from_secret: docker_password
+#      repo: rancher/rancher-agent
+#      tag: ${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-windows-ltsc2022
+#      username:
+#        from_secret: docker_username
+#    volumes:
+#      - name: docker_pipe
+#        path: \\\\.\\pipe\\docker_engine
+#    when:
+#      ref:
+#        include:
+#          - "refs/heads/master"
+#          - "refs/heads/release/v*"
+#      event:
+#        - push
 
   - name: docker-publish-agent
     image: rancher/drone-images:docker-amd64-ltsc2022
@@ -938,190 +938,190 @@ trigger:
   event:
     exclude:
       - promote
----
+#---
+#
+#kind: pipeline
+#name: manifest
+#
+#steps:
+#- name: push-installer-manifest
+#  image: plugins/manifest
+#  settings:
+#    username:
+#      from_secret: docker_username
+#    password:
+#      from_secret: docker_password
+#    spec: manifest-installer.tmpl
+#    ignore_missing: true
+#  when:
+#    instance:
+#      include:
+#      - drone-publish.rancher.io
+#    ref:
+#      include:
+#        - "refs/heads/master"
+#        - "refs/heads/release/v*"
+#        - "refs/tags/v*"
+#    event:
+#    - push
+#    - tag
 
-kind: pipeline
-name: manifest
+#- name: push-installer-manifest-head
+#  image: plugins/manifest
+#  settings:
+#    username:
+#      from_secret: docker_username
+#    password:
+#      from_secret: docker_password
+#    spec: manifest-installer-head.tmpl
+#    ignore_missing: true
+#  when:
+#    instance:
+#      include:
+#      - drone-publish.rancher.io
+#    ref:
+#      include:
+#        - "refs/heads/master"
+#        - "refs/heads/release/v*"
+#        - "refs/tags/v*"
+#    event:
+#    - push
 
-steps:
-- name: push-installer-manifest
-  image: plugins/manifest
-  settings:
-    username:
-      from_secret: docker_username
-    password:
-      from_secret: docker_password
-    spec: manifest-installer.tmpl
-    ignore_missing: true
-  when:
-    instance:
-      include:
-      - drone-publish.rancher.io
-    ref:
-      include:
-        - "refs/heads/master"
-        - "refs/heads/release/v*"
-        - "refs/tags/v*"
-    event:
-    - push
-    - tag
+#- name: push-agent-manifest
+#  image: plugins/manifest
+#  settings:
+#    username:
+#      from_secret: docker_username
+#    password:
+#      from_secret: docker_password
+#    spec: manifest-agent.tmpl
+#    ignore_missing: true
+#  when:
+#    instance:
+#      include:
+#      - drone-publish.rancher.io
+#    ref:
+#      include:
+#        - "refs/heads/master"
+#        - "refs/heads/release/v*"
+#        - "refs/tags/v*"
+#    event:
+#    - push
+#    - tag
 
-- name: push-installer-manifest-head
-  image: plugins/manifest
-  settings:
-    username:
-      from_secret: docker_username
-    password:
-      from_secret: docker_password
-    spec: manifest-installer-head.tmpl
-    ignore_missing: true
-  when:
-    instance:
-      include:
-      - drone-publish.rancher.io
-    ref:
-      include:
-        - "refs/heads/master"
-        - "refs/heads/release/v*"
-        - "refs/tags/v*"
-    event:
-    - push
+#- name: push-agent-manifest-head
+#  image: plugins/manifest
+#  settings:
+#    username:
+#      from_secret: docker_username
+#    password:
+#      from_secret: docker_password
+#    spec: manifest-agent-head.tmpl
+#    ignore_missing: true
+#  when:
+#    instance:
+#      include:
+#      - drone-publish.rancher.io
+#    ref:
+#      include:
+#        - "refs/heads/master"
+#        - "refs/heads/release/v*"
+#        - "refs/tags/v*"
+#    event:
+#    - push
 
-- name: push-agent-manifest
-  image: plugins/manifest
-  settings:
-    username:
-      from_secret: docker_username
-    password:
-      from_secret: docker_password
-    spec: manifest-agent.tmpl
-    ignore_missing: true
-  when:
-    instance:
-      include:
-      - drone-publish.rancher.io
-    ref:
-      include:
-        - "refs/heads/master"
-        - "refs/heads/release/v*"
-        - "refs/tags/v*"
-    event:
-    - push
-    - tag
+#- name: push-manifest-head
+#  image: plugins/manifest
+#  settings:
+#    username:
+#      from_secret: docker_username
+#    password:
+#      from_secret: docker_password
+#    spec: manifest-head.tmpl
+#    ignore_missing: true
+#  when:
+#    instance:
+#      include:
+#      - drone-publish.rancher.io
+#    ref:
+#      include:
+#        - "refs/heads/master"
+#        - "refs/heads/release/v*"
+#        - "refs/tags/v*"
+#    event:
+#    - push
 
-- name: push-agent-manifest-head
-  image: plugins/manifest
-  settings:
-    username:
-      from_secret: docker_username
-    password:
-      from_secret: docker_password
-    spec: manifest-agent-head.tmpl
-    ignore_missing: true
-  when:
-    instance:
-      include:
-      - drone-publish.rancher.io
-    ref:
-      include:
-        - "refs/heads/master"
-        - "refs/heads/release/v*"
-        - "refs/tags/v*"
-    event:
-    - push
-
-- name: push-manifest-head
-  image: plugins/manifest
-  settings:
-    username:
-      from_secret: docker_username
-    password:
-      from_secret: docker_password
-    spec: manifest-head.tmpl
-    ignore_missing: true
-  when:
-    instance:
-      include:
-      - drone-publish.rancher.io
-    ref:
-      include:
-        - "refs/heads/master"
-        - "refs/heads/release/v*"
-        - "refs/tags/v*"
-    event:
-    - push
-
-- name: push-manifest
-  image: plugins/manifest
-  settings:
-    username:
-      from_secret: docker_username
-    password:
-      from_secret: docker_password
-    spec: manifest.tmpl
-    ignore_missing: true
-  when:
-    instance:
-      include:
-      - drone-publish.rancher.io
-    ref:
-      include:
-        - "refs/heads/master"
-        - "refs/heads/release/v*"
-        - "refs/tags/v*"
-    event:
-    - push
-    - tag
-
-- name: build-chart
-  image: rancher/dapper:v0.6.0
-  commands:
-  - dapper chart/ci
-  privileged: true
-  volumes:
-  - name: docker
-    path: /var/run/docker.sock
-  when:
-    instance:
-      - drone-publish.rancher.io
-    ref:
-      include:
-        - "refs/heads/master"
-        - "refs/heads/release/v*"
-        - "refs/tags/v*"
-    event:
-    - push
-    - tag
-
-- name: chart-publish
-  image: plugins/gcs
-  settings:
-    acl:
-    - allUsers:READER
-    cache_control: "public,no-cache,proxy-revalidate"
-    source: bin/chart
-    target: releases.rancher.com/server-charts
-    token:
-      from_secret: google_auth_key
-  when:
-    event:
-    - tag
-
-volumes:
-- name: docker
-  host:
-    path: /var/run/docker.sock
-
-trigger:
-  event:
-    exclude:
-    - promote
-
-depends_on:
-- default-linux-amd64
-- default-linux-arm64
-- default-windows-1809
-- default-windows-ltsc2022
+#- name: push-manifest
+#  image: plugins/manifest
+#  settings:
+#    username:
+#      from_secret: docker_username
+#    password:
+#      from_secret: docker_password
+#    spec: manifest.tmpl
+#    ignore_missing: true
+#  when:
+#    instance:
+#      include:
+#      - drone-publish.rancher.io
+#    ref:
+#      include:
+#        - "refs/heads/master"
+#        - "refs/heads/release/v*"
+#        - "refs/tags/v*"
+#    event:
+#    - push
+#    - tag
+#
+#- name: build-chart
+#  image: rancher/dapper:v0.6.0
+#  commands:
+#  - dapper chart/ci
+#  privileged: true
+#  volumes:
+#  - name: docker
+#    path: /var/run/docker.sock
+#  when:
+#    instance:
+#      - drone-publish.rancher.io
+#    ref:
+#      include:
+#        - "refs/heads/master"
+#        - "refs/heads/release/v*"
+#        - "refs/tags/v*"
+#    event:
+#    - push
+#    - tag
+#
+#- name: chart-publish
+#  image: plugins/gcs
+#  settings:
+#    acl:
+#    - allUsers:READER
+#    cache_control: "public,no-cache,proxy-revalidate"
+#    source: bin/chart
+#    target: releases.rancher.com/server-charts
+#    token:
+#      from_secret: google_auth_key
+#  when:
+#    event:
+#    - tag
+#
+#volumes:
+#- name: docker
+#  host:
+#    path: /var/run/docker.sock
+#
+#trigger:
+#  event:
+#    exclude:
+#    - promote
+#
+#depends_on:
+#- default-linux-amd64
+#- default-linux-arm64
+#- default-windows-1809
+#- default-windows-ltsc2022
 ---
 kind: pipeline
 name: docker-image-digests-linux
