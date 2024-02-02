@@ -2,6 +2,7 @@ package fleetworkspace
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -12,7 +13,7 @@ import (
 	"github.com/rancher/wrangler/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierros "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -40,7 +41,7 @@ func TestOnChange(t *testing.T) {
 	tests := map[string]struct {
 		projectsMock       func() mgmtcontrollers.ProjectCache
 		expectedNamespaces []runtime.Object
-		expectedErr        error
+		expectedErr        string
 	}{
 		"FleetWorkspaces project exists": {
 			projectsMock: func() mgmtcontrollers.ProjectCache {
@@ -69,7 +70,17 @@ func TestOnChange(t *testing.T) {
 
 				return projectsMock
 			},
-			expectedErr: errorFleetWorkspacesProjectNotFound,
+			expectedErr: errorFleetWorkspacesProjectNotFound.Error(),
+		},
+		"List projects return an error": {
+			projectsMock: func() mgmtcontrollers.ProjectCache {
+				ctrl := gomock.NewController(t)
+				projectsMock := fake.NewMockCacheInterface[*v3.Project](ctrl)
+				projectsMock.EXPECT().List("local", labels.Set(project.FleetWorkspacesProjectLabel).AsSelector()).Return(nil, fmt.Errorf("projects can't be fetched"))
+
+				return projectsMock
+			},
+			expectedErr: "list project failed: projects can't be fetched",
 		},
 	}
 
@@ -81,7 +92,7 @@ func TestOnChange(t *testing.T) {
 
 			namespaces, _, err := h.OnChange(&workspace, v3.FleetWorkspaceStatus{})
 
-			assert.Equal(t, test.expectedErr, err)
+			assert.True(t, errorContains(err, test.expectedErr))
 			assert.Equal(t, test.expectedNamespaces, namespaces)
 		})
 	}
@@ -120,7 +131,7 @@ func TestOnSetting(t *testing.T) {
 			},
 			workspacesCacheMock: func() mgmtcontrollers.FleetWorkspaceCache {
 				workspacesCacheMock := fake.NewMockNonNamespacedCacheInterface[*v3.FleetWorkspace](ctrl)
-				workspacesCacheMock.EXPECT().Get(gomock.Any()).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+				workspacesCacheMock.EXPECT().Get(gomock.Any()).Return(nil, apierros.NewNotFound(schema.GroupResource{}, ""))
 
 				return workspacesCacheMock
 			},
@@ -185,4 +196,14 @@ func TestOnSetting(t *testing.T) {
 			assert.Equal(t, test.expectedErr, err)
 		})
 	}
+}
+
+func errorContains(err error, want string) bool {
+	if err == nil {
+		return want == ""
+	}
+	if want == "" {
+		return false
+	}
+	return strings.Contains(err.Error(), want)
 }
