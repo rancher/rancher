@@ -96,10 +96,10 @@ var (
 	WinsAgentVersion                    = NewSetting("wins-agent-version", "")
 	CSIProxyAgentVersion                = NewSetting("csi-proxy-agent-version", "")
 	CSIProxyAgentURL                    = NewSetting("csi-proxy-agent-url", "https://acs-mirror.azureedge.net/csi-proxy/%[1]s/binaries/csi-proxy-%[1]s.tar.gz")
-	SystemAgentInstallScript            = NewSetting("system-agent-install-script", "https://raw.githubusercontent.com/rancher/system-agent/v0.3.3/install.sh")
+	SystemAgentInstallScript            = NewSetting("system-agent-install-script", "") // Defined via environment variable
 	WinsAgentInstallScript              = NewSetting("wins-agent-install-script", "https://raw.githubusercontent.com/rancher/wins/v0.4.11/install.ps1")
-	SystemAgentInstallerImage           = NewSetting("system-agent-installer-image", "rancher/system-agent-installer-")
-	SystemAgentUpgradeImage             = NewSetting("system-agent-upgrade-image", "")
+	SystemAgentInstallerImage           = NewSetting("system-agent-installer-image", "") // Defined via environment variable
+	SystemAgentUpgradeImage             = NewSetting("system-agent-upgrade-image", "")   // Defined via environment variable
 	WinsAgentUpgradeImage               = NewSetting("wins-agent-upgrade-image", "")
 	SystemNamespaces                    = NewSetting("system-namespaces", strings.Join(systemNamespaces, ","))
 	SystemUpgradeControllerChartVersion = NewSetting("system-upgrade-controller-chart-version", "")

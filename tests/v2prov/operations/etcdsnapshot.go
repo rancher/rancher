@@ -5,7 +5,9 @@ import (
 	"crypto/sha256"
 	"encoding/base32"
 	"fmt"
+	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -96,8 +98,65 @@ func RunSnapshotCreateTest(t *testing.T, clients *clients.Clients, c *v1.Cluster
 		t.Fatal(err)
 	}
 
-	_, err = cluster.WaitForControlPlane(clients, c, "etcd snapshot creation", func(rkeControlPlane *rkev1.RKEControlPlane) (bool, error) {
-		return rkeControlPlane.Status.ETCDSnapshotCreatePhase == rkev1.ETCDSnapshotPhaseFinished, nil
+	_, err = cluster.WaitForControlPlane(clients, c, "first etcd snapshot creation", func(rkeControlPlane *rkev1.RKEControlPlane) (bool, error) {
+		return rkeControlPlane.Status.ETCDSnapshotCreate != nil && rkeControlPlane.Status.ETCDSnapshotCreate.Generation == 1 && rkeControlPlane.Status.ETCDSnapshotCreatePhase == rkev1.ETCDSnapshotPhaseFinished && capr.Ready.IsTrue(rkeControlPlane), nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Workaround in response to K3s/RKE2 bug around etcd snapshot configmap existence: https://github.com/k3s-io/k3s/issues/9047
+	if err := retry.OnError(wait.Backoff{
+		Steps:    10,
+		Duration: 30 * time.Second,
+		Factor:   1.0,
+		Jitter:   0.1,
+	}, func(err error) bool {
+		if apierrors.IsForbidden(err) {
+			return false
+		}
+		return true
+	},
+		func() error {
+			clientset, err = GetAndVerifyDownstreamClientset(clients, c)
+			if err != nil {
+				return err
+			}
+			etcdSnapshotsConfigMap, err := clientset.CoreV1().ConfigMaps("kube-system").Get(clients.Ctx, fmt.Sprintf("%s-etcd-snapshots", capr.GetRuntime(c.Spec.KubernetesVersion)), metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			if etcdSnapshotsConfigMap != nil && len(etcdSnapshotsConfigMap.Data) > 0 {
+				return nil
+			}
+			return fmt.Errorf("etcd snapshots config map was not usable")
+		}); err != nil {
+		t.Fatal(err)
+	}
+
+	snapshotsValidTime := time.Now()
+
+	// Create a second etcd snapshot
+	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		newC, err := clients.Provisioning.Cluster().Get(c.Namespace, c.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		newC.Spec.RKEConfig.ETCDSnapshotCreate = &rkev1.ETCDSnapshotCreate{
+			Generation: 2,
+		}
+		newC, err = clients.Provisioning.Cluster().Update(newC)
+		if err != nil {
+			return err
+		}
+		c = newC
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = cluster.WaitForControlPlane(clients, c, "second etcd snapshot creation", func(rkeControlPlane *rkev1.RKEControlPlane) (bool, error) {
+		return rkeControlPlane.Status.ETCDSnapshotCreate != nil && rkeControlPlane.Status.ETCDSnapshotCreate.Generation == 2 && rkeControlPlane.Status.ETCDSnapshotCreatePhase == rkev1.ETCDSnapshotPhaseFinished && capr.Ready.IsTrue(rkeControlPlane), nil
 	})
 	if err != nil {
 		dumpDebugData = false
@@ -105,9 +164,10 @@ func RunSnapshotCreateTest(t *testing.T, clients *clients.Clients, c *v1.Cluster
 	}
 
 	var snapshot *rkev1.ETCDSnapshot
+	re := regexp.MustCompile(".*-([0-9]+)$")
 	// Get the etcd snapshot object
 	if err := retry.OnError(wait.Backoff{
-		Steps:    10,
+		Steps:    30,
 		Duration: 30 * time.Second,
 		Factor:   1.0,
 		Jitter:   0.1,
@@ -123,12 +183,35 @@ func RunSnapshotCreateTest(t *testing.T, clients *clients.Clients, c *v1.Cluster
 				return err
 			}
 			var snapshots []*rkev1.ETCDSnapshot
+			// Parse the snapshot time from the snapshot file name
 			for _, s := range snapshotsList.Items {
 				if s.SnapshotFile.NodeName == targetNode && s.SnapshotFile.Size > 0 {
-					snapshots = append(snapshots, s.DeepCopy())
+					// Workaround in response to K3s/RKE2 bug around etcd snapshot configmap existence: https://github.com/k3s-io/k3s/issues/9047
+					// Ensure that there are at least 2 snapshots for the given target node, as the first snapshot is not usable.
+					spec, err := capr.ParseSnapshotClusterSpecOrError(&s)
+					if err != nil || spec == nil {
+						continue // ignore errors parsing the snapshot
+					}
+					// Parse the unix time out of the snapshot file name as CreatedAt is not set on S3 snapshots on older K3s/RKE2 versions
+					matches := re.FindStringSubmatch(s.SnapshotFile.Name)
+					if len(matches) != 2 {
+						continue
+					}
+					rawTime, err := strconv.ParseInt(matches[1], 10, 64)
+					if err != nil {
+						continue
+					}
+					snapshotTime := metav1.NewTime(time.Unix(rawTime, 0))
+					// Only count snapshots that were created after the first snapshots were taken.
+					if snapshotTime.After(snapshotsValidTime) {
+						sCopy := s.DeepCopy()
+						if sCopy.SnapshotFile.CreatedAt == nil {
+							sCopy.SnapshotFile.CreatedAt = &snapshotTime
+						}
+						snapshots = append(snapshots, s.DeepCopy())
+					}
 				}
 			}
-
 			if len(snapshots) > 0 {
 				sort.Slice(snapshots, func(i, j int) bool {
 					return snapshots[i].SnapshotFile.CreatedAt.Before(snapshots[j].SnapshotFile.CreatedAt)
@@ -196,7 +279,7 @@ func RunSnapshotRestoreTest(t *testing.T, clients *clients.Clients, c *v1.Cluste
 	}
 
 	_, err = cluster.WaitForControlPlane(clients, c, "etcd snapshot restore", func(rkeControlPlane *rkev1.RKEControlPlane) (bool, error) {
-		return rkeControlPlane.Status.ETCDSnapshotRestorePhase == rkev1.ETCDSnapshotPhaseFinished, nil
+		return rkeControlPlane.Status.ETCDSnapshotRestorePhase == rkev1.ETCDSnapshotPhaseFinished && capr.Ready.IsTrue(rkeControlPlane), nil
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -231,5 +314,13 @@ func RunSnapshotRestoreTest(t *testing.T, clients *clients.Clients, c *v1.Cluste
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t, expectedNodeCount, len(allNodes.Items))
+
+	// Nodes can be left in a `Deleting` state, so only check that our expected node count equals the number of nodes that are not deleting.
+	nonDeletingNodes := 0
+	for _, n := range allNodes.Items {
+		if n.GetDeletionTimestamp() == nil {
+			nonDeletingNodes++
+		}
+	}
+	assert.Equal(t, expectedNodeCount, nonDeletingNodes)
 }
