@@ -61,7 +61,7 @@ ENV CATTLE_FLEET_MIN_VERSION=102.2.0+up0.8.0
 # Deprecated in favor of CATTLE_RANCHER_WEBHOOK_VERSION.
 ENV CATTLE_RANCHER_WEBHOOK_MIN_VERSION=''
 ENV CATTLE_RANCHER_WEBHOOK_VERSION=2.0.6+up0.3.6
-ENV CATTLE_CSP_ADAPTER_MIN_VERSION=2.0.2
+ENV CATTLE_CSP_ADAPTER_MIN_VERSION=2.0.3+up2.0.3-rc1
 
 RUN mkdir -p /var/lib/rancher-data/local-catalogs/system-library && \
     mkdir -p /var/lib/rancher-data/local-catalogs/library && \
