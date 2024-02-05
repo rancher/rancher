@@ -11,7 +11,7 @@ replace (
 
 	github.com/knative/pkg => github.com/rancher/pkg v0.0.0-20190514055449-b30ab9de040e
 	github.com/matryer/moq => github.com/rancher/moq v0.0.0-20200712062324-13d1f37d2d77
-	github.com/opencontainers/runc => github.com/opencontainers/runc v1.1.5
+	github.com/opencontainers/runc => github.com/opencontainers/runc v1.1.12
 
 	github.com/rancher/machine => github.com/rancher/machine v0.15.0-rancher100 // aks-operator requires rancher99 but rancher100 should not break it.
 	github.com/rancher/rancher/pkg/apis => ./pkg/apis
@@ -106,7 +106,7 @@ require (
 	github.com/prometheus/client_model v0.3.0
 	github.com/prometheus/common v0.42.0
 	github.com/rancher/aks-operator v1.1.3
-	github.com/rancher/apiserver v0.0.0-20230515173455-c3b182bdbf7d
+	github.com/rancher/apiserver v0.0.0-20240205164342-97a10a30200c
 	github.com/rancher/channelserver v0.5.1-0.20230719220800-0a37b73c7df8
 	github.com/rancher/dynamiclistener v0.3.5
 	github.com/rancher/eks-operator v1.2.2
@@ -115,12 +115,12 @@ require (
 	github.com/rancher/kubernetes-provider-detector v0.1.5
 	github.com/rancher/lasso v0.0.0-20230629200414-8a54b32e6792
 	github.com/rancher/machine v0.15.0-rancher99
-	github.com/rancher/norman v0.0.0-20230426211126-d3552b018687
+	github.com/rancher/norman v0.0.0-20240205164302-7b2b467995e6
 	github.com/rancher/rancher/pkg/apis v0.0.0
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 	github.com/rancher/remotedialer v0.2.6-0.20220624190122-ea57207bf2b8
-	github.com/rancher/rke v1.4.10
+	github.com/rancher/rke v1.4.13
 	github.com/rancher/steve v0.0.0-20230717160251-d040cffef385
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007
 	github.com/rancher/wrangler v1.1.1
@@ -247,7 +247,7 @@ require (
 	github.com/containerd/containerd v1.6.18 // indirect
 	github.com/coreos/go-systemd/v22 v22.3.2 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
-	github.com/cyphar/filepath-securejoin v0.2.3 // indirect
+	github.com/cyphar/filepath-securejoin v0.2.4 // indirect
 	github.com/dimchansky/utfbom v1.1.1 // indirect
 	github.com/docker/cli v23.0.1+incompatible // indirect
 	github.com/docker/docker-credential-helpers v0.7.0 // indirect
