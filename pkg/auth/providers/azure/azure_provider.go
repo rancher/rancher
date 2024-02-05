@@ -206,7 +206,6 @@ func (ap *Provider) TransformToAuthProvider(
 
 	ep := microsoft.AzureADEndpoint(tenantID)
 	p[publicclient.AzureADProviderFieldAuthURL] = ep.AuthURL
-	p[publicclient.AzureADProviderFieldDeviceAuthURL] = ep.DeviceAuthURL
 	p[publicclient.AzureADProviderFieldTokenURL] = ep.TokenURL
 
 	return p, nil
