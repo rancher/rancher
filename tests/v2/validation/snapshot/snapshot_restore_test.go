@@ -44,6 +44,7 @@ func (s *SnapshotRestoreTestSuite) TestSnapshotRestoreETCDOnly() {
 		UpgradeKubernetesVersion: "",
 		SnapshotRestore:          "none",
 		RecurringRestores:        1,
+		ReplaceWorkerNode:        false,
 	}
 
 	tests := []struct {
@@ -62,6 +63,10 @@ func (s *SnapshotRestoreTestSuite) TestSnapshotRestoreETCDOnly() {
 }
 
 func (s *SnapshotRestoreTestSuite) TestSnapshotRestoreETCDOnlyDynamicInput() {
+	if s.clustersConfig == nil {
+		s.T().Skip()
+	}
+
 	snapshotRestore(s.T(), s.client, s.client.RancherConfig.ClusterName, s.clustersConfig)
 }
 
