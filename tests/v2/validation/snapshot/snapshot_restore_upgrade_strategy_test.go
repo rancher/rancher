@@ -41,23 +41,25 @@ func (s *SnapshotRestoreUpgradeStrategyTestSuite) SetupSuite() {
 
 func (s *SnapshotRestoreUpgradeStrategyTestSuite) TestSnapshotRestoreUpgradeStrategy() {
 	snapshotRestoreK8sVersion := &etcdsnapshot.Config{
-		UpgradeKubernetesVersion:     s.clustersConfig.UpgradeKubernetesVersion,
+		UpgradeKubernetesVersion:     "",
 		SnapshotRestore:              "kubernetesVersion",
 		ControlPlaneConcurrencyValue: "15%",
-		ControlPlaneUnavailableValue: "1",
+		ControlPlaneUnavailableValue: "3",
 		WorkerConcurrencyValue:       "20%",
-		WorkerUnavailableValue:       "10%",
+		WorkerUnavailableValue:       "15%",
 		RecurringRestores:            1,
+		ReplaceWorkerNode:            false,
 	}
 
 	snapshotRestoreAll := &etcdsnapshot.Config{
-		UpgradeKubernetesVersion:     s.clustersConfig.UpgradeKubernetesVersion,
+		UpgradeKubernetesVersion:     "",
 		SnapshotRestore:              "all",
 		ControlPlaneConcurrencyValue: "15%",
-		ControlPlaneUnavailableValue: "1",
+		ControlPlaneUnavailableValue: "3",
 		WorkerConcurrencyValue:       "20%",
-		WorkerUnavailableValue:       "10%",
+		WorkerUnavailableValue:       "15%",
 		RecurringRestores:            1,
+		ReplaceWorkerNode:            false,
 	}
 
 	tests := []struct {
@@ -77,6 +79,10 @@ func (s *SnapshotRestoreUpgradeStrategyTestSuite) TestSnapshotRestoreUpgradeStra
 }
 
 func (s *SnapshotRestoreUpgradeStrategyTestSuite) TestSnapshotRestoreUpgradeStrategyDynamicInput() {
+	if s.clustersConfig == nil {
+		s.T().Skip()
+	}
+
 	snapshotRestore(s.T(), s.client, s.client.RancherConfig.ClusterName, s.clustersConfig)
 }
 
