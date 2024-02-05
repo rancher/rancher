@@ -269,15 +269,15 @@ func TestReconcileGlobalRole(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			grLifecycle := globalRoleLifecycle{}
-
 			state := setupTest(t)
 			if test.stateSetup != nil {
 				test.stateSetup(state)
 			}
-
 			grLifecycle.crLister = state.crListerMock
 			grLifecycle.crClient = state.crClientMock
+
 			err := grLifecycle.reconcileGlobalRole(test.globalRole)
+
 			if test.wantError {
 				require.Error(t, err)
 			} else {
@@ -470,7 +470,6 @@ func TestReconcileCatalogRole(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			grLifecycle := globalRoleLifecycle{}
-
 			state := setupTest(t)
 			if test.stateSetup != nil {
 				test.stateSetup(state)
@@ -479,6 +478,7 @@ func TestReconcileCatalogRole(t *testing.T) {
 			grLifecycle.rClient = state.rClientMock
 
 			err := grLifecycle.reconcileCatalogRole(test.globalRole)
+
 			if test.wantError {
 				require.Error(t, err)
 			} else {
@@ -1344,16 +1344,16 @@ func TestReconcileNamespacedRoles(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			grLifecycle := globalRoleLifecycle{}
-
 			state := setupTest(t)
 			if test.stateSetup != nil {
 				test.stateSetup(state)
 			}
-
 			grLifecycle.nsCache = state.nsCacheMock
 			grLifecycle.rLister = state.rListerMock
 			grLifecycle.rClient = state.rClientMock
+
 			err := grLifecycle.reconcileNamespacedRoles(test.globalRole)
+
 			if test.wantError {
 				require.Error(t, err)
 			} else {
@@ -1415,7 +1415,7 @@ func TestSetGRAsInProgress(t *testing.T) {
 		{
 			name: "update gr status to InProgress",
 			oldGR: &v3.GlobalRole{
-				Status: &mgmtv3.GlobalRoleStatus{
+				Status: mgmtv3.GlobalRoleStatus{
 					Summary: SummaryCompleted,
 					Conditions: []metav1.Condition{
 						{
@@ -1431,7 +1431,7 @@ func TestSetGRAsInProgress(t *testing.T) {
 		{
 			name: "update gr with empty status to InProgress",
 			oldGR: &v3.GlobalRole{
-				Status: &mgmtv3.GlobalRoleStatus{},
+				Status: mgmtv3.GlobalRoleStatus{},
 			},
 			updateReturn: nil,
 			wantError:    false,
@@ -1494,7 +1494,7 @@ func TestSetGRAsCompleted(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Generation: generation,
 				},
-				Status: &mgmtv3.GlobalRoleStatus{
+				Status: mgmtv3.GlobalRoleStatus{
 					Conditions: []metav1.Condition{
 						{
 							Type:   "test1",
@@ -1513,7 +1513,7 @@ func TestSetGRAsCompleted(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Generation: generation,
 				},
-				Status: &mgmtv3.GlobalRoleStatus{
+				Status: mgmtv3.GlobalRoleStatus{
 					Conditions: []metav1.Condition{
 						{
 							Type:   "test1",
@@ -1536,7 +1536,7 @@ func TestSetGRAsCompleted(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Generation: generation,
 				},
-				Status: &mgmtv3.GlobalRoleStatus{
+				Status: mgmtv3.GlobalRoleStatus{
 					Conditions: []metav1.Condition{},
 				},
 			},
@@ -1561,7 +1561,7 @@ func TestSetGRAsCompleted(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Generation: generation,
 				},
-				Status: &mgmtv3.GlobalRoleStatus{
+				Status: mgmtv3.GlobalRoleStatus{
 					Conditions: []metav1.Condition{
 						{
 							Type:   "test1",
@@ -1584,7 +1584,7 @@ func TestSetGRAsCompleted(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Generation: generation,
 				},
-				Status: &mgmtv3.GlobalRoleStatus{
+				Status: mgmtv3.GlobalRoleStatus{
 					Conditions: []metav1.Condition{
 						{
 							Type:   "test1",
@@ -1607,7 +1607,7 @@ func TestSetGRAsCompleted(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Generation: generation,
 				},
-				Status: &mgmtv3.GlobalRoleStatus{
+				Status: mgmtv3.GlobalRoleStatus{
 					Conditions: []metav1.Condition{
 						{
 							Type:   "test1",

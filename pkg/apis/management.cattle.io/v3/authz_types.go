@@ -182,13 +182,13 @@ type GlobalRole struct {
 
 	// Status is the most recently observed status of the GlobalRole.
 	// +optional
-	Status *GlobalRoleStatus `json:"status,omitempty"`
+	Status GlobalRoleStatus `json:"status,omitempty"`
 }
 
 // GlobalRoleStatus represents the most recently observed status of the GlobalRole.
 type GlobalRoleStatus struct {
 	// ObservedGeneration is the most recent generation (metadata.generation in GlobalRole CR)
-	// observed by controller. Populated by the system.
+	// observed by the controller. Populated by the system.
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
@@ -201,7 +201,7 @@ type GlobalRoleStatus struct {
 	Summary string `json:"summary,omitempty"`
 
 	// Conditions is a slice of Condition, indicating the status of specific backing RBAC objects.
-	// There is one condition for each ClusterRole or Role being created for this object.
+	// There is one condition per ClusterRole and Role managed by the GlobalRole.
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 }

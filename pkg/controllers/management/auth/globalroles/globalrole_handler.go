@@ -8,7 +8,6 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	mgmt "github.com/rancher/rancher/pkg/apis/management.cattle.io"
-	mgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	mgmtconv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	rbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
@@ -87,10 +86,8 @@ func (gr *globalRoleLifecycle) Create(obj *v3.GlobalRole) (runtime.Object, error
 	// ObjectMeta.Generation does not get updated when the Status is updated.
 	// If only the status has been updated and we have finished updating the status (status.Summary != "InProgress")
 	// we don't need to perform a reconcile as nothing has changed.
-	if obj.Status != nil {
-		if obj.Status.ObservedGeneration == obj.ObjectMeta.Generation && obj.Status.Summary != SummaryInProgress {
-			return obj, nil
-		}
+	if obj.Status.ObservedGeneration == obj.ObjectMeta.Generation && obj.Status.Summary != SummaryInProgress {
+		return obj, nil
 	}
 	// set GR status to "in progress" while the underlying roles get added
 	err := gr.setGRAsInProgress(obj)
@@ -122,10 +119,8 @@ func (gr *globalRoleLifecycle) Updated(obj *v3.GlobalRole) (runtime.Object, erro
 	// ObjectMeta.Generation does not get updated when the Status is updated.
 	// If only the status has been updated and we have finished updating the status (status.Summary != "InProgress")
 	// we don't need to perform a reconcile as nothing has changed.
-	if obj.Status != nil {
-		if obj.Status.ObservedGeneration == obj.ObjectMeta.Generation && obj.Status.Summary != SummaryInProgress {
-			return obj, nil
-		}
+	if obj.Status.ObservedGeneration == obj.ObjectMeta.Generation && obj.Status.Summary != SummaryInProgress {
+		return obj, nil
 	}
 	// set GR status to "in progress" while the underlying roles get added
 	err := gr.setGRAsInProgress(obj)
@@ -312,7 +307,7 @@ func (gr *globalRoleLifecycle) reconcileNamespacedRoles(globalRole *v3.GlobalRol
 		if apierrors.IsNotFound(err) || namespace == nil {
 			// When a namespace is not found, don't re-enqueue GlobalRole
 			logrus.Warnf("[%v] Namespace %s not found. Not re-enqueueing GlobalRole %s", grController, ns, globalRole.Name)
-			addCondition(globalRole, condition, NamespaceNotFound, roleName, fmt.Errorf("namespace %s not found", namespace))
+			addCondition(globalRole, condition, NamespaceNotFound, roleName, fmt.Errorf("namespace %s not found", ns))
 			continue
 		} else if err != nil {
 			returnError = multierror.Append(returnError, errors.Wrapf(err, "couldn't get namespace %s", ns))
@@ -332,7 +327,7 @@ func (gr *globalRoleLifecycle) reconcileNamespacedRoles(globalRole *v3.GlobalRol
 			// If the namespace is terminating, don't create a Role
 			if namespace.Status.Phase == corev1.NamespaceTerminating {
 				logrus.Warnf("[%v] Namespace %s is terminating. Not creating role %s for %s", grController, ns, roleName, globalRole.Name)
-				addCondition(globalRole, condition, NamespaceTerminating, roleName, fmt.Errorf("namespace %s is terminating", namespace))
+				addCondition(globalRole, condition, NamespaceTerminating, roleName, fmt.Errorf("namespace %s is terminating", ns))
 				continue
 			}
 
@@ -438,9 +433,6 @@ func (gr *globalRoleLifecycle) purgeInvalidNamespacedRoles(roles []*v1.Role, uid
 }
 
 func (gr *globalRoleLifecycle) setGRAsInProgress(globalRole *v3.GlobalRole) error {
-	if globalRole.Status == nil {
-		globalRole.Status = &mgmtv3.GlobalRoleStatus{}
-	}
 	globalRole.Status.Conditions = []metav1.Condition{}
 	globalRole.Status.Summary = SummaryInProgress
 	globalRole.Status.LastUpdate = time.Now().String()
@@ -451,9 +443,6 @@ func (gr *globalRoleLifecycle) setGRAsInProgress(globalRole *v3.GlobalRole) erro
 }
 
 func (gr *globalRoleLifecycle) setGRAsCompleted(globalRole *v3.GlobalRole) error {
-	if globalRole.Status == nil {
-		globalRole.Status = &mgmtv3.GlobalRoleStatus{}
-	}
 	globalRole.Status.Summary = SummaryCompleted
 	for _, c := range globalRole.Status.Conditions {
 		if c.Status != metav1.ConditionTrue {
@@ -488,8 +477,5 @@ func addCondition(globalRole *v3.GlobalRole, condition metav1.Condition, reason,
 	}
 	condition.Reason = reason
 	condition.LastTransitionTime = metav1.Time{Time: time.Now()}
-	if globalRole.Status == nil {
-		globalRole.Status = &mgmtv3.GlobalRoleStatus{}
-	}
 	globalRole.Status.Conditions = append(globalRole.Status.Conditions, condition)
 }

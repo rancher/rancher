@@ -165,8 +165,8 @@ spec:
             properties:
               conditions:
                 description: Conditions is a slice of Condition, indicating the status
-                  of specific backing RBAC objects. There is one condition for each
-                  ClusterRole or Role being created for this object.
+                  of specific backing RBAC objects. There is one condition per ClusterRole
+                  and Role managed by the GlobalRole.
                 items:
                   description: "Condition contains details for one aspect of the current
                     state of this API Resource. --- This struct is intended for direct
@@ -240,7 +240,7 @@ spec:
                 type: string
               observedGeneration:
                 description: ObservedGeneration is the most recent generation (metadata.generation
-                  in GlobalRole CR) observed by controller. Populated by the system.
+                  in GlobalRole CR) observed by the controller. Populated by the system.
                 format: int64
                 type: integer
               summary:

@@ -3732,11 +3732,7 @@ func (in *GlobalRole) DeepCopyInto(out *GlobalRole) {
 			(*out)[key] = outVal
 		}
 	}
-	if in.Status != nil {
-		in, out := &in.Status, &out.Status
-		*out = new(GlobalRoleStatus)
-		(*in).DeepCopyInto(*out)
-	}
+	in.Status.DeepCopyInto(&out.Status)
 	return
 }
 
