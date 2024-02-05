@@ -190,7 +190,7 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 		// EKS cluster must have at least one node to run cluster agent. The best way to verify
 		// if a cluster has self-managed node or nodegroup is to check if the cluster agent was deployed.
 		// Issue: https://github.com/rancher/eks-operator/issues/301
-		addNgMessage := "Cluster must have at least one managed nodegroup."
+		addNgMessage := "Cluster must have at least one managed nodegroup or one self-managed node."
 		noNodeGroupsOnSpec := len(cluster.Spec.EKSConfig.NodeGroups) == 0
 		noNodeGroupsOnUpstreamSpec := len(cluster.Status.EKSStatus.UpstreamSpec.NodeGroups) == 0
 		if !apimgmtv3.ClusterConditionAgentDeployed.IsTrue(cluster) &&
