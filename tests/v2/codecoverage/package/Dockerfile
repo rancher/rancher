@@ -167,7 +167,7 @@ ENV CATTLE_CLI_VERSION v2.7.2-rc1
 ENV CATTLE_BASE_UI_BRAND=
 
 # Please update the api-ui-version in pkg/settings/settings.go when updating the version here.
-ENV CATTLE_API_UI_VERSION 1.1.9
+ENV CATTLE_API_UI_VERSION 1.1.11
 
 RUN mkdir -p /var/log/auditlog
 ENV AUDIT_LOG_PATH /var/log/auditlog/rancher-api-audit.log

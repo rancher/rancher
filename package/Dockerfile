@@ -1,6 +1,6 @@
 FROM registry.suse.com/bci/bci-base:15.4
 
-RUN zypper -n install git-core curl ca-certificates unzip xz gzip sed tar shadow gawk vim netcat-openbsd mkisofs && \
+RUN zypper -n install git-core curl ca-certificates unzip xz gzip sed tar shadow gawk vim netcat-openbsd mkisofs openssh-clients && \
     zypper -n clean -a && rm -rf /tmp/* /var/tmp/* /usr/share/doc/packages/* && \
     useradd rancher && \
     mkdir -p /var/lib/rancher /var/lib/cattle /opt/jail /opt/drivers/management-state/bin && \
@@ -167,7 +167,7 @@ ENV CATTLE_DASHBOARD_UI_VERSION v2.6.13
 ENV CATTLE_CLI_VERSION v2.6.11
 
 # Please update the api-ui-version in pkg/settings/settings.go when updating the version here.
-ENV CATTLE_API_UI_VERSION 1.1.10
+ENV CATTLE_API_UI_VERSION 1.1.11
 
 RUN mkdir -p /var/log/auditlog
 ENV AUDIT_LOG_PATH /var/log/auditlog/rancher-api-audit.log
