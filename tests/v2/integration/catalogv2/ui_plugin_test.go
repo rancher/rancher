@@ -1,21 +1,17 @@
 package integration
 
 import (
-	"bytes"
-	"compress/gzip"
 	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
 
 	rv1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
-	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/plugin"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/shepherd/clients/rancher"
 	"github.com/rancher/shepherd/clients/rancher/catalog"
 	client "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
-	stevev1 "github.com/rancher/shepherd/clients/rancher/v1"
 	"github.com/rancher/shepherd/extensions/kubeconfig"
 	"github.com/rancher/shepherd/pkg/api/steve/catalog/types"
 	"github.com/rancher/shepherd/pkg/session"
@@ -23,9 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"helm.sh/helm/v3/pkg/action"
-	"helm.sh/helm/v3/pkg/repo"
 	"io"
-	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kwait "k8s.io/apimachinery/pkg/util/wait"
@@ -74,14 +68,11 @@ func (w *UIPluginTest) SetupSuite() {
 	restConfig, err := (*kubeConfig).ClientConfig()
 	require.NoError(w.T(), err)
 
-	//restConfig.Insecure = true
-
 	cset, err := kubernetes.NewForConfig(restConfig)
 	require.NoError(w.T(), err)
 	w.corev1 = cset.CoreV1()
 
 	w.restClientGetter, err = kubeconfig.NewRestGetter(restConfig, *kubeConfig)
-	require.NoError(w.T(), err)
 	require.NoError(w.T(), err)
 	_, err = w.catalogClient.ClusterRepos().Create(context.Background(), &rv1.ClusterRepo{
 		ObjectMeta: metav1.ObjectMeta{Name: "extensions-examples"},
@@ -123,16 +114,12 @@ func (w *UIPluginTest) SetupSuite() {
 	time.Sleep(10 * time.Second)
 }
 
-func (w *UIPluginTest) resetSettings() {
-}
-
 func TestUIPluginSuite(t *testing.T) {
 	suite.Run(t, new(UIPluginTest))
 }
 
 // TestGetIndexAuthenticated Tests if all extensions are returned in the index if the user is authenticated
 func (w *UIPluginTest) TestGetIndexAuthenticated() {
-	defer w.resetSettings()
 	client := &http.Client{Transport: &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}}
@@ -154,7 +141,6 @@ func (w *UIPluginTest) TestGetIndexAuthenticated() {
 // TestGetIndexUnauthenticated Tests if the unauthenticated extensions (and only them) are present
 // in the anonymous index and that it is returned if the user is not authenticated
 func (w *UIPluginTest) TestGetIndexUnauthenticated() {
-	defer w.resetSettings()
 	client := &http.Client{Transport: &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}}
@@ -172,7 +158,6 @@ func (w *UIPluginTest) TestGetIndexUnauthenticated() {
 
 // TestGetSingleExtensionAuthenticated Tests that the requests succeeds if the user is authenticated
 func (w *UIPluginTest) TestGetSingleExtensionAuthenticated() {
-	defer w.resetSettings()
 	client := &http.Client{Transport: &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}}
@@ -189,7 +174,6 @@ func (w *UIPluginTest) TestGetSingleExtensionAuthenticated() {
 // TestGetSingleExtensionUnauthenticated Tests that the requests succeeds if
 // the user is unauthenticated when the requested extension does not require authentication
 func (w *UIPluginTest) TestGetSingleExtensionUnauthenticated() {
-	defer w.resetSettings()
 	client := &http.Client{Transport: &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}}
@@ -201,50 +185,11 @@ func (w *UIPluginTest) TestGetSingleExtensionUnauthenticated() {
 // TestGetSingleUnauthorizedExtension Tests that the requests fails and returns 404 if the
 // extension requires authentication and the user is not authenticated
 func (w *UIPluginTest) TestGetSingleUnauthorizedExtension() {
-	defer w.resetSettings()
 	client := &http.Client{Transport: &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}}
 	res, _ := client.Get("https://localhost:8443/v1/uiplugins/clock/0.2.0/plugin/clock-0.2.0.umd.min.js")
 	w.Require().Equal(res.StatusCode, http.StatusNotFound)
-}
-
-func (w *UIPluginTest) WaitForConfigMap(namespace, name, latestVersion string) error {
-	return kwait.Poll(1*time.Second, 3*time.Minute, func() (done bool, err error) {
-		cfgMap, err := w.corev1.ConfigMaps(namespace).Get(context.TODO(), name, metav1.GetOptions{})
-		w.Require().NoError(err)
-		gz, err := gzip.NewReader(bytes.NewBuffer(cfgMap.BinaryData["content"]))
-		w.Require().NoError(err)
-		defer gz.Close()
-		data, err := io.ReadAll(gz)
-		w.Require().NoError(err)
-		index := &repo.IndexFile{}
-		w.Require().NoError(json.Unmarshal(data, index))
-		index.SortEntries()
-		return index.Entries["rancher-aks-operator"][0].Version < latestVersion, nil
-	})
-}
-
-func (w *UIPluginTest) updateConfigMap(cfgMap *v1.ConfigMap) string {
-	gz, err := gzip.NewReader(bytes.NewBuffer(cfgMap.BinaryData["content"]))
-	w.Require().NoError(err)
-	defer gz.Close()
-	data, err := io.ReadAll(gz)
-	w.Require().NoError(err)
-	index := &repo.IndexFile{}
-	w.Require().NoError(json.Unmarshal(data, index))
-	index.SortEntries()
-	latestVersion := index.Entries["rancher-aks-operator"][0].Version
-	index.Entries["rancher-aks-operator"] = index.Entries["rancher-aks-operator"][1:]
-	marshal, err := json.Marshal(index)
-	w.Require().NoError(err)
-	var compressedData bytes.Buffer
-	writer := gzip.NewWriter(&compressedData)
-	_, err = writer.Write(marshal)
-	w.Require().NoError(err)
-	w.Require().NoError(writer.Close())
-	cfgMap.BinaryData["content"] = compressedData.Bytes()
-	return latestVersion
 }
 
 func (w *UIPluginTest) waitForChart(status rv1.Status, name string, previousVersion int) error {
@@ -265,61 +210,6 @@ func (w *UIPluginTest) waitForChart(status rv1.Status, name string, previousVers
 		return false, nil
 	})
 	w.Require().NoError(err)
-	return err
-}
-
-func (w *UIPluginTest) updateManagementCluster() error {
-	w.cluster.AKSConfig = &client.AKSClusterConfigSpec{}
-	c, err := w.client.Management.Cluster.Replace(w.cluster)
-	w.cluster = c
-	return err
-}
-
-func (w *UIPluginTest) resetManagementCluster() {
-	w.cluster.AKSConfig = nil
-	w.cluster.AppliedSpec.AKSConfig = nil
-	c, err := w.client.Management.Cluster.Replace(w.cluster)
-	w.Require().NoError(err)
-	err = kwait.Poll(5*time.Second, 2*time.Minute, func() (done bool, err error) {
-		c, err = w.client.Management.Cluster.ByID("local")
-		if err != nil {
-			return false, err
-		}
-		if c.AKSConfig == nil {
-			return true, nil
-		}
-		return false, nil
-	})
-	w.Require().NoError(err)
-	w.cluster = c
-	err = kwait.Poll(5*time.Second, 2*time.Minute, func() (done bool, err error) {
-		list, err := w.corev1.Secrets("cattle-system").List(context.TODO(), metav1.ListOptions{LabelSelector: "name in (rancher-aks-operator, rancher-aks-operator-crd)"})
-		w.Require().NoError(err)
-		if len(list.Items) == 0 {
-			return true, nil
-		}
-		for _, s := range list.Items {
-			w.Require().NoError(w.corev1.Secrets("cattle-system").Delete(context.Background(), s.Name, metav1.DeleteOptions{PropagationPolicy: &propagation}))
-		}
-		return false, nil
-	})
-	w.Require().NoError(err)
-}
-
-func (w *UIPluginTest) updateSetting(name, value string) error {
-	// Use the Steve client instead of the main one to be able to set a setting's value to an empty string.
-	existing, err := w.client.Steve.SteveType("management.cattle.io.setting").ByID(name)
-	if err != nil {
-		return err
-	}
-
-	var s v3.Setting
-	if err := stevev1.ConvertToK8sType(existing.JSONResp, &s); err != nil {
-		return err
-	}
-
-	s.Value = value
-	_, err = w.client.Steve.SteveType("management.cattle.io.setting").Update(existing, s)
 	return err
 }
 

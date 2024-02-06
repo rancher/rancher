@@ -6,9 +6,9 @@ import (
 
 // +genclient
 // +kubebuilder:resource:scope=Namespaced
-// +kubebuilder:printcolumn:name="Plugin Name",type=string,JSONPath=`.spec.release.name`
-// +kubebuilder:printcolumn:name="Version",type=string,JSONPath=`.status.version`
-// +kubebuilder:printcolumn:name="State",type=string,JSONPath=`.status.state`
+// +kubebuilder:printcolumn:name="Plugin Name",type=string,JSONPath=`.spec.plugin.name`
+// +kubebuilder:printcolumn:name="Version",type=string,JSONPath=`.spec.plugin.version`
+// +kubebuilder:printcolumn:name="State",type=string,JSONPath=`.status.cacheState`
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type UIPlugin struct {

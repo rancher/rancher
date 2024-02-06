@@ -13,28 +13,24 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/request"
 )
 
-func SetupUIPluginHandlers(router *mux.Router) {
+func RegisterUIPluginHandlers(router *mux.Router) {
 	router.HandleFunc("/v1/uiplugins", indexHandler)
 	router.HandleFunc("/v1/uiplugins/{name}/{version}/{rest:.*}", pluginHandler)
 }
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {
-	authed := isAuthenticated(r)
-	if authed {
-		index, err := json.Marshal(&plugin.Index)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			logrus.Error(err)
-		}
-		w.Write(index)
+	var in *plugin.SafeIndex
+	if isAuthenticated(r) {
+		in = &plugin.Index
 	} else {
-		index, err := json.Marshal(&plugin.AnonymousIndex)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			logrus.Error(err)
-		}
-		w.Write(index)
+		in = &plugin.AnonymousIndex
 	}
+	index, err := json.Marshal(in)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		logrus.Error(err)
+	}
+	w.Write(index)
 }
 
 func pluginHandler(w http.ResponseWriter, r *http.Request) {
@@ -42,6 +38,7 @@ func pluginHandler(w http.ResponseWriter, r *http.Request) {
 	logrus.Debugf("http request vars %s", vars)
 	authed := isAuthenticated(r)
 	entry, ok := plugin.Index.Entries[vars["name"]]
+	//
 	if (!ok || entry.Version != vars["version"]) || (!authed && !entry.NoAuth) {
 		msg := fmt.Sprintf("plugin [name: %s version: %s] does not exist in index", vars["name"], vars["version"])
 		http.Error(w, msg, http.StatusNotFound)
@@ -97,11 +94,10 @@ func isAuthenticated(r *http.Request) bool {
 	if !ok {
 		return false
 	}
-	authed := false
 	for _, g := range u.GetGroups() {
 		if g == "system:authenticated" {
-			authed = true
+			return true
 		}
 	}
-	return authed
+	return false
 }

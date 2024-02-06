@@ -53,9 +53,10 @@ func AdditionalAPIs(ctx context.Context, config *wrangler.Context, steve *steve.
 	if err != nil {
 		return nil, err
 	}
+
 	mux := gmux.NewRouter()
 	mux.UseEncodedPath()
-	catalog.SetupUIPluginHandlers(mux)
+	catalog.RegisterUIPluginHandlers(mux)
 	mux.Handle("/v1/github{path:.*}", githubHandler)
 	mux.Handle("/v3/connect", Tunnel(config))
 

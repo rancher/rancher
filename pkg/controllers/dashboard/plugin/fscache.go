@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
+	filepathsecure "github.com/cyphar/filepath-securejoin"
 	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	"github.com/sirupsen/logrus"
 )
@@ -76,7 +77,10 @@ func (c FSCache) SyncWithControllersCache(cachedPlugins []*v1.UIPlugin) error {
 			if err != nil {
 				return err
 			}
-			path := filepath.Join(FSCacheRootDir, plugin.Name, plugin.Version, file)
+			path, err := filepathsecure.SecureJoin(FSCacheRootDir, filepath.Join(plugin.Name, plugin.Version, file))
+			if err != nil {
+				return err
+			}
 			if err := c.Save(data, path); err != nil {
 				logrus.Debugf("failed to cache plugin [Name: %s Version: %s] in filesystem [path: %s]", plugin.Name, plugin.Version, path)
 			}
@@ -97,9 +101,7 @@ func (c FSCache) SyncWithIndex(index *SafeIndex, fsCacheFiles []string) error {
 		name := s[0]
 		version := s[1]
 		_, ok := index.Entries[name]
-		if ok && index.Entries[name].Version == version {
-			continue
-		} else {
+		if !ok || index.Entries[name].Version != version {
 			err := c.Delete(name, version)
 			if err != nil {
 				return err
@@ -128,7 +130,11 @@ func (c FSCache) Save(data []byte, path string) error {
 
 // Delete takes in a plugin's name and version, and deletes its entry in the filesystem cache
 func (c FSCache) Delete(name, version string) error {
-	err := osRemoveAll(filepath.Join(FSCacheRootDir, name))
+	p, err := filepathsecure.SecureJoin(FSCacheRootDir, name)
+	if err != nil {
+		return err
+	}
+	err = osRemoveAll(p)
 	if err != nil {
 		err = fmt.Errorf("failed to delete entry [Name: %s Version: %s] from filesystem cache: %s", name, version, err.Error())
 		return err
@@ -138,11 +144,29 @@ func (c FSCache) Delete(name, version string) error {
 	return nil
 }
 
-// isCache takes in the name and version of a plugin and returns true if
+// isCached takes in the name and version of a plugin and returns true if
 // it is cached (entry exists and files were fetched), returns false otherwise
 func (c FSCache) isCached(name, version string) (bool, error) {
-	path := filepath.Join(FSCacheRootDir, name, version)
-	_, err := osStat(path)
+	path, err := filepathsecure.SecureJoin(FSCacheRootDir, filepath.Join(name, version))
+	if err != nil {
+		return false, err
+	}
+	_, err = osStat(path)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return false, nil
+		}
+		isEmpty, err := isDirEmpty(path)
+		if err != nil {
+			return false, err
+		}
+		if !isEmpty {
+			return true, nil
+		}
+
+		return false, err
+	}
+
 	if !errors.Is(err, os.ErrNotExist) {
 		isEmpty, err := isDirEmpty(path)
 		if err != nil {

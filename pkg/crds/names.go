@@ -26,7 +26,7 @@ func RequiredCRDs() []string {
 	if features.Auth.Enabled() {
 		requiredCRDS = append(requiredCRDS, AuthCRDs()...)
 	}
-	if features.UIPlugin.Enabled() {
+	if features.UIExtension.Enabled() {
 		requiredCRDS = append(requiredCRDS, UIPluginsCRD()...)
 	}
 	return requiredCRDS
