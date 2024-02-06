@@ -1,7 +1,8 @@
 import pytest
+import kubernetes
 import json
 from .common import random_str
-from .conftest import wait_for_condition, wait_until, wait_for
+from .conftest import wait_for_condition, wait_until, wait_for, kubernetes_api_client
 
 CREATOR_ANNOTATION = 'authz.management.cattle.io/creator-role-bindings'
 systemProjectLabel = "authz.management.cattle.io/system-project"
@@ -38,6 +39,36 @@ def cleanup_roles(request, admin_mc):
 
     request.addfinalizer(_cleanup)
 
+@pytest.fixture(autouse=True)
+def add_cluster_roles(admin_mc, remove_resource):
+    k8s_client = kubernetes_api_client(admin_mc.client, 'local')
+    rbac_api = kubernetes.client.RbacAuthorizationV1Api(k8s_client)
+
+    roles = rbac_api.list_cluster_role()
+
+    hasMon = False
+    hasNavManage = False
+    hasNavView = False
+    for r in roles.items:
+        if r.metadata.name == "monitoring-ui-view":
+            hasMon = True
+        if r.metadata.name == "navlinks-view":
+            hasNavView = True
+        if r.metadata.name == "navlinks-manage":
+            hasNavManage = True
+
+    if not hasMon:
+        body = kubernetes.client.V1ClusterRole()
+        body.metadata = kubernetes.client.V1ObjectMeta(name="monitoring-ui-view")
+        rbac_api.create_cluster_role(body=body)
+    if not hasNavView:
+        body = kubernetes.client.V1ClusterRole()
+        body.metadata = kubernetes.client.V1ObjectMeta(name="navlinks-view")
+        rbac_api.create_cluster_role(body=body)
+    if not hasNavManage:
+        body = kubernetes.client.V1ClusterRole()
+        body.metadata = kubernetes.client.V1ObjectMeta(name="navlinks-manage")
+        rbac_api.create_cluster_role(body=body)
 
 @pytest.mark.nonparallel
 def test_cluster_create_default_role(admin_mc, cleanup_roles, remove_resource):
