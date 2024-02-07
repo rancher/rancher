@@ -38,7 +38,7 @@ provisioningInput:
     desiredflags: "Short|Long" #These flags are for running TestProvisioningRKE2Cluster or TestProvisioningRKE2CustomCluster it is not needed for the dynamic tests.
   rke2KubernetesVersion: ["v1.27.6+rke2r1"]
   cni: ["calico"]
-  providers: ["linode", "aws", "do", "harvester"]
+  providers: ["linode", "aws", "do", "harvester", "vsphere"]
   nodeProviders: ["ec2"]
   hardened: false
   psact: ""
@@ -110,116 +110,128 @@ Machine RKE2 config is the final piece needed for the config to run RKE2 provisi
 
 ### AWS RKE2 Machine Config
 ```yaml
-awsMachineConfig:
+awsMachineConfigs:
   region: "us-east-2"
-  ami: ""
-  instanceType: "t3a.medium"
-  sshUser: "ubuntu"
-  vpcId: ""
-  volumeType: "gp2"
-  zone: "a"
-  retries: "5"
-  rootSize: "60"
-  securityGroup: [""]
+  awsMachineConfig:
+  - roles: ["etcd","controlplane","worker"]
+    ami: ""
+    instanceType: "t3a.medium"
+    sshUser: "ubuntu"
+    vpcId: ""
+    volumeType: "gp2"
+    zone: "a"
+    retries: "5"
+    rootSize: "60"
+    securityGroup: [""]
 ```
 ### Digital Ocean RKE2 Machine Config
 ```yaml
-doMachineConfig:
-  image: "ubuntu-20-04-x64"
-  backups: false
-  ipv6: false
-  monitoring: false
-  privateNetworking: false
+doMachineConfigs:
   region: "nyc3"
-  size: "s-2vcpu-4gb"
-  sshKeyContents: ""
-  sshKeyFingerprint: ""
-  sshPort: "22"
-  sshUser: "root"
-  tags: ""
-  userdata: ""
+  doMachineConfig:
+  - roles: ["etcd","controlplane","worker"]
+    image: "ubuntu-20-04-x64"
+    backups: false
+    ipv6: false
+    monitoring: false
+    privateNetworking: false
+    size: "s-2vcpu-4gb"
+    sshKeyContents: ""
+    sshKeyFingerprint: ""
+    sshPort: "22"
+    sshUser: "root"
+    tags: ""
+    userdata: ""
 ```
 ### Linode RKE2 Machine Config
 ```yaml
-linodeMachineConfig:
-  authorizedUsers: ""
-  createPrivateIp: true
-  dockerPort: "2376"
-  image: "linode/ubuntu22.04"
-  instanceType: "g6-standard-8"
+linodeMachineConfigs:
   region: "us-west"
-  rootPass: ""
-  sshPort: "22"
-  sshUser: ""
-  stackscript: ""
-  stackscriptData: ""
-  swapSize: "512"
-  tags: ""
-  uaPrefix: "Rancher"
+  linodeMachineConfig:
+  - roles: ["etcd","controlplane","worker"]
+    authorizedUsers: ""
+    createPrivateIp: true
+    dockerPort: "2376"
+    image: "linode/ubuntu22.04"
+    instanceType: "g6-standard-8"
+    rootPass: ""
+    sshPort: "22"
+    sshUser: ""
+    stackscript: ""
+    stackscriptData: ""
+    swapSize: "512"
+    tags: ""
+    uaPrefix: "Rancher"
 ```
 ### Azure RKE2 Machine Config
 ```yaml
-azureMachineConfig:
-  availabilitySet: "docker-machine"
-  diskSize: "30"
+azureMachineConfigs:
   environment: "AzurePublicCloud"
-  faultDomainCount: "3"
-  image: "canonical:UbuntuServer:22.04-LTS:latest"
-  location: "westus"
-  managedDisks: false
-  noPublicIp: false
-  nsg: ""
-  openPort: ["6443/tcp", "2379/tcp", "2380/tcp", "8472/udp", "4789/udp", "9796/tcp", "10256/tcp", "10250/tcp", "10251/tcp", "10252/tcp"]
-  resourceGroup: "docker-machine"
-  size: "Standard_D2_v2"
-  sshUser: "docker-user"
-  staticPublicIp: false
-  storageType: "Standard_LRS"
-  subnet: "docker-machine"
-  subnetPrefix: "192.168.0.0/16"
-  updateDomainCount: "5"
-  usePrivateIp: false
-  vnet: "docker-machine-vnet"
+  azureMachineConfig:
+  - roles: ["etcd","controlplane","worker"]
+    availabilitySet: "docker-machine"
+    diskSize: "30"
+    faultDomainCount: "3"
+    image: "canonical:UbuntuServer:22.04-LTS:latest"
+    location: "westus"
+    managedDisks: false
+    noPublicIp: false
+    nsg: ""
+    openPort: ["6443/tcp", "2379/tcp", "2380/tcp", "8472/udp", "4789/udp", "9796/tcp", "10256/tcp", "10250/tcp", "10251/tcp", "10252/tcp"]
+    resourceGroup: "docker-machine"
+    size: "Standard_D2_v2"
+    sshUser: "docker-user"
+    staticPublicIp: false
+    storageType: "Standard_LRS"
+    subnet: "docker-machine"
+    subnetPrefix: "192.168.0.0/16"
+    updateDomainCount: "5"
+    usePrivateIp: false
+    vnet: "docker-machine-vnet"
 ```
 ### Harvester RKE2 Machine Config
 ```yaml
-harvesterMachineConfig":
-  diskSize: "40"
-  cpuCount: "2"
-  memorySize: "8"
-  networkName: "default/ctw-network-1"
-  imageName: "default/image-rpj98"
+harvesterMachineConfigs:
   vmNamespace: "default"
-  sshUser: "ubuntu"
-  diskBus: "virtio
+  harvesterMachineConfig:
+  - roles: ["etcd","controlplane","worker"]
+    diskSize: "40"
+    cpuCount: "2"
+    memorySize: "8"
+    networkName: "default/ctw-network-1"
+    imageName: "default/image-rpj98"
+    sshUser: "ubuntu"
+    diskBus: "virtio
 ```
 ## Vsphere RKE2 Machine Config
 ```yaml
-vmwarevsphereMachineConfig:
-  cfgparam: ["disk.enableUUID=TRUE"]
-  cloneFrom: ""
-  cloudinit: ""
-  contentLibrary: ""
-  cpuCount: "4"
-  creationType: ""
-  datacenter: ""
-  datastore: ""
-  datastoreCluster: ""
-  diskSize: "20000"
-  folder: ""
-  hostSystem: ""
-  memorySize: "4096"
-  network: [""]
-  os: "linux"
-  password: ""
-  pool: ""
-  sshPassword: ""
-  sshPort: "22"
-  sshUser: ""
-  sshUserGroup: ""
+vmwarevsphereMachineConfigs:
   username: ""
   vcenter: ""
   vcenterPort: "443"
+  password: ""
+  pool: ""
+  datacenter: ""
+  datastore: ""
+  folder: ""
+  hostSystem: ""
+  vmwarevsphereMachineConfig:
+  - roles: ["etcd","controlplane","worker","windows"]
+    cfgparam: ["disk.enableUUID=TRUE"]
+    cloneFrom: ""
+    cloudinit: ""
+    contentLibrary: "" 
+    cpuCount: "4"
+    creationType: "template" # library, clone
+    datastoreCluster: ""
+    diskSize: "20000"
+    memorySize: "4096"
+    network: [""]
+    os: "linux" # windows
+    sshPassword: ""
+    sshPort: "22"
+    sshUser: ""
+    sshUserGroup: ""
 ```
 
 These tests utilize Go build tags. Due to this, see the below examples on how to run the node driver tests:
