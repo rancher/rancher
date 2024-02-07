@@ -44,8 +44,8 @@ func Test_gitDir(t *testing.T) {
 		expected  string
 	}{
 		{
-			"namespace", "name", "https://github.com/chiukapoor/charts",
-			"management-state/git-repo/namespace/name/cf3633ed98cd12a6fef63cafe25250982640225938313fb83b553d458f095d28",
+			"namespace", "name", "https://github.com/krunalhinguu/charts",
+			"management-state/git-repo/namespace/name/21b045e9e6fb8f6439001f94a4f13f864c7aae5f796fe9602c95658690ec14bc",
 		},
 		// NOTE(manno): cannot test the other cases without poluting the filesystem
 	}

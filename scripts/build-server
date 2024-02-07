@@ -33,7 +33,7 @@ CGO_ENABLED=0 go build -tags k8s \
   -o bin/rancher
 
 if  [ -n "$CATTLE_KDM_BRANCH" ]; then
-    curl -sLf https://raw.githubusercontent.com/chiukapoor/kontainer-driver-metadata/rancher-v1.28/data/data.json > bin/data.json
+    curl -sLf https://raw.githubusercontent.com/krunalhinguu/kontainer-driver-metadata/dev-v2.9/data.json > bin/data.json
 elif [ ! -e bin/data.json ] && [ -e ../kontainer-driver-metadata/data/data.json ]; then
     cp ../kontainer-driver-metadata/data/data.json bin/data.json
 fi
