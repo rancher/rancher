@@ -1677,8 +1677,6 @@ github.com/rancher/fleet/pkg/apis v0.0.0-20231017140638-93432f288e79 h1:vfrBGudE
 github.com/rancher/fleet/pkg/apis v0.0.0-20231017140638-93432f288e79/go.mod h1:vqAYcX2NEkVb0AmUlY7luhh1TKIqbE2KRuERCKxW9pE=
 github.com/rancher/gke-operator v1.3.0-rc2 h1:MFtWsNSnyAJb8pr4Hmm+dFKqpo1EAHOZB3G5jmm4WpM=
 github.com/rancher/gke-operator v1.3.0-rc2/go.mod h1:tSLZ14qvAtuKjkpnFSN6iE3hioIyGiHpashs4jojKp8=
-github.com/rancher/helm/v3 v3.12.3-rancher1 h1:Qz1NbCydcPXPcjRc6PEnmJjjhbiSSJyg/9O6XGMctG8=
-github.com/rancher/helm/v3 v3.12.3-rancher1/go.mod h1:KPKQiX9IP5HX7o5YnnhViMnNuKiL/lJBVQ47GHe1R0k=
 github.com/rancher/kubernetes-provider-detector v0.1.5 h1:hWRAsWuJOemzGjz/XrbTlM7QmfO4OedvFE3QwXiH60I=
 github.com/rancher/kubernetes-provider-detector v0.1.5/go.mod h1:ypuJS7kP7rUiAn330xG46mj+Nhvym05GM8NqMVekpH0=
 github.com/rancher/lasso v0.0.0-20230830164424-d684fdeb6f29 h1:+kige/h8/LnzWgPjB5NUIHz/pWiW/lFpqcTUkN5uulY=
@@ -2812,6 +2810,8 @@ gotest.tools v2.2.0+incompatible h1:VsBPFP1AI068pPrMxtb/S8Zkgf9xEmTLJjfM+P5UIEo=
 gotest.tools v2.2.0+incompatible/go.mod h1:DsYFclhRJ6vuDpmuTbkuFWG+y2sxOXAzmJt81HFBacw=
 gotest.tools/v3 v3.5.0 h1:Ljk6PdHdOhAb5aDMWXjDLMMhph+BpztA4v1QdqEW2eY=
 gotest.tools/v3 v3.5.0/go.mod h1:isy3WKz7GK6uNw/sbHzfKBLvlvXwUyV06n6brMxxopU=
+helm.sh/helm/v3 v3.12.3 h1:5y1+Sbty12t48T/t/CGNYUIME5BJ0WKfmW/sobYqkFg=
+helm.sh/helm/v3 v3.12.3/go.mod h1:KPKQiX9IP5HX7o5YnnhViMnNuKiL/lJBVQ47GHe1R0k=
 honnef.co/go/tools v0.0.0-20180728063816-88497007e858/go.mod h1:rf3lG4BRIbNafJWhAfAdb/ePZxsR/4RtNHQocxwk9r4=
 honnef.co/go/tools v0.0.0-20190102054323-c2f93a96b099/go.mod h1:rf3lG4BRIbNafJWhAfAdb/ePZxsR/4RtNHQocxwk9r4=
 honnef.co/go/tools v0.0.0-20190106161140-3f1c8253044a/go.mod h1:rf3lG4BRIbNafJWhAfAdb/ePZxsR/4RtNHQocxwk9r4=
