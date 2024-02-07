@@ -7,13 +7,14 @@ FROM registry.suse.com/bci/bci-base:15.5 AS builder
 COPY --from=final / /chroot/
 
 # Install some packages with zypper in the chroot of the final micro image
-RUN zypper --installroot /chroot -n --gpg-auto-import-keys in --no-recommends \
+RUN zypper refresh && \
+    zypper --installroot /chroot -n in --no-recommends \
     git-core curl ca-certificates unzip xz gzip sed tar shadow gawk vim-small \
     netcat-openbsd mkisofs openssh-clients && \
     zypper --installroot /chroot clean -a && \
     rm -rf /chroot/var/cache/zypp/* /chroot/var/log/zypp/* /chroot/tmp/* /chroot/var/tmp/* /chroot/usr/share/doc/packages/*
 
-# Main stage using bco-micro as the base image
+# Main stage using bci-micro as the base image
 FROM final
 
 # Copy binaries and configuration files from builder to micro
