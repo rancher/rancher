@@ -906,7 +906,9 @@ steps:
         - tag
 
   - name: docker-publish-head-agent
-    image: rancher/drone-images:docker-amd64-ltsc2022
+    image: plugins/docker:windows-ltsc2022-amd64
+    environment:
+      DOCKER_REGISTRY: stgregistry.suse.com
     settings:
       purge: false
       build_args:
@@ -918,7 +920,7 @@ steps:
       dockerfile: package/windows/Dockerfile.agent
       password:
         from_secret: stage_registry_password
-      repo: stgregistry.suse.com/rancher/rancher-agent
+      repo: rancher/rancher-agent
       tag: ${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-windows-ltsc2022
       username:
         from_secret: stage_registry_username
@@ -934,7 +936,9 @@ steps:
         - push
 
   - name: docker-publish-agent
-    image: rancher/drone-images:docker-amd64-ltsc2022
+    image: plugins/docker:windows-ltsc2022-amd64
+    environment:
+      DOCKER_REGISTRY: stgregistry.suse.com
     settings:
       purge: false
       build_args:
@@ -946,7 +950,7 @@ steps:
       dockerfile: package/windows/Dockerfile.agent
       password:
         from_secret: stage_registry_password
-      repo: stgregistry.suse.com/rancher/rancher-agent
+      repo: rancher/rancher-agent
       tag: "${DRONE_TAG}-windows-ltsc2022"
       username:
         from_secret: stage_registry_username
