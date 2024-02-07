@@ -49,16 +49,16 @@ def add_cluster_roles(admin_mc, remove_resource):
     roles = rbac_api.list_cluster_role()
 
     cr1 = add_cr_if_not_exist(roles=roles,
-                             name="monitoring-ui-view",
-                             rbac_api=rbac_api)
+                              name="monitoring-ui-view",
+                              rbac_api=rbac_api)
 
     cr2 = add_cr_if_not_exist(roles=roles,
-                             name="navlinks-view",
-                             rbac_api=rbac_api)
+                              name="navlinks-view",
+                              rbac_api=rbac_api)
 
     cr3 = add_cr_if_not_exist(roles=roles,
-                             name="navlinks-manage",
-                             rbac_api=rbac_api)
+                              name="navlinks-manage",
+                              rbac_api=rbac_api)
 
     yield
 
@@ -305,7 +305,7 @@ def add_cr_if_not_exist(roles, name, rbac_api):
     for r in roles.items:
         if r.metadata.name == name:
             hasRole = True
-    
+
     if not hasRole:
         body = kubernetes.client.V1ClusterRole()
         body.metadata = kubernetes.client.V1ObjectMeta(name=name)
