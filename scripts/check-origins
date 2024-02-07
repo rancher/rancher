@@ -26,7 +26,7 @@ if [ ! -d build/system-charts ]; then
 fi
 
 if [ ! -d $CHART_REPO_DIR ]; then
-    git clone --branch rancher-v1.28 https://github.com/chiukapoor/charts $CHART_REPO_DIR
+    git clone --branch rancher-v1.29.0 https://github.com/krunalhinguu/charts $CHART_REPO_DIR
 fi
 
 TAG=$TAG REPO=${REPO} go run ../pkg/image/origins/main.go $SYSTEM_CHART_REPO_DIR $CHART_REPO_DIR $IMAGE $AGENT_IMAGE $SYSTEM_AGENT_UPGRADE_IMAGE $WINS_AGENT_UPGRADE_IMAGE ${SYSTEM_AGENT_INSTALLER_RKE2_IMAGES[@]} ${SYSTEM_AGENT_INSTALLER_K3S_IMAGES[@]}

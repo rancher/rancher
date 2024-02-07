@@ -55,12 +55,7 @@ if [ ! -d build/system-charts ]; then
 fi
 
 if [ ! -d $CHART_REPO_DIR ]; then
-    git clone --branch rancher-v1.28 https://github.com/chiukapoor/charts $CHART_REPO_DIR
-fi
-
-if [ ! -d $SMALL_FORK_REPO_DIR ]; then
-    mkdir -p $SMALL_FORK_REPO_DIR
-    git clone --branch main https://github.com/rancher/charts-small-fork $SMALL_FORK_REPO_DIR
+    git clone --branch rancher-v1.29.0 https://github.com/krunalhinguu/charts $CHART_REPO_DIR
 fi
 
 if [ ${ARCH} == amd64 ]; then

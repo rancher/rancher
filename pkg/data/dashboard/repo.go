@@ -27,8 +27,8 @@ func addRepo(wrangler *wrangler.Context, repoName, branchName string) error {
 					Name: repoName,
 				},
 				Spec: v1.RepoSpec{
-					GitRepo:   "https://github.com/chiukapoor/charts/",
-					GitBranch: "rancher-v1.28",
+					GitRepo:   "https://github.com/krunalhinguu/charts/",
+					GitBranch: "rancher-v1.29.0",
 				},
 			})
 		}
