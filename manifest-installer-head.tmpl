@@ -1,17 +1,17 @@
-image: rancher/system-agent-installer-rancher:{{#if build.tag}}{{build.tag}}{{else}}{{replace "release/" "" build.branch }}-head{{/if}}
+image: stgregistry.suse.com/rancher/system-agent-installer-rancher:{{#if build.tag}}{{build.tag}}{{else}}{{replace "release/" "" build.branch }}-head{{/if}}
 manifests:
   -
-    image: rancher/system-agent-installer-rancher:{{#if build.tag}}{{build.tag}}{{else}}{{replace "release/" "" build.branch }}-{{build.commit}}{{/if}}-linux-amd64
+    image: stgregistry.suse.com/rancher/system-agent-installer-rancher:{{#if build.tag}}{{build.tag}}{{else}}{{replace "release/" "" build.branch }}-{{build.commit}}{{/if}}-linux-amd64
     platform:
       architecture: amd64
       os: linux
   -
-    image: rancher/system-agent-installer-rancher:{{#if build.tag}}{{build.tag}}{{else}}{{replace "release/" "" build.branch }}-{{build.commit}}{{/if}}-linux-arm64
+    image: stgregistry.suse.com/rancher/system-agent-installer-rancher:{{#if build.tag}}{{build.tag}}{{else}}{{replace "release/" "" build.branch }}-{{build.commit}}{{/if}}-linux-arm64
     platform:
       architecture: arm64
       os: linux
   -
-    image: rancher/system-agent-installer-rancher:{{#if build.tag}}{{build.tag}}{{else}}{{replace "release/" "" build.branch }}-{{build.commit}}{{/if}}-linux-s390x
+    image: stgregistry.suse.com/rancher/system-agent-installer-rancher:{{#if build.tag}}{{build.tag}}{{else}}{{replace "release/" "" build.branch }}-{{build.commit}}{{/if}}-linux-s390x
     platform:
       architecture: s390x
       os: linux
