@@ -364,7 +364,7 @@ def setup_airgap_rancher(bastion_node, number_of_nodes=NUMBER_OF_INSTANCES):
         "--set rancherImage={2}/rancher/rancher " \
         "--set systemDefaultRegistry={2} " \
         "--set useBundledSystemChart=true --set ingress.tls.source=secret " \
-        "--set rancherImageTag={0} --no-hooks".format(
+        "--set rancherImageTag={0} --no-hooks --validate".format(
             RANCHER_SERVER_VERSION,
             RANCHER_AG_INTERNAL_HOSTNAME,
             REGISTRY_HOSTNAME,
