@@ -16,6 +16,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	util "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/clustermanager"
+	"github.com/rancher/rancher/pkg/controllers/managementuser/healthsyncer"
 	"github.com/rancher/rancher/pkg/features"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -42,6 +43,8 @@ const (
 	clusterImage        = "clusterImage"
 )
 
+var ErrCantConnectToAPI = errors.New("cannot connect to the cluster's Kubernetes API")
+
 var (
 	agentImagesMutex sync.RWMutex
 	agentImages      = map[string]map[string]string{
@@ -66,6 +69,7 @@ func Register(ctx context.Context, management *config.ManagementContext, cluster
 		nodeLister:           management.Management.Nodes("").Controller().Lister(),
 		clusterManager:       clusterManager,
 		secretLister:         management.Core.Secrets("").Controller().Lister(),
+		ctx:                  ctx,
 	}
 
 	management.Management.Clusters("").AddHandler(ctx, "cluster-deploy", c.sync)
@@ -79,6 +83,7 @@ type clusterDeploy struct {
 	mgmt                 *config.ManagementContext
 	nodeLister           v3.NodeLister
 	secretLister         v1.SecretLister
+	ctx                  context.Context
 }
 
 func (cd *clusterDeploy) sync(key string, cluster *apimgmtv3.Cluster) (runtime.Object, error) {
@@ -125,6 +130,18 @@ func (cd *clusterDeploy) doSync(cluster *apimgmtv3.Cluster) error {
 	if !apimgmtv3.ClusterConditionProvisioned.IsTrue(cluster) {
 		logrus.Tracef("clusterDeploy: doSync: cluster [%s] is not yet provisioned (ClusterConditionProvisioned is not True)", cluster.Name)
 		return nil
+	}
+
+	// Skip further work if the cluster's API is not reachable according to HealthSyncer criteria
+	// Note that we don't check the cluster's ClusterConditionReady status here, as HealthSyncer is not running
+	// prior deployment of the cluster agent
+	uc, err := cd.clusterManager.UserContextNoControllersReconnecting(cluster.Name, false)
+	if err != nil {
+		return err
+	}
+	if err := healthsyncer.IsAPIUp(cd.ctx, uc.K8sClient); err != nil {
+		logrus.Tracef("clusterDeploy: doSync: cannot connect to API for cluster [%s]", cluster.Name)
+		return ErrCantConnectToAPI
 	}
 
 	nodes, err := cd.nodeLister.List(cluster.Name, labels.Everything())
