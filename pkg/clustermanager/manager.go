@@ -467,12 +467,20 @@ func (m *Manager) APIExtClient(_ *types.APIContext, _ types.StorageContext) (cli
 
 // UserContextNoControllers accepts a cluster name and returns a client for that cluster,
 // no controllers are started for that cluster in the process.
+// Note it will block retrying to connect to the cluster for ~30 seconds before returning
+// in case the cluster connection fails.
 func (m *Manager) UserContextNoControllers(clusterName string) (*config.UserContext, error) {
+	return m.UserContextNoControllersReconnecting(clusterName, true)
+}
+
+// UserContextNoControllersReconnecting works like UserContextNoControllers if tryReconnecting is true.
+// Otherwise, it will return an error immediately if the cluster connection fails.
+func (m *Manager) UserContextNoControllersReconnecting(clusterName string, tryReconnecting bool) (*config.UserContext, error) {
 	cluster, err := m.clusterLister.Get("", clusterName)
 	if err != nil {
 		return nil, err
 	}
-	ctx, err := m.UserContextFromCluster(cluster)
+	ctx, err := m.UserContextFromClusterReconnecting(cluster, tryReconnecting)
 	if ctx == nil && err == nil {
 		return nil, fmt.Errorf("cluster context %s is unavailable", clusterName)
 	}
@@ -501,8 +509,16 @@ func (m *Manager) UserContext(clusterName string) (*config.UserContext, error) {
 
 // UserContextFromCluster accepts a pointer to a Cluster and returns a client
 // for that cluster. It does not start any controllers.
+// Note it will block retrying to connect to the cluster for ~30 seconds before returning
+// in case the cluster connection fails.
 func (m *Manager) UserContextFromCluster(cluster *apimgmtv3.Cluster) (*config.UserContext, error) {
-	kubeConfig, err := ToRESTConfig(cluster, m.ScaledContext, m.secretLister)
+	return m.UserContextFromClusterReconnecting(cluster, true)
+}
+
+// UserContextFromClusterReconnecting works like UserContextFromCluster if tryReconnecting is true.
+// Otherwise, it will return an error immediately if the cluster connection fails.
+func (m *Manager) UserContextFromClusterReconnecting(cluster *apimgmtv3.Cluster, tryReconnecting bool) (*config.UserContext, error) {
+	kubeConfig, err := ToRESTConfig(cluster, m.ScaledContext, m.secretLister, tryReconnecting)
 	if err != nil {
 		return nil, err
 	}
