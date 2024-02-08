@@ -5,7 +5,7 @@ go 1.21
 replace k8s.io/client-go => github.com/rancher/client-go v1.27.4-rancher1
 
 require (
-	github.com/rancher/norman v0.0.0-20230831160711-5de27f66385d
+	github.com/rancher/norman v0.0.0-20240205154641-a6a6cf569608
 	k8s.io/apimachinery v0.27.9
 )
 
