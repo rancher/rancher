@@ -9,7 +9,7 @@ replace (
 	github.com/knative/pkg => github.com/rancher/pkg v0.0.0-20190514055449-b30ab9de040e
 	github.com/matryer/moq => github.com/rancher/moq v0.0.0-20200712062324-13d1f37d2d77
 
-	github.com/opencontainers/runc => github.com/opencontainers/runc v1.1.2
+	github.com/opencontainers/runc => github.com/opencontainers/runc v1.1.12
 	github.com/rancher/rancher/pkg/apis => ./pkg/apis
 	github.com/rancher/rancher/pkg/client => ./pkg/client
 
@@ -103,7 +103,7 @@ require (
 	github.com/prometheus/client_model v0.2.0
 	github.com/prometheus/common v0.32.1
 	github.com/rancher/aks-operator v1.0.9
-	github.com/rancher/apiserver v0.0.0-20230502191800-c17b7df705a5
+	github.com/rancher/apiserver v0.0.0-20240205164636-4df268e250f6
 	github.com/rancher/channelserver v0.5.1-0.20220405170618-28c9b37deff1
 	github.com/rancher/dynamiclistener v0.3.5
 	github.com/rancher/eks-operator v1.1.6-rc3
@@ -113,14 +113,14 @@ require (
 	github.com/rancher/lasso v0.0.0-20221227210133-6ea88ca2fbcc
 	github.com/rancher/lasso/controller-runtime v0.0.0-20220627205005-00d9c8e9dda6
 	github.com/rancher/machine v0.15.0-rancher96
-	github.com/rancher/norman v0.0.0-20230426211157-18989f78fc0a
+	github.com/rancher/norman v0.0.0-20240205164525-bd13c653293b
 	github.com/rancher/rancher/pkg/apis v0.0.0
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 	github.com/rancher/remotedialer v0.2.6-0.20220624190122-ea57207bf2b8
-	github.com/rancher/rke v1.3.20
+	github.com/rancher/rke v1.3.24
 	github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168
-	github.com/rancher/steve v0.0.0-20230224165120-1a36a52a25b7
+	github.com/rancher/steve v0.0.0-20240207201906-815e20b6e12b
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007
 	github.com/rancher/wrangler v1.0.1-0.20230208234005-a59a11cc3ef5
 	github.com/robfig/cron v1.1.0
@@ -215,7 +215,7 @@ require (
 	github.com/coredns/corefile-migration v1.0.17 // indirect
 	github.com/coreos/go-systemd/v22 v22.3.2 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
-	github.com/cyphar/filepath-securejoin v0.2.3 // indirect
+	github.com/cyphar/filepath-securejoin v0.2.4 // indirect
 	github.com/dimchansky/utfbom v1.1.0 // indirect
 	github.com/docker/cli v20.10.17+incompatible // indirect
 	github.com/docker/docker-credential-helpers v0.6.4 // indirect

@@ -9,14 +9,21 @@ import (
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
 	k8srbac "k8s.io/api/rbac/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/cache"
 )
 
 const (
 	grbByRoleIndex = "management.cattle.io/grb-by-role"
+)
+
+var (
+	errNotFound     = apierrors.NewNotFound(schema.GroupResource{}, "")
+	errAlreadyExist = apierrors.NewAlreadyExists(schema.GroupResource{}, "")
 )
 
 func newClusterHandler(workload *config.UserContext) v3.ClusterHandlerFunc { //*clusterHandler {
