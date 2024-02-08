@@ -9,6 +9,7 @@ import (
 	"github.com/gorilla/mux"
 	authcontext "github.com/rancher/rancher/pkg/auth/context"
 	"github.com/rancher/rancher/pkg/auth/tokens"
+	controllers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -22,7 +23,10 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-const serviceAccountSubjectPrefix = "system:serviceaccount:"
+const (
+	serviceAccountSubjectPrefix = "system:serviceaccount:"
+	settingsObjectName          = "clusterproxyconfig"
+)
 
 type (
 	restConfigGetter  func(cluster *mgmtv3.Cluster, context *config.ScaledContext, secretLister corev1.SecretLister) (*rest.Config, error)
@@ -31,11 +35,12 @@ type (
 
 // ServiceAccountAuth is an authenticator that authenticates requests using the downstream service account's JWT.
 type ServiceAccountAuth struct {
-	scaledContext     *config.ScaledContext
-	clusterLister     mgmtv3.ClusterLister
-	secretLister      corev1.SecretLister
-	restConfigGetter  restConfigGetter
-	authClientCreator authClientCreator
+	scaledContext             *config.ScaledContext
+	clusterLister             mgmtv3.ClusterLister
+	secretLister              corev1.SecretLister
+	restConfigGetter          restConfigGetter
+	authClientCreator         authClientCreator
+	clusterProxyConfigsGetter controllers.ClusterProxyConfigCache
 }
 
 // NewServiceAccountAuth creates a new instance of ServiceAccountAuth.
@@ -51,14 +56,31 @@ func NewServiceAccountAuth(
 		authClientCreator: func(config *rest.Config) (authv1.AuthenticationV1Interface, error) {
 			return authv1.NewForConfig(config)
 		},
+		clusterProxyConfigsGetter: scaledContext.Wrangler.Mgmt.ClusterProxyConfig().Cache(),
 	}
 }
 
 // Authenticate the request using the downstream service account's JWT.
 func (t *ServiceAccountAuth) Authenticate(req *http.Request) (user.Info, bool, error) {
+	// Basic checks to see if we even need to proceed
 	info, hasAuth := request.UserFrom(req.Context())
 	if info.GetName() != "system:cattle:error" {
 		return info, hasAuth, nil
+	}
+	clusterID := mux.Vars(req)["clusterID"]
+	if clusterID == "" {
+		return info, hasAuth, fmt.Errorf("no clusterID found in request")
+	}
+	// Check the cluster setting value to determine whether we will continue the auth process
+	settings, err := t.clusterProxyConfigsGetter.Get(clusterID, settingsObjectName)
+	if err != nil {
+		logrus.Warnf("rejecting downstream proxy request for %s, unable to fetch ClusterProxySettings object for cluster", req.URL.Path)
+		return &user.DefaultInfo{}, false, nil
+	}
+
+	if !settings.Enabled {
+		logrus.Warnf("rejecting downstream proxy request for %s, current setting is enabled: %v", req.URL.Path, settings.Enabled)
+		return &user.DefaultInfo{}, false, nil
 	}
 
 	// See if the token is a JWT.
@@ -66,7 +88,7 @@ func (t *ServiceAccountAuth) Authenticate(req *http.Request) (user.Info, bool, e
 
 	jwtParser := jwtv4.Parser{}
 	claims := jwtv4.RegisteredClaims{}
-	_, _, err := jwtParser.ParseUnverified(rawToken, &claims)
+	_, _, err = jwtParser.ParseUnverified(rawToken, &claims)
 	if err != nil {
 		logrus.Debugf("saauth: error parsing JWT: %v", err)
 		return info, false, err
@@ -80,12 +102,6 @@ func (t *ServiceAccountAuth) Authenticate(req *http.Request) (user.Info, bool, e
 	if isTokenExpired(claims.ExpiresAt) {
 		logrus.Debugf("saauth: Service Account JWT is expired. Expiration time was: %v", claims.ExpiresAt)
 		return info, false, nil
-	}
-
-	// Make sure the cluster exists.
-	clusterID := mux.Vars(req)["clusterID"]
-	if clusterID == "" {
-		return info, hasAuth, fmt.Errorf("no clusterID found in request")
 	}
 
 	cluster, err := t.clusterLister.Get("", clusterID)

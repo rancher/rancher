@@ -476,3 +476,16 @@ type OIDCApplyInput struct {
 type KeyCloakOIDCConfig struct {
 	OIDCConfig `json:",inline" mapstructure:",squash"`
 }
+
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// ClusterProxyConfig determines which downstream requests will be proxied to the downstream cluster for requests that contain service account tokens.
+type ClusterProxyConfig struct {
+	types.Namespaced  `json:",inline"`
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	// Enabled indicates whether downstream proxy requests for service account tokens is enabled.
+	Enabled bool `json:"enabled"`
+}

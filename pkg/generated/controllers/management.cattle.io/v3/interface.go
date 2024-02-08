@@ -44,6 +44,7 @@ type Interface interface {
 	Cluster() ClusterController
 	ClusterCatalog() ClusterCatalogController
 	ClusterLogging() ClusterLoggingController
+	ClusterProxyConfig() ClusterProxyConfigController
 	ClusterRegistrationToken() ClusterRegistrationTokenController
 	ClusterRoleTemplateBinding() ClusterRoleTemplateBindingController
 	ClusterTemplate() ClusterTemplateController
@@ -159,6 +160,10 @@ func (v *version) ClusterCatalog() ClusterCatalogController {
 
 func (v *version) ClusterLogging() ClusterLoggingController {
 	return generic.NewController[*v3.ClusterLogging, *v3.ClusterLoggingList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ClusterLogging"}, "clusterloggings", true, v.controllerFactory)
+}
+
+func (v *version) ClusterProxyConfig() ClusterProxyConfigController {
+	return generic.NewController[*v3.ClusterProxyConfig, *v3.ClusterProxyConfigList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ClusterProxyConfig"}, "clusterproxyconfigs", true, v.controllerFactory)
 }
 
 func (v *version) ClusterRegistrationToken() ClusterRegistrationTokenController {

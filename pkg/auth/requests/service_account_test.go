@@ -1,16 +1,20 @@
 package requests
 
 import (
+	"fmt"
 	"net/http"
 	"testing"
 	"time"
 
 	jwtv4 "github.com/golang-jwt/jwt/v4"
+	"github.com/golang/mock/gomock"
 	"github.com/gorilla/mux"
+	v3api "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	"github.com/rancher/rancher/pkg/types/config"
+	wranglerfake "github.com/rancher/wrangler/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/authentication/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -21,6 +25,11 @@ import (
 	authv1 "k8s.io/client-go/kubernetes/typed/authentication/v1"
 	"k8s.io/client-go/rest"
 	k8stesting "k8s.io/client-go/testing"
+)
+
+const (
+	proxyPrefix       = "/k8s/clusters/"
+	tokenReviewSuffix = "/apis/authentication.k8s.io/v1/tokenreviews"
 )
 
 func TestIsTokenExpired(t *testing.T) {
@@ -55,25 +64,46 @@ func TestIsTokenExpired(t *testing.T) {
 }
 
 func TestAuthenticate(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name                  string
 		startUser             string
 		expectedUser          string
+		settingEnabled        bool
 		token                 string
 		tokenReviewAuthStatus bool
+		downstreamRequest     *http.Request
 		clusterID             string
 		isAuthenticated       bool
 		expectedError         bool
+		omitProxyConfig       bool
 	}{
 		{
-			name: "everything valid auth succeeds",
+			name: "everything valid auth succeeds secure mode",
 			token: makeJWT(jwtv4.MapClaims{
 				"sub": "system:serviceaccount:vault:token-reviewer",
 				"exp": time.Now().Add(time.Hour).Unix(),
 			}),
 			startUser:             "system:cattle:error",
 			expectedUser:          "expected-username",
+			settingEnabled:        true,
 			tokenReviewAuthStatus: true,
+			downstreamRequest:     generateDownstreamRequest("POST", "testclusterid"+tokenReviewSuffix),
+			clusterID:             "testclusterid",
+			isAuthenticated:       true,
+			expectedError:         false,
+		},
+		{
+			name: "everything valid auth succeeds insecure mode",
+			token: makeJWT(jwtv4.MapClaims{
+				"sub": "system:serviceaccount:vault:token-reviewer",
+				"exp": time.Now().Add(time.Hour).Unix(),
+			}),
+			startUser:             "system:cattle:error",
+			expectedUser:          "expected-username",
+			settingEnabled:        true,
+			tokenReviewAuthStatus: true,
+			downstreamRequest:     generateDownstreamRequest("POST", "testclusterid"+tokenReviewSuffix),
 			clusterID:             "testclusterid",
 			isAuthenticated:       true,
 			expectedError:         false,
@@ -86,7 +116,9 @@ func TestAuthenticate(t *testing.T) {
 			}),
 			startUser:             "system:cattle:error",
 			expectedUser:          "",
+			settingEnabled:        true,
 			tokenReviewAuthStatus: false,
+			downstreamRequest:     generateDownstreamRequest("POST", "testclusterid"+tokenReviewSuffix),
 			clusterID:             "testclusterid",
 			isAuthenticated:       false,
 			expectedError:         false,
@@ -97,20 +129,24 @@ func TestAuthenticate(t *testing.T) {
 				"sub": "system:serviceaccount:vault:token-reviewer",
 				"exp": time.Now().Add(-time.Hour).Unix(),
 			}),
-			startUser:       "system:cattle:error",
-			expectedUser:    "system:cattle:error",
-			clusterID:       "testclusterid",
-			isAuthenticated: false,
-			expectedError:   false,
+			startUser:         "system:cattle:error",
+			expectedUser:      "system:cattle:error",
+			settingEnabled:    true,
+			downstreamRequest: generateDownstreamRequest("POST", "testclusterid"+tokenReviewSuffix),
+			clusterID:         "testclusterid",
+			isAuthenticated:   false,
+			expectedError:     false,
 		},
 		{
-			name:            "invalid token auth fail",
-			token:           "totallybogusjwttoken",
-			startUser:       "system:cattle:error",
-			expectedUser:    "system:cattle:error",
-			clusterID:       "testclusterid",
-			isAuthenticated: false,
-			expectedError:   true,
+			name:              "invalid token auth fail",
+			token:             "totallybogusjwttoken",
+			startUser:         "system:cattle:error",
+			expectedUser:      "system:cattle:error",
+			settingEnabled:    true,
+			downstreamRequest: generateDownstreamRequest("POST", "testclusterid"+tokenReviewSuffix),
+			clusterID:         "testclusterid",
+			isAuthenticated:   false,
+			expectedError:     true,
 		},
 		{
 			name: "invalid subject in jwt will fail",
@@ -118,11 +154,13 @@ func TestAuthenticate(t *testing.T) {
 				"sub": "not-a-sa:totalfail",
 				"exp": time.Now().Add(time.Hour).Unix(),
 			}),
-			startUser:       "system:cattle:error",
-			expectedUser:    "system:cattle:error",
-			clusterID:       "testcluster",
-			isAuthenticated: false,
-			expectedError:   false,
+			startUser:         "system:cattle:error",
+			expectedUser:      "system:cattle:error",
+			settingEnabled:    true,
+			downstreamRequest: generateDownstreamRequest("POST", "testclusterid"+tokenReviewSuffix),
+			clusterID:         "testcluster",
+			isAuthenticated:   false,
+			expectedError:     false,
 		},
 		{
 			name: "missing clusterid auth fail",
@@ -130,22 +168,70 @@ func TestAuthenticate(t *testing.T) {
 				"sub": "system:serviceaccount:vault:token-reviewer",
 				"exp": time.Now().Add(time.Hour).Unix(),
 			}),
-			startUser:       "system:cattle:error",
-			expectedUser:    "system:cattle:error",
-			clusterID:       "",
-			isAuthenticated: true,
-			expectedError:   true,
+			startUser:         "system:cattle:error",
+			expectedUser:      "system:cattle:error",
+			settingEnabled:    true,
+			downstreamRequest: generateDownstreamRequest("POST", "testclusterid"+tokenReviewSuffix),
+			clusterID:         "",
+			isAuthenticated:   true,
+			expectedError:     true,
 		},
 		{
-			startUser:       "anotherauthuser",
-			expectedUser:    "anotherauthuser",
-			isAuthenticated: true,
-			expectedError:   false,
+			name: "everything valid but setting is off auth fails",
+			token: makeJWT(jwtv4.MapClaims{
+				"sub": "system:serviceaccount:vault:token-reviewer",
+				"exp": time.Now().Add(time.Hour).Unix(),
+			}),
+			startUser:         "system:cattle:error",
+			settingEnabled:    false,
+			downstreamRequest: generateDownstreamRequest("POST", "testclusterid"+tokenReviewSuffix),
+			clusterID:         "testcluster",
+			isAuthenticated:   false,
+			expectedError:     false,
+		},
+		{
+			name: "everything valid but setting is missing auth fails",
+			token: makeJWT(jwtv4.MapClaims{
+				"sub": "system:serviceaccount:vault:token-reviewer",
+				"exp": time.Now().Add(time.Hour).Unix(),
+			}),
+			startUser:         "system:cattle:error",
+			downstreamRequest: generateDownstreamRequest("POST", "testclusterid"+tokenReviewSuffix),
+			clusterID:         "testcluster",
+			isAuthenticated:   false,
+			expectedError:     false,
+			omitProxyConfig:   true,
+		},
+		{
+			name: "everything valid auth succeeds for non tokenreview feature enabled",
+			token: makeJWT(jwtv4.MapClaims{
+				"sub": "system:serviceaccount:vault:token-reviewer",
+				"exp": time.Now().Add(time.Hour).Unix(),
+			}),
+			startUser:             "system:cattle:error",
+			expectedUser:          "expected-username",
+			settingEnabled:        true,
+			tokenReviewAuthStatus: true,
+			downstreamRequest:     generateDownstreamRequest("GET", "testclusterid/apis/testgroup.k8s.io/v1/testendpoint"),
+			clusterID:             "testclusterid",
+			isAuthenticated:       true,
+			expectedError:         false,
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for _, test := range tests {
+		test := test
+		ctrl := gomock.NewController(t)
+		cpsCache := wranglerfake.NewMockCacheInterface[*v3api.ClusterProxyConfig](ctrl)
+		cpsCache.EXPECT().Get(gomock.Any(), gomock.Any()).DoAndReturn(func(namespace, name string) (*v3api.ClusterProxyConfig, error) {
+			if test.omitProxyConfig {
+				return nil, fmt.Errorf("config not found")
+			}
+			return &v3api.ClusterProxyConfig{
+				Enabled: test.settingEnabled,
+			}, nil
+		}).AnyTimes()
+		t.Run(test.name, func(t *testing.T) {
 			mgmtCtx, err := config.NewScaledContext(rest.Config{}, nil)
 			auth := &ServiceAccountAuth{
 				scaledContext: mgmtCtx,
@@ -168,10 +254,10 @@ func TestAuthenticate(t *testing.T) {
 								APIVersion: "authentication.k8s.io/v1",
 							},
 							Status: v1.TokenReviewStatus{
-								Authenticated: tt.tokenReviewAuthStatus,
+								Authenticated: test.tokenReviewAuthStatus,
 								Audiences:     []string{},
 								User: v1.UserInfo{
-									Username: tt.expectedUser,
+									Username: test.expectedUser,
 								},
 							},
 						}
@@ -179,27 +265,33 @@ func TestAuthenticate(t *testing.T) {
 					})
 					return authclient.AuthenticationV1(), nil
 				},
+				clusterProxyConfigsGetter: cpsCache,
 			}
 
-			req, _ := http.NewRequest("GET", "/k8s/clusters/"+tt.clusterID+"/apis/authentication.k8s.io/tokenreviews", nil)
-			req.Header.Set("Authorization", "Bearer "+tt.token)
+			req := test.downstreamRequest
+			req.Header.Set("Authorization", "Bearer "+test.token)
 			startUserInfo := &user.DefaultInfo{
-				Name: tt.startUser,
+				Name: test.startUser,
 			}
 			currentContext := req.Context()
 			req = req.WithContext(k8sRequest.WithUser(currentContext, startUserInfo))
-			req = mux.SetURLVars(req, map[string]string{"clusterID": tt.clusterID})
+			req = mux.SetURLVars(req, map[string]string{"clusterID": test.clusterID})
 			user, isAuthenticated, err := auth.Authenticate(req.WithContext(req.Context()))
 
-			if tt.expectedError {
+			if test.expectedError {
 				assert.NotNil(t, err, "Expected error")
 			} else {
 				assert.Nil(t, err, "Expected no error")
 			}
-			assert.Equal(t, tt.isAuthenticated, isAuthenticated, "Unexpected authentication result")
-			assert.Equal(t, tt.expectedUser, user.GetName(), "Expected username in the user info")
+			assert.Equal(t, test.isAuthenticated, isAuthenticated, "Unexpected authentication result")
+			assert.Equal(t, test.expectedUser, user.GetName(), "Expected username in the user info")
 		})
 	}
+}
+
+func generateDownstreamRequest(method string, path string) *http.Request {
+	req, _ := http.NewRequest("GET", proxyPrefix+path, nil)
+	return req
 }
 
 func makeJWT(claims jwtv4.Claims) string {

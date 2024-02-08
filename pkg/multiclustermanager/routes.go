@@ -99,7 +99,7 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 
 	saauthed := mux.NewRouter()
 	saauthed.UseEncodedPath()
-	saauthed.PathPrefix("/k8s/clusters/{clusterID}/apis/authentication.k8s.io/v1/tokenreviews").Handler(k8sProxy)
+	saauthed.PathPrefix("/k8s/clusters/{clusterID}").Handler(k8sProxy)
 	saauthed.Use(mux.MiddlewareFunc(saAuth.Chain(impersonatingAuth)))
 	saauthed.Use(mux.MiddlewareFunc(accessControlHandler))
 	saauthed.Use(requests.NewAuthenticatedFilter)
