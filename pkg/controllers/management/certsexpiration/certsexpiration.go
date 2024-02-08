@@ -6,8 +6,8 @@ import (
 	"time"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"k8s.io/client-go/kubernetes"
 
-	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/rkecerts"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -20,29 +20,30 @@ import (
 // This controller handles cert expiration for local cluster only
 func Register(ctx context.Context, management *config.ManagementContext) {
 	c := &certsExpiration{
-		clusters:        management.Management.Clusters(""),
-		configMapLister: management.Core.ConfigMaps("kube-system").Controller().Lister(),
+		clusters:  management.Management.Clusters(""),
+		k8sClient: management.K8sClient,
 	}
 	management.Management.Clusters("").AddHandler(ctx, "certificate-expiration", c.sync)
 }
 
 type certsExpiration struct {
-	clusters        v3.ClusterInterface
-	configMapLister v1.ConfigMapLister
+	clusters  v3.ClusterInterface
+	k8sClient kubernetes.Interface
 }
 
 func (c *certsExpiration) sync(key string, cluster *v3.Cluster) (runtime.Object, error) {
 	if cluster == nil || cluster.Name != "local" {
 		return cluster, nil // We are only checking local cluster
 	}
-	cm, err := c.configMapLister.Get("kube-system", rkeCluster.FullStateConfigMapName)
+	fullState, err := rkeCluster.GetFullStateFromK8s(context.Background(), c.k8sClient)
 	if err != nil {
 		if k8sErrors.IsNotFound(err) {
 			return cluster, nil // not an rke cluster, nothing we can do
 		}
 		return cluster, err
 	}
-	certBundle, err := rkecerts.CertBundleFromConfig(cm)
+
+	certBundle := fullState.CurrentState.CertificatesBundle
 	if err != nil {
 		return cluster, err
 	}
