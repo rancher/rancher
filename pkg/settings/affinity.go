@@ -10,7 +10,7 @@ const (
         {
           "matchExpressions": [
             {
-              "key": "beta.kubernetes.io/os",
+              "key": "kubernetes.io/os",
               "operator": "NotIn",
               "values": [
                 "windows"
