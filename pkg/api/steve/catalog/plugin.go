@@ -38,7 +38,7 @@ func pluginHandler(w http.ResponseWriter, r *http.Request) {
 	logrus.Debugf("http request vars %s", vars)
 	authed := isAuthenticated(r)
 	entry, ok := plugin.Index.Entries[vars["name"]]
-	//
+	// Checks if the requested plugin exists and if the user has authorization to see it
 	if (!ok || entry.Version != vars["version"]) || (!authed && !entry.NoAuth) {
 		msg := fmt.Sprintf("plugin [name: %s version: %s] does not exist in index", vars["name"], vars["version"])
 		http.Error(w, msg, http.StatusNotFound)

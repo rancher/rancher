@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"github.com/Masterminds/semver/v3"
 	filepathsecure "github.com/cyphar/filepath-securejoin"
@@ -90,13 +91,16 @@ func (c FSCache) SyncWithControllersCache(cachedPlugins []*v1.UIPlugin) error {
 	return nil
 }
 
-// SyncWithIndex syncs up entries in the filesystem cache with the index's entries
+// SyncWithIndex syncs up entries in the filesystem cache with the index's entries.
 // Entries that aren't in the index, but present in the filesystem cache are deleted
 func (c FSCache) SyncWithIndex(index *SafeIndex, fsCacheFiles []string) error {
 	for _, file := range fsCacheFiles {
 		logrus.Debugf("syncing index with filesystem cache")
 		// Splits /{root}/{pluginName}/{pluginVersion}/* from a fs cache path
-		rel, _ := filepath.Rel(FSCacheRootDir, file)
+		rel, err := filepath.Rel(FSCacheRootDir, file)
+		if err != nil {
+			return fmt.Errorf("path is not relative to the root cache path: %w", err)
+		}
 		s := strings.Split(rel, "/")
 		name := s[0]
 		version := s[1]
@@ -118,7 +122,7 @@ func (c FSCache) Save(data []byte, path string) error {
 	if err := os.MkdirAll(filepath.Dir(path), os.ModePerm); err != nil {
 		return err
 	}
-	out, err := os.Create(path)
+	out, err := os.OpenFile(path, syscall.O_RDWR|syscall.O_CREAT|syscall.O_TRUNC, 0600)
 	if err != nil {
 		return err
 	}
@@ -136,7 +140,7 @@ func (c FSCache) Delete(name, version string) error {
 	}
 	err = osRemoveAll(p)
 	if err != nil {
-		err = fmt.Errorf("failed to delete entry [Name: %s Version: %s] from filesystem cache: %s", name, version, err.Error())
+		err = fmt.Errorf("failed to delete entry [Name: %s Version: %s] from filesystem cache: %w", name, version, err)
 		return err
 	}
 	logrus.Debugf("deleted plugin entry from cache [Name: %s Version: %s]", name, version)
@@ -164,19 +168,6 @@ func (c FSCache) isCached(name, version string) (bool, error) {
 			return true, nil
 		}
 
-		return false, err
-	}
-
-	if !errors.Is(err, os.ErrNotExist) {
-		isEmpty, err := isDirEmpty(path)
-		if err != nil {
-			return false, err
-		} else if !isEmpty {
-			return true, nil
-		}
-	} else if errors.Is(err, os.ErrNotExist) {
-		return false, nil
-	} else if err != nil {
 		return false, err
 	}
 

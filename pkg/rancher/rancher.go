@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/rancher/rancher/pkg/controllers/dashboard/plugin"
 	"net/http"
 	"os"
 	"strings"
@@ -264,6 +265,9 @@ func (r *Rancher) Start(ctx context.Context) error {
 
 	if err := steveapi.Setup(ctx, r.Steve, r.Wrangler); err != nil {
 		return err
+	}
+	if features.UIExtension.Enabled() {
+		plugin.Register(ctx, r.Wrangler)
 	}
 
 	if features.MCM.Enabled() {

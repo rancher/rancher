@@ -3,6 +3,8 @@ package plugin
 import (
 	"context"
 	"fmt"
+	"github.com/rancher/rancher/pkg/namespace"
+	"github.com/rancher/rancher/pkg/wrangler"
 
 	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	plugincontroller "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
@@ -11,16 +13,14 @@ import (
 
 func Register(
 	ctx context.Context,
-	systemNamespace string,
-	plugin plugincontroller.UIPluginController,
-	pluginCache plugincontroller.UIPluginCache,
+	wContext *wrangler.Context,
 ) {
 	h := &handler{
-		systemNamespace: systemNamespace,
-		plugin:          plugin,
-		pluginCache:     pluginCache,
+		systemNamespace: namespace.UIPluginNamespace,
+		plugin:          wContext.Catalog.UIPlugin(),
+		pluginCache:     wContext.Catalog.UIPlugin().Cache(),
 	}
-	plugin.OnChange(ctx, "on-ui-plugin-change", h.OnPluginChange)
+	wContext.Catalog.UIPlugin().OnChange(ctx, "on-ui-plugin-change", h.OnPluginChange)
 }
 
 type handler struct {
