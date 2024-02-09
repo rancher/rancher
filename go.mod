@@ -31,6 +31,7 @@ replace (
 	github.com/knative/pkg => github.com/rancher/pkg v0.0.0-20190514055449-b30ab9de040e
 	github.com/matryer/moq => github.com/rancher/moq v0.0.0-20200712062324-13d1f37d2d77
 	github.com/opencontainers/image-spec => github.com/opencontainers/image-spec v1.1.0-rc2 // needed for containers/image/v5
+	github.com/opencontainers/runc => github.com/opencontainers/runc v1.1.12
 
 	github.com/rancher/rancher/pkg/apis => ./pkg/apis
 	github.com/rancher/rancher/pkg/client => ./pkg/client
@@ -126,20 +127,20 @@ require (
 	github.com/prometheus/client_golang v1.18.0
 	github.com/prometheus/client_model v0.5.0
 	github.com/prometheus/common v0.45.0
-	github.com/rancher/aks-operator v1.2.0
-	github.com/rancher/apiserver v0.0.0-20230831052300-120e615b17ba
+	github.com/rancher/aks-operator v1.2.1-rc2
+	github.com/rancher/apiserver v0.0.0-20240205154815-a3b9e3721c1b
 	github.com/rancher/channelserver v0.5.1-0.20230719220800-0a37b73c7df8
 	github.com/rancher/dynamiclistener v1.27.5
-	github.com/rancher/eks-operator v1.3.0
+	github.com/rancher/eks-operator v1.3.1-rc1
 	github.com/rancher/fleet/pkg/apis v0.0.0-20231017140638-93432f288e79
 	github.com/rancher/gke-operator v1.2.1-rc1
 	github.com/rancher/kubernetes-provider-detector v0.1.5
 	github.com/rancher/lasso v0.0.0-20240123150939-7055397d6dfa
 	github.com/rancher/machine v0.15.0-rancher109
-	github.com/rancher/norman v0.0.0-20230831160711-5de27f66385d
+	github.com/rancher/norman v0.0.0-20240205154641-a6a6cf569608
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/remotedialer v0.3.0
-	github.com/rancher/rke v1.5.2-rc1
+	github.com/rancher/rke v1.5.3
 	github.com/rancher/steve v0.0.0-20231016202603-993540401906
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007
 	github.com/rancher/wrangler/v2 v2.1.3
