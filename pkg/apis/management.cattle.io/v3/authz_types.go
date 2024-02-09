@@ -192,7 +192,7 @@ type GlobalRoleStatus struct {
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
-	// LastUpdate is a timestamp of the last time the status was updated.
+	// LastUpdate is a k8s timestamp of the last time the status was updated.
 	// +optional
 	LastUpdate string `json:"lastUpdateTime,omitempty"`
 

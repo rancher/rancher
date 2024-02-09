@@ -235,7 +235,7 @@ spec:
                   type: object
                 type: array
               lastUpdateTime:
-                description: LastUpdate is a timestamp of the last time the status
+                description: LastUpdate is a k8s timestamp of the last time the status
                   was updated.
                 type: string
               observedGeneration:
