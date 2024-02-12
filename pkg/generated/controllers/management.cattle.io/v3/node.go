@@ -20,7 +20,6 @@ package v3
 
 import (
 	"context"
-	"sync"
 	"time"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -49,14 +48,10 @@ type NodeCache interface {
 	generic.CacheInterface[*v3.Node]
 }
 
-// NodeStatusHandler is executed for every added or modified Node. Should return the new status to be updated
 type NodeStatusHandler func(obj *v3.Node, status v3.NodeStatus) (v3.NodeStatus, error)
 
-// NodeGeneratingHandler is the top-level handler that is executed for every Node event. It extends NodeStatusHandler by a returning a slice of child objects to be passed to apply.Apply
 type NodeGeneratingHandler func(obj *v3.Node, status v3.NodeStatus) ([]runtime.Object, v3.NodeStatus, error)
 
-// RegisterNodeStatusHandler configures a NodeController to execute a NodeStatusHandler for every events observed.
-// If a non-empty condition is provided, it will be updated in the status conditions for every handler execution
 func RegisterNodeStatusHandler(ctx context.Context, controller NodeController, condition condition.Cond, name string, handler NodeStatusHandler) {
 	statusHandler := &nodeStatusHandler{
 		client:    controller,
@@ -66,8 +61,6 @@ func RegisterNodeStatusHandler(ctx context.Context, controller NodeController, c
 	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
 }
 
-// RegisterNodeGeneratingHandler configures a NodeController to execute a NodeGeneratingHandler for every events observed, passing the returned objects to the provided apply.Apply.
-// If a non-empty condition is provided, it will be updated in the status conditions for every handler execution
 func RegisterNodeGeneratingHandler(ctx context.Context, controller NodeController, apply apply.Apply,
 	condition condition.Cond, name string, handler NodeGeneratingHandler, opts *generic.GeneratingHandlerOptions) {
 	statusHandler := &nodeGeneratingHandler{
@@ -89,7 +82,6 @@ type nodeStatusHandler struct {
 	handler   NodeStatusHandler
 }
 
-// sync is executed on every resource addition or modification. Executes the configured handlers and sends the updated status to the Kubernetes API
 func (a *nodeStatusHandler) sync(key string, obj *v3.Node) (*v3.Node, error) {
 	if obj == nil {
 		return obj, nil
@@ -135,10 +127,8 @@ type nodeGeneratingHandler struct {
 	opts  generic.GeneratingHandlerOptions
 	gvk   schema.GroupVersionKind
 	name  string
-	seen  sync.Map
 }
 
-// Remove handles the observed deletion of a resource, cascade deleting every associated resource previously applied
 func (a *nodeGeneratingHandler) Remove(key string, obj *v3.Node) (*v3.Node, error) {
 	if obj != nil {
 		return obj, nil
@@ -148,17 +138,12 @@ func (a *nodeGeneratingHandler) Remove(key string, obj *v3.Node) (*v3.Node, erro
 	obj.Namespace, obj.Name = kv.RSplit(key, "/")
 	obj.SetGroupVersionKind(a.gvk)
 
-	if a.opts.UniqueApplyForResourceVersion {
-		a.seen.Delete(key)
-	}
-
 	return nil, generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
 		WithOwner(obj).
 		WithSetID(a.name).
 		ApplyObjects()
 }
 
-// Handle executes the configured NodeGeneratingHandler and pass the resulting objects to apply.Apply, finally returning the new status of the resource
 func (a *nodeGeneratingHandler) Handle(obj *v3.Node, status v3.NodeStatus) (v3.NodeStatus, error) {
 	if !obj.DeletionTimestamp.IsZero() {
 		return status, nil
@@ -168,41 +153,9 @@ func (a *nodeGeneratingHandler) Handle(obj *v3.Node, status v3.NodeStatus) (v3.N
 	if err != nil {
 		return newStatus, err
 	}
-	if !a.isNewResourceVersion(obj) {
-		return newStatus, nil
-	}
 
-	err = generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
+	return newStatus, generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
 		WithOwner(obj).
 		WithSetID(a.name).
 		ApplyObjects(objs...)
-	if err != nil {
-		return newStatus, err
-	}
-	a.storeResourceVersion(obj)
-	return newStatus, nil
-}
-
-// isNewResourceVersion detects if a specific resource version was already successfully processed.
-// Only used if UniqueApplyForResourceVersion is set in generic.GeneratingHandlerOptions
-func (a *nodeGeneratingHandler) isNewResourceVersion(obj *v3.Node) bool {
-	if !a.opts.UniqueApplyForResourceVersion {
-		return true
-	}
-
-	// Apply once per resource version
-	key := obj.Namespace + "/" + obj.Name
-	previous, ok := a.seen.Load(key)
-	return !ok || previous != obj.ResourceVersion
-}
-
-// storeResourceVersion keeps track of the latest resource version of an object for which Apply was executed
-// Only used if UniqueApplyForResourceVersion is set in generic.GeneratingHandlerOptions
-func (a *nodeGeneratingHandler) storeResourceVersion(obj *v3.Node) {
-	if !a.opts.UniqueApplyForResourceVersion {
-		return
-	}
-
-	key := obj.Namespace + "/" + obj.Name
-	a.seen.Store(key, obj.ResourceVersion)
 }

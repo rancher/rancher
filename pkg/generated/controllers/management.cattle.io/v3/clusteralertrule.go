@@ -20,7 +20,6 @@ package v3
 
 import (
 	"context"
-	"sync"
 	"time"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -49,14 +48,10 @@ type ClusterAlertRuleCache interface {
 	generic.CacheInterface[*v3.ClusterAlertRule]
 }
 
-// ClusterAlertRuleStatusHandler is executed for every added or modified ClusterAlertRule. Should return the new status to be updated
 type ClusterAlertRuleStatusHandler func(obj *v3.ClusterAlertRule, status v3.AlertStatus) (v3.AlertStatus, error)
 
-// ClusterAlertRuleGeneratingHandler is the top-level handler that is executed for every ClusterAlertRule event. It extends ClusterAlertRuleStatusHandler by a returning a slice of child objects to be passed to apply.Apply
 type ClusterAlertRuleGeneratingHandler func(obj *v3.ClusterAlertRule, status v3.AlertStatus) ([]runtime.Object, v3.AlertStatus, error)
 
-// RegisterClusterAlertRuleStatusHandler configures a ClusterAlertRuleController to execute a ClusterAlertRuleStatusHandler for every events observed.
-// If a non-empty condition is provided, it will be updated in the status conditions for every handler execution
 func RegisterClusterAlertRuleStatusHandler(ctx context.Context, controller ClusterAlertRuleController, condition condition.Cond, name string, handler ClusterAlertRuleStatusHandler) {
 	statusHandler := &clusterAlertRuleStatusHandler{
 		client:    controller,
@@ -66,8 +61,6 @@ func RegisterClusterAlertRuleStatusHandler(ctx context.Context, controller Clust
 	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
 }
 
-// RegisterClusterAlertRuleGeneratingHandler configures a ClusterAlertRuleController to execute a ClusterAlertRuleGeneratingHandler for every events observed, passing the returned objects to the provided apply.Apply.
-// If a non-empty condition is provided, it will be updated in the status conditions for every handler execution
 func RegisterClusterAlertRuleGeneratingHandler(ctx context.Context, controller ClusterAlertRuleController, apply apply.Apply,
 	condition condition.Cond, name string, handler ClusterAlertRuleGeneratingHandler, opts *generic.GeneratingHandlerOptions) {
 	statusHandler := &clusterAlertRuleGeneratingHandler{
@@ -89,7 +82,6 @@ type clusterAlertRuleStatusHandler struct {
 	handler   ClusterAlertRuleStatusHandler
 }
 
-// sync is executed on every resource addition or modification. Executes the configured handlers and sends the updated status to the Kubernetes API
 func (a *clusterAlertRuleStatusHandler) sync(key string, obj *v3.ClusterAlertRule) (*v3.ClusterAlertRule, error) {
 	if obj == nil {
 		return obj, nil
@@ -135,10 +127,8 @@ type clusterAlertRuleGeneratingHandler struct {
 	opts  generic.GeneratingHandlerOptions
 	gvk   schema.GroupVersionKind
 	name  string
-	seen  sync.Map
 }
 
-// Remove handles the observed deletion of a resource, cascade deleting every associated resource previously applied
 func (a *clusterAlertRuleGeneratingHandler) Remove(key string, obj *v3.ClusterAlertRule) (*v3.ClusterAlertRule, error) {
 	if obj != nil {
 		return obj, nil
@@ -148,17 +138,12 @@ func (a *clusterAlertRuleGeneratingHandler) Remove(key string, obj *v3.ClusterAl
 	obj.Namespace, obj.Name = kv.RSplit(key, "/")
 	obj.SetGroupVersionKind(a.gvk)
 
-	if a.opts.UniqueApplyForResourceVersion {
-		a.seen.Delete(key)
-	}
-
 	return nil, generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
 		WithOwner(obj).
 		WithSetID(a.name).
 		ApplyObjects()
 }
 
-// Handle executes the configured ClusterAlertRuleGeneratingHandler and pass the resulting objects to apply.Apply, finally returning the new status of the resource
 func (a *clusterAlertRuleGeneratingHandler) Handle(obj *v3.ClusterAlertRule, status v3.AlertStatus) (v3.AlertStatus, error) {
 	if !obj.DeletionTimestamp.IsZero() {
 		return status, nil
@@ -168,41 +153,9 @@ func (a *clusterAlertRuleGeneratingHandler) Handle(obj *v3.ClusterAlertRule, sta
 	if err != nil {
 		return newStatus, err
 	}
-	if !a.isNewResourceVersion(obj) {
-		return newStatus, nil
-	}
 
-	err = generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
+	return newStatus, generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
 		WithOwner(obj).
 		WithSetID(a.name).
 		ApplyObjects(objs...)
-	if err != nil {
-		return newStatus, err
-	}
-	a.storeResourceVersion(obj)
-	return newStatus, nil
-}
-
-// isNewResourceVersion detects if a specific resource version was already successfully processed.
-// Only used if UniqueApplyForResourceVersion is set in generic.GeneratingHandlerOptions
-func (a *clusterAlertRuleGeneratingHandler) isNewResourceVersion(obj *v3.ClusterAlertRule) bool {
-	if !a.opts.UniqueApplyForResourceVersion {
-		return true
-	}
-
-	// Apply once per resource version
-	key := obj.Namespace + "/" + obj.Name
-	previous, ok := a.seen.Load(key)
-	return !ok || previous != obj.ResourceVersion
-}
-
-// storeResourceVersion keeps track of the latest resource version of an object for which Apply was executed
-// Only used if UniqueApplyForResourceVersion is set in generic.GeneratingHandlerOptions
-func (a *clusterAlertRuleGeneratingHandler) storeResourceVersion(obj *v3.ClusterAlertRule) {
-	if !a.opts.UniqueApplyForResourceVersion {
-		return
-	}
-
-	key := obj.Namespace + "/" + obj.Name
-	a.seen.Store(key, obj.ResourceVersion)
 }

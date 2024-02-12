@@ -20,7 +20,6 @@ package v1
 
 import (
 	"context"
-	"sync"
 	"time"
 
 	v1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
@@ -49,14 +48,10 @@ type CustomMachineCache interface {
 	generic.CacheInterface[*v1.CustomMachine]
 }
 
-// CustomMachineStatusHandler is executed for every added or modified CustomMachine. Should return the new status to be updated
 type CustomMachineStatusHandler func(obj *v1.CustomMachine, status v1.CustomMachineStatus) (v1.CustomMachineStatus, error)
 
-// CustomMachineGeneratingHandler is the top-level handler that is executed for every CustomMachine event. It extends CustomMachineStatusHandler by a returning a slice of child objects to be passed to apply.Apply
 type CustomMachineGeneratingHandler func(obj *v1.CustomMachine, status v1.CustomMachineStatus) ([]runtime.Object, v1.CustomMachineStatus, error)
 
-// RegisterCustomMachineStatusHandler configures a CustomMachineController to execute a CustomMachineStatusHandler for every events observed.
-// If a non-empty condition is provided, it will be updated in the status conditions for every handler execution
 func RegisterCustomMachineStatusHandler(ctx context.Context, controller CustomMachineController, condition condition.Cond, name string, handler CustomMachineStatusHandler) {
 	statusHandler := &customMachineStatusHandler{
 		client:    controller,
@@ -66,8 +61,6 @@ func RegisterCustomMachineStatusHandler(ctx context.Context, controller CustomMa
 	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
 }
 
-// RegisterCustomMachineGeneratingHandler configures a CustomMachineController to execute a CustomMachineGeneratingHandler for every events observed, passing the returned objects to the provided apply.Apply.
-// If a non-empty condition is provided, it will be updated in the status conditions for every handler execution
 func RegisterCustomMachineGeneratingHandler(ctx context.Context, controller CustomMachineController, apply apply.Apply,
 	condition condition.Cond, name string, handler CustomMachineGeneratingHandler, opts *generic.GeneratingHandlerOptions) {
 	statusHandler := &customMachineGeneratingHandler{
@@ -89,7 +82,6 @@ type customMachineStatusHandler struct {
 	handler   CustomMachineStatusHandler
 }
 
-// sync is executed on every resource addition or modification. Executes the configured handlers and sends the updated status to the Kubernetes API
 func (a *customMachineStatusHandler) sync(key string, obj *v1.CustomMachine) (*v1.CustomMachine, error) {
 	if obj == nil {
 		return obj, nil
@@ -135,10 +127,8 @@ type customMachineGeneratingHandler struct {
 	opts  generic.GeneratingHandlerOptions
 	gvk   schema.GroupVersionKind
 	name  string
-	seen  sync.Map
 }
 
-// Remove handles the observed deletion of a resource, cascade deleting every associated resource previously applied
 func (a *customMachineGeneratingHandler) Remove(key string, obj *v1.CustomMachine) (*v1.CustomMachine, error) {
 	if obj != nil {
 		return obj, nil
@@ -148,17 +138,12 @@ func (a *customMachineGeneratingHandler) Remove(key string, obj *v1.CustomMachin
 	obj.Namespace, obj.Name = kv.RSplit(key, "/")
 	obj.SetGroupVersionKind(a.gvk)
 
-	if a.opts.UniqueApplyForResourceVersion {
-		a.seen.Delete(key)
-	}
-
 	return nil, generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
 		WithOwner(obj).
 		WithSetID(a.name).
 		ApplyObjects()
 }
 
-// Handle executes the configured CustomMachineGeneratingHandler and pass the resulting objects to apply.Apply, finally returning the new status of the resource
 func (a *customMachineGeneratingHandler) Handle(obj *v1.CustomMachine, status v1.CustomMachineStatus) (v1.CustomMachineStatus, error) {
 	if !obj.DeletionTimestamp.IsZero() {
 		return status, nil
@@ -168,41 +153,9 @@ func (a *customMachineGeneratingHandler) Handle(obj *v1.CustomMachine, status v1
 	if err != nil {
 		return newStatus, err
 	}
-	if !a.isNewResourceVersion(obj) {
-		return newStatus, nil
-	}
 
-	err = generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
+	return newStatus, generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
 		WithOwner(obj).
 		WithSetID(a.name).
 		ApplyObjects(objs...)
-	if err != nil {
-		return newStatus, err
-	}
-	a.storeResourceVersion(obj)
-	return newStatus, nil
-}
-
-// isNewResourceVersion detects if a specific resource version was already successfully processed.
-// Only used if UniqueApplyForResourceVersion is set in generic.GeneratingHandlerOptions
-func (a *customMachineGeneratingHandler) isNewResourceVersion(obj *v1.CustomMachine) bool {
-	if !a.opts.UniqueApplyForResourceVersion {
-		return true
-	}
-
-	// Apply once per resource version
-	key := obj.Namespace + "/" + obj.Name
-	previous, ok := a.seen.Load(key)
-	return !ok || previous != obj.ResourceVersion
-}
-
-// storeResourceVersion keeps track of the latest resource version of an object for which Apply was executed
-// Only used if UniqueApplyForResourceVersion is set in generic.GeneratingHandlerOptions
-func (a *customMachineGeneratingHandler) storeResourceVersion(obj *v1.CustomMachine) {
-	if !a.opts.UniqueApplyForResourceVersion {
-		return
-	}
-
-	key := obj.Namespace + "/" + obj.Name
-	a.seen.Store(key, obj.ResourceVersion)
 }
