@@ -20,7 +20,6 @@ package v3
 
 import (
 	"context"
-	"sync"
 	"time"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -49,14 +48,10 @@ type GlobalDnsCache interface {
 	generic.CacheInterface[*v3.GlobalDns]
 }
 
-// GlobalDnsStatusHandler is executed for every added or modified GlobalDns. Should return the new status to be updated
 type GlobalDnsStatusHandler func(obj *v3.GlobalDns, status v3.GlobalDNSStatus) (v3.GlobalDNSStatus, error)
 
-// GlobalDnsGeneratingHandler is the top-level handler that is executed for every GlobalDns event. It extends GlobalDnsStatusHandler by a returning a slice of child objects to be passed to apply.Apply
 type GlobalDnsGeneratingHandler func(obj *v3.GlobalDns, status v3.GlobalDNSStatus) ([]runtime.Object, v3.GlobalDNSStatus, error)
 
-// RegisterGlobalDnsStatusHandler configures a GlobalDnsController to execute a GlobalDnsStatusHandler for every events observed.
-// If a non-empty condition is provided, it will be updated in the status conditions for every handler execution
 func RegisterGlobalDnsStatusHandler(ctx context.Context, controller GlobalDnsController, condition condition.Cond, name string, handler GlobalDnsStatusHandler) {
 	statusHandler := &globalDnsStatusHandler{
 		client:    controller,
@@ -66,8 +61,6 @@ func RegisterGlobalDnsStatusHandler(ctx context.Context, controller GlobalDnsCon
 	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
 }
 
-// RegisterGlobalDnsGeneratingHandler configures a GlobalDnsController to execute a GlobalDnsGeneratingHandler for every events observed, passing the returned objects to the provided apply.Apply.
-// If a non-empty condition is provided, it will be updated in the status conditions for every handler execution
 func RegisterGlobalDnsGeneratingHandler(ctx context.Context, controller GlobalDnsController, apply apply.Apply,
 	condition condition.Cond, name string, handler GlobalDnsGeneratingHandler, opts *generic.GeneratingHandlerOptions) {
 	statusHandler := &globalDnsGeneratingHandler{
@@ -89,7 +82,6 @@ type globalDnsStatusHandler struct {
 	handler   GlobalDnsStatusHandler
 }
 
-// sync is executed on every resource addition or modification. Executes the configured handlers and sends the updated status to the Kubernetes API
 func (a *globalDnsStatusHandler) sync(key string, obj *v3.GlobalDns) (*v3.GlobalDns, error) {
 	if obj == nil {
 		return obj, nil
@@ -135,10 +127,8 @@ type globalDnsGeneratingHandler struct {
 	opts  generic.GeneratingHandlerOptions
 	gvk   schema.GroupVersionKind
 	name  string
-	seen  sync.Map
 }
 
-// Remove handles the observed deletion of a resource, cascade deleting every associated resource previously applied
 func (a *globalDnsGeneratingHandler) Remove(key string, obj *v3.GlobalDns) (*v3.GlobalDns, error) {
 	if obj != nil {
 		return obj, nil
@@ -148,17 +138,12 @@ func (a *globalDnsGeneratingHandler) Remove(key string, obj *v3.GlobalDns) (*v3.
 	obj.Namespace, obj.Name = kv.RSplit(key, "/")
 	obj.SetGroupVersionKind(a.gvk)
 
-	if a.opts.UniqueApplyForResourceVersion {
-		a.seen.Delete(key)
-	}
-
 	return nil, generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
 		WithOwner(obj).
 		WithSetID(a.name).
 		ApplyObjects()
 }
 
-// Handle executes the configured GlobalDnsGeneratingHandler and pass the resulting objects to apply.Apply, finally returning the new status of the resource
 func (a *globalDnsGeneratingHandler) Handle(obj *v3.GlobalDns, status v3.GlobalDNSStatus) (v3.GlobalDNSStatus, error) {
 	if !obj.DeletionTimestamp.IsZero() {
 		return status, nil
@@ -168,41 +153,9 @@ func (a *globalDnsGeneratingHandler) Handle(obj *v3.GlobalDns, status v3.GlobalD
 	if err != nil {
 		return newStatus, err
 	}
-	if !a.isNewResourceVersion(obj) {
-		return newStatus, nil
-	}
 
-	err = generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
+	return newStatus, generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
 		WithOwner(obj).
 		WithSetID(a.name).
 		ApplyObjects(objs...)
-	if err != nil {
-		return newStatus, err
-	}
-	a.storeResourceVersion(obj)
-	return newStatus, nil
-}
-
-// isNewResourceVersion detects if a specific resource version was already successfully processed.
-// Only used if UniqueApplyForResourceVersion is set in generic.GeneratingHandlerOptions
-func (a *globalDnsGeneratingHandler) isNewResourceVersion(obj *v3.GlobalDns) bool {
-	if !a.opts.UniqueApplyForResourceVersion {
-		return true
-	}
-
-	// Apply once per resource version
-	key := obj.Namespace + "/" + obj.Name
-	previous, ok := a.seen.Load(key)
-	return !ok || previous != obj.ResourceVersion
-}
-
-// storeResourceVersion keeps track of the latest resource version of an object for which Apply was executed
-// Only used if UniqueApplyForResourceVersion is set in generic.GeneratingHandlerOptions
-func (a *globalDnsGeneratingHandler) storeResourceVersion(obj *v3.GlobalDns) {
-	if !a.opts.UniqueApplyForResourceVersion {
-		return
-	}
-
-	key := obj.Namespace + "/" + obj.Name
-	a.seen.Store(key, obj.ResourceVersion)
 }

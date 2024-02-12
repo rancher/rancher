@@ -20,7 +20,6 @@ package v1
 
 import (
 	"context"
-	"sync"
 	"time"
 
 	v1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
@@ -49,14 +48,10 @@ type RKEControlPlaneCache interface {
 	generic.CacheInterface[*v1.RKEControlPlane]
 }
 
-// RKEControlPlaneStatusHandler is executed for every added or modified RKEControlPlane. Should return the new status to be updated
 type RKEControlPlaneStatusHandler func(obj *v1.RKEControlPlane, status v1.RKEControlPlaneStatus) (v1.RKEControlPlaneStatus, error)
 
-// RKEControlPlaneGeneratingHandler is the top-level handler that is executed for every RKEControlPlane event. It extends RKEControlPlaneStatusHandler by a returning a slice of child objects to be passed to apply.Apply
 type RKEControlPlaneGeneratingHandler func(obj *v1.RKEControlPlane, status v1.RKEControlPlaneStatus) ([]runtime.Object, v1.RKEControlPlaneStatus, error)
 
-// RegisterRKEControlPlaneStatusHandler configures a RKEControlPlaneController to execute a RKEControlPlaneStatusHandler for every events observed.
-// If a non-empty condition is provided, it will be updated in the status conditions for every handler execution
 func RegisterRKEControlPlaneStatusHandler(ctx context.Context, controller RKEControlPlaneController, condition condition.Cond, name string, handler RKEControlPlaneStatusHandler) {
 	statusHandler := &rKEControlPlaneStatusHandler{
 		client:    controller,
@@ -66,8 +61,6 @@ func RegisterRKEControlPlaneStatusHandler(ctx context.Context, controller RKECon
 	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
 }
 
-// RegisterRKEControlPlaneGeneratingHandler configures a RKEControlPlaneController to execute a RKEControlPlaneGeneratingHandler for every events observed, passing the returned objects to the provided apply.Apply.
-// If a non-empty condition is provided, it will be updated in the status conditions for every handler execution
 func RegisterRKEControlPlaneGeneratingHandler(ctx context.Context, controller RKEControlPlaneController, apply apply.Apply,
 	condition condition.Cond, name string, handler RKEControlPlaneGeneratingHandler, opts *generic.GeneratingHandlerOptions) {
 	statusHandler := &rKEControlPlaneGeneratingHandler{
@@ -89,7 +82,6 @@ type rKEControlPlaneStatusHandler struct {
 	handler   RKEControlPlaneStatusHandler
 }
 
-// sync is executed on every resource addition or modification. Executes the configured handlers and sends the updated status to the Kubernetes API
 func (a *rKEControlPlaneStatusHandler) sync(key string, obj *v1.RKEControlPlane) (*v1.RKEControlPlane, error) {
 	if obj == nil {
 		return obj, nil
@@ -135,10 +127,8 @@ type rKEControlPlaneGeneratingHandler struct {
 	opts  generic.GeneratingHandlerOptions
 	gvk   schema.GroupVersionKind
 	name  string
-	seen  sync.Map
 }
 
-// Remove handles the observed deletion of a resource, cascade deleting every associated resource previously applied
 func (a *rKEControlPlaneGeneratingHandler) Remove(key string, obj *v1.RKEControlPlane) (*v1.RKEControlPlane, error) {
 	if obj != nil {
 		return obj, nil
@@ -148,17 +138,12 @@ func (a *rKEControlPlaneGeneratingHandler) Remove(key string, obj *v1.RKEControl
 	obj.Namespace, obj.Name = kv.RSplit(key, "/")
 	obj.SetGroupVersionKind(a.gvk)
 
-	if a.opts.UniqueApplyForResourceVersion {
-		a.seen.Delete(key)
-	}
-
 	return nil, generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
 		WithOwner(obj).
 		WithSetID(a.name).
 		ApplyObjects()
 }
 
-// Handle executes the configured RKEControlPlaneGeneratingHandler and pass the resulting objects to apply.Apply, finally returning the new status of the resource
 func (a *rKEControlPlaneGeneratingHandler) Handle(obj *v1.RKEControlPlane, status v1.RKEControlPlaneStatus) (v1.RKEControlPlaneStatus, error) {
 	if !obj.DeletionTimestamp.IsZero() {
 		return status, nil
@@ -168,41 +153,9 @@ func (a *rKEControlPlaneGeneratingHandler) Handle(obj *v1.RKEControlPlane, statu
 	if err != nil {
 		return newStatus, err
 	}
-	if !a.isNewResourceVersion(obj) {
-		return newStatus, nil
-	}
 
-	err = generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
+	return newStatus, generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
 		WithOwner(obj).
 		WithSetID(a.name).
 		ApplyObjects(objs...)
-	if err != nil {
-		return newStatus, err
-	}
-	a.storeResourceVersion(obj)
-	return newStatus, nil
-}
-
-// isNewResourceVersion detects if a specific resource version was already successfully processed.
-// Only used if UniqueApplyForResourceVersion is set in generic.GeneratingHandlerOptions
-func (a *rKEControlPlaneGeneratingHandler) isNewResourceVersion(obj *v1.RKEControlPlane) bool {
-	if !a.opts.UniqueApplyForResourceVersion {
-		return true
-	}
-
-	// Apply once per resource version
-	key := obj.Namespace + "/" + obj.Name
-	previous, ok := a.seen.Load(key)
-	return !ok || previous != obj.ResourceVersion
-}
-
-// storeResourceVersion keeps track of the latest resource version of an object for which Apply was executed
-// Only used if UniqueApplyForResourceVersion is set in generic.GeneratingHandlerOptions
-func (a *rKEControlPlaneGeneratingHandler) storeResourceVersion(obj *v1.RKEControlPlane) {
-	if !a.opts.UniqueApplyForResourceVersion {
-		return
-	}
-
-	key := obj.Namespace + "/" + obj.Name
-	a.seen.Store(key, obj.ResourceVersion)
 }

@@ -20,7 +20,6 @@ package v1alpha1
 
 import (
 	"context"
-	"sync"
 	"time"
 
 	v1alpha1 "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
@@ -49,14 +48,10 @@ type BundleCache interface {
 	generic.CacheInterface[*v1alpha1.Bundle]
 }
 
-// BundleStatusHandler is executed for every added or modified Bundle. Should return the new status to be updated
 type BundleStatusHandler func(obj *v1alpha1.Bundle, status v1alpha1.BundleStatus) (v1alpha1.BundleStatus, error)
 
-// BundleGeneratingHandler is the top-level handler that is executed for every Bundle event. It extends BundleStatusHandler by a returning a slice of child objects to be passed to apply.Apply
 type BundleGeneratingHandler func(obj *v1alpha1.Bundle, status v1alpha1.BundleStatus) ([]runtime.Object, v1alpha1.BundleStatus, error)
 
-// RegisterBundleStatusHandler configures a BundleController to execute a BundleStatusHandler for every events observed.
-// If a non-empty condition is provided, it will be updated in the status conditions for every handler execution
 func RegisterBundleStatusHandler(ctx context.Context, controller BundleController, condition condition.Cond, name string, handler BundleStatusHandler) {
 	statusHandler := &bundleStatusHandler{
 		client:    controller,
@@ -66,8 +61,6 @@ func RegisterBundleStatusHandler(ctx context.Context, controller BundleControlle
 	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
 }
 
-// RegisterBundleGeneratingHandler configures a BundleController to execute a BundleGeneratingHandler for every events observed, passing the returned objects to the provided apply.Apply.
-// If a non-empty condition is provided, it will be updated in the status conditions for every handler execution
 func RegisterBundleGeneratingHandler(ctx context.Context, controller BundleController, apply apply.Apply,
 	condition condition.Cond, name string, handler BundleGeneratingHandler, opts *generic.GeneratingHandlerOptions) {
 	statusHandler := &bundleGeneratingHandler{
@@ -89,7 +82,6 @@ type bundleStatusHandler struct {
 	handler   BundleStatusHandler
 }
 
-// sync is executed on every resource addition or modification. Executes the configured handlers and sends the updated status to the Kubernetes API
 func (a *bundleStatusHandler) sync(key string, obj *v1alpha1.Bundle) (*v1alpha1.Bundle, error) {
 	if obj == nil {
 		return obj, nil
@@ -135,10 +127,8 @@ type bundleGeneratingHandler struct {
 	opts  generic.GeneratingHandlerOptions
 	gvk   schema.GroupVersionKind
 	name  string
-	seen  sync.Map
 }
 
-// Remove handles the observed deletion of a resource, cascade deleting every associated resource previously applied
 func (a *bundleGeneratingHandler) Remove(key string, obj *v1alpha1.Bundle) (*v1alpha1.Bundle, error) {
 	if obj != nil {
 		return obj, nil
@@ -148,17 +138,12 @@ func (a *bundleGeneratingHandler) Remove(key string, obj *v1alpha1.Bundle) (*v1a
 	obj.Namespace, obj.Name = kv.RSplit(key, "/")
 	obj.SetGroupVersionKind(a.gvk)
 
-	if a.opts.UniqueApplyForResourceVersion {
-		a.seen.Delete(key)
-	}
-
 	return nil, generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
 		WithOwner(obj).
 		WithSetID(a.name).
 		ApplyObjects()
 }
 
-// Handle executes the configured BundleGeneratingHandler and pass the resulting objects to apply.Apply, finally returning the new status of the resource
 func (a *bundleGeneratingHandler) Handle(obj *v1alpha1.Bundle, status v1alpha1.BundleStatus) (v1alpha1.BundleStatus, error) {
 	if !obj.DeletionTimestamp.IsZero() {
 		return status, nil
@@ -168,41 +153,9 @@ func (a *bundleGeneratingHandler) Handle(obj *v1alpha1.Bundle, status v1alpha1.B
 	if err != nil {
 		return newStatus, err
 	}
-	if !a.isNewResourceVersion(obj) {
-		return newStatus, nil
-	}
 
-	err = generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
+	return newStatus, generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
 		WithOwner(obj).
 		WithSetID(a.name).
 		ApplyObjects(objs...)
-	if err != nil {
-		return newStatus, err
-	}
-	a.storeResourceVersion(obj)
-	return newStatus, nil
-}
-
-// isNewResourceVersion detects if a specific resource version was already successfully processed.
-// Only used if UniqueApplyForResourceVersion is set in generic.GeneratingHandlerOptions
-func (a *bundleGeneratingHandler) isNewResourceVersion(obj *v1alpha1.Bundle) bool {
-	if !a.opts.UniqueApplyForResourceVersion {
-		return true
-	}
-
-	// Apply once per resource version
-	key := obj.Namespace + "/" + obj.Name
-	previous, ok := a.seen.Load(key)
-	return !ok || previous != obj.ResourceVersion
-}
-
-// storeResourceVersion keeps track of the latest resource version of an object for which Apply was executed
-// Only used if UniqueApplyForResourceVersion is set in generic.GeneratingHandlerOptions
-func (a *bundleGeneratingHandler) storeResourceVersion(obj *v1alpha1.Bundle) {
-	if !a.opts.UniqueApplyForResourceVersion {
-		return
-	}
-
-	key := obj.Namespace + "/" + obj.Name
-	a.seen.Store(key, obj.ResourceVersion)
 }

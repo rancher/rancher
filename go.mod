@@ -142,7 +142,6 @@ require (
 	github.com/rancher/rke v1.5.2-rc1
 	github.com/rancher/steve v0.0.0-20231016202603-993540401906
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007
-	github.com/rancher/wrangler/v2 v2.1.2
 	github.com/rancher/wrangler/v2 v2.1.3
 	github.com/robfig/cron v1.1.0
 	github.com/sirupsen/logrus v1.9.3
@@ -178,7 +177,7 @@ require (
 	k8s.io/utils v0.0.0-20240102154912-e7106e64919e
 	sigs.k8s.io/aws-iam-authenticator v0.5.9
 	sigs.k8s.io/cluster-api v1.5.2
-	sigs.k8s.io/controller-runtime v0.15.1
+	sigs.k8s.io/controller-runtime v0.15.3
 	sigs.k8s.io/yaml v1.4.0
 )
 
