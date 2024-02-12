@@ -157,11 +157,15 @@ func (rb *RBTestSuite) TestRBACDynamicInput() {
 	user.Password = userConfig.Password
 
 	role := userConfig.Role
-	val, ok := roles[role]
-	if !ok {
-		rb.FailNow("Incorrect usage of roles. Please go through the readme for correct role configurations")
+	if userConfig.Role == "" {
+		rb.T().Skip()
+	} else {
+		val, ok := roles[role]
+		if !ok {
+			rb.FailNow("Incorrect usage of roles. Please go through the readme for correct role configurations")
+		}
+		role = val
 	}
-	role = val
 
 	if role == restrictedAdmin {
 		member = restrictedAdmin
