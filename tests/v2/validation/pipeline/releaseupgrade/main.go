@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/rancher/rancher/tests/v2/validation/upgrade"
 	"github.com/rancher/shepherd/clients/rancher"
 	"github.com/rancher/shepherd/extensions/pipeline"
 	"github.com/rancher/shepherd/extensions/provisioninginput"
+	"github.com/rancher/shepherd/extensions/upgradeinput"
 	"github.com/rancher/shepherd/pkg/config"
 	"github.com/rancher/shepherd/pkg/environmentflag"
 	"github.com/rancher/shepherd/pkg/file"
@@ -251,9 +251,9 @@ func main() {
 			continue
 		}
 
-		upgradeConfig := new(upgrade.Config)
-		config.LoadAndUpdateConfig(upgrade.ConfigurationFileKey, upgradeConfig, func() {
-			clusters := []upgrade.Cluster{
+		upgradeConfig := new(upgradeinput.Config)
+		config.LoadAndUpdateConfig(upgradeinput.ConfigurationFileKey, upgradeConfig, func() {
+			clusters := []upgradeinput.Cluster{
 				{
 					VersionToUpgrade: v.KubernetesVersionToUpgrade,
 					FeaturesToTest:   v.FeaturesToTest,
@@ -298,9 +298,9 @@ func NewRancherClusterConfiguration(cluster pipeline.RancherCluster, newConfigNa
 
 	pipeline.UpdateRancherDownstreamClusterFields(&cluster, isCustom, isRKE1)
 
-	upgradeConfig := new(upgrade.Config)
-	config.LoadAndUpdateConfig(upgrade.ConfigurationFileKey, upgradeConfig, func() {
-		clusters := []upgrade.Cluster{
+	upgradeConfig := new(upgradeinput.Config)
+	config.LoadAndUpdateConfig(upgradeinput.ConfigurationFileKey, upgradeConfig, func() {
+		clusters := []upgradeinput.Cluster{
 			{
 				VersionToUpgrade: cluster.KubernetesVersionToUpgrade,
 				FeaturesToTest:   cluster.FeaturesToTest,
