@@ -13,6 +13,7 @@ import (
 	nodestat "github.com/rancher/shepherd/extensions/nodes"
 	"github.com/rancher/shepherd/extensions/provisioninginput"
 	psadeploy "github.com/rancher/shepherd/extensions/psact"
+	"github.com/rancher/shepherd/extensions/upgradeinput"
 	"github.com/rancher/shepherd/extensions/workloads/pods"
 	"github.com/rancher/shepherd/pkg/session"
 	"github.com/stretchr/testify/assert"
@@ -30,7 +31,7 @@ type UpgradeKubernetesTestSuite struct {
 	suite.Suite
 	session  *session.Session
 	client   *rancher.Client
-	clusters []Cluster
+	clusters []upgradeinput.Cluster
 }
 
 func (u *UpgradeKubernetesTestSuite) TearDownSuite() {
@@ -46,7 +47,7 @@ func (u *UpgradeKubernetesTestSuite) SetupSuite() {
 
 	u.client = client
 
-	clusters, err := loadUpgradeKubernetesConfig(client)
+	clusters, err := upgradeinput.LoadUpgradeKubernetesConfig(client)
 	require.NoError(u.T(), err)
 
 	require.NotEmptyf(u.T(), clusters, "couldn't generate the config for the upgrade test")
@@ -58,19 +59,19 @@ func (u *UpgradeKubernetesTestSuite) TestUpgradeKubernetes() {
 		cluster := cluster
 		if cluster.Name == local {
 			u.Run(cluster.Name, func() {
-				if cluster.isUpgradeDisabled {
+				if cluster.IsUpgradeDisabled {
 					u.T().Skipf("Kubernetes upgrade is disabled for [%v]", cluster.Name)
 				}
 
-				u.testUpgradeLocalCluster(cluster.Name, cluster.VersionToUpgrade, cluster.isLatestVersion)
+				u.testUpgradeLocalCluster(cluster.Name, cluster.VersionToUpgrade, cluster.IsLatestVersion)
 			})
 		} else {
 			u.Run(cluster.Name, func() {
-				if cluster.isUpgradeDisabled {
+				if cluster.IsUpgradeDisabled {
 					u.T().Skipf("Kubernetes upgrade is disabled for [%v]", cluster.Name)
 				}
 
-				u.testUpgradeSingleCluster(cluster.Name, cluster.VersionToUpgrade, cluster.PSACT, cluster.isLatestVersion)
+				u.testUpgradeSingleCluster(cluster.Name, cluster.VersionToUpgrade, cluster.PSACT, cluster.IsLatestVersion)
 			})
 		}
 	}
