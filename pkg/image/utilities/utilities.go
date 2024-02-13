@@ -313,9 +313,9 @@ func checkImage(image string) error {
 	if imageNameTag[1] == "" {
 		return fmt.Errorf("Extracted tag from image [%s] is empty", image)
 	}
-	if !strings.HasPrefix(imageNameTag[0], "rancher/") {
-		return fmt.Errorf("Image [%s] does not start with rancher/", image)
-	}
+	// if !strings.HasPrefix(imageNameTag[0], "rancher/") {
+	// 	return fmt.Errorf("Image [%s] does not start with rancher/", image)
+	// }
 	if strings.HasSuffix(imageNameTag[0], "-") {
 		return fmt.Errorf("Image [%s] has trailing '-', probably an error in image substitution", image)
 	}
