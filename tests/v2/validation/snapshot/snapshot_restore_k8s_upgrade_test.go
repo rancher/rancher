@@ -41,15 +41,17 @@ func (s *SnapshotRestoreK8sUpgradeTestSuite) SetupSuite() {
 
 func (s *SnapshotRestoreK8sUpgradeTestSuite) TestSnapshotRestoreK8sUpgrade() {
 	snapshotRestoreK8sVersion := &etcdsnapshot.Config{
-		UpgradeKubernetesVersion: s.clustersConfig.UpgradeKubernetesVersion,
+		UpgradeKubernetesVersion: "",
 		SnapshotRestore:          "kubernetesVersion",
 		RecurringRestores:        1,
+		ReplaceWorkerNode:        false,
 	}
 
 	snapshotRestoreAll := &etcdsnapshot.Config{
-		UpgradeKubernetesVersion: s.clustersConfig.UpgradeKubernetesVersion,
+		UpgradeKubernetesVersion: "",
 		SnapshotRestore:          "all",
 		RecurringRestores:        1,
+		ReplaceWorkerNode:        false,
 	}
 
 	tests := []struct {
@@ -69,6 +71,10 @@ func (s *SnapshotRestoreK8sUpgradeTestSuite) TestSnapshotRestoreK8sUpgrade() {
 }
 
 func (s *SnapshotRestoreK8sUpgradeTestSuite) TestSnapshotRestoreK8sUpgradeDynamicInput() {
+	if s.clustersConfig == nil {
+		s.T().Skip()
+	}
+
 	snapshotRestore(s.T(), s.client, s.client.RancherConfig.ClusterName, s.clustersConfig)
 }
 
