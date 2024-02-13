@@ -43,7 +43,7 @@ provisioningInput:
   rke2KubernetesVersion:
     - "v1.27.6+rke2r1"
   k3sKubernetesVersion:
-    - "v1.27.6+k3s1"
+    - "v1.27.10+k3s2"
   cni:
     - "canal"
   providers: 

@@ -36,7 +36,7 @@ provisioningInput:
       quantity: 1
   flags:
     desiredflags: "Long" #These flags are for running TestProvisioningK3SCluster or TestProvisioningK3SCustomCluster it is not needed for the dynamic tests. Long will run the full table, where as short will run the short version of this test.
-  rke2KubernetesVersion: ["v1.27.6+k3s1"]
+  rke2KubernetesVersion: ["v1.27.10+k3s2"]
   providers: ["linode", "aws", "do", "harvester"]
   nodeProviders: ["ec2"]
   hardened: false
