@@ -7,16 +7,25 @@ import (
 	"github.com/coreos/go-semver/semver"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v33 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
-	app2 "github.com/rancher/rancher/pkg/app"
+	"github.com/rancher/rancher/pkg/catalogv2/content"
+	helmcfg "github.com/rancher/rancher/pkg/catalogv2/helm"
+	"github.com/rancher/rancher/pkg/catalogv2/helmop"
+	"github.com/rancher/rancher/pkg/catalogv2/system"
+	"github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/rancher/pkg/ref"
+	"github.com/rancher/rancher/pkg/settings"
+	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/rancher/pkg/wrangler"
+	"github.com/rancher/steve/pkg/client"
 	planv1 "github.com/rancher/system-upgrade-controller/pkg/apis/upgrade.cattle.io/v1"
-	"github.com/sirupsen/logrus"
-	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"github.com/rancher/wrangler/pkg/generic"
+	log "github.com/sirupsen/logrus"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/discovery/cached/memory"
+	"k8s.io/client-go/restmapper"
 )
 
 const (
@@ -86,14 +95,16 @@ func (h *handler) onClusterChange(key string, cluster *v3.Cluster) (*v3.Cluster,
 	cluster, err = h.modifyClusterCondition(cluster, planv1.Plan{}, planv1.Plan{}, strategy)
 	if err != nil {
 		return cluster, err
+
 	}
 
 	// create or update k3supgradecontroller if necessary
 	if err = h.deployK3sBasedUpgradeController(cluster.Name, updateVersion, isK3s, isRke2); err != nil {
+		// TODO   Shouldn't an error here modify the cluster status from updating to erro?
+		// Dosen't this reutrn make the cluster to get "stuck" on updating ?
 		return cluster, err
 	}
 
-	// deploy plans into downstream cluster
 	if err = h.deployPlans(cluster, isK3s, isRke2); err != nil {
 		return cluster, err
 	}
@@ -104,37 +115,17 @@ func (h *handler) onClusterChange(key string, cluster *v3.Cluster) (*v3.Cluster,
 // deployK3sBaseUpgradeController creates a rancher k3s/rke2 upgrader controller if one does not exist.
 // Updates k3s upgrader controller if one exists and is not the newest available version.
 func (h *handler) deployK3sBasedUpgradeController(clusterName, updateVersion string, isK3s, isRke2 bool) error {
+
 	userCtx, err := h.manager.UserContextNoControllers(clusterName)
 	if err != nil {
 		return err
 	}
 
-	projectLister := userCtx.Management.Management.Projects("").Controller().Lister()
-	systemProject, err := project.GetSystemProject(clusterName, projectLister)
-	if err != nil {
-		return err
-	}
+	// TODO _ CHECK HOW THIS WILL INTERACT WITH THE ONE FROM APPS, DO I NEED TO UNINSTALL? ???
+	//   Can i just call delete and ignore the error if it is not found or all errors?
+	_ = deleteOldApp(userCtx, clusterName, isK3s, isRke2)
 
-	templateID := k3sUpgraderCatalogName
-	template, err := h.templateLister.Get(namespace.GlobalNamespace, templateID)
-	if err != nil {
-		return err
-	}
-
-	latestTemplateVersion, err := h.catalogManager.LatestAvailableTemplateVersion(template, clusterName)
-	if err != nil {
-		return err
-	}
-
-	creator, err := h.systemAccountManager.GetSystemUser(clusterName)
-	if err != nil {
-		return err
-	}
-	systemProjectID := ref.Ref(systemProject)
-	_, systemProjectName := ref.Parse(systemProjectID)
-
-	nsClient := userCtx.Core.Namespaces("")
-	appProjectName, err := app2.EnsureAppProjectName(nsClient, systemProjectName, clusterName, systemUpgradeNS, creator.Name)
+	m, err := h.newDownstreamManagerFromUserContext(userCtx)
 	if err != nil {
 		return err
 	}
@@ -145,83 +136,26 @@ func (h *handler) deployK3sBasedUpgradeController(clusterName, updateVersion str
 		return err
 	}
 
-	// if we are using a version above or equal to 1.25 we need to explicitly disable PSPs
-	enablePSPInChart := "false"
-	if !is125OrAbove {
-		enablePSPInChart = "true"
-	}
-
-	appLister := userCtx.Management.Project.Apps("").Controller().Lister()
-	appClient := userCtx.Management.Project.Apps("")
-
-	latestVersionID := latestTemplateVersion.ExternalID
-	var appname string
-	switch {
-	case isK3s:
-		appname = "rancher-k3s-upgrader"
-	case isRke2:
-		appname = "rancher-rke2-upgrader"
-	}
-	app, err := appLister.Get(systemProjectName, appname)
-	if err != nil {
-		if !errors.IsNotFound(err) {
-			return err
-		}
-		desiredApp := &v33.App{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      appname,
-				Namespace: systemProjectName,
-				Annotations: map[string]string{
-					"field.cattle.io/creatorId": creator.Name,
+	//	TODO - I don't think it is possible to get the systemDefaultRegistry from the cluster, rancher gets it from Spec.RKEConfig witch
+	//	 dosen't exist for imported ones.
+	//	   The image.GetPrivateRepoURLFromCluster(cluster) will return the Default for clusters without spec.RKE witch is the case for imported clusters.
+	value := map[string]interface{}{
+		"global": map[string]interface{}{
+			"cattle": map[string]interface{}{
+				"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+				"psp": map[string]interface{}{
+					"enabled": !is125OrAbove,
 				},
 			},
-			Spec: v33.AppSpec{
-				Description:     "Upgrade controller for k3s based clusters",
-				ExternalID:      latestVersionID,
-				ProjectName:     appProjectName,
-				Answers:         make(map[string]string),
-				TargetNamespace: systemUpgradeNS,
-			},
-		}
+		},
+	}
 
-		desiredApp.Spec.Answers[PSPAnswersField] = enablePSPInChart
-
-		// k3s upgrader doesn't exist yet, so it will need to be created
-		if _, err = appClient.Create(desiredApp); err != nil {
-			return err
-		}
-	} else {
-		if !checkDeployed(app) {
-			if !v33.AppConditionForceUpgrade.IsUnknown(app) {
-				v33.AppConditionForceUpgrade.Unknown(app)
-			}
-			logrus.Warnln("force redeploying system-upgrade-controller")
-			if _, err = appClient.Update(app); err != nil {
-				return err
-			}
-		}
-
-		externalIDIsCorrect := app.Spec.ExternalID == latestVersionID
-		pspValuesHaveBeenSet := false
-		if app.Spec.Answers != nil {
-			pspValuesHaveBeenSet = app.Spec.Answers[PSPAnswersField] == enablePSPInChart
-		}
-
-		// everything is up-to-date and PSP attributes are set up properly, no need to update.
-		if externalIDIsCorrect && pspValuesHaveBeenSet {
-			return nil
-		}
-
-		desiredApp := app.DeepCopy()
-		if desiredApp.Spec.Answers == nil {
-			desiredApp.Spec.Answers = make(map[string]string)
-		}
-		desiredApp.Spec.Answers[PSPAnswersField] = enablePSPInChart
-		desiredApp.Spec.ExternalID = latestVersionID
-		// new version of k3s upgrade available, or the valuesYaml have changed, update app
-		if _, err = appClient.Update(desiredApp); err != nil {
-			return err
-		}
+	// Ensure won't install if the requested chart is already installed with the same args.
+	// it will only return when the deployment is done or if an error happens.
+	if err := m.Ensure("cattle-system", "system-upgrade-controller",
+		"", settings.SystemUpgradeControllerChartVersion.Get(), value, true, ""); err != nil {
+		log.Errorf("Failed to install the system-upgrade-controller with error: %s", err.Error())
+		return err
 	}
 
 	return nil
@@ -280,4 +214,72 @@ func (h *handler) nodesNeedUpgrade(cluster *v3.Cluster, version string) (bool, e
 
 func checkDeployed(app *v33.App) bool {
 	return v33.AppConditionDeployed.IsTrue(app) || v33.AppConditionInstalled.IsTrue(app)
+}
+
+// newDownstreamManagerFromUserContext will create a DownstreamManager "Handler" that interacts with the downstream cluster to install charts.
+// As this will interact with the downstream cluster and will be created on every interaction of the control loop that needs it
+// the Handler won't use cache, instead it will directly fetch the information of the downstream cluster.
+func (h *handler) newDownstreamManagerFromUserContext(userCtx *config.UserContext) (*system.DownstreamManager, error) {
+
+	helm, err := catalog.NewFactoryFromConfigWithOptions(&userCtx.RESTConfig,
+		&generic.FactoryOptions{SharedControllerFactory: userCtx.ControllerFactory})
+	if err != nil {
+		return nil, err
+	}
+
+	cg, err := client.NewFactory(&userCtx.RESTConfig, false)
+	if err != nil {
+		return nil, err
+	}
+
+	content := content.NewManager(
+		userCtx.K8sClient.Discovery(),
+		system.ConfigMapNoOptGetter{ConfigMapClient: userCtx.Corew.ConfigMap()},
+		system.SecretNoOptGetter{SecretClient: userCtx.Corew.Secret()},
+		system.HelmNoNamespaceNoOptGetter{ClusterRepoController: helm.Catalog().V1().ClusterRepo()},
+	)
+
+	helmop := helmop.NewOperations(cg,
+		helm.Catalog().V1(),
+		userCtx.RBACw,
+		content,
+		userCtx.Corew.Pod(),
+	)
+
+	cache := memory.NewMemCacheClient(userCtx.K8sClient.Discovery())
+	restMapper := restmapper.NewDeferredDiscoveryRESTMapper(cache)
+
+	restClientGetter := &wrangler.SimpleRESTClientGetter{
+		ClientConfig:    nil, // The Manager don't use the ClientConfig. Therefore, we can pass this as nill.
+		RESTConfig:      &userCtx.RESTConfig,
+		CachedDiscovery: cache,
+		RESTMapper:      restMapper,
+	}
+	helmClient := helmcfg.NewClient(restClientGetter)
+
+	return system.NewDownstreamManager(h.ctx, content, helmop, userCtx.Corew.Pod(), helmClient)
+}
+
+// deleteOldApp will try to delete the v3.app rancher-xxx-upgrader that used to manage the system-upgrade-controller
+func deleteOldApp(userCtx *config.UserContext, clusterName string, isK3s, isRke2 bool) error {
+	projectLister := userCtx.Management.Management.Projects("").Controller().Lister()
+	systemProject, err := project.GetSystemProject(clusterName, projectLister)
+	if err != nil {
+		return err
+	}
+
+	systemProjectID := ref.Ref(systemProject)
+	_, systemProjectName := ref.Parse(systemProjectID)
+
+	appClient := userCtx.Management.Project.Apps(systemProjectName)
+	var appname string
+	switch {
+	case isK3s:
+		appname = "rancher-k3s-upgrader"
+	case isRke2:
+		appname = "rancher-rke2-upgrader"
+	}
+	err = appClient.Delete(appname, &v1.DeleteOptions{})
+	return err
+
 }
