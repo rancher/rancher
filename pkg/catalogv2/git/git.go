@@ -168,6 +168,7 @@ func (g *git) httpClientWithCreds() (*http.Client, error) {
 		}
 		pool, err := x509.SystemCertPool()
 		if err != nil {
+			logrus.Debugf("getting system cert pool failed with %s", err)
 			pool = x509.NewCertPool()
 		}
 		pool.AddCert(cert)
