@@ -126,11 +126,11 @@ require (
 	github.com/prometheus/client_golang v1.18.0
 	github.com/prometheus/client_model v0.5.0
 	github.com/prometheus/common v0.45.0
-	github.com/rancher/aks-operator v1.2.0
+	github.com/rancher/aks-operator v1.2.1-rc8
 	github.com/rancher/apiserver v0.0.0-20230831052300-120e615b17ba
 	github.com/rancher/channelserver v0.5.1-0.20230719220800-0a37b73c7df8
 	github.com/rancher/dynamiclistener v1.27.5
-	github.com/rancher/eks-operator v1.3.0
+	github.com/rancher/eks-operator v1.3.1-rc7
 	github.com/rancher/fleet/pkg/apis v0.0.0-20231017140638-93432f288e79
 	github.com/rancher/gke-operator v1.2.1-rc3
 	github.com/rancher/kubernetes-provider-detector v0.1.5
@@ -142,7 +142,6 @@ require (
 	github.com/rancher/rke v1.5.3
 	github.com/rancher/steve v0.0.0-20240213172920-24878f9eedc5
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007
-	github.com/rancher/wrangler/v2 v2.1.2
 	github.com/rancher/wrangler/v2 v2.1.3
 	github.com/robfig/cron v1.1.0
 	github.com/sirupsen/logrus v1.9.3
@@ -151,13 +150,13 @@ require (
 	github.com/urfave/cli v1.22.14
 	github.com/vishvananda/netlink v1.2.1-beta.2
 	github.com/vmware/govmomi v0.30.6
-	golang.org/x/crypto v0.18.0
-	golang.org/x/mod v0.12.0
-	golang.org/x/net v0.20.0
+	golang.org/x/crypto v0.19.0
+	golang.org/x/mod v0.14.0
+	golang.org/x/net v0.21.0
 	golang.org/x/oauth2 v0.16.0
 	golang.org/x/sync v0.6.0
 	golang.org/x/text v0.14.0
-	golang.org/x/tools v0.12.0 // indirect
+	golang.org/x/tools v0.16.1 // indirect
 	google.golang.org/api v0.149.0
 	google.golang.org/grpc v1.60.1
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c
@@ -178,7 +177,7 @@ require (
 	k8s.io/utils v0.0.0-20240102154912-e7106e64919e
 	sigs.k8s.io/aws-iam-authenticator v0.5.9
 	sigs.k8s.io/cluster-api v1.5.2
-	sigs.k8s.io/controller-runtime v0.15.1
+	sigs.k8s.io/controller-runtime v0.15.3
 	sigs.k8s.io/yaml v1.4.0
 )
 
@@ -416,8 +415,8 @@ require (
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.24.0 // indirect
-	golang.org/x/sys v0.16.0 // indirect
-	golang.org/x/term v0.16.0 // indirect
+	golang.org/x/sys v0.17.0 // indirect
+	golang.org/x/term v0.17.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.3.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
