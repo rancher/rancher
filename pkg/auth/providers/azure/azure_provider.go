@@ -208,6 +208,10 @@ func (ap *Provider) TransformToAuthProvider(
 	p[publicclient.AzureADProviderFieldAuthURL] = ep.AuthURL
 	p[publicclient.AzureADProviderFieldTokenURL] = ep.TokenURL
 
+	// waiting for https://github.com/golang/oauth2/pull/701
+	deviceAuthURL := "https://login.microsoftonline.com/" + tenantID + "/oauth2/v2.0/devicecode"
+	p[publicclient.AzureADProviderFieldDeviceAuthURL] = deviceAuthURL
+
 	return p, nil
 }
 
