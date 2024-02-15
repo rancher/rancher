@@ -149,7 +149,7 @@ type SamlProvider struct {
 type AzureADLogin struct {
 	GenericLogin `json:",inline"`
 	Code         string `json:"code" norman:"type=string,required"`
-	IDToken      string `json:"token,omitempty"`
+	IDToken      string `json:"id_token,omitempty"`
 }
 
 // +genclient
