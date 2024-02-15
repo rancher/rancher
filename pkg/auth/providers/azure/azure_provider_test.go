@@ -220,7 +220,7 @@ func TestTransformToAuthProvider(t *testing.T) {
 				"applicationId":     "app123",
 				"applicationSecret": "secret123",
 				"rancherUrl":        "https://myrancher.com",
-				"scopes":            []string{"myscope"},
+				"scopes":            []interface{}{"myscope"},
 			},
 			expectedAuthProvider: map[string]interface{}{
 				"id":            "providerName",
