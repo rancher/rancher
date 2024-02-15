@@ -192,6 +192,18 @@ func authProvidersTypes(schemas *types.Schemas) *types.Schemas {
 			schema.ResourceMethods = []string{http.MethodGet}
 		}).
 		MustImport(&PublicVersion, v3.OIDCLogin{}).
+		MustImportAndCustomize(&PublicVersion, v3.GenericOIDCProvider{}, func(schema *types.Schema) {
+			schema.BaseType = "authProvider"
+			schema.ResourceActions = map[string]types.Action{
+				"login": {
+					Input:  "genericOIDCLogin",
+					Output: "token",
+				},
+			}
+			schema.CollectionMethods = []string{}
+			schema.ResourceMethods = []string{http.MethodGet}
+		}).
+		MustImport(&PublicVersion, v3.GenericOIDCLogin{}).
 		// KeyCloak OIDC provider
 		MustImportAndCustomize(&PublicVersion, v3.KeyCloakOIDCProvider{}, func(schema *types.Schema) {
 			schema.BaseType = "authProvider"

@@ -491,3 +491,28 @@ type ClusterProxyConfig struct {
 	// Enabled indicates whether downstream proxy requests for service account tokens is enabled.
 	Enabled bool `json:"enabled"`
 }
+
+type GenericOIDCConfig struct {
+	AuthConfig `json:",inline" mapstructure:",squash"`
+
+	ClientID           string `json:"clientId" norman:"required"`
+	ClientSecret       string `json:"clientSecret,omitempty" norman:"required,type=password"`
+	AuthEndpoint       string `json:"authEndpoint,omitempty" norman:"required,notnullable"`
+	Issuer             string `json:"issuer" norman:"required,notnullable"`
+	Certificate        string `json:"certificate,omitempty"`
+	PrivateKey         string `json:"privateKey,omitempty" norman:"type=password"`
+	RancherURL         string `json:"rancherUrl" norman:"required,notnullable"`
+	GroupsClaim        string `json:"groupsClaim"`
+	GroupSearchEnabled *bool  `json:"groupSearchEnabled"`
+	Scopes             string `json:"scopes"`
+}
+
+type GenericOIDCApplyInput struct {
+	OIDCConfig GenericOIDCConfig `json:"oidcConfig,omitempty"`
+	Code       string            `json:"code,omitempty"`
+	Enabled    bool              `json:"enabled,omitempty"`
+}
+
+type GenericOIDCTestOutput struct {
+	RedirectURL string `json:"redirectUrl"`
+}

@@ -3,6 +3,7 @@ package data
 import (
 	"github.com/rancher/rancher/pkg/auth/providers/activedirectory"
 	"github.com/rancher/rancher/pkg/auth/providers/azure"
+	"github.com/rancher/rancher/pkg/auth/providers/genericoidc"
 	"github.com/rancher/rancher/pkg/auth/providers/github"
 	"github.com/rancher/rancher/pkg/auth/providers/googleoauth"
 	"github.com/rancher/rancher/pkg/auth/providers/keycloakoidc"
@@ -68,6 +69,10 @@ func AuthConfigs(management *config.ManagementContext) error {
 	}
 
 	if err := addAuthConfig(keycloakoidc.Name, client.KeyCloakOIDCConfigType, false, management); err != nil {
+		return err
+	}
+
+	if err := addAuthConfig(genericoidc.Name, client.GenericOIDCConfigType, false, management); err != nil {
 		return err
 	}
 
