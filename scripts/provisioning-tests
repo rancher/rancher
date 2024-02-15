@@ -129,6 +129,9 @@ echo "Waiting up to 5 minutes for rancher-webhook deployment"
   --message "rancher-webhook was not available after {{elapsed}} seconds" `# Print this progress message` \
   "kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -w -n cattle-system deploy/rancher-webhook &>/dev/null"
 
+POD_NAME=$(kubectl get pods -n cattle-system -l app=rancher-webhook -o jsonpath="{.items[0].metadata.name}")
+echo "*** webhook version" $(kubectl get pod -n cattle-system $POD_NAME -o jsonpath="{.spec.containers[*].image}")
+
 echo "Waiting up to 5 minutes for rancher-provisioning-capi deployment"
 ./scripts/retry \
   --timeout 300 `# Time out after 300 seconds (5 min)` \
