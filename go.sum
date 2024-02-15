@@ -3047,8 +3047,8 @@ k8s.io/kube-openapi v0.0.0-20230717233707-2695361300d9 h1:LyMgNKD2P8Wn1iAwQU5Ohx
 k8s.io/kube-openapi v0.0.0-20230717233707-2695361300d9/go.mod h1:wZK2AVp1uHCp4VamDVgBP2COHZjqD1T68Rf0CM3YjSM=
 k8s.io/kubectl v0.29.0 h1:Oqi48gXjikDhrBF67AYuZRTcJV4lg2l42GmvsP7FmYI=
 k8s.io/kubectl v0.29.0/go.mod h1:0jMjGWIcMIQzmUaMgAzhSELv5WtHo2a8pq67DtviAJs=
-k8s.io/kubernetes v1.29.0 h1:DOLN7g8+nnAYBi8JHoW0+/MCrZKDPIqAxzLCXDXd0cg=
-k8s.io/kubernetes v1.29.0/go.mod h1:9kztbUQf9stVDcIYXx+BX3nuGCsAQDsuClkGMpPs3pA=
+k8s.io/kubernetes v1.28.5 h1:sqgm0Tk6lqfsfcLUxZ0rfNmtugtABSLUhCqhXtfV1C0=
+k8s.io/kubernetes v1.28.5/go.mod h1:lRbvAZMgn+BrOtymmJAp85Jsa7GlL01av29axiPJ+E0=
 k8s.io/pod-security-admission v0.29.0 h1:tY/ldtkbBCulMYVSWg6ZDLlgDYDWy6rLj8e/AgmwSj4=
 k8s.io/pod-security-admission v0.29.0/go.mod h1:bGIeKCzU0Q0Nl185NHmqcMCiOjTcqTrBfAQaeupwq0E=
 k8s.io/sample-controller v0.22.1/go.mod h1:184Fa29md4PuQSEozdEw6n+AAmoodWOy9iCtyfCvAWY=
