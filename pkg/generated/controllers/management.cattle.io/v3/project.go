@@ -20,7 +20,6 @@ package v3
 
 import (
 	"context"
-	"sync"
 	"time"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -49,14 +48,10 @@ type ProjectCache interface {
 	generic.CacheInterface[*v3.Project]
 }
 
-// ProjectStatusHandler is executed for every added or modified Project. Should return the new status to be updated
 type ProjectStatusHandler func(obj *v3.Project, status v3.ProjectStatus) (v3.ProjectStatus, error)
 
-// ProjectGeneratingHandler is the top-level handler that is executed for every Project event. It extends ProjectStatusHandler by a returning a slice of child objects to be passed to apply.Apply
 type ProjectGeneratingHandler func(obj *v3.Project, status v3.ProjectStatus) ([]runtime.Object, v3.ProjectStatus, error)
 
-// RegisterProjectStatusHandler configures a ProjectController to execute a ProjectStatusHandler for every events observed.
-// If a non-empty condition is provided, it will be updated in the status conditions for every handler execution
 func RegisterProjectStatusHandler(ctx context.Context, controller ProjectController, condition condition.Cond, name string, handler ProjectStatusHandler) {
 	statusHandler := &projectStatusHandler{
 		client:    controller,
@@ -66,8 +61,6 @@ func RegisterProjectStatusHandler(ctx context.Context, controller ProjectControl
 	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
 }
 
-// RegisterProjectGeneratingHandler configures a ProjectController to execute a ProjectGeneratingHandler for every events observed, passing the returned objects to the provided apply.Apply.
-// If a non-empty condition is provided, it will be updated in the status conditions for every handler execution
 func RegisterProjectGeneratingHandler(ctx context.Context, controller ProjectController, apply apply.Apply,
 	condition condition.Cond, name string, handler ProjectGeneratingHandler, opts *generic.GeneratingHandlerOptions) {
 	statusHandler := &projectGeneratingHandler{
@@ -89,7 +82,6 @@ type projectStatusHandler struct {
 	handler   ProjectStatusHandler
 }
 
-// sync is executed on every resource addition or modification. Executes the configured handlers and sends the updated status to the Kubernetes API
 func (a *projectStatusHandler) sync(key string, obj *v3.Project) (*v3.Project, error) {
 	if obj == nil {
 		return obj, nil
@@ -135,10 +127,8 @@ type projectGeneratingHandler struct {
 	opts  generic.GeneratingHandlerOptions
 	gvk   schema.GroupVersionKind
 	name  string
-	seen  sync.Map
 }
 
-// Remove handles the observed deletion of a resource, cascade deleting every associated resource previously applied
 func (a *projectGeneratingHandler) Remove(key string, obj *v3.Project) (*v3.Project, error) {
 	if obj != nil {
 		return obj, nil
@@ -148,17 +138,12 @@ func (a *projectGeneratingHandler) Remove(key string, obj *v3.Project) (*v3.Proj
 	obj.Namespace, obj.Name = kv.RSplit(key, "/")
 	obj.SetGroupVersionKind(a.gvk)
 
-	if a.opts.UniqueApplyForResourceVersion {
-		a.seen.Delete(key)
-	}
-
 	return nil, generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
 		WithOwner(obj).
 		WithSetID(a.name).
 		ApplyObjects()
 }
 
-// Handle executes the configured ProjectGeneratingHandler and pass the resulting objects to apply.Apply, finally returning the new status of the resource
 func (a *projectGeneratingHandler) Handle(obj *v3.Project, status v3.ProjectStatus) (v3.ProjectStatus, error) {
 	if !obj.DeletionTimestamp.IsZero() {
 		return status, nil
@@ -168,41 +153,9 @@ func (a *projectGeneratingHandler) Handle(obj *v3.Project, status v3.ProjectStat
 	if err != nil {
 		return newStatus, err
 	}
-	if !a.isNewResourceVersion(obj) {
-		return newStatus, nil
-	}
 
-	err = generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
+	return newStatus, generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
 		WithOwner(obj).
 		WithSetID(a.name).
 		ApplyObjects(objs...)
-	if err != nil {
-		return newStatus, err
-	}
-	a.storeResourceVersion(obj)
-	return newStatus, nil
-}
-
-// isNewResourceVersion detects if a specific resource version was already successfully processed.
-// Only used if UniqueApplyForResourceVersion is set in generic.GeneratingHandlerOptions
-func (a *projectGeneratingHandler) isNewResourceVersion(obj *v3.Project) bool {
-	if !a.opts.UniqueApplyForResourceVersion {
-		return true
-	}
-
-	// Apply once per resource version
-	key := obj.Namespace + "/" + obj.Name
-	previous, ok := a.seen.Load(key)
-	return !ok || previous != obj.ResourceVersion
-}
-
-// storeResourceVersion keeps track of the latest resource version of an object for which Apply was executed
-// Only used if UniqueApplyForResourceVersion is set in generic.GeneratingHandlerOptions
-func (a *projectGeneratingHandler) storeResourceVersion(obj *v3.Project) {
-	if !a.opts.UniqueApplyForResourceVersion {
-		return
-	}
-
-	key := obj.Namespace + "/" + obj.Name
-	a.seen.Store(key, obj.ResourceVersion)
 }
