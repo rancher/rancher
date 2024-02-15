@@ -203,11 +203,17 @@ func (ap *Provider) TransformToAuthProvider(
 	applicationID, _ := authConfig["applicationId"].(string)
 	p[publicclient.AzureADProviderFieldClientID] = applicationID
 
-	// default AzureAD scopes
-	p[publicclient.AzureADProviderFieldScopes] = []string{"openid", "profile", "email"}
-	if scopes, found := authConfig["scopes"].([]string); found {
-		p[publicclient.AzureADProviderFieldScopes] = scopes
+	scopes := []string{"openid", "profile", "email"}
+	// use custom scopes if defined
+	if customScopes, found := authConfig["scopes"].([]interface{}); found {
+		scopes = []string{}
+		for _, scope := range customScopes {
+			if s, ok := scope.(string); ok {
+				scopes = append(scopes, s)
+			}
+		}
 	}
+	p[publicclient.AzureADProviderFieldScopes] = scopes
 
 	ep := microsoft.AzureADEndpoint(tenantID)
 	p[publicclient.AzureADProviderFieldAuthURL] = ep.AuthURL

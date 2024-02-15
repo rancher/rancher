@@ -280,15 +280,16 @@ type GoogleOauthConfigApplyInput struct {
 type AzureADConfig struct {
 	AuthConfig `json:",inline" mapstructure:",squash"`
 
-	Endpoint           string `json:"endpoint,omitempty" norman:"default=https://login.microsoftonline.com/,required,notnullable"`
-	GraphEndpoint      string `json:"graphEndpoint,omitempty" norman:"required,notnullable"`
-	TokenEndpoint      string `json:"tokenEndpoint,omitempty" norman:"required,notnullable"`
-	AuthEndpoint       string `json:"authEndpoint,omitempty" norman:"required,notnullable"`
-	DeviceAuthEndpoint string `json:"deviceAuthEndpoint,omitempty" norman:"required,notnullable"`
-	TenantID           string `json:"tenantId,omitempty" norman:"required,notnullable"`
-	ApplicationID      string `json:"applicationId,omitempty" norman:"required,notnullable"`
-	ApplicationSecret  string `json:"applicationSecret,omitempty" norman:"required,type=password"`
-	RancherURL         string `json:"rancherUrl,omitempty" norman:"required,notnullable"`
+	Endpoint           string   `json:"endpoint,omitempty" norman:"default=https://login.microsoftonline.com/,required,notnullable"`
+	GraphEndpoint      string   `json:"graphEndpoint,omitempty" norman:"required,notnullable"`
+	TokenEndpoint      string   `json:"tokenEndpoint,omitempty" norman:"required,notnullable"`
+	AuthEndpoint       string   `json:"authEndpoint,omitempty" norman:"required,notnullable"`
+	TenantID           string   `json:"tenantId,omitempty" norman:"required,notnullable"`
+	ApplicationID      string   `json:"applicationId,omitempty" norman:"required,notnullable"`
+	ApplicationSecret  string   `json:"applicationSecret,omitempty" norman:"required,type=password"`
+	RancherURL         string   `json:"rancherUrl,omitempty" norman:"required,notnullable"`
+	DeviceAuthEndpoint string   `json:"deviceAuthEndpoint,omitempty"`
+	Scopes             []string `json:"scopes,omitempty"`
 }
 
 type AzureADConfigTestOutput struct {

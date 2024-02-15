@@ -726,6 +726,11 @@ func (in *AuthTokenList) DeepCopyObject() runtime.Object {
 func (in *AzureADConfig) DeepCopyInto(out *AzureADConfig) {
 	*out = *in
 	in.AuthConfig.DeepCopyInto(&out.AuthConfig)
+	if in.Scopes != nil {
+		in, out := &in.Scopes, &out.Scopes
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 
