@@ -125,6 +125,7 @@ func (p *ProjectSpec) ObjClusterName() string {
 // +genclient
 // +genclient:nonNamespaced
 // +kubebuilder:resource:scope=Cluster
+// +kubebuilder:subresource:status
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // GlobalRole defines rules that can be applied to the local cluster and or every downstream cluster.
@@ -166,6 +167,31 @@ type GlobalRole struct {
 	// and must exactly match with one existing namespace.
 	// +optional
 	NamespacedRules map[string][]rbacv1.PolicyRule `json:"namespacedRules,omitempty"`
+
+	// Status is the most recently observed status of the GlobalRole.
+	// +optional
+	Status GlobalRoleStatus `json:"status,omitempty"`
+}
+
+// GlobalRoleStatus represents the most recently observed status of the GlobalRole.
+type GlobalRoleStatus struct {
+	// ObservedGeneration is the most recent generation (metadata.generation in GlobalRole CR)
+	// observed by the controller. Populated by the system.
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+
+	// LastUpdate is a k8s timestamp of the last time the status was updated.
+	// +optional
+	LastUpdate string `json:"lastUpdateTime,omitempty"`
+
+	// Summary is a string. One of "Complete", "InProgress" or "Error".
+	// +optional
+	Summary string `json:"summary,omitempty"`
+
+	// Conditions is a slice of Condition, indicating the status of specific backing RBAC objects.
+	// There is one condition per ClusterRole and Role managed by the GlobalRole.
+	// +optional
+	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 }
 
 // +genclient

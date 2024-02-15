@@ -38,7 +38,7 @@ type GlobalRole struct {
 	OwnerReferences       []OwnerReference        `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	Removed               string                  `json:"removed,omitempty" yaml:"removed,omitempty"`
 	Rules                 []PolicyRule            `json:"rules,omitempty" yaml:"rules,omitempty"`
-	Status                GlobalRoleStatus        `json:"status,omitempty" yaml:"status,omitempty"`
+	Status                *GlobalRoleStatus       `json:"status,omitempty" yaml:"status,omitempty"`
 	UUID                  string                  `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
 

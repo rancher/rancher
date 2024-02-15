@@ -19,8 +19,18 @@ limitations under the License.
 package v3
 
 import (
+	"context"
+	"time"
+
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/wrangler/pkg/apply"
+	"github.com/rancher/wrangler/pkg/condition"
 	"github.com/rancher/wrangler/pkg/generic"
+	"github.com/rancher/wrangler/pkg/kv"
+	"k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 // GlobalRoleController interface for managing GlobalRole resources.
@@ -36,4 +46,116 @@ type GlobalRoleClient interface {
 // GlobalRoleCache interface for retrieving GlobalRole resources in memory.
 type GlobalRoleCache interface {
 	generic.NonNamespacedCacheInterface[*v3.GlobalRole]
+}
+
+type GlobalRoleStatusHandler func(obj *v3.GlobalRole, status v3.GlobalRoleStatus) (v3.GlobalRoleStatus, error)
+
+type GlobalRoleGeneratingHandler func(obj *v3.GlobalRole, status v3.GlobalRoleStatus) ([]runtime.Object, v3.GlobalRoleStatus, error)
+
+func RegisterGlobalRoleStatusHandler(ctx context.Context, controller GlobalRoleController, condition condition.Cond, name string, handler GlobalRoleStatusHandler) {
+	statusHandler := &globalRoleStatusHandler{
+		client:    controller,
+		condition: condition,
+		handler:   handler,
+	}
+	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
+}
+
+func RegisterGlobalRoleGeneratingHandler(ctx context.Context, controller GlobalRoleController, apply apply.Apply,
+	condition condition.Cond, name string, handler GlobalRoleGeneratingHandler, opts *generic.GeneratingHandlerOptions) {
+	statusHandler := &globalRoleGeneratingHandler{
+		GlobalRoleGeneratingHandler: handler,
+		apply:                       apply,
+		name:                        name,
+		gvk:                         controller.GroupVersionKind(),
+	}
+	if opts != nil {
+		statusHandler.opts = *opts
+	}
+	controller.OnChange(ctx, name, statusHandler.Remove)
+	RegisterGlobalRoleStatusHandler(ctx, controller, condition, name, statusHandler.Handle)
+}
+
+type globalRoleStatusHandler struct {
+	client    GlobalRoleClient
+	condition condition.Cond
+	handler   GlobalRoleStatusHandler
+}
+
+func (a *globalRoleStatusHandler) sync(key string, obj *v3.GlobalRole) (*v3.GlobalRole, error) {
+	if obj == nil {
+		return obj, nil
+	}
+
+	origStatus := obj.Status.DeepCopy()
+	obj = obj.DeepCopy()
+	newStatus, err := a.handler(obj, obj.Status)
+	if err != nil {
+		// Revert to old status on error
+		newStatus = *origStatus.DeepCopy()
+	}
+
+	if a.condition != "" {
+		if errors.IsConflict(err) {
+			a.condition.SetError(&newStatus, "", nil)
+		} else {
+			a.condition.SetError(&newStatus, "", err)
+		}
+	}
+	if !equality.Semantic.DeepEqual(origStatus, &newStatus) {
+		if a.condition != "" {
+			// Since status has changed, update the lastUpdatedTime
+			a.condition.LastUpdated(&newStatus, time.Now().UTC().Format(time.RFC3339))
+		}
+
+		var newErr error
+		obj.Status = newStatus
+		newObj, newErr := a.client.UpdateStatus(obj)
+		if err == nil {
+			err = newErr
+		}
+		if newErr == nil {
+			obj = newObj
+		}
+	}
+	return obj, err
+}
+
+type globalRoleGeneratingHandler struct {
+	GlobalRoleGeneratingHandler
+	apply apply.Apply
+	opts  generic.GeneratingHandlerOptions
+	gvk   schema.GroupVersionKind
+	name  string
+}
+
+func (a *globalRoleGeneratingHandler) Remove(key string, obj *v3.GlobalRole) (*v3.GlobalRole, error) {
+	if obj != nil {
+		return obj, nil
+	}
+
+	obj = &v3.GlobalRole{}
+	obj.Namespace, obj.Name = kv.RSplit(key, "/")
+	obj.SetGroupVersionKind(a.gvk)
+
+	return nil, generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
+		WithOwner(obj).
+		WithSetID(a.name).
+		ApplyObjects()
+}
+
+func (a *globalRoleGeneratingHandler) Handle(obj *v3.GlobalRole, status v3.GlobalRoleStatus) (v3.GlobalRoleStatus, error) {
+	if !obj.DeletionTimestamp.IsZero() {
+		return status, nil
+	}
+
+	objs, newStatus, err := a.GlobalRoleGeneratingHandler(obj, status)
+	if err != nil {
+		return newStatus, err
+	}
+
+	return newStatus, generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
+		WithOwner(obj).
+		WithSetID(a.name).
+		ApplyObjects(objs...)
 }
