@@ -189,6 +189,7 @@ require (
 	github.com/google/gnostic-models v0.6.8
 	github.com/rancher/rancher/pkg/apis v0.0.0-20230915232223-a9ea4ce4a5ba
 	github.com/rancher/shepherd v0.0.0-20240212210630-64631f2d67a0
+	github.com/rancher/wrangler v1.1.1
 	go.qase.io/client v0.0.0-20231114201952-65195ec001fa
 )
 
@@ -233,7 +234,6 @@ require (
 	github.com/opencontainers/selinux v1.11.0 // indirect
 	github.com/ostreedev/ostree-go v0.0.0-20210805093236-719684c64e4f // indirect
 	github.com/proglottis/gpgme v0.1.3 // indirect
-	github.com/rancher/wrangler v1.1.1 // indirect
 	github.com/sigstore/fulcio v1.2.0 // indirect
 	github.com/sigstore/rekor v1.1.1 // indirect
 	github.com/sigstore/sigstore v1.6.3 // indirect
@@ -256,10 +256,6 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20240108191215-35c7eff3a6b1 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240108191215-35c7eff3a6b1 // indirect
 	gopkg.in/go-jose/go-jose.v2 v2.6.1 // indirect
-	k8s.io/cloud-provider v0.27.4 // indirect
-	k8s.io/controller-manager v0.29.0 // indirect
-	k8s.io/kms v0.29.0 // indirect
-	k8s.io/kubelet v0.27.4 // indirect
 	k8s.io/pod-security-admission v0.28.6 // indirect
 )
 

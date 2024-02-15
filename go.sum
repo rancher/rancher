@@ -1857,8 +1857,8 @@ github.com/rancher/qase-go/client v0.0.0-20231114201952-65195ec001fa h1:/qeYlQVf
 github.com/rancher/qase-go/client v0.0.0-20231114201952-65195ec001fa/go.mod h1:NP3xboG+t2p+XMnrcrJ/L384Ki0Cp3Pww/X+vm5Jcy0=
 github.com/rancher/remotedialer v0.3.0 h1:y1EO8JCsgZo0RcqTUp6U8FXcBAv27R+TLnWRcpvX1sM=
 github.com/rancher/remotedialer v0.3.0/go.mod h1:BwwztuvViX2JrLLUwDlsYt5DiyUwHLlzynRwkZLAY0Q=
-github.com/rancher/shepherd v0.0.0-20240212210618-6f6f377a7e21 h1:GCa3Yv6im4aAxchaPWFlsqN3jxeZGgCgNulkvRhhS7I=
-github.com/rancher/shepherd v0.0.0-20240212210618-6f6f377a7e21/go.mod h1:pggo0NvlbxaplK5cwiTSp7AixbGrGWbz6CC710biulI=
+github.com/rancher/shepherd v0.0.0-20240212210630-64631f2d67a0 h1:Y1r/YmEjc3iMe2sQjg0CRB2iy8p6o2V6E9fT38VTbtI=
+github.com/rancher/shepherd v0.0.0-20240212210630-64631f2d67a0/go.mod h1:WqUGpxXtHYkRV2ldhOJNDko0KZue8LBfy+gsCB7As4U=
 github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007 h1:ru+mqGnxMmKeU0Q3XIDxkARvInDIqT1hH2amTcsjxI4=
 github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007/go.mod h1:Ja346o44aTPWADc/5Jm93+KgctT6KtftuOosgz0F2AM=
 github.com/rancher/wrangler v0.6.1/go.mod h1:L4HtjPeX8iqLgsxfJgz+JjKMcX2q3qbRXSeTlC/CSd4=
