@@ -7,7 +7,7 @@ import (
 
 	cache "k8s.io/client-go/tools/cache"
 
-	generic "github.com/rancher/wrangler/pkg/generic"
+	generic "github.com/rancher/wrangler/v2/pkg/generic"
 
 	management_cattle_iov3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 

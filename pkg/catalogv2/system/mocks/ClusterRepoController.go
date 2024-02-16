@@ -8,7 +8,7 @@ import (
 	catalog_cattle_iov1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	cache "k8s.io/client-go/tools/cache"
 
-	generic "github.com/rancher/wrangler/pkg/generic"
+	generic "github.com/rancher/wrangler/v2/pkg/generic"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 

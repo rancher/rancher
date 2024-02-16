@@ -20,13 +20,14 @@ package v1alpha1
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	v1alpha1 "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
-	"github.com/rancher/wrangler/pkg/apply"
-	"github.com/rancher/wrangler/pkg/condition"
-	"github.com/rancher/wrangler/pkg/generic"
-	"github.com/rancher/wrangler/pkg/kv"
+	"github.com/rancher/wrangler/v2/pkg/apply"
+	"github.com/rancher/wrangler/v2/pkg/condition"
+	"github.com/rancher/wrangler/v2/pkg/generic"
+	"github.com/rancher/wrangler/v2/pkg/kv"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -48,10 +49,14 @@ type ClusterGroupCache interface {
 	generic.CacheInterface[*v1alpha1.ClusterGroup]
 }
 
+// ClusterGroupStatusHandler is executed for every added or modified ClusterGroup. Should return the new status to be updated
 type ClusterGroupStatusHandler func(obj *v1alpha1.ClusterGroup, status v1alpha1.ClusterGroupStatus) (v1alpha1.ClusterGroupStatus, error)
 
+// ClusterGroupGeneratingHandler is the top-level handler that is executed for every ClusterGroup event. It extends ClusterGroupStatusHandler by a returning a slice of child objects to be passed to apply.Apply
 type ClusterGroupGeneratingHandler func(obj *v1alpha1.ClusterGroup, status v1alpha1.ClusterGroupStatus) ([]runtime.Object, v1alpha1.ClusterGroupStatus, error)
 
+// RegisterClusterGroupStatusHandler configures a ClusterGroupController to execute a ClusterGroupStatusHandler for every events observed.
+// If a non-empty condition is provided, it will be updated in the status conditions for every handler execution
 func RegisterClusterGroupStatusHandler(ctx context.Context, controller ClusterGroupController, condition condition.Cond, name string, handler ClusterGroupStatusHandler) {
 	statusHandler := &clusterGroupStatusHandler{
 		client:    controller,
@@ -61,6 +66,8 @@ func RegisterClusterGroupStatusHandler(ctx context.Context, controller ClusterGr
 	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
 }
 
+// RegisterClusterGroupGeneratingHandler configures a ClusterGroupController to execute a ClusterGroupGeneratingHandler for every events observed, passing the returned objects to the provided apply.Apply.
+// If a non-empty condition is provided, it will be updated in the status conditions for every handler execution
 func RegisterClusterGroupGeneratingHandler(ctx context.Context, controller ClusterGroupController, apply apply.Apply,
 	condition condition.Cond, name string, handler ClusterGroupGeneratingHandler, opts *generic.GeneratingHandlerOptions) {
 	statusHandler := &clusterGroupGeneratingHandler{
@@ -82,6 +89,7 @@ type clusterGroupStatusHandler struct {
 	handler   ClusterGroupStatusHandler
 }
 
+// sync is executed on every resource addition or modification. Executes the configured handlers and sends the updated status to the Kubernetes API
 func (a *clusterGroupStatusHandler) sync(key string, obj *v1alpha1.ClusterGroup) (*v1alpha1.ClusterGroup, error) {
 	if obj == nil {
 		return obj, nil
@@ -127,8 +135,10 @@ type clusterGroupGeneratingHandler struct {
 	opts  generic.GeneratingHandlerOptions
 	gvk   schema.GroupVersionKind
 	name  string
+	seen  sync.Map
 }
 
+// Remove handles the observed deletion of a resource, cascade deleting every associated resource previously applied
 func (a *clusterGroupGeneratingHandler) Remove(key string, obj *v1alpha1.ClusterGroup) (*v1alpha1.ClusterGroup, error) {
 	if obj != nil {
 		return obj, nil
@@ -138,12 +148,17 @@ func (a *clusterGroupGeneratingHandler) Remove(key string, obj *v1alpha1.Cluster
 	obj.Namespace, obj.Name = kv.RSplit(key, "/")
 	obj.SetGroupVersionKind(a.gvk)
 
+	if a.opts.UniqueApplyForResourceVersion {
+		a.seen.Delete(key)
+	}
+
 	return nil, generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
 		WithOwner(obj).
 		WithSetID(a.name).
 		ApplyObjects()
 }
 
+// Handle executes the configured ClusterGroupGeneratingHandler and pass the resulting objects to apply.Apply, finally returning the new status of the resource
 func (a *clusterGroupGeneratingHandler) Handle(obj *v1alpha1.ClusterGroup, status v1alpha1.ClusterGroupStatus) (v1alpha1.ClusterGroupStatus, error) {
 	if !obj.DeletionTimestamp.IsZero() {
 		return status, nil
@@ -153,9 +168,41 @@ func (a *clusterGroupGeneratingHandler) Handle(obj *v1alpha1.ClusterGroup, statu
 	if err != nil {
 		return newStatus, err
 	}
+	if !a.isNewResourceVersion(obj) {
+		return newStatus, nil
+	}
 
-	return newStatus, generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
+	err = generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
 		WithOwner(obj).
 		WithSetID(a.name).
 		ApplyObjects(objs...)
+	if err != nil {
+		return newStatus, err
+	}
+	a.storeResourceVersion(obj)
+	return newStatus, nil
+}
+
+// isNewResourceVersion detects if a specific resource version was already successfully processed.
+// Only used if UniqueApplyForResourceVersion is set in generic.GeneratingHandlerOptions
+func (a *clusterGroupGeneratingHandler) isNewResourceVersion(obj *v1alpha1.ClusterGroup) bool {
+	if !a.opts.UniqueApplyForResourceVersion {
+		return true
+	}
+
+	// Apply once per resource version
+	key := obj.Namespace + "/" + obj.Name
+	previous, ok := a.seen.Load(key)
+	return !ok || previous != obj.ResourceVersion
+}
+
+// storeResourceVersion keeps track of the latest resource version of an object for which Apply was executed
+// Only used if UniqueApplyForResourceVersion is set in generic.GeneratingHandlerOptions
+func (a *clusterGroupGeneratingHandler) storeResourceVersion(obj *v1alpha1.ClusterGroup) {
+	if !a.opts.UniqueApplyForResourceVersion {
+		return
+	}
+
+	key := obj.Namespace + "/" + obj.Name
+	a.seen.Store(key, obj.ResourceVersion)
 }

@@ -11,7 +11,7 @@ import (
 	"github.com/rancher/rancher/pkg/features"
 	clusterv3 "github.com/rancher/rancher/pkg/generated/norman/cluster.cattle.io/v3"
 	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	"github.com/rancher/wrangler/pkg/generic"
+	"github.com/rancher/wrangler/v2/pkg/generic"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
