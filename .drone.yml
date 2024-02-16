@@ -1122,16 +1122,16 @@ steps:
 - name: chart-publish
   image: plugins/s3
   settings:
-    bucket: registry.optimus.rancher.io
-    access_key: 
-      from_secret: aws_charts_access_key
+    bucket: charts.optimus.rancher.io
+    access_key:
+      from_secret: optimus_charts_access_key
     secret_key:
-      from_secret: aws_charts_secret
+      from_secret: optimus_charts_secret_key
     source: bin/chart
-    target: registry.optimus.rancher.io/server-charts
-  when:
-    event:
-    - tag
+    target: charts.optimus.rancher.io/server-charts
+    when:
+      event:
+      - tag
 
 volumes:
 - name: docker
