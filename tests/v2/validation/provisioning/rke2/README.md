@@ -10,11 +10,12 @@ Please see below for more details for your config. Please see below for more det
 1. [Prerequisites](../README.md)
 2. [Define your test](#provisioning-input)
 3. [Cloud Credential](#cloud-credentials)
-4. [Configure providers to use for Node Driver Clusters](#machine-rke2-config)
-5. [Configuring Custom Clusters](#custom-cluster)
-6. [Advanced Cluster Settings](#advanced-settings)
-7. [Static test cases](#static-test-cases) 
-8. [Back to general provisioning](../README.md)
+4. [Cloud Provider](#cloud-provider)
+5. [Configure providers to use for Node Driver Clusters](#machine-rke2-config)
+6. [Configuring Custom Clusters](#custom-cluster)
+7. [Advanced Cluster Settings](#advanced-settings)
+8. [Static test cases](#static-test-cases) 
+9. [Back to general provisioning](../README.md)
 
 ## Provisioning Input
 provisioningInput is needed to the run the RKE2 tests, specifically kubernetesVersion, cni, and providers. nodesAndRoles is only needed for the TestProvisioningDynamicInput test, node pools are divided by "{nodepool},". psact is optional and takes values `rancher-privileged`, `rancher-restricted` or `rancher-baseline`.
@@ -44,9 +45,10 @@ provisioningInput:
       quantity: 1
   flags:
     desiredflags: "Short|Long" #These flags are for running TestProvisioningRKE2Cluster or TestProvisioningRKE2CustomCluster it is not needed for the dynamic tests.
-  rke2KubernetesVersion: ["v1.27.6+rke2r1"]
+  rke2KubernetesVersion: ["v1.27.10+rke2r1"]
   cni: ["calico"]
-  providers: ["linode", "aws", "do", "harvester", "vsphere"]
+  providers: ["linode", "aws", "do", "harvester", "vsphere", "azure"]
+  cloudProvider: "aws"
   nodeProviders: ["ec2"]
   hardened: false
   psact: ""
@@ -82,7 +84,7 @@ linodeCredentials:
 azureCredentials:
   clientId: ""
   clientSecret: ""
-  subscriptionId": ""
+  subscriptionId: ""
   environment: "AzurePublicCloud"
 ```
 ### AWS
@@ -112,6 +114,13 @@ vmwarevsphereCredentials:
   vcenter: ""
   vcenterPort: ""
 ```
+
+## Cloud Provider
+Cloud Provider enables additional options such as load-balancers and storage devices to be provisioned through your cluster
+available options:
+### AWS
+* `aws-in-tree` uses the in-tree provider for aws -- **Deprecated on kubernetes 1.26 and below**
+* `aws` uses the out-of-tree provider for aws. Built in logic to the automation will be applied to the cluster that applies the correct configuration for the out-of-tree charts to be installed. Supported on kubernetes 1.22+
 
 ## Machine RKE2 Config
 Machine RKE2 config is the final piece needed for the config to run RKE2 provisioning tests.

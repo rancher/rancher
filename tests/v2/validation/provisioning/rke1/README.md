@@ -9,11 +9,12 @@ Please see below for more details for your config. Please note that the config c
 ## Table of Contents
 1. [Prerequisites](../README.md)
 2. [Define your test](#Provisioning-Input)
-3. [Configure providers to use for Node Driver Clusters](#NodeTemplateConfigs)
-4. [Configuring Custom Clusters](#Custom-Cluster)
-5. [Static test cases](#static-test-cases) 
-6. [Advanced Cluster Settings](#advanced-settings)
-7. [Back to general provisioning](../README.md)
+3. [Cloud Provider](#Cloud-Provider)
+4. [Configure providers to use Node Driver Clusters](#NodeTemplateConfigs)
+5. [Configuring Custom Clusters](#Custom-Cluster)
+6. [Static test cases](#static-test-cases) 
+7. [Advanced Cluster Settings](#advanced-settings)
+8. [Back to general provisioning](../README.md)
 
 ## Provisioning Input
 provisioningInput is needed to the run the RKE1 tests, specifically kubernetesVersion, cni, and providers. nodesAndRoles is only needed for the TestProvisioningDynamicInput test, node pools are divided by "{nodepool},". psact is optional and takes values `rancher-privileged`, `rancher-restricted` or `rancher-baseline`.
@@ -33,9 +34,10 @@ provisioningInput:
       quantity: 2
   flags:
     desiredflags: "Long" #These flags are for running TestProvisioningRKE1Cluster or TestProvisioningRKE1CustomCluster it is not needed for the dynamic tests. Long will run the full table, where as short will run the short version of this test.
-  rke1KubernetesVersion: ["v1.27.6-rancher1-1"]
+  rke1KubernetesVersion: ["v1.27.10-rancher1-1"]
   cni: ["calico"]
-  providers: ["linode", "aws", "do", "harvester"]
+  providers: ["linode", "aws", "do", "harvester", "vsphere", "azure"]
+  cloudProvider: "external-aws"
   nodeProviders: ["ec2"]
   psact: ""
   criDockerd: false
@@ -215,6 +217,13 @@ These tests utilize Go build tags. Due to this, see the below examples on how to
 `gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/provisioning/rke1 --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestRKE1ProvisioningTestSuite/TestProvisioningRKE1ClusterDynamicInput"`
 
 If the specified test passes immediately without warning, try adding the `-count=1` flag to get around this issue. This will avoid previous results from interfering with the new test run.
+
+## Cloud Provider
+Cloud Provider enables additional options such as load-balancers and storage devices to be provisioned through your cluster
+available options:
+### AWS
+* `aws` uses the in-tree provider for aws -- **Deprecated on kubernetes 1.26 and below**
+* `external-aws` uses the out-of-tree provider for aws. Built in logic to the automation will be applied to the cluster that applies the correct configuration for the out-of-tree charts to be installed. Supported on kubernetes 1.22+
 
 ## Custom Cluster
 For custom clusters, no nodeTemplateConfig or credentials are required. Currently only supported for ec2.
