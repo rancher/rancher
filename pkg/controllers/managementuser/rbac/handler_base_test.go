@@ -229,3 +229,187 @@ func Test_gatherRoles(t *testing.T) {
 		})
 	}
 }
+
+func TestCompareAndUpdateClusterRole(t *testing.T) {
+	numUpdatesCalled := 0
+	clusterRolesMock := &fakes2.ClusterRoleInterfaceMock{
+		UpdateFunc: func(in1 *v1.ClusterRole) (*v1.ClusterRole, error) {
+			numUpdatesCalled++
+			return &v1.ClusterRole{}, nil
+		},
+	}
+
+	tests := map[string]struct {
+		clusterRole         *v1.ClusterRole
+		roleTemplate        *v3.RoleTemplate
+		wantNumUpdatesCalls int
+	}{
+		"semantic difference": {
+			clusterRole: &v1.ClusterRole{
+				Rules: []v1.PolicyRule{
+					{
+						Verbs:     []string{"get"},
+						APIGroups: []string{""},
+						Resources: []string{"pods"},
+					},
+				},
+			},
+			roleTemplate: &v3.RoleTemplate{
+				Rules: []v1.PolicyRule{
+					{
+						Verbs:           []string{"get"},
+						APIGroups:       []string{""},
+						Resources:       []string{"pods"},
+						ResourceNames:   []string{},
+						NonResourceURLs: []string{},
+					},
+				},
+			},
+			wantNumUpdatesCalls: 0,
+		},
+		"no difference": {
+			clusterRole: &v1.ClusterRole{
+				Rules: []v1.PolicyRule{
+					{
+						Verbs:     []string{"get"},
+						APIGroups: []string{""},
+						Resources: []string{"pods"},
+					},
+				},
+			},
+			roleTemplate: &v3.RoleTemplate{
+				Rules: []v1.PolicyRule{
+					{
+						Verbs:     []string{"get"},
+						APIGroups: []string{""},
+						Resources: []string{"pods"},
+					},
+				},
+			},
+			wantNumUpdatesCalls: 0,
+		},
+		"difference": {
+			clusterRole: &v1.ClusterRole{
+				Rules: []v1.PolicyRule{
+					{
+						Verbs:     []string{"get"},
+						APIGroups: []string{""},
+						Resources: []string{"pods"},
+					},
+				},
+			},
+			roleTemplate: &v3.RoleTemplate{
+				Rules: []v1.PolicyRule{
+					{
+						Verbs:     []string{"get", "update"},
+						APIGroups: []string{""},
+						Resources: []string{"pods"},
+					},
+				},
+			},
+			wantNumUpdatesCalls: 1,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			numUpdatesCalled = 0
+			m := manager{clusterRoles: clusterRolesMock}
+			err := m.compareAndUpdateClusterRole(test.clusterRole, test.roleTemplate)
+			assert.NoError(t, err)
+			assert.Equal(t, numUpdatesCalled, test.wantNumUpdatesCalls)
+		})
+	}
+}
+
+func TestCompareAndUpdateNamespacedRole(t *testing.T) {
+	numUpdatesCalled := 0
+	rolesMock := &fakes2.RoleInterfaceMock{
+		UpdateFunc: func(in1 *v1.Role) (*v1.Role, error) {
+			numUpdatesCalled++
+			return &v1.Role{}, nil
+		},
+	}
+
+	tests := map[string]struct {
+		role                *v1.Role
+		roleTemplate        *v3.RoleTemplate
+		wantNumUpdatesCalls int
+	}{
+		"semantic difference": {
+			role: &v1.Role{
+				Rules: []v1.PolicyRule{
+					{
+						Verbs:     []string{"get"},
+						APIGroups: []string{""},
+						Resources: []string{"pods"},
+					},
+				},
+			},
+			roleTemplate: &v3.RoleTemplate{
+				Rules: []v1.PolicyRule{
+					{
+						Verbs:           []string{"get"},
+						APIGroups:       []string{""},
+						Resources:       []string{"pods"},
+						ResourceNames:   []string{},
+						NonResourceURLs: []string{},
+					},
+				},
+			},
+			wantNumUpdatesCalls: 0,
+		},
+		"no difference": {
+			role: &v1.Role{
+				Rules: []v1.PolicyRule{
+					{
+						Verbs:     []string{"get"},
+						APIGroups: []string{""},
+						Resources: []string{"pods"},
+					},
+				},
+			},
+			roleTemplate: &v3.RoleTemplate{
+				Rules: []v1.PolicyRule{
+					{
+						Verbs:     []string{"get"},
+						APIGroups: []string{""},
+						Resources: []string{"pods"},
+					},
+				},
+			},
+			wantNumUpdatesCalls: 0,
+		},
+		"difference": {
+			role: &v1.Role{
+				Rules: []v1.PolicyRule{
+					{
+						Verbs:     []string{"get"},
+						APIGroups: []string{""},
+						Resources: []string{"pods"},
+					},
+				},
+			},
+			roleTemplate: &v3.RoleTemplate{
+				Rules: []v1.PolicyRule{
+					{
+						Verbs:     []string{"get", "update"},
+						APIGroups: []string{""},
+						Resources: []string{"pods"},
+					},
+				},
+			},
+			wantNumUpdatesCalls: 1,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			numUpdatesCalled = 0
+			m := manager{roles: rolesMock}
+			err := m.compareAndUpdateNamespacedRole(test.role, test.roleTemplate, "")
+			assert.NoError(t, err)
+			assert.Equal(t, numUpdatesCalled, test.wantNumUpdatesCalls)
+		})
+	}
+}
