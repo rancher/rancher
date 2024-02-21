@@ -3,6 +3,7 @@ package serviceaccounttoken
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	corecontrollers "github.com/rancher/wrangler/v2/pkg/generated/controllers/core/v1"
@@ -22,6 +23,9 @@ const (
 	serviceAccountSecretAnnotation = "kubernetes.io/service-account.name"
 )
 
+// Mutex to limit parellal writes by EnsureSecretForServiceAccount
+var mu sync.Mutex
+
 // secretLister is an abstraction over any kind of secret lister.
 // The caller can use any cache or client it has available, whether that is from norman, wrangler, or client-go,
 // as long as it can wrap it in a simplified lambda with this signature.
@@ -30,6 +34,10 @@ type secretLister func(namespace string, selector labels.Selector) ([]*v1.Secret
 // EnsureSecretForServiceAccount gets or creates a service account token Secret for the provided Service Account.
 // For k8s <1.24, the secret is automatically generated for the service account. For >=1.24, we need to generate it explicitly.
 func EnsureSecretForServiceAccount(ctx context.Context, secretsCache corecontrollers.SecretCache, clientSet kubernetes.Interface, sa *v1.ServiceAccount) (*v1.Secret, error) {
+	// Lock avoids multiple calls to this func at the same time and creation of same resouce multiple times
+	mu.Lock()
+	defer mu.Unlock()
+
 	if sa == nil {
 		return nil, fmt.Errorf("could not ensure secret for invalid service account")
 	}
