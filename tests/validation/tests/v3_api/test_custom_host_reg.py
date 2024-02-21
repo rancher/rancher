@@ -21,6 +21,7 @@ RANCHER_ELASTIC_SEARCH_ENDPOINT = os.environ.get(
     'RANCHER_ELASTIC_SEARCH_ENDPOINT', "")
 K8S_VERSION = os.environ.get('RANCHER_K8S_VERSION', "")
 RANCHER_REPOSITORY_IMAGE = os.environ.get('RANCHER_REPOSITORY_IMAGE', "rancher/rancher")
+RANCHER_ADDITIONAL_ENV_PARAMETERS = os.environ.get('ADDITIONAL_ENV_PARAMETERS', "None")
 
 
 def test_add_custom_host():
@@ -50,7 +51,8 @@ def test_deploy_rancher_server():
         'sudo docker run -d --privileged --name="rancher-server" ' \
         '--restart=unless-stopped -p 80:80 -p 443:443  ' \
         '-e CATTLE_BOOTSTRAP_PASSWORD="{}" ' \
-        '{}:{} --trace'.format(ADMIN_PASSWORD,RANCHER_REPOSITORY_IMAGE,RANCHER_SERVER_VERSION)
+        '{}' \
+        '{}:{} --trace'.format(ADMIN_PASSWORD,RANCHER_ADDITIONAL_ENV_PARAMETERS,RANCHER_REPOSITORY_IMAGE,RANCHER_SERVER_VERSION)
 
     print(RANCHER_SERVER_CMD)
     aws_nodes = AmazonWebServices().create_multiple_nodes(
