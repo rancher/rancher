@@ -318,7 +318,7 @@ func (uh *upgradeHandler) upgradeCluster(cluster *v3.Cluster, nodeName string, p
 	}
 
 	if notReady > 0 {
-		// update plan for unavailable nodes
+		// update plan for unavailable nodes to eliminate the case where the nodes become not ready due to a broken node plan
 		for _, node := range status.notReady {
 			if node.Status.NodePlan.Version == cluster.Status.NodeVersion {
 				continue
