@@ -231,6 +231,7 @@ func Test_gatherRoles(t *testing.T) {
 }
 
 func TestCompareAndUpdateClusterRole(t *testing.T) {
+	t.Parallel()
 	numUpdatesCalled := 0
 	clusterRolesMock := &fakes2.ClusterRoleInterfaceMock{
 		UpdateFunc: func(in1 *v1.ClusterRole) (*v1.ClusterRole, error) {
@@ -323,6 +324,7 @@ func TestCompareAndUpdateClusterRole(t *testing.T) {
 }
 
 func TestCompareAndUpdateNamespacedRole(t *testing.T) {
+        t.Parallel()
 	numUpdatesCalled := 0
 	rolesMock := &fakes2.RoleInterfaceMock{
 		UpdateFunc: func(in1 *v1.Role) (*v1.Role, error) {
