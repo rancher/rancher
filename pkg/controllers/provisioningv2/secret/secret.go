@@ -5,8 +5,8 @@ import (
 
 	"github.com/rancher/rancher/pkg/controllers/management/rbac"
 	"github.com/rancher/rancher/pkg/wrangler"
-	wranglerv1 "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
-	rbacv1 "github.com/rancher/wrangler/pkg/generated/controllers/rbac/v1"
+	wranglerv1 "github.com/rancher/wrangler/v2/pkg/generated/controllers/core/v1"
+	rbacv1 "github.com/rancher/wrangler/v2/pkg/generated/controllers/rbac/v1"
 	v1 "k8s.io/api/core/v1"
 	k8srbac "k8s.io/api/rbac/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"

@@ -16,7 +16,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/rancher/wrangler/pkg/randomtoken"
+	"github.com/rancher/wrangler/v2/pkg/randomtoken"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"

@@ -2,9 +2,6 @@ module github.com/rancher/rancher
 
 go 1.21
 
-// on release remove this wrangler replace and use the latest tag
-replace github.com/rancher/wrangler v1.1.1 => github.com/rancher/wrangler v1.1.1-0.20230831050635-df1bd5aae9df
-
 replace (
 	github.com/containerd/containerd => github.com/containerd/containerd v1.6.27 // for compatibilty with docker 20.10.x
 	github.com/docker/distribution => github.com/docker/distribution v2.8.2+incompatible // rancher-machine requires a replace is set
@@ -69,7 +66,7 @@ require (
 	github.com/AzureAD/microsoft-authentication-library-for-go v0.5.1
 	github.com/Masterminds/semver/v3 v3.2.1
 	github.com/Masterminds/sprig/v3 v3.2.3
-	github.com/aws/aws-sdk-go v1.49.13
+	github.com/aws/aws-sdk-go v1.49.16
 	github.com/bep/debounce v1.2.0
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/coreos/go-iptables v0.6.0
@@ -109,23 +106,23 @@ require (
 	github.com/prometheus/client_golang v1.16.0
 	github.com/prometheus/client_model v0.4.0
 	github.com/prometheus/common v0.44.0
-	github.com/rancher/aks-operator v1.3.0-rc4
-	github.com/rancher/apiserver v0.0.0-20240205154815-a3b9e3721c1b
-	github.com/rancher/channelserver v0.5.1-0.20230719220800-0a37b73c7df8
-	github.com/rancher/dynamiclistener v0.3.6
-	github.com/rancher/eks-operator v1.4.0-rc4
+	github.com/rancher/aks-operator v1.3.0-rc5
+	github.com/rancher/apiserver v0.0.0-20240207153957-4fd7d821d952
+	github.com/rancher/channelserver v0.6.1-0.20240212155841-07630c8295da
+	github.com/rancher/dynamiclistener v0.5.0-rc1
+	github.com/rancher/eks-operator v1.4.0-rc5
 	github.com/rancher/fleet/pkg/apis v0.0.0-20231017140638-93432f288e79
-	github.com/rancher/gke-operator v1.3.0-rc4
+	github.com/rancher/gke-operator v1.3.0-rc5
 	github.com/rancher/kubernetes-provider-detector v0.1.5
-	github.com/rancher/lasso v0.0.0-20230830164424-d684fdeb6f29
+	github.com/rancher/lasso v0.0.0-20240123150939-7055397d6dfa
 	github.com/rancher/machine v0.15.0-rancher109
-	github.com/rancher/norman v0.0.0-20240205154641-a6a6cf569608
+	github.com/rancher/norman v0.0.0-20240207153100-3bb70b772b52
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/remotedialer v0.3.0
 	github.com/rancher/rke v1.5.3
-	github.com/rancher/steve v0.0.0-20231016202603-993540401906
+	github.com/rancher/steve v0.0.0-20240207202215-be7dccb37f4a
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007
-	github.com/rancher/wrangler v1.1.1
+	github.com/rancher/wrangler/v2 v2.1.3
 	github.com/robfig/cron v1.1.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.8.4
@@ -146,28 +143,28 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/yaml.v2 v2.4.0
 	helm.sh/helm/v3 v3.11.1
-	k8s.io/api v0.27.9
-	k8s.io/apiextensions-apiserver v0.27.9
-	k8s.io/apimachinery v0.27.9
-	k8s.io/apiserver v0.27.9
+	k8s.io/api v0.28.6
+	k8s.io/apiextensions-apiserver v0.28.6
+	k8s.io/apimachinery v0.28.6
+	k8s.io/apiserver v0.28.6
 	k8s.io/cli-runtime v0.27.9
 	k8s.io/client-go v12.0.0+incompatible
 	k8s.io/gengo v0.0.0-20240129211411-f967bbeff4b4
 	k8s.io/helm v2.16.9+incompatible
-	k8s.io/kube-aggregator v0.27.9
+	k8s.io/kube-aggregator v0.28.6
 	k8s.io/kubectl v0.27.9
 	k8s.io/kubernetes v1.27.9
 	k8s.io/utils v0.0.0-20240102154912-e7106e64919e
 	sigs.k8s.io/aws-iam-authenticator v0.5.9
 	sigs.k8s.io/cluster-api v1.5.0
-	sigs.k8s.io/controller-runtime v0.15.1
+	sigs.k8s.io/controller-runtime v0.15.3
 	sigs.k8s.io/yaml v1.4.0
 )
 
 require (
 	github.com/antihax/optional v1.0.0
 	github.com/containers/image/v5 v5.25.0
-	github.com/rancher/rancher/pkg/apis v0.0.0-20230915232223-a9ea4ce4a5ba
+	github.com/rancher/rancher/pkg/apis v0.0.0-20240104144633-360c02b3761f
 	github.com/rancher/shepherd v0.0.0-20240212210618-6f6f377a7e21
 	go.qase.io/client v0.0.0-20231114201952-65195ec001fa
 )
@@ -178,7 +175,7 @@ require (
 	github.com/VividCortex/ewma v1.2.0 // indirect
 	github.com/acarl005/stripansi v0.0.0-20180116102854-5a71ef0e047d // indirect
 	github.com/antlr/antlr4/runtime/Go/antlr v1.4.10 // indirect
-	github.com/cenkalti/backoff/v4 v4.2.0 // indirect
+	github.com/cenkalti/backoff/v4 v4.2.1 // indirect
 	github.com/containerd/log v0.1.0 // indirect
 	github.com/containerd/stargz-snapshotter/estargz v0.14.3 // indirect
 	github.com/containers/libtrust v0.0.0-20230121012942-c1716e8a8d01 // indirect
@@ -214,6 +211,7 @@ require (
 	github.com/opencontainers/selinux v1.11.0 // indirect
 	github.com/ostreedev/ostree-go v0.0.0-20210805093236-719684c64e4f // indirect
 	github.com/proglottis/gpgme v0.1.3 // indirect
+	github.com/rancher/wrangler v1.1.1 // indirect
 	github.com/sigstore/fulcio v1.2.0 // indirect
 	github.com/sigstore/rekor v1.1.1 // indirect
 	github.com/sigstore/sigstore v1.6.3 // indirect
@@ -281,7 +279,7 @@ require (
 	github.com/docker/go-metrics v0.0.1 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/docker/libtrust v0.0.0-20160708172513-aabc10ec26b7 // indirect
-	github.com/emicklei/go-restful/v3 v3.10.2 // indirect
+	github.com/emicklei/go-restful/v3 v3.11.0 // indirect
 	github.com/exponent-io/jsonpath v0.0.0-20210407135951-1de76d718b3f // indirect
 	github.com/fatih/camelcase v1.0.0 // indirect
 	github.com/fatih/color v1.15.0 // indirect
@@ -409,15 +407,15 @@ require (
 	gopkg.in/square/go-jose.v2 v2.6.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/cluster-bootstrap v0.27.2 // indirect
-	k8s.io/code-generator v0.27.9 // indirect
-	k8s.io/component-base v0.27.9 // indirect
+	k8s.io/code-generator v0.28.6 // indirect
+	k8s.io/component-base v0.28.6 // indirect
 	k8s.io/component-helpers v0.27.9 // indirect
 	k8s.io/klog v1.0.0 // indirect
 	k8s.io/klog/v2 v2.100.1 // indirect
-	k8s.io/kube-openapi v0.0.0-20230530175149-33f04d5d6b58 // indirect
+	k8s.io/kube-openapi v0.0.0-20230717233707-2695361300d9 // indirect
 	oras.land/oras-go v1.2.3 // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.1.2 // indirect
-	sigs.k8s.io/cli-utils v0.27.0 // indirect
+	sigs.k8s.io/cli-utils v0.28.0 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/kustomize/api v0.13.4 // indirect
 	sigs.k8s.io/kustomize/kyaml v0.14.2 // indirect
