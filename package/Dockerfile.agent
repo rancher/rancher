@@ -21,7 +21,7 @@ LABEL io.cattle.agent true
 ENV AGENT_IMAGE rancher/rancher-agent:${VERSION}
 ENV CATTLE_RANCHER_WEBHOOK_MIN_VERSION=''
 # For now, this value needs to be manually synced with the one in the main Dockerfile. This pins downstream webhook's version.
-ENV CATTLE_RANCHER_WEBHOOK_VERSION=2.0.7+up0.3.7-rc2
+ENV CATTLE_RANCHER_WEBHOOK_VERSION=2.0.7+up0.3.7
 ENV SSL_CERT_DIR /etc/kubernetes/ssl/certs
 COPY --from=rancher /var/lib/rancher-data /var/lib/rancher-data
 COPY --from=rancher /usr/bin/tini /usr/bin/
