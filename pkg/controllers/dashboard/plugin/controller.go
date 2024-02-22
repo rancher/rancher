@@ -3,8 +3,10 @@ package plugin
 import (
 	"context"
 	"fmt"
+	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/wrangler"
+	"github.com/sirupsen/logrus"
 
 	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	plugincontroller "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
@@ -63,7 +65,27 @@ func (h *handler) OnPluginChange(key string, plugin *v1.UIPlugin) (*v1.UIPlugin,
 	} else {
 		plugin.Status.CacheState = Pending
 	}
-	err = FsCache.SyncWithControllersCache(cachedPlugins)
+	for _, p := range cachedPlugins {
+		err2 := FsCache.SyncWithControllersCache(p)
+		if errors.Is(err2, maxFileSizeError) {
+			// update CRD to remove cache
+			p.Spec.Plugin.NoCache = true
+			_, err2 := h.plugin.Update(p)
+			if err2 != nil {
+				logrus.Errorf("failed to update plugin [%s] noCache flag: %s", p.Spec.Plugin.Name, err2.Error())
+				continue
+			}
+			// delete files that were written
+			err2 = FsCache.Delete(p.Spec.Plugin.Name, p.Spec.Plugin.Version)
+			if err2 != nil {
+				logrus.Error(err2)
+				continue
+			}
+			p.Status.CacheState = Disabled
+		} else {
+			err = err2
+		}
+	}
 	if err != nil {
 		return plugin, fmt.Errorf("failed to sync filesystem cache with controller cache: %w", err)
 	}

@@ -4,10 +4,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/rancher/rancher/pkg/settings"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 
@@ -28,63 +30,63 @@ const (
 )
 
 var (
-	FsCache        = FSCache{}
-	FSCacheRootDir = filepath.Join("management-state", "uiplugin")
-	osRemoveAll    = os.RemoveAll
-	osStat         = os.Stat
-	isDirEmpty     = isDirectoryEmpty
+	FsCache          = FSCache{}
+	maxFileSizeError = fmt.Errorf("file size limit of %s bytes reached", settings.MaxUIPluginFileByteSize.Get())
+	FSCacheRootDir   = filepath.Join("management-state", "uiplugin")
+	osRemoveAll      = os.RemoveAll
+	osStat           = os.Stat
+	isDirEmpty       = isDirectoryEmpty
 )
 
-type FSCache struct{}
+type FSCache struct {
+}
 
 type PackageJSON struct {
 	Version string `json:"version,omitempty"`
 }
 
-// SyncWithControllersCache takes in a slice of UI Plugins objects and syncs the filesystem cache with it
-func (c FSCache) SyncWithControllersCache(cachedPlugins []*v1.UIPlugin) error {
-	for _, p := range cachedPlugins {
-		plugin := p.Spec.Plugin
-		if plugin.NoCache {
-			logrus.Debugf("skipped caching plugin [Name: %s Version: %s] cache is disabled [noCache: %v]", plugin.Name, plugin.Version, plugin.NoCache)
+// SyncWithControllersCache takes in a UI Plugin object and syncs the filesystem cache with it
+func (c FSCache) SyncWithControllersCache(p *v1.UIPlugin) error {
+	plugin := p.Spec.Plugin
+	if plugin.NoCache {
+		logrus.Debugf("skipped caching plugin [Name: %s Version: %s] cache is disabled [noCache: %v]", plugin.Name, plugin.Version, plugin.NoCache)
+		return nil
+	}
+	if isCached, err := c.isCached(plugin.Name, plugin.Version); err != nil {
+		return err
+	} else if isCached {
+		logrus.Debugf("skipped caching plugin [Name: %s Version: %s] is already cached", plugin.Name, plugin.Version)
+		return nil
+	}
+	version, err := getVersionFromPackageJSON(fmt.Sprintf("%s/%s", plugin.Endpoint, PackageJSONFilename))
+	if err != nil {
+		return err
+	}
+	cachedVersion, err := semver.NewVersion(plugin.Version)
+	if err != nil {
+		return err
+	}
+	if !cachedVersion.Equal(version) {
+		return fmt.Errorf("plugin [%s] version [%s] does not match version in controller's cache [%s]", plugin.Name, version.String(), cachedVersion.String())
+	}
+	files, err := fetchFilesTxt(fmt.Sprintf("%s/%s", plugin.Endpoint, FilesTxtFilename))
+	if err != nil {
+		return err
+	}
+	for _, file := range files {
+		if file == "" {
 			continue
 		}
-		if isCached, err := c.isCached(plugin.Name, plugin.Version); err != nil {
-			return err
-		} else if isCached {
-			logrus.Debugf("skipped caching plugin [Name: %s Version: %s] is already cached", plugin.Name, plugin.Version)
-			continue
-		}
-		version, err := getVersionFromPackageJSON(fmt.Sprintf("%s/%s", plugin.Endpoint, PackageJSONFilename))
+		data, err := fetchFile(plugin.Endpoint + "/" + file)
 		if err != nil {
 			return err
 		}
-		cachedVersion, err := semver.NewVersion(plugin.Version)
+		path, err := filepathsecure.SecureJoin(FSCacheRootDir, filepath.Join(plugin.Name, plugin.Version, file))
 		if err != nil {
 			return err
 		}
-		if !cachedVersion.Equal(version) {
-			return fmt.Errorf("plugin [%s] version [%s] does not match version in controller's cache [%s]", plugin.Name, version.String(), cachedVersion.String())
-		}
-		files, err := fetchFilesTxt(fmt.Sprintf("%s/%s", plugin.Endpoint, FilesTxtFilename))
-		if err != nil {
-			return err
-		}
-		for _, file := range files {
-			if file == "" {
-				continue
-			}
-			data, err := fetchFile(plugin.Endpoint + "/" + file)
-			if err != nil {
-				return err
-			}
-			path, err := filepathsecure.SecureJoin(FSCacheRootDir, filepath.Join(plugin.Name, plugin.Version, file))
-			if err != nil {
-				return err
-			}
-			if err := c.Save(data, path); err != nil {
-				logrus.Debugf("failed to cache plugin [Name: %s Version: %s] in filesystem [path: %s]", plugin.Name, plugin.Version, path)
-			}
+		if err := c.Save(data, path); err != nil {
+			logrus.Debugf("failed to cache plugin [Name: %s Version: %s] in filesystem [path: %s]", plugin.Name, plugin.Version, path)
 		}
 	}
 
@@ -222,9 +224,21 @@ func fetchFile(URL string) ([]byte, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	data, err := io.ReadAll(resp.Body)
+	maxFileSize, err := strconv.ParseInt(settings.MaxUIPluginFileByteSize.Get(), 10, 64)
+	if err != nil {
+		logrus.Errorf("failed to convert setting MaxUIPluginFileByteSize to int64, using fallback. err: %s", err.Error())
+		maxFileSize = settings.DefaultMaxUIPluginFileSizeInBytes
+	}
+	if resp.ContentLength > maxFileSize {
+		return nil, maxFileSizeError
+	}
+	reader := &io.LimitedReader{R: resp.Body, N: maxFileSize + 1}
+	data, err := io.ReadAll(reader)
 	if err != nil {
 		return nil, err
+	}
+	if reader.N == 0 {
+		return nil, maxFileSizeError
 	}
 	return data, nil
 }
