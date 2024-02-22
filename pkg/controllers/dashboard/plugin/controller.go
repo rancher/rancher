@@ -3,6 +3,7 @@ package plugin
 import (
 	"context"
 	"fmt"
+
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -67,7 +68,7 @@ func (h *handler) OnPluginChange(key string, plugin *v1.UIPlugin) (*v1.UIPlugin,
 	}
 	for _, p := range cachedPlugins {
 		err2 := FsCache.SyncWithControllersCache(p)
-		if errors.Is(err2, maxFileSizeError) {
+		if errors.Is(err2, errMaxFileSizeError) {
 			// update CRD to remove cache
 			p.Spec.Plugin.NoCache = true
 			_, err2 := h.plugin.Update(p)

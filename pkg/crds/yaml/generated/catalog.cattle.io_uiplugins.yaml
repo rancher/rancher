@@ -15,13 +15,13 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - jsonPath: .spec.release.name
+    - jsonPath: .spec.plugin.name
       name: Plugin Name
       type: string
-    - jsonPath: .status.version
+    - jsonPath: .spec.plugin.version
       name: Version
       type: string
-    - jsonPath: .status.state
+    - jsonPath: .status.cacheState
       name: State
       type: string
     name: v1

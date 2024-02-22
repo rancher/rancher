@@ -67,7 +67,6 @@ func (w *UIPluginTest) SetupSuite() {
 
 	restConfig, err := (*kubeConfig).ClientConfig()
 	require.NoError(w.T(), err)
-
 	cset, err := kubernetes.NewForConfig(restConfig)
 	require.NoError(w.T(), err)
 	w.corev1 = cset.CoreV1()
@@ -76,7 +75,7 @@ func (w *UIPluginTest) SetupSuite() {
 	require.NoError(w.T(), err)
 	_, err = w.catalogClient.ClusterRepos().Create(context.Background(), &rv1.ClusterRepo{
 		ObjectMeta: metav1.ObjectMeta{Name: "extensions-examples"},
-		Spec:       rv1.RepoSpec{GitRepo: "https://github.com/diogoasouza/ui-plugin-examples", GitBranch: "main"},
+		Spec:       rv1.RepoSpec{GitRepo: "https://github.com/rancher/ui-plugin-examples", GitBranch: "main"},
 	}, metav1.CreateOptions{})
 	w.Require().NoError(err)
 	w.Require().NoError(w.pollUntilDownloaded("extensions-examples", metav1.Time{}))
@@ -88,7 +87,7 @@ func (w *UIPluginTest) SetupSuite() {
 		DisableOpenAPIValidation: false,
 		Charts: []types.ChartInstall{{
 			ChartName:   "uk-locale",
-			Version:     "0.1.0",
+			Version:     "0.1.1",
 			ReleaseName: "uk-locale",
 			Description: "locale",
 		}},

@@ -4,11 +4,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/rancher/rancher/pkg/settings"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"syscall"
@@ -16,6 +17,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	filepathsecure "github.com/cyphar/filepath-securejoin"
 	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/sirupsen/logrus"
 )
 
@@ -30,12 +32,13 @@ const (
 )
 
 var (
-	FsCache          = FSCache{}
-	maxFileSizeError = fmt.Errorf("file size limit of %s bytes reached", settings.MaxUIPluginFileByteSize.Get())
-	FSCacheRootDir   = filepath.Join("management-state", "uiplugin")
-	osRemoveAll      = os.RemoveAll
-	osStat           = os.Stat
-	isDirEmpty       = isDirectoryEmpty
+	FsCache             = FSCache{}
+	errMaxFileSizeError = fmt.Errorf("file size limit of %s bytes reached", settings.MaxUIPluginFileByteSize.Get())
+	FSCacheRootDir      = filepath.Join("management-state", "uiplugin")
+	osRemoveAll         = os.RemoveAll
+	osStat              = os.Stat
+	isDirEmpty          = isDirectoryEmpty
+	fileNameRegex       = regexp.MustCompile(`(^[/\\.])|\.\.`)
 )
 
 type FSCache struct {
@@ -98,17 +101,13 @@ func (c FSCache) SyncWithControllersCache(p *v1.UIPlugin) error {
 func (c FSCache) SyncWithIndex(index *SafeIndex, fsCacheFiles []string) error {
 	for _, file := range fsCacheFiles {
 		logrus.Debugf("syncing index with filesystem cache")
-		// Splits /{root}/{pluginName}/{pluginVersion}/* from a fs cache path
-		rel, err := filepath.Rel(FSCacheRootDir, file)
+		chartName, chartVersion, err := getChartNameAndVersion(file)
 		if err != nil {
-			return fmt.Errorf("path is not relative to the root cache path: %w", err)
+			return err
 		}
-		s := strings.Split(rel, "/")
-		name := s[0]
-		version := s[1]
-		_, ok := index.Entries[name]
-		if !ok || index.Entries[name].Version != version {
-			err := c.Delete(name, version)
+		_, ok := index.Entries[chartName]
+		if !ok || index.Entries[chartName].Version != chartVersion {
+			err := c.Delete(chartName, chartVersion)
 			if err != nil {
 				return err
 			}
@@ -162,18 +161,46 @@ func (c FSCache) isCached(name, version string) (bool, error) {
 		if errors.Is(err, os.ErrNotExist) {
 			return false, nil
 		}
-		isEmpty, err := isDirEmpty(path)
-		if err != nil {
-			return false, err
-		}
-		if !isEmpty {
-			return true, nil
-		}
-
 		return false, err
 	}
-
+	isEmpty, err := isDirEmpty(path)
+	if err != nil {
+		return false, err
+	}
+	if !isEmpty {
+		return true, nil
+	}
 	return false, nil
+}
+
+// getChartNameAndVersion receives a filepath and returns the chart name and chart version.
+// The path has to follow /{root}/{chartName}/{chartVersion}/*
+func getChartNameAndVersion(file string) (string, string, error) {
+	root, err := filepath.Abs(FSCacheRootDir)
+	if err != nil {
+		return "", "", fmt.Errorf("unable to get absolute root path: %w", err)
+	}
+	filePath, err := filepath.Abs(file)
+	if err != nil {
+		return "", "", fmt.Errorf("unable to get absolute file path: %w", err)
+	}
+
+	// file has to be rooted at FSCacheRootDir
+	if strings.HasPrefix(filePath, root) {
+		p, _ := strings.CutPrefix(filePath, root)
+		s := strings.Split(p, string(os.PathSeparator))
+		if len(s) < 3 {
+			return "", "", fmt.Errorf("file path is not valid. Path provided: %s", file)
+		}
+		chartName := s[1]
+		chartVersion := s[2]
+		if _, err := semver.NewVersion(chartVersion); err != nil {
+			return "", "", fmt.Errorf("invalid chart version: %w", err)
+		}
+		return chartName, chartVersion, nil
+	}
+	return "", "", fmt.Errorf("path root is not the root cache path. Path provided: %s", file)
+
 }
 
 func fsCacheFilepathGlob(pattern string) ([]string, error) {
@@ -213,6 +240,11 @@ func fetchFilesTxt(filesTxtURL string) ([]string, error) {
 	}
 	files := strings.Split(string(data), "\n")
 
+	err = validateFilesTxtEntries(files)
+	if err != nil {
+		return nil, err
+	}
+
 	return files, nil
 }
 
@@ -230,7 +262,7 @@ func fetchFile(URL string) ([]byte, error) {
 		maxFileSize = settings.DefaultMaxUIPluginFileSizeInBytes
 	}
 	if resp.ContentLength > maxFileSize {
-		return nil, maxFileSizeError
+		return nil, errMaxFileSizeError
 	}
 	reader := &io.LimitedReader{R: resp.Body, N: maxFileSize + 1}
 	data, err := io.ReadAll(reader)
@@ -238,7 +270,7 @@ func fetchFile(URL string) ([]byte, error) {
 		return nil, err
 	}
 	if reader.N == 0 {
-		return nil, maxFileSizeError
+		return nil, errMaxFileSizeError
 	}
 	return data, nil
 }
@@ -255,4 +287,17 @@ func isDirectoryEmpty(path string) (bool, error) {
 	}
 
 	return false, err
+}
+
+func validateFilesTxtEntries(entries []string) error {
+	for _, entry := range entries {
+		file, err := url.QueryUnescape(entry)
+		if err != nil {
+			return fmt.Errorf("failed to decode entry: %s", entry)
+		}
+		if fileNameRegex.MatchString(file) {
+			return fmt.Errorf("invalid file entry: %s", file)
+		}
+	}
+	return nil
 }
