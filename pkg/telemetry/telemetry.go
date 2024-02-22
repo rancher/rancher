@@ -13,7 +13,7 @@ import (
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
 	ruser "github.com/rancher/rancher/pkg/user"
-	"github.com/rancher/wrangler/pkg/ticker"
+	"github.com/rancher/wrangler/v2/pkg/ticker"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/labels"
 )

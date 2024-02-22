@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/rancher/rancher/pkg/fleet"
-	"github.com/rancher/wrangler/pkg/crd"
-	"github.com/rancher/wrangler/pkg/yaml"
+	"github.com/rancher/wrangler/v2/pkg/crd"
+	"github.com/rancher/wrangler/v2/pkg/yaml"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	clientv1 "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/labels"
