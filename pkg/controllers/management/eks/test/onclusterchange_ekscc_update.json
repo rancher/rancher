@@ -10,6 +10,7 @@
     "loggingTypes": [],
     "nodeGroups": [
       {
+        "arm": false,
         "desiredSize": 2,
         "diskSize": 20,
         "ec2SshKey": "",
@@ -35,6 +36,7 @@
         "version": "1.22"
       },
       {
+        "arm": false,
         "desiredSize": 2,
         "diskSize": 20,
         "ec2SshKey": "",

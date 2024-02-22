@@ -17,7 +17,8 @@ spec:
     kubernetesVersion: "1.22"
     loggingTypes: []
     nodeGroups:
-    - desiredSize: 2
+    - arm: false
+      desiredSize: 2
       diskSize: 20
       ec2SshKey: ""
       gpu: false
@@ -39,7 +40,8 @@ spec:
       tags: {}
       userData: ""
       version: "1.22"
-    - desiredSize: 2
+    - arm: false
+      desiredSize: 2
       diskSize: 20
       ec2SshKey: ""
       gpu: false
