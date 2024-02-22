@@ -4,6 +4,8 @@ go 1.19
 
 replace github.com/manicminer/hamilton => github.com/moio/hamilton v0.0.0-20240126124002-282ff9e5276f
 
+replace github.com/rancher/remotedialer => github.com/moio/remotedialer v0.2.6-debug-41809-1
+
 replace github.com/rancher/steve => github.com/rancher/steve v0.0.0-20231222173734-898644971b85
 
 replace (
