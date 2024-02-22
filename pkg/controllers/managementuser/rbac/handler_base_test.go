@@ -324,14 +324,7 @@ func TestCompareAndUpdateClusterRole(t *testing.T) {
 }
 
 func TestCompareAndUpdateNamespacedRole(t *testing.T) {
-        t.Parallel()
-	numUpdatesCalled := 0
-	rolesMock := &fakes2.RoleInterfaceMock{
-		UpdateFunc: func(in1 *v1.Role) (*v1.Role, error) {
-			numUpdatesCalled++
-			return &v1.Role{}, nil
-		},
-	}
+	t.Parallel()
 
 	tests := map[string]struct {
 		role                *v1.Role
@@ -406,8 +399,16 @@ func TestCompareAndUpdateNamespacedRole(t *testing.T) {
 	}
 
 	for name, test := range tests {
+		test := test
 		t.Run(name, func(t *testing.T) {
-			numUpdatesCalled = 0
+			t.Parallel()
+			numUpdatesCalled := 0
+			rolesMock := &fakes2.RoleInterfaceMock{
+				UpdateFunc: func(in1 *v1.Role) (*v1.Role, error) {
+					numUpdatesCalled++
+					return &v1.Role{}, nil
+				},
+			}
 			m := manager{roles: rolesMock}
 			err := m.compareAndUpdateNamespacedRole(test.role, test.roleTemplate, "")
 			assert.NoError(t, err)
