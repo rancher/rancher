@@ -13,6 +13,7 @@ replace (
 	github.com/rancher/machine => github.com/rancher/machine v0.15.0-rancher100 // aks-operator requires rancher99 but rancher100 should not break it.
 	github.com/rancher/rancher/pkg/apis => ./pkg/apis
 	github.com/rancher/rancher/pkg/client => ./pkg/client
+	github.com/rancher/steve => github.com/rmweir/steve v0.0.0-20240226174614-0462af3b9ac2
 
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc => go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.20.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp => go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.20.0
@@ -119,7 +120,7 @@ require (
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 	github.com/rancher/remotedialer v0.2.6-0.20220624190122-ea57207bf2b8
 	github.com/rancher/rke v1.4.6
-	github.com/rancher/steve v0.0.0-20230609202141-bf2e9655f5dd
+	github.com/rancher/steve v0.0.0-20240207202215-be7dccb37f4a
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007
 	github.com/rancher/wrangler v1.1.1
 	github.com/robfig/cron v1.1.0
