@@ -232,13 +232,6 @@ func Test_gatherRoles(t *testing.T) {
 
 func TestCompareAndUpdateClusterRole(t *testing.T) {
 	t.Parallel()
-	numUpdatesCalled := 0
-	clusterRolesMock := &fakes2.ClusterRoleInterfaceMock{
-		UpdateFunc: func(in1 *v1.ClusterRole) (*v1.ClusterRole, error) {
-			numUpdatesCalled++
-			return &v1.ClusterRole{}, nil
-		},
-	}
 
 	tests := map[string]struct {
 		clusterRole         *v1.ClusterRole
@@ -314,11 +307,22 @@ func TestCompareAndUpdateClusterRole(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			numUpdatesCalled = 0
+			numUpdatesCalled := 0
+			var updateParamCalled *v1.ClusterRole
+			clusterRolesMock := &fakes2.ClusterRoleInterfaceMock{
+				UpdateFunc: func(in1 *v1.ClusterRole) (*v1.ClusterRole, error) {
+					numUpdatesCalled++
+					updateParamCalled = in1
+					return &v1.ClusterRole{}, nil
+				},
+			}
 			m := manager{clusterRoles: clusterRolesMock}
 			err := m.compareAndUpdateClusterRole(test.clusterRole, test.roleTemplate)
 			assert.NoError(t, err)
-			assert.Equal(t, numUpdatesCalled, test.wantNumUpdatesCalls)
+			assert.Equal(t, test.wantNumUpdatesCalls, numUpdatesCalled)
+			if test.wantNumUpdatesCalls > 0 {
+				assert.Equal(t, test.roleTemplate.Rules, updateParamCalled.Rules)
+			}
 		})
 	}
 }
