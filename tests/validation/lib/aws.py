@@ -25,8 +25,8 @@ AWS_SSH_KEY_NAME = os.environ.get("AWS_SSH_KEY_NAME")
 AWS_CICD_INSTANCE_TAG = os.environ.get("AWS_CICD_INSTANCE_TAG",
                                        'rancher-validation')
 AWS_IAM_PROFILE = os.environ.get("AWS_IAM_PROFILE", "")
-# by default the public Ubuntu 20.04 AMI is used
-AWS_DEFAULT_AMI = "ami-012fd49f6b0c404c7"
+# by default the public Ubuntu 22.04 AMI is used
+AWS_DEFAULT_AMI = "ami-0930eb63bafda06d1"
 AWS_DEFAULT_USER = "ubuntu"
 AWS_AMI = os.environ.get("AWS_AMI", AWS_DEFAULT_AMI)
 AWS_USER = os.environ.get("AWS_USER", AWS_DEFAULT_USER)
