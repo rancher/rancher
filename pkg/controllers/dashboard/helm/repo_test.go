@@ -81,7 +81,7 @@ func TestShouldRefresh(t *testing.T) {
 				URL:                "https://example.com",
 				IndexConfigMapName: "configmap",
 				DownloadTime: metav1.Time{
-					Time: time.Now().Add(-6 * time.Minute),
+					Time: time.Now().Add(-7 * time.Hour),
 				},
 			},
 			true,
