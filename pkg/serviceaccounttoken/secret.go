@@ -8,12 +8,15 @@ import (
 
 	corecontrollers "github.com/rancher/wrangler/v2/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
+	coordinationv1 "k8s.io/api/coordination/v1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	clientv1 "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -21,6 +24,9 @@ const (
 	ServiceAccountSecretLabel = "cattle.io/service-account.name"
 
 	serviceAccountSecretAnnotation = "kubernetes.io/service-account.name"
+
+	// LeasePrefix is the name of the lease used to manage concurrency
+	LeasePrefix = "sa-token-lease-"
 )
 
 // Mutex to limit parellal writes by EnsureSecretForServiceAccount
@@ -34,7 +40,8 @@ type secretLister func(namespace string, selector labels.Selector) ([]*v1.Secret
 // EnsureSecretForServiceAccount gets or creates a service account token Secret for the provided Service Account.
 // For k8s <1.24, the secret is automatically generated for the service account. For >=1.24, we need to generate it explicitly.
 func EnsureSecretForServiceAccount(ctx context.Context, secretsCache corecontrollers.SecretCache, clientSet kubernetes.Interface, sa *v1.ServiceAccount) (*v1.Secret, error) {
-	// Lock avoids multiple calls to this func at the same time and creation of same resouce multiple times
+	// Lock avoids multiple calls to this func at the same time and creation of same resources multiple times
+	// Mutex is a addition to the Lease, it helps sync within the pod and avoid multiple Lease waits from the same pod
 	mu.Lock()
 	defer mu.Unlock()
 
@@ -60,6 +67,16 @@ func EnsureSecretForServiceAccount(ctx context.Context, secretsCache corecontrol
 			return result, nil
 		}
 	}
+	// Acquire lease
+	// acquireLease has a wait.Backoff until the lease is acquired, so this will be a blocking func call
+	if err := acquireLease(ctx, clientSet, sa.Namespace, sa.Name); err != nil {
+		return nil, fmt.Errorf("error acquiring lease: %w", err)
+	}
+	defer func() {
+		if err := releaseLease(ctx, clientSet, sa.Namespace, sa.Name); err != nil {
+			logrus.Errorf("error releasing lease: %v", err)
+		}
+	}()
 	secret, err := ServiceAccountSecret(ctx, sa, secretLister, secretClient)
 	if err != nil {
 		return nil, fmt.Errorf("error looking up secret for service account [%s:%s]: %w", sa.Namespace, sa.Name, err)
@@ -171,4 +188,50 @@ func isSecretForServiceAccount(secret *v1.Secret, sa *v1.ServiceAccount) bool {
 	annotations := secret.Annotations
 	annotation := annotations[serviceAccountSecretAnnotation]
 	return sa.Name == annotation
+}
+
+func acquireLease(ctx context.Context, clientSet kubernetes.Interface, namespace, name string) error {
+	leaseClient := clientSet.CoordinationV1().Leases(namespace)
+	leaseDuration := int32(30)
+	lease := &coordinationv1.Lease{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprint(LeasePrefix + name),
+			Namespace: namespace,
+		},
+		Spec: coordinationv1.LeaseSpec{
+			HolderIdentity:       ptr.To("serviceaccounttoken-controller"),
+			LeaseDurationSeconds: ptr.To(leaseDuration),
+		},
+	}
+	// Wait for the Lease to be granted
+	backoff := wait.Backoff{
+		Duration: 1 * time.Second,
+		Cap:      100 * time.Millisecond,
+		Steps:    50,
+	}
+	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
+		_, err := leaseClient.Create(ctx, lease, metav1.CreateOptions{})
+		// if create was success, meaning we got the lease
+		if err == nil {
+			return true, nil
+		}
+		// if lease already exists, another request has this lease, continue to wait
+		if errors.IsAlreadyExists(err) {
+			return false, nil
+		}
+		return false, err
+	})
+	if err != nil {
+		return fmt.Errorf("error acquiring the lease for %v: %w", name, err)
+	}
+	return nil
+}
+
+func releaseLease(ctx context.Context, clientSet kubernetes.Interface, namespace, name string) error {
+	leaseClient := clientSet.CoordinationV1().Leases(namespace)
+	err := leaseClient.Delete(ctx, fmt.Sprint(LeasePrefix+name), metav1.DeleteOptions{})
+	if err != nil {
+		return fmt.Errorf("error deleting lease: %w", err)
+	}
+	return nil
 }
