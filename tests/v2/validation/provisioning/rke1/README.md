@@ -8,12 +8,24 @@ Please see below for more details for your config. Please note that the config c
 
 ## Table of Contents
 1. [Prerequisites](../README.md)
-2. [Define your test](#Provisioning-Input)
-3. [Configure providers to use for Node Driver Clusters](#NodeTemplateConfigs)
-4. [Configuring Custom Clusters](#Custom-Cluster)
-5. [Static test cases](#static-test-cases) 
-6. [Advanced Cluster Settings](#advanced-settings)
-7. [Back to general provisioning](../README.md)
+2. [Configuring test flags](#Flags)
+3. [Define your test](#Provisioning-Input)
+4. [Configuring providers to use for Node Driver Clusters](#NodeTemplateConfigs)
+5. [Configuring Custom Clusters](#Custom-Cluster)
+6. [Static test cases](#static-test-cases)
+7. [Advanced Cluster Settings](#advanced-settings)
+8. [Back to general provisioning](../README.md)
+
+
+## Flags
+Flags are used to determine which static table tests are run (has no effect on dynamic tests) 
+`Long` Will run the long version of the table tests (usually all of them)
+`Short` Will run the subset of table tests with the short flag.
+
+```yaml
+flags:
+  desiredflags: "Long"
+```
 
 ## Provisioning Input
 provisioningInput is needed to the run the RKE1 tests, specifically kubernetesVersion, cni, and providers. nodesAndRoles is only needed for the TestProvisioningDynamicInput test, node pools are divided by "{nodepool},". psact is optional and takes values `rancher-privileged`, `rancher-restricted` or `rancher-baseline`.
@@ -31,8 +43,6 @@ provisioningInput:
       worker: true
       drainBeforeDelete: true
       quantity: 2
-  flags:
-    desiredflags: "Long" #These flags are for running TestProvisioningRKE1Cluster or TestProvisioningRKE1CustomCluster it is not needed for the dynamic tests. Long will run the full table, where as short will run the short version of this test.
   rke1KubernetesVersion: ["v1.27.6-rancher1-1"]
   cni: ["calico"]
   providers: ["linode", "aws", "do", "harvester"]
