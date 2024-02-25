@@ -50,6 +50,35 @@ func (w *WebhookTestSuite) SetupSuite() {
 
 }
 
+func (w *WebhookTestSuite) ValidateEscalationCheck(client *rancher.Client) {
+
+	getAdminRole, err := client.Management.GlobalRole.ByID(admin)
+	require.NoError(w.T(), err)
+	updatedAdminRole := *getAdminRole
+	updatedAdminRole.NewUserDefault = true
+
+	_, err = client.Management.GlobalRole.Update(getAdminRole, updatedAdminRole)
+	require.Error(w.T(), err)
+	errMessage := "admission webhook \"rancher.cattle.io.globalroles.management.cattle.io\" denied the request"
+
+	assert.Contains(w.T(), err.Error(), errMessage)
+}
+
+func (w *WebhookTestSuite) ValidateWebhookPodLogs(podName, clusterID string) {
+
+	podLogs, err := kubeconfig.GetPodLogs(w.client, clusterID, podName, charts.RancherWebhookNamespace, "")
+	require.NoError(w.T(), err)
+	delimiter := "\n"
+	segments := strings.Split(podLogs, delimiter)
+
+	for _, segment := range segments {
+		if strings.Contains(segment, "level=error") {
+			w.Fail("Error logs in webhook", segment)
+		}
+	}
+
+}
+
 func (w *WebhookTestSuite) TestWebhookChart() {
 	subSession := w.session.NewSession()
 	defer subSession.Cleanup()
