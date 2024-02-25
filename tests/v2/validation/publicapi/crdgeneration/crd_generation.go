@@ -30,6 +30,7 @@ const (
 	crdJSONFilePath      = "../resources/crds.json"
 	roleTemplateJSONPath = "../resources/roleTemplate.json"
 	localCluster         = "local"
+	defaultBufferSize    = ""
 )
 
 func mapCRD(crdList []string) map[string][]string {
@@ -88,7 +89,8 @@ func validateCRDList(t *testing.T, crdsList []string, crdMapPreUpgrade map[strin
 
 func validateCRDDescription(t *testing.T, client *rancher.Client, clusterV1 *v1.Cluster, clusterID string) {
 
-	logs, err := kubectl.Explain(client, clusterV1, roleTemplate, clusterID)
+	explainCmd := []string{"kubectl", "explain", roleTemplate}
+	logs, err := kubectl.Command(client, nil, clusterID, explainCmd, defaultBufferSize)
 	require.NoError(t, err)
 	assert.NotEmpty(t, logs)
 	desIndexStart := strings.Index(logs, "DESCRIPTION:")
@@ -114,7 +116,8 @@ func validateRoleCreation(t *testing.T, client *rancher.Client, clusterV1 *v1.Cl
 		YAML: string(role),
 	}
 
-	podLogs, err := kubectl.Apply(client, clusterV1, yamlInput, clusterID)
+	applyCmd := []string{"kubectl", "apply", "-f", "/root/.kube/my-pod.yaml"}
+	podLogs, err := kubectl.Command(client, yamlInput, clusterID, applyCmd, defaultBufferSize)
 	require.NoError(t, err)
 	errorLogs := "Unsupported value: \"invalid\": supported values: \"project\", \"cluster\""
 
