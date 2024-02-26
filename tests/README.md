@@ -10,7 +10,7 @@ The Rancher Test Framework provides tools for writing integrations and validatio
 To run rancher integration tests you will need:
 - a running instance of rancher with an accessible url
 - a rancher access token for the admin user
-- [golang 1.20](https://go.dev/doc/install)
+- [golang 1.21](https://go.dev/doc/install)
 - [k3d](https://k3d.io/v5.1.0/)
 
 #### Validation

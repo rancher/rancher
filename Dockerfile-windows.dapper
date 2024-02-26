@@ -1,4 +1,4 @@
-FROM library/golang:1.20.0
+FROM library/golang:1.21
 SHELL ["powershell", "-NoLogo", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
 
 ARG DAPPER_HOST_ARCH
