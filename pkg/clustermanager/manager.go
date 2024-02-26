@@ -415,7 +415,7 @@ func VerifyIgnoreDNSName(caCertsPEM []byte) (func(rawCerts [][]byte, verifiedCha
 }
 
 func (m *Manager) toRecord(ctx context.Context, cluster *apimgmtv3.Cluster) (*record, error) {
-	kubeConfig, err := ToRESTConfig(cluster, m.ScaledContext, m.secretLister)
+	kubeConfig, err := ToRESTConfig(cluster, m.ScaledContext, m.secretLister, true)
 	if kubeConfig == nil || err != nil {
 		return nil, err
 	}
