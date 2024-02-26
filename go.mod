@@ -119,7 +119,7 @@ require (
 	github.com/rancher/norman v0.0.0-20240206180703-6eda4bc94b4c
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/remotedialer v0.3.0
-	github.com/rancher/rke v1.5.7-rc2
+	github.com/rancher/rke v1.5.6-rc1
 	github.com/rancher/steve v0.0.0-20240213172920-24878f9eedc5
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007
 	github.com/rancher/wrangler/v2 v2.1.3
@@ -166,7 +166,7 @@ require (
 	github.com/containers/image/v5 v5.25.0
 	github.com/google/gnostic-models v0.6.8
 	github.com/rancher/rancher/pkg/apis v0.0.0-20240213233515-935d309ebad4
-	github.com/rancher/shepherd v0.0.0-20240212210630-64631f2d67a0
+	github.com/rancher/shepherd v0.0.0-20240221223135-1a88c96236fb
 	go.qase.io/client v0.0.0-20231114201952-65195ec001fa
 )
 
@@ -356,7 +356,7 @@ require (
 	github.com/onsi/gomega v1.31.1 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.0-rc5 // indirect
-	github.com/opencontainers/runc v1.1.9 // indirect
+	github.com/opencontainers/runc v1.1.12 // indirect
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
 	github.com/pkg/sftp v1.13.5 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
