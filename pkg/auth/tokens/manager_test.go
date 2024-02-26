@@ -11,10 +11,12 @@ import (
 	"github.com/rancher/rancher/pkg/auth/tokens/hashers"
 	"github.com/rancher/rancher/pkg/features"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	"github.com/rancher/wrangler/v2/pkg/randomtoken"
+	mgmtFakes "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
+	"github.com/rancher/wrangler/pkg/randomtoken"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/utils/pointer"
 )
 
 type DummyIndexer struct {
@@ -196,4 +198,58 @@ func (d *DummyIndexer) AddIndexers(newIndexers cache.Indexers) error {
 
 func (d *DummyIndexer) SetTokenHashed(enabled bool) {
 	d.hashedEnabled = enabled
+}
+
+func TestNewLoginTokenSetsLastLoginTime(t *testing.T) {
+	var createdUserAttribute *v3.UserAttribute
+
+	userID := "u-abcdef"
+	manager := Manager{
+		userLister: &mgmtFakes.UserListerMock{
+			GetFunc: func(namespace, name string) (*v3.User, error) {
+				return &v3.User{
+					ObjectMeta: v1.ObjectMeta{
+						Name: userID,
+					},
+					Enabled: pointer.BoolPtr(true),
+				}, nil
+			},
+		},
+		userAttributeLister: &mgmtFakes.UserAttributeListerMock{
+			GetFunc: func(namespace, name string) (*v3.UserAttribute, error) {
+				return &v3.UserAttribute{}, nil
+			},
+		},
+		userAttributes: &mgmtFakes.UserAttributeInterfaceMock{
+			UpdateFunc: func(userAttribute *v3.UserAttribute) (*v3.UserAttribute, error) {
+				return userAttribute.DeepCopy(), nil
+			},
+			CreateFunc: func(userAttribute *v3.UserAttribute) (*v3.UserAttribute, error) {
+				createdUserAttribute = userAttribute.DeepCopy()
+				return createdUserAttribute, nil
+			},
+		},
+		tokensClient: &mgmtFakes.TokenInterfaceMock{
+			CreateFunc: func(token *v3.Token) (*v3.Token, error) {
+				return token.DeepCopy(), nil
+			},
+		},
+	}
+
+	userPrincipal := v3.Principal{}
+	groupPrincipals := []v3.Principal{}
+	providerToken := ""
+	ttl := int64(0)
+	description := ""
+	userExtraInfo := map[string][]string{}
+
+	token, key, err := manager.NewLoginToken(userID, userPrincipal, groupPrincipals, providerToken, ttl, description, userExtraInfo)
+	assert.NoError(t, err)
+	assert.NotNil(t, token)
+	assert.NotEmpty(t, key)
+
+	// Make sure login time is set.
+	assert.LessOrEqual(t, time.Since(createdUserAttribute.LastLogin.Time), time.Second*5)
+	// Make sure the login time is truncated to seconds.
+	assert.Equal(t, createdUserAttribute.LastLogin.Truncate(time.Second), createdUserAttribute.LastLogin.Time)
 }
