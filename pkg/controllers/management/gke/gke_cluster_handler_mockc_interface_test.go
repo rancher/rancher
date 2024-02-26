@@ -541,7 +541,7 @@ func (m MockResourceInterfaceGkeCC) Patch(ctx context.Context, name string, pt t
 
 type MockFactory struct{}
 
-func (m MockFactory) ClusterDialer(clusterName string) (dialer.Dialer, error) {
+func (m MockFactory) ClusterDialer(clusterName string, retryOnError bool) (dialer.Dialer, error) {
 	// pass a dialer func to the client
 	dialer := func(ctx context.Context, network, address string) (net.Conn, error) {
 		return nil, nil
