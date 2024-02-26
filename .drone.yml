@@ -1151,15 +1151,15 @@ steps:
     - tag
 
 - name: chart-publish
-  image: plugins/gcs
+  image: plugins/s3
   settings:
-    acl:
-    - allUsers:READER
-    cache_control: "public,no-cache,proxy-revalidate"
-    source: bin/chart
-    target: releases.rancher.com/server-charts
-    token:
-      from_secret: google_auth_key
+    bucket: charts.optimus.rancher.io
+    access_key:
+      from_secret: optimus_charts_access_key
+    secret_key:
+      from_secret: optimus_charts_secret_key
+    source: bin/chart/**/*
+    target: /server-charts
   when:
     event:
     - tag
