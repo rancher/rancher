@@ -256,7 +256,11 @@ func (m *Manager) doStart(rec *record, clusterOwner bool) (exit error) {
 	}
 }
 
-func ToRESTConfig(cluster *apimgmtv3.Cluster, context *config.ScaledContext, secretLister v1.SecretLister) (*rest.Config, error) {
+// ToRESTConfig generates a rest.Config for a given cluster.
+// If tryReconnecting is true, the dialer used for connecting this rest.Config will block
+// and retry connecting to the cluster for ~30s if the connection is not available,
+// otherwise return immediately
+func ToRESTConfig(cluster *apimgmtv3.Cluster, context *config.ScaledContext, secretLister v1.SecretLister, tryReconnecting bool) (*rest.Config, error) {
 	if cluster == nil {
 		return nil, nil
 	}
@@ -288,7 +292,7 @@ func ToRESTConfig(cluster *apimgmtv3.Cluster, context *config.ScaledContext, sec
 		return nil, err
 	}
 
-	clusterDialer, err := context.Dialer.ClusterDialer(cluster.Name, true)
+	clusterDialer, err := context.Dialer.ClusterDialer(cluster.Name, tryReconnecting)
 	if err != nil {
 		return nil, err
 	}
