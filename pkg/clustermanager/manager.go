@@ -288,7 +288,7 @@ func ToRESTConfig(cluster *apimgmtv3.Cluster, context *config.ScaledContext, sec
 		return nil, err
 	}
 
-	clusterDialer, err := context.Dialer.ClusterDialer(cluster.Name)
+	clusterDialer, err := context.Dialer.ClusterDialer(cluster.Name, true)
 	if err != nil {
 		return nil, err
 	}
