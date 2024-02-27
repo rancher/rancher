@@ -220,7 +220,7 @@ node {
 
                     def mainRancherConfigPath = "./${filename}"
 
-                    sh "./yq e '.rancher.Cleanup = true' -i ${mainRancherConfigPath}"
+                    sh "./yq e '.rancher.cleanup = true' -i ${mainRancherConfigPath}"
                     configFiles.each {
                       try {
                         def configPath = "./${patchedConfigsDir}/$it"
@@ -236,7 +236,7 @@ node {
                         ).trim()
 
                         def clusterName = sh (  
-                          script: "./yq '.rancher.ClusterName' ${configPath}",
+                          script: "./yq '.rancher.clusterName' ${configPath}",
                           returnStdout: true
                         ).trim()
 
