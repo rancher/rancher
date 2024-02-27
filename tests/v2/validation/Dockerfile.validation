@@ -41,3 +41,10 @@ RUN if [[ -z '$EXTERNAL_ENCODED_VPN' ]] ; then \
         sed -i 's/auth-user-pass/auth-user-pass passfile/g' external.ovpn; \
         fi; \
     fi;
+
+ARG RKE_VERSION
+RUN if [[ -z "$RKE_VERSION" ]] ; then echo installing latest version RKE && \
+    curl -0Ls https://github.com/rancher/rke/releases/latest/download/rke_linux-amd64 > rke ; else echo installing ${RKE_VERSION} version RKE && \
+    curl -0Ls https://github.com/rancher/rke/releases/download/$RKE_VERSION/rke_linux-amd64 > rke; fi;
+RUN mv rke /bin/rke && \
+    chmod +x /bin/rke
