@@ -29,59 +29,59 @@ func main() {
 	client, err := rancher.NewClient("", testSession)
 	if err != nil {
 		logrus.Errorf("error creating admin client: %v", err)
-	}
+	} else {
+		var clusterList *v1.SteveCollection
+		err = kwait.Poll(500*time.Millisecond, 2*time.Minute, func() (done bool, err error) {
+			//clean up clusters
+			resp, err := client.Steve.SteveType(clusters.ProvisioningSteveResourceType).List(nil)
+			if k8sErrors.IsInternalError(err) || k8sErrors.IsServiceUnavailable(err) {
+				return false, err
+			} else if resp != nil {
+				clusterList = resp
+				return true, nil
+			}
+			return false, nil
+		})
 
-	var clusterList *v1.SteveCollection
-	err = kwait.Poll(500*time.Millisecond, 2*time.Minute, func() (done bool, err error) {
-		//clean up clusters
-		resp, err := client.Steve.SteveType(clusters.ProvisioningSteveResourceType).List(nil)
-		if k8sErrors.IsInternalError(err) || k8sErrors.IsServiceUnavailable(err) {
-			return false, err
-		} else if resp != nil {
-			clusterList = resp
-			return true, nil
+		if err != nil {
+			logrus.Errorf("error retrieving cluster list: %v", err)
 		}
-		return false, nil
-	})
 
-	if err != nil {
-		logrus.Errorf("error retrieving cluster list: %v", err)
-	}
-
-	deleteTimeout := timeout
-	for _, cluster := range clusterList.Data {
-		if cluster.ObjectMeta.Name != "local" {
-			err := client.Steve.SteveType(clusters.ProvisioningSteveResourceType).Delete(&cluster)
-			if err != nil {
-				logrus.Errorf("error deleting cluster: %v", err)
-			}
-
-			provKubeClient, err := client.GetKubeAPIProvisioningClient()
-			if err != nil {
-				logrus.Errorf("error deleting corral: %v", err)
-			}
-
-			watchInterface, err := provKubeClient.Clusters(cluster.ObjectMeta.Namespace).Watch(context.TODO(), metav1.ListOptions{
-				FieldSelector:  "metadata.name=" + cluster.ObjectMeta.Name,
-				TimeoutSeconds: &deleteTimeout,
-			})
-			if err != nil {
-				logrus.Errorf("error initiating watchInterface: %v", err)
-			}
-
-			err = wait.WatchWait(watchInterface, func(event watch.Event) (ready bool, err error) {
-				cluster := event.Object.(*apisV1.Cluster)
-				if event.Type == watch.Error {
-					return false, fmt.Errorf("there was an error deleting cluster")
-				} else if event.Type == watch.Deleted {
-					return true, nil
-				} else if cluster == nil {
-					return true, nil
+		deleteTimeout := timeout
+		for _, cluster := range clusterList.Data {
+			if cluster.ObjectMeta.Name != "local" {
+				err := client.Steve.SteveType(clusters.ProvisioningSteveResourceType).Delete(&cluster)
+				if err != nil {
+					logrus.Errorf("error deleting cluster: %v", err)
 				}
-				return false, nil
-			})
-			if err != nil {
-				logrus.Errorf("error while deleting clusters: %v", err)
+
+				provKubeClient, err := client.GetKubeAPIProvisioningClient()
+				if err != nil {
+					logrus.Errorf("error deleting corral: %v", err)
+				}
+
+				watchInterface, err := provKubeClient.Clusters(cluster.ObjectMeta.Namespace).Watch(context.TODO(), metav1.ListOptions{
+					FieldSelector:  "metadata.name=" + cluster.ObjectMeta.Name,
+					TimeoutSeconds: &deleteTimeout,
+				})
+				if err != nil {
+					logrus.Errorf("error initiating watchInterface: %v", err)
+				}
+
+				err = wait.WatchWait(watchInterface, func(event watch.Event) (ready bool, err error) {
+					cluster := event.Object.(*apisV1.Cluster)
+					if event.Type == watch.Error {
+						return false, fmt.Errorf("there was an error deleting cluster")
+					} else if event.Type == watch.Deleted {
+						return true, nil
+					} else if cluster == nil {
+						return true, nil
+					}
+					return false, nil
+				})
+				if err != nil {
+					logrus.Errorf("error while deleting clusters: %v", err)
+				}
 			}
 		}
 	}
