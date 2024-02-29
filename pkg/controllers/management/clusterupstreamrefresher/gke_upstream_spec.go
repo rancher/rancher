@@ -9,13 +9,9 @@ import (
 	wranglerv1 "github.com/rancher/wrangler/v2/pkg/generated/controllers/core/v1"
 )
 
-func BuildGKEUpstreamSpec(secretsCache wranglerv1.SecretCache, cluster *mgmtv3.Cluster) (*gkev1.GKEClusterConfigSpec, error) {
+func BuildGKEUpstreamSpec(secretsCache wranglerv1.SecretCache, secretClient wranglerv1.SecretClient, cluster *mgmtv3.Cluster) (*gkev1.GKEClusterConfigSpec, error) {
 	ctx := context.Background()
-	upstreamCluster, err := gkecontroller.GetCluster(ctx, secretsCache, cluster.Spec.GKEConfig)
-	if err != nil {
-		return nil, err
-	}
-	upstreamSpec, err := gkecontroller.BuildUpstreamClusterState(upstreamCluster)
+	upstreamSpec, err := gkecontroller.BuildUpstreamClusterState(ctx, secretsCache, secretClient, cluster.Spec.GKEConfig)
 	if err != nil {
 		return nil, err
 	}

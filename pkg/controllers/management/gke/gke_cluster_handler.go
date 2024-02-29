@@ -26,6 +26,7 @@ import (
 	"github.com/rancher/rancher/pkg/types/config"
 	typesDialer "github.com/rancher/rancher/pkg/types/config/dialer"
 	"github.com/rancher/rancher/pkg/wrangler"
+	corecontrollers "github.com/rancher/wrangler/v2/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -48,6 +49,7 @@ const (
 
 type gkeOperatorController struct {
 	clusteroperator.OperatorController
+	secretClient corecontrollers.SecretClient
 }
 
 func Register(ctx context.Context, wContext *wrangler.Context, mgmtCtx *config.ManagementContext) {
@@ -58,22 +60,25 @@ func Register(ctx context.Context, wContext *wrangler.Context, mgmtCtx *config.M
 	}
 
 	gkeCCDynamicClient := mgmtCtx.DynamicClient.Resource(gkeClusterConfigResource)
-	e := &gkeOperatorController{clusteroperator.OperatorController{
-		ClusterEnqueueAfter:  wContext.Mgmt.Cluster().EnqueueAfter,
-		Secrets:              mgmtCtx.Core.Secrets(""),
-		SecretsCache:         wContext.Core.Secret().Cache(),
-		TemplateCache:        wContext.Mgmt.CatalogTemplate().Cache(),
-		ProjectCache:         wContext.Mgmt.Project().Cache(),
-		AppLister:            mgmtCtx.Project.Apps("").Controller().Lister(),
-		AppClient:            mgmtCtx.Project.Apps(""),
-		NsClient:             mgmtCtx.Core.Namespaces(""),
-		ClusterClient:        wContext.Mgmt.Cluster(),
-		CatalogManager:       mgmtCtx.CatalogManager,
-		SystemAccountManager: systemaccount.NewManager(mgmtCtx),
-		DynamicClient:        gkeCCDynamicClient,
-		ClientDialer:         mgmtCtx.Dialer,
-		Discovery:            wContext.K8s.Discovery(),
-	}}
+	e := &gkeOperatorController{
+		OperatorController: clusteroperator.OperatorController{
+			ClusterEnqueueAfter:  wContext.Mgmt.Cluster().EnqueueAfter,
+			Secrets:              mgmtCtx.Core.Secrets(""),
+			SecretsCache:         wContext.Core.Secret().Cache(),
+			TemplateCache:        wContext.Mgmt.CatalogTemplate().Cache(),
+			ProjectCache:         wContext.Mgmt.Project().Cache(),
+			AppLister:            mgmtCtx.Project.Apps("").Controller().Lister(),
+			AppClient:            mgmtCtx.Project.Apps(""),
+			NsClient:             mgmtCtx.Core.Namespaces(""),
+			ClusterClient:        wContext.Mgmt.Cluster(),
+			CatalogManager:       mgmtCtx.CatalogManager,
+			SystemAccountManager: systemaccount.NewManager(mgmtCtx),
+			DynamicClient:        gkeCCDynamicClient,
+			ClientDialer:         mgmtCtx.Dialer,
+			Discovery:            wContext.K8s.Discovery(),
+		},
+		secretClient: wContext.Core.Secret(),
+	}
 
 	wContext.Mgmt.Cluster().OnChange(ctx, "gke-operator-controller", e.onClusterChange)
 }
@@ -298,7 +303,7 @@ func (e *gkeOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 func (e *gkeOperatorController) setInitialUpstreamSpec(cluster *mgmtv3.Cluster) (*mgmtv3.Cluster, error) {
 	logrus.Infof("setting initial upstreamSpec on cluster [%s]", cluster.Name)
 	cluster = cluster.DeepCopy()
-	upstreamSpec, err := clusterupstreamrefresher.BuildGKEUpstreamSpec(e.SecretsCache, cluster)
+	upstreamSpec, err := clusterupstreamrefresher.BuildGKEUpstreamSpec(e.SecretsCache, e.secretClient, cluster)
 	if err != nil {
 		return cluster, err
 	}
@@ -462,7 +467,7 @@ func (e *gkeOperatorController) generateSATokenWithPublicAPI(cluster *mgmtv3.Clu
 
 func (e *gkeOperatorController) getRestConfig(cluster *mgmtv3.Cluster, dialer typesDialer.Dialer) (*rest.Config, error) {
 	ctx := context.Background()
-	ts, err := controller.GetTokenSource(ctx, e.SecretsCache, cluster.Spec.GKEConfig)
+	ts, err := controller.GetTokenSource(ctx, e.secretClient, cluster.Spec.GKEConfig)
 	if err != nil {
 		return nil, err
 	}
