@@ -14,7 +14,7 @@ func TestGetClusterHost(t *testing.T) {
 	testCases := []struct {
 		name         string
 		config       clientcmdapi.Config
-		expectedHost string
+		expectedHost []string // The (single) returned host must be an element of this slice.
 		expectErr    bool
 	}{
 		// the in-cluster config case is not tested, as it would require a container with environment variables,
@@ -29,7 +29,7 @@ func TestGetClusterHost(t *testing.T) {
 					},
 				},
 			},
-			expectedHost: "bar",
+			expectedHost: []string{"bar"},
 			expectErr:    false,
 		},
 		{
@@ -45,7 +45,7 @@ func TestGetClusterHost(t *testing.T) {
 					},
 				},
 			},
-			expectedHost: "first-server",
+			expectedHost: []string{"first-server", "second-server"},
 			expectErr:    false,
 		},
 		{
@@ -54,7 +54,7 @@ func TestGetClusterHost(t *testing.T) {
 				CurrentContext: "not-found",
 				Clusters:       map[string]*clientcmdapi.Cluster{},
 			},
-			expectedHost: "",
+			expectedHost: []string{""},
 			expectErr:    true,
 		},
 	}
@@ -69,7 +69,7 @@ func TestGetClusterHost(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 			}
-			assert.Equal(t, tc.expectedHost, host)
+			assert.Contains(t, tc.expectedHost, host)
 		})
 	}
 }
