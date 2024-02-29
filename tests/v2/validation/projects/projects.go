@@ -20,11 +20,10 @@ import (
 )
 
 const (
-	dummyFinalizer    = "dummy"
-	timeFormat        = "2006/01/02 15:04:05"
-	roleProjectOwner  = "project-owner"
-	roleOwner         = "cluster-owner"
-	defaultBufferSize = ""
+	dummyFinalizer   = "dummy"
+	timeFormat       = "2006/01/02 15:04:05"
+	roleProjectOwner = "project-owner"
+	roleOwner        = "cluster-owner"
 )
 
 var project = v3.Project{
@@ -106,7 +105,7 @@ func checkPodLogsForErrors(client *rancher.Client, cluster string, podName strin
 	var errorMessage string
 
 	kwait.Poll(defaults.TenSecondTimeout, defaults.TwoMinuteTimeout, func() (bool, error) {
-		podLogs, err := kubeconfig.GetPodLogs(client, cluster, podName, namespace, defaultBufferSize)
+		podLogs, err := kubeconfig.GetPodLogs(client, cluster, podName, namespace)
 		if err != nil {
 			return false, err
 		}
