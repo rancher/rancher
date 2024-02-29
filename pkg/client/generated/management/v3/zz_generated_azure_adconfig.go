@@ -19,7 +19,6 @@ const (
 	AzureADConfigFieldOwnerReferences     = "ownerReferences"
 	AzureADConfigFieldRancherURL          = "rancherUrl"
 	AzureADConfigFieldRemoved             = "removed"
-	AzureADConfigFieldScopes              = "scopes"
 	AzureADConfigFieldStatus              = "status"
 	AzureADConfigFieldTenantID            = "tenantId"
 	AzureADConfigFieldTokenEndpoint       = "tokenEndpoint"
@@ -45,7 +44,6 @@ type AzureADConfig struct {
 	OwnerReferences     []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	RancherURL          string            `json:"rancherUrl,omitempty" yaml:"rancherUrl,omitempty"`
 	Removed             string            `json:"removed,omitempty" yaml:"removed,omitempty"`
-	Scopes              []string          `json:"scopes,omitempty" yaml:"scopes,omitempty"`
 	Status              *AuthConfigStatus `json:"status,omitempty" yaml:"status,omitempty"`
 	TenantID            string            `json:"tenantId,omitempty" yaml:"tenantId,omitempty"`
 	TokenEndpoint       string            `json:"tokenEndpoint,omitempty" yaml:"tokenEndpoint,omitempty"`

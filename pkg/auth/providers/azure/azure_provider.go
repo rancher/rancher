@@ -23,7 +23,6 @@ import (
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/oauth2/microsoft"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -203,25 +202,31 @@ func (ap *Provider) TransformToAuthProvider(
 	applicationID, _ := authConfig["applicationId"].(string)
 	p[publicclient.AzureADProviderFieldClientID] = applicationID
 
-	scopes := []string{"openid", "profile", "email"}
-	// use custom scopes if defined
-	if customScopes, found := authConfig["scopes"].([]interface{}); found {
-		scopes = []string{}
-		for _, scope := range customScopes {
-			if s, ok := scope.(string); ok {
-				scopes = append(scopes, s)
-			}
-		}
+	p[publicclient.AzureADProviderFieldScopes] = []string{"openid", "profile", "email"}
+
+	// this is the default base endpoint, i.e.: https://login.microsoftonline.com/
+	baseEndpoint, _ := authConfig["endpoint"].(string)
+
+	// Set default authEndpoint, or custom if provided
+	p[publicclient.AzureADProviderFieldAuthURL] = baseEndpoint + tenantID + "/oauth2/v2.0/authorize"
+	if customEndpoint, found := authConfig["authEndpoint"]; found {
+		ep, _ := customEndpoint.(string)
+		p[publicclient.AzureADProviderFieldAuthURL] = ep
 	}
-	p[publicclient.AzureADProviderFieldScopes] = scopes
 
-	ep := microsoft.AzureADEndpoint(tenantID)
-	p[publicclient.AzureADProviderFieldAuthURL] = ep.AuthURL
-	p[publicclient.AzureADProviderFieldTokenURL] = ep.TokenURL
+	// Set default tokenEndpoint, or custom if provided
+	p[publicclient.AzureADProviderFieldTokenURL] = baseEndpoint + tenantID + "/oauth2/v2.0/token"
+	if customEndpoint, found := authConfig["tokenEndpoint"]; found {
+		ep, _ := customEndpoint.(string)
+		p[publicclient.AzureADProviderFieldTokenURL] = ep
+	}
 
-	// waiting for https://github.com/golang/oauth2/pull/701
-	deviceAuthURL := "https://login.microsoftonline.com/" + tenantID + "/oauth2/v2.0/devicecode"
-	p[publicclient.AzureADProviderFieldDeviceAuthURL] = deviceAuthURL
+	// Set default deviceAuthEndpoint, or custom if provided
+	p[publicclient.AzureADProviderFieldDeviceAuthURL] = baseEndpoint + tenantID + "/oauth2/v2.0/devicecode"
+	if customEndpoint, found := authConfig["deviceAuthEndpoint"]; found {
+		ep, _ := customEndpoint.(string)
+		p[publicclient.AzureADProviderFieldDeviceAuthURL] = ep
+	}
 
 	return p, nil
 }
