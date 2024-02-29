@@ -3,6 +3,7 @@ package clients
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -134,6 +135,9 @@ func (c azureMSGraphClient) LoginUser(config *v32.AzureADConfig, credential *v32
 		err = token.Claims(&claims)
 		if err != nil {
 			return v3.Principal{}, nil, "", err
+		}
+		if claims.OID == "" {
+			return v3.Principal{}, nil, "", errors.New("empty user OID")
 		}
 
 		oid = claims.OID
