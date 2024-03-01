@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
@@ -16,7 +17,7 @@ func GetClusterHost(clientCfg clientcmd.ClientConfig) (string, error) {
 	}
 
 	fail := func(err error) (string, error) {
-		return "", fmt.Errorf("fleet.GetClusterHost: %w", err)
+		return "", fmt.Errorf("fleet.GetClusterHost: unable to determine cluster host: %w", err)
 	}
 
 	if clientCfg == nil {
@@ -25,7 +26,7 @@ func GetClusterHost(clientCfg clientcmd.ClientConfig) (string, error) {
 
 	rawConfig, err := clientCfg.RawConfig()
 	if err != nil {
-		return fail(errors.New("could not convert client config into raw config"))
+		return fail(fmt.Errorf("no configuration available: %w", err))
 	}
 
 	cluster, ok := rawConfig.Clusters[rawConfig.CurrentContext]
@@ -33,7 +34,18 @@ func GetClusterHost(clientCfg clientcmd.ClientConfig) (string, error) {
 		return cluster.Server, nil
 	}
 
-	for _, v := range rawConfig.Clusters {
+	logrus.Warnf(
+		"API server host retrieval: no cluster found for the current context (%s)",
+		rawConfig.CurrentContext,
+	)
+
+	for k, v := range rawConfig.Clusters {
+		logrus.Warnf(
+			"API server host retrieval: picking server %s "+
+				"with reference %s randomly from set of configured clusters",
+			v.Server,
+			k,
+		)
 		return v.Server, nil
 	}
 
