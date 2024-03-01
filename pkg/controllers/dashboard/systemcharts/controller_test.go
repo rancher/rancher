@@ -83,9 +83,6 @@ func Test_ChartInstallation(t *testing.T) {
 				settings.RancherWebhookVersion.Set("2.0.0")
 				expectedValues := map[string]interface{}{
 					"priorityClassName": priorityClassName,
-					"capi": map[string]interface{}{
-						"enabled": false,
-					},
 					"mcm": map[string]interface{}{
 						"enabled": features.MCM.Enabled(),
 					},
@@ -134,9 +131,6 @@ func Test_ChartInstallation(t *testing.T) {
 				mocks.configCache.EXPECT().Get(gomock.Any(), chart.CustomValueMapName).Return(nil, errTest).Times(4)
 				settings.RancherWebhookVersion.Set("2.0.0")
 				expectedValues := map[string]interface{}{
-					"capi": map[string]interface{}{
-						"enabled": false,
-					},
 					"mcm": map[string]interface{}{
 						"enabled": features.MCM.Enabled(),
 					},
@@ -183,9 +177,6 @@ func Test_ChartInstallation(t *testing.T) {
 				mocks.configCache.EXPECT().Get(gomock.Any(), chart.CustomValueMapName).Return(emptyConfig, nil).Times(4)
 				settings.RancherWebhookVersion.Set("2.0.1")
 				expectedValues := map[string]interface{}{
-					"capi": map[string]interface{}{
-						"enabled": false,
-					},
 					"mcm": map[string]interface{}{
 						"enabled": features.MCM.Enabled(),
 					},
@@ -242,9 +233,6 @@ func Test_ChartInstallation(t *testing.T) {
 				features.MCM.Set(true)
 				expectedValues := map[string]interface{}{
 					"priorityClassName": "newClass",
-					"capi": map[string]interface{}{
-						"enabled": false,
-					},
 					"mcm": map[string]interface{}{
 						"enabled": false,
 					},
