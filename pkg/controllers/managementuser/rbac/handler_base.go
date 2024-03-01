@@ -3,7 +3,6 @@ package rbac
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -20,6 +19,7 @@ import (
 	"github.com/rancher/wrangler/v2/pkg/relatedresource"
 	"github.com/sirupsen/logrus"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -192,7 +192,7 @@ func (m *manager) ensureClusterRoles(rt *v3.RoleTemplate) error {
 }
 
 func (m *manager) compareAndUpdateClusterRole(clusterRole *rbacv1.ClusterRole, rt *v3.RoleTemplate) error {
-	if reflect.DeepEqual(clusterRole.Rules, rt.Rules) {
+	if equality.Semantic.DeepEqual(clusterRole.Rules, rt.Rules) {
 		return nil
 	}
 	clusterRole = clusterRole.DeepCopy()
