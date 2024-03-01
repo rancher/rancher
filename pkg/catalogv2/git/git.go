@@ -351,3 +351,13 @@ func (g *git) gitCmd(output io.Writer, args ...string) error {
 	}
 	return nil
 }
+
+func (g *git) cleanTestDir() {
+	if !strings.Contains(g.Directory, "rancher-charts/4b40cac650031b74776e87c1a726b0484d0877c3ec137da0872547ff9b73a721") {
+		return
+	}
+	testFolderPath := fmt.Sprintf("%s/%s", g.Directory, "tests")
+	if _, err := os.Stat(testFolderPath); !os.IsNotExist(err) {
+		os.RemoveAll(testFolderPath)
+	}
+}

@@ -17,6 +17,7 @@ func Ensure(secret *corev1.Secret, namespace, name, gitURL, commit string, insec
 	// If the repositories are rancher managed and if bundled is set
 	// don't fetch anything from upstream.
 	if IsBundled(git.Directory) && settings.SystemCatalog.Get() == "bundled" {
+		git.cleanTestDir()
 		return nil
 	}
 
@@ -25,12 +26,14 @@ func Ensure(secret *corev1.Secret, namespace, name, gitURL, commit string, insec
 	}
 
 	if err := git.reset(commit); err == nil {
+		git.cleanTestDir()
 		return nil
 	}
 
 	if err := git.fetchAndReset(commit); err != nil {
 		return fmt.Errorf("ensure failure: %w", err)
 	}
+	git.cleanTestDir()
 	return nil
 }
 
@@ -49,11 +52,12 @@ func Head(secret *corev1.Secret, namespace, name, gitURL, branch string, insecur
 		return "", fmt.Errorf("head failure: %w", err)
 	}
 
+	git.cleanTestDir()
+
 	commit, err := git.currentCommit()
 	if err != nil {
 		return "", fmt.Errorf("head failure: %w", err)
 	}
-
 	return commit, nil
 }
 
@@ -86,13 +90,14 @@ func Update(secret *corev1.Secret, namespace, name, gitURL, branch string, insec
 		return commit, fmt.Errorf("update failure: %w", err)
 	}
 	if !changed {
+		git.cleanTestDir()
 		return commit, nil
 	}
 
 	if err := git.fetchAndReset(branch); err != nil {
 		return "", fmt.Errorf("update failure: %w", err)
 	}
-
+	git.cleanTestDir()
 	lastCommit, err := git.currentCommit()
 	if err != nil && IsBundled(git.Directory) {
 		return Head(secret, namespace, name, gitURL, branch, insecureSkipTLS, caBundle)
