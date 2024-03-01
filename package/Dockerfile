@@ -96,12 +96,12 @@ RUN curl -sLf https://github.com/rancher/machine/releases/download/${CATTLE_MACH
     curl -LO https://github.com/linode/docker-machine-driver-linode/releases/download/${DOCKER_MACHINE_LINODE_VERSION}/docker-machine-driver-linode_linux-amd64.zip && \
     unzip docker-machine-driver-linode_linux-amd64.zip -d /opt/drivers/management-state/bin && \
     mkdir -p /usr/share/rancher/ui/assets/ && \
-    cp /opt/drivers/management-state/bin/docker-machine-driver-linode /usr/share/rancher/ui/assets/ && \
+    ln -s /opt/drivers/management-state/bin/docker-machine-driver-linode /usr/share/rancher/ui/assets/ && \
     rm docker-machine-driver-linode_linux-amd64.zip
 
 RUN curl -LO https://releases.rancher.com/harvester-node-driver/${DOCKER_MACHINE_HARVESTER_VERSION}/docker-machine-driver-harvester-amd64.tar.gz && \
     tar -xf docker-machine-driver-harvester-amd64.tar.gz -C /opt/drivers/management-state/bin && \
-    cp /opt/drivers/management-state/bin/docker-machine-driver-harvester /usr/share/rancher/ui/assets/ && \
+    ln -s /opt/drivers/management-state/bin/docker-machine-driver-harvester /usr/share/rancher/ui/assets/ && \
     rm docker-machine-driver-harvester-amd64.tar.gz
 
 ENV TINI_URL_amd64=https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini \
