@@ -81,7 +81,7 @@ func (a *AirGapK3SCustomClusterTestSuite) SetupSuite() {
 	}
 }
 
-func (a *AirGapK3SCustomClusterTestSuite) TestProvisioningK3SCustomCluster() {
+func (a *AirGapK3SCustomClusterTestSuite) TestProvisioningAirGapK3SCustomCluster() {
 	a.clustersConfig.MachinePools = []provisioninginput.MachinePools{provisioninginput.AllRolesMachinePool}
 
 	tests := []struct {
@@ -96,7 +96,7 @@ func (a *AirGapK3SCustomClusterTestSuite) TestProvisioningK3SCustomCluster() {
 
 }
 
-func (a *AirGapK3SCustomClusterTestSuite) TestProvisioningUpgradeK3SCustomCluster() {
+func (a *AirGapK3SCustomClusterTestSuite) TestProvisioningUpgradeAirGapK3SCustomCluster() {
 	a.clustersConfig.MachinePools = []provisioninginput.MachinePools{provisioninginput.AllRolesMachinePool}
 
 	k3sVersions, err := kubernetesversions.ListK3SAllVersions(a.client)
