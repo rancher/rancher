@@ -57,7 +57,10 @@ func TestIsTokenExpired(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := isTokenExpired(tt.expirationTime); got != tt.wantExpired {
+			testClaim := jwtv4.RegisteredClaims{
+				ExpiresAt: tt.expirationTime,
+			}
+			if got := isTokenExpired(testClaim); got != tt.wantExpired {
 				t.Errorf("isTokenExpired() = %v, wantExpired %v", got, tt.wantExpired)
 			}
 		})
@@ -184,6 +187,7 @@ func TestAuthenticate(t *testing.T) {
 				"exp": time.Now().Add(time.Hour).Unix(),
 			}),
 			startUser:         "system:cattle:error",
+			expectedUser:      "system:cattle:error",
 			settingEnabled:    false,
 			downstreamRequest: generateDownstreamRequest("POST", "testclusterid"+tokenReviewSuffix),
 			clusterID:         "testcluster",
@@ -197,6 +201,7 @@ func TestAuthenticate(t *testing.T) {
 				"exp": time.Now().Add(time.Hour).Unix(),
 			}),
 			startUser:         "system:cattle:error",
+			expectedUser:      "system:cattle:error",
 			downstreamRequest: generateDownstreamRequest("POST", "testclusterid"+tokenReviewSuffix),
 			clusterID:         "testcluster",
 			isAuthenticated:   false,

@@ -106,7 +106,7 @@ func (t *ServiceAccountAuth) Authenticate(req *http.Request) (user.Info, bool, e
 		return info, false, nil
 	}
 
-	if isTokenExpired(claims.ExpiresAt) {
+	if isTokenExpired(claims) {
 		logrus.Debugf("saauth: Service Account JWT is expired. Expiration time was: %v", claims.ExpiresAt)
 		return info, false, nil
 	}
@@ -144,15 +144,10 @@ func (t *ServiceAccountAuth) Authenticate(req *http.Request) (user.Info, bool, e
 	}, tokenReview.Status.Authenticated, nil
 }
 
-// isTokenExpired takes the expiration time from a JWT and returns true if it is expired, otherwise it returns false.
-func isTokenExpired(expirationTime *jwtv4.NumericDate) bool {
-	if expirationTime == nil {
-		// Token does not have an expiration time, so it is not expired.
-		return false
-	}
-
-	currentTime := jwtv4.TimeFunc()
-	return currentTime.After(expirationTime.Time)
+// isTokenExpired takes RegisteredClaims JWT and returns true if it is expired, otherwise it returns false.
+func isTokenExpired(claims jwtv4.RegisteredClaims) bool {
+	// Token without an expiration time is not expired.
+	return !claims.VerifyExpiresAt(jwtv4.TimeFunc(), false)
 }
 
 // convertExtra converts the Extra value from a tokenResponse to map[string][]string
