@@ -210,7 +210,7 @@ require (
 	github.com/opencontainers/selinux v1.11.0 // indirect
 	github.com/ostreedev/ostree-go v0.0.0-20210805093236-719684c64e4f // indirect
 	github.com/proglottis/gpgme v0.1.3 // indirect
-	github.com/rancher/wrangler v1.1.1
+	github.com/rancher/wrangler v1.1.1 // indirect
 	github.com/sigstore/fulcio v1.3.1 // indirect
 	github.com/sigstore/rekor v1.2.2-0.20230601122533-4c81ff246d12 // indirect
 	github.com/sigstore/sigstore v1.7.1 // indirect
