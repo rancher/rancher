@@ -2,8 +2,9 @@ module github.com/rancher/rancher
 
 go 1.20
 
-// on release remove this wrangler replace and use the latest tag
-replace github.com/rancher/wrangler v1.1.1 => github.com/rancher/wrangler v1.1.1-0.20230831050635-df1bd5aae9df
+// branch aruiz14/remove-event-handlers-2.0, includes:
+// - https://github.com/rancher/wrangler/pull/362
+replace github.com/rancher/wrangler v1.1.1 => github.com/aruiz14/wrangler v1.1.1-0.20240304124811-7b23acf752a4
 
 replace (
 	github.com/containerd/containerd => github.com/containerd/containerd v1.6.22 // for compatibilty with docker 20.10.x
