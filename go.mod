@@ -2,8 +2,7 @@ module github.com/rancher/rancher
 
 go 1.20
 
-// on release remove this wrangler replace and use the latest tag
-replace github.com/rancher/wrangler v1.1.1 => github.com/rancher/wrangler v1.1.1-0.20230831050635-df1bd5aae9df
+replace github.com/rancher/wrangler v1.1.1 => github.com/moio/wrangler v1.1.1-debug-41809-1
 
 replace github.com/rancher/steve => github.com/moio/steve v0.0.0-20240301090544-d30a8a68fc76
 
