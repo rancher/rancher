@@ -52,7 +52,6 @@ replace (
 	k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.27.9
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.27.9
 	oras.land/oras-go => oras.land/oras-go v1.2.2 // for docker 20.10.x compatibility
-	sigs.k8s.io/aws-iam-authenticator => github.com/rancher/aws-iam-authenticator v0.5.9-0.20220713170329-78acb8c83863
 	sigs.k8s.io/cluster-api => sigs.k8s.io/cluster-api v1.5.0
 )
 
@@ -163,7 +162,7 @@ require (
 	k8s.io/kubernetes v1.27.9
 	k8s.io/utils v0.0.0-20240102154912-e7106e64919e
 	oras.land/oras-go/v2 v2.4.0
-	sigs.k8s.io/aws-iam-authenticator v0.5.9
+	sigs.k8s.io/aws-iam-authenticator v0.6.17
 	sigs.k8s.io/cluster-api v1.5.0
 	sigs.k8s.io/controller-runtime v0.15.3
 	sigs.k8s.io/yaml v1.4.0
