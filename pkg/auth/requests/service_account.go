@@ -72,26 +72,26 @@ func (t *ServiceAccountAuth) Authenticate(req *http.Request) (user.Info, bool, e
 	settings, err := t.clusterProxyConfigsGetter.List(clusterID, labels.NewSelector())
 	if err != nil {
 		logrus.Debugf("rejecting downstream proxy request for %s, unable to fetch ClusterProxySettings object for cluster", req.URL.Path)
-		return &user.DefaultInfo{}, false, nil
+		return info, false, nil
 	}
 	if settings == nil {
 		logrus.Debugf("rejecting downstream proxy request for %s, no ClusterProxySettings object exists for cluster", req.URL.Path)
-		return &user.DefaultInfo{}, false, nil
+		return info, false, nil
 	}
 	if len(settings) > 1 {
 		logrus.Errorf("multiple clusterproxyconfigs found for cluster, which is a misconfiguration, feature is disabled")
-		return &user.DefaultInfo{}, false, nil
+		return info, false, nil
 	}
 
 	if !settings[0].Enabled {
 		logrus.Debugf("rejecting downstream proxy request for %s, current setting is enabled: %v", req.URL.Path, settings[0].Enabled)
-		return &user.DefaultInfo{}, false, nil
+		return info, false, nil
 	}
 
 	// See if the token is a JWT.
 	rawToken := tokens.GetTokenAuthFromRequest(req)
 
-	jwtParser := jwtv4.Parser{}
+	jwtParser := jwtv4.NewParser(jwtv4.WithoutClaimsValidation())
 	claims := jwtv4.RegisteredClaims{}
 	// Using ParseUnverified is deliberate here to look at the basic info in the token.
 	// Later on, we do a real TokenReview against the downstream cluster to actually verify the JWT.
@@ -115,14 +115,10 @@ func (t *ServiceAccountAuth) Authenticate(req *http.Request) (user.Info, bool, e
 	downstreamAuthClient, err := t.authClientCreator(clusterID)
 	if err != nil {
 		logrus.Errorf("saauth: failed to fetch downstream kubeconfig: %v", err)
-		return info, false, fmt.Errorf("failed to get downstream auth client when validating token for downstream cluster")
+		return info, false, fmt.Errorf("failed to get downstream auth client when validating token for downstream cluster: %s", clusterID)
 	}
 
 	tokenReview := &v1.TokenReview{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "authentication.k8s.io/v1",
-			Kind:       "TokenReview",
-		},
 		Spec: v1.TokenReviewSpec{
 			Token: rawToken,
 		},

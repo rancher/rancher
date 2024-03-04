@@ -37,28 +37,28 @@ func TestIsTokenExpired(t *testing.T) {
 	tests := []struct {
 		name           string
 		expirationTime *jwtv4.NumericDate
-		want           bool
+		wantExpired    bool
 	}{
 		{
-			name: "empty expiration",
-			want: false,
+			name:        "empty expiration",
+			wantExpired: false,
 		},
 		{
 			name:           "expired token",
 			expirationTime: jwtv4.NewNumericDate(time.Now().Add(-time.Hour)),
-			want:           true,
+			wantExpired:    true,
 		},
 		{
 			name:           "not expired token",
 			expirationTime: jwtv4.NewNumericDate(time.Now().Add(time.Hour)),
-			want:           false,
+			wantExpired:    false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := isTokenExpired(tt.expirationTime); got != tt.want {
-				t.Errorf("isTokenExpired() = %v, want %v", got, tt.want)
+			if got := isTokenExpired(tt.expirationTime); got != tt.wantExpired {
+				t.Errorf("isTokenExpired() = %v, wantExpired %v", got, tt.wantExpired)
 			}
 		})
 	}
@@ -341,7 +341,7 @@ func TestConvertExtra(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got := convertExtra(tt.input)
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("convertExtra() = %v, want %v", got, tt.want)
+				t.Errorf("convertExtra() = %v, wantExpired %v", got, tt.want)
 			}
 		})
 	}
