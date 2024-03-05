@@ -16,8 +16,9 @@ import (
 )
 
 const (
-	SystemAgentInstallPath = "/system-agent-install.sh" // corresponding curl -o in package/Dockerfile
-	WindowsRke2InstallPath = "/wins-agent-install.ps1"  // corresponding curl -o in package/Dockerfile
+	SystemAgentInstallPath   = "/system-agent-install.sh"   // corresponding curl -o in package/Dockerfile
+	SystemAgentUninstallPath = "/system-agent-uninstall.sh" // corresponding curl -o in package/Dockerfile
+	WindowsRke2InstallPath   = "/wins-agent-install.ps1"    // corresponding curl -o in package/Dockerfile
 )
 
 var (
@@ -25,9 +26,14 @@ var (
 		settings.UIPath.Get() + "/assets" + SystemAgentInstallPath,
 		"." + SystemAgentInstallPath,
 	}
+	localAgentUninstallScripts = []string{
+		settings.UIPath.Get() + "/assets" + SystemAgentUninstallPath,
+		"." + SystemAgentUninstallPath,
+	}
 	localWindowsRke2InstallScripts = []string{
 		settings.UIPath.Get() + "/assets" + WindowsRke2InstallPath,
-		"." + WindowsRke2InstallPath}
+		"." + WindowsRke2InstallPath,
+	}
 )
 
 func installScript(setting settings.Setting, files []string) ([]byte, error) {
@@ -100,6 +106,62 @@ func LinuxInstallScript(ctx context.Context, token string, envVars []corev1.EnvV
 
 %s
 `, envVarBuf.String(), binaryURL, server, ca, token, data)), nil
+}
+
+func uninstallScript(setting settings.Setting, files []string) ([]byte, error) {
+	if setting.Get() == setting.Default {
+		// no setting override, check for local file first
+		for _, f := range files {
+			script, err := ioutil.ReadFile(f)
+			if err != nil {
+				if !os.IsNotExist(err) {
+					logrus.Debugf("error pulling system agent uninstall script %s: %s", f, err)
+				}
+				continue
+			}
+			return script, err
+		}
+		logrus.Debugf("no local uninstall script found, moving on to url: %s", setting.Get())
+	}
+
+	resp, err := http.Get(setting.Get())
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	return ioutil.ReadAll(resp.Body)
+}
+
+func LinuxUninstallScript(ctx context.Context, envVars []corev1.EnvVar, defaultHost string) ([]byte, error) {
+	data, err := uninstallScript(
+		settings.SystemAgentUninstallScript,
+		localAgentUninstallScripts)
+	if err != nil {
+		return nil, err
+	}
+	binaryURL := ""
+	if settings.SystemAgentVersion.Get() != "" {
+		if settings.ServerURL.Get() != "" {
+			binaryURL = fmt.Sprintf("CATTLE_AGENT_BINARY_BASE_URL=\"%s/assets\"", settings.ServerURL.Get())
+		} else if defaultHost != "" {
+			binaryURL = fmt.Sprintf("CATTLE_AGENT_BINARY_BASE_URL=\"https://%s/assets\"", defaultHost)
+		}
+	}
+	envVarBuf := &strings.Builder{}
+	for _, envVar := range envVars {
+		if envVar.Value == "" {
+			continue
+		}
+		envVarBuf.WriteString(fmt.Sprintf("%s=\"%s\"\n", envVar.Name, envVar.Value))
+	}
+
+	return []byte(fmt.Sprintf(`#!/usr/bin/env sh
+%s
+%s
+
+%s
+`, envVarBuf.String(), binaryURL, data)), nil
 }
 
 func WindowsInstallScript(ctx context.Context, token string, envVars []corev1.EnvVar, defaultHost string) ([]byte, error) {
