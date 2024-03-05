@@ -9,6 +9,7 @@ import (
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	mgmtcluster "github.com/rancher/rancher/pkg/cluster"
 	fleetconst "github.com/rancher/rancher/pkg/fleet"
+	fleetpkg "github.com/rancher/rancher/pkg/fleet"
 	fleetcontrollers "github.com/rancher/rancher/pkg/generated/controllers/fleet.cattle.io/v1alpha1"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	rocontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
@@ -16,16 +17,34 @@ import (
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/v2/pkg/apply"
+	corecontrollers "github.com/rancher/wrangler/v2/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v2/pkg/generic"
 	"github.com/rancher/wrangler/v2/pkg/yaml"
+	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
+// ClusterHostGetter provides cluster API server URL retrieval.
+type ClusterHostGetter interface {
+	GetClusterHost(clientcmd.ClientConfig) (string, error)
+}
+
+type fleetHostGetter struct{}
+
+// GetClusterHost enables fleetHostGetter to implement interface ClusterHostGetter.
+func (g fleetHostGetter) GetClusterHost(cfg clientcmd.ClientConfig) (string, error) {
+	return fleetpkg.GetClusterHost(cfg)
+}
+
 type handler struct {
+	clientConfig      clientcmd.ClientConfig
 	clusters          v3.ClusterClient
 	clustersCache     v3.ClusterCache
+	hostGetter        ClusterHostGetter
+	secretsController corecontrollers.SecretController
 	fleetClusters     fleetcontrollers.ClusterController
 	apply             apply.Apply
 	getPrivateRepoURL func(*provv1.Cluster, *apimgmtv3.Cluster) string
@@ -38,10 +57,13 @@ type handler struct {
 // corresponding clusters.management.cattle.io/v3 object, if one does not already exist, and vice-versa)
 func Register(ctx context.Context, clients *wrangler.Context) {
 	h := &handler{
-		clusters:      clients.Mgmt.Cluster(),
-		clustersCache: clients.Mgmt.Cluster().Cache(),
-		fleetClusters: clients.Fleet.Cluster(),
-		apply:         clients.Apply.WithCacheTypes(clients.Provisioning.Cluster()),
+		clientConfig:      clients.ClientConfig,
+		clusters:          clients.Mgmt.Cluster(),
+		clustersCache:     clients.Mgmt.Cluster().Cache(),
+		hostGetter:        fleetHostGetter{},
+		secretsController: clients.Core.Secret(),
+		fleetClusters:     clients.Fleet.Cluster(),
+		apply:             clients.Apply.WithCacheTypes(clients.Provisioning.Cluster()),
 	}
 
 	h.getPrivateRepoURL = func(cluster *provv1.Cluster, mgmtCluster *apimgmtv3.Cluster) string {
@@ -138,6 +160,8 @@ func (h *handler) createCluster(cluster *provv1.Cluster, status provv1.ClusterSt
 
 	objs := []runtime.Object{}
 	if mgmtCluster.Spec.Internal {
+		h.addAPIServerURL(clientSecret)
+
 		agentNamespace = fleetconst.ReleaseLocalNamespace
 		// restore fleet's hardcoded name label for the local cluster
 		labels["name"] = "local"
@@ -177,4 +201,26 @@ func (h *handler) createCluster(cluster *provv1.Cluster, status provv1.ClusterSt
 			AgentResources:            mgmtcluster.GetFleetAgentResourceRequirements(mgmtCluster),
 		},
 	}), status, nil
+}
+
+// addAPIServerURL populates the internal API server URL into the provided secret, which should be used as the
+// KubeConfig secret in the local cluster.
+func (h *handler) addAPIServerURL(clientSecret string) {
+	secret, err := h.secretsController.Cache().Get(fleetconst.ClustersLocalNamespace, clientSecret)
+	if err != nil {
+		logrus.Warnf("local cluster provisioning: failed to get client secret: %v", err)
+		return
+	}
+
+	host, err := h.hostGetter.GetClusterHost(h.clientConfig)
+	if err != nil {
+		logrus.Warnf("local cluster provisioning: failed to get internal API server URL: %v", err)
+		return
+	}
+
+	secret.Data["apiServerURL"] = []byte(host)
+
+	if _, err := h.secretsController.Update(secret); err != nil {
+		logrus.Warnf("local cluster provisioning: failed to update client secret: %v", err)
+	}
 }
