@@ -129,7 +129,7 @@ require (
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 	github.com/rancher/remotedialer v0.3.0
 	github.com/rancher/rke v1.4.15
-	github.com/rancher/steve v0.0.0-20240207201940-05ebdc1f5ef1
+	github.com/rancher/steve v0.0.0-20240305150731-02a6bd766b7a
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007
 	github.com/rancher/wrangler v1.1.1
 	github.com/robfig/cron v1.1.0
