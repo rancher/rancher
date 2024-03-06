@@ -29,13 +29,13 @@ import (
 
 // ClusterHostGetter provides cluster API server URL retrieval.
 type ClusterHostGetter interface {
-	GetClusterHost(clientcmd.ClientConfig) (string, error)
+	GetClusterHost(clientcmd.ClientConfig) (string, []byte, error)
 }
 
 type fleetHostGetter struct{}
 
 // GetClusterHost enables fleetHostGetter to implement interface ClusterHostGetter.
-func (g fleetHostGetter) GetClusterHost(cfg clientcmd.ClientConfig) (string, error) {
+func (g fleetHostGetter) GetClusterHost(cfg clientcmd.ClientConfig) (string, []byte, error) {
 	return fleetpkg.GetClusterHost(cfg)
 }
 
@@ -160,7 +160,7 @@ func (h *handler) createCluster(cluster *provv1.Cluster, status provv1.ClusterSt
 
 	objs := []runtime.Object{}
 	if mgmtCluster.Spec.Internal {
-		h.addAPIServerURL(clientSecret)
+		h.addAPIServer(clientSecret)
 
 		agentNamespace = fleetconst.ReleaseLocalNamespace
 		// restore fleet's hardcoded name label for the local cluster
@@ -203,22 +203,23 @@ func (h *handler) createCluster(cluster *provv1.Cluster, status provv1.ClusterSt
 	}), status, nil
 }
 
-// addAPIServerURL populates the internal API server URL into the provided secret, which should be used as the
+// addAPIServer populates the internal API server URL and CA into the provided secret, which should be used as the
 // KubeConfig secret in the local cluster.
-func (h *handler) addAPIServerURL(clientSecret string) {
+func (h *handler) addAPIServer(clientSecret string) {
 	secret, err := h.secretsController.Cache().Get(fleetconst.ClustersLocalNamespace, clientSecret)
 	if err != nil {
 		logrus.Warnf("local cluster provisioning: failed to get client secret: %v", err)
 		return
 	}
 
-	host, err := h.hostGetter.GetClusterHost(h.clientConfig)
+	host, ca, err := h.hostGetter.GetClusterHost(h.clientConfig)
 	if err != nil {
 		logrus.Warnf("local cluster provisioning: failed to get internal API server URL: %v", err)
 		return
 	}
 
 	secret.Data["apiServerURL"] = []byte(host)
+	secret.Data["apiServerCA"] = ca
 
 	if _, err := h.secretsController.Update(secret); err != nil {
 		logrus.Warnf("local cluster provisioning: failed to update client secret: %v", err)

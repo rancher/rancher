@@ -209,6 +209,7 @@ func TestCreateCluster(t *testing.T) {
 		status         provv1.ClusterStatus
 		cachedClusters map[string]*apimgmtv3.Cluster
 		APIServerURL   string
+		APIServerCA    []byte
 		expectedLen    int
 	}{
 		{
@@ -265,6 +266,7 @@ func TestCreateCluster(t *testing.T) {
 				),
 			},
 			APIServerURL: "http://42.42.42.42:4242",
+			APIServerCA:  []byte("foo"),
 			expectedLen:  2, // cluster and cluster group
 		},
 	}
@@ -274,7 +276,7 @@ func TestCreateCluster(t *testing.T) {
 
 			if tt.APIServerURL != "" {
 				hostGetter := NewMockClusterHostGetter(ctrl)
-				hostGetter.EXPECT().GetClusterHost(gomock.Any()).Return(tt.APIServerURL, nil)
+				hostGetter.EXPECT().GetClusterHost(gomock.Any()).Return(tt.APIServerURL, tt.APIServerCA, nil)
 				h.hostGetter = hostGetter
 
 				updatedSecret := corev1.Secret{
@@ -283,6 +285,7 @@ func TestCreateCluster(t *testing.T) {
 					},
 					Data: map[string][]byte{
 						"apiServerURL": []byte(tt.APIServerURL),
+						"apiServerCA":  []byte(tt.APIServerCA),
 					},
 				}
 				h.secretsController = newSecretsController(t, tt.cluster.Namespace, &updatedSecret)
