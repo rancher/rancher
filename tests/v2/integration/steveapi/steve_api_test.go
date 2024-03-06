@@ -15,21 +15,21 @@ import (
 	"time"
 
 	"github.com/rancher/rancher/pkg/api/scheme"
-	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
-	clientv1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
-	"github.com/rancher/rancher/tests/framework/extensions/clusters"
-	kubenamespaces "github.com/rancher/rancher/tests/framework/extensions/kubeapi/namespaces"
-	"github.com/rancher/rancher/tests/framework/extensions/kubeapi/rbac"
-	"github.com/rancher/rancher/tests/framework/extensions/kubeapi/secrets"
-	"github.com/rancher/rancher/tests/framework/extensions/namespaces"
-	stevesecrets "github.com/rancher/rancher/tests/framework/extensions/secrets"
-	"github.com/rancher/rancher/tests/framework/extensions/serviceaccounts"
-	"github.com/rancher/rancher/tests/framework/extensions/unstructured"
-	"github.com/rancher/rancher/tests/framework/extensions/users"
-	password "github.com/rancher/rancher/tests/framework/extensions/users/passwordgenerator"
-	"github.com/rancher/rancher/tests/framework/pkg/namegenerator"
-	"github.com/rancher/rancher/tests/framework/pkg/session"
+	"github.com/rancher/shepherd/clients/rancher"
+	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
+	clientv1 "github.com/rancher/shepherd/clients/rancher/v1"
+	"github.com/rancher/shepherd/extensions/clusters"
+	kubenamespaces "github.com/rancher/shepherd/extensions/kubeapi/namespaces"
+	"github.com/rancher/shepherd/extensions/kubeapi/rbac"
+	"github.com/rancher/shepherd/extensions/kubeapi/secrets"
+	"github.com/rancher/shepherd/extensions/namespaces"
+	stevesecrets "github.com/rancher/shepherd/extensions/secrets"
+	"github.com/rancher/shepherd/extensions/serviceaccounts"
+	"github.com/rancher/shepherd/extensions/unstructured"
+	"github.com/rancher/shepherd/extensions/users"
+	password "github.com/rancher/shepherd/extensions/users/passwordgenerator"
+	"github.com/rancher/shepherd/pkg/namegenerator"
+	"github.com/rancher/shepherd/pkg/session"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -408,13 +408,13 @@ func (s *steveAPITestSuite) setupSuite(clusterName string) {
 		for _, binding := range access {
 			switch b := binding.(type) {
 			case management.ClusterRoleTemplateBinding:
-				err = users.AddClusterRoleToUser(client, mgmtCluster, userObj, b.RoleTemplateID)
+				err = users.AddClusterRoleToUser(client, mgmtCluster, userObj, b.RoleTemplateID, nil)
 				require.NoError(s.T(), err)
 			case management.ProjectRoleTemplateBinding:
-				err = users.AddProjectMember(client, projectMap[b.ProjectID], userObj, b.RoleTemplateID)
+				err = users.AddProjectMember(client, projectMap[b.ProjectID], userObj, b.RoleTemplateID, nil)
 				require.NoError(s.T(), err)
 			case rbacv1.RoleBinding:
-				_ = users.AddClusterRoleToUser(client, mgmtCluster, userObj, "cluster-member")
+				_ = users.AddClusterRoleToUser(client, mgmtCluster, userObj, "cluster-member", nil)
 				subject := rbacv1.Subject{
 					Kind: "User",
 					Name: userObj.ID,

@@ -7,17 +7,20 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/rancher/rancher/tests/v2/validation/charts/resources"
+	"gopkg.in/yaml.v2"
+
 	"github.com/pkg/errors"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
-	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/alert/config"
-	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
-	"github.com/rancher/rancher/tests/framework/extensions/charts"
-	"github.com/rancher/rancher/tests/framework/extensions/clusterrolebindings"
-	"github.com/rancher/rancher/tests/framework/extensions/configmaps"
-	"github.com/rancher/rancher/tests/framework/extensions/serviceaccounts"
-	"github.com/rancher/rancher/tests/framework/extensions/workloads"
-	"github.com/rancher/rancher/tests/framework/pkg/namegenerator"
+	"github.com/rancher/shepherd/clients/rancher"
+	v1 "github.com/rancher/shepherd/clients/rancher/v1"
+	"github.com/rancher/shepherd/extensions/charts"
+	"github.com/rancher/shepherd/extensions/clusterrolebindings"
+	"github.com/rancher/shepherd/extensions/configmaps"
+	"github.com/rancher/shepherd/extensions/ingresses"
+	"github.com/rancher/shepherd/extensions/serviceaccounts"
+	"github.com/rancher/shepherd/extensions/workloads"
+	"github.com/rancher/shepherd/pkg/namegenerator"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -93,12 +96,17 @@ func waitUnknownPrometheusTargets(client *rancher.Client) error {
 	checkUnknownPrometheusTargets := func() (bool, error) {
 		var statusInit bool
 		var unknownTargets []string
-		resultAPI, err := charts.GetChartCaseEndpoint(client, client.RancherConfig.Host, prometheusTargetsPathAPI, true)
+		resultAPI, err := ingresses.GetExternalIngressResponse(client, client.RancherConfig.Host, prometheusTargetsPathAPI, true)
+		if err != nil {
+			return statusInit, err
+		}
+
+		bodyString, err := convertHTTPBodyToString(resultAPI)
 		if err != nil {
 			return statusInit, err
 		}
 		var mapResponse map[string]interface{}
-		if err = json.Unmarshal([]byte(resultAPI.Body), &mapResponse); err != nil {
+		if err = json.Unmarshal([]byte(bodyString), &mapResponse); err != nil {
 			return statusInit, err
 		}
 		if mapResponse["status"] != "success" {
@@ -147,13 +155,18 @@ func checkPrometheusTargets(client *rancher.Client) (bool, error) {
 		return statusInit, err
 	}
 
-	resultAPI, err := charts.GetChartCaseEndpoint(client, client.RancherConfig.Host, prometheusTargetsPathAPI, true)
+	resultAPI, err := ingresses.GetExternalIngressResponse(client, client.RancherConfig.Host, prometheusTargetsPathAPI, true)
+	if err != nil {
+		return statusInit, err
+	}
+
+	bodyString, err := convertHTTPBodyToString(resultAPI)
 	if err != nil {
 		return statusInit, err
 	}
 
 	var mapResponse map[string]interface{}
-	if err = json.Unmarshal([]byte(resultAPI.Body), &mapResponse); err != nil {
+	if err = json.Unmarshal([]byte(bodyString), &mapResponse); err != nil {
 		return statusInit, err
 	}
 
@@ -183,31 +196,36 @@ func checkPrometheusTargets(client *rancher.Client) (bool, error) {
 
 // editAlertReceiver is a private helper function
 // that edits alert config structure to be used by the webhook receiver.
-func editAlertReceiver(alertConfigByte []byte, origin string, originURL *url.URL) ([]byte, error) {
-	alertConfig, err := config.Load(string(alertConfigByte))
+func editAlertReceiver(alertConfigByte []byte, originURL *url.URL) ([]byte, error) {
+	alertConfig := &resources.AlertmanagerConfig{}
+	err := yaml.Unmarshal(alertConfigByte, alertConfig)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to unmarshal alert config")
 	}
 
-	alertConfig.Global = &config.GlobalConfig{
+	vsendresolved := false
+
+	alertConfig.Global = &resources.GlobalConfig{
 		ResolveTimeout: alertConfig.Global.ResolveTimeout,
 	}
-	alertConfig.Receivers = append(alertConfig.Receivers, &config.Receiver{
+	alertConfig.Receivers = append(alertConfig.Receivers, &resources.Receiver{
 		Name: webhookReceiverDeploymentName,
-		WebhookConfigs: []*config.WebhookConfig{
+		WebhookConfigs: []*resources.WebhookConfig{
 			{
-				HTTPConfig: &config.HTTPClientConfig{
-					ProxyURL: config.URL{URL: originURL},
+				VSendResolved: &vsendresolved,
+				HTTPConfig: &resources.HTTPClientConfig{
+					ProxyURL: originURL.String(),
 				},
-				NotifierConfig: config.NotifierConfig{
-					VSendResolved: false,
-				},
-				URL: origin,
+				URL: originURL.String(),
 			},
 		},
 	})
 
-	byteAlertConfig := []byte(alertConfig.String())
+	byteAlertConfig, err := yaml.Marshal(alertConfig)
+	if err != nil {
+		return nil, err
+	}
+
 	dst := make([]byte, base64.StdEncoding.EncodedLen(len(byteAlertConfig)))
 	base64.StdEncoding.Encode(dst, byteAlertConfig)
 
@@ -216,24 +234,29 @@ func editAlertReceiver(alertConfigByte []byte, origin string, originURL *url.URL
 
 // editAlertRoute is a private helper function
 // that edits alert config structure to be used by the webhook receiver.
-func editAlertRoute(alertConfigByte []byte, origin string, originURL *url.URL) ([]byte, error) {
-	alertConfig, err := config.Load(string(alertConfigByte))
+func editAlertRoute(alertConfigByte []byte) ([]byte, error) {
+	alertConfig := &resources.AlertmanagerConfig{}
+	err := yaml.Unmarshal(alertConfigByte, alertConfig)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to unmarshal alert config")
 	}
 
-	alertConfig.Global = &config.GlobalConfig{
+	alertConfig.Global = &resources.GlobalConfig{
 		ResolveTimeout: alertConfig.Global.ResolveTimeout,
 	}
-	alertConfig.Route.Routes = append(alertConfig.Route.Routes, &config.Route{
+
+	alertConfig.Route.Routes = append(alertConfig.Route.Routes, &resources.Route{
+		Receiver:       webhookReceiverDeploymentName,
+		Match:          ruleLabel,
 		GroupWait:      alertConfig.Route.GroupWait,
 		GroupInterval:  alertConfig.Route.GroupInterval,
 		RepeatInterval: alertConfig.Route.RepeatInterval,
-		Match:          ruleLabel,
-		Receiver:       webhookReceiverDeploymentName,
 	})
 
-	byteAlertConfig := []byte(alertConfig.String())
+	byteAlertConfig, err := yaml.Marshal(alertConfig)
+	if err != nil {
+		return nil, err
+	}
 	dst := make([]byte, base64.StdEncoding.EncodedLen(len(byteAlertConfig)))
 	base64.StdEncoding.Encode(dst, byteAlertConfig)
 
@@ -246,7 +269,10 @@ func createPrometheusRule(client *rancher.Client, clusterID string) error {
 	ruleName := "webhook-rule-" + namegenerator.RandStringLower(defaultRandStringLength)
 	alertName := "alert-" + namegenerator.RandStringLower(defaultRandStringLength)
 
-	client.ReLogin()
+	_, err := client.ReLogin()
+	if err != nil {
+		return err
+	}
 
 	steveclient, err := client.Steve.ProxyDownstream(clusterID)
 	if err != nil {
@@ -333,11 +359,15 @@ func createAlertWebhookReceiverDeployment(client *rancher.Client, clusterID, nam
 		return nil, err
 	}
 
+	labels := map[string]string{}
+	labels["workload.user.cattle.io/workloadselector"] = fmt.Sprintf("apps.deployment-%v-%v", namespace, deploymentName)
+
 	// Create webhook receiver config map
 	configmap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      configMapName,
 			Namespace: namespace,
+			Labels:    labels,
 		},
 		Data: map[string]string{
 			"config": kubeConfig,
@@ -349,9 +379,6 @@ func createAlertWebhookReceiverDeployment(client *rancher.Client, clusterID, nam
 		return nil, err
 	}
 
-	labels := map[string]string{}
-	labels["workload.user.cattle.io/workloadselector"] = fmt.Sprintf("apps.deployment-%v-%v", namespace, deploymentName)
-
 	imageSetting, err := client.Management.Setting.ByID(rancherShellSettingID)
 	if err != nil {
 		return nil, err
@@ -362,11 +389,11 @@ func createAlertWebhookReceiverDeployment(client *rancher.Client, clusterID, nam
 	var runAsGroup int64
 	podSpecTemplate := corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "alert-reciver-deployment",
+			Name:      "alert-receiver-deployment",
 			Namespace: namespace,
+			Labels:    labels,
 		},
 		Spec: corev1.PodSpec{
-			RestartPolicy:      corev1.RestartPolicyNever,
 			ServiceAccountName: serviceAccount.Name,
 			Containers: []corev1.Container{
 				{

@@ -1,15 +1,20 @@
 package main
 
 import (
-	"github.com/rancher/rancher/tests/framework/clients/corral"
-	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	"github.com/rancher/rancher/tests/framework/extensions/pipeline"
-	"github.com/rancher/rancher/tests/framework/pkg/config"
-	"github.com/rancher/rancher/tests/framework/pkg/environmentflag"
-	"github.com/rancher/rancher/tests/framework/pkg/session"
+	"strings"
+
 	"github.com/rancher/rancher/tests/v2/validation/pipeline/rancherha/corralha"
+	"github.com/rancher/shepherd/clients/corral"
+	"github.com/rancher/shepherd/clients/rancher"
+	"github.com/rancher/shepherd/clients/rkecli"
+	"github.com/rancher/shepherd/extensions/pipeline"
+	"github.com/rancher/shepherd/pkg/config"
+	"github.com/rancher/shepherd/pkg/environmentflag"
+	"github.com/rancher/shepherd/pkg/session"
 	"github.com/sirupsen/logrus"
 )
+
+const rke1 = "rke1"
 
 func main() {
 	corralRancherHA := new(corralha.CorralRancherHA)
@@ -52,6 +57,7 @@ func main() {
 		if err != nil {
 			logrus.Errorf("error creating the admin token: %v", err)
 		}
+
 		rancherConfig.AdminToken = token
 		config.UpdateConfig(rancher.ConfigurationFileKey, rancherConfig)
 		rancherSession := session.NewSession()
@@ -63,6 +69,18 @@ func main() {
 		err = pipeline.PostRancherInstall(client, rancherConfig.AdminPassword)
 		if err != nil {
 			logrus.Errorf("error during post rancher install: %v", err)
+		}
+
+		if strings.Contains(configPackage.CorralPackageImages[corralRancherHA.Name], rke1) {
+			sshkey, err := corral.GetCorralEnvVar(corralName, "corral_private_key")
+			if err != nil {
+				logrus.Errorf("error getting the private SSH key: %v", err)
+			}
+
+			rkecliConfig := new(rkecli.Config)
+			config.LoadAndUpdateConfig(rkecli.ConfigurationFileKey, rkecliConfig, func() {
+				rkecliConfig.SSHKey = sshkey
+			})
 		}
 	} else {
 		logrus.Infof("Skipped Rancher Install because installRancher is %t", installRancher)

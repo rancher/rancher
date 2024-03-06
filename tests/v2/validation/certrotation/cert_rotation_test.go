@@ -1,12 +1,14 @@
+//go:build (validation || infra.rke2k3s || cluster.any || stress) && !infra.any && !infra.aks && !infra.eks && !infra.gke && !infra.rke1 && !sanity && !extended
+
 package certrotation
 
 import (
 	"testing"
 
-	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	"github.com/rancher/rancher/tests/framework/extensions/provisioninginput"
-	"github.com/rancher/rancher/tests/framework/pkg/config"
-	"github.com/rancher/rancher/tests/framework/pkg/session"
+	"github.com/rancher/shepherd/clients/rancher"
+	"github.com/rancher/shepherd/extensions/provisioninginput"
+	"github.com/rancher/shepherd/pkg/config"
+	"github.com/rancher/shepherd/pkg/session"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
@@ -37,8 +39,8 @@ func (r *V2ProvCertRotationTestSuite) SetupSuite() {
 
 func (r *V2ProvCertRotationTestSuite) TestCertRotation() {
 	r.Run("test-cert-rotation", func() {
-		require.NoError(r.T(), RotateCerts(r.client, r.client.RancherConfig.ClusterName))
-		require.NoError(r.T(), RotateCerts(r.client, r.client.RancherConfig.ClusterName))
+		require.NoError(r.T(), rotateCerts(r.client, r.client.RancherConfig.ClusterName))
+		require.NoError(r.T(), rotateCerts(r.client, r.client.RancherConfig.ClusterName))
 	})
 }
 

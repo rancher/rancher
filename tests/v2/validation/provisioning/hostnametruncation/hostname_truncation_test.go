@@ -1,18 +1,20 @@
+//go:build (validation || stress) && !infra.any && !infra.aks && !infra.eks && !infra.rke2k3s && !infra.gke && !infra.rke1 && !cluster.any && !cluster.custom && !cluster.nodedriver && !sanity && !extended
+
 package hostnametruncation
 
 import (
 	"fmt"
 	"testing"
 
-	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	"github.com/rancher/rancher/tests/framework/extensions/clusters"
-	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
-	"github.com/rancher/rancher/tests/framework/extensions/provisioning"
-	"github.com/rancher/rancher/tests/framework/extensions/provisioninginput"
-	"github.com/rancher/rancher/tests/framework/pkg/config"
-	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
-	"github.com/rancher/rancher/tests/framework/pkg/session"
 	"github.com/rancher/rancher/tests/v2/validation/provisioning/permutations"
+	"github.com/rancher/shepherd/clients/rancher"
+	"github.com/rancher/shepherd/extensions/clusters"
+	"github.com/rancher/shepherd/extensions/machinepools"
+	"github.com/rancher/shepherd/extensions/provisioning"
+	"github.com/rancher/shepherd/extensions/provisioninginput"
+	"github.com/rancher/shepherd/pkg/config"
+	namegen "github.com/rancher/shepherd/pkg/namegenerator"
+	"github.com/rancher/shepherd/pkg/session"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
@@ -41,6 +43,9 @@ func (r *HostnameTruncationTestSuite) SetupSuite() {
 	r.client = client
 }
 
+// TestProvisioningRKE2ClusterTruncation consist of several test that loop through three limits
+// for hostnames. The test starts at a minimum length limit of 10 characters, then a maximum length
+// limit of 63 characters and finally a middle length limit of 31 characters
 func (r *HostnameTruncationTestSuite) TestProvisioningRKE2ClusterTruncation() {
 	tests := []struct {
 		name                        string
@@ -74,7 +79,7 @@ func (r *HostnameTruncationTestSuite) TestProvisioningRKE2ClusterTruncation() {
 		{
 			name:                        "Cluster and machine pool level truncation - 31 characters",
 			machinePoolNameLengths:      []int{10, 31, 63},
-			hostnameLengthLimits:        []int{31, 31},
+			hostnameLengthLimits:        []int{31, 31, 31},
 			defaultHostnameLengthLimits: []int{10, 63, 31},
 		},
 	}
@@ -110,6 +115,6 @@ func (r *HostnameTruncationTestSuite) TestProvisioningRKE2ClusterTruncation() {
 
 // In order for 'go test' to run this suite, we need to create
 // a normal test function and pass our suite to suite.Run
-func TestHostnameTruncationTestSuite(t *testing.T) {
+func TestProvisioningHostnameTruncationTestSuite(t *testing.T) {
 	suite.Run(t, new(HostnameTruncationTestSuite))
 }

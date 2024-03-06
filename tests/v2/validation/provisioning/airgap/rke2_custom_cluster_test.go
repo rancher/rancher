@@ -1,20 +1,21 @@
+//go:build validation
+
 package airgap
 
 import (
 	"testing"
 
-	"github.com/rancher/rancher/tests/framework/clients/corral"
-	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	"github.com/rancher/rancher/tests/framework/extensions/clusters"
-	"github.com/rancher/rancher/tests/framework/extensions/clusters/kubernetesversions"
-	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
-	provisioning "github.com/rancher/rancher/tests/framework/extensions/provisioning"
-	"github.com/rancher/rancher/tests/framework/extensions/provisioninginput"
-	"github.com/rancher/rancher/tests/framework/pkg/config"
-	"github.com/rancher/rancher/tests/framework/pkg/session"
 	"github.com/rancher/rancher/tests/v2/validation/pipeline/rancherha/corralha"
 	"github.com/rancher/rancher/tests/v2/validation/provisioning/permutations"
 	"github.com/rancher/rancher/tests/v2/validation/provisioning/registries"
+	"github.com/rancher/shepherd/clients/corral"
+	"github.com/rancher/shepherd/clients/rancher"
+	"github.com/rancher/shepherd/extensions/clusters"
+	"github.com/rancher/shepherd/extensions/clusters/kubernetesversions"
+	provisioning "github.com/rancher/shepherd/extensions/provisioning"
+	"github.com/rancher/shepherd/extensions/provisioninginput"
+	"github.com/rancher/shepherd/pkg/config"
+	"github.com/rancher/shepherd/pkg/session"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -81,7 +82,7 @@ func (a *AirGapRKE2CustomClusterTestSuite) SetupSuite() {
 }
 
 func (a *AirGapRKE2CustomClusterTestSuite) TestProvisioningRKE2CustomCluster() {
-	a.clustersConfig.NodesAndRoles = []machinepools.NodeRoles{provisioninginput.AllRolesPool}
+	a.clustersConfig.MachinePools = []provisioninginput.MachinePools{provisioninginput.AllRolesMachinePool}
 
 	tests := []struct {
 		name   string
@@ -96,7 +97,7 @@ func (a *AirGapRKE2CustomClusterTestSuite) TestProvisioningRKE2CustomCluster() {
 }
 
 func (a *AirGapRKE2CustomClusterTestSuite) TestProvisioningUpgradeRKE2CustomCluster() {
-	a.clustersConfig.NodesAndRoles = []machinepools.NodeRoles{provisioninginput.AllRolesPool}
+	a.clustersConfig.MachinePools = []provisioninginput.MachinePools{provisioninginput.AllRolesMachinePool}
 
 	rke2Versions, err := kubernetesversions.ListRKE2AllVersions(a.client)
 	require.NoError(a.T(), err)

@@ -5,12 +5,12 @@ import (
 
 	apiv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
-	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
-	"github.com/rancher/rancher/tests/framework/extensions/clusters"
-	"github.com/rancher/rancher/tests/framework/extensions/defaults"
-	"github.com/rancher/rancher/tests/framework/extensions/provisioning"
-	"github.com/rancher/rancher/tests/framework/pkg/wait"
+	"github.com/rancher/shepherd/clients/rancher"
+	v1 "github.com/rancher/shepherd/clients/rancher/v1"
+	"github.com/rancher/shepherd/extensions/clusters"
+	"github.com/rancher/shepherd/extensions/defaults"
+	"github.com/rancher/shepherd/extensions/provisioning"
+	"github.com/rancher/shepherd/pkg/wait"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -24,8 +24,8 @@ const (
 	clusterLabel                 = "cluster.x-k8s.io/cluster-name"
 )
 
-// RotateCerts rotates the certificates in a cluster
-func RotateCerts(client *rancher.Client, clusterName string) error {
+// rotateCerts rotates the certificates in a cluster
+func rotateCerts(client *rancher.Client, clusterName string) error {
 	kubeProvisioningClient, err := client.GetKubeAPIProvisioningClient()
 	if err != nil {
 		return err
@@ -36,7 +36,12 @@ func RotateCerts(client *rancher.Client, clusterName string) error {
 		return err
 	}
 
-	cluster, err := adminClient.Steve.SteveType(ProvisioningSteveResouceType).ByID("fleet-default/" + clusterName)
+	id, err := clusters.GetV1ProvisioningClusterByName(client, clusterName)
+	if err != nil {
+		return err
+	}
+
+	cluster, err := adminClient.Steve.SteveType(ProvisioningSteveResouceType).ByID(id)
 	if err != nil {
 		return err
 	}

@@ -1,8 +1,8 @@
 package charts
 
 import (
-	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	"github.com/rancher/rancher/tests/framework/extensions/kubeapi/webhook"
+	"github.com/rancher/shepherd/clients/rancher"
+	"github.com/rancher/shepherd/extensions/kubeapi/webhook"
 )
 
 const (

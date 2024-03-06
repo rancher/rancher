@@ -20,11 +20,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// Test_Operation_MP_EtcdSnapshotOperationsWithThreeEtcdNodesOnNewNode uses Minio as an object store to store S3 snapshots.
+// Test_Operation_SetB_MP_EtcdSnapshotOperationsWithThreeEtcdNodesOnNewNode uses Minio as an object store to store S3 snapshots.
 // It creates a 5 node machine provisioned cluster with 3 controlplane+etcd nodes and 2 workers, creates a configmap,
 // takes a snapshot of the cluster, deletes the configmap, then scales down the controlplane/etcd nodes.
 // It then creates a new etcd node and restores from local snapshot file, then scales the cluster back up to desired state.
-func Test_Operation_MP_EtcdSnapshotOperationsWithThreeEtcdNodesOnNewNode(t *testing.T) {
+func Test_Operation_SetB_MP_EtcdSnapshotOperationsWithThreeEtcdNodesOnNewNode(t *testing.T) {
 	clients, err := clients.New()
 	if err != nil {
 		t.Fatal(err)

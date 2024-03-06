@@ -1,3 +1,5 @@
+//go:build (validation || infra.rke1 || cluster.any || stress) && !infra.any && !infra.aks && !infra.eks && !infra.gke && !infra.rke2k3s && !sanity && !extended
+
 package charts
 
 import (
@@ -10,12 +12,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/rancher/norman/types"
-	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
-	"github.com/rancher/rancher/tests/framework/extensions/charts"
-	"github.com/rancher/rancher/tests/framework/extensions/clusters"
-	"github.com/rancher/rancher/tests/framework/extensions/namespaces"
-	"github.com/rancher/rancher/tests/framework/pkg/session"
+	"github.com/rancher/shepherd/clients/rancher"
+	"github.com/rancher/shepherd/clients/rancher/catalog"
+	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
+	"github.com/rancher/shepherd/extensions/charts"
+	"github.com/rancher/shepherd/extensions/clusters"
+	"github.com/rancher/shepherd/extensions/ingresses"
+	"github.com/rancher/shepherd/extensions/namespaces"
+	"github.com/rancher/shepherd/pkg/session"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -58,9 +62,9 @@ func (i *IstioTestSuite) SetupSuite() {
 	}
 
 	// Get latest versions of monitoring & istio charts
-	latestIstioVersion, err := client.Catalog.GetLatestChartVersion(charts.RancherIstioName)
+	latestIstioVersion, err := client.Catalog.GetLatestChartVersion(charts.RancherIstioName, catalog.RancherChartRepo)
 	require.NoError(i.T(), err)
-	latestMonitoringVersion, err := client.Catalog.GetLatestChartVersion(charts.RancherMonitoringName)
+	latestMonitoringVersion, err := client.Catalog.GetLatestChartVersion(charts.RancherMonitoringName, catalog.RancherChartRepo)
 	require.NoError(i.T(), err)
 
 	// Create project
@@ -177,13 +181,13 @@ func (i *IstioTestSuite) TestIstioChart() {
 	require.NoError(i.T(), err)
 
 	i.T().Log("Validating kiali and jaeger endpoints are accessible")
-	kialiResult, err := charts.GetChartCaseEndpoint(client, client.RancherConfig.Host, kialiPath, true)
+	kialiResult, err := ingresses.IsIngressExternallyAccessible(client, client.RancherConfig.Host, kialiPath, true)
 	require.NoError(i.T(), err)
-	assert.True(i.T(), kialiResult.Ok)
+	assert.True(i.T(), kialiResult)
 
-	tracingResult, err := charts.GetChartCaseEndpoint(client, client.RancherConfig.Host, tracingPath, true)
+	tracingResult, err := ingresses.IsIngressExternallyAccessible(client, client.RancherConfig.Host, tracingPath, true)
 	require.NoError(i.T(), err)
-	assert.True(i.T(), tracingResult.Ok)
+	assert.True(i.T(), tracingResult)
 
 	// Get a random worker node' public external IP of a specific cluster
 	nodeCollection, err := client.Management.Node.List(&types.ListOpts{Filters: map[string]interface{}{
@@ -198,9 +202,9 @@ func (i *IstioTestSuite) TestIstioChart() {
 	istioGatewayHost := randWorkerNodePublicIP + ":" + exampleAppPort
 
 	i.T().Log("Validating example app is accessible")
-	exampleAppResult, err := charts.GetChartCaseEndpoint(client, istioGatewayHost, exampleAppProductPagePath, false)
+	exampleAppResult, err := ingresses.IsIngressExternallyAccessible(client, istioGatewayHost, exampleAppProductPagePath, false)
 	require.NoError(i.T(), err)
-	assert.True(i.T(), exampleAppResult.Ok)
+	assert.True(i.T(), exampleAppResult)
 
 	i.T().Log("Validating example app has three different reviews bodies")
 	doesContainFirstPart, err := getChartCaseEndpointUntilBodyHas(client, istioGatewayHost, exampleAppProductPagePath, firstReviewBodyPart)
@@ -249,7 +253,7 @@ func (i *IstioTestSuite) TestUpgradeIstioChart() {
 	}
 
 	// Change istio install option version to previous version of the latest version
-	versionsList, err := client.Catalog.GetListChartVersions(charts.RancherIstioName)
+	versionsList, err := client.Catalog.GetListChartVersions(charts.RancherIstioName, catalog.RancherChartRepo)
 	require.NoError(i.T(), err)
 	require.Greaterf(i.T(), len(versionsList), 1, "There should be at least 2 versions of the istio chart")
 	versionLatest := versionsList[0]
@@ -297,7 +301,7 @@ func (i *IstioTestSuite) TestUpgradeIstioChart() {
 		require.Containsf(i.T(), imageVersion, istioVersionPreUpgrade, "Pilot & Ingressgateways images don't use the correct istio image version")
 	}
 
-	i.chartInstallOptions.istio.Version, err = client.Catalog.GetLatestChartVersion(charts.RancherIstioName)
+	i.chartInstallOptions.istio.Version, err = client.Catalog.GetLatestChartVersion(charts.RancherIstioName, catalog.RancherChartRepo)
 	require.NoError(i.T(), err)
 
 	i.T().Log("Upgrading istio chart with the latest version")

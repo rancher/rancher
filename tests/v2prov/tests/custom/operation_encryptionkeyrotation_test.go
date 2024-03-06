@@ -14,7 +14,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func Test_Operation_Custom_EncryptionKeyRotation(t *testing.T) {
+func Test_Operation_SetA_Custom_EncryptionKeyRotation(t *testing.T) {
 	// Encryption Key rotation is only possible with "stock configuration" on RKE2.
 	if strings.ToLower(os.Getenv("DIST")) != "rke2" {
 		t.Skip("encryption key rotation")

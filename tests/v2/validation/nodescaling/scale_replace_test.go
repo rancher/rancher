@@ -1,12 +1,16 @@
+//go:build (validation || infra.rke2k3s || cluster.nodedriver || extended) && !infra.any && !infra.aks && !infra.eks && !infra.gke && !infra.rke1 && !cluster.any && !cluster.custom && !sanity && !stress
+
 package nodescaling
 
 import (
 	"testing"
 
-	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	"github.com/rancher/rancher/tests/framework/extensions/provisioninginput"
-	"github.com/rancher/rancher/tests/framework/pkg/config"
-	"github.com/rancher/rancher/tests/framework/pkg/session"
+	"github.com/rancher/shepherd/clients/rancher"
+	"github.com/rancher/shepherd/extensions/clusters"
+	"github.com/rancher/shepherd/extensions/provisioning"
+	"github.com/rancher/shepherd/extensions/provisioninginput"
+	"github.com/rancher/shepherd/pkg/config"
+	"github.com/rancher/shepherd/pkg/session"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
@@ -39,20 +43,30 @@ func (s *NodeScaleDownAndUp) SetupSuite() {
 }
 
 func (s *NodeScaleDownAndUp) TestEtcdScaleDownAndUp() {
-	s.Run("rke2-etcd-node-scale-down-and-up", func() {
+	s.Run("etcd-node-scale-down-and-up", func() {
 		ReplaceNodes(s.T(), s.client, s.client.RancherConfig.ClusterName, true, false, false)
 	})
 }
 
 func (s *NodeScaleDownAndUp) TestControlPlaneScaleDownAndUp() {
-	s.Run("rke2-controlplane-node-scale-down-and-up", func() {
+	s.Run("controlplane-node-scale-down-and-up", func() {
 		ReplaceNodes(s.T(), s.client, s.client.RancherConfig.ClusterName, false, true, false)
 	})
 }
 
 func (s *NodeScaleDownAndUp) TestWorkerScaleDownAndUp() {
-	s.Run("rke2-worker-node-scale-down-and-up", func() {
+	s.Run("worker-node-scale-down-and-up", func() {
 		ReplaceNodes(s.T(), s.client, s.client.RancherConfig.ClusterName, false, false, true)
+	})
+}
+
+func (s *NodeScaleDownAndUp) TestValidate() {
+	s.Run("rke2-validate", func() {
+		_, stevecluster, err := clusters.GetProvisioningClusterByName(s.client, s.client.RancherConfig.ClusterName, provisioninginput.Namespace)
+		require.NoError(s.T(), err)
+
+		clusterConfig := clusters.ConvertConfigToClusterConfig(s.clustersConfig)
+		provisioning.VerifyCluster(s.T(), s.client, clusterConfig, stevecluster)
 	})
 }
 

@@ -1,7 +1,7 @@
 #!groovy
 node {
-    def rootPath = "/root/src/github.com/rancher/rancher/"
-    def workPath = "/root/src/github.com/rancher/rancher/tests/v2/validation/"
+    def rootPath = "/root/go/src/github.com/rancher/rancher/"
+    def workPath = "/root/go/src/github.com/rancher/rancher/tests/v2/validation/"
     def job_name = "${JOB_NAME}"
     if (job_name.contains('/')) { 
       job_names = job_name.split('/')
@@ -12,8 +12,9 @@ node {
     def cleanupTestContainer = "${job_name}${env.BUILD_NUMBER}-cleanuptest"
     def golangImageName = "rancher-validation-${job_name}${env.BUILD_NUMBER}"
     def validationVolume = "ValidationSharedVolume-${job_name}${env.BUILD_NUMBER}"
-    def testsDir = "/root/src/github.com/rancher/rancher/tests/v2/validation/${env.TEST_PACKAGE}"
+    def testsDir = "/root/go/src/github.com/rancher/rancher/tests/v2/validation/${env.TEST_PACKAGE}"
     def testResultsOut = "results.xml"
+    def testResultsJSON = "results.json"
     def envFile = ".env"
     def rancherConfig = "rancher_env.config"
     def branch = "release/v2.7"
@@ -65,6 +66,7 @@ node {
                           string(credentialsId: 'RANCHER_VALID_TLS_CERT', variable: 'RANCHER_VALID_TLS_CERT'),
                           string(credentialsId: 'RANCHER_VALID_TLS_KEY', variable: 'RANCHER_VALID_TLS_KEY'),
                           string(credentialsId: 'RANCHER_BYO_TLS_CERT', variable: 'RANCHER_BYO_TLS_CERT'),
+                          string(credentialsId: 'QASE_AUTOMATION_TOKEN', variable: 'QASE_AUTOMATION_TOKEN'),
                           string(credentialsId: 'RANCHER_BYO_TLS_KEY', variable: 'RANCHER_BYO_TLS_KEY')]) {
           
         withEnv(paramsMap) {
@@ -134,7 +136,9 @@ node {
             stage('Run Validation Tests') {
               try {
                 sh "docker run --volumes-from ${buildTestContainer} --name ${golangTestContainer} -t --env-file ${envFile} " +
-                "${golangImageName} sh -c \"gotestsum --format standard-verbose --packages=${testsDir} --junitfile ${testResultsOut} -- ${GOTEST_TESTCASE} -timeout=${timeout} -v\""
+                "${golangImageName} sh -c \"gotestsum --format standard-verbose --packages=${testsDir} --junitfile ${testResultsOut}  --jsonfile ${testResultsJSON} -- -tags=${TAGS} ${GOTEST_TESTCASE} -timeout=${timeout} -v;" +
+                "${workPath}pipeline/scripts/build_qase_reporter.sh;" +
+                "${workPath}reporter\""
               } catch(err) {
                 echo 'Validation tests had failures. Aborting'
               }

@@ -12,7 +12,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func Test_Operation_Custom_CertificateRotation(t *testing.T) {
+func Test_Operation_SetA_Custom_CertificateRotation(t *testing.T) {
 	clients, err := clients.New()
 	if err != nil {
 		t.Fatal(err)

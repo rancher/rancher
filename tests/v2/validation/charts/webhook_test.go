@@ -1,17 +1,20 @@
+//go:build (validation || infra.any || cluster.any || stress) && !sanity && !extended
+
 package charts
 
 import (
 	"strings"
 	"testing"
 
-	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	"github.com/rancher/rancher/tests/framework/extensions/charts"
-	"github.com/rancher/rancher/tests/framework/extensions/clusters"
-	"github.com/rancher/rancher/tests/framework/extensions/kubeconfig"
-	"github.com/rancher/rancher/tests/framework/extensions/workloads/pods"
+	"github.com/rancher/shepherd/clients/rancher"
+	"github.com/rancher/shepherd/clients/rancher/catalog"
+	"github.com/rancher/shepherd/extensions/charts"
+	"github.com/rancher/shepherd/extensions/clusters"
+	"github.com/rancher/shepherd/extensions/kubeconfig"
+	"github.com/rancher/shepherd/extensions/workloads/pods"
 
-	"github.com/rancher/rancher/tests/framework/extensions/users"
-	"github.com/rancher/rancher/tests/framework/pkg/session"
+	"github.com/rancher/shepherd/extensions/users"
+	"github.com/rancher/shepherd/pkg/session"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -42,7 +45,7 @@ func (w *WebhookTestSuite) SetupSuite() {
 
 	// Get clusterName from config yaml
 	w.clusterList = client.RancherConfig.ClusterName
-	w.chartVersion, err = client.Catalog.GetLatestChartVersion(charts.RancherWebhookName)
+	w.chartVersion, err = client.Catalog.GetLatestChartVersion(charts.RancherWebhookName, catalog.RancherChartRepo)
 	require.NoError(w.T(), err)
 
 }
@@ -95,7 +98,7 @@ func (w *WebhookTestSuite) TestWebhookChart() {
 	})
 
 	w.Run("Verify webhook pod logs", func() {
-		
+
 		steveClient, err := w.client.Steve.ProxyDownstream(clusterID)
 		require.NoError(w.T(), err)
 

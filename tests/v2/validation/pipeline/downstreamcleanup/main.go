@@ -6,13 +6,14 @@ import (
 	"time"
 
 	"github.com/rancher/norman/types"
-	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
-	"github.com/rancher/rancher/tests/framework/extensions/defaults"
-	"github.com/rancher/rancher/tests/framework/extensions/token"
-	"github.com/rancher/rancher/tests/framework/pkg/config"
-	"github.com/rancher/rancher/tests/framework/pkg/session"
-	"github.com/rancher/rancher/tests/framework/pkg/wait"
+	"github.com/rancher/shepherd/clients/rancher"
+	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
+	"github.com/rancher/shepherd/extensions/defaults"
+	"github.com/rancher/shepherd/extensions/token"
+	"github.com/rancher/shepherd/pkg/config"
+	"github.com/rancher/shepherd/pkg/file"
+	"github.com/rancher/shepherd/pkg/session"
+	"github.com/rancher/shepherd/pkg/wait"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,7 +29,7 @@ var (
 	adminPassword = os.Getenv("ADMIN_PASSWORD")
 	host          = os.Getenv("HA_HOST")
 
-	configFileName = config.FileName("cattle-config.yaml")
+	configFileName = file.Name("cattle-config.yaml")
 )
 
 func main() {
@@ -64,11 +65,11 @@ func main() {
 	if err != nil {
 		logrus.Errorf("error marshaling: %v", err)
 	}
-	err = configFileName.NewFile(configData)
+	_, err = configFileName.NewFile(configData)
 	if err != nil {
 		logrus.Fatalf("error writing yaml: %v", err)
 	}
-	err = configFileName.SetEnvironmentKey()
+	err = configFileName.SetEnvironmentKey(config.ConfigEnvironmentKey)
 	if err != nil {
 		logrus.Fatalf("error while setting environment path: %v", err)
 	}

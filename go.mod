@@ -15,7 +15,7 @@ replace (
 	github.com/opencontainers/image-spec => github.com/opencontainers/image-spec v1.1.0-rc2 // needed for containers/image/v5
 	github.com/opencontainers/runc => github.com/opencontainers/runc v1.1.12
 
-	github.com/rancher/machine => github.com/rancher/machine v0.15.0-rancher103
+	github.com/rancher/machine => github.com/rancher/machine v0.15.0-rancher109
 	github.com/rancher/rancher/pkg/apis => ./pkg/apis
 	github.com/rancher/rancher/pkg/client => ./pkg/client
 
@@ -121,7 +121,7 @@ require (
 	github.com/rancher/gke-operator v1.1.6
 	github.com/rancher/kubernetes-provider-detector v0.1.5
 	github.com/rancher/lasso v0.0.0-20230830164424-d684fdeb6f29
-	github.com/rancher/machine v0.15.0-rancher99
+	github.com/rancher/machine v0.15.0-rancher109
 	github.com/rancher/norman v0.0.0-20240207153035-cb54924f25c7
 	github.com/rancher/rancher/pkg/apis v0.0.0
 	github.com/rancher/rancher/pkg/client v0.0.0
@@ -169,7 +169,12 @@ require (
 	sigs.k8s.io/yaml v1.3.0
 )
 
-require github.com/containers/image/v5 v5.25.0
+require (
+	github.com/antihax/optional v1.0.0
+	github.com/containers/image/v5 v5.25.0
+	github.com/rancher/shepherd v0.0.0-20240226222616-1db791072a24
+	go.qase.io/client v0.0.0-20231114201952-65195ec001fa
+)
 
 require (
 	cloud.google.com/go/compute/metadata v0.2.3 // indirect
@@ -279,8 +284,8 @@ require (
 	github.com/docker/go-metrics v0.0.1 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/docker/libtrust v0.0.0-20160708172513-aabc10ec26b7 // indirect
-	github.com/emicklei/go-restful/v3 v3.10.2 // indirect
-	github.com/exponent-io/jsonpath v0.0.0-20210407135951-1de76d718b3f // indirect
+	github.com/emicklei/go-restful/v3 v3.10.1 // indirect
+	github.com/exponent-io/jsonpath v0.0.0-20151013193312-d6023ce2651d // indirect
 	github.com/fatih/camelcase v1.0.0 // indirect
 	github.com/fatih/color v1.15.0 // indirect
 	github.com/felixge/httpsnoop v1.0.3 // indirect
@@ -358,7 +363,7 @@ require (
 	github.com/opencontainers/image-spec v1.1.0-rc3 // indirect
 	github.com/opencontainers/runc v1.1.12 // indirect
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
-	github.com/pkg/sftp v1.13.5
+	github.com/pkg/sftp v1.13.5 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/procfs v0.10.1 // indirect
 	github.com/rivo/uniseg v0.4.4 // indirect

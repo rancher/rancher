@@ -2,18 +2,24 @@ package upgrade
 
 import (
 	"testing"
+	"time"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	apiv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
-	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
-	"github.com/rancher/rancher/tests/framework/extensions/clusters"
-	"github.com/rancher/rancher/tests/framework/extensions/clusters/bundledclusters"
+	"github.com/rancher/shepherd/clients/rancher"
+	v1 "github.com/rancher/shepherd/clients/rancher/v1"
+	"github.com/rancher/shepherd/extensions/clusters"
+	"github.com/rancher/shepherd/extensions/clusters/bundledclusters"
+	kcluster "github.com/rancher/shepherd/extensions/kubeapi/cluster"
+	kwait "k8s.io/apimachinery/pkg/util/wait"
 )
 
 const (
+	local = "local"
+
 	// isCheckingCurrentCluster is the boolean to decide whether validations should happen with a new GET request and cluster data or not
 	isCheckingCurrentCluster = true
 	// logMessageKubernetesVersion is the string message to log with the kubernetes versions validations' assertions
@@ -21,6 +27,30 @@ const (
 	// logMessageNodepoolVersion is the string message to log the with kubernetes nodepools versions validations' assertions
 	logMessageNodepoolVersions = "Validating the current nodepools version is the upgraded one"
 )
+
+func waitUntilLocalStable(client *rancher.Client, clusterName string) error {
+	return kwait.Poll(10*time.Second, 75*time.Minute, func() (bool, error) {
+		isConnected, err := client.IsConnected()
+		if err != nil {
+			logrus.Errorf("[connection stable]: %v", err)
+			return false, nil
+		}
+		logrus.Infof("[connection stable]: %v", isConnected)
+
+		if isConnected {
+			ready, err := kcluster.IsClusterActive(client, clusterName)
+			if err != nil {
+				logrus.Errorf("[cluster ready]: %v", err)
+				return false, nil
+			}
+			logrus.Infof("[cluster ready]: %v", ready)
+
+			return ready, nil
+		}
+
+		return false, nil
+	})
+}
 
 // getVersion is a test helper function to get kubernetes version of a cluster.
 // if versionToUpgrade in the config provided, checks the value within version first. Returns the version as string.
@@ -57,7 +87,11 @@ func validateKubernetesVersions(t *testing.T, client *rancher.Client, bc *bundle
 
 	switch cluster.Meta.Provider {
 	case clusters.KubernetesProviderRKE:
-		assert.Equalf(t, *versionToUpgrade, cluster.V3.RancherKubernetesEngineConfig.Version, "[%v]: %v", cluster.Meta.Name, logMessageKubernetesVersion)
+		if cluster.Meta.IsImported {
+			assert.Equalf(t, *versionToUpgrade, cluster.V3.RancherKubernetesEngineConfig.Version, "[%v]: %v", cluster.Meta.Name, logMessageKubernetesVersion)
+		} else if !cluster.Meta.IsImported {
+			assert.Equalf(t, *versionToUpgrade, cluster.V3.RancherKubernetesEngineConfig.Version, "[%v]: %v", cluster.Meta.Name, logMessageKubernetesVersion)
+		}
 	case clusters.KubernetesProviderRKE2:
 		if cluster.Meta.IsImported {
 			clusterSpec := &apiv1.ClusterSpec{}
