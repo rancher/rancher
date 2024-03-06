@@ -226,11 +226,11 @@ func createTempDir(obj *v3.App) (*common.HelmPath, error) {
 func renderNotes(obj *v3.App, tempDirs *common.HelmPath, port string) (string, error) {
 	var cmd *exec.Cmd
 	if common.IsHelm3(obj.Status.HelmVersion) {
-		commands := append([]string{"get", "notes", obj.Name, "-n", obj.Spec.TargetNamespace, "--kubeconfig", tempDirs.KubeConfigInJail})
+		commands := []string{"get", "notes", obj.Name, "-n", obj.Spec.TargetNamespace, "--kubeconfig", tempDirs.KubeConfigInJail}
 		cmd = exec.Command(common.HelmV3, commands...)
 	} else {
 		// helm get requires tiller to be running
-		commands := append([]string{"get", "notes", obj.Name})
+		commands := []string{"get", "notes", obj.Name}
 		cmd = exec.Command(common.HelmV2, commands...)
 		cmd.Env = []string{fmt.Sprintf("%s=%s", "HELM_HOST", "127.0.0.1:"+port)}
 	}
