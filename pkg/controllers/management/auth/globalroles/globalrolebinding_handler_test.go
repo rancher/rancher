@@ -75,25 +75,38 @@ var (
 )
 
 type grbTestStateChanges struct {
-	t                *testing.T
-	createdCRTBs     []*v3.ClusterRoleTemplateBinding
-	createdCRBs      []*rbacv1.ClusterRoleBinding
-	deletedCRTBNames []string
-	createdRBs       map[string]*rbacv1.RoleBinding
-	deletedRBsNames  map[string]struct{}
+	t               *testing.T
+	createdCRTBs    []*v3.ClusterRoleTemplateBinding
+	createdCRBs     []*rbacv1.ClusterRoleBinding
+	createdRBs      map[string]*rbacv1.RoleBinding
+	deletedRBsNames map[string]struct{}
 }
 type grbTestState struct {
 	crtbCacheMock     *fake.MockCacheInterface[*v3.ClusterRoleTemplateBinding]
 	grListerMock      *fakes.GlobalRoleListerMock
 	crbListerMock     *rbacFakes.ClusterRoleBindingListerMock
 	clusterListerMock *fakes.ClusterListerMock
-	crtbClientMock    *fakes.ClusterRoleTemplateBindingInterfaceMock
+	crtbClientMock    *fake.MockClientInterface[*v3.ClusterRoleTemplateBinding, *v3.ClusterRoleTemplateBindingList]
 	crbClientMock     *rbacFakes.ClusterRoleBindingInterfaceMock
 	nsCacheMock       *fake.MockNonNamespacedCacheInterface[*corev1.Namespace]
 	rListerMock       *rbacFakes.RoleListerMock
 	rbListerMock      *rbacFakes.RoleBindingListerMock
 	rbClientMock      *rbacFakes.RoleBindingInterfaceMock
 	stateChanges      *grbTestStateChanges
+}
+
+// matcher implements gomock.Matcher for use primarily in matching CRTBs with partial information
+type matcher struct {
+	matchFunc func(x interface{}) bool
+	id        string
+}
+
+func (m *matcher) Matches(x interface{}) bool {
+	return m.matchFunc(x)
+}
+
+func (m *matcher) String() string {
+	return m.id
 }
 
 func TestCreateUpdate(t *testing.T) {
@@ -161,15 +174,12 @@ func TestCreateUpdate(t *testing.T) {
 				}
 				// mocks for just cluster permissions
 				state.crtbCacheMock.EXPECT().GetByIndex(crtbGrbOwnerIndex, "local/test-grb").Return([]*v3.ClusterRoleTemplateBinding{}, nil)
-				state.crtbCacheMock.EXPECT().GetByIndex(crtbGrbOwnerIndex, "not-local/test-grb").Return([]*v3.ClusterRoleTemplateBinding{}, nil).Times(2)
-				state.crtbClientMock.CreateFunc = func(crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
+				state.crtbCacheMock.EXPECT().GetByIndex(crtbGrbOwnerIndex, "not-local/test-grb").Return([]*v3.ClusterRoleTemplateBinding{}, nil)
+
+				state.crtbClientMock.EXPECT().Create(gomock.Any()).DoAndReturn(func(crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
 					state.stateChanges.createdCRTBs = append(state.stateChanges.createdCRTBs, crtb)
 					return crtb, nil
-				}
-				state.crtbClientMock.DeleteNamespacedFunc = func(_ string, name string, _ *metav1.DeleteOptions) error {
-					state.stateChanges.deletedCRTBNames = append(state.stateChanges.deletedCRTBNames, name)
-					return nil
-				}
+				})
 				state.clusterListerMock.ListFunc = func(namespace string, selector labels.Selector) ([]*v3.Cluster, error) {
 					return []*v3.Cluster{&notLocalCluster, &localCluster}, nil
 				}
@@ -186,7 +196,6 @@ func TestCreateUpdate(t *testing.T) {
 			stateAssertions: func(stateChanges grbTestStateChanges) {
 				require.Len(stateChanges.t, stateChanges.createdCRTBs, 1)
 				require.Len(stateChanges.t, stateChanges.createdCRBs, 1)
-				require.Len(stateChanges.t, stateChanges.deletedCRTBNames, 0)
 
 				// cluster assertions
 				crtb := stateChanges.createdCRTBs[0]
@@ -229,15 +238,6 @@ func TestCreateUpdate(t *testing.T) {
 				state.rbListerMock.ListFunc = func(_ string, _ labels.Selector) ([]*rbacv1.RoleBinding, error) {
 					return nil, nil
 				}
-				// mocks for just cluster permissions
-				state.crtbClientMock.CreateFunc = func(crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
-					state.stateChanges.createdCRTBs = append(state.stateChanges.createdCRTBs, crtb)
-					return crtb, nil
-				}
-				state.crtbClientMock.DeleteNamespacedFunc = func(_ string, name string, _ *metav1.DeleteOptions) error {
-					state.stateChanges.deletedCRTBNames = append(state.stateChanges.deletedCRTBNames, name)
-					return nil
-				}
 				state.clusterListerMock.ListFunc = func(namespace string, selector labels.Selector) ([]*v3.Cluster, error) {
 					return nil, fmt.Errorf("server not available")
 				}
@@ -252,9 +252,7 @@ func TestCreateUpdate(t *testing.T) {
 				}
 			},
 			stateAssertions: func(stateChanges grbTestStateChanges) {
-				require.Len(stateChanges.t, stateChanges.createdCRTBs, 0)
 				require.Len(stateChanges.t, stateChanges.createdCRBs, 1)
-				require.Len(stateChanges.t, stateChanges.deletedCRTBNames, 0)
 
 				// global assertions
 				crb := stateChanges.createdCRBs[0]
@@ -290,15 +288,11 @@ func TestCreateUpdate(t *testing.T) {
 				}
 				// mocks for just cluster permissions
 				state.crtbCacheMock.EXPECT().GetByIndex(crtbGrbOwnerIndex, "local/test-grb").Return([]*v3.ClusterRoleTemplateBinding{}, nil)
-				state.crtbCacheMock.EXPECT().GetByIndex(crtbGrbOwnerIndex, "not-local/test-grb").Return([]*v3.ClusterRoleTemplateBinding{}, nil).Times(2)
-				state.crtbClientMock.CreateFunc = func(crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
+				state.crtbCacheMock.EXPECT().GetByIndex(crtbGrbOwnerIndex, "not-local/test-grb").Return([]*v3.ClusterRoleTemplateBinding{}, nil)
+				state.crtbClientMock.EXPECT().Create(gomock.Any()).DoAndReturn(func(crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
 					state.stateChanges.createdCRTBs = append(state.stateChanges.createdCRTBs, crtb)
 					return crtb, nil
-				}
-				state.crtbClientMock.DeleteNamespacedFunc = func(_ string, name string, _ *metav1.DeleteOptions) error {
-					state.stateChanges.deletedCRTBNames = append(state.stateChanges.deletedCRTBNames, name)
-					return nil
-				}
+				})
 				state.clusterListerMock.ListFunc = func(namespace string, selector labels.Selector) ([]*v3.Cluster, error) {
 					return []*v3.Cluster{&notLocalCluster, &localCluster}, nil
 				}
@@ -315,7 +309,6 @@ func TestCreateUpdate(t *testing.T) {
 			stateAssertions: func(stateChanges grbTestStateChanges) {
 				require.Len(stateChanges.t, stateChanges.createdCRTBs, 1)
 				require.Len(stateChanges.t, stateChanges.createdCRBs, 1)
-				require.Len(stateChanges.t, stateChanges.deletedCRTBNames, 0)
 
 				// cluster assertions
 				crtb := stateChanges.createdCRTBs[0]
@@ -355,15 +348,6 @@ func TestCreateUpdate(t *testing.T) {
 				state.rbListerMock.ListFunc = func(_ string, _ labels.Selector) ([]*rbacv1.RoleBinding, error) {
 					return nil, nil
 				}
-				// mocks for just cluster permissions
-				state.crtbClientMock.CreateFunc = func(crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
-					state.stateChanges.createdCRTBs = append(state.stateChanges.createdCRTBs, crtb)
-					return crtb, nil
-				}
-				state.crtbClientMock.DeleteNamespacedFunc = func(_ string, name string, _ *metav1.DeleteOptions) error {
-					state.stateChanges.deletedCRTBNames = append(state.stateChanges.deletedCRTBNames, name)
-					return nil
-				}
 
 				// mocks for just global permissions
 				state.crbListerMock.GetFunc = func(namespace, name string) (*rbacv1.ClusterRoleBinding, error) {
@@ -375,9 +359,7 @@ func TestCreateUpdate(t *testing.T) {
 				}
 			},
 			stateAssertions: func(stateChanges grbTestStateChanges) {
-				require.Len(stateChanges.t, stateChanges.createdCRTBs, 0)
 				require.Len(stateChanges.t, stateChanges.createdCRBs, 1)
-				require.Len(stateChanges.t, stateChanges.deletedCRTBNames, 0)
 
 				// global assertions
 				crb := stateChanges.createdCRBs[0]
@@ -409,21 +391,20 @@ func TestCreateUpdate(t *testing.T) {
 				grListerMock := fakes.GlobalRoleListerMock{}
 				crbListerMock := rbacFakes.ClusterRoleBindingListerMock{}
 				clusterListerMock := fakes.ClusterListerMock{}
-				crtbClientMock := fakes.ClusterRoleTemplateBindingInterfaceMock{}
+				crtbClientMock := fake.NewMockClientInterface[*v3.ClusterRoleTemplateBinding, *v3.ClusterRoleTemplateBindingList](ctrl)
 				crbClientMock := rbacFakes.ClusterRoleBindingInterfaceMock{}
 				rbListerMock := rbacFakes.RoleBindingListerMock{}
 				stateChanges := grbTestStateChanges{
-					t:                t,
-					createdCRTBs:     []*v3.ClusterRoleTemplateBinding{},
-					createdCRBs:      []*rbacv1.ClusterRoleBinding{},
-					deletedCRTBNames: []string{},
+					t:            t,
+					createdCRBs:  []*rbacv1.ClusterRoleBinding{},
+					createdCRTBs: []*v3.ClusterRoleTemplateBinding{},
 				}
 				state := grbTestState{
 					crtbCacheMock:     crtbCacheMock,
 					grListerMock:      &grListerMock,
 					crbListerMock:     &crbListerMock,
 					clusterListerMock: &clusterListerMock,
-					crtbClientMock:    &crtbClientMock,
+					crtbClientMock:    crtbClientMock,
 					crbClientMock:     &crbClientMock,
 					rbListerMock:      &rbListerMock,
 					stateChanges:      &stateChanges,
@@ -435,7 +416,7 @@ func TestCreateUpdate(t *testing.T) {
 				grbLifecycle.crbLister = &crbListerMock
 				grbLifecycle.crtbCache = crtbCacheMock
 				grbLifecycle.clusterLister = &clusterListerMock
-				grbLifecycle.crtbClient = &crtbClientMock
+				grbLifecycle.crtbClient = crtbClientMock
 				grbLifecycle.crbClient = &crbClientMock
 				grbLifecycle.roleBindingLister = &rbListerMock
 				res, resErr := testFunc(test.inputBinding)
@@ -549,23 +530,12 @@ func Test_reconcileClusterPermissions(t *testing.T) {
 			stateSetup: func(state grbTestState) {
 				state.grListerMock.GetFunc = grListerGetFunc
 				state.crtbCacheMock.EXPECT().GetByIndex(crtbGrbOwnerIndex, "local/test-grb").Return([]*v3.ClusterRoleTemplateBinding{}, nil)
-				state.crtbCacheMock.EXPECT().GetByIndex(crtbGrbOwnerIndex, "not-local/test-grb").Return([]*v3.ClusterRoleTemplateBinding{}, nil).Times(2)
-				state.crtbClientMock.CreateFunc = func(crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
-					state.stateChanges.createdCRTBs = append(state.stateChanges.createdCRTBs, crtb)
-					return crtb, nil
-				}
-				state.crtbClientMock.DeleteNamespacedFunc = func(_ string, name string, _ *metav1.DeleteOptions) error {
-					state.stateChanges.deletedCRTBNames = append(state.stateChanges.deletedCRTBNames, name)
-					return nil
-				}
+				state.crtbCacheMock.EXPECT().GetByIndex(crtbGrbOwnerIndex, "not-local/test-grb").Return([]*v3.ClusterRoleTemplateBinding{}, nil)
 				state.clusterListerMock.ListFunc = func(namespace string, selector labels.Selector) ([]*v3.Cluster, error) {
 					return []*v3.Cluster{&notLocalCluster, &localCluster}, nil
 				}
 			},
-			stateAssertions: func(stateChanges grbTestStateChanges) {
-				require.Len(stateChanges.t, stateChanges.createdCRTBs, 0)
-				require.Len(stateChanges.t, stateChanges.deletedCRTBNames, 0)
-			},
+			stateAssertions: func(stateChanges grbTestStateChanges) {},
 			inputObject: &v3.GlobalRoleBinding{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-grb",
@@ -581,23 +551,12 @@ func Test_reconcileClusterPermissions(t *testing.T) {
 			stateSetup: func(state grbTestState) {
 				state.grListerMock.GetFunc = grListerGetFunc
 				state.crtbCacheMock.EXPECT().GetByIndex(crtbGrbOwnerIndex, "local/test-grb").Return([]*v3.ClusterRoleTemplateBinding{}, nil)
-				state.crtbCacheMock.EXPECT().GetByIndex(crtbGrbOwnerIndex, "not-local/test-grb").Return([]*v3.ClusterRoleTemplateBinding{}, nil).Times(2)
-				state.crtbClientMock.CreateFunc = func(crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
-					state.stateChanges.createdCRTBs = append(state.stateChanges.createdCRTBs, crtb)
-					return crtb, nil
-				}
-				state.crtbClientMock.DeleteNamespacedFunc = func(_ string, name string, _ *metav1.DeleteOptions) error {
-					state.stateChanges.deletedCRTBNames = append(state.stateChanges.deletedCRTBNames, name)
-					return nil
-				}
+				state.crtbCacheMock.EXPECT().GetByIndex(crtbGrbOwnerIndex, "not-local/test-grb").Return([]*v3.ClusterRoleTemplateBinding{}, nil)
 				state.clusterListerMock.ListFunc = func(namespace string, selector labels.Selector) ([]*v3.Cluster, error) {
 					return []*v3.Cluster{&notLocalCluster, &localCluster}, nil
 				}
 			},
-			stateAssertions: func(stateChanges grbTestStateChanges) {
-				require.Len(stateChanges.t, stateChanges.createdCRTBs, 0)
-				require.Len(stateChanges.t, stateChanges.deletedCRTBNames, 0)
-			},
+			stateAssertions: func(stateChanges grbTestStateChanges) {},
 			inputObject: &v3.GlobalRoleBinding{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-grb",
@@ -613,22 +572,17 @@ func Test_reconcileClusterPermissions(t *testing.T) {
 			stateSetup: func(state grbTestState) {
 				state.grListerMock.GetFunc = grListerGetFunc
 				state.crtbCacheMock.EXPECT().GetByIndex(crtbGrbOwnerIndex, "local/test-grb").Return([]*v3.ClusterRoleTemplateBinding{}, nil)
-				state.crtbCacheMock.EXPECT().GetByIndex(crtbGrbOwnerIndex, "not-local/test-grb").Return([]*v3.ClusterRoleTemplateBinding{}, nil).Times(2)
-				state.crtbClientMock.CreateFunc = func(crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
+				state.crtbCacheMock.EXPECT().GetByIndex(crtbGrbOwnerIndex, "not-local/test-grb").Return([]*v3.ClusterRoleTemplateBinding{}, nil)
+				state.crtbClientMock.EXPECT().Create(gomock.Any()).DoAndReturn(func(crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
 					state.stateChanges.createdCRTBs = append(state.stateChanges.createdCRTBs, crtb)
 					return crtb, nil
-				}
-				state.crtbClientMock.DeleteNamespacedFunc = func(_ string, name string, _ *metav1.DeleteOptions) error {
-					state.stateChanges.deletedCRTBNames = append(state.stateChanges.deletedCRTBNames, name)
-					return nil
-				}
+				})
 				state.clusterListerMock.ListFunc = func(namespace string, selector labels.Selector) ([]*v3.Cluster, error) {
 					return []*v3.Cluster{&notLocalCluster, &localCluster}, nil
 				}
 			},
 			stateAssertions: func(stateChanges grbTestStateChanges) {
 				require.Len(stateChanges.t, stateChanges.createdCRTBs, 1)
-				require.Len(stateChanges.t, stateChanges.deletedCRTBNames, 0)
 				crtb := stateChanges.createdCRTBs[0]
 				require.Equal(stateChanges.t, "not-local", crtb.ClusterName)
 				require.Equal(stateChanges.t, "not-local", crtb.Namespace)
@@ -838,16 +792,18 @@ func Test_reconcileClusterPermissions(t *testing.T) {
 						UserName:           "test-user",
 						GroupPrincipalName: "",
 					},
-				}, nil).Times(2)
-				state.crtbClientMock.CreateFunc = func(crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
+				}, nil)
+				state.crtbClientMock.EXPECT().Create(gomock.Any()).DoAndReturn(func(crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
 					state.stateChanges.createdCRTBs = append(state.stateChanges.createdCRTBs, crtb)
 					return crtb, nil
-				}
-				state.crtbClientMock.DeleteNamespacedFunc = func(_ string, name string, _ *metav1.DeleteOptions) error {
-					state.stateChanges.deletedCRTBNames = append(state.stateChanges.deletedCRTBNames, name)
-					return nil
-				}
+				}).AnyTimes()
 
+				state.crtbClientMock.EXPECT().Delete("not-local", "crtb-grb-wrong-cluster-name", gomock.Any()).Return(nil)
+				state.crtbClientMock.EXPECT().Delete("not-local", "crtb-grb-wrong-user-name", gomock.Any()).Return(nil)
+				state.crtbClientMock.EXPECT().Delete("not-local", "crtb-grb-wrong-group-name", gomock.Any()).Return(nil)
+				state.crtbClientMock.EXPECT().Delete("not-local", "crtb-grb-deleting", gomock.Any()).Return(nil)
+				state.crtbClientMock.EXPECT().Delete("not-local", "crtb-grb-duplicate-2", gomock.Any()).Return(nil)
+				state.crtbClientMock.EXPECT().Delete("local", "crtb-grb-already-exists-local", gomock.Any()).Return(nil)
 				state.clusterListerMock.ListFunc = func(namespace string, selector labels.Selector) ([]*v3.Cluster, error) {
 					return []*v3.Cluster{&notLocalCluster, &localCluster}, nil
 				}
@@ -875,14 +831,6 @@ func Test_reconcileClusterPermissions(t *testing.T) {
 				require.Contains(stateChanges.t, roleTemplateNames, "wrong-user-name")
 				require.Contains(stateChanges.t, roleTemplateNames, "wrong-group-name")
 				require.Contains(stateChanges.t, roleTemplateNames, "deleting")
-
-				require.Len(stateChanges.t, stateChanges.deletedCRTBNames, 6)
-				require.Contains(stateChanges.t, stateChanges.deletedCRTBNames, "crtb-grb-wrong-cluster-name")
-				require.Contains(stateChanges.t, stateChanges.deletedCRTBNames, "crtb-grb-wrong-user-name")
-				require.Contains(stateChanges.t, stateChanges.deletedCRTBNames, "crtb-grb-wrong-group-name")
-				require.Contains(stateChanges.t, stateChanges.deletedCRTBNames, "crtb-grb-deleting")
-				require.Contains(stateChanges.t, stateChanges.deletedCRTBNames, "crtb-grb-duplicate-2")
-				require.Contains(stateChanges.t, stateChanges.deletedCRTBNames, "crtb-grb-already-exists-local")
 			},
 			inputObject: &v3.GlobalRoleBinding{
 				ObjectMeta: metav1.ObjectMeta{
@@ -898,22 +846,11 @@ func Test_reconcileClusterPermissions(t *testing.T) {
 			name: "cluster lister error",
 			stateSetup: func(state grbTestState) {
 				state.grListerMock.GetFunc = grListerGetFunc
-				state.crtbClientMock.CreateFunc = func(crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
-					state.stateChanges.createdCRTBs = append(state.stateChanges.createdCRTBs, crtb)
-					return crtb, nil
-				}
-				state.crtbClientMock.DeleteNamespacedFunc = func(_ string, name string, _ *metav1.DeleteOptions) error {
-					state.stateChanges.deletedCRTBNames = append(state.stateChanges.deletedCRTBNames, name)
-					return nil
-				}
 				state.clusterListerMock.ListFunc = func(namespace string, selector labels.Selector) ([]*v3.Cluster, error) {
 					return nil, fmt.Errorf("server unavailable")
 				}
 			},
-			stateAssertions: func(stateChanges grbTestStateChanges) {
-				require.Len(stateChanges.t, stateChanges.createdCRTBs, 0)
-				require.Len(stateChanges.t, stateChanges.deletedCRTBNames, 0)
-			},
+			stateAssertions: func(stateChanges grbTestStateChanges) {},
 			inputObject: &v3.GlobalRoleBinding{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-grb",
@@ -929,19 +866,15 @@ func Test_reconcileClusterPermissions(t *testing.T) {
 			stateSetup: func(state grbTestState) {
 				state.grListerMock.GetFunc = grListerGetFunc
 				state.crtbCacheMock.EXPECT().GetByIndex(crtbGrbOwnerIndex, "local/test-grb").Return([]*v3.ClusterRoleTemplateBinding{}, nil)
-				state.crtbCacheMock.EXPECT().GetByIndex(crtbGrbOwnerIndex, "not-local/test-grb").Return([]*v3.ClusterRoleTemplateBinding{}, nil).Times(2)
-				state.crtbCacheMock.EXPECT().GetByIndex(crtbGrbOwnerIndex, "error/test-grb").Return([]*v3.ClusterRoleTemplateBinding{}, nil).Times(2)
-				state.crtbClientMock.CreateFunc = func(crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
+				state.crtbCacheMock.EXPECT().GetByIndex(crtbGrbOwnerIndex, "not-local/test-grb").Return([]*v3.ClusterRoleTemplateBinding{}, nil)
+				state.crtbCacheMock.EXPECT().GetByIndex(crtbGrbOwnerIndex, "error/test-grb").Return([]*v3.ClusterRoleTemplateBinding{}, nil)
+				state.crtbClientMock.EXPECT().Create(gomock.Any()).DoAndReturn(func(crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
 					state.stateChanges.createdCRTBs = append(state.stateChanges.createdCRTBs, crtb)
 					if crtb.ClusterName == errorCluster.Name {
 						return nil, fmt.Errorf("server unavailable")
 					}
 					return crtb, nil
-				}
-				state.crtbClientMock.DeleteNamespacedFunc = func(_ string, name string, _ *metav1.DeleteOptions) error {
-					state.stateChanges.deletedCRTBNames = append(state.stateChanges.deletedCRTBNames, name)
-					return nil
-				}
+				}).AnyTimes()
 				state.clusterListerMock.ListFunc = func(namespace string, selector labels.Selector) ([]*v3.Cluster, error) {
 					return []*v3.Cluster{&errorCluster, &notLocalCluster, &localCluster}, nil
 				}
@@ -966,7 +899,6 @@ func Test_reconcileClusterPermissions(t *testing.T) {
 				}
 				require.Contains(stateChanges.t, clusterNames, notLocalCluster.Name)
 				require.Contains(stateChanges.t, clusterNames, errorCluster.Name)
-				require.Len(stateChanges.t, stateChanges.deletedCRTBNames, 0)
 			},
 			inputObject: &v3.GlobalRoleBinding{
 				ObjectMeta: metav1.ObjectMeta{
@@ -983,16 +915,12 @@ func Test_reconcileClusterPermissions(t *testing.T) {
 			stateSetup: func(state grbTestState) {
 				state.grListerMock.GetFunc = grListerGetFunc
 				state.crtbCacheMock.EXPECT().GetByIndex(crtbGrbOwnerIndex, "local/test-grb").Return([]*v3.ClusterRoleTemplateBinding{}, nil)
-				state.crtbCacheMock.EXPECT().GetByIndex(crtbGrbOwnerIndex, "not-local/test-grb").Return([]*v3.ClusterRoleTemplateBinding{}, nil).Times(2)
-				state.crtbCacheMock.EXPECT().GetByIndex(crtbGrbOwnerIndex, "error/test-grb").Return(nil, fmt.Errorf("indexer error")).Times(2)
-				state.crtbClientMock.CreateFunc = func(crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
+				state.crtbCacheMock.EXPECT().GetByIndex(crtbGrbOwnerIndex, "not-local/test-grb").Return([]*v3.ClusterRoleTemplateBinding{}, nil)
+				state.crtbCacheMock.EXPECT().GetByIndex(crtbGrbOwnerIndex, "error/test-grb").Return(nil, fmt.Errorf("indexer error"))
+				state.crtbClientMock.EXPECT().Create(gomock.Any()).DoAndReturn(func(crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
 					state.stateChanges.createdCRTBs = append(state.stateChanges.createdCRTBs, crtb)
 					return crtb, nil
-				}
-				state.crtbClientMock.DeleteNamespacedFunc = func(_ string, name string, _ *metav1.DeleteOptions) error {
-					state.stateChanges.deletedCRTBNames = append(state.stateChanges.deletedCRTBNames, name)
-					return nil
-				}
+				})
 				state.clusterListerMock.ListFunc = func(namespace string, selector labels.Selector) ([]*v3.Cluster, error) {
 					return []*v3.Cluster{&errorCluster, &notLocalCluster, &localCluster}, nil
 				}
@@ -1013,8 +941,6 @@ func Test_reconcileClusterPermissions(t *testing.T) {
 				require.Equal(stateChanges.t, "GlobalRoleBinding", ownerRef.Kind)
 				require.Equal(stateChanges.t, "test-grb", ownerRef.Name)
 				require.Equal(stateChanges.t, types.UID("1234"), ownerRef.UID)
-
-				require.Len(stateChanges.t, stateChanges.deletedCRTBNames, 0)
 			},
 			inputObject: &v3.GlobalRoleBinding{
 				ObjectMeta: metav1.ObjectMeta{
@@ -1055,18 +981,13 @@ func Test_reconcileClusterPermissions(t *testing.T) {
 						UserName:           "test-user",
 						GroupPrincipalName: "",
 					},
-				}, nil).Times(2)
-				state.crtbClientMock.CreateFunc = func(crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
+				}, nil)
+				state.crtbClientMock.EXPECT().Create(gomock.Any()).DoAndReturn(func(crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
 					state.stateChanges.createdCRTBs = append(state.stateChanges.createdCRTBs, crtb)
 					return crtb, nil
-				}
-				state.crtbClientMock.DeleteNamespacedFunc = func(_ string, name string, _ *metav1.DeleteOptions) error {
-					state.stateChanges.deletedCRTBNames = append(state.stateChanges.deletedCRTBNames, name)
-					if name == "crtb-grb-delete" || name == "crtb-grb-delete-local" {
-						return fmt.Errorf("server unavailable")
-					}
-					return nil
-				}
+				})
+				state.crtbClientMock.EXPECT().Delete("error", "crtb-grb-delete", gomock.Any()).Return(fmt.Errorf("server unavailable"))
+				state.crtbClientMock.EXPECT().Delete("local", "crtb-grb-delete-local", gomock.Any()).Return(fmt.Errorf("server unavailable"))
 				state.clusterListerMock.ListFunc = func(namespace string, selector labels.Selector) ([]*v3.Cluster, error) {
 					return []*v3.Cluster{&errorCluster, &localCluster}, nil
 				}
@@ -1087,10 +1008,6 @@ func Test_reconcileClusterPermissions(t *testing.T) {
 				require.Equal(stateChanges.t, "GlobalRoleBinding", ownerRef.Kind)
 				require.Equal(stateChanges.t, "test-grb", ownerRef.Name)
 				require.Equal(stateChanges.t, types.UID("1234"), ownerRef.UID)
-
-				require.Len(stateChanges.t, stateChanges.deletedCRTBNames, 2)
-				require.Contains(stateChanges.t, stateChanges.deletedCRTBNames, "crtb-grb-delete")
-				require.Contains(stateChanges.t, stateChanges.deletedCRTBNames, "crtb-grb-delete-local")
 			},
 			inputObject: &v3.GlobalRoleBinding{
 				ObjectMeta: metav1.ObjectMeta{
@@ -1106,22 +1023,11 @@ func Test_reconcileClusterPermissions(t *testing.T) {
 			name: "no global role",
 			stateSetup: func(state grbTestState) {
 				state.grListerMock.GetFunc = grListerGetFunc
-				state.crtbClientMock.CreateFunc = func(crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
-					state.stateChanges.createdCRTBs = append(state.stateChanges.createdCRTBs, crtb)
-					return crtb, nil
-				}
-				state.crtbClientMock.DeleteNamespacedFunc = func(_ string, name string, _ *metav1.DeleteOptions) error {
-					state.stateChanges.deletedCRTBNames = append(state.stateChanges.deletedCRTBNames, name)
-					return nil
-				}
 				state.clusterListerMock.ListFunc = func(namespace string, selector labels.Selector) ([]*v3.Cluster, error) {
 					return []*v3.Cluster{&errorCluster, &notLocalCluster, &localCluster}, nil
 				}
 			},
-			stateAssertions: func(stateChanges grbTestStateChanges) {
-				require.Len(stateChanges.t, stateChanges.createdCRTBs, 0)
-				require.Len(stateChanges.t, stateChanges.deletedCRTBNames, 0)
-			},
+			stateAssertions: func(stateChanges grbTestStateChanges) {},
 			inputObject: &v3.GlobalRoleBinding{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-grb",
@@ -1141,16 +1047,15 @@ func Test_reconcileClusterPermissions(t *testing.T) {
 			crtbCacheMock := fake.NewMockCacheInterface[*v3.ClusterRoleTemplateBinding](ctrl)
 			grListerMock := fakes.GlobalRoleListerMock{}
 			clusterListerMock := fakes.ClusterListerMock{}
-			crtbClientMock := fakes.ClusterRoleTemplateBindingInterfaceMock{}
+			crtbClientMock := fake.NewMockClientInterface[*v3.ClusterRoleTemplateBinding, *v3.ClusterRoleTemplateBindingList](ctrl)
 			state := grbTestState{
 				crtbCacheMock:     crtbCacheMock,
 				grListerMock:      &grListerMock,
 				clusterListerMock: &clusterListerMock,
-				crtbClientMock:    &crtbClientMock,
+				crtbClientMock:    crtbClientMock,
 				stateChanges: &grbTestStateChanges{
-					t:                t,
-					createdCRTBs:     []*v3.ClusterRoleTemplateBinding{},
-					deletedCRTBNames: []string{},
+					t:            t,
+					createdCRTBs: []*v3.ClusterRoleTemplateBinding{},
 				},
 			}
 			if test.stateSetup != nil {
@@ -1160,9 +1065,9 @@ func Test_reconcileClusterPermissions(t *testing.T) {
 				grLister:      &grListerMock,
 				crtbCache:     crtbCacheMock,
 				clusterLister: &clusterListerMock,
-				crtbClient:    &crtbClientMock,
+				crtbClient:    crtbClientMock,
 			}
-			resErr := grbLifecycle.reconcileClusterPermissions(test.inputObject)
+			resErr := grbLifecycle.ensureClusterPermissions(test.inputObject)
 			if test.wantError {
 				require.Error(t, resErr)
 			} else {
