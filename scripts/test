@@ -54,6 +54,8 @@ eval "$(grep '^ENV CATTLE_WINS_AGENT' package/Dockerfile | awk '{print "export "
 eval "$(grep '^ENV CATTLE_CSI_PROXY_AGENT' package/Dockerfile | awk '{print "export " $2 "=" $3}')"
 eval "$(grep '^ENV CATTLE_KDM_BRANCH' package/Dockerfile | awk '{print "export " $2 "=" $3}')"
 
+export CATTLE_SYSTEM_AGENT_INSTALL_SCRIPT=${CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX}/${CATTLE_SYSTEM_AGENT_VERSION}/install.sh
+
 if [ -z "${SOME_K8S_VERSION}" ]; then
 # Get the last release for $DIST, which is usually the latest version or an experimental version.
 # Previously this would use channels, but channels no longer reflect the latest version since
