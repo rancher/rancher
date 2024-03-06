@@ -35,12 +35,13 @@ func (m *MockClusterHostGetter) EXPECT() *MockClusterHostGetterMockRecorder {
 }
 
 // GetClusterHost mocks base method.
-func (m *MockClusterHostGetter) GetClusterHost(arg0 clientcmd.ClientConfig) (string, error) {
+func (m *MockClusterHostGetter) GetClusterHost(arg0 clientcmd.ClientConfig) (string, []byte, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetClusterHost", arg0)
 	ret0, _ := ret[0].(string)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret1, _ := ret[1].([]byte)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
 }
 
 // GetClusterHost indicates an expected call of GetClusterHost.
