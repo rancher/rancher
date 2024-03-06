@@ -1,6 +1,6 @@
 module github.com/rancher/rancher
 
-go 1.21
+go 1.22
 
 replace (
 	github.com/AzureAD/microsoft-authentication-library-for-go => github.com/AzureAD/microsoft-authentication-library-for-go v0.5.1 // for compatibility with rancher codebase
