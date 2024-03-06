@@ -26,6 +26,7 @@ replace (
 	go.opentelemetry.io/otel/sdk => go.opentelemetry.io/otel/sdk v1.10.0
 	go.opentelemetry.io/otel/trace => go.opentelemetry.io/otel/trace v1.10.0
 	go.opentelemetry.io/proto/otlp => go.opentelemetry.io/proto/otlp v0.19.0
+	go.qase.io/client => github.com/rancher/qase-go/client v0.0.0-20231114201952-65195ec001fa
 
 	helm.sh/helm/v3 => github.com/rancher/helm/v3 v3.12.3-rancher1
 	k8s.io/api => k8s.io/api v0.27.4
@@ -374,7 +375,7 @@ require (
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/shopspring/decimal v1.3.1 // indirect
 	github.com/spf13/cast v1.5.1 // indirect
-	github.com/spf13/cobra v1.7.0
+	github.com/spf13/cobra v1.7.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/stretchr/objx v0.5.0 // indirect
 	github.com/vishvananda/netns v0.0.2 // indirect
