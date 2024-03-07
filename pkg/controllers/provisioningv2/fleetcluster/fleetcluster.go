@@ -2,6 +2,7 @@ package fleetcluster
 
 import (
 	"context"
+	"os"
 	"time"
 
 	fleet "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
@@ -160,7 +161,11 @@ func (h *handler) createCluster(cluster *provv1.Cluster, status provv1.ClusterSt
 
 	objs := []runtime.Object{}
 	if mgmtCluster.Spec.Internal {
-		h.addAPIServer(clientSecret)
+		// When not running inside a cluster (which may happen in local dev setups), do not populate API server
+		// host and CA information which then comes from the local host
+		if os.Getenv("KUBERNETES_PORT") != "" {
+			h.addAPIServer(clientSecret)
+		}
 
 		agentNamespace = fleetconst.ReleaseLocalNamespace
 		// restore fleet's hardcoded name label for the local cluster
