@@ -47,7 +47,6 @@ func (w *WebhookTestSuite) SetupSuite() {
 	w.clusterName = client.RancherConfig.ClusterName
 	w.chartVersion, err = client.Catalog.GetLatestChartVersion(charts.RancherWebhookName, catalog.RancherChartRepo)
 	require.NoError(w.T(), err)
-
 }
 
 func (w *WebhookTestSuite) TestWebhookChart() {
@@ -78,7 +77,6 @@ func (w *WebhookTestSuite) TestWebhookChart() {
 		})
 
 		w.Run("Verify webhook pod logs", func() {
-
 			steveClient, err := w.client.Steve.ProxyDownstream(clusterID)
 			require.NoError(w.T(), err)
 
@@ -106,10 +104,8 @@ func (w *WebhookTestSuite) TestWebhookChart() {
 			log.Info("Count of webhook obtained for the cluster: ", tt.cluster, " is ", len(webhookList))
 			listStr := strings.Join(webhookList, ", ")
 			log.WithField("", listStr).Info("List of webhooks obtained for the ", tt.cluster)
-
 		})
 	}
-
 }
 
 func (w *WebhookTestSuite) TestWebhookEscalationCheck() {
@@ -132,7 +128,6 @@ func (w *WebhookTestSuite) TestWebhookEscalationCheck() {
 		assert.Contains(w.T(), err.Error(), errMessage)
 	})
 }
-
 
 func TestWebhookTestSuite(t *testing.T) {
 	suite.Run(t, new(WebhookTestSuite))
