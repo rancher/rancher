@@ -173,7 +173,7 @@ require (
 require (
 	github.com/antihax/optional v1.0.0
 	github.com/containers/image/v5 v5.25.0
-	github.com/rancher/shepherd v0.0.0-20240226222616-1db791072a24
+	github.com/rancher/shepherd v0.0.0-20240305214113-df6385985517
 	go.qase.io/client v0.0.0-20231114201952-65195ec001fa
 )
 
@@ -319,6 +319,8 @@ require (
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/go-retryablehttp v0.7.2 // indirect
 	github.com/hashicorp/go-uuid v1.0.2 // indirect
+	github.com/hashicorp/go-version v1.6.0 // indirect
+	github.com/huandu/xstrings v1.3.3 // indirect
 	github.com/hashicorp/go-version v1.3.0 // indirect
 	github.com/huandu/xstrings v1.4.0 // indirect
 	github.com/imdario/mergo v0.3.15 // indirect

@@ -102,8 +102,8 @@ func addKontainerDrivers(management *config.ManagementContext) error {
 	}
 	if err := creator.addCustomDriver(
 		"linodekubernetesengine",
-		"https://github.com/linode/kontainer-engine-driver-lke/releases/download/v0.0.6/kontainer-engine-driver-lke-linux-amd64",
-		"233cbd550a93ded322906b9fc6ebc88b8791e53d31f0d21d501feb0bad77461c",
+		"https://github.com/linode/kontainer-engine-driver-lke/releases/download/v0.0.9/kontainer-engine-driver-lke-linux-amd64",
+		"f489f3b354280f8a2859945de27c76b0a70a888976d4cebcb58a30fe161f4b97",
 		"",
 		false,
 		"api.linode.com",
