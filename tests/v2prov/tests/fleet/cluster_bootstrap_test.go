@@ -17,7 +17,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func TestFleetClusterBootstrap(t *testing.T) {
+func Test_Fleet_ClusterBootstrap(t *testing.T) {
 	const waitFor = 5 * time.Minute
 	const tick = 2 * time.Second
 	assert := assert.New(t)
