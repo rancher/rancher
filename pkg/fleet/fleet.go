@@ -3,21 +3,24 @@ package fleet
 import (
 	"errors"
 	"fmt"
+	"os"
 
 	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/tools/clientcmd/api"
 )
 
-// GetClusterHost returns the API server host for the specified client configuration.
-func GetClusterHost(clientCfg clientcmd.ClientConfig) (string, error) {
+// GetClusterHost returns the API server host and CA for the specified client configuration.
+func GetClusterHost(clientCfg clientcmd.ClientConfig) (string, []byte, error) {
 	icc, err := rest.InClusterConfig()
 	if err == nil {
-		return icc.Host, nil
+		ca, err := os.ReadFile(icc.CAFile)
+		return icc.Host, ca, err
 	}
 
-	fail := func(err error) (string, error) {
-		return "", fmt.Errorf("fleet.GetClusterHost: unable to determine cluster host: %w", err)
+	fail := func(err error) (string, []byte, error) {
+		return "", []byte{}, fmt.Errorf("fleet.GetClusterHost: unable to determine cluster host: %w", err)
 	}
 
 	if clientCfg == nil {
@@ -31,7 +34,8 @@ func GetClusterHost(clientCfg clientcmd.ClientConfig) (string, error) {
 
 	cluster, ok := rawConfig.Clusters[rawConfig.CurrentContext]
 	if ok {
-		return cluster.Server, nil
+		ca, err := getCA(cluster)
+		return cluster.Server, ca, err
 	}
 
 	logrus.Warnf(
@@ -46,8 +50,17 @@ func GetClusterHost(clientCfg clientcmd.ClientConfig) (string, error) {
 			v.Server,
 			k,
 		)
-		return v.Server, nil
+		ca, err := getCA(v)
+		return v.Server, ca, err
 	}
 
-	return "", errors.New("failed to find cluster server parameter")
+	return "", []byte{}, errors.New("failed to find cluster server parameter")
+}
+
+// getCA retrieves certificate authority information for the specified cluster.
+func getCA(cluster *api.Cluster) ([]byte, error) {
+	if len(cluster.CertificateAuthorityData) > 0 {
+		return cluster.CertificateAuthorityData, nil
+	}
+	return os.ReadFile(cluster.CertificateAuthority)
 }
