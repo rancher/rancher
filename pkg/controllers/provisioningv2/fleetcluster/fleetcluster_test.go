@@ -208,8 +208,6 @@ func TestCreateCluster(t *testing.T) {
 		cluster        *provv1.Cluster
 		status         provv1.ClusterStatus
 		cachedClusters map[string]*apimgmtv3.Cluster
-		APIServerURL   string
-		APIServerCA    []byte
 		expectedLen    int
 	}{
 		{
@@ -265,31 +263,12 @@ func TestCreateCluster(t *testing.T) {
 					},
 				),
 			},
-			APIServerURL: "http://42.42.42.42:4242",
-			APIServerCA:  []byte("foo"),
-			expectedLen:  2, // cluster and cluster group
+			expectedLen: 2, // cluster and cluster group
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-
-			if tt.APIServerURL != "" {
-				hostGetter := NewMockClusterHostGetter(ctrl)
-				hostGetter.EXPECT().GetClusterHost(gomock.Any()).Return(tt.APIServerURL, tt.APIServerCA, nil)
-				h.hostGetter = hostGetter
-
-				updatedSecret := corev1.Secret{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: tt.status.ClientSecretName,
-					},
-					Data: map[string][]byte{
-						"apiServerURL": []byte(tt.APIServerURL),
-						"apiServerCA":  []byte(tt.APIServerCA),
-					},
-				}
-				h.secretsController = newSecretsController(t, tt.cluster.Namespace, &updatedSecret)
-			}
 
 			h.clustersCache = newClusterCache(t, ctrl, tt.cachedClusters)
 
@@ -378,11 +357,6 @@ func newSecretsController(
 ) corecontrollers.SecretController {
 	t.Helper()
 	ctrl := gomock.NewController(t)
-	secretsController := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
 
-	secretsController.EXPECT().Cache().Return(newSecretsCache(t, ctrl, namespace, nil))
-
-	secretsController.EXPECT().Update(updatedSecret).Return(updatedSecret, nil)
-
-	return secretsController
+	return fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
 }
