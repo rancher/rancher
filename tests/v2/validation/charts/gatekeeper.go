@@ -6,6 +6,7 @@ import (
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
 	v1 "github.com/rancher/shepherd/clients/rancher/v1"
+	"golang.org/x/net/context"
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
@@ -31,8 +32,7 @@ func getAuditTimestamp(client *rancher.Client, project *management.Project) erro
 	if err != nil {
 		return err
 	}
-	return wait.Poll(1*time.Second, 5*time.Minute, func() (done bool, err error) {
-
+	return wait.PollUntilContextTimeout(context.TODO(), 1*time.Second, 5*time.Minute, true, func(context.Context) (done bool, err error) {
 		// get list of constraints
 		auditList, err := steveClient.SteveType(ConstraintResourceSteveType).List(nil)
 		if err != nil {
@@ -53,5 +53,4 @@ func getAuditTimestamp(client *rancher.Client, project *management.Project) erro
 		}
 		return true, nil
 	})
-
 }
