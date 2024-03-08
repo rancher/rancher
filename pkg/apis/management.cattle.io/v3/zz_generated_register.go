@@ -77,7 +77,6 @@ var (
 	OIDCProviderResourceName                              = "oidcproviders"
 	OpenLdapProviderResourceName                          = "openldapproviders"
 	PodSecurityAdmissionConfigurationTemplateResourceName = "podsecurityadmissionconfigurationtemplates"
-	PodSecurityPolicyTemplateResourceName                 = "podsecuritypolicytemplates"
 	PodSecurityPolicyTemplateProjectBindingResourceName   = "podsecuritypolicytemplateprojectbindings"
 	PreferenceResourceName                                = "preferences"
 	PrincipalResourceName                                 = "principals"
