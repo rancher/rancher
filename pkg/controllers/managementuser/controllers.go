@@ -13,7 +13,6 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/managementuser/nodesyncer"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/nsserviceaccount"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/rbac"
-	"github.com/rancher/rancher/pkg/controllers/managementuser/rbac/podsecuritypolicy"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/resourcequota"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/secret"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/snapshotbackpopulate"
@@ -30,7 +29,6 @@ func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.U
 	healthsyncer.Register(ctx, cluster)
 	networkpolicy.Register(ctx, cluster)
 	nodesyncer.Register(ctx, cluster, kubeConfigGetter)
-	podsecuritypolicy.Register(ctx, cluster)
 	secret.Register(ctx, cluster)
 	resourcequota.Register(ctx, cluster)
 	certsexpiration.Register(ctx, cluster)

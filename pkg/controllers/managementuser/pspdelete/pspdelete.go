@@ -2,7 +2,6 @@ package pspdelete
 
 import (
 	provisioningcontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
-	v1beta12 "github.com/rancher/rancher/pkg/generated/norman/policy/v1beta1"
 )
 
 const (
@@ -11,9 +10,8 @@ const (
 )
 
 type handler struct {
-	clusterName         string
-	clusterCache        provisioningcontrollers.ClusterCache
-	podSecurityPolicies v1beta12.PodSecurityPolicyInterface
+	clusterName  string
+	clusterCache provisioningcontrollers.ClusterCache
 }
 
 func has(data map[string]string, key string) bool {

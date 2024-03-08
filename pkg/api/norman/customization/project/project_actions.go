@@ -56,7 +56,6 @@ type Handler struct {
 	ClusterLister            v3.ClusterLister
 	ProvisioningClusterCache provisioningcontrollerv1.ClusterCache
 	UserMgr                  user.Manager
-	PSPTemplateLister        v3.PodSecurityPolicyTemplateLister
 }
 
 func (h *Handler) Actions(actionName string, action *types.Action, apiContext *types.APIContext) error {
@@ -304,16 +303,6 @@ func (h *Handler) setPodSecurityPolicyTemplate(actionName string, action *types.
 	podSecurityPolicyTemplateName, ok := providedPSP.(string)
 	if !ok && providedPSP != nil {
 		return fmt.Errorf("could not convert: %v", providedPSP)
-	}
-
-	if ok {
-		if _, err := h.PSPTemplateLister.Get("", podSecurityPolicyTemplateName); err != nil {
-			if apierrors.IsNotFound(err) {
-				return httperror.NewAPIError(httperror.InvalidBodyContent,
-					fmt.Sprintf("podSecurityPolicyTemplate [%v] not found", podSecurityPolicyTemplateName))
-			}
-			return err
-		}
 	}
 
 	schema := request.Schemas.Schema(&managementschema.Version, client.PodSecurityPolicyTemplateProjectBindingType)
