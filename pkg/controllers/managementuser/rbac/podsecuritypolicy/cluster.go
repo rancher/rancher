@@ -12,7 +12,6 @@ import (
 	v1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
-	v1beta13 "k8s.io/api/policy/v1beta1"
 	rbac "k8s.io/api/rbac/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -99,20 +98,6 @@ func (m *clusterManager) sync(key string, obj *v3.Cluster) (runtime.Object, erro
 					if !strings.Contains(k, podSecurityPolicyTemplateFilterAnnotation) {
 						objectMeta.Annotations[k] = v
 					}
-				}
-
-				psp := &v1beta13.PodSecurityPolicy{
-					TypeMeta: metav1.TypeMeta{
-						Kind:       podSecurityPolicy,
-						APIVersion: apiVersion,
-					},
-					ObjectMeta: objectMeta,
-					Spec:       template.Spec,
-				}
-
-				_, err = m.policies.Create(psp)
-				if err != nil {
-					return nil, fmt.Errorf("error creating psp: %v", err)
 				}
 			} else {
 				return nil, fmt.Errorf("error getting policy: %v", err)

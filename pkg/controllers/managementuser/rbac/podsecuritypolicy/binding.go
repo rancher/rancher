@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -13,7 +12,6 @@ import (
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	v13 "k8s.io/api/core/v1"
-	v1beta13 "k8s.io/api/policy/v1beta1"
 	rbac "k8s.io/api/rbac/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -104,16 +102,6 @@ func (l *lifecycle) sync(obj *v3.PodSecurityPolicyTemplateProjectBinding) (runti
 
 	podSecurityPolicyName := fmt.Sprintf("%v-psp", obj.PodSecurityPolicyTemplateName)
 	_, err = l.policyLister.Get("", podSecurityPolicyName)
-	if err != nil {
-		if k8serrors.IsNotFound(err) {
-			_, err = l.createPolicy(obj, podSecurityPolicyName)
-			if err != nil {
-				return nil, fmt.Errorf("error creating policy: %v", err)
-			}
-		} else {
-			return nil, fmt.Errorf("error getting policy: %v", err)
-		}
-	}
 
 	clusterRoleName := fmt.Sprintf("%v-clusterrole", obj.PodSecurityPolicyTemplateName)
 	_, err = l.clusterRoleLister.Get("", clusterRoleName)
@@ -129,38 +117,6 @@ func (l *lifecycle) sync(obj *v3.PodSecurityPolicyTemplateProjectBinding) (runti
 	}
 
 	return obj, l.syncNamespacesInProject(obj.TargetProjectName)
-}
-
-func (l *lifecycle) createPolicy(obj *v3.PodSecurityPolicyTemplateProjectBinding,
-	podSecurityPolicyName string) (*v1beta13.PodSecurityPolicy, error) {
-	template, err := l.psptLister.Get("", obj.PodSecurityPolicyTemplateName)
-	if err != nil {
-		return nil, fmt.Errorf("error getting pspt: %v", err)
-	}
-
-	objectMeta := metav1.ObjectMeta{}
-	objectMeta.Name = podSecurityPolicyName
-	objectMeta.Annotations = make(map[string]string)
-	objectMeta.Annotations[podSecurityPolicyTemplateParentAnnotation] = template.Name
-	objectMeta.Annotations[podSecurityPolicyTemplateVersionAnnotation] = template.ResourceVersion
-
-	// Setting annotations that doesn't contains podSecurityPolicyTemplateFilterAnnotation
-	for k, v := range template.Annotations {
-		if !strings.Contains(k, podSecurityPolicyTemplateFilterAnnotation) {
-			objectMeta.Annotations[k] = v
-		}
-	}
-
-	psp := &v1beta13.PodSecurityPolicy{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       podSecurityPolicy,
-			APIVersion: apiVersion,
-		},
-		ObjectMeta: objectMeta,
-		Spec:       template.Spec,
-	}
-
-	return l.policies.Create(psp)
 }
 
 func (l *lifecycle) createClusterRole(clusterRoleName string, podSecurityPolicyName string,

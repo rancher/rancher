@@ -225,8 +225,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&OpenLdapProviderList{},
 		&PodSecurityAdmissionConfigurationTemplate{},
 		&PodSecurityAdmissionConfigurationTemplateList{},
-		&PodSecurityPolicyTemplate{},
-		&PodSecurityPolicyTemplateList{},
 		&PodSecurityPolicyTemplateProjectBinding{},
 		&PodSecurityPolicyTemplateProjectBindingList{},
 		&Preference{},

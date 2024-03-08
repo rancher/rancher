@@ -12,7 +12,6 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/managementuser/networkpolicy"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/nodesyncer"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/nsserviceaccount"
-	"github.com/rancher/rancher/pkg/controllers/managementuser/pspdelete"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/rbac"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/rbac/podsecuritypolicy"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/resourcequota"
@@ -42,7 +41,7 @@ func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.U
 		if clusterRec.Annotations["provisioning.cattle.io/administrated"] == "true" {
 			snapshotbackpopulate.Register(ctx, cluster)
 		}
-		pspdelete.Register(ctx, cluster)
+
 		machinerole.Register(ctx, cluster)
 	}
 

@@ -6,7 +6,6 @@ import (
 	"github.com/rancher/norman/condition"
 	"github.com/rancher/norman/types"
 	v1 "k8s.io/api/core/v1"
-	policyv1 "k8s.io/api/policy/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -270,19 +269,6 @@ type RoleTemplate struct {
 	// Default is false.
 	// +optional
 	Administrative bool `json:"administrative,omitempty"`
-}
-
-// +genclient
-// +kubebuilder:skipversion
-// +genclient:nonNamespaced
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-type PodSecurityPolicyTemplate struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-
-	Description string                         `json:"description"`
-	Spec        policyv1.PodSecurityPolicySpec `json:"spec,omitempty"`
 }
 
 // +genclient

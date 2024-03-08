@@ -55,7 +55,5 @@ func registerDeferred(ctx context.Context, context *config.UserContext) {
 	RegisterClusterRole(ctx, context)
 	RegisterBindings(ctx, context)
 	RegisterNamespace(ctx, context)
-	RegisterPodSecurityPolicy(ctx, context)
 	RegisterServiceAccount(ctx, context)
-	RegisterTemplate(ctx, context)
 }
