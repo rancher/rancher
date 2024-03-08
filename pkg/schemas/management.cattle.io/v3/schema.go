@@ -347,7 +347,6 @@ func authzTypes(schemas *types.Schemas) *types.Schemas {
 		MustImport(&Version, v3.GlobalRole{}).
 		MustImport(&Version, v3.GlobalRoleBinding{}).
 		MustImport(&Version, v3.RoleTemplate{}).
-		MustImport(&Version, v3.PodSecurityPolicyTemplate{}).
 		MustImportAndCustomize(&Version, v3.PodSecurityPolicyTemplateProjectBinding{}, func(schema *types.Schema) {
 			schema.CollectionMethods = []string{http.MethodGet, http.MethodPost}
 			schema.ResourceMethods = []string{}
