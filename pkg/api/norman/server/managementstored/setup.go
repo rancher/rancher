@@ -96,7 +96,6 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.NodeType,
 		client.PodSecurityAdmissionConfigurationTemplateType,
 		client.PodSecurityPolicyTemplateProjectBindingType,
-		client.PodSecurityPolicyTemplateType,
 		client.PreferenceType,
 		client.ProjectNetworkPolicyType,
 		client.ProjectRoleTemplateBindingType,
