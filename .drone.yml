@@ -432,43 +432,20 @@ steps:
     event:
     - tag
 
-- name: github_binary_prerelease
-  image: plugins/github-release
+- name: artifacts-upload
+  image: plugins/s3
   settings:
-    api_key:
-      from_secret: github_token
-    checksum:
-    - sha256
-    files:
-    - "bin/rancher-*"
-    prerelease: true
-    title: "Pre-release ${DRONE_TAG}"
-    note: ./bin/rancher-components.txt
-    overwrite: true
+    bucket: 
+    access_key:
+      from_secret: prime_artifacts_access_key
+    secret_key:
+      from_secret: prime_artifacts_secret_key
+    source: bin/rancher-*
+    strip_prefix: bin/
+    target: "/rancher/${DRONE_TAG}"
   when:
     event:
     - tag
-    ref:
-      include:
-      - "refs/tags/*-*"
-
-- name: github_binary_release
-  image: plugins/github-release
-  settings:
-    api_key:
-      from_secret: github_token
-    checksum:
-    - sha256
-    files:
-    - "bin/rancher-*"
-  when:
-    event:
-    - tag
-    ref:
-      include:
-      - "refs/tags/v2*"
-      exclude:
-      - "refs/tags/*-*"
 
 - name: check-release-images-exists
   image: rancher/dapper:v0.6.0
