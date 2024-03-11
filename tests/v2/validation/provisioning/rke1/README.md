@@ -11,8 +11,9 @@ Please see below for more details for your config. Please note that the config c
 2. [Define your test](#Provisioning-Input)
 3. [Configure providers to use for Node Driver Clusters](#NodeTemplateConfigs)
 4. [Configuring Custom Clusters](#Custom-Cluster)
-5. [Advanced Cluster Settings](#advanced-settings)
-6. [Back to general provisioning](../README.md)
+5. [Static test cases](#static-test-cases) 
+6. [Advanced Cluster Settings](#advanced-settings)
+7. [Back to general provisioning](../README.md)
 
 ## Provisioning Input
 provisioningInput is needed to the run the RKE1 tests, specifically kubernetesVersion, cni, and providers. nodesAndRoles is only needed for the TestProvisioningDynamicInput test, node pools are divided by "{nodepool},". psact is optional and takes values `rancher-privileged`, `rancher-restricted` or `rancher-baseline`.
@@ -280,6 +281,53 @@ provisioningInput:
   nodeProviders: ["ec2"]
   psact: ""
 ```
+
+## Static Test Cases
+In an effort to have uniform testing across our internal QA test case reporter, there are specific test cases that are put into their respective test files. This section highlights those test cases.
+
+### PSACT
+These test cases cover the following PSACT values as both an admin and standard user:
+1. `rancher-privileged`
+2. `rancher-restricted`
+3. `rancher-baseline`
+
+See an example YAML below:
+
+```yaml
+rancher:
+  host: "<rancher server url>"
+  adminToken: "<rancher admin bearer token>"
+  cleanup: false
+  clusterName: "<provided cluster name>"
+  insecure: true
+provisioningInput:
+  rke1KubernetesVersion: ["v1.27.10-rancher1-1"]
+  cni: ["calico"]
+  providers: ["linode"]
+  nodeProviders: ["ec2"]
+linodeNodeTemplate:
+  authorizedUsers: ""
+  createPrivateIp: true
+  dockerPort: "2376"
+  image: "linode/ubuntu22.04"
+  instanceType: "g6-dedicated-8"
+  label: ""
+  region: "us-west"
+  rootPass: ""
+  sshPort: "22"
+  sshUser: "root"
+  stackscript: ""
+  stackscriptData: ""
+  swapSize: "512"
+  tags: ""
+  token: ""
+  type: "linodeConfig"
+  uaPrefix: "Rancher"
+```
+
+These tests utilize Go build tags. Due to this, see the below examples on how to run the tests:
+
+`gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/provisioning/rke1 --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestRKE1PSACTTestSuite$"`
 
 ## Advanced Settings
 This encapsulates any other setting that is applied in the cluster.spec. Currently we have support for:

@@ -1272,8 +1272,9 @@ github.com/hashicorp/go-uuid v1.0.0/go.mod h1:6SBZvOh/SIDV7/2o3Jml5SYk/TvGqwFJ/b
 github.com/hashicorp/go-uuid v1.0.1/go.mod h1:6SBZvOh/SIDV7/2o3Jml5SYk/TvGqwFJ/bN7x4byOro=
 github.com/hashicorp/go-uuid v1.0.2 h1:cfejS+Tpcp13yd5nYHWDI6qVCny6wyX2Mt5SGur2IGE=
 github.com/hashicorp/go-uuid v1.0.2/go.mod h1:6SBZvOh/SIDV7/2o3Jml5SYk/TvGqwFJ/bN7x4byOro=
-github.com/hashicorp/go-version v1.3.0 h1:McDWVJIU/y+u1BRV06dPaLfLCaT7fUTJLp5r04x7iNw=
 github.com/hashicorp/go-version v1.3.0/go.mod h1:fltr4n8CU8Ke44wwGCBoEymUuxUHl09ZGVZPK5anwXA=
+github.com/hashicorp/go-version v1.6.0 h1:feTTfFNnjP967rlCxM/I9g701jU+RN74YKx2mOkIeek=
+github.com/hashicorp/go-version v1.6.0/go.mod h1:fltr4n8CU8Ke44wwGCBoEymUuxUHl09ZGVZPK5anwXA=
 github.com/hashicorp/go.net v0.0.1/go.mod h1:hjKkEWcCURg++eb33jQU7oqQcI9XDCnUzHA0oac0k90=
 github.com/hashicorp/golang-lru v0.5.0/go.mod h1:/m3WP610KZHVQ1SGc6re/UDhFvYD7pJ4Ao+sR/qLZy8=
 github.com/hashicorp/golang-lru v0.5.1/go.mod h1:/m3WP610KZHVQ1SGc6re/UDhFvYD7pJ4Ao+sR/qLZy8=
@@ -1679,10 +1680,10 @@ github.com/rancher/remotedialer v0.3.0 h1:y1EO8JCsgZo0RcqTUp6U8FXcBAv27R+TLnWRcp
 github.com/rancher/remotedialer v0.3.0/go.mod h1:BwwztuvViX2JrLLUwDlsYt5DiyUwHLlzynRwkZLAY0Q=
 github.com/rancher/rke v1.5.3 h1:7mGn+NIL7KXk99NwWYBgoByh2+IfVCdws5ad3X/JIZY=
 github.com/rancher/rke v1.5.3/go.mod h1:wZaVWzW46OTuGvyxgRHXGUyJ/QP0zOkKESO9hBOwTaY=
-github.com/rancher/shepherd v0.0.0-20240226222553-f4062285e094 h1:cqxjo6w+YFPOoRj3datKAOFCfiyaxOQu2y8K6kvODc4=
-github.com/rancher/shepherd v0.0.0-20240226222553-f4062285e094/go.mod h1:pggo0NvlbxaplK5cwiTSp7AixbGrGWbz6CC710biulI=
-github.com/rancher/steve v0.0.0-20240228161051-641178e7cbc7 h1:kxC+zzqWsAfLIXKzoO+zAISzs+OJMNNVvoO03IqdQuQ=
-github.com/rancher/steve v0.0.0-20240228161051-641178e7cbc7/go.mod h1:+MET7wv8z6yycUt6NRDQzrd+h/j91tumImDg29w7eTw=
+github.com/rancher/shepherd v0.0.0-20240305180225-5ba571c8a3cf h1:K0SJ5FhFY93rS8Jiy4rFceY7IV5GBsyU1fzYdN0C6b0=
+github.com/rancher/shepherd v0.0.0-20240305180225-5ba571c8a3cf/go.mod h1:PVGWt4qZBe+UND1lqsgYCwnjwB/gsGO9umk1KAdtnJU=
+github.com/rancher/steve v0.0.0-20240301154841-7913f2782a62 h1:BvrW0Tkp1obDP5K1OgvCI+WWmI8m+Zg1X4uCPoxHx90=
+github.com/rancher/steve v0.0.0-20240301154841-7913f2782a62/go.mod h1:+MET7wv8z6yycUt6NRDQzrd+h/j91tumImDg29w7eTw=
 github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007 h1:ru+mqGnxMmKeU0Q3XIDxkARvInDIqT1hH2amTcsjxI4=
 github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007/go.mod h1:Ja346o44aTPWADc/5Jm93+KgctT6KtftuOosgz0F2AM=
 github.com/rancher/wrangler v0.6.1/go.mod h1:L4HtjPeX8iqLgsxfJgz+JjKMcX2q3qbRXSeTlC/CSd4=

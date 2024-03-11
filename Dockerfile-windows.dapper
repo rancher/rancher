@@ -1,4 +1,4 @@
-FROM library/golang:1.21
+FROM library/golang:1.22
 SHELL ["powershell", "-NoLogo", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
 
 ARG DAPPER_HOST_ARCH
@@ -14,7 +14,7 @@ RUN pushd c:\; \
     popd;
 
 RUN pushd c:\; \
-    $URL = 'https://github.com/golangci/golangci-lint/releases/download/v1.54.0/golangci-lint-1.54.0-windows-amd64.zip'; \
+    $URL = 'https://github.com/golangci/golangci-lint/releases/download/v1.56.0/golangci-lint-1.56.0-windows-amd64.zip'; \
     \
     Write-Host ('Downloading golangci from {0} ...' -f $URL); \
     curl.exe -sfL $URL -o c:\golangci-lint.zip; \
@@ -26,7 +26,7 @@ RUN pushd c:\; \
     Remove-Item -Force -Recurse -Path c:\golangci-lint.zip; \
     \
     Write-Host 'Updating PATH ...'; \
-    [Environment]::SetEnvironmentVariable('PATH', ('c:\golangci-lint-1.54.0-windows-amd64\;{0}' -f $env:PATH), [EnvironmentVariableTarget]::Machine); \
+    [Environment]::SetEnvironmentVariable('PATH', ('c:\golangci-lint-1.56.0-windows-amd64\;{0}' -f $env:PATH), [EnvironmentVariableTarget]::Machine); \
     \
     Write-Host 'Complete.'; \
     popd;

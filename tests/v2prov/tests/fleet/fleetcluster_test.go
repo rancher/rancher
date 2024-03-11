@@ -74,7 +74,7 @@ var (
 	}
 )
 
-func TestFleetCluster(t *testing.T) {
+func Test_Fleet_Cluster(t *testing.T) {
 	require := require.New(t)
 	clients, err := clients.New()
 	if err != nil {

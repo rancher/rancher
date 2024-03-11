@@ -1,6 +1,6 @@
 module github.com/rancher/rancher
 
-go 1.21
+go 1.22
 
 replace (
 	github.com/AzureAD/microsoft-authentication-library-for-go => github.com/AzureAD/microsoft-authentication-library-for-go v0.5.1 // for compatibility with rancher codebase
@@ -59,7 +59,7 @@ require (
 	github.com/antihax/optional v1.0.0
 	github.com/containers/image/v5 v5.26.0
 	github.com/rancher/rancher/pkg/apis v0.0.0-20240126142034-676c3eb3dfa5
-	github.com/rancher/shepherd v0.0.0-20240226222553-f4062285e094
+	github.com/rancher/shepherd v0.0.0-20240305180225-5ba571c8a3cf
 	go.qase.io/client v0.0.0-20231114201952-65195ec001fa
 )
 
@@ -126,7 +126,7 @@ require (
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/remotedialer v0.3.0
 	github.com/rancher/rke v1.5.3
-	github.com/rancher/steve v0.0.0-20240228161051-641178e7cbc7
+	github.com/rancher/steve v0.0.0-20240301154841-7913f2782a62
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007
 	github.com/rancher/wrangler/v2 v2.1.3
 	github.com/robfig/cron v1.1.0
@@ -315,7 +315,7 @@ require (
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/go-retryablehttp v0.7.4 // indirect
 	github.com/hashicorp/go-uuid v1.0.2 // indirect
-	github.com/hashicorp/go-version v1.3.0 // indirect
+	github.com/hashicorp/go-version v1.6.0 // indirect
 	github.com/huandu/xstrings v1.4.0 // indirect
 	github.com/imdario/mergo v0.3.16 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect

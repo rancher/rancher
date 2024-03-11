@@ -85,11 +85,11 @@ func (m *Manager) deleteTemplates(key string, namespace string) error {
 func getCatalogType(cmt *CatalogInfo) string {
 	if cmt.projectCatalog == nil && cmt.clusterCatalog == nil {
 		return client.CatalogType
-	} else if cmt.projectCatalog != nil {
-		return client.ProjectCatalogType
-	} else {
-		return client.ClusterCatalogType
 	}
+	if cmt.projectCatalog != nil {
+		return client.ProjectCatalogType
+	}
+	return client.ClusterCatalogType
 }
 
 func (m *Manager) updateCatalogInfo(cmt *CatalogInfo, catalogType string, templateName string, condition bool, updateOnly bool) (*CatalogInfo, error) {
