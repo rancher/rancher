@@ -461,6 +461,7 @@ steps:
     - sha256
     files:
     - "bin/rancher-*"
+    prerelease: true
   when:
     event:
     - tag
