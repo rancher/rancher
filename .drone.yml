@@ -461,7 +461,6 @@ steps:
     - sha256
     files:
     - "bin/rancher-*"
-    prerelease: true
   when:
     event:
     - tag
@@ -1129,6 +1128,7 @@ steps:
     secret_key:
       from_secret: optimus_charts_secret_key
     source: bin/chart/**/*
+    strip_prefix: bin/chart/
     target: /server-charts
   when:
     event:
