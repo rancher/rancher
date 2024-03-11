@@ -31,7 +31,7 @@ else
 fi
 
 if [ -z "${V2PROV_TEST_RUN_REGEX}" ]; then
-  V2PROV_TEST_RUN_REGEX="^Test_(General|Provisioning)_.*$"
+  V2PROV_TEST_RUN_REGEX="^Test_(General|Provisioning|Fleet)_.*$"
 fi
 
 RUNARG="-run ${V2PROV_TEST_RUN_REGEX}"
