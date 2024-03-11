@@ -435,7 +435,7 @@ steps:
 - name: artifacts-upload
   image: plugins/s3
   settings:
-    bucket: 
+    bucket: prime-artifacts
     access_key:
       from_secret: prime_artifacts_access_key
     secret_key:
