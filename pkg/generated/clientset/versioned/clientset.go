@@ -39,8 +39,7 @@ type Interface interface {
 	UpgradeV1() upgradev1.UpgradeV1Interface
 }
 
-// Clientset contains the clients for groups. Each group has exactly one
-// version included in a Clientset.
+// Clientset contains the clients for groups.
 type Clientset struct {
 	*discovery.DiscoveryClient
 	catalogV1      *catalogv1.CatalogV1Client

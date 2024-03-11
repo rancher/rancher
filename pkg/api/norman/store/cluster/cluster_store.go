@@ -1368,11 +1368,14 @@ func setInstanceMetadataHostname(data map[string]interface{}) {
 	rkeConfig, ok := values.GetValue(data, "rancherKubernetesEngineConfig")
 	if ok && rkeConfig != nil {
 		cloudProviderName := convert.ToString(values.GetValueN(data, "rancherKubernetesEngineConfig", "cloudProvider", "name"))
-		if cloudProviderName == k8s.AWSCloudProvider {
-			_, ok := values.GetValue(data, "rancherKubernetesEngineConfig", "cloudProvider", "useInstanceMetadataHostname")
-			if !ok {
-				// set default false for aws cloud provider
+		_, ok := values.GetValue(data, "rancherKubernetesEngineConfig", "cloudProvider", "useInstanceMetadataHostname")
+		if !ok {
+			if cloudProviderName == k8s.AWSCloudProvider {
+				// set default false for in-tree aws cloud provider
 				values.PutValue(data, false, "rancherKubernetesEngineConfig", "cloudProvider", "useInstanceMetadataHostname")
+			} else if cloudProviderName == k8s.ExternalAWSCloudProviderName {
+				// set default true for external-aws cloud provider
+				values.PutValue(data, true, "rancherKubernetesEngineConfig", "cloudProvider", "useInstanceMetadataHostname")
 			}
 		}
 	}

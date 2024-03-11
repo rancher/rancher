@@ -15,6 +15,7 @@ import (
 	v1apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes/fake"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
@@ -192,23 +193,29 @@ func getDeploymentCacheMock(ctrl *gomock.Controller) *ctrlfake.MockCacheInterfac
 	return mockDeploymentCache
 }
 
-func getSecretCacheMock(ctrl *gomock.Controller, namespace, secretName string) *ctrlfake.MockCacheInterface[*v1.Secret] {
+func getSecretCacheMock(ctrl *gomock.Controller, namespace, saName string) *ctrlfake.MockCacheInterface[*v1.Secret] {
 	mockSecretCache := ctrlfake.NewMockCacheInterface[*v1.Secret](ctrl)
-	mockSecretCache.EXPECT().Get(namespace, secretName).DoAndReturn(func(namespace, name string) (*v1.Secret, error) {
-		return &v1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: namespace,
-				Name:      name,
-				Annotations: map[string]string{
-					"kubernetes.io/service-account.name": secretName,
+	selector := labels.Set{"cattle.io/service-account.name": saName}.AsSelector()
+	mockSecretCache.EXPECT().List(namespace, selector).DoAndReturn(func(namespace string, selector labels.Selector) ([]*v1.Secret, error) {
+		return []*v1.Secret{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: namespace,
+					Name:      saName + "-secret",
+					Annotations: map[string]string{
+						"kubernetes.io/service-account.name": saName,
+					},
+					Labels: map[string]string{
+						"cattle.io/service-account.name": saName,
+					},
 				},
+				Immutable: nil,
+				Data: map[string][]byte{
+					"token": []byte("thisismytokenandiwillprotectit"),
+				},
+				StringData: nil,
+				Type:       "kubernetes.io/service-account-token",
 			},
-			Immutable: nil,
-			Data: map[string][]byte{
-				"token": []byte("thisismytokenandiwillprotectit"),
-			},
-			StringData: nil,
-			Type:       "kubernetes.io/service-account-token",
 		}, nil
 	}).AnyTimes()
 	return mockSecretCache

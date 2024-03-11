@@ -7,7 +7,6 @@ import (
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1/fakes"
-	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/stretchr/testify/assert"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
@@ -103,17 +102,13 @@ func TestCreate(t *testing.T) {
 							}, name)
 						},
 					},
-					workload: &config.UserContext{
-						RBAC: &fakeRBAC{
-							clusterRoleFake: fakes.ClusterRoleInterfaceMock{
-								CreateFunc: func(in *rbacv1.ClusterRole) (*rbacv1.ClusterRole, error) {
-									newCRs = append(newCRs, in)
-									if test.createErr != nil {
-										return nil, test.createErr
-									}
-									return in, nil
-								},
-							},
+					clusterRoles: &fakes.ClusterRoleInterfaceMock{
+						CreateFunc: func(in *rbacv1.ClusterRole) (*rbacv1.ClusterRole, error) {
+							newCRs = append(newCRs, in)
+							if test.createErr != nil {
+								return nil, test.createErr
+							}
+							return in, nil
 						},
 					},
 				},
@@ -288,25 +283,19 @@ func TestUpdated(t *testing.T) {
 						},
 					},
 					clusterRoles: &fakes.ClusterRoleInterfaceMock{
+						CreateFunc: func(in *rbacv1.ClusterRole) (*rbacv1.ClusterRole, error) {
+							newCRs = append(newCRs, in)
+							if test.createError != nil {
+								return nil, test.createError
+							}
+							return in, nil
+						},
 						UpdateFunc: func(in *rbacv1.ClusterRole) (*rbacv1.ClusterRole, error) {
 							newCRs = append(newCRs, in)
 							if test.updError != nil {
 								return nil, test.updError
 							}
 							return in, nil
-						},
-					},
-					workload: &config.UserContext{
-						RBAC: &fakeRBAC{
-							clusterRoleFake: fakes.ClusterRoleInterfaceMock{
-								CreateFunc: func(in *rbacv1.ClusterRole) (*rbacv1.ClusterRole, error) {
-									newCRs = append(newCRs, in)
-									if test.createError != nil {
-										return nil, test.createError
-									}
-									return in, nil
-								},
-							},
 						},
 					},
 				},

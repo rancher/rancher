@@ -156,7 +156,7 @@ trigger:
       - promote
 ---
 kind: pipeline
-name: provisioning-operations-test-setA-rke2
+name: provisioning-operations-tests-rke2
 
 platform:
   os: linux
@@ -164,60 +164,7 @@ platform:
 
 environment:
   V2PROV_TEST_DIST: "rke2"
-  V2PROV_TEST_RUN_REGEX: "^Test_Operation_SetA_.*$"
-
-steps:
-  - name: provisioning-operations-tests-pr
-    image: rancher/dapper:v0.6.0
-    commands:
-      - dapper provisioning-tests
-    privileged: true
-    volumes:
-      - name: docker
-        path: /var/run/docker.sock
-    when:
-      event:
-        - pull_request
-  - name: provisioning-operations-tests-push
-    image: rancher/dapper:v0.6.0
-    failure: ignore
-    commands:
-      - dapper provisioning-tests
-    privileged: true
-    volumes:
-      - name: docker
-        path: /var/run/docker.sock
-    when:
-      instance:
-        - drone-publish.rancher.io
-      ref:
-        include:
-          - "refs/heads/master"
-          - "refs/heads/release/v*"
-          - "refs/tags/v*"
-      event:
-        - push
-
-volumes:
-  - name: docker
-    host:
-      path: /var/run/docker.sock
-
-trigger:
-  event:
-    exclude:
-      - promote
----
-kind: pipeline
-name: provisioning-operations-test-setB-rke2
-
-platform:
-  os: linux
-  arch: amd64
-
-environment:
-  V2PROV_TEST_DIST: "rke2"
-  V2PROV_TEST_RUN_REGEX: "^Test_Operation_SetB_.*$"
+  V2PROV_TEST_RUN_REGEX: "^Test_Operation_.*$"
 
 steps:
   - name: provisioning-operations-tests-pr
@@ -351,10 +298,11 @@ steps:
     dockerfile: package/Dockerfile
     tag: ${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-linux-amd64
     password:
-      from_secret: docker_password
-    repo: rancher/rancher
+      from_secret: stage_registry_password
+    repo: stgregistry.suse.com/rancher/rancher
+    registry: stgregistry.suse.com
     username:
-      from_secret: docker_username
+      from_secret: stage_registry_username
   when:
     ref:
       include:
@@ -371,15 +319,17 @@ steps:
     - ARCH=amd64
     - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-head
     - RANCHER_TAG=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-linux-amd64
+    - RANCHER_REPO=stgregistry.suse.com/rancher
     context: package/
     custom_dns: 1.1.1.1
     dockerfile: package/Dockerfile.installer
     tag: ${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-linux-amd64
     password:
-      from_secret: docker_password
-    repo: rancher/system-agent-installer-rancher
+      from_secret: stage_registry_password
+    repo: stgregistry.suse.com/rancher/system-agent-installer-rancher
+    registry: stgregistry.suse.com
     username:
-      from_secret: docker_username
+      from_secret: stage_registry_username
   when:
     ref:
       include:
@@ -396,15 +346,17 @@ steps:
     - ARCH=amd64
     - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-head
     - RANCHER_TAG=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-linux-amd64
+    - RANCHER_REPO=stgregistry.suse.com/rancher
     context: package/
     custom_dns: 1.1.1.1
     dockerfile: package/Dockerfile.agent
     tag: ${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-linux-amd64
     password:
-      from_secret: docker_password
-    repo: rancher/rancher-agent
+      from_secret: stage_registry_password
+    repo: stgregistry.suse.com/rancher/rancher-agent
+    registry: stgregistry.suse.com
     username:
-      from_secret: docker_username
+      from_secret: stage_registry_username
   when:
     ref:
       include:
@@ -424,11 +376,12 @@ steps:
     custom_dns: 1.1.1.1
     dockerfile: package/Dockerfile
     password:
-      from_secret: docker_password
-    repo: rancher/rancher
+      from_secret: stage_registry_password
+    repo: stgregistry.suse.com/rancher/rancher
+    registry: stgregistry.suse.com
     tag: "${DRONE_TAG}-linux-amd64"
     username:
-      from_secret: docker_username
+      from_secret: stage_registry_username
   when:
     event:
     - tag
@@ -441,15 +394,17 @@ steps:
     - ARCH=amd64
     - "VERSION=${DRONE_TAG}"
     - "RANCHER_TAG=${DRONE_TAG}-linux-amd64"
+    - RANCHER_REPO=stgregistry.suse.com/rancher
     context: package/
     custom_dns: 1.1.1.1
     dockerfile: package/Dockerfile.installer
     password:
-      from_secret: docker_password
-    repo: rancher/system-agent-installer-rancher
+      from_secret: stage_registry_password
+    repo: stgregistry.suse.com/rancher/system-agent-installer-rancher
+    registry: stgregistry.suse.com
     tag: "${DRONE_TAG}-linux-amd64"
     username:
-      from_secret: docker_username
+      from_secret: stage_registry_username
   when:
     event:
     - tag
@@ -462,15 +417,17 @@ steps:
     - ARCH=amd64
     - "VERSION=${DRONE_TAG}"
     - "RANCHER_TAG=${DRONE_TAG}-linux-amd64"
+    - RANCHER_REPO=stgregistry.suse.com/rancher
     context: package/
     custom_dns: 1.1.1.1
     dockerfile: package/Dockerfile.agent
     password:
-      from_secret: docker_password
-    repo: rancher/rancher-agent
+      from_secret: stage_registry_password
+    repo: stgregistry.suse.com/rancher/rancher-agent
+    registry: stgregistry.suse.com
     tag: "${DRONE_TAG}-linux-amd64"
     username:
-      from_secret: docker_username
+      from_secret: stage_registry_username
   when:
     event:
     - tag
@@ -609,10 +566,11 @@ steps:
     dockerfile: package/Dockerfile
     tag: ${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-linux-arm64
     password:
-      from_secret: docker_password
-    repo: rancher/rancher
+      from_secret: stage_registry_password
+    repo: stgregistry.suse.com/rancher/rancher
+    registry: stgregistry.suse.com
     username:
-      from_secret: docker_username
+      from_secret: stage_registry_username
   when:
     ref:
       include:
@@ -629,15 +587,17 @@ steps:
     - ARCH=arm64
     - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-head
     - RANCHER_TAG=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-linux-arm64
+    - RANCHER_REPO=stgregistry.suse.com/rancher
     context: package/
     custom_dns: 1.1.1.1
     dockerfile: package/Dockerfile.installer
     tag: ${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-linux-arm64
     password:
-      from_secret: docker_password
-    repo: rancher/system-agent-installer-rancher
+      from_secret: stage_registry_password
+    repo: stgregistry.suse.com/rancher/system-agent-installer-rancher
+    registry: stgregistry.suse.com
     username:
-      from_secret: docker_username
+      from_secret: stage_registry_username
   when:
     ref:
       include:
@@ -654,15 +614,17 @@ steps:
     - ARCH=arm64
     - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-head
     - RANCHER_TAG=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-linux-arm64
+    - RANCHER_REPO=stgregistry.suse.com/rancher
     context: package/
     custom_dns: 1.1.1.1
     dockerfile: package/Dockerfile.agent
     tag: ${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-linux-arm64
     password:
-      from_secret: docker_password
-    repo: rancher/rancher-agent
+      from_secret: stage_registry_password
+    repo: stgregistry.suse.com/rancher/rancher-agent
+    registry: stgregistry.suse.com
     username:
-      from_secret: docker_username
+      from_secret: stage_registry_username
   when:
     ref:
       include:
@@ -682,11 +644,12 @@ steps:
     custom_dns: 1.1.1.1
     dockerfile: package/Dockerfile
     password:
-      from_secret: docker_password
-    repo: rancher/rancher
+      from_secret: stage_registry_password
+    repo: stgregistry.suse.com/rancher/rancher
+    registry: stgregistry.suse.com
     tag: "${DRONE_TAG}-linux-arm64"
     username:
-      from_secret: docker_username
+      from_secret: stage_registry_username
   when:
     event:
     - tag
@@ -699,36 +662,42 @@ steps:
     - ARCH=arm64
     - "VERSION=${DRONE_TAG}"
     - "RANCHER_TAG=${DRONE_TAG}-linux-arm64"
+    - RANCHER_REPO=stgregistry.suse.com/rancher
     context: package/
     custom_dns: 1.1.1.1
     dockerfile: package/Dockerfile.installer
     password:
-      from_secret: docker_password
-    repo: rancher/system-agent-installer-rancher
+      from_secret: stage_registry_password
+    repo: stgregistry.suse.com/rancher/system-agent-installer-rancher
+    registry: stgregistry.suse.com
     tag: "${DRONE_TAG}-linux-arm64"
     username:
-      from_secret: docker_username
+      from_secret: stage_registry_username
   when:
     event:
     - tag
 
 - name: docker-publish-agent
   image: plugins/docker
+  environment:
+    DOCKER_REGISTRY: stgregistry.suse.com
   settings:
     purge: false
     build_args:
     - ARCH=arm64
     - "VERSION=${DRONE_TAG}"
     - "RANCHER_TAG=${DRONE_TAG}-linux-arm64"
+    - RANCHER_REPO=stgregistry.suse.com/rancher
     context: package/
     custom_dns: 1.1.1.1
     dockerfile: package/Dockerfile.agent
     password:
-      from_secret: docker_password
-    repo: rancher/rancher-agent
+      from_secret: stage_registry_password
+    repo: stgregistry.suse.com/rancher/rancher-agent
+    registry: stgregistry.suse.com
     tag: "${DRONE_TAG}-linux-arm64"
     username:
-      from_secret: docker_username
+      from_secret: stage_registry_username
   when:
     event:
     - tag
@@ -817,11 +786,12 @@ steps:
       custom_dns: 1.1.1.1
       dockerfile: package/windows/Dockerfile.agent
       password:
-        from_secret: docker_password
-      repo: rancher/rancher-agent
+        from_secret: stage_registry_password
+      repo: stgregistry.suse.com/rancher/rancher-agent
+      registry: stgregistry.suse.com
       tag: ${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-windows-1809
       username:
-        from_secret: docker_username
+        from_secret: stage_registry_username
     volumes:
       - name: docker_pipe
         path: \\\\.\\pipe\\docker_engine
@@ -845,11 +815,12 @@ steps:
       custom_dns: 1.1.1.1
       dockerfile: package/windows/Dockerfile.agent
       password:
-        from_secret: docker_password
-      repo: rancher/rancher-agent
+        from_secret: stage_registry_password
+      repo: stgregistry.suse.com/rancher/rancher-agent
+      registry: stgregistry.suse.com
       tag: "${DRONE_TAG}-windows-1809"
       username:
-        from_secret: docker_username
+        from_secret: stage_registry_username
     volumes:
       - name: docker_pipe
         path: \\\\.\\pipe\\docker_engine
@@ -931,7 +902,7 @@ steps:
         - tag
 
   - name: docker-publish-head-agent
-    image: rancher/drone-images:docker-amd64-ltsc2022
+    image: plugins/docker:windows-ltsc2022-amd64
     settings:
       purge: false
       build_args:
@@ -942,11 +913,12 @@ steps:
       custom_dns: 1.1.1.1
       dockerfile: package/windows/Dockerfile.agent
       password:
-        from_secret: docker_password
-      repo: rancher/rancher-agent
+        from_secret: stage_registry_password
+      repo: stgregistry.suse.com/rancher/rancher-agent
+      registry: stgregistry.suse.com
       tag: ${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-windows-ltsc2022
       username:
-        from_secret: docker_username
+        from_secret: stage_registry_username
     volumes:
       - name: docker_pipe
         path: \\\\.\\pipe\\docker_engine
@@ -959,7 +931,7 @@ steps:
         - push
 
   - name: docker-publish-agent
-    image: rancher/drone-images:docker-amd64-ltsc2022
+    image: plugins/docker:windows-ltsc2022-amd64
     settings:
       purge: false
       build_args:
@@ -970,11 +942,12 @@ steps:
       custom_dns: 1.1.1.1
       dockerfile: package/windows/Dockerfile.agent
       password:
-        from_secret: docker_password
-      repo: rancher/rancher-agent
+        from_secret: stage_registry_password
+      repo: stgregistry.suse.com/rancher/rancher-agent
+      registry: stgregistry.suse.com
       tag: "${DRONE_TAG}-windows-ltsc2022"
       username:
-        from_secret: docker_username
+        from_secret: stage_registry_username
     volumes:
       - name: docker_pipe
         path: \\\\.\\pipe\\docker_engine
@@ -1001,9 +974,9 @@ steps:
   image: plugins/manifest
   settings:
     username:
-      from_secret: docker_username
+      from_secret: stage_registry_username
     password:
-      from_secret: docker_password
+      from_secret: stage_registry_password
     spec: manifest-installer.tmpl
     ignore_missing: true
   when:
@@ -1023,9 +996,9 @@ steps:
   image: plugins/manifest
   settings:
     username:
-      from_secret: docker_username
+      from_secret: stage_registry_username
     password:
-      from_secret: docker_password
+      from_secret: stage_registry_password
     spec: manifest-installer-head.tmpl
     ignore_missing: true
   when:
@@ -1044,9 +1017,9 @@ steps:
   image: plugins/manifest
   settings:
     username:
-      from_secret: docker_username
+      from_secret: stage_registry_username
     password:
-      from_secret: docker_password
+      from_secret: stage_registry_password
     spec: manifest-agent.tmpl
     ignore_missing: true
   when:
@@ -1066,9 +1039,9 @@ steps:
   image: plugins/manifest
   settings:
     username:
-      from_secret: docker_username
+      from_secret: stage_registry_username
     password:
-      from_secret: docker_password
+      from_secret: stage_registry_password
     spec: manifest-agent-head.tmpl
     ignore_missing: true
   when:
@@ -1087,9 +1060,9 @@ steps:
   image: plugins/manifest
   settings:
     username:
-      from_secret: docker_username
+      from_secret: stage_registry_username
     password:
-      from_secret: docker_password
+      from_secret: stage_registry_password
     spec: manifest-head.tmpl
     ignore_missing: true
   when:
@@ -1108,9 +1081,9 @@ steps:
   image: plugins/manifest
   settings:
     username:
-      from_secret: docker_username
+      from_secret: stage_registry_username
     password:
-      from_secret: docker_password
+      from_secret: stage_registry_password
     spec: manifest.tmpl
     ignore_missing: true
   when:
@@ -1147,15 +1120,15 @@ steps:
     - tag
 
 - name: chart-publish
-  image: plugins/gcs
+  image: plugins/s3
   settings:
-    acl:
-    - allUsers:READER
-    cache_control: "public,no-cache,proxy-revalidate"
-    source: bin/chart
-    target: releases.rancher.com/server-charts
-    token:
-      from_secret: google_auth_key
+    bucket: charts.optimus.rancher.io
+    access_key:
+      from_secret: optimus_charts_access_key
+    secret_key:
+      from_secret: optimus_charts_secret_key
+    source: bin/chart/**/*
+    target: /server-charts
   when:
     event:
     - tag
@@ -1249,7 +1222,7 @@ steps:
     PLUGIN_GITHUB_TAG: "${DRONE_TAG}"
     PLUGIN_INPUT_FILE: "rancher-windows-images.txt"
     PLUGIN_OUTPUT_FILE: "rancher-images-digests-windows-1809.txt"
-    PLUGIN_REGISTRY: "docker.io"
+    PLUGIN_REGISTRY: "stgregistry.suse.com"
   volumes:
     - name: docker_pipe
       path: \\\\.\\pipe\\docker_engine
@@ -1299,7 +1272,7 @@ steps:
     PLUGIN_GITHUB_TAG: "${DRONE_TAG}"
     PLUGIN_INPUT_FILE: "rancher-windows-images.txt"
     PLUGIN_OUTPUT_FILE: "rancher-images-digests-windows-ltsc2022.txt"
-    PLUGIN_REGISTRY: "docker.io"
+    PLUGIN_REGISTRY: "stgregistry.suse.com"
   volumes:
     - name: docker_pipe
       path: \\\\.\\pipe\\docker_engine
@@ -1324,87 +1297,3 @@ trigger:
 depends_on:
 - default-linux-amd64
 - default-windows-ltsc2022
----
-kind: pipeline
-name: publish
-
-platform:
-  os: linux
-  arch: amd64
-
-steps:
-- name: chart-promote
-  image: rancher/dapper:v0.6.0
-  commands:
-  - dapper chart/copy
-  volumes:
-  - name: docker
-    path: /var/run/docker.sock
-  when:
-    event:
-    - promote
-    target:
-    - promote-stable
-
-- name: chart-publish
-  image: plugins/gcs
-  settings:
-    acl:
-    - allUsers:READER
-    cache_control: "public,no-cache,proxy-revalidate"
-    source: bin/chart
-    target: releases.rancher.com/server-charts
-    token:
-      from_secret: google_auth_key
-  when:
-    event:
-    - promote
-    target:
-    - promote-stable
-
-volumes:
-- name: docker
-  host:
-    path: /var/run/docker.sock
-
-trigger:
-  event:
-  - promote
----
-kind: pipeline
-name: promote-docker-image
-
-platform:
-  os: linux
-  arch: amd64
-
-steps:
-- name: docker-image-promote
-  image: quay.io/skopeo/stable:v1.1.1
-  commands:
-  - echo $${DOCKER_PASSWORD} | skopeo login docker.io --username $${DOCKER_USERNAME} --password-stdin
-  - skopeo copy docker://rancher/rancher:$${SOURCE_TAG} docker://rancher/rancher:$${DESTINATION_TAG} --all
-  settings:
-    custom_dns: 1.1.1.1
-  volumes:
-  - name: docker
-    path: /var/run/docker.sock
-  environment:
-    DOCKER_PASSWORD:
-      from_secret: docker_password
-    DOCKER_USERNAME:
-      from_secret: docker_username
-  when:
-    event:
-    - promote
-    target:
-    - promote-docker-image
-
-volumes:
-- name: docker
-  host:
-    path: /var/run/docker.sock
-
-trigger:
-  event:
-  - promote

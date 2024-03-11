@@ -1,12 +1,12 @@
-FROM registry.suse.com/bci/golang:1.19
+FROM registry.suse.com/bci/golang:1.20
 
 ARG DAPPER_HOST_ARCH
 ENV HOST_ARCH=${DAPPER_HOST_ARCH} ARCH=${DAPPER_HOST_ARCH}
 ENV CATTLE_HELM_VERSION v2.16.8-rancher2
 ENV CATTLE_MACHINE_VERSION v0.15.0-rancher109
-ENV CATTLE_K3S_VERSION v1.26.4+k3s1
+ENV CATTLE_K3S_VERSION v1.27.5+k3s1
 # helm 3 version
-ENV HELM_VERSION v3.11.3
+ENV HELM_VERSION v3.12.3
 ENV KUSTOMIZE_VERSION v5.0.1
 ENV HELM_UNITTEST_VERSION 0.3.2
 # k3d ci version
@@ -25,7 +25,7 @@ RUN if [ "${ARCH}" != "s390x" ]; then \
     fi
 
 RUN if [ "${ARCH}" == "amd64" ]; then \
-        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.49.0; \
+        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.52.0; \
         curl -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/fossas/spectrometer/master/install.sh | sh; \
     fi
 
@@ -60,13 +60,15 @@ RUN mkdir /usr/tmp && \
     chmod +x /usr/bin/kustomize
 
 # Set up K3s: copy the necessary binaries from the K3s image.
-COPY --from=rancher/k3s:v1.26.4-k3s1 \
+COPY --from=rancher/k3s:v1.27.5-k3s1 \
     /bin/blkid \
+    /bin/bandwidth \
     /bin/cni \
     /bin/conntrack \
     /bin/containerd \
     /bin/containerd-shim-runc-v2 \
     /bin/ethtool \
+    /bin/firewall \
     /bin/ip \
     /bin/ipset \
     /bin/k3s \

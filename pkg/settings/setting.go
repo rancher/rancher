@@ -109,7 +109,7 @@ var (
 	WhitelistDomain                     = NewSetting("whitelist-domain", "forums.rancher.com")
 	WhitelistEnvironmentVars            = NewSetting("whitelist-envvars", "HTTP_PROXY,HTTPS_PROXY,NO_PROXY")
 	AuthUserInfoResyncCron              = NewSetting("auth-user-info-resync-cron", "0 0 * * *")
-	APIUIVersion                        = NewSetting("api-ui-version", "1.1.10")              // Please update the CATTLE_API_UI_VERSION in package/Dockerfile when updating the version here.
+	APIUIVersion                        = NewSetting("api-ui-version", "1.1.11")              // Please update the CATTLE_API_UI_VERSION in package/Dockerfile when updating the version here.
 	RotateCertsIfExpiringInDays         = NewSetting("rotate-certs-if-expiring-in-days", "7") // 7 days
 	ClusterTemplateEnforcement          = NewSetting("cluster-template-enforcement", "false")
 	InitialDockerRootDir                = NewSetting("initial-docker-root-dir", "/var/lib/docker")
@@ -118,7 +118,7 @@ var (
 	PartnerChartDefaultBranch           = NewSetting("partner-chart-default-branch", "main")
 	RKE2ChartDefaultBranch              = NewSetting("rke2-chart-default-branch", "main")
 	FleetDefaultWorkspaceName           = NewSetting("fleet-default-workspace-name", fleetconst.ClustersDefaultNamespace) // fleetWorkspaceName to assign to clusters with none
-	ShellImage                          = NewSetting("shell-image", "rancher/shell:v0.1.21")
+	ShellImage                          = NewSetting("shell-image", "rancher/shell:v0.1.22")
 	IgnoreNodeName                      = NewSetting("ignore-node-name", "") // nodes to ignore when syncing v1.node to v3.node
 	NoDefaultAdmin                      = NewSetting("no-default-admin", "")
 	RestrictedDefaultAdmin              = NewSetting("restricted-default-admin", "false") // When bootstrapping the admin for the first time, give them the global role restricted-admin

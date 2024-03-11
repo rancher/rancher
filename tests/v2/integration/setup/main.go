@@ -33,6 +33,7 @@ import (
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	kwait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
 )
 
@@ -56,13 +57,21 @@ func main() {
 	}
 
 	hostURL := fmt.Sprintf("%s:8443", ipAddress.String())
-	userToken, err := token.GenerateUserToken(
-		&management.User{
+
+	var userToken *management.Token
+
+	err = kwait.Poll(500*time.Millisecond, 5*time.Minute, func() (done bool, err error) {
+		userToken, err = token.GenerateUserToken(&management.User{
 			Username: "admin",
 			Password: "admin",
-		},
-		hostURL,
-	)
+		}, hostURL)
+		if err != nil {
+			return false, nil
+		}
+
+		return true, nil
+	})
+
 	if err != nil {
 		logrus.Fatalf("Error with generating admin token: %v", err)
 	}
