@@ -437,9 +437,9 @@ steps:
   settings:
     bucket: prime-artifacts
     access_key:
-      from_secret: prime_artifacts_access_key
+      from_secret: prime_artifacts_uploader-access_key
     secret_key:
-      from_secret: prime_artifacts_secret_key
+      from_secret: prime_artifacts_uploader-secret_key
     source: bin/rancher-*
     strip_prefix: bin/
     target: "/rancher/${DRONE_TAG}"
