@@ -8,6 +8,9 @@ replace github.com/rancher/remotedialer => github.com/moio/remotedialer v0.2.6-d
 
 replace github.com/rancher/steve => github.com/rancher/steve v0.0.0-20231222173734-898644971b85
 
+// https://github.com/aruiz14/wrangler/tree/v1.1.1-debug-41809
+replace github.com/rancher/wrangler v1.1.1 => github.com/aruiz14/wrangler v1.1.1-debug-41809-1
+
 replace (
 	github.com/docker/distribution => github.com/docker/distribution v2.7.1+incompatible // oras dep requires a replace is set
 	github.com/docker/docker => github.com/docker/docker v20.10.18+incompatible // oras dep requires a replace is set
