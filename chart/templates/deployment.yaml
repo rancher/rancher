@@ -64,7 +64,7 @@ spec:
             nodeSelectorTerms: {{ include "linux-node-selector-terms" . | nindent 14 }}
       tolerations: {{ include "linux-node-tolerations" . | nindent 8 }}
       containers:
-      - image: {{ .Values.rancherImage }}:{{ default .Chart.AppVersion .Values.rancherImageTag }}
+      - image: {{ .Values.rancherImage }}{{- if .Values.rancherImageDigest }}@{{ .Values.rancherImageDigest }}{{- else }}:{{ default .Chart.AppVersion .Values.rancherImageTag }}{{- end }}
         imagePullPolicy: {{ default "IfNotPresent" .Values.rancherImagePullPolicy }}
         name: {{ template "rancher.name" . }}
         ports:
@@ -202,7 +202,7 @@ spec:
       {{- if .Values.busyboxImage }}
       - image: {{ .Values.busyboxImage}}
       {{- else }}
-      - image: {{ .Values.auditLog.image.repository }}:{{.Values.auditLog.image.tag}}
+      - image: {{ .Values.auditLog.image.repository }}{{- if .Values.auditLog.image.digest }}@{{ .Values.auditLog.image.digest }}{{- else }}:{{ .Values.auditLog.image.tag }}{{- end }}
       {{- end }}
       {{- if .Values.busyboxImagePullPolicy }}
         imagePullPolicy: {{ .Values.busyboxImagePullPolicy }}

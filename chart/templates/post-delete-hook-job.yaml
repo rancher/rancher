@@ -20,7 +20,7 @@ spec:
       restartPolicy: OnFailure
       containers:
         - name: {{ template "rancher.name" . }}-post-delete
-          image: "{{ include "system_default_registry" . }}{{ .Values.postDelete.image.repository }}:{{ .Values.postDelete.image.tag }}"
+          image: "{{ include "system_default_registry" . }}{{ .Values.postDelete.image.repository }}{{- if .Values.postDelete.image.digest }}@{{ .Values.postDelete.image.digest }}{{- else }}:{{ .Values.postDelete.image.tag }}{{- end }}"
           imagePullPolicy: IfNotPresent
           securityContext:
             runAsUser: 0
