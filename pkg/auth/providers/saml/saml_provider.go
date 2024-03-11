@@ -366,7 +366,7 @@ func (s *Provider) combineSamlAndLdapConfig(config *v32.SamlConfig) (runtime.Obj
 	if err != nil {
 		logrus.Warnf("error pulling %s ldap configs: %s\n", s.name, err)
 
-		// if the the config subkey not in the crd
+		// if the config subkey not in the crd
 		if ldapConfig == nil {
 			return config, nil
 		}

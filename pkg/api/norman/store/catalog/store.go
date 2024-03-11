@@ -277,7 +277,7 @@ func (s *Store) isRestrictedAdmin(apiContext *types.APIContext) (bool, error) {
 	return ma.IsRestrictedAdmin(callerID)
 }
 
-// isSystemCatalog checks whether the catalog is the the system catalog maintained by rancher
+// isSystemCatalog checks whether the catalog is the system catalog maintained by rancher
 func (s *Store) isSystemCatalog(apiContext *types.APIContext, schema *types.Schema, id string) (bool, error) {
 	catalog, err := s.ByID(apiContext, schema, id)
 	if err != nil {
