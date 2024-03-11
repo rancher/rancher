@@ -2,8 +2,10 @@ module github.com/rancher/rancher
 
 go 1.20
 
-// on release remove this wrangler replace and use the latest tag
-replace github.com/rancher/wrangler v1.1.1 => github.com/rancher/wrangler v1.1.1-0.20230831050635-df1bd5aae9df
+// We cannot longer advance in the release-2.0 branch from wrangler without adopting the new wrangler/v2 import path
+// This requires coordination of several dependencies, so we have only performed this for Rancher >= 2.8
+// To mitigate this, a new "release-2.0-untagged" branch has been created, based on v2.0.1, to contain any needed fixes from that point
+replace github.com/rancher/wrangler v1.1.1 => github.com/rancher/wrangler v1.1.1-0.20240307150840-1279389d86ec
 
 replace (
 	github.com/containerd/containerd => github.com/containerd/containerd v1.6.22 // for compatibilty with docker 20.10.x
