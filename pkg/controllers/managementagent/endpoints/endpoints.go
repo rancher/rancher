@@ -296,6 +296,10 @@ func convertIngressToServicePublicEndpointsMap(ingress ingresswrapper.Ingress, a
 			continue
 		}
 		for _, path := range rule.HTTP.Paths {
+			//If the ingress backend is resource type, skip it
+			if path.Backend.Service == nil {
+				continue
+			}
 			for port, proto := range ports {
 				if port == 80 {
 					if tlsHosts.Has(rule.Host) {
