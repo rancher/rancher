@@ -139,7 +139,7 @@ func (cd *clusterDeploy) doSync(cluster *apimgmtv3.Cluster) error {
 	if err != nil {
 		return err
 	}
-	if err := healthsyncer.IsAPIUp(cd.ctx, uc.K8sClient); err != nil {
+	if err := healthsyncer.IsAPIUp(cd.ctx, uc.K8sClient.CoreV1().Namespaces()); err != nil {
 		logrus.Tracef("clusterDeploy: doSync: cannot connect to API for cluster [%s]", cluster.Name)
 		return ErrCantConnectToAPI
 	}
