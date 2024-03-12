@@ -280,21 +280,32 @@ func (m *manager) checkForGlobalResourceRules(role *v3.RoleTemplate, resource st
 	return verbs, nil
 }
 
-// Ensure the clusterRole used to grant access of global resources to users/groups in projects has appropriate rules for the given resource and verbs
-func (m *manager) reconcileRoleForProjectAccessToGlobalResource(resource string, rt *v3.RoleTemplate, newVerbs map[string]bool, baseRule rbacv1.PolicyRule) (string, error) {
-	clusterRoles := m.clusterRoles
-	roleName := rt.Name + "-promoted"
-	if role, err := m.crLister.Get("", roleName); err == nil && role != nil {
-		currentVerbs := map[string]bool{}
-		currentResourceNames := map[string]struct{}{}
-		for _, rule := range role.Rules {
-			if slice.ContainsString(rule.Resources, resource) {
-				for _, v := range rule.Verbs {
-					currentVerbs[v] = true
-				}
-				for _, v := range rule.ResourceNames {
-					currentResourceNames[v] = struct{}{}
-				}
+// reconcileRoleForProjectAccessToGlobalResource ensure the clusterRole used to grant access of global resources
+// to users/groups in projects has appropriate rules for the given resource and verbs.
+// The roleName is used to find and create/update the relevant '<roleName>-promoted' ClusterRole.
+func (m *manager) reconcileRoleForProjectAccessToGlobalResource(resource string, roleName string, newVerbs map[string]bool, baseRule rbacv1.PolicyRule) (string, error) {
+	if roleName == "" {
+		return "", errors.New("cannot reconcile Role: missing roleName")
+	}
+	roleName = roleName + "-promoted"
+
+	role, err := m.crLister.Get("", roleName)
+
+	// we try to create the role if not found, or if we get an error (for backward compatibility)
+	if apierrors.IsNotFound(err) || err != nil {
+		logrus.Infof("Creating clusterRole %v for project access to global resource.", roleName)
+
+		clusterRole := &rbacv1.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: roleName,
+			},
+			Rules: []rbacv1.PolicyRule{buildRule(resource, newVerbs)},
+		}
+
+		_, err := m.clusterRoles.Create(clusterRole)
+		if err != nil {
+			if !apierrors.IsAlreadyExists(err) {
+				return "", errors.Wrapf(err, "couldn't create role %v", roleName)
 			}
 		}
 
