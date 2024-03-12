@@ -203,8 +203,10 @@ github.com/armon/go-radix v0.0.0-20180808171621-7fddfc383310/go.mod h1:ufUuZ+zHj
 github.com/armon/go-radix v1.0.0/go.mod h1:ufUuZ+zHj4x4TnLV4JWEpy2hxWSpsRywHrMgIH9cCH8=
 github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5 h1:0CwZNZbxp69SHPdPJAN/hZIm0C4OItdklCFmMRWYpio=
 github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5/go.mod h1:wHh0iHkYZB8zMSxRWpUBQtwG5a7fFgvEO+odwuTv2gs=
-github.com/aruiz14/wrangler v1.1.1-debug-41809-1 h1:ukDVfKZRJkrwWaCYh+9+mxn7IayKJ1VCLsFDgqRu+3g=
-github.com/aruiz14/wrangler v1.1.1-debug-41809-1/go.mod h1:6Fj16A+KkCg9Pb5Qw75JDUQVDVKuaxImxSVpm452VMw=
+github.com/aruiz14/client-go v1.25.4-rancher1-debug-41809-1 h1:9llcTEnnbMstURH/DtmnKvf8kOw8Yv233xA0gSu3xig=
+github.com/aruiz14/client-go v1.25.4-rancher1-debug-41809-1/go.mod h1:8trHCAC83XKY0wsBIpbirZU4NTUpbuhc2JnI7OruGZw=
+github.com/aruiz14/wrangler v1.1.1-debug-41809-2 h1:VFXMuX13K16ksH5SjFbhvPGeMHURWApl3wnBXBesJWk=
+github.com/aruiz14/wrangler v1.1.1-debug-41809-2/go.mod h1:6Fj16A+KkCg9Pb5Qw75JDUQVDVKuaxImxSVpm452VMw=
 github.com/asaskevich/govalidator v0.0.0-20180720115003-f9ffefc3facf/go.mod h1:lB+ZfQJz7igIIfQNfa7Ml4HSf2uFQQRzpGGRXenZAgY=
 github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a/go.mod h1:lB+ZfQJz7igIIfQNfa7Ml4HSf2uFQQRzpGGRXenZAgY=
 github.com/asaskevich/govalidator v0.0.0-20200428143746-21a406dcc535 h1:4daAzAu0S6Vi7/lbWECcX0j45yZReDZ56BQsrVBOEEY=
@@ -1363,8 +1365,6 @@ github.com/rancher/aws-iam-authenticator v0.5.9-0.20220713170329-78acb8c83863 h1
 github.com/rancher/aws-iam-authenticator v0.5.9-0.20220713170329-78acb8c83863/go.mod h1:6dId2LCc8oHqeBzP6E8ndp4DflhKTxYLb5ZXwI4YmFA=
 github.com/rancher/channelserver v0.5.1-0.20220405170618-28c9b37deff1 h1:NMYQzCtLEEaJZ2xleLzDixN6Y+yO9ShzgsjHDg4zOrk=
 github.com/rancher/channelserver v0.5.1-0.20220405170618-28c9b37deff1/go.mod h1:dZ4saGTw1S0RwX8ivPijBIR+2obRpfFuO2NkDHUKKXg=
-github.com/rancher/client-go v1.25.4-rancher1 h1:9MlBC8QbgngUkhNzMR8rZmmCIj6WNRHFOnYiwC2Kty4=
-github.com/rancher/client-go v1.25.4-rancher1/go.mod h1:8trHCAC83XKY0wsBIpbirZU4NTUpbuhc2JnI7OruGZw=
 github.com/rancher/dynamiclistener v0.3.5 h1:5TaIHvkDGmZKvc96Huur16zfTKOiLhDtK4S+WV0JA6A=
 github.com/rancher/dynamiclistener v0.3.5/go.mod h1:dW/YF6/m2+uEyJ5VtEcd9THxda599HP6N9dSXk81+k0=
 github.com/rancher/eks-operator v1.2.0 h1:hwM6HBegxC62Am8Og1PLOGtCrDDLXXp5I259rYlUwLI=
