@@ -249,7 +249,7 @@ func (m *manager) ownerExistsByNsName(nsAndName interface{}) (bool, error) {
 }
 
 // If the roleTemplate has rules granting access to non-namespaced (global) resource, return the verbs for those rules
-func (m *manager) checkForGlobalResourceRules(role *v3.RoleTemplate, resource string, baseRule rbacv1.PolicyRule) (map[string]bool, error) {
+func (m *manager) checkForGlobalResourceRules(role *v3.RoleTemplate, resource string, baseRule rbacv1.PolicyRule) (map[string]struct{}, error) {
 	var rules []rbacv1.PolicyRule
 	if role.External {
 		externalRole, err := m.crLister.Get("", role.Name)
@@ -264,14 +264,14 @@ func (m *manager) checkForGlobalResourceRules(role *v3.RoleTemplate, resource st
 		rules = role.Rules
 	}
 
-	verbs := map[string]bool{}
+	verbs := map[string]struct{}{}
 	for _, rule := range rules {
 		// given the global resource, we check if the passed in RoleTemplate has a corresponding rule, if it does, we add the verbs specified in the rule to the map of verbs that is returned
 		// NOTE: ResourceNames are checked since some global resources are scoped to specific resources, e.g. management.cattle.io/v3.Clusters are scoped to just the "local" cluster resource
 		if (slice.ContainsString(rule.Resources, resource) || slice.ContainsString(rule.Resources, "*")) && reflect.DeepEqual(rule.ResourceNames, baseRule.ResourceNames) {
 			if checkGroup(resource, rule) {
 				for _, v := range rule.Verbs {
-					verbs[v] = true
+					verbs[v] = struct{}{}
 				}
 			}
 		}
@@ -283,7 +283,7 @@ func (m *manager) checkForGlobalResourceRules(role *v3.RoleTemplate, resource st
 // reconcileRoleForProjectAccessToGlobalResource ensure the clusterRole used to grant access of global resources
 // to users/groups in projects has appropriate rules for the given resource and verbs.
 // The roleName is used to find and create/update the relevant '<roleName>-promoted' ClusterRole.
-func (m *manager) reconcileRoleForProjectAccessToGlobalResource(resource string, roleName string, newVerbs map[string]bool, baseRule rbacv1.PolicyRule) (string, error) {
+func (m *manager) reconcileRoleForProjectAccessToGlobalResource(resource string, roleName string, newVerbs map[string]struct{}, baseRule rbacv1.PolicyRule) (string, error) {
 	if roleName == "" {
 		return "", errors.New("cannot reconcile Role: missing roleName")
 	}
@@ -299,7 +299,7 @@ func (m *manager) reconcileRoleForProjectAccessToGlobalResource(resource string,
 			ObjectMeta: metav1.ObjectMeta{
 				Name: roleName,
 			},
-			Rules: []rbacv1.PolicyRule{buildRule(resource, newVerbs)},
+			Rules: []rbacv1.PolicyRule{buildRule(resource, newVerbs, baseRule)},
 		}
 
 		_, err := m.clusterRoles.Create(clusterRole)
@@ -348,6 +348,39 @@ func (m *manager) reconcileRoleForProjectAccessToGlobalResource(resource string,
 		return roleName, errors.Wrapf(err, "couldn't create role %v", roleName)
 	}
 
+	desiredResourceNames := map[string]struct{}{}
+	for _, resourceName := range baseRule.ResourceNames {
+		desiredResourceNames[resourceName] = struct{}{}
+	}
+
+	equalVerbs := reflect.DeepEqual(currentVerbs, newVerbs)
+	equalResources := reflect.DeepEqual(currentResourceNames, desiredResourceNames)
+
+	// if the verbs or the resourceNames matches the desired state we can return
+	if equalVerbs && equalResources {
+		return roleName, nil
+	}
+
+	// if the verbs or the resourceNames in the promoted clusterrole don't match what's desired then the role requires updating
+	// desired verbs are passed in and the desired resourceNames come from the resource's base rule
+	role = role.DeepCopy()
+
+	added := false
+	for i, rule := range role.Rules {
+		if slice.ContainsString(rule.Resources, resource) {
+			role.Rules[i] = buildRule(resource, newVerbs, baseRule)
+			added = true
+		}
+	}
+	if !added {
+		role.Rules = append(role.Rules, buildRule(resource, newVerbs, baseRule))
+	}
+
+	logrus.Infof("Updating clusterRole %v for project access to global resource.", role.Name)
+	_, err = m.clusterRoles.Update(role)
+	if err != nil {
+		return "", errors.Wrapf(err, "couldn't update role %v", role.Name)
+	}
 	return roleName, nil
 }
 
@@ -371,7 +404,7 @@ func checkGroup(resource string, rule rbacv1.PolicyRule) bool {
 	return false
 }
 
-func buildRule(resource string, verbs map[string]bool) rbacv1.PolicyRule {
+func buildRule(resource string, verbs map[string]struct{}, baseRule rbacv1.PolicyRule) rbacv1.PolicyRule {
 	var vs []string
 	for v := range verbs {
 		vs = append(vs, v)
@@ -379,8 +412,6 @@ func buildRule(resource string, verbs map[string]bool) rbacv1.PolicyRule {
 
 	// Sort the verbs, a map does not guarantee order
 	sort.Strings(vs)
-
-	baseRule := globalResourceRulesNeededInProjects[resource]
 
 	return rbacv1.PolicyRule{
 		Resources:     []string{resource},
