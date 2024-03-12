@@ -290,12 +290,9 @@ func (m *manager) reconcileRoleForProjectAccessToGlobalResource(resource string,
 	roleName = roleName + "-promoted"
 
 	role, err := m.crLister.Get("", roleName)
-	if err != nil {
-		// return if something bad happened
-		if !apierrors.IsNotFound(err) {
-			return "", errors.Wrapf(err, "couldn't get role %v", roleName)
-		}
 
+	// we try to create the role if not found, or if we get an error (for backward compatibility)
+	if apierrors.IsNotFound(err) || err != nil {
 		logrus.Infof("Creating clusterRole %v for project access to global resource.", roleName)
 
 		clusterRole := &rbacv1.ClusterRole{
