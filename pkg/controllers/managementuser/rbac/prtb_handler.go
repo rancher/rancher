@@ -280,63 +280,90 @@ func (m *manager) checkForGlobalResourceRules(role *v3.RoleTemplate, resource st
 	return verbs, nil
 }
 
-// Ensure the clusterRole used to grant access of global resources to users/groups in projects has appropriate rules for the given resource and verbs
-func (m *manager) reconcileRoleForProjectAccessToGlobalResource(resource string, rt *v3.RoleTemplate, newVerbs map[string]bool, baseRule rbacv1.PolicyRule) (string, error) {
-	clusterRoles := m.clusterRoles
-	roleName := rt.Name + "-promoted"
-	if role, err := m.crLister.Get("", roleName); err == nil && role != nil {
-		currentVerbs := map[string]bool{}
-		currentResourceNames := map[string]struct{}{}
-		for _, rule := range role.Rules {
-			if slice.ContainsString(rule.Resources, resource) {
-				for _, v := range rule.Verbs {
-					currentVerbs[v] = true
-				}
-				for _, v := range rule.ResourceNames {
-					currentResourceNames[v] = struct{}{}
-				}
-			}
+// reconcileRoleForProjectAccessToGlobalResource ensure the clusterRole used to grant access of global resources
+// to users/groups in projects has appropriate rules for the given resource and verbs.
+// The roleName is used to find and create/update the relevant '<roleName>-promoted' ClusterRole.
+func (m *manager) reconcileRoleForProjectAccessToGlobalResource(resource string, roleName string, newVerbs map[string]bool, baseRule rbacv1.PolicyRule) (string, error) {
+	if roleName == "" {
+		return "", errors.New("cannot reconcile Role: missing roleName")
+	}
+	roleName = roleName + "-promoted"
+
+	role, err := m.crLister.Get("", roleName)
+	if err != nil {
+		// return if something bad happened
+		if !apierrors.IsNotFound(err) {
+			return "", errors.Wrapf(err, "couldn't get role %v", roleName)
 		}
 
-		desiredResourceNames := map[string]struct{}{}
-		for _, resourceName := range baseRule.ResourceNames {
-			desiredResourceNames[resourceName] = struct{}{}
+		logrus.Infof("Creating clusterRole %v for project access to global resource.", roleName)
+
+		clusterRole := &rbacv1.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: roleName,
+			},
+			Rules: []rbacv1.PolicyRule{buildRule(resource, newVerbs)},
 		}
 
-		// if the verbs or the resourceNames in the promoted clusterrole don't match what's desired then the role requires updating
-		// desired verbs are passed in and the desired resourceNames come from the resource's base rule
-		if !reflect.DeepEqual(currentVerbs, newVerbs) || !reflect.DeepEqual(currentResourceNames, desiredResourceNames) {
-			role = role.DeepCopy()
-			added := false
-			for i, rule := range role.Rules {
-				if slice.ContainsString(rule.Resources, resource) {
-					role.Rules[i] = buildRule(resource, newVerbs)
-					added = true
-				}
+		_, err := m.clusterRoles.Create(clusterRole)
+		if err != nil {
+			if !apierrors.IsAlreadyExists(err) {
+				return "", errors.Wrapf(err, "couldn't create role %v", roleName)
 			}
-			if !added {
-				role.Rules = append(role.Rules, buildRule(resource, newVerbs))
-			}
-			logrus.Infof("Updating clusterRole %v for project access to global resource.", role.Name)
-			_, err := clusterRoles.Update(role)
-			return roleName, err
+			logrus.Infof("Trying to create an already existing clusterRole %v for project access to global resource.", roleName)
 		}
 
 		return roleName, nil
 	}
 
-	logrus.Infof("Creating clusterRole %v for project access to global resource.", roleName)
-	rules := []rbacv1.PolicyRule{buildRule(resource, newVerbs)}
-	_, err := clusterRoles.Create(&rbacv1.ClusterRole{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: roleName,
-		},
-		Rules: rules,
-	})
-	if err != nil && !apierrors.IsAlreadyExists(err) {
-		return roleName, errors.Wrapf(err, "couldn't create role %v", roleName)
+	// role already exists -> updating / reconciling
+
+	currentVerbs := map[string]bool{}
+	currentResourceNames := map[string]struct{}{}
+	for _, rule := range role.Rules {
+		if slice.ContainsString(rule.Resources, resource) {
+			for _, v := range rule.Verbs {
+				currentVerbs[v] = true
+			}
+			for _, v := range rule.ResourceNames {
+				currentResourceNames[v] = struct{}{}
+			}
+		}
 	}
 
+	desiredResourceNames := map[string]struct{}{}
+	for _, resourceName := range baseRule.ResourceNames {
+		desiredResourceNames[resourceName] = struct{}{}
+	}
+
+	equalVerbs := reflect.DeepEqual(currentVerbs, newVerbs)
+	equalResources := reflect.DeepEqual(currentResourceNames, desiredResourceNames)
+
+	// if the verbs or the resourceNames matches the desired state we can return
+	if equalVerbs && equalResources {
+		return roleName, nil
+	}
+
+	// if the verbs or the resourceNames in the promoted clusterrole don't match what's desired then the role requires updating
+	// desired verbs are passed in and the desired resourceNames come from the resource's base rule
+	role = role.DeepCopy()
+
+	added := false
+	for i, rule := range role.Rules {
+		if slice.ContainsString(rule.Resources, resource) {
+			role.Rules[i] = buildRule(resource, newVerbs)
+			added = true
+		}
+	}
+	if !added {
+		role.Rules = append(role.Rules, buildRule(resource, newVerbs))
+	}
+
+	logrus.Infof("Updating clusterRole %v for project access to global resource.", role.Name)
+	_, err = m.clusterRoles.Update(role)
+	if err != nil {
+		return "", errors.Wrapf(err, "couldn't update role %v", role.Name)
+	}
 	return roleName, nil
 }
 

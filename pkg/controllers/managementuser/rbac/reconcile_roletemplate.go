@@ -139,8 +139,9 @@ func (m *manager) ensureGlobalResourcesRolesForPRTB(projectName string, rts map[
 			if err != nil {
 				return nil, err
 			}
+
 			if len(verbs) > 0 {
-				roleName, err := m.reconcileRoleForProjectAccessToGlobalResource(resource, rt, verbs, baseRule)
+				roleName, err := m.reconcileRoleForProjectAccessToGlobalResource(resource, rt.Name, verbs, baseRule)
 				if err != nil {
 					return nil, err
 				}
