@@ -335,7 +335,7 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("").resources("pods", "pods/attach", "pods/exec", "pods/portforward", "pods/proxy", "replicationcontrollers",
 		"replicationcontrollers/scale").verbs("*").
 		addRule().apiGroups("apps").resources("daemonsets", "deployments", "deployments/rollback", "deployments/scale", "replicasets",
-		"replicasets/scale", "statefulsets").verbs("*").
+		"replicasets/scale", "statefulsets", "statefulsets/scale").verbs("*").
 		addRule().apiGroups("autoscaling").resources("horizontalpodautoscalers").verbs("*").
 		addRule().apiGroups("batch").resources("cronjobs", "jobs").verbs("*").
 		addRule().apiGroups("").resources("limitranges", "pods/log", "pods/status", "replicationcontrollers/status", "resourcequotas", "resourcequotas/status", "bindings").verbs("get", "list", "watch").
