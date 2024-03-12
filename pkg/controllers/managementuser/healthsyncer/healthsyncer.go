@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
+	typedv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
 const (
@@ -83,7 +84,7 @@ func (h *HealthSyncer) getComponentStatus(cluster *v3.Cluster) error {
 	// Prior to k8s v1.14, we only needed to list the ComponentStatuses from the user cluster.
 	// As of k8s v1.14, kubeapi returns a successful ComponentStatuses response even if etcd is not available.
 	// To work around this, now we try to get a namespace from the API, even if not found, it means the API is up.
-	if err := IsAPIUp(h.ctx, h.k8s); err != nil {
+	if err := IsAPIUp(h.ctx, h.k8s.CoreV1().Namespaces()); err != nil {
 		return condition.Error("ComponentStatusFetchingFailure", errors.Wrap(err, "Failed to communicate with API server during namespace check"))
 	}
 
@@ -130,11 +131,11 @@ func (h *HealthSyncer) getComponentStatus(cluster *v3.Cluster) error {
 // IsAPIUp checks if the Kubernetes API server is up and etcd is available.
 // It gets a namespace from the API, even if not found, it means the API is up.
 // It returns nil if the API is up, otherwise it returns an error.
-func IsAPIUp(ctx context.Context, k8s kubernetes.Interface) error {
+func IsAPIUp(ctx context.Context, ns typedv1.NamespaceInterface) error {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	if _, err := k8s.CoreV1().Namespaces().Get(ctx, "kube-system", metav1.GetOptions{}); err != nil && !apierrors.IsNotFound(err) {
+	if _, err := ns.Get(ctx, "kube-system", metav1.GetOptions{}); err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
 	return nil
