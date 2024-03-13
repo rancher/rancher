@@ -113,6 +113,12 @@ var (
 		false,
 		false,
 		true)
+	UIExtension = newFeature(
+		"uiextension",
+		"Enable UI Extensions when starting Rancher",
+		true,
+		false,
+		true)
 )
 
 type Feature struct {

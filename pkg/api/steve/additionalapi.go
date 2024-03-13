@@ -6,6 +6,7 @@ import (
 
 	gmux "github.com/gorilla/mux"
 	"github.com/rancher/rancher/pkg/api/steve/aggregation"
+	"github.com/rancher/rancher/pkg/api/steve/catalog"
 	"github.com/rancher/rancher/pkg/api/steve/github"
 	"github.com/rancher/rancher/pkg/api/steve/health"
 	"github.com/rancher/rancher/pkg/api/steve/projects"
@@ -55,8 +56,12 @@ func AdditionalAPIs(ctx context.Context, config *wrangler.Context, steve *steve.
 
 	mux := gmux.NewRouter()
 	mux.UseEncodedPath()
+	if features.UIExtension.Enabled() {
+		catalog.RegisterUIPluginHandlers(mux)
+	}
 	mux.Handle("/v1/github{path:.*}", githubHandler)
 	mux.Handle("/v3/connect", Tunnel(config))
+
 	health.Register(mux)
 
 	return func(next http.Handler) http.Handler {

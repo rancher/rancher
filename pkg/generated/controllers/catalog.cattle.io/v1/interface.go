@@ -34,6 +34,7 @@ type Interface interface {
 	App() AppController
 	ClusterRepo() ClusterRepoController
 	Operation() OperationController
+	UIPlugin() UIPluginController
 }
 
 func New(controllerFactory controller.SharedControllerFactory) Interface {
@@ -56,4 +57,8 @@ func (v *version) ClusterRepo() ClusterRepoController {
 
 func (v *version) Operation() OperationController {
 	return generic.NewController[*v1.Operation, *v1.OperationList](schema.GroupVersionKind{Group: "catalog.cattle.io", Version: "v1", Kind: "Operation"}, "operations", true, v.controllerFactory)
+}
+
+func (v *version) UIPlugin() UIPluginController {
+	return generic.NewController[*v1.UIPlugin, *v1.UIPluginList](schema.GroupVersionKind{Group: "catalog.cattle.io", Version: "v1", Kind: "UIPlugin"}, "uiplugins", true, v.controllerFactory)
 }
