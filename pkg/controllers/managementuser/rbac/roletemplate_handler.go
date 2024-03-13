@@ -85,12 +85,10 @@ func (c *rtSync) syncRT(template *v3.RoleTemplate, usedInProjects bool, prtbs []
 				if err != nil {
 					return err
 				}
-				if len(verbs) > 0 {
-					roleName, err := c.m.reconcileRoleForProjectAccessToGlobalResource(resource, rt, verbs, baseRule)
-					if err != nil {
-						return errors.Wrapf(err, "couldn't reconcile role for project access to global resources")
-					}
-					rolesToKeep[roleName] = true
+
+				roleName, err := c.m.reconcileRoleForProjectAccessToGlobalResource(resource, rt.Name, verbs, baseRule)
+				if err != nil {
+					return errors.Wrapf(err, "couldn't reconcile role '%s' for project access to global resources", roleName)
 				}
 			}
 		}
