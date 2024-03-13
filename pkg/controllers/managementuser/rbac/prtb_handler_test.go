@@ -21,7 +21,7 @@ func Test_manager_checkForGlobalResourceRules(t *testing.T) {
 		role     *v3.RoleTemplate
 		resource string
 		baseRule rbacv1.PolicyRule
-		want     map[string]bool
+		want     map[string]struct{}
 	}
 
 	testCases := []tests{
@@ -38,7 +38,7 @@ func Test_manager_checkForGlobalResourceRules(t *testing.T) {
 			},
 			resource: "persistentvolumes",
 			baseRule: rbacv1.PolicyRule{},
-			want:     map[string]bool{"put": true},
+			want:     map[string]struct{}{"put": {}},
 		},
 		{
 			name: "invalid_api_group_persistentvolumes",
@@ -53,7 +53,7 @@ func Test_manager_checkForGlobalResourceRules(t *testing.T) {
 			},
 			resource: "persistentvolumes",
 			baseRule: rbacv1.PolicyRule{},
-			want:     map[string]bool{},
+			want:     map[string]struct{}{},
 		},
 		{
 			name: "valid_api_group_storageclasses",
@@ -68,7 +68,7 @@ func Test_manager_checkForGlobalResourceRules(t *testing.T) {
 			},
 			resource: "storageclasses",
 			baseRule: rbacv1.PolicyRule{},
-			want:     map[string]bool{"put": true},
+			want:     map[string]struct{}{"put": {}},
 		},
 		{
 			name: "invalid_api_group_storageclasses",
@@ -83,7 +83,7 @@ func Test_manager_checkForGlobalResourceRules(t *testing.T) {
 			},
 			resource: "storageclasses",
 			baseRule: rbacv1.PolicyRule{},
-			want:     map[string]bool{},
+			want:     map[string]struct{}{},
 		},
 		{
 			name: "valid_api_group_start",
@@ -98,7 +98,7 @@ func Test_manager_checkForGlobalResourceRules(t *testing.T) {
 			},
 			resource: "persistentvolumes",
 			baseRule: rbacv1.PolicyRule{},
-			want:     map[string]bool{"put": true},
+			want:     map[string]struct{}{"put": {}},
 		},
 		{
 			name: "invalid_api_group_star",
@@ -113,7 +113,7 @@ func Test_manager_checkForGlobalResourceRules(t *testing.T) {
 			},
 			resource: "persistentvolumes",
 			baseRule: rbacv1.PolicyRule{},
-			want:     map[string]bool{},
+			want:     map[string]struct{}{},
 		},
 		{
 			name: "cluster_rule_match",
@@ -128,7 +128,7 @@ func Test_manager_checkForGlobalResourceRules(t *testing.T) {
 			},
 			resource: "clusters",
 			baseRule: rbacv1.PolicyRule{},
-			want:     map[string]bool{"get": true},
+			want:     map[string]struct{}{"get": {}},
 		},
 		{
 			name: "cluster_rule_resource_names_match",
@@ -146,7 +146,7 @@ func Test_manager_checkForGlobalResourceRules(t *testing.T) {
 			baseRule: rbacv1.PolicyRule{
 				ResourceNames: []string{"local"},
 			},
-			want: map[string]bool{"get": true},
+			want: map[string]struct{}{"get": {}},
 		},
 		{
 			name: "cluster_rule_baserule_resource_names_no_match",
@@ -163,7 +163,7 @@ func Test_manager_checkForGlobalResourceRules(t *testing.T) {
 			baseRule: rbacv1.PolicyRule{
 				ResourceNames: []string{"local"},
 			},
-			want: map[string]bool{},
+			want: map[string]struct{}{},
 		},
 		{
 			name: "cluster_rule_roletemplate_resource_names_no_match",
@@ -179,7 +179,7 @@ func Test_manager_checkForGlobalResourceRules(t *testing.T) {
 			},
 			resource: "clusters",
 			baseRule: rbacv1.PolicyRule{},
-			want:     map[string]bool{},
+			want:     map[string]struct{}{},
 		},
 	}
 
@@ -371,7 +371,34 @@ func Test_manager_reconcileRoleForProjectAccessToGlobalResource(t *testing.T) {
 			},
 			want: "myrole-promoted",
 		},
-
+		{
+			name: "reconciling non existing ClusterRole with no verbs is nop-op",
+			args: args{
+				rtName:   "myrole",
+				resource: "myresource",
+				newVerbs: map[string]struct{}{},
+				baseRule: rbacv1.PolicyRule{
+					APIGroups:     []string{"management.cattle.io"},
+					ResourceNames: []string{"local"},
+				},
+			},
+			crListerMock: &typesrbacv1fakes.ClusterRoleListerMock{
+				GetFunc: func(namespace, name string) (*v1.ClusterRole, error) {
+					return nil, errNotFound
+				},
+			},
+			clusterRolesMock: &typesrbacv1fakes.ClusterRoleInterfaceMock{
+				CreateFunc: func(in1 *v1.ClusterRole) (*v1.ClusterRole, error) {
+					assert.Fail(t, "unexpected call to ClusterRole Create")
+					return in1, nil
+				},
+				UpdateFunc: func(in1 *v1.ClusterRole) (*v1.ClusterRole, error) {
+					assert.Fail(t, "unexpected call to ClusterRole Update")
+					return in1, nil
+				},
+			},
+			want: "",
+		},
 		{
 			name: "create a the role if get fails",
 			args: args{

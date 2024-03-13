@@ -282,6 +282,7 @@ func (m *manager) checkForGlobalResourceRules(role *v3.RoleTemplate, resource st
 
 // reconcileRoleForProjectAccessToGlobalResource ensure the clusterRole used to grant access of global resources
 // to users/groups in projects has appropriate rules for the given resource and verbs.
+// It returns the created or updated ClusterRole name, or blank "" if none were created or updated.
 // The roleName is used to find and create/update the relevant '<roleName>-promoted' ClusterRole.
 func (m *manager) reconcileRoleForProjectAccessToGlobalResource(resource string, roleName string, newVerbs map[string]struct{}, baseRule rbacv1.PolicyRule) (string, error) {
 	if roleName == "" {
@@ -293,6 +294,12 @@ func (m *manager) reconcileRoleForProjectAccessToGlobalResource(resource string,
 
 	// we try to create the role if not found, or if we get an error (for backward compatibility)
 	if apierrors.IsNotFound(err) || err != nil {
+		// if no ClusterRole was found and the verbs are empty we skip the creation
+		// and we return a blank role name, to let the caller knows that this was a no-op
+		if len(newVerbs) == 0 {
+			return "", nil
+		}
+
 		logrus.Infof("Creating clusterRole %v for project access to global resource.", roleName)
 
 		clusterRole := &rbacv1.ClusterRole{
@@ -315,12 +322,12 @@ func (m *manager) reconcileRoleForProjectAccessToGlobalResource(resource string,
 
 	// role already exists -> updating / reconciling
 
-	currentVerbs := map[string]bool{}
+	currentVerbs := map[string]struct{}{}
 	currentResourceNames := map[string]struct{}{}
 	for _, rule := range role.Rules {
 		if slice.ContainsString(rule.Resources, resource) {
 			for _, v := range rule.Verbs {
-				currentVerbs[v] = true
+				currentVerbs[v] = struct{}{}
 			}
 			for _, v := range rule.ResourceNames {
 				currentResourceNames[v] = struct{}{}
@@ -354,6 +361,17 @@ func (m *manager) reconcileRoleForProjectAccessToGlobalResource(resource string,
 	}
 	if !added {
 		role.Rules = append(role.Rules, buildRule(resource, newVerbs, baseRule))
+	}
+
+	// check if we need to delete some policy rules
+	if len(newVerbs) == 0 {
+		newRules := []rbacv1.PolicyRule{}
+		for _, rule := range role.Rules {
+			if !slice.ContainsString(rule.Resources, resource) {
+				newRules = append(newRules, rule)
+			}
+		}
+		role.Rules = newRules
 	}
 
 	logrus.Infof("Updating clusterRole %v for project access to global resource.", role.Name)
