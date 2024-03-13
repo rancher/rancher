@@ -44,6 +44,6 @@ func (r *V2ProvCertRotationTestSuite) TestCertRotation() {
 	})
 }
 
-func TestCertRotation(t *testing.T) {
+func TestCertRotationTestSuite(t *testing.T) {
 	suite.Run(t, new(V2ProvCertRotationTestSuite))
 }
