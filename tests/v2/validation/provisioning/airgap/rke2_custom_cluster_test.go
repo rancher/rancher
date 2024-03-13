@@ -81,7 +81,7 @@ func (a *AirGapRKE2CustomClusterTestSuite) SetupSuite() {
 
 }
 
-func (a *AirGapRKE2CustomClusterTestSuite) TestProvisioningRKE2CustomCluster() {
+func (a *AirGapRKE2CustomClusterTestSuite) TestProvisioningAirGapRKE2CustomCluster() {
 	a.clustersConfig.MachinePools = []provisioninginput.MachinePools{provisioninginput.AllRolesMachinePool}
 
 	tests := []struct {
@@ -96,7 +96,7 @@ func (a *AirGapRKE2CustomClusterTestSuite) TestProvisioningRKE2CustomCluster() {
 
 }
 
-func (a *AirGapRKE2CustomClusterTestSuite) TestProvisioningUpgradeRKE2CustomCluster() {
+func (a *AirGapRKE2CustomClusterTestSuite) TestProvisioningAirGapUpgradeRKE2CustomCluster() {
 	a.clustersConfig.MachinePools = []provisioninginput.MachinePools{provisioninginput.AllRolesMachinePool}
 
 	rke2Versions, err := kubernetesversions.ListRKE2AllVersions(a.client)
