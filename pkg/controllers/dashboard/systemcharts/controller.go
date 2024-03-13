@@ -138,6 +138,9 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 			ExactVersionSetting: settings.RancherWebhookVersion,
 			Values: func() map[string]interface{} {
 				values := map[string]interface{}{
+					"capi": map[string]interface{}{
+						"enabled": false,
+					},
 					"mcm": map[string]interface{}{
 						"enabled": features.MCM.Enabled(),
 					},
