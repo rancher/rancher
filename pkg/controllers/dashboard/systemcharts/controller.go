@@ -138,6 +138,10 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 			ExactVersionSetting: settings.RancherWebhookVersion,
 			Values: func() map[string]interface{} {
 				values := map[string]interface{}{
+					// This is no longer used in the webhook chart but previous values can still be found
+					// with `helm get values -n cattle-system rancher-webhook` which can be confusing. We
+					// completely remove the previous capi values by setting it to nil here.
+					"capi": nil,
 					"mcm": map[string]interface{}{
 						"enabled": features.MCM.Enabled(),
 					},
