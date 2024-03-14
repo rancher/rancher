@@ -11,7 +11,6 @@ import (
 
 	"github.com/ghodss/yaml"
 	"github.com/pkg/errors"
-	"github.com/rancher/norman/api/handler"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
@@ -26,7 +25,6 @@ import (
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/monitoring"
 	"github.com/rancher/rancher/pkg/ref"
-	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/user"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 )
@@ -56,7 +54,6 @@ type Handler struct {
 	ClusterLister            v3.ClusterLister
 	ProvisioningClusterCache provisioningcontrollerv1.ClusterCache
 	UserMgr                  user.Manager
-	PSPTemplateLister        v3.PodSecurityPolicyTemplateLister
 }
 
 func (h *Handler) Actions(actionName string, action *types.Action, apiContext *types.APIContext) error {
@@ -69,8 +66,6 @@ func (h *Handler) Actions(actionName string, action *types.Action, apiContext *t
 	}
 
 	switch actionName {
-	case "setpodsecuritypolicytemplate":
-		return h.setPodSecurityPolicyTemplate(actionName, action, apiContext)
 	case "exportYaml":
 		return h.ExportYamlHandler(actionName, action, apiContext)
 	case "viewMonitoring":
@@ -262,80 +257,6 @@ func (h *Handler) disableMonitoring(actionName string, action *types.Action, api
 	}
 
 	apiContext.WriteResponse(http.StatusNoContent, map[string]interface{}{})
-	return nil
-}
-
-func (h *Handler) setPodSecurityPolicyTemplate(actionName string, action *types.Action,
-	request *types.APIContext) error {
-	input, err := handler.ParseAndValidateActionBody(request, request.Schemas.Schema(&managementschema.Version,
-		client.SetPodSecurityPolicyTemplateInputType))
-	if err != nil {
-		return fmt.Errorf("error parse/validate action body: %v", err)
-	}
-
-	providedPSP := input[client.PodSecurityPolicyTemplateProjectBindingFieldPodSecurityPolicyTemplateName]
-
-	if providedPSP != nil {
-		// cannot use cluster manager to get cluster name as subcontext is nil
-		idParts := strings.Split(request.ID, ":")
-		if len(idParts) != 2 {
-			return httperror.NewAPIError(httperror.InvalidBodyContent,
-				fmt.Sprintf("cannot parse cluster from ID [%s]", request.ID))
-		}
-
-		clusterName := idParts[0]
-		managementCluster, err := h.ClusterLister.Get("", clusterName)
-		if err != nil {
-			return fmt.Errorf("error retrieving management cluster [%s]: %w", clusterName, err)
-		}
-
-		k3sPodSecurityPoliciesEnabled, err := h.areK3SPodSecurityPoliciesEnabled(managementCluster)
-		if err != nil {
-			return fmt.Errorf("error checking if K3s pod security policies are enabled for cluster [%s]: %w", clusterName, err)
-		}
-
-		// rke2 provisioned clusters always have PSP enabled
-		if !managementCluster.Status.Capabilities.PspEnabled && !isProvisionedRke2Cluster(managementCluster) && !k3sPodSecurityPoliciesEnabled {
-			return httperror.NewAPIError(httperror.InvalidAction,
-				fmt.Sprintf("cluster [%s] does not have Pod Security Policies enabled", clusterName))
-		}
-	}
-
-	podSecurityPolicyTemplateName, ok := providedPSP.(string)
-	if !ok && providedPSP != nil {
-		return fmt.Errorf("could not convert: %v", providedPSP)
-	}
-
-	if ok {
-		if _, err := h.PSPTemplateLister.Get("", podSecurityPolicyTemplateName); err != nil {
-			if apierrors.IsNotFound(err) {
-				return httperror.NewAPIError(httperror.InvalidBodyContent,
-					fmt.Sprintf("podSecurityPolicyTemplate [%v] not found", podSecurityPolicyTemplateName))
-			}
-			return err
-		}
-	}
-
-	schema := request.Schemas.Schema(&managementschema.Version, client.PodSecurityPolicyTemplateProjectBindingType)
-	if schema == nil {
-		return fmt.Errorf("no %v store available", client.PodSecurityPolicyTemplateProjectBindingType)
-	}
-
-	err = h.createOrUpdateBinding(request, schema, podSecurityPolicyTemplateName)
-	if err != nil {
-		return err
-	}
-
-	project, err := h.updateProjectPSPTID(request, podSecurityPolicyTemplateName)
-	if err != nil {
-		if apierrors.IsConflict(err) {
-			return httperror.WrapAPIError(err, httperror.Conflict, "error updating PSPT ID")
-		}
-		return fmt.Errorf("error updating PSPT ID: %v", err)
-	}
-
-	request.WriteResponse(http.StatusOK, project)
-
 	return nil
 }
 
