@@ -46,6 +46,7 @@ provisioningInput:
     desiredflags: "Short|Long" #These flags are for running TestProvisioningRKE2Cluster or TestProvisioningRKE2CustomCluster it is not needed for the dynamic tests.
   rke2KubernetesVersion: ["v1.27.6+rke2r1"]
   cni: ["calico"]
+  cloudProvider: "" 
   providers: ["linode", "aws", "do", "harvester", "vsphere"]
   nodeProviders: ["ec2"]
   hardened: false
@@ -112,6 +113,18 @@ vmwarevsphereCredentials:
   vcenter: ""
   vcenterPort: ""
 ```
+
+## Cloud Provider
+Cloud Provider enables additional options through the cloud provider, like cloud persistent storage or cloud provisioned load balancers.
+
+Names of cloud provider options are typically controlled by rancher product. Hence the discrepancy in rke2 vs. rke1 AWS in-tree and out-of-tree options. 
+To use automation with a cloud provider, simply enter one of the following options in the `cloudProvider` field in the config. 
+
+### RKE2 Cloud Provider Options
+* aws-in-tree
+* aws
+* rancher-vsphere
+
 
 ## Machine RKE2 Config
 Machine RKE2 config is the final piece needed for the config to run RKE2 provisioning tests.

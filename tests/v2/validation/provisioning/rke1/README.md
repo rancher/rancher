@@ -35,6 +35,7 @@ provisioningInput:
     desiredflags: "Long" #These flags are for running TestProvisioningRKE1Cluster or TestProvisioningRKE1CustomCluster it is not needed for the dynamic tests. Long will run the full table, where as short will run the short version of this test.
   rke1KubernetesVersion: ["v1.27.6-rancher1-1"]
   cni: ["calico"]
+  cloudProvider: ""
   providers: ["linode", "aws", "do", "harvester"]
   nodeProviders: ["ec2"]
   psact: ""
@@ -55,6 +56,19 @@ provisioningInput:
     retention: "72h"
     snapshot: false
 ```
+
+
+## Cloud Provider
+Cloud Provider enables additional options through the cloud provider, like cloud persistent storage or cloud provisioned load balancers.
+
+Names of cloud provider options are typically controlled by rancher product. Hence the discrepancy in rke2 vs. rke1 AWS in-tree and out-of-tree options. 
+To use automation with a cloud provider, simply enter one of the following options in the `cloudProvider` field in the config. 
+
+### RKE1 Cloud Provider Options
+* external-aws
+* aws
+* rancher-vsphere
+
 
 ## NodeTemplateConfigs
 RKE1 specifically needs a node template config to run properly. These are the inputs needed for the different node providers.
