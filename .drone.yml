@@ -1255,7 +1255,7 @@ clone:
 
 steps:
 - name: docker-image-digests
-  image: rancher/drone-docker-image-digests:v0.0.12
+  image: rancher/drone-docker-image-digests:v0.1.0
   environment:
     PLUGIN_GITHUB_REPOSITORY: "rancher/rancher"
     PLUGIN_GITHUB_TOKEN:
@@ -1271,6 +1271,19 @@ steps:
     instance:
       include:
       - drone-publish.rancher.io
+    event:
+    - tag
+- name: artifacts-upload
+  image: plugins/s3
+  settings:
+    bucket: prime-artifacts
+    access_key:
+      from_secret: prime_artifacts_uploader-access_key
+    secret_key:
+      from_secret: prime_artifacts_uploader-secret_key
+    source: rancher-images-digests-windows-ltsc2022.txt
+    target: "/rancher/${DRONE_TAG}"
+  when:
     event:
     - tag
 
