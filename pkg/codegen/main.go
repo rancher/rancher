@@ -23,7 +23,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	extv1beta1 "k8s.io/api/extensions/v1beta1"
 	knetworkingv1 "k8s.io/api/networking/v1"
-	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	k8sschema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -179,12 +178,6 @@ func main() {
 			extv1beta1.Ingress{},
 		},
 		nil,
-	)
-	generator.GenerateNativeTypes(policyv1beta1.SchemeGroupVersion,
-		nil,
-		[]interface{}{
-			policyv1beta1.PodSecurityPolicy{},
-		},
 	)
 	generator.GenerateNativeTypes(storagev1.SchemeGroupVersion,
 		nil,
