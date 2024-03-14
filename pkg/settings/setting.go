@@ -17,7 +17,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-const RancherVersionDev = "2.8.99"
+const RancherVersionDev = "2.9.99"
 
 var (
 	releasePattern = regexp.MustCompile("^v[0-9]")
@@ -376,9 +376,11 @@ func GetEnvKey(key string) string {
 }
 
 func getMetadataConfig() string {
-	branch := KDMBranch.Get()
+	// branch := KDMBranch.Get()
+	branch := "k8s-1.29.0"
 	data := map[string]interface{}{
-		"url":                      fmt.Sprintf("https://releases.rancher.com/kontainer-driver-metadata/%s/data.json", branch),
+		// "url":                      fmt.Sprintf("https://releases.rancher.com/kontainer-driver-metadata/%s/data.json", branch),
+		"url":                      fmt.Sprintf("https://raw.githubusercontent.com/krunalhinguu/kontainer-driver-metadata/%s/data/data.json", branch),
 		"refresh-interval-minutes": "1440",
 	}
 	ans, err := json.Marshal(data)
