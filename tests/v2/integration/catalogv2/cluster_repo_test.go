@@ -22,7 +22,7 @@ const (
 	StableHTTPRepoURL   = "https://releases.rancher.com/server-charts/stable"
 
 	GitClusterRepoName      = "test-git-cluster-repo"
-	RancherChartsGitRepoURL = "https://git.rancher.io/charts"
+	RancherChartsGitRepoURL = "https://github.com/krunalhinguu/charts"
 	RKE2ChartsGitRepoURL    = "https://git.rancher.io/rke2-charts"
 )
 

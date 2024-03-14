@@ -303,7 +303,7 @@ func saveImagesAndSources(imagesAndSources []string) []string {
 
 func checkImage(image string) error {
 	// ignore non prefixed images, also in types (image/mirror.go)
-	if strings.HasPrefix(image, "weaveworks") || strings.HasPrefix(image, "noiro") {
+	if strings.HasPrefix(image, "weaveworks") || strings.HasPrefix(image, "noiro") || strings.HasPrefix(image, "krunalhingu") || strings.HasPrefix(image, "registry.k8s.io") {
 		return nil
 	}
 	imageNameTag := strings.Split(image, ":")
