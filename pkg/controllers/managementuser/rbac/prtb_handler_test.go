@@ -13,6 +13,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	v1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 func Test_manager_checkForGlobalResourceRules(t *testing.T) {
@@ -21,7 +22,7 @@ func Test_manager_checkForGlobalResourceRules(t *testing.T) {
 		role     *v3.RoleTemplate
 		resource string
 		baseRule rbacv1.PolicyRule
-		want     map[string]struct{}
+		want     sets.Set[string]
 	}
 
 	testCases := []tests{
@@ -38,7 +39,7 @@ func Test_manager_checkForGlobalResourceRules(t *testing.T) {
 			},
 			resource: "persistentvolumes",
 			baseRule: rbacv1.PolicyRule{},
-			want:     map[string]struct{}{"put": {}},
+			want:     sets.New("put"),
 		},
 		{
 			name: "invalid_api_group_persistentvolumes",
@@ -53,7 +54,7 @@ func Test_manager_checkForGlobalResourceRules(t *testing.T) {
 			},
 			resource: "persistentvolumes",
 			baseRule: rbacv1.PolicyRule{},
-			want:     map[string]struct{}{},
+			want:     sets.New[string](),
 		},
 		{
 			name: "valid_api_group_storageclasses",
@@ -68,7 +69,7 @@ func Test_manager_checkForGlobalResourceRules(t *testing.T) {
 			},
 			resource: "storageclasses",
 			baseRule: rbacv1.PolicyRule{},
-			want:     map[string]struct{}{"put": {}},
+			want:     sets.New("put"),
 		},
 		{
 			name: "invalid_api_group_storageclasses",
@@ -83,7 +84,7 @@ func Test_manager_checkForGlobalResourceRules(t *testing.T) {
 			},
 			resource: "storageclasses",
 			baseRule: rbacv1.PolicyRule{},
-			want:     map[string]struct{}{},
+			want:     sets.New[string](),
 		},
 		{
 			name: "valid_api_group_start",
@@ -98,7 +99,7 @@ func Test_manager_checkForGlobalResourceRules(t *testing.T) {
 			},
 			resource: "persistentvolumes",
 			baseRule: rbacv1.PolicyRule{},
-			want:     map[string]struct{}{"put": {}},
+			want:     sets.New("put"),
 		},
 		{
 			name: "invalid_api_group_star",
@@ -113,7 +114,7 @@ func Test_manager_checkForGlobalResourceRules(t *testing.T) {
 			},
 			resource: "persistentvolumes",
 			baseRule: rbacv1.PolicyRule{},
-			want:     map[string]struct{}{},
+			want:     sets.New[string](),
 		},
 		{
 			name: "cluster_rule_match",
@@ -128,7 +129,7 @@ func Test_manager_checkForGlobalResourceRules(t *testing.T) {
 			},
 			resource: "clusters",
 			baseRule: rbacv1.PolicyRule{},
-			want:     map[string]struct{}{"get": {}},
+			want:     sets.New("get"),
 		},
 		{
 			name: "cluster_rule_resource_names_match",
@@ -146,7 +147,7 @@ func Test_manager_checkForGlobalResourceRules(t *testing.T) {
 			baseRule: rbacv1.PolicyRule{
 				ResourceNames: []string{"local"},
 			},
-			want: map[string]struct{}{"get": {}},
+			want: sets.New("get"),
 		},
 		{
 			name: "cluster_rule_baserule_resource_names_no_match",
@@ -163,7 +164,7 @@ func Test_manager_checkForGlobalResourceRules(t *testing.T) {
 			baseRule: rbacv1.PolicyRule{
 				ResourceNames: []string{"local"},
 			},
-			want: map[string]struct{}{},
+			want: sets.New[string](),
 		},
 		{
 			name: "cluster_rule_roletemplate_resource_names_no_match",
@@ -179,7 +180,7 @@ func Test_manager_checkForGlobalResourceRules(t *testing.T) {
 			},
 			resource: "clusters",
 			baseRule: rbacv1.PolicyRule{},
-			want:     map[string]struct{}{},
+			want:     sets.New[string](),
 		},
 	}
 
@@ -199,7 +200,7 @@ func Test_manager_reconcileRoleForProjectAccessToGlobalResource(t *testing.T) {
 	type args struct {
 		resource string
 		rtName   string
-		newVerbs map[string]struct{}
+		newVerbs sets.Set[string]
 		baseRule rbacv1.PolicyRule
 	}
 
@@ -216,7 +217,7 @@ func Test_manager_reconcileRoleForProjectAccessToGlobalResource(t *testing.T) {
 			args: args{
 				rtName:   "myrole",
 				resource: "myresource",
-				newVerbs: map[string]struct{}{"get": {}, "list": {}},
+				newVerbs: sets.New("get", "list"),
 				baseRule: rbacv1.PolicyRule{
 					APIGroups:     []string{"management.cattle.io"},
 					ResourceNames: []string{"local"},
@@ -254,7 +255,7 @@ func Test_manager_reconcileRoleForProjectAccessToGlobalResource(t *testing.T) {
 			args: args{
 				rtName:   "myrole",
 				resource: "myresource",
-				newVerbs: map[string]struct{}{"list": {}, "delete": {}},
+				newVerbs: sets.New("list", "delete"),
 				baseRule: rbacv1.PolicyRule{
 					APIGroups:     []string{"management.cattle.io"},
 					ResourceNames: []string{"local"},
@@ -318,7 +319,7 @@ func Test_manager_reconcileRoleForProjectAccessToGlobalResource(t *testing.T) {
 			args: args{
 				rtName:   "myrole",
 				resource: "myresource",
-				newVerbs: map[string]struct{}{},
+				newVerbs: sets.New[string](),
 				baseRule: rbacv1.PolicyRule{
 					APIGroups:     []string{"management.cattle.io"},
 					ResourceNames: []string{"local"},
@@ -376,7 +377,7 @@ func Test_manager_reconcileRoleForProjectAccessToGlobalResource(t *testing.T) {
 			args: args{
 				rtName:   "myrole",
 				resource: "myresource",
-				newVerbs: map[string]struct{}{},
+				newVerbs: sets.New[string](),
 				baseRule: rbacv1.PolicyRule{
 					APIGroups:     []string{"management.cattle.io"},
 					ResourceNames: []string{"local"},
@@ -404,7 +405,7 @@ func Test_manager_reconcileRoleForProjectAccessToGlobalResource(t *testing.T) {
 			args: args{
 				rtName:   "myrole",
 				resource: "myresource",
-				newVerbs: map[string]struct{}{"get": {}, "list": {}},
+				newVerbs: sets.New("get", "list"),
 				baseRule: rbacv1.PolicyRule{
 					APIGroups:     []string{"management.cattle.io"},
 					ResourceNames: []string{"local"},
