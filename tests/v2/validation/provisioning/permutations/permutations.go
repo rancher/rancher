@@ -122,7 +122,7 @@ func RunTestPermutations(s *suite.Suite, testNamePrefix string, client *rancher.
 
 						if strings.Contains(testClusterConfig.CloudProvider, provisioninginput.AWSProviderName.String()) {
 							if strings.Contains(testClusterConfig.CloudProvider, externalProviderString) {
-								err = createAndInstallAWSExternalCharts(client, clusterObject.ID)
+								err = createAndInstallAWSExternalCharts(client, clusterObject.Name)
 								require.NoError(s.T(), err)
 
 								podErrors := pods.StatusPods(client, clusterObject.ID)
@@ -189,7 +189,6 @@ func RunTestPermutations(s *suite.Suite, testNamePrefix string, client *rancher.
 					default:
 						s.T().Fatalf("Invalid cluster type: %s", clusterType)
 					}
-
 				})
 			}
 		}
@@ -285,8 +284,13 @@ func createNginxDeployment(steveclient *steveV1.Client, containerNamePrefix stri
 
 // createAndInstallAWSExternalCharts is a helper function for rke1 external-aws cloud provider
 // clusters that install the appropriate chart(s) and returns an error, if any.
-func createAndInstallAWSExternalCharts(client *rancher.Client, clusterID string) error {
-	steveclient, err := client.Steve.ProxyDownstream(clusterID)
+func createAndInstallAWSExternalCharts(client *rancher.Client, clusterName string) error {
+	cluster, err := clusters.NewClusterMeta(client, clusterName)
+	if err != nil {
+		return err
+	}
+
+	steveclient, err := client.Steve.ProxyDownstream(cluster.ID)
 	if err != nil {
 		return err
 	}
@@ -297,12 +301,12 @@ func createAndInstallAWSExternalCharts(client *rancher.Client, clusterID string)
 		return err
 	}
 
-	project, err := projects.GetProjectByName(client, clusterID, systemProject)
+	project, err := projects.GetProjectByName(client, cluster.ID, systemProject)
 	if err != nil {
 		return err
 	}
 
-	catalogClient, err := client.GetClusterCatalogClient(clusterID)
+	catalogClient, err := client.GetClusterCatalogClient(cluster.ID)
 	if err != nil {
 		return err
 	}
@@ -313,10 +317,10 @@ func createAndInstallAWSExternalCharts(client *rancher.Client, clusterID string)
 	}
 
 	installOptions := &charts.InstallOptions{
-		ClusterID: clusterID,
+		Cluster:   cluster,
 		Version:   latestVersion,
 		ProjectID: project.ID,
 	}
-	err = charts.InstallAWSOutOfTreeChart(client, installOptions, repoName, clusterID)
+	err = charts.InstallAWSOutOfTreeChart(client, installOptions, repoName, cluster.ID)
 	return err
 }
