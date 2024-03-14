@@ -205,53 +205,45 @@ func Test_manager_reconcileRoleForProjectAccessToGlobalResource(t *testing.T) {
 	}
 
 	tests := []struct {
-		name             string
-		crListerMock     *typesrbacv1fakes.ClusterRoleListerMock
-		clusterRolesMock *typesrbacv1fakes.ClusterRoleInterfaceMock
-		args             args
-		want             string
-		wantErr          bool
+		name                         string
+		crListerMockGetResult        *v1.ClusterRole
+		crListerMockGetErr           error
+		clusterRolesMockCreateResult *v1.ClusterRole
+		clusterRolesMockCreateErr    error
+		clusterRolesMockUpdateResult *v1.ClusterRole
+		clusterRolesMockUpdateErr    error
+		args                         args
+		want                         string
+		wantErr                      bool
 	}{
 		{
-			name: "non existing ClusteRole will create a new promoted ClusterRole",
+			name: "missing role name will fail",
 			args: args{
-				rtName:   "myrole",
-				resource: "myresource",
-				newVerbs: sets.New("get", "list"),
-				baseRule: rbacv1.PolicyRule{
-					APIGroups:     []string{"management.cattle.io"},
-					ResourceNames: []string{"local"},
-				},
+				rtName: "",
 			},
-			crListerMock: &typesrbacv1fakes.ClusterRoleListerMock{
-				GetFunc: func(namespace, name string) (*v1.ClusterRole, error) {
-					return nil, errNotFound
-				},
-			},
-			clusterRolesMock: &typesrbacv1fakes.ClusterRoleInterfaceMock{
-				CreateFunc: func(in1 *v1.ClusterRole) (*v1.ClusterRole, error) {
-					assert.Equal(t, &rbacv1.ClusterRole{
-						ObjectMeta: metav1.ObjectMeta{
-							Name: "myrole-promoted",
-						},
-						Rules: []rbacv1.PolicyRule{{
-							APIGroups:     []string{"management.cattle.io"},
-							ResourceNames: []string{"local"},
-							Resources:     []string{"myresource"},
-							Verbs:         []string{"get", "list"},
-						}},
-					}, in1)
-					return in1, nil
-				},
-				UpdateFunc: func(in1 *v1.ClusterRole) (*v1.ClusterRole, error) {
-					assert.Fail(t, "unexpected call to ClusterRole Update")
-					return nil, nil
-				},
-			},
-			want: "myrole-promoted",
+			wantErr: true,
 		},
 		{
-			name: "existing ClusteRole will update it",
+			name: "failing create will return an error",
+			args: args{
+				rtName:   "myrole",
+				newVerbs: sets.New("get", "list"),
+			},
+			crListerMockGetErr:        errNotFound,
+			clusterRolesMockCreateErr: errors.New("something bad happened"),
+			wantErr:                   true,
+		},
+		{
+			name: "reconciling non existing ClusterRole with no verbs is no-op",
+			args: args{
+				rtName:   "myrole",
+				newVerbs: sets.New[string](),
+			},
+			crListerMockGetErr: errNotFound,
+			want:               "",
+		},
+		{
+			name: "existing ClusterRole will not update if no need to reconcile",
 			args: args{
 				rtName:   "myrole",
 				resource: "myresource",
@@ -261,55 +253,138 @@ func Test_manager_reconcileRoleForProjectAccessToGlobalResource(t *testing.T) {
 					ResourceNames: []string{"local"},
 				},
 			},
-			crListerMock: &typesrbacv1fakes.ClusterRoleListerMock{
-				GetFunc: func(namespace, name string) (*v1.ClusterRole, error) {
-					return &rbacv1.ClusterRole{
-						ObjectMeta: metav1.ObjectMeta{
-							Name: "myrole-promoted",
-						},
-						Rules: []rbacv1.PolicyRule{
-							{
-								APIGroups:     []string{"another.cattle.io"},
-								ResourceNames: []string{"foobar"},
-								Resources:     []string{"nodes"},
-								Verbs:         []string{"create"},
-							},
-							{
-								APIGroups:     []string{"management.cattle.io"},
-								ResourceNames: []string{"local"},
-								Resources:     []string{"myresource"},
-								Verbs:         []string{"get", "list"},
-							},
-						},
-					}, nil
+			crListerMockGetResult: &rbacv1.ClusterRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "myrole-promoted",
+				},
+				Rules: []rbacv1.PolicyRule{
+					{
+						APIGroups:     []string{"management.cattle.io"},
+						ResourceNames: []string{"local"},
+						Resources:     []string{"myresource"},
+						Verbs:         []string{"list", "delete"},
+					},
 				},
 			},
-			clusterRolesMock: &typesrbacv1fakes.ClusterRoleInterfaceMock{
-				CreateFunc: func(in1 *v1.ClusterRole) (*v1.ClusterRole, error) {
-					assert.Fail(t, "unexpected call to ClusterRole Create")
-					return in1, nil
+			want: "myrole-promoted",
+		},
+		{
+			name: "non existing ClusterRole will create a new promoted ClusterRole",
+			args: args{
+				rtName:   "myrole",
+				resource: "myresource",
+				newVerbs: sets.New("get", "list"),
+				baseRule: rbacv1.PolicyRule{
+					APIGroups:     []string{"management.cattle.io"},
+					ResourceNames: []string{"local"},
 				},
-				UpdateFunc: func(in1 *v1.ClusterRole) (*v1.ClusterRole, error) {
-					assert.Equal(t, &rbacv1.ClusterRole{
-						ObjectMeta: metav1.ObjectMeta{
-							Name: "myrole-promoted",
-						},
-						Rules: []rbacv1.PolicyRule{
-							{
-								APIGroups:     []string{"another.cattle.io"},
-								ResourceNames: []string{"foobar"},
-								Resources:     []string{"nodes"},
-								Verbs:         []string{"create"},
-							},
-							{
-								APIGroups:     []string{"management.cattle.io"},
-								ResourceNames: []string{"local"},
-								Resources:     []string{"myresource"},
-								Verbs:         []string{"delete", "list"},
-							},
-						},
-					}, in1)
-					return nil, nil
+			},
+			crListerMockGetErr: errNotFound,
+			clusterRolesMockCreateResult: &rbacv1.ClusterRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "myrole-promoted",
+				},
+				Rules: []rbacv1.PolicyRule{{
+					APIGroups:     []string{"management.cattle.io"},
+					ResourceNames: []string{"local"},
+					Resources:     []string{"myresource"},
+					Verbs:         []string{"get", "list"},
+				}},
+			},
+			want: "myrole-promoted",
+		},
+		{
+			name: "existing ClusterRole will update it adding missing rules",
+			args: args{
+				rtName:   "myrole",
+				resource: "myresource",
+				newVerbs: sets.New("list", "delete"),
+				baseRule: rbacv1.PolicyRule{
+					APIGroups:     []string{"management.cattle.io"},
+					ResourceNames: []string{"local"},
+				},
+			},
+			crListerMockGetResult: &rbacv1.ClusterRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "myrole-promoted",
+				},
+				Rules: []rbacv1.PolicyRule{
+					{
+						APIGroups:     []string{"management.cattle.io"},
+						ResourceNames: []string{"local"},
+						Resources:     []string{"another"},
+						Verbs:         []string{"get", "list"},
+					},
+				},
+			},
+			clusterRolesMockUpdateResult: &rbacv1.ClusterRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "myrole-promoted",
+				},
+				Rules: []rbacv1.PolicyRule{
+					{
+						APIGroups:     []string{"management.cattle.io"},
+						ResourceNames: []string{"local"},
+						Resources:     []string{"another"},
+						Verbs:         []string{"get", "list"},
+					},
+					{
+						APIGroups:     []string{"management.cattle.io"},
+						ResourceNames: []string{"local"},
+						Resources:     []string{"myresource"},
+						Verbs:         []string{"delete", "list"},
+					},
+				},
+			},
+			want: "myrole-promoted",
+		},
+		{
+			name: "existing ClusterRole will update it",
+			args: args{
+				rtName:   "myrole",
+				resource: "myresource",
+				newVerbs: sets.New("list", "delete"),
+				baseRule: rbacv1.PolicyRule{
+					APIGroups:     []string{"management.cattle.io"},
+					ResourceNames: []string{"local"},
+				},
+			},
+			crListerMockGetResult: &rbacv1.ClusterRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "myrole-promoted",
+				},
+				Rules: []rbacv1.PolicyRule{
+					{
+						APIGroups:     []string{"another.cattle.io"},
+						ResourceNames: []string{"foobar"},
+						Resources:     []string{"nodes"},
+						Verbs:         []string{"create"},
+					},
+					{
+						APIGroups:     []string{"management.cattle.io"},
+						ResourceNames: []string{"local"},
+						Resources:     []string{"myresource"},
+						Verbs:         []string{"get", "list"},
+					},
+				},
+			},
+			clusterRolesMockUpdateResult: &rbacv1.ClusterRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "myrole-promoted",
+				},
+				Rules: []rbacv1.PolicyRule{
+					{
+						APIGroups:     []string{"another.cattle.io"},
+						ResourceNames: []string{"foobar"},
+						Resources:     []string{"nodes"},
+						Verbs:         []string{"create"},
+					},
+					{
+						APIGroups:     []string{"management.cattle.io"},
+						ResourceNames: []string{"local"},
+						Resources:     []string{"myresource"},
+						Verbs:         []string{"delete", "list"},
+					},
 				},
 			},
 			want: "myrole-promoted",
@@ -325,83 +400,42 @@ func Test_manager_reconcileRoleForProjectAccessToGlobalResource(t *testing.T) {
 					ResourceNames: []string{"local"},
 				},
 			},
-			crListerMock: &typesrbacv1fakes.ClusterRoleListerMock{
-				GetFunc: func(namespace, name string) (*v1.ClusterRole, error) {
-					return &rbacv1.ClusterRole{
-						ObjectMeta: metav1.ObjectMeta{
-							Name: "myrole-promoted",
-						},
-						Rules: []rbacv1.PolicyRule{
-							{
-								APIGroups:     []string{"another.cattle.io"},
-								ResourceNames: []string{"foobar"},
-								Resources:     []string{"nodes"},
-								Verbs:         []string{"create"},
-							},
-							{
-								APIGroups:     []string{"management.cattle.io"},
-								ResourceNames: []string{"local"},
-								Resources:     []string{"myresource"},
-								Verbs:         []string{"get", "list"},
-							},
-						},
-					}, nil
+			crListerMockGetResult: &rbacv1.ClusterRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "myrole-promoted",
+				},
+				Rules: []rbacv1.PolicyRule{
+					{
+						APIGroups:     []string{"another.cattle.io"},
+						ResourceNames: []string{"foobar"},
+						Resources:     []string{"nodes"},
+						Verbs:         []string{"create"},
+					},
+					{
+						APIGroups:     []string{"management.cattle.io"},
+						ResourceNames: []string{"local"},
+						Resources:     []string{"myresource"},
+						Verbs:         []string{"get", "list"},
+					},
 				},
 			},
-			clusterRolesMock: &typesrbacv1fakes.ClusterRoleInterfaceMock{
-				CreateFunc: func(in1 *v1.ClusterRole) (*v1.ClusterRole, error) {
-					assert.Fail(t, "unexpected call to ClusterRole Create")
-					return in1, nil
+			clusterRolesMockUpdateResult: &rbacv1.ClusterRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "myrole-promoted",
 				},
-				UpdateFunc: func(in1 *v1.ClusterRole) (*v1.ClusterRole, error) {
-					assert.Equal(t, &rbacv1.ClusterRole{
-						ObjectMeta: metav1.ObjectMeta{
-							Name: "myrole-promoted",
-						},
-						Rules: []rbacv1.PolicyRule{
-							{
-								APIGroups:     []string{"another.cattle.io"},
-								ResourceNames: []string{"foobar"},
-								Resources:     []string{"nodes"},
-								Verbs:         []string{"create"},
-							},
-						},
-					}, in1)
-					return in1, nil
+				Rules: []rbacv1.PolicyRule{
+					{
+						APIGroups:     []string{"another.cattle.io"},
+						ResourceNames: []string{"foobar"},
+						Resources:     []string{"nodes"},
+						Verbs:         []string{"create"},
+					},
 				},
 			},
 			want: "myrole-promoted",
 		},
 		{
-			name: "reconciling non existing ClusterRole with no verbs is nop-op",
-			args: args{
-				rtName:   "myrole",
-				resource: "myresource",
-				newVerbs: sets.New[string](),
-				baseRule: rbacv1.PolicyRule{
-					APIGroups:     []string{"management.cattle.io"},
-					ResourceNames: []string{"local"},
-				},
-			},
-			crListerMock: &typesrbacv1fakes.ClusterRoleListerMock{
-				GetFunc: func(namespace, name string) (*v1.ClusterRole, error) {
-					return nil, errNotFound
-				},
-			},
-			clusterRolesMock: &typesrbacv1fakes.ClusterRoleInterfaceMock{
-				CreateFunc: func(in1 *v1.ClusterRole) (*v1.ClusterRole, error) {
-					assert.Fail(t, "unexpected call to ClusterRole Create")
-					return in1, nil
-				},
-				UpdateFunc: func(in1 *v1.ClusterRole) (*v1.ClusterRole, error) {
-					assert.Fail(t, "unexpected call to ClusterRole Update")
-					return in1, nil
-				},
-			},
-			want: "",
-		},
-		{
-			name: "create a the role if get fails",
+			name: "get fail will return an error",
 			args: args{
 				rtName:   "myrole",
 				resource: "myresource",
@@ -411,53 +445,103 @@ func Test_manager_reconcileRoleForProjectAccessToGlobalResource(t *testing.T) {
 					ResourceNames: []string{"local"},
 				},
 			},
-			crListerMock: &typesrbacv1fakes.ClusterRoleListerMock{
-				GetFunc: func(namespace, name string) (*v1.ClusterRole, error) {
-					return nil, errors.New("get failed")
+			crListerMockGetErr: errors.New("get failed"),
+			wantErr:            true,
+		},
+		{
+			name: "update fail will return an error",
+			args: args{
+				rtName:   "myrole",
+				resource: "myresource",
+				newVerbs: sets.New("list", "delete"),
+				baseRule: rbacv1.PolicyRule{
+					APIGroups:     []string{"management.cattle.io"},
+					ResourceNames: []string{"local"},
 				},
 			},
-			clusterRolesMock: &typesrbacv1fakes.ClusterRoleInterfaceMock{
-				CreateFunc: func(in1 *v1.ClusterRole) (*v1.ClusterRole, error) {
-					assert.Equal(t, &rbacv1.ClusterRole{
-						ObjectMeta: metav1.ObjectMeta{
-							Name: "myrole-promoted",
-						},
-						Rules: []rbacv1.PolicyRule{
-							{
-								APIGroups:     []string{"management.cattle.io"},
-								ResourceNames: []string{"local"},
-								Resources:     []string{"myresource"},
-								Verbs:         []string{"get", "list"},
-							},
-						},
-					}, in1)
-					return in1, nil
+			crListerMockGetResult: &rbacv1.ClusterRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "myrole-promoted",
 				},
-				UpdateFunc: func(in1 *v1.ClusterRole) (*v1.ClusterRole, error) {
-					assert.Fail(t, "unexpected call to ClusterRole Update")
-					return in1, nil
+				Rules: []rbacv1.PolicyRule{
+					{
+						APIGroups:     []string{"management.cattle.io"},
+						ResourceNames: []string{"local"},
+						Resources:     []string{"myresource"},
+						Verbs:         []string{"get", "list"},
+					},
 				},
 			},
-			want: "myrole-promoted",
+			clusterRolesMockUpdateErr: errors.New("something bad happened"),
+			wantErr:                   true,
 		},
 	}
 
 	for _, tc := range tests {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			// setup ClusterRoleLister mock
+			crListerMock := &typesrbacv1fakes.ClusterRoleListerMock{
+				GetFunc: func(namespace, name string) (*v1.ClusterRole, error) {
+					return tc.crListerMockGetResult, tc.crListerMockGetErr
+				},
+			}
+
+			// setup ClusterRole mock: it will just return the passed ClusterRole or the error
+			clusterRolesMock := &typesrbacv1fakes.ClusterRoleInterfaceMock{
+				CreateFunc: func(in1 *v1.ClusterRole) (*v1.ClusterRole, error) {
+					return in1, tc.clusterRolesMockCreateErr
+				},
+				UpdateFunc: func(in1 *v1.ClusterRole) (*v1.ClusterRole, error) {
+					return in1, tc.clusterRolesMockUpdateErr
+				},
+			}
 
 			manager := manager{
-				crLister:     tc.crListerMock,
-				clusterRoles: tc.clusterRolesMock,
+				crLister:     crListerMock,
+				clusterRoles: clusterRolesMock,
 			}
 
 			got, err := manager.reconcileRoleForProjectAccessToGlobalResource(tc.args.resource, tc.args.rtName, tc.args.newVerbs, tc.args.baseRule)
 			assert.Equal(t, tc.want, got)
-
 			if tc.wantErr {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
+			}
+
+			// if result and err are nil the method should have not been called
+			if tc.crListerMockGetResult == nil && tc.crListerMockGetErr == nil {
+				assert.Empty(t, crListerMock.GetCalls())
+			} else {
+				// otherwise only one call to Get is expected
+				assert.Len(t, crListerMock.GetCalls(), 1)
+			}
+
+			// if result and err are nil the method should have not been called
+			if tc.clusterRolesMockCreateResult == nil && tc.clusterRolesMockCreateErr == nil {
+				assert.Empty(t, clusterRolesMock.CreateCalls())
+			} else {
+				// otherwise only one call to Get is expected, and the values should match
+				results := clusterRolesMock.CreateCalls()
+				assert.Len(t, results, 1)
+
+				if tc.clusterRolesMockCreateErr == nil {
+					assert.Equal(t, tc.clusterRolesMockCreateResult, results[0].In1)
+				}
+			}
+
+			// if result and err are nil the method should have not been called
+			if tc.clusterRolesMockUpdateResult == nil && tc.clusterRolesMockUpdateErr == nil {
+				assert.Empty(t, clusterRolesMock.UpdateCalls())
+			} else {
+				// otherwise only one call to Update is expected, and the values should match
+				results := clusterRolesMock.UpdateCalls()
+				assert.Len(t, results, 1)
+
+				if tc.clusterRolesMockUpdateErr == nil {
+					assert.Equal(t, tc.clusterRolesMockUpdateResult, results[0].In1)
+				}
 			}
 		})
 	}

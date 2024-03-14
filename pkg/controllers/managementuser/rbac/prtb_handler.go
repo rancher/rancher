@@ -1,6 +1,7 @@
 package rbac
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
 
@@ -93,13 +94,13 @@ func (p *prtbLifecycle) syncPRTB(binding *v3.ProjectRoleTemplateBinding) error {
 
 	rt, err := p.m.rtLister.Get("", binding.RoleTemplateName)
 	if err != nil {
-		return errors.Wrapf(err, "couldn't get role template %v", binding.RoleTemplateName)
+		return fmt.Errorf("couldn't get role template %v: %w", binding.RoleTemplateName, err)
 	}
 
 	// Get namespaces belonging to project
 	namespaces, err := p.m.nsIndexer.ByIndex(nsByProjectIndex, binding.ProjectName)
 	if err != nil {
-		return errors.Wrapf(err, "couldn't list namespaces with project ID %v", binding.ProjectName)
+		return fmt.Errorf("couldn't list namespaces with project ID %v: %w", binding.ProjectName, err)
 	}
 	roles := map[string]*v3.RoleTemplate{}
 	if err := p.m.gatherRoles(rt, roles, 0); err != nil {
@@ -116,13 +117,13 @@ func (p *prtbLifecycle) syncPRTB(binding *v3.ProjectRoleTemplateBinding) error {
 			continue
 		}
 		if err := p.m.ensureProjectRoleBindings(ns.Name, roles, binding); err != nil {
-			return errors.Wrapf(err, "couldn't ensure binding %v in %v", binding.Name, ns.Name)
+			return fmt.Errorf("couldn't ensure binding %v in %v: %w", binding.Name, ns.Name, err)
 		}
 	}
 
 	if binding.UserName != "" {
 		if err := p.m.ensureServiceAccountImpersonator(binding.UserName); err != nil {
-			return errors.Wrapf(err, "couldn't ensure service account impersonator")
+			return fmt.Errorf("couldn't ensure service account impersonator: %w", err)
 		}
 	}
 
@@ -133,7 +134,7 @@ func (p *prtbLifecycle) ensurePRTBDelete(binding *v3.ProjectRoleTemplateBinding)
 	// Get namespaces belonging to project
 	namespaces, err := p.m.nsIndexer.ByIndex(nsByProjectIndex, binding.ProjectName)
 	if err != nil {
-		return errors.Wrapf(err, "couldn't list namespaces with project ID %v", binding.ProjectName)
+		return fmt.Errorf("couldn't list namespaces with project ID %v: %w", binding.ProjectName, err)
 	}
 
 	set := labels.Set(map[string]string{rtbOwnerLabel: pkgrbac.GetRTBLabel(binding.ObjectMeta)})
@@ -142,13 +143,13 @@ func (p *prtbLifecycle) ensurePRTBDelete(binding *v3.ProjectRoleTemplateBinding)
 		bindingCli := p.m.workload.RBAC.RoleBindings(ns.Name)
 		rbs, err := p.m.rbLister.List(ns.Name, set.AsSelector())
 		if err != nil {
-			return errors.Wrapf(err, "couldn't list rolebindings with selector %s", set.AsSelector())
+			return fmt.Errorf("couldn't list rolebindings with selector %s: %w", set.AsSelector(), err)
 		}
 
 		for _, rb := range rbs {
 			if err := bindingCli.Delete(rb.Name, &metav1.DeleteOptions{}); err != nil {
 				if !apierrors.IsNotFound(err) {
-					return errors.Wrapf(err, "error deleting rolebinding %v", rb.Name)
+					return fmt.Errorf("error deleting rolebinding %v: %w", rb.Name, err)
 				}
 			}
 		}
@@ -289,11 +290,15 @@ func (m *manager) reconcileRoleForProjectAccessToGlobalResource(resource string,
 	roleName = roleName + "-promoted"
 
 	role, err := m.crLister.Get("", roleName)
+	if err != nil {
+		if !apierrors.IsNotFound(err) {
+			return "", fmt.Errorf("get cluster role %s failed: %w", roleName, err)
+		}
 
-	// we try to create the role if not found, or if we get an error (for backward compatibility)
-	if apierrors.IsNotFound(err) || err != nil {
-		// if no ClusterRole was found and the verbs are empty we skip the creation
-		// and we return a blank role name, to let the caller knows that this was a no-op
+		// try to create the role if not found
+
+		// if newVerbs are empty we can skip the creation and return a blank role name
+		// to let the caller knows that this was a no-op
 		if len(newVerbs) == 0 {
 			return "", nil
 		}
@@ -310,7 +315,7 @@ func (m *manager) reconcileRoleForProjectAccessToGlobalResource(resource string,
 		_, err := m.clusterRoles.Create(clusterRole)
 		if err != nil {
 			if !apierrors.IsAlreadyExists(err) {
-				return "", errors.Wrapf(err, "couldn't create role %v", roleName)
+				return "", fmt.Errorf("couldn't create role %v: %w", roleName, err)
 			}
 		}
 
@@ -388,7 +393,7 @@ func (m *manager) reconcileRoleForProjectAccessToGlobalResource(resource string,
 	logrus.Infof("Updating clusterRole %v for project access to global resource.", role.Name)
 	_, err = m.clusterRoles.Update(role)
 	if err != nil {
-		return "", errors.Wrapf(err, "couldn't update role %v", role.Name)
+		return "", fmt.Errorf("couldn't update role %v: %w", role.Name, err)
 	}
 	return roleName, nil
 }

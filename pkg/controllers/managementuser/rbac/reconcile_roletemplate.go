@@ -10,6 +10,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 func (m *manager) reconcileProjectAccessToGlobalResources(binding *v3.ProjectRoleTemplateBinding, roles []string) (map[string]bool, error) {
@@ -95,8 +96,7 @@ func (m *manager) reconcileProjectAccessToGlobalResources(binding *v3.ProjectRol
 // EnsureGlobalResourcesRolesForPRTB ensures that all necessary roles exist and contain the rules needed to
 // enforce permissions described by RoleTemplate rules. A slice of strings indicating role names is returned.
 func (m *manager) ensureGlobalResourcesRolesForPRTB(projectName string, rts map[string]*v3.RoleTemplate) ([]string, error) {
-	var role string
-	var roles []string
+	roles := sets.New[string]()
 
 	if projectName == "" {
 		return nil, nil
@@ -110,7 +110,7 @@ func (m *manager) ensureGlobalResourcesRolesForPRTB(projectName string, rts map[
 			if hasNamespaceGroup && hasNamespaceResources && len(rule.ResourceNames) == 0 {
 				if slice.ContainsString(rule.Verbs, "*") || slice.ContainsString(rule.Verbs, "create") {
 					roleVerb = "*"
-					roles = append(roles, "create-ns")
+					roles.Insert("create-ns")
 					if nsRole, _ := m.crLister.Get("", "create-ns"); nsRole == nil {
 						createNSRT, err := m.rtLister.Get("", "create-ns")
 						if err != nil {
@@ -130,8 +130,8 @@ func (m *manager) ensureGlobalResourcesRolesForPRTB(projectName string, rts map[
 		roleVerb = "get"
 	}
 	roleSuffix = projectNSVerbToSuffix[roleVerb]
-	role = fmt.Sprintf(projectNSGetClusterRoleNameFmt, projectName, roleSuffix)
-	roles = append(roles, role)
+	role := fmt.Sprintf(projectNSGetClusterRoleNameFmt, projectName, roleSuffix)
+	roles.Insert(role)
 
 	for _, rt := range rts {
 		for resource, baseRule := range globalResourceRulesNeededInProjects {
@@ -147,9 +147,10 @@ func (m *manager) ensureGlobalResourcesRolesForPRTB(projectName string, rts map[
 
 			// if a role was created or updated append it to the existing roles
 			if roleName != "" {
-				roles = append(roles, roleName)
+				roles.Insert(roleName)
 			}
 		}
 	}
-	return roles, nil
+
+	return sets.List(roles), nil
 }
