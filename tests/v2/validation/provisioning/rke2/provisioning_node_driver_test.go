@@ -116,6 +116,12 @@ func (r *RKE2NodeDriverProvisioningTestSuite) TestProvisioningRKE2ClusterDynamic
 	}
 }
 
+func (r *RKE2NodeDriverProvisioningTestSuite) TestVsphereCloudProvider() {
+	_, cluster, err := clusters.GetProvisioningClusterByName(r.client, r.client.RancherConfig.ClusterName, "fleet-default")
+	require.NoError(r.T(), err)
+	permutations.CreatePVCWorkload(r.T(), r.client, cluster)
+}
+
 // In order for 'go test' to run this suite, we need to create
 // a normal test function and pass our suite to suite.Run
 func TestRKE2ProvisioningTestSuite(t *testing.T) {

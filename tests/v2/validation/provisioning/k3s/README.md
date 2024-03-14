@@ -216,7 +216,7 @@ harvesterMachineConfig":
 vmwarevsphereMachineConfigs:
     datacenter: "/<datacenter>"                                 #required 
     hostSystem: "/<datacenter>/path-to-host"                    #required
-    datastore: "/<datacenter>/path-to-datastore"                #required 
+    datastoreURL: "/<datacenter>/path-to-datastore"                #required 
     folder: "/<datacenter>/path-to-vm-folder"                   #required 
     pool: "/<datacenter>/path-to-resource-pool"                 #required 
     vmwarevsphereMachineConfig:
