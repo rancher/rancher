@@ -45,8 +45,8 @@ func (g *GateKeeperTestSuite) SetupSuite() {
 	clusterName := client.RancherConfig.ClusterName
 	require.NotEmptyf(g.T(), clusterName, "Cluster name to install is not set")
 
-	// Get clusterID with clusterName
-	clusterID, err := clusters.GetClusterIDByName(client, clusterName)
+	// Get cluster meta
+	cluster, err := clusters.NewClusterMeta(client, clusterName)
 	require.NoError(g.T(), err)
 
 	// get latest version of gatekeeper chart
@@ -55,7 +55,7 @@ func (g *GateKeeperTestSuite) SetupSuite() {
 
 	// Create project
 	projectConfig := &management.Project{
-		ClusterID: clusterID,
+		ClusterID: cluster.ID,
 		Name:      gatekeeperProjectName,
 	}
 	createdProject, err := client.Management.Project.Create(projectConfig)
@@ -64,12 +64,10 @@ func (g *GateKeeperTestSuite) SetupSuite() {
 	g.project = createdProject
 
 	g.gatekeeperChartInstallOptions = &charts.InstallOptions{
-		ClusterName: clusterName,
-		ClusterID:   clusterID,
-		Version:     latestGatekeeperVersion,
-		ProjectID:   createdProject.ID,
+		Cluster:   cluster,
+		Version:   latestGatekeeperVersion,
+		ProjectID: createdProject.ID,
 	}
-
 }
 
 func (g *GateKeeperTestSuite) TestGatekeeperChart() {
