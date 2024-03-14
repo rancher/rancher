@@ -2,7 +2,6 @@ package rbac
 
 import (
 	"reflect"
-	"sort"
 	"strings"
 
 	"github.com/hashicorp/go-multierror"
@@ -19,6 +18,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/selection"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/retry"
 )
 
@@ -249,7 +249,7 @@ func (m *manager) ownerExistsByNsName(nsAndName interface{}) (bool, error) {
 }
 
 // If the roleTemplate has rules granting access to non-namespaced (global) resource, return the verbs for those rules
-func (m *manager) checkForGlobalResourceRules(role *v3.RoleTemplate, resource string, baseRule rbacv1.PolicyRule) (map[string]struct{}, error) {
+func (m *manager) checkForGlobalResourceRules(role *v3.RoleTemplate, resource string, baseRule rbacv1.PolicyRule) (sets.Set[string], error) {
 	var rules []rbacv1.PolicyRule
 	if role.External {
 		externalRole, err := m.crLister.Get("", role.Name)
@@ -264,15 +264,13 @@ func (m *manager) checkForGlobalResourceRules(role *v3.RoleTemplate, resource st
 		rules = role.Rules
 	}
 
-	verbs := map[string]struct{}{}
+	verbs := sets.New[string]()
 	for _, rule := range rules {
 		// given the global resource, we check if the passed in RoleTemplate has a corresponding rule, if it does, we add the verbs specified in the rule to the map of verbs that is returned
 		// NOTE: ResourceNames are checked since some global resources are scoped to specific resources, e.g. management.cattle.io/v3.Clusters are scoped to just the "local" cluster resource
 		if (slice.ContainsString(rule.Resources, resource) || slice.ContainsString(rule.Resources, "*")) && reflect.DeepEqual(rule.ResourceNames, baseRule.ResourceNames) {
 			if checkGroup(resource, rule) {
-				for _, v := range rule.Verbs {
-					verbs[v] = struct{}{}
-				}
+				verbs.Insert(rule.Verbs...)
 			}
 		}
 	}
@@ -284,7 +282,7 @@ func (m *manager) checkForGlobalResourceRules(role *v3.RoleTemplate, resource st
 // to users/groups in projects has appropriate rules for the given resource and verbs.
 // It returns the created or updated ClusterRole name, or blank "" if none were created or updated.
 // The roleName is used to find and create/update the relevant '<roleName>-promoted' ClusterRole.
-func (m *manager) reconcileRoleForProjectAccessToGlobalResource(resource string, roleName string, newVerbs map[string]struct{}, baseRule rbacv1.PolicyRule) (string, error) {
+func (m *manager) reconcileRoleForProjectAccessToGlobalResource(resource string, roleName string, newVerbs sets.Set[string], baseRule rbacv1.PolicyRule) (string, error) {
 	if roleName == "" {
 		return "", errors.New("cannot reconcile Role: missing roleName")
 	}
@@ -322,29 +320,19 @@ func (m *manager) reconcileRoleForProjectAccessToGlobalResource(resource string,
 
 	// role already exists -> updating / reconciling
 
-	currentVerbs := map[string]struct{}{}
-	currentResourceNames := map[string]struct{}{}
+	currentVerbs := sets.New[string]()
+	currentResourceNames := sets.New[string]()
 	for _, rule := range role.Rules {
 		if slice.ContainsString(rule.Resources, resource) {
-			for _, v := range rule.Verbs {
-				currentVerbs[v] = struct{}{}
-			}
-			for _, v := range rule.ResourceNames {
-				currentResourceNames[v] = struct{}{}
-			}
+			currentVerbs.Insert(rule.Verbs...)
+			currentResourceNames.Insert(rule.ResourceNames...)
 		}
 	}
 
-	desiredResourceNames := map[string]struct{}{}
-	for _, resourceName := range baseRule.ResourceNames {
-		desiredResourceNames[resourceName] = struct{}{}
-	}
+	desiredResourceNames := sets.New(baseRule.ResourceNames...)
 
-	equalVerbs := reflect.DeepEqual(currentVerbs, newVerbs)
-	equalResources := reflect.DeepEqual(currentResourceNames, desiredResourceNames)
-
-	// if the verbs or the resourceNames matches the desired state we can return
-	if equalVerbs && equalResources {
+	// if the currentVerbs and the currentResourceNames matches the desired state we can return
+	if currentVerbs.Equal(newVerbs) && currentResourceNames.Equal(desiredResourceNames) {
 		return roleName, nil
 	}
 
@@ -402,18 +390,10 @@ func checkGroup(resource string, rule rbacv1.PolicyRule) bool {
 	return false
 }
 
-func buildRule(resource string, verbs map[string]struct{}, baseRule rbacv1.PolicyRule) rbacv1.PolicyRule {
-	var vs []string
-	for v := range verbs {
-		vs = append(vs, v)
-	}
-
-	// Sort the verbs, a map does not guarantee order
-	sort.Strings(vs)
-
+func buildRule(resource string, verbs sets.Set[string], baseRule rbacv1.PolicyRule) rbacv1.PolicyRule {
 	return rbacv1.PolicyRule{
 		Resources:     []string{resource},
-		Verbs:         vs,
+		Verbs:         sets.List(verbs), // List returns a sorted array of the verbs
 		APIGroups:     baseRule.APIGroups,
 		ResourceNames: baseRule.ResourceNames,
 	}
