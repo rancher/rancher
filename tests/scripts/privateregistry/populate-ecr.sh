@@ -24,8 +24,8 @@ createCert() {
 
 createECRRepo() {
     echo -e "\nDownloading "${RANCHER_VERSION}" image list and scripts..."
-    wget https://github.com/rancher/rancher/releases/download/"${RANCHER_VERSION}"/rancher-images.txt
-    wget https://github.com/rancher/rancher/releases/download/"${RANCHER_VERSION}"/rancher-save-images.sh
+    wget https://prime.ribs.rancher.io/rancher/"${RANCHER_VERSION}"/rancher-images.txt
+    wget https://prime.ribs.rancher.io/rancher/"${RANCHER_VERSION}"/rancher-save-images.sh
     chmod +x rancher-save-images.sh
 
     echo -e "\nCutting the tags from the image names..."
