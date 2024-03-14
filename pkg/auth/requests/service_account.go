@@ -71,7 +71,7 @@ func (t *ServiceAccountAuth) Authenticate(req *http.Request) (user.Info, bool, e
 	// Check the cluster setting value to determine whether we will continue the auth process
 	settings, err := t.clusterProxyConfigsGetter.List(clusterID, labels.NewSelector())
 	if err != nil {
-		logrus.Debugf("rejecting downstream proxy request for %s, unable to fetch ClusterProxySettings object for cluster", req.URL.Path)
+		logrus.Debugf("rejecting downstream proxy request for %s, unable to fetch ClusterProxySettings object for cluster. %v", req.URL.Path, err)
 		return info, false, nil
 	}
 	if settings == nil {
