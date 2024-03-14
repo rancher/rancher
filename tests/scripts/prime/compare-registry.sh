@@ -25,7 +25,7 @@ prereq() {
 
 scanRegistries() {
     echo -e "\nPulling rancher-images.txt file..."
-    wget https://github.com/rancher/rancher/releases/download/"${RANCHER_VERSION}"/rancher-images.txt
+    wget https://prime.ribs.rancher.io/rancher/"${RANCHER_VERSION}"/rancher-images.txt
 
     echo -e "\nRunning scan-registry.sh against Docker Hub..."
     "${SCAN_REGISTRY_PATH}" -l "$(pwd)/rancher-images.txt" -r "${DOCKER_REGISTRY}" >> "${DOCKER_IMAGES_PATH}"

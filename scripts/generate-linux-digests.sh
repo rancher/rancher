@@ -11,7 +11,7 @@ fi
 
 DIGEST_TEMPLATE_FILENAME="./bin/rancher-images-digests-linux"
 IMAGES_FILE=$(mktemp)
-IMAGES_URL="https://github.com/rancher/rancher/releases/download/${DRONE_TAG}/rancher-images.txt"
+IMAGES_URL="https://prime.ribs.rancher.io/rancher/${DRONE_TAG}/rancher-images.txt"
 
 wget --retry-connrefused --waitretry=1 --read-timeout=20 --timeout=15 -t 10 $IMAGES_URL -O $IMAGES_FILE
 
