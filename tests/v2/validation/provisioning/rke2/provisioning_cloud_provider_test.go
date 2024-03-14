@@ -3,6 +3,7 @@
 package rke2
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/rancher/rancher/tests/v2/validation/provisioning/permutations"
@@ -83,13 +84,50 @@ func (r *RKE2CloudProviderTestSuite) TestAWSCloudProviderCluster() {
 		{"OutOfTree" + provisioninginput.StandardClientName.String(), nodeRolesDedicated, r.standardUserClient, r.client.Flags.GetValue(environmentflag.Long)},
 	}
 
+	if !slices.Contains(r.provisioningConfig.Providers, "aws") {
+		r.T().Skip("AWS Cloud Provider test requires access to aws.")
+	}
+
 	for _, tt := range tests {
 		if !tt.runFlag {
 			r.T().Logf("SKIPPED")
 			continue
 		}
+
 		provisioningConfig := *r.provisioningConfig
 		provisioningConfig.CloudProvider = "aws"
+		provisioningConfig.MachinePools = tt.machinePools
+		permutations.RunTestPermutations(&r.Suite, tt.name, tt.client, &provisioningConfig, permutations.RKE2ProvisionCluster, nil, nil)
+	}
+}
+
+func (r *RKE2CloudProviderTestSuite) TestVsphereCloudProviderCluster() {
+	nodeRolesDedicated := []provisioninginput.MachinePools{provisioninginput.EtcdMachinePool, provisioninginput.ControlPlaneMachinePool, provisioninginput.WorkerMachinePool}
+	nodeRolesDedicated[0].MachinePoolConfig.Quantity = 3
+	nodeRolesDedicated[1].MachinePoolConfig.Quantity = 2
+	nodeRolesDedicated[2].MachinePoolConfig.Quantity = 2
+
+	tests := []struct {
+		name         string
+		machinePools []provisioninginput.MachinePools
+		client       *rancher.Client
+		runFlag      bool
+	}{
+		{"OutOfTree" + provisioninginput.StandardClientName.String(), nodeRolesDedicated, r.standardUserClient, r.client.Flags.GetValue(environmentflag.Long)},
+	}
+
+	if !slices.Contains(r.provisioningConfig.Providers, "vsphere") {
+		r.T().Skip("Vsphere Cloud Provider test requires access to vsphere.")
+	}
+
+	for _, tt := range tests {
+		if !tt.runFlag {
+			r.T().Logf("SKIPPED")
+			continue
+		}
+
+		provisioningConfig := *r.provisioningConfig
+		provisioningConfig.CloudProvider = "rancher-vsphere"
 		provisioningConfig.MachinePools = tt.machinePools
 		permutations.RunTestPermutations(&r.Suite, tt.name, tt.client, &provisioningConfig, permutations.RKE2ProvisionCluster, nil, nil)
 	}
