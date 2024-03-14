@@ -8,6 +8,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers"
+	"github.com/rancher/rancher/pkg/controllers/management/auth/globalroles/fleetpermissions"
 	mgmtcontroller "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	rbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
@@ -48,22 +49,23 @@ const (
 func newGlobalRoleBindingLifecycle(management *config.ManagementContext, clusterManager *clustermanager.Manager) *globalRoleBindingLifecycle {
 	management.Wrangler.Mgmt.ClusterRoleTemplateBinding().Cache().AddIndexer(crtbGrbOwnerIndex, crtbGrbOwnerIndexer)
 	return &globalRoleBindingLifecycle{
-		clusters:          management.Management.Clusters(""),
-		clusterLister:     management.Management.Clusters("").Controller().Lister(),
-		projectLister:     management.Management.Projects("").Controller().Lister(),
-		clusterManager:    clusterManager,
-		clusterRoles:      management.RBAC.ClusterRoles(""),
-		crbClient:         management.RBAC.ClusterRoleBindings(""),
-		crbLister:         management.RBAC.ClusterRoleBindings("").Controller().Lister(),
-		crLister:          management.RBAC.ClusterRoles("").Controller().Lister(),
-		crtbClient:        management.Management.ClusterRoleTemplateBindings(""),
-		crtbCache:         management.Wrangler.Mgmt.ClusterRoleTemplateBinding().Cache(),
-		grLister:          management.Management.GlobalRoles("").Controller().Lister(),
-		nsCache:           management.Wrangler.Core.Namespace().Cache(),
-		roles:             management.RBAC.Roles(""),
-		roleLister:        management.RBAC.Roles("").Controller().Lister(),
-		roleBindings:      management.RBAC.RoleBindings(""),
-		roleBindingLister: management.RBAC.RoleBindings("").Controller().Lister(),
+		clusters:                management.Management.Clusters(""),
+		clusterLister:           management.Management.Clusters("").Controller().Lister(),
+		projectLister:           management.Management.Projects("").Controller().Lister(),
+		clusterManager:          clusterManager,
+		clusterRoles:            management.RBAC.ClusterRoles(""),
+		crbClient:               management.RBAC.ClusterRoleBindings(""),
+		crbLister:               management.RBAC.ClusterRoleBindings("").Controller().Lister(),
+		crLister:                management.RBAC.ClusterRoles("").Controller().Lister(),
+		crtbClient:              management.Management.ClusterRoleTemplateBindings(""),
+		crtbCache:               management.Wrangler.Mgmt.ClusterRoleTemplateBinding().Cache(),
+		grLister:                management.Management.GlobalRoles("").Controller().Lister(),
+		nsCache:                 management.Wrangler.Core.Namespace().Cache(),
+		roles:                   management.RBAC.Roles(""),
+		roleLister:              management.RBAC.Roles("").Controller().Lister(),
+		roleBindings:            management.RBAC.RoleBindings(""),
+		roleBindingLister:       management.RBAC.RoleBindings("").Controller().Lister(),
+		fleetPermissionsHandler: fleetpermissions.NewHandler(management),
 	}
 }
 
@@ -77,23 +79,28 @@ func crtbGrbOwnerIndexer(crtb *v3.ClusterRoleTemplateBinding) ([]string, error) 
 	return []string{fmt.Sprintf("%s/%s", crtb.ClusterName, grbOwner)}, nil
 }
 
+type fleetPermissionsHandler interface {
+	ReconcileFleetWorkspacePermissions(globalRoleBinding *v3.GlobalRoleBinding) error
+}
+
 type globalRoleBindingLifecycle struct {
-	clusters          v3.ClusterInterface
-	clusterLister     v3.ClusterLister
-	projectLister     v3.ProjectLister
-	clusterManager    *clustermanager.Manager
-	clusterRoles      rbacv1.ClusterRoleInterface
-	crLister          rbacv1.ClusterRoleLister
-	crbClient         rbacv1.ClusterRoleBindingInterface
-	crbLister         rbacv1.ClusterRoleBindingLister
-	crtbCache         mgmtcontroller.ClusterRoleTemplateBindingCache
-	crtbClient        v3.ClusterRoleTemplateBindingInterface
-	grLister          v3.GlobalRoleLister
-	nsCache           wcorev1.NamespaceCache
-	roles             rbacv1.RoleInterface
-	roleLister        rbacv1.RoleLister
-	roleBindings      rbacv1.RoleBindingInterface
-	roleBindingLister rbacv1.RoleBindingLister
+	clusters                v3.ClusterInterface
+	clusterLister           v3.ClusterLister
+	projectLister           v3.ProjectLister
+	clusterManager          *clustermanager.Manager
+	clusterRoles            rbacv1.ClusterRoleInterface
+	crLister                rbacv1.ClusterRoleLister
+	crbClient               rbacv1.ClusterRoleBindingInterface
+	crbLister               rbacv1.ClusterRoleBindingLister
+	crtbCache               mgmtcontroller.ClusterRoleTemplateBindingCache
+	crtbClient              v3.ClusterRoleTemplateBindingInterface
+	grLister                v3.GlobalRoleLister
+	nsCache                 wcorev1.NamespaceCache
+	roles                   rbacv1.RoleInterface
+	roleLister              rbacv1.RoleLister
+	roleBindings            rbacv1.RoleBindingInterface
+	roleBindingLister       rbacv1.RoleBindingLister
+	fleetPermissionsHandler fleetPermissionsHandler
 }
 
 func (grb *globalRoleBindingLifecycle) Create(obj *v3.GlobalRoleBinding) (runtime.Object, error) {
@@ -107,6 +114,10 @@ func (grb *globalRoleBindingLifecycle) Create(obj *v3.GlobalRoleBinding) (runtim
 		returnError = multierror.Append(returnError, err)
 	}
 	err = grb.reconcileNamespacedRoleBindings(obj)
+	if err != nil {
+		returnError = multierror.Append(returnError, err)
+	}
+	err = grb.fleetPermissionsHandler.ReconcileFleetWorkspacePermissions(obj)
 	if err != nil {
 		returnError = multierror.Append(returnError, err)
 	}
@@ -124,6 +135,10 @@ func (grb *globalRoleBindingLifecycle) Updated(obj *v3.GlobalRoleBinding) (runti
 		returnError = multierror.Append(returnError, err)
 	}
 	err = grb.reconcileNamespacedRoleBindings(obj)
+	if err != nil {
+		returnError = multierror.Append(returnError, err)
+	}
+	err = grb.fleetPermissionsHandler.ReconcileFleetWorkspacePermissions(obj)
 	if err != nil {
 		returnError = multierror.Append(returnError, err)
 	}
