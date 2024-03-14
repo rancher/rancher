@@ -16,7 +16,6 @@ type Client struct {
 	GlobalRole                                GlobalRoleOperations
 	GlobalRoleBinding                         GlobalRoleBindingOperations
 	RoleTemplate                              RoleTemplateOperations
-	PodSecurityPolicyTemplate                 PodSecurityPolicyTemplateOperations
 	PodSecurityPolicyTemplateProjectBinding   PodSecurityPolicyTemplateProjectBindingOperations
 	ClusterRoleTemplateBinding                ClusterRoleTemplateBindingOperations
 	ProjectRoleTemplateBinding                ProjectRoleTemplateBindingOperations
@@ -90,7 +89,6 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 	client.GlobalRole = newGlobalRoleClient(client)
 	client.GlobalRoleBinding = newGlobalRoleBindingClient(client)
 	client.RoleTemplate = newRoleTemplateClient(client)
-	client.PodSecurityPolicyTemplate = newPodSecurityPolicyTemplateClient(client)
 	client.PodSecurityPolicyTemplateProjectBinding = newPodSecurityPolicyTemplateProjectBindingClient(client)
 	client.ClusterRoleTemplateBinding = newClusterRoleTemplateBindingClient(client)
 	client.ProjectRoleTemplateBinding = newProjectRoleTemplateBindingClient(client)

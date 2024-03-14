@@ -80,7 +80,6 @@ type Interface interface {
 	OIDCProvider() OIDCProviderController
 	OpenLdapProvider() OpenLdapProviderController
 	PodSecurityAdmissionConfigurationTemplate() PodSecurityAdmissionConfigurationTemplateController
-	PodSecurityPolicyTemplate() PodSecurityPolicyTemplateController
 	PodSecurityPolicyTemplateProjectBinding() PodSecurityPolicyTemplateProjectBindingController
 	Preference() PreferenceController
 	Principal() PrincipalController
@@ -313,10 +312,6 @@ func (v *version) OpenLdapProvider() OpenLdapProviderController {
 
 func (v *version) PodSecurityAdmissionConfigurationTemplate() PodSecurityAdmissionConfigurationTemplateController {
 	return generic.NewNonNamespacedController[*v3.PodSecurityAdmissionConfigurationTemplate, *v3.PodSecurityAdmissionConfigurationTemplateList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "PodSecurityAdmissionConfigurationTemplate"}, "podsecurityadmissionconfigurationtemplates", v.controllerFactory)
-}
-
-func (v *version) PodSecurityPolicyTemplate() PodSecurityPolicyTemplateController {
-	return generic.NewNonNamespacedController[*v3.PodSecurityPolicyTemplate, *v3.PodSecurityPolicyTemplateList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "PodSecurityPolicyTemplate"}, "podsecuritypolicytemplates", v.controllerFactory)
 }
 
 func (v *version) PodSecurityPolicyTemplateProjectBinding() PodSecurityPolicyTemplateProjectBindingController {

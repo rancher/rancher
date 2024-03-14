@@ -12,7 +12,6 @@ const (
 	KubeAPIServiceFieldExtraEnv                 = "extraEnv"
 	KubeAPIServiceFieldImage                    = "image"
 	KubeAPIServiceFieldPodSecurityConfiguration = "podSecurityConfiguration"
-	KubeAPIServiceFieldPodSecurityPolicy        = "podSecurityPolicy"
 	KubeAPIServiceFieldSecretsEncryptionConfig  = "secretsEncryptionConfig"
 	KubeAPIServiceFieldServiceClusterIPRange    = "serviceClusterIpRange"
 	KubeAPIServiceFieldServiceNodePortRange     = "serviceNodePortRange"
@@ -33,7 +32,6 @@ type KubeAPIService struct {
 	ExtraEnv                 []string                 `json:"extraEnv,omitempty" yaml:"extraEnv,omitempty"`
 	Image                    string                   `json:"image,omitempty" yaml:"image,omitempty"`
 	PodSecurityConfiguration string                   `json:"podSecurityConfiguration,omitempty" yaml:"podSecurityConfiguration,omitempty"`
-	PodSecurityPolicy        bool                     `json:"podSecurityPolicy,omitempty" yaml:"podSecurityPolicy,omitempty"`
 	SecretsEncryptionConfig  *SecretsEncryptionConfig `json:"secretsEncryptionConfig,omitempty" yaml:"secretsEncryptionConfig,omitempty"`
 	ServiceClusterIPRange    string                   `json:"serviceClusterIpRange,omitempty" yaml:"serviceClusterIpRange,omitempty"`
 	ServiceNodePortRange     string                   `json:"serviceNodePortRange,omitempty" yaml:"serviceNodePortRange,omitempty"`
