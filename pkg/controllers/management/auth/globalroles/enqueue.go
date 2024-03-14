@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/controllers/management/auth/globalroles/fleetpermissions"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	wrangler "github.com/rancher/wrangler/v2/pkg/name"
 	"github.com/rancher/wrangler/v2/pkg/relatedresource"
@@ -17,16 +18,19 @@ import (
 )
 
 const (
-	grbGrIndex          = "mgmt-auth-grb-gr-idex"
-	grNsIndex           = "mgmt-auth-gr-ns-index"
-	grSafeConcatIndex   = "mgmt-auth-gr-concat-index"
-	grbSafeConcatIndex  = "mgmt-auth-grb-concat-index"
-	grbEnqueuer         = "mgmt-auth-gr-enqueue"
-	clusterGrEnqueuer   = "mgmt-auth-cluster-gr"
-	crtbGRBEnqueuer     = "mgmt-auth-crtb-grb"
-	roleEnqueuer        = "mgmt-auth-role-gr"
-	roleBindingEnqueuer = "mgmt-auth-rb-grb"
-	namespaceGrEnqueuer = "mgmt-auth-ns-gr"
+	grbGrIndex                 = "mgmt-auth-grb-gr-idex"
+	grNsIndex                  = "mgmt-auth-gr-ns-index"
+	grSafeConcatIndex          = "mgmt-auth-gr-concat-index"
+	grbSafeConcatIndex         = "mgmt-auth-grb-concat-index"
+	grbEnqueuer                = "mgmt-auth-gr-enqueue"
+	clusterGrEnqueuer          = "mgmt-auth-cluster-gr"
+	crtbGRBEnqueuer            = "mgmt-auth-crtb-grb"
+	roleEnqueuer               = "mgmt-auth-role-gr"
+	roleBindingEnqueuer        = "mgmt-auth-rb-grb"
+	namespaceGrEnqueuer        = "mgmt-auth-ns-gr"
+	fleetWorkspaceGrbEnqueuer  = "mgmt-auth-fw-grb"
+	clusterRoleEnqueuer        = "mgmt-auth-cr-grb"
+	clusterRoleBindingEnqueuer = "mgmt-auth-crb-grb"
 )
 
 type globalRBACEnqueuer struct {
@@ -198,6 +202,13 @@ func (g *globalRBACEnqueuer) roleBindingEnqueueGRB(_, _ string, obj runtime.Obje
 		logrus.Errorf("unable to convert object: %[1]v, type: %[1]T to a RoleBinding", obj)
 		return nil, nil
 	}
+	if roleBinding.Labels[fleetpermissions.GRBFleetWorkspaceOwnerLabel] != "" {
+		return []relatedresource.Key{
+			{
+				Name: roleBinding.Labels[fleetpermissions.GRBFleetWorkspaceOwnerLabel],
+			},
+		}, nil
+	}
 	grbOwner, ok := roleBinding.Labels[grbOwnerLabel]
 	if !ok {
 		// this RoleBinding isn't owned by a GRB, no need to enqueue a GRB
@@ -238,4 +249,72 @@ func (g *globalRBACEnqueuer) namespaceEnqueueGR(_, _ string, obj runtime.Object)
 		grNames = append(grNames, relatedresource.Key{Name: gr.Name})
 	}
 	return grNames, nil
+}
+
+// fleetWorkspaceEnqueueGRB enqueues GlobalRoleBinding that are bound to GlobalRoles with InheritedFleetWorkspacePermissions
+// when a FleetWorkspace has changed.
+func (g *globalRBACEnqueuer) fleetWorkspaceEnqueueGRB(_, _ string, obj runtime.Object) ([]relatedresource.Key, error) {
+	if obj == nil {
+		return nil, nil
+	}
+
+	grbs, err := g.grbCache.List(labels.Everything())
+	if err != nil {
+		return nil, fmt.Errorf("unable to list current GlobalRoles: %w", err)
+	}
+	var grbToSync []relatedresource.Key
+	for _, grb := range grbs {
+		gr, err := g.grCache.Get(grb.GlobalRoleName)
+		if err != nil {
+			return nil, fmt.Errorf("unable to get GlobalRole %s: %w", grb.GlobalRoleName, err)
+		}
+		if gr.InheritedFleetWorkspacePermissions.WorkspaceVerbs != nil ||
+			gr.InheritedFleetWorkspacePermissions.ResourceRules != nil {
+			grbToSync = append(grbToSync, relatedresource.Key{Name: grb.Name})
+		}
+	}
+
+	return grbToSync, nil
+}
+
+// clusterRoleEnqueueGRB enqueues GlobalRoleBinding when a generated ClusterRole changes.
+func (g *globalRBACEnqueuer) clusterRoleEnqueueGRB(_, _ string, obj runtime.Object) ([]relatedresource.Key, error) {
+	if obj == nil {
+		return nil, nil
+	}
+	clusterRole, ok := obj.(*v1.ClusterRole)
+	if !ok {
+		logrus.Errorf("unable to convert object: %[1]v, type: %[1]T to a ClusterRole", obj)
+		return nil, nil
+	}
+	if clusterRole.Labels[fleetpermissions.GRBFleetWorkspaceOwnerLabel] != "" {
+		return []relatedresource.Key{
+			{
+				Name: clusterRole.Labels[fleetpermissions.GRBFleetWorkspaceOwnerLabel],
+			},
+		}, nil
+	}
+
+	return nil, nil
+}
+
+// clusterRoleBindingEnqueueGRB enqueues GlobalRoleBinding when a generated ClusterRoleBinding changes.
+func (g *globalRBACEnqueuer) clusterRoleBindingEnqueueGRB(_, _ string, obj runtime.Object) ([]relatedresource.Key, error) {
+	if obj == nil {
+		return nil, nil
+	}
+	clusterRoleBinding, ok := obj.(*v1.ClusterRoleBinding)
+	if !ok {
+		logrus.Errorf("unable to convert object: %[1]v, type: %[1]T to a ClusterRole", obj)
+		return nil, nil
+	}
+	if clusterRoleBinding.Labels[fleetpermissions.GRBFleetWorkspaceOwnerLabel] != "" {
+		return []relatedresource.Key{
+			{
+				Name: clusterRoleBinding.Labels[fleetpermissions.GRBFleetWorkspaceOwnerLabel],
+			},
+		}, nil
+	}
+
+	return nil, nil
 }
