@@ -1149,16 +1149,18 @@ steps:
       - drone-publish.rancher.io
     event:
     - tag
-- name: github_binary_release_digests
-  image: plugins/github-release
+- name: artifacts-upload
+  image: plugins/s3
   settings:
-    api_key:
-      from_secret: github_token
-    files:
-    - "bin/rancher-images-digests-linux-*"
+    bucket: prime-artifacts
+    access_key:
+      from_secret: prime_artifacts_uploader-access_key
+    secret_key:
+      from_secret: prime_artifacts_uploader-secret_key
+    source: bin/rancher-images-digests-linux-*
+    strip_prefix: bin/
+    target: "/rancher/${DRONE_TAG}"
   when:
-    instance:
-    - drone-publish.rancher.io
     event:
     - tag
 
