@@ -629,7 +629,9 @@ func CreateProvisioningAirgapCustomCluster(client *rancher.Client, clustersConfi
 	for poolIndex, poolRole := range rolesPerPool {
 
 		regCmd := fmt.Sprintf("%s %s", token.InsecureNodeCommand, poolRole)
-		regCmd = strings.Replace(regCmd, "CATTLE_AGENT_FALLBACK_PATH=\"/opt/bin\" ", "", -1)
+
+		// environment variables must be escaped inside original registration command
+		regCmd = strings.Replace(regCmd, "\"", "\\\"", -1)
 
 		corralsArgs = append(corralsArgs, corral.Args{
 			Name:        namegen.AppendRandomString(rke2k3sNodeCorralName),
@@ -701,11 +703,13 @@ func CreateProvisioningRKE1AirgapCustomCluster(client *rancher.Client, clustersC
 
 	logrus.Infof("Register Custom Cluster Through Corral")
 	for poolIndex, poolRole := range rolesPerPool {
+		// environment variables must be escaped inside original registration command
+		escapedCommand := strings.Replace(token.InsecureNodeCommand, "\"", "\\\"", -1)
 
 		corralsArgs = append(corralsArgs, corral.Args{
 			Name:        namegen.AppendRandomString(rke1NodeCorralName),
 			PackageName: corralPackages.CorralPackageImages[corralPackageAirgapCustomClusterName],
-			Updates:     map[string]string{"registration_command": fmt.Sprintf("%s %s", token.NodeCommand, poolRole), "node_count": fmt.Sprint(quantityPerPool[poolIndex])},
+			Updates:     map[string]string{"registration_command": fmt.Sprintf("%s %s", escapedCommand, poolRole), "node_count": fmt.Sprint(quantityPerPool[poolIndex])},
 		})
 	}
 
