@@ -1600,6 +1600,8 @@ github.com/poy/onpar v0.0.0-20200406201722-06f95a1c68e8/go.mod h1:nSbFQvMj97ZyhF
 github.com/poy/onpar v1.1.2 h1:QaNrNiZx0+Nar5dLgTVp5mXkyoVFIbepjyEoGSnhbAY=
 github.com/poy/onpar v1.1.2/go.mod h1:6X8FLNoxyr9kkmnlqpK6LSoiOtrO6MICtWwEuWkLjzg=
 github.com/pquerna/cachecontrol v0.1.0/go.mod h1:NrUG3Z7Rdu85UNR3vm7SOsl1nFIeSiQnrHV5K9mBcUI=
+github.com/priyashetty17/shepherd v0.0.0-20240313203801-694f40a3e4d1 h1:P4hoJFnnZeAZSuQ+i7WEHBM9HmleF52DpvfUdsypXeU=
+github.com/priyashetty17/shepherd v0.0.0-20240313203801-694f40a3e4d1/go.mod h1:PVGWt4qZBe+UND1lqsgYCwnjwB/gsGO9umk1KAdtnJU=
 github.com/proglottis/gpgme v0.1.3 h1:Crxx0oz4LKB3QXc5Ea0J19K/3ICfy3ftr5exgUK1AU0=
 github.com/proglottis/gpgme v0.1.3/go.mod h1:fPbW/EZ0LvwQtH8Hy7eixhp1eF3G39dtx7GUN+0Gmy0=
 github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.52.0 h1:ANs+jxSJz7Xylkw9GGrN7IFaVrEjhDyeRqikccPXbW8=
@@ -1680,8 +1682,6 @@ github.com/rancher/remotedialer v0.3.0 h1:y1EO8JCsgZo0RcqTUp6U8FXcBAv27R+TLnWRcp
 github.com/rancher/remotedialer v0.3.0/go.mod h1:BwwztuvViX2JrLLUwDlsYt5DiyUwHLlzynRwkZLAY0Q=
 github.com/rancher/rke v1.5.3 h1:7mGn+NIL7KXk99NwWYBgoByh2+IfVCdws5ad3X/JIZY=
 github.com/rancher/rke v1.5.3/go.mod h1:wZaVWzW46OTuGvyxgRHXGUyJ/QP0zOkKESO9hBOwTaY=
-github.com/rancher/shepherd v0.0.0-20240311154430-9b663d9dfc17 h1:VV9ff26XLhasD6O+DKd6l1jeIQzMZqQkUC9PsPV9aw0=
-github.com/rancher/shepherd v0.0.0-20240311154430-9b663d9dfc17/go.mod h1:PVGWt4qZBe+UND1lqsgYCwnjwB/gsGO9umk1KAdtnJU=
 github.com/rancher/steve v0.0.0-20240301154841-7913f2782a62 h1:BvrW0Tkp1obDP5K1OgvCI+WWmI8m+Zg1X4uCPoxHx90=
 github.com/rancher/steve v0.0.0-20240301154841-7913f2782a62/go.mod h1:+MET7wv8z6yycUt6NRDQzrd+h/j91tumImDg29w7eTw=
 github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007 h1:ru+mqGnxMmKeU0Q3XIDxkARvInDIqT1hH2amTcsjxI4=
