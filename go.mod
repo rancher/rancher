@@ -2,7 +2,7 @@ module github.com/rancher/rancher
 
 go 1.20
 
-replace github.com/rancher/wrangler v1.1.1 => github.com/moio/wrangler v1.1.1-debug-41809-1
+replace github.com/rancher/wrangler v1.1.1 => github.com/aruiz14/wrangler v1.1.1-0.20240315164510-43c77e8207cf // tag: release-2.0-untagged-debug-41809-1
 
 replace github.com/rancher/steve => github.com/moio/steve v0.0.0-20240301090544-d30a8a68fc76
 
@@ -35,7 +35,7 @@ replace (
 	k8s.io/apimachinery => k8s.io/apimachinery v0.27.4
 	k8s.io/apiserver => k8s.io/apiserver v0.27.4
 	k8s.io/cli-runtime => k8s.io/cli-runtime v0.27.4
-	k8s.io/client-go => github.com/rancher/client-go v1.27.4-rancher1
+	k8s.io/client-go => github.com/aruiz14/client-go v1.27.4-rancher1-debug-41809-1
 	k8s.io/cloud-provider => k8s.io/cloud-provider v0.27.4
 	k8s.io/cluster-bootstrap => k8s.io/cluster-bootstrap v0.27.4
 	k8s.io/code-generator => k8s.io/code-generator v0.27.4

@@ -141,6 +141,10 @@ github.com/armon/go-radix v0.0.0-20180808171621-7fddfc383310/go.mod h1:ufUuZ+zHj
 github.com/armon/go-radix v1.0.0/go.mod h1:ufUuZ+zHj4x4TnLV4JWEpy2hxWSpsRywHrMgIH9cCH8=
 github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5 h1:0CwZNZbxp69SHPdPJAN/hZIm0C4OItdklCFmMRWYpio=
 github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5/go.mod h1:wHh0iHkYZB8zMSxRWpUBQtwG5a7fFgvEO+odwuTv2gs=
+github.com/aruiz14/client-go v1.27.4-rancher1-debug-41809-1 h1:so5OzuRCeYi/F+hDUNh+q+7Q2fIoHLwaN0f2ApHCyug=
+github.com/aruiz14/client-go v1.27.4-rancher1-debug-41809-1/go.mod h1:ragcly7lUlN0SRPk5/ZkGnDjPknzb37TICq07WhI6Xc=
+github.com/aruiz14/wrangler v1.1.1-0.20240315164510-43c77e8207cf h1:ZygQWro6r44YmDNTloK2D9CSXkikSoyO09EV5gQzLW8=
+github.com/aruiz14/wrangler v1.1.1-0.20240315164510-43c77e8207cf/go.mod h1:4T80p+rLh2OLbjCjdExIjRHKNBgK9NUAd7eIU/gRPKk=
 github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a/go.mod h1:lB+ZfQJz7igIIfQNfa7Ml4HSf2uFQQRzpGGRXenZAgY=
 github.com/asaskevich/govalidator v0.0.0-20200907205600-7a23bdc65eef/go.mod h1:WaHUgvxTVq04UNunO+XhnAqY/wQc+bxr74GqbsZ/Jqw=
 github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 h1:DklsrG3dyBCFEj5IhUbnKptjxatkF07cF2ak3yi77so=
@@ -864,8 +868,6 @@ github.com/moio/remotedialer v0.3.0-debug-41809-1 h1:pGg43xIYBsut7/65Hy+TRcpNM7U
 github.com/moio/remotedialer v0.3.0-debug-41809-1/go.mod h1:BwwztuvViX2JrLLUwDlsYt5DiyUwHLlzynRwkZLAY0Q=
 github.com/moio/steve v0.0.0-20240301090544-d30a8a68fc76 h1:3/kY2eMBFGGJP+Uq+HxkMxJUIMSZMTHo/Q7SE6Qf0RM=
 github.com/moio/steve v0.0.0-20240301090544-d30a8a68fc76/go.mod h1:IAeZiWgZLSGGlYOUa3qj/G6i1eKl2LFuZ/DKb9mIrzw=
-github.com/moio/wrangler v1.1.1-debug-41809-1 h1:e9TeaooztleJyRQzOYtDHRDuS+0aUgeU/hnH6aGKBoU=
-github.com/moio/wrangler v1.1.1-debug-41809-1/go.mod h1:4T80p+rLh2OLbjCjdExIjRHKNBgK9NUAd7eIU/gRPKk=
 github.com/monochromegane/go-gitignore v0.0.0-20200626010858-205db1a8cc00 h1:n6/2gBQ3RWajuToeY6ZtZTIKv2v7ThUy5KKusIT0yc0=
 github.com/monochromegane/go-gitignore v0.0.0-20200626010858-205db1a8cc00/go.mod h1:Pm3mSP3c5uWn86xMLZ5Sa7JB9GsEZySvHYXCTK4E9q4=
 github.com/montanaflynn/stats v0.0.0-20171201202039-1bf9dbcd8cbe/go.mod h1:wL8QJuTMNUDYhXwkmfOly8iTdp5TEcJFWZD2D7SIkUc=
@@ -1015,8 +1017,6 @@ github.com/rancher/aws-iam-authenticator v0.5.9-0.20220713170329-78acb8c83863 h1
 github.com/rancher/aws-iam-authenticator v0.5.9-0.20220713170329-78acb8c83863/go.mod h1:6dId2LCc8oHqeBzP6E8ndp4DflhKTxYLb5ZXwI4YmFA=
 github.com/rancher/channelserver v0.5.1-0.20230719220800-0a37b73c7df8 h1:Dyg8vyYMBIImru9mo8EF40yRgNgGQQOpC/aA2vZ/SXY=
 github.com/rancher/channelserver v0.5.1-0.20230719220800-0a37b73c7df8/go.mod h1:Ra21yfic6jHRp9+lelgupPeZw0fwpPZ/kPAY3UFQo+I=
-github.com/rancher/client-go v1.27.4-rancher1 h1:1W1A0bV6KXYbu1z+KIezlfLsHPc1wiasAM42BICVKBM=
-github.com/rancher/client-go v1.27.4-rancher1/go.mod h1:ragcly7lUlN0SRPk5/ZkGnDjPknzb37TICq07WhI6Xc=
 github.com/rancher/dynamiclistener v0.3.6 h1:iAFWeiFNra6tYlt4k+jINrK3hOxZ8mjW2S/9nA6sxKs=
 github.com/rancher/dynamiclistener v0.3.6/go.mod h1:VqBaJNi+bZmre0+gi+2Jb6jbn7ovHzRueW+M7QhVKsk=
 github.com/rancher/eks-operator v1.3.0 h1:Hou6VJHNjnT3yCQsI/i6nWYNCGlwZWjX/Wue41X95Do=
