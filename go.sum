@@ -1695,6 +1695,8 @@ github.com/monochromegane/go-gitignore v0.0.0-20200626010858-205db1a8cc00/go.mod
 github.com/montanaflynn/stats v0.0.0-20171201202039-1bf9dbcd8cbe/go.mod h1:wL8QJuTMNUDYhXwkmfOly8iTdp5TEcJFWZD2D7SIkUc=
 github.com/morikuni/aec v1.0.0 h1:nP9CBfwrvYnBRgY6qfDQkygYDmYwOilePFkwzv4dU8A=
 github.com/morikuni/aec v1.0.0/go.mod h1:BbKIizmSmc5MMPqRYbxO4ZU0S0+P200+tUnFx7PXmsc=
+github.com/mspencer87/shepherd v0.0.0-20240709095717-5c8b3703b16e h1:7ywG9PHPa59w8HTeNQg/bVFH756rtrF9GRsYeLlXSzY=
+github.com/mspencer87/shepherd v0.0.0-20240709095717-5c8b3703b16e/go.mod h1:eU5EZYZt86odAKQrZLni9KhClgXh9aI13sPgIDy3FLc=
 github.com/munnerz/goautoneg v0.0.0-20120707110453-a547fc61f48d/go.mod h1:+n7T8mK8HuQTcFwEeznm/DIxMOiR9yIdICNftLE1DvQ=
 github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 h1:C3w9PqII01/Oq1c1nUAm88MOHcQC9l5mIlSMApZMrHA=
 github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822/go.mod h1:+n7T8mK8HuQTcFwEeznm/DIxMOiR9yIdICNftLE1DvQ=
@@ -1885,8 +1887,6 @@ github.com/rancher/remotedialer v0.4.0 h1:T9yC5bFMsZFVQ6rK0dNrRg6rRb6Zr/4vsig8S0
 github.com/rancher/remotedialer v0.4.0/go.mod h1:Ys004RpJuTLSm+k4aYUCoFiOOad37ubYev3TkOFg/5w=
 github.com/rancher/rke v1.6.0-rc9 h1:P8EVV4hl3cG8CHDuFUEfqFK8sC92aLoemFzmeFQOCck=
 github.com/rancher/rke v1.6.0-rc9/go.mod h1:5xRbf3L8PxqJRhABjYRfaBqbpVqAnqyH3maUNQEuwvk=
-github.com/rancher/shepherd v0.0.0-20240628185912-bd372ac2e2e1 h1:JifxjqwelIDn2vx2gf857DBQHFnjaVhvWK4+yy4QQH4=
-github.com/rancher/shepherd v0.0.0-20240628185912-bd372ac2e2e1/go.mod h1:u9MIIECvfn+aLZPYi6+JPnH2qmgE88NIJGQ2UwVsC3w=
 github.com/rancher/steve v0.0.0-20240703132554-22a06dd14f51 h1:Mesz/EY4wtEq2ahqnQirrEufXnfE5HCkFDEqdIhxqa4=
 github.com/rancher/steve v0.0.0-20240703132554-22a06dd14f51/go.mod h1:fFT7pNgAQA+ZPVwT2NqO6B6bLuOmReHpCKxkg0pKUqE=
 github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007 h1:ru+mqGnxMmKeU0Q3XIDxkARvInDIqT1hH2amTcsjxI4=
