@@ -6,6 +6,7 @@ import (
 
 // +genclient
 // +kubebuilder:resource:scope=Namespaced
+// +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Plugin Name",type=string,JSONPath=`.spec.plugin.name`
 // +kubebuilder:printcolumn:name="Version",type=string,JSONPath=`.spec.plugin.version`
 // +kubebuilder:printcolumn:name="State",type=string,JSONPath=`.status.cacheState`
