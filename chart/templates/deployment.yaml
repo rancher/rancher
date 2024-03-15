@@ -143,26 +143,33 @@ spec:
 {{- if .Values.extraEnv }}
 {{ toYaml .Values.extraEnv | indent 8}}
 {{- end }}
-        livenessProbe:
-          httpGet:
-            path: /healthz
-            port: 80
-          initialDelaySeconds: {{.Values.livenessProbe.initialDelaySeconds | default 60 }}
-          periodSeconds: {{ .Values.livenessProbe.periodSeconds | default 30 }}
-        readinessProbe:
-          httpGet:
-            path: /healthz
-            port: 80
-          initialDelaySeconds: {{.Values.readinessProbe.initialDelaySeconds | default  5}}
-          periodSeconds: {{ .Values.readinessProbe.periodSeconds | default 30}}
-{{- if .Values.startupProbe }}
         startupProbe:
           httpGet:
             path: /healthz
             port: 80
-          failureThreshold: {{.Values.startupProbe.failureThreshold | default 1}}
-          periodSeconds: {{ .Values.startupProbe.periodSeconds | default 30}}
-{{- end }}
+          timeoutSeconds: {{ .Values.startupProbe.timeoutSeconds }}
+          failureThreshold: {{ .Values.startupProbe.failureThreshold }}
+          periodSeconds: {{ .Values.startupProbe.periodSeconds }}
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 80
+          {{- with .Values.livenessProbe.initialDelaySeconds}}
+          initialDelaySeconds: {{ . }}
+          {{- end }}
+          timeoutSeconds: {{.Values.livenessProbe.timeoutSeconds }}
+          periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
+          failureThreshold: {{.Values.livenessProbe.failureThreshold }}
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 80
+          {{- with .Values.readinessProbe.initialDelaySeconds}}
+          initialDelaySeconds: {{ . }}
+          {{- end }}
+          timeoutSeconds: {{.Values.readinessProbe.timeoutSeconds }}
+          periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
+          failureThreshold: {{.Values.readinessProbe.failureThreshold }}
         resources:
 {{ toYaml .Values.resources | indent 10 }}
         volumeMounts:
