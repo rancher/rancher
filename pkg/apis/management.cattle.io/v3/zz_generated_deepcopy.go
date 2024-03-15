@@ -10233,6 +10233,7 @@ func (in *UserAttribute) DeepCopyInto(out *UserAttribute) {
 			(*out)[key] = outVal
 		}
 	}
+	in.LastLogin.DeepCopyInto(&out.LastLogin)
 	return
 }
 
