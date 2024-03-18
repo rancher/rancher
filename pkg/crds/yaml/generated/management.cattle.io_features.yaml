@@ -12,7 +12,7 @@ spec:
     listKind: FeatureList
     plural: features
     singular: feature
-  scope: Namespaced
+  scope: Cluster
   versions:
   - name: v3
     schema:
