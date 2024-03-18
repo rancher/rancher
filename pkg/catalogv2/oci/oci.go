@@ -56,7 +56,6 @@ func Chart(credentialSecret *corev1.Secret, chart *repo.ChartVersion, clusterRep
 			PreCopy: func(ctx context.Context, desc ocispecv1.Descriptor) error {
 				// Download only helm chart related descriptors.
 				if desc.MediaType == ocispecv1.MediaTypeImageManifest ||
-					desc.MediaType == registry.ConfigMediaType ||
 					desc.MediaType == registry.ChartLayerMediaType {
 					// We cannot load huge amounts of data into the memory
 					// and so we are defining a limit before fetching.
