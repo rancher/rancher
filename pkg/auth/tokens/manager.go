@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"reflect"
-	"sort"
 	"time"
 
 	"github.com/rancher/norman/httperror"
@@ -572,71 +570,43 @@ func (m *Manager) EnsureAndGetUserAttribute(userID string) (*v3.UserAttribute, b
 	return attribs, true, nil
 }
 
-func (m *Manager) UserAttributeCreateOrUpdate(userID, provider string, groupPrincipals []v3.Principal, userExtraInfo map[string][]string) error {
+func (m *Manager) userAttributeCreateOrUpdate(userID, provider string, groupPrincipals []v3.Principal, userExtraInfo map[string][]string) error {
 	attribs, needCreate, err := m.EnsureAndGetUserAttribute(userID)
 	if err != nil {
 		return err
 	}
 
+	if attribs.GroupPrincipals == nil {
+		attribs.GroupPrincipals = make(map[string]v32.Principals)
+	}
+	attribs.GroupPrincipals[provider] = v32.Principals{Items: groupPrincipals}
+
+	if attribs.ExtraByProvider == nil {
+		attribs.ExtraByProvider = make(map[string]map[string][]string)
+	}
 	if userExtraInfo == nil {
 		userExtraInfo = make(map[string][]string)
 	}
+	attribs.ExtraByProvider[provider] = userExtraInfo
+
+	// Login time is truncated to seconds as the corresponding user label is set as epoch time.
+	attribs.LastLogin = metav1.NewTime(time.Now().Truncate(time.Second))
+
 	if needCreate {
-		attribs.GroupPrincipals[provider] = v32.Principals{Items: groupPrincipals}
-		attribs.ExtraByProvider[provider] = userExtraInfo
-		_, err := m.userAttributes.Create(attribs)
+		_, err = m.userAttributes.Create(attribs)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to create UserAttribute: %w", err)
 		}
+
 		return nil
 	}
 
-	// Exists, just update if necessary
-	if m.UserAttributeChanged(attribs, provider, userExtraInfo, groupPrincipals) {
-		if attribs.ExtraByProvider == nil {
-			attribs.ExtraByProvider = make(map[string]map[string][]string)
-		}
-		attribs.GroupPrincipals[provider] = v32.Principals{Items: groupPrincipals}
-		attribs.ExtraByProvider[provider] = userExtraInfo
-		_, err := m.userAttributes.Update(attribs)
-		if err != nil {
-			return err
-		}
+	_, err = m.userAttributes.Update(attribs)
+	if err != nil {
+		return fmt.Errorf("failed to update UserAttribute: %w", err)
 	}
 
 	return nil
-}
-
-func (m *Manager) UserAttributeChanged(attribs *v32.UserAttribute, provider string, extraInfo map[string][]string, groupPrincipals []v32.Principal) bool {
-	oldSet := []string{}
-	newSet := []string{}
-	for _, principal := range attribs.GroupPrincipals[provider].Items {
-		oldSet = append(oldSet, principal.ObjectMeta.Name)
-	}
-	for _, principal := range groupPrincipals {
-		newSet = append(newSet, principal.ObjectMeta.Name)
-	}
-	sort.Strings(oldSet)
-	sort.Strings(newSet)
-
-	if len(oldSet) != len(newSet) {
-		return true
-	}
-
-	for i := range oldSet {
-		if oldSet[i] != newSet[i] {
-			return true
-		}
-	}
-
-	if attribs.ExtraByProvider == nil && extraInfo != nil {
-		return true
-	}
-	if !reflect.DeepEqual(attribs.ExtraByProvider[provider], extraInfo) {
-		return true
-	}
-
-	return false
 }
 
 var uaBackoff = wait.Backoff{
@@ -660,7 +630,7 @@ func (m *Manager) NewLoginToken(userID string, userPrincipal v3.Principal, group
 	}
 
 	err := wait.ExponentialBackoff(uaBackoff, func() (bool, error) {
-		err := m.UserAttributeCreateOrUpdate(userID, provider, groupPrincipals, userExtraInfo)
+		err := m.userAttributeCreateOrUpdate(userID, provider, groupPrincipals, userExtraInfo)
 		if err != nil {
 			logrus.Warnf("Problem creating or updating userAttribute for %v: %v", userID, err)
 		}
