@@ -1291,6 +1291,8 @@ github.com/jmhodges/clock v0.0.0-20160418191101-880ee4c33548 h1:dYTbLf4m0a5u0KLm
 github.com/jmhodges/clock v0.0.0-20160418191101-880ee4c33548/go.mod h1:hGT6jSUVzF6no3QaDSMLGLEHtHSBSefs+MgcDWnmhmo=
 github.com/jmoiron/sqlx v1.3.5 h1:vFFPA71p1o5gAeqtEAwLU4dnX2napprKtHr7PYIcN3g=
 github.com/jmoiron/sqlx v1.3.5/go.mod h1:nRVWtLre0KfCLJvgxzCsLVMogSvQ1zNJtpYr2Ccp0mQ=
+github.com/joesims22/shepherd v0.0.0-20240318171043-4c32c64962ec h1:Rp9jNzi6lzwEeLoJsgPtzVc17pJSCiYDvUwq7eEdEEI=
+github.com/joesims22/shepherd v0.0.0-20240318171043-4c32c64962ec/go.mod h1:RZBKxW7aL5Pio4F7KLqVVBWoaR20QzvTf3DFWrJzmjU=
 github.com/joho/godotenv v1.3.0/go.mod h1:7hK45KPybAkOC6peb+G5yklZfMxEjkZhHbwpqxOKXbg=
 github.com/jonboulle/clockwork v0.1.0/go.mod h1:Ii8DK3G1RaLaWxj9trq07+26W01tbo22gdxWY5EU2bo=
 github.com/jonboulle/clockwork v0.2.2 h1:UOGuzwb1PwsrDAObMuhUnj0p5ULPj8V/xJ7Kx9qUBdQ=
@@ -1641,8 +1643,6 @@ github.com/rancher/remotedialer v0.3.0 h1:y1EO8JCsgZo0RcqTUp6U8FXcBAv27R+TLnWRcp
 github.com/rancher/remotedialer v0.3.0/go.mod h1:BwwztuvViX2JrLLUwDlsYt5DiyUwHLlzynRwkZLAY0Q=
 github.com/rancher/rke v1.5.7-rc3 h1:UyPGHCE3m69A2UoIQ4VKoXIKYrM593XCgw5USVL741Y=
 github.com/rancher/rke v1.5.7-rc3/go.mod h1:+lcRKCxBLtfaSZQ9Q+BA82cHhSImF62mfElqJvHJUls=
-github.com/rancher/shepherd v0.0.0-20240307235216-45526fb052a5 h1:iONiMurJulhfFufIUwOYqTnuBlVffa9DHvaeA4ZEjl8=
-github.com/rancher/shepherd v0.0.0-20240307235216-45526fb052a5/go.mod h1:RZBKxW7aL5Pio4F7KLqVVBWoaR20QzvTf3DFWrJzmjU=
 github.com/rancher/steve v0.0.0-20240305150728-3943409601f1 h1:6wNYy3q9jget45syTN6K2uOLSYaptLYCHscY2WRmhDI=
 github.com/rancher/steve v0.0.0-20240305150728-3943409601f1/go.mod h1:o4vLBzMTKbHHhIiAcbgOiaN3aK1vIjL6ZTgaGxQYpsY=
 github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007 h1:ru+mqGnxMmKeU0Q3XIDxkARvInDIqT1hH2amTcsjxI4=
