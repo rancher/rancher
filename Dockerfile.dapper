@@ -4,7 +4,7 @@ ARG DAPPER_HOST_ARCH
 ENV HOST_ARCH=${DAPPER_HOST_ARCH} ARCH=${DAPPER_HOST_ARCH}
 ENV CATTLE_HELM_VERSION v2.16.8-rancher2
 ENV CATTLE_MACHINE_VERSION v0.15.0-rancher109
-ENV CATTLE_K3S_VERSION v1.27.5+k3s1
+ENV CATTLE_K3S_VERSION v1.27.10+k3s2
 # helm 3 version
 ENV HELM_VERSION v3.12.3
 ENV KUSTOMIZE_VERSION v5.0.1
@@ -60,7 +60,7 @@ RUN mkdir /usr/tmp && \
     chmod +x /usr/bin/kustomize
 
 # Set up K3s: copy the necessary binaries from the K3s image.
-COPY --from=rancher/k3s:v1.27.5-k3s1 \
+COPY --from=rancher/k3s:v1.27.10-k3s2 \
     /bin/blkid \
     /bin/bandwidth \
     /bin/cni \
