@@ -14,6 +14,12 @@ import (
 
 const SecretsNamespace = namespace.GlobalNamespace
 
+// NameForSecret returns a string with the namespace:name for the provided
+// Secret.
+func NameForSecret(s *corev1.Secret) string {
+	return fmt.Sprintf("%s:%s", s.GetNamespace(), s.GetName())
+}
+
 // CreateOrUpdateSecrets creates a new Secret for a specific authorisation
 // mechanism.
 //
@@ -55,7 +61,8 @@ func CreateOrUpdateSecrets(secrets corev1.SecretInterface, secretInfo, field, au
 			return "", fmt.Errorf("error creating secret %s %w", name, err)
 		}
 	}
-	return fmt.Sprintf("%s:%s", secret.GetNamespace(), secret.GetName()), nil
+
+	return NameForSecret(secret), nil
 }
 
 func ReadFromSecret(secrets corev1.SecretInterface, secretInfo string, field string) (string, error) {
