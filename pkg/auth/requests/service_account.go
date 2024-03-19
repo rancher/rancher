@@ -115,7 +115,7 @@ func (t *ServiceAccountAuth) Authenticate(req *http.Request) (user.Info, bool, e
 	downstreamAuthClient, err := t.authClientCreator(clusterID)
 	if err != nil {
 		logrus.Errorf("saauth: failed to fetch downstream kubeconfig: %v", err)
-		return info, false, fmt.Errorf("failed to get downstream auth client when validating token for downstream cluster: %s", clusterID)
+		return info, false, nil
 	}
 
 	tokenReview := &v1.TokenReview{
