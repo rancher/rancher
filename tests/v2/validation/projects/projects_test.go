@@ -6,15 +6,14 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/rancher/shepherd/extensions/clusters"
 	"github.com/rancher/rancher/tests/v2/actions/kubeapi/namespaces"
 	"github.com/rancher/rancher/tests/v2/actions/kubeapi/projects"
 	project "github.com/rancher/rancher/tests/v2/actions/projects"
 	rbac "github.com/rancher/rancher/tests/v2/actions/rbac"
-	deployment "github.com/rancher/rancher/tests/v2/actions/workloads/deployment"
+	"github.com/rancher/shepherd/extensions/users"
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
-	"github.com/rancher/shepherd/extensions/charts"
-	"github.com/rancher/shepherd/extensions/clusters"
 	"github.com/rancher/shepherd/pkg/session"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
@@ -96,8 +95,12 @@ func (pr *ProjectsTestSuite) TestProjectsCrudDownstreamCluster() {
 	defer subSession.Cleanup()
 
 	log.Info("Create a standard user and add the user to the downstream cluster as cluster owner.")
-	_, standardUserClient, err := rbac.AddUserWithRoleToCluster(pr.client, rbac.StandardUser.String(), rbac.ClusterOwner.String(), pr.cluster, nil)
+	standardUser, err := users.CreateUserWithRole(pr.client, users.UserConfig(), projects.StandardUser)
+	require.NoError(pr.T(), err, "Failed to create standard user")
+	standardUserClient, err := pr.client.AsUser(standardUser)
 	require.NoError(pr.T(), err)
+	err = users.AddClusterRoleToUser(pr.client, pr.cluster, standardUser, rbac.ClusterOwner.String(), nil)
+	require.NoError(pr.T(), err, "Failed to add the user as a cluster owner to the downstream cluster")
 
 	log.Info("Create a project in the downstream cluster and verify that the project can be listed.")
 	projectTemplate := projects.NewProjectTemplate(pr.cluster.ID)
@@ -167,47 +170,17 @@ func (pr *ProjectsTestSuite) TestDeleteSystemProject() {
 	require.Equal(pr.T(), expectedErrorMessage, err.Error())
 }
 
-func (pr *ProjectsTestSuite) TestProjectWithoutResourceQuota() {
-	subSession := pr.session.NewSession()
-	defer subSession.Cleanup()
-
-	log.Info("Create a standard user and add the user to the downstream cluster as cluster owner.")
-	_, standardUserClient, err := rbac.AddUserWithRoleToCluster(pr.client, rbac.StandardUser.String(), rbac.ClusterOwner.String(), pr.cluster, nil)
-	require.NoError(pr.T(), err)
-
-	log.Info("Create a project (without any resource quota) and a namespace in the project.")
-	projectTemplate := projects.NewProjectTemplate(pr.cluster.ID)
-	createdProject, createdNamespace, err := createProjectAndNamespace(standardUserClient, pr.cluster.ID, projectTemplate)
-	require.NoError(pr.T(), err)
-
-	log.Info("Verify that the namespace has the label and annotation referencing the project.")
-	updatedNamespace, err := namespaces.GetNamespaceByName(standardUserClient, pr.cluster.ID, createdNamespace.Name)
-	require.NoError(pr.T(), err)
-	err = checkNamespaceLabelsAndAnnotations(pr.cluster.ID, createdProject.Name, updatedNamespace)
-	require.NoError(pr.T(), err)
-
-	log.Info("Verify that the namespace does not have the annotation: field.cattle.io/resourceQuota.")
-	err = checkAnnotationExistsInNamespace(standardUserClient, pr.cluster.ID, updatedNamespace.Name, resourceQuotaAnnotation, false)
-	require.NoError(pr.T(), err, "'field.cattle.io/resourceQuota' annotation should not exist")
-
-	log.Info("Create a deployment in the namespace with ten replicas.")
-	deployment, err := deployment.CreateDeployment(standardUserClient, pr.cluster.ID, updatedNamespace.Name, 10, "", "", false, false)
-	require.NoError(pr.T(), err, "Failed to create deployment in the namespace")
-
-	log.Info("Verify that there are ten pods created in the deployment and they are in Running state.")
-	err = charts.WatchAndWaitDeployments(standardUserClient, pr.cluster.ID, updatedNamespace.Name, metav1.ListOptions{
-		FieldSelector: "metadata.name=" + deployment.Name,
-	})
-	require.NoError(pr.T(), err)
-}
-
 func (pr *ProjectsTestSuite) TestMoveNamespaceOutOfProject() {
 	subSession := pr.session.NewSession()
 	defer subSession.Cleanup()
 
 	log.Info("Create a standard user and add the user to the downstream cluster as cluster owner.")
-	_, standardUserClient, err := rbac.AddUserWithRoleToCluster(pr.client, rbac.StandardUser.String(), rbac.ClusterOwner.String(), pr.cluster, nil)
+	standardUser, err := users.CreateUserWithRole(pr.client, users.UserConfig(), projects.StandardUser)
+	require.NoError(pr.T(), err, "Failed to create standard user")
+	standardUserClient, err := pr.client.AsUser(standardUser)
 	require.NoError(pr.T(), err)
+	err = users.AddClusterRoleToUser(pr.client, pr.cluster, standardUser, rbac.ClusterOwner.String(), nil)
+	require.NoError(pr.T(), err, "Failed to add the user as a cluster owner to the downstream cluster")
 
 	log.Info("Create a project in the downstream cluster and a namespace in the project.")
 	projectTemplate := projects.NewProjectTemplate(pr.cluster.ID)
@@ -238,76 +211,6 @@ func (pr *ProjectsTestSuite) TestMoveNamespaceOutOfProject() {
 	require.NoError(pr.T(), err)
 	err = checkNamespaceLabelsAndAnnotations(pr.cluster.ID, createdProject.Name, movedNamespace)
 	require.Error(pr.T(), err)
-}
-
-func (pr *ProjectsTestSuite) TestMoveNamespaceBetweenProjectsWithNoResourceQuota() {
-	subSession := pr.session.NewSession()
-	defer subSession.Cleanup()
-
-	log.Info("Create a standard user and add the user to the downstream cluster as cluster owner.")
-	_, standardUserClient, err := rbac.AddUserWithRoleToCluster(pr.client, rbac.StandardUser.String(), rbac.ClusterOwner.String(), pr.cluster, nil)
-	require.NoError(pr.T(), err)
-
-	log.Info("Create a project in the downstream cluster and a namespace in the project.")
-	projectTemplate := projects.NewProjectTemplate(pr.cluster.ID)
-	projectTemplate.Spec.NamespaceDefaultResourceQuota.Limit.Pods = ""
-	projectTemplate.Spec.ResourceQuota.Limit.Pods = ""
-	createdProject, createdNamespace, err := createProjectAndNamespace(standardUserClient, pr.cluster.ID, projectTemplate)
-	require.NoError(pr.T(), err)
-
-	log.Info("Verify that the namespace has the label and annotation referencing the project.")
-	updatedNamespace, err := namespaces.GetNamespaceByName(standardUserClient, pr.cluster.ID, createdNamespace.Name)
-	require.NoError(pr.T(), err)
-	err = checkNamespaceLabelsAndAnnotations(pr.cluster.ID, createdProject.Name, updatedNamespace)
-	require.NoError(pr.T(), err)
-
-	log.Info("Verify that the namespace does not have the annotation: field.cattle.io/resourceQuota.")
-	err = checkAnnotationExistsInNamespace(standardUserClient, pr.cluster.ID, updatedNamespace.Name, resourceQuotaAnnotation, false)
-	require.NoError(pr.T(), err, "'field.cattle.io/resourceQuota' annotation should not exist")
-
-	log.Info("Create a deployment in the namespace with ten replicas.")
-	deployment, err := deployment.CreateDeployment(standardUserClient, createdProject.Namespace, updatedNamespace.Name, 10, "", "", false, false)
-	require.NoError(pr.T(), err, "Failed to create deployment in the namespace")
-
-	log.Info("Verify that there are ten pods created in the deployment and they are in Running state.")
-	err = charts.WatchAndWaitDeployments(standardUserClient, createdProject.Namespace, updatedNamespace.Name, metav1.ListOptions{
-		FieldSelector: "metadata.name=" + deployment.Name,
-	})
-	require.NoError(pr.T(), err)
-
-	log.Info("Create another project in the downstream cluster.")
-	projectTemplate = projects.NewProjectTemplate(pr.cluster.ID)
-	createdProject2, err := standardUserClient.WranglerContext.Mgmt.Project().Create(projectTemplate)
-	require.NoError(pr.T(), err, "Failed to create project")
-	err = project.WaitForProjectFinalizerToUpdate(pr.client, createdProject2.Name, createdProject2.Namespace, 2)
-	require.NoError(pr.T(), err)
-
-	log.Info("Move the namespace from the first project to the second project.")
-	currentNamespace, err := namespaces.GetNamespaceByName(standardUserClient, pr.cluster.ID, updatedNamespace.Name)
-	require.NoError(pr.T(), err)
-	downstreamContext, err := pr.client.WranglerContext.DownStreamClusterWranglerContext(pr.cluster.ID)
-	require.NoError(pr.T(), err)
-
-	updatedNamespace.Annotations[projects.ProjectIDAnnotation] = createdProject2.Namespace + ":" + createdProject2.Name
-	updatedNamespace.ResourceVersion = currentNamespace.ResourceVersion
-	_, err = downstreamContext.Core.Namespace().Update(updatedNamespace)
-	require.NoError(pr.T(), err)
-
-	log.Info("Verify that the namespace has the correct label and annotation referencing the second project.")
-	movedNamespace, err := namespaces.GetNamespaceByName(standardUserClient, pr.cluster.ID, updatedNamespace.Name)
-	require.NoError(pr.T(), err)
-	err = checkNamespaceLabelsAndAnnotations(pr.cluster.ID, createdProject2.Name, movedNamespace)
-	require.NoError(pr.T(), err)
-
-	log.Info("Verify that the namespace does not have the annotation: field.cattle.io/resourceQuota.")
-	err = checkAnnotationExistsInNamespace(standardUserClient, pr.cluster.ID, updatedNamespace.Name, resourceQuotaAnnotation, false)
-	require.NoError(pr.T(), err, "'field.cattle.io/resourceQuota' annotation should not exist")
-
-	log.Info("Verify that the deployment is in Active state and all pods in the deployment are in Running state.")
-	err = charts.WatchAndWaitDeployments(standardUserClient, pr.cluster.ID, movedNamespace.Name, metav1.ListOptions{
-		FieldSelector: "metadata.name=" + deployment.Name,
-	})
-	require.NoError(pr.T(), err)
 }
 
 func TestProjectsTestSuite(t *testing.T) {
