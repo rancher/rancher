@@ -224,7 +224,7 @@ func (c AccessTokenCache) Export(cache cache.Marshaler, key string) {
 		return
 	}
 
-	err = common.CreateOrUpdateSecrets(c.Secrets, string(marshalled), "access-token", "azuread")
+	_, err = common.CreateOrUpdateSecrets(c.Secrets, string(marshalled), "access-token", "azuread")
 	if err != nil {
 		logrus.Errorf("[%s] failed to save the access token in Kubernetes: %v", cacheLogPrefix, err)
 	}

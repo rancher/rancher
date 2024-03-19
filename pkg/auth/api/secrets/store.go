@@ -9,7 +9,6 @@ import (
 	"github.com/rancher/norman/types/values"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
-	"github.com/rancher/rancher/pkg/namespace"
 )
 
 func Wrap(store types.Store, secrets corev1.SecretInterface) types.Store {
@@ -69,8 +68,10 @@ func (s *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 }
 
 func (s *Store) CreateOrUpdateSecrets(value, field, kind string) (string, error) {
-	if err := common.CreateOrUpdateSecrets(s.Secrets, value, strings.ToLower(field), strings.ToLower(kind)); err != nil {
-		return "", fmt.Errorf("error creating secret for %s:%s", kind, field)
+	name, err := common.CreateOrUpdateSecrets(s.Secrets, value, strings.ToLower(field), strings.ToLower(kind))
+	if err != nil {
+		return "", fmt.Errorf("error creating secret %s: %w", name, err)
 	}
-	return fmt.Sprintf("%s:%s-%s", namespace.GlobalNamespace, strings.ToLower(kind), strings.ToLower(field)), nil
+
+	return name, nil
 }

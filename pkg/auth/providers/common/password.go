@@ -14,10 +14,21 @@ import (
 
 const SecretsNamespace = namespace.GlobalNamespace
 
-func CreateOrUpdateSecrets(secrets corev1.SecretInterface, secretInfo string, field string, authType string) error {
+// CreateOrUpdateSecrets creates a new Secret for a specific authorisation
+// mechanism.
+//
+// The secret is created with field: secretInfo as its .Data and the authType
+// and field as the Name.
+//
+// In the event that the Secret already exists, if the .Data doesn't match the
+// desired state it is overwritten.
+//
+// It returns a string with the namespace:name of the created Secret.
+func CreateOrUpdateSecrets(secrets corev1.SecretInterface, secretInfo, field, authType string) (string, error) {
 	if secretInfo == "" {
-		return nil
+		return "", nil
 	}
+
 	name := fmt.Sprintf("%s-%s", authType, field)
 	secret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -30,20 +41,21 @@ func CreateOrUpdateSecrets(secrets corev1.SecretInterface, secretInfo string, fi
 
 	curr, err := secrets.Controller().Lister().Get(SecretsNamespace, name)
 	if err != nil && !apierrors.IsNotFound(err) {
-		return fmt.Errorf("error getting secret for %s : %v", name, err)
+		return "", fmt.Errorf("error getting secret for %s : %w", name, err)
 	}
+
 	if err == nil && !reflect.DeepEqual(curr.Data, secret.Data) {
 		_, err = secrets.Update(secret)
 		if err != nil {
-			return fmt.Errorf("error updating secret %s: %v", name, err)
+			return "", fmt.Errorf("error updating secret %s: %w", name, err)
 		}
 	} else if apierrors.IsNotFound(err) {
 		_, err = secrets.Create(secret)
 		if err != nil && !apierrors.IsAlreadyExists(err) {
-			return fmt.Errorf("error creating secret %s %v", name, err)
+			return "", fmt.Errorf("error creating secret %s %w", name, err)
 		}
 	}
-	return nil
+	return fmt.Sprintf("%s:%s", secret.GetNamespace(), secret.GetName()), nil
 }
 
 func ReadFromSecret(secrets corev1.SecretInterface, secretInfo string, field string) (string, error) {
@@ -89,8 +101,5 @@ func DeleteSecret(secrets corev1.SecretInterface, configType string, field strin
 
 // SavePasswordSecret creates a secret out of a password, config type, and field name.
 func SavePasswordSecret(secrets corev1.SecretInterface, password string, fieldName string, authType string) (string, error) {
-	if err := CreateOrUpdateSecrets(secrets, password, strings.ToLower(fieldName), strings.ToLower(authType)); err != nil {
-		return "", err
-	}
-	return GetFullSecretName(authType, strings.ToLower(fieldName)), nil
+	return CreateOrUpdateSecrets(secrets, password, strings.ToLower(fieldName), strings.ToLower(authType))
 }

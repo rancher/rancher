@@ -119,11 +119,12 @@ func (g *ghProvider) saveGithubConfig(config *v32.GithubConfig) error {
 
 	secretInfo := convert.ToString(config.ClientSecret)
 	field := strings.ToLower(client.GithubConfigFieldClientSecret)
-	if err := common.CreateOrUpdateSecrets(g.secrets, secretInfo, field, strings.ToLower(config.Type)); err != nil {
+	name, err := common.CreateOrUpdateSecrets(g.secrets, secretInfo, field, strings.ToLower(config.Type))
+	if err != nil {
 		return err
 	}
 
-	config.ClientSecret = common.GetFullSecretName(config.Type, field)
+	config.ClientSecret = name
 
 	_, err = g.authConfigs.ObjectClient().Update(config.ObjectMeta.Name, config)
 	if err != nil {

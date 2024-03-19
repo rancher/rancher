@@ -54,6 +54,24 @@ func TestReadFromSecret(t *testing.T) {
 	}
 }
 
+func TestNameForSecret(t *testing.T) {
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "shibbolethconfig-serviceaccountpassword",
+			Namespace: "cattle-global-data",
+		},
+		StringData: map[string]string{
+			"serviceaccountpassword": "test-password",
+		},
+		Type: corev1.SecretTypeOpaque,
+	}
+
+	want := "cattle-global-data:shibbolethconfig-serviceaccountpassword"
+	if n := NameForSecret(secret); n != want {
+		t.Errorf("NameForSecret() got %s, want t%s", n, want)
+	}
+}
+
 func TestSavePasswordSecret(t *testing.T) {
 	secrets := &secretFake{}
 	secretInterface := newSecretInterfaceMock(secrets)
