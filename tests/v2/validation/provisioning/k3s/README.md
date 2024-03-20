@@ -23,16 +23,23 @@ provisioningInput is needed to the run the K3S tests, specifically kubernetesVer
 ```yaml
 provisioningInput:
   machinePools:
-  - nodeRoles:
+  - machinePoolConfig:
       etcd: true
       controlplane: true
       worker: true
       quantity: 1
-  - nodeRoles:
+      # the following are optional parameters
+      drainBeforeDelete: true
+      hostnameLengthLimit: 29
+      nodeStartupTimeout: "600s"
+      unhealthyNodeTimeout: "300s"
+      maxUnhealthy: "2"
+      unhealthyRange: "2-4"
+  - machinePoolConfig:
       worker: true
       quantity: 2
       drainBeforeDelete: true
-  - nodeRoles:
+  - machinePoolConfig:
       windows: true
       quantity: 1
   flags:

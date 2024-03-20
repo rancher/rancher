@@ -9,7 +9,6 @@ import (
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
 	"github.com/rancher/shepherd/extensions/clusters"
-	"github.com/rancher/shepherd/extensions/machinepools"
 	"github.com/rancher/shepherd/extensions/provisioning"
 	"github.com/rancher/shepherd/extensions/provisioninginput"
 	"github.com/rancher/shepherd/extensions/users"
@@ -66,26 +65,10 @@ func (r *RKE2AgentCustomizationTestSuite) SetupSuite() {
 }
 
 func (r *RKE2AgentCustomizationTestSuite) TestProvisioningRKE2ClusterAgentCustomization() {
-	productionPool := []provisioninginput.MachinePools{
-		{
-			NodeRoles: machinepools.NodeRoles{
-				ControlPlane: true,
-				Quantity:     2,
-			},
-		},
-		{
-			NodeRoles: machinepools.NodeRoles{
-				Etcd:     true,
-				Quantity: 3,
-			},
-		},
-		{
-			NodeRoles: machinepools.NodeRoles{
-				Worker:   true,
-				Quantity: 2,
-			},
-		},
-	}
+	productionPool := []provisioninginput.MachinePools{provisioninginput.EtcdMachinePool, provisioninginput.ControlPlaneMachinePool, provisioninginput.WorkerMachinePool}
+	productionPool[0].MachinePoolConfig.Quantity = 3
+	productionPool[1].MachinePoolConfig.Quantity = 2
+	productionPool[2].MachinePoolConfig.Quantity = 2
 
 	agentCustomization := management.AgentDeploymentCustomization{
 		AppendTolerations: []management.Toleration{
@@ -157,26 +140,10 @@ func (r *RKE2AgentCustomizationTestSuite) TestProvisioningRKE2ClusterAgentCustom
 }
 
 func (r *RKE2AgentCustomizationTestSuite) TestFailureProvisioningRKE2ClusterAgentCustomization() {
-	productionPool := []provisioninginput.MachinePools{
-		{
-			NodeRoles: machinepools.NodeRoles{
-				ControlPlane: true,
-				Quantity:     2,
-			},
-		},
-		{
-			NodeRoles: machinepools.NodeRoles{
-				Etcd:     true,
-				Quantity: 3,
-			},
-		},
-		{
-			NodeRoles: machinepools.NodeRoles{
-				Worker:   true,
-				Quantity: 2,
-			},
-		},
-	}
+	productionPool := []provisioninginput.MachinePools{provisioninginput.EtcdMachinePool, provisioninginput.ControlPlaneMachinePool, provisioninginput.WorkerMachinePool}
+	productionPool[0].MachinePoolConfig.Quantity = 3
+	productionPool[1].MachinePoolConfig.Quantity = 2
+	productionPool[2].MachinePoolConfig.Quantity = 2
 
 	agentCustomization := management.AgentDeploymentCustomization{
 		AppendTolerations: []management.Toleration{
