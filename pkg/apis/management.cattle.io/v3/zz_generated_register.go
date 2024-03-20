@@ -1,5 +1,5 @@
 /*
-Copyright 2023 Rancher Labs, Inc.
+Copyright 2024 Rancher Labs, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -39,12 +39,8 @@ var (
 	CatalogTemplateVersionResourceName                    = "catalogtemplateversions"
 	CloudCredentialResourceName                           = "cloudcredentials"
 	ClusterResourceName                                   = "clusters"
-	ClusterAlertResourceName                              = "clusteralerts"
-	ClusterAlertGroupResourceName                         = "clusteralertgroups"
-	ClusterAlertRuleResourceName                          = "clusteralertrules"
 	ClusterCatalogResourceName                            = "clustercatalogs"
 	ClusterLoggingResourceName                            = "clusterloggings"
-	ClusterMonitorGraphResourceName                       = "clustermonitorgraphs"
 	ClusterRegistrationTokenResourceName                  = "clusterregistrationtokens"
 	ClusterRoleTemplateBindingResourceName                = "clusterroletemplatebindings"
 	ClusterTemplateResourceName                           = "clustertemplates"
@@ -66,14 +62,12 @@ var (
 	KontainerDriverResourceName                           = "kontainerdrivers"
 	LocalProviderResourceName                             = "localproviders"
 	ManagedChartResourceName                              = "managedcharts"
-	MonitorMetricResourceName                             = "monitormetrics"
 	MultiClusterAppResourceName                           = "multiclusterapps"
 	MultiClusterAppRevisionResourceName                   = "multiclusterapprevisions"
 	NodeResourceName                                      = "nodes"
 	NodeDriverResourceName                                = "nodedrivers"
 	NodePoolResourceName                                  = "nodepools"
 	NodeTemplateResourceName                              = "nodetemplates"
-	NotifierResourceName                                  = "notifiers"
 	OIDCProviderResourceName                              = "oidcproviders"
 	OpenLdapProviderResourceName                          = "openldapproviders"
 	PodSecurityAdmissionConfigurationTemplateResourceName = "podsecurityadmissionconfigurationtemplates"
@@ -82,12 +76,8 @@ var (
 	PreferenceResourceName                                = "preferences"
 	PrincipalResourceName                                 = "principals"
 	ProjectResourceName                                   = "projects"
-	ProjectAlertResourceName                              = "projectalerts"
-	ProjectAlertGroupResourceName                         = "projectalertgroups"
-	ProjectAlertRuleResourceName                          = "projectalertrules"
 	ProjectCatalogResourceName                            = "projectcatalogs"
 	ProjectLoggingResourceName                            = "projectloggings"
-	ProjectMonitorGraphResourceName                       = "projectmonitorgraphs"
 	ProjectNetworkPolicyResourceName                      = "projectnetworkpolicies"
 	ProjectRoleTemplateBindingResourceName                = "projectroletemplatebindings"
 	RancherUserNotificationResourceName                   = "rancherusernotifications"
@@ -149,18 +139,10 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&CloudCredentialList{},
 		&Cluster{},
 		&ClusterList{},
-		&ClusterAlert{},
-		&ClusterAlertList{},
-		&ClusterAlertGroup{},
-		&ClusterAlertGroupList{},
-		&ClusterAlertRule{},
-		&ClusterAlertRuleList{},
 		&ClusterCatalog{},
 		&ClusterCatalogList{},
 		&ClusterLogging{},
 		&ClusterLoggingList{},
-		&ClusterMonitorGraph{},
-		&ClusterMonitorGraphList{},
 		&ClusterRegistrationToken{},
 		&ClusterRegistrationTokenList{},
 		&ClusterRoleTemplateBinding{},
@@ -203,8 +185,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&LocalProviderList{},
 		&ManagedChart{},
 		&ManagedChartList{},
-		&MonitorMetric{},
-		&MonitorMetricList{},
 		&MultiClusterApp{},
 		&MultiClusterAppList{},
 		&MultiClusterAppRevision{},
@@ -217,8 +197,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&NodePoolList{},
 		&NodeTemplate{},
 		&NodeTemplateList{},
-		&Notifier{},
-		&NotifierList{},
 		&OIDCProvider{},
 		&OIDCProviderList{},
 		&OpenLdapProvider{},
@@ -235,18 +213,10 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&PrincipalList{},
 		&Project{},
 		&ProjectList{},
-		&ProjectAlert{},
-		&ProjectAlertList{},
-		&ProjectAlertGroup{},
-		&ProjectAlertGroupList{},
-		&ProjectAlertRule{},
-		&ProjectAlertRuleList{},
 		&ProjectCatalog{},
 		&ProjectCatalogList{},
 		&ProjectLogging{},
 		&ProjectLoggingList{},
-		&ProjectMonitorGraph{},
-		&ProjectMonitorGraphList{},
 		&ProjectNetworkPolicy{},
 		&ProjectNetworkPolicyList{},
 		&ProjectRoleTemplateBinding{},

@@ -11,3 +11,8 @@ data:
   {{- else if .Values.webhook }}
   rancher-webhook: {{ toYaml .Values.webhook | quote }}
   {{- end }}
+  {{- if and .Values.fleet (kindIs "string" .Values.fleet) }}
+  fleet: {{ .Values.fleet | quote }}
+  {{- else if .Values.fleet }}
+  fleet: {{ toYaml .Values.fleet | quote }}
+  {{- end }}

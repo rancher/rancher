@@ -19,11 +19,11 @@ import (
 	"github.com/rancher/rancher/pkg/serviceaccounttoken"
 	"github.com/rancher/rancher/pkg/tls"
 	"github.com/rancher/rancher/pkg/wrangler"
-	appcontrollers "github.com/rancher/wrangler/pkg/generated/controllers/apps/v1"
-	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
-	"github.com/rancher/wrangler/pkg/generic"
-	"github.com/rancher/wrangler/pkg/name"
-	"github.com/rancher/wrangler/pkg/relatedresource"
+	appcontrollers "github.com/rancher/wrangler/v2/pkg/generated/controllers/apps/v1"
+	corecontrollers "github.com/rancher/wrangler/v2/pkg/generated/controllers/core/v1"
+	"github.com/rancher/wrangler/v2/pkg/generic"
+	"github.com/rancher/wrangler/v2/pkg/name"
+	"github.com/rancher/wrangler/v2/pkg/relatedresource"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -39,10 +39,9 @@ import (
 )
 
 const (
-	rkeBootstrapName                   = "rke.cattle.io/rkebootstrap-name"
-	capiMachinePreDrainAnnotation      = "pre-drain.delete.hook.machine.cluster.x-k8s.io/rke-bootstrap-cleanup"
-	capiMachinePreDrainAnnotationOwner = "rke-bootstrap-controller"
-	capiMachinePreTerminateAnnotation  = "pre-terminate.delete.hook.machine.cluster.x-k8s.io/rke-bootstrap-cleanup"
+	rkeBootstrapName                       = "rke.cattle.io/rkebootstrap-name"
+	capiMachinePreTerminateAnnotation      = "pre-terminate.delete.hook.machine.cluster.x-k8s.io/rke-bootstrap-cleanup"
+	capiMachinePreTerminateAnnotationOwner = "rke-bootstrap-controller"
 )
 
 type handler struct {
@@ -292,7 +291,7 @@ func (h *handler) OnChange(_ string, bootstrap *rkev1.RKEBootstrap) (*rkev1.RKEB
 		return h.rkeBootstrap.Update(bootstrap)
 	}
 
-	return h.reconcileMachinePreDrainAnnotation(bootstrap)
+	return h.reconcileMachinePreTerminateAnnotation(bootstrap)
 }
 
 func (h *handler) GeneratingHandler(bootstrap *rkev1.RKEBootstrap, status rkev1.RKEBootstrapStatus) ([]runtime.Object, rkev1.RKEBootstrapStatus, error) {
@@ -396,24 +395,23 @@ func getLabelsAndAnnotationsForPlanSecret(bootstrap *rkev1.RKEBootstrap, machine
 // when it is deleting and bootstrap is for an etcd node.
 func (h *handler) OnRemove(_ string, bootstrap *rkev1.RKEBootstrap) (*rkev1.RKEBootstrap, error) {
 	logrus.Debugf("[rkebootstrap] %s/%s: OnRemove invoked", bootstrap.Namespace, bootstrap.Name)
-
-	return h.reconcileMachinePreDrainAnnotation(bootstrap)
+	return h.reconcileMachinePreTerminateAnnotation(bootstrap)
 }
 
-// reconcileMachinePreDrainAnnotation reconciles the machine object that owns the bootstrap. It only reconciles the machine if it is an
-// etcd machine. Its primary purpose is to manage the pre-drain.delete.hook.machine.x-k8s.io annotation on the machine
-// object, which is used to prevent draining of the corresponding downstream node, since draining may include the static
-// etcd pod which could cause a quorum loss or at worst inability to elect a new etcd member.
-// The pre-drain hook will be set on the machine object if the machine and bootstrap are not deleting, the corresponding
+// reconcileMachinePreTerminateAnnotation reconciles the machine object that owns the bootstrap. It only reconciles the machine if it is an
+// etcd machine. Its primary purpose is to manage the pre-terminate.delete.hook.machine.x-k8s.io annotation on the machine
+// object, which is used to prevent premature tear down of infrastructure before it is ready to be teared down, i.e.
+// allowing removal of an etcd member without causing quorum loss.
+// The pre-terminate hook will be set on the machine object if the machine and bootstrap are not deleting, the corresponding
 // CAPI cluster and RKEControlPlane are not deleting, and the force remove annotation is not set on the bootstrap.
-// The annotation will be removed from the machine to allow draining in the following cases:
-// * The machine is deleting and no machines are using this one's join-url
+// The annotation will be removed from the machine to allow infrastructure cleanup in the following cases:
+// * The machine is deleting and the "safe remove" logic has fired and removed the etcd member from the etcd cluster
 // * The bootstrap is missing the CAPI cluster label || the CAPI cluster controlPlaneRef is nil || the machine noderef is nil
 // * Any of the following: CAPI kubeconfig secret, CAPI cluster object, RKEControlPlane object are not found
 //
-// Notably, CAPI controllers do not trigger a deletion of the RKEBootstrap object if a pre-drain annotation exists on the corresponding machine object.
+// Notably, CAPI controllers do not trigger a deletion of the RKEBootstrap object if a pre-terminate annotation exists on the corresponding machine object.
 // This means we rely on the OnChange handler to perform node safe removal, when it sees that the corresponding machine is deleting.
-func (h *handler) reconcileMachinePreDrainAnnotation(bootstrap *rkev1.RKEBootstrap) (*rkev1.RKEBootstrap, error) {
+func (h *handler) reconcileMachinePreTerminateAnnotation(bootstrap *rkev1.RKEBootstrap) (*rkev1.RKEBootstrap, error) {
 	machine, err := capr.GetMachineByOwner(h.machineCache, bootstrap)
 	if err != nil {
 		if errors.Is(err, capr.ErrNoMachineOwnerRef) || apierrors.IsNotFound(err) {
@@ -427,19 +425,19 @@ func (h *handler) reconcileMachinePreDrainAnnotation(bootstrap *rkev1.RKEBootstr
 
 	forceRemove, ok := bootstrap.Annotations[capr.ForceRemoveEtcdAnnotation]
 	if (ok && strings.ToLower(forceRemove) == "true") || !isEtcd {
-		// If the force remove annotation is "true" or the node is not an etcd node, then ensure the machine pre drain annotation is removed.
-		return h.ensureMachinePreDrainAnnotationRemoved(bootstrap, machine)
+		// If the force remove annotation is "true" or the node is not an etcd node, then ensure the machine pre terminate annotation is removed.
+		return h.ensureMachinePreTerminateAnnotationRemoved(bootstrap, machine)
 	}
 
-	// Only add the pre-drain hook annotation if the corresponding machine and bootstrap are NOT deleting
+	// Only add the pre-terminate hook annotation if the corresponding machine and bootstrap are NOT deleting
 	if machine.DeletionTimestamp.IsZero() && bootstrap.DeletionTimestamp.IsZero() {
-		// annotate the CAPI machine with the pre-drain.delete.hook.machine.cluster.x-k8s.io annotation if it is an etcd machine
-		if val, ok := machine.GetAnnotations()[capiMachinePreDrainAnnotation]; !ok || val != capiMachinePreDrainAnnotationOwner {
+		// annotate the CAPI machine with the pre-terminate.delete.hook.machine.cluster.x-k8s.io annotation if it is an etcd machine
+		if val, ok := machine.GetAnnotations()[capiMachinePreTerminateAnnotation]; !ok || val != capiMachinePreTerminateAnnotationOwner {
 			machine = machine.DeepCopy()
 			if machine.Annotations == nil {
 				machine.Annotations = make(map[string]string)
 			}
-			machine.Annotations[capiMachinePreDrainAnnotation] = capiMachinePreDrainAnnotationOwner
+			machine.Annotations[capiMachinePreTerminateAnnotation] = capiMachinePreTerminateAnnotationOwner
 			machine, err = h.machineClient.Update(machine)
 			if err != nil {
 				return bootstrap, err
@@ -449,40 +447,40 @@ func (h *handler) reconcileMachinePreDrainAnnotation(bootstrap *rkev1.RKEBootstr
 	}
 
 	if bootstrap.Spec.ClusterName == "" {
-		logrus.Warnf("[rkebootstrap] %s/%s: CAPI cluster label %s was not found in bootstrap labels, ensuring machine pre-drain annotation is removed", bootstrap.Namespace, bootstrap.Name, capi.ClusterNameLabel)
-		return h.ensureMachinePreDrainAnnotationRemoved(bootstrap, machine)
+		logrus.Warnf("[rkebootstrap] %s/%s: CAPI cluster label %s was not found in bootstrap labels, ensuring machine pre-terminate annotation is removed", bootstrap.Namespace, bootstrap.Name, capi.ClusterNameLabel)
+		return h.ensureMachinePreTerminateAnnotationRemoved(bootstrap, machine)
 	}
 
 	capiCluster, err := h.capiClusterCache.Get(bootstrap.Namespace, bootstrap.Spec.ClusterName)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			logrus.Warnf("[rkebootstrap] %s/%s: CAPI cluster %s/%s was not found, ensuring machine pre-drain annotation is removed", bootstrap.Namespace, bootstrap.Name, bootstrap.Namespace, bootstrap.Spec.ClusterName)
-			return h.ensureMachinePreDrainAnnotationRemoved(bootstrap, machine)
+			logrus.Warnf("[rkebootstrap] %s/%s: CAPI cluster %s/%s was not found, ensuring machine pre-terminate annotation is removed", bootstrap.Namespace, bootstrap.Name, bootstrap.Namespace, bootstrap.Spec.ClusterName)
+			return h.ensureMachinePreTerminateAnnotationRemoved(bootstrap, machine)
 		}
 		return bootstrap, err
 	}
 
 	if capiCluster.Spec.ControlPlaneRef == nil {
-		logrus.Warnf("[rkebootstrap] %s/%s: CAPI cluster %s/%s controlplane object reference was nil, ensuring machine pre-drain annotation is removed", bootstrap.Namespace, bootstrap.Name, capiCluster.Namespace, capiCluster.Name)
-		return h.ensureMachinePreDrainAnnotationRemoved(bootstrap, machine)
+		logrus.Warnf("[rkebootstrap] %s/%s: CAPI cluster %s/%s controlplane object reference was nil, ensuring machine pre-terminate annotation is removed", bootstrap.Namespace, bootstrap.Name, capiCluster.Namespace, capiCluster.Name)
+		return h.ensureMachinePreTerminateAnnotationRemoved(bootstrap, machine)
 	}
 
 	cp, err := h.rkeControlPlanes.Get(capiCluster.Spec.ControlPlaneRef.Namespace, capiCluster.Spec.ControlPlaneRef.Name)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			logrus.Warnf("[rkebootstrap] %s/%s: RKEControlPlane %s/%s was not found, ensuring machine pre-drain annotation is removed", bootstrap.Namespace, bootstrap.Name, capiCluster.Spec.ControlPlaneRef.Namespace, capiCluster.Spec.ControlPlaneRef.Name)
-			return h.ensureMachinePreDrainAnnotationRemoved(bootstrap, machine)
+			logrus.Warnf("[rkebootstrap] %s/%s: RKEControlPlane %s/%s was not found, ensuring machine pre-terminate annotation is removed", bootstrap.Namespace, bootstrap.Name, capiCluster.Spec.ControlPlaneRef.Namespace, capiCluster.Spec.ControlPlaneRef.Name)
+			return h.ensureMachinePreTerminateAnnotationRemoved(bootstrap, machine)
 		}
 		return bootstrap, err
 	}
 
 	if !cp.DeletionTimestamp.IsZero() || !capiCluster.DeletionTimestamp.IsZero() {
-		return h.ensureMachinePreDrainAnnotationRemoved(bootstrap, machine)
+		return h.ensureMachinePreTerminateAnnotationRemoved(bootstrap, machine)
 	}
 
 	if machine.Status.NodeRef == nil {
-		logrus.Infof("[rkebootstrap] No associated node found for machine %s/%s in cluster %s, ensuring machine pre-drain annotation is removed", machine.Namespace, machine.Name, bootstrap.Spec.ClusterName)
-		return h.ensureMachinePreDrainAnnotationRemoved(bootstrap, machine)
+		logrus.Infof("[rkebootstrap] No associated node found for machine %s/%s in cluster %s, ensuring machine pre-terminate annotation is removed", machine.Namespace, machine.Name, bootstrap.Spec.ClusterName)
+		return h.ensureMachinePreTerminateAnnotationRemoved(bootstrap, machine)
 	}
 
 	// If the RKEControlPlane is not deleting, then make sure this node is not being used as an init node.
@@ -514,7 +512,7 @@ func (h *handler) reconcileMachinePreDrainAnnotation(bootstrap *rkev1.RKEBootstr
 	kcSecret, err := h.secretCache.Get(bootstrap.Namespace, secret.Name(bootstrap.Spec.ClusterName, secret.Kubeconfig))
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			return h.ensureMachinePreDrainAnnotationRemoved(bootstrap, machine)
+			return h.ensureMachinePreTerminateAnnotationRemoved(bootstrap, machine)
 		}
 		return bootstrap, err
 	}
@@ -532,27 +530,16 @@ func (h *handler) reconcileMachinePreDrainAnnotation(bootstrap *rkev1.RKEBootstr
 		h.rkeBootstrap.EnqueueAfter(bootstrap.Namespace, bootstrap.Name, 5*time.Second)
 		return bootstrap, generic.ErrSkip
 	}
-
-	return h.ensureMachinePreDrainAnnotationRemoved(bootstrap, machine)
+	return h.ensureMachinePreTerminateAnnotationRemoved(bootstrap, machine)
 }
 
-// ensureMachinePreDrainAnnotationRemoved removes the pre-drain annotation from a CAPI machine when we remove
-// the rkebootstrap, indicating the node can be drained. This also removes the legacy capiMachinePreTerminateAnnotation
-// if it exists.
-func (h *handler) ensureMachinePreDrainAnnotationRemoved(bootstrap *rkev1.RKEBootstrap, machine *capi.Machine) (*rkev1.RKEBootstrap, error) {
+// ensureMachinePreTerminateAnnotationRemoved removes the pre-terminate annotation from a CAPI machine when we removing the rkebootstrap, indicating the infrastructure can be deleted.
+func (h *handler) ensureMachinePreTerminateAnnotationRemoved(bootstrap *rkev1.RKEBootstrap, machine *capi.Machine) (*rkev1.RKEBootstrap, error) {
 	if machine == nil || machine.Annotations == nil {
 		return bootstrap, nil
 	}
 
 	var err error
-	if _, ok := machine.GetAnnotations()[capiMachinePreDrainAnnotation]; ok {
-		machine = machine.DeepCopy()
-		delete(machine.Annotations, capiMachinePreDrainAnnotation)
-		_, err = h.machineClient.Update(machine)
-	}
-	if err != nil {
-		return bootstrap, err
-	}
 	if _, ok := machine.GetAnnotations()[capiMachinePreTerminateAnnotation]; ok {
 		machine = machine.DeepCopy()
 		delete(machine.Annotations, capiMachinePreTerminateAnnotation)

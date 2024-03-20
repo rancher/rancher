@@ -6,15 +6,96 @@ import (
 
 	"github.com/golang/mock/gomock"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	"github.com/rancher/wrangler/pkg/generic/fake"
-	"github.com/rancher/wrangler/pkg/relatedresource"
+	"github.com/rancher/wrangler/v2/pkg/generic/fake"
+	"github.com/rancher/wrangler/v2/pkg/relatedresource"
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
+
+var (
+	longName           = "long-name--------------------------------------------------------"
+	safeConcatLongName = "long-name------------------------------------------------cc9244"
+)
+
+func Test_grNsIndexer(t *testing.T) {
+	t.Parallel()
+	gr := &v3.GlobalRole{
+		NamespacedRules: map[string][]v1.PolicyRule{
+			"ns1": nil,
+			"ns2": nil,
+		},
+	}
+	res, resErr := grNsIndexer(gr)
+	require.NoError(t, resErr)
+	require.Len(t, res, 2)
+	require.Contains(t, res, "ns1")
+	require.Contains(t, res, "ns2")
+
+	gr.NamespacedRules = map[string][]v1.PolicyRule{}
+	res, resErr = grNsIndexer(gr)
+	require.NoError(t, resErr)
+	require.Len(t, res, 0)
+
+	gr.NamespacedRules = nil
+	res, resErr = grNsIndexer(gr)
+	require.NoError(t, resErr)
+	require.Len(t, res, 0)
+}
+
+func Test_grbGrIndexer(t *testing.T) {
+	t.Parallel()
+	grb := &v3.GlobalRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-grb",
+		},
+		GlobalRoleName: "test-gr",
+	}
+	res, resErr := grbGrIndexer(grb)
+	require.NoError(t, resErr)
+	require.Equal(t, []string{"test-gr"}, res)
+}
+
+func Test_grSafeConcatIndexer(t *testing.T) {
+	t.Parallel()
+	gr := &v3.GlobalRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "gr1",
+		},
+	}
+	res, resErr := grSafeConcatIndexer(gr)
+	require.NoError(t, resErr)
+	require.Equal(t, []string{"gr1"}, res)
+
+	// Make sure it returns the concatenated name
+	gr.SetName(longName)
+	res, resErr = grSafeConcatIndexer(gr)
+	require.NoError(t, resErr)
+	require.Equal(t, []string{safeConcatLongName}, res)
+}
+
+func Test_grbSafeConcatIndexer(t *testing.T) {
+	t.Parallel()
+	grb := &v3.GlobalRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "grb1",
+		},
+	}
+	res, resErr := grbSafeConcatIndexer(grb)
+	require.NoError(t, resErr)
+	require.Equal(t, []string{"grb1"}, res)
+
+	// Make sure it returns the concatenated name
+	grb.SetName(longName)
+	res, resErr = grbSafeConcatIndexer(grb)
+	require.NoError(t, resErr)
+	require.Equal(t, []string{safeConcatLongName}, res)
+}
 
 func Test_enqueueGRBs(t *testing.T) {
 	t.Parallel()
@@ -485,6 +566,339 @@ func Test_crtbEnqueueGRB(t *testing.T) {
 				grbCache: grbCache,
 			}
 			res, resErr := enqueuer.crtbEnqueueGRB("", "", test.inputObject)
+			require.Len(t, res, len(test.wantKeys))
+			for _, key := range test.wantKeys {
+				require.Contains(t, res, key)
+			}
+			if test.wantError {
+				require.Error(t, resErr)
+			} else {
+				require.NoError(t, resErr)
+			}
+		})
+	}
+}
+
+func Test_roleEnqueueGR(t *testing.T) {
+	t.Parallel()
+	type testState struct {
+		grCacheMock *fake.MockNonNamespacedCacheInterface[*v3.GlobalRole]
+	}
+	tests := []struct {
+		name        string
+		stateSetup  func(state testState)
+		inputObject runtime.Object
+		wantKeys    []relatedresource.Key
+		wantError   bool
+	}{
+		{
+			name:        "object is nil",
+			inputObject: nil,
+			wantError:   false,
+		},
+		{
+			name:        "object is not a role",
+			inputObject: &v3.GlobalRole{},
+			wantError:   false,
+		},
+		{
+			name: "role does not have owning GR",
+			inputObject: &v1.Role{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-role",
+				},
+			},
+			wantError: false,
+		},
+		{
+			name: "GR get fails",
+			inputObject: &v1.Role{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "test-role",
+					Labels: map[string]string{grOwnerLabel: "test-GR"},
+				},
+			},
+			stateSetup: func(state testState) {
+				state.grCacheMock.EXPECT().GetByIndex(grSafeConcatIndex, "test-GR").Return(nil, fmt.Errorf("error"))
+			},
+			wantError: true,
+		},
+		{
+			name: "GR gets enqueued",
+			inputObject: &v1.Role{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "test-role",
+					Labels: map[string]string{grOwnerLabel: "test-GR"},
+				},
+			},
+			stateSetup: func(state testState) {
+				gr := &v3.GlobalRole{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-GR",
+					},
+				}
+				state.grCacheMock.EXPECT().GetByIndex(grSafeConcatIndex, "test-GR").Return([]*v3.GlobalRole{gr}, nil)
+			},
+			wantKeys:  []relatedresource.Key{{Name: "test-GR"}},
+			wantError: false,
+		},
+		{
+			name: "GR with long name gets enqueued",
+			inputObject: &v1.Role{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "test-role",
+					Labels: map[string]string{grOwnerLabel: safeConcatLongName},
+				},
+			},
+			stateSetup: func(state testState) {
+				gr := &v3.GlobalRole{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: longName,
+					},
+				}
+				state.grCacheMock.EXPECT().GetByIndex(grSafeConcatIndex, safeConcatLongName).Return([]*v3.GlobalRole{gr}, nil)
+			},
+			wantKeys:  []relatedresource.Key{{Name: longName}},
+			wantError: false,
+		},
+	}
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			ctrl := gomock.NewController(t)
+			grCache := fake.NewMockNonNamespacedCacheInterface[*v3.GlobalRole](ctrl)
+			state := testState{
+				grCacheMock: grCache,
+			}
+			if test.stateSetup != nil {
+				test.stateSetup(state)
+			}
+			enqueuer := globalRBACEnqueuer{
+				grCache: grCache,
+			}
+			res, resErr := enqueuer.roleEnqueueGR("", "", test.inputObject)
+			require.Len(t, res, len(test.wantKeys))
+			for _, key := range test.wantKeys {
+				require.Contains(t, res, key)
+			}
+			if test.wantError {
+				require.Error(t, resErr)
+			} else {
+				require.NoError(t, resErr)
+			}
+		})
+	}
+}
+
+func Test_roleBindingEnqueueGRB(t *testing.T) {
+	t.Parallel()
+	type testState struct {
+		grbCacheMock *fake.MockNonNamespacedCacheInterface[*v3.GlobalRoleBinding]
+	}
+	tests := []struct {
+		name        string
+		stateSetup  func(state testState)
+		inputObject runtime.Object
+		wantKeys    []relatedresource.Key
+		wantError   bool
+	}{
+		{
+			name:        "object is nil",
+			inputObject: nil,
+			wantError:   false,
+		},
+		{
+			name:        "object is not a roleBinding",
+			inputObject: &v3.GlobalRole{},
+			wantError:   false,
+		},
+		{
+			name: "roleBinding does not have owning GR",
+			inputObject: &v1.RoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-roleBinding",
+				},
+			},
+			wantError: false,
+		},
+		{
+			name: "GRB get fails",
+			inputObject: &v1.RoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "test-roleBinding",
+					Labels: map[string]string{grbOwnerLabel: "test-GRB"},
+				},
+			},
+			stateSetup: func(state testState) {
+				state.grbCacheMock.EXPECT().GetByIndex(grbSafeConcatIndex, "test-GRB").Return(nil, fmt.Errorf("error"))
+			},
+			wantError: true,
+		},
+		{
+			name: "GRB gets enqueued",
+			inputObject: &v1.RoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "test-roleBinding",
+					Labels: map[string]string{grbOwnerLabel: "test-GRB"},
+				},
+			},
+			stateSetup: func(state testState) {
+				grb := &v3.GlobalRoleBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-GRB",
+					},
+				}
+				state.grbCacheMock.EXPECT().GetByIndex(grbSafeConcatIndex, "test-GRB").Return([]*v3.GlobalRoleBinding{grb}, nil)
+			},
+			wantKeys:  []relatedresource.Key{{Name: "test-GRB"}},
+			wantError: false,
+		},
+		{
+			name: "GRB with long name gets enqueued",
+			inputObject: &v1.RoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "test-roleBinding",
+					Labels: map[string]string{grbOwnerLabel: safeConcatLongName},
+				},
+			},
+			stateSetup: func(state testState) {
+				grb := &v3.GlobalRoleBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: longName,
+					},
+				}
+				state.grbCacheMock.EXPECT().GetByIndex(grbSafeConcatIndex, safeConcatLongName).Return([]*v3.GlobalRoleBinding{grb}, nil)
+			},
+			wantKeys:  []relatedresource.Key{{Name: longName}},
+			wantError: false,
+		},
+	}
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			ctrl := gomock.NewController(t)
+			grbCache := fake.NewMockNonNamespacedCacheInterface[*v3.GlobalRoleBinding](ctrl)
+			state := testState{
+				grbCacheMock: grbCache,
+			}
+			if test.stateSetup != nil {
+				test.stateSetup(state)
+			}
+			enqueuer := globalRBACEnqueuer{
+				grbCache: grbCache,
+			}
+			res, resErr := enqueuer.roleBindingEnqueueGRB("", "", test.inputObject)
+			require.Len(t, res, len(test.wantKeys))
+			for _, key := range test.wantKeys {
+				require.Contains(t, res, key)
+			}
+			if test.wantError {
+				require.Error(t, resErr)
+			} else {
+				require.NoError(t, resErr)
+			}
+		})
+	}
+}
+
+func Test_namespaceEnqueueGR(t *testing.T) {
+	t.Parallel()
+	type testState struct {
+		grCacheMock *fake.MockNonNamespacedCacheInterface[*v3.GlobalRole]
+	}
+	tests := []struct {
+		name        string
+		stateSetup  func(state testState)
+		inputObject runtime.Object
+		wantKeys    []relatedresource.Key
+		wantError   bool
+	}{
+		{
+			name:        "object is nil",
+			inputObject: nil,
+			wantError:   false,
+		},
+		{
+			name:        "object is not a namespace",
+			inputObject: &v3.GlobalRole{},
+			wantError:   false,
+		},
+		{
+			name: "namespace not in a NamespacedRule",
+			inputObject: &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "ns1",
+				},
+			},
+			stateSetup: func(state testState) {
+				state.grCacheMock.EXPECT().GetByIndex(grNsIndex, "ns1").Return([]*v3.GlobalRole{}, nil)
+			},
+			wantError: false,
+		},
+		{
+			name: "get namespace fails",
+			inputObject: &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "ns1",
+				},
+			},
+			stateSetup: func(state testState) {
+				state.grCacheMock.EXPECT().GetByIndex(grNsIndex, "ns1").Return(nil, fmt.Errorf("error"))
+			},
+			wantError: true,
+		},
+		{
+			name: "multiple grs are returned",
+			inputObject: &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "ns1",
+				},
+			},
+			stateSetup: func(state testState) {
+				grs := []*v3.GlobalRole{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "gr1",
+						},
+						NamespacedRules: map[string][]v1.PolicyRule{
+							"ns1": nil,
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "gr2",
+						},
+						NamespacedRules: map[string][]v1.PolicyRule{
+							"ns1": nil,
+						},
+					},
+				}
+				state.grCacheMock.EXPECT().GetByIndex(grNsIndex, "ns1").Return(grs, nil)
+			},
+			wantKeys: []relatedresource.Key{
+				{Name: "gr1"},
+				{Name: "gr2"},
+			},
+		},
+	}
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			ctrl := gomock.NewController(t)
+			grCache := fake.NewMockNonNamespacedCacheInterface[*v3.GlobalRole](ctrl)
+			state := testState{
+				grCacheMock: grCache,
+			}
+			if test.stateSetup != nil {
+				test.stateSetup(state)
+			}
+			enqueuer := globalRBACEnqueuer{
+				grCache: grCache,
+			}
+			res, resErr := enqueuer.namespaceEnqueueGR("", "", test.inputObject)
 			require.Len(t, res, len(test.wantKeys))
 			for _, key := range test.wantKeys {
 				require.Contains(t, res, key)

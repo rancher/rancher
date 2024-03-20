@@ -8,7 +8,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/dashboard/chart"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
-	"github.com/rancher/wrangler/pkg/generic/fake"
+	"github.com/rancher/wrangler/v2/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
@@ -176,7 +176,7 @@ func TestGetChartValue(t *testing.T) {
 			configCache := fake.NewMockCacheInterface[*v1.ConfigMap](ctrl)
 			test.setup(configCache)
 			getter := chart.RancherConfigGetter{configCache}
-			got, err := getter.GetChartValues(tt.chartName)
+			got, err := getter.GetChartValues(test.chartName)
 			if test.wantErr {
 				assert.Equal(t, test.notFound, chart.IsNotFoundError(err))
 				assert.Error(t, err, "Expected test to error.")

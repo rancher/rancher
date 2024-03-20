@@ -22,6 +22,7 @@ type ExportConfig struct {
 	OsType           OSType
 	ChartsPath       string
 	SystemChartsPath string
+	GithubEndpoints  []GithubEndpoint
 }
 
 type OSType int
@@ -61,6 +62,10 @@ func ResolveWithCluster(image string, cluster *v3.Cluster) string {
 	return image
 }
 
+// GetImages fetches the list of container images used in the sources provided in the exportConfig.
+// Rancher charts, system charts, system images and extension images of Rancher are fetched.
+// GetImages is called during runtime by Rancher catalog package which is deprecated.
+// It is actually used for generation rancher-images.txt for airgap scenarios.
 func GetImages(exportConfig ExportConfig, externalImages map[string][]string, imagesFromArgs []string, rkeSystemImages map[string]rketypes.RKESystemImages) ([]string, []string, error) {
 	imagesSet := make(map[string]map[string]struct{})
 
@@ -83,9 +88,7 @@ func GetImages(exportConfig ExportConfig, externalImages map[string][]string, im
 	}
 
 	// fetch images from extension catalog images
-	extensions := ExtensionsConfig{
-		GithubEndpoints: ExtensionEndpoints,
-	}
+	extensions := ExtensionsConfig{exportConfig}
 	if err := extensions.FetchExtensionImages(imagesSet); err != nil {
 		return nil, nil, errors.Wrap(err, "failed to fetch images from extensions")
 	}

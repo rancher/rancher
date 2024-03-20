@@ -69,11 +69,6 @@ spec:
               displayName:
                 description: DisplayName is the human-readable name for the project.
                 type: string
-              enableProjectMonitoring:
-                description: EnableProjectMonitoring indicates whether Monitoring
-                  V1 should be enabled for this project. Deprecated. Use the Monitoring
-                  V2 app instead. Defaults to false.
-                type: boolean
               namespaceDefaultResourceQuota:
                 description: NamespaceDefaultResourceQuota is a specification of the
                   default ResourceQuota that a namespace will receive if none is provided.
@@ -303,41 +298,6 @@ spec:
                   - type
                   type: object
                 type: array
-              monitoringStatus:
-                description: MonitoringStatus is the status of the Monitoring V1 app.
-                properties:
-                  conditions:
-                    items:
-                      properties:
-                        lastTransitionTime:
-                          description: Last time the condition transitioned from one
-                            status to another.
-                          type: string
-                        lastUpdateTime:
-                          description: The last time this condition was updated.
-                          type: string
-                        message:
-                          description: Human-readable message indicating details about
-                            last transition
-                          type: string
-                        reason:
-                          description: The reason for the condition's last transition.
-                          type: string
-                        status:
-                          description: Status of the condition, one of True, False,
-                            Unknown.
-                          type: string
-                        type:
-                          description: Type of cluster condition.
-                          type: string
-                      required:
-                      - status
-                      - type
-                      type: object
-                    type: array
-                  grafanaEndpoint:
-                    type: string
-                type: object
               podSecurityPolicyTemplateId:
                 description: PodSecurityPolicyTemplateName is the pod security policy
                   template associated with the project.

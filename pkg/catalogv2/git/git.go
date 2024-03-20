@@ -1,13 +1,11 @@
 package git
 
 import (
-	"bufio"
 	"bytes"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
@@ -18,7 +16,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/rancher/wrangler/pkg/randomtoken"
+	"github.com/rancher/wrangler/v2/pkg/randomtoken"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
@@ -31,6 +29,18 @@ type Options struct {
 	CABundle          []byte
 	InsecureTLSVerify bool
 	Headers           map[string]string
+}
+
+type git struct {
+	URL               string
+	Directory         string
+	password          string
+	agent             *agent.Agent
+	caBundle          []byte
+	insecureTLSVerify bool
+	secret            *corev1.Secret
+	headers           map[string]string
+	knownHosts        []byte
 }
 
 func newGit(directory, url string, opts *Options) (*git, error) {
@@ -49,96 +59,85 @@ func newGit(directory, url string, opts *Options) (*git, error) {
 	return g, g.setCredential(opts.Credential)
 }
 
-type git struct {
-	URL               string
-	Directory         string
-	password          string
-	agent             *agent.Agent
-	caBundle          []byte
-	insecureTLSVerify bool
-	secret            *corev1.Secret
-	headers           map[string]string
-	knownHosts        []byte
-}
-
-// LsRemote runs ls-remote on git repo and returns the HEAD commit SHA
-func (g *git) LsRemote(branch string, commit string) (string, error) {
-	if changed, err := g.remoteSHAChanged(branch, commit); err != nil || !changed {
-		return commit, err
-	}
-
-	output := &bytes.Buffer{}
-	if err := g.gitCmd(output, "ls-remote", "--", g.URL, formatRefForBranch(branch)); err != nil {
-		return "", err
-	}
-
-	var lines []string
-	s := bufio.NewScanner(output)
-	for s.Scan() {
-		lines = append(lines, s.Text())
-	}
-
-	return firstField(lines, fmt.Sprintf("no commit for branch: %s", branch))
-}
-
-// Head runs git clone on directory(if not exist), reset dirty content and return the HEAD commit
-func (g *git) Head(branch string) (string, error) {
-	if err := g.clone(branch); err != nil {
-		return "", err
-	}
-
-	if err := g.reset("HEAD"); err != nil {
-		return "", err
-	}
-
-	return g.currentCommit()
-}
-
-// Clone runs git clone with depth 1
-func (g *git) Clone(branch string) error {
-	if branch == "" {
-		return g.git("clone", "--depth=1", "-n", "--", g.URL, g.Directory)
-	}
-	return g.git("clone", "--depth=1", "-n", "--branch="+branch, "--", g.URL, g.Directory)
-}
-
-// Update updates git repo if remote sha has changed
-func (g *git) Update(branch string) (string, error) {
-	if err := g.clone(branch); err != nil {
-		return "", nil
-	}
-
-	if err := g.reset("HEAD"); err != nil {
-		return "", err
-	}
-
-	commit, err := g.currentCommit()
-	if err != nil {
-		return commit, err
-	}
-
-	if changed, err := g.remoteSHAChanged(branch, commit); err != nil || !changed {
-		return commit, err
-	}
-
-	if err := g.fetchAndReset(branch); err != nil {
-		return "", err
-	}
-
-	return g.currentCommit()
-}
-
-// Ensure runs git clone, clean DIRTY contents and fetch the latest commit
-func (g *git) Ensure(commit string) error {
-	if err := g.clone(""); err != nil {
-		return err
-	}
-
-	if err := g.reset(commit); err == nil {
+func (g *git) setCredential(cred *corev1.Secret) error {
+	if cred == nil {
 		return nil
 	}
 
-	return g.fetchAndReset(commit)
+	switch cred.Type {
+	case corev1.SecretTypeBasicAuth:
+		username, password := cred.Data[corev1.BasicAuthUsernameKey], cred.Data[corev1.BasicAuthPasswordKey]
+		if len(password) == 0 && len(username) == 0 {
+			return nil
+		}
+
+		u, err := url.Parse(g.URL)
+		if err != nil {
+			return err
+		}
+		u.User = url.User(string(username))
+		g.URL = u.String()
+		g.password = string(password)
+	case corev1.SecretTypeSSHAuth:
+		key, err := ssh.ParseRawPrivateKey(cred.Data[corev1.SSHAuthPrivateKey])
+		if err != nil {
+			return err
+		}
+		sshAgent := agent.NewKeyring()
+		err = sshAgent.Add(agent.AddedKey{
+			PrivateKey: key,
+		})
+		if err != nil {
+			return err
+		}
+		g.knownHosts = cred.Data["known_hosts"]
+		g.agent = &sshAgent
+	}
+
+	return nil
+}
+
+func (g *git) injectAgent(cmd *exec.Cmd) (io.Closer, error) {
+	r, err := randomtoken.Generate()
+	if err != nil {
+		return nil, err
+	}
+
+	tmpDir, err := os.MkdirTemp("", "ssh-agent")
+	if err != nil {
+		return nil, err
+	}
+
+	addr := &net.UnixAddr{
+		Name: filepath.Join(tmpDir, r),
+		Net:  "unix",
+	}
+
+	l, err := net.ListenUnix(addr.Net, addr)
+	if err != nil {
+		return nil, err
+	}
+
+	cmd.Env = append(cmd.Env, "SSH_AUTH_SOCK="+addr.Name)
+
+	go func() {
+		defer os.RemoveAll(tmpDir)
+		defer l.Close()
+		for {
+			conn, err := l.Accept()
+			if err != nil {
+				if !k8snet.IsProbableEOF(err) {
+					logrus.Errorf("failed to accept ssh-agent client connection: %v", err)
+				}
+				return
+			}
+			if err := agent.ServeAgent(*g.agent, conn); err != nil && err != io.EOF {
+				logrus.Errorf("failed to handle ssh-agent client connection: %v", err)
+			}
+		}
+	}()
+
+	return l, nil
 }
 
 func (g *git) httpClientWithCreds() (*http.Client, error) {
@@ -169,6 +168,7 @@ func (g *git) httpClientWithCreds() (*http.Client, error) {
 		}
 		pool, err := x509.SystemCertPool()
 		if err != nil {
+			logrus.Debugf("getting system cert pool failed with %s", err)
 			pool = x509.NewCertPool()
 		}
 		pool.AddCert(cert)
@@ -192,6 +192,42 @@ func (g *git) httpClientWithCreds() (*http.Client, error) {
 	}
 
 	return client, nil
+}
+
+// Clone runs git clone with depth 1
+func (g *git) Clone(branch string) error {
+	if branch == "" {
+		return g.git("clone", "--depth=1", "-n", "--", g.URL, g.Directory)
+	}
+	return g.git("clone", "--depth=1", "-n", "--branch="+branch, "--", g.URL, g.Directory)
+}
+
+func (g *git) clone(branch string) error {
+	gitDir := filepath.Join(g.Directory, ".git")
+	if dir, err := os.Stat(gitDir); err == nil && dir.IsDir() {
+		return nil
+	}
+
+	if err := os.RemoveAll(g.Directory); err != nil {
+		return fmt.Errorf("failed to remove directory %s: %v", g.Directory, err)
+	}
+
+	return g.Clone(branch)
+}
+
+func (g *git) fetchAndReset(rev string) error {
+	if err := g.git("-C", g.Directory, "fetch", "origin", "--", rev); err != nil {
+		return err
+	}
+	return g.reset("FETCH_HEAD")
+}
+
+func (g *git) reset(rev string) error {
+	return g.git("-C", g.Directory, "reset", "--hard", rev)
+}
+
+func (g *git) currentCommit() (string, error) {
+	return g.gitOutput("-C", g.Directory, "rev-parse", "HEAD")
 }
 
 func (g *git) remoteSHAChanged(branch, sha string) (bool, error) {
@@ -251,71 +287,6 @@ func (g *git) gitOutput(args ...string) (string, error) {
 	return strings.TrimSpace(output.String()), err
 }
 
-func (g *git) setCredential(cred *corev1.Secret) error {
-	if cred == nil {
-		return nil
-	}
-
-	if cred.Type == corev1.SecretTypeBasicAuth {
-		username, password := cred.Data[corev1.BasicAuthUsernameKey], cred.Data[corev1.BasicAuthPasswordKey]
-		if len(password) == 0 && len(username) == 0 {
-			return nil
-		}
-
-		u, err := url.Parse(g.URL)
-		if err != nil {
-			return err
-		}
-		u.User = url.User(string(username))
-		g.URL = u.String()
-		g.password = string(password)
-	} else if cred.Type == corev1.SecretTypeSSHAuth {
-		key, err := ssh.ParseRawPrivateKey(cred.Data[corev1.SSHAuthPrivateKey])
-		if err != nil {
-			return err
-		}
-		sshAgent := agent.NewKeyring()
-		err = sshAgent.Add(agent.AddedKey{
-			PrivateKey: key,
-		})
-		if err != nil {
-			return err
-		}
-		g.knownHosts = cred.Data["known_hosts"]
-		g.agent = &sshAgent
-	}
-
-	return nil
-}
-
-func (g *git) clone(branch string) error {
-	gitDir := filepath.Join(g.Directory, ".git")
-	if dir, err := os.Stat(gitDir); err == nil && dir.IsDir() {
-		return nil
-	}
-
-	if err := os.RemoveAll(g.Directory); err != nil {
-		return fmt.Errorf("failed to remove directory %s: %v", g.Directory, err)
-	}
-
-	return g.Clone(branch)
-}
-
-func (g *git) fetchAndReset(rev string) error {
-	if err := g.git("-C", g.Directory, "fetch", "origin", "--", rev); err != nil {
-		return err
-	}
-	return g.reset("FETCH_HEAD")
-}
-
-func (g *git) reset(rev string) error {
-	return g.git("-C", g.Directory, "reset", "--hard", rev)
-}
-
-func (g *git) currentCommit() (string, error) {
-	return g.gitOutput("-C", g.Directory, "rev-parse", "HEAD")
-}
-
 func (g *git) gitCmd(output io.Writer, args ...string) error {
 	kv := fmt.Sprintf("credential.helper=%s", `/bin/sh -c 'echo "password=$GIT_PASSWORD"'`)
 	cmd := exec.Command("git", append([]string{"-c", kv}, args...)...)
@@ -333,7 +304,7 @@ func (g *git) gitCmd(output io.Writer, args ...string) error {
 	}
 
 	if len(g.knownHosts) != 0 {
-		f, err := ioutil.TempFile("", "known_hosts")
+		f, err := os.CreateTemp("", "known_hosts")
 		if err != nil {
 			return err
 		}
@@ -358,7 +329,7 @@ func (g *git) gitCmd(output io.Writer, args ...string) error {
 	}
 
 	if len(g.caBundle) > 0 {
-		f, err := ioutil.TempFile("", "ca-pem-")
+		f, err := os.CreateTemp("", "ca-pem-")
 		if err != nil {
 			return err
 		}
@@ -379,102 +350,4 @@ func (g *git) gitCmd(output io.Writer, args ...string) error {
 		return fmt.Errorf("git %s error: %w, detail: %v", strings.Join(args, " "), err, stderrBuf.String())
 	}
 	return nil
-}
-
-func (g *git) injectAgent(cmd *exec.Cmd) (io.Closer, error) {
-	r, err := randomtoken.Generate()
-	if err != nil {
-		return nil, err
-	}
-
-	tmpDir, err := ioutil.TempDir("", "ssh-agent")
-	if err != nil {
-		return nil, err
-	}
-
-	addr := &net.UnixAddr{
-		Name: filepath.Join(tmpDir, r),
-		Net:  "unix",
-	}
-
-	l, err := net.ListenUnix(addr.Net, addr)
-	if err != nil {
-		return nil, err
-	}
-
-	cmd.Env = append(cmd.Env, "SSH_AUTH_SOCK="+addr.Name)
-
-	go func() {
-		defer os.RemoveAll(tmpDir)
-		defer l.Close()
-		for {
-			conn, err := l.Accept()
-			if err != nil {
-				if !k8snet.IsProbableEOF(err) {
-					logrus.Errorf("failed to accept ssh-agent client connection: %v", err)
-				}
-				return
-			}
-			if err := agent.ServeAgent(*g.agent, conn); err != nil && err != io.EOF {
-				logrus.Errorf("failed to handle ssh-agent client connection: %v", err)
-			}
-		}
-	}()
-
-	return l, nil
-}
-
-func formatGitURL(endpoint, branch string) string {
-	u, err := url.Parse(endpoint)
-	if err != nil {
-		return ""
-	}
-
-	pathParts := strings.Split(u.Path, "/")
-	switch u.Hostname() {
-	case "github.com":
-		if len(pathParts) >= 3 {
-			org := pathParts[1]
-			repo := strings.TrimSuffix(pathParts[2], ".git")
-			return fmt.Sprintf("https://api.github.com/repos/%s/%s/commits/%s", org, repo, branch)
-		}
-	case "git.rancher.io":
-		repo := strings.TrimSuffix(pathParts[1], ".git")
-		u.Path = fmt.Sprintf("/repos/%s/commits/%s", repo, branch)
-		return u.String()
-	}
-
-	return ""
-}
-
-func firstField(lines []string, errText string) (string, error) {
-	if len(lines) == 0 {
-		return "", errors.New(errText)
-	}
-
-	fields := strings.Fields(lines[0])
-	if len(fields) == 0 {
-		return "", errors.New(errText)
-	}
-
-	if len(fields[0]) == 0 {
-		return "", errors.New(errText)
-	}
-
-	return fields[0], nil
-}
-
-func formatRefForBranch(branch string) string {
-	return fmt.Sprintf("refs/heads/%s", branch)
-}
-
-type basicRoundTripper struct {
-	username string
-	password string
-	next     http.RoundTripper
-}
-
-func (b *basicRoundTripper) RoundTrip(request *http.Request) (*http.Response, error) {
-	request.SetBasicAuth(b.username, b.password)
-	return b.next.RoundTrip(request)
 }

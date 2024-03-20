@@ -2,9 +2,11 @@ package client
 
 const (
 	GKEClusterConfigSpecType                                = "gkeClusterConfigSpec"
+	GKEClusterConfigSpecFieldAutopilotConfig                = "autopilotConfig"
 	GKEClusterConfigSpecFieldClusterAddons                  = "clusterAddons"
 	GKEClusterConfigSpecFieldClusterIpv4CidrBlock           = "clusterIpv4Cidr"
 	GKEClusterConfigSpecFieldClusterName                    = "clusterName"
+	GKEClusterConfigSpecFieldCustomerManagedEncryptionKey   = "customerManagedEncryptionKey"
 	GKEClusterConfigSpecFieldDescription                    = "description"
 	GKEClusterConfigSpecFieldEnableKubernetesAlpha          = "enableKubernetesAlpha"
 	GKEClusterConfigSpecFieldGoogleCredentialSecret         = "googleCredentialSecret"
@@ -28,9 +30,11 @@ const (
 )
 
 type GKEClusterConfigSpec struct {
+	AutopilotConfig                *GKEAutopilotConfig                `json:"autopilotConfig,omitempty" yaml:"autopilotConfig,omitempty"`
 	ClusterAddons                  *GKEClusterAddons                  `json:"clusterAddons,omitempty" yaml:"clusterAddons,omitempty"`
 	ClusterIpv4CidrBlock           *string                            `json:"clusterIpv4Cidr,omitempty" yaml:"clusterIpv4Cidr,omitempty"`
 	ClusterName                    string                             `json:"clusterName,omitempty" yaml:"clusterName,omitempty"`
+	CustomerManagedEncryptionKey   *CMEKConfig                        `json:"customerManagedEncryptionKey,omitempty" yaml:"customerManagedEncryptionKey,omitempty"`
 	Description                    string                             `json:"description,omitempty" yaml:"description,omitempty"`
 	EnableKubernetesAlpha          *bool                              `json:"enableKubernetesAlpha,omitempty" yaml:"enableKubernetesAlpha,omitempty"`
 	GoogleCredentialSecret         string                             `json:"googleCredentialSecret,omitempty" yaml:"googleCredentialSecret,omitempty"`

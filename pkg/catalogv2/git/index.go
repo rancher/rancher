@@ -11,7 +11,7 @@ import (
 )
 
 func BuildOrGetIndex(namespace, name, gitURL string) (*repo.IndexFile, error) {
-	dir := gitDir(namespace, name, gitURL)
+	dir := RepoDir(namespace, name, gitURL)
 	return buildOrGetIndex(dir)
 }
 

@@ -12,9 +12,9 @@ import (
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
-	"github.com/rancher/wrangler/pkg/data"
-	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
-	"github.com/rancher/wrangler/pkg/relatedresource"
+	"github.com/rancher/wrangler/v2/pkg/data"
+	corecontrollers "github.com/rancher/wrangler/v2/pkg/generated/controllers/core/v1"
+	"github.com/rancher/wrangler/v2/pkg/relatedresource"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -138,9 +138,10 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 			ExactVersionSetting: settings.RancherWebhookVersion,
 			Values: func() map[string]interface{} {
 				values := map[string]interface{}{
-					"capi": map[string]interface{}{
-						"enabled": false,
-					},
+					// This is no longer used in the webhook chart but previous values can still be found
+					// with `helm get values -n cattle-system rancher-webhook` which can be confusing. We
+					// completely remove the previous capi values by setting it to nil here.
+					"capi": nil,
 					"mcm": map[string]interface{}{
 						"enabled": features.MCM.Enabled(),
 					},

@@ -5,12 +5,12 @@ import (
 
 	apiv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
-	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
-	"github.com/rancher/rancher/tests/framework/extensions/clusters"
-	"github.com/rancher/rancher/tests/framework/extensions/defaults"
-	"github.com/rancher/rancher/tests/framework/extensions/provisioning"
-	"github.com/rancher/rancher/tests/framework/pkg/wait"
+	"github.com/rancher/shepherd/clients/rancher"
+	v1 "github.com/rancher/shepherd/clients/rancher/v1"
+	"github.com/rancher/shepherd/extensions/clusters"
+	"github.com/rancher/shepherd/extensions/defaults"
+	"github.com/rancher/shepherd/extensions/provisioning"
+	"github.com/rancher/shepherd/pkg/wait"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )

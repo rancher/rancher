@@ -12,9 +12,13 @@ node {
     def testResultsOut = "results.xml"
     def envFile = ".env"
     def rancherConfig = "rancher_env.config"
-    def branch = "release/v2.7"
+    def branch = "release/v2.8"
     if ("${env.BRANCH}" != "null" && "${env.BRANCH}" != "") {
       branch = "${env.BRANCH}"
+    }
+    def rancherRepo = scm.getUserRemoteConfigs()[0].getUrl()
+    if ("${env.REPO}" != "null" && "${env.REPO}" != "") {
+      rancherRepo = "${env.REPO}"
     }
     def timeout = "60m"
     if ("${env.TIMEOUT}" != "null" && "${env.TIMEOUT}" != "") {
@@ -82,7 +86,7 @@ node {
                       $class: 'GitSCM',
                       branches: [[name: "*/${branch}"]],
                       extensions: scm.extensions + [[$class: 'CleanCheckout']],
-                      userRemoteConfigs: scm.userRemoteConfigs
+                      userRemoteConfigs: [[url: rancherRepo]]
                     ])
           }
           dir ("./") {
@@ -167,24 +171,32 @@ node {
                     text(name: 'CONFIG', value: awsNodeTemplateParam),
                     string(name: 'TEST_PACKAGE', value: "${env.RANCHER_RKE1_TEST_PACKAGE}"),
                     string(name: 'GOTEST_TESTCASE', value: "${env.RANCHER_RKE1_NODE_GOTEST_TESTCASE}"),
+                    string(name: 'REPO', value: "${rancherRepo}"),
+                    string(name: 'BRANCH', value: "${branch}"),
                   ]
                   rke2NodeParams = [
                     string(name: 'TIMEOUT', value: "${env.TIMEOUT}"),
                     text(name: 'CONFIG', value: awsMachineConfigParam),
                     string(name: 'TEST_PACKAGE', value: "${env.RANCHER_RKE2_TEST_PACKAGE}"),
                     string(name: 'GOTEST_TESTCASE', value: "${env.RANCHER_RKE2_NODE_GOTEST_TESTCASE}"),
+                    string(name: 'REPO', value: "${rancherRepo}"),
+                    string(name: 'BRANCH', value: "${branch}"),
                   ]
                   rke1CustomParams = [
                     string(name: 'TIMEOUT', value: "${env.TIMEOUT}"),
                     text(name: 'CONFIG', value: awsEC2ConfigParam),
                     string(name: 'TEST_PACKAGE', value: "${env.RANCHER_RKE1_TEST_PACKAGE}"),
                     string(name: 'GOTEST_TESTCASE', value: "${env.RANCHER_RKE1_CUSTOM_GOTEST_TESTCASE}"),
+                    string(name: 'REPO', value: "${rancherRepo}"),
+                    string(name: 'BRANCH', value: "${branch}"),
                   ]
                   rke2CustomParams = [
                     string(name: 'TIMEOUT', value: "${env.TIMEOUT}"),
                     text(name: 'CONFIG', value: awsEC2ConfigParam),
                     string(name: 'TEST_PACKAGE', value: "${env.RANCHER_RKE2_TEST_PACKAGE}"),
                     string(name: 'GOTEST_TESTCASE', value: "${env.RANCHER_RKE2_CUSTOM_GOTEST_TESTCASE}"),
+                    string(name: 'REPO', value: "${rancherRepo}"),
+                    string(name: 'BRANCH', value: "${branch}"),
                   ]
 
                   jobs = [:]

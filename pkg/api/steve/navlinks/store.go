@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/rancher/apiserver/pkg/types"
-	"github.com/rancher/wrangler/pkg/schemas/validation"
+	"github.com/rancher/wrangler/v2/pkg/schemas/validation"
 )
 
 type store struct {

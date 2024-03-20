@@ -10,7 +10,7 @@ import (
 	"github.com/rancher/rancher/tests/v2prov/namespace"
 	"github.com/rancher/rancher/tests/v2prov/objectstore"
 	"github.com/rancher/rancher/tests/v2prov/operations"
-	"github.com/rancher/wrangler/pkg/name"
+	"github.com/rancher/wrangler/v2/pkg/name"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -19,10 +19,10 @@ import (
 	"time"
 )
 
-// Test_Operation_MP_EtcdSnapshotOperationsOnNewNode uses Minio as an object store to store S3 snapshots. It creates a 2 node machine provisioned cluster with a controlplane+worker and
+// Test_Operation_SetB_MP_EtcdSnapshotOperationsOnNewNode uses Minio as an object store to store S3 snapshots. It creates a 2 node machine provisioned cluster with a controlplane+worker and
 // etcd node, creates a configmap, takes a snapshot of the cluster, deletes the configmap, then deletes the etcd machine/node.
 // It then creates a new etcd node and restores from local snapshot file.
-func Test_Operation_MP_EtcdSnapshotOperationsOnNewNode(t *testing.T) {
+func Test_Operation_SetB_MP_EtcdSnapshotOperationsOnNewNode(t *testing.T) {
 	clients, err := clients.New()
 	if err != nil {
 		t.Fatal(err)

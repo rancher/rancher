@@ -8,10 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/rancher/rancher/pkg/image"
-	"github.com/rancher/rancher/pkg/settings"
-
 	"github.com/coreos/go-semver/semver"
+	"github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rke/types/kdm"
 	"github.com/stretchr/testify/assert"
 )
@@ -115,7 +113,7 @@ func TestGetExternalImages(t *testing.T) {
 			case k3s:
 				tt.args.externalData = data.K3S
 			}
-			systemAgentInstallerImage := fmt.Sprintf("%s%s:%s", settings.SystemAgentInstallerImage.Default, tt.args.source, strings.ReplaceAll(tt.args.version, "+", "-"))
+			systemAgentInstallerImage := fmt.Sprintf("%s%s:%s", "rancher/system-agent-installer-", tt.args.source, strings.ReplaceAll(tt.args.version, "+", "-"))
 
 			got, err := GetExternalImages(tt.args.rancherVersion, tt.args.externalData, tt.args.source, tt.args.minimumKubernetesVersion, image.Linux)
 			if err != nil {

@@ -1,18 +1,31 @@
 package permutations
 
 import (
+	"os"
 	"strings"
+	"testing"
 
-	"github.com/rancher/rancher/tests/framework/clients/corral"
-	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	"github.com/rancher/rancher/tests/framework/extensions/clusters"
-	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
-	"github.com/rancher/rancher/tests/framework/extensions/provisioning"
-	"github.com/rancher/rancher/tests/framework/extensions/provisioninginput"
-	"github.com/rancher/rancher/tests/framework/extensions/rke1/componentchecks"
-	"github.com/rancher/rancher/tests/framework/pkg/session"
+	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	"github.com/rancher/shepherd/clients/corral"
+	"github.com/rancher/shepherd/clients/rancher"
+	steveV1 "github.com/rancher/shepherd/clients/rancher/v1"
+	"github.com/rancher/shepherd/extensions/charts"
+	"github.com/rancher/shepherd/extensions/clusters"
+	"github.com/rancher/shepherd/extensions/machinepools"
+	"github.com/rancher/shepherd/extensions/projects"
+	"github.com/rancher/shepherd/extensions/provisioning"
+	"github.com/rancher/shepherd/extensions/provisioninginput"
+	"github.com/rancher/shepherd/extensions/rke1/componentchecks"
+	"github.com/rancher/shepherd/extensions/services"
+	"github.com/rancher/shepherd/extensions/workloads"
+	"github.com/rancher/shepherd/extensions/workloads/pods"
+	"github.com/rancher/shepherd/pkg/namegenerator"
+	"github.com/rancher/shepherd/pkg/session"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	appv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 const (
@@ -26,6 +39,22 @@ const (
 	RKE1ProvisionCluster = "rke1"
 	RKE1AirgapCluster    = "rke1Airgap"
 	CorralProvider       = "corral"
+
+	outOfTreeAWSFilePath = "../resources/out-of-tree/aws.yml"
+	clusterIPPrefix      = "cip"
+	loadBalancerPrefix   = "lb"
+	portName             = "port"
+	nginxName            = "nginx"
+	defaultNamespace     = "default"
+
+	repoType                     = "catalog.cattle.io.clusterrepo"
+	appsType                     = "catalog.cattle.io.apps"
+	awsUpstreamCloudProviderRepo = "https://github.com/kubernetes/cloud-provider-aws.git"
+	masterBranch                 = "master"
+	awsUpstreamChartName         = "aws-cloud-controller-manager"
+	kubeSystemNamespace          = "kube-system"
+	systemProject                = "System"
+	externalProviderString       = "external"
 )
 
 // RunTestPermutations runs through all relevant perumutations in a given config file, including node providers, k8s versions, and CNIs
@@ -55,13 +84,31 @@ func RunTestPermutations(s *suite.Suite, testNamePrefix string, client *rancher.
 				testClusterConfig.CNI = cni
 				name = testNamePrefix + " Node Provider: " + nodeProviderName + " Kubernetes version: " + kubeVersion + " cni: " + cni
 				s.Run(name, func() {
+					if testClusterConfig.CloudProvider == provisioninginput.AWSProviderName.String() {
+						byteYaml, err := os.ReadFile(outOfTreeAWSFilePath)
+						require.NoError(s.T(), err)
+						testClusterConfig.AddOnConfig = &provisioninginput.AddOnConfig{
+							AdditionalManifest: string(byteYaml),
+						}
+					}
+
 					switch clusterType {
 					case RKE2ProvisionCluster, K3SProvisionCluster:
 						testClusterConfig.KubernetesVersion = kubeVersion
 						clusterObject, err := provisioning.CreateProvisioningCluster(client, *nodeProvider, testClusterConfig, hostnameTruncation)
-
 						require.NoError(s.T(), err)
+
 						provisioning.VerifyCluster(s.T(), client, testClusterConfig, clusterObject)
+
+						if testClusterConfig.CloudProvider == provisioninginput.AWSProviderName.String() {
+							lbServiceResp := createAWSWorkloadAndServices(s.T(), client, clusterObject)
+
+							status := &provv1.ClusterStatus{}
+							err := steveV1.ConvertToK8sType(clusterObject.Status, status)
+							require.NoError(s.T(), err)
+
+							services.VerifyAWSLoadBalancer(s.T(), client, lbServiceResp, status.ClusterName)
+						}
 
 					case RKE1ProvisionCluster:
 						testClusterConfig.KubernetesVersion = kubeVersion
@@ -73,6 +120,30 @@ func RunTestPermutations(s *suite.Suite, testNamePrefix string, client *rancher.
 
 						provisioning.VerifyRKE1Cluster(s.T(), client, testClusterConfig, clusterObject)
 
+						if strings.Contains(testClusterConfig.CloudProvider, provisioninginput.AWSProviderName.String()) {
+							if strings.Contains(testClusterConfig.CloudProvider, externalProviderString) {
+								err = createAndInstallAWSExternalCharts(client, clusterObject.ID)
+								require.NoError(s.T(), err)
+
+								podErrors := pods.StatusPods(client, clusterObject.ID)
+								require.Empty(s.T(), podErrors)
+							}
+
+							adminClient, err := rancher.NewClient(client.RancherConfig.AdminToken, client.Session)
+							require.NoError(s.T(), err)
+
+							steveClusterObject, err := adminClient.Steve.SteveType(clusters.ProvisioningSteveResourceType).ByID(provisioninginput.Namespace + "/" + clusterObject.ID)
+							require.NoError(s.T(), err)
+
+							lbServiceResp := createAWSWorkloadAndServices(s.T(), client, steveClusterObject)
+
+							status := &provv1.ClusterStatus{}
+							err = steveV1.ConvertToK8sType(steveClusterObject.Status, status)
+							require.NoError(s.T(), err)
+
+							services.VerifyAWSLoadBalancer(s.T(), client, lbServiceResp, status.ClusterName)
+						}
+
 					case RKE2CustomCluster, K3SCustomCluster:
 						testClusterConfig.KubernetesVersion = kubeVersion
 
@@ -80,6 +151,15 @@ func RunTestPermutations(s *suite.Suite, testNamePrefix string, client *rancher.
 						require.NoError(s.T(), err)
 
 						provisioning.VerifyCluster(s.T(), client, testClusterConfig, clusterObject)
+						if testClusterConfig.CloudProvider == provisioninginput.AWSProviderName.String() {
+							lbServiceResp := createAWSWorkloadAndServices(s.T(), client, clusterObject)
+
+							status := &provv1.ClusterStatus{}
+							err := steveV1.ConvertToK8sType(clusterObject.Status, status)
+							require.NoError(s.T(), err)
+
+							services.VerifyAWSLoadBalancer(s.T(), client, lbServiceResp, status.ClusterName)
+						}
 
 					case RKE1CustomCluster:
 						testClusterConfig.KubernetesVersion = kubeVersion
@@ -109,12 +189,14 @@ func RunTestPermutations(s *suite.Suite, testNamePrefix string, client *rancher.
 					default:
 						s.T().Fatalf("Invalid cluster type: %s", clusterType)
 					}
+
 				})
 			}
 		}
 	}
 }
 
+// GetClusterProvider returns a provider object given cluster type, nodeProviderName (for custom clusters) and the provisioningConfig
 func GetClusterProvider(clusterType string, nodeProviderName string, provisioningConfig *provisioninginput.Config) (*provisioning.Provider, *provisioning.RKE1Provider, *provisioning.ExternalNodeProvider, []string) {
 	var nodeProvider provisioning.Provider
 	var rke1NodeProvider provisioning.RKE1Provider
@@ -150,4 +232,91 @@ func GetClusterProvider(clusterType string, nodeProviderName string, provisionin
 		panic("Cluster type not found")
 	}
 	return &nodeProvider, &rke1NodeProvider, &customProvider, kubeVersions
+}
+
+// createAWSWorkloadAndServices creates a test workload, clusterIP service and awsLoadBalancer service.
+// This should be used when testing cloud provider for aws, with in-tree or out-of-tree set on the cluster.
+func createAWSWorkloadAndServices(t *testing.T, client *rancher.Client, cluster *steveV1.SteveAPIObject) *steveV1.SteveAPIObject {
+	status := &provv1.ClusterStatus{}
+	err := steveV1.ConvertToK8sType(cluster.Status, status)
+	require.NoError(t, err)
+
+	adminClient, err := rancher.NewClient(client.RancherConfig.AdminToken, client.Session)
+	require.NoError(t, err)
+
+	steveclient, err := adminClient.Steve.ProxyDownstream(status.ClusterName)
+	require.NoError(t, err)
+
+	nginxWorkload, err := createNginxDeployment(steveclient, status.ClusterName)
+	require.NoError(t, err)
+
+	nginxSpec := &appv1.DeploymentSpec{}
+	err = steveV1.ConvertToK8sType(nginxWorkload.Spec, nginxSpec)
+	require.NoError(t, err)
+
+	clusterIPserviceName := namegenerator.AppendRandomString(clusterIPPrefix)
+	clusterIPserviceTemplate := services.NewServiceTemplate(clusterIPserviceName, defaultNamespace, corev1.ServiceTypeClusterIP, []corev1.ServicePort{{Name: portName, Port: 80}}, nginxSpec.Selector.MatchLabels)
+	_, err = steveclient.SteveType(services.ServiceSteveType).Create(clusterIPserviceTemplate)
+	require.NoError(t, err)
+
+	lbServiceName := namegenerator.AppendRandomString(loadBalancerPrefix)
+	lbServiceTemplate := services.NewServiceTemplate(lbServiceName, defaultNamespace, corev1.ServiceTypeLoadBalancer, []corev1.ServicePort{{Name: portName, Port: 80}}, nginxSpec.Selector.MatchLabels)
+	lbServiceResp, err := steveclient.SteveType(services.ServiceSteveType).Create(lbServiceTemplate)
+	require.NoError(t, err)
+	logrus.Info("loadbalancer created for nginx workload.")
+
+	return lbServiceResp
+}
+
+// createNginxDeployment is a helper function that creates a nginx deployment in a cluster's default namespace
+func createNginxDeployment(steveclient *steveV1.Client, containerNamePrefix string) (*steveV1.SteveAPIObject, error) {
+	containerName := namegenerator.AppendRandomString(containerNamePrefix)
+	containerTemplate := workloads.NewContainer(nginxName, nginxName, corev1.PullAlways, []corev1.VolumeMount{}, []corev1.EnvFromSource{}, nil, nil, nil)
+	podTemplate := workloads.NewPodTemplate([]corev1.Container{containerTemplate}, []corev1.Volume{}, []corev1.LocalObjectReference{}, nil)
+	deployment := workloads.NewDeploymentTemplate(containerName, defaultNamespace, podTemplate, true, nil)
+
+	deploymentResp, err := steveclient.SteveType(workloads.DeploymentSteveType).Create(deployment)
+	if err != nil {
+		return nil, err
+	}
+
+	return deploymentResp, err
+}
+
+// createAndInstallAWSExternalCharts is a helper function for rke1 external-aws cloud provider
+// clusters that install the appropriate chart(s) and returns an error, if any.
+func createAndInstallAWSExternalCharts(client *rancher.Client, clusterID string) error {
+	steveclient, err := client.Steve.ProxyDownstream(clusterID)
+	if err != nil {
+		return err
+	}
+
+	repoName := namegenerator.AppendRandomString(provisioninginput.AWSProviderName.String())
+	err = charts.CreateChartRepoFromGithub(steveclient, awsUpstreamCloudProviderRepo, masterBranch, repoName)
+	if err != nil {
+		return err
+	}
+
+	project, err := projects.GetProjectByName(client, clusterID, systemProject)
+	if err != nil {
+		return err
+	}
+
+	catalogClient, err := client.GetClusterCatalogClient(clusterID)
+	if err != nil {
+		return err
+	}
+
+	latestVersion, err := catalogClient.GetLatestChartVersion(awsUpstreamChartName, repoName)
+	if err != nil {
+		return err
+	}
+
+	installOptions := &charts.InstallOptions{
+		ClusterID: clusterID,
+		Version:   latestVersion,
+		ProjectID: project.ID,
+	}
+	err = charts.InstallAWSOutOfTreeChart(client, installOptions, repoName, clusterID)
+	return err
 }

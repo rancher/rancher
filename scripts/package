@@ -2,8 +2,8 @@
 set -e
 
 source $(dirname $0)/version
-
-source package-env
+source $(dirname $0)/export-config
+source $(dirname $0)/package-env
 
 cd $(dirname $0)/../package
 
@@ -21,9 +21,25 @@ if [ ${ARCH} == s390x ]; then
     ETCD_UNSUPPORTED_ARCH=s390x
 fi
 
-docker build --build-arg VERSION=${TAG} --build-arg ETCD_UNSUPPORTED_ARCH=${ETCD_UNSUPPORTED_ARCH} --build-arg ARCH=${ARCH} --build-arg IMAGE_REPO=${REPO} --build-arg SYSTEM_CHART_DEFAULT_BRANCH=${SYSTEM_CHART_DEFAULT_BRANCH} --build-arg CHART_DEFAULT_BRANCH=${CHART_DEFAULT_BRANCH} -t ${IMAGE} .
+docker build \
+    --build-arg VERSION=${TAG} \
+    --build-arg ETCD_UNSUPPORTED_ARCH=${ETCD_UNSUPPORTED_ARCH} \
+    --build-arg ARCH=${ARCH} \
+    --build-arg IMAGE_REPO=${REPO} \
+    --build-arg SYSTEM_CHART_DEFAULT_BRANCH=${SYSTEM_CHART_DEFAULT_BRANCH} \
+    --build-arg CHART_DEFAULT_BRANCH=${CHART_DEFAULT_BRANCH} \
+    --build-arg CATTLE_RANCHER_WEBHOOK_VERSION="${CATTLE_RANCHER_WEBHOOK_VERSION}" \
+    --build-arg CATTLE_CSP_ADAPTER_MIN_VERSION="${CATTLE_CSP_ADAPTER_MIN_VERSION}" \
+    --build-arg CATTLE_FLEET_VERSION="${CATTLE_FLEET_VERSION}" \
+    -t ${IMAGE} .
 
-docker build --build-arg VERSION=${TAG} --build-arg ARCH=${ARCH} --build-arg RANCHER_TAG=${TAG} --build-arg RANCHER_REPO=${REPO} -t ${AGENT_IMAGE} -f Dockerfile.agent .
+docker build \
+    --build-arg VERSION=${TAG} \
+    --build-arg ARCH=${ARCH} \
+    --build-arg RANCHER_TAG=${TAG} \
+    --build-arg CATTLE_RANCHER_WEBHOOK_VERSION="${CATTLE_RANCHER_WEBHOOK_VERSION}" \
+    --build-arg RANCHER_REPO=${REPO} \
+    -t ${AGENT_IMAGE} -f Dockerfile.agent .
 
 mkdir -p ../dist
 echo ${IMAGE} > ../dist/images
@@ -40,6 +56,11 @@ fi
 
 if [ ! -d $CHART_REPO_DIR ]; then
     git clone --branch $CHART_DEFAULT_BRANCH https://github.com/rancher/charts $CHART_REPO_DIR
+fi
+
+if [ ! -d $SMALL_FORK_REPO_DIR ]; then
+    mkdir -p $SMALL_FORK_REPO_DIR
+    git clone --branch main https://github.com/rancher/charts-small-fork $SMALL_FORK_REPO_DIR
 fi
 
 if [ ${ARCH} == amd64 ]; then

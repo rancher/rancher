@@ -1,5 +1,5 @@
 /*
-Copyright 2023 Rancher Labs, Inc.
+Copyright 2024 Rancher Labs, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,8 +21,8 @@ package v1
 import (
 	"github.com/rancher/lasso/pkg/controller"
 	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
-	"github.com/rancher/wrangler/pkg/generic"
-	"github.com/rancher/wrangler/pkg/schemes"
+	"github.com/rancher/wrangler/v2/pkg/generic"
+	"github.com/rancher/wrangler/v2/pkg/schemes"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -34,6 +34,7 @@ type Interface interface {
 	App() AppController
 	ClusterRepo() ClusterRepoController
 	Operation() OperationController
+	UIPlugin() UIPluginController
 }
 
 func New(controllerFactory controller.SharedControllerFactory) Interface {
@@ -56,4 +57,8 @@ func (v *version) ClusterRepo() ClusterRepoController {
 
 func (v *version) Operation() OperationController {
 	return generic.NewController[*v1.Operation, *v1.OperationList](schema.GroupVersionKind{Group: "catalog.cattle.io", Version: "v1", Kind: "Operation"}, "operations", true, v.controllerFactory)
+}
+
+func (v *version) UIPlugin() UIPluginController {
+	return generic.NewController[*v1.UIPlugin, *v1.UIPluginList](schema.GroupVersionKind{Group: "catalog.cattle.io", Version: "v1", Kind: "UIPlugin"}, "uiplugins", true, v.controllerFactory)
 }

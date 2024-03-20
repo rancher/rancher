@@ -70,7 +70,10 @@
     "projectID": "test-project-id",
     "region": "",
     "subnetwork": "default",
-    "zone": "us-central1-c"
+    "zone": "us-central1-c",
+    "autopilotConfig": {
+      "enabled": false
+    }
   },
   "status": {
     "failureMessage": "",

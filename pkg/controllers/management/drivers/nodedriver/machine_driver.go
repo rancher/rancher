@@ -18,7 +18,6 @@ import (
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
-	"github.com/rancher/wrangler/pkg/name"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -101,11 +100,14 @@ func (m *Lifecycle) download(obj *v32.NodeDriver) (*v32.NodeDriver, error) {
 		forceUpdate = true
 	}
 
+	err := errs.New("not found")
 	// if node driver was created, we also activate the driver by default
-	driver := drivers.NewDynamicDriver(obj.Spec.Builtin, obj.ObjectMeta.Name, obj.Spec.URL, obj.Spec.Checksum)
-	schemaName := name.SafeConcatName(obj.ObjectMeta.Name + "config")
-
-	existingSchema, err := m.schemaLister.Get("", schemaName)
+	driver := drivers.NewDynamicDriver(obj.Spec.Builtin, obj.Spec.DisplayName, obj.Spec.URL, obj.Spec.Checksum)
+	schemaName := obj.Spec.DisplayName + "config"
+	var existingSchema *v32.DynamicSchema
+	if obj.Spec.DisplayName != "" {
+		existingSchema, err = m.schemaLister.Get("", schemaName)
+	}
 
 	if driver.Exists() && err == nil && !forceUpdate {
 		// add credential schema
@@ -219,7 +221,7 @@ func (m *Lifecycle) download(obj *v32.NodeDriver) (*v32.NodeDriver, error) {
 			ResourceFields: resourceFields,
 		},
 	}
-	dynamicSchema.Name = name.SafeConcatName(obj.ObjectMeta.Name + "config")
+	dynamicSchema.Name = obj.Spec.DisplayName + "config"
 	dynamicSchema.OwnerReferences = []metav1.OwnerReference{
 		{
 			UID:        obj.UID,
@@ -229,7 +231,7 @@ func (m *Lifecycle) download(obj *v32.NodeDriver) (*v32.NodeDriver, error) {
 		},
 	}
 	dynamicSchema.Labels = map[string]string{}
-	dynamicSchema.Labels[driverNameLabel] = obj.ObjectMeta.Name
+	dynamicSchema.Labels[driverNameLabel] = obj.Spec.DisplayName
 
 	_, err = m.schemaClient.Create(dynamicSchema)
 	if err != nil {
@@ -252,7 +254,7 @@ func (m *Lifecycle) download(obj *v32.NodeDriver) (*v32.NodeDriver, error) {
 }
 
 func (m *Lifecycle) createCredSchema(obj *v32.NodeDriver, credFields map[string]v32.Field) (*v32.NodeDriver, error) {
-	name := credentialConfigSchemaName(obj.ObjectMeta.Name)
+	name := credentialConfigSchemaName(obj.Spec.DisplayName)
 	credSchema, err := m.schemaLister.Get("", name)
 
 	if name == "amazonec2credentialconfig" {
@@ -301,7 +303,7 @@ func (m *Lifecycle) checkDriverVersion(obj *v32.NodeDriver) bool {
 		return true
 	}
 
-	driverName := strings.TrimPrefix(obj.ObjectMeta.Name, drivers.DockerMachineDriverPrefix)
+	driverName := strings.TrimPrefix(obj.Spec.DisplayName, drivers.DockerMachineDriverPrefix)
 
 	if _, ok := DriverToSchemaFields[driverName]; ok {
 		if val, ok := obj.Annotations[uiFieldHintsAnno]; !ok || val == "" {
@@ -366,12 +368,12 @@ func (m *Lifecycle) Updated(obj *v32.NodeDriver) (runtime.Object, error) {
 		return obj, err
 	}
 
-	if err := m.createOrUpdateNodeForEmbeddedType(obj.ObjectMeta.Name+"config", obj.ObjectMeta.Name+"Config", obj.Spec.Active); err != nil {
+	if err := m.createOrUpdateNodeForEmbeddedType(obj.Spec.DisplayName+"config", obj.Spec.DisplayName+"Config", obj.Spec.Active); err != nil {
 		return obj, err
 	}
 
-	if err := m.createOrUpdateNodeForEmbeddedTypeCredential(credentialConfigSchemaName(obj.ObjectMeta.Name),
-		obj.ObjectMeta.Name+"credentialConfig", obj.Spec.Active || obj.Spec.AddCloudCredential); err != nil {
+	if err := m.createOrUpdateNodeForEmbeddedTypeCredential(credentialConfigSchemaName(obj.Spec.DisplayName),
+		obj.Spec.DisplayName+"credentialConfig", obj.Spec.Active || obj.Spec.AddCloudCredential); err != nil {
 		return obj, err
 	}
 
@@ -383,7 +385,7 @@ func (m *Lifecycle) Updated(obj *v32.NodeDriver) (runtime.Object, error) {
 
 func (m *Lifecycle) Remove(obj *v32.NodeDriver) (runtime.Object, error) {
 	schemas, err := m.schemaClient.List(metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("%s=%s", driverNameLabel, obj.ObjectMeta.Name),
+		LabelSelector: fmt.Sprintf("%s=%s", driverNameLabel, obj.Spec.DisplayName),
 	})
 	if err != nil {
 		return obj, err
@@ -395,7 +397,7 @@ func (m *Lifecycle) Remove(obj *v32.NodeDriver) (runtime.Object, error) {
 		}
 		logrus.Infof("Deleting schema %s done", schema.Name)
 	}
-	if err := m.createOrUpdateNodeForEmbeddedType(obj.ObjectMeta.Name+"config", obj.ObjectMeta.Name+"Config", false); err != nil {
+	if err := m.createOrUpdateNodeForEmbeddedType(obj.Spec.DisplayName+"config", obj.Spec.DisplayName+"Config", false); err != nil {
 		return obj, err
 	}
 	return obj, nil

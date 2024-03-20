@@ -16,7 +16,7 @@ import (
 	"github.com/rancher/steve/pkg/schema"
 	steveserver "github.com/rancher/steve/pkg/server"
 	"github.com/rancher/steve/pkg/stores/proxy"
-	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
+	corecontrollers "github.com/rancher/wrangler/v2/pkg/generated/controllers/core/v1"
 )
 
 type projectServer struct {

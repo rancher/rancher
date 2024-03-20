@@ -21,8 +21,8 @@ import (
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/capr"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
-	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
-	"github.com/rancher/wrangler/pkg/generic"
+	corecontrollers "github.com/rancher/wrangler/v2/pkg/generated/controllers/core/v1"
+	"github.com/rancher/wrangler/v2/pkg/generic"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
@@ -126,11 +126,11 @@ func (p *PlanStore) Load(cluster *capi.Cluster, rkeControlPlane *rkev1.RKEContro
 func noPlanMessage(entry *planEntry) string {
 	if isEtcd(entry) {
 		return "waiting for bootstrap etcd to be available"
-	} else if isControlPlane(entry) {
-		return "waiting for etcd to be available"
-	} else {
-		return "waiting for control plane to be available"
 	}
+	if isControlPlane(entry) {
+		return "waiting for etcd to be available"
+	}
+	return "waiting for control plane to be available"
 }
 
 func probesMessage(plan *plan.Node) string {
@@ -579,14 +579,16 @@ func getJoinURLFromOutput(entry *planEntry, capiCluster *capi.Cluster, rkeContro
 
 	var address []byte
 	var name string
-	if ca := entry.Plan.PeriodicOutput[captureAddressInstructionName]; ca.ExitCode != 0 || ca.LastSuccessfulRunTime == "" {
+	ca := entry.Plan.PeriodicOutput[captureAddressInstructionName]
+	if ca.ExitCode != 0 || ca.LastSuccessfulRunTime == "" {
 		return "", nil
-	} else if etcdNameOutput := entry.Plan.PeriodicOutput[etcdNameInstructionName]; etcdNameOutput.ExitCode != 0 || etcdNameOutput.LastSuccessfulRunTime == "" {
-		return "", nil
-	} else {
-		address = ca.Stdout
-		name = string(bytes.TrimSpace(etcdNameOutput.Stdout))
 	}
+	etcdNameOutput := entry.Plan.PeriodicOutput[etcdNameInstructionName]
+	if etcdNameOutput.ExitCode != 0 || etcdNameOutput.LastSuccessfulRunTime == "" {
+		return "", nil
+	}
+	address = ca.Stdout
+	name = string(bytes.TrimSpace(etcdNameOutput.Stdout))
 
 	var str string
 	scanner := bufio.NewScanner(bytes.NewBuffer(address))

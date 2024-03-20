@@ -1,4 +1,4 @@
-FROM registry.suse.com/bci/golang:1.20
+FROM registry.suse.com/bci/golang:1.22
 
 # Configure Go
 ENV GOPATH /root/go
@@ -19,3 +19,13 @@ RUN zypper install -y -f docker && rpm -e --nodeps --noscripts containerd
 RUN go mod download && \
     go install gotest.tools/gotestsum@latest && \
     go install github.com/rancherlabs/corral@${CORRAL_VERSION}
+
+# necessary to run if statements using [[ ]]
+SHELL ["/bin/bash", "-c"] 
+
+ARG RKE_VERSION
+RUN if [[ -z "$RKE_VERSION" ]] ; then echo installing latest version RKE && \
+    curl -0Ls https://github.com/rancher/rke/releases/latest/download/rke_linux-amd64 > rke ; else echo installing ${RKE_VERSION} version RKE && \
+    curl -0Ls https://github.com/rancher/rke/releases/download/$RKE_VERSION/rke_linux-amd64 > rke; fi;
+RUN mv rke /bin/rke && \
+    chmod +x /bin/rke

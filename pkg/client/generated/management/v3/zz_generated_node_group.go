@@ -2,6 +2,7 @@ package client
 
 const (
 	NodeGroupType                      = "nodeGroup"
+	NodeGroupFieldArm                  = "arm"
 	NodeGroupFieldDesiredSize          = "desiredSize"
 	NodeGroupFieldDiskSize             = "diskSize"
 	NodeGroupFieldEc2SshKey            = "ec2SshKey"
@@ -24,6 +25,7 @@ const (
 )
 
 type NodeGroup struct {
+	Arm                  *bool             `json:"arm,omitempty" yaml:"arm,omitempty"`
 	DesiredSize          *int64            `json:"desiredSize,omitempty" yaml:"desiredSize,omitempty"`
 	DiskSize             *int64            `json:"diskSize,omitempty" yaml:"diskSize,omitempty"`
 	Ec2SshKey            *string           `json:"ec2SshKey,omitempty" yaml:"ec2SshKey,omitempty"`

@@ -14,13 +14,17 @@ import (
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
+	wcorev1 "github.com/rancher/wrangler/v2/pkg/generated/controllers/core/v1"
+	wrangler "github.com/rancher/wrangler/v2/pkg/name"
 	"github.com/sirupsen/logrus"
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/selection"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 var (
@@ -55,6 +59,7 @@ func newGlobalRoleBindingLifecycle(management *config.ManagementContext, cluster
 		crtbClient:        management.Management.ClusterRoleTemplateBindings(""),
 		crtbCache:         management.Wrangler.Mgmt.ClusterRoleTemplateBinding().Cache(),
 		grLister:          management.Management.GlobalRoles("").Controller().Lister(),
+		nsCache:           management.Wrangler.Core.Namespace().Cache(),
 		roles:             management.RBAC.Roles(""),
 		roleLister:        management.RBAC.Roles("").Controller().Lister(),
 		roleBindings:      management.RBAC.RoleBindings(""),
@@ -84,6 +89,7 @@ type globalRoleBindingLifecycle struct {
 	crtbCache         mgmtcontroller.ClusterRoleTemplateBindingCache
 	crtbClient        v3.ClusterRoleTemplateBindingInterface
 	grLister          v3.GlobalRoleLister
+	nsCache           wcorev1.NamespaceCache
 	roles             rbacv1.RoleInterface
 	roleLister        rbacv1.RoleLister
 	roleBindings      rbacv1.RoleBindingInterface
@@ -96,8 +102,11 @@ func (grb *globalRoleBindingLifecycle) Create(obj *v3.GlobalRoleBinding) (runtim
 	if err != nil {
 		returnError = multierror.Append(returnError, err)
 	}
-
 	err = grb.reconcileGlobalRoleBinding(obj)
+	if err != nil {
+		returnError = multierror.Append(returnError, err)
+	}
+	err = grb.reconcileNamespacedRoleBindings(obj)
 	if err != nil {
 		returnError = multierror.Append(returnError, err)
 	}
@@ -114,6 +123,10 @@ func (grb *globalRoleBindingLifecycle) Updated(obj *v3.GlobalRoleBinding) (runti
 	if err != nil {
 		returnError = multierror.Append(returnError, err)
 	}
+	err = grb.reconcileNamespacedRoleBindings(obj)
+	if err != nil {
+		returnError = multierror.Append(returnError, err)
+	}
 	return obj, returnError
 }
 
@@ -121,7 +134,7 @@ func (grb *globalRoleBindingLifecycle) Remove(obj *v3.GlobalRoleBinding) (runtim
 	if obj.GlobalRoleName == rbac.GlobalAdmin || obj.GlobalRoleName == rbac.GlobalRestrictedAdmin {
 		return obj, grb.deleteAdminBinding(obj)
 	}
-	// Don't need to delete the created ClusterRole because owner reference will take care of that
+	// Don't need to delete the created ClusterRole or RoleBindings because owner reference will take care of them
 	return obj, nil
 }
 
@@ -583,6 +596,127 @@ func (grb *globalRoleBindingLifecycle) grantRestrictedAdminUserClusterPermission
 		}
 	}
 	return returnErr
+}
+
+// reconcileNamespacedRoleBindings ensures that RoleBindings exist for each namespace listed in NamespacedRules
+// from the associated GlobalRole
+func (grb *globalRoleBindingLifecycle) reconcileNamespacedRoleBindings(globalRoleBinding *v3.GlobalRoleBinding) error {
+	var returnError error
+	grbName := wrangler.SafeConcatName(globalRoleBinding.Name)
+	gr, err := grb.grLister.Get("", globalRoleBinding.GlobalRoleName)
+	if err != nil {
+		return fmt.Errorf("unable to get globalRole %s: %w", globalRoleBinding.GlobalRoleName, err)
+	}
+
+	roleBindingUIDs := map[types.UID]struct{}{}
+
+	for ns := range gr.NamespacedRules {
+		namespace, err := grb.nsCache.Get(ns)
+		if apierrors.IsNotFound(err) || namespace == nil {
+			// When a namespace is not found, don't re-enqueue GlobalRoleBinding
+			logrus.Warnf("[%v] Namespace %s not found. Not re-enqueueing GlobalRoleBinding %s", grController, ns, globalRoleBinding.Name)
+			continue
+		} else if err != nil {
+			returnError = multierror.Append(returnError, errors.Wrapf(err, "couldn't get namespace %s", ns))
+			continue
+		}
+
+		roleName := wrangler.SafeConcatName(gr.Name, ns)
+		roleRef := v1.RoleRef{
+			APIGroup: rbacv1.GroupName,
+			Kind:     "Role",
+			Name:     roleName,
+		}
+
+		subject := rbac.GetGRBSubject(globalRoleBinding)
+		rbName := wrangler.SafeConcatName(globalRoleBinding.Name, ns)
+		roleBinding, err := grb.roleBindingLister.Get(ns, rbName)
+		if err == nil {
+			if reflect.DeepEqual(roleRef, roleBinding.RoleRef) && roleBinding.Labels != nil && roleBinding.Labels[grbOwnerLabel] == grbName {
+				roleBindingUIDs[roleBinding.UID] = struct{}{}
+				continue
+			}
+			// Since roleRef is immutable, we have to delete and recreate the RB
+			err = grb.roleBindings.DeleteNamespaced(roleBinding.Namespace, roleBinding.Name, &metav1.DeleteOptions{})
+			if err != nil {
+				returnError = multierror.Append(returnError, err)
+				continue
+			}
+		} else if !apierrors.IsNotFound(err) {
+			returnError = multierror.Append(returnError, err)
+			continue
+		}
+
+		// If the namespace is terminating, don't create RoleBinding
+		if namespace.Status.Phase == corev1.NamespaceTerminating {
+			logrus.Warnf("[%v] Namespace %s is terminating. Not creating roleBinding %s for %s", grController, ns, rbName, globalRoleBinding.Name)
+			continue
+		}
+
+		// Create a new RoleBinding
+		newRoleBinding := &v1.RoleBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      rbName,
+				Namespace: ns,
+				OwnerReferences: []metav1.OwnerReference{
+					{
+						APIVersion: globalRoleBinding.APIVersion,
+						Kind:       globalRoleBinding.Kind,
+						UID:        globalRoleBinding.UID,
+						Name:       globalRoleBinding.Name,
+					},
+				},
+				Labels: map[string]string{
+					grbOwnerLabel: grbName,
+				},
+			},
+			RoleRef:  roleRef,
+			Subjects: []v1.Subject{subject},
+		}
+
+		createdRB, err := grb.roleBindings.Create(newRoleBinding)
+		if err != nil {
+			returnError = multierror.Append(returnError, err)
+			continue
+		}
+		roleBindingUIDs[createdRB.UID] = struct{}{}
+	}
+
+	// get all the roleBindings claiming to be owned by this GRB and remove any that shouldn't exist
+	r, err := labels.NewRequirement(grbOwnerLabel, selection.Equals, []string{grbName})
+	if err != nil {
+		return multierror.Append(returnError, errors.Wrapf(err, "couldn't create label: %s", grOwnerLabel))
+	}
+
+	rbs, err := grb.roleBindingLister.List("", labels.NewSelector().Add(*r))
+	if err != nil {
+		return multierror.Append(returnError,
+			errors.Wrapf(err, "couldn't list roleBindings with label %s : %s", grbOwnerLabel, grbName))
+	}
+
+	// After creating/updating all RBs, if the number of RBs with the grbOwnerLabel is the same as
+	// as the number of created/updated RBs, we know there are no invalid RBs to purge
+	if len(rbs) != len(roleBindingUIDs) {
+		err = grb.purgeInvalidNamespacedRBs(rbs, roleBindingUIDs)
+		if err != nil {
+			returnError = multierror.Append(returnError, err)
+		}
+	}
+	return returnError
+}
+
+// purgeInvalidNamespacedRBs removes any roleBindings that aren't in the namespaces listed in the associated GlobalRole.namespacedRules
+func (grb *globalRoleBindingLifecycle) purgeInvalidNamespacedRBs(rbs []*v1.RoleBinding, uids map[types.UID]struct{}) error {
+	var returnError error
+	for _, rb := range rbs {
+		if _, ok := uids[rb.UID]; !ok {
+			err := grb.roleBindings.DeleteNamespaced(rb.Namespace, rb.Name, &metav1.DeleteOptions{})
+			if err != nil {
+				returnError = multierror.Append(returnError, errors.Wrapf(err, "couldn't delete roleBinding %s", rb.Name))
+			}
+		}
+	}
+	return returnError
 }
 
 // isCRTBValid determines if a given CRTB is up to date for a given cluster and owning global role binding. Should

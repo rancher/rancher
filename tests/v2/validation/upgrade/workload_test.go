@@ -5,16 +5,18 @@ package upgrade
 import (
 	"testing"
 
-	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
-	"github.com/rancher/rancher/tests/framework/extensions/charts"
-	"github.com/rancher/rancher/tests/framework/extensions/clusters"
-	"github.com/rancher/rancher/tests/framework/extensions/ingresses"
-	"github.com/rancher/rancher/tests/framework/extensions/namespaces"
-	"github.com/rancher/rancher/tests/framework/extensions/secrets"
-	"github.com/rancher/rancher/tests/framework/extensions/services"
-	"github.com/rancher/rancher/tests/framework/extensions/workloads"
-	"github.com/rancher/rancher/tests/framework/pkg/session"
+	"github.com/rancher/shepherd/clients/rancher"
+	"github.com/rancher/shepherd/clients/rancher/catalog"
+	v1 "github.com/rancher/shepherd/clients/rancher/v1"
+	"github.com/rancher/shepherd/extensions/charts"
+	"github.com/rancher/shepherd/extensions/clusters"
+	"github.com/rancher/shepherd/extensions/ingresses"
+	"github.com/rancher/shepherd/extensions/namespaces"
+	"github.com/rancher/shepherd/extensions/secrets"
+	"github.com/rancher/shepherd/extensions/services"
+	"github.com/rancher/shepherd/extensions/upgradeinput"
+	"github.com/rancher/shepherd/extensions/workloads"
+	"github.com/rancher/shepherd/pkg/session"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -28,7 +30,7 @@ type UpgradeWorkloadTestSuite struct {
 	suite.Suite
 	session  *session.Session
 	client   *rancher.Client
-	clusters []Clusters
+	clusters []upgradeinput.Cluster
 }
 
 func (u *UpgradeWorkloadTestSuite) TearDownSuite() {
@@ -44,7 +46,7 @@ func (u *UpgradeWorkloadTestSuite) SetupSuite() {
 
 	u.client = client
 
-	u.clusters, err = loadUpgradeWorkloadConfig(client)
+	u.clusters, err = upgradeinput.LoadUpgradeWorkloadConfig(client)
 	require.NoError(u.T(), err)
 }
 
@@ -72,7 +74,7 @@ func TestWorkloadUpgradeTestSuite(t *testing.T) {
 	suite.Run(t, new(UpgradeWorkloadTestSuite))
 }
 
-func (u *UpgradeWorkloadTestSuite) testPreUpgradeSingleCluster(clusterName string, featuresToTest Features, names *resourceNames) {
+func (u *UpgradeWorkloadTestSuite) testPreUpgradeSingleCluster(clusterName string, featuresToTest upgradeinput.Features, names *resourceNames) {
 	isCattleLabeled := true
 
 	subSession := u.session.NewSession()
@@ -259,7 +261,7 @@ func (u *UpgradeWorkloadTestSuite) testPreUpgradeSingleCluster(clusterName strin
 		if !loggingChart.IsAlreadyInstalled {
 			clusterName, err := clusters.GetClusterNameByID(client, project.ClusterID)
 			require.NoError(u.T(), err)
-			latestLoggingVersion, err := client.Catalog.GetLatestChartVersion(charts.RancherLoggingName)
+			latestLoggingVersion, err := client.Catalog.GetLatestChartVersion(charts.RancherLoggingName, catalog.RancherChartRepo)
 			require.NoError(u.T(), err)
 
 			loggingChartInstallOption := &charts.InstallOptions{
@@ -280,7 +282,7 @@ func (u *UpgradeWorkloadTestSuite) testPreUpgradeSingleCluster(clusterName strin
 	}
 }
 
-func (u *UpgradeWorkloadTestSuite) testPostUpgradeSingleCluster(clusterName string, featuresToTest Features, names *resourceNames) {
+func (u *UpgradeWorkloadTestSuite) testPostUpgradeSingleCluster(clusterName string, featuresToTest upgradeinput.Features, names *resourceNames) {
 	subSession := u.session.NewSession()
 	defer subSession.Cleanup()
 

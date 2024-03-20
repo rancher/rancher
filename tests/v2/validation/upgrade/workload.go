@@ -9,17 +9,17 @@ import (
 
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/api/scheme"
-	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
-	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
-	"github.com/rancher/rancher/tests/framework/extensions/clusters"
-	"github.com/rancher/rancher/tests/framework/extensions/ingresses"
-	kubeingress "github.com/rancher/rancher/tests/framework/extensions/kubeapi/ingresses"
-	"github.com/rancher/rancher/tests/framework/extensions/projects"
-	"github.com/rancher/rancher/tests/framework/extensions/services"
-	"github.com/rancher/rancher/tests/framework/extensions/workloads"
-	"github.com/rancher/rancher/tests/framework/pkg/namegenerator"
-	"github.com/rancher/rancher/tests/framework/pkg/wait"
+	"github.com/rancher/shepherd/clients/rancher"
+	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
+	v1 "github.com/rancher/shepherd/clients/rancher/v1"
+	"github.com/rancher/shepherd/extensions/clusters"
+	"github.com/rancher/shepherd/extensions/ingresses"
+	kubeingress "github.com/rancher/shepherd/extensions/kubeapi/ingresses"
+	"github.com/rancher/shepherd/extensions/projects"
+	"github.com/rancher/shepherd/extensions/services"
+	"github.com/rancher/shepherd/extensions/workloads"
+	"github.com/rancher/shepherd/pkg/namegenerator"
+	"github.com/rancher/shepherd/pkg/wait"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	appv1 "k8s.io/api/apps/v1"
@@ -167,7 +167,7 @@ func newPodTemplateWithSecretEnvironmentVariable(secretName string) corev1.PodTe
 // waitUntilIngressIsAccessible waits until the ingress is accessible
 func waitUntilIngressIsAccessible(client *rancher.Client, hostname string) (bool, error) {
 	err := kubewait.Poll(500*time.Millisecond, 2*time.Minute, func() (done bool, err error) {
-		isIngressAccessible, err := ingresses.AccessIngressExternally(client, hostname, false)
+		isIngressAccessible, err := ingresses.IsIngressExternallyAccessible(client, hostname, "", false)
 		if err != nil {
 			return false, err
 		}

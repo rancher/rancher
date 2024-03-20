@@ -10,16 +10,16 @@ import (
 	"github.com/rancher/rancher/tests/v2prov/cluster"
 	"github.com/rancher/rancher/tests/v2prov/operations"
 	"github.com/rancher/rancher/tests/v2prov/systemdnode"
-	"github.com/rancher/wrangler/pkg/name"
+	"github.com/rancher/wrangler/v2/pkg/name"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// Test_Operation_Custom_EtcdSnapshotCreationRestoreInPlace creates a custom 2 node cluster with a controlplane+worker and
+// Test_Operation_SetA_Custom_EtcdSnapshotCreationRestoreInPlace creates a custom 2 node cluster with a controlplane+worker and
 // etcd node, creates a configmap, takes a snapshot of the cluster, deletes the configmap, then restores from snapshot.
 // This validates that it is possible to restore a snapshot.
-func Test_Operation_Custom_EtcdSnapshotCreationRestoreInPlace(t *testing.T) {
+func Test_Operation_SetA_Custom_EtcdSnapshotCreationRestoreInPlace(t *testing.T) {
 	clients, err := clients.New()
 	if err != nil {
 		t.Fatal(err)

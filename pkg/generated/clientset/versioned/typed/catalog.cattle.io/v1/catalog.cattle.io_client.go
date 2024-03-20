@@ -1,5 +1,5 @@
 /*
-Copyright 2023 Rancher Labs, Inc.
+Copyright 2024 Rancher Labs, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -31,6 +31,7 @@ type CatalogV1Interface interface {
 	AppsGetter
 	ClusterReposGetter
 	OperationsGetter
+	UIPluginsGetter
 }
 
 // CatalogV1Client is used to interact with features provided by the catalog.cattle.io group.
@@ -48,6 +49,10 @@ func (c *CatalogV1Client) ClusterRepos() ClusterRepoInterface {
 
 func (c *CatalogV1Client) Operations(namespace string) OperationInterface {
 	return newOperations(c, namespace)
+}
+
+func (c *CatalogV1Client) UIPlugins(namespace string) UIPluginInterface {
+	return newUIPlugins(c, namespace)
 }
 
 // NewForConfig creates a new CatalogV1Client for the given config.

@@ -9,7 +9,6 @@ import (
 	"github.com/rancher/norman/store/subtype"
 	"github.com/rancher/norman/store/transform"
 	"github.com/rancher/norman/types"
-	"github.com/rancher/rancher/pkg/api/norman/customization/alert"
 	"github.com/rancher/rancher/pkg/api/norman/customization/app"
 	"github.com/rancher/rancher/pkg/api/norman/customization/authn"
 	"github.com/rancher/rancher/pkg/api/norman/customization/catalog"
@@ -22,7 +21,6 @@ import (
 	"github.com/rancher/rancher/pkg/api/norman/customization/globalrole"
 	"github.com/rancher/rancher/pkg/api/norman/customization/globalrolebinding"
 	"github.com/rancher/rancher/pkg/api/norman/customization/kontainerdriver"
-	"github.com/rancher/rancher/pkg/api/norman/customization/monitor"
 	"github.com/rancher/rancher/pkg/api/norman/customization/multiclusterapp"
 	"github.com/rancher/rancher/pkg/api/norman/customization/namespacedresource"
 	"github.com/rancher/rancher/pkg/api/norman/customization/node"
@@ -35,7 +33,6 @@ import (
 	"github.com/rancher/rancher/pkg/api/norman/customization/roletemplatebinding"
 	"github.com/rancher/rancher/pkg/api/norman/customization/secret"
 	"github.com/rancher/rancher/pkg/api/norman/customization/setting"
-	alertStore "github.com/rancher/rancher/pkg/api/norman/store/alert"
 	appStore "github.com/rancher/rancher/pkg/api/norman/store/app"
 	catalogStore "github.com/rancher/rancher/pkg/api/norman/store/catalog"
 	"github.com/rancher/rancher/pkg/api/norman/store/cert"
@@ -119,21 +116,11 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.CatalogType,
 		client.CatalogTemplateType,
 		client.CatalogTemplateVersionType,
-		client.ClusterAlertType,
-		client.ClusterAlertGroupType,
 		client.ClusterCatalogType,
-		client.ClusterAlertRuleType,
-		client.ClusterMonitorGraphType,
 		client.ComposeConfigType,
 		client.MultiClusterAppType,
 		client.MultiClusterAppRevisionType,
-		client.MonitorMetricType,
-		client.NotifierType,
-		client.ProjectAlertType,
-		client.ProjectAlertGroupType,
 		client.ProjectCatalogType,
-		client.ProjectAlertRuleType,
-		client.ProjectMonitorGraphType,
 		client.TemplateType,
 		client.TemplateVersionType,
 		client.TemplateContentType,
@@ -181,9 +168,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	ProjectCatalog(schemas, apiContext)
 	ClusterCatalog(schemas, apiContext)
 	App(schemas, apiContext, clusterManager)
-	Alert(schemas, apiContext)
 	TemplateContent(schemas)
-	Monitor(schemas, apiContext, clusterManager)
 	MultiClusterApps(schemas, apiContext)
 	GlobalDNSs(schemas, apiContext, localClusterEnabled)
 	GlobalDNSProviders(schemas, apiContext, localClusterEnabled)
@@ -546,53 +531,6 @@ func Feature(schemas *types.Schemas, management *config.ScaledContext) {
 	schema.Validator = validator.Validator
 	schema.Formatter = feature.Formatter
 	schema.Store = featStore.New(schema.Store)
-}
-
-func Alert(schemas *types.Schemas, management *config.ScaledContext) {
-	handler := &alert.Handler{
-		ClusterAlertRule: management.Management.ClusterAlertRules(""),
-		ProjectAlertRule: management.Management.ProjectAlertRules(""),
-		Notifiers:        management.Management.Notifiers(""),
-		DialerFactory:    management.Dialer,
-	}
-
-	schema := schemas.Schema(&managementschema.Version, client.NotifierType)
-	schema.CollectionFormatter = alert.NotifierCollectionFormatter
-	schema.Formatter = alert.NotifierFormatter
-	schema.ActionHandler = handler.NotifierActionHandler
-	schema.Store = alertStore.NewNotifier(management, schema.Store)
-
-	schema = schemas.Schema(&managementschema.Version, client.ClusterAlertRuleType)
-	schema.Formatter = alert.RuleFormatter
-	schema.Validator = alert.ClusterAlertRuleValidator
-	schema.ActionHandler = handler.ClusterAlertRuleActionHandler
-
-	schema = schemas.Schema(&managementschema.Version, client.ProjectAlertRuleType)
-	schema.Formatter = alert.RuleFormatter
-	schema.Validator = alert.ProjectAlertRuleValidator
-	schema.ActionHandler = handler.ProjectAlertRuleActionHandler
-
-	//old schema just for migrate
-	schema = schemas.Schema(&managementschema.Version, client.ClusterAlertType)
-	schema = schemas.Schema(&managementschema.Version, client.ProjectAlertType)
-}
-
-func Monitor(schemas *types.Schemas, management *config.ScaledContext, clusterManager *clustermanager.Manager) {
-	clusterGraphHandler := monitor.NewClusterGraphHandler(management.Dialer, clusterManager)
-	projectGraphHandler := monitor.NewProjectGraphHandler(management.Dialer, clusterManager)
-	metricHandler := monitor.NewMetricHandler(management.Dialer, clusterManager)
-
-	schema := schemas.Schema(&managementschema.Version, client.ClusterMonitorGraphType)
-	schema.CollectionFormatter = monitor.QueryGraphCollectionFormatter
-	schema.ActionHandler = clusterGraphHandler.QuerySeriesAction
-
-	schema = schemas.Schema(&managementschema.Version, client.ProjectMonitorGraphType)
-	schema.CollectionFormatter = monitor.QueryGraphCollectionFormatter
-	schema.ActionHandler = projectGraphHandler.QuerySeriesAction
-
-	schema = schemas.Schema(&managementschema.Version, client.MonitorMetricType)
-	schema.CollectionFormatter = monitor.MetricCollectionFormatter
-	schema.ActionHandler = metricHandler.Action
 }
 
 func Project(schemas *types.Schemas, management *config.ScaledContext) {

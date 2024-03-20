@@ -31,12 +31,12 @@ import (
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/steve/pkg/podimpersonation"
 	"github.com/rancher/steve/pkg/stores/proxy"
-	data2 "github.com/rancher/wrangler/pkg/data"
-	"github.com/rancher/wrangler/pkg/data/convert"
-	corev1controllers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
-	rbacv1controllers "github.com/rancher/wrangler/pkg/generated/controllers/rbac/v1"
-	"github.com/rancher/wrangler/pkg/name"
-	"github.com/rancher/wrangler/pkg/schemas/validation"
+	data2 "github.com/rancher/wrangler/v2/pkg/data"
+	"github.com/rancher/wrangler/v2/pkg/data/convert"
+	corev1controllers "github.com/rancher/wrangler/v2/pkg/generated/controllers/core/v1"
+	rbacv1controllers "github.com/rancher/wrangler/v2/pkg/generated/controllers/rbac/v1"
+	"github.com/rancher/wrangler/v2/pkg/name"
+	"github.com/rancher/wrangler/v2/pkg/schemas/validation"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -589,6 +589,10 @@ func (c Command) renderArgs() ([]string, error) {
 	return append([]string{c.Operation}, args...), nil
 }
 
+func sanitizeCommandKeyNames(name string) string {
+	return strings.Replace(name, "/", "-", -1)
+}
+
 func sanitizeVersion(chartVersion string) string {
 	return badChars.ReplaceAllString(chartVersion, "-")
 }
@@ -710,9 +714,12 @@ func (s *Operations) getChartCommand(namespace, name, chartName, chartVersion st
 		return Command{}, err
 	}
 
+	valuesFileName := sanitizeCommandKeyNames(fmt.Sprintf("values-%s-%s.yaml", chartName, sanitizeVersion(chartVersion)))
+	chartFileName := sanitizeCommandKeyNames(fmt.Sprintf("%s-%s.tgz", chartName, sanitizeVersion(chartVersion)))
+
 	c := Command{
-		ValuesFile: fmt.Sprintf("values-%s-%s.yaml", chartName, sanitizeVersion(chartVersion)),
-		ChartFile:  fmt.Sprintf("%s-%s.tgz", chartName, sanitizeVersion(chartVersion)),
+		ValuesFile: valuesFileName,
+		ChartFile:  chartFileName,
 		Chart:      chartData,
 		Kustomize:  s.enableKustomize(annotations, upgrade),
 	}

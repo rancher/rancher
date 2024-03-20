@@ -10,7 +10,8 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	managementcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
-	"k8s.io/apimachinery/pkg/api/errors"
+	"github.com/sirupsen/logrus"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -34,6 +35,7 @@ func (s *settingsProvider) Get(name string) string {
 	if value != "" {
 		return value
 	}
+
 	obj, err := s.settingCache.Get(name)
 	if err != nil {
 		val, err := s.settings.Get(name, metav1.GetOptions{})
@@ -42,9 +44,11 @@ func (s *settingsProvider) Get(name string) string {
 		}
 		obj = val
 	}
+
 	if obj.Value == "" {
 		return obj.Default
 	}
+
 	return obj.Value
 }
 
@@ -80,8 +84,8 @@ func (s *settingsProvider) SetIfUnset(name, value string) error {
 
 // SetAll iterates through a map of settings.Setting and updates corresponding settings in k8s
 // to match any values set for them via their respective CATTLE_<setting-name> env var, their
-// source to "env" if configured by an env var, and their default to match the setting in the
-// map.
+// source to "env" if configured by an env var, and their default to match the setting in the map.
+// NOTE: All settings not provided in settingsMap will be marked as unknown, and may be removed in the future.
 func (s *settingsProvider) SetAll(settingsMap map[string]settings.Setting) error {
 	fallback := map[string]string{}
 
@@ -90,7 +94,7 @@ func (s *settingsProvider) SetAll(settingsMap map[string]settings.Setting) error
 		envValue, envOk := os.LookupEnv(key)
 
 		obj, err := s.settings.Get(setting.Name, metav1.GetOptions{})
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			newSetting := &v3.Setting{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: setting.Name,
@@ -109,7 +113,7 @@ func (s *settingsProvider) SetAll(settingsMap map[string]settings.Setting) error
 			_, err := s.settings.Create(newSetting)
 			// Rancher will race in an HA setup to try and create the settings
 			// so if it exists just move on.
-			if err != nil && !errors.IsAlreadyExists(err) {
+			if err != nil && !apierrors.IsAlreadyExists(err) {
 				return err
 			}
 		} else if err != nil {
@@ -147,6 +151,35 @@ func (s *settingsProvider) SetAll(settingsMap map[string]settings.Setting) error
 	}
 
 	s.fallback = fallback
+
+	if err := s.cleanupUnknownSettings(settingsMap); err != nil {
+		logrus.Errorf("Error cleaning up unknown settings: %v", err)
+	}
+
+	return nil
+}
+
+// cleanupUnknownSettings lists all settings in the cluster and deletes all unknown (e.g. deprecated) settings.
+func (s *settingsProvider) cleanupUnknownSettings(settingsMap map[string]settings.Setting) error {
+	// The settings cache is not yet available at this point, thus using the client directly.
+	list, err := s.settings.List(metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+
+	for _, setting := range list.Items {
+		if _, ok := settingsMap[setting.Name]; ok {
+			continue
+		}
+
+		err = s.settings.Delete(setting.Name, &metav1.DeleteOptions{})
+		if err != nil {
+			logrus.Errorf("Error deleting unknown setting %s: %v", setting.Name, err)
+			continue
+		}
+
+		logrus.Warnf("Deleted unknown setting %s", setting.Name)
+	}
 
 	return nil
 }

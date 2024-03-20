@@ -1,5 +1,5 @@
 /*
-Copyright 2023 Rancher Labs, Inc.
+Copyright 2024 Rancher Labs, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,8 +21,8 @@ package v3
 import (
 	"github.com/rancher/lasso/pkg/controller"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	"github.com/rancher/wrangler/pkg/generic"
-	"github.com/rancher/wrangler/pkg/schemes"
+	"github.com/rancher/wrangler/v2/pkg/generic"
+	"github.com/rancher/wrangler/v2/pkg/schemes"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -42,12 +42,8 @@ type Interface interface {
 	CatalogTemplateVersion() CatalogTemplateVersionController
 	CloudCredential() CloudCredentialController
 	Cluster() ClusterController
-	ClusterAlert() ClusterAlertController
-	ClusterAlertGroup() ClusterAlertGroupController
-	ClusterAlertRule() ClusterAlertRuleController
 	ClusterCatalog() ClusterCatalogController
 	ClusterLogging() ClusterLoggingController
-	ClusterMonitorGraph() ClusterMonitorGraphController
 	ClusterRegistrationToken() ClusterRegistrationTokenController
 	ClusterRoleTemplateBinding() ClusterRoleTemplateBindingController
 	ClusterTemplate() ClusterTemplateController
@@ -69,14 +65,12 @@ type Interface interface {
 	KontainerDriver() KontainerDriverController
 	LocalProvider() LocalProviderController
 	ManagedChart() ManagedChartController
-	MonitorMetric() MonitorMetricController
 	MultiClusterApp() MultiClusterAppController
 	MultiClusterAppRevision() MultiClusterAppRevisionController
 	Node() NodeController
 	NodeDriver() NodeDriverController
 	NodePool() NodePoolController
 	NodeTemplate() NodeTemplateController
-	Notifier() NotifierController
 	OIDCProvider() OIDCProviderController
 	OpenLdapProvider() OpenLdapProviderController
 	PodSecurityAdmissionConfigurationTemplate() PodSecurityAdmissionConfigurationTemplateController
@@ -85,12 +79,8 @@ type Interface interface {
 	Preference() PreferenceController
 	Principal() PrincipalController
 	Project() ProjectController
-	ProjectAlert() ProjectAlertController
-	ProjectAlertGroup() ProjectAlertGroupController
-	ProjectAlertRule() ProjectAlertRuleController
 	ProjectCatalog() ProjectCatalogController
 	ProjectLogging() ProjectLoggingController
-	ProjectMonitorGraph() ProjectMonitorGraphController
 	ProjectNetworkPolicy() ProjectNetworkPolicyController
 	ProjectRoleTemplateBinding() ProjectRoleTemplateBindingController
 	RancherUserNotification() RancherUserNotificationController
@@ -163,28 +153,12 @@ func (v *version) Cluster() ClusterController {
 	return generic.NewNonNamespacedController[*v3.Cluster, *v3.ClusterList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "Cluster"}, "clusters", v.controllerFactory)
 }
 
-func (v *version) ClusterAlert() ClusterAlertController {
-	return generic.NewController[*v3.ClusterAlert, *v3.ClusterAlertList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ClusterAlert"}, "clusteralerts", true, v.controllerFactory)
-}
-
-func (v *version) ClusterAlertGroup() ClusterAlertGroupController {
-	return generic.NewController[*v3.ClusterAlertGroup, *v3.ClusterAlertGroupList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ClusterAlertGroup"}, "clusteralertgroups", true, v.controllerFactory)
-}
-
-func (v *version) ClusterAlertRule() ClusterAlertRuleController {
-	return generic.NewController[*v3.ClusterAlertRule, *v3.ClusterAlertRuleList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ClusterAlertRule"}, "clusteralertrules", true, v.controllerFactory)
-}
-
 func (v *version) ClusterCatalog() ClusterCatalogController {
 	return generic.NewController[*v3.ClusterCatalog, *v3.ClusterCatalogList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ClusterCatalog"}, "clustercatalogs", true, v.controllerFactory)
 }
 
 func (v *version) ClusterLogging() ClusterLoggingController {
 	return generic.NewController[*v3.ClusterLogging, *v3.ClusterLoggingList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ClusterLogging"}, "clusterloggings", true, v.controllerFactory)
-}
-
-func (v *version) ClusterMonitorGraph() ClusterMonitorGraphController {
-	return generic.NewController[*v3.ClusterMonitorGraph, *v3.ClusterMonitorGraphList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ClusterMonitorGraph"}, "clustermonitorgraphs", true, v.controllerFactory)
 }
 
 func (v *version) ClusterRegistrationToken() ClusterRegistrationTokenController {
@@ -271,10 +245,6 @@ func (v *version) ManagedChart() ManagedChartController {
 	return generic.NewController[*v3.ManagedChart, *v3.ManagedChartList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ManagedChart"}, "managedcharts", true, v.controllerFactory)
 }
 
-func (v *version) MonitorMetric() MonitorMetricController {
-	return generic.NewController[*v3.MonitorMetric, *v3.MonitorMetricList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "MonitorMetric"}, "monitormetrics", true, v.controllerFactory)
-}
-
 func (v *version) MultiClusterApp() MultiClusterAppController {
 	return generic.NewController[*v3.MultiClusterApp, *v3.MultiClusterAppList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "MultiClusterApp"}, "multiclusterapps", true, v.controllerFactory)
 }
@@ -297,10 +267,6 @@ func (v *version) NodePool() NodePoolController {
 
 func (v *version) NodeTemplate() NodeTemplateController {
 	return generic.NewController[*v3.NodeTemplate, *v3.NodeTemplateList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "NodeTemplate"}, "nodetemplates", true, v.controllerFactory)
-}
-
-func (v *version) Notifier() NotifierController {
-	return generic.NewController[*v3.Notifier, *v3.NotifierList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "Notifier"}, "notifiers", true, v.controllerFactory)
 }
 
 func (v *version) OIDCProvider() OIDCProviderController {
@@ -335,28 +301,12 @@ func (v *version) Project() ProjectController {
 	return generic.NewController[*v3.Project, *v3.ProjectList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "Project"}, "projects", true, v.controllerFactory)
 }
 
-func (v *version) ProjectAlert() ProjectAlertController {
-	return generic.NewController[*v3.ProjectAlert, *v3.ProjectAlertList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ProjectAlert"}, "projectalerts", true, v.controllerFactory)
-}
-
-func (v *version) ProjectAlertGroup() ProjectAlertGroupController {
-	return generic.NewController[*v3.ProjectAlertGroup, *v3.ProjectAlertGroupList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ProjectAlertGroup"}, "projectalertgroups", true, v.controllerFactory)
-}
-
-func (v *version) ProjectAlertRule() ProjectAlertRuleController {
-	return generic.NewController[*v3.ProjectAlertRule, *v3.ProjectAlertRuleList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ProjectAlertRule"}, "projectalertrules", true, v.controllerFactory)
-}
-
 func (v *version) ProjectCatalog() ProjectCatalogController {
 	return generic.NewController[*v3.ProjectCatalog, *v3.ProjectCatalogList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ProjectCatalog"}, "projectcatalogs", true, v.controllerFactory)
 }
 
 func (v *version) ProjectLogging() ProjectLoggingController {
 	return generic.NewController[*v3.ProjectLogging, *v3.ProjectLoggingList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ProjectLogging"}, "projectloggings", true, v.controllerFactory)
-}
-
-func (v *version) ProjectMonitorGraph() ProjectMonitorGraphController {
-	return generic.NewController[*v3.ProjectMonitorGraph, *v3.ProjectMonitorGraphList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ProjectMonitorGraph"}, "projectmonitorgraphs", true, v.controllerFactory)
 }
 
 func (v *version) ProjectNetworkPolicy() ProjectNetworkPolicyController {

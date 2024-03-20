@@ -26,8 +26,8 @@ func RequiredCRDs() []string {
 	if features.Auth.Enabled() {
 		requiredCRDS = append(requiredCRDS, AuthCRDs()...)
 	}
-	if features.MonitoringV1.Enabled() {
-		requiredCRDS = append(requiredCRDS, MonitoringV1CRDs()...)
+	if features.UIExtension.Enabled() {
+		requiredCRDS = append(requiredCRDS, UIPluginsCRD()...)
 	}
 	return requiredCRDS
 }
@@ -116,16 +116,6 @@ func ClusterAuthCRDs() []string {
 	}
 }
 
-// MonitoringV1CRDs returns a list of CRD names needed for MonitoringV1.
-func MonitoringV1CRDs() []string {
-	return []string{
-		"alertmanagers.monitoring.coreos.com",
-		"prometheuses.monitoring.coreos.com",
-		"prometheusrules.monitoring.coreos.com",
-		"servicemonitors.monitoring.coreos.com",
-	}
-}
-
 // MCMCRDs returns a list of CRD names needed for Multi CLuster Management.
 func MCMCRDs() []string {
 	return []string{
@@ -188,6 +178,13 @@ func MCMCRDs() []string {
 		"tokens.management.cattle.io",
 		"users.management.cattle.io",
 		"userattributes.management.cattle.io",
+	}
+}
+
+// UIPluginsCRD returns a list of CRD names needed to enable UIPlugins
+func UIPluginsCRD() []string {
+	return []string{
+		"uiplugins.catalog.cattle.io",
 	}
 }
 
@@ -296,5 +293,6 @@ var MigratedResources = map[string]bool{
 	"tokens.management.cattle.io":                                     false,
 	"userattributes.management.cattle.io":                             false,
 	"users.management.cattle.io":                                      false,
+	"uiplugins.catalog.cattle.io":                                     true,
 	"workloads.project.cattle.io":                                     false,
 }

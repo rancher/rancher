@@ -2,8 +2,8 @@ package configmaps
 
 import (
 	"github.com/pkg/errors"
-	steveV1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
-	cm "github.com/rancher/rancher/tests/framework/extensions/configmaps"
+	steveV1 "github.com/rancher/shepherd/clients/rancher/v1"
+	cm "github.com/rancher/shepherd/extensions/configmaps"
 	"github.com/sirupsen/logrus"
 )
 

@@ -12,12 +12,15 @@ import (
 	"github.com/rancher/rancher/pkg/catalogv2"
 	"github.com/rancher/rancher/pkg/catalogv2/git"
 	helmhttp "github.com/rancher/rancher/pkg/catalogv2/http"
+	"github.com/rancher/rancher/pkg/catalogv2/oci"
 	catalogcontrollers "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
 	namespaces "github.com/rancher/rancher/pkg/namespace"
-	"github.com/rancher/wrangler/pkg/apply"
-	"github.com/rancher/wrangler/pkg/condition"
-	corev1controllers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
-	name2 "github.com/rancher/wrangler/pkg/name"
+	"github.com/rancher/wrangler/v2/pkg/apply"
+	"github.com/rancher/wrangler/v2/pkg/condition"
+	corev1controllers "github.com/rancher/wrangler/v2/pkg/generated/controllers/core/v1"
+	name2 "github.com/rancher/wrangler/v2/pkg/name"
+	"github.com/sirupsen/logrus"
+	"helm.sh/helm/v3/pkg/registry"
 	"helm.sh/helm/v3/pkg/repo"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -30,7 +33,7 @@ const (
 )
 
 var (
-	interval = 5 * time.Minute
+	interval = 6 * time.Hour
 )
 
 type repoHandler struct {
@@ -79,6 +82,8 @@ func (r *repoHandler) ClusterRepoDownloadEnsureStatusHandler(repo *catalog.Clust
 }
 
 func (r *repoHandler) ClusterRepoDownloadStatusHandler(repo *catalog.ClusterRepo, status catalog.RepoStatus) (catalog.RepoStatus, error) {
+	logrus.Debugf("ClusterRepoDownloadStatusHandler triggered for clusterrepo %s", repo.Name)
+
 	err := r.ensureIndexConfigMap(repo, &status)
 	if err != nil {
 		return status, err
@@ -190,6 +195,8 @@ func (r *repoHandler) ensure(repoSpec *catalog.RepoSpec, status catalog.RepoStat
 }
 
 func (r *repoHandler) download(repoSpec *catalog.RepoSpec, status catalog.RepoStatus, metadata *metav1.ObjectMeta, owner metav1.OwnerReference) (catalog.RepoStatus, error) {
+	logrus.Debugf("Downloading helm charts metadata for clusterrepo %s", metadata.Name)
+
 	var (
 		index  *repo.IndexFile
 		commit string
@@ -225,9 +232,15 @@ func (r *repoHandler) download(repoSpec *catalog.RepoSpec, status catalog.RepoSt
 		}
 		index, err = git.BuildOrGetIndex(metadata.Namespace, metadata.Name, repoSpec.GitRepo)
 	} else if repoSpec.URL != "" {
+		switch {
+		case registry.IsOCI(repoSpec.URL):
+			index, err = oci.GenerateIndex(repoSpec.URL, secret, *repoSpec, status, r.configMapCache)
+		default:
+			index, err = helmhttp.DownloadIndex(secret, repoSpec.URL, repoSpec.CABundle, repoSpec.InsecureSkipTLSverify, repoSpec.DisableSameOriginCheck)
+		}
+
 		status.URL = repoSpec.URL
 		status.Branch = ""
-		index, err = helmhttp.DownloadIndex(secret, repoSpec.URL, repoSpec.CABundle, repoSpec.InsecureSkipTLSverify, repoSpec.DisableSameOriginCheck)
 	} else {
 		return status, nil
 	}

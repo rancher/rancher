@@ -24,6 +24,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/requests"
 	"github.com/rancher/rancher/pkg/controllers/dashboard"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/apiservice"
+	"github.com/rancher/rancher/pkg/controllers/dashboard/plugin"
 	"github.com/rancher/rancher/pkg/controllers/dashboardapi"
 	managementauth "github.com/rancher/rancher/pkg/controllers/management/auth"
 	"github.com/rancher/rancher/pkg/controllers/nodedriver"
@@ -43,9 +44,9 @@ import (
 	aggregation2 "github.com/rancher/steve/pkg/aggregation"
 	steveauth "github.com/rancher/steve/pkg/auth"
 	steveserver "github.com/rancher/steve/pkg/server"
-	"github.com/rancher/wrangler/pkg/generic"
-	"github.com/rancher/wrangler/pkg/k8scheck"
-	"github.com/rancher/wrangler/pkg/unstructured"
+	"github.com/rancher/wrangler/v2/pkg/generic"
+	"github.com/rancher/wrangler/v2/pkg/k8scheck"
+	"github.com/rancher/wrangler/v2/pkg/unstructured"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	v1 "k8s.io/api/core/v1"
@@ -264,6 +265,9 @@ func (r *Rancher) Start(ctx context.Context) error {
 
 	if err := steveapi.Setup(ctx, r.Steve, r.Wrangler); err != nil {
 		return err
+	}
+	if features.UIExtension.Enabled() {
+		plugin.Register(ctx, r.Wrangler)
 	}
 
 	if features.MCM.Enabled() {

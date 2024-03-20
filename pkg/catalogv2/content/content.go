@@ -19,6 +19,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
@@ -32,11 +33,13 @@ import (
 	"github.com/rancher/rancher/pkg/catalogv2/git"
 	"github.com/rancher/rancher/pkg/catalogv2/helm"
 	helmhttp "github.com/rancher/rancher/pkg/catalogv2/http"
+	"github.com/rancher/rancher/pkg/catalogv2/oci"
 	catalogcontrollers "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/settings"
-	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
-	"github.com/rancher/wrangler/pkg/schemas/validation"
+	corecontrollers "github.com/rancher/wrangler/v2/pkg/generated/controllers/core/v1"
+	"github.com/rancher/wrangler/v2/pkg/schemas/validation"
 	"github.com/sirupsen/logrus"
+	"helm.sh/helm/v3/pkg/registry"
 	"helm.sh/helm/v3/pkg/repo"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -179,8 +182,18 @@ func (c *Manager) Icon(namespace, name, chartName, version string) (io.ReadClose
 		return nil, "", err
 	}
 
+	// If the chart icon is not an HTTP URL and the repository has a commit status,
+	// attempt to get the icon from the git repository.
 	if !isHTTP(chart.Icon) && repo.status.Commit != "" {
 		return git.Icon(namespace, name, repo.status.URL, chart)
+	}
+
+	// Check if the repository from the chart is bundled and is at an airgapped environment
+	rancherBundled := isRancherAndBundledCatalog(repo)
+	if rancherBundled {
+		// If the icon is not available in the git repository, use the fallback icon for airgapped environments.
+		// which will be handled by the UI, as long as this returns a nil io.ReadCloser and nil error.
+		return nil, "", nil
 	}
 
 	secret, err := catalogv2.GetSecret(c.secrets, repo.spec, repo.metadata.Namespace)
@@ -231,7 +244,23 @@ func (c *Manager) Chart(namespace, name, chartName, version string, skipFilter b
 		return nil, err
 	}
 
-	return helmhttp.Chart(secret, repo.status.URL, repo.spec.CABundle, repo.spec.InsecureSkipTLSverify, repo.spec.DisableSameOriginCheck, chart)
+	// Check if chart is nil and has at least one URL
+	if chart == nil {
+		return nil, errors.New("chart is nil")
+	}
+	if len(chart.URLs) <= 0 {
+		return nil, errors.New("chart has no urls specified")
+	}
+
+	switch {
+	// For OCI based helm repositories, there is no index.yaml.
+	// We generate index.yaml for it. While generating the index.yaml
+	// we only set index 0 of chart.URLs.
+	case registry.IsOCI(chart.URLs[0]):
+		return oci.Chart(secret, chart, *repo.spec)
+	default:
+		return helmhttp.Chart(secret, repo.status.URL, repo.spec.CABundle, repo.spec.InsecureSkipTLSverify, repo.spec.DisableSameOriginCheck, chart)
+	}
 }
 
 // Info retrieves detailed information about a specific Helm chart from a Helm repository.
@@ -420,4 +449,12 @@ func (c *Manager) filterReleases(index *repo.IndexFile, k8sVersion *semver.Versi
 func isHTTP(iconURL string) bool {
 	u, err := url.Parse(iconURL)
 	return err == nil && (u.Scheme == "http" || u.Scheme == "https")
+}
+
+// isRancherAndBundledCatalog - checks if the current chart repo
+// is from the default rancher official helm catalog and if rancher is operating at bundled mode
+// which means Rancher is at an airgapped environment
+func isRancherAndBundledCatalog(repo repoDef) bool {
+	gitDir := git.RepoDir(repo.metadata.Namespace, repo.metadata.Name, repo.status.URL)
+	return (git.IsBundled(gitDir) && settings.SystemCatalog.Get() == "bundled")
 }

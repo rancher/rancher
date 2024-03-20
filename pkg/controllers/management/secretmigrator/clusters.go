@@ -358,45 +358,6 @@ func (m *Migrator) CreateOrUpdateAADCertSecret(secretName string, rkeConfig *rke
 	return m.createOrUpdateSecretForCredential(secretName, SecretNamespace, rkeConfig.CloudProvider.AzureCloudProvider.AADClientCertPassword, nil, owner, "cluster", "aadcert")
 }
 
-// CreateOrUpdateSMTPSecret accepts an optional secret name and an SMTPConfig object
-// and creates a Secret for the SMTP server password if there is one.
-// If an owner is passed, the owner is set as an owner reference on the Secret.
-// It returns a reference to the Secret if one was created. If the returned Secret is not nil and there is no error,
-// the caller is responsible for un-setting the secret data, setting a reference to the Secret, and
-// updating the Cluster object, if applicable.
-func (m *Migrator) CreateOrUpdateSMTPSecret(secretName string, smtpConfig *apimgmtv3.SMTPConfig, owner runtime.Object) (*corev1.Secret, error) {
-	if smtpConfig == nil {
-		return nil, nil
-	}
-	return m.createOrUpdateSecretForCredential(secretName, SecretNamespace, smtpConfig.Password, nil, owner, "notifier", "smtpconfig")
-}
-
-// CreateOrUpdateWechatSecret accepts an optional secret name and a WechatConfig object
-// and creates a Secret for the Wechat credential if there is one.
-// If an owner is passed, the owner is set as an owner reference on the Secret.
-// It returns a reference to the Secret if one was created. If the returned Secret is not nil and there is no error,
-// the caller is responsible for un-setting the secret data, setting a reference to the Secret, and
-// updating the Cluster object, if applicable.
-func (m *Migrator) CreateOrUpdateWechatSecret(secretName string, wechatConfig *apimgmtv3.WechatConfig, owner runtime.Object) (*corev1.Secret, error) {
-	if wechatConfig == nil {
-		return nil, nil
-	}
-	return m.createOrUpdateSecretForCredential(secretName, SecretNamespace, wechatConfig.Secret, nil, owner, "notifier", "wechatconfig")
-}
-
-// CreateOrUpdateDingtalkSecret accepts an optional secret name and a DingtalkConfig object
-// and creates a Secret for the Dingtalk credential if there is one.
-// If an owner is passed, the owner is set as an owner reference on the Secret.
-// It returns a reference to the Secret if one was created. If the returned Secret is not nil and there is no error,
-// the caller is responsible for un-setting the secret data, setting a reference to the Secret, and
-// updating the Cluster object, if applicable.
-func (m *Migrator) CreateOrUpdateDingtalkSecret(secretName string, dingtalkConfig *apimgmtv3.DingtalkConfig, owner runtime.Object) (*corev1.Secret, error) {
-	if dingtalkConfig == nil {
-		return nil, nil
-	}
-	return m.createOrUpdateSecretForCredential(secretName, SecretNamespace, dingtalkConfig.Secret, nil, owner, "notifier", "dingtalkconfig")
-}
-
 // CreateOrUpdateSourceCodeProviderConfigSecret accepts an optional secret name and a client secret or
 // private key for a SourceCodeProviderConfig and creates a Secret for the credential if there is one.
 // If an owner is passed, the owner is set as an owner reference on the Secret.
@@ -816,81 +777,6 @@ func (h *handler) migrateClusterSecrets(cluster *apimgmtv3.Cluster) (*apimgmtv3.
 		// cluster template questions and answers
 		logrus.Tracef("[secretmigrator] cleaning questions and answers from cluster %s", clusterCopy.Name)
 		cleanQuestions(clusterCopy)
-
-		// notifiers
-		notifiers, err := h.notifierLister.List(clusterCopy.Name, labels.NewSelector())
-		if err != nil {
-			logrus.Errorf("[secretmigrator] failed to get notifiers for cluster %s, will retry: %v", clusterCopy.Name, err)
-			return cluster, err
-		}
-		for _, n := range notifiers {
-			if n.Status.SMTPCredentialSecret == "" && n.Spec.SMTPConfig != nil {
-				logrus.Tracef("[secretmigrator] migrating SMTP secrets for notifier %s in cluster %s", n.Name, clusterCopy.Name)
-				smtpSecret, err := h.migrator.CreateOrUpdateSMTPSecret("", n.Spec.SMTPConfig, clusterCopy)
-				if err != nil {
-					logrus.Errorf("[secretmigrator] failed to migrate SMTP secrets for notifier %s in cluster %s, will retry: %v", n.Name, clusterCopy.Name, err)
-					return cluster, err
-				}
-				if smtpSecret != nil {
-					logrus.Tracef("[secretmigrator] SMTP secret found for notifier %s in cluster %s", n.Name, clusterCopy.Name)
-					n.Status.SMTPCredentialSecret = smtpSecret.Name
-					n.Spec.SMTPConfig.Password = ""
-					_, err = h.notifiers.Update(n)
-					if err != nil {
-						logrus.Errorf("[secretmigrator] failed to migrate SMTP secrets for notifier %s in cluster %s, will retry: %v", n.Name, clusterCopy.Name, err)
-						deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, smtpSecret.Name, &metav1.DeleteOptions{})
-						if deleteErr != nil {
-							logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
-						}
-						return cluster, err
-					}
-				}
-			}
-			if n.Status.WechatCredentialSecret == "" && n.Spec.WechatConfig != nil {
-				logrus.Tracef("[secretmigrator] migrating Wechat secrets for notifier %s in cluster %s", n.Name, clusterCopy.Name)
-				wechatSecret, err := h.migrator.CreateOrUpdateWechatSecret("", n.Spec.WechatConfig, clusterCopy)
-				if err != nil {
-					logrus.Errorf("[secretmigrator] failed to migrate Wechat secrets for notifier %s in cluster %s, will retry: %v", n.Name, clusterCopy.Name, err)
-					return cluster, err
-				}
-				if wechatSecret != nil {
-					logrus.Tracef("[secretmigrator] Wechat secret found for notifier %s in cluster %s", n.Name, clusterCopy.Name)
-					n.Status.WechatCredentialSecret = wechatSecret.Name
-					n.Spec.WechatConfig.Secret = ""
-					_, err = h.notifiers.Update(n)
-					if err != nil {
-						logrus.Errorf("[secretmigrator] failed to migrate Wechat secrets for notifier %s in cluster %s, will retry: %v", n.Name, clusterCopy.Name, err)
-						deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, wechatSecret.Name, &metav1.DeleteOptions{})
-						if deleteErr != nil {
-							logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
-						}
-						return cluster, err
-					}
-				}
-			}
-			if n.Status.DingtalkCredentialSecret == "" && n.Spec.DingtalkConfig != nil {
-				logrus.Tracef("[secretmigrator] migrating Dingtalk secrets for notifier %s in cluster %s", n.Name, clusterCopy.Name)
-				dingtalkSecret, err := h.migrator.CreateOrUpdateDingtalkSecret(n.Status.DingtalkCredentialSecret, n.Spec.DingtalkConfig, clusterCopy)
-				if err != nil {
-					logrus.Errorf("[secretmigrator] failed to migrate Dingtalk secrets for notifier %s in cluster %s, will retry: %v", n.Name, clusterCopy.Name, err)
-					return cluster, err
-				}
-				if dingtalkSecret != nil {
-					logrus.Tracef("[secretmigrator] Dingtalk secret found for notifier %s in cluster %s", n.Name, clusterCopy.Name)
-					n.Status.DingtalkCredentialSecret = dingtalkSecret.Name
-					n.Spec.DingtalkConfig.Secret = ""
-					_, err = h.notifiers.Update(n)
-					if err != nil {
-						logrus.Errorf("[secretmigrator] failed to migrate Dingtalk secrets for notifier %s in cluster %s, will retry: %v", n.Name, clusterCopy.Name, err)
-						deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, dingtalkSecret.Name, &metav1.DeleteOptions{})
-						if deleteErr != nil {
-							logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
-						}
-						return cluster, err
-					}
-				}
-			}
-		}
 
 		// cluster catalogs
 		clusterCatalogs, err := h.clusterCatalogLister.List(clusterCopy.Name, labels.NewSelector())

@@ -41,13 +41,6 @@ type Client struct {
 	ProjectNetworkPolicy                      ProjectNetworkPolicyOperations
 	Setting                                   SettingOperations
 	Feature                                   FeatureOperations
-	ClusterAlert                              ClusterAlertOperations
-	ProjectAlert                              ProjectAlertOperations
-	Notifier                                  NotifierOperations
-	ClusterAlertGroup                         ClusterAlertGroupOperations
-	ProjectAlertGroup                         ProjectAlertGroupOperations
-	ClusterAlertRule                          ClusterAlertRuleOperations
-	ProjectAlertRule                          ProjectAlertRuleOperations
 	ComposeConfig                             ComposeConfigOperations
 	ProjectCatalog                            ProjectCatalogOperations
 	ClusterCatalog                            ClusterCatalogOperations
@@ -57,9 +50,6 @@ type Client struct {
 	GlobalDnsProvider                         GlobalDnsProviderOperations
 	KontainerDriver                           KontainerDriverOperations
 	EtcdBackup                                EtcdBackupOperations
-	MonitorMetric                             MonitorMetricOperations
-	ClusterMonitorGraph                       ClusterMonitorGraphOperations
-	ProjectMonitorGraph                       ProjectMonitorGraphOperations
 	CloudCredential                           CloudCredentialOperations
 	ManagementSecret                          ManagementSecretOperations
 	ClusterTemplate                           ClusterTemplateOperations
@@ -115,13 +105,6 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 	client.ProjectNetworkPolicy = newProjectNetworkPolicyClient(client)
 	client.Setting = newSettingClient(client)
 	client.Feature = newFeatureClient(client)
-	client.ClusterAlert = newClusterAlertClient(client)
-	client.ProjectAlert = newProjectAlertClient(client)
-	client.Notifier = newNotifierClient(client)
-	client.ClusterAlertGroup = newClusterAlertGroupClient(client)
-	client.ProjectAlertGroup = newProjectAlertGroupClient(client)
-	client.ClusterAlertRule = newClusterAlertRuleClient(client)
-	client.ProjectAlertRule = newProjectAlertRuleClient(client)
 	client.ComposeConfig = newComposeConfigClient(client)
 	client.ProjectCatalog = newProjectCatalogClient(client)
 	client.ClusterCatalog = newClusterCatalogClient(client)
@@ -131,9 +114,6 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 	client.GlobalDnsProvider = newGlobalDnsProviderClient(client)
 	client.KontainerDriver = newKontainerDriverClient(client)
 	client.EtcdBackup = newEtcdBackupClient(client)
-	client.MonitorMetric = newMonitorMetricClient(client)
-	client.ClusterMonitorGraph = newClusterMonitorGraphClient(client)
-	client.ProjectMonitorGraph = newProjectMonitorGraphClient(client)
 	client.CloudCredential = newCloudCredentialClient(client)
 	client.ManagementSecret = newManagementSecretClient(client)
 	client.ClusterTemplate = newClusterTemplateClient(client)

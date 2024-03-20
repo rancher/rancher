@@ -2,14 +2,31 @@ ARG RANCHER_TAG=dev
 ARG RANCHER_REPO=rancher
 FROM ${RANCHER_REPO}/rancher:${RANCHER_TAG} as rancher
 
-FROM registry.suse.com/bci/bci-base:15.5
-ARG ARCH=amd64
+FROM registry.suse.com/bci/bci-micro:15.5 AS final
 
-ENV KUBECTL_VERSION v1.25.12
-RUN zypper -n install --no-recommends curl ca-certificates jq git-core hostname iproute2 vim-small less \
+# Temporary build stage image
+FROM registry.suse.com/bci/bci-base:15.5 AS builder
+
+# Install system packages using builder image that has zypper
+COPY --from=final / /chroot/
+
+# Install some packages with zypper in the chroot of the final micro image
+RUN zypper --installroot /chroot -n --gpg-auto-import-keys in --no-recommends \
+    curl ca-certificates jq git-core hostname iproute2 vim-small less \
 	bash-completion bind-utils acl openssh-clients tar gzip xz gawk sysstat && \
-    zypper -n clean -a && rm -rf /tmp/* /var/tmp/* /usr/share/doc/packages/* && \
-    curl -sLf https://storage.googleapis.com/kubernetes-release/release/${KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl > /usr/bin/kubectl && \
+    zypper --installroot /chroot clean -a && \
+    rm -rf /chroot/var/cache/zypp/* /chroot/var/log/zypp/* /chroot/tmp/* /chroot/var/tmp/* /chroot/usr/share/doc/packages/*
+
+# Main stage using bco-micro as the base image
+FROM final
+
+# Copy binaries and configuration files from builder to micro
+COPY --from=builder /chroot/ /
+
+ARG ARCH=amd64
+ENV KUBECTL_VERSION v1.27.10
+
+RUN curl -sLf https://storage.googleapis.com/kubernetes-release/release/${KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl > /usr/bin/kubectl && \
     chmod +x /usr/bin/kubectl
 
 ENV LOGLEVEL_VERSION v0.1.5
@@ -20,7 +37,8 @@ ARG VERSION=dev
 LABEL io.cattle.agent true
 ENV AGENT_IMAGE rancher/rancher-agent:${VERSION}
 # For now, this value needs to be manually synced with the one in the main Dockerfile. This pins downstream webhook's version.
-ENV CATTLE_RANCHER_WEBHOOK_VERSION=103.0.0+up0.4.0
+ARG CATTLE_RANCHER_WEBHOOK_VERSION
+ENV CATTLE_RANCHER_WEBHOOK_VERSION=$CATTLE_RANCHER_WEBHOOK_VERSION
 ENV SSL_CERT_DIR /etc/kubernetes/ssl/certs
 COPY --from=rancher /var/lib/rancher-data /var/lib/rancher-data
 COPY --from=rancher /usr/bin/tini /usr/bin/

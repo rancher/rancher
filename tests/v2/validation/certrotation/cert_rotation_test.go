@@ -5,10 +5,10 @@ package certrotation
 import (
 	"testing"
 
-	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	"github.com/rancher/rancher/tests/framework/extensions/provisioninginput"
-	"github.com/rancher/rancher/tests/framework/pkg/config"
-	"github.com/rancher/rancher/tests/framework/pkg/session"
+	"github.com/rancher/shepherd/clients/rancher"
+	"github.com/rancher/shepherd/extensions/provisioninginput"
+	"github.com/rancher/shepherd/pkg/config"
+	"github.com/rancher/shepherd/pkg/session"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
@@ -44,6 +44,6 @@ func (r *V2ProvCertRotationTestSuite) TestCertRotation() {
 	})
 }
 
-func TestCertRotation(t *testing.T) {
+func TestCertRotationTestSuite(t *testing.T) {
 	suite.Run(t, new(V2ProvCertRotationTestSuite))
 }

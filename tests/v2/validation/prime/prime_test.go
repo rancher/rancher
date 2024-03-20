@@ -5,12 +5,12 @@ package prime
 import (
 	"testing"
 
-	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	prime "github.com/rancher/rancher/tests/framework/extensions/prime"
-	"github.com/rancher/rancher/tests/framework/extensions/rancherversion"
-	"github.com/rancher/rancher/tests/framework/extensions/workloads/pods"
-	"github.com/rancher/rancher/tests/framework/pkg/config"
-	"github.com/rancher/rancher/tests/framework/pkg/session"
+	"github.com/rancher/shepherd/clients/rancher"
+	prime "github.com/rancher/shepherd/extensions/prime"
+	"github.com/rancher/shepherd/extensions/rancherversion"
+	"github.com/rancher/shepherd/extensions/workloads/pods"
+	"github.com/rancher/shepherd/pkg/config"
+	"github.com/rancher/shepherd/pkg/session"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -79,9 +79,8 @@ func (t *PrimeTestSuite) TestSystemDefaultRegistry() {
 }
 
 func (t *PrimeTestSuite) TestLocalClusterRancherImages() {
-	podResults, podErrors := pods.StatusPods(t.client, localCluster)
+	podErrors := pods.StatusPods(t.client, localCluster)
 	assert.Empty(t.T(), podErrors)
-	assert.NotEmpty(t.T(), podResults)
 }
 
 func TestPrimeTestSuite(t *testing.T) {

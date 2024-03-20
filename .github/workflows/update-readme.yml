@@ -20,7 +20,7 @@ jobs:
        tmpfile=$(mktemp)
        unset latest
        unset stable
-       for rancher_major_minor in 2.7 2.6 2.5; do
+       for rancher_major_minor in 2.8 2.7 2.6; do
         latest2x=$(yq  ".entries.rancher[].appVersion | select(test(\"^v${rancher_major_minor}\") and select(. != \"*-rc*\"))" 'latest.index.yaml' | head -1)
         stable2x=$(yq  ".entries.rancher[].appVersion | select(test(\"^v${rancher_major_minor}\") and select(. != \"*-rc*\"))" 'stable.index.yaml' | head -1)
         [[ -z ${latest2x} ]] && [[ -z ${stable2x} ]] && continue

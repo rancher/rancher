@@ -4,37 +4,56 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"fmt"
 	"net/http"
 
 	"github.com/coreos/go-oidc/v3/oidc"
 )
 
-func AddCertKeyToContext(ctx context.Context, certificate, key string) (context.Context, error) {
+func getClientCertificates(certificate, key string) ([]tls.Certificate, error) {
+	cert, err := tls.X509KeyPair([]byte(certificate), []byte(key))
+	if err != nil {
+		return nil, fmt.Errorf("could not parse cert/key pair: %w", err)
+	}
+
+	return []tls.Certificate{cert}, nil
+}
+
+func getHTTPClient(certificate, key string) (*http.Client, error) {
+	pool, err := x509.SystemCertPool()
+	if err != nil {
+		return nil, err
+	}
+
 	if certificate != "" && key != "" {
-		certKeyClient := &http.Client{}
-		err := GetClientWithCertKey(certKeyClient, certificate, key)
+		certs, err := getClientCertificates(certificate, key)
 		if err != nil {
 			return nil, err
 		}
-		return oidc.ClientContext(ctx, certKeyClient), nil
+
+		pool.AppendCertsFromPEM([]byte(certificate))
+		return &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{
+					RootCAs:      pool,
+					Certificates: certs,
+				},
+			},
+		}, nil
 	}
-	return ctx, nil
+
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.TLSClientConfig.RootCAs = pool
+	return &http.Client{
+		Transport: transport,
+	}, nil
 }
 
-func GetClientWithCertKey(httpClient *http.Client, certificate, key string) error {
-	if certificate != "" && key != "" {
-		keyPair, err := tls.X509KeyPair([]byte(certificate), []byte(key))
-		if err != nil {
-			return err
-		}
-		caCertPool := x509.NewCertPool()
-		caCertPool.AppendCertsFromPEM([]byte(certificate))
-		httpClient.Transport = &http.Transport{
-			TLSClientConfig: &tls.Config{
-				RootCAs:      caCertPool,
-				Certificates: []tls.Certificate{keyPair},
-			},
-		}
+func AddCertKeyToContext(ctx context.Context, certificate, key string) (context.Context, error) {
+	client, err := getHTTPClient(certificate, key)
+	if err != nil {
+		return nil, err
 	}
-	return nil
+
+	return oidc.ClientContext(ctx, client), nil
 }

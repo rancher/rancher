@@ -17,8 +17,6 @@ var (
 	DefaultNetworkPolicyCreated               condition.Cond = "DefaultNetworkPolicyCreated"
 	ProjectConditionDefaultNamespacesAssigned condition.Cond = "DefaultNamespacesAssigned"
 	ProjectConditionInitialRolesPopulated     condition.Cond = "InitialRolesPopulated"
-	ProjectConditionMonitoringEnabled         condition.Cond = "MonitoringEnabled"
-	ProjectConditionMetricExpressionDeployed  condition.Cond = "MetricExpressionDeployed"
 	ProjectConditionSystemNamespacesAssigned  condition.Cond = "SystemNamespacesAssigned"
 )
 
@@ -58,10 +56,6 @@ type ProjectStatus struct {
 	// PodSecurityPolicyTemplateName is the pod security policy template associated with the project.
 	// +optional
 	PodSecurityPolicyTemplateName string `json:"podSecurityPolicyTemplateId,omitempty"`
-
-	// MonitoringStatus is the status of the Monitoring V1 app.
-	// +optional
-	MonitoringStatus *MonitoringStatus `json:"monitoringStatus,omitempty" norman:"nocreate,noupdate"`
 }
 
 // ProjectCondition is the status of an aspect of the project.
@@ -122,12 +116,6 @@ type ProjectSpec struct {
 	// See https://kubernetes.io/docs/concepts/policy/limit-range/ for more details.
 	// +optional
 	ContainerDefaultResourceLimit *ContainerResourceLimit `json:"containerDefaultResourceLimit,omitempty"`
-
-	// EnableProjectMonitoring indicates whether Monitoring V1 should be enabled for this project.
-	// Deprecated. Use the Monitoring V2 app instead.
-	// Defaults to false.
-	// +optional
-	EnableProjectMonitoring bool `json:"enableProjectMonitoring,omitempty" norman:"default=false"`
 }
 
 func (p *ProjectSpec) ObjClusterName() string {
@@ -137,6 +125,7 @@ func (p *ProjectSpec) ObjClusterName() string {
 // +genclient
 // +genclient:nonNamespaced
 // +kubebuilder:resource:scope=Cluster
+// +kubebuilder:subresource:status
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // GlobalRole defines rules that can be applied to the local cluster and or every downstream cluster.
@@ -171,6 +160,38 @@ type GlobalRole struct {
 	// cluster besides the local cluster. To grant permissions in the local cluster, use the Rules field.
 	// +optional
 	InheritedClusterRoles []string `json:"inheritedClusterRoles,omitempty"`
+
+	// NamespacedRules are the rules that are active in each namespace of this GlobalRole.
+	// These are applied to the local cluster only.
+	// * has no special meaning in the keys - these keys are read as raw strings
+	// and must exactly match with one existing namespace.
+	// +optional
+	NamespacedRules map[string][]rbacv1.PolicyRule `json:"namespacedRules,omitempty"`
+
+	// Status is the most recently observed status of the GlobalRole.
+	// +optional
+	Status GlobalRoleStatus `json:"status,omitempty"`
+}
+
+// GlobalRoleStatus represents the most recently observed status of the GlobalRole.
+type GlobalRoleStatus struct {
+	// ObservedGeneration is the most recent generation (metadata.generation in GlobalRole CR)
+	// observed by the controller. Populated by the system.
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+
+	// LastUpdate is a k8s timestamp of the last time the status was updated.
+	// +optional
+	LastUpdate string `json:"lastUpdateTime,omitempty"`
+
+	// Summary is a string. One of "Complete", "InProgress" or "Error".
+	// +optional
+	Summary string `json:"summary,omitempty"`
+
+	// Conditions is a slice of Condition, indicating the status of specific backing RBAC objects.
+	// There is one condition per ClusterRole and Role managed by the GlobalRole.
+	// +optional
+	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 }
 
 // +genclient

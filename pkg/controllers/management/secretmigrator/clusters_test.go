@@ -113,13 +113,6 @@ func newTestHandler(t *testing.T) *handler {
 		},
 	}
 
-	notifierLister := &v3fakes.NotifierListerMock{
-		ListFunc: func(namespace string, selector labels.Selector) ([]*apimgmtv3.Notifier, error) {
-			var list []*apimgmtv3.Notifier
-			return list, nil
-		},
-	}
-
 	clusterCatalogLister := &v3fakes.ClusterCatalogListerMock{
 		ListFunc: func(namespace string, selector labels.Selector) ([]*apimgmtv3.ClusterCatalog, error) {
 			var list []*apimgmtv3.ClusterCatalog
@@ -163,7 +156,6 @@ func newTestHandler(t *testing.T) *handler {
 			},
 		},
 		migrator:             NewMigrator(&secretLister, &secrets),
-		notifierLister:       notifierLister,
 		clusterCatalogLister: clusterCatalogLister,
 		projectLister:        projectLister,
 	}

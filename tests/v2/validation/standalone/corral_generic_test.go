@@ -5,10 +5,10 @@ package standalone
 import (
 	"testing"
 
-	"github.com/rancher/rancher/tests/framework/clients/corral"
+	"github.com/rancher/shepherd/clients/corral"
 
-	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
-	"github.com/rancher/rancher/tests/framework/pkg/session"
+	namegen "github.com/rancher/shepherd/pkg/namegenerator"
+	"github.com/rancher/shepherd/pkg/session"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )

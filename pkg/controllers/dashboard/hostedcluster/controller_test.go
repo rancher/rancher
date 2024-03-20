@@ -13,7 +13,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/dashboard/chart"
 	chartsfake "github.com/rancher/rancher/pkg/controllers/dashboard/chart/fake"
 	"github.com/rancher/rancher/pkg/settings"
-	"github.com/rancher/wrangler/pkg/generic/fake"
+	"github.com/rancher/wrangler/v2/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,6 +38,8 @@ func Test_handler_onClusterChange(t *testing.T) {
 			},
 			newManager: func(ctrl *gomock.Controller) chart.Manager {
 				settings.ConfigMapName.Set("pass")
+				settings.AksOperatorVersion.Set("")
+
 				manager := chartsfake.NewMockManager(ctrl)
 				expectedValues := map[string]interface{}{
 					"global": map[string]interface{}{
@@ -55,7 +57,7 @@ func Test_handler_onClusterChange(t *testing.T) {
 				manager.EXPECT().Ensure(
 					AksCrdChart.ReleaseNamespace,
 					AksCrdChart.ChartName,
-					"",
+					settings.AksOperatorVersion.Get(),
 					"",
 					nil,
 					gomock.AssignableToTypeOf(b),
@@ -64,7 +66,7 @@ func Test_handler_onClusterChange(t *testing.T) {
 				manager.EXPECT().Ensure(
 					AksChart.ReleaseNamespace,
 					AksChart.ChartName,
-					"",
+					settings.AksOperatorVersion.Get(),
 					"",
 					expectedValues,
 					gomock.AssignableToTypeOf(b),
@@ -83,6 +85,7 @@ func Test_handler_onClusterChange(t *testing.T) {
 			},
 			newManager: func(ctrl *gomock.Controller) chart.Manager {
 				settings.ConfigMapName.Set("error")
+				settings.AksOperatorVersion.Set("")
 				manager := chartsfake.NewMockManager(ctrl)
 				expectedValues := map[string]interface{}{
 					"global": map[string]interface{}{
@@ -99,7 +102,7 @@ func Test_handler_onClusterChange(t *testing.T) {
 				manager.EXPECT().Ensure(
 					AksCrdChart.ReleaseNamespace,
 					AksCrdChart.ChartName,
-					"",
+					settings.AksOperatorVersion.Get(),
 					"",
 					nil,
 					gomock.AssignableToTypeOf(b),
@@ -108,7 +111,56 @@ func Test_handler_onClusterChange(t *testing.T) {
 				manager.EXPECT().Ensure(
 					AksChart.ReleaseNamespace,
 					AksChart.ChartName,
+					settings.AksOperatorVersion.Get(),
 					"",
+					expectedValues,
+					gomock.AssignableToTypeOf(b),
+					"",
+				).Return(nil)
+
+				return manager
+			},
+		},
+		{
+			name: "normal installation with chart version precedence",
+			cluster: &v3.Cluster{
+				Spec: v3.ClusterSpec{
+					AKSConfig: &aksv1.AKSClusterConfigSpec{},
+				},
+			},
+			newManager: func(ctrl *gomock.Controller) chart.Manager {
+				settings.ConfigMapName.Set("pass")
+				manager := chartsfake.NewMockManager(ctrl)
+				expectedValues := map[string]interface{}{
+					"global": map[string]interface{}{
+						"cattle": map[string]interface{}{
+							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+						},
+					},
+					"httpProxy":            os.Getenv("HTTP_PROXY"),
+					"httpsProxy":           os.Getenv("HTTPS_PROXY"),
+					"noProxy":              os.Getenv("NO_PROXY"),
+					"additionalTrustedCAs": false,
+					"priorityClassName":    priorityClassName,
+				}
+
+				exactVersion := "1.4.0"
+				settings.AksOperatorVersion.Set(exactVersion)
+
+				var b bool
+				manager.EXPECT().Ensure(
+					AksCrdChart.ReleaseNamespace,
+					AksCrdChart.ChartName,
+					exactVersion,
+					"",
+					nil,
+					gomock.AssignableToTypeOf(b),
+					"",
+				).Return(nil)
+				manager.EXPECT().Ensure(
+					AksChart.ReleaseNamespace,
+					AksChart.ChartName,
+					exactVersion,
 					"",
 					expectedValues,
 					gomock.AssignableToTypeOf(b),

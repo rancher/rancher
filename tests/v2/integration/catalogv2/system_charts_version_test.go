@@ -9,15 +9,15 @@ import (
 
 	"github.com/rancher/rancher/pkg/api/scheme"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	"github.com/rancher/rancher/tests/framework/clients/rancher/catalog"
-	stevev1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
-	"github.com/rancher/rancher/tests/framework/extensions/kubeapi/workloads/deployments"
-	"github.com/rancher/rancher/tests/framework/extensions/kubeapi/workloads/pods"
-	"github.com/rancher/rancher/tests/framework/extensions/kubeconfig"
-	"github.com/rancher/rancher/tests/framework/pkg/session"
-	"github.com/rancher/rancher/tests/framework/pkg/wait"
 	"github.com/rancher/rancher/tests/integration/pkg/defaults"
+	"github.com/rancher/shepherd/clients/rancher"
+	"github.com/rancher/shepherd/clients/rancher/catalog"
+	stevev1 "github.com/rancher/shepherd/clients/rancher/v1"
+	"github.com/rancher/shepherd/extensions/kubeapi/workloads/deployments"
+	"github.com/rancher/shepherd/extensions/kubeapi/workloads/pods"
+	"github.com/rancher/shepherd/extensions/kubeconfig"
+	"github.com/rancher/shepherd/pkg/session"
+	"github.com/rancher/shepherd/pkg/wait"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -67,7 +67,7 @@ func (w *SystemChartsVersionSuite) SetupSuite() {
 	w.restClientGetter, err = kubeconfig.NewRestGetter(restConfig, *kubeConfig)
 	require.NoError(w.T(), err)
 
-	w.latestWebhookVersion, err = w.catalogClient.GetLatestChartVersion(rancherWebhook)
+	w.latestWebhookVersion, err = w.catalogClient.GetLatestChartVersion(rancherWebhook, catalog.RancherChartRepo)
 	require.NoError(w.T(), err)
 
 	require.NoError(w.T(), w.updateSetting("rancher-webhook-version", w.latestWebhookVersion))
@@ -200,7 +200,7 @@ func (w *SystemChartsVersionSuite) TestInstallFleet() {
 	})
 	w.Require().NoError(err)
 
-	latest, err := w.catalogClient.GetLatestChartVersion("fleet")
+	latest, err := w.catalogClient.GetLatestChartVersion("fleet", catalog.RancherChartRepo)
 	w.Require().NoError(err)
 
 	// Ensure Rancher deployed the latest version when the minimum version is below the latest.
