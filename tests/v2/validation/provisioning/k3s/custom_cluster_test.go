@@ -102,7 +102,7 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningK3SCustomCluster() 
 func (c *CustomClusterProvisioningTestSuite) TestProvisioningK3SCustomClusterDynamicInput() {
 	isWindows := false
 	for _, pool := range c.provisioningConfig.MachinePools {
-		if pool.NodeRoles.Windows {
+		if pool.MachinePoolConfig.Windows {
 			isWindows = true
 			break
 		}
