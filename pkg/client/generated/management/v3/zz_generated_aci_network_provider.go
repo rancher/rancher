@@ -13,6 +13,7 @@ const (
 	AciNetworkProviderFieldAciMultipodUbuntu                    = "aciMultipodUbuntu"
 	AciNetworkProviderFieldAddExternalContractToDefaultEpg      = "addExternalContractToDefaultEpg"
 	AciNetworkProviderFieldAddExternalSubnetsToRdconfig         = "addExternalSubnetsToRdconfig"
+	AciNetworkProviderFieldApicConnectionRetryLimit             = "apicConnectionRetryLimit"
 	AciNetworkProviderFieldApicHosts                            = "apicHosts"
 	AciNetworkProviderFieldApicRefreshTickerAdjust              = "apicRefreshTickerAdjust"
 	AciNetworkProviderFieldApicRefreshTime                      = "apicRefreshTime"
@@ -24,8 +25,10 @@ const (
 	AciNetworkProviderFieldControllerLogLevel                   = "controllerLogLevel"
 	AciNetworkProviderFieldDhcpDelay                            = "dhcpDelay"
 	AciNetworkProviderFieldDhcpRenewMaxRetryCount               = "dhcpRenewMaxRetryCount"
+	AciNetworkProviderFieldDisableHppRendering                  = "disableHppRendering"
 	AciNetworkProviderFieldDisablePeriodicSnatGlobalInfoSync    = "disablePeriodicSnatGlobalInfoSync"
 	AciNetworkProviderFieldDisableWaitForNetwork                = "disableWaitForNetwork"
+	AciNetworkProviderFieldDropLogDisableEvents                 = "dropLogDisableEvents"
 	AciNetworkProviderFieldDropLogEnable                        = "dropLogEnable"
 	AciNetworkProviderFieldDurationWaitForNetwork               = "durationWaitForNetwork"
 	AciNetworkProviderFieldDynamicExternalSubnet                = "externDynamic"
@@ -94,6 +97,7 @@ const (
 	AciNetworkProviderFieldStaticExternalSubnet                 = "externStatic"
 	AciNetworkProviderFieldSubnetDomainName                     = "subnetDomainName"
 	AciNetworkProviderFieldSystemIdentifier                     = "systemId"
+	AciNetworkProviderFieldTaintNotReadyNode                    = "taintNotReadyNode"
 	AciNetworkProviderFieldTenant                               = "tenant"
 	AciNetworkProviderFieldToken                                = "token"
 	AciNetworkProviderFieldTolerationSeconds                    = "tolerationSeconds"
@@ -122,6 +126,7 @@ type AciNetworkProvider struct {
 	AciMultipodUbuntu                    string              `json:"aciMultipodUbuntu,omitempty" yaml:"aciMultipodUbuntu,omitempty"`
 	AddExternalContractToDefaultEpg      string              `json:"addExternalContractToDefaultEpg,omitempty" yaml:"addExternalContractToDefaultEpg,omitempty"`
 	AddExternalSubnetsToRdconfig         string              `json:"addExternalSubnetsToRdconfig,omitempty" yaml:"addExternalSubnetsToRdconfig,omitempty"`
+	ApicConnectionRetryLimit             string              `json:"apicConnectionRetryLimit,omitempty" yaml:"apicConnectionRetryLimit,omitempty"`
 	ApicHosts                            []string            `json:"apicHosts,omitempty" yaml:"apicHosts,omitempty"`
 	ApicRefreshTickerAdjust              string              `json:"apicRefreshTickerAdjust,omitempty" yaml:"apicRefreshTickerAdjust,omitempty"`
 	ApicRefreshTime                      string              `json:"apicRefreshTime,omitempty" yaml:"apicRefreshTime,omitempty"`
@@ -133,8 +138,10 @@ type AciNetworkProvider struct {
 	ControllerLogLevel                   string              `json:"controllerLogLevel,omitempty" yaml:"controllerLogLevel,omitempty"`
 	DhcpDelay                            string              `json:"dhcpDelay,omitempty" yaml:"dhcpDelay,omitempty"`
 	DhcpRenewMaxRetryCount               string              `json:"dhcpRenewMaxRetryCount,omitempty" yaml:"dhcpRenewMaxRetryCount,omitempty"`
+	DisableHppRendering                  string              `json:"disableHppRendering,omitempty" yaml:"disableHppRendering,omitempty"`
 	DisablePeriodicSnatGlobalInfoSync    string              `json:"disablePeriodicSnatGlobalInfoSync,omitempty" yaml:"disablePeriodicSnatGlobalInfoSync,omitempty"`
 	DisableWaitForNetwork                string              `json:"disableWaitForNetwork,omitempty" yaml:"disableWaitForNetwork,omitempty"`
+	DropLogDisableEvents                 string              `json:"dropLogDisableEvents,omitempty" yaml:"dropLogDisableEvents,omitempty"`
 	DropLogEnable                        string              `json:"dropLogEnable,omitempty" yaml:"dropLogEnable,omitempty"`
 	DurationWaitForNetwork               string              `json:"durationWaitForNetwork,omitempty" yaml:"durationWaitForNetwork,omitempty"`
 	DynamicExternalSubnet                string              `json:"externDynamic,omitempty" yaml:"externDynamic,omitempty"`
@@ -203,6 +210,7 @@ type AciNetworkProvider struct {
 	StaticExternalSubnet                 string              `json:"externStatic,omitempty" yaml:"externStatic,omitempty"`
 	SubnetDomainName                     string              `json:"subnetDomainName,omitempty" yaml:"subnetDomainName,omitempty"`
 	SystemIdentifier                     string              `json:"systemId,omitempty" yaml:"systemId,omitempty"`
+	TaintNotReadyNode                    string              `json:"taintNotReadyNode,omitempty" yaml:"taintNotReadyNode,omitempty"`
 	Tenant                               string              `json:"tenant,omitempty" yaml:"tenant,omitempty"`
 	Token                                string              `json:"token,omitempty" yaml:"token,omitempty"`
 	TolerationSeconds                    string              `json:"tolerationSeconds,omitempty" yaml:"tolerationSeconds,omitempty"`
