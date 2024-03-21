@@ -71,10 +71,10 @@ func (rb *RBTestSuite) sequentialTestRBAC(role, member string, user *management.
 	additionalUser, err := users.CreateUserWithRole(rb.client, users.UserConfig(), standardUser)
 	require.NoError(rb.T(), err)
 
-	rb.Run("Validating Global Role Binding is created for the user.", func() {
+	rb.Run("Validating Global Role Binding is created for "+role, func() {
 		rbac.VerifyGlobalRoleBindingsForUser(rb.T(), user, rb.client)
 	})
-	rb.Run("Test case Validate if users can list any downstream clusters", func() {
+	rb.Run("Validating if "+role+" can list any downstream clusters", func() {
 		rbac.VerifyUserCanListCluster(rb.T(), rb.client, standardClient, rb.cluster.ID, role)
 	})
 	rb.Run("Validating if members with role "+role+" are able to list all projects", func() {
@@ -124,16 +124,19 @@ func (rb *RBTestSuite) TestRBAC() {
 	}
 
 	for _, tt := range tests {
-		rb.Run("Set up User with Cluster Role "+tt.name, func() {
-			newUser, err := users.CreateUserWithRole(rb.client, users.UserConfig(), tt.member)
+		var newUser *management.User
+		rb.Run("Validate conditions for user with role "+tt.name, func() {
+			user, err := users.CreateUserWithRole(rb.client, users.UserConfig(), tt.member)
 			require.NoError(rb.T(), err)
+			newUser = user
 			rb.T().Logf("Created user: %v", newUser.Username)
+		})
 
+		if newUser != nil {
 			rb.sequentialTestRBAC(tt.role, tt.member, newUser)
 			subSession := rb.session.NewSession()
 			defer subSession.Cleanup()
-		})
-
+		}
 	}
 }
 

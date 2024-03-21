@@ -105,7 +105,7 @@ func checkPodLogsForErrors(client *rancher.Client, cluster string, podName strin
 	var errorMessage string
 
 	kwait.Poll(defaults.TenSecondTimeout, defaults.TwoMinuteTimeout, func() (bool, error) {
-		podLogs, err := kubeconfig.GetPodLogs(client, cluster, podName, namespace)
+		podLogs, err := kubeconfig.GetPodLogs(client, cluster, podName, namespace, "")
 		if err != nil {
 			return false, err
 		}

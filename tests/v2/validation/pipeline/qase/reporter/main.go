@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	automationSuiteID    = int32(14)
+	automationSuiteID    = int32(554)
 	failStatus           = "fail"
 	passStatus           = "pass"
 	skipStatus           = "skip"
@@ -53,7 +53,6 @@ func main() {
 			logrus.Error("error reporting: ", err)
 		}
 	}
-
 }
 
 func getAllAutomationTestCases(client *qase.APIClient) (map[string]qase.TestCase, error) {
@@ -139,6 +138,13 @@ func parseCorrectTestCases(testCases []testcase.GoTestOutput) map[string]*testca
 		}
 	}
 
+	for _, testCase := range finalTestCases {
+		testSuite := strings.Split(testCase.Name, "/")
+		testName := testSuite[len(testSuite)-1]
+		testCase.Name = testName
+		testCase.TestSuite = testSuite[0 : len(testSuite)-1]
+	}
+
 	return finalTestCases
 }
 
@@ -178,10 +184,55 @@ func reportTestQases(client *qase.APIClient, testRunID int64) error {
 	return nil
 }
 
+func writeTestSuiteToQase(client *qase.APIClient, testCase testcase.GoTestCase) (*int64, error) {
+	parentSuite := int64(automationSuiteID)
+	var id int64
+	for _, suiteGo := range testCase.TestSuite {
+		localVarOptionals := &qase.SuitesApiGetSuitesOpts{
+			FiltersSearch: optional.NewString(suiteGo),
+		}
+
+		qaseSuites, _, err := client.SuitesApi.GetSuites(context.TODO(), qasedefaults.RancherManagerProjectID, localVarOptionals)
+		if err != nil {
+			return nil, err
+		}
+
+		var testSuiteWasFound bool
+		var qaseSuiteFound qase.Suite
+		for _, qaseSuite := range qaseSuites.Result.Entities {
+			if qaseSuite.Title == suiteGo {
+				testSuiteWasFound = true
+				qaseSuiteFound = qaseSuite
+			}
+		}
+		if !testSuiteWasFound {
+			suiteBody := qase.SuiteCreate{
+				Title:    suiteGo,
+				ParentId: int64(parentSuite),
+			}
+			idResponse, _, err := client.SuitesApi.CreateSuite(context.TODO(), suiteBody, qasedefaults.RancherManagerProjectID)
+			id = idResponse.Result.Id
+			if err != nil {
+				return nil, err
+			}
+			parentSuite = id
+		} else {
+			id = qaseSuiteFound.Id
+		}
+	}
+
+	return &id, nil
+}
+
 func writeTestCaseToQase(client *qase.APIClient, testCase testcase.GoTestCase) (*qase.IdResponse, error) {
+	testSuiteID, err := writeTestSuiteToQase(client, testCase)
+	if err != nil {
+		return nil, err
+	}
+
 	testQaseBody := qase.TestCaseCreate{
 		Title:      testCase.Name,
-		SuiteId:    int64(automationSuiteID),
+		SuiteId:    *testSuiteID,
 		IsFlaky:    int32(0),
 		Automation: int32(2),
 		CustomField: map[string]string{

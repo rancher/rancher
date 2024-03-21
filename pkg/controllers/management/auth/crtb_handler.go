@@ -176,6 +176,10 @@ func (c *crtbLifecycle) reconcileBindings(binding *v3.ClusterRoleTemplateBinding
 		return err
 	}
 	for _, p := range projects {
+		if p.DeletionTimestamp != nil {
+			logrus.Warnf("Project %v is being deleted, not creating membership bindings", p.Name)
+			continue
+		}
 		if err := c.mgr.grantManagementClusterScopedPrivilegesInProjectNamespace(binding.RoleTemplateName, p.Name, projectManagmentPlaneResources, subject, binding); err != nil {
 			return err
 		}

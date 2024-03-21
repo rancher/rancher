@@ -92,7 +92,7 @@ func (w *WebhookTestSuite) TestWebhookChart() {
 				}
 			}
 
-			podLogs, err := kubeconfig.GetPodLogs(w.client, clusterID, podName, charts.RancherWebhookNamespace)
+			podLogs, err := kubeconfig.GetPodLogs(w.client, clusterID, podName, charts.RancherWebhookNamespace, "")
 			require.NoError(w.T(), err)
 			webhookLogs := validateWebhookPodLogs(podLogs)
 			require.Nil(w.T(), webhookLogs)

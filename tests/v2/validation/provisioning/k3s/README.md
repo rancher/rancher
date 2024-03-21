@@ -12,8 +12,9 @@ Please see below for more details for your config. Please see below for more det
 3. [Cloud Credential](#cloud-credentials)
 4. [Configure providers to use for Node Driver Clusters](#machine-k3s-config)
 5. [Configuring Custom Clusters](#custom-cluster)
-6. [Advanced Cluster Settings](#advanced-settings)
-7. [Back to general provisioning](../README.md)
+6. [Static test cases](#static-test-cases) 
+7. [Advanced Cluster Settings](#advanced-settings)
+8. [Back to general provisioning](../README.md)
 
 ## Provisioning Input
 provisioningInput is needed to the run the K3S tests, specifically kubernetesVersion and providers. nodesAndRoles is only needed for the TestProvisioningDynamicInput test, node pools are divided by "{nodepool},". psact is optional and takes values `rancher-privileged`, `rancher-restricted` or `rancher-baseline`.
@@ -22,16 +23,23 @@ provisioningInput is needed to the run the K3S tests, specifically kubernetesVer
 ```yaml
 provisioningInput:
   machinePools:
-  - nodeRoles:
+  - machinePoolConfig:
       etcd: true
       controlplane: true
       worker: true
       quantity: 1
-  - nodeRoles:
+      # the following are optional parameters
+      drainBeforeDelete: true
+      hostnameLengthLimit: 29
+      nodeStartupTimeout: "600s"
+      unhealthyNodeTimeout: "300s"
+      maxUnhealthy: "2"
+      unhealthyRange: "2-4"
+  - machinePoolConfig:
       worker: true
       quantity: 2
       drainBeforeDelete: true
-  - nodeRoles:
+  - machinePoolConfig:
       windows: true
       quantity: 1
   flags:
@@ -276,6 +284,55 @@ These tests utilize Go build tags. Due to this, see the below examples on how to
 `gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/provisioning/k3s --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestCustomClusterK3SProvisioningTestSuite/TestProvisioningK3SCustomClusterDynamicInput"`
 
 If the specified test passes immediately without warning, try adding the `-count=1` flag to get around this issue. This will avoid previous results from interfering with the new test run.
+
+## Static Test Cases
+In an effort to have uniform testing across our internal QA test case reporter, there are specific test cases that are put into their respective test files. This section highlights those test cases.
+
+### PSACT
+These test cases cover the following PSACT values as both an admin and standard user:
+1. `rancher-privileged`
+2. `rancher-restricted`
+3. `rancher-baseline`
+
+See an example YAML below:
+
+```yaml
+rancher:
+  host: "<rancher server url>"
+  adminToken: "<rancher admin bearer token>"
+  cleanup: false
+  clusterName: "<provided cluster name>"
+  insecure: true
+provisioningInput:
+  k3sKubernetesVersion: ["v1.27.10+k3s2"]
+  cni: ["calico"]
+  providers: ["linode"]
+  nodeProviders: ["ec2"]
+linodeCredentials:
+   token: ""
+linodeMachineConfigs:
+  region: "us-west"
+  linodeMachineConfig:
+  - roles: ["etcd", "controlplane", "worker"]
+    authorizedUsers: ""
+    createPrivateIp: true
+    dockerPort: "2376"
+    image: "linode/ubuntu22.04"
+    instanceType: "g6-standard-8"
+    region: "us-west"
+    rootPass: ""
+    sshPort: "22"
+    sshUser: ""
+    stackscript: ""
+    stackscriptData: ""
+    swapSize: "512"
+    tags: ""
+    uaPrefix: "Rancher"
+```
+
+These tests utilize Go build tags. Due to this, see the below examples on how to run the tests:
+
+`gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/provisioning/k3s --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestK3SPSACTTestSuite$"`
 
 ## Advanced Settings
 This encapsulates any other setting that is applied in the cluster.spec. Currently we have support for:

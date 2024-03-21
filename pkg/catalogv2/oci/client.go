@@ -128,7 +128,6 @@ func (o *Client) fetchChart(orasRepository *remote.Repository) (string, bool, er
 			PreCopy: func(ctx context.Context, desc ocispecv1.Descriptor) error {
 				// Download only helm chart related descriptors.
 				if desc.MediaType == ocispecv1.MediaTypeImageManifest ||
-					desc.MediaType == helmregistry.ConfigMediaType ||
 					desc.MediaType == helmregistry.ChartLayerMediaType {
 					// We cannot load huge amounts of data into the memory
 					// and so we are defining a limit before fetching.
