@@ -71,11 +71,11 @@ func (s *RKE1CustomClusterNodeScalingTestSuite) TestScalingRKE1CustomClusterNode
 		nodeRoles nodepools.NodeRoles
 		client    *rancher.Client
 	}{
-		{"Scaling control plane by 1", nodeRolesControlPlane, s.client},
-		{"Scaling etcd by 1", nodeRolesEtcd, s.client},
-		{"Scaling etcd and control plane by 1", nodeRolesEtcdControlPlane, s.client},
-		{"Scaling worker by 1", nodeRolesWorker, s.client},
-		{"Scaling worker by 2", nodeRolesTwoWorkers, s.client},
+		{"Scaling custom RKE1 control plane by 1", nodeRolesControlPlane, s.client},
+		{"Scaling custom RKE1 etcd by 1", nodeRolesEtcd, s.client},
+		{"Scaling custom RKE1 etcd and control plane by 1", nodeRolesEtcdControlPlane, s.client},
+		{"Scaling custom RKE1 worker by 1", nodeRolesWorker, s.client},
+		{"Scaling custom RKE1 worker by 2", nodeRolesTwoWorkers, s.client},
 	}
 
 	for _, tt := range tests {
