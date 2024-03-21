@@ -29,11 +29,11 @@ provisioningInput:
       quantity: 1
   - nodeRoles:
       worker: true
-      quantity: 2
       drainBeforeDelete: true
+      quantity: 2
   flags:
     desiredflags: "Long" #These flags are for running TestProvisioningRKE1Cluster or TestProvisioningRKE1CustomCluster it is not needed for the dynamic tests. Long will run the full table, where as short will run the short version of this test.
-  rke1KubernetesVersion: ["v1.26.8-rancher1-1"]
+  rke1KubernetesVersion: ["v1.27.6-rancher1-1"]
   cni: ["calico"]
   providers: ["linode", "aws", "do", "harvester"]
   nodeProviders: ["ec2"]
@@ -58,10 +58,16 @@ provisioningInput:
 
 ## NodeTemplateConfigs
 RKE1 specifically needs a node template config to run properly. These are the inputs needed for the different node providers.
-
+Top level node template config entries can be set. The top level nodeTemplate is optional, and is not need for the different node
+providers to work.
+```yaml
+  nodeTemplate:
+    engineInstallURL: "testNT"
+    name:             "testNTName"
+```
 ### AWS
 ```yaml
-  awsNodeTemplate:
+  awsNodeConfig:
     accessKey: ""
     ami: ""
     blockDurationMinutes: "0"
@@ -100,7 +106,7 @@ RKE1 specifically needs a node template config to run properly. These are the in
 
 ### Azure
 ```yaml
-azureNodeTemplate:
+azureNodeConfig:
   availabilitySet: "docker-machine"
   clientId: ""
   clientSecret: ""
@@ -133,7 +139,7 @@ azureNodeTemplate:
 
 ### Harvester
 ```yaml
-harvesterNodeTemplate":
+harvesterNodeConfig":
   cloudConfig: ""
   clusterId: ""
   clusterType: ""
@@ -160,7 +166,7 @@ harvesterNodeTemplate":
 
 ### Linode
 ```yaml
-linodeNodeTemplate:
+linodeNodeConfig:
   authorizedUsers: ""
   createPrivateIp: true
   dockerPort: "2376"
@@ -182,7 +188,7 @@ linodeNodeTemplate:
 
 ### Vsphere
 ```yaml
-vmwarevsphereNodeTemplate:
+vmwarevsphereNodeConfig:
   cfgparam: ["disk.enableUUID=TRUE"]
   cloneFrom: ""
   cloudinit: "#cloud-config\n\n"
@@ -305,7 +311,9 @@ provisioningInput:
   cni: ["calico"]
   providers: ["linode"]
   nodeProviders: ["ec2"]
-linodeNodeTemplate:
+nodeTemplate:
+  engineInstallURL: "https://releases.rancher.com/install-docker/23.0.sh"
+linodeNodeConfig:
   authorizedUsers: ""
   createPrivateIp: true
   dockerPort: "2376"
