@@ -53,8 +53,8 @@ func (s *AKSNodeScalingTestSuite) TestScalingAKSNodePools() {
 		aksNodes aks.NodePool
 		client   *rancher.Client
 	}{
-		{"Scaling agentpool by 1", scaleOneNode, s.client},
-		{"Scaling agentpool by 2", scaleTwoNodes, s.client},
+		{"Scaling AKS agentpool by 1", scaleOneNode, s.client},
+		{"Scaling AKS agentpool by 2", scaleTwoNodes, s.client},
 	}
 
 	for _, tt := range tests {
