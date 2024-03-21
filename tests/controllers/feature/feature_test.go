@@ -1,8 +1,6 @@
 package feature_test
 
 import (
-	"fmt"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -15,29 +13,24 @@ var _ = Describe("harvester-baremetal-container-workload Feature", func() {
 			Name: "harvester-baremetal-container-workload",
 		},
 	}
-	When("test1", func() {
+	When("harvester feature is created", func() {
 		BeforeEach(func() {
-			f := v3.Feature{}
-			err := sharedController.Client().Create(ctx, "", &feature, &f, v1.CreateOptions{})
-			Expect(f).ToNot(BeNil())
-			fmt.Printf("%v\n", f)
+			f1, err := wranglerContext.Mgmt.Feature().Create(&feature)
+			Expect(f1).ToNot(BeNil())
 			Expect(err).ToNot(HaveOccurred())
 		})
 
 		AfterEach(func() {
-			err := sharedController.Client().Delete(ctx, "", "harvester-baremetal-container-workload", v1.DeleteOptions{})
+			err := wranglerContext.Mgmt.Feature().Delete("harvester-baremetal-container-workload", &v1.DeleteOptions{})
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		It("adds annotation", func() {
-			f := v3.Feature{}
-			// test currently fails because the feature handler's featureClient isn't updating the feature correctly
-			// TODO figure out why
-			err := sharedController.Client().Get(ctx, "", "harvester-baremetal-container-workload", &f, v1.GetOptions{})
-			Expect(err).ToNot(HaveOccurred())
-			fmt.Printf("%v\n", f)
-
-			Expect(f.Annotations[v3.ExperimentalFeatureKey]).To(Equal(v3.ExperimentalFeatureValue))
+		It("adds experimental feature annotation", func() {
+			Eventually(func() string {
+				f, err := wranglerContext.Mgmt.Feature().Get("harvester-baremetal-container-workload", v1.GetOptions{})
+				Expect(err).ToNot(HaveOccurred())
+				return f.Annotations[v3.ExperimentalFeatureKey]
+			}).Should(Equal(v3.ExperimentalFeatureValue))
 		})
 	})
 })
