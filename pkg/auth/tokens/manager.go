@@ -632,11 +632,11 @@ func (m *Manager) NewLoginToken(userID string, userPrincipal v3.Principal, group
 	err := wait.ExponentialBackoff(uaBackoff, func() (bool, error) {
 		err := m.userAttributeCreateOrUpdate(userID, provider, groupPrincipals, userExtraInfo)
 		if err != nil {
-			logrus.Warnf("Problem creating or updating userAttribute for %v: %v", userID, err)
+			logrus.Warnf("Error creating or updating userAttribute for %v: %v", userID, err)
+			return false, nil
 		}
-		return err == nil, nil
+		return true, nil
 	})
-
 	if err != nil {
 		return v3.Token{}, "", errors.New("unable to create userAttribute")
 	}
@@ -675,18 +675,14 @@ func (m *Manager) GetGroupsForTokenAuthProvider(token *v3.Token) []v3.Principal 
 		for provider, y := range attribs.GroupPrincipals {
 			if provider == token.AuthProvider {
 				hitProvider = true
-				for _, principal := range y.Items {
-					groups = append(groups, principal)
-				}
+				groups = append(groups, y.Items...)
 			}
 		}
 	}
 
 	// fallback to legacy token groupPrincipals
 	if !hitProvider {
-		for _, principal := range token.GroupPrincipals {
-			groups = append(groups, principal)
-		}
+		groups = append(groups, token.GroupPrincipals...)
 	}
 
 	return groups
