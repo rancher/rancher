@@ -210,12 +210,14 @@ func (s *Provider) saveSamlConfig(config *v32.SamlConfig) error {
 	if fields, ok := secrets.TypeToFields[configType]; ok && len(fields) > 0 {
 		field = strings.ToLower(fields[0])
 	}
-	if err := common.CreateOrUpdateSecrets(s.secrets, config.SpKey,
-		field, strings.ToLower(config.Type)); err != nil {
+	spKey, err := common.CreateOrUpdateSecrets(s.secrets, config.SpKey,
+		field, strings.ToLower(config.Type))
+	if err != nil {
 		return err
 	}
 
-	config.SpKey = common.GetFullSecretName(config.Type, field)
+	config.SpKey = spKey
+
 	if s.hasLdapGroupSearch() {
 		combinedConfig, err := s.combineSamlAndLdapConfig(config)
 		if err != nil {

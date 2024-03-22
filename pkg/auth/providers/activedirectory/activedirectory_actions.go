@@ -107,11 +107,12 @@ func (p *adProvider) saveActiveDirectoryConfig(config *v32.ActiveDirectoryConfig
 	config.ObjectMeta = storedConfig.ObjectMeta
 
 	field := strings.ToLower(client.ActiveDirectoryConfigFieldServiceAccountPassword)
-	if err := common.CreateOrUpdateSecrets(p.secrets, config.ServiceAccountPassword, field, strings.ToLower(convert.ToString(config.Type))); err != nil {
+	name, err := common.CreateOrUpdateSecrets(p.secrets, config.ServiceAccountPassword, field, strings.ToLower(convert.ToString(config.Type)))
+	if err != nil {
 		return err
 	}
 
-	config.ServiceAccountPassword = common.GetFullSecretName(config.Type, field)
+	config.ServiceAccountPassword = name
 
 	logrus.Debugf("updating activeDirectoryConfig")
 	_, err = p.authConfigs.ObjectClient().Update(config.ObjectMeta.Name, config)
