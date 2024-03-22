@@ -231,10 +231,12 @@ func (m *Migrator) createOrUpdateSecret(secretName, secretNamespace string, data
 	}
 	if existing == nil {
 		return m.secrets.Create(secret)
-	} else if !reflect.DeepEqual(existing.StringData, secret.StringData) {
+	}
+	if !reflect.DeepEqual(existing.StringData, secret.StringData) {
 		existing.StringData = data
 		return m.secrets.Update(existing)
 	}
+
 	return secret, nil
 }
 

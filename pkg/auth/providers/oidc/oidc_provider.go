@@ -287,17 +287,19 @@ func (o *OpenIDCProvider) saveOIDCConfig(config *v32.OIDCConfig) error {
 
 	if config.PrivateKey != "" {
 		privateKeyField := strings.ToLower(client.OIDCConfigFieldPrivateKey)
-		if err = common.CreateOrUpdateSecrets(o.Secrets, config.PrivateKey, privateKeyField, strings.ToLower(config.Type)); err != nil {
+		name, err := common.CreateOrUpdateSecrets(o.Secrets, config.PrivateKey, privateKeyField, strings.ToLower(config.Type))
+		if err != nil {
 			return err
 		}
-		config.PrivateKey = common.GetFullSecretName(config.Type, privateKeyField)
+		config.PrivateKey = name
 	}
 
 	secretField := strings.ToLower(client.OIDCConfigFieldClientSecret)
-	if err := common.CreateOrUpdateSecrets(o.Secrets, convert.ToString(config.ClientSecret), secretField, strings.ToLower(config.Type)); err != nil {
+	name, err := common.CreateOrUpdateSecrets(o.Secrets, convert.ToString(config.ClientSecret), secretField, strings.ToLower(config.Type))
+	if err != nil {
 		return err
 	}
-	config.ClientSecret = common.GetFullSecretName(config.Type, secretField)
+	config.ClientSecret = name
 
 	logrus.Debugf("[generic oidc] saveOIDCConfig: updating config")
 	_, err = o.AuthConfigs.ObjectClient().Update(config.ObjectMeta.Name, config)

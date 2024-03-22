@@ -338,18 +338,20 @@ func (g *googleOauthProvider) saveGoogleOAuthConfigCR(config *v32.GoogleOauthCon
 
 	secretInfo := convert.ToString(config.OauthCredential)
 	field := strings.ToLower(client.GoogleOauthConfigFieldOauthCredential)
-	if err := common.CreateOrUpdateSecrets(g.secrets, secretInfo, field, strings.ToLower(config.Type)); err != nil {
+	name, err := common.CreateOrUpdateSecrets(g.secrets, secretInfo, field, strings.ToLower(config.Type))
+	if err != nil {
 		return err
 	}
-	config.OauthCredential = common.GetFullSecretName(config.Type, field)
+	config.OauthCredential = name
 
 	if config.ServiceAccountCredential != "" {
 		secretInfo = convert.ToString(config.ServiceAccountCredential)
 		field = strings.ToLower(client.GoogleOauthConfigFieldServiceAccountCredential)
-		if err := common.CreateOrUpdateSecrets(g.secrets, secretInfo, field, strings.ToLower(config.Type)); err != nil {
+		name, err := common.CreateOrUpdateSecrets(g.secrets, secretInfo, field, strings.ToLower(config.Type))
+		if err != nil {
 			return err
 		}
-		config.ServiceAccountCredential = common.GetFullSecretName(config.Type, field)
+		config.ServiceAccountCredential = name
 	}
 
 	_, err = g.authConfigs.ObjectClient().Update(config.ObjectMeta.Name, config)

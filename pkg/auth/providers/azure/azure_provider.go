@@ -301,11 +301,12 @@ func (ap *Provider) saveAzureConfigK8s(config *v32.AzureADConfig) error {
 	}
 
 	field := strings.ToLower(client.AzureADConfigFieldApplicationSecret)
-	if err := common.CreateOrUpdateSecrets(ap.secrets, config.ApplicationSecret, field, strings.ToLower(config.Type)); err != nil {
+	name, err := common.CreateOrUpdateSecrets(ap.secrets, config.ApplicationSecret, field, strings.ToLower(config.Type))
+	if err != nil {
 		return err
 	}
 
-	config.ApplicationSecret = common.GetFullSecretName(config.Type, field)
+	config.ApplicationSecret = name
 
 	logrus.Debugf("updating AzureADConfig")
 	_, err = ap.authConfigs.ObjectClient().Update(config.ObjectMeta.Name, config)

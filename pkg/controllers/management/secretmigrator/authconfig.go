@@ -97,7 +97,7 @@ func (h *handler) migrateShibbolethSecrets(unstructuredConfig map[string]any) (*
 
 	// cannot use createOrUpdateSecretForCredential because the credential is saved in the secret with a key of
 	// "credential", but our AuthProviders look for "serviceaccountpassword"
-	_, err = h.migrator.createOrUpdateSecret(
+	secret, err := h.migrator.createOrUpdateSecret(
 		secretName,
 		namespace.GlobalNamespace,
 		map[string]string{
@@ -111,9 +111,7 @@ func (h *handler) migrateShibbolethSecrets(unstructuredConfig map[string]any) (*
 		return nil, err
 	}
 
-	lowerType := strings.ToLower(shibbConfig.Type)
-	fullSecretName := common.GetFullSecretName(lowerType, serviceAccountPasswordFieldName)
-	shibbConfig.OpenLdapConfig.ServiceAccountPassword = fullSecretName
+	shibbConfig.OpenLdapConfig.ServiceAccountPassword = common.NameForSecret(secret)
 
 	return shibbConfig, nil
 }
