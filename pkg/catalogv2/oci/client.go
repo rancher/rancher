@@ -34,6 +34,15 @@ import (
 // maxHelmChartTar defines what is the max size of helm chart we support.
 const maxHelmChartTarSize int64 = 20 * 1024 * 1024 // 20 MiB
 
+// Default Values for exponentialBackOff function which is used
+// by oras to retry a HTTP call when 429 response code is hit.
+var retryPolicy retry.GenericPolicy = retry.GenericPolicy{
+	Retryable: retry.DefaultPredicate,
+	MinWait:   1 * time.Minute,
+	MaxWait:   5 * time.Minute,
+	MaxRetry:  5,
+}
+
 // Client is an OCI client that manages Helm charts in OCI based Helm registries.
 type Client struct {
 	// URL refers to the OCI url provided by the user ie. dp.apps.rancher.io/charts/etcd:1.0.2
@@ -45,9 +54,10 @@ type Client struct {
 	// tag is the tag part of the URL ie. 1.0.2
 	tag string
 
-	insecure          bool
-	caBundle          []byte
-	insecurePlainHTTP bool
+	insecure                 bool
+	caBundle                 []byte
+	insecurePlainHTTP        bool
+	exponentialBackOffValues catalogv1.ExponentialBackOffValues
 
 	username string
 	password string
@@ -57,10 +67,11 @@ type Client struct {
 // the URL provided and fetching the credentials.
 func NewClient(url string, clusterRepoSpec catalogv1.RepoSpec, credentialSecret *v1.Secret) (*Client, error) {
 	ociClient := &Client{
-		URL:               url,
-		insecure:          clusterRepoSpec.InsecureSkipTLSverify,
-		caBundle:          clusterRepoSpec.CABundle,
-		insecurePlainHTTP: clusterRepoSpec.InsecurePlainHTTP,
+		URL:                      url,
+		insecure:                 clusterRepoSpec.InsecureSkipTLSverify,
+		caBundle:                 clusterRepoSpec.CABundle,
+		insecurePlainHTTP:        clusterRepoSpec.InsecurePlainHTTP,
+		exponentialBackOffValues: *clusterRepoSpec.ExponentialBackOffValues,
 	}
 
 	err := ociClient.parseURL()
@@ -114,9 +125,8 @@ func (o *Client) parseURL() error {
 }
 
 // fetchChart fetchs the chart specified by the oras repository. It first downloads it into the
-// oras memory and then saves it into a file and returns the file path. It will also return a bool
-// to indicate if it found a helm chart OCI artifact or not.
-func (o *Client) fetchChart(orasRepository *remote.Repository) (string, bool, error) {
+// oras memory and then saves it into a file and returns the file path.
+func (o *Client) fetchChart(orasRepository *remote.Repository) (string, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	ociURL := fmt.Sprintf("%s/%s:%s", o.registry, o.repository, o.tag)
@@ -142,54 +152,53 @@ func (o *Client) fetchChart(orasRepository *remote.Repository) (string, bool, er
 		},
 	})
 	if err != nil {
-		return "", false, fmt.Errorf("unable to oras copy the remote oci artifact %s: %w", ociURL, err)
+		return "", fmt.Errorf("unable to oras copy the remote oci artifact %s: %w", ociURL, err)
 	}
 
 	// Helm codebase sets oci artifacts manifest mediatype as ocispecv1.MediaTypeImageManifest
 	// https://github.com/oras-project/oras-go/blob/v1/pkg/content/manifest.go#L89C22-L89C44 referenced by helm codebase
 	if manifest.MediaType != ocispecv1.MediaTypeImageManifest {
-		logrus.Debugf("skip adding tag %s since its manifest is not %s", o.tag, ocispecv1.MediaTypeImageManifest)
-		return "", false, nil
+		return "", fmt.Errorf("the oci artifact %s is not a helm chart. The OCI URL must contain only helm charts", ociURL)
 	}
 
 	// Fetch the manifest blob of the oci artifact
 	manifestblob, err := content.FetchAll(ctx, memoryStore, manifest)
 	if err != nil {
-		return "", false, fmt.Errorf("unable to fetch the manifest blob of %s: %w", ociURL, err)
+		return "", fmt.Errorf("unable to fetch the manifest blob of %s: %w", ociURL, err)
 	}
 	var manifestJSON ocispecv1.Manifest
 	err = json.Unmarshal(manifestblob, &manifestJSON)
 	if err != nil {
-		return "", false, fmt.Errorf("unable to unmarshal manifest blob of %s: %w", ociURL, err)
+		return "", fmt.Errorf("unable to unmarshal manifest blob of %s: %w", ociURL, err)
 	}
 
 	// Create a temp file to store the helm chart tar
 	tempFile, err := os.CreateTemp("", "helm-")
 	if err != nil {
-		return "", false, fmt.Errorf("unable to create temp file for storing the oci artifact")
+		return "", fmt.Errorf("unable to create temp file for storing the oci artifact")
 	}
 
-	// Check if the oci artifact is of type helm config ?
+	// Checking if the OCI artifact is of type helm config ?
 	if manifestJSON.ArtifactType == helmregistry.ConfigMediaType || manifestJSON.Config.MediaType == helmregistry.ConfigMediaType {
 		// find the layer of helm chart type and fetch it
 		for _, layer := range manifestJSON.Layers {
 			if layer.MediaType == helmregistry.ChartLayerMediaType {
 				chartTar, err := content.FetchAll(ctx, memoryStore, layer)
 				if err != nil {
-					return "", false, fmt.Errorf("unable to fetch chart blob of %s: %w", ociURL, err)
+					return "", fmt.Errorf("unable to fetch chart blob of %s: %w", ociURL, err)
 				}
 
 				err = os.WriteFile(tempFile.Name(), chartTar, 0o600)
 				if err != nil {
-					return "", false, fmt.Errorf("unable to write chart %s into file %s: %w", ociURL, tempFile.Name(), err)
+					return "", fmt.Errorf("unable to write chart %s into file %s: %w", ociURL, tempFile.Name(), err)
 				}
 
-				return tempFile.Name(), true, nil
+				return tempFile.Name(), nil
 			}
 		}
 	}
 
-	return tempFile.Name(), false, nil
+	return tempFile.Name(), fmt.Errorf("the oci artifact %s is not a helm chart. The OCI URL must contain only helm charts", ociURL)
 }
 
 // getAuthClient creates an oras auth client that can be used
@@ -215,8 +224,24 @@ func (o *Client) getAuthClient() (*http.Client, error) {
 	baseTransport := http.DefaultTransport.(*http.Transport).Clone()
 	baseTransport.TLSClientConfig = config
 
+	if o.exponentialBackOffValues.MaxRetries > 0 {
+		retryPolicy.MaxRetry = o.exponentialBackOffValues.MaxRetries
+	}
+	if o.exponentialBackOffValues.MaxWait != nil {
+		retryPolicy.MaxWait = o.exponentialBackOffValues.MaxWait.Duration
+	}
+	if o.exponentialBackOffValues.MinWait != nil {
+		retryPolicy.MinWait = o.exponentialBackOffValues.MinWait.Duration
+	}
+	retryPolicy.Backoff = retry.ExponentialBackoff(retryPolicy.MinWait, 2, 0.2)
+
+	retryTransport := retry.NewTransport(baseTransport)
+	retryTransport.Policy = func() retry.Policy {
+		return &retryPolicy
+	}
+
 	return &http.Client{
-		Transport: retry.NewTransport(baseTransport),
+		Transport: retryTransport,
 	}, nil
 }
 
@@ -277,25 +302,11 @@ func (o *Client) GetOrasRepository() (*remote.Repository, error) {
 }
 
 // addToIndex adds the given helm chart entry into the helm repo index provided.
-func (o *Client) addToIndex(indexFile *repo.IndexFile, chartName, chartTarFilePath string) error {
+func (o *Client) addToIndex(indexFile *repo.IndexFile, chartTarFilePath string) error {
 	// Load the Chart into chart golang struct.
 	chart, err := loader.Load(chartTarFilePath)
 	if err != nil {
 		return fmt.Errorf("failed to load the chart %s: %w", chartTarFilePath, err)
-	}
-
-	// Only pull if the helm chart version and tag are same since helm does the same thing as well when pushing
-	// https://github.com/helm/helm/blob/main/pkg/pusher/ocipusher.go#L88
-	if chart.Metadata.Version != o.tag {
-		logrus.Debugf("Ignoring tag %s for repository %s since the tag and helm chart version don't match", o.tag, o.repository)
-		return nil
-	}
-
-	// If chartName is not empty, then replace metadata chart name with the chartName
-	// since mutiple chartNames can exist in multiple helm repositories in an oci registry.
-	// and replacing with chartName will make the chart name unqiue in that helm repository.
-	if chartName != "" {
-		chart.Metadata.Name = chartName
 	}
 
 	// Generate the digest of the chart.

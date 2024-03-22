@@ -7,8 +7,10 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -17,9 +19,97 @@ import (
 	"helm.sh/helm/v3/pkg/repo"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"oras.land/oras-go/v2/registry/remote/auth"
+	"oras.land/oras-go/v2/registry/remote/retry"
 
 	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 )
+
+func spinRegistry(layerSize int, chartMediaType, helmManifest bool, testcaseName string, t *testing.T) *httptest.Server {
+	helmChartTar, err := os.ReadFile("../../../tests/testdata/testingchart-0.1.0.tgz")
+	assert.NoError(t, err)
+
+	layerDesc := ocispec.Descriptor{
+		MediaType: registry.ChartLayerMediaType,
+		Digest:    digest.FromBytes(helmChartTar),
+		Size:      int64(len(helmChartTar)),
+	}
+	if layerSize > 0 {
+		layerDesc.Size = int64(layerSize)
+	}
+	if !chartMediaType {
+		layerDesc.MediaType = ocispec.MediaTypeImageLayer
+	}
+
+	configBlob := []byte("config")
+	configDesc := ocispec.Descriptor{
+		MediaType: registry.ConfigMediaType,
+		Digest:    digest.FromBytes(configBlob),
+		Size:      int64(len(configBlob)),
+	}
+
+	// Modify test data according to the testcase
+	switch testcaseName {
+	case "fetches no chart since chart layer is not Helm Chart type":
+		layerDesc.MediaType = ocispec.MediaTypeImageLayer
+	}
+
+	manifest := ocispec.Manifest{
+		MediaType: ocispec.MediaTypeImageManifest,
+		Config:    configDesc,
+		Layers:    []ocispec.Descriptor{layerDesc},
+	}
+	manifest.Config.MediaType = registry.ConfigMediaType
+	manifestJSON, err := json.Marshal(manifest)
+	assert.NoError(t, err)
+
+	manifestDesc := ocispec.Descriptor{
+		MediaType: ocispec.MediaTypeImageManifest,
+		Digest:    digest.FromBytes(manifestJSON),
+		Size:      int64(len(manifestJSON)),
+	}
+	if !helmManifest {
+		manifestDesc.MediaType = ocispec.MediaTypeImageIndex
+	}
+	manifestCount := 0
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+		switch r.URL.Path {
+
+		case "/v2/testingchart/tags/list":
+			t := `{"tags": ["0.1.0","0.0.1","sha256"]}`
+			w.Write([]byte(t))
+
+		case "/v2/_catalog":
+			t := `{"repositories": ["testingchart"]}`
+			w.Write([]byte(t))
+		case "/v2/testingchart/blobs/" + configDesc.Digest.String():
+			t.FailNow()
+		case "/v2/testingchart/blobs/" + layerDesc.Digest.String():
+			http.ServeFile(w, r, "../../../tests/testdata/testingchart-0.1.0.tgz")
+		case "/v2/testingchart/manifests/0.1.0":
+			manifestCount++
+			if manifestCount > 1 {
+				w.WriteHeader(http.StatusForbidden)
+				return
+			}
+			if accept := r.Header.Get("Accept"); !strings.Contains(accept, manifestDesc.MediaType) {
+				assert.NoError(t, err)
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			w.Header().Set("Content-Type", manifestDesc.MediaType)
+			w.Header().Set("Docker-Content-Digest", manifestDesc.Digest.String())
+			if _, err := w.Write(manifestJSON); err != nil {
+				assert.NoError(t, err)
+			}
+
+		}
+	}))
+
+	return ts
+}
 
 func TestNewClient(t *testing.T) {
 	testCases := []struct {
@@ -170,128 +260,165 @@ func TestNewClient(t *testing.T) {
 
 func TestFetchChart(t *testing.T) {
 	type testcase struct {
-		name          string
-		expectedErr   string
-		expectedFound bool
-		expectedFile  bool
+		name           string
+		expectedErr    string
+		expectedFound  bool
+		expectedFile   bool
+		size           int
+		spinServer     bool
+		helmManifest   bool
+		chartMediaType bool
 	}
 
 	testCase1 := testcase{
-		name:          "fetching a chart works fine with a tag",
-		expectedErr:   "",
-		expectedFound: true,
-		expectedFile:  true,
+		name:           "fetching a chart works fine with a tag",
+		expectedErr:    "",
+		expectedFound:  true,
+		expectedFile:   true,
+		size:           0,
+		spinServer:     true,
+		helmManifest:   true,
+		chartMediaType: true,
 	}
 
 	testCase2 := testcase{
-		name:          "fetches no chart since chart layer is not Helm Chart type",
-		expectedErr:   "",
-		expectedFound: false,
-		expectedFile:  false,
+		name:           "fetches no chart that is more than the max size",
+		expectedErr:    "has size more than 20971520",
+		expectedFound:  false,
+		expectedFile:   false,
+		size:           21 * 1024 * 1024, // 21 MiB
+		spinServer:     true,
+		helmManifest:   true,
+		chartMediaType: true,
+	}
+
+	testCase3 := testcase{
+		name:           "if the server is not responding, oras throws an error",
+		expectedErr:    "unable to oras copy the remote oci artifact",
+		expectedFound:  false,
+		expectedFile:   false,
+		size:           0,
+		spinServer:     false,
+		helmManifest:   true,
+		chartMediaType: true,
+	}
+
+	testCase4 := testcase{
+		name:           "if the oci artifact is not helm manifest mediatype, we throw an error",
+		expectedErr:    "is not a helm chart",
+		expectedFound:  false,
+		expectedFile:   false,
+		size:           0,
+		spinServer:     true,
+		helmManifest:   false,
+		chartMediaType: true,
+	}
+
+	testCase5 := testcase{
+		name:           "if the oci artifact has no chart tar, we throw an error",
+		expectedErr:    "is not a helm chart",
+		expectedFound:  false,
+		expectedFile:   false,
+		size:           0,
+		spinServer:     true,
+		helmManifest:   true,
+		chartMediaType: false,
 	}
 
 	testCases := []testcase{
 		testCase1,
 		testCase2,
+		testCase3,
+		testCase4,
+		testCase5,
 	}
 
 	assert := assert.New(t)
 	for _, tc := range testCases {
-		// Create an OCI Helm Chart Image
-		layerBlob := []byte("layer")
-		layerDesc := ocispec.Descriptor{
-			MediaType: registry.ChartLayerMediaType,
-			Digest:    digest.FromBytes(layerBlob),
-			Size:      int64(len(layerBlob)),
-		}
-
-		// Modify test data according to the testcase
-		switch tc.name {
-		case "fetches no chart since chart layer is not Helm Chart type":
-			layerDesc.MediaType = ocispec.MediaTypeImageLayer
-		}
-
-		manifest := ocispec.Manifest{
-			MediaType: ocispec.MediaTypeImageManifest,
-			Config:    ocispec.DescriptorEmptyJSON,
-			Layers:    []ocispec.Descriptor{layerDesc},
-		}
-		manifest.Config.MediaType = registry.ConfigMediaType
-		manifestJSON, err := json.Marshal(manifest)
-		assert.NoError(err)
-
-		manifestDesc := ocispec.Descriptor{
-			MediaType: ocispec.MediaTypeImageManifest,
-			Digest:    digest.FromBytes(manifestJSON),
-			Size:      int64(len(manifestJSON)),
-		}
-
-		// Create a OCI Registry Server
-		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-
-			switch r.URL.Path {
-			case "/v2/test/blobs/" + layerDesc.Digest.String():
-				w.Header().Set("Content-Type", "application/octet-stream")
-				w.Header().Set("Docker-Content-Digest", layerDesc.Digest.String())
-				if _, err := w.Write(layerBlob); err != nil {
-					assert.NoError(err)
-				}
-			case "/v2/test/manifests/v1.0.2":
-				if accept := r.Header.Get("Accept"); !strings.Contains(accept, manifestDesc.MediaType) {
-					assert.NoError(err)
-					w.WriteHeader(http.StatusBadRequest)
-					return
-				}
-				w.Header().Set("Content-Type", manifestDesc.MediaType)
-				w.Header().Set("Docker-Content-Digest", manifestDesc.Digest.String())
-				if _, err := w.Write(manifestJSON); err != nil {
-					assert.NoError(err)
-				}
+		t.Run(tc.name, func(t *testing.T) {
+			ts := &httptest.Server{
+				URL: "http://localhost.com",
 			}
-		}))
-		defer ts.Close()
+			if tc.spinServer {
+				ts = spinRegistry(tc.size, tc.chartMediaType, tc.helmManifest, tc.name, t)
+				defer ts.Close()
+			}
 
-		ociClient, err := NewClient(fmt.Sprintf("%s/test:v1.0.2", strings.Replace(ts.URL, "http", "oci", 1)), v1.RepoSpec{}, nil)
-		assert.NoError(err)
-
-		orasReposistory, err := ociClient.GetOrasRepository()
-		orasReposistory.PlainHTTP = true
-		assert.NoError(err)
-
-		_, found, err := ociClient.fetchChart(orasReposistory)
-		if tc.expectedErr == "" {
+			ociClient, err := NewClient(fmt.Sprintf("%s/testingchart:0.1.0", strings.Replace(ts.URL, "http", "oci", 1)), v1.RepoSpec{}, nil)
 			assert.NoError(err)
-		} else {
-			assert.Contains(err.Error(), tc.expectedErr)
-		}
-		assert.Equal(found, tc.expectedFound)
+			ociClient.exponentialBackOffValues.MinWait = &metav1.Duration{
+				Duration: time.Duration(1 * time.Second),
+			}
+			ociClient.exponentialBackOffValues.MaxWait = &metav1.Duration{
+				Duration: time.Duration(1 * time.Second),
+			}
+
+			orasReposistory, err := ociClient.GetOrasRepository()
+			orasReposistory.PlainHTTP = true
+			orasReposistory.Client.(*auth.Client).Client.Timeout = 5 * time.Second
+			assert.NoError(err)
+
+			_, err = ociClient.fetchChart(orasReposistory)
+			if tc.expectedErr == "" {
+				assert.NoError(err)
+			} else {
+				assert.Contains(err.Error(), tc.expectedErr)
+			}
+		})
 	}
 }
 
 func TestGetOrasRegistry(t *testing.T) {
 	testCases := []struct {
-		name              string
-		expectedErr       error
-		insecurePlainHTTP bool
+		name                     string
+		expectedErr              error
+		insecurePlainHTTP        bool
+		exponentialBackOffValues *v1.ExponentialBackOffValues
 	}{
 		{
-			name:              "fetching oras registry works fine without auth",
-			expectedErr:       nil,
-			insecurePlainHTTP: false,
+			name:                     "fetching oras registry works fine without auth",
+			expectedErr:              nil,
+			insecurePlainHTTP:        false,
+			exponentialBackOffValues: nil,
 		},
 		{
-			name:              "fetching oras repository works fine with plainHTTP",
+			name:                     "fetching oras repository works fine with plainHTTP",
+			expectedErr:              nil,
+			insecurePlainHTTP:        true,
+			exponentialBackOffValues: nil,
+		},
+		{
+			name:              "retry policy values are set correctly in oras auth client",
 			expectedErr:       nil,
 			insecurePlainHTTP: true,
+			exponentialBackOffValues: &v1.ExponentialBackOffValues{
+				MaxRetries: 5,
+				MaxWait:    &metav1.Duration{Duration: time.Duration(5)},
+				MinWait:    &metav1.Duration{Duration: time.Duration(5)},
+			},
 		},
 	}
 
 	for _, tc := range testCases {
-		ociClient, err := NewClient("oci://example.com/charts/test:1.2.2", v1.RepoSpec{InsecurePlainHTTP: tc.insecurePlainHTTP}, nil)
+		repoSpec := v1.RepoSpec{
+			InsecurePlainHTTP: tc.insecurePlainHTTP,
+		}
+		if tc.exponentialBackOffValues != nil {
+			repoSpec.ExponentialBackOffValues = tc.exponentialBackOffValues
+		}
+
+		ociClient, err := NewClient("oci://example.com/charts/test:1.2.2", repoSpec, nil)
 		assert.NoError(t, err)
 
 		orasRegistry, err := ociClient.GetOrasRegistry()
 		assert.Equal(t, orasRegistry.PlainHTTP, tc.insecurePlainHTTP)
+		policy := orasRegistry.Client.(*auth.Client).Client.Transport.(*retry.Transport).Policy().(*retry.GenericPolicy)
+
+		if tc.exponentialBackOffValues != nil {
+			assert.Equal(t, policy.MaxRetry, 5)
+			assert.Equal(t, policy.MinWait, time.Duration(5))
+			assert.Equal(t, policy.MaxWait, time.Duration(5))
+		}
 
 		if tc.expectedErr != nil {
 			assert.ErrorContains(t, err, tc.expectedErr.Error())
@@ -367,18 +494,19 @@ func TestAddToIndex(t *testing.T) {
 			expectedErr: errors.New("failed to add entry"),
 		},
 	}
-	assert := assert.New(t)
 	for _, tc := range testCases {
-
-		ociClient, err := NewClient("oci://example.com/testingchart:0.1.0", v1.RepoSpec{}, nil)
-		assert.NoError(err)
-
-		err = ociClient.addToIndex(tc.indexFile, tc.chartName, tc.fileName)
-		if tc.expectedErr != nil {
-			assert.ErrorContains(err, tc.expectedErr.Error())
-		} else {
+		t.Run(tc.name, func(t *testing.T) {
+			assert := assert.New(t)
+			ociClient, err := NewClient("oci://example.com/testingchart:0.1.0", v1.RepoSpec{}, nil)
 			assert.NoError(err)
-		}
+
+			err = ociClient.addToIndex(tc.indexFile, tc.fileName)
+			if tc.expectedErr != nil {
+				assert.ErrorContains(err, tc.expectedErr.Error())
+			} else {
+				assert.NoError(err)
+			}
+		})
 	}
 }
 

@@ -23,6 +23,13 @@ type SecretReference struct {
 	Namespace string `json:"namespace,omitempty"`
 }
 
+// ExponentialBackOffValues are values for the ratelimiting func when OCI registry sends 429 http response codes.
+type ExponentialBackOffValues struct {
+	MinWait    *metav1.Duration `json:"minWait,omitempty"`
+	MaxWait    *metav1.Duration `json:"maxWait,omitempty"`
+	MaxRetries int              `json:"maxRetries,omitempty"`
+}
+
 type RepoSpec struct {
 	// URL can be a HTTP URL i.e https://charts.rancher.io or an OCI URL i.e oci://dp.apps.rancher.io/charts/etcd.
 	URL string `json:"url,omitempty"`
@@ -35,6 +42,10 @@ type RepoSpec struct {
 
 	// GitBranch The git branch to follow
 	GitBranch string `json:"gitBranch,omitempty"`
+
+	// ExponentialBackOffValues are values given to the Rancher manager to handle 429 TOOMANYREQUESTS response code
+	// from the OCI registry.
+	ExponentialBackOffValues *ExponentialBackOffValues `json:"exponentialBackOffValues,omitempty"`
 
 	// CABundle is a PEM encoded CA bundle which will be used to validate the repo's certificate.
 	// If unspecified, system trust roots will be used.
@@ -76,6 +87,7 @@ type RepoCondition string
 const (
 	RepoDownloaded         RepoCondition = "Downloaded"
 	FollowerRepoDownloaded RepoCondition = "FollowerDownloaded"
+	OCIDownloaded          RepoCondition = "OCIDownloaded"
 )
 
 type RepoStatus struct {

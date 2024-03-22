@@ -12,7 +12,6 @@ import (
 	"github.com/rancher/rancher/pkg/catalogv2"
 	"github.com/rancher/rancher/pkg/catalogv2/git"
 	helmhttp "github.com/rancher/rancher/pkg/catalogv2/http"
-	"github.com/rancher/rancher/pkg/catalogv2/oci"
 	catalogcontrollers "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
 	namespaces "github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/wrangler/v2/pkg/apply"
@@ -26,6 +25,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 const (
@@ -82,9 +82,12 @@ func (r *repoHandler) ClusterRepoDownloadEnsureStatusHandler(repo *catalog.Clust
 }
 
 func (r *repoHandler) ClusterRepoDownloadStatusHandler(repo *catalog.ClusterRepo, status catalog.RepoStatus) (catalog.RepoStatus, error) {
-	logrus.Debugf("ClusterRepoDownloadStatusHandler triggered for clusterrepo %s", repo.Name)
+	// Ignore OCI Based Helm Repositories
+	if registry.IsOCI(repo.Spec.URL) {
+		return status, nil
+	}
 
-	err := r.ensureIndexConfigMap(repo, &status)
+	err := ensureIndexConfigMap(repo, &status, r.configMaps)
 	if err != nil {
 		return status, err
 	}
@@ -115,7 +118,7 @@ func toOwnerObject(namespace string, owner metav1.OwnerReference) runtime.Object
 	}
 }
 
-func (r *repoHandler) createOrUpdateMap(namespace, name string, index *repo.IndexFile, owner metav1.OwnerReference) (*corev1.ConfigMap, error) {
+func createOrUpdateMap(namespace string, index *repo.IndexFile, owner metav1.OwnerReference, apply apply.Apply) (*corev1.ConfigMap, error) {
 	// do this before we normalize the namespace
 	ownerObject := toOwnerObject(namespace, owner)
 
@@ -128,9 +131,7 @@ func (r *repoHandler) createOrUpdateMap(namespace, name string, index *repo.Inde
 		return nil, err
 	}
 
-	if namespace == "" {
-		namespace = namespaces.System
-	}
+	namespace = GetConfigMapNamespace(namespace)
 
 	var (
 		objs  []runtime.Object
@@ -148,12 +149,12 @@ func (r *repoHandler) createOrUpdateMap(namespace, name string, index *repo.Inde
 
 		next := ""
 		if len(left) > 0 {
-			next = name2.SafeConcatName(owner.Name, fmt.Sprint(i+1), string(owner.UID))
+			next = GenerateConfigMapName(owner.Name, i+1, owner.UID)
 		}
 
 		cm := &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:            name2.SafeConcatName(owner.Name, fmt.Sprint(i), string(owner.UID)),
+				Name:            GenerateConfigMapName(owner.Name, i, owner.UID),
 				Namespace:       namespace,
 				OwnerReferences: []metav1.OwnerReference{owner},
 				Annotations: map[string]string{
@@ -177,7 +178,7 @@ func (r *repoHandler) createOrUpdateMap(namespace, name string, index *repo.Inde
 		left = nil
 	}
 
-	return objs[0].(*corev1.ConfigMap), r.apply.WithOwner(ownerObject).ApplyObjects(objs...)
+	return objs[0].(*corev1.ConfigMap), apply.WithOwner(ownerObject).ApplyObjects(objs...)
 }
 
 func (r *repoHandler) ensure(repoSpec *catalog.RepoSpec, status catalog.RepoStatus, metadata *metav1.ObjectMeta) (catalog.RepoStatus, error) {
@@ -232,12 +233,7 @@ func (r *repoHandler) download(repoSpec *catalog.RepoSpec, status catalog.RepoSt
 		}
 		index, err = git.BuildOrGetIndex(metadata.Namespace, metadata.Name, repoSpec.GitRepo)
 	} else if repoSpec.URL != "" {
-		switch {
-		case registry.IsOCI(repoSpec.URL):
-			index, err = oci.GenerateIndex(repoSpec.URL, secret, *repoSpec, status, r.configMapCache)
-		default:
-			index, err = helmhttp.DownloadIndex(secret, repoSpec.URL, repoSpec.CABundle, repoSpec.InsecureSkipTLSverify, repoSpec.DisableSameOriginCheck)
-		}
+		index, err = helmhttp.DownloadIndex(secret, repoSpec.URL, repoSpec.CABundle, repoSpec.InsecureSkipTLSverify, repoSpec.DisableSameOriginCheck)
 
 		status.URL = repoSpec.URL
 		status.Branch = ""
@@ -250,12 +246,7 @@ func (r *repoHandler) download(repoSpec *catalog.RepoSpec, status catalog.RepoSt
 
 	index.SortEntries()
 
-	name := status.IndexConfigMapName
-	if name == "" {
-		name = owner.Name
-	}
-
-	cm, err := r.createOrUpdateMap(metadata.Namespace, name, index, owner)
+	cm, err := createOrUpdateMap(metadata.Namespace, index, owner, r.apply)
 	if err != nil {
 		return status, err
 	}
@@ -268,12 +259,12 @@ func (r *repoHandler) download(repoSpec *catalog.RepoSpec, status catalog.RepoSt
 	return status, nil
 }
 
-func (r *repoHandler) ensureIndexConfigMap(repo *catalog.ClusterRepo, status *catalog.RepoStatus) error {
+func ensureIndexConfigMap(repo *catalog.ClusterRepo, status *catalog.RepoStatus, configMap corev1controllers.ConfigMapClient) error {
 	// Charts from the clusterRepo will be unavailable if the IndexConfigMap recorded in the status does not exist.
 	// By resetting the value of IndexConfigMapName, IndexConfigMapNamespace, IndexConfigMapResourceVersion to "",
 	// the method shouldRefresh will return true and trigger the rebuild of the IndexConfigMap and accordingly update the status.
 	if repo.Spec.GitRepo != "" && status.IndexConfigMapName != "" {
-		_, err := r.configMapCache.Get(status.IndexConfigMapNamespace, status.IndexConfigMapName)
+		_, err := configMap.Get(status.IndexConfigMapNamespace, status.IndexConfigMapName, metav1.GetOptions{})
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				status.IndexConfigMapName = ""
@@ -305,4 +296,38 @@ func shouldRefresh(spec *catalog.RepoSpec, status *catalog.RepoStatus) bool {
 	}
 	refreshTime := time.Now().Add(-interval)
 	return refreshTime.After(status.DownloadTime.Time)
+}
+
+// readBytes reads data from the chain of helm repo index configmaps.
+func readBytes(configMapCache corev1controllers.ConfigMapClient, cm *corev1.ConfigMap) ([]byte, error) {
+	var (
+		bytes = cm.BinaryData["content"]
+		err   error
+	)
+
+	for {
+		next := cm.Annotations["catalog.cattle.io/next"]
+		if next == "" {
+			break
+		}
+		cm, err = configMapCache.Get(cm.Namespace, next, metav1.GetOptions{})
+		if err != nil {
+			return nil, err
+		}
+		bytes = append(bytes, cm.BinaryData["content"]...)
+	}
+
+	return bytes, nil
+}
+
+func GenerateConfigMapName(ownerName string, index int, UID types.UID) string {
+	return name2.SafeConcatName(ownerName, fmt.Sprint(index), string(UID))
+}
+
+func GetConfigMapNamespace(namespace string) string {
+	if namespace == "" {
+		return namespaces.System
+	}
+
+	return namespace
 }

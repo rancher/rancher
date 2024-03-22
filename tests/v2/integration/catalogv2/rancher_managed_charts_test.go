@@ -33,7 +33,6 @@ import (
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
-const rancherLocalDir = "../rancher-data/local-catalogs/v2"
 const smallForkURL = "https://github.com/rancher/charts-small-fork"
 const smallForkClusterRepoName = "rancher-charts-small-fork"
 
@@ -120,7 +119,7 @@ func (w *RancherManagedChartsTest) resetSettings() {
 		clusterRepo.Spec.GitRepo = w.originalGitRepo
 		clusterRepo.Spec.GitBranch = w.originalBranch
 		downloadTime := clusterRepo.Status.DownloadTime
-		clusterRepo, err = w.catalogClient.ClusterRepos().Update(context.TODO(), clusterRepo, metav1.UpdateOptions{})
+		_, err = w.catalogClient.ClusterRepos().Update(context.TODO(), clusterRepo, metav1.UpdateOptions{})
 		w.Require().NoError(err)
 		w.Require().NoError(w.pollUntilDownloaded("rancher-charts", downloadTime))
 	}
@@ -171,7 +170,7 @@ func (w *RancherManagedChartsTest) TestUpgradeChartToLatestVersion() {
 
 	//REVERT CONFIGMAP TO ORIGINAL VALUE
 	cfgMap.BinaryData["content"] = origCfg.BinaryData["content"]
-	cfgMap, err = w.corev1.ConfigMaps(clusterRepo.Status.IndexConfigMapNamespace).Update(context.TODO(), cfgMap, metav1.UpdateOptions{})
+	_, err = w.corev1.ConfigMaps(clusterRepo.Status.IndexConfigMapNamespace).Update(context.TODO(), cfgMap, metav1.UpdateOptions{})
 	w.Require().NoError(err)
 
 	clusterRepo, err = w.catalogClient.ClusterRepos().Get(context.TODO(), "rancher-charts", metav1.GetOptions{})
@@ -227,7 +226,7 @@ func (w *RancherManagedChartsTest) TestUpgradeToWorkingVersion() {
 
 	//REVERT CONFIGMAP TO ORIGINAL VALUE
 	cfgMap.BinaryData["content"] = origCfg.BinaryData["content"]
-	cfgMap, err = w.corev1.ConfigMaps(clusterRepo.Status.IndexConfigMapNamespace).Update(context.TODO(), cfgMap, metav1.UpdateOptions{})
+	_, err = w.corev1.ConfigMaps(clusterRepo.Status.IndexConfigMapNamespace).Update(context.TODO(), cfgMap, metav1.UpdateOptions{})
 	w.Require().NoError(err)
 	clusterRepo, err = w.catalogClient.ClusterRepos().Get(ctx, "rancher-charts", metav1.GetOptions{})
 	w.Require().NoError(err)
