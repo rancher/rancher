@@ -111,6 +111,7 @@ func readTestCase() ([]testcase.GoTestOutput, error) {
 func parseCorrectTestCases(testCases []testcase.GoTestOutput) map[string]*testcase.GoTestCase {
 	finalTestCases := map[string]*testcase.GoTestCase{}
 	var deletedTest string
+	var timeoutFailure bool
 	for _, testCase := range testCases {
 		if testCase.Action == "run" && strings.Contains(testCase.Test, "/") {
 			newTestCase := &testcase.GoTestCase{Name: testCase.Test}
@@ -135,6 +136,8 @@ func parseCorrectTestCases(testCases []testcase.GoTestOutput) map[string]*testca
 				}
 
 			}
+		} else if testCase.Action == failStatus && testCase.Test == "" {
+			timeoutFailure = true
 		}
 	}
 
@@ -143,6 +146,9 @@ func parseCorrectTestCases(testCases []testcase.GoTestOutput) map[string]*testca
 		testName := testSuite[len(testSuite)-1]
 		testCase.Name = testName
 		testCase.TestSuite = testSuite[0 : len(testSuite)-1]
+		if timeoutFailure && testCase.Status == "" {
+			testCase.Status = failStatus
+		}
 	}
 
 	return finalTestCases
@@ -211,10 +217,10 @@ func writeTestSuiteToQase(client *qase.APIClient, testCase testcase.GoTestCase) 
 				ParentId: int64(parentSuite),
 			}
 			idResponse, _, err := client.SuitesApi.CreateSuite(context.TODO(), suiteBody, qasedefaults.RancherManagerProjectID)
-			id = idResponse.Result.Id
 			if err != nil {
 				return nil, err
 			}
+			id = idResponse.Result.Id
 			parentSuite = id
 		} else {
 			id = qaseSuiteFound.Id
