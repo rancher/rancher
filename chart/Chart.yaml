@@ -5,12 +5,11 @@ version: %VERSION%
 appVersion: %APP_VERSION%
 kubeVersion: < 1.28.0-0
 home: https://rancher.com
-icon: https://github.com/rancher/ui/blob/master/public/assets/images/logos/welcome-cow.svg
+icon: https://raw.githubusercontent.com/rancher/ui/master/public/assets/images/logos/welcome-cow.svg
 keywords:
   - rancher
 sources:
   - https://github.com/rancher/rancher
-  - https://github.com/rancher/server-chart
 maintainers:
   - name: Rancher Labs
     email: charts@rancher.com
