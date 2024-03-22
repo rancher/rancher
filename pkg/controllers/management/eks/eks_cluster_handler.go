@@ -11,10 +11,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/eks"
-	"github.com/rancher/eks-operator/controller"
 	eksv1 "github.com/rancher/eks-operator/pkg/apis/eks.cattle.io/v1"
+	"github.com/rancher/eks-operator/utils"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/management/clusteroperator"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterupstreamrefresher"
@@ -543,8 +546,42 @@ func (e *eksOperatorController) generateSATokenWithPublicAPI(cluster *mgmtv3.Clu
 	return serviceToken, requiresTunnel, err
 }
 
+func (e *eksOperatorController) getAWSSession(cluster *mgmtv3.Cluster) (*session.Session, error) {
+	awsConfig := &aws.Config{}
+	eksConfig := cluster.Spec.EKSConfig
+
+	if region := eksConfig.Region; region != "" {
+		awsConfig.Region = aws.String(region)
+	}
+
+	ns, id := utils.Parse(eksConfig.AmazonCredentialSecret)
+	if amazonCredentialSecret := eksConfig.AmazonCredentialSecret; amazonCredentialSecret != "" {
+		secret, err := e.SecretsCache.Get(ns, id)
+		if err != nil {
+			return nil, fmt.Errorf("error getting secret %s/%s: %w", ns, id, err)
+		}
+
+		accessKeyBytes := secret.Data["amazonec2credentialConfig-accessKey"]
+		secretKeyBytes := secret.Data["amazonec2credentialConfig-secretKey"]
+		if accessKeyBytes == nil || secretKeyBytes == nil {
+			return nil, fmt.Errorf("invalid aws cloud credential")
+		}
+
+		accessKey := string(accessKeyBytes)
+		secretKey := string(secretKeyBytes)
+
+		awsConfig.Credentials = credentials.NewStaticCredentials(accessKey, secretKey, "")
+	}
+
+	sess, err := session.NewSession(awsConfig)
+	if err != nil {
+		return nil, fmt.Errorf("error getting new aws session: %w", err)
+	}
+	return sess, nil
+}
+
 func (e *eksOperatorController) getAccessToken(cluster *mgmtv3.Cluster) (string, error) {
-	sess, _, err := controller.StartAWSSessions(e.SecretsCache, *cluster.Spec.EKSConfig)
+	sess, err := e.getAWSSession(cluster)
 	if err != nil {
 		return "", err
 	}
