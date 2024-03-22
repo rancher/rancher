@@ -205,8 +205,9 @@ func acquireLease(ctx context.Context, clientSet kubernetes.Interface, namespace
 	}
 	// Wait for the Lease to be granted
 	backoff := wait.Backoff{
-		Duration: 1 * time.Second,
-		Cap:      100 * time.Millisecond,
+		Duration: 500 * time.Millisecond,
+		Factor:   1.0,
+		Jitter:   1.0,
 		Steps:    50,
 	}
 	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
