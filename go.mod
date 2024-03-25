@@ -175,7 +175,7 @@ require (
 require (
 	github.com/antihax/optional v1.0.0
 	github.com/containers/image/v5 v5.25.0
-	github.com/rancher/shepherd v0.0.0-20240319182026-a6fdc531cdea
+	github.com/rancher/shepherd v0.0.0-20240325171542-060a406ec212
 	go.qase.io/client v0.0.0-20231114201952-65195ec001fa
 )
 
@@ -253,6 +253,7 @@ require (
 
 require (
 	cloud.google.com/go/compute v1.23.3 // indirect
+	dario.cat/mergo v1.0.0 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 // indirect
 	github.com/Azure/go-autorest v14.2.0+incompatible // indirect
 	github.com/Azure/go-autorest/autorest/azure/auth v0.5.12 // indirect
