@@ -110,6 +110,10 @@ func (rb *roleBuilder) policyRules() []rbacv1.PolicyRule {
 }
 
 func (rb *roleBuilder) namespacedPolicyRules() map[string][]rbacv1.PolicyRule {
+	if len(rb.namespacedRules) == 0 {
+		return nil
+	}
+
 	nsRules := map[string][]rbacv1.PolicyRule{}
 	for _, n := range rb.namespacedRules {
 		var prs []rbacv1.PolicyRule
@@ -305,10 +309,11 @@ func (rb *roleBuilder) reconcileGlobalRoles(grClient wranglerv3.GlobalRoleClient
 
 	compareAndMod := func(haveGR *v3.GlobalRole, wantGR *v3.GlobalRole) (bool, *v3.GlobalRole, error) {
 		builtin := haveGR.Builtin == wantGR.Builtin
-		equal := builtin && haveGR.DisplayName == wantGR.DisplayName && reflect.DeepEqual(haveGR.Rules, wantGR.Rules)
+		equal := builtin && haveGR.DisplayName == wantGR.DisplayName && reflect.DeepEqual(haveGR.Rules, wantGR.Rules) && reflect.DeepEqual(haveGR.NamespacedRules, wantGR.NamespacedRules)
 
 		haveGR.DisplayName = wantGR.DisplayName
 		haveGR.Rules = wantGR.Rules
+		haveGR.NamespacedRules = wantGR.NamespacedRules
 		haveGR.Builtin = wantGR.Builtin
 
 		return equal, haveGR, nil

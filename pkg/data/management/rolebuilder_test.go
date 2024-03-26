@@ -75,7 +75,7 @@ func Test_reconcileGlobalRoles(t *testing.T) {
 		},
 		DisplayName: "Namespaced GR",
 		NamespacedRules: map[string][]rbacv1.PolicyRule{
-			"namespace1": []rbacv1.PolicyRule{ruleReadPods},
+			"namespace1": {ruleReadPods},
 		},
 		Builtin: true,
 	}
@@ -190,6 +190,24 @@ func Test_reconcileGlobalRoles(t *testing.T) {
 					func(toUpdate *v3.GlobalRole) (*v3.GlobalRole, error) {
 						require.EqualValues(mocks.t, adminGR.Rules, toUpdate.Rules, "roleBuilder did not attempt to update the correct rules")
 						require.EqualValues(mocks.t, adminGR.DisplayName, toUpdate.DisplayName, "roleBuilder attempted to update the unchanged display name")
+						return toUpdate, nil
+					})
+			},
+		},
+		{
+			name:        "Update existing GR Namespaced Rules",
+			grsToCreate: []*v3.GlobalRole{namespacedGR},
+			setup: func(mocks testMocks) {
+				oldGR := namespacedGR.DeepCopy()
+				oldGR.NamespacedRules["namespace2"] = []rbacv1.PolicyRule{ruleReadServices}
+				curr := &v3.GlobalRoleList{Items: []v3.GlobalRole{*oldGR}}
+				mocks.grClientMock.EXPECT().List(gomock.Any()).Return(curr, nil)
+				mocks.grClientMock.EXPECT().WithImpersonation(controllers.WebhookImpersonation()).Return(mocks.grClientMock, nil)
+				mocks.grClientMock.EXPECT().Update(ObjectMatcher(namespacedGR)).DoAndReturn(
+					func(toUpdate *v3.GlobalRole) (*v3.GlobalRole, error) {
+						require.EqualValues(mocks.t, namespacedGR.Rules, toUpdate.Rules, "roleBuilder did not attempt to update the correct rules")
+						require.EqualValues(mocks.t, namespacedGR.NamespacedRules, toUpdate.NamespacedRules, "roleBuilder did not attempt to update the correct rules")
+						require.EqualValues(mocks.t, namespacedGR.DisplayName, toUpdate.DisplayName, "roleBuilder attempted to update the unchanged display name")
 						return toUpdate, nil
 					})
 			},
