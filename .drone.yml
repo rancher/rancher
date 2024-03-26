@@ -935,7 +935,7 @@ steps:
         - tag
 
   - name: docker-publish-head-agent
-    image: rancher/drone-images:docker-amd64-ltsc2022
+    image: plugins/docker:windows-ltsc2022-amd64
     settings:
       purge: false
       build_args:
@@ -963,7 +963,7 @@ steps:
         - push
 
   - name: docker-publish-agent
-    image: rancher/drone-images:docker-amd64-ltsc2022
+    image: plugins/docker:windows-ltsc2022-amd64
     settings:
       purge: false
       build_args:
