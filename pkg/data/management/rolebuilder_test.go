@@ -69,6 +69,16 @@ func Test_reconcileGlobalRoles(t *testing.T) {
 		Rules:       []rbacv1.PolicyRule{ruleReadPods},
 		Builtin:     true,
 	}
+	namespacedGR := &v3.GlobalRole{
+		ObjectMeta: v1.ObjectMeta{
+			Name: "namespaced-gr",
+		},
+		DisplayName: "Namespaced GR",
+		NamespacedRules: map[string][]rbacv1.PolicyRule{
+			"namespace1": []rbacv1.PolicyRule{ruleReadPods},
+		},
+		Builtin: true,
+	}
 	tests := []struct {
 		name        string
 		grsToCreate []*v3.GlobalRole
@@ -76,7 +86,7 @@ func Test_reconcileGlobalRoles(t *testing.T) {
 		wantErr     bool
 	}{
 		{
-			name:        "Create new GRB with no preexisting",
+			name:        "Create new GR with no preexisting",
 			grsToCreate: []*v3.GlobalRole{basicGR},
 			setup: func(mocks testMocks) {
 
@@ -93,7 +103,7 @@ func Test_reconcileGlobalRoles(t *testing.T) {
 			},
 		},
 		{
-			name:        "Create new GRB and append to existing",
+			name:        "Create new GR and append to existing",
 			grsToCreate: []*v3.GlobalRole{basicGR, adminGR},
 			setup: func(mocks testMocks) {
 				curr := &v3.GlobalRoleList{Items: []v3.GlobalRole{*adminGR}}
@@ -110,7 +120,7 @@ func Test_reconcileGlobalRoles(t *testing.T) {
 			},
 		},
 		{
-			name:        "Create multiple new GRBs",
+			name:        "Create multiple new GRs",
 			grsToCreate: []*v3.GlobalRole{basicGR, readGR, adminGR},
 			setup: func(mocks testMocks) {
 				curr := &v3.GlobalRoleList{Items: []v3.GlobalRole{*adminGR}}
@@ -134,9 +144,24 @@ func Test_reconcileGlobalRoles(t *testing.T) {
 				)
 			},
 		},
-
 		{
-			name:        "Update existing GRB DisplayName",
+			name:        "Create GR with NamespacedRules",
+			grsToCreate: []*v3.GlobalRole{namespacedGR},
+			setup: func(mocks testMocks) {
+				mocks.grClientMock.EXPECT().List(gomock.Any()).Return(&v3.GlobalRoleList{}, nil)
+				mocks.grClientMock.EXPECT().WithImpersonation(controllers.WebhookImpersonation()).Return(mocks.grClientMock, nil)
+				mocks.grClientMock.EXPECT().Create(ObjectMatcher(namespacedGR)).DoAndReturn(
+					func(toCreate *v3.GlobalRole) (*v3.GlobalRole, error) {
+						require.EqualValues(mocks.t, namespacedGR.Rules, toCreate.Rules, "roleBuilder did not attempt to create the correct role")
+						require.EqualValues(mocks.t, namespacedGR.Name, toCreate.Name, "roleBuilder did not attempt to create the correct role")
+						require.EqualValues(mocks.t, namespacedGR.DisplayName, toCreate.DisplayName, "roleBuilder did not attempt to create the correct role")
+						require.EqualValues(mocks.t, namespacedGR.NamespacedRules, toCreate.NamespacedRules, "roleBuilder did not attempt to create the correct role")
+						return toCreate, nil
+					})
+			},
+		},
+		{
+			name:        "Update existing GR DisplayName",
 			grsToCreate: []*v3.GlobalRole{adminGR},
 			setup: func(mocks testMocks) {
 				oldAdmin := adminGR.DeepCopy()
@@ -153,7 +178,7 @@ func Test_reconcileGlobalRoles(t *testing.T) {
 			},
 		},
 		{
-			name:        "Update existing GRB Rules",
+			name:        "Update existing GR Rules",
 			grsToCreate: []*v3.GlobalRole{adminGR},
 			setup: func(mocks testMocks) {
 				oldAdmin := adminGR.DeepCopy()
@@ -170,7 +195,7 @@ func Test_reconcileGlobalRoles(t *testing.T) {
 			},
 		},
 		{
-			name:        "Delete existing GRB Rules",
+			name:        "Delete existing GR Rules",
 			grsToCreate: nil,
 			setup: func(mocks testMocks) {
 				curr := &v3.GlobalRoleList{Items: []v3.GlobalRole{*adminGR}}
@@ -180,7 +205,7 @@ func Test_reconcileGlobalRoles(t *testing.T) {
 			},
 		},
 		{
-			name:    "Fail to delete existing GRB Rules",
+			name:    "Fail to delete existing GR Rules",
 			wantErr: true,
 			setup: func(mocks testMocks) {
 				curr := &v3.GlobalRoleList{Items: []v3.GlobalRole{*adminGR}}
@@ -190,7 +215,7 @@ func Test_reconcileGlobalRoles(t *testing.T) {
 			},
 		},
 		{
-			name:    "Fail to list existing GRB Rules",
+			name:    "Fail to list existing GR Rules",
 			wantErr: true,
 			setup: func(mocks testMocks) {
 				mocks.grClientMock.EXPECT().WithImpersonation(controllers.WebhookImpersonation()).Return(mocks.grClientMock, nil)
@@ -198,7 +223,7 @@ func Test_reconcileGlobalRoles(t *testing.T) {
 			},
 		},
 		{
-			name:        "Fail to create new GRB",
+			name:        "Fail to create new GR",
 			grsToCreate: []*v3.GlobalRole{basicGR},
 			wantErr:     true,
 			setup: func(mocks testMocks) {
@@ -208,7 +233,7 @@ func Test_reconcileGlobalRoles(t *testing.T) {
 			},
 		},
 		{
-			name:        "Fail to update existing GRB",
+			name:        "Fail to update existing GR",
 			grsToCreate: []*v3.GlobalRole{adminGR},
 			wantErr:     true,
 			setup: func(mocks testMocks) {
@@ -553,10 +578,9 @@ func Test_reconcileRoleTemplate(t *testing.T) {
 
 func addGlobalRole(builder *roleBuilder, roles ...*v3.GlobalRole) {
 	for _, gr := range roles {
-		addRules(
-			builder.addRole(gr.DisplayName, gr.Name),
-			gr.Rules...,
-		)
+		r := builder.addRole(gr.DisplayName, gr.Name)
+		addRules(r, gr.Rules...)
+		addNamespacedRules(builder, gr.NamespacedRules)
 	}
 }
 func addRoleTemplates(builder *roleBuilder, templates ...*v3.RoleTemplate) {
@@ -577,6 +601,19 @@ func addRules(builder *roleBuilder, rules ...rbacv1.PolicyRule) {
 		rb.resources(rule.Resources...)
 		rb.resourceNames(rule.ResourceNames...)
 		rb.nonResourceURLs(rule.NonResourceURLs...)
+	}
+}
+func addNamespacedRules(builder *roleBuilder, nsRules map[string][]rbacv1.PolicyRule) {
+	for ns, rules := range nsRules {
+		nsrb := builder.addNamespacedRule(ns)
+		for _, r := range rules {
+			rb := nsrb.addRule()
+			rb.verbs(r.Verbs...)
+			rb.apiGroups(r.APIGroups...)
+			rb.resources(r.Resources...)
+			rb.resourceNames(r.ResourceNames...)
+			rb.nonResourceURLs(r.NonResourceURLs...)
+		}
 	}
 }
 
