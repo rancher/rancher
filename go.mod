@@ -14,6 +14,7 @@ replace (
 
 	github.com/rancher/rancher/pkg/apis => ./pkg/apis
 	github.com/rancher/rancher/pkg/client => ./pkg/client
+	github.com/rancher/shepherd => github.com/joesims22/shepherd v0.0.0-20240326201719-ed7fdf9c3cae
 
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc => go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.35.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp => go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.35.1
@@ -116,7 +117,7 @@ require (
 	github.com/rancher/kubernetes-provider-detector v0.1.5
 	github.com/rancher/lasso v0.0.0-20240123150939-7055397d6dfa
 	github.com/rancher/machine v0.15.0-rancher110
-	github.com/rancher/norman v0.0.0-20240206180703-6eda4bc94b4c
+	github.com/rancher/norman v0.0.0-20240207153035-cb54924f25c7
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/remotedialer v0.3.0
 	github.com/rancher/rke v1.5.7-rc5
@@ -166,12 +167,13 @@ require (
 	github.com/containers/image/v5 v5.25.0
 	github.com/google/gnostic-models v0.6.8
 	github.com/rancher/rancher/pkg/apis v0.0.0-20240213233515-935d309ebad4
-	github.com/rancher/shepherd v0.0.0-20240325171529-2334ef617633
+	github.com/rancher/shepherd v0.0.0-20240325171542-060a406ec212
 	go.qase.io/client v0.0.0-20231114201952-65195ec001fa
 )
 
 require (
 	cloud.google.com/go/compute/metadata v0.2.3 // indirect
+	dario.cat/mergo v1.0.0 // indirect
 	github.com/NYTimes/gziphandler v1.1.1 // indirect
 	github.com/VividCortex/ewma v1.2.0 // indirect
 	github.com/acarl005/stripansi v0.0.0-20180116102854-5a71ef0e047d // indirect
