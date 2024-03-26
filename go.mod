@@ -73,7 +73,7 @@ replace (
 	oras.land/oras-go => oras.land/oras-go v1.2.2 // for docker 20.10.x compatibility
 
 	sigs.k8s.io/aws-iam-authenticator => github.com/rancher/aws-iam-authenticator v0.5.9-0.20220713170329-78acb8c83863
-	sigs.k8s.io/cluster-api => sigs.k8s.io/cluster-api v1.6.1
+	sigs.k8s.io/cluster-api => sigs.k8s.io/cluster-api v1.5.5
 )
 
 require (
