@@ -4,7 +4,7 @@ go 1.20
 
 replace github.com/rancher/wrangler v1.1.1 => github.com/aruiz14/wrangler v1.1.1-0.20240315164510-43c77e8207cf // tag: release-2.0-untagged-debug-41809-1
 
-replace github.com/rancher/steve => github.com/aruiz14/steve v0.0.0-20240322151803-82d599c870dd
+replace github.com/rancher/steve => github.com/aruiz14/steve v0.0.0-20240326122631-d9373fe3a7be
 
 replace github.com/manicminer/hamilton => github.com/moio/hamilton v0.46.0-debug-41809-1
 
