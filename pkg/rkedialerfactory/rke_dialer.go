@@ -83,7 +83,7 @@ func (t *RKEDialerFactory) WrapTransport(config *rketypes.RancherKubernetesEngin
 					}
 					conn, err := dialer(ctx, network, address)
 					if ref.IsNodeNotFound(err) {
-						clusterDialer, dialerErr := t.Factory.ClusterDialer(ns)
+						clusterDialer, dialerErr := t.Factory.ClusterDialer(ns, true)
 						if dialerErr == nil {
 							return clusterDialer(ctx, network, address)
 						}
