@@ -93,10 +93,19 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 	unauthed.PathPrefix("/v3-public").Handler(publicAPI)
 
 	// Authenticated routes
+	impersonatingAuth := auth.ToMiddleware(requests.NewImpersonatingAuth(sar.NewSubjectAccessReview(clusterManager)))
+	saAuth := auth.ToMiddleware(requests.NewServiceAccountAuth(scaledContext, clustermanager.ToRESTConfig))
+	accessControlHandler := rbac.NewAccessControlHandler()
+
+	saauthed := mux.NewRouter()
+	saauthed.UseEncodedPath()
+	saauthed.PathPrefix("/k8s/clusters/{clusterID}").Handler(k8sProxy)
+	saauthed.Use(mux.MiddlewareFunc(saAuth.Chain(impersonatingAuth)))
+	saauthed.Use(mux.MiddlewareFunc(accessControlHandler))
+	saauthed.Use(requests.NewAuthenticatedFilter)
+
 	authed := mux.NewRouter()
 	authed.UseEncodedPath()
-	impersonatingAuth := auth.ToMiddleware(requests.NewImpersonatingAuth(sar.NewSubjectAccessReview(clusterManager)))
-	accessControlHandler := rbac.NewAccessControlHandler()
 
 	authed.Use(mux.MiddlewareFunc(impersonatingAuth))
 	authed.Use(mux.MiddlewareFunc(accessControlHandler))
@@ -109,7 +118,6 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 	authed.Path("/v3/tokenreview").Methods(http.MethodPost).Handler(&webhook.TokenReviewer{})
 	authed.Path("/metrics/{clusterID}").Handler(metricsHandler)
 	authed.Path(supportconfigs.Endpoint).Handler(&supportConfigGenerator)
-	authed.PathPrefix("/k8s/clusters/").Handler(k8sProxy)
 	authed.PathPrefix("/meta/proxy").Handler(metaProxy)
 	authed.PathPrefix("/v1-telemetry").Handler(telemetry.NewProxy())
 	authed.PathPrefix("/v3/identit").Handler(tokenAPI)
@@ -126,8 +134,10 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 
 	metricsAuthed.Path("/metrics").Handler(metricsHandler)
 
-	unauthed.NotFoundHandler = authed
+	unauthed.NotFoundHandler = saauthed
+	saauthed.NotFoundHandler = authed
 	authed.NotFoundHandler = metricsAuthed
+
 	return func(next http.Handler) http.Handler {
 		metricsAuthed.NotFoundHandler = next
 		return unauthed

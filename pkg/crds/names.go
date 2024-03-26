@@ -105,6 +105,7 @@ func AuthCRDs() []string {
 		"tokens.management.cattle.io",
 		"users.management.cattle.io",
 		"userattributes.management.cattle.io",
+		"clusterproxyconfigs.management.cattle.io",
 	}
 }
 
@@ -215,6 +216,7 @@ var MigratedResources = map[string]bool{
 	"clusterclasses.cluster.x-k8s.io":                                 false,
 	"clusterloggings.management.cattle.io":                            false,
 	"clustermonitorgraphs.management.cattle.io":                       false,
+	"clusterproxyconfigs.management.cattle.io":                        true,
 	"clusterregistrationtokens.management.cattle.io":                  false,
 	"clusterrepoes.catalog.cattle.io":                                 false,
 	"clusterresourcesetbindings.addons.cluster.x-k8s.io":              false,

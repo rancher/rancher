@@ -298,6 +298,23 @@ func NewClusterMonitorGraph(namespace, name string, obj ClusterMonitorGraph) *Cl
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// ClusterProxyConfigList is a list of ClusterProxyConfig resources
+type ClusterProxyConfigList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+
+	Items []ClusterProxyConfig `json:"items"`
+}
+
+func NewClusterProxyConfig(namespace, name string, obj ClusterProxyConfig) *ClusterProxyConfig {
+	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("ClusterProxyConfig").ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // ClusterRegistrationTokenList is a list of ClusterRegistrationToken resources
 type ClusterRegistrationTokenList struct {
 	metav1.TypeMeta `json:",inline"`

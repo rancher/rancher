@@ -13,6 +13,7 @@ import (
 
 	"github.com/rancher/norman/httperror"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	authcontext "github.com/rancher/rancher/pkg/auth/context"
 	dialer2 "github.com/rancher/rancher/pkg/dialer"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/impersonation"
@@ -233,12 +234,20 @@ func (r *RemoteService) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 			er.Error(rw, req, validation.Unauthorized)
 			return
 		}
-		token, err := r.getImpersonatorAccountToken(userInfo)
-		if err != nil && !strings.Contains(err.Error(), dialer2.ErrAgentDisconnected.Error()) {
-			er.Error(rw, req, fmt.Errorf("unable to create impersonator account: %w", err))
-			return
+
+		if !authcontext.IsSAAuthenticated(req.Context()) {
+			// If the request is not authenticated as a service account,
+			// we need to use an impersonation token.
+			// This is because the impersonator service account does exist on the downstream cluster, and
+			// it has sufficient permissions to perform the TokenReview.
+			token, err := r.getImpersonatorAccountToken(userInfo)
+			if err != nil && !strings.Contains(err.Error(), dialer2.ErrAgentDisconnected.Error()) {
+				er.Error(rw, req, fmt.Errorf("unable to create impersonator account: %w", err))
+				return
+			}
+
+			req.Header.Set("Authorization", "Bearer "+token)
 		}
-		req.Header.Set("Authorization", "Bearer "+token)
 	}
 
 	if httpstream.IsUpgradeRequest(req) {
