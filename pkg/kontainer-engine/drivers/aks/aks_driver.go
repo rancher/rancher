@@ -2,6 +2,7 @@ package aks
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -16,14 +17,13 @@ import (
 	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/to"
-	"github.com/rancher/aks-operator/pkg/aks"
-	"github.com/rancher/aks-operator/pkg/aks/services"
 	"github.com/rancher/rancher/pkg/kontainer-engine/drivers/options"
 	"github.com/rancher/rancher/pkg/kontainer-engine/drivers/util"
 	"github.com/rancher/rancher/pkg/kontainer-engine/types"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
 	"gopkg.in/yaml.v2"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
@@ -656,7 +656,7 @@ func (d *Driver) createOrUpdate(ctx context.Context, options *types.DriverOption
 		return info, err
 	}
 
-	workplacesClient, err := services.NewWorkplacesClient(azureAuthorizer, driverState.BaseURL, driverState.SubscriptionID)
+	operationInsightsWorkspaceClient, err := newOperationInsightsWorkspaceClient(azureAuthorizer, driverState)
 	if err != nil {
 		return info, err
 	}
@@ -716,8 +716,7 @@ func (d *Driver) createOrUpdate(ctx context.Context, options *types.DriverOption
 		},
 	}
 	if driverState.AddonEnableMonitoring {
-		logAnalyticsWorkspaceResourceID, err := aks.CheckLogAnalyticsWorkspaceForMonitoring(ctx, workplacesClient,
-			driverState.Location, driverState.ResourceGroup, driverState.LogAnalyticsWorkspaceResourceGroup, driverState.LogAnalyticsWorkspace)
+		logAnalyticsWorkspaceResourceID, err := d.checkLogAnalyticsWorkspaceForMonitoring(ctx, operationInsightsWorkspaceClient, driverState)
 		if err != nil {
 			return info, err
 		}
@@ -929,6 +928,176 @@ func (d *Driver) resourceGroupExists(ctx context.Context, client *resources.Grou
 	}
 
 	return resp.StatusCode == 204, nil
+}
+
+const (
+	workspaceLength     = 63
+	workspaceNameLength = 46
+)
+
+// Please keep in sync with
+// https://github.com/Azure/azure-cli/blob/release/src/azure-cli/azure/cli/command_modules/acs/custom.py#L3091
+var locationToOmsRegionCodeMap = map[string]string{
+	"australiasoutheast": "ASE",
+	"australiaeast":      "EAU",
+	"australiacentral":   "CAU",
+	"canadacentral":      "CCA",
+	"centralindia":       "CIN",
+	"centralus":          "CUS",
+	"eastasia":           "EA",
+	"eastus":             "EUS",
+	"eastus2":            "EUS2",
+	"eastus2euap":        "EAP",
+	"francecentral":      "PAR",
+	"japaneast":          "EJP",
+	"koreacentral":       "SE",
+	"northeurope":        "NEU",
+	"southcentralus":     "SCUS",
+	"southeastasia":      "SEA",
+	"uksouth":            "SUK",
+	"usgovvirginia":      "USGV",
+	"westcentralus":      "EUS",
+	"westeurope":         "WEU",
+	"westus":             "WUS",
+	"westus2":            "WUS2",
+	"brazilsouth":        "CQ",
+	"brazilsoutheast":    "BRSE",
+	"norwayeast":         "NOE",
+	"southafricanorth":   "JNB",
+	"northcentralus":     "NCUS",
+	"uaenorth":           "DXB",
+	"germanywestcentral": "DEWC",
+	"ukwest":             "WUK",
+	"switzerlandnorth":   "CHN",
+	"switzerlandwest":    "CHW",
+	"uaecentral":         "AUH",
+	// mapping for azure china cloud
+	"chinaeast":   "EAST2",
+	"chinaeast2":  "EAST2",
+	"chinanorth":  "EAST2",
+	"chinanorth2": "EAST2",
+}
+
+// Please keep in sync with
+// https://github.com/Azure/azure-cli/blob/release/src/azure-cli/azure/cli/command_modules/acs/custom.py#L3126
+var regionToOmsRegionMap = map[string]string{
+	"australiacentral":   "australiacentral",
+	"australiacentral2":  "australiacentral",
+	"australiaeast":      "australiaeast",
+	"australiasoutheast": "australiasoutheast",
+	"brazilsouth":        "brazilsouth",
+	"canadacentral":      "canadacentral",
+	"canadaeast":         "canadacentral",
+	"centralus":          "centralus",
+	"centralindia":       "centralindia",
+	"eastasia":           "eastasia",
+	"eastus":             "eastus",
+	"eastus2":            "eastus2",
+	"francecentral":      "francecentral",
+	"francesouth":        "francecentral",
+	"japaneast":          "japaneast",
+	"japanwest":          "japaneast",
+	"koreacentral":       "koreacentral",
+	"koreasouth":         "koreacentral",
+	"northcentralus":     "northcentralus",
+	"northeurope":        "northeurope",
+	"southafricanorth":   "southafricanorth",
+	"southafricawest":    "southafricanorth",
+	"southcentralus":     "southcentralus",
+	"southeastasia":      "southeastasia",
+	"southindia":         "centralindia",
+	"uksouth":            "uksouth",
+	"ukwest":             "ukwest",
+	"westcentralus":      "eastus",
+	"westeurope":         "westeurope",
+	"westindia":          "centralindia",
+	"westus":             "westus",
+	"westus2":            "westus2",
+	"norwayeast":         "norwayeast",
+	"norwaywest":         "norwayeast",
+	"switzerlandnorth":   "switzerlandnorth",
+	"switzerlandwest":    "switzerlandwest",
+	"uaenorth":           "uaenorth",
+	"germanywestcentral": "germanywestcentral",
+	"germanynorth":       "germanywestcentral",
+	"uaecentral":         "uaecentral",
+	"eastus2euap":        "eastus2euap",
+	"brazilsoutheast":    "brazilsoutheast",
+	// mapping for azure china cloud
+	"chinaeast":   "chinaeast2",
+	"chinaeast2":  "chinaeast2",
+	"chinanorth":  "chinaeast2",
+	"chinanorth2": "chinaeast2",
+}
+
+func (d *Driver) checkLogAnalyticsWorkspaceForMonitoring(ctx context.Context,
+	client *operationalinsights.WorkspacesClient, state state) (workspaceID string, err error) {
+	workspaceRegion, ok := regionToOmsRegionMap[state.Location]
+	if !ok {
+		return "", fmt.Errorf("region %s not supported for Log Analytics workspace", state.Location)
+	}
+
+	workspaceRegionCode, ok := locationToOmsRegionCodeMap[workspaceRegion]
+	if !ok {
+		return "", fmt.Errorf("region %s not supported for Log Analytics workspace", workspaceRegion)
+	}
+
+	workspaceResourceGroup := state.LogAnalyticsWorkspaceResourceGroup
+	if workspaceResourceGroup == "" {
+		workspaceResourceGroup = state.ResourceGroup
+	}
+
+	workspaceName := state.LogAnalyticsWorkspace
+	if workspaceName == "" {
+		workspaceName = fmt.Sprintf("%s-%s", state.ResourceGroup, workspaceRegionCode)
+	}
+
+	// workspaceName string length can be only 63
+	if len(workspaceName) > workspaceLength {
+		workspaceName = generateUniqueLogWorkspace(workspaceName)
+	}
+
+	if gotRet, gotErr := client.Get(ctx, workspaceResourceGroup, workspaceName); gotErr == nil {
+		return *gotRet.ID, nil
+	}
+
+	logrus.Infof("Create Azure Log Analytics Workspace %q on Resource Group %q", workspaceName, workspaceResourceGroup)
+
+	asyncRet, asyncErr := client.CreateOrUpdate(ctx, workspaceResourceGroup, workspaceName, operationalinsights.Workspace{
+		Location: to.StringPtr(workspaceRegion),
+		WorkspaceProperties: &operationalinsights.WorkspaceProperties{
+			Sku: &operationalinsights.WorkspaceSku{
+				Name: operationalinsights.WorkspaceSkuNameEnumStandalone,
+			},
+		},
+	})
+	if asyncErr != nil {
+		return "", asyncErr
+	}
+
+	err = wait.Poll(5*time.Second, 30*time.Second, func() (bool, error) {
+		ret, err := asyncRet.Result(*client)
+		if err != nil {
+			return false, err
+		}
+
+		workspaceID = *ret.ID
+		return true, nil
+	})
+
+	return
+}
+
+func generateUniqueLogWorkspace(workspaceName string) string {
+	if len(workspaceName) < workspaceNameLength {
+		return workspaceName
+	}
+	s := workspaceName[0:workspaceNameLength]
+	h := sha256.New()
+	h.Write([]byte(workspaceName))
+	hexHash := h.Sum(nil)
+	shaString := fmt.Sprintf("%x", hexHash)
+	return fmt.Sprintf("%s-%s", s, shaString[0:16])
 }
 
 func (d *Driver) createResourceGroup(ctx context.Context, client *resources.GroupsClient, state state) error {
