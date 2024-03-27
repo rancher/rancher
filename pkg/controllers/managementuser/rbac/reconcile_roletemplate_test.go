@@ -17,12 +17,9 @@ func TestEnsureGlobalResourcesRolesForPRTB(t *testing.T) {
 	t.Parallel()
 	logrus.SetOutput(io.Discard)
 
-	defaultManager := setupManager(
-		map[string]*v3.RoleTemplate{"create-ns": createNSRoleTemplate},
-		map[string]*v1.ClusterRole{},
-		map[string]*v1.Role{},
-		map[string]*v3.Project{},
-		clientErrs{}, clientErrs{}, clientErrs{},
+	defaultManager := newManager(
+		withRoleTemplates(map[string]*v3.RoleTemplate{"create-ns": createNSRoleTemplate}, nil),
+		withClusterRoles(nil, nil),
 	)
 
 	type testCase struct {
@@ -31,12 +28,11 @@ func TestEnsureGlobalResourcesRolesForPRTB(t *testing.T) {
 		projectName   string
 		roleTemplates map[string]*v3.RoleTemplate
 		expectedRoles []string
-		isErrExpected bool
+		expectedError string
 	}
 	testCases := []testCase{
 		{
 			description:   "global resource rule should grant namespace read",
-			manager:       defaultManager,
 			projectName:   "testproject",
 			expectedRoles: []string{"testproject-namespaces-readonly"},
 			roleTemplates: map[string]*v3.RoleTemplate{
@@ -56,7 +52,6 @@ func TestEnsureGlobalResourcesRolesForPRTB(t *testing.T) {
 		},
 		{
 			description:   "namespace create rule should grant create-ns and a namespaces-edit role",
-			manager:       defaultManager,
 			projectName:   "testproject",
 			expectedRoles: []string{"create-ns", "testproject-namespaces-edit"},
 			roleTemplates: map[string]*v3.RoleTemplate{
@@ -76,7 +71,6 @@ func TestEnsureGlobalResourcesRolesForPRTB(t *testing.T) {
 		},
 		{
 			description:   "namespace create rule for other API group should grant namespaces-read role only",
-			manager:       defaultManager,
 			projectName:   "testproject",
 			expectedRoles: []string{"testproject-namespaces-readonly"},
 			roleTemplates: map[string]*v3.RoleTemplate{
@@ -96,7 +90,6 @@ func TestEnsureGlobalResourcesRolesForPRTB(t *testing.T) {
 		},
 		{
 			description:   "namespace * rule for other API group should grant namespaces-read role only",
-			manager:       defaultManager,
 			projectName:   "testproject",
 			expectedRoles: []string{"testproject-namespaces-readonly"},
 			roleTemplates: map[string]*v3.RoleTemplate{
@@ -116,7 +109,6 @@ func TestEnsureGlobalResourcesRolesForPRTB(t *testing.T) {
 		},
 		{
 			description:   "global resource rule result in promoted role returned",
-			manager:       defaultManager,
 			projectName:   "testproject",
 			expectedRoles: []string{"testproject-namespaces-readonly", "testrt5-promoted"},
 			roleTemplates: map[string]*v3.RoleTemplate{
@@ -136,7 +128,6 @@ func TestEnsureGlobalResourcesRolesForPRTB(t *testing.T) {
 		},
 		{
 			description:   "empty project name will result in no roles returned",
-			manager:       defaultManager,
 			projectName:   "",
 			expectedRoles: nil,
 			roleTemplates: map[string]*v3.RoleTemplate{
@@ -156,7 +147,6 @@ func TestEnsureGlobalResourcesRolesForPRTB(t *testing.T) {
 		},
 		{
 			description:   "* resources and non-core APIGroup should only result in namespace-readonly role",
-			manager:       defaultManager,
 			projectName:   "testproject",
 			expectedRoles: []string{"testproject-namespaces-readonly"},
 			roleTemplates: map[string]*v3.RoleTemplate{
@@ -176,7 +166,6 @@ func TestEnsureGlobalResourcesRolesForPRTB(t *testing.T) {
 		},
 		{
 			description:   "* resources and * APIGroup should only result in namespace-readonly and promoted role",
-			manager:       defaultManager,
 			projectName:   "testproject",
 			expectedRoles: []string{"create-ns", "testproject-namespaces-edit", "testrt8-promoted"},
 			roleTemplates: map[string]*v3.RoleTemplate{
@@ -196,7 +185,6 @@ func TestEnsureGlobalResourcesRolesForPRTB(t *testing.T) {
 		},
 		{
 			description:   "* resources and core (\"\") APIGroup should only result in namespace-readonly and promoted role",
-			manager:       defaultManager,
 			projectName:   "testproject",
 			expectedRoles: []string{"create-ns", "testproject-namespaces-edit", "testrt9-promoted"},
 			roleTemplates: map[string]*v3.RoleTemplate{
@@ -217,16 +205,11 @@ func TestEnsureGlobalResourcesRolesForPRTB(t *testing.T) {
 		{
 			projectName: "testproject",
 			description: "error return when RoleTemplate client returns error",
-			manager: setupManager(
-				map[string]*v3.RoleTemplate{"create-ns": createNSRoleTemplate},
-				make(map[string]*v1.ClusterRole),
-				make(map[string]*v1.Role),
-				make(map[string]*v3.Project),
-				clientErrs{},
-				clientErrs{getError: errNotFound},
-				clientErrs{},
+			manager: newManager(
+				withRoleTemplates(map[string]*v3.RoleTemplate{"create-ns": createNSRoleTemplate}, &clientErrs{getError: errNotFound}),
+				withClusterRoles(nil, nil),
 			),
-			isErrExpected: true,
+			expectedError: "not found",
 			roleTemplates: map[string]*v3.RoleTemplate{
 				"testrt": {
 					ObjectMeta: metav1.ObjectMeta{
@@ -245,16 +228,11 @@ func TestEnsureGlobalResourcesRolesForPRTB(t *testing.T) {
 		{
 			projectName: "testproject",
 			description: "error return when ClusterRole client returns error and RoleTemplate is external",
-			manager: setupManager(
-				map[string]*v3.RoleTemplate{"create-ns": createNSRoleTemplate},
-				make(map[string]*v1.ClusterRole),
-				make(map[string]*v1.Role),
-				make(map[string]*v3.Project),
-				clientErrs{getError: apierrors.NewInternalError(errors.New("error"))},
-				clientErrs{},
-				clientErrs{},
+			manager: newManager(
+				withRoleTemplates(map[string]*v3.RoleTemplate{"create-ns": createNSRoleTemplate}, nil),
+				withClusterRoles(nil, &clientErrs{getError: apierrors.NewInternalError(errors.New("internal error"))}),
 			),
-			isErrExpected: true,
+			expectedError: "internal error",
 			roleTemplates: map[string]*v3.RoleTemplate{
 				"testrt": {
 					ObjectMeta: metav1.ObjectMeta{
@@ -277,10 +255,15 @@ func TestEnsureGlobalResourcesRolesForPRTB(t *testing.T) {
 		t.Run(test.description, func(t *testing.T) {
 			t.Parallel()
 
-			roles, err := test.manager.ensureGlobalResourcesRolesForPRTB(test.projectName, test.roleTemplates)
+			manager := test.manager
+			if manager == nil {
+				manager = defaultManager
+			}
 
-			if test.isErrExpected {
-				assert.Error(t, err)
+			roles, err := manager.ensureGlobalResourcesRolesForPRTB(test.projectName, test.roleTemplates)
+
+			if test.expectedError != "" {
+				assert.ErrorContains(t, err, test.expectedError)
 				assert.Nil(t, roles)
 			} else {
 				assert.NoError(t, err)

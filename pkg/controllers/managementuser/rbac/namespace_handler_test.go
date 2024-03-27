@@ -6,7 +6,6 @@ import (
 
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io"
 	apisV3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1/fakes"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
@@ -253,8 +252,10 @@ func TestReconcileNamespaceProjectClusterRole(t *testing.T) {
 
 func TestCreateProjectNSRole(t *testing.T) {
 	t.Parallel()
+
 	crs := make(map[string]*v1.ClusterRole)
-	m := setupManager(make(map[string]*v3.RoleTemplate), crs, make(map[string]*v1.Role), make(map[string]*v3.Project), clientErrs{}, clientErrs{}, clientErrs{})
+	m := newManager(withClusterRoles(crs, nil))
+
 	type testCase struct {
 		description   string
 		verb          string
@@ -353,7 +354,8 @@ func TestCreateProjectNSRole(t *testing.T) {
 		assert.Equal(t, test.expectedCR, crs[test.expectedCR.Name], test.description)
 		delete(crs, test.expectedCR.Name)
 	}
-	m = setupManager(make(map[string]*v3.RoleTemplate), crs, make(map[string]*v1.Role), make(map[string]*v3.Project), clientErrs{createError: errors.NewInternalError(fmt.Errorf("some error"))}, clientErrs{}, clientErrs{})
+
+	m = newManager(withClusterRoles(crs, &clientErrs{createError: errors.NewInternalError(fmt.Errorf("some error"))}))
 	description := "test should return non-AlreadyExists error"
 	err := m.createProjectNSRole(fmt.Sprintf(projectNSGetClusterRoleNameFmt, "p-123xyz", "edit"), "*", "", "p-123xyz")
 	assert.NotNil(t, err, description)
