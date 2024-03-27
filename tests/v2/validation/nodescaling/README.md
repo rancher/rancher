@@ -54,17 +54,8 @@ These tests utilize Go build tags. Due to this, see the below examples on how to
 `gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/nodescaling --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestNodeScaleDownAndUp/TestWorkerScaleDownAndUp"`
 
 ## Scaling Existing Node Pools
-Similar to the `provisioning` tests, the node scaling tests have static test cases as well as dynamicInput tests you can specify. In order to run the dynamicInput tests, you will need to define the `scalingInput` block in your config file. This block defines the quantity you would like the pool to be scaled up/down to. See an example below:
+Similar to the `provisioning` tests, the node scaling tests have static test cases as well as dynamicInput tests you can specify. In order to run the dynamicInput tests, you will need to define the `scalingInput` block in your config file. This block defines the quantity you would like the pool to be scaled up/down to. See an example below that accounts for node drivers, custom clusters and hosted clusters:
 ```yaml
-scalingInput:
-  nodePools:
-    nodeRoles:
-      worker: true
-      quantity: 2
-  machinePools:
-    nodeRoles:
-      etcd: true
-      quantity: 1
 scalingInput:
   nodeProvider: "ec2"
   nodePools:
@@ -82,7 +73,9 @@ scalingInput:
   gkeNodePool:
     initialNodeCount: 1
 ```
-NOTE: When scaling AKS and EKS, you will need to make sure that the `maxCount` and `maxSize` parameter is greater than the desired scale amount, respectively. For example, if you wish to have 6 total EKS nodes, then the `maxSize` parameter needs to be at least 7. This is not a limitation of the automation, but rather how EkS specifically handles nodegroups.
+NOTE: When scaling AKS and EKS, you will need to make sure that the `maxCount` and `maxSize` parameter is greater than the desired scale amount, respectively. For example, if you wish to have 6 total EKS nodes, then the `maxSize` parameter needs to be at least 7. This is not a limitation of the automation, but rather how EKS specifically handles nodegroups.
+
+Additionally, for AKS, you must have `enableAutoScaling` set to true if you specify `maxCount` and `minCount`.
 
 These tests utilize Go build tags. Due to this, see the below examples on how to run the tests:
 
@@ -91,8 +84,8 @@ These tests utilize Go build tags. Due to this, see the below examples on how to
 `gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/nodescaling --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestRKE1NodeScalingTestSuite/TestScalingRKE1NodePoolsDynamicInput"`
 
 ### RKE2 | K3S
-`gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/nodescaling --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestRKE2NodeScalingTestSuite/TestRKE2NodeScalingTestSuite"` \
-`gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/nodescaling --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestRKE2NodeScalingTestSuite/TestScalingRKE2NodePoolsDynamicInput"`
+`gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/nodescaling --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestNodeScalingTestSuite/TestScalingNodePools"` \
+`gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/nodescaling --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestNodeScalingTestSuite/TestScalingNodePoolsDynamicInput"`
 
 ### AKS
 `gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/nodescaling --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestAKSNodeScalingTestSuite/TestScalingAKSNodePools"` \
