@@ -143,8 +143,8 @@ github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5 h1:0CwZNZbxp69SHPd
 github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5/go.mod h1:wHh0iHkYZB8zMSxRWpUBQtwG5a7fFgvEO+odwuTv2gs=
 github.com/aruiz14/client-go v1.27.4-rancher1-debug-41809-1 h1:so5OzuRCeYi/F+hDUNh+q+7Q2fIoHLwaN0f2ApHCyug=
 github.com/aruiz14/client-go v1.27.4-rancher1-debug-41809-1/go.mod h1:ragcly7lUlN0SRPk5/ZkGnDjPknzb37TICq07WhI6Xc=
-github.com/aruiz14/steve v0.0.0-20240326122631-d9373fe3a7be h1:VOwy60rxlWsmmvxX0msJLQG6QKiyCEoZf6vHGrId11E=
-github.com/aruiz14/steve v0.0.0-20240326122631-d9373fe3a7be/go.mod h1:IAeZiWgZLSGGlYOUa3qj/G6i1eKl2LFuZ/DKb9mIrzw=
+github.com/aruiz14/steve v0.0.0-20240322151803-82d599c870dd h1:N1T/ldkw1V3XJhlweoVEeYkZgsHDTs+IEPHa6EZLsA4=
+github.com/aruiz14/steve v0.0.0-20240322151803-82d599c870dd/go.mod h1:IAeZiWgZLSGGlYOUa3qj/G6i1eKl2LFuZ/DKb9mIrzw=
 github.com/aruiz14/wrangler v1.1.1-0.20240315164510-43c77e8207cf h1:ZygQWro6r44YmDNTloK2D9CSXkikSoyO09EV5gQzLW8=
 github.com/aruiz14/wrangler v1.1.1-0.20240315164510-43c77e8207cf/go.mod h1:4T80p+rLh2OLbjCjdExIjRHKNBgK9NUAd7eIU/gRPKk=
 github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a/go.mod h1:lB+ZfQJz7igIIfQNfa7Ml4HSf2uFQQRzpGGRXenZAgY=
