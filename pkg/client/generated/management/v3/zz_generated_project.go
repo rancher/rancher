@@ -20,7 +20,6 @@ const (
 	ProjectFieldNamespaceDefaultResourceQuota = "namespaceDefaultResourceQuota"
 	ProjectFieldNamespaceId                   = "namespaceId"
 	ProjectFieldOwnerReferences               = "ownerReferences"
-	ProjectFieldPodSecurityPolicyTemplateName = "podSecurityPolicyTemplateId"
 	ProjectFieldRemoved                       = "removed"
 	ProjectFieldResourceQuota                 = "resourceQuota"
 	ProjectFieldState                         = "state"
@@ -45,7 +44,6 @@ type Project struct {
 	NamespaceDefaultResourceQuota *NamespaceResourceQuota `json:"namespaceDefaultResourceQuota,omitempty" yaml:"namespaceDefaultResourceQuota,omitempty"`
 	NamespaceId                   string                  `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
 	OwnerReferences               []OwnerReference        `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
-	PodSecurityPolicyTemplateName string                  `json:"podSecurityPolicyTemplateId,omitempty" yaml:"podSecurityPolicyTemplateId,omitempty"`
 	Removed                       string                  `json:"removed,omitempty" yaml:"removed,omitempty"`
 	ResourceQuota                 *ProjectResourceQuota   `json:"resourceQuota,omitempty" yaml:"resourceQuota,omitempty"`
 	State                         string                  `json:"state,omitempty" yaml:"state,omitempty"`
