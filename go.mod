@@ -14,6 +14,7 @@ replace (
 
 	github.com/rancher/rancher/pkg/apis => ./pkg/apis
 	github.com/rancher/rancher/pkg/client => ./pkg/client
+	github.com/rancher/shepherd => github.com/joesims22/shepherd v0.0.0-20240326174531-79b92764a4c3
 
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc => go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.35.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp => go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.35.1
@@ -166,7 +167,7 @@ require (
 	github.com/containers/image/v5 v5.25.0
 	github.com/google/gnostic-models v0.6.8
 	github.com/rancher/rancher/pkg/apis v0.0.0-20240213233515-935d309ebad4
-	github.com/rancher/shepherd v0.0.0-20240325171529-2334ef617633
+	github.com/rancher/shepherd v0.0.0-20240326230250-981fedb03a38
 	go.qase.io/client v0.0.0-20231114201952-65195ec001fa
 )
 
