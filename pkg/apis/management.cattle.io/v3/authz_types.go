@@ -54,10 +54,6 @@ type ProjectStatus struct {
 	// +optional
 	Conditions []ProjectCondition `json:"conditions,omitempty"`
 
-	// PodSecurityPolicyTemplateName is the pod security policy template associated with the project.
-	// +optional
-	PodSecurityPolicyTemplateName string `json:"podSecurityPolicyTemplateId,omitempty"`
-
 	// MonitoringStatus is the status of the Monitoring V1 app.
 	// +optional
 	MonitoringStatus *MonitoringStatus `json:"monitoringStatus,omitempty" norman:"nocreate,noupdate"`
@@ -269,19 +265,6 @@ type RoleTemplate struct {
 	// Default is false.
 	// +optional
 	Administrative bool `json:"administrative,omitempty"`
-}
-
-// +genclient
-// +kubebuilder:skipversion
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-type PodSecurityPolicyTemplateProjectBinding struct {
-	types.Namespaced
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-
-	PodSecurityPolicyTemplateName string `json:"podSecurityPolicyTemplateId" norman:"required,type=reference[podSecurityPolicyTemplate]"`
-	TargetProjectName             string `json:"targetProjectId" norman:"required,type=reference[project]"`
 }
 
 // +genclient
