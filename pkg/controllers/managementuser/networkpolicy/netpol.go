@@ -1,17 +1,21 @@
 package networkpolicy
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"reflect"
 	"sort"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/controllers/management/imported"
 	"github.com/rancher/rancher/pkg/controllers/managementagent/nslabels"
-	cluster2 "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
 	rancherv1 "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	typescorev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	rnetworkingv1 "github.com/rancher/rancher/pkg/generated/norman/networking.k8s.io/v1"
+
+	cluster2 "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
 	rkecluster "github.com/rancher/rke/cluster"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
@@ -33,6 +37,8 @@ const (
 	hostNetworkPolicyName                   = "hn-nodes"
 	creatorNorman                           = "norman"
 )
+
+var ErrNodeNotFound = errors.New("node not found")
 
 type netpolMgr struct {
 	clusterLister    v3.ClusterLister
@@ -170,6 +176,8 @@ func (npmgr *netpolMgr) programNetworkPolicy(projectID string, clusterNamespace 
 const (
 	calicoIPIPTunnelAddrAnno  = "projectcalico.org/IPv4IPIPTunnelAddr"
 	calicoVXLANTunnelAddrAnno = "projectcalico.org/IPv4VXLANTunnelAddr"
+	calicoIPv4AddrAnno        = "projectcalico.org/IPv4Address"
+	calicoIPv6AddrAnno        = "projectcalico.org/IPv6Address"
 )
 
 func (npmgr *netpolMgr) handleHostNetwork(clusterNamespace string) error {
@@ -178,7 +186,7 @@ func (npmgr *netpolMgr) handleHostNetwork(clusterNamespace string) error {
 		return fmt.Errorf("couldn't list nodes err=%v", err)
 	}
 
-	cni, err := npmgr.getClusterCNI(clusterNamespace)
+	cni, err := npmgr.getClusterCNI(clusterNamespace, nodes[0])
 	if err != nil {
 		return err
 	}
@@ -281,14 +289,20 @@ func (npmgr *netpolMgr) handleHostNetwork(clusterNamespace string) error {
 }
 
 // getClusterCNI returns the cluster's CNI name if it is found or an api error
-func (npmgr *netpolMgr) getClusterCNI(clusterName string) (string, error) {
+func (npmgr *netpolMgr) getClusterCNI(clusterName string, node *corev1.Node) (string, error) {
 	cluster, err := npmgr.clusterLister.Get("", clusterName)
 	if err != nil {
 		return "", err
 	}
 
-	if cluster.Spec.Rke2Config != nil {
+	// this returns the CNI for provisioned RKE2 clusters
+	if isProvisionedRke2Cluster(cluster) {
 		return npmgr.getRKE2ClusterCNI(cluster)
+	}
+
+	// this returns the CNI for imported RKE2 clusters
+	if cluster.Spec.Rke2Config != nil {
+		return npmgr.getImportedRke2ClusterCNI(node)
 	}
 
 	if cluster.Spec.RancherKubernetesEngineConfig != nil {
@@ -296,6 +310,11 @@ func (npmgr *netpolMgr) getClusterCNI(clusterName string) (string, error) {
 	}
 
 	return "", nil
+}
+
+// isProvisionedRke2Cluster check to see if this is a rancher provisioned rke2 cluster
+func isProvisionedRke2Cluster(cluster *v3.Cluster) bool {
+	return cluster.Status.Provider == v32.ClusterDriverRke2 && imported.IsAdministratedByProvisioningCluster(cluster)
 }
 
 // getRKE2ClusterCNI returns the RKE2 cluster CNI name if it is found, or an api error
@@ -318,6 +337,21 @@ func (npmgr *netpolMgr) getRKE2ClusterCNI(mgmtCluster *v3.Cluster) (string, erro
 	}
 
 	return "", nil
+}
+
+// getImportedRke2ClusterCNI gets the CNI for the imported RKE2 cluster, or returns an error if not found.
+// Since cluster.Spec.RKEConfig from management.cattle.io/v3 isn't set for imported RKE2 clusters,
+// we're relying on node annotations.
+// This method currently only retrieves the CNI if it's set to Calico.
+// TODO: Revise the approach if we begin storing CNI information in the provisioning.cattle.io/v1 cluster object.
+func (npmgr *netpolMgr) getImportedRke2ClusterCNI(node *corev1.Node) (string, error) {
+	if node != nil {
+		if node.Annotations[calicoIPv4AddrAnno] != "" || node.Annotations[calicoIPv6AddrAnno] != "" {
+			return rkecluster.CalicoNetworkPlugin, nil
+		}
+		return "", nil
+	}
+	return "", ErrNodeNotFound
 }
 
 func (npmgr *netpolMgr) getSystemNSInfo(clusterNamespace string) (map[string]bool, string, error) {
