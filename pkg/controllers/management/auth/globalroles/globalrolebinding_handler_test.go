@@ -1857,7 +1857,7 @@ type fleetPermissionsHandlerMock struct {
 	reconcileFleetWorkspacePermissionsFunc func(globalRoleBinding *v3.GlobalRoleBinding)
 }
 
-func (f *fleetPermissionsHandlerMock) ReconcileFleetWorkspacePermissions(globalRoleBinding *v3.GlobalRoleBinding) error {
+func (f *fleetPermissionsHandlerMock) ReconcileFleetWorkspacePermissionsBindings(globalRoleBinding *v3.GlobalRoleBinding) error {
 	f.reconcileFleetWorkspacePermissionsFunc(globalRoleBinding)
 	return nil
 }
