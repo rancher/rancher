@@ -89,7 +89,7 @@ type AlertManager struct {
 }
 
 func NewAlertManager(cluster *config.UserContext) *AlertManager {
-	dial, err := cluster.Management.Dialer.ClusterDialer(cluster.ClusterName, true)
+	dial, err := cluster.Management.Dialer.ClusterDialer(cluster.ClusterName)
 	if err != nil {
 		logrus.Warnf("Failed to get cluster dialer: %v", err)
 	}

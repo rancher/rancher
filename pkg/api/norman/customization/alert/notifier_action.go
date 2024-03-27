@@ -83,7 +83,7 @@ func (h *Handler) testNotifier(ctx context.Context, actionName string, action *t
 		notifierMessage.Title = testSMTPTitle
 	}
 
-	dialer, err := h.DialerFactory.ClusterDialer(clientNotifier.ClusterID, true)
+	dialer, err := h.DialerFactory.ClusterDialer(clientNotifier.ClusterID)
 	if err != nil {
 		return errors.Wrap(err, "error getting dialer")
 	}

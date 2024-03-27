@@ -429,7 +429,7 @@ func (e *eksOperatorController) updateEKSClusterConfig(cluster *mgmtv3.Cluster, 
 
 // generateAndSetServiceAccount uses the API endpoint and CA cert to generate a service account token. The token is then copied to the cluster status.
 func (e *eksOperatorController) generateAndSetServiceAccount(cluster *mgmtv3.Cluster) (*mgmtv3.Cluster, error) {
-	clusterDialer, err := e.ClientDialer.ClusterDialer(cluster.Name, true)
+	clusterDialer, err := e.ClientDialer.ClusterDialer(cluster.Name)
 	if err != nil {
 		return cluster, err
 	}
