@@ -29,18 +29,6 @@ func (h *handler) OnChangeInstallSUC(cluster *rancherv1.Cluster, status rancherv
 		return nil, status, nil
 	}
 
-	currentVersion, err := semver.NewVersion(cluster.Spec.KubernetesVersion)
-	if err != nil {
-		return nil, status, err
-	}
-
-	// indicate to the SUC chart if we want to
-	// install PodSecurityPolicy manifests
-	pspEnabled := false
-	if currentVersion.LessThan(Kubernetes125) {
-		pspEnabled = true
-	}
-
 	// we must limit the output of name.SafeConcatName to at most 48 characters because
 	// a) the chart release name cannot exceed 53 characters, and
 	// b) upon creation of this resource the prefix 'mcc-' will be added to the release name, hence the limiting to 48 characters
@@ -59,9 +47,6 @@ func (h *handler) OnChangeInstallSUC(cluster *rancherv1.Cluster, status rancherv
 					"global": map[string]interface{}{
 						"cattle": map[string]interface{}{
 							"systemDefaultRegistry": image.GetPrivateRepoURLFromCluster(cluster),
-							"psp": map[string]interface{}{
-								"enabled": pspEnabled,
-							},
 						},
 					},
 				},

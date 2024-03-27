@@ -20,7 +20,6 @@ type Interface interface {
 	GlobalRolesGetter
 	GlobalRoleBindingsGetter
 	RoleTemplatesGetter
-	PodSecurityPolicyTemplateProjectBindingsGetter
 	ClusterRoleTemplateBindingsGetter
 	ProjectRoleTemplateBindingsGetter
 	ClustersGetter
@@ -218,20 +217,6 @@ func (c *Client) RoleTemplates(namespace string) RoleTemplateInterface {
 	sharedClient := c.clientFactory.ForResourceKind(RoleTemplateGroupVersionResource, RoleTemplateGroupVersionKind.Kind, false)
 	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &RoleTemplateResource, RoleTemplateGroupVersionKind, roleTemplateFactory{})
 	return &roleTemplateClient{
-		ns:           namespace,
-		client:       c,
-		objectClient: objectClient,
-	}
-}
-
-type PodSecurityPolicyTemplateProjectBindingsGetter interface {
-	PodSecurityPolicyTemplateProjectBindings(namespace string) PodSecurityPolicyTemplateProjectBindingInterface
-}
-
-func (c *Client) PodSecurityPolicyTemplateProjectBindings(namespace string) PodSecurityPolicyTemplateProjectBindingInterface {
-	sharedClient := c.clientFactory.ForResourceKind(PodSecurityPolicyTemplateProjectBindingGroupVersionResource, PodSecurityPolicyTemplateProjectBindingGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &PodSecurityPolicyTemplateProjectBindingResource, PodSecurityPolicyTemplateProjectBindingGroupVersionKind, podSecurityPolicyTemplateProjectBindingFactory{})
-	return &podSecurityPolicyTemplateProjectBindingClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,
