@@ -13,7 +13,6 @@ import (
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
 	v1 "github.com/rancher/shepherd/clients/rancher/v1"
-
 	"github.com/rancher/shepherd/extensions/clusters"
 	"github.com/rancher/shepherd/extensions/defaults"
 	"github.com/rancher/shepherd/extensions/kubeapi/rbac"
@@ -60,10 +59,10 @@ var globalRoleBinding = &v3.GlobalRoleBinding{
 	UserName:       "",
 }
 
-func createGlobalRoleWithInheritedClusterRoles(client *rancher.Client, inheritedRoles []string) (*v3.GlobalRole, error) {
+func createGlobalRoleWithInheritedClusterRolesWrangler(client *rancher.Client, inheritedRoles []string) (*v3.GlobalRole, error) {
 	globalRole.Name = namegen.AppendRandomString("testgr")
 	globalRole.InheritedClusterRoles = inheritedRoles
-	createdGlobalRole, err := rbac.CreateGlobalRole(client, &globalRole)
+	createdGlobalRole, err := client.WranglerContext.Mgmt.GlobalRole().Create(&globalRole)
 	if err != nil {
 		return nil, err
 	}
@@ -71,9 +70,8 @@ func createGlobalRoleWithInheritedClusterRoles(client *rancher.Client, inherited
 	return createdGlobalRole, nil
 }
 
-func getGlobalRoleBindingForUser(client *rancher.Client, userID string) (string, error) {
-	grblist, err := rbac.ListGlobalRoleBindings(client, metav1.ListOptions{})
-
+func getGlobalRoleBindingForUserWrangler(client *rancher.Client, userID string) (string, error) {
+	grblist, err := client.WranglerContext.Mgmt.GlobalRoleBinding().List(metav1.ListOptions{})
 	if err != nil {
 		return "", err
 	}
