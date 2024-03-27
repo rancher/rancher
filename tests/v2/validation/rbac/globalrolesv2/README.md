@@ -6,14 +6,14 @@ Global Roles v2 introduces enhanced capabilities, allowing users to define permi
 - Some tests require creating additional downstream cluster. Providing the provisioningInput parameter with appropriate values is mandatory unless you are skipping those tests.
 
 ## Test Setup
-Your GO suite should be set to `-run ^TestGlobalRolesV2TestSuite$`. You can find specific tests by checking the test file you plan to run.
+* For [globalroles_v2 checks](globalroles_v2_test.go), your GO suite should be set to `-run ^TestGlobalRolesV2TestSuite$`. You can find specific tests by checking the test file you plan to run.
+* For [globalroles_v2 webhook checks](globalroles_v2_webhook_test.go), your GO suite should be set to `-run ^TestGlobalRolesV2WebhookTestSuite$`. You can find specific tests by checking the test file you plan to run.
 
 In your config file, set the following:
-```
-rancher: 
+```yaml
+rancher:
   host: "rancher_server_address"
   adminToken: "rancher_admin_token"
-  userToken: "rancher_user_token"
   insecure: True
   cleanup: True
   clusterName: "downstream_cluster_name"
