@@ -77,7 +77,6 @@ var (
 	OIDCProviderResourceName                              = "oidcproviders"
 	OpenLdapProviderResourceName                          = "openldapproviders"
 	PodSecurityAdmissionConfigurationTemplateResourceName = "podsecurityadmissionconfigurationtemplates"
-	PodSecurityPolicyTemplateProjectBindingResourceName   = "podsecuritypolicytemplateprojectbindings"
 	PreferenceResourceName                                = "preferences"
 	PrincipalResourceName                                 = "principals"
 	ProjectResourceName                                   = "projects"
@@ -224,8 +223,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&OpenLdapProviderList{},
 		&PodSecurityAdmissionConfigurationTemplate{},
 		&PodSecurityAdmissionConfigurationTemplateList{},
-		&PodSecurityPolicyTemplateProjectBinding{},
-		&PodSecurityPolicyTemplateProjectBindingList{},
 		&Preference{},
 		&PreferenceList{},
 		&Principal{},

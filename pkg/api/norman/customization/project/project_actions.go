@@ -3,7 +3,6 @@ package project
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strings"
@@ -19,14 +18,12 @@ import (
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/management/imported"
-	"github.com/rancher/rancher/pkg/fleet"
 	"github.com/rancher/rancher/pkg/generated/compose"
 	provisioningcontrollerv1 "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/monitoring"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/user"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
 func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
@@ -258,139 +255,6 @@ func (h *Handler) disableMonitoring(actionName string, action *types.Action, api
 
 	apiContext.WriteResponse(http.StatusNoContent, map[string]interface{}{})
 	return nil
-}
-
-func (h *Handler) createOrUpdateBinding(request *types.APIContext, schema *types.Schema,
-	podSecurityPolicyTemplateName string) error {
-	bindings, err := schema.Store.List(request, schema, &types.QueryOptions{
-		Conditions: []*types.QueryCondition{
-			types.NewConditionFromString(client.PodSecurityPolicyTemplateProjectBindingFieldTargetProjectName,
-				types.ModifierEQ, request.ID),
-		},
-	})
-	if err != nil {
-		return fmt.Errorf("error retrieving binding: %v", err)
-	}
-
-	if podSecurityPolicyTemplateName == "" {
-		for _, binding := range bindings {
-			namespace, okNamespace := binding[client.PodSecurityPolicyTemplateProjectBindingFieldNamespaceId].(string)
-			name, okName := binding[client.PodSecurityPolicyTemplateProjectBindingFieldName].(string)
-
-			if okNamespace && okName {
-				_, err := schema.Store.Delete(request, schema, namespace+":"+name)
-				if err != nil {
-					return fmt.Errorf("error deleting binding: %v", err)
-				}
-			} else {
-				return fmt.Errorf("could not convert name or namespace field: %v %v",
-					binding[client.PodSecurityPolicyTemplateProjectBindingFieldNamespaceId],
-					binding[client.PodSecurityPolicyTemplateProjectBindingFieldName])
-			}
-		}
-	} else {
-		if len(bindings) == 0 {
-			err = h.createNewBinding(request, schema, podSecurityPolicyTemplateName)
-			if err != nil {
-				return fmt.Errorf("error creating binding: %v", err)
-			}
-		} else {
-			binding := bindings[0]
-
-			id, ok := binding["id"].(string)
-			if ok {
-				split := strings.Split(id, ":")
-
-				binding, err = schema.Store.ByID(request, schema, split[0]+":"+split[len(split)-1])
-				if err != nil {
-					return fmt.Errorf("error retreiving binding: %v for %v", err, bindings[0])
-				}
-				err = h.updateBinding(binding, request, schema, podSecurityPolicyTemplateName)
-				if err != nil {
-					return err
-				}
-			} else {
-				return fmt.Errorf("could not convert id field: %v", binding["id"])
-			}
-		}
-	}
-
-	return nil
-}
-
-func (h *Handler) updateProjectPSPTID(request *types.APIContext,
-	podSecurityPolicyTemplateName string) (*v3.Project, error) {
-
-	split := strings.Split(request.ID, ":")
-	project, err := h.ProjectLister.Get(split[0], split[len(split)-1])
-	if err != nil {
-		return nil, fmt.Errorf("error getting project: %v", err)
-	}
-	project = project.DeepCopy()
-	project.Status.PodSecurityPolicyTemplateName = podSecurityPolicyTemplateName
-
-	return h.Projects.Update(project)
-}
-
-func (h *Handler) createNewBinding(request *types.APIContext, schema *types.Schema,
-	podSecurityPolicyTemplateName string) error {
-	binding := make(map[string]interface{})
-	binding["targetProjectId"] = request.ID
-	binding["podSecurityPolicyTemplateId"] = podSecurityPolicyTemplateName
-	binding["namespaceId"] = strings.Split(request.ID, ":")[0]
-
-	_, err := schema.Store.Create(request, schema, binding)
-	return err
-}
-
-func (h *Handler) updateBinding(binding map[string]interface{}, request *types.APIContext, schema *types.Schema,
-	podSecurityPolicyTemplateName string) error {
-	binding[client.PodSecurityPolicyTemplateProjectBindingFieldPodSecurityPolicyTemplateName] =
-		podSecurityPolicyTemplateName
-	id, err := getID(binding["id"])
-	if err != nil {
-		return err
-	}
-	binding["id"] = id
-
-	if _, ok := binding["id"].(string); ok && id != "" {
-		_, err := schema.Store.Update(request, schema, binding, id)
-		if err != nil {
-			return fmt.Errorf("error updating binding: %v", err)
-		}
-	} else {
-		return fmt.Errorf("could not parse: %v", binding["id"])
-	}
-
-	return nil
-}
-
-func (h *Handler) areK3SPodSecurityPoliciesEnabled(managementCluster *v32.Cluster) (bool, error) {
-	if managementCluster.Status.Provider != v32.ClusterDriverK3s {
-		return false, nil
-	}
-
-	provisioningCluster, err := h.ProvisioningClusterCache.Get(fleet.ClustersDefaultNamespace, managementCluster.Spec.DisplayName)
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			// cluster not found by provisioning API, assume PSPs are not enabled
-			return false, nil
-		}
-		return false, fmt.Errorf("error retrieving provisioning cluster [%s]: %w", managementCluster.Spec.DisplayName, err)
-	}
-
-	args := parseKubeAPIServerArgs(provisioningCluster)
-	return strings.Contains(args["enable-admission-plugins"], "PodSecurityPolicy"), nil
-}
-
-func getID(id interface{}) (string, error) {
-	s, ok := id.(string)
-	if !ok {
-		return "", fmt.Errorf("could not convert %v", id)
-	}
-
-	split := strings.Split(s, ":")
-	return split[0] + ":" + split[len(split)-1], nil
 }
 
 // isProvisionedRke2Cluster check to see if this is a rancher provisioned rke2 cluster

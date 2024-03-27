@@ -2,7 +2,6 @@ package planner
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"hash/crc32"
@@ -470,13 +469,6 @@ func blockProgressForSUCPSPIf125(msgPrefix string, status rkev1.RKEControlPlaneS
 			}
 			return errWaiting("waiting for system-upgrade-controller helm chart reconciliation")
 		}
-		if disabled, err := systemUpgradeControllerPSPsDisabled(capr.SystemUpgradeControllerReady.GetMessage(&status)); err == nil {
-			if !disabled {
-				return errWaiting("system-upgrade-controller helm chart has podsecuritypolicy enabled, waiting for helm chart reconciliation")
-			}
-		} else {
-			return errWaitingf("error occurred while determining whether SUC PSPs were disabled: %v", err)
-		}
 	}
 	return nil
 }
@@ -487,22 +479,6 @@ func clusterIsSane(plan *plan.Plan) bool {
 		return false
 	}
 	return true
-}
-
-func systemUpgradeControllerPSPsDisabled(data string) (bool, error) {
-	var sucMetadata = managesystemagent.SUCMetadata{}
-	if data == "" {
-		return false, fmt.Errorf("data for SUC Metadata was blank")
-	}
-	rawMetadata, err := base64.StdEncoding.DecodeString(data)
-	if err != nil {
-		return false, err
-	}
-	err = json.Unmarshal(rawMetadata, &sucMetadata)
-	if err != nil {
-		return false, err
-	}
-	return !sucMetadata.PspEnabled, nil
 }
 
 // calculateJoinURL will return a join URL based on calculating the checksum of the given machine UID. This is somewhat deterministic but will change when suitable machine lists change.
