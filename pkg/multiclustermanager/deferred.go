@@ -120,7 +120,7 @@ func (s *DeferredServer) ClusterDialer(clusterID string) func(ctx context.Contex
 		if mcm == nil {
 			return nil, fmt.Errorf("failed to find cluster %s", clusterID)
 		}
-		dialer, err := mcm.ScaledContext.Dialer.ClusterDialer(clusterID, true)
+		dialer, err := mcm.ScaledContext.Dialer.ClusterDialer(clusterID)
 		if err != nil {
 			return nil, err
 		}

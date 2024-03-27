@@ -101,7 +101,7 @@ func (m *mockEksOperatorController) setInitialUpstreamSpec(cluster *mgmtv3.Clust
 // test generateAndSetServiceAccount with mock sibling func (getAccessToken)
 
 func (m *mockEksOperatorController) generateAndSetServiceAccount(cluster *mgmtv3.Cluster) (*mgmtv3.Cluster, error) {
-	clusterDialer, err := m.ClientDialer.ClusterDialer(cluster.Name, true)
+	clusterDialer, err := m.ClientDialer.ClusterDialer(cluster.Name)
 	if err != nil {
 		return cluster, err
 	}

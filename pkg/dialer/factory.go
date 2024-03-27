@@ -45,9 +45,9 @@ type Factory struct {
 	TunnelServer  *remotedialer.Server
 }
 
-func (f *Factory) ClusterDialer(clusterName string, retryOnError bool) (dialer.Dialer, error) {
+func (f *Factory) ClusterDialer(clusterName string) (dialer.Dialer, error) {
 	return func(ctx context.Context, network, address string) (net.Conn, error) {
-		d, err := f.clusterDialer(clusterName, address, retryOnError)
+		d, err := f.clusterDialer(clusterName, address)
 		if err != nil {
 			logrus.Debugf(WaitForAgentError, clusterName)
 			return nil, err
@@ -173,7 +173,7 @@ func (f *Factory) translateClusterAddress(cluster *v3.Cluster, clusterHostPort, 
 	return address
 }
 
-func (f *Factory) clusterDialer(clusterName, address string, retryOnError bool) (dialer.Dialer, error) {
+func (f *Factory) clusterDialer(clusterName, address string) (dialer.Dialer, error) {
 	cluster, err := f.clusterLister.Get("", clusterName)
 	if err != nil {
 		return nil, err
@@ -233,11 +233,6 @@ func (f *Factory) clusterDialer(clusterName, address string, retryOnError bool) 
 				}, nil
 			}
 		}
-	}
-
-	if !retryOnError {
-		logrus.Debugf("No active connection for cluster [%s], returning", cluster.Name)
-		return nil, ErrAgentDisconnected
 	}
 
 	logrus.Debugf("No active connection for cluster [%s], will wait for about 30 seconds", cluster.Name)

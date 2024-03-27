@@ -208,7 +208,7 @@ func minorVersion(cluster *v3.Cluster) (int, error) {
 
 func (s *StatsAggregator) updateVersion(cluster *v3.Cluster) bool {
 	updated := false
-	userContext, err := s.ClusterManager.UserContextNoControllersReconnecting(cluster.Name, false)
+	userContext, err := s.ClusterManager.UserContextNoControllers(cluster.Name)
 	if err == nil {
 		callWithTimeout(func() {
 			// This has the tendency to timeout

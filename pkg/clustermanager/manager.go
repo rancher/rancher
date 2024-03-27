@@ -256,11 +256,7 @@ func (m *Manager) doStart(rec *record, clusterOwner bool) (exit error) {
 	}
 }
 
-// ToRESTConfig generates a rest.Config for a given cluster.
-// If reconnect is true, the dialer used for connecting this rest.Config will block
-// and retry connecting to the cluster for ~30s if the connection is not available,
-// otherwise return immediately
-func ToRESTConfig(cluster *apimgmtv3.Cluster, context *config.ScaledContext, secretLister v1.SecretLister, reconnect bool) (*rest.Config, error) {
+func ToRESTConfig(cluster *apimgmtv3.Cluster, context *config.ScaledContext, secretLister v1.SecretLister) (*rest.Config, error) {
 	if cluster == nil {
 		return nil, nil
 	}
@@ -292,7 +288,7 @@ func ToRESTConfig(cluster *apimgmtv3.Cluster, context *config.ScaledContext, sec
 		return nil, err
 	}
 
-	clusterDialer, err := context.Dialer.ClusterDialer(cluster.Name, reconnect)
+	clusterDialer, err := context.Dialer.ClusterDialer(cluster.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -415,7 +411,7 @@ func VerifyIgnoreDNSName(caCertsPEM []byte) (func(rawCerts [][]byte, verifiedCha
 }
 
 func (m *Manager) toRecord(ctx context.Context, cluster *apimgmtv3.Cluster) (*record, error) {
-	kubeConfig, err := ToRESTConfig(cluster, m.ScaledContext, m.secretLister, true)
+	kubeConfig, err := ToRESTConfig(cluster, m.ScaledContext, m.secretLister)
 	if kubeConfig == nil || err != nil {
 		return nil, err
 	}
@@ -467,20 +463,12 @@ func (m *Manager) APIExtClient(_ *types.APIContext, _ types.StorageContext) (cli
 
 // UserContextNoControllers accepts a cluster name and returns a client for that cluster,
 // no controllers are started for that cluster in the process.
-// Note it will block retrying to connect to the cluster for ~30 seconds before returning
-// in case the cluster connection fails.
 func (m *Manager) UserContextNoControllers(clusterName string) (*config.UserContext, error) {
-	return m.UserContextNoControllersReconnecting(clusterName, true)
-}
-
-// UserContextNoControllersReconnecting works like UserContextNoControllers if reconnect is true.
-// Otherwise, it will return an error immediately if the cluster connection fails.
-func (m *Manager) UserContextNoControllersReconnecting(clusterName string, reconnect bool) (*config.UserContext, error) {
 	cluster, err := m.clusterLister.Get("", clusterName)
 	if err != nil {
 		return nil, err
 	}
-	ctx, err := m.UserContextFromClusterReconnecting(cluster, reconnect)
+	ctx, err := m.UserContextFromCluster(cluster)
 	if ctx == nil && err == nil {
 		return nil, fmt.Errorf("cluster context %s is unavailable", clusterName)
 	}
@@ -509,16 +497,8 @@ func (m *Manager) UserContext(clusterName string) (*config.UserContext, error) {
 
 // UserContextFromCluster accepts a pointer to a Cluster and returns a client
 // for that cluster. It does not start any controllers.
-// Note it will block retrying to connect to the cluster for ~30 seconds before returning
-// in case the cluster connection fails.
 func (m *Manager) UserContextFromCluster(cluster *apimgmtv3.Cluster) (*config.UserContext, error) {
-	return m.UserContextFromClusterReconnecting(cluster, true)
-}
-
-// UserContextFromClusterReconnecting works like UserContextFromCluster if reconnect is true.
-// Otherwise, it will return an error immediately if the cluster connection fails.
-func (m *Manager) UserContextFromClusterReconnecting(cluster *apimgmtv3.Cluster, reconnect bool) (*config.UserContext, error) {
-	kubeConfig, err := ToRESTConfig(cluster, m.ScaledContext, m.secretLister, reconnect)
+	kubeConfig, err := ToRESTConfig(cluster, m.ScaledContext, m.secretLister)
 	if err != nil {
 		return nil, err
 	}

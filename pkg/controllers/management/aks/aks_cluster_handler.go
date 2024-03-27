@@ -335,7 +335,7 @@ func (e *aksOperatorController) generateAndSetServiceAccount(cluster *apimgmtv3.
 		return cluster, fmt.Errorf("error getting kube config: %v", err)
 	}
 
-	clusterDialer, err := e.ClientDialer.ClusterDialer(cluster.Name, true)
+	clusterDialer, err := e.ClientDialer.ClusterDialer(cluster.Name)
 	if err != nil {
 		return cluster, err
 	}
