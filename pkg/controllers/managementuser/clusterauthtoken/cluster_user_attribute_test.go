@@ -69,9 +69,9 @@ func TestClusterUserAttributeHandlerCleanup(t *testing.T) {
 }
 
 func TestClusterUserAttributeHandlerCleanupErrors(t *testing.T) {
-	name := "u-bdploclm4x"
+	attribName := "u-bdploclm4x"
 	someErr := fmt.Errorf("some error")
-	notFoundErr := apierrors.NewNotFound(managementv3.Resource("userattributes"), name)
+	notFoundErr := apierrors.NewNotFound(managementv3.Resource("userattributes"), attribName)
 
 	tests := []struct {
 		desc                          string
@@ -119,18 +119,27 @@ func TestClusterUserAttributeHandlerCleanupErrors(t *testing.T) {
 
 			userAttributes := &managementFakes.UserAttributeInterfaceMock{
 				GetFunc: func(name string, opts metav1.GetOptions) (*managementv3.UserAttribute, error) {
+					if name != attribName {
+						t.Errorf("Unexpected name in userAttributes.Get call: %s", name)
+					}
 					return nil, tt.userAttributeGetErr
 				},
 			}
 
 			userAttributeLister := &managementFakes.UserAttributeListerMock{
 				GetFunc: func(namespace string, name string) (*managementv3.UserAttribute, error) {
+					if name != attribName {
+						t.Errorf("Unexpected name in userAttributeLister.Get call: %s", name)
+					}
 					return nil, tt.userAttributeListerGetErr
 				},
 			}
 
 			clusterUserAttributes := &clusterFakes.ClusterUserAttributeInterfaceMock{
 				DeleteFunc: func(name string, opts *metav1.DeleteOptions) error {
+					if name != attribName {
+						t.Errorf("Unexpected name in clusterUserAttributes.Delete call: %s", name)
+					}
 					return tt.clusterUserAttributeDeleteErr
 				},
 			}
@@ -143,7 +152,7 @@ func TestClusterUserAttributeHandlerCleanupErrors(t *testing.T) {
 
 			_, err := handler.Sync("", &clusterv3.ClusterUserAttribute{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: name,
+					Name: attribName,
 				},
 			})
 			if tt.shouldErr {

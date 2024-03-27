@@ -27,7 +27,7 @@ func (h *clusterUserAttributeHandler) Sync(key string, clusterUserAttribute *clu
 		// If the corresponding UserAttribute no longer exists, we need to clean up the ClusterUserAttribute.
 		if apierrors.IsNotFound(err) {
 			// There is a chance that it hasn't ended up in the cache yet so we try to get it afresh.
-			userAttribute, err = h.userAttribute.Get("", metav1.GetOptions{})
+			userAttribute, err = h.userAttribute.Get(clusterUserAttribute.Name, metav1.GetOptions{})
 			if err != nil {
 				if apierrors.IsNotFound(err) {
 					err = h.clusterUserAttribute.Delete(clusterUserAttribute.Name, &metav1.DeleteOptions{})
