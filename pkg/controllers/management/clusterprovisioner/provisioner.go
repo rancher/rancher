@@ -67,11 +67,12 @@ type Provisioner struct {
 }
 
 func Register(ctx context.Context, management *config.ManagementContext) {
+	clusterClient := management.Management.Clusters("")
 	p := &Provisioner{
-		engineService:         service.NewEngineService(NewPersistentStore(management.Core.Namespaces(""), management.Core)),
-		Clusters:              management.Management.Clusters(""),
+		engineService:         service.NewEngineService(NewPersistentStore(management.Core.Namespaces(""), management.Core, clusterClient)),
+		Clusters:              clusterClient,
 		ConfigMaps:            management.Core.ConfigMaps(""),
-		ClusterController:     management.Management.Clusters("").Controller(),
+		ClusterController:     clusterClient.Controller(),
 		NodeLister:            management.Management.Nodes("").Controller().Lister(),
 		Nodes:                 management.Management.Nodes(""),
 		backoff:               flowcontrol.NewBackOff(30*time.Second, 10*time.Minute),

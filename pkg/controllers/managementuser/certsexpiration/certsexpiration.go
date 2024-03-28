@@ -53,15 +53,16 @@ func Register(ctx context.Context, userContext *config.UserContext) {
 }
 
 func registerDeferred(ctx context.Context, userContext *config.UserContext) {
+	clusterClient := userContext.Management.Management.Clusters("")
 	c := &Controller{
 		ClusterName:   userContext.ClusterName,
-		ClusterLister: userContext.Management.Management.Clusters("").Controller().Lister(),
-		ClusterClient: userContext.Management.Management.Clusters(""),
-		ClusterStore:  clusterprovisioner.NewPersistentStore(userContext.Management.Core.Namespaces(""), userContext.Management.Core),
+		ClusterLister: clusterClient.Controller().Lister(),
+		ClusterClient: clusterClient,
+		ClusterStore:  clusterprovisioner.NewPersistentStore(userContext.Management.Core.Namespaces(""), userContext.Management.Core, clusterClient),
 		SecretLister:  userContext.Core.Secrets("").Controller().Lister(),
 	}
 
-	userContext.Management.Management.Clusters("").AddHandler(ctx, "certificate-expiration", c.sync)
+	clusterClient.AddHandler(ctx, "certificate-expiration", c.sync)
 }
 
 func (c Controller) sync(key string, cluster *v3.Cluster) (runtime.Object, error) {

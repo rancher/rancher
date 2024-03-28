@@ -55,13 +55,14 @@ type Controller struct {
 }
 
 func Register(ctx context.Context, management *config.ManagementContext) {
+	clusterClient := management.Management.Clusters("")
 	c := &Controller{
 		ctx:                   ctx,
-		clusterClient:         management.Management.Clusters(""),
-		clusterLister:         management.Management.Clusters("").Controller().Lister(),
+		clusterClient:         clusterClient,
+		clusterLister:         clusterClient.Controller().Lister(),
 		backupClient:          management.Management.EtcdBackups(""),
 		backupLister:          management.Management.EtcdBackups("").Controller().Lister(),
-		backupDriver:          service.NewEngineService(clusterprovisioner.NewPersistentStore(management.Core.Namespaces(""), management.Core)),
+		backupDriver:          service.NewEngineService(clusterprovisioner.NewPersistentStore(management.Core.Namespaces(""), management.Core, clusterClient)),
 		secretLister:          management.Core.Secrets("").Controller().Lister(),
 		KontainerDriverLister: management.Management.KontainerDrivers("").Controller().Lister(),
 	}
