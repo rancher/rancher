@@ -65,6 +65,24 @@ func getContainerServiceClient(ctx context.Context, credentialContent string) (*
 	return service, nil
 }
 
+func listRegions(ctx context.Context, cap *Capabilities) ([]byte, int, error) {
+	if cap.ProjectID == "" {
+		return nil, http.StatusBadRequest, fmt.Errorf("projectId is required")
+	}
+
+	client, err := getComputeServiceClient(ctx, cap.Credentials)
+	if err != nil {
+		return nil, http.StatusInternalServerError, err
+	}
+
+	result, err := client.Regions.List(cap.ProjectID).Do()
+	if err != nil {
+		return nil, http.StatusInternalServerError, err
+	}
+
+	return encodeOutput(result)
+}
+
 func listMachineTypes(ctx context.Context, cap *Capabilities) ([]byte, int, error) {
 	if cap.ProjectID == "" || cap.Zone == "" {
 		return nil, http.StatusBadRequest, fmt.Errorf("projectId and zone are required")
@@ -76,6 +94,24 @@ func listMachineTypes(ctx context.Context, cap *Capabilities) ([]byte, int, erro
 	}
 
 	result, err := client.MachineTypes.List(cap.ProjectID, cap.Zone).Do()
+	if err != nil {
+		return nil, http.StatusInternalServerError, err
+	}
+
+	return encodeOutput(result)
+}
+
+func listDiskTypes(ctx context.Context, cap *Capabilities) ([]byte, int, error) {
+	if cap.ProjectID == "" || cap.Zone == "" {
+		return nil, http.StatusBadRequest, fmt.Errorf("projectId and zone are required")
+	}
+
+	client, err := getComputeServiceClient(ctx, cap.Credentials)
+	if err != nil {
+		return nil, http.StatusInternalServerError, err
+	}
+
+	result, err := client.DiskTypes.List(cap.ProjectID, cap.Zone).Do()
 	if err != nil {
 		return nil, http.StatusInternalServerError, err
 	}

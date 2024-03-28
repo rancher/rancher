@@ -119,6 +119,12 @@ var (
 		true,
 		false,
 		true)
+	RKE1UI = newFeature(
+		"rke1-ui",
+		"Enable RKE1 provisioning in the Rancher UI",
+		true,
+		true,
+		true)
 )
 
 type Feature struct {

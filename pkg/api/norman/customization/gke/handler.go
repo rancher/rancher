@@ -76,6 +76,20 @@ func (h *handler) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
 	resourceType := mux.Vars(req)["resource"]
 
 	switch resourceType {
+	case "gkeRegions":
+		if serialized, errCode, err = listRegions(req.Context(), capa); err != nil {
+			logrus.Errorf("[gke-handler] error getting regions: %v", err)
+			handleErr(writer, errCode, err)
+			return
+		}
+		writer.Write(serialized)
+	case "gkeDiskTypes":
+		if serialized, errCode, err = listDiskTypes(req.Context(), capa); err != nil {
+			logrus.Errorf("[gke-handler] error getting disk types: %v", err)
+			handleErr(writer, errCode, err)
+			return
+		}
+		writer.Write(serialized)
 	case "gkeMachineTypes":
 		if serialized, errCode, err = listMachineTypes(req.Context(), capa); err != nil {
 			logrus.Errorf("[gke-handler] error getting machine types: %v", err)
