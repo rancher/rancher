@@ -168,9 +168,22 @@ type GlobalRole struct {
 	// +optional
 	NamespacedRules map[string][]rbacv1.PolicyRule `json:"namespacedRules,omitempty"`
 
+	// InheritedFleetWorkspacePermissions are the permissions granted by this GlobalRole in every fleet workspace besides
+	// the local one.
+	// +optional
+	InheritedFleetWorkspacePermissions FleetWorkspacePermission `json:"inheritedFleetWorkspacePermissions,omitempty"`
+
 	// Status is the most recently observed status of the GlobalRole.
 	// +optional
 	Status GlobalRoleStatus `json:"status,omitempty"`
+}
+
+type FleetWorkspacePermission struct {
+	// ResourceRules rules granted in all backing namespaces for all fleet workspaces besides the local one.
+	ResourceRules []rbacv1.PolicyRule `json:"resourceRules,omitempty" yaml:"resourceRules,omitempty"`
+	// WorkspaceVerbs verbs used to grant permissions to the cluster-wide fleetworkspace resources. ResourceNames for
+	// this rule will contain all fleet workspace names except local.
+	WorkspaceVerbs []string `json:"workspaceVerbs,omitempty" yaml:"workspaceVerbs,omitempty"`
 }
 
 // GlobalRoleStatus represents the most recently observed status of the GlobalRole.
