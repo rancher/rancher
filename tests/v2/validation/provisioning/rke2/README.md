@@ -8,27 +8,37 @@ Please see below for more details for your config. Please see below for more det
 
 ## Table of Contents
 1. [Prerequisites](../README.md)
-2. [Define your test](#provisioning-input)
-3. [Cloud Credential](#cloud-credentials)
-4. [Configure providers to use for Node Driver Clusters](#machine-rke2-config)
-5. [Configuring Custom Clusters](#custom-cluster)
-6. [Advanced Cluster Settings](#advanced-settings)
-7. [Static test cases](#static-test-cases) 
-8. [Back to general provisioning](../README.md)
+2. [Configuring test flags](#Flags)
+3. [Define your test](#provisioning-input)
+4. [Cloud Credential](#cloud-credentials)
+5. [Configure providers to use for Node Driver Clusters](#machine-rke2-config)
+6. [Configuring Custom Clusters](#custom-cluster)
+7. [Static test cases](#static-test-cases)
+8. [Advanced Cluster Settings](#advanced-settings)
+9. [Back to general provisioning](../README.md)
+
+## Flags
+Flags are used to determine which static table tests are run (has no effect on dynamic tests) 
+`Long` Will run the long version of the table tests (usually all of them)
+`Short` Will run the subset of table tests with the short flag.
+
+```yaml
+flags:
+  desiredflags: "Long"
+```
 
 ## Provisioning Input
-provisioningInput is needed to the run the RKE2 tests, specifically kubernetesVersion, cni, and providers. nodesAndRoles is only needed for the TestProvisioningDynamicInput test, node pools are divided by "{nodepool},". psact is optional and takes values `rancher-privileged`, `rancher-restricted` or `rancher-baseline`.
+provisioningInput is needed to the run the RKE2 tests.
 
 **nodeProviders is only needed for custom cluster tests; the framework only supports custom clusters through aws/ec2 instances.**
 ```yaml
 provisioningInput:
   machinePools:
-  - machinePoolConfig:
-      etcd: true
+  - machinePoolConfig:                        #required(dynamic only) (at least 1)
+      etcd: true                              #required(dynamic only) (at least 1 controlplane & etcd & worker)
       controlplane: true
       worker: true
       quantity: 5
-      # the following are optional parameters
       drainBeforeDelete: true
       hostnameLengthLimit: 29
       nodeStartupTimeout: "600s"
@@ -38,26 +48,23 @@ provisioningInput:
   - machinePoolConfig:
       worker: true
       quantity: 2
-      drainBeforeDelete: true
   - machinePoolConfig:
       windows: true
       quantity: 1
-  flags:
-    desiredflags: "Short|Long" #These flags are for running TestProvisioningRKE2Cluster or TestProvisioningRKE2CustomCluster it is not needed for the dynamic tests.
-  rke2KubernetesVersion: ["v1.27.6+rke2r1"]
-  cni: ["calico"]
-  providers: ["linode", "aws", "do", "harvester", "vsphere"]
-  nodeProviders: ["ec2"]
+  rke2KubernetesVersion: ["v1.27.6+rke2r1"]   #required (at least 1)
+  cni: ["calico"]                             #required (at least 1)
+  providers: ["aws"]                          #required (at least 1) linode,aws,do,harvester,vsphere,azure,google
+  nodeProviders: ["ec2"]                      #required(custom clusters only)
   hardened: false
-  psact: ""
-  clusterSSHTests: [""]
+  psact: ""                                   #either rancher-privileged|rancher-restricted|rancher-baseline
+  clusterSSHTests: ["CheckCPU", "NodeReboot", "AuditLog"]
   etcd:
     disableSnapshot: false
     snapshotScheduleCron: "0 */5 * * *"
     snapshotRetain: 3
     s3:
       bucket: ""
-      endpoint: ""
+      endpoint: "s3.us-east-2.amazonaws.com"
       endpointCA: ""
       folder: ""
       region: "us-east-2"
@@ -65,52 +72,52 @@ provisioningInput:
 ```
 
 ## Cloud Credentials
-These are the inputs needed for the different node provider cloud credentials, inlcuding linode, aws, digital ocean, harvester, azure, and google.
+These are the inputs needed for the different node provider cloud credentials, including linode, aws, digital ocean, harvester, azure, and google.
 
 ### Digital Ocean
 ```yaml
 digitalOceanCredentials:
-  accessToken": ""
+  accessToken": ""                    #required
 ```
 ### Linode
 ```yaml
 linodeCredentials:
-  token: ""
+  token: ""                           #required
 ```
 ### Azure
 ```yaml
 azureCredentials:
-  clientId: ""
-  clientSecret: ""
-  subscriptionId": ""
-  environment: "AzurePublicCloud"
+  clientId: ""                        #required
+  clientSecret: ""                    #required
+  subscriptionId": ""                 #required
+  environment: "AzurePublicCloud"     #required
 ```
 ### AWS
 ```yaml
 awsCredentials:
-  secretKey: "",
-  accessKey: "",
-  defaultRegion: ""
+  secretKey: ""                       #required
+  accessKey: ""                       #required
+  defaultRegion: ""                   #required
 ```
 ### Harvester
 ```yaml
 harvesterCredentials:
-  clusterId: "",
-  clusterType: "",
-  kubeconfigContent: ""
+  clusterId: ""                       #required
+  clusterType: ""                     #required
+  kubeconfigContent: ""               #required
 ```
 ### Google
 ```yaml
 googleCredentials:
-  authEncodedJson: ""
+  authEncodedJson: ""                 #required
 ```
 ### VSphere
 ```yaml
 vmwarevsphereCredentials:
-  password: ""
-  username: ""
-  vcenter: ""
-  vcenterPort: ""
+  password: ""                        #required
+  username: ""                        #required
+  vcenter: ""                         #required
+  vcenterPort: ""                     #required
 ```
 
 ## Machine RKE2 Config
@@ -119,18 +126,18 @@ Machine RKE2 config is the final piece needed for the config to run RKE2 provisi
 ### AWS RKE2 Machine Config
 ```yaml
 awsMachineConfigs:
-  region: "us-east-2"
+  region: "us-east-2"                         #required
   awsMachineConfig:
-  - roles: ["etcd","controlplane","worker"]
-    ami: ""
-    instanceType: "t3a.medium"
-    sshUser: "ubuntu"
-    vpcId: ""
-    volumeType: "gp2"
-    zone: "a"
-    retries: "5"
-    rootSize: "60"
-    securityGroup: [""]
+  - roles: ["etcd","controlplane","worker"]   #required
+    ami: ""                                   #required
+    instanceType: "t3a.medium"                
+    sshUser: "ubuntu"                         #required
+    vpcId: ""                                 #required
+    volumeType: "gp2"                         
+    zone: "a"                                 #required
+    retries: "5"                              
+    rootSize: "60"                            
+    securityGroup: [""]                       
 ```
 ### Digital Ocean RKE2 Machine Config
 ```yaml
@@ -214,32 +221,31 @@ harvesterMachineConfigs:
 ## Vsphere RKE2 Machine Config
 ```yaml
 vmwarevsphereMachineConfigs:
-  username: ""
-  vcenter: ""
-  vcenterPort: "443"
-  password: ""
-  pool: ""
-  datacenter: ""
-  datastore: ""
-  folder: ""
-  hostSystem: ""
-  vmwarevsphereMachineConfig:
-  - roles: ["etcd","controlplane","worker","windows"]
-    cfgparam: ["disk.enableUUID=TRUE"]
-    cloneFrom: ""
-    cloudinit: ""
-    contentLibrary: "" 
-    cpuCount: "4"
-    creationType: "template" # library, clone
-    datastoreCluster: ""
-    diskSize: "20000"
-    memorySize: "4096"
-    network: [""]
-    os: "linux" # windows
-    sshPassword: ""
-    sshPort: "22"
-    sshUser: ""
-    sshUserGroup: ""
+    datacenter: "/<datacenter>"                                 #required 
+    hostSystem: "/<datacenter>/path-to-host"                    #required
+    datastore: "/<datacenter>/path-to-datastore"                #required 
+    folder: "/<datacenter>/path-to-vm-folder"                   #required 
+    pool: "/<datacenter>/path-to-resource-pool"                 #required 
+    vmwarevsphereMachineConfig:
+    - cfgparam: ["disk.enableUUID=TRUE"]                        #required
+      cloudConfig: "#cloud-config\n\n"
+      customAttribute: []
+      tag: []
+      roles: ["etcd","controlplane",worker]
+      creationType: "template"                                  #required
+      os: "linux"                                               #required
+      cloneFrom: "/<datacenter>/path-to-linux-image"            #required(linux templates only)
+      cloneFromWindows: "/<datacenter>/path-to-windows-image"   #required(windows templates only)
+      contentLibrary: ""                                        
+      datastoreCluster: ""
+      network: ["/<datacenter>/path-to-vm-network"]             #required
+      sshUser: ""                                               #required
+      sshPassword: ""                                           
+      sshUserGroup: ""
+      sshPort: "22"
+      cpuCount: "4"
+      diskSize: "40000"
+      memorySize: "8192"
 ```
 
 These tests utilize Go build tags. Due to this, see the below examples on how to run the node driver tests:
