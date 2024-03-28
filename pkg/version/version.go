@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+
+	"github.com/gorilla/mux"
 )
 
 var (
@@ -30,6 +32,13 @@ func FriendlyVersion() string {
 
 type versionHandler struct {
 	info Info
+}
+
+func NewVersionMiddleware(next http.Handler) http.Handler {
+	router := mux.NewRouter()
+	router.Handle("/rancherversion", NewVersionHandler())
+	router.NotFoundHandler = next
+	return router
 }
 
 // NewVersionHandler checks the runtime environment for the RANCHER_PRIME environment variable

@@ -38,6 +38,7 @@ import (
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/tls"
 	"github.com/rancher/rancher/pkg/ui"
+	"github.com/rancher/rancher/pkg/version"
 	"github.com/rancher/rancher/pkg/websocket"
 	"github.com/rancher/rancher/pkg/wrangler"
 	aggregation2 "github.com/rancher/steve/pkg/aggregation"
@@ -247,7 +248,8 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 			wranglerContext.MultiClusterManager.Middleware,
 			authServer.Management,
 			additionalAPI,
-			requests.NewRequireAuthenticatedFilter("/v1/", "/v1/management.cattle.io.setting"),
+			requests.NewRequireAuthenticatedFilter("/v1/", "/v1/management.cattle.io.setting", "/rancherversion"),
+			version.NewVersionMiddleware,
 		}.Handler(steve),
 		Wrangler:   wranglerContext,
 		Steve:      steve,
