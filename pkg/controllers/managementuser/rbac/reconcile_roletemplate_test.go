@@ -1,27 +1,34 @@
 package rbac
 
 import (
+	"io"
 	"testing"
 
 	"github.com/pkg/errors"
-
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/rbac/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestEnsureGlobalResourcesRolesForPRTB(t *testing.T) {
 	t.Parallel()
-	m := setupManager(map[string]*v3.RoleTemplate{"create-ns": createNSRoleTemplate}, make(map[string]*v1.ClusterRole), make(map[string]*v1.Role), make(map[string]*v3.Project), clientErrs{}, clientErrs{}, clientErrs{})
+	logrus.SetOutput(io.Discard)
+
+	defaultManager := newManager(
+		withRoleTemplates(map[string]*v3.RoleTemplate{"create-ns": createNSRoleTemplate}, nil),
+		withClusterRoles(nil, nil),
+	)
+
 	type testCase struct {
 		description   string
+		manager       *manager
 		projectName   string
 		roleTemplates map[string]*v3.RoleTemplate
 		expectedRoles []string
-		isErrExpected bool
+		expectedError string
 	}
 	testCases := []testCase{
 		{
@@ -158,12 +165,9 @@ func TestEnsureGlobalResourcesRolesForPRTB(t *testing.T) {
 			},
 		},
 		{
-			description: "* resources and * APIGroup should only result in namespace-readonly and promoted role",
-			projectName: "testproject",
-			// at the time of adding these tests ensureGlobalResourceRoleForPRTB returns duplicate promoted roles
-			// names per applicable rule found in globalResourceRulesNeededInProjects. This is not incompatible with
-			// current reconcile logic but should be fixed in the future.
-			expectedRoles: []string{"create-ns", "testproject-namespaces-edit", "testrt8-promoted", "testrt8-promoted", "testrt8-promoted", "testrt8-promoted", "testrt8-promoted", "testrt8-promoted"},
+			description:   "* resources and * APIGroup should only result in namespace-readonly and promoted role",
+			projectName:   "testproject",
+			expectedRoles: []string{"create-ns", "testproject-namespaces-edit", "testrt8-promoted"},
 			roleTemplates: map[string]*v3.RoleTemplate{
 				"testrt8": {
 					ObjectMeta: metav1.ObjectMeta{
@@ -182,7 +186,7 @@ func TestEnsureGlobalResourcesRolesForPRTB(t *testing.T) {
 		{
 			description:   "* resources and core (\"\") APIGroup should only result in namespace-readonly and promoted role",
 			projectName:   "testproject",
-			expectedRoles: []string{"create-ns", "testproject-namespaces-edit", "testrt9-promoted", "testrt9-promoted"},
+			expectedRoles: []string{"create-ns", "testproject-namespaces-edit", "testrt9-promoted"},
 			roleTemplates: map[string]*v3.RoleTemplate{
 				"testrt9": {
 					ObjectMeta: metav1.ObjectMeta{
@@ -198,58 +202,73 @@ func TestEnsureGlobalResourcesRolesForPRTB(t *testing.T) {
 				},
 			},
 		},
+		{
+			projectName: "testproject",
+			description: "error return when RoleTemplate client returns error",
+			manager: newManager(
+				withRoleTemplates(map[string]*v3.RoleTemplate{"create-ns": createNSRoleTemplate}, &clientErrs{getError: errNotFound}),
+				withClusterRoles(nil, nil),
+			),
+			expectedError: "not found",
+			roleTemplates: map[string]*v3.RoleTemplate{
+				"testrt": {
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "testrt",
+					},
+					Rules: []v1.PolicyRule{
+						{
+							Verbs:     []string{"create"},
+							APIGroups: []string{""},
+							Resources: []string{"namespaces"},
+						},
+					},
+				},
+			},
+		},
+		{
+			projectName: "testproject",
+			description: "error return when ClusterRole client returns error and RoleTemplate is external",
+			manager: newManager(
+				withRoleTemplates(map[string]*v3.RoleTemplate{"create-ns": createNSRoleTemplate}, nil),
+				withClusterRoles(nil, &clientErrs{getError: apierrors.NewInternalError(errors.New("internal error"))}),
+			),
+			expectedError: "internal error",
+			roleTemplates: map[string]*v3.RoleTemplate{
+				"testrt": {
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "testrt",
+					},
+					Rules: []v1.PolicyRule{
+						{
+							Verbs:     []string{"create"},
+							APIGroups: []string{""},
+							Resources: []string{"namespaces"},
+						},
+					},
+					External: true,
+				},
+			},
+		},
 	}
 	for _, test := range testCases {
 		test := test
 		t.Run(test.description, func(t *testing.T) {
 			t.Parallel()
-			roles, err := m.ensureGlobalResourcesRolesForPRTB(test.projectName, test.roleTemplates)
-			assert.Nil(t, err)
-			assert.Equal(t, test.expectedRoles, roles, test.description)
+
+			manager := test.manager
+			if manager == nil {
+				manager = defaultManager
+			}
+
+			roles, err := manager.ensureGlobalResourcesRolesForPRTB(test.projectName, test.roleTemplates)
+
+			if test.expectedError != "" {
+				assert.ErrorContains(t, err, test.expectedError)
+				assert.Nil(t, roles)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, test.expectedRoles, roles, test.description)
+			}
 		})
 	}
-
-	test := testCase{
-		projectName:   "testproject",
-		expectedRoles: []string{"create-ns", "testproject-namespaces-edit"},
-		roleTemplates: map[string]*v3.RoleTemplate{
-			"testrt": {
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "testrt",
-				},
-				Rules: []v1.PolicyRule{
-					{
-						Verbs:     []string{"create"},
-						APIGroups: []string{""},
-						Resources: []string{"namespaces"},
-					},
-				},
-			},
-		},
-	}
-	m = setupManager(map[string]*v3.RoleTemplate{"create-ns": createNSRoleTemplate}, make(map[string]*v1.ClusterRole), make(map[string]*v1.Role), make(map[string]*v3.Project), clientErrs{}, clientErrs{getError: errNotFound}, clientErrs{})
-	test1 := test
-	test1.description = "error return when RoleTemplate client returns error"
-	t.Run(test.description, func(t *testing.T) {
-		t.Parallel()
-		_, err := m.ensureGlobalResourcesRolesForPRTB(test.projectName, test.roleTemplates)
-		assert.NotNil(t, err)
-	})
-	m = setupManager(map[string]*v3.RoleTemplate{"create-ns": createNSRoleTemplate}, make(map[string]*v1.ClusterRole), make(map[string]*v1.Role), make(map[string]*v3.Project), clientErrs{}, clientErrs{}, clientErrs{createError: errAlreadyExist})
-	test2 := test
-	test2.description = "error return when Role client returns error"
-	t.Run(test.description, func(t *testing.T) {
-		t.Parallel()
-		_, err := m.ensureGlobalResourcesRolesForPRTB(test.projectName, test.roleTemplates)
-		assert.NotNil(t, err)
-	})
-	m = setupManager(map[string]*v3.RoleTemplate{"create-ns": createNSRoleTemplate}, make(map[string]*v1.ClusterRole), make(map[string]*v1.Role), make(map[string]*v3.Project), clientErrs{getError: apierrors.NewInternalError(errors.New("error"))}, clientErrs{}, clientErrs{})
-	test3 := test
-	test3.description = "error return when ClusterRole client returns error and RoleTemplate is external"
-	test3.roleTemplates["testrt"].External = true
-	t.Run(test.description, func(t *testing.T) {
-		t.Parallel()
-		_, err := m.ensureGlobalResourcesRolesForPRTB(test.projectName, test.roleTemplates)
-		assert.NotNil(t, err)
-	})
 }
