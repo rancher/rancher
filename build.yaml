@@ -1,4 +1,9 @@
+# To understand how to use the build/config system, read the docs in docs/build.md.
+
 webhookVersion: 104.0.0+up0.5.0-rc6
 cspAdapterMinVersion: 103.0.0+up3.0.0
 defaultShellVersion: rancher/shell:v0.1.22
+systemChartDefaultBranch: dev-v2.9
+chartDefaultBranch: dev-v2.9
+kdmBranch: dev-v2.9
 fleetVersion: 104.0.0+up0.10.0-rc.4

@@ -3,8 +3,11 @@
 package buildconfig
 
 const (
-	CspAdapterMinVersion = "103.0.0+up3.0.0"
-	DefaultShellVersion  = "rancher/shell:v0.1.22"
-	FleetVersion         = "104.0.0+up0.10.0-rc.4"
-	WebhookVersion       = "104.0.0+up0.5.0-rc6"
+	ChartDefaultBranch       = "dev-v2.9"
+	CspAdapterMinVersion     = "103.0.0+up3.0.0"
+	DefaultShellVersion      = "rancher/shell:v0.1.22"
+	FleetVersion             = "104.0.0+up0.10.0-rc.4"
+	KdmBranch                = "dev-v2.9"
+	SystemChartDefaultBranch = "dev-v2.9"
+	WebhookVersion           = "104.0.0+up0.5.0-rc6"
 )

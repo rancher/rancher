@@ -58,6 +58,9 @@ cp "${K3S_AIRGAP_IMAGES_TARBALL}" "${PACKAGE_FOLDER}"
 DOCKERFILE="${SCRIPT_DIR}/../package/Dockerfile"
 # Always use buildx to make sure the image & the binary architectures match
 docker buildx build -t "${TARGET_REPO}" -f "${DOCKERFILE}" \
+  --build-arg SYSTEM_CHART_DEFAULT_BRANCH=${SYSTEM_CHART_DEFAULT_BRANCH} \
+  --build-arg CHART_DEFAULT_BRANCH=${CHART_DEFAULT_BRANCH} \
+  --build-arg CATTLE_KDM_BRANCH="${CATTLE_KDM_BRANCH}" \
   --build-arg CATTLE_RANCHER_WEBHOOK_VERSION="${CATTLE_RANCHER_WEBHOOK_VERSION}" \
   --build-arg CATTLE_CSP_ADAPTER_MIN_VERSION="${CATTLE_CSP_ADAPTER_MIN_VERSION}" \
   --build-arg CATTLE_FLEET_VERSION="${CATTLE_FLEET_VERSION}" \
