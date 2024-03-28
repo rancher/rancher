@@ -196,6 +196,38 @@ func (ap *Provider) TransformToAuthProvider(
 ) (map[string]interface{}, error) {
 	p := common.TransformToAuthProvider(authConfig)
 	p[publicclient.AzureADProviderFieldRedirectURL] = formAzureRedirectURL(authConfig)
+
+	tenantID, _ := authConfig["tenantId"].(string)
+	p[publicclient.AzureADProviderFieldTenantID] = tenantID
+	applicationID, _ := authConfig["applicationId"].(string)
+	p[publicclient.AzureADProviderFieldClientID] = applicationID
+
+	p[publicclient.AzureADProviderFieldScopes] = []string{"openid", "profile", "email"}
+
+	// this is the default base endpoint, i.e.: https://login.microsoftonline.com/
+	baseEndpoint, _ := authConfig["endpoint"].(string)
+
+	// Set default authEndpoint, or custom if provided
+	p[publicclient.AzureADProviderFieldAuthURL] = baseEndpoint + tenantID + "/oauth2/v2.0/authorize"
+	if customEndpoint, found := authConfig["authEndpoint"]; found {
+		ep, _ := customEndpoint.(string)
+		p[publicclient.AzureADProviderFieldAuthURL] = ep
+	}
+
+	// Set default tokenEndpoint, or custom if provided
+	p[publicclient.AzureADProviderFieldTokenURL] = baseEndpoint + tenantID + "/oauth2/v2.0/token"
+	if customEndpoint, found := authConfig["tokenEndpoint"]; found {
+		ep, _ := customEndpoint.(string)
+		p[publicclient.AzureADProviderFieldTokenURL] = ep
+	}
+
+	// Set default deviceAuthEndpoint, or custom if provided
+	p[publicclient.AzureADProviderFieldDeviceAuthURL] = baseEndpoint + tenantID + "/oauth2/v2.0/devicecode"
+	if customEndpoint, found := authConfig["deviceAuthEndpoint"]; found {
+		ep, _ := customEndpoint.(string)
+		p[publicclient.AzureADProviderFieldDeviceAuthURL] = ep
+	}
+
 	return p, nil
 }
 
