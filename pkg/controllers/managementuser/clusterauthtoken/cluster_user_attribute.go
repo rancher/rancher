@@ -5,6 +5,7 @@ import (
 
 	clusterv3 "github.com/rancher/rancher/pkg/generated/norman/cluster.cattle.io/v3"
 	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -34,6 +35,7 @@ func (h *clusterUserAttributeHandler) Sync(key string, clusterUserAttribute *clu
 					if err != nil && !apierrors.IsNotFound(err) && !apierrors.IsGone(err) {
 						return nil, fmt.Errorf("error deleting orphaned clusteruserattribute %s: %w", clusterUserAttribute.Name, err)
 					}
+					logrus.Infof("Deleted orphaned clusteruserattribute %s", clusterUserAttribute.Name)
 					return nil, nil
 				}
 				return nil, err
