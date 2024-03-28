@@ -20,7 +20,7 @@ func addUnauthenticatedRoles(apply apply.Apply) error {
 						Verbs:         []string{"get"},
 						APIGroups:     []string{"management.cattle.io"},
 						Resources:     []string{"settings"},
-						ResourceNames: []string{"first-login", "ui-pl", "ui-banners", "ui-brand", "ui-favicon"},
+						ResourceNames: []string{"first-login", "ui-pl", "ui-banners", "ui-brand", "ui-favicon", "ui-login-background-light", "ui-login-background-dark"},
 					},
 				},
 			},
