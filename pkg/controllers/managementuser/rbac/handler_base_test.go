@@ -2,6 +2,7 @@ package rbac
 
 import (
 	"fmt"
+	"sync"
 	"testing"
 
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -75,19 +76,25 @@ func withRoleTemplates(roleTemplates map[string]*v3.RoleTemplate, errs *clientEr
 		errs = &clientErrs{}
 	}
 
+	syncRoleTemplates := &sync.Map{}
+	for k, v := range roleTemplates {
+		syncRoleTemplates.Store(k, v)
+	}
+
 	return func(m *manager) {
 		m.rtLister = &fakes.RoleTemplateListerMock{
-			ListFunc: newListFunc(roleTemplates, errs.listError),
+			ListFunc: newListFunc[*v3.RoleTemplate](syncRoleTemplates, errs.listError),
 			GetFunc: func(namespace string, name string) (*v3.RoleTemplate, error) {
 				if errs.getError != nil {
 					return nil, errs.getError
 				}
 
-				rt, ok := roleTemplates[name]
+				rtVal, ok := syncRoleTemplates.Load(name)
 				if !ok {
 					return nil, errors.NewNotFound(v3.RoleTemplateGroupVersionResource.GroupResource(), name)
 				}
 
+				rt := rtVal.(*v3.RoleTemplate)
 				return rt.DeepCopy(), nil
 			},
 		}
@@ -104,19 +111,25 @@ func withClusterRoles(clusterRoles map[string]*v1.ClusterRole, errs *clientErrs)
 		errs = &clientErrs{}
 	}
 
+	syncClusterRoles := &sync.Map{}
+	for k, v := range clusterRoles {
+		syncClusterRoles.Store(k, v)
+	}
+
 	return func(m *manager) {
 		m.crLister = &fakes2.ClusterRoleListerMock{
-			ListFunc: newListFunc(clusterRoles, errs.listError),
+			ListFunc: newListFunc[*v1.ClusterRole](syncClusterRoles, errs.listError),
 			GetFunc: func(namespace string, name string) (*v1.ClusterRole, error) {
 				if errs.getError != nil {
 					return nil, errs.getError
 				}
 
-				cr, ok := clusterRoles[name]
+				crVal, ok := syncClusterRoles.Load(name)
 				if !ok {
 					return nil, errors.NewNotFound(v3.RoleTemplateGroupVersionResource.GroupResource(), name)
 				}
 
+				cr := crVal.(*v1.ClusterRole)
 				return cr.DeepCopy(), nil
 			},
 		}
@@ -127,49 +140,55 @@ func withClusterRoles(clusterRoles map[string]*v1.ClusterRole, errs *clientErrs)
 					return nil, errs.getError
 				}
 
-				cr, ok := clusterRoles[name]
+				crVal, ok := syncClusterRoles.Load(name)
 				if !ok {
 					return nil, errors.NewNotFound(v3.RoleTemplateGroupVersionResource.GroupResource(), name)
 				}
 
+				cr := crVal.(*v1.ClusterRole)
 				return cr.DeepCopy(), nil
 			},
 			UpdateFunc: func(cr *v1.ClusterRole) (*v1.ClusterRole, error) {
 				if errs.updateError != nil {
 					return nil, errs.updateError
 				}
-				_, ok := clusterRoles[cr.Name]
+
+				_, ok := syncClusterRoles.Load(cr.Name)
 				if !ok {
 					return nil, errors.NewNotFound(v3.RoleTemplateGroupVersionResource.GroupResource(), cr.Name)
 				}
-				clusterRoles[cr.Name] = cr
-				return clusterRoles[cr.Name].DeepCopy(), nil
+
+				syncClusterRoles.Store(cr.Name, cr)
+				return cr.DeepCopy(), nil
 			},
 			CreateFunc: func(cr *v1.ClusterRole) (*v1.ClusterRole, error) {
 				if errs.createError != nil {
 					return nil, errs.createError
 				}
-				_, ok := clusterRoles[cr.Name]
+
+				_, ok := syncClusterRoles.Load(cr.Name)
 				if ok {
 					return nil, errors.NewAlreadyExists(v3.RoleTemplateGroupVersionResource.GroupResource(), cr.Name)
 				}
-				clusterRoles[cr.Name] = cr
-				return clusterRoles[cr.Name].DeepCopy(), nil
+
+				syncClusterRoles.Store(cr.Name, cr)
+				return cr.DeepCopy(), nil
 			},
 		}
 	}
 }
 
-func newListFunc[T any](resourceMap map[string]T, err error) func(string, labels.Selector) ([]T, error) {
+func newListFunc[T any](resourceMap *sync.Map, err error) func(string, labels.Selector) ([]T, error) {
 	return func(namespace string, selector labels.Selector) ([]T, error) {
 		if err != nil {
 			return nil, err
 		}
 
-		resourceList := make([]T, len(resourceMap))
-		for i := range resourceMap {
-			resourceList = append(resourceList, resourceMap[i])
-		}
+		resourceList := []T{}
+		resourceMap.Range(func(key, value any) bool {
+			resourceList = append(resourceList, value.(T))
+			return true
+		})
 
 		return resourceList, nil
 	}
