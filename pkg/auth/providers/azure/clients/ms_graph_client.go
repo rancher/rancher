@@ -93,8 +93,10 @@ func (c azureMSGraphClient) ListGroups(filter string) ([]v3.Principal, error) {
 }
 
 // ListGroupMemberships takes a user ID and fetches the user's group principals as string IDs from the Microsoft Graph API.
-func (c azureMSGraphClient) ListGroupMemberships(id string) ([]string, error) {
-	groups, _, err := c.userClient.ListGroupMemberships(context.Background(), id, odata.Query{})
+func (c azureMSGraphClient) ListGroupMemberships(id string, filter string) ([]string, error) {
+	groups, _, err := c.userClient.ListGroupMemberships(context.Background(), id, odata.Query{
+		Filter: filter,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -127,7 +129,7 @@ func (c azureMSGraphClient) LoginUser(config *v32.AzureADConfig, credential *v32
 	userPrincipal.Me = true
 	logrus.Debugf("[%s] Completed getting user info from AzureAD", providerLogPrefix)
 
-	userGroups, err := c.ListGroupMemberships(GetPrincipalID(userPrincipal))
+	userGroups, err := c.ListGroupMemberships(GetPrincipalID(userPrincipal), config.GroupMembershipFilter)
 	if err != nil {
 		return v3.Principal{}, nil, "", err
 	}
@@ -302,7 +304,9 @@ func (c azureMSGraphClient) userToPrincipal(user msgraph.User) (v3.Principal, er
 
 func (c azureMSGraphClient) groupToPrincipal(group msgraph.Group) (v3.Principal, error) {
 	return v3.Principal{
-		ObjectMeta:    metav1.ObjectMeta{Name: Name + "_group://" + *group.ID},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: Name + "_group://" + *group.ID,
+		},
 		DisplayName:   *group.DisplayName,
 		PrincipalType: "group",
 		Provider:      Name,
