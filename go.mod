@@ -109,7 +109,7 @@ require (
 	github.com/rancher/aks-operator v1.2.1
 	github.com/rancher/apiserver v0.0.0-20240207153744-69b3c2b56f3f
 	github.com/rancher/channelserver v0.6.1-0.20240212155841-07630c8295da
-	github.com/rancher/dynamiclistener v0.4.0-rc2
+	github.com/rancher/dynamiclistener v0.4.0
 	github.com/rancher/eks-operator v1.3.1
 	github.com/rancher/fleet/pkg/apis v0.9.1-rc.2.0.20240213164401-2c6b1019687c
 	github.com/rancher/gke-operator v1.2.1
@@ -119,7 +119,7 @@ require (
 	github.com/rancher/norman v0.0.0-20240206180703-6eda4bc94b4c
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/remotedialer v0.3.0
-	github.com/rancher/rke v1.5.7-rc5
+	github.com/rancher/rke v1.5.7
 	github.com/rancher/steve v0.0.0-20240305150728-3943409601f1
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007
 	github.com/rancher/wrangler/v2 v2.1.4
@@ -166,7 +166,7 @@ require (
 	github.com/containers/image/v5 v5.25.0
 	github.com/google/gnostic-models v0.6.8
 	github.com/rancher/rancher/pkg/apis v0.0.0-20240213233515-935d309ebad4
-	github.com/rancher/shepherd v0.0.0-20240319182018-6c29a53b0a23
+	github.com/rancher/shepherd v0.0.0-20240325171529-2334ef617633
 	go.qase.io/client v0.0.0-20231114201952-65195ec001fa
 )
 
