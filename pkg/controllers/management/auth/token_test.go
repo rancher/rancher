@@ -295,7 +295,7 @@ func populateTestCases(tokens map[string]*v3.Token, userAttributes map[string]*v
 					DeletionTimestamp: &timeNow,
 				},
 			},
-			description: "Tests the the \"controller.cattle.io/cat-token-controller\" is removed if token possesses" +
+			description: "Tests the \"controller.cattle.io/cat-token-controller\" is removed if token possesses" +
 				" deletion timestamp.",
 		},
 		{

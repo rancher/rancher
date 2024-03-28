@@ -117,7 +117,7 @@ func GrbCRBName(grb *v3.GlobalRoleBinding) string {
 }
 
 // GetGRBSubject creates and returns a subject that is
-// determined by inspecting the the GRB's target fields
+// determined by inspecting the GRB's target fields
 func GetGRBSubject(grb *v3.GlobalRoleBinding) rbacv1.Subject {
 	kind := "User"
 	name := grb.UserName
