@@ -2,49 +2,34 @@ package auth
 
 import (
 	"fmt"
-	"strconv"
 	"testing"
 	"time"
 
+	"github.com/golang/mock/gomock"
 	management "github.com/rancher/rancher/pkg/apis/management.cattle.io"
-	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	mgmtFakes "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/wrangler/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/utils/pointer"
 )
 
-func TestSyncEnsureLastLoginLabel(t *testing.T) {
+func TestSyncEnsureUserRetentionLabels(t *testing.T) {
 	userID := "u-abcdef"
-	user := &v3.User{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: userID,
-		},
-		Enabled: pointer.BoolPtr(true),
-	}
+	ctrl := gomock.NewController(t)
 
-	var userUpdateCalledTimes int
+	userAttributeClient := fake.NewMockNonNamespacedControllerInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
+	userAttributeClient.EXPECT().Update(gomock.Any()).AnyTimes().DoAndReturn(func(userAttribute *v3.UserAttribute) (*v3.UserAttribute, error) {
+		return userAttribute.DeepCopy(), nil
+	})
 
+	var ensureLabelsCalledTimes int
 	controller := UserAttributeController{
-		userLister: &mgmtFakes.UserListerMock{
-			GetFunc: func(namespace, name string) (*v3.User, error) {
-				return user, nil
-			},
-		},
-		users: &mgmtFakes.UserInterfaceMock{
-			UpdateFunc: func(user *v3.User) (*v3.User, error) {
-				userUpdateCalledTimes++
-				user = user.DeepCopy()
-				return user, nil
-			},
-		},
-		userAttributes: &mgmtFakes.UserAttributeInterfaceMock{
-			UpdateFunc: func(userAttribute *v3.UserAttribute) (*v3.UserAttribute, error) {
-				return userAttribute.DeepCopy(), nil
-			},
+		userAttributes: userAttributeClient,
+		ensureUserRetentionLabels: func(attribs *v3.UserAttribute) error {
+			ensureLabelsCalledTimes++
+			return nil
 		},
 	}
 
@@ -57,51 +42,14 @@ func TestSyncEnsureLastLoginLabel(t *testing.T) {
 		}
 	}
 
-	// Make sure zero value time is ignored.
-	now := time.Time{}
-	_, err := controller.sync("", &v3.UserAttribute{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: userID,
-		},
-		LastLogin: metav1.NewTime(now),
-	})
+	// Make labeler was called.
+	_, err := controller.sync("", newAttribs(metav1.NewTime(time.Now())))
 	assert.NoError(t, err)
-	assert.Equal(t, 0, userUpdateCalledTimes)
-
-	// Make sure the label is created.
-	now = time.Now().Add(-1 * time.Minute).Truncate(time.Second)
-
-	_, err = controller.sync("", newAttribs(metav1.NewTime(now)))
-	assert.NoError(t, err)
-
-	assert.Contains(t, user.Labels, labelLastLoginKey)
-	assert.Equal(t, strconv.FormatInt(now.Unix(), 10), user.Labels[labelLastLoginKey])
-	assert.Equal(t, 1, userUpdateCalledTimes)
-
-	// Make sure the label is updated.
-	now = time.Now().Truncate(time.Second)
-
-	_, err = controller.sync("", newAttribs(metav1.NewTime(now)))
-	assert.NoError(t, err)
-
-	assert.Contains(t, user.Labels, labelLastLoginKey)
-	assert.Equal(t, strconv.FormatInt(now.Unix(), 10), user.Labels[labelLastLoginKey])
-	assert.Equal(t, 2, userUpdateCalledTimes)
-
-	// Make sure the user is not updated if the last login time remains the same.
-	_, err = controller.sync("", newAttribs(metav1.NewTime(now)))
-	assert.NoError(t, err)
-	assert.Equal(t, 2, userUpdateCalledTimes)
+	assert.Equal(t, 1, ensureLabelsCalledTimes)
 }
 
 func TestSyncProviderRefreshNoConflict(t *testing.T) {
 	userID := "u-abcdef"
-	user := &v3.User{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: userID,
-		},
-		Enabled: pointer.BoolPtr(true),
-	}
 	attribs := &v3.UserAttribute{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: userID,
@@ -117,35 +65,29 @@ func TestSyncProviderRefreshNoConflict(t *testing.T) {
 
 	now := time.Now().Truncate(time.Second)
 
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	userAttributeClient := fake.NewMockNonNamespacedControllerInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
+	userAttributeClient.EXPECT().Get(gomock.Any(), gomock.Any()).AnyTimes().DoAndReturn(func(name string, opts metav1.GetOptions) (*v3.UserAttribute, error) {
+		userAttributesGetCalledTimes++
+		return attribs.DeepCopy(), nil
+	})
+	userAttributeClient.EXPECT().Update(gomock.Any()).AnyTimes().DoAndReturn(func(userAttribute *v3.UserAttribute) (*v3.UserAttribute, error) {
+		userAttributesUpdateCalledTimes++
+		attribs = userAttribute.DeepCopy()
+		return attribs, nil
+	})
+
 	controller := UserAttributeController{
-		userLister: &mgmtFakes.UserListerMock{
-			GetFunc: func(namespace, name string) (*v3.User, error) {
-				return user, nil
-			},
-		},
-		users: &mgmtFakes.UserInterfaceMock{
-			UpdateFunc: func(user *v3.User) (*v3.User, error) {
-				user = user.DeepCopy()
-				return user, nil
-			},
-		},
-		userAttributes: &mgmtFakes.UserAttributeInterfaceMock{
-			GetFunc: func(name string, opts metav1.GetOptions) (*apiv3.UserAttribute, error) {
-				userAttributesGetCalledTimes++
-				return attribs.DeepCopy(), nil
-			},
-			UpdateFunc: func(userAttribute *v3.UserAttribute) (*v3.UserAttribute, error) {
-				userAttributesUpdateCalledTimes++
-				attribs = userAttribute.DeepCopy()
-				return attribs, nil
-			},
-		},
+		userAttributes:            userAttributeClient,
+		ensureUserRetentionLabels: func(attribs *v3.UserAttribute) error { return nil },
 		providerRefresh: func(attribs *v3.UserAttribute) (*v3.UserAttribute, error) {
 			providerRefreshCalledTimes++
 			a := attribs.DeepCopy()
 			a.NeedsRefresh = false
 			a.LastRefresh = now.Format(time.RFC3339)
-			a.GroupPrincipals = map[string]apiv3.Principals{"activedirectory": {}}
+			a.GroupPrincipals = map[string]v3.Principals{"activedirectory": {}}
 			a.ExtraByProvider = map[string]map[string][]string{"activedirectory": {}}
 			return a, nil
 		},
@@ -170,12 +112,6 @@ func TestSyncProviderRefreshNoConflict(t *testing.T) {
 
 func TestSyncProviderRefreshConflict(t *testing.T) {
 	userID := "u-abcdef"
-	user := &v3.User{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: userID,
-		},
-		Enabled: pointer.BoolPtr(true),
-	}
 	attribs := &v3.UserAttribute{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: userID,
@@ -191,51 +127,44 @@ func TestSyncProviderRefreshConflict(t *testing.T) {
 
 	groupResource := schema.GroupResource{
 		Group:    management.GroupName,
-		Resource: apiv3.UserAttributeResourceName,
+		Resource: v3.UserAttributeResourceName,
 	}
 
 	now := time.Now().Truncate(time.Second)
 
+	ctrl := gomock.NewController(t)
+
+	userAttributeClient := fake.NewMockNonNamespacedControllerInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
+	userAttributeClient.EXPECT().Get(gomock.Any(), gomock.Any()).AnyTimes().DoAndReturn(func(name string, opts metav1.GetOptions) (*v3.UserAttribute, error) {
+		userAttributesGetCalledTimes++
+
+		a := attribs.DeepCopy()
+		if userAttributesGetCalledTimes > 1 {
+			a.LastLogin = metav1.NewTime(now)
+		}
+
+		return a, nil
+	})
+	userAttributeClient.EXPECT().Update(gomock.Any()).AnyTimes().DoAndReturn(func(userAttribute *v3.UserAttribute) (*v3.UserAttribute, error) {
+		userAttributesUpdateCalledTimes++
+
+		if userAttributesUpdateCalledTimes == 1 {
+			return nil, apierrors.NewConflict(groupResource, userAttribute.Name, fmt.Errorf("some error"))
+		}
+
+		attribs = userAttribute.DeepCopy()
+		return attribs, nil
+	})
+
 	controller := UserAttributeController{
-		userLister: &mgmtFakes.UserListerMock{
-			GetFunc: func(namespace, name string) (*v3.User, error) {
-				return user, nil
-			},
-		},
-		users: &mgmtFakes.UserInterfaceMock{
-			UpdateFunc: func(user *v3.User) (*v3.User, error) {
-				user = user.DeepCopy()
-				return user, nil
-			},
-		},
-		userAttributes: &mgmtFakes.UserAttributeInterfaceMock{
-			GetFunc: func(name string, opts metav1.GetOptions) (*apiv3.UserAttribute, error) {
-				userAttributesGetCalledTimes++
-
-				a := attribs.DeepCopy()
-				if userAttributesGetCalledTimes > 1 {
-					a.LastLogin = metav1.NewTime(now)
-				}
-
-				return a, nil
-			},
-			UpdateFunc: func(userAttribute *v3.UserAttribute) (*v3.UserAttribute, error) {
-				userAttributesUpdateCalledTimes++
-
-				if userAttributesUpdateCalledTimes == 1 {
-					return nil, apierrors.NewConflict(groupResource, userAttribute.Name, fmt.Errorf("some error"))
-				}
-
-				attribs = userAttribute.DeepCopy()
-				return attribs, nil
-			},
-		},
+		userAttributes:            userAttributeClient,
+		ensureUserRetentionLabels: func(attribs *v3.UserAttribute) error { return nil },
 		providerRefresh: func(attribs *v3.UserAttribute) (*v3.UserAttribute, error) {
 			providerRefreshCalledTimes++
 			a := attribs.DeepCopy()
 			a.NeedsRefresh = false
 			a.LastRefresh = now.Format(time.RFC3339)
-			a.GroupPrincipals = map[string]apiv3.Principals{"activedirectory": {}}
+			a.GroupPrincipals = map[string]v3.Principals{"activedirectory": {}}
 			a.ExtraByProvider = map[string]map[string][]string{"activedirectory": {}}
 			return a, nil
 		},

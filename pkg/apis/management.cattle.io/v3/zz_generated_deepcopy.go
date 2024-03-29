@@ -30,6 +30,7 @@ import (
 	types "github.com/rancher/rke/types"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	version "k8s.io/apimachinery/pkg/version"
 )
@@ -10229,6 +10230,16 @@ func (in *UserAttribute) DeepCopyInto(out *UserAttribute) {
 		}
 	}
 	in.LastLogin.DeepCopyInto(&out.LastLogin)
+	if in.DisableAfter != nil {
+		in, out := &in.DisableAfter, &out.DisableAfter
+		*out = new(metav1.Duration)
+		**out = **in
+	}
+	if in.DeleteAfter != nil {
+		in, out := &in.DeleteAfter, &out.DeleteAfter
+		*out = new(metav1.Duration)
+		**out = **in
+	}
 	return
 }
 

@@ -1,6 +1,8 @@
 package v3
 
 import (
+	"strings"
+
 	"github.com/rancher/norman/condition"
 	"github.com/rancher/norman/types"
 	v1 "k8s.io/api/core/v1"
@@ -63,6 +65,22 @@ type User struct {
 	Status             UserStatus `json:"status"`
 }
 
+// IsSystem returns true if the user is a system user.
+func (u *User) IsSystem() bool {
+	for _, principalID := range u.PrincipalIDs {
+		if strings.HasPrefix(principalID, "system:") {
+			return true
+		}
+	}
+
+	return false
+}
+
+// IsDefaultAdmin returns true if the user is the default admin user.
+func (u *User) IsDefaultAdmin() bool {
+	return u.Username == "admin"
+}
+
 type UserStatus struct {
 	Conditions []UserCondition `json:"conditions"`
 }
@@ -100,6 +118,8 @@ type UserAttribute struct {
 	NeedsRefresh    bool
 	ExtraByProvider map[string]map[string][]string // extra information for the user to print in audit logs, stored per authProvider. example: map[openldap:map[principalid:[openldap_user://uid=testuser1,ou=dev,dc=us-west-2,dc=compute,dc=internal]]]
 	LastLogin       metav1.Time                    `json:"lastLogin,omitempty"`
+	DisableAfter    *metav1.Duration               `json:"disableAfter,omitempty"` // Overrides DisableInactiveUserAfter setting.
+	DeleteAfter     *metav1.Duration               `json:"deleteAfter,omitempty"`  // Overrides DeleteInactiveUserAfter setting.
 }
 
 type Principals struct {
