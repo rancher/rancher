@@ -260,6 +260,14 @@ var (
 	// UIPL the vendor/company name.
 	UIPL = NewSetting("ui-pl", "rancher")
 
+	// UILoginBackground the custom background in the login page.
+	UILoginBackgroundLight = NewSetting("ui-login-background-light", "")
+	UILoginBackgroundDark  = NewSetting("ui-login-background-dark", "")
+
+	// UIBanner the custom background image in the home page.
+	UIBannerLight = NewSetting("ui-banner-light", "")
+	UIBannerDark  = NewSetting("ui-banner-dark", "")
+
 	// UIPreferred Ensure that the new Dashboard is the default UI.
 	UIPreferred = NewSetting("ui-preferred", "vue")
 
