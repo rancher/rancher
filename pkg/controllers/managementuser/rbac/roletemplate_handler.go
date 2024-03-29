@@ -77,7 +77,6 @@ func (c *rtSync) syncRT(template *v3.RoleTemplate, usedInProjects bool, prtbs []
 		return errors.Wrapf(err, "couldn't ensure roles")
 	}
 
-	rolesToKeep := make(map[string]bool)
 	if usedInProjects {
 		for _, rt := range roleTemplates {
 			for resource, baseRule := range globalResourceRulesNeededInProjects {

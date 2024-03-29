@@ -317,30 +317,7 @@ func (m *manager) reconcileRoleForProjectAccessToGlobalResource(resource string,
 			if !apierrors.IsAlreadyExists(err) {
 				return "", fmt.Errorf("couldn't create role %v: %w", roleName, err)
 			}
-		}
-
-		desiredResourceNames := map[string]struct{}{}
-		for _, resourceName := range baseRule.ResourceNames {
-			desiredResourceNames[resourceName] = struct{}{}
-		}
-
-		// if the verbs or the resourceNames in the promoted clusterrole don't match what's desired then the role requires updating
-		// desired verbs are passed in and the desired resourceNames come from the resource's base rule
-		if !reflect.DeepEqual(currentVerbs, newVerbs) || !reflect.DeepEqual(currentResourceNames, desiredResourceNames) {
-			role = role.DeepCopy()
-			added := false
-			for i, rule := range role.Rules {
-				if slice.ContainsString(rule.Resources, resource) {
-					role.Rules[i] = buildRule(resource, newVerbs)
-					added = true
-				}
-			}
-			if !added {
-				role.Rules = append(role.Rules, buildRule(resource, newVerbs))
-			}
-			logrus.Infof("Updating clusterRole %v for project access to global resource.", role.Name)
-			_, err := clusterRoles.Update(role)
-			return roleName, err
+			logrus.Infof("Trying to create an already existing clusterRole %v for project access to global resource.", roleName)
 		}
 
 		return roleName, nil
