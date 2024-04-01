@@ -29,7 +29,7 @@ const (
 	LeasePrefix = "sa-token-lease-"
 )
 
-// Mutex to limit parellal writes by EnsureSecretForServiceAccount
+// Mutex to limit parallel writes by EnsureSecretForServiceAccount
 var mu sync.Mutex
 
 // secretLister is an abstraction over any kind of secret lister.
