@@ -8,7 +8,7 @@ replace (
 	github.com/rancher/dynamiclistener => github.com/krunalhinguu/dynamiclistener v1.29.0-rancher4
 	github.com/rancher/eks-operator => github.com/krunalhinguu/eks-operator v1.29.0-rancher5
 	github.com/rancher/gke-operator => github.com/krunalhinguu/gke-operator v1.29.0-rancher8
-	github.com/rancher/helm/v3 => github.com/krunalhinguu/helm/v3 v3.14.3-rancher1
+	github.com/rancher/helm/v3 => github.com/krunalhinguu/helm/v3 v3.14.3-rancher2
 	github.com/rancher/lasso => github.com/krunalhinguu/lasso v0.0.0-20240314064442-707f664400c6
 	github.com/rancher/machine => github.com/krunalhinguu/machine v1.29.0-rancher4
 	github.com/rancher/norman => github.com/krunalhinguu/norman v1.29.0-rancher5
