@@ -3,6 +3,10 @@ package fleetpermissions
 import (
 	"fmt"
 
+	"github.com/rancher/rancher/pkg/controllers"
+
+	wrangler "github.com/rancher/wrangler/v2/pkg/name"
+
 	mgmtcontroller "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -15,10 +19,11 @@ import (
 )
 
 const (
-	GRBFleetWorkspaceOwnerLabel      = "authz.management.cattle.io/grb-fw-owner"
-	localFleetWorkspace              = "fleet-local"
-	fleetWorkspaceClusterRulesPrefix = "fwcr-"
-	fleetWorkspaceVerbsPrefix        = "fwv-"
+	localFleetWorkspace            = "fleet-local"
+	fleetWorkspaceClusterRulesName = "fwcr"
+	fleetWorkspaceVerbsName        = "fwv"
+	grOwnerLabel                   = "authz.management.cattle.io/gr-owner" //TODO unexport
+
 )
 
 type RoleHandler struct {
@@ -53,8 +58,7 @@ func (h *RoleHandler) ReconcileFleetWorkspacePermissions(globalRole *v3.GlobalRo
 }
 
 func (h *RoleHandler) reconcileRulesClusterRole(globalRole *v3.GlobalRole) error {
-	crName := fleetWorkspaceClusterRulesPrefix + globalRole.Name
-
+	crName := wrangler.SafeConcatName(globalRole.Name, fleetWorkspaceClusterRulesName)
 	cr, err := h.crCache.Get(crName)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
@@ -72,6 +76,10 @@ func (h *RoleHandler) reconcileRulesClusterRole(globalRole *v3.GlobalRole) error
 						Name:       globalRole.Name,
 						UID:        globalRole.UID,
 					},
+				},
+				Labels: map[string]string{
+					grOwnerLabel:                wrangler.SafeConcatName(globalRole.Name),
+					controllers.K8sManagedByKey: controllers.ManagerValue,
 				},
 			},
 			Rules: globalRole.InheritedFleetWorkspacePermissions.ResourceRules,
@@ -94,7 +102,7 @@ func (h *RoleHandler) reconcileVerbsClusterRole(globalRole *v3.GlobalRole) error
 	if globalRole.InheritedFleetWorkspacePermissions.WorkspaceVerbs == nil || len(globalRole.InheritedFleetWorkspacePermissions.WorkspaceVerbs) == 0 {
 		return nil
 	}
-	crName := fleetWorkspaceVerbsPrefix + globalRole.Name
+	crName := wrangler.SafeConcatName(globalRole.Name, fleetWorkspaceVerbsName)
 	fleetWorkspaces, err := h.fwCache.List(labels.Everything())
 	if err != nil {
 		return fmt.Errorf("unable to list fleetWorkspaces when reconciling globalRole %s: %w", globalRole.Name, err)
@@ -130,6 +138,10 @@ func (h *RoleHandler) reconcileVerbsClusterRole(globalRole *v3.GlobalRole) error
 						Name:       globalRole.Name,
 						UID:        globalRole.UID,
 					},
+				},
+				Labels: map[string]string{
+					grOwnerLabel:                wrangler.SafeConcatName(globalRole.Name),
+					controllers.K8sManagedByKey: controllers.ManagerValue,
 				},
 			},
 			Rules: rules,

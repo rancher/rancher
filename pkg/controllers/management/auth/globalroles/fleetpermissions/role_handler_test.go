@@ -1,6 +1,7 @@
 package fleetpermissions
 
 import (
+	"github.com/rancher/rancher/pkg/controllers"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -8,6 +9,7 @@ import (
 	mgmtcontroller "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	rbacv1 "github.com/rancher/wrangler/v2/pkg/generated/controllers/rbac/v1"
 	"github.com/rancher/wrangler/v2/pkg/generic/fake"
+	wrangler "github.com/rancher/wrangler/v2/pkg/name"
 	"github.com/stretchr/testify/assert"
 	rbac "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -38,8 +40,8 @@ func TestReconcileFleetPermissions(t *testing.T) {
 		"backing ClusterRoles are created for a new GlobalRole": {
 			crCache: func() rbacv1.ClusterRoleCache {
 				mock := fake.NewMockNonNamespacedCacheInterface[*rbac.ClusterRole](ctrl)
-				mock.EXPECT().Get("fwcr-"+grName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
-				mock.EXPECT().Get("fwv-"+grName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+				mock.EXPECT().Get(wrangler.SafeConcatName(grName, fleetWorkspaceVerbsName)).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+				mock.EXPECT().Get(wrangler.SafeConcatName(grName, fleetWorkspaceClusterRulesName)).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
 				return mock
 			},
 			crClient: createClusterRolesMock(ctrl),
@@ -78,7 +80,7 @@ func TestReconcileFleetPermissions(t *testing.T) {
 				mock.EXPECT().Update(&rbac.ClusterRole{
 					TypeMeta: metav1.TypeMeta{},
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "fwcr-" + grName,
+						Name: wrangler.SafeConcatName(grName, fleetWorkspaceClusterRulesName),
 						OwnerReferences: []metav1.OwnerReference{
 							{
 								APIVersion: "management.cattle.io/v3",
@@ -99,7 +101,7 @@ func TestReconcileFleetPermissions(t *testing.T) {
 				mock.EXPECT().Update(&rbac.ClusterRole{
 					TypeMeta: metav1.TypeMeta{},
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "fwv-" + grName,
+						Name: wrangler.SafeConcatName(grName, fleetWorkspaceVerbsName),
 						OwnerReferences: []metav1.OwnerReference{
 							{
 								APIVersion: "management.cattle.io/v3",
@@ -172,7 +174,7 @@ func TestReconcileFleetPermissions_errors(t *testing.T) {
 			},
 			crCache: func() rbacv1.ClusterRoleCache {
 				mock := fake.NewMockNonNamespacedCacheInterface[*rbac.ClusterRole](ctrl)
-				mock.EXPECT().Get("fwcr-gr").Return(nil, errors.NewServiceUnavailable("unexpected error"))
+				mock.EXPECT().Get(wrangler.SafeConcatName(grName, fleetWorkspaceClusterRulesName)).Return(nil, errors.NewServiceUnavailable("unexpected error"))
 				return mock
 			},
 			crClient: func() rbacv1.ClusterRoleController {
@@ -186,7 +188,7 @@ func TestReconcileFleetPermissions_errors(t *testing.T) {
 			},
 			crCache: func() rbacv1.ClusterRoleCache {
 				mock := fake.NewMockNonNamespacedCacheInterface[*rbac.ClusterRole](ctrl)
-				mock.EXPECT().Get("fwcr-gr").Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+				mock.EXPECT().Get(wrangler.SafeConcatName(grName, fleetWorkspaceClusterRulesName)).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
 				return mock
 			},
 			crClient: func() rbacv1.ClusterRoleController {
@@ -194,7 +196,7 @@ func TestReconcileFleetPermissions_errors(t *testing.T) {
 				mock.EXPECT().Create(&rbac.ClusterRole{
 					TypeMeta: metav1.TypeMeta{},
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "fwcr-" + grName,
+						Name: wrangler.SafeConcatName(grName, fleetWorkspaceClusterRulesName),
 						OwnerReferences: []metav1.OwnerReference{
 							{
 								APIVersion: "management.cattle.io/v3",
@@ -202,6 +204,10 @@ func TestReconcileFleetPermissions_errors(t *testing.T) {
 								Name:       grName,
 								UID:        grUID,
 							},
+						},
+						Labels: map[string]string{
+							grOwnerLabel:                wrangler.SafeConcatName(grName),
+							controllers.K8sManagedByKey: controllers.ManagerValue,
 						},
 					},
 					Rules: resourceRules,
@@ -244,7 +250,7 @@ func createClusterRolesMock(ctrl *gomock.Controller) func() rbacv1.ClusterRoleCo
 		mock.EXPECT().Create(&rbac.ClusterRole{
 			TypeMeta: metav1.TypeMeta{},
 			ObjectMeta: metav1.ObjectMeta{
-				Name: "fwcr-" + grName,
+				Name: wrangler.SafeConcatName(grName, fleetWorkspaceClusterRulesName),
 				OwnerReferences: []metav1.OwnerReference{
 					{
 						APIVersion: "management.cattle.io/v3",
@@ -253,13 +259,17 @@ func createClusterRolesMock(ctrl *gomock.Controller) func() rbacv1.ClusterRoleCo
 						UID:        grUID,
 					},
 				},
+				Labels: map[string]string{
+					grOwnerLabel:                wrangler.SafeConcatName(grName),
+					controllers.K8sManagedByKey: controllers.ManagerValue,
+				},
 			},
 			Rules: resourceRules,
 		})
 		mock.EXPECT().Create(&rbac.ClusterRole{
 			TypeMeta: metav1.TypeMeta{},
 			ObjectMeta: metav1.ObjectMeta{
-				Name: "fwv-" + grName,
+				Name: wrangler.SafeConcatName(grName, fleetWorkspaceVerbsName),
 				OwnerReferences: []metav1.OwnerReference{
 					{
 						APIVersion: "management.cattle.io/v3",
@@ -267,6 +277,10 @@ func createClusterRolesMock(ctrl *gomock.Controller) func() rbacv1.ClusterRoleCo
 						Name:       grName,
 						UID:        grUID,
 					},
+				},
+				Labels: map[string]string{
+					grOwnerLabel:                wrangler.SafeConcatName(grName),
+					controllers.K8sManagedByKey: controllers.ManagerValue,
 				},
 			},
 			Rules: []rbac.PolicyRule{
@@ -285,10 +299,10 @@ func createClusterRolesMock(ctrl *gomock.Controller) func() rbacv1.ClusterRoleCo
 func clusterRoleMock(ctrl *gomock.Controller) func() rbacv1.ClusterRoleCache {
 	return func() rbacv1.ClusterRoleCache {
 		mock := fake.NewMockNonNamespacedCacheInterface[*rbac.ClusterRole](ctrl)
-		mock.EXPECT().Get("fwcr-"+grName).Return(&rbac.ClusterRole{
+		mock.EXPECT().Get(wrangler.SafeConcatName(grName, fleetWorkspaceClusterRulesName)).Return(&rbac.ClusterRole{
 			TypeMeta: metav1.TypeMeta{},
 			ObjectMeta: metav1.ObjectMeta{
-				Name: "fwcr-" + grName,
+				Name: wrangler.SafeConcatName(grName, fleetWorkspaceClusterRulesName),
 				OwnerReferences: []metav1.OwnerReference{
 					{
 						APIVersion: "management.cattle.io/v3",
@@ -300,10 +314,10 @@ func clusterRoleMock(ctrl *gomock.Controller) func() rbacv1.ClusterRoleCache {
 			},
 			Rules: resourceRules,
 		}, nil)
-		mock.EXPECT().Get("fwv-"+grName).Return(&rbac.ClusterRole{
+		mock.EXPECT().Get(wrangler.SafeConcatName(grName, fleetWorkspaceVerbsName)).Return(&rbac.ClusterRole{
 			TypeMeta: metav1.TypeMeta{},
 			ObjectMeta: metav1.ObjectMeta{
-				Name: "fwv-" + grName,
+				Name: wrangler.SafeConcatName(grName, fleetWorkspaceVerbsName),
 				OwnerReferences: []metav1.OwnerReference{
 					{
 						APIVersion: "management.cattle.io/v3",

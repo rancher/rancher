@@ -43,7 +43,8 @@ const (
 	TemplateResourceRule               = "templates"
 	TemplateVersionResourceRule        = "templateversions"
 	localClusterName                   = "local"
-	grbOwnerLabel                      = "authz.management.cattle.io/grb-owner"
+	grbOwnerLabel                      = "authz.management.cattle.io/grb-owner" //TODO unexport
+	fleetWorkspacePermissionLabel      = "authz.management.cattle.io/fleet-workspace-permissions"
 )
 
 func newGlobalRoleBindingLifecycle(management *config.ManagementContext, clusterManager *clustermanager.Manager) *globalRoleBindingLifecycle {
@@ -702,8 +703,13 @@ func (grb *globalRoleBindingLifecycle) reconcileNamespacedRoleBindings(globalRol
 	if err != nil {
 		return multierror.Append(returnError, errors.Wrapf(err, "couldn't create label: %s", grOwnerLabel))
 	}
+	// exclude roleBindings created for granting fleet workspace permissions
+	rFleet, err := labels.NewRequirement(fleetWorkspacePermissionLabel, selection.DoesNotExist, []string{})
+	if err != nil {
+		return multierror.Append(returnError, errors.Wrapf(err, "couldn't create label: %s", grOwnerLabel))
+	}
 
-	rbs, err := grb.roleBindingLister.List("", labels.NewSelector().Add(*r))
+	rbs, err := grb.roleBindingLister.List("", labels.NewSelector().Add(*r).Add(*rFleet))
 	if err != nil {
 		return multierror.Append(returnError,
 			errors.Wrapf(err, "couldn't list roleBindings with label %s : %s", grbOwnerLabel, grbName))

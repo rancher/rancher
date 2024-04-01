@@ -3,6 +3,8 @@ package fleetpermissions
 import (
 	"testing"
 
+	wrangler "github.com/rancher/wrangler/v2/pkg/name"
+
 	"github.com/golang/mock/gomock"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers"
@@ -41,14 +43,14 @@ func TestReconcileFleetWorkspacePermissionsBindings(t *testing.T) {
 			grCache: globalRoleMock(ctrl),
 			rbCache: func() rbacv1.RoleBindingCache {
 				mock := fake.NewMockCacheInterface[*rbac.RoleBinding](ctrl)
-				mock.EXPECT().Get("fleet-default", user+"-fwcr-"+grName+"-fleet-default").Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+				mock.EXPECT().Get("fleet-default", grbName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
 				return mock
 			},
 			rbClient:  createRoleBindingsMock(ctrl),
 			crbClient: createClusterRoleBindingsMock(ctrl),
 			crbCache: func() rbacv1.ClusterRoleBindingCache {
 				mock := fake.NewMockNonNamespacedCacheInterface[*rbac.ClusterRoleBinding](ctrl)
-				mock.EXPECT().Get("fwv-gr-user").Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+				mock.EXPECT().Get(wrangler.SafeConcatName(grbName, fleetWorkspaceVerbsName)).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
 				return mock
 			},
 			grb: &v3.GlobalRoleBinding{
@@ -64,9 +66,9 @@ func TestReconcileFleetWorkspacePermissionsBindings(t *testing.T) {
 			grCache: globalRoleMock(ctrl),
 			rbCache: func() rbacv1.RoleBindingCache {
 				mock := fake.NewMockCacheInterface[*rbac.RoleBinding](ctrl)
-				mock.EXPECT().Get("fleet-default", "newUser-fwcr-"+grName+"-fleet-default").Return(&rbac.RoleBinding{
+				mock.EXPECT().Get("fleet-default", grbName).Return(&rbac.RoleBinding{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      user + "-fwcr-" + grName + "-fleet-default",
+						Name:      grbName,
 						Namespace: "fleet-default",
 						OwnerReferences: []metav1.OwnerReference{
 							{
@@ -80,7 +82,7 @@ func TestReconcileFleetWorkspacePermissionsBindings(t *testing.T) {
 					RoleRef: rbac.RoleRef{
 						APIGroup: "rbac.authorization.k8s.io",
 						Kind:     "ClusterRole",
-						Name:     "fwcr-" + grName,
+						Name:     wrangler.SafeConcatName(grName, fleetWorkspaceClusterRulesName),
 					},
 					Subjects: []rbac.Subject{
 						{
@@ -96,7 +98,7 @@ func TestReconcileFleetWorkspacePermissionsBindings(t *testing.T) {
 				mock := fake.NewMockControllerInterface[*rbac.RoleBinding, *rbac.RoleBindingList](ctrl)
 				mock.EXPECT().Update(&rbac.RoleBinding{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      user + "-fwcr-" + grName + "-fleet-default",
+						Name:      grbName,
 						Namespace: "fleet-default",
 						OwnerReferences: []metav1.OwnerReference{
 							{
@@ -110,7 +112,7 @@ func TestReconcileFleetWorkspacePermissionsBindings(t *testing.T) {
 					RoleRef: rbac.RoleRef{
 						APIGroup: "rbac.authorization.k8s.io",
 						Kind:     "ClusterRole",
-						Name:     "fwcr-" + grName,
+						Name:     wrangler.SafeConcatName(grName, fleetWorkspaceClusterRulesName),
 					},
 					Subjects: []rbac.Subject{
 						{
@@ -126,7 +128,7 @@ func TestReconcileFleetWorkspacePermissionsBindings(t *testing.T) {
 				mock := fake.NewMockNonNamespacedControllerInterface[*rbac.ClusterRoleBinding, *rbac.ClusterRoleBindingList](ctrl)
 				mock.EXPECT().Update(&rbac.ClusterRoleBinding{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "fwv-gr-user",
+						Name: wrangler.SafeConcatName(grbName, fleetWorkspaceVerbsName),
 						OwnerReferences: []metav1.OwnerReference{
 							{
 								APIVersion: "management.cattle.io/v3",
@@ -139,7 +141,7 @@ func TestReconcileFleetWorkspacePermissionsBindings(t *testing.T) {
 					RoleRef: rbac.RoleRef{
 						APIGroup: "rbac.authorization.k8s.io",
 						Kind:     "ClusterRole",
-						Name:     "fwv-" + grName,
+						Name:     wrangler.SafeConcatName(grName, fleetWorkspaceVerbsName),
 					},
 					Subjects: []rbac.Subject{
 						{
@@ -152,9 +154,9 @@ func TestReconcileFleetWorkspacePermissionsBindings(t *testing.T) {
 			},
 			crbCache: func() rbacv1.ClusterRoleBindingCache {
 				mock := fake.NewMockNonNamespacedCacheInterface[*rbac.ClusterRoleBinding](ctrl)
-				mock.EXPECT().Get("fwv-gr-newUser").Return(&rbac.ClusterRoleBinding{
+				mock.EXPECT().Get(wrangler.SafeConcatName(grbName, fleetWorkspaceVerbsName)).Return(&rbac.ClusterRoleBinding{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "fwv-gr-user",
+						Name: wrangler.SafeConcatName(grbName, fleetWorkspaceVerbsName),
 						OwnerReferences: []metav1.OwnerReference{
 							{
 								APIVersion: "management.cattle.io/v3",
@@ -167,7 +169,7 @@ func TestReconcileFleetWorkspacePermissionsBindings(t *testing.T) {
 					RoleRef: rbac.RoleRef{
 						APIGroup: "rbac.authorization.k8s.io",
 						Kind:     "ClusterRole",
-						Name:     "fwv-" + grName,
+						Name:     wrangler.SafeConcatName(grName, fleetWorkspaceVerbsName),
 					},
 					Subjects: []rbac.Subject{
 						{
@@ -278,14 +280,14 @@ func TestReconcileFleetWorkspacePermissionsBindings_errors(t *testing.T) {
 			},
 			rbCache: func() rbacv1.RoleBindingCache {
 				mock := fake.NewMockCacheInterface[*rbac.RoleBinding](ctrl)
-				mock.EXPECT().Get("fleet-default", user+"-fwcr-"+grName+"-fleet-default").Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+				mock.EXPECT().Get("fleet-default", grbName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
 				return mock
 			},
 			rbClient: func() rbacv1.RoleBindingController {
 				mock := fake.NewMockControllerInterface[*rbac.RoleBinding, *rbac.RoleBindingList](ctrl)
 				mock.EXPECT().Create(&rbac.RoleBinding{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      user + "-fwcr-" + grName + "-fleet-default",
+						Name:      grbName,
 						Namespace: "fleet-default",
 						OwnerReferences: []metav1.OwnerReference{
 							{
@@ -296,14 +298,15 @@ func TestReconcileFleetWorkspacePermissionsBindings_errors(t *testing.T) {
 							},
 						},
 						Labels: map[string]string{
-							GRBFleetWorkspaceOwnerLabel: grbName,
-							controllers.K8sManagedByKey: controllers.ManagerValue,
+							grbOwnerLabel:                 grbName,
+							fleetWorkspacePermissionLabel: "true",
+							controllers.K8sManagedByKey:   controllers.ManagerValue,
 						},
 					},
 					RoleRef: rbac.RoleRef{
 						APIGroup: "rbac.authorization.k8s.io",
 						Kind:     "ClusterRole",
-						Name:     "fwcr-" + grName,
+						Name:     wrangler.SafeConcatName(grName, fleetWorkspaceClusterRulesName),
 					},
 					Subjects: []rbac.Subject{
 						{
@@ -330,7 +333,7 @@ func TestReconcileFleetWorkspacePermissionsBindings_errors(t *testing.T) {
 			},
 			rbCache: func() rbacv1.RoleBindingCache {
 				mock := fake.NewMockCacheInterface[*rbac.RoleBinding](ctrl)
-				mock.EXPECT().Get("fleet-default", user+"-fwcr-"+grName+"-fleet-default").Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+				mock.EXPECT().Get("fleet-default", grbName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
 				return mock
 			},
 			rbClient: createRoleBindingsMock(ctrl),
@@ -338,7 +341,7 @@ func TestReconcileFleetWorkspacePermissionsBindings_errors(t *testing.T) {
 				mock := fake.NewMockNonNamespacedControllerInterface[*rbac.ClusterRoleBinding, *rbac.ClusterRoleBindingList](ctrl)
 				mock.EXPECT().Create(&rbac.ClusterRoleBinding{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "fwv-gr-user",
+						Name: wrangler.SafeConcatName(grbName, fleetWorkspaceVerbsName),
 						OwnerReferences: []metav1.OwnerReference{
 							{
 								APIVersion: "management.cattle.io/v3",
@@ -348,14 +351,14 @@ func TestReconcileFleetWorkspacePermissionsBindings_errors(t *testing.T) {
 							},
 						},
 						Labels: map[string]string{
-							GRBFleetWorkspaceOwnerLabel: grbName,
+							grbOwnerLabel:               grbName,
 							controllers.K8sManagedByKey: controllers.ManagerValue,
 						},
 					},
 					RoleRef: rbac.RoleRef{
 						APIGroup: "rbac.authorization.k8s.io",
 						Kind:     "ClusterRole",
-						Name:     "fwv-" + grName,
+						Name:     wrangler.SafeConcatName(grName, fleetWorkspaceVerbsName),
 					},
 					Subjects: []rbac.Subject{
 						{
@@ -369,7 +372,7 @@ func TestReconcileFleetWorkspacePermissionsBindings_errors(t *testing.T) {
 			},
 			crbCache: func() rbacv1.ClusterRoleBindingCache {
 				mock := fake.NewMockNonNamespacedCacheInterface[*rbac.ClusterRoleBinding](ctrl)
-				mock.EXPECT().Get("fwv-"+grName+"-"+user).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+				mock.EXPECT().Get(wrangler.SafeConcatName(grbName, fleetWorkspaceVerbsName)).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
 				return mock
 			},
 			wantErrMessage: "error reconciling fleet workspace verbs: unexpected error",
@@ -408,7 +411,7 @@ func createClusterRoleBindingsMock(ctrl *gomock.Controller) func() rbacv1.Cluste
 		mock := fake.NewMockNonNamespacedControllerInterface[*rbac.ClusterRoleBinding, *rbac.ClusterRoleBindingList](ctrl)
 		mock.EXPECT().Create(&rbac.ClusterRoleBinding{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: "fwv-gr-user",
+				Name: wrangler.SafeConcatName(grbName, fleetWorkspaceVerbsName),
 				OwnerReferences: []metav1.OwnerReference{
 					{
 						APIVersion: "management.cattle.io/v3",
@@ -418,14 +421,14 @@ func createClusterRoleBindingsMock(ctrl *gomock.Controller) func() rbacv1.Cluste
 					},
 				},
 				Labels: map[string]string{
-					GRBFleetWorkspaceOwnerLabel: grbName,
+					grbOwnerLabel:               grbName,
 					controllers.K8sManagedByKey: controllers.ManagerValue,
 				},
 			},
 			RoleRef: rbac.RoleRef{
 				APIGroup: "rbac.authorization.k8s.io",
 				Kind:     "ClusterRole",
-				Name:     "fwv-" + grName,
+				Name:     wrangler.SafeConcatName(grName, fleetWorkspaceVerbsName),
 			},
 			Subjects: []rbac.Subject{
 				{
@@ -443,7 +446,7 @@ func createRoleBindingsMock(ctrl *gomock.Controller) func() rbacv1.RoleBindingCo
 		mock := fake.NewMockControllerInterface[*rbac.RoleBinding, *rbac.RoleBindingList](ctrl)
 		mock.EXPECT().Create(&rbac.RoleBinding{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      user + "-fwcr-" + grName + "-fleet-default",
+				Name:      grbName,
 				Namespace: "fleet-default",
 				OwnerReferences: []metav1.OwnerReference{
 					{
@@ -454,14 +457,15 @@ func createRoleBindingsMock(ctrl *gomock.Controller) func() rbacv1.RoleBindingCo
 					},
 				},
 				Labels: map[string]string{
-					GRBFleetWorkspaceOwnerLabel: grbName,
-					controllers.K8sManagedByKey: controllers.ManagerValue,
+					grbOwnerLabel:                 grbName,
+					fleetWorkspacePermissionLabel: "true",
+					controllers.K8sManagedByKey:   controllers.ManagerValue,
 				},
 			},
 			RoleRef: rbac.RoleRef{
 				APIGroup: "rbac.authorization.k8s.io",
 				Kind:     "ClusterRole",
-				Name:     "fwcr-" + grName,
+				Name:     wrangler.SafeConcatName(grName, fleetWorkspaceClusterRulesName),
 			},
 			Subjects: []rbac.Subject{
 				{

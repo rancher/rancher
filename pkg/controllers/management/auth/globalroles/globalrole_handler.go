@@ -150,6 +150,13 @@ func (gr *globalRoleLifecycle) Updated(obj *v3.GlobalRole) (runtime.Object, erro
 	if err != nil {
 		returnError = multierror.Append(returnError, err)
 	}
+	if err != nil {
+		returnError = multierror.Append(returnError, err)
+	}
+	err = gr.fleetPermissionsHandler.ReconcileFleetWorkspacePermissions(obj)
+	if err != nil {
+		returnError = multierror.Append(returnError, err)
+	}
 	err = gr.setGRAsCompleted(obj)
 	if err != nil {
 		returnError = multierror.Append(returnError, err)
