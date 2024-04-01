@@ -1,4 +1,4 @@
-package fleetpermissions
+package globalroles
 
 import (
 	"testing"
@@ -21,9 +21,9 @@ import (
 
 const (
 	grName  = "gr"
-	grUID   = "abcd"
+	grUID   = "9cf141b8-54ab-4711-8e43-eb1fc0a189a8"
 	grbName = "grb"
-	grbUID  = "efdj"
+	grbUID  = "3267582b-96eb-4752-81de-cb33e7d8f3e7"
 	user    = "user"
 )
 
@@ -195,7 +195,7 @@ func TestReconcileFleetWorkspacePermissionsBindings(t *testing.T) {
 		test := test
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			h := BindingHandler{
+			h := fleetWorkspaceBindingHandler{
 				crbClient: test.crbClient(),
 				crbCache:  test.crbCache(),
 				grCache:   test.grCache(),
@@ -204,7 +204,7 @@ func TestReconcileFleetWorkspacePermissionsBindings(t *testing.T) {
 				fwCache:   fleetDefaultAndLocalWorkspaceCacheMock(ctrl),
 			}
 
-			err := h.ReconcileFleetWorkspacePermissionsBindings(test.grb)
+			err := h.reconcileFleetWorkspacePermissionsBindings(test.grb)
 
 			assert.Equal(t, err, nil)
 		})
@@ -383,7 +383,7 @@ func TestReconcileFleetWorkspacePermissionsBindings_errors(t *testing.T) {
 		test := test
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			h := BindingHandler{
+			h := fleetWorkspaceBindingHandler{
 				crbClient: test.crbClient(),
 				crbCache:  test.crbCache(),
 				grCache:   test.grCache(),
@@ -392,7 +392,7 @@ func TestReconcileFleetWorkspacePermissionsBindings_errors(t *testing.T) {
 				fwCache:   test.fwCache(),
 			}
 
-			err := h.ReconcileFleetWorkspacePermissionsBindings(&v3.GlobalRoleBinding{
+			err := h.reconcileFleetWorkspacePermissionsBindings(&v3.GlobalRoleBinding{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: grbName,
 					UID:  grbUID,

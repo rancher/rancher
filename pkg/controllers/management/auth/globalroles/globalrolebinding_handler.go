@@ -8,7 +8,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers"
-	"github.com/rancher/rancher/pkg/controllers/management/auth/globalroles/fleetpermissions"
 	mgmtcontroller "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	rbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
@@ -43,7 +42,7 @@ const (
 	TemplateResourceRule               = "templates"
 	TemplateVersionResourceRule        = "templateversions"
 	localClusterName                   = "local"
-	grbOwnerLabel                      = "authz.management.cattle.io/grb-owner" //TODO unexport
+	grbOwnerLabel                      = "authz.management.cattle.io/grb-owner"
 	fleetWorkspacePermissionLabel      = "authz.management.cattle.io/fleet-workspace-permissions"
 )
 
@@ -66,7 +65,7 @@ func newGlobalRoleBindingLifecycle(management *config.ManagementContext, cluster
 		roleLister:              management.RBAC.Roles("").Controller().Lister(),
 		roleBindings:            management.RBAC.RoleBindings(""),
 		roleBindingLister:       management.RBAC.RoleBindings("").Controller().Lister(),
-		fleetPermissionsHandler: fleetpermissions.NewBindingHandler(management),
+		fleetPermissionsHandler: newFleetWorkspaceBindingHandler(management),
 	}
 }
 
@@ -81,7 +80,7 @@ func crtbGrbOwnerIndexer(crtb *v3.ClusterRoleTemplateBinding) ([]string, error) 
 }
 
 type fleetPermissionsHandler interface {
-	ReconcileFleetWorkspacePermissionsBindings(globalRoleBinding *v3.GlobalRoleBinding) error
+	reconcileFleetWorkspacePermissionsBindings(globalRoleBinding *v3.GlobalRoleBinding) error
 }
 
 type globalRoleBindingLifecycle struct {
@@ -118,7 +117,7 @@ func (grb *globalRoleBindingLifecycle) Create(obj *v3.GlobalRoleBinding) (runtim
 	if err != nil {
 		returnError = multierror.Append(returnError, err)
 	}
-	err = grb.fleetPermissionsHandler.ReconcileFleetWorkspacePermissionsBindings(obj)
+	err = grb.fleetPermissionsHandler.reconcileFleetWorkspacePermissionsBindings(obj)
 	if err != nil {
 		returnError = multierror.Append(returnError, err)
 	}
@@ -139,7 +138,7 @@ func (grb *globalRoleBindingLifecycle) Updated(obj *v3.GlobalRoleBinding) (runti
 	if err != nil {
 		returnError = multierror.Append(returnError, err)
 	}
-	err = grb.fleetPermissionsHandler.ReconcileFleetWorkspacePermissionsBindings(obj)
+	err = grb.fleetPermissionsHandler.reconcileFleetWorkspacePermissionsBindings(obj)
 	if err != nil {
 		returnError = multierror.Append(returnError, err)
 	}

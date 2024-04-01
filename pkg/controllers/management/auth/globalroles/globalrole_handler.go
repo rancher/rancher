@@ -8,7 +8,6 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	mgmt "github.com/rancher/rancher/pkg/apis/management.cattle.io"
-	"github.com/rancher/rancher/pkg/controllers/management/auth/globalroles/fleetpermissions"
 	mgmtconv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	rbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
@@ -62,7 +61,7 @@ const (
 )
 
 type fleetPermissionsRoleHandler interface {
-	ReconcileFleetWorkspacePermissions(globalRole *v3.GlobalRole) error
+	reconcileFleetWorkspacePermissions(globalRole *v3.GlobalRole) error
 }
 
 func newGlobalRoleLifecycle(management *config.ManagementContext) *globalRoleLifecycle {
@@ -73,7 +72,7 @@ func newGlobalRoleLifecycle(management *config.ManagementContext) *globalRoleLif
 		rLister:                 management.RBAC.Roles("").Controller().Lister(),
 		rClient:                 management.RBAC.Roles(""),
 		grClient:                management.Wrangler.Mgmt.GlobalRole(),
-		fleetPermissionsHandler: fleetpermissions.NewRoleHandler(management),
+		fleetPermissionsHandler: newFleetWorkspaceRoleHandler(management),
 	}
 }
 
@@ -113,7 +112,7 @@ func (gr *globalRoleLifecycle) Create(obj *v3.GlobalRole) (runtime.Object, error
 	if err != nil {
 		returnError = multierror.Append(returnError, err)
 	}
-	err = gr.fleetPermissionsHandler.ReconcileFleetWorkspacePermissions(obj)
+	err = gr.fleetPermissionsHandler.reconcileFleetWorkspacePermissions(obj)
 	if err != nil {
 		returnError = multierror.Append(returnError, err)
 	}
@@ -150,10 +149,7 @@ func (gr *globalRoleLifecycle) Updated(obj *v3.GlobalRole) (runtime.Object, erro
 	if err != nil {
 		returnError = multierror.Append(returnError, err)
 	}
-	if err != nil {
-		returnError = multierror.Append(returnError, err)
-	}
-	err = gr.fleetPermissionsHandler.ReconcileFleetWorkspacePermissions(obj)
+	err = gr.fleetPermissionsHandler.reconcileFleetWorkspacePermissions(obj)
 	if err != nil {
 		returnError = multierror.Append(returnError, err)
 	}

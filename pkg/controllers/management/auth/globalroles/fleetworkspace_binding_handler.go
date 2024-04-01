@@ -1,4 +1,4 @@
-package fleetpermissions
+package globalroles
 
 import (
 	"fmt"
@@ -21,12 +21,8 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
-const (
-	grbOwnerLabel                 = "authz.management.cattle.io/grb-owner" //TODO remove
-	fleetWorkspacePermissionLabel = "authz.management.cattle.io/fleet-workspace-permissions"
-)
-
-type BindingHandler struct {
+// fleetWorkspaceBindingHandler manages Bindings created for the InheritedFleetWorkspacePermissions field.
+type fleetWorkspaceBindingHandler struct {
 	crbClient rbacv1.ClusterRoleBindingController
 	crbCache  rbacv1.ClusterRoleBindingCache
 	grCache   mgmtcontroller.GlobalRoleCache
@@ -35,8 +31,8 @@ type BindingHandler struct {
 	fwCache   mgmtcontroller.FleetWorkspaceCache
 }
 
-func NewBindingHandler(management *config.ManagementContext) *BindingHandler {
-	return &BindingHandler{
+func newFleetWorkspaceBindingHandler(management *config.ManagementContext) *fleetWorkspaceBindingHandler {
+	return &fleetWorkspaceBindingHandler{
 		crbClient: management.Wrangler.RBAC.ClusterRoleBinding(),
 		crbCache:  management.Wrangler.RBAC.ClusterRoleBinding().Cache(),
 		grCache:   management.Wrangler.Mgmt.GlobalRole().Cache(),
@@ -48,7 +44,7 @@ func NewBindingHandler(management *config.ManagementContext) *BindingHandler {
 
 // ReconcileFleetWorkspacePermissionsBindings reconciles backing RoleBindings and ClusterRoleBindings created for granting permission
 // to fleet workspaces.
-func (h *BindingHandler) ReconcileFleetWorkspacePermissionsBindings(globalRoleBinding *v3.GlobalRoleBinding) error {
+func (h *fleetWorkspaceBindingHandler) reconcileFleetWorkspacePermissionsBindings(globalRoleBinding *v3.GlobalRoleBinding) error {
 	globalRole, err := h.grCache.Get(globalRoleBinding.GlobalRoleName)
 	if err != nil {
 		return fmt.Errorf("unable to get globalRole: %w", err)
@@ -73,7 +69,7 @@ func (h *BindingHandler) ReconcileFleetWorkspacePermissionsBindings(globalRoleBi
 	return nil
 }
 
-func (h *BindingHandler) reconcileResourceRulesBindings(globalRoleBinding *v3.GlobalRoleBinding, globalRole *v3.GlobalRole, fleetWorkspaces []*v3.FleetWorkspace) error {
+func (h *fleetWorkspaceBindingHandler) reconcileResourceRulesBindings(globalRoleBinding *v3.GlobalRoleBinding, globalRole *v3.GlobalRole, fleetWorkspaces []*v3.FleetWorkspace) error {
 	var returnError error
 	subject := rbac.GetGRBSubject(globalRoleBinding)
 	roleref := v1.RoleRef{
@@ -86,11 +82,11 @@ func (h *BindingHandler) reconcileResourceRulesBindings(globalRoleBinding *v3.Gl
 	}
 
 	for _, fleetWorkspace := range fleetWorkspaces {
-		rbName := wrangler.SafeConcatName(globalRoleBinding.Name)
 		if fleetWorkspace.Name == localFleetWorkspace {
 			continue
 		}
 
+		rbName := wrangler.SafeConcatName(globalRoleBinding.Name)
 		rb, err := h.rbCache.Get(fleetWorkspace.Name, rbName)
 		if err != nil && !apierrors.IsNotFound(err) {
 			returnError = multierror.Append(returnError, err)
@@ -122,8 +118,13 @@ func (h *BindingHandler) reconcileResourceRulesBindings(globalRoleBinding *v3.Gl
 			if err != nil && !apierrors.IsNotFound(err) {
 				returnError = multierror.Append(returnError, err)
 			}
-		} else if !reflect.DeepEqual(rb.Subjects, subjects) {
+		} else if !reflect.DeepEqual(rb.Subjects, subjects) ||
+			reflect.DeepEqual(rb.RoleRef, roleref) ||
+			rb.Labels[grbOwnerLabel] != wrangler.SafeConcatName(globalRoleBinding.Name) {
+			// undo modifications if rb has changed.
 			rb.Subjects = subjects
+			rb.RoleRef = roleref
+			rb.Labels[grbOwnerLabel] = wrangler.SafeConcatName(globalRoleBinding.Name)
 			_, err := h.rbClient.Update(rb)
 			if err != nil {
 				returnError = multierror.Append(returnError, err)
@@ -134,7 +135,7 @@ func (h *BindingHandler) reconcileResourceRulesBindings(globalRoleBinding *v3.Gl
 	return returnError
 }
 
-func (h *BindingHandler) reconcileWorkspaceVerbsBindings(globalRoleBinding *v3.GlobalRoleBinding, globalRole *apimgmtv3.GlobalRole, fleetWorkspaces []*apimgmtv3.FleetWorkspace) error {
+func (h *fleetWorkspaceBindingHandler) reconcileWorkspaceVerbsBindings(globalRoleBinding *v3.GlobalRoleBinding, globalRole *apimgmtv3.GlobalRole, fleetWorkspaces []*apimgmtv3.FleetWorkspace) error {
 	if globalRole.InheritedFleetWorkspacePermissions.WorkspaceVerbs == nil || len(globalRole.InheritedFleetWorkspacePermissions.WorkspaceVerbs) == 0 {
 		return nil
 	}
@@ -145,6 +146,11 @@ func (h *BindingHandler) reconcileWorkspaceVerbsBindings(globalRoleBinding *v3.G
 	}
 
 	subjects := []v1.Subject{rbac.GetGRBSubject(globalRoleBinding)}
+	roleref := v1.RoleRef{
+		APIGroup: "rbac.authorization.k8s.io",
+		Kind:     "ClusterRole",
+		Name:     wrangler.SafeConcatName(globalRole.Name, fleetWorkspaceVerbsName),
+	}
 	if apierrors.IsNotFound(err) {
 		_, err = h.crbClient.Create(
 			&v1.ClusterRoleBinding{
@@ -163,18 +169,19 @@ func (h *BindingHandler) reconcileWorkspaceVerbsBindings(globalRoleBinding *v3.G
 						controllers.K8sManagedByKey: controllers.ManagerValue,
 					},
 				},
-				RoleRef: v1.RoleRef{
-					APIGroup: "rbac.authorization.k8s.io",
-					Kind:     "ClusterRole",
-					Name:     wrangler.SafeConcatName(globalRole.Name, fleetWorkspaceVerbsName),
-				},
+				RoleRef:  roleref,
 				Subjects: subjects,
 			})
 
 		return err
 	}
-	if !reflect.DeepEqual(crb.Subjects, subjects) {
+	if !reflect.DeepEqual(crb.Subjects, subjects) ||
+		reflect.DeepEqual(crb.RoleRef, roleref) ||
+		crb.Labels[grbOwnerLabel] != wrangler.SafeConcatName(globalRoleBinding.Name) {
+		// undo modifications if crb has changed.
 		crb.Subjects = subjects
+		crb.RoleRef = roleref
+		crb.Labels[grbOwnerLabel] = wrangler.SafeConcatName(globalRoleBinding.Name)
 		_, err := h.crbClient.Update(crb)
 
 		return err

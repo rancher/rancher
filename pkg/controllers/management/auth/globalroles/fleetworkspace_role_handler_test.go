@@ -1,4 +1,4 @@
-package fleetpermissions
+package globalroles
 
 import (
 	"github.com/rancher/rancher/pkg/controllers"
@@ -145,13 +145,13 @@ func TestReconcileFleetPermissions(t *testing.T) {
 		test := test
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			h := RoleHandler{
+			h := fleetWorkspaceRoleHandler{
 				crClient: test.crClient(),
 				crCache:  test.crCache(),
 				fwCache:  fleetDefaultAndLocalWorkspaceCacheMock(ctrl),
 			}
 
-			err := h.ReconcileFleetWorkspacePermissions(test.gr)
+			err := h.reconcileFleetWorkspacePermissions(test.gr)
 
 			assert.Equal(t, err, nil)
 		})
@@ -222,13 +222,13 @@ func TestReconcileFleetPermissions_errors(t *testing.T) {
 		test := test
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			h := RoleHandler{
+			h := fleetWorkspaceRoleHandler{
 				crClient: test.crClient(),
 				crCache:  test.crCache(),
 				fwCache:  test.fwCache(),
 			}
 
-			err := h.ReconcileFleetWorkspacePermissions(&v3.GlobalRole{
+			err := h.reconcileFleetWorkspacePermissions(&v3.GlobalRole{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: grName,
 					UID:  grUID,

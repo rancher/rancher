@@ -1,4 +1,4 @@
-package fleetpermissions
+package globalroles
 
 import (
 	"fmt"
@@ -22,18 +22,19 @@ const (
 	localFleetWorkspace            = "fleet-local"
 	fleetWorkspaceClusterRulesName = "fwcr"
 	fleetWorkspaceVerbsName        = "fwv"
-	grOwnerLabel                   = "authz.management.cattle.io/gr-owner" //TODO unexport
-
 )
 
-type RoleHandler struct {
+// fleetWorkspaceRoleHandler manages ClusterRoles created for the InheritedFleetWorkspacePermissions field. It manages 2 roles:
+// - 1) CR for ResourceRules
+// - 2) CR for WorkspaceVerbs
+type fleetWorkspaceRoleHandler struct {
 	crClient rbacv1.ClusterRoleController
 	crCache  rbacv1.ClusterRoleCache
 	fwCache  mgmtcontroller.FleetWorkspaceCache
 }
 
-func NewRoleHandler(management *config.ManagementContext) *RoleHandler {
-	return &RoleHandler{
+func newFleetWorkspaceRoleHandler(management *config.ManagementContext) *fleetWorkspaceRoleHandler {
+	return &fleetWorkspaceRoleHandler{
 		crClient: management.Wrangler.RBAC.ClusterRole(),
 		crCache:  management.Wrangler.RBAC.ClusterRole().Cache(),
 		fwCache:  management.Wrangler.Mgmt.FleetWorkspace().Cache(),
@@ -41,7 +42,7 @@ func NewRoleHandler(management *config.ManagementContext) *RoleHandler {
 }
 
 // ReconcileFleetWorkspacePermissions reconciles backing ClusterRoles created for granting permission to fleet workspaces.
-func (h *RoleHandler) ReconcileFleetWorkspacePermissions(globalRole *v3.GlobalRole) error {
+func (h *fleetWorkspaceRoleHandler) reconcileFleetWorkspacePermissions(globalRole *v3.GlobalRole) error {
 	if globalRole.InheritedFleetWorkspacePermissions.WorkspaceVerbs == nil &&
 		globalRole.InheritedFleetWorkspacePermissions.ResourceRules == nil {
 		return nil
@@ -57,7 +58,7 @@ func (h *RoleHandler) ReconcileFleetWorkspacePermissions(globalRole *v3.GlobalRo
 	return nil
 }
 
-func (h *RoleHandler) reconcileRulesClusterRole(globalRole *v3.GlobalRole) error {
+func (h *fleetWorkspaceRoleHandler) reconcileRulesClusterRole(globalRole *v3.GlobalRole) error {
 	crName := wrangler.SafeConcatName(globalRole.Name, fleetWorkspaceClusterRulesName)
 	cr, err := h.crCache.Get(crName)
 	if err != nil && !apierrors.IsNotFound(err) {
@@ -88,8 +89,11 @@ func (h *RoleHandler) reconcileRulesClusterRole(globalRole *v3.GlobalRole) error
 		return err
 	}
 
-	if !equality.Semantic.DeepEqual(cr.Rules, globalRole.InheritedFleetWorkspacePermissions.ResourceRules) {
+	if !equality.Semantic.DeepEqual(cr.Rules, globalRole.InheritedFleetWorkspacePermissions.ResourceRules) ||
+		cr.Labels[grOwnerLabel] != wrangler.SafeConcatName(globalRole.Name) {
+		// undo modifications if cr has changed
 		cr.Rules = globalRole.InheritedFleetWorkspacePermissions.ResourceRules
+		cr.Labels[grOwnerLabel] = wrangler.SafeConcatName(globalRole.Name)
 		_, err := h.crClient.Update(cr)
 
 		return err
@@ -98,7 +102,7 @@ func (h *RoleHandler) reconcileRulesClusterRole(globalRole *v3.GlobalRole) error
 	return err
 }
 
-func (h *RoleHandler) reconcileVerbsClusterRole(globalRole *v3.GlobalRole) error {
+func (h *fleetWorkspaceRoleHandler) reconcileVerbsClusterRole(globalRole *v3.GlobalRole) error {
 	if globalRole.InheritedFleetWorkspacePermissions.WorkspaceVerbs == nil || len(globalRole.InheritedFleetWorkspacePermissions.WorkspaceVerbs) == 0 {
 		return nil
 	}
@@ -148,8 +152,11 @@ func (h *RoleHandler) reconcileVerbsClusterRole(globalRole *v3.GlobalRole) error
 		})
 
 		return err
-	} else if !equality.Semantic.DeepEqual(cr.Rules, rules) {
+	} else if !equality.Semantic.DeepEqual(cr.Rules, rules) ||
+		cr.Labels[grOwnerLabel] != wrangler.SafeConcatName(globalRole.Name) {
+		// undo modifications if cr has changed
 		cr.Rules = rules
+		cr.Labels[grOwnerLabel] = wrangler.SafeConcatName(globalRole.Name)
 		_, err := h.crClient.Update(cr)
 
 		return err
