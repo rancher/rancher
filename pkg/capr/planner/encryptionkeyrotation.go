@@ -406,7 +406,7 @@ func (p *Planner) encryptionKeyRotationRestartService(controlPlane *rkev1.RKECon
 
 	runtime := capr.GetRuntime(controlPlane.Spec.KubernetesVersion)
 	if runtime == capr.RuntimeRKE2 {
-		if generated, instruction := generateManifestRemovalInstruction(runtime, entry); generated {
+		if generated, instruction := generateManifestRemovalInstruction(controlPlane, entry); generated {
 			nodePlan.Instructions = append(nodePlan.Instructions, convertToIdempotentInstruction(
 				controlPlane,
 				strings.ToLower(fmt.Sprintf("encryption-key-rotation/manifest-cleanup/%s", controlPlane.Status.RotateEncryptionKeysPhase)),

@@ -201,7 +201,7 @@ func (p *Planner) rotateCertificatesPlan(controlPlane *rkev1.RKEControlPlane, to
 		}
 	}
 	if runtime == capr.RuntimeRKE2 {
-		if generated, instruction := generateManifestRemovalInstruction(runtime, entry); generated {
+		if generated, instruction := generateManifestRemovalInstruction(controlPlane, entry); generated {
 			rotatePlan.Instructions = append(rotatePlan.Instructions, convertToIdempotentInstruction(
 				controlPlane,
 				"certificate-rotation/manifest-removal",
