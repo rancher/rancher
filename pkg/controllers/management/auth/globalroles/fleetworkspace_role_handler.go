@@ -48,17 +48,17 @@ func (h *fleetWorkspaceRoleHandler) reconcileFleetWorkspacePermissions(globalRol
 		return nil
 	}
 
-	if err := h.reconcileRulesClusterRole(globalRole); err != nil {
+	if err := h.reconcileResourceRules(globalRole); err != nil {
 		return fmt.Errorf("error reconciling fleet permissions cluster role: %w", err)
 	}
-	if err := h.reconcileVerbsClusterRole(globalRole); err != nil {
+	if err := h.reconcileWorkspaceVerbs(globalRole); err != nil {
 		return fmt.Errorf("error reconciling fleet workspace verbs cluster role: %w", err)
 	}
 
 	return nil
 }
 
-func (h *fleetWorkspaceRoleHandler) reconcileRulesClusterRole(globalRole *v3.GlobalRole) error {
+func (h *fleetWorkspaceRoleHandler) reconcileResourceRules(globalRole *v3.GlobalRole) error {
 	crName := wrangler.SafeConcatName(globalRole.Name, fleetWorkspaceClusterRulesName)
 	cr, err := h.crCache.Get(crName)
 	if err != nil && !apierrors.IsNotFound(err) {
@@ -100,7 +100,7 @@ func (h *fleetWorkspaceRoleHandler) reconcileRulesClusterRole(globalRole *v3.Glo
 	return err
 }
 
-func (h *fleetWorkspaceRoleHandler) reconcileVerbsClusterRole(globalRole *v3.GlobalRole) error {
+func (h *fleetWorkspaceRoleHandler) reconcileWorkspaceVerbs(globalRole *v3.GlobalRole) error {
 	if globalRole.InheritedFleetWorkspacePermissions.WorkspaceVerbs == nil || len(globalRole.InheritedFleetWorkspacePermissions.WorkspaceVerbs) == 0 {
 		return nil
 	}
