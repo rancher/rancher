@@ -1,11 +1,13 @@
 package planner
 
 import (
-	"encoding/base64"
 	"fmt"
+	"path"
 	"strings"
 
+	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
+	"github.com/rancher/rancher/pkg/capr"
 )
 
 const idempotentActionScript = `
@@ -16,9 +18,10 @@ key=$1
 targetHash=$2
 hashedCmd=$3
 cmd=$4
+caprDir=$5
 shift 4
 
-dataRoot="/var/lib/rancher/capr/idempotence/$key/$hashedCmd/$targetHash"
+dataRoot="$caprDir/idempotence/$key/$hashedCmd/$targetHash"
 attemptFile="$dataRoot/last-attempt"
 
 currentAttempt=$(cat "$attemptFile" || echo "-1")
@@ -32,19 +35,12 @@ else
 fi
 `
 
-const (
-	idempotentActionScriptPath = "/var/lib/rancher/capr/idempotence/idempotent.sh"
-)
-
-var idempotentScriptFile = plan.File{
-	Content: base64.StdEncoding.EncodeToString([]byte(idempotentActionScript)),
-	Path:    idempotentActionScriptPath,
-	Dynamic: true,
-	Minor:   true,
+func idempotentActionScriptPath(controlPlane *rkev1.RKEControlPlane) string {
+	return path.Join(capr.GetCaprVarDir(controlPlane), "idempotence/idempotent.sh")
 }
 
 // generateIdempotencyCleanupInstruction generates a one-time instruction that performs a cleanup of the given key.
-func generateIdempotencyCleanupInstruction(key string) plan.OneTimeInstruction {
+func generateIdempotencyCleanupInstruction(controlPlane *rkev1.RKEControlPlane, key string) plan.OneTimeInstruction {
 	if key == "" {
 		return plan.OneTimeInstruction{}
 	}
@@ -53,15 +49,15 @@ func generateIdempotencyCleanupInstruction(key string) plan.OneTimeInstruction {
 		Command: "/bin/sh",
 		Args: []string{
 			"-c",
-			fmt.Sprintf("rm -rf /var/lib/rancher/capr/idempotence/%s", key),
+			fmt.Sprintf("rm -rf %s/idempotence/%s", capr.GetCaprVarDir(controlPlane), key),
 		},
 	}
 }
 
 // idempotentInstruction generates an idempotent action instruction that will execute the given command + args exactly once.
-// It works by running a script that writes the given "value" to a file at /var/lib/rancher/idempotence/<identifier>/<hashedCommand>,
+// It works by running a script that writes the given "value" to a file at /var/lib/rancher/capr/idempotence/<identifier>/<hashedCommand>,
 // and checks this file to determine if it needs to run the instruction again. Notably, `identifier` must be a valid relative path.
-func idempotentInstruction(identifier, value, command string, args []string, env []string) plan.OneTimeInstruction {
+func idempotentInstruction(controlPlane *rkev1.RKEControlPlane, identifier, value, command string, args []string, env []string) plan.OneTimeInstruction {
 	hashedCommand := PlanHash([]byte(command))
 	hashedValue := PlanHash([]byte(value))
 	return plan.OneTimeInstruction{
@@ -69,11 +65,12 @@ func idempotentInstruction(identifier, value, command string, args []string, env
 		Command: "/bin/sh",
 		Args: append([]string{
 			"-x",
-			idempotentActionScriptPath,
+			idempotentActionScriptPath(controlPlane),
 			strings.ToLower(identifier),
 			hashedValue,
 			hashedCommand,
-			command},
+			command,
+			capr.GetCaprVarDir(controlPlane)},
 			args...),
 		Env: env,
 	}
@@ -81,8 +78,8 @@ func idempotentInstruction(identifier, value, command string, args []string, env
 
 // convertToIdempotentInstruction converts a OneTimeInstruction to a OneTimeInstruction wrapped with the idempotent script.
 // This is useful when an instruction may be used in various phases, without needing idempotency in all cases.
-func convertToIdempotentInstruction(identifier, value string, instruction plan.OneTimeInstruction) plan.OneTimeInstruction {
-	newInstruction := idempotentInstruction(identifier, value, instruction.Command, instruction.Args, instruction.Env)
+func convertToIdempotentInstruction(controlPlane *rkev1.RKEControlPlane, identifier, value string, instruction plan.OneTimeInstruction) plan.OneTimeInstruction {
+	newInstruction := idempotentInstruction(controlPlane, identifier, value, instruction.Command, instruction.Args, instruction.Env)
 	newInstruction.Image = instruction.Image
 	newInstruction.SaveOutput = instruction.SaveOutput
 	return newInstruction
@@ -90,9 +87,10 @@ func convertToIdempotentInstruction(identifier, value string, instruction plan.O
 
 // idempotentRestartInstructions generates an idempotent restart instructions for the given runtimeUnit. It checks the
 // unit for failure, resets it if necessary, and restarts the unit.
-func idempotentRestartInstructions(identifier, value, runtimeUnit string) []plan.OneTimeInstruction {
+func idempotentRestartInstructions(controlPlane *rkev1.RKEControlPlane, identifier, value, runtimeUnit string) []plan.OneTimeInstruction {
 	return []plan.OneTimeInstruction{
 		idempotentInstruction(
+			controlPlane,
 			identifier+"-reset-failed",
 			value,
 			"/bin/sh",
@@ -103,6 +101,7 @@ func idempotentRestartInstructions(identifier, value, runtimeUnit string) []plan
 			[]string{},
 		),
 		idempotentInstruction(
+			controlPlane,
 			identifier+"-restart",
 			value,
 			"systemctl",

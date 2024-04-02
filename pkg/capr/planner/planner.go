@@ -1045,6 +1045,13 @@ func (p *Planner) generatePlanWithConfigFiles(controlPlane *rkev1.RKEControlPlan
 
 		nodePlan, err = addOtherFiles(nodePlan, controlPlane, entry)
 
+		idempotentScriptFile := plan.File{
+			Content: base64.StdEncoding.EncodeToString([]byte(idempotentActionScript)),
+			Path:    idempotentActionScriptPath(controlPlane),
+			Dynamic: true,
+			Minor:   true,
+		}
+
 		nodePlan.Files = append(nodePlan.Files, idempotentScriptFile)
 
 		return nodePlan, config, joinedServer, err

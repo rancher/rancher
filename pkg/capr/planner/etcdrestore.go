@@ -646,7 +646,7 @@ func (p *Planner) runEtcdRestoreServiceStop(controlPlane *rkev1.RKEControlPlane,
 			return err
 		}
 		// Clean up previous restoration tracking attempts before starting this restoration.
-		stopPlan.Instructions = append(stopPlan.Instructions, generateIdempotencyCleanupInstruction("etcd-restore"))
+		stopPlan.Instructions = append(stopPlan.Instructions, generateIdempotencyCleanupInstruction(controlPlane, "etcd-restore"))
 		if isEtcd(server) {
 			stopPlan.Instructions = append(stopPlan.Instructions, generateCreateEtcdTombstoneInstruction(controlPlane))
 		}
