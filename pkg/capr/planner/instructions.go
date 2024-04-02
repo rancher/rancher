@@ -103,9 +103,8 @@ func (p *Planner) addInitNodePeriodicInstruction(nodePlan plan.NodePlan, control
 			Args: []string{
 				"-c",
 				// the grep here is to make the command fail if we don't get the output we expect, like empty string.
-				fmt.Sprintf("curl -f --retry 100 --retry-delay 5 --cacert "+
-					"/var/lib/rancher/%s/server/tls/server-ca.crt https://localhost:%d/db/info | grep 'clientURLs'",
-					capr.GetRuntime(controlPlane.Spec.KubernetesVersion),
+				fmt.Sprintf("curl -f --retry 100 --retry-delay 5 --cacert %s https://localhost:%d/db/info | grep 'clientURLs'",
+					path.Join(capr.GetDataDir(controlPlane), "server/tls/server-ca.crt"),
 					capr.GetRuntimeSupervisorPort(controlPlane.Spec.KubernetesVersion)),
 			},
 			PeriodSeconds: 600,
@@ -115,7 +114,7 @@ func (p *Planner) addInitNodePeriodicInstruction(nodePlan plan.NodePlan, control
 			Command: "sh",
 			Args: []string{
 				"-c",
-				fmt.Sprintf("cat /var/lib/rancher/%s/server/db/etcd/name", capr.GetRuntime(controlPlane.Spec.KubernetesVersion)),
+				fmt.Sprintf("cat %s", path.Join(capr.GetDataDir(controlPlane), "server/db/etcd/name")),
 			},
 			PeriodSeconds: 600,
 		},
