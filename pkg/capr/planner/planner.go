@@ -58,7 +58,7 @@ const (
 	CertDirArgument                               = "cert-dir"
 	TLSCertFileArgument                           = "tls-cert-file"
 
-	authnWebhookFileName = "/var/lib/rancher/%s/kube-api-authn-webhook.yaml"
+	authnWebhookFileName = "kube-api-authn-webhook.yaml"
 	ConfigYamlFileName   = "/etc/rancher/%s/config.yaml.d/50-rancher.yaml"
 
 	bootstrapTier    = "bootstrap"

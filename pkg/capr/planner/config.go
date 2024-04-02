@@ -167,7 +167,7 @@ func addLocalClusterAuthenticationEndpointConfig(config map[string]interface{}, 
 		return
 	}
 
-	authFile := fmt.Sprintf(authnWebhookFileName, capr.GetRuntime(controlPlane.Spec.KubernetesVersion))
+	authFile := path.Join(capr.GetDataDir(controlPlane), authnWebhookFileName)
 	config["kube-apiserver-arg"] = append(convert.ToStringSlice(config["kube-apiserver-arg"]),
 		fmt.Sprintf("authentication-token-webhook-config-file=%s", authFile))
 }
@@ -178,7 +178,7 @@ func addLocalClusterAuthenticationEndpointFile(nodePlan plan.NodePlan, controlPl
 	}
 
 	loopbackAddress := capr.GetLoopbackAddress(controlPlane)
-	authFile := fmt.Sprintf(authnWebhookFileName, capr.GetRuntime(controlPlane.Spec.KubernetesVersion))
+	authFile := path.Join(capr.GetDataDir(controlPlane), authnWebhookFileName)
 	nodePlan.Files = append(nodePlan.Files, plan.File{
 		Content: base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf(AuthnWebhook, loopbackAddress))),
 		Path:    authFile,
