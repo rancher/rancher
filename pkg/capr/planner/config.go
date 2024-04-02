@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"path"
 	"sort"
 	"strconv"
 	"strings"
@@ -279,7 +280,7 @@ func (p *Planner) addChartConfigs(nodePlan plan.NodePlan, controlPlane *rkev1.RK
 
 	nodePlan.Files = append(nodePlan.Files, plan.File{
 		Content: base64.StdEncoding.EncodeToString(contents),
-		Path:    fmt.Sprintf("/var/lib/rancher/%s/server/manifests/rancher/managed-chart-config.yaml", capr.GetRuntime(controlPlane.Spec.KubernetesVersion)),
+		Path:    path.Join(capr.GetDataDir(controlPlane), "server/manifests/rancher/managed-chart-config.yaml"),
 		Dynamic: true,
 	})
 
@@ -460,7 +461,7 @@ func checkForSecretFormat(secretFieldName, configValue string) (bool, string, st
 
 // configFile renders the full path to a config file based on the passed in filename and controlPlane
 // If the desired filename does not have a defined path template in the `filePaths` map, the function will fall back
-// to rendering a filepath based on `/var/lib/rancher/%s/etc/config-files/%s` where the first %s is the runtime and
+// to rendering a filepath based on `%s/etc/config-files/%s` where the first %s is the data-dir and
 // second %s is the filename.
 func configFile(controlPlane *rkev1.RKEControlPlane, filename string) string {
 	if path := filePaths[filename]; path != "" {
@@ -469,8 +470,7 @@ func configFile(controlPlane *rkev1.RKEControlPlane, filename string) string {
 		}
 		return path
 	}
-	return fmt.Sprintf("/var/lib/rancher/%s/etc/config-files/%s",
-		capr.GetRuntime(controlPlane.Spec.KubernetesVersion), filename)
+	return path.Join(capr.GetDataDir(controlPlane), "etc/config-files", filename)
 }
 
 func (p *Planner) renderFiles(controlPlane *rkev1.RKEControlPlane, entry *planEntry) ([]plan.File, error) {
