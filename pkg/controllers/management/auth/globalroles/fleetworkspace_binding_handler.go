@@ -119,12 +119,10 @@ func (h *fleetWorkspaceBindingHandler) reconcileResourceRulesBindings(globalRole
 				returnError = multierror.Append(returnError, err)
 			}
 		} else if !reflect.DeepEqual(rb.Subjects, subjects) ||
-			reflect.DeepEqual(rb.RoleRef, roleref) ||
-			rb.Labels[grbOwnerLabel] != wrangler.SafeConcatName(globalRoleBinding.Name) {
+			reflect.DeepEqual(rb.RoleRef, roleref) {
 			// undo modifications if rb has changed.
 			rb.Subjects = subjects
 			rb.RoleRef = roleref
-			rb.Labels[grbOwnerLabel] = wrangler.SafeConcatName(globalRoleBinding.Name)
 			_, err := h.rbClient.Update(rb)
 			if err != nil {
 				returnError = multierror.Append(returnError, err)
@@ -176,12 +174,10 @@ func (h *fleetWorkspaceBindingHandler) reconcileWorkspaceVerbsBindings(globalRol
 		return err
 	}
 	if !reflect.DeepEqual(crb.Subjects, subjects) ||
-		reflect.DeepEqual(crb.RoleRef, roleref) ||
-		crb.Labels[grbOwnerLabel] != wrangler.SafeConcatName(globalRoleBinding.Name) {
+		reflect.DeepEqual(crb.RoleRef, roleref) {
 		// undo modifications if crb has changed.
 		crb.Subjects = subjects
 		crb.RoleRef = roleref
-		crb.Labels[grbOwnerLabel] = wrangler.SafeConcatName(globalRoleBinding.Name)
 		_, err := h.crbClient.Update(crb)
 
 		return err

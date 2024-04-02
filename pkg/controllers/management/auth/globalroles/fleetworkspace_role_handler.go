@@ -89,11 +89,9 @@ func (h *fleetWorkspaceRoleHandler) reconcileRulesClusterRole(globalRole *v3.Glo
 		return err
 	}
 
-	if !equality.Semantic.DeepEqual(cr.Rules, globalRole.InheritedFleetWorkspacePermissions.ResourceRules) ||
-		cr.Labels[grOwnerLabel] != wrangler.SafeConcatName(globalRole.Name) {
+	if !equality.Semantic.DeepEqual(cr.Rules, globalRole.InheritedFleetWorkspacePermissions.ResourceRules) {
 		// undo modifications if cr has changed
 		cr.Rules = globalRole.InheritedFleetWorkspacePermissions.ResourceRules
-		cr.Labels[grOwnerLabel] = wrangler.SafeConcatName(globalRole.Name)
 		_, err := h.crClient.Update(cr)
 
 		return err
@@ -152,11 +150,9 @@ func (h *fleetWorkspaceRoleHandler) reconcileVerbsClusterRole(globalRole *v3.Glo
 		})
 
 		return err
-	} else if !equality.Semantic.DeepEqual(cr.Rules, rules) ||
-		cr.Labels[grOwnerLabel] != wrangler.SafeConcatName(globalRole.Name) {
+	} else if !equality.Semantic.DeepEqual(cr.Rules, rules) {
 		// undo modifications if cr has changed
 		cr.Rules = rules
-		cr.Labels[grOwnerLabel] = wrangler.SafeConcatName(globalRole.Name)
 		_, err := h.crClient.Update(cr)
 
 		return err
