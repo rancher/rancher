@@ -3,6 +3,7 @@ package planner
 import (
 	"encoding/base64"
 	"fmt"
+	"path"
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
@@ -29,7 +30,7 @@ func (p *Planner) getControlPlaneManifests(controlPlane *rkev1.RKEControlPlane, 
 		return nil, nil
 	}
 
-	clusterAgent, err := p.getClusterAgentManifestFile(controlPlane, capr.GetRuntime(controlPlane.Spec.KubernetesVersion), entry)
+	clusterAgent, err := p.getClusterAgentManifestFile(controlPlane, entry)
 	if err != nil {
 		return nil, err
 	}
@@ -43,7 +44,7 @@ func (p *Planner) getControlPlaneManifests(controlPlane *rkev1.RKEControlPlane, 
 		result = append(result, *snapshotMetadata)
 	}
 
-	addons := p.getAddons(controlPlane, capr.GetRuntime(controlPlane.Spec.KubernetesVersion))
+	addons := p.getAddons(controlPlane)
 	result = append(result, addons)
 
 	return result, nil
@@ -56,17 +57,18 @@ func getEtcdSnapshotExtraMetadata(controlPlane *rkev1.RKEControlPlane, runtime s
 		cm := fmt.Sprintf(EtcdSnapshotExtraMetadataConfigMapTemplate, runtime, metav1.NamespaceSystem, EtcdSnapshotConfigMapKey, v)
 		return &plan.File{
 			Content: base64.StdEncoding.EncodeToString([]byte(cm)),
-			Path:    fmt.Sprintf("/var/lib/rancher/%s/server/manifests/rancher/%s-etcd-snapshot-extra-metadata.yaml", runtime, runtime),
+			Path:    path.Join(capr.GetDataDir(controlPlane), fmt.Sprintf("server/manifests/rancher/%s-etcd-snapshot-extra-metadata.yaml", runtime)),
 			Dynamic: true,
 			Minor:   true,
 		}
 	}
+
 	logrus.Errorf("rkecluster %s/%s: unable to find cluster spec annotation for control plane", controlPlane.Spec.ClusterName, controlPlane.Namespace)
 	return nil
 }
 
 // getClusterAgentManifestFile returns a plan.File that contains the cluster agent manifest.
-func (p *Planner) getClusterAgentManifestFile(controlPlane *rkev1.RKEControlPlane, runtime string, entry *planEntry) (plan.File, error) {
+func (p *Planner) getClusterAgentManifestFile(controlPlane *rkev1.RKEControlPlane, entry *planEntry) (plan.File, error) {
 	data, err := p.generateClusterAgentManifest(controlPlane, entry)
 	if err != nil {
 		return plan.File{}, err
@@ -74,17 +76,17 @@ func (p *Planner) getClusterAgentManifestFile(controlPlane *rkev1.RKEControlPlan
 
 	return plan.File{
 		Content: base64.StdEncoding.EncodeToString(data),
-		Path:    fmt.Sprintf("/var/lib/rancher/%s/server/manifests/rancher/cluster-agent.yaml", runtime),
+		Path:    path.Join(capr.GetDataDir(controlPlane), "server/manifests/rancher/cluster-agent.yaml"),
 		Dynamic: true,
 		Minor:   true,
 	}, nil
 }
 
 // getAddons returns a plan.File that contains the content of the defined additional manifests.
-func (p *Planner) getAddons(controlPlane *rkev1.RKEControlPlane, runtime string) plan.File {
+func (p *Planner) getAddons(controlPlane *rkev1.RKEControlPlane) plan.File {
 	return plan.File{
 		Content: base64.StdEncoding.EncodeToString([]byte(controlPlane.Spec.AdditionalManifest)),
-		Path:    fmt.Sprintf("/var/lib/rancher/%s/server/manifests/rancher/addons.yaml", runtime),
+		Path:    path.Join(capr.GetDataDir(controlPlane), "server/manifests/rancher/addons.yaml"),
 		Dynamic: true,
 	}
 }
