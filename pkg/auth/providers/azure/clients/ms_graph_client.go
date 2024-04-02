@@ -4,11 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/AzureAD/microsoft-authentication-library-for-go/apps/cache"
 	"github.com/AzureAD/microsoft-authentication-library-for-go/apps/confidential"
-	"github.com/hashicorp/go-azure-sdk/sdk/environments"
 	"github.com/hashicorp/go-azure-sdk/sdk/odata"
 	"github.com/manicminer/hamilton/msgraph"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -46,7 +46,7 @@ func (c azureMSGraphClient) GetUser(id string) (v3.Principal, error) {
 	if err != nil {
 		return v3.Principal{}, err
 	}
-	return c.userToPrincipal(*user)
+	return c.userToPrincipal(*user), nil
 }
 
 // ListUsers fetches all user principals in a directory from the Microsoft Graph API.
@@ -57,11 +57,7 @@ func (c azureMSGraphClient) ListUsers(filter string) ([]v3.Principal, error) {
 	}
 	var principals []v3.Principal
 	for _, u := range *users {
-		principal, err := c.userToPrincipal(u)
-		if err != nil {
-			return nil, err
-		}
-		principals = append(principals, principal)
+		principals = append(principals, c.userToPrincipal(u))
 	}
 	return principals, err
 }
@@ -72,7 +68,7 @@ func (c azureMSGraphClient) GetGroup(id string) (v3.Principal, error) {
 	if err != nil {
 		return v3.Principal{}, err
 	}
-	return c.groupToPrincipal(*g)
+	return c.groupToPrincipal(*g), nil
 }
 
 // ListGroups fetches all group principals in a directory from the Microsoft Graph API.
@@ -83,11 +79,7 @@ func (c azureMSGraphClient) ListGroups(filter string) ([]v3.Principal, error) {
 	}
 	var principals []v3.Principal
 	for _, u := range *groups {
-		principal, err := c.groupToPrincipal(u)
-		if err != nil {
-			return nil, err
-		}
-		principals = append(principals, principal)
+		principals = append(principals, c.groupToPrincipal(u))
 	}
 	return principals, err
 }
@@ -100,8 +92,8 @@ func (c azureMSGraphClient) ListGroupMemberships(id string) ([]string, error) {
 	}
 	var names []string
 	for _, g := range *groups {
-		if g.ID != nil && g.DisplayName != nil && g.SecurityEnabled != nil {
-			names = append(names, *g.ID)
+		if id := g.ID(); id != nil && g.DisplayName != nil && g.SecurityEnabled != nil {
+			names = append(names, *id)
 		}
 	}
 	return names, nil
@@ -159,12 +151,12 @@ type authorizer struct {
 }
 
 // AuxiliaryTokens is a no-op that satisfies the Authorizer interface for the SDK to the Microsoft Graph API.
-func (a *authorizer) AuxiliaryTokens() ([]*oauth2.Token, error) {
+func (a *authorizer) AuxiliaryTokens(context.Context, *http.Request) ([]*oauth2.Token, error) {
 	return nil, nil
 }
 
 // Token transforms the underlying provider access token into an OAuth2 token.
-func (a *authorizer) Token() (*oauth2.Token, error) {
+func (a *authorizer) Token(context.Context, *http.Request) (*oauth2.Token, error) {
 	return &oauth2.Token{
 		AccessToken: a.authResult.AccessToken,
 		TokenType:   "Bearer",
@@ -263,14 +255,14 @@ func NewMSGraphClient(config *v32.AzureADConfig, secrets corev1.SecretInterface)
 	authResult := getCustomAuthResult(&ar)
 	authorizer := authorizer{authResult: authResult}
 
-	userClient := msgraph.NewUsersClient(config.TenantID)
-	userClient.BaseClient.Endpoint = environments.ApiEndpoint(config.GraphEndpoint)
+	userClient := msgraph.NewUsersClient()
+	userClient.BaseClient.Endpoint = config.GraphEndpoint
 	userClient.BaseClient.Authorizer = &authorizer
 	userClient.BaseClient.ApiVersion = msgraph.Version10
 	userClient.BaseClient.DisableRetries = true
 
-	groupClient := msgraph.NewGroupsClient(config.TenantID)
-	groupClient.BaseClient.Endpoint = environments.ApiEndpoint(config.GraphEndpoint)
+	groupClient := msgraph.NewGroupsClient()
+	groupClient.BaseClient.Endpoint = config.GraphEndpoint
 	groupClient.BaseClient.Authorizer = &authorizer
 	groupClient.BaseClient.ApiVersion = msgraph.Version10
 	groupClient.BaseClient.DisableRetries = true
@@ -290,21 +282,23 @@ func getCustomAuthResult(result *confidential.AuthResult) *customAuthResult {
 	}
 }
 
-func (c azureMSGraphClient) userToPrincipal(user msgraph.User) (v3.Principal, error) {
+func (c azureMSGraphClient) userToPrincipal(user msgraph.User) v3.Principal {
+	userID := user.ID()
 	return v3.Principal{
-		ObjectMeta:    metav1.ObjectMeta{Name: Name + "_user://" + *user.ID},
+		ObjectMeta:    metav1.ObjectMeta{Name: Name + "_user://" + *userID},
 		DisplayName:   *user.DisplayName,
 		LoginName:     *user.UserPrincipalName,
 		PrincipalType: "user",
 		Provider:      Name,
-	}, nil
+	}
 }
 
-func (c azureMSGraphClient) groupToPrincipal(group msgraph.Group) (v3.Principal, error) {
+func (c azureMSGraphClient) groupToPrincipal(group msgraph.Group) v3.Principal {
+	groupID := group.ID()
 	return v3.Principal{
-		ObjectMeta:    metav1.ObjectMeta{Name: Name + "_group://" + *group.ID},
+		ObjectMeta:    metav1.ObjectMeta{Name: Name + "_group://" + *groupID},
 		DisplayName:   *group.DisplayName,
 		PrincipalType: "group",
 		Provider:      Name,
-	}, nil
+	}
 }
