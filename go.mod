@@ -95,10 +95,11 @@ require (
 	github.com/google/go-containerregistry v0.15.2
 	github.com/gorilla/mux v1.8.0
 	github.com/gorilla/websocket v1.5.0
+	github.com/hashicorp/go-azure-sdk/sdk v0.20240125.1115017
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/heptio/authenticator v0.0.0-20180409043135-d282f87a1972
-	github.com/manicminer/hamilton v0.46.0
+	github.com/manicminer/hamilton v0.67.0
 	github.com/mattn/go-colorable v0.1.13
 	github.com/mcuadros/go-version v0.0.0-20190830083331-035f6764e8d2
 	github.com/minio/minio-go/v7 v7.0.10
@@ -198,6 +199,7 @@ require (
 	github.com/googleapis/enterprise-certificate-proxy v0.3.2 // indirect
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.1-0.20210315223345-82c243799c99 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.15.2 // indirect
+	github.com/hashicorp/go-azure-helpers v0.66.1 // indirect
 	github.com/klauspost/cpuid/v2 v2.0.9 // indirect
 	github.com/klauspost/pgzip v1.2.6 // indirect
 	github.com/kr/fs v0.1.0 // indirect
@@ -240,6 +242,7 @@ require (
 	k8s.io/kms v0.27.9 // indirect
 	k8s.io/kubelet v0.27.9 // indirect
 	k8s.io/pod-security-admission v0.27.6 // indirect
+	software.sslmate.com/src/go-pkcs12 v0.4.0 // indirect
 )
 
 require (
@@ -313,8 +316,8 @@ require (
 	github.com/gregjones/httpcache v0.0.0-20190611155906-901d90724c79 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
-	github.com/hashicorp/go-retryablehttp v0.7.4 // indirect
-	github.com/hashicorp/go-uuid v1.0.2 // indirect
+	github.com/hashicorp/go-retryablehttp v0.7.5 // indirect
+	github.com/hashicorp/go-uuid v1.0.3 // indirect
 	github.com/hashicorp/go-version v1.6.0 // indirect
 	github.com/huandu/xstrings v1.4.0 // indirect
 	github.com/imdario/mergo v0.3.16 // indirect
