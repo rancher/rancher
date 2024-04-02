@@ -239,6 +239,27 @@ func GetLoopbackAddress(controlPlane *rkev1.RKEControlPlane) string {
 	return "127.0.0.1"
 }
 
+func GetDataDir(controlPlane *rkev1.RKEControlPlane) string {
+	if dataDir := controlPlane.Spec.DataDir; dataDir != "" {
+		return dataDir
+	}
+	return fmt.Sprintf("/var/lib/rancher/%s", GetRuntime(controlPlane.Spec.KubernetesVersion))
+}
+
+func GetCaprVarDir(controlPlane *rkev1.RKEControlPlane) string {
+	if caprVarDir := controlPlane.Spec.CaprVarDir; caprVarDir != "" {
+		return caprVarDir
+	}
+	return "/var/lib/rancher/capr"
+}
+
+func GetSystemAgentVarDir(controlPlane *rkev1.RKEControlPlane) string {
+	if systemAgentVarDir := controlPlane.Spec.SystemAgentVarDir; systemAgentVarDir != "" {
+		return systemAgentVarDir
+	}
+	return "/var/lib/rancher/agent"
+}
+
 func IsOwnedByMachine(bootstrapCache rkecontroller.RKEBootstrapCache, machineName string, sa *corev1.ServiceAccount) (bool, error) {
 	for _, owner := range sa.OwnerReferences {
 		if owner.Kind == "RKEBootstrap" {
