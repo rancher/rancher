@@ -42,6 +42,7 @@ const (
 	rkeBootstrapName                       = "rke.cattle.io/rkebootstrap-name"
 	capiMachinePreTerminateAnnotation      = "pre-terminate.delete.hook.machine.cluster.x-k8s.io/rke-bootstrap-cleanup"
 	capiMachinePreTerminateAnnotationOwner = "rke-bootstrap-controller"
+	systemAgentVarDirEnvVar                = "CATTLE_AGENT_VAR_DIR"
 )
 
 type handler struct {
@@ -135,6 +136,7 @@ func (h *handler) getBootstrapSecret(namespace, name string, envVars []corev1.En
 	if os := machine.GetLabels()[capr.CattleOSLabel]; os == capr.WindowsMachineOS {
 		is = installer.WindowsInstallScript
 	}
+
 	data, err := is(context.WithValue(context.Background(), tls.InternalAPI, hasHostPort), base64.URLEncoding.EncodeToString(hash[:]), envVars, "")
 	if err != nil {
 		return nil, err
@@ -218,16 +220,26 @@ func (h *handler) getEnvVar(bootstrap *rkev1.RKEBootstrap, capiCluster *capi.Clu
 		return nil, nil
 	}
 
-	cp, err := h.rkeControlPlanes.Get(bootstrap.Namespace, capiCluster.Spec.ControlPlaneRef.Name)
+	controlPlane, err := h.rkeControlPlanes.Get(bootstrap.Namespace, capiCluster.Spec.ControlPlaneRef.Name)
 	if err != nil {
 		return nil, err
 	}
 
 	var result []corev1.EnvVar
-	for _, env := range cp.Spec.AgentEnvVars {
+	for _, env := range controlPlane.Spec.AgentEnvVars {
+		// Disallow user supplied system agent var dir env var in favor of spec.systemAgentVarDir
+		if env.Name == systemAgentVarDirEnvVar {
+			continue
+		}
 		result = append(result, corev1.EnvVar{
 			Name:  env.Name,
 			Value: env.Value,
+		})
+	}
+	if varDir := controlPlane.Spec.SystemAgentVarDir; varDir != "" {
+		result = append(result, corev1.EnvVar{
+			Name:  systemAgentVarDirEnvVar,
+			Value: varDir,
 		})
 	}
 
