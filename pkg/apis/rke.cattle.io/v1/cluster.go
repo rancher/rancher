@@ -64,6 +64,7 @@ type RKEClusterSpecCommon struct {
 	Registries            *Registry              `json:"registries,omitempty"`
 	ETCD                  *ETCD                  `json:"etcd,omitempty"`
 	SystemAgentVarDir     string                 `json:"systemAgentVarDir,omitempty"`
+	DataDir               string                 `json:"dataDir,omitempty"`
 	// Networking contains information regarding the desired and actual networking stack of the cluster.
 	Networking *Networking `json:"networking,omitempty"`
 
