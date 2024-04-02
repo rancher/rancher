@@ -142,14 +142,14 @@ func addRoleConfig(config map[string]interface{}, controlPlane *rkev1.RKEControl
 	// to run.
 	if isControlPlane(entry) {
 		logrus.Debug("addRoleConfig rendering arguments and mounts for kube-controller-manager")
-		certDirArg, certDirMount := renderArgAndMount(config[KubeControllerManagerArg], config[KubeControllerManagerExtraMount], runtime, DefaultKubeControllerManagerDefaultSecurePort, DefaultKubeControllerManagerCertDir)
+		certDirArg, certDirMount := renderArgAndMount(config[KubeControllerManagerArg], config[KubeControllerManagerExtraMount], controlPlane, DefaultKubeControllerManagerDefaultSecurePort, DefaultKubeControllerManagerCertDir)
 		config[KubeControllerManagerArg] = certDirArg
 		if runtime == capr.RuntimeRKE2 {
 			config[KubeControllerManagerExtraMount] = certDirMount
 		}
 
 		logrus.Debug("addRoleConfig rendering arguments and mounts for kube-scheduler")
-		certDirArg, certDirMount = renderArgAndMount(config[KubeSchedulerArg], config[KubeSchedulerExtraMount], runtime, DefaultKubeSchedulerDefaultSecurePort, DefaultKubeSchedulerCertDir)
+		certDirArg, certDirMount = renderArgAndMount(config[KubeSchedulerArg], config[KubeSchedulerExtraMount], controlPlane, DefaultKubeSchedulerDefaultSecurePort, DefaultKubeSchedulerCertDir)
 		config[KubeSchedulerArg] = certDirArg
 		if runtime == capr.RuntimeRKE2 {
 			config[KubeSchedulerExtraMount] = certDirMount
