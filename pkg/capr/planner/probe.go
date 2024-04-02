@@ -38,9 +38,9 @@ var (
 			FailureThreshold:    2,
 			HTTPGetAction: plan.HTTPGetAction{
 				URL:        "https://%s:6443/readyz",
-				CACert:     "/var/lib/rancher/%s/server/tls/server-ca.crt",
-				ClientCert: "/var/lib/rancher/%s/server/tls/client-kube-apiserver.crt",
-				ClientKey:  "/var/lib/rancher/%s/server/tls/client-kube-apiserver.key",
+				CACert:     "%s/server/tls/server-ca.crt",
+				ClientCert: "%s/server/tls/client-kube-apiserver.crt",
+				ClientKey:  "%s/server/tls/client-kube-apiserver.key",
 			},
 		},
 		"kube-scheduler": {
@@ -143,7 +143,7 @@ func (p *Planner) generateProbes(controlPlane *rkev1.RKEControlPlane, entry *pla
 		probes[probeName] = allProbes[probeName]
 	}
 
-	probes = replaceRuntimeForProbes(probes, runtime)
+	probes = insertDataDirForProbes(controlPlane, probes)
 
 	loopbackAddress := capr.GetLoopbackAddress(controlPlane)
 
@@ -182,13 +182,14 @@ func replaceCACertAndPortForProbes(probe plan.Probe, cacert, host, port string) 
 	return probe, nil
 }
 
-// replaceRuntimeForProbes will insert the k8s runtime for all probes based on the runtime provider.
-func replaceRuntimeForProbes(probes map[string]plan.Probe, runtime string) map[string]plan.Probe {
+// insertDataDirForProbes will insert the data-dir for all probes based on the controlplane object.
+func insertDataDirForProbes(controlPlane *rkev1.RKEControlPlane, probes map[string]plan.Probe) map[string]plan.Probe {
 	result := make(map[string]plan.Probe, len(probes))
+	dataDir := capr.GetDataDir(controlPlane)
 	for k, v := range probes {
-		v.HTTPGetAction.CACert = replaceIfFormatSpecifier(v.HTTPGetAction.CACert, runtime)
-		v.HTTPGetAction.ClientCert = replaceIfFormatSpecifier(v.HTTPGetAction.ClientCert, runtime)
-		v.HTTPGetAction.ClientKey = replaceIfFormatSpecifier(v.HTTPGetAction.ClientKey, runtime)
+		v.HTTPGetAction.CACert = replaceIfFormatSpecifier(v.HTTPGetAction.CACert, dataDir)
+		v.HTTPGetAction.ClientCert = replaceIfFormatSpecifier(v.HTTPGetAction.ClientCert, dataDir)
+		v.HTTPGetAction.ClientKey = replaceIfFormatSpecifier(v.HTTPGetAction.ClientKey, dataDir)
 		result[k] = v
 	}
 	return result
