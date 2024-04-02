@@ -2,6 +2,7 @@ package planner
 
 import (
 	"fmt"
+	"path"
 	"strconv"
 	"strings"
 
@@ -85,7 +86,11 @@ func (p *Planner) rotateCertificatesPlan(controlPlane *rkev1.RKEControlPlane, to
 	}
 
 	if isOnlyWorker(entry) {
-		rotatePlan.Instructions = append(rotatePlan.Instructions, idempotentRestartInstructions("certificate-rotation/restart", strconv.FormatInt(rotation.Generation, 10), capr.GetRuntimeAgentUnit(controlPlane.Spec.KubernetesVersion))...)
+		rotatePlan.Instructions = append(rotatePlan.Instructions, idempotentRestartInstructions(
+			controlPlane,
+			"certificate-rotation/restart",
+			strconv.FormatInt(rotation.Generation, 10),
+			capr.GetRuntimeAgentUnit(controlPlane.Spec.KubernetesVersion))...)
 		return rotatePlan, joinedServer, nil
 	}
 
@@ -103,6 +108,7 @@ func (p *Planner) rotateCertificatesPlan(controlPlane *rkev1.RKEControlPlane, to
 	runtime := capr.GetRuntime(controlPlane.Spec.KubernetesVersion)
 
 	rotatePlan.Instructions = append(rotatePlan.Instructions, idempotentInstruction(
+		controlPlane,
 		"certificate-rotation/rotate",
 		strconv.FormatInt(rotation.Generation, 10),
 		capr.GetRuntime(controlPlane.Spec.KubernetesVersion),
@@ -115,6 +121,7 @@ func (p *Planner) rotateCertificatesPlan(controlPlane *rkev1.RKEControlPlane, to
 			if kcmCertDir := getArgValue(config[KubeControllerManagerArg], CertDirArgument, "="); kcmCertDir != "" && getArgValue(config[KubeControllerManagerArg], TLSCertFileArgument, "=") == "" {
 				rotatePlan.Instructions = append(rotatePlan.Instructions, []plan.OneTimeInstruction{
 					idempotentInstruction(
+						controlPlane,
 						"certificate-rotation/rm-kcm-cert",
 						strconv.FormatInt(rotation.Generation, 10),
 						"rm",
@@ -125,6 +132,7 @@ func (p *Planner) rotateCertificatesPlan(controlPlane *rkev1.RKEControlPlane, to
 						[]string{},
 					),
 					idempotentInstruction(
+						controlPlane,
 						"certificate-rotation/rm-kcm-key",
 						strconv.FormatInt(rotation.Generation, 10),
 						"rm",
@@ -137,12 +145,13 @@ func (p *Planner) rotateCertificatesPlan(controlPlane *rkev1.RKEControlPlane, to
 				}...)
 				if runtime == capr.RuntimeRKE2 {
 					rotatePlan.Instructions = append(rotatePlan.Instructions, idempotentInstruction(
+						controlPlane,
 						"certificate-rotation/rm-kcm-spm",
 						strconv.FormatInt(rotation.Generation, 10),
 						"rm",
 						[]string{
 							"-f",
-							"/var/lib/rancher/rke2/agent/pod-manifests/kube-controller-manager.yaml",
+							path.Join(capr.GetDataDir(controlPlane), "/agent/pod-manifests/kube-controller-manager.yaml"),
 						},
 						[]string{},
 					))
@@ -153,6 +162,7 @@ func (p *Planner) rotateCertificatesPlan(controlPlane *rkev1.RKEControlPlane, to
 			if ksCertDir := getArgValue(config[KubeSchedulerArg], CertDirArgument, "="); ksCertDir != "" && getArgValue(config[KubeSchedulerArg], TLSCertFileArgument, "=") == "" {
 				rotatePlan.Instructions = append(rotatePlan.Instructions, []plan.OneTimeInstruction{
 					idempotentInstruction(
+						controlPlane,
 						"certificate-rotation/rm-ks-cert",
 						strconv.FormatInt(rotation.Generation, 10),
 						"rm",
@@ -163,6 +173,7 @@ func (p *Planner) rotateCertificatesPlan(controlPlane *rkev1.RKEControlPlane, to
 						[]string{},
 					),
 					idempotentInstruction(
+						controlPlane,
 						"certificate-rotation/rm-ks-key",
 						strconv.FormatInt(rotation.Generation, 10),
 						"rm",
@@ -175,12 +186,13 @@ func (p *Planner) rotateCertificatesPlan(controlPlane *rkev1.RKEControlPlane, to
 				}...)
 				if runtime == capr.RuntimeRKE2 {
 					rotatePlan.Instructions = append(rotatePlan.Instructions, idempotentInstruction(
+						controlPlane,
 						"certificate-rotation/rm-ks-spm",
 						strconv.FormatInt(rotation.Generation, 10),
 						"rm",
 						[]string{
 							"-f",
-							"/var/lib/rancher/rke2/agent/pod-manifests/kube-scheduler.yaml",
+							path.Join(capr.GetDataDir(controlPlane), "agent/pod-manifests/kube-scheduler.yaml"),
 						},
 						[]string{},
 					))
@@ -190,10 +202,18 @@ func (p *Planner) rotateCertificatesPlan(controlPlane *rkev1.RKEControlPlane, to
 	}
 	if runtime == capr.RuntimeRKE2 {
 		if generated, instruction := generateManifestRemovalInstruction(runtime, entry); generated {
-			rotatePlan.Instructions = append(rotatePlan.Instructions, convertToIdempotentInstruction("certificate-rotation/manifest-removal", strconv.FormatInt(rotation.Generation, 10), instruction))
+			rotatePlan.Instructions = append(rotatePlan.Instructions, convertToIdempotentInstruction(
+				controlPlane,
+				"certificate-rotation/manifest-removal",
+				strconv.FormatInt(rotation.Generation, 10),
+				instruction))
 		}
 	}
-	rotatePlan.Instructions = append(rotatePlan.Instructions, idempotentRestartInstructions("certificate-rotation/restart", strconv.FormatInt(rotation.Generation, 10), capr.GetRuntimeServerUnit(controlPlane.Spec.KubernetesVersion))...)
+	rotatePlan.Instructions = append(rotatePlan.Instructions, idempotentRestartInstructions(
+		controlPlane,
+		"certificate-rotation/restart",
+		strconv.FormatInt(rotation.Generation, 10),
+		capr.GetRuntimeServerUnit(controlPlane.Spec.KubernetesVersion))...)
 	return rotatePlan, joinedServer, nil
 }
 
