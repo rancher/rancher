@@ -2,6 +2,7 @@ package planner
 
 import (
 	"fmt"
+	"path"
 	"strings"
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
@@ -150,4 +151,20 @@ func (p *Planner) addEtcdSnapshotListS3PeriodicInstruction(nodePlan plan.NodePla
 		PeriodSeconds: 600,
 	})
 	return nodePlan, nil
+}
+
+// generateManifestRemovalInstruction generates a rm -rf command for the manifests of a server. This was created in response to https://github.com/rancher/rancher/issues/41174
+func generateManifestRemovalInstruction(controlPlane *rkev1.RKEControlPlane, entry *planEntry) (bool, plan.OneTimeInstruction) {
+	runtime := capr.GetRuntime(controlPlane.Spec.KubernetesVersion)
+	if runtime == "" || entry == nil || roleNot(roleOr(isEtcd, isControlPlane))(entry) {
+		return false, plan.OneTimeInstruction{}
+	}
+	return true, plan.OneTimeInstruction{
+		Name:    "remove server manifests",
+		Command: "/bin/sh",
+		Args: []string{
+			"-c",
+			fmt.Sprintf("rm -rf %s/%s-*.yaml", path.Join(capr.GetDataDir(controlPlane), "server/manifests"), runtime),
+		},
+	}
 }
