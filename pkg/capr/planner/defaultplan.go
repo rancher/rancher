@@ -5,7 +5,6 @@ import (
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
-	"github.com/rancher/rancher/pkg/capr"
 )
 
 // commonNodePlan returns a "default" node plan with the corresponding registry configuration.
@@ -15,8 +14,7 @@ func (p *Planner) commonNodePlan(controlPlane *rkev1.RKEControlPlane, np plan.No
 		return np, registries{}, nil
 	}
 
-	reg, err := p.renderRegistries(capr.GetRuntime(controlPlane.Spec.KubernetesVersion),
-		controlPlane.Namespace, controlPlane.Spec.Registries)
+	reg, err := p.renderRegistries(controlPlane)
 	if err != nil {
 		return plan.NodePlan{}, registries{}, err
 	}

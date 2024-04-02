@@ -8,11 +8,12 @@ import (
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
+	"github.com/rancher/rancher/pkg/capr"
 	corev1 "k8s.io/api/core/v1"
 )
 
-// renderRegistries accepts a runtime, namespace, and registry and generates the data needed to set up registries
-func (p *Planner) renderRegistries(runtime, namespace string, registry *rkev1.Registry) (registries, error) {
+// renderRegistries accepts an RKEControlPlane, namespace, and registry and generates the data needed to set up registries
+func (p *Planner) renderRegistries(controlPlane *rkev1.RKEControlPlane) (registries, error) {
 	var (
 		files   []plan.File
 		configs = map[string]interface{}{}
@@ -20,7 +21,7 @@ func (p *Planner) renderRegistries(runtime, namespace string, registry *rkev1.Re
 		err     error
 	)
 
-	for registryName, config := range registry.Configs {
+	for registryName, config := range controlPlane.Spec.Registries.Configs {
 		registryConfig := &registryConfig{}
 		if config.InsecureSkipVerify || config.TLSSecretName != "" || len(config.CABundle) > 0 {
 			registryConfig.TLS = &tlsConfig{
@@ -29,7 +30,7 @@ func (p *Planner) renderRegistries(runtime, namespace string, registry *rkev1.Re
 		}
 
 		if config.TLSSecretName != "" {
-			secret, err := p.secretCache.Get(namespace, config.TLSSecretName)
+			secret, err := p.secretCache.Get(controlPlane.Namespace, config.TLSSecretName)
 			if err != nil {
 				return data, err
 			}
@@ -38,26 +39,26 @@ func (p *Planner) renderRegistries(runtime, namespace string, registry *rkev1.Re
 			}
 
 			if cert := secret.Data[corev1.TLSCertKey]; len(cert) != 0 {
-				file := toFile(runtime, fmt.Sprintf("tls/registries/%s/tls.crt", registryName), cert)
+				file := toFile(controlPlane, fmt.Sprintf("tls/registries/%s/tls.crt", registryName), cert)
 				registryConfig.TLS.CertFile = file.Path
 				files = append(files, file)
 			}
 
 			if key := secret.Data[corev1.TLSPrivateKeyKey]; len(key) != 0 {
-				file := toFile(runtime, fmt.Sprintf("tls/registries/%s/tls.key", registryName), key)
+				file := toFile(controlPlane, fmt.Sprintf("tls/registries/%s/tls.key", registryName), key)
 				registryConfig.TLS.KeyFile = file.Path
 				files = append(files, file)
 			}
 		}
 
 		if len(config.CABundle) > 0 {
-			file := toFile(runtime, fmt.Sprintf("tls/registries/%s/ca.crt", registryName), config.CABundle)
+			file := toFile(controlPlane, fmt.Sprintf("tls/registries/%s/ca.crt", registryName), config.CABundle)
 			registryConfig.TLS.CAFile = file.Path
 			files = append(files, file)
 		}
 
 		if config.AuthConfigSecretName != "" {
-			secret, err := p.secretCache.Get(namespace, config.AuthConfigSecretName)
+			secret, err := p.secretCache.Get(controlPlane.Namespace, config.AuthConfigSecretName)
 			if err != nil {
 				return data, err
 			}
@@ -77,7 +78,7 @@ func (p *Planner) renderRegistries(runtime, namespace string, registry *rkev1.Re
 	}
 
 	data.registriesFileRaw, err = json.Marshal(map[string]interface{}{
-		"mirrors": registry.Mirrors,
+		"mirrors": controlPlane.Spec.Registries.Mirrors,
 		"configs": configs,
 	})
 	if err != nil {
@@ -91,10 +92,10 @@ func (p *Planner) renderRegistries(runtime, namespace string, registry *rkev1.Re
 }
 
 // toFile accepts the runtime, path, and a byte slice containing data to be written to a file on host. It returns a plan.File.
-func toFile(runtime, path string, content []byte) plan.File {
+func toFile(controlPlane *rkev1.RKEControlPlane, path string, content []byte) plan.File {
 	return plan.File{
 		Content: base64.StdEncoding.EncodeToString(content),
-		Path:    fmt.Sprintf("/var/lib/rancher/%s/etc/%s", runtime, path),
+		Path:    fmt.Sprintf("%s/etc/%s", capr.GetDataDir(controlPlane), path),
 	}
 }
 
