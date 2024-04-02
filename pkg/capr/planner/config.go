@@ -91,6 +91,11 @@ func addUserConfig(config map[string]interface{}, controlPlane *rkev1.RKEControl
 	}
 
 	filterConfigData(config, controlPlane, entry)
+
+	if controlPlane.Spec.DataDir != "" {
+		config["data-dir"] = controlPlane.Spec.DataDir
+	}
+
 	return nil
 }
 
