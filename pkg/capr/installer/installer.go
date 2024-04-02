@@ -16,8 +16,9 @@ import (
 )
 
 const (
-	SystemAgentInstallPath = "/system-agent-install.sh" // corresponding curl -o in package/Dockerfile
-	WindowsRke2InstallPath = "/wins-agent-install.ps1"  // corresponding curl -o in package/Dockerfile
+	SystemAgentInstallPath  = "/system-agent-install.sh" // corresponding curl -o in package/Dockerfile
+	WindowsRke2InstallPath  = "/wins-agent-install.ps1"  // corresponding curl -o in package/Dockerfile
+	SystemAgentVarDirEnvVar = "CATTLE_AGENT_VAR_DIR"
 )
 
 var (
@@ -140,10 +141,14 @@ func WindowsInstallScript(ctx context.Context, token string, envVars []corev1.En
 	if token != "" {
 		token = "$env:CATTLE_ROLE_NONE=\"true\"\n$env:CATTLE_TOKEN=\"" + token + "\""
 	}
+	dataDir := "/var/lib/rancher/rke2"
 	envVarBuf := &strings.Builder{}
 	for _, envVar := range envVars {
 		if envVar.Value == "" {
 			continue
+		}
+		if envVar.Name == SystemAgentVarDirEnvVar {
+			dataDir = envVar.Value
 		}
 		envVarBuf.WriteString(fmt.Sprintf("$env:%s=\"%s\"\n", envVar.Name, envVar.Value))
 	}
@@ -163,9 +168,9 @@ func WindowsInstallScript(ctx context.Context, token string, envVars []corev1.En
 # Enables CSI Proxy
 $env:CSI_PROXY_URL = "%s"
 $env:CSI_PROXY_VERSION = "%s"
-$env:CSI_PROXY_KUBELET_PATH = "C:/var/lib/rancher/rke2/bin/kubelet.exe"
+$env:CSI_PROXY_KUBELET_PATH = "C:%s/bin/kubelet.exe"
 
 Invoke-WinsInstaller @PSBoundParameters
 exit 0
-`, data, envVarBuf.String(), binaryURL, server, ca, token, csiProxyURL, csiProxyVersion)), nil
+`, data, envVarBuf.String(), binaryURL, server, ca, token, csiProxyURL, csiProxyVersion, dataDir)), nil
 }
