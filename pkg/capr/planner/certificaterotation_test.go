@@ -1,7 +1,6 @@
 package planner
 
 import (
-	"encoding/json"
 	"strconv"
 	"testing"
 
@@ -10,7 +9,6 @@ import (
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/provisioningv2/image"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -279,8 +277,6 @@ func Test_rotateCertificatesPlan(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Equal(t, tt.expected.joinServer, joined)
 			assert.Equal(t, tt.expected.otiCount, len(np.Instructions))
-			blob, err := json.Marshal(tt.expected.oti)
-			logrus.Infof("Output:\n%s\n", blob)
 		})
 	}
 }

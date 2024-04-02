@@ -178,16 +178,24 @@ func TestRenderProbes(t *testing.T) {
 		expected     map[string]plan.Probe
 	}{
 		{
-			name:         "nil",
-			input:        nil,
-			controlPlane: nil,
-			expected:     map[string]plan.Probe{},
+			name:  "nil",
+			input: nil,
+			controlPlane: &rkev1.RKEControlPlane{
+				Spec: rkev1.RKEControlPlaneSpec{
+					KubernetesVersion: "v1.28.8+rke2r1",
+				},
+			},
+			expected: map[string]plan.Probe{},
 		},
 		{
-			name:         "no probes",
-			input:        map[string]plan.Probe{},
-			controlPlane: nil,
-			expected:     map[string]plan.Probe{},
+			name:  "no probes",
+			input: map[string]plan.Probe{},
+			controlPlane: &rkev1.RKEControlPlane{
+				Spec: rkev1.RKEControlPlaneSpec{
+					KubernetesVersion: "v1.28.8+rke2r1",
+				},
+			},
+			expected: map[string]plan.Probe{},
 		},
 		{
 			name: "simple probe",
@@ -200,7 +208,11 @@ func TestRenderProbes(t *testing.T) {
 					},
 				},
 			},
-			controlPlane: &rkev1.RKEControlPlane{},
+			controlPlane: &rkev1.RKEControlPlane{
+				Spec: rkev1.RKEControlPlaneSpec{
+					KubernetesVersion: "v1.28.8+rke2r1",
+				},
+			},
 			expected: map[string]plan.Probe{
 				"a": {
 					HTTPGetAction: plan.HTTPGetAction{
