@@ -6,7 +6,6 @@ import (
 	"github.com/rancher/norman/condition"
 	"github.com/rancher/norman/types"
 	v1 "k8s.io/api/core/v1"
-	policyv1 "k8s.io/api/policy/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -309,19 +308,6 @@ type RoleTemplate struct {
 
 // +genclient
 // +kubebuilder:skipversion
-// +genclient:nonNamespaced
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-type PodSecurityPolicyTemplate struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-
-	Description string                         `json:"description"`
-	Spec        policyv1.PodSecurityPolicySpec `json:"spec,omitempty"`
-}
-
-// +genclient
-// +kubebuilder:skipversion
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type PodSecurityPolicyTemplateProjectBinding struct {
@@ -421,8 +407,4 @@ type ClusterRoleTemplateBinding struct {
 
 func (c *ClusterRoleTemplateBinding) ObjClusterName() string {
 	return c.ClusterName
-}
-
-type SetPodSecurityPolicyTemplateInput struct {
-	PodSecurityPolicyTemplateName string `json:"podSecurityPolicyTemplateId" norman:"type=reference[podSecurityPolicyTemplate]"`
 }

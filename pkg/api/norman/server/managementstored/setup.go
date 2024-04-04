@@ -26,8 +26,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/norman/customization/node"
 	"github.com/rancher/rancher/pkg/api/norman/customization/nodepool"
 	"github.com/rancher/rancher/pkg/api/norman/customization/nodetemplate"
-	psptBinding "github.com/rancher/rancher/pkg/api/norman/customization/podsecuritypolicybinding"
-	"github.com/rancher/rancher/pkg/api/norman/customization/podsecuritypolicytemplate"
+
 	projectaction "github.com/rancher/rancher/pkg/api/norman/customization/project"
 	"github.com/rancher/rancher/pkg/api/norman/customization/roletemplate"
 	"github.com/rancher/rancher/pkg/api/norman/customization/roletemplatebinding"
@@ -94,7 +93,6 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.NodeType,
 		client.PodSecurityAdmissionConfigurationTemplateType,
 		client.PodSecurityPolicyTemplateProjectBindingType,
-		client.PodSecurityPolicyTemplateType,
 		client.PreferenceType,
 		client.ProjectNetworkPolicyType,
 		client.ProjectRoleTemplateBindingType,
@@ -151,8 +149,6 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	Project(schemas, apiContext)
 	ProjectRoleTemplateBinding(schemas, apiContext)
 	PodSecurityAdmissionConfigurationTemplate(schemas, apiContext)
-	PodSecurityPolicyTemplate(schemas, apiContext)
-	PodSecurityPolicyTemplateProjectBinding(schemas, apiContext)
 	GlobalRole(schemas, apiContext)
 	GlobalRoleBindings(schemas, apiContext)
 	RoleTemplate(schemas, apiContext)
@@ -543,27 +539,12 @@ func Project(schemas *types.Schemas, management *config.ScaledContext) {
 		ClusterManager:           management.ClientGetter.(*clustermanager.Manager),
 		ClusterLister:            management.Management.Clusters("").Controller().Lister(),
 		ProvisioningClusterCache: management.Wrangler.Provisioning.Cluster().Cache(),
-		PSPTemplateLister:        management.Management.PodSecurityPolicyTemplates("").Controller().Lister(),
 	}
 	schema.ActionHandler = handler.Actions
 }
 
 func PodSecurityAdmissionConfigurationTemplate(schemas *types.Schemas, management *config.ScaledContext) {
 	schemas.Schema(&managementschema.Version, client.PodSecurityAdmissionConfigurationTemplateType)
-}
-
-func PodSecurityPolicyTemplate(schemas *types.Schemas, management *config.ScaledContext) {
-	schema := schemas.Schema(&managementschema.Version, client.PodSecurityPolicyTemplateType)
-	schema.Formatter = podsecuritypolicytemplate.NewFormatter(management)
-	schema.Store = &podsecuritypolicytemplate.Store{
-		Store: schema.Store,
-	}
-	schema.Validator = podsecuritypolicytemplate.Validator
-}
-
-func PodSecurityPolicyTemplateProjectBinding(schemas *types.Schemas, management *config.ScaledContext) {
-	schema := schemas.Schema(&managementschema.Version, client.PodSecurityPolicyTemplateProjectBindingType)
-	schema.Validator = psptBinding.NewValidator(management)
 }
 
 func ClusterRoleTemplateBinding(schemas *types.Schemas, management *config.ScaledContext) {

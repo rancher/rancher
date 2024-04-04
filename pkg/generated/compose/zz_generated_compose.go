@@ -19,7 +19,6 @@ type Config struct {
 	GlobalRoles                                map[string]managementClient.GlobalRole                                `json:"globalRoles,omitempty" yaml:"globalRoles,omitempty"`
 	GlobalRoleBindings                         map[string]managementClient.GlobalRoleBinding                         `json:"globalRoleBindings,omitempty" yaml:"globalRoleBindings,omitempty"`
 	RoleTemplates                              map[string]managementClient.RoleTemplate                              `json:"roleTemplates,omitempty" yaml:"roleTemplates,omitempty"`
-	PodSecurityPolicyTemplates                 map[string]managementClient.PodSecurityPolicyTemplate                 `json:"podSecurityPolicyTemplates,omitempty" yaml:"podSecurityPolicyTemplates,omitempty"`
 	PodSecurityPolicyTemplateProjectBindings   map[string]managementClient.PodSecurityPolicyTemplateProjectBinding   `json:"podSecurityPolicyTemplateProjectBindings,omitempty" yaml:"podSecurityPolicyTemplateProjectBindings,omitempty"`
 	ClusterRoleTemplateBindings                map[string]managementClient.ClusterRoleTemplateBinding                `json:"clusterRoleTemplateBindings,omitempty" yaml:"clusterRoleTemplateBindings,omitempty"`
 	ProjectRoleTemplateBindings                map[string]managementClient.ProjectRoleTemplateBinding                `json:"projectRoleTemplateBindings,omitempty" yaml:"projectRoleTemplateBindings,omitempty"`

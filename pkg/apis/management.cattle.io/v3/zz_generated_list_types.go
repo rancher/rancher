@@ -757,23 +757,6 @@ func NewPodSecurityAdmissionConfigurationTemplate(namespace, name string, obj Po
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// PodSecurityPolicyTemplateList is a list of PodSecurityPolicyTemplate resources
-type PodSecurityPolicyTemplateList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []PodSecurityPolicyTemplate `json:"items"`
-}
-
-func NewPodSecurityPolicyTemplate(namespace, name string, obj PodSecurityPolicyTemplate) *PodSecurityPolicyTemplate {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("PodSecurityPolicyTemplate").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
 // PodSecurityPolicyTemplateProjectBindingList is a list of PodSecurityPolicyTemplateProjectBinding resources
 type PodSecurityPolicyTemplateProjectBindingList struct {
 	metav1.TypeMeta `json:",inline"`

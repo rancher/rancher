@@ -10,7 +10,6 @@ import (
 
 	"github.com/ghodss/yaml"
 	"github.com/pkg/errors"
-	"github.com/rancher/norman/api/handler"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
@@ -24,7 +23,6 @@ import (
 	provisioningcontrollerv1 "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/ref"
-	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/user"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 )
@@ -41,13 +39,10 @@ type Handler struct {
 	ClusterLister            v3.ClusterLister
 	ProvisioningClusterCache provisioningcontrollerv1.ClusterCache
 	UserMgr                  user.Manager
-	PSPTemplateLister        v3.PodSecurityPolicyTemplateLister
 }
 
 func (h *Handler) Actions(actionName string, action *types.Action, apiContext *types.APIContext) error {
 	switch actionName {
-	case "setpodsecuritypolicytemplate":
-		return h.setPodSecurityPolicyTemplate(actionName, action, apiContext)
 	case "exportYaml":
 		return h.ExportYamlHandler(actionName, action, apiContext)
 	}
