@@ -20,16 +20,24 @@ fi
 echo "getting latest shepherd version for branch $2"
 cd $1
 git checkout $2 -q
-git fetch -q
+git fetch upstream -q
 git pull -q
-export SHEPHERD_VERSION=$(curl -s https://proxy.golang.org/github.com/rancher/shepherd/@v/$(git log -n 1 --pretty=format:"%H").info | grep -E -o "\bv0.0.0-+[A-Za-z0-9.-]+[A-Za-z0-9.-]\b")
+git rebase upstream/$2
+
+if [[ $4 == "" ]]; then
+  export upstream="rancher"
+else
+  export upstream=$4
+fi
+
+export SHEPHERD_VERSION=$(curl -s https://proxy.golang.org/github.com/$upstream/shepherd/@v/$(git log -n 1 --pretty=format:"%H").info | grep -E -o "\bv0.0.0-+[A-Za-z0-9.-]+[A-Za-z0-9.-]\b")
 echo "Shepherd Version is: $SHEPHERD_VERSION"
 
 echo "writing version to go.mod, then tidying in $3"
 cd $3
 
-if [ $upstream == "rancher" ]; then
-  go get github.com/rancher/shepherd@$SHEPHERD_VERSION
+if [[ $upstream == "rancher" ]]; then
+  go get github.com/$upstream/shepherd@$SHEPHERD_VERSION
 else
   go mod edit -replace=github.com/rancher/shepherd=github.com/$upstream/shepherd@$SHEPHERD_VERSION
 fi
