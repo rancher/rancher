@@ -13,8 +13,6 @@ import (
 	"github.com/stretchr/testify/suite"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/tools/clientcmd"
-	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 )
 
@@ -48,31 +46,26 @@ func (s *FeatureTestSuite) SetupSuite() {
 	// Create feature CRD
 	factory, err := crd.NewFactoryFromClient(restCfg)
 	assert.NoError(s.T(), err)
-
 	err = factory.BatchCreateCRDs(s.ctx, crd.CRD{
 		SchemaObject: v3.Feature{},
 		NonNamespace: true,
 	}).BatchWait()
 	assert.NoError(s.T(), err)
 
-	// Create the clientConfig for the wrangler context
-	config := clientcmdapi.NewConfig()
+	// Create the wrangler context
+	s.wranglerContext, err = wrangler.NewContext(s.ctx, nil, restCfg)
 	assert.NoError(s.T(), err)
 
-	clientCfg := clientcmd.NewDefaultClientConfig(*config, nil)
-	assert.NoError(s.T(), err)
+	// Register the feature controller
+	feature.Register(s.ctx, s.wranglerContext)
 
-	s.wranglerContext, err = wrangler.NewContext(s.ctx, clientCfg, restCfg)
-	assert.NoError(s.T(), err)
-
+	// Create and start the feature controller factory
 	sc := s.wranglerContext.ControllerFactory.ForResourceKind(schema.GroupVersionResource{
 		Group:    "management.cattle.io",
 		Version:  "v3",
 		Resource: "features",
 	}, "Feature", false)
 	assert.NoError(s.T(), err)
-
-	feature.Register(s.ctx, s.wranglerContext)
 	err = sc.Start(s.ctx, 1)
 	assert.NoError(s.T(), err)
 }
@@ -83,12 +76,14 @@ func (s *FeatureTestSuite) TestHarvesterFeature() {
 	assert.NoError(s.T(), err)
 	assert.NotNil(s.T(), f1)
 
+	// Check that feature.cattle.io/experimental gets set to true by the controller
 	assert.EventuallyWithT(s.T(), func(c *assert.CollectT) {
 		f, err := wranglerContext.Mgmt.Feature().Get("harvester-baremetal-container-workload", v1.GetOptions{})
 		assert.NoError(c, err)
 		assert.Equal(c, v3.ExperimentalFeatureValue, f.Annotations[v3.ExperimentalFeatureKey])
 	}, 1*time.Second, 10*time.Second, "feature.cattle.io/experimental has not changed to true")
 
+	// Remove the feature
 	err = wranglerContext.Mgmt.Feature().Delete("harvester-baremetal-container-workload", &v1.DeleteOptions{})
 	assert.NoError(s.T(), err)
 }
