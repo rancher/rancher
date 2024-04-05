@@ -15,7 +15,11 @@ rancher:
   insecure: True
   cleanup: True
   clusterName: "downstream_cluster_name"
+<<<<<<< HEAD
 broInput:
+=======
+backupRestoreInput:
+>>>>>>> 0b773e519 ([2.9] BRO In-Place Restore P0)
   backupName: ""
   s3BucketName: ""
   s3FolderName: ""
