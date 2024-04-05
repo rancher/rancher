@@ -44,7 +44,7 @@ var DriverData = map[string]map[string][]string{
 	Linodedriver:       {"privateCredentialFields": []string{"token"}, "passwordFields": []string{"rootPass"}},
 	NutanixDriver:      {"publicCredentialFields": []string{"endpoint", "username", "port"}, "privateCredentialFields": []string{"password"}},
 	OCIDriver:          {"publicCredentialFields": []string{"tenancyId", "userId", "fingerprint"}, "privateCredentialFields": []string{"privateKeyContents"}, "passwordFields": []string{"privateKeyPassphrase"}},
-	OTCDriver:          {"privateCredentialFields": []string{"accessKeySecret"}},
+	OTCDriver:          {"publicCredentialFields": []string{"accessKey", "username"}, "privateCredentialFields": []string{"secretKey", "password", "token"}},
 	OpenstackDriver:    {"privateCredentialFields": []string{"password"}},
 	PacketDriver:       {"privateCredentialFields": []string{"apiKey"}},
 	PhoenixNAPDriver:   {"publicCredentialFields": []string{"clientIdentifier"}, "privateCredentialFields": []string{"clientSecret"}},
@@ -119,7 +119,7 @@ func addMachineDrivers(management *config.ManagementContext) error {
 	if err := addMachineDriver(OpenstackDriver, "local://", "", "", nil, false, true, false, management); err != nil {
 		return err
 	}
-	if err := addMachineDriver(OTCDriver, "https://github.com/rancher-plugins/docker-machine-driver-otc/releases/download/v2019.5.7/docker-machine-driver-otc", "", "3f793ebb0ebd9477b9166ec542f77e25", nil, false, false, false, management); err != nil {
+	if err := addMachineDriver(OTCDriver, "https://otc-rancher.obs.eu-de.otc.t-systems.com/node/driver/0.3.1/docker-machine-driver-otc_0.3.1_linux_amd64.tar.gz", "https://otc-rancher.obs.eu-de.otc.t-systems.com/node/ui/1.0.0/component.js", "49f205a03650b8a71411054d4961c79a4d11835885a55f9d29dc2791a49df74a", []string{"*.otc.t-systems.com"}, false, false, false, management); err != nil {
 		return err
 	}
 	if err := addMachineDriver(PacketDriver, "https://github.com/equinix/docker-machine-driver-metal/releases/download/v0.6.0/docker-machine-driver-metal_linux-amd64.zip", "https://rancher-drivers.equinixmetal.net/1.0.2/component.js", "fad5e551a35d2ef2db742b07ca6d61bb9c9b574d322d3000f0c557d5fb90a734", []string{"api.packet.net", "api.equinix.com", "rancher-drivers.equinixmetal.net"}, false, false, false, management); err != nil {
