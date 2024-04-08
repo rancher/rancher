@@ -80,7 +80,7 @@ func TestReconcileFleetWorkspacePermissionsBindings(t *testing.T) {
 						},
 					},
 					RoleRef: rbac.RoleRef{
-						APIGroup: "rbac.authorization.k8s.io",
+						APIGroup: rbac.GroupName,
 						Kind:     "ClusterRole",
 						Name:     wrangler.SafeConcatName(grName, fleetWorkspaceClusterRulesName),
 					},
@@ -110,7 +110,7 @@ func TestReconcileFleetWorkspacePermissionsBindings(t *testing.T) {
 						},
 					},
 					RoleRef: rbac.RoleRef{
-						APIGroup: "rbac.authorization.k8s.io",
+						APIGroup: rbac.GroupName,
 						Kind:     "ClusterRole",
 						Name:     wrangler.SafeConcatName(grName, fleetWorkspaceClusterRulesName),
 					},
@@ -139,7 +139,7 @@ func TestReconcileFleetWorkspacePermissionsBindings(t *testing.T) {
 						},
 					},
 					RoleRef: rbac.RoleRef{
-						APIGroup: "rbac.authorization.k8s.io",
+						APIGroup: rbac.GroupName,
 						Kind:     "ClusterRole",
 						Name:     wrangler.SafeConcatName(grName, fleetWorkspaceVerbsName),
 					},
@@ -167,7 +167,7 @@ func TestReconcileFleetWorkspacePermissionsBindings(t *testing.T) {
 						},
 					},
 					RoleRef: rbac.RoleRef{
-						APIGroup: "rbac.authorization.k8s.io",
+						APIGroup: rbac.GroupName,
 						Kind:     "ClusterRole",
 						Name:     wrangler.SafeConcatName(grName, fleetWorkspaceVerbsName),
 					},
@@ -304,7 +304,7 @@ func TestReconcileFleetWorkspacePermissionsBindings_errors(t *testing.T) {
 						},
 					},
 					RoleRef: rbac.RoleRef{
-						APIGroup: "rbac.authorization.k8s.io",
+						APIGroup: rbac.GroupName,
 						Kind:     "ClusterRole",
 						Name:     wrangler.SafeConcatName(grName, fleetWorkspaceClusterRulesName),
 					},
@@ -356,7 +356,7 @@ func TestReconcileFleetWorkspacePermissionsBindings_errors(t *testing.T) {
 						},
 					},
 					RoleRef: rbac.RoleRef{
-						APIGroup: "rbac.authorization.k8s.io",
+						APIGroup: rbac.GroupName,
 						Kind:     "ClusterRole",
 						Name:     wrangler.SafeConcatName(grName, fleetWorkspaceVerbsName),
 					},
@@ -426,7 +426,7 @@ func createClusterRoleBindingsMock(ctrl *gomock.Controller) func() rbacv1.Cluste
 				},
 			},
 			RoleRef: rbac.RoleRef{
-				APIGroup: "rbac.authorization.k8s.io",
+				APIGroup: rbac.GroupName,
 				Kind:     "ClusterRole",
 				Name:     wrangler.SafeConcatName(grName, fleetWorkspaceVerbsName),
 			},
@@ -463,7 +463,7 @@ func createRoleBindingsMock(ctrl *gomock.Controller) func() rbacv1.RoleBindingCo
 				},
 			},
 			RoleRef: rbac.RoleRef{
-				APIGroup: "rbac.authorization.k8s.io",
+				APIGroup: rbac.GroupName,
 				Kind:     "ClusterRole",
 				Name:     wrangler.SafeConcatName(grName, fleetWorkspaceClusterRulesName),
 			},

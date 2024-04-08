@@ -73,7 +73,7 @@ func (h *fleetWorkspaceBindingHandler) reconcileResourceRulesBindings(globalRole
 	var returnError error
 	subject := rbac.GetGRBSubject(globalRoleBinding)
 	roleref := v1.RoleRef{
-		APIGroup: "rbac.authorization.k8s.io",
+		APIGroup: v1.GroupName,
 		Kind:     "ClusterRole",
 		Name:     wrangler.SafeConcatName(globalRole.Name, fleetWorkspaceClusterRulesName),
 	}
@@ -145,7 +145,7 @@ func (h *fleetWorkspaceBindingHandler) reconcileWorkspaceVerbsBindings(globalRol
 
 	subjects := []v1.Subject{rbac.GetGRBSubject(globalRoleBinding)}
 	roleref := v1.RoleRef{
-		APIGroup: "rbac.authorization.k8s.io",
+		APIGroup: v1.GroupName,
 		Kind:     "ClusterRole",
 		Name:     wrangler.SafeConcatName(globalRole.Name, fleetWorkspaceVerbsName),
 	}

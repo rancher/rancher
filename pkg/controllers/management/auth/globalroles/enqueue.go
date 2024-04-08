@@ -284,7 +284,7 @@ func (g *globalRBACEnqueuer) clusterRoleEnqueueGR(_, _ string, obj runtime.Objec
 	}
 	grs, err := g.grCache.GetByIndex(grSafeConcatIndex, grOwner)
 	if err != nil {
-		return nil, fmt.Errorf("unable to get GlobalRole %s for RoleBinding %s", grOwner, clusterRole.Name)
+		return nil, fmt.Errorf("unable to get GlobalRole %s for RoleBinding %s: %w", grOwner, clusterRole.Name, err)
 	}
 	grNames := make([]relatedresource.Key, 0, len(grs))
 	for _, gr := range grs {
@@ -313,7 +313,7 @@ func (g *globalRBACEnqueuer) clusterRoleBindingEnqueueGRB(_, _ string, obj runti
 	}
 	grbs, err := g.grbCache.GetByIndex(grbSafeConcatIndex, grbOwner)
 	if err != nil {
-		return nil, fmt.Errorf("unable to get GlobalRoleBinding %s for ClusterRoleBinding %s", grbOwner, clusterRoleBinding.Name)
+		return nil, fmt.Errorf("unable to get GlobalRoleBinding %s for ClusterRoleBinding %s: %w", grbOwner, clusterRoleBinding.Name, err)
 	}
 	grbNames := make([]relatedresource.Key, 0, len(grbs))
 	for _, grb := range grbs {
