@@ -29,3 +29,10 @@ RUN if [[ -z "$RKE_VERSION" ]] ; then echo installing latest version RKE && \
     curl -0Ls https://github.com/rancher/rke/releases/download/$RKE_VERSION/rke_linux-amd64 > rke; fi;
 RUN mv rke /bin/rke && \
     chmod +x /bin/rke
+
+ARG CLI_VERSION
+RUN if [[ -n "$CLI_VERSION" ]] ; then echo installing CLI version ${CLI_VERSION} && \
+    curl -LO https://github.com/rancher/cli/releases/download/${CLI_VERSION}/rancher-linux-amd64-${CLI_VERSION}.tar.gz ; fi;
+RUN tar -xf rancher-linux-amd64-${CLI_VERSION}.tar.gz && \
+    mv rancher-${CLI_VERSION}/rancher /bin/rancher && \
+    chmod +x /bin/rancher
