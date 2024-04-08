@@ -83,8 +83,8 @@ func (k *K3SNodeDriverProvisioningTestSuite) TestProvisioningK3SCluster() {
 	}{
 		{"1 Node all roles " + provisioninginput.AdminClientName.String(), nodeRolesAll, k.client, k.client.Flags.GetValue(environmentflag.Long)},
 		{"1 Node all roles " + provisioninginput.StandardClientName.String(), nodeRolesAll, k.standardUserClient, k.client.Flags.GetValue(environmentflag.Short) || k.client.Flags.GetValue(environmentflag.Long)},
-		{"2 nodes - etcd/cp roles per 1 node " + provisioninginput.AdminClientName.String(), nodeRolesShared, k.client, k.client.Flags.GetValue(environmentflag.Long)},
-		{"2 nodes - etcd/cp roles per 1 node " + provisioninginput.StandardClientName.String(), nodeRolesShared, k.standardUserClient, k.client.Flags.GetValue(environmentflag.Short) || k.client.Flags.GetValue(environmentflag.Long)},
+		{"2 nodes - etcd|cp roles per 1 node " + provisioninginput.AdminClientName.String(), nodeRolesShared, k.client, k.client.Flags.GetValue(environmentflag.Long)},
+		{"2 nodes - etcd|cp roles per 1 node " + provisioninginput.StandardClientName.String(), nodeRolesShared, k.standardUserClient, k.client.Flags.GetValue(environmentflag.Short) || k.client.Flags.GetValue(environmentflag.Long)},
 		{"3 nodes - 1 role per node " + provisioninginput.AdminClientName.String(), nodeRolesDedicated, k.client, k.client.Flags.GetValue(environmentflag.Long)},
 		{"3 nodes - 1 role per node " + provisioninginput.StandardClientName.String(), nodeRolesDedicated, k.standardUserClient, k.client.Flags.GetValue(environmentflag.Long)},
 	}

@@ -13,6 +13,7 @@ type GoTestOutput struct {
 // GoTestCase is the struct used for sending the appropriate API call to Qase
 type GoTestCase struct {
 	Name       string
+	TestSuite  []string
 	Status     string
 	StackTrace string
 	Elapsed    string

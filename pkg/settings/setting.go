@@ -18,6 +18,7 @@ import (
 )
 
 const RancherVersionDev = "2.8.99"
+const DefaultMaxUIPluginFileSizeInBytes = 20 * 1024 * 1024 // 20MB
 
 var (
 	releasePattern = regexp.MustCompile("^v[0-9]")
@@ -130,6 +131,7 @@ var (
 	SystemFeatureChartRefreshSeconds    = NewSetting("system-feature-chart-refresh-seconds", "21600")
 	ClusterAgentDefaultAffinity         = NewSetting("cluster-agent-default-affinity", ClusterAgentAffinity)
 	FleetAgentDefaultAffinity           = NewSetting("fleet-agent-default-affinity", FleetAgentAffinity)
+	MaxUIPluginFileByteSize             = NewSetting("max-ui-plugin-file-byte-size", strconv.Itoa(DefaultMaxUIPluginFileSizeInBytes)) // Max file size in bytes for ui plugins
 
 	Rke2DefaultVersion = NewSetting("rke2-default-version", "")
 	K3sDefaultVersion  = NewSetting("k3s-default-version", "")
@@ -257,6 +259,14 @@ var (
 
 	// UIPL the vendor/company name.
 	UIPL = NewSetting("ui-pl", "rancher")
+
+	// UILoginBackground the custom background in the login page.
+	UILoginBackgroundLight = NewSetting("ui-login-background-light", "")
+	UILoginBackgroundDark  = NewSetting("ui-login-background-dark", "")
+
+	// UIBanner the custom background image in the home page.
+	UIBannerLight = NewSetting("ui-banner-light", "")
+	UIBannerDark  = NewSetting("ui-banner-dark", "")
 
 	// UIPreferred Ensure that the new Dashboard is the default UI.
 	UIPreferred = NewSetting("ui-preferred", "vue")

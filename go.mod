@@ -19,7 +19,7 @@ replace (
 	go.opentelemetry.io/otel/sdk => go.opentelemetry.io/otel/sdk v1.10.0
 	go.opentelemetry.io/otel/trace => go.opentelemetry.io/otel/trace v1.10.0
 	go.opentelemetry.io/proto/otlp => go.opentelemetry.io/proto/otlp v0.19.0
-	go.qase.io/client => github.com/rancher/qase-go/client v0.0.0-20231114201952-65195ec001fa
+	go.qase.io/client => github.com/rancher/qase-go/client v0.0.0-20240308221502-c3b2635212be
 
 	helm.sh/helm/v3 => github.com/rancher/helm/v3 v3.12.3-rancher1
 	k8s.io/api => k8s.io/api v0.27.9
@@ -59,7 +59,7 @@ require (
 	github.com/antihax/optional v1.0.0
 	github.com/containers/image/v5 v5.26.0
 	github.com/rancher/rancher/pkg/apis v0.0.0-20240126142034-676c3eb3dfa5
-	github.com/rancher/shepherd v0.0.0-20240305180225-5ba571c8a3cf
+	github.com/rancher/shepherd v0.0.0-20240405204755-d27fed3d99e5
 	go.qase.io/client v0.0.0-20231114201952-65195ec001fa
 )
 
@@ -88,6 +88,7 @@ require (
 	github.com/ghodss/yaml v1.0.0
 	github.com/go-ldap/ldap/v3 v3.4.1
 	github.com/golang-jwt/jwt v3.2.1+incompatible
+	github.com/golang-jwt/jwt/v4 v4.5.0
 	github.com/golang/mock v1.6.0
 	github.com/golang/protobuf v1.5.3
 	github.com/google/gnostic v0.6.9
@@ -126,9 +127,9 @@ require (
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/remotedialer v0.3.0
 	github.com/rancher/rke v1.5.3
-	github.com/rancher/steve v0.0.0-20240301154841-7913f2782a62
+	github.com/rancher/steve v0.0.0-20240314145706-870824dc8f49
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007
-	github.com/rancher/wrangler/v2 v2.1.3
+	github.com/rancher/wrangler/v2 v2.1.4
 	github.com/robfig/cron v1.1.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.8.4
@@ -182,7 +183,7 @@ require (
 	github.com/containers/storage v1.48.0 // indirect
 	github.com/cyberphone/json-canonicalization v0.0.0-20230514072755-504adb8a8af1 // indirect
 	github.com/evanphx/json-patch/v5 v5.6.0 // indirect
-	github.com/go-jose/go-jose/v3 v3.0.1 // indirect
+	github.com/go-jose/go-jose/v3 v3.0.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-openapi/analysis v0.21.4 // indirect
 	github.com/go-openapi/errors v0.20.3 // indirect
@@ -233,7 +234,7 @@ require (
 	golang.org/x/exp v0.0.0-20230522175609-2e198f4a06a1 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20231106174013-bbf56f31fb17 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20231120223509-83a465c0220f // indirect
-	gopkg.in/go-jose/go-jose.v2 v2.6.1 // indirect
+	gopkg.in/go-jose/go-jose.v2 v2.6.3 // indirect
 	k8s.io/cloud-provider v0.27.9 // indirect
 	k8s.io/controller-manager v0.27.9 // indirect
 	k8s.io/kms v0.27.9 // indirect
@@ -271,7 +272,7 @@ require (
 	github.com/containerd/containerd v1.7.1 // indirect
 	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
-	github.com/cyphar/filepath-securejoin v0.2.4 // indirect
+	github.com/cyphar/filepath-securejoin v0.2.4
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dimchansky/utfbom v1.1.1 // indirect
 	github.com/docker/cli v23.0.5+incompatible // indirect
@@ -298,7 +299,6 @@ require (
 	github.com/gobwas/glob v0.2.3 // indirect
 	github.com/gofrs/flock v0.8.1 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
-	github.com/golang-jwt/jwt/v4 v4.5.0 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/google/btree v1.1.2 // indirect
 	github.com/google/go-cmp v0.6.0 // indirect
@@ -402,7 +402,7 @@ require (
 	gomodules.xyz/jsonpatch/v2 v2.3.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/genproto v0.0.0-20231106174013-bbf56f31fb17 // indirect
-	google.golang.org/protobuf v1.31.0 // indirect
+	google.golang.org/protobuf v1.33.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/square/go-jose.v2 v2.6.0 // indirect

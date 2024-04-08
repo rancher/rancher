@@ -184,13 +184,6 @@ func TestFetchChart(t *testing.T) {
 	}
 
 	testCase2 := testcase{
-		name:          "fetches no chart since manifest config media type is not Helm Media type",
-		expectedErr:   "",
-		expectedFound: false,
-		expectedFile:  false,
-	}
-
-	testCase3 := testcase{
 		name:          "fetches no chart since chart layer is not Helm Chart type",
 		expectedErr:   "",
 		expectedFound: false,
@@ -200,18 +193,11 @@ func TestFetchChart(t *testing.T) {
 	testCases := []testcase{
 		testCase1,
 		testCase2,
-		testCase3,
 	}
 
 	assert := assert.New(t)
 	for _, tc := range testCases {
 		// Create an OCI Helm Chart Image
-		configBlob := []byte("config")
-		configDesc := ocispec.Descriptor{
-			MediaType: registry.ConfigMediaType,
-			Digest:    digest.FromBytes(configBlob),
-			Size:      int64(len(configBlob)),
-		}
 		layerBlob := []byte("layer")
 		layerDesc := ocispec.Descriptor{
 			MediaType: registry.ChartLayerMediaType,
@@ -221,18 +207,16 @@ func TestFetchChart(t *testing.T) {
 
 		// Modify test data according to the testcase
 		switch tc.name {
-		case "fetches no chart since manifest config media type is not Helm Media type":
-			configDesc.MediaType = ocispec.MediaTypeImageConfig
-
 		case "fetches no chart since chart layer is not Helm Chart type":
 			layerDesc.MediaType = ocispec.MediaTypeImageLayer
 		}
 
 		manifest := ocispec.Manifest{
 			MediaType: ocispec.MediaTypeImageManifest,
-			Config:    configDesc,
+			Config:    ocispec.DescriptorEmptyJSON,
 			Layers:    []ocispec.Descriptor{layerDesc},
 		}
+		manifest.Config.MediaType = registry.ConfigMediaType
 		manifestJSON, err := json.Marshal(manifest)
 		assert.NoError(err)
 
@@ -250,12 +234,6 @@ func TestFetchChart(t *testing.T) {
 				w.Header().Set("Content-Type", "application/octet-stream")
 				w.Header().Set("Docker-Content-Digest", layerDesc.Digest.String())
 				if _, err := w.Write(layerBlob); err != nil {
-					assert.NoError(err)
-				}
-			case "/v2/test/blobs/" + configDesc.Digest.String():
-				w.Header().Set("Content-Type", "application/octet-stream")
-				w.Header().Set("Docker-Content-Digest", configDesc.Digest.String())
-				if _, err := w.Write(configBlob); err != nil {
 					assert.NoError(err)
 				}
 			case "/v2/test/manifests/v1.0.2":

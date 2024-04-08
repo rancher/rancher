@@ -33,7 +33,7 @@ require (
 	github.com/rancher/gke-operator v1.3.0-rc6
 	github.com/rancher/norman v0.0.0-20240207153100-3bb70b772b52
 	github.com/rancher/rke v1.5.3
-	github.com/rancher/wrangler/v2 v2.1.3
+	github.com/rancher/wrangler/v2 v2.1.4
 	github.com/sirupsen/logrus v1.9.3
 	k8s.io/api v0.28.6
 	k8s.io/apimachinery v0.28.6
@@ -86,7 +86,7 @@ require (
 	golang.org/x/time v0.5.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.3.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
-	google.golang.org/protobuf v1.31.0 // indirect
+	google.golang.org/protobuf v1.33.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
