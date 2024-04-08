@@ -30,10 +30,13 @@ func scalingRKE2K3SNodePools(t *testing.T, client *rancher.Client, clusterID str
 	clusterResp, err := machinepools.ScaleMachinePoolNodes(client, cluster, nodeRoles)
 	require.NoError(t, err)
 
-	pods.VerifyReadyDaemonsetPods(t, client, cluster)
+	pods.VerifyReadyDaemonsetPods(t, client, clusterResp)
+
+	updatedCluster, err := client.Steve.SteveType(ProvisioningSteveResourceType).ByID(clusterID)
+	require.NoError(t, err)
 
 	nodeRoles.Quantity = -nodeRoles.Quantity
-	scaledClusterResp, err := machinepools.ScaleMachinePoolNodes(client, clusterResp, nodeRoles)
+	scaledClusterResp, err := machinepools.ScaleMachinePoolNodes(client, updatedCluster, nodeRoles)
 	require.NoError(t, err)
 
 	pods.VerifyReadyDaemonsetPods(t, client, scaledClusterResp)

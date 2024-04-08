@@ -3,11 +3,14 @@
 package nodescaling
 
 import (
+	"strings"
 	"testing"
 
+	apisV1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/shepherd/clients/rancher"
+	v1 "github.com/rancher/shepherd/clients/rancher/v1"
 	"github.com/rancher/shepherd/extensions/clusters"
-	"github.com/rancher/shepherd/extensions/provisioning"
+	"github.com/rancher/shepherd/extensions/machinepools"
 	"github.com/rancher/shepherd/extensions/provisioninginput"
 	"github.com/rancher/shepherd/pkg/config"
 	"github.com/rancher/shepherd/pkg/session"
@@ -15,7 +18,7 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-type NodeScaleDownAndUp struct {
+type NodeReplacingTestSuite struct {
 	suite.Suite
 	session        *session.Session
 	client         *rancher.Client
@@ -23,11 +26,11 @@ type NodeScaleDownAndUp struct {
 	clustersConfig *provisioninginput.Config
 }
 
-func (s *NodeScaleDownAndUp) TearDownSuite() {
+func (s *NodeReplacingTestSuite) TearDownSuite() {
 	s.session.Cleanup()
 }
 
-func (s *NodeScaleDownAndUp) SetupSuite() {
+func (s *NodeReplacingTestSuite) SetupSuite() {
 	testSession := session.NewSession()
 	s.session = testSession
 
@@ -42,34 +45,58 @@ func (s *NodeScaleDownAndUp) SetupSuite() {
 	s.client = client
 }
 
-func (s *NodeScaleDownAndUp) TestEtcdScaleDownAndUp() {
-	s.Run("etcd-node-scale-down-and-up", func() {
-		ReplaceNodes(s.T(), s.client, s.client.RancherConfig.ClusterName, true, false, false)
-	})
-}
+func (s *NodeReplacingTestSuite) TestReplacingNodes() {
+	nodeRolesEtcd := machinepools.NodeRoles{
+		Etcd:         true,
+		ControlPlane: false,
+		Worker:       false,
+	}
 
-func (s *NodeScaleDownAndUp) TestControlPlaneScaleDownAndUp() {
-	s.Run("controlplane-node-scale-down-and-up", func() {
-		ReplaceNodes(s.T(), s.client, s.client.RancherConfig.ClusterName, false, true, false)
-	})
-}
+	nodeRolesControlPlane := machinepools.NodeRoles{
+		Etcd:         false,
+		ControlPlane: true,
+		Worker:       false,
+	}
 
-func (s *NodeScaleDownAndUp) TestWorkerScaleDownAndUp() {
-	s.Run("worker-node-scale-down-and-up", func() {
-		ReplaceNodes(s.T(), s.client, s.client.RancherConfig.ClusterName, false, false, true)
-	})
-}
+	nodeRolesWorker := machinepools.NodeRoles{
+		Etcd:         false,
+		ControlPlane: false,
+		Worker:       true,
+	}
 
-func (s *NodeScaleDownAndUp) TestValidate() {
-	s.Run("rke2-validate", func() {
-		_, stevecluster, err := clusters.GetProvisioningClusterByName(s.client, s.client.RancherConfig.ClusterName, provisioninginput.Namespace)
+	tests := []struct {
+		name      string
+		nodeRoles machinepools.NodeRoles
+		client    *rancher.Client
+	}{
+		{"control plane nodes", nodeRolesControlPlane, s.client},
+		{"etcd nodes", nodeRolesEtcd, s.client},
+		{"worker nodes", nodeRolesWorker, s.client},
+	}
+
+	for _, tt := range tests {
+		clusterID, err := clusters.GetV1ProvisioningClusterByName(s.client, s.client.RancherConfig.ClusterName)
 		require.NoError(s.T(), err)
 
-		clusterConfig := clusters.ConvertConfigToClusterConfig(s.clustersConfig)
-		provisioning.VerifyCluster(s.T(), s.client, clusterConfig, stevecluster)
-	})
+		cluster, err := tt.client.Steve.SteveType(ProvisioningSteveResourceType).ByID(clusterID)
+		require.NoError(s.T(), err)
+
+		updatedCluster := new(apisV1.Cluster)
+		err = v1.ConvertToK8sType(cluster, &updatedCluster)
+		require.NoError(s.T(), err)
+
+		if strings.Contains(updatedCluster.Spec.KubernetesVersion, "rke2") {
+			tt.name = "Replacing RKE2 " + tt.name
+		} else {
+			tt.name = "Replacing K3S " + tt.name
+		}
+
+		s.Run(tt.name, func() {
+			ReplaceNodes(s.T(), s.client, s.client.RancherConfig.ClusterName, tt.nodeRoles.Etcd, tt.nodeRoles.ControlPlane, tt.nodeRoles.Worker)
+		})
+	}
 }
 
-func TestScaleDownAndUp(t *testing.T) {
-	suite.Run(t, new(NodeScaleDownAndUp))
+func TestNodeReplacingTestSuite(t *testing.T) {
+	suite.Run(t, new(NodeReplacingTestSuite))
 }
