@@ -34,11 +34,20 @@ func (c *RKE1ClusterDeleteTestSuite) SetupSuite() {
 }
 
 func (c *RKE1ClusterDeleteTestSuite) TestDeletingRKE1Cluster() {
-	clusterID, err := clusters.GetClusterIDByName(c.client, c.client.RancherConfig.ClusterName)
-	require.NoError(c.T(), err)
+	tests := []struct {
+		name   string
+		client *rancher.Client
+	}{
+		{"Deleting cluster", c.client},
+	}
 
-	clusters.DeleteRKE1Cluster(c.client, clusterID)
-	provisioning.VerifyDeleteRKE1Cluster(c.T(), c.client, clusterID)
+	for _, tt := range tests {
+		clusterID, err := clusters.GetClusterIDByName(c.client, c.client.RancherConfig.ClusterName)
+		require.NoError(c.T(), err)
+
+		clusters.DeleteRKE1Cluster(tt.client, clusterID)
+		provisioning.VerifyDeleteRKE1Cluster(c.T(), tt.client, clusterID)
+	}
 }
 
 // In order for 'go test' to run this suite, we need to create
