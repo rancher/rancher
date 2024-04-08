@@ -46,9 +46,9 @@ ENV CATTLE_WINS_AGENT_VERSION v0.4.14
 ENV CATTLE_WINS_AGENT_INSTALL_SCRIPT https://raw.githubusercontent.com/rancher/wins/${CATTLE_WINS_AGENT_VERSION}/install.ps1
 ENV CATTLE_WINS_AGENT_UNINSTALL_SCRIPT https://raw.githubusercontent.com/rancher/wins/${CATTLE_WINS_AGENT_VERSION}/uninstall.ps1
 ENV CATTLE_WINS_AGENT_UPGRADE_IMAGE rancher/wins:${CATTLE_WINS_AGENT_VERSION}
-ENV CATTLE_CSI_PROXY_AGENT_VERSION v1.1.1
+ENV CATTLE_CSI_PROXY_AGENT_VERSION v1.1.3
 # make sure the CATTLE_SYSTEM_AGENT_VERSION is consistent with tests/v2/codecoverage/package/Dockerfile
-ENV CATTLE_SYSTEM_AGENT_VERSION v0.3.5-rc1
+ENV CATTLE_SYSTEM_AGENT_VERSION v0.3.6
 ENV CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX https://github.com/rancher/system-agent/releases/download
 ENV CATTLE_SYSTEM_AGENT_UPGRADE_IMAGE rancher/system-agent:${CATTLE_SYSTEM_AGENT_VERSION}-suc
 ENV CATTLE_SYSTEM_AGENT_INSTALLER_IMAGE rancher/system-agent-installer-
@@ -177,7 +177,7 @@ RUN curl -sLf ${!TINI_URL} > /usr/bin/tini && \
 
 ENV CATTLE_UI_VERSION 2.8.0
 ENV CATTLE_DASHBOARD_UI_VERSION v2.8.0
-ENV CATTLE_CLI_VERSION v2.8.0
+ENV CATTLE_CLI_VERSION v2.8.3
 
 # Base UI brand used as a fallback env setting (not user facing) to indicate this is a non-prime install
 ENV CATTLE_BASE_UI_BRAND=

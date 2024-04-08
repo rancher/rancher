@@ -21,7 +21,7 @@ replace (
 	go.opentelemetry.io/otel/sdk => go.opentelemetry.io/otel/sdk v1.10.0
 	go.opentelemetry.io/otel/trace => go.opentelemetry.io/otel/trace v1.10.0
 	go.opentelemetry.io/proto/otlp => go.opentelemetry.io/proto/otlp v0.19.0
-	go.qase.io/client => github.com/rancher/qase-go/client v0.0.0-20231114201952-65195ec001fa
+	go.qase.io/client => github.com/rancher/qase-go/client v0.0.0-20240308221502-c3b2635212be
 
 	helm.sh/helm/v3 => github.com/rancher/helm/v3 v3.13.3-rancher1
 	k8s.io/api => k8s.io/api v0.28.6
@@ -106,23 +106,23 @@ require (
 	github.com/prometheus/client_golang v1.16.0
 	github.com/prometheus/client_model v0.4.0
 	github.com/prometheus/common v0.44.0
-	github.com/rancher/aks-operator v1.2.1-rc9
+	github.com/rancher/aks-operator v1.2.1
 	github.com/rancher/apiserver v0.0.0-20240207153744-69b3c2b56f3f
 	github.com/rancher/channelserver v0.6.1-0.20240212155841-07630c8295da
-	github.com/rancher/dynamiclistener v0.4.0-rc2
-	github.com/rancher/eks-operator v1.3.1-rc8
+	github.com/rancher/dynamiclistener v0.4.0
+	github.com/rancher/eks-operator v1.3.1
 	github.com/rancher/fleet/pkg/apis v0.9.1-rc.2.0.20240213164401-2c6b1019687c
-	github.com/rancher/gke-operator v1.2.1-rc4
+	github.com/rancher/gke-operator v1.2.1
 	github.com/rancher/kubernetes-provider-detector v0.1.5
 	github.com/rancher/lasso v0.0.0-20240123150939-7055397d6dfa
 	github.com/rancher/machine v0.15.0-rancher110
 	github.com/rancher/norman v0.0.0-20240206180703-6eda4bc94b4c
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/remotedialer v0.3.0
-	github.com/rancher/rke v1.5.7-rc2
-	github.com/rancher/steve v0.0.0-20240213172920-24878f9eedc5
+	github.com/rancher/rke v1.5.7
+	github.com/rancher/steve v0.0.0-20240305150728-3943409601f1
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007
-	github.com/rancher/wrangler/v2 v2.1.3
+	github.com/rancher/wrangler/v2 v2.1.4
 	github.com/robfig/cron v1.1.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.8.4
@@ -166,7 +166,7 @@ require (
 	github.com/containers/image/v5 v5.25.0
 	github.com/google/gnostic-models v0.6.8
 	github.com/rancher/rancher/pkg/apis v0.0.0-20240213233515-935d309ebad4
-	github.com/rancher/shepherd v0.0.0-20240226222603-98384bb5e464
+	github.com/rancher/shepherd v0.0.0-20240405212128-578908d4308a
 	go.qase.io/client v0.0.0-20231114201952-65195ec001fa
 )
 
@@ -313,7 +313,7 @@ require (
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/go-retryablehttp v0.7.2 // indirect
 	github.com/hashicorp/go-uuid v1.0.2 // indirect
-	github.com/hashicorp/go-version v1.3.0 // indirect
+	github.com/hashicorp/go-version v1.6.0 // indirect
 	github.com/huandu/xstrings v1.4.0 // indirect
 	github.com/imdario/mergo v0.3.16 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
@@ -356,7 +356,7 @@ require (
 	github.com/onsi/gomega v1.31.1 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.0-rc5 // indirect
-	github.com/opencontainers/runc v1.1.9 // indirect
+	github.com/opencontainers/runc v1.1.12 // indirect
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
 	github.com/pkg/sftp v1.13.5 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect

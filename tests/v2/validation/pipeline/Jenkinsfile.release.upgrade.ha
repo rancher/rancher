@@ -174,6 +174,24 @@ node {
                 ).trim()
                 println "HA helm repo: ${env.HA_HELM_REPO}"
 
+                env.HA_HELM_REPO_TO_UPGRADE= sh (
+                  script: "./yq '.ha.helmRepoToUpgrade' ${initConfigPath}",
+                  returnStdout: true
+                ).trim()
+                println "HA helm repo to upgrade: ${env.HA_HELM_REPO_TO_UPGRADE}"
+
+                env.HA_HELM_URL= sh (
+                  script: "./yq '.ha.helmURL' ${initConfigPath}",
+                  returnStdout: true
+                ).trim()
+                println "HA helm url: ${env.HA_HELM_URL}"
+
+                env.HA_HELM_URL_TO_UPGRADE= sh (
+                  script: "./yq '.ha.helmURLToUpgrade' ${initConfigPath}",
+                  returnStdout: true
+                ).trim()
+                println "HA helm url to upgrade: ${env.HA_HELM_URL_TO_UPGRADE}"
+
                 env.RKE_VERSION= sh (
                   script: "./yq '.ha.rkeVersion' ${initConfigPath}",
                   returnStdout: true
@@ -226,6 +244,7 @@ node {
                  string(name: 'RANCHER_CHART_VERSION', value: "${env.HA_CHART_VERSION}"),
                  string(name: 'RANCHER_IMAGE_TAG', value: "${env.HA_IMAGE_TAG}"),
                  string(name: 'RANCHER_HELM_REPO', value: "${env.HA_HELM_REPO}"),
+                 string(name: 'RANCHER_HELM_URL', value: "${env.HA_HELM_URL}"),
                  string(name: 'RANCHER_HA_CERT_OPTION', value: "${env.HA_CERT_OPTION}"),
                  string(name: 'RKE_VERSION', value: "${env.RKE_VERSION}"),
                  string(name: 'RANCHER_HA_HARDENED', value: "${env.RANCHER_HA_HARDENED}"),
@@ -365,7 +384,8 @@ node {
                 string(name: 'RANCHER_HA_HOSTNAME', value: "${env.HA_HOST}"),
                 string(name: 'RANCHER_CHART_VERSION', value: "${env.HA_CHART_VERSION_TO_UPGRADE}"),
                 string(name: 'RANCHER_IMAGE_TAG', value: "${env.HA_IMAGE_TAG_TO_UPGRADE}"),
-                string(name: 'RANCHER_HELM_REPO', value: "${env.HA_HELM_REPO}"),
+                string(name: 'RANCHER_HELM_REPO', value: "${env.HA_HELM_REPO_TO_UPGRADE}"),
+                string(name: 'RANCHER_HELM_URL', value: "${env.HA_HELM_URL_TO_UPGRADE}"),
                 string(name: 'RANCHER_HA_CERT_OPTION', value: "${env.HA_CERT_OPTION}"),
                 string(name: 'RANCHER_HA_KUBECONFIG', value: "${env.HA_KUBECONFIG}"),
                 string(name: 'RANCHER_HELM_EXTRA_SETTINGS', value: "${env.RANCHER_HELM_EXTRA_SETTINGS_TO_UPGRADE}")

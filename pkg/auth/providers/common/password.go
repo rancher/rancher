@@ -92,5 +92,5 @@ func SavePasswordSecret(secrets corev1.SecretInterface, password string, fieldNa
 	if err := CreateOrUpdateSecrets(secrets, password, strings.ToLower(fieldName), strings.ToLower(authType)); err != nil {
 		return "", err
 	}
-	return GetFullSecretName(authType, fieldName), nil
+	return GetFullSecretName(authType, strings.ToLower(fieldName)), nil
 }

@@ -82,8 +82,8 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningK3SCustomCluster() 
 	}{
 		{"1 Node all roles " + provisioninginput.AdminClientName.String(), c.client, nodeRolesAll, c.client.Flags.GetValue(environmentflag.Long)},
 		{"1 Node all roles " + provisioninginput.StandardClientName.String(), c.standardUserClient, nodeRolesAll, c.client.Flags.GetValue(environmentflag.Short) || c.client.Flags.GetValue(environmentflag.Long)},
-		{"2 nodes - etcd/cp roles per 1 node " + provisioninginput.AdminClientName.String(), c.client, nodeRolesShared, c.client.Flags.GetValue(environmentflag.Long)},
-		{"2 nodes - etcd/cp roles per 1 node " + provisioninginput.StandardClientName.String(), c.standardUserClient, nodeRolesShared, c.client.Flags.GetValue(environmentflag.Short) || c.client.Flags.GetValue(environmentflag.Long)},
+		{"2 nodes - etcd|cp roles per 1 node " + provisioninginput.AdminClientName.String(), c.client, nodeRolesShared, c.client.Flags.GetValue(environmentflag.Long)},
+		{"2 nodes - etcd|cp roles per 1 node " + provisioninginput.StandardClientName.String(), c.standardUserClient, nodeRolesShared, c.client.Flags.GetValue(environmentflag.Short) || c.client.Flags.GetValue(environmentflag.Long)},
 		{"3 nodes - 1 role per node " + provisioninginput.AdminClientName.String(), c.client, nodeRolesDedicated, c.client.Flags.GetValue(environmentflag.Long)},
 		{"3 nodes - 1 role per node " + provisioninginput.StandardClientName.String(), c.standardUserClient, nodeRolesDedicated, c.client.Flags.GetValue(environmentflag.Long)},
 	}
@@ -102,7 +102,7 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningK3SCustomCluster() 
 func (c *CustomClusterProvisioningTestSuite) TestProvisioningK3SCustomClusterDynamicInput() {
 	isWindows := false
 	for _, pool := range c.provisioningConfig.MachinePools {
-		if pool.NodeRoles.Windows {
+		if pool.MachinePoolConfig.Windows {
 			isWindows = true
 			break
 		}

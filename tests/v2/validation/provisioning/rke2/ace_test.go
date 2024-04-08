@@ -66,27 +66,33 @@ func (r *RKE2ACETestSuite) SetupSuite() {
 func (r *RKE2ACETestSuite) TestProvisioningRKE2ClusterACE() {
 	nodeRoles0 := []provisioninginput.MachinePools{
 		{
-			NodeRoles: machinepools.NodeRoles{
-				ControlPlane: true,
-				Etcd:         false,
-				Worker:       false,
-				Quantity:     3,
+			MachinePoolConfig: machinepools.MachinePoolConfig{
+				NodeRoles: machinepools.NodeRoles{
+					ControlPlane: true,
+					Etcd:         false,
+					Worker:       false,
+					Quantity:     3,
+				},
 			},
 		},
 		{
-			NodeRoles: machinepools.NodeRoles{
-				ControlPlane: false,
-				Etcd:         true,
-				Worker:       false,
-				Quantity:     1,
+			MachinePoolConfig: machinepools.MachinePoolConfig{
+				NodeRoles: machinepools.NodeRoles{
+					ControlPlane: false,
+					Etcd:         true,
+					Worker:       false,
+					Quantity:     1,
+				},
 			},
 		},
 		{
-			NodeRoles: machinepools.NodeRoles{
-				ControlPlane: false,
-				Etcd:         false,
-				Worker:       true,
-				Quantity:     1,
+			MachinePoolConfig: machinepools.MachinePoolConfig{
+				NodeRoles: machinepools.NodeRoles{
+					ControlPlane: false,
+					Etcd:         false,
+					Worker:       true,
+					Quantity:     1,
+				},
 			},
 		},
 	}

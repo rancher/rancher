@@ -107,3 +107,14 @@ These tests utilize Go build tags. Due to this, see the below examples on how to
 `gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/nodescaling --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestGKENodeScalingTestSuite/TestScalingGKENodePoolsDynamicInput"`
 
 If the specified test passes immediately without warning, try adding the `-count=1` flag to get around this issue. This will avoid previous results from interfering with the new test run.
+
+
+## Auto Replacing Nodes
+If UnhealthyNodeTimeout is set on your machinepools, auto_replace_test.go will replace a single node with the given role. There are static tests for Etcd, ControlPlane and Worker roles.
+
+If UnhealthyNodeTimeout is not set, the test(s) in this suite will wait for the cluster upgrade default timeout to be reached (30 mins), expecting an error on the node to remain as a negative test. 
+
+Each test requires 2 or more nodes in the specified role's pool. i.e. if you're running the entire suite, you would need 3etcd, 2controlplane, 2worker, minimum. 
+
+### RKE2 | K3S
+`gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/nodescaling --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestEtcdAutoReplaceRKE2K3S/TestEtcdAutoReplaceRKE2K3S"`

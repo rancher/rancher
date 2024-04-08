@@ -8,11 +8,25 @@ Please see below for more details for your config. Please note that the config c
 
 ## Table of Contents
 1. [Prerequisites](../README.md)
-2. [Define your test](#Provisioning-Input)
-3. [Configure providers to use for Node Driver Clusters](#NodeTemplateConfigs)
-4. [Configuring Custom Clusters](#Custom-Cluster)
-5. [Advanced Cluster Settings](#advanced-settings)
-6. [Back to general provisioning](../README.md)
+2. [Configuring test flags](#Flags)
+3. [Define your test](#Provisioning-Input)
+4. [Configuring providers to use for Node Driver Clusters](#NodeTemplateConfigs)
+5. [Configuring Custom Clusters](#Custom-Cluster)
+6. [Static test cases](#static-test-cases)
+7. [Cloud Provider](#Cloud-Provider)
+8. [Advanced Cluster Settings](#advanced-settings)
+9. [Back to general provisioning](../README.md)
+
+
+## Flags
+Flags are used to determine which static table tests are run (has no effect on dynamic tests) 
+`Long` Will run the long version of the table tests (usually all of them)
+`Short` Will run the subset of table tests with the short flag.
+
+```yaml
+flags:
+  desiredflags: "Long"
+```
 
 ## Provisioning Input
 provisioningInput is needed to the run the RKE1 tests, specifically kubernetesVersion, cni, and providers. nodesAndRoles is only needed for the TestProvisioningDynamicInput test, node pools are divided by "{nodepool},". psact is optional and takes values `rancher-privileged`, `rancher-restricted` or `rancher-baseline`.
@@ -30,11 +44,10 @@ provisioningInput:
       worker: true
       drainBeforeDelete: true
       quantity: 2
-  flags:
-    desiredflags: "Long" #These flags are for running TestProvisioningRKE1Cluster or TestProvisioningRKE1CustomCluster it is not needed for the dynamic tests. Long will run the full table, where as short will run the short version of this test.
-  rke1KubernetesVersion: ["v1.27.6-rancher1-1"]
+  rke1KubernetesVersion: ["v1.27.10-rancher1-1"]
   cni: ["calico"]
-  providers: ["linode", "aws", "do", "harvester"]
+  providers: ["linode", "aws", "do", "harvester", "vsphere", "azure"]
+  cloudProvider: "external-aws"
   nodeProviders: ["ec2"]
   psact: ""
   criDockerd: false
@@ -57,10 +70,16 @@ provisioningInput:
 
 ## NodeTemplateConfigs
 RKE1 specifically needs a node template config to run properly. These are the inputs needed for the different node providers.
-
+Top level node template config entries can be set. The top level nodeTemplate is optional, and is not need for the different node
+providers to work.
+```yaml
+  nodeTemplate:
+    engineInstallURL: "testNT"
+    name:             "testNTName"
+```
 ### AWS
 ```yaml
-  awsNodeTemplate:
+  awsNodeConfig:
     accessKey: ""
     ami: ""
     blockDurationMinutes: "0"
@@ -99,7 +118,7 @@ RKE1 specifically needs a node template config to run properly. These are the in
 
 ### Azure
 ```yaml
-azureNodeTemplate:
+azureNodeConfig:
   availabilitySet: "docker-machine"
   clientId: ""
   clientSecret: ""
@@ -132,7 +151,7 @@ azureNodeTemplate:
 
 ### Harvester
 ```yaml
-harvesterNodeTemplate":
+harvesterNodeConfig":
   cloudConfig: ""
   clusterId: ""
   clusterType: ""
@@ -159,7 +178,7 @@ harvesterNodeTemplate":
 
 ### Linode
 ```yaml
-linodeNodeTemplate:
+linodeNodeConfig:
   authorizedUsers: ""
   createPrivateIp: true
   dockerPort: "2376"
@@ -181,7 +200,7 @@ linodeNodeTemplate:
 
 ### Vsphere
 ```yaml
-vmwarevsphereNodeTemplate:
+vmwarevsphereNodeConfig:
   cfgparam: ["disk.enableUUID=TRUE"]
   cloneFrom: ""
   cloudinit: "#cloud-config\n\n"
@@ -214,6 +233,13 @@ These tests utilize Go build tags. Due to this, see the below examples on how to
 `gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/provisioning/rke1 --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestRKE1ProvisioningTestSuite/TestProvisioningRKE1ClusterDynamicInput"`
 
 If the specified test passes immediately without warning, try adding the `-count=1` flag to get around this issue. This will avoid previous results from interfering with the new test run.
+
+## Cloud Provider
+Cloud Provider enables additional options such as load-balancers and storage devices to be provisioned through your cluster
+available options:
+### AWS
+* `aws` uses the in-tree provider for aws -- **Deprecated on kubernetes 1.26 and below**
+* `external-aws` uses the out-of-tree provider for aws. Built in logic to the automation will be applied to the cluster that applies the correct configuration for the out-of-tree charts to be installed. Supported on kubernetes 1.22+
 
 ## Custom Cluster
 For custom clusters, no nodeTemplateConfig or credentials are required. Currently only supported for ec2.
@@ -280,6 +306,55 @@ provisioningInput:
   nodeProviders: ["ec2"]
   psact: ""
 ```
+
+## Static Test Cases
+In an effort to have uniform testing across our internal QA test case reporter, there are specific test cases that are put into their respective test files. This section highlights those test cases.
+
+### PSACT
+These test cases cover the following PSACT values as both an admin and standard user:
+1. `rancher-privileged`
+2. `rancher-restricted`
+3. `rancher-baseline`
+
+See an example YAML below:
+
+```yaml
+rancher:
+  host: "<rancher server url>"
+  adminToken: "<rancher admin bearer token>"
+  cleanup: false
+  clusterName: "<provided cluster name>"
+  insecure: true
+provisioningInput:
+  rke1KubernetesVersion: ["v1.27.10-rancher1-1"]
+  cni: ["calico"]
+  providers: ["linode"]
+  nodeProviders: ["ec2"]
+nodeTemplate:
+  engineInstallURL: "https://releases.rancher.com/install-docker/23.0.sh"
+linodeNodeConfig:
+  authorizedUsers: ""
+  createPrivateIp: true
+  dockerPort: "2376"
+  image: "linode/ubuntu22.04"
+  instanceType: "g6-dedicated-8"
+  label: ""
+  region: "us-west"
+  rootPass: ""
+  sshPort: "22"
+  sshUser: "root"
+  stackscript: ""
+  stackscriptData: ""
+  swapSize: "512"
+  tags: ""
+  token: ""
+  type: "linodeConfig"
+  uaPrefix: "Rancher"
+```
+
+These tests utilize Go build tags. Due to this, see the below examples on how to run the tests:
+
+`gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/provisioning/rke1 --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestRKE1PSACTTestSuite$"`
 
 ## Advanced Settings
 This encapsulates any other setting that is applied in the cluster.spec. Currently we have support for:
