@@ -12,6 +12,7 @@ import (
 	v1 "github.com/rancher/shepherd/clients/rancher/v1"
 	"github.com/rancher/shepherd/extensions/clusters"
 	"github.com/rancher/shepherd/extensions/clusters/kubernetesversions"
+	"github.com/rancher/shepherd/extensions/kubeapi/rbac"
 	"github.com/rancher/shepherd/extensions/projects"
 	"github.com/rancher/shepherd/extensions/provisioning"
 	"github.com/rancher/shepherd/extensions/provisioninginput"
@@ -22,6 +23,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type RBACAdditionalTestSuite struct {
@@ -205,6 +207,14 @@ func (rb *RBACAdditionalTestSuite) ValidateEditGlobalSettings() {
 
 }
 
+func (rb *RBACAdditionalTestSuite) ValidateListGlobalRoles() {
+
+	expectedError := "globalroles.management.cattle.io is forbidden: User \"" + rb.standardUser.ID + "\" cannot list resource \"globalroles\" in API group \"management.cattle.io\" at the cluster scope"
+	_, err := rbac.ListGlobalRoles(rb.standardUserClient, metav1.ListOptions{})
+	require.Error(rb.T(), err)
+	assert.Equal(rb.T(), expectedError, err.Error())
+}
+
 func (rb *RBACAdditionalTestSuite) TestRBACAdditional() {
 
 	tests := []struct {
@@ -260,10 +270,11 @@ func (rb *RBACAdditionalTestSuite) TestRBACAdditional() {
 				rb.ValidateCannotAddMPMsAsProjectOwner()
 			})
 
+			rb.Run("Validating if standard users can get global roles", func() {
+				rb.ValidateListGlobalRoles()
+			})
+
 		} else {
-			// There's some logic in here that is only known to the user who wrote this test.
-			// Why is it special cased for restrictedAdmin? Do we have it documented that you must provide a config
-			// if testing restrictedAdmin?
 			rb.Run("Validating if "+restrictedAdmin+" can create an RKE1 cluster", func() {
 				userConfig := new(provisioninginput.Config)
 				config.LoadConfig(provisioninginput.ConfigurationFileKey, userConfig)

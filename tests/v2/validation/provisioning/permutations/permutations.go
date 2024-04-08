@@ -101,7 +101,7 @@ func RunTestPermutations(s *suite.Suite, testNamePrefix string, client *rancher.
 						provisioning.VerifyCluster(s.T(), client, testClusterConfig, clusterObject)
 
 						if testClusterConfig.CloudProvider == provisioninginput.AWSProviderName.String() {
-							lbServiceResp := createAWSWorkloadAndServices(s.T(), client, clusterObject)
+							lbServiceResp := CreateCloudProviderWorkloadAndServicesLB(s.T(), client, clusterObject)
 
 							status := &provv1.ClusterStatus{}
 							err := steveV1.ConvertToK8sType(clusterObject.Status, status)
@@ -122,7 +122,7 @@ func RunTestPermutations(s *suite.Suite, testNamePrefix string, client *rancher.
 
 						if strings.Contains(testClusterConfig.CloudProvider, provisioninginput.AWSProviderName.String()) {
 							if strings.Contains(testClusterConfig.CloudProvider, externalProviderString) {
-								err = createAndInstallAWSExternalCharts(client, clusterObject.ID)
+								err = CreateAndInstallAWSExternalCharts(client, clusterObject.ID, false)
 								require.NoError(s.T(), err)
 
 								podErrors := pods.StatusPods(client, clusterObject.ID)
@@ -135,7 +135,7 @@ func RunTestPermutations(s *suite.Suite, testNamePrefix string, client *rancher.
 							steveClusterObject, err := adminClient.Steve.SteveType(clusters.ProvisioningSteveResourceType).ByID(provisioninginput.Namespace + "/" + clusterObject.ID)
 							require.NoError(s.T(), err)
 
-							lbServiceResp := createAWSWorkloadAndServices(s.T(), client, steveClusterObject)
+							lbServiceResp := CreateCloudProviderWorkloadAndServicesLB(s.T(), client, steveClusterObject)
 
 							status := &provv1.ClusterStatus{}
 							err = steveV1.ConvertToK8sType(steveClusterObject.Status, status)
@@ -152,7 +152,7 @@ func RunTestPermutations(s *suite.Suite, testNamePrefix string, client *rancher.
 
 						provisioning.VerifyCluster(s.T(), client, testClusterConfig, clusterObject)
 						if testClusterConfig.CloudProvider == provisioninginput.AWSProviderName.String() {
-							lbServiceResp := createAWSWorkloadAndServices(s.T(), client, clusterObject)
+							lbServiceResp := CreateCloudProviderWorkloadAndServicesLB(s.T(), client, clusterObject)
 
 							status := &provv1.ClusterStatus{}
 							err := steveV1.ConvertToK8sType(clusterObject.Status, status)
@@ -234,9 +234,9 @@ func GetClusterProvider(clusterType string, nodeProviderName string, provisionin
 	return &nodeProvider, &rke1NodeProvider, &customProvider, kubeVersions
 }
 
-// createAWSWorkloadAndServices creates a test workload, clusterIP service and awsLoadBalancer service.
-// This should be used when testing cloud provider for aws, with in-tree or out-of-tree set on the cluster.
-func createAWSWorkloadAndServices(t *testing.T, client *rancher.Client, cluster *steveV1.SteveAPIObject) *steveV1.SteveAPIObject {
+// CreateCloudProviderWorkloadAndServicesLB creates a test workload, clusterIP service and LoadBalancer service.
+// This should be used when testing cloud provider with in-tree or out-of-tree set on the cluster.
+func CreateCloudProviderWorkloadAndServicesLB(t *testing.T, client *rancher.Client, cluster *steveV1.SteveAPIObject) *steveV1.SteveAPIObject {
 	status := &provv1.ClusterStatus{}
 	err := steveV1.ConvertToK8sType(cluster.Status, status)
 	require.NoError(t, err)
@@ -283,9 +283,9 @@ func createNginxDeployment(steveclient *steveV1.Client, containerNamePrefix stri
 	return deploymentResp, err
 }
 
-// createAndInstallAWSExternalCharts is a helper function for rke1 external-aws cloud provider
+// CreateAndInstallAWSExternalCharts is a helper function for rke1 external-aws cloud provider
 // clusters that install the appropriate chart(s) and returns an error, if any.
-func createAndInstallAWSExternalCharts(client *rancher.Client, clusterID string) error {
+func CreateAndInstallAWSExternalCharts(client *rancher.Client, clusterID string, isLeaderMigration bool) error {
 	steveclient, err := client.Steve.ProxyDownstream(clusterID)
 	if err != nil {
 		return err
@@ -317,6 +317,6 @@ func createAndInstallAWSExternalCharts(client *rancher.Client, clusterID string)
 		Version:   latestVersion,
 		ProjectID: project.ID,
 	}
-	err = charts.InstallAWSOutOfTreeChart(client, installOptions, repoName, clusterID)
+	err = charts.InstallAWSOutOfTreeChart(client, installOptions, repoName, clusterID, isLeaderMigration)
 	return err
 }
