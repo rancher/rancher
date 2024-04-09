@@ -108,7 +108,7 @@ func (m *mockGkeOperatorController) generateAndSetServiceAccount(cluster *mgmtv3
 		return cluster, fmt.Errorf("error getting kube config: %v", err)
 	}
 
-	clusterDialer, err := m.ClientDialer.ClusterDialer(cluster.Name)
+	clusterDialer, err := m.ClientDialer.ClusterDialer(cluster.Name, true)
 	if err != nil {
 		return cluster, err
 	}
