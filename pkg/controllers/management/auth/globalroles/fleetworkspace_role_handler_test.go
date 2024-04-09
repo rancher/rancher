@@ -59,7 +59,7 @@ func TestReconcileFleetPermissions(t *testing.T) {
 				},
 			},
 		},
-		"no update if ClusterRoles are prensent, and haven't changed": {
+		"no update if ClusterRoles are present, and haven't changed": {
 			crCache: clusterRoleMock(ctrl),
 			crClient: func() rbacv1.ClusterRoleController {
 				return fake.NewMockNonNamespacedControllerInterface[*rbac.ClusterRole, *rbac.ClusterRoleList](ctrl)
@@ -148,6 +148,7 @@ func TestReconcileFleetPermissions(t *testing.T) {
 			crCache: func() rbacv1.ClusterRoleCache {
 				mock := fake.NewMockNonNamespacedCacheInterface[*rbac.ClusterRole](ctrl)
 				mock.EXPECT().Get(wrangler.SafeConcatName(grName, fleetWorkspaceClusterRulesName)).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+				mock.EXPECT().Get(wrangler.SafeConcatName(grName, fleetWorkspaceVerbsName)).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
 				return mock
 			},
 			crClient: func() rbacv1.ClusterRoleController {
@@ -193,6 +194,49 @@ func TestReconcileFleetPermissions(t *testing.T) {
 				InheritedFleetWorkspacePermissions: v3.FleetWorkspacePermission{
 					ResourceRules:  resourceRules,
 					WorkspaceVerbs: workspaceVerbs,
+				},
+			},
+		},
+		"no backing ClusterRoles are created, updated or deleted if InheritedFleetWorkspacePermissions is not provided ": {
+			crCache: func() rbacv1.ClusterRoleCache {
+				mock := fake.NewMockNonNamespacedCacheInterface[*rbac.ClusterRole](ctrl)
+				mock.EXPECT().Get(wrangler.SafeConcatName(grName, fleetWorkspaceClusterRulesName)).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+				mock.EXPECT().Get(wrangler.SafeConcatName(grName, fleetWorkspaceVerbsName)).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+				return mock
+			},
+			crClient: func() rbacv1.ClusterRoleController {
+				return fake.NewMockNonNamespacedControllerInterface[*rbac.ClusterRole, *rbac.ClusterRoleList](ctrl)
+			},
+			fwCache: func() mgmtcontroller.FleetWorkspaceCache {
+				return fake.NewMockNonNamespacedCacheInterface[*v3.FleetWorkspace](ctrl)
+			},
+			gr: &v3.GlobalRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: grName,
+					UID:  grUID,
+				},
+			},
+		},
+		"existing backing ClusterRoles are deleted if InheritedFleetWorkspacePermissions is nil": {
+			crCache: func() rbacv1.ClusterRoleCache {
+				mock := fake.NewMockNonNamespacedCacheInterface[*rbac.ClusterRole](ctrl)
+				mock.EXPECT().Get(wrangler.SafeConcatName(grName, fleetWorkspaceClusterRulesName)).Return(&rbac.ClusterRole{}, nil)
+				mock.EXPECT().Get(wrangler.SafeConcatName(grName, fleetWorkspaceVerbsName)).Return(&rbac.ClusterRole{}, nil)
+				return mock
+			},
+			crClient: func() rbacv1.ClusterRoleController {
+				mock := fake.NewMockNonNamespacedControllerInterface[*rbac.ClusterRole, *rbac.ClusterRoleList](ctrl)
+				mock.EXPECT().Delete(wrangler.SafeConcatName(grName, fleetWorkspaceClusterRulesName), &metav1.DeleteOptions{})
+				mock.EXPECT().Delete(wrangler.SafeConcatName(grName, fleetWorkspaceVerbsName), &metav1.DeleteOptions{})
+				return mock
+			},
+			fwCache: func() mgmtcontroller.FleetWorkspaceCache {
+				return fake.NewMockNonNamespacedCacheInterface[*v3.FleetWorkspace](ctrl)
+			},
+			gr: &v3.GlobalRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: grName,
+					UID:  grUID,
 				},
 			},
 		},

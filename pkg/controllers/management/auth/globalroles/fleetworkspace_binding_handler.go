@@ -70,6 +70,9 @@ func (h *fleetWorkspaceBindingHandler) reconcileFleetWorkspacePermissionsBinding
 }
 
 func (h *fleetWorkspaceBindingHandler) reconcileResourceRulesBindings(globalRoleBinding *v3.GlobalRoleBinding, globalRole *v3.GlobalRole, fleetWorkspaces []*v3.FleetWorkspace) error {
+	if globalRole.InheritedFleetWorkspacePermissions.ResourceRules == nil {
+		return nil
+	}
 	var returnError error
 	subject := rbac.GetGRBSubject(globalRoleBinding)
 	roleref := v1.RoleRef{
@@ -134,7 +137,7 @@ func (h *fleetWorkspaceBindingHandler) reconcileResourceRulesBindings(globalRole
 }
 
 func (h *fleetWorkspaceBindingHandler) reconcileWorkspaceVerbsBindings(globalRoleBinding *v3.GlobalRoleBinding, globalRole *apimgmtv3.GlobalRole, fleetWorkspaces []*apimgmtv3.FleetWorkspace) error {
-	if globalRole.InheritedFleetWorkspacePermissions.WorkspaceVerbs == nil || len(globalRole.InheritedFleetWorkspacePermissions.WorkspaceVerbs) == 0 {
+	if globalRole.InheritedFleetWorkspacePermissions.WorkspaceVerbs == nil {
 		return nil
 	}
 	crbName := wrangler.SafeConcatName(globalRoleBinding.Name, fleetWorkspaceVerbsName)
