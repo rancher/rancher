@@ -284,7 +284,7 @@ func (s *projectStore) getNamespacesCount(apiContext *types.APIContext, project 
 		return 0, err
 	}
 
-	kubeConfig, err := clustermanager.ToRESTConfig(cluster, s.scaledContext, s.secretLister)
+	kubeConfig, err := clustermanager.ToRESTConfig(cluster, s.scaledContext, s.secretLister, true)
 	if kubeConfig == nil || err != nil {
 		return 0, err
 	}
