@@ -2,7 +2,6 @@ package oci
 
 import (
 	"bytes"
-	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -10,10 +9,10 @@ import (
 	"os"
 	"strings"
 
-	"github.com/Masterminds/semver"
+	"github.com/hashicorp/go-version"
 	ocispecv1 "github.com/opencontainers/image-spec/specs-go/v1"
-	corev1controllers "github.com/rancher/wrangler/v2/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
+	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/registry"
 	"helm.sh/helm/v3/pkg/repo"
 	corev1 "k8s.io/api/core/v1"
@@ -26,7 +25,7 @@ import (
 )
 
 // maxHelmRepoIndexSize defines what is the max size of helm repo index file we support.
-const maxHelmRepoIndexSize int = 30 * 1024 * 1024 // 30 MiB
+var maxHelmRepoIndexSize = 30 * 1024 * 1024 // 30 MiB
 
 // Chart returns an io.ReadCloser of the chart tar that is requested.
 // It uses oras Go library to download the manifest of the OCI artifact
@@ -105,7 +104,10 @@ func Chart(credentialSecret *corev1.Secret, chart *repo.ChartVersion, clusterRep
 // GenerateIndex creates a Helm repo index from the OCI url provided
 // by fetching the repositories and then the tags according to the url.
 // Lastly, adds the chart entry to the Helm repo index using the oras library.
-func GenerateIndex(URL string, credentialSecret *corev1.Secret, clusterRepoSpec v1.RepoSpec, clusterRepoStatus v1.RepoStatus, configMapCache corev1controllers.ConfigMapCache) (*repo.IndexFile, error) {
+func GenerateIndex(URL string, credentialSecret *corev1.Secret,
+	clusterRepoSpec v1.RepoSpec,
+	clusterRepoStatus v1.RepoStatus,
+	indexFile *repo.IndexFile) (*repo.IndexFile, error) {
 	logrus.Debugf("Generating index for oci clusterrepo URL %s", URL)
 
 	// Create a new oci client
@@ -114,58 +116,39 @@ func GenerateIndex(URL string, credentialSecret *corev1.Secret, clusterRepoSpec 
 		return nil, fmt.Errorf("failed to create an OCI client for url %s: %w", URL, err)
 	}
 
-	indexFile := repo.NewIndexFile()
-
-	// if the index file configmap already exists, use it instead of creating a new one.
-	if clusterRepoStatus.IndexConfigMapName != "" && clusterRepoSpec.URL == clusterRepoStatus.URL {
-		configMap, err := configMapCache.Get(clusterRepoStatus.IndexConfigMapNamespace, clusterRepoStatus.IndexConfigMapName)
-		if err != nil {
-			return nil, fmt.Errorf("failed to fetch existing configmap of indexfile for URL %s", URL)
-		}
-
-		data, err := readBytes(configMapCache, configMap)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read bytes of existing configmap for URL %s", URL)
-		}
-		gz, err := gzip.NewReader(bytes.NewBuffer(data))
-		if err != nil {
-			return nil, err
-		}
-		defer gz.Close()
-
-		data, err = io.ReadAll(gz)
-		if err != nil {
-			return nil, err
-		}
-
-		if err := json.Unmarshal(data, indexFile); err != nil {
-			return nil, err
-		}
+	// Checking if the URL specified by the user is a oras repository or not ?
+	IsOrasRepository, err := ociClient.IsOrasRepository()
+	if err != nil {
+		return nil, err
 	}
 
-	var orasRepository *remote.Repository
-	chartName := ""
+	var maxTag *version.Version
+	var chartName string
 
-	// Loop over all the tags and add to helm repo index
+	// Loop over all the tags and find the latest version
 	tagsFunc := func(tags []string) error {
-		// We don't need to switch from + to _ like helm does https://github.com/helm/helm/blob/e81f6140ddb22bc99a08f7409522a8dbe5338ee3/pkg/registry/util.go#L123-L142
-		// since we are pulling the chart and not pushing the chart.+ in version is not accepted in OCI registries.
-		for _, tag := range tags {
+		for i := len(tags) - 1; i >= 0; i-- {
 			// Check if the tag is a valid semver version or not. If yes, then proceed.
-			if _, err := semver.NewVersion(tag); err == nil {
-				logrus.Debugf("found a tag %s for the repository %s for OCI clusterrepo URL %s", tag, ociClient.repository, URL)
-				ociURL := fmt.Sprintf("%s/%s:%s", ociClient.registry, ociClient.repository, ociClient.tag)
-				ociClient.tag = tag
+			semverTag, err := version.NewVersion(tags[i])
+			if err != nil {
+				// skipping the tag since it is not semver
+				continue
+			}
 
-				orasRepository, err = ociClient.GetOrasRepository()
-				if err != nil {
-					return fmt.Errorf("failed to create an oras repository for url %s: %w", ociURL, err)
-				}
+			if maxTag == nil || maxTag.LessThan(semverTag) {
+				maxTag = semverTag
+			}
 
-				err = addToHelmRepoIndex(*ociClient, chartName, indexFile, orasRepository)
-				if err != nil {
-					return fmt.Errorf("failed to add chartName %s in OCI URL %s to helm repo index: %w", chartName, ociURL, err)
+			// Add tags into the helm repo index
+			if !indexFile.Has(chartName, tags[i]) {
+				chartVersion := &repo.ChartVersion{
+					Metadata: &chart.Metadata{
+						Version: tags[i],
+						Name:    chartName,
+					},
+					URLs: []string{fmt.Sprintf("oci://%s/%s:%s", ociClient.registry, ociClient.repository, tags[i])},
 				}
+				indexFile.Entries[chartName] = append(indexFile.Entries[chartName], chartVersion)
 			}
 		}
 		return nil
@@ -180,25 +163,29 @@ func GenerateIndex(URL string, credentialSecret *corev1.Secret, clusterRepoSpec 
 			userProvidedRepository := ociClient.repository
 
 			// Work on the oci repositories that match with the userProvidedRepository
-			if subRepo, found := strings.CutPrefix(repository, ociClient.repository); found {
-				// We only proceed for the following two conditions
-				// 1: If the entire word is cut such as `charts` in oci://example.com/charts/etcd, not `cha` in `oci://example.com/charts/etcd`.
-				// 2: there is nothing to cut, which means userprovidedRepository is an orasRepository.
-				if strings.HasPrefix(subRepo, "/") || repository == subRepo {
-					chartName = strings.Trim(subRepo, "/")
+			if _, found := strings.CutPrefix(repository, ociClient.repository); found {
+				ociClient.repository = repository
 
-					// We need to replace the repo given by the user with the full repository for fetching the helm chart.
-					ociClient.repository = repository
-					ociURL := fmt.Sprintf("%s/%s", ociClient.registry, ociClient.repository)
+				orasRepository, err := ociClient.GetOrasRepository()
+				if err != nil {
+					return fmt.Errorf("failed to create an oras repository for url %s: %w", URL, err)
+				}
+				chartName = ociClient.repository[strings.LastIndex(ociClient.repository, "/")+1:]
+				maxTag = nil
 
-					orasRepository, err = ociClient.GetOrasRepository()
+				// call tags to get the max tag and update the indexFile
+				err = orasRepository.Tags(context.Background(), "", tagsFunc)
+				if err != nil {
+					return fmt.Errorf("failed to fetch tags for repository %s: %w", URL, err)
+				}
+
+				if maxTag != nil {
+					ociClient.tag = maxTag.String()
+
+					// fetch the chart.yaml for the latest tag and add it to the index.
+					err = addToHelmRepoIndex(*ociClient, indexFile, orasRepository)
 					if err != nil {
-						return fmt.Errorf("failed to create an oras repository for url %s: %w", ociURL, err)
-					}
-
-					err = orasRepository.Tags(context.Background(), "", tagsFunc)
-					if err != nil {
-						return fmt.Errorf("failed to fetch tags for repository %s: %w", ociURL, err)
+						return fmt.Errorf("failed to add tag %s in OCI repository %s to helm repo index: %w", maxTag.String(), ociClient.repository, err)
 					}
 				}
 			}
@@ -207,35 +194,41 @@ func GenerateIndex(URL string, credentialSecret *corev1.Secret, clusterRepoSpec 
 		return nil
 	}
 
-	IsOrasRepository, err := ociClient.IsOrasRepository()
-	if err != nil {
-		return nil, err
-	}
-
 	// If the user has provided the tag, we simply generate the index with that single oci artifact.
 	if ociClient.tag != "" {
-		orasRepository, err = ociClient.GetOrasRepository()
+		orasRepository, err := ociClient.GetOrasRepository()
 		if err != nil {
 			return nil, fmt.Errorf("failed to create an oras repository for url %s: %w", URL, err)
 		}
 
-		err = addToHelmRepoIndex(*ociClient, chartName, indexFile, orasRepository)
+		err = addToHelmRepoIndex(*ociClient, indexFile, orasRepository)
 		if err != nil {
-			return nil, fmt.Errorf("failed to add chartName %s in OCI URL %s to Helm repo index: %w", chartName, URL, err)
+			return nil, fmt.Errorf("failed to add oci artifact %s in OCI URL %s to Helm repo index: %w", ociClient.repository, URL, err)
 		}
 
 		// If the repository is provided with no tag, then we fetch all tags.
 	} else if IsOrasRepository {
-		orasRepository, err = ociClient.GetOrasRepository()
+		orasRepository, err := ociClient.GetOrasRepository()
 		if err != nil {
 			return nil, fmt.Errorf("failed to create an oras repository for url %s: %w", URL, err)
 		}
+		chartName = ociClient.repository[strings.LastIndex(ociClient.repository, "/")+1:]
 
+		// call tags to get the max tag and update the indexFile
 		err = orasRepository.Tags(context.Background(), "", tagsFunc)
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch tags for repository %s: %w", URL, err)
 		}
 
+		if maxTag != nil {
+			ociClient.tag = maxTag.String()
+
+			// fetch the chart.yaml for the latest tag and add it to the index.
+			err = addToHelmRepoIndex(*ociClient, indexFile, orasRepository)
+			if err != nil {
+				return indexFile, fmt.Errorf("failed to add tag %s in OCI repository %s to helm repo index: %w", maxTag.String(), ociClient.repository, err)
+			}
+		}
 		// If no repository and tag is provided, we fetch
 		// all repositories and then tags associated.
 	} else {
@@ -247,7 +240,7 @@ func GenerateIndex(URL string, credentialSecret *corev1.Secret, clusterRepoSpec 
 		// Fetch all repositories
 		err = orasRegistry.Repositories(context.Background(), "", repositoriesFunc)
 		if err != nil {
-			return nil, fmt.Errorf("failed to fetch repositories for %s: %w", URL, err)
+			return indexFile, fmt.Errorf("failed to fetch repositories for %s: %w", URL, err)
 		}
 	}
 
@@ -255,76 +248,64 @@ func GenerateIndex(URL string, credentialSecret *corev1.Secret, clusterRepoSpec 
 }
 
 // addToHelmRepoIndex adds the helmchart aka oras repository to the helm repo index
-func addToHelmRepoIndex(ociClient Client, chartName string, indexFile *repo.IndexFile, orasRepository *remote.Repository) error {
+func addToHelmRepoIndex(ociClient Client, indexFile *repo.IndexFile, orasRepository *remote.Repository) (err error) {
 	ociURL := fmt.Sprintf("%s/%s:%s", ociClient.registry, ociClient.repository, ociClient.tag)
 	filePath := ""
-	var err error
+	var indexFileBytes []byte
 
-	// Delete the file
+	// Delete the temporary file created to store the helm chart.
 	defer func() {
 		if filePath != "" {
-			err = os.Remove(filePath)
+			err2 := os.Remove(filePath)
+			if err == nil {
+				err = err2
+			}
 		}
 	}()
+	// The chartname is always the last part of the repository
+	// Helm codebase also says the same thing https://github.com/helm/helm/blob/main/pkg/pusher/ocipusher.go#L88
+	chartName := ociClient.repository[strings.LastIndex(ociClient.repository, "/")+1:]
 
-	// If chartname is empty, then just take the last part of the repository
-	// If chartname is not empty, then use the chartname
-	if chartName == "" {
-		chartName = ociClient.repository[strings.LastIndex(ociClient.repository, "/")+1:]
-	}
+	// Check if the repository and tag are not already present in the indexFile
+	// If it is already present, skip adding it to the indexFile.
 	for _, entry := range indexFile.Entries[chartName] {
-		if entry.Metadata.Name == chartName && entry.Version == ociClient.tag {
+		if entry.Metadata.Name == chartName && entry.Version == ociClient.tag && entry.Digest != "" {
 			logrus.Debugf("skip adding chart %s version %s since it is already present in the index", chartName, ociClient.tag)
-			return nil
+			return
 		}
 	}
 
-	// Fetch the helm chart
-	filePath, isHelmChart, err := ociClient.fetchChart(orasRepository)
+	// Fetch the helm chart tar to get the Chart.yaml
+	filePath, err = ociClient.fetchChart(orasRepository)
 	if err != nil {
-		return fmt.Errorf("failed to fetch an helm chart %s: %w", ociURL, err)
+		err = fmt.Errorf("failed to fetch the helm chart %s: %w", ociURL, err)
+		return
 	}
 
 	// We load index into memory and so we should set a limit
 	// to the size of the index file that is being created.
-	indexFileBytes, err := json.Marshal(indexFile)
+	indexFileBytes, err = json.Marshal(indexFile)
 	if err != nil {
-		return err
+		return
 	}
-
 	if len(indexFileBytes) > maxHelmRepoIndexSize {
-		return fmt.Errorf("there are a lot of charts inside this oci URL %s which is making the index larger than %d", ociURL, maxHelmRepoIndexSize)
+		err = fmt.Errorf("there are a lot of charts inside this oci URL %s which is making the index larger than %d", ociURL, maxHelmRepoIndexSize)
+		return
 	}
 
-	// Add to the index if it is a helm chart
-	if isHelmChart {
-		err = ociClient.addToIndex(indexFile, chartName, filePath)
-		if err != nil {
-			return fmt.Errorf("unable to add helm chart %s to index: %w", ociURL, err)
+	// Remove the entry from the indexfile since the next function addToIndex
+	// will add. This is done to avoid duplication.
+	for index, entry := range indexFile.Entries[chartName] {
+		if entry.Metadata.Name == chartName && entry.Version == ociClient.tag {
+			indexFile.Entries[chartName] = append(indexFile.Entries[chartName][:index], indexFile.Entries[chartName][index+1:]...)
 		}
 	}
 
-	return err
-}
-
-// readBytes reads data from the chain of helm repo index configmaps.
-func readBytes(configMapCache corev1controllers.ConfigMapCache, cm *corev1.ConfigMap) ([]byte, error) {
-	var (
-		bytes = cm.BinaryData["content"]
-		err   error
-	)
-
-	for {
-		next := cm.Annotations["catalog.cattle.io/next"]
-		if next == "" {
-			break
-		}
-		cm, err = configMapCache.Get(cm.Namespace, next)
-		if err != nil {
-			return nil, err
-		}
-		bytes = append(bytes, cm.BinaryData["content"]...)
+	// Add the chart to the index
+	err = ociClient.addToIndex(indexFile, filePath)
+	if err != nil {
+		err = fmt.Errorf("unable to add helm chart %s to index: %w", ociURL, err)
 	}
 
-	return bytes, nil
+	return
 }
