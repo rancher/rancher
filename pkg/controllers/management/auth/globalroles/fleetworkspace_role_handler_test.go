@@ -1,11 +1,11 @@
 package globalroles
 
 import (
-	"github.com/rancher/rancher/pkg/controllers"
 	"testing"
 
 	"github.com/golang/mock/gomock"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/controllers"
 	mgmtcontroller "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	rbacv1 "github.com/rancher/wrangler/v2/pkg/generated/controllers/rbac/v1"
 	"github.com/rancher/wrangler/v2/pkg/generic/fake"
@@ -14,6 +14,7 @@ import (
 	rbac "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -35,6 +36,7 @@ func TestReconcileFleetPermissions(t *testing.T) {
 	tests := map[string]struct {
 		crClient func() rbacv1.ClusterRoleController
 		crCache  func() rbacv1.ClusterRoleCache
+		fwCache  func() mgmtcontroller.FleetWorkspaceCache
 		gr       *v3.GlobalRole
 	}{
 		"backing ClusterRoles are created for a new GlobalRole": {
@@ -45,6 +47,7 @@ func TestReconcileFleetPermissions(t *testing.T) {
 				return mock
 			},
 			crClient: createClusterRolesMock(ctrl),
+			fwCache:  fleetDefaultAndLocalWorkspaceCacheMock(ctrl),
 			gr: &v3.GlobalRole{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: grName,
@@ -61,6 +64,7 @@ func TestReconcileFleetPermissions(t *testing.T) {
 			crClient: func() rbacv1.ClusterRoleController {
 				return fake.NewMockNonNamespacedControllerInterface[*rbac.ClusterRole, *rbac.ClusterRoleList](ctrl)
 			},
+			fwCache: fleetDefaultAndLocalWorkspaceCacheMock(ctrl),
 			gr: &v3.GlobalRole{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: grName,
@@ -122,6 +126,7 @@ func TestReconcileFleetPermissions(t *testing.T) {
 				})
 				return mock
 			},
+			fwCache: fleetDefaultAndLocalWorkspaceCacheMock(ctrl),
 			gr: &v3.GlobalRole{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: grName,
@@ -139,6 +144,58 @@ func TestReconcileFleetPermissions(t *testing.T) {
 				},
 			},
 		},
+		"backing ClusterRole for fleetworkspace cluster-wide resource is not created if there are no fleetworkspaces besides local": {
+			crCache: func() rbacv1.ClusterRoleCache {
+				mock := fake.NewMockNonNamespacedCacheInterface[*rbac.ClusterRole](ctrl)
+				mock.EXPECT().Get(wrangler.SafeConcatName(grName, fleetWorkspaceClusterRulesName)).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+				return mock
+			},
+			crClient: func() rbacv1.ClusterRoleController {
+				mock := fake.NewMockNonNamespacedControllerInterface[*rbac.ClusterRole, *rbac.ClusterRoleList](ctrl)
+				mock.EXPECT().Create(&rbac.ClusterRole{
+					TypeMeta: metav1.TypeMeta{},
+					ObjectMeta: metav1.ObjectMeta{
+						Name: wrangler.SafeConcatName(grName, fleetWorkspaceClusterRulesName),
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								APIVersion: "management.cattle.io/v3",
+								Kind:       "GlobalRole",
+								Name:       grName,
+								UID:        grUID,
+							},
+						},
+						Labels: map[string]string{
+							grOwnerLabel:                wrangler.SafeConcatName(grName),
+							controllers.K8sManagedByKey: controllers.ManagerValue,
+						},
+					},
+					Rules: resourceRules,
+				})
+
+				return mock
+			},
+			fwCache: func() mgmtcontroller.FleetWorkspaceCache {
+				mock := fake.NewMockNonNamespacedCacheInterface[*v3.FleetWorkspace](ctrl)
+				mock.EXPECT().List(labels.Everything()).Return([]*v3.FleetWorkspace{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "fleet-local",
+						},
+					},
+				}, nil)
+				return mock
+			},
+			gr: &v3.GlobalRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: grName,
+					UID:  grUID,
+				},
+				InheritedFleetWorkspacePermissions: v3.FleetWorkspacePermission{
+					ResourceRules:  resourceRules,
+					WorkspaceVerbs: workspaceVerbs,
+				},
+			},
+		},
 	}
 
 	for name, test := range tests {
@@ -148,7 +205,7 @@ func TestReconcileFleetPermissions(t *testing.T) {
 			h := fleetWorkspaceRoleHandler{
 				crClient: test.crClient(),
 				crCache:  test.crCache(),
-				fwCache:  fleetDefaultAndLocalWorkspaceCacheMock(ctrl),
+				fwCache:  test.fwCache(),
 			}
 
 			err := h.reconcileFleetWorkspacePermissions(test.gr)

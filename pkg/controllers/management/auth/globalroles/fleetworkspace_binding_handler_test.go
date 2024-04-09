@@ -37,6 +37,7 @@ func TestReconcileFleetWorkspacePermissionsBindings(t *testing.T) {
 		grCache   func() mgmtcontroller.GlobalRoleCache
 		rbClient  func() rbacv1.RoleBindingController
 		rbCache   func() rbacv1.RoleBindingCache
+		fwCache   func() mgmtcontroller.FleetWorkspaceCache
 		grb       *v3.GlobalRoleBinding
 	}{
 		"backing RoleBindings and ClusterRoleBindings are created for a new GlobalRoleBinding": {
@@ -53,6 +54,7 @@ func TestReconcileFleetWorkspacePermissionsBindings(t *testing.T) {
 				mock.EXPECT().Get(wrangler.SafeConcatName(grbName, fleetWorkspaceVerbsName)).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
 				return mock
 			},
+			fwCache: fleetDefaultAndLocalWorkspaceCacheMock(ctrl),
 			grb: &v3.GlobalRoleBinding{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: grbName,
@@ -180,6 +182,7 @@ func TestReconcileFleetWorkspacePermissionsBindings(t *testing.T) {
 					}}, nil)
 				return mock
 			},
+			fwCache: fleetDefaultAndLocalWorkspaceCacheMock(ctrl),
 			grb: &v3.GlobalRoleBinding{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: grbName,
@@ -201,7 +204,7 @@ func TestReconcileFleetWorkspacePermissionsBindings(t *testing.T) {
 				grCache:   test.grCache(),
 				rbClient:  test.rbClient(),
 				rbCache:   test.rbCache(),
-				fwCache:   fleetDefaultAndLocalWorkspaceCacheMock(ctrl),
+				fwCache:   test.fwCache(),
 			}
 
 			err := h.reconcileFleetWorkspacePermissionsBindings(test.grb)
@@ -275,9 +278,7 @@ func TestReconcileFleetWorkspacePermissionsBindings_errors(t *testing.T) {
 		},
 		"Error creating backing RoleBindings for permission rules": {
 			grCache: globalRoleMock(ctrl),
-			fwCache: func() mgmtcontroller.FleetWorkspaceCache {
-				return fleetDefaultAndLocalWorkspaceCacheMock(ctrl)
-			},
+			fwCache: fleetDefaultAndLocalWorkspaceCacheMock(ctrl),
 			rbCache: func() rbacv1.RoleBindingCache {
 				mock := fake.NewMockCacheInterface[*rbac.RoleBinding](ctrl)
 				mock.EXPECT().Get("fleet-default", grbName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
@@ -328,9 +329,7 @@ func TestReconcileFleetWorkspacePermissionsBindings_errors(t *testing.T) {
 		},
 		"Error creating backing RoleBindings for workspace verbs": {
 			grCache: globalRoleMock(ctrl),
-			fwCache: func() mgmtcontroller.FleetWorkspaceCache {
-				return fleetDefaultAndLocalWorkspaceCacheMock(ctrl)
-			},
+			fwCache: fleetDefaultAndLocalWorkspaceCacheMock(ctrl),
 			rbCache: func() rbacv1.RoleBindingCache {
 				mock := fake.NewMockCacheInterface[*rbac.RoleBinding](ctrl)
 				mock.EXPECT().Get("fleet-default", grbName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
@@ -479,21 +478,23 @@ func createRoleBindingsMock(ctrl *gomock.Controller) func() rbacv1.RoleBindingCo
 	}
 }
 
-func fleetDefaultAndLocalWorkspaceCacheMock(ctrl *gomock.Controller) mgmtcontroller.FleetWorkspaceCache {
-	mock := fake.NewMockNonNamespacedCacheInterface[*v3.FleetWorkspace](ctrl)
-	mock.EXPECT().List(labels.Everything()).Return([]*v3.FleetWorkspace{
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "fleet-local",
+func fleetDefaultAndLocalWorkspaceCacheMock(ctrl *gomock.Controller) func() mgmtcontroller.FleetWorkspaceCache {
+	return func() mgmtcontroller.FleetWorkspaceCache {
+		mock := fake.NewMockNonNamespacedCacheInterface[*v3.FleetWorkspace](ctrl)
+		mock.EXPECT().List(labels.Everything()).Return([]*v3.FleetWorkspace{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "fleet-local",
+				},
 			},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "fleet-default",
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "fleet-default",
+				},
 			},
-		},
-	}, nil)
-	return mock
+		}, nil)
+		return mock
+	}
 }
 
 func globalRoleMock(ctrl *gomock.Controller) func() mgmtcontroller.GlobalRoleCache {

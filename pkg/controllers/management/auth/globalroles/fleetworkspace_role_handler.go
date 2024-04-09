@@ -116,6 +116,10 @@ func (h *fleetWorkspaceRoleHandler) reconcileWorkspaceVerbs(globalRole *v3.Globa
 			workspacesNames = append(workspacesNames, fleetWorkspace.Name)
 		}
 	}
+	if workspacesNames == nil {
+		// skip if there are no workspaces besides local
+		return nil
+	}
 	rules := []v1.PolicyRule{
 		{
 			Verbs:         globalRole.InheritedFleetWorkspacePermissions.WorkspaceVerbs,
