@@ -201,6 +201,7 @@ var OriginMap = map[string]string{
 	"mirrored-prometheus-operator-prometheus-config-reloader": "https://github.com/prometheus-operator/prometheus-operator/pkgs/container/prometheus-config-reloader",
 	"mirrored-prometheus-operator-prometheus-operator":        "https://github.com/prometheus-operator/prometheus-operator",
 	"mirrored-prometheus-prometheus":                          "https://github.com/prometheus/prometheus",
+	"mirrored-prometheus-windows-exporter":                    "https://github.com/prometheus-community/windows_exporter",
 	"mirrored-pstauffer-curl":                                 "https://github.com/pstauffer/docker-curl",
 	"mirrored-s3gw-s3gw":                                      "https://github.com/aquarist-labs/s3gw",
 	"mirrored-sig-storage-csi-attacher":                       "https://github.com/kubernetes-csi/external-attacher",
