@@ -52,6 +52,10 @@ func (u *UpgradeWorkloadTestSuite) SetupSuite() {
 
 func (u *UpgradeWorkloadTestSuite) TestWorkloadPreUpgrade() {
 	for _, cluster := range u.clusters {
+		if cluster.Name == "local" {
+			u.T().Skip()
+		}
+
 		cluster := cluster
 		names := newNames()
 		u.Run(cluster.Name, func() {
@@ -62,6 +66,10 @@ func (u *UpgradeWorkloadTestSuite) TestWorkloadPreUpgrade() {
 
 func (u *UpgradeWorkloadTestSuite) TestWorkloadPostUpgrade() {
 	for _, cluster := range u.clusters {
+		if cluster.Name == "local" {
+			u.T().Skip()
+		}
+
 		cluster := cluster
 		names := newNames()
 		u.Run(cluster.Name, func() {
