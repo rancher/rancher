@@ -4,6 +4,7 @@ package azure
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -207,25 +208,48 @@ func (ap *Provider) TransformToAuthProvider(
 	// this is the default base endpoint, i.e.: https://login.microsoftonline.com/
 	baseEndpoint, _ := authConfig["endpoint"].(string)
 
+	// getString will return the string value from the map, or a blank string if the value is not a string
+	getString := func(data map[string]interface{}, key string) string {
+		v, ok := data[key]
+		if !ok {
+			return ""
+		}
+
+		s, _ := v.(string)
+		return s
+	}
+
 	// Set default authEndpoint, or custom if provided
-	p[publicclient.AzureADProviderFieldAuthURL] = baseEndpoint + tenantID + "/oauth2/v2.0/authorize"
-	if customEndpoint, found := authConfig["authEndpoint"]; found {
-		ep, _ := customEndpoint.(string)
-		p[publicclient.AzureADProviderFieldAuthURL] = ep
+	joined, err := url.JoinPath(baseEndpoint, tenantID, "/oauth2/v2.0/authorize")
+	if err != nil {
+		return nil, err
+	}
+	p[publicclient.AzureADProviderFieldAuthURL] = joined
+
+	if customEndpoint := getString(authConfig, "authEndpoint"); customEndpoint != "" {
+		p[publicclient.AzureADProviderFieldAuthURL] = customEndpoint
 	}
 
 	// Set default tokenEndpoint, or custom if provided
-	p[publicclient.AzureADProviderFieldTokenURL] = baseEndpoint + tenantID + "/oauth2/v2.0/token"
-	if customEndpoint, found := authConfig["tokenEndpoint"]; found {
-		ep, _ := customEndpoint.(string)
-		p[publicclient.AzureADProviderFieldTokenURL] = ep
+	joined, err = url.JoinPath(baseEndpoint, tenantID, "/oauth2/v2.0/token")
+	if err != nil {
+		return nil, err
+	}
+	p[publicclient.AzureADProviderFieldTokenURL] = joined
+
+	if customEndpoint := getString(authConfig, "tokenEndpoint"); customEndpoint != "" {
+		p[publicclient.AzureADProviderFieldTokenURL] = customEndpoint
 	}
 
 	// Set default deviceAuthEndpoint, or custom if provided
-	p[publicclient.AzureADProviderFieldDeviceAuthURL] = baseEndpoint + tenantID + "/oauth2/v2.0/devicecode"
-	if customEndpoint, found := authConfig["deviceAuthEndpoint"]; found {
-		ep, _ := customEndpoint.(string)
-		p[publicclient.AzureADProviderFieldDeviceAuthURL] = ep
+	joined, err = url.JoinPath(baseEndpoint, tenantID, "/oauth2/v2.0/devicecode")
+	if err != nil {
+		return nil, err
+	}
+	p[publicclient.AzureADProviderFieldDeviceAuthURL] = joined
+
+	if customEndpoint := getString(authConfig, "deviceAuthEndpoint"); customEndpoint != "" {
+		p[publicclient.AzureADProviderFieldDeviceAuthURL] = customEndpoint
 	}
 
 	return p, nil
