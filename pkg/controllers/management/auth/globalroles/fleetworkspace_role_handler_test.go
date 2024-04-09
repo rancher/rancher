@@ -267,6 +267,7 @@ func TestReconcileFleetPermissions_errors(t *testing.T) {
 		crClient       func() rbacv1.ClusterRoleController
 		crCache        func() rbacv1.ClusterRoleCache
 		fwCache        func() mgmtcontroller.FleetWorkspaceCache
+		globalRole     *v3.GlobalRole
 		wantErrMessage string
 	}{
 		"Error retrieving ClusterRole": {
@@ -280,6 +281,16 @@ func TestReconcileFleetPermissions_errors(t *testing.T) {
 			},
 			crClient: func() rbacv1.ClusterRoleController {
 				return fake.NewMockNonNamespacedControllerInterface[*rbac.ClusterRole, *rbac.ClusterRoleList](ctrl)
+			},
+			globalRole: &v3.GlobalRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: grName,
+					UID:  grUID,
+				},
+				InheritedFleetWorkspacePermissions: v3.FleetWorkspacePermission{
+					ResourceRules:  resourceRules,
+					WorkspaceVerbs: workspaceVerbs,
+				},
 			},
 			wantErrMessage: "error reconciling fleet permissions cluster role: unexpected error",
 		},
@@ -315,6 +326,66 @@ func TestReconcileFleetPermissions_errors(t *testing.T) {
 				}).Return(nil, errors.NewServiceUnavailable("unexpected error"))
 				return mock
 			},
+			globalRole: &v3.GlobalRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: grName,
+					UID:  grUID,
+				},
+				InheritedFleetWorkspacePermissions: v3.FleetWorkspacePermission{
+					ResourceRules:  resourceRules,
+					WorkspaceVerbs: workspaceVerbs,
+				},
+			},
+			wantErrMessage: "error reconciling fleet permissions cluster role: unexpected error",
+		},
+		"Error updating ClusterRole": {
+			fwCache: func() mgmtcontroller.FleetWorkspaceCache {
+				return fake.NewMockNonNamespacedCacheInterface[*v3.FleetWorkspace](ctrl)
+			},
+			crCache: func() rbacv1.ClusterRoleCache {
+				mock := fake.NewMockNonNamespacedCacheInterface[*rbac.ClusterRole](ctrl)
+				mock.EXPECT().Get(wrangler.SafeConcatName(grName, fleetWorkspaceClusterRulesName)).Return(&rbac.ClusterRole{}, nil)
+				return mock
+			},
+			crClient: func() rbacv1.ClusterRoleController {
+				mock := fake.NewMockNonNamespacedControllerInterface[*rbac.ClusterRole, *rbac.ClusterRoleList](ctrl)
+				mock.EXPECT().Update(&rbac.ClusterRole{
+					Rules: resourceRules,
+				}).Return(nil, errors.NewServiceUnavailable("unexpected error"))
+				return mock
+			},
+			globalRole: &v3.GlobalRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: grName,
+					UID:  grUID,
+				},
+				InheritedFleetWorkspacePermissions: v3.FleetWorkspacePermission{
+					ResourceRules:  resourceRules,
+					WorkspaceVerbs: workspaceVerbs,
+				},
+			},
+			wantErrMessage: "error reconciling fleet permissions cluster role: unexpected error",
+		},
+		"Error deleting ClusterRole": {
+			fwCache: func() mgmtcontroller.FleetWorkspaceCache {
+				return fake.NewMockNonNamespacedCacheInterface[*v3.FleetWorkspace](ctrl)
+			},
+			crCache: func() rbacv1.ClusterRoleCache {
+				mock := fake.NewMockNonNamespacedCacheInterface[*rbac.ClusterRole](ctrl)
+				mock.EXPECT().Get(wrangler.SafeConcatName(grName, fleetWorkspaceClusterRulesName)).Return(&rbac.ClusterRole{}, nil)
+				return mock
+			},
+			crClient: func() rbacv1.ClusterRoleController {
+				mock := fake.NewMockNonNamespacedControllerInterface[*rbac.ClusterRole, *rbac.ClusterRoleList](ctrl)
+				mock.EXPECT().Delete(wrangler.SafeConcatName(grName, fleetWorkspaceClusterRulesName), &metav1.DeleteOptions{}).Return(errors.NewServiceUnavailable("unexpected error"))
+				return mock
+			},
+			globalRole: &v3.GlobalRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: grName,
+					UID:  grUID,
+				},
+			},
 			wantErrMessage: "error reconciling fleet permissions cluster role: unexpected error",
 		},
 	}
@@ -329,16 +400,7 @@ func TestReconcileFleetPermissions_errors(t *testing.T) {
 				fwCache:  test.fwCache(),
 			}
 
-			err := h.reconcileFleetWorkspacePermissions(&v3.GlobalRole{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: grName,
-					UID:  grUID,
-				},
-				InheritedFleetWorkspacePermissions: v3.FleetWorkspacePermission{
-					ResourceRules:  resourceRules,
-					WorkspaceVerbs: workspaceVerbs,
-				},
-			})
+			err := h.reconcileFleetWorkspacePermissions(test.globalRole)
 
 			assert.EqualError(t, err, test.wantErrMessage)
 		})
