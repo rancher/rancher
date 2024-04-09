@@ -24,8 +24,8 @@ type UserAttribute struct {
 	Annotations     map[string]string              `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	Created         string                         `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID       string                         `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
-	DeleteAfter     *Duration                      `json:"deleteAfter,omitempty" yaml:"deleteAfter,omitempty"`
-	DisableAfter    *Duration                      `json:"disableAfter,omitempty" yaml:"disableAfter,omitempty"`
+	DeleteAfter     string                         `json:"deleteAfter,omitempty" yaml:"deleteAfter,omitempty"`
+	DisableAfter    string                         `json:"disableAfter,omitempty" yaml:"disableAfter,omitempty"`
 	ExtraByProvider map[string]map[string][]string `json:"extraByProvider,omitempty" yaml:"extraByProvider,omitempty"`
 	GroupPrincipals map[string]Principal           `json:"groupPrincipals,omitempty" yaml:"groupPrincipals,omitempty"`
 	Labels          map[string]string              `json:"labels,omitempty" yaml:"labels,omitempty"`
