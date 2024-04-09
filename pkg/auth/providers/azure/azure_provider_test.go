@@ -354,13 +354,7 @@ func TestTransformToAuthProvider(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			authProvider, err := provider.TransformToAuthProvider(test.authConfig)
 			assert.NoError(t, err)
-
-			// check the expected length, so if the keys change we can update the test
-			assert.Len(t, authProvider, len(test.expectedAuthProvider))
-
-			for k, v := range test.expectedAuthProvider {
-				assert.Equal(t, v, authProvider[k])
-			}
+			assert.Equal(t, test.expectedAuthProvider, authProvider)
 		})
 	}
 }
