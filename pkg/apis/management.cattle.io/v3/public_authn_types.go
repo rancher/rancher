@@ -20,12 +20,15 @@ func (a *AuthProvider) GetType() string {
 	return a.Type
 }
 
+// OAuthProvider contains the OAuth configuration of the AuthProvider
 type OAuthProvider struct {
 	ClientID      string   `json:"clientId"`
 	Scopes        []string `json:"scopes"`
 	OAuthEndpoint `json:",inline"`
 }
 
+// OAuthEndpoint contains the endpoints needed for an oauth exchange.
+// See also https://pkg.go.dev/golang.org/x/oauth2#Endpoint
 type OAuthEndpoint struct {
 	AuthURL       string `json:"authUrl,omitempty"`
 	DeviceAuthURL string `json:"deviceAuthUrl,omitempty"`
