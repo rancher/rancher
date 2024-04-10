@@ -26,7 +26,7 @@ import (
 )
 
 type (
-	restConfigGetter  func(cluster *mgmtv3.Cluster, context *config.ScaledContext, secretLister corev1.SecretLister) (*rest.Config, error)
+	restConfigGetter  func(cluster *mgmtv3.Cluster, context *config.ScaledContext, secretLister corev1.SecretLister, tryReconnecting bool) (*rest.Config, error)
 	authClientCreator func(clusterID string) (kubernetes.Interface, error)
 )
 
