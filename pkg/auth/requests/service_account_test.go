@@ -249,7 +249,7 @@ func TestAuthenticate(t *testing.T) {
 					},
 				},
 				secretLister: nil,
-				restConfigGetter: func(cluster *v3.Cluster, context *config.ScaledContext, secretLister corev1.SecretLister) (*rest.Config, error) {
+				restConfigGetter: func(cluster *v3.Cluster, context *config.ScaledContext, secretLister corev1.SecretLister, tryReconnecting bool) (*rest.Config, error) {
 					return &rest.Config{}, nil
 				},
 				authClientCreator: func(clusterID string) (kubernetes.Interface, error) {
