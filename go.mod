@@ -111,7 +111,7 @@ require (
 	github.com/rancher/channelserver v0.6.1-0.20240212155841-07630c8295da
 	github.com/rancher/dynamiclistener v0.4.0
 	github.com/rancher/eks-operator v1.3.1
-	github.com/rancher/fleet/pkg/apis v0.9.1-rc.2.0.20240213164401-2c6b1019687c
+	github.com/rancher/fleet/pkg/apis v0.9.1-rc.2.0.20240409074608-6c3e28e7713a
 	github.com/rancher/gke-operator v1.2.1
 	github.com/rancher/kubernetes-provider-detector v0.1.5
 	github.com/rancher/lasso v0.0.0-20240123150939-7055397d6dfa
@@ -143,9 +143,9 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 	gopkg.in/yaml.v2 v2.4.0
 	helm.sh/helm/v3 v3.9.0
-	k8s.io/api v0.28.6
+	k8s.io/api v0.28.8
 	k8s.io/apiextensions-apiserver v0.28.6
-	k8s.io/apimachinery v0.28.6
+	k8s.io/apimachinery v0.28.8
 	k8s.io/apiserver v0.28.6
 	k8s.io/cli-runtime v0.28.6
 	k8s.io/client-go v12.0.0+incompatible
