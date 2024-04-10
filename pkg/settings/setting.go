@@ -275,6 +275,8 @@ var (
 	// This setting is for development purposes only.
 	SkipHostedClusterChartInstallation = NewSetting("skip-hosted-cluster-chart-installation", os.Getenv("CATTLE_SKIP_HOSTED_CLUSTER_CHART_INSTALLATION"))
 	MachineProvisionImagePullPolicy    = NewSetting("machine-provision-image-pull-policy", string(v1.PullAlways))
+	// EULAAgreed is used only by the UI, but needs to be known to Rancher so that it's not removed.
+	EULAAgreed = NewSetting("eula-agreed", "")
 )
 
 // FullShellImage returns the full private registry name of the rancher shell image.
