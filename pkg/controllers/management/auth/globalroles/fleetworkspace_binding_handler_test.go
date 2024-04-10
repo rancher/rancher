@@ -7,9 +7,6 @@ import (
 
 	"github.com/golang/mock/gomock"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/controllers"
-	mgmtcontroller "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
-	rbacv1 "github.com/rancher/wrangler/v2/pkg/generated/controllers/rbac/v1"
 	"github.com/rancher/wrangler/v2/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	rbac "k8s.io/api/rbac/v1"
@@ -27,170 +24,79 @@ const (
 	user    = "user"
 )
 
+var (
+	grVerbs = &v3.GlobalRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: grName,
+			UID:  grUID,
+		},
+		InheritedFleetWorkspacePermissions: v3.FleetWorkspacePermission{
+			ResourceRules: []rbac.PolicyRule{
+				{
+					Verbs:     []string{"get", "list"},
+					APIGroups: []string{"fleet.cattle.io"},
+					Resources: []string{"gitrepos", "bundles"},
+				},
+			},
+			WorkspaceVerbs: []string{"get", "list"},
+		},
+	}
+	grb = &v3.GlobalRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: grbName,
+			UID:  grbUID,
+		},
+		UserName:       user,
+		GlobalRoleName: grName,
+	}
+)
+
 func TestReconcileFleetWorkspacePermissionsBindings(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
+	type testState struct {
+		crbClient *fake.MockNonNamespacedControllerInterface[*rbac.ClusterRoleBinding, *rbac.ClusterRoleBindingList]
+		crbCache  *fake.MockNonNamespacedCacheInterface[*rbac.ClusterRoleBinding]
+		grCache   *fake.MockNonNamespacedCacheInterface[*v3.GlobalRole]
+		rbClient  *fake.MockControllerInterface[*rbac.RoleBinding, *rbac.RoleBindingList]
+		rbCache   *fake.MockCacheInterface[*rbac.RoleBinding]
+		fwCache   *fake.MockNonNamespacedCacheInterface[*v3.FleetWorkspace]
+	}
 
 	tests := map[string]struct {
-		crbClient func() rbacv1.ClusterRoleBindingController
-		crbCache  func() rbacv1.ClusterRoleBindingCache
-		grCache   func() mgmtcontroller.GlobalRoleCache
-		rbClient  func() rbacv1.RoleBindingController
-		rbCache   func() rbacv1.RoleBindingCache
-		fwCache   func() mgmtcontroller.FleetWorkspaceCache
-		grb       *v3.GlobalRoleBinding
+		stateSetup func(state testState)
+		grb        *v3.GlobalRoleBinding
 	}{
 		"backing RoleBindings and ClusterRoleBindings are created for a new GlobalRoleBinding": {
-			grCache: globalRoleMock(ctrl),
-			rbCache: func() rbacv1.RoleBindingCache {
-				mock := fake.NewMockCacheInterface[*rbac.RoleBinding](ctrl)
-				mock.EXPECT().Get("fleet-default", grbName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
-				return mock
+			stateSetup: func(state testState) {
+				state.grCache.EXPECT().Get(grName).Return(grVerbs, nil)
+				state.rbCache.EXPECT().Get("fleet-default", grbName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+				state.crbClient.EXPECT().Create(backingClusterRoleBinding(grb, grVerbs, wrangler.SafeConcatName(grb.Name, fleetWorkspaceVerbsName)))
+				state.rbClient.EXPECT().Create(backingRoleBinding(grb, grVerbs, "fleet-default"))
+				state.crbCache.EXPECT().Get(wrangler.SafeConcatName(grbName, fleetWorkspaceVerbsName)).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+				state.fwCache.EXPECT().List(labels.Everything()).Return(fleetWorkspaces, nil)
 			},
-			rbClient:  createRoleBindingsMock(ctrl),
-			crbClient: createClusterRoleBindingsMock(ctrl),
-			crbCache: func() rbacv1.ClusterRoleBindingCache {
-				mock := fake.NewMockNonNamespacedCacheInterface[*rbac.ClusterRoleBinding](ctrl)
-				mock.EXPECT().Get(wrangler.SafeConcatName(grbName, fleetWorkspaceVerbsName)).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
-				return mock
-			},
-			fwCache: fleetDefaultAndLocalWorkspaceCacheMock(ctrl),
-			grb: &v3.GlobalRoleBinding{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: grbName,
-					UID:  grbUID,
-				},
-				UserName:       user,
-				GlobalRoleName: grName,
-			},
+
+			grb: grb,
 		},
 		"backing RoleBindings and ClusterRoleBindings are updated with new content": {
-			grCache: globalRoleMock(ctrl),
-			rbCache: func() rbacv1.RoleBindingCache {
-				mock := fake.NewMockCacheInterface[*rbac.RoleBinding](ctrl)
-				mock.EXPECT().Get("fleet-default", grbName).Return(&rbac.RoleBinding{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      grbName,
-						Namespace: "fleet-default",
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								APIVersion: "management.cattle.io/v3",
-								Kind:       "GlobalRoleBinding",
-								Name:       grbName,
-								UID:        grbUID,
-							},
-						},
+			stateSetup: func(state testState) {
+				state.grCache.EXPECT().Get(grName).Return(grVerbs, nil)
+				rb := backingRoleBinding(grb, grVerbs, "fleet-default")
+				rb.Subjects = []rbac.Subject{
+					{
+						Name: "modified",
 					},
-					RoleRef: rbac.RoleRef{
-						APIGroup: rbac.GroupName,
-						Kind:     "ClusterRole",
-						Name:     wrangler.SafeConcatName(grName, fleetWorkspaceClusterRulesName),
-					},
-					Subjects: []rbac.Subject{
-						{
-							Kind:     "User",
-							Name:     user,
-							APIGroup: rbac.GroupName,
-						},
-					},
-				}, nil)
-				return mock
+				}
+				state.rbCache.EXPECT().Get("fleet-default", grbName).Return(backingRoleBinding(grb, grVerbs, "fleet-default"), nil)
+				state.crbClient.EXPECT().Delete(wrangler.SafeConcatName(grbName, fleetWorkspaceVerbsName), &metav1.DeleteOptions{})
+				state.crbClient.EXPECT().Create(backingClusterRoleBinding(grb, grVerbs, wrangler.SafeConcatName(grb.Name, fleetWorkspaceVerbsName)))
+				state.rbClient.EXPECT().Delete("fleet-default", grbName, &metav1.DeleteOptions{})
+				state.rbClient.EXPECT().Create(backingRoleBinding(grb, grVerbs, "fleet-default"))
+				state.crbCache.EXPECT().Get(wrangler.SafeConcatName(grbName, fleetWorkspaceVerbsName)).Return(backingClusterRoleBinding(grb, grVerbs, wrangler.SafeConcatName(grb.Name, fleetWorkspaceVerbsName)), nil)
+				state.fwCache.EXPECT().List(labels.Everything()).Return(fleetWorkspaces, nil)
 			},
-			rbClient: func() rbacv1.RoleBindingController {
-				mock := fake.NewMockControllerInterface[*rbac.RoleBinding, *rbac.RoleBindingList](ctrl)
-				mock.EXPECT().Update(&rbac.RoleBinding{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      grbName,
-						Namespace: "fleet-default",
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								APIVersion: "management.cattle.io/v3",
-								Kind:       "GlobalRoleBinding",
-								Name:       grbName,
-								UID:        grbUID,
-							},
-						},
-					},
-					RoleRef: rbac.RoleRef{
-						APIGroup: rbac.GroupName,
-						Kind:     "ClusterRole",
-						Name:     wrangler.SafeConcatName(grName, fleetWorkspaceClusterRulesName),
-					},
-					Subjects: []rbac.Subject{
-						{
-							Kind:     "User",
-							Name:     "newUser", // verify update with new user
-							APIGroup: rbac.GroupName,
-						},
-					},
-				})
-				return mock
-			},
-			crbClient: func() rbacv1.ClusterRoleBindingController {
-				mock := fake.NewMockNonNamespacedControllerInterface[*rbac.ClusterRoleBinding, *rbac.ClusterRoleBindingList](ctrl)
-				mock.EXPECT().Update(&rbac.ClusterRoleBinding{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: wrangler.SafeConcatName(grbName, fleetWorkspaceVerbsName),
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								APIVersion: "management.cattle.io/v3",
-								Kind:       "GlobalRoleBinding",
-								Name:       grbName,
-								UID:        grbUID,
-							},
-						},
-					},
-					RoleRef: rbac.RoleRef{
-						APIGroup: rbac.GroupName,
-						Kind:     "ClusterRole",
-						Name:     wrangler.SafeConcatName(grName, fleetWorkspaceVerbsName),
-					},
-					Subjects: []rbac.Subject{
-						{
-							Kind:     "User",
-							Name:     "newUser", // verify update with new user
-							APIGroup: rbac.GroupName,
-						},
-					}})
-				return mock
-			},
-			crbCache: func() rbacv1.ClusterRoleBindingCache {
-				mock := fake.NewMockNonNamespacedCacheInterface[*rbac.ClusterRoleBinding](ctrl)
-				mock.EXPECT().Get(wrangler.SafeConcatName(grbName, fleetWorkspaceVerbsName)).Return(&rbac.ClusterRoleBinding{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: wrangler.SafeConcatName(grbName, fleetWorkspaceVerbsName),
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								APIVersion: "management.cattle.io/v3",
-								Kind:       "GlobalRoleBinding",
-								Name:       grbName,
-								UID:        grbUID,
-							},
-						},
-					},
-					RoleRef: rbac.RoleRef{
-						APIGroup: rbac.GroupName,
-						Kind:     "ClusterRole",
-						Name:     wrangler.SafeConcatName(grName, fleetWorkspaceVerbsName),
-					},
-					Subjects: []rbac.Subject{
-						{
-							Kind:     "User",
-							Name:     user,
-							APIGroup: rbac.GroupName,
-						},
-					}}, nil)
-				return mock
-			},
-			fwCache: fleetDefaultAndLocalWorkspaceCacheMock(ctrl),
-			grb: &v3.GlobalRoleBinding{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: grbName,
-					UID:  grbUID,
-				},
-				UserName:       "newUser",
-				GlobalRoleName: grName,
-			},
+			grb: grb,
 		},
 	}
 
@@ -198,13 +104,24 @@ func TestReconcileFleetWorkspacePermissionsBindings(t *testing.T) {
 		test := test
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
+			state := testState{
+				crbClient: fake.NewMockNonNamespacedControllerInterface[*rbac.ClusterRoleBinding, *rbac.ClusterRoleBindingList](ctrl),
+				crbCache:  fake.NewMockNonNamespacedCacheInterface[*rbac.ClusterRoleBinding](ctrl),
+				grCache:   fake.NewMockNonNamespacedCacheInterface[*v3.GlobalRole](ctrl),
+				rbClient:  fake.NewMockControllerInterface[*rbac.RoleBinding, *rbac.RoleBindingList](ctrl),
+				rbCache:   fake.NewMockCacheInterface[*rbac.RoleBinding](ctrl),
+				fwCache:   fake.NewMockNonNamespacedCacheInterface[*v3.FleetWorkspace](ctrl),
+			}
+			if test.stateSetup != nil {
+				test.stateSetup(state)
+			}
 			h := fleetWorkspaceBindingHandler{
-				crbClient: test.crbClient(),
-				crbCache:  test.crbCache(),
-				grCache:   test.grCache(),
-				rbClient:  test.rbClient(),
-				rbCache:   test.rbCache(),
-				fwCache:   test.fwCache(),
+				crbClient: state.crbClient,
+				crbCache:  state.crbCache,
+				grCache:   state.grCache,
+				rbClient:  state.rbClient,
+				rbCache:   state.rbCache,
+				fwCache:   state.fwCache,
 			}
 
 			err := h.reconcileFleetWorkspacePermissionsBindings(test.grb)
@@ -217,268 +134,98 @@ func TestReconcileFleetWorkspacePermissionsBindings(t *testing.T) {
 func TestReconcileFleetWorkspacePermissionsBindings_errors(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-
+	type testState struct {
+		crbClient *fake.MockNonNamespacedControllerInterface[*rbac.ClusterRoleBinding, *rbac.ClusterRoleBindingList]
+		crbCache  *fake.MockNonNamespacedCacheInterface[*rbac.ClusterRoleBinding]
+		grCache   *fake.MockNonNamespacedCacheInterface[*v3.GlobalRole]
+		rbClient  *fake.MockControllerInterface[*rbac.RoleBinding, *rbac.RoleBindingList]
+		rbCache   *fake.MockCacheInterface[*rbac.RoleBinding]
+		fwCache   *fake.MockNonNamespacedCacheInterface[*v3.FleetWorkspace]
+	}
 	tests := map[string]struct {
-		crClient       func() rbacv1.ClusterRoleController
-		crCache        func() rbacv1.ClusterRoleCache
-		crbClient      func() rbacv1.ClusterRoleBindingController
-		crbCache       func() rbacv1.ClusterRoleBindingCache
-		grCache        func() mgmtcontroller.GlobalRoleCache
-		rbClient       func() rbacv1.RoleBindingController
-		rbCache        func() rbacv1.RoleBindingCache
-		fwCache        func() mgmtcontroller.FleetWorkspaceCache
+		stateSetup     func(state testState)
 		wantErrMessage string
 	}{
 		"GlobalRole not found": {
-			grCache: func() mgmtcontroller.GlobalRoleCache {
-				mock := fake.NewMockNonNamespacedCacheInterface[*v3.GlobalRole](ctrl)
-				mock.EXPECT().Get(grName).Return(nil, errors.NewNotFound(schema.GroupResource{
+			stateSetup: func(state testState) {
+				state.grCache.EXPECT().Get(grName).Return(nil, errors.NewNotFound(schema.GroupResource{
 					Group:    "management.cattle.io",
 					Resource: "GlobalRole",
 				}, grName))
-				return mock
-			},
-			rbCache: func() rbacv1.RoleBindingCache {
-				return fake.NewMockCacheInterface[*rbac.RoleBinding](ctrl)
-			},
-			rbClient: func() rbacv1.RoleBindingController {
-				return fake.NewMockControllerInterface[*rbac.RoleBinding, *rbac.RoleBindingList](ctrl)
-			},
-			crbClient: func() rbacv1.ClusterRoleBindingController {
-				return fake.NewMockNonNamespacedControllerInterface[*rbac.ClusterRoleBinding, *rbac.ClusterRoleBindingList](ctrl)
-			},
-			crbCache: func() rbacv1.ClusterRoleBindingCache {
-				return fake.NewMockNonNamespacedCacheInterface[*rbac.ClusterRoleBinding](ctrl)
-			},
-			fwCache: func() mgmtcontroller.FleetWorkspaceCache {
-				return fake.NewMockNonNamespacedCacheInterface[*v3.FleetWorkspace](ctrl)
 			},
 			wantErrMessage: "unable to get globalRole: GlobalRole.management.cattle.io \"gr\" not found",
 		},
 		"Error retrieving fleetworkspaces": {
-			grCache: globalRoleMock(ctrl),
-			fwCache: func() mgmtcontroller.FleetWorkspaceCache {
-				mock := fake.NewMockNonNamespacedCacheInterface[*v3.FleetWorkspace](ctrl)
-				mock.EXPECT().List(labels.Everything()).Return(nil, errors.NewServiceUnavailable("unexpected error"))
-				return mock
-			},
-			rbCache: func() rbacv1.RoleBindingCache {
-				return fake.NewMockCacheInterface[*rbac.RoleBinding](ctrl)
-			},
-			rbClient: func() rbacv1.RoleBindingController {
-				return fake.NewMockControllerInterface[*rbac.RoleBinding, *rbac.RoleBindingList](ctrl)
-			},
-			crbClient: func() rbacv1.ClusterRoleBindingController {
-				return fake.NewMockNonNamespacedControllerInterface[*rbac.ClusterRoleBinding, *rbac.ClusterRoleBindingList](ctrl)
-			},
-			crbCache: func() rbacv1.ClusterRoleBindingCache {
-				return fake.NewMockNonNamespacedCacheInterface[*rbac.ClusterRoleBinding](ctrl)
+			stateSetup: func(state testState) {
+				state.grCache.EXPECT().Get(grName).Return(grVerbs, nil)
+				state.fwCache.EXPECT().List(labels.Everything()).Return(nil, errors.NewServiceUnavailable("unexpected error"))
 			},
 			wantErrMessage: "unable to list fleetWorkspaces when reconciling globalRoleBinding grb: unexpected error",
 		},
 		"Error creating backing RoleBindings for permission rules": {
-			grCache: globalRoleMock(ctrl),
-			fwCache: fleetDefaultAndLocalWorkspaceCacheMock(ctrl),
-			rbCache: func() rbacv1.RoleBindingCache {
-				mock := fake.NewMockCacheInterface[*rbac.RoleBinding](ctrl)
-				mock.EXPECT().Get("fleet-default", grbName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
-				return mock
-			},
-			rbClient: func() rbacv1.RoleBindingController {
-				mock := fake.NewMockControllerInterface[*rbac.RoleBinding, *rbac.RoleBindingList](ctrl)
-				mock.EXPECT().Create(&rbac.RoleBinding{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      grbName,
-						Namespace: "fleet-default",
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								APIVersion: "management.cattle.io/v3",
-								Kind:       "GlobalRoleBinding",
-								Name:       grbName,
-								UID:        grbUID,
-							},
-						},
-						Labels: map[string]string{
-							grbOwnerLabel:                 grbName,
-							fleetWorkspacePermissionLabel: "true",
-							controllers.K8sManagedByKey:   controllers.ManagerValue,
-						},
-					},
-					RoleRef: rbac.RoleRef{
-						APIGroup: rbac.GroupName,
-						Kind:     "ClusterRole",
-						Name:     wrangler.SafeConcatName(grName, fleetWorkspaceClusterRulesName),
-					},
-					Subjects: []rbac.Subject{
-						{
-							Kind:     "User",
-							Name:     user,
-							APIGroup: rbac.GroupName,
-						},
-					},
-				}).Return(nil, errors.NewServiceUnavailable("unexpected error"))
-				return mock
-			},
-			crbClient: func() rbacv1.ClusterRoleBindingController {
-				return fake.NewMockNonNamespacedControllerInterface[*rbac.ClusterRoleBinding, *rbac.ClusterRoleBindingList](ctrl)
-			},
-			crbCache: func() rbacv1.ClusterRoleBindingCache {
-				return fake.NewMockNonNamespacedCacheInterface[*rbac.ClusterRoleBinding](ctrl)
+			stateSetup: func(state testState) {
+				state.grCache.EXPECT().Get(grName).Return(grVerbs, nil)
+				state.fwCache.EXPECT().List(labels.Everything()).Return(fleetWorkspaces, nil)
+				state.rbCache.EXPECT().Get("fleet-default", grbName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+				state.rbClient.EXPECT().Create(backingRoleBinding(grb, grVerbs, "fleet-default")).Return(nil, errors.NewServiceUnavailable("unexpected error"))
 			},
 			wantErrMessage: "error reconciling fleet permissions rules: 1 error occurred:\n\t* unexpected error\n\n",
 		},
-		"Error updating backing RoleBindings for permission rules": {
-			grCache: globalRoleMock(ctrl),
-			fwCache: fleetDefaultAndLocalWorkspaceCacheMock(ctrl),
-			rbCache: func() rbacv1.RoleBindingCache {
-				mock := fake.NewMockCacheInterface[*rbac.RoleBinding](ctrl)
-				mock.EXPECT().Get("fleet-default", grbName).Return(&rbac.RoleBinding{}, nil)
-				return mock
-			},
-			rbClient: func() rbacv1.RoleBindingController {
-				mock := fake.NewMockControllerInterface[*rbac.RoleBinding, *rbac.RoleBindingList](ctrl)
-				mock.EXPECT().Update(&rbac.RoleBinding{
-					RoleRef: rbac.RoleRef{
-						APIGroup: rbac.GroupName,
-						Kind:     "ClusterRole",
-						Name:     wrangler.SafeConcatName(grName, fleetWorkspaceClusterRulesName),
+		"Error deleting backing RoleBindings for permission rules when it has changed": {
+			stateSetup: func(state testState) {
+				state.grCache.EXPECT().Get(grName).Return(grVerbs, nil)
+				state.fwCache.EXPECT().List(labels.Everything()).Return(fleetWorkspaces, nil)
+				state.rbCache.EXPECT().Get("fleet-default", grbName).Return(&rbac.RoleBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "fleet-default",
+						Name:      grbName,
 					},
-					Subjects: []rbac.Subject{
-						{
-							Kind:     "User",
-							Name:     user,
-							APIGroup: rbac.GroupName,
-						},
-					},
-				}).Return(nil, errors.NewServiceUnavailable("unexpected error"))
-				return mock
-			},
-			crbClient: func() rbacv1.ClusterRoleBindingController {
-				return fake.NewMockNonNamespacedControllerInterface[*rbac.ClusterRoleBinding, *rbac.ClusterRoleBindingList](ctrl)
-			},
-			crbCache: func() rbacv1.ClusterRoleBindingCache {
-				return fake.NewMockNonNamespacedCacheInterface[*rbac.ClusterRoleBinding](ctrl)
+				}, nil)
+				state.rbClient.EXPECT().Delete("fleet-default", grbName, &metav1.DeleteOptions{}).Return(errors.NewServiceUnavailable("unexpected error"))
+				state.rbClient.EXPECT().Create(backingRoleBinding(grb, grVerbs, "fleet-default")).Return(nil, errors.NewServiceUnavailable("unexpected error"))
 			},
 			wantErrMessage: "error reconciling fleet permissions rules",
 		},
-		"Error creating backing RoleBindings for workspace verbs": {
-			grCache: globalRoleMock(ctrl),
-			fwCache: fleetDefaultAndLocalWorkspaceCacheMock(ctrl),
-			rbCache: func() rbacv1.RoleBindingCache {
-				mock := fake.NewMockCacheInterface[*rbac.RoleBinding](ctrl)
-				mock.EXPECT().Get("fleet-default", grbName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
-				return mock
-			},
-			rbClient: createRoleBindingsMock(ctrl),
-			crbClient: func() rbacv1.ClusterRoleBindingController {
-				mock := fake.NewMockNonNamespacedControllerInterface[*rbac.ClusterRoleBinding, *rbac.ClusterRoleBindingList](ctrl)
-				mock.EXPECT().Create(&rbac.ClusterRoleBinding{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: wrangler.SafeConcatName(grbName, fleetWorkspaceVerbsName),
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								APIVersion: "management.cattle.io/v3",
-								Kind:       "GlobalRoleBinding",
-								Name:       grbName,
-								UID:        grbUID,
-							},
-						},
-						Labels: map[string]string{
-							grbOwnerLabel:               grbName,
-							controllers.K8sManagedByKey: controllers.ManagerValue,
-						},
-					},
-					RoleRef: rbac.RoleRef{
-						APIGroup: rbac.GroupName,
-						Kind:     "ClusterRole",
-						Name:     wrangler.SafeConcatName(grName, fleetWorkspaceVerbsName),
-					},
-					Subjects: []rbac.Subject{
-						{
-							Kind:     "User",
-							Name:     user,
-							APIGroup: rbac.GroupName,
-						},
-					}}).Return(nil, errors.NewServiceUnavailable("unexpected error"))
-
-				return mock
-			},
-			crbCache: func() rbacv1.ClusterRoleBindingCache {
-				mock := fake.NewMockNonNamespacedCacheInterface[*rbac.ClusterRoleBinding](ctrl)
-				mock.EXPECT().Get(wrangler.SafeConcatName(grbName, fleetWorkspaceVerbsName)).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
-				return mock
+		"Error creating backing ClusterRoleBinding for workspace verbs": {
+			stateSetup: func(state testState) {
+				state.grCache.EXPECT().Get(grName).Return(grVerbs, nil)
+				state.fwCache.EXPECT().List(labels.Everything()).Return(fleetWorkspaces, nil)
+				state.rbCache.EXPECT().Get("fleet-default", grbName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+				state.rbClient.EXPECT().Create(backingRoleBinding(grb, grVerbs, "fleet-default"))
+				state.crbCache.EXPECT().Get(wrangler.SafeConcatName(grbName, fleetWorkspaceVerbsName)).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+				state.crbClient.EXPECT().Create(backingClusterRoleBinding(grb, grVerbs, wrangler.SafeConcatName(grb.Name, fleetWorkspaceVerbsName))).Return(nil, errors.NewServiceUnavailable("unexpected error"))
 			},
 			wantErrMessage: "error reconciling fleet workspace verbs: unexpected error",
 		},
-		"Error updating backing RoleBindings for workspace verbs": {
-			grCache: globalRoleMock(ctrl),
-			fwCache: fleetDefaultAndLocalWorkspaceCacheMock(ctrl),
-			rbCache: func() rbacv1.RoleBindingCache {
-				mock := fake.NewMockCacheInterface[*rbac.RoleBinding](ctrl)
-				mock.EXPECT().Get("fleet-default", grbName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
-				return mock
-			},
-			rbClient: createRoleBindingsMock(ctrl),
-			crbClient: func() rbacv1.ClusterRoleBindingController {
-				mock := fake.NewMockNonNamespacedControllerInterface[*rbac.ClusterRoleBinding, *rbac.ClusterRoleBindingList](ctrl)
-				mock.EXPECT().Update(&rbac.ClusterRoleBinding{
-					RoleRef: rbac.RoleRef{
-						APIGroup: rbac.GroupName,
-						Kind:     "ClusterRole",
-						Name:     wrangler.SafeConcatName(grName, fleetWorkspaceVerbsName),
-					},
-					Subjects: []rbac.Subject{
-						{
-							Kind:     "User",
-							Name:     user,
-							APIGroup: rbac.GroupName,
-						},
-					}}).Return(nil, errors.NewServiceUnavailable("unexpected error"))
-
-				return mock
-			},
-			crbCache: func() rbacv1.ClusterRoleBindingCache {
-				mock := fake.NewMockNonNamespacedCacheInterface[*rbac.ClusterRoleBinding](ctrl)
-				mock.EXPECT().Get(wrangler.SafeConcatName(grbName, fleetWorkspaceVerbsName)).Return(&rbac.ClusterRoleBinding{}, nil)
-				return mock
+		"Error deleting backing ClusterRoleBinding for workspace verbs when it has changed": {
+			stateSetup: func(state testState) {
+				state.grCache.EXPECT().Get(grName).Return(grVerbs, nil)
+				state.fwCache.EXPECT().List(labels.Everything()).Return(fleetWorkspaces, nil)
+				state.rbCache.EXPECT().Get("fleet-default", grbName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+				state.rbClient.EXPECT().Create(backingRoleBinding(grb, grVerbs, "fleet-default"))
+				state.crbCache.EXPECT().Get(wrangler.SafeConcatName(grbName, fleetWorkspaceVerbsName)).Return(&rbac.ClusterRoleBinding{
+					ObjectMeta: metav1.ObjectMeta{Name: wrangler.SafeConcatName(grb.Name, fleetWorkspaceVerbsName)},
+				}, nil)
+				state.crbClient.EXPECT().Delete(wrangler.SafeConcatName(grb.Name, fleetWorkspaceVerbsName), &metav1.DeleteOptions{}).Return(errors.NewServiceUnavailable("unexpected error"))
+				state.rbClient.EXPECT().Create(backingClusterRoleBinding(grb, grVerbs, wrangler.SafeConcatName(grb.Name, fleetWorkspaceVerbsName))).Return(nil, errors.NewServiceUnavailable("unexpected error"))
 			},
 			wantErrMessage: "error reconciling fleet workspace verbs",
 		},
 		"Error getting RoleBinding": {
-			grCache: globalRoleMock(ctrl),
-			fwCache: fleetDefaultAndLocalWorkspaceCacheMock(ctrl),
-			rbCache: func() rbacv1.RoleBindingCache {
-				mock := fake.NewMockCacheInterface[*rbac.RoleBinding](ctrl)
-				mock.EXPECT().Get("fleet-default", grbName).Return(nil, errors.NewServiceUnavailable("unexpected error"))
-				return mock
-			},
-			rbClient: func() rbacv1.RoleBindingController {
-				return fake.NewMockControllerInterface[*rbac.RoleBinding, *rbac.RoleBindingList](ctrl)
-			},
-			crbClient: func() rbacv1.ClusterRoleBindingController {
-				return fake.NewMockNonNamespacedControllerInterface[*rbac.ClusterRoleBinding, *rbac.ClusterRoleBindingList](ctrl)
-			},
-			crbCache: func() rbacv1.ClusterRoleBindingCache {
-				return fake.NewMockNonNamespacedCacheInterface[*rbac.ClusterRoleBinding](ctrl)
+			stateSetup: func(state testState) {
+				state.grCache.EXPECT().Get(grName).Return(grVerbs, nil)
+				state.fwCache.EXPECT().List(labels.Everything()).Return(fleetWorkspaces, nil)
+				state.rbCache.EXPECT().Get("fleet-default", grbName).Return(nil, errors.NewServiceUnavailable("unexpected error"))
 			},
 			wantErrMessage: "error reconciling fleet permissions rules",
 		},
 		"Error getting ClusterRoleBinding": {
-			grCache: globalRoleMock(ctrl),
-			fwCache: fleetDefaultAndLocalWorkspaceCacheMock(ctrl),
-			rbCache: func() rbacv1.RoleBindingCache {
-				mock := fake.NewMockCacheInterface[*rbac.RoleBinding](ctrl)
-				mock.EXPECT().Get("fleet-default", grbName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
-				return mock
-			},
-			rbClient: createRoleBindingsMock(ctrl),
-			crbClient: func() rbacv1.ClusterRoleBindingController {
-				return fake.NewMockNonNamespacedControllerInterface[*rbac.ClusterRoleBinding, *rbac.ClusterRoleBindingList](ctrl)
-			},
-			crbCache: func() rbacv1.ClusterRoleBindingCache {
-				mock := fake.NewMockNonNamespacedCacheInterface[*rbac.ClusterRoleBinding](ctrl)
-				mock.EXPECT().Get(wrangler.SafeConcatName(grbName, fleetWorkspaceVerbsName)).Return(nil, errors.NewServiceUnavailable("unexpected error"))
-				return mock
+			stateSetup: func(state testState) {
+				state.grCache.EXPECT().Get(grName).Return(grVerbs, nil)
+				state.fwCache.EXPECT().List(labels.Everything()).Return(fleetWorkspaces, nil)
+				state.rbCache.EXPECT().Get("fleet-default", grbName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+				state.rbClient.EXPECT().Create(backingRoleBinding(grb, grVerbs, "fleet-default"))
+				state.crbCache.EXPECT().Get(wrangler.SafeConcatName(grbName, fleetWorkspaceVerbsName)).Return(nil, errors.NewServiceUnavailable("unexpected error"))
 			},
 			wantErrMessage: "error reconciling fleet workspace verbs",
 		},
@@ -488,13 +235,24 @@ func TestReconcileFleetWorkspacePermissionsBindings_errors(t *testing.T) {
 		test := test
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
+			state := testState{
+				crbClient: fake.NewMockNonNamespacedControllerInterface[*rbac.ClusterRoleBinding, *rbac.ClusterRoleBindingList](ctrl),
+				crbCache:  fake.NewMockNonNamespacedCacheInterface[*rbac.ClusterRoleBinding](ctrl),
+				grCache:   fake.NewMockNonNamespacedCacheInterface[*v3.GlobalRole](ctrl),
+				rbClient:  fake.NewMockControllerInterface[*rbac.RoleBinding, *rbac.RoleBindingList](ctrl),
+				rbCache:   fake.NewMockCacheInterface[*rbac.RoleBinding](ctrl),
+				fwCache:   fake.NewMockNonNamespacedCacheInterface[*v3.FleetWorkspace](ctrl),
+			}
+			if test.stateSetup != nil {
+				test.stateSetup(state)
+			}
 			h := fleetWorkspaceBindingHandler{
-				crbClient: test.crbClient(),
-				crbCache:  test.crbCache(),
-				grCache:   test.grCache(),
-				rbClient:  test.rbClient(),
-				rbCache:   test.rbCache(),
-				fwCache:   test.fwCache(),
+				crbClient: state.crbClient,
+				crbCache:  state.crbCache,
+				grCache:   state.grCache,
+				rbClient:  state.rbClient,
+				rbCache:   state.rbCache,
+				fwCache:   state.fwCache,
 			}
 
 			err := h.reconcileFleetWorkspacePermissionsBindings(&v3.GlobalRoleBinding{
@@ -508,120 +266,5 @@ func TestReconcileFleetWorkspacePermissionsBindings_errors(t *testing.T) {
 
 			assert.ErrorContains(t, err, test.wantErrMessage)
 		})
-	}
-}
-
-func createClusterRoleBindingsMock(ctrl *gomock.Controller) func() rbacv1.ClusterRoleBindingController {
-	return func() rbacv1.ClusterRoleBindingController {
-		mock := fake.NewMockNonNamespacedControllerInterface[*rbac.ClusterRoleBinding, *rbac.ClusterRoleBindingList](ctrl)
-		mock.EXPECT().Create(&rbac.ClusterRoleBinding{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: wrangler.SafeConcatName(grbName, fleetWorkspaceVerbsName),
-				OwnerReferences: []metav1.OwnerReference{
-					{
-						APIVersion: "management.cattle.io/v3",
-						Kind:       "GlobalRoleBinding",
-						Name:       grbName,
-						UID:        grbUID,
-					},
-				},
-				Labels: map[string]string{
-					grbOwnerLabel:               grbName,
-					controllers.K8sManagedByKey: controllers.ManagerValue,
-				},
-			},
-			RoleRef: rbac.RoleRef{
-				APIGroup: rbac.GroupName,
-				Kind:     "ClusterRole",
-				Name:     wrangler.SafeConcatName(grName, fleetWorkspaceVerbsName),
-			},
-			Subjects: []rbac.Subject{
-				{
-					Kind:     "User",
-					Name:     user,
-					APIGroup: rbac.GroupName,
-				},
-			}})
-		return mock
-	}
-}
-
-func createRoleBindingsMock(ctrl *gomock.Controller) func() rbacv1.RoleBindingController {
-	return func() rbacv1.RoleBindingController {
-		mock := fake.NewMockControllerInterface[*rbac.RoleBinding, *rbac.RoleBindingList](ctrl)
-		mock.EXPECT().Create(&rbac.RoleBinding{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      grbName,
-				Namespace: "fleet-default",
-				OwnerReferences: []metav1.OwnerReference{
-					{
-						APIVersion: "management.cattle.io/v3",
-						Kind:       "GlobalRoleBinding",
-						Name:       grbName,
-						UID:        grbUID,
-					},
-				},
-				Labels: map[string]string{
-					grbOwnerLabel:                 grbName,
-					fleetWorkspacePermissionLabel: "true",
-					controllers.K8sManagedByKey:   controllers.ManagerValue,
-				},
-			},
-			RoleRef: rbac.RoleRef{
-				APIGroup: rbac.GroupName,
-				Kind:     "ClusterRole",
-				Name:     wrangler.SafeConcatName(grName, fleetWorkspaceClusterRulesName),
-			},
-			Subjects: []rbac.Subject{
-				{
-					Kind:     "User",
-					Name:     user,
-					APIGroup: rbac.GroupName,
-				},
-			},
-		})
-		return mock
-	}
-}
-
-func fleetDefaultAndLocalWorkspaceCacheMock(ctrl *gomock.Controller) func() mgmtcontroller.FleetWorkspaceCache {
-	return func() mgmtcontroller.FleetWorkspaceCache {
-		mock := fake.NewMockNonNamespacedCacheInterface[*v3.FleetWorkspace](ctrl)
-		mock.EXPECT().List(labels.Everything()).Return([]*v3.FleetWorkspace{
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "fleet-local",
-				},
-			},
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "fleet-default",
-				},
-			},
-		}, nil)
-		return mock
-	}
-}
-
-func globalRoleMock(ctrl *gomock.Controller) func() mgmtcontroller.GlobalRoleCache {
-	return func() mgmtcontroller.GlobalRoleCache {
-		mock := fake.NewMockNonNamespacedCacheInterface[*v3.GlobalRole](ctrl)
-		mock.EXPECT().Get(grName).Return(&v3.GlobalRole{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: grName,
-				UID:  grUID,
-			},
-			InheritedFleetWorkspacePermissions: v3.FleetWorkspacePermission{
-				ResourceRules: []rbac.PolicyRule{
-					{
-						Verbs:     []string{"get", "list"},
-						APIGroups: []string{"fleet.cattle.io"},
-						Resources: []string{"gitrepos", "bundles"},
-					},
-				},
-				WorkspaceVerbs: []string{"get", "list"},
-			},
-		}, nil)
-		return mock
 	}
 }

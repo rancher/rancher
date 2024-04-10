@@ -42,55 +42,37 @@ func newFleetWorkspaceRoleHandler(management *config.ManagementContext) *fleetWo
 }
 
 // ReconcileFleetWorkspacePermissions reconciles backing ClusterRoles created for granting permission to fleet workspaces.
-func (h *fleetWorkspaceRoleHandler) reconcileFleetWorkspacePermissions(globalRole *v3.GlobalRole) error {
-	if err := h.reconcileResourceRules(globalRole); err != nil {
+func (h *fleetWorkspaceRoleHandler) reconcileFleetWorkspacePermissions(gr *v3.GlobalRole) error {
+	if err := h.reconcileResourceRules(gr); err != nil {
 		return fmt.Errorf("error reconciling fleet permissions cluster role: %w", err)
 	}
-	if err := h.reconcileWorkspaceVerbs(globalRole); err != nil {
+	if err := h.reconcileWorkspaceVerbs(gr); err != nil {
 		return fmt.Errorf("error reconciling fleet workspace verbs cluster role: %w", err)
 	}
 
 	return nil
 }
 
-func (h *fleetWorkspaceRoleHandler) reconcileResourceRules(globalRole *v3.GlobalRole) error {
-	crName := wrangler.SafeConcatName(globalRole.Name, fleetWorkspaceClusterRulesName)
+func (h *fleetWorkspaceRoleHandler) reconcileResourceRules(gr *v3.GlobalRole) error {
+	crName := wrangler.SafeConcatName(gr.Name, fleetWorkspaceClusterRulesName)
 	cr, err := h.crCache.Get(crName)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
 
-	if globalRole.InheritedFleetWorkspacePermissions.ResourceRules == nil {
+	if gr.InheritedFleetWorkspacePermissions.ResourceRules == nil {
 		return h.deleteClusterRoleIfNeeded(!apierrors.IsNotFound(err), crName)
 	}
 
 	if apierrors.IsNotFound(err) {
-		_, err := h.crClient.Create(&v1.ClusterRole{
-			TypeMeta: metav1.TypeMeta{},
-			ObjectMeta: metav1.ObjectMeta{
-				Name: crName,
-				OwnerReferences: []metav1.OwnerReference{
-					{
-						APIVersion: v3.GlobalRoleGroupVersionKind.GroupVersion().String(),
-						Kind:       v3.GlobalRoleGroupVersionKind.Kind,
-						Name:       globalRole.Name,
-						UID:        globalRole.UID,
-					},
-				},
-				Labels: map[string]string{
-					grOwnerLabel:                wrangler.SafeConcatName(globalRole.Name),
-					controllers.K8sManagedByKey: controllers.ManagerValue,
-				},
-			},
-			Rules: globalRole.InheritedFleetWorkspacePermissions.ResourceRules,
-		})
+		_, err := h.crClient.Create(backingResourceRulesClusterRole(gr, crName))
 
 		return err
 	}
 
-	if !equality.Semantic.DeepEqual(cr.Rules, globalRole.InheritedFleetWorkspacePermissions.ResourceRules) {
+	if !equality.Semantic.DeepEqual(cr.Rules, gr.InheritedFleetWorkspacePermissions.ResourceRules) {
 		// undo modifications if cr has changed
-		cr.Rules = globalRole.InheritedFleetWorkspacePermissions.ResourceRules
+		cr.Rules = gr.InheritedFleetWorkspacePermissions.ResourceRules
 		_, err := h.crClient.Update(cr)
 
 		return err
@@ -99,15 +81,15 @@ func (h *fleetWorkspaceRoleHandler) reconcileResourceRules(globalRole *v3.Global
 	return err
 }
 
-func (h *fleetWorkspaceRoleHandler) reconcileWorkspaceVerbs(globalRole *v3.GlobalRole) error {
-	crName := wrangler.SafeConcatName(globalRole.Name, fleetWorkspaceVerbsName)
+func (h *fleetWorkspaceRoleHandler) reconcileWorkspaceVerbs(gr *v3.GlobalRole) error {
+	crName := wrangler.SafeConcatName(gr.Name, fleetWorkspaceVerbsName)
 	cr, err := h.crCache.Get(crName)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
 	crMissing := apierrors.IsNotFound(err)
 
-	if globalRole.InheritedFleetWorkspacePermissions.WorkspaceVerbs == nil {
+	if gr.InheritedFleetWorkspacePermissions.WorkspaceVerbs == nil {
 		return h.deleteClusterRoleIfNeeded(!apierrors.IsNotFound(err), crName)
 	}
 
@@ -119,45 +101,69 @@ func (h *fleetWorkspaceRoleHandler) reconcileWorkspaceVerbs(globalRole *v3.Globa
 		// skip if there are no workspaces besides local
 		return nil
 	}
-	rules := []v1.PolicyRule{
-		{
-			Verbs:         globalRole.InheritedFleetWorkspacePermissions.WorkspaceVerbs,
-			APIGroups:     []string{"management.cattle.io"},
-			Resources:     []string{"fleetworkspaces"},
-			ResourceNames: workspacesNames,
-		},
-	}
+	desiredCR := backingWorkspaceVerbsClusterRole(gr, crName, workspacesNames)
 	if crMissing {
-		_, err := h.crClient.Create(&v1.ClusterRole{
-			TypeMeta: metav1.TypeMeta{},
-			ObjectMeta: metav1.ObjectMeta{
-				Name: crName,
-				OwnerReferences: []metav1.OwnerReference{
-					{
-						APIVersion: v3.GlobalRoleGroupVersionKind.GroupVersion().String(),
-						Kind:       v3.GlobalRoleGroupVersionKind.Kind,
-						Name:       globalRole.Name,
-						UID:        globalRole.UID,
-					},
-				},
-				Labels: map[string]string{
-					grOwnerLabel:                wrangler.SafeConcatName(globalRole.Name),
-					controllers.K8sManagedByKey: controllers.ManagerValue,
-				},
-			},
-			Rules: rules,
-		})
+		_, err := h.crClient.Create(desiredCR)
 
 		return err
-	} else if !equality.Semantic.DeepEqual(cr.Rules, rules) {
+	} else if !equality.Semantic.DeepEqual(cr.Rules, desiredCR.Rules) {
 		// undo modifications if cr has changed
-		cr.Rules = rules
+		cr.Rules = desiredCR.Rules
 		_, err := h.crClient.Update(cr)
 
 		return err
 	}
 
 	return nil
+}
+
+func backingResourceRulesClusterRole(gr *v3.GlobalRole, crName string) *v1.ClusterRole {
+	return &v1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: crName,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: v3.GlobalRoleGroupVersionKind.GroupVersion().String(),
+					Kind:       v3.GlobalRoleGroupVersionKind.Kind,
+					Name:       gr.Name,
+					UID:        gr.UID,
+				},
+			},
+			Labels: map[string]string{
+				grOwnerLabel:                wrangler.SafeConcatName(gr.Name),
+				controllers.K8sManagedByKey: controllers.ManagerValue,
+			},
+		},
+		Rules: gr.InheritedFleetWorkspacePermissions.ResourceRules,
+	}
+}
+
+func backingWorkspaceVerbsClusterRole(gr *v3.GlobalRole, crName string, workspaceNames []string) *v1.ClusterRole {
+	return &v1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: crName,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: v3.GlobalRoleGroupVersionKind.GroupVersion().String(),
+					Kind:       v3.GlobalRoleGroupVersionKind.Kind,
+					Name:       gr.Name,
+					UID:        gr.UID,
+				},
+			},
+			Labels: map[string]string{
+				grOwnerLabel:                wrangler.SafeConcatName(gr.Name),
+				controllers.K8sManagedByKey: controllers.ManagerValue,
+			},
+		},
+		Rules: []v1.PolicyRule{
+			{
+				Verbs:         gr.InheritedFleetWorkspacePermissions.WorkspaceVerbs,
+				APIGroups:     []string{"management.cattle.io"},
+				Resources:     []string{"fleetworkspaces"},
+				ResourceNames: workspaceNames,
+			},
+		},
+	}
 }
 
 func (h *fleetWorkspaceRoleHandler) deleteClusterRoleIfNeeded(crExists bool, crName string) error {
