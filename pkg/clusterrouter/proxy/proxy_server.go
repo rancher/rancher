@@ -167,7 +167,7 @@ func (r *RemoteService) getTransport() (http.RoundTripper, error) {
 	}
 
 	if r.factory != nil {
-		d, err := r.factory.ClusterDialer(newCluster.Name)
+		d, err := r.factory.ClusterDialer(newCluster.Name, true)
 		if err != nil {
 			return nil, err
 		}
