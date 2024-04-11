@@ -239,14 +239,14 @@ func TestReconcileFleetPermissions_errors(t *testing.T) {
 		globalRole     *v3.GlobalRole
 		wantErrMessage string
 	}{
-		"Error retrieving ClusterRole": {
+		"Error retrieving resource rules ClusterRole": {
 			stateSetup: func(state testState) {
 				state.crCache.EXPECT().Get(wrangler.SafeConcatName(grName, fleetWorkspaceClusterRulesName)).Return(nil, errors.NewServiceUnavailable("unexpected error"))
 			},
 			globalRole:     gr,
 			wantErrMessage: "error reconciling fleet permissions cluster role: unexpected error",
 		},
-		"Error creating ClusterRole": {
+		"Error creating resource rules ClusterRole": {
 			stateSetup: func(state testState) {
 				state.crCache.EXPECT().Get(wrangler.SafeConcatName(grName, fleetWorkspaceClusterRulesName)).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
 				state.crClient.EXPECT().Create(backingResourceRulesClusterRole(gr, wrangler.SafeConcatName(gr.Name, fleetWorkspaceClusterRulesName))).Return(nil, errors.NewServiceUnavailable("unexpected error"))
@@ -254,7 +254,7 @@ func TestReconcileFleetPermissions_errors(t *testing.T) {
 			globalRole:     gr,
 			wantErrMessage: "error reconciling fleet permissions cluster role: unexpected error",
 		},
-		"Error updating ClusterRole": {
+		"Error updating resource rules ClusterRole": {
 			stateSetup: func(state testState) {
 				state.crCache.EXPECT().Get(wrangler.SafeConcatName(grName, fleetWorkspaceClusterRulesName)).Return(&rbac.ClusterRole{}, nil)
 				state.crClient.EXPECT().Update(&rbac.ClusterRole{
@@ -264,7 +264,7 @@ func TestReconcileFleetPermissions_errors(t *testing.T) {
 			globalRole:     gr,
 			wantErrMessage: "error reconciling fleet permissions cluster role: unexpected error",
 		},
-		"Error deleting ClusterRole": {
+		"Error deleting resource rules ClusterRole": {
 			stateSetup: func(state testState) {
 				state.crCache.EXPECT().Get(wrangler.SafeConcatName(grName, fleetWorkspaceClusterRulesName)).Return(&rbac.ClusterRole{}, nil)
 				state.crClient.EXPECT().Delete(wrangler.SafeConcatName(grName, fleetWorkspaceClusterRulesName), &metav1.DeleteOptions{}).Return(errors.NewServiceUnavailable("unexpected error"))
@@ -276,6 +276,58 @@ func TestReconcileFleetPermissions_errors(t *testing.T) {
 				},
 			},
 			wantErrMessage: "error reconciling fleet permissions cluster role: unexpected error",
+		},
+		"Error retrieving workspace verbs ClusterRole": {
+			stateSetup: func(state testState) {
+				state.crCache.EXPECT().Get(wrangler.SafeConcatName(grName, fleetWorkspaceVerbsName)).Return(nil, errors.NewServiceUnavailable("unexpected error"))
+				state.crCache.EXPECT().Get(wrangler.SafeConcatName(grName, fleetWorkspaceClusterRulesName)).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+				state.crClient.EXPECT().Create(backingResourceRulesClusterRole(gr, wrangler.SafeConcatName(gr.Name, fleetWorkspaceClusterRulesName)))
+			},
+			globalRole:     gr,
+			wantErrMessage: "error reconciling fleet workspace verbs cluster role: unexpected error",
+		},
+		"Error creating workspace verbs ClusterRole": {
+			stateSetup: func(state testState) {
+				state.crCache.EXPECT().Get(wrangler.SafeConcatName(grName, fleetWorkspaceClusterRulesName)).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+				state.crClient.EXPECT().Create(backingResourceRulesClusterRole(gr, wrangler.SafeConcatName(gr.Name, fleetWorkspaceClusterRulesName)))
+				state.crCache.EXPECT().Get(wrangler.SafeConcatName(grName, fleetWorkspaceVerbsName)).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+				state.fwCache.EXPECT().List(labels.Everything()).Return(fleetWorkspaces, nil)
+				state.crClient.EXPECT().Create(backingWorkspaceVerbsClusterRole(gr, wrangler.SafeConcatName(gr.Name, fleetWorkspaceVerbsName), []string{"fleet-default"})).Return(nil, errors.NewServiceUnavailable("unexpected error"))
+			},
+			globalRole:     gr,
+			wantErrMessage: "error reconciling fleet workspace verbs cluster role: unexpected error",
+		},
+		"Error updating workspace verbs ClusterRole": {
+			stateSetup: func(state testState) {
+				state.crCache.EXPECT().Get(wrangler.SafeConcatName(grName, fleetWorkspaceClusterRulesName)).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+				state.crClient.EXPECT().Create(backingResourceRulesClusterRole(gr, wrangler.SafeConcatName(gr.Name, fleetWorkspaceClusterRulesName)))
+				state.crCache.EXPECT().Get(wrangler.SafeConcatName(grName, fleetWorkspaceVerbsName)).Return(&rbac.ClusterRole{}, nil)
+				state.fwCache.EXPECT().List(labels.Everything()).Return(fleetWorkspaces, nil)
+				state.crClient.EXPECT().Update(&rbac.ClusterRole{
+					Rules: backingWorkspaceVerbsClusterRole(gr, wrangler.SafeConcatName(gr.Name, fleetWorkspaceVerbsName), []string{"fleet-default"}).Rules,
+				}).Return(nil, errors.NewServiceUnavailable("unexpected error"))
+			},
+			globalRole:     gr,
+			wantErrMessage: "error reconciling fleet workspace verbs cluster role: unexpected error",
+		},
+		"Error deleting workspace verbs ClusterRole": {
+			stateSetup: func(state testState) {
+				state.crCache.EXPECT().Get(wrangler.SafeConcatName(grName, fleetWorkspaceClusterRulesName)).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+				state.crClient.EXPECT().Create(backingResourceRulesClusterRole(gr, wrangler.SafeConcatName(gr.Name, fleetWorkspaceClusterRulesName)))
+				state.crCache.EXPECT().Get(wrangler.SafeConcatName(grName, fleetWorkspaceVerbsName)).Return(&rbac.ClusterRole{}, nil)
+				state.fwCache.EXPECT().List(labels.Everything()).Return(fleetWorkspaces, nil)
+				state.crClient.EXPECT().Delete(wrangler.SafeConcatName(grName, fleetWorkspaceVerbsName), &metav1.DeleteOptions{}).Return(errors.NewServiceUnavailable("unexpected error"))
+			},
+			globalRole: &v3.GlobalRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: grName,
+					UID:  grUID,
+				},
+				InheritedFleetWorkspacePermissions: v3.FleetWorkspacePermission{
+					ResourceRules: gr.InheritedFleetWorkspacePermissions.ResourceRules,
+				},
+			},
+			wantErrMessage: "error reconciling fleet workspace verbs cluster role: unexpected error",
 		},
 	}
 

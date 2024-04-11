@@ -49,10 +49,6 @@ func (h *fleetWorkspaceBindingHandler) reconcileFleetWorkspacePermissionsBinding
 	if err != nil {
 		return fmt.Errorf("unable to get globalRole: %w", err)
 	}
-	if globalRole.InheritedFleetWorkspacePermissions.WorkspaceVerbs == nil &&
-		globalRole.InheritedFleetWorkspacePermissions.ResourceRules == nil {
-		return nil
-	}
 
 	if err = h.reconcileResourceRulesBindings(globalRoleBinding, globalRole); err != nil {
 		return fmt.Errorf("error reconciling fleet permissions rules: %w", err)
@@ -66,9 +62,6 @@ func (h *fleetWorkspaceBindingHandler) reconcileFleetWorkspacePermissionsBinding
 }
 
 func (h *fleetWorkspaceBindingHandler) reconcileResourceRulesBindings(grb *v3.GlobalRoleBinding, gr *v3.GlobalRole) error {
-	if gr.InheritedFleetWorkspacePermissions.ResourceRules == nil {
-		return nil
-	}
 	fleetWorkspaces, err := h.fwCache.List(labels.Everything())
 	if err != nil {
 		return fmt.Errorf("unable to list fleetWorkspaces when reconciling globalRoleBinding %s: %w", grb.Name, err)
@@ -79,22 +72,34 @@ func (h *fleetWorkspaceBindingHandler) reconcileResourceRulesBindings(grb *v3.Gl
 		if fleetWorkspace.Name == localFleetWorkspace {
 			continue
 		}
+		desiredRB := backingRoleBinding(grb, gr, fleetWorkspace.Name)
 		rb, err := h.rbCache.Get(fleetWorkspace.Name, wrangler.SafeConcatName(grb.Name))
-		if err != nil && !apierrors.IsNotFound(err) {
-			returnError = multierror.Append(returnError, err)
+		if err != nil {
+			if !apierrors.IsNotFound(err) {
+				returnError = multierror.Append(returnError, err)
+				continue
+			}
+			if gr.InheritedFleetWorkspacePermissions.ResourceRules != nil {
+				_, err = h.rbClient.Create(desiredRB)
+				if err != nil {
+					returnError = multierror.Append(returnError, err)
+				}
+			}
 			continue
 		}
-		desiredRB := backingRoleBinding(grb, gr, fleetWorkspace.Name)
-		if apierrors.IsNotFound(err) {
-			_, err = h.rbClient.Create(desiredRB)
+
+		if gr.InheritedFleetWorkspacePermissions.ResourceRules == nil {
+			err := h.rbClient.Delete(rb.Namespace, rb.Name, &metav1.DeleteOptions{})
 			if err != nil && !apierrors.IsNotFound(err) {
-				returnError = multierror.Append(returnError, err)
+				return err
 			}
-		} else if !reflect.DeepEqual(rb.Subjects, desiredRB.Subjects) ||
+			return nil
+		}
+		if !reflect.DeepEqual(rb.Subjects, desiredRB.Subjects) ||
 			!reflect.DeepEqual(rb.RoleRef, desiredRB.RoleRef) {
 			// undo modifications if rb has changed.
 			err := h.rbClient.Delete(rb.Namespace, rb.Name, &metav1.DeleteOptions{})
-			if err != nil {
+			if err != nil && !apierrors.IsNotFound(err) {
 				returnError = multierror.Append(returnError, err)
 			}
 			_, err = h.rbClient.Create(desiredRB)
@@ -108,26 +113,29 @@ func (h *fleetWorkspaceBindingHandler) reconcileResourceRulesBindings(grb *v3.Gl
 }
 
 func (h *fleetWorkspaceBindingHandler) reconcileWorkspaceVerbsBindings(grb *v3.GlobalRoleBinding, gr *apimgmtv3.GlobalRole) error {
-	if gr.InheritedFleetWorkspacePermissions.WorkspaceVerbs == nil {
+	crbName := wrangler.SafeConcatName(grb.Name, fleetWorkspaceVerbsName)
+	desiredCRB := backingClusterRoleBinding(grb, gr, crbName)
+
+	crb, err := h.crbCache.Get(crbName)
+	if err != nil {
+		if !apierrors.IsNotFound(err) {
+			return err
+		}
+		if gr.InheritedFleetWorkspacePermissions.ResourceRules != nil {
+			_, err = h.crbClient.Create(desiredCRB)
+			return err
+		}
 		return nil
 	}
-	crbName := wrangler.SafeConcatName(grb.Name, fleetWorkspaceVerbsName)
-	crb, err := h.crbCache.Get(crbName)
-	if err != nil && !apierrors.IsNotFound(err) {
-		return err
-	}
 
-	desiredCRB := backingClusterRoleBinding(grb, gr, crbName)
-	if apierrors.IsNotFound(err) {
-		_, err = h.crbClient.Create(desiredCRB)
-
-		return err
+	if gr.InheritedFleetWorkspacePermissions.ResourceRules == nil {
+		return h.crbClient.Delete(crbName, &metav1.DeleteOptions{})
 	}
 	if !reflect.DeepEqual(crb.Subjects, desiredCRB.Subjects) ||
 		!reflect.DeepEqual(crb.RoleRef, desiredCRB.RoleRef) {
 		// undo modifications if crb has changed.
 		err := h.crbClient.Delete(crb.Name, &metav1.DeleteOptions{})
-		if err != nil {
+		if err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}
 		_, err = h.crbClient.Create(desiredCRB)

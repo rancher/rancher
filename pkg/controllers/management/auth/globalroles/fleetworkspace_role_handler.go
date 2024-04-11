@@ -56,20 +56,20 @@ func (h *fleetWorkspaceRoleHandler) reconcileFleetWorkspacePermissions(gr *v3.Gl
 func (h *fleetWorkspaceRoleHandler) reconcileResourceRules(gr *v3.GlobalRole) error {
 	crName := wrangler.SafeConcatName(gr.Name, fleetWorkspaceClusterRulesName)
 	cr, err := h.crCache.Get(crName)
-	if err != nil && !apierrors.IsNotFound(err) {
-		return err
+	if err != nil {
+		if !apierrors.IsNotFound(err) {
+			return err
+		}
+		if gr.InheritedFleetWorkspacePermissions.ResourceRules != nil {
+			_, err := h.crClient.Create(backingResourceRulesClusterRole(gr, crName))
+			return err
+		}
+		return nil
 	}
 
 	if gr.InheritedFleetWorkspacePermissions.ResourceRules == nil {
-		return h.deleteClusterRoleIfNeeded(!apierrors.IsNotFound(err), crName)
+		return h.crClient.Delete(crName, &metav1.DeleteOptions{})
 	}
-
-	if apierrors.IsNotFound(err) {
-		_, err := h.crClient.Create(backingResourceRulesClusterRole(gr, crName))
-
-		return err
-	}
-
 	if !equality.Semantic.DeepEqual(cr.Rules, gr.InheritedFleetWorkspacePermissions.ResourceRules) {
 		// undo modifications if cr has changed
 		cr.Rules = gr.InheritedFleetWorkspacePermissions.ResourceRules
@@ -88,9 +88,11 @@ func (h *fleetWorkspaceRoleHandler) reconcileWorkspaceVerbs(gr *v3.GlobalRole) e
 		return err
 	}
 	crMissing := apierrors.IsNotFound(err)
-
 	if gr.InheritedFleetWorkspacePermissions.WorkspaceVerbs == nil {
-		return h.deleteClusterRoleIfNeeded(!apierrors.IsNotFound(err), crName)
+		if !crMissing {
+			return h.crClient.Delete(crName, &metav1.DeleteOptions{})
+		}
+		return nil
 	}
 
 	workspacesNames, err := h.fleetWorkspaceNames()
@@ -164,14 +166,6 @@ func backingWorkspaceVerbsClusterRole(gr *v3.GlobalRole, crName string, workspac
 			},
 		},
 	}
-}
-
-func (h *fleetWorkspaceRoleHandler) deleteClusterRoleIfNeeded(crExists bool, crName string) error {
-	if crExists {
-		return h.crClient.Delete(crName, &metav1.DeleteOptions{})
-	}
-
-	return nil
 }
 
 func (h *fleetWorkspaceRoleHandler) fleetWorkspaceNames() ([]string, error) {

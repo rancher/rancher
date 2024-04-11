@@ -41,6 +41,12 @@ var (
 			WorkspaceVerbs: []string{"get", "list"},
 		},
 	}
+	grVerbsNoFleetPermissions = &v3.GlobalRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: grName,
+			UID:  grUID,
+		},
+	}
 	grb = &v3.GlobalRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: grbName,
@@ -96,6 +102,37 @@ func TestReconcileFleetWorkspacePermissionsBindings(t *testing.T) {
 				state.crbCache.EXPECT().Get(wrangler.SafeConcatName(grbName, fleetWorkspaceVerbsName)).Return(backingClusterRoleBinding(grb, grVerbs, wrangler.SafeConcatName(grb.Name, fleetWorkspaceVerbsName)), nil)
 				state.fwCache.EXPECT().List(labels.Everything()).Return(fleetWorkspaces, nil)
 			},
+			grb: grb,
+		},
+		"no RoleBindings and ClusterRoleBindings are created or updated if inheritedFleetWorkspaceRoles not provided": {
+			stateSetup: func(state testState) {
+				state.grCache.EXPECT().Get(grName).Return(grVerbsNoFleetPermissions, nil)
+				state.rbCache.EXPECT().Get("fleet-default", grbName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+				state.crbCache.EXPECT().Get(wrangler.SafeConcatName(grbName, fleetWorkspaceVerbsName)).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+				state.fwCache.EXPECT().List(labels.Everything()).Return(fleetWorkspaces, nil)
+			},
+
+			grb: grb,
+		},
+		"RoleBindings and ClusterRoleBinding are deleted if inheritedFleetWorkspaceRoles is set to nil": {
+			stateSetup: func(state testState) {
+				state.grCache.EXPECT().Get(grName).Return(grVerbsNoFleetPermissions, nil)
+				state.fwCache.EXPECT().List(labels.Everything()).Return(fleetWorkspaces, nil)
+				state.rbCache.EXPECT().Get("fleet-default", grbName).Return(&rbac.RoleBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      grbName,
+						Namespace: "fleet-default",
+					},
+				}, nil)
+				state.crbCache.EXPECT().Get(wrangler.SafeConcatName(grbName, fleetWorkspaceVerbsName)).Return(&rbac.ClusterRoleBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: wrangler.SafeConcatName(grbName, fleetWorkspaceVerbsName),
+					},
+				}, nil)
+				state.rbClient.EXPECT().Delete("fleet-default", grbName, &metav1.DeleteOptions{})
+				state.crbClient.EXPECT().Delete(wrangler.SafeConcatName(grbName, fleetWorkspaceVerbsName), &metav1.DeleteOptions{})
+			},
+
 			grb: grb,
 		},
 	}
