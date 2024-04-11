@@ -19,6 +19,7 @@ node {
     def rancherConfig = "rancher_env.config"
     def branch = "release/v2.8"
     def corralBranch = "main"
+    def config = env.CONFIG
     def cleanup = env.RANCHER_CLEANUP.toLowerCase()
     if ("${env.BRANCH}" != "null" && "${env.BRANCH}" != "") {
       branch = "${env.BRANCH}"
@@ -103,6 +104,14 @@ node {
           }
           dir ("./") {
             stage('Configure and Build') {
+              config = config.replace('${AWS_SECRET_ACCESS_KEY}', env.AWS_SECRET_ACCESS_KEY)
+              config = config.replace('${AWS_ACCESS_KEY_ID}', env.AWS_ACCESS_KEY_ID)
+              config = config.replace('${AWS_IAM_PROFILE}', env.AWS_IAM_PROFILE)
+              config = config.replace('${AWS_REGION}', env.AWS_REGION)
+              config = config.replace('${AWS_VPC}', env.AWS_VPC)
+              config = config.replace('${AWS_SECURITY_GROUPS}', env.AWS_SECURITY_GROUPS)
+              config = config.replace('${ADMIN_PASSWORD}', env.ADMIN_PASSWORD)
+
               if (env.AWS_SSH_PEM_KEY && env.AWS_SSH_KEY_NAME) {
                 dir("./rancher/tests/v2/validation/.ssh") {
                   def decoded = new String(AWS_SSH_PEM_KEY.decodeBase64())
@@ -111,9 +120,8 @@ node {
               }
               dir("./rancher/tests/v2/validation") {
                 def filename = "config.yaml"
-                def configContents = env.CONFIG
 
-                writeFile file: filename, text: configContents
+                writeFile file: filename, text: config
                 env.CATTLE_TEST_CONFIG = "${workPath}"+filename
               }
               dir ("./") {
