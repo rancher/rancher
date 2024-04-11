@@ -91,6 +91,11 @@ letsEncrypt:
 # in the 'rancher-system' namespace. See the README.md for details
 privateCA: false
 
+### ACME config ###
+# ingress.tls.source "acme"
+# acme:
+#   server: my-private-acme-server
+
 # http[s] proxy server passed into rancher server.
 # proxy: http://<username>@<password>:<url>:<port>
 

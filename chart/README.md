@@ -99,6 +99,16 @@ helm install rancher rancher-latest/rancher \
   --set ingress.tls.source=secret
 ```
 
+- ACME
+
+```bash
+helm install rancher rancher-latest/rancher \
+  --namespace cattle-system \
+  --set hostname=rancher.my.org \
+  --set ingress.tls.source=acme
+  --set acme.server=my-private-amce-server.intra
+```
+
 *If you are using a Private CA signed certificate , add **--set privateCA=true** to the command:`*
 
 ```bash
@@ -154,10 +164,11 @@ Specify each parameter using the `--set key=value[,key=value]` argument to `helm
 | Parameter                 | Default Value | Description                                                                                  |
 | ------------------------- | ------------- | -------------------------------------------------------------------------------------------- |
 | `hostname`                | " "           | ***string*** - the Fully Qualified Domain Name for your Rancher Server                       |
-| `ingress.tls.source`      | "rancher"     | ***string*** - Where to get the cert for the ingress. - "***rancher, letsEncrypt, secret***" |
+| `ingress.tls.source`      | "rancher"     | ***string*** - Where to get the cert for the ingress. - "***rancher, letsEncrypt, secret***, ***acme***" |
 | `letsEncrypt.email`       | " "           | ***string*** - Your email address                                                            |
 | `letsEncrypt.environment` | "production"  | ***string*** - Valid options: "***staging, production***"                                    |
 | `privateCA`               | false         | ***bool*** - Set to true if your cert is signed by a private CA                              |
+| `acme.server`             | ""            | ***string*** - Set the acme server als alternative to letsEncrypt                                      |
 
 #### Advanced Options
 
