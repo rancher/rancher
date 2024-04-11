@@ -260,6 +260,12 @@ var (
 	// UIPL the vendor/company name.
 	UIPL = NewSetting("ui-pl", "rancher")
 
+	// UIPrimaryColor UI primary color for branding customisation
+	UIPrimaryColor = NewSetting("ui-primary-color", "")
+
+	// UILinkColor UI link color for branding customisation
+	UILinkColor = NewSetting("ui-link-color", "")
+
 	// UILoginBackground the custom background in the login page.
 	UILoginBackgroundLight = NewSetting("ui-login-background-light", "")
 	UILoginBackgroundDark  = NewSetting("ui-login-background-dark", "")
