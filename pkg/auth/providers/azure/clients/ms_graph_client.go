@@ -196,7 +196,12 @@ func oidFromAuthCode(code string, config *v32.AzureADConfig) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("could not create a cred from a secret: %w", err)
 	}
-	confidentialClientApp, err := confidential.New(fmt.Sprintf("%s%s", config.Endpoint, config.TenantID), config.ApplicationID, cred)
+
+	authority, err := url.JoinPath(config.Endpoint, config.TenantID)
+	if err != nil {
+		return "", fmt.Errorf("could not create token authority url: %w", err)
+	}
+	confidentialClientApp, err := confidential.New(authority, config.ApplicationID, cred)
 	if err != nil {
 		return "", err
 	}
@@ -299,7 +304,11 @@ func NewMSGraphClient(config *v32.AzureADConfig, secrets corev1.SecretInterface)
 	}
 	tokenCache := AccessTokenCache{Secrets: secrets}
 
-	confidentialClientApp, err := confidential.New(fmt.Sprintf("%s%s", config.Endpoint, config.TenantID), config.ApplicationID, cred,
+	authority, err := url.JoinPath(config.Endpoint, config.TenantID)
+	if err != nil {
+		return nil, fmt.Errorf("could not create token authority url: %w", err)
+	}
+	confidentialClientApp, err := confidential.New(authority, config.ApplicationID, cred,
 		confidential.WithCache(tokenCache))
 	if err != nil {
 		return nil, err
