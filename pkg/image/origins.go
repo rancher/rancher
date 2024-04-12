@@ -176,6 +176,7 @@ var OriginMap = map[string]string{
 	"mirrored-longhornio-longhorn-share-manager":              "https://github.com/longhorn/longhorn-share-manager",
 	"mirrored-longhornio-longhorn-ui":                         "https://github.com/longhorn/longhorn-ui",
 	"mirrored-longhornio-support-bundle-kit":                  "https://github.com/longhorn/longhorn",
+	"mirrored-longhornio-openshift-origin-oauth-proxy":        "https://github.com/longhorn/longhorn",
 	"mirrored-messagebird-sachet":                             "https://github.com/messagebird/sachet",
 	"mirrored-metrics-server":                                 "https://github.com/kubernetes-sigs/metrics-server",
 	"mirrored-minio-mc":                                       "https://github.com/minio/mc",
