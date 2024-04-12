@@ -107,7 +107,10 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningK3SCustomClusterDyn
 			break
 		}
 	}
-	require.False(c.T(), isWindows, "Windows nodes are not supported for k3s Clusters")
+	if isWindows {
+		c.T().Skip("Skipping Windows tests, not supported on k3s")
+	}
+
 	if len(c.provisioningConfig.MachinePools) == 0 {
 		c.T().Skip()
 	}
