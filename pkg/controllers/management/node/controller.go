@@ -45,7 +45,7 @@ import (
 )
 
 const (
-	defaultEngineInstallURL         = "https://releases.rancher.com/install-docker/24.0.sh"
+	defaultEngineInstallURL         = "https://releases.rancher.com/install-docker/25.0.sh"
 	amazonec2                       = "amazonec2"
 	userNodeRemoveCleanupAnnotation = "cleanup.cattle.io/user-node-remove"
 	userNodeRemoveFinalizerPrefix   = "clusterscoped.controller.cattle.io/user-node-remove_"
