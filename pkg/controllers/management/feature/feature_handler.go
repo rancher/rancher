@@ -96,7 +96,7 @@ func (h *handler) syncHarvesterFeature(obj *v3.Feature) error {
 
 func (h *handler) toggleHarvesterNodeDriver(harvester string) error {
 	if val := features.GetFeatureByName(harvester).Enabled(); val {
-		m, err := h.nodeDriverController.Cache().Get(harvester)
+		m, err := h.nodeDriverController.Get(harvester, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
