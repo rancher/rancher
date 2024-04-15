@@ -771,7 +771,7 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 	}
 
 	cleanPrivateRegistry(data)
-	dialer, err := r.DialerFactory.ClusterDialer(id)
+	dialer, err := r.DialerFactory.ClusterDialer(id, true)
 	if err != nil {
 		return nil, errors.Wrap(err, "error getting dialer")
 	}
