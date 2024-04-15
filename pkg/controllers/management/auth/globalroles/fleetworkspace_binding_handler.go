@@ -91,9 +91,9 @@ func (h *fleetWorkspaceBindingHandler) reconcileResourceRulesBindings(grb *v3.Gl
 		if gr.InheritedFleetWorkspacePermissions.ResourceRules == nil {
 			err := h.rbClient.Delete(rb.Namespace, rb.Name, &metav1.DeleteOptions{})
 			if err != nil && !apierrors.IsNotFound(err) {
-				return err
+				returnError = multierror.Append(returnError, err)
 			}
-			return nil
+			continue
 		}
 		if !reflect.DeepEqual(rb.Subjects, desiredRB.Subjects) ||
 			!reflect.DeepEqual(rb.RoleRef, desiredRB.RoleRef) {
