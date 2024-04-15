@@ -196,7 +196,12 @@ func oidFromAuthCode(code string, config *v32.AzureADConfig) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("could not create a cred from a secret: %w", err)
 	}
-	confidentialClientApp, err := confidential.New(config.ApplicationID, cred, confidential.WithAuthority(fmt.Sprintf("%s%s", config.Endpoint, config.TenantID)))
+
+	authority, err := url.JoinPath(config.Endpoint, config.TenantID)
+	if err != nil {
+		return "", fmt.Errorf("could not create token authority url: %w", err)
+	}
+	confidentialClientApp, err := confidential.New(authority, config.ApplicationID, cred)
 	if err != nil {
 		return "", err
 	}
@@ -253,32 +258,38 @@ type AccessTokenCache struct {
 }
 
 // Replace fetches the access token from a secret in Kubernetes.
-func (c AccessTokenCache) Replace(cache cache.Unmarshaler, key string) {
+func (c AccessTokenCache) Replace(ctx context.Context, cache cache.Unmarshaler, hints cache.ReplaceHints) error {
 	secretName := fmt.Sprintf("%s:%s", common.SecretsNamespace, AccessTokenSecretName)
 	secret, err := common.ReadFromSecret(c.Secrets, secretName, "access-token")
 	if err != nil {
 		logrus.Errorf("[%s] failed to read the access token from Kubernetes: %v", cacheLogPrefix, err)
-		return
+		return err
 	}
 
 	err = cache.Unmarshal([]byte(secret))
 	if err != nil {
 		logrus.Errorf("[%s] failed to unmarshal the access token: %v", cacheLogPrefix, err)
+		return err
 	}
+
+	return nil
 }
 
 // Export persists the access token to a secret in Kubernetes.
-func (c AccessTokenCache) Export(cache cache.Marshaler, key string) {
+func (c AccessTokenCache) Export(ctx context.Context, cache cache.Marshaler, hints cache.ExportHints) error {
 	marshalled, err := cache.Marshal()
 	if err != nil {
 		logrus.Errorf("[%s] failed to marshal the access token before saving in Kubernetes: %v", cacheLogPrefix, err)
-		return
+		return err
 	}
 
 	_, err = common.CreateOrUpdateSecrets(c.Secrets, string(marshalled), "access-token", "azuread")
 	if err != nil {
 		logrus.Errorf("[%s] failed to save the access token in Kubernetes: %v", cacheLogPrefix, err)
+		return err
 	}
+
+	return nil
 }
 
 // NewMSGraphClient returns a client of the Microsoft Graph API. It attempts to get an access token to the API.
@@ -292,9 +303,13 @@ func NewMSGraphClient(config *v32.AzureADConfig, secrets corev1.SecretInterface)
 		return nil, fmt.Errorf("could not create a cred from a secret: %w", err)
 	}
 	tokenCache := AccessTokenCache{Secrets: secrets}
-	confidentialClientApp, err := confidential.New(config.ApplicationID, cred,
-		confidential.WithAccessor(tokenCache),
-		confidential.WithAuthority(fmt.Sprintf("%s%s", config.Endpoint, config.TenantID)))
+
+	authority, err := url.JoinPath(config.Endpoint, config.TenantID)
+	if err != nil {
+		return nil, fmt.Errorf("could not create token authority url: %w", err)
+	}
+	confidentialClientApp, err := confidential.New(authority, config.ApplicationID, cred,
+		confidential.WithCache(tokenCache))
 	if err != nil {
 		return nil, err
 	}
