@@ -3,11 +3,14 @@ package clients
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net/url"
 	"time"
 
 	"github.com/AzureAD/microsoft-authentication-library-for-go/apps/cache"
 	"github.com/AzureAD/microsoft-authentication-library-for-go/apps/confidential"
+	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/manicminer/hamilton/environments"
 	"github.com/manicminer/hamilton/msgraph"
 	"github.com/manicminer/hamilton/odata"
@@ -112,29 +115,44 @@ func (c azureMSGraphClient) ListGroupMemberships(id string) ([]string, error) {
 func (c azureMSGraphClient) LoginUser(config *v32.AzureADConfig, credential *v32.AzureADLogin) (v3.Principal, []v3.Principal, string, error) {
 	logrus.Debugf("[%s] Started token swap with AzureAD", providerLogPrefix)
 
-	// Acquire the OID just to verify the user.
-	oid, err := oidFromAuthCode(credential.Code, config)
-	if err != nil {
-		return v3.Principal{}, nil, "", err
+	// an empty Principal
+	var zero v3.Principal
+	var oid string
+
+	if credential.IDToken != "" {
+		// Acquire the OID from the IDToken to verify the user
+		oidFromToken, err := oidFromIDToken(credential.IDToken, config)
+		if err != nil {
+			return zero, nil, "", fmt.Errorf("getting OID from IDToken: %w", err)
+		}
+		oid = oidFromToken
+	} else {
+		// Acquire the OID exchanging the Code to verify the user
+		oidFromCode, err := oidFromAuthCode(credential.Code, config)
+		if err != nil {
+			return zero, nil, "", fmt.Errorf("getting OID from AuthCode: %w", err)
+		}
+		oid = oidFromCode
 	}
+
 	logrus.Debugf("[%s] Completed token swap with AzureAD", providerLogPrefix)
 
 	logrus.Debugf("[%s] Started getting user info from AzureAD", providerLogPrefix)
 	userPrincipal, err := c.GetUser(oid)
 	if err != nil {
-		return v3.Principal{}, nil, "", err
+		return zero, nil, "", fmt.Errorf("getting UserInfo from Azure: %w", err)
 	}
 	userPrincipal.Me = true
 	logrus.Debugf("[%s] Completed getting user info from AzureAD", providerLogPrefix)
 
 	userGroups, err := c.ListGroupMemberships(GetPrincipalID(userPrincipal))
 	if err != nil {
-		return v3.Principal{}, nil, "", err
+		return zero, nil, "", fmt.Errorf("listing group membeships: %w", err)
 	}
 
 	groupPrincipals, err := UserGroupsToPrincipals(c, userGroups)
 	if err != nil {
-		return v3.Principal{}, nil, "", err
+		return zero, nil, "", fmt.Errorf("converting groups to principals: %w", err)
 	}
 
 	// Return an empty string for the provider token, so that it does not get saved in a secret later, like users'
@@ -172,23 +190,61 @@ func (a *authorizer) Token() (*oauth2.Token, error) {
 	}, nil
 }
 
-// oidFromAuthCode verifies a user.
-func oidFromAuthCode(token string, config *v32.AzureADConfig) (string, error) {
+// oidFromAuthCode exchanges the AuthCode for a IDToken, returning the user OID
+func oidFromAuthCode(code string, config *v32.AzureADConfig) (string, error) {
 	cred, err := confidential.NewCredFromSecret(config.ApplicationSecret)
 	if err != nil {
 		return "", fmt.Errorf("could not create a cred from a secret: %w", err)
 	}
-	confidentialClientApp, err := confidential.New(config.ApplicationID, cred, confidential.WithAuthority(fmt.Sprintf("%s%s", config.Endpoint, config.TenantID)))
+
+	authority, err := url.JoinPath(config.Endpoint, config.TenantID)
+	if err != nil {
+		return "", fmt.Errorf("could not create token authority url: %w", err)
+	}
+	confidentialClientApp, err := confidential.New(authority, config.ApplicationID, cred)
 	if err != nil {
 		return "", err
 	}
 	scope := fmt.Sprintf("%s/%s", config.GraphEndpoint, ".default")
-	authResult, err := confidentialClientApp.AcquireTokenByAuthCode(context.Background(), token, config.RancherURL, []string{scope})
+	authResult, err := confidentialClientApp.AcquireTokenByAuthCode(context.Background(), code, config.RancherURL, []string{scope})
 	if err != nil {
 		return "", err
 	}
 
 	return authResult.IDToken.Oid, nil
+}
+
+// oidFromIDToken verifies the IDToken, returning the user OID
+func oidFromIDToken(token string, config *v32.AzureADConfig) (string, error) {
+	issuer, err := url.JoinPath(config.Endpoint, config.TenantID, "/v2.0")
+	if err != nil {
+		return "", fmt.Errorf("joining auth provider path: %w", err)
+	}
+
+	ctx := context.Background()
+	provider, err := oidc.NewProvider(ctx, issuer)
+	if err != nil {
+		return "", fmt.Errorf("creating OIDC provider: %w", err)
+	}
+
+	verifier := provider.Verifier(&oidc.Config{ClientID: config.ApplicationID})
+	idToken, err := verifier.Verify(ctx, token)
+	if err != nil {
+		return "", fmt.Errorf("verifying user ID Token: %w", err)
+	}
+
+	var claims struct {
+		OID string `json:"oid"`
+	}
+
+	if err = idToken.Claims(&claims); err != nil {
+		return "", fmt.Errorf("extracting claims: %w", err)
+	}
+
+	if claims.OID == "" {
+		return "", errors.New("empty user OID")
+	}
+	return claims.OID, nil
 }
 
 // AccessTokenCache is responsible for reading (replacing) the access token from some storage (a secret in the database,
@@ -202,32 +258,38 @@ type AccessTokenCache struct {
 }
 
 // Replace fetches the access token from a secret in Kubernetes.
-func (c AccessTokenCache) Replace(cache cache.Unmarshaler, key string) {
+func (c AccessTokenCache) Replace(ctx context.Context, cache cache.Unmarshaler, hints cache.ReplaceHints) error {
 	secretName := fmt.Sprintf("%s:%s", common.SecretsNamespace, AccessTokenSecretName)
 	secret, err := common.ReadFromSecret(c.Secrets, secretName, "access-token")
 	if err != nil {
 		logrus.Errorf("[%s] failed to read the access token from Kubernetes: %v", cacheLogPrefix, err)
-		return
+		return err
 	}
 
 	err = cache.Unmarshal([]byte(secret))
 	if err != nil {
 		logrus.Errorf("[%s] failed to unmarshal the access token: %v", cacheLogPrefix, err)
+		return err
 	}
+
+	return nil
 }
 
 // Export persists the access token to a secret in Kubernetes.
-func (c AccessTokenCache) Export(cache cache.Marshaler, key string) {
+func (c AccessTokenCache) Export(ctx context.Context, cache cache.Marshaler, hints cache.ExportHints) error {
 	marshalled, err := cache.Marshal()
 	if err != nil {
 		logrus.Errorf("[%s] failed to marshal the access token before saving in Kubernetes: %v", cacheLogPrefix, err)
-		return
+		return err
 	}
 
 	_, err = common.CreateOrUpdateSecrets(c.Secrets, string(marshalled), "access-token", "azuread")
 	if err != nil {
 		logrus.Errorf("[%s] failed to save the access token in Kubernetes: %v", cacheLogPrefix, err)
+		return err
 	}
+
+	return nil
 }
 
 // NewMSGraphClient returns a client of the Microsoft Graph API. It attempts to get an access token to the API.
@@ -241,9 +303,13 @@ func NewMSGraphClient(config *v32.AzureADConfig, secrets corev1.SecretInterface)
 		return nil, fmt.Errorf("could not create a cred from a secret: %w", err)
 	}
 	tokenCache := AccessTokenCache{Secrets: secrets}
-	confidentialClientApp, err := confidential.New(config.ApplicationID, cred,
-		confidential.WithAccessor(tokenCache),
-		confidential.WithAuthority(fmt.Sprintf("%s%s", config.Endpoint, config.TenantID)))
+
+	authority, err := url.JoinPath(config.Endpoint, config.TenantID)
+	if err != nil {
+		return nil, fmt.Errorf("could not create token authority url: %w", err)
+	}
+	confidentialClientApp, err := confidential.New(authority, config.ApplicationID, cred,
+		confidential.WithCache(tokenCache))
 	if err != nil {
 		return nil, err
 	}
