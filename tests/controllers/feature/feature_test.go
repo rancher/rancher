@@ -2,7 +2,6 @@ package feature_test
 
 import (
 	"context"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -26,39 +25,15 @@ type FeatureTestSuite struct {
 	wranglerContext *wrangler.Context
 }
 
-var (
-	harvesterFeatureNoAnnotation = v3.Feature{
-		ObjectMeta: v1.ObjectMeta{
-			Name: "harvester-baremetal-container-workload",
-		},
-	}
-	harvesterFeature = v3.Feature{
-		ObjectMeta: v1.ObjectMeta{
-			Name: "harvester-baremetal-container-workload",
-			Annotations: map[string]string{
-				v3.ExperimentalFeatureValue: v3.ExperimentalFeatureKey,
-			},
-		},
-	}
-	//t = true
-	//f = false
-	h = v3.Feature{
-		ObjectMeta: v1.ObjectMeta{
-			Name: "harvester",
-		},
-	}
+const (
+	tick     = 1 * time.Second
+	duration = 10 * time.Second
 )
 
 func (s *FeatureTestSuite) SetupSuite() {
 	s.ctx, s.cancel = context.WithCancel(context.TODO())
 	// Load CRD from YAML for REST Client
-	s.testEnv = &envtest.Environment{
-		CRDDirectoryPaths: []string{
-			filepath.Join("..", "..", "..", "pkg", "crds", "yaml", "generated", "management.cattle.io_features.yaml"),
-			filepath.Join("..", "..", "..", "pkg", "crds", "yaml", "generated", "management.cattle.io_nodedrivers.yaml"),
-		},
-		ErrorIfCRDPathMissing: true,
-	}
+	s.testEnv = &envtest.Environment{}
 	restCfg, err := s.testEnv.Start()
 	assert.NoError(s.T(), err)
 	assert.NotNil(s.T(), restCfg)
@@ -86,20 +61,28 @@ func (s *FeatureTestSuite) SetupSuite() {
 	feature.Register(s.ctx, s.wranglerContext)
 
 	// Create and start the feature controller factory
-	sc := s.wranglerContext.ControllerFactory.ForResourceKind(schema.GroupVersionResource{
+	cf := s.wranglerContext.ControllerFactory.ForResourceKind(schema.GroupVersionResource{
 		Group:    "management.cattle.io",
 		Version:  "v3",
 		Resource: "features",
 	}, "Feature", false)
 	assert.NoError(s.T(), err)
-	err = sc.Start(s.ctx, 1)
+	err = cf.Start(s.ctx, 1)
 	assert.NoError(s.T(), err)
 
-	s.wranglerContext.ControllerFactory.SharedCacheFactory().StartGVK(s.ctx, schema.GroupVersionKind{
+	// Start the NodeDriver cache
+	_, err = s.wranglerContext.ControllerFactory.SharedCacheFactory().ForKind(schema.GroupVersionKind{
 		Group:   "management.cattle.io",
 		Version: "v3",
-		Kind:    "nodedrivers",
+		Kind:    "NodeDriver",
 	})
+	assert.NoError(s.T(), err)
+	err = s.wranglerContext.ControllerFactory.SharedCacheFactory().StartGVK(s.ctx, schema.GroupVersionKind{
+		Group:   "management.cattle.io",
+		Version: "v3",
+		Kind:    "NodeDriver",
+	})
+	assert.NoError(s.T(), err)
 
 	// The feature controller checks the harvester NodeDriver, so it needs to exist
 	n, err := s.wranglerContext.Mgmt.NodeDriver().Create(&v3.NodeDriver{
@@ -131,7 +114,7 @@ func (s *FeatureTestSuite) TestHarvesterFeature() {
 		nd, err := s.wranglerContext.Mgmt.NodeDriver().Get("harvester", v1.GetOptions{})
 		assert.NoError(c, err)
 		assert.True(c, nd.Spec.Active)
-	}, 10*time.Second, 1*time.Second, "harvester feature has not been enabled")
+	}, duration, tick, "harvester feature has not been enabled")
 
 }
 
@@ -164,14 +147,14 @@ func (s *FeatureTestSuite) TestHarvesterBaremetalFeature() {
 		f, err := s.wranglerContext.Mgmt.Feature().Get("harvester-baremetal-container-workload", v1.GetOptions{})
 		assert.NoError(c, err)
 		assert.Equal(c, v3.ExperimentalFeatureValue, f.Annotations[v3.ExperimentalFeatureKey])
-	}, 10*time.Second, 1*time.Second, "annotation feature.cattle.io/experimental has not changed to true")
+	}, duration, tick, "annotation feature.cattle.io/experimental has not changed to true")
 
 	// Check that harvester feature gets set
 	assert.EventuallyWithT(s.T(), func(c *assert.CollectT) {
 		nd, err := s.wranglerContext.Mgmt.Feature().Get("harvester", v1.GetOptions{})
 		assert.NoError(c, err)
 		assert.NotNil(c, nd.Spec.Value)
-	}, 10*time.Second, 1*time.Second, "harvester feature has not been enabled")
+	}, duration, tick, "harvester feature has not been enabled")
 
 	// Once set, confirm that the harvester feature is enabled
 	nd, err := s.wranglerContext.Mgmt.Feature().Get("harvester", v1.GetOptions{})
