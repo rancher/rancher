@@ -21,6 +21,11 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
+var (
+	errReconcileResourceRulesBinding  = fmt.Errorf("reconciling fleet role bindings failed")
+	errReconcileWorkspaceVerbsBinding = fmt.Errorf("reconciling fleet workspace verbs cluster role binding failed")
+)
+
 // fleetWorkspaceBindingHandler manages Bindings created for the InheritedFleetWorkspacePermissions field.
 type fleetWorkspaceBindingHandler struct {
 	crbClient rbacv1.ClusterRoleBindingController
@@ -47,24 +52,23 @@ func newFleetWorkspaceBindingHandler(management *config.ManagementContext) *flee
 func (h *fleetWorkspaceBindingHandler) reconcileFleetWorkspacePermissionsBindings(globalRoleBinding *v3.GlobalRoleBinding) error {
 	globalRole, err := h.grCache.Get(globalRoleBinding.GlobalRoleName)
 	if err != nil {
-		return fmt.Errorf("unable to get globalRole: %w", err)
+		return fmt.Errorf("couldn't get globalRole: %w", err)
 	}
-
+	var returnErr error
 	if err = h.reconcileResourceRulesBindings(globalRoleBinding, globalRole); err != nil {
-		return fmt.Errorf("error reconciling fleet permissions rules: %w", err)
+		returnErr = multierror.Append(errReconcileResourceRulesBinding, err)
 	}
-
 	if err = h.reconcileWorkspaceVerbsBindings(globalRoleBinding, globalRole); err != nil {
-		return fmt.Errorf("error reconciling fleet workspace verbs: %w", err)
+		returnErr = multierror.Append(errReconcileWorkspaceVerbsBinding, err)
 	}
 
-	return nil
+	return returnErr
 }
 
 func (h *fleetWorkspaceBindingHandler) reconcileResourceRulesBindings(grb *v3.GlobalRoleBinding, gr *v3.GlobalRole) error {
 	fleetWorkspaces, err := h.fwCache.List(labels.Everything())
 	if err != nil {
-		return fmt.Errorf("unable to list fleetWorkspaces when reconciling globalRoleBinding %s: %w", grb.Name, err)
+		return fmt.Errorf("couldn't list fleetWorkspaces: %w", err)
 	}
 
 	var returnError error
@@ -76,13 +80,13 @@ func (h *fleetWorkspaceBindingHandler) reconcileResourceRulesBindings(grb *v3.Gl
 		rb, err := h.rbCache.Get(fleetWorkspace.Name, wrangler.SafeConcatName(grb.Name))
 		if err != nil {
 			if !apierrors.IsNotFound(err) {
-				returnError = multierror.Append(returnError, err)
+				returnError = multierror.Append(returnError, fmt.Errorf("couldn't get RoleBinding %s : %w", wrangler.SafeConcatName(grb.Name), err))
 				continue
 			}
 			if gr.InheritedFleetWorkspacePermissions.ResourceRules != nil {
 				_, err = h.rbClient.Create(desiredRB)
 				if err != nil {
-					returnError = multierror.Append(returnError, err)
+					returnError = multierror.Append(returnError, fmt.Errorf("couldn't create RoleBinding: %w", err))
 				}
 			}
 			continue
@@ -91,7 +95,7 @@ func (h *fleetWorkspaceBindingHandler) reconcileResourceRulesBindings(grb *v3.Gl
 		if gr.InheritedFleetWorkspacePermissions.ResourceRules == nil {
 			err := h.rbClient.Delete(rb.Namespace, rb.Name, &metav1.DeleteOptions{})
 			if err != nil && !apierrors.IsNotFound(err) {
-				returnError = multierror.Append(returnError, err)
+				returnError = multierror.Append(returnError, fmt.Errorf("couldn't clean up RoleBinding: %w", err))
 			}
 			continue
 		}
@@ -100,12 +104,12 @@ func (h *fleetWorkspaceBindingHandler) reconcileResourceRulesBindings(grb *v3.Gl
 			// undo modifications if rb has changed.
 			err := h.rbClient.Delete(rb.Namespace, rb.Name, &metav1.DeleteOptions{})
 			if err != nil && !apierrors.IsNotFound(err) {
-				returnError = multierror.Append(returnError, err)
+				returnError = multierror.Append(returnError, fmt.Errorf("couldn't delete RoleBinding: %w", err))
 				continue
 			}
 			_, err = h.rbClient.Create(desiredRB)
 			if err != nil {
-				returnError = multierror.Append(returnError, err)
+				returnError = multierror.Append(returnError, fmt.Errorf("couldn't create RoleBinding: %w", err))
 			}
 		}
 	}
@@ -120,11 +124,13 @@ func (h *fleetWorkspaceBindingHandler) reconcileWorkspaceVerbsBindings(grb *v3.G
 	crb, err := h.crbCache.Get(crbName)
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
-			return err
+			return fmt.Errorf("couldn't get ClusterRoleBinding: %w", err)
 		}
 		if gr.InheritedFleetWorkspacePermissions.ResourceRules != nil {
 			_, err = h.crbClient.Create(desiredCRB)
-			return err
+			if err != nil {
+				return fmt.Errorf("couldn't create ClusterRoleBinding: %w", err)
+			}
 		}
 		return nil
 	}
@@ -132,7 +138,7 @@ func (h *fleetWorkspaceBindingHandler) reconcileWorkspaceVerbsBindings(grb *v3.G
 	if gr.InheritedFleetWorkspacePermissions.ResourceRules == nil {
 		err := h.crbClient.Delete(crbName, &metav1.DeleteOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
-			return err
+			return fmt.Errorf("couldn't clean up ClusterRoleBinding: %w", err)
 		}
 		return nil
 	}
@@ -141,7 +147,7 @@ func (h *fleetWorkspaceBindingHandler) reconcileWorkspaceVerbsBindings(grb *v3.G
 		// undo modifications if crb has changed.
 		err := h.crbClient.Delete(crb.Name, &metav1.DeleteOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
-			return err
+			return fmt.Errorf("couldn't delete ClusterRoleBinding: %w", err)
 		}
 		_, err = h.crbClient.Create(desiredCRB)
 

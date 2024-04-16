@@ -174,6 +174,11 @@ func TestReconcileFleetWorkspacePermissionsBindings(t *testing.T) {
 func TestReconcileFleetWorkspacePermissionsBindings_errors(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
+	grNotFoundErr := errors.NewNotFound(schema.GroupResource{
+		Group:    "management.cattle.io",
+		Resource: "GlobalRole",
+	}, grName)
+	unexpectedErr := errors.NewServiceUnavailable("unexpected error")
 	type testState struct {
 		crbClient *fake.MockNonNamespacedControllerInterface[*rbac.ClusterRoleBinding, *rbac.ClusterRoleBindingList]
 		crbCache  *fake.MockNonNamespacedCacheInterface[*rbac.ClusterRoleBinding]
@@ -183,33 +188,34 @@ func TestReconcileFleetWorkspacePermissionsBindings_errors(t *testing.T) {
 		fwCache   *fake.MockNonNamespacedCacheInterface[*v3.FleetWorkspace]
 	}
 	tests := map[string]struct {
-		stateSetup     func(state testState)
-		wantErrMessage string
+		stateSetup func(state testState)
+		wantErrs   []error
 	}{
 		"GlobalRole not found": {
 			stateSetup: func(state testState) {
-				state.grCache.EXPECT().Get(grName).Return(nil, errors.NewNotFound(schema.GroupResource{
-					Group:    "management.cattle.io",
-					Resource: "GlobalRole",
-				}, grName))
+				state.grCache.EXPECT().Get(grName).Return(nil, grNotFoundErr)
 			},
-			wantErrMessage: "unable to get globalRole: GlobalRole.management.cattle.io \"gr\" not found",
+			wantErrs: []error{grNotFoundErr},
 		},
 		"Error retrieving fleetworkspaces": {
 			stateSetup: func(state testState) {
 				state.grCache.EXPECT().Get(grName).Return(grVerbs, nil)
-				state.fwCache.EXPECT().List(labels.Everything()).Return(nil, errors.NewServiceUnavailable("unexpected error"))
+				state.fwCache.EXPECT().List(labels.Everything()).Return(nil, unexpectedErr)
+				state.crbClient.EXPECT().Create(mockClusterRoleBinding(grb, grVerbs, wrangler.SafeConcatName(grb.Name, fleetWorkspaceVerbsName)))
+				state.crbCache.EXPECT().Get(wrangler.SafeConcatName(grbName, fleetWorkspaceVerbsName)).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
 			},
-			wantErrMessage: "unable to list fleetWorkspaces when reconciling globalRoleBinding grb: unexpected error",
+			wantErrs: []error{errReconcileResourceRulesBinding, unexpectedErr},
 		},
 		"Error creating backing RoleBindings for permission rules": {
 			stateSetup: func(state testState) {
 				state.grCache.EXPECT().Get(grName).Return(grVerbs, nil)
 				state.fwCache.EXPECT().List(labels.Everything()).Return(fleetWorkspaces, nil)
 				state.rbCache.EXPECT().Get("fleet-default", grbName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
-				state.rbClient.EXPECT().Create(mockRoleBinding(grb, grVerbs, "fleet-default")).Return(nil, errors.NewServiceUnavailable("unexpected error"))
+				state.rbClient.EXPECT().Create(mockRoleBinding(grb, grVerbs, "fleet-default")).Return(nil, unexpectedErr)
+				state.crbClient.EXPECT().Create(mockClusterRoleBinding(grb, grVerbs, wrangler.SafeConcatName(grb.Name, fleetWorkspaceVerbsName)))
+				state.crbCache.EXPECT().Get(wrangler.SafeConcatName(grbName, fleetWorkspaceVerbsName)).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
 			},
-			wantErrMessage: "error reconciling fleet permissions rules: 1 error occurred:\n\t* unexpected error\n\n",
+			wantErrs: []error{errReconcileResourceRulesBinding, unexpectedErr},
 		},
 		"Error deleting backing RoleBindings for permission rules when it has changed": {
 			stateSetup: func(state testState) {
@@ -221,10 +227,12 @@ func TestReconcileFleetWorkspacePermissionsBindings_errors(t *testing.T) {
 						Name:      grbName,
 					},
 				}, nil)
-				state.rbClient.EXPECT().Delete("fleet-default", grbName, &metav1.DeleteOptions{}).Return(errors.NewServiceUnavailable("unexpected error"))
-				state.rbClient.EXPECT().Create(mockRoleBinding(grb, grVerbs, "fleet-default")).Return(nil, errors.NewServiceUnavailable("unexpected error"))
+				state.rbClient.EXPECT().Delete("fleet-default", grbName, &metav1.DeleteOptions{}).Return(unexpectedErr)
+				state.rbClient.EXPECT().Create(mockRoleBinding(grb, grVerbs, "fleet-default")).Return(nil, unexpectedErr)
+				state.crbClient.EXPECT().Create(mockClusterRoleBinding(grb, grVerbs, wrangler.SafeConcatName(grb.Name, fleetWorkspaceVerbsName)))
+				state.crbCache.EXPECT().Get(wrangler.SafeConcatName(grbName, fleetWorkspaceVerbsName)).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
 			},
-			wantErrMessage: "error reconciling fleet permissions rules",
+			wantErrs: []error{errReconcileResourceRulesBinding, unexpectedErr},
 		},
 		"Error creating backing ClusterRoleBinding for workspace verbs": {
 			stateSetup: func(state testState) {
@@ -233,9 +241,9 @@ func TestReconcileFleetWorkspacePermissionsBindings_errors(t *testing.T) {
 				state.rbCache.EXPECT().Get("fleet-default", grbName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
 				state.rbClient.EXPECT().Create(mockRoleBinding(grb, grVerbs, "fleet-default"))
 				state.crbCache.EXPECT().Get(wrangler.SafeConcatName(grbName, fleetWorkspaceVerbsName)).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
-				state.crbClient.EXPECT().Create(mockClusterRoleBinding(grb, grVerbs, wrangler.SafeConcatName(grb.Name, fleetWorkspaceVerbsName))).Return(nil, errors.NewServiceUnavailable("unexpected error"))
+				state.crbClient.EXPECT().Create(mockClusterRoleBinding(grb, grVerbs, wrangler.SafeConcatName(grb.Name, fleetWorkspaceVerbsName))).Return(nil, unexpectedErr)
 			},
-			wantErrMessage: "error reconciling fleet workspace verbs: unexpected error",
+			wantErrs: []error{errReconcileWorkspaceVerbsBinding, unexpectedErr},
 		},
 		"Error deleting backing ClusterRoleBinding for workspace verbs when it has changed": {
 			stateSetup: func(state testState) {
@@ -246,18 +254,22 @@ func TestReconcileFleetWorkspacePermissionsBindings_errors(t *testing.T) {
 				state.crbCache.EXPECT().Get(wrangler.SafeConcatName(grbName, fleetWorkspaceVerbsName)).Return(&rbac.ClusterRoleBinding{
 					ObjectMeta: metav1.ObjectMeta{Name: wrangler.SafeConcatName(grb.Name, fleetWorkspaceVerbsName)},
 				}, nil)
-				state.crbClient.EXPECT().Delete(wrangler.SafeConcatName(grb.Name, fleetWorkspaceVerbsName), &metav1.DeleteOptions{}).Return(errors.NewServiceUnavailable("unexpected error"))
-				state.rbClient.EXPECT().Create(mockClusterRoleBinding(grb, grVerbs, wrangler.SafeConcatName(grb.Name, fleetWorkspaceVerbsName))).Return(nil, errors.NewServiceUnavailable("unexpected error"))
+				state.crbClient.EXPECT().Delete(wrangler.SafeConcatName(grb.Name, fleetWorkspaceVerbsName), &metav1.DeleteOptions{}).Return(unexpectedErr)
+				state.rbClient.EXPECT().Create(mockClusterRoleBinding(grb, grVerbs, wrangler.SafeConcatName(grb.Name, fleetWorkspaceVerbsName))).Return(nil, unexpectedErr)
 			},
-			wantErrMessage: "error reconciling fleet workspace verbs",
+			wantErrs: []error{errReconcileWorkspaceVerbsBinding, unexpectedErr},
 		},
 		"Error getting RoleBinding": {
 			stateSetup: func(state testState) {
 				state.grCache.EXPECT().Get(grName).Return(grVerbs, nil)
 				state.fwCache.EXPECT().List(labels.Everything()).Return(fleetWorkspaces, nil)
-				state.rbCache.EXPECT().Get("fleet-default", grbName).Return(nil, errors.NewServiceUnavailable("unexpected error"))
+				state.rbCache.EXPECT().Get("fleet-default", grbName).Return(nil, unexpectedErr)
+				state.crbCache.EXPECT().Get(wrangler.SafeConcatName(grbName, fleetWorkspaceVerbsName)).Return(&rbac.ClusterRoleBinding{
+					ObjectMeta: metav1.ObjectMeta{Name: wrangler.SafeConcatName(grb.Name, fleetWorkspaceVerbsName)},
+				}, nil)
+				state.crbClient.EXPECT().Delete(wrangler.SafeConcatName(grb.Name, fleetWorkspaceVerbsName), &metav1.DeleteOptions{}).Return(unexpectedErr)
 			},
-			wantErrMessage: "error reconciling fleet permissions rules",
+			wantErrs: []error{errReconcileWorkspaceVerbsBinding, unexpectedErr},
 		},
 		"Error getting ClusterRoleBinding": {
 			stateSetup: func(state testState) {
@@ -265,9 +277,9 @@ func TestReconcileFleetWorkspacePermissionsBindings_errors(t *testing.T) {
 				state.fwCache.EXPECT().List(labels.Everything()).Return(fleetWorkspaces, nil)
 				state.rbCache.EXPECT().Get("fleet-default", grbName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
 				state.rbClient.EXPECT().Create(mockRoleBinding(grb, grVerbs, "fleet-default"))
-				state.crbCache.EXPECT().Get(wrangler.SafeConcatName(grbName, fleetWorkspaceVerbsName)).Return(nil, errors.NewServiceUnavailable("unexpected error"))
+				state.crbCache.EXPECT().Get(wrangler.SafeConcatName(grbName, fleetWorkspaceVerbsName)).Return(nil, unexpectedErr)
 			},
-			wantErrMessage: "error reconciling fleet workspace verbs",
+			wantErrs: []error{errReconcileWorkspaceVerbsBinding, unexpectedErr},
 		},
 	}
 
@@ -304,7 +316,9 @@ func TestReconcileFleetWorkspacePermissionsBindings_errors(t *testing.T) {
 				GlobalRoleName: grName,
 			})
 
-			assert.ErrorContains(t, err, test.wantErrMessage)
+			for _, wantErr := range test.wantErrs {
+				assert.ErrorIs(t, err, wantErr)
+			}
 		})
 	}
 }

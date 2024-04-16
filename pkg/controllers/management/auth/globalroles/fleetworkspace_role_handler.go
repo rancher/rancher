@@ -7,6 +7,7 @@ import (
 
 	wrangler "github.com/rancher/wrangler/v2/pkg/name"
 
+	"github.com/hashicorp/go-multierror"
 	mgmtcontroller "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -22,6 +23,11 @@ const (
 	localFleetWorkspace            = "fleet-local"
 	fleetWorkspaceClusterRulesName = "fwcr"
 	fleetWorkspaceVerbsName        = "fwv"
+)
+
+var (
+	errReconcileResourceRules  = fmt.Errorf("reconciling fleet resource rules cluster role failed")
+	errReconcileWorkspaceVerbs = fmt.Errorf("reconciling fleet workspace verbs cluster role failed")
 )
 
 // fleetWorkspaceRoleHandler manages ClusterRoles created for the InheritedFleetWorkspacePermissions field. It manages 2 roles:
@@ -43,14 +49,15 @@ func newFleetWorkspaceRoleHandler(management *config.ManagementContext) *fleetWo
 
 // ReconcileFleetWorkspacePermissions reconciles backing ClusterRoles created for granting permission to fleet workspaces.
 func (h *fleetWorkspaceRoleHandler) reconcileFleetWorkspacePermissions(gr *v3.GlobalRole) error {
+	var returnErr error
 	if err := h.reconcileResourceRules(gr); err != nil {
-		return fmt.Errorf("error reconciling fleet permissions cluster role: %w", err)
+		returnErr = multierror.Append(returnErr, errReconcileResourceRules, err)
 	}
 	if err := h.reconcileWorkspaceVerbs(gr); err != nil {
-		return fmt.Errorf("error reconciling fleet workspace verbs cluster role: %w", err)
+		returnErr = multierror.Append(returnErr, errReconcileWorkspaceVerbs, err)
 	}
 
-	return nil
+	return returnErr
 }
 
 func (h *fleetWorkspaceRoleHandler) reconcileResourceRules(gr *v3.GlobalRole) error {
@@ -58,11 +65,13 @@ func (h *fleetWorkspaceRoleHandler) reconcileResourceRules(gr *v3.GlobalRole) er
 	cr, err := h.crCache.Get(crName)
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
-			return err
+			return fmt.Errorf("couldn't get ClusterRole: %w", err)
 		}
 		if gr.InheritedFleetWorkspacePermissions.ResourceRules != nil {
 			_, err := h.crClient.Create(backingResourceRulesClusterRole(gr, crName))
-			return err
+			if err != nil {
+				return fmt.Errorf("couldn't create ClusterRole: %w", err)
+			}
 		}
 		return nil
 	}
@@ -70,7 +79,7 @@ func (h *fleetWorkspaceRoleHandler) reconcileResourceRules(gr *v3.GlobalRole) er
 	if gr.InheritedFleetWorkspacePermissions.ResourceRules == nil {
 		err := h.crClient.Delete(crName, &metav1.DeleteOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
-			return err
+			return fmt.Errorf("couldn't delete ClusterRole: %w", err)
 		}
 		return nil
 	}
@@ -78,11 +87,12 @@ func (h *fleetWorkspaceRoleHandler) reconcileResourceRules(gr *v3.GlobalRole) er
 		// undo modifications if cr has changed
 		cr.Rules = gr.InheritedFleetWorkspacePermissions.ResourceRules
 		_, err := h.crClient.Update(cr)
-
-		return err
+		if err != nil {
+			return fmt.Errorf("couldn't update ClusterRole: %w", err)
+		}
 	}
 
-	return err
+	return nil
 }
 
 func (h *fleetWorkspaceRoleHandler) reconcileWorkspaceVerbs(gr *v3.GlobalRole) error {
@@ -96,7 +106,7 @@ func (h *fleetWorkspaceRoleHandler) reconcileWorkspaceVerbs(gr *v3.GlobalRole) e
 		if !crMissing {
 			err := h.crClient.Delete(crName, &metav1.DeleteOptions{})
 			if err != nil && !apierrors.IsNotFound(err) {
-				return err
+				return fmt.Errorf("couldn't delete ClusterRole: %w", err)
 			}
 		}
 		return nil
@@ -104,7 +114,7 @@ func (h *fleetWorkspaceRoleHandler) reconcileWorkspaceVerbs(gr *v3.GlobalRole) e
 
 	workspacesNames, err := h.fleetWorkspaceNames()
 	if err != nil {
-		return err
+		return fmt.Errorf("couldn't get fleet workspace names: %w", err)
 	}
 	if len(workspacesNames) == 0 {
 		// skip if there are no workspaces besides local
@@ -113,14 +123,16 @@ func (h *fleetWorkspaceRoleHandler) reconcileWorkspaceVerbs(gr *v3.GlobalRole) e
 	desiredCR := backingWorkspaceVerbsClusterRole(gr, crName, workspacesNames)
 	if crMissing {
 		_, err := h.crClient.Create(desiredCR)
-
-		return err
+		if err != nil {
+			return fmt.Errorf("couldn't create ClusterRole: %w", err)
+		}
 	} else if !equality.Semantic.DeepEqual(cr.Rules, desiredCR.Rules) {
 		// undo modifications if cr has changed
 		cr.Rules = desiredCR.Rules
 		_, err := h.crClient.Update(cr)
-
-		return err
+		if err != nil {
+			return fmt.Errorf("couldn't update ClusterRole: %w", err)
+		}
 	}
 
 	return nil
@@ -178,7 +190,7 @@ func backingWorkspaceVerbsClusterRole(gr *v3.GlobalRole, crName string, workspac
 func (h *fleetWorkspaceRoleHandler) fleetWorkspaceNames() ([]string, error) {
 	fleetWorkspaces, err := h.fwCache.List(labels.Everything())
 	if err != nil {
-		return nil, fmt.Errorf("unable to list fleetWorkspaces when reconciling globalRole: %w", err)
+		return nil, err
 	}
 
 	var workspacesNames []string

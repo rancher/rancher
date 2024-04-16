@@ -234,41 +234,54 @@ func TestReconcileFleetPermissions_errors(t *testing.T) {
 		crCache  *fake.MockNonNamespacedCacheInterface[*rbac.ClusterRole]
 		fwCache  *fake.MockNonNamespacedCacheInterface[*v3.FleetWorkspace]
 	}
+	unexpectedErr := errors.NewServiceUnavailable("unexpected error")
 
 	tests := map[string]struct {
-		stateSetup     func(state testState)
-		globalRole     *v3.GlobalRole
-		wantErrMessage string
+		stateSetup func(state testState)
+		globalRole *v3.GlobalRole
+		wantErrs   []error
 	}{
 		"Error retrieving resource rules ClusterRole": {
 			stateSetup: func(state testState) {
-				state.crCache.EXPECT().Get(wrangler.SafeConcatName(grName, fleetWorkspaceClusterRulesName)).Return(nil, errors.NewServiceUnavailable("unexpected error"))
+				state.crCache.EXPECT().Get(wrangler.SafeConcatName(grName, fleetWorkspaceClusterRulesName)).Return(nil, unexpectedErr)
+				state.crCache.EXPECT().Get(wrangler.SafeConcatName(grName, fleetWorkspaceVerbsName)).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+				state.crClient.EXPECT().Create(mockWorkspaceVerbsClusterRole(gr, wrangler.SafeConcatName(gr.Name, fleetWorkspaceVerbsName), fleetWorkspaceNames))
+				state.fwCache.EXPECT().List(labels.Everything()).Return(fleetWorkspaces, nil)
 			},
-			globalRole:     gr,
-			wantErrMessage: "error reconciling fleet permissions cluster role: unexpected error",
+			globalRole: gr,
+			wantErrs:   []error{errReconcileResourceRules, unexpectedErr},
 		},
 		"Error creating resource rules ClusterRole": {
 			stateSetup: func(state testState) {
 				state.crCache.EXPECT().Get(wrangler.SafeConcatName(grName, fleetWorkspaceClusterRulesName)).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
-				state.crClient.EXPECT().Create(mockResourceRulesClusterRole(gr, wrangler.SafeConcatName(gr.Name, fleetWorkspaceClusterRulesName))).Return(nil, errors.NewServiceUnavailable("unexpected error"))
+				state.crClient.EXPECT().Create(mockResourceRulesClusterRole(gr, wrangler.SafeConcatName(gr.Name, fleetWorkspaceClusterRulesName))).Return(nil, unexpectedErr)
+				state.crCache.EXPECT().Get(wrangler.SafeConcatName(grName, fleetWorkspaceVerbsName)).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+				state.crClient.EXPECT().Create(mockWorkspaceVerbsClusterRole(gr, wrangler.SafeConcatName(gr.Name, fleetWorkspaceVerbsName), fleetWorkspaceNames))
+				state.fwCache.EXPECT().List(labels.Everything()).Return(fleetWorkspaces, nil)
 			},
-			globalRole:     gr,
-			wantErrMessage: "error reconciling fleet permissions cluster role: unexpected error",
+			globalRole: gr,
+			wantErrs:   []error{errReconcileResourceRules, unexpectedErr},
 		},
 		"Error updating resource rules ClusterRole": {
 			stateSetup: func(state testState) {
 				state.crCache.EXPECT().Get(wrangler.SafeConcatName(grName, fleetWorkspaceClusterRulesName)).Return(&rbac.ClusterRole{}, nil)
 				state.crClient.EXPECT().Update(&rbac.ClusterRole{
 					Rules: gr.InheritedFleetWorkspacePermissions.ResourceRules,
-				}).Return(nil, errors.NewServiceUnavailable("unexpected error"))
+				}).Return(nil, unexpectedErr)
+				state.crCache.EXPECT().Get(wrangler.SafeConcatName(grName, fleetWorkspaceVerbsName)).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+				state.crClient.EXPECT().Create(mockWorkspaceVerbsClusterRole(gr, wrangler.SafeConcatName(gr.Name, fleetWorkspaceVerbsName), fleetWorkspaceNames))
+				state.fwCache.EXPECT().List(labels.Everything()).Return(fleetWorkspaces, nil)
 			},
-			globalRole:     gr,
-			wantErrMessage: "error reconciling fleet permissions cluster role: unexpected error",
+			globalRole: gr,
+			wantErrs:   []error{errReconcileResourceRules, unexpectedErr},
 		},
 		"Error deleting resource rules ClusterRole": {
 			stateSetup: func(state testState) {
 				state.crCache.EXPECT().Get(wrangler.SafeConcatName(grName, fleetWorkspaceClusterRulesName)).Return(&rbac.ClusterRole{}, nil)
-				state.crClient.EXPECT().Delete(wrangler.SafeConcatName(grName, fleetWorkspaceClusterRulesName), &metav1.DeleteOptions{}).Return(errors.NewServiceUnavailable("unexpected error"))
+				state.crClient.EXPECT().Delete(wrangler.SafeConcatName(grName, fleetWorkspaceClusterRulesName), &metav1.DeleteOptions{}).Return(unexpectedErr)
+				state.crCache.EXPECT().Get(wrangler.SafeConcatName(grName, fleetWorkspaceVerbsName)).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+				state.crClient.EXPECT().Create(mockWorkspaceVerbsClusterRole(gr, wrangler.SafeConcatName(gr.Name, fleetWorkspaceVerbsName), fleetWorkspaceNames))
+				state.fwCache.EXPECT().List(labels.Everything()).Return(fleetWorkspaces, nil)
 			},
 			globalRole: &v3.GlobalRole{
 				ObjectMeta: metav1.ObjectMeta{
@@ -276,16 +289,16 @@ func TestReconcileFleetPermissions_errors(t *testing.T) {
 					UID:  grUID,
 				},
 			},
-			wantErrMessage: "error reconciling fleet permissions cluster role: unexpected error",
+			wantErrs: []error{errReconcileResourceRules, unexpectedErr},
 		},
 		"Error retrieving workspace verbs ClusterRole": {
 			stateSetup: func(state testState) {
-				state.crCache.EXPECT().Get(wrangler.SafeConcatName(grName, fleetWorkspaceVerbsName)).Return(nil, errors.NewServiceUnavailable("unexpected error"))
+				state.crCache.EXPECT().Get(wrangler.SafeConcatName(grName, fleetWorkspaceVerbsName)).Return(nil, unexpectedErr)
 				state.crCache.EXPECT().Get(wrangler.SafeConcatName(grName, fleetWorkspaceClusterRulesName)).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
 				state.crClient.EXPECT().Create(mockResourceRulesClusterRole(gr, wrangler.SafeConcatName(gr.Name, fleetWorkspaceClusterRulesName)))
 			},
-			globalRole:     gr,
-			wantErrMessage: "error reconciling fleet workspace verbs cluster role: unexpected error",
+			globalRole: gr,
+			wantErrs:   []error{errReconcileWorkspaceVerbs, unexpectedErr},
 		},
 		"Error creating workspace verbs ClusterRole": {
 			stateSetup: func(state testState) {
@@ -293,10 +306,10 @@ func TestReconcileFleetPermissions_errors(t *testing.T) {
 				state.crClient.EXPECT().Create(mockResourceRulesClusterRole(gr, wrangler.SafeConcatName(gr.Name, fleetWorkspaceClusterRulesName)))
 				state.crCache.EXPECT().Get(wrangler.SafeConcatName(grName, fleetWorkspaceVerbsName)).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
 				state.fwCache.EXPECT().List(labels.Everything()).Return(fleetWorkspaces, nil)
-				state.crClient.EXPECT().Create(mockWorkspaceVerbsClusterRole(gr, wrangler.SafeConcatName(gr.Name, fleetWorkspaceVerbsName), []string{"fleet-default"})).Return(nil, errors.NewServiceUnavailable("unexpected error"))
+				state.crClient.EXPECT().Create(mockWorkspaceVerbsClusterRole(gr, wrangler.SafeConcatName(gr.Name, fleetWorkspaceVerbsName), []string{"fleet-default"})).Return(nil, unexpectedErr)
 			},
-			globalRole:     gr,
-			wantErrMessage: "error reconciling fleet workspace verbs cluster role: unexpected error",
+			globalRole: gr,
+			wantErrs:   []error{errReconcileWorkspaceVerbs, unexpectedErr},
 		},
 		"Error updating workspace verbs ClusterRole": {
 			stateSetup: func(state testState) {
@@ -306,10 +319,10 @@ func TestReconcileFleetPermissions_errors(t *testing.T) {
 				state.fwCache.EXPECT().List(labels.Everything()).Return(fleetWorkspaces, nil)
 				state.crClient.EXPECT().Update(&rbac.ClusterRole{
 					Rules: mockWorkspaceVerbsClusterRole(gr, wrangler.SafeConcatName(gr.Name, fleetWorkspaceVerbsName), []string{"fleet-default"}).Rules,
-				}).Return(nil, errors.NewServiceUnavailable("unexpected error"))
+				}).Return(nil, unexpectedErr)
 			},
-			globalRole:     gr,
-			wantErrMessage: "error reconciling fleet workspace verbs cluster role: unexpected error",
+			globalRole: gr,
+			wantErrs:   []error{errReconcileWorkspaceVerbs, unexpectedErr},
 		},
 		"Error deleting workspace verbs ClusterRole": {
 			stateSetup: func(state testState) {
@@ -317,7 +330,7 @@ func TestReconcileFleetPermissions_errors(t *testing.T) {
 				state.crClient.EXPECT().Create(mockResourceRulesClusterRole(gr, wrangler.SafeConcatName(gr.Name, fleetWorkspaceClusterRulesName)))
 				state.crCache.EXPECT().Get(wrangler.SafeConcatName(grName, fleetWorkspaceVerbsName)).Return(&rbac.ClusterRole{}, nil)
 				state.fwCache.EXPECT().List(labels.Everything()).Return(fleetWorkspaces, nil)
-				state.crClient.EXPECT().Delete(wrangler.SafeConcatName(grName, fleetWorkspaceVerbsName), &metav1.DeleteOptions{}).Return(errors.NewServiceUnavailable("unexpected error"))
+				state.crClient.EXPECT().Delete(wrangler.SafeConcatName(grName, fleetWorkspaceVerbsName), &metav1.DeleteOptions{}).Return(unexpectedErr)
 			},
 			globalRole: &v3.GlobalRole{
 				ObjectMeta: metav1.ObjectMeta{
@@ -328,7 +341,7 @@ func TestReconcileFleetPermissions_errors(t *testing.T) {
 					ResourceRules: gr.InheritedFleetWorkspacePermissions.ResourceRules,
 				},
 			},
-			wantErrMessage: "error reconciling fleet workspace verbs cluster role: unexpected error",
+			wantErrs: []error{errReconcileWorkspaceVerbs, unexpectedErr},
 		},
 	}
 
@@ -351,7 +364,9 @@ func TestReconcileFleetPermissions_errors(t *testing.T) {
 			}
 			err := h.reconcileFleetWorkspacePermissions(test.globalRole)
 
-			assert.EqualError(t, err, test.wantErrMessage)
+			for _, wantErr := range test.wantErrs {
+				assert.ErrorIs(t, err, wantErr)
+			}
 		})
 	}
 }
