@@ -2,8 +2,10 @@ package supportconfigs
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	configmapfakes "github.com/rancher/rancher/pkg/generated/norman/core/v1/fakes"
@@ -157,11 +159,19 @@ func TestGenerateSupportConfigScenarios(t *testing.T) {
 				ConfigMaps: &configmapfakes.ConfigMapInterfaceMock{
 					GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v1.ConfigMap, error) {
 						// NOTE: we are not testing the configmap itself. Just need to return a valid configmap.
-						return &v1.ConfigMap{
-							Data: map[string]string{
-								"data": "{}",
-							},
-						}, nil
+						if name == cspAdapterConfigmap {
+							return &v1.ConfigMap{
+								Data: map[string]string{
+									"data": "{}",
+								},
+							}, nil
+						} else {
+							return &v1.ConfigMap{
+                                                                Data: map[string]string{
+                                                                        "archive": "[]",
+                                                                },
+                                                        }, nil
+						}
 					},
 				},
 				SubjectAccessReviews: k8sClient.AuthorizationV1().SubjectAccessReviews(),
@@ -186,6 +196,11 @@ func TestGenerateSupportConfigScenarios(t *testing.T) {
 			req = req.WithContext(ctx)
 			h.ServeHTTP(rr, req)
 			assert.Equal(t, test.expectedHTTPCode, rr.Code)
+			if test.expectedHTTPCode == http.StatusForbidden {
+				// if user denied access, config.json should not be returned
+				body, _ := io.ReadAll(rr.Body)
+				assert.False(t, strings.Contains(string(body), "rancher/config.json"))
+			}
 		})
 	}
 }
