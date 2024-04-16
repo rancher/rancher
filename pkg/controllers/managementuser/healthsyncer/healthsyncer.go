@@ -178,6 +178,7 @@ func (h *HealthSyncer) updateClusterHealth() error {
 	}
 
 	if !reflect.DeepEqual(oldCluster, newObj) {
+		logrus.Tracef("[healthSyncer] update cluster %s", cluster.Name)
 		if _, err := h.clusters.Update(newObj.(*v3.Cluster)); err != nil {
 			return errors.Wrapf(err, "[updateClusterHealth] Failed to update cluster [%s]", cluster.Name)
 		}
