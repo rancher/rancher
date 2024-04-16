@@ -153,6 +153,7 @@ var OriginMap = map[string]string{
 	"mirrored-k8scsi-livenessprobe":                           "https://github.com/kubernetes-csi/livenessprobe",
 	"mirrored-kiali-kiali":                                    "https://github.com/kiali/kiali",
 	"mirrored-kiwigrid-k8s-sidecar":                           "https://github.com/kiwigrid/k8s-sidecar",
+	"mirrored-kube-logging-logging-operator":                  "https://github.com/kube-logging/logging-operator",
 	"mirrored-kube-rbac-proxy":                                "https://github.com/brancz/kube-rbac-proxy",
 	"mirrored-kube-state-metrics-kube-state-metrics":          "https://github.com/kubernetes/kube-state-metrics",
 	"mirrored-kube-vip-kube-vip-iptables":                     "https://github.com/kube-vip/kube-vip",
