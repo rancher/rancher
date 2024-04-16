@@ -30,6 +30,7 @@ import (
 	"github.com/rancher/rancher/pkg/types/config"
 	typesDialer "github.com/rancher/rancher/pkg/types/config/dialer"
 	"github.com/rancher/rancher/pkg/wrangler"
+	corecontrollers "github.com/rancher/wrangler/v2/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -53,6 +54,7 @@ const (
 
 type eksOperatorController struct {
 	clusteroperator.OperatorController
+	secretClient corecontrollers.SecretClient
 }
 
 func Register(ctx context.Context, wContext *wrangler.Context, mgmtCtx *config.ManagementContext) {
@@ -63,22 +65,25 @@ func Register(ctx context.Context, wContext *wrangler.Context, mgmtCtx *config.M
 	}
 
 	eksCCDynamicClient := mgmtCtx.DynamicClient.Resource(eksClusterConfigResource)
-	e := &eksOperatorController{clusteroperator.OperatorController{
-		ClusterEnqueueAfter:  wContext.Mgmt.Cluster().EnqueueAfter,
-		SecretsCache:         wContext.Core.Secret().Cache(),
-		Secrets:              mgmtCtx.Core.Secrets(""),
-		TemplateCache:        wContext.Mgmt.CatalogTemplate().Cache(),
-		ProjectCache:         wContext.Mgmt.Project().Cache(),
-		AppLister:            mgmtCtx.Project.Apps("").Controller().Lister(),
-		AppClient:            mgmtCtx.Project.Apps(""),
-		NsClient:             mgmtCtx.Core.Namespaces(""),
-		ClusterClient:        wContext.Mgmt.Cluster(),
-		CatalogManager:       mgmtCtx.CatalogManager,
-		SystemAccountManager: systemaccount.NewManager(mgmtCtx),
-		DynamicClient:        eksCCDynamicClient,
-		ClientDialer:         mgmtCtx.Dialer,
-		Discovery:            wContext.K8s.Discovery(),
-	}}
+	e := &eksOperatorController{
+		OperatorController: clusteroperator.OperatorController{
+			ClusterEnqueueAfter:  wContext.Mgmt.Cluster().EnqueueAfter,
+			SecretsCache:         wContext.Core.Secret().Cache(),
+			Secrets:              mgmtCtx.Core.Secrets(""),
+			TemplateCache:        wContext.Mgmt.CatalogTemplate().Cache(),
+			ProjectCache:         wContext.Mgmt.Project().Cache(),
+			AppLister:            mgmtCtx.Project.Apps("").Controller().Lister(),
+			AppClient:            mgmtCtx.Project.Apps(""),
+			NsClient:             mgmtCtx.Core.Namespaces(""),
+			ClusterClient:        wContext.Mgmt.Cluster(),
+			CatalogManager:       mgmtCtx.CatalogManager,
+			SystemAccountManager: systemaccount.NewManager(mgmtCtx),
+			DynamicClient:        eksCCDynamicClient,
+			ClientDialer:         mgmtCtx.Dialer,
+			Discovery:            wContext.K8s.Discovery(),
+		},
+		secretClient: wContext.Core.Secret(),
+	}
 
 	wContext.Mgmt.Cluster().OnChange(ctx, "eks-operator-controller", e.onClusterChange)
 }
@@ -382,7 +387,7 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 func (e *eksOperatorController) setInitialUpstreamSpec(cluster *mgmtv3.Cluster) (*mgmtv3.Cluster, error) {
 	logrus.Infof("setting initial upstreamSpec on cluster [%s]", cluster.Name)
 	cluster = cluster.DeepCopy()
-	upstreamSpec, err := clusterupstreamrefresher.BuildEKSUpstreamSpec(e.SecretsCache, cluster)
+	upstreamSpec, err := clusterupstreamrefresher.BuildEKSUpstreamSpec(e.secretClient, cluster)
 	if err != nil {
 		return cluster, err
 	}

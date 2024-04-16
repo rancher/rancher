@@ -285,7 +285,7 @@ func getComparableUpstreamSpec(secretsCache wranglerv1.SecretCache, secretClient
 		clusterCfg.aksConfig = aksConfig
 		return clusterCfg, err
 	case apimgmtv3.ClusterDriverEKS:
-		eksConfig, err := BuildEKSUpstreamSpec(secretsCache, cluster)
+		eksConfig, err := BuildEKSUpstreamSpec(secretClient, cluster)
 		clusterCfg.eksConfig = eksConfig
 		return clusterCfg, err
 	case apimgmtv3.ClusterDriverGKE:
