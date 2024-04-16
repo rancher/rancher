@@ -101,6 +101,7 @@ func (h *fleetWorkspaceBindingHandler) reconcileResourceRulesBindings(grb *v3.Gl
 			err := h.rbClient.Delete(rb.Namespace, rb.Name, &metav1.DeleteOptions{})
 			if err != nil && !apierrors.IsNotFound(err) {
 				returnError = multierror.Append(returnError, err)
+				continue
 			}
 			_, err = h.rbClient.Create(desiredRB)
 			if err != nil {
@@ -129,7 +130,11 @@ func (h *fleetWorkspaceBindingHandler) reconcileWorkspaceVerbsBindings(grb *v3.G
 	}
 
 	if gr.InheritedFleetWorkspacePermissions.ResourceRules == nil {
-		return h.crbClient.Delete(crbName, &metav1.DeleteOptions{})
+		err := h.crbClient.Delete(crbName, &metav1.DeleteOptions{})
+		if err != nil && !apierrors.IsNotFound(err) {
+			return err
+		}
+		return nil
 	}
 	if !reflect.DeepEqual(crb.Subjects, desiredCRB.Subjects) ||
 		!reflect.DeepEqual(crb.RoleRef, desiredCRB.RoleRef) {
