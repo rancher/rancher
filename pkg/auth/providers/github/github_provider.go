@@ -233,11 +233,9 @@ func (g *ghProvider) RefetchGroupPrincipals(principalID string, secret string) (
 	var err error
 	var config *v32.GithubConfig
 
-	if config == nil {
-		config, err = g.getGithubConfigCR()
-		if err != nil {
-			return nil, err
-		}
+	config, err = g.getGithubConfigCR()
+	if err != nil {
+		return nil, err
 	}
 
 	orgAccts, err := g.githubClient.getOrgs(secret, config)
@@ -294,6 +292,19 @@ func (g *ghProvider) SearchPrincipals(searchKey, principalType string, token v3.
 		principals = append(principals, p)
 	}
 
+	if principalType == "" || principalType == "group" {
+		// Additionally see if there are any matching teams since GitHub user search API doesn't cover those.
+		teamAccts, err := g.githubClient.searchTeams(searchKey, accessToken, config)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, acct := range teamAccts {
+			p := g.toPrincipal(teamType, acct, &token)
+			principals = append(principals, p)
+		}
+	}
+
 	return principals, nil
 }
 
@@ -331,9 +342,7 @@ func (g *ghProvider) GetPrincipal(principalID string, token v3.Token) (v3.Princi
 	principalType := parts[1]
 	var acct Account
 	switch principalType {
-	case userType:
-		fallthrough
-	case orgType:
+	case userType, orgType:
 		acct, err = g.githubClient.getUserOrgByID(externalID, accessToken, config)
 		if err != nil {
 			return v3.Principal{}, err
@@ -344,7 +353,7 @@ func (g *ghProvider) GetPrincipal(principalID string, token v3.Token) (v3.Princi
 			return v3.Principal{}, err
 		}
 	default:
-		return v3.Principal{}, fmt.Errorf("Cannot get the github account due to invalid externalIDType %v", principalType)
+		return v3.Principal{}, fmt.Errorf("cannot get the github account due to invalid externalIDType %v", principalType)
 	}
 
 	princ := g.toPrincipal(principalType, acct, &token)
