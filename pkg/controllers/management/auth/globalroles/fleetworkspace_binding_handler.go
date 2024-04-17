@@ -30,6 +30,7 @@ var (
 type fleetWorkspaceBindingHandler struct {
 	crbClient rbacv1.ClusterRoleBindingController
 	crbCache  rbacv1.ClusterRoleBindingCache
+	crCache   rbacv1.ClusterRoleCache
 	grCache   mgmtcontroller.GlobalRoleCache
 	rbClient  rbacv1.RoleBindingController
 	rbCache   rbacv1.RoleBindingCache
@@ -44,6 +45,7 @@ func newFleetWorkspaceBindingHandler(management *config.ManagementContext) *flee
 		rbClient:  management.Wrangler.RBAC.RoleBinding(),
 		rbCache:   management.Wrangler.RBAC.RoleBinding().Cache(),
 		fwCache:   management.Wrangler.Mgmt.FleetWorkspace().Cache(),
+		crCache:   management.Wrangler.RBAC.ClusterRole().Cache(),
 	}
 }
 
@@ -84,6 +86,11 @@ func (h *fleetWorkspaceBindingHandler) reconcileResourceRulesBindings(grb *v3.Gl
 				continue
 			}
 			if gr.InheritedFleetWorkspacePermissions.ResourceRules != nil {
+				_, err = h.crCache.Get(desiredRB.RoleRef.Name)
+				if err != nil {
+					returnError = multierror.Append(returnError, fmt.Errorf("couldn't get ClusterRole: %w", err))
+					continue
+				}
 				_, err = h.rbClient.Create(desiredRB)
 				if err != nil {
 					returnError = multierror.Append(returnError, fmt.Errorf("couldn't create RoleBinding: %w", err))
@@ -127,6 +134,10 @@ func (h *fleetWorkspaceBindingHandler) reconcileWorkspaceVerbsBindings(grb *v3.G
 			return fmt.Errorf("couldn't get ClusterRoleBinding: %w", err)
 		}
 		if gr.InheritedFleetWorkspacePermissions.ResourceRules != nil {
+			_, err = h.crCache.Get(desiredCRB.RoleRef.Name)
+			if err != nil {
+				return fmt.Errorf("couldn't get ClusterRole: %w", err)
+			}
 			_, err = h.crbClient.Create(desiredCRB)
 			if err != nil {
 				return fmt.Errorf("couldn't create ClusterRoleBinding: %w", err)
