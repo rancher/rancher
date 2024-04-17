@@ -343,6 +343,16 @@ func TestReconcileFleetPermissions_errors(t *testing.T) {
 			},
 			wantErrs: []error{errReconcileWorkspaceVerbs, unexpectedErr},
 		},
+		"Error getting fleet workspaces": {
+			stateSetup: func(state testState) {
+				state.crCache.EXPECT().Get(wrangler.SafeConcatName(grName, fleetWorkspaceClusterRulesName)).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+				state.crClient.EXPECT().Create(mockResourceRulesClusterRole(gr, wrangler.SafeConcatName(gr.Name, fleetWorkspaceClusterRulesName)))
+				state.crCache.EXPECT().Get(wrangler.SafeConcatName(grName, fleetWorkspaceVerbsName)).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+				state.fwCache.EXPECT().List(labels.Everything()).Return(fleetWorkspaces, unexpectedErr)
+			},
+			globalRole: gr,
+			wantErrs:   []error{errReconcileWorkspaceVerbs, unexpectedErr},
+		},
 	}
 
 	for name, test := range tests {

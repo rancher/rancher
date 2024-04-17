@@ -58,10 +58,10 @@ func (h *fleetWorkspaceBindingHandler) reconcileFleetWorkspacePermissionsBinding
 	}
 	var returnErr error
 	if err = h.reconcileResourceRulesBindings(globalRoleBinding, globalRole); err != nil {
-		returnErr = multierror.Append(errReconcileResourceRulesBinding, err)
+		returnErr = multierror.Append(returnErr, errReconcileResourceRulesBinding, err)
 	}
 	if err = h.reconcileWorkspaceVerbsBindings(globalRoleBinding, globalRole); err != nil {
-		returnErr = multierror.Append(errReconcileWorkspaceVerbsBinding, err)
+		returnErr = multierror.Append(returnErr, errReconcileWorkspaceVerbsBinding, err)
 	}
 
 	return returnErr
