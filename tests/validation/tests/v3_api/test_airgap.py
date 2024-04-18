@@ -701,10 +701,10 @@ def create_nlb_and_add_targets(aws_nodes):
     # Upsert the route53 record -- if it exists, update, if not, insert
     AmazonWebServices().upsert_route_53_record_cname(
         RANCHER_AG_INTERNAL_HOSTNAME, internal_lb_dns)
-    if RANCHER_HA_CERT_OPTION == 'byo-valid':
-        AmazonWebServices().upsert_route_53_record_cname(
-            RANCHER_AG_HOSTNAME, public_dns)
-        public_dns = RANCHER_AG_HOSTNAME
+
+    AmazonWebServices().upsert_route_53_record_cname(
+        RANCHER_AG_HOSTNAME, public_dns)
+    public_dns = RANCHER_AG_HOSTNAME
 
     # Create the target groups
     tg80 = AmazonWebServices(). \
