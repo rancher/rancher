@@ -122,7 +122,7 @@ func (g *GClient) getTeams(githubAccessToken string, config *v32.GithubConfig) (
 
 // getOrgTeams returns the teams belonging to an organization.
 func (g *GClient) getOrgTeams(githubAccessToken string, config *v32.GithubConfig, org Account) ([]Account, error) {
-	url := fmt.Sprintf(g.getURL("ORG_TEAMS", config), org.Login)
+	url := fmt.Sprintf(g.getURL("ORG_TEAMS", config), url.PathEscape(org.Login))
 	responses, err := g.paginateGithub(githubAccessToken, url)
 	if err != nil {
 		logrus.Errorf("Github getGithubTeams: GET url %v received error from github, err: %v", url, err)
@@ -377,7 +377,6 @@ func (g *GClient) getFromGithub(githubAccessToken string, url string) ([]byte, s
 }
 
 func (g *GClient) getURL(endpoint string, config *v32.GithubConfig) string {
-
 	var hostName, apiEndpoint, toReturn string
 
 	if config.Hostname != "" {
