@@ -23,6 +23,11 @@ FROM final
 
 # Copy binaries and configuration files from builder to micro
 COPY --from=builder /chroot/ /
+COPY --from=builder \
+    /usr/bin/unshare \
+    /usr/bin/mount \
+    /usr/bin/umount \
+    /usr/bin/
 
 ARG ARCH=amd64
 ENV KUBECTL_VERSION v1.27.10
