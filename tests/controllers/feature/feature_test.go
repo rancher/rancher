@@ -12,7 +12,7 @@ import (
 	"github.com/rancher/wrangler/v2/pkg/crd"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 )
@@ -28,6 +28,10 @@ type FeatureTestSuite struct {
 const (
 	tick     = 1 * time.Second
 	duration = 10 * time.Second
+)
+
+var (
+	truePtr = &[]bool{true}[0]
 )
 
 func (s *FeatureTestSuite) SetupSuite() {
@@ -86,32 +90,33 @@ func (s *FeatureTestSuite) SetupSuite() {
 
 	// The feature controller checks the harvester NodeDriver, so it needs to exist
 	n, err := s.wranglerContext.Mgmt.NodeDriver().Create(&v3.NodeDriver{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "harvester",
 		},
 	})
 	assert.NoError(s.T(), err)
 	assert.NotNil(s.T(), n)
 
-	// Initialize Features
+	// Initialize Features - this creates all feature resources used by rancher
 	features.InitializeFeatures(s.wranglerContext.Mgmt.Feature(), "")
 }
 
 func (s *FeatureTestSuite) TestHarvesterFeature() {
+	t := assert.New(s.T())
 	// If the harvester feature is enabled, it needs to enable the NodeDriver as well
-	n, err := s.wranglerContext.Mgmt.NodeDriver().Get("harvester", v1.GetOptions{})
-	assert.NoError(s.T(), err)
-	assert.NotNil(s.T(), n)
+	n, err := s.wranglerContext.Mgmt.NodeDriver().Get("harvester", metav1.GetOptions{})
+	t.NoError(err)
+	t.NotNil(n)
 
 	nCopy := n.DeepCopy()
 	nCopy.Spec.Active = false
 	_, err = s.wranglerContext.Mgmt.NodeDriver().Update(nCopy)
-	assert.NoError(s.T(), err)
+	t.NoError(err)
 
-	s.triggerSync("harvester")
+	s.triggerFeatureSync("harvester")
 
-	assert.EventuallyWithT(s.T(), func(c *assert.CollectT) {
-		nd, err := s.wranglerContext.Mgmt.NodeDriver().Get("harvester", v1.GetOptions{})
+	t.EventuallyWithT(func(c *assert.CollectT) {
+		nd, err := s.wranglerContext.Mgmt.NodeDriver().Get("harvester", metav1.GetOptions{})
 		assert.NoError(c, err)
 		assert.True(c, nd.Spec.Active)
 	}, duration, tick, "harvester feature has not been enabled")
@@ -119,54 +124,49 @@ func (s *FeatureTestSuite) TestHarvesterFeature() {
 }
 
 func (s *FeatureTestSuite) TestHarvesterBaremetalFeature() {
+	t := assert.New(s.T())
 	// Set harvester baremetal feature to true
 	features.GetFeatureByName("harvester-baremetal-container-workload").Set(true)
 
 	// Harvester feature should get set if baremetal feature is enabled
-	h, err := s.wranglerContext.Mgmt.Feature().Get("harvester", v1.GetOptions{})
-	assert.NoError(s.T(), err)
-	assert.NotNil(s.T(), h)
+	h, err := s.wranglerContext.Mgmt.Feature().Get("harvester", metav1.GetOptions{})
+	t.NoError(err)
+	t.NotNil(h)
 
 	hCopy := h.DeepCopy()
 	h.Spec.Value = nil
 	_, err = s.wranglerContext.Mgmt.Feature().Update(hCopy)
-	assert.NoError(s.T(), err)
+	t.NoError(err)
 
 	// Baremetal feature gets annotation added if it's not there
-	hf, err := s.wranglerContext.Mgmt.Feature().Get("harvester-baremetal-container-workload", v1.GetOptions{})
-	assert.NoError(s.T(), err)
-	assert.NotNil(s.T(), hf)
+	hf, err := s.wranglerContext.Mgmt.Feature().Get("harvester-baremetal-container-workload", metav1.GetOptions{})
+	t.NoError(err)
+	t.NotNil(hf)
 
 	harvesterFeature := hf.DeepCopy()
 	harvesterFeature.Annotations = nil
 	_, err = s.wranglerContext.Mgmt.Feature().Update(harvesterFeature)
-	assert.NoError(s.T(), err)
+	t.NoError(err)
 
 	// Check that feature.cattle.io/experimental gets set to true by the controller
-	assert.EventuallyWithT(s.T(), func(c *assert.CollectT) {
-		f, err := s.wranglerContext.Mgmt.Feature().Get("harvester-baremetal-container-workload", v1.GetOptions{})
+	t.EventuallyWithT(func(c *assert.CollectT) {
+		f, err := s.wranglerContext.Mgmt.Feature().Get("harvester-baremetal-container-workload", metav1.GetOptions{})
 		assert.NoError(c, err)
 		assert.Equal(c, v3.ExperimentalFeatureValue, f.Annotations[v3.ExperimentalFeatureKey])
 	}, duration, tick, "annotation feature.cattle.io/experimental has not changed to true")
 
-	// Check that harvester feature gets set
-	assert.EventuallyWithT(s.T(), func(c *assert.CollectT) {
-		nd, err := s.wranglerContext.Mgmt.Feature().Get("harvester", v1.GetOptions{})
+	// Check that harvester feature gets set to true
+	t.EventuallyWithT(func(c *assert.CollectT) {
+		nd, err := s.wranglerContext.Mgmt.Feature().Get("harvester", metav1.GetOptions{})
 		assert.NoError(c, err)
-		assert.NotNil(c, nd.Spec.Value)
+		assert.Equal(c, truePtr, nd.Spec.Value)
 	}, duration, tick, "harvester feature has not been enabled")
-
-	// Once set, confirm that the harvester feature is enabled
-	nd, err := s.wranglerContext.Mgmt.Feature().Get("harvester", v1.GetOptions{})
-	assert.NoError(s.T(), err)
-	assert.True(s.T(), *nd.Spec.Value)
-
 }
 
 // triggerSync updates an annotation on the feature triggering a sync to occur
 // useful when testing that a non-feature setting gets modified
-func (s *FeatureTestSuite) triggerSync(name string) {
-	h, _ := s.wranglerContext.Mgmt.Feature().Get(name, v1.GetOptions{})
+func (s *FeatureTestSuite) triggerFeatureSync(name string) {
+	h, _ := s.wranglerContext.Mgmt.Feature().Get(name, metav1.GetOptions{})
 	hCopy := h.DeepCopy()
 	if hCopy.Annotations == nil {
 		hCopy.Annotations = map[string]string{"test": "test"}
