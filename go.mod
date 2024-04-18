@@ -133,7 +133,7 @@ require (
 	github.com/rancher/norman v0.0.0-20240207153100-3bb70b772b52
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/remotedialer v0.3.0
-	github.com/rancher/rke v1.5.3
+	github.com/rancher/rke v1.6.0-rc1
 	github.com/rancher/steve v0.0.0-20240314145706-870824dc8f49
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007
 	github.com/rancher/wrangler/v2 v2.1.4
@@ -167,7 +167,7 @@ require (
 	k8s.io/helm v2.16.9+incompatible
 	k8s.io/kube-aggregator v0.28.6
 	k8s.io/kubectl v0.28.6
-	k8s.io/kubernetes v1.27.9
+	k8s.io/kubernetes v1.28.6
 	k8s.io/utils v0.0.0-20240102154912-e7106e64919e
 	oras.land/oras-go/v2 v2.4.0
 	sigs.k8s.io/aws-iam-authenticator v0.6.17
@@ -265,7 +265,7 @@ require (
 	k8s.io/controller-manager v0.28.6 // indirect
 	k8s.io/kms v0.28.6 // indirect
 	k8s.io/kubelet v0.27.9 // indirect
-	k8s.io/pod-security-admission v0.27.6 // indirect
+	k8s.io/pod-security-admission v0.28.6 // indirect
 )
 
 require (

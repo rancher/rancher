@@ -39,7 +39,7 @@ ARG CHART_DEFAULT_BRANCH=dev-v2.9
 ARG PARTNER_CHART_DEFAULT_BRANCH=main
 ARG RKE2_CHART_DEFAULT_BRANCH=main
 # kontainer-driver-metadata branch to be set for specific branch other than dev/master, logic at rancher/rancher/pkg/settings/setting.go
-ARG CATTLE_KDM_BRANCH=dev-v2.8
+ARG CATTLE_KDM_BRANCH=dev-v2.9
 
 ENV CATTLE_SYSTEM_CHART_DEFAULT_BRANCH=$SYSTEM_CHART_DEFAULT_BRANCH
 ENV CATTLE_CHART_DEFAULT_BRANCH=$CHART_DEFAULT_BRANCH
@@ -204,7 +204,7 @@ RUN curl -sLf ${!TINI_URL} > /usr/bin/tini && \
 
 ENV CATTLE_UI_VERSION 2.9.0-alpha2
 ENV CATTLE_DASHBOARD_UI_VERSION v2.9.0-alpha1
-ENV CATTLE_CLI_VERSION v2.8.0
+ENV CATTLE_CLI_VERSION v2.9.0-rc1
 
 # Base UI brand used as a fallback env setting (not user facing) to indicate this is a non-prime install
 ENV CATTLE_BASE_UI_BRAND=

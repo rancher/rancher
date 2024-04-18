@@ -5,11 +5,11 @@ source $(dirname $0)/../../../../scripts/export-config
 
 ARCH=${ARCH:-"amd64"}
 REPO=ranchertest
-TAG=v2.7-head
+TAG=v2.9-head
 SYSTEM_CHART_REPO_DIR=build/system-charts
-SYSTEM_CHART_DEFAULT_BRANCH=${SYSTEM_CHART_DEFAULT_BRANCH:-"dev-v2.8"}
+SYSTEM_CHART_DEFAULT_BRANCH=${SYSTEM_CHART_DEFAULT_BRANCH:-"dev-v2.9"}
 CHART_REPO_DIR=build/charts
-CHART_DEFAULT_BRANCH=${CHART_DEFAULT_BRANCH:-"dev-v2.8"}
+CHART_DEFAULT_BRANCH=${CHART_DEFAULT_BRANCH:-"dev-v2.9"}
 
 cd $(dirname $0)/../package
 

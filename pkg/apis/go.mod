@@ -33,7 +33,7 @@ require (
 	github.com/rancher/fleet/pkg/apis v0.0.0-20231017140638-93432f288e79
 	github.com/rancher/gke-operator v1.3.0-rc6
 	github.com/rancher/norman v0.0.0-20240207153100-3bb70b772b52
-	github.com/rancher/rke v1.5.3
+	github.com/rancher/rke v1.6.0-rc1
 	github.com/rancher/wrangler/v2 v2.1.4
 	github.com/sirupsen/logrus v1.9.3
 	k8s.io/api v0.28.8
@@ -96,7 +96,7 @@ require (
 	k8s.io/component-base v0.28.8 // indirect
 	k8s.io/klog/v2 v2.100.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20230717233707-2695361300d9 // indirect
-	k8s.io/kubernetes v1.27.9 // indirect
+	k8s.io/kubernetes v1.28.6 // indirect
 	k8s.io/utils v0.0.0-20230505201702-9f6742963106 // indirect
 	sigs.k8s.io/cli-utils v0.28.0 // indirect
 	sigs.k8s.io/controller-runtime v0.15.3 // indirect
