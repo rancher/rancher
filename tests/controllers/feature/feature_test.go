@@ -163,7 +163,7 @@ func (s *FeatureTestSuite) TestHarvesterBaremetalFeature() {
 	}, duration, tick, "harvester feature has not been enabled")
 }
 
-// triggerSync updates an annotation on the feature triggering a sync to occur
+// triggerFeatureSync updates an annotation on the feature triggering a sync to occur
 // useful when testing that a non-feature setting gets modified
 func (s *FeatureTestSuite) triggerFeatureSync(name string) {
 	h, _ := s.wranglerContext.Mgmt.Feature().Get(name, metav1.GetOptions{})
