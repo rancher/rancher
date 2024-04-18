@@ -36,7 +36,7 @@ func (g *GClient) getAccessToken(code string, config *v32.GithubConfig) (string,
 
 	b, err := g.postToGithub(url, form)
 	if err != nil {
-		return "", fmt.Errorf("github getAccessToken: GET url %v received error from github, err: %v", url, err)
+		return "", fmt.Errorf("github getAccessToken: POST url %v received error from github, err: %v", url, err)
 	}
 
 	// Decode the response
