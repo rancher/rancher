@@ -4,6 +4,7 @@ const (
 	CronJobSpecType                               = "cronJobSpec"
 	CronJobSpecFieldActiveDeadlineSeconds         = "activeDeadlineSeconds"
 	CronJobSpecFieldAutomountServiceAccountToken  = "automountServiceAccountToken"
+	CronJobSpecFieldBackoffLimitPerIndex          = "backoffLimitPerIndex"
 	CronJobSpecFieldCompletionMode                = "completionMode"
 	CronJobSpecFieldContainers                    = "containers"
 	CronJobSpecFieldCronJobConfig                 = "cronJobConfig"
@@ -21,11 +22,13 @@ const (
 	CronJobSpecFieldHostUsers                     = "hostUsers"
 	CronJobSpecFieldHostname                      = "hostname"
 	CronJobSpecFieldImagePullSecrets              = "imagePullSecrets"
+	CronJobSpecFieldMaxFailedIndexes              = "maxFailedIndexes"
 	CronJobSpecFieldNodeID                        = "nodeId"
 	CronJobSpecFieldOS                            = "os"
 	CronJobSpecFieldObjectMeta                    = "metadata"
 	CronJobSpecFieldOverhead                      = "overhead"
 	CronJobSpecFieldPodFailurePolicy              = "podFailurePolicy"
+	CronJobSpecFieldPodReplacementPolicy          = "podReplacementPolicy"
 	CronJobSpecFieldPreemptionPolicy              = "preemptionPolicy"
 	CronJobSpecFieldReadinessGates                = "readinessGates"
 	CronJobSpecFieldResourceClaims                = "resourceClaims"
@@ -54,6 +57,7 @@ const (
 type CronJobSpec struct {
 	ActiveDeadlineSeconds         *int64                         `json:"activeDeadlineSeconds,omitempty" yaml:"activeDeadlineSeconds,omitempty"`
 	AutomountServiceAccountToken  *bool                          `json:"automountServiceAccountToken,omitempty" yaml:"automountServiceAccountToken,omitempty"`
+	BackoffLimitPerIndex          *int64                         `json:"backoffLimitPerIndex,omitempty" yaml:"backoffLimitPerIndex,omitempty"`
 	CompletionMode                string                         `json:"completionMode,omitempty" yaml:"completionMode,omitempty"`
 	Containers                    []Container                    `json:"containers,omitempty" yaml:"containers,omitempty"`
 	CronJobConfig                 *CronJobConfig                 `json:"cronJobConfig,omitempty" yaml:"cronJobConfig,omitempty"`
@@ -71,11 +75,13 @@ type CronJobSpec struct {
 	HostUsers                     *bool                          `json:"hostUsers,omitempty" yaml:"hostUsers,omitempty"`
 	Hostname                      string                         `json:"hostname,omitempty" yaml:"hostname,omitempty"`
 	ImagePullSecrets              []LocalObjectReference         `json:"imagePullSecrets,omitempty" yaml:"imagePullSecrets,omitempty"`
+	MaxFailedIndexes              *int64                         `json:"maxFailedIndexes,omitempty" yaml:"maxFailedIndexes,omitempty"`
 	NodeID                        string                         `json:"nodeId,omitempty" yaml:"nodeId,omitempty"`
 	OS                            *PodOS                         `json:"os,omitempty" yaml:"os,omitempty"`
 	ObjectMeta                    *ObjectMeta                    `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 	Overhead                      map[string]string              `json:"overhead,omitempty" yaml:"overhead,omitempty"`
 	PodFailurePolicy              *PodFailurePolicy              `json:"podFailurePolicy,omitempty" yaml:"podFailurePolicy,omitempty"`
+	PodReplacementPolicy          string                         `json:"podReplacementPolicy,omitempty" yaml:"podReplacementPolicy,omitempty"`
 	PreemptionPolicy              string                         `json:"preemptionPolicy,omitempty" yaml:"preemptionPolicy,omitempty"`
 	ReadinessGates                []PodReadinessGate             `json:"readinessGates,omitempty" yaml:"readinessGates,omitempty"`
 	ResourceClaims                []PodResourceClaim             `json:"resourceClaims,omitempty" yaml:"resourceClaims,omitempty"`
