@@ -8,6 +8,8 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/object"
@@ -49,6 +51,35 @@ func processSoapFinder(ctx context.Context, fieldName string, cc *v1.Secret, dc 
 	}
 
 	return data, err
+}
+
+func processSoapFinderExtended(ctx context.Context, fieldName string, cc *v1.Secret, dc string) ([]map[string]interface{}, error) {
+	finder, err := getSoapFinder(ctx, cc, dc)
+	if err != nil {
+		return nil, errors.Wrap(err, "error getting soap finder")
+	}
+	var data []map[string]interface{}
+	switch fieldName {
+	case "networks-extended":
+		data, err = listNetworksExtended(ctx, finder)
+	}
+	return data, err
+}
+
+func listNetworksExtended(ctx context.Context, finder *find.Finder) ([]map[string]interface{}, error) {
+	networks, err := finder.NetworkList(ctx, "*")
+	if err != nil {
+		return nil, errors.Wrap(err, "error listing networks")
+	}
+
+	data := make([]map[string]interface{}, len(networks))
+	for i, net := range networks {
+		data[i] = map[string]interface{}{
+			"name": net.GetInventoryPath(),
+			"moid": net.Reference().String(),
+		}
+	}
+	return data, nil
 }
 
 func processTagsManager(ctx context.Context, fieldName string, cc *v1.Secret, cat string) ([]map[string]string, error) {
@@ -295,7 +326,7 @@ func listHosts(ctx context.Context, finder *find.Finder) ([]string, error) {
 		return nil, err
 	}
 
-	data := []string{""} //blank default
+	data := []string{""} // blank default
 
 	for _, h := range hosts {
 		data = append(data, h.InventoryPath)
@@ -313,6 +344,10 @@ func listNetworks(ctx context.Context, finder *find.Finder) ([]string, error) {
 	var data []string
 	for _, net := range networks {
 		data = append(data, net.GetInventoryPath())
+		// For testing
+		logrus.Info("==== listNetworks ====")
+		logrus.Infof("InventoryPath: %s", net.GetInventoryPath())
+		logrus.Infof("MOID: %s", net.Reference().String())
 	}
 
 	return data, nil
