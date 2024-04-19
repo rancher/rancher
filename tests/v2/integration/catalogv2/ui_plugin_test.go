@@ -176,7 +176,7 @@ func (w *UIPluginTest) TestGetSingleExtensionUnauthenticated() {
 	client := &http.Client{Transport: &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}}
-	res, _ := client.Get("https://localhost:8443/v1/uiplugins/uk-locale/0.1.0/plugin/uk-locale-0.1.0.umd.min.js")
+	res, _ := client.Get("https://localhost:8443/v1/uiplugins/uk-locale/0.1.1/plugin/uk-locale-0.1.1.umd.min.js")
 
 	w.Require().Equal(res.StatusCode, http.StatusOK)
 }
