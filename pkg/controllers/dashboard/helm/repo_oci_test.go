@@ -6,10 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/golang/mock/gomock"
 	catalog "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	"github.com/rancher/wrangler/v2/pkg/generic/fake"
+	"github.com/rancher/wrangler/v2/pkg/genericcondition"
 	"github.com/stretchr/testify/assert"
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/repo"
@@ -243,6 +245,126 @@ func TestGetIndexFile(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 			}
+		})
+	}
+}
+
+func TestGetRetryPolicy(t *testing.T) {
+	testCases := []struct {
+		name                string
+		backOffValues       *catalog.ExponentialBackOffValues
+		expectedRetryPolicy retryPolicy
+	}{
+		{
+			name:          "Should return default values if values are not present",
+			backOffValues: nil,
+			expectedRetryPolicy: retryPolicy{
+				MinWait:  1 * time.Second,
+				MaxWait:  5 * time.Second,
+				MaxRetry: 5,
+			},
+		},
+		{
+			name: "Should get max retries values from clusterRepo",
+			backOffValues: &catalog.ExponentialBackOffValues{
+				MaxRetries: 10,
+			},
+			expectedRetryPolicy: retryPolicy{
+				MinWait:  1 * time.Second,
+				MaxWait:  5 * time.Second,
+				MaxRetry: 10,
+			},
+		},
+		{
+			name: "Should get max wait from clusterRepo",
+			backOffValues: &catalog.ExponentialBackOffValues{
+				MaxWait: &metav1.Duration{Duration: 1 * time.Hour},
+			},
+			expectedRetryPolicy: retryPolicy{
+				MinWait:  1 * time.Second,
+				MaxWait:  1 * time.Hour,
+				MaxRetry: 5,
+			},
+		},
+		{
+			name: "Should get min wait from clusterRepo",
+			backOffValues: &catalog.ExponentialBackOffValues{
+				MinWait: &metav1.Duration{Duration: 1 * time.Minute},
+			},
+			expectedRetryPolicy: retryPolicy{
+				MinWait:  1 * 1 * time.Minute,
+				MaxWait:  5 * time.Second,
+				MaxRetry: 5,
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			clusterRepo := &catalog.ClusterRepo{
+				Spec: catalog.RepoSpec{
+					ExponentialBackOffValues: testCase.backOffValues,
+				},
+			}
+			assert.Equal(t, testCase.expectedRetryPolicy, getRetryPolicy(clusterRepo))
+		})
+	}
+}
+
+func TestShouldResetRetries(t *testing.T) {
+	interval = 1 * time.Hour
+	testCases := []struct {
+		name              string
+		ociDownloadedTime time.Time
+		lastStatusUpdate  *metav1.Time
+		forceUpdate       *metav1.Time
+		timeNow           func() time.Time
+		expected          bool
+	}{
+		{
+			name:              "Should reset retries if interval has passed and status was not updated after the interval",
+			ociDownloadedTime: time.Date(2024, 04, 23, 9, 0, 0, 0, time.UTC),
+			lastStatusUpdate:  &metav1.Time{Time: time.Date(2024, 04, 23, 9, 0, 0, 0, time.UTC)},
+			forceUpdate:       nil,
+			timeNow: func() time.Time {
+				return time.Date(2024, 04, 23, 10, 1, 0, 0, time.UTC)
+			},
+			expected: true,
+		},
+		{
+			name:              "Should NOT reset retries if interval has passed but status was updated after the interval",
+			ociDownloadedTime: time.Date(2024, 04, 23, 10, 0, 0, 0, time.UTC),
+			lastStatusUpdate:  &metav1.Time{Time: time.Date(2024, 04, 23, 11, 1, 0, 0, time.UTC)},
+			forceUpdate:       nil,
+			timeNow: func() time.Time {
+				return time.Date(2024, 04, 23, 10, 1, 0, 0, time.UTC)
+			},
+			expected: false,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			timeNow = testCase.timeNow
+			clusterRepo := &catalog.ClusterRepo{
+				ObjectMeta: metav1.ObjectMeta{ManagedFields: []metav1.ManagedFieldsEntry{
+					{
+						Subresource: "status",
+						Operation:   metav1.ManagedFieldsOperationUpdate,
+						Time:        testCase.lastStatusUpdate,
+					},
+				}},
+				Spec: catalog.RepoSpec{
+					ForceUpdate: testCase.forceUpdate,
+				},
+				Status: catalog.RepoStatus{Conditions: []genericcondition.GenericCondition{
+					{
+						Type:           string(catalog.OCIDownloaded),
+						LastUpdateTime: testCase.ociDownloadedTime.Format(time.RFC3339),
+					},
+				}},
+			}
+			assert.Equal(t, testCase.expected, shouldResetRetries(clusterRepo))
 		})
 	}
 }

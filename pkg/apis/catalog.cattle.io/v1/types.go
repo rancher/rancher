@@ -111,6 +111,9 @@ type RepoStatus struct {
 	Commit string `json:"commit,omitempty"`
 
 	Conditions []genericcondition.GenericCondition `json:"conditions,omitempty"`
+
+	NumberOfRetries int         `json:"numberOfRetries,omitempty"`
+	NextRetryAt     metav1.Time `json:"nextRetryAt,omitempty"`
 }
 
 // +genclient

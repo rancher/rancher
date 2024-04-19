@@ -213,7 +213,7 @@ func Start429Registry(t assert.TestingT) (*url.URL, error) {
 	manifestCount := 1
 	timerStart := false
 
-	// Create a OCI Registry Server
+	// Create an OCI Registry Server
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 		switch r.URL.Path {
@@ -382,7 +382,7 @@ func (c *ClusterRepoTestSuite) TestOCIRepo2() {
 	})
 }
 
-// TestOCIRepo3 tests 4xx response codes recieved from the registry
+// TestOCIRepo3 tests 4xx response codes received from the registry
 func (c *ClusterRepoTestSuite) TestOCIRepo3() {
 	statusCodes := [3]int{404, 401, 403}
 	for _, statusCode := range statusCodes {
@@ -438,6 +438,7 @@ func (c *ClusterRepoTestSuite) test429Error(params ClusterRepoParams) {
 		return false, nil
 	})
 	assert.NoError(c.T(), err)
+	assert.Equal(c.T(), clusterRepo.Status.NumberOfRetries, expoValues.MaxRetries+1, "Number of retries should be max+1")
 
 	configMap, err := c.corev1.ConfigMaps(helm.GetConfigMapNamespace(clusterRepo.Namespace)).Get(context.TODO(), helm.GenerateConfigMapName(clusterRepo.Name, 0, clusterRepo.UID), metav1.GetOptions{})
 	assert.NoError(c.T(), err)
@@ -480,6 +481,7 @@ func (c *ClusterRepoTestSuite) test429Error(params ClusterRepoParams) {
 
 	clusterRepo, err = c.catalogClient.ClusterRepos().Get(context.TODO(), params.Name, metav1.GetOptions{})
 	assert.NoError(c.T(), err)
+	assert.Equal(c.T(), clusterRepo.Status.NumberOfRetries, 0, "Number of retries should be 0 since there were no 429s")
 	configMap, err = c.corev1.ConfigMaps(clusterRepo.Status.IndexConfigMapNamespace).Get(context.TODO(), clusterRepo.Status.IndexConfigMapName, metav1.GetOptions{})
 	assert.NoError(c.T(), err)
 
@@ -540,7 +542,7 @@ func (c *ClusterRepoTestSuite) test4xxErrors(params ClusterRepoParams) {
 	assert.Error(c.T(), err)
 }
 
-// TestOCI tests creating a OCI clusterrepo and install a chart
+// TestOCI tests creating an OCI clusterrepo and install a chart
 func (c *ClusterRepoTestSuite) TestOCIRepoChartInstallation() {
 	//start registry
 	u, err := StartRegistry()
