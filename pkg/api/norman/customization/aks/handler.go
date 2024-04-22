@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/cloud"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/gorilla/mux"
 	"github.com/rancher/aks-operator/pkg/aks"
@@ -183,7 +184,7 @@ func (h *handler) checkCredentials(req *http.Request) (int, error) {
 	if cred.Environment != "" {
 		clientEnvironment = cred.Environment
 	}
-	azureEnvironment := GetEnvironment(clientEnvironment)
+	_, azureEnvironment := GetEnvironment(clientEnvironment)
 
 	cred.BaseURL = azureEnvironment.ResourceManagerEndpoint
 	cred.AuthBaseURL = azureEnvironment.ActiveDirectoryEndpoint
@@ -202,7 +203,7 @@ func (h *handler) checkCredentials(req *http.Request) (int, error) {
 		logrus.Errorf("[AKS] failed to create new subscription client: %v", err)
 		return http.StatusUnauthorized, fmt.Errorf("invalid credentials: %w", err)
 	}
-	_, err = client.Get(ctx, cred.SubscriptionID)
+	_, err = client.Get(ctx, cred.SubscriptionID, nil)
 	if err != nil {
 		logrus.Errorf("[AKS] failed to get subscription details: %v", err)
 		return http.StatusUnauthorized, fmt.Errorf("invalid credentials: %w", err)
@@ -254,7 +255,7 @@ func (h *handler) getCloudCredential(req *http.Request, cap *Capabilities, credI
 	if cap.Environment != "" {
 		clientEnvironment = cap.Environment
 	}
-	azureEnvironment := GetEnvironment(clientEnvironment)
+	_, azureEnvironment := GetEnvironment(clientEnvironment)
 
 	if cap.TenantID == "" {
 		cap.TenantID, err = aks.GetCachedTenantID(h.secretClient, cap.SubscriptionID, cc)
@@ -341,7 +342,7 @@ func (h *handler) getCredentialsFromBody(req *http.Request, cap *Capabilities) (
 	if cap.Environment != "" {
 		clientEnvironment = cap.Environment
 	}
-	azureEnvironment := GetEnvironment(clientEnvironment)
+	_, azureEnvironment := GetEnvironment(clientEnvironment)
 
 	if cap.BaseURL == "" {
 		cap.BaseURL = azureEnvironment.ResourceManagerEndpoint
@@ -375,15 +376,13 @@ func handleErr(writer http.ResponseWriter, errorCode int, originalErr error) {
 	writer.Write(payloadJSON)
 }
 
-func GetEnvironment(env string) azure.Environment {
+func GetEnvironment(env string) (cloud.Configuration, azure.Environment) {
 	switch env {
-	case "AzureGermanCloud":
-		return azure.GermanCloud
 	case "AzureChinaCloud":
-		return azure.ChinaCloud
+		return cloud.AzureChina, azure.ChinaCloud
 	case "AzureUSGovernmentCloud":
-		return azure.USGovernmentCloud
+		return cloud.AzureGovernment, azure.USGovernmentCloud
 	default:
-		return azure.PublicCloud
+		return cloud.AzurePublic, azure.PublicCloud
 	}
 }
