@@ -89,7 +89,6 @@ func (r *ImportProvisioningTestSuite) TestProvisioningImportK3SCluster() {
 		require.Nil(r.T(), err, "error setting remote repo")
 	}
 
-	newPackages := []string{}
 	if len(corralPackage.CorralPackageImages) == 0 {
 		r.T().Error("No Corral Packages to Test")
 	}
@@ -101,17 +100,17 @@ func (r *ImportProvisioningTestSuite) TestProvisioningImportK3SCluster() {
 
 	for packageName, packageImage := range corralPackage.CorralPackageImages {
 		newPackageName := namegen.AppendRandomString(packageName)
+
 		if packageName == k3sImportPackageName {
 			importPackageName = newPackageName
+
+			corralRun, err := corral.CreateCorral(r.session, newPackageName, packageImage, corralPackage.HasDebug, corralPackage.HasDebug)
+			require.NoError(r.T(), err, "error creating corral %v", packageName)
+
+			r.T().Logf("Corral %v created successfully", packageName)
+			require.NotNil(r.T(), corralRun, "corral run had no restConfig")
 		}
 
-		newPackages = append(newPackages, newPackageName)
-
-		corralRun, err := corral.CreateCorral(r.session, newPackageName, packageImage, corralPackage.HasDebug, corralPackage.HasDebug)
-		require.NoError(r.T(), err, "error creating corral %v", packageName)
-
-		r.T().Logf("Corral %v created successfully", packageName)
-		require.NotNil(r.T(), corralRun, "corral run had no restConfig")
 	}
 
 	importCluster := apiv1.Cluster{
@@ -121,7 +120,22 @@ func (r *ImportProvisioningTestSuite) TestProvisioningImportK3SCluster() {
 		},
 	}
 
-	decodedKubeConfig, err := corral.GetKubeConfig(importPackageName)
+	backoff := wait.Backoff{
+		Duration: 5 * time.Second,
+		Factor:   1.1,
+		Jitter:   0.1,
+		Steps:    40,
+	}
+
+	decodedKubeConfig := []byte{}
+	err := wait.ExponentialBackoff(backoff, func() (finished bool, err error) {
+		decodedKubeConfig, err = corral.GetKubeConfig(importPackageName)
+		if err != nil {
+			return false, nil
+		}
+		return true, nil
+	})
+
 	require.NoError(r.T(), err)
 
 	config, err := clientcmd.RESTConfigFromKubeConfig(decodedKubeConfig)
@@ -129,13 +143,6 @@ func (r *ImportProvisioningTestSuite) TestProvisioningImportK3SCluster() {
 
 	_, err = clusters.CreateK3SRKE2Cluster(r.client, &importCluster)
 	require.NoError(r.T(), err)
-
-	backoff := wait.Backoff{
-		Duration: 5 * time.Second,
-		Factor:   1.1,
-		Jitter:   0.1,
-		Steps:    10,
-	}
 
 	updatedCluster := new(apiv1.Cluster)
 
