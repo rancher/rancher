@@ -29,7 +29,7 @@ ENV CATTLE_PARTNER_CHART_DEFAULT_BRANCH=$PARTNER_CHART_DEFAULT_BRANCH
 ENV CATTLE_RKE2_CHART_DEFAULT_BRANCH=$RKE2_CHART_DEFAULT_BRANCH
 ENV CATTLE_HELM_VERSION v2.16.8-rancher2
 # make sure the version number is consistent with the one at the 1) tests/v2/codecoverage/package/Dockerfile, 2) Dockerfile.dapper, 3) go.mod and 4) the setting MachineProvisionImage in pkg/settings/setting.go
-ENV CATTLE_MACHINE_VERSION v0.15.0-rancher111
+ENV CATTLE_MACHINE_VERSION v0.15.0-rancher112
 ENV CATTLE_K3S_VERSION v1.28.6+k3s2
 ENV CATTLE_MACHINE_PROVISION_IMAGE rancher/machine:${CATTLE_MACHINE_VERSION}
 ENV CATTLE_ETCD_VERSION v3.5.9
