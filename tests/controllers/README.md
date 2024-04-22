@@ -15,7 +15,7 @@ go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
 ## Running Integration Tests
 
 ### Makefile
-All tests can be run with `make test`. That runs the bash script [`run_controller_tests.sh`](./run_controller_tests.sh).
+All tests can be run with `make controller-test`. That runs the bash script [`run_controller_tests.sh`](./run_controller_tests.sh).
 
 ### Manually
 
