@@ -43,9 +43,12 @@ func (c *UserAttributeController) sync(key string, attribs *v3.UserAttribute) (r
 		return nil, nil
 	}
 
+	// Preserve the name as attribs can be set to nil by the following calls.
+	name := attribs.Name
+
 	err := c.ensureUserRetentionLabels(attribs)
 	if err != nil {
-		return nil, fmt.Errorf("error setting user retention labels for user %s: %w", attribs.Name, err)
+		return nil, fmt.Errorf("error setting user retention labels for user %s: %w", name, err)
 	}
 
 	if !attribs.NeedsRefresh {
@@ -63,9 +66,9 @@ func (c *UserAttributeController) sync(key string, attribs *v3.UserAttribute) (r
 	// We want to move away from this pattern of triggering a refresh by using a field (NeedsRefresh)
 	// on the resource object itself, which is inherently racey.
 	// Instead we plan to have a dedicated CRD for triggering refreshes.
-	attribs, err = c.userAttributes.Get(attribs.Name, metav1.GetOptions{})
+	attribs, err = c.userAttributes.Get(name, metav1.GetOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("error getting user attribute %s before provider refresh: %w", attribs.Name, err)
+		return nil, fmt.Errorf("error getting user attribute %s before provider refresh: %w", name, err)
 	}
 	if !attribs.NeedsRefresh {
 		return attribs, nil
@@ -73,7 +76,7 @@ func (c *UserAttributeController) sync(key string, attribs *v3.UserAttribute) (r
 
 	attribs, err = c.providerRefresh(attribs)
 	if err != nil {
-		return nil, fmt.Errorf("error refreshing user attribute %s: %w", attribs.Name, err)
+		return nil, fmt.Errorf("error refreshing user attribute %s: %w", name, err)
 	}
 
 	updated, err := c.userAttributes.Update(attribs)
@@ -81,14 +84,14 @@ func (c *UserAttributeController) sync(key string, attribs *v3.UserAttribute) (r
 		return updated, nil
 	}
 
-	err = fmt.Errorf("error updating user attribute %s after provider refresh: %w", attribs.Name, err)
+	err = fmt.Errorf("error updating user attribute %s after provider refresh: %w", name, err)
 	if !apierrors.IsConflict(err) {
 		return nil, err
 	}
 
-	newAttribs, nerr := c.userAttributes.Get(attribs.Name, metav1.GetOptions{})
+	newAttribs, nerr := c.userAttributes.Get(name, metav1.GetOptions{})
 	if nerr != nil {
-		logrus.Errorf("error getting new version of user attribute %s: %v", attribs.Name, nerr)
+		logrus.Errorf("error getting new version of user attribute %s: %v", name, nerr)
 		return nil, err // Deliberately return the original error.
 	}
 
@@ -99,7 +102,7 @@ func (c *UserAttributeController) sync(key string, attribs *v3.UserAttribute) (r
 
 	updated, nerr = c.userAttributes.Update(newAttribs)
 	if nerr != nil {
-		logrus.Errorf("error updating new version of user attribute %s: %v", attribs.Name, nerr)
+		logrus.Errorf("error updating new version of user attribute %s: %v", name, nerr)
 		return nil, err // Deliberately return the original error.
 	}
 
