@@ -417,7 +417,7 @@ func (ap *Provider) updateToken(client clients.AzureClient, token *v3.Token) err
 
 	current, err := client.MarshalTokenJSON()
 	if err != nil {
-		return errors.New("failed to unmarshal token")
+		return fmt.Errorf("marshaling token to JSON: %w", err)
 	}
 
 	secret, err := ap.tokenMGR.GetSecret(token.UserID, token.AuthProvider, []*v3.Token{token})
