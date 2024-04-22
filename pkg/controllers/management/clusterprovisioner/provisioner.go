@@ -179,8 +179,13 @@ func (p *Provisioner) Remove(cluster *apimgmtv3.Cluster) (runtime.Object, error)
 }
 
 func (p *Provisioner) Updated(cluster *apimgmtv3.Cluster) (runtime.Object, error) {
-	if skipOperatorCluster("update", cluster) || imported.IsAdministratedByProvisioningCluster(cluster) {
+	if skipOperatorCluster("update", cluster) {
 		return cluster, nil
+	}
+
+	if imported.IsAdministratedByProvisioningCluster(cluster) {
+		reconcileACE(cluster)
+		return p.Clusters.Update(cluster)
 	}
 
 	obj, err := apimgmtv3.ClusterConditionUpdated.Do(cluster, func() (runtime.Object, error) {
