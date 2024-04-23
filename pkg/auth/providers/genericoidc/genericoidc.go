@@ -374,10 +374,13 @@ func (g GenericOIDCProvider) getRedirectURL(config map[string]interface{}) strin
 	//TODO sort out scopes...just hardcoded for now
 
 	return fmt.Sprintf(
-		"%s?client_id=%s&response_type=code&redirect_uri=%s&scope=openid%%20profile%%20email&",
+		// TODO...sort out whether we need scopes included here or not
+		//"%s?client_id=%s&response_type=code&redirect_uri=%s&scope=openid%%20profile%%20email",
+		"%s?client_id=%s&response_type=code&redirect_uri=%s",
 		config["authEndpoint"],
 		config["clientId"],
-		config["rancherApiHost"],
+		config["rancherUrl"],
+		//config["rancherApiHost"],
 	)
 }
 
