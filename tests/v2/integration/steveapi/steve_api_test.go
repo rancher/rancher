@@ -19,6 +19,7 @@ import (
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
 	clientv1 "github.com/rancher/shepherd/clients/rancher/v1"
 	"github.com/rancher/shepherd/extensions/clusters"
+	"github.com/rancher/shepherd/extensions/defaults/schema/groupversionresources"
 	kubenamespaces "github.com/rancher/shepherd/extensions/kubeapi/namespaces"
 	"github.com/rancher/shepherd/extensions/kubeapi/rbac"
 	"github.com/rancher/shepherd/extensions/kubeapi/secrets"
@@ -314,7 +315,7 @@ func (s *steveAPITestSuite) setupSuite(clusterName string) {
 		}
 		dynamicClient, err := client.GetDownStreamClusterClient(s.clusterID)
 		require.NoError(s.T(), err)
-		namespaceResource := dynamicClient.Resource(kubenamespaces.NamespaceGroupVersionResource)
+		namespaceResource := dynamicClient.Resource(groupversionresources.Namespace())
 		resp, err := namespaceResource.Create(context.TODO(), unstructured.MustToUnstructured(ns), metav1.CreateOptions{})
 		require.NoError(s.T(), err)
 		s.client.Session.RegisterCleanupFunc(func() error {

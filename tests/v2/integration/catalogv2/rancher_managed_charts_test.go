@@ -16,6 +16,7 @@ import (
 	"github.com/rancher/shepherd/clients/rancher/catalog"
 	client "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
 	stevev1 "github.com/rancher/shepherd/clients/rancher/v1"
+	"github.com/rancher/shepherd/extensions/defaults/stevetypes"
 	"github.com/rancher/shepherd/extensions/kubeconfig"
 	"github.com/rancher/shepherd/pkg/session"
 	"github.com/sirupsen/logrus"
@@ -404,7 +405,7 @@ func (w *RancherManagedChartsTest) resetManagementCluster() {
 
 func (w *RancherManagedChartsTest) updateSetting(name, value string) error {
 	// Use the Steve client instead of the main one to be able to set a setting's value to an empty string.
-	existing, err := w.client.Steve.SteveType("management.cattle.io.setting").ByID(name)
+	existing, err := w.client.Steve.SteveType(stevetypes.ManagementSetting).ByID(name)
 	if err != nil {
 		return err
 	}
@@ -415,7 +416,7 @@ func (w *RancherManagedChartsTest) updateSetting(name, value string) error {
 	}
 
 	s.Value = value
-	_, err = w.client.Steve.SteveType("management.cattle.io.setting").Update(existing, s)
+	_, err = w.client.Steve.SteveType(stevetypes.ManagementSetting).Update(existing, s)
 	return err
 }
 
@@ -476,7 +477,7 @@ func (w *RancherManagedChartsTest) TestServeIcons() {
 			},
 		},
 	)
-	_, err := w.client.Steve.SteveType(catalog.ClusterRepoSteveResourceType).Create(clusterRepoToCreate)
+	_, err := w.client.Steve.SteveType(stevetypes.ClusterRepo).Create(clusterRepoToCreate)
 	w.Require().NoError(err)
 	time.Sleep(1 * time.Second)
 

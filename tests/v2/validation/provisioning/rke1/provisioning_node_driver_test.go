@@ -71,9 +71,9 @@ func (r *RKE1NodeDriverProvisioningTestSuite) SetupSuite() {
 }
 
 func (r *RKE1NodeDriverProvisioningTestSuite) TestProvisioningRKE1Cluster() {
-	nodeRolesAll := []provisioninginput.NodePools{provisioninginput.AllRolesNodePool}
-	nodeRolesShared := []provisioninginput.NodePools{provisioninginput.EtcdControlPlaneNodePool, provisioninginput.WorkerNodePool}
-	nodeRolesDedicated := []provisioninginput.NodePools{provisioninginput.EtcdNodePool, provisioninginput.ControlPlaneNodePool, provisioninginput.WorkerNodePool}
+	nodeRolesAll := provisioninginput.GetNodePoolConfigs([]string{"etcdControlPlaneWorker"})
+	nodeRolesShared := provisioninginput.GetNodePoolConfigs([]string{"etcdControlPlane", "worker"})
+	nodeRolesDedicated := provisioninginput.GetNodePoolConfigs([]string{"etcd", "controlPlane", "worker"})
 	tests := []struct {
 		name      string
 		nodePools []provisioninginput.NodePools

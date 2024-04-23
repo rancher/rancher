@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/shepherd/clients/rancher"
 	v1 "github.com/rancher/shepherd/clients/rancher/v1"
 	"github.com/rancher/shepherd/extensions/clusters"
+	"github.com/rancher/shepherd/extensions/defaults/stevetypes"
 	"github.com/rancher/shepherd/extensions/etcdsnapshot"
 
 	"github.com/rancher/shepherd/pkg/config"
@@ -79,7 +80,7 @@ func (s *SnapshotAdditionalTestsTestSuite) TestSnapshotReplaceWorkerNode() {
 		clusterID, err := clusters.GetV1ProvisioningClusterByName(s.client, s.client.RancherConfig.ClusterName)
 		require.NoError(s.T(), err)
 
-		cluster, err := tt.client.Steve.SteveType(clusters.ProvisioningSteveResourceType).ByID(clusterID)
+		cluster, err := tt.client.Steve.SteveType(stevetypes.Provisioning).ByID(clusterID)
 		require.NoError(s.T(), err)
 
 		updatedCluster := new(apisV1.Cluster)
@@ -120,7 +121,7 @@ func (s *SnapshotAdditionalTestsTestSuite) TestSnapshotRecurringRestores() {
 		clusterID, err := clusters.GetV1ProvisioningClusterByName(s.client, s.client.RancherConfig.ClusterName)
 		require.NoError(s.T(), err)
 
-		cluster, err := tt.client.Steve.SteveType(clusters.ProvisioningSteveResourceType).ByID(clusterID)
+		cluster, err := tt.client.Steve.SteveType(stevetypes.Provisioning).ByID(clusterID)
 		require.NoError(s.T(), err)
 
 		updatedCluster := new(apisV1.Cluster)

@@ -11,10 +11,12 @@ import (
 
 	apiv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
-	"github.com/rancher/rancher/tests/integration/pkg/defaults"
 	"github.com/rancher/shepherd/clients/rancher"
 	v1 "github.com/rancher/shepherd/clients/rancher/v1"
 	"github.com/rancher/shepherd/extensions/clusters"
+	"github.com/rancher/shepherd/extensions/defaults/schema/groupversionresources"
+	"github.com/rancher/shepherd/extensions/defaults/stevetypes"
+	"github.com/rancher/shepherd/extensions/defaults/timeouts"
 	"github.com/rancher/shepherd/extensions/kubeapi"
 	"github.com/rancher/shepherd/extensions/kubeapi/secrets"
 	"github.com/rancher/shepherd/pkg/environmentflag"
@@ -69,7 +71,7 @@ func (r *V2ProvEncryptionKeyRotationTestSuite) SetupSuite() {
 func setEncryptSecret(t *testing.T, client *rancher.Client, steveID string) {
 	t.Logf("Set secret encryption key for cluster %s", steveID)
 
-	cluster, err := client.Steve.SteveType(clusters.ProvisioningSteveResourceType).ByID(steveID)
+	cluster, err := client.Steve.SteveType(stevetypes.Provisioning).ByID(steveID)
 	require.NoError(t, err)
 
 	clusterSpec := &apiv1.ClusterSpec{}
@@ -84,7 +86,7 @@ func setEncryptSecret(t *testing.T, client *rancher.Client, steveID string) {
 
 		updatedCluster.Spec = *clusterSpec
 
-		cluster, err = client.Steve.SteveType(clusters.ProvisioningSteveResourceType).Update(cluster, updatedCluster)
+		cluster, err = client.Steve.SteveType(stevetypes.Provisioning).Update(cluster, updatedCluster)
 		require.NoError(t, err)
 
 		err = clusters.WatchAndWaitForCluster(client, steveID)
@@ -100,7 +102,7 @@ func rotateEncryptionKeys(t *testing.T, client *rancher.Client, steveID string, 
 	kubeProvisioningClient, err := client.GetKubeAPIProvisioningClient()
 	require.NoError(t, err)
 
-	cluster, err := client.Steve.SteveType(clusters.ProvisioningSteveResourceType).ByID(steveID)
+	cluster, err := client.Steve.SteveType(stevetypes.Provisioning).ByID(steveID)
 	require.NoError(t, err)
 
 	clusterSpec := &apiv1.ClusterSpec{}
@@ -115,7 +117,7 @@ func rotateEncryptionKeys(t *testing.T, client *rancher.Client, steveID string, 
 
 	updatedCluster.Spec = *clusterSpec
 
-	cluster, err = client.Steve.SteveType(clusters.ProvisioningSteveResourceType).Update(cluster, updatedCluster)
+	cluster, err = client.Steve.SteveType(stevetypes.Provisioning).Update(cluster, updatedCluster)
 	require.NoError(t, err)
 
 	for _, phase := range phases {
@@ -125,7 +127,7 @@ func rotateEncryptionKeys(t *testing.T, client *rancher.Client, steveID string, 
 
 	clusterWait, err := kubeProvisioningClient.Clusters(namespace).Watch(context.TODO(), metav1.ListOptions{
 		FieldSelector:  "metadata.name=" + cluster.ObjectMeta.Name,
-		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+		TimeoutSeconds: timeouts.ThirtyMinuteWatch(),
 	})
 	require.NoError(t, err)
 
@@ -143,7 +145,7 @@ func createSecretsForCluster(t *testing.T, client *rancher.Client, steveID strin
 
 	clusterID, err := clusters.GetClusterIDByName(client, clusterName)
 	require.NoError(t, err)
-	secretResource, err := kubeapi.ResourceForClient(client, clusterID, "default", secrets.SecretGroupVersionResource)
+	secretResource, err := kubeapi.ResourceForClient(client, clusterID, "default", groupversionresources.Secret())
 	require.NoError(t, err)
 
 	for i := 0; i < scale; i++ {

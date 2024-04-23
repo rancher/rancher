@@ -71,9 +71,9 @@ func (k *K3SNodeDriverProvisioningTestSuite) SetupSuite() {
 }
 
 func (k *K3SNodeDriverProvisioningTestSuite) TestProvisioningK3SCluster() {
-	nodeRolesAll := []provisioninginput.MachinePools{provisioninginput.AllRolesMachinePool}
-	nodeRolesShared := []provisioninginput.MachinePools{provisioninginput.EtcdControlPlaneMachinePool, provisioninginput.WorkerMachinePool}
-	nodeRolesDedicated := []provisioninginput.MachinePools{provisioninginput.EtcdMachinePool, provisioninginput.ControlPlaneMachinePool, provisioninginput.WorkerMachinePool}
+	nodeRolesAll := provisioninginput.GetMachinePoolConfigs([]string{"etcdControlPlaneWorker"})
+	nodeRolesShared := provisioninginput.GetMachinePoolConfigs([]string{"etcdControlPlane", "worker"})
+	nodeRolesDedicated := provisioninginput.GetMachinePoolConfigs([]string{"etcd", "controlPlane", "worker"})
 
 	tests := []struct {
 		name         string

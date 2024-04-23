@@ -16,7 +16,9 @@ import (
 	steveV1 "github.com/rancher/shepherd/clients/rancher/v1"
 	"github.com/rancher/shepherd/extensions/charts"
 	"github.com/rancher/shepherd/extensions/clusters"
-	"github.com/rancher/shepherd/extensions/kubeapi/storageclasses"
+	"github.com/rancher/shepherd/extensions/defaults/namespaces"
+	"github.com/rancher/shepherd/extensions/defaults/schema/groupversionresources"
+	"github.com/rancher/shepherd/extensions/defaults/stevetypes"
 	"github.com/rancher/shepherd/extensions/kubeapi/volumes/persistentvolumeclaims"
 	"github.com/rancher/shepherd/extensions/machinepools"
 	"github.com/rancher/shepherd/extensions/projects"
@@ -61,12 +63,9 @@ const (
 	pollInterval = time.Duration(1 * time.Second)
 	pollTimeout  = time.Duration(1 * time.Minute)
 
-	repoType                     = "catalog.cattle.io.clusterrepo"
-	appsType                     = "catalog.cattle.io.apps"
 	awsUpstreamCloudProviderRepo = "https://github.com/kubernetes/cloud-provider-aws.git"
 	masterBranch                 = "master"
 	awsUpstreamChartName         = "aws-cloud-controller-manager"
-	kubeSystemNamespace          = "kube-system"
 	systemProject                = "System"
 	externalProviderString       = "external"
 	vsphereCPIchartName          = "rancher-vsphere-cpi"
@@ -221,7 +220,7 @@ func RunPostClusterCloudProviderChecks(t *testing.T, client *rancher.Client, clu
 				require.Empty(t, podErrors)
 			}
 
-			clusterObject, err = adminClient.Steve.SteveType(clusters.ProvisioningSteveResourceType).ByID(provisioninginput.Namespace + "/" + rke1ClusterObject.ID)
+			clusterObject, err = adminClient.Steve.SteveType(stevetypes.Provisioning).ByID(namespaces.Fleet + "/" + rke1ClusterObject.ID)
 			require.NoError(t, err)
 
 			lbServiceResp := CreateCloudProviderWorkloadAndServicesLB(t, client, clusterObject)
@@ -238,7 +237,7 @@ func RunPostClusterCloudProviderChecks(t *testing.T, client *rancher.Client, clu
 			podErrors := pods.StatusPods(client, rke1ClusterObject.ID)
 			require.Empty(t, podErrors)
 
-			clusterObject, err := adminClient.Steve.SteveType(clusters.ProvisioningSteveResourceType).ByID(provisioninginput.Namespace + "/" + rke1ClusterObject.ID)
+			clusterObject, err := adminClient.Steve.SteveType(stevetypes.Provisioning).ByID(namespaces.Fleet + "/" + rke1ClusterObject.ID)
 			require.NoError(t, err)
 
 			CreatePVCWorkload(t, client, clusterObject)
@@ -248,7 +247,7 @@ func RunPostClusterCloudProviderChecks(t *testing.T, client *rancher.Client, clu
 		require.NoError(t, err)
 
 		if testClusterConfig.CloudProvider == provisioninginput.AWSProviderName.String() {
-			clusterObject, err := adminClient.Steve.SteveType(clusters.ProvisioningSteveResourceType).ByID(clusterObject.ID)
+			clusterObject, err := adminClient.Steve.SteveType(stevetypes.Provisioning).ByID(clusterObject.ID)
 			require.NoError(t, err)
 
 			lbServiceResp := CreateCloudProviderWorkloadAndServicesLB(t, client, clusterObject)
@@ -326,12 +325,12 @@ func CreateCloudProviderWorkloadAndServicesLB(t *testing.T, client *rancher.Clie
 	require.NoError(t, err)
 
 	clusterIPserviceName := namegenerator.AppendRandomString(clusterIPPrefix)
-	clusterIPserviceTemplate := services.NewServiceTemplate(clusterIPserviceName, defaultNamespace, corev1.ServiceTypeClusterIP, []corev1.ServicePort{{Name: portName, Port: 80}}, nginxSpec.Selector.MatchLabels)
+	clusterIPserviceTemplate := services.NewServiceTemplate(clusterIPserviceName, namespaces.Default, corev1.ServiceTypeClusterIP, []corev1.ServicePort{{Name: portName, Port: 80}}, nginxSpec.Selector.MatchLabels)
 	_, err = steveclient.SteveType(services.ServiceSteveType).Create(clusterIPserviceTemplate)
 	require.NoError(t, err)
 
 	lbServiceName := namegenerator.AppendRandomString(loadBalancerPrefix)
-	lbServiceTemplate := services.NewServiceTemplate(lbServiceName, defaultNamespace, corev1.ServiceTypeLoadBalancer, []corev1.ServicePort{{Name: portName, Port: 80}}, nginxSpec.Selector.MatchLabels)
+	lbServiceTemplate := services.NewServiceTemplate(lbServiceName, namespaces.Default, corev1.ServiceTypeLoadBalancer, []corev1.ServicePort{{Name: portName, Port: 80}}, nginxSpec.Selector.MatchLabels)
 	lbServiceResp, err := steveclient.SteveType(services.ServiceSteveType).Create(lbServiceTemplate)
 	require.NoError(t, err)
 	logrus.Info("loadbalancer created for nginx workload.")
@@ -355,7 +354,7 @@ func CreatePVCWorkload(t *testing.T, client *rancher.Client, cluster *steveV1.St
 	dynamicClient, err := client.GetDownStreamClusterClient(status.ClusterName)
 	require.NoError(t, err)
 
-	storageClassVolumesResource := dynamicClient.Resource(storageclasses.StorageClassGroupVersionResource).Namespace("")
+	storageClassVolumesResource := dynamicClient.Resource(groupversionresources.StorageClass()).Namespace("")
 
 	ctx := context.Background()
 	unstructuredResp, err := storageClassVolumesResource.List(ctx, metav1.ListOptions{})
@@ -447,7 +446,7 @@ func createNginxDeployment(steveclient *steveV1.Client, containerNamePrefix stri
 	containerName := namegenerator.AppendRandomString(containerNamePrefix)
 	containerTemplate := workloads.NewContainer(nginxName, nginxName, corev1.PullAlways, []corev1.VolumeMount{}, []corev1.EnvFromSource{}, nil, nil, nil)
 	podTemplate := workloads.NewPodTemplate([]corev1.Container{containerTemplate}, []corev1.Volume{}, []corev1.LocalObjectReference{}, nil)
-	deployment := workloads.NewDeploymentTemplate(containerName, defaultNamespace, podTemplate, true, nil)
+	deployment := workloads.NewDeploymentTemplate(containerName, namespaces.Default, podTemplate, true, nil)
 
 	deploymentResp, err := steveclient.SteveType(workloads.DeploymentSteveType).Create(deployment)
 	if err != nil {

@@ -13,8 +13,8 @@ import (
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
 	v1 "github.com/rancher/shepherd/clients/rancher/v1"
 	"github.com/rancher/shepherd/extensions/clusters"
+	"github.com/rancher/shepherd/extensions/defaults/schema/groupversionresources"
 	"github.com/rancher/shepherd/extensions/ingresses"
-	kubeingress "github.com/rancher/shepherd/extensions/kubeapi/ingresses"
 	"github.com/rancher/shepherd/extensions/projects"
 	"github.com/rancher/shepherd/extensions/services"
 	"github.com/rancher/shepherd/extensions/workloads"
@@ -193,7 +193,7 @@ func waitUntilIngressHostnameUpdates(client *rancher.Client, clusterID, namespac
 	if err != nil {
 		return err
 	}
-	adminIngressResource := adminDynamicClient.Resource(kubeingress.IngressesGroupVersionResource).Namespace(namespace)
+	adminIngressResource := adminDynamicClient.Resource(groupversionresources.Ingress()).Namespace(namespace)
 
 	watchAppInterface, err := adminIngressResource.Watch(context.TODO(), metav1.ListOptions{
 		FieldSelector:  "metadata.name=" + ingressName,

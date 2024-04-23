@@ -11,6 +11,7 @@ import (
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
 	v1 "github.com/rancher/shepherd/clients/rancher/v1"
 	"github.com/rancher/shepherd/extensions/clusters"
+	"github.com/rancher/shepherd/extensions/defaults/stevetypes"
 	"github.com/rancher/shepherd/extensions/namespaces"
 	"github.com/rancher/shepherd/extensions/projects"
 	"github.com/rancher/shepherd/extensions/workloads"
@@ -168,7 +169,7 @@ func convertSetting(globalSetting *v1.SteveAPIObject) (*v3.Setting, error) {
 }
 
 func listGlobalSettings(steveclient *v1.Client) ([]string, error) {
-	globalSettings, err := steveclient.SteveType("management.cattle.io.setting").List(nil)
+	globalSettings, err := steveclient.SteveType(stevetypes.ManagementSetting).List(nil)
 	if err != nil {
 		return nil, err
 	}
@@ -188,7 +189,7 @@ func editGlobalSettings(steveclient *v1.Client, globalSetting *v1.SteveAPIObject
 	}
 
 	updateSetting.Value = value
-	updateGlobalSetting, err := steveclient.SteveType("management.cattle.io.setting").Update(globalSetting, updateSetting)
+	updateGlobalSetting, err := steveclient.SteveType(stevetypes.ManagementSetting).Update(globalSetting, updateSetting)
 	if err != nil {
 		return nil, err
 	}

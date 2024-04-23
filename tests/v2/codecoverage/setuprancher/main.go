@@ -11,8 +11,8 @@ import (
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
 	"github.com/rancher/shepherd/extensions/clusters"
-	"github.com/rancher/shepherd/extensions/defaults"
-	"github.com/rancher/shepherd/extensions/kubeapi/workloads/deployments"
+	"github.com/rancher/shepherd/extensions/defaults/schema/groupversionresources"
+	"github.com/rancher/shepherd/extensions/defaults/timeouts"
 	"github.com/rancher/shepherd/extensions/pipeline"
 	"github.com/rancher/shepherd/extensions/provisioninginput"
 	nodepools "github.com/rancher/shepherd/extensions/rke1/nodepools"
@@ -197,7 +197,7 @@ func updateRancherDeployment(kubeconfig []byte) error {
 		return err
 	}
 
-	deploymentResource := dynamicClient.Resource(deployments.DeploymentGroupVersionResource)
+	deploymentResource := dynamicClient.Resource(groupversionresources.Deployment())
 
 	cattleSystemDeploymentResource := deploymentResource.Namespace(namespace)
 	unstructuredDeployment, err := cattleSystemDeploymentResource.Get(context.TODO(), deploymentName, metav1.GetOptions{})
@@ -305,7 +305,7 @@ func createTestCluster(client, adminClient *rancher.Client, numClusters int, clu
 
 		opts := metav1.ListOptions{
 			FieldSelector:  "metadata.name=" + clusterResp.ID,
-			TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+			TimeoutSeconds: timeouts.ThirtyMinuteWatch(),
 		}
 		watchInterface, err := adminClient.GetManagementWatchInterface(management.ClusterType, opts)
 		if err != nil {

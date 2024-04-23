@@ -70,7 +70,7 @@ func (r *RKE2CloudProviderTestSuite) SetupSuite() {
 }
 
 func (r *RKE2CloudProviderTestSuite) TestAWSCloudProviderCluster() {
-	nodeRolesDedicated := []provisioninginput.MachinePools{provisioninginput.EtcdMachinePool, provisioninginput.ControlPlaneMachinePool, provisioninginput.WorkerMachinePool}
+	nodeRolesDedicated := provisioninginput.GetMachinePoolConfigs([]string{"etcd", "controlPlane", "worker"})
 	nodeRolesDedicated[0].MachinePoolConfig.Quantity = 3
 	nodeRolesDedicated[1].MachinePoolConfig.Quantity = 2
 	nodeRolesDedicated[2].MachinePoolConfig.Quantity = 2
@@ -102,7 +102,7 @@ func (r *RKE2CloudProviderTestSuite) TestAWSCloudProviderCluster() {
 }
 
 func (r *RKE2CloudProviderTestSuite) TestVsphereCloudProviderCluster() {
-	nodeRolesDedicated := []provisioninginput.MachinePools{provisioninginput.EtcdMachinePool, provisioninginput.ControlPlaneMachinePool, provisioninginput.WorkerMachinePool}
+	nodeRolesDedicated := provisioninginput.GetMachinePoolConfigs([]string{"etcd", "controlPlane", "worker"})
 	nodeRolesDedicated[0].MachinePoolConfig.Quantity = 3
 	nodeRolesDedicated[1].MachinePoolConfig.Quantity = 2
 	nodeRolesDedicated[2].MachinePoolConfig.Quantity = 2

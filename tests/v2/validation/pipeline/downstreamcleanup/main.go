@@ -8,7 +8,7 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
-	"github.com/rancher/shepherd/extensions/defaults"
+	"github.com/rancher/shepherd/extensions/defaults/timeouts"
 	"github.com/rancher/shepherd/extensions/token"
 	"github.com/rancher/shepherd/pkg/config"
 	"github.com/rancher/shepherd/pkg/file"
@@ -90,7 +90,7 @@ func main() {
 		if !isLocalCluster {
 			opts := metav1.ListOptions{
 				FieldSelector:  "metadata.name=" + c.ID,
-				TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+				TimeoutSeconds: timeouts.ThirtyMinuteWatch(),
 			}
 
 			err := client.Management.Cluster.Delete(&c)

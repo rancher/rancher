@@ -79,35 +79,15 @@ func (c *CustomClusterProvisioningTestSuite) SetupSuite() {
 }
 
 func (c *CustomClusterProvisioningTestSuite) TestProvisioningRKE2CustomCluster() {
-	nodeRolesAll := []provisioninginput.MachinePools{
-		provisioninginput.AllRolesMachinePool,
-	}
+	nodeRolesAll := provisioninginput.GetMachinePoolConfigs([]string{"etcdControlPlaneWorker"})
 
-	nodeRolesShared := []provisioninginput.MachinePools{
-		provisioninginput.EtcdControlPlaneMachinePool,
-		provisioninginput.WorkerMachinePool,
-	}
+	nodeRolesShared := provisioninginput.GetMachinePoolConfigs([]string{"etcdControlPlane", "worker"})
 
-	nodeRolesDedicated := []provisioninginput.MachinePools{
-		provisioninginput.EtcdMachinePool,
-		provisioninginput.ControlPlaneMachinePool,
-		provisioninginput.WorkerMachinePool,
-	}
+	nodeRolesDedicated := provisioninginput.GetMachinePoolConfigs([]string{"etcd", "controlPlane", "worker"})
 
-	nodeRolesDedicatedWindows := []provisioninginput.MachinePools{
-		provisioninginput.EtcdMachinePool,
-		provisioninginput.ControlPlaneMachinePool,
-		provisioninginput.WorkerMachinePool,
-		provisioninginput.WindowsMachinePool,
-	}
+	nodeRolesDedicatedWindows := provisioninginput.GetMachinePoolConfigs([]string{"etcd", "controlPlane", "worker", "windows"})
 
-	nodeRolesDedicatedTwoWindows := []provisioninginput.MachinePools{
-		provisioninginput.EtcdMachinePool,
-		provisioninginput.ControlPlaneMachinePool,
-		provisioninginput.WorkerMachinePool,
-		provisioninginput.WindowsMachinePool,
-		provisioninginput.WindowsMachinePool,
-	}
+	nodeRolesDedicatedTwoWindows := provisioninginput.GetMachinePoolConfigs([]string{"etcd", "controlPlane", "worker", "windows", "windows"})
 
 	tests := []struct {
 		name         string

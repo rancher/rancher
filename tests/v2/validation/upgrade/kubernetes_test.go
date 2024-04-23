@@ -9,7 +9,7 @@ import (
 	"github.com/rancher/shepherd/clients/rancher"
 	"github.com/rancher/shepherd/extensions/clusters"
 	"github.com/rancher/shepherd/extensions/clusters/bundledclusters"
-	"github.com/rancher/shepherd/extensions/defaults"
+	"github.com/rancher/shepherd/extensions/defaults/timeouts"
 	nodestat "github.com/rancher/shepherd/extensions/nodes"
 	"github.com/rancher/shepherd/extensions/provisioninginput"
 	psadeploy "github.com/rancher/shepherd/extensions/psact"
@@ -134,9 +134,9 @@ func (u *UpgradeKubernetesTestSuite) testUpgradeSingleCluster(clusterName, versi
 	}
 
 	if strings.Contains(versionToUpgrade, rke1KubeVersionCheck) {
-		err = nodestat.AllManagementNodeReady(client, clusterMeta.ID, defaults.ThirtyMinuteTimeout)
+		err = nodestat.AllManagementNodeReady(client, clusterMeta.ID, timeouts.ThirtyMinute)
 	} else if strings.Contains(versionToUpgrade, rke2KubeVersionCheck) || strings.Contains(versionToUpgrade, k3sKubeVersionCheck) {
-		err = nodestat.AllMachineReady(client, clusterMeta.ID, defaults.TenMinuteTimeout)
+		err = nodestat.AllMachineReady(client, clusterMeta.ID, timeouts.TenMinute)
 	}
 	require.NoError(u.T(), err)
 

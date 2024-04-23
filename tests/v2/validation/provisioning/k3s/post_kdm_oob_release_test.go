@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/rancher/tests/v2/validation/provisioning/permutations"
 	"github.com/rancher/shepherd/clients/rancher"
 	"github.com/rancher/shepherd/extensions/clusters/kubernetesversions"
+	"github.com/rancher/shepherd/extensions/defaults/namespaces"
 	"github.com/rancher/shepherd/extensions/provisioninginput"
 	"github.com/rancher/shepherd/pkg/config"
 	"github.com/rancher/shepherd/pkg/session"
@@ -24,10 +25,6 @@ type KdmChecksTestSuite struct {
 	provisioningConfig *provisioninginput.Config
 }
 
-const (
-	defaultNamespace = "default"
-)
-
 func (k *KdmChecksTestSuite) TearDownSuite() {
 	k.session.Cleanup()
 }
@@ -36,7 +33,7 @@ func (k *KdmChecksTestSuite) SetupSuite() {
 	testSession := session.NewSession()
 	k.session = testSession
 
-	k.ns = defaultNamespace
+	k.ns = namespaces.Default
 
 	k.provisioningConfig = new(provisioninginput.Config)
 	config.LoadConfig(provisioninginput.ConfigurationFileKey, k.provisioningConfig)

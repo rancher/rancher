@@ -25,8 +25,7 @@ type KdmChecksTestSuite struct {
 }
 
 const (
-	defaultNamespace             = "default"
-	ProvisioningSteveResouceType = "provisioning.cattle.io.cluster"
+	defaultNamespace = "default"
 )
 
 func (k *KdmChecksTestSuite) TearDownSuite() {

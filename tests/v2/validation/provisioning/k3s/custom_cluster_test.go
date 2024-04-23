@@ -70,9 +70,9 @@ func (c *CustomClusterProvisioningTestSuite) SetupSuite() {
 }
 
 func (c *CustomClusterProvisioningTestSuite) TestProvisioningK3SCustomCluster() {
-	nodeRolesAll := []provisioninginput.MachinePools{provisioninginput.AllRolesMachinePool}
-	nodeRolesShared := []provisioninginput.MachinePools{provisioninginput.EtcdControlPlaneMachinePool, provisioninginput.WorkerMachinePool}
-	nodeRolesDedicated := []provisioninginput.MachinePools{provisioninginput.EtcdMachinePool, provisioninginput.ControlPlaneMachinePool, provisioninginput.WorkerMachinePool}
+	nodeRolesAll := provisioninginput.GetMachinePoolConfigs([]string{"etcdControlPlaneWorker"})
+	nodeRolesShared := provisioninginput.GetMachinePoolConfigs([]string{"etcdControlPlaneWorker", "worker"})
+	nodeRolesDedicated := provisioninginput.GetMachinePoolConfigs([]string{"etcd", "controlPlane", "worker"})
 
 	tests := []struct {
 		name         string

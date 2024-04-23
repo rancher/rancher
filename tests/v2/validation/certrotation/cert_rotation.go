@@ -15,7 +15,9 @@ import (
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
 	v1 "github.com/rancher/shepherd/clients/rancher/v1"
 	"github.com/rancher/shepherd/extensions/clusters"
-	"github.com/rancher/shepherd/extensions/defaults"
+	"github.com/rancher/shepherd/extensions/defaults/namespaces"
+	"github.com/rancher/shepherd/extensions/defaults/stevetypes"
+	"github.com/rancher/shepherd/extensions/defaults/timeouts"
 	"github.com/rancher/shepherd/extensions/provisioning"
 	"github.com/rancher/shepherd/extensions/sshkeys"
 	"github.com/rancher/shepherd/pkg/nodes"
@@ -25,14 +27,8 @@ import (
 )
 
 const (
-	namespace                     = "fleet-default"
-	provisioningSteveResourceType = "provisioning.cattle.io.cluster"
-	machineSteveResourceType      = "cluster.x-k8s.io.machine"
-	machineSteveAnnotation        = "cluster.x-k8s.io/machine"
-	etcdLabel                     = "node-role.kubernetes.io/etcd"
-	clusterLabel                  = "cluster.x-k8s.io/cluster-name"
-	certFileExtension             = ".crt"
-	pemFileExtension              = ".pem"
+	certFileExtension = ".crt"
+	pemFileExtension  = ".pem"
 
 	privateKeySSHKeyRegExPattern = `-----BEGIN RSA PRIVATE KEY-{3,}\n([\s\S]*?)\n-{3,}END RSA PRIVATE KEY-----`
 )
@@ -54,7 +50,7 @@ func rotateCerts(client *rancher.Client, clusterName string) error {
 		return err
 	}
 
-	cluster, err := adminClient.Steve.SteveType(provisioningSteveResourceType).ByID(id)
+	cluster, err := adminClient.Steve.SteveType(stevetypes.Provisioning).ByID(id)
 	if err != nil {
 		return err
 	}
@@ -75,7 +71,7 @@ func rotateCerts(client *rancher.Client, clusterName string) error {
 		return err
 	}
 
-	nodeList, err := steveclient.SteveType("node").List(nil)
+	nodeList, err := steveclient.SteveType(stevetypes.Node).List(nil)
 	if err != nil {
 		return err
 	}
@@ -111,7 +107,7 @@ func rotateCerts(client *rancher.Client, clusterName string) error {
 
 	updatedCluster.Spec = *clusterSpec
 
-	_, err = client.Steve.SteveType(provisioningSteveResourceType).Update(cluster, updatedCluster)
+	_, err = client.Steve.SteveType(stevetypes.Provisioning).Update(cluster, updatedCluster)
 	if err != nil {
 		return err
 	}
@@ -122,9 +118,9 @@ func rotateCerts(client *rancher.Client, clusterName string) error {
 		return err
 	}
 
-	result, err := kubeRKEClient.RKEControlPlanes(namespace).Watch(context.TODO(), metav1.ListOptions{
+	result, err := kubeRKEClient.RKEControlPlanes(namespaces.Fleet).Watch(context.TODO(), metav1.ListOptions{
 		FieldSelector:  "metadata.name=" + clusterName,
-		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+		TimeoutSeconds: timeouts.ThirtyMinuteWatch(),
 	})
 	if err != nil {
 		return err
@@ -139,7 +135,7 @@ func rotateCerts(client *rancher.Client, clusterName string) error {
 
 	clusterWait, err := kubeProvisioningClient.Clusters("fleet-default").Watch(context.TODO(), metav1.ListOptions{
 		FieldSelector:  "metadata.name=" + clusterName,
-		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+		TimeoutSeconds: timeouts.ThirtyMinuteWatch(),
 	})
 	if err != nil {
 		return err

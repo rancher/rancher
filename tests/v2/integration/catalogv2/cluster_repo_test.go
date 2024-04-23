@@ -21,10 +21,11 @@ import (
 	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/catalogv2/oci"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/helm"
-	"github.com/rancher/rancher/tests/integration/pkg/defaults"
 	"github.com/rancher/shepherd/clients/rancher"
 	"github.com/rancher/shepherd/clients/rancher/catalog"
 	stevev1 "github.com/rancher/shepherd/clients/rancher/v1"
+	"github.com/rancher/shepherd/extensions/defaults/stevetypes"
+	"github.com/rancher/shepherd/extensions/defaults/timeouts"
 	"github.com/rancher/shepherd/extensions/kubeconfig"
 	"github.com/rancher/shepherd/pkg/api/steve/catalog/types"
 	"github.com/rancher/shepherd/pkg/session"
@@ -592,7 +593,7 @@ func (c *ClusterRepoTestSuite) TestOCIRepoChartInstallation() {
 	// wait for chart to be full deployed
 	watchAppInterface, err := catalogClient.Apps("default").Watch(context.TODO(), metav1.ListOptions{
 		FieldSelector:  "metadata.name=" + "testreleasename",
-		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+		TimeoutSeconds: timeouts.TenMinuteWatch(),
 	})
 	assert.NoError(c.T(), err)
 
@@ -618,7 +619,7 @@ func (c *ClusterRepoTestSuite) TestOCIRepoChartInstallation() {
 
 	watchAppInterface, err = catalogClient.Apps("default").Watch(context.TODO(), metav1.ListOptions{
 		FieldSelector:  "metadata.name=" + "testreleasename",
-		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+		TimeoutSeconds: timeouts.TenMinuteWatch(),
 	})
 	assert.NoError(c.T(), err)
 
@@ -644,7 +645,7 @@ func (c *ClusterRepoTestSuite) testClusterRepo(params ClusterRepoParams) {
 	cr := v1.NewClusterRepo("", params.Name, v1.ClusterRepo{})
 	setClusterRepoURL(&cr.Spec, params.Type, params.URL1)
 	cr.Spec.InsecurePlainHTTP = params.InsecurePlainHTTP
-	_, err := c.client.Steve.SteveType(catalog.ClusterRepoSteveResourceType).Create(cr)
+	_, err := c.client.Steve.SteveType(stevetypes.ClusterRepo).Create(cr)
 	require.NoError(c.T(), err)
 	time.Sleep(1 * time.Second)
 
@@ -665,7 +666,7 @@ func (c *ClusterRepoTestSuite) testClusterRepo(params ClusterRepoParams) {
 	clusterRepoUpdated := *clusterRepo
 	clusterRepoUpdated.Spec = spec
 
-	_, err = c.client.Steve.SteveType(catalog.ClusterRepoSteveResourceType).Replace(&clusterRepoUpdated)
+	_, err = c.client.Steve.SteveType(stevetypes.ClusterRepo).Replace(&clusterRepoUpdated)
 	require.NoError(c.T(), err)
 
 	clusterRepo, err = c.pollUntilDownloaded(params.Name, downloadTime)
@@ -676,10 +677,10 @@ func (c *ClusterRepoTestSuite) testClusterRepo(params ClusterRepoParams) {
 	assert.Greater(c.T(), status.ObservedGeneration, observedGeneration)
 
 	// Validate deleting the ClusterRepo
-	err = c.client.Steve.SteveType(catalog.ClusterRepoSteveResourceType).Delete(clusterRepo)
+	err = c.client.Steve.SteveType(stevetypes.ClusterRepo).Delete(clusterRepo)
 	require.NoError(c.T(), err)
 
-	_, err = c.client.Steve.SteveType(catalog.ClusterRepoSteveResourceType).ByID(params.Name)
+	_, err = c.client.Steve.SteveType(stevetypes.ClusterRepo).ByID(params.Name)
 	require.Error(c.T(), err)
 }
 
@@ -687,7 +688,7 @@ func (c *ClusterRepoTestSuite) testClusterRepo(params ClusterRepoParams) {
 func (c *ClusterRepoTestSuite) pollUntilDownloaded(ClusterRepoName string, prevDownloadTime metav1.Time) (*stevev1.SteveAPIObject, error) {
 	var clusterRepo *stevev1.SteveAPIObject
 	err := wait.Poll(PollInterval, PollTimeout, func() (done bool, err error) {
-		clusterRepo, err = c.client.Steve.SteveType(catalog.ClusterRepoSteveResourceType).ByID(ClusterRepoName)
+		clusterRepo, err = c.client.Steve.SteveType(stevetypes.ClusterRepo).ByID(ClusterRepoName)
 		if err != nil {
 			return false, err
 		}

@@ -70,11 +70,7 @@ func (k *K3SPSACTTestSuite) SetupSuite() {
 }
 
 func (k *K3SPSACTTestSuite) TestK3SPSACTNodeDriverCluster() {
-	nodeRolesDedicated := []provisioninginput.MachinePools{
-		provisioninginput.EtcdMachinePool,
-		provisioninginput.ControlPlaneMachinePool,
-		provisioninginput.WorkerMachinePool,
-	}
+	nodeRolesDedicated := provisioninginput.GetMachinePoolConfigs([]string{"etcd", "controlPlane", "worker"})
 
 	tests := []struct {
 		name         string
@@ -112,11 +108,7 @@ func (k *K3SPSACTTestSuite) TestK3SPSACTNodeDriverCluster() {
 }
 
 func (k *K3SPSACTTestSuite) TestK3SPSACTCustomCluster() {
-	nodeRolesDedicated := []provisioninginput.MachinePools{
-		provisioninginput.EtcdMachinePool,
-		provisioninginput.ControlPlaneMachinePool,
-		provisioninginput.WorkerMachinePool,
-	}
+	nodeRolesDedicated := provisioninginput.GetMachinePoolConfigs([]string{"etcd", "controlPlane", "worker"})
 
 	tests := []struct {
 		name         string

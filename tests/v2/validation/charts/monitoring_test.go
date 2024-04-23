@@ -15,6 +15,7 @@ import (
 	v1 "github.com/rancher/shepherd/clients/rancher/v1"
 	"github.com/rancher/shepherd/extensions/charts"
 	"github.com/rancher/shepherd/extensions/clusters"
+	defaultAnnotations "github.com/rancher/shepherd/extensions/defaults/annotations"
 	"github.com/rancher/shepherd/extensions/ingresses"
 	"github.com/rancher/shepherd/extensions/namespaces"
 	"github.com/rancher/shepherd/extensions/projects"
@@ -189,7 +190,7 @@ func (m *MonitoringTestSuite) TestMonitoringChart() {
 	require.NoError(m.T(), err)
 	workerNodePublicIPs := []string{}
 	for _, node := range nodeCollection.Data {
-		workerNodePublicIPs = append(workerNodePublicIPs, node.Annotations["rke.cattle.io/external-ip"])
+		workerNodePublicIPs = append(workerNodePublicIPs, node.Annotations[defaultAnnotations.ExternalIp])
 	}
 	randWorkerNodePublicIP := workerNodePublicIPs[rand.Intn(len(workerNodePublicIPs))]
 

@@ -65,7 +65,7 @@ func (r *RKE2AgentCustomizationTestSuite) SetupSuite() {
 }
 
 func (r *RKE2AgentCustomizationTestSuite) TestProvisioningRKE2ClusterAgentCustomization() {
-	productionPool := []provisioninginput.MachinePools{provisioninginput.EtcdMachinePool, provisioninginput.ControlPlaneMachinePool, provisioninginput.WorkerMachinePool}
+	productionPool := provisioninginput.GetMachinePoolConfigs([]string{"etcd", "controlPlane", "worker"})
 	productionPool[0].MachinePoolConfig.Quantity = 3
 	productionPool[1].MachinePoolConfig.Quantity = 2
 	productionPool[2].MachinePoolConfig.Quantity = 2
@@ -140,7 +140,7 @@ func (r *RKE2AgentCustomizationTestSuite) TestProvisioningRKE2ClusterAgentCustom
 }
 
 func (r *RKE2AgentCustomizationTestSuite) TestFailureProvisioningRKE2ClusterAgentCustomization() {
-	productionPool := []provisioninginput.MachinePools{provisioninginput.EtcdMachinePool, provisioninginput.ControlPlaneMachinePool, provisioninginput.WorkerMachinePool}
+	productionPool := provisioninginput.GetMachinePoolConfigs([]string{"etcd", "controlPlane", "worker"})
 	productionPool[0].MachinePoolConfig.Quantity = 3
 	productionPool[1].MachinePoolConfig.Quantity = 2
 	productionPool[2].MachinePoolConfig.Quantity = 2

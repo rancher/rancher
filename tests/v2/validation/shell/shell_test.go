@@ -11,6 +11,7 @@ import (
 	"github.com/rancher/shepherd/pkg/session"
 
 	steveV1 "github.com/rancher/shepherd/clients/rancher/v1"
+	"github.com/rancher/shepherd/extensions/defaults/namespaces"
 	"github.com/rancher/shepherd/extensions/settings"
 	"github.com/rancher/shepherd/extensions/workloads/pods"
 	"github.com/stretchr/testify/assert"
@@ -20,9 +21,8 @@ import (
 )
 
 const (
-	cattleSystemNameSpace = "cattle-system"
-	shellName             = "shell-image"
-	clusterName           = "local"
+	shellName   = "shell-image"
+	clusterName = "local"
 )
 
 type ShellTestSuite struct {
@@ -57,7 +57,7 @@ func (s *ShellTestSuite) TestShell() {
 
 	s.Run("Verify the helm operations for the shell succeeded", func() {
 		steveClient := s.client.Steve
-		pods, err := steveClient.SteveType(pods.PodResourceSteveType).NamespacedSteveClient(cattleSystemNameSpace).List(nil)
+		pods, err := steveClient.SteveType(pods.PodResourceSteveType).NamespacedSteveClient(namespaces.CattleSystem).List(nil)
 		require.NoError(s.T(), err)
 
 		for _, pod := range pods.Data {

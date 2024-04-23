@@ -82,7 +82,7 @@ func (a *AirGapK3SCustomClusterTestSuite) SetupSuite() {
 }
 
 func (a *AirGapK3SCustomClusterTestSuite) TestProvisioningAirGapK3SCustomCluster() {
-	a.clustersConfig.MachinePools = []provisioninginput.MachinePools{provisioninginput.AllRolesMachinePool}
+	a.clustersConfig.MachinePools = provisioninginput.GetMachinePoolConfigs([]string{"etcdControlPlaneWorker"})
 
 	tests := []struct {
 		name   string
@@ -97,7 +97,7 @@ func (a *AirGapK3SCustomClusterTestSuite) TestProvisioningAirGapK3SCustomCluster
 }
 
 func (a *AirGapK3SCustomClusterTestSuite) TestProvisioningUpgradeAirGapK3SCustomCluster() {
-	a.clustersConfig.MachinePools = []provisioninginput.MachinePools{provisioninginput.AllRolesMachinePool}
+	a.clustersConfig.MachinePools = provisioninginput.GetMachinePoolConfigs([]string{"etcdControlPlaneWorker"})
 
 	k3sVersions, err := kubernetesversions.ListK3SAllVersions(a.client)
 	require.NoError(a.T(), err)

@@ -9,7 +9,8 @@ import (
 
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
-	"github.com/rancher/shepherd/extensions/defaults"
+	"github.com/rancher/shepherd/extensions/defaults/schema/groupversionresources"
+	"github.com/rancher/shepherd/extensions/defaults/timeouts"
 	"github.com/rancher/shepherd/extensions/kubeapi/resourcequotas"
 	"github.com/rancher/shepherd/extensions/namespaces"
 	steveResourceQuotas "github.com/rancher/shepherd/extensions/resourcequotas"
@@ -241,9 +242,9 @@ func (s *ResourceQuotaSuite) TestRemoveQuotaFromProjectWithNamespacePropagation(
 	testProject.ResourceQuota.Limit.ConfigMaps = ""
 	testProject.NamespaceDefaultResourceQuota.Limit.ConfigMaps = ""
 
-	watchInterface, err := dynamicClient.Resource(resourcequotas.ResourceQuotaGroupVersionResource).Watch(context.TODO(), metav1.ListOptions{
+	watchInterface, err := dynamicClient.Resource(groupversionresources.ResourceQuota()).Watch(context.TODO(), metav1.ListOptions{
 		FieldSelector:  "metadata.name=" + quotaName,
-		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+		TimeoutSeconds: timeouts.ThirtyMinuteWatch(),
 	})
 	s.Require().NoError(err)
 

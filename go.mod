@@ -1,6 +1,8 @@
 module github.com/rancher/rancher
 
-go 1.22
+go 1.22.0
+
+toolchain go1.22.2
 
 replace (
 	github.com/containerd/containerd => github.com/containerd/containerd v1.6.27 // for compatibilty with docker 20.10.x
@@ -450,3 +452,5 @@ require (
 	sigs.k8s.io/kustomize/kyaml v0.14.3-0.20230601165947-6ce0bf390ce3 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
 )
+
+replace github.com/rancher/shepherd => github.com/susesgartner/shepherd v0.0.0-20240426205906-5052bfd25d0b

@@ -14,9 +14,7 @@ import (
 )
 
 const (
-	fleetNamespace        = "fleet-default"
-	deletingState         = "deleting"
-	machineNameAnnotation = "cluster.x-k8s.io/machine"
+	deletingState = "deleting"
 )
 
 type AutoReplaceSuite struct {

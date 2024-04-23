@@ -70,11 +70,7 @@ func (r *RKE1PSACTTestSuite) SetupSuite() {
 }
 
 func (r *RKE1PSACTTestSuite) TestRKE1PSACTNodeDriverCluster() {
-	nodeRolesDedicated := []provisioninginput.NodePools{
-		provisioninginput.EtcdNodePool,
-		provisioninginput.ControlPlaneNodePool,
-		provisioninginput.WorkerNodePool,
-	}
+	nodeRolesDedicated := provisioninginput.GetNodePoolConfigs([]string{"etcd", "controlPlane", "worker"})
 
 	tests := []struct {
 		name      string
@@ -112,11 +108,7 @@ func (r *RKE1PSACTTestSuite) TestRKE1PSACTNodeDriverCluster() {
 }
 
 func (r *RKE1PSACTTestSuite) TestRKE1PSACTCustomCluster() {
-	nodeRolesDedicated := []provisioninginput.NodePools{
-		provisioninginput.EtcdNodePool,
-		provisioninginput.ControlPlaneNodePool,
-		provisioninginput.WorkerNodePool,
-	}
+	nodeRolesDedicated := provisioninginput.GetNodePoolConfigs([]string{"etcd", "controlPlane", "worker"})
 
 	require.GreaterOrEqual(r.T(), len(r.provisioningConfig.CNIs), 1)
 

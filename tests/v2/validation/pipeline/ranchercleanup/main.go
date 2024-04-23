@@ -9,7 +9,7 @@ import (
 	"github.com/rancher/shepherd/clients/corral"
 	"github.com/rancher/shepherd/clients/rancher"
 	v1 "github.com/rancher/shepherd/clients/rancher/v1"
-	"github.com/rancher/shepherd/extensions/clusters"
+	"github.com/rancher/shepherd/extensions/defaults/stevetypes"
 	"github.com/rancher/shepherd/pkg/session"
 	"github.com/rancher/shepherd/pkg/wait"
 	"github.com/sirupsen/logrus"
@@ -33,7 +33,7 @@ func main() {
 		var clusterList *v1.SteveCollection
 		err = kwait.Poll(500*time.Millisecond, 2*time.Minute, func() (done bool, err error) {
 			//clean up clusters
-			resp, err := client.Steve.SteveType(clusters.ProvisioningSteveResourceType).List(nil)
+			resp, err := client.Steve.SteveType(stevetypes.Provisioning).List(nil)
 			if k8sErrors.IsInternalError(err) || k8sErrors.IsServiceUnavailable(err) {
 				return false, err
 			} else if resp != nil {
@@ -50,7 +50,7 @@ func main() {
 		deleteTimeout := timeout
 		for _, cluster := range clusterList.Data {
 			if cluster.ObjectMeta.Name != "local" {
-				err := client.Steve.SteveType(clusters.ProvisioningSteveResourceType).Delete(&cluster)
+				err := client.Steve.SteveType(stevetypes.Provisioning).Delete(&cluster)
 				if err != nil {
 					logrus.Errorf("error deleting cluster: %v", err)
 				}

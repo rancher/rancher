@@ -82,7 +82,7 @@ func (a *AirGapRKE2CustomClusterTestSuite) SetupSuite() {
 }
 
 func (a *AirGapRKE2CustomClusterTestSuite) TestProvisioningAirGapRKE2CustomCluster() {
-	a.clustersConfig.MachinePools = []provisioninginput.MachinePools{provisioninginput.AllRolesMachinePool}
+	a.clustersConfig.MachinePools = provisioninginput.GetMachinePoolConfigs([]string{"etcdControlPlaneWorker"})
 
 	tests := []struct {
 		name   string
@@ -97,7 +97,7 @@ func (a *AirGapRKE2CustomClusterTestSuite) TestProvisioningAirGapRKE2CustomClust
 }
 
 func (a *AirGapRKE2CustomClusterTestSuite) TestProvisioningAirGapUpgradeRKE2CustomCluster() {
-	a.clustersConfig.MachinePools = []provisioninginput.MachinePools{provisioninginput.AllRolesMachinePool}
+	a.clustersConfig.MachinePools = provisioninginput.GetMachinePoolConfigs([]string{"etcdControlPlaneWorker"})
 
 	rke2Versions, err := kubernetesversions.ListRKE2AllVersions(a.client)
 	require.NoError(a.T(), err)

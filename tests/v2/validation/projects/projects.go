@@ -10,7 +10,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
-	"github.com/rancher/shepherd/extensions/defaults"
+	"github.com/rancher/shepherd/extensions/defaults/timeouts"
 	projectsApi "github.com/rancher/shepherd/extensions/kubeapi/projects"
 	rbacApi "github.com/rancher/shepherd/extensions/kubeapi/rbac"
 	"github.com/rancher/shepherd/extensions/kubeconfig"
@@ -75,7 +75,7 @@ func createProjectRoleTemplateBinding(client *rancher.Client, user *management.U
 }
 
 func waitForFinalizerToUpdate(client *rancher.Client, projectName string, projectNamespace string, finalizerCount int) error {
-	err := kwait.Poll(defaults.FiveHundredMillisecondTimeout, defaults.TenSecondTimeout, func() (done bool, pollErr error) {
+	err := kwait.Poll(timeouts.FiveHundredMillisecond, timeouts.TenSecond, func() (done bool, pollErr error) {
 		project, pollErr := projectsApi.ListProjects(client, project.Namespace, metav1.ListOptions{
 			FieldSelector: "metadata.name=" + project.Name,
 		})
@@ -104,7 +104,7 @@ func checkPodLogsForErrors(client *rancher.Client, cluster string, podName strin
 
 	var errorMessage string
 
-	kwait.Poll(defaults.TenSecondTimeout, defaults.TwoMinuteTimeout, func() (bool, error) {
+	kwait.Poll(timeouts.TenSecond, timeouts.TwoMinute, func() (bool, error) {
 		podLogs, err := kubeconfig.GetPodLogs(client, cluster, podName, namespace, "")
 		if err != nil {
 			return false, err

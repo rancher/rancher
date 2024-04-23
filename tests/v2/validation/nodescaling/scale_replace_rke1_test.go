@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/rancher/shepherd/clients/rancher"
+	"github.com/rancher/shepherd/extensions/defaults/namespaces"
 	"github.com/rancher/shepherd/extensions/provisioninginput"
 	nodepools "github.com/rancher/shepherd/extensions/rke1/nodepools"
 	"github.com/rancher/shepherd/pkg/config"
@@ -30,7 +31,7 @@ func (s *RKE1NodeReplacingTestSuite) SetupSuite() {
 	testSession := session.NewSession()
 	s.session = testSession
 
-	s.ns = provisioninginput.Namespace
+	s.ns = namespaces.Fleet
 
 	s.clustersConfig = new(provisioninginput.Config)
 	config.LoadConfig(provisioninginput.ConfigurationFileKey, s.clustersConfig)

@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/shepherd/clients/rancher"
 	steveV1 "github.com/rancher/shepherd/clients/rancher/v1"
 	"github.com/rancher/shepherd/extensions/clusters"
+	"github.com/rancher/shepherd/extensions/defaults/stevetypes"
 	"github.com/rancher/shepherd/extensions/provisioninginput"
 	"github.com/rancher/shepherd/pkg/config"
 	"github.com/rancher/shepherd/pkg/session"
@@ -45,7 +46,7 @@ func (r *V2ProvCertRotationTestSuite) TestCertRotation() {
 	id, err := clusters.GetV1ProvisioningClusterByName(r.client, r.client.RancherConfig.ClusterName)
 	require.NoError(r.T(), err)
 
-	cluster, err := r.client.Steve.SteveType(provisioningSteveResourceType).ByID(id)
+	cluster, err := r.client.Steve.SteveType(stevetypes.Provisioning).ByID(id)
 	require.NoError(r.T(), err)
 
 	spec := &provv1.ClusterSpec{}

@@ -17,7 +17,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 
 	"github.com/rancher/shepherd/extensions/clusters"
-	"github.com/rancher/shepherd/extensions/defaults"
+	"github.com/rancher/shepherd/extensions/defaults/timeouts"
 	"github.com/rancher/shepherd/extensions/kubeapi/rbac"
 	"github.com/rancher/shepherd/extensions/provisioning"
 	"github.com/rancher/shepherd/extensions/users"
@@ -238,7 +238,7 @@ func (gr *GlobalRolesV2TestSuite) TestUserDeletionAndResourceCleanupWithInherite
 
 	log.Infof("Verify that the global role binding %s is deleted for the user.", grbName)
 	var grbOwner string
-	err = kwait.Poll(defaults.FiveHundredMillisecondTimeout, defaults.TenSecondTimeout, func() (done bool, pollErr error) {
+	err = kwait.Poll(timeouts.FiveHundredMillisecond, timeouts.TenSecond, func() (done bool, pollErr error) {
 		grbOwner, pollErr = getGlobalRoleBindingForUser(gr.client, createdUser.ID)
 		if pollErr != nil {
 			return false, pollErr

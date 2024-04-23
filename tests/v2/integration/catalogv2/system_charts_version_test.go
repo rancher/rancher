@@ -9,12 +9,13 @@ import (
 
 	"github.com/rancher/rancher/pkg/api/scheme"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/tests/integration/pkg/defaults"
 	"github.com/rancher/shepherd/clients/rancher"
 	"github.com/rancher/shepherd/clients/rancher/catalog"
 	stevev1 "github.com/rancher/shepherd/clients/rancher/v1"
-	"github.com/rancher/shepherd/extensions/kubeapi/workloads/deployments"
-	"github.com/rancher/shepherd/extensions/kubeapi/workloads/pods"
+	"github.com/rancher/shepherd/extensions/defaults/namespaces"
+	"github.com/rancher/shepherd/extensions/defaults/schema/groupversionresources"
+	"github.com/rancher/shepherd/extensions/defaults/stevetypes"
+	"github.com/rancher/shepherd/extensions/defaults/timeouts"
 	"github.com/rancher/shepherd/extensions/kubeconfig"
 	"github.com/rancher/shepherd/pkg/session"
 	"github.com/rancher/shepherd/pkg/wait"
@@ -32,8 +33,7 @@ import (
 )
 
 const (
-	cattleSystemNameSpace = "cattle-system"
-	rancherWebhook        = "rancher-webhook"
+	rancherWebhook = "rancher-webhook"
 )
 
 type SystemChartsVersionSuite struct {
@@ -83,7 +83,7 @@ func (w *SystemChartsVersionSuite) resetSettings() {
 	dynamicClient, err := w.client.GetRancherDynamicClient()
 	require.NoError(w.T(), err)
 
-	podList, err := dynamicClient.Resource(pods.PodGroupVersionResource).Namespace(cattleSystemNameSpace).List(context.Background(), metav1.ListOptions{})
+	podList, err := dynamicClient.Resource(groupversionresources.Pod()).Namespace(namespaces.CattleSystem).List(context.Background(), metav1.ListOptions{})
 	require.NoError(w.T(), err)
 
 	var podName string
@@ -96,11 +96,11 @@ func (w *SystemChartsVersionSuite) resetSettings() {
 		}
 	}
 
-	err = dynamicClient.Resource(pods.PodGroupVersionResource).Namespace(cattleSystemNameSpace).Delete(context.Background(), podName, metav1.DeleteOptions{})
+	err = dynamicClient.Resource(groupversionresources.Pod()).Namespace(namespaces.CattleSystem).Delete(context.Background(), podName, metav1.DeleteOptions{})
 	require.NoError(w.T(), err)
 
 	err = kwait.Poll(500*time.Millisecond, 10*time.Minute, func() (done bool, err error) {
-		deployment, err := dynamicClient.Resource(deployments.DeploymentGroupVersionResource).Namespace(cattleSystemNameSpace).Get(context.TODO(), rancherWebhook, metav1.GetOptions{})
+		deployment, err := dynamicClient.Resource(groupversionresources.Deployment()).Namespace(namespaces.CattleSystem).Get(context.TODO(), rancherWebhook, metav1.GetOptions{})
 		if k8sErrors.IsNotFound(err) {
 			return false, nil
 		} else if err != nil {
@@ -135,7 +135,7 @@ func (w *SystemChartsVersionSuite) TestInstallWebhook() {
 
 	watcher, err := w.catalogClient.Apps("cattle-system").Watch(context.TODO(), metav1.ListOptions{
 		FieldSelector:  "metadata.name=" + "rancher-webhook",
-		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+		TimeoutSeconds: timeouts.TenMinuteWatch(),
 	})
 	w.Require().NoError(err)
 
@@ -175,7 +175,7 @@ func (w *SystemChartsVersionSuite) TestInstallFleet() {
 
 	watcher, err := w.catalogClient.Apps("cattle-fleet-system").Watch(context.TODO(), metav1.ListOptions{
 		FieldSelector:  "metadata.name=" + "fleet",
-		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+		TimeoutSeconds: timeouts.TenMinuteWatch(),
 	})
 	w.Require().NoError(err)
 
@@ -254,7 +254,7 @@ func (w *SystemChartsVersionSuite) fetchRelease(namespace, chartName string) (*r
 
 func (w *SystemChartsVersionSuite) updateSetting(name, value string) error {
 	// Use the Steve client instead of the main one to be able to set a setting's value to an empty string.
-	existing, err := w.client.Steve.SteveType("management.cattle.io.setting").ByID(name)
+	existing, err := w.client.Steve.SteveType(stevetypes.ManagementSetting).ByID(name)
 	if err != nil {
 		return err
 	}
@@ -265,6 +265,6 @@ func (w *SystemChartsVersionSuite) updateSetting(name, value string) error {
 	}
 
 	s.Value = value
-	_, err = w.client.Steve.SteveType("management.cattle.io.setting").Update(existing, s)
+	_, err = w.client.Steve.SteveType(stevetypes.ManagementSetting).Update(existing, s)
 	return err
 }

@@ -70,9 +70,9 @@ func (c *CustomClusterProvisioningTestSuite) SetupSuite() {
 }
 
 func (c *CustomClusterProvisioningTestSuite) TestProvisioningRKE1CustomCluster() {
-	nodeRolesAll := []provisioninginput.NodePools{provisioninginput.AllRolesNodePool}
-	nodeRolesShared := []provisioninginput.NodePools{provisioninginput.EtcdControlPlaneNodePool, provisioninginput.WorkerNodePool}
-	nodeRolesDedicated := []provisioninginput.NodePools{provisioninginput.EtcdNodePool, provisioninginput.ControlPlaneNodePool, provisioninginput.WorkerNodePool}
+	nodeRolesAll := provisioninginput.GetNodePoolConfigs([]string{"etcdControlPlaneWorker"})
+	nodeRolesShared := provisioninginput.GetNodePoolConfigs([]string{"etcdControlPlane", "worker"})
+	nodeRolesDedicated := provisioninginput.GetNodePoolConfigs([]string{"etcd", "controlPlane", "worker"})
 
 	require.GreaterOrEqual(c.T(), len(c.provisioningConfig.CNIs), 1)
 

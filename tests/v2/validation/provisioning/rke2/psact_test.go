@@ -70,11 +70,7 @@ func (r *RKE2PSACTTestSuite) SetupSuite() {
 }
 
 func (r *RKE2PSACTTestSuite) TestRKE2PSACTNodeDriverCluster() {
-	nodeRolesDedicated := []provisioninginput.MachinePools{
-		provisioninginput.EtcdMachinePool,
-		provisioninginput.ControlPlaneMachinePool,
-		provisioninginput.WorkerMachinePool,
-	}
+	nodeRolesDedicated := provisioninginput.GetMachinePoolConfigs([]string{"etcd", "controlPlane", "worker"})
 
 	tests := []struct {
 		name         string
@@ -112,11 +108,7 @@ func (r *RKE2PSACTTestSuite) TestRKE2PSACTNodeDriverCluster() {
 }
 
 func (r *RKE2PSACTTestSuite) TestRKE2PSACTCustomCluster() {
-	nodeRolesDedicated := []provisioninginput.MachinePools{
-		provisioninginput.EtcdMachinePool,
-		provisioninginput.ControlPlaneMachinePool,
-		provisioninginput.WorkerMachinePool,
-	}
+	nodeRolesDedicated := provisioninginput.GetMachinePoolConfigs([]string{"etcd", "controlPlane", "worker"})
 
 	tests := []struct {
 		name         string

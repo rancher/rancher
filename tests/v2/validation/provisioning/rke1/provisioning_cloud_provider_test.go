@@ -72,7 +72,7 @@ func (r *RKE1CloudProviderTestSuite) SetupSuite() {
 }
 
 func (r *RKE1CloudProviderTestSuite) TestAWSCloudProviderRKE1Cluster() {
-	nodeRolesDedicated := []provisioninginput.NodePools{provisioninginput.EtcdNodePool, provisioninginput.ControlPlaneNodePool, provisioninginput.WorkerNodePool}
+	nodeRolesDedicated := provisioninginput.GetNodePoolConfigs([]string{"etcd", "controlPlane", "worker"})
 	nodeRolesDedicated[0].NodeRoles.Quantity = 3
 	nodeRolesDedicated[1].NodeRoles.Quantity = 2
 	nodeRolesDedicated[2].NodeRoles.Quantity = 2
@@ -103,7 +103,7 @@ func (r *RKE1CloudProviderTestSuite) TestAWSCloudProviderRKE1Cluster() {
 }
 
 func (r *RKE1CloudProviderTestSuite) TestVsphereCloudProviderRKE1Cluster() {
-	nodeRolesDedicated := []provisioninginput.NodePools{provisioninginput.EtcdNodePool, provisioninginput.ControlPlaneNodePool, provisioninginput.WorkerNodePool}
+	nodeRolesDedicated := provisioninginput.GetNodePoolConfigs([]string{"etcd", "controlPlane", "worker"})
 	nodeRolesDedicated[0].NodeRoles.Quantity = 3
 	nodeRolesDedicated[1].NodeRoles.Quantity = 2
 	nodeRolesDedicated[2].NodeRoles.Quantity = 2

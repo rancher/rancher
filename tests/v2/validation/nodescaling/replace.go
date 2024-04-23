@@ -13,10 +13,12 @@ import (
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
 	steveV1 "github.com/rancher/shepherd/clients/rancher/v1"
 	"github.com/rancher/shepherd/extensions/clusters"
-	"github.com/rancher/shepherd/extensions/defaults"
+	"github.com/rancher/shepherd/extensions/defaults/annotations"
+	"github.com/rancher/shepherd/extensions/defaults/namespaces"
+	"github.com/rancher/shepherd/extensions/defaults/stevetypes"
+	"github.com/rancher/shepherd/extensions/defaults/timeouts"
 	"github.com/rancher/shepherd/extensions/nodes"
 	nodestat "github.com/rancher/shepherd/extensions/nodes"
-	"github.com/rancher/shepherd/extensions/provisioninginput"
 	"github.com/rancher/shepherd/extensions/sshkeys"
 	"github.com/rancher/shepherd/extensions/workloads/pods"
 	"github.com/sirupsen/logrus"
@@ -31,13 +33,7 @@ const (
 	etcd            = "etcd"
 	worker          = "worker"
 
-	unreachableCondition         = "NodeStatusUnknown"
-	namespace                    = "fleet-default"
-	ProvisioningSteveResouceType = "provisioning.cattle.io.cluster"
-	machineSteveResourceType     = "cluster.x-k8s.io.machine"
-	machineSteveAnnotation       = "cluster.x-k8s.io/machine"
-	etcdLabel                    = "node-role.kubernetes.io/etcd"
-	clusterLabel                 = "cluster.x-k8s.io/cluster-name"
+	unreachableCondition = "NodeStatusUnknown"
 )
 
 func MatchNodeToRole(t *testing.T, client *rancher.Client, clusterID string, isEtcd bool, isControlPlane bool, isWorker bool) (int, []management.Node) {
@@ -67,11 +63,11 @@ func ReplaceNodes(t *testing.T, client *rancher.Client, clusterName string, isEt
 	numOfNodesBeforeDeletion, nodesToDelete := MatchNodeToRole(t, client, clusterID, isEtcd, isControlPlane, isWorker)
 
 	for i := range nodesToDelete {
-		machineToDelete, err := client.Steve.SteveType(machineSteveResourceType).ByID("fleet-default/" + nodesToDelete[i].Annotations[machineSteveAnnotation])
+		machineToDelete, err := client.Steve.SteveType(stevetypes.Machine).ByID("fleet-default/" + nodesToDelete[i].Annotations[annotations.Machine])
 		require.NoError(t, err)
 
 		logrus.Infof("Replacing node: " + nodesToDelete[i].NodeName)
-		err = client.Steve.SteveType(machineSteveResourceType).Delete(machineToDelete)
+		err = client.Steve.SteveType(stevetypes.Machine).Delete(machineToDelete)
 		require.NoError(t, err)
 
 		err = clusters.WaitClusterToBeUpgraded(client, clusterID)
@@ -101,7 +97,7 @@ func ReplaceRKE1Nodes(t *testing.T, client *rancher.Client, clusterName string, 
 		require.NoError(t, err)
 
 		logrus.Infof("Checking if node %s is replaced", nodeToDelete[i].NodeName)
-		err = nodestat.AllManagementNodeReady(client, clusterID, defaults.ThirtyMinuteTimeout)
+		err = nodestat.AllManagementNodeReady(client, clusterID, timeouts.ThirtyMinute)
 		require.NoError(t, err)
 
 		_, err = nodestat.IsNodeReplaced(client, nodeToDelete[i].ID, clusterID, numOfNodesBeforeDeletion)
@@ -124,7 +120,7 @@ func shutdownFirstNodeWithRole(client *rancher.Client, stevecluster *steveV1.Ste
 		return nil, err
 	}
 
-	nodeList, err := steveclient.SteveType("node").List(query)
+	nodeList, err := steveclient.SteveType(stevetypes.Node).List(query)
 	if err != nil {
 		return nil, err
 	}
@@ -180,7 +176,7 @@ func AutoReplaceFirstNodeWithRole(t *testing.T, client *rancher.Client, clusterN
 	clusterID, err := clusters.GetClusterIDByName(client, clusterName)
 	require.NoError(t, err)
 
-	_, stevecluster, err := clusters.GetProvisioningClusterByName(client, clusterName, provisioninginput.Namespace)
+	_, stevecluster, err := clusters.GetProvisioningClusterByName(client, clusterName, namespaces.Fleet)
 	require.NoError(t, err)
 
 	machine, err := shutdownFirstNodeWithRole(client, stevecluster, clusterID, nodeRole)
@@ -208,7 +204,7 @@ func AutoReplaceFirstNodeWithRole(t *testing.T, client *rancher.Client, clusterN
 	steveclient, err := client.Steve.ProxyDownstream(clusterID)
 	require.NoError(t, err)
 
-	v1NodeList, err := steveclient.SteveType("node").List(nil)
+	v1NodeList, err := steveclient.SteveType(stevetypes.Node).List(nil)
 	require.NoError(t, err)
 
 	_, err = nodes.IsNodeReplaced(client, machine.Name, clusterID, len(v1NodeList.Data))

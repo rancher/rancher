@@ -11,6 +11,7 @@ import (
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
 	steveV1 "github.com/rancher/shepherd/clients/rancher/v1"
 	"github.com/rancher/shepherd/extensions/clusters"
+	"github.com/rancher/shepherd/extensions/defaults/stevetypes"
 	"github.com/rancher/shepherd/extensions/kubectl"
 	"github.com/rancher/shepherd/extensions/services"
 	"github.com/rancher/shepherd/extensions/workloads"
@@ -231,7 +232,7 @@ func rke2AWSCloudProviderMigration(t *testing.T, client *rancher.Client, steveCl
 	newSteveCluster.Spec = spec
 
 	steveClusterObject, err = client.Steve.SteveType(
-		clusters.ProvisioningSteveResourceType).Update(steveClusterObject, newSteveCluster)
+		stevetypes.Provisioning).Update(steveClusterObject, newSteveCluster)
 	require.NoError(t, err)
 
 	err = clusters.WaitClusterToBeUpgraded(client, status.ClusterName)
@@ -268,7 +269,7 @@ func rke2AWSCloudProviderMigration(t *testing.T, client *rancher.Client, steveCl
 	newSteveCluster.Spec = spec
 
 	steveClusterObject, err = client.Steve.SteveType(
-		clusters.ProvisioningSteveResourceType).Update(steveClusterObject, newSteveCluster)
+		stevetypes.Provisioning).Update(steveClusterObject, newSteveCluster)
 	require.NoError(t, err)
 
 	err = clusters.WaitClusterToBeUpgraded(client, status.ClusterName)

@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/shepherd/clients/rancher"
 	v1 "github.com/rancher/shepherd/clients/rancher/v1"
 	"github.com/rancher/shepherd/extensions/clusters"
+	"github.com/rancher/shepherd/extensions/defaults/stevetypes"
 	"github.com/rancher/shepherd/extensions/machinepools"
 	"github.com/rancher/shepherd/extensions/scalinginput"
 	"github.com/rancher/shepherd/pkg/config"
@@ -85,7 +86,7 @@ func (s *CustomClusterNodeScalingTestSuite) TestScalingCustomClusterNodes() {
 		clusterID, err := clusters.GetV1ProvisioningClusterByName(s.client, s.client.RancherConfig.ClusterName)
 		require.NoError(s.T(), err)
 
-		cluster, err := tt.client.Steve.SteveType(ProvisioningSteveResourceType).ByID(clusterID)
+		cluster, err := tt.client.Steve.SteveType(stevetypes.Provisioning).ByID(clusterID)
 		require.NoError(s.T(), err)
 
 		updatedCluster := new(apisV1.Cluster)

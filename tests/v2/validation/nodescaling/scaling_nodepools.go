@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/shepherd/extensions/clusters/aks"
 	"github.com/rancher/shepherd/extensions/clusters/eks"
 	"github.com/rancher/shepherd/extensions/clusters/gke"
+	"github.com/rancher/shepherd/extensions/defaults/stevetypes"
 	"github.com/rancher/shepherd/extensions/machinepools"
 	"github.com/rancher/shepherd/extensions/provisioning"
 	rke1 "github.com/rancher/shepherd/extensions/rke1/nodepools"
@@ -15,16 +16,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const (
-	ProvisioningSteveResourceType = "provisioning.cattle.io.cluster"
-	defaultNamespace              = "fleet-default"
-)
-
 var oneNode int64 = 1
 var twoNodes int64 = 2
 
 func scalingRKE2K3SNodePools(t *testing.T, client *rancher.Client, clusterID string, nodeRoles machinepools.NodeRoles) {
-	cluster, err := client.Steve.SteveType(ProvisioningSteveResourceType).ByID(clusterID)
+	cluster, err := client.Steve.SteveType(stevetypes.Provisioning).ByID(clusterID)
 	require.NoError(t, err)
 
 	clusterResp, err := machinepools.ScaleMachinePoolNodes(client, cluster, nodeRoles)
@@ -32,7 +28,7 @@ func scalingRKE2K3SNodePools(t *testing.T, client *rancher.Client, clusterID str
 
 	pods.VerifyReadyDaemonsetPods(t, client, clusterResp)
 
-	updatedCluster, err := client.Steve.SteveType(ProvisioningSteveResourceType).ByID(clusterID)
+	updatedCluster, err := client.Steve.SteveType(stevetypes.Provisioning).ByID(clusterID)
 	require.NoError(t, err)
 
 	nodeRoles.Quantity = -nodeRoles.Quantity
@@ -73,7 +69,7 @@ func scalingRKE2K3SCustomClusterPools(t *testing.T, client *rancher.Client, clus
 	nodes, err := externalNodeProvider.NodeCreationFunc(client, rolesPerPool, quantityPerPool)
 	require.NoError(t, err)
 
-	cluster, err := client.Steve.SteveType(ProvisioningSteveResourceType).ByID(clusterID)
+	cluster, err := client.Steve.SteveType(stevetypes.Provisioning).ByID(clusterID)
 	require.NoError(t, err)
 
 	err = provisioning.AddRKE2K3SCustomClusterNodes(client, cluster, nodes, rolesPerNode)

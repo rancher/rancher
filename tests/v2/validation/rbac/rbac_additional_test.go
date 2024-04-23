@@ -12,6 +12,7 @@ import (
 	v1 "github.com/rancher/shepherd/clients/rancher/v1"
 	"github.com/rancher/shepherd/extensions/clusters"
 	"github.com/rancher/shepherd/extensions/clusters/kubernetesversions"
+	"github.com/rancher/shepherd/extensions/defaults/stevetypes"
 	"github.com/rancher/shepherd/extensions/kubeapi/rbac"
 	"github.com/rancher/shepherd/extensions/projects"
 	"github.com/rancher/shepherd/extensions/provisioning"
@@ -89,7 +90,7 @@ func (rb *RBACAdditionalTestSuite) ValidateAddMemberAsClusterRoles() {
 	require.NoError(rb.T(), err)
 	rb.additionalUserClient = additionalUserClient
 
-	clusterList, err := rb.additionalUserClient.Steve.SteveType(clusters.ProvisioningSteveResourceType).ListAll(nil)
+	clusterList, err := rb.additionalUserClient.Steve.SteveType(stevetypes.Provisioning).ListAll(nil)
 	require.NoError(rb.T(), err)
 	assert.Equal(rb.T(), 1, len(clusterList.Data))
 
@@ -107,7 +108,7 @@ func (rb *RBACAdditionalTestSuite) ValidateAddCMAsProjectOwner() {
 	require.NoError(rb.T(), err)
 	rb.additionalUserClient = additionalUserClient
 
-	clusterList, err := rb.standardUserClient.Steve.SteveType(clusters.ProvisioningSteveResourceType).ListAll(nil)
+	clusterList, err := rb.standardUserClient.Steve.SteveType(stevetypes.Provisioning).ListAll(nil)
 	require.NoError(rb.T(), err)
 	assert.Equal(rb.T(), 1, len(clusterList.Data))
 
@@ -197,7 +198,7 @@ func (rb *RBACAdditionalTestSuite) ValidateListGlobalSettings() {
 }
 
 func (rb *RBACAdditionalTestSuite) ValidateEditGlobalSettings() {
-	kubeConfigTokenSetting, err := rb.steveStdUserclient.SteveType("management.cattle.io.setting").ByID(kubeConfigTokenSettingID)
+	kubeConfigTokenSetting, err := rb.steveStdUserclient.SteveType(stevetypes.ManagementSetting).ByID(kubeConfigTokenSettingID)
 	require.NoError(rb.T(), err)
 
 	_, err = editGlobalSettings(rb.steveStdUserclient, kubeConfigTokenSetting, "3")
@@ -279,9 +280,7 @@ func (rb *RBACAdditionalTestSuite) TestRBACAdditional() {
 				userConfig := new(provisioninginput.Config)
 				config.LoadConfig(provisioninginput.ConfigurationFileKey, userConfig)
 				nodeProviders := userConfig.NodeProviders[0]
-				nodeAndRoles := []provisioninginput.NodePools{
-					provisioninginput.AllRolesNodePool,
-				}
+				nodeAndRoles := provisioninginput.GetNodePoolConfigs([]string{"etcdControlPlaneWorker"})
 				externalNodeProvider := provisioning.ExternalNodeProviderSetup(nodeProviders)
 				clusterConfig := clusters.ConvertConfigToClusterConfig(userConfig)
 				clusterConfig.NodePools = nodeAndRoles
