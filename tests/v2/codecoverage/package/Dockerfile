@@ -39,15 +39,15 @@ ARG CHART_DEFAULT_BRANCH=dev-v2.9
 ARG PARTNER_CHART_DEFAULT_BRANCH=main
 ARG RKE2_CHART_DEFAULT_BRANCH=main
 # kontainer-driver-metadata branch to be set for specific branch other than dev/master, logic at rancher/rancher/pkg/settings/setting.go
-ARG CATTLE_KDM_BRANCH=dev-v2.8
+ARG CATTLE_KDM_BRANCH=dev-v2.9
 
 ENV CATTLE_SYSTEM_CHART_DEFAULT_BRANCH=$SYSTEM_CHART_DEFAULT_BRANCH
 ENV CATTLE_CHART_DEFAULT_BRANCH=$CHART_DEFAULT_BRANCH
 ENV CATTLE_PARTNER_CHART_DEFAULT_BRANCH=$PARTNER_CHART_DEFAULT_BRANCH
 ENV CATTLE_RKE2_CHART_DEFAULT_BRANCH=$RKE2_CHART_DEFAULT_BRANCH
 ENV CATTLE_HELM_VERSION v2.16.8-rancher2
-ENV CATTLE_MACHINE_VERSION v0.15.0-rancher109
-ENV CATTLE_K3S_VERSION v1.27.10+k3s2
+ENV CATTLE_MACHINE_VERSION v0.15.0-rancher110
+ENV CATTLE_K3S_VERSION v1.28.6+k3s2
 ENV CATTLE_MACHINE_PROVISION_IMAGE rancher/machine:${CATTLE_MACHINE_VERSION}
 ENV CATTLE_ETCD_VERSION v3.5.12
 ENV LOGLEVEL_VERSION v0.1.5
@@ -154,7 +154,7 @@ RUN curl ${HELM_URL_V3} | tar xvzf - --strip-components=1 -C /usr/bin && \
     chmod +x /usr/bin/kustomize
 
 # Set up K3s: copy the necessary binaries from the K3s image.
-COPY --from=rancher/k3s:v1.27.10-k3s2 \
+COPY --from=rancher/k3s:v1.28.6-k3s2 \
     /bin/blkid \
     /bin/bandwidth \
     /bin/cni \
@@ -171,7 +171,7 @@ COPY --from=rancher/k3s:v1.27.10-k3s2 \
     /bin/runc \
     /bin/which \
     /bin/aux/xtables-legacy-multi \
-/usr/bin/
+    /usr/bin/
 
 RUN ln -s /usr/bin/cni /usr/bin/bridge && \
     ln -s /usr/bin/cni /usr/bin/flannel && \
@@ -201,9 +201,9 @@ RUN curl -sLf ${!TINI_URL} > /usr/bin/tini && \
     chmod +x /usr/bin/tini /usr/bin/telemetry && \
     mkdir -p /var/lib/rancher-data/driver-metadata
 
-ENV CATTLE_UI_VERSION 2.8.0
-ENV CATTLE_DASHBOARD_UI_VERSION v2.8.0
-ENV CATTLE_CLI_VERSION v2.8.0
+ENV CATTLE_UI_VERSION 2.9.0-alpha2
+ENV CATTLE_DASHBOARD_UI_VERSION v2.9.0-alpha1
+ENV CATTLE_CLI_VERSION v2.9.0-rc1
 
 # Base UI brand used as a fallback env setting (not user facing) to indicate this is a non-prime install
 ENV CATTLE_BASE_UI_BRAND=
