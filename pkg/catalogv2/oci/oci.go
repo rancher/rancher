@@ -180,7 +180,7 @@ func GenerateIndex(URL string, credentialSecret *corev1.Secret,
 				}
 
 				if maxTag != nil {
-					ociClient.tag = maxTag.String()
+					ociClient.tag = maxTag.Original()
 
 					// fetch the chart.yaml for the latest tag and add it to the index.
 					err = addToHelmRepoIndex(*ociClient, indexFile, orasRepository)
@@ -221,7 +221,7 @@ func GenerateIndex(URL string, credentialSecret *corev1.Secret,
 		}
 
 		if maxTag != nil {
-			ociClient.tag = maxTag.String()
+			ociClient.tag = maxTag.Original()
 
 			// fetch the chart.yaml for the latest tag and add it to the index.
 			err = addToHelmRepoIndex(*ociClient, indexFile, orasRepository)
