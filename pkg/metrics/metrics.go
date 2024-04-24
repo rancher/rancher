@@ -18,7 +18,6 @@ import (
 	authV1 "k8s.io/api/authorization/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -44,15 +43,15 @@ type metricsHandler struct {
 }
 
 type ClusterCounts struct {
-	AppRevisions            int `json:"appRevisions"`
-	CatalogTemplateVersions int `json:"catalogTemplateVersions"`
-	Projects                int `json:"projects"`
-	ConfigMaps              int `json:"configMaps"`
-	Secrets                 int `json:"secrets"`
-	Namespaces              int `json:"namespaces"`
-	Nodes                   int `json:"nodes"`
-	RoleBindings            int `json:"roleBindings"`
-	ClusterRoleBindings     int `json:"clusterRoleBindings"`
+	AppRevisions            int64 `json:"appRevisions"`
+	CatalogTemplateVersions int64 `json:"catalogTemplateVersions"`
+	Projects                int64 `json:"projects"`
+	ConfigMaps              int64 `json:"configMaps"`
+	Secrets                 int64 `json:"secrets"`
+	Namespaces              int64 `json:"namespaces"`
+	Nodes                   int64 `json:"nodes"`
+	RoleBindings            int64 `json:"roleBindings"`
+	ClusterRoleBindings     int64 `json:"clusterRoleBindings"`
 }
 
 func NewMetricsHandler(scaledContext *config.ScaledContext, clusterManager *clustermanager.Manager, handler http.Handler) http.Handler {
@@ -93,7 +92,7 @@ func (h *metricsHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	if id := mux.Vars(req)["clusterID"]; id != "" {
-		h.getClusterObjectCount(id, rw, req)
+		h.getClusterObjectCount(req.Context(), id, rw, req)
 		return
 	}
 
@@ -105,8 +104,8 @@ func (h *metricsHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 // see through the UI. For example projects only live in the management cluster so the count would only be displayed
 // if getting 'local'. The count would show as 0 for a downstream cluster since the CR that backs the project only
 // lives in management.
-func (h *metricsHandler) getClusterObjectCount(clusterID string, rw http.ResponseWriter, req *http.Request) {
-	cluster, err := h.clusterManager.UserContext(clusterID)
+func (h *metricsHandler) getClusterObjectCount(ctx context.Context, clusterID string, rw http.ResponseWriter, req *http.Request) {
+	cluster, err := h.getClusterClient(clusterID)
 	if err != nil {
 		var (
 			normanError *httperror.APIError
@@ -127,73 +126,63 @@ func (h *metricsHandler) getClusterObjectCount(clusterID string, rw http.Respons
 	}
 
 	var cc ClusterCounts
-	labelSelector := labels.NewSelector()
 
-	ar, err := cluster.Project.AppRevisions(metav1.NamespaceAll).Controller().Lister().List(metav1.NamespaceAll, labelSelector)
+	cc.AppRevisions, err = cluster.AppRevisions(ctx)
 	if err != nil {
 		returnK8serror(err, rw, req)
 		return
 	}
-	cc.AppRevisions = len(ar)
 
 	// None of these resources are pushed downstream to a user cluster so we can only count them in the management cluster.
 	if clusterID == "local" {
-		ctv, err := cluster.Management.Management.CatalogTemplateVersions(metav1.NamespaceAll).Controller().Lister().List(metav1.NamespaceAll, labelSelector)
+		cc.CatalogTemplateVersions, err = cluster.CatalogTemplateVersions(ctx)
 		if err != nil {
 			returnK8serror(err, rw, req)
 			return
 		}
-		cc.CatalogTemplateVersions = len(ctv)
 
-		projects, err := cluster.Management.Management.Projects(metav1.NamespaceAll).Controller().Lister().List(metav1.NamespaceAll, labelSelector)
+		cc.Projects, err = cluster.Projects(ctx)
 		if err != nil {
 			returnK8serror(err, rw, req)
 			return
 		}
-		cc.Projects = len(projects)
 	}
 
-	cf, err := cluster.Core.ConfigMaps(metav1.NamespaceAll).Controller().Lister().List(metav1.NamespaceAll, labelSelector)
+	cc.ConfigMaps, err = cluster.ConfigMaps(ctx)
 	if err != nil {
 		returnK8serror(err, rw, req)
 		return
 	}
-	cc.ConfigMaps = len(cf)
 
-	s, err := cluster.Core.Secrets(metav1.NamespaceAll).Controller().Lister().List(metav1.NamespaceAll, labelSelector)
+	cc.Secrets, err = cluster.Secrets(ctx)
 	if err != nil {
 		returnK8serror(err, rw, req)
 		return
 	}
-	cc.Secrets = len(s)
 
-	ns, err := cluster.Core.Namespaces(metav1.NamespaceAll).Controller().Lister().List(metav1.NamespaceAll, labelSelector)
+	cc.Namespaces, err = cluster.Namespaces(ctx)
 	if err != nil {
 		returnK8serror(err, rw, req)
 		return
 	}
-	cc.Namespaces = len(ns)
 
-	nodes, err := cluster.Core.Nodes(metav1.NamespaceAll).Controller().Lister().List(metav1.NamespaceAll, labelSelector)
+	cc.Nodes, err = cluster.Nodes(ctx)
 	if err != nil {
 		returnK8serror(err, rw, req)
 		return
 	}
-	cc.Nodes = len(nodes)
 
-	rb, err := cluster.RBAC.RoleBindings(metav1.NamespaceAll).Controller().Lister().List(metav1.NamespaceAll, labelSelector)
+	cc.RoleBindings, err = cluster.RoleBindings(ctx)
 	if err != nil {
 		returnK8serror(err, rw, req)
 		return
 	}
-	cc.RoleBindings = len(rb)
 
-	crb, err := cluster.RBAC.ClusterRoleBindings(metav1.NamespaceAll).Controller().Lister().List(metav1.NamespaceAll, labelSelector)
+	cc.ClusterRoleBindings, err = cluster.ClusterRoleBindings(ctx)
 	if err != nil {
 		returnK8serror(err, rw, req)
 		return
 	}
-	cc.ClusterRoleBindings = len(crb)
 
 	js, err := json.Marshal(cc)
 	if err != nil {
