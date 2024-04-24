@@ -52,6 +52,11 @@ func RegisterOCIRepo(ctx context.Context,
 	clusterRepoController.OnChange(ctx, "oci-clusterrepo-helm", ociRepoHandler.onClusterRepoChange)
 }
 
+// This handler is retriggerd in the following cases
+// * When the spec of the ClusterRepo is changed.
+// * When there is no error from the handler, at a regular interval of 6 hours.
+// * When there is an error from the handler, at the wrangler's default error interval.
+// * When the response from OCI registry is anything 4xx HTTP status code, at an interval of 6 hours.
 func (o *OCIRepohandler) onClusterRepoChange(key string, clusterRepo *catalog.ClusterRepo) (*catalog.ClusterRepo, error) {
 	if clusterRepo == nil {
 		return nil, nil
@@ -72,11 +77,6 @@ func (o *OCIRepohandler) onClusterRepoChange(key string, clusterRepo *catalog.Cl
 		return o.setErrorCondition(clusterRepo, err, originalStatus)
 	}
 
-	if !shouldRefresh(&clusterRepo.Spec, &clusterRepo.Status) {
-		o.clusterRepoController.EnqueueAfter(clusterRepo.Name, interval)
-		return clusterRepo, nil
-	}
-
 	originalStatus.ObservedGeneration = clusterRepo.Generation
 	secret, err := catalogv2.GetSecret(o.secretCacheController, &clusterRepo.Spec, clusterRepo.Namespace)
 	if err != nil {
@@ -92,6 +92,10 @@ func (o *OCIRepohandler) onClusterRepoChange(key string, clusterRepo *catalog.Cl
 
 	downloadTime := metav1.Now()
 	index, err = getIndexfile(clusterRepo.Status, clusterRepo.Spec, o.configMapController, owner, clusterRepo.Namespace)
+	if err != nil {
+		return o.setErrorCondition(clusterRepo, err, originalStatus)
+	}
+	originalIndexBytes, err := json.Marshal(index)
 	if err != nil {
 		return o.setErrorCondition(clusterRepo, err, originalStatus)
 	}
@@ -130,17 +134,25 @@ func (o *OCIRepohandler) onClusterRepoChange(key string, clusterRepo *catalog.Cl
 		return o.setErrorCondition(clusterRepo, err, originalStatus)
 	}
 
-	index.SortEntries()
-	cm, err := createOrUpdateMap(clusterRepo.Namespace, index, owner, o.apply)
+	newIndexBytes, err := json.Marshal(index)
 	if err != nil {
 		return o.setErrorCondition(clusterRepo, err, originalStatus)
 	}
 
-	originalStatus.URL = clusterRepo.Spec.URL
-	originalStatus.IndexConfigMapName = cm.Name
-	originalStatus.IndexConfigMapNamespace = cm.Namespace
-	originalStatus.IndexConfigMapResourceVersion = cm.ResourceVersion
-	originalStatus.DownloadTime = downloadTime
+	// Only update, if the index got updated
+	if !bytes.Equal(originalIndexBytes, newIndexBytes) {
+		index.SortEntries()
+		cm, err := createOrUpdateMap(clusterRepo.Namespace, index, owner, o.apply)
+		if err != nil {
+			return o.setErrorCondition(clusterRepo, err, originalStatus)
+		}
+
+		originalStatus.URL = clusterRepo.Spec.URL
+		originalStatus.IndexConfigMapName = cm.Name
+		originalStatus.IndexConfigMapNamespace = cm.Namespace
+		originalStatus.IndexConfigMapResourceVersion = cm.ResourceVersion
+		originalStatus.DownloadTime = downloadTime
+	}
 
 	return o.setErrorCondition(clusterRepo, err, originalStatus)
 }
@@ -157,7 +169,7 @@ func (o *OCIRepohandler) setErrorCondition(clusterRepo *catalog.ClusterRepo, err
 		ociDownloaded.SetError(originalStatus, "", err)
 	}
 
-	if !equality.Semantic.DeepEqual(originalStatus, clusterRepo.Status) {
+	if !equality.Semantic.DeepEqual(originalStatus, &clusterRepo.Status) {
 		ociDownloaded.LastUpdated(originalStatus, time.Now().UTC().Format(time.RFC3339))
 
 		clusterRepo.Status = *originalStatus
@@ -165,9 +177,12 @@ func (o *OCIRepohandler) setErrorCondition(clusterRepo *catalog.ClusterRepo, err
 		if statusErr != nil {
 			err = statusErr
 		}
+
+		return clusterRepo, err
 	}
 
-	return clusterRepo, err
+	o.clusterRepoController.EnqueueAfter(clusterRepo.Name, interval)
+	return clusterRepo, nil
 }
 
 // set4xxCondition is only called when we receive a 4xx error
@@ -190,6 +205,7 @@ func (o *OCIRepohandler) set4xxCondition(clusterRepo *catalog.ClusterRepo, err *
 		return o.clusterRepoController.UpdateStatus(clusterRepo)
 	}
 
+	o.clusterRepoController.EnqueueAfter(clusterRepo.Name, interval)
 	return clusterRepo, nil
 }
 
