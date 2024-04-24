@@ -28,7 +28,7 @@ replace (
 )
 
 require (
-	github.com/rancher/aks-operator v1.3.0-rc5
+	github.com/rancher/aks-operator v1.3.0-rc11
 	github.com/rancher/eks-operator v1.4.0-rc9
 	github.com/rancher/fleet/pkg/apis v0.0.0-20231017140638-93432f288e79
 	github.com/rancher/gke-operator v1.3.0-rc6
@@ -61,7 +61,7 @@ require (
 	github.com/google/gnostic-models v0.6.8 // indirect
 	github.com/google/go-cmp v0.6.0 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
-	github.com/google/uuid v1.5.0 // indirect
+	github.com/google/uuid v1.6.0 // indirect
 	github.com/imdario/mergo v0.3.16 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
