@@ -6,12 +6,16 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"io"
+	"net/http"
+	"testing"
+	"time"
+
 	rv1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/plugin"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/shepherd/clients/rancher"
 	"github.com/rancher/shepherd/clients/rancher/catalog"
-	client "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
 	"github.com/rancher/shepherd/extensions/kubeconfig"
 	"github.com/rancher/shepherd/pkg/api/steve/catalog/types"
 	"github.com/rancher/shepherd/pkg/session"
@@ -19,16 +23,12 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"helm.sh/helm/v3/pkg/action"
-	"io"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kwait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/kubernetes"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
-	"net/http"
-	"testing"
-	"time"
 )
 
 type UIPluginTest struct {
@@ -37,7 +37,6 @@ type UIPluginTest struct {
 	session          *session.Session
 	restClientGetter genericclioptions.RESTClientGetter
 	catalogClient    *catalog.Client
-	cluster          *client.Cluster
 	corev1           corev1.CoreV1Interface
 	originalBranch   string
 	originalGitRepo  string
