@@ -417,8 +417,8 @@ func (c *ClusterRepoTestSuite) test429Error(params ClusterRepoParams) {
 	setClusterRepoURL(&clusterRepo.Spec, params.Type, params.URL1)
 	clusterRepo.Spec.InsecurePlainHTTP = params.InsecurePlainHTTP
 	expoValues := v1.ExponentialBackOffValues{
-		MinWait:    &metav1.Duration{Duration: 1 * time.Second},
-		MaxWait:    &metav1.Duration{Duration: 1 * time.Second},
+		MinWait:    "1s",
+		MaxWait:    "1s",
 		MaxRetries: 1,
 	}
 	clusterRepo.Spec.ExponentialBackOffValues = &expoValues
