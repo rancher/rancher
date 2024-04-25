@@ -359,6 +359,7 @@ func (p *ProjectRoleTemplateBinding) ObjClusterName() string {
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:subresource:status
 
 // ClusterRoleTemplateBinding is the object representing membership of a subject in a cluster with permissions
 // specified by a given role template.
@@ -394,6 +395,30 @@ type ClusterRoleTemplateBinding struct {
 	// RoleTemplateName is the name of the role template that defines permissions to perform actions on resources in the cluster. Immutable.
 	// +kubebuilder:validation:Required
 	RoleTemplateName string `json:"roleTemplateName" norman:"required,noupdate,type=reference[roleTemplate]"`
+
+	// Status is the most recently observed status of the ClusterRoleTemplateBinding
+	// +optional
+	Status ClusterRoleTemplateBindingStatus `json:"status,omitempty"`
+}
+
+// ClusterRoleTemplateBindingStatus represents the most recently observed status of the ClusterRoleTemplateBinding
+type ClusterRoleTemplateBindingStatus struct {
+	// ObservedGeneration is the most recent generation (metadata.generation in CRTB)
+	// observed by the controller. Populated by the system.
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+
+	// LastUpdateTime is a k8s timestamp of the last time the status was updated.
+	// +optional
+	LastUpdateTime string `json:"lastUpdateTime,omitempty"`
+
+	// Summary is a string. One of "Complete", "InProgress" or "Error".
+	// +optional
+	Summary string `json:"summary,omitempty"`
+
+	// Conditions is a slice of Condition, indicating the status of specific backing RBAC objects.
+	// +optional
+	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 }
 
 func (c *ClusterRoleTemplateBinding) ObjClusterName() string {

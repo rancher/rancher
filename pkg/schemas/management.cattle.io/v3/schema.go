@@ -318,7 +318,12 @@ func authzTypes(schemas *types.Schemas) *types.Schemas {
 		}).
 		MustImport(&Version, v3.GlobalRoleBinding{}).
 		MustImport(&Version, v3.RoleTemplate{}).
-		MustImport(&Version, v3.ClusterRoleTemplateBinding{}).
+		MustImportAndCustomize(&Version, v3.ClusterRoleTemplateBinding{}, func(s *types.Schema) {
+			s.MustCustomizeField("status", func(field types.Field) types.Field {
+				field.Nullable = false
+				return field
+			})
+		}).
 		MustImport(&Version, v3.ProjectRoleTemplateBinding{}).
 		MustImport(&Version, v3.GlobalRoleBinding{})
 }
