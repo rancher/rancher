@@ -36,7 +36,6 @@ const (
 
 type Controller struct {
 	secrets                   v1.SecretInterface
-	secretLister              v1.SecretLister
 	clusterNamespaceLister    v1.NamespaceLister
 	managementNamespaceLister v1.NamespaceLister
 	projectLister             v3.ProjectLister
@@ -75,7 +74,6 @@ func registerDeferred(ctx context.Context, cluster *config.UserContext) {
 	clusterSecretsClient := cluster.Core.Secrets("")
 	s := &Controller{
 		secrets:                   clusterSecretsClient,
-		secretLister:              clusterSecretsClient.Controller().Lister(),
 		clusterNamespaceLister:    cluster.Core.Namespaces("").Controller().Lister(),
 		managementNamespaceLister: cluster.Management.Core.Namespaces("").Controller().Lister(),
 		projectLister:             cluster.Management.Management.Projects(cluster.ClusterName).Controller().Lister(),
@@ -256,7 +254,7 @@ func (s *Controller) createOrUpdate(obj *corev1.Secret, action string) error {
 		namespacedSecret := getNamespacedSecret(obj, namespace.Name)
 		switch action {
 		case create:
-			if _, err := s.secretLister.Get(namespacedSecret.Namespace, namespacedSecret.Name); err == nil {
+			if _, err := s.secrets.GetNamespaced(namespacedSecret.Namespace, namespacedSecret.Name, metav1.GetOptions{}); err == nil {
 				continue
 			}
 			logrus.Infof("Copying secret [%s] into namespace [%s]", namespacedSecret.Name, namespace.Name)
@@ -265,7 +263,7 @@ func (s *Controller) createOrUpdate(obj *corev1.Secret, action string) error {
 				return err
 			}
 		case update:
-			if existing, err := s.secretLister.Get(namespacedSecret.Namespace, namespacedSecret.Name); err == nil &&
+			if existing, err := s.secrets.GetNamespaced(namespacedSecret.Namespace, namespacedSecret.Name, metav1.GetOptions{}); err == nil &&
 				reflect.DeepEqual(existing.Data, namespacedSecret.Data) {
 				continue
 			}
