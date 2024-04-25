@@ -11,7 +11,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/kubernetes"
 	clientv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
@@ -27,30 +26,34 @@ const (
 // as long as it can wrap it in a simplified lambda with this signature.
 type secretLister func(namespace string, selector labels.Selector) ([]*v1.Secret, error)
 
+func toSecretLister(ctx context.Context, secrets clientv1.SecretInterface) secretLister {
+	return func(_ string, selector labels.Selector) ([]*v1.Secret, error) {
+		secretList, err := secrets.List(ctx, metav1.ListOptions{
+			LabelSelector: selector.String(),
+		})
+		if err != nil {
+			return nil, err
+		}
+		result := make([]*v1.Secret, len(secretList.Items))
+		for i := range secretList.Items {
+			result[i] = &secretList.Items[i]
+		}
+		return result, nil
+	}
+}
+
 // EnsureSecretForServiceAccount gets or creates a service account token Secret for the provided Service Account.
 // For k8s <1.24, the secret is automatically generated for the service account. For >=1.24, we need to generate it explicitly.
-func EnsureSecretForServiceAccount(ctx context.Context, secretsCache corecontrollers.SecretCache, clientSet kubernetes.Interface, sa *v1.ServiceAccount) (*v1.Secret, error) {
+func EnsureSecretForServiceAccount(ctx context.Context, secretsCache corecontrollers.SecretCache, secretsGetter clientv1.SecretsGetter, sa *v1.ServiceAccount) (*v1.Secret, error) {
 	if sa == nil {
 		return nil, fmt.Errorf("could not ensure secret for invalid service account")
 	}
-	secretClient := clientSet.CoreV1().Secrets(sa.Namespace)
+	secretClient := secretsGetter.Secrets(sa.Namespace)
 	var secretLister secretLister
 	if secretsCache != nil {
 		secretLister = secretsCache.List
 	} else {
-		secretLister = func(_ string, selector labels.Selector) ([]*v1.Secret, error) {
-			secretList, err := secretClient.List(ctx, metav1.ListOptions{
-				LabelSelector: selector.String(),
-			})
-			if err != nil {
-				return nil, err
-			}
-			result := make([]*v1.Secret, len(secretList.Items))
-			for i := range secretList.Items {
-				result[i] = &secretList.Items[i]
-			}
-			return result, nil
-		}
+		secretLister = toSecretLister(ctx, secretClient)
 	}
 	secret, err := ServiceAccountSecret(ctx, sa, secretLister, secretClient)
 	if err != nil {
@@ -127,6 +130,9 @@ func serviceAccountSecretPrefix(sa *v1.ServiceAccount) string {
 func ServiceAccountSecret(ctx context.Context, sa *v1.ServiceAccount, secretLister secretLister, secretClient clientv1.SecretInterface) (*v1.Secret, error) {
 	if sa == nil {
 		return nil, fmt.Errorf("cannot get secret for nil service account")
+	}
+	if secretLister == nil {
+		secretLister = toSecretLister(ctx, secretClient)
 	}
 	secrets, err := secretLister(sa.Namespace, labels.SelectorFromSet(map[string]string{
 		ServiceAccountSecretLabel: sa.Name,

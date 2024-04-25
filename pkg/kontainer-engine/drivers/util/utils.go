@@ -95,7 +95,7 @@ func GenerateServiceAccountToken(clientset kubernetes.Interface) (string, error)
 	if serviceAccount, err = clientset.CoreV1().ServiceAccounts(cattleNamespace).Get(context.Background(), serviceAccount.Name, metav1.GetOptions{}); err != nil {
 		return "", fmt.Errorf("error getting service account: %w", err)
 	}
-	secret, err := serviceaccounttoken.EnsureSecretForServiceAccount(context.Background(), nil, clientset, serviceAccount)
+	secret, err := serviceaccounttoken.EnsureSecretForServiceAccount(context.Background(), nil, clientset.CoreV1(), serviceAccount)
 	if err != nil {
 		return "", fmt.Errorf("error ensuring secret for service account: %w", err)
 	}

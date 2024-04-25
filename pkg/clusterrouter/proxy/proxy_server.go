@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
@@ -201,6 +202,7 @@ func (r *RemoteService) Handler() http.Handler {
 }
 
 func (r *RemoteService) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	ctx := req.Context()
 	u, err := r.url()
 	if err != nil {
 		er.Error(rw, req, err)
@@ -229,18 +231,18 @@ func (r *RemoteService) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	if r.cluster.Spec.Internal && r.localAuth == "" {
 		req.Header.Del("Authorization")
 	} else {
-		userInfo, authed := request.UserFrom(req.Context())
+		userInfo, authed := request.UserFrom(ctx)
 		if !authed {
 			er.Error(rw, req, validation.Unauthorized)
 			return
 		}
 
-		if !authcontext.IsSAAuthenticated(req.Context()) {
+		if !authcontext.IsSAAuthenticated(ctx) {
 			// If the request is not authenticated as a service account,
 			// we need to use an impersonation token.
 			// This is because the impersonator service account does exist on the downstream cluster, and
 			// it has sufficient permissions to perform the TokenReview.
-			token, err := r.getImpersonatorAccountToken(userInfo)
+			token, err := r.getImpersonatorAccountToken(ctx, userInfo)
 			if err != nil && !strings.Contains(err.Error(), dialer2.ErrAgentDisconnected.Error()) {
 				er.Error(rw, req, fmt.Errorf("unable to create impersonator account: %w", err))
 				return
@@ -291,7 +293,7 @@ func (p *UpgradeProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 // getImpersonatorAccountToken creates, if not already present, a service account and role bindings
 // whose only permission is to impersonate the given user, and returns the bearer token for the account.
-func (r *RemoteService) getImpersonatorAccountToken(user user.Info) (string, error) {
+func (r *RemoteService) getImpersonatorAccountToken(ctx context.Context, user user.Info) (string, error) {
 	clusterContext, err := r.clusterContextGetter.UserContext(r.cluster.Name)
 	if err != nil {
 		return "", err
@@ -302,11 +304,11 @@ func (r *RemoteService) getImpersonatorAccountToken(user user.Info) (string, err
 		return "", fmt.Errorf("error creating impersonation for user %s: %w", user.GetUID(), err)
 	}
 
-	sa, err := i.SetUpImpersonation()
+	sa, err := i.SetUpImpersonation(ctx)
 	if err != nil {
 		return "", fmt.Errorf("error setting up impersonation for user %s: %w", user.GetUID(), err)
 	}
-	saToken, err := i.GetToken(sa)
+	saToken, err := i.GetToken(ctx, sa)
 	if err != nil {
 		return "", fmt.Errorf("error getting service account token: %w", err)
 	}

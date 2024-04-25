@@ -77,7 +77,7 @@ func getTokenFromToken(ctx context.Context, tokenBytes []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	secret, err := serviceaccounttoken.EnsureSecretForServiceAccount(ctx, nil, client, sa)
+	secret, err := serviceaccounttoken.EnsureSecretForServiceAccount(ctx, nil, client.CoreV1(), sa)
 	if err != nil {
 		return nil, err
 	}

@@ -148,7 +148,7 @@ func (h *handler) getToken(sa *corev1.ServiceAccount) (string, error) {
 	}
 
 	// create a secret-based token for the service account if one does not exist
-	secret, err := serviceaccounttoken.EnsureSecretForServiceAccount(h.ctx, h.secretsCache, h.k8s, sa)
+	secret, err := serviceaccounttoken.EnsureSecretForServiceAccount(h.ctx, h.secretsCache, h.k8s.CoreV1(), sa)
 	if err != nil {
 		return "", fmt.Errorf("error ensuring secret for service account [%s:%s]: %w", sa.Namespace, sa.Name, err)
 	}

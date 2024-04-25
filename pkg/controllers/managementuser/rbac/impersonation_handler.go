@@ -1,6 +1,8 @@
 package rbac
 
 import (
+	"context"
+
 	"github.com/rancher/rancher/pkg/impersonation"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -18,7 +20,7 @@ func (m *manager) ensureServiceAccountImpersonator(username string) error {
 	if err != nil {
 		return err
 	}
-	_, err = i.SetUpImpersonation()
+	_, err = i.SetUpImpersonation(context.TODO())
 	return err
 }
 
