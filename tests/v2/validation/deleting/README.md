@@ -27,3 +27,6 @@ These tests utilize Go build tags. Due to this, see the below examples on how to
 `gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/deleting --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestClusterDeleteTestSuite/TestDeletingCluster"`
 
 If the specified test passes immediately without warning, try adding the `-count=1` flag to get around this issue. This will avoid previous results from interfering with the new test run.
+
+### Delete Init Machine Suite (rke2/k3s)
+`gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/deleting --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestDeleteInitMachineTestSuite/TestDeleteInitMachine"`

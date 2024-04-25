@@ -617,12 +617,8 @@ github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerservice/armcontai
 github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerservice/armcontainerservice/v4 v4.8.0/go.mod h1:gYq8wyDgv6JLhGbAU6gg8amCPgQWRE+aCvrV2gyzdfs=
 github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/internal/v2 v2.0.0 h1:PTFGRSlMKCQelWwxUyYVEUqseBJVemLyqWJjvMyt0do=
 github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/internal/v2 v2.0.0/go.mod h1:LRr2FzBTQlONPPa5HREE5+RjSCTXl7BwOvYOaWTqCaI=
-github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/managementgroups/armmanagementgroups v1.0.0 h1:pPvTJ1dY0sA35JOeFq6TsY2xj6Z85Yo23Pj4wCCvu4o=
-github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/managementgroups/armmanagementgroups v1.0.0/go.mod h1:mLfWfj8v3jfWKsL9G4eoBoXVcsqcIUTapmdKy7uGOp0=
 github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork/v5 v5.1.1 h1:QZY6o3E/KX0QhgQpvat4UxAsXuBIb4efrFtZcqCUTbs=
 github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork/v5 v5.1.1/go.mod h1:8gv2PVzO0a+f4aWpe940Ouz0r4ifLj8H+/jxRXgwPxg=
-github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/operationalinsights/armoperationalinsights v1.2.0 h1:4FlNvfcPu7tTvOgOzXxIbZLvwvmZq1OdhQUdIa9g2N4=
-github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/operationalinsights/armoperationalinsights v1.2.0/go.mod h1:A4nzEXwVd5pAyneR6KOvUAo72svUc5rmCzRHhAbP6lA=
 github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources v1.2.0 h1:Dd+RhdJn0OTtVGaeDLZpcumkIVCtA/3/Fo42+eoYvVM=
 github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources v1.2.0/go.mod h1:5kakwfW5CjC9KK+Q4wjXAg+ShuIm2mBMua0ZFj2C8PE=
 github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/subscription/armsubscription v1.2.0 h1:UrGzkHueDwAWDdjQxC+QaXHd4tVCkISYE9j7fSSXF8k=
@@ -1356,6 +1352,8 @@ github.com/joho/godotenv v1.3.0/go.mod h1:7hK45KPybAkOC6peb+G5yklZfMxEjkZhHbwpqx
 github.com/jonboulle/clockwork v0.1.0/go.mod h1:Ii8DK3G1RaLaWxj9trq07+26W01tbo22gdxWY5EU2bo=
 github.com/jonboulle/clockwork v0.2.2 h1:UOGuzwb1PwsrDAObMuhUnj0p5ULPj8V/xJ7Kx9qUBdQ=
 github.com/jonboulle/clockwork v0.2.2/go.mod h1:Pkfl5aHPm1nk2H9h0bjmnJD/BcgbGXUBGnn1kMkgxc8=
+github.com/josh-diamond/shepherd v0.0.0-20240425164840-0c4fb5f33b50 h1:ccrU8A2jGkPG1P9Rh3KG/OUJbrPaVQhnLoDJ98W3ouY=
+github.com/josh-diamond/shepherd v0.0.0-20240425164840-0c4fb5f33b50/go.mod h1:yWG+A4NlpJkY2NQf6VyZ0elGAow4uy6IdlnqvOip32M=
 github.com/josharian/intern v1.0.0 h1:vlS4z54oSdjm0bgjRigI+G1HpF+tI+9rE5LLzOg8HmY=
 github.com/josharian/intern v1.0.0/go.mod h1:5DoeVV0s6jJacbCEi61lwdGj/aVlrQvzHFFd8Hwg//Y=
 github.com/jpillora/backoff v1.0.0/go.mod h1:J/6gKK9jxlEcS3zixgDgUAsiuZ7yrSoa/FX5e0EB2j4=
@@ -1664,8 +1662,8 @@ github.com/prometheus/procfs v0.9.0/go.mod h1:+pB4zwohETzFnmlpe6yd2lSc+0/46IYZRB
 github.com/prometheus/procfs v0.10.1 h1:kYK1Va/YMlutzCGazswoHKo//tZVlFpKYh+PymziUAg=
 github.com/prometheus/procfs v0.10.1/go.mod h1:nwNm2aOCAYw8uTR/9bWRREkZFxAUcWzPHWJq+XBB/FM=
 github.com/prometheus/tsdb v0.7.1/go.mod h1:qhTCs0VvXwvX/y3TZrWD7rabWM+ijKTux40TwIPHuXU=
-github.com/rancher/aks-operator v1.3.0-rc11 h1:KHELLM1MKijD2aqhZtZqGJX1BI0h5p2eTmbMgWRrd5I=
-github.com/rancher/aks-operator v1.3.0-rc11/go.mod h1:5EkWCP3mq0Ymt/C/eWgI68iQdzzDXfH1NOhB9Crcc4Y=
+github.com/rancher/aks-operator v1.3.0-rc5 h1:4yiTDMmPVZbp+Uy8WQprwElJ6R8yKA0aZema5VDMQo4=
+github.com/rancher/aks-operator v1.3.0-rc5/go.mod h1:ZWFl+bqxOXOJhVsSZybXwt3wxEEtPM/ujQjrtQZaRiQ=
 github.com/rancher/apiserver v0.0.0-20240207153957-4fd7d821d952 h1:lMf1jIqD/igkGv1V2ibBKsGLJWhWbJ4cy85U6FGLqaQ=
 github.com/rancher/apiserver v0.0.0-20240207153957-4fd7d821d952/go.mod h1:RBcpQs/KjClGntgKCd5XcrUX5J2Rz9sW5DGEMd7H5bw=
 github.com/rancher/channelserver v0.6.1-0.20240212155841-07630c8295da h1:M7p9bmFBw5kKgoBtkPXjDZTGoj94ZWt6NaTa/7jglB4=
@@ -1698,8 +1696,6 @@ github.com/rancher/remotedialer v0.3.0 h1:y1EO8JCsgZo0RcqTUp6U8FXcBAv27R+TLnWRcp
 github.com/rancher/remotedialer v0.3.0/go.mod h1:BwwztuvViX2JrLLUwDlsYt5DiyUwHLlzynRwkZLAY0Q=
 github.com/rancher/rke v1.6.0-rc1 h1:4aYfGiG4gxL5k44M3jpDoKfQqI1lxdl4GAVPRMvKMj8=
 github.com/rancher/rke v1.6.0-rc1/go.mod h1:vojhOf8U8VCmw7y17OENWXSIfEFPEbXCMQcmI7xN7i8=
-github.com/rancher/shepherd v0.0.0-20240424170735-64c67a5265b7 h1:Nb1ILiB0/OaNTSa2h9KIhLN3abG41aUBINNO2fSSiB4=
-github.com/rancher/shepherd v0.0.0-20240424170735-64c67a5265b7/go.mod h1:yWG+A4NlpJkY2NQf6VyZ0elGAow4uy6IdlnqvOip32M=
 github.com/rancher/steve v0.0.0-20240314145706-870824dc8f49 h1:FVWzTCgR2bRcKIWqgJCa7L4s8J1S8HfCJMnqoSj99yg=
 github.com/rancher/steve v0.0.0-20240314145706-870824dc8f49/go.mod h1:+MET7wv8z6yycUt6NRDQzrd+h/j91tumImDg29w7eTw=
 github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007 h1:ru+mqGnxMmKeU0Q3XIDxkARvInDIqT1hH2amTcsjxI4=
@@ -1960,8 +1956,6 @@ go.uber.org/goleak v1.1.12/go.mod h1:cwTWslyiVhfpKIDGSZEM2HlOvcqm+tG4zioyIeLoqMQ
 go.uber.org/goleak v1.2.0/go.mod h1:XJYK+MuIchqpmGmUSAzotztawfKvYLUIgg7guXrwVUo=
 go.uber.org/goleak v1.2.1 h1:NBol2c7O1ZokfZ0LEU9K6Whx/KnwvepVetCUhtKja4A=
 go.uber.org/goleak v1.2.1/go.mod h1:qlT2yGI9QafXHhZZLxlSuNsMw3FFLxBr+tBRlmO1xH4=
-go.uber.org/mock v0.4.0 h1:VcM4ZOtdbR4f6VXfiOpwpVJDL6lCReaZ6mw31wqh7KU=
-go.uber.org/mock v0.4.0/go.mod h1:a6FSlNadKUHUa9IP5Vyt1zh4fC7uAwxMutEAscFbkZc=
 go.uber.org/multierr v1.1.0/go.mod h1:wR5kodmAFQ0UK8QlbwjlSNy0Z68gJhDJUG5sjR94q/0=
 go.uber.org/multierr v1.6.0/go.mod h1:cdWPpRnG4AhwMwsgIHip0KRBQjJy5kYEpYjJxpXp9iU=
 go.uber.org/multierr v1.11.0 h1:blXXJkSxSSfBVBlC76pxqeO+LN3aDfLQo+309xJstO0=
