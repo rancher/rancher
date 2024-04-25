@@ -259,16 +259,16 @@ func (u *UpgradeWorkloadTestSuite) testPreUpgradeSingleCluster(clusterName strin
 		require.NoError(u.T(), err)
 
 		if !loggingChart.IsAlreadyInstalled {
-			clusterName, err := clusters.GetClusterNameByID(client, project.ClusterID)
+			// Get cluster meta
+			cluster, err := clusters.NewClusterMeta(client, clusterName)
 			require.NoError(u.T(), err)
 			latestLoggingVersion, err := client.Catalog.GetLatestChartVersion(charts.RancherLoggingName, catalog.RancherChartRepo)
 			require.NoError(u.T(), err)
 
 			loggingChartInstallOption := &charts.InstallOptions{
-				ClusterName: clusterName,
-				ClusterID:   project.ClusterID,
-				Version:     latestLoggingVersion,
-				ProjectID:   project.ID,
+				Cluster:   cluster,
+				Version:   latestLoggingVersion,
+				ProjectID: project.ID,
 			}
 
 			loggingChartFeatureOption := &charts.RancherLoggingOpts{
