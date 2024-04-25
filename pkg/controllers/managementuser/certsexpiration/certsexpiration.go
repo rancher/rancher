@@ -3,15 +3,16 @@ package certsexpiration
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"strings"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	rketypes "github.com/rancher/rke/types"
 
 	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
-	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/kontainer-engine/cluster"
 	"github.com/rancher/rancher/pkg/rkecerts"
@@ -22,7 +23,6 @@ import (
 	"github.com/rancher/rke/services"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -31,7 +31,9 @@ type Controller struct {
 	ClusterLister v3.ClusterLister
 	ClusterClient v3.ClusterInterface
 	ClusterStore  cluster.PersistentStore
-	SecretLister  v1.SecretLister
+	secretLister  interface {
+		ListNamespaced(string, metav1.ListOptions) (*corev1.SecretList, error)
+	}
 }
 
 func Register(ctx context.Context, userContext *config.UserContext) {
@@ -58,7 +60,7 @@ func registerDeferred(ctx context.Context, userContext *config.UserContext) {
 		ClusterLister: userContext.Management.Management.Clusters("").Controller().Lister(),
 		ClusterClient: userContext.Management.Management.Clusters(""),
 		ClusterStore:  clusterprovisioner.NewPersistentStore(userContext.Management.Core.Namespaces(""), userContext.Management.Core),
-		SecretLister:  userContext.Core.Secrets("").Controller().Lister(),
+		secretLister:  userContext.Core.Secrets(""),
 	}
 
 	userContext.Management.Management.Clusters("").AddHandler(ctx, "certificate-expiration", c.sync)
@@ -143,13 +145,14 @@ func getRKECurrentStateFromStore(store cluster.PersistentStore, clusterName stri
 
 func (c Controller) getCertsFromUserCluster() (map[string]pki.CertificatePKI, error) {
 	certs := map[string]pki.CertificatePKI{}
-	secrets, err := c.SecretLister.List("kube-system", labels.Everything())
+	secrets, err := c.secretLister.ListNamespaced(metav1.NamespaceSystem, metav1.ListOptions{
+		FieldSelector: fmt.Sprintf("type=%s", corev1.SecretTypeOpaque),
+	})
 	if err != nil {
 		return nil, err
 	}
-	for _, secret := range secrets {
-		if strings.HasPrefix(secret.GetName(), "kube-") &&
-			secret.Type == corev1.SecretTypeOpaque {
+	for _, secret := range secrets.Items {
+		if strings.HasPrefix(secret.GetName(), "kube-") {
 			cert, ok := secret.Data["Certificate"]
 			if !ok {
 				logrus.Debugf("secret [%s] for cluster [%s] doesn't contain a certificate", secret.GetName(), c.ClusterName)
