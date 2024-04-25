@@ -13,7 +13,7 @@ COPY --from=final / /chroot/
 # Install some packages with zypper in the chroot of the final micro image
 RUN zypper refresh && \
     zypper --installroot /chroot -n in --no-recommends \
-    curl ca-certificates jq git-core hostname iproute2 vim-small less \
+    curl util-linux ca-certificates ca-certificates-mozilla jq git-core hostname iproute2 vim-small less \
 	bash-completion bind-utils acl openssh-clients tar gzip xz gawk sysstat && \
     zypper --installroot /chroot clean -a && \
     rm -rf /chroot/var/cache/zypp/* /chroot/var/log/zypp/* /chroot/tmp/* /chroot/var/tmp/* /chroot/usr/share/doc/packages/*
@@ -23,11 +23,13 @@ FROM final
 
 # Copy binaries and configuration files from builder to micro
 COPY --from=builder /chroot/ /
-COPY --from=builder \
-    /usr/bin/unshare \
-    /usr/bin/mount \
-    /usr/bin/umount \
-    /usr/bin/
+
+# Test that some of the dependency binaries were copied
+# and are working on the target image.
+RUN /usr/bin/unshare --version && \
+    /usr/bin/mount --version && \
+    /usr/bin/umount --version && \
+    /usr/bin/nsenter --version
 
 ARG ARCH=amd64
 ENV KUBECTL_VERSION v1.27.10
