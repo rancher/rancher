@@ -48,8 +48,6 @@ func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.U
 
 	// register controller for API
 	cluster.APIAggregation.APIServices("").Controller()
-	// register secrets controller for impersonation
-	cluster.Core.Secrets("").Controller()
 
 	if clusterRec.Spec.LocalClusterAuthEndpoint.Enabled {
 		err := clusterauthtoken.CRDSetup(ctx, cluster.UserOnlyContext())
@@ -61,7 +59,6 @@ func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.U
 
 	// Ensure these caches are started
 	cluster.Core.Namespaces("").Controller()
-	cluster.Core.Secrets("").Controller()
 	cluster.Core.ServiceAccounts("").Controller()
 
 	return managementuserlegacy.Register(ctx, mgmt, cluster, clusterRec, kubeConfigGetter)
