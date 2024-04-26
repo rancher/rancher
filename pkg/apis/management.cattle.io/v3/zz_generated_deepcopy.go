@@ -3675,7 +3675,11 @@ func (in *GlobalRole) DeepCopyInto(out *GlobalRole) {
 			(*out)[key] = outVal
 		}
 	}
-	in.InheritedFleetWorkspacePermissions.DeepCopyInto(&out.InheritedFleetWorkspacePermissions)
+	if in.InheritedFleetWorkspacePermissions != nil {
+		in, out := &in.InheritedFleetWorkspacePermissions, &out.InheritedFleetWorkspacePermissions
+		*out = new(FleetWorkspacePermission)
+		(*in).DeepCopyInto(*out)
+	}
 	in.Status.DeepCopyInto(&out.Status)
 	return
 }

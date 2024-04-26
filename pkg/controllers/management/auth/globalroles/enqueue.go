@@ -256,8 +256,8 @@ func (g *globalRBACEnqueuer) fleetWorkspaceEnqueueGR(_, _ string, obj runtime.Ob
 	}
 	var grToSync []relatedresource.Key
 	for _, gr := range grs {
-		if gr.InheritedFleetWorkspacePermissions.WorkspaceVerbs != nil ||
-			gr.InheritedFleetWorkspacePermissions.ResourceRules != nil {
+		if gr.InheritedFleetWorkspacePermissions != nil && (gr.InheritedFleetWorkspacePermissions.WorkspaceVerbs != nil ||
+			gr.InheritedFleetWorkspacePermissions.ResourceRules != nil) {
 			// Set the status as InProgress since we have to reconcile the global role
 			gr.Status.Summary = SummaryInProgress
 			grToSync = append(grToSync, relatedresource.Key{Name: gr.Name})

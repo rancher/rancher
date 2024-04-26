@@ -1098,7 +1098,7 @@ func TestFleetWorkspaceEnqueueGRB(t *testing.T) {
 				state.grCacheMock.EXPECT().List(labels.Everything()).Return([]*v3.GlobalRole{
 					{
 						ObjectMeta: metav1.ObjectMeta{Name: "gr1"},
-						InheritedFleetWorkspacePermissions: v3.FleetWorkspacePermission{
+						InheritedFleetWorkspacePermissions: &v3.FleetWorkspacePermission{
 							ResourceRules: []v1.PolicyRule{
 								{
 									Verbs:     []string{"*"},

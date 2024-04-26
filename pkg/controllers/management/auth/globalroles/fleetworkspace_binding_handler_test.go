@@ -33,7 +33,7 @@ var (
 			Name: grName,
 			UID:  grUID,
 		},
-		InheritedFleetWorkspacePermissions: v3.FleetWorkspacePermission{
+		InheritedFleetWorkspacePermissions: &v3.FleetWorkspacePermission{
 			ResourceRules: []rbac.PolicyRule{
 				{
 					Verbs:     []string{"get", "list"},

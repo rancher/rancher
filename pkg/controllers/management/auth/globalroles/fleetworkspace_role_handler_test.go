@@ -23,7 +23,7 @@ var (
 			Name: grName,
 			UID:  grUID,
 		},
-		InheritedFleetWorkspacePermissions: v3.FleetWorkspacePermission{
+		InheritedFleetWorkspacePermissions: &v3.FleetWorkspacePermission{
 			ResourceRules: []rbac.PolicyRule{
 				{
 					Verbs:     []string{"get", "list"},
@@ -146,7 +146,7 @@ func TestReconcileFleetPermissions(t *testing.T) {
 					Name: grName,
 					UID:  grUID,
 				},
-				InheritedFleetWorkspacePermissions: v3.FleetWorkspacePermission{
+				InheritedFleetWorkspacePermissions: &v3.FleetWorkspacePermission{
 					ResourceRules: []rbac.PolicyRule{
 						{
 							Verbs:     []string{"*"},
@@ -337,7 +337,7 @@ func TestReconcileFleetPermissions_errors(t *testing.T) {
 					Name: grName,
 					UID:  grUID,
 				},
-				InheritedFleetWorkspacePermissions: v3.FleetWorkspacePermission{
+				InheritedFleetWorkspacePermissions: &v3.FleetWorkspacePermission{
 					ResourceRules: gr.InheritedFleetWorkspacePermissions.ResourceRules,
 				},
 			},

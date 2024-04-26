@@ -46,7 +46,7 @@ spec:
             type: array
           inheritedFleetWorkspacePermissions:
             description: InheritedFleetWorkspacePermissions are the permissions granted
-              by this GlobalRoles in every fleet workspace besides the local one.
+              by this GlobalRole in every fleet workspace besides the local one.
             properties:
               resourceRules:
                 description: ResourceRules rules granted in all backing namespaces

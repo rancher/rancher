@@ -85,7 +85,7 @@ func (h *fleetWorkspaceBindingHandler) reconcileResourceRulesBindings(grb *v3.Gl
 				returnError = multierror.Append(returnError, fmt.Errorf("couldn't get RoleBinding %s : %w", wrangler.SafeConcatName(grb.Name), err))
 				continue
 			}
-			if gr.InheritedFleetWorkspacePermissions.ResourceRules != nil {
+			if gr.InheritedFleetWorkspacePermissions != nil && gr.InheritedFleetWorkspacePermissions.ResourceRules != nil {
 				_, err = h.crCache.Get(desiredRB.RoleRef.Name)
 				if err != nil {
 					returnError = multierror.Append(returnError, fmt.Errorf("couldn't get ClusterRole: %w", err))
@@ -99,7 +99,7 @@ func (h *fleetWorkspaceBindingHandler) reconcileResourceRulesBindings(grb *v3.Gl
 			continue
 		}
 
-		if gr.InheritedFleetWorkspacePermissions.ResourceRules == nil {
+		if gr.InheritedFleetWorkspacePermissions == nil || gr.InheritedFleetWorkspacePermissions.ResourceRules == nil {
 			err := h.rbClient.Delete(rb.Namespace, rb.Name, &metav1.DeleteOptions{})
 			if err != nil && !apierrors.IsNotFound(err) {
 				returnError = multierror.Append(returnError, fmt.Errorf("couldn't clean up RoleBinding: %w", err))
@@ -133,7 +133,7 @@ func (h *fleetWorkspaceBindingHandler) reconcileWorkspaceVerbsBindings(grb *v3.G
 		if !apierrors.IsNotFound(err) {
 			return fmt.Errorf("couldn't get ClusterRoleBinding: %w", err)
 		}
-		if gr.InheritedFleetWorkspacePermissions.ResourceRules != nil {
+		if gr.InheritedFleetWorkspacePermissions != nil && gr.InheritedFleetWorkspacePermissions.ResourceRules != nil {
 			_, err = h.crCache.Get(desiredCRB.RoleRef.Name)
 			if err != nil {
 				return fmt.Errorf("couldn't get ClusterRole: %w", err)
@@ -146,7 +146,7 @@ func (h *fleetWorkspaceBindingHandler) reconcileWorkspaceVerbsBindings(grb *v3.G
 		return nil
 	}
 
-	if gr.InheritedFleetWorkspacePermissions.ResourceRules == nil {
+	if gr.InheritedFleetWorkspacePermissions == nil || gr.InheritedFleetWorkspacePermissions.ResourceRules == nil {
 		err := h.crbClient.Delete(crbName, &metav1.DeleteOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
 			return fmt.Errorf("couldn't clean up ClusterRoleBinding: %w", err)

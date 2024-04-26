@@ -171,7 +171,7 @@ type GlobalRole struct {
 	// InheritedFleetWorkspacePermissions are the permissions granted by this GlobalRole in every fleet workspace besides
 	// the local one.
 	// +optional
-	InheritedFleetWorkspacePermissions FleetWorkspacePermission `json:"inheritedFleetWorkspacePermissions,omitempty"`
+	InheritedFleetWorkspacePermissions *FleetWorkspacePermission `json:"inheritedFleetWorkspacePermissions,omitempty"`
 
 	// Status is the most recently observed status of the GlobalRole.
 	// +optional
