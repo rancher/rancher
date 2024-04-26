@@ -409,6 +409,7 @@ func TestGetOrasRegistry(t *testing.T) {
 		assert.NoError(t, err)
 
 		orasRegistry, err := ociClient.GetOrasRegistry()
+		assert.Nil(t, orasRegistry.Client.(*auth.Client).Cache)
 		assert.Equal(t, orasRegistry.PlainHTTP, tc.insecurePlainHTTP)
 		policy := orasRegistry.Client.(*auth.Client).Client.Transport.(*retry.Transport).Policy().(*retry.GenericPolicy)
 
@@ -450,6 +451,7 @@ func TestGetOrasRepository(t *testing.T) {
 		assert.NoError(err)
 
 		orasRepo, err := ociClient.GetOrasRepository()
+		assert.Equal(orasRepo.Client.(*auth.Client).Cache, nil)
 		assert.Equal(orasRepo.PlainHTTP, tc.insecurePlainHTTP)
 		if tc.expectedErr != nil {
 			assert.ErrorContains(err, tc.expectedErr.Error())
