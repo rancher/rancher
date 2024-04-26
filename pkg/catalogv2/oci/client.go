@@ -280,7 +280,6 @@ func (o *Client) GetOrasRegistry() (*remote.Registry, error) {
 	}
 
 	orasRegistry.Client = &auth.Client{
-		Cache: auth.DefaultCache,
 		Credential: func(ctx context.Context, reg string) (auth.Credential, error) {
 			return auth.Credential{
 				Username: o.username,
@@ -308,7 +307,6 @@ func (o *Client) GetOrasRepository() (*remote.Repository, error) {
 	}
 
 	orasRepository.Client = &auth.Client{
-		Cache: auth.DefaultCache,
 		Credential: func(ctx context.Context, reg string) (auth.Credential, error) {
 			return auth.Credential{
 				Username: o.username,
