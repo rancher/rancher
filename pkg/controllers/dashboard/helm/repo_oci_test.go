@@ -278,7 +278,7 @@ func TestGetRetryPolicy(t *testing.T) {
 		{
 			name: "Should get max wait from clusterRepo",
 			backOffValues: &catalog.ExponentialBackOffValues{
-				MaxWait: &metav1.Duration{Duration: 1 * time.Hour},
+				MaxWait: "1h",
 			},
 			expectedRetryPolicy: retryPolicy{
 				MinWait:  1 * time.Second,
@@ -289,11 +289,34 @@ func TestGetRetryPolicy(t *testing.T) {
 		{
 			name: "Should get min wait from clusterRepo",
 			backOffValues: &catalog.ExponentialBackOffValues{
-				MinWait: &metav1.Duration{Duration: 1 * time.Minute},
+				MinWait: "1m",
 			},
 			expectedRetryPolicy: retryPolicy{
 				MinWait:  1 * 1 * time.Minute,
 				MaxWait:  5 * time.Second,
+				MaxRetry: 5,
+			},
+		},
+		{
+			name: "minWait should be at least 1 second",
+			backOffValues: &catalog.ExponentialBackOffValues{
+				MinWait: "150ms",
+			},
+			expectedRetryPolicy: retryPolicy{
+				MinWait:  1 * time.Second,
+				MaxWait:  5 * time.Second,
+				MaxRetry: 5,
+			},
+		},
+		{
+			name: "minWait cant be less than maxWait",
+			backOffValues: &catalog.ExponentialBackOffValues{
+				MinWait: "1m",
+				MaxWait: "5s",
+			},
+			expectedRetryPolicy: retryPolicy{
+				MinWait:  1 * 1 * time.Minute,
+				MaxWait:  1 * 1 * time.Minute,
 				MaxRetry: 5,
 			},
 		},
@@ -314,12 +337,14 @@ func TestGetRetryPolicy(t *testing.T) {
 func TestShouldResetRetries(t *testing.T) {
 	interval = 1 * time.Hour
 	testCases := []struct {
-		name              string
-		ociDownloadedTime time.Time
-		lastStatusUpdate  *metav1.Time
-		forceUpdate       *metav1.Time
-		timeNow           func() time.Time
-		expected          bool
+		name               string
+		ociDownloadedTime  time.Time
+		lastStatusUpdate   *metav1.Time
+		forceUpdate        *metav1.Time
+		timeNow            func() time.Time
+		generation         int64
+		observedGeneration int64
+		expected           bool
 	}{
 		{
 			name:              "Should reset retries if interval has passed and status was not updated after the interval",
@@ -341,28 +366,44 @@ func TestShouldResetRetries(t *testing.T) {
 			},
 			expected: false,
 		},
+		{
+			name:              "Should reset retries if generation has changed",
+			ociDownloadedTime: time.Date(2024, 04, 23, 10, 0, 0, 0, time.UTC),
+			lastStatusUpdate:  &metav1.Time{Time: time.Date(2024, 04, 23, 11, 1, 0, 0, time.UTC)},
+			forceUpdate:       nil,
+			timeNow: func() time.Time {
+				return time.Date(2024, 04, 23, 10, 1, 0, 0, time.UTC)
+			},
+			generation:         2,
+			observedGeneration: 3,
+			expected:           false,
+		},
 	}
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			timeNow = testCase.timeNow
 			clusterRepo := &catalog.ClusterRepo{
-				ObjectMeta: metav1.ObjectMeta{ManagedFields: []metav1.ManagedFieldsEntry{
-					{
-						Subresource: "status",
-						Operation:   metav1.ManagedFieldsOperationUpdate,
-						Time:        testCase.lastStatusUpdate,
-					},
-				}},
+				ObjectMeta: metav1.ObjectMeta{
+					Generation: testCase.generation,
+					ManagedFields: []metav1.ManagedFieldsEntry{
+						{
+							Subresource: "status",
+							Operation:   metav1.ManagedFieldsOperationUpdate,
+							Time:        testCase.lastStatusUpdate,
+						},
+					}},
 				Spec: catalog.RepoSpec{
 					ForceUpdate: testCase.forceUpdate,
 				},
-				Status: catalog.RepoStatus{Conditions: []genericcondition.GenericCondition{
-					{
-						Type:           string(catalog.OCIDownloaded),
-						LastUpdateTime: testCase.ociDownloadedTime.Format(time.RFC3339),
-					},
-				}},
+				Status: catalog.RepoStatus{
+					ObservedGeneration: testCase.observedGeneration,
+					Conditions: []genericcondition.GenericCondition{
+						{
+							Type:           string(catalog.OCIDownloaded),
+							LastUpdateTime: testCase.ociDownloadedTime.Format(time.RFC3339),
+						},
+					}},
 			}
 			assert.Equal(t, testCase.expected, shouldResetRetries(clusterRepo))
 		})

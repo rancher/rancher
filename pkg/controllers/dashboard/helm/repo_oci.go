@@ -93,6 +93,8 @@ func (o *OCIRepohandler) onClusterRepoChange(key string, clusterRepo *catalog.Cl
 		clusterRepo.Status.NextRetryAt = metav1.Time{}
 	}
 
+	// The handler is triggered immediately after any changes, including when updating the number of retries done.
+	// This check is to prevent the handler from executing before the backoff time has passed
 	if !clusterRepo.Status.NextRetryAt.IsZero() && clusterRepo.Status.NextRetryAt.Time.After(timeNow()) {
 		return clusterRepo, nil
 	}
@@ -100,6 +102,7 @@ func (o *OCIRepohandler) onClusterRepoChange(key string, clusterRepo *catalog.Cl
 	retryPolicy := getRetryPolicy(clusterRepo)
 
 	if clusterRepo.Status.NumberOfRetries > retryPolicy.MaxRetry {
+		logrus.Infof("Maximum number of retries for oci repository %s reached, will retry after %s", key, interval)
 		return clusterRepo, nil
 	}
 
@@ -200,7 +203,6 @@ func (o *OCIRepohandler) onClusterRepoChange(key string, clusterRepo *catalog.Cl
 		originalStatus.IndexConfigMapNamespace = cm.Namespace
 		originalStatus.IndexConfigMapResourceVersion = cm.ResourceVersion
 		originalStatus.DownloadTime = downloadTime
-		originalStatus.NumberOfRetries = 0
 	}
 
 	return o.setErrorCondition(clusterRepo, err, originalStatus)
@@ -370,16 +372,24 @@ func getRetryPolicy(clusterRepo *catalog.ClusterRepo) retryPolicy {
 		if clusterRepo.Spec.ExponentialBackOffValues.MaxRetries > 0 {
 			retryPolicy.MaxRetry = clusterRepo.Spec.ExponentialBackOffValues.MaxRetries
 		}
-		if clusterRepo.Spec.ExponentialBackOffValues.MaxWait != "" {
-			maxWait, err := time.ParseDuration(clusterRepo.Spec.ExponentialBackOffValues.MaxWait)
-			if err == nil {
-				retryPolicy.MaxWait = maxWait
-			}
-		}
 		if clusterRepo.Spec.ExponentialBackOffValues.MinWait != "" {
 			minWait, err := time.ParseDuration(clusterRepo.Spec.ExponentialBackOffValues.MinWait)
 			if err == nil {
-				retryPolicy.MinWait = minWait
+				if minWait >= 1*time.Second {
+					retryPolicy.MinWait = minWait
+				}
+				logrus.Warnf("retry policy minWait should be at least 1 second")
+			}
+		}
+		if clusterRepo.Spec.ExponentialBackOffValues.MaxWait != "" {
+			maxWait, err := time.ParseDuration(clusterRepo.Spec.ExponentialBackOffValues.MaxWait)
+			if err == nil {
+				if maxWait >= retryPolicy.MinWait {
+					retryPolicy.MaxWait = maxWait
+				} else {
+					logrus.Warnf("retry policy maxWait can be less than retryPolicy minWait")
+					retryPolicy.MaxWait = retryPolicy.MinWait
+				}
 			}
 		}
 	}
@@ -388,16 +398,21 @@ func getRetryPolicy(clusterRepo *catalog.ClusterRepo) retryPolicy {
 
 // shouldResetRetries checks to see if the interval has passed or if we need to do a force update
 func shouldResetRetries(clusterRepo *catalog.ClusterRepo) bool {
+	// check if generation has changed
+	if clusterRepo.Generation > clusterRepo.Status.ObservedGeneration {
+		return true
+	}
 	var lastStatusUpdate time.Time
 	for _, field := range clusterRepo.ManagedFields {
+		// get the last time the status was updated
 		if field.Operation == metav1.ManagedFieldsOperationUpdate && field.Subresource == "status" {
 			lastStatusUpdate = field.Time.Time.UTC()
 		}
 	}
 	ociDownloaded := condition.Cond(catalog.OCIDownloaded)
-	ociDownloadedTime, _ := time.Parse(time.RFC3339, ociDownloaded.GetLastUpdated(clusterRepo))
+	ociDownloadedUpdateTime, _ := time.Parse(time.RFC3339, ociDownloaded.GetLastUpdated(clusterRepo))
 	// interval has passed. lastStatusUpdate will always be greater than zero if the ociDownloaded Condition exists
-	if !ociDownloadedTime.IsZero() && ociDownloadedTime.Add(interval).Before(timeNow().UTC()) && ociDownloadedTime.Add(interval).After(lastStatusUpdate) {
+	if !ociDownloadedUpdateTime.IsZero() && ociDownloadedUpdateTime.Add(interval).Before(timeNow().UTC()) && ociDownloadedUpdateTime.Add(interval).After(lastStatusUpdate) {
 		return true
 	}
 	return false
