@@ -164,7 +164,7 @@ func (g GenericOIDCProvider) RefetchGroupPrincipals(principalID string, secret s
 func (g GenericOIDCProvider) CanAccessWithGroupProviders(userPrincipalID string, groupPrincipals []v3.Principal) (bool, error) {
 	config, err := g.GetOIDCConfig()
 	if err != nil {
-		logrus.Errorf("[generic oidc] canAccessWithGroupProviders: error fetching OIDCConfig: %v", err)
+		logrus.Errorf("[generic oidc] canAccessWithGroupProviders: error fetching GenericOIDCConfig: %v", err)
 		return false, err
 	}
 	allowed, err := g.UserMGR.CheckAccess(config.AccessMode, config.AllowedPrincipalIDs, userPrincipalID, groupPrincipals)

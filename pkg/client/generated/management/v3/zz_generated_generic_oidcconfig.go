@@ -15,6 +15,7 @@ const (
 	GenericOIDCConfigFieldGroupSearchEnabled  = "groupSearchEnabled"
 	GenericOIDCConfigFieldGroupsClaim         = "groupsClaim"
 	GenericOIDCConfigFieldIssuer              = "issuer"
+	GenericOIDCConfigFieldJWKSUrl             = "jwksUrl"
 	GenericOIDCConfigFieldLabels              = "labels"
 	GenericOIDCConfigFieldName                = "name"
 	GenericOIDCConfigFieldOwnerReferences     = "ownerReferences"
@@ -41,6 +42,7 @@ type GenericOIDCConfig struct {
 	GroupSearchEnabled  *bool             `json:"groupSearchEnabled,omitempty" yaml:"groupSearchEnabled,omitempty"`
 	GroupsClaim         string            `json:"groupsClaim,omitempty" yaml:"groupsClaim,omitempty"`
 	Issuer              string            `json:"issuer,omitempty" yaml:"issuer,omitempty"`
+	JWKSUrl             string            `json:"jwksUrl,omitempty" yaml:"jwksUrl,omitempty"`
 	Labels              map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Name                string            `json:"name,omitempty" yaml:"name,omitempty"`
 	OwnerReferences     []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`

@@ -497,14 +497,15 @@ type GenericOIDCConfig struct {
 
 	ClientID           string `json:"clientId" norman:"required"`
 	ClientSecret       string `json:"clientSecret,omitempty" norman:"required,type=password"`
-	AuthEndpoint       string `json:"authEndpoint,omitempty" norman:"required,notnullable"`
+	RancherURL         string `json:"rancherUrl" norman:"required,notnullable"`
 	Issuer             string `json:"issuer" norman:"required,notnullable"`
+	AuthEndpoint       string `json:"authEndpoint,omitempty" norman:"required,notnullable"`
+	JWKSUrl            string `json:"jwksUrl,omitempty"`
 	Certificate        string `json:"certificate,omitempty"`
 	PrivateKey         string `json:"privateKey,omitempty" norman:"type=password"`
-	RancherURL         string `json:"rancherUrl" norman:"required,notnullable"`
-	GroupsClaim        string `json:"groupsClaim"`
 	GroupSearchEnabled *bool  `json:"groupSearchEnabled"`
-	Scopes             string `json:"scopes"`
+	GroupsClaim        string `json:"groupsClaim,omitempty"`
+	Scopes             string `json:"scopes,omitempty"`
 }
 
 type GenericOIDCApplyInput struct {
