@@ -30,14 +30,14 @@ replace (
 require (
 	github.com/rancher/aks-operator v1.2.1
 	github.com/rancher/eks-operator v1.3.1
-	github.com/rancher/fleet/pkg/apis v0.9.1-rc.2.0.20240213164401-2c6b1019687c
+	github.com/rancher/fleet/pkg/apis v0.9.4
 	github.com/rancher/gke-operator v1.2.1
 	github.com/rancher/norman v0.0.0-20240206180703-6eda4bc94b4c
 	github.com/rancher/rke v1.5.9-rc1
 	github.com/rancher/wrangler/v2 v2.1.4
 	github.com/sirupsen/logrus v1.9.3
-	k8s.io/api v0.28.6
-	k8s.io/apimachinery v0.28.6
+	k8s.io/api v0.28.8
+	k8s.io/apimachinery v0.28.8
 	sigs.k8s.io/cluster-api v1.5.5
 )
 
@@ -77,10 +77,10 @@ require (
 	github.com/prometheus/procfs v0.10.1 // indirect
 	github.com/rancher/lasso v0.0.0-20240123150939-7055397d6dfa // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
-	golang.org/x/net v0.21.0 // indirect
+	golang.org/x/net v0.23.0 // indirect
 	golang.org/x/oauth2 v0.16.0 // indirect
-	golang.org/x/sys v0.17.0 // indirect
-	golang.org/x/term v0.17.0 // indirect
+	golang.org/x/sys v0.18.0 // indirect
+	golang.org/x/term v0.18.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.3.0 // indirect
