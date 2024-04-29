@@ -118,6 +118,7 @@ func (c *checker) updateClusterConnectedCondition(cluster *v3.Cluster, connected
 			v3.ClusterConditionReady.Reason(cluster, "Disconnected")
 			v3.ClusterConditionReady.Message(cluster, "Cluster agent is not connected")
 		}
+		logrus.Tracef("[clusterConnectedCondition] update cluster %v", cluster.Name)
 		_, err := c.clusters.Update(cluster)
 		if apierror.IsConflict(err) {
 			cluster, err = c.clusters.Get(cluster.Name, metav1.GetOptions{})
