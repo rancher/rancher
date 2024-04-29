@@ -14,6 +14,7 @@ import (
 	"github.com/rancher/norman/types/convert"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
+	oidcclient "github.com/rancher/rancher/pkg/auth/providers/oidc"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	publicclient "github.com/rancher/rancher/pkg/client/generated/management/v3public"
@@ -236,7 +237,7 @@ func (g GenericOIDCProvider) getUserInfo(ctx *context.Context, config *v32.Gener
 	var oauth2Token *oauth2.Token
 	var err error
 
-	updatedContext, err := AddCertKeyToContext(*ctx, config.Certificate, config.PrivateKey)
+	updatedContext, err := oidcclient.AddCertKeyToContext(*ctx, config.Certificate, config.PrivateKey)
 	if err != nil {
 		return userInfo, oauth2Token, err
 	}
