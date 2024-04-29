@@ -152,6 +152,7 @@ func Configure(ctx context.Context, mgmt *config.ScaledContext) {
 	p = genericoidc.Configure(ctx, mgmt, userMGR, tokenMGR)
 	ProviderNames[genericoidc.Name] = true
 	providersWithSecrets[genericoidc.Name] = true
+	UnrefreshableProviders[genericoidc.Name] = true
 	Providers[genericoidc.Name] = p
 	providersByType[client.GenericOIDCConfigType] = p
 	providersByType[publicclient.GenericOIDCProviderType] = p

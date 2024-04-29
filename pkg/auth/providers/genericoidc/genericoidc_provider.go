@@ -3,6 +3,7 @@ package genericoidc
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -116,9 +117,26 @@ func (g GenericOIDCProvider) LoginUser(ctx context.Context, oauthLoginInfo *v32.
 	return userPrincipal, groupPrincipals, string(oauthToken), userClaimInfo, nil
 }
 
-func (g GenericOIDCProvider) SearchPrincipals(name, principalType string, myToken v3.Token) ([]v3.Principal, error) {
-	//TODO implement me
-	return nil, nil
+// SearchPrincipals will return a principal of the requested principalType with a displayName and loginName
+// that match the searchValue.  This is done because OIDC does not have a proper lookup mechanism.  In order
+// to provide some degree of functionality that allows manual entry for users/groups, this is the compromise.
+func (g GenericOIDCProvider) SearchPrincipals(searchValue, principalType string, _ v3.Token) ([]v3.Principal, error) {
+	var principals []v3.Principal
+
+	if principalType == "" {
+		principalType = UserType
+	}
+
+	p := v3.Principal{
+		ObjectMeta:    metav1.ObjectMeta{Name: g.Name + "_" + principalType + "://" + searchValue},
+		DisplayName:   searchValue,
+		LoginName:     searchValue,
+		PrincipalType: principalType,
+		Provider:      g.Name,
+	}
+
+	principals = append(principals, p)
+	return principals, nil
 }
 
 func (g GenericOIDCProvider) GetPrincipal(principalID string, token v3.Token) (v3.Principal, error) {
@@ -137,27 +155,10 @@ func (g GenericOIDCProvider) TransformToAuthProvider(authConfig map[string]inter
 	return p, nil
 }
 
+// RefetchGroupPrincipals is not implemented for OIDC.  The typical lifespan of a refresh token (minutes, not hours or days)
+// would not grant the functionality that we require.
 func (g GenericOIDCProvider) RefetchGroupPrincipals(principalID string, secret string) ([]v3.Principal, error) {
-	var groupPrincipals []v3.Principal
-	var claimInfo ClaimInfo
-
-	config, err := g.GetOIDCConfig()
-	if err != nil {
-		logrus.Errorf("[generic oidc] refetchGroupPrincipals: error fetching OIDCConfig: %v", err)
-		return groupPrincipals, err
-	}
-	// need to get the user information so that the refreshed token can be saved using the username / userID
-	user, err := g.UserMGR.GetUserByPrincipalID(principalID)
-	if err != nil {
-		logrus.Errorf("[generic oidc] refetchGroupPrincipals: error getting user by principalID: %v", err)
-		return groupPrincipals, err
-	}
-	//do not need userInfo or oauth2Token since we are only processing groups
-	_, _, err = g.getUserInfo(&g.CTX, config, secret, &claimInfo, user.Name)
-	if err != nil {
-		return groupPrincipals, err
-	}
-	return g.getGroupsFromClaimInfo(claimInfo), nil
+	return nil, errors.New("Not implemented")
 }
 
 func (g GenericOIDCProvider) CanAccessWithGroupProviders(userPrincipalID string, groupPrincipals []v3.Principal) (bool, error) {
