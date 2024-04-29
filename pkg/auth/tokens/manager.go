@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"reflect"
+	"sort"
 	"time"
 
 	"github.com/rancher/norman/httperror"
@@ -26,7 +28,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -570,7 +571,7 @@ func (m *Manager) EnsureAndGetUserAttribute(userID string) (*v3.UserAttribute, b
 	return attribs, true, nil
 }
 
-func (m *Manager) userAttributeCreateOrUpdate(userID, provider string, groupPrincipals []v3.Principal, userExtraInfo map[string][]string) error {
+func (m *Manager) UserAttributeCreateOrUpdate(userID, provider string, groupPrincipals []v3.Principal, userExtraInfo map[string][]string, loginTime ...time.Time) error {
 	attribs, needCreate, err := m.EnsureAndGetUserAttribute(userID)
 	if err != nil {
 		return err
@@ -589,8 +590,12 @@ func (m *Manager) userAttributeCreateOrUpdate(userID, provider string, groupPrin
 	}
 	attribs.ExtraByProvider[provider] = userExtraInfo
 
-	// Login time is truncated to seconds as the corresponding user label is set as epoch time.
-	attribs.LastLogin = metav1.NewTime(time.Now().Truncate(time.Second))
+	var shouldUpdate bool
+	if len(loginTime) > 0 && !loginTime[0].IsZero() {
+		// Login time is truncated to seconds as the corresponding user label is set as epoch time.
+		attribs.LastLogin = metav1.NewTime(loginTime[0].Truncate(time.Second))
+		shouldUpdate = true
+	}
 
 	if needCreate {
 		_, err = m.userAttributes.Create(attribs)
@@ -601,25 +606,50 @@ func (m *Manager) userAttributeCreateOrUpdate(userID, provider string, groupPrin
 		return nil
 	}
 
-	_, err = m.userAttributes.Update(attribs)
-	if err != nil {
-		return fmt.Errorf("failed to update UserAttribute: %w", err)
+	if shouldUpdate || m.userAttributeChanged(attribs, provider, userExtraInfo, groupPrincipals) {
+		_, err = m.userAttributes.Update(attribs)
+		if err != nil {
+			return fmt.Errorf("failed to update UserAttribute: %w", err)
+		}
 	}
 
 	return nil
 }
 
-var uaBackoff = wait.Backoff{
-	Duration: time.Millisecond * 100,
-	Factor:   2,
-	Jitter:   .2,
-	Steps:    5,
+func (m *Manager) userAttributeChanged(attribs *v32.UserAttribute, provider string, extraInfo map[string][]string, groupPrincipals []v32.Principal) bool {
+	oldSet := []string{}
+	newSet := []string{}
+
+	if len(attribs.GroupPrincipals[provider].Items) != len(groupPrincipals) {
+		return true
+	}
+
+	for _, principal := range attribs.GroupPrincipals[provider].Items {
+		oldSet = append(oldSet, principal.ObjectMeta.Name)
+	}
+	for _, principal := range groupPrincipals {
+		newSet = append(newSet, principal.ObjectMeta.Name)
+	}
+	sort.Strings(oldSet)
+	sort.Strings(newSet)
+
+	for i := range oldSet {
+		if oldSet[i] != newSet[i] {
+			return true
+		}
+	}
+
+	if attribs.ExtraByProvider == nil && extraInfo != nil {
+		return true
+	}
+
+	return !reflect.DeepEqual(attribs.ExtraByProvider[provider], extraInfo)
 }
 
 // PerUserCacheProviders is a set of provider names for which the token manager creates a per-user login token.
 var PerUserCacheProviders = []string{"github", "azuread", "googleoauth", "oidc", "keycloakoidc"}
 
-func (m *Manager) NewLoginToken(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerToken string, ttl int64, description string, userExtraInfo map[string][]string) (v3.Token, string, error) {
+func (m *Manager) NewLoginToken(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerToken string, ttl int64, description string) (v3.Token, string, error) {
 	provider := userPrincipal.Provider
 	// Providers that use oauth need to create a secret for storing the access token.
 	if utils.Contains(PerUserCacheProviders, provider) && providerToken != "" {
@@ -627,18 +657,6 @@ func (m *Manager) NewLoginToken(userID string, userPrincipal v3.Principal, group
 		if err != nil {
 			return v3.Token{}, "", fmt.Errorf("unable to create secret: %s", err)
 		}
-	}
-
-	err := wait.ExponentialBackoff(uaBackoff, func() (bool, error) {
-		err := m.userAttributeCreateOrUpdate(userID, provider, groupPrincipals, userExtraInfo)
-		if err != nil {
-			logrus.Warnf("Error creating or updating userAttribute for %v: %v", userID, err)
-			return false, nil
-		}
-		return true, nil
-	})
-	if err != nil {
-		return v3.Token{}, "", errors.New("unable to create userAttribute")
 	}
 
 	token := &v3.Token{
@@ -654,6 +672,7 @@ func (m *Manager) NewLoginToken(userID string, userPrincipal v3.Principal, group
 			},
 		},
 	}
+
 	return m.createToken(token)
 }
 
@@ -717,8 +736,8 @@ func (m *Manager) IsMemberOf(token v3.Token, group v3.Principal) bool {
 	return groups[group.Name]
 }
 
-func (m *Manager) CreateTokenAndSetCookie(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerToken string, ttl int, description string, request *types.APIContext, userExtraInfo map[string][]string) error {
-	token, unhashedTokenKey, err := m.NewLoginToken(userID, userPrincipal, groupPrincipals, providerToken, 0, description, userExtraInfo)
+func (m *Manager) CreateTokenAndSetCookie(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerToken string, ttl int, description string, request *types.APIContext) error {
+	token, unhashedTokenKey, err := m.NewLoginToken(userID, userPrincipal, groupPrincipals, providerToken, 0, description)
 	if err != nil {
 		logrus.Errorf("Failed creating token with error: %v", err)
 		return httperror.NewAPIErrorLong(500, "", fmt.Sprintf("Failed creating token with error: %v", err))

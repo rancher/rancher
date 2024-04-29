@@ -31,15 +31,15 @@ func (g *ghProvider) actionHandler(actionName string, action *types.Action, requ
 	}
 
 	if actionName == "configureTest" {
-		return g.configureTest(actionName, action, request)
+		return g.configureTest(request)
 	} else if actionName == "testAndApply" {
-		return g.testAndApply(actionName, action, request)
+		return g.testAndApply(request)
 	}
 
 	return httperror.NewAPIError(httperror.ActionNotAvailable, "")
 }
 
-func (g *ghProvider) configureTest(actionName string, action *types.Action, request *types.APIContext) error {
+func (g *ghProvider) configureTest(request *types.APIContext) error {
 	githubConfig := &v32.GithubConfig{}
 	if err := json.NewDecoder(request.Request.Body).Decode(githubConfig); err != nil {
 		return httperror.NewAPIError(httperror.InvalidBodyContent,
@@ -88,7 +88,7 @@ func githubRedirectURL(hostname, clientID string, tls bool) string {
 	return redirect
 }
 
-func (g *ghProvider) testAndApply(actionName string, action *types.Action, request *types.APIContext) error {
+func (g *ghProvider) testAndApply(request *types.APIContext) error {
 	var githubConfig v32.GithubConfig
 	githubConfigApplyInput := &v32.GithubConfigApplyInput{}
 
@@ -110,7 +110,7 @@ func (g *ghProvider) testAndApply(actionName string, action *types.Action, reque
 		githubConfig.ClientSecret = value
 	}
 
-	//Call provider to testLogin
+	// Call provider to testLogin
 	userPrincipal, groupPrincipals, providerInfo, err := g.LoginUser("", githubLogin, &githubConfig, true)
 	if err != nil {
 		if httperror.IsAPIError(err) {
@@ -119,7 +119,7 @@ func (g *ghProvider) testAndApply(actionName string, action *types.Action, reque
 		return errors.Wrap(err, "server error while authenticating")
 	}
 
-	//if this works, save githubConfig CR adding enabled flag
+	// if this works, save githubConfig CR adding enabled flag
 	user, err := g.userMGR.SetPrincipalOnCurrentUser(request, userPrincipal)
 	if err != nil {
 		return err
@@ -132,6 +132,10 @@ func (g *ghProvider) testAndApply(actionName string, action *types.Action, reque
 	}
 
 	userExtraInfo := g.GetUserExtraAttributes(userPrincipal)
+	err = g.tokenMGR.UserAttributeCreateOrUpdate(user.Name, userPrincipal.Provider, groupPrincipals, userExtraInfo)
+	if err != nil {
+		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Failed to create or update userAttribute: %v", err))
+	}
 
-	return g.tokenMGR.CreateTokenAndSetCookie(user.Name, userPrincipal, groupPrincipals, providerInfo, 0, "Token via Github Configuration", request, userExtraInfo)
+	return g.tokenMGR.CreateTokenAndSetCookie(user.Name, userPrincipal, groupPrincipals, providerInfo, 0, "Token via Github Configuration", request)
 }
