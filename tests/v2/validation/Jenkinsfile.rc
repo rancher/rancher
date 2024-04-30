@@ -26,7 +26,7 @@ node {
     def config = env.CONFIG
     def rancherToken = ""
     def filename = "config.yaml"
-    def individualJob = (jobName =~ /(go-recurring-[a-z]+)/)[0][1]
+    def individualJob = "go-recurring-daily"
     individualJob = "${individualJob}-individual-job"
 
     if ("${env.BRANCH}" != "null" && "${env.BRANCH}" != "") {
@@ -75,7 +75,7 @@ node {
                           string(credentialsId: 'ADMIN_PASSWORD', variable: 'ADMIN_PASSWORD'),
                           string(credentialsId: 'USER_PASSWORD', variable: 'USER_PASSWORD'),
                           
-                          string(credentialsId: 'AWS_SSH_PEM_KEY', variable: 'AWS_SSH_PEM_KEY'),
+                          string(credentialsId: 'AWS_RSA_KEY_NAME', variable: 'AWS_RSA_KEY_NAME'),
                           string(credentialsId: 'AWS_SSH_RSA_KEY', variable: 'AWS_SSH_RSA_KEY'),
 
                           string(credentialsId: 'RANCHER_VALID_TLS_CERT', variable: 'RANCHER_VALID_TLS_CERT'),
@@ -139,7 +139,7 @@ node {
               }
               dir ("./") {
                 sh "./rancher/tests/v2/validation/configure.sh"
-                sh "docker build . -f ./rancher/tests/v2/validation/Dockerfile.e2e -t ${imageName}"
+                sh "docker build . -f ./rancher/tests/v2/validation/Dockerfile.e2e --build-arg CLI_VERSION=\"${CLI_VERSION}\" -t ${imageName}"
                 sh "docker volume create --name ${validationVolume}"
               }
             }
@@ -159,23 +159,61 @@ node {
               }
             }
             try {
+              stage ('Run Local Cluster Tests') {
+                jobs = [:]
+                // start a validation run for tests that need to be on the local cluster only
+                sh "docker cp ${buildTestContainer}:${workPath}${filename} ./"
+
+                def mainRancherConfigPath = "./${filename}"
+
+                def tags = sh (
+                  script: "./yq '.testCases.tags'  ${mainRancherConfigPath}",
+                  returnStdout: true
+                ).trim()
+
+                def runFlag = sh (  
+                  script: "./yq '.testCases.runFlag'  ${mainRancherConfigPath}",
+                  returnStdout: true
+                ).trim()
+
+                sh "./yq e '.rancher.clusterName = \"local\"' -i ${mainRancherConfigPath}"
+                sh "./yq e '.rancher.rancherCLI = true' -i ${mainRancherConfigPath}"
+
+                def configYaml = readFile(file: "${mainRancherConfigPath}")
+                // This is the config for the local cluster i.e. CLI tests
+                def goValidationParams = [
+                  string(name: 'TIMEOUT', value: timeout),
+                  text(name: 'CONFIG', value: configYaml),
+                  string(name: 'REPO', value: "${rancherRepo}"),
+                  string(name: 'BRANCH', value: "${branch}"),
+                  string(name: 'TEST_PACKAGE', value: "${env.TEST_PACKAGE}"),
+                  string(name: 'TAGS', value: tags),
+                  string(name: 'CLI_VERSION', value: "${CLI_VERSION}"),
+                  string(name: 'GOTEST_TESTCASE', value: "${env.GOTEST_LOCAL}"),
+                ]
+
+                jobs["$it-local-validation"] = { build job: individualJob, parameters: goValidationParams }
+                parallel jobs
+
+                sh "./yq e 'del(.rancher.rancherCLI)' -i ${mainRancherConfigPath}"
+              }
               stage ('Generate configuration files') {
-                  sh "docker run --volumes-from ${buildTestContainer} --name ${configGeneratorContainer} -t -e CATTLE_TEST_CONFIG=\$CATTLE_TEST_CONFIG " +
-                    "${imageName} sh -c \"${workPath}pipeline/releaseupgrade/releaseupgrade.sh\""
+                sh "docker run --volumes-from ${buildTestContainer} --name ${configGeneratorContainer} -t -e CATTLE_TEST_CONFIG=\$CATTLE_TEST_CONFIG " +
+                  "${imageName} sh -c \"${workPath}pipeline/releaseupgrade/releaseupgrade.sh\""
 
-                  sh "docker cp ${configGeneratorContainer}:${rootPath}${configsDir}/ ."
+                sh "docker cp ${configGeneratorContainer}:${rootPath}${configsDir}/ ."
 
-                  def configs = sh(script: "ls -1 ./${configsDir}", returnStdout: true).split()
+                def configs = sh(script: "ls -1 ./${configsDir}", returnStdout: true).split()
 
-                  for (int i = 0; i < configs.size(); i++) {
-                      def configName = configs[i]
-                      echo "pushing ${configName} to the global variable"
-                      configFiles << "${configName}"
-                  }
+                for (int i = 0; i < configs.size(); i++) {
+                    def configName = configs[i]
+                    echo "pushing ${configName} to the global variable"
+                    configFiles << "${configName}"
+                }
 
-                  println "Building the image again with the config files"
-                  sh "./rancher/tests/v2/validation/configure.sh"
-                  sh "docker build . -f ./rancher/tests/v2/validation/Dockerfile.e2e -t ${imageName}"
+                println "Building the image again with the config files"
+                sh "./rancher/tests/v2/validation/configure.sh"
+                sh "docker build . -f ./rancher/tests/v2/validation/Dockerfile.e2e --build-arg CLI_VERSION=\"${CLI_VERSION}\" -t ${imageName}"
               }
               stage('Deploys clusters') {
                 try {
@@ -215,6 +253,7 @@ node {
                       }
                     }
                   }
+
                   parallel jobs
                 } catch(err){
                     echo "Provisioning tests had failures: " + err
@@ -259,7 +298,7 @@ node {
                         sh "./yq e '.rancher.clusterName = \"${clusterName}\"' -i ${mainRancherConfigPath}"
 
                         def configYaml = readFile(file: "${mainRancherConfigPath}")
-
+                        // This is the config for the glue-code clusters
                         def goValidationParams = [
                           string(name: 'TIMEOUT', value: timeout),
                           text(name: 'CONFIG', value: configYaml),
@@ -267,24 +306,28 @@ node {
                           string(name: 'BRANCH', value: "${branch}"),
                           string(name: 'QASE_TEST_RUN_ID', value: "${testRunID}"),
                           string(name: 'TEST_PACKAGE', value: "${env.TEST_PACKAGE}"),
-                          string(name: 'GOTEST_TESTCASE', value: "${runFlag} -p 1"),
+                          string(name: 'GOTEST_TESTCASE', value: "${runFlag}"),
                           string(name: 'TAGS', value: tags),
+                          string(name: 'CLI_VERSION', value: "${CLI_VERSION}"),
+                          string(name: 'GOTEST_TESTCASE', value: "${env.GOTEST_SINGLE_CLUSTER}"),
                         ]
 
                         jobs["$it-test-validation"] = { build job: individualJob, parameters: goValidationParams }
+
+
                       } catch(err) {
                         echo "Test Validation $it had failures: " + err
                       }
                     }
 
                     if ("${env.TAGS}" != "") {
-                      sh "./yq e 'del(.provisioningInput.machinePools)' -i ${mainRancherConfigPath}"
-                      sh "./yq e 'del(.provisioningInput.nodePools)' -i ${mainRancherConfigPath}"
-                      
+                      // need to add RSA key to jenkins before windows will work
+                      // sh "./yq '.provisioningInput.machinePools += [{\"machinePoolConfig\": {\"windows\": true, \"quantity\": 1}}]' -i ${mainRancherConfigPath}"
                       sh "./yq e '.corralConfigs.corralConfigVars.aws_hostname_prefix = \"k3spro\"' -i ${mainRancherConfigPath}"
                       sh "./yq e '.corralConfigs.corralConfigVars.hostname = \"k3spro.qa.rancher.space\"' -i ${mainRancherConfigPath}"
                       sh "./yq e 'del(.corralConfigs.corralConfigVars.rancher_version)' -i ${mainRancherConfigPath}"
                       sh "./yq e 'del(.corralConfigs.corralConfigVars.rancher_image_tag)' -i ${mainRancherConfigPath}"
+                      sh "./yq e 'del(.corralConfigs.corralConfigVars.kubernetes_version)' -i ${mainRancherConfigPath}"
 
                       sh "./yq e 'del(.corralPackages.corralPackageImages.rancherha)' -i ${mainRancherConfigPath}"
                       
@@ -298,7 +341,7 @@ node {
                         string(name: 'QASE_TEST_RUN_ID', value: "${testRunID}"),
                         string(name: 'TEST_PACKAGE', value: "${env.TEST_PACKAGE}"),
                         string(name: 'TAGS', value: "${env.TAGS}"),
-                        string(name: 'GOTEST_TESTCASE', value: "${env.GOTEST_TESTCASE} -p 1"),
+                        string(name: 'GOTEST_TESTCASE', value: "${env.GOTEST_TESTCASE}"),
                       ]
 
                       jobs["provisioning-test-validation"] = { build job: individualJob, parameters: goValidationParams }
