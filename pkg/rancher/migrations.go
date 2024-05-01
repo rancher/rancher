@@ -38,12 +38,14 @@ const (
 	migrateFromMachineToPlanSecret             = "migratefrommachinetoplanesecret"
 	migrateEncryptionKeyRotationLeaderToStatus = "migrateencryptionkeyrotationleadertostatus"
 	migrateDynamicSchemaToMachinePools         = "migratedynamicschematomachinepools"
+	migrateSystemAgentVarDirToDataDirectory    = "migratesystemagentvardirtodatadirectory"
 	rancherVersionKey                          = "rancherVersion"
 	projectsCreatedKey                         = "projectsCreated"
 	namespacesAssignedKey                      = "namespacesAssigned"
 	capiMigratedKey                            = "capiMigrated"
 	encryptionKeyRotationStatusMigratedKey     = "encryptionKeyRotationStatusMigrated"
 	dynamicSchemaMachinePoolsMigratedKey       = "dynamicSchemaMachinePoolsMigrated"
+	systemAgentVarDirMigratedKey               = "systemAgentVarDirMigrated"
 )
 
 func runMigrations(wranglerContext *wrangler.Context) error {
@@ -62,6 +64,11 @@ func runMigrations(wranglerContext *wrangler.Context) error {
 	}
 
 	if features.RKE2.Enabled() {
+		// must migrate system agent data directory first, since update requests will be rejected by webhook if
+		// "CATTLE_AGENT_VAR_DIR" is set within AgentEnvVars.
+		if err := migrateSystemAgentDataDirectory(wranglerContext); err != nil {
+			return err
+		}
 		if err := migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(wranglerContext); err != nil {
 			return err
 		}
@@ -501,6 +508,46 @@ func migrateMachinePoolsDynamicSchemaLabel(w *wrangler.Context) error {
 	}
 
 	cm.Data[dynamicSchemaMachinePoolsMigratedKey] = "true"
+	return createOrUpdateConfigMap(w.Core.ConfigMap(), cm)
+}
+
+func migrateSystemAgentDataDirectory(w *wrangler.Context) error {
+	cm, err := getConfigMap(w.Core.ConfigMap(), migrateSystemAgentVarDirToDataDirectory)
+	if err != nil || cm == nil {
+		return err
+	}
+
+	if cm.Data[systemAgentVarDirMigratedKey] == "true" {
+		return nil
+	}
+
+	provClusters, err := w.Provisioning.Cluster().List("", metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+
+	for _, cluster := range provClusters.Items {
+		systemAgentDataDir := ""
+		for i, e := range cluster.Spec.AgentEnvVars {
+			if e.Name == "CATTLE_AGENT_VAR_DIR" {
+				systemAgentDataDir = e.Value
+				cluster = *cluster.DeepCopy()
+				cluster.Spec.AgentEnvVars = append(cluster.Spec.AgentEnvVars[:i], cluster.Spec.AgentEnvVars[i+1:]...)
+				// don't break, the webhook allows duplicate entries and the last one would have been the effective data dir
+			}
+		}
+		if systemAgentDataDir == "" {
+			continue
+		}
+
+		cluster.Spec.RKEConfig.DataDirectories.SystemAgent = systemAgentDataDir
+		_, err = w.Provisioning.Cluster().Update(&cluster)
+		if err != nil {
+			return err
+		}
+	}
+
+	cm.Data[systemAgentVarDirMigratedKey] = "true"
 	return createOrUpdateConfigMap(w.Core.ConfigMap(), cm)
 }
 
