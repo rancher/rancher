@@ -5,20 +5,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"reflect"
 	"strings"
 
 	"github.com/coreos/go-oidc/v3/oidc"
-	"github.com/rancher/norman/httperror"
-	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
-	oidcclient "github.com/rancher/rancher/pkg/auth/providers/oidc"
+	baseoidc "github.com/rancher/rancher/pkg/auth/providers/oidc"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	publicclient "github.com/rancher/rancher/pkg/client/generated/management/v3public"
-	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
@@ -28,21 +24,15 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
+type GenericOIDCProvider struct {
+	baseoidc.OpenIDCProvider
+}
+
 const (
 	Name      = "genericoidc"
 	UserType  = "user"
 	GroupType = "group"
 )
-
-type GenericOIDCProvider struct {
-	Name        string
-	Type        string
-	CTX         context.Context
-	AuthConfigs v3.AuthConfigInterface
-	Secrets     corev1.SecretInterface
-	UserMGR     user.Manager
-	TokenMGR    *tokens.Manager
-}
 
 type ClaimInfo struct {
 	Subject           string   `json:"sub"`
@@ -58,64 +48,20 @@ type ClaimInfo struct {
 
 func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *tokens.Manager) common.AuthProvider {
 	return &GenericOIDCProvider{
-		Name:        Name,
-		Type:        client.OIDCConfigType,
-		CTX:         ctx,
-		AuthConfigs: mgmtCtx.Management.AuthConfigs(""),
-		Secrets:     mgmtCtx.Core.Secrets(""),
-		UserMGR:     userMGR,
-		TokenMGR:    tokenMGR,
+		baseoidc.OpenIDCProvider{
+			Name:        Name,
+			Type:        client.GenericOIDCConfigType,
+			CTX:         ctx,
+			AuthConfigs: mgmtCtx.Management.AuthConfigs(""),
+			Secrets:     mgmtCtx.Core.Secrets(""),
+			UserMGR:     userMGR,
+			TokenMGR:    tokenMGR,
+		},
 	}
 }
 
 func (g GenericOIDCProvider) GetName() string {
 	return Name
-}
-
-func (g GenericOIDCProvider) AuthenticateUser(ctx context.Context, input interface{}) (v3.Principal, []v3.Principal, string, error) {
-	login, ok := input.(*v32.GenericOIDCLogin)
-	if !ok {
-		return v3.Principal{}, nil, "", fmt.Errorf("unexpected input type")
-	}
-	userPrincipal, groupPrincipals, providerToken, _, err := g.LoginUser(ctx, login, nil)
-	return userPrincipal, groupPrincipals, providerToken, err
-}
-
-func (g GenericOIDCProvider) LoginUser(ctx context.Context, oauthLoginInfo *v32.GenericOIDCLogin, config *v32.OIDCConfig) (v3.Principal, []v3.Principal, string, ClaimInfo, error) {
-	var userPrincipal v3.Principal
-	var groupPrincipals []v3.Principal
-	var userClaimInfo ClaimInfo
-	var err error
-
-	if config == nil {
-		config, err = g.GetOIDCConfig()
-		if err != nil {
-			return userPrincipal, nil, "", userClaimInfo, err
-		}
-	}
-	userInfo, oauth2Token, err := g.getUserInfo(&ctx, config, oauthLoginInfo.Code, &userClaimInfo, "")
-	if err != nil {
-		return userPrincipal, groupPrincipals, "", userClaimInfo, err
-	}
-	userPrincipal = g.userToPrincipal(userInfo, userClaimInfo)
-	userPrincipal.Me = true
-	groupPrincipals = g.getGroupsFromClaimInfo(userClaimInfo)
-
-	logrus.Debugf("[generic oidc] loginuser: checking user's access to rancher")
-	allowed, err := g.UserMGR.CheckAccess(config.AccessMode, config.AllowedPrincipalIDs, userPrincipal.Name, groupPrincipals)
-	if err != nil {
-		return userPrincipal, groupPrincipals, "", userClaimInfo, err
-	}
-	if !allowed {
-		return userPrincipal, groupPrincipals, "", userClaimInfo, httperror.NewAPIError(httperror.Unauthorized, "unauthorized")
-	}
-	// save entire oauthToken because it contains refresh_token and token expiry time
-	// will use with oauth2.Client and with TokenSource to ensure auto refresh of tokens occurs for api calls
-	oauthToken, err := json.Marshal(oauth2Token)
-	if err != nil {
-		return userPrincipal, groupPrincipals, "", userClaimInfo, err
-	}
-	return userPrincipal, groupPrincipals, string(oauthToken), userClaimInfo, nil
 }
 
 // SearchPrincipals will return a principal of the requested principalType with a displayName and loginName
@@ -143,11 +89,6 @@ func (g GenericOIDCProvider) SearchPrincipals(searchValue, principalType string,
 func (g GenericOIDCProvider) GetPrincipal(principalID string, token v3.Token) (v3.Principal, error) {
 	//TODO implement me
 	return v3.Principal{}, nil
-}
-
-func (g GenericOIDCProvider) CustomizeSchema(schema *types.Schema) {
-	schema.ActionHandler = g.ActionHandler
-	schema.Formatter = g.Formatter
 }
 
 func (g GenericOIDCProvider) TransformToAuthProvider(authConfig map[string]interface{}) (map[string]interface{}, error) {
@@ -232,82 +173,82 @@ func (g GenericOIDCProvider) GetOIDCConfig() (*v32.OIDCConfig, error) {
 	return storedOidcConfig, nil
 }
 
-func (g GenericOIDCProvider) getUserInfo(ctx *context.Context, config *v32.OIDCConfig, authCode string, claimInfo *ClaimInfo, userName string) (*oidc.UserInfo, *oauth2.Token, error) {
-	var userInfo *oidc.UserInfo
-	var oauth2Token *oauth2.Token
-	var err error
+//func (g GenericOIDCProvider) getUserInfo(ctx *context.Context, config *v32.OIDCConfig, authCode string, claimInfo *ClaimInfo, userName string) (*oidc.UserInfo, *oauth2.Token, error) {
+//	var userInfo *oidc.UserInfo
+//	var oauth2Token *oauth2.Token
+//	var err error
+//
+//	updatedContext, err := baseoidc.AddCertKeyToContext(*ctx, config.Certificate, config.PrivateKey)
+//	if err != nil {
+//		return userInfo, oauth2Token, err
+//	}
+//
+//	provider, err := oidc.NewProvider(updatedContext, config.Issuer)
+//	if err != nil {
+//		return userInfo, oauth2Token, err
+//	}
+//	oauthConfig := ConfigToOauthConfig(provider.Endpoint(), config)
+//	var verifier = provider.Verifier(&oidc.Config{ClientID: config.ClientID})
+//	if err := json.Unmarshal([]byte(authCode), &oauth2Token); err != nil {
+//		oauth2Token, err = oauthConfig.Exchange(updatedContext, authCode, oauth2.SetAuthURLParam("scope", strings.Join(oauthConfig.Scopes, " ")))
+//		if err != nil {
+//			return userInfo, oauth2Token, err
+//		}
+//		rawIDToken, ok := oauth2Token.Extra("id_token").(string)
+//		_, err = verifier.Verify(updatedContext, rawIDToken)
+//		if !ok {
+//			return userInfo, oauth2Token, err
+//		}
+//		if err != nil {
+//			return userInfo, oauth2Token, err
+//		}
+//	}
+//	// Valid will return false if access token is expired
+//	if !oauth2Token.Valid() {
+//		// since token is not valid, the TokenSource func will attempt to refresh the access token
+//		// if the refresh token has not expired
+//		logrus.Debugf("[generic oidc] getUserInfo: attempting to refresh access token")
+//	}
+//	reusedToken, err := oauth2.ReuseTokenSource(oauth2Token, oauthConfig.TokenSource(updatedContext, oauth2Token)).Token()
+//	if err != nil {
+//		return userInfo, oauth2Token, err
+//	}
+//	if !reflect.DeepEqual(oauth2Token, reusedToken) {
+//		g.UpdateToken(reusedToken, userName)
+//	}
+//	logrus.Debugf("[generic oidc] getUserInfo: getting user info")
+//	userInfo, err = provider.UserInfo(updatedContext, oauthConfig.TokenSource(updatedContext, reusedToken))
+//	if err != nil {
+//		return userInfo, oauth2Token, err
+//	}
+//	if err := userInfo.Claims(&claimInfo); err != nil {
+//		return userInfo, oauth2Token, err
+//	}
+//
+//	return userInfo, oauth2Token, nil
+//}
 
-	updatedContext, err := oidcclient.AddCertKeyToContext(*ctx, config.Certificate, config.PrivateKey)
-	if err != nil {
-		return userInfo, oauth2Token, err
-	}
-
-	provider, err := oidc.NewProvider(updatedContext, config.Issuer)
-	if err != nil {
-		return userInfo, oauth2Token, err
-	}
-	oauthConfig := ConfigToOauthConfig(provider.Endpoint(), config)
-	var verifier = provider.Verifier(&oidc.Config{ClientID: config.ClientID})
-	if err := json.Unmarshal([]byte(authCode), &oauth2Token); err != nil {
-		oauth2Token, err = oauthConfig.Exchange(updatedContext, authCode, oauth2.SetAuthURLParam("scope", strings.Join(oauthConfig.Scopes, " ")))
-		if err != nil {
-			return userInfo, oauth2Token, err
-		}
-		rawIDToken, ok := oauth2Token.Extra("id_token").(string)
-		_, err = verifier.Verify(updatedContext, rawIDToken)
-		if !ok {
-			return userInfo, oauth2Token, err
-		}
-		if err != nil {
-			return userInfo, oauth2Token, err
-		}
-	}
-	// Valid will return false if access token is expired
-	if !oauth2Token.Valid() {
-		// since token is not valid, the TokenSource func will attempt to refresh the access token
-		// if the refresh token has not expired
-		logrus.Debugf("[generic oidc] getUserInfo: attempting to refresh access token")
-	}
-	reusedToken, err := oauth2.ReuseTokenSource(oauth2Token, oauthConfig.TokenSource(updatedContext, oauth2Token)).Token()
-	if err != nil {
-		return userInfo, oauth2Token, err
-	}
-	if !reflect.DeepEqual(oauth2Token, reusedToken) {
-		g.UpdateToken(reusedToken, userName)
-	}
-	logrus.Debugf("[generic oidc] getUserInfo: getting user info")
-	userInfo, err = provider.UserInfo(updatedContext, oauthConfig.TokenSource(updatedContext, reusedToken))
-	if err != nil {
-		return userInfo, oauth2Token, err
-	}
-	if err := userInfo.Claims(&claimInfo); err != nil {
-		return userInfo, oauth2Token, err
-	}
-
-	return userInfo, oauth2Token, nil
-}
-
-func ConfigToOauthConfig(endpoint oauth2.Endpoint, config *v32.OIDCConfig) oauth2.Config {
-	var finalScopes []string
-	hasOIDCScope := strings.Contains(config.Scopes, oidc.ScopeOpenID)
-	// scopes must be space separated in string when passed into the api
-	configScopes := strings.Split(config.Scopes, " ")
-	if !hasOIDCScope {
-		configScopes = append(configScopes, oidc.ScopeOpenID)
-	}
-	for _, scope := range configScopes {
-		if scope != "" {
-			finalScopes = append(finalScopes, scope)
-		}
-	}
-	return oauth2.Config{
-		ClientID:     config.ClientID,
-		ClientSecret: config.ClientSecret,
-		Endpoint:     endpoint,
-		RedirectURL:  config.RancherURL,
-		Scopes:       finalScopes,
-	}
-}
+//func ConfigToOauthConfig(endpoint oauth2.Endpoint, config *v32.OIDCConfig) oauth2.Config {
+//	var finalScopes []string
+//	hasOIDCScope := strings.Contains(config.Scopes, oidc.ScopeOpenID)
+//	// scopes must be space separated in string when passed into the api
+//	configScopes := strings.Split(config.Scopes, " ")
+//	if !hasOIDCScope {
+//		configScopes = append(configScopes, oidc.ScopeOpenID)
+//	}
+//	for _, scope := range configScopes {
+//		if scope != "" {
+//			finalScopes = append(finalScopes, scope)
+//		}
+//	}
+//	return oauth2.Config{
+//		ClientID:     config.ClientID,
+//		ClientSecret: config.ClientSecret,
+//		Endpoint:     endpoint,
+//		RedirectURL:  config.RancherURL,
+//		Scopes:       finalScopes,
+//	}
+//}
 
 func (g GenericOIDCProvider) UpdateToken(refreshedToken *oauth2.Token, userID string) error {
 	var err error
