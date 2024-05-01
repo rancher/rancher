@@ -39,6 +39,7 @@ var OriginMap = map[string]string{
 	"gitjob":                                                  "https://github.com/rancher/gitjob",
 	"gke-operator":                                            "https://github.com/rancher/gke-operator",
 	"grafana-grafana":                                         "https://github.com/grafana/grafana",
+	"hardened-addon-resizer":                                  "https://github.com/rancher/image-build-addon-resizer",
 	"hardened-calico":                                         "https://github.com/rancher/image-build-calico",
 	"hardened-cluster-autoscaler":                             "https://github.com/kubernetes/autoscaler",
 	"hardened-cni-plugins":                                    "https://github.com/rancher/image-build-cni-plugins",
