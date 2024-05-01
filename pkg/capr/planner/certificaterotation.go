@@ -151,7 +151,7 @@ func (p *Planner) rotateCertificatesPlan(controlPlane *rkev1.RKEControlPlane, to
 						"rm",
 						[]string{
 							"-f",
-							path.Join(capr.GetDataDir(controlPlane), "/agent/pod-manifests/kube-controller-manager.yaml"),
+							path.Join(capr.GetDistroDataDir(controlPlane), "/agent/pod-manifests/kube-controller-manager.yaml"),
 						},
 						[]string{},
 					))
@@ -192,7 +192,7 @@ func (p *Planner) rotateCertificatesPlan(controlPlane *rkev1.RKEControlPlane, to
 						"rm",
 						[]string{
 							"-f",
-							path.Join(capr.GetDataDir(controlPlane), "agent/pod-manifests/kube-scheduler.yaml"),
+							path.Join(capr.GetDistroDataDir(controlPlane), "agent/pod-manifests/kube-scheduler.yaml"),
 						},
 						[]string{},
 					))

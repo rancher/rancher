@@ -36,7 +36,7 @@ fi
 `
 
 func idempotentActionScriptPath(controlPlane *rkev1.RKEControlPlane) string {
-	return path.Join(capr.GetCaprVarDir(controlPlane), "idempotence/idempotent.sh")
+	return path.Join(capr.GetProvisioningDataDir(controlPlane), "idempotence/idempotent.sh")
 }
 
 // generateIdempotencyCleanupInstruction generates a one-time instruction that performs a cleanup of the given key.
@@ -49,7 +49,7 @@ func generateIdempotencyCleanupInstruction(controlPlane *rkev1.RKEControlPlane, 
 		Command: "/bin/sh",
 		Args: []string{
 			"-c",
-			fmt.Sprintf("rm -rf %s/idempotence/%s", capr.GetCaprVarDir(controlPlane), key),
+			fmt.Sprintf("rm -rf %s/idempotence/%s", capr.GetProvisioningDataDir(controlPlane), key),
 		},
 	}
 }
@@ -70,7 +70,7 @@ func idempotentInstruction(controlPlane *rkev1.RKEControlPlane, identifier, valu
 			hashedValue,
 			hashedCommand,
 			command,
-			capr.GetCaprVarDir(controlPlane)},
+			capr.GetProvisioningDataDir(controlPlane)},
 			args...),
 		Env: env,
 	}

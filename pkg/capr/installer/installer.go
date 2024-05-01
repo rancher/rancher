@@ -16,9 +16,9 @@ import (
 )
 
 const (
-	SystemAgentInstallPath  = "/system-agent-install.sh" // corresponding curl -o in package/Dockerfile
-	WindowsRke2InstallPath  = "/wins-agent-install.ps1"  // corresponding curl -o in package/Dockerfile
-	SystemAgentVarDirEnvVar = "CATTLE_AGENT_VAR_DIR"
+	SystemAgentInstallPath = "/system-agent-install.sh" // corresponding curl -o in package/Dockerfile
+	WindowsRke2InstallPath = "/wins-agent-install.ps1"  // corresponding curl -o in package/Dockerfile
+	SystemAgentEnvVar      = "CATTLE_AGENT_VAR_DIR"
 )
 
 var (
@@ -147,7 +147,7 @@ func WindowsInstallScript(ctx context.Context, token string, envVars []corev1.En
 		if envVar.Value == "" {
 			continue
 		}
-		if envVar.Name == SystemAgentVarDirEnvVar {
+		if envVar.Name == SystemAgentEnvVar {
 			dataDir = envVar.Value
 		}
 		envVarBuf.WriteString(fmt.Sprintf("$env:%s=\"%s\"\n", envVar.Name, envVar.Value))

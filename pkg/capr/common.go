@@ -239,23 +239,23 @@ func GetLoopbackAddress(controlPlane *rkev1.RKEControlPlane) string {
 	return "127.0.0.1"
 }
 
-func GetDataDir(controlPlane *rkev1.RKEControlPlane) string {
-	if dataDir := controlPlane.Spec.DataDir; dataDir != "" {
-		return dataDir
+func GetDistroDataDir(controlPlane *rkev1.RKEControlPlane) string {
+	if dir := controlPlane.Spec.DataDirectories.K8sDistro; dir != "" {
+		return dir
 	}
 	return fmt.Sprintf("/var/lib/rancher/%s", GetRuntime(controlPlane.Spec.KubernetesVersion))
 }
 
-func GetCaprVarDir(controlPlane *rkev1.RKEControlPlane) string {
-	if caprVarDir := controlPlane.Spec.CaprVarDir; caprVarDir != "" {
-		return caprVarDir
+func GetProvisioningDataDir(controlPlane *rkev1.RKEControlPlane) string {
+	if dir := controlPlane.Spec.DataDirectories.Provisioning; dir != "" {
+		return dir
 	}
 	return "/var/lib/rancher/capr"
 }
 
-func GetSystemAgentVarDir(controlPlane *rkev1.RKEControlPlane) string {
-	if systemAgentVarDir := controlPlane.Spec.SystemAgentVarDir; systemAgentVarDir != "" {
-		return systemAgentVarDir
+func GetSystemAgent(controlPlane *rkev1.RKEControlPlane) string {
+	if dir := controlPlane.Spec.DataDirectories.SystemAgent; dir != "" {
+		return dir
 	}
 	return "/var/lib/rancher/agent"
 }

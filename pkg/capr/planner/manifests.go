@@ -57,7 +57,7 @@ func getEtcdSnapshotExtraMetadata(controlPlane *rkev1.RKEControlPlane, runtime s
 		cm := fmt.Sprintf(EtcdSnapshotExtraMetadataConfigMapTemplate, runtime, metav1.NamespaceSystem, EtcdSnapshotConfigMapKey, v)
 		return &plan.File{
 			Content: base64.StdEncoding.EncodeToString([]byte(cm)),
-			Path:    path.Join(capr.GetDataDir(controlPlane), fmt.Sprintf("server/manifests/rancher/%s-etcd-snapshot-extra-metadata.yaml", runtime)),
+			Path:    path.Join(capr.GetDistroDataDir(controlPlane), fmt.Sprintf("server/manifests/rancher/%s-etcd-snapshot-extra-metadata.yaml", runtime)),
 			Dynamic: true,
 			Minor:   true,
 		}
@@ -76,7 +76,7 @@ func (p *Planner) getClusterAgentManifestFile(controlPlane *rkev1.RKEControlPlan
 
 	return plan.File{
 		Content: base64.StdEncoding.EncodeToString(data),
-		Path:    path.Join(capr.GetDataDir(controlPlane), "server/manifests/rancher/cluster-agent.yaml"),
+		Path:    path.Join(capr.GetDistroDataDir(controlPlane), "server/manifests/rancher/cluster-agent.yaml"),
 		Dynamic: true,
 		Minor:   true,
 	}, nil
@@ -86,7 +86,7 @@ func (p *Planner) getClusterAgentManifestFile(controlPlane *rkev1.RKEControlPlan
 func (p *Planner) getAddons(controlPlane *rkev1.RKEControlPlane) plan.File {
 	return plan.File{
 		Content: base64.StdEncoding.EncodeToString([]byte(controlPlane.Spec.AdditionalManifest)),
-		Path:    path.Join(capr.GetDataDir(controlPlane), "server/manifests/rancher/addons.yaml"),
+		Path:    path.Join(capr.GetDistroDataDir(controlPlane), "server/manifests/rancher/addons.yaml"),
 		Dynamic: true,
 	}
 }

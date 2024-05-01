@@ -95,7 +95,7 @@ func (p *Planner) renderRegistries(controlPlane *rkev1.RKEControlPlane) (registr
 func toFile(controlPlane *rkev1.RKEControlPlane, path string, content []byte) plan.File {
 	return plan.File{
 		Content: base64.StdEncoding.EncodeToString(content),
-		Path:    fmt.Sprintf("%s/etc/%s", capr.GetDataDir(controlPlane), path),
+		Path:    fmt.Sprintf("%s/etc/%s", capr.GetDistroDataDir(controlPlane), path),
 	}
 }
 

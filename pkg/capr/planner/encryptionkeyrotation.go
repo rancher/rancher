@@ -755,5 +755,5 @@ func (p *Planner) encryptionKeyRotationFailed(status rkev1.RKEControlPlaneStatus
 }
 
 func encryptionKeyRotationScriptPath(controlPlane *rkev1.RKEControlPlane, file string) string {
-	return path.Join(capr.GetDataDir(controlPlane), encryptionKeyRotationBinPrefix, file)
+	return path.Join(capr.GetDistroDataDir(controlPlane), encryptionKeyRotationBinPrefix, file)
 }

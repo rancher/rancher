@@ -226,8 +226,8 @@ func (h *handler) getEnvVar(bootstrap *rkev1.RKEBootstrap, capiCluster *capi.Clu
 
 	var result []corev1.EnvVar
 	for _, env := range controlPlane.Spec.AgentEnvVars {
-		// Disallow user supplied system agent var dir env var in favor of spec.systemAgentVarDir
-		if env.Name == installer.SystemAgentVarDirEnvVar {
+		// Disallow user supplied system agent var dir env var in favor of spec.systemAgent
+		if env.Name == installer.SystemAgentEnvVar {
 			continue
 		}
 		result = append(result, corev1.EnvVar{
@@ -235,10 +235,10 @@ func (h *handler) getEnvVar(bootstrap *rkev1.RKEBootstrap, capiCluster *capi.Clu
 			Value: env.Value,
 		})
 	}
-	if varDir := controlPlane.Spec.SystemAgentVarDir; varDir != "" {
+	if dir := controlPlane.Spec.DataDirectories.SystemAgent; dir != "" {
 		result = append(result, corev1.EnvVar{
-			Name:  installer.SystemAgentVarDirEnvVar,
-			Value: varDir,
+			Name:  installer.SystemAgentEnvVar,
+			Value: dir,
 		})
 	}
 

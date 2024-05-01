@@ -368,7 +368,7 @@ func (p *Planner) generateEtcdSnapshotRestorePlan(controlPlane *rkev1.RKEControl
 				Command: "rm",
 				Args: []string{
 					"-rf",
-					path.Join(capr.GetDataDir(controlPlane), "server/db/etcd"),
+					path.Join(capr.GetDistroDataDir(controlPlane), "server/db/etcd"),
 				}}),
 		idempotentInstruction(
 			controlPlane,
@@ -415,13 +415,13 @@ func generateCreateEtcdTombstoneInstruction(controlPlane *rkev1.RKEControlPlane)
 		Name:    "create-etcd-tombstone",
 		Command: "touch",
 		Args: []string{
-			path.Join(capr.GetDataDir(controlPlane), "server/db/etcd/tombstone"),
+			path.Join(capr.GetDistroDataDir(controlPlane), "server/db/etcd/tombstone"),
 		},
 	}
 }
 
 func etcdRestoreScriptPath(controlPlane *rkev1.RKEControlPlane, file string) string {
-	return path.Join(capr.GetDataDir(controlPlane), etcdRestoreBinPrefix, file)
+	return path.Join(capr.GetDistroDataDir(controlPlane), etcdRestoreBinPrefix, file)
 }
 
 // generateEtcdRestorePodCleanupFilesAndInstruction generates a file that contains a script that checks API server health and a slice of instructions that cleans up system pods on etcd restore.
@@ -584,7 +584,7 @@ func generateRemoveTLSAndCredDirInstructions(controlPlane *rkev1.RKEControlPlane
 			Command: "rm",
 			Args: []string{
 				"-rf",
-				path.Join(capr.GetDataDir(controlPlane), "server/tls"),
+				path.Join(capr.GetDistroDataDir(controlPlane), "server/tls"),
 			},
 		},
 		{
@@ -592,7 +592,7 @@ func generateRemoveTLSAndCredDirInstructions(controlPlane *rkev1.RKEControlPlane
 			Command: "rm",
 			Args: []string{
 				"-rf",
-				path.Join(capr.GetDataDir(controlPlane), "server/cred"),
+				path.Join(capr.GetDistroDataDir(controlPlane), "server/cred"),
 			},
 		},
 	}

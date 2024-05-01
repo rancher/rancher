@@ -93,8 +93,8 @@ func addUserConfig(config map[string]interface{}, controlPlane *rkev1.RKEControl
 
 	filterConfigData(config, controlPlane, entry)
 
-	if controlPlane.Spec.DataDir != "" {
-		config["data-dir"] = controlPlane.Spec.DataDir
+	if controlPlane.Spec.DataDirectories.K8sDistro != "" {
+		config["data-dir"] = controlPlane.Spec.DataDirectories.K8sDistro
 	}
 
 	return nil
@@ -167,7 +167,7 @@ func addLocalClusterAuthenticationEndpointConfig(config map[string]interface{}, 
 		return
 	}
 
-	authFile := path.Join(capr.GetDataDir(controlPlane), authnWebhookFileName)
+	authFile := path.Join(capr.GetDistroDataDir(controlPlane), authnWebhookFileName)
 	config["kube-apiserver-arg"] = append(convert.ToStringSlice(config["kube-apiserver-arg"]),
 		fmt.Sprintf("authentication-token-webhook-config-file=%s", authFile))
 }
@@ -178,7 +178,7 @@ func addLocalClusterAuthenticationEndpointFile(nodePlan plan.NodePlan, controlPl
 	}
 
 	loopbackAddress := capr.GetLoopbackAddress(controlPlane)
-	authFile := path.Join(capr.GetDataDir(controlPlane), authnWebhookFileName)
+	authFile := path.Join(capr.GetDistroDataDir(controlPlane), authnWebhookFileName)
 	nodePlan.Files = append(nodePlan.Files, plan.File{
 		Content: base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf(AuthnWebhook, loopbackAddress))),
 		Path:    authFile,
@@ -280,7 +280,7 @@ func (p *Planner) addChartConfigs(nodePlan plan.NodePlan, controlPlane *rkev1.RK
 
 	nodePlan.Files = append(nodePlan.Files, plan.File{
 		Content: base64.StdEncoding.EncodeToString(contents),
-		Path:    path.Join(capr.GetDataDir(controlPlane), "server/manifests/rancher/managed-chart-config.yaml"),
+		Path:    path.Join(capr.GetDistroDataDir(controlPlane), "server/manifests/rancher/managed-chart-config.yaml"),
 		Dynamic: true,
 	})
 
@@ -470,7 +470,7 @@ func configFile(controlPlane *rkev1.RKEControlPlane, filename string) string {
 		}
 		return path
 	}
-	return path.Join(capr.GetDataDir(controlPlane), "etc/config-files", filename)
+	return path.Join(capr.GetDistroDataDir(controlPlane), "etc/config-files", filename)
 }
 
 func (p *Planner) renderFiles(controlPlane *rkev1.RKEControlPlane, entry *planEntry) ([]plan.File, error) {

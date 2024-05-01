@@ -106,7 +106,7 @@ func renderSecureProbe(arg any, rawProbe plan.Probe, controlPlane *rkev1.RKECont
 		certDir := getArgValue(arg, CertDirArgument, "=")
 		if certDir == "" {
 			// If --cert-dir was not set, we use defaultCertDir value that was passed in, but must prefix the data-dir
-			certDir = path.Join(capr.GetDataDir(controlPlane), defaultCertDir)
+			certDir = path.Join(capr.GetDistroDataDir(controlPlane), defaultCertDir)
 		}
 		// Our goal here is to generate the tlsCert. If we get to this point, we know we will be using the defaultCert
 		TLSCert = certDir + "/" + defaultCert
@@ -185,7 +185,7 @@ func replaceCACertAndPortForProbes(probe plan.Probe, cacert, host, port string) 
 // insertDataDirForProbes will insert the data-dir for all probes based on the controlplane object.
 func insertDataDirForProbes(controlPlane *rkev1.RKEControlPlane, probes map[string]plan.Probe) map[string]plan.Probe {
 	result := make(map[string]plan.Probe, len(probes))
-	dataDir := capr.GetDataDir(controlPlane)
+	dataDir := capr.GetDistroDataDir(controlPlane)
 	for k, v := range probes {
 		v.HTTPGetAction.CACert = replaceIfFormatSpecifier(v.HTTPGetAction.CACert, dataDir)
 		v.HTTPGetAction.ClientCert = replaceIfFormatSpecifier(v.HTTPGetAction.ClientCert, dataDir)

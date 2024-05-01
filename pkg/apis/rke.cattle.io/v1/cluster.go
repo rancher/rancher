@@ -54,6 +54,15 @@ type Networking struct {
 	StackPreference NetworkingStackPreference `json:"stackPreference,omitempty"`
 }
 
+type DataDirectories struct {
+	// Data directory for the system-agent connection info and plans
+	SystemAgent string `json:"systemAgent,omitempty"`
+	// Data directory for provisioning related files (idempotency)
+	Provisioning string `json:"provisioning,omitempty"`
+	// Data directory for the k8s distro
+	K8sDistro string `json:"k8sDistro,omitempty"`
+}
+
 type RKEClusterSpecCommon struct {
 	UpgradeStrategy       ClusterUpgradeStrategy `json:"upgradeStrategy,omitempty"`
 	ChartValues           GenericMap             `json:"chartValues,omitempty" wrangler:"nullable"`
@@ -64,12 +73,11 @@ type RKEClusterSpecCommon struct {
 	Registries            *Registry              `json:"registries,omitempty"`
 	ETCD                  *ETCD                  `json:"etcd,omitempty"`
 
-	SystemAgentVarDir string `json:"systemAgentVarDir,omitempty"`
-	DataDir           string `json:"dataDir,omitempty"`
-	CaprVarDir        string `json:"caprVarDir,omitempty"`
-
 	// Networking contains information regarding the desired and actual networking stack of the cluster.
 	Networking *Networking `json:"networking,omitempty"`
+
+	// DataDirectories contains the configuration for the data directories typically stored within /var/lib/rancher.
+	DataDirectories DataDirectories `json:"dataDirectories"`
 
 	// Increment to force all nodes to re-provision
 	ProvisionGeneration int `json:"provisionGeneration,omitempty"`

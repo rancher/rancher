@@ -717,7 +717,7 @@ func convertInterfaceToStringSlice(input interface{}) []string {
 func renderArgAndMount(existingArg interface{}, existingMount interface{}, controlPlane *rkev1.RKEControlPlane, defaultSecurePort string, defaultCertDir string) ([]string, []string) {
 	retArg := convertInterfaceToStringSlice(existingArg)
 	retMount := convertInterfaceToStringSlice(existingMount)
-	renderedCertDir := path.Join(capr.GetDataDir(controlPlane), defaultCertDir)
+	renderedCertDir := path.Join(capr.GetDistroDataDir(controlPlane), defaultCertDir)
 	// Set a default value for certDirArg and certDirMount (for the case where the user does not set these values)
 	// If a user sets these values, we will set them to an empty string and check to make sure they are not empty
 	// strings before adding them to the rendered arg/mount slices.
