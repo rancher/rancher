@@ -200,8 +200,8 @@ func (d *DummyIndexer) SetTokenHashed(enabled bool) {
 	d.hashedEnabled = enabled
 }
 
-func TestNewLoginTokenSetsLastLoginTime(t *testing.T) {
-	var createdUserAttribute *v3.UserAttribute
+func TestUserAttributeCreateOrUpdateSetsLastLoginTime(t *testing.T) {
+	createdUserAttribute := &v3.UserAttribute{}
 
 	userID := "u-abcdef"
 	manager := Manager{
@@ -229,27 +229,15 @@ func TestNewLoginTokenSetsLastLoginTime(t *testing.T) {
 				return createdUserAttribute, nil
 			},
 		},
-		tokensClient: &mgmtFakes.TokenInterfaceMock{
-			CreateFunc: func(token *v3.Token) (*v3.Token, error) {
-				return token.DeepCopy(), nil
-			},
-		},
 	}
 
-	userPrincipal := v3.Principal{}
 	groupPrincipals := []v3.Principal{}
-	providerToken := ""
-	ttl := int64(0)
-	description := ""
 	userExtraInfo := map[string][]string{}
 
-	token, key, err := manager.NewLoginToken(userID, userPrincipal, groupPrincipals, providerToken, ttl, description, userExtraInfo)
+	loginTime := time.Now()
+	err := manager.UserAttributeCreateOrUpdate(userID, "provider", groupPrincipals, userExtraInfo, loginTime)
 	assert.NoError(t, err)
-	assert.NotNil(t, token)
-	assert.NotEmpty(t, key)
 
-	// Make sure login time is set.
-	assert.LessOrEqual(t, time.Since(createdUserAttribute.LastLogin.Time), time.Second*5)
-	// Make sure the login time is truncated to seconds.
-	assert.Equal(t, createdUserAttribute.LastLogin.Truncate(time.Second), createdUserAttribute.LastLogin.Time)
+	// Make sure login time is set and truncated to seconds.
+	assert.Equal(t, loginTime.Truncate(time.Second), createdUserAttribute.LastLogin.Time)
 }
