@@ -3,9 +3,9 @@
 package rke2
 
 import (
-	"slices"
 	"testing"
 
+	"github.com/rancher/rancher/pkg/catalog/utils"
 	"github.com/rancher/rancher/tests/v2/validation/provisioning/permutations"
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
@@ -84,7 +84,7 @@ func (r *RKE2CloudProviderTestSuite) TestAWSCloudProviderCluster() {
 		{"OutOfTree" + provisioninginput.StandardClientName.String(), nodeRolesDedicated, r.standardUserClient, r.client.Flags.GetValue(environmentflag.Long)},
 	}
 
-	if !slices.Contains(r.provisioningConfig.Providers, "aws") {
+	if !utils.Contains(r.provisioningConfig.Providers, "aws") {
 		r.T().Skip("AWS Cloud Provider test requires access to aws.")
 	}
 
@@ -116,7 +116,7 @@ func (r *RKE2CloudProviderTestSuite) TestVsphereCloudProviderCluster() {
 		{"OutOfTree" + provisioninginput.StandardClientName.String(), nodeRolesDedicated, r.standardUserClient, r.client.Flags.GetValue(environmentflag.Long)},
 	}
 
-	if !slices.Contains(r.provisioningConfig.Providers, "vsphere") {
+	if !utils.Contains(r.provisioningConfig.Providers, "vsphere") {
 		r.T().Skip("Vsphere Cloud Provider test requires access to vsphere.")
 	}
 
