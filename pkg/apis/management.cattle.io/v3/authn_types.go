@@ -455,13 +455,15 @@ type OIDCConfig struct {
 
 	ClientID           string `json:"clientId" norman:"required"`
 	ClientSecret       string `json:"clientSecret,omitempty" norman:"required,type=password"`
-	Scopes             string `json:"scope"`
-	AuthEndpoint       string `json:"authEndpoint,omitempty" norman:"required,notnullable"`
-	Issuer             string `json:"issuer" norman:"required,notnullable"`
-	Certificate        string `json:"certificate,omitempty"`
-	PrivateKey         string `json:"privateKey" norman:"type=password"`
 	RancherURL         string `json:"rancherUrl" norman:"required,notnullable"`
+	Issuer             string `json:"issuer" norman:"required,notnullable"`
+	AuthEndpoint       string `json:"authEndpoint,omitempty" norman:"required,notnullable"`
+	JWKSUrl            string `json:"jwksUrl,omitempty"`
+	Certificate        string `json:"certificate,omitempty"`
+	PrivateKey         string `json:"privateKey,omitempty" norman:"type=password"`
 	GroupSearchEnabled *bool  `json:"groupSearchEnabled"`
+	GroupsClaim        string `json:"groupsClaim,omitempty"`
+	Scopes             string `json:"scopes,omitempty"`
 }
 
 type OIDCTestOutput struct {
@@ -493,27 +495,15 @@ type ClusterProxyConfig struct {
 }
 
 type GenericOIDCConfig struct {
-	AuthConfig `json:",inline" mapstructure:",squash"`
-
-	ClientID           string `json:"clientId" norman:"required"`
-	ClientSecret       string `json:"clientSecret,omitempty" norman:"required,type=password"`
-	RancherURL         string `json:"rancherUrl" norman:"required,notnullable"`
-	Issuer             string `json:"issuer" norman:"required,notnullable"`
-	AuthEndpoint       string `json:"authEndpoint,omitempty" norman:"required,notnullable"`
-	JWKSUrl            string `json:"jwksUrl,omitempty"`
-	Certificate        string `json:"certificate,omitempty"`
-	PrivateKey         string `json:"privateKey,omitempty" norman:"type=password"`
-	GroupSearchEnabled *bool  `json:"groupSearchEnabled"`
-	GroupsClaim        string `json:"groupsClaim,omitempty"`
-	Scopes             string `json:"scopes,omitempty"`
-}
-
-type GenericOIDCApplyInput struct {
-	OIDCConfig GenericOIDCConfig `json:"oidcConfig,omitempty"`
-	Code       string            `json:"code,omitempty"`
-	Enabled    bool              `json:"enabled,omitempty"`
+	OIDCConfig `json:",inline" mapstructure:",squash"`
 }
 
 type GenericOIDCTestOutput struct {
 	RedirectURL string `json:"redirectUrl"`
+}
+
+type GenericOIDCApplyInput struct {
+	OIDCConfig OIDCConfig `json:"oidcConfig,omitempty"`
+	Code       string     `json:"code,omitempty"`
+	Enabled    bool       `json:"enabled,omitempty"`
 }

@@ -59,7 +59,7 @@ type ClaimInfo struct {
 func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *tokens.Manager) common.AuthProvider {
 	return &GenericOIDCProvider{
 		Name:        Name,
-		Type:        client.GenericOIDCConfigType,
+		Type:        client.OIDCConfigType,
 		CTX:         ctx,
 		AuthConfigs: mgmtCtx.Management.AuthConfigs(""),
 		Secrets:     mgmtCtx.Core.Secrets(""),
@@ -81,7 +81,7 @@ func (g GenericOIDCProvider) AuthenticateUser(ctx context.Context, input interfa
 	return userPrincipal, groupPrincipals, providerToken, err
 }
 
-func (g GenericOIDCProvider) LoginUser(ctx context.Context, oauthLoginInfo *v32.GenericOIDCLogin, config *v32.GenericOIDCConfig) (v3.Principal, []v3.Principal, string, ClaimInfo, error) {
+func (g GenericOIDCProvider) LoginUser(ctx context.Context, oauthLoginInfo *v32.GenericOIDCLogin, config *v32.OIDCConfig) (v3.Principal, []v3.Principal, string, ClaimInfo, error) {
 	var userPrincipal v3.Principal
 	var groupPrincipals []v3.Principal
 	var userClaimInfo ClaimInfo
@@ -165,7 +165,7 @@ func (g GenericOIDCProvider) RefetchGroupPrincipals(principalID string, secret s
 func (g GenericOIDCProvider) CanAccessWithGroupProviders(userPrincipalID string, groupPrincipals []v3.Principal) (bool, error) {
 	config, err := g.GetOIDCConfig()
 	if err != nil {
-		logrus.Errorf("[generic oidc] canAccessWithGroupProviders: error fetching GenericOIDCConfig: %v", err)
+		logrus.Errorf("[generic oidc] canAccessWithGroupProviders: error fetching OIDCConfig: %v", err)
 		return false, err
 	}
 	allowed, err := g.UserMGR.CheckAccess(config.AccessMode, config.AllowedPrincipalIDs, userPrincipalID, groupPrincipals)
@@ -194,7 +194,7 @@ func (g GenericOIDCProvider) IsDisabledProvider() (bool, error) {
 	return !oidcConfig.Enabled, nil
 }
 
-func (g GenericOIDCProvider) GetOIDCConfig() (*v32.GenericOIDCConfig, error) {
+func (g GenericOIDCProvider) GetOIDCConfig() (*v32.OIDCConfig, error) {
 	authConfigObj, err := g.AuthConfigs.ObjectClient().UnstructuredClient().Get(g.Name, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve OIDCConfig, error: %v", err)
@@ -206,7 +206,7 @@ func (g GenericOIDCProvider) GetOIDCConfig() (*v32.GenericOIDCConfig, error) {
 	}
 	storedOidcConfigMap := u.UnstructuredContent()
 
-	storedOidcConfig := &v32.GenericOIDCConfig{}
+	storedOidcConfig := &v32.OIDCConfig{}
 	err = common.Decode(storedOidcConfigMap, storedOidcConfig)
 	if err != nil {
 		return nil, fmt.Errorf("unable to decode OidcConfig: %w", err)
@@ -232,7 +232,7 @@ func (g GenericOIDCProvider) GetOIDCConfig() (*v32.GenericOIDCConfig, error) {
 	return storedOidcConfig, nil
 }
 
-func (g GenericOIDCProvider) getUserInfo(ctx *context.Context, config *v32.GenericOIDCConfig, authCode string, claimInfo *ClaimInfo, userName string) (*oidc.UserInfo, *oauth2.Token, error) {
+func (g GenericOIDCProvider) getUserInfo(ctx *context.Context, config *v32.OIDCConfig, authCode string, claimInfo *ClaimInfo, userName string) (*oidc.UserInfo, *oauth2.Token, error) {
 	var userInfo *oidc.UserInfo
 	var oauth2Token *oauth2.Token
 	var err error
@@ -287,7 +287,7 @@ func (g GenericOIDCProvider) getUserInfo(ctx *context.Context, config *v32.Gener
 	return userInfo, oauth2Token, nil
 }
 
-func ConfigToOauthConfig(endpoint oauth2.Endpoint, config *v32.GenericOIDCConfig) oauth2.Config {
+func ConfigToOauthConfig(endpoint oauth2.Endpoint, config *v32.OIDCConfig) oauth2.Config {
 	var finalScopes []string
 	hasOIDCScope := strings.Contains(config.Scopes, oidc.ScopeOpenID)
 	// scopes must be space separated in string when passed into the api
@@ -386,7 +386,7 @@ func (g GenericOIDCProvider) getRedirectURL(config map[string]interface{}) strin
 	)
 }
 
-func (g GenericOIDCProvider) saveOIDCConfig(config *v32.GenericOIDCConfig) error {
+func (g GenericOIDCProvider) saveOIDCConfig(config *v32.OIDCConfig) error {
 	storedOidcConfig, err := g.GetOIDCConfig()
 	if err != nil {
 		return err

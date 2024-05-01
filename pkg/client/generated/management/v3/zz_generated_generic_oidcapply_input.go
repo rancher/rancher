@@ -8,7 +8,7 @@ const (
 )
 
 type GenericOIDCApplyInput struct {
-	Code       string             `json:"code,omitempty" yaml:"code,omitempty"`
-	Enabled    bool               `json:"enabled,omitempty" yaml:"enabled,omitempty"`
-	OIDCConfig *GenericOIDCConfig `json:"oidcConfig,omitempty" yaml:"oidcConfig,omitempty"`
+	Code       string      `json:"code,omitempty" yaml:"code,omitempty"`
+	Enabled    bool        `json:"enabled,omitempty" yaml:"enabled,omitempty"`
+	OIDCConfig *OIDCConfig `json:"oidcConfig,omitempty" yaml:"oidcConfig,omitempty"`
 }

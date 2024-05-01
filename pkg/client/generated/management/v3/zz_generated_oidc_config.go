@@ -13,14 +13,16 @@ const (
 	OIDCConfigFieldCreatorID           = "creatorId"
 	OIDCConfigFieldEnabled             = "enabled"
 	OIDCConfigFieldGroupSearchEnabled  = "groupSearchEnabled"
+	OIDCConfigFieldGroupsClaim         = "groupsClaim"
 	OIDCConfigFieldIssuer              = "issuer"
+	OIDCConfigFieldJWKSUrl             = "jwksUrl"
 	OIDCConfigFieldLabels              = "labels"
 	OIDCConfigFieldName                = "name"
 	OIDCConfigFieldOwnerReferences     = "ownerReferences"
 	OIDCConfigFieldPrivateKey          = "privateKey"
 	OIDCConfigFieldRancherURL          = "rancherUrl"
 	OIDCConfigFieldRemoved             = "removed"
-	OIDCConfigFieldScopes              = "scope"
+	OIDCConfigFieldScopes              = "scopes"
 	OIDCConfigFieldStatus              = "status"
 	OIDCConfigFieldType                = "type"
 	OIDCConfigFieldUUID                = "uuid"
@@ -38,14 +40,16 @@ type OIDCConfig struct {
 	CreatorID           string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	Enabled             bool              `json:"enabled,omitempty" yaml:"enabled,omitempty"`
 	GroupSearchEnabled  *bool             `json:"groupSearchEnabled,omitempty" yaml:"groupSearchEnabled,omitempty"`
+	GroupsClaim         string            `json:"groupsClaim,omitempty" yaml:"groupsClaim,omitempty"`
 	Issuer              string            `json:"issuer,omitempty" yaml:"issuer,omitempty"`
+	JWKSUrl             string            `json:"jwksUrl,omitempty" yaml:"jwksUrl,omitempty"`
 	Labels              map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Name                string            `json:"name,omitempty" yaml:"name,omitempty"`
 	OwnerReferences     []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	PrivateKey          string            `json:"privateKey,omitempty" yaml:"privateKey,omitempty"`
 	RancherURL          string            `json:"rancherUrl,omitempty" yaml:"rancherUrl,omitempty"`
 	Removed             string            `json:"removed,omitempty" yaml:"removed,omitempty"`
-	Scopes              string            `json:"scope,omitempty" yaml:"scope,omitempty"`
+	Scopes              string            `json:"scopes,omitempty" yaml:"scopes,omitempty"`
 	Status              *AuthConfigStatus `json:"status,omitempty" yaml:"status,omitempty"`
 	Type                string            `json:"type,omitempty" yaml:"type,omitempty"`
 	UUID                string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`

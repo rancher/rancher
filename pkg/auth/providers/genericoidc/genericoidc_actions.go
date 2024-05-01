@@ -56,7 +56,7 @@ func (g GenericOIDCProvider) ConfigureTest(actionName string, action *types.Acti
 }
 
 func (g GenericOIDCProvider) TestAndApply(actionName string, action *types.Action, request *types.APIContext) error {
-	var oidcConfig v32.GenericOIDCConfig
+	var oidcConfig v32.OIDCConfig
 	oidcConfigApplyInput := &v32.GenericOIDCApplyInput{}
 
 	if err := json.NewDecoder(request.Request.Body).Decode(oidcConfigApplyInput); err != nil {
