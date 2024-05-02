@@ -244,16 +244,21 @@ func checkPrefix(name string, prefix string) bool {
 	return strings.HasPrefix(name, prefix)
 }
 
-// validateDaemonset checks daemonset available number is equal to the number of workers in the cluster
+// validateDaemonset checks that the available number of daemonsets equals the number of workers in a downstream cluster or the number of nodes in the local cluster
 func validateDaemonset(t *testing.T, client *rancher.Client, clusterID, namespaceName, daemonsetName string) {
 	t.Helper()
 
-	workerNodesCollection, err := client.Management.Node.List(&types.ListOpts{
+	listFilter := &types.ListOpts{
 		Filters: map[string]interface{}{
 			"clusterId": clusterID,
-			"worker":    true,
 		},
-	})
+	}
+
+	if clusterID != local {
+		listFilter.Filters["worker"] = true
+	}
+
+	nodesCollection, err := client.Management.Node.List(listFilter)
 	require.NoError(t, err)
 
 	steveClient, err := client.Steve.ProxyDownstream(clusterID)
@@ -267,7 +272,7 @@ func validateDaemonset(t *testing.T, client *rancher.Client, clusterID, namespac
 	err = v1.ConvertToK8sType(daemonsetResp.Status, daemonsetStatus)
 	require.NoError(t, err)
 
-	assert.Equalf(t, int(daemonsetStatus.NumberAvailable), len(workerNodesCollection.Data), "Daemonset %v doesn't have the required ready", daemonsetName)
+	assert.Equalf(t, int(daemonsetStatus.NumberAvailable), len(nodesCollection.Data), "Daemonset %v doesn't have the required ready", daemonsetName)
 }
 
 // newNames returns a new resourceNames struct
