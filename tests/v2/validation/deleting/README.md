@@ -26,4 +26,9 @@ These tests utilize Go build tags. Due to this, see the below examples on how to
 ### RKE2 | K3S
 `gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/deleting --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestClusterDeleteTestSuite/TestDeletingCluster"`
 
+### Delete Init Machine Suite (rke2/k3s)
+automated check to validate [this issue](https://github.com/rancher/rancher/issues/42709), where the "init node" machine for v2 prov clusters would hang in deletion state and fail to be removed.
+
+`gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/deleting --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestDeleteInitMachineTestSuite/TestDeleteInitMachine"`
+
 If the specified test passes immediately without warning, try adding the `-count=1` flag to get around this issue. This will avoid previous results from interfering with the new test run.
