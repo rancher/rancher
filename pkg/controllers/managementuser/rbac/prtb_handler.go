@@ -1,12 +1,11 @@
 package rbac
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
 
-	"github.com/hashicorp/go-multierror"
-	"github.com/pkg/errors"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/slice"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -108,7 +107,7 @@ func (p *prtbLifecycle) syncPRTB(binding *v3.ProjectRoleTemplateBinding) error {
 	}
 
 	if err := p.m.ensureRoles(roles); err != nil {
-		return errors.Wrap(err, "couldn't ensure roles")
+		return fmt.Errorf("couldn't ensure roles: %w", err)
 	}
 
 	for _, n := range namespaces {
@@ -156,7 +155,7 @@ func (p *prtbLifecycle) ensurePRTBDelete(binding *v3.ProjectRoleTemplateBinding)
 	}
 
 	if err := p.m.deleteServiceAccountImpersonator(binding.UserName); err != nil {
-		return errors.Wrap(err, "error deleting service account impersonator")
+		return fmt.Errorf("error deleting service account impersonator: %w", err)
 	}
 
 	return p.reconcileProjectAccessToGlobalResourcesForDelete(binding)
@@ -285,7 +284,7 @@ func (m *manager) checkForGlobalResourceRules(role *v3.RoleTemplate, resource st
 // The roleName is used to find and create/update the relevant '<roleName>-promoted' ClusterRole.
 func (m *manager) reconcileRoleForProjectAccessToGlobalResource(resource string, roleName string, newVerbs sets.Set[string], baseRule rbacv1.PolicyRule) (string, error) {
 	if roleName == "" {
-		return "", errors.New("cannot reconcile Role: missing roleName")
+		return "", fmt.Errorf("cannot reconcile Role: missing roleName")
 	}
 	roleName = roleName + "-promoted"
 
@@ -445,7 +444,7 @@ func (p *prtbLifecycle) reconcilePRTBUserClusterLabels(binding *v3.ProjectRoleTe
 			return err
 		})
 		if retryErr != nil {
-			returnErr = multierror.Append(returnErr, retryErr)
+			returnErr = errors.Join(returnErr, retryErr)
 		}
 	}
 
@@ -473,7 +472,7 @@ func (p *prtbLifecycle) reconcilePRTBUserClusterLabels(binding *v3.ProjectRoleTe
 			return err
 		})
 		if retryErr != nil {
-			returnErr = multierror.Append(returnErr, retryErr)
+			returnErr = errors.Join(returnErr, retryErr)
 		}
 	}
 
