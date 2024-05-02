@@ -6,6 +6,7 @@ package config
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"sync"
 	"time"
 
@@ -391,20 +392,25 @@ func newManagementContext(c *ScaledContext) (*ManagementContext, error) {
 }
 
 func NewUserContext(scaledContext *ScaledContext, config rest.Config, clusterName string) (*UserContext, error) {
-	var err error
+	restConfig := enableProtobuf(steve.RestConfigDefaults(&config))
+	restConfig.Wrap(func(rt http.RoundTripper) http.RoundTripper {
+		return &kindMetricsRoundTripper{clusterName: clusterName, wrapped: rt}
+	})
+
 	context := &UserContext{
-		RESTConfig:     *steve.RestConfigDefaults(&config),
+		RESTConfig:     *restConfig,
 		ClusterName:    clusterName,
 		runContext:     scaledContext.RunContext,
 		KindNamespaces: map[schema.GroupVersionKind]string{},
 	}
 
+	var err error
 	context.Management, err = scaledContext.NewManagementContext()
 	if err != nil {
 		return nil, err
 	}
 
-	clientFactory, err := client.NewSharedClientFactory(enableProtobuf(&context.RESTConfig), &client.SharedClientFactoryOptions{
+	clientFactory, err := client.NewSharedClientFactory(restConfig, &client.SharedClientFactoryOptions{
 		Scheme: wrangler.Scheme,
 	})
 	if err != nil {

@@ -222,6 +222,9 @@ func Register(ctx context.Context, scaledContext *config.ScaledContext) {
 	// Cluster Owner
 	prometheus.MustRegister(clusterOwner)
 
+	// Custom metrics
+	config.RegisterDownstreamK8sMetrics(prometheus.DefaultRegisterer)
+
 	// node and node core metrics
 	prometheus.MustRegister(numNodes)
 	prometheus.MustRegister(numCores)
