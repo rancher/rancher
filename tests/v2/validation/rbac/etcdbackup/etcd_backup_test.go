@@ -46,6 +46,19 @@ func (etcd *ETCDRbacBackupTestSuite) SetupSuite() {
 	require.NoError(etcd.T(), err)
 }
 
+func (etcd *ETCDRbacBackupTestSuite) testEtcdSnapshotRKE1Cluster(role string, standardUserClient *rancher.Client) {
+	log.Info("Test case - Take Etcd snapshot of an RKE1 cluster as a " + role)
+	err := etcdsnapshot.CreateRKE1Snapshot(standardUserClient, etcd.cluster.Name)
+	switch role {
+	case rbac.ClusterOwner.String(), rbac.RestrictedAdmin.String():
+		require.NoError(etcd.T(), err)
+
+	case rbac.ClusterMember.String(), rbac.ProjectOwner.String(), rbac.ProjectMember.String():
+		require.Error(etcd.T(), err)
+		assert.Contains(etcd.T(), err.Error(), "action [backupEtcd] not available")
+	}
+}
+
 func (etcd *ETCDRbacBackupTestSuite) testEtcdSnapshotCluster(role string, standardUserClient *rancher.Client) {
 	log.Info("Test case - Take Etcd snapshot of a cluster as a " + role)
 	err := etcdsnapshot.CreateRKE2K3SSnapshot(standardUserClient, etcd.cluster.Name)
@@ -73,33 +86,58 @@ func (etcd *ETCDRbacBackupTestSuite) TestETCDRBAC() {
 	}
 	for _, tt := range tests {
 		if !(strings.Contains(etcd.cluster.ID, "c-m-")) {
-			etcd.T().Skip("Skipping tests since cluster is not of type - k3s or RKE2")
-		}
-		etcd.Run("Set up User with Role "+tt.name, func() {
-			clusterUser, clusterClient, err := rbac.SetupUser(etcd.client, tt.member)
-			require.NoError(etcd.T(), err)
+			etcd.Run("Set up User with Role "+tt.name, func() {
+				clusterUser, clusterClient, err := rbac.SetupUser(etcd.client, tt.member)
+				require.NoError(etcd.T(), err)
 
-			adminProject, err := etcd.client.Management.Project.Create(projects.NewProjectConfig(etcd.cluster.ID))
-			require.NoError(etcd.T(), err)
+				adminProject, err := etcd.client.Management.Project.Create(projects.NewProjectConfig(etcd.cluster.ID))
+				require.NoError(etcd.T(), err)
 
-			if tt.member == rbac.StandardUser.String() {
-				if strings.Contains(tt.role, "project") {
-					err := users.AddProjectMember(etcd.client, adminProject, clusterUser, tt.role, nil)
-					require.NoError(etcd.T(), err)
-				} else {
-					err := users.AddClusterRoleToUser(etcd.client, etcd.cluster, clusterUser, tt.role, nil)
-					require.NoError(etcd.T(), err)
+				if tt.member == rbac.StandardUser.String() {
+					if strings.Contains(tt.role, "project") {
+						err := users.AddProjectMember(etcd.client, adminProject, clusterUser, tt.role, nil)
+						require.NoError(etcd.T(), err)
+					} else {
+						err := users.AddClusterRoleToUser(etcd.client, etcd.cluster, clusterUser, tt.role, nil)
+						require.NoError(etcd.T(), err)
+					}
 				}
-			}
 
-			relogin, err := clusterClient.ReLogin()
-			require.NoError(etcd.T(), err)
-			clusterClient = relogin
+				relogin, err := clusterClient.ReLogin()
+				require.NoError(etcd.T(), err)
+				clusterClient = relogin
 
-			etcd.testEtcdSnapshotCluster(tt.role, clusterClient)
-			subSession := etcd.session.NewSession()
-			defer subSession.Cleanup()
-		})
+				etcd.testEtcdSnapshotRKE1Cluster(tt.role, clusterClient)
+				subSession := etcd.session.NewSession()
+				defer subSession.Cleanup()
+		 	})
+		} else {
+			etcd.Run("Set up User with Role "+tt.name, func() {
+				clusterUser, clusterClient, err := rbac.SetupUser(etcd.client, tt.member)
+				require.NoError(etcd.T(), err)
+
+				adminProject, err := etcd.client.Management.Project.Create(projects.NewProjectConfig(etcd.cluster.ID))
+				require.NoError(etcd.T(), err)
+
+				if tt.member == rbac.StandardUser.String() {
+					if strings.Contains(tt.role, "project") {
+						err := users.AddProjectMember(etcd.client, adminProject, clusterUser, tt.role, nil)
+						require.NoError(etcd.T(), err)
+					} else {
+						err := users.AddClusterRoleToUser(etcd.client, etcd.cluster, clusterUser, tt.role, nil)
+						require.NoError(etcd.T(), err)
+					}
+				}
+
+				relogin, err := clusterClient.ReLogin()
+				require.NoError(etcd.T(), err)
+				clusterClient = relogin
+
+				etcd.testEtcdSnapshotCluster(tt.role, clusterClient)
+				subSession := etcd.session.NewSession()
+				defer subSession.Cleanup()
+			})
+		}
 	}
 }
 
