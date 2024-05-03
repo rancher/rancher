@@ -178,6 +178,7 @@ type GlobalRole struct {
 	Status GlobalRoleStatus `json:"status,omitempty"`
 }
 
+// FleetWorkspacePermission defines permissions that will apply to all fleet workspaces except local.
 type FleetWorkspacePermission struct {
 	// ResourceRules rules granted in all backing namespaces for all fleet workspaces besides the local one.
 	ResourceRules []rbacv1.PolicyRule `json:"resourceRules,omitempty" yaml:"resourceRules,omitempty"`
