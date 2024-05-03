@@ -9,10 +9,6 @@ node {
     def hostnameSuffix = ["v2.7-head":"v27", "v2.8-head":"v28", "v2.9-head":"v29"]
     def releaseBranchTagMap = ["v2.7-head":"release/v2.7", "v2.8-head":"release/v2.8", "v2.9-head":"release/v2.9"]
     def tagChartMap = ["v2.7-head":"2.7.12", "v2.8-head":"2.8.3", "v2.9-head":"2.8.3"]
-    def rancherChartRepo = "prime"
-    def rancherChartUrl = "https://charts.rancher.com/server-charts"
-    def rancherImage = "stgregistry.suse.com/rancher/rancher"
-    def cattleImageEnvVar = '[\\"CATTLE_AGENT_IMAGE|stgregistry.suse.com/rancher/rancher-agent:v2.7-head\\"]'
     def configPath = ""
 
     if (jobName.contains('/')) { 
@@ -61,6 +57,8 @@ node {
                           string(credentialsId: 'RANCHER_VALID_TLS_KEY', variable: 'RANCHER_VALID_TLS_KEY'),
                           string(credentialsId: 'RANCHER_BYO_TLS_CERT', variable: 'RANCHER_BYO_TLS_CERT'),
                           string(credentialsId: 'RANCHER_BYO_TLS_KEY', variable: 'RANCHER_BYO_TLS_KEY'),
+                          string(credentialsId: 'PRIME_STAGING_REPO', variable: 'PRIME_STAGING_REPO'),
+                          string(credentialsId: 'PRIME_STAGING_REGISTRY', variable: 'PRIME_STAGING_REGISTRY'),
                           string(credentialsId: 'QASE_AUTOMATION_TOKEN', variable: 'QASE_AUTOMATION_TOKEN')]) {
           
         withEnv(paramsMap) {
@@ -78,9 +76,9 @@ node {
           dir ("./") {
             stage('Setup') {
                 dir("./rancher/tests/v2/validation") {
-                    writeFile file: filename, text: config
-                    env.CATTLE_TEST_CONFIG = "${workPath}${filename}"
-                    configPath = "./rancher/tests/v2/validation/${filename}"
+                  writeFile file: filename, text: config
+                  env.CATTLE_TEST_CONFIG = "${workPath}${filename}"
+                  configPath = "./rancher/tests/v2/validation/${filename}"
                 }
                 sh returnStdout: true, script: 'wget -qO ./yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64'
                 sh returnStdout:true, script: 'chmod a+x ./yq'
@@ -93,6 +91,10 @@ node {
                     returnStdout: true
                   ).trim()
                   for( String testTag : rancherImageTags ) {
+                    dir("./rancher/tests/v2/validation") {
+                      writeFile file: filename, text: config
+                    }
+
                     def hostname = "${hostnamePrefix}${hostnameSuffix[testTag]}"
                     def rancherHostName = "${hostname}.qa.rancher.space"
 
@@ -102,8 +104,9 @@ node {
                     sh "./yq e '.rancher.host = \"${rancherHostName}\"' -i ${configPath}"
                     
                     if (testTag == "v2.7-head") {
-                      sh "./yq e '.corralConfigs.corralConfigVars.rancher_chart_repo = \"${rancherChartRepo}\"' -i ${configPath}"
-                      sh "./yq e '.corralConfigs.corralConfigVars.rancher_chart_url = \"${rancherChartUrl}\"' -i ${configPath}"
+                      def cattleImageEnvVar = '[\\"CATTLE_AGENT_IMAGE|'+"${env.PRIME_STAGING_REGISTRY}"+'/rancher/rancher-agent:v2.7-head\\"]'
+                      def rancherImage = "${env.PRIME_STAGING_REGISTRY}/rancher/rancher"
+                      sh "./yq e '.corralConfigs.corralConfigVars.rancher_chart_url = \"${env.PRIME_STAGING_REPO}\"' -i ${configPath}"
                       sh "./yq e '.corralConfigs.corralConfigVars.rancher_image = \"${rancherImage}\"' -i ${configPath}"
                       sh "./yq e '.corralConfigs.corralConfigVars.env_var_map = \"${cattleImageEnvVar}\"' -i ${configPath}"
                     }
