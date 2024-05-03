@@ -116,17 +116,6 @@ func (g GenericOIDCProvider) CanAccessWithGroupProviders(userPrincipalID string,
 	return allowed, nil
 }
 
-func (g GenericOIDCProvider) GetUserExtraAttributes(userPrincipal v3.Principal) map[string][]string {
-	extras := make(map[string][]string)
-	if userPrincipal.Name != "" {
-		extras[common.UserAttributePrincipalID] = []string{userPrincipal.Name}
-	}
-	if userPrincipal.LoginName != "" {
-		extras[common.UserAttributeUserName] = []string{userPrincipal.LoginName}
-	}
-	return extras
-}
-
 func (g GenericOIDCProvider) IsDisabledProvider() (bool, error) {
 	oidcConfig, err := g.GetOIDCConfig()
 	if err != nil {
@@ -314,16 +303,15 @@ func (g GenericOIDCProvider) groupToPrincipal(groupName string) v3.Principal {
 }
 
 func (g GenericOIDCProvider) getRedirectURL(config map[string]interface{}) string {
-	//TODO sort out scopes...just hardcoded for now
+	// TODO maybe use discovery in case authurl isn't present...might not be needed if authendpoint is already set in config
+
+	authURL, _ := baseoidc.FetchAuthURL(config["issuer"].(string))
 
 	return fmt.Sprintf(
-		// TODO...sort out whether we need scopes included here or not
-		//"%s?client_id=%s&response_type=code&redirect_uri=%s&scope=openid%%20profile%%20email",
 		"%s?client_id=%s&response_type=code&redirect_uri=%s",
-		config["authEndpoint"],
+		authURL,
 		config["clientId"],
 		config["rancherUrl"],
-		//config["rancherApiHost"],
 	)
 }
 

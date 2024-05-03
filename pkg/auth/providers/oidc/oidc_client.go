@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -56,4 +57,27 @@ func AddCertKeyToContext(ctx context.Context, certificate, key string) (context.
 	}
 
 	return oidc.ClientContext(ctx, client), nil
+}
+
+func FetchAuthURL(issuerURL string) (string, error) {
+	discoveryURL := fmt.Sprintf("%s/.well-known/openid-configuration", issuerURL)
+	resp, err := http.Get(discoveryURL)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("failed to fetch discovery document: %s", resp.Status)
+	}
+
+	var discoveryInfo struct {
+		AuthorizationEndpoint string `json:"authorization_endpoint"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&discoveryInfo); err != nil {
+		return "", err
+	}
+
+	return discoveryInfo.AuthorizationEndpoint, nil
 }
