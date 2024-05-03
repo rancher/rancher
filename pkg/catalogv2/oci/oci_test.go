@@ -111,6 +111,17 @@ func TestGenerateIndex(t *testing.T) {
 			},
 		},
 	}
+
+	indexFile3 := repo.NewIndexFile()
+	indexFile3.Entries["testingchart"] = repo.ChartVersions{
+		&repo.ChartVersion{
+			Metadata: &chart.Metadata{
+				Name:    "testingchart",
+				Version: "1.0.0",
+			},
+			Digest: "digest",
+		},
+	}
 	one := 1
 	two := 2
 
@@ -177,6 +188,15 @@ func TestGenerateIndex(t *testing.T) {
 			nil,
 			"",
 			"testingchart:0.1.0",
+		},
+		{
+			"Index file should not have versions that aren't present in the respose of /tags/list",
+			indexFile3,
+			"",
+			&two,
+			nil,
+			"",
+			"",
 		},
 	}
 	for _, tt := range tests {

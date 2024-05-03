@@ -127,7 +127,9 @@ func GenerateIndex(URL string, credentialSecret *corev1.Secret,
 
 	// Loop over all the tags and find the latest version
 	tagsFunc := func(tags []string) error {
+		existingTags := make(map[string]bool)
 		for i := len(tags) - 1; i >= 0; i-- {
+			existingTags[tags[i]] = true
 			// Check if the tag is a valid semver version or not. If yes, then proceed.
 			semverTag, err := version.NewVersion(tags[i])
 			if err != nil {
@@ -151,6 +153,15 @@ func GenerateIndex(URL string, credentialSecret *corev1.Secret,
 				indexFile.Entries[chartName] = append(indexFile.Entries[chartName], chartVersion)
 			}
 		}
+		var updatedChartVersions []*repo.ChartVersion
+
+		// Only keep the versions that are also present in the /tags/list call
+		for _, chartVersion := range indexFile.Entries[chartName] {
+			if existingTags[chartVersion.Version] {
+				updatedChartVersions = append(updatedChartVersions, chartVersion)
+			}
+		}
+		indexFile.Entries[chartName] = updatedChartVersions
 		return nil
 	}
 
