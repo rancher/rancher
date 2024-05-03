@@ -24,7 +24,7 @@ func TestEnsureForAttributes(t *testing.T) {
 	}
 	attribs := &v3.UserAttribute{
 		ObjectMeta: metav1.ObjectMeta{Name: userID},
-		LastLogin:  metav1.NewTime(now),
+		LastLogin:  &metav1.Time{Time: now},
 	}
 
 	ctrl := gomock.NewController(t)
@@ -159,7 +159,7 @@ func TestEnsureForAttributesConflictOnUpdate(t *testing.T) {
 	unmodifiedUser := user.DeepCopy()
 	attribs := &v3.UserAttribute{
 		ObjectMeta: metav1.ObjectMeta{Name: userID},
-		LastLogin:  metav1.NewTime(now),
+		LastLogin:  &metav1.Time{Time: now},
 	}
 
 	ctrl := gomock.NewController(t)
@@ -308,27 +308,27 @@ func TestEnsureForAll(t *testing.T) {
 	attribs := []*v3.UserAttribute{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "u-abcdef"},
-			LastLogin:  metav1.NewTime(now),
+			LastLogin:  &metav1.Time{Time: now},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "u-bcdefa"},
-			LastLogin:  metav1.NewTime(now),
+			LastLogin:  &metav1.Time{Time: now},
 		},
 		{
 			ObjectMeta:   metav1.ObjectMeta{Name: "u-cdefab"},
-			LastLogin:    metav1.NewTime(now),
+			LastLogin:    &metav1.Time{Time: now},
 			DisableAfter: &metav1.Duration{Duration: override},
 			DeleteAfter:  &metav1.Duration{Duration: override},
 		},
 		{
 			ObjectMeta:   metav1.ObjectMeta{Name: "u-defabc"},
-			LastLogin:    metav1.NewTime(now),
+			LastLogin:    &metav1.Time{Time: now},
 			DisableAfter: &metav1.Duration{Duration: 0},
 			DeleteAfter:  &metav1.Duration{Duration: 0},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "user-phs88"},
-			LastLogin:  metav1.NewTime(now),
+			LastLogin:  &metav1.Time{Time: now},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "u-fabcde"},

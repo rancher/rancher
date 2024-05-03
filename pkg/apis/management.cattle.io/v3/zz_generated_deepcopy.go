@@ -10234,7 +10234,10 @@ func (in *UserAttribute) DeepCopyInto(out *UserAttribute) {
 			(*out)[key] = outVal
 		}
 	}
-	in.LastLogin.DeepCopyInto(&out.LastLogin)
+	if in.LastLogin != nil {
+		in, out := &in.LastLogin, &out.LastLogin
+		*out = (*in).DeepCopy()
+	}
 	if in.DisableAfter != nil {
 		in, out := &in.DisableAfter, &out.DisableAfter
 		*out = new(metav1.Duration)

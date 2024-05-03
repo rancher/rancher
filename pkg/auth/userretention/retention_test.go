@@ -20,6 +20,58 @@ import (
 	"k8s.io/utils/pointer"
 )
 
+func TestLastLoginTime(t *testing.T) {
+	now := time.Now()
+	zeroLastLogin := &metav1.Time{Time: time.Time{}}
+
+	tests := []struct {
+		desc             string
+		lastLoginDefault time.Time
+		lastLogin        *metav1.Time
+		want             time.Time
+	}{
+		{
+			desc: "missing last login",
+		},
+		{
+			desc:      "zero last login",
+			lastLogin: zeroLastLogin,
+		},
+		{
+			desc:             "missing last login with default",
+			lastLoginDefault: now,
+			want:             now,
+		},
+		{
+			desc:             "zero last login with default",
+			lastLogin:        zeroLastLogin,
+			lastLoginDefault: now,
+			want:             now,
+		},
+		{
+			desc:      "last login is set with no default",
+			lastLogin: &metav1.Time{Time: now},
+			want:      now,
+		},
+		{
+			desc:             "last login is set with default",
+			lastLogin:        &metav1.Time{Time: now},
+			lastLoginDefault: now.Add(-time.Hour),
+			want:             now,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			settings := settings{defaultLastLogin: test.lastLoginDefault}
+			attribs := &v3.UserAttribute{LastLogin: test.lastLogin}
+			if want, got := test.want, lastLoginTime(settings, attribs); want != got {
+				t.Errorf("Expected last login time %v got %v", want, got)
+			}
+		})
+	}
+}
+
 func TestRetentionIsDisabledByDefault(t *testing.T) {
 	defer func() {
 		if err := recover(); err != nil {
@@ -48,21 +100,21 @@ func TestRetentionNormalRun(t *testing.T) {
 			// LastLogin is missing.
 		},
 		"u-ckrl4grxg5": {
-			LastLogin: metav1.Time{Time: now.Add(-time.Hour)},
+			LastLogin: &metav1.Time{Time: now.Add(-time.Hour)},
 		},
 		"u-mo773yttt4": {
-			LastLogin: metav1.Time{Time: now.Add(-time.Hour)},
+			LastLogin: &metav1.Time{Time: now.Add(-time.Hour)},
 		},
 		"u-yypnjwjmkq": {
-			LastLogin: metav1.Time{Time: now.Add(-2 * time.Hour)},
+			LastLogin: &metav1.Time{Time: now.Add(-2 * time.Hour)},
 		},
 		"u-evhs6gb54u": {
-			LastLogin:    metav1.Time{Time: now.Add(-2 * time.Hour)},
+			LastLogin:    &metav1.Time{Time: now.Add(-2 * time.Hour)},
 			DisableAfter: &metav1.Duration{Duration: 4 * time.Hour},
 			DeleteAfter:  &metav1.Duration{Duration: 5 * time.Hour},
 		},
 		"u-f5ugvctlrk": {
-			LastLogin:    metav1.Time{Time: now.Add(-10 * time.Hour)},
+			LastLogin:    &metav1.Time{Time: now.Add(-10 * time.Hour)},
 			DisableAfter: &metav1.Duration{Duration: 0},
 			DeleteAfter:  &metav1.Duration{Duration: 0},
 		},
@@ -261,10 +313,10 @@ func TestRetentionDryRun(t *testing.T) {
 	}
 	userAttributes := map[string]*v3.UserAttribute{
 		"u-ckrl4grxg5": {
-			LastLogin: metav1.Time{Time: time.Now().Add(-time.Hour)},
+			LastLogin: &metav1.Time{Time: time.Now().Add(-time.Hour)},
 		},
 		"u-mo773yttt4": {
-			LastLogin: metav1.Time{Time: time.Now().Add(-2 * time.Hour)},
+			LastLogin: &metav1.Time{Time: time.Now().Add(-2 * time.Hour)},
 		},
 	}
 

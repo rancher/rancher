@@ -117,7 +117,7 @@ type UserAttribute struct {
 	LastRefresh     string
 	NeedsRefresh    bool
 	ExtraByProvider map[string]map[string][]string // extra information for the user to print in audit logs, stored per authProvider. example: map[openldap:map[principalid:[openldap_user://uid=testuser1,ou=dev,dc=us-west-2,dc=compute,dc=internal]]]
-	LastLogin       metav1.Time                    `json:"lastLogin,omitempty"`
+	LastLogin       *metav1.Time                   `json:"lastLogin,omitempty"`
 	DisableAfter    *metav1.Duration               `json:"disableAfter,omitempty"` // Overrides DisableInactiveUserAfter setting.
 	DeleteAfter     *metav1.Duration               `json:"deleteAfter,omitempty"`  // Overrides DeleteInactiveUserAfter setting.
 }

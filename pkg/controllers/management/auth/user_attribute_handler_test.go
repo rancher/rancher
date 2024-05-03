@@ -39,11 +39,11 @@ func TestSyncEnsureUserRetentionLabels(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: userID,
 			},
-			LastLogin: lastLogin,
+			LastLogin: &lastLogin,
 		}
 	}
 
-	// Make labeler was called.
+	// Make sure labeler was called.
 	_, err := controller.sync("", newAttribs(metav1.NewTime(time.Now())))
 	require.NoError(t, err)
 	assert.Equal(t, 1, ensureLabelsCalledTimes)
@@ -141,7 +141,7 @@ func TestSyncProviderRefreshConflict(t *testing.T) {
 
 		a := attribs.DeepCopy()
 		if userAttributesGetCalledTimes > 1 {
-			a.LastLogin = metav1.NewTime(now)
+			a.LastLogin = &metav1.Time{Time: now}
 		}
 
 		return a, nil

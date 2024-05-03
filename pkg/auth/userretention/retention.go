@@ -68,8 +68,8 @@ func (r *Retention) Run(ctx context.Context) error {
 	}
 
 	logrus.Infof(
-		"userretention: started (disableAfter %s, deleteAfter %s, defaultLastLogin %s, dryRun %t)",
-		settings.disableAfter, settings.deleteAfter, settings.defaultLastLogin, settings.dryRun,
+		"userretention: started (disable-inactive-user-after %s, delete-inactive-user-after %s, user-last-login-default %s, user-retention-dry-run %t)",
+		settings.disableAfter, settings.deleteAfter, settings.FormatDefaultLastLogin(), settings.dryRun,
 	)
 
 	users, err := r.userCache.List(labels.Everything())
@@ -236,7 +236,7 @@ func isSubjectToRetention(user *v3.User) bool {
 }
 
 func lastLoginTime(settings settings, attribs *v3.UserAttribute) time.Time {
-	if !attribs.LastLogin.Time.IsZero() {
+	if attribs.LastLogin != nil && !attribs.LastLogin.Time.IsZero() {
 		return attribs.LastLogin.Time
 	}
 

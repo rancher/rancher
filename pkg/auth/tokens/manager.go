@@ -593,7 +593,8 @@ func (m *Manager) UserAttributeCreateOrUpdate(userID, provider string, groupPrin
 	var shouldUpdate bool
 	if len(loginTime) > 0 && !loginTime[0].IsZero() {
 		// Login time is truncated to seconds as the corresponding user label is set as epoch time.
-		attribs.LastLogin = metav1.NewTime(loginTime[0].Truncate(time.Second))
+		lastLogin := metav1.NewTime(loginTime[0].Truncate(time.Second))
+		attribs.LastLogin = &lastLogin
 		shouldUpdate = true
 	}
 
