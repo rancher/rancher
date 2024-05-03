@@ -84,6 +84,17 @@ service:
 letsEncrypt:
   # email: none@example.com
   environment: production
+  # http01 default or dns01 for extended support in CSPs
+  solver: 
+    http01:
+    #dns01:
+      #route53:
+        #accessKeyID: ""
+        #hostedZoneID: ""
+        #region: ""
+        #secretAccessKeySecretRef:
+          #key: ""
+          #name: ""
   ingress:
     # options: traefik, nginx
     class: ""

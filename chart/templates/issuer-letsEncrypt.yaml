@@ -29,9 +29,17 @@ spec:
     http01: {}
     {{- else }}
     solvers:
+    {{- if .Values.letsEncrypt.solver.dns01 }}
+    - selector:
+        dnsZones:
+          - {{ .Values.hostname }}
+      dns01:
+{{ toYaml .Values.letsEncrypt.solver.dns01 | indent 8}}
+    {{- else }}
     - http01:
         ingress:
           class: {{ .Values.letsEncrypt.ingress.class }}
+    {{- end }}
     {{- end }}
   {{- end -}}
 {{- end -}}
