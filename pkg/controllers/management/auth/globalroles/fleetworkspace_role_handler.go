@@ -1,13 +1,13 @@
 package globalroles
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/rancher/rancher/pkg/controllers"
 
 	wrangler "github.com/rancher/wrangler/v2/pkg/name"
 
-	"github.com/hashicorp/go-multierror"
 	mgmtcontroller "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -51,10 +51,10 @@ func newFleetWorkspaceRoleHandler(management *config.ManagementContext) *fleetWo
 func (h *fleetWorkspaceRoleHandler) reconcileFleetWorkspacePermissions(gr *v3.GlobalRole) error {
 	var returnErr error
 	if err := h.reconcileResourceRules(gr); err != nil {
-		returnErr = multierror.Append(returnErr, errReconcileResourceRules, err)
+		returnErr = errors.Join(returnErr, errReconcileResourceRules, err)
 	}
 	if err := h.reconcileWorkspaceVerbs(gr); err != nil {
-		returnErr = multierror.Append(returnErr, errReconcileWorkspaceVerbs, err)
+		returnErr = errors.Join(returnErr, errReconcileWorkspaceVerbs, err)
 	}
 
 	return returnErr
