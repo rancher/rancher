@@ -167,21 +167,21 @@ func GenerateIndex(URL string, credentialSecret *corev1.Secret,
 
 	// Loop over all the repositories and fetch the tags
 	repositoriesFunc := func(repositories []string) error {
+		existingCharts := make(map[string]bool)
 		for _, repository := range repositories {
 			logrus.Debugf("found repository %s for OCI clusterrepo URL %s", repository, URL)
-
 			// Storing the user provided repository that can be an oras repository or a sub repository.
 			userProvidedRepository := ociClient.repository
 
 			// Work on the oci repositories that match with the userProvidedRepository
 			if _, found := strings.CutPrefix(repository, ociClient.repository); found {
 				ociClient.repository = repository
-
 				orasRepository, err := ociClient.GetOrasRepository()
 				if err != nil {
 					return fmt.Errorf("failed to create an oras repository for url %s: %w", URL, err)
 				}
 				chartName = ociClient.repository[strings.LastIndex(ociClient.repository, "/")+1:]
+				existingCharts[chartName] = true
 				maxTag = nil
 
 				// call tags to get the max tag and update the indexFile
@@ -201,6 +201,13 @@ func GenerateIndex(URL string, credentialSecret *corev1.Secret,
 				}
 			}
 			ociClient.repository = userProvidedRepository
+		}
+
+		// Only keep the charts that are also present in the /_catalog call
+		for chartName := range indexFile.Entries {
+			if !existingCharts[chartName] {
+				delete(indexFile.Entries, chartName)
+			}
 		}
 		return nil
 	}

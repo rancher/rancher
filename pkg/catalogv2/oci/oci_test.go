@@ -122,6 +122,25 @@ func TestGenerateIndex(t *testing.T) {
 			Digest: "digest",
 		},
 	}
+	indexFile4 := repo.NewIndexFile()
+	indexFile4.Entries["anotherchart"] = repo.ChartVersions{
+		&repo.ChartVersion{
+			Metadata: &chart.Metadata{
+				Name:    "anotherchart",
+				Version: "1.0.0",
+			},
+			Digest: "digest",
+		},
+	}
+	indexFile4.Entries["anotherchartagain"] = repo.ChartVersions{
+		&repo.ChartVersion{
+			Metadata: &chart.Metadata{
+				Name:    "anotherchartagain",
+				Version: "1.0.0",
+			},
+			Digest: "digest",
+		},
+	}
 	one := 1
 	two := 2
 
@@ -130,6 +149,7 @@ func TestGenerateIndex(t *testing.T) {
 		indexFile       *repo.IndexFile
 		expectedErrMsg  string
 		numberOfEntries *int
+		numberOfCharts  *int
 		secret          *corev1.Secret
 		url             string
 		urlPath         string
@@ -138,6 +158,7 @@ func TestGenerateIndex(t *testing.T) {
 			"returns an error if url is invalid",
 			repo.NewIndexFile(),
 			"failed to create an OCI client for url",
+			nil,
 			nil,
 			nil,
 			"invalidUrl//",
@@ -149,6 +170,7 @@ func TestGenerateIndex(t *testing.T) {
 			"failed to create an OCI client for url",
 			nil,
 			nil,
+			nil,
 			"http://github.com/rancher/charts",
 			"",
 		},
@@ -157,6 +179,7 @@ func TestGenerateIndex(t *testing.T) {
 			"Can add a specific chart to indexFile if tag is provided",
 			repo.NewIndexFile(),
 			"",
+			&one,
 			&one,
 			nil,
 			"",
@@ -167,6 +190,7 @@ func TestGenerateIndex(t *testing.T) {
 			repo.NewIndexFile(),
 			"",
 			&two,
+			&one,
 			nil,
 			"",
 			"testingchart",
@@ -176,6 +200,7 @@ func TestGenerateIndex(t *testing.T) {
 			repo.NewIndexFile(),
 			"",
 			&two,
+			&one,
 			nil,
 			"",
 			"",
@@ -185,15 +210,27 @@ func TestGenerateIndex(t *testing.T) {
 			indexFile,
 			"",
 			&one,
+			&one,
 			nil,
 			"",
 			"testingchart:0.1.0",
 		},
 		{
-			"Index file should not have versions that aren't present in the respose of /tags/list",
+			"Index file should not have versions that aren't present in the response of /tags/list",
 			indexFile3,
 			"",
 			&two,
+			&one,
+			nil,
+			"",
+			"",
+		},
+		{
+			"Index file should not have repositories that aren't present in the response of /_catalog",
+			indexFile4,
+			"",
+			&two,
+			&one,
 			nil,
 			"",
 			"",
@@ -210,14 +247,17 @@ func TestGenerateIndex(t *testing.T) {
 			repoSpec := v1.RepoSpec{InsecurePlainHTTP: true, InsecureSkipTLSverify: true}
 			i, err := GenerateIndex(u, nil, repoSpec, v1.RepoStatus{}, tt.indexFile)
 			if tt.expectedErrMsg != "" {
-				assert.Contains(t, err.Error(), tt.expectedErrMsg)
+				assert.Contains(t, err.Error(), tt.expectedErrMsg, "wrong error")
+			}
+			if tt.numberOfCharts != nil {
+				assert.Equal(t, len(i.Entries), *tt.numberOfCharts, "number of charts don't match")
 			}
 			if tt.numberOfEntries != nil {
-				assert.Equal(t, len(i.Entries["testingchart"]), *tt.numberOfEntries)
+				assert.Equal(t, len(i.Entries["testingchart"]), *tt.numberOfEntries, "number of entries don't match")
 				i.SortEntries()
-				assert.NotEmpty(t, i.Entries["testingchart"][0].Digest)
+				assert.NotEmpty(t, i.Entries["testingchart"][0].Digest, "wrong digest for the first entry")
 				if *tt.numberOfEntries > 1 {
-					assert.Empty(t, i.Entries["testingchart"][1].Digest)
+					assert.Empty(t, i.Entries["testingchart"][1].Digest, "wrong digest for the second entry")
 				}
 			}
 		})
