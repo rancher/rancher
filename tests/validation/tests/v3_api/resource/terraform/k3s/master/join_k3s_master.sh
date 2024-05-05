@@ -43,7 +43,7 @@ then
   sysctl -p /etc/sysctl.d/90-kubelet.conf
   systemctl restart systemd-sysctl
   cat /tmp/audit.yaml > /var/lib/rancher/k3s/server/audit.yaml
-  if [[ "${4}" == *"v1.18"* ]] || [[ "${4}" == *"v1.19"* ]] || [[ "${4}" == *"v1.20"* ]]
+  if [[ "${4}" == *"v1.18"* ]] || [[ "${4}" == *"v1.19"* ]] || [[ "${4}" == *"v1.20"* ]] || [[ "${4}" == *"v1.21"* ]] || [[ "${4}" == *"v1.22"* ]]
   then
     cat /tmp/v120ingresspolicy.yaml > /var/lib/rancher/k3s/server/manifests/v120ingresspolicy.yaml
   else
