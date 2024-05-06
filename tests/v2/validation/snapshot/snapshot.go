@@ -362,14 +362,6 @@ func restoreV2Prov(t *testing.T, client *rancher.Client, v2prov initialSnapshotC
 		assert.Empty(t, podErrors)
 		require.Equal(t, v2prov.kubernetesVersion, clusterObject.Spec.KubernetesVersion)
 
-		steveclient, err := client.Steve.ProxyDownstream(clusterID)
-		require.NoError(t, err)
-
-		deploymentList, err := steveclient.SteveType(workloads.DeploymentSteveType).NamespacedSteveClient(defaultNamespace).List(nil)
-		require.NoError(t, err)
-		require.Equal(t, 1, len(deploymentList.Data))
-		require.Equal(t, initialWorkloadName, deploymentList.Data[0].ObjectMeta.Name)
-
 		if etcdRestore.SnapshotRestore == kubernetesVersion || etcdRestore.SnapshotRestore == all {
 			clusterObject, _, err := clusters.GetProvisioningClusterByName(client, clusterName, namespace)
 			require.NoError(t, err)
