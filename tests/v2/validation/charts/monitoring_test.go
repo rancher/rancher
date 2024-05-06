@@ -1,23 +1,26 @@
+//go:build (validation || infra.rke1 || cluster.any || stress) && !infra.any && !infra.aks && !infra.eks && !infra.gke && !infra.rke2k3s && !sanity && !extended
+
 package charts
 
 import (
 	"fmt"
 	"math/rand"
+	"net/url"
 	"testing"
 
-	"net/url"
-
 	"github.com/rancher/norman/types"
-	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
-	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
-	"github.com/rancher/rancher/tests/framework/extensions/charts"
-	"github.com/rancher/rancher/tests/framework/extensions/clusters"
-	"github.com/rancher/rancher/tests/framework/extensions/namespaces"
-	"github.com/rancher/rancher/tests/framework/extensions/projects"
-	"github.com/rancher/rancher/tests/framework/extensions/secrets"
-	"github.com/rancher/rancher/tests/framework/extensions/services"
-	"github.com/rancher/rancher/tests/framework/pkg/session"
+	"github.com/rancher/shepherd/clients/rancher"
+	"github.com/rancher/shepherd/clients/rancher/catalog"
+	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
+	v1 "github.com/rancher/shepherd/clients/rancher/v1"
+	"github.com/rancher/shepherd/extensions/charts"
+	"github.com/rancher/shepherd/extensions/clusters"
+	"github.com/rancher/shepherd/extensions/ingresses"
+	"github.com/rancher/shepherd/extensions/namespaces"
+	"github.com/rancher/shepherd/extensions/projects"
+	"github.com/rancher/shepherd/extensions/secrets"
+	"github.com/rancher/shepherd/extensions/services"
+	"github.com/rancher/shepherd/pkg/session"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -52,45 +55,44 @@ func (m *MonitoringTestSuite) SetupSuite() {
 	clusterName := client.RancherConfig.ClusterName
 	require.NotEmptyf(m.T(), clusterName, "Cluster name to install is not set")
 
-	// Get clusterID with clusterName
-	clusterID, err := clusters.GetClusterIDByName(client, clusterName)
+	// Get cluster meta
+	cluster, err := clusters.NewClusterMeta(client, clusterName)
 	require.NoError(m.T(), err)
 
 	// Change alert manager and grafana paths if it's not local cluster
-	if clusterID != clusterName {
-		alertManagerPath = fmt.Sprintf("k8s/clusters/%s/%s", clusterID, alertManagerPath)
-		grafanaPath = fmt.Sprintf("k8s/clusters/%s/%s", clusterID, grafanaPath)
-		prometheusTargetsPathAPI = fmt.Sprintf("k8s/clusters/%s/%s", clusterID, prometheusTargetsPathAPI)
+	if !cluster.IsLocal {
+		alertManagerPath = fmt.Sprintf("k8s/clusters/%s/%s", cluster.ID, alertManagerPath)
+		grafanaPath = fmt.Sprintf("k8s/clusters/%s/%s", cluster.ID, grafanaPath)
+		prometheusTargetsPathAPI = fmt.Sprintf("k8s/clusters/%s/%s", cluster.ID, prometheusTargetsPathAPI)
 	}
 
 	// Change prometheus paths to use the clusterID
-	prometheusGraphPath = fmt.Sprintf("k8s/clusters/%s/%s", clusterID, prometheusGraphPath)
-	prometheusRulesPath = fmt.Sprintf("k8s/clusters/%s/%s", clusterID, prometheusRulesPath)
-	prometheusTargetsPath = fmt.Sprintf("k8s/clusters/%s/%s", clusterID, prometheusTargetsPath)
+	prometheusGraphPath = fmt.Sprintf("k8s/clusters/%s/%s", cluster.ID, prometheusGraphPath)
+	prometheusRulesPath = fmt.Sprintf("k8s/clusters/%s/%s", cluster.ID, prometheusRulesPath)
+	prometheusTargetsPath = fmt.Sprintf("k8s/clusters/%s/%s", cluster.ID, prometheusTargetsPath)
 
 	// Get latest versions of the monitoring chart
-	latestMonitoringVersion, err := client.Catalog.GetLatestChartVersion(charts.RancherMonitoringName)
+	latestMonitoringVersion, err := client.Catalog.GetLatestChartVersion(charts.RancherMonitoringName, catalog.RancherChartRepo)
 	require.NoError(m.T(), err)
 
 	// Get project system projectId
-	project, err := projects.GetProjectByName(client, clusterID, projectName)
+	project, err := projects.GetProjectByName(client, cluster.ID, projectName)
 	require.NoError(m.T(), err)
 
 	m.project = project
 	require.NotEmpty(m.T(), m.project)
 
 	m.chartInstallOptions = &charts.InstallOptions{
-		ClusterName: clusterName,
-		ClusterID:   clusterID,
-		Version:     latestMonitoringVersion,
-		ProjectID:   m.project.ID,
+		Cluster:   cluster,
+		Version:   latestMonitoringVersion,
+		ProjectID: m.project.ID,
 	}
 	m.chartFeatureOptions = &charts.RancherMonitoringOpts{
-		IngressNginx:         true,
-		RKEControllerManager: true,
-		RKEEtcd:              true,
-		RKEProxy:             true,
-		RKEScheduler:         true,
+		IngressNginx:      true,
+		ControllerManager: true,
+		Etcd:              true,
+		Proxy:             true,
+		Scheduler:         true,
 	}
 }
 
@@ -129,9 +131,9 @@ func (m *MonitoringTestSuite) TestMonitoringChart() {
 	paths := []string{alertManagerPath, grafanaPath, prometheusGraphPath, prometheusRulesPath, prometheusTargetsPath}
 	for _, path := range paths {
 		m.T().Logf("Validating %s is accessible", path)
-		result, err := charts.GetChartCaseEndpoint(client, client.RancherConfig.Host, path, true)
+		result, err := ingresses.IsIngressExternallyAccessible(client, client.RancherConfig.Host, path, true)
 		assert.NoError(m.T(), err)
-		assert.True(m.T(), result.Ok)
+		assert.True(m.T(), result)
 	}
 
 	m.T().Log("Validating all Prometheus active targets are up")
@@ -237,9 +239,9 @@ func (m *MonitoringTestSuite) TestMonitoringChart() {
 
 	m.T().Logf("Validating traefik is accessible externally")
 	host := fmt.Sprintf("%v:%v", randWorkerNodePublicIP, webhookReceiverServiceSpec.Ports[0].NodePort)
-	result, err := charts.GetChartCaseEndpoint(client, host, "dashboard", false)
+	result, err := ingresses.IsIngressExternallyAccessible(client, host, "dashboard", false)
 	assert.NoError(m.T(), err)
-	assert.True(m.T(), result.Ok)
+	assert.True(m.T(), result)
 
 	m.T().Logf("Validating alertmanager sent alert to webhook receiver")
 	err = charts.WatchAndWaitDeploymentForAnnotation(client, m.project.ClusterID, webhookReceiverNamespace.Name, alertWebhookReceiverDeploymentResp.Name, webhookReceiverAnnotationKey, webhookReceiverAnnotationValue)
@@ -258,7 +260,7 @@ func (m *MonitoringTestSuite) TestUpgradeMonitoringChart() {
 	require.NoError(m.T(), err)
 
 	// Change monitoring install option version to previous version of the latest version
-	versionsList, err := client.Catalog.GetListChartVersions(charts.RancherMonitoringName)
+	versionsList, err := client.Catalog.GetListChartVersions(charts.RancherMonitoringName, catalog.RancherChartRepo)
 	require.NoError(m.T(), err)
 	require.Greaterf(m.T(), len(versionsList), 1, "There should be at least 2 versions of the monitoring chart")
 	versionLatest := versionsList[0]
@@ -294,7 +296,7 @@ func (m *MonitoringTestSuite) TestUpgradeMonitoringChart() {
 	chartVersionPreUpgrade := monitoringChartPreUpgrade.ChartDetails.Spec.Chart.Metadata.Version
 	assert.Contains(m.T(), versionsList[1:], chartVersionPreUpgrade)
 
-	m.chartInstallOptions.Version, err = client.Catalog.GetLatestChartVersion(charts.RancherMonitoringName)
+	m.chartInstallOptions.Version, err = client.Catalog.GetLatestChartVersion(charts.RancherMonitoringName, catalog.RancherChartRepo)
 	require.NoError(m.T(), err)
 
 	m.T().Log("Upgrading monitoring chart with the latest version")

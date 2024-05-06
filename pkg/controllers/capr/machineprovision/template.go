@@ -4,7 +4,7 @@ import (
 	"sort"
 	"strconv"
 
-	name2 "github.com/rancher/wrangler/pkg/name"
+	name2 "github.com/rancher/wrangler/v2/pkg/name"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"

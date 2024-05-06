@@ -3,6 +3,7 @@ package image
 import (
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -188,6 +189,86 @@ func TestResolveWithCluster(t *testing.T) {
 
 	if err := settings.SystemDefaultRegistry.Set(""); err != nil {
 		t.Errorf("Failed to clean up TestResolveWithCluster(), unable to set SystemDefaultRegistry with the err: %v", err)
+	}
+}
+
+func TestGetImages(t *testing.T) {
+	// Setup a httpserver
+	server := setupTestServer()
+	defer server.Close()
+
+	// Mock the parseRepoName function to return the expected repoName
+	originalParseRepoName := parseRepoName
+	parseRepoName = func(url string) (string, error) {
+		return "rancher/ui-plugin-catalog", nil
+	}
+	defer func() {
+		parseRepoName = originalParseRepoName
+	}()
+
+	tests := []struct {
+		name         string
+		exportConfig ExportConfig
+		expected     []string
+		notExpected  []string
+	}{
+		{
+			name: "exportConfig is completely empty",
+			exportConfig: ExportConfig{
+				SystemChartsPath: "",
+				ChartsPath:       "",
+				OsType:           Linux,
+				RancherVersion:   "",
+				GithubEndpoints:  []GithubEndpoint{},
+			},
+			expected:    []string{},
+			notExpected: []string{"rancher/ui-plugin-catalog"},
+		},
+		{
+			name: "only extensions is set in exportConfig",
+			exportConfig: ExportConfig{
+				SystemChartsPath: "",
+				ChartsPath:       "",
+				OsType:           Linux,
+				RancherVersion:   "",
+				GithubEndpoints: []GithubEndpoint{
+					{URL: server.URL},
+				},
+			},
+			expected:    []string{"rancher/ui-plugin-catalog"},
+			notExpected: []string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			imagesList, _, err := GetImages(tt.exportConfig, make(map[string][]string), []string{}, map[string]rketypes.RKESystemImages{})
+			assertlib.NoError(t, err)
+
+			for _, expected := range tt.expected {
+				found := false
+				for _, image := range imagesList {
+					if strings.Contains(image, expected) {
+						found = true
+						break
+					}
+				}
+				assertlib.True(t, found)
+			}
+
+			for _, notexpected := range tt.notExpected {
+				found := false
+				for _, image := range imagesList {
+					if strings.Contains(image, notexpected) {
+						found = true
+						break
+					}
+				}
+
+				assertlib.False(t, found)
+			}
+
+		})
 	}
 }
 

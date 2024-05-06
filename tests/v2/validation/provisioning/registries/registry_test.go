@@ -1,21 +1,23 @@
+//go:build validation
+
 package registries
 
 import (
 	"testing"
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
-	"github.com/rancher/rancher/tests/framework/clients/corral"
-	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
-	"github.com/rancher/rancher/tests/framework/extensions/clusters"
-	provisioning "github.com/rancher/rancher/tests/framework/extensions/provisioning"
-	"github.com/rancher/rancher/tests/framework/extensions/provisioninginput"
-	"github.com/rancher/rancher/tests/framework/extensions/registries"
-	"github.com/rancher/rancher/tests/framework/extensions/workloads/pods"
-	"github.com/rancher/rancher/tests/framework/pkg/config"
-	"github.com/rancher/rancher/tests/framework/pkg/environmentflag"
-	"github.com/rancher/rancher/tests/framework/pkg/session"
 	"github.com/rancher/rancher/tests/v2/validation/provisioning/permutations"
+	"github.com/rancher/shepherd/clients/corral"
+	"github.com/rancher/shepherd/clients/rancher"
+	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
+	"github.com/rancher/shepherd/extensions/clusters"
+	provisioning "github.com/rancher/shepherd/extensions/provisioning"
+	"github.com/rancher/shepherd/extensions/provisioninginput"
+	"github.com/rancher/shepherd/extensions/registries"
+	"github.com/rancher/shepherd/extensions/workloads/pods"
+	"github.com/rancher/shepherd/pkg/config"
+	"github.com/rancher/shepherd/pkg/environmentflag"
+	"github.com/rancher/shepherd/pkg/session"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -253,8 +255,7 @@ func (rt *RegistryTestSuite) TestRegistriesRKE() {
 		provisioning.VerifyRKE1Cluster(rt.T(), subClient, testConfig, clusterObject)
 	}
 
-	podResults, podErrors := pods.StatusPods(rt.client, rt.clusterLocalID)
-	assert.NotEmpty(rt.T(), podResults)
+	podErrors := pods.StatusPods(rt.client, rt.clusterLocalID)
 	assert.Empty(rt.T(), podErrors)
 	registries.CheckAllClusterPodsForRegistryPrefix(rt.client, rt.clusterLocalID, rt.localClusterGlobalRegistryHost)
 }
@@ -302,8 +303,7 @@ func (rt *RegistryTestSuite) TestRegistriesK3S() {
 		provisioning.VerifyCluster(rt.T(), subClient, testConfig, clusterObject)
 	}
 
-	podResults, podErrors := pods.StatusPods(rt.client, rt.clusterLocalID)
-	assert.NotEmpty(rt.T(), podResults)
+	podErrors := pods.StatusPods(rt.client, rt.clusterLocalID)
 	assert.Empty(rt.T(), podErrors)
 	registries.CheckAllClusterPodsForRegistryPrefix(rt.client, rt.clusterLocalID, rt.localClusterGlobalRegistryHost)
 }
@@ -351,8 +351,7 @@ func (rt *RegistryTestSuite) TestRegistriesRKE2() {
 		provisioning.VerifyCluster(rt.T(), subClient, testConfig, clusterObject)
 	}
 
-	podResults, podErrors := pods.StatusPods(rt.client, rt.clusterLocalID)
-	assert.NotEmpty(rt.T(), podResults)
+	podErrors := pods.StatusPods(rt.client, rt.clusterLocalID)
 	assert.Empty(rt.T(), podErrors)
 	registries.CheckAllClusterPodsForRegistryPrefix(rt.client, rt.clusterLocalID, rt.localClusterGlobalRegistryHost)
 }

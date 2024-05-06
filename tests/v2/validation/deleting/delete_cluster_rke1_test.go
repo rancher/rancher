@@ -1,12 +1,14 @@
+//go:build (infra.rke1 || validation) && !infra.any && !infra.aks && !infra.eks && !infra.gke && !infra.rke2k3s && !stress && !sanity && !extended
+
 package deleting
 
 import (
 	"testing"
 
-	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	"github.com/rancher/rancher/tests/framework/extensions/clusters"
-	"github.com/rancher/rancher/tests/framework/extensions/provisioning"
-	"github.com/rancher/rancher/tests/framework/pkg/session"
+	"github.com/rancher/shepherd/clients/rancher"
+	"github.com/rancher/shepherd/extensions/clusters"
+	"github.com/rancher/shepherd/extensions/provisioning"
+	"github.com/rancher/shepherd/pkg/session"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
@@ -32,11 +34,20 @@ func (c *RKE1ClusterDeleteTestSuite) SetupSuite() {
 }
 
 func (c *RKE1ClusterDeleteTestSuite) TestDeletingRKE1Cluster() {
-	clusterID, err := clusters.GetClusterIDByName(c.client, c.client.RancherConfig.ClusterName)
-	require.NoError(c.T(), err)
+	tests := []struct {
+		name   string
+		client *rancher.Client
+	}{
+		{"Deleting cluster", c.client},
+	}
 
-	clusters.DeleteRKE1Cluster(c.client, clusterID)
-	provisioning.VerifyDeleteRKE1Cluster(c.T(), c.client, clusterID)
+	for _, tt := range tests {
+		clusterID, err := clusters.GetClusterIDByName(c.client, c.client.RancherConfig.ClusterName)
+		require.NoError(c.T(), err)
+
+		clusters.DeleteRKE1Cluster(tt.client, clusterID)
+		provisioning.VerifyDeleteRKE1Cluster(c.T(), tt.client, clusterID)
+	}
 }
 
 // In order for 'go test' to run this suite, we need to create

@@ -28,46 +28,60 @@ ENV CATTLE_CHART_DEFAULT_BRANCH=$CHART_DEFAULT_BRANCH
 ENV CATTLE_PARTNER_CHART_DEFAULT_BRANCH=$PARTNER_CHART_DEFAULT_BRANCH
 ENV CATTLE_RKE2_CHART_DEFAULT_BRANCH=$RKE2_CHART_DEFAULT_BRANCH
 ENV CATTLE_HELM_VERSION v2.16.8-rancher2
-ENV CATTLE_MACHINE_VERSION v0.15.0-rancher106
-ENV CATTLE_K3S_VERSION v1.27.6+k3s1
+# make sure the version number is consistent with the one at the 1) tests/v2/codecoverage/package/Dockerfile, 2) Dockerfile.dapper, 3) go.mod and 4) the setting MachineProvisionImage in pkg/settings/setting.go
+ENV CATTLE_MACHINE_VERSION v0.15.0-rancher112
+ENV CATTLE_K3S_VERSION v1.28.6+k3s2
 ENV CATTLE_MACHINE_PROVISION_IMAGE rancher/machine:${CATTLE_MACHINE_VERSION}
-ENV CATTLE_ETCD_VERSION v3.5.1
+ENV CATTLE_ETCD_VERSION v3.5.9
 ENV LOGLEVEL_VERSION v0.1.5
 ENV TINI_VERSION v0.18.0
-ENV TELEMETRY_VERSION v0.5.20
+ENV TELEMETRY_VERSION v0.6.2
 ENV DOCKER_MACHINE_LINODE_VERSION v0.1.11
 ENV LINODE_UI_DRIVER_VERSION v0.5.0
 # make sure the version number is consistent with the one at Line 100 of pkg/data/management/machinedriver_data.go
-ENV DOCKER_MACHINE_HARVESTER_VERSION v0.6.5
+ENV DOCKER_MACHINE_HARVESTER_VERSION v0.6.7
 ENV CATTLE_KDM_BRANCH ${CATTLE_KDM_BRANCH}
-ENV HELM_VERSION v3.12.3
+ENV HELM_VERSION v3.13.3
 ENV KUSTOMIZE_VERSION v5.0.1
-ENV CATTLE_WINS_AGENT_VERSION v0.4.11
+ENV CATTLE_WINS_AGENT_VERSION v0.4.15
 ENV CATTLE_WINS_AGENT_INSTALL_SCRIPT https://raw.githubusercontent.com/rancher/wins/${CATTLE_WINS_AGENT_VERSION}/install.ps1
 ENV CATTLE_WINS_AGENT_UNINSTALL_SCRIPT https://raw.githubusercontent.com/rancher/wins/${CATTLE_WINS_AGENT_VERSION}/uninstall.ps1
 ENV CATTLE_WINS_AGENT_UPGRADE_IMAGE rancher/wins:${CATTLE_WINS_AGENT_VERSION}
-ENV CATTLE_CSI_PROXY_AGENT_VERSION v1.1.1
-# make sure the CATTLE_SYSTEM_AGENT_VERSION is consistent with tests/v2/codecoverage/package/Dockerfile and pkg/settings/setting.go
-ENV CATTLE_SYSTEM_AGENT_VERSION v0.3.4-rc1
-ENV CATTLE_SYSTEM_AGENT_INSTALL_SCRIPT https://raw.githubusercontent.com/rancher/system-agent/${CATTLE_SYSTEM_AGENT_VERSION}/install.sh
-ENV CATTLE_SYSTEM_AGENT_UNINSTALL_SCRIPT https://raw.githubusercontent.com/rancher/system-agent/${CATTLE_SYSTEM_AGENT_VERSION}/system-agent-uninstall.sh
+ENV CATTLE_CSI_PROXY_AGENT_VERSION v1.1.3
+# make sure the CATTLE_SYSTEM_AGENT_VERSION is consistent with tests/v2/codecoverage/package/Dockerfile
+ENV CATTLE_SYSTEM_AGENT_VERSION v0.3.6
+ENV CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX https://github.com/rancher/system-agent/releases/download
 ENV CATTLE_SYSTEM_AGENT_UPGRADE_IMAGE rancher/system-agent:${CATTLE_SYSTEM_AGENT_VERSION}-suc
-ENV CATTLE_SYSTEM_UPGRADE_CONTROLLER_CHART_VERSION 103.0.0+up0.6.0
+ENV CATTLE_SYSTEM_AGENT_INSTALLER_IMAGE rancher/system-agent-installer-
+# make sure the ENV CATTLE_SYSTEM_AGENT_INSTALL_SCRIPT is consistent with pkg/settings/setting.go to utlize the local version of install script downloaded during build/package
+ENV CATTLE_SYSTEM_AGENT_INSTALL_SCRIPT ${CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX}/${CATTLE_SYSTEM_AGENT_VERSION}/install.sh
+ENV CATTLE_SYSTEM_AGENT_UNINSTALL_SCRIPT ${CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX}/${CATTLE_SYSTEM_AGENT_VERSION}/system-agent-uninstall.sh
+ENV CATTLE_SYSTEM_UPGRADE_CONTROLLER_CHART_VERSION 103.0.1+up0.6.0
 
 # System charts minimal version
-ENV CATTLE_FLEET_MIN_VERSION=103.1.0+up0.9.0-rc.4
-ENV CATTLE_RANCHER_WEBHOOK_VERSION=103.0.0+up0.4.0-rc10
-ENV CATTLE_CSP_ADAPTER_MIN_VERSION=103.0.0+up3.0.0-rc2
+# Deprecated in favor of CATTLE_FLEET_VERSION.
+ENV CATTLE_FLEET_MIN_VERSION=""
+ARG CATTLE_FLEET_VERSION
+ENV CATTLE_FLEET_VERSION=$CATTLE_FLEET_VERSION
+ARG CATTLE_RANCHER_WEBHOOK_VERSION
+ENV CATTLE_RANCHER_WEBHOOK_VERSION=$CATTLE_RANCHER_WEBHOOK_VERSION
+ARG CATTLE_CSP_ADAPTER_MIN_VERSION
+ENV CATTLE_CSP_ADAPTER_MIN_VERSION=$CATTLE_CSP_ADAPTER_MIN_VERSION
 
 RUN mkdir -p /var/lib/rancher-data/local-catalogs/system-library && \
     mkdir -p /var/lib/rancher-data/local-catalogs/library && \
     mkdir -p /var/lib/rancher-data/local-catalogs/helm3-library && \
     mkdir -p /var/lib/rancher-data/local-catalogs/v2 && \
     git clone -b $CATTLE_SYSTEM_CHART_DEFAULT_BRANCH --depth 1 https://github.com/rancher/system-charts /var/lib/rancher-data/local-catalogs/system-library && \
+    # Temporarily clone from our GitHub's main repo, to avoid unnecessary load
+    # in git.rancher.io
+    git config --global url."https://github.com/rancher/".insteadOf https://git.rancher.io/ && \
     # Charts need to be copied into the sha256 value of git url computed in https://github.com/rancher/rancher/blob/5ebda9ac23c06e9647b586ec38aa51cc9ff9b031/pkg/catalogv2/git/download.go#L102 to create a unique folder per url
     git clone -b $CATTLE_CHART_DEFAULT_BRANCH --depth 1 https://git.rancher.io/charts /var/lib/rancher-data/local-catalogs/v2/rancher-charts/4b40cac650031b74776e87c1a726b0484d0877c3ec137da0872547ff9b73a721/ && \
     git clone -b $CATTLE_PARTNER_CHART_DEFAULT_BRANCH --depth 1 https://git.rancher.io/partner-charts /var/lib/rancher-data/local-catalogs/v2/rancher-partner-charts/8f17acdce9bffd6e05a58a3798840e408c4ea71783381ecd2e9af30baad65974 && \
     git clone -b $CATTLE_RKE2_CHART_DEFAULT_BRANCH --depth 1 https://git.rancher.io/rke2-charts /var/lib/rancher-data/local-catalogs/v2/rancher-rke2-charts/675f1b63a0a83905972dcab2794479ed599a6f41b86cd6193d69472d0fa889c9 && \
+    # Revert the previous change in git.rancher.io from .gitconfig
+    rm "${HOME}/.gitconfig" && \
     git clone -b master --depth 1 https://github.com/rancher/charts /var/lib/rancher-data/local-catalogs/library && \
     git clone -b master --depth 1 https://github.com/rancher/helm3-charts /var/lib/rancher-data/local-catalogs/helm3-library
 
@@ -116,7 +130,7 @@ RUN curl ${HELM_URL_V3} | tar xvzf - --strip-components=1 -C /usr/bin && \
     chmod +x /usr/bin/kustomize
 
 # Set up K3s: copy the necessary binaries from the K3s image.
-COPY --from=rancher/k3s:v1.27.6-k3s1 \
+COPY --from=rancher/k3s:v1.28.6-k3s2 \
     /bin/blkid \
     /bin/bandwidth \
     /bin/cni \
@@ -133,7 +147,7 @@ COPY --from=rancher/k3s:v1.27.6-k3s1 \
     /bin/runc \
     /bin/which \
     /bin/aux/xtables-legacy-multi \
-/usr/bin/
+    /usr/bin/
 
 RUN ln -s /usr/bin/cni /usr/bin/bridge && \
     ln -s /usr/bin/cni /usr/bin/flannel && \
@@ -163,15 +177,17 @@ RUN curl -sLf ${!TINI_URL} > /usr/bin/tini && \
     chmod +x /usr/bin/tini /usr/bin/telemetry && \
     mkdir -p /var/lib/rancher-data/driver-metadata
 
+
 ENV CATTLE_UI_VERSION 2.8.4-rc1
 ENV CATTLE_DASHBOARD_UI_VERSION v2.8.4-rc1
-ENV CATTLE_CLI_VERSION v2.8.0-rc2
+ENV CATTLE_CLI_VERSION v2.8.3
+
 
 # Base UI brand used as a fallback env setting (not user facing) to indicate this is a non-prime install
 ENV CATTLE_BASE_UI_BRAND=
 
 # Please update the api-ui-version in pkg/settings/settings.go when updating the version here.
-ENV CATTLE_API_UI_VERSION 1.1.10
+ENV CATTLE_API_UI_VERSION 1.1.11
 
 RUN mkdir -p /var/log/auditlog
 ENV AUDIT_LOG_PATH /var/log/auditlog/rancher-api-audit.log
@@ -196,9 +212,8 @@ RUN mkdir -p /usr/share/rancher/ui && \
     curl -sL https://releases.rancher.com/dashboard/${CATTLE_DASHBOARD_UI_VERSION}.tar.gz | tar xvzf - --strip-components=2 && \
     ln -s dashboard/index.html ../index.html && \
     cd ../../ui/assets && \
-    curl -sfL https://github.com/rancher/system-agent/releases/download/${CATTLE_SYSTEM_AGENT_VERSION}/rancher-system-agent-arm64 -O && \
-    curl -sfL https://github.com/rancher/system-agent/releases/download/${CATTLE_SYSTEM_AGENT_VERSION}/rancher-system-agent-amd64 -O && \
-    curl -sfL https://github.com/rancher/system-agent/releases/download/${CATTLE_SYSTEM_AGENT_VERSION}/rancher-system-agent-s390x -O && \
+    curl -sfL ${CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX}/${CATTLE_SYSTEM_AGENT_VERSION}/rancher-system-agent-arm64 -O && \
+    curl -sfL ${CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX}/${CATTLE_SYSTEM_AGENT_VERSION}/rancher-system-agent-amd64 -O && \
     curl -sfL ${CATTLE_SYSTEM_AGENT_INSTALL_SCRIPT} -o system-agent-install.sh && \
     curl -sfL ${CATTLE_SYSTEM_AGENT_UNINSTALL_SCRIPT} -o system-agent-uninstall.sh && \
     curl -sfL https://github.com/rancher/wins/releases/download/${CATTLE_WINS_AGENT_VERSION}/wins.exe -O && \

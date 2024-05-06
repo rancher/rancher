@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -42,6 +43,11 @@ func TestHandler_ServeHTTP(t *testing.T) {
 			handler := handler{}
 
 			// act
+			err = settings.SystemAgentInstallScript.Set("https://raw.githubusercontent.com/rancher/system-agent/main/install.sh")
+			a.Nil(err)
+			err = settings.SystemAgentInstallerImage.Set("rancher/system-agent-installer-")
+			a.Nil(err)
+
 			handler.ServeHTTP(rr, req)
 
 			// assert
@@ -79,6 +85,11 @@ func TestHandler_ServeHTTPAirgap(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// arrange
 			a := assert.New(t)
+			err := settings.SystemAgentInstallScript.Set("https://raw.githubusercontent.com/rancher/system-agent/main/install.sh")
+			a.Nil(err)
+			err = settings.SystemAgentInstallerImage.Set("rancher/system-agent-installer-")
+			a.Nil(err)
+
 			req, err := http.NewRequest(http.MethodGet, tt.args.path, nil)
 			a.Nil(err)
 			rr := httptest.NewRecorder()

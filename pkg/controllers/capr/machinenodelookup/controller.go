@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/rancher/lasso/pkg/dynamic"
@@ -14,18 +15,17 @@ import (
 	rkecontroller "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/provisioningv2/kubeconfig"
 	"github.com/rancher/rancher/pkg/wrangler"
-	"github.com/rancher/wrangler/pkg/condition"
-	"github.com/rancher/wrangler/pkg/data"
-	"github.com/rancher/wrangler/pkg/generic"
+	"github.com/rancher/wrangler/v2/pkg/condition"
+	"github.com/rancher/wrangler/v2/pkg/data"
+	"github.com/rancher/wrangler/v2/pkg/generic"
+	"github.com/rancher/wrangler/v2/pkg/summary"
 	"github.com/sirupsen/logrus"
-	corev1 "k8s.io/api/core/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
 const (
@@ -58,6 +58,8 @@ func Register(ctx context.Context, clients *wrangler.Context, kubeconfigManager 
 	clients.RKE.RKEBootstrap().OnChange(ctx, "machine-node-lookup", h.associateMachineWithNode)
 }
 
+// associateMachineWithNode back-populates the provider ID and addresses from the K8s v1 Node object onto the
+// corresponding infrastructure machine object that is referenced by the bootstrap.
 func (h *handler) associateMachineWithNode(_ string, bootstrap *rkev1.RKEBootstrap) (*rkev1.RKEBootstrap, error) {
 	if bootstrap == nil || bootstrap.DeletionTimestamp != nil {
 		return bootstrap, nil
@@ -77,6 +79,26 @@ func (h *handler) associateMachineWithNode(_ string, bootstrap *rkev1.RKEBootstr
 
 	if machine.Spec.ProviderID != nil && *machine.Spec.ProviderID != "" {
 		// If the machine already has its provider ID set, then we do not need to continue
+		return bootstrap, nil
+	}
+
+	gvk := schema.FromAPIVersionAndKind(machine.Spec.InfrastructureRef.APIVersion, machine.Spec.InfrastructureRef.Kind)
+	infra, err := h.dynamic.Get(gvk, machine.Namespace, machine.Spec.InfrastructureRef.Name)
+	if apierror.IsNotFound(err) {
+		return bootstrap, nil
+	} else if err != nil {
+		return bootstrap, err
+	}
+
+	d, err := data.Convert(infra)
+	if err != nil {
+		return bootstrap, err
+	}
+
+	// Do not mutate the infrastructure machine object if it is not marked as Ready, otherwise it will cause the
+	// controller to potentially re-run the provision job
+	if c := getCondition(d, "Ready"); c == nil || (c != nil && strings.ToLower(c.Status()) != "true") {
+		h.rkeBootstrap.EnqueueAfter(bootstrap.Namespace, bootstrap.Name, nodeErrorEnqueueTime)
 		return bootstrap, nil
 	}
 
@@ -104,27 +126,12 @@ func (h *handler) associateMachineWithNode(_ string, bootstrap *rkev1.RKEBootstr
 		return bootstrap, nil
 	}
 
-	return bootstrap, h.updateMachine(&nodes.Items[0], machine)
-}
-
-func (h *handler) updateMachine(node *corev1.Node, machine *capi.Machine) error {
-	gvk := schema.FromAPIVersionAndKind(machine.Spec.InfrastructureRef.APIVersion, machine.Spec.InfrastructureRef.Kind)
-	infra, err := h.dynamic.Get(gvk, machine.Namespace, machine.Spec.InfrastructureRef.Name)
-	if apierror.IsNotFound(err) {
-		return nil
-	} else if err != nil {
-		return err
-	}
-
-	d, err := data.Convert(infra)
-	if err != nil {
-		return err
-	}
+	node := &nodes.Items[0]
 
 	if d.String("spec", "providerID") != node.Spec.ProviderID {
 		obj, err := data.Convert(infra.DeepCopyObject())
 		if err != nil {
-			return err
+			return bootstrap, err
 		}
 
 		obj.SetNested(node.Status.Addresses, "status", "addresses")
@@ -132,19 +139,29 @@ func (h *handler) updateMachine(node *corev1.Node, machine *capi.Machine) error 
 			Object: obj,
 		})
 		if err != nil {
-			return err
+			return bootstrap, err
 		}
 
 		obj, err = data.Convert(newObj)
 		if err != nil {
-			return err
+			return bootstrap, err
 		}
 
 		obj.SetNested(node.Spec.ProviderID, "spec", "providerID")
 		_, err = h.dynamic.Update(&unstructured.Unstructured{
 			Object: obj,
 		})
-		return err
+		return bootstrap, err
+	}
+
+	return bootstrap, nil
+}
+
+func getCondition(d data.Object, conditionType string) *summary.Condition {
+	for _, cond := range summary.GetUnstructuredConditions(d) {
+		if cond.Type() == conditionType {
+			return &cond
+		}
 	}
 
 	return nil

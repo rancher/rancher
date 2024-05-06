@@ -15,7 +15,7 @@ AZURE_CLIENT_SECRET = os.environ.get("AZURE_CLIENT_SECRET")
 AZURE_TENANT_ID = os.environ.get("AZURE_TENANT_ID")
 worker_count = int(os.environ.get('RANCHER_STRESS_TEST_WORKER_COUNT', 1))
 HOST_NAME = os.environ.get('RANCHER_HOST_NAME', "testcustom")
-engine_install_url = "https://releases.rancher.com/install-docker/24.0.sh"
+engine_install_url = "https://releases.rancher.com/install-docker/25.0.sh"
 
 rke_config = {
     "addonJobTimeout": 30,
@@ -952,7 +952,7 @@ def node_template_az():
             "dockerPort": "2376",
             "environment": "AzurePublicCloud",
             "faultDomainCount": "3",
-            "image": "canonical:UbuntuServer:18.04-LTS:latest",
+            "image": "Canonical:0001-com-ubuntu-server-jammy:22_04-lts:latest",
             "location": "westus",
             "managedDisks": False,
             "noPublicIp": False,

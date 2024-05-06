@@ -1,18 +1,20 @@
+//go:build validation
+
 package rke2
 
 import (
 	"testing"
 
-	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
-	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
-	"github.com/rancher/rancher/tests/framework/extensions/provisioninginput"
-	"github.com/rancher/rancher/tests/framework/extensions/users"
-	password "github.com/rancher/rancher/tests/framework/extensions/users/passwordgenerator"
-	"github.com/rancher/rancher/tests/framework/pkg/config"
-	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
-	"github.com/rancher/rancher/tests/framework/pkg/session"
 	"github.com/rancher/rancher/tests/v2/validation/provisioning/permutations"
+	"github.com/rancher/shepherd/clients/rancher"
+	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
+	"github.com/rancher/shepherd/extensions/machinepools"
+	"github.com/rancher/shepherd/extensions/provisioninginput"
+	"github.com/rancher/shepherd/extensions/users"
+	password "github.com/rancher/shepherd/extensions/users/passwordgenerator"
+	"github.com/rancher/shepherd/pkg/config"
+	namegen "github.com/rancher/shepherd/pkg/namegenerator"
+	"github.com/rancher/shepherd/pkg/session"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
@@ -64,27 +66,33 @@ func (r *RKE2ACETestSuite) SetupSuite() {
 func (r *RKE2ACETestSuite) TestProvisioningRKE2ClusterACE() {
 	nodeRoles0 := []provisioninginput.MachinePools{
 		{
-			NodeRoles: machinepools.NodeRoles{
-				ControlPlane: true,
-				Etcd:         false,
-				Worker:       false,
-				Quantity:     3,
+			MachinePoolConfig: machinepools.MachinePoolConfig{
+				NodeRoles: machinepools.NodeRoles{
+					ControlPlane: true,
+					Etcd:         false,
+					Worker:       false,
+					Quantity:     3,
+				},
 			},
 		},
 		{
-			NodeRoles: machinepools.NodeRoles{
-				ControlPlane: false,
-				Etcd:         true,
-				Worker:       false,
-				Quantity:     1,
+			MachinePoolConfig: machinepools.MachinePoolConfig{
+				NodeRoles: machinepools.NodeRoles{
+					ControlPlane: false,
+					Etcd:         true,
+					Worker:       false,
+					Quantity:     1,
+				},
 			},
 		},
 		{
-			NodeRoles: machinepools.NodeRoles{
-				ControlPlane: false,
-				Etcd:         false,
-				Worker:       true,
-				Quantity:     1,
+			MachinePoolConfig: machinepools.MachinePoolConfig{
+				NodeRoles: machinepools.NodeRoles{
+					ControlPlane: false,
+					Etcd:         false,
+					Worker:       true,
+					Quantity:     1,
+				},
 			},
 		},
 	}

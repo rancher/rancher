@@ -1,14 +1,16 @@
+//go:build (validation || infra.eks || extended) && !infra.any && !infra.aks && !infra.gke && !infra.rke2k3s && !infra.rke1 && !cluster.any && !cluster.custom && !cluster.nodedriver && !sanity && !stress
+
 package nodescaling
 
 import (
 	"testing"
 
-	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	"github.com/rancher/rancher/tests/framework/extensions/clusters"
-	"github.com/rancher/rancher/tests/framework/extensions/clusters/eks"
-	"github.com/rancher/rancher/tests/framework/extensions/scalinginput"
-	"github.com/rancher/rancher/tests/framework/pkg/config"
-	"github.com/rancher/rancher/tests/framework/pkg/session"
+	"github.com/rancher/shepherd/clients/rancher"
+	"github.com/rancher/shepherd/extensions/clusters"
+	"github.com/rancher/shepherd/extensions/clusters/eks"
+	"github.com/rancher/shepherd/extensions/scalinginput"
+	"github.com/rancher/shepherd/pkg/config"
+	"github.com/rancher/shepherd/pkg/session"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
@@ -51,8 +53,8 @@ func (s *EKSNodeScalingTestSuite) TestScalingEKSNodePools() {
 		eksNodes eks.NodeGroupConfig
 		client   *rancher.Client
 	}{
-		{"Scaling node group by 1", scaleOneNode, s.client},
-		{"Scaling node group by 2", scaleTwoNodes, s.client},
+		{"Scaling EKS node group by 1", scaleOneNode, s.client},
+		{"Scaling EKS node group by 2", scaleTwoNodes, s.client},
 	}
 
 	for _, tt := range tests {
@@ -60,7 +62,7 @@ func (s *EKSNodeScalingTestSuite) TestScalingEKSNodePools() {
 		require.NoError(s.T(), err)
 
 		s.Run(tt.name, func() {
-			ScalingEKSNodePools(s.T(), s.client, clusterID, &tt.eksNodes)
+			scalingEKSNodePools(s.T(), s.client, clusterID, &tt.eksNodes)
 		})
 	}
 }
@@ -73,7 +75,7 @@ func (s *EKSNodeScalingTestSuite) TestScalingEKSNodePoolsDynamicInput() {
 	clusterID, err := clusters.GetClusterIDByName(s.client, s.client.RancherConfig.ClusterName)
 	require.NoError(s.T(), err)
 
-	ScalingEKSNodePools(s.T(), s.client, clusterID, s.scalingConfig.EKSNodePool)
+	scalingEKSNodePools(s.T(), s.client, clusterID, s.scalingConfig.EKSNodePool)
 }
 
 // In order for 'go test' to run this suite, we need to create

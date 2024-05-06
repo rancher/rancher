@@ -1,3 +1,5 @@
+//go:build (validation || infra.any || cluster.any || extended) && !sanity && !stress
+
 package rbac
 
 import (
@@ -5,20 +7,23 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
-	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
-	"github.com/rancher/rancher/tests/framework/extensions/clusters"
-	"github.com/rancher/rancher/tests/framework/extensions/projects"
-	"github.com/rancher/rancher/tests/framework/extensions/provisioning"
-	"github.com/rancher/rancher/tests/framework/extensions/provisioninginput"
-	"github.com/rancher/rancher/tests/framework/extensions/users"
-	"github.com/rancher/rancher/tests/framework/pkg/config"
-	"github.com/rancher/rancher/tests/framework/pkg/session"
+	"github.com/rancher/shepherd/clients/rancher"
+	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
+	v1 "github.com/rancher/shepherd/clients/rancher/v1"
+	"github.com/rancher/shepherd/extensions/clusters"
+	"github.com/rancher/shepherd/extensions/clusters/kubernetesversions"
+	"github.com/rancher/shepherd/extensions/kubeapi/rbac"
+	"github.com/rancher/shepherd/extensions/projects"
+	"github.com/rancher/shepherd/extensions/provisioning"
+	"github.com/rancher/shepherd/extensions/provisioninginput"
+	"github.com/rancher/shepherd/extensions/users"
+	"github.com/rancher/shepherd/pkg/config"
+	"github.com/rancher/shepherd/pkg/session"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type RBACAdditionalTestSuite struct {
@@ -73,7 +78,6 @@ func (rb *RBACAdditionalTestSuite) ValidateAddStdUserAsProjectOwner() {
 
 	err = users.RemoveProjectMember(rb.standardUserClient, rb.additionalUser)
 	require.NoError(rb.T(), err)
-
 }
 
 func (rb *RBACAdditionalTestSuite) ValidateAddMemberAsClusterRoles() {
@@ -203,6 +207,14 @@ func (rb *RBACAdditionalTestSuite) ValidateEditGlobalSettings() {
 
 }
 
+func (rb *RBACAdditionalTestSuite) ValidateListGlobalRoles() {
+
+	expectedError := "globalroles.management.cattle.io is forbidden: User \"" + rb.standardUser.ID + "\" cannot list resource \"globalroles\" in API group \"management.cattle.io\" at the cluster scope"
+	_, err := rbac.ListGlobalRoles(rb.standardUserClient, metav1.ListOptions{})
+	require.Error(rb.T(), err)
+	assert.Equal(rb.T(), expectedError, err.Error())
+}
+
 func (rb *RBACAdditionalTestSuite) TestRBACAdditional() {
 
 	tests := []struct {
@@ -258,10 +270,11 @@ func (rb *RBACAdditionalTestSuite) TestRBACAdditional() {
 				rb.ValidateCannotAddMPMsAsProjectOwner()
 			})
 
+			rb.Run("Validating if standard users can get global roles", func() {
+				rb.ValidateListGlobalRoles()
+			})
+
 		} else {
-			// There's some logic in here that is only known to the user who wrote this test.
-			// Why is it special cased for restrictedAdmin? Do we have it documented that you must provide a config
-			// if testing restrictedAdmin?
 			rb.Run("Validating if "+restrictedAdmin+" can create an RKE1 cluster", func() {
 				userConfig := new(provisioninginput.Config)
 				config.LoadConfig(provisioninginput.ConfigurationFileKey, userConfig)
@@ -272,7 +285,10 @@ func (rb *RBACAdditionalTestSuite) TestRBACAdditional() {
 				externalNodeProvider := provisioning.ExternalNodeProviderSetup(nodeProviders)
 				clusterConfig := clusters.ConvertConfigToClusterConfig(userConfig)
 				clusterConfig.NodePools = nodeAndRoles
-				clusterConfig.KubernetesVersion = userConfig.RKE1KubernetesVersions[0]
+				kubernetesVersion, err := kubernetesversions.Default(rb.client, clusters.RKE1ClusterType.String(), []string{})
+				require.NoError(rb.T(), err)
+
+				clusterConfig.KubernetesVersion = kubernetesVersion[0]
 				clusterConfig.CNI = userConfig.CNIs[0]
 				clusterObject, _, err := provisioning.CreateProvisioningRKE1CustomCluster(rb.client, &externalNodeProvider, clusterConfig)
 				require.NoError(rb.T(), err)

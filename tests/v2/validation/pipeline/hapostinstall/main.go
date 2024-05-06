@@ -8,12 +8,13 @@ import (
 
 	b64 "encoding/base64"
 
-	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
-	"github.com/rancher/rancher/tests/framework/extensions/pipeline"
-	"github.com/rancher/rancher/tests/framework/extensions/token"
-	"github.com/rancher/rancher/tests/framework/pkg/config"
-	"github.com/rancher/rancher/tests/framework/pkg/session"
+	"github.com/rancher/shepherd/clients/rancher"
+	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
+	"github.com/rancher/shepherd/extensions/pipeline"
+	"github.com/rancher/shepherd/extensions/token"
+	"github.com/rancher/shepherd/pkg/config"
+	"github.com/rancher/shepherd/pkg/file"
+	"github.com/rancher/shepherd/pkg/session"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 	kwait "k8s.io/apimachinery/pkg/util/wait"
@@ -25,7 +26,7 @@ var (
 
 	clusterID = "local"
 
-	configFileName       = config.FileName("cattle-config.yaml")
+	configFileName       = file.Name("cattle-config.yaml")
 	environmentsFileName = "environments.groovy"
 
 	tokenEnvironmentKey      = "HA_TOKEN"
@@ -69,11 +70,11 @@ func main() {
 	if err != nil {
 		logrus.Fatalf("error marshaling: %v", err)
 	}
-	err = configFileName.NewFile(configData)
+	_, err = configFileName.NewFile(configData)
 	if err != nil {
 		logrus.Fatalf("error writing yaml: %v", err)
 	}
-	err = configFileName.SetEnvironmentKey()
+	err = configFileName.SetEnvironmentKey(config.ConfigEnvironmentKey)
 	if err != nil {
 		logrus.Fatalf("error while setting environment path: %v", err)
 	}
@@ -85,7 +86,7 @@ func main() {
 		logrus.Fatalf("error creating client: %v", err)
 	}
 
-	err = pipeline.UpdateEULA(client, clusterID)
+	err = pipeline.UpdateEULA(client)
 	if err != nil {
 		logrus.Fatalf("error updating EULA: %v", err)
 	}

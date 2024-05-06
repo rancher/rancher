@@ -1,10 +1,11 @@
 package machineprovisioning
 
 import (
-	"github.com/rancher/rancher/pkg/capr"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/rancher/rancher/pkg/capr"
 
 	provisioningv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
@@ -14,17 +15,17 @@ import (
 	"github.com/rancher/rancher/tests/v2prov/namespace"
 	"github.com/rancher/rancher/tests/v2prov/objectstore"
 	"github.com/rancher/rancher/tests/v2prov/operations"
-	"github.com/rancher/wrangler/pkg/name"
+	"github.com/rancher/wrangler/v2/pkg/name"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// Test_Operation_MP_EtcdSnapshotOperationsWithThreeEtcdNodesOnNewNode uses Minio as an object store to store S3 snapshots.
+// Test_Operation_SetB_MP_EtcdSnapshotOperationsWithThreeEtcdNodesOnNewNode uses Minio as an object store to store S3 snapshots.
 // It creates a 5 node machine provisioned cluster with 3 controlplane+etcd nodes and 2 workers, creates a configmap,
 // takes a snapshot of the cluster, deletes the configmap, then scales down the controlplane/etcd nodes.
 // It then creates a new etcd node and restores from local snapshot file, then scales the cluster back up to desired state.
-func Test_Operation_MP_EtcdSnapshotOperationsWithThreeEtcdNodesOnNewNode(t *testing.T) {
+func Test_Operation_SetB_MP_EtcdSnapshotOperationsWithThreeEtcdNodesOnNewNode(t *testing.T) {
 	clients, err := clients.New()
 	if err != nil {
 		t.Fatal(err)

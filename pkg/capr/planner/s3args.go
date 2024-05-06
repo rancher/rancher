@@ -8,9 +8,9 @@ import (
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/controllers/capr/machineprovision"
-	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
-	"github.com/rancher/wrangler/pkg/kv"
-	"github.com/rancher/wrangler/pkg/name"
+	corecontrollers "github.com/rancher/wrangler/v2/pkg/generated/controllers/core/v1"
+	"github.com/rancher/wrangler/v2/pkg/kv"
+	"github.com/rancher/wrangler/v2/pkg/name"
 )
 
 // s3Args is a struct that contains functions used to generate arguments for etcd snapshots stored in S3

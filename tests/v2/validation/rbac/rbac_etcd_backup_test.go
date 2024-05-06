@@ -1,15 +1,17 @@
+//go:build (validation || infra.any || cluster.any || stress) && !sanity && !extended
+
 package rbac
 
 import (
 	"strings"
 	"testing"
 
-	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
-	"github.com/rancher/rancher/tests/framework/extensions/clusters"
-	"github.com/rancher/rancher/tests/framework/extensions/etcdsnapshot"
-	"github.com/rancher/rancher/tests/framework/extensions/users"
-	"github.com/rancher/rancher/tests/framework/pkg/session"
+	"github.com/rancher/shepherd/clients/rancher"
+	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
+	"github.com/rancher/shepherd/extensions/clusters"
+	"github.com/rancher/shepherd/extensions/etcdsnapshot"
+	"github.com/rancher/shepherd/extensions/users"
+	"github.com/rancher/shepherd/pkg/session"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -54,7 +56,7 @@ func (rb *ETCDRbacBackupTestSuite) ValidateEtcdSnapshotCluster(role string) {
 
 	log.Infof("Creating a snapshot of the cluster as %v", role)
 
-	err := etcdsnapshot.CreateSnapshot(rb.standardUserClient, rb.clusterName)
+	err := etcdsnapshot.CreateRKE2K3SSnapshot(rb.standardUserClient, rb.clusterName)
 	switch role {
 	case roleOwner, restrictedAdmin:
 		require.NoError(rb.T(), err)
@@ -65,7 +67,7 @@ func (rb *ETCDRbacBackupTestSuite) ValidateEtcdSnapshotCluster(role string) {
 	}
 }
 
-func (rb *ETCDRbacBackupTestSuite) TestETCDRbac() {
+func (rb *ETCDRbacBackupTestSuite) TestETCDRBAC() {
 	clusterID, err := clusters.GetClusterIDByName(rb.client, rb.clusterName)
 	require.NoError(rb.T(), err)
 	if !(strings.Contains(clusterID, "c-m-")) {
@@ -125,6 +127,6 @@ func (rb *ETCDRbacBackupTestSuite) TestETCDRbac() {
 	}
 }
 
-func TestETCDRbacBackupTestSuite(t *testing.T) {
+func TestETCDRBACBackupTestSuite(t *testing.T) {
 	suite.Run(t, new(ETCDRbacBackupTestSuite))
 }

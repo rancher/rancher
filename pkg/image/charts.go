@@ -23,7 +23,7 @@ const RancherVersionAnnotationKey = "catalog.cattle.io/rancher-version"
 // chartsToCheckConstraints and systemChartsToCheckConstraints define which charts and system charts should
 // be checked for images and added to imageSet based on whether the given Rancher version/tag satisfies the chart's
 // Rancher version constraints to allow support for multiple version lines of a chart in airgap setups. If a chart is
-// not defined here, only the latest version of it will be checked for images.
+// not defined here, only the latest version of it will be checked for images and added if it passes the constraint.
 // Note: CRD charts need to be added as well.
 var chartsToCheckConstraints = map[string]struct{}{
 	"rancher-istio": {},
@@ -61,11 +61,15 @@ func (c Charts) FetchImages(imagesSet map[string]map[string]struct{}) error {
 		if len(versions) == 0 {
 			continue
 		}
-		// Always append the latest version of the chart
+		// Always append the latest version of the chart if it passes the constraint check
 		// Note: Selecting the correct latest version relies on the charts-build-scripts `make standardize` command
 		// sorting the versions in the index file in descending order correctly.
 		latestVersion := versions[0]
-		filteredVersions = append(filteredVersions, latestVersion)
+		if isConstraintSatisfied, err := c.checkChartVersionConstraint(*latestVersion); err != nil {
+			return errors.Wrapf(err, "failed to check constraint of chart")
+		} else if isConstraintSatisfied {
+			filteredVersions = append(filteredVersions, latestVersion)
+		}
 		// Append the remaining versions of the chart if the chart exists in the chartsToCheckConstraints map
 		// and the given Rancher version satisfies the chart's Rancher version constraint annotation.
 		chartName := versions[0].Metadata.Name

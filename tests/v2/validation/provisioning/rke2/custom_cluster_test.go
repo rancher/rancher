@@ -1,19 +1,22 @@
+//go:build (validation || sanity) && !infra.any && !infra.aks && !infra.eks && !infra.rke2k3s && !infra.gke && !infra.rke1 && !cluster.any && !cluster.custom && !cluster.nodedriver && !extended && !stress
+
 package rke2
 
 import (
 	"testing"
 
-	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
-	"github.com/rancher/rancher/tests/framework/extensions/clusters"
-	"github.com/rancher/rancher/tests/framework/extensions/clusters/kubernetesversions"
-	"github.com/rancher/rancher/tests/framework/extensions/provisioninginput"
-	"github.com/rancher/rancher/tests/framework/extensions/users"
-	password "github.com/rancher/rancher/tests/framework/extensions/users/passwordgenerator"
-	"github.com/rancher/rancher/tests/framework/pkg/config"
-	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
-	"github.com/rancher/rancher/tests/framework/pkg/session"
 	"github.com/rancher/rancher/tests/v2/validation/provisioning/permutations"
+	"github.com/rancher/shepherd/clients/rancher"
+	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
+	"github.com/rancher/shepherd/extensions/clusters"
+	"github.com/rancher/shepherd/extensions/clusters/kubernetesversions"
+	"github.com/rancher/shepherd/extensions/provisioninginput"
+	"github.com/rancher/shepherd/extensions/users"
+	password "github.com/rancher/shepherd/extensions/users/passwordgenerator"
+	"github.com/rancher/shepherd/pkg/config"
+	"github.com/rancher/shepherd/pkg/environmentflag"
+	namegen "github.com/rancher/shepherd/pkg/namegenerator"
+	"github.com/rancher/shepherd/pkg/session"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
@@ -40,7 +43,7 @@ func (c *CustomClusterProvisioningTestSuite) SetupSuite() {
 
 	c.isWindows = false
 	for _, pool := range c.provisioningConfig.MachinePools {
-		if pool.NodeRoles.Windows {
+		if pool.MachinePoolConfig.Windows {
 			c.isWindows = true
 			break
 		}
@@ -76,32 +79,66 @@ func (c *CustomClusterProvisioningTestSuite) SetupSuite() {
 }
 
 func (c *CustomClusterProvisioningTestSuite) TestProvisioningRKE2CustomCluster() {
-	nodeRolesAll := []provisioninginput.MachinePools{provisioninginput.AllRolesMachinePool}
-	nodeRolesShared := []provisioninginput.MachinePools{provisioninginput.EtcdControlPlaneMachinePool, provisioninginput.WorkerMachinePool}
-	nodeRolesDedicated := []provisioninginput.MachinePools{provisioninginput.EtcdMachinePool, provisioninginput.ControlPlaneMachinePool, provisioninginput.WorkerMachinePool}
-	nodeRolesDedicatedWindows := []provisioninginput.MachinePools{provisioninginput.EtcdMachinePool, provisioninginput.ControlPlaneMachinePool, provisioninginput.WorkerMachinePool, provisioninginput.WindowsMachinePool}
+	nodeRolesAll := []provisioninginput.MachinePools{
+		provisioninginput.AllRolesMachinePool,
+	}
+
+	nodeRolesShared := []provisioninginput.MachinePools{
+		provisioninginput.EtcdControlPlaneMachinePool,
+		provisioninginput.WorkerMachinePool,
+	}
+
+	nodeRolesDedicated := []provisioninginput.MachinePools{
+		provisioninginput.EtcdMachinePool,
+		provisioninginput.ControlPlaneMachinePool,
+		provisioninginput.WorkerMachinePool,
+	}
+
+	nodeRolesDedicatedWindows := []provisioninginput.MachinePools{
+		provisioninginput.EtcdMachinePool,
+		provisioninginput.ControlPlaneMachinePool,
+		provisioninginput.WorkerMachinePool,
+		provisioninginput.WindowsMachinePool,
+	}
+
+	nodeRolesDedicatedTwoWindows := []provisioninginput.MachinePools{
+		provisioninginput.EtcdMachinePool,
+		provisioninginput.ControlPlaneMachinePool,
+		provisioninginput.WorkerMachinePool,
+		provisioninginput.WindowsMachinePool,
+		provisioninginput.WindowsMachinePool,
+	}
 
 	tests := []struct {
 		name         string
 		client       *rancher.Client
 		machinePools []provisioninginput.MachinePools
 		isWindows    bool
+		runFlag      bool
 	}{
-		{"1 Node all roles " + provisioninginput.AdminClientName.String(), c.client, nodeRolesAll, false},
-		{"1 Node all roles " + provisioninginput.StandardClientName.String(), c.standardUserClient, nodeRolesAll, false},
-		{"2 nodes - etcd/cp roles per 1 node " + provisioninginput.AdminClientName.String(), c.client, nodeRolesShared, false},
-		{"2 nodes - etcd/cp roles per 1 node " + provisioninginput.StandardClientName.String(), c.standardUserClient, nodeRolesShared, false},
-		{"3 nodes - 1 role per node " + provisioninginput.AdminClientName.String(), c.client, nodeRolesDedicated, false},
-		{"3 nodes - 1 role per node " + provisioninginput.StandardClientName.String(), c.standardUserClient, nodeRolesDedicated, false},
-		{"4 nodes - 1 role per node + 1 windows worker" + provisioninginput.AdminClientName.String(), c.client, nodeRolesDedicatedWindows, true},
-		{"4 nodes - 1 role per node + 1 windows worker" + provisioninginput.StandardClientName.String(), c.standardUserClient, nodeRolesDedicatedWindows, true},
+		{"1 Node all roles " + provisioninginput.AdminClientName.String(), c.client, nodeRolesAll, false, c.client.Flags.GetValue(environmentflag.Long)},
+		{"1 Node all roles " + provisioninginput.StandardClientName.String(), c.standardUserClient, nodeRolesAll, false, c.client.Flags.GetValue(environmentflag.Short) || c.client.Flags.GetValue(environmentflag.Long)},
+		{"2 nodes - etcd|cp roles per 1 node " + provisioninginput.AdminClientName.String(), c.client, nodeRolesShared, false, c.client.Flags.GetValue(environmentflag.Long)},
+		{"2 nodes - etcd|cp roles per 1 node " + provisioninginput.StandardClientName.String(), c.standardUserClient, nodeRolesShared, false, c.client.Flags.GetValue(environmentflag.Short) || c.client.Flags.GetValue(environmentflag.Long)},
+		{"3 nodes - 1 role per node " + provisioninginput.AdminClientName.String(), c.client, nodeRolesDedicated, false, c.client.Flags.GetValue(environmentflag.Long)},
+		{"3 nodes - 1 role per node " + provisioninginput.StandardClientName.String(), c.standardUserClient, nodeRolesDedicated, false, c.client.Flags.GetValue(environmentflag.Long)},
+		{"4 nodes - 1 role per node + 1 windows worker " + provisioninginput.AdminClientName.String(), c.client, nodeRolesDedicatedWindows, true, c.client.Flags.GetValue(environmentflag.Long)},
+		{"4 nodes - 1 role per node + 1 windows worker " + provisioninginput.StandardClientName.String(), c.standardUserClient, nodeRolesDedicatedWindows, true, c.client.Flags.GetValue(environmentflag.Long)},
+		{"5 nodes - 1 role per node + 2 windows workers " + provisioninginput.AdminClientName.String(), c.client, nodeRolesDedicatedTwoWindows, true, c.client.Flags.GetValue(environmentflag.Long)},
+		{"5 nodes - 1 role per node + 2 windows workers " + provisioninginput.StandardClientName.String(), c.standardUserClient, nodeRolesDedicatedTwoWindows, true, c.client.Flags.GetValue(environmentflag.Long)},
 	}
 	for _, tt := range tests {
+		if !tt.runFlag {
+			c.T().Logf("SKIPPED")
+			continue
+		}
+
 		testSession := session.NewSession()
 		defer testSession.Cleanup()
 		if (c.isWindows == tt.isWindows) || (c.isWindows && !tt.isWindows) {
-			c.provisioningConfig.MachinePools = tt.machinePools
-			permutations.RunTestPermutations(&c.Suite, tt.name, tt.client, c.provisioningConfig, permutations.RKE2CustomCluster, nil, nil)
+			provisioningConfig := *c.provisioningConfig
+			provisioningConfig.MachinePools = tt.machinePools
+			permutations.RunTestPermutations(&c.Suite, tt.name, tt.client, &provisioningConfig, permutations.RKE2CustomCluster, nil, nil)
 		} else {
 			c.T().Skip("Skipping Windows tests")
 		}

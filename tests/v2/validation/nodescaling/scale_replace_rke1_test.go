@@ -1,17 +1,20 @@
+//go:build (validation || infra.rke1 || cluster.nodedriver || extended) && !infra.any && !infra.aks && !infra.eks && !infra.gke && !infra.rke2k3s && !cluster.any && !cluster.custom && !sanity && !stress
+
 package nodescaling
 
 import (
 	"testing"
 
-	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	"github.com/rancher/rancher/tests/framework/extensions/provisioninginput"
-	"github.com/rancher/rancher/tests/framework/pkg/config"
-	"github.com/rancher/rancher/tests/framework/pkg/session"
+	"github.com/rancher/shepherd/clients/rancher"
+	"github.com/rancher/shepherd/extensions/provisioninginput"
+	nodepools "github.com/rancher/shepherd/extensions/rke1/nodepools"
+	"github.com/rancher/shepherd/pkg/config"
+	"github.com/rancher/shepherd/pkg/session"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
 
-type NodeScaleRKE1DownAndUp struct {
+type RKE1NodeReplacingTestSuite struct {
 	suite.Suite
 	session        *session.Session
 	client         *rancher.Client
@@ -19,11 +22,11 @@ type NodeScaleRKE1DownAndUp struct {
 	clustersConfig *provisioninginput.Config
 }
 
-func (s *NodeScaleRKE1DownAndUp) TearDownSuite() {
+func (s *RKE1NodeReplacingTestSuite) TearDownSuite() {
 	s.session.Cleanup()
 }
 
-func (s *NodeScaleRKE1DownAndUp) SetupSuite() {
+func (s *RKE1NodeReplacingTestSuite) SetupSuite() {
 	testSession := session.NewSession()
 	s.session = testSession
 
@@ -38,22 +41,42 @@ func (s *NodeScaleRKE1DownAndUp) SetupSuite() {
 	s.client = client
 }
 
-func (s *NodeScaleRKE1DownAndUp) TestEtcdScaleDownAndUp() {
-	s.Run("rke1-etcd-node-scale-down-and-up", func() {
-		ReplaceRKE1Nodes(s.T(), s.client, s.client.RancherConfig.ClusterName, true, false, false)
-	})
-}
-func (s *NodeScaleRKE1DownAndUp) TestWorkerScaleDownAndUp() {
-	s.Run("rke1-worker-node-scale-down-and-up", func() {
-		ReplaceRKE1Nodes(s.T(), s.client, s.client.RancherConfig.ClusterName, false, false, true)
-	})
-}
-func (s *NodeScaleRKE1DownAndUp) TestControlPlaneScaleDownAndUp() {
-	s.Run("rke1-controlplane-node-scale-down-and-up", func() {
-		ReplaceRKE1Nodes(s.T(), s.client, s.client.RancherConfig.ClusterName, false, true, false)
-	})
+func (s *RKE1NodeReplacingTestSuite) TestReplacingRKE1Nodes() {
+	nodeRolesEtcd := nodepools.NodeRoles{
+		Etcd:         true,
+		ControlPlane: false,
+		Worker:       false,
+	}
+
+	nodeRolesControlPlane := nodepools.NodeRoles{
+		Etcd:         false,
+		ControlPlane: true,
+		Worker:       false,
+	}
+
+	nodeRolesWorker := nodepools.NodeRoles{
+		Etcd:         false,
+		ControlPlane: false,
+		Worker:       true,
+	}
+
+	tests := []struct {
+		name      string
+		nodeRoles nodepools.NodeRoles
+		client    *rancher.Client
+	}{
+		{"Replacing control plane nodes", nodeRolesControlPlane, s.client},
+		{"Replacing etcd nodes", nodeRolesEtcd, s.client},
+		{"Replacing worker nodes", nodeRolesWorker, s.client},
+	}
+
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			ReplaceRKE1Nodes(s.T(), s.client, s.client.RancherConfig.ClusterName, tt.nodeRoles.Etcd, tt.nodeRoles.ControlPlane, tt.nodeRoles.Worker)
+		})
+	}
 }
 
-func TestRKE1NodeScaleDownAndUp(t *testing.T) {
-	suite.Run(t, new(NodeScaleRKE1DownAndUp))
+func TestRKE1NodeReplacingTestSuite(t *testing.T) {
+	suite.Run(t, new(RKE1NodeReplacingTestSuite))
 }

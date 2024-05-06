@@ -6,20 +6,24 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"strings"
+	"testing"
+	"time"
+
 	rv1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	"github.com/rancher/rancher/tests/framework/clients/rancher/catalog"
-	client "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
-	stevev1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
-	"github.com/rancher/rancher/tests/framework/extensions/kubeconfig"
-	"github.com/rancher/rancher/tests/framework/pkg/session"
+	"github.com/rancher/shepherd/clients/rancher"
+	"github.com/rancher/shepherd/clients/rancher/catalog"
+	client "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
+	stevev1 "github.com/rancher/shepherd/clients/rancher/v1"
+	"github.com/rancher/shepherd/extensions/kubeconfig"
+	"github.com/rancher/shepherd/pkg/session"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/repo"
-	"io"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,9 +31,11 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/kubernetes"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
-	"testing"
-	"time"
 )
+
+const rancherLocalDir = "../rancher-data/local-catalogs/v2"
+const smallForkURL = "https://github.com/rancher/charts-small-fork"
+const smallForkClusterRepoName = "rancher-charts-small-fork"
 
 var propagation = metav1.DeletePropagationForeground
 
@@ -130,7 +136,7 @@ func (w *RancherManagedChartsTest) TestInstallChartLatestVersion() {
 	w.Require().NoError(w.updateManagementCluster())
 	app, _, err := w.waitForAksChart(rv1.StatusDeployed, "rancher-aks-operator", 0)
 	w.Require().NoError(err)
-	latest, err := w.catalogClient.GetLatestChartVersion("rancher-aks-operator")
+	latest, err := w.catalogClient.GetLatestChartVersion("rancher-aks-operator", catalog.RancherChartRepo)
 	w.Require().NoError(err)
 	w.Assert().Equal(app.Spec.Chart.Metadata.Version, latest)
 }
@@ -459,4 +465,73 @@ func (w *RancherManagedChartsTest) pollUntilDownloaded(ClusterRepoName string, p
 		return clusterRepo.Status.DownloadTime != prevDownloadTime, nil
 	})
 	return err
+}
+
+func (w *RancherManagedChartsTest) TestServeIcons() {
+	// Testing: Chart.icon field with (file:// scheme)
+	// Create ClusterRepo for charts-small-fork
+	clusterRepoToCreate := rv1.NewClusterRepo("", smallForkClusterRepoName,
+		rv1.ClusterRepo{
+			Spec: rv1.RepoSpec{
+				GitRepo:   smallForkURL,
+				GitBranch: "main",
+			},
+		},
+	)
+	_, err := w.client.Steve.SteveType(catalog.ClusterRepoSteveResourceType).Create(clusterRepoToCreate)
+	w.Require().NoError(err)
+	time.Sleep(1 * time.Second)
+
+	w.Require().NoError(w.pollUntilDownloaded(smallForkClusterRepoName, metav1.Time{}))
+
+	// Get Charts from the ClusterRepo
+	smallForkCharts, err := w.catalogClient.GetChartsFromClusterRepo(smallForkClusterRepoName)
+	w.Require().NoError(err)
+	w.Assert().Greater(len(smallForkCharts), 1)
+
+	// Get the client settings to update settings.SystemCatalog
+	systemCatalog, err := w.client.Management.Setting.ByID("system-catalog")
+	w.Require().NoError(err)
+	w.Assert().Equal("external", systemCatalog.Value)
+
+	// Update settings.SystemCatalog to bundled
+	systemCatalogUpdated, err := w.client.Management.Setting.Update(systemCatalog, map[string]interface{}{"value": "bundled"})
+	w.Require().NoError(err)
+	w.Assert().Equal("bundled", systemCatalogUpdated.Value)
+
+	// Fetch one icon with https:// scheme, it should return an empty object (i.e length of image equals 0) with nil error
+	imgLength, err := w.catalogClient.FetchChartIcon(smallForkClusterRepoName, "fleet")
+	w.Require().NoError(err)
+	w.Assert().Equal(0, imgLength)
+
+	imgLength, err = w.catalogClient.FetchChartIcon(smallForkClusterRepoName, "rancher-cis-benchmark")
+	w.Require().NoError(err)
+	w.Assert().Greater(imgLength, 0)
+
+	// Update settings.SystemCatalog to external
+	_, err = w.client.Management.Setting.Update(systemCatalog, map[string]interface{}{"value": "external"})
+	w.Require().NoError(err)
+
+	// Deleting clusterRepo
+	err = w.catalogClient.ClusterRepos().Delete(context.Background(), smallForkClusterRepoName, metav1.DeleteOptions{})
+	w.Require().NoError(err)
+}
+
+// extractChartsAndLatestVersions returns a map of chartName -> latestVersion
+func extractChartsAndLatestVersions(charts map[string]interface{}) map[string]string {
+	chartVersions := make(map[string]string)
+	for chartName, chartVersionsList := range charts {
+		// exclude charts for crd's
+		if strings.HasSuffix(chartName, "-crd") {
+			continue
+		}
+		chartVersionsList := chartVersionsList.([]interface{})
+		// exclude charts with the hidden annotation
+		_, hidden := chartVersionsList[0].(map[string]interface{})["annotations"].(map[string]interface{})["catalog.cattle.io/hidden"]
+		if hidden {
+			continue
+		}
+		chartVersions[chartName] = chartVersionsList[0].(map[string]interface{})["version"].(string)
+	}
+	return chartVersions
 }

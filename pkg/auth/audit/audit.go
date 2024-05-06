@@ -20,6 +20,7 @@ import (
 	"github.com/sirupsen/logrus"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/utils/strings/slices"
 )
 
 const (
@@ -50,8 +51,9 @@ var (
 		http.MethodPut:  true,
 		http.MethodPost: true,
 	}
-	sensitiveRequestHeader  = []string{"Cookie", "Authorization", "X-Api-Tunnel-Params", "X-Api-Tunnel-Token"}
-	sensitiveResponseHeader = []string{"Cookie", "Set-Cookie"}
+	sensitiveRequestHeader  = []string{"Cookie", "Authorization", "X-Api-Tunnel-Params", "X-Api-Tunnel-Token", "X-Api-Auth-Header", "X-Amz-Security-Token"}
+	sensitiveResponseHeader = []string{"Cookie", "Set-Cookie", "X-Api-Set-Cookie-Header"}
+	sensitiveBodyFields     = []string{"credentials", "applicationSecret", "oauthCredential", "serviceAccountCredential", "spKey", "spCert", "certificate", "privateKey"}
 	// ErrUnsupportedEncoding is returned when the response encoding is unsupported
 	ErrUnsupportedEncoding = fmt.Errorf("unsupported encoding")
 	secretBaseType         = regexp.MustCompile(".\"baseType\":\"([A-Za-z]*[S|s]ecret)\".")
@@ -394,7 +396,7 @@ func (a *auditLog) redactMap(m map[string]interface{}) bool {
 	for key := range m {
 		switch val := m[key].(type) {
 		case string:
-			if a.keysToRedactRegex.MatchString(key) {
+			if a.keysToRedactRegex.MatchString(key) || slices.Contains(sensitiveBodyFields, key) {
 				changed = true
 				m[key] = redacted
 			}

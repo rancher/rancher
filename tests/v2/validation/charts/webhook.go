@@ -1,14 +1,17 @@
 package charts
 
 import (
-	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	"github.com/rancher/rancher/tests/framework/extensions/kubeapi/webhook"
+	"strings"
+
+	"github.com/rancher/shepherd/clients/rancher"
+	"github.com/rancher/shepherd/extensions/kubeapi/webhook"
 )
 
 const (
 	resourceName    = "rancher.cattle.io"
 	restrictedAdmin = "restricted-admin"
 	admin           = "admin"
+	localCluster    = "local"
 )
 
 func getWebhookNames(client *rancher.Client, clusterID, resourceName string) ([]string, error) {
@@ -24,4 +27,17 @@ func getWebhookNames(client *rancher.Client, clusterID, resourceName string) ([]
 
 	return webhookL, nil
 
+}
+
+func validateWebhookPodLogs(podLogs string) interface{} {
+
+	delimiter := "\n"
+	segments := strings.Split(podLogs, delimiter)
+
+	for _, segment := range segments {
+		if strings.Contains(segment, "level=error") {
+			return "Error logs in webhook" + segment
+		}
+	}
+	return nil
 }

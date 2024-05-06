@@ -29,7 +29,7 @@ SHELL ["/bin/bash", "-c"]
 RUN apt-get update && apt-get install -y python3 python3-pip python3-venv apt-transport-https ca-certificates gnupg curl
 RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] http://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key --keyring /usr/share/keyrings/cloud.google.gpg  add - && apt-get update -y && apt-get install google-cloud-cli -y
 RUN curl -sL https://aka.ms/InstallAzureCLIDeb | bash
-RUN python3 -m venv custodian-venv
+RUN python3.11 -m venv custodian-venv
 RUN . custodian-venv/bin/activate
 RUN pip3 install c7n c7n_azure c7n_gcp c7n_mailer
 RUN az login -u ${AZURE_CLIENT_ID} --service-principal -p ${AZURE_CLIENT_SECRET} --tenant ${AZURE_TENANT_ID}

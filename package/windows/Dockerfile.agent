@@ -4,14 +4,14 @@ FROM mcr.microsoft.com/windows/servercore:${SERVERCORE_VERSION} AS builder
 ARG ARCH=amd64
 SHELL ["powershell", "-NoLogo", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
 # download wins
-RUN $URL = 'https://github.com/rancher/wins/releases/download/v0.4.11/wins.exe'; \
+RUN $URL = 'https://github.com/rancher/wins/releases/download/v0.4.15/wins.exe'; \
     \
     Write-Host ('Downloading Wins from {0} ...' -f $URL); \
     curl.exe -sfL $URL -o c:\wins.exe; \
     \
     Write-Host 'Complete.'
 # download kubelet
-RUN $URL = 'https://dl.k8s.io/v1.24.3/kubernetes-client-windows-amd64.tar.gz'; \
+RUN $URL = 'https://dl.k8s.io/v1.25.12/kubernetes-client-windows-amd64.tar.gz'; \
     Write-Host ('Downloading Kubernetes from {0} ...' -f $URL); \
     curl.exe -sfL $URL -o c:\kubernetes.tar.gz; \
     \

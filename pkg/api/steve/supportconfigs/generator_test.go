@@ -2,8 +2,10 @@ package supportconfigs
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	configmapfakes "github.com/rancher/rancher/pkg/generated/norman/core/v1/fakes"
@@ -47,93 +49,113 @@ func (c *FakeChartUtil) GetRelease(_ string, _ string) (*release.Release, error)
 
 func TestGenerateSupportConfigScenarios(t *testing.T) {
 	scenarios := []struct {
-		name                    string
-		usePAYG                 bool
-		generateAdapterError    bool
-		generateAdapterNotFound bool
-		generateAuthorizedError bool
-		authorized              bool
-		marshalledCSPConfig     string
-		expectedHTTPCode        int
+		name                      string
+		usePAYG                   bool
+		generateAdapterError      bool
+		generateAdapterNotFound   bool
+		generateAuthorizedError   bool
+		authorizedCSPConfig       bool
+		authorizedMeteringArchive bool
+		marshalledCSPConfig       string
+		expectedHTTPCode          int
 	}{
 		{
-			name:                    "internal server error due to CSP release lookup",
-			usePAYG:                 true,
-			generateAdapterError:    true,
-			generateAdapterNotFound: false,
-			generateAuthorizedError: false,
-			authorized:              true,
-			expectedHTTPCode:        http.StatusInternalServerError,
+			name:                      "internal server error due to CSP release lookup",
+			usePAYG:                   true,
+			generateAdapterError:      true,
+			generateAdapterNotFound:   false,
+			generateAuthorizedError:   false,
+			authorizedCSPConfig:       true,
+			authorizedMeteringArchive: true,
+			expectedHTTPCode:          http.StatusInternalServerError,
 		},
 		{
-			name:                    "denied access due to error while performing authorization",
-			usePAYG:                 true,
-			generateAdapterError:    false,
-			generateAdapterNotFound: false,
-			generateAuthorizedError: true,
-			authorized:              false,
-			marshalledCSPConfig:     "{}",
-			expectedHTTPCode:        http.StatusForbidden,
+			name:                      "denied access due to error while performing authorization",
+			usePAYG:                   true,
+			generateAdapterError:      false,
+			generateAdapterNotFound:   false,
+			generateAuthorizedError:   true,
+			authorizedCSPConfig:       false,
+			authorizedMeteringArchive: false,
+			marshalledCSPConfig:       "{}",
+			expectedHTTPCode:          http.StatusForbidden,
 		},
 		{
-			name:                    "user requests PAYG, authorized to get PAYG, PAYG not installed (501)",
-			usePAYG:                 true,
-			generateAdapterError:    false,
-			generateAdapterNotFound: true,
-			generateAuthorizedError: false,
-			authorized:              true,
-			marshalledCSPConfig:     "{}",
-			expectedHTTPCode:        http.StatusNotImplemented,
+			name:                      "user requests PAYG, authorized to get PAYG, PAYG not installed (501)",
+			usePAYG:                   true,
+			generateAdapterError:      false,
+			generateAdapterNotFound:   true,
+			generateAuthorizedError:   false,
+			authorizedCSPConfig:       true,
+			authorizedMeteringArchive: true,
+			marshalledCSPConfig:       "{}",
+			expectedHTTPCode:          http.StatusNotImplemented,
 		},
 		{
-			name:                    "user requests PAYG, not authorized to get PAYG, auth denied (403)",
-			usePAYG:                 true,
-			generateAdapterError:    false,
-			generateAdapterNotFound: true,
-			generateAuthorizedError: false,
-			authorized:              false,
-			marshalledCSPConfig:     "{}",
-			expectedHTTPCode:        http.StatusForbidden,
+			name:                      "user requests PAYG, not authorized to get PAYG, auth denied (403)",
+			usePAYG:                   true,
+			generateAdapterError:      false,
+			generateAdapterNotFound:   true,
+			generateAuthorizedError:   false,
+			authorizedCSPConfig:       false,
+			authorizedMeteringArchive: false,
+			marshalledCSPConfig:       "{}",
+			expectedHTTPCode:          http.StatusForbidden,
 		},
 		{
-			name:                    "user requests BYOL, authorized to get BYOL, BYOL not installed (501)",
-			usePAYG:                 false,
-			generateAdapterError:    false,
-			generateAdapterNotFound: true,
-			generateAuthorizedError: false,
-			authorized:              true,
-			marshalledCSPConfig:     "{}",
-			expectedHTTPCode:        http.StatusNotImplemented,
+			name:                      "user requests BYOL, authorized to get BYOL, BYOL not installed (501)",
+			usePAYG:                   false,
+			generateAdapterError:      false,
+			generateAdapterNotFound:   true,
+			generateAuthorizedError:   false,
+			authorizedCSPConfig:       true,
+			authorizedMeteringArchive: true,
+			marshalledCSPConfig:       "{}",
+			expectedHTTPCode:          http.StatusNotImplemented,
 		},
 		{
-			name:                    "user requests BYOL, not authorized to get BYOL, auth denied (403)",
-			usePAYG:                 false,
-			generateAdapterError:    false,
-			generateAdapterNotFound: false,
-			generateAuthorizedError: false,
-			authorized:              false,
-			marshalledCSPConfig:     "{}",
-			expectedHTTPCode:        http.StatusForbidden,
+			name:                      "user requests BYOL, not authorized to get BYOL, auth denied (403)",
+			usePAYG:                   false,
+			generateAdapterError:      false,
+			generateAdapterNotFound:   false,
+			generateAuthorizedError:   false,
+			authorizedCSPConfig:       false,
+			authorizedMeteringArchive: false,
+			marshalledCSPConfig:       "{}",
+			expectedHTTPCode:          http.StatusForbidden,
 		},
 		{
-			name:                    "user requests BYOL, authorized to get BYOL, we return output (200)",
-			usePAYG:                 false,
-			generateAdapterError:    false,
-			generateAdapterNotFound: false,
-			generateAuthorizedError: false,
-			authorized:              true,
-			marshalledCSPConfig:     "{}",
-			expectedHTTPCode:        http.StatusOK,
+			name:                      "user requests BYOL, authorized to get BYOL, we return output (200)",
+			usePAYG:                   false,
+			generateAdapterError:      false,
+			generateAdapterNotFound:   false,
+			generateAuthorizedError:   false,
+			authorizedCSPConfig:       true,
+			authorizedMeteringArchive: true,
+			marshalledCSPConfig:       "{}",
+			expectedHTTPCode:          http.StatusOK,
 		},
 		{
-			name:                    "user requests PAYG, autorized to get PAYG, we return output (200)",
-			usePAYG:                 true,
-			generateAdapterError:    false,
-			generateAdapterNotFound: false,
-			generateAuthorizedError: false,
-			authorized:              true,
-			marshalledCSPConfig:     "{}",
-			expectedHTTPCode:        http.StatusOK,
+			name:                      "user requests PAYG, autorized to get PAYG, we return output (200)",
+			usePAYG:                   true,
+			generateAdapterError:      false,
+			generateAdapterNotFound:   false,
+			generateAuthorizedError:   false,
+			authorizedCSPConfig:       true,
+			authorizedMeteringArchive: true,
+			marshalledCSPConfig:       "{}",
+			expectedHTTPCode:          http.StatusOK,
+		},
+		{
+			name:                      "user requests PAYG, autorized to get PAYG CSP Config but not metering archive, we return output (200)",
+			usePAYG:                   true,
+			generateAdapterError:      false,
+			generateAdapterNotFound:   false,
+			generateAuthorizedError:   false,
+			authorizedCSPConfig:       true,
+			authorizedMeteringArchive: false,
+			marshalledCSPConfig:       "{}",
+			expectedHTTPCode:          http.StatusOK,
 		},
 	}
 	for _, scenario := range scenarios {
@@ -149,7 +171,11 @@ func TestGenerateSupportConfigScenarios(t *testing.T) {
 					if test.generateAuthorizedError {
 						return false, nil, fmt.Errorf("random error")
 					}
-					ret.Status.Allowed = test.authorized
+					if ret.Spec.ResourceAttributes.Name == "metering-archive" {
+						ret.Status.Allowed = test.authorizedMeteringArchive
+					} else {
+						ret.Status.Allowed = test.authorizedCSPConfig
+					}
 					return true, ret, nil
 				},
 			)
@@ -157,11 +183,19 @@ func TestGenerateSupportConfigScenarios(t *testing.T) {
 				ConfigMaps: &configmapfakes.ConfigMapInterfaceMock{
 					GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v1.ConfigMap, error) {
 						// NOTE: we are not testing the configmap itself. Just need to return a valid configmap.
-						return &v1.ConfigMap{
-							Data: map[string]string{
-								"data": "{}",
-							},
-						}, nil
+						if name == cspAdapterConfigmap {
+							return &v1.ConfigMap{
+								Data: map[string]string{
+									"data": "{}",
+								},
+							}, nil
+						} else {
+							return &v1.ConfigMap{
+								Data: map[string]string{
+									"archive": "[]",
+								},
+							}, nil
+						}
 					},
 				},
 				SubjectAccessReviews: k8sClient.AuthorizationV1().SubjectAccessReviews(),
@@ -186,6 +220,17 @@ func TestGenerateSupportConfigScenarios(t *testing.T) {
 			req = req.WithContext(ctx)
 			h.ServeHTTP(rr, req)
 			assert.Equal(t, test.expectedHTTPCode, rr.Code)
+			if test.expectedHTTPCode == http.StatusForbidden {
+				// if user denied access, config.json should not be returned
+				body, _ := io.ReadAll(rr.Body)
+				assert.False(t, strings.Contains(string(body), "rancher/config.json"))
+			}
+			if test.expectedHTTPCode == http.StatusOK {
+				if !test.authorizedMeteringArchive {
+					body, _ := io.ReadAll(rr.Body)
+					assert.False(t, strings.Contains(string(body), "rancher/metering-archive.json"))
+				}
+			}
 		})
 	}
 }

@@ -1,4 +1,4 @@
-FROM golang:1.20
+FROM golang:1.21
 
 # Configure Go
 ENV GOPATH /root/go
@@ -29,8 +29,30 @@ RUN CGO_ENABLED=0
 # necessary to run if statements using [[ ]]
 SHELL ["/bin/bash", "-c"] 
 
-RUN if [[ -z "$EXTERNAL_ENCODED_VPN" ]] ; then echo no vpn provided ; else apt-get update && \
-    apt-get -y install openvpn net-tools && echo $EXTERNAL_ENCODED_VPN | base64 -d > external.ovpn && \
-    if [[ -z "$VPN_ENCODED_LOGIN}" ]] ; then echo no passcode provided ; else echo adding passfile && \
-    echo $VPN_ENCODED_LOGIN | base64 -d > passfile && \
-    sed -i 's/auth-user-pass/auth-user-pass passfile/g' external.ovpn; fi; fi;
+RUN if [[ -n '$EXTERNAL_ENCODED_VPN' ]] ; then \
+      echo 'no vpn provided' ; \
+    else \
+      apt-get update && apt-get -y install openvpn net-tools && \
+      echo $EXTERNAL_ENCODED_VPN | base64 -d > external.ovpn && \
+      if [[ -n '$VPN_ENCODED_LOGIN' ]] ; then \
+        echo 'no passcode provided' ; \
+      else \
+        echo 'adding passfile' && echo $VPN_ENCODED_LOGIN | base64 -d > passfile && \
+        sed -i 's/auth-user-pass/auth-user-pass passfile/g' external.ovpn; \
+        fi; \
+    fi;
+
+ARG RKE_VERSION
+RUN if [[ -n "$RKE_VERSION" ]] ; then echo installing latest version RKE && \
+    curl -0Ls https://github.com/rancher/rke/releases/latest/download/rke_linux-amd64 > rke ; else echo installing ${RKE_VERSION} version RKE && \
+    curl -0Ls https://github.com/rancher/rke/releases/download/$RKE_VERSION/rke_linux-amd64 > rke; fi;
+RUN mv rke /bin/rke && \
+    chmod +x /bin/rke
+
+ARG CLI_VERSION
+RUN if [[ -n "$CLI_VERSION" ]] ; then  \
+        echo installing CLI version $CLI_VERSION ; \
+        curl -LO https://github.com/rancher/cli/releases/download/$CLI_VERSION/rancher-linux-amd64-$CLI_VERSION.tar.gz ; \
+        tar -xf rancher-linux-amd64-$CLI_VERSION.tar.gz && \
+        mv rancher-$CLI_VERSION/rancher /bin/rancher && \
+        chmod +x /bin/rancher; fi;

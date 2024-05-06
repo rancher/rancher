@@ -1,3 +1,5 @@
+//go:build (validation || infra.rke1 || cluster.any || stress) && !infra.any && !infra.aks && !infra.eks && !infra.gke && !infra.rke2k3s && !sanity && !extended
+
 package charts
 
 import (
@@ -5,10 +7,10 @@ import (
 	"strings"
 
 	settings "github.com/rancher/rancher/pkg/settings"
-	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
-	"github.com/rancher/rancher/tests/framework/extensions/charts"
-	namespaces "github.com/rancher/rancher/tests/framework/extensions/namespaces"
-	"github.com/rancher/rancher/tests/framework/pkg/environmentflag"
+	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
+	"github.com/rancher/shepherd/extensions/charts"
+	namespaces "github.com/rancher/shepherd/extensions/namespaces"
+	"github.com/rancher/shepherd/pkg/environmentflag"
 	"github.com/stretchr/testify/assert"
 	require "github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

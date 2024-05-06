@@ -10,7 +10,7 @@ import (
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
-	ctrlfake "github.com/rancher/wrangler/pkg/generic/fake"
+	ctrlfake "github.com/rancher/wrangler/v2/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	v1apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -74,6 +74,10 @@ func Test_getBootstrapSecret(t *testing.T) {
 
 			//act
 			err := settings.ServerURL.Set("localhost")
+			a.Nil(err)
+			err = settings.SystemAgentInstallScript.Set("https://raw.githubusercontent.com/rancher/system-agent/main/install.sh")
+			a.Nil(err)
+			err = settings.SystemAgentInstallerImage.Set("rancher/system-agent-installer-")
 			a.Nil(err)
 
 			serviceAccount, err := handler.serviceAccountCache.Get(tt.args.namespaceName, tt.args.secretName)

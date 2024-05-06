@@ -7,6 +7,7 @@ set -eo pipefail
 set -x
 
 SCRIPT_DIR="$(cd "$(dirname "$0")"; pwd)"
+source "$SCRIPT_DIR/../scripts/export-config"
 
 TARGET_OS="${TARGET_OS:-linux}"
 GO_BINARY="${GO_BINARY:-$(which go)}"
@@ -56,4 +57,9 @@ cp "${K3S_AIRGAP_IMAGES_TARBALL}" "${PACKAGE_FOLDER}"
 
 DOCKERFILE="${SCRIPT_DIR}/../package/Dockerfile"
 # Always use buildx to make sure the image & the binary architectures match
-docker buildx build -t "${TARGET_REPO}" -f "${DOCKERFILE}" "${PACKAGE_FOLDER}" --platform="${TARGET_OS}/${TARGET_ARCH}"
+docker buildx build -t "${TARGET_REPO}" -f "${DOCKERFILE}" \
+  --build-arg CATTLE_RANCHER_WEBHOOK_VERSION="${CATTLE_RANCHER_WEBHOOK_VERSION}" \
+  --build-arg CATTLE_CSP_ADAPTER_MIN_VERSION="${CATTLE_CSP_ADAPTER_MIN_VERSION}" \
+  --build-arg CATTLE_FLEET_VERSION="${CATTLE_FLEET_VERSION}" \
+  --build-arg ARCH="${TARGET_ARCH}" \
+  "${PACKAGE_FOLDER}" --platform="${TARGET_OS}/${TARGET_ARCH}"

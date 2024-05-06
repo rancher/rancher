@@ -23,7 +23,7 @@ import (
 	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
-	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
+	corecontrollers "github.com/rancher/wrangler/v2/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -335,7 +335,7 @@ func (e *aksOperatorController) generateAndSetServiceAccount(cluster *apimgmtv3.
 		return cluster, fmt.Errorf("error getting kube config: %v", err)
 	}
 
-	clusterDialer, err := e.ClientDialer.ClusterDialer(cluster.Name)
+	clusterDialer, err := e.ClientDialer.ClusterDialer(cluster.Name, true)
 	if err != nil {
 		return cluster, err
 	}

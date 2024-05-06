@@ -434,7 +434,11 @@ func loadDataFromTemplate(clusterTemplateRevision *apimgmtv3.ClusterTemplateRevi
 					if err != nil {
 						return nil, httperror.WrapAPIError(err, httperror.ServerError, processingError)
 					}
-					question.Default = registries[index]["password"].(string)
+					// the key may not exist if the password is not set in the clusterTemplateRevision
+					password, ok := registries[index]["password"]
+					if ok {
+						question.Default = password.(string)
+					}
 				} else if strings.HasPrefix(question.Variable, "rancherKubernetesEngineConfig.cloudProvider.vsphereCloudProvider.virtualCenter") {
 					vcenters, ok := values.GetValue(dataFromTemplate, "rancherKubernetesEngineConfig", "cloudProvider", "vsphereCloudProvider", "virtualCenter")
 					if !ok {
@@ -537,7 +541,7 @@ func loadDataFromTemplate(clusterTemplateRevision *apimgmtv3.ClusterTemplateRevi
 		dataFromTemplate[managementv3.ClusterFieldFleetWorkspaceName] = fleetworkspace
 	}
 
-	//validate that the data loaded is valid clusterSpec
+	// validate that the data loaded is valid clusterSpec
 	var spec apimgmtv3.ClusterSpec
 	if err := convert.ToObj(dataFromTemplate, &spec); err != nil {
 		return nil, httperror.WrapAPIError(err, httperror.InvalidBodyContent, "Invalid clusterTemplate, cannot convert to cluster spec")
@@ -775,7 +779,7 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 	}
 
 	cleanPrivateRegistry(data)
-	dialer, err := r.DialerFactory.ClusterDialer(id)
+	dialer, err := r.DialerFactory.ClusterDialer(id, true)
 	if err != nil {
 		return nil, errors.Wrap(err, "error getting dialer")
 	}
@@ -1368,11 +1372,14 @@ func setInstanceMetadataHostname(data map[string]interface{}) {
 	rkeConfig, ok := values.GetValue(data, "rancherKubernetesEngineConfig")
 	if ok && rkeConfig != nil {
 		cloudProviderName := convert.ToString(values.GetValueN(data, "rancherKubernetesEngineConfig", "cloudProvider", "name"))
-		if cloudProviderName == k8s.AWSCloudProvider {
-			_, ok := values.GetValue(data, "rancherKubernetesEngineConfig", "cloudProvider", "useInstanceMetadataHostname")
-			if !ok {
-				// set default false for aws cloud provider
+		_, ok := values.GetValue(data, "rancherKubernetesEngineConfig", "cloudProvider", "useInstanceMetadataHostname")
+		if !ok {
+			if cloudProviderName == k8s.AWSCloudProvider {
+				// set default false for in-tree aws cloud provider
 				values.PutValue(data, false, "rancherKubernetesEngineConfig", "cloudProvider", "useInstanceMetadataHostname")
+			} else if cloudProviderName == k8s.ExternalAWSCloudProviderName {
+				// set default true for external-aws cloud provider
+				values.PutValue(data, true, "rancherKubernetesEngineConfig", "cloudProvider", "useInstanceMetadataHostname")
 			}
 		}
 	}

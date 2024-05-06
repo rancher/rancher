@@ -9,7 +9,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/alert/manager"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
-	"github.com/rancher/wrangler/pkg/ticker"
+	"github.com/rancher/wrangler/v2/pkg/ticker"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"

@@ -9,6 +9,7 @@ const (
 	CronJobFieldActiveDeadlineSeconds         = "activeDeadlineSeconds"
 	CronJobFieldAnnotations                   = "annotations"
 	CronJobFieldAutomountServiceAccountToken  = "automountServiceAccountToken"
+	CronJobFieldBackoffLimitPerIndex          = "backoffLimitPerIndex"
 	CronJobFieldCompletionMode                = "completionMode"
 	CronJobFieldContainers                    = "containers"
 	CronJobFieldCreated                       = "created"
@@ -30,6 +31,7 @@ const (
 	CronJobFieldHostname                      = "hostname"
 	CronJobFieldImagePullSecrets              = "imagePullSecrets"
 	CronJobFieldLabels                        = "labels"
+	CronJobFieldMaxFailedIndexes              = "maxFailedIndexes"
 	CronJobFieldName                          = "name"
 	CronJobFieldNamespaceId                   = "namespaceId"
 	CronJobFieldNodeID                        = "nodeId"
@@ -37,6 +39,7 @@ const (
 	CronJobFieldOverhead                      = "overhead"
 	CronJobFieldOwnerReferences               = "ownerReferences"
 	CronJobFieldPodFailurePolicy              = "podFailurePolicy"
+	CronJobFieldPodReplacementPolicy          = "podReplacementPolicy"
 	CronJobFieldPreemptionPolicy              = "preemptionPolicy"
 	CronJobFieldProjectID                     = "projectId"
 	CronJobFieldPublicEndpoints               = "publicEndpoints"
@@ -77,6 +80,7 @@ type CronJob struct {
 	ActiveDeadlineSeconds         *int64                         `json:"activeDeadlineSeconds,omitempty" yaml:"activeDeadlineSeconds,omitempty"`
 	Annotations                   map[string]string              `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	AutomountServiceAccountToken  *bool                          `json:"automountServiceAccountToken,omitempty" yaml:"automountServiceAccountToken,omitempty"`
+	BackoffLimitPerIndex          *int64                         `json:"backoffLimitPerIndex,omitempty" yaml:"backoffLimitPerIndex,omitempty"`
 	CompletionMode                string                         `json:"completionMode,omitempty" yaml:"completionMode,omitempty"`
 	Containers                    []Container                    `json:"containers,omitempty" yaml:"containers,omitempty"`
 	Created                       string                         `json:"created,omitempty" yaml:"created,omitempty"`
@@ -98,6 +102,7 @@ type CronJob struct {
 	Hostname                      string                         `json:"hostname,omitempty" yaml:"hostname,omitempty"`
 	ImagePullSecrets              []LocalObjectReference         `json:"imagePullSecrets,omitempty" yaml:"imagePullSecrets,omitempty"`
 	Labels                        map[string]string              `json:"labels,omitempty" yaml:"labels,omitempty"`
+	MaxFailedIndexes              *int64                         `json:"maxFailedIndexes,omitempty" yaml:"maxFailedIndexes,omitempty"`
 	Name                          string                         `json:"name,omitempty" yaml:"name,omitempty"`
 	NamespaceId                   string                         `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
 	NodeID                        string                         `json:"nodeId,omitempty" yaml:"nodeId,omitempty"`
@@ -105,6 +110,7 @@ type CronJob struct {
 	Overhead                      map[string]string              `json:"overhead,omitempty" yaml:"overhead,omitempty"`
 	OwnerReferences               []OwnerReference               `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	PodFailurePolicy              *PodFailurePolicy              `json:"podFailurePolicy,omitempty" yaml:"podFailurePolicy,omitempty"`
+	PodReplacementPolicy          string                         `json:"podReplacementPolicy,omitempty" yaml:"podReplacementPolicy,omitempty"`
 	PreemptionPolicy              string                         `json:"preemptionPolicy,omitempty" yaml:"preemptionPolicy,omitempty"`
 	ProjectID                     string                         `json:"projectId,omitempty" yaml:"projectId,omitempty"`
 	PublicEndpoints               []PublicEndpoint               `json:"publicEndpoints,omitempty" yaml:"publicEndpoints,omitempty"`

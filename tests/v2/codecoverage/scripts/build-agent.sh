@@ -4,6 +4,7 @@ set -e
 cd $(dirname $0)/../../../../
 
 source $(dirname $0)/scripts/version
+source $(dirname $0)/scripts/export-config
 
 mkdir -p bin
 

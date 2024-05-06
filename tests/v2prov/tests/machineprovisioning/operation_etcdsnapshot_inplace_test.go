@@ -12,13 +12,13 @@ import (
 	"github.com/rancher/rancher/tests/v2prov/cluster"
 	"github.com/rancher/rancher/tests/v2prov/defaults"
 	"github.com/rancher/rancher/tests/v2prov/operations"
-	"github.com/rancher/wrangler/pkg/name"
+	"github.com/rancher/wrangler/v2/pkg/name"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func Test_Operation_MP_EtcdSnapshotCreationRestoreInPlace(t *testing.T) {
+func Test_Operation_SetA_MP_EtcdSnapshotCreationRestoreInPlace(t *testing.T) {
 	clients, err := clients.New()
 	if err != nil {
 		t.Fatal(err)

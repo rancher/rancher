@@ -93,6 +93,7 @@ func registerDeferred(ctx context.Context, cluster *config.UserContext) {
 	cluster.Cluster.ClusterUserAttributes(namespace).AddHandler(ctx, "cat-cluster-user-attribute-controller", (&clusterUserAttributeHandler{
 		userAttribute,
 		userAttributeLister,
+		clusterUserAttribute,
 	}).Sync)
 }
 

@@ -10,7 +10,7 @@ import (
 )
 
 type ExtensionsConfig struct {
-	GithubEndpoints []GithubEndpoint
+	Config ExportConfig
 }
 
 type Release struct {
@@ -26,7 +26,7 @@ var ExtensionEndpoints = []GithubEndpoint{
 }
 
 func (e ExtensionsConfig) FetchExtensionImages(imagesSet map[string]map[string]struct{}) error {
-	for _, endpoint := range e.GithubEndpoints {
+	for _, endpoint := range e.Config.GithubEndpoints {
 		// Parse the repository name from the URL
 		repoName, err := parseRepoName(endpoint.URL)
 		if err != nil {

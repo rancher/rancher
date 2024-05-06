@@ -21,6 +21,8 @@ variable "no_of_server_nodes" {}
 variable "server_flags" {}
 variable "cluster_type" {}
 variable "node_os" {}
+variable "enforce_mode" {}
+variable "optional_files" {}
 
 variable "create_lb" {
   description = "Create Network Load Balancer if set to true"
@@ -36,4 +38,3 @@ variable "environment" {}
 variable "engine_mode" {}
 variable "instance_class" {}
 variable "max_connections" {}
-variable "optional_files" {}

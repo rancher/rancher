@@ -10,7 +10,7 @@ import (
 
 	"github.com/rancher/apiserver/pkg/types"
 	"github.com/rancher/rancher/pkg/catalogv2/content"
-	"github.com/rancher/wrangler/pkg/schemas/validation"
+	"github.com/rancher/wrangler/v2/pkg/schemas/validation"
 	"helm.sh/helm/v3/pkg/repo"
 )
 
@@ -108,10 +108,12 @@ func (i *contentDownload) serveIcon(apiContext *types.APIRequest, rw http.Respon
 	if err != nil {
 		return err
 	}
-	defer chart.Close()
+	if chart != nil {
+		setIconHeaders(rw, suffix)
+		_, err = io.Copy(rw, chart)
+		defer chart.Close()
+	}
 
-	setIconHeaders(rw, suffix)
-	_, err = io.Copy(rw, chart)
 	return err
 }
 

@@ -1,12 +1,12 @@
-FROM registry.suse.com/bci/golang:1.20
+FROM registry.suse.com/bci/golang:1.21
 
 ARG DAPPER_HOST_ARCH
 ENV HOST_ARCH=${DAPPER_HOST_ARCH} ARCH=${DAPPER_HOST_ARCH}
 ENV CATTLE_HELM_VERSION v2.16.8-rancher2
-ENV CATTLE_MACHINE_VERSION v0.15.0-rancher106
-ENV CATTLE_K3S_VERSION v1.27.6+k3s1
+ENV CATTLE_MACHINE_VERSION v0.15.0-rancher112
+ENV CATTLE_K3S_VERSION v1.28.6+k3s2
 # helm 3 version
-ENV HELM_VERSION v3.12.3
+ENV HELM_VERSION v3.13.3
 ENV KUSTOMIZE_VERSION v5.0.1
 ENV HELM_UNITTEST_VERSION 0.3.2
 # k3d ci version
@@ -28,12 +28,17 @@ RUN if [ "${ARCH}" != "s390x" ]; then \
     fi
 
 RUN if [ "${ARCH}" == "amd64" ]; then \
-        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.52.0; \
+        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.54.2; \
         curl -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/fossas/spectrometer/master/install.sh | sh; \
     fi
 
-# install controller-tools for crd generation
-RUN go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.12.0
+# Tool for CRD generation.
+ENV CONTROLLER_GEN_VERSION v0.12.0
+RUN go install sigs.k8s.io/controller-tools/cmd/controller-gen@${CONTROLLER_GEN_VERSION}
+
+# YAML processor for release configuration.
+ENV YQ_VERSION v4.40.2
+RUN wget -q https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_${ARCH}.tar.gz -O - | tar xz && mv yq_linux_${ARCH} /usr/bin/yq
 
 ENV HELM_URL_V2_amd64=https://github.com/rancher/helm/releases/download/${CATTLE_HELM_VERSION}/rancher-helm \
     HELM_URL_V2_arm64=https://github.com/rancher/helm/releases/download/${CATTLE_HELM_VERSION}/rancher-helm-arm64 \
@@ -63,7 +68,7 @@ RUN mkdir /usr/tmp && \
     chmod +x /usr/bin/kustomize
 
 # Set up K3s: copy the necessary binaries from the K3s image.
-COPY --from=rancher/k3s:v1.27.6-k3s1 \
+COPY --from=rancher/k3s:v1.28.6-k3s2 \
     /bin/blkid \
     /bin/bandwidth \
     /bin/cni \
@@ -109,7 +114,8 @@ RUN ln -s /usr/bin/cni /usr/bin/bridge && \
 
 RUN curl -sLf https://github.com/rancher/k3s/releases/download/${CATTLE_K3S_VERSION}/k3s-images.txt -o /usr/tmp/k3s-images.txt
 
-RUN zypper install -y python3-tox python3-base python3 libffi-devel libopenssl-devel
+# Python related dependencies for the Integration/Validation tests.
+RUN zypper -n install python311-pip python311-base python311 python311-devel python311-tox libffi-devel libopenssl-devel
 
 ENV HELM_HOME /root/.helm
 ENV DAPPER_ENV REPO TAG CI DRONE_BUILD_NUMBER DRONE_TAG DRONE_COMMIT DRONE_BRANCH DRONE_BUILD_EVENT SYSTEM_CHART_DEFAULT_BRANCH FOSSA_API_KEY GOGET_MODULE GOGET_VERSION RELEASE_ACTION RELEASE_TYPE POSTRELEASE_RANCHER_VERSION POSTRELEASE_RANCHER_STABLE DEBUG V2PROV_TEST_DIST V2PROV_TEST_RUN_REGEX

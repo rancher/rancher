@@ -60,6 +60,9 @@ ingress:
   includeDefaultExtraAnnotations: true
   extraAnnotations: {}
   ingressClassName: ""
+  # Certain ingress controllers will will require the pathType or path to be set to a different value.
+  pathType: ImplementationSpecific
+  path: "/"
   # backend port number
   servicePort: 80
 
@@ -185,3 +188,7 @@ global:
 # helm values to use when installing the rancher-webhook chart.
 # helm values set here will override all other global values used when installing the webhook such as priorityClassName and systemRegistry settings.
 webhook: ""
+
+# helm values to use when installing the fleet chart.
+# helm values set here will override all other global values used when installing the fleet chart.
+fleet: ""

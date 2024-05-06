@@ -11,7 +11,8 @@ import (
 	fleetconst "github.com/rancher/rancher/pkg/fleet"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
-	"github.com/rancher/wrangler/pkg/relatedresource"
+	"github.com/rancher/wrangler/v2/pkg/data"
+	"github.com/rancher/wrangler/v2/pkg/relatedresource"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -30,6 +31,14 @@ var (
 	fleetUninstallChart = chart.Definition{
 		ReleaseNamespace: fleetconst.ReleaseLegacyNamespace,
 		ChartName:        fleetconst.ChartName,
+	}
+
+	watchedSettings = map[string]struct{}{
+		settings.ServerURL.Name:             {},
+		settings.CACerts.Name:               {},
+		settings.SystemDefaultRegistry.Name: {},
+		settings.FleetMinVersion.Name:       {},
+		settings.FleetVersion.Name:          {},
 	}
 )
 
@@ -63,9 +72,7 @@ func (h *handler) onSetting(key string, setting *v3.Setting) (*v3.Setting, error
 		return nil, nil
 	}
 
-	if setting.Name != settings.ServerURL.Name &&
-		setting.Name != settings.CACerts.Name &&
-		setting.Name != settings.SystemDefaultRegistry.Name {
+	if _, isWatched := watchedSettings[setting.Name]; !isWatched {
 		return setting, nil
 	}
 
@@ -76,7 +83,20 @@ func (h *handler) onSetting(key string, setting *v3.Setting) (*v3.Setting, error
 	}
 	h.Unlock()
 
-	err := h.manager.Ensure(fleetCRDChart.ReleaseNamespace, fleetCRDChart.ChartName, settings.FleetMinVersion.Get(), "", nil, true, "")
+	fleetVersion := settings.FleetVersion.Get()
+	// Keep Fleet min version precedence for backward compatibility.
+	if fleetMinVersion := settings.FleetMinVersion.Get(); fleetMinVersion != "" {
+		fleetVersion = fleetMinVersion
+	}
+
+	err := h.manager.Ensure(
+		fleetCRDChart.ReleaseNamespace,
+		fleetCRDChart.ChartName,
+		fleetVersion,
+		"",
+		nil,
+		true,
+		"")
 	if err != nil {
 		return setting, err
 	}
@@ -125,5 +145,20 @@ func (h *handler) onSetting(key string, setting *v3.Setting) (*v3.Setting, error
 		fleetChartValues["gitjob"] = gitjobChartValues
 	}
 
-	return setting, h.manager.Ensure(fleetChart.ReleaseNamespace, fleetChart.ChartName, settings.FleetMinVersion.Get(), "", fleetChartValues, true, "")
+	extraValues, err := h.chartsConfig.GetChartValues(fleetconst.ChartName)
+	if err != nil && !chart.IsNotFoundError(err) {
+		// Missing extra config is okay, return the error otherwise
+		return nil, err
+	}
+	fleetChartValues = data.MergeMaps(fleetChartValues, extraValues)
+
+	return setting,
+		h.manager.Ensure(
+			fleetChart.ReleaseNamespace,
+			fleetChart.ChartName,
+			fleetVersion,
+			"",
+			fleetChartValues,
+			true,
+			"")
 }

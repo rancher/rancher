@@ -1,18 +1,19 @@
 package integration
 
 import (
+	"strings"
 	"testing"
 
-	"github.com/rancher/rancher/pkg/api/scheme"
-	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
-	extauthz "github.com/rancher/rancher/tests/framework/extensions/kubeapi/authorization"
-	extnamespaces "github.com/rancher/rancher/tests/framework/extensions/kubeapi/namespaces"
-	"github.com/rancher/rancher/tests/framework/extensions/kubeapi/secrets"
-	"github.com/rancher/rancher/tests/framework/extensions/users"
-	password "github.com/rancher/rancher/tests/framework/extensions/users/passwordgenerator"
-	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
-	"github.com/rancher/rancher/tests/framework/pkg/session"
+	"github.com/rancher/shepherd/clients/rancher"
+	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
+	extauthz "github.com/rancher/shepherd/extensions/kubeapi/authorization"
+	extnamespaces "github.com/rancher/shepherd/extensions/kubeapi/namespaces"
+	"github.com/rancher/shepherd/extensions/kubeapi/secrets"
+	"github.com/rancher/shepherd/extensions/users"
+	password "github.com/rancher/shepherd/extensions/users/passwordgenerator"
+	"github.com/rancher/shepherd/pkg/api/scheme"
+	namegen "github.com/rancher/shepherd/pkg/namegenerator"
+	"github.com/rancher/shepherd/pkg/session"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	authzv1 "k8s.io/api/authorization/v1"
@@ -80,7 +81,8 @@ func (p *RTBTestSuite) TestPRTBRoleTemplateInheritance() {
 	client, err := p.client.WithSession(subSession)
 	require.NoError(p.T(), err)
 
-	createdNamespace, err := extnamespaces.CreateNamespace(client, namegen.AppendRandomString("testns-"), "{}", map[string]string{}, map[string]string{}, p.project)
+	projectName := strings.Split(p.project.ID, ":")[1]
+	createdNamespace, err := extnamespaces.CreateNamespace(client, p.downstreamClusterID, projectName, namegen.AppendRandomString("testns-"), "{}", map[string]string{}, map[string]string{})
 	require.NoError(p.T(), err)
 
 	testUser, err := client.AsUser(p.testUser)
@@ -211,7 +213,8 @@ func (p *RTBTestSuite) TestCRTBRoleTemplateInheritance() {
 	// Test that user can get a specified namespace once granted the permission to do so via roletemplate inheritance bounded
 	// by a CRTB.
 
-	ns, err := extnamespaces.CreateNamespace(client, namegen.AppendRandomString("testns-"), "{}", map[string]string{}, map[string]string{}, p.project)
+	projectName := strings.Split(p.project.ID, ":")[1]
+	ns, err := extnamespaces.CreateNamespace(client, p.downstreamClusterID, projectName, namegen.AppendRandomString("testns-"), "{}", map[string]string{}, map[string]string{})
 	require.NoError(p.T(), err)
 
 	testUser, err := client.AsUser(p.testUser)
@@ -288,7 +291,7 @@ func (p *RTBTestSuite) TestCRTBRoleTemplateInheritance() {
 	_, err = extnamespaces.GetNamespaceByName(testUser, p.downstreamClusterID, ns.Name)
 	require.NoError(p.T(), err)
 
-	anotherNS, err := extnamespaces.CreateNamespace(client, namegen.AppendRandomString("testns-"), "{}", map[string]string{}, map[string]string{}, p.project)
+	anotherNS, err := extnamespaces.CreateNamespace(client, p.downstreamClusterID, projectName, namegen.AppendRandomString("testns-"), "{}", map[string]string{}, map[string]string{})
 	require.NoError(p.T(), err)
 
 	_, err = extnamespaces.GetNamespaceByName(testUser, p.downstreamClusterID, anotherNS.Name)
