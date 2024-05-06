@@ -23,7 +23,7 @@ const (
 )
 
 func (uh *upgradeHandler) nonWorkerPlan(node *v3.Node, cluster *v3.Cluster) (*rketypes.RKEConfigNodePlan, error) {
-	appliedSpec, err := assemblers.AssembleRKEConfigSpec(cluster, cluster.Status.AppliedSpec, uh.secretLister)
+	appliedSpec, err := assemblers.AssembleRKEConfigSpec(cluster, *cluster.Status.AppliedSpec.DeepCopy(), uh.secretLister)
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +87,7 @@ func (uh *upgradeHandler) workerPlan(node *v3.Node, cluster *v3.Cluster) (*rkety
 	hostAddress := node.Status.NodeConfig.Address
 	hostDockerInfo := infos[hostAddress]
 
-	appliedSpec, err := assemblers.AssembleRKEConfigSpec(cluster, cluster.Status.AppliedSpec, uh.secretLister)
+	appliedSpec, err := assemblers.AssembleRKEConfigSpec(cluster, *cluster.Status.AppliedSpec.DeepCopy(), uh.secretLister)
 	if err != nil {
 		return nil, err
 	}
