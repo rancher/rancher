@@ -5,9 +5,11 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
+	"github.com/pkg/errors"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/wrangler/v2/pkg/generic/fake"
 	"github.com/rancher/wrangler/v2/pkg/relatedresource"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/rbac/v1"
@@ -908,6 +910,246 @@ func Test_namespaceEnqueueGR(t *testing.T) {
 			} else {
 				require.NoError(t, resErr)
 			}
+		})
+	}
+}
+func TestClusterRoleEnqueueGR(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	type testState struct {
+		grCacheMock *fake.MockNonNamespacedCacheInterface[*v3.GlobalRole]
+	}
+
+	tests := map[string]struct {
+		obj              runtime.Object
+		stateSetup       func(state testState)
+		wantKeys         []relatedresource.Key
+		wantErrorMessage string
+	}{
+		"enqueue grb if cr contains the label authz.management.cattle.io/grb-owner": {
+			obj: &v1.ClusterRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						grOwnerLabel: "gr",
+					},
+				},
+			},
+			stateSetup: func(state testState) {
+				state.grCacheMock.EXPECT().GetByIndex(grSafeConcatIndex, "gr").Return([]*v3.GlobalRole{{
+					ObjectMeta: metav1.ObjectMeta{Name: "gr"},
+				}}, nil)
+			},
+			wantKeys: []relatedresource.Key{
+				{
+					Name: "gr",
+				},
+			},
+		},
+		"don't enqueue grb if cr doesn't contain the label authz.management.cattle.io/grb-owner": {
+			obj:      &v1.ClusterRole{},
+			wantKeys: nil,
+		},
+		"nil obj": {
+			obj:      nil,
+			wantKeys: nil,
+		},
+		"can't cast obj to ClusterRole": {
+			obj:      &v1.Role{},
+			wantKeys: nil,
+		},
+		"can't get GlobalRole from cache": {
+			obj: &v1.ClusterRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						grOwnerLabel: "gr",
+					},
+				},
+			},
+			stateSetup: func(state testState) {
+				state.grCacheMock.EXPECT().GetByIndex(grSafeConcatIndex, "gr").Return(nil, errors.New("unexpected error"))
+			},
+			wantKeys:         nil,
+			wantErrorMessage: "unable to get GlobalRole gr for RoleBinding : unexpected error",
+		},
+	}
+
+	for name, test := range tests {
+		test := test
+		t.Run(name, func(t *testing.T) {
+			state := testState{
+				grCacheMock: fake.NewMockNonNamespacedCacheInterface[*v3.GlobalRole](ctrl),
+			}
+			if test.stateSetup != nil {
+				test.stateSetup(state)
+			}
+			g := globalRBACEnqueuer{
+				grCache: state.grCacheMock,
+			}
+			keys, err := g.clusterRoleEnqueueGR("", "", test.obj)
+			if test.wantErrorMessage == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.EqualError(t, err, test.wantErrorMessage)
+			}
+			assert.Equal(t, test.wantKeys, keys)
+		})
+	}
+}
+
+func TestClusterRoleBindingEnqueueGRB(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	type testState struct {
+		grbCacheMock *fake.MockNonNamespacedCacheInterface[*v3.GlobalRoleBinding]
+	}
+
+	tests := map[string]struct {
+		obj              runtime.Object
+		stateSetup       func(state testState)
+		wantKeys         []relatedresource.Key
+		wantErrorMessage string
+	}{
+		"enqueue grb if cr contains the label authz.management.cattle.io/grb-fw-owner": {
+			obj: &v1.ClusterRoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						grbOwnerLabel: "grb",
+					},
+				},
+			},
+			stateSetup: func(state testState) {
+				state.grbCacheMock.EXPECT().GetByIndex(grbSafeConcatIndex, "grb").Return([]*v3.GlobalRoleBinding{{
+					ObjectMeta: metav1.ObjectMeta{Name: "grb"},
+				}}, nil)
+			},
+			wantKeys: []relatedresource.Key{
+				{
+					Name: "grb",
+				},
+			},
+		},
+		"don't enqueue grb if cr doesn't contain the label authz.management.cattle.io/grb-fw-owner": {
+			obj:      &v1.ClusterRoleBinding{},
+			wantKeys: nil,
+		},
+		"nil obj": {
+			obj:      nil,
+			wantKeys: nil,
+		},
+		"can't cast obj to ClusterRoleBinding": {
+			obj:      &v1.Role{},
+			wantKeys: nil,
+		},
+		"can't get GlobalRoleBinding from cache": {
+			obj: &v1.ClusterRoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						grbOwnerLabel: "grb",
+					},
+				},
+			},
+			stateSetup: func(state testState) {
+				state.grbCacheMock.EXPECT().GetByIndex(grbSafeConcatIndex, "grb").Return(nil, errors.New("unexpected error"))
+			},
+			wantKeys:         nil,
+			wantErrorMessage: "unable to get GlobalRoleBinding grb for ClusterRoleBinding : unexpected error",
+		},
+	}
+
+	for name, test := range tests {
+		test := test
+		t.Run(name, func(t *testing.T) {
+			state := testState{
+				grbCacheMock: fake.NewMockNonNamespacedCacheInterface[*v3.GlobalRoleBinding](ctrl),
+			}
+			if test.stateSetup != nil {
+				test.stateSetup(state)
+			}
+			g := globalRBACEnqueuer{
+				grbCache: state.grbCacheMock,
+			}
+			keys, err := g.clusterRoleBindingEnqueueGRB("", "", test.obj)
+			if test.wantErrorMessage == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.EqualError(t, err, test.wantErrorMessage)
+			}
+			assert.Equal(t, test.wantKeys, keys)
+		})
+	}
+}
+
+func TestFleetWorkspaceEnqueueGRB(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	type testState struct {
+		grCacheMock *fake.MockNonNamespacedCacheInterface[*v3.GlobalRole]
+	}
+
+	tests := map[string]struct {
+		obj            runtime.Object
+		stateSetup     func(state testState)
+		wantKeys       []relatedresource.Key
+		wantErrMessage string
+	}{
+		"enqueue just the GlobalRoles with InheritedFleetWorkspacePermissions": {
+			obj: &v3.FleetWorkspace{},
+			stateSetup: func(state testState) {
+				state.grCacheMock.EXPECT().List(labels.Everything()).Return([]*v3.GlobalRole{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "gr1"},
+						InheritedFleetWorkspacePermissions: &v3.FleetWorkspacePermission{
+							ResourceRules: []v1.PolicyRule{
+								{
+									Verbs:     []string{"*"},
+									APIGroups: []string{"fleet.cattle.io"},
+									Resources: []string{"*"},
+								},
+							},
+							WorkspaceVerbs: []string{"get"},
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "gr2"},
+					},
+				}, nil)
+			},
+			wantKeys: []relatedresource.Key{
+				{
+					Name: "gr1",
+				},
+			},
+		},
+		"error listing GlobalRoles": {
+			obj: &v3.FleetWorkspace{},
+			stateSetup: func(state testState) {
+				state.grCacheMock.EXPECT().List(labels.Everything()).Return(nil, errors.New("unexpected error"))
+			},
+			wantErrMessage: "unable to list current GlobalRoles: unexpected error",
+		},
+		"nil obj": {
+			obj: nil,
+		},
+	}
+
+	for name, test := range tests {
+		test := test
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			state := testState{
+				grCacheMock: fake.NewMockNonNamespacedCacheInterface[*v3.GlobalRole](ctrl),
+			}
+			if test.stateSetup != nil {
+				test.stateSetup(state)
+			}
+			g := globalRBACEnqueuer{
+				grCache: state.grCacheMock,
+			}
+			keys, err := g.fleetWorkspaceEnqueueGR("", "", test.obj)
+			if test.wantErrMessage != "" {
+				assert.EqualError(t, err, test.wantErrMessage)
+			}
+			assert.Equal(t, test.wantKeys, keys)
 		})
 	}
 }
