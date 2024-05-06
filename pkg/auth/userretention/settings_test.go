@@ -25,7 +25,7 @@ func TestSettingsShouldDisable(t *testing.T) {
 			settings := settings{disableAfter: tt.disableAfter}
 
 			if want, got := tt.shouldDisable, settings.ShouldDisable(); want != got {
-				t.Errorf("Expected %t, got %t", want, got)
+				t.Errorf("Expected %t got %t", want, got)
 			}
 		})
 	}
@@ -48,7 +48,31 @@ func TestSettingsShouldDelete(t *testing.T) {
 			settings := settings{deleteAfter: tt.deleteAfter}
 
 			if want, got := tt.shouldDelete, settings.ShouldDelete(); want != got {
-				t.Errorf("Expected %t, got %t", want, got)
+				t.Errorf("Expected %t got %t", want, got)
+			}
+		})
+	}
+}
+
+func TestSettingsFormatDefaultLastLogin(t *testing.T) {
+	now := time.Now()
+	tests := []struct {
+		defaultLastLogin time.Time
+		formatted        string
+	}{
+		{},
+		{
+			defaultLastLogin: now,
+			formatted:        now.Format(time.RFC3339),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.defaultLastLogin.String(), func(t *testing.T) {
+			settings := settings{defaultLastLogin: tt.defaultLastLogin}
+
+			if want, got := tt.formatted, settings.FormatDefaultLastLogin(); want != got {
+				t.Errorf("Expected %s got %s", want, got)
 			}
 		})
 	}

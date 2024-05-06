@@ -17,13 +17,22 @@ type settings struct {
 }
 
 // ShouldDisable returns true if the user retention process should disable users.
-func (c *settings) ShouldDisable() bool {
-	return c.disableAfter != 0
+func (s *settings) ShouldDisable() bool {
+	return s.disableAfter != 0
 }
 
 // ShouldDelete returns true if the user retention process should delete users.
-func (c *settings) ShouldDelete() bool {
-	return c.deleteAfter != 0
+func (s *settings) ShouldDelete() bool {
+	return s.deleteAfter != 0
+}
+
+// FormatDefaultLastLogin returns formatted value of the default last login.
+func (s *settings) FormatDefaultLastLogin() string {
+	if s.defaultLastLogin.IsZero() {
+		return ""
+	}
+
+	return s.defaultLastLogin.Format(time.RFC3339)
 }
 
 // readSettings reads and parses user retention settings.
