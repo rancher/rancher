@@ -9,6 +9,7 @@ const (
 	LocalConfigFieldCreatorID           = "creatorId"
 	LocalConfigFieldEnabled             = "enabled"
 	LocalConfigFieldLabels              = "labels"
+	LocalConfigFieldLogoutAllSupported  = "logoutAllSupported"
 	LocalConfigFieldName                = "name"
 	LocalConfigFieldOwnerReferences     = "ownerReferences"
 	LocalConfigFieldRemoved             = "removed"
@@ -25,6 +26,7 @@ type LocalConfig struct {
 	CreatorID           string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	Enabled             bool              `json:"enabled,omitempty" yaml:"enabled,omitempty"`
 	Labels              map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
+	LogoutAllSupported  bool              `json:"logoutAllSupported,omitempty" yaml:"logoutAllSupported,omitempty"`
 	Name                string            `json:"name,omitempty" yaml:"name,omitempty"`
 	OwnerReferences     []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	Removed             string            `json:"removed,omitempty" yaml:"removed,omitempty"`

@@ -10,6 +10,7 @@ import (
 
 // ClientState implements client side storage for state.
 type ClientState interface {
+	SetPath(path string)
 	SetState(w http.ResponseWriter, r *http.Request, id string, value string)
 	GetStates(r *http.Request) map[string]string
 	GetState(r *http.Request, id string) string
@@ -29,17 +30,31 @@ type ClientCookies struct {
 	Name            string
 	Domain          string
 	Secure          bool
+	Path            string
+}
+
+// SetPath declares the path to use for the cookies
+func (c *ClientCookies) SetPath(path string) {
+	c.Path = path
 }
 
 // SetState stores the named state value by setting a cookie.
 func (c ClientCookies) SetState(w http.ResponseWriter, r *http.Request, id string, value string) {
+	var path string
+	if c.Path != "" {
+		path = c.Path
+	} else {
+		// Fallback, default
+		path = c.ServiceProvider.AcsURL.Path
+	}
+
 	http.SetCookie(w, &http.Cookie{
 		Name:     stateCookiePrefix + id,
 		Value:    value,
 		MaxAge:   int(saml.MaxIssueDelay.Seconds()),
 		HttpOnly: true,
 		Secure:   c.Secure || r.URL.Scheme == "https",
-		Path:     c.ServiceProvider.AcsURL.Path,
+		Path:     path,
 	})
 }
 

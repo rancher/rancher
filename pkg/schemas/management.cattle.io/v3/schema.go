@@ -404,8 +404,14 @@ func tokens(schemas *types.Schemas) *types.Schemas {
 		MustImportAndCustomize(&Version, v3.Token{}, func(schema *types.Schema) {
 			schema.CollectionActions = map[string]types.Action{
 				"logout": {},
+				"logoutAll": {
+					Input:  "samlConfigLogoutInput",
+					Output: "samlConfigLogoutOutput",
+				},
 			}
-		})
+		}).
+		MustImport(&Version, v3.SamlConfigLogoutInput{}).
+		MustImport(&Version, v3.SamlConfigLogoutOutput{})
 }
 
 func authnTypes(schemas *types.Schemas) *types.Schemas {
@@ -551,9 +557,7 @@ func authnTypes(schemas *types.Schemas) *types.Schemas {
 			})
 		}).
 		MustImport(&Version, v3.FreeIpaTestAndApplyInput{}).
-		// Saml Config
-		// Ping-Saml Config
-		// KeyCloak-Saml Configs
+		// Saml Configs (ping adfs, keycloak, okta, shibboleth)
 		MustImportAndCustomize(&Version, v3.PingConfig{}, configSchema).
 		MustImportAndCustomize(&Version, v3.ADFSConfig{}, configSchema).
 		MustImportAndCustomize(&Version, v3.KeyCloakConfig{}, configSchema).
@@ -632,6 +636,7 @@ func authnTypes(schemas *types.Schemas) *types.Schemas {
 		})
 }
 
+// Common SAML schema configuration
 func configSchema(schema *types.Schema) {
 	schema.BaseType = "authConfig"
 	schema.ResourceActions = map[string]types.Action{

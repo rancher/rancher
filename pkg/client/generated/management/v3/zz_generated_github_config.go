@@ -14,6 +14,7 @@ const (
 	GithubConfigFieldHostname            = "hostname"
 	GithubConfigFieldHostnameToClientID  = "hostnameToClientId"
 	GithubConfigFieldLabels              = "labels"
+	GithubConfigFieldLogoutAllSupported  = "logoutAllSupported"
 	GithubConfigFieldName                = "name"
 	GithubConfigFieldOwnerReferences     = "ownerReferences"
 	GithubConfigFieldRemoved             = "removed"
@@ -36,6 +37,7 @@ type GithubConfig struct {
 	Hostname            string            `json:"hostname,omitempty" yaml:"hostname,omitempty"`
 	HostnameToClientID  map[string]string `json:"hostnameToClientId,omitempty" yaml:"hostnameToClientId,omitempty"`
 	Labels              map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
+	LogoutAllSupported  bool              `json:"logoutAllSupported,omitempty" yaml:"logoutAllSupported,omitempty"`
 	Name                string            `json:"name,omitempty" yaml:"name,omitempty"`
 	OwnerReferences     []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	Removed             string            `json:"removed,omitempty" yaml:"removed,omitempty"`

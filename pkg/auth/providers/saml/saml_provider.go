@@ -2,12 +2,14 @@ package saml
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
 
 	"github.com/crewjam/saml"
 	"github.com/pkg/errors"
+	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/api/secrets"
@@ -48,6 +50,8 @@ type Provider struct {
 	groupType       string
 	clientState     ClientState
 	ldapProvider    common.AuthProvider
+	sloEnabled      bool
+	sloForced       bool
 }
 
 var SamlProviders = make(map[string]*Provider)
@@ -103,6 +107,85 @@ func (s *Provider) AuthenticateUser(ctx context.Context, input interface{}) (v3.
 	return v3.Principal{}, nil, "", fmt.Errorf("SAML providers do not implement Authenticate User API")
 }
 
+// PerformSamlLogout guards against a regular logout when the system has SLO, i.e. LogoutAll forced.
+func PerformSamlLogout(apiContext *types.APIContext, token *v3.Token) error {
+	providerName := token.AuthProvider
+
+	logrus.Debugf("SAML [logout]: triggered by provider %s", providerName)
+
+	provider, ok := SamlProviders[providerName]
+	if !ok {
+		logrus.Debugf("SAML [logout]: Rancher provider resource `%v` not configured at all", providerName)
+		return fmt.Errorf("SAML [logout]: Rancher provider resource `%v` not configured at all", providerName)
+	}
+
+	if provider.sloForced {
+		logrus.Debugf("SAML [logout]: Rancher provider resource `%v` configured for forced SLO, rejecting regular logout", providerName)
+		return fmt.Errorf("SAML [logout]: Rancher provider resource `%v` configured for forced SLO, rejecting regular logout", providerName)
+	}
+
+	return nil
+}
+
+func PerformSamlLogoutAll(apiContext *types.APIContext, token *v3.Token) error {
+	r := apiContext.Request
+	w := apiContext.Response
+
+	providerName := token.AuthProvider
+
+	logrus.Debugf("SAML [logout-all]: triggered by provider %s", providerName)
+
+	provider, ok := SamlProviders[providerName]
+	if !ok {
+		logrus.Debugf("SAML [logout-all]: Rancher provider resource `%v` not configured at all", providerName)
+		return fmt.Errorf("SAML [logout-all]: Rancher provider resource `%v` not configured at all", providerName)
+	}
+
+	if !provider.sloEnabled {
+		logrus.Debugf("SAML [logout-all]: Rancher provider resource `%v` not configured for SLO", providerName)
+		return fmt.Errorf("SAML [logout-all]: Rancher provider resource `%v` not configured for SLO", providerName)
+	}
+
+	samlLogout := &v32.SamlConfigLogoutInput{}
+	if err := json.NewDecoder(r.Body).Decode(samlLogout); err != nil {
+		return httperror.NewAPIError(httperror.InvalidBodyContent,
+			fmt.Sprintf("SAML: Failed to parse body: %w", err))
+	}
+
+	userName := provider.userMGR.GetUser(apiContext)
+	userAttributes, _, err := provider.tokenMGR.EnsureAndGetUserAttribute(userName)
+	if err != nil {
+		return err
+	}
+	if userAttributes == nil {
+		logrus.Debugf("SAML [logout-all]: UserAttributes for rancher user %q not found", userName)
+		return fmt.Errorf("SAML [logout-all]: UserAttributes for rancher user %q not found", userName)
+	}
+
+	userAtProvider := userAttributes.ExtraByProvider[providerName]["username"][0]
+	finalRedirectURL := samlLogout.FinalRedirectURL
+
+	provider.clientState.SetPath(provider.serviceProvider.SloURL.Path)
+	provider.clientState.SetState(w, r, "Rancher_FinalRedirectURL", finalRedirectURL)
+	provider.clientState.SetState(w, r, "Rancher_UserID", userName)
+	provider.clientState.SetState(w, r, "Rancher_Action", "logout-all")
+
+	idpRedirectURL, err := provider.HandleSamlLogout(userAtProvider, w, r)
+	if err != nil {
+		return err
+	}
+
+	logrus.Debugf("SAML [logout-all]: Redirecting to the identity provider logout page at %v", idpRedirectURL)
+
+	data := map[string]interface{}{
+		"idpRedirectUrl": idpRedirectURL,
+		"type":           "samlConfigLogoutOutput",
+	}
+
+	apiContext.WriteResponse(http.StatusOK, data)
+	return nil
+}
+
 func PerformSamlLogin(name string, apiContext *types.APIContext, input interface{}) error {
 	//input will contain the FINAL redirect URL
 	login, ok := input.(*v32.SamlLoginInput)
@@ -111,16 +194,19 @@ func PerformSamlLogin(name string, apiContext *types.APIContext, input interface
 	}
 	finalRedirectURL := login.FinalRedirectURL
 
+	logrus.Debugf("SAML [PerformSamlLogin]: Id Provider            (%v)", name)
+
 	if provider, ok := SamlProviders[name]; ok {
 		if provider == nil {
-			logrus.Errorf("SAML: Provider %v not initialized", name)
-			return fmt.Errorf("SAML: Provider %v not initialized", name)
+			logrus.Errorf("SAML: Rancher provider resource %v not initialized", name)
+			return fmt.Errorf("SAML: Rancher provider resource %v not initialized", name)
 		}
 		if provider.clientState == nil {
 			logrus.Errorf("SAML: Provider %v clientState not set", name)
 			return fmt.Errorf("SAML: Provider %v clientState not set", name)
 		}
-		logrus.Debugf("SAML [PerformSamlLogin]: Setting clientState for SAML service provider %v", name)
+
+		provider.clientState.SetPath(provider.serviceProvider.AcsURL.Path)
 		provider.clientState.SetState(apiContext.Response, apiContext.Request, "Rancher_FinalRedirectURL", finalRedirectURL)
 		provider.clientState.SetState(apiContext.Response, apiContext.Request, "Rancher_Action", loginAction)
 		provider.clientState.SetState(apiContext.Response, apiContext.Request, "Rancher_PublicKey", login.PublicKey)
@@ -136,8 +222,8 @@ func PerformSamlLogin(name string, apiContext *types.APIContext, input interface
 			"idpRedirectUrl": idpRedirectURL,
 			"type":           "samlLoginOutput",
 		}
-		apiContext.WriteResponse(http.StatusOK, data)
 
+		apiContext.WriteResponse(http.StatusOK, data)
 		return nil
 	}
 	return nil
