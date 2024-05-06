@@ -8,12 +8,13 @@
       "id": "test-ns-1/test4",
       "kind": "Secret",
       "links": {
-        "self": "https://localhost:8443/v1/secrets/test-ns-1/test4",
-        "view": "https://localhost:8443/api/v1/namespaces/test-ns-1/secrets/test4"
+        "self": "https://rancherurl/v1/secrets/test-ns-1/test4",
+        "view": "https://rancherurl/api/v1/namespaces/test-ns-1/secrets/test4"
       },
       "metadata": {
         "labels": {
-          "test-label-gte": "3"
+          "test-label-gte": "3",
+          "test.cattle.io/steveapi": "nondeterministicid"
         },
         "name": "test4",
         "namespace": "test-ns-1",
@@ -31,12 +32,13 @@
       "id": "test-ns-1/test5",
       "kind": "Secret",
       "links": {
-        "self": "https://localhost:8443/v1/secrets/test-ns-1/test5",
-        "view": "https://localhost:8443/api/v1/namespaces/test-ns-1/secrets/test5"
+        "self": "https://rancherurl/v1/secrets/test-ns-1/test5",
+        "view": "https://rancherurl/api/v1/namespaces/test-ns-1/secrets/test5"
       },
       "metadata": {
         "labels": {
-          "test-label-gte": "3"
+          "test-label-gte": "3",
+          "test.cattle.io/steveapi": "nondeterministicid"
         },
         "name": "test5",
         "namespace": "test-ns-1",
@@ -50,10 +52,10 @@
     }
   ],
   "links": {
-    "self": "https://localhost:8443/v1/secrets"
+    "self": "https://rancherurl/v1/secrets"
   },
   "pagination": {
-    "first": "https://localhost:8443/v1/secrets",
+    "first": "https://rancherurl/v1/secrets",
     "partial": true
   },
   "resourceType": "secret",

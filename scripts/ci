@@ -12,6 +12,6 @@ fi
 
 ./validate
 ./build
-./test
 ./package
+./test
 ./chart/ci

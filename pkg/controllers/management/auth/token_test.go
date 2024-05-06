@@ -2,12 +2,12 @@ package auth
 
 import (
 	"fmt"
-	"strings"
 	"testing"
 	"time"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	tokens2 "github.com/rancher/rancher/pkg/auth/tokens"
+	"github.com/rancher/rancher/pkg/auth/tokens/hashers"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	"github.com/stretchr/testify/assert"
@@ -70,8 +70,11 @@ func TestSync(t *testing.T) {
 		assert.Equalf(t, returnToken, storedToken, fmt.Sprintf("%s", testcase.inputToken.Name), testErr)
 		features.TokenHashing.Set(false)
 		if testcase.enableHashing {
-			assert.NotEqualf(t, returnToken.(*v3.Token).Token, testcase.inputToken.Token, testErr)
-			assert.Truef(t, strings.HasPrefix(returnToken.(*v3.Token).Token, "$2"), testErr)
+			tokenVal := returnToken.(*v3.Token).Token
+			assert.NotEqualf(t, tokenVal, testcase.inputToken.Token, testErr)
+			hasher, err := hashers.GetHasherForHash(tokenVal)
+			assert.Nil(t, err)
+			assert.Nil(t, hasher.VerifyHash(tokenVal, testcase.inputToken.Token))
 			testcase.expectedOutputToken.Token = ""
 			returnToken.(*v3.Token).Token = ""
 		}
@@ -249,7 +252,7 @@ func TestSync(t *testing.T) {
 
 func populateTestCases(tokens map[string]*v3.Token, userAttributes map[string]*v3.UserAttribute) []tokenTestCase {
 	timeNow := metav1.NewTime(time.Now())
-	hashedToken, _ := tokens2.CreateSHA256Hash("1234")
+	hashedToken, _ := hashers.GetHasher().CreateHash("1234")
 	testCases := []tokenTestCase{
 		{
 			inputToken: &v3.Token{

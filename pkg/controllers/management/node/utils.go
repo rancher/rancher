@@ -67,8 +67,20 @@ func buildCreateCommand(node *v3.Node, configMap map[string]interface{}) []strin
 	cmd = append(cmd, buildEngineOpts("--engine-registry-mirror", node.Status.NodeTemplateSpec.EngineRegistryMirror)...)
 	cmd = append(cmd, buildEngineOpts("--engine-storage-driver", []string{node.Status.NodeTemplateSpec.EngineStorageDriver})...)
 
+	// Append driver-specific flags to the command.
+	cmd = append(cmd, buildDriverFlags(sDriver, configMap)...)
+
+	// Add the hostname to the command.
+	cmd = append(cmd, node.Spec.RequestedHostname)
+	return cmd
+}
+
+// buildDriverFlags extracts driver-specific configuration from the given configmap and turns it into CLI flags.
+func buildDriverFlags(driverName string, configMap map[string]any) []string {
+	cmd := make([]string, 0)
+
 	for k, v := range configMap {
-		dmField := "--" + sDriver + "-" + strings.ToLower(regExHyphen.ReplaceAllString(k, "${1}-${2}"))
+		dmField := "--" + driverName + "-" + strings.ToLower(regExHyphen.ReplaceAllString(k, "${1}-${2}"))
 		if v == nil {
 			continue
 		}
@@ -92,8 +104,7 @@ func buildCreateCommand(node *v3.Node, configMap map[string]interface{}) []strin
 			}
 		}
 	}
-	logrus.Tracef("create cmd %v", cmd)
-	cmd = append(cmd, node.Spec.RequestedHostname)
+
 	return cmd
 }
 
@@ -290,8 +301,18 @@ func nodeExists(nodeDir string, node *v3.Node) (bool, error) {
 	return false, nil
 }
 
-func deleteNode(nodeDir string, node *v3.Node) error {
-	command, err := buildCommand(nodeDir, node, []string{"rm", "-f", node.Spec.RequestedHostname})
+func deleteNode(nodeDir string, node *v3.Node, configMap map[string]any) error {
+	// We're passing the `--update-config` flag here along with driver-specific flags to tell Rancher Machine
+	// to reload the driver-specific flags we pass via CLI flags. They need to be reloaded to account for cases
+	// were configuration used by Rancher machine (namely cloud credentials) change while the machine is still running.
+	// If we didn't do this, a user could create a machine and change the cloud credential it uses, leaving Rancher
+	// unable to remove the machine afterward because Rancher machine will always use the old credential it stored on
+	// machine creation.
+	driverName := strings.ToLower(node.Status.NodeTemplateSpec.Driver)
+	args := append([]string{"rm", "-f", "--update-config"}, buildDriverFlags(driverName, configMap)...)
+
+	args = append(args, node.Spec.RequestedHostname)
+	command, err := buildCommand(nodeDir, node, args)
 	if err != nil {
 		return err
 	}

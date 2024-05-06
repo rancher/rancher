@@ -1,0 +1,11 @@
+{
+  "extends": [
+    "github>rancher/renovate-config#release"
+  ],
+  "baseBranches": [
+    "release/v2.7"
+  ],
+  "prHourlyLimit": 2,
+  "prConcurrentLimit": 4,
+  "prCreation": "status-success"
+}

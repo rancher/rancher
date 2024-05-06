@@ -1,16 +1,19 @@
+//go:build (validation || infra.rke1 || cluster.any || stress) && !infra.any && !infra.aks && !infra.eks && !infra.gke && !infra.rke2k3s && !sanity && !extended
+
 package charts
 
 import (
 	"os"
 	"testing"
 
-	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
-	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
-	"github.com/rancher/rancher/tests/framework/extensions/charts"
-	"github.com/rancher/rancher/tests/framework/extensions/clusters"
-	"github.com/rancher/rancher/tests/framework/extensions/namespaces"
-	"github.com/rancher/rancher/tests/framework/pkg/session"
+	"github.com/rancher/shepherd/clients/rancher"
+	"github.com/rancher/shepherd/clients/rancher/catalog"
+	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
+	v1 "github.com/rancher/shepherd/clients/rancher/v1"
+	"github.com/rancher/shepherd/extensions/charts"
+	"github.com/rancher/shepherd/extensions/clusters"
+	"github.com/rancher/shepherd/extensions/namespaces"
+	"github.com/rancher/shepherd/pkg/session"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -42,17 +45,17 @@ func (g *GateKeeperTestSuite) SetupSuite() {
 	clusterName := client.RancherConfig.ClusterName
 	require.NotEmptyf(g.T(), clusterName, "Cluster name to install is not set")
 
-	// Get clusterID with clusterName
-	clusterID, err := clusters.GetClusterIDByName(client, clusterName)
+	// Get cluster meta
+	cluster, err := clusters.NewClusterMeta(client, clusterName)
 	require.NoError(g.T(), err)
 
 	// get latest version of gatekeeper chart
-	latestGatekeeperVersion, err := client.Catalog.GetLatestChartVersion(charts.RancherGatekeeperName)
+	latestGatekeeperVersion, err := client.Catalog.GetLatestChartVersion(charts.RancherGatekeeperName, catalog.RancherChartRepo)
 	require.NoError(g.T(), err)
 
 	// Create project
 	projectConfig := &management.Project{
-		ClusterID: clusterID,
+		ClusterID: cluster.ID,
 		Name:      gatekeeperProjectName,
 	}
 	createdProject, err := client.Management.Project.Create(projectConfig)
@@ -61,12 +64,10 @@ func (g *GateKeeperTestSuite) SetupSuite() {
 	g.project = createdProject
 
 	g.gatekeeperChartInstallOptions = &charts.InstallOptions{
-		ClusterName: clusterName,
-		ClusterID:   clusterID,
-		Version:     latestGatekeeperVersion,
-		ProjectID:   createdProject.ID,
+		Cluster:   cluster,
+		Version:   latestGatekeeperVersion,
+		ProjectID: createdProject.ID,
 	}
-
 }
 
 func (g *GateKeeperTestSuite) TestGatekeeperChart() {
@@ -144,7 +145,7 @@ func (g *GateKeeperTestSuite) TestUpgradeGatekeeperChart() {
 	require.NoError(g.T(), err)
 
 	// Change gatekeeper install option version to previous version of the latest version
-	versionsList, err := client.Catalog.GetListChartVersions(charts.RancherGatekeeperName)
+	versionsList, err := client.Catalog.GetListChartVersions(charts.RancherGatekeeperName, catalog.RancherChartRepo)
 	require.NoError(g.T(), err)
 
 	if len(versionsList) < 2 {
@@ -186,7 +187,7 @@ func (g *GateKeeperTestSuite) TestUpgradeGatekeeperChart() {
 	chartVersionPreUpgrade := gatekeeperChartPreUpgrade.ChartDetails.Spec.Chart.Metadata.Version
 	require.Contains(g.T(), versionsList[1:], chartVersionPreUpgrade)
 
-	g.gatekeeperChartInstallOptions.Version, err = client.Catalog.GetLatestChartVersion(charts.RancherGatekeeperName)
+	g.gatekeeperChartInstallOptions.Version, err = client.Catalog.GetLatestChartVersion(charts.RancherGatekeeperName, catalog.RancherChartRepo)
 	require.NoError(g.T(), err)
 
 	g.T().Log("Upgrading gatekeeper chart to the latest version")

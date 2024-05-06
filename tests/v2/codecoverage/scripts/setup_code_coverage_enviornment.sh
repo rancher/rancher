@@ -8,8 +8,6 @@ sh tests/v2/codecoverage/scripts/build_code_coverage_images.sh
 echo "build corral packages"
 sh tests/v2/codecoverage/scripts/build_corral_packages.sh
 
-echo | corral config
-
 echo "running rancher corral"
 tests/v2/codecoverage/bin/ranchercorral
 

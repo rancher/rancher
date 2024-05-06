@@ -45,7 +45,7 @@ import (
 )
 
 const (
-	defaultEngineInstallURL         = "https://releases.rancher.com/install-docker/20.10.sh"
+	defaultEngineInstallURL         = "https://releases.rancher.com/install-docker/24.0.sh"
 	amazonec2                       = "amazonec2"
 	userNodeRemoveCleanupAnnotation = "cleanup.cattle.io/user-node-remove"
 	userNodeRemoveFinalizerPrefix   = "clusterscoped.controller.cattle.io/user-node-remove_"
@@ -275,7 +275,18 @@ func (m *Lifecycle) Remove(machine *apimgmtv3.Node) (obj runtime.Object, err err
 			if err = m.drainNode(machine); err != nil {
 				return machine, err
 			}
-			if err = deleteNode(config.Dir(), machine); err != nil {
+
+			driverConfig, err := config.DriverConfig()
+			if err != nil {
+				return nil, err
+			}
+
+			configRawMap := map[string]any{}
+			if err := json.Unmarshal([]byte(driverConfig), &configRawMap); err != nil {
+				return obj, errors.Wrap(err, "failed to unmarshal node config")
+			}
+
+			if err = deleteNode(config.Dir(), machine, configRawMap); err != nil {
 				return machine, err
 			}
 			logrus.Infof("[node-controller] Removing node %s done", machine.Spec.RequestedHostname)
@@ -666,7 +677,7 @@ func (m *Lifecycle) refreshNodeConfig(nc *nodeconfig.NodeConfig, obj *apimgmtv3.
 	if template.Spec.Driver == amazonec2 {
 		setEc2ClusterIDTag(rawConfig, obj.Namespace)
 		logrus.Debug("[node-controller] refreshNodeConfig: Updating amazonec2 machine config")
-		//TODO: Update to not be amazon specific, this needs to be moved to the driver
+		// TODO: Update to not be amazon specific, this needs to be moved to the driver
 		update, err = nc.UpdateAmazonAuth(rawConfig)
 		if err != nil {
 			return err

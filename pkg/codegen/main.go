@@ -18,7 +18,7 @@ import (
 	controllergen "github.com/rancher/wrangler/pkg/controller-gen"
 	"github.com/rancher/wrangler/pkg/controller-gen/args"
 	appsv1 "k8s.io/api/apps/v1"
-	scalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
+	scalingv2 "k8s.io/api/autoscaling/v2"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	extv1beta1 "k8s.io/api/extensions/v1beta1"
@@ -98,6 +98,7 @@ func main() {
 				Types: []interface{}{
 					fleet.Bundle{},
 					fleet.Cluster{},
+					fleet.ClusterGroup{},
 				},
 			},
 			"rke.cattle.io": {
@@ -201,9 +202,9 @@ func main() {
 		},
 		nil,
 	)
-	generator.GenerateNativeTypes(scalingv2beta2.SchemeGroupVersion,
+	generator.GenerateNativeTypes(scalingv2.SchemeGroupVersion,
 		[]interface{}{
-			scalingv2beta2.HorizontalPodAutoscaler{},
+			scalingv2.HorizontalPodAutoscaler{},
 		},
 		nil,
 	)

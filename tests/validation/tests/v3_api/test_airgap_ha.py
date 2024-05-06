@@ -24,6 +24,7 @@ DOCKER_COMPOSE_VERSION = os.environ.get("DOCKER_COMPOSE_VERSION", "1.24.1")
 RKE_VERSION = os.environ.get("RKE_VERSION", "v1.3.11")
 
 # airgap variables
+RANCHER_HELM_EXTRA_SETTINGS = os.environ.get("RANCHER_HELM_EXTRA_SETTINGS")
 NUMBER_OF_INSTANCES = int(os.environ.get("RANCHER_AIRGAP_INSTANCE_COUNT", "3"))
 HOST_NAME = os.environ.get('RANCHER_HOST_NAME', "testsa")
 AG_HOST_NAME = HOST_NAME
@@ -129,7 +130,7 @@ def setup_rancher_server(bastion_node):
     bootstrap_passwd = bastion_node.execute_command(get_bootstrap_passwd)[0]
     print("bootstrap password:", bootstrap_passwd.replace(" ", ""))
     # currently can't set password in airgap setup without reworking below function
-    # set_url_and_password(base_url, "https://" + RANCHER_AG_INTERNAL_HOSTNAME)
+    set_url_and_password(base_url, "https://" + RANCHER_AG_INTERNAL_HOSTNAME)
 
 
 def deploy_bastion_server():
@@ -174,8 +175,8 @@ def overwrite_tls_certs(external_node):
 def get_registry_resources(external_node):
     get_resources_command = \
         'scp -q -i {}/{}.pem -o StrictHostKeyChecking=no ' \
-        '-o UserKnownHostsFile=/dev/null -r {}/airgap/basic-registry/ ' \
-        '{}@{}:~/basic-registry/'.format(
+        '-o UserKnownHostsFile=/dev/null -r {}/airgap/basic-registry ' \
+        '{}@{}:~/basic-registry'.format(
             SSH_KEY_DIR, external_node.ssh_key_name, RESOURCE_DIR,
             AWS_USER, external_node.host_name)
     run_command(get_resources_command, log_out=False)
@@ -363,11 +364,18 @@ def setup_airgap_rancher(bastion_node, number_of_nodes=NUMBER_OF_INSTANCES):
         "--set rancherImage={2}/rancher/rancher " \
         "--set systemDefaultRegistry={2} " \
         "--set useBundledSystemChart=true --set ingress.tls.source=secret " \
-        "--set rancherImageTag={0} --no-hooks".format(
+        "--set rancherImageTag={0} --no-hooks --validate".format(
             RANCHER_SERVER_VERSION,
             RANCHER_AG_INTERNAL_HOSTNAME,
             REGISTRY_HOSTNAME,
             new_rancher_version)
+    extra_settings = []
+    if RANCHER_HELM_EXTRA_SETTINGS:
+        extra_settings.append(RANCHER_HELM_EXTRA_SETTINGS)
+    if extra_settings:
+        for setting in extra_settings:
+            helm_template = helm_template + " " + setting
+
     print("Executing helm install: \n", helm_template)
     print("\nUsing the following kube config: \n")
     print(bastion_node.execute_command("cat ~/kube_config_config.yaml")[0])
@@ -377,6 +385,24 @@ def setup_airgap_rancher(bastion_node, number_of_nodes=NUMBER_OF_INSTANCES):
     bastion_node.execute_command(
         kube_config+"/snap/bin/kubectl create namespace cattle-system && 10")
     create_tls_secrets(bastion_node)
+    bootstrap_password=""
+    if RANCHER_HELM_EXTRA_SETTINGS:
+        for setting in RANCHER_HELM_EXTRA_SETTINGS.split("--set "):
+            settings_keypair = RANCHER_HELM_EXTRA_SETTINGS.split("=")
+            if "bootstrapPassword" in settings_keypair[0]:
+                bootstrap_password = settings_keypair[1]
+                print ("bootstrap password: ", bootstrap_password)
+                execution = bastion_node.execute_command(
+                    kube_config+
+                    "/snap/bin/kubectl create secret" +
+                    " generic -n cattle-system " +
+                    "bootstrap-secret --from-literal=bootstrapPassword=" +
+                    bootstrap_password + " && 10")
+                print(execution[0], execution[1])
+                assert execution[0].find("create") > -1, \
+                    "bootstrap password secret not created"
+                break
+    
     bastion_node.execute_command(
         kube_config + "/snap/bin/kubectl -n cattle-system apply -R -f"
         + " ./rancher && sleep 60")

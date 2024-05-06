@@ -2,12 +2,15 @@ package rbac
 
 import (
 	"github.com/pkg/errors"
+	wranglerv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/rbac"
+	"github.com/rancher/wrangler/pkg/relatedresource"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/cache"
 )
 
 func newRTLifecycle(m *manager) v3.RoleTemplateHandlerFunc {
@@ -22,6 +25,17 @@ func newRTLifecycle(m *manager) v3.RoleTemplateHandlerFunc {
 // ClusterRoleTemplateBinding references the roleTemplates. This handler only ensures they remain in-sync after being created
 type rtSync struct {
 	m *manager
+}
+
+func newRTEnqueueFunc(rtIndxer cache.Indexer) relatedresource.Resolver {
+	return (&rtEnqueue{rtIndexer: rtIndxer}).rtRelatedResources
+}
+
+// rtEnqueue is responsible for returning RoleTemplates names that inherit from a changed roletemplate and should be
+// enqueued as a result. This is to ensure those beneficiary roletemplates make the necessary syncs for their own
+// corresponding clusterRoles.
+type rtEnqueue struct {
+	rtIndexer cache.Indexer
 }
 
 func (c *rtSync) sync(key string, obj *v3.RoleTemplate) (runtime.Object, error) {
@@ -54,18 +68,18 @@ func (c *rtSync) sync(key string, obj *v3.RoleTemplate) (runtime.Object, error) 
 }
 
 func (c *rtSync) syncRT(template *v3.RoleTemplate, usedInProjects bool, prtbs []interface{}, crtbs []interface{}) error {
-	roles := map[string]*v3.RoleTemplate{}
-	if err := c.m.gatherRoles(template, roles, 0); err != nil {
+	roleTemplates := map[string]*v3.RoleTemplate{}
+	if err := c.m.gatherRoles(template, roleTemplates, 0); err != nil {
 		return err
 	}
 
-	if err := c.m.ensureRoles(roles); err != nil {
+	if err := c.m.ensureRoles(roleTemplates); err != nil {
 		return errors.Wrapf(err, "couldn't ensure roles")
 	}
 
 	rolesToKeep := make(map[string]bool)
 	if usedInProjects {
-		for _, rt := range roles {
+		for _, rt := range roleTemplates {
 			for resource, baseRule := range globalResourceRulesNeededInProjects {
 				verbs, err := c.m.checkForGlobalResourceRules(rt, resource, baseRule)
 				if err != nil {
@@ -88,6 +102,10 @@ func (c *rtSync) syncRT(template *v3.RoleTemplate, usedInProjects bool, prtbs []
 			continue
 		}
 
+		roles, err := c.m.ensureGlobalResourcesRolesForPRTB(parseProjectName(prtb.ProjectName), roleTemplates)
+		if err != nil {
+			return err
+		}
 		crbsToKeep, err := c.m.reconcileProjectAccessToGlobalResources(prtb, roles)
 		if err != nil {
 			return err
@@ -117,7 +135,7 @@ func (c *rtSync) syncRT(template *v3.RoleTemplate, usedInProjects bool, prtbs []
 			if !ns.DeletionTimestamp.IsZero() {
 				continue
 			}
-			if err := c.m.ensureProjectRoleBindings(ns.Name, roles, prtb); err != nil {
+			if err := c.m.ensureProjectRoleBindings(ns.Name, roleTemplates, prtb); err != nil {
 				return errors.Wrapf(err, "couldn't ensure binding %v in %v", prtb.Name, ns.Name)
 			}
 		}
@@ -128,9 +146,21 @@ func (c *rtSync) syncRT(template *v3.RoleTemplate, usedInProjects bool, prtbs []
 		if !ok {
 			continue
 		}
-		if err := c.m.ensureClusterBindings(roles, crtb); err != nil {
+		if err := c.m.ensureClusterBindings(roleTemplates, crtb); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func (r *rtEnqueue) rtRelatedResources(_, name string, _ runtime.Object) ([]relatedresource.Key, error) {
+	beneficiaryRTs, err := r.rtIndexer.ByIndex(rtByInheritedRTsIndex, name)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]relatedresource.Key, len(beneficiaryRTs))
+	for i, rt := range beneficiaryRTs {
+		result[i] = relatedresource.Key{Name: rt.(*wranglerv3.RoleTemplate).Name}
+	}
+	return result, nil
 }

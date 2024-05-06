@@ -72,6 +72,12 @@ ingress:
     source: rancher
     secretName: tls-rancher-ingress
 
+### service ###
+# Override to use NodePort or LoadBalancer service type - default is ClusterIP
+service:
+  type: ""
+  annotations: {}
+
 ### LetsEncrypt config ###
 # ProTip: The production environment only allows you to register a name 5 times a week.
 #         Use staging until you have your config right.
@@ -172,4 +178,10 @@ readinessProbe:
 global:
   cattle:
     psp:
-      enabled: true #PSPs enablement should default to true
+      # will default to true on 1.24 and below, and false for 1.25 and above
+      # can be changed manually to true or false to bypass version checks and force that option
+      enabled: ""
+
+# helm values to use when installing the rancher-webhook chart.
+# helm values set here will override all other global values used when installing the webhook such as priorityClassName and systemRegistry settings.
+webhook: ""

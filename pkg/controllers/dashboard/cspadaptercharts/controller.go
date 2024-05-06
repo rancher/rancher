@@ -37,7 +37,7 @@ func (h *handler) onSetting(key string, setting *v3.Setting) (*v3.Setting, error
 		// we only need to check for changes to the CSPAdapterMinVersion setting, ignore any others
 		return setting, nil
 	}
-	adapterRelease, err := h.adapterUtil.GetRelease()
+	adapterRelease, err := h.adapterUtil.GetRelease(cspadapter.MLOChartNamespace, cspadapter.MLOChartName)
 	if err != nil {
 		if errors.Is(err, cspadapter.ErrNotFound) {
 			// If the adapter isn't installed, don't attempt an upgrade
@@ -46,6 +46,6 @@ func (h *handler) onSetting(key string, setting *v3.Setting) (*v3.Setting, error
 		// if we can't determine the status of the adapter, stop here and attempt to re-evaluate later
 		return setting, fmt.Errorf("unable to validate if the csp adater was installed: %w", err)
 	}
-	err = h.manager.Ensure(cspadapter.ChartNamespace, adapterRelease.Chart.Name(), settings.CSPAdapterMinVersion.Get(), nil, true, "")
+	err = h.manager.Ensure(cspadapter.MLOChartNamespace, adapterRelease.Chart.Name(), settings.CSPAdapterMinVersion.Get(), "", nil, true, "")
 	return setting, err
 }

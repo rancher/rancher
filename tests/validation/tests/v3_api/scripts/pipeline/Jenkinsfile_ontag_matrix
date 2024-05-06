@@ -78,11 +78,16 @@ if ( true == via_webhook() && (!(rancher_version ==~ rancher_version_regex)) ) {
       def ADMIN_TOKEN_2 = ""
       def USER_TOKEN_2 = ""
 
+      def TIMEOUT = "6h"
+
       wrap([$class: 'AnsiColorBuildWrapper', 'colorMapName': 'XTerm', 'defaultFg': 2, 'defaultBg':1]) {
         withFolderProperties {
           withCredentials([ string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
                             string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
                             string(credentialsId: 'AWS_SSH_PEM_KEY', variable: 'AWS_SSH_PEM_KEY'),
+                            string(credentialsId: 'AZURE_CLIENT_ID', variable: 'AZURE_CLIENT_ID'),
+                            string(credentialsId: 'AZURE_CLIENT_SECRET', variable: 'AZURE_CLIENT_SECRET'),
+                            string(credentialsId: 'AZURE_SUBSCRIPTION_ID', variable: 'AZURE_SUBSCRIPTION_ID'),
                             string(credentialsId: 'ADMIN_PASSWORD', variable: 'ADMIN_PASSWORD'),
                             string(credentialsId: 'USER_PASSWORD', variable: 'USER_PASSWORD')]) {
 
@@ -150,6 +155,22 @@ if ( true == via_webhook() && (!(rancher_version ==~ rancher_version_regex)) ) {
                   }
                 }
 
+                // AWS_USER and AWS_AMI are currently not set in the environmental variables.
+                def GO_CATTLE_TEST_URL = env.CATTLE_TEST_URL.replace('https://', '')
+                env.CONFIG = env.CONFIG.replace('${CATTLE_TEST_URL}', "${GO_CATTLE_TEST_URL}")
+                env.CONFIG = env.CONFIG.replace('${ADMIN_TOKEN}', env.ADMIN_TOKEN)
+                env.CONFIG = env.CONFIG.replace('${AZURE_CLIENT_ID}', env.AZURE_CLIENT_ID)
+                env.CONFIG = env.CONFIG.replace('${AZURE_CLIENT_SECRET}', env.AZURE_CLIENT_SECRET)
+                env.CONFIG = env.CONFIG.replace('${AZURE_SUBSCRIPTION_ID}', env.AZURE_SUBSCRIPTION_ID)
+                env.CONFIG = env.CONFIG.replace('${AWS_SECRET_ACCESS_KEY}', env.AWS_SECRET_ACCESS_KEY)
+                env.CONFIG = env.CONFIG.replace('${AWS_ACCESS_KEY_ID}', env.AWS_ACCESS_KEY_ID)
+                env.CONFIG = env.CONFIG.replace('${AWS_IAM_PROFILE}', env.AWS_IAM_PROFILE)
+                env.CONFIG = env.CONFIG.replace('${AWS_REGION}', env.AWS_REGION)
+                env.CONFIG = env.CONFIG.replace('${AWS_INSTANCE_TYPE}', env.AWS_INSTANCE_TYPE)
+                env.CONFIG = env.CONFIG.replace('${AWS_VPC}', env.AWS_VPC)
+                env.CONFIG = env.CONFIG.replace('${AWS_SECURITY_GROUPS}', env.AWS_SECURITY_GROUPS)
+                env.CONFIG = env.CONFIG.replace('${AWS_SSH_PEM_KEY}', env.AWS_SSH_KEY_NAME)
+
                 stage('Execute subjobs') {
                   try {
                       jobs = [:]
@@ -164,20 +185,21 @@ if ( true == via_webhook() && (!(rancher_version ==~ rancher_version_regex)) ) {
                       }
                       else if (rancher_version.startsWith("v2.6")){
                         if (!env.RKE_VERSION) {
-                          RKE_VERSION = "v1.3.15"
+                          RKE_VERSION = "v1.3.19"
                         }
                         if (!env.RANCHER_K3S_VERSION) {
-                          RANCHER_K3S_VERSION = "v1.24.6+k3s1"
+                          RANCHER_K3S_VERSION = "v1.24.11+k3s1"
                         }
                       }
                       else if (rancher_version.startsWith("v2.7")){
                         if (!env.RKE_VERSION) {
-                          RKE_VERSION = "v1.4.0-rc4"
+                          RKE_VERSION = "v1.4.4"
                         }
                         if (!env.RANCHER_K3S_VERSION) {
-                          RANCHER_K3S_VERSION = "v1.24.6+k3s1"
+                          RANCHER_K3S_VERSION = "v1.27.10+k3s2"
                         }
                       }
+
                       params = [ string(name: 'CATTLE_TEST_URL', value: "${CATTLE_TEST_URL}"),
                                 string(name: 'ADMIN_TOKEN', value: "${ADMIN_TOKEN}"),
                                 string(name: 'USER_TOKEN', value: "${USER_TOKEN}"),
@@ -192,22 +214,28 @@ if ( true == via_webhook() && (!(rancher_version ==~ rancher_version_regex)) ) {
                                   string(name: 'RANCHER_K3S_VERSION', value: "${RANCHER_K3S_VERSION}"),
                                   string(name: 'BRANCH', value: branch) ]
 
-                      // Rancher server 1 is used to test RKE clusters
+                      goParams = [ string(name: 'TIMEOUT', value: "${TIMEOUT}"),
+                                  text(name: 'CONFIG', value: "${env.CONFIG}"),
+                                  string(name: 'REPO', value: "https://github.com/rancher/rancher.git"),
+                                  string(name: 'BRANCH', value: branch),
+                                  string(name: 'TEST_PACKAGE', value: "provisioning/..."),
+                                  string(name: 'GOTEST_TESTCASE', value: "${env.GOTEST_TESTCASE}") ]
+
+                      // Rancher server 1 is used to test RKE1, RKE2 and K3s clusters.
                       // DO Note: https://github.com/rancher/qa-tasks/issues/318
                       // jobs["do"] = { build job: 'rancher-v3_ontag_do_certification', parameters: params }
                       jobs["ec2"] = { build job: 'rancher-v3_ontag_ec2_certification', parameters: params }
                       jobs["az"] = { build job: 'rancher-v3_ontag_az_certification', parameters: params }
                       jobs["custom"] = { build job: 'rancher-v3_ontag_custom_certification', parameters: params}
+                      jobs["go-provisioning"] = { build job: 'rancher_ontag_go_certification', parameters: goParams }
                       // windows note: https://github.com/rancher/dashboard/issues/6549
                       // jobs["windows"] = { build job: 'rancher-v3_ontag_windows_certification', parameters: params}
-                      if (rancher_version.startsWith("v2.6") || rancher_version.startsWith("v2.7")){
-                        // Rancher server 2 is used to test GKE, EKS, AKS and Imported clusters
-                        jobs["eks"] = { build job: 'rancher-v3_ontag_eks_certification', parameters: params2 }
-                        jobs["aks"] = { build job: 'rancher-v3_ontag_aks_certification', parameters: params2 }
-                        // gke note: https://github.com/rancher/qa-tasks/issues/429
-                        // jobs["gke"] = { build job: 'rancher-v3_ontag_gke_certification', parameters: params2 }
+                      // Rancher server 2 is used to test GKE, EKS, AKS and Imported clusters.
+                      jobs["eks"] = { build job: 'rancher-v3_ontag_eks_certification', parameters: params2 }
+                      jobs["aks"] = { build job: 'rancher-v3_ontag_aks_certification', parameters: params2 }
+                      // gke note: https://github.com/rancher/qa-tasks/issues/429
+                      // jobs["gke"] = { build job: 'rancher-v3_ontag_gke_certification', parameters: params2 }
                         
-                      }
                       jobs["import"] = { build job: 'rancher-v3_ontag_import_certification', parameters: params2}
                       jobs["importk3s"] = { build job: 'rancher-v3_ontag_import_k3s_certification', parameters: params2}
 

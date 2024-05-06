@@ -46,7 +46,7 @@ TEST_OS = os.environ.get('RANCHER_TEST_OS', "linux")
 TEST_IMAGE = os.environ.get(
     'RANCHER_TEST_IMAGE', "ranchertest/mytestcontainer")
 TEST_IMAGE_PORT = os.environ.get('RANCHER_TEST_IMAGE_PORT', "80")
-TEST_IMAGE_NGINX = os.environ.get('RANCHER_TEST_IMAGE_NGINX', "nginx")
+TEST_IMAGE_REDIS = os.environ.get('RANCHER_TEST_IMAGE_REDIS', "redis:latest")
 TEST_IMAGE_OS_BASE = os.environ.get('RANCHER_TEST_IMAGE_OS_BASE', "ubuntu")
 if TEST_OS == "windows":
     DEFAULT_TIMEOUT = 300
@@ -1500,6 +1500,17 @@ def cluster_cleanup(client, cluster, aws_nodes=None):
         env_details += "env.ADMIN_TOKEN='" + ADMIN_TOKEN + "'\n"
         env_details += "env.USER_TOKEN='" + USER_TOKEN + "'\n"
         env_details += "env.CLUSTER_NAME='" + cluster.name + "'\n"
+        create_config_file(env_details)
+        
+        
+def hosted_cluster_cleanup(client, cluster, cluster_name):
+    if RANCHER_CLEANUP_CLUSTER:
+        client.delete(cluster)
+    else:
+        env_details = "env.CATTLE_TEST_URL='" + CATTLE_TEST_URL + "'\n"
+        env_details += "env.ADMIN_TOKEN='" + ADMIN_TOKEN + "'\n"
+        env_details += "env.USER_TOKEN='" + USER_TOKEN + "'\n"
+        env_details += "env.CLUSTER_NAME='" + cluster_name + "'\n"
         create_config_file(env_details)
 
 

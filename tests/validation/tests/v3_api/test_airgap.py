@@ -6,7 +6,7 @@ import time
 from lib.aws import AWS_USER
 from .common import (
     ADMIN_PASSWORD, AmazonWebServices, run_command, wait_for_status_code,
-    TEST_IMAGE, TEST_IMAGE_NGINX, TEST_IMAGE_OS_BASE, readDataFile,
+    TEST_IMAGE, TEST_IMAGE_REDIS, TEST_IMAGE_OS_BASE, readDataFile,
     DEFAULT_CLUSTER_STATE_TIMEOUT, compare_versions
 )
 from .test_custom_host_reg import (
@@ -23,7 +23,7 @@ PRIVATE_REGISTRY_PASSWORD = \
 BASTION_ID = os.environ.get("RANCHER_BASTION_ID", "")
 NUMBER_OF_INSTANCES = int(os.environ.get("RANCHER_AIRGAP_INSTANCE_COUNT", "1"))
 IMAGE_LIST = os.environ.get("RANCHER_IMAGE_LIST", ",".join(
-    [TEST_IMAGE, TEST_IMAGE_NGINX, TEST_IMAGE_OS_BASE])).split(",")
+    [TEST_IMAGE, TEST_IMAGE_REDIS, TEST_IMAGE_OS_BASE])).split(",")
 TARBALL_TYPE = os.environ.get("K3S_TARBALL_TYPE", "tar.gz")
 ARCH = os.environ.get("K3S_ARCH", "amd64")
 
@@ -109,8 +109,8 @@ def test_deploy_airgap_nodes():
                                                    AGENT_REG_CMD)
         results.append(deploy_result)
     for result in results:
-        assert "Downloaded newer image for {}/rancher/rancher-agent".format(
-            bastion_node.host_name) in result[1]
+        assert "Downloaded newer image for " in result[1]
+        assert "/rancher/rancher-agent" in result[1]
 
 
 def test_add_rancher_images_to_private_registry():
@@ -118,8 +118,8 @@ def test_add_rancher_images_to_private_registry():
     save_res, load_res = add_rancher_images_to_private_registry(bastion_node)
     assert "Image pull success: rancher/rancher:{}".format(
         RANCHER_SERVER_VERSION) in save_res[0]
-    assert "The push refers to repository [{}/rancher/rancher]".format(
-        bastion_node.host_name) in load_res[0]
+    assert "The push refers to repository " in load_res[0]
+    assert "/rancher/rancher]" in load_res[0]
 
 
 def test_add_images_to_private_registry():
@@ -191,8 +191,8 @@ def deploy_bastion_server():
     # Get resources for private registry and generate self signed certs
     get_resources_command = \
         'scp -q -i {}/{}.pem -o StrictHostKeyChecking=no ' \
-        '-o UserKnownHostsFile=/dev/null -r {}/airgap/basic-registry/ ' \
-        '{}@{}:~/basic-registry/'.format(
+        '-o UserKnownHostsFile=/dev/null -r {}/airgap/basic-registry ' \
+        '{}@{}:~/basic-registry'.format(
             SSH_KEY_DIR, bastion_node.ssh_key_name, RESOURCE_DIR,
             AWS_USER, bastion_node.host_name)
     run_command(get_resources_command, log_out=False)
@@ -550,12 +550,7 @@ def optionally_add_cluster_to_rancher(bastion_node, ag_nodes, prep="none"):
 
 def deploy_airgap_rancher(bastion_node):
     ag_node = prepare_airgap_node(bastion_node, 1)[0]
-    if "v2.5" in RANCHER_SERVER_VERSION or \
-            "v2.6" in RANCHER_SERVER_VERSION or \
-            "master" in RANCHER_SERVER_VERSION:
-        privileged = "--privileged"
-    else:
-        privileged = ""
+    privileged = "--privileged"
     if RANCHER_HA_CERT_OPTION == 'byo-valid':
         write_cert_command = "cat <<EOT >> fullchain.pem\n{}\nEOT".format(
             base64.b64decode(RANCHER_VALID_TLS_CERT).decode("utf-8"))

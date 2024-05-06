@@ -1,5 +1,5 @@
 /*
-Copyright 2023 Rancher Labs, Inc.
+Copyright 2024 Rancher Labs, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,238 +19,21 @@ limitations under the License.
 package v1
 
 import (
-	"context"
-	"time"
-
-	"github.com/rancher/lasso/pkg/client"
-	"github.com/rancher/lasso/pkg/controller"
 	v1 "github.com/rancher/rancher/pkg/apis/ui.cattle.io/v1"
 	"github.com/rancher/wrangler/pkg/generic"
-	"k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/tools/cache"
 )
 
-type NavLinkHandler func(string, *v1.NavLink) (*v1.NavLink, error)
-
+// NavLinkController interface for managing NavLink resources.
 type NavLinkController interface {
-	generic.ControllerMeta
-	NavLinkClient
-
-	OnChange(ctx context.Context, name string, sync NavLinkHandler)
-	OnRemove(ctx context.Context, name string, sync NavLinkHandler)
-	Enqueue(namespace, name string)
-	EnqueueAfter(namespace, name string, duration time.Duration)
-
-	Cache() NavLinkCache
+	generic.ControllerInterface[*v1.NavLink, *v1.NavLinkList]
 }
 
+// NavLinkClient interface for managing NavLink resources in Kubernetes.
 type NavLinkClient interface {
-	Create(*v1.NavLink) (*v1.NavLink, error)
-	Update(*v1.NavLink) (*v1.NavLink, error)
-
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-	Get(namespace, name string, options metav1.GetOptions) (*v1.NavLink, error)
-	List(namespace string, opts metav1.ListOptions) (*v1.NavLinkList, error)
-	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.NavLink, err error)
+	generic.ClientInterface[*v1.NavLink, *v1.NavLinkList]
 }
 
+// NavLinkCache interface for retrieving NavLink resources in memory.
 type NavLinkCache interface {
-	Get(namespace, name string) (*v1.NavLink, error)
-	List(namespace string, selector labels.Selector) ([]*v1.NavLink, error)
-
-	AddIndexer(indexName string, indexer NavLinkIndexer)
-	GetByIndex(indexName, key string) ([]*v1.NavLink, error)
-}
-
-type NavLinkIndexer func(obj *v1.NavLink) ([]string, error)
-
-type navLinkController struct {
-	controller    controller.SharedController
-	client        *client.Client
-	gvk           schema.GroupVersionKind
-	groupResource schema.GroupResource
-}
-
-func NewNavLinkController(gvk schema.GroupVersionKind, resource string, namespaced bool, controller controller.SharedControllerFactory) NavLinkController {
-	c := controller.ForResourceKind(gvk.GroupVersion().WithResource(resource), gvk.Kind, namespaced)
-	return &navLinkController{
-		controller: c,
-		client:     c.Client(),
-		gvk:        gvk,
-		groupResource: schema.GroupResource{
-			Group:    gvk.Group,
-			Resource: resource,
-		},
-	}
-}
-
-func FromNavLinkHandlerToHandler(sync NavLinkHandler) generic.Handler {
-	return func(key string, obj runtime.Object) (ret runtime.Object, err error) {
-		var v *v1.NavLink
-		if obj == nil {
-			v, err = sync(key, nil)
-		} else {
-			v, err = sync(key, obj.(*v1.NavLink))
-		}
-		if v == nil {
-			return nil, err
-		}
-		return v, err
-	}
-}
-
-func (c *navLinkController) Updater() generic.Updater {
-	return func(obj runtime.Object) (runtime.Object, error) {
-		newObj, err := c.Update(obj.(*v1.NavLink))
-		if newObj == nil {
-			return nil, err
-		}
-		return newObj, err
-	}
-}
-
-func UpdateNavLinkDeepCopyOnChange(client NavLinkClient, obj *v1.NavLink, handler func(obj *v1.NavLink) (*v1.NavLink, error)) (*v1.NavLink, error) {
-	if obj == nil {
-		return obj, nil
-	}
-
-	copyObj := obj.DeepCopy()
-	newObj, err := handler(copyObj)
-	if newObj != nil {
-		copyObj = newObj
-	}
-	if obj.ResourceVersion == copyObj.ResourceVersion && !equality.Semantic.DeepEqual(obj, copyObj) {
-		return client.Update(copyObj)
-	}
-
-	return copyObj, err
-}
-
-func (c *navLinkController) AddGenericHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.controller.RegisterHandler(ctx, name, controller.SharedControllerHandlerFunc(handler))
-}
-
-func (c *navLinkController) AddGenericRemoveHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), handler))
-}
-
-func (c *navLinkController) OnChange(ctx context.Context, name string, sync NavLinkHandler) {
-	c.AddGenericHandler(ctx, name, FromNavLinkHandlerToHandler(sync))
-}
-
-func (c *navLinkController) OnRemove(ctx context.Context, name string, sync NavLinkHandler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), FromNavLinkHandlerToHandler(sync)))
-}
-
-func (c *navLinkController) Enqueue(namespace, name string) {
-	c.controller.Enqueue(namespace, name)
-}
-
-func (c *navLinkController) EnqueueAfter(namespace, name string, duration time.Duration) {
-	c.controller.EnqueueAfter(namespace, name, duration)
-}
-
-func (c *navLinkController) Informer() cache.SharedIndexInformer {
-	return c.controller.Informer()
-}
-
-func (c *navLinkController) GroupVersionKind() schema.GroupVersionKind {
-	return c.gvk
-}
-
-func (c *navLinkController) Cache() NavLinkCache {
-	return &navLinkCache{
-		indexer:  c.Informer().GetIndexer(),
-		resource: c.groupResource,
-	}
-}
-
-func (c *navLinkController) Create(obj *v1.NavLink) (*v1.NavLink, error) {
-	result := &v1.NavLink{}
-	return result, c.client.Create(context.TODO(), obj.Namespace, obj, result, metav1.CreateOptions{})
-}
-
-func (c *navLinkController) Update(obj *v1.NavLink) (*v1.NavLink, error) {
-	result := &v1.NavLink{}
-	return result, c.client.Update(context.TODO(), obj.Namespace, obj, result, metav1.UpdateOptions{})
-}
-
-func (c *navLinkController) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	if options == nil {
-		options = &metav1.DeleteOptions{}
-	}
-	return c.client.Delete(context.TODO(), namespace, name, *options)
-}
-
-func (c *navLinkController) Get(namespace, name string, options metav1.GetOptions) (*v1.NavLink, error) {
-	result := &v1.NavLink{}
-	return result, c.client.Get(context.TODO(), namespace, name, result, options)
-}
-
-func (c *navLinkController) List(namespace string, opts metav1.ListOptions) (*v1.NavLinkList, error) {
-	result := &v1.NavLinkList{}
-	return result, c.client.List(context.TODO(), namespace, result, opts)
-}
-
-func (c *navLinkController) Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
-	return c.client.Watch(context.TODO(), namespace, opts)
-}
-
-func (c *navLinkController) Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (*v1.NavLink, error) {
-	result := &v1.NavLink{}
-	return result, c.client.Patch(context.TODO(), namespace, name, pt, data, result, metav1.PatchOptions{}, subresources...)
-}
-
-type navLinkCache struct {
-	indexer  cache.Indexer
-	resource schema.GroupResource
-}
-
-func (c *navLinkCache) Get(namespace, name string) (*v1.NavLink, error) {
-	obj, exists, err := c.indexer.GetByKey(namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(c.resource, name)
-	}
-	return obj.(*v1.NavLink), nil
-}
-
-func (c *navLinkCache) List(namespace string, selector labels.Selector) (ret []*v1.NavLink, err error) {
-
-	err = cache.ListAllByNamespace(c.indexer, namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.NavLink))
-	})
-
-	return ret, err
-}
-
-func (c *navLinkCache) AddIndexer(indexName string, indexer NavLinkIndexer) {
-	utilruntime.Must(c.indexer.AddIndexers(map[string]cache.IndexFunc{
-		indexName: func(obj interface{}) (strings []string, e error) {
-			return indexer(obj.(*v1.NavLink))
-		},
-	}))
-}
-
-func (c *navLinkCache) GetByIndex(indexName, key string) (result []*v1.NavLink, err error) {
-	objs, err := c.indexer.ByIndex(indexName, key)
-	if err != nil {
-		return nil, err
-	}
-	result = make([]*v1.NavLink, 0, len(objs))
-	for _, obj := range objs {
-		result = append(result, obj.(*v1.NavLink))
-	}
-	return result, nil
+	generic.CacheInterface[*v1.NavLink]
 }

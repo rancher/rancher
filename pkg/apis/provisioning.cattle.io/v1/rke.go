@@ -28,6 +28,8 @@ type RKEMachinePool struct {
 	MaxUnhealthy                 *string                      `json:"maxUnhealthy,omitempty"`
 	UnhealthyRange               *string                      `json:"unhealthyRange,omitempty"`
 	MachineOS                    string                       `json:"machineOS,omitempty"`
+	DynamicSchemaSpec            string                       `json:"dynamicSchemaSpec,omitempty"`
+	HostnameLengthLimit          int                          `json:"hostnameLengthLimit,omitempty"`
 }
 
 type RKEMachinePoolRollingUpdate struct {
@@ -76,6 +78,11 @@ type RKEConfig struct {
 	RotateCertificates   *rkev1.RotateCertificates   `json:"rotateCertificates,omitempty"`
 	RotateEncryptionKeys *rkev1.RotateEncryptionKeys `json:"rotateEncryptionKeys,omitempty"`
 
-	MachinePools      []RKEMachinePool        `json:"machinePools,omitempty"`
-	InfrastructureRef *corev1.ObjectReference `json:"infrastructureRef,omitempty"`
+	MachinePools        []RKEMachinePool        `json:"machinePools,omitempty"`
+	MachinePoolDefaults RKEMachinePoolDefaults  `json:"machinePoolDefaults,omitempty"`
+	InfrastructureRef   *corev1.ObjectReference `json:"infrastructureRef,omitempty"`
+}
+
+type RKEMachinePoolDefaults struct {
+	HostnameLengthLimit int `json:"hostnameLengthLimit,omitempty"`
 }

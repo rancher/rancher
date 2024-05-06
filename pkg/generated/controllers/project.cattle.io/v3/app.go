@@ -1,5 +1,5 @@
 /*
-Copyright 2023 Rancher Labs, Inc.
+Copyright 2024 Rancher Labs, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,8 +22,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/lasso/pkg/client"
-	"github.com/rancher/lasso/pkg/controller"
 	v3 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
 	"github.com/rancher/wrangler/pkg/apply"
 	"github.com/rancher/wrangler/pkg/condition"
@@ -31,236 +29,23 @@ import (
 	"github.com/rancher/wrangler/pkg/kv"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/tools/cache"
 )
 
-type AppHandler func(string, *v3.App) (*v3.App, error)
-
+// AppController interface for managing App resources.
 type AppController interface {
-	generic.ControllerMeta
-	AppClient
-
-	OnChange(ctx context.Context, name string, sync AppHandler)
-	OnRemove(ctx context.Context, name string, sync AppHandler)
-	Enqueue(namespace, name string)
-	EnqueueAfter(namespace, name string, duration time.Duration)
-
-	Cache() AppCache
+	generic.ControllerInterface[*v3.App, *v3.AppList]
 }
 
+// AppClient interface for managing App resources in Kubernetes.
 type AppClient interface {
-	Create(*v3.App) (*v3.App, error)
-	Update(*v3.App) (*v3.App, error)
-	UpdateStatus(*v3.App) (*v3.App, error)
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-	Get(namespace, name string, options metav1.GetOptions) (*v3.App, error)
-	List(namespace string, opts metav1.ListOptions) (*v3.AppList, error)
-	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.App, err error)
+	generic.ClientInterface[*v3.App, *v3.AppList]
 }
 
+// AppCache interface for retrieving App resources in memory.
 type AppCache interface {
-	Get(namespace, name string) (*v3.App, error)
-	List(namespace string, selector labels.Selector) ([]*v3.App, error)
-
-	AddIndexer(indexName string, indexer AppIndexer)
-	GetByIndex(indexName, key string) ([]*v3.App, error)
-}
-
-type AppIndexer func(obj *v3.App) ([]string, error)
-
-type appController struct {
-	controller    controller.SharedController
-	client        *client.Client
-	gvk           schema.GroupVersionKind
-	groupResource schema.GroupResource
-}
-
-func NewAppController(gvk schema.GroupVersionKind, resource string, namespaced bool, controller controller.SharedControllerFactory) AppController {
-	c := controller.ForResourceKind(gvk.GroupVersion().WithResource(resource), gvk.Kind, namespaced)
-	return &appController{
-		controller: c,
-		client:     c.Client(),
-		gvk:        gvk,
-		groupResource: schema.GroupResource{
-			Group:    gvk.Group,
-			Resource: resource,
-		},
-	}
-}
-
-func FromAppHandlerToHandler(sync AppHandler) generic.Handler {
-	return func(key string, obj runtime.Object) (ret runtime.Object, err error) {
-		var v *v3.App
-		if obj == nil {
-			v, err = sync(key, nil)
-		} else {
-			v, err = sync(key, obj.(*v3.App))
-		}
-		if v == nil {
-			return nil, err
-		}
-		return v, err
-	}
-}
-
-func (c *appController) Updater() generic.Updater {
-	return func(obj runtime.Object) (runtime.Object, error) {
-		newObj, err := c.Update(obj.(*v3.App))
-		if newObj == nil {
-			return nil, err
-		}
-		return newObj, err
-	}
-}
-
-func UpdateAppDeepCopyOnChange(client AppClient, obj *v3.App, handler func(obj *v3.App) (*v3.App, error)) (*v3.App, error) {
-	if obj == nil {
-		return obj, nil
-	}
-
-	copyObj := obj.DeepCopy()
-	newObj, err := handler(copyObj)
-	if newObj != nil {
-		copyObj = newObj
-	}
-	if obj.ResourceVersion == copyObj.ResourceVersion && !equality.Semantic.DeepEqual(obj, copyObj) {
-		return client.Update(copyObj)
-	}
-
-	return copyObj, err
-}
-
-func (c *appController) AddGenericHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.controller.RegisterHandler(ctx, name, controller.SharedControllerHandlerFunc(handler))
-}
-
-func (c *appController) AddGenericRemoveHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), handler))
-}
-
-func (c *appController) OnChange(ctx context.Context, name string, sync AppHandler) {
-	c.AddGenericHandler(ctx, name, FromAppHandlerToHandler(sync))
-}
-
-func (c *appController) OnRemove(ctx context.Context, name string, sync AppHandler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), FromAppHandlerToHandler(sync)))
-}
-
-func (c *appController) Enqueue(namespace, name string) {
-	c.controller.Enqueue(namespace, name)
-}
-
-func (c *appController) EnqueueAfter(namespace, name string, duration time.Duration) {
-	c.controller.EnqueueAfter(namespace, name, duration)
-}
-
-func (c *appController) Informer() cache.SharedIndexInformer {
-	return c.controller.Informer()
-}
-
-func (c *appController) GroupVersionKind() schema.GroupVersionKind {
-	return c.gvk
-}
-
-func (c *appController) Cache() AppCache {
-	return &appCache{
-		indexer:  c.Informer().GetIndexer(),
-		resource: c.groupResource,
-	}
-}
-
-func (c *appController) Create(obj *v3.App) (*v3.App, error) {
-	result := &v3.App{}
-	return result, c.client.Create(context.TODO(), obj.Namespace, obj, result, metav1.CreateOptions{})
-}
-
-func (c *appController) Update(obj *v3.App) (*v3.App, error) {
-	result := &v3.App{}
-	return result, c.client.Update(context.TODO(), obj.Namespace, obj, result, metav1.UpdateOptions{})
-}
-
-func (c *appController) UpdateStatus(obj *v3.App) (*v3.App, error) {
-	result := &v3.App{}
-	return result, c.client.UpdateStatus(context.TODO(), obj.Namespace, obj, result, metav1.UpdateOptions{})
-}
-
-func (c *appController) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	if options == nil {
-		options = &metav1.DeleteOptions{}
-	}
-	return c.client.Delete(context.TODO(), namespace, name, *options)
-}
-
-func (c *appController) Get(namespace, name string, options metav1.GetOptions) (*v3.App, error) {
-	result := &v3.App{}
-	return result, c.client.Get(context.TODO(), namespace, name, result, options)
-}
-
-func (c *appController) List(namespace string, opts metav1.ListOptions) (*v3.AppList, error) {
-	result := &v3.AppList{}
-	return result, c.client.List(context.TODO(), namespace, result, opts)
-}
-
-func (c *appController) Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
-	return c.client.Watch(context.TODO(), namespace, opts)
-}
-
-func (c *appController) Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (*v3.App, error) {
-	result := &v3.App{}
-	return result, c.client.Patch(context.TODO(), namespace, name, pt, data, result, metav1.PatchOptions{}, subresources...)
-}
-
-type appCache struct {
-	indexer  cache.Indexer
-	resource schema.GroupResource
-}
-
-func (c *appCache) Get(namespace, name string) (*v3.App, error) {
-	obj, exists, err := c.indexer.GetByKey(namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(c.resource, name)
-	}
-	return obj.(*v3.App), nil
-}
-
-func (c *appCache) List(namespace string, selector labels.Selector) (ret []*v3.App, err error) {
-
-	err = cache.ListAllByNamespace(c.indexer, namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v3.App))
-	})
-
-	return ret, err
-}
-
-func (c *appCache) AddIndexer(indexName string, indexer AppIndexer) {
-	utilruntime.Must(c.indexer.AddIndexers(map[string]cache.IndexFunc{
-		indexName: func(obj interface{}) (strings []string, e error) {
-			return indexer(obj.(*v3.App))
-		},
-	}))
-}
-
-func (c *appCache) GetByIndex(indexName, key string) (result []*v3.App, err error) {
-	objs, err := c.indexer.ByIndex(indexName, key)
-	if err != nil {
-		return nil, err
-	}
-	result = make([]*v3.App, 0, len(objs))
-	for _, obj := range objs {
-		result = append(result, obj.(*v3.App))
-	}
-	return result, nil
+	generic.CacheInterface[*v3.App]
 }
 
 type AppStatusHandler func(obj *v3.App, status v3.AppStatus) (v3.AppStatus, error)
@@ -273,7 +58,7 @@ func RegisterAppStatusHandler(ctx context.Context, controller AppController, con
 		condition: condition,
 		handler:   handler,
 	}
-	controller.AddGenericHandler(ctx, name, FromAppHandlerToHandler(statusHandler.sync))
+	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
 }
 
 func RegisterAppGeneratingHandler(ctx context.Context, controller AppController, apply apply.Apply,

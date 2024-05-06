@@ -9,14 +9,17 @@ import (
 
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/api/scheme"
-	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
-	"github.com/rancher/rancher/tests/framework/extensions/ingresses"
-	kubeingress "github.com/rancher/rancher/tests/framework/extensions/kubeapi/ingresses"
-	"github.com/rancher/rancher/tests/framework/extensions/services"
-	"github.com/rancher/rancher/tests/framework/extensions/workloads"
-	"github.com/rancher/rancher/tests/framework/pkg/namegenerator"
-	"github.com/rancher/rancher/tests/framework/pkg/wait"
+	"github.com/rancher/shepherd/clients/rancher"
+	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
+	v1 "github.com/rancher/shepherd/clients/rancher/v1"
+	"github.com/rancher/shepherd/extensions/clusters"
+	"github.com/rancher/shepherd/extensions/ingresses"
+	kubeingress "github.com/rancher/shepherd/extensions/kubeapi/ingresses"
+	"github.com/rancher/shepherd/extensions/projects"
+	"github.com/rancher/shepherd/extensions/services"
+	"github.com/rancher/shepherd/extensions/workloads"
+	"github.com/rancher/shepherd/pkg/namegenerator"
+	"github.com/rancher/shepherd/pkg/wait"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	appv1 "k8s.io/api/apps/v1"
@@ -51,6 +54,32 @@ const (
 
 func getSteveID(namespaceName, resourceName string) string {
 	return fmt.Sprintf(namespaceName + "/" + resourceName)
+}
+
+func getProject(client *rancher.Client, clusterName, projectName string) (project *management.Project, err error) {
+	clusterID, err := clusters.GetClusterIDByName(client, clusterName)
+	if err != nil {
+		return
+	}
+
+	project, err = projects.GetProjectByName(client, clusterID, projectName)
+	if err != nil {
+		return
+	}
+
+	if project == nil {
+		projectConfig := &management.Project{
+			ClusterID: clusterID,
+			Name:      projectName,
+		}
+
+		project, err = client.Management.Project.Create(projectConfig)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return
 }
 
 // newIngressTemplate is a private constructor that returns ingress spec for specific services
@@ -90,7 +119,7 @@ func newServiceTemplate(serviceName, namespaceName string, selector map[string]s
 // newTestContainerMinimal is a private constructor that returns container for minimal workload creations
 func newTestContainerMinimal() corev1.Container {
 	pullPolicy := corev1.PullAlways
-	return workloads.NewContainer(containerName, containerImage, pullPolicy, nil, nil)
+	return workloads.NewContainer(containerName, containerImage, pullPolicy, nil, nil, nil, nil, nil)
 }
 
 // newPodTemplateWithTestContainer is a private constructor that returns pod template spec for workload creations
@@ -129,7 +158,7 @@ func newPodTemplateWithSecretEnvironmentVariable(secretName string) corev1.PodTe
 			},
 		},
 	}
-	container := workloads.NewContainer(containerName, containerImage, pullPolicy, nil, envFrom)
+	container := workloads.NewContainer(containerName, containerImage, pullPolicy, nil, envFrom, nil, nil, nil)
 	containers := []corev1.Container{container}
 
 	return workloads.NewPodTemplate(containers, nil, nil, nil)
@@ -138,7 +167,7 @@ func newPodTemplateWithSecretEnvironmentVariable(secretName string) corev1.PodTe
 // waitUntilIngressIsAccessible waits until the ingress is accessible
 func waitUntilIngressIsAccessible(client *rancher.Client, hostname string) (bool, error) {
 	err := kubewait.Poll(500*time.Millisecond, 2*time.Minute, func() (done bool, err error) {
-		isIngressAccessible, err := ingresses.AccessIngressExternally(client, hostname, false)
+		isIngressAccessible, err := ingresses.IsIngressExternallyAccessible(client, hostname, "", false)
 		if err != nil {
 			return false, err
 		}
@@ -215,16 +244,21 @@ func checkPrefix(name string, prefix string) bool {
 	return strings.HasPrefix(name, prefix)
 }
 
-// validateDaemonset checks daemonset available number is equal to the number of workers in the cluster
+// validateDaemonset checks that the available number of daemonsets equals the number of workers in a downstream cluster or the number of nodes in the local cluster
 func validateDaemonset(t *testing.T, client *rancher.Client, clusterID, namespaceName, daemonsetName string) {
 	t.Helper()
 
-	workerNodesCollection, err := client.Management.Node.List(&types.ListOpts{
+	listFilter := &types.ListOpts{
 		Filters: map[string]interface{}{
 			"clusterId": clusterID,
-			"worker":    true,
 		},
-	})
+	}
+
+	if clusterID != local {
+		listFilter.Filters["worker"] = true
+	}
+
+	nodesCollection, err := client.Management.Node.List(listFilter)
 	require.NoError(t, err)
 
 	steveClient, err := client.Steve.ProxyDownstream(clusterID)
@@ -238,7 +272,7 @@ func validateDaemonset(t *testing.T, client *rancher.Client, clusterID, namespac
 	err = v1.ConvertToK8sType(daemonsetResp.Status, daemonsetStatus)
 	require.NoError(t, err)
 
-	assert.Equalf(t, int(daemonsetStatus.NumberAvailable), len(workerNodesCollection.Data), "Daemonset %v doesn't have the required ready", daemonsetName)
+	assert.Equalf(t, int(daemonsetStatus.NumberAvailable), len(nodesCollection.Data), "Daemonset %v doesn't have the required ready", daemonsetName)
 }
 
 // newNames returns a new resourceNames struct

@@ -22,7 +22,7 @@ def needs_cluster(py_options, upgrade_check, create_resource_prefix) {
           string(name: 'RANCHER_TEST_IMAGE', value: "${RANCHER_TEST_IMAGE}"),
           string(name: 'RANCHER_TEST_IMAGE_PORT', value: "${RANCHER_TEST_IMAGE_PORT}"),
           string(name: 'RANCHER_HARDENED_CLUSTER', value: "${RANCHER_HARDENED_CLUSTER}"),
-          string(name: 'RANCHER_TEST_IMAGE_NGINX', value: "${RANCHER_TEST_IMAGE_NGINX}"),
+          string(name: 'RANCHER_TEST_IMAGE_REDIS', value: "${RANCHER_TEST_IMAGE_REDIS}"),
         ]
         echo "Params are: ${params}"
         jobs["test-${i}"] = { build job: 'rancher-v3_needs_cluster', parameters: params }

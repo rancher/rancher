@@ -734,7 +734,10 @@ def create_and_validate_workload_with_secret_as_volume(p_client, secret, ns,
     con = [{"name": "test1",
             "image": TEST_IMAGE,
             "volumeMounts": volumeMounts}]
-
+    sel = {"node": {
+        "nodeId": "null", 
+        "requireAll": ["kubernetes.io/os =" + TEST_OS]
+        }}
     secretName = secret['name']
 
     volumes = [{"type": "volume", "name": "vol1",
@@ -744,7 +747,9 @@ def create_and_validate_workload_with_secret_as_volume(p_client, secret, ns,
 
     workload = p_client.create_workload(name=name,
                                         containers=con,
-                                        namespaceId=ns.id, volumes=volumes)
+                                        namespaceId=ns.id,
+                                        volumes=volumes,
+                                        scheduling=sel)
     validate_workload_with_secret(p_client, workload, "deployment",
                                   ns.name, keyvaluepair,
                                   workloadwithsecretasVolume=True)
@@ -780,10 +785,15 @@ def create_and_validate_workload_with_secret_as_env_variable(p_client, secret,
     con = [{"name": "test",
             "image": TEST_IMAGE,
             env_str: environment_data }]
-
+    sel = {"node": {
+        "nodeId": "null", 
+        "requireAll": ["kubernetes.io/os =" + TEST_OS]
+        }}
+    
     workload = p_client.create_workload(name=name,
                                         containers=con,
-                                        namespaceId=ns.id)
+                                        namespaceId=ns.id,
+                                        scheduling=sel)
     validate_workload_with_secret(p_client, workload, "deployment",
                                   ns.name, keyvaluepair,
                                   workloadwithsecretasenvvar=True)

@@ -2,7 +2,7 @@
   "actions": {},
   "count": 1,
   "createTypes": {
-    "secret": "https://localhost:8443/v1/secrets"
+    "secret": "https://rancherurl/v1/secrets"
   },
   "data": [
     {
@@ -11,12 +11,15 @@
       "id": "test-ns-1/test1",
       "kind": "Secret",
       "links": {
-        "remove": "https://localhost:8443/v1/secrets/test-ns-1/test1",
-        "self": "https://localhost:8443/v1/secrets/test-ns-1/test1",
-        "update": "https://localhost:8443/v1/secrets/test-ns-1/test1",
-        "view": "https://localhost:8443/api/v1/namespaces/test-ns-1/secrets/test1"
+        "remove": "https://rancherurl/v1/secrets/test-ns-1/test1",
+        "self": "https://rancherurl/v1/secrets/test-ns-1/test1",
+        "update": "https://rancherurl/v1/secrets/test-ns-1/test1",
+        "view": "https://rancherurl/api/v1/namespaces/test-ns-1/secrets/test1"
       },
       "metadata": {
+        "labels": {
+          "test.cattle.io/steveapi": "nondeterministicid"
+        },
         "name": "test1",
         "namespace": "test-ns-1",
         "resourceVersion": "1000",
@@ -29,7 +32,7 @@
     }
   ],
   "links": {
-    "self": "https://localhost:8443/v1/secrets/test-ns-1"
+    "self": "https://rancherurl/v1/secrets/test-ns-1"
   },
   "resourceType": "secret",
   "revision": "100",

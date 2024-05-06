@@ -1,5 +1,5 @@
 from .common import TEST_IMAGE
-from .common import TEST_IMAGE_NGINX
+from .common import TEST_IMAGE_REDIS
 from .common import TEST_IMAGE_OS_BASE
 from .common import cluster_cleanup
 from .common import get_user_client
@@ -61,7 +61,7 @@ def pull_images(node):
     print("Pulling images on node: " + node.host_name)
     pull_result = node.execute_command("docker pull " + TEST_IMAGE
                                        + " && " +
-                                       "docker pull " + TEST_IMAGE_NGINX
+                                       "docker pull " + TEST_IMAGE_REDIS
                                        + " && " +
                                        "docker pull " + TEST_IMAGE_OS_BASE)
     print(pull_result)

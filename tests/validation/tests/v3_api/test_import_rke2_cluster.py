@@ -47,6 +47,7 @@ RKE2_CP_WORKER_NODES = os.environ.get("RKE2_CP_WORKER_NODES", 0)
 # 2=RKE2_ETCD_ONLY_NODES 3=RKE2_ETCD_CP_NODES, 4=RKE2_ETCD_WORKER_NODES,
 # 5=RKE2_CP_ONLY_NODES, 6=RKE2_CP_WORKER_NODES
 RKE2_ROLE_ORDER = os.environ.get("RKE2_ROLE_ORDER", "1,2,3,4,5,6")
+RANCHER_OPTIONAL_FILES = os.environ.get("RANCHER_OPTIONAL_FILES")
 
 
 def test_create_rancherd_multiple_control_cluster():
@@ -153,7 +154,8 @@ def create_rke2_multiple_control_cluster(cluster_type, cluster_version):
                               'etcd_worker_nodes': RKE2_ETCD_WORKER_NODES,
                               'cp_only_nodes': RKE2_CP_ONLY_NODES,
                               'cp_worker_nodes': RKE2_CP_WORKER_NODES,
-                              'role_order': RKE2_ROLE_ORDER})
+                              'role_order': RKE2_ROLE_ORDER,
+                              'optional_files': RANCHER_OPTIONAL_FILES})
     print("Creating cluster")
     tf.init()
     tf.plan(out="plan_server.out")

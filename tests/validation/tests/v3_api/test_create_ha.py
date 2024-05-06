@@ -8,11 +8,13 @@ from .test_import_rke2_cluster import (
     RANCHER_RKE2_VERSION, create_rke2_multiple_control_cluster
 )
 from .test_rke_cluster_provisioning import AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, rke_config
+from packaging import version
 
 # RANCHER_HA_KUBECONFIG and RANCHER_HA_HOSTNAME are provided
 # when installing Rancher into a k3s setup
 RANCHER_HA_KUBECONFIG = os.environ.get("RANCHER_HA_KUBECONFIG")
 RANCHER_HA_HARDENED = ast.literal_eval(os.environ.get("RANCHER_HA_HARDENED", "False"))
+RANCHER_PSP_ENABLED = ast.literal_eval(os.environ.get("RANCHER_PSP_ENABLED", "True"))
 RANCHER_HA_HOSTNAME = os.environ.get(
     "RANCHER_HA_HOSTNAME", RANCHER_HOSTNAME_PREFIX + ".qa.rancher.space")
 resource_prefix = RANCHER_HA_HOSTNAME.split(".qa.rancher.space")[0]
@@ -335,7 +337,7 @@ def add_repo_create_namespace(repo=RANCHER_HELM_REPO, url=RANCHER_HELM_URL):
 
 
 def install_rancher(type=RANCHER_HA_CERT_OPTION, repo=RANCHER_HELM_REPO,
-                    upgrade=False, extra_settings=None):
+                    upgrade=False, extra_settings=[]):
     operation = "install"
 
     if upgrade:
@@ -347,6 +349,9 @@ def install_rancher(type=RANCHER_HA_CERT_OPTION, repo=RANCHER_HELM_REPO,
         "--version " + RANCHER_CHART_VERSION + " " + \
         "--namespace cattle-system " + \
         "--set hostname=" + RANCHER_HA_HOSTNAME
+
+    if version.parse(RANCHER_CHART_VERSION) > version.parse("2.7.1"):
+        helm_rancher_cmd = helm_rancher_cmd + " --set global.cattle.psp.enabled=" + str(RANCHER_PSP_ENABLED).lower()
 
     if type == 'letsencrypt':
         helm_rancher_cmd = \

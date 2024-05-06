@@ -13,7 +13,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/ref"
 	k8srbacv1 "github.com/rancher/wrangler/pkg/generated/controllers/rbac/v1"
-	"github.com/rancher/wrangler/pkg/name"
+	wranglerName "github.com/rancher/wrangler/pkg/name"
 	"github.com/sirupsen/logrus"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -178,7 +178,7 @@ func TypeFromContext(apiContext *types.APIContext, resource *types.RawResource) 
 }
 
 func GetRTBLabel(objMeta metav1.ObjectMeta) string {
-	return objMeta.Namespace + "_" + objMeta.Name
+	return wranglerName.SafeConcatName(objMeta.Namespace + "_" + objMeta.Name)
 }
 
 // NameForRoleBinding returns a deterministic name for a RoleBinding with the provided namespace, roleName, and subject
@@ -264,7 +264,7 @@ func gatherRules(clusterRoles k8srbacv1.ClusterRoleCache, roleTemplates v32.Role
 }
 
 func ProvisioningClusterAdminName(cluster *provv1.Cluster) string {
-	return name.SafeConcatName("crt", cluster.Name, "cluster-owner")
+	return wranglerName.SafeConcatName("crt", cluster.Name, "cluster-owner")
 }
 
 func RuleGivesResourceAccess(rule rbacv1.PolicyRule, resourceName string) bool {

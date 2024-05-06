@@ -1,29 +1,24 @@
+//go:build (validation || sanity) && !infra.any && !infra.aks && !infra.eks && !infra.rke2k3s && !infra.gke && !infra.rke1 && !cluster.any && !cluster.custom && !cluster.nodedriver && !extended && !stress
+
 package k3s
 
 import (
-	"context"
-	"fmt"
 	"testing"
 
-	apiv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
-	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
-	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
-	"github.com/rancher/rancher/tests/framework/extensions/clusters"
-	hardening "github.com/rancher/rancher/tests/framework/extensions/hardening/k3s"
-	"github.com/rancher/rancher/tests/framework/extensions/tokenregistration"
-	"github.com/rancher/rancher/tests/framework/extensions/users"
-	password "github.com/rancher/rancher/tests/framework/extensions/users/passwordgenerator"
-	"github.com/rancher/rancher/tests/framework/pkg/config"
-	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
-	"github.com/rancher/rancher/tests/framework/pkg/session"
-	"github.com/rancher/rancher/tests/framework/pkg/wait"
-	"github.com/rancher/rancher/tests/integration/pkg/defaults"
-	provisioning "github.com/rancher/rancher/tests/v2/validation/provisioning"
-	"github.com/stretchr/testify/assert"
+	"github.com/rancher/rancher/tests/v2/validation/provisioning/permutations"
+	"github.com/rancher/shepherd/clients/rancher"
+	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
+	"github.com/rancher/shepherd/extensions/clusters"
+	"github.com/rancher/shepherd/extensions/clusters/kubernetesversions"
+	"github.com/rancher/shepherd/extensions/provisioninginput"
+	"github.com/rancher/shepherd/extensions/users"
+	password "github.com/rancher/shepherd/extensions/users/passwordgenerator"
+	"github.com/rancher/shepherd/pkg/config"
+	"github.com/rancher/shepherd/pkg/environmentflag"
+	namegen "github.com/rancher/shepherd/pkg/namegenerator"
+	"github.com/rancher/shepherd/pkg/session"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type CustomClusterProvisioningTestSuite struct {
@@ -31,9 +26,7 @@ type CustomClusterProvisioningTestSuite struct {
 	client             *rancher.Client
 	session            *session.Session
 	standardUserClient *rancher.Client
-	provisioning       *provisioning.Config
-	kubernetesVersions []string
-	nodeProviders      []string
+	provisioningConfig *provisioninginput.Config
 }
 
 func (c *CustomClusterProvisioningTestSuite) TearDownSuite() {
@@ -44,17 +37,16 @@ func (c *CustomClusterProvisioningTestSuite) SetupSuite() {
 	testSession := session.NewSession()
 	c.session = testSession
 
-	clustersConfig := new(provisioning.Config)
-	config.LoadConfig(provisioning.ConfigurationFileKey, clustersConfig)
-
-	c.kubernetesVersions = clustersConfig.K3SKubernetesVersions
-	c.nodeProviders = clustersConfig.NodeProviders
-	c.provisioning = clustersConfig
+	c.provisioningConfig = new(provisioninginput.Config)
+	config.LoadConfig(provisioninginput.ConfigurationFileKey, c.provisioningConfig)
 
 	client, err := rancher.NewClient("", testSession)
 	require.NoError(c.T(), err)
 
 	c.client = client
+
+	c.provisioningConfig.K3SKubernetesVersions, err = kubernetesversions.Default(c.client, clusters.K3SClusterType.String(), c.provisioningConfig.K3SKubernetesVersions)
+	require.NoError(c.T(), err)
 
 	enabled := true
 	var testuser = namegen.AppendRandomString("testuser-")
@@ -78,163 +70,60 @@ func (c *CustomClusterProvisioningTestSuite) SetupSuite() {
 }
 
 func (c *CustomClusterProvisioningTestSuite) TestProvisioningK3SCustomCluster() {
-	nodeRoles0 := []string{
-		"--etcd --controlplane --worker",
-	}
-
-	nodeRoles1 := []string{
-		"--etcd",
-		"--controlplane",
-		"--worker",
-	}
+	nodeRolesAll := []provisioninginput.MachinePools{provisioninginput.AllRolesMachinePool}
+	nodeRolesShared := []provisioninginput.MachinePools{provisioninginput.EtcdControlPlaneMachinePool, provisioninginput.WorkerMachinePool}
+	nodeRolesDedicated := []provisioninginput.MachinePools{provisioninginput.EtcdMachinePool, provisioninginput.ControlPlaneMachinePool, provisioninginput.WorkerMachinePool}
 
 	tests := []struct {
-		name      string
-		nodeRoles []string
-		hardening *provisioning.Config
-		client    *rancher.Client
+		name         string
+		client       *rancher.Client
+		machinePools []provisioninginput.MachinePools
+		runFlag      bool
 	}{
-		{"1 Node all roles Admin User", nodeRoles0, c.provisioning, c.client},
-		{"1 Node all roles Standard User", nodeRoles0, c.provisioning, c.standardUserClient},
-		{"3 nodes - 1 role per node Admin User", nodeRoles1, c.provisioning, c.client},
-		{"3 nodes - 1 role per node Standard User", nodeRoles1, c.provisioning, c.standardUserClient},
+		{"1 Node all roles " + provisioninginput.AdminClientName.String(), c.client, nodeRolesAll, c.client.Flags.GetValue(environmentflag.Long)},
+		{"1 Node all roles " + provisioninginput.StandardClientName.String(), c.standardUserClient, nodeRolesAll, c.client.Flags.GetValue(environmentflag.Short) || c.client.Flags.GetValue(environmentflag.Long)},
+		{"2 nodes - etcd|cp roles per 1 node " + provisioninginput.AdminClientName.String(), c.client, nodeRolesShared, c.client.Flags.GetValue(environmentflag.Long)},
+		{"2 nodes - etcd|cp roles per 1 node " + provisioninginput.StandardClientName.String(), c.standardUserClient, nodeRolesShared, c.client.Flags.GetValue(environmentflag.Short) || c.client.Flags.GetValue(environmentflag.Long)},
+		{"3 nodes - 1 role per node " + provisioninginput.AdminClientName.String(), c.client, nodeRolesDedicated, c.client.Flags.GetValue(environmentflag.Long)},
+		{"3 nodes - 1 role per node " + provisioninginput.StandardClientName.String(), c.standardUserClient, nodeRolesDedicated, c.client.Flags.GetValue(environmentflag.Long)},
 	}
-	var name string
 	for _, tt := range tests {
-		testSession := session.NewSession()
-		defer testSession.Cleanup()
-
-		client, err := tt.client.WithSession(testSession)
-		require.NoError(c.T(), err)
-
-		for _, nodeProviderName := range c.nodeProviders {
-			externalNodeProvider := provisioning.ExternalNodeProviderSetup(nodeProviderName)
-			for _, kubeVersion := range c.kubernetesVersions {
-				name = tt.name + " Kubernetes version: " + kubeVersion
-				c.Run(name, func() {
-					c.testProvisioningK3SCustomCluster(client, externalNodeProvider, tt.nodeRoles, kubeVersion, tt.hardening)
-				})
-			}
+		if !tt.runFlag {
+			c.T().Logf("SKIPPED")
+			continue
 		}
+
+		provisioningConfig := *c.provisioningConfig
+		provisioningConfig.MachinePools = tt.machinePools
+		permutations.RunTestPermutations(&c.Suite, tt.name, tt.client, &provisioningConfig, permutations.K3SCustomCluster, nil, nil)
 	}
 }
 
 func (c *CustomClusterProvisioningTestSuite) TestProvisioningK3SCustomClusterDynamicInput() {
-	clustersConfig := new(provisioning.Config)
-	config.LoadConfig(provisioning.ConfigurationFileKey, clustersConfig)
-	nodesAndRoles := clustersConfig.NodesAndRoles
+	isWindows := false
+	for _, pool := range c.provisioningConfig.MachinePools {
+		if pool.MachinePoolConfig.Windows {
+			isWindows = true
+			break
+		}
+	}
+	if isWindows {
+		c.T().Skip("Skipping Windows tests, not supported on k3s")
+	}
 
-	if len(nodesAndRoles) == 0 {
+	if len(c.provisioningConfig.MachinePools) == 0 {
 		c.T().Skip()
 	}
 
-	rolesPerNode := []string{}
-
-	for _, nodes := range nodesAndRoles {
-		var finalRoleCommand string
-		if nodes.ControlPlane {
-			finalRoleCommand += " --controlplane"
-		}
-		if nodes.Etcd {
-			finalRoleCommand += " --etcd"
-		}
-		if nodes.Worker {
-			finalRoleCommand += " --worker"
-		}
-		rolesPerNode = append(rolesPerNode, finalRoleCommand)
-	}
-
 	tests := []struct {
-		name      string
-		client    *rancher.Client
-		hardening *provisioning.Config
+		name   string
+		client *rancher.Client
 	}{
-		{"Admin User", c.client, c.provisioning},
-		{"Standard User", c.standardUserClient, c.provisioning},
+		{provisioninginput.AdminClientName.String(), c.client},
+		{provisioninginput.StandardClientName.String(), c.standardUserClient},
 	}
-	var name string
 	for _, tt := range tests {
-		testSession := session.NewSession()
-		defer testSession.Cleanup()
-
-		client, err := tt.client.WithSession(testSession)
-		require.NoError(c.T(), err)
-
-		for _, nodeProviderName := range c.nodeProviders {
-			externalNodeProvider := provisioning.ExternalNodeProviderSetup(nodeProviderName)
-			for _, kubeVersion := range c.kubernetesVersions {
-				name = tt.name + " Kubernetes version: " + kubeVersion
-				c.Run(name, func() {
-					c.testProvisioningK3SCustomCluster(client, externalNodeProvider, rolesPerNode, kubeVersion, tt.hardening)
-				})
-			}
-		}
-	}
-}
-
-func (c *CustomClusterProvisioningTestSuite) testProvisioningK3SCustomCluster(client *rancher.Client, externalNodeProvider provisioning.ExternalNodeProvider, nodesAndRoles []string, kubeVersion string, harden *provisioning.Config) {
-	namespace := "fleet-default"
-
-	numNodes := len(nodesAndRoles)
-	nodes, _, err := externalNodeProvider.NodeCreationFunc(client, numNodes, 0, false)
-	require.NoError(c.T(), err)
-
-	clusterName := namegen.AppendRandomString(externalNodeProvider.Name)
-
-	cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, namespace, "", "", kubeVersion, nil)
-
-	clusterResp, err := clusters.CreateK3SRKE2Cluster(client, cluster)
-	require.NoError(c.T(), err)
-
-	client, err = client.ReLogin()
-	require.NoError(c.T(), err)
-	customCluster, err := client.Steve.SteveType(clusters.ProvisioningSteveResouceType).ByID(clusterResp.ID)
-	require.NoError(c.T(), err)
-
-	clusterStatus := &apiv1.ClusterStatus{}
-	err = v1.ConvertToK8sType(customCluster.Status, clusterStatus)
-	require.NoError(c.T(), err)
-
-	token, err := tokenregistration.GetRegistrationToken(client, clusterStatus.ClusterName)
-	require.NoError(c.T(), err)
-
-	for key, node := range nodes {
-		c.T().Logf("Execute Registration Command for node %s", node.NodeID)
-		command := fmt.Sprintf("%s %s", token.InsecureNodeCommand, nodesAndRoles[key])
-
-		output, err := node.ExecuteCommand(command)
-		require.NoError(c.T(), err)
-		c.T().Logf(output)
-	}
-
-	kubeProvisioningClient, err := c.client.GetKubeAPIProvisioningClient()
-	require.NoError(c.T(), err)
-
-	result, err := kubeProvisioningClient.Clusters(namespace).Watch(context.TODO(), metav1.ListOptions{
-		FieldSelector:  "metadata.name=" + clusterName,
-		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
-	})
-	require.NoError(c.T(), err)
-
-	checkFunc := clusters.IsProvisioningClusterReady
-
-	err = wait.WatchWait(result, checkFunc)
-	assert.NoError(c.T(), err)
-	assert.Equal(c.T(), clusterName, clusterResp.ObjectMeta.Name)
-
-	clusterToken, err := clusters.CheckServiceAccountTokenSecret(client, clusterName)
-	require.NoError(c.T(), err)
-	assert.NotEmpty(c.T(), clusterToken)
-
-	if harden.Hardened && kubeVersion < "v1.25.0" {
-		err = hardening.HardeningNodes(client, harden.Hardened, nodes, nodesAndRoles)
-		require.NoError(c.T(), err)
-
-		hardenCluster := clusters.HardenK3SRKE2ClusterConfig(clusterName, namespace, "", "", kubeVersion, nil)
-
-		hardenClusterResp, err := clusters.UpdateK3SRKE2Cluster(client, clusterResp, hardenCluster)
-		require.NoError(c.T(), err)
-		assert.Equal(c.T(), clusterName, hardenClusterResp.ObjectMeta.Name)
+		permutations.RunTestPermutations(&c.Suite, tt.name, tt.client, c.provisioningConfig, permutations.K3SCustomCluster, nil, nil)
 	}
 }
 

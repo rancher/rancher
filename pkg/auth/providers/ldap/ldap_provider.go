@@ -3,12 +3,12 @@ package ldap
 import (
 	"context"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"strings"
 
 	ldapv3 "github.com/go-ldap/ldap/v3"
-	"github.com/mitchellh/mapstructure"
-	"github.com/pkg/errors"
+	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/norman/types"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
@@ -29,10 +29,19 @@ const (
 	FreeIpaName    = "freeipa"
 	ShibbolethName = "shibboleth"
 	ObjectClass    = "objectClass"
+	OKTAName       = "okta"
 )
 
+// An ErrorNotConfigured indicates that the requested LDAP operation
+// failed due to missing or incomplete configuration.
+type ErrorNotConfigured struct{}
+
+// Error provides a string representation of an ErrorNotConfigured
+func (e ErrorNotConfigured) Error() string {
+	return "not configured"
+}
+
 var (
-	errNotConfigured       = fmt.Errorf("not configured")
 	testAndApplyInputTypes = map[string]string{
 		FreeIpaName:  client.FreeIpaTestAndApplyInputType,
 		OpenLdapName: client.OpenLdapTestAndApplyInputType,
@@ -43,6 +52,7 @@ var (
 		FreeIpaName:    "",
 		OpenLdapName:   "",
 		ShibbolethName: client.ShibbolethConfigFieldOpenLdapConfig,
+		OKTAName:       client.OKTAConfigFieldOpenLdapConfig,
 	}
 )
 
@@ -80,11 +90,12 @@ func GetLDAPConfig(authProvider common.AuthProvider) (*v3.LdapConfig, *x509.Cert
 		return nil, nil, fmt.Errorf("can not get ldap config from type other than ldapProvider")
 	}
 
-	return ldapProvider.getLDAPConfig()
+	return ldapProvider.getLDAPConfig(ldapProvider.authConfigs.ObjectClient().UnstructuredClient())
 }
 
+// IsNotConfigured checks whether this error indicates a missing LDAP configuration.
 func IsNotConfigured(err error) bool {
-	return err == errNotConfigured
+	return errors.Is(err, ErrorNotConfigured{})
 }
 
 func (p *ldapProvider) GetName() string {
@@ -101,18 +112,34 @@ func (p *ldapProvider) TransformToAuthProvider(authConfig map[string]interface{}
 	return ldap, nil
 }
 
-func (p *ldapProvider) AuthenticateUser(ctx context.Context, input interface{}) (v3.Principal, []v3.Principal, string, error) {
+func toBasicLogin(input interface{}) (*v32.BasicLogin, error) {
 	login, ok := input.(*v32.BasicLogin)
 	if !ok {
-		return v3.Principal{}, nil, "", errors.New("unexpected input type")
+		return nil, errors.New("unexpected input type")
+	}
+	return login, nil
+}
+
+// AuthenticateUser takes in a context and user credentials, and authenticates the user against an LDAP server.
+// Returns principal, slice of group principals, and any errors encountered.
+func (p *ldapProvider) AuthenticateUser(ctx context.Context, input interface{}) (v3.Principal, []v3.Principal, string, error) {
+	login, err := toBasicLogin(input)
+	if err != nil {
+		return v3.Principal{}, nil, "", err
 	}
 
-	config, caPool, err := p.getLDAPConfig()
+	config, caPool, err := p.getLDAPConfig(p.authConfigs.ObjectClient().UnstructuredClient())
 	if err != nil {
 		return v3.Principal{}, nil, "", errors.New("can't find authprovider")
 	}
 
-	principal, groupPrincipal, err := p.loginUser(login, config, caPool)
+	lConn, err := ldap.Connect(config, caPool)
+	if err != nil {
+		return v3.Principal{}, nil, "", err
+	}
+	defer lConn.Close()
+
+	principal, groupPrincipal, err := p.loginUser(lConn, login, config, caPool)
 	if err != nil {
 		return v3.Principal{}, nil, "", err
 	}
@@ -125,7 +152,7 @@ func (p *ldapProvider) SearchPrincipals(searchKey, principalType string, myToken
 	var principals []v3.Principal
 	var err error
 
-	config, caPool, err := p.getLDAPConfig()
+	config, caPool, err := p.getLDAPConfig(p.authConfigs.ObjectClient().UnstructuredClient())
 	if err != nil {
 		if IsNotConfigured(err) {
 			return principals, err
@@ -160,7 +187,7 @@ func (p *ldapProvider) SearchPrincipals(searchKey, principalType string, myToken
 }
 
 func (p *ldapProvider) GetPrincipal(principalID string, token v3.Token) (v3.Principal, error) {
-	config, caPool, err := p.getLDAPConfig()
+	config, caPool, err := p.getLDAPConfig(p.authConfigs.ObjectClient().UnstructuredClient())
 	if err != nil {
 		if IsNotConfigured(err) {
 			return v3.Principal{}, err
@@ -206,9 +233,9 @@ func (p *ldapProvider) isMemberOf(myGroups []v3.Principal, other v3.Principal) b
 	return false
 }
 
-func (p *ldapProvider) getLDAPConfig() (*v3.LdapConfig, *x509.CertPool, error) {
+func (p *ldapProvider) getLDAPConfig(genericClient objectclient.GenericClient) (*v3.LdapConfig, *x509.CertPool, error) {
 	// TODO See if this can be simplified. also, this makes an api call everytime. find a better way
-	authConfigObj, err := p.authConfigs.ObjectClient().UnstructuredClient().Get(p.providerName, metav1.GetOptions{})
+	authConfigObj, err := genericClient.Get(p.providerName, metav1.GetOptions{})
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to retrieve %s, error: %v", p.providerName, err)
 	}
@@ -224,23 +251,22 @@ func (p *ldapProvider) getLDAPConfig() (*v3.LdapConfig, *x509.CertPool, error) {
 	if p.samlSearchProvider() && ldapConfigKey[p.providerName] != "" {
 		subLdapConfig, ok := storedLdapConfigMap[ldapConfigKey[p.providerName]]
 		if !ok {
-			return nil, nil, errNotConfigured
+			return nil, nil, ErrorNotConfigured{}
 		}
 
 		storedLdapConfigMap = subLdapConfig.(map[string]interface{})
-		mapstructure.Decode(storedLdapConfigMap, storedLdapConfig)
+		err = common.Decode(storedLdapConfigMap, storedLdapConfig)
+		if err != nil {
+			return nil, nil, fmt.Errorf("unable to decode Ldap Config: %w", err)
+		}
 		if len(storedLdapConfig.Servers) < 1 {
-			return storedLdapConfig, nil, errNotConfigured
+			return storedLdapConfig, nil, ErrorNotConfigured{}
 		}
 	} else {
-		mapstructure.Decode(storedLdapConfigMap, storedLdapConfig)
-		metadataMap, ok := storedLdapConfigMap["metadata"].(map[string]interface{})
-		if !ok {
-			return nil, nil, fmt.Errorf("failed to retrieve %s metadata, cannot read k8s Unstructured data", p.providerName)
+		err = common.Decode(storedLdapConfigMap, storedLdapConfig)
+		if err != nil {
+			return nil, nil, fmt.Errorf("unable to decode Ldap Config: %w", err)
 		}
-		objectMeta := &metav1.ObjectMeta{}
-		mapstructure.Decode(metadataMap, objectMeta)
-		storedLdapConfig.ObjectMeta = *objectMeta
 	}
 
 	if p.certs != storedLdapConfig.Certificate || p.caPool == nil {
@@ -265,7 +291,7 @@ func (p *ldapProvider) getLDAPConfig() (*v3.LdapConfig, *x509.CertPool, error) {
 }
 
 func (p *ldapProvider) CanAccessWithGroupProviders(userPrincipalID string, groupPrincipals []v3.Principal) (bool, error) {
-	config, _, err := p.getLDAPConfig()
+	config, _, err := p.getLDAPConfig(p.authConfigs.ObjectClient().UnstructuredClient())
 	if err != nil {
 		logrus.Errorf("Error fetching ldap config: %v", err)
 		return false, err
@@ -280,7 +306,7 @@ func (p *ldapProvider) CanAccessWithGroupProviders(userPrincipalID string, group
 func (p *ldapProvider) getDNAndScopeFromPrincipalID(principalID string) (string, string, error) {
 	parts := strings.SplitN(principalID, ":", 2)
 	if len(parts) != 2 {
-		return "", "", errors.Errorf("invalid id %v", principalID)
+		return "", "", fmt.Errorf("invalid id %v", principalID)
 	}
 	scope := parts[0]
 	externalID := strings.TrimPrefix(parts[1], "//")
@@ -290,10 +316,7 @@ func (p *ldapProvider) getDNAndScopeFromPrincipalID(principalID string) (string,
 
 // if provider only enabled for search by a SAML provider
 func (p *ldapProvider) samlSearchProvider() bool {
-	if p.providerName == ShibbolethName {
-		return true
-	}
-	return false
+	return ShibbolethName == p.providerName || OKTAName == p.providerName
 }
 
 func (p *ldapProvider) samlSearchGetPrincipal(
@@ -382,7 +405,7 @@ func (p *ldapProvider) GetUserExtraAttributes(userPrincipal v3.Principal) map[st
 
 // IsDisabledProvider checks if the LDAP auth provider is currently disabled in Rancher.
 func (p *ldapProvider) IsDisabledProvider() (bool, error) {
-	ldapConfig, _, err := p.getLDAPConfig()
+	ldapConfig, _, err := p.getLDAPConfig(p.authConfigs.ObjectClient().UnstructuredClient())
 	if err != nil {
 		return false, err
 	}

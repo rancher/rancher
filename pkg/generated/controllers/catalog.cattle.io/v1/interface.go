@@ -1,5 +1,5 @@
 /*
-Copyright 2023 Rancher Labs, Inc.
+Copyright 2024 Rancher Labs, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ package v1
 import (
 	"github.com/rancher/lasso/pkg/controller"
 	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
+	"github.com/rancher/wrangler/pkg/generic"
 	"github.com/rancher/wrangler/pkg/schemes"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -45,12 +46,14 @@ type version struct {
 	controllerFactory controller.SharedControllerFactory
 }
 
-func (c *version) App() AppController {
-	return NewAppController(schema.GroupVersionKind{Group: "catalog.cattle.io", Version: "v1", Kind: "App"}, "apps", true, c.controllerFactory)
+func (v *version) App() AppController {
+	return generic.NewController[*v1.App, *v1.AppList](schema.GroupVersionKind{Group: "catalog.cattle.io", Version: "v1", Kind: "App"}, "apps", true, v.controllerFactory)
 }
-func (c *version) ClusterRepo() ClusterRepoController {
-	return NewClusterRepoController(schema.GroupVersionKind{Group: "catalog.cattle.io", Version: "v1", Kind: "ClusterRepo"}, "clusterrepos", false, c.controllerFactory)
+
+func (v *version) ClusterRepo() ClusterRepoController {
+	return generic.NewNonNamespacedController[*v1.ClusterRepo, *v1.ClusterRepoList](schema.GroupVersionKind{Group: "catalog.cattle.io", Version: "v1", Kind: "ClusterRepo"}, "clusterrepos", v.controllerFactory)
 }
-func (c *version) Operation() OperationController {
-	return NewOperationController(schema.GroupVersionKind{Group: "catalog.cattle.io", Version: "v1", Kind: "Operation"}, "operations", true, c.controllerFactory)
+
+func (v *version) Operation() OperationController {
+	return generic.NewController[*v1.Operation, *v1.OperationList](schema.GroupVersionKind{Group: "catalog.cattle.io", Version: "v1", Kind: "Operation"}, "operations", true, v.controllerFactory)
 }

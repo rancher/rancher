@@ -59,10 +59,11 @@ def get_aks_version(multiple_versions=False):
         print(response.content)
         json_response = json.loads(response.content)
 
+        # Getting the second highest version from the list to avoid K8s versions in preview.
         if multiple_versions and len(json_response) > 1:
-            aksclusterversion = [json_response[0], json_response[-1]]
+            aksclusterversion = [json_response[0], json_response[-2]]
         else:
-            aksclusterversion = json_response[-1]
+            aksclusterversion = json_response[-2]
     else:
         aksclusterversion = AKS_CLUSTER_VERSION
 

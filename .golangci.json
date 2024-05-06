@@ -21,9 +21,9 @@
     "run": {
         "skip-dirs": [
             "vendor",
-            "tests",
             "pkg/client",
-            "pkg/generated"
+            "pkg/generated",
+            "tests/framework/clients/rancher/generated"
         ],
         "tests": false,
         "timeout": "10m"
@@ -57,6 +57,26 @@
             {
                 "linters": "typecheck",
                 "text": "imported but not used as apierrors"
+            },
+            {
+                "linters": "revive",
+                "text": "unused-parameter"
+            },
+            {
+                "linters": "revive",
+                "text": "redefines-builtin-id"
+            },
+            {
+                "linters": "revive",
+                "text": "superfluous-else"
+            },
+            {
+                "linters": "revive",
+                "text": "empty-block"
+            },
+            {
+                "linters": "revive",
+                "text": "if-return: redundant if"
             }
         ]
     }

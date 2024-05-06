@@ -1,0 +1,200 @@
+#!groovy
+node {
+    def rootPath = "/root/go/src/github.com/rancher/rancher/"
+    def workPath = "/root/go/src/github.com/rancher/rancher/tests/v2/validation/"
+    def job_name = "${JOB_NAME}"
+    if (job_name.contains('/')) { 
+      job_names = job_name.split('/')
+      job_name = job_names[job_names.size() - 1] 
+    }
+    def golangTestContainer = "${job_name}${env.BUILD_NUMBER}-golangtest"
+    def buildTestContainer = "${job_name}${env.BUILD_NUMBER}-buildtest"
+    def cleanupTestContainer = "${job_name}${env.BUILD_NUMBER}-cleanuptest"
+    def golangImageName = "rancher-validation-${job_name}${env.BUILD_NUMBER}"
+    def validationVolume = "ValidationSharedVolume-${job_name}${env.BUILD_NUMBER}"
+    def testsDir = "/root/go/src/github.com/rancher/rancher/tests/v2/validation/${env.TEST_PACKAGE}"
+    def testResultsOut = "results.xml"
+    def testResultsJSON = "results.json"
+    def envFile = ".env"
+    def rancherConfig = "rancher_env.config"
+    def branch = "release/v2.7"
+    def corralBranch = "main"
+    def cleanup = env.RANCHER_CLEANUP.toLowerCase()
+    if ("${env.BRANCH}" != "null" && "${env.BRANCH}" != "") {
+      branch = "${env.BRANCH}"
+    }
+
+    if ("${env.RANCHER_CORRAL_PACKAGES_REPO_BRANCH}" != "null" && "${env.RANCHER_CORRAL_PACKAGES_REPO_BRANCH}" != "") {
+      corralBranch = "${env.RANCHER_CORRAL_PACKAGES_REPO_BRANCH}"
+    }
+
+    def rancherRepo = scm.getUserRemoteConfigs()[0].getUrl()
+    if ("${env.REPO}" != "null" && "${env.REPO}" != "") {
+      rancherRepo = "${env.REPO}"
+    }
+
+    if (scm.getUserRemoteConfigs().size() > 1) {
+      corralRepo = scm.getUserRemoteConfigs()[1].getUrl()
+    }
+
+    if ("${env.RANCHER_CORRAL_PACKAGES_REPO_URL}" != "null" && "${env.RANCHER_CORRAL_PACKAGES_REPO_URL}" != "") {
+      corralRepo = "${env.RANCHER_CORRAL_PACKAGES_REPO_URL}"
+    }
+  
+    def timeout = "60m"
+    if ("${env.TIMEOUT}" != "null" && "${env.TIMEOUT}" != "") {
+      timeout = "${env.TIMEOUT}" 
+    }
+    wrap([$class: 'AnsiColorBuildWrapper', 'colorMapName': 'XTerm', 'defaultFg': 2, 'defaultBg':1]) {
+      withFolderProperties {
+        paramsMap = []
+        params.each {
+          if (it.value && it.value.trim() != "") {
+              paramsMap << "$it.key=$it.value"
+          }
+        }
+        withCredentials([ string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
+                          string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
+                          string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'RANCHER_EKS_ACCESS_KEY'),
+                          string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'RANCHER_EKS_SECRET_KEY'),
+                          string(credentialsId: 'AWS_SSH_PEM_KEY', variable: 'AWS_SSH_PEM_KEY'),
+                          string(credentialsId: 'RANCHER_SSH_KEY', variable: 'RANCHER_SSH_KEY'),
+                          string(credentialsId: 'RANCHER_REGISTRY_USER_NAME', variable: 'RANCHER_REGISTRY_USER_NAME'),
+                          string(credentialsId: 'RANCHER_REGISTRY_PASSWORD', variable: 'RANCHER_REGISTRY_PASSWORD'),
+                          string(credentialsId: 'ADMIN_PASSWORD', variable: 'ADMIN_PASSWORD'),
+                          string(credentialsId: 'USER_PASSWORD', variable: 'USER_PASSWORD'),
+                          string(credentialsId: 'RANCHER_VALID_TLS_CERT', variable: 'RANCHER_VALID_TLS_CERT'),
+                          string(credentialsId: 'RANCHER_VALID_TLS_KEY', variable: 'RANCHER_VALID_TLS_KEY'),
+                          string(credentialsId: 'RANCHER_BYO_TLS_CERT', variable: 'RANCHER_BYO_TLS_CERT'),
+                          string(credentialsId: 'QASE_AUTOMATION_TOKEN', variable: 'QASE_AUTOMATION_TOKEN'),
+                          string(credentialsId: 'RANCHER_BYO_TLS_KEY', variable: 'RANCHER_BYO_TLS_KEY')]) {
+          
+        withEnv(paramsMap) {
+          stage('Checkout') {
+            deleteDir()
+            dir("./rancher") {
+              checkout([
+                      $class: 'GitSCM',
+                      branches: [[name: "*/${branch}"]],
+                      extensions: scm.extensions + [[$class: 'CleanCheckout']],
+                      userRemoteConfigs: [[url: rancherRepo]]
+                    ])
+            }
+            dir('./') {
+              echo "cloning corral-packages repo"
+
+              dir('./corral-packages') {
+                checkout([
+                      $class: 'GitSCM',
+                      branches: [[name: "*/${corralBranch}"]],
+                      extensions: scm.extensions + [[$class: 'CleanCheckout']],
+                      userRemoteConfigs: [[url: corralRepo]]
+                    ])
+              }
+              def rancherFilename = "rancher-registry.yaml"
+              def rancherConfigContents = env.RANCHER_CORRAL_CONFIG
+              def registriesFilename = "registry.yaml"
+              def registriesConfigContents = env.REGISTRIES_CORRAL_CONFIG
+              if (rancherConfigContents != null && registriesConfigContents != null) {
+                writeFile file: "./corral-packages/packages/aws/"+rancherFilename, text: rancherConfigContents
+                writeFile file: "./corral-packages/packages/aws/"+registriesFilename, text: registriesConfigContents
+              }
+            }
+          }
+          dir ("./") {
+            stage('Configure and Build') {
+              if (env.AWS_SSH_PEM_KEY && env.AWS_SSH_KEY_NAME) {
+                dir("./rancher/tests/v2/validation/.ssh") {
+                  def decoded = new String(AWS_SSH_PEM_KEY.decodeBase64())
+                  writeFile file: AWS_SSH_KEY_NAME, text: decoded
+                }
+              }
+              dir("./rancher/tests/v2/validation") {
+                def filename = "config.yaml"
+                def configContents = env.CONFIG
+
+                writeFile file: filename, text: configContents
+                env.CATTLE_TEST_CONFIG = "${workPath}"+filename
+              }
+              dir ("./") {
+                sh "./rancher/tests/v2/validation/configure.sh"
+                sh "docker build . -f ./rancher/tests/v2/validation/Dockerfile.e2e --build-arg CORRAL_VERSION=${env.CORRAL_VERSION} -t ${golangImageName}"
+                sh "docker volume create --name ${validationVolume}"
+              }
+            }
+            stage("Build Environment") {
+              try {
+                sh "docker run -v ${validationVolume}:/root --name ${buildTestContainer} -t --env-file ${envFile} " +
+                "${golangImageName} sh -c \"${workPath}pipeline/scripts/setup_environment.sh\""
+              } catch(err) {
+                sh "docker stop ${buildTestContainer}"
+                sh "docker rm -v ${buildTestContainer}"
+                sh "docker volume rm -f ${validationVolume}"
+                error "Build Environment had failures."
+              }
+            }
+            stage('Run Validation Tests') {
+              try {
+                sh "docker run --volumes-from ${buildTestContainer} --name ${golangTestContainer} -t --env-file ${envFile} " +
+                "${golangImageName} sh -c \"gotestsum --format standard-verbose --packages=${testsDir} --junitfile ${testResultsOut}  --jsonfile ${testResultsJSON} -- -tags=${TAGS} ${GOTEST_TESTCASE} -timeout=${timeout} -v;" +
+                "${workPath}pipeline/scripts/build_qase_reporter.sh;" +
+                "${workPath}reporter\""
+              } catch(err) {
+                echo 'Validation tests had failures. Aborting'
+              }
+            }
+            stage('Cleanup Rancher Environment') {
+              try {
+                if (cleanup.toBoolean()) {
+                  sh "docker run --volumes-from ${buildTestContainer} --name ${cleanupTestContainer} -t --env-file ${envFile} " +
+                  "${golangImageName} sh -c \"${workPath}pipeline/scripts/rancher_cleanup.sh\""
+                }
+              } catch(err) {
+                sh "docker stop ${buildTestContainer}"
+                sh "docker rm -v ${buildTestContainer}"
+                sh "docker stop ${golangTestContainer}"
+                sh "docker rm -v ${golangTestContainer}"
+                sh "docker stop ${cleanupTestContainer}"
+                sh "docker rm -v ${cleanupTestContainer}"
+                sh "docker rmi -f ${golangImageName}"
+                sh "docker volume rm -f ${validationVolume}"
+                error "Cleanup had failures."
+              }
+            }
+            stage('Test Report') {
+              try {
+                sh "docker cp ${golangTestContainer}:${rootPath}${testResultsOut} ."
+                step([$class: 'JUnitResultArchiver', testResults: "**/${testResultsOut}"])
+              } catch (err) {
+                sh "docker stop ${buildTestContainer}"
+                sh "docker rm -v ${buildTestContainer}"
+                sh "docker stop ${golangTestContainer}"
+                sh "docker rm -v ${golangTestContainer}"
+                if (cleanup.toBoolean()) {
+                  sh "docker stop ${cleanupTestContainer}"
+                  sh "docker rm -v ${cleanupTestContainer}"
+                }
+                sh "docker rmi -f ${golangImageName}"
+                sh "docker volume rm -f ${validationVolume}"
+                error 'Report had failures.'
+              }
+            }
+            stage('Clean Up Images and Volume') {
+              echo 'Cleaning test images and volume.'
+              sh "docker stop ${buildTestContainer}"
+              sh "docker rm -v ${buildTestContainer}"
+              sh "docker stop ${golangTestContainer}"
+              sh "docker rm -v ${golangTestContainer}"
+              if (cleanup.toBoolean()) {
+                  sh "docker stop ${cleanupTestContainer}"
+                  sh "docker rm -v ${cleanupTestContainer}"
+              }
+              sh "docker rmi -f ${golangImageName}"
+              sh "docker volume rm -f ${validationVolume}"
+            }
+          } // dir 
+        } // withEnv
+      } // creds
+    } // folder properties
+  } // wrap 
+} // node

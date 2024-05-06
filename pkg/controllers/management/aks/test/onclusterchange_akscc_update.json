@@ -57,6 +57,7 @@
     ],
     "podCidr": null,
     "privateCluster": false,
+    "privateDnsZone": null,
     "resourceGroup": "aks-resource-group",
     "resourceLocation": "eastus",
     "serviceCidr": null,
@@ -72,7 +73,10 @@
       "Stakeholder": "stakeholder@suse.com"
     },
     "virtualNetwork": null,
-    "virtualNetworkResourceGroup": null
+    "virtualNetworkResourceGroup": null,
+    "outboundType": null,
+    "managedIdentity": null,
+    "userAssignedIdentity": null
   },
   "status": {
     "failureMessage": "",

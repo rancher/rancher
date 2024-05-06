@@ -7,9 +7,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const UserConditionInitialRolesPopulated condition.Cond = "InitialRolesPopulated"
+const (
+	UserConditionInitialRolesPopulated condition.Cond = "InitialRolesPopulated"
+	AuthConfigConditionSecretsMigrated condition.Cond = "SecretsMigrated"
+)
 
 // +genclient
+// +kubebuilder:skipversion
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -39,6 +43,7 @@ func (t *Token) ObjClusterName() string {
 }
 
 // +genclient
+// +kubebuilder:skipversion
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -80,6 +85,7 @@ type UserCondition struct {
 type UserSpec struct{}
 
 // +genclient
+// +kubebuilder:skipversion
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -100,6 +106,7 @@ type Principals struct {
 }
 
 // +genclient
+// +kubebuilder:skipversion
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -111,6 +118,7 @@ type Group struct {
 }
 
 // +genclient
+// +kubebuilder:skipversion
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -123,6 +131,7 @@ type GroupMember struct {
 }
 
 // +genclient
+// +kubebuilder:skipversion
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -156,20 +165,47 @@ type SetPasswordInput struct {
 }
 
 // +genclient
+// +kubebuilder:skipversion
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type AuthConfig struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
+	metav1.TypeMeta   `json:",inline" mapstructure:",squash"`
+	metav1.ObjectMeta `json:"metadata,omitempty" mapstructure:"metadata"`
 
-	Type                string   `json:"type" norman:"noupdate"`
-	Enabled             bool     `json:"enabled,omitempty"`
-	AccessMode          string   `json:"accessMode,omitempty" norman:"required,notnullable,type=enum,options=required|restricted|unrestricted"`
-	AllowedPrincipalIDs []string `json:"allowedPrincipalIds,omitempty" norman:"type=array[reference[principal]]"`
+	Type                string           `json:"type" norman:"noupdate"`
+	Enabled             bool             `json:"enabled,omitempty"`
+	AccessMode          string           `json:"accessMode,omitempty" norman:"required,notnullable,type=enum,options=required|restricted|unrestricted"`
+	AllowedPrincipalIDs []string         `json:"allowedPrincipalIds,omitempty" norman:"type=array[reference[principal]]"`
+	Status              AuthConfigStatus `json:"status"`
+}
+
+type AuthConfigStatus struct {
+	Conditions []AuthConfigConditions `json:"conditions"`
+}
+
+type AuthConfigConditions struct {
+	// Type of condition
+	Type condition.Cond `json:"type"`
+
+	// Status of condition (one of True, False, Unknown)
+	Status v1.ConditionStatus `json:"status"`
+
+	// Last time the condition was updated
+	LastUpdateTime string `json:"lastUpdateTime,omitempty"`
+
+	// Last time the condition transitioned from one status to another
+	LastTransitionTime string `json:"lastTransitionTime,omitempty"`
+
+	// The reason for the condition's last transition
+	Reason string `json:"reason,omitempty"`
+
+	// Human-readable message indicating details about last transition
+	Message string `json:"message,omitempty"`
 }
 
 // +genclient
+// +kubebuilder:skipversion
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -189,6 +225,7 @@ type LocalConfig struct {
 }
 
 // +genclient
+// +kubebuilder:skipversion
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -397,12 +434,13 @@ type KeyCloakConfig struct {
 }
 
 type OKTAConfig struct {
-	SamlConfig `json:",inline" mapstructure:",squash"`
+	SamlConfig     `json:",inline" mapstructure:",squash"`
+	OpenLdapConfig LdapFields `json:"openLdapConfig" mapstructure:",squash"`
 }
 
 type ShibbolethConfig struct {
 	SamlConfig     `json:",inline" mapstructure:",squash"`
-	OpenLdapConfig LdapFields `json:"openLdapConfig" mapstructure:",squash"`
+	OpenLdapConfig LdapFields `json:"openLdapConfig"`
 }
 
 type AuthSystemImages struct {

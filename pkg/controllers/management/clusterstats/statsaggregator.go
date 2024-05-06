@@ -208,7 +208,7 @@ func minorVersion(cluster *v3.Cluster) (int, error) {
 
 func (s *StatsAggregator) updateVersion(cluster *v3.Cluster) bool {
 	updated := false
-	userContext, err := s.ClusterManager.UserContextNoControllers(cluster.Name)
+	userContext, err := s.ClusterManager.UserContextNoControllersReconnecting(cluster.Name, false)
 	if err == nil {
 		callWithTimeout(func() {
 			// This has the tendency to timeout
@@ -306,8 +306,8 @@ func resourceListChanged(oldList, newList v1.ResourceList) bool {
 func callWithTimeout(do func()) {
 	done := make(chan struct{})
 	go func() {
+		defer close(done)
 		do()
-		done <- struct{}{}
 	}()
 
 	select {

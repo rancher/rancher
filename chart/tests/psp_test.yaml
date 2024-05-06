@@ -1,0 +1,53 @@
+suite: Test PSP
+templates:
+- post-delete-hook-psp.yaml 
+- post-delete-hook-cluster-role.yaml
+tests:
+- it: should include psps when enabled
+  set:
+    global.cattle.psp.enabled: true
+  asserts:
+    - hasDocuments:
+        count: 1
+      template: post-delete-hook-psp.yaml
+    - contains:
+        path: rules
+        content:
+          apiGroups: [ "policy" ]
+          resources: [ "podsecuritypolicies" ]
+          verbs: [ "use"]
+      template: post-delete-hook-cluster-role.yaml
+- it: should not include psps when disabled
+  set:
+    global.cattle.psp.enabled: false
+  asserts:
+    - hasDocuments:
+        count: 0
+      template: post-delete-hook-psp.yaml 
+    - notContains:
+        path: rules
+        content:
+          apiGroups: [ "policy" ]
+          resources: [ "podsecuritypolicies" ]
+          verbs: [ "use"]
+      template: post-delete-hook-cluster-role.yaml
+- it: should fail when given an invalid value
+  set:
+    global.cattle.psp.enabled: "invalid"
+  asserts:
+    - failedTemplate:
+        errorMessage: "Invalid value for .Values.global.cattle.psp.enabled - must be a bool of true, false, or \"\""
+      template: post-delete-hook-psp.yaml 
+- it: should include psps by default when we can't communicate with kubernetes 
+  asserts:
+    - hasDocuments:
+        count: 1
+      template: post-delete-hook-psp.yaml 
+    - contains:
+        path: rules
+        content:
+          apiGroups: [ "policy" ]
+          resources: [ "podsecuritypolicies" ]
+          verbs: [ "use"]
+      template: post-delete-hook-cluster-role.yaml
+

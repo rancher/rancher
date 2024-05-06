@@ -16,6 +16,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	util "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/clustermanager"
+	"github.com/rancher/rancher/pkg/controllers/managementuser/healthsyncer"
 	"github.com/rancher/rancher/pkg/features"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -42,6 +43,8 @@ const (
 	clusterImage        = "clusterImage"
 )
 
+var ErrCantConnectToAPI = errors.New("cannot connect to the cluster's Kubernetes API")
+
 var (
 	agentImagesMutex sync.RWMutex
 	agentImages      = map[string]map[string]string{
@@ -66,6 +69,7 @@ func Register(ctx context.Context, management *config.ManagementContext, cluster
 		nodeLister:           management.Management.Nodes("").Controller().Lister(),
 		clusterManager:       clusterManager,
 		secretLister:         management.Core.Secrets("").Controller().Lister(),
+		ctx:                  ctx,
 	}
 
 	management.Management.Clusters("").AddHandler(ctx, "cluster-deploy", c.sync)
@@ -79,6 +83,7 @@ type clusterDeploy struct {
 	mgmt                 *config.ManagementContext
 	nodeLister           v3.NodeLister
 	secretLister         v1.SecretLister
+	ctx                  context.Context
 }
 
 func (cd *clusterDeploy) sync(key string, cluster *apimgmtv3.Cluster) (runtime.Object, error) {
@@ -125,6 +130,18 @@ func (cd *clusterDeploy) doSync(cluster *apimgmtv3.Cluster) error {
 	if !apimgmtv3.ClusterConditionProvisioned.IsTrue(cluster) {
 		logrus.Tracef("clusterDeploy: doSync: cluster [%s] is not yet provisioned (ClusterConditionProvisioned is not True)", cluster.Name)
 		return nil
+	}
+
+	// Skip further work if the cluster's API is not reachable according to HealthSyncer criteria
+	// Note that we don't check the cluster's ClusterConditionReady status here, as HealthSyncer is not running
+	// prior deployment of the cluster agent
+	uc, err := cd.clusterManager.UserContextNoControllersReconnecting(cluster.Name, false)
+	if err != nil {
+		return err
+	}
+	if err := healthsyncer.IsAPIUp(cd.ctx, uc.K8sClient.CoreV1().Namespaces()); err != nil {
+		logrus.Tracef("clusterDeploy: doSync: cannot connect to API for cluster [%s]", cluster.Name)
+		return ErrCantConnectToAPI
 	}
 
 	nodes, err := cd.nodeLister.List(cluster.Name, labels.Everything())
@@ -208,6 +225,7 @@ func redeployAgent(cluster *apimgmtv3.Cluster, desiredAgent, desiredAuth string,
 			}
 		}
 	}
+
 	if forceDeploy || imageChange || repoChange || agentFeaturesChanged {
 		logrus.Infof("Redeploy Rancher Agents is needed for %s: forceDeploy=%v, agent/auth image changed=%v,"+
 			" private repo changed=%v, agent features changed=%v", cluster.Name, forceDeploy, imageChange, repoChange,
@@ -228,8 +246,8 @@ func redeployAgent(cluster *apimgmtv3.Cluster, desiredAgent, desiredAuth string,
 	}
 
 	// Taints/tolerations
-	// Current taints are cached for comparison
-	currentTaints := getCachedTaints(cluster.Name)
+	// Current control plane taints are cached for comparison
+	currentTaints := getCachedControlPlaneTaints(cluster.Name)
 	logrus.Tracef("clusterDeploy: redeployAgent: cluster [%s] currentTaints: [%v]", cluster.Name, currentTaints)
 	logrus.Tracef("clusterDeploy: redeployAgent: cluster [%s] desiredTaints: [%v]", cluster.Name, desiredTaints)
 	toAdd, toDelete := taints.GetToDiffTaints(currentTaints, desiredTaints)
@@ -246,17 +264,14 @@ func redeployAgent(cluster *apimgmtv3.Cluster, desiredAgent, desiredAuth string,
 		return true
 	}
 
+	if !reflect.DeepEqual(cluster.Spec.ClusterAgentDeploymentCustomization, cluster.Status.AppliedClusterAgentDeploymentCustomization) {
+		logrus.Infof("clusterDeploy: redeployAgent: redeploy Rancher agents due to agent customization mismatch for [%s], was [%v] and will be [%v]", cluster.Name, cluster.Status.AppliedClusterAgentDeploymentCustomization, cluster.Spec.ClusterAgentDeploymentCustomization)
+		return true
+	}
+
 	logrus.Tracef("clusterDeploy: redeployAgent: returning false for redeployAgent")
 
 	return false
-}
-
-func getDesiredImage(cluster *apimgmtv3.Cluster) string {
-	if cluster.Spec.AgentImageOverride != "" {
-		return cluster.Spec.AgentImageOverride
-	}
-
-	return cluster.Spec.DesiredAgentImage
 }
 
 func (cd *clusterDeploy) getDesiredFeatures(cluster *apimgmtv3.Cluster) map[string]bool {
@@ -388,6 +403,8 @@ func (cd *clusterDeploy) deployAgent(cluster *apimgmtv3.Cluster) error {
 	}
 
 	cluster.Status.AppliedAgentEnvVars = append(settings.DefaultAgentSettingsAsEnvVars(), cluster.Spec.AgentEnvVars...)
+
+	cluster.Status.AppliedClusterAgentDeploymentCustomization = cluster.Spec.ClusterAgentDeploymentCustomization
 
 	return nil
 }
@@ -531,7 +548,7 @@ func getAgentImages(name string) (string, string) {
 	return agentImages[nodeImage][name], agentImages[clusterImage][name]
 }
 
-func getCachedTaints(name string) []corev1.Taint {
+func getCachedControlPlaneTaints(name string) []corev1.Taint {
 	controlPlaneTaintsMutex.RLock()
 	defer controlPlaneTaintsMutex.RUnlock()
 	if _, ok := controlPlaneTaints[name]; ok {

@@ -20,6 +20,7 @@ import (
 	"github.com/sirupsen/logrus"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/utils/strings/slices"
 )
 
 const (
@@ -41,6 +42,8 @@ const (
 	LevelRequest
 	// LevelRequestResponse log metadata request body and response header and body.
 	LevelRequestResponse
+
+	generateKubeconfigURI = "action=generateKubeconfig"
 )
 
 var (
@@ -48,17 +51,19 @@ var (
 		http.MethodPut:  true,
 		http.MethodPost: true,
 	}
-	sensitiveRequestHeader  = []string{"Cookie", "Authorization"}
-	sensitiveResponseHeader = []string{"Cookie", "Set-Cookie"}
+	sensitiveRequestHeader  = []string{"Cookie", "Authorization", "X-Api-Tunnel-Params", "X-Api-Tunnel-Token", "X-Api-Auth-Header", "X-Amz-Security-Token"}
+	sensitiveResponseHeader = []string{"Cookie", "Set-Cookie", "X-Api-Set-Cookie-Header"}
+	sensitiveBodyFields     = []string{"credentials", "applicationSecret", "oauthCredential", "serviceAccountCredential", "spKey", "spCert", "certificate", "privateKey"}
 	// ErrUnsupportedEncoding is returned when the response encoding is unsupported
 	ErrUnsupportedEncoding = fmt.Errorf("unsupported encoding")
+	secretBaseType         = regexp.MustCompile(".\"baseType\":\"([A-Za-z]*[S|s]ecret)\".")
 )
 
 type auditLog struct {
-	log                *log
-	writer             *LogWriter
-	reqBody            []byte
-	keysToConcealRegex *regexp.Regexp
+	log               *log
+	writer            *LogWriter
+	reqBody           []byte
+	keysToRedactRegex *regexp.Regexp
 }
 
 type log struct {
@@ -115,7 +120,7 @@ func FromContext(ctx context.Context) (*User, bool) {
 	return u, ok
 }
 
-func newAuditLog(writer *LogWriter, req *http.Request, keysToConcealRegex *regexp.Regexp) (*auditLog, error) {
+func newAuditLog(writer *LogWriter, req *http.Request, keysToRedactRegex *regexp.Regexp) (*auditLog, error) {
 	auditLog := &auditLog{
 		writer: writer,
 		log: &log{
@@ -125,7 +130,7 @@ func newAuditLog(writer *LogWriter, req *http.Request, keysToConcealRegex *regex
 			RemoteAddr:       req.RemoteAddr,
 			RequestTimestamp: time.Now().Format(time.RFC3339),
 		},
-		keysToConcealRegex: keysToConcealRegex,
+		keysToRedactRegex: keysToRedactRegex,
 	}
 
 	contentType := req.Header.Get("Content-Type")
@@ -205,7 +210,7 @@ func (a *auditLog) writeRequest(buf *bytes.Buffer) {
 	}
 
 	buf.WriteString(`,"requestBody":`)
-	buf.Write(bytes.TrimSuffix(a.concealSensitiveData(a.log.RequestURI, a.reqBody), []byte("\n")))
+	buf.Write(bytes.TrimSuffix(a.redactSensitiveData(a.log.RequestURI, a.reqBody), []byte("\n")))
 }
 
 // writeResponse attempt to write the API response to the log message.
@@ -232,7 +237,7 @@ func (a *auditLog) writeResponse(buf *bytes.Buffer, resHeaders http.Header, resB
 	}
 
 	buf.WriteString(`,"responseBody":`)
-	buf.Write(bytes.TrimSuffix(a.concealSensitiveData(a.log.RequestURI, resBody), []byte("\n")))
+	buf.Write(bytes.TrimSuffix(a.redactSensitiveData(a.log.RequestURI, resBody), []byte("\n")))
 
 	return nil
 }
@@ -275,57 +280,165 @@ func isExist(array []string, key string) bool {
 	return false
 }
 
-func (a *auditLog) concealSensitiveData(requestURI string, body []byte) []byte {
+func (a *auditLog) redactSensitiveData(requestURI string, body []byte) []byte {
 	var m map[string]interface{}
 	if err := json.Unmarshal(body, &m); err != nil {
-		return body
+		logrus.Debugf("auditLog: Redacting entire body for requestURI [%s]. Cannot marshal body into a map[string]interface{}: %v", requestURI, err)
+		return []byte{}
 	}
 
 	var changed bool
-	// Conceal values of secret data.
-	if strings.Contains(requestURI, "secrets") {
-		dataKey := "data"
-		data, _ := m[dataKey].(map[string]interface{})
-		if data == nil {
-			dataKey = "stringData"
-			data, _ = m[dataKey].(map[string]interface{})
-		}
-
-		for key := range data {
-			data[key] = redacted
-		}
-		if data != nil {
-			changed = true
-			m[dataKey] = data
-		}
+	// Redact values of secret data.
+	if strings.Contains(requestURI, "secrets") || secretBaseType.Match(body) {
+		changed = a.redactSecretsData(requestURI, m)
 	}
 
-	// Conceal values for data considered sensitive: passwords, tokens, etc.
-	if !a.concealMap(m) && !changed {
+	if strings.Contains(requestURI, generateKubeconfigURI) {
+		// generateKubeconfig cannot rely on regex because it uses config key instead of [kK]ube[cC]onfig
+		changed = redact(m, "config")
+	}
+
+	// Redact values for data considered sensitive: passwords, tokens, etc.
+	if !a.redactMap(m) && !changed {
 		return body
 	}
 
 	newBody, err := json.Marshal(m)
 	if err != nil {
-		return body
+		return []byte{}
 	}
 	return newBody
 }
 
-func (a *auditLog) concealMap(m map[string]interface{}) bool {
+func redact(body map[string]interface{}, key string) bool {
+	if _, ok := body[key]; !ok {
+		return false
+	}
+	body[key] = redacted
+	return true
+}
+
+func (a *auditLog) redactSecretsData(requestURI string, body map[string]interface{}) bool {
+	var changed bool
+
+	isK8sProxyList := strings.HasPrefix(requestURI, "/k8s/") && (body["kind"] != nil && body["kind"] == "SecretList")
+	isRegularList := body["type"] != nil && body["type"] == "collection"
+	if !(isK8sProxyList || isRegularList) {
+		return redactSecret(body)
+	}
+
+	itemsKey := "data"
+	if isK8sProxyList {
+		itemsKey = "items"
+	}
+
+	if _, ok := body[itemsKey]; !ok {
+		logrus.Debugf("auditLog: Skipping data redaction of secret bodies in secrets list: no key [%s] present, no data to redact.", itemsKey)
+		return false
+	}
+
+	secretsList, ok := body[itemsKey].([]interface{})
+	if !ok {
+		body[itemsKey] = redacted
+		logrus.Debugf("auditLog: Redacting entire value for key [%s] in response to request URI [%s], unable to assert body is of type []interface{}", itemsKey, requestURI)
+		return true
+	}
+
+	for index, secret := range secretsList {
+		m, ok := secret.(map[string]interface{})
+		if !ok {
+			secretsList[index] = redacted
+			logrus.Debugf("auditLog: Redacting entire value for index [%d] in list in response to request URI [%s]. Failed to assert secret element as map[string]interface", index, requestURI)
+			continue
+		}
+
+		changed = redactSecret(m) || changed
+		secretsList[index] = m
+	}
+
+	if changed {
+		body[itemsKey] = secretsList
+		return changed
+	}
+
+	return changed
+}
+
+func redactSecret(secret map[string]interface{}) bool {
+	var changed bool
+	if secret["data"] != nil {
+		secret["data"] = redacted
+		changed = true
+	}
+	if secret["stringData"] != nil {
+		secret["stringData"] = redacted
+		changed = true
+	}
+	if changed {
+		return changed
+	}
+
+	for key := range secret {
+		if key == "id" || key == "baseType" || key == "created" {
+			// censorAll is used when the secret is formatted in such a way where its
+			// data fields cannot be distinguished from its other fields. In this case
+			// most of the data is redacted apart from "id", "baseType", "key"
+			continue
+		}
+		secret[key] = redacted
+		changed = true
+	}
+	return changed
+}
+
+func (a *auditLog) redactMap(m map[string]interface{}) bool {
 	var changed bool
 	for key := range m {
-		if _, ok := m[key].(string); ok {
-			if a.keysToConcealRegex.MatchString(key) {
+		switch val := m[key].(type) {
+		case string:
+			if a.keysToRedactRegex.MatchString(key) || slices.Contains(sensitiveBodyFields, key) {
 				changed = true
 				m[key] = redacted
 			}
-		} else if nested, ok := m[key].(map[string]interface{}); ok && a.concealMap(nested) {
-			changed = true
-			m[key] = nested
+		case map[string]interface{}:
+			if a.redactMap(val) {
+				changed = true
+				m[key] = val
+			}
+		case []interface{}:
+			if a.redactSlice(val) {
+				changed = true
+				m[key] = val
+			}
 		}
 	}
 
+	return changed
+}
+
+func (a *auditLog) redactSlice(valSlice []interface{}) bool {
+	var changed bool
+	for i, v := range valSlice {
+		switch val := v.(type) {
+		case map[string]interface{}:
+			if a.redactMap(val) {
+				changed = true
+				valSlice[i] = val
+			}
+		case string:
+			// this attempts to identify slices that represent commands of the format ["--<command>, <value>"], and
+			// redact value is command indicates it is sensitive.
+			if i+1 == len(valSlice) {
+				continue
+			}
+			if !strings.HasPrefix(val, "--") || !a.keysToRedactRegex.MatchString(val) {
+				// not a sensitive option flag
+				continue
+			}
+			valSlice[i+1] = redacted
+			changed = true
+		}
+	}
 	return changed
 }
 

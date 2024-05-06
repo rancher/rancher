@@ -1,0 +1,9 @@
+{
+    "apiVersion": "management.cattle.io/v3",
+    "context": "invalid",
+    "displayName": "Kubernetes view",
+    "kind": "RoleTemplate",
+    "metadata": {
+        "name": "test-rt"
+    }
+}

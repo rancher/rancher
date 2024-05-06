@@ -17,7 +17,7 @@ import (
 	"github.com/rancher/rancher/pkg/logserver"
 	"github.com/rancher/rancher/pkg/rancher"
 	"github.com/rancher/rancher/pkg/version"
-	"github.com/rancher/rancher/tests/framework/pkg/killserver"
+	"github.com/rancher/shepherd/pkg/killserver"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
@@ -30,7 +30,7 @@ var (
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	killServer := killserver.NewKillServer(killserver.KillServerPort, cancel)
+	killServer := killserver.NewKillServer(killserver.Port, cancel)
 	go killServer.Start()
 	go runRancher(ctx)
 	<-ctx.Done()
@@ -181,7 +181,7 @@ func runRancher(ctx context.Context) error {
 			}()
 		}
 		initLogs(c, config)
-		return runServer(c, ctx, config)
+		return runServer(ctx, c, config)
 	}
 
 	err := app.Run(os.Args)
@@ -191,7 +191,7 @@ func runRancher(ctx context.Context) error {
 	return nil
 }
 
-func runServer(cli *cli.Context, ctx context.Context, cfg rancher.Options) error {
+func runServer(ctx context.Context, _ *cli.Context, cfg rancher.Options) error {
 	logrus.Infof("Rancher version %s is starting", version.FriendlyVersion())
 	logrus.Infof("Rancher arguments %+v", cfg)
 

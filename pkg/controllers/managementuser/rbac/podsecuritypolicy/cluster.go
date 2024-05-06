@@ -61,12 +61,20 @@ func (m *clusterManager) sync(key string, obj *v3.Cluster) (runtime.Object, erro
 		return nil, nil
 	}
 
-	err := checkClusterVersion(m.clusterName, m.clusterLister)
+	err := CheckClusterVersion(m.clusterName, m.clusterLister)
 	if err != nil {
-		if errors.Is(err, errVersionIncompatible) {
+		if errors.Is(err, ErrClusterVersionIncompatible) {
+			if obj.Status.AppliedPodSecurityPolicyTemplateName != "" {
+				obj = obj.DeepCopy()
+				obj.Status.AppliedPodSecurityPolicyTemplateName = ""
+				obj, err = m.clusters.Update(obj)
+				if err != nil {
+					return nil, fmt.Errorf("error updating cluster for dropping the applied pspt: %v", err)
+				}
+			}
 			return obj, nil
 		}
-		return obj, fmt.Errorf(clusterVersionCheckErrorString, err)
+		return obj, fmt.Errorf("error checking cluster version for Cluster controller: %w", err)
 	}
 
 	if obj.Spec.DefaultPodSecurityPolicyTemplateName != "" {
@@ -143,10 +151,11 @@ func (m *clusterManager) sync(key string, obj *v3.Cluster) (runtime.Object, erro
 			}
 		}
 
+		obj = obj.DeepCopy()
 		obj.Status.AppliedPodSecurityPolicyTemplateName = obj.Spec.DefaultPodSecurityPolicyTemplateName
 		_, err = m.clusters.Update(obj)
 		if err != nil {
-			return nil, fmt.Errorf("error updating cluster: %v", err)
+			return nil, fmt.Errorf("error updating cluster with the applied pspt: %v", err)
 		}
 
 		return nil, resyncServiceAccounts(m.serviceAccountLister, m.serviceAccountsController, "")

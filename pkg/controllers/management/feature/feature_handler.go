@@ -2,14 +2,18 @@ package feature
 
 import (
 	"context"
+	"fmt"
+	"reflect"
 	"time"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/features"
 	managementv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/wrangler"
-	"k8s.io/apimachinery/pkg/labels"
 )
 
 type handler struct {
@@ -46,7 +50,48 @@ func (h *handler) sync(_ string, obj *v3.Feature) (*v3.Feature, error) {
 	if obj.Name == features.Harvester.Name() {
 		return obj, h.toggleHarvesterNodeDriver(obj.Name)
 	}
+
+	if obj.Name == features.HarvesterBaremetalContainerWorkload.Name() {
+		return obj, h.syncHarvesterFeature(obj)
+	}
 	return obj, nil
+}
+
+// syncHarvesterFeature ensures that Harvester feature is enabled
+// if baremetal management feature is enabled and annotates feature with experimental annotation
+func (h *handler) syncHarvesterFeature(obj *v3.Feature) error {
+
+	objCopy := obj.DeepCopy()
+
+	if objCopy.Annotations == nil {
+		objCopy.Annotations = make(map[string]string)
+	}
+
+	objCopy.Annotations[v3.ExperimentalFeatureKey] = v3.ExperimentalFeatureValue
+
+	if !reflect.DeepEqual(obj, objCopy) {
+		_, err := h.featuresClient.Update(objCopy)
+		return err
+	}
+
+	// if feature is enabled, ensure harvester feature is also enabled
+	if features.GetFeatureByName(obj.Name).Enabled() {
+		harvesterFeature, err := h.featuresClient.Get(features.Harvester.Name(), metav1.GetOptions{})
+		if err != nil {
+			return fmt.Errorf("error fetching feature %s: %w", features.Harvester.Name(), err)
+		}
+		harvesterFeatureCopy := harvesterFeature.DeepCopy()
+		if harvesterFeatureCopy.Spec.Value == nil || !*harvesterFeatureCopy.Spec.Value {
+			harvesterFeatureCopy.Spec.Value = &[]bool{true}[0]
+		}
+		if !reflect.DeepEqual(harvesterFeature, harvesterFeatureCopy) {
+			if _, err := h.featuresClient.Update(harvesterFeatureCopy); err != nil {
+				return fmt.Errorf("error updating Harvester feature %s: %w", obj.Name, err)
+			}
+		}
+	}
+
+	return nil
 }
 
 func (h *handler) toggleHarvesterNodeDriver(harvester string) error {
@@ -68,7 +113,7 @@ func (h *handler) refreshTokens() error {
 		return err
 	}
 	for _, token := range tokenList {
-		if token.Labels[tokens.TokenHashed] == "true" {
+		if token.Annotations[tokens.TokenHashed] == "true" {
 			continue
 		}
 		h.tokenEnqueue(token.Name, 10*time.Second)

@@ -1,0 +1,86 @@
+#!/bin/bash
+
+cmd=""
+timeoutSeconds=60
+sleepSeconds=1
+message=""
+messageInterval=5
+startTimeSeconds=$(date +%s)
+elapsedSeconds=0
+attempts=0
+
+print_usage() {
+    echo "Usage: $0 [options] <command>"
+    echo
+    echo "Attempts to execute a given command periodically until it succeeds or a timeout occurs."
+    echo
+    echo "Options:"
+    echo "  -t, --timeout           The maximum number of seconds to wait for the command to succeed (default: 60)"
+    echo "  -s, --sleep             The number of seconds to sleep for between command attempts (default: 1)"
+    echo "  -m, --message           The progress message to print after every attempt (default: '')"
+    echo "                          Instances of {{elapsed}} and {{attempts}} in the message will be replaced by total"
+    echo "                          elapsed time (in seconds) and total attempts respectively."
+    echo "  -i, --message-interval  The number of command attempts to make before each printing of the progress message"
+    echo "                          (default: 5)."
+    echo
+}
+
+print_progress() {
+  if [ -n "$message" ]; then
+    echo "$message" | sed "s/{{attempts}}/$attempts/g; s/{{elapsed}}/$elapsedSeconds/g"
+  fi
+}
+
+# Parse options and arguments
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -t | --timeout)
+            shift
+            timeoutSeconds="$1"
+            ;;
+        -s | --sleep)
+            shift
+            sleepSeconds="$1"
+            ;;
+        -m | --message)
+            shift
+            message="$1"
+            ;;
+        -i | --message-interval)
+            shift
+            messageInterval="$1"
+            ;;
+        *)
+            cmd="$@"
+            break
+            ;;
+    esac
+    shift
+done
+
+# Error if no command was provided
+if [ -z "$cmd" ]; then
+    print_usage
+    exit 1
+fi
+
+# Loop until either the command succeeds or a timeout occurs.
+until [ "$elapsedSeconds" -gt "$timeoutSeconds" ] || eval "$cmd"; do
+    sleep "$sleepSeconds"
+
+    # Increment attempt counter. If we've hit the message interval, print the message
+    attempts=$((attempts + 1))
+    if [ $((attempts % messageInterval)) -eq 0 ]; then
+        print_progress
+    fi
+
+    # Recalculate $elapsedSeconds
+    currentTimeSeconds=$(date +%s)
+    elapsedSeconds=$((currentTimeSeconds - startTimeSeconds))
+done
+
+# If we timed out, print the final progress message and exit with code 1.
+if [ "$elapsedSeconds" -gt "$timeoutSeconds" ]; then
+  print_progress
+  exit 1
+fi

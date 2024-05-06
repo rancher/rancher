@@ -1,5 +1,5 @@
 /*
-Copyright 2023 Rancher Labs, Inc.
+Copyright 2024 Rancher Labs, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ package v3
 import (
 	"github.com/rancher/lasso/pkg/controller"
 	v3 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
+	"github.com/rancher/wrangler/pkg/generic"
 	"github.com/rancher/wrangler/pkg/schemes"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -55,42 +56,54 @@ type version struct {
 	controllerFactory controller.SharedControllerFactory
 }
 
-func (c *version) App() AppController {
-	return NewAppController(schema.GroupVersionKind{Group: "project.cattle.io", Version: "v3", Kind: "App"}, "apps", true, c.controllerFactory)
+func (v *version) App() AppController {
+	return generic.NewController[*v3.App, *v3.AppList](schema.GroupVersionKind{Group: "project.cattle.io", Version: "v3", Kind: "App"}, "apps", true, v.controllerFactory)
 }
-func (c *version) AppRevision() AppRevisionController {
-	return NewAppRevisionController(schema.GroupVersionKind{Group: "project.cattle.io", Version: "v3", Kind: "AppRevision"}, "apprevisions", true, c.controllerFactory)
+
+func (v *version) AppRevision() AppRevisionController {
+	return generic.NewController[*v3.AppRevision, *v3.AppRevisionList](schema.GroupVersionKind{Group: "project.cattle.io", Version: "v3", Kind: "AppRevision"}, "apprevisions", true, v.controllerFactory)
 }
-func (c *version) BasicAuth() BasicAuthController {
-	return NewBasicAuthController(schema.GroupVersionKind{Group: "project.cattle.io", Version: "v3", Kind: "BasicAuth"}, "basicauths", true, c.controllerFactory)
+
+func (v *version) BasicAuth() BasicAuthController {
+	return generic.NewController[*v3.BasicAuth, *v3.BasicAuthList](schema.GroupVersionKind{Group: "project.cattle.io", Version: "v3", Kind: "BasicAuth"}, "basicauths", true, v.controllerFactory)
 }
-func (c *version) Certificate() CertificateController {
-	return NewCertificateController(schema.GroupVersionKind{Group: "project.cattle.io", Version: "v3", Kind: "Certificate"}, "certificates", true, c.controllerFactory)
+
+func (v *version) Certificate() CertificateController {
+	return generic.NewController[*v3.Certificate, *v3.CertificateList](schema.GroupVersionKind{Group: "project.cattle.io", Version: "v3", Kind: "Certificate"}, "certificates", true, v.controllerFactory)
 }
-func (c *version) DockerCredential() DockerCredentialController {
-	return NewDockerCredentialController(schema.GroupVersionKind{Group: "project.cattle.io", Version: "v3", Kind: "DockerCredential"}, "dockercredentials", true, c.controllerFactory)
+
+func (v *version) DockerCredential() DockerCredentialController {
+	return generic.NewController[*v3.DockerCredential, *v3.DockerCredentialList](schema.GroupVersionKind{Group: "project.cattle.io", Version: "v3", Kind: "DockerCredential"}, "dockercredentials", true, v.controllerFactory)
 }
-func (c *version) NamespacedBasicAuth() NamespacedBasicAuthController {
-	return NewNamespacedBasicAuthController(schema.GroupVersionKind{Group: "project.cattle.io", Version: "v3", Kind: "NamespacedBasicAuth"}, "namespacedbasicauths", true, c.controllerFactory)
+
+func (v *version) NamespacedBasicAuth() NamespacedBasicAuthController {
+	return generic.NewController[*v3.NamespacedBasicAuth, *v3.NamespacedBasicAuthList](schema.GroupVersionKind{Group: "project.cattle.io", Version: "v3", Kind: "NamespacedBasicAuth"}, "namespacedbasicauths", true, v.controllerFactory)
 }
-func (c *version) NamespacedCertificate() NamespacedCertificateController {
-	return NewNamespacedCertificateController(schema.GroupVersionKind{Group: "project.cattle.io", Version: "v3", Kind: "NamespacedCertificate"}, "namespacedcertificates", true, c.controllerFactory)
+
+func (v *version) NamespacedCertificate() NamespacedCertificateController {
+	return generic.NewController[*v3.NamespacedCertificate, *v3.NamespacedCertificateList](schema.GroupVersionKind{Group: "project.cattle.io", Version: "v3", Kind: "NamespacedCertificate"}, "namespacedcertificates", true, v.controllerFactory)
 }
-func (c *version) NamespacedDockerCredential() NamespacedDockerCredentialController {
-	return NewNamespacedDockerCredentialController(schema.GroupVersionKind{Group: "project.cattle.io", Version: "v3", Kind: "NamespacedDockerCredential"}, "namespaceddockercredentials", true, c.controllerFactory)
+
+func (v *version) NamespacedDockerCredential() NamespacedDockerCredentialController {
+	return generic.NewController[*v3.NamespacedDockerCredential, *v3.NamespacedDockerCredentialList](schema.GroupVersionKind{Group: "project.cattle.io", Version: "v3", Kind: "NamespacedDockerCredential"}, "namespaceddockercredentials", true, v.controllerFactory)
 }
-func (c *version) NamespacedSSHAuth() NamespacedSSHAuthController {
-	return NewNamespacedSSHAuthController(schema.GroupVersionKind{Group: "project.cattle.io", Version: "v3", Kind: "NamespacedSSHAuth"}, "namespacedsshauths", true, c.controllerFactory)
+
+func (v *version) NamespacedSSHAuth() NamespacedSSHAuthController {
+	return generic.NewController[*v3.NamespacedSSHAuth, *v3.NamespacedSSHAuthList](schema.GroupVersionKind{Group: "project.cattle.io", Version: "v3", Kind: "NamespacedSSHAuth"}, "namespacedsshauths", true, v.controllerFactory)
 }
-func (c *version) NamespacedServiceAccountToken() NamespacedServiceAccountTokenController {
-	return NewNamespacedServiceAccountTokenController(schema.GroupVersionKind{Group: "project.cattle.io", Version: "v3", Kind: "NamespacedServiceAccountToken"}, "namespacedserviceaccounttokens", true, c.controllerFactory)
+
+func (v *version) NamespacedServiceAccountToken() NamespacedServiceAccountTokenController {
+	return generic.NewController[*v3.NamespacedServiceAccountToken, *v3.NamespacedServiceAccountTokenList](schema.GroupVersionKind{Group: "project.cattle.io", Version: "v3", Kind: "NamespacedServiceAccountToken"}, "namespacedserviceaccounttokens", true, v.controllerFactory)
 }
-func (c *version) SSHAuth() SSHAuthController {
-	return NewSSHAuthController(schema.GroupVersionKind{Group: "project.cattle.io", Version: "v3", Kind: "SSHAuth"}, "sshauths", true, c.controllerFactory)
+
+func (v *version) SSHAuth() SSHAuthController {
+	return generic.NewController[*v3.SSHAuth, *v3.SSHAuthList](schema.GroupVersionKind{Group: "project.cattle.io", Version: "v3", Kind: "SSHAuth"}, "sshauths", true, v.controllerFactory)
 }
-func (c *version) ServiceAccountToken() ServiceAccountTokenController {
-	return NewServiceAccountTokenController(schema.GroupVersionKind{Group: "project.cattle.io", Version: "v3", Kind: "ServiceAccountToken"}, "serviceaccounttokens", true, c.controllerFactory)
+
+func (v *version) ServiceAccountToken() ServiceAccountTokenController {
+	return generic.NewController[*v3.ServiceAccountToken, *v3.ServiceAccountTokenList](schema.GroupVersionKind{Group: "project.cattle.io", Version: "v3", Kind: "ServiceAccountToken"}, "serviceaccounttokens", true, v.controllerFactory)
 }
-func (c *version) Workload() WorkloadController {
-	return NewWorkloadController(schema.GroupVersionKind{Group: "project.cattle.io", Version: "v3", Kind: "Workload"}, "workloads", true, c.controllerFactory)
+
+func (v *version) Workload() WorkloadController {
+	return generic.NewController[*v3.Workload, *v3.WorkloadList](schema.GroupVersionKind{Group: "project.cattle.io", Version: "v3", Kind: "Workload"}, "workloads", true, v.controllerFactory)
 }

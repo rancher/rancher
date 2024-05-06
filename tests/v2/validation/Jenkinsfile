@@ -1,6 +1,6 @@
 #!groovy
 node {
-    def rootPath = "/go/src/github.com/rancher/rancher/tests/v2/validation/"
+    def rootPath = "/root/go/src/github.com/rancher/rancher/tests/v2/validation/"
     def job_name = "${JOB_NAME}"
     if (job_name.contains('/')) { 
       job_names = job_name.split('/')
@@ -10,9 +10,10 @@ node {
     def imageName = "rancher-validation-${job_name}${env.BUILD_NUMBER}"
     def testsDir = "github.com/rancher/rancher/tests/v2/validation/${env.TEST_PACKAGE}"
     def testResultsOut = "results.xml"
+    def testResultsJSON = "results.json"
     def envFile = ".env"
     def rancherConfig = "rancher_env.config"
-    def branch = "release/v2.6"
+    def branch = "release/v2.7"
     if ("${env.BRANCH}" != "null" && "${env.BRANCH}" != "") {
       branch = "${env.BRANCH}"
     }
@@ -77,6 +78,7 @@ node {
                           string(credentialsId: 'RANCHER_VALID_TLS_KEY', variable: 'RANCHER_VALID_TLS_KEY'),
                           string(credentialsId: 'RANCHER_BYO_TLS_CERT', variable: 'RANCHER_BYO_TLS_CERT'),
                           string(credentialsId: 'RANCHER_BYO_TLS_KEY', variable: 'RANCHER_BYO_TLS_KEY'),
+                          string(credentialsId: 'QASE_AUTOMATION_TOKEN', variable: 'QASE_AUTOMATION_TOKEN'),
                           string(credentialsId: 'RANCHER_LINODE_ACCESSKEY', variable: "RANCHER_LINODE_ACCESSKEY")]) {
           
         withEnv(paramsMap) {
@@ -104,7 +106,7 @@ node {
                   def configContents = env.CONFIG
 
                   writeFile file: filename, text: configContents
-                  env.CATTLE_TEST_CONFIG = "/go/src/github.com/rancher/rancher/tests/v2/validation/"+filename
+                  env.CATTLE_TEST_CONFIG = rootPath+filename
                 }
 
                 sh "./tests/v2/validation/configure.sh"
@@ -113,7 +115,9 @@ node {
               stage('Run Validation Tests') {
                 try {
                   sh "docker run --name ${testContainer} -t --env-file ${envFile} " +
-                  "${imageName} sh -c \"/go/bin/gotestsum --format standard-verbose --packages=${testsDir} --junitfile ${testResultsOut} -- ${GOTEST_TESTCASE} -timeout=${timeout} -v\""
+                  "${imageName} sh -c \"/root/go/bin/gotestsum --format standard-verbose --packages=${testsDir} --junitfile ${testResultsOut} --jsonfile ${testResultsJSON} -- -tags=${TAGS} ${GOTEST_TESTCASE} -timeout=${timeout} -v;" +
+                  "${rootPath}pipeline/scripts/build_qase_reporter.sh;" +
+                  "${rootPath}reporter\""
                 } catch(err) {
                   echo 'Test run had failures. Collecting results...'
                 }
@@ -123,7 +127,7 @@ node {
                 step([$class: 'JUnitResultArchiver', testResults: "**/${testResultsOut}"])
                 sh "docker stop ${testContainer}"
                 sh "docker rm -v ${testContainer}"
-                sh "docker rmi -f ${imageName}"
+                sh "docker rmi -f ${imageName}" 
               }
             } catch(err) {           
                 sh "docker stop ${testContainer}"

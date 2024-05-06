@@ -1,0 +1,73 @@
+# GCP Policies
+# Note: for GOOGLE_APPLICATION_CREDENTIALS, must be valid json
+#     with quotes commented out
+policies:
+# VMs
+- name: gcp-mark-unknown-instance-for-deletion
+  resource: gcp.instance
+  description: |
+    Mark unknown user instances for deletion in 1 day
+  filters:
+    - "State.Name": running
+    # instance name not in accepted user keys
+    - type: value
+      key: name
+      op: regex
+      #doesNOTcontain
+      value:  "^((?!USERKEYS).)*$"
+    # tagging not supported through cloud custodian at this time
+    - not: 
+      - type: value
+        key: name
+        op: regex
+        value:  "^.*DONOTDELETEKEYS.*$"
+  actions:
+    - type: set-labels
+      labels:
+        unknown_user: setForDeletion
+    - type: mark-for-op
+      op: delete
+      days: 1
+
+
+- name: gcp-mark-known-instance-for-deletion
+  resource: gcp.instance
+  description: |
+    Mark known user instances for deletion in 2 days
+  filters:
+    # instance is named with accepted user key
+    - type: value
+      key: name
+      op: regex
+      value:  "^.*USERKEYS.*$"
+    # tagging not supported through cloud custodian at this time
+    - not: 
+      - type: value
+        key: name
+        op: regex
+        value:  "^.*DONOTDELETEKEYS.*$"
+  actions:
+    - type: set-labels
+      labels:
+        known_user: setForDeletion
+    - type: mark-for-op
+      op: delete
+      days: 2
+
+- name: gcp-terminate-instance
+  resource: gcp.instance
+  description: |
+    Delete any marked instances which have been 
+    marked for deletion for more than 1 day.
+  filters:
+    - or:
+      - type: marked-for-op
+        label: unknown_user
+        op: delete
+      - type: marked-for-op
+        label: known_user
+        op: delete
+  actions:
+    - type: delete
+
+# GKE - no support for labels nor tags at this time

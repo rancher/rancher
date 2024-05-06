@@ -1,12 +1,14 @@
+//go:build validation
+
 package standalone
 
 import (
 	"testing"
 
-	"github.com/rancher/rancher/tests/framework/clients/corral"
+	"github.com/rancher/shepherd/clients/corral"
 
-	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
-	"github.com/rancher/rancher/tests/framework/pkg/session"
+	namegen "github.com/rancher/shepherd/pkg/namegenerator"
+	"github.com/rancher/shepherd/pkg/session"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
@@ -24,16 +26,16 @@ func (r *CorralStandaloneTestSuite) SetupSuite() {
 	testSession := session.NewSession()
 	r.session = testSession
 
-	corralConfig := corral.CorralConfigurations()
+	corralConfig := corral.Configurations()
 	err := corral.SetupCorralConfig(corralConfig.CorralConfigVars, corralConfig.CorralConfigUser, corralConfig.CorralSSHPath)
 	require.NoError(r.T(), err, "error reading corral configs")
 }
 
 func (r *CorralStandaloneTestSuite) TestGenericCorralPackage() {
-	corralPackage := corral.CorralPackagesConfig()
+	corralPackage := corral.PackagesConfig()
 	// Expecting in the future, we will be mainly running from publically available corral images
-	if corralPackage.CustomRepo != "" {
-		err := corral.SetCustomRepo(corralPackage.CustomRepo)
+	if corralPackage.HasCustomRepo != "" {
+		err := corral.SetCustomRepo(corralPackage.HasCustomRepo)
 		require.Nil(r.T(), err, "error setting remote repo")
 	}
 	newPackages := []string{}
@@ -43,7 +45,7 @@ func (r *CorralStandaloneTestSuite) TestGenericCorralPackage() {
 	for packageName, packageImage := range corralPackage.CorralPackageImages {
 		newPackageName := namegen.AppendRandomString(packageName)
 		newPackages = append(newPackages, newPackageName)
-		corralRun, err := corral.CreateCorral(r.session, newPackageName, packageImage, corralPackage.Debug, corralPackage.Cleanup)
+		corralRun, err := corral.CreateCorral(r.session, newPackageName, packageImage, corralPackage.HasDebug, corralPackage.HasDebug)
 		require.NoError(r.T(), err, "error creating corral %v", packageName)
 		r.T().Logf("Corral %v created successfully", packageName)
 		require.NotNil(r.T(), corralRun, "corral run had no restConfig")

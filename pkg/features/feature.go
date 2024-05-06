@@ -61,7 +61,7 @@ var (
 		false)
 	EmbeddedClusterAPI = newFeature(
 		"embedded-cluster-api",
-		"Enable an embedded instance of cluster-api core controller",
+		"Enable a Rancher-managed instance of cluster-api core controller",
 		true,
 		false,
 		false)
@@ -105,6 +105,13 @@ var (
 		"rke1-custom-node-cleanup",
 		"Enable cleanup RKE1 custom cluster nodes when they are deleted",
 		true,
+		true,
+		true)
+
+	HarvesterBaremetalContainerWorkload = newFeature(
+		"harvester-baremetal-container-workload",
+		"[Experimental]: Deploy container workloads to underlying harvester cluster",
+		false,
 		true,
 		true)
 )

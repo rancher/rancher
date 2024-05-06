@@ -2,18 +2,22 @@ package rkenodeconfigclient
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/rancher/rancher/pkg/agent/node"
-
+	"github.com/rancher/rancher/pkg/rkenodeconfigserver"
 	"github.com/rancher/rancher/pkg/rkeworker"
+	"github.com/rancher/rke/types"
 	"github.com/sirupsen/logrus"
 )
 
@@ -50,10 +54,19 @@ func newErrNodeOrClusterNotFound(msg, occursType string) *ErrNodeOrClusterNotFou
 	}
 }
 
+// ConfigClient executes a GET request against the rancher servers node-server API in an attempt to get the most recent node-config.
+// It continues to do so until a node-config is returned within the response body, or the retry limit of 3 attempts is exceeded. Upon
+// receiving a valid node-config this function inspects any kubelet serving certificates present on the host to determine if they need to be refreshed.
+// If kubelet certificates need to be regenerated, a second GET request will be made so that the node config holds valid certificates. Once all kubelet certificates
+// are deemed valid, ConfigClient will execute the node config, writing files and executing processes as directed. The passed
+// url and header values are used when crafting the GET request, and the writeCertOnly parameter is used to denote if the agent should disregard
+// all aspects of the received node-config except any delivered certificates. Upon a successful execution of the node config, this function
+// will return a polling interval which should be used to query the rancher server for the next node-config and any encountered errors.
 func ConfigClient(ctx context.Context, url string, header http.Header, writeCertOnly bool) (int, error) {
 	// try a few more times because there is a delay after registering a new node
 	nodeOrClusterNotFoundRetryLimit := 3
 	interval := 120
+	requestedRenewedCert := false
 	for {
 		nc, err := getConfig(client, url, header)
 		if err != nil {
@@ -72,13 +85,38 @@ func ConfigClient(ctx context.Context, url string, header http.Header, writeCert
 		}
 
 		if nc != nil {
+
+			// if a cert file and key file are passed to the kubelet
+			// then we need to ensure they are valid, otherwise we can safely skip the check
+			certFile, keyFile := getKubeletCertificateFilesFromProcess(nc.Processes)
+			if certFile != "" && keyFile != "" {
+				logrus.Debugf("agent detected certificate arguments within kubelet process, checking kubelet certificate validity")
+				// check to see if we need a new kubelet certificate
+				kubeletCertNeedsRegen, err := kubeletNeedsNewCertificate(nc)
+				if err != nil {
+					return interval, err
+				}
+
+				if kubeletCertNeedsRegen && !requestedRenewedCert {
+					// add to the  header and run getConfig again, so we get a new cert
+					// we should only do this at most once per call to ConfigClient
+					header.Set(rkenodeconfigserver.RegenerateKubeletCertificate, "true")
+					logrus.Debugf("Requesting kubelet certificate regeneration")
+					requestedRenewedCert = true
+					continue
+				}
+			}
+
+			header.Set(rkenodeconfigserver.RegenerateKubeletCertificate, "false")
+			requestedRenewedCert = false
+
 			// Logging at trace level as NodeConfig may contain sensitive data
 			logrus.Tracef("Get agent config: %#v", nc)
 			if nc.AgentCheckInterval != 0 {
 				interval = nc.AgentCheckInterval
 			}
 
-			err := rkeworker.ExecutePlan(ctx, nc, writeCertOnly)
+			err = rkeworker.ExecutePlan(ctx, nc, writeCertOnly)
 			if err != nil {
 				return interval, err
 			}
@@ -152,4 +190,59 @@ func getConfig(client *http.Client, url string, header http.Header) (*rkeworker.
 
 	nc := &rkeworker.NodeConfig{}
 	return nc, json.NewDecoder(resp.Body).Decode(nc)
+}
+
+// getKubeletCertificateFilesFromProcess finds the tls-private-key-file and tls-cert-file values from
+// the kubelet process so that they may be used to determine the validity of the kubelet certificates stored
+// on the host.
+func getKubeletCertificateFilesFromProcess(processes map[string]types.Process) (string, string) {
+	proc, ok := processes["kubelet"]
+	if !ok {
+		return "", ""
+	}
+
+	return findCommandValue("--tls-private-key-file", proc.Command), findCommandValue("--tls-cert-file", proc.Command)
+}
+
+// findCommandValue iterates over a list of process flags and returns the value of
+// the specified flag, stripping the flag name and the '=' sign. If the flag
+// cannot be found in the list of flags, an empty string is returned.
+func findCommandValue(flag string, commandsFlags []string) string {
+	for _, cmd := range commandsFlags {
+		if strings.HasPrefix(cmd, flag) {
+			valueWithEqual := strings.TrimPrefix(cmd, flag)
+			value := strings.TrimPrefix(valueWithEqual, "=")
+			return value
+		}
+	}
+	return ""
+}
+
+// kubeletNeedsNewCertificate will set the
+// 'RegenerateKubeletCertificate' header field to true if
+// a) the kubelet serving certificate does not exist
+// b) the certificate will expire in 72 hours
+// c) the certificate does not accurately represent the current IP address and Hostname of the node
+//
+// While the agent may denote it needs a new kubelet certificate
+// in its connection request, a new certificate will only be
+// delivered by Rancher if the generate_serving_certificate property
+// is set to 'true' for the clusters kubelet service.
+func kubeletNeedsNewCertificate(nc *rkeworker.NodeConfig) (bool, error) {
+	kubeletCertKeyFile, kubeletCertFile := getKubeletCertificateFilesFromProcess(nc.Processes)
+	if kubeletCertFile == "" || kubeletCertKeyFile == "" {
+		return true, nil
+	}
+
+	cert, err := tls.LoadX509KeyPair(kubeletCertFile, kubeletCertKeyFile)
+	if err != nil && !strings.Contains(err.Error(), "no such file") {
+		return true, err
+	}
+
+	needsRegen, err := kubeletCertificateNeedsRegeneration(os.Getenv("CATTLE_ADDRESS"), os.Getenv("CATTLE_NODE_NAME"), cert, time.Now())
+	if err != nil {
+		return true, err
+	}
+
+	return needsRegen, nil
 }

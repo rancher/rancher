@@ -45,6 +45,7 @@ const (
 	WorkloadFieldNamespaceId                          = "namespaceId"
 	WorkloadFieldNodeID                               = "nodeId"
 	WorkloadFieldOS                                   = "os"
+	WorkloadFieldOrdinals                             = "ordinals"
 	WorkloadFieldOverhead                             = "overhead"
 	WorkloadFieldOwnerReferences                      = "ownerReferences"
 	WorkloadFieldPaused                               = "paused"
@@ -59,12 +60,14 @@ const (
 	WorkloadFieldReplicaSetStatus                     = "replicaSetStatus"
 	WorkloadFieldReplicationControllerConfig          = "replicationControllerConfig"
 	WorkloadFieldReplicationControllerStatus          = "replicationControllerStatus"
+	WorkloadFieldResourceClaims                       = "resourceClaims"
 	WorkloadFieldRestartPolicy                        = "restartPolicy"
 	WorkloadFieldRunAsGroup                           = "runAsGroup"
 	WorkloadFieldRunAsNonRoot                         = "runAsNonRoot"
 	WorkloadFieldRuntimeClassName                     = "runtimeClassName"
 	WorkloadFieldScale                                = "scale"
 	WorkloadFieldScheduling                           = "scheduling"
+	WorkloadFieldSchedulingGates                      = "schedulingGates"
 	WorkloadFieldSeccompProfile                       = "seccompProfile"
 	WorkloadFieldSelector                             = "selector"
 	WorkloadFieldServiceAccountName                   = "serviceAccountName"
@@ -130,6 +133,7 @@ type Workload struct {
 	NamespaceId                          string                                           `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
 	NodeID                               string                                           `json:"nodeId,omitempty" yaml:"nodeId,omitempty"`
 	OS                                   *PodOS                                           `json:"os,omitempty" yaml:"os,omitempty"`
+	Ordinals                             *StatefulSetOrdinals                             `json:"ordinals,omitempty" yaml:"ordinals,omitempty"`
 	Overhead                             map[string]string                                `json:"overhead,omitempty" yaml:"overhead,omitempty"`
 	OwnerReferences                      []OwnerReference                                 `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	Paused                               bool                                             `json:"paused,omitempty" yaml:"paused,omitempty"`
@@ -144,12 +148,14 @@ type Workload struct {
 	ReplicaSetStatus                     *ReplicaSetStatus                                `json:"replicaSetStatus,omitempty" yaml:"replicaSetStatus,omitempty"`
 	ReplicationControllerConfig          *ReplicationControllerConfig                     `json:"replicationControllerConfig,omitempty" yaml:"replicationControllerConfig,omitempty"`
 	ReplicationControllerStatus          *ReplicationControllerStatus                     `json:"replicationControllerStatus,omitempty" yaml:"replicationControllerStatus,omitempty"`
+	ResourceClaims                       []PodResourceClaim                               `json:"resourceClaims,omitempty" yaml:"resourceClaims,omitempty"`
 	RestartPolicy                        string                                           `json:"restartPolicy,omitempty" yaml:"restartPolicy,omitempty"`
 	RunAsGroup                           *int64                                           `json:"runAsGroup,omitempty" yaml:"runAsGroup,omitempty"`
 	RunAsNonRoot                         *bool                                            `json:"runAsNonRoot,omitempty" yaml:"runAsNonRoot,omitempty"`
 	RuntimeClassName                     string                                           `json:"runtimeClassName,omitempty" yaml:"runtimeClassName,omitempty"`
 	Scale                                *int64                                           `json:"scale,omitempty" yaml:"scale,omitempty"`
 	Scheduling                           *Scheduling                                      `json:"scheduling,omitempty" yaml:"scheduling,omitempty"`
+	SchedulingGates                      []PodSchedulingGate                              `json:"schedulingGates,omitempty" yaml:"schedulingGates,omitempty"`
 	SeccompProfile                       *SeccompProfile                                  `json:"seccompProfile,omitempty" yaml:"seccompProfile,omitempty"`
 	Selector                             *LabelSelector                                   `json:"selector,omitempty" yaml:"selector,omitempty"`
 	ServiceAccountName                   string                                           `json:"serviceAccountName,omitempty" yaml:"serviceAccountName,omitempty"`

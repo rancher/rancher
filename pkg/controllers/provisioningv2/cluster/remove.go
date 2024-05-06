@@ -6,7 +6,7 @@ import (
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
-	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
+	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/wrangler/pkg/generic"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -45,7 +45,7 @@ func (h *handler) OnClusterRemove(_ string, cluster *v1.Cluster) (*v1.Cluster, e
 	oldStatus := cluster.Status
 	cluster = cluster.DeepCopy()
 
-	err := rke2.DoRemoveAndUpdateStatus(cluster, h.doClusterRemove(cluster), h.clusters.EnqueueAfter)
+	err := capr.DoRemoveAndUpdateStatus(cluster, h.doClusterRemove(cluster), h.clusters.EnqueueAfter)
 
 	if equality.Semantic.DeepEqual(oldStatus, cluster.Status) {
 		return cluster, err
@@ -113,14 +113,14 @@ func (h *handler) doClusterRemove(cluster *v1.Cluster) func() (string, error) {
 			}
 		}
 
-		machines, err := h.capiMachinesCache.List(cluster.Namespace, labels.SelectorFromSet(labels.Set{capi.ClusterLabelName: cluster.Name}))
+		machines, err := h.capiMachinesCache.List(cluster.Namespace, labels.SelectorFromSet(labels.Set{capi.ClusterNameLabel: cluster.Name}))
 		if err != nil {
 			return "", err
 		}
 
 		// Machines will delete first so report their status, if any exist.
 		if len(machines) > 0 {
-			return rke2.GetMachineDeletionStatus(machines)
+			return capr.GetMachineDeletionStatus(machines)
 		}
 
 		if capiClusterErr == nil {
