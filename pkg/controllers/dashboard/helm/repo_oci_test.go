@@ -374,9 +374,9 @@ func TestShouldResetRetries(t *testing.T) {
 			timeNow: func() time.Time {
 				return time.Date(2024, 04, 23, 10, 1, 0, 0, time.UTC)
 			},
-			generation:         2,
-			observedGeneration: 3,
-			expected:           false,
+			generation:         3,
+			observedGeneration: 2,
+			expected:           true,
 		},
 	}
 
