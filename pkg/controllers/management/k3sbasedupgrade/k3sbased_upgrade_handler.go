@@ -81,7 +81,7 @@ func (h *handler) onClusterChange(key string, cluster *v3.Cluster) (*v3.Cluster,
 	}
 
 	// create or update k3supgradecontroller if necessary
-	if err = h.deployK3sBasedUpgradeController(cluster.Name, updateVersion, isK3s, isRke2); err != nil {
+	if err = h.deployK3sBasedUpgradeController(cluster.Name, isK3s, isRke2); err != nil {
 		return cluster, err
 	}
 
@@ -95,7 +95,7 @@ func (h *handler) onClusterChange(key string, cluster *v3.Cluster) (*v3.Cluster,
 
 // deployK3sBaseUpgradeController creates a rancher k3s/rke2 upgrader controller if one does not exist.
 // Updates k3s upgrader controller if one exists and is not the newest available version.
-func (h *handler) deployK3sBasedUpgradeController(clusterName, updateVersion string, isK3s, isRke2 bool) error {
+func (h *handler) deployK3sBasedUpgradeController(clusterName string, isK3s, isRke2 bool) error {
 	userCtx, err := h.manager.UserContextNoControllers(clusterName)
 	if err != nil {
 		return err
@@ -159,7 +159,6 @@ func (h *handler) deployK3sBasedUpgradeController(clusterName, updateVersion str
 				Description:     "Upgrade controller for k3s based clusters",
 				ExternalID:      latestVersionID,
 				ProjectName:     appProjectName,
-				Answers:         make(map[string]string),
 				TargetNamespace: systemUpgradeNS,
 			},
 		}
@@ -179,10 +178,12 @@ func (h *handler) deployK3sBasedUpgradeController(clusterName, updateVersion str
 			}
 		}
 
-		desiredApp := app.DeepCopy()
-		if desiredApp.Spec.Answers == nil {
-			desiredApp.Spec.Answers = make(map[string]string)
+		// everything is up-to-date and are set up properly, no need to update.
+		if app.Spec.ExternalID == latestVersionID {
+			return nil
 		}
+
+		desiredApp := app.DeepCopy()
 		desiredApp.Spec.ExternalID = latestVersionID
 		// new version of k3s upgrade available, or the valuesYaml have changed, update app
 		if _, err = appClient.Update(desiredApp); err != nil {
@@ -191,12 +192,6 @@ func (h *handler) deployK3sBasedUpgradeController(clusterName, updateVersion str
 	}
 
 	return nil
-}
-
-// Is125OrAbove determines if a particular Kubernetes version is
-// equal to or greater than 1.25.0
-func Is125OrAbove(version string) (bool, error) {
-	return IsNewerVersion("v1.24.99", version)
 }
 
 // IsNewerVersion returns true if updated versions semver is newer and false if its

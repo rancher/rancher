@@ -21,7 +21,6 @@ func TestManageSystemAgent_syncSystemUpgradeControllerStatusConditionManipulatio
 		controlPlaneName      string
 		controlPlaneNamespace string
 		kubernetesVersion     string
-		pspEnabled            bool
 		changeExpected        bool
 		bs                    fleetv1alpha1.BundleSummary
 	}
@@ -43,34 +42,6 @@ func TestManageSystemAgent_syncSystemUpgradeControllerStatusConditionManipulatio
 			},
 		},
 		{
-			name: "test for PSPs still enabled on 1.26",
-			args: args{
-				controlPlaneName:      "lol",
-				controlPlaneNamespace: "lol",
-				kubernetesVersion:     "v1.26.5+k3s1",
-				bs: fleetv1alpha1.BundleSummary{
-					DesiredReady: 1,
-					Ready:        1,
-				},
-				pspEnabled:     true,
-				changeExpected: true,
-			},
-		},
-		{
-			name: "test for PSPs disabled on 1.26",
-			args: args{
-				controlPlaneName:      "lol",
-				controlPlaneNamespace: "lol",
-				kubernetesVersion:     "v1.26.5+k3s1",
-				bs: fleetv1alpha1.BundleSummary{
-					DesiredReady: 1,
-					Ready:        1,
-				},
-				pspEnabled:     false,
-				changeExpected: false,
-			},
-		},
-		{
 			name: "test for super long controlplane name",
 			args: args{
 				controlPlaneName:      "ayyhxrojzehfiqampacgkqbqyewdjxwvhjowpikqqtxbkjqpegqaovgfehehkfg",
@@ -80,7 +51,6 @@ func TestManageSystemAgent_syncSystemUpgradeControllerStatusConditionManipulatio
 					DesiredReady: 1,
 					Ready:        1,
 				},
-				pspEnabled:     false,
 				changeExpected: false,
 			},
 		},
@@ -107,7 +77,7 @@ func TestManageSystemAgent_syncSystemUpgradeControllerStatusConditionManipulatio
 			}
 
 			capr.SystemUpgradeControllerReady.True(&mockControlPlane.Status)
-
+			capr.SystemUpgradeControllerReady.Message(&mockControlPlane.Status, "")
 			// Set the "last updated time" to the start of time, because RFC3339 only provides granularity at seconds and the test can run in less than a second (thus ensuring the timestamp is mutated when we expect it to be mutated)
 			capr.SystemUpgradeControllerReady.LastUpdated(&mockControlPlane.Status, time.Time{}.UTC().Format(time.RFC3339))
 			lu := capr.SystemUpgradeControllerReady.GetLastUpdated(&mockControlPlane.Status)
@@ -133,11 +103,7 @@ func TestManageSystemAgent_syncSystemUpgradeControllerStatusConditionManipulatio
 							Values: &fleetv1alpha1.GenericMap{
 								Data: map[string]interface{}{
 									"global": map[string]interface{}{
-										"cattle": map[string]interface{}{
-											"psp": map[string]interface{}{
-												"enabled": tt.args.pspEnabled,
-											},
-										},
+										"cattle": map[string]interface{}{},
 									},
 								},
 							},
