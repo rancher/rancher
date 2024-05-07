@@ -1,3 +1,5 @@
+//go:build (infra.rke2k3s || validation) && !infra.any && !infra.aks && !infra.eks && !infra.gke && !infra.rke1 && !stress && !sanity && !extended
+
 package deleting
 
 import (
@@ -53,6 +55,7 @@ func (d *DeleteInitMachineTestSuite) TestDeleteInitMachine() {
 	if strings.Contains(updatedCluster.Spec.KubernetesVersion, "rke2") {
 		name = "RKE2"
 	}
+
 	require.NotContains(d.T(), updatedCluster.Spec.KubernetesVersion, "-rancher")
 	require.NotEmpty(d.T(), updatedCluster.Spec.KubernetesVersion)
 
