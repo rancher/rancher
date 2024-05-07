@@ -241,6 +241,7 @@ type GenericOIDCProvider struct {
 	AuthProvider      `json:",inline"`
 
 	RedirectURL string `json:"redirectUrl"`
+	Scopes      string `json:"scopes"`
 }
 
 type GenericOIDCLogin struct {
