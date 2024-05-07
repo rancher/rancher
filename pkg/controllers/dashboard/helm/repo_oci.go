@@ -121,41 +121,43 @@ func (o *OCIRepohandler) onClusterRepoChange(key string, clusterRepo *catalog.Cl
 	index, err = oci.GenerateIndex(clusterRepo.Spec.URL, secret, clusterRepo.Spec, *newStatus, index)
 	// If there is 401 or 403 error code, then we don't reconcile further and wait for 6 hours interval
 	var errResp *errcode.ErrorResponse
-	if errors.As(err, &errResp) {
-		if errResp.StatusCode == http.StatusUnauthorized ||
-			errResp.StatusCode == http.StatusForbidden ||
-			errResp.StatusCode == http.StatusNotFound {
-			return o.set4xxCondition(clusterRepo, errResp, newStatus, nil)
+
+	// If there is 429 error code and max retry is reached, then we don't reconcile further and wait for 6 hours interval,
+	// but we also create the configmap for future usecases.
+	if errors.As(err, &errResp) && errResp.StatusCode == http.StatusTooManyRequests {
+		if index != nil && len(index.Entries) > 0 {
+			newStatus.URL = clusterRepo.Spec.URL
+
+			index.SortEntries()
+			_, err := createOrUpdateMap(clusterRepo.Namespace, index, owner, o.apply)
+			if err != nil {
+				logrus.Debugf("failed to create/udpate the configmap incase of 4xx statuscode for %s", clusterRepo.Name)
+			}
 		}
 
-		// If there is 429 error code and max retry is reached, then we don't reconcile further and wait for 6 hours interval,
-		// but we also create the configmap for future usecases.
-		if errResp.StatusCode == http.StatusTooManyRequests {
-			if index != nil && len(index.Entries) > 0 {
-				newStatus.URL = clusterRepo.Spec.URL
-
-				index.SortEntries()
-				_, err := createOrUpdateMap(clusterRepo.Namespace, index, owner, o.apply)
-				if err != nil {
-					logrus.Debugf("failed to create/udpate the configmap incase of 4xx statuscode for %s", clusterRepo.Name)
-				}
-			}
-
-			newStatus.NumberOfRetries++
-			if newStatus.NumberOfRetries > retryPolicy.MaxRetry {
-				newStatus.NumberOfRetries = 0
-				newStatus.NextRetryAt = metav1.Time{}
-				return o.set4xxCondition(clusterRepo, errResp, newStatus, nil)
-			}
-
-			backoff := calculateBackoff(clusterRepo, retryPolicy)
-
-			newStatus.NextRetryAt = metav1.Time{Time: timeNow().UTC().Add(backoff)}
-			return o.set4xxCondition(clusterRepo, errResp, newStatus, &backoff)
+		newStatus.NumberOfRetries++
+		if newStatus.NumberOfRetries > retryPolicy.MaxRetry {
+			newStatus.NumberOfRetries = 0
+			newStatus.NextRetryAt = metav1.Time{}
+			return o.setConditionWithInterval(clusterRepo, errResp, newStatus, nil)
 		}
+
+		backoff := calculateBackoff(clusterRepo, retryPolicy)
+
+		newStatus.NextRetryAt = metav1.Time{Time: timeNow().UTC().Add(backoff)}
+		return o.setConditionWithInterval(clusterRepo, errResp, newStatus, &backoff)
+
 	}
+	// If there is an error, we wait for the next interval to happen.
 	if err != nil {
-		return o.setErrorCondition(clusterRepo, err, newStatus)
+		errResp := &errcode.ErrorResponse{
+			Errors: []errcode.Error{
+				{
+					Message: err.Error(),
+				},
+			},
+		}
+		return o.setConditionWithInterval(clusterRepo, errResp, newStatus, nil)
 	}
 	if index == nil || len(index.Entries) <= 0 {
 		err = errors.New("there are no helm charts in the repository specified")
@@ -221,14 +223,13 @@ func (o *OCIRepohandler) setErrorCondition(clusterRepo *catalog.ClusterRepo, err
 	return clusterRepo, err
 }
 
-// set4xxCondition is only called when we receive a 4xx error
-// we need to wait for 6 hours to requeue.
-func (o *OCIRepohandler) set4xxCondition(clusterRepo *catalog.ClusterRepo, err *errcode.ErrorResponse, newStatus *catalog.RepoStatus, backoff *time.Duration) (*catalog.ClusterRepo, error) {
+// setConditionWithInterval is called to reenqueue the object
+// after the interval of 6 hours.
+func (o *OCIRepohandler) setConditionWithInterval(clusterRepo *catalog.ClusterRepo, err *errcode.ErrorResponse, newStatus *catalog.RepoStatus, backoff *time.Duration) (*catalog.ClusterRepo, error) {
 	if backoff != nil {
 		err.Errors = append(err.Errors, errcode.Error{Message: fmt.Sprintf(" will retry will after %s", backoff)})
 	} else {
 		err.Errors = append(err.Errors, errcode.Error{Message: fmt.Sprintf(" will retry will after %s", interval)})
-
 	}
 	ociDownloaded := condition.Cond(catalog.OCIDownloaded)
 	if apierrors.IsConflict(err) {
