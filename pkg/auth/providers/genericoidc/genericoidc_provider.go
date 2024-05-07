@@ -9,7 +9,6 @@ import (
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/pkg/errors"
-	"github.com/rancher/norman/httperror"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	baseoidc "github.com/rancher/rancher/pkg/auth/providers/oidc"
@@ -267,52 +266,6 @@ func (g *GenericOIDCProvider) toPrincipalFromToken(principalType string, princ v
 		}
 	}
 	return princ
-}
-
-func (g *GenericOIDCProvider) AuthenticateUser(ctx context.Context, input interface{}) (v3.Principal, []v3.Principal, string, error) {
-	login, ok := input.(*v32.GenericOIDCLogin)
-	if !ok {
-		return v3.Principal{}, nil, "", fmt.Errorf("unexpected input type")
-	}
-	userPrincipal, groupPrincipals, providerToken, _, err := g.LoginUser(ctx, login, nil)
-	return userPrincipal, groupPrincipals, providerToken, err
-}
-
-func (g *GenericOIDCProvider) LoginUser(ctx context.Context, oauthLoginInfo *v32.GenericOIDCLogin, config *v32.OIDCConfig) (v3.Principal, []v3.Principal, string, ClaimInfo, error) {
-	var userPrincipal v3.Principal
-	var groupPrincipals []v3.Principal
-	var userClaimInfo ClaimInfo
-	var err error
-
-	if config == nil {
-		config, err = g.GetOIDCConfig()
-		if err != nil {
-			return userPrincipal, nil, "", userClaimInfo, err
-		}
-	}
-	userInfo, oauth2Token, err := g.getUserInfo(&ctx, config, oauthLoginInfo.Code, &userClaimInfo, "")
-	if err != nil {
-		return userPrincipal, groupPrincipals, "", userClaimInfo, err
-	}
-	userPrincipal = g.userToPrincipal(userInfo, userClaimInfo)
-	userPrincipal.Me = true
-	groupPrincipals = g.getGroupsFromClaimInfo(userClaimInfo)
-
-	logrus.Debugf("[generic oidc] loginuser: checking user's access to rancher")
-	allowed, err := g.UserMGR.CheckAccess(config.AccessMode, config.AllowedPrincipalIDs, userPrincipal.Name, groupPrincipals)
-	if err != nil {
-		return userPrincipal, groupPrincipals, "", userClaimInfo, err
-	}
-	if !allowed {
-		return userPrincipal, groupPrincipals, "", userClaimInfo, httperror.NewAPIError(httperror.Unauthorized, "unauthorized")
-	}
-	// save entire oauthToken because it contains refresh_token and token expiry time
-	// will use with oauth2.Client and with TokenSource to ensure auto refresh of tokens occurs for api calls
-	oauthToken, err := json.Marshal(oauth2Token)
-	if err != nil {
-		return userPrincipal, groupPrincipals, "", userClaimInfo, err
-	}
-	return userPrincipal, groupPrincipals, string(oauthToken), userClaimInfo, nil
 }
 
 func (g *GenericOIDCProvider) getUserInfo(ctx *context.Context, config *v32.OIDCConfig, authCode string, claimInfo *ClaimInfo, userName string) (*oidc.UserInfo, *oauth2.Token, error) {

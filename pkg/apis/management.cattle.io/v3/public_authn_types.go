@@ -247,7 +247,3 @@ type GenericOIDCLogin struct {
 	GenericLogin `json:",inline"`
 	Code         string `json:"code" norman:"type=string,required"`
 }
-
-type GenericCloakOIDCProvider struct {
-	GenericOIDCProvider `json:",inline"`
-}

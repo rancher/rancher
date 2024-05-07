@@ -499,11 +499,9 @@ type GenericOIDCConfig struct {
 }
 
 type GenericOIDCTestOutput struct {
-	RedirectURL string `json:"redirectUrl"`
+	OIDCTestOutput `json:",inline" mapstructure:",squash"`
 }
 
 type GenericOIDCApplyInput struct {
-	OIDCConfig OIDCConfig `json:"oidcConfig,omitempty"`
-	Code       string     `json:"code,omitempty"`
-	Enabled    bool       `json:"enabled,omitempty"`
+	OIDCApplyInput `json:",inline" mapstructure:",squash"`
 }
