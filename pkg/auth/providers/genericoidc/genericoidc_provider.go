@@ -60,6 +60,7 @@ func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.
 	}
 }
 
+// GetName returns the name of this provider.
 func (g *GenericOIDCProvider) GetName() string {
 	return Name
 }
@@ -123,6 +124,7 @@ func (g *GenericOIDCProvider) GetPrincipal(principalID string, token v3.Token) (
 	return p, nil
 }
 
+// TransformToAuthProvider yields information used, typically by the UI, to be able to form URLs used to perform login.
 func (g *GenericOIDCProvider) TransformToAuthProvider(authConfig map[string]interface{}) (map[string]interface{}, error) {
 	p := common.TransformToAuthProvider(authConfig)
 	p[publicclient.GenericOIDCProviderFieldRedirectURL] = g.getRedirectURL(authConfig)
@@ -130,12 +132,13 @@ func (g *GenericOIDCProvider) TransformToAuthProvider(authConfig map[string]inte
 	return p, nil
 }
 
-// RefetchGroupPrincipals is not implemented for OIDC.  The typical lifespan of a refresh token (minutes, not hours or days)
-// would not grant the functionality that we require.
+// RefetchGroupPrincipals is not implemented for OIDC.
 func (g *GenericOIDCProvider) RefetchGroupPrincipals(principalID string, secret string) ([]v3.Principal, error) {
 	return nil, errors.New("Not implemented")
 }
 
+// GetOIDCConfig fetches necessary details from the AuthConfig object and returns the parts required in order
+// to configure an OIDC library provider object.
 func (g *GenericOIDCProvider) GetOIDCConfig() (*v32.OIDCConfig, error) {
 	authConfigObj, err := g.AuthConfigs.ObjectClient().UnstructuredClient().Get(g.Name, metav1.GetOptions{})
 	if err != nil {
@@ -174,18 +177,8 @@ func (g *GenericOIDCProvider) GetOIDCConfig() (*v32.OIDCConfig, error) {
 	return storedOidcConfig, nil
 }
 
-func (g *GenericOIDCProvider) UpdateToken(refreshedToken *oauth2.Token, userID string) error {
-	var err error
-	logrus.Debugf("[generic oidc] UpdateToken: access token has been refreshed")
-	marshalledToken, err := json.Marshal(refreshedToken)
-	if err != nil {
-		return err
-	}
-	logrus.Debugf("[generic oidc] UpdateToken: saving refreshed access token")
-	g.TokenMGR.UpdateSecret(userID, g.Name, string(marshalledToken))
-	return err
-}
-
+// userToPrincipal takes user-related information from OIDC's UserInfo and combines it with information present
+// in the claims to form and return a v3.Principal object.
 func (g *GenericOIDCProvider) userToPrincipal(userInfo *oidc.UserInfo, claimInfo ClaimInfo) v3.Principal {
 	displayName := claimInfo.Name
 	if displayName == "" {
@@ -202,6 +195,7 @@ func (g *GenericOIDCProvider) userToPrincipal(userInfo *oidc.UserInfo, claimInfo
 	return p
 }
 
+// getGroupsFromClaimInfo takes the claims that we get from the OIDC provider and returns a slice of groupPrincipals.
 func (g *GenericOIDCProvider) getGroupsFromClaimInfo(claimInfo ClaimInfo) []v3.Principal {
 	var groupPrincipals []v3.Principal
 
@@ -226,6 +220,8 @@ func (g *GenericOIDCProvider) getGroupsFromClaimInfo(claimInfo ClaimInfo) []v3.P
 	return groupPrincipals
 }
 
+// groupToPrincipal takes a bare group name and turns it into a v3.Principal group object by filling-in other fields
+// with basic provider information.
 func (g *GenericOIDCProvider) groupToPrincipal(groupName string) v3.Principal {
 	p := v3.Principal{
 		ObjectMeta:    metav1.ObjectMeta{Name: g.Name + "_" + GroupType + "://" + groupName},
@@ -237,6 +233,7 @@ func (g *GenericOIDCProvider) groupToPrincipal(groupName string) v3.Principal {
 	return p
 }
 
+// getRedirectURL uses the AuthConfig map to build-up the redirect URL passed to the OIDC provider at login-time.
 func (g *GenericOIDCProvider) getRedirectURL(config map[string]interface{}) string {
 	// TODO maybe use discovery in case authurl isn't present...might not be needed if authendpoint is already set in config
 
@@ -250,6 +247,8 @@ func (g *GenericOIDCProvider) getRedirectURL(config map[string]interface{}) stri
 	)
 }
 
+// toPrincipalFromToken uses additional information about the principal found in the token, if available, to provide
+// a more detailed, useful Principal object.
 func (g *GenericOIDCProvider) toPrincipalFromToken(principalType string, princ v3.Principal, token *v3.Token) v3.Principal {
 	if principalType == UserType {
 		princ.PrincipalType = UserType
@@ -269,6 +268,8 @@ func (g *GenericOIDCProvider) toPrincipalFromToken(principalType string, princ v
 	return princ
 }
 
+// getUserInfo takes all the OIDC provider config information, along with a user's oauth auth code to query the
+// OIDC provider for details about the given user.
 func (g *GenericOIDCProvider) getUserInfo(ctx *context.Context, config *v32.OIDCConfig, authCode string, claimInfo *ClaimInfo, userName string) (*oidc.UserInfo, *oauth2.Token, error) {
 	var userInfo *oidc.UserInfo
 	var oauth2Token *oauth2.Token
