@@ -10,7 +10,6 @@ import (
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
-	"github.com/rancher/norman/types/convert"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	baseoidc "github.com/rancher/rancher/pkg/auth/providers/oidc"
@@ -137,27 +136,6 @@ func (g *GenericOIDCProvider) RefetchGroupPrincipals(principalID string, secret 
 	return nil, errors.New("Not implemented")
 }
 
-func (g *GenericOIDCProvider) CanAccessWithGroupProviders(userPrincipalID string, groupPrincipals []v3.Principal) (bool, error) {
-	config, err := g.GetOIDCConfig()
-	if err != nil {
-		logrus.Errorf("[generic oidc] canAccessWithGroupProviders: error fetching OIDCConfig: %v", err)
-		return false, err
-	}
-	allowed, err := g.UserMGR.CheckAccess(config.AccessMode, config.AllowedPrincipalIDs, userPrincipalID, groupPrincipals)
-	if err != nil {
-		return false, err
-	}
-	return allowed, nil
-}
-
-func (g *GenericOIDCProvider) IsDisabledProvider() (bool, error) {
-	oidcConfig, err := g.GetOIDCConfig()
-	if err != nil {
-		return false, err
-	}
-	return !oidcConfig.Enabled, nil
-}
-
 func (g *GenericOIDCProvider) GetOIDCConfig() (*v32.OIDCConfig, error) {
 	authConfigObj, err := g.AuthConfigs.ObjectClient().UnstructuredClient().Get(g.Name, metav1.GetOptions{})
 	if err != nil {
@@ -177,7 +155,7 @@ func (g *GenericOIDCProvider) GetOIDCConfig() (*v32.OIDCConfig, error) {
 	}
 
 	if storedOidcConfig.PrivateKey != "" {
-		value, err := common.ReadFromSecret(g.Secrets, storedOidcConfig.PrivateKey, strings.ToLower(client.OIDCConfigFieldPrivateKey))
+		value, err := common.ReadFromSecret(g.Secrets, storedOidcConfig.PrivateKey, strings.ToLower(client.GenericOIDCConfigFieldPrivateKey))
 		if err != nil {
 			return nil, err
 		}
@@ -272,35 +250,6 @@ func (g *GenericOIDCProvider) getRedirectURL(config map[string]interface{}) stri
 	)
 }
 
-func (g *GenericOIDCProvider) saveOIDCConfig(config *v32.OIDCConfig) error {
-	storedOidcConfig, err := g.GetOIDCConfig()
-	if err != nil {
-		return err
-	}
-	config.APIVersion = "management.cattle.io/v3"
-	config.Kind = v3.AuthConfigGroupVersionKind.Kind
-	config.Type = g.Type
-	config.ObjectMeta = storedOidcConfig.ObjectMeta
-
-	if config.PrivateKey != "" {
-		privateKeyField := strings.ToLower(client.OIDCConfigFieldPrivateKey)
-		if err = common.CreateOrUpdateSecrets(g.Secrets, config.PrivateKey, privateKeyField, strings.ToLower(config.Type)); err != nil {
-			return err
-		}
-		config.PrivateKey = common.GetFullSecretName(config.Type, privateKeyField)
-	}
-
-	secretField := strings.ToLower(client.OIDCConfigFieldClientSecret)
-	if err := common.CreateOrUpdateSecrets(g.Secrets, convert.ToString(config.ClientSecret), secretField, strings.ToLower(config.Type)); err != nil {
-		return err
-	}
-	config.ClientSecret = common.GetFullSecretName(config.Type, secretField)
-
-	logrus.Debugf("[generic oidc] saveOIDCConfig: updating config")
-	_, err = g.AuthConfigs.ObjectClient().Update(config.ObjectMeta.Name, config)
-	return err
-}
-
 func (g *GenericOIDCProvider) toPrincipalFromToken(principalType string, princ v3.Principal, token *v3.Token) v3.Principal {
 	if principalType == UserType {
 		princ.PrincipalType = UserType
@@ -380,7 +329,7 @@ func (g *GenericOIDCProvider) getUserInfo(ctx *context.Context, config *v32.OIDC
 	if err != nil {
 		return userInfo, oauth2Token, err
 	}
-	oauthConfig := ConfigToOauthConfig(provider.Endpoint(), config)
+	oauthConfig := baseoidc.ConfigToOauthConfig(provider.Endpoint(), config)
 	var verifier = provider.Verifier(&oidc.Config{ClientID: config.ClientID})
 	if err := json.Unmarshal([]byte(authCode), &oauth2Token); err != nil {
 		oauth2Token, err = oauthConfig.Exchange(updatedContext, authCode, oauth2.SetAuthURLParam("scope", strings.Join(oauthConfig.Scopes, " ")))
@@ -419,26 +368,4 @@ func (g *GenericOIDCProvider) getUserInfo(ctx *context.Context, config *v32.OIDC
 	}
 
 	return userInfo, oauth2Token, nil
-}
-
-func ConfigToOauthConfig(endpoint oauth2.Endpoint, config *v32.OIDCConfig) oauth2.Config {
-	var finalScopes []string
-	hasOIDCScope := strings.Contains(config.Scopes, oidc.ScopeOpenID)
-	// scopes must be space separated in string when passed into the api
-	configScopes := strings.Split(config.Scopes, " ")
-	if !hasOIDCScope {
-		configScopes = append(configScopes, oidc.ScopeOpenID)
-	}
-	for _, scope := range configScopes {
-		if scope != "" {
-			finalScopes = append(finalScopes, scope)
-		}
-	}
-	return oauth2.Config{
-		ClientID:     config.ClientID,
-		ClientSecret: config.ClientSecret,
-		Endpoint:     endpoint,
-		RedirectURL:  config.RancherURL,
-		Scopes:       finalScopes,
-	}
 }
