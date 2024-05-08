@@ -19,14 +19,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
-const (
-	// PSPAnswersField is passed to the helm --set command and denotes if we want to enable PodSecurityPolicies
-	// when deploying the app, overriding the default value of 'true'.
-	// In clusters >= 1.25 PSP's are not available, however we should
-	// continue to deploy them in sub 1.25 clusters as they are required for cluster hardening.
-	PSPAnswersField = "global.cattle.psp.enabled"
-)
-
 func (h *handler) onClusterChange(key string, cluster *v3.Cluster) (*v3.Cluster, error) {
 	if cluster == nil || cluster.DeletionTimestamp != nil {
 		return nil, nil
@@ -139,18 +131,6 @@ func (h *handler) deployK3sBasedUpgradeController(clusterName, updateVersion str
 		return err
 	}
 
-	// determine what version of Kubernetes we are updating to
-	is125OrAbove, err := Is125OrAbove(updateVersion)
-	if err != nil {
-		return err
-	}
-
-	// if we are using a version above or equal to 1.25 we need to explicitly disable PSPs
-	enablePSPInChart := "false"
-	if !is125OrAbove {
-		enablePSPInChart = "true"
-	}
-
 	appLister := userCtx.Management.Project.Apps("").Controller().Lister()
 	appClient := userCtx.Management.Project.Apps("")
 
@@ -184,8 +164,6 @@ func (h *handler) deployK3sBasedUpgradeController(clusterName, updateVersion str
 			},
 		}
 
-		desiredApp.Spec.Answers[PSPAnswersField] = enablePSPInChart
-
 		// k3s upgrader doesn't exist yet, so it will need to be created
 		if _, err = appClient.Create(desiredApp); err != nil {
 			return err
@@ -201,22 +179,10 @@ func (h *handler) deployK3sBasedUpgradeController(clusterName, updateVersion str
 			}
 		}
 
-		externalIDIsCorrect := app.Spec.ExternalID == latestVersionID
-		pspValuesHaveBeenSet := false
-		if app.Spec.Answers != nil {
-			pspValuesHaveBeenSet = app.Spec.Answers[PSPAnswersField] == enablePSPInChart
-		}
-
-		// everything is up-to-date and PSP attributes are set up properly, no need to update.
-		if externalIDIsCorrect && pspValuesHaveBeenSet {
-			return nil
-		}
-
 		desiredApp := app.DeepCopy()
 		if desiredApp.Spec.Answers == nil {
 			desiredApp.Spec.Answers = make(map[string]string)
 		}
-		desiredApp.Spec.Answers[PSPAnswersField] = enablePSPInChart
 		desiredApp.Spec.ExternalID = latestVersionID
 		// new version of k3s upgrade available, or the valuesYaml have changed, update app
 		if _, err = appClient.Update(desiredApp); err != nil {

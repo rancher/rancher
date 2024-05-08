@@ -1,8 +1,6 @@
 package managesystemagent
 
 import (
-	"encoding/base64"
-	"encoding/json"
 	"fmt"
 
 	"github.com/Masterminds/semver/v3"
@@ -70,10 +68,6 @@ func (h *handler) OnChangeInstallSUC(cluster *rancherv1.Cluster, status rancherv
 	return []runtime.Object{
 		mcc,
 	}, status, nil
-}
-
-type SUCMetadata struct {
-	PspEnabled bool
 }
 
 // syncSystemUpgradeControllerStatus queries the managed system-upgrade-controller chart and determines if it is properly configured for a given
@@ -179,15 +173,11 @@ func (h *handler) syncSystemUpgradeControllerStatus(obj *rkev1.RKEControlPlane, 
 		return status, nil
 	}
 
-	metadata, err := json.Marshal(SUCMetadata{
-		PspEnabled: enabled,
-	})
 	if err != nil {
 		logrus.Errorf("[managesystemagentplan] rkecluster %s/%s: error while marshaling SUC Metadata: %v", obj.Namespace, obj.Name, err)
 		return status, err
 	}
 
-	capr.SystemUpgradeControllerReady.Message(&status, base64.StdEncoding.EncodeToString(metadata))
 	capr.SystemUpgradeControllerReady.Reason(&status, "")
 	capr.SystemUpgradeControllerReady.True(&status)
 	return status, nil
