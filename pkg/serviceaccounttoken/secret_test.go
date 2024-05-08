@@ -3,6 +3,7 @@ package serviceaccounttoken
 import (
 	"context"
 	"fmt"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -11,6 +12,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
 )
@@ -336,6 +338,71 @@ func TestServiceAccountSecret(t *testing.T) {
 				require.Nil(t, err)
 			}
 		})
+	}
+}
+
+func TestEnsureSecretForServiceAccount_in_parallel(t *testing.T) {
+	k8sClient := fake.NewSimpleClientset()
+	var m sync.Mutex
+	var created []*v1.Secret
+
+	k8sClient.PrependReactor("*", "leases",
+		func(a k8stesting.Action) (bool, runtime.Object, error) {
+			switch action := a.(type) {
+			case k8stesting.CreateAction:
+				ret := action.GetObject()
+				return true, ret, nil
+			case k8stesting.DeleteAction:
+				return true, nil, nil
+			}
+			return false, nil, nil
+		})
+
+	k8sClient.PrependReactor("list", "secrets",
+		func(a k8stesting.Action) (bool, runtime.Object, error) {
+			m.Lock()
+			defer m.Unlock()
+
+			secrets := &v1.SecretList{}
+			for _, v := range created {
+				secrets.Items = append(secrets.Items, *v)
+			}
+
+			return true, secrets, nil
+		},
+	)
+
+	k8sClient.PrependReactor("create", "secrets",
+		func(action k8stesting.Action) (bool, runtime.Object, error) {
+			ret := action.(k8stesting.CreateAction).GetObject().(*v1.Secret)
+			ret.ObjectMeta.Name = ret.GenerateName + rand.String(5)
+			ret.Data = map[string][]byte{
+				"token": []byte("abcde"),
+			}
+			created = append(created, ret)
+			return true, ret, nil
+		},
+	)
+
+	var wg sync.WaitGroup
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, err := EnsureSecretForServiceAccount(context.Background(), nil, k8sClient, &v1.ServiceAccount{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					Namespace: "default",
+				},
+			})
+			assert.NoError(t, err)
+		}()
+	}
+
+	wg.Wait()
+
+	if l := len(created); l != 1 {
+		t.Fatalf("EnsureSecretForServiceAccount() created %d secrets, want 1", l)
 	}
 }
 
