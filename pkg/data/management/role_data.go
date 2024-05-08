@@ -47,7 +47,6 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("management.cattle.io").resources("templates", "templateversions").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("nodedrivers").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("kontainerdrivers").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("podsecuritypolicytemplates").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("podsecurityadmissionconfigurationtemplates").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("nodetemplates").verbs("*").
 		addRule().apiGroups("").resources("secrets").verbs("create").
@@ -76,8 +75,6 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("management.cattle.io").resources("settings").verbs("*")
 	rb.addRole("Manage Features", "features-manage").
 		addRule().apiGroups("management.cattle.io").resources("features").verbs("get", "list", "watch", "update")
-	rb.addRole("Manage PodSecurityPolicy Templates", "podsecuritypolicytemplates-manage").
-		addRule().apiGroups("management.cattle.io").resources("podsecuritypolicytemplates").verbs("*")
 	rb.addRole("Create RKE Templates", "clustertemplates-create").
 		addRule().apiGroups("management.cattle.io").resources("clustertemplates").verbs("create")
 	rb.addRole("Create RKE Template Revisions", "clustertemplaterevisions-create").
@@ -99,7 +96,6 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("management.cattle.io").resources("globalrolebindings").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("globalroles").verbs("delete", "deletecollection", "get", "list", "patch", "create", "update", "watch").
 		addRule().apiGroups("management.cattle.io").resources("users", "userattribute", "groups", "groupmembers").verbs("*").
-		addRule().apiGroups("management.cattle.io").resources("podsecuritypolicytemplates").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("podsecurityadmissionconfigurationtemplates").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("fleetworkspaces").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("authconfigs").verbs("*").
@@ -117,7 +113,6 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 	userRole := addUserRules(rb.addRole("User", "user"))
 	userRole.
 		addRule().apiGroups("catalog.cattle.io").resources("clusterrepos").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("podsecuritypolicytemplates").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("podsecurityadmissionconfigurationtemplates").verbs("get", "list", "watch")
 
 	userRole.addNamespacedRule("cattle-global-data").addRule().apiGroups("").resources("secrets").verbs("create")

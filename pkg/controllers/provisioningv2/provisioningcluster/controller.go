@@ -261,10 +261,6 @@ func reconcileClusterSpecEtcdRestore(cluster *rancherv1.Cluster, desiredSpec ran
 		changed = true
 		cluster.Spec.KubernetesVersion = desiredSpec.KubernetesVersion
 	}
-	if cluster.Spec.DefaultPodSecurityPolicyTemplateName != desiredSpec.DefaultPodSecurityPolicyTemplateName {
-		changed = true
-		cluster.Spec.DefaultPodSecurityPolicyTemplateName = desiredSpec.DefaultPodSecurityPolicyTemplateName
-	}
 	if cluster.Spec.DefaultPodSecurityAdmissionConfigurationTemplateName != desiredSpec.DefaultPodSecurityAdmissionConfigurationTemplateName {
 		changed = true
 		cluster.Spec.DefaultPodSecurityAdmissionConfigurationTemplateName = desiredSpec.DefaultPodSecurityAdmissionConfigurationTemplateName
