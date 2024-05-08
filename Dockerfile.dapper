@@ -27,7 +27,7 @@ RUN if [ "${ARCH}" != "s390x" ]; then \
         curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | TAG=${K3D_VERSION} bash; \
     fi
 
-ENV GOLANGCI_LINT v1.56.0
+ENV GOLANGCI_LINT v1.57.2
 RUN if [ "${ARCH}" == "amd64" ]; then \
         curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s "${GOLANGCI_LINT}"; \
         curl -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/fossas/spectrometer/master/install.sh | sh; \

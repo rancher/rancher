@@ -223,14 +223,14 @@ func (s *Store) validateChartCompatibility(id string, data map[string]interface{
 
 func checkDuplicateTargets(data map[string]interface{}) error {
 	targets, _ := values.GetSlice(data, "targets")
-	projectIds := map[string]bool{}
+	projectIDs := map[string]bool{}
 	for _, target := range targets {
 		id := convert.ToString(values.GetValueN(target, "projectId"))
 		if id != "" {
-			if _, ok := projectIds[id]; ok {
+			if _, ok := projectIDs[id]; ok {
 				return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("duplicate projects in targets %s", id))
 			}
-			projectIds[id] = true
+			projectIDs[id] = true
 		}
 	}
 	return nil
