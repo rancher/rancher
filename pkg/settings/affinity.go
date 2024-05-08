@@ -80,7 +80,7 @@ const (
     ]
   },
   "podAntiAffinity": {
-    "preferredDuringSchedulingIgnoredDuringExecution": [
+    "requiredDuringSchedulingIgnoredDuringExecution": [
       {
         "weight": 100,
         "podAffinityTerm": {
