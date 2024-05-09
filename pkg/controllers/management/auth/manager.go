@@ -69,6 +69,13 @@ func newRTBLifecycles(management *config.ManagementContext) (*prtbLifecycle, *cr
 		},
 		projectLister: management.Management.Projects("").Controller().Lister(),
 		clusterLister: management.Management.Clusters("").Controller().Lister(),
+		userMGR:       management.UserManager,
+		userLister:    management.Management.Users("").Controller().Lister(),
+		rbLister:      management.RBAC.RoleBindings("").Controller().Lister(),
+		rbClient:      management.RBAC.RoleBindings(""),
+		crbLister:     management.RBAC.ClusterRoleBindings("").Controller().Lister(),
+		crbClient:     management.RBAC.ClusterRoleBindings(""),
+		prtbClient:    management.Management.ProjectRoleTemplateBindings(""),
 	}
 	crtb := &crtbLifecycle{
 		mgr: &manager{
