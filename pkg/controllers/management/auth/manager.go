@@ -97,6 +97,15 @@ func newRTBLifecycles(management *config.ManagementContext) (*prtbLifecycle, *cr
 	return prtb, crtb
 }
 
+type managerInterface interface {
+	reconcileClusterMembershipBindingForDelete(string, string) error
+	removeAuthV2Permissions(string, runtime.Object) error
+	checkReferencedRoles(string, string, int) (bool, error)
+	ensureClusterMembershipBinding(string, string, *v3.Cluster, bool, v1.Subject) error
+	grantManagementPlanePrivileges(string, map[string]string, v1.Subject, interface{}) error
+	grantManagementClusterScopedPrivilegesInProjectNamespace(string, string, map[string]string, v1.Subject, *v3.ClusterRoleTemplateBinding) error
+}
+
 type manager struct {
 	crLister   typesrbacv1.ClusterRoleLister
 	rLister    typesrbacv1.RoleLister

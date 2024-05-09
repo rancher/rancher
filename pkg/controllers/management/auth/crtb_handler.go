@@ -59,7 +59,7 @@ var clusterManagmentPlaneResources = map[string]string{
 }
 
 type crtbLifecycle struct {
-	mgr           *manager
+	mgr           managerInterface
 	clusterLister v3.ClusterLister
 	userMGR       user.Manager
 	userLister    v3.UserLister
