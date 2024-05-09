@@ -9,7 +9,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/norman/types/slice"
-	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/rbac"
 	v13 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -92,30 +91,37 @@ func newRTBLifecycles(management *config.ManagementContext) (*prtbLifecycle, *cr
 			crtbs:         management.Management.ClusterRoleTemplateBindings(""),
 		},
 		clusterLister: management.Management.Clusters("").Controller().Lister(),
+		userMGR:       management.UserManager,
+		userLister:    management.Management.Users("").Controller().Lister(),
+		projectLister: management.Management.Projects("").Controller().Lister(),
+		rbLister:      management.RBAC.RoleBindings("").Controller().Lister(),
+		rbClient:      management.RBAC.RoleBindings(""),
+		crbLister:     management.RBAC.ClusterRoleBindings("").Controller().Lister(),
+		crbClient:     management.RBAC.ClusterRoleBindings(""),
+		crtbClient:    management.Management.ClusterRoleTemplateBindings(""),
 	}
 	return prtb, crtb
 }
 
 type manager struct {
-	projectLister  v3.ProjectLister
-	crLister       typesrbacv1.ClusterRoleLister
-	rLister        typesrbacv1.RoleLister
-	rClient        typesrbacv1.RoleInterface
-	rbLister       typesrbacv1.RoleBindingLister
-	rbClient       typesrbacv1.RoleBindingInterface
-	crbLister      typesrbacv1.ClusterRoleBindingLister
-	crbClient      typesrbacv1.ClusterRoleBindingInterface
-	rtLister       v3.RoleTemplateLister
-	nsLister       v13.NamespaceLister
-	userLister     v3.UserLister
-	rbIndexer      cache.Indexer
-	crbIndexer     cache.Indexer
-	mgmt           *config.ManagementContext
-	userMGR        user.Manager
-	controller     string
-	clusterManager *clustermanager.Manager
-	crtbs          v3.ClusterRoleTemplateBindingInterface
-	prtbs          v3.ProjectRoleTemplateBindingInterface
+	projectLister v3.ProjectLister
+	crLister      typesrbacv1.ClusterRoleLister
+	rLister       typesrbacv1.RoleLister
+	rClient       typesrbacv1.RoleInterface
+	rbLister      typesrbacv1.RoleBindingLister
+	rbClient      typesrbacv1.RoleBindingInterface
+	crbLister     typesrbacv1.ClusterRoleBindingLister
+	crbClient     typesrbacv1.ClusterRoleBindingInterface
+	rtLister      v3.RoleTemplateLister
+	nsLister      v13.NamespaceLister
+	userLister    v3.UserLister
+	rbIndexer     cache.Indexer
+	crbIndexer    cache.Indexer
+	mgmt          *config.ManagementContext
+	userMGR       user.Manager
+	controller    string
+	crtbs         v3.ClusterRoleTemplateBindingInterface
+	prtbs         v3.ProjectRoleTemplateBindingInterface
 }
 
 // When a CRTB is created that gives a subject some permissions in a project or cluster, we need to create a "membership" binding
