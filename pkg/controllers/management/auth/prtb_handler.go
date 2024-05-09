@@ -46,7 +46,7 @@ var prtbClusterManagmentPlaneResources = map[string]string{
 }
 
 type prtbLifecycle struct {
-	mgr           *manager
+	mgr           managerInterface
 	projectLister v3.ProjectLister
 	clusterLister v3.ClusterLister
 	userMGR       user.Manager
