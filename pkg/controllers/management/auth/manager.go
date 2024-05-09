@@ -15,7 +15,6 @@ import (
 	typesrbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
 	pkgrbac "github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
-	"github.com/rancher/rancher/pkg/user"
 	"github.com/rancher/wrangler/v2/pkg/apply"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
@@ -49,23 +48,17 @@ func newRTBLifecycles(management *config.ManagementContext) (*prtbLifecycle, *cr
 
 	prtb := &prtbLifecycle{
 		mgr: &manager{
-			mgmt:          management,
-			projectLister: management.Management.Projects("").Controller().Lister(),
-			crbLister:     management.RBAC.ClusterRoleBindings("").Controller().Lister(),
-			crbClient:     management.RBAC.ClusterRoleBindings(""),
-			crLister:      management.RBAC.ClusterRoles("").Controller().Lister(),
-			nsLister:      management.Core.Namespaces("").Controller().Lister(),
-			rLister:       management.RBAC.Roles("").Controller().Lister(),
-			rClient:       management.RBAC.Roles(""),
-			rbLister:      management.RBAC.RoleBindings("").Controller().Lister(),
-			rbClient:      management.RBAC.RoleBindings(""),
-			rtLister:      management.Management.RoleTemplates("").Controller().Lister(),
-			userLister:    management.Management.Users("").Controller().Lister(),
-			rbIndexer:     rbInformer.GetIndexer(),
-			crbIndexer:    crbInformer.GetIndexer(),
-			userMGR:       management.UserManager,
-			controller:    ptrbMGMTController,
-			prtbs:         management.Management.ProjectRoleTemplateBindings(""),
+			mgmt:       management,
+			crLister:   management.RBAC.ClusterRoles("").Controller().Lister(),
+			nsLister:   management.Core.Namespaces("").Controller().Lister(),
+			rLister:    management.RBAC.Roles("").Controller().Lister(),
+			rClient:    management.RBAC.Roles(""),
+			rbLister:   management.RBAC.RoleBindings("").Controller().Lister(),
+			rbClient:   management.RBAC.RoleBindings(""),
+			rtLister:   management.Management.RoleTemplates("").Controller().Lister(),
+			rbIndexer:  rbInformer.GetIndexer(),
+			crbIndexer: crbInformer.GetIndexer(),
+			controller: ptrbMGMTController,
 		},
 		projectLister: management.Management.Projects("").Controller().Lister(),
 		clusterLister: management.Management.Clusters("").Controller().Lister(),
@@ -79,23 +72,17 @@ func newRTBLifecycles(management *config.ManagementContext) (*prtbLifecycle, *cr
 	}
 	crtb := &crtbLifecycle{
 		mgr: &manager{
-			mgmt:          management,
-			projectLister: management.Management.Projects("").Controller().Lister(),
-			crbLister:     management.RBAC.ClusterRoleBindings("").Controller().Lister(),
-			crbClient:     management.RBAC.ClusterRoleBindings(""),
-			crLister:      management.RBAC.ClusterRoles("").Controller().Lister(),
-			nsLister:      management.Core.Namespaces("").Controller().Lister(),
-			rLister:       management.RBAC.Roles("").Controller().Lister(),
-			rClient:       management.RBAC.Roles(""),
-			rbLister:      management.RBAC.RoleBindings("").Controller().Lister(),
-			rbClient:      management.RBAC.RoleBindings(""),
-			rtLister:      management.Management.RoleTemplates("").Controller().Lister(),
-			userLister:    management.Management.Users("").Controller().Lister(),
-			rbIndexer:     rbInformer.GetIndexer(),
-			crbIndexer:    crbInformer.GetIndexer(),
-			userMGR:       management.UserManager,
-			controller:    ctrbMGMTController,
-			crtbs:         management.Management.ClusterRoleTemplateBindings(""),
+			mgmt:       management,
+			crLister:   management.RBAC.ClusterRoles("").Controller().Lister(),
+			nsLister:   management.Core.Namespaces("").Controller().Lister(),
+			rLister:    management.RBAC.Roles("").Controller().Lister(),
+			rClient:    management.RBAC.Roles(""),
+			rbLister:   management.RBAC.RoleBindings("").Controller().Lister(),
+			rbClient:   management.RBAC.RoleBindings(""),
+			rtLister:   management.Management.RoleTemplates("").Controller().Lister(),
+			rbIndexer:  rbInformer.GetIndexer(),
+			crbIndexer: crbInformer.GetIndexer(),
+			controller: ctrbMGMTController,
 		},
 		clusterLister: management.Management.Clusters("").Controller().Lister(),
 		userMGR:       management.UserManager,
@@ -111,24 +98,17 @@ func newRTBLifecycles(management *config.ManagementContext) (*prtbLifecycle, *cr
 }
 
 type manager struct {
-	projectLister v3.ProjectLister
-	crLister      typesrbacv1.ClusterRoleLister
-	rLister       typesrbacv1.RoleLister
-	rClient       typesrbacv1.RoleInterface
-	rbLister      typesrbacv1.RoleBindingLister
-	rbClient      typesrbacv1.RoleBindingInterface
-	crbLister     typesrbacv1.ClusterRoleBindingLister
-	crbClient     typesrbacv1.ClusterRoleBindingInterface
-	rtLister      v3.RoleTemplateLister
-	nsLister      v13.NamespaceLister
-	userLister    v3.UserLister
-	rbIndexer     cache.Indexer
-	crbIndexer    cache.Indexer
-	mgmt          *config.ManagementContext
-	userMGR       user.Manager
-	controller    string
-	crtbs         v3.ClusterRoleTemplateBindingInterface
-	prtbs         v3.ProjectRoleTemplateBindingInterface
+	crLister   typesrbacv1.ClusterRoleLister
+	rLister    typesrbacv1.RoleLister
+	rClient    typesrbacv1.RoleInterface
+	rbLister   typesrbacv1.RoleBindingLister
+	rbClient   typesrbacv1.RoleBindingInterface
+	rtLister   v3.RoleTemplateLister
+	nsLister   v13.NamespaceLister
+	rbIndexer  cache.Indexer
+	crbIndexer cache.Indexer
+	mgmt       *config.ManagementContext
+	controller string
 }
 
 // When a CRTB is created that gives a subject some permissions in a project or cluster, we need to create a "membership" binding
