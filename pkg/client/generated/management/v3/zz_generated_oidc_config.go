@@ -24,8 +24,10 @@ const (
 	OIDCConfigFieldRemoved             = "removed"
 	OIDCConfigFieldScopes              = "scopes"
 	OIDCConfigFieldStatus              = "status"
+	OIDCConfigFieldTokenEndpoint       = "tokenEndpoint"
 	OIDCConfigFieldType                = "type"
 	OIDCConfigFieldUUID                = "uuid"
+	OIDCConfigFieldUserInfoEndpoint    = "userInfoEndpoint"
 )
 
 type OIDCConfig struct {
@@ -51,6 +53,8 @@ type OIDCConfig struct {
 	Removed             string            `json:"removed,omitempty" yaml:"removed,omitempty"`
 	Scopes              string            `json:"scopes,omitempty" yaml:"scopes,omitempty"`
 	Status              *AuthConfigStatus `json:"status,omitempty" yaml:"status,omitempty"`
+	TokenEndpoint       string            `json:"tokenEndpoint,omitempty" yaml:"tokenEndpoint,omitempty"`
 	Type                string            `json:"type,omitempty" yaml:"type,omitempty"`
 	UUID                string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	UserInfoEndpoint    string            `json:"userInfoEndpoint,omitempty" yaml:"userInfoEndpoint,omitempty"`
 }

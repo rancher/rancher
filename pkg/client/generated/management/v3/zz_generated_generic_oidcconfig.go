@@ -24,8 +24,10 @@ const (
 	GenericOIDCConfigFieldRemoved             = "removed"
 	GenericOIDCConfigFieldScopes              = "scopes"
 	GenericOIDCConfigFieldStatus              = "status"
+	GenericOIDCConfigFieldTokenEndpoint       = "tokenEndpoint"
 	GenericOIDCConfigFieldType                = "type"
 	GenericOIDCConfigFieldUUID                = "uuid"
+	GenericOIDCConfigFieldUserInfoEndpoint    = "userInfoEndpoint"
 )
 
 type GenericOIDCConfig struct {
@@ -51,6 +53,8 @@ type GenericOIDCConfig struct {
 	Removed             string            `json:"removed,omitempty" yaml:"removed,omitempty"`
 	Scopes              string            `json:"scopes,omitempty" yaml:"scopes,omitempty"`
 	Status              *AuthConfigStatus `json:"status,omitempty" yaml:"status,omitempty"`
+	TokenEndpoint       string            `json:"tokenEndpoint,omitempty" yaml:"tokenEndpoint,omitempty"`
 	Type                string            `json:"type,omitempty" yaml:"type,omitempty"`
 	UUID                string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	UserInfoEndpoint    string            `json:"userInfoEndpoint,omitempty" yaml:"userInfoEndpoint,omitempty"`
 }
