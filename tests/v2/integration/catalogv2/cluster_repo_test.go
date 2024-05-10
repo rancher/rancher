@@ -398,7 +398,7 @@ func (c *ClusterRepoTestSuite) TestOCIRepo3() {
 	}
 }
 
-// TestOCIRepo4 tests 429 response code recieved from the registry
+// TestOCIRepo4 tests 429 response code received from the registry
 func (c *ClusterRepoTestSuite) TestOCIRepo4() {
 	u, err := Start429Registry(c.T())
 	assert.NoError(c.T(), err)
@@ -431,14 +431,13 @@ func (c *ClusterRepoTestSuite) test429Error(params ClusterRepoParams) {
 
 		for _, condition := range clusterRepo.Status.Conditions {
 			if v1.RepoCondition(condition.Type) == v1.OCIDownloaded {
-				return condition.Status == corev1.ConditionFalse, nil
+				return condition.Status == corev1.ConditionFalse && clusterRepo.Status.NumberOfRetries == 0, nil
 			}
 		}
 
 		return false, nil
 	})
 	assert.NoError(c.T(), err)
-	assert.Equal(c.T(), clusterRepo.Status.NumberOfRetries, expoValues.MaxRetries+1, "Number of retries should be max+1")
 
 	configMap, err := c.corev1.ConfigMaps(helm.GetConfigMapNamespace(clusterRepo.Namespace)).Get(context.TODO(), helm.GenerateConfigMapName(clusterRepo.Name, 0, clusterRepo.UID), metav1.GetOptions{})
 	assert.NoError(c.T(), err)

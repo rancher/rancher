@@ -112,8 +112,14 @@ type RepoStatus struct {
 
 	Conditions []genericcondition.GenericCondition `json:"conditions,omitempty"`
 
-	NumberOfRetries int         `json:"numberOfRetries,omitempty"`
-	NextRetryAt     metav1.Time `json:"nextRetryAt,omitempty"`
+	// Number of times the handler will retry if it gets a 429 error
+	NumberOfRetries int `json:"numberOfRetries,omitempty"`
+
+	// The time the next retry will happen
+	NextRetryAt metav1.Time `json:"nextRetryAt,omitempty"`
+
+	// If the handler should be skipped or not
+	ShouldNotSkip bool `json:"shouldNotSkip,omitempty"`
 }
 
 // +genclient
