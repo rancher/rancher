@@ -186,11 +186,9 @@ func (o *OpenIDCProvider) TransformToAuthProvider(authConfig map[string]interfac
 }
 
 func (o *OpenIDCProvider) getRedirectURL(config map[string]interface{}) string {
-	authURL, _ := FetchAuthURL(config["issuer"].(string))
-
 	return fmt.Sprintf(
 		"%s?client_id=%s&response_type=code&redirect_uri=%s",
-		authURL,
+		config["authEndpoint"],
 		config["clientId"],
 		config["rancherUrl"],
 	)

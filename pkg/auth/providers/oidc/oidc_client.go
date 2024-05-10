@@ -59,7 +59,12 @@ func AddCertKeyToContext(ctx context.Context, certificate, key string) (context.
 	return oidc.ClientContext(ctx, client), nil
 }
 
-func FetchAuthURL(issuerURL string) (string, error) {
+func FetchAuthURL(config map[string]interface{}) (string, error) {
+	// If the authEndpoint is already configured, use that
+	if config["authEndpoint"] != nil {
+		return config["authEndpoint"].(string), nil
+	}
+	issuerURL := config["issuerURL"].(string)
 	discoveryURL := fmt.Sprintf("%s/.well-known/openid-configuration", issuerURL)
 	resp, err := http.Get(discoveryURL)
 	if err != nil {

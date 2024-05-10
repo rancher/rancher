@@ -2,9 +2,7 @@ package genericoidc
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"reflect"
 	"strings"
 
 	"github.com/coreos/go-oidc/v3/oidc"
@@ -18,8 +16,6 @@ import (
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
-	"github.com/sirupsen/logrus"
-	"golang.org/x/oauth2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -235,9 +231,7 @@ func (g *GenericOIDCProvider) groupToPrincipal(groupName string) v3.Principal {
 
 // getRedirectURL uses the AuthConfig map to build-up the redirect URL passed to the OIDC provider at login-time.
 func (g *GenericOIDCProvider) getRedirectURL(config map[string]interface{}) string {
-	// TODO maybe use discovery in case authurl isn't present...might not be needed if authendpoint is already set in config
-
-	authURL, _ := baseoidc.FetchAuthURL(config["issuer"].(string))
+	authURL, _ := baseoidc.FetchAuthURL(config)
 
 	return fmt.Sprintf(
 		"%s?client_id=%s&response_type=code&redirect_uri=%s",
@@ -266,61 +260,4 @@ func (g *GenericOIDCProvider) toPrincipalFromToken(principalType string, princ v
 		}
 	}
 	return princ
-}
-
-// getUserInfo takes all the OIDC provider config information, along with a user's oauth auth code to query the
-// OIDC provider for details about the given user.
-func (g *GenericOIDCProvider) getUserInfo(ctx *context.Context, config *v32.OIDCConfig, authCode string, claimInfo *ClaimInfo, userName string) (*oidc.UserInfo, *oauth2.Token, error) {
-	var userInfo *oidc.UserInfo
-	var oauth2Token *oauth2.Token
-	var err error
-
-	updatedContext, err := baseoidc.AddCertKeyToContext(*ctx, config.Certificate, config.PrivateKey)
-	if err != nil {
-		return userInfo, oauth2Token, err
-	}
-
-	provider, err := oidc.NewProvider(updatedContext, config.Issuer)
-	if err != nil {
-		return userInfo, oauth2Token, err
-	}
-	oauthConfig := baseoidc.ConfigToOauthConfig(provider.Endpoint(), config)
-	var verifier = provider.Verifier(&oidc.Config{ClientID: config.ClientID})
-	if err := json.Unmarshal([]byte(authCode), &oauth2Token); err != nil {
-		oauth2Token, err = oauthConfig.Exchange(updatedContext, authCode, oauth2.SetAuthURLParam("scope", strings.Join(oauthConfig.Scopes, " ")))
-		if err != nil {
-			return userInfo, oauth2Token, err
-		}
-		rawIDToken, ok := oauth2Token.Extra("id_token").(string)
-		_, err = verifier.Verify(updatedContext, rawIDToken)
-		if !ok {
-			return userInfo, oauth2Token, err
-		}
-		if err != nil {
-			return userInfo, oauth2Token, err
-		}
-	}
-	// Valid will return false if access token is expired
-	if !oauth2Token.Valid() {
-		// since token is not valid, the TokenSource func will attempt to refresh the access token
-		// if the refresh token has not expired
-		logrus.Debugf("[generic oidc] getUserInfo: attempting to refresh access token")
-	}
-	reusedToken, err := oauth2.ReuseTokenSource(oauth2Token, oauthConfig.TokenSource(updatedContext, oauth2Token)).Token()
-	if err != nil {
-		return userInfo, oauth2Token, err
-	}
-	if !reflect.DeepEqual(oauth2Token, reusedToken) {
-		g.UpdateToken(reusedToken, userName)
-	}
-	logrus.Debugf("[generic oidc] getUserInfo: getting user info")
-	userInfo, err = provider.UserInfo(updatedContext, oauthConfig.TokenSource(updatedContext, reusedToken))
-	if err != nil {
-		return userInfo, oauth2Token, err
-	}
-	if err := userInfo.Claims(&claimInfo); err != nil {
-		return userInfo, oauth2Token, err
-	}
-
-	return userInfo, oauth2Token, nil
 }
