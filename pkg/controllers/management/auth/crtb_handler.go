@@ -38,7 +38,7 @@ const (
 	RtbCrbRbLabelsUpdated        = "auth.management.cattle.io/crb-rb-labels-updated"
 )
 
-var clusterManagmentPlaneResources = map[string]string{
+var clusterManagementPlaneResources = map[string]string{
 	"clusterscans":                "management.cattle.io",
 	"catalogtemplates":            "management.cattle.io",
 	"catalogtemplateversions":     "management.cattle.io",
@@ -176,7 +176,7 @@ func (c *crtbLifecycle) reconcileBindings(binding *v3.ClusterRoleTemplateBinding
 		return err
 	}
 
-	err = c.mgr.grantManagementPlanePrivileges(binding.RoleTemplateName, clusterManagmentPlaneResources, subject, binding)
+	err = c.mgr.grantManagementPlanePrivileges(binding.RoleTemplateName, clusterManagementPlaneResources, subject, binding)
 	if err != nil {
 		return err
 	}
@@ -190,7 +190,7 @@ func (c *crtbLifecycle) reconcileBindings(binding *v3.ClusterRoleTemplateBinding
 			logrus.Warnf("Project %v is being deleted, not creating membership bindings", p.Name)
 			continue
 		}
-		if err := c.mgr.grantManagementClusterScopedPrivilegesInProjectNamespace(binding.RoleTemplateName, p.Name, projectManagmentPlaneResources, subject, binding); err != nil {
+		if err := c.mgr.grantManagementClusterScopedPrivilegesInProjectNamespace(binding.RoleTemplateName, p.Name, projectManagementPlaneResources, subject, binding); err != nil {
 			return err
 		}
 	}

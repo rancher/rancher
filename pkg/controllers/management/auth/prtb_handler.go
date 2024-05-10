@@ -24,7 +24,7 @@ const (
 	ptrbMGMTController = "mgmt-auth-prtb-controller"
 )
 
-var projectManagmentPlaneResources = map[string]string{
+var projectManagementPlaneResources = map[string]string{
 	"apps":                        "project.cattle.io",
 	"apprevisions":                "project.cattle.io",
 	"catalogtemplates":            "management.cattle.io",
@@ -202,7 +202,7 @@ func (p *prtbLifecycle) reconcileBindings(binding *v3.ProjectRoleTemplateBinding
 	if err := p.mgr.grantManagementProjectScopedPrivilegesInClusterNamespace(binding.RoleTemplateName, proj.Namespace, prtbClusterManagmentPlaneResources, subject, binding); err != nil {
 		return err
 	}
-	return p.mgr.grantManagementPlanePrivileges(binding.RoleTemplateName, projectManagmentPlaneResources, subject, binding)
+	return p.mgr.grantManagementPlanePrivileges(binding.RoleTemplateName, projectManagementPlaneResources, subject, binding)
 }
 
 // removeMGMTProjectScopedPrivilegesInClusterNamespace revokes access that project roles were granted to certain cluster scoped resources like
