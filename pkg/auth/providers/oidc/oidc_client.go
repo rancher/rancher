@@ -61,10 +61,15 @@ func AddCertKeyToContext(ctx context.Context, certificate, key string) (context.
 
 func FetchAuthURL(config map[string]interface{}) (string, error) {
 	// If the authEndpoint is already configured, use that
-	if config["authEndpoint"] != nil {
-		return config["authEndpoint"].(string), nil
+	if authURL, ok := config["authEndpoint"]; ok {
+		return authURL.(string), nil
 	}
-	issuerURL := config["issuerURL"].(string)
+
+	issuerURL, ok := config["issuer"].(string)
+	if !ok {
+		return "", fmt.Errorf("both authEndpoint and issuerURL are missing in the authConfig")
+	}
+
 	discoveryURL := fmt.Sprintf("%s/.well-known/openid-configuration", issuerURL)
 	resp, err := http.Get(discoveryURL)
 	if err != nil {
