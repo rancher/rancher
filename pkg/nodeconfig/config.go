@@ -151,7 +151,7 @@ func (m *NodeConfig) Save() error {
 
 	m.cm[configKey] = extractedConfig
 
-	if err = m.store.Set(m.id, m.cm); err != nil {
+	if err = m.store.Set(m.id, m.cm, nil); err != nil {
 		m.cm = nil
 		return err
 	}
