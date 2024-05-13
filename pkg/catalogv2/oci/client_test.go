@@ -344,8 +344,8 @@ func TestFetchChart(t *testing.T) {
 			}
 
 			expoValues := v1.ExponentialBackOffValues{
-				MinWait: &metav1.Duration{Duration: time.Duration(1 * time.Second)},
-				MaxWait: &metav1.Duration{Duration: time.Duration(1 * time.Second)},
+				MinWait: "1s",
+				MaxWait: "1s",
 			}
 
 			ociClient, err := NewClient(fmt.Sprintf("%s/testingchart:0.1.0", strings.Replace(ts.URL, "http", "oci", 1)), v1.RepoSpec{ExponentialBackOffValues: &expoValues}, nil)
@@ -374,6 +374,16 @@ func TestGetOrasRegistry(t *testing.T) {
 		exponentialBackOffValues *v1.ExponentialBackOffValues
 	}{
 		{
+			name:              "retry policy values are set correctly in oras auth client",
+			expectedErr:       nil,
+			insecurePlainHTTP: true,
+			exponentialBackOffValues: &v1.ExponentialBackOffValues{
+				MaxRetries: 5,
+				MaxWait:    "5s",
+				MinWait:    "5s",
+			},
+		},
+		{
 			name:                     "fetching oras registry works fine without auth",
 			expectedErr:              nil,
 			insecurePlainHTTP:        false,
@@ -384,16 +394,6 @@ func TestGetOrasRegistry(t *testing.T) {
 			expectedErr:              nil,
 			insecurePlainHTTP:        true,
 			exponentialBackOffValues: nil,
-		},
-		{
-			name:              "retry policy values are set correctly in oras auth client",
-			expectedErr:       nil,
-			insecurePlainHTTP: true,
-			exponentialBackOffValues: &v1.ExponentialBackOffValues{
-				MaxRetries: 5,
-				MaxWait:    &metav1.Duration{Duration: time.Duration(5)},
-				MinWait:    &metav1.Duration{Duration: time.Duration(5)},
-			},
 		},
 	}
 
@@ -409,13 +409,14 @@ func TestGetOrasRegistry(t *testing.T) {
 		assert.NoError(t, err)
 
 		orasRegistry, err := ociClient.GetOrasRegistry()
+		assert.Nil(t, orasRegistry.Client.(*auth.Client).Cache)
 		assert.Equal(t, orasRegistry.PlainHTTP, tc.insecurePlainHTTP)
 		policy := orasRegistry.Client.(*auth.Client).Client.Transport.(*retry.Transport).Policy().(*retry.GenericPolicy)
 
 		if tc.exponentialBackOffValues != nil {
 			assert.Equal(t, policy.MaxRetry, 5)
-			assert.Equal(t, policy.MinWait, time.Duration(5))
-			assert.Equal(t, policy.MaxWait, time.Duration(5))
+			assert.Equal(t, policy.MinWait, time.Duration(5*time.Second))
+			assert.Equal(t, policy.MaxWait, time.Duration(5*time.Second))
 		}
 
 		if tc.expectedErr != nil {
@@ -450,6 +451,7 @@ func TestGetOrasRepository(t *testing.T) {
 		assert.NoError(err)
 
 		orasRepo, err := ociClient.GetOrasRepository()
+		assert.Equal(orasRepo.Client.(*auth.Client).Cache, nil)
 		assert.Equal(orasRepo.PlainHTTP, tc.insecurePlainHTTP)
 		if tc.expectedErr != nil {
 			assert.ErrorContains(err, tc.expectedErr.Error())

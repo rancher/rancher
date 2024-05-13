@@ -5,8 +5,11 @@ import (
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/retry"
+	"k8s.io/gengo/examples/set-gen/sets"
 )
 
 var FeatureAppNS = []string{
@@ -34,18 +37,58 @@ var FeatureAppNS = []string{
 	"cattle-provisioning-capi-system", // CAPI core controller manager
 }
 
+// addDefaultPodSecurityAdmissionConfigurationTemplates creates or updates the default PSACTs with the builtin templates.
 func addDefaultPodSecurityAdmissionConfigurationTemplates(management *config.ManagementContext) error {
-	psapts := management.Management.PodSecurityAdmissionConfigurationTemplates("")
+	psactClient := management.Management.PodSecurityAdmissionConfigurationTemplates("")
 	templates := []*v3.PodSecurityAdmissionConfigurationTemplate{
 		newPodSecurityAdmissionConfigurationTemplatePrivileged(),
 		newPodSecurityAdmissionConfigurationTemplateRestricted(),
 	}
-	for _, template := range templates {
-		if _, err := psapts.Create(template); err != nil && !errors.IsAlreadyExists(err) {
-			return fmt.Errorf("error creating default '%s' pod security admission configuration template: %w", template.Name, err)
+	for _, t := range templates {
+		if _, err := psactClient.Create(t); err != nil {
+			if !errors.IsAlreadyExists(err) {
+				return fmt.Errorf("failed to create default '%s' pod security admission configuration: %w", t.Name, err)
+			}
+			logrus.Tracef("updating default '%s' pod security admission configuration", t.Name)
+			err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+				// get the latest version of the object from the k8s API directly
+				existing, err := psactClient.Get(t.Name, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				// We'd like to preserve user's additions to the exemptions, meanwhile merging everything from
+				// the built-in template into the existing psact for Rancher to work properly. It means that any
+				// value that is still in the built-in template but removed by user will be added back.
+				final := mergeExemptions(existing, t)
+				if _, err = psactClient.Update(final); err != nil {
+					return err
+				}
+				return nil
+			})
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil
+}
+
+// mergeExemptions returns a new pointer to PodSecurityAdmissionConfigurationTemplate which values are copied from
+// the base but the exemptions field is the union set of the values from the base and the additional PSACT.
+func mergeExemptions(base, additional *v3.PodSecurityAdmissionConfigurationTemplate) *v3.PodSecurityAdmissionConfigurationTemplate {
+	if base == nil {
+		return additional
+	}
+	if additional == nil {
+		return base
+	}
+	a := base.Configuration.Exemptions
+	b := additional.Configuration.Exemptions
+	final := base.DeepCopy()
+	final.Configuration.Exemptions.Usernames = sets.NewString(a.Usernames...).Insert(b.Usernames...).List()
+	final.Configuration.Exemptions.Namespaces = sets.NewString(a.Namespaces...).Insert(b.Namespaces...).List()
+	final.Configuration.Exemptions.RuntimeClasses = sets.NewString(a.RuntimeClasses...).Insert(b.RuntimeClasses...).List()
+	return final
 }
 
 func newPodSecurityAdmissionConfigurationTemplateRestricted() *v3.PodSecurityAdmissionConfigurationTemplate {

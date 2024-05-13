@@ -26,9 +26,9 @@ const (
 	eksRefreshCronAnnotation = "settings.management.cattle.io/migrated"
 )
 
-func BuildEKSUpstreamSpec(secretsCache wranglerv1.SecretCache, cluster *mgmtv3.Cluster) (*eksv1.EKSClusterConfigSpec, error) {
+func BuildEKSUpstreamSpec(secretClient wranglerv1.SecretClient, cluster *mgmtv3.Cluster) (*eksv1.EKSClusterConfigSpec, error) {
 	ctx := context.Background()
-	eksService, err := ekscontroller.StartEKSService(ctx, secretsCache, *cluster.Spec.EKSConfig)
+	eksService, err := ekscontroller.StartEKSService(ctx, secretClient, *cluster.Spec.EKSConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -81,7 +81,7 @@ func BuildEKSUpstreamSpec(secretsCache wranglerv1.SecretCache, cluster *mgmtv3.C
 		}
 	}
 
-	ec2Service, err := ekscontroller.StartEC2Service(ctx, secretsCache, *cluster.Spec.EKSConfig)
+	ec2Service, err := ekscontroller.StartEC2Service(ctx, secretClient, *cluster.Spec.EKSConfig)
 	if err != nil {
 		return nil, err
 	}

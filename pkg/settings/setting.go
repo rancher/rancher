@@ -17,7 +17,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-const RancherVersionDev = "2.8.99"
+const RancherVersionDev = "2.9.99"
 const DefaultMaxUIPluginFileSizeInBytes = 20 * 1024 * 1024 // 20MB
 
 var (
@@ -51,7 +51,7 @@ var (
 		"cattle-elemental-system",
 	}
 
-	AgentImage                          = NewSetting("agent-image", "rancher/rancher-agent:v2.8-head")
+	AgentImage                          = NewSetting("agent-image", "rancher/rancher-agent:v2.9-head")
 	AgentRolloutTimeout                 = NewSetting("agent-rollout-timeout", "300s")
 	AgentRolloutWait                    = NewSetting("agent-rollout-wait", "true")
 	AuthImage                           = NewSetting("auth-image", v32.ToolsSystemImages.AuthSystemImages.KubeAPIAuth)
@@ -63,10 +63,10 @@ var (
 	CLIURLLinux                         = NewSetting("cli-url-linux", "https://releases.rancher.com/cli/v1.0.0-alpha8/rancher-linux-amd64-v1.0.0-alpha8.tar.gz")
 	CLIURLWindows                       = NewSetting("cli-url-windows", "https://releases.rancher.com/cli/v1.0.0-alpha8/rancher-windows-386-v1.0.0-alpha8.zip")
 	ClusterControllerStartCount         = NewSetting("cluster-controller-start-count", "50")
-	EngineInstallURL                    = NewSetting("engine-install-url", "https://releases.rancher.com/install-docker/24.0.sh")
+	EngineInstallURL                    = NewSetting("engine-install-url", "https://releases.rancher.com/install-docker/25.0.sh")
 	EngineISOURL                        = NewSetting("engine-iso-url", "https://releases.rancher.com/os/latest/rancheros-vmware.iso")
 	EngineNewestVersion                 = NewSetting("engine-newest-version", "v17.12.0")
-	EngineSupportedRange                = NewSetting("engine-supported-range", "~v1.11.2 || ~v1.12.0 || ~v1.13.0 || ~v17.03.0 || ~v17.06.0 || ~v17.09.0 || ~v18.06.0 || ~v18.09.0 || ~v19.03.0 || ~v20.10.0 || ~v23.0.0 || ~v24.0.0 ")
+	EngineSupportedRange                = NewSetting("engine-supported-range", "~v1.11.2 || ~v1.12.0 || ~v1.13.0 || ~v17.03.0 || ~v17.06.0 || ~v17.09.0 || ~v18.06.0 || ~v18.09.0 || ~v19.03.0 || ~v20.10.0 || ~v23.0.0 || ~v24.0.0 || ~v25.0.0 ")
 	FirstLogin                          = NewSetting("first-login", "true")
 	GlobalRegistryEnabled               = NewSetting("global-registry-enabled", "false")
 	GithubProxyAPIURL                   = NewSetting("github-proxy-api-url", "https://api.github.com")
@@ -83,7 +83,7 @@ var (
 	KubernetesVersionToSystemImages     = NewSetting("k8s-version-to-images", "")
 	KubernetesVersionsCurrent           = NewSetting("k8s-versions-current", "")
 	KubernetesVersionsDeprecated        = NewSetting("k8s-versions-deprecated", "")
-	KDMBranch                           = NewSetting("kdm-branch", "dev-v2.8")
+	KDMBranch                           = NewSetting("kdm-branch", "dev-v2.9")
 	MachineVersion                      = NewSetting("machine-version", "dev")
 	Namespace                           = NewSetting("namespace", os.Getenv("CATTLE_NAMESPACE"))
 	PasswordMinLength                   = NewSetting("password-min-length", "12")
@@ -98,7 +98,7 @@ var (
 	CSIProxyAgentVersion                = NewSetting("csi-proxy-agent-version", "")
 	CSIProxyAgentURL                    = NewSetting("csi-proxy-agent-url", "https://acs-mirror.azureedge.net/csi-proxy/%[1]s/binaries/csi-proxy-%[1]s.tar.gz")
 	SystemAgentInstallScript            = NewSetting("system-agent-install-script", "https://github.com/rancher/system-agent/releases/download/v0.3.6-rc2/install.sh") // To ensure consistency between SystemAgentInstallScript default value and CATTLE_SYSTEM_AGENT_INSTALL_SCRIPT to utilize the local system-agent-install.sh script when both values are equal.
-	WinsAgentInstallScript              = NewSetting("wins-agent-install-script", "https://raw.githubusercontent.com/rancher/wins/v0.4.15-rc1/install.ps1")
+	WinsAgentInstallScript              = NewSetting("wins-agent-install-script", "https://raw.githubusercontent.com/rancher/wins/v0.4.15/install.ps1")
 	SystemAgentInstallerImage           = NewSetting("system-agent-installer-image", "") // Defined via environment variable
 	SystemAgentUpgradeImage             = NewSetting("system-agent-upgrade-image", "")   // Defined via environment variable
 	WinsAgentUpgradeImage               = NewSetting("wins-agent-upgrade-image", "")

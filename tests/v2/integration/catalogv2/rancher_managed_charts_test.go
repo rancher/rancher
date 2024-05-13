@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"strings"
 	"testing"
 	"time"
 
@@ -278,7 +277,7 @@ func (w *RancherManagedChartsTest) TestUpgradeToBrokenVersion() {
 
 	//REVERT CONFIGMAP TO ORIGINAL VALUE
 	cfgMap.BinaryData["content"] = origCfg.BinaryData["content"]
-	cfgMap, err = w.corev1.ConfigMaps(clusterRepo.Status.IndexConfigMapNamespace).Update(context.TODO(), cfgMap, metav1.UpdateOptions{})
+	_, err = w.corev1.ConfigMaps(clusterRepo.Status.IndexConfigMapNamespace).Update(context.TODO(), cfgMap, metav1.UpdateOptions{})
 	w.Require().NoError(err)
 
 	clusterRepo, err = w.catalogClient.ClusterRepos().Get(ctx, "rancher-charts", metav1.GetOptions{})
@@ -499,11 +498,11 @@ func (w *RancherManagedChartsTest) TestServeIcons() {
 	w.Assert().Equal("bundled", systemCatalogUpdated.Value)
 
 	// Fetch one icon with https:// scheme, it should return an empty object (i.e length of image equals 0) with nil error
-	imgLength, err := w.catalogClient.FetchChartIcon(smallForkClusterRepoName, "fleet", "102.0.0+up0.6.0")
+	imgLength, err := w.catalogClient.FetchChartIcon(smallForkClusterRepoName, "fleet")
 	w.Require().NoError(err)
 	w.Assert().Equal(0, imgLength)
 
-	imgLength, err = w.catalogClient.FetchChartIcon(smallForkClusterRepoName, "rancher-cis-benchmark", "4.0.0")
+	imgLength, err = w.catalogClient.FetchChartIcon(smallForkClusterRepoName, "rancher-cis-benchmark")
 	w.Require().NoError(err)
 	w.Assert().Greater(imgLength, 0)
 
@@ -514,23 +513,4 @@ func (w *RancherManagedChartsTest) TestServeIcons() {
 	// Deleting clusterRepo
 	err = w.catalogClient.ClusterRepos().Delete(context.Background(), smallForkClusterRepoName, metav1.DeleteOptions{})
 	w.Require().NoError(err)
-}
-
-// extractChartsAndLatestVersions returns a map of chartName -> latestVersion
-func extractChartsAndLatestVersions(charts map[string]interface{}) map[string]string {
-	chartVersions := make(map[string]string)
-	for chartName, chartVersionsList := range charts {
-		// exclude charts for crd's
-		if strings.HasSuffix(chartName, "-crd") {
-			continue
-		}
-		chartVersionsList := chartVersionsList.([]interface{})
-		// exclude charts with the hidden annotation
-		_, hidden := chartVersionsList[0].(map[string]interface{})["annotations"].(map[string]interface{})["catalog.cattle.io/hidden"]
-		if hidden {
-			continue
-		}
-		chartVersions[chartName] = chartVersionsList[0].(map[string]interface{})["version"].(string)
-	}
-	return chartVersions
 }

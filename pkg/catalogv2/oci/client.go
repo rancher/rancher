@@ -228,13 +228,31 @@ func (o *Client) getAuthClient() (*http.Client, error) {
 		if o.exponentialBackOffValues.MaxRetries > 0 {
 			retryPolicy.MaxRetry = o.exponentialBackOffValues.MaxRetries
 		}
-		if o.exponentialBackOffValues.MaxWait != nil {
-			retryPolicy.MaxWait = o.exponentialBackOffValues.MaxWait.Duration
+		if o.exponentialBackOffValues.MaxWait != "" {
+			maxWait, err := time.ParseDuration(o.exponentialBackOffValues.MaxWait)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse exponentialBackOffValues.MaxWait: %w", err)
+			}
+			retryPolicy.MaxWait = maxWait
 		}
-		if o.exponentialBackOffValues.MinWait != nil {
-			retryPolicy.MinWait = o.exponentialBackOffValues.MinWait.Duration
+		if o.exponentialBackOffValues.MinWait != "" {
+			minWait, err := time.ParseDuration(o.exponentialBackOffValues.MinWait)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse exponentialBackOffValues.MinWait: %w", err)
+			}
+			retryPolicy.MinWait = minWait
 		}
 	}
+	// The minimum duration should be atleast 1 second
+	if retryPolicy.MinWait < 1*time.Second {
+		return nil, errors.New("minWait should be at least 1 second")
+	}
+
+	// The minWait should be > maxWait
+	if retryPolicy.MaxWait < retryPolicy.MinWait {
+		return nil, errors.New("maxWait should be greater than minWait")
+	}
+
 	retryPolicy.Backoff = retry.ExponentialBackoff(retryPolicy.MinWait, 2, 0.2)
 
 	retryTransport := retry.NewTransport(baseTransport)
@@ -262,7 +280,6 @@ func (o *Client) GetOrasRegistry() (*remote.Registry, error) {
 	}
 
 	orasRegistry.Client = &auth.Client{
-		Cache: auth.DefaultCache,
 		Credential: func(ctx context.Context, reg string) (auth.Credential, error) {
 			return auth.Credential{
 				Username: o.username,
@@ -290,7 +307,6 @@ func (o *Client) GetOrasRepository() (*remote.Repository, error) {
 	}
 
 	orasRepository.Client = &auth.Client{
-		Cache: auth.DefaultCache,
 		Credential: func(ctx context.Context, reg string) (auth.Credential, error) {
 			return auth.Credential{
 				Username: o.username,

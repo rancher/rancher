@@ -127,7 +127,9 @@ func GenerateIndex(URL string, credentialSecret *corev1.Secret,
 
 	// Loop over all the tags and find the latest version
 	tagsFunc := func(tags []string) error {
+		existingTags := make(map[string]bool)
 		for i := len(tags) - 1; i >= 0; i-- {
+			existingTags[tags[i]] = true
 			// Check if the tag is a valid semver version or not. If yes, then proceed.
 			semverTag, err := version.NewVersion(tags[i])
 			if err != nil {
@@ -151,26 +153,35 @@ func GenerateIndex(URL string, credentialSecret *corev1.Secret,
 				indexFile.Entries[chartName] = append(indexFile.Entries[chartName], chartVersion)
 			}
 		}
+		var updatedChartVersions []*repo.ChartVersion
+
+		// Only keep the versions that are also present in the /tags/list call
+		for _, chartVersion := range indexFile.Entries[chartName] {
+			if existingTags[chartVersion.Version] {
+				updatedChartVersions = append(updatedChartVersions, chartVersion)
+			}
+		}
+		indexFile.Entries[chartName] = updatedChartVersions
 		return nil
 	}
 
 	// Loop over all the repositories and fetch the tags
 	repositoriesFunc := func(repositories []string) error {
+		existingCharts := make(map[string]bool)
 		for _, repository := range repositories {
 			logrus.Debugf("found repository %s for OCI clusterrepo URL %s", repository, URL)
-
 			// Storing the user provided repository that can be an oras repository or a sub repository.
 			userProvidedRepository := ociClient.repository
 
 			// Work on the oci repositories that match with the userProvidedRepository
 			if _, found := strings.CutPrefix(repository, ociClient.repository); found {
 				ociClient.repository = repository
-
 				orasRepository, err := ociClient.GetOrasRepository()
 				if err != nil {
 					return fmt.Errorf("failed to create an oras repository for url %s: %w", URL, err)
 				}
 				chartName = ociClient.repository[strings.LastIndex(ociClient.repository, "/")+1:]
+				existingCharts[chartName] = true
 				maxTag = nil
 
 				// call tags to get the max tag and update the indexFile
@@ -180,7 +191,7 @@ func GenerateIndex(URL string, credentialSecret *corev1.Secret,
 				}
 
 				if maxTag != nil {
-					ociClient.tag = maxTag.String()
+					ociClient.tag = maxTag.Original()
 
 					// fetch the chart.yaml for the latest tag and add it to the index.
 					err = addToHelmRepoIndex(*ociClient, indexFile, orasRepository)
@@ -190,6 +201,13 @@ func GenerateIndex(URL string, credentialSecret *corev1.Secret,
 				}
 			}
 			ociClient.repository = userProvidedRepository
+		}
+
+		// Only keep the charts that are also present in the /_catalog call
+		for chartName := range indexFile.Entries {
+			if !existingCharts[chartName] {
+				delete(indexFile.Entries, chartName)
+			}
 		}
 		return nil
 	}
@@ -221,7 +239,7 @@ func GenerateIndex(URL string, credentialSecret *corev1.Secret,
 		}
 
 		if maxTag != nil {
-			ociClient.tag = maxTag.String()
+			ociClient.tag = maxTag.Original()
 
 			// fetch the chart.yaml for the latest tag and add it to the index.
 			err = addToHelmRepoIndex(*ociClient, indexFile, orasRepository)

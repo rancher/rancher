@@ -110,7 +110,7 @@ func (g *ghProvider) testAndApply(actionName string, action *types.Action, reque
 		githubConfig.ClientSecret = value
 	}
 
-	//Call provider to testLogin
+	// Call provider to testLogin
 	userPrincipal, groupPrincipals, providerInfo, err := g.LoginUser("", githubLogin, &githubConfig, true)
 	if err != nil {
 		if httperror.IsAPIError(err) {
@@ -119,7 +119,7 @@ func (g *ghProvider) testAndApply(actionName string, action *types.Action, reque
 		return errors.Wrap(err, "server error while authenticating")
 	}
 
-	//if this works, save githubConfig CR adding enabled flag
+	// if this works, save githubConfig CR adding enabled flag
 	user, err := g.userMGR.SetPrincipalOnCurrentUser(request, userPrincipal)
 	if err != nil {
 		return err

@@ -25,9 +25,9 @@ type SecretReference struct {
 
 // ExponentialBackOffValues are values for the ratelimiting func when OCI registry sends 429 http response code.
 type ExponentialBackOffValues struct {
-	MinWait    *metav1.Duration `json:"minWait,omitempty"`
-	MaxWait    *metav1.Duration `json:"maxWait,omitempty"`
-	MaxRetries int              `json:"maxRetries,omitempty"`
+	MinWait    string `json:"minWait,omitempty"`
+	MaxWait    string `json:"maxWait,omitempty"`
+	MaxRetries int    `json:"maxRetries,omitempty"`
 }
 
 type RepoSpec struct {
