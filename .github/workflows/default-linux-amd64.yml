@@ -5,12 +5,14 @@ jobs:
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
     container: 
       image: rancher/dapper:v0.6.0
-      options: --user root --privileged -v "/var/run/docker.sock:/var/run/docker.sock:rw"
+      options: --privileged
     steps:
       - name: Add Git
         run: apk add -U git
       - name: Add Docker
-        run: apk add -U docker 
+        run: |
+          apk add -U docker
+          service docker start
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Validate
