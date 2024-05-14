@@ -7,7 +7,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"hash/maphash"
 	"io"
+	"math"
+	"math/rand"
 	"net/http"
 	"time"
 
@@ -29,11 +32,24 @@ import (
 	"oras.land/oras-go/v2/registry/remote/errcode"
 )
 
+var timeNow = time.Now
+
 type OCIRepohandler struct {
 	clusterRepoController catalogcontrollers.ClusterRepoController
 	configMapController   corev1controllers.ConfigMapController
 	secretCacheController corev1controllers.SecretCache
 	apply                 apply.Apply
+}
+
+type retryPolicy struct {
+	// MinWait is the minimum duration to wait before retrying.
+	MinWait time.Duration
+
+	// MaxWait is the maximum duration to wait before retrying.
+	MaxWait time.Duration
+
+	// MaxRetry is the maximum number of retries.
+	MaxRetry int
 }
 
 func RegisterOCIRepo(ctx context.Context,
@@ -52,35 +68,38 @@ func RegisterOCIRepo(ctx context.Context,
 	clusterRepoController.OnChange(ctx, "oci-clusterrepo-helm", ociRepoHandler.onClusterRepoChange)
 }
 
-// This handler is retriggerd in the following cases
+// This handler is triggered in the following cases
 // * When the spec of the ClusterRepo is changed.
 // * When there is no error from the handler, at a regular interval of 6 hours.
 // * When there is an error from the handler, at the wrangler's default error interval.
-// * When the response from OCI registry is anything 4xx HTTP status code, at an interval of 6 hours.
+// * When the response from OCI registry is anything 4xx HTTP status code, at an interval of 6 hours or the duration time to wait which is calculated by the backoff function.
 func (o *OCIRepohandler) onClusterRepoChange(key string, clusterRepo *catalog.ClusterRepo) (*catalog.ClusterRepo, error) {
 	if clusterRepo == nil {
 		return nil, nil
 	}
-
 	// Ignore non OCI ClusterRepos
 	if !registry.IsOCI(clusterRepo.Spec.URL) {
 		return clusterRepo, nil
 	}
 
-	originalStatus := clusterRepo.Status.DeepCopy()
+	retryPolicy := getRetryPolicy(clusterRepo)
+	if o.shouldSkip(clusterRepo, retryPolicy, key) {
+		return clusterRepo, nil
+	}
+	newStatus := clusterRepo.Status.DeepCopy()
+	newStatus.ShouldNotSkip = false
 
 	logrus.Debugf("OCIRepoHandler triggered for clusterrepo %s", clusterRepo.Name)
 	var index *repo.IndexFile
 
-	err := ensureIndexConfigMap(clusterRepo, originalStatus, o.configMapController)
+	err := ensureIndexConfigMap(clusterRepo, newStatus, o.configMapController)
 	if err != nil {
-		return o.setErrorCondition(clusterRepo, err, originalStatus)
+		return o.setErrorCondition(clusterRepo, err, newStatus)
 	}
 
-	originalStatus.ObservedGeneration = clusterRepo.Generation
 	secret, err := catalogv2.GetSecret(o.secretCacheController, &clusterRepo.Spec, clusterRepo.Namespace)
 	if err != nil {
-		return o.setErrorCondition(clusterRepo, err, originalStatus)
+		return o.setErrorCondition(clusterRepo, err, newStatus)
 	}
 
 	owner := metav1.OwnerReference{
@@ -93,119 +112,149 @@ func (o *OCIRepohandler) onClusterRepoChange(key string, clusterRepo *catalog.Cl
 	downloadTime := metav1.Now()
 	index, err = getIndexfile(clusterRepo.Status, clusterRepo.Spec, o.configMapController, owner, clusterRepo.Namespace)
 	if err != nil {
-		return o.setErrorCondition(clusterRepo, err, originalStatus)
+		return o.setErrorCondition(clusterRepo, err, newStatus)
 	}
 	originalIndexBytes, err := json.Marshal(index)
 	if err != nil {
-		return o.setErrorCondition(clusterRepo, err, originalStatus)
+		return o.setErrorCondition(clusterRepo, err, newStatus)
 	}
-	index, err = oci.GenerateIndex(clusterRepo.Spec.URL, secret, clusterRepo.Spec, *originalStatus, index)
+	index, err = oci.GenerateIndex(clusterRepo.Spec.URL, secret, clusterRepo.Spec, *newStatus, index)
 	// If there is 401 or 403 error code, then we don't reconcile further and wait for 6 hours interval
 	var errResp *errcode.ErrorResponse
 	if errors.As(err, &errResp) {
 		if errResp.StatusCode == http.StatusUnauthorized ||
 			errResp.StatusCode == http.StatusForbidden ||
 			errResp.StatusCode == http.StatusNotFound {
-			return o.set4xxCondition(clusterRepo, errResp, originalStatus)
+			return o.set4xxCondition(clusterRepo, errResp, newStatus, nil)
 		}
 
-		// If there is 429 error code, then we don't reconcile further and wait for 6 hours interval
+		// If there is 429 error code and max retry is reached, then we don't reconcile further and wait for 6 hours interval,
 		// but we also create the configmap for future usecases.
 		if errResp.StatusCode == http.StatusTooManyRequests {
 			if index != nil && len(index.Entries) > 0 {
-				originalStatus.URL = clusterRepo.Spec.URL
+				newStatus.URL = clusterRepo.Spec.URL
 
 				index.SortEntries()
 				_, err := createOrUpdateMap(clusterRepo.Namespace, index, owner, o.apply)
 				if err != nil {
 					logrus.Debugf("failed to create/udpate the configmap incase of 4xx statuscode for %s", clusterRepo.Name)
-					return o.set4xxCondition(clusterRepo, errResp, originalStatus)
 				}
 			}
 
-			return o.set4xxCondition(clusterRepo, errResp, originalStatus)
+			newStatus.NumberOfRetries++
+			if newStatus.NumberOfRetries > retryPolicy.MaxRetry {
+				newStatus.NumberOfRetries = 0
+				newStatus.NextRetryAt = metav1.Time{}
+				return o.set4xxCondition(clusterRepo, errResp, newStatus, nil)
+			}
+
+			backoff := calculateBackoff(clusterRepo, retryPolicy)
+
+			newStatus.NextRetryAt = metav1.Time{Time: timeNow().UTC().Add(backoff)}
+			return o.set4xxCondition(clusterRepo, errResp, newStatus, &backoff)
 		}
 	}
 	if err != nil {
-		return o.setErrorCondition(clusterRepo, err, originalStatus)
+		return o.setErrorCondition(clusterRepo, err, newStatus)
 	}
 	if index == nil || len(index.Entries) <= 0 {
 		err = errors.New("there are no helm charts in the repository specified")
-		return o.setErrorCondition(clusterRepo, err, originalStatus)
+		return o.setErrorCondition(clusterRepo, err, newStatus)
 	}
 
 	newIndexBytes, err := json.Marshal(index)
 	if err != nil {
-		return o.setErrorCondition(clusterRepo, err, originalStatus)
+		return o.setErrorCondition(clusterRepo, err, newStatus)
 	}
-
 	// Only update, if the index got updated
 	if !bytes.Equal(originalIndexBytes, newIndexBytes) {
 		index.SortEntries()
 		cm, err := createOrUpdateMap(clusterRepo.Namespace, index, owner, o.apply)
 		if err != nil {
-			return o.setErrorCondition(clusterRepo, err, originalStatus)
+			return o.setErrorCondition(clusterRepo, err, newStatus)
 		}
 
-		originalStatus.URL = clusterRepo.Spec.URL
-		originalStatus.IndexConfigMapName = cm.Name
-		originalStatus.IndexConfigMapNamespace = cm.Namespace
-		originalStatus.IndexConfigMapResourceVersion = cm.ResourceVersion
-		originalStatus.DownloadTime = downloadTime
+		newStatus.URL = clusterRepo.Spec.URL
+		newStatus.IndexConfigMapName = cm.Name
+		newStatus.IndexConfigMapNamespace = cm.Namespace
+		newStatus.IndexConfigMapResourceVersion = cm.ResourceVersion
+		newStatus.DownloadTime = downloadTime
 	}
 
-	return o.setErrorCondition(clusterRepo, err, originalStatus)
+	return o.setErrorCondition(clusterRepo, err, newStatus)
 }
 
-// setErrorCondition is only called when error happens in the handler and
-// we need to depend on wrangler to reenqueue the handler
-func (o *OCIRepohandler) setErrorCondition(clusterRepo *catalog.ClusterRepo, err error, originalStatus *catalog.RepoStatus) (*catalog.ClusterRepo, error) {
+// setErrorCondition is only called when error happens in the handler, and
+// we need to depend on wrangler to requeue the handler
+func (o *OCIRepohandler) setErrorCondition(clusterRepo *catalog.ClusterRepo, err error, newStatus *catalog.RepoStatus) (*catalog.ClusterRepo, error) {
 	var statusErr error
-
+	newStatus.NumberOfRetries = 0
+	newStatus.NextRetryAt = metav1.Time{}
+	if err != nil {
+		newStatus.ShouldNotSkip = true
+	}
 	ociDownloaded := condition.Cond(catalog.OCIDownloaded)
 	if apierrors.IsConflict(err) {
-		ociDownloaded.SetError(originalStatus, "", nil)
+		ociDownloaded.SetError(newStatus, "", nil)
 	} else {
-		ociDownloaded.SetError(originalStatus, "", err)
+		ociDownloaded.SetError(newStatus, "", err)
 	}
+	newStatus.ObservedGeneration = clusterRepo.Generation
 
-	if !equality.Semantic.DeepEqual(originalStatus, &clusterRepo.Status) {
-		ociDownloaded.LastUpdated(originalStatus, time.Now().UTC().Format(time.RFC3339))
+	if !equality.Semantic.DeepEqual(newStatus, &clusterRepo.Status) {
+		ociDownloaded.LastUpdated(newStatus, timeNow().UTC().Format(time.RFC3339))
 
-		clusterRepo.Status = *originalStatus
+		clusterRepo.Status = *newStatus
 		clusterRepo, statusErr = o.clusterRepoController.UpdateStatus(clusterRepo)
 		if statusErr != nil {
 			err = statusErr
 		}
-
+		if err == nil {
+			o.clusterRepoController.EnqueueAfter(clusterRepo.Name, interval)
+		}
 		return clusterRepo, err
 	}
 
-	o.clusterRepoController.EnqueueAfter(clusterRepo.Name, interval)
-	return clusterRepo, nil
+	if err == nil {
+		o.clusterRepoController.EnqueueAfter(clusterRepo.Name, interval)
+	}
+	return clusterRepo, err
 }
 
 // set4xxCondition is only called when we receive a 4xx error
-// we need to wait for 6 hours to reenqueue.
-func (o *OCIRepohandler) set4xxCondition(clusterRepo *catalog.ClusterRepo, err *errcode.ErrorResponse, originalStatus *catalog.RepoStatus) (*catalog.ClusterRepo, error) {
-	err.Errors = append(err.Errors, errcode.Error{Message: fmt.Sprintf(" will retry will after %s", interval)})
+// we need to wait for 6 hours to requeue.
+func (o *OCIRepohandler) set4xxCondition(clusterRepo *catalog.ClusterRepo, err *errcode.ErrorResponse, newStatus *catalog.RepoStatus, backoff *time.Duration) (*catalog.ClusterRepo, error) {
+	if backoff != nil {
+		err.Errors = append(err.Errors, errcode.Error{Message: fmt.Sprintf(" will retry will after %s", backoff)})
+	} else {
+		err.Errors = append(err.Errors, errcode.Error{Message: fmt.Sprintf(" will retry will after %s", interval)})
 
+	}
 	ociDownloaded := condition.Cond(catalog.OCIDownloaded)
 	if apierrors.IsConflict(err) {
-		ociDownloaded.SetError(originalStatus, "", nil)
+		ociDownloaded.SetError(newStatus, "", nil)
 	} else {
-		ociDownloaded.SetError(originalStatus, "", err)
+		ociDownloaded.SetError(newStatus, "", err)
 	}
+	newStatus.ObservedGeneration = clusterRepo.Generation
 
-	if !equality.Semantic.DeepEqual(originalStatus, &clusterRepo.Status) {
+	if !equality.Semantic.DeepEqual(newStatus, &clusterRepo.Status) {
 		// Since status has changed, update the lastUpdatedTime
-		ociDownloaded.LastUpdated(originalStatus, time.Now().UTC().Format(time.RFC3339))
+		ociDownloaded.LastUpdated(newStatus, timeNow().UTC().Format(time.RFC3339))
 
-		clusterRepo.Status = *originalStatus
-		return o.clusterRepoController.UpdateStatus(clusterRepo)
+		clusterRepo.Status = *newStatus
+
+		_, statusErr := o.clusterRepoController.UpdateStatus(clusterRepo)
+		if statusErr != nil {
+			return clusterRepo, statusErr
+		}
 	}
 
-	o.clusterRepoController.EnqueueAfter(clusterRepo.Name, interval)
+	if backoff != nil {
+		o.clusterRepoController.EnqueueAfter(clusterRepo.Name, *backoff)
+	} else {
+		o.clusterRepoController.EnqueueAfter(clusterRepo.Name, interval)
+	}
 	return clusterRepo, nil
 }
 
@@ -220,7 +269,6 @@ func getIndexfile(clusterRepoStatus catalog.RepoStatus,
 	indexFile := repo.NewIndexFile()
 	var configMap *corev1.ConfigMap
 	var err error
-
 	if clusterRepoSpec.URL != clusterRepoStatus.URL {
 		return indexFile, nil
 	}
@@ -285,4 +333,101 @@ func readBytes(configMapCache corev1controllers.ConfigMapClient, cm *corev1.Conf
 	}
 
 	return bytes, nil
+}
+
+// calculateBackoff gets the amount of time to wait for the next call.
+// Reference: https://github.com/oras-project/oras-go/blob/main/registry/remote/retry/policy.go#L95
+func calculateBackoff(clusterRepo *catalog.ClusterRepo, policy retryPolicy) time.Duration {
+	var h maphash.Hash
+	h.SetSeed(maphash.MakeSeed())
+	rand := rand.New(rand.NewSource(int64(h.Sum64())))
+	temp := float64(policy.MinWait) * math.Pow(2, float64(clusterRepo.Status.NumberOfRetries))
+	backoff := time.Duration(temp*(1-0.2)) + time.Duration(rand.Int63n(int64(2*0.2*temp)))
+	if backoff < policy.MinWait {
+		return policy.MinWait
+	}
+	if backoff > policy.MaxWait {
+		return policy.MaxWait
+	}
+	return backoff
+}
+
+// getRetryPolicy returns the retry policy for the repository using the values present in the spec
+// or, if they aren't present, the default values
+func getRetryPolicy(clusterRepo *catalog.ClusterRepo) retryPolicy {
+	// Default Values for exponentialBackOff function which is used
+	// to retry an HTTP call when 429 response code is hit.
+	var retryPolicy = retryPolicy{
+		MinWait:  1 * time.Second,
+		MaxWait:  5 * time.Second,
+		MaxRetry: 5,
+	}
+
+	if clusterRepo.Spec.ExponentialBackOffValues != nil {
+		if clusterRepo.Spec.ExponentialBackOffValues.MaxRetries > 0 {
+			retryPolicy.MaxRetry = clusterRepo.Spec.ExponentialBackOffValues.MaxRetries
+		}
+		if clusterRepo.Spec.ExponentialBackOffValues.MinWait != "" {
+			minWait, err := time.ParseDuration(clusterRepo.Spec.ExponentialBackOffValues.MinWait)
+			if err != nil {
+				logrus.Errorf("Failed to parse minWait, using the default value. err: %s", err)
+			}
+			if minWait >= 1*time.Second {
+				retryPolicy.MinWait = minWait
+			} else {
+				logrus.Warnf("retry policy minWait should be at least 1 second")
+			}
+		}
+		if clusterRepo.Spec.ExponentialBackOffValues.MaxWait != "" {
+			maxWait, err := time.ParseDuration(clusterRepo.Spec.ExponentialBackOffValues.MaxWait)
+			if err != nil {
+				logrus.Errorf("Failed to parse maxWait, using the default value. err: %s", err)
+			}
+			if maxWait >= retryPolicy.MinWait {
+				retryPolicy.MaxWait = maxWait
+			} else {
+				logrus.Warnf("retry policy maxWait can not be less than retryPolicy minWait")
+				retryPolicy.MaxWait = retryPolicy.MinWait
+			}
+		}
+	}
+	return retryPolicy
+}
+
+// shouldSkip checks certain conditions to see if the handler should be skipped.
+// For information regarding the conditions, check the comments in the implementation.
+func (o *OCIRepohandler) shouldSkip(clusterRepo *catalog.ClusterRepo, policy retryPolicy, key string) bool {
+	// this is to prevent the handler from making calls when the crd is outdated.
+	updatedRepo, err := o.clusterRepoController.Get(key, metav1.GetOptions{})
+	if err == nil && updatedRepo.ResourceVersion != clusterRepo.ResourceVersion {
+		return true
+	}
+
+	if clusterRepo.Status.ObservedGeneration < clusterRepo.Generation {
+		clusterRepo.Status.NumberOfRetries = 0
+		clusterRepo.Status.NextRetryAt = metav1.Time{}
+		return false
+	}
+
+	// The handler is triggered immediately after any changes, including when updating the number of retries done.
+	// This check is to prevent the handler from executing before the backoff time has passed
+	if !clusterRepo.Status.NextRetryAt.IsZero() && clusterRepo.Status.NextRetryAt.Time.After(timeNow().UTC()) {
+		return true
+	}
+
+	if clusterRepo.Status.ShouldNotSkip { //checks if we should skip running the handler or not
+		return false
+	}
+
+	ociDownloaded := condition.Cond(catalog.OCIDownloaded)
+	ociDownloadedUpdateTime, _ := time.Parse(time.RFC3339, ociDownloaded.GetLastUpdated(clusterRepo))
+
+	if (clusterRepo.Status.NumberOfRetries > policy.MaxRetry || clusterRepo.Status.NumberOfRetries == 0) && // checks if it's retrying
+		clusterRepo.Generation == clusterRepo.Status.ObservedGeneration && // checks if the generation has not changed
+		ociDownloadedUpdateTime.Add(interval).After(timeNow().UTC()) { // checks if the interval has passed
+
+		o.clusterRepoController.EnqueueAfter(clusterRepo.Name, interval)
+		return true
+	}
+	return false
 }

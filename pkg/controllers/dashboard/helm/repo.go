@@ -76,6 +76,9 @@ func RegisterReposForFollowers(ctx context.Context,
 }
 
 func (r *repoHandler) ClusterRepoDownloadEnsureStatusHandler(repo *catalog.ClusterRepo, status catalog.RepoStatus) (catalog.RepoStatus, error) {
+	if registry.IsOCI(repo.Spec.URL) {
+		return status, nil
+	}
 	r.clusterRepos.EnqueueAfter(repo.Name, interval)
 	return r.ensure(&repo.Spec, status, &repo.ObjectMeta)
 }

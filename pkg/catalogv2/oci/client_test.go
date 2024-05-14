@@ -14,15 +14,13 @@ import (
 
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	"github.com/stretchr/testify/assert"
 	"helm.sh/helm/v3/pkg/registry"
 	"helm.sh/helm/v3/pkg/repo"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"oras.land/oras-go/v2/registry/remote/auth"
-	"oras.land/oras-go/v2/registry/remote/retry"
-
-	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 )
 
 func spinRegistry(layerSize int, chartMediaType, helmManifest bool, testcaseName string, t *testing.T) *httptest.Server {
@@ -368,41 +366,25 @@ func TestFetchChart(t *testing.T) {
 
 func TestGetOrasRegistry(t *testing.T) {
 	testCases := []struct {
-		name                     string
-		expectedErr              error
-		insecurePlainHTTP        bool
-		exponentialBackOffValues *v1.ExponentialBackOffValues
+		name              string
+		expectedErr       error
+		insecurePlainHTTP bool
 	}{
 		{
-			name:              "retry policy values are set correctly in oras auth client",
+			name:              "fetching oras registry works fine without auth",
+			expectedErr:       nil,
+			insecurePlainHTTP: false,
+		},
+		{
+			name:              "fetching oras repository works fine with plainHTTP",
 			expectedErr:       nil,
 			insecurePlainHTTP: true,
-			exponentialBackOffValues: &v1.ExponentialBackOffValues{
-				MaxRetries: 5,
-				MaxWait:    "5s",
-				MinWait:    "5s",
-			},
-		},
-		{
-			name:                     "fetching oras registry works fine without auth",
-			expectedErr:              nil,
-			insecurePlainHTTP:        false,
-			exponentialBackOffValues: nil,
-		},
-		{
-			name:                     "fetching oras repository works fine with plainHTTP",
-			expectedErr:              nil,
-			insecurePlainHTTP:        true,
-			exponentialBackOffValues: nil,
 		},
 	}
 
 	for _, tc := range testCases {
 		repoSpec := v1.RepoSpec{
 			InsecurePlainHTTP: tc.insecurePlainHTTP,
-		}
-		if tc.exponentialBackOffValues != nil {
-			repoSpec.ExponentialBackOffValues = tc.exponentialBackOffValues
 		}
 
 		ociClient, err := NewClient("oci://example.com/charts/test:1.2.2", repoSpec, nil)
@@ -411,13 +393,6 @@ func TestGetOrasRegistry(t *testing.T) {
 		orasRegistry, err := ociClient.GetOrasRegistry()
 		assert.Nil(t, orasRegistry.Client.(*auth.Client).Cache)
 		assert.Equal(t, orasRegistry.PlainHTTP, tc.insecurePlainHTTP)
-		policy := orasRegistry.Client.(*auth.Client).Client.Transport.(*retry.Transport).Policy().(*retry.GenericPolicy)
-
-		if tc.exponentialBackOffValues != nil {
-			assert.Equal(t, policy.MaxRetry, 5)
-			assert.Equal(t, policy.MinWait, time.Duration(5*time.Second))
-			assert.Equal(t, policy.MaxWait, time.Duration(5*time.Second))
-		}
 
 		if tc.expectedErr != nil {
 			assert.ErrorContains(t, err, tc.expectedErr.Error())

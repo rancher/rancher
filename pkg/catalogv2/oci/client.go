@@ -13,6 +13,7 @@ import (
 
 	ocispecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
+	catalogv1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	"github.com/sirupsen/logrus"
 	"helm.sh/helm/v3/pkg/chart/loader"
 	helmregistry "helm.sh/helm/v3/pkg/registry"
@@ -26,22 +27,10 @@ import (
 	"oras.land/oras-go/v2/registry/remote"
 	"oras.land/oras-go/v2/registry/remote/auth"
 	"oras.land/oras-go/v2/registry/remote/errcode"
-	"oras.land/oras-go/v2/registry/remote/retry"
-
-	catalogv1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 )
 
 // maxHelmChartTar defines what is the max size of helm chart we support.
 const maxHelmChartTarSize int64 = 20 * 1024 * 1024 // 20 MiB
-
-// Default Values for exponentialBackOff function which is used
-// by oras to retry a HTTP call when 429 response code is hit.
-var retryPolicy retry.GenericPolicy = retry.GenericPolicy{
-	Retryable: retry.DefaultPredicate,
-	MinWait:   1 * time.Second,
-	MaxWait:   5 * time.Second,
-	MaxRetry:  5,
-}
 
 // Client is an OCI client that manages Helm charts in OCI based Helm registries.
 type Client struct {
@@ -224,44 +213,8 @@ func (o *Client) getAuthClient() (*http.Client, error) {
 	baseTransport := http.DefaultTransport.(*http.Transport).Clone()
 	baseTransport.TLSClientConfig = config
 
-	if o.exponentialBackOffValues != nil {
-		if o.exponentialBackOffValues.MaxRetries > 0 {
-			retryPolicy.MaxRetry = o.exponentialBackOffValues.MaxRetries
-		}
-		if o.exponentialBackOffValues.MaxWait != "" {
-			maxWait, err := time.ParseDuration(o.exponentialBackOffValues.MaxWait)
-			if err != nil {
-				return nil, fmt.Errorf("failed to parse exponentialBackOffValues.MaxWait: %w", err)
-			}
-			retryPolicy.MaxWait = maxWait
-		}
-		if o.exponentialBackOffValues.MinWait != "" {
-			minWait, err := time.ParseDuration(o.exponentialBackOffValues.MinWait)
-			if err != nil {
-				return nil, fmt.Errorf("failed to parse exponentialBackOffValues.MinWait: %w", err)
-			}
-			retryPolicy.MinWait = minWait
-		}
-	}
-	// The minimum duration should be atleast 1 second
-	if retryPolicy.MinWait < 1*time.Second {
-		return nil, errors.New("minWait should be at least 1 second")
-	}
-
-	// The minWait should be > maxWait
-	if retryPolicy.MaxWait < retryPolicy.MinWait {
-		return nil, errors.New("maxWait should be greater than minWait")
-	}
-
-	retryPolicy.Backoff = retry.ExponentialBackoff(retryPolicy.MinWait, 2, 0.2)
-
-	retryTransport := retry.NewTransport(baseTransport)
-	retryTransport.Policy = func() retry.Policy {
-		return &retryPolicy
-	}
-
 	return &http.Client{
-		Transport: retryTransport,
+		Transport: baseTransport,
 	}, nil
 }
 

@@ -6,10 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/golang/mock/gomock"
 	catalog "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	"github.com/rancher/wrangler/v2/pkg/generic/fake"
+	"github.com/rancher/wrangler/v2/pkg/genericcondition"
 	"github.com/stretchr/testify/assert"
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/repo"
@@ -243,6 +245,254 @@ func TestGetIndexFile(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 			}
+		})
+	}
+}
+
+func TestGetRetryPolicy(t *testing.T) {
+	testCases := []struct {
+		name                string
+		backOffValues       *catalog.ExponentialBackOffValues
+		expectedRetryPolicy retryPolicy
+	}{
+		{
+			name:          "Should return default values if values are not present",
+			backOffValues: nil,
+			expectedRetryPolicy: retryPolicy{
+				MinWait:  1 * time.Second,
+				MaxWait:  5 * time.Second,
+				MaxRetry: 5,
+			},
+		},
+		{
+			name: "Should get max retries values from clusterRepo",
+			backOffValues: &catalog.ExponentialBackOffValues{
+				MaxRetries: 10,
+			},
+			expectedRetryPolicy: retryPolicy{
+				MinWait:  1 * time.Second,
+				MaxWait:  5 * time.Second,
+				MaxRetry: 10,
+			},
+		},
+		{
+			name: "Should get max wait from clusterRepo",
+			backOffValues: &catalog.ExponentialBackOffValues{
+				MaxWait: "1h",
+			},
+			expectedRetryPolicy: retryPolicy{
+				MinWait:  1 * time.Second,
+				MaxWait:  1 * time.Hour,
+				MaxRetry: 5,
+			},
+		},
+		{
+			name: "Should get min wait from clusterRepo",
+			backOffValues: &catalog.ExponentialBackOffValues{
+				MinWait: "1m",
+			},
+			expectedRetryPolicy: retryPolicy{
+				MinWait:  1 * 1 * time.Minute,
+				MaxWait:  5 * time.Second,
+				MaxRetry: 5,
+			},
+		},
+		{
+			name: "minWait should be at least 1 second",
+			backOffValues: &catalog.ExponentialBackOffValues{
+				MinWait: "150ms",
+			},
+			expectedRetryPolicy: retryPolicy{
+				MinWait:  1 * time.Second,
+				MaxWait:  5 * time.Second,
+				MaxRetry: 5,
+			},
+		},
+		{
+			name: "minWait cant be less than maxWait",
+			backOffValues: &catalog.ExponentialBackOffValues{
+				MinWait: "1m",
+				MaxWait: "5s",
+			},
+			expectedRetryPolicy: retryPolicy{
+				MinWait:  1 * 1 * time.Minute,
+				MaxWait:  1 * 1 * time.Minute,
+				MaxRetry: 5,
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			clusterRepo := &catalog.ClusterRepo{
+				Spec: catalog.RepoSpec{
+					ExponentialBackOffValues: testCase.backOffValues,
+				},
+			}
+			assert.Equal(t, testCase.expectedRetryPolicy, getRetryPolicy(clusterRepo))
+		})
+	}
+}
+
+func TestShouldSkip(t *testing.T) {
+	interval = 1 * time.Hour
+	testCases := []struct {
+		name                     string
+		ociDownloadedTime        time.Time
+		timeNow                  func() time.Time
+		nextRetryAt              metav1.Time
+		newClusterRepoController func(ctrl *gomock.Controller) *fake.MockNonNamespacedControllerInterface[*catalog.ClusterRepo, *catalog.ClusterRepoList]
+		generation               int64
+		observedGeneration       int64
+		maxRetries               int
+		numberOfRetries          int
+		shouldNotSkip            bool
+		expected                 bool
+	}{
+		{
+			name: "Should skip if resourceVersion don't match",
+			newClusterRepoController: func(ctrl *gomock.Controller) *fake.MockNonNamespacedControllerInterface[*catalog.ClusterRepo, *catalog.ClusterRepoList] {
+				mockController := fake.NewMockNonNamespacedControllerInterface[*catalog.ClusterRepo, *catalog.ClusterRepoList](ctrl)
+				mockController.EXPECT().Get("clusterRepo", metav1.GetOptions{}).Return(&catalog.ClusterRepo{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "2"}}, nil)
+				return mockController
+			},
+			expected: true,
+		},
+		{
+			name: "Should skip if nextRetryAt is after time.now()",
+			timeNow: func() time.Time {
+				return time.Date(2024, 04, 23, 10, 1, 0, 0, time.UTC)
+			},
+			nextRetryAt: metav1.NewTime(time.Date(2024, 04, 23, 10, 2, 0, 0, time.UTC)),
+			newClusterRepoController: func(ctrl *gomock.Controller) *fake.MockNonNamespacedControllerInterface[*catalog.ClusterRepo, *catalog.ClusterRepoList] {
+				mockController := fake.NewMockNonNamespacedControllerInterface[*catalog.ClusterRepo, *catalog.ClusterRepoList](ctrl)
+				mockController.EXPECT().Get("clusterRepo", metav1.GetOptions{}).Return(&catalog.ClusterRepo{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}}, nil)
+				return mockController
+			},
+			expected: true,
+		},
+		{
+			name: "Should NOT skip if status.ShouldNotSkip is true",
+			timeNow: func() time.Time {
+				return time.Date(2024, 04, 23, 10, 1, 0, 0, time.UTC)
+			},
+			newClusterRepoController: func(ctrl *gomock.Controller) *fake.MockNonNamespacedControllerInterface[*catalog.ClusterRepo, *catalog.ClusterRepoList] {
+				mockController := fake.NewMockNonNamespacedControllerInterface[*catalog.ClusterRepo, *catalog.ClusterRepoList](ctrl)
+				mockController.EXPECT().Get("clusterRepo", metav1.GetOptions{}).Return(&catalog.ClusterRepo{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}}, nil)
+				return mockController
+			},
+			shouldNotSkip: true,
+			expected:      false,
+		},
+		{
+			name: "Should NOT skip if the handler is retrying",
+			timeNow: func() time.Time {
+				return time.Date(2024, 04, 23, 10, 1, 0, 0, time.UTC)
+			},
+			newClusterRepoController: func(ctrl *gomock.Controller) *fake.MockNonNamespacedControllerInterface[*catalog.ClusterRepo, *catalog.ClusterRepoList] {
+				mockController := fake.NewMockNonNamespacedControllerInterface[*catalog.ClusterRepo, *catalog.ClusterRepoList](ctrl)
+				mockController.EXPECT().Get("clusterRepo", metav1.GetOptions{}).Return(&catalog.ClusterRepo{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}}, nil)
+				return mockController
+			},
+			maxRetries:      5,
+			numberOfRetries: 1,
+			expected:        false,
+		},
+		{
+			name: "Should NOT skip if generation has changed",
+			timeNow: func() time.Time {
+				return time.Date(2024, 04, 23, 10, 1, 0, 0, time.UTC)
+			},
+			newClusterRepoController: func(ctrl *gomock.Controller) *fake.MockNonNamespacedControllerInterface[*catalog.ClusterRepo, *catalog.ClusterRepoList] {
+				mockController := fake.NewMockNonNamespacedControllerInterface[*catalog.ClusterRepo, *catalog.ClusterRepoList](ctrl)
+				mockController.EXPECT().Get("clusterRepo", metav1.GetOptions{}).Return(&catalog.ClusterRepo{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}}, nil)
+				return mockController
+			},
+			generation:         1,
+			observedGeneration: 0,
+			maxRetries:         5,
+			numberOfRetries:    0,
+			expected:           false,
+		},
+		{
+			name:              "Should NOT skip if interval has not passed",
+			ociDownloadedTime: time.Date(2024, 04, 23, 10, 0, 0, 0, time.UTC),
+			timeNow: func() time.Time {
+				return time.Date(2024, 04, 23, 10, 1, 0, 0, time.UTC)
+			},
+			newClusterRepoController: func(ctrl *gomock.Controller) *fake.MockNonNamespacedControllerInterface[*catalog.ClusterRepo, *catalog.ClusterRepoList] {
+				mockController := fake.NewMockNonNamespacedControllerInterface[*catalog.ClusterRepo, *catalog.ClusterRepoList](ctrl)
+				mockController.EXPECT().Get("clusterRepo", metav1.GetOptions{}).Return(&catalog.ClusterRepo{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}}, nil)
+				return mockController
+			},
+			generation:         1,
+			observedGeneration: 0,
+			maxRetries:         5,
+			numberOfRetries:    0,
+			expected:           false,
+		},
+		{
+			name:              "Should skip if handler is done retrying, generation didn't change and interval has not passed",
+			ociDownloadedTime: time.Date(2024, 04, 23, 10, 0, 0, 0, time.UTC),
+			timeNow: func() time.Time {
+				return time.Date(2024, 04, 23, 10, 5, 0, 0, time.UTC)
+			},
+			newClusterRepoController: func(ctrl *gomock.Controller) *fake.MockNonNamespacedControllerInterface[*catalog.ClusterRepo, *catalog.ClusterRepoList] {
+				mockController := fake.NewMockNonNamespacedControllerInterface[*catalog.ClusterRepo, *catalog.ClusterRepoList](ctrl)
+				mockController.EXPECT().Get("clusterRepo", metav1.GetOptions{}).Return(&catalog.ClusterRepo{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}}, nil)
+				mockController.EXPECT().EnqueueAfter("", interval).Return()
+				return mockController
+			},
+			generation:         1,
+			observedGeneration: 1,
+			maxRetries:         5,
+			numberOfRetries:    6,
+			expected:           true,
+		},
+		{
+			name:              "Should NOT skip if handler is done retrying, generation didn't change but interval has passed",
+			ociDownloadedTime: time.Date(2024, 04, 23, 10, 0, 0, 0, time.UTC),
+			timeNow: func() time.Time {
+				return time.Date(2024, 04, 24, 11, 0, 0, 0, time.UTC)
+			},
+			newClusterRepoController: func(ctrl *gomock.Controller) *fake.MockNonNamespacedControllerInterface[*catalog.ClusterRepo, *catalog.ClusterRepoList] {
+				mockController := fake.NewMockNonNamespacedControllerInterface[*catalog.ClusterRepo, *catalog.ClusterRepoList](ctrl)
+				mockController.EXPECT().Get("clusterRepo", metav1.GetOptions{}).Return(&catalog.ClusterRepo{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}}, nil)
+				return mockController
+			},
+			generation:         1,
+			observedGeneration: 1,
+			maxRetries:         5,
+			numberOfRetries:    5,
+			expected:           false,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			policy := retryPolicy{MaxRetry: testCase.maxRetries}
+			ctrl := gomock.NewController(t)
+			mockController := testCase.newClusterRepoController(ctrl)
+			handler := OCIRepohandler{clusterRepoController: mockController}
+			timeNow = testCase.timeNow
+			clusterRepo := &catalog.ClusterRepo{
+				ObjectMeta: metav1.ObjectMeta{
+					Generation:      testCase.generation,
+					ResourceVersion: "1",
+				},
+				Status: catalog.RepoStatus{
+					ObservedGeneration: testCase.observedGeneration,
+					NumberOfRetries:    testCase.numberOfRetries,
+					NextRetryAt:        testCase.nextRetryAt,
+					ShouldNotSkip:      testCase.shouldNotSkip,
+					Conditions: []genericcondition.GenericCondition{
+						{
+							Type:           string(catalog.OCIDownloaded),
+							LastUpdateTime: testCase.ociDownloadedTime.Format(time.RFC3339),
+						},
+					}},
+			}
+			assert.Equal(t, testCase.expected, handler.shouldSkip(clusterRepo, policy, "clusterRepo"))
 		})
 	}
 }
