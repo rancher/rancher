@@ -254,6 +254,7 @@ func TestGetRetryPolicy(t *testing.T) {
 		name                string
 		backOffValues       *catalog.ExponentialBackOffValues
 		expectedRetryPolicy retryPolicy
+		expectedErr         string
 	}{
 		{
 			name:          "Should return default values if values are not present",
@@ -263,10 +264,13 @@ func TestGetRetryPolicy(t *testing.T) {
 				MaxWait:  5 * time.Second,
 				MaxRetry: 5,
 			},
+			expectedErr: "",
 		},
 		{
 			name: "Should get max retries values from clusterRepo",
 			backOffValues: &catalog.ExponentialBackOffValues{
+				MinWait:    1,
+				MaxWait:    5,
 				MaxRetries: 10,
 			},
 			expectedRetryPolicy: retryPolicy{
@@ -274,51 +278,59 @@ func TestGetRetryPolicy(t *testing.T) {
 				MaxWait:  5 * time.Second,
 				MaxRetry: 10,
 			},
+			expectedErr: "",
 		},
 		{
 			name: "Should get max wait from clusterRepo",
 			backOffValues: &catalog.ExponentialBackOffValues{
-				MaxWait: "1h",
+				MinWait: 1,
+				MaxWait: 3600,
 			},
 			expectedRetryPolicy: retryPolicy{
 				MinWait:  1 * time.Second,
 				MaxWait:  1 * time.Hour,
 				MaxRetry: 5,
 			},
+			expectedErr: "",
 		},
 		{
 			name: "Should get min wait from clusterRepo",
 			backOffValues: &catalog.ExponentialBackOffValues{
-				MinWait: "1m",
+				MinWait: 60,
+				MaxWait: 120,
 			},
 			expectedRetryPolicy: retryPolicy{
-				MinWait:  1 * 1 * time.Minute,
-				MaxWait:  5 * time.Second,
+				MinWait:  1 * time.Minute,
+				MaxWait:  2 * time.Minute,
 				MaxRetry: 5,
 			},
+			expectedErr: "",
 		},
 		{
-			name: "minWait should be at least 1 second",
+			name: "minWait should be atleast 1 second",
 			backOffValues: &catalog.ExponentialBackOffValues{
-				MinWait: "150ms",
+				MinWait: 0,
+				MaxWait: 5,
 			},
 			expectedRetryPolicy: retryPolicy{
 				MinWait:  1 * time.Second,
 				MaxWait:  5 * time.Second,
 				MaxRetry: 5,
 			},
+			expectedErr: "minWait should be at least 1 second",
 		},
 		{
-			name: "minWait cant be less than maxWait",
+			name: "maxWait cant be less than minWait",
 			backOffValues: &catalog.ExponentialBackOffValues{
-				MinWait: "1m",
-				MaxWait: "5s",
+				MinWait: 60,
+				MaxWait: 20,
 			},
 			expectedRetryPolicy: retryPolicy{
-				MinWait:  1 * 1 * time.Minute,
-				MaxWait:  1 * 1 * time.Minute,
+				MinWait:  1 * time.Minute,
+				MaxWait:  20 * time.Second,
 				MaxRetry: 5,
 			},
+			expectedErr: "maxWait should be greater than minWait",
 		},
 	}
 
@@ -329,7 +341,13 @@ func TestGetRetryPolicy(t *testing.T) {
 					ExponentialBackOffValues: testCase.backOffValues,
 				},
 			}
-			assert.Equal(t, testCase.expectedRetryPolicy, getRetryPolicy(clusterRepo))
+			retryPolicy, err := getRetryPolicy(clusterRepo)
+			if testCase.expectedErr != "" {
+				assert.Contains(t, err.Error(), testCase.expectedErr)
+			} else {
+				assert.Nil(t, err)
+			}
+			assert.Equal(t, testCase.expectedRetryPolicy, retryPolicy)
 		})
 	}
 }

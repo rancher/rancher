@@ -342,8 +342,8 @@ func TestFetchChart(t *testing.T) {
 			}
 
 			expoValues := v1.ExponentialBackOffValues{
-				MinWait: "1s",
-				MaxWait: "1s",
+				MinWait: 1,
+				MaxWait: 1,
 			}
 
 			ociClient, err := NewClient(fmt.Sprintf("%s/testingchart:0.1.0", strings.Replace(ts.URL, "http", "oci", 1)), v1.RepoSpec{ExponentialBackOffValues: &expoValues}, nil)
