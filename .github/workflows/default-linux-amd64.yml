@@ -11,5 +11,7 @@ jobs:
         run: apk add -U git
       - name: Checkout code
         uses: actions/checkout@v4
+      - name: Validate
+        run: dapper validate
       - name: Build Rancher
         run: dapper ci
