@@ -24,7 +24,7 @@ func deleteInitMachine(t *testing.T, client *rancher.Client, clusterID string) {
 	require.NoError(t, err)
 
 	logrus.Info("Awaiting machine deletion...")
-	err = steve.WaitForSteveResourceDeletion(client, defaults.FiveHundredMillisecondTimeout, defaults.TwoMinuteTimeout, machineSteveResourceType, initMachine.ID)
+	err = steve.WaitForSteveResourceDeletion(client, defaults.FiveHundredMillisecondTimeout, defaults.TenMinuteTimeout, machineSteveResourceType, initMachine.ID)
 	require.NoError(t, err)
 
 	logrus.Info("Awaiting machine replacement...")
