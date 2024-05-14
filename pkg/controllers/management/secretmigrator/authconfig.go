@@ -7,7 +7,6 @@ import (
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/rancher/norman/condition"
-	"github.com/rancher/norman/objectclient"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
@@ -198,7 +197,7 @@ func setUnstructuredStatus(unstructured runtime.Unstructured, key condition.Cond
 }
 
 // getUnstructuredAuthConfig attempts to get the unstructured AuthConfig for the AuthConfig that is passed in.
-func getUnstructuredAuthConfig(unstructuredClient objectclient.GenericClient, authConfig *apimgmtv3.AuthConfig) (runtime.Unstructured, error) {
+func getUnstructuredAuthConfig(unstructuredClient authConfigsClient, authConfig *apimgmtv3.AuthConfig) (runtime.Unstructured, error) {
 	unstructuredAuthConfig, err := unstructuredClient.Get(authConfig.Name, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve unstructured data for AuthConfig from cluster: %w", err)

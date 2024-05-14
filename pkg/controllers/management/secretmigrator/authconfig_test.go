@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/rancher/norman/objectclient"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/saml"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
@@ -22,8 +21,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/watch"
 )
 
 const (
@@ -511,7 +508,7 @@ type mockAuthConfigClient struct {
 	config map[string]any
 }
 
-func newMockAuthConfigClient(authConfig map[string]any) objectclient.GenericClient {
+func newMockAuthConfigClient(authConfig map[string]any) authConfigsClient {
 	return mockAuthConfigClient{config: authConfig}
 }
 
@@ -523,60 +520,4 @@ func (m mockAuthConfigClient) Get(name string, opts metav1.GetOptions) (runtime.
 
 func (m mockAuthConfigClient) Update(name string, o runtime.Object) (runtime.Object, error) {
 	return o, nil
-}
-
-func (m mockAuthConfigClient) UnstructuredClient() objectclient.GenericClient {
-	panic("implement me")
-}
-
-func (m mockAuthConfigClient) GroupVersionKind() schema.GroupVersionKind {
-	panic("implement me")
-}
-
-func (m mockAuthConfigClient) Create(o runtime.Object) (runtime.Object, error) {
-	panic("implement me")
-}
-
-func (m mockAuthConfigClient) GetNamespaced(namespace, name string, opts metav1.GetOptions) (runtime.Object, error) {
-	panic("implement me")
-}
-
-func (m mockAuthConfigClient) UpdateStatus(name string, o runtime.Object) (runtime.Object, error) {
-	panic("implement me")
-}
-
-func (m mockAuthConfigClient) DeleteNamespaced(namespace, name string, opts *metav1.DeleteOptions) error {
-	panic("implement me")
-}
-
-func (m mockAuthConfigClient) Delete(name string, opts *metav1.DeleteOptions) error {
-	panic("implement me")
-}
-
-func (m mockAuthConfigClient) List(opts metav1.ListOptions) (runtime.Object, error) {
-	panic("implement me")
-}
-
-func (m mockAuthConfigClient) ListNamespaced(namespace string, opts metav1.ListOptions) (runtime.Object, error) {
-	panic("implement me")
-}
-
-func (m mockAuthConfigClient) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	panic("implement me")
-}
-
-func (m mockAuthConfigClient) DeleteCollection(deleteOptions *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
-	panic("implement me")
-}
-
-func (m mockAuthConfigClient) Patch(name string, o runtime.Object, patchType types.PatchType, data []byte, subresources ...string) (runtime.Object, error) {
-	panic("implement me")
-}
-
-func (m mockAuthConfigClient) ObjectFactory() objectclient.ObjectFactory {
-	panic("implement me")
-}
-
-func (m mockAuthConfigClient) ObjectClient() *objectclient.ObjectClient {
-	panic("implement me")
 }
