@@ -1,0 +1,15 @@
+name: default-linux-amd64
+on: [pull_request]
+jobs:
+  build-pr:
+    runs-on: ubuntu-latest
+    container: 
+      image: rancher/dapper:v0.6.0
+      options: --privileged
+    steps:
+      - name: Add Git
+        run: apk add -U git
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Build Rancher
+        run: dapper ci
