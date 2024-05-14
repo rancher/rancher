@@ -5,14 +5,14 @@ jobs:
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
     container: 
       image: rancher/dapper:v0.6.0
-      options: --privileged
+      options: --user root --privileged
     steps:
       - name: Add Git
         run: apk add -U git
       - name: Add Docker
         run: |
           apk add -U docker
-          addgroup username docker
+          addgroup root docker
           rc-update add docker default
           service docker start
       - name: Checkout code
