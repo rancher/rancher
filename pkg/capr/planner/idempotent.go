@@ -19,7 +19,7 @@ targetHash=$2
 hashedCmd=$3
 cmd=$4
 caprDir=$5
-shift 4
+shift 5
 
 dataRoot="$caprDir/idempotence/$key/$hashedCmd/$targetHash"
 attemptFile="$dataRoot/last-attempt"
