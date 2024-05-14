@@ -1128,6 +1128,7 @@ steps:
     secret_key:
       from_secret: optimus_charts_secret_key
     source: bin/chart/**/*
+    strip_prefix: bin/chart/
     target: /server-charts
   when:
     event:
