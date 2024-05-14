@@ -60,41 +60,22 @@ func (s *SnapshotRestoreTestSuite) TestSnapshotRestoreETCDOnly() {
 	}
 
 	for _, tt := range tests {
-		clusterObject, _, _ := clusters.GetProvisioningClusterByName(tt.client, s.client.RancherConfig.ClusterName, namespace)
-		if clusterObject == nil {
-			clusterID, err := clusters.GetClusterIDByName(s.client, s.client.RancherConfig.ClusterName)
-			require.NoError(s.T(), err)
+		clusterID, err := clusters.GetV1ProvisioningClusterByName(s.client, s.client.RancherConfig.ClusterName)
+		require.NoError(s.T(), err)
 
-			clusterResp, err := tt.client.Management.Cluster.ByID(clusterID)
-			require.NoError(s.T(), err)
+		cluster, err := tt.client.Steve.SteveType(clusters.ProvisioningSteveResourceType).ByID(clusterID)
+		require.NoError(s.T(), err)
 
-			if clusterResp.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig.S3BackupConfig != nil {
-				tt.name = "RKE1 S3 " + tt.name
-			} else {
-				tt.name = "RKE1 Local " + tt.name
-			}
+		updatedCluster := new(apisV1.Cluster)
+		err = v1.ConvertToK8sType(cluster, &updatedCluster)
+		require.NoError(s.T(), err)
+
+		if strings.Contains(updatedCluster.Spec.KubernetesVersion, "rke2") {
+			tt.name = "RKE2 " + tt.name
+		} else if strings.Contains(updatedCluster.Spec.KubernetesVersion, "k3s") {
+			tt.name = "K3S " + tt.name
 		} else {
-			clusterID, err := clusters.GetV1ProvisioningClusterByName(s.client, s.client.RancherConfig.ClusterName)
-			require.NoError(s.T(), err)
-
-			cluster, err := tt.client.Steve.SteveType(clusters.ProvisioningSteveResourceType).ByID(clusterID)
-			require.NoError(s.T(), err)
-
-			updatedCluster := new(apisV1.Cluster)
-			err = v1.ConvertToK8sType(cluster, &updatedCluster)
-			require.NoError(s.T(), err)
-
-			if updatedCluster.Spec.RKEConfig.ETCD.S3 != nil {
-				tt.name = "S3 " + tt.name
-			} else {
-				tt.name = "Local " + tt.name
-			}
-
-			if strings.Contains(updatedCluster.Spec.KubernetesVersion, "rke2") {
-				tt.name = "RKE2 " + tt.name
-			} else if strings.Contains(updatedCluster.Spec.KubernetesVersion, "k3s") {
-				tt.name = "K3S " + tt.name
-			}
+			tt.name = "RKE1 " + tt.name
 		}
 
 		s.Run(tt.name, func() {
@@ -113,6 +94,6 @@ func (s *SnapshotRestoreTestSuite) TestSnapshotRestoreETCDOnlyDynamicInput() {
 
 // In order for 'go test' to run this suite, we need to create
 // a normal test function and pass our suite to suite.Run
-func TestSnapshotRestoreETCDOnlyTestSuite(t *testing.T) {
+func TestSnapshotRestoreTestSuite(t *testing.T) {
 	suite.Run(t, new(SnapshotRestoreTestSuite))
 }
