@@ -2,7 +2,7 @@ name: default-linux-amd64
 on: [pull_request]
 jobs:
   build-pr:
-    runs-on: org-${{ github.repository_owner_id }}-{{ arch }}-k8s
+    runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
     container: 
       image: rancher/dapper:v0.6.0
       options: --privileged
