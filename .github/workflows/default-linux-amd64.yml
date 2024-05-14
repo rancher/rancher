@@ -11,7 +11,7 @@ jobs:
         run: apk add -U git
       - name: Add Docker
         run: |
-          apk add -U docker
+          apk add -U docker openrc
           addgroup root docker
           rc-update add docker default
           service docker start
