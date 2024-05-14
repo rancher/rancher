@@ -14,7 +14,6 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/gengo/args"
 )
 
 var (
@@ -83,7 +82,7 @@ func GenerateComposeType(projectSchemas *types.Schemas, managementSchemas *types
 }
 
 func generateComposeType(baseCompose string, projectSchemas *types.Schemas, managementSchemas *types.Schemas, clusterSchemas *types.Schemas) error {
-	outputDir := filepath.Join(args.DefaultSourceTree(), baseCompose)
+	outputDir := filepath.Join(defaultSourceTree(), baseCompose)
 	if err := os.MkdirAll(outputDir, 0755); err != nil {
 		return err
 	}
@@ -112,7 +111,7 @@ func generateComposeType(baseCompose string, projectSchemas *types.Schemas, mana
 		return err
 	}
 
-	return generator.Gofmt(args.DefaultSourceTree(), baseCompose)
+	return generator.Gofmt(defaultSourceTree(), baseCompose)
 }
 
 func GenerateNativeTypes(gv schema.GroupVersion, nsObjs []interface{}, objs []interface{}) {
@@ -149,4 +148,15 @@ func getVersion(schemas *types.Schemas) *types.APIVersion {
 	}
 
 	return &version
+}
+
+// From gengo/args, v1:
+// defaultSourceTree returns the /src directory of the first entry in $GOPATH.
+// If $GOPATH is empty, it returns "./". Useful as a default output location.
+func defaultSourceTree() string {
+	paths := strings.Split(os.Getenv("GOPATH"), string(filepath.ListSeparator))
+	if len(paths) > 0 && len(paths[0]) > 0 {
+		return filepath.Join(paths[0], "src")
+	}
+	return "./"
 }
