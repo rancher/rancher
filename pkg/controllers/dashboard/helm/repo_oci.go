@@ -81,18 +81,20 @@ func (o *OCIRepohandler) onClusterRepoChange(key string, clusterRepo *catalog.Cl
 	if !registry.IsOCI(clusterRepo.Spec.URL) {
 		return clusterRepo, nil
 	}
-
-	retryPolicy := getRetryPolicy(clusterRepo)
+	newStatus := clusterRepo.Status.DeepCopy()
+	retryPolicy, err := getRetryPolicy(clusterRepo)
+	if err != nil {
+		return o.setErrorCondition(clusterRepo, err, newStatus)
+	}
 	if o.shouldSkip(clusterRepo, retryPolicy, key) {
 		return clusterRepo, nil
 	}
-	newStatus := clusterRepo.Status.DeepCopy()
 	newStatus.ShouldNotSkip = false
 
 	logrus.Debugf("OCIRepoHandler triggered for clusterrepo %s", clusterRepo.Name)
 	var index *repo.IndexFile
 
-	err := ensureIndexConfigMap(clusterRepo, newStatus, o.configMapController)
+	err = ensureIndexConfigMap(clusterRepo, newStatus, o.configMapController)
 	if err != nil {
 		return o.setErrorCondition(clusterRepo, err, newStatus)
 	}
@@ -121,7 +123,6 @@ func (o *OCIRepohandler) onClusterRepoChange(key string, clusterRepo *catalog.Cl
 	index, err = oci.GenerateIndex(clusterRepo.Spec.URL, secret, clusterRepo.Spec, *newStatus, index)
 	// If there is 401 or 403 error code, then we don't reconcile further and wait for 6 hours interval
 	var errResp *errcode.ErrorResponse
-
 	// If there is 429 error code and max retry is reached, then we don't reconcile further and wait for 6 hours interval,
 	// but we also create the configmap for future usecases.
 	if errors.As(err, &errResp) && errResp.StatusCode == http.StatusTooManyRequests {
@@ -355,7 +356,7 @@ func calculateBackoff(clusterRepo *catalog.ClusterRepo, policy retryPolicy) time
 
 // getRetryPolicy returns the retry policy for the repository using the values present in the spec
 // or, if they aren't present, the default values
-func getRetryPolicy(clusterRepo *catalog.ClusterRepo) retryPolicy {
+func getRetryPolicy(clusterRepo *catalog.ClusterRepo) (retryPolicy, error) {
 	// Default Values for exponentialBackOff function which is used
 	// to retry an HTTP call when 429 response code is hit.
 	var retryPolicy = retryPolicy{
@@ -363,36 +364,25 @@ func getRetryPolicy(clusterRepo *catalog.ClusterRepo) retryPolicy {
 		MaxWait:  5 * time.Second,
 		MaxRetry: 5,
 	}
-
 	if clusterRepo.Spec.ExponentialBackOffValues != nil {
 		if clusterRepo.Spec.ExponentialBackOffValues.MaxRetries > 0 {
 			retryPolicy.MaxRetry = clusterRepo.Spec.ExponentialBackOffValues.MaxRetries
 		}
-		if clusterRepo.Spec.ExponentialBackOffValues.MinWait != "" {
-			minWait, err := time.ParseDuration(clusterRepo.Spec.ExponentialBackOffValues.MinWait)
-			if err != nil {
-				logrus.Errorf("Failed to parse minWait, using the default value. err: %s", err)
+		if clusterRepo.Spec.ExponentialBackOffValues.MinWait >= 0 {
+			if clusterRepo.Spec.ExponentialBackOffValues.MinWait < 1 {
+				return retryPolicy, errors.New("minWait should be at least 1 second")
 			}
-			if minWait >= 1*time.Second {
-				retryPolicy.MinWait = minWait
-			} else {
-				logrus.Warnf("retry policy minWait should be at least 1 second")
-			}
+
+			retryPolicy.MinWait = time.Duration(clusterRepo.Spec.ExponentialBackOffValues.MinWait) * time.Second
 		}
-		if clusterRepo.Spec.ExponentialBackOffValues.MaxWait != "" {
-			maxWait, err := time.ParseDuration(clusterRepo.Spec.ExponentialBackOffValues.MaxWait)
-			if err != nil {
-				logrus.Errorf("Failed to parse maxWait, using the default value. err: %s", err)
-			}
-			if maxWait >= retryPolicy.MinWait {
-				retryPolicy.MaxWait = maxWait
-			} else {
-				logrus.Warnf("retry policy maxWait can not be less than retryPolicy minWait")
-				retryPolicy.MaxWait = retryPolicy.MinWait
-			}
+		if clusterRepo.Spec.ExponentialBackOffValues.MaxWait > 0 {
+			retryPolicy.MaxWait = time.Duration(clusterRepo.Spec.ExponentialBackOffValues.MaxWait) * time.Second
+		}
+		if clusterRepo.Spec.ExponentialBackOffValues.MaxWait < clusterRepo.Spec.ExponentialBackOffValues.MinWait {
+			return retryPolicy, errors.New("maxWait should be greater than minWait")
 		}
 	}
-	return retryPolicy
+	return retryPolicy, nil
 }
 
 // shouldSkip checks certain conditions to see if the handler should be skipped.
