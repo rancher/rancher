@@ -10,7 +10,11 @@ jobs:
       - name: Add Git
         run: apk add -U git
       - name: Add Docker
-        run: apk add -U docker
+        run: |
+          apk add -U docker
+          addgroup username docker
+          rc-update add docker default
+          service docker start
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Validate
