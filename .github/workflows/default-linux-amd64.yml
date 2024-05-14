@@ -6,15 +6,13 @@ jobs:
     container: 
       image: rancher/dapper:v0.6.0
       options: --user root --privileged
+      volumes:
+        - /var/run/docker.sock:/var/run/docker.sock
     steps:
       - name: Add Git
         run: apk add -U git
       - name: Add Docker
-        run: |
-          apk add -U docker openrc
-          addgroup root docker
-          rc-update add docker default
-          service docker start
+        run: apk add -U docker 
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Validate
