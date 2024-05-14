@@ -171,7 +171,6 @@ require (
 	k8s.io/apiserver v0.30.1
 	k8s.io/cli-runtime v0.30.1
 	k8s.io/client-go v12.0.0+incompatible
-	k8s.io/gengo v0.0.0-20240310015720-9cff6334dab4
 	k8s.io/helm v2.16.9+incompatible
 	k8s.io/kube-aggregator v0.30.1
 	k8s.io/kubectl v0.30.1
@@ -285,6 +284,7 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20231106174013-bbf56f31fb17 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20231120223509-83a465c0220f // indirect
 	gopkg.in/go-jose/go-jose.v2 v2.6.3 // indirect
+	k8s.io/gengo v0.0.0-20240310015720-9cff6334dab4 // indirect
 	k8s.io/gengo/v2 v2.0.0-20240228010128-51d4e06bde70 // indirect
 	k8s.io/pod-security-admission v0.30.1 // indirect
 	modernc.org/gc/v3 v3.0.0-20240107210532-573471604cb6 // indirect
