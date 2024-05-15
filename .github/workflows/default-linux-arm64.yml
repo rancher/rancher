@@ -1,5 +1,5 @@
 name: default-linux-arm64
-on: [pull_request]
+on: [workflow_dispatch]
 jobs:
   build-pr:
     runs-on: org-${{ github.repository_owner_id }}-arm64-k8s
@@ -8,7 +8,7 @@ jobs:
       options: --privileged
     steps:
       - name: Add curl
-        run: apt install curl -y 
+        run: apt-get -y update; apt-get -y install curl
       - name: Add Dapper
         run: |
           curl -sL https://releases.rancher.com/dapper/latest/dapper-$(uname -s)-$(uname -m) > /usr/local/bin/dapper
