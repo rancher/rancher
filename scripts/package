@@ -3,9 +3,9 @@ set -e
 
 cd $(dirname $0)/../package
 ls
-source $(dirname $0)/version
+source ../scripts/version
 
-source $(dirname $0)/package-env
+source ../scripts/package-env
 
 
 ../scripts/k3s-images.sh
