@@ -1,0 +1,31 @@
+name: Build PR (Windows Server 2019)
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - master 
+      - release/v*
+
+jobs:
+  build-pr:
+    name: Build for Windows Server 2019
+    runs-on: windows-2019
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Dapper
+        run: |
+          Invoke-WebRequest -Uri "https://github.com/rancher/dapper/releases/download/v0.6.0/dapper-Windows-x86_64.exe" -OutFile "C:\ProgramData\dapper.exe"
+          echo "DAPPER_PATH=C:\ProgramData\dapper.exe" >> $env:GITHUB_ENV
+        shell: pwsh
+
+      - name: Verify Dapper installation
+        run: |
+          Invoke-Expression "$env:DAPPER_PATH --version"
+        shell: pwsh
+
+      - name: Run Build
+        run: |
+          Invoke-Expression "$env:DAPPER_PATH -f Dockerfile-windows.dapper -d ci"
+        shell: pwsh
