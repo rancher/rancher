@@ -53,11 +53,10 @@ if [ ! -d $CHART_REPO_DIR ]; then
     git clone --branch $CHART_DEFAULT_BRANCH https://github.com/rancher/charts $CHART_REPO_DIR
 fi
 
-if [ ${ARCH} == amd64 ]; then
-    # Move this out of ARCH check for local dev on non-amd64 hardware.
-    touch $HOME/bin/rancher-rke-k8s-versions.txt
-    TAG=$TAG REPO=${REPO} go run ../pkg/image/export/main.go $SYSTEM_CHART_REPO_DIR $CHART_REPO_DIR $IMAGE $AGENT_IMAGE $SYSTEM_AGENT_UPGRADE_IMAGE $WINS_AGENT_UPGRADE_IMAGE ${SYSTEM_AGENT_INSTALLER_RKE2_IMAGES[@]} ${SYSTEM_AGENT_INSTALLER_K3S_IMAGES[@]}
-fi
+# if [ ${ARCH} == amd64 ]; then
+#     # Move this out of ARCH check for local dev on non-amd64 hardware.
+#     TAG=$TAG REPO=${REPO} go run ../pkg/image/export/main.go $SYSTEM_CHART_REPO_DIR $CHART_REPO_DIR $IMAGE $AGENT_IMAGE $SYSTEM_AGENT_UPGRADE_IMAGE $WINS_AGENT_UPGRADE_IMAGE ${SYSTEM_AGENT_INSTALLER_RKE2_IMAGES[@]} ${SYSTEM_AGENT_INSTALLER_K3S_IMAGES[@]}
+# fi
 
 # Create components file used for pre-release notes
-../scripts/create-components-file.sh
+# ../scripts/create-components-file.sh
