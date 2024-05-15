@@ -3,7 +3,7 @@ package dashboard
 import (
 	"context"
 
-	"github.com/rancher/wrangler/v2/pkg/crd"
+	"github.com/rancher/wrangler/v3/pkg/crd"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 )

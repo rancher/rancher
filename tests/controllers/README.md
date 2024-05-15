@@ -42,7 +42,7 @@ restCfg, err := testEnv.Start()
 2. Create the CRDs
 
 ```
-import "github.com/rancher/wrangler/v2/pkg/crd"
+import "github.com/rancher/wrangler/v3/pkg/crd"
 
 factory, err := crd.NewFactoryFromClient(restCfg)
 err = factory.BatchCreateCRDs(ctx,

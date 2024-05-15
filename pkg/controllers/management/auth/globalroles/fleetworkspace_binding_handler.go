@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"reflect"
 
-	wrangler "github.com/rancher/wrangler/v2/pkg/name"
+	wrangler "github.com/rancher/wrangler/v3/pkg/name"
 
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 
@@ -14,7 +14,7 @@ import (
 	mgmtcontroller "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
-	rbacv1 "github.com/rancher/wrangler/v2/pkg/generated/controllers/rbac/v1"
+	rbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	v1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

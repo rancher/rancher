@@ -12,7 +12,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/dashboard/clusterindex"
 	provisioningcontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/wrangler"
-	corev1controllers "github.com/rancher/wrangler/v2/pkg/generated/controllers/core/v1"
+	corev1controllers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

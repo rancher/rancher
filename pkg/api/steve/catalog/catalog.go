@@ -22,8 +22,8 @@ import (
 	"github.com/rancher/rancher/pkg/catalogv2/helmop"
 	schema2 "github.com/rancher/steve/pkg/schema"
 	steve "github.com/rancher/steve/pkg/server"
-	schemas3 "github.com/rancher/wrangler/v2/pkg/schemas"
-	"github.com/rancher/wrangler/v2/pkg/schemas/validation"
+	schemas3 "github.com/rancher/wrangler/v3/pkg/schemas"
+	"github.com/rancher/wrangler/v3/pkg/schemas/validation"
 )
 
 // Register is used to register the two handlers with the apiserver

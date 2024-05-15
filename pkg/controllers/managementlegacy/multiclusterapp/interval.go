@@ -7,7 +7,7 @@ import (
 
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/namespace"
-	"github.com/rancher/wrangler/v2/pkg/ticker"
+	"github.com/rancher/wrangler/v3/pkg/ticker"
 	"github.com/sirupsen/logrus"
 )
 
