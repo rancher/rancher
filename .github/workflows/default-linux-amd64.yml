@@ -3,10 +3,15 @@ on: [pull_request]
 jobs:
   build-pr:
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
+    container: ubuntu:22.04
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Validate
         run: ./scripts/validate
       - name: Build Rancher
-        run: ./scripts/ci
+        run: ./scripts/build
+      - name: Package
+        run: ./scripts/package
+      - name: Test
+        run: ./scripts/test
