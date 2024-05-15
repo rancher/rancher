@@ -1,0 +1,17 @@
+name: default-linux-arm64
+on: [pull_request]
+jobs:
+  build-pr:
+    runs-on: org-${{ github.repository_owner_id }}-arm64-k8s
+    container: 
+      image: rancher/dapper:v0.6.0
+      options: --privileged
+    steps:
+      - name: Add Git
+        run: apk add -U git
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Validate
+        run: dapper validate
+      - name: Build Rancher
+        run: dapper ci
