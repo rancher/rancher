@@ -77,7 +77,7 @@ type RKEClusterSpecCommon struct {
 	Networking *Networking `json:"networking,omitempty"`
 
 	// DataDirectories contains the configuration for the data directories typically stored within /var/lib/rancher.
-	DataDirectories DataDirectories `json:"dataDirectories"`
+	DataDirectories DataDirectories `json:"dataDirectories,omitempty"`
 
 	// Increment to force all nodes to re-provision
 	ProvisionGeneration int `json:"provisionGeneration,omitempty"`
