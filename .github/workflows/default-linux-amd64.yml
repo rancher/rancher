@@ -4,11 +4,13 @@ jobs:
   build-pr:
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
     container: 
-      image: docker:dind
+      image: ubuntu:22.04
       options: --privileged
+    env:
+      DOCKER_HOST: unix:///var/run/docker.sock
     steps:
       - name: Install dependencies
-        run: apk update; apk add curl; apk add git
+        run: apt-get -y update; apt-get -y install curl
       - name: Add Dapper
         run: |
           curl -sL https://releases.rancher.com/dapper/latest/dapper-$(uname -s)-$(uname -m) > /usr/local/bin/dapper
