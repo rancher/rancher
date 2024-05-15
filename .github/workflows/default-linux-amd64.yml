@@ -13,10 +13,6 @@ jobs:
         run: |
           curl -sL https://releases.rancher.com/dapper/latest/dapper-$(uname -s)-$(uname -m) > /usr/local/bin/dapper
           chmod +x /usr/local/bin/dapper
-      - name: Add Docker
-        run: |
-          apk add -U docker openrc
-          service docker start
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Validate
