@@ -212,7 +212,7 @@ func TestInstallCharts(t *testing.T) {
 		releases        []*release.Release
 		indexedReleases map[string]repo.ChartVersions
 		desiredCharts   map[desiredKey]map[string]any
-		forceAdopt      bool
+		takeOwnership   bool
 		expectInstalls  map[string]bool
 		expectedErr     error
 	}{
@@ -244,7 +244,7 @@ func TestInstallCharts(t *testing.T) {
 					exactVersion: "2.0.0",
 				}: {},
 			},
-			forceAdopt: false,
+			takeOwnership: false,
 			expectInstalls: map[string]bool{
 				"rancher-webhook": true,
 				"fleet":           true,
@@ -279,7 +279,7 @@ func TestInstallCharts(t *testing.T) {
 					exactVersion: "2.0.0",
 				}: {},
 			},
-			forceAdopt: false,
+			takeOwnership: false,
 			expectInstalls: map[string]bool{
 				"fleet":           false,
 				"rancher-webhook": true,
@@ -314,7 +314,7 @@ func TestInstallCharts(t *testing.T) {
 					exactVersion: "2.0.0",
 				}: {},
 			},
-			forceAdopt: false,
+			takeOwnership: false,
 			expectInstalls: map[string]bool{
 				"fleet":           false,
 				"rancher-webhook": true,
@@ -350,7 +350,7 @@ func TestInstallCharts(t *testing.T) {
 					exactVersion: "2.0.0",
 				}: {},
 			},
-			forceAdopt: false,
+			takeOwnership: false,
 			expectInstalls: map[string]bool{
 				"fleet":           true,
 				"rancher-webhook": true,
@@ -385,7 +385,7 @@ func TestInstallCharts(t *testing.T) {
 					exactVersion: "2.0.0",
 				}: {},
 			},
-			forceAdopt: false,
+			takeOwnership: false,
 			expectInstalls: map[string]bool{
 				"fleet":           true,
 				"rancher-webhook": true,
@@ -423,7 +423,7 @@ func TestInstallCharts(t *testing.T) {
 					exactVersion: "2.0.0",
 				}: {},
 			},
-			forceAdopt: false,
+			takeOwnership: false,
 			expectInstalls: map[string]bool{
 				"fleet":           false,
 				"rancher-webhook": true,
@@ -514,7 +514,7 @@ func TestInstallCharts(t *testing.T) {
 				operation:     mockOperationClient,
 			}
 
-			err := manager.installCharts(test.desiredCharts, test.forceAdopt)
+			err := manager.installCharts(test.desiredCharts, test.takeOwnership)
 			if test.expectedErr == nil {
 				assert.NoError(t, err)
 			} else {
