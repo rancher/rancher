@@ -9,8 +9,8 @@ webhooks:
   - v1beta1
   clientConfig:
     service:
-      name: webhook-service
-      namespace: system
+      name: capi-webhook-service
+      namespace: cattle-provisioning-capi-system
       path: /mutate-cluster-x-k8s-io-v1beta1-cluster
   failurePolicy: Fail
   matchPolicy: Equivalent
@@ -31,8 +31,8 @@ webhooks:
   - v1beta1
   clientConfig:
     service:
-      name: webhook-service
-      namespace: system
+      name: capi-webhook-service
+      namespace: cattle-provisioning-capi-system
       path: /mutate-cluster-x-k8s-io-v1beta1-clusterclass
   failurePolicy: Fail
   matchPolicy: Equivalent
@@ -53,8 +53,8 @@ webhooks:
   - v1beta1
   clientConfig:
     service:
-      name: webhook-service
-      namespace: system
+      name: capi-webhook-service
+      namespace: cattle-provisioning-capi-system
       path: /mutate-cluster-x-k8s-io-v1beta1-machine
   failurePolicy: Fail
   matchPolicy: Equivalent
@@ -75,8 +75,8 @@ webhooks:
   - v1beta1
   clientConfig:
     service:
-      name: webhook-service
-      namespace: system
+      name: capi-webhook-service
+      namespace: cattle-provisioning-capi-system
       path: /mutate-cluster-x-k8s-io-v1beta1-machinedeployment
   failurePolicy: Fail
   matchPolicy: Equivalent
@@ -97,8 +97,8 @@ webhooks:
   - v1beta1
   clientConfig:
     service:
-      name: webhook-service
-      namespace: system
+      name: capi-webhook-service
+      namespace: cattle-provisioning-capi-system
       path: /mutate-cluster-x-k8s-io-v1beta1-machinehealthcheck
   failurePolicy: Fail
   matchPolicy: Equivalent
@@ -119,8 +119,8 @@ webhooks:
   - v1beta1
   clientConfig:
     service:
-      name: webhook-service
-      namespace: system
+      name: capi-webhook-service
+      namespace: cattle-provisioning-capi-system
       path: /mutate-cluster-x-k8s-io-v1beta1-machineset
   failurePolicy: Fail
   matchPolicy: Equivalent
@@ -141,8 +141,8 @@ webhooks:
   - v1beta1
   clientConfig:
     service:
-      name: webhook-service
-      namespace: system
+      name: capi-webhook-service
+      namespace: cattle-provisioning-capi-system
       path: /mutate-runtime-cluster-x-k8s-io-v1alpha1-extensionconfig
   failurePolicy: Fail
   matchPolicy: Equivalent
@@ -163,8 +163,8 @@ webhooks:
   - v1beta1
   clientConfig:
     service:
-      name: webhook-service
-      namespace: system
+      name: capi-webhook-service
+      namespace: cattle-provisioning-capi-system
       path: /mutate-cluster-x-k8s-io-v1beta1-machinepool
   failurePolicy: Fail
   matchPolicy: Equivalent
@@ -185,8 +185,8 @@ webhooks:
   - v1beta1
   clientConfig:
     service:
-      name: webhook-service
-      namespace: system
+      name: capi-webhook-service
+      namespace: cattle-provisioning-capi-cattle-provisioning-capi-system
       path: /mutate-addons-cluster-x-k8s-io-v1beta1-clusterresourceset
   failurePolicy: Fail
   matchPolicy: Equivalent
@@ -213,8 +213,8 @@ webhooks:
   - v1beta1
   clientConfig:
     service:
-      name: webhook-service
-      namespace: system
+      name: capi-webhook-service
+      namespace: cattle-provisioning-capi-system
       path: /validate-cluster-x-k8s-io-v1beta1-cluster
   failurePolicy: Fail
   matchPolicy: Equivalent
@@ -236,8 +236,8 @@ webhooks:
   - v1beta1
   clientConfig:
     service:
-      name: webhook-service
-      namespace: system
+      name: capi-webhook-service
+      namespace: cattle-provisioning-capi-system
       path: /validate-cluster-x-k8s-io-v1beta1-clusterclass
   failurePolicy: Fail
   matchPolicy: Equivalent
@@ -259,8 +259,8 @@ webhooks:
   - v1beta1
   clientConfig:
     service:
-      name: webhook-service
-      namespace: system
+      name: capi-webhook-service
+      namespace: cattle-provisioning-capi-system
       path: /validate-cluster-x-k8s-io-v1beta1-machine
   failurePolicy: Fail
   matchPolicy: Equivalent
@@ -281,8 +281,8 @@ webhooks:
   - v1beta1
   clientConfig:
     service:
-      name: webhook-service
-      namespace: system
+      name: capi-webhook-service
+      namespace: cattle-provisioning-capi-system
       path: /validate-cluster-x-k8s-io-v1beta1-machinedeployment
   failurePolicy: Fail
   matchPolicy: Equivalent
@@ -303,8 +303,8 @@ webhooks:
   - v1beta1
   clientConfig:
     service:
-      name: webhook-service
-      namespace: system
+      name: capi-webhook-service
+      namespace: cattle-provisioning-capi-system
       path: /validate-cluster-x-k8s-io-v1beta1-machinehealthcheck
   failurePolicy: Fail
   matchPolicy: Equivalent
@@ -325,8 +325,8 @@ webhooks:
   - v1beta1
   clientConfig:
     service:
-      name: webhook-service
-      namespace: system
+      name: capi-webhook-service
+      namespace: cattle-provisioning-capi-system
       path: /validate-cluster-x-k8s-io-v1beta1-machineset
   failurePolicy: Fail
   matchPolicy: Equivalent
@@ -347,8 +347,8 @@ webhooks:
   - v1beta1
   clientConfig:
     service:
-      name: webhook-service
-      namespace: system
+      name: capi-webhook-service
+      namespace: cattle-provisioning-capi-system
       path: /validate-runtime-cluster-x-k8s-io-v1alpha1-extensionconfig
   failurePolicy: Fail
   matchPolicy: Equivalent
@@ -369,8 +369,8 @@ webhooks:
   - v1beta1
   clientConfig:
     service:
-      name: webhook-service
-      namespace: system
+      name: capi-webhook-service
+      namespace: cattle-provisioning-capi-system
       path: /validate-cluster-x-k8s-io-v1beta1-machinepool
   failurePolicy: Fail
   matchPolicy: Equivalent
@@ -391,8 +391,8 @@ webhooks:
   - v1beta1
   clientConfig:
     service:
-      name: webhook-service
-      namespace: system
+      name: capi-webhook-service
+      namespace: cattle-provisioning-capi-system
       path: /validate-addons-cluster-x-k8s-io-v1beta1-clusterresourceset
   failurePolicy: Fail
   matchPolicy: Equivalent
@@ -413,8 +413,8 @@ webhooks:
   - v1beta1
   clientConfig:
     service:
-      name: webhook-service
-      namespace: system
+      name: capi-webhook-service
+      namespace: cattle-provisioning-capi-system
       path: /validate-addons-cluster-x-k8s-io-v1beta1-clusterresourcesetbinding
   failurePolicy: Fail
   matchPolicy: Equivalent
@@ -435,8 +435,8 @@ webhooks:
   - v1beta1
   clientConfig:
     service:
-      name: webhook-service
-      namespace: system
+      name: capi-webhook-service
+      namespace: cattle-provisioning-capi-system
       path: /validate-ipam-cluster-x-k8s-io-v1beta1-ipaddress
   failurePolicy: Fail
   matchPolicy: Equivalent
@@ -458,8 +458,8 @@ webhooks:
   - v1beta1
   clientConfig:
     service:
-      name: webhook-service
-      namespace: system
+      name: capi-webhook-service
+      namespace: cattle-provisioning-capi-system
       path: /validate-ipam-cluster-x-k8s-io-v1beta1-ipaddressclaim
   failurePolicy: Fail
   matchPolicy: Equivalent
