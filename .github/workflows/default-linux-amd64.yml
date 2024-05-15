@@ -6,6 +6,8 @@ jobs:
     container: 
       image: ubuntu:22.04
       options: --privileged
+      volumes:
+        - /var/run/docker.sock:/var/run/docker.sock
     env:
       DOCKER_HOST: unix:///var/run/docker.sock
     steps:
