@@ -2,25 +2,11 @@ name: default-linux-amd64
 on: [pull_request]
 jobs:
   build-pr:
-    # runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
-    runs-on: ubuntu-latest
-    container: 
-      image: ubuntu:22.04
-      options: --privileged
-      volumes:
-        - /var/run/docker.sock:/var/run/docker.sock
-    env:
-      DOCKER_HOST: unix:///var/run/docker.sock
+    runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
     steps:
-      - name: Install dependencies
-        run: apt-get -y update; apt-get -y install curl docker.io
-      - name: Add Dapper
-        run: |
-          curl -sL https://releases.rancher.com/dapper/latest/dapper-$(uname -s)-$(uname -m) > /usr/local/bin/dapper
-          chmod +x /usr/local/bin/dapper
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Validate
-        run: dapper validate
+        run: ./scripts/validate
       - name: Build Rancher
-        run: /usr/local/bin/dapper ci
+        run: ./scripts/ci
