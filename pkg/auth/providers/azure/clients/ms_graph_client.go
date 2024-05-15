@@ -186,11 +186,10 @@ func (c AzureMSGraphClient) ListGroups(filter string) ([]v3.Principal, error) {
 func (c AzureMSGraphClient) ListGroupMemberships(userID string) ([]string, error) {
 	logrus.Debugf("[%s] ListGroupMemberships %s", providerLogPrefix, userID)
 	var groupIDs []string
-	err := c.listGroupMemberships(userID, func(g *models.Group) error {
+	err := c.listGroupMemberships(userID, func(g *models.Group) {
 		if id := g.GetId(); id != nil {
 			groupIDs = append(groupIDs, *id)
 		}
-		return nil
 	})
 	if err != nil {
 		return nil, err
@@ -199,7 +198,7 @@ func (c AzureMSGraphClient) ListGroupMemberships(userID string) ([]string, error
 	return groupIDs, nil
 }
 
-func (c AzureMSGraphClient) listGroupMemberships(userID string, f func(*models.Group) error) error {
+func (c AzureMSGraphClient) listGroupMemberships(userID string, f func(*models.Group)) error {
 	result, err := c.GraphClient.Users().
 		ByUserId(userID).
 		MemberOf().
@@ -220,9 +219,7 @@ func (c AzureMSGraphClient) listGroupMemberships(userID string, f func(*models.G
 		if !ok {
 			return true
 		}
-		if err := f(group); err != nil {
-			return true
-		}
+		f(group)
 
 		return true
 	})
@@ -260,11 +257,10 @@ func (c AzureMSGraphClient) LoginUser(config *v32.AzureADConfig, credential *v32
 
 func (c AzureMSGraphClient) listGroupPrincipals(userPrincipal v3.Principal) ([]v3.Principal, error) {
 	var groups []string
-	err := c.listGroupMemberships(GetPrincipalID(userPrincipal), func(g *models.Group) error {
+	err := c.listGroupMemberships(GetPrincipalID(userPrincipal), func(g *models.Group) {
 		if id := g.GetId(); id != nil && g.GetDisplayName() != nil && g.GetSecurityEnabled() != nil {
 			groups = append(groups, *id)
 		}
-		return nil
 	})
 	if err != nil {
 		return nil, fmt.Errorf("listing group membeships: %w", err)
