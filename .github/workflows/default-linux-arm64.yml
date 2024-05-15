@@ -4,14 +4,18 @@ jobs:
   build-pr:
     runs-on: org-${{ github.repository_owner_id }}-arm64-k8s
     container: 
-      image: rancher/dapper:v0.6.0
+      image: ubuntu:22.04
       options: --privileged
     steps:
       - name: Add Git
         run: apk add -U git
+      - name: Add Dapper
+        run: |
+          curl -sL https://releases.rancher.com/dapper/latest/dapper-$(uname -s)-$(uname -m) > /usr/local/bin/dapper
+          chmod +x /usr/local/bin/dapper
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Validate
         run: dapper validate
       - name: Build Rancher
-        run: dapper ci
+        run: /usr/local/bin/dapper ci
