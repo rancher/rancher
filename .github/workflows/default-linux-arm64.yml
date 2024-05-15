@@ -7,8 +7,6 @@ jobs:
       image: ubuntu:22.04
       options: --privileged
     steps:
-      - name: Add Git
-        run: apk add -U git
       - name: Add Dapper
         run: |
           curl -sL https://releases.rancher.com/dapper/latest/dapper-$(uname -s)-$(uname -m) > /usr/local/bin/dapper
