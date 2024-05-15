@@ -703,18 +703,6 @@ clone:
   depth: 20
 
 steps:
-  - name: build-pr
-    pull: always
-    image: rancher/dapper:v0.6.0
-    commands:
-      - dapper.exe -f Dockerfile-windows.dapper -d ci
-    volumes:
-      - name: docker_pipe
-        path: \\\\.\\pipe\\docker_engine
-    when:
-      event:
-        - pull_request
-
   - name: build-push-tag
     pull: always
     image: rancher/dapper:v0.6.0
@@ -830,18 +818,6 @@ clone:
   depth: 20
 
 steps:
-  - name: build-pr
-    pull: always
-    image: rancher/dapper:v0.6.0
-    commands:
-      - dapper.exe -f Dockerfile-windows.dapper -d ci
-    volumes:
-      - name: docker_pipe
-        path: \\\\.\\pipe\\docker_engine
-    when:
-      event:
-        - pull_request
-
   - name: build-push-tag
     pull: always
     image: rancher/dapper:v0.6.0
