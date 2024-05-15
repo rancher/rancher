@@ -118,7 +118,7 @@ func (c AzureMSGraphClient) GetUser(userID string) (v3.Principal, error) {
 	return userToPrincipal(result), nil
 }
 
-// istUsers fetches all user principals in a directory from the Microsoft Graph API.
+// ListUsers fetches all user principals in a directory from the Microsoft Graph API.
 func (c AzureMSGraphClient) ListUsers(filter string) ([]v3.Principal, error) {
 	logrus.Debugf("[%s] ListUsers %s", providerLogPrefix, filter)
 	result, err := c.GraphClient.Users().Get(context.Background(), &msgraphusers.UsersRequestBuilderGetRequestConfiguration{
