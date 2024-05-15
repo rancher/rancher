@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rancher/wrangler/v2/pkg/schemas/validation"
+	"github.com/rancher/wrangler/v3/pkg/schemas/validation"
 
 	"sigs.k8s.io/yaml"
 

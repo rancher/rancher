@@ -8,8 +8,8 @@ import (
 
 	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 
-	"github.com/rancher/wrangler/v2/pkg/data"
-	"github.com/rancher/wrangler/v2/pkg/yaml"
+	"github.com/rancher/wrangler/v3/pkg/data"
+	"github.com/rancher/wrangler/v3/pkg/yaml"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	meta2 "k8s.io/apimachinery/pkg/api/meta"

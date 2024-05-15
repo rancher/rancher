@@ -8,7 +8,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	fleetconst "github.com/rancher/rancher/pkg/fleet"
 	"github.com/rancher/rancher/pkg/rbac"
-	"github.com/rancher/wrangler/v2/pkg/relatedresource"
+	"github.com/rancher/wrangler/v3/pkg/relatedresource"
 	k8srbac "k8s.io/api/rbac/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

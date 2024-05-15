@@ -25,7 +25,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/mattn/go-colorable"
 	"github.com/rancher/remotedialer"
-	"github.com/rancher/wrangler/v2/pkg/signals"
+	"github.com/rancher/wrangler/v3/pkg/signals"
 	"github.com/sirupsen/logrus"
 
 	"github.com/rancher/rancher/pkg/agent/clean"
