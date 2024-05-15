@@ -126,12 +126,29 @@ func TestMSGraphClient_ListGroups_with_filter(t *testing.T) {
 func TestMSGraphClient_ListGroupMemberships(t *testing.T) {
 	client := newTestClient(t)
 
-	groups, err := client.ListGroupMemberships("testuser1@ranchertest.onmicrosoft.com")
+	groups, err := client.ListGroupMemberships("testuser1@ranchertest.onmicrosoft.com", "")
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	assert.Equal(t, []string{"15f6a947-9d67-4e7f-b1d0-f5f52145fed3", "bf881716-8d6d-456f-b234-2b143dfd5cf0"}, groups)
+}
+
+func TestMSGraphClient_ListGroupMemberships_with_filter(t *testing.T) {
+	client := newTestClient(t)
+
+	groups, err := client.ListGroupMemberships("testuser1@ranchertest.onmicrosoft.com", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	unfilteredCount := len(groups)
+
+	groups, err = client.ListGroupMemberships("testuser1@ranchertest.onmicrosoft.com", "startswith(displayName,'test')")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Less(t, len(groups), unfilteredCount)
 }
 
 func newTestClient(t *testing.T) *AzureMSGraphClient {

@@ -13,6 +13,7 @@ import (
 	"github.com/AzureAD/microsoft-authentication-library-for-go/apps/cache"
 	"github.com/AzureAD/microsoft-authentication-library-for-go/apps/confidential"
 	"github.com/coreos/go-oidc/v3/oidc"
+	abstractions "github.com/microsoft/kiota-abstractions-go"
 	msgraphsdk "github.com/microsoftgraph/msgraph-sdk-go"
 	msgraphsdkgo "github.com/microsoftgraph/msgraph-sdk-go"
 	msgraphcore "github.com/microsoftgraph/msgraph-sdk-go-core"
@@ -183,10 +184,10 @@ func (c AzureMSGraphClient) ListGroups(filter string) ([]v3.Principal, error) {
 }
 
 // ListGroupMemberships takes a user ID and fetches the user's group principals as string IDs from the Microsoft Graph API.
-func (c AzureMSGraphClient) ListGroupMemberships(userID string) ([]string, error) {
+func (c AzureMSGraphClient) ListGroupMemberships(userID string, filter string) ([]string, error) {
 	logrus.Debugf("[%s] ListGroupMemberships %s", providerLogPrefix, userID)
 	var groupIDs []string
-	err := c.listGroupMemberships(context.Background(), userID, func(g *models.Group) {
+	err := c.listGroupMemberships(context.Background(), userID, filter, func(g *models.Group) {
 		if id := g.GetId(); id != nil {
 			groupIDs = append(groupIDs, *id)
 		}
@@ -198,11 +199,21 @@ func (c AzureMSGraphClient) ListGroupMemberships(userID string) ([]string, error
 	return groupIDs, nil
 }
 
-func (c AzureMSGraphClient) listGroupMemberships(ctx context.Context, userID string, f func(*models.Group)) error {
+func (c AzureMSGraphClient) listGroupMemberships(ctx context.Context, userID string, filter string, f func(*models.Group)) error {
+	requestCount := true
+	headers := abstractions.NewRequestHeaders()
+	headers.Add("ConsistencyLevel", "eventual")
+
 	result, err := c.GraphClient.Users().
 		ByUserId(userID).
 		MemberOf().
-		Get(ctx, nil)
+		Get(ctx,
+			&msgraphusers.ItemMemberOfRequestBuilderGetRequestConfiguration{
+				Headers: headers,
+				QueryParameters: &msgraphusers.ItemMemberOfRequestBuilderGetQueryParameters{
+					Filter: &filter,
+					Count:  &requestCount,
+				}})
 	if err != nil {
 		return fmt.Errorf("listing group memberships: %w", err)
 	}
@@ -248,7 +259,7 @@ func (c AzureMSGraphClient) LoginUser(config *v32.AzureADConfig, credential *v32
 	userPrincipal.Me = true
 	logrus.Debugf("[%s] Completed getting user info from AzureAD", providerLogPrefix)
 
-	groupPrincipals, err := c.listGroupPrincipals(context.Background(), userPrincipal)
+	groupPrincipals, err := c.listGroupPrincipals(context.Background(), userPrincipal, config.GroupMembershipFilter)
 	if err != nil {
 		return v3.Principal{}, nil, "", err
 	}
@@ -256,15 +267,15 @@ func (c AzureMSGraphClient) LoginUser(config *v32.AzureADConfig, credential *v32
 	return userPrincipal, groupPrincipals, "", nil
 }
 
-func (c AzureMSGraphClient) listGroupPrincipals(ctx context.Context, userPrincipal v3.Principal) ([]v3.Principal, error) {
+func (c AzureMSGraphClient) listGroupPrincipals(ctx context.Context, userPrincipal v3.Principal, filter string) ([]v3.Principal, error) {
 	var groups []string
-	err := c.listGroupMemberships(ctx, GetPrincipalID(userPrincipal), func(g *models.Group) {
+	err := c.listGroupMemberships(ctx, GetPrincipalID(userPrincipal), filter, func(g *models.Group) {
 		if id := g.GetId(); id != nil && g.GetDisplayName() != nil && g.GetSecurityEnabled() != nil {
 			groups = append(groups, *id)
 		}
 	})
 	if err != nil {
-		return nil, fmt.Errorf("listing group membeships: %w", err)
+		return nil, fmt.Errorf("listing group memberships: %w", err)
 	}
 
 	groupPrincipals, err := UserGroupsToPrincipals(c, groups)

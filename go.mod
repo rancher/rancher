@@ -108,6 +108,7 @@ require (
 	github.com/heptio/authenticator v0.0.0-20180409043135-d282f87a1972
 	github.com/mattn/go-colorable v0.1.13
 	github.com/mcuadros/go-version v0.0.0-20190830083331-035f6764e8d2
+	github.com/microsoft/kiota-abstractions-go v1.0.0
 	github.com/microsoftgraph/msgraph-sdk-go v1.0.0
 	github.com/microsoftgraph/msgraph-sdk-go-core v1.0.0
 	github.com/minio/minio-go/v7 v7.0.10
@@ -238,7 +239,6 @@ require (
 	github.com/letsencrypt/boulder v0.0.0-20230907030200-6d76a0f91e1e // indirect
 	github.com/mattn/go-shellwords v1.0.12 // indirect
 	github.com/mattn/go-sqlite3 v1.14.22 // indirect
-	github.com/microsoft/kiota-abstractions-go v1.0.0 // indirect
 	github.com/microsoft/kiota-authentication-azure-go v1.0.0 // indirect
 	github.com/microsoft/kiota-http-go v1.0.0 // indirect
 	github.com/microsoft/kiota-serialization-form-go v1.0.0 // indirect
