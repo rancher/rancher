@@ -439,3 +439,65 @@ tests:
     - equal:
         path: spec.template.spec.containers[0].startupProbe.periodSeconds
         value: 15
+- it: should add CATTLE_AGENT_TLS_CHECK=true to env and maintain default vars
+  set:
+    agentTLSMode: "strict"
+  asserts:
+    - contains:
+        path: spec.template.spec.containers[0].env
+        content:
+          name: CATTLE_AGENT_TLS_CHECK
+          value: "true"
+    - contains:
+        path: spec.template.spec.containers[0].env
+        content:
+          name: CATTLE_PEER_SERVICE
+          value: RELEASE-NAME-rancher
+    - contains:
+        path: spec.template.spec.containers[0].env
+        content:
+          name: CATTLE_NAMESPACE
+          value: NAMESPACE
+- it: should add CATTLE_AGENT_TLS_CHECK=false to env and maintain default vars
+  set:
+    agentTLSMode: "system-store"
+  asserts:
+    - contains:
+        path: spec.template.spec.containers[0].env
+        content:
+          name: CATTLE_AGENT_TLS_CHECK
+          value: "false"
+    - contains:
+        path: spec.template.spec.containers[0].env
+        content:
+          name: CATTLE_PEER_SERVICE
+          value: RELEASE-NAME-rancher
+    - contains:
+        path: spec.template.spec.containers[0].env
+        content:
+          name: CATTLE_NAMESPACE
+          value: NAMESPACE
+- it: should not add CATTLE_AGENT_TLS_CHECK to env and maintain default vars
+  set:
+    agentTLSMode: null
+  asserts:
+    - notContains:
+        path: spec.template.spec.containers[0].env
+        content:
+          name: CATTLE_AGENT_TLS_CHECK
+          value: "true"
+    - notContains:
+        path: spec.template.spec.containers[0].env
+        content:
+          name: CATTLE_AGENT_TLS_CHECK
+          value: "false"
+    - contains:
+        path: spec.template.spec.containers[0].env
+        content:
+          name: CATTLE_PEER_SERVICE
+          value: RELEASE-NAME-rancher
+    - contains:
+        path: spec.template.spec.containers[0].env
+        content:
+          name: CATTLE_NAMESPACE
+          value: NAMESPACE
