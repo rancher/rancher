@@ -7,7 +7,6 @@ import (
 	"net/url"
 
 	"github.com/gorilla/mux"
-	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -37,6 +36,5 @@ func redirectAuth(rw http.ResponseWriter, req *http.Request) {
 		Path:     authToTarget[input.To],
 		RawQuery: req.URL.RawQuery,
 	}
-	logrus.Infof("In redirectAuth path is: %s     query is: %s", u.Path, u.RawQuery)
 	http.Redirect(rw, req, u.String(), http.StatusFound)
 }

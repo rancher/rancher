@@ -20,7 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-type GenericOIDCProvider struct {
+type GenOIDCProvider struct {
 	baseoidc.OpenIDCProvider
 }
 
@@ -43,7 +43,7 @@ type ClaimInfo struct {
 }
 
 func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *tokens.Manager) common.AuthProvider {
-	return &GenericOIDCProvider{
+	return &GenOIDCProvider{
 		baseoidc.OpenIDCProvider{
 			Name:        Name,
 			Type:        client.GenericOIDCConfigType,
@@ -57,14 +57,14 @@ func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.
 }
 
 // GetName returns the name of this provider.
-func (g *GenericOIDCProvider) GetName() string {
+func (g *GenOIDCProvider) GetName() string {
 	return Name
 }
 
 // SearchPrincipals will return a principal of the requested principalType with a displayName and loginName
 // that match the searchValue.  This is done because OIDC does not have a proper lookup mechanism.  In order
 // to provide some degree of functionality that allows manual entry for users/groups, this is the compromise.
-func (g *GenericOIDCProvider) SearchPrincipals(searchValue, principalType string, _ v3.Token) ([]v3.Principal, error) {
+func (g *GenOIDCProvider) SearchPrincipals(searchValue, principalType string, _ v3.Token) ([]v3.Principal, error) {
 	var principals []v3.Principal
 
 	if principalType == "" {
@@ -83,7 +83,7 @@ func (g *GenericOIDCProvider) SearchPrincipals(searchValue, principalType string
 	return principals, nil
 }
 
-func (g *GenericOIDCProvider) GetPrincipal(principalID string, token v3.Token) (v3.Principal, error) {
+func (g *GenOIDCProvider) GetPrincipal(principalID string, token v3.Token) (v3.Principal, error) {
 	var p v3.Principal
 
 	// parsing id to get the external id and type. Example genericoidc_<user|group>://<user sub | group name>
@@ -121,7 +121,7 @@ func (g *GenericOIDCProvider) GetPrincipal(principalID string, token v3.Token) (
 }
 
 // TransformToAuthProvider yields information used, typically by the UI, to be able to form URLs used to perform login.
-func (g *GenericOIDCProvider) TransformToAuthProvider(authConfig map[string]interface{}) (map[string]interface{}, error) {
+func (g *GenOIDCProvider) TransformToAuthProvider(authConfig map[string]interface{}) (map[string]interface{}, error) {
 	p := common.TransformToAuthProvider(authConfig)
 	p[publicclient.GenericOIDCProviderFieldRedirectURL] = g.getRedirectURL(authConfig)
 	p[publicclient.GenericOIDCProviderFieldScopes] = authConfig["scope"]
@@ -129,13 +129,13 @@ func (g *GenericOIDCProvider) TransformToAuthProvider(authConfig map[string]inte
 }
 
 // RefetchGroupPrincipals is not implemented for OIDC.
-func (g *GenericOIDCProvider) RefetchGroupPrincipals(principalID string, secret string) ([]v3.Principal, error) {
+func (g *GenOIDCProvider) RefetchGroupPrincipals(principalID string, secret string) ([]v3.Principal, error) {
 	return nil, errors.New("Not implemented")
 }
 
 // GetOIDCConfig fetches necessary details from the AuthConfig object and returns the parts required in order
 // to configure an OIDC library provider object.
-func (g *GenericOIDCProvider) GetOIDCConfig() (*v32.OIDCConfig, error) {
+func (g *GenOIDCProvider) GetOIDCConfig() (*v32.OIDCConfig, error) {
 	authConfigObj, err := g.AuthConfigs.ObjectClient().UnstructuredClient().Get(g.Name, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve OIDCConfig, error: %v", err)
@@ -175,7 +175,7 @@ func (g *GenericOIDCProvider) GetOIDCConfig() (*v32.OIDCConfig, error) {
 
 // userToPrincipal takes user-related information from OIDC's UserInfo and combines it with information present
 // in the claims to form and return a v3.Principal object.
-func (g *GenericOIDCProvider) userToPrincipal(userInfo *oidc.UserInfo, claimInfo ClaimInfo) v3.Principal {
+func (g *GenOIDCProvider) userToPrincipal(userInfo *oidc.UserInfo, claimInfo ClaimInfo) v3.Principal {
 	displayName := claimInfo.Name
 	if displayName == "" {
 		displayName = userInfo.Email
@@ -192,7 +192,7 @@ func (g *GenericOIDCProvider) userToPrincipal(userInfo *oidc.UserInfo, claimInfo
 }
 
 // getGroupsFromClaimInfo takes the claims that we get from the OIDC provider and returns a slice of groupPrincipals.
-func (g *GenericOIDCProvider) getGroupsFromClaimInfo(claimInfo ClaimInfo) []v3.Principal {
+func (g *GenOIDCProvider) getGroupsFromClaimInfo(claimInfo ClaimInfo) []v3.Principal {
 	var groupPrincipals []v3.Principal
 
 	if claimInfo.FullGroupPath != nil {
@@ -218,7 +218,7 @@ func (g *GenericOIDCProvider) getGroupsFromClaimInfo(claimInfo ClaimInfo) []v3.P
 
 // groupToPrincipal takes a bare group name and turns it into a v3.Principal group object by filling-in other fields
 // with basic provider information.
-func (g *GenericOIDCProvider) groupToPrincipal(groupName string) v3.Principal {
+func (g *GenOIDCProvider) groupToPrincipal(groupName string) v3.Principal {
 	p := v3.Principal{
 		ObjectMeta:    metav1.ObjectMeta{Name: g.Name + "_" + GroupType + "://" + groupName},
 		DisplayName:   groupName,
@@ -230,7 +230,7 @@ func (g *GenericOIDCProvider) groupToPrincipal(groupName string) v3.Principal {
 }
 
 // getRedirectURL uses the AuthConfig map to build-up the redirect URL passed to the OIDC provider at login-time.
-func (g *GenericOIDCProvider) getRedirectURL(config map[string]interface{}) string {
+func (g *GenOIDCProvider) getRedirectURL(config map[string]interface{}) string {
 	authURL, _ := baseoidc.FetchAuthURL(config)
 
 	return fmt.Sprintf(
@@ -243,7 +243,7 @@ func (g *GenericOIDCProvider) getRedirectURL(config map[string]interface{}) stri
 
 // toPrincipalFromToken uses additional information about the principal found in the token, if available, to provide
 // a more detailed, useful Principal object.
-func (g *GenericOIDCProvider) toPrincipalFromToken(principalType string, princ v3.Principal, token *v3.Token) v3.Principal {
+func (g *GenOIDCProvider) toPrincipalFromToken(principalType string, princ v3.Principal, token *v3.Token) v3.Principal {
 	if principalType == UserType {
 		princ.PrincipalType = UserType
 		if token != nil {
