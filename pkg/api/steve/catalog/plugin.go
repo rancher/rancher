@@ -1,17 +1,23 @@
 package catalog
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
+	"mime"
 	"net/http"
 	"net/http/httputil"
 	neturl "net/url"
+	"path/filepath"
 
 	"github.com/gorilla/mux"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/plugin"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apiserver/pkg/endpoints/request"
 )
+
+var denyFunc = denylist
 
 func RegisterUIPluginHandlers(router *mux.Router) {
 	router.HandleFunc("/v1/uiplugins", indexHandler)
@@ -61,11 +67,24 @@ func proxyRequest(target, path string, w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("failed to parse url [%s]", target), http.StatusInternalServerError)
 		return
 	}
-	if denylist(url.Hostname()) {
+	if denyFunc(url.Hostname()) {
 		http.Error(w, fmt.Sprintf("url [%s] is forbidden", target), http.StatusForbidden)
 		return
 	}
 	proxy := httputil.NewSingleHostReverseProxy(url)
+	proxy.ModifyResponse = func(response *http.Response) error {
+		if response.StatusCode == http.StatusOK {
+			if contentType := mime.TypeByExtension(filepath.Ext(r.URL.Path)); contentType != "" {
+				w.Header().Set("Content-Type", contentType)
+			} else {
+				body, _ := io.ReadAll(response.Body)
+				response.Body = io.NopCloser(bytes.NewBuffer(body))
+				w.Header().Set("Content-Type", http.DetectContentType(body))
+			}
+
+		}
+		return nil
+	}
 	r.URL.Host = url.Host
 	r.URL.Scheme = url.Scheme
 	r.URL.Path = path
