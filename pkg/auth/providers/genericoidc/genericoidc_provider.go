@@ -124,7 +124,7 @@ func (g *GenericOIDCProvider) GetPrincipal(principalID string, token v3.Token) (
 func (g *GenericOIDCProvider) TransformToAuthProvider(authConfig map[string]interface{}) (map[string]interface{}, error) {
 	p := common.TransformToAuthProvider(authConfig)
 	p[publicclient.GenericOIDCProviderFieldRedirectURL] = g.getRedirectURL(authConfig)
-	p[publicclient.GenericOIDCProviderFieldScopes] = authConfig["scopes"]
+	p[publicclient.GenericOIDCProviderFieldScopes] = authConfig["scope"]
 	return p, nil
 }
 

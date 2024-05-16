@@ -22,7 +22,7 @@ const (
 	GenericOIDCConfigFieldPrivateKey          = "privateKey"
 	GenericOIDCConfigFieldRancherURL          = "rancherUrl"
 	GenericOIDCConfigFieldRemoved             = "removed"
-	GenericOIDCConfigFieldScopes              = "scopes"
+	GenericOIDCConfigFieldScopes              = "scope"
 	GenericOIDCConfigFieldStatus              = "status"
 	GenericOIDCConfigFieldTokenEndpoint       = "tokenEndpoint"
 	GenericOIDCConfigFieldType                = "type"
@@ -51,7 +51,7 @@ type GenericOIDCConfig struct {
 	PrivateKey          string            `json:"privateKey,omitempty" yaml:"privateKey,omitempty"`
 	RancherURL          string            `json:"rancherUrl,omitempty" yaml:"rancherUrl,omitempty"`
 	Removed             string            `json:"removed,omitempty" yaml:"removed,omitempty"`
-	Scopes              string            `json:"scopes,omitempty" yaml:"scopes,omitempty"`
+	Scopes              string            `json:"scope,omitempty" yaml:"scope,omitempty"`
 	Status              *AuthConfigStatus `json:"status,omitempty" yaml:"status,omitempty"`
 	TokenEndpoint       string            `json:"tokenEndpoint,omitempty" yaml:"tokenEndpoint,omitempty"`
 	Type                string            `json:"type,omitempty" yaml:"type,omitempty"`
