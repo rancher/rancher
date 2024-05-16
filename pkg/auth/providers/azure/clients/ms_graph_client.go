@@ -69,19 +69,19 @@ func NewMSGraphClient(config *v32.AzureADConfig, secrets normancorev1.SecretInte
 	ctx := context.Background()
 	ar, err = confidentialClient.AcquireTokenSilent(ctx, []string{graphEndpoint})
 	if err != nil {
-		logrus.Infof("[%s] failed to get the access token from cache: %s", cacheLogPrefix, err)
-		logrus.Infoln("attempting to acquire the access token by credential")
+		logrus.Debugf("[%s] failed to get the access token from cache: %s", providerLogPrefix, err)
+		logrus.Debugf("[%s] attempting to acquire the access token by credential", providerLogPrefix)
 		ar, err = confidentialClient.AcquireTokenByCredential(ctx, []string{graphEndpoint})
 		if err != nil {
 			return nil, fmt.Errorf("acquiring token by credential: %w", err)
 		}
 	} else {
-		logrus.Infof("[%s] acquired token from cache", cacheLogPrefix)
+		logrus.Debugf("[%s] acquired token from cache", providerLogPrefix)
 	}
 
 	authResult := getCustomAuthResult(ar)
 
-	logrus.Infof("[%s] connecting to graph endpoint: %s", providerLogPrefix, graphEndpoint)
+	logrus.Debugf("[%s] connecting to graph endpoint: %s", providerLogPrefix, graphEndpoint)
 	graphClient, err := msgraphsdk.NewGraphServiceClientWithCredentials(
 		authResult, []string{graphEndpoint})
 	if err != nil {
@@ -186,7 +186,7 @@ func (c AzureMSGraphClient) ListGroups(filter string) ([]v3.Principal, error) {
 func (c AzureMSGraphClient) ListGroupMemberships(userID string) ([]string, error) {
 	logrus.Debugf("[%s] ListGroupMemberships %s", providerLogPrefix, userID)
 	var groupIDs []string
-	err := c.listGroupMemberships(userID, func(g *models.Group) {
+	err := c.listGroupMemberships(context.Background(), userID, func(g *models.Group) {
 		if id := g.GetId(); id != nil {
 			groupIDs = append(groupIDs, *id)
 		}
@@ -198,11 +198,11 @@ func (c AzureMSGraphClient) ListGroupMemberships(userID string) ([]string, error
 	return groupIDs, nil
 }
 
-func (c AzureMSGraphClient) listGroupMemberships(userID string, f func(*models.Group)) error {
+func (c AzureMSGraphClient) listGroupMemberships(ctx context.Context, userID string, f func(*models.Group)) error {
 	result, err := c.GraphClient.Users().
 		ByUserId(userID).
 		MemberOf().
-		Get(context.Background(), nil)
+		Get(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("listing group memberships: %w", err)
 	}
@@ -214,9 +214,10 @@ func (c AzureMSGraphClient) listGroupMemberships(userID string, f func(*models.G
 		return fmt.Errorf("iterating over group membership list: %w", err)
 	}
 
-	err = pageIterator.Iterate(context.Background(), func(do models.DirectoryObjectable) bool {
+	err = pageIterator.Iterate(ctx, func(do models.DirectoryObjectable) bool {
 		group, ok := do.(*models.Group)
 		if !ok {
+			logrus.Errorf("[%s] Page Iterator received incorrect value of type %T", providerLogPrefix, do)
 			return true
 		}
 		f(group)
@@ -247,7 +248,7 @@ func (c AzureMSGraphClient) LoginUser(config *v32.AzureADConfig, credential *v32
 	userPrincipal.Me = true
 	logrus.Debugf("[%s] Completed getting user info from AzureAD", providerLogPrefix)
 
-	groupPrincipals, err := c.listGroupPrincipals(userPrincipal)
+	groupPrincipals, err := c.listGroupPrincipals(context.Background(), userPrincipal)
 	if err != nil {
 		return v3.Principal{}, nil, "", err
 	}
@@ -255,9 +256,9 @@ func (c AzureMSGraphClient) LoginUser(config *v32.AzureADConfig, credential *v32
 	return userPrincipal, groupPrincipals, "", nil
 }
 
-func (c AzureMSGraphClient) listGroupPrincipals(userPrincipal v3.Principal) ([]v3.Principal, error) {
+func (c AzureMSGraphClient) listGroupPrincipals(ctx context.Context, userPrincipal v3.Principal) ([]v3.Principal, error) {
 	var groups []string
-	err := c.listGroupMemberships(GetPrincipalID(userPrincipal), func(g *models.Group) {
+	err := c.listGroupMemberships(ctx, GetPrincipalID(userPrincipal), func(g *models.Group) {
 		if id := g.GetId(); id != nil && g.GetDisplayName() != nil && g.GetSecurityEnabled() != nil {
 			groups = append(groups, *id)
 		}
