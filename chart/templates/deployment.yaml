@@ -140,6 +140,10 @@ spec:
               name: "bootstrap-secret"
               key: "bootstrapPassword"
 {{- end }}
+{{- if (include "rancher.agent_tls_mode" .) }}
+        - name: CATTLE_AGENT_TLS_CHECK
+          value: "{{- include "rancher.agent_tls_mode" . }}"
+{{- end }}
 {{- if .Values.extraEnv }}
 {{ toYaml .Values.extraEnv | indent 8}}
 {{- end }}

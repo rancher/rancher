@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "properties": {
+    "agentTLSMode": {
+      "type": ["string", "null"],
+      "enum": ["strict", "system-store", null],
+      "description": "agentTLSMode must be 'strict' or 'system-store' or null (undefined)"
+    },
+    "extraEnv": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "value": {
+            "type": ["string", "number", "boolean"]
+          }
+        },
+        "required": ["name", "value"],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "name": { "const": "CATTLE_AGENT_TLS_CHECK" }
+              }
+            },
+            "then": {
+              "properties": {
+                "value": {
+                  "type": ["boolean", "string"],
+                  "enum": [true, false, "true", "false"]
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "required": [],
+  "allOf": [
+    {
+      "if": {
+        "required": ["agentTLSMode", "extraEnv"]
+      },
+      "then": {
+        "if": {
+          "properties": {
+            "agentTLSMode": { "type": "string" }
+          }
+        },
+        "then": {
+          "if": {
+            "properties": {
+              "extraEnv": { "type": "array" }
+            }
+          },
+          "then": {
+            "not": {
+              "properties": {
+                "extraEnv": {
+                  "contains": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "const": "CATTLE_AGENT_TLS_CHECK"
+                      }
+                    },
+                    "required": ["name"]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "title": "Rancher Chart Values",
+  "type": "object"
+}
