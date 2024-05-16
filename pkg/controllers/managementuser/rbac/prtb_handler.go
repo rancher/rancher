@@ -10,7 +10,9 @@ import (
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/slice"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	typesrbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
 	pkgrbac "github.com/rancher/rancher/pkg/rbac"
+	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -20,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/retry"
 )
 
@@ -57,12 +60,28 @@ var globalResourceRulesNeededInProjects = map[string]rbacv1.PolicyRule{
 	},
 }
 
-func newPRTBLifecycle(m *manager) *prtbLifecycle {
-	return &prtbLifecycle{m: m}
+func newPRTBLifecycle(m *manager, management *config.ManagementContext, nsInformer cache.SharedIndexInformer) *prtbLifecycle {
+	return &prtbLifecycle{
+		m:          m,
+		rtLister:   management.Management.RoleTemplates("").Controller().Lister(),
+		nsIndexer:  nsInformer.GetIndexer(),
+		rbLister:   m.workload.RBAC.RoleBindings("").Controller().Lister(),
+		rbClient:   m.workload.RBAC.RoleBindings(""),
+		crbLister:  m.workload.RBAC.ClusterRoleBindings("").Controller().Lister(),
+		crbClient:  m.workload.RBAC.ClusterRoleBindings(""),
+		prtbClient: management.Management.ProjectRoleTemplateBindings(""),
+	}
 }
 
 type prtbLifecycle struct {
-	m *manager
+	m          managerInterface
+	rtLister   v3.RoleTemplateLister
+	nsIndexer  cache.Indexer
+	rbLister   typesrbacv1.RoleBindingLister
+	rbClient   typesrbacv1.RoleBindingInterface
+	crbLister  typesrbacv1.ClusterRoleBindingLister
+	crbClient  typesrbacv1.ClusterRoleBindingInterface
+	prtbClient v3.ProjectRoleTemplateBindingInterface
 }
 
 func (p *prtbLifecycle) Create(obj *v3.ProjectRoleTemplateBinding) (runtime.Object, error) {
@@ -92,13 +111,13 @@ func (p *prtbLifecycle) syncPRTB(binding *v3.ProjectRoleTemplateBinding) error {
 		return nil
 	}
 
-	rt, err := p.m.rtLister.Get("", binding.RoleTemplateName)
+	rt, err := p.rtLister.Get("", binding.RoleTemplateName)
 	if err != nil {
 		return fmt.Errorf("couldn't get role template %v: %w", binding.RoleTemplateName, err)
 	}
 
 	// Get namespaces belonging to project
-	namespaces, err := p.m.nsIndexer.ByIndex(nsByProjectIndex, binding.ProjectName)
+	namespaces, err := p.nsIndexer.ByIndex(nsByProjectIndex, binding.ProjectName)
 	if err != nil {
 		return fmt.Errorf("couldn't list namespaces with project ID %v: %w", binding.ProjectName, err)
 	}
@@ -132,7 +151,7 @@ func (p *prtbLifecycle) syncPRTB(binding *v3.ProjectRoleTemplateBinding) error {
 
 func (p *prtbLifecycle) ensurePRTBDelete(binding *v3.ProjectRoleTemplateBinding) error {
 	// Get namespaces belonging to project
-	namespaces, err := p.m.nsIndexer.ByIndex(nsByProjectIndex, binding.ProjectName)
+	namespaces, err := p.nsIndexer.ByIndex(nsByProjectIndex, binding.ProjectName)
 	if err != nil {
 		return fmt.Errorf("couldn't list namespaces with project ID %v: %w", binding.ProjectName, err)
 	}
@@ -140,14 +159,13 @@ func (p *prtbLifecycle) ensurePRTBDelete(binding *v3.ProjectRoleTemplateBinding)
 	set := labels.Set(map[string]string{rtbOwnerLabel: pkgrbac.GetRTBLabel(binding.ObjectMeta)})
 	for _, n := range namespaces {
 		ns := n.(*v1.Namespace)
-		bindingCli := p.m.workload.RBAC.RoleBindings(ns.Name)
-		rbs, err := p.m.rbLister.List(ns.Name, set.AsSelector())
+		rbs, err := p.rbLister.List(ns.Name, set.AsSelector())
 		if err != nil {
 			return fmt.Errorf("couldn't list rolebindings with selector %s: %w", set.AsSelector(), err)
 		}
 
 		for _, rb := range rbs {
-			if err := bindingCli.Delete(rb.Name, &metav1.DeleteOptions{}); err != nil {
+			if err := p.rbClient.DeleteNamespaced(ns.Name, rb.Name, &metav1.DeleteOptions{}); err != nil {
 				if !apierrors.IsNotFound(err) {
 					return fmt.Errorf("error deleting rolebinding %v: %w", rb.Name, err)
 				}
@@ -175,10 +193,9 @@ func (p *prtbLifecycle) reconcileProjectAccessToGlobalResources(binding *v3.Proj
 }
 
 func (p *prtbLifecycle) reconcileProjectAccessToGlobalResourcesForDelete(binding *v3.ProjectRoleTemplateBinding) error {
-	bindingCli := p.m.workload.RBAC.ClusterRoleBindings("")
 	rtbNsAndName := pkgrbac.GetRTBLabel(binding.ObjectMeta)
 	set := labels.Set(map[string]string{rtbNsAndName: owner})
-	crbs, err := p.m.crbLister.List("", set.AsSelector())
+	crbs, err := p.crbLister.List("", set.AsSelector())
 	if err != nil {
 		return err
 	}
@@ -197,14 +214,14 @@ func (p *prtbLifecycle) reconcileProjectAccessToGlobalResourcesForDelete(binding
 		}
 
 		if eligibleForDeletion {
-			if err := bindingCli.Delete(crb.Name, &metav1.DeleteOptions{}); err != nil {
+			if err := p.crbClient.Delete(crb.Name, &metav1.DeleteOptions{}); err != nil {
 				if apierrors.IsNotFound(err) {
 					continue
 				}
 				return err
 			}
 		} else {
-			if _, err := bindingCli.Update(crb); err != nil {
+			if _, err := p.crbClient.Update(crb); err != nil {
 				return err
 			}
 		}
@@ -424,7 +441,7 @@ func (p *prtbLifecycle) reconcilePRTBUserClusterLabels(binding *v3.ProjectRoleTe
 		return err
 	}
 	set := labels.Set(map[string]string{string(binding.UID): owner})
-	userCRBs, err := p.m.clusterRoleBindings.List(metav1.ListOptions{LabelSelector: set.AsSelector().Add(*reqUpdatedLabel, *reqNsAndNameLabel).String()})
+	userCRBs, err := p.crbClient.List(metav1.ListOptions{LabelSelector: set.AsSelector().Add(*reqUpdatedLabel, *reqNsAndNameLabel).String()})
 	if err != nil {
 		return err
 	}
@@ -432,7 +449,7 @@ func (p *prtbLifecycle) reconcilePRTBUserClusterLabels(binding *v3.ProjectRoleTe
 
 	for _, crb := range userCRBs.Items {
 		retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			crbToUpdate, updateErr := p.m.clusterRoleBindings.Get(crb.Name, metav1.GetOptions{})
+			crbToUpdate, updateErr := p.crbClient.Get(crb.Name, metav1.GetOptions{})
 			if updateErr != nil {
 				return updateErr
 			}
@@ -441,7 +458,7 @@ func (p *prtbLifecycle) reconcilePRTBUserClusterLabels(binding *v3.ProjectRoleTe
 			}
 			crbToUpdate.Labels[bindingLabel] = owner
 			crbToUpdate.Labels[rtbLabelUpdated] = "true"
-			_, err := p.m.clusterRoleBindings.Update(crbToUpdate)
+			_, err := p.crbClient.Update(crbToUpdate)
 			return err
 		})
 		if retryErr != nil {
@@ -454,13 +471,13 @@ func (p *prtbLifecycle) reconcilePRTBUserClusterLabels(binding *v3.ProjectRoleTe
 		return err
 	}
 	set = map[string]string{rtbOwnerLabelLegacy: string(binding.UID)}
-	rbs, err := p.m.rbLister.List(v1.NamespaceAll, set.AsSelector().Add(*reqUpdatedLabel, *reqUpdatedOwnerLabel))
+	rbs, err := p.rbLister.List(v1.NamespaceAll, set.AsSelector().Add(*reqUpdatedLabel, *reqUpdatedOwnerLabel))
 	if err != nil {
 		return err
 	}
 	for _, rb := range rbs {
 		retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			rbToUpdate, updateErr := p.m.roleBindings.GetNamespaced(rb.Namespace, rb.Name, metav1.GetOptions{})
+			rbToUpdate, updateErr := p.rbClient.GetNamespaced(rb.Namespace, rb.Name, metav1.GetOptions{})
 			if updateErr != nil {
 				return updateErr
 			}
@@ -469,7 +486,7 @@ func (p *prtbLifecycle) reconcilePRTBUserClusterLabels(binding *v3.ProjectRoleTe
 			}
 			rbToUpdate.Labels[rtbOwnerLabel] = bindingLabel
 			rbToUpdate.Labels[rtbLabelUpdated] = "true"
-			_, err := p.m.roleBindings.Update(rbToUpdate)
+			_, err := p.rbClient.Update(rbToUpdate)
 			return err
 		})
 		if retryErr != nil {
@@ -482,7 +499,7 @@ func (p *prtbLifecycle) reconcilePRTBUserClusterLabels(binding *v3.ProjectRoleTe
 	}
 
 	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		prtbToUpdate, updateErr := p.m.prtbs.GetNamespaced(binding.Namespace, binding.Name, metav1.GetOptions{})
+		prtbToUpdate, updateErr := p.prtbClient.GetNamespaced(binding.Namespace, binding.Name, metav1.GetOptions{})
 		if updateErr != nil {
 			return updateErr
 		}
@@ -490,7 +507,7 @@ func (p *prtbLifecycle) reconcilePRTBUserClusterLabels(binding *v3.ProjectRoleTe
 			prtbToUpdate.Labels = make(map[string]string)
 		}
 		prtbToUpdate.Labels[rtbCrbRbLabelsUpdated] = "true"
-		_, err := p.m.prtbs.Update(prtbToUpdate)
+		_, err := p.prtbClient.Update(prtbToUpdate)
 		return err
 	})
 	return retryErr

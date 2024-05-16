@@ -144,6 +144,7 @@ require (
 	github.com/urfave/cli v1.22.14
 	github.com/vishvananda/netlink v1.2.1-beta.2
 	github.com/vmware/govmomi v0.30.6
+	go.uber.org/mock v0.4.0
 	golang.org/x/crypto v0.22.0
 	golang.org/x/mod v0.14.0
 	golang.org/x/net v0.24.0

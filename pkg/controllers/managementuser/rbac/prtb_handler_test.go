@@ -10,11 +10,91 @@ import (
 	typesrbacv1fakes "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1/fakes"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 	rbacv1 "k8s.io/api/rbac/v1"
 	v1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
+
+type prtbTestState struct {
+	managerMock *MockmanagerInterface
+}
+
+func TestReconcileProjectAccessToGlobalResources(t *testing.T) {
+	t.Parallel()
+
+	defaultPRTB := v3.ProjectRoleTemplateBinding{
+		ProjectName: "default",
+	}
+
+	tests := []struct {
+		name       string
+		stateSetup func(prtbTestState)
+		prtb       *v3.ProjectRoleTemplateBinding
+		rts        map[string]*v3.RoleTemplate
+		wantError  bool
+	}{
+		{
+			name: "error ensuring global resource roles",
+			stateSetup: func(pts prtbTestState) {
+				pts.managerMock.EXPECT().ensureGlobalResourcesRolesForPRTB(gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("error"))
+			},
+			prtb:      defaultPRTB.DeepCopy(),
+			rts:       nil,
+			wantError: true,
+		},
+		{
+			name: "error reconciling access to global resources",
+			stateSetup: func(pts prtbTestState) {
+				pts.managerMock.EXPECT().ensureGlobalResourcesRolesForPRTB(gomock.Any(), gomock.Any()).Return(nil, nil)
+				pts.managerMock.EXPECT().reconcileProjectAccessToGlobalResources(gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("error"))
+			},
+			prtb:      defaultPRTB.DeepCopy(),
+			rts:       nil,
+			wantError: true,
+		},
+		{
+			name: "success",
+			stateSetup: func(pts prtbTestState) {
+				pts.managerMock.EXPECT().ensureGlobalResourcesRolesForPRTB(gomock.Any(), gomock.Any()).Return(nil, nil)
+				pts.managerMock.EXPECT().reconcileProjectAccessToGlobalResources(gomock.Any(), gomock.Any()).Return(nil, nil)
+			},
+			prtb: defaultPRTB.DeepCopy(),
+			rts:  nil,
+		},
+	}
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			prtbLifecycle := prtbLifecycle{}
+			state := setupPRTBTest(t)
+			if test.stateSetup != nil {
+				test.stateSetup(state)
+			}
+			prtbLifecycle.m = state.managerMock
+
+			err := prtbLifecycle.reconcileProjectAccessToGlobalResources(test.prtb, test.rts)
+
+			if test.wantError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func setupPRTBTest(t *testing.T) prtbTestState {
+	ctrl := gomock.NewController(t)
+	managerMock := NewMockmanagerInterface(ctrl)
+	state := prtbTestState{
+		managerMock: managerMock,
+	}
+	return state
+}
 
 func Test_manager_checkForGlobalResourceRules(t *testing.T) {
 	type tests struct {
