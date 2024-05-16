@@ -31,6 +31,12 @@ func (p *Planner) generateInstallInstruction(controlPlane *rkev1.RKEControlPlane
 			env = append(env, fmt.Sprintf("%s=%s", arg.Name, arg.Value))
 		}
 	}
+	switch cattleOS {
+	case capr.WindowsMachineOS:
+		env = append(env, fmt.Sprintf("$env:%s_DATA_DIR=\"c:%s\"", strings.ToUpper(capr.GetRuntime(controlPlane.Spec.KubernetesVersion)), capr.GetDistroDataDir(controlPlane)))
+	default:
+		env = append(env, fmt.Sprintf("%s_DATA_DIR=%s", strings.ToUpper(capr.GetRuntime(controlPlane.Spec.KubernetesVersion)), capr.GetDistroDataDir(controlPlane)))
+	}
 
 	switch cattleOS {
 	case capr.WindowsMachineOS:
