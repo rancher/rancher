@@ -1613,8 +1613,8 @@ github.com/rancher/aws-iam-authenticator v0.5.9-0.20220713170329-78acb8c83863 h1
 github.com/rancher/aws-iam-authenticator v0.5.9-0.20220713170329-78acb8c83863/go.mod h1:6dId2LCc8oHqeBzP6E8ndp4DflhKTxYLb5ZXwI4YmFA=
 github.com/rancher/channelserver v0.6.1-0.20240212155841-07630c8295da h1:M7p9bmFBw5kKgoBtkPXjDZTGoj94ZWt6NaTa/7jglB4=
 github.com/rancher/channelserver v0.6.1-0.20240212155841-07630c8295da/go.mod h1:DuOeweH+bHP22OVq7mgQwDMVJjMmPNn8WzF1IHAU39U=
-github.com/rancher/client-go v1.28.6-rancher1 h1:nSoGKs12BuPviZtzemO7wTX8jxABaLqfYKFLRBV8MI0=
-github.com/rancher/client-go v1.28.6-rancher1/go.mod h1:+nu0Yp21Oeo/cBCsprNVXB2BfJTV51lFfe5tXl2rUL8=
+github.com/rancher/client-go v1.28.6-rancher1-debug-45509-1 h1:/SX4lhH16SgtPP48K++ivMtUbG7RcAW8xdV6s6WVgg8=
+github.com/rancher/client-go v1.28.6-rancher1-debug-45509-1/go.mod h1:+nu0Yp21Oeo/cBCsprNVXB2BfJTV51lFfe5tXl2rUL8=
 github.com/rancher/dynamiclistener v0.4.0 h1:1bOlH4uzD5BPQ8fo2FeiWxiMp87ppwmyc2uYxN2z1kc=
 github.com/rancher/dynamiclistener v0.4.0/go.mod h1:Y+VdjQH9KQGE97uMwYEWqNN6puFQ17aBemIjVLYdlD8=
 github.com/rancher/eks-operator v1.3.1 h1:G7wcT8WuuCWPHWVu84d8W1/mLkxKhCUIljMzMKMTsJg=

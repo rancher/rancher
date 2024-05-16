@@ -167,6 +167,9 @@ func (e *OperatorController) CheckCrdReady(cluster *mgmtv3.Cluster, clusterType 
 }
 
 func GenerateSAToken(restConfig *rest.Config) (string, error) {
+	// prevent a memory leak as client-go cache is never pruned
+	restConfig.TLSClientConfig.DisableTransportCaching = true
+
 	clientSet, err := kubernetes.NewForConfig(restConfig)
 	if err != nil {
 		return "", fmt.Errorf("error creating clientset: %v", err)
