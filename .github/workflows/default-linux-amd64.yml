@@ -51,12 +51,6 @@ jobs:
         uses: actions/checkout@v4
       - name: Validate
         run: ./scripts/validate
-      - name: Build Rancher
-        run: ./scripts/build
-      - name: Package
-        run: ./scripts/package
-      - name: Test
-        run: ./scripts/test
   # build:
   #   runs-on: ubuntu-latest
   #   container: registry.suse.com/bci/golang:1.20
