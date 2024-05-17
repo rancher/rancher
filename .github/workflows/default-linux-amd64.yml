@@ -23,9 +23,10 @@ jobs:
     env:
       ARCH: amd64
     steps:
-      - name: Install Dependencies
+      - name: Install Dependencies and configure git
         run: |
           zypper -n install gcc binutils glibc-devel-static ca-certificates git-core wget curl unzip tar vim less file xz gzip sed gawk iproute2 iptables jq
+          git config --global --add safe.directory /__w/rancher/rancher
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Build Rancher
