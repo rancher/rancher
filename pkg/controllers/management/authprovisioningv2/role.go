@@ -54,9 +54,18 @@ func crdToResourceMatch(crd *apiextv1.CustomResourceDefinition) *resourceMatch {
 		return nil
 	}
 
+	version := crd.Spec.Versions[0]
+
+	for _, ver := range crd.Spec.Versions {
+		if !ver.Deprecated {
+			version = ver
+			break
+		}
+	}
+
 	gvk := schema.GroupVersionKind{
 		Group:   crd.Spec.Group,
-		Version: crd.Spec.Versions[0].Name,
+		Version: version.Name,
 		Kind:    crd.Status.AcceptedNames.Kind,
 	}
 
