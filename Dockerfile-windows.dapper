@@ -14,7 +14,7 @@ RUN pushd c:\; \
     popd;
 
 RUN pushd c:\; \
-    $URL = 'https://github.com/golangci/golangci-lint/releases/download/v1.57.2/golangci-lint-1.57.2-windows-amd64.zip'; \
+    $URL = 'https://github.com/golangci/golangci-lint/releases/download/v1.59.0/golangci-lint-1.59.0-windows-amd64.zip'; \
     \
     Write-Host ('Downloading golangci from {0} ...' -f $URL); \
     curl.exe -sfL $URL -o c:\golangci-lint.zip; \
