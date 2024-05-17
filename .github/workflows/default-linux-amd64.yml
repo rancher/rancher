@@ -50,9 +50,9 @@ jobs:
       CATTLE_MACHINE_VERSION: v0.15.0-rancher109
       CATTLE_K3S_VERSION: v1.27.10+k3s2
       ARCH: amd64
+      HELM_UNITTEST_VERSION: 0.3.2
       HELM_VERSION: v3.12.3
       KUSTOMIZE_VERSION: v5.0.1
-      HELM_UNITTEST_VERSION: 0.3.2
       K3D_VERSION: v5.4.6
       CATTLE_KDM_BRANCH: dev-v2.7
       HELM_URL_V2: https://github.com/rancher/helm/releases/downloadv/2.16.8-rancher2/rancher-helm
