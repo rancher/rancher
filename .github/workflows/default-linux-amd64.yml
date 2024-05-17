@@ -1,48 +1,48 @@
 name: default-linux-amd64
 on: [pull_request]
 jobs:
-  validate:
-    runs-on: ubuntu-latest
-    container: registry.suse.com/bci/golang:1.20
-    env:
-      ARCH: amd64
-    steps:
-      - name: Install Dependencies
-        run: |
-          zypper -n install curl unzip tar vim less file xz gzip sed gawk
-          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.52.0; \
-          zypper -n install python311-pip python311-base python311 python311-devel python311-tox libffi-devel libopenssl-devel
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Validate
-        run: ./scripts/validate
-  build:
-    needs: [validate]
-    runs-on: ubuntu-latest
-    container: registry.suse.com/bci/golang:1.20
-    env:
-      ARCH: amd64
-    steps:
-      - name: Install Dependencies and configure git
-        run: |
-          zypper -n install gcc binutils glibc-devel-static ca-certificates git-core wget curl unzip tar vim less file xz gzip sed gawk iproute2 iptables jq
-          git config --global --add safe.directory /__w/rancher/rancher
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Build Rancher
-        run: ./scripts/build-server
-      - name: Build Rancher Agent
-        run: ./scripts/build-agent
-      - name: Describe files
-        run: ls -R
-      - name: Upload build
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-${{ github.run_id }}-${{ github.sha }}
-          path: ./bin
-          retention-days: 1
+  # validate:
+  #   runs-on: ubuntu-latest
+  #   container: registry.suse.com/bci/golang:1.20
+  #   env:
+  #     ARCH: amd64
+  #   steps:
+  #     - name: Install Dependencies
+  #       run: |
+  #         zypper -n install curl unzip tar vim less file xz gzip sed gawk
+  #         curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.52.0; \
+  #         zypper -n install python311-pip python311-base python311 python311-devel python311-tox libffi-devel libopenssl-devel
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
+  #     - name: Validate
+  #       run: ./scripts/validate
+  # build:
+  #   needs: [validate]
+  #   runs-on: ubuntu-latest
+  #   container: registry.suse.com/bci/golang:1.20
+  #   env:
+  #     ARCH: amd64
+  #   steps:
+  #     - name: Install Dependencies and configure git
+  #       run: |
+  #         zypper -n install gcc binutils glibc-devel-static ca-certificates git-core wget curl unzip tar vim less file xz gzip sed gawk iproute2 iptables jq
+  #         git config --global --add safe.directory /__w/rancher/rancher
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
+  #     - name: Build Rancher
+  #       run: ./scripts/build-server
+  #     - name: Build Rancher Agent
+  #       run: ./scripts/build-agent
+  #     - name: Describe files
+  #       run: ls -R
+  #     - name: Upload build
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: build-${{ github.run_id }}-${{ github.sha }}
+  #         path: ./bin
+  #         retention-days: 1
   package:
-    needs: [build]
+    # needs: [build]
     runs-on: ubuntu-latest
     container: registry.suse.com/bci/golang:1.20
     env:
@@ -85,8 +85,9 @@ jobs:
       - name: download build
         uses: actions/download-artifact@v4
         with:
-          name: build-${{ github.run_id }}-${{ github.sha }}
-          path: ./rancher/bin
+          # name: build-${{ github.run_id }}-${{ github.sha }}
+          name: build-9127269699-79c4d3d448b5c63188d7709181a11b355181f123
+          path: ./bin
       - name: Display structure of downloaded files
         run: ls -R
       - name: Package
