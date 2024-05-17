@@ -274,6 +274,9 @@ var (
 	UIBannerLight = NewSetting("ui-banner-light", "")
 	UIBannerDark  = NewSetting("ui-banner-dark", "")
 
+	// UIExtensions - setting for configuring UI Extensions (e.g. allow users to enable/disable extensions)
+	UIExtenstions = NewSetting("ui-extensions", "")
+
 	// UIPreferred Ensure that the new Dashboard is the default UI.
 	UIPreferred = NewSetting("ui-preferred", "vue")
 
