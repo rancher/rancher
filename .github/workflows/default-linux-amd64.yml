@@ -125,5 +125,5 @@ jobs:
           git config --global --add safe.directory /__w/rancher/rancher
       - name: Checkout code
         uses: actions/checkout@v4
-      - name: Validate
+      - name: test
         run: ./scripts/test
