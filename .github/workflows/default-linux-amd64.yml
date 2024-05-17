@@ -86,7 +86,9 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: build-${{ github.run_id }}-${{ github.sha }}
-          path: ./bin
+          path: ./rancher/bin
+      - name: Display structure of downloaded files
+        run: ls -R
       - name: Package
         run: ./scripts/package
   test:
