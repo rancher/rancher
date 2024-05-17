@@ -58,7 +58,6 @@ jobs:
       HELM_URL_V2: https://github.com/rancher/helm/releases/downloadv/2.16.8-rancher2/rancher-helm
       HELM_URL_V3: https://get.helm.sh/helm-v3.12.3-linux-amd64.tar.gz
       TILLER_URL: https://github.com/rancher/helm/releases/download/2.16.8-rancher2/rancher-tiller
-      KUSTOMIZE_URL: https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/v5.0.1/kustomize_v5.0.1_linux_amd64.tar.gz
     steps:
       - name: Install Dependencies
         run: |
@@ -68,7 +67,6 @@ jobs:
 
           go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.12.0
 
-          curl -sLf ${KUSTOMIZE_URL} | tar -xzf - -C /usr/bin
 
           curl -sLf ${HELM_URL_V2} -o /usr/bin/rancher-helm && \
           curl -sLf ${TILLER_URL} -o /usr/bin/rancher-tiller && \
@@ -80,7 +78,6 @@ jobs:
           mkdir /usr/tmp && \
           curl ${HELM_URL_V3} | tar xvzf - --strip-components=1 -C /usr/tmp/ && \
           mv /usr/tmp/helm /usr/bin/helm_v3 && \
-          chmod +x /usr/bin/kustomize
           helm_v3 plugin install https://github.com/helm-unittest/helm-unittest.git --version ${HELM_UNITTEST_VERSION};
           git config --global --add safe.directory /__w/rancher/rancher
       - name: Checkout code
@@ -117,7 +114,10 @@ jobs:
           mkdir /usr/tmp && \
           curl ${HELM_URL_V3} | tar xvzf - --strip-components=1 -C /usr/tmp/ && \
           mv /usr/tmp/helm /usr/bin/helm_v3 && \
+
+          curl -sLf ${KUSTOMIZE_URL} | tar -xzf - -C /usr/bin
           chmod +x /usr/bin/kustomize
+
           helm_v3 plugin install https://github.com/helm-unittest/helm-unittest.git --version ${HELM_UNITTEST_VERSION};
           git config --global --add safe.directory /__w/rancher/rancher
       - name: Checkout code
