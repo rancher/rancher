@@ -12,6 +12,7 @@ import (
 	"github.com/antihax/optional"
 	qasedefaults "github.com/rancher/rancher/tests/v2/validation/pipeline/qase"
 	"github.com/rancher/rancher/tests/v2/validation/pipeline/qase/testcase"
+	"github.com/rancher/rancher/tests/v2/validation/pipeline/slack"
 	"github.com/sirupsen/logrus"
 	qase "go.qase.io/client"
 	"gopkg.in/yaml.v2"
@@ -167,6 +168,7 @@ func reportTestQases(client *qase.APIClient, testRunID int64) error {
 		return err
 	}
 
+	resultTestMap := []*testcase.GoTestCase{}
 	for _, goTestCase := range goTestCases {
 		if testQase, ok := qaseTestCases[goTestCase.Name]; ok {
 			// update test status
@@ -174,17 +176,33 @@ func reportTestQases(client *qase.APIClient, testRunID int64) error {
 			if err != nil {
 				return err
 			}
+
+			if goTestCase.Status == failStatus {
+				resultTestMap = append(resultTestMap, goTestCase)
+			}
 		} else {
 			// write test case
 			caseID, err := writeTestCaseToQase(client, *goTestCase)
 			if err != nil {
 				return err
 			}
+
 			err = updateTestInRun(client, *goTestCase, caseID.Result.Id, testRunID)
 			if err != nil {
 				return err
 			}
+
+			if goTestCase.Status == failStatus {
+				resultTestMap = append(resultTestMap, goTestCase)
+			}
 		}
+	}
+	resp, _, err := client.RunsApi.GetRun(context.TODO(), qasedefaults.RancherManagerProjectID, int32(testRunID))
+	if err != nil {
+		return fmt.Errorf("error getting test run: %v", err)
+	}
+	if strings.Contains(resp.Result.Title, "-head") {
+		return slack.PostSlackMessage(resultTestMap, testRunID, resp.Result.Title)
 	}
 
 	return nil
