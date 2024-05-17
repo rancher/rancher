@@ -42,6 +42,7 @@ jobs:
           path: ./bin
           retention-days: 1
   package:
+    needs: [build]
     runs-on: ubuntu-latest
     container: registry.suse.com/bci/golang:1.20
     env:
