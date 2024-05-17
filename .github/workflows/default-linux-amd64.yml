@@ -104,7 +104,7 @@ jobs:
     steps:
       - name: Install Dependencies
         run: |
-          zypper -n install curl unzip tar vim less file xz gzip sed gawk
+          zypper -n install curl unzip tar vim less file xz gzip sed gawk jq
           curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.52.0; \
           zypper -n install python311-pip python311-base python311 python311-devel python311-tox libffi-devel libopenssl-devel
           curl -sLf ${HELM_URL_V2} -o /usr/bin/rancher-helm && \
