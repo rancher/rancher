@@ -86,52 +86,88 @@ RKE1 specifically needs a node template config to run properly. These are the in
 Top level node template config entries can be set. The top level nodeTemplate is optional, and is not need for the different node
 providers to work.
 ```yaml
-  nodeTemplate:
-    engineInstallURL: "testNT"
-    name:             "testNTName"
+nodeTemplate:    # All are optional and can be omitted
+  annotations:
+  authCertificateAuthority: ""
+  authKey: ""
+  cloudCredentialId: ""
+  created: ""
+  creatorId: ""
+  description: ""
+  dockerVersion: ""
+  driver: ""
+  engineEnv:
+  engineInsecureRegistry:
+  engineInstallURL: ""
+  engineLabel:
+  engineOpt:
+  engineRegistryMirror:
+  engineStorageDriver: ""
+  label:
+  amazonec2Config:
+    # options defined here, it is overriden by the top-level config key if both present
+  azureConfig:
+    # options defined here, it is overriden by the top-level config key if both present
+  harvesterConfig:
+    # options defined here, it is overriden by the top-level config key if both present
+  linodeConfig:
+    # options defined here, it is overriden by the top-level config key if both present
+  vmwarevsphereConfig:
+    # options defined here, it is overriden by the top-level config key if both present
+  name: ""
+  namespaceId: ""
+  removed: ""
+  state: ""
+  transitioning: ""
+  transitioningMessage: ""
+  type: ""
+  uuid: ""
+  useInternalIpAddress:
+
 ```
 ### AWS
 ```yaml
-  awsNodeConfig:
-    accessKey: ""
-    ami: ""
-    blockDurationMinutes: "0"
-    encryptEbsVolume: false
-    endpoint: ""
-    httpEndpoint: "enabled"
-    httpTokens: "optional"
-    iamInstanceProfile: ""
-    insecureTransport: false
-    instanceType: "t2.2xlarge"
-    keypairName: "your-key-name"
-    kmsKey: ""
-    monitoring: false
-    privateAddressOnly: false
-    region: "us-east-2"
-    requestSpotInstance: true
-    retries: "5"
-    rootSize: "16"
-    secretKey: ""
-    securityGroup: ["open-all"]
-    securityGroupReadonly: false
-    sessionToken: ""
-    spotPrice: "0.50"
-    sshKeyContents: ""
-    sshUser: "ec2-user"
-    subnetId: ""
-    tags: ""
-    type: "amazonec2Config"
-    useEbsOptimizedInstance: false
-    usePrivateAddress: false
-    userdata: ""
-    volumeType: "gp2"
-    vpcId: ""
-    zone: "a"
+amazonec2Config:
+  accessKey: ""
+  ami: ""
+  blockDurationMinutes: "0"
+  deviceName: ""
+  encryptEbsVolume: false
+  endpoint: ""
+  httpEndpoint: ""
+  httpTokens: ""
+  iamInstanceProfile: ""
+  insecureTransport: false
+  instanceType: ""
+  keyPairName: ""
+  kmsKey: ""
+  monitoring: false
+  privateAddressOnly: false
+  region: ""
+  requestSpotInstance: true
+  retries: "5"
+  rootSize: "32"
+  secretKey: ""
+  securityGroup:
+    - ""
+  securityGroupReadonly: true
+  sessionToken: ""
+  spotPrice: ""
+  sshKeyContexts: ""
+  sshUser: ""
+  subnetId:
+  tags: "Owner,shepherd,"
+  type: "amazonec2Config"
+  useEbsOptimizedInstance: false
+  usePrivateAddress: false
+  volumeType: "gp2"
+  vpcId: ""
+  zone: ""
 ```
 
 ### Azure
 ```yaml
-azureNodeConfig:
+azureConfig:
   availabilitySet: "docker-machine"
   clientId: ""
   clientSecret: ""
@@ -145,6 +181,7 @@ azureNodeConfig:
   location: "eastus2"
   managedDisks: false
   noPublicIp: false
+  nsg: ""
   openPort: ["6443/tcp","2379/tcp","2380/tcp","8472/udp","4789/udp","9796/tcp","10256/tcp","10250/tcp","10251/tcp","10252/tcp"]
   plan: ""
   privateIpAddress: ""
@@ -159,12 +196,13 @@ azureNodeConfig:
   tenantId: ""
   type: "azureConfig"
   updateDomainCount: "5"
+  usePrivateIP: true
   vnet: "docker-machine-vnet"
 ```
 
 ### Harvester
 ```yaml
-harvesterNodeConfig":
+harvesterConfig:
   cloudConfig: ""
   clusterId: ""
   clusterType: ""
@@ -173,7 +211,6 @@ harvesterNodeConfig":
   diskSize: "40"
   imageName: "default/image-gchq8"
   keyPairName: ""
-  kubeconfigContent: ""
   memorySize: "4"
   networkData: ""
   networkModel: "virtio"
@@ -191,7 +228,7 @@ harvesterNodeConfig":
 
 ### Linode
 ```yaml
-linodeNodeConfig:
+linodeConfig:
   authorizedUsers: ""
   createPrivateIp: true
   dockerPort: "2376"
@@ -213,13 +250,15 @@ linodeNodeConfig:
 
 ### Vsphere
 ```yaml
-vmwarevsphereNodeConfig:
+vmwarevsphereConfig:
   cfgparam: ["disk.enableUUID=TRUE"]
   cloneFrom: ""
+  cloudConfig: ""
   cloudinit: "#cloud-config\n\n"
   contentLibrary: ""
   cpuCount: "4"
   creationType: ""
+  customAttribute: [""]
   datacenter: ""
   datastore: ""
   datastoreURL: ""
@@ -236,7 +275,12 @@ vmwarevsphereNodeConfig:
   sshPort: "22"
   sshUser: ""
   sshUserGroup: ""
+  tag: [""]
   username: ""
+  vappIpallocationplicy: ""
+  vappIpprotocol: ""
+  vappProperty: [""]
+  vappTransport: ""
   vcenter: ""
   vcenterPort: "443"
 ```
