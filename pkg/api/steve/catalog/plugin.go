@@ -17,7 +17,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/request"
 )
 
-var denyFunc = denylist
+type denyFunc func(host string) bool
 
 func RegisterUIPluginHandlers(router *mux.Router) {
 	router.HandleFunc("/v1/uiplugins", indexHandler)
@@ -53,7 +53,7 @@ func pluginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	if entry.NoCache {
 		logrus.Debugf("[noCache: %v] proxying request to [endpoint: %v]\n", entry.NoCache, entry.Endpoint)
-		proxyRequest(entry.Endpoint, vars["rest"], w, r)
+		proxyRequest(entry.Endpoint, vars["rest"], w, r, denylist)
 	} else {
 		logrus.Debugf("[noCache: %v] serving plugin files from filesystem cache\n", entry.NoCache)
 		r.URL.Path = fmt.Sprintf("/%s/%s/%s", vars["name"], vars["version"], vars["rest"])
@@ -61,13 +61,13 @@ func pluginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func proxyRequest(target, path string, w http.ResponseWriter, r *http.Request) {
+func proxyRequest(target, path string, w http.ResponseWriter, r *http.Request, denyListFunc denyFunc) {
 	url, err := neturl.Parse(target)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("failed to parse url [%s]", target), http.StatusInternalServerError)
 		return
 	}
-	if denyFunc(url.Hostname()) {
+	if denyListFunc(url.Hostname()) {
 		http.Error(w, fmt.Sprintf("url [%s] is forbidden", target), http.StatusForbidden)
 		return
 	}
