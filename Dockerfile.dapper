@@ -34,7 +34,7 @@ RUN if [ "${ARCH}" == "amd64" ]; then \
     fi
 
 # Tool for CRD generation.
-ENV CONTROLLER_GEN_VERSION v0.12.0
+ENV CONTROLLER_GEN_VERSION v0.14.0
 RUN go install sigs.k8s.io/controller-tools/cmd/controller-gen@${CONTROLLER_GEN_VERSION}
 
 # YAML processor for release configuration.
