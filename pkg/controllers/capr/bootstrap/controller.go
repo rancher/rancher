@@ -111,7 +111,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 	}, clients.RKE.RKEBootstrap(), clients.Core.ServiceAccount(), clients.CAPI.Machine())
 }
 
-func (h *handler) getBootstrapSecret(namespace, name string, envVars []corev1.EnvVar, machine *capi.Machine) (*corev1.Secret, error) {
+func (h *handler) getBootstrapSecret(namespace, name string, envVars []corev1.EnvVar, machine *capi.Machine, dataDir string) (*corev1.Secret, error) {
 	sa, err := h.serviceAccountCache.Get(namespace, name)
 	if apierrors.IsNotFound(err) {
 		return nil, nil
@@ -136,7 +136,7 @@ func (h *handler) getBootstrapSecret(namespace, name string, envVars []corev1.En
 		is = installer.WindowsInstallScript
 	}
 
-	data, err := is(context.WithValue(context.Background(), tls.InternalAPI, hasHostPort), base64.URLEncoding.EncodeToString(hash[:]), envVars, "")
+	data, err := is(context.WithValue(context.Background(), tls.InternalAPI, hasHostPort), base64.URLEncoding.EncodeToString(hash[:]), envVars, "", dataDir)
 	if err != nil {
 		return nil, err
 	}
@@ -214,16 +214,7 @@ func (h *handler) assignPlanSecret(machine *capi.Machine, bootstrap *rkev1.RKEBo
 	return []runtime.Object{sa, secret, role, roleBinding}
 }
 
-func (h *handler) getEnvVar(bootstrap *rkev1.RKEBootstrap, capiCluster *capi.Cluster) ([]corev1.EnvVar, error) {
-	if capiCluster.Spec.ControlPlaneRef == nil || capiCluster.Spec.ControlPlaneRef.Kind != "RKEControlPlane" {
-		return nil, nil
-	}
-
-	controlPlane, err := h.rkeControlPlanes.Get(bootstrap.Namespace, capiCluster.Spec.ControlPlaneRef.Name)
-	if err != nil {
-		return nil, err
-	}
-
+func (h *handler) getEnvVars(controlPlane *rkev1.RKEControlPlane) ([]corev1.EnvVar, error) {
 	var result []corev1.EnvVar
 	for _, env := range controlPlane.Spec.AgentEnvVars {
 		// Disallow user supplied system agent var dir env var in favor of spec.systemAgent
@@ -261,10 +252,20 @@ func (h *handler) assignBootStrapSecret(machine *capi.Machine, bootstrap *rkev1.
 		return nil, nil, nil
 	}
 
-	envVars, err := h.getEnvVar(bootstrap, capiCluster)
+	if capiCluster.Spec.ControlPlaneRef == nil || capiCluster.Spec.ControlPlaneRef.Kind != "RKEControlPlane" {
+		return nil, nil, nil
+	}
+	controlPlane, err := h.rkeControlPlanes.Get(bootstrap.Namespace, capiCluster.Spec.ControlPlaneRef.Name)
 	if err != nil {
 		return nil, nil, err
 	}
+
+	envVars, err := h.getEnvVars(controlPlane)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	dataDir := capr.GetDistroDataDir(controlPlane)
 
 	secretName := name.SafeConcatName(bootstrap.Name, "machine", "bootstrap")
 
@@ -280,7 +281,7 @@ func (h *handler) assignBootStrapSecret(machine *capi.Machine, bootstrap *rkev1.
 		},
 	}
 
-	bootstrapSecret, err := h.getBootstrapSecret(sa.Namespace, sa.Name, envVars, machine)
+	bootstrapSecret, err := h.getBootstrapSecret(sa.Namespace, sa.Name, envVars, machine, dataDir)
 	if err != nil {
 		return nil, nil, err
 	}

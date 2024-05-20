@@ -56,7 +56,7 @@ func installScript(setting settings.Setting, files []string) ([]byte, error) {
 	return ioutil.ReadAll(resp.Body)
 }
 
-func LinuxInstallScript(ctx context.Context, token string, envVars []corev1.EnvVar, defaultHost string) ([]byte, error) {
+func LinuxInstallScript(ctx context.Context, token string, envVars []corev1.EnvVar, defaultHost, _ string) ([]byte, error) {
 	data, err := installScript(
 		settings.SystemAgentInstallScript,
 		localAgentInstallScripts)
@@ -103,7 +103,7 @@ func LinuxInstallScript(ctx context.Context, token string, envVars []corev1.EnvV
 `, envVarBuf.String(), binaryURL, server, ca, token, data)), nil
 }
 
-func WindowsInstallScript(ctx context.Context, token string, envVars []corev1.EnvVar, defaultHost string) ([]byte, error) {
+func WindowsInstallScript(ctx context.Context, token string, envVars []corev1.EnvVar, defaultHost, dataDir string) ([]byte, error) {
 	data, err := installScript(
 		settings.WinsAgentInstallScript,
 		localWindowsRke2InstallScripts)
@@ -141,14 +141,10 @@ func WindowsInstallScript(ctx context.Context, token string, envVars []corev1.En
 	if token != "" {
 		token = "$env:CATTLE_ROLE_NONE=\"true\"\n$env:CATTLE_TOKEN=\"" + token + "\""
 	}
-	dataDir := "/var/lib/rancher/rke2"
 	envVarBuf := &strings.Builder{}
 	for _, envVar := range envVars {
 		if envVar.Value == "" {
 			continue
-		}
-		if envVar.Name == SystemAgentEnvVar {
-			dataDir = envVar.Value
 		}
 		envVarBuf.WriteString(fmt.Sprintf("$env:%s=\"%s\"\n", envVar.Name, envVar.Value))
 	}
