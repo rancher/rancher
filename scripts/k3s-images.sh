@@ -1,8 +1,6 @@
 #!/bin/bash
 set -e -x
 
-cd $(dirname $0)/..
-
 mkdir -p bin
 
 # This is used for downloading the tar file and not the images text file.
