@@ -499,7 +499,7 @@ func (o *OpenIDCProvider) getOIDCProvider(ctx context.Context, oidcConfig *v32.O
 	// If all the fields are set, we will use them and manually specify each one.
 	// Otherwise, we will fall back to using just the issuer and the others will be determined by discovery.
 	if len(emptyFields) > 0 && slices.Contains(emptyFields, oidcFields[client.OIDCConfigFieldIssuer]) {
-		return nil, fmt.Errorf("unable to create OIDC provider.  The following fields are missing: %v", emptyFields)
+		return nil, fmt.Errorf("unable to create OIDC provider. The following fields are missing: %s", strings.Join(emptyFields, ","))
 	}
 
 	if len(emptyFields) == 0 {

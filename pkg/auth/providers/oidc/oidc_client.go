@@ -73,7 +73,7 @@ func FetchAuthURL(config map[string]interface{}) (string, error) {
 	discoveryURL := fmt.Sprintf("%s/.well-known/openid-configuration", issuerURL)
 	resp, err := http.Get(discoveryURL)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("unable to fetch discovery information for OIDC provider: %v", err)
 	}
 	defer resp.Body.Close()
 
@@ -86,7 +86,7 @@ func FetchAuthURL(config map[string]interface{}) (string, error) {
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&discoveryInfo); err != nil {
-		return "", err
+		return "", fmt.Errorf("unable to decode the OIDC discovery response %v", err)
 	}
 
 	return discoveryInfo.AuthorizationEndpoint, nil
