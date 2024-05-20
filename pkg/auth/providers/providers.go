@@ -164,7 +164,7 @@ func GetPrincipal(principalID string, myToken v3.Token) (v3.Principal, error) {
 	principalScheme, _, _ := strings.Cut(principalID, ":")
 	principalProvider, _, _ := strings.Cut(principalScheme, "_")
 
-	// Try to use the provider of the pricipal rather then the one we used to authenticate.
+	// Try to use the provider of the principal rather then the one we used to authenticate.
 	// Make sure that it exists and is enabled.
 	provider := Providers[principalProvider]
 	if provider == nil {
