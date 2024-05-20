@@ -2,6 +2,6 @@
 set -e
 
 echo Running: build-server
-$(dirname $0)/build-server
+./scripts/build-server
 echo Running: build-agent
-$(dirname $0)/build-agent
+./scripts/build-agent

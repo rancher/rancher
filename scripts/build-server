@@ -1,9 +1,7 @@
 #!/bin/bash
 set -ex
 
-source $(dirname $0)/version
-
-cd $(dirname $0)/..
+source ./scripts/version
 
 mkdir -p bin
 

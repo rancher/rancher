@@ -16,33 +16,33 @@ jobs:
   #       uses: actions/checkout@v4
   #     - name: Validate
   #       run: ./scripts/validate
-  # build:
-  #   needs: [validate]
-  #   runs-on: ubuntu-latest
-  #   container: registry.suse.com/bci/golang:1.20
-  #   env:
-  #     ARCH: amd64
-  #   steps:
-  #     - name: Install Dependencies and configure git
-  #       run: |
-  #         zypper -n install gcc binutils glibc-devel-static ca-certificates git-core wget curl unzip tar vim less file xz gzip sed gawk iproute2 iptables jq
-  #         git config --global --add safe.directory /__w/rancher/rancher
-  #     - name: Checkout code
-  #       uses: actions/checkout@v4
-  #     - name: Build Rancher
-  #       run: ./scripts/build-server
-  #     - name: Build Rancher Agent
-  #       run: ./scripts/build-agent
-  #     - name: Describe files
-  #       run: ls -R
-  #     - name: Upload build
-  #       uses: actions/upload-artifact@v4
-  #       with:
-  #         name: build-${{ github.run_id }}-${{ github.sha }}
-  #         path: ./bin
-  #         retention-days: 1
+  build:
+    # needs: [validate]
+    runs-on: ubuntu-latest
+    container: registry.suse.com/bci/golang:1.20
+    env:
+      ARCH: amd64
+    steps:
+      - name: Install Dependencies and configure git
+        run: |
+          zypper -n install gcc binutils glibc-devel-static ca-certificates git-core wget curl unzip tar vim less file xz gzip sed gawk iproute2 iptables jq
+          git config --global --add safe.directory /__w/rancher/rancher
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Build Rancher
+        run: ./scripts/build-server
+      - name: Build Rancher Agent
+        run: ./scripts/build-agent
+      - name: Describe files
+        run: ls -R
+      - name: Upload build
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-${{ github.run_id }}-${{ github.sha }}
+          path: ./bin
+          retention-days: 1
   package:
-    # needs: [build]
+    needs: [build]
     runs-on: ubuntu-latest
     container: registry.suse.com/bci/golang:1.20
     env:
@@ -85,9 +85,9 @@ jobs:
       - name: download build
         uses: actions/download-artifact@v4
         with:
-          # name: build-${{ github.run_id }}-${{ github.sha }}
+          name: build-${{ github.run_id }}-${{ github.sha }}
           # name: build-9162208106-f85b529503282d2d32550f471e73734cc2264a76
-          run-id: 9162208106
+          # run-id: 9162208106
           path: ./bin
       - name: Display structure of downloaded files
         run: ls -R

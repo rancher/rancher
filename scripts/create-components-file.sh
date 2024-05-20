@@ -4,8 +4,6 @@ set -e -x
 
 echo "Creating ./bin/rancher-components.txt"
 
-cd $(dirname $0)/..
-
 mkdir -p bin
 
 COMPONENTSFILE=./bin/rancher-components.txt
