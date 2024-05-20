@@ -1,16 +1,19 @@
 #!/bin/bash
 set -e
 
-source ./scripts/version
-source ./scripts/package-env
+cd $(dirname $0)
+source $(dirname $0)/version
+source $(dirname $0)/package-env
+
+cd $(dirname $0)/../package
 
 
-./scripts/k3s-images.sh
+$(dirname $0)/k3s-images.sh
 
-cp ./bin/rancher ./bin/agent ./bin/data.json ./bin/k3s-airgap-images.tar .
+cp $(dirname $0)/../bin/rancher $(dirname $0)/../bin/agent $(dirname $0)/../bin/data.json $(dirname $0)/../bin/k3s-airgap-images.tar .
 
 # Make sure the used data.json is a release artifact
-cp ./bin/data.json ./bin/rancher-data.json
+cp $(dirname $0)/../bin/data.json $(dirname $0)/../bin/rancher-data.json
 
 if [ ${ARCH} == arm64 ]; then
     ETCD_UNSUPPORTED_ARCH=arm64
@@ -31,15 +34,15 @@ docker build \
     --build-arg CATTLE_FLEET_VERSION="${CATTLE_FLEET_VERSION}" \
     -t ${IMAGE} .
 
-docker build --build-arg VERSION=${TAG} --build-arg ARCH=${ARCH} --build-arg RANCHER_TAG=${TAG} --build-arg RANCHER_REPO=${REPO} -t ${AGENT_IMAGE} -f ./package/Dockerfile.agent ./package
+docker build --build-arg VERSION=${TAG} --build-arg ARCH=${ARCH} --build-arg RANCHER_TAG=${TAG} --build-arg RANCHER_REPO=${REPO} -t ${AGENT_IMAGE} -f ./Dockerfile.agent .
 
-mkdir -p ./dist
-echo ${IMAGE} > ./dist/images
-echo ${AGENT_IMAGE} >> ./dist/images
+mkdir -p $(dirname $0)/../dist
+echo ${IMAGE} > $(dirname $0)/../dist/images
+echo ${AGENT_IMAGE} >> $(dirname $0)/../dist/images
 echo Built ${IMAGE} #${AGENT_IMAGE}
 echo
 
-cd ./bin
+cd $(dirname $0)/../bin
 
 if [ ! -d build/system-charts ]; then
     mkdir -p build
@@ -51,9 +54,9 @@ if [ ! -d $CHART_REPO_DIR ]; then
 fi
 
 if [ ${ARCH} == amd64 ]; then
-#     # Move this out of ARCH check for local dev on non-amd64 hardware.
-    TAG=$TAG REPO=${REPO} go run ./pkg/image/export/main.go $SYSTEM_CHART_REPO_DIR $CHART_REPO_DIR $IMAGE $AGENT_IMAGE $SYSTEM_AGENT_UPGRADE_IMAGE $WINS_AGENT_UPGRADE_IMAGE ${SYSTEM_AGENT_INSTALLER_RKE2_IMAGES[@]} ${SYSTEM_AGENT_INSTALLER_K3S_IMAGES[@]}
+    # Move this out of ARCH check for local dev on non-amd64 hardware.
+    TAG=$TAG REPO=${REPO} go run $(dirname $0)/../pkg/image/export/main.go $SYSTEM_CHART_REPO_DIR $CHART_REPO_DIR $IMAGE $AGENT_IMAGE $SYSTEM_AGENT_UPGRADE_IMAGE $WINS_AGENT_UPGRADE_IMAGE ${SYSTEM_AGENT_INSTALLER_RKE2_IMAGES[@]} ${SYSTEM_AGENT_INSTALLER_K3S_IMAGES[@]}
 fi
 
 # Create components file used for pre-release notes
-./scripts/create-components-file.sh
+$(dirname $0)/../create-components-file.sh

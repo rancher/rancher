@@ -1,7 +1,0 @@
-#!/bin/bash
-set -e
-
-echo Running: build-server
-./scripts/build-server
-echo Running: build-agent
-./scripts/build-agent
