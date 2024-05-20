@@ -1,9 +1,7 @@
 #!/bin/bash
 set -e
 
-ls -R
 source ./scripts/version
-
 source ./scripts/package-env
 
 

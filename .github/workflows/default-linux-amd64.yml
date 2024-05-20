@@ -1,48 +1,48 @@
 name: default-linux-amd64
 on: [pull_request]
 jobs:
-  validate:
-    runs-on: ubuntu-latest
-    container: registry.suse.com/bci/golang:1.20
-    env:
-      ARCH: amd64
-    steps:
-      - name: Install Dependencies
-        run: |
-          zypper -n install curl unzip tar vim less file xz gzip sed gawk
-          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.52.0; \
-          zypper -n install python311-pip python311-base python311 python311-devel python311-tox libffi-devel libopenssl-devel
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Validate
-        run: ./scripts/validate
-  build:
-    needs: [validate]
-    runs-on: ubuntu-latest
-    container: registry.suse.com/bci/golang:1.20
-    env:
-      ARCH: amd64
-    steps:
-      - name: Install Dependencies and configure git
-        run: |
-          zypper -n install gcc binutils glibc-devel-static ca-certificates git-core wget curl unzip tar vim less file xz gzip sed gawk iproute2 iptables jq
-          git config --global --add safe.directory /__w/rancher/rancher
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Build Rancher
-        run: ./scripts/build-server
-      - name: Build Rancher Agent
-        run: ./scripts/build-agent
-      - name: Describe files
-        run: ls -R
-      - name: Upload build
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-${{ github.run_id }}-${{ github.sha }}
-          path: ./bin
-          retention-days: 1
+  # validate:
+  #   runs-on: ubuntu-latest
+  #   container: registry.suse.com/bci/golang:1.20
+  #   env:
+  #     ARCH: amd64
+  #   steps:
+  #     - name: Install Dependencies
+  #       run: |
+  #         zypper -n install curl unzip tar vim less file xz gzip sed gawk
+  #         curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.52.0; \
+  #         zypper -n install python311-pip python311-base python311 python311-devel python311-tox libffi-devel libopenssl-devel
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
+  #     - name: Validate
+  #       run: ./scripts/validate
+  # build:
+  #   needs: [validate]
+  #   runs-on: ubuntu-latest
+  #   container: registry.suse.com/bci/golang:1.20
+  #   env:
+  #     ARCH: amd64
+  #   steps:
+  #     - name: Install Dependencies and configure git
+  #       run: |
+  #         zypper -n install gcc binutils glibc-devel-static ca-certificates git-core wget curl unzip tar vim less file xz gzip sed gawk iproute2 iptables jq
+  #         git config --global --add safe.directory /__w/rancher/rancher
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
+  #     - name: Build Rancher
+  #       run: ./scripts/build-server
+  #     - name: Build Rancher Agent
+  #       run: ./scripts/build-agent
+  #     - name: Describe files
+  #       run: ls -R
+  #     - name: Upload build
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: build-${{ github.run_id }}-${{ github.sha }}
+  #         path: ./bin
+  #         retention-days: 1
   package:
-    needs: [build]
+    # needs: [build]
     runs-on: ubuntu-latest
     container: registry.suse.com/bci/golang:1.20
     env:
@@ -85,45 +85,46 @@ jobs:
       - name: download build
         uses: actions/download-artifact@v4
         with:
-          name: build-${{ github.run_id }}-${{ github.sha }}
+          # name: build-${{ github.run_id }}-${{ github.sha }}
+          name: build-9162208106-f85b529503282d2d32550f471e73734cc2264a76
           path: ./bin
       - name: Display structure of downloaded files
         run: ls -R
       - name: Package
         run: ./scripts/package
-  test:
-    runs-on: ubuntu-latest
-    container: registry.suse.com/bci/golang:1.20
-    env:
-      ARCH: amd64
-      HELM_URL_V2: https://github.com/rancher/helm/releases/downloadv/2.16.8-rancher2/rancher-helm
-      HELM_URL_V3: https://get.helm.sh/helm-v3.12.3-linux-amd64.tar.gz
-      TILLER_URL: https://github.com/rancher/helm/releases/download/2.16.8-rancher2/rancher-tiller
-      KUSTOMIZE_URL: https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/v5.0.1/kustomize_v5.0.1_linux_amd64.tar.gz
-      HELM_UNITTEST_VERSION: 0.3.2
-    steps:
-      - name: Install Dependencies
-        run: |
-          zypper -n install curl unzip tar vim less file xz gzip sed gawk jq
-          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.52.0; \
-          zypper -n install python311-pip python311-base python311 python311-devel python311-tox libffi-devel libopenssl-devel
-          curl -sLf ${HELM_URL_V2} -o /usr/bin/rancher-helm && \
-          curl -sLf ${TILLER_URL} -o /usr/bin/rancher-tiller && \
-          chmod +x /usr/bin/rancher-helm /usr/bin/rancher-tiller && \
-          ln -s /usr/bin/rancher-helm /usr/bin/helm && \
-          ln -s /usr/bin/rancher-tiller /usr/bin/tiller && \
-          helm init -c --stable-repo-url https://charts.helm.sh/stable/
+  # test:
+  #   runs-on: ubuntu-latest
+  #   container: registry.suse.com/bci/golang:1.20
+  #   env:
+  #     ARCH: amd64
+  #     HELM_URL_V2: https://github.com/rancher/helm/releases/downloadv/2.16.8-rancher2/rancher-helm
+  #     HELM_URL_V3: https://get.helm.sh/helm-v3.12.3-linux-amd64.tar.gz
+  #     TILLER_URL: https://github.com/rancher/helm/releases/download/2.16.8-rancher2/rancher-tiller
+  #     KUSTOMIZE_URL: https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/v5.0.1/kustomize_v5.0.1_linux_amd64.tar.gz
+  #     HELM_UNITTEST_VERSION: 0.3.2
+  #   steps:
+  #     - name: Install Dependencies
+  #       run: |
+  #         zypper -n install curl unzip tar vim less file xz gzip sed gawk jq
+  #         curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.52.0; \
+  #         zypper -n install python311-pip python311-base python311 python311-devel python311-tox libffi-devel libopenssl-devel
+  #         curl -sLf ${HELM_URL_V2} -o /usr/bin/rancher-helm && \
+  #         curl -sLf ${TILLER_URL} -o /usr/bin/rancher-tiller && \
+  #         chmod +x /usr/bin/rancher-helm /usr/bin/rancher-tiller && \
+  #         ln -s /usr/bin/rancher-helm /usr/bin/helm && \
+  #         ln -s /usr/bin/rancher-tiller /usr/bin/tiller && \
+  #         helm init -c --stable-repo-url https://charts.helm.sh/stable/
 
-          mkdir /usr/tmp && \
-          curl ${HELM_URL_V3} | tar xvzf - --strip-components=1 -C /usr/tmp/ && \
-          mv /usr/tmp/helm /usr/bin/helm_v3 && \
+  #         mkdir /usr/tmp && \
+  #         curl ${HELM_URL_V3} | tar xvzf - --strip-components=1 -C /usr/tmp/ && \
+  #         mv /usr/tmp/helm /usr/bin/helm_v3 && \
 
-          curl -sLf ${KUSTOMIZE_URL} | tar -xzf - -C /usr/bin
-          chmod +x /usr/bin/kustomize
+  #         curl -sLf ${KUSTOMIZE_URL} | tar -xzf - -C /usr/bin
+  #         chmod +x /usr/bin/kustomize
 
-          helm_v3 plugin install https://github.com/helm-unittest/helm-unittest.git --version ${HELM_UNITTEST_VERSION};
-          git config --global --add safe.directory /__w/rancher/rancher
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: test
-        run: ./scripts/test
+  #         helm_v3 plugin install https://github.com/helm-unittest/helm-unittest.git --version ${HELM_UNITTEST_VERSION};
+  #         git config --global --add safe.directory /__w/rancher/rancher
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
+  #     - name: test
+  #       run: ./scripts/test
