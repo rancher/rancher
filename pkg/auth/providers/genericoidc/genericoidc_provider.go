@@ -5,9 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/pkg/errors"
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	baseoidc "github.com/rancher/rancher/pkg/auth/providers/oidc"
 	"github.com/rancher/rancher/pkg/auth/tokens"
@@ -17,7 +15,6 @@ import (
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 )
 
 type GenOIDCProvider struct {
@@ -29,18 +26,6 @@ const (
 	UserType  = "user"
 	GroupType = "group"
 )
-
-type ClaimInfo struct {
-	Subject           string   `json:"sub"`
-	Name              string   `json:"name"`
-	PreferredUsername string   `json:"preferred_username"`
-	GivenName         string   `json:"given_name"`
-	FamilyName        string   `json:"family_name"`
-	Email             string   `json:"email"`
-	EmailVerified     bool     `json:"email_verified"`
-	Groups            []string `json:"groups"`
-	FullGroupPath     []string `json:"full_group_path"`
-}
 
 func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *tokens.Manager) common.AuthProvider {
 	return &GenOIDCProvider{
@@ -131,89 +116,6 @@ func (g *GenOIDCProvider) TransformToAuthProvider(authConfig map[string]interfac
 // RefetchGroupPrincipals is not implemented for OIDC.
 func (g *GenOIDCProvider) RefetchGroupPrincipals(principalID string, secret string) ([]v3.Principal, error) {
 	return nil, errors.New("Not implemented")
-}
-
-// GetOIDCConfig fetches necessary details from the AuthConfig object and returns the parts required in order
-// to configure an OIDC library provider object.
-func (g *GenOIDCProvider) GetOIDCConfig() (*v32.OIDCConfig, error) {
-	authConfigObj, err := g.AuthConfigs.ObjectClient().UnstructuredClient().Get(g.Name, metav1.GetOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve OIDCConfig, error: %v", err)
-	}
-
-	u, ok := authConfigObj.(runtime.Unstructured)
-	if !ok {
-		return nil, fmt.Errorf("failed to retrieve OIDCConfig, cannot read k8s Unstructured data")
-	}
-	storedOidcConfigMap := u.UnstructuredContent()
-
-	storedOidcConfig := &v32.OIDCConfig{}
-	err = common.Decode(storedOidcConfigMap, storedOidcConfig)
-	if err != nil {
-		return nil, fmt.Errorf("unable to decode OidcConfig: %w", err)
-	}
-
-	if storedOidcConfig.PrivateKey != "" {
-		value, err := common.ReadFromSecret(g.Secrets, storedOidcConfig.PrivateKey, strings.ToLower(client.GenericOIDCConfigFieldPrivateKey))
-		if err != nil {
-			return nil, err
-		}
-		storedOidcConfig.PrivateKey = value
-	}
-	if storedOidcConfig.ClientSecret != "" {
-		data, err := common.ReadFromSecretData(g.Secrets, storedOidcConfig.ClientSecret)
-		if err != nil {
-			return nil, err
-		}
-		for _, v := range data {
-			storedOidcConfig.ClientSecret = string(v)
-		}
-	}
-
-	return storedOidcConfig, nil
-}
-
-// userToPrincipal takes user-related information from OIDC's UserInfo and combines it with information present
-// in the claims to form and return a v3.Principal object.
-func (g *GenOIDCProvider) userToPrincipal(userInfo *oidc.UserInfo, claimInfo ClaimInfo) v3.Principal {
-	displayName := claimInfo.Name
-	if displayName == "" {
-		displayName = userInfo.Email
-	}
-	p := v3.Principal{
-		ObjectMeta:    metav1.ObjectMeta{Name: g.Name + "_" + UserType + "://" + userInfo.Subject},
-		DisplayName:   displayName,
-		LoginName:     userInfo.Email,
-		Provider:      g.Name,
-		PrincipalType: UserType,
-		Me:            false,
-	}
-	return p
-}
-
-// getGroupsFromClaimInfo takes the claims that we get from the OIDC provider and returns a slice of groupPrincipals.
-func (g *GenOIDCProvider) getGroupsFromClaimInfo(claimInfo ClaimInfo) []v3.Principal {
-	var groupPrincipals []v3.Principal
-
-	if claimInfo.FullGroupPath != nil {
-		for _, groupPath := range claimInfo.FullGroupPath {
-			groupsFromPath := strings.Split(groupPath, "/")
-			for _, group := range groupsFromPath {
-				if group != "" {
-					groupPrincipal := g.groupToPrincipal(group)
-					groupPrincipal.MemberOf = true
-					groupPrincipals = append(groupPrincipals, groupPrincipal)
-				}
-			}
-		}
-	} else {
-		for _, group := range claimInfo.Groups {
-			groupPrincipal := g.groupToPrincipal(group)
-			groupPrincipal.MemberOf = true
-			groupPrincipals = append(groupPrincipals, groupPrincipal)
-		}
-	}
-	return groupPrincipals
 }
 
 // groupToPrincipal takes a bare group name and turns it into a v3.Principal group object by filling-in other fields
