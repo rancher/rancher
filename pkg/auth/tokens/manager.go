@@ -702,21 +702,18 @@ func (m *Manager) GetGroupsForTokenAuthProvider(token *v3.Token) []v3.Principal 
 
 	hitProvider := false
 	if attribs != nil {
-		for provider, y := range attribs.GroupPrincipals {
+		for provider, principals := range attribs.GroupPrincipals {
 			if provider == token.AuthProvider {
 				hitProvider = true
-				for _, principal := range y.Items {
-					groups = append(groups, principal)
-				}
+				groups = append(groups, principals.Items...)
+				break
 			}
 		}
 	}
 
 	// fallback to legacy token groupPrincipals
 	if !hitProvider {
-		for _, principal := range token.GroupPrincipals {
-			groups = append(groups, principal)
-		}
+		groups = append(groups, token.GroupPrincipals...)
 	}
 
 	return groups

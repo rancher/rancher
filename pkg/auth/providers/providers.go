@@ -40,7 +40,7 @@ func GetProvider(providerName string) (common.AuthProvider, error) {
 			return provider, nil
 		}
 	}
-	return nil, fmt.Errorf("No such provider '%s'", providerName)
+	return nil, fmt.Errorf("no such provider '%s'", providerName)
 }
 
 func GetProviderByType(configType string) common.AuthProvider {
@@ -161,16 +161,54 @@ func AuthenticateUser(ctx context.Context, input interface{}, providerName strin
 }
 
 func GetPrincipal(principalID string, myToken v3.Token) (v3.Principal, error) {
-	principal, err := Providers[myToken.AuthProvider].GetPrincipal(principalID, myToken)
+	principalScheme, _, _ := strings.Cut(principalID, ":")
+	principalProvider, _, _ := strings.Cut(principalScheme, "_")
 
-	if err != nil && myToken.AuthProvider != LocalProvider {
-		p2, e2 := Providers[LocalProvider].GetPrincipal(principalID, myToken)
-		if e2 == nil {
-			return p2, nil
+	// Try to use the provider of the pricipal rather then the one we used to authenticate.
+	// Make sure that it exists and is enabled.
+	provider := Providers[principalProvider]
+	if provider == nil {
+		return v3.Principal{}, fmt.Errorf("authProvider %s is not initialized", principalProvider)
+	}
+
+	disabled, err := provider.IsDisabledProvider()
+	if err != nil {
+		return v3.Principal{}, err
+	}
+	if disabled {
+		return v3.Principal{}, fmt.Errorf("authProvider %s is disabled", principalProvider)
+	}
+
+	return provider.GetPrincipal(principalID, myToken)
+}
+
+// GetEnabledExternalProvider returns the first enabled external provider.
+func GetEnabledExternalProvider() common.AuthProvider {
+	for _, provider := range Providers {
+		if provider.GetName() == LocalProvider {
+			continue
+		}
+
+		disabled, err := provider.IsDisabledProvider()
+		if err == nil && !disabled {
+			return provider
 		}
 	}
 
-	return principal, err
+	return nil
+}
+
+type dedupeSearchFunc func(searchKey, principalType string, token v3.Token, principals []v3.Principal) ([]v3.Principal, error)
+
+// searchLocalPrincipalsDedupe searches for principals in the local provider and dedupes
+// the results against the given list of principals, coming from an external provider.
+var searchLocalPrincipalsDedupe dedupeSearchFunc = func(searchKey, principalType string, token v3.Token, principals []v3.Principal) ([]v3.Principal, error) {
+	localProvider := Providers[LocalProvider].(*local.Provider)
+	if localProvider != nil {
+		return localProvider.SearchPrincipalsDedupe(searchKey, principalType, token, principals)
+	}
+
+	return nil, nil
 }
 
 func SearchPrincipals(name, principalType string, myToken v3.Token) ([]v3.Principal, error) {
@@ -180,20 +218,40 @@ func SearchPrincipals(name, principalType string, myToken v3.Token) ([]v3.Princi
 	if Providers[myToken.AuthProvider] == nil {
 		return []v3.Principal{}, fmt.Errorf("[SearchPrincipals] authProvider %v not initialized", myToken.AuthProvider)
 	}
-	principals, err := Providers[myToken.AuthProvider].SearchPrincipals(name, principalType, myToken)
-	if err != nil {
-		return principals, err
-	}
-	if myToken.AuthProvider != LocalProvider {
-		lp := Providers[LocalProvider]
-		if lpDedupe, _ := lp.(*local.Provider); lpDedupe != nil {
-			localPrincipals, err := lpDedupe.SearchPrincipalsDedupe(name, principalType, myToken, principals)
-			if err != nil {
-				return principals, err
-			}
-			principals = append(principals, localPrincipals...)
+
+	provider := Providers[myToken.AuthProvider]
+	isLocalProvider := myToken.AuthProvider == LocalProvider
+
+	if isLocalProvider {
+		// If the local provider was used to authenticate see if there any other provider is enabled.
+		if extProvider := GetEnabledExternalProvider(); extProvider != nil {
+			provider = extProvider
 		}
 	}
+
+	var (
+		principals []v3.Principal
+		err        error
+	)
+
+	if provider.GetName() != LocalProvider {
+		// And use it to search first.
+		principals, err = provider.SearchPrincipals(name, principalType, myToken)
+		if err != nil {
+			return principals, err
+		}
+	}
+
+	// Then search in the local provider and dedupe the results.
+	if searchLocalPrincipalsDedupe != nil { // Sanity check.
+		localPrincipals, err := searchLocalPrincipalsDedupe(name, principalType, myToken, principals)
+		if err != nil {
+			return principals, err
+		}
+
+		return append(principals, localPrincipals...), err
+	}
+
 	return principals, err
 }
 

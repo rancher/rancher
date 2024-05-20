@@ -22,21 +22,23 @@ import (
 )
 
 type principalsHandler struct {
-	principalsClient v3.PrincipalInterface
-	tokensClient     v3.TokenInterface
-	auth             requests.Authenticator
-	tokenMGR         *tokens.Manager
-	ac               types.AccessControl
+	principalsClient              v3.PrincipalInterface
+	tokensClient                  v3.TokenInterface
+	auth                          requests.Authenticator
+	getGroupsForTokenAuthProvider func(*v3.Token) []v3.Principal
+	ac                            types.AccessControl
 }
 
 func newPrincipalsHandler(ctx context.Context, clusterRouter requests.ClusterRouter, mgmt *config.ScaledContext) *principalsHandler {
 	providers.Configure(ctx, mgmt)
+
+	tokenManager := tokens.NewManager(ctx, mgmt)
 	return &principalsHandler{
-		principalsClient: mgmt.Management.Principals(""),
-		tokensClient:     mgmt.Management.Tokens(""),
-		auth:             requests.NewAuthenticator(ctx, clusterRouter, mgmt),
-		tokenMGR:         tokens.NewManager(ctx, mgmt),
-		ac:               mgmt.AccessControl,
+		principalsClient:              mgmt.Management.Principals(""),
+		tokensClient:                  mgmt.Management.Tokens(""),
+		auth:                          requests.NewAuthenticator(ctx, clusterRouter, mgmt),
+		getGroupsForTokenAuthProvider: tokenManager.GetGroupsForTokenAuthProvider,
+		ac:                            mgmt.AccessControl,
 	}
 }
 
@@ -101,19 +103,39 @@ func (h *principalsHandler) list(apiContext *types.APIContext, next types.Reques
 		return nil
 	}
 
-	p, err := convertPrincipal(apiContext.Schema, token.UserPrincipal)
+	userPrincipal, err := convertPrincipal(apiContext.Schema, token.UserPrincipal)
 	if err != nil {
 		return err
 	}
-	principals = append(principals, p)
+	principals = append(principals, userPrincipal)
 
-	groupPrincipals := h.tokenMGR.GetGroupsForTokenAuthProvider(token)
-	for _, p := range groupPrincipals {
-		x, err := convertPrincipal(apiContext.Schema, p)
-		if err != nil {
-			return err
+	// Local provider doesn't support groups at the moment.
+	shouldGetGroupPrincipals := token.AuthProvider != providers.LocalProvider
+	getGroupPricipalsToken := token
+
+	if token.AuthProvider == providers.LocalProvider {
+		// If the local provider was used to authenticate the user,
+		// we'll check if there is an enabled external provider and
+		// get the group principals for that provider.
+		if extProvider := providers.GetEnabledExternalProvider(); extProvider != nil {
+			shouldGetGroupPrincipals = true
+			// We'll fake the token in this case.
+			getGroupPricipalsToken = &v32.Token{
+				UserID:       token.UserID,
+				AuthProvider: extProvider.GetName(),
+			}
 		}
-		principals = append(principals, x)
+	}
+
+	if shouldGetGroupPrincipals {
+		groupPrincipals := h.getGroupsForTokenAuthProvider(getGroupPricipalsToken)
+		for _, p := range groupPrincipals {
+			x, err := convertPrincipal(apiContext.Schema, p)
+			if err != nil {
+				return err
+			}
+			principals = append(principals, x)
+		}
 	}
 
 	apiContext.WriteResponse(200, principals)
