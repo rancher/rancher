@@ -496,14 +496,19 @@ type ClusterProxyConfig struct {
 	Enabled bool `json:"enabled"`
 }
 
+// GenericOIDCConfig is the wrapper for the Generic OIDC provider to hold the OIDC Configuration
 type GenericOIDCConfig struct {
 	OIDCConfig `json:",inline" mapstructure:",squash"`
 }
 
+// GenericOIDCTestOutput is the wrapper for the Generic OIDC provider to hold the OIDC test output object, which
+// in turn holds the RedirectURL
 type GenericOIDCTestOutput struct {
 	OIDCTestOutput `json:",inline" mapstructure:",squash"`
 }
 
+// GenericOIDCApplyInput is the wrapper for the input used to enable/activate the Generic OIDC auth provider.  It holds
+// the configuration for the OIDC provider as well as an auth code.
 type GenericOIDCApplyInput struct {
 	OIDCApplyInput `json:",inline" mapstructure:",squash"`
 }
