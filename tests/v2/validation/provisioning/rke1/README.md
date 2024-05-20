@@ -10,12 +10,13 @@ Please see below for more details for your config. Please note that the config c
 1. [Prerequisites](../README.md)
 2. [Configuring test flags](#Flags)
 3. [Define your test](#Provisioning-Input)
-4. [Configuring providers to use for Node Driver Clusters](#NodeTemplateConfigs)
-5. [Configuring Custom Clusters](#Custom-Cluster)
-6. [Static test cases](#static-test-cases)
-7. [Cloud Provider](#Cloud-Provider)
-8. [Advanced Cluster Settings](#advanced-settings)
-9. [Back to general provisioning](../README.md)
+4. [Cloud Credential](#cloud-credentials)
+5. [Configuring providers to use for Node Driver Clusters](#NodeTemplateConfigs)
+6. [Configuring Custom Clusters](#Custom-Cluster)
+7. [Static test cases](#static-test-cases)
+8. [Cloud Provider](#Cloud-Provider)
+9. [Advanced Cluster Settings](#advanced-settings)
+10. [Back to general provisioning](../README.md)
 
 
 ## Flags
@@ -68,6 +69,55 @@ provisioningInput:
     snapshot: false
 ```
 
+## Cloud Credentials
+These are the inputs needed for the different node provider cloud credentials, including linode, aws, harvester, azure, and google.
+
+### Digital Ocean
+```yaml
+digitalOceanCredentials:               
+  accessToken: ""                     #required
+```
+### Linode
+```yaml
+linodeCredentials:                   
+  token: ""                           #required
+```
+### Azure
+```yaml
+azureCredentials:                     
+  clientId: ""                        #required
+  clientSecret: ""                    #required
+  subscriptionId: ""                  #required
+  environment: "AzurePublicCloud"     #required
+```
+### AWS
+```yaml
+awsCredentials:                       
+  secretKey: ""                       #required
+  accessKey: ""                       #required
+  defaultRegion: ""                   #required
+```
+### Harvester
+```yaml
+harvesterCredentials:                 
+  clusterId: ""                       #required
+  clusterType: ""                     #required
+  kubeconfigContent: ""               #required
+```
+### Google
+```yaml
+googleCredentials:                    
+  authEncodedJson: ""                 #required
+```
+### VSphere
+```yaml
+vmwarevsphereCredentials:             
+  password: ""                        #required
+  username: ""                        #required
+  vcenter: ""                         #required
+  vcenterPort: ""                     #required
+```
+
 
 ## Cloud Provider
 Cloud Provider enables additional options through the cloud provider, like cloud persistent storage or cloud provisioned load balancers.
@@ -93,7 +143,6 @@ providers to work.
 ### AWS
 ```yaml
   awsNodeConfig:
-    accessKey: ""
     ami: ""
     blockDurationMinutes: "0"
     encryptEbsVolume: false
@@ -111,7 +160,6 @@ providers to work.
     requestSpotInstance: true
     retries: "5"
     rootSize: "16"
-    secretKey: ""
     securityGroup: ["open-all"]
     securityGroupReadonly: false
     sessionToken: ""
@@ -133,8 +181,6 @@ providers to work.
 ```yaml
 azureNodeConfig:
   availabilitySet: "docker-machine"
-  clientId: ""
-  clientSecret: ""
   customData: ""
   diskSize: "30"
   dns: ""
@@ -156,7 +202,6 @@ azureNodeConfig:
   subnet: "docker-machine"
   subnetPrefix: "192.168.0.0/16"
   subscriptionId: ""
-  tenantId: ""
   type: "azureConfig"
   updateDomainCount: "5"
   vnet: "docker-machine-vnet"
@@ -166,14 +211,11 @@ azureNodeConfig:
 ```yaml
 harvesterNodeConfig":
   cloudConfig: ""
-  clusterId: ""
-  clusterType: ""
   cpuCount: "2"
   diskBus: "virtio"
   diskSize: "40"
   imageName: "default/image-gchq8"
   keyPairName: ""
-  kubeconfigContent: ""
   memorySize: "4"
   networkData: ""
   networkModel: "virtio"
@@ -206,7 +248,6 @@ linodeNodeConfig:
   stackscriptData: ""
   swapSize: "512"
   tags: ""
-  token: ""
   type: "linodeConfig"
   uaPrefix: "Rancher"
 ```
