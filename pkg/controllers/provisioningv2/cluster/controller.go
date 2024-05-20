@@ -302,6 +302,13 @@ func mgmtClusterName() (string, error) {
 func (h *handler) createNewCluster(cluster *v1.Cluster, status v1.ClusterStatus, spec v3.ClusterSpec) ([]runtime.Object, v1.ClusterStatus, error) {
 	spec.DisplayName = cluster.Name
 	spec.Description = cluster.Annotations["field.cattle.io/description"]
+
+	mgmtCluster, err := h.mgmtClusterCache.Get(cluster.Status.ClusterName)
+	if err == nil {
+		spec.DisplayName = mgmtCluster.Spec.DisplayName
+		spec.Description = mgmtCluster.Spec.Description
+	}
+
 	spec.DefaultPodSecurityPolicyTemplateName = cluster.Spec.DefaultPodSecurityPolicyTemplateName
 	spec.DefaultPodSecurityAdmissionConfigurationTemplateName = cluster.Spec.DefaultPodSecurityAdmissionConfigurationTemplateName
 	spec.DefaultClusterRoleForProjectMembers = cluster.Spec.DefaultClusterRoleForProjectMembers
