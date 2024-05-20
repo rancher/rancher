@@ -175,7 +175,7 @@ require (
 require (
 	github.com/antihax/optional v1.0.0
 	github.com/containers/image/v5 v5.25.0
-	github.com/rancher/shepherd v0.0.0-20240513202644-fdbe0e62987e
+	github.com/rancher/shepherd v0.0.0-20240521170632-97ba2939148d
 	go.qase.io/client v0.0.0-20231114201952-65195ec001fa
 )
 
