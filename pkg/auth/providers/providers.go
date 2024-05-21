@@ -21,6 +21,7 @@ import (
 	publicclient "github.com/rancher/rancher/pkg/client/generated/management/v3public"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -173,7 +174,9 @@ func GetPrincipal(principalID string, myToken v3.Token) (v3.Principal, error) {
 
 	disabled, err := provider.IsDisabledProvider()
 	if err != nil {
-		return v3.Principal{}, err
+		// Treat the error here the same way the provider refresher does.
+		logrus.Warnf("Unable to determine if provider %s was disabled, will assume that it isn't with error: %v", principalProvider, err)
+		disabled = false
 	}
 	if disabled {
 		return v3.Principal{}, fmt.Errorf("authProvider %s is disabled", principalProvider)

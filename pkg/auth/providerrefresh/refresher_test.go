@@ -49,8 +49,8 @@ func Test_refreshAttributes(t *testing.T) {
 			want: &v3.UserAttribute{
 				ObjectMeta: metav1.ObjectMeta{Name: "user-abcde"},
 				GroupPrincipals: map[string]v3.Principals{
-					"local":      v3.Principals{},
-					"shibboleth": v3.Principals{},
+					"local":      {},
+					"shibboleth": {},
 				},
 				ExtraByProvider: map[string]map[string][]string{},
 			},
@@ -87,13 +87,13 @@ func Test_refreshAttributes(t *testing.T) {
 			want: &v3.UserAttribute{
 				ObjectMeta: metav1.ObjectMeta{Name: "user-abcde"},
 				GroupPrincipals: map[string]v3.Principals{
-					"local":      v3.Principals{},
-					"shibboleth": v3.Principals{},
+					"local":      {},
+					"shibboleth": {},
 				},
 				ExtraByProvider: map[string]map[string][]string{
-					providers.LocalProvider: map[string][]string{
-						common.UserAttributePrincipalID: []string{"local://user-abcde"},
-						common.UserAttributeUserName:    []string{"admin"},
+					providers.LocalProvider: {
+						common.UserAttributePrincipalID: {"local://user-abcde"},
+						common.UserAttributeUserName:    {"admin"},
 					},
 				},
 			},
@@ -130,13 +130,13 @@ func Test_refreshAttributes(t *testing.T) {
 			want: &v3.UserAttribute{
 				ObjectMeta: metav1.ObjectMeta{Name: "user-abcde"},
 				GroupPrincipals: map[string]v3.Principals{
-					"local":      v3.Principals{},
-					"shibboleth": v3.Principals{},
+					"local":      {},
+					"shibboleth": {},
 				},
 				ExtraByProvider: map[string]map[string][]string{
-					providers.LocalProvider: map[string][]string{
-						common.UserAttributePrincipalID: []string{"local://user-abcde"},
-						common.UserAttributeUserName:    []string{"admin"},
+					providers.LocalProvider: {
+						common.UserAttributePrincipalID: {"local://user-abcde"},
+						common.UserAttributeUserName:    {"admin"},
 					},
 				},
 			},
@@ -173,8 +173,8 @@ func Test_refreshAttributes(t *testing.T) {
 			want: &v3.UserAttribute{
 				ObjectMeta: metav1.ObjectMeta{Name: "user-abcde"},
 				GroupPrincipals: map[string]v3.Principals{
-					"local":      v3.Principals{},
-					"shibboleth": v3.Principals{},
+					"local":      {},
+					"shibboleth": {},
 				},
 				ExtraByProvider: map[string]map[string][]string{},
 			},
@@ -221,13 +221,13 @@ func Test_refreshAttributes(t *testing.T) {
 			want: &v3.UserAttribute{
 				ObjectMeta: metav1.ObjectMeta{Name: "user-abcde"},
 				GroupPrincipals: map[string]v3.Principals{
-					"local":      v3.Principals{},
-					"shibboleth": v3.Principals{},
+					"local":      {},
+					"shibboleth": {},
 				},
 				ExtraByProvider: map[string]map[string][]string{
-					providers.LocalProvider: map[string][]string{
-						common.UserAttributePrincipalID: []string{"local://user-abcde"},
-						common.UserAttributeUserName:    []string{"admin"},
+					providers.LocalProvider: {
+						common.UserAttributePrincipalID: {"local://user-abcde"},
+						common.UserAttributeUserName:    {"admin"},
 					},
 				},
 			},
@@ -264,13 +264,13 @@ func Test_refreshAttributes(t *testing.T) {
 			want: &v3.UserAttribute{
 				ObjectMeta: metav1.ObjectMeta{Name: "user-abcde"},
 				GroupPrincipals: map[string]v3.Principals{
-					"local":      v3.Principals{},
-					"shibboleth": v3.Principals{},
+					"local":      {},
+					"shibboleth": {},
 				},
 				ExtraByProvider: map[string]map[string][]string{
-					saml.ShibbolethName: map[string][]string{
-						common.UserAttributePrincipalID: []string{"shibboleth_user://user1"},
-						common.UserAttributeUserName:    []string{"user1"},
+					saml.ShibbolethName: {
+						common.UserAttributePrincipalID: {"shibboleth_user://user1"},
+						common.UserAttributeUserName:    {"user1"},
 					},
 				},
 			},
@@ -318,8 +318,8 @@ func Test_refreshAttributes(t *testing.T) {
 			want: &v3.UserAttribute{
 				ObjectMeta: metav1.ObjectMeta{Name: "user-abcde"},
 				GroupPrincipals: map[string]v3.Principals{
-					"local":      v3.Principals{},
-					"shibboleth": v3.Principals{},
+					"local":      {},
+					"shibboleth": {},
 				},
 				ExtraByProvider: map[string]map[string][]string{},
 			},
@@ -370,13 +370,13 @@ func Test_refreshAttributes(t *testing.T) {
 			want: &v3.UserAttribute{
 				ObjectMeta: metav1.ObjectMeta{Name: "user-abcde"},
 				GroupPrincipals: map[string]v3.Principals{
-					"local":      v3.Principals{},
-					"shibboleth": v3.Principals{},
+					"local":      {},
+					"shibboleth": {},
 				},
 				ExtraByProvider: map[string]map[string][]string{
-					providers.LocalProvider: map[string][]string{
-						common.UserAttributePrincipalID: []string{"local://user-abcde"},
-						common.UserAttributeUserName:    []string{"admin"},
+					providers.LocalProvider: {
+						common.UserAttributePrincipalID: {"local://user-abcde"},
+						common.UserAttributeUserName:    {"admin"},
 					},
 				},
 			},
@@ -557,8 +557,8 @@ func (p *mockLocalProvider) CanAccessWithGroupProviders(userPrincipalID string, 
 
 func (p *mockLocalProvider) GetUserExtraAttributes(userPrincipal v3.Principal) map[string][]string {
 	return map[string][]string{
-		common.UserAttributePrincipalID: []string{userPrincipal.ExtraInfo[common.UserAttributePrincipalID]},
-		common.UserAttributeUserName:    []string{userPrincipal.ExtraInfo[common.UserAttributeUserName]},
+		common.UserAttributePrincipalID: {userPrincipal.ExtraInfo[common.UserAttributePrincipalID]},
+		common.UserAttributeUserName:    {userPrincipal.ExtraInfo[common.UserAttributeUserName]},
 	}
 }
 
@@ -609,8 +609,8 @@ func (p *mockShibbolethProvider) CanAccessWithGroupProviders(userPrincipalID str
 
 func (p *mockShibbolethProvider) GetUserExtraAttributes(userPrincipal v3.Principal) map[string][]string {
 	return map[string][]string{
-		common.UserAttributePrincipalID: []string{userPrincipal.ExtraInfo[common.UserAttributePrincipalID]},
-		common.UserAttributeUserName:    []string{userPrincipal.ExtraInfo[common.UserAttributeUserName]},
+		common.UserAttributePrincipalID: {userPrincipal.ExtraInfo[common.UserAttributePrincipalID]},
+		common.UserAttributeUserName:    {userPrincipal.ExtraInfo[common.UserAttributeUserName]},
 	}
 }
 
