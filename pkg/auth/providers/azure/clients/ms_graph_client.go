@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/AzureAD/microsoft-authentication-library-for-go/apps/cache"
@@ -44,8 +45,9 @@ func (c azureMSGraphClient) MarshalTokenJSON() (string, error) {
 func (c azureMSGraphClient) GetUser(id string) (v3.Principal, error) {
 	user, _, err := c.userClient.Get(context.Background(), id, odata.Query{})
 	if err != nil {
-		return v3.Principal{}, err
+		return v3.Principal{}, fmt.Errorf("failed to get user from Azure: %w", err)
 	}
+
 	return c.userToPrincipal(*user)
 }
 
@@ -202,7 +204,7 @@ type AccessTokenCache struct {
 }
 
 // Replace fetches the access token from a secret in Kubernetes.
-func (c AccessTokenCache) Replace(cache cache.Unmarshaler, key string) {
+func (c AccessTokenCache) Replace(unmarshaler cache.Unmarshaler, key string) {
 	secretName := fmt.Sprintf("%s:%s", common.SecretsNamespace, AccessTokenSecretName)
 	secret, err := common.ReadFromSecret(c.Secrets, secretName, "access-token")
 	if err != nil {
@@ -210,7 +212,7 @@ func (c AccessTokenCache) Replace(cache cache.Unmarshaler, key string) {
 		return
 	}
 
-	err = cache.Unmarshal([]byte(secret))
+	err = unmarshaler.Unmarshal([]byte(secret))
 	if err != nil {
 		logrus.Errorf("[%s] failed to unmarshal the access token: %v", cacheLogPrefix, err)
 	}
@@ -235,18 +237,19 @@ func (c AccessTokenCache) Export(cache cache.Marshaler, key string) {
 // If that fails, it tries to acquire it directly from the auth provider with the credential (application secret in Azure).
 // It also checks that the access token has the necessary permissions.
 func NewMSGraphClient(config *v32.AzureADConfig, secrets corev1.SecretInterface) (AzureClient, error) {
-	c := &azureMSGraphClient{}
 	cred, err := confidential.NewCredFromSecret(config.ApplicationSecret)
 	if err != nil {
 		return nil, fmt.Errorf("could not create a cred from a secret: %w", err)
 	}
+
 	tokenCache := AccessTokenCache{Secrets: secrets}
 	confidentialClientApp, err := confidential.New(config.ApplicationID, cred,
 		confidential.WithAccessor(tokenCache),
 		confidential.WithAuthority(fmt.Sprintf("%s%s", config.Endpoint, config.TenantID)))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create Azure client: %w", err)
 	}
+
 	scope := fmt.Sprintf("%s/%s", config.GraphEndpoint, ".default")
 
 	var ar confidential.AuthResult
@@ -260,6 +263,10 @@ func NewMSGraphClient(config *v32.AzureADConfig, secrets corev1.SecretInterface)
 		}
 	}
 
+	return newMSGraphClient(config, ar), nil
+}
+
+func newMSGraphClient(config *v32.AzureADConfig, ar confidential.AuthResult) *azureMSGraphClient {
 	authResult := getCustomAuthResult(&ar)
 	authorizer := authorizer{authResult: authResult}
 
@@ -268,17 +275,28 @@ func NewMSGraphClient(config *v32.AzureADConfig, secrets corev1.SecretInterface)
 	userClient.BaseClient.Authorizer = &authorizer
 	userClient.BaseClient.ApiVersion = msgraph.Version10
 	userClient.BaseClient.DisableRetries = true
+	userClient.BaseClient.RetryableClient.ErrorHandler = retryableErrorHandler
 
 	groupClient := msgraph.NewGroupsClient(config.TenantID)
 	groupClient.BaseClient.Endpoint = environments.ApiEndpoint(config.GraphEndpoint)
 	groupClient.BaseClient.Authorizer = &authorizer
 	groupClient.BaseClient.ApiVersion = msgraph.Version10
 	groupClient.BaseClient.DisableRetries = true
+	groupClient.BaseClient.RetryableClient.ErrorHandler = retryableErrorHandler
 
-	c.authResult = authResult
-	c.userClient = userClient
-	c.groupClient = groupClient
-	return c, err
+	return &azureMSGraphClient{
+		authResult:  authResult,
+		userClient:  userClient,
+		groupClient: groupClient,
+	}
+}
+
+func retryableErrorHandler(resp *http.Response, err error, numTries int) (*http.Response, error) {
+	if resp == nil {
+		return nil, err
+	}
+
+	return resp, nil
 }
 
 func getCustomAuthResult(result *confidential.AuthResult) *customAuthResult {
