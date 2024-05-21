@@ -13,9 +13,10 @@ Please see below for more details for your config. Please see below for more det
 4. [Cloud Credential](#cloud-credentials)
 5. [Configure providers to use for Node Driver Clusters](#machine-k3s-config)
 6. [Configuring Custom Clusters](#custom-cluster)
-7. [Static test cases](#static-test-cases)
-8. [Advanced Cluster Settings](#advanced-settings)
-9. [Back to general provisioning](../README.md)
+7. [Template Test](#template-test)
+8. [Static test cases](#static-test-cases)
+9. [Advanced Cluster Settings](#advanced-settings)
+10. [Back to general provisioning](../README.md)
 
 ## Flags
 Flags are used to determine which static table tests are run (has no effect on dynamic tests) 
@@ -298,6 +299,26 @@ These tests utilize Go build tags. Due to this, see the below examples on how to
 `gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/provisioning/k3s --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestCustomClusterK3SProvisioningTestSuite/TestProvisioningK3SCustomClusterDynamicInput"`
 
 If the specified test passes immediately without warning, try adding the `-count=1` flag to get around this issue. This will avoid previous results from interfering with the new test run.
+
+## Template Test
+
+Dependencies:
+* [Cloud Credential](#cloud-credentials)
+* Make sure the template provider matches the credentials.
+```yaml
+templateTest:
+  repo:
+    metadata:
+      name: "demo"
+    spec:
+      gitRepo: "https://github.com/<forked repo>/cluster-template-examples.git"
+      gitBranch: main
+      insecureSkipTLSVerify: true
+  templateProvider: "aws"
+  templateName: "cluster-template"
+```
+
+`gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/provisioning/rke2 --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestClusterTemplateTestSuite/TestProvisionK3sTemplateCluster`
 
 ## Static Test Cases
 In an effort to have uniform testing across our internal QA test case reporter, there are specific test cases that are put into their respective test files. This section highlights those test cases.
