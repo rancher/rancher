@@ -2,8 +2,8 @@
 set -e
 
 cd $(dirname $0)
-source $(dirname $0)/version
-source $(dirname $0)/package-env
+source version
+source package-env
 
 cd $(dirname $0)/../package
 
