@@ -40,7 +40,7 @@ custom_cluster_add_edit = {"cluster": None, "aws_node": []}
 cluster_node_template_2 = {"cluster": [], "node_template": []}
 roles = [CLUSTER_MEMBER, CLUSTER_OWNER, PROJECT_OWNER, PROJECT_MEMBER,
          PROJECT_READ_ONLY]
-engine_install_url = "https://releases.rancher.com/install-docker/24.0.sh"
+engine_install_url = "https://releases.rancher.com/install-docker/25.0.sh"
 
 
 def test_node_label_add():

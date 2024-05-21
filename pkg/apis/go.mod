@@ -15,6 +15,7 @@ replace (
 	k8s.io/cri-api => k8s.io/cri-api v0.28.6
 	k8s.io/csi-translation-lib => k8s.io/csi-translation-lib v0.28.6
 	k8s.io/dynamic-resource-allocation => k8s.io/dynamic-resource-allocation v0.28.6
+	k8s.io/endpointslice => k8s.io/endpointslice v0.28.6
 	k8s.io/kube-controller-manager => k8s.io/kube-controller-manager v0.28.6
 	k8s.io/kube-proxy => k8s.io/kube-proxy v0.28.6
 	k8s.io/kube-scheduler => k8s.io/kube-scheduler v0.28.6
@@ -32,7 +33,7 @@ require (
 	github.com/rancher/fleet/pkg/apis v0.9.1-rc.2.0.20240213164401-2c6b1019687c
 	github.com/rancher/gke-operator v1.2.1
 	github.com/rancher/norman v0.0.0-20240206180703-6eda4bc94b4c
-	github.com/rancher/rke v1.5.7
+	github.com/rancher/rke v1.5.9
 	github.com/rancher/wrangler/v2 v2.1.4
 	github.com/sirupsen/logrus v1.9.3
 	k8s.io/api v0.28.6

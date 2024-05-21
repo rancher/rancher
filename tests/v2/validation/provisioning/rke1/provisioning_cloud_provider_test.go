@@ -3,6 +3,7 @@
 package rke1
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/rancher/rancher/tests/v2/validation/provisioning/permutations"
@@ -84,6 +85,11 @@ func (r *RKE1CloudProviderTestSuite) TestAWSCloudProviderRKE1Cluster() {
 	}{
 		{"OutOfTree" + provisioninginput.StandardClientName.String(), nodeRolesDedicated, r.standardUserClient, r.client.Flags.GetValue(environmentflag.Long)},
 	}
+
+	if !slices.Contains(r.provisioningConfig.Providers, "aws") {
+		r.T().Skip("AWS Cloud Provider test requires access to aws.")
+	}
+
 	for _, tt := range tests {
 		if !tt.runFlag {
 			r.T().Logf("SKIPPED")
@@ -91,6 +97,37 @@ func (r *RKE1CloudProviderTestSuite) TestAWSCloudProviderRKE1Cluster() {
 		}
 		provisioningConfig := *r.provisioningConfig
 		provisioningConfig.CloudProvider = "external-aws"
+		provisioningConfig.NodePools = tt.nodePools
+		permutations.RunTestPermutations(&r.Suite, tt.name, tt.client, &provisioningConfig, permutations.RKE1ProvisionCluster, nil, nil)
+	}
+}
+
+func (r *RKE1CloudProviderTestSuite) TestVsphereCloudProviderRKE1Cluster() {
+	nodeRolesDedicated := []provisioninginput.NodePools{provisioninginput.EtcdNodePool, provisioninginput.ControlPlaneNodePool, provisioninginput.WorkerNodePool}
+	nodeRolesDedicated[0].NodeRoles.Quantity = 3
+	nodeRolesDedicated[1].NodeRoles.Quantity = 2
+	nodeRolesDedicated[2].NodeRoles.Quantity = 2
+
+	tests := []struct {
+		name      string
+		nodePools []provisioninginput.NodePools
+		client    *rancher.Client
+		runFlag   bool
+	}{
+		{"OutOfTree" + provisioninginput.StandardClientName.String(), nodeRolesDedicated, r.standardUserClient, r.client.Flags.GetValue(environmentflag.Long)},
+	}
+
+	if !slices.Contains(r.provisioningConfig.Providers, "vsphere") {
+		r.T().Skip("Vsphere Cloud Provider test requires access to Vsphere.")
+	}
+
+	for _, tt := range tests {
+		if !tt.runFlag {
+			r.T().Logf("SKIPPED")
+			continue
+		}
+		provisioningConfig := *r.provisioningConfig
+		provisioningConfig.CloudProvider = "rancher-vsphere"
 		provisioningConfig.NodePools = tt.nodePools
 		permutations.RunTestPermutations(&r.Suite, tt.name, tt.client, &provisioningConfig, permutations.RKE1ProvisionCluster, nil, nil)
 	}

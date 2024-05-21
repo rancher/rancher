@@ -39,6 +39,7 @@ replace (
 	k8s.io/cri-api => k8s.io/cri-api v0.28.6
 	k8s.io/csi-translation-lib => k8s.io/csi-translation-lib v0.28.6
 	k8s.io/dynamic-resource-allocation => k8s.io/dynamic-resource-allocation v0.28.6
+	k8s.io/endpointslice => k8s.io/endpointslice v0.28.6
 	k8s.io/kms => k8s.io/kms v0.28.6
 	k8s.io/kube-aggregator => k8s.io/kube-aggregator v0.28.6
 	k8s.io/kube-controller-manager => k8s.io/kube-controller-manager v0.28.6
@@ -115,12 +116,12 @@ require (
 	github.com/rancher/gke-operator v1.2.1
 	github.com/rancher/kubernetes-provider-detector v0.1.5
 	github.com/rancher/lasso v0.0.0-20240123150939-7055397d6dfa
-	github.com/rancher/machine v0.15.0-rancher110
+	github.com/rancher/machine v0.15.0-rancher112
 	github.com/rancher/norman v0.0.0-20240206180703-6eda4bc94b4c
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/remotedialer v0.3.0
-	github.com/rancher/rke v1.5.7
-	github.com/rancher/steve v0.0.0-20240305150728-3943409601f1
+	github.com/rancher/rke v1.5.9
+	github.com/rancher/steve v0.0.0-20240411162517-a80bf83f76b4
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007
 	github.com/rancher/wrangler/v2 v2.1.4
 	github.com/robfig/cron v1.1.0
@@ -166,7 +167,7 @@ require (
 	github.com/containers/image/v5 v5.25.0
 	github.com/google/gnostic-models v0.6.8
 	github.com/rancher/rancher/pkg/apis v0.0.0-20240213233515-935d309ebad4
-	github.com/rancher/shepherd v0.0.0-20240405212128-578908d4308a
+	github.com/rancher/shepherd v0.0.0-20240513202648-b64563872c50
 	go.qase.io/client v0.0.0-20231114201952-65195ec001fa
 )
 

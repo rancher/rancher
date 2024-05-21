@@ -1,0 +1,132 @@
+#!groovy
+node {
+    def rootPath = "/root/go/src/github.com/rancher/rancher/"
+    def workPath = "/root/go/src/github.com/rancher/rancher/tests/v2/validation/"
+    def rancherImageTags = "${env.RANCHER_IMAGE_TAGS}".split(',')
+    def jobName = "${JOB_NAME}"
+    def config = env.CONFIG
+    def filename = "config.yaml"
+    def hostnameSuffix = ["v2.7-head":"v27", "v2.8-head":"v28", "v2.9-head":"v29"]
+    def releaseBranchTagMap = ["v2.7-head":"release/v2.7", "v2.8-head":"release/v2.8", "v2.9-head":"release/v2.9"]
+    def tagChartMap = ["v2.7-head":"2.7.12", "v2.8-head":"2.8.3", "v2.9-head":"2.8.3"]
+    def configPath = ""
+
+    if (jobName.contains('/')) { 
+      jobNames = jobName.split('/')
+      jobName = jobNames[jobNames.size() - 1] 
+    }
+
+    def branch = "release/v2.9"
+    def recurringRunJob = (jobName =~ /(go-recurring-[a-z]+)/)[0][1]
+    recurringRunJob = "${recurringRunJob}-job"
+
+    if ("${env.BRANCH}" != "null" && "${env.BRANCH}" != "") {
+      branch = "${env.BRANCH}"
+    }
+
+    def rancherRepo = scm.getUserRemoteConfigs()[0].getUrl()
+    if ("${env.REPO}" != "null" && "${env.REPO}" != "") {
+      rancherRepo = "${env.REPO}"
+    }
+  
+    def timeout = "60m"
+    if ("${env.TIMEOUT}" != "null" && "${env.TIMEOUT}" != "") {
+      timeout = "${env.TIMEOUT}" 
+    }
+
+    def configFiles = []
+    wrap([$class: 'AnsiColorBuildWrapper', 'colorMapName': 'XTerm', 'defaultFg': 2, 'defaultBg':1]) {
+      withFolderProperties {
+        paramsMap = []
+        params.each {
+          if (it.value && it.value.trim() != "") {
+              paramsMap << "$it.key=$it.value"
+          }
+        }
+        withCredentials([ string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
+                          string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
+                          string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'RANCHER_EKS_ACCESS_KEY'),
+                          string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'RANCHER_EKS_SECRET_KEY'),
+                          string(credentialsId: 'AWS_SSH_PEM_KEY', variable: 'AWS_SSH_PEM_KEY'),
+                          string(credentialsId: 'RANCHER_SSH_KEY', variable: 'RANCHER_SSH_KEY'),
+                          string(credentialsId: 'RANCHER_REGISTRY_USER_NAME', variable: 'RANCHER_REGISTRY_USER_NAME'),
+                          string(credentialsId: 'RANCHER_REGISTRY_PASSWORD', variable: 'RANCHER_REGISTRY_PASSWORD'),
+                          string(credentialsId: 'ADMIN_PASSWORD', variable: 'ADMIN_PASSWORD'),
+                          string(credentialsId: 'USER_PASSWORD', variable: 'USER_PASSWORD'),
+                          string(credentialsId: 'RANCHER_VALID_TLS_CERT', variable: 'RANCHER_VALID_TLS_CERT'),
+                          string(credentialsId: 'RANCHER_VALID_TLS_KEY', variable: 'RANCHER_VALID_TLS_KEY'),
+                          string(credentialsId: 'RANCHER_BYO_TLS_CERT', variable: 'RANCHER_BYO_TLS_CERT'),
+                          string(credentialsId: 'RANCHER_BYO_TLS_KEY', variable: 'RANCHER_BYO_TLS_KEY'),
+                          string(credentialsId: 'PRIME_STAGING_REPO', variable: 'PRIME_STAGING_REPO'),
+                          string(credentialsId: 'PRIME_STAGING_REGISTRY', variable: 'PRIME_STAGING_REGISTRY'),
+                          string(credentialsId: 'QASE_AUTOMATION_TOKEN', variable: 'QASE_AUTOMATION_TOKEN')]) {
+          
+        withEnv(paramsMap) {
+          stage('Checkout') {
+            deleteDir()
+            dir("./rancher") {
+              checkout([
+                      $class: 'GitSCM',
+                      branches: [[name: "*/${branch}"]],
+                      extensions: scm.extensions + [[$class: 'CleanCheckout']],
+                      userRemoteConfigs: [[url: rancherRepo]]
+                    ])
+            }
+          }
+          dir ("./") {
+            stage('Setup') {
+                dir("./rancher/tests/v2/validation") {
+                  writeFile file: filename, text: config
+                  env.CATTLE_TEST_CONFIG = "${workPath}${filename}"
+                  configPath = "./rancher/tests/v2/validation/${filename}"
+                }
+                sh returnStdout: true, script: 'wget -qO ./yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64'
+                sh returnStdout:true, script: 'chmod a+x ./yq'
+            }
+            stage('Run Different Release Branches Testing') {
+              try {
+                  jobs = [:]
+                  def hostnamePrefix = sh (
+                    script: "./yq '.corralConfigs.corralConfigVars.aws_hostname_prefix '  ${configPath}",
+                    returnStdout: true
+                  ).trim()
+                  for( String testTag : rancherImageTags ) {
+                    dir("./rancher/tests/v2/validation") {
+                      writeFile file: filename, text: config
+                    }
+
+                    def hostname = "${hostnamePrefix}${hostnameSuffix[testTag]}"
+                    def rancherHostName = "${hostname}.qa.rancher.space"
+
+                    sh "./yq e '.corralConfigs.corralConfigVars.rancher_image_tag = \"${testTag}\"' -i ${configPath}"
+                    sh "./yq e '.corralConfigs.corralConfigVars.rancher_version = \"${tagChartMap[testTag]}\"' -i ${configPath}"
+                    sh "./yq e '.corralConfigs.corralConfigVars.aws_hostname_prefix = \"${hostname}\"' -i ${configPath}"
+                    sh "./yq e '.rancher.host = \"${rancherHostName}\"' -i ${configPath}"
+                    
+                    if (testTag == "v2.7-head") {
+                      def cattleImageEnvVar = '[\\"CATTLE_AGENT_IMAGE|'+"${env.PRIME_STAGING_REGISTRY}"+'/rancher/rancher-agent:v2.7-head\\"]'
+                      def rancherImage = "${env.PRIME_STAGING_REGISTRY}/rancher/rancher"
+                      sh "./yq e '.corralConfigs.corralConfigVars.rancher_chart_url = \"${env.PRIME_STAGING_REPO}\"' -i ${configPath}"
+                      sh "./yq e '.corralConfigs.corralConfigVars.rancher_image = \"${rancherImage}\"' -i ${configPath}"
+                      sh "./yq e '.corralConfigs.corralConfigVars.env_var_map = \"${cattleImageEnvVar}\"' -i ${configPath}"
+                    }
+                    def configYaml = readFile(file: "${configPath}")
+                    def goValidationParams = [
+                        text(name: 'CONFIG', value: configYaml),
+                        string(name: 'BRANCH', value: "${releaseBranchTagMap[testTag]}"),
+                        string(name: 'TEST_RUN_NAME', value: "${testTag}-${env.TEST_RUN_NAME}"),
+                      ]
+
+                      jobs["$testTag-test-validation"] = { build job: recurringRunJob, parameters: goValidationParams }
+                  }
+              parallel jobs
+              } catch(err){
+                  echo "Provisioning tests had failures: " + err
+              }
+            } //stage
+          } // dir 
+        } // withEnv
+      } // creds
+    } // folder properties
+  } // wrap 
+} // node

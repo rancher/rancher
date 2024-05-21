@@ -123,11 +123,15 @@ vmwarevsphereCredentials:
 ```
 
 ## Cloud Provider
-Cloud Provider enables additional options such as load-balancers and storage devices to be provisioned through your cluster
-available options:
-### AWS
+Cloud Provider enables additional options through the cloud provider, like cloud persistent storage or cloud provisioned load balancers.
+
+Names of cloud provider options are typically controlled by rancher product. Hence the discrepancy in rke2 vs. rke1 AWS in-tree and out-of-tree options. 
+To use automation with a cloud provider, simply enter one of the following options in the `cloudProvider` field in the config. 
+
+### RKE2 Cloud Provider Options
 * `aws-in-tree` uses the in-tree provider for aws -- **Deprecated on kubernetes 1.26 and below**
 * `aws` uses the out-of-tree provider for aws. Built in logic to the automation will be applied to the cluster that applies the correct configuration for the out-of-tree charts to be installed. Supported on kubernetes 1.22+
+* rancher-vsphere
 
 ## Machine RKE2 Config
 Machine RKE2 config is the final piece needed for the config to run RKE2 provisioning tests.
@@ -233,6 +237,7 @@ vmwarevsphereMachineConfigs:
     datacenter: "/<datacenter>"                                 #required 
     hostSystem: "/<datacenter>/path-to-host"                    #required
     datastore: "/<datacenter>/path-to-datastore"                #required 
+    datastoreURL: "ds:///<url>"             
     folder: "/<datacenter>/path-to-vm-folder"                   #required 
     pool: "/<datacenter>/path-to-resource-pool"                 #required 
     vmwarevsphereMachineConfig:

@@ -6,7 +6,6 @@ import (
 
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io"
 	apisV3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1/fakes"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
@@ -253,17 +252,16 @@ func TestReconcileNamespaceProjectClusterRole(t *testing.T) {
 
 func TestCreateProjectNSRole(t *testing.T) {
 	t.Parallel()
-	crs := make(map[string]*v1.ClusterRole)
-	m := setupManager(make(map[string]*v3.RoleTemplate), crs, make(map[string]*v1.Role), make(map[string]*v3.Project), clientErrs{}, clientErrs{}, clientErrs{})
+
 	type testCase struct {
-		description   string
-		verb          string
-		namespace     string
-		projectName   string
-		startingCR    *v1.ClusterRole
-		expectedCR    *v1.ClusterRole
-		isErrExpected bool
-		expectedErr   string
+		description string
+		verb        string
+		namespace   string
+		projectName string
+		startingCR  *v1.ClusterRole
+		expectedCR  *v1.ClusterRole
+		createError error
+		expectedErr string
 	}
 	testCases := []testCase{
 		{
@@ -336,28 +334,40 @@ func TestCreateProjectNSRole(t *testing.T) {
 					},
 				},
 			},
-			isErrExpected: true,
-			expectedErr:   "roletemplates.management.cattle.io \"p-123xyz-namespaces-edit\" already exists",
+			expectedErr: `roletemplates.management.cattle.io "p-123xyz-namespaces-edit" already exists`,
+		},
+		{
+			description: "test should return non-AlreadyExists error",
+			verb:        "*",
+			projectName: "p-123xyz",
+			createError: errors.NewInternalError(fmt.Errorf("some error")),
+			expectedErr: "Internal error occurred: some error",
 		},
 	}
 	for _, test := range testCases {
+		clusterRoles := map[string]*v1.ClusterRole{}
 		if test.startingCR != nil {
-			crs[test.startingCR.Name] = test.startingCR
+			clusterRoles = map[string]*v1.ClusterRole{
+				test.startingCR.Name: test.startingCR,
+			}
 		}
-		err := m.createProjectNSRole(fmt.Sprintf(projectNSGetClusterRoleNameFmt, test.projectName, projectNSVerbToSuffix[test.verb]), test.verb, test.namespace, test.projectName)
-		if test.isErrExpected {
-			assert.NotNil(t, err, test.description)
+
+		m := newManager(withClusterRoles(clusterRoles, &clientErrs{createError: test.createError}))
+
+		roleName := fmt.Sprintf(projectNSGetClusterRoleNameFmt, test.projectName, projectNSVerbToSuffix[test.verb])
+		err := m.createProjectNSRole(roleName, test.verb, test.namespace, test.projectName)
+
+		crMock := m.clusterRoles.(*fakes.ClusterRoleInterfaceMock)
+		calls := crMock.CreateCalls()
+		assert.Len(t, calls, 1)
+
+		if test.expectedErr != "" {
+			assert.ErrorContains(t, err, test.expectedErr, test.description)
 		} else {
-			assert.Nil(t, err)
+			assert.NoError(t, err)
+			assert.Equal(t, test.expectedCR, calls[0].In1, test.description)
 		}
-		assert.Equal(t, test.expectedCR, crs[test.expectedCR.Name], test.description)
-		delete(crs, test.expectedCR.Name)
 	}
-	m = setupManager(make(map[string]*v3.RoleTemplate), crs, make(map[string]*v1.Role), make(map[string]*v3.Project), clientErrs{createError: errors.NewInternalError(fmt.Errorf("some error"))}, clientErrs{}, clientErrs{})
-	description := "test should return non-AlreadyExists error"
-	err := m.createProjectNSRole(fmt.Sprintf(projectNSGetClusterRoleNameFmt, "p-123xyz", "edit"), "*", "", "p-123xyz")
-	assert.NotNil(t, err, description)
-	assert.Equal(t, "Internal error occurred: some error", err.Error(), description)
 }
 
 func createClusterRoleForProject(projectName string, namespace string, verb string) *rbacv1.ClusterRole {
