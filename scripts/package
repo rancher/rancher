@@ -34,7 +34,7 @@ docker build \
     --build-arg CATTLE_FLEET_VERSION="${CATTLE_FLEET_VERSION}" \
     -t ${IMAGE} .
 
-docker build --build-arg VERSION=${TAG} --build-arg ARCH=${ARCH} --build-arg RANCHER_TAG=${TAG} --build-arg RANCHER_REPO=${REPO} -t ${AGENT_IMAGE} -f ./Dockerfile.agent .
+docker build --build-arg VERSION=${TAG} --build-arg ARCH=${ARCH} --build-arg RANCHER_TAG=${TAG} --build-arg RANCHER_REPO=${REPO} -t ${AGENT_IMAGE} -f Dockerfile.agent .
 
 mkdir -p $(dirname $0)/../dist
 echo ${IMAGE} > $(dirname $0)/../dist/images
