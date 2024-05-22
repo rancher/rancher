@@ -465,7 +465,8 @@ type OIDCConfig struct {
 	PrivateKey         string `json:"privateKey,omitempty" norman:"type=password"`
 	GroupSearchEnabled *bool  `json:"groupSearchEnabled"`
 	GroupsClaim        string `json:"groupsClaim,omitempty"`
-	Scopes             string `json:"scope,omitempty"`
+	// Scopes is expected to be a space delimited list of scopes
+	Scopes string `json:"scope,omitempty"`
 }
 
 type OIDCTestOutput struct {
