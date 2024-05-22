@@ -9,10 +9,10 @@ ARG LDFLAGS="-X github.com/rancher/rancher/pkg/version.Version=${VERSION} -X git
 
 WORKDIR /app
 
-COPY go.mod go.sum ./
+COPY ../go.mod ../go.sum ./
 RUN go mod download
 
-COPY ./ ./
+COPY ../ ./
 
 RUN go build -tags k8s -ldflags "${LDFLAGS}" -o rancher
 
