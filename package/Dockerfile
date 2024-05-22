@@ -240,9 +240,9 @@ ENV CATTLE_CLI_URL_WINDOWS https://releases.rancher.com/cli2/${CATTLE_CLI_VERSIO
 ARG VERSION=dev
 ENV CATTLE_SERVER_VERSION ${VERSION}
 COPY --from=build /app/rancher /usr/bin/
-COPY --from=build /app/entrypoint.sh /usr/bin/
-COPY --from=build /app/kustomize.sh /usr/bin/
-COPY --from=build /appjailer.sh /usr/bin/
+COPY --from=build /app/package/entrypoint.sh /usr/bin/
+COPY --from=build /app/package/kustomize.sh /usr/bin/
+COPY --from=build app/package/appjailer.sh /usr/bin/
 COPY --from=build /app/k3s-airgap-images.tar /var/lib/rancher/k3s/agent/images/
 RUN chmod +x /usr/bin/entrypoint.sh
 RUN chmod +x /usr/bin/kustomize.sh
