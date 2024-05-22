@@ -1,6 +1,24 @@
 ARG RANCHER_TAG=dev
 ARG RANCHER_REPO=rancher
-FROM ${RANCHER_REPO}/rancher:${RANCHER_TAG} as rancher
+ARG RANCHER_IMAGE=${RANCHER_REPO}/rancher:${RANCHER_TAG}
+
+FROM registry.suse.com/bci/golang:1.20 as build
+ARG VERSION
+ARG CGO_ENABLED=0
+ARG TAGS="k8s"
+ARG LINKFLAGS="-extldflags -static"
+ARG LDFLAGS="-X main.VERSION=${VERSION} $LINKFLAGS"
+
+WORKDIR /app
+
+COPY . .
+
+RUN go mod download
+
+RUN go build -tags "${TAGS}" -ldflags "${LDFLAGS}" -o agent ./cmd/agent
+
+
+FROM ${RANCHER_IMAGE} as rancher
 
 FROM registry.suse.com/bci/bci-base:15.5
 ARG ARCH=amd64
@@ -25,6 +43,6 @@ ENV CATTLE_RANCHER_WEBHOOK_VERSION=$CATTLE_RANCHER_WEBHOOK_VERSION
 ENV SSL_CERT_DIR /etc/kubernetes/ssl/certs
 COPY --from=rancher /var/lib/rancher-data /var/lib/rancher-data
 COPY --from=rancher /usr/bin/tini /usr/bin/
-COPY agent run.sh kubectl-shell.sh shell-setup.sh /usr/bin/
+COPY --from=build /app/agent /app/package/run.sh /app/package/kubectl-shell.sh /app/package/shell-setup.sh /usr/bin/
 WORKDIR /var/lib/rancher
 ENTRYPOINT ["run.sh"]
