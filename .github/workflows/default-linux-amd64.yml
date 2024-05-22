@@ -34,7 +34,7 @@ jobs:
         run: curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${{ env.CATTLE_KDM_BRANCH }}/data.json > ./data.json
       - name: Build and export server
         run: |
-          docker build \
+          docker buildx build \
             --build-arg VERSION=${{ env.COMMIT }} \
             --build-arg COMMIT=${{ env.COMMIT }} \
             --build-arg RKE_VERSION=${{ env.RKE_VERSION }} \
