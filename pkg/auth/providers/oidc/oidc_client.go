@@ -63,8 +63,8 @@ func AddCertKeyToContext(ctx context.Context, certificate, key string) (context.
 
 func FetchAuthURL(config map[string]interface{}) (string, error) {
 	// If the authEndpoint is already configured, use that
-	if authURL, ok := config["authEndpoint"]; ok {
-		return authURL.(string), nil
+	if authURL, ok := config["authEndpoint"].(string); ok {
+		return authURL, nil
 	}
 
 	issuerURL, ok := config["issuer"].(string)
