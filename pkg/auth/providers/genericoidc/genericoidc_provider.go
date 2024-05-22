@@ -88,7 +88,7 @@ func (g *GenOIDCProvider) GetPrincipal(principalID string, token v3.Token) (v3.P
 		return p, fmt.Errorf("invalid id %v", principalID)
 	}
 	if principalType != UserType && principalType != GroupType {
-		return p, fmt.Errorf("invalid principal type")
+		return p, fmt.Errorf("invalid principal type: %s", principalType)
 	}
 	if principalType == UserType {
 		p = v3.Principal{
