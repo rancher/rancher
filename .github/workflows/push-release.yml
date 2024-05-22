@@ -38,8 +38,10 @@ jobs:
         run: curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${{ env.CATTLE_KDM_BRANCH }}/data.json > ./data.json
       - name: Tag name
         run: |
-          if [[ ${{ github.ref_name }} == release/v* ]]; then
-            TAG=${${{ github.ref_name }}#"release/"}-${{ github.sha }}-head
+          ref_name="${{ github.ref_name }}"
+          prefix="release/"
+          if [[ "$ref_name" == release/v* ]]; then
+            TAG=${ref_name#$prefix}-${{ github.sha }}-head
             echo "TAG=$TAG" >> "$GITHUB_ENV"
           fi
       - name: Build and export server
