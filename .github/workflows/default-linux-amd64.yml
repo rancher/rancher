@@ -33,7 +33,7 @@ jobs:
         run: touch k3s-airgap-images.tar
       - name: Download data.json
         run: curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${{ env.CATTLE_KDM_BRANCH }}/data.json > ./data.json
-      - name: Build Server
+      - name: Build and export server
         uses: docker/build-push-action@v5
         with:
           push: false
@@ -44,6 +44,40 @@ jobs:
           tags: ${{ env.REPOSITORY_OWNER }}/rancher:${{ env.COMMIT }}
           context: .
           file: ./package/Dockerfile
+          outputs: type=docker,dest=/tmp/rancher.tar
+      - name: Upload build
+        uses: actions/upload-artifact@v4
+        with:
+          name: rancher-${{ github.run_id }}
+          path: /tmp/rancher.tar
+          retention-days: 1
+  build-agent:
+    runs-on: ubuntu-latest
+    needs: [build-server]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Download rancher image
+        uses: actions/download-artifact@v4
+        with:
+          name: rancher-${{ github.run_id }}
+          path: /tmp
+      - name: Load image
+        run: |
+          docker load --input /tmp/rancher-${{ github.run_id }}.tar
+          docker image ls -a   
+      - name: Build agent
+        uses: docker/build-push-action@v5
+        with:
+          push: false
+          build-args: |
+            "VERSION=${{ env.COMMIT }}"
+          tags: ${{ env.REPOSITORY_OWNER }}/rancher-agent:${{ env.COMMIT }}
+          context: .
+          file: ./package/Dockerfile.agent
+      
   # test:
   #   runs-on: ubuntu-latest
   #   container: registry.suse.com/bci/golang:1.20
