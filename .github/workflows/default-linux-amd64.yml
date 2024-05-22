@@ -74,6 +74,7 @@ jobs:
           push: false
           build-args: |
             "VERSION=${{ env.COMMIT }}"
+            "RANCHER_REPO=${{ env.REPOSITORY_OWNER }}"
           tags: ${{ env.REPOSITORY_OWNER }}/rancher-agent:${{ env.COMMIT }}
           context: .
           file: ./package/Dockerfile.agent
