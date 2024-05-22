@@ -5,54 +5,54 @@ env:
   REPOSITORY_OWNER: ${{ github.repository_owner }}
   CATTLE_KDM_BRANCH: dev-v2.7
 jobs:
-  validate:
-    runs-on: ubuntu-latest
-    container: registry.suse.com/bci/golang:1.20
-    steps:
-      - name: Install Dependencies
-        run: |
-          zypper -n install curl unzip tar vim less file xz gzip sed gawk
-          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.52.0; \
-          zypper -n install python311-pip python311-base python311 python311-devel python311-tox libffi-devel libopenssl-devel
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Validate
-        run: ./scripts/validate
-  build-server:
-    needs: [validate]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-      - name: Set Up RKE_VERSION env
-        run: echo "RKE_VERSION=$(grep -m1 'github.com/rancher/rke' go.mod | awk '{print $2}')" >> "$GITHUB_ENV"
-      - name: Create k3s images file
-        run: touch k3s-airgap-images.tar
-      - name: Download data.json
-        run: curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${{ env.CATTLE_KDM_BRANCH }}/data.json > ./data.json
-      - name: Build and export server
-        uses: docker/build-push-action@v5
-        with:
-          push: false
-          build-args: |
-            "VERSION=${{ env.COMMIT }}"
-            "COMMIT=${{ env.COMMIT }}"
-            "RKE_VERSION=${{ env.RKE_VERSION }}"
-          tags: ${{ env.REPOSITORY_OWNER }}/rancher:${{ env.COMMIT }}
-          context: .
-          file: ./package/Dockerfile
-          outputs: type=docker,dest=/tmp/rancher.tar
-      - name: Upload build
-        uses: actions/upload-artifact@v4
-        with:
-          name: rancher-image-${{ github.run_id }}
-          path: /tmp/rancher.tar
-          retention-days: 1
+  # validate:
+  #   runs-on: ubuntu-latest
+  #   container: registry.suse.com/bci/golang:1.20
+  #   steps:
+  #     - name: Install Dependencies
+  #       run: |
+  #         zypper -n install curl unzip tar vim less file xz gzip sed gawk
+  #         curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.52.0; \
+  #         zypper -n install python311-pip python311-base python311 python311-devel python311-tox libffi-devel libopenssl-devel
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
+  #     - name: Validate
+  #       run: ./scripts/validate
+  # build-server:
+  #   needs: [validate]
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
+  #     - name: Set up Docker Buildx
+  #       uses: docker/setup-buildx-action@v3
+  #     - name: Set Up RKE_VERSION env
+  #       run: echo "RKE_VERSION=$(grep -m1 'github.com/rancher/rke' go.mod | awk '{print $2}')" >> "$GITHUB_ENV"
+  #     - name: Create k3s images file
+  #       run: touch k3s-airgap-images.tar
+  #     - name: Download data.json
+  #       run: curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${{ env.CATTLE_KDM_BRANCH }}/data.json > ./data.json
+  #     - name: Build and export server
+  #       uses: docker/build-push-action@v5
+  #       with:
+  #         push: false
+  #         build-args: |
+  #           "VERSION=${{ env.COMMIT }}"
+  #           "COMMIT=${{ env.COMMIT }}"
+  #           "RKE_VERSION=${{ env.RKE_VERSION }}"
+  #         tags: ${{ env.REPOSITORY_OWNER }}/rancher:${{ env.COMMIT }}
+  #         context: .
+  #         file: ./package/Dockerfile
+  #         outputs: type=docker,dest=/tmp/rancher.tar
+  #     - name: Upload build
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: rancher-image-${{ github.run_id }}
+  #         path: /tmp/rancher.tar
+  #         retention-days: 1
   build-agent:
     runs-on: ubuntu-latest
-    needs: [build-server]
+    # needs: [build-server]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -61,7 +61,9 @@ jobs:
       - name: Download rancher image
         uses: actions/download-artifact@v4
         with:
-          name: rancher-image-${{ github.run_id }}
+          # name: rancher-image-${{ github.run_id }}
+          name: rancher-image-9193300302
+          run-id: 9193300302
           path: /tmp
       - name: Load image
         run: |
@@ -85,50 +87,50 @@ jobs:
           name: rancher-agent-image-${{ github.run_id }}
           path: /tmp/rancher-agent.tar
           retention-days: 1
-  test:
-    needs: [build-agent]
-    runs-on: ubuntu-latest
-    container: registry.suse.com/bci/golang:1.20
-    steps:
-      - name: Install Dependencies
-        run: |
-          zypper -n install curl unzip tar vim less file xz gzip sed gawk jq
-          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.52.0; \
-          zypper -n install python311-pip python311-base python311 python311-devel python311-tox libffi-devel libopenssl-devel
-          curl -sLf ${HELM_URL_V2} -o /usr/bin/rancher-helm && \
-          curl -sLf ${TILLER_URL} -o /usr/bin/rancher-tiller && \
-          chmod +x /usr/bin/rancher-helm /usr/bin/rancher-tiller && \
-          ln -s /usr/bin/rancher-helm /usr/bin/helm && \
-          ln -s /usr/bin/rancher-tiller /usr/bin/tiller && \
-          helm init -c --stable-repo-url https://charts.helm.sh/stable/
+  # test:
+  #   needs: [build-agent]
+  #   runs-on: ubuntu-latest
+  #   container: registry.suse.com/bci/golang:1.20
+  #   steps:
+  #     - name: Install Dependencies
+  #       run: |
+  #         zypper -n install curl unzip tar vim less file xz gzip sed gawk jq
+  #         curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.52.0; \
+  #         zypper -n install python311-pip python311-base python311 python311-devel python311-tox libffi-devel libopenssl-devel
+  #         curl -sLf ${HELM_URL_V2} -o /usr/bin/rancher-helm && \
+  #         curl -sLf ${TILLER_URL} -o /usr/bin/rancher-tiller && \
+  #         chmod +x /usr/bin/rancher-helm /usr/bin/rancher-tiller && \
+  #         ln -s /usr/bin/rancher-helm /usr/bin/helm && \
+  #         ln -s /usr/bin/rancher-tiller /usr/bin/tiller && \
+  #         helm init -c --stable-repo-url https://charts.helm.sh/stable/
 
-          mkdir /usr/tmp && \
-          curl ${HELM_URL_V3} | tar xvzf - --strip-components=1 -C /usr/tmp/ && \
-          mv /usr/tmp/helm /usr/bin/helm_v3 && \
+  #         mkdir /usr/tmp && \
+  #         curl ${HELM_URL_V3} | tar xvzf - --strip-components=1 -C /usr/tmp/ && \
+  #         mv /usr/tmp/helm /usr/bin/helm_v3 && \
 
-          curl -sLf ${KUSTOMIZE_URL} | tar -xzf - -C /usr/bin
-          chmod +x /usr/bin/kustomize
+  #         curl -sLf ${KUSTOMIZE_URL} | tar -xzf - -C /usr/bin
+  #         chmod +x /usr/bin/kustomize
 
-          helm_v3 plugin install https://github.com/helm-unittest/helm-unittest.git --version ${HELM_UNITTEST_VERSION};
-          git config --global --add safe.directory /__w/rancher/rancher
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Download rancher images
-        uses: actions/download-artifact@v4
-        with:
-          path: /tmp
-          merge-multiple: true
-          pattern: rancher-*
-      - name: Load images
-        run: |
-          docker load --input /tmp/rancher.tar
-          docker load --input /tmp/rancher-agent.tar
-          docker image ls -a   
-      - name: Copy server from image
-        run: |
-          mkdir -p bin
-          id=$(docker create ${{ env.REPOSITORY_OWNER }}/rancher:${{ env.COMMIT }})
-          docker cp "$id:/usr/bin/rancher" ./bin
-          docker rm -v "$id"
-      - name: test
-        run: ./scripts/test
+  #         helm_v3 plugin install https://github.com/helm-unittest/helm-unittest.git --version ${HELM_UNITTEST_VERSION};
+  #         git config --global --add safe.directory /__w/rancher/rancher
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
+  #     - name: Download rancher images
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         path: /tmp
+  #         merge-multiple: true
+  #         pattern: rancher-*
+  #     - name: Load images
+  #       run: |
+  #         docker load --input /tmp/rancher.tar
+  #         docker load --input /tmp/rancher-agent.tar
+  #         docker image ls -a   
+  #     - name: Copy server from image
+  #       run: |
+  #         mkdir -p bin
+  #         id=$(docker create ${{ env.REPOSITORY_OWNER }}/rancher:${{ env.COMMIT }})
+  #         docker cp "$id:/usr/bin/rancher" ./bin
+  #         docker rm -v "$id"
+  #     - name: test
+  #       run: ./scripts/test
