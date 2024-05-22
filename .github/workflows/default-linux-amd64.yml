@@ -17,6 +17,7 @@ env:
   GIT_TAG: ${{ github.ref }}
   COMMIT: ${{ github.sha }}
   BRANCH: ${{ github.ref }}
+  REPOSITORY_OWNER: ${{ github.repository_owner }}
 jobs:
   # validate:
   #   runs-on: ubuntu-latest
@@ -31,68 +32,28 @@ jobs:
   #       uses: actions/checkout@v4
   #     - name: Validate
   #       run: ./scripts/validate
-  build:
+  build-server:
     # needs: [validate]
     runs-on: ubuntu-latest
-    container: registry.suse.com/bci/golang:1.20
+    # container: registry.suse.com/bci/golang:1.20
     steps:
-      - name: Install Dependencies and configure git
-        run: |
-          zypper -n install gcc binutils glibc-devel-static ca-certificates git-core wget curl unzip tar vim less file xz gzip sed gawk iproute2 iptables jq
-          git config --global --add safe.directory /__w/rancher/rancher
       - name: Checkout code
         uses: actions/checkout@v4
-      - name: Build Rancher
-        run: ./scripts/build-server
-      - name: Build Rancher Agent
-        run: ./scripts/build-agent
-      - name: Describe files
-        run: ls -R
-      - name: Upload build
-        uses: actions/upload-artifact@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Set Up RKE_VERSION env
+        run: echo "$(grep -m1 'github.com/rancher/rke' go.mod | awk '{print $2}')" >> "$GITHUB_ENV"
+      - name: Build Server
+        uses: docker/build-push-action@v5
         with:
-          name: build-${{ github.run_id }}-${{ github.sha }}
-          path: ./bin
-          retention-days: 1
-  package:
-    needs: [build]
-    runs-on: ubuntu-latest
-    container: registry.suse.com/bci/golang:1.20
-    steps:
-      - name: Install Dependencies
-        run: |
-          zypper -n install gcc binutils glibc-devel-static ca-certificates git-core wget curl unzip tar vim less file xz gzip sed gawk iproute2 iptables jq skopeo
-
-          zypper install -y -f docker && rpm -e --nodeps --noscripts containerd
-
-          go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.12.0
-
-
-          curl -sLf ${HELM_URL_V2} -o /usr/bin/rancher-helm && \
-          curl -sLf ${TILLER_URL} -o /usr/bin/rancher-tiller && \
-          chmod +x /usr/bin/rancher-helm /usr/bin/rancher-tiller && \
-          ln -s /usr/bin/rancher-helm /usr/bin/helm && \
-          ln -s /usr/bin/rancher-tiller /usr/bin/tiller && \
-          helm init -c --stable-repo-url https://charts.helm.sh/stable/
-
-          mkdir /usr/tmp && \
-          curl ${HELM_URL_V3} | tar xvzf - --strip-components=1 -C /usr/tmp/ && \
-          mv /usr/tmp/helm /usr/bin/helm_v3 && \
-          helm_v3 plugin install https://github.com/helm-unittest/helm-unittest.git --version ${HELM_UNITTEST_VERSION};
-          git config --global --add safe.directory /__w/rancher/rancher
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: download build
-        uses: actions/download-artifact@v4
-        with:
-          name: build-${{ github.run_id }}-${{ github.sha }}
-          # name: build-9162208106-f85b529503282d2d32550f471e73734cc2264a76
-          # run-id: 9162208106
-          path: ./bin
-      - name: Display structure of downloaded files
-        run: ls -R
-      - name: Package
-        run: ./scripts/package
+          push: false
+          build-args: |
+            "VERSION=${{ env.GIT_TAG }}"
+            "COMMIT=${{ env.COMMIT }}"
+            "RKE_VERSION=${{ env.RKE_VERSION }}"
+          tags: ${{ env.REPOSITORY_OWNER }}/rancher:${{ env.GIT_TAG }}
+          context: ./package
+          file: Dockerfile
   # test:
   #   runs-on: ubuntu-latest
   #   container: registry.suse.com/bci/golang:1.20
