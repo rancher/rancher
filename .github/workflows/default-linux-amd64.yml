@@ -30,7 +30,7 @@ jobs:
       - name: Set Up RKE_VERSION env
         run: echo "RKE_VERSION=$(grep -m1 'github.com/rancher/rke' go.mod | awk '{print $2}')" >> "$GITHUB_ENV"
       - name: Create k3s images file
-        run: touch package/k3s-airgap-images.tar
+        run: touch k3s-airgap-images.tar
       - name: Download data.json
         run: curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${{ env.CATTLE_KDM_BRANCH }}/data.json > ./data.json
       - name: Build Server
