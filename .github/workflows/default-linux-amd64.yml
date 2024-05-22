@@ -14,7 +14,7 @@ env:
   HELM_URL_V3: https://get.helm.sh/helm-v3.12.3-linux-amd64.tar.gz
   TILLER_URL: https://github.com/rancher/helm/releases/download/2.16.8-rancher2/rancher-tiller
   KUSTOMIZE_URL: https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/v5.0.1/kustomize_v5.0.1_linux_amd64.tar.gz
-  GIT_TAG: ${{ github.ref }}
+  GIT_TAG: ${{ github.ref_name }}
   COMMIT: ${{ github.sha }}
   BRANCH: ${{ github.ref }}
   REPOSITORY_OWNER: ${{ github.repository_owner }}
