@@ -67,7 +67,7 @@ jobs:
           docker image ls -a   
       - name: Build and export agent
         run: |
-          docker build \
+          docker buildx build \
             --build-arg VERSION=${{ env.COMMIT }} \
             --build-arg RANCHER_REPO=${{ env.REPOSITORY_OWNER }} \
             --file ./package/Dockerfile.agent \
