@@ -33,17 +33,15 @@ jobs:
       - name: Download data.json
         run: curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${{ env.CATTLE_KDM_BRANCH }}/data.json > ./data.json
       - name: Build and export server
-        uses: docker/build-push-action@v5
-        with:
-          push: false
-          build-args: |
-            "VERSION=${{ env.COMMIT }}"
-            "COMMIT=${{ env.COMMIT }}"
-            "RKE_VERSION=${{ env.RKE_VERSION }}"
-          tags: ${{ env.REPOSITORY_OWNER }}/rancher:dev
-          context: .
-          file: ./package/Dockerfile
-          outputs: type=docker,dest=/tmp/rancher.tar
+        run: |
+          docker build \
+            --build-arg VERSION=${{ env.COMMIT }} \
+            --build-arg COMMIT=${{ env.COMMIT }} \
+            --build-arg RKE_VERSION=${{ env.RKE_VERSION }} \
+            --file ./package/Dockerfile \
+            --output type=docker,dest=/tmp/rancher.tar \
+            --tag ${{ env.REPOSITORY_OWNER }}/rancher:dev \
+            .
       - name: Upload build
         uses: actions/upload-artifact@v4
         with:
@@ -67,17 +65,15 @@ jobs:
         run: |
           docker load --input /tmp/rancher.tar
           docker image ls -a   
-      - name: Build agent
-        uses: docker/build-push-action@v5
-        with:
-          push: false
-          build-args: |
-            "VERSION=${{ env.COMMIT }}"
-            "RANCHER_REPO=${{ env.REPOSITORY_OWNER }}"
-          tags: ${{ env.REPOSITORY_OWNER }}/rancher-agent:dev
-          context: .
-          file: ./package/Dockerfile.agent
-          outputs: type=docker,dest=/tmp/rancher-agent.tar
+      - name: Build and export agent
+        run: |
+          docker build \
+            --build-arg VERSION=${{ env.COMMIT }} \
+            --build-arg RANCHER_REPO=${{ env.REPOSITORY_OWNER }} \
+            --file ./package/Dockerfile.agent \
+            --output type=docker,dest=/tmp/rancher-agent.tar \
+            --tag ${{ env.REPOSITORY_OWNER }}/rancher-agent:dev \
+            .
       - name: Upload build
         uses: actions/upload-artifact@v4
         with:
