@@ -121,14 +121,13 @@ func (g *GenOIDCProvider) RefetchGroupPrincipals(principalID string, secret stri
 // groupToPrincipal takes a bare group name and turns it into a v3.Principal group object by filling-in other fields
 // with basic provider information.
 func (g *GenOIDCProvider) groupToPrincipal(groupName string) v3.Principal {
-	p := v3.Principal{
+	return v3.Principal{
 		ObjectMeta:    metav1.ObjectMeta{Name: g.Name + "_" + GroupType + "://" + groupName},
 		DisplayName:   groupName,
 		Provider:      g.Name,
 		PrincipalType: GroupType,
 		Me:            false,
 	}
-	return p
 }
 
 // getRedirectURL uses the AuthConfig map to build-up the redirect URL passed to the OIDC provider at login-time.

@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
+	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
 )
@@ -70,23 +72,30 @@ func FetchAuthURL(config map[string]interface{}) (string, error) {
 		return "", fmt.Errorf("both authEndpoint and issuerURL are missing in the authConfig")
 	}
 
-	discoveryURL := fmt.Sprintf("%s/.well-known/openid-configuration", issuerURL)
-	resp, err := http.Get(discoveryURL)
+	discoveryURL, err := url.JoinPath(issuerURL, "/.well-known/openid-configuration")
 	if err != nil {
-		return "", fmt.Errorf("unable to fetch discovery information for OIDC provider: %v", err)
+		return "", fmt.Errorf("could not form discovery URL: %w", err)
 	}
-	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("failed to fetch discovery document: %s", resp.Status)
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+	}
+	discoveryResponse, err := client.Get(discoveryURL)
+	if err != nil {
+		return "", fmt.Errorf("unable to fetch discovery information for OIDC provider: %w", err)
+	}
+	defer discoveryResponse.Body.Close()
+
+	if discoveryResponse.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("failed to fetch discovery document: %s", discoveryResponse.Status)
 	}
 
 	var discoveryInfo struct {
 		AuthorizationEndpoint string `json:"authorization_endpoint"`
 	}
 
-	if err := json.NewDecoder(resp.Body).Decode(&discoveryInfo); err != nil {
-		return "", fmt.Errorf("unable to decode the OIDC discovery response %v", err)
+	if err := json.NewDecoder(discoveryResponse.Body).Decode(&discoveryInfo); err != nil {
+		return "", fmt.Errorf("unable to decode the OIDC discovery response %w", err)
 	}
 
 	return discoveryInfo.AuthorizationEndpoint, nil
