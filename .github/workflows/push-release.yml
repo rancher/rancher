@@ -1,0 +1,49 @@
+name: push-release-amd64
+on: 
+  push:
+    branches:
+      - "master"
+      - "release/v*"
+    tags:
+      - "v*"
+env:
+  TAG: ${{ github.ref_name }}
+  COMMIT: ${{ github.sha }}
+  REPOSITORY_OWNER: ${{ github.repository_owner }}
+  CATTLE_KDM_BRANCH: dev-v2.8
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: "Read secrets"
+        uses: rancher-eio/read-vault-secrets@main
+        with:
+          secrets: |
+            secret/data/github/repo/${{ github.repository }}/dockerhub/${{ github.repository_owner }}/credentials username | DOCKER_USERNAME ;
+            secret/data/github/repo/${{ github.repository }}/dockerhub/${{ github.repository_owner }}/credentials password | DOCKER_PASSWORD
+      - name: Docker Registry Login
+        uses: docker/login-action@v3
+        with:
+          username: ${{ env.DOCKER_USERNAME }}
+          password: ${{ env.DOCKER_PASSWORD }}
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Set Up RKE_VERSION env
+        run: echo "RKE_VERSION=$(grep -m1 'github.com/rancher/rke' go.mod | awk '{print $2}')" >> "$GITHUB_ENV"
+      - name: Create k3s images file
+        run: touch k3s-airgap-images.tar
+      - name: Download data.json
+        run: curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${{ env.CATTLE_KDM_BRANCH }}/data.json > ./data.json
+      - name: Build and export server
+        uses: docker/build-push-action@v5
+        with:
+          push: true
+          build-args: |
+            "VERSION=${{ env.COMMIT }}"
+            "COMMIT=${{ env.COMMIT }}"
+            "RKE_VERSION=${{ env.RKE_VERSION }}"
+          tags: ${{ env.REPOSITORY_OWNER }}/rancher:${{ env.TAG }}
+          context: .
+          file: ./package/Dockerfile
