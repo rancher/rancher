@@ -1613,6 +1613,8 @@ github.com/rancher/aws-iam-authenticator v0.5.9-0.20220713170329-78acb8c83863 h1
 github.com/rancher/aws-iam-authenticator v0.5.9-0.20220713170329-78acb8c83863/go.mod h1:6dId2LCc8oHqeBzP6E8ndp4DflhKTxYLb5ZXwI4YmFA=
 github.com/rancher/channelserver v0.6.1-0.20240212155841-07630c8295da h1:M7p9bmFBw5kKgoBtkPXjDZTGoj94ZWt6NaTa/7jglB4=
 github.com/rancher/channelserver v0.6.1-0.20240212155841-07630c8295da/go.mod h1:DuOeweH+bHP22OVq7mgQwDMVJjMmPNn8WzF1IHAU39U=
+github.com/rancher/cis-operator v1.0.11 h1:3fOkwk45no0S9NaGFYgIINqxjBChqvvGhXWY/ZPGGDM=
+github.com/rancher/cis-operator v1.0.11/go.mod h1:tSfpBeEcxYizMRT+rPtvQebJ5CcSJCKL9LW16Zdm7Zc=
 github.com/rancher/client-go v1.28.6-rancher1 h1:nSoGKs12BuPviZtzemO7wTX8jxABaLqfYKFLRBV8MI0=
 github.com/rancher/client-go v1.28.6-rancher1/go.mod h1:+nu0Yp21Oeo/cBCsprNVXB2BfJTV51lFfe5tXl2rUL8=
 github.com/rancher/dynamiclistener v0.4.0 h1:1bOlH4uzD5BPQ8fo2FeiWxiMp87ppwmyc2uYxN2z1kc=
@@ -1643,8 +1645,8 @@ github.com/rancher/remotedialer v0.3.0 h1:y1EO8JCsgZo0RcqTUp6U8FXcBAv27R+TLnWRcp
 github.com/rancher/remotedialer v0.3.0/go.mod h1:BwwztuvViX2JrLLUwDlsYt5DiyUwHLlzynRwkZLAY0Q=
 github.com/rancher/rke v1.5.9 h1:sCD2vWtkUQEQmNWyne7akZXuu4gZw+3vZVf8VRALXOE=
 github.com/rancher/rke v1.5.9/go.mod h1:/z9oyKqYpFwgRBV9rfLxqUdjydz/VMCTcjld4uUt7uM=
-github.com/rancher/shepherd v0.0.0-20240530205630-5f53d57cf2cf h1:U8Yea+NWcb5S9e4GJRi/lJ/pLgUrC4EjVKWlWTSfS0c=
-github.com/rancher/shepherd v0.0.0-20240530205630-5f53d57cf2cf/go.mod h1:aF+34m7gi1PkHYqMd0kCcPJMyr4blVCsj0RgijAyXPg=
+github.com/rancher/shepherd v0.0.0-20240531204233-b305a7097821 h1:VNa1dludfG0E3KQIw+T6LHTmM0utW6AlSCKvPDVrcxw=
+github.com/rancher/shepherd v0.0.0-20240531204233-b305a7097821/go.mod h1:aF+34m7gi1PkHYqMd0kCcPJMyr4blVCsj0RgijAyXPg=
 github.com/rancher/steve v0.0.0-20240411162517-a80bf83f76b4 h1:aN7muy+rU1aCB1Pjcy8V2cD5Qm/l96S/+qiukBr/fE0=
 github.com/rancher/steve v0.0.0-20240411162517-a80bf83f76b4/go.mod h1:o4vLBzMTKbHHhIiAcbgOiaN3aK1vIjL6ZTgaGxQYpsY=
 github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007 h1:ru+mqGnxMmKeU0Q3XIDxkARvInDIqT1hH2amTcsjxI4=
@@ -1658,8 +1660,8 @@ github.com/remyoudompheng/bigfft v0.0.0-20200410134404-eec4a21b6bb0/go.mod h1:qq
 github.com/rivo/uniseg v0.2.0/go.mod h1:J6wj4VEh+S6ZtnVlnTBMWIodfgj8LQOQFoIToxlJtxc=
 github.com/rivo/uniseg v0.4.4 h1:8TfxU8dW6PdqD27gjM8MVNuicgxIjxpm4K7x4jp8sis=
 github.com/rivo/uniseg v0.4.4/go.mod h1:FN3SvrM+Zdj16jyLfmOkMNblXMcoc8DfTHruCPUcx88=
-github.com/robfig/cron v1.1.0 h1:jk4/Hud3TTdcrJgUOBgsqrZBarcxl6ADIjSC2iniwLY=
-github.com/robfig/cron v1.1.0/go.mod h1:JGuDeoQd7Z6yL4zQhZ3OPEVHB7fL6Ka6skscFHfmt2k=
+github.com/robfig/cron v1.2.0 h1:ZjScXvvxeQ63Dbyxy76Fj3AT3Ut0aKsyd2/tl3DTMuQ=
+github.com/robfig/cron v1.2.0/go.mod h1:JGuDeoQd7Z6yL4zQhZ3OPEVHB7fL6Ka6skscFHfmt2k=
 github.com/rogpeppe/fastuuid v0.0.0-20150106093220-6724a57986af/go.mod h1:XWv6SoW27p1b0cqNHllgS5HIMJraePCO15w5zCzIWYg=
 github.com/rogpeppe/fastuuid v1.2.0/go.mod h1:jVj6XXZzXRy/MSR5jhDC/2q6DgLz+nrA6LYCDYWNEvQ=
 github.com/rogpeppe/go-internal v1.1.0/go.mod h1:M8bDsm7K2OlrFYOpmOWEs/qY81heoFRclV5y23lUDJ4=
