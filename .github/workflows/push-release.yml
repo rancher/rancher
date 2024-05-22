@@ -36,6 +36,12 @@ jobs:
         run: touch k3s-airgap-images.tar
       - name: Download data.json
         run: curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${{ env.CATTLE_KDM_BRANCH }}/data.json > ./data.json
+      - name: Tag name
+        run: |
+          if [[ ${{ github.ref_name }} == release/v* ]]; then
+            TAG=${${{ github.ref_name }}#"release/"}-${{ github.sha }}-head
+            echo "TAG=$TAG" >> "$GITHUB_ENV"
+          fi
       - name: Build and export server
         uses: docker/build-push-action@v5
         with:
@@ -44,7 +50,6 @@ jobs:
             "VERSION=${{ env.COMMIT }}"
             "COMMIT=${{ env.COMMIT }}"
             "RKE_VERSION=${{ env.RKE_VERSION }}"
-
           tags: ${{ env.REPOSITORY_OWNER }}/rancher:${{ env.TAG }}
           context: .
           file: ./package/Dockerfile
