@@ -62,7 +62,6 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           # name: rancher-image-${{ github.run_id }}
-          name: rancher-image-9193300302
           run-id: 9193300302
           path: /tmp
       - name: Load image
