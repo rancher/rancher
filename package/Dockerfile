@@ -9,10 +9,10 @@ ARG LDFLAGS="-X github.com/rancher/rancher/pkg/version.Version=${VERSION} -X git
 
 WORKDIR /app
 
-COPY ../go.mod ../go.sum ./
+COPY go.mod go.sum ./
 RUN go mod download
 
-COPY ../ ./
+COPY ./ ./
 
 RUN go build -tags k8s -ldflags "${LDFLAGS}" -o rancher
 
@@ -240,14 +240,14 @@ ENV CATTLE_CLI_URL_WINDOWS https://releases.rancher.com/cli2/${CATTLE_CLI_VERSIO
 ARG VERSION=dev
 ENV CATTLE_SERVER_VERSION ${VERSION}
 COPY --from=build /app/rancher /usr/bin/
-COPY entrypoint.sh /usr/bin/
-COPY kustomize.sh /usr/bin/
-COPY jailer.sh /usr/bin/
-COPY k3s-airgap-images.tar /var/lib/rancher/k3s/agent/images/
+COPY --from=build /app/entrypoint.sh /usr/bin/
+COPY --from=build /app/kustomize.sh /usr/bin/
+COPY --from=build /appjailer.sh /usr/bin/
+COPY --from=build /app/k3s-airgap-images.tar /var/lib/rancher/k3s/agent/images/
 RUN chmod +x /usr/bin/entrypoint.sh
 RUN chmod +x /usr/bin/kustomize.sh
 
-COPY data.json /var/lib/rancher-data/driver-metadata/
+COPY --from=build /app/data.json /var/lib/rancher-data/driver-metadata/
 
 ENV CATTLE_AGENT_IMAGE ${IMAGE_REPO}/rancher-agent:${VERSION}
 ENV CATTLE_SERVER_IMAGE ${IMAGE_REPO}/rancher

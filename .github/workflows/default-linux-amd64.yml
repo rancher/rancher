@@ -42,7 +42,7 @@ jobs:
             "COMMIT=${{ env.COMMIT }}"
             "RKE_VERSION=${{ env.RKE_VERSION }}"
           tags: ${{ env.REPOSITORY_OWNER }}/rancher:${{ env.COMMIT }}
-          context: ./package
+          context: .
           file: ./package/Dockerfile
   # test:
   #   runs-on: ubuntu-latest
