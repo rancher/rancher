@@ -12,7 +12,7 @@ env:
   REPOSITORY_OWNER: ${{ github.repository_owner }}
   CATTLE_KDM_BRANCH: dev-v2.8
 jobs:
-  validate:
+  build-server:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
