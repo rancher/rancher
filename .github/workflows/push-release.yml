@@ -67,6 +67,10 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+      - name: Install docker
+        run: |
+          curl -fsSL https://get.docker.com -o /tmp/get-docker.sh
+          sh /tmp/get-docker.sh
       # - name: "Read secrets"
       #   uses: rancher-eio/read-vault-secrets@main
       #   with:
