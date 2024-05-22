@@ -1,22 +1,7 @@
 name: default-linux-amd64
 on: [pull_request]
 env:
-  ARCH: amd64
-  CATTLE_HELM_VERSION: v2.16.8-rancher2
-  CATTLE_MACHINE_VERSION: v0.15.0-rancher109
-  CATTLE_K3S_VERSION: v1.27.10+k3s2
-  HELM_UNITTEST_VERSION: 0.3.2
-  HELM_VERSION: v3.12.3
-  KUSTOMIZE_VERSION: v5.0.1
-  K3D_VERSION: v5.4.6
-  CATTLE_KDM_BRANCH: dev-v2.7
-  HELM_URL_V2: https://github.com/rancher/helm/releases/downloadv/2.16.8-rancher2/rancher-helm
-  HELM_URL_V3: https://get.helm.sh/helm-v3.12.3-linux-amd64.tar.gz
-  TILLER_URL: https://github.com/rancher/helm/releases/download/2.16.8-rancher2/rancher-tiller
-  KUSTOMIZE_URL: https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/v5.0.1/kustomize_v5.0.1_linux_amd64.tar.gz
-  GIT_TAG: ${{ github.ref_name }}
   COMMIT: ${{ github.sha }}
-  BRANCH: ${{ github.ref }}
   REPOSITORY_OWNER: ${{ github.repository_owner }}
 jobs:
   # validate:
@@ -48,10 +33,10 @@ jobs:
         with:
           push: false
           build-args: |
-            "VERSION=${{ env.GIT_TAG }}"
+            "VERSION=${{ env.COMMIT }}"
             "COMMIT=${{ env.COMMIT }}"
             "RKE_VERSION=${{ env.RKE_VERSION }}"
-          tags: ${{ env.REPOSITORY_OWNER }}/rancher:${{ env.GIT_TAG }}
+          tags: ${{ env.REPOSITORY_OWNER }}/rancher:${{ env.COMMIT }}
           context: ./package
           file: Dockerfile
   # test:
