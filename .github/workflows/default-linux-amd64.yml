@@ -86,6 +86,7 @@ jobs:
           path: /tmp/rancher-agent.tar
           retention-days: 1
   test:
+    needs: [build-agent]
     runs-on: ubuntu-latest
     container: registry.suse.com/bci/golang:1.20
     steps:
@@ -127,7 +128,7 @@ jobs:
         run: |
           mkdir -p bin
           id=$(docker create ${{ env.REPOSITORY_OWNER }}/rancher:${{ env.COMMIT }})
-          docker cp "$id:rancher" ./bin
+          docker cp "$id:/usr/bin/rancher" ./bin
           docker rm -v "$id"
       - name: test
         run: ./scripts/test
