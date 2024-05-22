@@ -32,7 +32,7 @@ jobs:
       - name: Create k3s images file
         run: touch package/k3s-airgap-images.tar
       - name: Download data.json
-        run: curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${{ env.CATTLE_KDM_BRANCH }}/data.json > ./package/data.json
+        run: curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${{ env.CATTLE_KDM_BRANCH }}/data.json > ./data.json
       - name: Build Server
         uses: docker/build-push-action@v5
         with:
