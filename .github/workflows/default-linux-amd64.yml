@@ -40,7 +40,7 @@ jobs:
             "VERSION=${{ env.COMMIT }}"
             "COMMIT=${{ env.COMMIT }}"
             "RKE_VERSION=${{ env.RKE_VERSION }}"
-          tags: ${{ env.REPOSITORY_OWNER }}/rancher:${{ env.COMMIT }}
+          tags: ${{ env.REPOSITORY_OWNER }}/rancher:dev
           context: .
           file: ./package/Dockerfile
           outputs: type=docker,dest=/tmp/rancher.tar
@@ -74,8 +74,7 @@ jobs:
           build-args: |
             "VERSION=${{ env.COMMIT }}"
             "RANCHER_REPO=${{ env.REPOSITORY_OWNER }}"
-            "RANCHER_TAG=${{ env.COMMIT }}"
-          tags: ${{ env.REPOSITORY_OWNER }}/rancher-agent:${{ env.COMMIT }}
+          tags: ${{ env.REPOSITORY_OWNER }}/rancher-agent:dev
           context: .
           file: ./package/Dockerfile.agent
           outputs: type=docker,dest=/tmp/rancher-agent.tar
