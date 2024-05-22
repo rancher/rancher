@@ -62,11 +62,12 @@ jobs:
       - name: Download rancher image
         uses: actions/download-artifact@v4
         with:
-          name: rancher-${{ github.run_id }}
+          # name: rancher-${{ github.run_id }}
+          run-id: 9184324117
           path: /tmp
       - name: Load image
         run: |
-          docker load --input /tmp/rancher-${{ github.run_id }}.tar
+          docker load --input /tmp/rancher.tar
           docker image ls -a   
       - name: Build agent
         uses: docker/build-push-action@v5
