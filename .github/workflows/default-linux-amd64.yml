@@ -38,7 +38,7 @@ jobs:
             "RKE_VERSION=${{ env.RKE_VERSION }}"
           tags: ${{ env.REPOSITORY_OWNER }}/rancher:${{ env.COMMIT }}
           context: ./package
-          file: Dockerfile
+          file: ./package/Dockerfile
   # test:
   #   runs-on: ubuntu-latest
   #   container: registry.suse.com/bci/golang:1.20
