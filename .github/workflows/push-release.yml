@@ -63,6 +63,7 @@ jobs:
             "VERSION=${{ env.COMMIT }}"
             "COMMIT=${{ env.COMMIT }}"
             "RKE_VERSION=${{ env.RKE_VERSION }}"
+            "ARCH=${{ matrix.arch }}"
           tags: ${{ env.IMAGE }}:${{ env.TAG }}-${{ matrix.arch }}
           context: .
           platforms: "${{ matrix.os }}/${{ matrix.arch }}"
