@@ -1,3 +1,4 @@
+ARG ARCH
 FROM --platform=$BUILDPLATFORM registry.suse.com/bci/golang:1.20 as build
 ARG VERSION
 ARG COMMIT
@@ -30,7 +31,6 @@ RUN mkdir /root/.kube && \
     ln -s /usr/bin/rancher /usr/bin/ensure-default-admin
 WORKDIR /var/lib/rancher
 
-ARG ARCH=amd64
 ARG ETCD_UNSUPPORTED_ARCH
 ARG IMAGE_REPO=rancher
 ARG SYSTEM_CHART_DEFAULT_BRANCH=dev-v2.8
