@@ -72,18 +72,15 @@ func (g *GenOIDCProvider) GetPrincipal(principalID string, token v3.Token) (v3.P
 	var p v3.Principal
 
 	// parsing id to get the external id and type. Example genericoidc_<user|group>://<user sub | group name>
-	var externalID string
-	parts := strings.SplitN(principalID, ":", 2)
-	if len(parts) != 2 {
-		return p, errors.Errorf("invalid id %v", principalID)
+	principalScheme, externalID, found := strings.Cut(principalID, "://")
+	if !found {
+		return p, fmt.Errorf("invalid principal id: %s", principalID)
 	}
-	externalID = strings.TrimPrefix(parts[1], "//")
-	parts = strings.SplitN(parts[0], "_", 2)
-	if len(parts) != 2 {
-		return p, errors.Errorf("invalid id %v", principalID)
+	provider, principalType, found := strings.Cut(principalScheme, "_")
+	if !found {
+		return p, fmt.Errorf("invalid principal scheme: %s", principalScheme)
 	}
-	provider := parts[0]
-	principalType := parts[1]
+
 	if externalID == "" && principalType == "" {
 		return p, fmt.Errorf("invalid id %v", principalID)
 	}
