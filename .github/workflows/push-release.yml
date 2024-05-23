@@ -1,4 +1,4 @@
-name: push-release-amd64
+name: build-docker-images
 on: 
   push:
     branches:
@@ -10,47 +10,50 @@ env:
   TAG: ${{ github.ref_name }}
   COMMIT: ${{ github.sha }}
   REPOSITORY_OWNER: ${{ github.repository_owner }}
+  IMAGE: ${{ github.repository_owner }}/rancher
   CATTLE_KDM_BRANCH: dev-v2.8
 jobs:
-  build-server-amd64:
+  build-server:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [linux]
+        arch: [amd64, arm64]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      # - name: "Read secrets"
-      #   uses: rancher-eio/read-vault-secrets@main
-      #   with:
-      #     secrets: |
-      #       secret/data/github/repo/${{ github.repository }}/dockerhub/${{ github.repository_owner }}/credentials username | DOCKER_USERNAME ;
-      #       secret/data/github/repo/${{ github.repository }}/dockerhub/${{ github.repository_owner }}/credentials password | DOCKER_PASSWORD
-
-      - name: Docker Registry Login
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Set Up RKE_VERSION env
-        run: echo "RKE_VERSION=$(grep -m1 'github.com/rancher/rke' go.mod | awk '{print $2}')" >> "$GITHUB_ENV"
-
-      - name: Create k3s images file
-        run: touch k3s-airgap-images.tar
-
-      - name: Download data.json
-        run: curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${{ env.CATTLE_KDM_BRANCH }}/data.json > ./data.json
-
-      - name: Tag name
+      - name: Setup Environment Variables
         run: |
+          echo "ARCH=${{ matrix.arch }}" >> "$GITHUB_ENV"
+
+          echo "RKE_VERSION=$(grep -m1 'github.com/rancher/rke' go.mod | awk '{print $2}')" >> "$GITHUB_ENV"
+
           ref_name="${{ github.ref_name }}"
           prefix="release/"
           if [[ "$ref_name" == release/v* ]]; then
             TAG=${ref_name#$prefix}-${{ github.sha }}-head
             echo "TAG=$TAG" >> "$GITHUB_ENV"
           fi
-
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          flavor: |
+            latest=false
+      - name: Docker Registry Login
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Create k3s images file
+        run: touch k3s-airgap-images.tar
+      - name: Download data.json
+        run: curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${{ env.CATTLE_KDM_BRANCH }}/data.json > ./data.json
       - name: Build and export server
         uses: docker/build-push-action@v5
         with:
@@ -59,101 +62,48 @@ jobs:
             "VERSION=${{ env.COMMIT }}"
             "COMMIT=${{ env.COMMIT }}"
             "RKE_VERSION=${{ env.RKE_VERSION }}"
-          tags: ${{ env.REPOSITORY_OWNER }}/rancher:${{ env.TAG }}
+          tags: ${{ env.IMAGE }}:${{ env.TAG }}
           context: .
+          platforms: "${{ matrix.os }}/${{ matrix.arch }}"
           file: ./package/Dockerfile
-  build-server-arm64:
-    runs-on: self-hosted
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Install docker
-        run: |
-          curl -fsSL https://get.docker.com -o /tmp/get-docker.sh
-          sh /tmp/get-docker.sh
-      # - name: "Read secrets"
-      #   uses: rancher-eio/read-vault-secrets@main
-      #   with:
-      #     secrets: |
-      #       secret/data/github/repo/${{ github.repository }}/dockerhub/${{ github.repository_owner }}/credentials username | DOCKER_USERNAME ;
-      #       secret/data/github/repo/${{ github.repository }}/dockerhub/${{ github.repository_owner }}/credentials password | DOCKER_PASSWORD
+  # build-agent-amd64:
+  #   needs: [build-server]
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
+  #     # - name: "Read secrets"
+  #     #   uses: rancher-eio/read-vault-secrets@main
+  #     #   with:
+  #     #     secrets: |
+  #     #       secret/data/github/repo/${{ github.repository }}/dockerhub/${{ github.repository_owner }}/credentials username | DOCKER_USERNAME ;
+  #     #       secret/data/github/repo/${{ github.repository }}/dockerhub/${{ github.repository_owner }}/credentials password | DOCKER_PASSWORD
 
-      - name: Docker Registry Login
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
+  #     - name: Docker Registry Login
+  #       uses: docker/login-action@v3
+  #       with:
+  #         username: ${{ secrets.DOCKER_USERNAME }}
+  #         password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+  #     - name: Set up Docker Buildx
+  #       uses: docker/setup-buildx-action@v3
 
-      - name: Set Up RKE_VERSION env
-        run: echo "RKE_VERSION=$(grep -m1 'github.com/rancher/rke' go.mod | awk '{print $2}')" >> "$GITHUB_ENV"
+  #     - name: Tag name
+  #       run: |
+  #         ref_name="${{ github.ref_name }}"
+  #         prefix="release/"
+  #         if [[ "$ref_name" == release/v* ]]; then
+  #           TAG=${ref_name#$prefix}-${{ github.sha }}-head
+  #           echo "TAG=$TAG" >> "$GITHUB_ENV"
+  #         fi
 
-      - name: Create k3s images file
-        run: touch k3s-airgap-images.tar
-
-      - name: Download data.json
-        run: curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${{ env.CATTLE_KDM_BRANCH }}/data.json > ./data.json
-
-      - name: Tag name
-        run: |
-          ref_name="${{ github.ref_name }}"
-          prefix="release/"
-          if [[ "$ref_name" == release/v* ]]; then
-            TAG=${ref_name#$prefix}-${{ github.sha }}-head
-            echo "TAG=$TAG" >> "$GITHUB_ENV"
-          fi
-
-      - name: Build and export server
-        uses: docker/build-push-action@v5
-        with:
-          push: true
-          build-args: |
-            "VERSION=${{ env.COMMIT }}"
-            "COMMIT=${{ env.COMMIT }}"
-            "RKE_VERSION=${{ env.RKE_VERSION }}"
-          tags: ${{ env.REPOSITORY_OWNER }}/rancher:${{ env.TAG }}
-          context: .
-          file: ./package/Dockerfile
-  build-agent-amd64:
-    needs: [build-server-amd64]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      # - name: "Read secrets"
-      #   uses: rancher-eio/read-vault-secrets@main
-      #   with:
-      #     secrets: |
-      #       secret/data/github/repo/${{ github.repository }}/dockerhub/${{ github.repository_owner }}/credentials username | DOCKER_USERNAME ;
-      #       secret/data/github/repo/${{ github.repository }}/dockerhub/${{ github.repository_owner }}/credentials password | DOCKER_PASSWORD
-
-      - name: Docker Registry Login
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Tag name
-        run: |
-          ref_name="${{ github.ref_name }}"
-          prefix="release/"
-          if [[ "$ref_name" == release/v* ]]; then
-            TAG=${ref_name#$prefix}-${{ github.sha }}-head
-            echo "TAG=$TAG" >> "$GITHUB_ENV"
-          fi
-
-      - name: Build and export server
-        uses: docker/build-push-action@v5
-        with:
-          push: true
-          build-args: |
-            "VERSION=${{ env.COMMIT }}"
-            "RANCHER_REPO=${{ env.REPOSITORY_OWNER }}"
-          tags: ${{ env.REPOSITORY_OWNER }}/rancher-agent:${{ env.TAG }}
-          context: .
-          file: ./package/Dockerfile.agent
+  #     - name: Build and export server
+  #       uses: docker/build-push-action@v5
+  #       with:
+  #         push: true
+  #         build-args: |
+  #           "VERSION=${{ env.COMMIT }}"
+  #           "RANCHER_REPO=${{ env.REPOSITORY_OWNER }}"
+  #         tags: ${{ env.REPOSITORY_OWNER }}/rancher-agent:${{ env.TAG }}
+  #         context: .
+  #         file: ./package/Dockerfile.agent
