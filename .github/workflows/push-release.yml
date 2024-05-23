@@ -88,6 +88,14 @@ jobs:
       contents: read
       id-token: write
     steps:
+      - name: Setup Environment variables
+        run: |
+          ref_name="${{ github.ref_name }}"
+          prefix="release/"
+          if [[ "$ref_name" == release/v* ]]; then
+            TAG=${ref_name#$prefix}-${{ github.sha }}-head
+            echo "TAG=$TAG" >> "$GITHUB_ENV"
+          fi
       - name: Download digests
         uses: actions/download-artifact@v4
         with:
