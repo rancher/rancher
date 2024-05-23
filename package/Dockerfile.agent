@@ -21,7 +21,7 @@ RUN go build -tags "${TAGS}" -ldflags "${LDFLAGS}" -o agent ./cmd/agent
 FROM ${RANCHER_IMAGE} as rancher
 
 FROM registry.suse.com/bci/bci-base:15.5
-ARG ARCH=amd64
+ARG ARCH
 
 ENV KUBECTL_VERSION v1.25.12
 RUN zypper -n install --no-recommends curl ca-certificates jq git-core hostname iproute2 vim-small less \
