@@ -31,7 +31,7 @@ jobs:
           ref_name="${{ github.ref_name }}"
           prefix="release/"
           if [[ "$ref_name" == release/v* ]]; then
-            TAG=${ref_name#$prefix}-${{ github.sha }}-head
+            TAG=${ref_name#$prefix}-${{ github.sha }}-head-${{ env.ARCH }}
             echo "TAG=$TAG" >> "$GITHUB_ENV"
           fi
       - name: Docker meta
@@ -92,7 +92,10 @@ jobs:
           password: ${{ secrets.DOCKER_PASSWORD }}
       - name: Create and Push manifest
         run: |
-          docker manifest create ${{ env.IMAGE }}:${{ env.TAG }} ${{ env.IMAGE }}:${{ env.TAG }} 
+          docker manifest create ${{ env.IMAGE }}:${{ env.TAG }}-amd64 \
+            --amend ${{ env.IMAGE }}:${{ env.TAG }}-arm64 \
+            --amend ${{ env.IMAGE }}:${{ env.TAG }}-amd64
+
           docker manifest push ${{ env.IMAGE }}:${{ env.TAG }}
   # build-agent-amd64:
   #   needs: [build-server]
