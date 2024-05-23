@@ -15,11 +15,17 @@ env:
 jobs:
   build-server:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [linux]
+        arch: [amd64, arm64]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Setup Environment Variables
         run: |
+          echo "ARCH=${{ matrix.arch }}" >> "$GITHUB_ENV"
+
           echo "RKE_VERSION=$(grep -m1 'github.com/rancher/rke' go.mod | awk '{print $2}')" >> "$GITHUB_ENV"
 
           ref_name="${{ github.ref_name }}"
@@ -57,11 +63,70 @@ jobs:
             "VERSION=${{ env.COMMIT }}"
             "COMMIT=${{ env.COMMIT }}"
             "RKE_VERSION=${{ env.RKE_VERSION }}"
-          tags: ${{ env.IMAGE }}:${{ env.TAG }}
+          tags: ${{ env.IMAGE }}:${{ env.TAG }}-${{ matrix.arch }}
           context: .
-          platforms: linux/amd64, linux/arm64
+          platforms: "${{ matrix.os }}/${{ matrix.arch }}"
           file: ./package/Dockerfile
           labels: "${{ steps.meta.outputs.labels }}"
+      - name: Export digest
+        run: |
+          mkdir -p /tmp/digests
+          digest="${{ steps.build.outputs.digest }}"
+          touch "/tmp/digests/${digest#sha256:}"
+      - name: Upload digest
+        uses: actions/upload-artifact@v4
+        with:
+          name: "digests-${{ matrix.os }}-${{ matrix.arch }}"
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 7
+          overwrite: true
+  merge-manifest:
+    runs-on: ubuntu-latest
+    needs: [build-server]
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Setup Environment variables
+        run: |
+          ref_name="${{ github.ref_name }}"
+          prefix="release/"
+          if [[ "$ref_name" == release/v* ]]; then
+            TAG=${ref_name#$prefix}-${{ github.sha }}-head
+            echo "TAG=$TAG" >> "$GITHUB_ENV"
+          fi
+      - name: Download digests
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests
+          pattern: digests-*
+          merge-multiple: true
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          flavor: |
+            latest=false
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      - name: Create manifest list and push
+        working-directory: /tmp/digests
+        run: |
+          echo $DOCKER_METADATA_OUTPUT_JSON
+          
+          docker buildx imagetools create -t ${{ env.TAG }} \
+            $(printf '${{ env.IMAGE }}@sha256:%s ' *)
+      - name: Inspect image
+        run: |
+          docker buildx imagetools inspect ${{ env.IMAGE }}:${{ env.TAG }}
   # build-agent-amd64:
   #   needs: [build-server]
   #   runs-on: ubuntu-latest
