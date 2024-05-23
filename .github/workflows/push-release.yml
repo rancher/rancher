@@ -59,7 +59,7 @@ jobs:
             "RKE_VERSION=${{ env.RKE_VERSION }}"
           tags: ${{ env.IMAGE }}:${{ env.TAG }}
           context: .
-          platforms: "linux/amd64,linux/arm64"
+          platforms: linux/amd64, linux/arm64
           file: ./package/Dockerfile
           labels: "${{ steps.meta.outputs.labels }}"
   # build-agent-amd64:
