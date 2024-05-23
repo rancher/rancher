@@ -30,7 +30,7 @@ RUN mkdir /root/.kube && \
     ln -s /usr/bin/rancher /usr/bin/ensure-default-admin
 WORKDIR /var/lib/rancher
 
-ARG ARCH=amd64
+ARG ARCH=$TARGETARCH
 ARG ETCD_UNSUPPORTED_ARCH
 ARG IMAGE_REPO=rancher
 ARG SYSTEM_CHART_DEFAULT_BRANCH=dev-v2.8
