@@ -31,7 +31,7 @@ jobs:
           ref_name="${{ github.ref_name }}"
           prefix="release/"
           if [[ "$ref_name" == release/v* ]]; then
-            TAG=${ref_name#$prefix}-${{ github.sha }}-head-${{ matrix.arch }}
+            TAG=${ref_name#$prefix}-${{ github.sha }}-head
             echo "TAG=$TAG" >> "$GITHUB_ENV"
           fi
       - name: Docker meta
@@ -63,7 +63,7 @@ jobs:
             "VERSION=${{ env.COMMIT }}"
             "COMMIT=${{ env.COMMIT }}"
             "RKE_VERSION=${{ env.RKE_VERSION }}"
-          tags: ${{ env.IMAGE }}:${{ env.TAG }}
+          tags: ${{ env.IMAGE }}:${{ env.TAG }}-${{ matrix.arch }}
           context: .
           platforms: "${{ matrix.os }}/${{ matrix.arch }}"
           file: ./package/Dockerfile
