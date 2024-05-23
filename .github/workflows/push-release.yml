@@ -122,7 +122,7 @@ jobs:
         run: |
           echo $DOCKER_METADATA_OUTPUT_JSON
           
-          docker buildx imagetools create -t ${{ env.TAG }} \
+          docker buildx imagetools create -t ${{ env.REPOSITORY_OWNER }}:${{ env.TAG }} \
             $(printf '${{ env.IMAGE }}@sha256:%s ' *)
       - name: Inspect image
         run: |
