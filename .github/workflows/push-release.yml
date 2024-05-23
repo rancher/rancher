@@ -92,7 +92,7 @@ jobs:
           password: ${{ secrets.DOCKER_PASSWORD }}
       - name: Create and Push manifest
         run: |
-          docker manifest create ${{ env.IMAGE }}:${{ env.TAG }}-amd64 \
+          docker manifest create ${{ env.IMAGE }}:${{ env.TAG }} \
             --amend ${{ env.IMAGE }}:${{ env.TAG }}-arm64 \
             --amend ${{ env.IMAGE }}:${{ env.TAG }}-amd64
 
