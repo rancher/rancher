@@ -7,10 +7,12 @@ import (
 
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
+	"github.com/rancher/shepherd/extensions/clusters/aks"
 	"github.com/rancher/shepherd/extensions/provisioning"
 	"github.com/rancher/shepherd/extensions/provisioninginput"
 	"github.com/rancher/shepherd/extensions/users"
 	password "github.com/rancher/shepherd/extensions/users/passwordgenerator"
+	"github.com/rancher/shepherd/pkg/config"
 	namegen "github.com/rancher/shepherd/pkg/namegenerator"
 	"github.com/rancher/shepherd/pkg/session"
 	"github.com/stretchr/testify/require"
@@ -69,7 +71,10 @@ func (h *HostedAKSClusterProvisioningTestSuite) TestProvisioningHostedAKS() {
 	}
 
 	for _, tt := range tests {
-		clusterObject, err := provisioning.CreateProvisioningAKSHostedCluster(tt.client)
+		var aksClusterConfig aks.ClusterConfig
+		config.LoadConfig(aks.AKSClusterConfigConfigurationFileKey, &aksClusterConfig)
+
+		clusterObject, err := provisioning.CreateProvisioningAKSHostedCluster(tt.client, aksClusterConfig)
 		require.NoError(h.T(), err)
 
 		provisioning.VerifyHostedCluster(h.T(), tt.client, clusterObject)
