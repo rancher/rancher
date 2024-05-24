@@ -9,6 +9,7 @@ on:
 env:
   ARCH: amd64
   TAG: ${{ github.ref_name }}
+  GIT_TAG: ${{ github.ref_name }}
   HEAD_TAG: ${{ github.ref_name }}
   COMMIT: ${{ github.sha }}
   REPOSITORY_OWNER: ${{ github.repository_owner }}
@@ -45,6 +46,14 @@ jobs:
           sudo chmod +x /usr/bin/helm_v3
 
           helm_v3 plugin install https://github.com/helm-unittest/helm-unittest.git --version ${{ env.HELM_UNITTEST_VERSION }}; \
+      - name: Setup Environment Variables
+        run: |
+          ref_name="${{ github.ref_name }}"
+          prefix="release/"
+          if [[ "$ref_name" == release/v* ]]; then
+            GIT_TAG=${ref_name#$prefix}-${{ github.sha }}-head
+            echo "GIT_TAG=$GIT_TAG" >> "$GITHUB_ENV"
+          fi
       - name: Build
         run: ./scripts/chart/build chart
       - name: Validate
