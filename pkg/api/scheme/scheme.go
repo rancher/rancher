@@ -61,7 +61,7 @@ var builders = []runtime.SchemeBuilder{
 	management.SchemeBuilder,
 	cluster.SchemeBuilder,
 	catalog.SchemeBuilder,
-	fleet.SchemeBuilder,
+	fleet.SchemeBuilder.SchemeBuilder,
 	monitoringv1.SchemeBuilder,
 	monitoringv1alpha1.SchemeBuilder,
 	planv1.SchemeBuilder,
