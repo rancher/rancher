@@ -39,7 +39,7 @@ jobs:
         uses: actions/checkout@v4
       - name: Install dependencies
         run: |
-          sudo apt install -y yq
+          sudo snap install -y yq
 
           mkdir /usr/tmp && \
           curl ${HELM_URL_V3} | tar xvzf - --strip-components=1 -C /usr/tmp/ && \
