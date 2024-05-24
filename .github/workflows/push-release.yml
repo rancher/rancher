@@ -33,7 +33,9 @@ jobs:
           prefix="release/"
           if [[ "$ref_name" == release/v* ]]; then
             TAG=${ref_name#$prefix}-${{ github.sha }}-head
+            HEAD_TAG=${ref_name#$prefix}-head
             echo "TAG=$TAG" >> "$GITHUB_ENV"
+            echo "HEAD_TAG=$HEAD_TAG" >> "$GITHUB_ENV"
           fi
       - name: Docker meta
         id: meta
@@ -96,7 +98,9 @@ jobs:
           prefix="release/"
           if [[ "$ref_name" == release/v* ]]; then
             TAG=${ref_name#$prefix}-${{ github.sha }}-head
+            HEAD_TAG=${ref_name#$prefix}-head
             echo "TAG=$TAG" >> "$GITHUB_ENV"
+            echo "HEAD_TAG=$HEAD_TAG" >> "$GITHUB_ENV"
           fi
       - name: Download digests
         uses: actions/download-artifact@v4
@@ -127,10 +131,8 @@ jobs:
       - name: Create head manifest list and push
         run: |
           ref_name="${{ github.ref_name }}"
-          prefix="release/"
           if [[ "$ref_name" == release/v* ]]; then
-            TAG=${ref_name#$prefix}-head
-            docker buildx imagetools create -t ${{ env.IMAGE }}:$TAG \
+            docker buildx imagetools create -t ${{ env.IMAGE }}:${{ env.HEAD_TAG }} \
               $(printf '${{ env.IMAGE }}@sha256:%s ' *)
           fi
       - name: Inspect image
@@ -246,10 +248,8 @@ jobs:
       - name: Create head manifest list and push
         run: |
           ref_name="${{ github.ref_name }}"
-          prefix="release/"
           if [[ "$ref_name" == release/v* ]]; then
-            TAG=${ref_name#$prefix}-head
-            docker buildx imagetools create -t ${{ env.IMAGE_AGENT }}:$TAG \
+            docker buildx imagetools create -t ${{ env.IMAGE_AGENT }}:${{ env.HEAD_TAG }} \
               $(printf '${{ env.IMAGE_AGENT }}@sha256:%s ' *)
           fi
       - name: Inspect image
