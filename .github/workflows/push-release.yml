@@ -130,8 +130,7 @@ jobs:
           prefix="release/"
           if [[ "$ref_name" == release/v* ]]; then
             TAG=${ref_name#$prefix}-head
-            echo "TAG=$TAG" >> "$GITHUB_ENV"
-            docker buildx imagetools create -t ${{ env.IMAGE }}:${{ env.TAG }} \
+            docker buildx imagetools create -t ${{ env.IMAGE }}:$TAG \
               $(printf '${{ env.IMAGE }}@sha256:%s ' *)
           fi
       - name: Inspect image
@@ -250,8 +249,7 @@ jobs:
           prefix="release/"
           if [[ "$ref_name" == release/v* ]]; then
             TAG=${ref_name#$prefix}-head
-            echo "TAG=$TAG" >> "$GITHUB_ENV"
-            docker buildx imagetools create -t ${{ env.IMAGE_AGENT }}:${{ env.TAG }} \
+            docker buildx imagetools create -t ${{ env.IMAGE_AGENT }}:$TAG \
               $(printf '${{ env.IMAGE_AGENT }}@sha256:%s ' *)
           fi
       - name: Inspect image
