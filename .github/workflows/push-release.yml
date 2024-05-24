@@ -41,7 +41,7 @@ jobs:
           sudo snap install yq
 
           curl ${{ env.HELM_URL_V3 }} | tar xvzf - --strip-components=1 -C /tmp/ && \
-          mv /tmp/helm /usr/bin/helm_v3 && \
+          sudo mv /tmp/helm /usr/bin/helm_v3 && \
           sudo chmod +x /usr/bin/helm_v3
 
           helm_v3 plugin install https://github.com/helm-unittest/helm-unittest.git --version ${{ env.HELM_UNITTEST_VERSION }}; \
