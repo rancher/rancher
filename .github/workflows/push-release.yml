@@ -24,8 +24,7 @@ jobs:
         uses: actions/checkout@v4
       - name: Install Dependencies
         run: |
-          zypper -n install gawk
-
+          zypper -n install gawk python311-pip python311-base python311 python311-devel python311-tox libffi-devel libopenssl-devel
           curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.54.2; \
       - name: Validate
         run: ./scripts/validate
