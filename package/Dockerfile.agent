@@ -1,5 +1,5 @@
-ARG RANCHER_TAG=dev
-ARG RANCHER_REPO=rancher
+ARG RANCHER_TAG
+ARG RANCHER_REPO
 ARG RANCHER_IMAGE=${RANCHER_REPO}/rancher:${RANCHER_TAG}
 
 FROM --platform=$BUILDPLATFORM registry.suse.com/bci/golang:1.20 as build

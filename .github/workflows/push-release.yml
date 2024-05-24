@@ -122,10 +122,18 @@ jobs:
       - name: Create manifest list and push
         working-directory: /tmp/digests
         run: |
-          echo $DOCKER_METADATA_OUTPUT_JSON
-          
           docker buildx imagetools create -t ${{ env.IMAGE }}:${{ env.TAG }} \
             $(printf '${{ env.IMAGE }}@sha256:%s ' *)
+      - name: Create head manifest list and push
+        run: |
+          ref_name="${{ github.ref_name }}"
+          prefix="release/"
+          if [[ "$ref_name" == release/v* ]]; then
+            TAG=${ref_name#$prefix}-head
+            echo "TAG=$TAG" >> "$GITHUB_ENV"
+            docker buildx imagetools create -t ${{ env.IMAGE }}:${{ env.TAG }} \
+              $(printf '${{ env.IMAGE }}@sha256:%s ' *)
+          fi
       - name: Inspect image
         run: |
           docker buildx imagetools inspect ${{ env.IMAGE }}:${{ env.TAG }}
@@ -173,6 +181,8 @@ jobs:
           build-args: |
             "VERSION=${{ env.COMMIT }}"
             "ARCH=${{ matrix.arch }}"
+            "RANCHER_TAG=${{ env.TAG }}"
+            "RANCHER_REPO=${{ env.REPOSITORY_OWNER }}"
           tags: ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-${{ matrix.arch }}
           context: .
           platforms: "${{ matrix.os }}/${{ matrix.arch }}"
@@ -219,7 +229,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.IMAGE }}
+          images: ${{ env.IMAGE_AGENT }}
           flavor: |
             latest=false
       - name: Login to Docker Hub
@@ -233,7 +243,17 @@ jobs:
           echo $DOCKER_METADATA_OUTPUT_JSON
           
           docker buildx imagetools create -t ${{ env.IMAGE_AGENT }}:${{ env.TAG }} \
-            $(printf '${{ env.IMAGE }}@sha256:%s ' *)
+            $(printf '${{ env.IMAGE_AGENT }}@sha256:%s ' *)
+      - name: Create head manifest list and push
+        run: |
+          ref_name="${{ github.ref_name }}"
+          prefix="release/"
+          if [[ "$ref_name" == release/v* ]]; then
+            TAG=${ref_name#$prefix}-head
+            echo "TAG=$TAG" >> "$GITHUB_ENV"
+            docker buildx imagetools create -t ${{ env.IMAGE_AGENT }}:${{ env.TAG }} \
+              $(printf '${{ env.IMAGE_AGENT }}@sha256:%s ' *)
+          fi
       - name: Inspect image
         run: |
           docker buildx imagetools inspect ${{ env.IMAGE_AGENT }}:${{ env.TAG }}
