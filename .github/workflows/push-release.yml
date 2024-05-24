@@ -7,6 +7,7 @@ on:
     tags:
       - "v*"
 env:
+  ARCH: amd64
   TAG: ${{ github.ref_name }}
   HEAD_TAG: ${{ github.ref_name }}
   COMMIT: ${{ github.sha }}
@@ -14,6 +15,9 @@ env:
   IMAGE: ${{ github.repository_owner }}/rancher
   IMAGE_AGENT: ${{ github.repository_owner }}/rancher-agent
   CATTLE_KDM_BRANCH: dev-v2.8
+  HELM_UNITTEST_VERSION: 0.3.2
+  HELM_VERSION: v3.13.3
+  HELM_URL_V3: https://get.helm.sh/helm-${HELM_VERSION}-linux-${ARCH}.tar.gz
 jobs:
   validate:
     runs-on: ubuntu-latest
@@ -28,17 +32,38 @@ jobs:
           curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.54.2; \
       - name: Validate
         run: ./scripts/validate
-  test:
+  build-chart:
     runs-on: ubuntu-latest
-    container:
-      image: rancher/dapper:v0.6.0
     steps:
-      - name: Add Git
-        run: apk add -U git
       - name: Checkout code
         uses: actions/checkout@v4
-      - name: Run dapper
-        run: dapper test
+      - name: Install dependencies
+        run: |
+          apt install -y yq
+
+          mkdir /usr/tmp && \
+          curl ${HELM_URL_V3} | tar xvzf - --strip-components=1 -C /usr/tmp/ && \
+          mv /usr/tmp/helm /usr/bin/helm_v3 && \
+          chmod +x /usr/bin/helm_v3
+
+          helm_v3 plugin install https://github.com/helm-unittest/helm-unittest.git --version ${HELM_UNITTEST_VERSION}; \
+      - name: Build
+        run: ./scripts/chart/build chart
+      - name: Validate
+        run: ./scripts/chart/validate
+      - name: Test
+        run: ./scripts/chart/test
+      - name: Package
+        run: ./scripts/chart/package
+      - name: Upload chart
+        uses: actions/upload-artifact@v4
+        with:
+          name: "charts"
+          path: ./bin/chart/*
+          if-no-files-found: error
+          retention-days: 1
+          overwrite: true
+
   # build-server:
   #   runs-on: ubuntu-latest
   #   strategy:
