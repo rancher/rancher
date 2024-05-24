@@ -8,4 +8,4 @@ if [ -z "$(type -p helm_v3)" ]; then
     exit 1
 fi
 
-helm_v3 lint ../../build/chart/rancher
+helm_v3 lint $(dirname $0)/../build/chart/rancher
