@@ -127,11 +127,11 @@ jobs:
       - name: Create manifest list and push
         working-directory: /tmp/digests
         run: |
-          TAGS="-t ${{ env.IMAGE }}:${{ env.TAG }}"
+          images=$(printf '${{ env.IMAGE }}@sha256:%s ' *)
+          docker buildx imagetools create -t ${{ env.IMAGE }}:${{ env.TAG }} $images
           if [[ "${{ github.ref_name }}" == release/v* ]]; then
-            TAGS="$TAGS -t ${{ env.IMAGE }}:${{ env.HEAD_TAG }}"
+            docker buildx imagetools create -t ${{ env.IMAGE }}:${{ env.HEAD_TAG }} $images
           fi
-          docker buildx imagetools create "$TAGS" $(printf '${{ env.IMAGE }}@sha256:%s ' *)
       - name: Create head manifest list and push
         run: |
       - name: Inspect image
@@ -244,11 +244,11 @@ jobs:
             $(printf '${{ env.IMAGE_AGENT }}@sha256:%s ' *)
       - name: Create head manifest list and push
         run: |
-          TAGS="-t ${{ env.IMAGE_AGENT }}:${{ env.TAG }}"
+          images=$(printf '${{ env.IMAGE_AGENT }}@sha256:%s ' *)
+          docker buildx imagetools create -t ${{ env.IMAGE_AGENT }}:${{ env.TAG }} $images
           if [[ "${{ github.ref_name }}" == release/v* ]]; then
-            TAGS="$TAGS -t ${{ env.IMAGE_AGENT }}:${{ env.HEAD_TAG }}"
+            docker buildx imagetools create -t ${{ env.IMAGE_AGENT }}:${{ env.HEAD_TAG }} $images
           fi
-          docker buildx imagetools create "$TAGS" $(printf '${{ env.IMAGE }}@sha256:%s ' *)
       - name: Inspect image
         run: |
           docker buildx imagetools inspect ${{ env.IMAGE_AGENT }}:${{ env.TAG }}
