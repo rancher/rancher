@@ -41,8 +41,7 @@ jobs:
         run: |
           sudo snap install yq
 
-          mkdir /usr/tmp && \
-          curl ${HELM_URL_V3} | tar xvzf - --strip-components=1 -C /usr/tmp/ && \
+          curl ${HELM_URL_V3} | tar xvzf - --strip-components=1 -C /tmp/ && \
           mv /usr/tmp/helm /usr/bin/helm_v3 && \
           sudo chmod +x /usr/bin/helm_v3
 
