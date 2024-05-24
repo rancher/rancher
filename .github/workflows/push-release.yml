@@ -20,8 +20,6 @@ jobs:
     container:
       image: registry.suse.com/bci/golang:1.21
     steps:
-      - name: Add Git
-        run: apk add -U git
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Install Dependencies
