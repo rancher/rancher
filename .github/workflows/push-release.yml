@@ -28,7 +28,17 @@ jobs:
           curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.54.2; \
       - name: Validate
         run: ./scripts/validate
-
+  test:
+    runs-on: ubuntu-latest
+    container:
+      image: rancher/dapper:v0.6.0
+    steps:
+      - name: Add Git
+        run: apk add -U git
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Run dapper
+        run: dapper test
   # build-server:
   #   runs-on: ubuntu-latest
   #   strategy:
@@ -36,8 +46,8 @@ jobs:
   #       os: [linux]
   #       arch: [amd64, arm64]
   #   steps:
-  #     - name: Checkout code
-  #       uses: actions/checkout@v4
+      # - name: Checkout code
+      #   uses: actions/checkout@v4
   #     - name: Setup Environment Variables
   #       run: |
   #         echo "ARCH=${{ matrix.arch }}" >> "$GITHUB_ENV"
