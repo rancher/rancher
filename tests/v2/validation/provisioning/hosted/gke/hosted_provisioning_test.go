@@ -7,10 +7,12 @@ import (
 
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
+	"github.com/rancher/shepherd/extensions/clusters/gke"
 	"github.com/rancher/shepherd/extensions/provisioning"
 	"github.com/rancher/shepherd/extensions/provisioninginput"
 	"github.com/rancher/shepherd/extensions/users"
 	password "github.com/rancher/shepherd/extensions/users/passwordgenerator"
+	"github.com/rancher/shepherd/pkg/config"
 	namegen "github.com/rancher/shepherd/pkg/namegenerator"
 	"github.com/rancher/shepherd/pkg/session"
 	"github.com/stretchr/testify/require"
@@ -68,7 +70,9 @@ func (h *HostedGKEClusterProvisioningTestSuite) TestProvisioningHostedGKE() {
 	}
 
 	for _, tt := range tests {
-		clusterObject, err := provisioning.CreateProvisioningGKEHostedCluster(tt.client)
+		var gkeClusterConfig gke.ClusterConfig
+		config.LoadConfig(gke.GKEClusterConfigConfigurationFileKey, &gkeClusterConfig)
+		clusterObject, err := provisioning.CreateProvisioningGKEHostedCluster(tt.client, gkeClusterConfig)
 		require.NoError(h.T(), err)
 
 		provisioning.VerifyHostedCluster(h.T(), tt.client, clusterObject)
