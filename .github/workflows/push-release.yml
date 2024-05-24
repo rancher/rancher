@@ -8,6 +8,7 @@ on:
       - "v*"
 env:
   TAG: ${{ github.ref_name }}
+  HEAD_TAG: ${{ github.ref_name }}
   COMMIT: ${{ github.sha }}
   REPOSITORY_OWNER: ${{ github.repository_owner }}
   IMAGE: ${{ github.repository_owner }}/rancher
@@ -126,15 +127,13 @@ jobs:
       - name: Create manifest list and push
         working-directory: /tmp/digests
         run: |
-          docker buildx imagetools create -t ${{ env.IMAGE }}:${{ env.TAG }} \
-            $(printf '${{ env.IMAGE }}@sha256:%s ' *)
+          TAGS="-t ${{ env.IMAGE }}:${{ env.TAG }}"
+          if [[ "${{ github.ref_name }}" == release/v* ]]; then
+            TAGS="$TAGS -t ${{ env.IMAGE }}:${{ env.HEAD_TAG }}"
+          fi
+          docker buildx imagetools create "$TAGS" $(printf '${{ env.IMAGE }}@sha256:%s ' *)
       - name: Create head manifest list and push
         run: |
-          ref_name="${{ github.ref_name }}"
-          if [[ "$ref_name" == release/v* ]]; then
-            docker buildx imagetools create -t ${{ env.IMAGE }}:${{ env.HEAD_TAG }} \
-              $(printf '${{ env.IMAGE }}@sha256:%s ' *)
-          fi
       - name: Inspect image
         run: |
           docker buildx imagetools inspect ${{ env.IMAGE }}:${{ env.TAG }}
@@ -241,17 +240,15 @@ jobs:
       - name: Create manifest list and push
         working-directory: /tmp/digests
         run: |
-          echo $DOCKER_METADATA_OUTPUT_JSON
-          
           docker buildx imagetools create -t ${{ env.IMAGE_AGENT }}:${{ env.TAG }} \
             $(printf '${{ env.IMAGE_AGENT }}@sha256:%s ' *)
       - name: Create head manifest list and push
         run: |
-          ref_name="${{ github.ref_name }}"
-          if [[ "$ref_name" == release/v* ]]; then
-            docker buildx imagetools create -t ${{ env.IMAGE_AGENT }}:${{ env.HEAD_TAG }} \
-              $(printf '${{ env.IMAGE_AGENT }}@sha256:%s ' *)
+          TAGS="-t ${{ env.IMAGE_AGENT }}:${{ env.TAG }}"
+          if [[ "${{ github.ref_name }}" == release/v* ]]; then
+            TAGS="$TAGS -t ${{ env.IMAGE_AGENT }}:${{ env.HEAD_TAG }}"
           fi
+          docker buildx imagetools create "$TAGS" $(printf '${{ env.IMAGE }}@sha256:%s ' *)
       - name: Inspect image
         run: |
           docker buildx imagetools inspect ${{ env.IMAGE_AGENT }}:${{ env.TAG }}
