@@ -242,10 +242,6 @@ jobs:
       - name: Create manifest list and push
         working-directory: /tmp/digests
         run: |
-          docker buildx imagetools create -t ${{ env.IMAGE_AGENT }}:${{ env.TAG }} \
-            $(printf '${{ env.IMAGE_AGENT }}@sha256:%s ' *)
-      - name: Create head manifest list and push
-        run: |
           images=$(printf '${{ env.IMAGE_AGENT }}@sha256:%s ' *)
           docker buildx imagetools create -t ${{ env.IMAGE_AGENT }}:${{ env.TAG }} $images
           if [[ "${{ github.ref_name }}" == release/v* ]]; then
