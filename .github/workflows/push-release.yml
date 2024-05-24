@@ -214,7 +214,9 @@ jobs:
           prefix="release/"
           if [[ "$ref_name" == release/v* ]]; then
             TAG=${ref_name#$prefix}-${{ github.sha }}-head
+            HEAD_TAG=${ref_name#$prefix}-head
             echo "TAG=$TAG" >> "$GITHUB_ENV"
+            echo "HEAD_TAG=$HEAD_TAG" >> "$GITHUB_ENV"
           fi
       - name: Download digests
         uses: actions/download-artifact@v4
