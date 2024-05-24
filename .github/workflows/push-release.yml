@@ -16,8 +16,7 @@ env:
   IMAGE_AGENT: ${{ github.repository_owner }}/rancher-agent
   CATTLE_KDM_BRANCH: dev-v2.8
   HELM_UNITTEST_VERSION: 0.3.2
-  HELM_VERSION: v3.13.3
-  HELM_URL_V3: https://get.helm.sh/helm-${HELM_VERSION}-linux-${ARCH}.tar.gz
+  HELM_URL_V3: https://get.helm.sh/helm-v3.13.3-linux-amd64.tar.gz
 jobs:
   # validate:
   #   runs-on: ubuntu-latest
