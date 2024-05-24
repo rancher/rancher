@@ -84,6 +84,7 @@ func (o *OCIRepohandler) onClusterRepoChange(key string, clusterRepo *catalog.Cl
 	newStatus := clusterRepo.Status.DeepCopy()
 	retryPolicy, err := getRetryPolicy(clusterRepo)
 	if err != nil {
+		err = fmt.Errorf("failed to get retry policy: %w", err)
 		return o.setErrorCondition(clusterRepo, err, newStatus)
 	}
 	if o.shouldSkip(clusterRepo, retryPolicy, key) {
@@ -96,11 +97,17 @@ func (o *OCIRepohandler) onClusterRepoChange(key string, clusterRepo *catalog.Cl
 
 	err = ensureIndexConfigMap(clusterRepo, newStatus, o.configMapController)
 	if err != nil {
+		err = fmt.Errorf("failed to ensure index configmap: %w", err)
 		return o.setErrorCondition(clusterRepo, err, newStatus)
 	}
 
 	secret, err := catalogv2.GetSecret(o.secretCacheController, &clusterRepo.Spec, clusterRepo.Namespace)
 	if err != nil {
+		logrus.Errorf("Error while fetching secret for cluster repo %s: %v", clusterRepo.Name, err)
+		reason := apierrors.ReasonForError(err)
+		if reason != metav1.StatusReasonUnknown {
+			err = fmt.Errorf("failed to fetch secret: %s", reason)
+		}
 		return o.setErrorCondition(clusterRepo, err, newStatus)
 	}
 
@@ -114,11 +121,12 @@ func (o *OCIRepohandler) onClusterRepoChange(key string, clusterRepo *catalog.Cl
 	downloadTime := metav1.Now()
 	index, err = getIndexfile(clusterRepo.Status, clusterRepo.Spec, o.configMapController, owner, clusterRepo.Namespace)
 	if err != nil {
-		return o.setErrorCondition(clusterRepo, err, newStatus)
+		return o.setErrorCondition(clusterRepo, fmt.Errorf("error while getting indexfile: %w", err), newStatus)
 	}
 	originalIndexBytes, err := json.Marshal(index)
 	if err != nil {
-		return o.setErrorCondition(clusterRepo, err, newStatus)
+		logrus.Errorf("Error while marshalling indexfile for cluster repo %s: %v", clusterRepo.Name, err)
+		return o.setErrorCondition(clusterRepo, fmt.Errorf("error while reading indexfile"), newStatus)
 	}
 	index, err = oci.GenerateIndex(clusterRepo.Spec.URL, secret, clusterRepo.Spec, *newStatus, index)
 	// If there is 401 or 403 error code, then we don't reconcile further and wait for 6 hours interval
@@ -151,14 +159,7 @@ func (o *OCIRepohandler) onClusterRepoChange(key string, clusterRepo *catalog.Cl
 	}
 	// If there is an error, we wait for the next interval to happen.
 	if err != nil {
-		errResp := &errcode.ErrorResponse{
-			Errors: []errcode.Error{
-				{
-					Message: err.Error(),
-				},
-			},
-		}
-		return o.setConditionWithInterval(clusterRepo, errResp, newStatus, nil)
+		return o.setConditionWithInterval(clusterRepo, err, newStatus, nil)
 	}
 	if index == nil || len(index.Entries) <= 0 {
 		err = errors.New("there are no helm charts in the repository specified")
@@ -167,14 +168,15 @@ func (o *OCIRepohandler) onClusterRepoChange(key string, clusterRepo *catalog.Cl
 
 	newIndexBytes, err := json.Marshal(index)
 	if err != nil {
-		return o.setErrorCondition(clusterRepo, err, newStatus)
+		logrus.Errorf("Error while marshalling indexfile for cluster repo %s: %v", clusterRepo.Name, err)
+		return o.setErrorCondition(clusterRepo, fmt.Errorf("error while reading indexfile"), newStatus)
 	}
 	// Only update, if the index got updated
 	if !bytes.Equal(originalIndexBytes, newIndexBytes) {
 		index.SortEntries()
 		cm, err := createOrUpdateMap(clusterRepo.Namespace, index, owner, o.apply)
 		if err != nil {
-			return o.setErrorCondition(clusterRepo, err, newStatus)
+			return o.setErrorCondition(clusterRepo, fmt.Errorf("error while creating or updating confimap"), newStatus)
 		}
 
 		newStatus.URL = clusterRepo.Spec.URL
@@ -184,7 +186,7 @@ func (o *OCIRepohandler) onClusterRepoChange(key string, clusterRepo *catalog.Cl
 		newStatus.DownloadTime = downloadTime
 	}
 
-	return o.setErrorCondition(clusterRepo, err, newStatus)
+	return o.setErrorCondition(clusterRepo, nil, newStatus)
 }
 
 // setErrorCondition is only called when error happens in the handler, and
@@ -226,17 +228,25 @@ func (o *OCIRepohandler) setErrorCondition(clusterRepo *catalog.ClusterRepo, err
 
 // setConditionWithInterval is called to reenqueue the object
 // after the interval of 6 hours.
-func (o *OCIRepohandler) setConditionWithInterval(clusterRepo *catalog.ClusterRepo, err *errcode.ErrorResponse, newStatus *catalog.RepoStatus, backoff *time.Duration) (*catalog.ClusterRepo, error) {
-	if backoff != nil {
-		err.Errors = append(err.Errors, errcode.Error{Message: fmt.Sprintf(" will retry will after %s", backoff)})
+func (o *OCIRepohandler) setConditionWithInterval(clusterRepo *catalog.ClusterRepo, err error, newStatus *catalog.RepoStatus, backoff *time.Duration) (*catalog.ClusterRepo, error) {
+	var errResp *errcode.ErrorResponse
+	var newErr error
+	if errors.As(err, &errResp) {
+		errorMsg := fmt.Sprintf("error %d: %s", errResp.StatusCode, http.StatusText(errResp.StatusCode))
+		if backoff != nil {
+			errorMsg = fmt.Sprintf("%s. %s", errorMsg, fmt.Sprintf("Will retry after %s", backoff.Round(time.Second)))
+		} else {
+			errorMsg = fmt.Sprintf("%s. %s", errorMsg, fmt.Sprintf("Will retry after %s", interval.Round(time.Second)))
+		}
+		newErr = fmt.Errorf(errorMsg)
 	} else {
-		err.Errors = append(err.Errors, errcode.Error{Message: fmt.Sprintf(" will retry will after %s", interval)})
+		newErr = err
 	}
 	ociDownloaded := condition.Cond(catalog.OCIDownloaded)
 	if apierrors.IsConflict(err) {
 		ociDownloaded.SetError(newStatus, "", nil)
 	} else {
-		ociDownloaded.SetError(newStatus, "", err)
+		ociDownloaded.SetError(newStatus, "", newErr)
 	}
 	newStatus.ObservedGeneration = clusterRepo.Generation
 
@@ -301,15 +311,18 @@ func getIndexfile(clusterRepoStatus catalog.RepoStatus,
 	}
 	gz, err := gzip.NewReader(bytes.NewBuffer(data))
 	if err != nil {
-		return indexFile, err
+		logrus.Errorf("failed to create reader for index file for URL %s: %v", clusterRepoSpec.URL, err)
+		return indexFile, fmt.Errorf("failed to read indexfile for cluster repo")
 	}
 	defer gz.Close()
 	data, err = io.ReadAll(gz)
 	if err != nil {
-		return indexFile, err
+		logrus.Errorf("failed to read index file for URL %s: %v", clusterRepoSpec.URL, err)
+		return indexFile, fmt.Errorf("failed to read indexfile for cluster repo")
 	}
 	if err := json.Unmarshal(data, indexFile); err != nil {
-		return indexFile, err
+		logrus.Errorf("failed to unmarshal index file for URL %s: %v", clusterRepoSpec.URL, err)
+		return indexFile, fmt.Errorf("failed to unmarshal indexfile for cluster repo")
 	}
 
 	return indexFile, nil
