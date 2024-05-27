@@ -114,15 +114,22 @@ jobs:
         run: touch k3s-airgap-images.tar
       - name: Download data.json
         run: curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${{ env.CATTLE_KDM_BRANCH }}/data.json > ./data.json
+      - name: Build server
+        run: |
+          tags="k8s"
+          linkflags="-extldflags -static"
+          default_values="{\"rke-version\":\"${{ env.RKE_VERSION }}\"}"
+          version=${{ env.commit }}
+          commit=${{ env.commit }}
+          ldflags="-X github.com/rancher/rancher/pkg/version.Version=${version} -X github.com/rancher/rancher/pkg/version.GitCommit=${commit} -X github.com/rancher/rancher/pkg/settings.InjectDefaults=${default_values} ${linkflags}"
+          mkdir -p bin
+          CGO_ENABLED=0 GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -tags "${tags}" -ldflags "${ldflags}" -o bin/rancher
       - name: Build and export server
         id: build
         uses: docker/build-push-action@v5
         with:
           push: true
           build-args: |
-            "VERSION=${{ env.COMMIT }}"
-            "COMMIT=${{ env.COMMIT }}"
-            "RKE_VERSION=${{ env.RKE_VERSION }}"
             "ARCH=${{ matrix.arch }}"
           tags: ${{ env.IMAGE }}:${{ env.TAG }}-${{ matrix.arch }}
           context: .
