@@ -235,7 +235,7 @@ COPY k3s-airgap-images.tar /var/lib/rancher/k3s/agent/imag
 RUN chmod +x /usr/bin/entrypoint.sh
 RUN chmod +x /usr/bin/kustomize.sh
 
-COPY --from=build /app/data.json /var/lib/rancher-data/driver-metadata/
+COPY data.json /var/lib/rancher-data/driver-metadata/
 
 ENV CATTLE_AGENT_IMAGE ${IMAGE_REPO}/rancher-agent:${VERSION}
 ENV CATTLE_SERVER_IMAGE ${IMAGE_REPO}/rancher
