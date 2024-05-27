@@ -3,11 +3,14 @@ package clients
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net/url"
 	"time"
 
 	"github.com/AzureAD/microsoft-authentication-library-for-go/apps/cache"
 	"github.com/AzureAD/microsoft-authentication-library-for-go/apps/confidential"
+	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/manicminer/hamilton/environments"
 	"github.com/manicminer/hamilton/msgraph"
 	"github.com/manicminer/hamilton/odata"
@@ -112,29 +115,43 @@ func (c azureMSGraphClient) ListGroupMemberships(id string) ([]string, error) {
 func (c azureMSGraphClient) LoginUser(config *v32.AzureADConfig, credential *v32.AzureADLogin) (v3.Principal, []v3.Principal, string, error) {
 	logrus.Debugf("[%s] Started token swap with AzureAD", providerLogPrefix)
 
-	// Acquire the OID just to verify the user.
-	oid, err := oidFromAuthCode(credential.Code, config)
-	if err != nil {
-		return v3.Principal{}, nil, "", err
+	// an empty Principal
+	var zero v3.Principal
+	var oid string
+
+	if credential.IDToken != "" {
+		// Acquire the OID from the IDToken to verify the user
+		oidFromToken, err := oidFromIDToken(credential.IDToken, config)
+		if err != nil {
+			return zero, nil, "", fmt.Errorf("getting OID from IDToken: %w", err)
+		}
+		oid = oidFromToken
+	} else {
+		// Acquire the OID exchanging the Code to verify the user
+		oidFromCode, err := oidFromAuthCode(credential.Code, config)
+		if err != nil {
+			return zero, nil, "", fmt.Errorf("getting OID from AuthCode: %w", err)
+		}
+		oid = oidFromCode
 	}
 	logrus.Debugf("[%s] Completed token swap with AzureAD", providerLogPrefix)
 
 	logrus.Debugf("[%s] Started getting user info from AzureAD", providerLogPrefix)
 	userPrincipal, err := c.GetUser(oid)
 	if err != nil {
-		return v3.Principal{}, nil, "", err
+		return zero, nil, "", fmt.Errorf("getting UserInfo from Azure: %w", err)
 	}
 	userPrincipal.Me = true
 	logrus.Debugf("[%s] Completed getting user info from AzureAD", providerLogPrefix)
 
 	userGroups, err := c.ListGroupMemberships(GetPrincipalID(userPrincipal))
 	if err != nil {
-		return v3.Principal{}, nil, "", err
+		return zero, nil, "", fmt.Errorf("listing group membeships: %w", err)
 	}
 
 	groupPrincipals, err := UserGroupsToPrincipals(c, userGroups)
 	if err != nil {
-		return v3.Principal{}, nil, "", err
+		return zero, nil, "", fmt.Errorf("converting groups to principals: %w", err)
 	}
 
 	// Return an empty string for the provider token, so that it does not get saved in a secret later, like users'
@@ -172,8 +189,8 @@ func (a *authorizer) Token() (*oauth2.Token, error) {
 	}, nil
 }
 
-// oidFromAuthCode verifies a user.
-func oidFromAuthCode(token string, config *v32.AzureADConfig) (string, error) {
+// oidFromAuthCode exchanges the AuthCode for a IDToken, returning the user OID
+func oidFromAuthCode(code string, config *v32.AzureADConfig) (string, error) {
 	cred, err := confidential.NewCredFromSecret(config.ApplicationSecret)
 	if err != nil {
 		return "", fmt.Errorf("could not create a cred from a secret: %w", err)
@@ -183,12 +200,45 @@ func oidFromAuthCode(token string, config *v32.AzureADConfig) (string, error) {
 		return "", err
 	}
 	scope := fmt.Sprintf("%s/%s", config.GraphEndpoint, ".default")
-	authResult, err := confidentialClientApp.AcquireTokenByAuthCode(context.Background(), token, config.RancherURL, []string{scope})
+	authResult, err := confidentialClientApp.AcquireTokenByAuthCode(context.Background(), code, config.RancherURL, []string{scope})
 	if err != nil {
 		return "", err
 	}
 
 	return authResult.IDToken.Oid, nil
+}
+
+// oidFromIDToken verifies the IDToken, returning the user OID
+func oidFromIDToken(token string, config *v32.AzureADConfig) (string, error) {
+	issuer, err := url.JoinPath(config.Endpoint, config.TenantID, "/v2.0")
+	if err != nil {
+		return "", fmt.Errorf("joining auth provider path: %w", err)
+	}
+
+	ctx := context.Background()
+	provider, err := oidc.NewProvider(ctx, issuer)
+	if err != nil {
+		return "", fmt.Errorf("creating OIDC provider: %w", err)
+	}
+
+	verifier := provider.Verifier(&oidc.Config{ClientID: config.ApplicationID})
+	idToken, err := verifier.Verify(ctx, token)
+	if err != nil {
+		return "", fmt.Errorf("verifying user ID Token: %w", err)
+	}
+
+	var claims struct {
+		OID string `json:"oid"`
+	}
+
+	if err = idToken.Claims(&claims); err != nil {
+		return "", fmt.Errorf("extracting claims: %w", err)
+	}
+
+	if claims.OID == "" {
+		return "", errors.New("empty user OID")
+	}
+	return claims.OID, nil
 }
 
 // AccessTokenCache is responsible for reading (replacing) the access token from some storage (a secret in the database,
