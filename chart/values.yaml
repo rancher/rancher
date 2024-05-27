@@ -171,12 +171,19 @@ postDelete:
 # Set a bootstrap password. If leave empty, a random password will be generated.
 bootstrapPassword: ""
 
+startupProbe:
+  ## should be ready within 2 minutes
+  timeoutSeconds: 5
+  periodSeconds: 10
+  failureThreshold: 12
 livenessProbe:
-  initialDelaySeconds: 60
+  timeoutSeconds: 5
   periodSeconds: 30
+  failureThreshold: 5
 readinessProbe:
-  initialDelaySeconds: 5
+  timeoutSeconds: 5
   periodSeconds: 30
+  failureThreshold: 5
 
 global:
   cattle:
