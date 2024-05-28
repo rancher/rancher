@@ -274,7 +274,7 @@ jobs:
           fi
       - name: Download digests
         uses: actions/download-artifact@v4
-        witha
+        with:
           path: /tmp/digests
           pattern: digests-agent-*
           merge-multiple: true
