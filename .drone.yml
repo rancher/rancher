@@ -8,7 +8,7 @@ platform:
 
 environment:
   V2PROV_TEST_DIST: "k3s"
-  V2PROV_TEST_RUN_REGEX: "^Test_(General|Provisioning)_.*$"
+  V2PROV_TEST_RUN_REGEX: "^Test_(General|Provisioning|Fleet)_.*$"
 
 steps:
 - name: provisioning-tests-pr
