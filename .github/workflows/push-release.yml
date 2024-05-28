@@ -227,12 +227,6 @@ jobs:
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-      - name: Download Rancher Data
-        uses: actions/download-artifact@v4
-        with:
-          name: "rancher-data-${{ matrix.os }}-${{ matrix.arch }}"
-          path: ${{ github.workspace }}/rancher/bin/rancher-data
-          merge-multiple: true
       - name: Build and export agent
         id: build
         uses: docker/build-push-action@v5
@@ -244,7 +238,7 @@ jobs:
             "RANCHER_TAG=${{ env.TAG }}"
             "RANCHER_REPO=${{ env.REPOSITORY_OWNER }}"
           tags: ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-${{ matrix.arch }}
-          context: ${{ github.workspace }}/rancher
+          context: .
           platforms: "${{ matrix.os }}/${{ matrix.arch }}"
           file: ./package/Dockerfile.agent
           labels: "${{ steps.meta.outputs.labels }}"
@@ -280,7 +274,7 @@ jobs:
           fi
       - name: Download digests
         uses: actions/download-artifact@v4
-        with:
+        witha
           path: /tmp/digests
           pattern: digests-agent-*
           merge-multiple: true

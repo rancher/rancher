@@ -3,9 +3,9 @@ on:
   - pull_request 
 env:
   ARCH: amd64
-  TAG: ${{ github.sha }}-dirty
-  GIT_TAG: ${{ github.sha }}-dirty
-  HEAD_TAG: ${{ github.sha }}-dirty
+  TAG: v2.8-${{ github.sha }}
+  GIT_TAG: v2.8-${{ github.sha }}
+  HEAD_TAG: v2.8-${{ github.sha }}
   COMMIT: ${{ github.sha }}
   REPOSITORY_OWNER: ${{ github.repository_owner }}
   IMAGE: ${{ github.repository_owner }}/rancher
