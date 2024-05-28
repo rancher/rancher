@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -22,7 +23,6 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
-	"github.com/hashicorp/go-multierror"
 	"github.com/mattn/go-colorable"
 	"github.com/rancher/remotedialer"
 	"github.com/rancher/wrangler/v3/pkg/signals"
@@ -69,15 +69,15 @@ func main() {
 			var bindingErr error
 			err = clean.DuplicateBindings(nil)
 			if err != nil {
-				bindingErr = multierror.Append(bindingErr, err)
+				bindingErr = errors.Join(bindingErr, err)
 			}
 			err = clean.OrphanBindings(nil)
 			if err != nil {
-				bindingErr = multierror.Append(bindingErr, err)
+				bindingErr = errors.Join(bindingErr, err)
 			}
 			err = clean.OrphanCatalogBindings(nil)
 			if err != nil {
-				bindingErr = multierror.Append(bindingErr, err)
+				bindingErr = errors.Join(bindingErr, err)
 			}
 			err = bindingErr
 		} else if os.Getenv("AD_GUID_CLEANUP") == "true" {

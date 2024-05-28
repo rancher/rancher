@@ -2,12 +2,12 @@ package management
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"reflect"
 	"sort"
 	"sync"
 
-	"github.com/hashicorp/go-multierror"
-	"github.com/pkg/errors"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/rbac"
@@ -130,7 +130,7 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 	// TODO enable when groups are "in". they need to be self-service
 
 	if err := rb.reconcileGlobalRoles(wrangler.Mgmt.GlobalRole()); err != nil {
-		return "", errors.Wrap(err, "problem reconciling global roles")
+		return "", fmt.Errorf("problem reconciling global roles: %w", err)
 	}
 
 	// RoleTemplates to be used inside of clusters
@@ -436,7 +436,7 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 	//	addRule().apiGroups("management.cattle.io").resources("clusterevents").verbs("get", "list", "watch")
 
 	if err := rb.reconcileRoleTemplates(wrangler.Mgmt.RoleTemplate()); err != nil {
-		return "", errors.Wrap(err, "problem reconciling role templates")
+		return "", fmt.Errorf("problem reconciling role templates: %w", err)
 	}
 
 	adminName, err := BootstrapAdmin(wrangler)
@@ -518,7 +518,7 @@ func BootstrapAdmin(management *wrangler.Context) (string, error) {
 		// Config map does not exist and no users, attempt to create the default admin user
 		bootstrapPassword, bootstrapPasswordIsGenerated, err := GetBootstrapPassword(context.TODO(), management.K8s.CoreV1().Secrets(cattleNamespace))
 		if err != nil {
-			return "", errors.Wrap(err, "failed to retrieve bootstrap password")
+			return "", fmt.Errorf("failed to retrieve bootstrap password: %w", err)
 		}
 
 		bootstrapPasswordHash, _ := bcrypt.GenerateFromPassword([]byte(bootstrapPassword), bcrypt.DefaultCost)
@@ -534,7 +534,7 @@ func BootstrapAdmin(management *wrangler.Context) (string, error) {
 			MustChangePassword: bootstrapPasswordIsGenerated || bootstrapPassword == "admin",
 		})
 		if err != nil && !apierrors.IsAlreadyExists(err) {
-			return "", errors.Wrap(err, "can not ensure admin user exists")
+			return "", fmt.Errorf("can not ensure admin user exists: %w", err)
 		}
 		if err == nil {
 			var serverURL string
@@ -712,7 +712,7 @@ func addClusterRoleForNamespacedCRDs(management *config.ManagementContext) error
 		},
 	}
 	if err := createOrUpdateClusterRole(management, cr); err != nil {
-		returnErr = multierror.Append(returnErr, err)
+		returnErr = errors.Join(returnErr, err)
 	}
 
 	// ProjectCRDsClusterRole is a CR containing rules for granting restricted-admins access to all CRDs that can be created in a
@@ -735,7 +735,7 @@ func addClusterRoleForNamespacedCRDs(management *config.ManagementContext) error
 		},
 	}
 	if err := createOrUpdateClusterRole(management, cr); err != nil {
-		returnErr = multierror.Append(returnErr, err)
+		returnErr = errors.Join(returnErr, err)
 	}
 	return returnErr
 }
