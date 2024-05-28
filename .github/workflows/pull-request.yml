@@ -77,7 +77,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: "rancher-${{ matrix.os }}-${{ matrix.arch }}"
-          path: /tmp/rancher-${{ matrix.os }}-${{ matrix.arch }}
+          path: /tmp/rancher-${{ matrix.os }}-${{ matrix.arch }}.tar
           if-no-files-found: error
           retention-days: 1
           overwrite: false
