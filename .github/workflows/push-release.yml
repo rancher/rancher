@@ -74,7 +74,7 @@ jobs:
     strategy:
       matrix:
         os: [linux]
-        arch: [amd64, arm64]
+        arch: [arm64]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
