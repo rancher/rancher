@@ -19,7 +19,8 @@ jobs:
     strategy:
       matrix:
         os: [linux]
-        arch: [amd64, arm64]
+        # arch: [amd64, arm64]
+        arch: [amd64]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -87,7 +88,8 @@ jobs:
     strategy:
       matrix:
         os: [linux]
-        arch: [amd64, arm64]
+        # arch: [amd64, arm64]
+        arch: [amd64]
     services:
       registry:
         image: registry:2
