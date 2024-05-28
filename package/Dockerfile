@@ -1,3 +1,20 @@
+FROM --platform=$BUILDPLATFORM registry.suse.com/bci/golang:1.20 as build
+ARG VERSION
+ARG COMMIT
+ARG RKE_VERSION
+ARG CGO_ENABLED=0
+ARG TAGS="k8s"
+ARG LINKFLAGS="-extldflags -static"
+ARG DEFAULT_VALUES="{\"rke-version\":\"${RKE_VERSION}\"}"
+ARG LDFLAGS="-X github.com/rancher/rancher/pkg/version.Version=${VERSION} -X github.com/rancher/rancher/pkg/version.GitCommit=$COMMIT -X github.com/rancher/rancher/pkg/settings.InjectDefaults=$DEFAULT_VALUES $LINKFLAGS"
+ARG TARGETOS
+ARG TARGETARCH
+
+WORKDIR /app
+COPY . .
+RUN go mod download
+RUN GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" -o rancher
+
 FROM registry.suse.com/bci/bci-base:15.5
 
 RUN zypper -n install --no-recommends git-core curl ca-certificates unzip xz gzip sed tar shadow gawk vim-small netcat-openbsd mkisofs openssh-clients && \
@@ -227,15 +244,15 @@ ENV CATTLE_CLI_URL_WINDOWS https://releases.rancher.com/cli2/${CATTLE_CLI_VERSIO
 
 ARG VERSION=dev
 ENV CATTLE_SERVER_VERSION ${VERSION}
-COPY bin/rancher /usr/bin/
-COPY package/entrypoint.sh /usr/bin/
-COPY package/kustomize.sh /usr/bin/
-COPY package/jailer.sh /usr/bin/
-COPY k3s-airgap-images.tar /var/lib/rancher/k3s/agent/imag
+COPY --from=build /app/rancher /usr/bin/
+COPY --from=build /app/package/entrypoint.sh /usr/bin/
+COPY --from=build /app/package/kustomize.sh /usr/bin/
+COPY --from=build app/package/jailer.sh /usr/bin/
+COPY --from=build /app/k3s-airgap-images.tar /var/lib/rancher/k3s/agent/imag
 RUN chmod +x /usr/bin/entrypoint.sh
 RUN chmod +x /usr/bin/kustomize.sh
 
-COPY data.json /var/lib/rancher-data/driver-metadata/
+COPY --from=build /app/data.json /var/lib/rancher-data/driver-metadata/
 
 ENV CATTLE_AGENT_IMAGE ${IMAGE_REPO}/rancher-agent:${VERSION}
 ENV CATTLE_SERVER_IMAGE ${IMAGE_REPO}/rancher
