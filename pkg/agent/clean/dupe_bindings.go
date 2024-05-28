@@ -13,13 +13,13 @@ package clean
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"sort"
 	"strings"
 	"sync"
 
+	"github.com/hashicorp/go-multierror"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/management/auth"
 	"github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io"
@@ -181,25 +181,25 @@ func (bc *dupeBindingsCleanup) cleanObjectDuplicates(bindingType string, newLabe
 
 			crbs, err := bc.clusterRoleBindings.List(metav1.ListOptions{LabelSelector: label})
 			if err != nil {
-				returnErr = errors.Join(returnErr, err)
+				returnErr = multierror.Append(returnErr, err)
 			}
 
 			if len(crbs.Items) > 1 {
 				CRBduplicates += len(crbs.Items) - 1
 				if err := bc.dedupeCRB(crbs.Items); err != nil {
-					returnErr = errors.Join(returnErr, err)
+					returnErr = multierror.Append(returnErr, err)
 				}
 			}
 
 			roleBindings, err := bc.roleBindings.List("", metav1.ListOptions{LabelSelector: label})
 			if err != nil {
-				returnErr = errors.Join(returnErr, err)
+				returnErr = multierror.Append(returnErr, err)
 			}
 
 			if len(roleBindings.Items) > 1 {
 				roleDuplicates, err := bc.dedupeRB(roleBindings.Items)
 				if err != nil {
-					returnErr = errors.Join(returnErr, err)
+					returnErr = multierror.Append(returnErr, err)
 				}
 				RBDupes += roleDuplicates
 			}

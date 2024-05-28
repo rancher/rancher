@@ -1,11 +1,12 @@
 package auth
 
 import (
-	"errors"
 	"fmt"
 	"reflect"
 	"sort"
 
+	"github.com/hashicorp/go-multierror"
+	"github.com/pkg/errors"
 	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/rbac"
@@ -459,7 +460,7 @@ func (m *manager) removeAuthV2Permissions(setID string, owner runtime.Object) er
 		err := m.rbClient.DeleteNamespaced(binding.Namespace, binding.Name, &metav1.DeleteOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
 			// Combine all errors so we try our best to delete everything in the first run
-			returnErr = errors.Join(returnErr, err)
+			returnErr = multierror.Append(returnErr, err)
 		}
 	}
 
@@ -717,7 +718,7 @@ func (m *manager) reconcileDesiredMGMTPlaneRoleBindings(currentRBs, desiredRBs m
 	// If the namespace is terminating don't create RoleBindings
 	ns, err := m.nsLister.Get("", namespace)
 	if err != nil {
-		return fmt.Errorf("couldn't get namespace %v: %w", namespace, err)
+		return errors.Wrapf(err, "couldn't get namespace %v", namespace)
 	}
 	if ns.Status.Phase == corev1.NamespaceTerminating {
 		logrus.Warnf("[%v] Namespace %v is terminating, not creating roleBindings", m.controller, namespace)
@@ -822,7 +823,7 @@ func (m *manager) reconcileManagementPlaneRole(namespace string, resourceToVerbs
 	// If the namespace is terminating, don't create a Role in it
 	ns, err := m.nsLister.Get("", namespace)
 	if err != nil {
-		return fmt.Errorf("couldn't get namespace %v: %w", namespace, err)
+		return errors.Wrapf(err, "couldn't get namespace %v", namespace)
 	}
 	if ns.Status.Phase == corev1.NamespaceTerminating {
 		logrus.Warnf("[%v] Namespace %v is terminating, not creating role", m.controller, namespace)
@@ -842,7 +843,7 @@ func (m *manager) reconcileManagementPlaneRole(namespace string, resourceToVerbs
 		Rules: rules,
 	})
 	if err != nil && !apierrors.IsAlreadyExists(err) {
-		return fmt.Errorf("couldn't create role %v: %w", rt.Name, err)
+		return errors.Wrapf(err, "couldn't create role %v", rt.Name)
 	}
 
 	return nil
@@ -854,10 +855,10 @@ func (m *manager) gatherRoleTemplates(rt *v3.RoleTemplate, roleTemplates map[str
 	for _, rtName := range rt.RoleTemplateNames {
 		subRT, err := m.rtLister.Get("", rtName)
 		if err != nil {
-			return fmt.Errorf("couldn't get RoleTemplate %s: %w", rtName, err)
+			return errors.Wrapf(err, "couldn't get RoleTemplate %s", rtName)
 		}
 		if err := m.gatherRoleTemplates(subRT, roleTemplates); err != nil {
-			return fmt.Errorf("couldn't gather RoleTemplate %s: %w", rtName, err)
+			return errors.Wrapf(err, "couldn't gather RoleTemplate %s", rtName)
 		}
 	}
 

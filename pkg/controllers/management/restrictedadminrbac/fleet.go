@@ -1,10 +1,10 @@
 package restrictedadminrbac
 
 import (
-	"errors"
 	"fmt"
 	"reflect"
 
+	"github.com/hashicorp/go-multierror"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	fleetconst "github.com/rancher/rancher/pkg/fleet"
 	"github.com/rancher/rancher/pkg/rbac"
@@ -44,7 +44,7 @@ func (r *rbaccontroller) ensureRestricedAdminForFleet(key string, obj *v3.Global
 			continue
 		}
 		if err := r.ensureRolebinding(fw.Name, rbac.GetGRBSubject(obj), obj); err != nil {
-			finalError = errors.Join(finalError, err)
+			finalError = multierror.Append(finalError, err)
 		}
 	}
 	return obj, finalError
