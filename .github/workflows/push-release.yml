@@ -20,19 +20,19 @@ env:
   HELM_UNITTEST_VERSION: 0.3.2
   HELM_URL_V3: https://get.helm.sh/helm-v3.13.3-linux-amd64.tar.gz
 jobs:
-  # validate:
-  #   runs-on: ubuntu-latest
-  #   container:
-  #     image: registry.suse.com/bci/golang:1.21
-  #   steps:
-  #     - name: Checkout code
-  #       uses: actions/checkout@v4
-  #     - name: Install Dependencies
-  #       run: |
-  #         zypper -n install gawk python311-pip python311-base python311 python311-devel python311-tox libffi-devel libopenssl-devel
-  #         curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.54.2; \
-  #     - name: Validate
-  #       run: ./scripts/validate
+  validate:
+    runs-on: ubuntu-latest
+    container:
+      image: registry.suse.com/bci/golang:1.21
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Install Dependencies
+        run: |
+          zypper -n install gawk python311-pip python311-base python311 python311-devel python311-tox libffi-devel libopenssl-devel
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.54.2; \
+      - name: Validate
+        run: ./scripts/validate
   build-chart:
     runs-on: ubuntu-latest
     steps:
