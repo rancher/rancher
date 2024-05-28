@@ -1,5 +1,6 @@
 name: pull request
-on: [push]
+on:
+  - pull_request 
 env:
   ARCH: amd64
   TAG: ${{ github.ref_name }}
@@ -60,8 +61,7 @@ jobs:
     strategy:
       matrix:
         os: [linux]
-        # arch: [amd64, arm64]
-        arch: [amd64]
+        arch: [amd64, arm64]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -129,8 +129,7 @@ jobs:
     strategy:
       matrix:
         os: [linux]
-        # arch: [amd64, arm64]
-        arch: [amd64]
+        arch: [amd64, arm64]
     services:
       registry:
         image: registry:2
