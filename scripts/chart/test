@@ -2,6 +2,8 @@
 
 echo "-- chart/test --"
 
+set -ex
+
 # Check for helm
 if [ -z "$(type -p helm_v3)" ]; then
     echo "helm not found. Helm is required to run tests."
