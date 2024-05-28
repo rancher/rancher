@@ -145,7 +145,7 @@ jobs:
             "RANCHER_REPO=${{ env.REPOSITORY_OWNER }}"
             "REGISTRY=localhost:5000"
           tags: ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-${{ matrix.arch }}
-          context: ${{ github.workspace }}/rancher
+          context: .
           platforms: "${{ matrix.os }}/${{ matrix.arch }}"
           file: ./package/Dockerfile.agent
           labels: "${{ steps.meta.outputs.labels }}"
