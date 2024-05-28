@@ -1,12 +1,11 @@
 package globalroles
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"time"
 
-	"github.com/hashicorp/go-multierror"
-	"github.com/pkg/errors"
 	mgmt "github.com/rancher/rancher/pkg/apis/management.cattle.io"
 	mgmtconv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -98,19 +97,19 @@ func (gr *globalRoleLifecycle) Create(obj *v3.GlobalRole) (runtime.Object, error
 	// set GR status to "in progress" while the underlying roles get added
 	err := gr.setGRAsInProgress(obj)
 	if err != nil {
-		returnError = multierror.Append(returnError, err)
+		returnError = errors.Join(returnError, err)
 	}
 	err = gr.reconcileGlobalRole(obj)
 	if err != nil {
-		returnError = multierror.Append(returnError, err)
+		returnError = errors.Join(returnError, err)
 	}
 	err = gr.reconcileCatalogRole(obj)
 	if err != nil {
-		returnError = multierror.Append(returnError, err)
+		returnError = errors.Join(returnError, err)
 	}
 	err = gr.reconcileNamespacedRoles(obj)
 	if err != nil {
-		returnError = multierror.Append(returnError, err)
+		returnError = errors.Join(returnError, err)
 	}
 	err = gr.fleetPermissionsHandler.reconcileFleetWorkspacePermissions(obj)
 	if err != nil {
@@ -118,7 +117,7 @@ func (gr *globalRoleLifecycle) Create(obj *v3.GlobalRole) (runtime.Object, error
 	}
 	err = gr.setGRAsCompleted(obj)
 	if err != nil {
-		returnError = multierror.Append(returnError, err)
+		returnError = errors.Join(returnError, err)
 	}
 	return obj, returnError
 }
@@ -135,19 +134,19 @@ func (gr *globalRoleLifecycle) Updated(obj *v3.GlobalRole) (runtime.Object, erro
 	// set GR status to "in progress" while the underlying roles get added
 	err := gr.setGRAsInProgress(obj)
 	if err != nil {
-		returnError = multierror.Append(returnError, err)
+		returnError = errors.Join(returnError, err)
 	}
 	err = gr.reconcileGlobalRole(obj)
 	if err != nil {
-		returnError = multierror.Append(returnError, err)
+		returnError = errors.Join(returnError, err)
 	}
 	err = gr.reconcileCatalogRole(obj)
 	if err != nil {
-		returnError = multierror.Append(returnError, err)
+		returnError = errors.Join(returnError, err)
 	}
 	err = gr.reconcileNamespacedRoles(obj)
 	if err != nil {
-		returnError = multierror.Append(returnError, err)
+		returnError = errors.Join(returnError, err)
 	}
 	err = gr.fleetPermissionsHandler.reconcileFleetWorkspacePermissions(obj)
 	if err != nil {
@@ -155,7 +154,7 @@ func (gr *globalRoleLifecycle) Updated(obj *v3.GlobalRole) (runtime.Object, erro
 	}
 	err = gr.setGRAsCompleted(obj)
 	if err != nil {
-		returnError = multierror.Append(returnError, err)
+		returnError = errors.Join(returnError, err)
 	}
 	return nil, returnError
 }
@@ -178,7 +177,7 @@ func (gr *globalRoleLifecycle) reconcileGlobalRole(globalRole *v3.GlobalRole) er
 			logrus.Infof("[%v] Updating clusterRole %v. GlobalRole rules have changed. Have: %+v. Want: %+v", grController, clusterRole.Name, clusterRole.Rules, globalRole.Rules)
 			if _, err := gr.crClient.Update(clusterRole); err != nil {
 				addCondition(globalRole, condition, FailedToUpdateClusterRole, crName, err)
-				return errors.Wrapf(err, "couldn't update ClusterRole %v", clusterRole.Name)
+				return fmt.Errorf("couldn't update ClusterRole %v: %w", clusterRole.Name, err)
 			}
 		}
 		addCondition(globalRole, condition, ClusterRoleExists, crName, nil)
@@ -324,7 +323,7 @@ func (gr *globalRoleLifecycle) reconcileNamespacedRoles(globalRole *v3.GlobalRol
 			addCondition(globalRole, condition, NamespaceNotFound, roleName, fmt.Errorf("namespace %s not found", ns))
 			continue
 		} else if err != nil {
-			returnError = multierror.Append(returnError, errors.Wrapf(err, "couldn't get namespace %s", ns))
+			returnError = errors.Join(returnError, fmt.Errorf("couldn't get namespace %s: %w", ns, err))
 			addCondition(globalRole, condition, FailedToGetNamespace, roleName, err)
 			continue
 		}
@@ -333,7 +332,7 @@ func (gr *globalRoleLifecycle) reconcileNamespacedRoles(globalRole *v3.GlobalRol
 		role, err := gr.rLister.Get(ns, roleName)
 		if err != nil {
 			if !apierrors.IsNotFound(err) {
-				returnError = multierror.Append(returnError, err)
+				returnError = errors.Join(returnError, err)
 				addCondition(globalRole, condition, FailedToGetRole, roleName, err)
 				continue
 			}
@@ -371,7 +370,7 @@ func (gr *globalRoleLifecycle) reconcileNamespacedRoles(globalRole *v3.GlobalRol
 			}
 
 			if !apierrors.IsAlreadyExists(err) {
-				returnError = multierror.Append(returnError, err)
+				returnError = errors.Join(returnError, err)
 				addCondition(globalRole, condition, FailedToCreateRole, roleName, err)
 				continue
 			}
@@ -379,7 +378,7 @@ func (gr *globalRoleLifecycle) reconcileNamespacedRoles(globalRole *v3.GlobalRol
 			// In the case that the role already exists, we get it and check that the rules are correct
 			role, err = gr.rLister.Get(ns, roleName)
 			if err != nil {
-				returnError = multierror.Append(returnError, err)
+				returnError = errors.Join(returnError, err)
 				addCondition(globalRole, condition, FailedToGetRole, roleName, err)
 				continue
 			}
@@ -402,7 +401,7 @@ func (gr *globalRoleLifecycle) reconcileNamespacedRoles(globalRole *v3.GlobalRol
 
 			_, err := gr.rClient.Update(newRole)
 			if err != nil {
-				returnError = multierror.Append(returnError, err)
+				returnError = errors.Join(returnError, err)
 				addCondition(globalRole, condition, FailedToUpdateRole, roleName, err)
 				continue
 			}
@@ -413,12 +412,12 @@ func (gr *globalRoleLifecycle) reconcileNamespacedRoles(globalRole *v3.GlobalRol
 	// get all the roles claiming to be owned by this GR and remove any that shouldn't exist
 	r, err := labels.NewRequirement(grOwnerLabel, selection.Equals, []string{globalRoleName})
 	if err != nil {
-		return multierror.Append(returnError, errors.Wrapf(err, "couldn't create label: %s", grOwnerLabel))
+		return errors.Join(returnError, fmt.Errorf("couldn't create label: %s: %w", grOwnerLabel, err))
 	}
 
 	roles, err := gr.rLister.List("", labels.NewSelector().Add(*r))
 	if err != nil {
-		return multierror.Append(returnError, errors.Wrapf(err, "couldn't list roles with label %s : %s", grOwnerLabel, globalRoleName))
+		return errors.Join(returnError, fmt.Errorf("couldn't list roles with label %s : %s: %w", grOwnerLabel, globalRoleName, err))
 	}
 
 	// After creating/updating all Roles, if the number of RBs with the grOwnerLabel is the same as
@@ -426,7 +425,7 @@ func (gr *globalRoleLifecycle) reconcileNamespacedRoles(globalRole *v3.GlobalRol
 	if len(roleUIDs) != len(roles) {
 		err = gr.purgeInvalidNamespacedRoles(roles, roleUIDs)
 		if err != nil {
-			returnError = multierror.Append(returnError, err)
+			returnError = errors.Join(returnError, err)
 		}
 	}
 	return returnError
@@ -439,7 +438,7 @@ func (gr *globalRoleLifecycle) purgeInvalidNamespacedRoles(roles []*v1.Role, uid
 		if _, ok := uids[r.UID]; !ok {
 			err := gr.rClient.DeleteNamespaced(r.Namespace, r.Name, &metav1.DeleteOptions{})
 			if err != nil {
-				returnError = multierror.Append(returnError, errors.Wrapf(err, "couldn't delete role %s", r.Name))
+				returnError = errors.Join(returnError, fmt.Errorf("couldn't delete role %s: %w", r.Name, err))
 			}
 		}
 	}
