@@ -3,9 +3,9 @@ on:
   - pull_request 
 env:
   ARCH: amd64
-  TAG: ${{ github.ref_name }}
-  GIT_TAG: ${{ github.ref_name }}
-  HEAD_TAG: ${{ github.ref_name }}
+  TAG: ${{ github.event.pull_request.base.ref }}
+  GIT_TAG: ${{ github.event.pull_request.base.ref }}
+  HEAD_TAG: ${{ github.event.pull_request.base.ref }}
   COMMIT: ${{ github.sha }}
   REPOSITORY_OWNER: ${{ github.repository_owner }}
   IMAGE: ${{ github.repository_owner }}/rancher
