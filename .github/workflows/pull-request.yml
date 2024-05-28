@@ -172,16 +172,3 @@ jobs:
           platforms: "${{ matrix.os }}/${{ matrix.arch }}"
           file: ./package/Dockerfile.agent
           labels: "${{ steps.meta.outputs.labels }}"
-      - name: Export digest
-        run: |
-          mkdir -p /tmp/digests
-          digest="${{ steps.build.outputs.digest }}"
-          touch "/tmp/digests/${digest#sha256:}"
-      - name: Upload digest
-        uses: actions/upload-artifact@v4
-        with:
-          name: "digests-agent-${{ matrix.os }}-${{ matrix.arch }}"
-          path: /tmp/digests/*
-          if-no-files-found: error
-          retention-days: 7
-          overwrite: true
