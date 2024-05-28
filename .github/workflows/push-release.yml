@@ -132,7 +132,7 @@ jobs:
       - name: Export Rancher data
         run: |
           mkdir -p /tmp/rancher-data
-          id=$(docker create ${{ env.IMAGE }}:${{ env.TAG }}-${{ matrix.arch }})
+          id=$(docker create -platform=linux/amd64 ${{ env.IMAGE }}:${{ env.TAG }}-${{ matrix.arch }})
           docker cp $id:/var/lib/rancher-data /tmp/rancher-data
       - name: Upload digest
         uses: actions/upload-artifact@v4
