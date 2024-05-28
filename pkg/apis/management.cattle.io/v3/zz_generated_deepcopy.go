@@ -8872,6 +8872,13 @@ func (in *RoleTemplate) DeepCopyInto(out *RoleTemplate) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.ExternalRules != nil {
+		in, out := &in.ExternalRules, &out.ExternalRules
+		*out = make([]rbacv1.PolicyRule, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 	if in.RoleTemplateNames != nil {
 		in, out := &in.RoleTemplateNames, &out.RoleTemplateNames
 		*out = make([]string, len(*in))
