@@ -133,7 +133,13 @@ jobs:
           path: /tmp
       - name: Load image
         run: |
-          docker load --input /tmp/rancher-${{ matrix.os }}-${{ matrix.arch }}.tar
+          image_id=$(docker load --input /tmp/rancher-${{ matrix.os }}-${{ matrix.arch }}.tar 2>&1 | grep "Loaded image" | awk '{print $NF}')
+          if [ -z "$image_id" ]; then
+            echo "Error: Failed to load image from tarball!"
+            exit 1
+          fi
+          docker tag "$image_id" localhost:5000/${{ env.IMAGE }}:${{ env.TAG }}
+          docker push localhost:5000/${{ env.IMAGE }}:${{ env.TAG }}
           docker image ls -a  
       - name: Build agent
         id: build
