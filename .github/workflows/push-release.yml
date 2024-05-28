@@ -38,14 +38,14 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          path: ${{ github.workspace }}/rancher
       - name: Install dependencies
         run: |
           sudo snap install yq
-
           curl ${{ env.HELM_URL_V3 }} | tar xvzf - --strip-components=1 -C /tmp/ && \
           sudo mv /tmp/helm /usr/bin/helm_v3 && \
           sudo chmod +x /usr/bin/helm_v3
-
           helm_v3 plugin install https://github.com/helm-unittest/helm-unittest.git --version ${{ env.HELM_UNITTEST_VERSION }}; \
       - name: Setup Environment Variables
         run: |
@@ -80,6 +80,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          path: ${{ github.workspace }}/rancher
       - name: Setup Environment Variables
         run: |
           echo "ARCH=${{ matrix.arch }}" >> "$GITHUB_ENV"
@@ -131,6 +133,11 @@ jobs:
           mkdir -p /tmp/digests
           digest="${{ steps.build.outputs.digest }}"
           touch "/tmp/digests/${digest#sha256:}"
+      - name: Export Rancher data
+        run: |
+          mkdir -p /tmp/rancher-data
+          id=$(docker create ${{ env.IMAGE }}:${{ env.TAG }}-${{ matrix.arch }})
+          docker cp $id:/var/lib/rancher-data /tmp/rancher-data
       - name: Upload digest
         uses: actions/upload-artifact@v4
         with:
@@ -139,6 +146,13 @@ jobs:
           if-no-files-found: error
           retention-days: 7
           overwrite: true
+      - name: Upload Rancher Data
+        uses: actions/upload-artifact@v4
+        with:
+          name: "rancher-data-${{ matrix.os }}-${{ matrix.arch }}"
+          path: /tmp/rancher-data/*
+          if-no-files-found: error
+          retention-days: 7
   merge-server-manifest:
     runs-on: ubuntu-latest
     needs: [build-server]
@@ -159,7 +173,7 @@ jobs:
       - name: Download digests
         uses: actions/download-artifact@v4
         with:
-          path: /tmp/digests
+          path: /tmp/digest
           pattern: digests-server*
           merge-multiple: true
       
@@ -190,236 +204,242 @@ jobs:
       - name: Inspect image
         run: |
           docker buildx imagetools inspect ${{ env.IMAGE }}:${{ env.TAG }}
-  build-agent:
-    needs: [merge-server-manifest]
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        os: [linux]
-        arch: [amd64, arm64]
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Setup Environment Variables
-        run: |
-          echo "ARCH=${{ matrix.arch }}" >> "$GITHUB_ENV"
+  # build-agent:
+  #   needs: [merge-server-manifest]
+  #   runs-on: ubuntu-latest
+  #   strategy:
+  #     matrix:
+  #       os: [linux]
+  #       arch: [amd64, arm64]
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
+  #     - name: Setup Environment Variables
+  #       run: |
+  #         echo "ARCH=${{ matrix.arch }}" >> "$GITHUB_ENV"
 
-          ref_name="${{ github.ref_name }}"
-          prefix="release/"
-          if [[ "$ref_name" == release/v* ]]; then
-            TAG=${ref_name#$prefix}-${{ github.sha }}-head
-            echo "TAG=$TAG" >> "$GITHUB_ENV"
-          fi
-      - name: Docker meta
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.IMAGE }}
-          flavor: |
-            latest=false
-      - name: Docker Registry Login
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-      - name: Build and export agent
-        id: build
-        uses: docker/build-push-action@v5
-        with:
-          push:  ${{ github.event_name != 'pull_request' }}
-          build-args: |
-            "VERSION=${{ env.COMMIT }}"
-            "ARCH=${{ matrix.arch }}"
-            "RANCHER_TAG=${{ env.TAG }}"
-            "RANCHER_REPO=${{ env.REPOSITORY_OWNER }}"
-          tags: ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-${{ matrix.arch }}
-          context: .
-          platforms: "${{ matrix.os }}/${{ matrix.arch }}"
-          file: ./package/Dockerfile.agent
-          labels: "${{ steps.meta.outputs.labels }}"
-      - name: Export digest
-        run: |
-          mkdir -p /tmp/digests
-          digest="${{ steps.build.outputs.digest }}"
-          touch "/tmp/digests/${digest#sha256:}"
-      - name: Upload digest
-        uses: actions/upload-artifact@v4
-        with:
-          name: "digests-agent-${{ matrix.os }}-${{ matrix.arch }}"
-          path: /tmp/digests/*
-          if-no-files-found: error
-          retention-days: 7
-          overwrite: true
-  merge-agent-manifest:
-    runs-on: ubuntu-latest
-    needs: [build-agent]
-    permissions:
-      contents: read
-      id-token: write
-    steps:
-      - name: Setup Environment variables
-        run: |
-          ref_name="${{ github.ref_name }}"
-          prefix="release/"
-          if [[ "$ref_name" == release/v* ]]; then
-            TAG=${ref_name#$prefix}-${{ github.sha }}-head
-            HEAD_TAG=${ref_name#$prefix}-head
-            echo "TAG=$TAG" >> "$GITHUB_ENV"
-            echo "HEAD_TAG=$HEAD_TAG" >> "$GITHUB_ENV"
-          fi
-      - name: Download digests
-        uses: actions/download-artifact@v4
-        with:
-          path: /tmp/digests
-          pattern: digests-agent-*
-          merge-multiple: true
+  #         ref_name="${{ github.ref_name }}"
+  #         prefix="release/"
+  #         if [[ "$ref_name" == release/v* ]]; then
+  #           TAG=${ref_name#$prefix}-${{ github.sha }}-head
+  #           echo "TAG=$TAG" >> "$GITHUB_ENV"
+  #         fi
+  #     - name: Docker meta
+  #       id: meta
+  #       uses: docker/metadata-action@v5
+  #       with:
+  #         images: ${{ env.IMAGE }}
+  #         flavor: |
+  #           latest=false
+  #     - name: Docker Registry Login
+  #       uses: docker/login-action@v3
+  #       with:
+  #         username: ${{ secrets.DOCKER_USERNAME }}
+  #         password: ${{ secrets.DOCKER_PASSWORD }}
+  #     - name: Set up QEMU
+  #       uses: docker/setup-qemu-action@v3
+  #     - name: Set up Docker Buildx
+  #       uses: docker/setup-buildx-action@v3
+  #     - name: Download Rancher Data
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: "rancher-data-${{ matrix.os }}-${{ matrix.arch }}"
+  #         path: ${{ github.workspace }}/rancher/bin/rancher-data
+  #         merge-multiple: true
+  #     - name: Build and export agent
+  #       id: build
+  #       uses: docker/build-push-action@v5
+  #       with:
+  #         push:  ${{ github.event_name != 'pull_request' }}
+  #         build-args: |
+  #           "VERSION=${{ env.COMMIT }}"
+  #           "ARCH=${{ matrix.arch }}"
+  #           "RANCHER_TAG=${{ env.TAG }}"
+  #           "RANCHER_REPO=${{ env.REPOSITORY_OWNER }}"
+  #         tags: ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-${{ matrix.arch }}
+  #         context: ${{ github.workspace }}/rancher
+  #         platforms: "${{ matrix.os }}/${{ matrix.arch }}"
+  #         file: ./package/Dockerfile.agent
+  #         labels: "${{ steps.meta.outputs.labels }}"
+  #     - name: Export digest
+  #       run: |
+  #         mkdir -p /tmp/digests
+  #         digest="${{ steps.build.outputs.digest }}"
+  #         touch "/tmp/digests/${digest#sha256:}"
+  #     - name: Upload digest
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: "digests-agent-${{ matrix.os }}-${{ matrix.arch }}"
+  #         path: /tmp/digests/*
+  #         if-no-files-found: error
+  #         retention-days: 7
+  #         overwrite: true
+  # merge-agent-manifest:
+  #   runs-on: ubuntu-latest
+  #   needs: [build-agent]
+  #   permissions:
+  #     contents: read
+  #     id-token: write
+  #   steps:
+  #     - name: Setup Environment variables
+  #       run: |
+  #         ref_name="${{ github.ref_name }}"
+  #         prefix="release/"
+  #         if [[ "$ref_name" == release/v* ]]; then
+  #           TAG=${ref_name#$prefix}-${{ github.sha }}-head
+  #           HEAD_TAG=${ref_name#$prefix}-head
+  #           echo "TAG=$TAG" >> "$GITHUB_ENV"
+  #           echo "HEAD_TAG=$HEAD_TAG" >> "$GITHUB_ENV"
+  #         fi
+  #     - name: Download digests
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         path: /tmp/digests
+  #         pattern: digests-agent-*
+  #         merge-multiple: true
       
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-      - name: Docker meta
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.IMAGE_AGENT }}
-          flavor: |
-            latest=false
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Create manifest list and push
-        working-directory: /tmp/digests
-        run: |
-          images=$(printf '${{ env.IMAGE_AGENT }}@sha256:%s ' *)
-          docker buildx imagetools create -t ${{ env.IMAGE_AGENT }}:${{ env.TAG }} $images
-          if [[ "${{ github.ref_name }}" == release/v* ]]; then
-            docker buildx imagetools create -t ${{ env.IMAGE_AGENT }}:${{ env.HEAD_TAG }} $images
-          fi
-      - name: Inspect image
-        run: |
-          docker buildx imagetools inspect ${{ env.IMAGE_AGENT }}:${{ env.TAG }}
-  build-installer:
-    needs: 
-      - merge-server-manifest
-      - build-chart
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        os: [linux]
-        arch: [amd64, arm64]
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Setup Environment Variables
-        run: |
-          echo "ARCH=${{ matrix.arch }}" >> "$GITHUB_ENV"
+  #     - name: Set up Docker Buildx
+  #       uses: docker/setup-buildx-action@v3
+  #     - name: Docker meta
+  #       id: meta
+  #       uses: docker/metadata-action@v5
+  #       with:
+  #         images: ${{ env.IMAGE_AGENT }}
+  #         flavor: |
+  #           latest=false
+  #     - name: Login to Docker Hub
+  #       uses: docker/login-action@v3
+  #       with:
+  #         username: ${{ secrets.DOCKER_USERNAME }}
+  #         password: ${{ secrets.DOCKER_PASSWORD }}
+  #     - name: Create manifest list and push
+  #       working-directory: /tmp/digests
+  #       run: |
+  #         images=$(printf '${{ env.IMAGE_AGENT }}@sha256:%s ' *)
+  #         docker buildx imagetools create -t ${{ env.IMAGE_AGENT }}:${{ env.TAG }} $images
+  #         if [[ "${{ github.ref_name }}" == release/v* ]]; then
+  #           docker buildx imagetools create -t ${{ env.IMAGE_AGENT }}:${{ env.HEAD_TAG }} $images
+  #         fi
+  #     - name: Inspect image
+  #       run: |
+  #         docker buildx imagetools inspect ${{ env.IMAGE_AGENT }}:${{ env.TAG }}
+  # build-installer:
+  #   needs: 
+  #     - merge-server-manifest
+  #     - build-chart
+  #   runs-on: ubuntu-latest
+  #   strategy:
+  #     matrix:
+  #       os: [linux]
+  #       arch: [amd64, arm64]
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
+  #     - name: Setup Environment Variables
+  #       run: |
+  #         echo "ARCH=${{ matrix.arch }}" >> "$GITHUB_ENV"
 
-          ref_name="${{ github.ref_name }}"
-          prefix="release/"
-          if [[ "$ref_name" == release/v* ]]; then
-            TAG=${ref_name#$prefix}-${{ github.sha }}-head
-            echo "TAG=$TAG" >> "$GITHUB_ENV"
-          fi
-      - name: Docker meta
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.IMAGE }}
-          flavor: |
-            latest=false
-      - name: Docker Registry Login
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-      - name: Download chart
-        uses: actions/download-artifact@v4
-        with:
-          path: ./chart
-          pattern: chart
-      - name: Build and export agent
-        id: build
-        uses: docker/build-push-action@v5
-        with:
-          push:  ${{ github.event_name != 'pull_request' }}
-          build-args: |
-            "VERSION=${{ env.COMMIT }}"
-            "ARCH=${{ matrix.arch }}"
-            "RANCHER_TAG=${{ env.TAG }}"
-            "RANCHER_REPO=${{ env.REPOSITORY_OWNER }}"
-          tags: ${{ env.IMAGE_INSTALLER }}:${{ env.TAG }}-${{ matrix.arch }}
-          context: .
-          platforms: "${{ matrix.os }}/${{ matrix.arch }}"
-          file: ./package/Dockerfile.installer
-          labels: "${{ steps.meta.outputs.labels }}"
-      - name: Export digest
-        run: |
-          mkdir -p /tmp/digests
-          digest="${{ steps.build.outputs.digest }}"
-          touch "/tmp/digests/${digest#sha256:}"
-      - name: Upload digest
-        uses: actions/upload-artifact@v4
-        with:
-          name: "digests-installer-${{ matrix.os }}-${{ matrix.arch }}"
-          path: /tmp/digests/*
-          if-no-files-found: error
-          retention-days: 7
-          overwrite: true
-  merge-installer-manifest:
-    runs-on: ubuntu-latest
-    needs: [build-installer]
-    permissions:
-      contents: read
-      id-token: write
-    steps:
-      - name: Setup Environment variables
-        run: |
-          ref_name="${{ github.ref_name }}"
-          prefix="release/"
-          if [[ "$ref_name" == release/v* ]]; then
-            TAG=${ref_name#$prefix}-${{ github.sha }}-head
-            HEAD_TAG=${ref_name#$prefix}-head
-            echo "TAG=$TAG" >> "$GITHUB_ENV"
-            echo "HEAD_TAG=$HEAD_TAG" >> "$GITHUB_ENV"
-          fi
-      - name: Download digests
-        uses: actions/download-artifact@v4
-        with:
-          path: /tmp/digests
-          pattern: digests-installer-*
-          merge-multiple: true
+  #         ref_name="${{ github.ref_name }}"
+  #         prefix="release/"
+  #         if [[ "$ref_name" == release/v* ]]; then
+  #           TAG=${ref_name#$prefix}-${{ github.sha }}-head
+  #           echo "TAG=$TAG" >> "$GITHUB_ENV"
+  #         fi
+  #     - name: Docker meta
+  #       id: meta
+  #       uses: docker/metadata-action@v5
+  #       with:
+  #         images: ${{ env.IMAGE }}
+  #         flavor: |
+  #           latest=false
+  #     - name: Docker Registry Login
+  #       uses: docker/login-action@v3
+  #       with:
+  #         username: ${{ secrets.DOCKER_USERNAME }}
+  #         password: ${{ secrets.DOCKER_PASSWORD }}
+  #     - name: Set up QEMU
+  #       uses: docker/setup-qemu-action@v3
+  #     - name: Set up Docker Buildx
+  #       uses: docker/setup-buildx-action@v3
+  #     - name: Download chart
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         path: ./chart
+  #         pattern: chart
+  #     - name: Build and export agent
+  #       id: build
+  #       uses: docker/build-push-action@v5
+  #       with:
+  #         push:  ${{ github.event_name != 'pull_request' }}
+  #         build-args: |
+  #           "VERSION=${{ env.COMMIT }}"
+  #           "ARCH=${{ matrix.arch }}"
+  #           "RANCHER_TAG=${{ env.TAG }}"
+  #           "RANCHER_REPO=${{ env.REPOSITORY_OWNER }}"
+  #         tags: ${{ env.IMAGE_INSTALLER }}:${{ env.TAG }}-${{ matrix.arch }}
+  #         context: .
+  #         platforms: "${{ matrix.os }}/${{ matrix.arch }}"
+  #         file: ./package/Dockerfile.installer
+  #         labels: "${{ steps.meta.outputs.labels }}"
+  #     - name: Export digest
+  #       run: |
+  #         mkdir -p /tmp/digests
+  #         digest="${{ steps.build.outputs.digest }}"
+  #         touch "/tmp/digests/${digest#sha256:}"
+  #     - name: Upload digest
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: "digests-installer-${{ matrix.os }}-${{ matrix.arch }}"
+  #         path: /tmp/digests/*
+  #         if-no-files-found: error
+  #         retention-days: 7
+  #         overwrite: true
+  # merge-installer-manifest:
+  #   runs-on: ubuntu-latest
+  #   needs: [build-installer]
+  #   permissions:
+  #     contents: read
+  #     id-token: write
+  #   steps:
+  #     - name: Setup Environment variables
+  #       run: |
+  #         ref_name="${{ github.ref_name }}"
+  #         prefix="release/"
+  #         if [[ "$ref_name" == release/v* ]]; then
+  #           TAG=${ref_name#$prefix}-${{ github.sha }}-head
+  #           HEAD_TAG=${ref_name#$prefix}-head
+  #           echo "TAG=$TAG" >> "$GITHUB_ENV"
+  #           echo "HEAD_TAG=$HEAD_TAG" >> "$GITHUB_ENV"
+  #         fi
+  #     - name: Download digests
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         path: /tmp/digests
+  #         pattern: digests-installer-*
+  #         merge-multiple: true
       
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-      - name: Docker meta
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.IMAGE_INSTALLER }}
-          flavor: |
-            latest=false
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Create manifest list and push
-        working-directory: /tmp/digests
-        run: |
-          images=$(printf '${{ env.IMAGE_INSTALLER }}@sha256:%s ' *)
-          docker buildx imagetools create -t ${{ env.IMAGE_INSTALLER }}:${{ env.TAG }} $images
-          if [[ "${{ github.ref_name }}" == release/v* ]]; then
-            docker buildx imagetools create -t ${{ env.IMAGE_INSTALLER }}:${{ env.HEAD_TAG }} $images
-          fi
-      - name: Inspect image
-        run: |
-          docker buildx imagetools inspect ${{ env.IMAGE_INSTALLER }}:${{ env.TAG }}
+  #     - name: Set up Docker Buildx
+  #       uses: docker/setup-buildx-action@v3
+  #     - name: Docker meta
+  #       id: meta
+  #       uses: docker/metadata-action@v5
+  #       with:
+  #         images: ${{ env.IMAGE_INSTALLER }}
+  #         flavor: |
+  #           latest=false
+  #     - name: Login to Docker Hub
+  #       uses: docker/login-action@v3
+  #       with:
+  #         username: ${{ secrets.DOCKER_USERNAME }}
+  #         password: ${{ secrets.DOCKER_PASSWORD }}
+  #     - name: Create manifest list and push
+  #       working-directory: /tmp/digests
+  #       run: |
+  #         images=$(printf '${{ env.IMAGE_INSTALLER }}@sha256:%s ' *)
+  #         docker buildx imagetools create -t ${{ env.IMAGE_INSTALLER }}:${{ env.TAG }} $images
+  #         if [[ "${{ github.ref_name }}" == release/v* ]]; then
+  #           docker buildx imagetools create -t ${{ env.IMAGE_INSTALLER }}:${{ env.HEAD_TAG }} $images
+  #         fi
+  #     - name: Inspect image
+  #       run: |
+  #         docker buildx imagetools inspect ${{ env.IMAGE_INSTALLER }}:${{ env.TAG }}
