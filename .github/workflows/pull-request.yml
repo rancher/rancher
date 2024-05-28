@@ -3,9 +3,9 @@ on:
   - pull_request 
 env:
   ARCH: amd64
-  TAG: ${{ github.event.pull_request.base.ref }}
-  GIT_TAG: ${{ github.event.pull_request.base.ref }}
-  HEAD_TAG: ${{ github.event.pull_request.base.ref }}
+  TAG: ${{ github.sha }}-dirty
+  GIT_TAG: ${{ github.sha }}-dirty
+  HEAD_TAG: ${{ github.sha }}-dirty
   COMMIT: ${{ github.sha }}
   REPOSITORY_OWNER: ${{ github.repository_owner }}
   IMAGE: ${{ github.repository_owner }}/rancher
@@ -40,14 +40,6 @@ jobs:
           sudo mv /tmp/helm /usr/bin/helm_v3 && \
           sudo chmod +x /usr/bin/helm_v3
           helm_v3 plugin install https://github.com/helm-unittest/helm-unittest.git --version ${{ env.HELM_UNITTEST_VERSION }}; \
-      - name: Setup Environment Variables
-        run: |
-          ref_name="${{ github.ref_name }}"
-          prefix="release/"
-          if [[ "$ref_name" == release/v* ]]; then
-            GIT_TAG=${ref_name#$prefix}-${{ github.sha }}-head
-            echo "GIT_TAG=$GIT_TAG" >> "$GITHUB_ENV"
-          fi
       - name: Build
         run: ./scripts/chart/build chart
       - name: Validate
@@ -68,17 +60,7 @@ jobs:
       - name: Setup Environment Variables
         run: |
           echo "ARCH=${{ matrix.arch }}" >> "$GITHUB_ENV"
-
           echo "RKE_VERSION=$(grep -m1 'github.com/rancher/rke' go.mod | awk '{print $2}')" >> "$GITHUB_ENV"
-
-          ref_name="${{ github.ref_name }}"
-          prefix="release/"
-          if [[ "$ref_name" == release/v* ]]; then
-            TAG=${ref_name#$prefix}-${{ github.sha }}-head
-            HEAD_TAG=${ref_name#$prefix}-head
-            echo "TAG=$TAG" >> "$GITHUB_ENV"
-            echo "HEAD_TAG=$HEAD_TAG" >> "$GITHUB_ENV"
-          fi
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
@@ -141,13 +123,6 @@ jobs:
       - name: Setup Environment Variables
         run: |
           echo "ARCH=${{ matrix.arch }}" >> "$GITHUB_ENV"
-
-          ref_name="${{ github.ref_name }}"
-          prefix="release/"
-          if [[ "$ref_name" == release/v* ]]; then
-            TAG=${ref_name#$prefix}-${{ github.sha }}-head
-            echo "TAG=$TAG" >> "$GITHUB_ENV"
-          fi
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
