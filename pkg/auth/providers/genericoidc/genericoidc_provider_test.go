@@ -209,3 +209,41 @@ func TestGenOIDCProvider_SearchPrincipals(t *testing.T) {
 		})
 	}
 }
+
+func TestGenOIDCProvider_TransformToAuthProvider(t *testing.T) {
+	tests := []struct {
+		name       string
+		authConfig map[string]interface{}
+		expected   map[string]interface{}
+	}{
+		{
+			name: "Test with valid authConfig",
+			authConfig: map[string]interface{}{
+				"clientId":     "client123",
+				"rancherUrl":   "https://example.com/callback",
+				"scope":        "openid profile email",
+				"issuer":       "https://ranchertest.io/issuer",
+				"authEndpoint": "https://ranchertest.io/auth",
+			},
+			expected: map[string]interface{}{
+				"redirectUrl": "https://ranchertest.io/auth?client_id=client123&response_type=code&redirect_uri=https://example.com/callback",
+				"scopes":      "openid profile email",
+			},
+		},
+	}
+
+	provider := &GenOIDCProvider{}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result, err := provider.TransformToAuthProvider(test.authConfig)
+			if err != nil {
+				t.Errorf("TransformToAuthProvider() returned an error: %v", err)
+			}
+
+			if !reflect.DeepEqual(result, test.expected) {
+				t.Errorf("TransformToAuthProvider() returned %+v, expected %+v", result, test.expected)
+			}
+		})
+	}
+}
