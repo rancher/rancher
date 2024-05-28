@@ -97,6 +97,9 @@ func FetchAuthURL(config map[string]interface{}) (string, error) {
 	if err := json.NewDecoder(discoveryResponse.Body).Decode(&discoveryInfo); err != nil {
 		return "", fmt.Errorf("unable to decode the OIDC discovery response %w", err)
 	}
+	if discoveryInfo.AuthorizationEndpoint == "" {
+		return "", fmt.Errorf("no authorization endpoint found in discovery response with status %s", discoveryResponse.Status)
+	}
 
 	return discoveryInfo.AuthorizationEndpoint, nil
 }
