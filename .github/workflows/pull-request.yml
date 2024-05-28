@@ -1,0 +1,164 @@
+name: pull request
+on: [push]
+env:
+  ARCH: amd64
+  TAG: ${{ github.ref_name }}
+  GIT_TAG: ${{ github.ref_name }}
+  HEAD_TAG: ${{ github.ref_name }}
+  COMMIT: ${{ github.sha }}
+  REPOSITORY_OWNER: ${{ github.repository_owner }}
+  IMAGE: ${{ github.repository_owner }}/rancher
+  IMAGE_AGENT: ${{ github.repository_owner }}/rancher-agent
+  IMAGE_INSTALLER: ${{ github.repository_owner }}/system-agent-installer-rancher
+  CATTLE_KDM_BRANCH: dev-v2.8
+  HELM_UNITTEST_VERSION: 0.3.2
+  HELM_URL_V3: https://get.helm.sh/helm-v3.13.3-linux-amd64.tar.gz
+jobs:
+  build-server:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [linux]
+        arch: [amd64, arm64]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup Environment Variables
+        run: |
+          echo "ARCH=${{ matrix.arch }}" >> "$GITHUB_ENV"
+
+          echo "RKE_VERSION=$(grep -m1 'github.com/rancher/rke' go.mod | awk '{print $2}')" >> "$GITHUB_ENV"
+
+          ref_name="${{ github.ref_name }}"
+          prefix="release/"
+          if [[ "$ref_name" == release/v* ]]; then
+            TAG=${ref_name#$prefix}-${{ github.sha }}-head
+            HEAD_TAG=${ref_name#$prefix}-head
+            echo "TAG=$TAG" >> "$GITHUB_ENV"
+            echo "HEAD_TAG=$HEAD_TAG" >> "$GITHUB_ENV"
+          fi
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          flavor: |
+            latest=false
+      - name: Docker Registry Login
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Create k3s images file
+        run: touch k3s-airgap-images.tar
+      - name: Download data.json
+        run: curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${{ env.CATTLE_KDM_BRANCH }}/data.json > ./data.json
+      - name: Build and export server
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          push: false
+          build-args: |
+            "VERSION=${{ env.COMMIT }}"
+            "COMMIT=${{ env.COMMIT }}"
+            "RKE_VERSION=${{ env.RKE_VERSION }}"
+            "ARCH=${{ matrix.arch }}"
+          tags: ${{ env.IMAGE }}:${{ env.TAG }}-${{ matrix.arch }}
+          context: .
+          platforms: "${{ matrix.os }}/${{ matrix.arch }}"
+          file: ./package/Dockerfile
+          labels: "${{ steps.meta.outputs.labels }}"
+          outputs: type=docker,dest=/tmp/rancher-${{ matrix.os }}-${{ matrix.arch }}.tar
+      - name: Upload image
+        uses: actions/upload-artifact@v4
+        with:
+          name: "rancher-${{ matrix.os }}-${{ matrix.arch }}"
+          path: /tmp/rancher-${{ matrix.os }}-${{ matrix.arch }}
+          if-no-files-found: error
+          retention-days: 1
+          overwrite: false
+  build-agent:
+    needs: [build-server]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [linux]
+        arch: [amd64, arm64]
+    services:
+      registry:
+        image: registry:2
+        ports:
+          - 5000:5000
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup Environment Variables
+        run: |
+          echo "ARCH=${{ matrix.arch }}" >> "$GITHUB_ENV"
+
+          ref_name="${{ github.ref_name }}"
+          prefix="release/"
+          if [[ "$ref_name" == release/v* ]]; then
+            TAG=${ref_name#$prefix}-${{ github.sha }}-head
+            echo "TAG=$TAG" >> "$GITHUB_ENV"
+          fi
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          flavor: |
+            latest=false
+      - name: Docker Registry Login
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver-opts: network=host
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: "rancher-${{ matrix.os }}-${{ matrix.arch }}"
+          path: /tmp
+      - name: Load image
+        run: |
+          docker load --input /tmp/rancher-${{ matrix.os }}-${{ matrix.arch }}.tar
+          docker image ls -a  
+      - name: Build agent
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          push:  ${{ github.event_name != 'pull_request' }}
+          build-args: |
+            "VERSION=${{ env.COMMIT }}"
+            "ARCH=${{ matrix.arch }}"
+            "RANCHER_TAG=${{ env.TAG }}"
+            "RANCHER_REPO=${{ env.REPOSITORY_OWNER }}"
+            "REGISTRY=localhost:5000"
+          tags: ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-${{ matrix.arch }}
+          context: ${{ github.workspace }}/rancher
+          platforms: "${{ matrix.os }}/${{ matrix.arch }}"
+          file: ./package/Dockerfile.agent
+          labels: "${{ steps.meta.outputs.labels }}"
+      - name: Export digest
+        run: |
+          mkdir -p /tmp/digests
+          digest="${{ steps.build.outputs.digest }}"
+          touch "/tmp/digests/${digest#sha256:}"
+      - name: Upload digest
+        uses: actions/upload-artifact@v4
+        with:
+          name: "digests-agent-${{ matrix.os }}-${{ matrix.arch }}"
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 7
+          overwrite: true
