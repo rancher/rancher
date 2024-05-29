@@ -13,7 +13,7 @@ RUN go mod download
 ENV CGO_ENABLED=0
 ENV GOOS=windows
 ENV GOARCH=$ARCH
-RUN go build -tags k8s -ldflags $LDFLAGS -o .\agent.exe .\cmd/\agent
+RUN go build -tags k8s -ldflags $LDFLAGS -o \app\agent.exe .\cmd\agent
 
 FROM mcr.microsoft.com/windows/servercore:${SERVERCORE_VERSION} AS builder
 SHELL ["powershell", "-NoLogo", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
