@@ -194,6 +194,10 @@ func (r *Retention) Run(ctx context.Context) error {
 				}
 			}
 
+			if settings.dryRun {
+				return nil
+			}
+
 			if disableUser {
 				user.Enabled = pointer.Bool(false)
 			}
@@ -203,10 +207,6 @@ func (r *Retention) Run(ctx context.Context) error {
 
 			// No user updates; return early.
 			if !labelsUpdated && !disableUser {
-				return nil
-			}
-
-			if settings.dryRun {
 				return nil
 			}
 
