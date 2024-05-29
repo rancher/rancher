@@ -27,6 +27,7 @@ node {
     def rancherToken = ""
     def filename = "config.yaml"
     def individualJob = "go-recurring-daily"
+    def corralJob = "corral-go-job"
     individualJob = "${individualJob}-individual-job"
 
     if ("${env.BRANCH}" != "null" && "${env.BRANCH}" != "") {
@@ -159,44 +160,6 @@ node {
               }
             }
             try {
-              stage ('Run Local Cluster Tests') {
-                jobs = [:]
-                // start a validation run for tests that need to be on the local cluster only
-                sh "docker cp ${buildTestContainer}:${workPath}${filename} ./"
-
-                def mainRancherConfigPath = "./${filename}"
-
-                def tags = sh (
-                  script: "./yq '.testCases.tags'  ${mainRancherConfigPath}",
-                  returnStdout: true
-                ).trim()
-
-                def runFlag = sh (  
-                  script: "./yq '.testCases.runFlag'  ${mainRancherConfigPath}",
-                  returnStdout: true
-                ).trim()
-
-                sh "./yq e '.rancher.clusterName = \"local\"' -i ${mainRancherConfigPath}"
-                sh "./yq e '.rancher.rancherCLI = true' -i ${mainRancherConfigPath}"
-
-                def configYaml = readFile(file: "${mainRancherConfigPath}")
-                // This is the config for the local cluster i.e. CLI tests
-                def goValidationParams = [
-                  string(name: 'TIMEOUT', value: timeout),
-                  text(name: 'CONFIG', value: configYaml),
-                  string(name: 'REPO', value: "${rancherRepo}"),
-                  string(name: 'BRANCH', value: "${branch}"),
-                  string(name: 'TEST_PACKAGE', value: "${env.TEST_PACKAGE}"),
-                  string(name: 'TAGS', value: tags),
-                  string(name: 'CLI_VERSION', value: "${CLI_VERSION}"),
-                  string(name: 'GOTEST_TESTCASE', value: "${env.GOTEST_LOCAL}"),
-                ]
-
-                jobs["$it-local-validation"] = { build job: individualJob, parameters: goValidationParams }
-                parallel jobs
-
-                sh "./yq e 'del(.rancher.rancherCLI)' -i ${mainRancherConfigPath}"
-              }
               stage ('Generate configuration files') {
                 sh "docker run --volumes-from ${buildTestContainer} --name ${configGeneratorContainer} -t -e CATTLE_TEST_CONFIG=\$CATTLE_TEST_CONFIG " +
                   "${imageName} sh -c \"${workPath}pipeline/releaseupgrade/releaseupgrade.sh\""
@@ -341,11 +304,43 @@ node {
                         string(name: 'QASE_TEST_RUN_ID', value: "${testRunID}"),
                         string(name: 'TEST_PACKAGE', value: "${env.TEST_PACKAGE}"),
                         string(name: 'TAGS', value: "${env.TAGS}"),
-                        string(name: 'GOTEST_TESTCASE', value: "${env.GOTEST_TESTCASE}"),
+                        string(name: 'GOTEST_TESTCASE', value: "${env.GOTEST_PROVISIONING}"),
                       ]
 
                       jobs["provisioning-test-validation"] = { build job: individualJob, parameters: goValidationParams }
-                    
+
+                      sh "./yq e '.rancher.rancherCLI = true' -i ${mainRancherConfigPath}"
+
+                      def config2Yaml = readFile(file: "${mainRancherConfigPath}")
+                      // This is the config for the local cluster i.e. CLI tests
+                      def goValidation2Params = [
+                        string(name: 'TIMEOUT', value: timeout),
+                        text(name: 'CONFIG', value: config2Yaml),
+                        string(name: 'REPO', value: "${rancherRepo}"),
+                        string(name: 'BRANCH', value: "${branch}"),
+                        string(name: 'TEST_PACKAGE', value: "${env.TEST_PACKAGE}"),
+                        string(name: 'TAGS', value: tags),
+                        string(name: 'CLI_VERSION', value: "${CLI_VERSION}"),
+                        string(name: 'GOTEST_TESTCASE', value: "${env.GOTEST_CLI}"),
+                      ]
+
+                      jobs["provisioning-cli-validation"] = { build job: individualJob, parameters: goValidation2Params }
+
+                      sh "./yq e 'del(.rancher.rancherCLI)' -i ${mainRancherConfigPath}"
+
+                      def config3Yaml = readFile(file: "${mainRancherConfigPath}")
+                      // This is the config for the local cluster i.e. CLI tests
+                      def goValidation3Params = [
+                        string(name: 'TIMEOUT', value: timeout),
+                        text(name: 'CONFIG', value: config3Yaml),
+                        string(name: 'REPO', value: "${rancherRepo}"),
+                        string(name: 'BRANCH', value: "${branch}"),
+                        string(name: 'TEST_PACKAGE', value: "${env.TEST_PACKAGE}"),
+                        string(name: 'TAGS', value: tags),
+                        string(name: 'GOTEST_TESTCASE', value: "${env.GOTEST_CORRAL}"),
+                      ]
+
+                      jobs["provisioning-corral-validation"] = { build job: corralJob, parameters: goValidation3Params }
                     }
                     parallel jobs
                   } catch(err) {
