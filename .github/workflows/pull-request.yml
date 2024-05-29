@@ -178,9 +178,4 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
     - name: Build Windows Server Image
-      run: |
-        docker build -t ${{ env.IMAGE_AGENT }}:${{ env.TAG }} \
-          --build-arg VERSION=${{ env.COMMIT }} \
-          --build-arg SERVERCORE_VERSION=ltsc2019 \
-          -f package/windows/Dockerfile.agent \
-          .
+      run: docker build -t ${{ env.IMAGE_AGENT }}:${{ env.TAG }} --build-arg VERSION=${{ env.COMMIT }} --build-arg SERVERCORE_VERSION=ltsc2019 -f package/windows/Dockerfile.agent .
