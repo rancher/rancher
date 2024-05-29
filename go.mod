@@ -8,6 +8,7 @@ replace (
 	github.com/docker/docker => github.com/docker/docker v20.10.25+incompatible // rancher-machine requires a repalce is set
 
 	github.com/knative/pkg => github.com/rancher/pkg v0.0.0-20190514055449-b30ab9de040e
+	github.com/manicminer/hamilton v0.46.0 => github.com/rancher/hamilton v0.0.0-20240507075902-326692ab84f7
 	github.com/matryer/moq => github.com/rancher/moq v0.0.0-20200712062324-13d1f37d2d77
 	github.com/opencontainers/image-spec => github.com/opencontainers/image-spec v1.1.0-rc2 // needed for containers/image/v5
 	github.com/opencontainers/runc => github.com/opencontainers/runc v1.1.12
