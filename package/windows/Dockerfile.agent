@@ -4,8 +4,6 @@ ARG VERSION
 
 FROM --platform=$BUILDPLATFORM library/golang:1.21 as build
 
-ARG LINKFLAGS="-s -w -extldflags -static"
-ARG LDFLAGS="-X main.VERSION={0} $LINKFLAGS -f $VERSION"
 
 WORKDIR /app
 COPY . .
@@ -13,7 +11,10 @@ RUN go mod download
 ENV CGO_ENABLED=0
 ENV GOOS=$TARGETOS
 ENV GOARCH=$TARGETARCH
-RUN go build -tags k8s -ldflags $LDFLAGS -o agent.exe ./cmd/agent
+ENV TAGS="k8s"
+ENV LINKFLAGS="-s -w -extldflags -static"
+ENV LDFLAGS="-X main.VERSION={0} $LINKFLAGS -f $VERSION"
+RUN GOOS=${GOOS} GOARCH=${GOARCH} CGO_ENABLED=${CGO_ENABLED} go build -tags "${TAGS}" -ldflags "${LDFLAGS}" -o agent.exe ./cmd/agent
 
 FROM mcr.microsoft.com/windows/servercore:${SERVERCORE_VERSION} AS builder
 SHELL ["powershell", "-NoLogo", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
