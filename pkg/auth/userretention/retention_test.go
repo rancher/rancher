@@ -127,18 +127,21 @@ func TestRetentionNormalRun(t *testing.T) {
 			},
 			PrincipalIDs: []string{"local://user-phs88", "activedirectory_user://CN=testuser1,CN=Users,DC=qa,DC=rancher,DC=space"},
 			Username:     "admin",
+			Enabled:      pointer.Bool(true),
 		},
 		"u-cx7gc": { // Local user.
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "u-cx7gc",
 			},
 			PrincipalIDs: []string{"local://u-cx7gc"},
+			Enabled:      pointer.Bool(true),
 		},
 		"u-ckrl4grxg5": {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "u-ckrl4grxg5",
 			},
 			PrincipalIDs: []string{"activedirectory_user://CN=testuser2,CN=Users,DC=qa,DC=rancher,DC=space", "local://u-ckrl4grxg5"},
+			Enabled:      pointer.Bool(true),
 		},
 		"u-mo773yttt4": { // Already disabled.
 			ObjectMeta: metav1.ObjectMeta{
@@ -157,6 +160,7 @@ func TestRetentionNormalRun(t *testing.T) {
 				Name: "u-yypnjwjmkq",
 			},
 			PrincipalIDs: []string{"activedirectory_user://CN=testuser4,CN=Users,DC=qa,DC=rancher,DC=space", "local://u-yypnjwjmkq"},
+			Enabled:      pointer.Bool(true),
 		},
 		"u-evhs6gb54u": { // A user with disable and delete overrides.
 			ObjectMeta: metav1.ObjectMeta{
@@ -168,6 +172,7 @@ func TestRetentionNormalRun(t *testing.T) {
 				},
 			},
 			PrincipalIDs: []string{"activedirectory_user://CN=testuser5,CN=Users,DC=qa,DC=rancher,DC=space", "local://u-evhs6gb54u"},
+			Enabled:      pointer.Bool(true),
 		},
 		"u-f5ugvctlrk": { // A user that should be retained indefinitely.
 			ObjectMeta: metav1.ObjectMeta{
@@ -178,6 +183,7 @@ func TestRetentionNormalRun(t *testing.T) {
 				},
 			},
 			PrincipalIDs: []string{"activedirectory_user://CN=testuser6,CN=Users,DC=qa,DC=rancher,DC=space", "local://u-f5ugvctlrk"},
+			Enabled:      pointer.Bool(true),
 		},
 	}
 	var (
@@ -303,12 +309,14 @@ func TestRetentionDryRun(t *testing.T) {
 				Name: "u-ckrl4grxg5",
 			},
 			PrincipalIDs: []string{"activedirectory_user://CN=testuser2,CN=Users,DC=qa,DC=rancher,DC=space", "local://u-ckrl4grxg5"},
+			Enabled:      pointer.Bool(true),
 		},
 		"u-mo773yttt4": {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "u-mo773yttt4",
 			},
 			PrincipalIDs: []string{"activedirectory_user://CN=testuser3,CN=Users,DC=qa,DC=rancher,DC=space", "local://u-mo773yttt4"},
+			Enabled:      pointer.Bool(true),
 		},
 	}
 	userAttributes := map[string]*v3.UserAttribute{
@@ -365,6 +373,15 @@ func TestRetentionDryRun(t *testing.T) {
 	err := retention.Run(context.Background())
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	for id, user := range users {
+		if want, got := true, pointer.BoolDeref(user.Enabled, false); want != got {
+			t.Errorf("Expected Enabled for user %s %t got %t", id, want, got)
+		}
+		if want, got := 0, len(user.Labels); want != got {
+			t.Errorf("Expected labels for user %s %d got %d", id, want, got)
+		}
 	}
 }
 
