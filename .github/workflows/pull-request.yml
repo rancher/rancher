@@ -105,6 +105,14 @@ jobs:
           if-no-files-found: error
           retention-days: 1
           overwrite: false
+  build-server-windows:
+    runs-on: windows-2019
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    - name: Build Windows Server Image
+      run: |
+        docker build -t ${{ env.IMAGE_AGENT }}:${{ env.TAG }} --build-arg VERSION=${{ env.COMMIT }} -f package/windows/Dockerfile.agent .
   build-agent:
     needs: [build-server]
     runs-on: ubuntu-latest

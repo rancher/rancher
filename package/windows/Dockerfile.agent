@@ -1,7 +1,17 @@
 ARG SERVERCORE_VERSION
+ARG ARCH=amd64
+ARG VERSION
+
+FROM library/golang:1.21 as build
+
+ARG LINKFLAGS='-X main.VERSION={0} -s -w -extldflags "-static"' -f $VERSION'
+
+WORKDIR /app
+COPY . .
+RUN go mod download
+RUN CGO_ENABLED=0 GOOS='windows' GOARCH=$ARCH go build -tags k8s -ldflags $LINKFLAGS -o .\agent.exe .\cmd/\agent
 
 FROM mcr.microsoft.com/windows/servercore:${SERVERCORE_VERSION} AS builder
-ARG ARCH=amd64
 SHELL ["powershell", "-NoLogo", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
 # download wins
 RUN $URL = 'https://github.com/rancher/wins/releases/download/v0.4.16/wins.exe'; \
@@ -24,10 +34,9 @@ RUN $URL = 'https://dl.k8s.io/v1.25.12/kubernetes-client-windows-amd64.tar.gz'; 
 RUN Copy-Item -Path /wins.exe -Destination /Windows/
 RUN Copy-Item -Path /kubernetes/client/bin/kubectl.exe -Destination /Windows/
 
-ARG VERSION=dev
 LABEL io.cattle.agent true
 ENV DOCKER_API_VERSION 1.24
 ENV AGENT_IMAGE rancher/rancher-agent:${VERSION}
 ENV SSL_CERT_DIR C:\\etc\\kubernetes\\ssl\\certs
-COPY agent.exe *.ps1 *.psm1 /etc/rancher/
+COPY --from=build /app/agent.exe /app/package/windows/*.ps1 /app/package/windows/*.psm1 /etc/rancher/
 ENTRYPOINT ["powershell", "-NoLogo", "-NonInteractive", "-File", "c:/etc/rancher/entrypoint.ps1"]
