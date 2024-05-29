@@ -1371,8 +1371,6 @@ github.com/mailru/easyjson v0.0.0-20190626092158-b2ccc519800e/go.mod h1:C1wdFJiN
 github.com/mailru/easyjson v0.7.6/go.mod h1:xzfreul335JAWq5oZzymOObrkdz5UnU4kGfJJLY9Nlc=
 github.com/mailru/easyjson v0.7.7 h1:UGYAvKxe3sBsEDzO8ZeWOSlIQfWFlxbzLZe7hwFURr0=
 github.com/mailru/easyjson v0.7.7/go.mod h1:xzfreul335JAWq5oZzymOObrkdz5UnU4kGfJJLY9Nlc=
-github.com/manicminer/hamilton v0.46.0 h1:ag0xqWnALt9uQSfrrrXuQvm6puV8y+LghJQD32lzW+M=
-github.com/manicminer/hamilton v0.46.0/go.mod h1:lbVyngC+/nCWuDp8UhC6Bw+bh7jcP/E+YwqzHTmzemk=
 github.com/manifoldco/promptui v0.9.0/go.mod h1:ka04sppxSGFAtxX0qhlYQjISsg9mR4GWtQEhdbn6Pgg=
 github.com/markbates/errx v1.1.0 h1:QDFeR+UP95dO12JgW+tgi2UVfo0V8YBHiUIOaeBPiEI=
 github.com/markbates/errx v1.1.0/go.mod h1:PLa46Oex9KNbVDZhKel8v1OT7hD5JZ2eI7AHhA0wswc=
@@ -1623,6 +1621,8 @@ github.com/rancher/fleet/pkg/apis v0.9.1-rc.2.0.20240213164401-2c6b1019687c h1:O
 github.com/rancher/fleet/pkg/apis v0.9.1-rc.2.0.20240213164401-2c6b1019687c/go.mod h1:KNDEr0BQU33vw4UEYR0v33HwIcyrykcI5UksJwJOmpM=
 github.com/rancher/gke-operator v1.2.1 h1:xliQI7kzIffYeGg/rTW0t1vavygCtH3hU5aO4kHtp1A=
 github.com/rancher/gke-operator v1.2.1/go.mod h1:YnHa6BgnACNSPr4KFjaE7bycZN7+iwizy2wqp+BrpbQ=
+github.com/rancher/hamilton v0.0.0-20240507075902-326692ab84f7 h1:P2F98Jn851vBRNVyU+M35rhawhdWeOZTy3Vls0xClj4=
+github.com/rancher/hamilton v0.0.0-20240507075902-326692ab84f7/go.mod h1:lbVyngC+/nCWuDp8UhC6Bw+bh7jcP/E+YwqzHTmzemk=
 github.com/rancher/helm/v3 v3.13.3-rancher1 h1:iDVShnxFHtz66CzAlS0wktsEZ13cb3Em+W7g4RviC4w=
 github.com/rancher/helm/v3 v3.13.3-rancher1/go.mod h1:3OKO33yI3p4YEXtTITN2+4oScsHeQe71KuzhlZ+aPfg=
 github.com/rancher/kubernetes-provider-detector v0.1.5 h1:hWRAsWuJOemzGjz/XrbTlM7QmfO4OedvFE3QwXiH60I=
