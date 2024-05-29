@@ -28,7 +28,6 @@ import (
 	extv1beta1 "github.com/rancher/rancher/pkg/generated/norman/extensions/v1beta1"
 	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	knetworkingv1 "github.com/rancher/rancher/pkg/generated/norman/networking.k8s.io/v1"
-	policyv1beta1 "github.com/rancher/rancher/pkg/generated/norman/policy/v1beta1"
 	projectv3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	rbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
 	storagev1 "github.com/rancher/rancher/pkg/generated/norman/storage.k8s.io/v1"
@@ -220,7 +219,6 @@ type UserContext struct {
 	Networking     knetworkingv1.Interface
 	Cluster        clusterv3.Interface
 	Storage        storagev1.Interface
-	Policy         policyv1beta1.Interface
 
 	RBACw          wrbacv1.Interface
 	Corew          wcorev1.Interface
@@ -308,7 +306,6 @@ func (w *UserContext) UserOnlyContext() *UserOnlyContext {
 		BatchV1:     w.BatchV1,
 		Cluster:     w.Cluster,
 		Storage:     w.Storage,
-		Policy:      w.Policy,
 	}
 }
 
@@ -331,7 +328,6 @@ type UserOnlyContext struct {
 	Networking      knetworkingv1.Interface
 	Cluster         clusterv3.Interface
 	Storage         storagev1.Interface
-	Policy          policyv1beta1.Interface
 }
 
 func newManagementContext(c *ScaledContext) (*ManagementContext, error) {
@@ -426,7 +422,6 @@ func NewUserContext(scaledContext *ScaledContext, config rest.Config, clusterNam
 	context.RBAC = rbacv1.NewFromControllerFactory(controllerFactory)
 	context.Networking = knetworkingv1.NewFromControllerFactory(controllerFactory)
 	context.Extensions = extv1beta1.NewFromControllerFactory(controllerFactory)
-	context.Policy = policyv1beta1.NewFromControllerFactory(controllerFactory)
 	context.BatchV1 = batchv1.NewFromControllerFactory(controllerFactory)
 	context.Autoscaling = autoscaling.NewFromControllerFactory(controllerFactory)
 	context.Cluster = clusterv3.NewFromControllerFactory(controllerFactory)
@@ -494,7 +489,6 @@ func NewUserOnlyContext(config *wrangler.Context) (*UserOnlyContext, error) {
 	context.Storage = storagev1.NewFromControllerFactory(context.ControllerFactory)
 	context.RBAC = rbacv1.NewFromControllerFactory(context.ControllerFactory)
 	context.Extensions = extv1beta1.NewFromControllerFactory(context.ControllerFactory)
-	context.Policy = policyv1beta1.NewFromControllerFactory(context.ControllerFactory)
 	context.BatchV1 = batchv1.NewFromControllerFactory(context.ControllerFactory)
 	context.Autoscaling = autoscaling.NewFromControllerFactory(context.ControllerFactory)
 	context.Cluster = clusterv3.NewFromControllerFactory(context.ControllerFactory)

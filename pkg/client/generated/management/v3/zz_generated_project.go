@@ -18,7 +18,6 @@ const (
 	ProjectFieldNamespaceDefaultResourceQuota = "namespaceDefaultResourceQuota"
 	ProjectFieldNamespaceId                   = "namespaceId"
 	ProjectFieldOwnerReferences               = "ownerReferences"
-	ProjectFieldPodSecurityPolicyTemplateName = "podSecurityPolicyTemplateId"
 	ProjectFieldRemoved                       = "removed"
 	ProjectFieldResourceQuota                 = "resourceQuota"
 	ProjectFieldState                         = "state"
@@ -41,7 +40,6 @@ type Project struct {
 	NamespaceDefaultResourceQuota *NamespaceResourceQuota `json:"namespaceDefaultResourceQuota,omitempty" yaml:"namespaceDefaultResourceQuota,omitempty"`
 	NamespaceId                   string                  `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
 	OwnerReferences               []OwnerReference        `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
-	PodSecurityPolicyTemplateName string                  `json:"podSecurityPolicyTemplateId,omitempty" yaml:"podSecurityPolicyTemplateId,omitempty"`
 	Removed                       string                  `json:"removed,omitempty" yaml:"removed,omitempty"`
 	ResourceQuota                 *ProjectResourceQuota   `json:"resourceQuota,omitempty" yaml:"resourceQuota,omitempty"`
 	State                         string                  `json:"state,omitempty" yaml:"state,omitempty"`
@@ -70,8 +68,6 @@ type ProjectOperations interface {
 	Delete(container *Project) error
 
 	ActionExportYaml(resource *Project) error
-
-	ActionSetpodsecuritypolicytemplate(resource *Project, input *SetPodSecurityPolicyTemplateInput) (*Project, error)
 }
 
 func newProjectClient(apiClient *Client) *ProjectClient {
@@ -146,10 +142,4 @@ func (c *ProjectClient) Delete(container *Project) error {
 func (c *ProjectClient) ActionExportYaml(resource *Project) error {
 	err := c.apiClient.Ops.DoAction(ProjectType, "exportYaml", &resource.Resource, nil, nil)
 	return err
-}
-
-func (c *ProjectClient) ActionSetpodsecuritypolicytemplate(resource *Project, input *SetPodSecurityPolicyTemplateInput) (*Project, error) {
-	resp := &Project{}
-	err := c.apiClient.Ops.DoAction(ProjectType, "setpodsecuritypolicytemplate", &resource.Resource, input, resp)
-	return resp, err
 }

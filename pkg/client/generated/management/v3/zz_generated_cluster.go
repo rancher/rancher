@@ -20,7 +20,6 @@ const (
 	ClusterFieldAppliedAgentEnvVars                                  = "appliedAgentEnvVars"
 	ClusterFieldAppliedClusterAgentDeploymentCustomization           = "appliedClusterAgentDeploymentCustomization"
 	ClusterFieldAppliedEnableNetworkPolicy                           = "appliedEnableNetworkPolicy"
-	ClusterFieldAppliedPodSecurityPolicyTemplateName                 = "appliedPodSecurityPolicyTemplateId"
 	ClusterFieldAppliedSpec                                          = "appliedSpec"
 	ClusterFieldAuthImage                                            = "authImage"
 	ClusterFieldCACert                                               = "caCert"
@@ -40,7 +39,6 @@ const (
 	ClusterFieldCurrentCisRunName                                    = "currentCisRunName"
 	ClusterFieldDefaultClusterRoleForProjectMembers                  = "defaultClusterRoleForProjectMembers"
 	ClusterFieldDefaultPodSecurityAdmissionConfigurationTemplateName = "defaultPodSecurityAdmissionConfigurationTemplateName"
-	ClusterFieldDefaultPodSecurityPolicyTemplateID                   = "defaultPodSecurityPolicyTemplateId"
 	ClusterFieldDescription                                          = "description"
 	ClusterFieldDesiredAgentImage                                    = "desiredAgentImage"
 	ClusterFieldDesiredAuthImage                                     = "desiredAuthImage"
@@ -103,7 +101,6 @@ type Cluster struct {
 	AppliedAgentEnvVars                                  []EnvVar                       `json:"appliedAgentEnvVars,omitempty" yaml:"appliedAgentEnvVars,omitempty"`
 	AppliedClusterAgentDeploymentCustomization           *AgentDeploymentCustomization  `json:"appliedClusterAgentDeploymentCustomization,omitempty" yaml:"appliedClusterAgentDeploymentCustomization,omitempty"`
 	AppliedEnableNetworkPolicy                           bool                           `json:"appliedEnableNetworkPolicy,omitempty" yaml:"appliedEnableNetworkPolicy,omitempty"`
-	AppliedPodSecurityPolicyTemplateName                 string                         `json:"appliedPodSecurityPolicyTemplateId,omitempty" yaml:"appliedPodSecurityPolicyTemplateId,omitempty"`
 	AppliedSpec                                          *ClusterSpec                   `json:"appliedSpec,omitempty" yaml:"appliedSpec,omitempty"`
 	AuthImage                                            string                         `json:"authImage,omitempty" yaml:"authImage,omitempty"`
 	CACert                                               string                         `json:"caCert,omitempty" yaml:"caCert,omitempty"`
@@ -123,7 +120,6 @@ type Cluster struct {
 	CurrentCisRunName                                    string                         `json:"currentCisRunName,omitempty" yaml:"currentCisRunName,omitempty"`
 	DefaultClusterRoleForProjectMembers                  string                         `json:"defaultClusterRoleForProjectMembers,omitempty" yaml:"defaultClusterRoleForProjectMembers,omitempty"`
 	DefaultPodSecurityAdmissionConfigurationTemplateName string                         `json:"defaultPodSecurityAdmissionConfigurationTemplateName,omitempty" yaml:"defaultPodSecurityAdmissionConfigurationTemplateName,omitempty"`
-	DefaultPodSecurityPolicyTemplateID                   string                         `json:"defaultPodSecurityPolicyTemplateId,omitempty" yaml:"defaultPodSecurityPolicyTemplateId,omitempty"`
 	Description                                          string                         `json:"description,omitempty" yaml:"description,omitempty"`
 	DesiredAgentImage                                    string                         `json:"desiredAgentImage,omitempty" yaml:"desiredAgentImage,omitempty"`
 	DesiredAuthImage                                     string                         `json:"desiredAuthImage,omitempty" yaml:"desiredAuthImage,omitempty"`

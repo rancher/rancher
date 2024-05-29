@@ -49,9 +49,9 @@ type desiredKey struct {
 }
 
 type desired struct {
-	key        desiredKey
-	values     map[string]interface{}
-	forceAdopt bool
+	key           desiredKey
+	values        map[string]interface{}
+	takeOwnership bool
 }
 
 type HelmClient interface {
@@ -165,7 +165,7 @@ func (m *Manager) runSync() {
 					map[desiredKey]map[string]interface{}{
 						desired.key: desired.values,
 					},
-					desired.forceAdopt,
+					desired.takeOwnership,
 				)
 				if err == nil {
 					m.desiredCharts[desired.key] = desired.values
@@ -184,13 +184,13 @@ func getIntervalOrDefault(interval string) time.Duration {
 	return time.Duration(i) * time.Second
 }
 
-// installCharts installs charts with forceAdopt.
-func (m *Manager) installCharts(charts map[desiredKey]map[string]interface{}, forceAdopt bool) error {
+// installCharts installs charts with takeOwnership.
+func (m *Manager) installCharts(charts map[desiredKey]map[string]interface{}, takeOwnership bool) error {
 	var errs []error
 
 	for key, values := range charts {
 		for {
-			if err := m.install(key.namespace, key.name, key.minVersion, key.exactVersion, values, forceAdopt, key.installImageOverride); err == repo.ErrNoChartName || apierrors.IsNotFound(err) {
+			if err := m.install(key.namespace, key.name, key.minVersion, key.exactVersion, values, takeOwnership, key.installImageOverride); err == repo.ErrNoChartName || apierrors.IsNotFound(err) {
 				logrus.Errorf("Failed to find system chart %s will try again in 5 seconds: %v", key.name, err)
 				time.Sleep(5 * time.Second)
 				continue
@@ -232,7 +232,7 @@ func (m *Manager) Uninstall(namespace, name string) error {
 	return m.waitPodDone(op)
 }
 
-func (m *Manager) Ensure(namespace, name, minVersion, exactVersion string, values map[string]interface{}, forceAdopt bool, installImageOverride string) error {
+func (m *Manager) Ensure(namespace, name, minVersion, exactVersion string, values map[string]interface{}, takeOwnership bool, installImageOverride string) error {
 	go func() {
 		m.sync <- desired{
 			key: desiredKey{
@@ -242,8 +242,8 @@ func (m *Manager) Ensure(namespace, name, minVersion, exactVersion string, value
 				exactVersion:         exactVersion,
 				installImageOverride: installImageOverride,
 			},
-			values:     values,
-			forceAdopt: forceAdopt,
+			values:        values,
+			takeOwnership: takeOwnership,
 		}
 	}()
 	return nil
@@ -265,7 +265,7 @@ func (m *Manager) Remove(namespace, name string) {
 // If no version is provided, it will try to install the latest version available.
 // If a release with the version to be installed is already installed, or is pending install, upgrade or rollback, this
 // does nothing.
-func (m *Manager) install(namespace, name, minVersion, exactVersion string, values map[string]interface{}, forceAdopt bool, installImageOverride string) error {
+func (m *Manager) install(namespace, name, minVersion, exactVersion string, values map[string]interface{}, takeOwnership bool, installImageOverride string) error {
 	index, err := m.content.Index("", "rancher-charts", "", true)
 	if err != nil {
 		return err
@@ -319,12 +319,12 @@ func (m *Manager) install(namespace, name, minVersion, exactVersion string, valu
 		t = 5 * time.Minute
 	}
 	upgrade, err := json.Marshal(types.ChartUpgradeAction{
-		Timeout:    &metav1.Duration{Duration: t},
-		Wait:       true,
-		Install:    true,
-		MaxHistory: 5,
-		Namespace:  namespace,
-		ForceAdopt: forceAdopt,
+		Timeout:       &metav1.Duration{Duration: t},
+		Wait:          true,
+		Install:       true,
+		MaxHistory:    5,
+		Namespace:     namespace,
+		TakeOwnership: takeOwnership,
 		Charts: []types.ChartUpgrade{
 			{
 				ChartName:   name,

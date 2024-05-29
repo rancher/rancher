@@ -402,7 +402,7 @@ func TestInstall(t *testing.T) {
 		minVersion           string
 		exactVersion         string
 		values               map[string]interface{}
-		forceAdopt           bool
+		takeOwnership        bool
 		installImageOverride string
 	}
 	type testMocks struct {
@@ -596,7 +596,7 @@ func TestInstall(t *testing.T) {
 			podsMock.On("Get", test.mocks.upgradeOutput.Status.PodNamespace, test.mocks.upgradeOutput.Status.PodName, metav1.GetOptions{}).Return(test.mocks.podGetOutput, test.mocks.podGetError)
 		}
 		manager, _ := NewManager(context.TODO(), contentMock, opsMock, podsMock, settingsMock, clusterRepoMock, helmMock)
-		err := manager.install(test.input.namespace, test.input.name, test.input.minVersion, test.input.exactVersion, test.input.values, test.input.forceAdopt, test.input.installImageOverride)
+		err := manager.install(test.input.namespace, test.input.name, test.input.minVersion, test.input.exactVersion, test.input.values, test.input.takeOwnership, test.input.installImageOverride)
 		asserts.Equal(test.expected, err, test.name)
 	}
 }

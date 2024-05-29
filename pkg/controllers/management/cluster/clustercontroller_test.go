@@ -141,9 +141,6 @@ func TestOverrideCapabilities(t *testing.T) {
 				fmt.Sprintf("%s%s", capabilitiesAnnotation, "pspEnabled"): "true",
 			},
 			capabilities: v32.Capabilities{},
-			result: v32.Capabilities{
-				PspEnabled: true,
-			},
 		},
 		{
 			annotations: map[string]string{

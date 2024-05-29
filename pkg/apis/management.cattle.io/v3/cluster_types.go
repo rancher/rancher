@@ -111,7 +111,6 @@ type ClusterSpecBase struct {
 	AgentEnvVars                                         []v1.EnvVar                             `json:"agentEnvVars,omitempty"`
 	RancherKubernetesEngineConfig                        *rketypes.RancherKubernetesEngineConfig `json:"rancherKubernetesEngineConfig,omitempty"`
 	DefaultPodSecurityAdmissionConfigurationTemplateName string                                  `json:"defaultPodSecurityAdmissionConfigurationTemplateName,omitempty"`
-	DefaultPodSecurityPolicyTemplateName                 string                                  `json:"defaultPodSecurityPolicyTemplateName,omitempty" norman:"type=reference[podSecurityPolicyTemplate]"`
 	DefaultClusterRoleForProjectMembers                  string                                  `json:"defaultClusterRoleForProjectMembers,omitempty" norman:"type=reference[roleTemplate]"`
 	DockerRootDir                                        string                                  `json:"dockerRootDir,omitempty" norman:"default=/var/lib/docker"`
 	EnableNetworkPolicy                                  *bool                                   `json:"enableNetworkPolicy" norman:"default=false"`
@@ -160,45 +159,44 @@ type ClusterStatus struct {
 	Conditions []ClusterCondition `json:"conditions,omitempty"`
 	// Component statuses will represent cluster's components (etcd/controller/scheduler) health
 	// https://kubernetes.io/docs/api-reference/v1.8/#componentstatus-v1-core
-	Driver                               string                    `json:"driver"`
-	Provider                             string                    `json:"provider"`
-	AgentImage                           string                    `json:"agentImage"`
-	AppliedAgentEnvVars                  []v1.EnvVar               `json:"appliedAgentEnvVars,omitempty"`
-	AgentFeatures                        map[string]bool           `json:"agentFeatures,omitempty"`
-	AuthImage                            string                    `json:"authImage"`
-	ComponentStatuses                    []ClusterComponentStatus  `json:"componentStatuses,omitempty"`
-	APIEndpoint                          string                    `json:"apiEndpoint,omitempty"`
-	ServiceAccountToken                  string                    `json:"serviceAccountToken,omitempty"`
-	ServiceAccountTokenSecret            string                    `json:"serviceAccountTokenSecret,omitempty"`
-	CACert                               string                    `json:"caCert,omitempty"`
-	Capacity                             v1.ResourceList           `json:"capacity,omitempty"`
-	Allocatable                          v1.ResourceList           `json:"allocatable,omitempty"`
-	AppliedSpec                          ClusterSpec               `json:"appliedSpec,omitempty"`
-	FailedSpec                           *ClusterSpec              `json:"failedSpec,omitempty"`
-	Requested                            v1.ResourceList           `json:"requested,omitempty"`
-	Limits                               v1.ResourceList           `json:"limits,omitempty"`
-	Version                              *version.Info             `json:"version,omitempty"`
-	AppliedPodSecurityPolicyTemplateName string                    `json:"appliedPodSecurityPolicyTemplateId"`
-	AppliedEnableNetworkPolicy           bool                      `json:"appliedEnableNetworkPolicy" norman:"nocreate,noupdate,default=false"`
-	Capabilities                         Capabilities              `json:"capabilities,omitempty"`
-	NodeVersion                          int                       `json:"nodeVersion,omitempty"`
-	NodeCount                            int                       `json:"nodeCount,omitempty" norman:"nocreate,noupdate"`
-	LinuxWorkerCount                     int                       `json:"linuxWorkerCount,omitempty" norman:"nocreate,noupdate"`
-	WindowsWorkerCount                   int                       `json:"windowsWorkerCount,omitempty" norman:"nocreate,noupdate"`
-	IstioEnabled                         bool                      `json:"istioEnabled,omitempty" norman:"nocreate,noupdate,default=false"`
-	CertificatesExpiration               map[string]CertExpiration `json:"certificatesExpiration,omitempty"`
-	CurrentCisRunName                    string                    `json:"currentCisRunName,omitempty"`
-	AKSStatus                            AKSStatus                 `json:"aksStatus,omitempty" norman:"nocreate,noupdate"`
-	EKSStatus                            EKSStatus                 `json:"eksStatus,omitempty" norman:"nocreate,noupdate"`
-	GKEStatus                            GKEStatus                 `json:"gkeStatus,omitempty" norman:"nocreate,noupdate"`
-	PrivateRegistrySecret                string                    `json:"privateRegistrySecret,omitempty" norman:"nocreate,noupdate"` // Deprecated: use ClusterSpec.ClusterSecrets.PrivateRegistrySecret instead
-	S3CredentialSecret                   string                    `json:"s3CredentialSecret,omitempty" norman:"nocreate,noupdate"`    // Deprecated: use ClusterSpec.ClusterSecrets.S3CredentialSecret instead
-	WeavePasswordSecret                  string                    `json:"weavePasswordSecret,omitempty" norman:"nocreate,noupdate"`   // Deprecated: use ClusterSpec.ClusterSecrets.WeavePasswordSecret instead
-	VsphereSecret                        string                    `json:"vsphereSecret,omitempty" norman:"nocreate,noupdate"`         // Deprecated: use ClusterSpec.ClusterSecrets.VsphereSecret instead
-	VirtualCenterSecret                  string                    `json:"virtualCenterSecret,omitempty" norman:"nocreate,noupdate"`   // Deprecated: use ClusterSpec.ClusterSecrets.VirtualCenterSecret instead
-	OpenStackSecret                      string                    `json:"openStackSecret,omitempty" norman:"nocreate,noupdate"`       // Deprecated: use ClusterSpec.ClusterSecrets.OpenStackSecret instead
-	AADClientSecret                      string                    `json:"aadClientSecret,omitempty" norman:"nocreate,noupdate"`       // Deprecated: use ClusterSpec.ClusterSecrets.AADClientSecret instead
-	AADClientCertSecret                  string                    `json:"aadClientCertSecret,omitempty" norman:"nocreate,noupdate"`   // Deprecated: use ClusterSpec.ClusterSecrets.AADClientCertSecret instead
+	Driver                     string                    `json:"driver"`
+	Provider                   string                    `json:"provider"`
+	AgentImage                 string                    `json:"agentImage"`
+	AppliedAgentEnvVars        []v1.EnvVar               `json:"appliedAgentEnvVars,omitempty"`
+	AgentFeatures              map[string]bool           `json:"agentFeatures,omitempty"`
+	AuthImage                  string                    `json:"authImage"`
+	ComponentStatuses          []ClusterComponentStatus  `json:"componentStatuses,omitempty"`
+	APIEndpoint                string                    `json:"apiEndpoint,omitempty"`
+	ServiceAccountToken        string                    `json:"serviceAccountToken,omitempty"`
+	ServiceAccountTokenSecret  string                    `json:"serviceAccountTokenSecret,omitempty"`
+	CACert                     string                    `json:"caCert,omitempty"`
+	Capacity                   v1.ResourceList           `json:"capacity,omitempty"`
+	Allocatable                v1.ResourceList           `json:"allocatable,omitempty"`
+	AppliedSpec                ClusterSpec               `json:"appliedSpec,omitempty"`
+	FailedSpec                 *ClusterSpec              `json:"failedSpec,omitempty"`
+	Requested                  v1.ResourceList           `json:"requested,omitempty"`
+	Limits                     v1.ResourceList           `json:"limits,omitempty"`
+	Version                    *version.Info             `json:"version,omitempty"`
+	AppliedEnableNetworkPolicy bool                      `json:"appliedEnableNetworkPolicy" norman:"nocreate,noupdate,default=false"`
+	Capabilities               Capabilities              `json:"capabilities,omitempty"`
+	NodeVersion                int                       `json:"nodeVersion,omitempty"`
+	NodeCount                  int                       `json:"nodeCount,omitempty" norman:"nocreate,noupdate"`
+	LinuxWorkerCount           int                       `json:"linuxWorkerCount,omitempty" norman:"nocreate,noupdate"`
+	WindowsWorkerCount         int                       `json:"windowsWorkerCount,omitempty" norman:"nocreate,noupdate"`
+	IstioEnabled               bool                      `json:"istioEnabled,omitempty" norman:"nocreate,noupdate,default=false"`
+	CertificatesExpiration     map[string]CertExpiration `json:"certificatesExpiration,omitempty"`
+	CurrentCisRunName          string                    `json:"currentCisRunName,omitempty"`
+	AKSStatus                  AKSStatus                 `json:"aksStatus,omitempty" norman:"nocreate,noupdate"`
+	EKSStatus                  EKSStatus                 `json:"eksStatus,omitempty" norman:"nocreate,noupdate"`
+	GKEStatus                  GKEStatus                 `json:"gkeStatus,omitempty" norman:"nocreate,noupdate"`
+	PrivateRegistrySecret      string                    `json:"privateRegistrySecret,omitempty" norman:"nocreate,noupdate"` // Deprecated: use ClusterSpec.ClusterSecrets.PrivateRegistrySecret instead
+	S3CredentialSecret         string                    `json:"s3CredentialSecret,omitempty" norman:"nocreate,noupdate"`    // Deprecated: use ClusterSpec.ClusterSecrets.S3CredentialSecret instead
+	WeavePasswordSecret        string                    `json:"weavePasswordSecret,omitempty" norman:"nocreate,noupdate"`   // Deprecated: use ClusterSpec.ClusterSecrets.WeavePasswordSecret instead
+	VsphereSecret              string                    `json:"vsphereSecret,omitempty" norman:"nocreate,noupdate"`         // Deprecated: use ClusterSpec.ClusterSecrets.VsphereSecret instead
+	VirtualCenterSecret        string                    `json:"virtualCenterSecret,omitempty" norman:"nocreate,noupdate"`   // Deprecated: use ClusterSpec.ClusterSecrets.VirtualCenterSecret instead
+	OpenStackSecret            string                    `json:"openStackSecret,omitempty" norman:"nocreate,noupdate"`       // Deprecated: use ClusterSpec.ClusterSecrets.OpenStackSecret instead
+	AADClientSecret            string                    `json:"aadClientSecret,omitempty" norman:"nocreate,noupdate"`       // Deprecated: use ClusterSpec.ClusterSecrets.AADClientSecret instead
+	AADClientCertSecret        string                    `json:"aadClientCertSecret,omitempty" norman:"nocreate,noupdate"`   // Deprecated: use ClusterSpec.ClusterSecrets.AADClientCertSecret instead
 
 	AppliedClusterAgentDeploymentCustomization *AgentDeploymentCustomization `json:"appliedClusterAgentDeploymentCustomization,omitempty"`
 }
@@ -319,7 +317,6 @@ type Capabilities struct {
 	NodePoolScalingSupported bool                     `json:"nodePoolScalingSupported,omitempty"`
 	NodePortRange            string                   `json:"nodePortRange,omitempty"`
 	TaintSupport             *bool                    `json:"taintSupport,omitempty"`
-	PspEnabled               bool                     `json:"pspEnabled,omitempty"`
 }
 
 type LoadBalancerCapabilities struct {

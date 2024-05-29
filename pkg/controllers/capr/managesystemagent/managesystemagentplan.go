@@ -1,8 +1,6 @@
 package managesystemagent
 
 import (
-	"encoding/base64"
-	"encoding/json"
 	"fmt"
 
 	"github.com/Masterminds/semver/v3"
@@ -29,18 +27,6 @@ func (h *handler) OnChangeInstallSUC(cluster *rancherv1.Cluster, status rancherv
 		return nil, status, nil
 	}
 
-	currentVersion, err := semver.NewVersion(cluster.Spec.KubernetesVersion)
-	if err != nil {
-		return nil, status, err
-	}
-
-	// indicate to the SUC chart if we want to
-	// install PodSecurityPolicy manifests
-	pspEnabled := false
-	if currentVersion.LessThan(Kubernetes125) {
-		pspEnabled = true
-	}
-
 	// we must limit the output of name.SafeConcatName to at most 48 characters because
 	// a) the chart release name cannot exceed 53 characters, and
 	// b) upon creation of this resource the prefix 'mcc-' will be added to the release name, hence the limiting to 48 characters
@@ -59,9 +45,6 @@ func (h *handler) OnChangeInstallSUC(cluster *rancherv1.Cluster, status rancherv
 					"global": map[string]interface{}{
 						"cattle": map[string]interface{}{
 							"systemDefaultRegistry": image.GetPrivateRepoURLFromCluster(cluster),
-							"psp": map[string]interface{}{
-								"enabled": pspEnabled,
-							},
 						},
 					},
 				},
@@ -85,10 +68,6 @@ func (h *handler) OnChangeInstallSUC(cluster *rancherv1.Cluster, status rancherv
 	return []runtime.Object{
 		mcc,
 	}, status, nil
-}
-
-type SUCMetadata struct {
-	PspEnabled bool
 }
 
 // syncSystemUpgradeControllerStatus queries the managed system-upgrade-controller chart and determines if it is properly configured for a given
@@ -194,15 +173,11 @@ func (h *handler) syncSystemUpgradeControllerStatus(obj *rkev1.RKEControlPlane, 
 		return status, nil
 	}
 
-	metadata, err := json.Marshal(SUCMetadata{
-		PspEnabled: enabled,
-	})
 	if err != nil {
 		logrus.Errorf("[managesystemagentplan] rkecluster %s/%s: error while marshaling SUC Metadata: %v", obj.Namespace, obj.Name, err)
 		return status, err
 	}
 
-	capr.SystemUpgradeControllerReady.Message(&status, base64.StdEncoding.EncodeToString(metadata))
 	capr.SystemUpgradeControllerReady.Reason(&status, "")
 	capr.SystemUpgradeControllerReady.True(&status)
 	return status, nil

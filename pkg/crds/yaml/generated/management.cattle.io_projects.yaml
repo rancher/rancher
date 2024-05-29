@@ -302,10 +302,6 @@ spec:
                   - type
                   type: object
                 type: array
-              podSecurityPolicyTemplateId:
-                description: PodSecurityPolicyTemplateName is the pod security policy
-                  template associated with the project.
-                type: string
             type: object
         type: object
     served: true
