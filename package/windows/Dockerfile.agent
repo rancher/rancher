@@ -2,15 +2,15 @@ ARG SERVERCORE_VERSION
 ARG ARCH=amd64
 ARG VERSION
 
-FROM --platform=$BUILDPLATFORM library/golang:1.21 as build
+FROM library/golang:1.21 as build
 
 
 WORKDIR /app
 COPY . .
 RUN go mod download
 ENV CGO_ENABLED=0
-ENV GOOS=$TARGETOS
-ENV GOARCH=$TARGETARCH
+ENV GOOS="windows"
+ENV GOARCH="amd64"
 ENV TAGS="k8s"
 ENV LINKFLAGS="-s -w -extldflags -static"
 ENV LDFLAGS="-X main.VERSION={0} $LINKFLAGS -f $VERSION"

@@ -173,35 +173,14 @@ jobs:
   #         file: ./package/Dockerfile.agent
   #         labels: "${{ steps.meta.outputs.labels }}"
   build-agent-windows:
-    runs-on: ubuntu-latest
+    runs-on: windows-2019
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Docker meta
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.IMAGE }}
-          flavor: |
-            latest=false
-      - name: Docker Registry Login
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-      - name: Build agent
-        uses: docker/build-push-action@v5
-        with:
-          push: false
-          build-args: |
-            "VERSION=${{ env.COMMIT }}"
-            "SERVERCORE_VERSION=ltsc2019"
-          tags: ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-windows-ltsc2019
-          context: .
-          platforms: "windows/amd64"
-          file: ./package/windows/Dockerfile.agent
-          labels: "${{ steps.meta.outputs.labels }}"
+    - name: Checkout code
+      uses: actions/checkout@v4
+    - name: Build Windows Server Image
+      run: |
+        docker build -t ${{ env.IMAGE_AGENT }}:${{ env.TAG }} \
+          --build-arg VERSION=${{ env.COMMIT }} \
+          --build-arg SERVERCORE_VERSION=ltsc2019 \
+          -f package/windows/Dockerfile.agent \
+          .
