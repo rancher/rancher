@@ -105,7 +105,8 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("management.cattle.io").resources("nodedrivers").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("kontainerdrivers").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("roletemplates").verbs("*").
-		addRule().apiGroups("management.cattle.io").resources("catalogs", "templates", "templateversions").verbs("*")
+		addRule().apiGroups("management.cattle.io").resources("catalogs", "templates", "templateversions").verbs("*").
+		addRule().apiGroups("management.cattle.io").resources("features").verbs("update", "patch", "security-enable").resourceNames("external-rules")
 
 	// restricted-admin can edit settings if rancher is bootstrapped with restricted-admin role
 	if settings.RestrictedDefaultAdmin.Get() == "true" {
