@@ -4,7 +4,8 @@ ARG VERSION
 
 FROM library/golang:1.21 as build
 
-ARG LINKFLAGS='-X main.VERSION={0} -s -w -extldflags "-static"' -f $VERSION'
+ARG LINKFLAGS="-s -w -extldflags -static"
+ARG LDFLAGS="-X main.VERSION={0} $LINKFLAGS -f $VERSION"
 
 WORKDIR /app
 COPY . .
