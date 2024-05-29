@@ -1,10 +1,11 @@
 package auth
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 
+	"github.com/hashicorp/go-multierror"
+	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/controllers/management/authprovisioningv2"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	typesrbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
@@ -87,7 +88,7 @@ func (p *prtbLifecycle) Updated(obj *v3.ProjectRoleTemplateBinding) (runtime.Obj
 func (p *prtbLifecycle) Remove(obj *v3.ProjectRoleTemplateBinding) (runtime.Object, error) {
 	parts := strings.SplitN(obj.ProjectName, ":", 2)
 	if len(parts) < 2 {
-		return nil, fmt.Errorf("cannot determine project and cluster from %v", obj.ProjectName)
+		return nil, errors.Errorf("cannot determine project and cluster from %v", obj.ProjectName)
 	}
 	clusterName := parts[0]
 	rtbNsAndName := pkgrbac.GetRTBLabel(obj.ObjectMeta)
@@ -138,7 +139,7 @@ func (p *prtbLifecycle) reconcileSubject(binding *v3.ProjectRoleTemplateBinding)
 		return binding, nil
 	}
 
-	return nil, fmt.Errorf("Binding %v has no subject", binding.Name)
+	return nil, errors.Errorf("Binding %v has no subject", binding.Name)
 }
 
 // When a PRTB is created or updated, translate it into several k8s roles and bindings to actually enforce the RBAC.
@@ -153,7 +154,7 @@ func (p *prtbLifecycle) reconcileBindings(binding *v3.ProjectRoleTemplateBinding
 
 	parts := strings.SplitN(binding.ProjectName, ":", 2)
 	if len(parts) < 2 {
-		return fmt.Errorf("cannot determine project and cluster from %v", binding.ProjectName)
+		return errors.Errorf("cannot determine project and cluster from %v", binding.ProjectName)
 	}
 
 	clusterName := parts[0]
@@ -163,7 +164,7 @@ func (p *prtbLifecycle) reconcileBindings(binding *v3.ProjectRoleTemplateBinding
 		return err
 	}
 	if proj == nil {
-		return fmt.Errorf("cannot create binding because project %v was not found", projectName)
+		return errors.Errorf("cannot create binding because project %v was not found", projectName)
 	}
 
 	cluster, err := p.clusterLister.Get("", clusterName)
@@ -171,7 +172,7 @@ func (p *prtbLifecycle) reconcileBindings(binding *v3.ProjectRoleTemplateBinding
 		return err
 	}
 	if cluster == nil {
-		return fmt.Errorf("cannot create binding because cluster %v was not found", clusterName)
+		return errors.Errorf("cannot create binding because cluster %v was not found", clusterName)
 	}
 
 	roleName := strings.ToLower(fmt.Sprintf("%v-clustermember", clusterName))
@@ -270,7 +271,7 @@ func (p *prtbLifecycle) reconcileLabels(binding *v3.ProjectRoleTemplateBinding) 
 			return err
 		})
 		if retryErr != nil {
-			returnErr = errors.Join(returnErr, retryErr)
+			returnErr = multierror.Append(returnErr, retryErr)
 		}
 	}
 
@@ -295,7 +296,7 @@ func (p *prtbLifecycle) reconcileLabels(binding *v3.ProjectRoleTemplateBinding) 
 				return err
 			})
 			if retryErr != nil {
-				returnErr = errors.Join(returnErr, retryErr)
+				returnErr = multierror.Append(returnErr, retryErr)
 			}
 		}
 	}

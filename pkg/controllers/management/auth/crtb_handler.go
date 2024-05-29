@@ -1,10 +1,11 @@
 package auth
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 
+	"github.com/hashicorp/go-multierror"
+	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/controllers/management/authprovisioningv2"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	typesrbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
@@ -134,7 +135,7 @@ func (c *crtbLifecycle) reconcileSubject(binding *v3.ClusterRoleTemplateBinding)
 		return binding, nil
 	}
 
-	return nil, fmt.Errorf("Binding %v has no subject", binding.Name)
+	return nil, errors.Errorf("Binding %v has no subject", binding.Name)
 }
 
 // When a CRTB is created or updated, translate it into several k8s roles and bindings to actually enforce the RBAC
@@ -153,7 +154,7 @@ func (c *crtbLifecycle) reconcileBindings(binding *v3.ClusterRoleTemplateBinding
 		return err
 	}
 	if cluster == nil {
-		return fmt.Errorf("cannot create binding because cluster %v was not found", clusterName)
+		return errors.Errorf("cannot create binding because cluster %v was not found", clusterName)
 	}
 	// if roletemplate is not builtin, check if it's inherited/cloned
 	isOwnerRole, err := c.mgr.checkReferencedRoles(binding.RoleTemplateName, clusterContext, 0)
@@ -255,7 +256,7 @@ func (c *crtbLifecycle) reconcileLabels(binding *v3.ClusterRoleTemplateBinding) 
 			return err
 		})
 		if retryErr != nil {
-			returnErr = errors.Join(returnErr, retryErr)
+			returnErr = multierror.Append(returnErr, retryErr)
 		}
 	}
 
@@ -280,7 +281,7 @@ func (c *crtbLifecycle) reconcileLabels(binding *v3.ClusterRoleTemplateBinding) 
 			return err
 		})
 		if retryErr != nil {
-			returnErr = errors.Join(returnErr, retryErr)
+			returnErr = multierror.Append(returnErr, retryErr)
 		}
 	}
 	if returnErr != nil {

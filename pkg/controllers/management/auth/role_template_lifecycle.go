@@ -1,9 +1,9 @@
 package auth
 
 import (
-	"errors"
 	"fmt"
 
+	"github.com/hashicorp/go-multierror"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	rbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
@@ -134,7 +134,7 @@ func (rtl *roleTemplateLifecycle) removeAuthV2Roles(roleTemplate *v3.RoleTemplat
 		err := rtl.roles.DeleteNamespaced(role.Namespace, role.Name, &metav1.DeleteOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
 			// Combine all errors so we try our best to delete everything in the first run
-			returnErr = errors.Join(returnErr, err)
+			returnErr = multierror.Append(returnErr, err)
 		}
 	}
 

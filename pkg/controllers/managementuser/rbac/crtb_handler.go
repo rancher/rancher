@@ -1,9 +1,8 @@
 package rbac
 
 import (
-	"errors"
-	"fmt"
-
+	"github.com/hashicorp/go-multierror"
+	"github.com/pkg/errors"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	typesrbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
 	pkgrbac "github.com/rancher/rancher/pkg/rbac"
@@ -65,7 +64,7 @@ func (c *crtbLifecycle) syncCRTB(binding *v3.ClusterRoleTemplateBinding) error {
 
 	rt, err := c.rtLister.Get("", binding.RoleTemplateName)
 	if err != nil {
-		return fmt.Errorf("couldn't get role template %v: %w", binding.RoleTemplateName, err)
+		return errors.Wrapf(err, "couldn't get role template %v", binding.RoleTemplateName)
 	}
 
 	roles := map[string]*v3.RoleTemplate{}
@@ -74,16 +73,16 @@ func (c *crtbLifecycle) syncCRTB(binding *v3.ClusterRoleTemplateBinding) error {
 	}
 
 	if err := c.m.ensureRoles(roles); err != nil {
-		return fmt.Errorf("couldn't ensure roles: %w", err)
+		return errors.Wrap(err, "couldn't ensure roles")
 	}
 
 	if err := c.m.ensureClusterBindings(roles, binding); err != nil {
-		return fmt.Errorf("couldn't ensure cluster bindings %v: %w", binding, err)
+		return errors.Wrapf(err, "couldn't ensure cluster bindings %v", binding)
 	}
 
 	if binding.UserName != "" {
 		if err := c.m.ensureServiceAccountImpersonator(binding.UserName); err != nil {
-			return fmt.Errorf("couldn't ensure service account impersonator: %w", err)
+			return errors.Wrapf(err, "couldn't ensure service account impersonator")
 		}
 	}
 
@@ -94,19 +93,19 @@ func (c *crtbLifecycle) ensureCRTBDelete(binding *v3.ClusterRoleTemplateBinding)
 	set := labels.Set(map[string]string{rtbOwnerLabel: pkgrbac.GetRTBLabel(binding.ObjectMeta)})
 	rbs, err := c.crbLister.List("", set.AsSelector())
 	if err != nil {
-		return fmt.Errorf("couldn't list clusterrolebindings with selector %s: %w", set.AsSelector(), err)
+		return errors.Wrapf(err, "couldn't list clusterrolebindings with selector %s", set.AsSelector())
 	}
 
 	for _, rb := range rbs {
 		if err := c.crbClient.Delete(rb.Name, &metav1.DeleteOptions{}); err != nil {
 			if !apierrors.IsNotFound(err) {
-				return fmt.Errorf("error deleting clusterrolebinding %v: %w", rb.Name, err)
+				return errors.Wrapf(err, "error deleting clusterrolebinding %v", rb.Name)
 			}
 		}
 	}
 
 	if err := c.m.deleteServiceAccountImpersonator(binding.UserName); err != nil {
-		return fmt.Errorf("error deleting service account impersonator: %w", err)
+		return errors.Wrap(err, "error deleting service account impersonator")
 	}
 
 	return nil
@@ -152,7 +151,7 @@ func (c *crtbLifecycle) reconcileCRTBUserClusterLabels(binding *v3.ClusterRoleTe
 			return err
 		})
 		if retryErr != nil {
-			returnErr = errors.Join(returnErr, retryErr)
+			returnErr = multierror.Append(returnErr, retryErr)
 		}
 	}
 	if returnErr != nil {

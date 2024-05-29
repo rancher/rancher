@@ -3,7 +3,6 @@ package rancher
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -11,6 +10,8 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/hashicorp/go-multierror"
+	"github.com/pkg/errors"
 	responsewriter "github.com/rancher/apiserver/pkg/middleware"
 	"github.com/rancher/rancher/pkg/api/norman/customization/kontainerdriver"
 	"github.com/rancher/rancher/pkg/api/norman/customization/podsecuritypolicytemplate"
@@ -563,13 +564,13 @@ func migrateEncryptionConfig(ctx context.Context, restConfig *rest.Config) error
 
 			clusterBytes, err := rawDynamicCluster.MarshalJSON()
 			if err != nil {
-				return false, fmt.Errorf("error trying to Marshal dynamic cluster: %w", err)
+				return false, errors.Wrap(err, "error trying to Marshal dynamic cluster")
 			}
 
 			var cluster *v3.Cluster
 
 			if err := json.Unmarshal(clusterBytes, &cluster); err != nil {
-				return false, fmt.Errorf("error trying to Unmarshal dynamicCluster into v3 cluster: %w", err)
+				return false, errors.Wrap(err, "error trying to Unmarshal dynamicCluster into v3 cluster")
 			}
 
 			if cluster.Annotations == nil {
@@ -592,7 +593,7 @@ func migrateEncryptionConfig(ctx context.Context, restConfig *rest.Config) error
 			return false, err
 		})
 		if err != nil {
-			allErrors = errors.Join(err, allErrors)
+			allErrors = multierror.Append(err, allErrors)
 		}
 	}
 	return allErrors

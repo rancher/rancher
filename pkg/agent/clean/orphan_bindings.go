@@ -10,9 +10,9 @@ package clean
 
 import (
 	"context"
-	"errors"
 	"os"
 
+	"github.com/hashicorp/go-multierror"
 	"github.com/rancher/rancher/pkg/controllers/management/auth"
 	"github.com/rancher/rancher/pkg/controllers/management/auth/globalroles"
 	mgmt "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io"
@@ -155,7 +155,7 @@ func (bc *orphanBindingsCleanup) cleanOrphans(dryRun bool) error {
 			logrus.Infof("[%v] deleting orphaned binding: %s/%s", orphanBindingsOperation, rb.Namespace, rb.Name)
 			err := bc.roleBindings.Delete(rb.Namespace, rb.Name, &metav1.DeleteOptions{})
 			if err != nil && !k8serrors.IsNotFound(err) {
-				returnErr = errors.Join(returnErr, err)
+				returnErr = multierror.Append(returnErr, err)
 			}
 		}
 	}
