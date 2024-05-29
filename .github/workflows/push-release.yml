@@ -69,6 +69,23 @@ jobs:
           if-no-files-found: error
           retention-days: 1
           overwrite: true
+  publish-chart:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && contains(github.ref, 'tags/') # Only run on push
+    env:
+      CLOUDSDK_AUTH_ACCESS_TOKEN: ${{ secrets.gcloud_token }}
+    steps:
+      - name: Install gcloud CLI
+        run: |
+          sudo snap install google-cloud-cli --classic
+      - name: Download chart
+        uses: actions/download-artifact@v4
+        with:
+          name: "chart"
+          path: /tmp/charts/
+      - name: Upload chart to bucket
+        run: |
+          gcloud storage cp /tmp/charts gs://releases.rancher.com/server-charts --recursive --acl allUsers:READER --cache-control "public,no-cache,proxy-revalidate"
   build-server:
     runs-on: ubuntu-latest
     strategy:
