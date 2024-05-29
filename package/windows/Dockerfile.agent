@@ -14,7 +14,7 @@ ENV GOARCH="amd64"
 ENV TAGS="k8s"
 ENV LINKFLAGS="-s -w -extldflags -static"
 ENV LDFLAGS="-X main.VERSION={0} $LINKFLAGS -f $VERSION"
-RUN GOOS=${GOOS} GOARCH=${GOARCH} CGO_ENABLED=${CGO_ENABLED} go build -tags "${TAGS}" -ldflags "${LDFLAGS}" -o agent.exe ./cmd/agent
+RUN go build -tags "${TAGS}" -ldflags "${LDFLAGS}" -o agent.exe ./cmd/agent
 
 FROM mcr.microsoft.com/windows/servercore:${SERVERCORE_VERSION} AS builder
 SHELL ["powershell", "-NoLogo", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
