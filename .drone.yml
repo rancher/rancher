@@ -345,8 +345,16 @@ steps:
 
 - name: docker-publish-head
   image: plugins/docker
+  environment:
+    CATTLE_RANCHER_WEBHOOK_VERSION: 103.0.4+up0.4.5
+    CATTLE_CSP_ADAPTER_MIN_VERSION: 103.0.1+up3.0.1
+    CATTLE_FLEET_VERSION: 103.1.4+up0.9.4
   settings:
     purge: false
+    build_args_from_env:
+      - CATTLE_RANCHER_WEBHOOK_VERSION
+      - CATTLE_CSP_ADAPTER_MIN_VERSION
+      - CATTLE_FLEET_VERSION
     build_args:
     - ARCH=amd64
     - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-head
@@ -394,8 +402,12 @@ steps:
 
 - name: docker-publish-head-agent
   image: plugins/docker
+  environment:
+    CATTLE_RANCHER_WEBHOOK_VERSION: 103.0.4+up0.4.5
   settings:
     purge: false
+    build_args_from_env:
+      - CATTLE_RANCHER_WEBHOOK_VERSION
     build_args:
     - ARCH=amd64
     - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-head
@@ -419,8 +431,16 @@ steps:
 
 - name: docker-publish
   image: plugins/docker
+  environment:
+    CATTLE_RANCHER_WEBHOOK_VERSION: 103.0.4+up0.4.5
+    CATTLE_CSP_ADAPTER_MIN_VERSION: 103.0.1+up3.0.1
+    CATTLE_FLEET_VERSION: 103.1.4+up0.9.4
   settings:
     purge: false
+    build_args_from_env:
+      - CATTLE_RANCHER_WEBHOOK_VERSION
+      - CATTLE_CSP_ADAPTER_MIN_VERSION
+      - CATTLE_FLEET_VERSION
     build_args:
     - ARCH=amd64
     - "VERSION=${DRONE_TAG}"
@@ -460,8 +480,12 @@ steps:
 
 - name: docker-publish-agent
   image: plugins/docker
+  environment:
+    CATTLE_RANCHER_WEBHOOK_VERSION: 103.0.4+up0.4.5
   settings:
     purge: false
+    build_args_from_env:
+      - CATTLE_RANCHER_WEBHOOK_VERSION
     build_args:
     - ARCH=amd64
     - "VERSION=${DRONE_TAG}"
@@ -603,8 +627,16 @@ steps:
 
 - name: docker-publish-head
   image: plugins/docker
+  environment:
+    CATTLE_RANCHER_WEBHOOK_VERSION: 103.0.4+up0.4.5
+    CATTLE_CSP_ADAPTER_MIN_VERSION: 103.0.1+up3.0.1
+    CATTLE_FLEET_VERSION: 103.1.4+up0.9.4
   settings:
     purge: false
+    build_args_from_env:
+      - CATTLE_RANCHER_WEBHOOK_VERSION
+      - CATTLE_CSP_ADAPTER_MIN_VERSION
+      - CATTLE_FLEET_VERSION
     build_args:
     - ARCH=arm64
     - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-head
@@ -652,8 +684,12 @@ steps:
 
 - name: docker-publish-head-agent
   image: plugins/docker
+  environment:
+    CATTLE_RANCHER_WEBHOOK_VERSION: 103.0.4+up0.4.5
   settings:
     purge: false
+    build_args_from_env:
+      - CATTLE_RANCHER_WEBHOOK_VERSION
     build_args:
     - ARCH=arm64
     - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-head
@@ -677,8 +713,16 @@ steps:
 
 - name: docker-publish
   image: plugins/docker
+  environment:
+    CATTLE_RANCHER_WEBHOOK_VERSION: 103.0.4+up0.4.5
+    CATTLE_CSP_ADAPTER_MIN_VERSION: 103.0.1+up3.0.1
+    CATTLE_FLEET_VERSION: 103.1.4+up0.9.4
   settings:
     purge: false
+    build_args_from_env:
+      - CATTLE_RANCHER_WEBHOOK_VERSION
+      - CATTLE_CSP_ADAPTER_MIN_VERSION
+      - CATTLE_FLEET_VERSION
     build_args:
     - ARCH=arm64
     - "VERSION=${DRONE_TAG}"
@@ -718,8 +762,12 @@ steps:
 
 - name: docker-publish-agent
   image: plugins/docker
+  environment:
+    CATTLE_RANCHER_WEBHOOK_VERSION: 103.0.4+up0.4.5
   settings:
     purge: false
+    build_args_from_env:
+      - CATTLE_RANCHER_WEBHOOK_VERSION
     build_args:
     - ARCH=arm64
     - "VERSION=${DRONE_TAG}"

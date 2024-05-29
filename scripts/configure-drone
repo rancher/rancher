@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+
+# This is needed because it's difficult (if not impossible) to configure Drone to
+# pass environment variables from a file and refer to them as Docker build args.
+
+set -e
+
+echo Replacing build-config values for Drone...
+
+source "$(dirname "$0")/export-config"
+
+set -u
+
+sed -i "s|\(CATTLE_RANCHER_WEBHOOK_VERSION: \).*|\1$CATTLE_RANCHER_WEBHOOK_VERSION|" .drone.yml
+sed -i "s|\(CATTLE_CSP_ADAPTER_MIN_VERSION: \).*|\1$CATTLE_CSP_ADAPTER_MIN_VERSION|" .drone.yml
+sed -i "s|\(CATTLE_FLEET_VERSION: \).*|\1$CATTLE_FLEET_VERSION|" .drone.yml
