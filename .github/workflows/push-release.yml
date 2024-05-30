@@ -288,8 +288,15 @@ jobs:
         password: ${{ secrets.DOCKER_PASSWORD }}
     - name: Build Windows Server Image
       run: |
+        ref_name="${{ github.ref_name }}"
+        prefix="release/"
+        if [[ "$ref_name" == release/v* ]]; then
+          TAG=${ref_name#$prefix}-${{ github.sha }}-head
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+        fi
         docker build -t ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-windows-${{ matrix.version }} --build-arg VERSION=${{ env.COMMIT }} --build-arg SERVERCORE_VERSION=ltsc${{ matrix.version }} -f package/windows/Dockerfile.agent .
         docker push ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-windows-${{ matrix.version }}
+      shell: bash
   merge-agent-manifest:
     runs-on: ubuntu-latest
     needs: [build-agent, build-agent-windows]
