@@ -96,22 +96,23 @@ func TestGenOIDCProvider_GetPrincipal(t *testing.T) {
 			wantErr:     true,
 		},
 	}
-	for _, tt := range tests {
+	for _, test := range tests {
+		test := test
 		g := &GenOIDCProvider{
 			oidc.OpenIDCProvider{
 				Name: Name,
 				Type: client.GenericOIDCConfigType,
 			},
 		}
-		t.Run(tt.name, func(t *testing.T) {
+		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := g.GetPrincipal(tt.principalID, tt.token)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("GetPrincipal() error = %v, wantErr %v", err, tt.wantErr)
+			got, err := g.GetPrincipal(test.principalID, test.token)
+			if (err != nil) != test.wantErr {
+				t.Errorf("GetPrincipal() error = %v, wantErr %v", err, test.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("GetPrincipal() got = %v, want %v", got, tt.want)
+			if !reflect.DeepEqual(got, test.want) {
+				t.Errorf("GetPrincipal() got = %v, want %v", got, test.want)
 			}
 		})
 	}
@@ -196,6 +197,7 @@ func TestGenOIDCProvider_SearchPrincipals(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			result, err := g.SearchPrincipals(test.searchValue, test.principalType, v3.Token{})
@@ -235,7 +237,9 @@ func TestGenOIDCProvider_TransformToAuthProvider(t *testing.T) {
 	provider := &GenOIDCProvider{}
 
 	for _, test := range tests {
+		test := test
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
 			result, err := provider.TransformToAuthProvider(test.authConfig)
 			if err != nil {
 				t.Errorf("TransformToAuthProvider() returned an error: %v", err)
