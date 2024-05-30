@@ -7,7 +7,6 @@ FROM library/golang:1.21 as build
 
 WORKDIR C:/app
 COPY . .
-RUN go mod download
 ENV CGO_ENABLED=0
 ENV GOOS="windows"
 ENV GOARCH="amd64"
