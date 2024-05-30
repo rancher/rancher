@@ -5,7 +5,7 @@ ARG VERSION
 FROM library/golang:1.21 as build
 
 
-WORKDIR /app
+WORKDIR C:/app
 COPY . .
 RUN go mod download
 ENV CGO_ENABLED=0
@@ -43,7 +43,8 @@ LABEL io.cattle.agent true
 ENV DOCKER_API_VERSION 1.24
 ENV AGENT_IMAGE rancher/rancher-agent:${VERSION}
 ENV SSL_CERT_DIR C:\\etc\\kubernetes\\ssl\\certs
-COPY --from=build /app/agent.exe /etc/rancher/
-COPY --from=build /app/package/windows/*.ps1 /etc/rancher/
-COPY --from=build /app/package/windows/*.psm1 /etc/rancher/
+
+COPY --from=build C:/app/agent.exe /etc/rancher/
+COPY --from=build C:/app/package/windows/*.ps1 /etc/rancher/
+COPY --from=build C:/app/package/windows/*.psm1 /etc/rancher/
 ENTRYPOINT ["powershell", "-NoLogo", "-NonInteractive", "-File", "c:/etc/rancher/entrypoint.ps1"]
