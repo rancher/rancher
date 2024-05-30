@@ -44,6 +44,9 @@ ENV AGENT_IMAGE rancher/rancher-agent:${VERSION}
 ENV SSL_CERT_DIR C:\\etc\\kubernetes\\ssl\\certs
 
 COPY --from=build C:/app/agent.exe /etc/rancher/
-COPY --from=build C:/app/package/windows/*.ps1 /etc/rancher/
-COPY --from=build C:/app/package/windows/*.psm1 /etc/rancher/
+COPY --from=build C:/app/package/windows/agent.ps1 /etc/rancher/
+COPY --from=build C:/app/package/windows/bootstrap.ps1 /etc/rancher/
+COPY --from=build C:/app/package/windows/entrypoint.ps1 /etc/rancher/
+COPY --from=build C:/app/package/windows/execute.ps1 /etc/rancher/
+COPY --from=build C:/app/package/windows/utils.psm1 /etc/rancher/
 ENTRYPOINT ["powershell", "-NoLogo", "-NonInteractive", "-File", "c:/etc/rancher/entrypoint.ps1"]
