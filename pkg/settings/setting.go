@@ -191,6 +191,9 @@ var (
 	// RancherWebhookVersion is the exact version of the webhook that Rancher will install.
 	RancherWebhookVersion = NewSetting("rancher-webhook-version", "")
 
+	// RancherWebhookVersion is the exact version of the webhook that Rancher will install.
+	RancherProvisioningCAPIVersion = NewSetting("rancher-provisioning-capi-version", "")
+
 	// RKE2ChartDefaultBranch represents the default branch for the RKE2 charts repo.
 	RKE2ChartDefaultBranch = NewSetting("rke2-chart-default-branch", "main")
 

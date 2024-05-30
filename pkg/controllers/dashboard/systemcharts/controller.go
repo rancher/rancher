@@ -31,9 +31,10 @@ var (
 		chart.ProvisioningCAPIChartName: "rancher/mirrored-cluster-api-controller",
 	}
 	watchedSettings = map[string]struct{}{
-		settings.RancherWebhookVersion.Name: {},
-		settings.SystemDefaultRegistry.Name: {},
-		settings.ShellImage.Name:            {},
+		settings.RancherWebhookVersion.Name:          {},
+		settings.RancherProvisioningCAPIVersion.Name: {},
+		settings.SystemDefaultRegistry.Name:          {},
+		settings.ShellImage.Name:                     {},
 	}
 )
 
@@ -172,8 +173,9 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 			RemoveNamespace:  true,
 		},
 		{
-			ReleaseNamespace: namespace.ProvisioningCAPINamespace,
-			ChartName:        chart.ProvisioningCAPIChartName,
+			ReleaseNamespace:    namespace.ProvisioningCAPINamespace,
+			ChartName:           chart.ProvisioningCAPIChartName,
+			ExactVersionSetting: settings.RancherProvisioningCAPIVersion,
 			Values: func() map[string]interface{} {
 				values := map[string]interface{}{}
 				// add priority class value
