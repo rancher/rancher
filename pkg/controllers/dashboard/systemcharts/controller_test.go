@@ -81,6 +81,7 @@ func Test_ChartInstallation(t *testing.T) {
 				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
 				mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).Times(4)
 				settings.RancherWebhookVersion.Set("2.0.0")
+				settings.RancherProvisioningCAPIVersion.Set("2.0.0")
 				expectedValues := map[string]interface{}{
 					"priorityClassName": priorityClassName,
 					"capi":              nil,
@@ -116,7 +117,7 @@ func Test_ChartInstallation(t *testing.T) {
 					namespace.ProvisioningCAPINamespace,
 					"rancher-provisioning-capi",
 					"",
-					"",
+					"2.0.0",
 					expectedProvCAPIValues,
 					gomock.AssignableToTypeOf(false),
 					"",
@@ -131,6 +132,7 @@ func Test_ChartInstallation(t *testing.T) {
 				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
 				mocks.configCache.EXPECT().Get(gomock.Any(), chart.CustomValueMapName).Return(nil, errTest).Times(4)
 				settings.RancherWebhookVersion.Set("2.0.0")
+				settings.RancherProvisioningCAPIVersion.Set("2.0.0")
 				expectedValues := map[string]interface{}{
 					"capi": nil,
 					"mcm": map[string]interface{}{
@@ -163,7 +165,7 @@ func Test_ChartInstallation(t *testing.T) {
 					namespace.ProvisioningCAPINamespace,
 					"rancher-provisioning-capi",
 					"",
-					"",
+					"2.0.0",
 					expectedProvCAPIValues,
 					gomock.AssignableToTypeOf(false),
 					"",
@@ -178,6 +180,7 @@ func Test_ChartInstallation(t *testing.T) {
 				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
 				mocks.configCache.EXPECT().Get(gomock.Any(), chart.CustomValueMapName).Return(emptyConfig, nil).Times(4)
 				settings.RancherWebhookVersion.Set("2.0.1")
+				settings.RancherProvisioningCAPIVersion.Set("2.0.1")
 				expectedValues := map[string]interface{}{
 					"capi": nil,
 					"mcm": map[string]interface{}{
@@ -217,7 +220,7 @@ func Test_ChartInstallation(t *testing.T) {
 					namespace.ProvisioningCAPINamespace,
 					"rancher-provisioning-capi",
 					"",
-					"",
+					"2.0.1",
 					expectedProvCAPIValues,
 					gomock.AssignableToTypeOf(false),
 					"rancher-test.io/"+settings.ShellImage.Get(),
@@ -233,6 +236,7 @@ func Test_ChartInstallation(t *testing.T) {
 				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
 				mocks.configCache.EXPECT().Get(gomock.Any(), chart.CustomValueMapName).Return(fullConfig, nil).Times(4)
 				settings.RancherWebhookVersion.Set("2.0.0")
+				settings.RancherProvisioningCAPIVersion.Set("2.0.0")
 				features.MCM.Set(true)
 				expectedValues := map[string]interface{}{
 					"priorityClassName": "newClass",
@@ -265,7 +269,7 @@ func Test_ChartInstallation(t *testing.T) {
 					namespace.ProvisioningCAPINamespace,
 					"rancher-provisioning-capi",
 					"",
-					"",
+					"2.0.0",
 					expectedProvCAPIValues,
 					gomock.AssignableToTypeOf(false),
 					"",
@@ -279,6 +283,7 @@ func Test_ChartInstallation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// reset setting to default values before each test
 			settings.RancherWebhookVersion.Set(originalVersion)
+			settings.RancherProvisioningCAPIVersion.Set(originalVersion)
 			features.MCM.Set(originalMCM)
 
 			ctrl := gomock.NewController(t)
