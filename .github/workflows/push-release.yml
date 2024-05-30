@@ -272,9 +272,27 @@ jobs:
           if-no-files-found: error
           retention-days: 7
           overwrite: true
+  build-agent-windows:
+    strategy:
+      matrix:
+        os: [windows]
+        version: [2019, 2022]
+    runs-on: ${{ matrix.os }}-${{ matrix.version }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    - name: Login to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+    - name: Build Windows Server Image
+      run: |
+        docker build -t ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-windows-${{ matrix.version }} --build-arg VERSION=${{ env.COMMIT }} --build-arg SERVERCORE_VERSION=ltsc${{ matrix.version }} -f package/windows/Dockerfile.agent .
+        docker push ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-windows-${{ matrix.version }}
   merge-agent-manifest:
     runs-on: ubuntu-latest
-    needs: [build-agent]
+    needs: [build-agent, build-agent-windows]
     permissions:
       contents: read
       id-token: write
@@ -315,8 +333,10 @@ jobs:
         run: |
           images=$(printf '${{ env.IMAGE_AGENT }}@sha256:%s ' *)
           docker buildx imagetools create -t ${{ env.IMAGE_AGENT }}:${{ env.TAG }} $images
+          # create the same docker buildx command above but with the windows images for the agent
+          docker buildx imagetools create -t ${{ env.IMAGE_AGENT }}:${{ env.TAG }} $images ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-windows-2019 ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-windows-2022
           if [[ "${{ github.ref_name }}" == release/v* ]]; then
-            docker buildx imagetools create -t ${{ env.IMAGE_AGENT }}:${{ env.HEAD_TAG }} $images
+            docker buildx imagetools create -t ${{ env.IMAGE_AGENT }}:${{ env.HEAD_TAG }} $images ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-windows-2019 ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-windows-2022
           fi
       - name: Inspect image
         run: |

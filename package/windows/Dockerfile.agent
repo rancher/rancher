@@ -2,6 +2,19 @@ ARG SERVERCORE_VERSION
 ARG ARCH=amd64
 ARG VERSION
 
+FROM library/golang:1.21 as build
+
+
+WORKDIR C:/app
+COPY . .
+ENV CGO_ENABLED=0
+ENV GOOS="windows"
+ENV GOARCH="amd64"
+ENV TAGS="k8s"
+ENV LINKFLAGS="-s -w -extldflags -static"
+ENV LDFLAGS="-X main.VERSION={0} $LINKFLAGS -f $VERSION"
+RUN go build -tags "${TAGS}" -ldflags "${LDFLAGS}" -o agent.exe ./cmd/agent
+
 FROM mcr.microsoft.com/windows/servercore:${SERVERCORE_VERSION} AS builder
 SHELL ["powershell", "-NoLogo", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
 # download wins
@@ -30,10 +43,10 @@ ENV DOCKER_API_VERSION 1.24
 ENV AGENT_IMAGE rancher/rancher-agent:${VERSION}
 ENV SSL_CERT_DIR C:\\etc\\kubernetes\\ssl\\certs
 
-COPY package/windows/agent.exe /etc/rancher/
-COPY package/windows/agent.ps1 /etc/rancher/
-COPY package/windows/bootstrap.ps1 /etc/rancher/
-COPY package/windows/entrypoint.ps1 /etc/rancher/
-COPY package/windows/execute.ps1 /etc/rancher/
-COPY package/windows/utils.psm1 /etc/rancher/
+COPY --from=build C:/app/agent.exe /etc/rancher/
+COPY --from=build C:/app/package/windows/agent.ps1 /etc/rancher/
+COPY --from=build C:/app/package/windows/bootstrap.ps1 /etc/rancher/
+COPY --from=build C:/app/package/windows/entrypoint.ps1 /etc/rancher/
+COPY --from=build C:/app/package/windows/execute.ps1 /etc/rancher/
+COPY --from=build C:/app/package/windows/utils.psm1 /etc/rancher/
 ENTRYPOINT ["powershell", "-NoLogo", "-NonInteractive", "-File", "c:/etc/rancher/entrypoint.ps1"]
