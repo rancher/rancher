@@ -2,8 +2,6 @@ module github.com/rancher/rancher
 
 go 1.22
 
-replace github.com/rancher/shepherd => github.com/caliskanugur/shepherd v0.0.0-20240507144611-b10827fbb1f1
-
 replace (
 	github.com/containerd/containerd => github.com/containerd/containerd v1.6.27 // for compatibilty with docker 20.10.x
 	github.com/docker/distribution => github.com/docker/distribution v2.8.2+incompatible // rancher-machine requires a replace is set
@@ -61,8 +59,8 @@ replace (
 require (
 	github.com/antihax/optional v1.0.0
 	github.com/containers/image/v5 v5.30.0
-	github.com/rancher/rancher/pkg/apis v0.0.0-20240425061024-5ce684a45887
-	github.com/rancher/shepherd v0.0.0-20240524164658-9f5a88163ffa
+	github.com/rancher/rancher/pkg/apis v0.0.0-20240529155832-64dbde013b4c
+	github.com/rancher/shepherd v0.0.0-20240530155239-a3783b7c7f54
 	go.qase.io/client v0.0.0-20231114201952-65195ec001fa
 )
 

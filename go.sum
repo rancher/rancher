@@ -950,8 +950,6 @@ github.com/bugsnag/osext v0.0.0-20130617224835-0dd3f918b21b h1:otBG+dV+YK+Soembj
 github.com/bugsnag/osext v0.0.0-20130617224835-0dd3f918b21b/go.mod h1:obH5gd0BsqsP2LwDJ9aOkm/6J86V6lyAXCoQWGw3K50=
 github.com/bugsnag/panicwrap v0.0.0-20160118154447-aceac81c6e2f h1:7+HZb3PwI0cCUETyMDgPCvSta1y3idwBL8PHwSgelJk=
 github.com/bugsnag/panicwrap v0.0.0-20160118154447-aceac81c6e2f/go.mod h1:D/8v3kj0zr8ZAKg1AQ6crr+5VwKN5eIywRkfhyM/+dE=
-github.com/caliskanugur/shepherd v0.0.0-20240507144611-b10827fbb1f1 h1:aNbhaGUsAIkwjd8x6SzR6mF1/V00ynpd1Rykf/myV0I=
-github.com/caliskanugur/shepherd v0.0.0-20240507144611-b10827fbb1f1/go.mod h1:RZuVQEn5OAp2ol3FE7Fy5lyJPIG71Hy09RwAC6IHMOU=
 github.com/cenkalti/backoff/v4 v4.1.1/go.mod h1:scbssz8iZGpm3xbr14ovlUdkxfGXNInqkPWOWmG2CLw=
 github.com/cenkalti/backoff/v4 v4.2.1 h1:y4OZtCnogmCPw98Zjyt5a6+QwPLGkiQsYW5oUqylYbM=
 github.com/cenkalti/backoff/v4 v4.2.1/go.mod h1:Y3VNntkOUPxTVeUxJ/G5vcM//AlwfmyYozVcomhLiZE=
@@ -1878,6 +1876,8 @@ github.com/rancher/remotedialer v0.3.2 h1:kstZbRwPS5gPWpGg8VjEHT2poHtArs+Fc317YM
 github.com/rancher/remotedialer v0.3.2/go.mod h1:Ys004RpJuTLSm+k4aYUCoFiOOad37ubYev3TkOFg/5w=
 github.com/rancher/rke v1.6.0-rc4 h1:5ytUakGjIGGwtG0uB6bnwMqbRoK8ZPiOAUPl6V12Vcw=
 github.com/rancher/rke v1.6.0-rc4/go.mod h1:zvrJLRt+84/OMOUO0AggVqW6a2RSsTjqSW8bDHvKgME=
+github.com/rancher/shepherd v0.0.0-20240530155239-a3783b7c7f54 h1:Zqd+VCeca/8yzs6N5tfknb96ctQ+Svkbb5baIxJy+Go=
+github.com/rancher/shepherd v0.0.0-20240530155239-a3783b7c7f54/go.mod h1:+1bFZ/XBf8QOu0WLJIJ+2K2x/GIjHgKXKCUfm7PnCz4=
 github.com/rancher/steve v0.0.0-20240510175329-a9bf8c7e9cad h1:vlLNRXBJXQL5HAPzYpZc/w43mqfMnp2w+KX/4KrudqA=
 github.com/rancher/steve v0.0.0-20240510175329-a9bf8c7e9cad/go.mod h1:V7k47aUXw0LQeZtirdRRZ1noMad9YtwOAS6Q4FsiL68=
 github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007 h1:ru+mqGnxMmKeU0Q3XIDxkARvInDIqT1hH2amTcsjxI4=
