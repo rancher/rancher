@@ -24,6 +24,7 @@ snapshotInput:
   controlPlaneUnavailableValue: "1"
   workerUnavailableValue: "10%"
   recurringRestores: 1 # By default, this is set to 1 if this field is not included in the config.
+  replaceWorkerNode: false
 ```
 
 Additionally, S3 is a supported restore option. If you choose to use S3, then you must have it already enabled on the downstream cluster.
@@ -31,8 +32,8 @@ Additionally, S3 is a supported restore option. If you choose to use S3, then yo
 These tests utilize Go build tags. Due to this, see the below example on how to run the tests:
 
 ### Snapshot restore
-`gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/snapshot --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestSnapshotRestoreTestSuite/TestSnapshotRestore"` \
-`gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/snapshot --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestSnapshotRestoreTestSuite/TestSnapshotRestoreDynamicInput"`
+`gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/snapshot --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestSnapshotRestoreETCDOnlyTestSuite/TestSnapshotRestoreETCDOnly"` \
+`gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/snapshot --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestSnapshotRestoreETCDOnlyTestSuite/TestSnapshotRestoreETCDOnlyDynamicInput"`
 
 ### Snapshot restore with K8s upgrade
 `gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/snapshot --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestSnapshotRestoreK8sUpgradeTestSuite/TestSnapshotRestoreK8sUpgrade"` \
@@ -41,3 +42,6 @@ These tests utilize Go build tags. Due to this, see the below example on how to 
 ### Sanpshot restore with upgrade strategy
 `gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/snapshot --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestSnapshotRestoreUpgradeStrategyTestSuite/TestSnapshotRestoreUpgradeStrategy"` \
 `gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/snapshot --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestSnapshotRestoreUpgradeStrategyTestSuite/TestSnapshotRestoreUpgradeStrategyDynamicInput"`
+
+### Sanpshot additional tests
+`gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/snapshot --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestSnapshotAdditionalTestsTestSuite$"`

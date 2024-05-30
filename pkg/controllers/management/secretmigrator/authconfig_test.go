@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/rancher/norman/objectclient"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/saml"
+	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	corefakes "github.com/rancher/rancher/pkg/generated/norman/core/v1/fakes"
 	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	"github.com/rancher/rancher/pkg/namespace"
@@ -21,12 +21,10 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/watch"
 )
 
 const (
-	mockPass                = "testpass1234"
+	testPassword            = "testpass1234"
 	testCreationStampString = "2023-05-15T19:28:22Z"
 )
 
@@ -178,6 +176,11 @@ func (c *unstructuredConfig) GetObjectKind() schema.ObjectKind {
 	panic("implement me")
 }
 
+// EachListItemWithAlloc implements runtime.Unstructured.
+func (*unstructuredConfig) EachListItemWithAlloc(func(runtime.Object) error) error {
+	panic("implement me")
+}
+
 func (c *unstructuredConfig) DeepCopyObject() runtime.Object {
 	panic("implement me")
 }
@@ -240,7 +243,7 @@ func TestShibbolethAuthConfigMigration(t *testing.T) {
 
 					assert.Equal(t, tt.expectedSecretName, secret.Name)
 					assert.Equal(t, namespace.GlobalNamespace, secret.Namespace)
-					assert.Equal(t, mockPass, secret.StringData[strings.ToLower(serviceAccountPasswordFieldName)])
+					assert.Equal(t, testPassword, secret.StringData[strings.ToLower(serviceAccountPasswordFieldName)])
 
 					return secret, nil
 				},
@@ -288,6 +291,116 @@ func TestShibbolethAuthConfigMigration(t *testing.T) {
 
 			assert.NoError(t, err)
 			assert.NotNil(t, config)
+		})
+	}
+}
+
+func TestOKTAAuthConfigMigration(t *testing.T) {
+	timeStamp, _ := time.Parse(time.RFC3339, testCreationStampString)
+	testcases := []struct {
+		name                   string
+		unstructuredAuthConfig map[string]any
+		authConfig             apimgmtv3.AuthConfig
+		expectedLdapConfig     apimgmtv3.LdapFields
+		wantStringData         map[string]string
+		// wantMigration is true when we expect the migration to execute
+		wantMigration bool
+	}{
+		{
+			name:                   "test migrating OKTA configuration with openLDAP",
+			unstructuredAuthConfig: getUnstructuredOKTAWithOpenLDAP(),
+			authConfig: apimgmtv3.AuthConfig{
+				Type:    "oktaConfig",
+				Enabled: true,
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "okta",
+					CreationTimestamp: metav1.NewTime(timeStamp),
+				},
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "AuthConfig",
+					APIVersion: "management.cattle.io/v3",
+				},
+			},
+			expectedLdapConfig: apimgmtv3.LdapFields{
+				ServiceAccountPassword: "cattle-global-data:oktaconfig-serviceaccountpassword",
+			},
+			wantStringData: map[string]string{
+				"serviceaccountpassword": "testpass1234",
+			},
+			wantMigration: true,
+		},
+		{
+			name:                   "test migrating with existing migration",
+			unstructuredAuthConfig: getUnstructuredOKTAWithOpenLDAP(),
+			authConfig: apimgmtv3.AuthConfig{
+				Type:    "oktaConfig",
+				Enabled: true,
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "okta",
+					CreationTimestamp: metav1.NewTime(timeStamp),
+				},
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "AuthConfig",
+					APIVersion: "management.cattle.io/v3",
+				},
+				Status: apimgmtv3.AuthConfigStatus{
+					Conditions: []apimgmtv3.AuthConfigConditions{
+						apimgmtv3.AuthConfigConditions{
+							Type:               apimgmtv3.AuthConfigConditionSecretsMigrated,
+							Status:             "True",
+							LastUpdateTime:     "2024-05-13T15:20:34+01:00",
+							LastTransitionTime: "",
+							Reason:             "",
+							Message:            "",
+						},
+					},
+				},
+			},
+			expectedLdapConfig: apimgmtv3.LdapFields{
+				ServiceAccountPassword: "cattle-global-data:oktaconfig-serviceaccountpassword",
+			},
+			wantStringData: map[string]string{
+				"serviceaccountpassword": "testpass1234",
+			},
+		},
+	}
+
+	for _, tt := range testcases {
+		t.Run(tt.name, func(t *testing.T) {
+			h := newFakeHandler(
+				tt.unstructuredAuthConfig,
+				func(secret *corev1.Secret) (*corev1.Secret, error) {
+					assert.Equal(t, "oktaconfig-serviceaccountpassword", secret.Name)
+					assert.Equal(t, namespace.GlobalNamespace, secret.Namespace)
+					assert.Equal(t, tt.wantStringData, secret.StringData)
+
+					return secret, nil
+				},
+				func(secret *corev1.Secret) (*corev1.Secret, error) {
+					return nil, nil
+				},
+				func(namespace string, name string) (*corev1.Secret, error) {
+					return nil, apierrors.NewNotFound(schema.GroupResource{Resource: "secrets"}, name)
+				},
+			)
+
+			config, err := h.syncAuthConfig("test", &tt.authConfig)
+
+			assert.NotNil(t, config)
+			assert.NoError(t, err)
+
+			oktaConfig, ok := config.(*apimgmtv3.OKTAConfig)
+
+			assert.Equal(t, tt.wantMigration, ok)
+			if !tt.wantMigration {
+				return
+			}
+			assert.NotNil(t, oktaConfig)
+
+			assert.NotEmpty(t, oktaConfig.Status.Conditions)
+			assert.NotNil(t, oktaConfig.Status.Conditions[0])
+			assert.Equal(t, apimgmtv3.AuthConfigConditionSecretsMigrated, oktaConfig.Status.Conditions[0].Type)
+			assert.Equal(t, tt.expectedLdapConfig, oktaConfig.OpenLdapConfig)
 		})
 	}
 }
@@ -367,11 +480,27 @@ func getMockShibbolethWithOpenLDAP() map[string]any {
 		},
 		"kind":       "AuthConfig",
 		"apiVersion": "management.cattle.io/v3",
-		"type":       "shibbolethConfig",
+		"type":       client.ShibbolethConfigType,
 		"enabled":    true,
 		"openLdapConfig": map[string]any{
-			"serviceAccountPassword": mockPass,
+			"serviceAccountPassword": testPassword,
 		},
+	}
+}
+
+func getUnstructuredOKTAWithOpenLDAP() map[string]any {
+	timeStamp, _ := time.Parse(time.RFC3339, testCreationStampString)
+	createdTime := metav1.NewTime(timeStamp)
+	return map[string]any{
+		"metadata": map[string]any{
+			"name":              "okta",
+			"creationtimestamp": createdTime,
+		},
+		"kind":                   "AuthConfig",
+		"apiVersion":             "management.cattle.io/v3",
+		"type":                   client.OKTAConfigType,
+		"enabled":                true,
+		"serviceAccountPassword": testPassword,
 	}
 }
 
@@ -379,7 +508,7 @@ type mockAuthConfigClient struct {
 	config map[string]any
 }
 
-func newMockAuthConfigClient(authConfig map[string]any) objectclient.GenericClient {
+func newMockAuthConfigClient(authConfig map[string]any) authConfigsClient {
 	return mockAuthConfigClient{config: authConfig}
 }
 
@@ -391,60 +520,4 @@ func (m mockAuthConfigClient) Get(name string, opts metav1.GetOptions) (runtime.
 
 func (m mockAuthConfigClient) Update(name string, o runtime.Object) (runtime.Object, error) {
 	return o, nil
-}
-
-func (m mockAuthConfigClient) UnstructuredClient() objectclient.GenericClient {
-	panic("implement me")
-}
-
-func (m mockAuthConfigClient) GroupVersionKind() schema.GroupVersionKind {
-	panic("implement me")
-}
-
-func (m mockAuthConfigClient) Create(o runtime.Object) (runtime.Object, error) {
-	panic("implement me")
-}
-
-func (m mockAuthConfigClient) GetNamespaced(namespace, name string, opts metav1.GetOptions) (runtime.Object, error) {
-	panic("implement me")
-}
-
-func (m mockAuthConfigClient) UpdateStatus(name string, o runtime.Object) (runtime.Object, error) {
-	panic("implement me")
-}
-
-func (m mockAuthConfigClient) DeleteNamespaced(namespace, name string, opts *metav1.DeleteOptions) error {
-	panic("implement me")
-}
-
-func (m mockAuthConfigClient) Delete(name string, opts *metav1.DeleteOptions) error {
-	panic("implement me")
-}
-
-func (m mockAuthConfigClient) List(opts metav1.ListOptions) (runtime.Object, error) {
-	panic("implement me")
-}
-
-func (m mockAuthConfigClient) ListNamespaced(namespace string, opts metav1.ListOptions) (runtime.Object, error) {
-	panic("implement me")
-}
-
-func (m mockAuthConfigClient) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	panic("implement me")
-}
-
-func (m mockAuthConfigClient) DeleteCollection(deleteOptions *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
-	panic("implement me")
-}
-
-func (m mockAuthConfigClient) Patch(name string, o runtime.Object, patchType types.PatchType, data []byte, subresources ...string) (runtime.Object, error) {
-	panic("implement me")
-}
-
-func (m mockAuthConfigClient) ObjectFactory() objectclient.ObjectFactory {
-	panic("implement me")
-}
-
-func (m mockAuthConfigClient) ObjectClient() *objectclient.ObjectClient {
-	panic("implement me")
 }

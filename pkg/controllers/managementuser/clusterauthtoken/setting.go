@@ -68,7 +68,6 @@ func (h *settingHandler) Sync(key string, setting *managementv3.Setting) (runtim
 		config.Data["value"] = setting.Value
 		_, err = h.clusterConfigMap.Update(config)
 		return nil, err
-	} else {
-		return nil, err
 	}
+	return nil, err
 }

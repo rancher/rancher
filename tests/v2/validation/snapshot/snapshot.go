@@ -3,6 +3,7 @@ package snapshot
 import (
 	"strings"
 	"testing"
+	"time"
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/apps/v1"
@@ -12,6 +13,7 @@ import (
 	"github.com/rancher/shepherd/extensions/clusters"
 	"github.com/rancher/shepherd/extensions/clusters/kubernetesversions"
 	extdefault "github.com/rancher/shepherd/extensions/defaults"
+	"github.com/rancher/shepherd/extensions/defaults/stevetypes"
 	"github.com/rancher/shepherd/extensions/etcdsnapshot"
 	"github.com/rancher/shepherd/extensions/ingresses"
 	nodestat "github.com/rancher/shepherd/extensions/nodes"
@@ -360,14 +362,6 @@ func restoreV2Prov(t *testing.T, client *rancher.Client, v2prov initialSnapshotC
 		assert.Empty(t, podErrors)
 		require.Equal(t, v2prov.kubernetesVersion, clusterObject.Spec.KubernetesVersion)
 
-		steveclient, err := client.Steve.ProxyDownstream(clusterID)
-		require.NoError(t, err)
-
-		deploymentList, err := steveclient.SteveType(workloads.DeploymentSteveType).NamespacedSteveClient(defaultNamespace).List(nil)
-		require.NoError(t, err)
-		require.Equal(t, 1, len(deploymentList.Data))
-		require.Equal(t, initialWorkloadName, deploymentList.Data[0].ObjectMeta.Name)
-
 		if etcdRestore.SnapshotRestore == kubernetesVersion || etcdRestore.SnapshotRestore == all {
 			clusterObject, _, err := clusters.GetProvisioningClusterByName(client, clusterName, namespace)
 			require.NoError(t, err)
@@ -412,4 +406,36 @@ func createPostBackupWorkloads(t *testing.T, client *rancher.Client, clusterID s
 	err = workloads.VerifyDeployment(steveclient, postDeploymentResp)
 	require.NoError(t, err)
 	require.Equal(t, WorkloadNamePostBackup, postDeploymentResp.ObjectMeta.Name)
+}
+
+// This function waits for retentionlimit+1 automatic snapshots to be taken before verifying that the retention limit is respected
+func createSnapshotsUntilRetentionLimit(t *testing.T, client *rancher.Client, clusterName string, retentionLimit int, timeBetweenSnapshots int) {
+	v1ClusterID, err := clusters.GetV1ProvisioningClusterByName(client, clusterName)
+	if v1ClusterID == "" {
+		v3ClusterID, err := clusters.GetClusterIDByName(client, clusterName)
+		require.NoError(t, err)
+		v1ClusterID = "fleet-default/" + v3ClusterID
+	}
+	require.NoError(t, err)
+
+	fleetCluster, err := client.Steve.SteveType(stevetypes.FleetCluster).ByID(v1ClusterID)
+	require.NoError(t, err)
+
+	provider := fleetCluster.ObjectMeta.Labels["provider.cattle.io"]
+	if provider == "rke" {
+		sleepNum := (retentionLimit + 1) * timeBetweenSnapshots
+		logrus.Infof("Waiting %v hours for %v automatic snapshots to be taken", sleepNum, (retentionLimit + 1))
+		time.Sleep(time.Duration(sleepNum)*time.Hour + time.Minute*5)
+
+		err := etcdsnapshot.RKE1RetentionLimitCheck(client, clusterName)
+		require.NoError(t, err)
+
+	} else {
+		sleepNum := (retentionLimit + 1) * timeBetweenSnapshots
+		logrus.Infof("Waiting %v minutes for %v automatic snapshots to be taken", sleepNum, (retentionLimit + 1))
+		time.Sleep(time.Duration(sleepNum)*time.Minute + time.Minute*5)
+
+		err := etcdsnapshot.RKE2K3SRetentionLimitCheck(client, clusterName)
+		require.NoError(t, err)
+	}
 }

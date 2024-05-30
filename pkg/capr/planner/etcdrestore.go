@@ -525,10 +525,10 @@ func (p *Planner) generateEtcdRestoreNodeCleanupFilesAndInstruction(controlPlane
 		return nil, nil
 	}
 
-	var nodeNames, machineIds []byte
+	var nodeNames, machineIDs []byte
 
 	for _, mid := range allMachineUIDs {
-		machineIds = fmt.Appendf(machineIds, "%s\n", mid)
+		machineIDs = fmt.Appendf(machineIDs, "%s\n", mid)
 	}
 
 	for _, nodeName := range allNodeNames {
@@ -537,7 +537,7 @@ func (p *Planner) generateEtcdRestoreNodeCleanupFilesAndInstruction(controlPlane
 
 	identifier := name.Hex(controlPlane.Spec.ETCDSnapshotRestore.Name+controlPlane.Spec.ETCDSnapshotRestore.RestoreRKEConfig+strconv.Itoa(controlPlane.Spec.ETCDSnapshotRestore.Generation), 10)
 
-	machineIdsFile := fmt.Sprintf("machine-ids-%s", identifier)
+	machineIDsFile := fmt.Sprintf("machine-ids-%s", identifier)
 	nodeNamesFile := fmt.Sprintf("node-names-%s", identifier)
 
 	instructions := []plan.OneTimeInstruction{
@@ -545,7 +545,7 @@ func (p *Planner) generateEtcdRestoreNodeCleanupFilesAndInstruction(controlPlane
 			"etcd-restore/cleanup-nodes",
 			fmt.Sprintf("%v", controlPlane.Status.ETCDSnapshotRestore),
 			"/bin/sh",
-			[]string{etcdRestoreScriptPath(controlPlane, etcdRestoreNodeCleanUpPath), etcdRestoreScriptPath(controlPlane, machineIdsFile), etcdRestoreScriptPath(controlPlane, nodeNamesFile)},
+			[]string{etcdRestoreScriptPath(controlPlane, etcdRestoreNodeCleanUpPath), etcdRestoreScriptPath(controlPlane, machineIDsFile), etcdRestoreScriptPath(controlPlane, nodeNamesFile)},
 			[]string{
 				fmt.Sprintf("%s=%s", "KUBECTL", kubectl),
 				fmt.Sprintf("%s=%s", "KUBECONFIG", kubeconfig),
@@ -559,8 +559,8 @@ func (p *Planner) generateEtcdRestoreNodeCleanupFilesAndInstruction(controlPlane
 			Dynamic: true,
 		},
 		{
-			Content: base64.StdEncoding.EncodeToString(machineIds),
-			Path:    etcdRestoreScriptPath(controlPlane, machineIdsFile),
+			Content: base64.StdEncoding.EncodeToString(machineIDs),
+			Path:    etcdRestoreScriptPath(controlPlane, machineIDsFile),
 			Dynamic: true,
 		},
 		{

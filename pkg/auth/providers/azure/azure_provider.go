@@ -4,6 +4,7 @@ package azure
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -196,6 +197,61 @@ func (ap *Provider) TransformToAuthProvider(
 ) (map[string]interface{}, error) {
 	p := common.TransformToAuthProvider(authConfig)
 	p[publicclient.AzureADProviderFieldRedirectURL] = formAzureRedirectURL(authConfig)
+
+	tenantID, _ := authConfig["tenantId"].(string)
+	p[publicclient.AzureADProviderFieldTenantID] = tenantID
+	applicationID, _ := authConfig["applicationId"].(string)
+	p[publicclient.AzureADProviderFieldClientID] = applicationID
+
+	p[publicclient.AzureADProviderFieldScopes] = []string{"openid", "profile", "email"}
+
+	// this is the default base endpoint, i.e.: https://login.microsoftonline.com/
+	baseEndpoint, _ := authConfig["endpoint"].(string)
+
+	// getString will return the string value from the map, or a blank string if the value is not a string
+	getString := func(data map[string]interface{}, key string) string {
+		v, ok := data[key]
+		if !ok {
+			return ""
+		}
+
+		s, _ := v.(string)
+		return s
+	}
+
+	// Set default authEndpoint, or custom if provided
+	joined, err := url.JoinPath(baseEndpoint, tenantID, "/oauth2/v2.0/authorize")
+	if err != nil {
+		return nil, err
+	}
+	p[publicclient.AzureADProviderFieldAuthURL] = joined
+
+	if customEndpoint := getString(authConfig, "authEndpoint"); customEndpoint != "" {
+		p[publicclient.AzureADProviderFieldAuthURL] = customEndpoint
+	}
+
+	// Set default tokenEndpoint, or custom if provided
+	joined, err = url.JoinPath(baseEndpoint, tenantID, "/oauth2/v2.0/token")
+	if err != nil {
+		return nil, err
+	}
+	p[publicclient.AzureADProviderFieldTokenURL] = joined
+
+	if customEndpoint := getString(authConfig, "tokenEndpoint"); customEndpoint != "" {
+		p[publicclient.AzureADProviderFieldTokenURL] = customEndpoint
+	}
+
+	// Set default deviceAuthEndpoint, or custom if provided
+	joined, err = url.JoinPath(baseEndpoint, tenantID, "/oauth2/v2.0/devicecode")
+	if err != nil {
+		return nil, err
+	}
+	p[publicclient.AzureADProviderFieldDeviceAuthURL] = joined
+
+	if customEndpoint := getString(authConfig, "deviceAuthEndpoint"); customEndpoint != "" {
+		p[publicclient.AzureADProviderFieldDeviceAuthURL] = customEndpoint
+	}
+
 	return p, nil
 }
 
@@ -301,11 +357,12 @@ func (ap *Provider) saveAzureConfigK8s(config *v32.AzureADConfig) error {
 	}
 
 	field := strings.ToLower(client.AzureADConfigFieldApplicationSecret)
-	if err := common.CreateOrUpdateSecrets(ap.secrets, config.ApplicationSecret, field, strings.ToLower(config.Type)); err != nil {
+	name, err := common.CreateOrUpdateSecrets(ap.secrets, config.ApplicationSecret, field, strings.ToLower(config.Type))
+	if err != nil {
 		return err
 	}
 
-	config.ApplicationSecret = common.GetFullSecretName(config.Type, field)
+	config.ApplicationSecret = name
 
 	logrus.Debugf("updating AzureADConfig")
 	_, err = ap.authConfigs.ObjectClient().Update(config.ObjectMeta.Name, config)
@@ -360,7 +417,7 @@ func (ap *Provider) updateToken(client clients.AzureClient, token *v3.Token) err
 
 	current, err := client.MarshalTokenJSON()
 	if err != nil {
-		return errors.New("failed to unmarshal token")
+		return fmt.Errorf("marshaling token to JSON: %w", err)
 	}
 
 	secret, err := ap.tokenMGR.GetSecret(token.UserID, token.AuthProvider, []*v3.Token{token})

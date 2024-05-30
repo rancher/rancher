@@ -47,7 +47,6 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("management.cattle.io").resources("templates", "templateversions").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("nodedrivers").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("kontainerdrivers").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("podsecuritypolicytemplates").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("podsecurityadmissionconfigurationtemplates").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("nodetemplates").verbs("*").
 		addRule().apiGroups("").resources("secrets").verbs("create").
@@ -76,8 +75,6 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("management.cattle.io").resources("settings").verbs("*")
 	rb.addRole("Manage Features", "features-manage").
 		addRule().apiGroups("management.cattle.io").resources("features").verbs("get", "list", "watch", "update")
-	rb.addRole("Manage PodSecurityPolicy Templates", "podsecuritypolicytemplates-manage").
-		addRule().apiGroups("management.cattle.io").resources("podsecuritypolicytemplates").verbs("*")
 	rb.addRole("Create RKE Templates", "clustertemplates-create").
 		addRule().apiGroups("management.cattle.io").resources("clustertemplates").verbs("create")
 	rb.addRole("Create RKE Template Revisions", "clustertemplaterevisions-create").
@@ -92,13 +89,13 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 	// restricted-admin will get cluster admin access to all downstream clusters but limited access to the local cluster
 	restrictedAdminRole := addUserRules(rb.addRole("Restricted Admin", "restricted-admin"))
 	restrictedAdminRole.
+		addRule().apiGroups("").resources("secret").verbs("create").
 		addRule().apiGroups("catalog.cattle.io").resources("clusterrepos").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("clustertemplates").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("clustertemplaterevisions").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("globalrolebindings").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("globalroles").verbs("delete", "deletecollection", "get", "list", "patch", "create", "update", "watch").
 		addRule().apiGroups("management.cattle.io").resources("users", "userattribute", "groups", "groupmembers").verbs("*").
-		addRule().apiGroups("management.cattle.io").resources("podsecuritypolicytemplates").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("podsecurityadmissionconfigurationtemplates").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("fleetworkspaces").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("authconfigs").verbs("*").
@@ -116,8 +113,9 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 	userRole := addUserRules(rb.addRole("User", "user"))
 	userRole.
 		addRule().apiGroups("catalog.cattle.io").resources("clusterrepos").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("podsecuritypolicytemplates").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("podsecurityadmissionconfigurationtemplates").verbs("get", "list", "watch")
+
+	userRole.addNamespacedRule("cattle-global-data").addRule().apiGroups("").resources("secrets").verbs("create")
 
 	rb.addRole("User Base", "user-base").
 		addRule().apiGroups("management.cattle.io").resources("preferences").verbs("*").
@@ -153,6 +151,7 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("rke-machine-config.cattle.io").resources("*").verbs("*").
 		addRule().apiGroups("rke-machine.cattle.io").resources("*").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("projects").verbs("updatepsa").
+		addRule().apiGroups("management.cattle.io").resources("clusterproxyconfigs").verbs("*").
 		addRule().apiGroups().nonResourceURLs("*").verbs("*")
 
 	rb.addRoleTemplate("Cluster Member", "cluster-member", "cluster", false, false, false).
@@ -335,7 +334,7 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("").resources("pods", "pods/attach", "pods/exec", "pods/portforward", "pods/proxy", "replicationcontrollers",
 		"replicationcontrollers/scale").verbs("*").
 		addRule().apiGroups("apps").resources("daemonsets", "deployments", "deployments/rollback", "deployments/scale", "replicasets",
-		"replicasets/scale", "statefulsets").verbs("*").
+		"replicasets/scale", "statefulsets", "statefulsets/scale").verbs("*").
 		addRule().apiGroups("autoscaling").resources("horizontalpodautoscalers").verbs("*").
 		addRule().apiGroups("batch").resources("cronjobs", "jobs").verbs("*").
 		addRule().apiGroups("").resources("limitranges", "pods/log", "pods/status", "replicationcontrollers/status", "resourcequotas", "resourcequotas/status", "bindings").verbs("get", "list", "watch").
@@ -438,7 +437,6 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 
 func addUserRules(role *roleBuilder) *roleBuilder {
 	role.
-		addRule().apiGroups("").resources("secrets").verbs("create").
 		addRule().apiGroups("management.cattle.io").resources("principals", "roletemplates").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("preferences").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("settings").verbs("get", "list", "watch").
@@ -460,7 +458,6 @@ func addUserRules(role *roleBuilder) *roleBuilder {
 		addRule().apiGroups("provisioning.cattle.io").resources("clusters").verbs("create").
 		addRule().apiGroups("rke-machine-config.cattle.io").resources("*").verbs("create").
 		addRule().apiGroups("management.cattle.io").resources("rancherusernotifications").verbs("get", "list", "watch")
-
 	return role
 }
 

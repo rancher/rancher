@@ -17,16 +17,19 @@ import (
 )
 
 const (
-	grbGrIndex          = "mgmt-auth-grb-gr-idex"
-	grNsIndex           = "mgmt-auth-gr-ns-index"
-	grSafeConcatIndex   = "mgmt-auth-gr-concat-index"
-	grbSafeConcatIndex  = "mgmt-auth-grb-concat-index"
-	grbEnqueuer         = "mgmt-auth-gr-enqueue"
-	clusterGrEnqueuer   = "mgmt-auth-cluster-gr"
-	crtbGRBEnqueuer     = "mgmt-auth-crtb-grb"
-	roleEnqueuer        = "mgmt-auth-role-gr"
-	roleBindingEnqueuer = "mgmt-auth-rb-grb"
-	namespaceGrEnqueuer = "mgmt-auth-ns-gr"
+	grbGrIndex                 = "mgmt-auth-grb-gr-idex"
+	grNsIndex                  = "mgmt-auth-gr-ns-index"
+	grSafeConcatIndex          = "mgmt-auth-gr-concat-index"
+	grbSafeConcatIndex         = "mgmt-auth-grb-concat-index"
+	grbEnqueuer                = "mgmt-auth-gr-enqueue"
+	clusterGrEnqueuer          = "mgmt-auth-cluster-gr"
+	crtbGRBEnqueuer            = "mgmt-auth-crtb-grb"
+	roleEnqueuer               = "mgmt-auth-role-gr"
+	roleBindingEnqueuer        = "mgmt-auth-rb-grb"
+	namespaceGrEnqueuer        = "mgmt-auth-ns-gr"
+	fleetWorkspaceGrbEnqueuer  = "mgmt-auth-fw-grb"
+	clusterRoleEnqueuer        = "mgmt-auth-cr-gr"
+	clusterRoleBindingEnqueuer = "mgmt-auth-crb-grb"
 )
 
 type globalRBACEnqueuer struct {
@@ -238,4 +241,84 @@ func (g *globalRBACEnqueuer) namespaceEnqueueGR(_, _ string, obj runtime.Object)
 		grNames = append(grNames, relatedresource.Key{Name: gr.Name})
 	}
 	return grNames, nil
+}
+
+// fleetWorkspaceEnqueueGRB enqueues GlobalRole that have set InheritedFleetWorkspacePermissions
+// when a FleetWorkspace has changed.
+func (g *globalRBACEnqueuer) fleetWorkspaceEnqueueGR(_, _ string, obj runtime.Object) ([]relatedresource.Key, error) {
+	if obj == nil {
+		return nil, nil
+	}
+
+	grs, err := g.grCache.List(labels.Everything())
+	if err != nil {
+		return nil, fmt.Errorf("unable to list current GlobalRoles: %w", err)
+	}
+	var grToSync []relatedresource.Key
+	for _, gr := range grs {
+		if gr.InheritedFleetWorkspacePermissions != nil && (gr.InheritedFleetWorkspacePermissions.WorkspaceVerbs != nil ||
+			gr.InheritedFleetWorkspacePermissions.ResourceRules != nil) {
+			// Set the status as InProgress since we have to reconcile the global role
+			gr.Status.Summary = SummaryInProgress
+			grToSync = append(grToSync, relatedresource.Key{Name: gr.Name})
+		}
+	}
+
+	return grToSync, nil
+}
+
+// clusterRoleEnqueueGRB enqueues GlobalRole when a generated ClusterRole changes.
+func (g *globalRBACEnqueuer) clusterRoleEnqueueGR(_, _ string, obj runtime.Object) ([]relatedresource.Key, error) {
+	if obj == nil {
+		return nil, nil
+	}
+	clusterRole, ok := obj.(*v1.ClusterRole)
+	if !ok {
+		logrus.Errorf("unable to convert object: %[1]v, type: %[1]T to a ClusterRole", obj)
+		return nil, nil
+	}
+	grOwner, ok := clusterRole.Labels[grOwnerLabel]
+	if !ok {
+		// this RoleBinding isn't owned by a GRB, no need to enqueue a GRB
+		return nil, nil
+	}
+	grs, err := g.grCache.GetByIndex(grSafeConcatIndex, grOwner)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get GlobalRole %s for RoleBinding %s: %w", grOwner, clusterRole.Name, err)
+	}
+	grNames := make([]relatedresource.Key, 0, len(grs))
+	for _, gr := range grs {
+		// Set the status as InProgress since we have to reconcile the global role
+		gr.Status.Summary = SummaryInProgress
+		grNames = append(grNames, relatedresource.Key{Name: gr.Name})
+	}
+
+	return grNames, nil
+}
+
+// clusterRoleBindingEnqueueGRB enqueues GlobalRoleBinding when a generated ClusterRoleBinding changes.
+func (g *globalRBACEnqueuer) clusterRoleBindingEnqueueGRB(_, _ string, obj runtime.Object) ([]relatedresource.Key, error) {
+	if obj == nil {
+		return nil, nil
+	}
+	clusterRoleBinding, ok := obj.(*v1.ClusterRoleBinding)
+	if !ok {
+		logrus.Errorf("unable to convert object: %[1]v, type: %[1]T to a ClusterRole", obj)
+		return nil, nil
+	}
+	grbOwner, ok := clusterRoleBinding.Labels[grbOwnerLabel]
+	if !ok {
+		// this RoleBinding isn't owned by a GRB, no need to enqueue a GRB
+		return nil, nil
+	}
+	grbs, err := g.grbCache.GetByIndex(grbSafeConcatIndex, grbOwner)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get GlobalRoleBinding %s for ClusterRoleBinding %s: %w", grbOwner, clusterRoleBinding.Name, err)
+	}
+	grbNames := make([]relatedresource.Key, 0, len(grbs))
+	for _, grb := range grbs {
+		grbNames = append(grbNames, relatedresource.Key{Name: grb.Name})
+	}
+
+	return grbNames, nil
 }

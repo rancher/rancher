@@ -126,11 +126,11 @@ func (p *PlanStore) Load(cluster *capi.Cluster, rkeControlPlane *rkev1.RKEContro
 func noPlanMessage(entry *planEntry) string {
 	if isEtcd(entry) {
 		return "waiting for bootstrap etcd to be available"
-	} else if isControlPlane(entry) {
-		return "waiting for etcd to be available"
-	} else {
-		return "waiting for control plane to be available"
 	}
+	if isControlPlane(entry) {
+		return "waiting for etcd to be available"
+	}
+	return "waiting for control plane to be available"
 }
 
 func probesMessage(plan *plan.Node) string {
@@ -579,14 +579,16 @@ func getJoinURLFromOutput(entry *planEntry, capiCluster *capi.Cluster, rkeContro
 
 	var address []byte
 	var name string
-	if ca := entry.Plan.PeriodicOutput[captureAddressInstructionName]; ca.ExitCode != 0 || ca.LastSuccessfulRunTime == "" {
+	ca := entry.Plan.PeriodicOutput[captureAddressInstructionName]
+	if ca.ExitCode != 0 || ca.LastSuccessfulRunTime == "" {
 		return "", nil
-	} else if etcdNameOutput := entry.Plan.PeriodicOutput[etcdNameInstructionName]; etcdNameOutput.ExitCode != 0 || etcdNameOutput.LastSuccessfulRunTime == "" {
-		return "", nil
-	} else {
-		address = ca.Stdout
-		name = string(bytes.TrimSpace(etcdNameOutput.Stdout))
 	}
+	etcdNameOutput := entry.Plan.PeriodicOutput[etcdNameInstructionName]
+	if etcdNameOutput.ExitCode != 0 || etcdNameOutput.LastSuccessfulRunTime == "" {
+		return "", nil
+	}
+	address = ca.Stdout
+	name = string(bytes.TrimSpace(etcdNameOutput.Stdout))
 
 	var str string
 	scanner := bufio.NewScanner(bytes.NewBuffer(address))

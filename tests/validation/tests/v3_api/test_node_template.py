@@ -6,7 +6,7 @@ from .test_rke_cluster_provisioning import rke_config
 from .test_rke_cluster_provisioning import random_node_name
 from .test_rke_cluster_provisioning import create_and_validate_cluster
 
-engine_install_url = "https://releases.rancher.com/install-docker/24.0.sh"
+engine_install_url = "https://releases.rancher.com/install-docker/26.0.sh"
 user_clients = {"admin": None, "standard_user_1": None,
                 "standard_user_2": None}
 

@@ -2,9 +2,9 @@ package rbac
 
 import (
 	"fmt"
+	"sync"
 	"testing"
 
-	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	fakes2 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1/fakes"
@@ -45,138 +45,157 @@ var (
 
 type clientErrs struct {
 	getError    error
+	listError   error
 	updateError error
 	createError error
 }
 
-func setupManager(roleTemplates map[string]*v3.RoleTemplate, clusterRoles map[string]*v1.ClusterRole, roles map[string]*v1.Role, projects map[string]*v3.Project, crErrs, rtErrs, rErrs clientErrs) *manager {
-	return &manager{
-		rtLister: &fakes.RoleTemplateListerMock{
+type managerOpt func(m *manager)
+
+func newManager(opts ...managerOpt) *manager {
+	manager := &manager{
+		clusterName: "testcluster",
+		rtLister:    &fakes.RoleTemplateListerMock{},
+		crLister:    &fakes2.ClusterRoleListerMock{},
+	}
+
+	for _, opt := range opts {
+		opt(manager)
+	}
+
+	return manager
+}
+
+// withRoleTemplates setup a rtLister mock with the provided roleTemplates and errors
+func withRoleTemplates(roleTemplates map[string]*v3.RoleTemplate, errs *clientErrs) managerOpt {
+	if roleTemplates == nil {
+		roleTemplates = map[string]*v3.RoleTemplate{}
+	}
+
+	if errs == nil {
+		errs = &clientErrs{}
+	}
+
+	syncRoleTemplates := &sync.Map{}
+	for k, v := range roleTemplates {
+		syncRoleTemplates.Store(k, v)
+	}
+
+	return func(m *manager) {
+		m.rtLister = &fakes.RoleTemplateListerMock{
+			ListFunc: newListFunc[*v3.RoleTemplate](syncRoleTemplates, errs.listError),
 			GetFunc: func(namespace string, name string) (*v3.RoleTemplate, error) {
-				if rtErrs.getError != nil {
-					return nil, rtErrs.getError
+				if errs.getError != nil {
+					return nil, errs.getError
 				}
-				rt, ok := roleTemplates[name]
+
+				rtVal, ok := syncRoleTemplates.Load(name)
 				if !ok {
 					return nil, errors.NewNotFound(v3.RoleTemplateGroupVersionResource.GroupResource(), name)
 				}
+
+				rt := rtVal.(*v3.RoleTemplate)
 				return rt.DeepCopy(), nil
 			},
-			ListFunc: func(namespace string, selector labels.Selector) ([]*v3.RoleTemplate, error) {
-				rts := make([]*v3.RoleTemplate, len(roleTemplates))
-				for i := range roleTemplates {
-					rts = append(rts, roleTemplates[i])
-				}
-				return rts, nil
-			},
-		},
-		crLister: &fakes2.ClusterRoleListerMock{
+		}
+	}
+}
+
+// withRoleTemplates setup a crLister and clusterRoles mock with the provided clusterRoles and errors
+func withClusterRoles(clusterRoles map[string]*v1.ClusterRole, errs *clientErrs) managerOpt {
+	if clusterRoles == nil {
+		clusterRoles = map[string]*v1.ClusterRole{}
+	}
+
+	if errs == nil {
+		errs = &clientErrs{}
+	}
+
+	syncClusterRoles := &sync.Map{}
+	for k, v := range clusterRoles {
+		syncClusterRoles.Store(k, v)
+	}
+
+	return func(m *manager) {
+		m.crLister = &fakes2.ClusterRoleListerMock{
+			ListFunc: newListFunc[*v1.ClusterRole](syncClusterRoles, errs.listError),
 			GetFunc: func(namespace string, name string) (*v1.ClusterRole, error) {
-				if crErrs.getError != nil {
-					return nil, crErrs.getError
+				if errs.getError != nil {
+					return nil, errs.getError
 				}
-				cr, ok := clusterRoles[name]
+
+				crVal, ok := syncClusterRoles.Load(name)
 				if !ok {
 					return nil, errors.NewNotFound(v3.RoleTemplateGroupVersionResource.GroupResource(), name)
 				}
+
+				cr := crVal.(*v1.ClusterRole)
 				return cr.DeepCopy(), nil
 			},
-			ListFunc: func(namespace string, selector labels.Selector) ([]*v1.ClusterRole, error) {
-				crs := make([]*v1.ClusterRole, len(roleTemplates))
-				for i := range clusterRoles {
-					crs = append(crs, clusterRoles[i])
-				}
-				return crs, nil
-			},
-		},
-		clusterRoles: &fakes2.ClusterRoleInterfaceMock{
+		}
+
+		m.clusterRoles = &fakes2.ClusterRoleInterfaceMock{
 			GetFunc: func(name string, opts metav1.GetOptions) (*v1.ClusterRole, error) {
-				if crErrs.getError != nil {
-					return nil, crErrs.getError
+				if errs.getError != nil {
+					return nil, errs.getError
 				}
-				cr, ok := clusterRoles[name]
+
+				crVal, ok := syncClusterRoles.Load(name)
 				if !ok {
 					return nil, errors.NewNotFound(v3.RoleTemplateGroupVersionResource.GroupResource(), name)
 				}
+
+				cr := crVal.(*v1.ClusterRole)
 				return cr.DeepCopy(), nil
 			},
 			UpdateFunc: func(cr *v1.ClusterRole) (*v1.ClusterRole, error) {
-				if crErrs.updateError != nil {
-					return nil, crErrs.updateError
+				if errs.updateError != nil {
+					return nil, errs.updateError
 				}
-				_, ok := clusterRoles[cr.Name]
+
+				_, ok := syncClusterRoles.Load(cr.Name)
 				if !ok {
 					return nil, errors.NewNotFound(v3.RoleTemplateGroupVersionResource.GroupResource(), cr.Name)
 				}
-				clusterRoles[cr.Name] = cr
-				return clusterRoles[cr.Name].DeepCopy(), nil
+
+				syncClusterRoles.Store(cr.Name, cr)
+				return cr.DeepCopy(), nil
 			},
 			CreateFunc: func(cr *v1.ClusterRole) (*v1.ClusterRole, error) {
-				if crErrs.createError != nil {
-					return nil, crErrs.createError
+				if errs.createError != nil {
+					return nil, errs.createError
 				}
-				_, ok := clusterRoles[cr.Name]
+
+				_, ok := syncClusterRoles.Load(cr.Name)
 				if ok {
 					return nil, errors.NewAlreadyExists(v3.RoleTemplateGroupVersionResource.GroupResource(), cr.Name)
 				}
-				clusterRoles[cr.Name] = cr
-				return clusterRoles[cr.Name].DeepCopy(), nil
+
+				syncClusterRoles.Store(cr.Name, cr)
+				return cr.DeepCopy(), nil
 			},
-		},
-		rLister: &fakes2.RoleListerMock{
-			GetFunc: func(namespace string, name string) (*v1.Role, error) {
-				if rErrs.getError != nil {
-					return nil, rErrs.getError
-				}
-				key := fmt.Sprintf("%s:%s", namespace, name)
-				r, ok := roles[key]
-				if !ok {
-					return nil, errors.NewNotFound(v3.RoleTemplateGroupVersionResource.GroupResource(), name)
-				}
-				return r.DeepCopy(), nil
-			},
-			ListFunc: func(namespace string, selector labels.Selector) ([]*v1.Role, error) {
-				rs := make([]*v1.Role, len(roles))
-				for i := range roles {
-					rs = append(rs, roles[i])
-				}
-				return rs, nil
-			},
-		},
-		roles: &fakes2.RoleInterfaceMock{
-			UpdateFunc: func(r *v1.Role) (*v1.Role, error) {
-				key := fmt.Sprintf("%s:%s", r.Namespace, r.Name)
-				_, ok := roles[key]
-				if ok {
-					return nil, errors.NewAlreadyExists(v3.RoleTemplateGroupVersionResource.GroupResource(), key)
-				}
-				roles[r.Name] = r
-				return roles[r.Name].DeepCopy(), nil
-			},
-			GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v1.Role, error) {
-				key := fmt.Sprintf("%s:%s", namespace, name)
-				r, ok := roles[key]
-				if !ok {
-					return nil, errors.NewNotFound(v3.RoleTemplateGroupVersionResource.GroupResource(), name)
-				}
-				return r.DeepCopy(), nil
-			},
-		},
-		projectLister: &fakes.ProjectListerMock{
-			ListFunc: func(namespace string, selector labels.Selector) ([]*apimgmtv3.Project, error) {
-				rs := make([]*v3.Project, len(projects))
-				for i := range projects {
-					rs = append(rs, projects[i])
-				}
-				return rs, nil
-			},
-		},
-		clusterName: "testcluster",
+		}
+	}
+}
+
+func newListFunc[T any](resourceMap *sync.Map, err error) func(string, labels.Selector) ([]T, error) {
+	return func(namespace string, selector labels.Selector) ([]T, error) {
+		if err != nil {
+			return nil, err
+		}
+
+		resourceList := []T{}
+		resourceMap.Range(func(key, value any) bool {
+			resourceList = append(resourceList, value.(T))
+			return true
+		})
+
+		return resourceList, nil
 	}
 }
 
 func Test_gatherRoles(t *testing.T) {
-	m := setupManager(recursiveTestRoleTemplates, make(map[string]*v1.ClusterRole), make(map[string]*v1.Role), make(map[string]*v3.Project), clientErrs{}, clientErrs{}, clientErrs{})
+	m := newManager(withRoleTemplates(recursiveTestRoleTemplates, nil))
 
 	emptyRoleTemplates := make(map[string]*v3.RoleTemplate)
 	type args struct {
@@ -226,6 +245,197 @@ func Test_gatherRoles(t *testing.T) {
 			} else {
 				assert.NoError(t, err, fmt.Sprintf("expected no err, got %v", err))
 			}
+		})
+	}
+}
+
+func TestCompareAndUpdateClusterRole(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]struct {
+		clusterRole         *v1.ClusterRole
+		roleTemplate        *v3.RoleTemplate
+		wantNumUpdatesCalls int
+	}{
+		"semantic difference": {
+			clusterRole: &v1.ClusterRole{
+				Rules: []v1.PolicyRule{
+					{
+						Verbs:     []string{"get"},
+						APIGroups: []string{""},
+						Resources: []string{"pods"},
+					},
+				},
+			},
+			roleTemplate: &v3.RoleTemplate{
+				Rules: []v1.PolicyRule{
+					{
+						Verbs:           []string{"get"},
+						APIGroups:       []string{""},
+						Resources:       []string{"pods"},
+						ResourceNames:   []string{},
+						NonResourceURLs: []string{},
+					},
+				},
+			},
+			wantNumUpdatesCalls: 0,
+		},
+		"no difference": {
+			clusterRole: &v1.ClusterRole{
+				Rules: []v1.PolicyRule{
+					{
+						Verbs:     []string{"get"},
+						APIGroups: []string{""},
+						Resources: []string{"pods"},
+					},
+				},
+			},
+			roleTemplate: &v3.RoleTemplate{
+				Rules: []v1.PolicyRule{
+					{
+						Verbs:     []string{"get"},
+						APIGroups: []string{""},
+						Resources: []string{"pods"},
+					},
+				},
+			},
+			wantNumUpdatesCalls: 0,
+		},
+		"difference": {
+			clusterRole: &v1.ClusterRole{
+				Rules: []v1.PolicyRule{
+					{
+						Verbs:     []string{"get"},
+						APIGroups: []string{""},
+						Resources: []string{"pods"},
+					},
+				},
+			},
+			roleTemplate: &v3.RoleTemplate{
+				Rules: []v1.PolicyRule{
+					{
+						Verbs:     []string{"get", "update"},
+						APIGroups: []string{""},
+						Resources: []string{"pods"},
+					},
+				},
+			},
+			wantNumUpdatesCalls: 1,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			numUpdatesCalled := 0
+			var updateParamCalled *v1.ClusterRole
+			clusterRolesMock := &fakes2.ClusterRoleInterfaceMock{
+				UpdateFunc: func(in1 *v1.ClusterRole) (*v1.ClusterRole, error) {
+					numUpdatesCalled++
+					updateParamCalled = in1
+					return &v1.ClusterRole{}, nil
+				},
+			}
+			m := manager{clusterRoles: clusterRolesMock}
+			err := m.compareAndUpdateClusterRole(test.clusterRole, test.roleTemplate)
+			assert.NoError(t, err)
+			assert.Equal(t, test.wantNumUpdatesCalls, numUpdatesCalled)
+			if test.wantNumUpdatesCalls > 0 {
+				assert.Equal(t, test.roleTemplate.Rules, updateParamCalled.Rules)
+			}
+		})
+	}
+}
+
+func TestCompareAndUpdateNamespacedRole(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]struct {
+		role                *v1.Role
+		roleTemplate        *v3.RoleTemplate
+		wantNumUpdatesCalls int
+	}{
+		"semantic difference": {
+			role: &v1.Role{
+				Rules: []v1.PolicyRule{
+					{
+						Verbs:     []string{"get"},
+						APIGroups: []string{""},
+						Resources: []string{"pods"},
+					},
+				},
+			},
+			roleTemplate: &v3.RoleTemplate{
+				Rules: []v1.PolicyRule{
+					{
+						Verbs:           []string{"get"},
+						APIGroups:       []string{""},
+						Resources:       []string{"pods"},
+						ResourceNames:   []string{},
+						NonResourceURLs: []string{},
+					},
+				},
+			},
+			wantNumUpdatesCalls: 0,
+		},
+		"no difference": {
+			role: &v1.Role{
+				Rules: []v1.PolicyRule{
+					{
+						Verbs:     []string{"get"},
+						APIGroups: []string{""},
+						Resources: []string{"pods"},
+					},
+				},
+			},
+			roleTemplate: &v3.RoleTemplate{
+				Rules: []v1.PolicyRule{
+					{
+						Verbs:     []string{"get"},
+						APIGroups: []string{""},
+						Resources: []string{"pods"},
+					},
+				},
+			},
+			wantNumUpdatesCalls: 0,
+		},
+		"difference": {
+			role: &v1.Role{
+				Rules: []v1.PolicyRule{
+					{
+						Verbs:     []string{"get"},
+						APIGroups: []string{""},
+						Resources: []string{"pods"},
+					},
+				},
+			},
+			roleTemplate: &v3.RoleTemplate{
+				Rules: []v1.PolicyRule{
+					{
+						Verbs:     []string{"get", "update"},
+						APIGroups: []string{""},
+						Resources: []string{"pods"},
+					},
+				},
+			},
+			wantNumUpdatesCalls: 1,
+		},
+	}
+
+	for name, test := range tests {
+		test := test
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			numUpdatesCalled := 0
+			rolesMock := &fakes2.RoleInterfaceMock{
+				UpdateFunc: func(in1 *v1.Role) (*v1.Role, error) {
+					numUpdatesCalled++
+					return &v1.Role{}, nil
+				},
+			}
+			m := manager{roles: rolesMock}
+			err := m.compareAndUpdateNamespacedRole(test.role, test.roleTemplate, "")
+			assert.NoError(t, err)
+			assert.Equal(t, numUpdatesCalled, test.wantNumUpdatesCalls)
 		})
 	}
 }

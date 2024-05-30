@@ -11,6 +11,7 @@ const (
 	WorkloadFieldActiveDeadlineSeconds                = "activeDeadlineSeconds"
 	WorkloadFieldAnnotations                          = "annotations"
 	WorkloadFieldAutomountServiceAccountToken         = "automountServiceAccountToken"
+	WorkloadFieldBackoffLimitPerIndex                 = "backoffLimitPerIndex"
 	WorkloadFieldCompletionMode                       = "completionMode"
 	WorkloadFieldContainers                           = "containers"
 	WorkloadFieldCreated                              = "created"
@@ -38,6 +39,7 @@ const (
 	WorkloadFieldJobConfig                            = "jobConfig"
 	WorkloadFieldJobStatus                            = "jobStatus"
 	WorkloadFieldLabels                               = "labels"
+	WorkloadFieldMaxFailedIndexes                     = "maxFailedIndexes"
 	WorkloadFieldMaxSurge                             = "maxSurge"
 	WorkloadFieldMaxUnavailable                       = "maxUnavailable"
 	WorkloadFieldMinReadySeconds                      = "minReadySeconds"
@@ -51,6 +53,7 @@ const (
 	WorkloadFieldPaused                               = "paused"
 	WorkloadFieldPersistentVolumeClaimRetentionPolicy = "persistentVolumeClaimRetentionPolicy"
 	WorkloadFieldPodFailurePolicy                     = "podFailurePolicy"
+	WorkloadFieldPodReplacementPolicy                 = "podReplacementPolicy"
 	WorkloadFieldPreemptionPolicy                     = "preemptionPolicy"
 	WorkloadFieldProjectID                            = "projectId"
 	WorkloadFieldPublicEndpoints                      = "publicEndpoints"
@@ -99,6 +102,7 @@ type Workload struct {
 	ActiveDeadlineSeconds                *int64                                           `json:"activeDeadlineSeconds,omitempty" yaml:"activeDeadlineSeconds,omitempty"`
 	Annotations                          map[string]string                                `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	AutomountServiceAccountToken         *bool                                            `json:"automountServiceAccountToken,omitempty" yaml:"automountServiceAccountToken,omitempty"`
+	BackoffLimitPerIndex                 *int64                                           `json:"backoffLimitPerIndex,omitempty" yaml:"backoffLimitPerIndex,omitempty"`
 	CompletionMode                       string                                           `json:"completionMode,omitempty" yaml:"completionMode,omitempty"`
 	Containers                           []Container                                      `json:"containers,omitempty" yaml:"containers,omitempty"`
 	Created                              string                                           `json:"created,omitempty" yaml:"created,omitempty"`
@@ -126,6 +130,7 @@ type Workload struct {
 	JobConfig                            *JobConfig                                       `json:"jobConfig,omitempty" yaml:"jobConfig,omitempty"`
 	JobStatus                            *JobStatus                                       `json:"jobStatus,omitempty" yaml:"jobStatus,omitempty"`
 	Labels                               map[string]string                                `json:"labels,omitempty" yaml:"labels,omitempty"`
+	MaxFailedIndexes                     *int64                                           `json:"maxFailedIndexes,omitempty" yaml:"maxFailedIndexes,omitempty"`
 	MaxSurge                             intstr.IntOrString                               `json:"maxSurge,omitempty" yaml:"maxSurge,omitempty"`
 	MaxUnavailable                       intstr.IntOrString                               `json:"maxUnavailable,omitempty" yaml:"maxUnavailable,omitempty"`
 	MinReadySeconds                      int64                                            `json:"minReadySeconds,omitempty" yaml:"minReadySeconds,omitempty"`
@@ -139,6 +144,7 @@ type Workload struct {
 	Paused                               bool                                             `json:"paused,omitempty" yaml:"paused,omitempty"`
 	PersistentVolumeClaimRetentionPolicy *StatefulSetPersistentVolumeClaimRetentionPolicy `json:"persistentVolumeClaimRetentionPolicy,omitempty" yaml:"persistentVolumeClaimRetentionPolicy,omitempty"`
 	PodFailurePolicy                     *PodFailurePolicy                                `json:"podFailurePolicy,omitempty" yaml:"podFailurePolicy,omitempty"`
+	PodReplacementPolicy                 string                                           `json:"podReplacementPolicy,omitempty" yaml:"podReplacementPolicy,omitempty"`
 	PreemptionPolicy                     string                                           `json:"preemptionPolicy,omitempty" yaml:"preemptionPolicy,omitempty"`
 	ProjectID                            string                                           `json:"projectId,omitempty" yaml:"projectId,omitempty"`
 	PublicEndpoints                      []PublicEndpoint                                 `json:"publicEndpoints,omitempty" yaml:"publicEndpoints,omitempty"`

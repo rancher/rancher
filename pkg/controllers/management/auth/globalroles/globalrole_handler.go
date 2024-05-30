@@ -60,24 +60,30 @@ const (
 	FailedToUpdateClusterRole = "UpdateClusterRoleFailed"
 )
 
+type fleetPermissionsRoleHandler interface {
+	reconcileFleetWorkspacePermissions(globalRole *v3.GlobalRole) error
+}
+
 func newGlobalRoleLifecycle(management *config.ManagementContext) *globalRoleLifecycle {
 	return &globalRoleLifecycle{
-		crLister: management.RBAC.ClusterRoles("").Controller().Lister(),
-		crClient: management.RBAC.ClusterRoles(""),
-		nsCache:  management.Wrangler.Core.Namespace().Cache(),
-		rLister:  management.RBAC.Roles("").Controller().Lister(),
-		rClient:  management.RBAC.Roles(""),
-		grClient: management.Wrangler.Mgmt.GlobalRole(),
+		crLister:                management.RBAC.ClusterRoles("").Controller().Lister(),
+		crClient:                management.RBAC.ClusterRoles(""),
+		nsCache:                 management.Wrangler.Core.Namespace().Cache(),
+		rLister:                 management.RBAC.Roles("").Controller().Lister(),
+		rClient:                 management.RBAC.Roles(""),
+		grClient:                management.Wrangler.Mgmt.GlobalRole(),
+		fleetPermissionsHandler: newFleetWorkspaceRoleHandler(management),
 	}
 }
 
 type globalRoleLifecycle struct {
-	crLister rbacv1.ClusterRoleLister
-	crClient rbacv1.ClusterRoleInterface
-	nsCache  wcorev1.NamespaceCache
-	rLister  rbacv1.RoleLister
-	rClient  rbacv1.RoleInterface
-	grClient mgmtconv3.GlobalRoleClient
+	crLister                rbacv1.ClusterRoleLister
+	crClient                rbacv1.ClusterRoleInterface
+	nsCache                 wcorev1.NamespaceCache
+	rLister                 rbacv1.RoleLister
+	rClient                 rbacv1.RoleInterface
+	grClient                mgmtconv3.GlobalRoleClient
+	fleetPermissionsHandler fleetPermissionsRoleHandler
 }
 
 func (gr *globalRoleLifecycle) Create(obj *v3.GlobalRole) (runtime.Object, error) {
@@ -103,6 +109,10 @@ func (gr *globalRoleLifecycle) Create(obj *v3.GlobalRole) (runtime.Object, error
 		returnError = multierror.Append(returnError, err)
 	}
 	err = gr.reconcileNamespacedRoles(obj)
+	if err != nil {
+		returnError = multierror.Append(returnError, err)
+	}
+	err = gr.fleetPermissionsHandler.reconcileFleetWorkspacePermissions(obj)
 	if err != nil {
 		returnError = multierror.Append(returnError, err)
 	}
@@ -136,6 +146,10 @@ func (gr *globalRoleLifecycle) Updated(obj *v3.GlobalRole) (runtime.Object, erro
 		returnError = multierror.Append(returnError, err)
 	}
 	err = gr.reconcileNamespacedRoles(obj)
+	if err != nil {
+		returnError = multierror.Append(returnError, err)
+	}
+	err = gr.fleetPermissionsHandler.reconcileFleetWorkspacePermissions(obj)
 	if err != nil {
 		returnError = multierror.Append(returnError, err)
 	}

@@ -1,19 +1,19 @@
-FROM registry.suse.com/bci/golang:1.21
+FROM registry.suse.com/bci/golang:1.22
 
 ARG DAPPER_HOST_ARCH
 ENV HOST_ARCH=${DAPPER_HOST_ARCH} ARCH=${DAPPER_HOST_ARCH}
 ENV CATTLE_HELM_VERSION v2.16.8-rancher2
-ENV CATTLE_MACHINE_VERSION v0.15.0-rancher109
-ENV CATTLE_K3S_VERSION v1.27.10+k3s2
+ENV CATTLE_MACHINE_VERSION v0.15.0-rancher112
+ENV CATTLE_K3S_VERSION v1.29.3+k3s1
 # helm 3 version
-ENV HELM_VERSION v3.13.3
+ENV HELM_VERSION v3.14.3
 ENV KUSTOMIZE_VERSION v5.0.1
 ENV HELM_UNITTEST_VERSION 0.3.2
 # k3d ci version
 ENV K3D_VERSION v5.4.6
 
 # kontainer-driver-metadata branch to be set for specific branch other than dev/master, logic at rancher/rancher/pkg/settings/setting.go
-ENV CATTLE_KDM_BRANCH=dev-v2.8
+ENV CATTLE_KDM_BRANCH=dev-v2.9
 
 RUN zypper -n install gcc binutils glibc-devel-static ca-certificates git-core wget curl unzip tar vim less file xz gzip sed gawk iproute2 iptables jq skopeo
 # use containerd from k3s image, not from bci
@@ -27,14 +27,14 @@ RUN if [ "${ARCH}" != "s390x" ]; then \
         curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | TAG=${K3D_VERSION} bash; \
     fi
 
-ENV GOLANGCI_LINT v1.54.0
+ENV GOLANGCI_LINT v1.57.2
 RUN if [ "${ARCH}" == "amd64" ]; then \
         curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s "${GOLANGCI_LINT}"; \
         curl -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/fossas/spectrometer/master/install.sh | sh; \
     fi
 
 # Tool for CRD generation.
-ENV CONTROLLER_GEN_VERSION v0.12.0
+ENV CONTROLLER_GEN_VERSION v0.14.0
 RUN go install sigs.k8s.io/controller-tools/cmd/controller-gen@${CONTROLLER_GEN_VERSION}
 
 # YAML processor for release configuration.
@@ -69,7 +69,7 @@ RUN mkdir /usr/tmp && \
     chmod +x /usr/bin/kustomize
 
 # Set up K3s: copy the necessary binaries from the K3s image.
-COPY --from=rancher/k3s:v1.27.10-k3s2 \
+COPY --from=rancher/k3s:v1.29.3-k3s1 \
     /bin/blkid \
     /bin/bandwidth \
     /bin/cni \

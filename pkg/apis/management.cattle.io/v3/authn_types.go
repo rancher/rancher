@@ -280,14 +280,15 @@ type GoogleOauthConfigApplyInput struct {
 type AzureADConfig struct {
 	AuthConfig `json:",inline" mapstructure:",squash"`
 
-	Endpoint          string `json:"endpoint,omitempty" norman:"default=https://login.microsoftonline.com/,required,notnullable"`
-	GraphEndpoint     string `json:"graphEndpoint,omitempty" norman:"required,notnullable"`
-	TokenEndpoint     string `json:"tokenEndpoint,omitempty" norman:"required,notnullable"`
-	AuthEndpoint      string `json:"authEndpoint,omitempty" norman:"required,notnullable"`
-	TenantID          string `json:"tenantId,omitempty" norman:"required,notnullable"`
-	ApplicationID     string `json:"applicationId,omitempty" norman:"required,notnullable"`
-	ApplicationSecret string `json:"applicationSecret,omitempty" norman:"required,type=password"`
-	RancherURL        string `json:"rancherUrl,omitempty" norman:"required,notnullable"`
+	Endpoint           string `json:"endpoint,omitempty" norman:"default=https://login.microsoftonline.com/,required,notnullable"`
+	GraphEndpoint      string `json:"graphEndpoint,omitempty" norman:"required,notnullable"`
+	TokenEndpoint      string `json:"tokenEndpoint,omitempty" norman:"required,notnullable"`
+	AuthEndpoint       string `json:"authEndpoint,omitempty" norman:"required,notnullable"`
+	DeviceAuthEndpoint string `json:"deviceAuthEndpoint,omitempty"`
+	TenantID           string `json:"tenantId,omitempty" norman:"required,notnullable"`
+	ApplicationID      string `json:"applicationId,omitempty" norman:"required,notnullable"`
+	ApplicationSecret  string `json:"applicationSecret,omitempty" norman:"required,type=password"`
+	RancherURL         string `json:"rancherUrl,omitempty" norman:"required,notnullable"`
 }
 
 type AzureADConfigTestOutput struct {
@@ -475,4 +476,18 @@ type OIDCApplyInput struct {
 
 type KeyCloakOIDCConfig struct {
 	OIDCConfig `json:",inline" mapstructure:",squash"`
+}
+
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// ClusterProxyConfig determines which downstream requests will be proxied to the downstream cluster for requests that contain service account tokens.
+// Objects of this type are created in the namespace of the target cluster.  If no object exists, the feature will be disabled by default.
+type ClusterProxyConfig struct {
+	types.Namespaced  `json:",inline"`
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	// Enabled indicates whether downstream proxy requests for service account tokens is enabled.
+	Enabled bool `json:"enabled"`
 }

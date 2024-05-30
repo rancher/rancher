@@ -43,7 +43,7 @@ func (c *CustomClusterProvisioningTestSuite) SetupSuite() {
 
 	c.isWindows = false
 	for _, pool := range c.provisioningConfig.MachinePools {
-		if pool.NodeRoles.Windows {
+		if pool.MachinePoolConfig.Windows {
 			c.isWindows = true
 			break
 		}
@@ -79,10 +79,35 @@ func (c *CustomClusterProvisioningTestSuite) SetupSuite() {
 }
 
 func (c *CustomClusterProvisioningTestSuite) TestProvisioningRKE2CustomCluster() {
-	nodeRolesAll := []provisioninginput.MachinePools{provisioninginput.AllRolesMachinePool}
-	nodeRolesShared := []provisioninginput.MachinePools{provisioninginput.EtcdControlPlaneMachinePool, provisioninginput.WorkerMachinePool}
-	nodeRolesDedicated := []provisioninginput.MachinePools{provisioninginput.EtcdMachinePool, provisioninginput.ControlPlaneMachinePool, provisioninginput.WorkerMachinePool}
-	nodeRolesDedicatedWindows := []provisioninginput.MachinePools{provisioninginput.EtcdMachinePool, provisioninginput.ControlPlaneMachinePool, provisioninginput.WorkerMachinePool, provisioninginput.WindowsMachinePool}
+	nodeRolesAll := []provisioninginput.MachinePools{
+		provisioninginput.AllRolesMachinePool,
+	}
+
+	nodeRolesShared := []provisioninginput.MachinePools{
+		provisioninginput.EtcdControlPlaneMachinePool,
+		provisioninginput.WorkerMachinePool,
+	}
+
+	nodeRolesDedicated := []provisioninginput.MachinePools{
+		provisioninginput.EtcdMachinePool,
+		provisioninginput.ControlPlaneMachinePool,
+		provisioninginput.WorkerMachinePool,
+	}
+
+	nodeRolesDedicatedWindows := []provisioninginput.MachinePools{
+		provisioninginput.EtcdMachinePool,
+		provisioninginput.ControlPlaneMachinePool,
+		provisioninginput.WorkerMachinePool,
+		provisioninginput.WindowsMachinePool,
+	}
+
+	nodeRolesDedicatedTwoWindows := []provisioninginput.MachinePools{
+		provisioninginput.EtcdMachinePool,
+		provisioninginput.ControlPlaneMachinePool,
+		provisioninginput.WorkerMachinePool,
+		provisioninginput.WindowsMachinePool,
+		provisioninginput.WindowsMachinePool,
+	}
 
 	tests := []struct {
 		name         string
@@ -93,12 +118,14 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningRKE2CustomCluster()
 	}{
 		{"1 Node all roles " + provisioninginput.AdminClientName.String(), c.client, nodeRolesAll, false, c.client.Flags.GetValue(environmentflag.Long)},
 		{"1 Node all roles " + provisioninginput.StandardClientName.String(), c.standardUserClient, nodeRolesAll, false, c.client.Flags.GetValue(environmentflag.Short) || c.client.Flags.GetValue(environmentflag.Long)},
-		{"2 nodes - etcd/cp roles per 1 node " + provisioninginput.AdminClientName.String(), c.client, nodeRolesShared, false, c.client.Flags.GetValue(environmentflag.Long)},
-		{"2 nodes - etcd/cp roles per 1 node " + provisioninginput.StandardClientName.String(), c.standardUserClient, nodeRolesShared, false, c.client.Flags.GetValue(environmentflag.Short) || c.client.Flags.GetValue(environmentflag.Long)},
+		{"2 nodes - etcd|cp roles per 1 node " + provisioninginput.AdminClientName.String(), c.client, nodeRolesShared, false, c.client.Flags.GetValue(environmentflag.Long)},
+		{"2 nodes - etcd|cp roles per 1 node " + provisioninginput.StandardClientName.String(), c.standardUserClient, nodeRolesShared, false, c.client.Flags.GetValue(environmentflag.Short) || c.client.Flags.GetValue(environmentflag.Long)},
 		{"3 nodes - 1 role per node " + provisioninginput.AdminClientName.String(), c.client, nodeRolesDedicated, false, c.client.Flags.GetValue(environmentflag.Long)},
 		{"3 nodes - 1 role per node " + provisioninginput.StandardClientName.String(), c.standardUserClient, nodeRolesDedicated, false, c.client.Flags.GetValue(environmentflag.Long)},
-		{"4 nodes - 1 role per node + 1 windows worker" + provisioninginput.AdminClientName.String(), c.client, nodeRolesDedicatedWindows, true, c.client.Flags.GetValue(environmentflag.Long)},
-		{"4 nodes - 1 role per node + 1 windows worker" + provisioninginput.StandardClientName.String(), c.standardUserClient, nodeRolesDedicatedWindows, true, c.client.Flags.GetValue(environmentflag.Long)},
+		{"4 nodes - 1 role per node + 1 windows worker " + provisioninginput.AdminClientName.String(), c.client, nodeRolesDedicatedWindows, true, c.client.Flags.GetValue(environmentflag.Long)},
+		{"4 nodes - 1 role per node + 1 windows worker " + provisioninginput.StandardClientName.String(), c.standardUserClient, nodeRolesDedicatedWindows, true, c.client.Flags.GetValue(environmentflag.Long)},
+		{"5 nodes - 1 role per node + 2 windows workers " + provisioninginput.AdminClientName.String(), c.client, nodeRolesDedicatedTwoWindows, true, c.client.Flags.GetValue(environmentflag.Long)},
+		{"5 nodes - 1 role per node + 2 windows workers " + provisioninginput.StandardClientName.String(), c.standardUserClient, nodeRolesDedicatedTwoWindows, true, c.client.Flags.GetValue(environmentflag.Long)},
 	}
 	for _, tt := range tests {
 		if !tt.runFlag {

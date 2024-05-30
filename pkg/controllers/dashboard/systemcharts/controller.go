@@ -121,8 +121,8 @@ func (h *handler) onRepo(key string, repo *catalog.ClusterRepo) (*catalog.Cluste
 		// chart definition, but is now part of the chart definition
 		minVersion := chartDef.MinVersionSetting.Get()
 		exactVersion := chartDef.ExactVersionSetting.Get()
-		forceAdopt := chartDef.ChartName == chart.WebhookChartName || chartDef.ChartName == chart.ProvisioningCAPIChartName
-		if err := h.manager.Ensure(chartDef.ReleaseNamespace, chartDef.ChartName, minVersion, exactVersion, values, forceAdopt, installImageOverride); err != nil {
+		takeOwnership := chartDef.ChartName == chart.WebhookChartName || chartDef.ChartName == chart.ProvisioningCAPIChartName
+		if err := h.manager.Ensure(chartDef.ReleaseNamespace, chartDef.ChartName, minVersion, exactVersion, values, takeOwnership, installImageOverride); err != nil {
 			return repo, err
 		}
 	}
@@ -138,9 +138,10 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 			ExactVersionSetting: settings.RancherWebhookVersion,
 			Values: func() map[string]interface{} {
 				values := map[string]interface{}{
-					"capi": map[string]interface{}{
-						"enabled": false,
-					},
+					// This is no longer used in the webhook chart but previous values can still be found
+					// with `helm get values -n cattle-system rancher-webhook` which can be confusing. We
+					// completely remove the previous capi values by setting it to nil here.
+					"capi": nil,
 					"mcm": map[string]interface{}{
 						"enabled": features.MCM.Enabled(),
 					},

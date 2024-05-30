@@ -13,6 +13,11 @@ func Register(ctx context.Context, wrangler *wrangler.Context) {
 		wrangler.Catalog.ClusterRepo(),
 		wrangler.Core.ConfigMap(),
 		wrangler.Core.ConfigMap().Cache())
+	RegisterOCIRepo(ctx,
+		wrangler.Apply,
+		wrangler.Catalog.ClusterRepo(),
+		wrangler.Core.ConfigMap(),
+		wrangler.Core.Secret().Cache())
 	RegisterApps(ctx,
 		wrangler.Apply,
 		wrangler.ControllerFactory.SharedCacheFactory().SharedClientFactory(),

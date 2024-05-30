@@ -1,13 +1,13 @@
 package clusterupstreamrefresher
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/ec2"
-	"github.com/aws/aws-sdk-go/service/eks"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/eks"
 	ekscontroller "github.com/rancher/eks-operator/controller"
 	eksv1 "github.com/rancher/eks-operator/pkg/apis/eks.cattle.io/v1"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -26,13 +26,14 @@ const (
 	eksRefreshCronAnnotation = "settings.management.cattle.io/migrated"
 )
 
-func BuildEKSUpstreamSpec(secretsCache wranglerv1.SecretCache, cluster *mgmtv3.Cluster) (*eksv1.EKSClusterConfigSpec, error) {
-	sess, eksService, err := ekscontroller.StartAWSSessions(secretsCache, *cluster.Spec.EKSConfig)
+func BuildEKSUpstreamSpec(secretClient wranglerv1.SecretClient, cluster *mgmtv3.Cluster) (*eksv1.EKSClusterConfigSpec, error) {
+	ctx := context.Background()
+	eksService, err := ekscontroller.StartEKSService(ctx, secretClient, *cluster.Spec.EKSConfig)
 	if err != nil {
 		return nil, err
 	}
 
-	clusterState, err := eksService.DescribeCluster(
+	clusterState, err := eksService.DescribeCluster(ctx,
 		&eks.DescribeClusterInput{
 			Name: aws.String(cluster.Spec.EKSConfig.DisplayName),
 		})
@@ -40,7 +41,7 @@ func BuildEKSUpstreamSpec(secretsCache wranglerv1.SecretCache, cluster *mgmtv3.C
 		return nil, err
 	}
 
-	ngs, err := eksService.ListNodegroups(
+	ngs, err := eksService.ListNodegroups(ctx,
 		&eks.ListNodegroupsInput{
 			ClusterName: aws.String(cluster.Spec.EKSConfig.DisplayName),
 		})
@@ -52,10 +53,10 @@ func BuildEKSUpstreamSpec(secretsCache wranglerv1.SecretCache, cluster *mgmtv3.C
 	var nodeGroupStates []*eks.DescribeNodegroupOutput
 	var errs []string
 	for _, ngName := range ngs.Nodegroups {
-		ng, err := eksService.DescribeNodegroup(
+		ng, err := eksService.DescribeNodegroup(ctx,
 			&eks.DescribeNodegroupInput{
 				ClusterName:   aws.String(cluster.Spec.EKSConfig.DisplayName),
-				NodegroupName: ngName,
+				NodegroupName: aws.String(ngName),
 			})
 		if err != nil {
 			return nil, err
@@ -66,13 +67,13 @@ func BuildEKSUpstreamSpec(secretsCache wranglerv1.SecretCache, cluster *mgmtv3.C
 		if len(ng.Nodegroup.Health.Issues) != 0 {
 			var issueMessages []string
 			for _, issue := range ng.Nodegroup.Health.Issues {
-				issueMessages = append(issueMessages, aws.StringValue(issue.Message))
-				if !ekscontroller.NodeGroupIssueIsUpdatable(aws.StringValue(issue.Code)) {
+				issueMessages = append(issueMessages, aws.ToString(issue.Message))
+				if !ekscontroller.NodeGroupIssueIsUpdatable(string(issue.Code)) {
 					nodeGroupMustBeDeleted = ": node group cannot be updated, must be deleted and recreated"
 				}
 			}
 			errs = append(errs, fmt.Sprintf("health error for node group [%s] in cluster [%s]: %s%s",
-				aws.StringValue(ng.Nodegroup.NodegroupName),
+				aws.ToString(ng.Nodegroup.NodegroupName),
 				cluster.Name,
 				strings.Join(issueMessages, "; "),
 				nodeGroupMustBeDeleted,
@@ -80,7 +81,11 @@ func BuildEKSUpstreamSpec(secretsCache wranglerv1.SecretCache, cluster *mgmtv3.C
 		}
 	}
 
-	upstreamSpec, _, err := ekscontroller.BuildUpstreamClusterState(cluster.Spec.DisplayName, cluster.Status.EKSStatus.ManagedLaunchTemplateID, clusterState, nodeGroupStates, ec2.New(sess), false)
+	ec2Service, err := ekscontroller.StartEC2Service(ctx, secretClient, *cluster.Spec.EKSConfig)
+	if err != nil {
+		return nil, err
+	}
+	upstreamSpec, _, err := ekscontroller.BuildUpstreamClusterState(ctx, cluster.Spec.DisplayName, cluster.Status.EKSStatus.ManagedLaunchTemplateID, clusterState, nodeGroupStates, ec2Service, false)
 	if err != nil {
 		// If we get an error here, then syncing is broken
 		return nil, err

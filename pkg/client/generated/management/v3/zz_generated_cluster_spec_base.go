@@ -8,7 +8,6 @@ const (
 	ClusterSpecBaseFieldClusterSecrets                                       = "clusterSecrets"
 	ClusterSpecBaseFieldDefaultClusterRoleForProjectMembers                  = "defaultClusterRoleForProjectMembers"
 	ClusterSpecBaseFieldDefaultPodSecurityAdmissionConfigurationTemplateName = "defaultPodSecurityAdmissionConfigurationTemplateName"
-	ClusterSpecBaseFieldDefaultPodSecurityPolicyTemplateID                   = "defaultPodSecurityPolicyTemplateId"
 	ClusterSpecBaseFieldDesiredAgentImage                                    = "desiredAgentImage"
 	ClusterSpecBaseFieldDesiredAuthImage                                     = "desiredAuthImage"
 	ClusterSpecBaseFieldDockerRootDir                                        = "dockerRootDir"
@@ -26,7 +25,6 @@ type ClusterSpecBase struct {
 	ClusterSecrets                                       *ClusterSecrets                `json:"clusterSecrets,omitempty" yaml:"clusterSecrets,omitempty"`
 	DefaultClusterRoleForProjectMembers                  string                         `json:"defaultClusterRoleForProjectMembers,omitempty" yaml:"defaultClusterRoleForProjectMembers,omitempty"`
 	DefaultPodSecurityAdmissionConfigurationTemplateName string                         `json:"defaultPodSecurityAdmissionConfigurationTemplateName,omitempty" yaml:"defaultPodSecurityAdmissionConfigurationTemplateName,omitempty"`
-	DefaultPodSecurityPolicyTemplateID                   string                         `json:"defaultPodSecurityPolicyTemplateId,omitempty" yaml:"defaultPodSecurityPolicyTemplateId,omitempty"`
 	DesiredAgentImage                                    string                         `json:"desiredAgentImage,omitempty" yaml:"desiredAgentImage,omitempty"`
 	DesiredAuthImage                                     string                         `json:"desiredAuthImage,omitempty" yaml:"desiredAuthImage,omitempty"`
 	DockerRootDir                                        string                         `json:"dockerRootDir,omitempty" yaml:"dockerRootDir,omitempty"`

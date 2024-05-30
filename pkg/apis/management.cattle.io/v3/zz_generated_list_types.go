@@ -230,6 +230,23 @@ func NewClusterLogging(namespace, name string, obj ClusterLogging) *ClusterLoggi
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// ClusterProxyConfigList is a list of ClusterProxyConfig resources
+type ClusterProxyConfigList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+
+	Items []ClusterProxyConfig `json:"items"`
+}
+
+func NewClusterProxyConfig(namespace, name string, obj ClusterProxyConfig) *ClusterProxyConfig {
+	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("ClusterProxyConfig").ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // ClusterRegistrationTokenList is a list of ClusterRegistrationToken resources
 type ClusterRegistrationTokenList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -733,40 +750,6 @@ type PodSecurityAdmissionConfigurationTemplateList struct {
 
 func NewPodSecurityAdmissionConfigurationTemplate(namespace, name string, obj PodSecurityAdmissionConfigurationTemplate) *PodSecurityAdmissionConfigurationTemplate {
 	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("PodSecurityAdmissionConfigurationTemplate").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// PodSecurityPolicyTemplateList is a list of PodSecurityPolicyTemplate resources
-type PodSecurityPolicyTemplateList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []PodSecurityPolicyTemplate `json:"items"`
-}
-
-func NewPodSecurityPolicyTemplate(namespace, name string, obj PodSecurityPolicyTemplate) *PodSecurityPolicyTemplate {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("PodSecurityPolicyTemplate").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// PodSecurityPolicyTemplateProjectBindingList is a list of PodSecurityPolicyTemplateProjectBinding resources
-type PodSecurityPolicyTemplateProjectBindingList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []PodSecurityPolicyTemplateProjectBinding `json:"items"`
-}
-
-func NewPodSecurityPolicyTemplateProjectBinding(namespace, name string, obj PodSecurityPolicyTemplateProjectBinding) *PodSecurityPolicyTemplateProjectBinding {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("PodSecurityPolicyTemplateProjectBinding").ToAPIVersionAndKind()
 	obj.Name = name
 	obj.Namespace = namespace
 	return &obj

@@ -706,7 +706,7 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *ty
 	displayName := state.DisplayName
 
 	var vpcid string
-	var subnetIds []*string
+	var subnetIDs []*string
 	var securityGroups []*string
 	if state.VirtualNetwork == "" {
 		logrus.Infof("[amazonelasticcontainerservice] Bringing up vpc")
@@ -718,14 +718,14 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *ty
 		}
 
 		securityGroupsString := getParameterValueFromOutput("SecurityGroups", stack.Stacks[0].Outputs)
-		subnetIdsString := getParameterValueFromOutput("SubnetIds", stack.Stacks[0].Outputs)
+		subnetIDsString := getParameterValueFromOutput("SubnetIds", stack.Stacks[0].Outputs)
 
-		if securityGroupsString == "" || subnetIdsString == "" {
+		if securityGroupsString == "" || subnetIDsString == "" {
 			return info, fmt.Errorf("no security groups or subnet ids were returned")
 		}
 
 		securityGroups = toStringPointerSlice(strings.Split(securityGroupsString, ","))
-		subnetIds = toStringPointerSlice(strings.Split(subnetIdsString, ","))
+		subnetIDs = toStringPointerSlice(strings.Split(subnetIDsString, ","))
 
 		resources, err := svc.DescribeStackResources(&cloudformation.DescribeStackResourcesInput{
 			StackName: aws.String(state.DisplayName + "-eks-vpc"),
@@ -743,7 +743,7 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *ty
 		logrus.Infof("[amazonelasticcontainerservice] VPC info provided, skipping create")
 
 		vpcid = state.VirtualNetwork
-		subnetIds = toStringPointerSlice(state.Subnets)
+		subnetIDs = toStringPointerSlice(state.Subnets)
 		securityGroups = toStringPointerSlice(state.SecurityGroups)
 	}
 
@@ -782,7 +782,7 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *ty
 		RoleArn: aws.String(roleARN),
 		ResourcesVpcConfig: &eks.VpcConfigRequest{
 			SecurityGroupIds: securityGroups,
-			SubnetIds:        subnetIds,
+			SubnetIds:        subnetIDs,
 		},
 		Version: aws.String(state.KubernetesVersion),
 	})
@@ -871,7 +871,7 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *ty
 			{ParameterKey: aws.String("KeyName"), ParameterValue: aws.String(keyPairName)},
 			{ParameterKey: aws.String("VpcId"), ParameterValue: aws.String(vpcid)},
 			{ParameterKey: aws.String("Subnets"),
-				ParameterValue: aws.String(strings.Join(toStringLiteralSlice(subnetIds), ","))},
+				ParameterValue: aws.String(strings.Join(toStringLiteralSlice(subnetIDs), ","))},
 			{ParameterKey: aws.String("PublicIp"), ParameterValue: aws.String(strconv.FormatBool(publicIP))},
 			{ParameterKey: aws.String("EBSEncryption"), ParameterValue: aws.String(strconv.FormatBool(state.EBSEncryption))},
 		})

@@ -41,6 +41,7 @@ var (
 	ClusterResourceName                                   = "clusters"
 	ClusterCatalogResourceName                            = "clustercatalogs"
 	ClusterLoggingResourceName                            = "clusterloggings"
+	ClusterProxyConfigResourceName                        = "clusterproxyconfigs"
 	ClusterRegistrationTokenResourceName                  = "clusterregistrationtokens"
 	ClusterRoleTemplateBindingResourceName                = "clusterroletemplatebindings"
 	ClusterTemplateResourceName                           = "clustertemplates"
@@ -71,8 +72,6 @@ var (
 	OIDCProviderResourceName                              = "oidcproviders"
 	OpenLdapProviderResourceName                          = "openldapproviders"
 	PodSecurityAdmissionConfigurationTemplateResourceName = "podsecurityadmissionconfigurationtemplates"
-	PodSecurityPolicyTemplateResourceName                 = "podsecuritypolicytemplates"
-	PodSecurityPolicyTemplateProjectBindingResourceName   = "podsecuritypolicytemplateprojectbindings"
 	PreferenceResourceName                                = "preferences"
 	PrincipalResourceName                                 = "principals"
 	ProjectResourceName                                   = "projects"
@@ -143,6 +142,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&ClusterCatalogList{},
 		&ClusterLogging{},
 		&ClusterLoggingList{},
+		&ClusterProxyConfig{},
+		&ClusterProxyConfigList{},
 		&ClusterRegistrationToken{},
 		&ClusterRegistrationTokenList{},
 		&ClusterRoleTemplateBinding{},
@@ -203,10 +204,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&OpenLdapProviderList{},
 		&PodSecurityAdmissionConfigurationTemplate{},
 		&PodSecurityAdmissionConfigurationTemplateList{},
-		&PodSecurityPolicyTemplate{},
-		&PodSecurityPolicyTemplateList{},
-		&PodSecurityPolicyTemplateProjectBinding{},
-		&PodSecurityPolicyTemplateProjectBindingList{},
 		&Preference{},
 		&PreferenceList{},
 		&Principal{},

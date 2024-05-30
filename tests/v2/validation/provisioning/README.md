@@ -22,4 +22,5 @@ From there, your config should contain the tests you want to run (provisioningIn
 
 1. [RKE1 Provisioning](rke1/README.md)
 2. [RKE2 Provisioning](rke2/README.md)
-3. [Hosted Provider Provisioning](hosted/README.md)
+3. [K3s Provisioning](k3s/README.md)
+4. [Hosted Provider Provisioning](hosted/README.md)
