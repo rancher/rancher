@@ -173,6 +173,24 @@ jobs:
   #         file: ./package/Dockerfile.agent
   #         labels: "${{ steps.meta.outputs.labels }}"
   build-agent-windows:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    - name: Build Windows Agent Binary
+      run: |
+        version=${{ env.COMMIT }}
+        tags="k8s"
+        linkflags="-s -w -extldflags -static"
+        ldflags="-X main.VERSION={0} ${linkflags} -f ${version}"
+        GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -tags "${tags}" -ldflags "${ldflags}" -o agent.exe ./cmd/agent
+    - name: Upload binary
+      uses: actions/upload-artifact@v2
+      with:
+        name: agent-windows
+        path: agent.exe
+  package-agent-windows:
+    needs: [build-agent-windows]
     strategy:
       matrix:
         os: [windows]
@@ -181,5 +199,10 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+    - name: Download windows binary
+      uses: actions/download-artifact@v2
+      with:
+        name: agent-windows
+        path: ./package/windows
     - name: Build Windows Server Image
       run: docker build -t ${{ env.IMAGE_AGENT }}:${{ env.TAG }} --build-arg VERSION=${{ env.COMMIT }} --build-arg SERVERCORE_VERSION=ltsc${{ matrix.version }} -f package/windows/Dockerfile.agent .
