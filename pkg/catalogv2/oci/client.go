@@ -14,6 +14,7 @@ import (
 	ocispecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	catalogv1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/catalogv2/oci/capturewindowclient"
 	"github.com/sirupsen/logrus"
 	"helm.sh/helm/v3/pkg/chart/loader"
 	helmregistry "helm.sh/helm/v3/pkg/registry"
@@ -43,6 +44,7 @@ type Client struct {
 	// tag is the tag part of the URL ie. 1.0.2
 	tag string
 
+	HTTPClient               http.Client
 	insecure                 bool
 	caBundle                 []byte
 	insecurePlainHTTP        bool
@@ -79,6 +81,11 @@ func NewClient(url string, clusterRepoSpec catalogv1.RepoSpec, credentialSecret 
 		}
 		ociClient.username = username
 		ociClient.password = password
+	}
+
+	err = ociClient.SetAuthClient()
+	if err != nil {
+		return nil, err
 	}
 
 	return ociClient, nil
@@ -192,14 +199,14 @@ func (o *Client) fetchChart(orasRepository *remote.Repository) (string, error) {
 
 // getAuthClient creates an oras auth client that can be used
 // in creating an oras registry client or oras repository client.
-func (o *Client) getAuthClient() (*http.Client, error) {
+func (o *Client) SetAuthClient() error {
 	config := &tls.Config{
 		InsecureSkipVerify: o.insecure,
 	}
 	if len(o.caBundle) > 0 {
 		cert, err := x509.ParseCertificate(o.caBundle)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		pool, err := x509.SystemCertPool()
 		if err != nil {
@@ -213,9 +220,11 @@ func (o *Client) getAuthClient() (*http.Client, error) {
 	baseTransport := http.DefaultTransport.(*http.Transport).Clone()
 	baseTransport.TLSClientConfig = config
 
-	return &http.Client{
-		Transport: baseTransport,
-	}, nil
+	o.HTTPClient = http.Client{
+		Transport: capturewindowclient.NewTransport(baseTransport),
+	}
+
+	return nil
 }
 
 // GetOrasRegistry returns the oras registry client along with
@@ -227,11 +236,6 @@ func (o *Client) GetOrasRegistry() (*remote.Registry, error) {
 	}
 	orasRegistry.PlainHTTP = o.insecurePlainHTTP
 
-	client, err := o.getAuthClient()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create an oras auth client: %w", err)
-	}
-
 	orasRegistry.Client = &auth.Client{
 		Credential: func(ctx context.Context, reg string) (auth.Credential, error) {
 			return auth.Credential{
@@ -239,7 +243,7 @@ func (o *Client) GetOrasRegistry() (*remote.Registry, error) {
 				Password: o.password,
 			}, nil
 		},
-		Client: client,
+		Client: &o.HTTPClient,
 	}
 
 	return orasRegistry, nil
@@ -254,11 +258,6 @@ func (o *Client) GetOrasRepository() (*remote.Repository, error) {
 	}
 	orasRepository.PlainHTTP = o.insecurePlainHTTP
 
-	client, err := o.getAuthClient()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create an oras auth client: %w", err)
-	}
-
 	orasRepository.Client = &auth.Client{
 		Credential: func(ctx context.Context, reg string) (auth.Credential, error) {
 			return auth.Credential{
@@ -266,7 +265,7 @@ func (o *Client) GetOrasRepository() (*remote.Repository, error) {
 				Password: o.password,
 			}, nil
 		},
-		Client: client,
+		Client: &o.HTTPClient,
 	}
 
 	return orasRepository, nil

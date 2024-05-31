@@ -104,17 +104,11 @@ func Chart(credentialSecret *corev1.Secret, chart *repo.ChartVersion, clusterRep
 // GenerateIndex creates a Helm repo index from the OCI url provided
 // by fetching the repositories and then the tags according to the url.
 // Lastly, adds the chart entry to the Helm repo index using the oras library.
-func GenerateIndex(URL string, credentialSecret *corev1.Secret,
+func GenerateIndex(ociClient *Client, URL string, credentialSecret *corev1.Secret,
 	clusterRepoSpec v1.RepoSpec,
 	clusterRepoStatus v1.RepoStatus,
 	indexFile *repo.IndexFile) (*repo.IndexFile, error) {
 	logrus.Debugf("Generating index for oci clusterrepo URL %s", URL)
-
-	// Create a new oci client
-	ociClient, err := NewClient(URL, clusterRepoSpec, credentialSecret)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create an OCI client for url %s: %w", URL, err)
-	}
 
 	// Checking if the URL specified by the user is a oras repository or not ?
 	IsOrasRepository, err := ociClient.IsOrasRepository()
