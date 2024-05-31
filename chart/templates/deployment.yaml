@@ -29,6 +29,9 @@ spec:
       labels:
         app: {{ template "rancher.fullname" . }}
         release: {{ .Release.Name }}
+{{- with .Values.podLabels }}
+{{ toYaml . | indent 8 }}
+{{- end }}
     spec:
       priorityClassName: {{ .Values.priorityClassName }}
       serviceAccountName: {{ template "rancher.fullname" . }}

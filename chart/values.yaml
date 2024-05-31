@@ -118,6 +118,9 @@ priorityClassName: rancher-critical
 # Set pod resource requests/limits for Rancher.
 resources: {}
 
+#Set new pod labels not included in the selector
+podLabels: {}
+
 #
 # tls
 #   Where to offload the TLS/SSL encryption
