@@ -60,7 +60,7 @@ require (
 	github.com/antihax/optional v1.0.0
 	github.com/containers/image/v5 v5.30.0
 	github.com/rancher/rancher/pkg/apis v0.0.0-20240529155832-64dbde013b4c
-	github.com/rancher/shepherd v0.0.0-20240530205615-2eebe64ba818
+	github.com/rancher/shepherd v0.0.0-20240531204216-65735fd062c1
 	go.qase.io/client v0.0.0-20231114201952-65195ec001fa
 )
 
@@ -139,7 +139,7 @@ require (
 	github.com/rancher/steve v0.0.0-20240510175329-a9bf8c7e9cad
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007
 	github.com/rancher/wrangler/v2 v2.2.0-rc6
-	github.com/robfig/cron v1.1.0
+	github.com/robfig/cron v1.2.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.9.0
 	github.com/tomnomnom/linkheader v0.0.0-20180905144013-02ca5825eb80
@@ -392,6 +392,7 @@ require (
 	github.com/pkg/sftp v1.13.5 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/procfs v0.11.1 // indirect
+	github.com/rancher/cis-operator v1.0.11
 	github.com/rivo/uniseg v0.4.4 // indirect
 	github.com/rogpeppe/go-internal v1.12.0 // indirect
 	github.com/rs/xid v1.2.1 // indirect
