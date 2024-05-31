@@ -17,6 +17,7 @@ import (
 	catalog "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/catalogv2"
 	"github.com/rancher/rancher/pkg/catalogv2/oci"
+	"github.com/rancher/rancher/pkg/catalogv2/oci/capturewindowclient"
 	catalogcontrollers "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/wrangler/v2/pkg/apply"
@@ -120,7 +121,13 @@ func (o *OCIRepohandler) onClusterRepoChange(key string, clusterRepo *catalog.Cl
 	if err != nil {
 		return o.setErrorCondition(clusterRepo, err, newStatus)
 	}
-	index, err = oci.GenerateIndex(clusterRepo.Spec.URL, secret, clusterRepo.Spec, *newStatus, index)
+	// Create a new oci client
+	ociClient, err := oci.NewClient(clusterRepo.Spec.URL, clusterRepo.Spec, secret)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create an OCI client for url %s: %w", clusterRepo.Spec.URL, err)
+	}
+
+	index, err = oci.GenerateIndex(ociClient, clusterRepo.Spec.URL, secret, clusterRepo.Spec, *newStatus, index)
 	// If there is 401 or 403 error code, then we don't reconcile further and wait for 6 hours interval
 	var errResp *errcode.ErrorResponse
 	// If there is 429 error code and max retry is reached, then we don't reconcile further and wait for 6 hours interval,
@@ -136,14 +143,24 @@ func (o *OCIRepohandler) onClusterRepoChange(key string, clusterRepo *catalog.Cl
 			}
 		}
 
-		newStatus.NumberOfRetries++
-		if newStatus.NumberOfRetries > retryPolicy.MaxRetry {
-			newStatus.NumberOfRetries = 0
-			newStatus.NextRetryAt = metav1.Time{}
-			return o.setConditionWithInterval(clusterRepo, errResp, newStatus, nil)
-		}
+		// If OCIRegistryBackOffDuration is already defined by the registry,
+		// we ignore the exponentialBackOffValues set by the user.
+		var backoff time.Duration
+		ociRegistryBackOffDuration := ociClient.HTTPClient.Transport.(*capturewindowclient.Transport).BackOffDuration
+		if ociRegistryBackOffDuration > 0.0 {
+			backoff = time.Duration(ociRegistryBackOffDuration) * time.Second
+			ociClient.HTTPClient.Transport.(*capturewindowclient.Transport).BackOffDuration = 0.0
+			newStatus.ShouldNotSkip = true
+		} else {
+			backoff = calculateBackoff(clusterRepo, retryPolicy)
 
-		backoff := calculateBackoff(clusterRepo, retryPolicy)
+			newStatus.NumberOfRetries++
+			if newStatus.NumberOfRetries > retryPolicy.MaxRetry {
+				newStatus.NumberOfRetries = 0
+				newStatus.NextRetryAt = metav1.Time{}
+				return o.setConditionWithInterval(clusterRepo, errResp, newStatus, nil)
+			}
+		}
 
 		newStatus.NextRetryAt = metav1.Time{Time: timeNow().UTC().Add(backoff)}
 		return o.setConditionWithInterval(clusterRepo, errResp, newStatus, &backoff)
@@ -413,9 +430,9 @@ func (o *OCIRepohandler) shouldSkip(clusterRepo *catalog.ClusterRepo, policy ret
 	ociDownloaded := condition.Cond(catalog.OCIDownloaded)
 	ociDownloadedUpdateTime, _ := time.Parse(time.RFC3339, ociDownloaded.GetLastUpdated(clusterRepo))
 
-	if (clusterRepo.Status.NumberOfRetries > policy.MaxRetry || clusterRepo.Status.NumberOfRetries == 0) && // checks if it's retrying
+	if (clusterRepo.Status.NumberOfRetries > policy.MaxRetry || clusterRepo.Status.NumberOfRetries == 0) && // checks if it's not retrying
 		clusterRepo.Generation == clusterRepo.Status.ObservedGeneration && // checks if the generation has not changed
-		ociDownloadedUpdateTime.Add(interval).After(timeNow().UTC()) { // checks if the interval has passed
+		ociDownloadedUpdateTime.Add(interval).After(timeNow().UTC()) { // checks if the interval has not passed
 
 		o.clusterRepoController.EnqueueAfter(clusterRepo.Name, interval)
 		return true
