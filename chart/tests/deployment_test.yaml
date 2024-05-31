@@ -439,15 +439,15 @@ tests:
     - equal:
         path: spec.template.spec.containers[0].startupProbe.periodSeconds
         value: 15
-- it: should add CATTLE_AGENT_TLS_CHECK=true to env and maintain default vars
+- it: should add CATTLE_AGENT_TLS_MODE=strict to env and maintain default vars
   set:
     agentTLSMode: "strict"
   asserts:
     - contains:
         path: spec.template.spec.containers[0].env
         content:
-          name: CATTLE_AGENT_TLS_CHECK
-          value: "true"
+          name: CATTLE_AGENT_TLS_MODE
+          value: "strict"
     - contains:
         path: spec.template.spec.containers[0].env
         content:
@@ -458,15 +458,15 @@ tests:
         content:
           name: CATTLE_NAMESPACE
           value: NAMESPACE
-- it: should add CATTLE_AGENT_TLS_CHECK=false to env and maintain default vars
+- it: should add CATTLE_AGENT_TLS_MODE=system-store to env and maintain default vars
   set:
     agentTLSMode: "system-store"
   asserts:
     - contains:
         path: spec.template.spec.containers[0].env
         content:
-          name: CATTLE_AGENT_TLS_CHECK
-          value: "false"
+          name: CATTLE_AGENT_TLS_MODE
+          value: "system-store"
     - contains:
         path: spec.template.spec.containers[0].env
         content:
@@ -477,20 +477,20 @@ tests:
         content:
           name: CATTLE_NAMESPACE
           value: NAMESPACE
-- it: should not add CATTLE_AGENT_TLS_CHECK to env and maintain default vars
+- it: should not add CATTLE_AGENT_TLS_MODE to env and maintain default vars
   set:
     agentTLSMode: null
   asserts:
     - notContains:
         path: spec.template.spec.containers[0].env
         content:
-          name: CATTLE_AGENT_TLS_CHECK
-          value: "true"
+          name: CATTLE_AGENT_TLS_MODE
+          value: "strict"
     - notContains:
         path: spec.template.spec.containers[0].env
         content:
-          name: CATTLE_AGENT_TLS_CHECK
-          value: "false"
+          name: CATTLE_AGENT_TLS_MODE
+          value: "system-store"
     - contains:
         path: spec.template.spec.containers[0].env
         content:
