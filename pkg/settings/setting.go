@@ -275,9 +275,9 @@ var (
 	UIBannerDark  = NewSetting("ui-banner-dark", "")
 
 	// UI Settings for allowing seperate configuration of page banners
-	UIBannerDark  = NewSetting("ui-banner-header", "")
-	UIBannerDark  = NewSetting("ui-banner-footer", "")
-	UIBannerDark  = NewSetting("ui-banner-login-consent", "")
+	UIBannerHeader  = NewSetting("ui-banner-header", "")
+	UIBannerFooter  = NewSetting("ui-banner-footer", "")
+	UIBannerLoginConsent  = NewSetting("ui-banner-login-consent", "")
 
 	// UIPreferred Ensure that the new Dashboard is the default UI.
 	UIPreferred = NewSetting("ui-preferred", "vue")
