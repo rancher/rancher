@@ -275,8 +275,8 @@ var (
 	UIBannerDark  = NewSetting("ui-banner-dark", "")
 
 	// UI Settings for allowing seperate configuration of page banners
-	UIBannerHeader  = NewSetting("ui-banner-header", "")
-	UIBannerFooter  = NewSetting("ui-banner-footer", "")
+	UIBannerHeader        = NewSetting("ui-banner-header", "")
+	UIBannerFooter        = NewSetting("ui-banner-footer", "")
 	UIBannerLoginConsent  = NewSetting("ui-banner-login-consent", "")
 
 	// UIPreferred Ensure that the new Dashboard is the default UI.
