@@ -183,3 +183,28 @@ jobs:
       uses: actions/checkout@v4
     - name: Build Windows Server Image
       run: docker build -t ${{ env.IMAGE_AGENT }}:${{ env.TAG }} --build-arg VERSION=${{ env.COMMIT }} --build-arg SERVERCORE_VERSION=ltsc${{ matrix.version }} -f package/windows/Dockerfile.agent .
+  test-windows:
+    strategy:
+      matrix:
+        os: [windows]
+        version: [2019, 2022]
+    runs-on: ${{ matrix.os }}-${{ matrix.version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Dapper
+        run: |
+          Invoke-WebRequest -Uri "https://github.com/rancher/dapper/releases/download/v0.6.0/dapper-Windows-x86_64.exe" -OutFile "C:\ProgramData\dapper.exe"
+          echo "DAPPER_PATH=C:\ProgramData\dapper.exe" >> $env:GITHUB_ENV
+        shell: pwsh
+
+      - name: Verify Dapper installation
+        run: |
+          Invoke-Expression "$env:DAPPER_PATH --version"
+        shell: pwsh
+
+      - name: Run Build
+        run: |
+          Invoke-Expression "$env:DAPPER_PATH -f Dockerfile-windows.dapper -d test"
+        shell: pwsh
