@@ -45,13 +45,23 @@ eval "$(grep '^ENV CATTLE_WINS_AGENT' package/Dockerfile | awk '{print "export "
 eval "$(grep '^ENV CATTLE_CSI_PROXY_AGENT' package/Dockerfile | awk '{print "export " $2 "=" $3}')"
 eval "$(grep '^ENV CATTLE_KDM_BRANCH' package/Dockerfile | awk '{print "export " $2 "=" $3}')"
 
-if [ -z "${SOME_K8S_VERSION}" ]; then
+#if [ -z "${SOME_K8S_VERSION}" ]; then
+# Only set SOME_K8S_VERSION if it is empty -- for KDM provisioning tests, this value should already be populated
 # Get the last release for $DIST, which is usually the latest version or an experimental version.
 # Previously this would use channels, but channels no longer reflect the latest version since
 # https://github.com/rancher/rancher/issues/36827 has added appDefaults. We do not use appDefaults
 # here for simplicity's sake, as it requires semver parsing & matching. The last release should
 # be good enough for our needs.
-export SOME_K8S_VERSION=$(curl -sS https://raw.githubusercontent.com/rancher/kontainer-driver-metadata/dev-v2.9/data/data.json | jq -r ".$DIST.releases[-1].version")
+#export SOME_K8S_VERSION=$(curl -sS https://raw.githubusercontent.com/rancher/kontainer-driver-metadata/dev-v2.9/data/data.json | jq -r ".$DIST.releases[-1].version")
+#fi
+
+# Remove the following K8s version setting after the root cause of issues/rancher/45577 is determined
+if [ -z "${SOME_K8S_VERSION}" ]; then
+  if [ "$DIST" = "rke2" ]; then
+    export SOME_K8S_VERSION="v1.27.10+rke2r1"
+  else
+    export SOME_K8S_VERSION=$(curl https://raw.githubusercontent.com/rancher/kontainer-driver-metadata/dev-v2.9/data/data.json | jq -r ".$DIST.channels[0].latest")
+  fi
 fi
 
 echo "Starting rancher server for provisioning-tests using $SOME_K8S_VERSION"
