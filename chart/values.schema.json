@@ -3,7 +3,7 @@
   "properties": {
     "agentTLSMode": {
       "type": ["string", "null"],
-      "enum": ["strict", "system-store", null],
+      "enum": ["strict", "system-store", "", null],
       "description": "agentTLSMode must be 'strict' or 'system-store' or null (defaults to system-store)"
     }
   },

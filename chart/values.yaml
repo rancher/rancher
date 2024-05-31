@@ -38,8 +38,9 @@ debug: false
 restrictedAdmin: false
 
 # Control how the Rancher agents validate TLS connections
-# Valid options: strict, system-store, null, or leave it undefined
-# agentTLSMode: strict
+# Valid options: strict, or system-store
+# Note, for new installations empty will default to strict on 2.9+, or system-store on 2.8 or older
+agentTLSMode: ""
 
 # Extra environment variables passed to the rancher pods.
 # extraEnv:
