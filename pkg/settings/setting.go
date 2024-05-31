@@ -274,7 +274,7 @@ var (
 	UIBannerLight = NewSetting("ui-banner-light", "")
 	UIBannerDark  = NewSetting("ui-banner-dark", "")
 
-	// UI Settings for allowing seperate configuration of page banners
+	// UI Settings for allowing separate configuration of page banners
 	UIBannerHeader        = NewSetting("ui-banner-header", "")
 	UIBannerFooter        = NewSetting("ui-banner-footer", "")
 	UIBannerLoginConsent  = NewSetting("ui-banner-login-consent", "")
