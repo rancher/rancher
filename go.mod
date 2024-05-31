@@ -125,7 +125,7 @@ require (
 	github.com/rancher/steve v0.0.0-20240411162517-a80bf83f76b4
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007
 	github.com/rancher/wrangler/v2 v2.1.4
-	github.com/robfig/cron v1.1.0
+	github.com/robfig/cron v1.2.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.8.4
 	github.com/tomnomnom/linkheader v0.0.0-20180905144013-02ca5825eb80
@@ -167,8 +167,9 @@ require (
 	github.com/antihax/optional v1.0.0
 	github.com/containers/image/v5 v5.25.0
 	github.com/google/gnostic-models v0.6.8
+	github.com/rancher/cis-operator v1.0.11
 	github.com/rancher/rancher/pkg/apis v0.0.0-20240213233515-935d309ebad4
-	github.com/rancher/shepherd v0.0.0-20240530205630-5f53d57cf2cf
+	github.com/rancher/shepherd v0.0.0-20240531204233-b305a7097821
 	go.qase.io/client v0.0.0-20231114201952-65195ec001fa
 )
 
