@@ -28,6 +28,7 @@ import (
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/nodeconfig"
 	"github.com/rancher/rancher/pkg/ref"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/rancher/pkg/taints"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -45,7 +46,6 @@ import (
 )
 
 const (
-	defaultEngineInstallURL         = "https://releases.rancher.com/install-docker/26.0.sh"
 	amazonec2                       = "amazonec2"
 	userNodeRemoveCleanupAnnotation = "cleanup.cattle.io/user-node-remove"
 	userNodeRemoveFinalizerPrefix   = "clusterscoped.controller.cattle.io/user-node-remove_"
@@ -202,7 +202,7 @@ func (m *Lifecycle) Create(obj *apimgmtv3.Node) (runtime.Object, error) {
 		}
 
 		if obj.Status.NodeTemplateSpec.EngineInstallURL == "" {
-			obj.Status.NodeTemplateSpec.EngineInstallURL = defaultEngineInstallURL
+			obj.Status.NodeTemplateSpec.EngineInstallURL = settings.EngineInstallURL.Get()
 		}
 
 		return obj, nil
