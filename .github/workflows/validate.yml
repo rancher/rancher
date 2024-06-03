@@ -1,0 +1,23 @@
+name: Validate
+on:
+  pull_request:
+  push:
+    branches:
+      - "master"
+      - "release/v*"
+    tags:
+      - "v*"
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    container:
+      image: registry.suse.com/bci/golang:1.21
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Install Dependencies
+        run: |
+          zypper -n install gawk python311-pip python311-base python311 python311-devel python311-tox libffi-devel libopenssl-devel
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.54.2; \
+      - name: Validate
+        run: ./scripts/validate
