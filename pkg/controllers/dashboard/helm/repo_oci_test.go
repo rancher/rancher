@@ -257,6 +257,16 @@ func TestGetRetryPolicy(t *testing.T) {
 		expectedErr         string
 	}{
 		{
+			name:          "Should return default values if exponentailBackOffValues is empty",
+			backOffValues: &catalog.ExponentialBackOffValues{},
+			expectedRetryPolicy: retryPolicy{
+				MinWait:  1 * time.Second,
+				MaxWait:  5 * time.Second,
+				MaxRetry: 5,
+			},
+			expectedErr: "",
+		},
+		{
 			name:          "Should return default values if values are not present",
 			backOffValues: nil,
 			expectedRetryPolicy: retryPolicy{
@@ -309,7 +319,7 @@ func TestGetRetryPolicy(t *testing.T) {
 		{
 			name: "minWait should be atleast 1 second",
 			backOffValues: &catalog.ExponentialBackOffValues{
-				MinWait: 0,
+				MinWait: -1,
 				MaxWait: 5,
 			},
 			expectedRetryPolicy: retryPolicy{
@@ -317,7 +327,7 @@ func TestGetRetryPolicy(t *testing.T) {
 				MaxWait:  5 * time.Second,
 				MaxRetry: 5,
 			},
-			expectedErr: "minWait should be at least 1 second",
+			expectedErr: "minWait must be at least 1 second",
 		},
 		{
 			name: "maxWait cant be less than minWait",
@@ -330,7 +340,7 @@ func TestGetRetryPolicy(t *testing.T) {
 				MaxWait:  20 * time.Second,
 				MaxRetry: 5,
 			},
-			expectedErr: "maxWait should be greater than minWait",
+			expectedErr: "maxWait must be greater than or equal to minWait",
 		},
 	}
 
