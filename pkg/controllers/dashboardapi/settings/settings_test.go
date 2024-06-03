@@ -6,14 +6,15 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
-	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/wrangler/v2/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/utils/pointer"
+
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/settings"
 )
 
 type testCase struct {
@@ -54,7 +55,7 @@ func TestSetAll(t *testing.T) {
 		}
 
 		return &v3.SettingList{Items: items}, nil
-	}).Times(1)
+	}).AnyTimes()
 	client.EXPECT().Delete(gomock.Any(), gomock.Any()).DoAndReturn(func(name string, opts *metav1.DeleteOptions) error {
 		delete(store, name)
 		return nil
@@ -133,6 +134,7 @@ func TestSetAll(t *testing.T) {
 	provider = settingsProvider{
 		settings: cannotCreateClient,
 	}
+	cannotCreateClient.EXPECT().List(gomock.Any()).Return(new(v3.SettingList), nil).AnyTimes()
 	cannotCreateClient.EXPECT().Get(gomock.Any(), gomock.Any()).DoAndReturn(get).AnyTimes()
 	cannotCreateClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(setting *v3.Setting) (*v3.Setting, error) {
 		return nil, apierrors.NewServiceUnavailable("some error")
@@ -149,6 +151,7 @@ func TestSetAll(t *testing.T) {
 	}
 
 	// Test when setting client's Update method fails.
+	cannotUpdateClient.EXPECT().List(gomock.Any()).Return(new(v3.SettingList), nil).AnyTimes()
 	cannotUpdateClient.EXPECT().Get(gomock.Any(), gomock.Any()).DoAndReturn(get).AnyTimes()
 	cannotUpdateClient.EXPECT().Create(gomock.Any()).DoAndReturn(set).AnyTimes()
 	cannotUpdateClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(s *v3.Setting) (*v3.Setting, error) {
@@ -173,7 +176,7 @@ func TestSetAll(t *testing.T) {
 	alreadyExistsCreateClient.EXPECT().Update(gomock.Any()).DoAndReturn(set).AnyTimes()
 	alreadyExistsCreateClient.EXPECT().List(gomock.Any()).DoAndReturn(func(opts metav1.ListOptions) (*v3.SettingList, error) {
 		return &v3.SettingList{}, nil
-	}).Times(1)
+	}).AnyTimes()
 
 	store = make(map[string]v3.Setting)
 

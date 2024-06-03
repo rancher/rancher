@@ -7,12 +7,13 @@ import (
 	"fmt"
 	"os"
 
-	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	managementcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/settings"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	managementcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/settings"
 )
 
 func Register(settingController managementcontrollers.SettingController) error {
@@ -87,6 +88,10 @@ func (s *settingsProvider) SetIfUnset(name, value string) error {
 // source to "env" if configured by an env var, and their default to match the setting in the map.
 // NOTE: All settings not provided in settingsMap will be marked as unknown, and may be removed in the future.
 func (s *settingsProvider) SetAll(settingsMap map[string]settings.Setting) error {
+	anyInstalled, err := s.anySettingsInstalled()
+	if err != nil {
+		return fmt.Errorf("failed to check if any settings are installed: %w", err)
+	}
 	fallback := map[string]string{}
 
 	for name, setting := range settingsMap {
@@ -100,6 +105,9 @@ func (s *settingsProvider) SetAll(settingsMap map[string]settings.Setting) error
 					Name: setting.Name,
 				},
 				Default: setting.Default,
+			}
+			if anyInstalled && setting.DefaultOnUpgrade != "" {
+				newSetting.Default = setting.DefaultOnUpgrade
 			}
 			if envOk {
 				newSetting.Source = "env"
@@ -121,7 +129,11 @@ func (s *settingsProvider) SetAll(settingsMap map[string]settings.Setting) error
 		} else {
 			update := false
 			if obj.Default != setting.Default {
-				obj.Default = setting.Default
+				if setting.DefaultOnUpgrade != "" {
+					obj.Default = setting.DefaultOnUpgrade
+				} else {
+					obj.Default = setting.Default
+				}
 				update = true
 			}
 			if envOk && obj.Source != "env" {
@@ -182,4 +194,12 @@ func (s *settingsProvider) cleanupUnknownSettings(settingsMap map[string]setting
 	}
 
 	return nil
+}
+
+func (s *settingsProvider) anySettingsInstalled() (bool, error) {
+	list, err := s.settings.List(metav1.ListOptions{})
+	if err != nil {
+		return false, err
+	}
+	return len(list.Items) > 0, nil
 }
