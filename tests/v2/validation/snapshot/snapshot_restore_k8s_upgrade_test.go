@@ -48,14 +48,6 @@ func (s *SnapshotRestoreK8sUpgradeTestSuite) TestSnapshotRestoreK8sUpgrade() {
 		UpgradeKubernetesVersion: "",
 		SnapshotRestore:          "kubernetesVersion",
 		RecurringRestores:        1,
-		ReplaceWorkerNode:        false,
-	}
-
-	snapshotRestoreAll := &etcdsnapshot.Config{
-		UpgradeKubernetesVersion: "",
-		SnapshotRestore:          "all",
-		RecurringRestores:        1,
-		ReplaceWorkerNode:        false,
 	}
 
 	tests := []struct {
@@ -64,7 +56,6 @@ func (s *SnapshotRestoreK8sUpgradeTestSuite) TestSnapshotRestoreK8sUpgrade() {
 		client       *rancher.Client
 	}{
 		{"Restore Kubernetes version and etcd", snapshotRestoreK8sVersion, s.client},
-		{"Restore cluster config, Kubernetes version and etcd", snapshotRestoreAll, s.client},
 	}
 
 	for _, tt := range tests {

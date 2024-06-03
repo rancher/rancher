@@ -5,21 +5,27 @@ import (
 	"testing"
 	"time"
 
+	apisV1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/apps/v1"
 	scaling "github.com/rancher/rancher/tests/v2/validation/nodescaling"
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
+	steveV1 "github.com/rancher/shepherd/clients/rancher/v1"
 	"github.com/rancher/shepherd/extensions/clusters"
 	"github.com/rancher/shepherd/extensions/clusters/kubernetesversions"
+	"github.com/rancher/shepherd/extensions/defaults"
 	extdefault "github.com/rancher/shepherd/extensions/defaults"
 	"github.com/rancher/shepherd/extensions/defaults/stevetypes"
 	"github.com/rancher/shepherd/extensions/etcdsnapshot"
 	"github.com/rancher/shepherd/extensions/ingresses"
 	nodestat "github.com/rancher/shepherd/extensions/nodes"
 	"github.com/rancher/shepherd/extensions/provisioning"
+	"github.com/rancher/shepherd/extensions/services"
 	"github.com/rancher/shepherd/extensions/workloads"
+	deploy "github.com/rancher/shepherd/extensions/workloads/deployment"
 	"github.com/rancher/shepherd/extensions/workloads/pods"
+	namegen "github.com/rancher/shepherd/pkg/namegenerator"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -35,38 +41,30 @@ const (
 	defaultNamespace             = "default"
 	DeploymentSteveType          = "apps.deployment"
 	isCattleLabeled              = true
-	IngressSteveType             = "networking.k8s.io.ingress"
+	initialIngress               = "ingress-before-restore"
+	initialWorkload              = "wload-before-restore"
+	ingressSteveType             = "networking.k8s.io.ingress"
 	ingressPath                  = "/index.html"
-	initialIngressName           = "ingress-before-restore"
-	initialWorkloadName          = "wload-before-restore"
-	localClusterName             = "local"
 	K3S                          = "k3s"
 	kubernetesVersion            = "kubernetesVersion"
 	namespace                    = "fleet-default"
 	port                         = "port"
+	postWorkload                 = "wload-after-backup"
 	ProvisioningSteveResouceType = "provisioning.cattle.io.cluster"
 	RKE1                         = "rke1"
 	RKE2                         = "rke2"
 	serviceAppendName            = "service-"
-	ServiceType                  = "service"
-	WorkloadNamePostBackup       = "wload-after-backup"
+	serviceType                  = "service"
 )
 
-type initialSnapshotConfig struct {
-	kubernetesVersion              string
-	initialControlPlaneUnavailable string
-	initialWorkerUnavailable       string
-	snapshot                       string
-}
-
 func snapshotRestore(t *testing.T, client *rancher.Client, clusterName string, etcdRestore *etcdsnapshot.Config) {
+	initialIngressName := namegen.AppendRandomString(initialIngress)
+	initialWorkloadName := namegen.AppendRandomString(initialWorkload)
+
 	clusterID, err := clusters.GetClusterIDByName(client, clusterName)
 	require.NoError(t, err)
 
 	steveclient, err := client.Steve.ProxyDownstream(clusterID)
-	require.NoError(t, err)
-
-	localClusterID, err := clusters.GetClusterIDByName(client, localClusterName)
 	require.NoError(t, err)
 
 	var isRKE1 = false
@@ -100,69 +98,84 @@ func snapshotRestore(t *testing.T, client *rancher.Client, clusterName string, e
 		},
 	}
 
-	deploymentResp, serviceResp, err := workloads.CreateDeploymentWithService(steveclient, initialWorkloadName, deployment, service)
+	deploymentResp, err := deploy.CreateDeployment(steveclient, initialWorkloadName, deployment)
 	require.NoError(t, err)
 
-	err = workloads.VerifyDeployment(steveclient, deploymentResp)
+	err = deploy.VerifyDeployment(steveclient, deploymentResp)
 	require.NoError(t, err)
 	require.Equal(t, initialWorkloadName, deploymentResp.ObjectMeta.Name)
+
+	serviceResp, err := services.CreateService(steveclient, service)
+	require.NoError(t, err)
+
+	err = services.VerifyService(steveclient, serviceResp)
+	require.NoError(t, err)
+	require.Equal(t, serviceAppendName+initialWorkloadName, serviceResp.ObjectMeta.Name)
 
 	path := ingresses.NewIngressPathTemplate(networking.PathTypeExact, ingressPath, serviceAppendName+initialWorkloadName, 80)
 	ingressTemplate := ingresses.NewIngressTemplate(initialIngressName, defaultNamespace, "", []networking.HTTPIngressPath{path})
 
 	ingressResp, err := ingresses.CreateIngress(steveclient, initialIngressName, ingressTemplate)
 	require.NoError(t, err)
+
+	err = ingresses.VerifyIngress(steveclient, ingressResp, initialIngressName)
+	require.NoError(t, err)
 	require.Equal(t, initialIngressName, ingressResp.ObjectMeta.Name)
 
 	if isRKE1 {
-		initialSnapshotValues := snapshotRKE1(t, client, podTemplate, deployment, clusterName, clusterID, localClusterID, etcdRestore, isRKE1)
-		restoreRKE1(t, client, initialSnapshotValues, etcdRestore, clusterName, clusterID)
+		cluster, snapshotName, postDeploymentResp, postServiceResp := snapshotRKE1(t, client, podTemplate, deployment, clusterName, clusterID, etcdRestore, isRKE1)
+		restoreRKE1(t, client, snapshotName, etcdRestore, cluster, clusterID)
+
+		_, err = steveclient.SteveType(DeploymentSteveType).ByID(postDeploymentResp.ID)
+		require.Error(t, err)
+
+		_, err = steveclient.SteveType(serviceType).ByID(postServiceResp.ID)
+		require.Error(t, err)
+
 	} else {
-		initialSnapshotValues := snapshotV2Prov(t, client, podTemplate, deployment, clusterName, clusterID, localClusterID, etcdRestore, isRKE1)
-		restoreV2Prov(t, client, initialSnapshotValues, etcdRestore, clusterName, clusterID)
+		cluster, snapshotName, postDeploymentResp, postServiceResp := snapshotV2Prov(t, client, podTemplate, deployment, clusterName, clusterID, etcdRestore, isRKE1)
+		restoreV2Prov(t, client, snapshotName, etcdRestore, cluster, clusterID)
+
+		_, err = steveclient.SteveType(DeploymentSteveType).ByID(postDeploymentResp.ID)
+		require.Error(t, err)
+
+		_, err = steveclient.SteveType(serviceType).ByID(postServiceResp.ID)
+		require.Error(t, err)
 	}
 
 	logrus.Infof("Deleting created workloads...")
 	err = steveclient.SteveType(DeploymentSteveType).Delete(deploymentResp)
 	require.NoError(t, err)
 
-	err = steveclient.SteveType(ServiceType).Delete(serviceResp)
+	err = steveclient.SteveType(serviceType).Delete(serviceResp)
 	require.NoError(t, err)
 
-	err = steveclient.SteveType(IngressSteveType).Delete(ingressResp)
+	err = steveclient.SteveType(ingressSteveType).Delete(ingressResp)
 	require.NoError(t, err)
 }
 
-func snapshotRKE1(t *testing.T, client *rancher.Client, podTemplate corev1.PodTemplateSpec, deployment *v1.Deployment, clusterName, clusterID, localClusterID string, etcdRestore *etcdsnapshot.Config, isRKE1 bool) initialSnapshotConfig {
+func snapshotRKE1(t *testing.T, client *rancher.Client, podTemplate corev1.PodTemplateSpec, deployment *v1.Deployment, clusterName, clusterID string,
+	etcdRestore *etcdsnapshot.Config, isRKE1 bool) (*management.Cluster, string, *steveV1.SteveAPIObject, *steveV1.SteveAPIObject) {
 	existingSnapshots, err := etcdsnapshot.GetRKE1Snapshots(client, clusterID)
 	require.NoError(t, err)
 
 	err = etcdsnapshot.CreateRKE1Snapshot(client, clusterName)
 	require.NoError(t, err)
 
-	clusterResp, err := client.Management.Cluster.ByID(clusterID)
+	cluster, err := client.Management.Cluster.ByID(clusterID)
 	require.NoError(t, err)
-
-	podErrors := pods.StatusPods(client, clusterID)
-	assert.Empty(t, podErrors)
 
 	if etcdRestore.ReplaceWorkerNode {
 		scaling.ReplaceRKE1Nodes(t, client, clusterName, false, false, true)
 	}
 
-	initialKubernetesVersion := clusterResp.RancherKubernetesEngineConfig.Version
-	require.Equal(t, initialKubernetesVersion, clusterResp.RancherKubernetesEngineConfig.Version)
+	podErrors := pods.StatusPods(client, clusterID)
+	assert.Empty(t, podErrors)
 
-	initialControlPlaneUnavailable := clusterResp.RancherKubernetesEngineConfig.UpgradeStrategy.MaxUnavailableControlplane
-	require.Equal(t, initialControlPlaneUnavailable, clusterResp.RancherKubernetesEngineConfig.UpgradeStrategy.MaxUnavailableControlplane)
-
-	initialWorkerUnavailableValue := clusterResp.RancherKubernetesEngineConfig.UpgradeStrategy.MaxUnavailableWorker
-	require.Equal(t, initialWorkerUnavailableValue, clusterResp.RancherKubernetesEngineConfig.UpgradeStrategy.MaxUnavailableWorker)
-
-	createPostBackupWorkloads(t, client, clusterID, podTemplate, deployment)
+	postDeploymentResp, postServiceResp := createPostBackupWorkloads(t, client, clusterID, podTemplate, deployment)
 
 	etcdNodeCount, _ := etcdsnapshot.MatchNodeToAnyEtcdRole(client, clusterID)
-	snapshotToRestore, err := provisioning.VerifySnapshots(client, localClusterID, clusterName, etcdNodeCount+len(existingSnapshots), isRKE1)
+	snapshotToRestore, err := provisioning.VerifySnapshots(client, clusterName, etcdNodeCount+len(existingSnapshots), isRKE1)
 	require.NoError(t, err)
 
 	if etcdRestore.SnapshotRestore == kubernetesVersion || etcdRestore.SnapshotRestore == all {
@@ -180,7 +193,7 @@ func snapshotRKE1(t *testing.T, client *rancher.Client, podTemplate corev1.PodTe
 
 		clusterResp.RancherKubernetesEngineConfig.Version = etcdRestore.UpgradeKubernetesVersion
 
-		if etcdRestore.ControlPlaneUnavailableValue != "" && etcdRestore.WorkerUnavailableValue != "" {
+		if etcdRestore.SnapshotRestore == all && etcdRestore.ControlPlaneUnavailableValue != "" && etcdRestore.WorkerUnavailableValue != "" {
 			clusterResp.RancherKubernetesEngineConfig.UpgradeStrategy.MaxUnavailableControlplane = etcdRestore.ControlPlaneUnavailableValue
 			clusterResp.RancherKubernetesEngineConfig.UpgradeStrategy.MaxUnavailableWorker = etcdRestore.WorkerUnavailableValue
 		}
@@ -199,7 +212,7 @@ func snapshotRKE1(t *testing.T, client *rancher.Client, podTemplate corev1.PodTe
 		assert.Empty(t, podErrors)
 		require.Equal(t, etcdRestore.UpgradeKubernetesVersion, clusterResp.RancherKubernetesEngineConfig.Version)
 
-		if etcdRestore.ControlPlaneUnavailableValue != "" && etcdRestore.WorkerUnavailableValue != "" {
+		if etcdRestore.SnapshotRestore == all && etcdRestore.ControlPlaneUnavailableValue != "" && etcdRestore.WorkerUnavailableValue != "" {
 			logrus.Infof("Control plane unavailable value is set to: %s", clusterResp.RancherKubernetesEngineConfig.UpgradeStrategy.MaxUnavailableControlplane)
 			logrus.Infof("Worker unavailable value is set to: %s", clusterResp.RancherKubernetesEngineConfig.UpgradeStrategy.MaxUnavailableWorker)
 
@@ -208,77 +221,66 @@ func snapshotRKE1(t *testing.T, client *rancher.Client, podTemplate corev1.PodTe
 		}
 	}
 
-	return initialSnapshotConfig{initialKubernetesVersion, initialControlPlaneUnavailable, initialWorkerUnavailableValue, snapshotToRestore}
+	return cluster, snapshotToRestore, postDeploymentResp, postServiceResp
 }
 
-func restoreRKE1(t *testing.T, client *rancher.Client, rke1Snapshot initialSnapshotConfig, etcdRestore *etcdsnapshot.Config, clusterName, clusterID string) {
+func restoreRKE1(t *testing.T, client *rancher.Client, snapshotName string, etcdRestore *etcdsnapshot.Config, oldCluster *management.Cluster, clusterID string) {
 	// Give the option to restore the same snapshot multiple times. By default, it is set to 1.
 	for i := 0; i < etcdRestore.RecurringRestores; i++ {
 		snapshotRKE1Restore := &management.RestoreFromEtcdBackupInput{
-			EtcdBackupID:     rke1Snapshot.snapshot,
+			EtcdBackupID:     snapshotName,
 			RestoreRkeConfig: etcdRestore.SnapshotRestore,
 		}
 
-		err := etcdsnapshot.RestoreRKE1Snapshot(client, clusterName, snapshotRKE1Restore, rke1Snapshot.initialControlPlaneUnavailable, rke1Snapshot.initialWorkerUnavailable)
+		err := etcdsnapshot.RestoreRKE1Snapshot(client, oldCluster.Name, snapshotRKE1Restore)
 		require.NoError(t, err)
+
+		nodestat.AllManagementNodeReady(client, oldCluster.ID, defaults.ThirtyMinuteTimeout)
 
 		clusterResp, err := client.Management.Cluster.ByID(clusterID)
 		require.NoError(t, err)
 
+		require.Equal(t, oldCluster.RancherKubernetesEngineConfig.Version, clusterResp.RancherKubernetesEngineConfig.Version)
 		logrus.Infof("Cluster version is restored to: %s", clusterResp.RancherKubernetesEngineConfig.Version)
 
-		nodestat.AllManagementNodeReady(client, clusterResp.ID, extdefault.ThirtyMinuteTimeout)
+		client, err = client.ReLogin()
+		require.NoError(t, err)
 
 		podErrors := pods.StatusPods(client, clusterID)
 		assert.Empty(t, podErrors)
-		require.Equal(t, rke1Snapshot.kubernetesVersion, clusterResp.RancherKubernetesEngineConfig.Version)
 
-		if etcdRestore.SnapshotRestore == kubernetesVersion || etcdRestore.SnapshotRestore == all {
-			clusterResp, err = client.Management.Cluster.ByID(clusterID)
-			require.NoError(t, err)
-			require.Equal(t, rke1Snapshot.kubernetesVersion, clusterResp.RancherKubernetesEngineConfig.Version)
+		if etcdRestore.SnapshotRestore == all && etcdRestore.ControlPlaneUnavailableValue != "" && etcdRestore.WorkerUnavailableValue != "" {
+			logrus.Infof("Control plane unavailable value is restored to: %s", clusterResp.RancherKubernetesEngineConfig.UpgradeStrategy.MaxUnavailableControlplane)
+			logrus.Infof("Worker unavailable value is restored to: %s", clusterResp.RancherKubernetesEngineConfig.UpgradeStrategy.MaxUnavailableWorker)
 
-			if etcdRestore.ControlPlaneUnavailableValue != "" && etcdRestore.WorkerUnavailableValue != "" {
-				logrus.Infof("Control plane unavailable value is restored to: %s", clusterResp.RancherKubernetesEngineConfig.UpgradeStrategy.MaxUnavailableControlplane)
-				logrus.Infof("Worker unavailable value is restored to: %s", clusterResp.RancherKubernetesEngineConfig.UpgradeStrategy.MaxUnavailableWorker)
-
-				require.Equal(t, rke1Snapshot.initialControlPlaneUnavailable, clusterResp.RancherKubernetesEngineConfig.UpgradeStrategy.MaxUnavailableControlplane)
-				require.Equal(t, rke1Snapshot.initialWorkerUnavailable, clusterResp.RancherKubernetesEngineConfig.UpgradeStrategy.MaxUnavailableWorker)
-			}
+			require.Equal(t, oldCluster.RancherKubernetesEngineConfig.UpgradeStrategy.MaxUnavailableControlplane, clusterResp.RancherKubernetesEngineConfig.UpgradeStrategy.MaxUnavailableControlplane)
+			require.Equal(t, oldCluster.RancherKubernetesEngineConfig.UpgradeStrategy.MaxUnavailableWorker, clusterResp.RancherKubernetesEngineConfig.UpgradeStrategy.MaxUnavailableWorker)
 		}
 	}
 }
 
-func snapshotV2Prov(t *testing.T, client *rancher.Client, podTemplate corev1.PodTemplateSpec, deployment *v1.Deployment, clusterName, clusterID, localClusterID string, etcdRestore *etcdsnapshot.Config, isRKE1 bool) initialSnapshotConfig {
-	existingSnapshots, err := etcdsnapshot.GetRKE2K3SSnapshots(client, localClusterID, clusterName)
+func snapshotV2Prov(t *testing.T, client *rancher.Client, podTemplate corev1.PodTemplateSpec, deployment *v1.Deployment, clusterName, clusterID string,
+	etcdRestore *etcdsnapshot.Config, isRKE1 bool) (*apisV1.Cluster, string, *steveV1.SteveAPIObject, *steveV1.SteveAPIObject) {
+	existingSnapshots, err := etcdsnapshot.GetRKE2K3SSnapshots(client, clusterName)
 	require.NoError(t, err)
 
 	err = etcdsnapshot.CreateRKE2K3SSnapshot(client, clusterName)
 	require.NoError(t, err)
 
-	clusterObject, _, err := clusters.GetProvisioningClusterByName(client, clusterName, namespace)
+	cluster, _, err := clusters.GetProvisioningClusterByName(client, clusterName, namespace)
 	require.NoError(t, err)
-
-	podErrors := pods.StatusPods(client, clusterID)
-	assert.Empty(t, podErrors)
 
 	if etcdRestore.ReplaceWorkerNode {
 		scaling.ReplaceNodes(t, client, clusterName, false, false, true)
 	}
 
-	initialKubernetesVersion := clusterObject.Spec.KubernetesVersion
-	require.Equal(t, initialKubernetesVersion, clusterObject.Spec.KubernetesVersion)
+	podErrors := pods.StatusPods(client, clusterID)
+	assert.Empty(t, podErrors)
 
-	initialControlPlaneConcurrencyValue := clusterObject.Spec.RKEConfig.UpgradeStrategy.ControlPlaneConcurrency
-	require.Equal(t, initialControlPlaneConcurrencyValue, clusterObject.Spec.RKEConfig.UpgradeStrategy.ControlPlaneConcurrency)
-
-	initialWorkerConcurrencyValue := clusterObject.Spec.RKEConfig.UpgradeStrategy.WorkerConcurrency
-	require.Equal(t, initialWorkerConcurrencyValue, clusterObject.Spec.RKEConfig.UpgradeStrategy.WorkerConcurrency)
-
-	createPostBackupWorkloads(t, client, clusterID, podTemplate, deployment)
+	postDeploymentResp, postServiceResp := createPostBackupWorkloads(t, client, clusterID, podTemplate, deployment)
 
 	etcdNodeCount, _ := etcdsnapshot.MatchNodeToAnyEtcdRole(client, clusterID)
-	snapshotToRestore, err := provisioning.VerifySnapshots(client, localClusterID, clusterName, etcdNodeCount+len(existingSnapshots), isRKE1)
+	snapshotToRestore, err := provisioning.VerifySnapshots(client, clusterName, etcdNodeCount+len(existingSnapshots), isRKE1)
 	require.NoError(t, err)
 
 	if etcdRestore.SnapshotRestore == kubernetesVersion || etcdRestore.SnapshotRestore == all {
@@ -301,7 +303,7 @@ func snapshotV2Prov(t *testing.T, client *rancher.Client, podTemplate corev1.Pod
 
 		clusterObject.Spec.KubernetesVersion = etcdRestore.UpgradeKubernetesVersion
 
-		if etcdRestore.ControlPlaneConcurrencyValue != "" && etcdRestore.WorkerConcurrencyValue != "" {
+		if etcdRestore.SnapshotRestore == all && etcdRestore.ControlPlaneConcurrencyValue != "" && etcdRestore.WorkerConcurrencyValue != "" {
 			clusterObject.Spec.RKEConfig.UpgradeStrategy.ControlPlaneConcurrency = etcdRestore.ControlPlaneConcurrencyValue
 			clusterObject.Spec.RKEConfig.UpgradeStrategy.WorkerConcurrency = etcdRestore.WorkerConcurrencyValue
 		}
@@ -318,7 +320,7 @@ func snapshotV2Prov(t *testing.T, client *rancher.Client, podTemplate corev1.Pod
 		assert.Empty(t, podErrors)
 		require.Equal(t, etcdRestore.UpgradeKubernetesVersion, clusterObject.Spec.KubernetesVersion)
 
-		if etcdRestore.ControlPlaneConcurrencyValue != "" && etcdRestore.WorkerConcurrencyValue != "" {
+		if etcdRestore.SnapshotRestore == all && etcdRestore.ControlPlaneConcurrencyValue != "" && etcdRestore.WorkerConcurrencyValue != "" {
 			logrus.Infof("Control plane concurrency value is set to: %s", clusterObject.Spec.RKEConfig.UpgradeStrategy.ControlPlaneConcurrency)
 			logrus.Infof("Worker concurrency value is set to: %s", clusterObject.Spec.RKEConfig.UpgradeStrategy.WorkerConcurrency)
 
@@ -327,11 +329,11 @@ func snapshotV2Prov(t *testing.T, client *rancher.Client, podTemplate corev1.Pod
 		}
 	}
 
-	return initialSnapshotConfig{initialKubernetesVersion, initialControlPlaneConcurrencyValue, initialWorkerConcurrencyValue, snapshotToRestore}
+	return cluster, snapshotToRestore, postDeploymentResp, postServiceResp
 }
 
-func restoreV2Prov(t *testing.T, client *rancher.Client, v2prov initialSnapshotConfig, etcdRestore *etcdsnapshot.Config, clusterName, clusterID string) {
-	clusterObject, _, err := clusters.GetProvisioningClusterByName(client, clusterName, namespace)
+func restoreV2Prov(t *testing.T, client *rancher.Client, snapshotName string, etcdRestore *etcdsnapshot.Config, cluster *apisV1.Cluster, clusterID string) {
+	clusterObject, _, err := clusters.GetProvisioningClusterByName(client, cluster.Name, namespace)
 	require.NoError(t, err)
 
 	// Give the option to restore the same snapshot multiple times. By default, it is set to 1.
@@ -342,47 +344,40 @@ func restoreV2Prov(t *testing.T, client *rancher.Client, v2prov initialSnapshotC
 		}
 
 		snapshotRKE2K3SRestore := &rkev1.ETCDSnapshotRestore{
-			Name:             v2prov.snapshot,
+			Name:             snapshotName,
 			Generation:       generation,
 			RestoreRKEConfig: etcdRestore.SnapshotRestore,
 		}
 
-		err := etcdsnapshot.RestoreRKE2K3SSnapshot(client, clusterName, snapshotRKE2K3SRestore, v2prov.initialControlPlaneUnavailable, v2prov.initialWorkerUnavailable)
+		err := etcdsnapshot.RestoreRKE2K3SSnapshot(client, snapshotRKE2K3SRestore, clusterObject.Name)
 		require.NoError(t, err)
 
-		err = clusters.WaitClusterToBeUpgraded(client, clusterID)
+		clusterObject, _, err = clusters.GetProvisioningClusterByName(client, cluster.Name, namespace)
 		require.NoError(t, err)
 
-		clusterObject, _, err = clusters.GetProvisioningClusterByName(client, clusterName, namespace)
-		require.NoError(t, err)
-
+		require.Equal(t, cluster.Spec.KubernetesVersion, clusterObject.Spec.KubernetesVersion)
 		logrus.Infof("Cluster version is restored to: %s", clusterObject.Spec.KubernetesVersion)
 
 		podErrors := pods.StatusPods(client, clusterID)
 		assert.Empty(t, podErrors)
-		require.Equal(t, v2prov.kubernetesVersion, clusterObject.Spec.KubernetesVersion)
 
-		if etcdRestore.SnapshotRestore == kubernetesVersion || etcdRestore.SnapshotRestore == all {
-			clusterObject, _, err := clusters.GetProvisioningClusterByName(client, clusterName, namespace)
-			require.NoError(t, err)
-			require.Equal(t, v2prov.kubernetesVersion, clusterObject.Spec.KubernetesVersion)
+		if etcdRestore.SnapshotRestore == all && etcdRestore.ControlPlaneConcurrencyValue != "" && etcdRestore.WorkerConcurrencyValue != "" {
+			logrus.Infof("Control plane concurrency value is restored to: %s", clusterObject.Spec.RKEConfig.UpgradeStrategy.ControlPlaneConcurrency)
+			logrus.Infof("Worker concurrency value is restored to: %s", clusterObject.Spec.RKEConfig.UpgradeStrategy.WorkerConcurrency)
 
-			if etcdRestore.ControlPlaneConcurrencyValue != "" && etcdRestore.WorkerConcurrencyValue != "" {
-				logrus.Infof("Control plane concurrency value is restored to: %s", clusterObject.Spec.RKEConfig.UpgradeStrategy.ControlPlaneConcurrency)
-				logrus.Infof("Worker concurrency value is restored to: %s", clusterObject.Spec.RKEConfig.UpgradeStrategy.WorkerConcurrency)
-
-				require.Equal(t, v2prov.initialControlPlaneUnavailable, clusterObject.Spec.RKEConfig.UpgradeStrategy.ControlPlaneConcurrency)
-				require.Equal(t, v2prov.initialWorkerUnavailable, clusterObject.Spec.RKEConfig.UpgradeStrategy.WorkerConcurrency)
-			}
+			require.Equal(t, cluster.Spec.RKEConfig.UpgradeStrategy.ControlPlaneConcurrency, clusterObject.Spec.RKEConfig.UpgradeStrategy.ControlPlaneConcurrency)
+			require.Equal(t, cluster.Spec.RKEConfig.UpgradeStrategy.WorkerConcurrency, clusterObject.Spec.RKEConfig.UpgradeStrategy.WorkerConcurrency)
 		}
 	}
 }
 
-func createPostBackupWorkloads(t *testing.T, client *rancher.Client, clusterID string, podTemplate corev1.PodTemplateSpec, deployment *v1.Deployment) {
-	postBackupDeployment := workloads.NewDeploymentTemplate(WorkloadNamePostBackup, defaultNamespace, podTemplate, isCattleLabeled, nil)
+func createPostBackupWorkloads(t *testing.T, client *rancher.Client, clusterID string, podTemplate corev1.PodTemplateSpec, deployment *v1.Deployment) (*steveV1.SteveAPIObject, *steveV1.SteveAPIObject) {
+	workloadNamePostBackup := namegen.AppendRandomString(postWorkload)
+
+	postBackupDeployment := workloads.NewDeploymentTemplate(workloadNamePostBackup, defaultNamespace, podTemplate, isCattleLabeled, nil)
 	postBackupService := corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      serviceAppendName + WorkloadNamePostBackup,
+			Name:      serviceAppendName + workloadNamePostBackup,
 			Namespace: defaultNamespace,
 		},
 		Spec: corev1.ServiceSpec{
@@ -400,12 +395,21 @@ func createPostBackupWorkloads(t *testing.T, client *rancher.Client, clusterID s
 	steveclient, err := client.Steve.ProxyDownstream(clusterID)
 	require.NoError(t, err)
 
-	postDeploymentResp, _, err := workloads.CreateDeploymentWithService(steveclient, WorkloadNamePostBackup, postBackupDeployment, postBackupService)
+	postDeploymentResp, err := deploy.CreateDeployment(steveclient, workloadNamePostBackup, postBackupDeployment)
 	require.NoError(t, err)
 
-	err = workloads.VerifyDeployment(steveclient, postDeploymentResp)
+	err = deploy.VerifyDeployment(steveclient, postDeploymentResp)
 	require.NoError(t, err)
-	require.Equal(t, WorkloadNamePostBackup, postDeploymentResp.ObjectMeta.Name)
+	require.Equal(t, workloadNamePostBackup, postDeploymentResp.ObjectMeta.Name)
+
+	postServiceResp, err := services.CreateService(steveclient, postBackupService)
+	require.NoError(t, err)
+
+	err = services.VerifyService(steveclient, postServiceResp)
+	require.NoError(t, err)
+	require.Equal(t, serviceAppendName+workloadNamePostBackup, postServiceResp.ObjectMeta.Name)
+
+	return postDeploymentResp, postServiceResp
 }
 
 // This function waits for retentionlimit+1 automatic snapshots to be taken before verifying that the retention limit is respected

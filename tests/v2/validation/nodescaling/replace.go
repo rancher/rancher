@@ -64,21 +64,23 @@ func MatchNodeToRole(t *testing.T, client *rancher.Client, clusterID string, isE
 func ReplaceNodes(t *testing.T, client *rancher.Client, clusterName string, isEtcd bool, isControlPlane bool, isWorker bool) {
 	clusterID, err := clusters.GetClusterIDByName(client, clusterName)
 	require.NoError(t, err)
-	numOfNodesBeforeDeletion, nodesToDelete := MatchNodeToRole(t, client, clusterID, isEtcd, isControlPlane, isWorker)
+	_, nodesToDelete := MatchNodeToRole(t, client, clusterID, isEtcd, isControlPlane, isWorker)
 
 	for i := range nodesToDelete {
 		machineToDelete, err := client.Steve.SteveType(machineSteveResourceType).ByID("fleet-default/" + nodesToDelete[i].Annotations[machineSteveAnnotation])
 		require.NoError(t, err)
 
-		logrus.Infof("Replacing node: " + nodesToDelete[i].NodeName)
+		logrus.Infof("Deleting node: " + nodesToDelete[i].NodeName)
 		err = client.Steve.SteveType(machineSteveResourceType).Delete(machineToDelete)
+		require.NoError(t, err)
+
+		err = nodestat.IsNodeDeleted(client, nodesToDelete[i].NodeName, clusterID)
 		require.NoError(t, err)
 
 		err = clusters.WaitClusterToBeUpgraded(client, clusterID)
 		require.NoError(t, err)
 
-		logrus.Infof("Checking if node %s is replaced", nodesToDelete[i].NodeName)
-		_, err = nodestat.IsNodeReplaced(client, machineToDelete.ID, clusterID, numOfNodesBeforeDeletion)
+		err = nodestat.AllMachineReady(client, clusterID, defaults.ThirtyMinuteTimeout)
 		require.NoError(t, err)
 
 		podErrors := pods.StatusPods(client, clusterID)
@@ -90,21 +92,17 @@ func ReplaceNodes(t *testing.T, client *rancher.Client, clusterName string, isEt
 func ReplaceRKE1Nodes(t *testing.T, client *rancher.Client, clusterName string, isEtcd bool, isControlPlane bool, isWorker bool) {
 	clusterID, err := clusters.GetClusterIDByName(client, clusterName)
 	require.NoError(t, err)
-	numOfNodesBeforeDeletion, nodeToDelete := MatchNodeToRole(t, client, clusterID, isEtcd, isControlPlane, isWorker)
+	_, nodesToDelete := MatchNodeToRole(t, client, clusterID, isEtcd, isControlPlane, isWorker)
 
-	for i := range nodeToDelete {
-		logrus.Info("Replacing node: " + nodeToDelete[i].NodeName)
-		err = client.Management.Node.Delete(&nodeToDelete[i])
+	for i := range nodesToDelete {
+		logrus.Info("Deleting node: " + nodesToDelete[i].NodeName)
+		err = client.Management.Node.Delete(&nodesToDelete[i])
 		require.NoError(t, err)
 
-		err = clusters.WaitClusterToBeUpgraded(client, clusterID)
+		err = nodestat.IsNodeDeleted(client, nodesToDelete[i].NodeName, clusterID)
 		require.NoError(t, err)
 
-		logrus.Infof("Checking if node %s is replaced", nodeToDelete[i].NodeName)
 		err = nodestat.AllManagementNodeReady(client, clusterID, defaults.ThirtyMinuteTimeout)
-		require.NoError(t, err)
-
-		_, err = nodestat.IsNodeReplaced(client, nodeToDelete[i].ID, clusterID, numOfNodesBeforeDeletion)
 		require.NoError(t, err)
 
 		podErrors := pods.StatusPods(client, clusterID)
@@ -205,13 +203,7 @@ func AutoReplaceFirstNodeWithRole(t *testing.T, client *rancher.Client, clusterN
 	}
 	require.NoError(t, err)
 
-	steveclient, err := client.Steve.ProxyDownstream(clusterID)
-	require.NoError(t, err)
-
-	v1NodeList, err := steveclient.SteveType("node").List(nil)
-	require.NoError(t, err)
-
-	_, err = nodes.IsNodeReplaced(client, machine.Name, clusterID, len(v1NodeList.Data))
+	err = nodestat.IsNodeDeleted(client, machine.Name, clusterID)
 	require.NoError(t, err)
 
 	err = nodes.AllMachineReady(client, clusterID, machinePool.UnhealthyNodeTimeout.Duration+time.Duration(1800))
