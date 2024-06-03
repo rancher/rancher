@@ -455,3 +455,26 @@ jobs:
       - name: Inspect image
         run: |
           docker buildx imagetools inspect ${{ env.IMAGE_INSTALLER }}:${{ env.TAG }}
+  create-images-files:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup Environment Variables
+        run: |
+          ref_name="${{ github.ref_name }}"
+          prefix="release/"
+          if [[ "$ref_name" == release/v* ]]; then
+            TAG=${ref_name#$prefix}-${{ github.sha }}-head
+            echo "TAG=$TAG" >> "$GITHUB_ENV"
+          fi
+      - name: Create components and images files
+        run: ./scripts/components-images-files.sh
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: "artifacts"
+          path: ./dist/*
+          if-no-files-found: error
+          retention-days: 7
+          overwrite: true
