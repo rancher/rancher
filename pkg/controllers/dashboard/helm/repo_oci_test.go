@@ -309,7 +309,7 @@ func TestGetRetryPolicy(t *testing.T) {
 		{
 			name: "minWait should be atleast 1 second",
 			backOffValues: &catalog.ExponentialBackOffValues{
-				MinWait: 0,
+				MinWait: -1,
 				MaxWait: 5,
 			},
 			expectedRetryPolicy: retryPolicy{
@@ -317,7 +317,7 @@ func TestGetRetryPolicy(t *testing.T) {
 				MaxWait:  5 * time.Second,
 				MaxRetry: 5,
 			},
-			expectedErr: "minWait should be at least 1 second",
+			expectedErr: "minWait must be at least 1 second",
 		},
 		{
 			name: "maxWait cant be less than minWait",
@@ -330,7 +330,7 @@ func TestGetRetryPolicy(t *testing.T) {
 				MaxWait:  20 * time.Second,
 				MaxRetry: 5,
 			},
-			expectedErr: "maxWait should be greater than minWait",
+			expectedErr: "maxWait must be greater than or equal to minWait",
 		},
 	}
 
@@ -346,8 +346,11 @@ func TestGetRetryPolicy(t *testing.T) {
 				assert.Contains(t, err.Error(), testCase.expectedErr)
 			} else {
 				assert.Nil(t, err)
+				assert.Equal(t, testCase.expectedRetryPolicy, retryPolicy)
+				assert.Equal(t, clusterRepo.Spec.ExponentialBackOffValues.MinWait, int(testCase.expectedRetryPolicy.MinWait.Seconds()))
+				assert.Equal(t, clusterRepo.Spec.ExponentialBackOffValues.MaxWait, int(testCase.expectedRetryPolicy.MaxWait.Seconds()))
+				assert.Equal(t, clusterRepo.Spec.ExponentialBackOffValues.MaxRetries, testCase.expectedRetryPolicy.MaxRetry)
 			}
-			assert.Equal(t, testCase.expectedRetryPolicy, retryPolicy)
 		})
 	}
 }

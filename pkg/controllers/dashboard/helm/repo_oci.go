@@ -376,30 +376,50 @@ func calculateBackoff(clusterRepo *catalog.ClusterRepo, policy retryPolicy) time
 func getRetryPolicy(clusterRepo *catalog.ClusterRepo) (retryPolicy, error) {
 	// Default Values for exponentialBackOff function which is used
 	// to retry an HTTP call when 429 response code is hit.
-	var retryPolicy = retryPolicy{
+	defaultRetryPolicy := retryPolicy{
 		MinWait:  1 * time.Second,
 		MaxWait:  5 * time.Second,
 		MaxRetry: 5,
 	}
-	if clusterRepo.Spec.ExponentialBackOffValues != nil {
-		if clusterRepo.Spec.ExponentialBackOffValues.MaxRetries > 0 {
-			retryPolicy.MaxRetry = clusterRepo.Spec.ExponentialBackOffValues.MaxRetries
-		}
-		if clusterRepo.Spec.ExponentialBackOffValues.MinWait >= 0 {
-			if clusterRepo.Spec.ExponentialBackOffValues.MinWait < 1 {
-				return retryPolicy, errors.New("minWait should be at least 1 second")
-			}
 
-			retryPolicy.MinWait = time.Duration(clusterRepo.Spec.ExponentialBackOffValues.MinWait) * time.Second
+	// If ExponentialBackOffValues is not provided, use default values
+	if clusterRepo.Spec.ExponentialBackOffValues == nil {
+		clusterRepo.Spec.ExponentialBackOffValues = &catalog.ExponentialBackOffValues{
+			MinWait:    int(defaultRetryPolicy.MinWait.Seconds()),
+			MaxWait:    int(defaultRetryPolicy.MaxWait.Seconds()),
+			MaxRetries: defaultRetryPolicy.MaxRetry,
 		}
-		if clusterRepo.Spec.ExponentialBackOffValues.MaxWait > 0 {
-			retryPolicy.MaxWait = time.Duration(clusterRepo.Spec.ExponentialBackOffValues.MaxWait) * time.Second
-		}
-		if clusterRepo.Spec.ExponentialBackOffValues.MaxWait < clusterRepo.Spec.ExponentialBackOffValues.MinWait {
-			return retryPolicy, errors.New("maxWait should be greater than minWait")
-		}
+		return defaultRetryPolicy, nil
 	}
-	return retryPolicy, nil
+
+	// Set MaxRetry if specified and valid
+	if clusterRepo.Spec.ExponentialBackOffValues.MaxRetries > 0 {
+		defaultRetryPolicy.MaxRetry = clusterRepo.Spec.ExponentialBackOffValues.MaxRetries
+	} else {
+		clusterRepo.Spec.ExponentialBackOffValues.MaxRetries = defaultRetryPolicy.MaxRetry
+	}
+
+	// Set MinWait if specified and valid
+	if clusterRepo.Spec.ExponentialBackOffValues.MinWait >= 1 {
+		defaultRetryPolicy.MinWait = time.Duration(clusterRepo.Spec.ExponentialBackOffValues.MinWait) * time.Second
+	} else if clusterRepo.Spec.ExponentialBackOffValues.MinWait < 0 {
+		return defaultRetryPolicy, errors.New("minWait must be at least 1 second")
+	} else {
+		clusterRepo.Spec.ExponentialBackOffValues.MinWait = int(defaultRetryPolicy.MinWait.Seconds())
+	}
+
+	// Set MaxWait if specified and valid
+	if clusterRepo.Spec.ExponentialBackOffValues.MaxWait > 0 {
+		defaultRetryPolicy.MaxWait = time.Duration(clusterRepo.Spec.ExponentialBackOffValues.MaxWait) * time.Second
+	} else {
+		clusterRepo.Spec.ExponentialBackOffValues.MaxWait = int(defaultRetryPolicy.MaxWait.Seconds())
+	}
+
+	// Ensure MaxWait is not less than MinWait
+	if clusterRepo.Spec.ExponentialBackOffValues.MaxWait < clusterRepo.Spec.ExponentialBackOffValues.MinWait {
+		return defaultRetryPolicy, errors.New("maxWait must be greater than or equal to minWait")
+	}
+	return defaultRetryPolicy, nil
 }
 
 // shouldSkip checks certain conditions to see if the handler should be skipped.
