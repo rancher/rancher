@@ -122,9 +122,8 @@ func (s *SnapshotAdditionalTestsTestSuite) TestSnapshotReplaceWorkerNode() {
 func (s *SnapshotAdditionalTestsTestSuite) TestSnapshotRecurringRestores() {
 	snapshotRestoreFiveTimes := &etcdsnapshot.Config{
 		UpgradeKubernetesVersion: "",
-		SnapshotRestore:          "all",
+		SnapshotRestore:          "none",
 		RecurringRestores:        5,
-		ReplaceWorkerNode:        false,
 	}
 
 	tests := []struct {

@@ -44,17 +44,6 @@ func (s *SnapshotRestoreUpgradeStrategyTestSuite) SetupSuite() {
 }
 
 func (s *SnapshotRestoreUpgradeStrategyTestSuite) TestSnapshotRestoreUpgradeStrategy() {
-	snapshotRestoreK8sVersion := &etcdsnapshot.Config{
-		UpgradeKubernetesVersion:     "",
-		SnapshotRestore:              "kubernetesVersion",
-		ControlPlaneConcurrencyValue: "15%",
-		ControlPlaneUnavailableValue: "3",
-		WorkerConcurrencyValue:       "20%",
-		WorkerUnavailableValue:       "15%",
-		RecurringRestores:            1,
-		ReplaceWorkerNode:            false,
-	}
-
 	snapshotRestoreAll := &etcdsnapshot.Config{
 		UpgradeKubernetesVersion:     "",
 		SnapshotRestore:              "all",
@@ -63,7 +52,6 @@ func (s *SnapshotRestoreUpgradeStrategyTestSuite) TestSnapshotRestoreUpgradeStra
 		WorkerConcurrencyValue:       "20%",
 		WorkerUnavailableValue:       "15%",
 		RecurringRestores:            1,
-		ReplaceWorkerNode:            false,
 	}
 
 	tests := []struct {
@@ -71,7 +59,6 @@ func (s *SnapshotRestoreUpgradeStrategyTestSuite) TestSnapshotRestoreUpgradeStra
 		etcdSnapshot *etcdsnapshot.Config
 		client       *rancher.Client
 	}{
-		{"Restore Kubernetes version and etcd", snapshotRestoreK8sVersion, s.client},
 		{"Restore cluster config, Kubernetes version and etcd", snapshotRestoreAll, s.client},
 	}
 

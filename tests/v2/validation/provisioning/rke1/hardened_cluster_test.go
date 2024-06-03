@@ -84,8 +84,8 @@ func (c *HardenedRKE1ClusterProvisioningTestSuite) TestProvisioningRKE1HardenedC
 		nodePools       []provisioninginput.NodePools
 		scanProfileName string
 	}{
-		{"CIS 1.8 Profile Hardened " + provisioninginput.StandardClientName.String(), c.standardUserClient, nodeRolesDedicated, "rke-profile-hardened-1.8"},
-		{"CIS 1.8 Profile Permissive " + provisioninginput.StandardClientName.String(), c.standardUserClient, nodeRolesDedicated, "rke-profile-permissive-1.8"},
+		{"RKE1 CIS 1.8 Profile Hardened " + provisioninginput.StandardClientName.String(), c.standardUserClient, nodeRolesDedicated, "rke-profile-hardened-1.8"},
+		{"RKE1 CIS 1.8 Profile Permissive " + provisioninginput.StandardClientName.String(), c.standardUserClient, nodeRolesDedicated, "rke-profile-permissive-1.8"},
 	}
 	for _, tt := range tests {
 		c.Run(tt.name, func() {

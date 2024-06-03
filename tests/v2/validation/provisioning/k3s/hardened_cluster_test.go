@@ -84,8 +84,8 @@ func (c *HardenedK3SClusterProvisioningTestSuite) TestProvisioningK3SHardenedClu
 		machinePools    []provisioninginput.MachinePools
 		scanProfileName string
 	}{
-		{"CIS 1.8 Profile Hardened " + provisioninginput.StandardClientName.String(), c.standardUserClient, nodeRolesDedicated, "k3s-cis-1.8-profile-hardened"},
-		{"CIS 1.8 Profile Permissive " + provisioninginput.StandardClientName.String(), c.standardUserClient, nodeRolesDedicated, "k3s-cis-1.8-profile-permissive"},
+		{"K3S CIS 1.8 Profile Hardened " + provisioninginput.StandardClientName.String(), c.standardUserClient, nodeRolesDedicated, "k3s-cis-1.8-profile-hardened"},
+		{"K3S CIS 1.8 Profile Permissive " + provisioninginput.StandardClientName.String(), c.standardUserClient, nodeRolesDedicated, "k3s-cis-1.8-profile-permissive"},
 	}
 	for _, tt := range tests {
 		c.Run(tt.name, func() {

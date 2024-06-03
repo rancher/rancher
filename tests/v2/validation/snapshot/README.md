@@ -1,6 +1,6 @@
 # Snapshot
 
-For the snapshot tests, these tests are designed to accept an existing cluster that the user has access to. If you do not have a downstream cluster in Rancher, you should create one first before running these tests.
+For the snapshot tests, these tests are designed to accept an existing cluster that the user has access to. If you do not have a downstream cluster in Rancher, you should create one first before running these tests. It is recommended to have a cluster configuration of 3 etcd, 2 controlplane, 3 workers.
 
 Please see below for more details for your config. Please note that the config can be in either JSON or YAML (all examples are illustrated in YAML).
 
@@ -17,14 +17,13 @@ rancher:
   insecure: true/optional
   cleanup: false/optional
 snapshotInput:
-  upgradeKubernetesVersion: "v1.26.9+rke2r1" # If left blank, the default version in Rancher will be used.
-  snapshotRestore: "all" # Options include none, kubernetesVersion, all. Option 'none' means that only the etcd will be restored.
+  upgradeKubernetesVersion: ""        # If left blank, the default version in Rancher will be used.
+  snapshotRestore: "all"              # Options include none, kubernetesVersion, all. Option 'none' means that only the etcd will be restored.
   controlPlaneConcurrencyValue: "15%"
   workerConcurrencyValue: "20%"
   controlPlaneUnavailableValue: "1"
   workerUnavailableValue: "10%"
-  recurringRestores: 1 # By default, this is set to 1 if this field is not included in the config.
-  replaceWorkerNode: false
+  recurringRestores: 1                # By default, this is set to 1 if this field is not included in the config.
 ```
 
 Additionally, S3 is a supported restore option. If you choose to use S3, then you must have it already enabled on the downstream cluster.

@@ -48,7 +48,6 @@ func (s *SnapshotRestoreTestSuite) TestSnapshotRestoreETCDOnly() {
 		UpgradeKubernetesVersion: "",
 		SnapshotRestore:          "none",
 		RecurringRestores:        1,
-		ReplaceWorkerNode:        false,
 	}
 
 	tests := []struct {

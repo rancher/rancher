@@ -55,7 +55,7 @@ func SetupCISBenchmarkChart(client *rancher.Client, projectClusterID string, cha
 
 // RunCISScan runs the CIS Benchmark scan with the specified profile name.
 func RunCISScan(client *rancher.Client, projectClusterID, scanProfileName string) error {
-	logrus.Infof("Running CIS Benchmark scan: %s" + scanProfileName)
+	logrus.Infof("Running CIS Benchmark scan: %s", scanProfileName)
 
 	cisScan := cis.ClusterScan{
 		ObjectMeta: metav1.ObjectMeta{
