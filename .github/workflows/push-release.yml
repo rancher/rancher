@@ -142,7 +142,7 @@ jobs:
   #         name: "digests-server-${{ matrix.os }}-${{ matrix.arch }}"
   #         path: /tmp/digests/*
   #         if-no-files-found: error
-  #         retention-days: 7
+  #         retention-days: 1
   #         overwrite: true
   # merge-server-manifest:
   #   runs-on: ubuntu-latest
@@ -257,7 +257,7 @@ jobs:
   #         name: "digests-agent-${{ matrix.os }}-${{ matrix.arch }}"
   #         path: /tmp/digests/*
   #         if-no-files-found: error
-  #         retention-days: 7
+  #         retention-days: 1
   #         overwrite: true
   # build-agent-windows:
   #   strategy:
@@ -404,7 +404,7 @@ jobs:
   #         name: "digests-installer-${{ matrix.os }}-${{ matrix.arch }}"
   #         path: /tmp/digests/*
   #         if-no-files-found: error
-  #         retention-days: 7
+  #         retention-days: 1
   #         overwrite: true
   # merge-installer-manifest:
   #   runs-on: ubuntu-latest
@@ -490,5 +490,37 @@ jobs:
           name: "artifacts"
           path: ./dist/*
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 1
           overwrite: true
+  docker-image-digests:
+    runs-on: ubuntu-latest
+    needs: [create-images-files]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup Environment Variables
+        run: |
+          ref_name="${{ github.ref_name }}"
+          prefix="release/"
+          if [[ "$ref_name" == release/v* ]]; then
+            TAG=${ref_name#$prefix}-${{ github.sha }}-head
+            echo "TAG=$TAG" >> "$GITHUB_ENV"
+          fi
+      - name: Download rancher-images.txt
+        uses: actions/download-artifact@v4
+        with:
+          name: "artifacts"
+          pattern: rancher-images.txt
+          path: .
+      - name: Install dependencies
+        run: sudo apt-get -y install skopeo jq
+      - name: Generate Linux Digests
+        run: ./scripts/generate-linux-digests.sh
+      - name: Upload digests
+        uses: actions/upload-artifact@v4
+        with:
+          name: "digests"
+          path: ./bin/rancher-images-digests-linux-*
+          if-no-files-found: error
+          retention-days: 1
+      

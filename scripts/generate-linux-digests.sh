@@ -4,16 +4,13 @@ mkdir -p bin
 
 declare -a archs=(amd64 arm64 s390x)
 
-if [ -z "${DRONE_TAG}" ]; then
-    echo "Environment variable DRONE_TAG not set"
+if [ -z "${TAG}" ]; then
+    echo "Environment variable TAG not set"
     exit 0
 fi
 
 DIGEST_TEMPLATE_FILENAME="./bin/rancher-images-digests-linux"
-IMAGES_FILE=$(mktemp)
-IMAGES_URL="https://github.com/rancher/rancher/releases/download/${DRONE_TAG}/rancher-images.txt"
-
-wget --retry-connrefused --waitretry=1 --read-timeout=20 --timeout=15 -t 10 $IMAGES_URL -O $IMAGES_FILE
+IMAGES_FILE=rancher-images.txt
 
 for image in $(cat $IMAGES_FILE); do
     INSPECT_JSON=$(skopeo inspect "docker://${image}" --raw)
