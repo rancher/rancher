@@ -468,6 +468,8 @@ jobs:
             TAG=${ref_name#$prefix}-${{ github.sha }}-head
             echo "TAG=$TAG" >> "$GITHUB_ENV"
           fi
+      - name: Download data.json
+        run: curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${{ env.CATTLE_KDM_BRANCH }}/data.json > ./data.json
       - name: Create components and images files
         run: ./scripts/create-components-images-files.sh
       - name: Upload artifacts
