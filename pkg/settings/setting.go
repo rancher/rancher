@@ -275,7 +275,7 @@ var (
 	UIBannerDark  = NewSetting("ui-banner-dark", "")
 
 	// UIExtensions - setting for configuring UI Extensions (e.g. allow users to enable/disable extensions)
-	UIExtenstions = NewSetting("ui-extensions", "")
+	UIExtensions = NewSetting("ui-extensions", "")
 
   	// UI Settings for allowing separate configuration of page banners
 	UIBannerHeader       = NewSetting("ui-banner-header", "")
