@@ -18,6 +18,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/managementuser/snapshotbackpopulate"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/windows"
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy"
+	"github.com/rancher/rancher/pkg/controllers/resourcesyncer"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/impersonation"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -26,6 +27,7 @@ import (
 
 func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.UserContext, clusterRec *apimgmtv3.Cluster, kubeConfigGetter common.KubeConfigGetter) error {
 	rbac.Register(ctx, cluster)
+	resourcesyncer.Register(ctx, cluster, mgmt)
 	healthsyncer.Register(ctx, cluster)
 	networkpolicy.Register(ctx, cluster)
 	nodesyncer.Register(ctx, cluster, kubeConfigGetter)
