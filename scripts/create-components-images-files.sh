@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e
 
+cd $(dirname $0)
+
 source $(dirname $0)/version
 source $(dirname $0)/export-config
 source $(dirname $0)/package-env
@@ -9,10 +11,8 @@ cd $(dirname $0)/../package
 
 ../scripts/k3s-images.sh
 
-cp ../bin/rancher ../bin/agent ../bin/data.json ../bin/k3s-airgap-images.tar .
-
 # Make sure the used data.json is a release artifact
-cp ../bin/data.json ../bin/rancher-data.json
+cp ../data.json ../rancher-data.json
 
 if [ ${ARCH} == arm64 ]; then
     ETCD_UNSUPPORTED_ARCH=arm64
