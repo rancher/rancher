@@ -478,14 +478,11 @@ jobs:
           touch $HOME/bin/rancher-rke-k8s-versions.txt
       - name: Create components and images files
         run: ./scripts/create-components-images-files.sh
-      - name: Move files
-        run: |
-          mv $HOME/bin/rancher-rke-k8s-versions.txt ./dist
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: "artifacts"
-          path: ./dist/*
+          path: ${{ env.HOME }}/bin/*
           if-no-files-found: error
           retention-days: 7
           overwrite: true
