@@ -155,27 +155,6 @@ func TestGenerateIndex(t *testing.T) {
 		urlPath         string
 	}{
 		{
-			"returns an error if url is invalid",
-			repo.NewIndexFile(),
-			"failed to create an OCI client for url",
-			nil,
-			nil,
-			nil,
-			"invalidUrl//",
-			"",
-		},
-		{
-			"returns an error if url is not an oras repository",
-			repo.NewIndexFile(),
-			"failed to create an OCI client for url",
-			nil,
-			nil,
-			nil,
-			"http://github.com/rancher/charts",
-			"",
-		},
-
-		{
 			"Can add a specific chart to indexFile if tag is provided",
 			repo.NewIndexFile(),
 			"",
@@ -245,7 +224,9 @@ func TestGenerateIndex(t *testing.T) {
 				u = tt.url
 			}
 			repoSpec := v1.RepoSpec{InsecurePlainHTTP: true, InsecureSkipTLSverify: true}
-			i, err := GenerateIndex(u, nil, repoSpec, v1.RepoStatus{}, tt.indexFile)
+			ociClient, err := NewClient(u, repoSpec, nil)
+			assert.Nil(t, err)
+			i, err := GenerateIndex(ociClient, u, nil, repoSpec, v1.RepoStatus{}, tt.indexFile)
 			if tt.expectedErrMsg != "" {
 				assert.Contains(t, err.Error(), tt.expectedErrMsg, "wrong error")
 			}
