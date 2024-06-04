@@ -472,8 +472,15 @@ jobs:
         run: |
           mkdir -p bin
           curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${{ env.CATTLE_KDM_BRANCH }}/data.json > ./bin/data.json
+      - name: Create files
+        run: |
+          mkdir -p $HOME/bin
+          touch $HOME/bin/rancher-rke-k8s-versions.txt
       - name: Create components and images files
         run: ./scripts/create-components-images-files.sh
+      - name: Move files
+        run: |
+          mv $HOME/bin/rancher-rke-k8s-versions.txt ./dist
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
