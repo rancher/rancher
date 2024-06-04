@@ -481,7 +481,9 @@ jobs:
       - name: Move files
         run: |
           mv $HOME/bin/* ./dist
-          mv ./bin/* ./dist
+          mv ./bin/*.txt ./dist
+          mv ./bin/*.sh ./dist
+          mv ./bin/*.ps1 ./dist
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
