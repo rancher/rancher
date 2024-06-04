@@ -31,7 +31,7 @@ jobs:
           sudo chmod +x /usr/bin/helm_v3
           helm_v3 plugin install https://github.com/helm-unittest/helm-unittest.git --version ${{ env.HELM_UNITTEST_VERSION }}; \
       - name: Setup Environment Variables
-        uses: ./actions/.github/actions/setup-tag-env
+        uses: ./.github/actions/setup-tag-env
       - name: Build
         run: ./scripts/chart/build chart
       - name: Validate
@@ -75,7 +75,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Setup Environment Variables
-        uses: ./actions/.github/actions/setup-tag-env
+        uses: ./.github/actions/setup-tag-env
       - name: Setup New Environment Variables
         run: |
           echo "ARCH=${{ matrix.arch }}" >> "$GITHUB_ENV"
@@ -142,7 +142,7 @@ jobs:
       id-token: write
     steps:
       - name: Setup Environment Variables
-        uses: ./actions/.github/actions/setup-tag-env
+        uses: ./.github/actions/setup-tag-env
       - name: Download digests
         uses: actions/download-artifact@v4
         with:
@@ -194,7 +194,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Setup Environment Variables
-        uses: ./actions/.github/actions/setup-tag-env
+        uses: ./.github/actions/setup-tag-env
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
@@ -346,7 +346,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Setup Environment Variables
-        uses: ./actions/.github/actions/setup-tag-env
+        uses: ./.github/actions/setup-tag-env
       - name: Setup New Environment Variables
         run: |
           echo "ARCH=${{ matrix.arch }}" >> "$GITHUB_ENV"
@@ -467,7 +467,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Setup Environment Variables
-        uses: ./actions/.github/actions/setup-tag-env
+        uses: ./.github/actions/setup-tag-env
       - name: Download data.json
         run: |
           mkdir -p bin
@@ -500,7 +500,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Setup Environment Variables
-        uses: ./actions/.github/actions/setup-tag-env
+        uses: ./.github/actions/setup-tag-env
       - name: Download rancher-images.txt
         uses: actions/download-artifact@v4
         with:
