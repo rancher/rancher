@@ -7,18 +7,13 @@ on:
     tags:
       - "v*"
 env:
-  ARCH: amd64
-  TAG: ${{ github.ref_name }}
   GIT_TAG: ${{ github.ref_name }}
-  HEAD_TAG: ${{ github.ref_name }}
   COMMIT: ${{ github.sha }}
   REPOSITORY_OWNER: ${{ github.repository_owner }}
   IMAGE: ${{ github.repository_owner }}/rancher
   IMAGE_AGENT: ${{ github.repository_owner }}/rancher-agent
   IMAGE_INSTALLER: ${{ github.repository_owner }}/system-agent-installer-rancher
   CATTLE_KDM_BRANCH: dev-v2.8
-  HELM_UNITTEST_VERSION: 0.3.2
-  HELM_URL_V3: https://get.helm.sh/helm-v3.13.3-linux-amd64.tar.gz
 jobs:
   build-chart:
     runs-on: ubuntu-latest
@@ -26,6 +21,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Install dependencies
+        env:
+          HELM_URL_V3: https://get.helm.sh/helm-v3.13.3-linux-amd64.tar.gz
+          HELM_UNITTEST_VERSION: 0.3.2
         run: |
           sudo snap install yq
           curl ${{ env.HELM_URL_V3 }} | tar xvzf - --strip-components=1 -C /tmp/ && \
@@ -33,13 +31,7 @@ jobs:
           sudo chmod +x /usr/bin/helm_v3
           helm_v3 plugin install https://github.com/helm-unittest/helm-unittest.git --version ${{ env.HELM_UNITTEST_VERSION }}; \
       - name: Setup Environment Variables
-        run: |
-          ref_name="${{ github.ref_name }}"
-          prefix="release/"
-          if [[ "$ref_name" == release/v* ]]; then
-            GIT_TAG=${ref_name#$prefix}-${{ github.sha }}-head
-            echo "GIT_TAG=$GIT_TAG" >> "$GITHUB_ENV"
-          fi
+        uses: ./actions/.github/actions/setup-tag-env
       - name: Build
         run: ./scripts/chart/build chart
       - name: Validate
@@ -83,19 +75,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Setup Environment Variables
+        uses: ./actions/.github/actions/setup-tag-env
+      - name: Setup New Environment Variables
         run: |
           echo "ARCH=${{ matrix.arch }}" >> "$GITHUB_ENV"
-
           echo "RKE_VERSION=$(grep -m1 'github.com/rancher/rke' go.mod | awk '{print $2}')" >> "$GITHUB_ENV"
-
-          ref_name="${{ github.ref_name }}"
-          prefix="release/"
-          if [[ "$ref_name" == release/v* ]]; then
-            TAG=${ref_name#$prefix}-${{ github.sha }}-head
-            HEAD_TAG=${ref_name#$prefix}-head
-            echo "TAG=$TAG" >> "$GITHUB_ENV"
-            echo "HEAD_TAG=$HEAD_TAG" >> "$GITHUB_ENV"
-          fi
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
@@ -157,16 +141,8 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - name: Setup Environment variables
-        run: |
-          ref_name="${{ github.ref_name }}"
-          prefix="release/"
-          if [[ "$ref_name" == release/v* ]]; then
-            TAG=${ref_name#$prefix}-${{ github.sha }}-head
-            HEAD_TAG=${ref_name#$prefix}-head
-            echo "TAG=$TAG" >> "$GITHUB_ENV"
-            echo "HEAD_TAG=$HEAD_TAG" >> "$GITHUB_ENV"
-          fi
+      - name: Setup Environment Variables
+        uses: ./actions/.github/actions/setup-tag-env
       - name: Download digests
         uses: actions/download-artifact@v4
         with:
@@ -218,15 +194,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Setup Environment Variables
-        run: |
-          echo "ARCH=${{ matrix.arch }}" >> "$GITHUB_ENV"
-
-          ref_name="${{ github.ref_name }}"
-          prefix="release/"
-          if [[ "$ref_name" == release/v* ]]; then
-            TAG=${ref_name#$prefix}-${{ github.sha }}-head
-            echo "TAG=$TAG" >> "$GITHUB_ENV"
-          fi
+        uses: ./actions/.github/actions/setup-tag-env
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
@@ -378,15 +346,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Setup Environment Variables
+        uses: ./actions/.github/actions/setup-tag-env
+      - name: Setup New Environment Variables
         run: |
           echo "ARCH=${{ matrix.arch }}" >> "$GITHUB_ENV"
-
-          ref_name="${{ github.ref_name }}"
-          prefix="release/"
-          if [[ "$ref_name" == release/v* ]]; then
-            TAG=${ref_name#$prefix}-${{ github.sha }}-head
-            echo "TAG=$TAG" >> "$GITHUB_ENV"
-          fi
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
@@ -504,13 +467,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Setup Environment Variables
-        run: |
-          ref_name="${{ github.ref_name }}"
-          prefix="release/"
-          if [[ "$ref_name" == release/v* ]]; then
-            TAG=${ref_name#$prefix}-${{ github.sha }}-head
-            echo "TAG=$TAG" >> "$GITHUB_ENV"
-          fi
+        uses: ./actions/.github/actions/setup-tag-env
       - name: Download data.json
         run: |
           mkdir -p bin
@@ -543,13 +500,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Setup Environment Variables
-        run: |
-          ref_name="${{ github.ref_name }}"
-          prefix="release/"
-          if [[ "$ref_name" == release/v* ]]; then
-            TAG=${ref_name#$prefix}-${{ github.sha }}-head
-            echo "TAG=$TAG" >> "$GITHUB_ENV"
-          fi
+        uses: ./actions/.github/actions/setup-tag-env
       - name: Download rancher-images.txt
         uses: actions/download-artifact@v4
         with:
