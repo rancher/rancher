@@ -2,6 +2,7 @@ package planner
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"hash/crc32"
