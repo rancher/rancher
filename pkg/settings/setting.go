@@ -277,7 +277,7 @@ var (
 	// UIExtensions - setting for configuring UI Extensions (e.g. allow users to enable/disable extensions)
 	UIExtensions = NewSetting("ui-extensions", "")
 
-  	// UI Settings for allowing separate configuration of page banners
+	// UI Settings for allowing separate configuration of page banners
 	UIBannerHeader       = NewSetting("ui-banner-header", "")
 	UIBannerFooter       = NewSetting("ui-banner-footer", "")
 	UIBannerLoginConsent = NewSetting("ui-banner-login-consent", "")
