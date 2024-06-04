@@ -162,7 +162,11 @@ func AuthenticateUser(ctx context.Context, input interface{}, providerName strin
 }
 
 func GetPrincipal(principalID string, myToken v3.Token) (v3.Principal, error) {
-	principalScheme, _, _ := strings.Cut(principalID, ":")
+	principalScheme, _, found := strings.Cut(principalID, ":")
+	if !found {
+		return v3.Principal{}, fmt.Errorf("invalid principalID %s", principalID)
+	}
+
 	principalProvider, _, _ := strings.Cut(principalScheme, "_")
 
 	// Try to use the provider of the principal rather then the one we used to authenticate.

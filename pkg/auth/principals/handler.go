@@ -119,7 +119,8 @@ func (h *principalsHandler) list(apiContext *types.APIContext, next types.Reques
 		// get the group principals for that provider.
 		if extProvider := providers.GetEnabledExternalProvider(); extProvider != nil {
 			shouldGetGroupPrincipals = true
-			// We'll fake the token in this case.
+			// We'll fake the token in this case to pass the user id and auth provider,
+			// that are used to fetch user's group principals stored in the userattribute object.
 			getGroupPricipalsToken = &v32.Token{
 				UserID:       token.UserID,
 				AuthProvider: extProvider.GetName(),
