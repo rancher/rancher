@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/rancher/wrangler/v2/pkg/schemas/validation"
 
@@ -26,6 +27,7 @@ func Icon(secret *corev1.Secret, repoURL string, caBundle []byte, insecureSkipTL
 	}
 
 	client, err := HelmClient(secret, caBundle, insecureSkipTLSVerify, disableSameOriginCheck, repoURL)
+	client.Timeout = 2 * time.Second
 	if err != nil {
 		return nil, "", err
 	}
