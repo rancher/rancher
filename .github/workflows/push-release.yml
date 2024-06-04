@@ -7,8 +7,6 @@ on:
     tags:
       - "v*"
 env:
-  GIT_TAG: ${{ github.ref_name }}
-  COMMIT: ${{ github.sha }}
   REPOSITORY_OWNER: ${{ github.repository_owner }}
   IMAGE: ${{ github.repository_owner }}/rancher
   IMAGE_AGENT: ${{ github.repository_owner }}/rancher-agent
