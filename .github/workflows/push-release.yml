@@ -493,6 +493,7 @@ jobs:
           retention-days: 1
           overwrite: true
   docker-image-digests:
+    #   if: github.event_name == 'push' && contains(github.ref, 'tags/') # Only run on push
     runs-on: ubuntu-latest
     needs: [create-images-files]
     steps:
@@ -523,4 +524,22 @@ jobs:
           path: ./bin/rancher-images-digests-linux-*
           if-no-files-found: error
           retention-days: 1
-      
+  docker-image-digests-windows:
+    #   if: github.event_name == 'push' && contains(github.ref, 'tags/') # Only run on push
+    strategy:
+      matrix:
+        os: [windows]
+        version: [2019, 2022]
+    runs-on: ${{ matrix.os }}-${{ matrix.version }}
+    steps:
+      - name: Docker run
+        shell: bash
+        run:  |
+          docker run \
+            -e PLUGIN_GITHUB_REPOSITORY="${{ env.REPOSITORY_OWNER }}/rancher" \
+            -e PLUGIN_GITHUB_TOKEN="${{ secrets.GITHUB_TOKEN }}" \
+            -e PLUGIN_GITHUB_TAG="${{ env.TAG }} \
+            -e PLUGIN_INPUT_FILE=""rancher-windows-images.txt" \
+            -e PLUGIN_OUTPUT_FILE=""rancher-images-digests-windows-1809.txt" \
+            -e PLUGIN_REGISTRY=""docker.io" \
+            rancher/drone-docker-image-digests:v0.0.12 
