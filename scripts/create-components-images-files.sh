@@ -3,11 +3,11 @@ set -e
 
 cd $(dirname $0)
 
-source $(dirname $0)/version
-source $(dirname $0)/export-config
-source $(dirname $0)/package-env
+source version
+source export-config
+source package-env
 
-cd $(dirname $0)/../package
+cd ../package
 
 ../scripts/k3s-images.sh
 
