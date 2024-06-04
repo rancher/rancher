@@ -12,7 +12,7 @@ cd ../package
 ../scripts/k3s-images.sh
 
 # Make sure the used data.json is a release artifact
-cp ../data.json ../rancher-data.json
+cp ../bin/data.json ../bin/rancher-data.json
 
 if [ ${ARCH} == arm64 ]; then
     ETCD_UNSUPPORTED_ARCH=arm64
