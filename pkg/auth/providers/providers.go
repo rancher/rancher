@@ -169,21 +169,26 @@ func GetPrincipal(principalID string, myToken v3.Token) (v3.Principal, error) {
 
 	principalProvider, _, _ := strings.Cut(principalScheme, "_")
 
-	// Try to use the provider of the principal rather then the one we used to authenticate.
+	authProvider := myToken.AuthProvider
+	if myToken.AuthProvider == LocalProvider && principalProvider != LocalProvider {
+		// Try to use the provider of the principal rather then the one we used to authenticate.
+		authProvider = principalProvider
+	}
+
 	// Make sure that it exists and is enabled.
-	provider := Providers[principalProvider]
+	provider := Providers[authProvider]
 	if provider == nil {
-		return v3.Principal{}, fmt.Errorf("authProvider %s is not initialized", principalProvider)
+		return v3.Principal{}, fmt.Errorf("authProvider %s is not initialized", authProvider)
 	}
 
 	disabled, err := provider.IsDisabledProvider()
 	if err != nil {
 		// Treat the error here the same way the provider refresher does.
-		logrus.Warnf("Unable to determine if provider %s was disabled, will assume that it isn't with error: %v", principalProvider, err)
+		logrus.Warnf("Unable to determine if provider %s was disabled, will assume that it isn't with error: %v", authProvider, err)
 		disabled = false
 	}
 	if disabled {
-		return v3.Principal{}, fmt.Errorf("authProvider %s is disabled", principalProvider)
+		return v3.Principal{}, fmt.Errorf("authProvider %s is disabled", authProvider)
 	}
 
 	return provider.GetPrincipal(principalID, myToken)

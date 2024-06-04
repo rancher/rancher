@@ -234,32 +234,28 @@ func TestGetPrincipal(t *testing.T) {
 				name:     local.Name,
 				disabled: false,
 				getPrincipalFunc: func(string, v3.Token) (v3.Principal, error) {
-					return v3.Principal{
-						ObjectMeta:    metav1.ObjectMeta{Name: localPrincipalID},
-						Provider:      local.Name,
-						PrincipalType: "user",
-					}, nil
+					t.Error("Unexpected call to local provider")
+					return v3.Principal{}, nil
 				},
 			},
 			extProvider: &fakeProvider{
 				name:     activedirectory.Name,
 				disabled: false,
 				getPrincipalFunc: func(string, v3.Token) (v3.Principal, error) {
-					t.Error("Unexpected call to external provider")
-					return v3.Principal{}, nil
+					return v3.Principal{}, fmt.Errorf("not found")
 				},
 			},
 			searchPrincipalID: localPrincipalID,
-			wantProvider:      local.Name,
+			shoudErr:          true,
 		},
 		{
-			desc:              "Provider is not initialized",
+			desc:              "External provider is not initialized",
 			myToken:           localToken,
 			searchPrincipalID: extPrincipalID,
 			shoudErr:          true,
 		},
 		{
-			desc:    "Provider disabled",
+			desc:    "External provider is disabled",
 			myToken: localToken,
 			extProvider: &fakeProvider{
 				name:     activedirectory.Name,
