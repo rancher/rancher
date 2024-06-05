@@ -136,7 +136,7 @@ require (
 	github.com/rancher/norman v0.0.0-20240503193601-9f5f6586bb5b
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/remotedialer v0.3.2
-	github.com/rancher/rke v1.6.0-rc4
+	github.com/rancher/rke v1.6.0-rc5
 	github.com/rancher/steve v0.0.0-20240510175329-a9bf8c7e9cad
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007
 	github.com/rancher/wrangler/v2 v2.2.0-rc6
