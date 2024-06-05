@@ -250,10 +250,10 @@ jobs:
         version: [2019, 2022]
     runs-on: ${{ matrix.os }}-${{ matrix.version }}
     steps:
-      - name: Setup Environment Variables
-        uses: ./.github/actions/setup-tag-env
       - name: Checkout code
         uses: actions/checkout@v4
+      - name: Setup Environment Variables
+        uses: ./.github/actions/setup-tag-env
       # - name: Load Secrets from Vault
         # uses: rancher-eio/read-vault-secrets@main
         # with:
