@@ -118,7 +118,6 @@ RUN mkdir -p /var/lib/rancher-data/local-catalogs/system-library && \
     git clone -b master --depth 1 https://github.com/rancher/helm3-charts /var/lib/rancher-data/local-catalogs/helm3-library
 
 RUN curl -sLf https://github.com/rancher/machine/releases/download/${CATTLE_MACHINE_VERSION}/rancher-machine-${ARCH}.tar.gz | tar xvzf - -C /usr/bin && \
-    curl -sLf https://github.com/rancher/loglevel/releases/download/${LOGLEVEL_VERSION}/loglevel-${ARCH}-${LOGLEVEL_VERSION}.tar.gz | tar xvzf - -C /usr/bin && \
     curl -LO https://github.com/linode/docker-machine-driver-linode/releases/download/${DOCKER_MACHINE_LINODE_VERSION}/docker-machine-driver-linode_linux-amd64.zip && \
     unzip docker-machine-driver-linode_linux-amd64.zip -d /opt/drivers/management-state/bin && \
     mkdir -p /usr/share/rancher/ui/assets/ && \
@@ -257,7 +256,7 @@ ENV CATTLE_CLI_URL_WINDOWS https://releases.rancher.com/cli2/${CATTLE_CLI_VERSIO
 
 ARG VERSION=dev
 ENV CATTLE_SERVER_VERSION ${VERSION}
-COPY entrypoint.sh rancher /usr/bin/
+COPY entrypoint.sh rancher loglevel /usr/bin/
 COPY kustomize.sh /usr/bin/
 COPY jailer.sh /usr/bin/
 COPY k3s-airgap-images.tar /var/lib/rancher/k3s/agent/images/
