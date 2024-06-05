@@ -269,9 +269,7 @@ func (p *prtbLifecycle) reconcileLabels(binding *v3.ProjectRoleTemplateBinding) 
 			_, err := p.crbClient.Update(crbToUpdate)
 			return err
 		})
-		if retryErr != nil {
-			returnErr = errors.Join(returnErr, retryErr)
-		}
+		returnErr = errors.Join(returnErr, retryErr)
 	}
 
 	for _, prtbLabel := range []string{MembershipBindingOwner, PrtbInClusterBindingOwner} {
@@ -294,9 +292,7 @@ func (p *prtbLifecycle) reconcileLabels(binding *v3.ProjectRoleTemplateBinding) 
 				_, err := p.rbClient.Update(rbToUpdate)
 				return err
 			})
-			if retryErr != nil {
-				returnErr = errors.Join(returnErr, retryErr)
-			}
+			returnErr = errors.Join(returnErr, retryErr)
 		}
 	}
 	if returnErr != nil {

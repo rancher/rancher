@@ -711,9 +711,8 @@ func addClusterRoleForNamespacedCRDs(management *config.ManagementContext) error
 			},
 		},
 	}
-	if err := createOrUpdateClusterRole(management, cr); err != nil {
-		returnErr = errors.Join(returnErr, err)
-	}
+	err := createOrUpdateClusterRole(management, cr)
+	returnErr = errors.Join(returnErr, err)
 
 	// ProjectCRDsClusterRole is a CR containing rules for granting restricted-admins access to all CRDs that can be created in a
 	// v3.Cluster and v3.Project's namespace
@@ -734,9 +733,9 @@ func addClusterRoleForNamespacedCRDs(management *config.ManagementContext) error
 			},
 		},
 	}
-	if err := createOrUpdateClusterRole(management, cr); err != nil {
-		returnErr = errors.Join(returnErr, err)
-	}
+	err = createOrUpdateClusterRole(management, cr)
+	returnErr = errors.Join(returnErr, err)
+
 	return returnErr
 }
 

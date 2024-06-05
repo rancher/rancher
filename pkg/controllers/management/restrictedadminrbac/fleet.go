@@ -43,9 +43,8 @@ func (r *rbaccontroller) ensureRestricedAdminForFleet(key string, obj *v3.Global
 		if fw.Name == fleetconst.ClustersLocalNamespace {
 			continue
 		}
-		if err := r.ensureRolebinding(fw.Name, rbac.GetGRBSubject(obj), obj); err != nil {
-			finalError = errors.Join(finalError, err)
-		}
+		err := r.ensureRolebinding(fw.Name, rbac.GetGRBSubject(obj), obj)
+		finalError = errors.Join(finalError, err)
 	}
 	return obj, finalError
 }

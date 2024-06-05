@@ -77,19 +77,11 @@ func runAgent(ctx context.Context) {
 		if os.Getenv("CLUSTER_CLEANUP") == "true" {
 			err = clean.Cluster()
 		} else if os.Getenv("BINDING_CLEANUP") == "true" {
-			var bindingErr error
-			err = clean.DuplicateBindings(nil)
-			if err != nil {
-				bindingErr = errors.Join(bindingErr, err)
-			}
-			err = clean.OrphanBindings(nil)
-			if err != nil {
-				bindingErr = errors.Join(bindingErr, err)
-			}
-			err = clean.OrphanCatalogBindings(nil)
-			if err != nil {
-				bindingErr = errors.Join(bindingErr, err)
-			}
+			bindingErr := errors.Join(
+				clean.DuplicateBindings(nil),
+				clean.OrphanBindings(nil),
+				clean.OrphanCatalogBindings(nil),
+			)
 			err = bindingErr
 		} else {
 			err = run(ctx)

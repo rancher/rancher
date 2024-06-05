@@ -133,7 +133,7 @@ func (c *crtbLifecycle) reconcileSubject(binding *v3.ClusterRoleTemplateBinding)
 		return binding, nil
 	}
 
-	return nil, fmt.Errorf("Binding %v has no subject", binding.Name)
+	return nil, fmt.Errorf("ClusterRoleTemplateBinding %v has no subject", binding.Name)
 }
 
 // When a CRTB is created or updated, translate it into several k8s roles and bindings to actually enforce the RBAC
@@ -253,9 +253,7 @@ func (c *crtbLifecycle) reconcileLabels(binding *v3.ClusterRoleTemplateBinding) 
 			_, err := c.crbClient.Update(crbToUpdate)
 			return err
 		})
-		if retryErr != nil {
-			returnErr = errors.Join(returnErr, retryErr)
-		}
+		returnErr = errors.Join(returnErr, retryErr)
 	}
 
 	set = map[string]string{string(binding.UID): CrtbInProjectBindingOwner}
@@ -278,9 +276,7 @@ func (c *crtbLifecycle) reconcileLabels(binding *v3.ClusterRoleTemplateBinding) 
 			_, err := c.rbClient.Update(rbToUpdate)
 			return err
 		})
-		if retryErr != nil {
-			returnErr = errors.Join(returnErr, retryErr)
-		}
+		returnErr = errors.Join(returnErr, retryErr)
 	}
 	if returnErr != nil {
 		return returnErr

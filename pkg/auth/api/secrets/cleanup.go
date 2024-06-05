@@ -34,9 +34,7 @@ func CleanupClientSecrets(secretInterface corev1.SecretInterface, config *v3.Aut
 
 	if utils.Contains(tokens.PerUserCacheProviders, config.Name) {
 		err := CleanupOAuthTokens(secretInterface, config.Name)
-		if err != nil {
-			result = errors.Join(result, err)
-		}
+		result = errors.Join(result, err)
 	}
 
 	if fieldsMap, ok := SubTypeToFields[config.Type]; ok {

@@ -590,9 +590,7 @@ func migrateEncryptionConfig(ctx context.Context, restConfig *rest.Config) error
 			}
 			return false, err
 		})
-		if err != nil {
-			allErrors = errors.Join(err, allErrors)
-		}
+		allErrors = errors.Join(err, allErrors)
 	}
 	return allErrors
 }

@@ -103,44 +103,22 @@ type globalRoleBindingLifecycle struct {
 }
 
 func (grb *globalRoleBindingLifecycle) Create(obj *v3.GlobalRoleBinding) (runtime.Object, error) {
-	var returnError error
-	err := grb.reconcileClusterPermissions(obj)
-	if err != nil {
-		returnError = errors.Join(returnError, err)
-	}
-	err = grb.reconcileGlobalRoleBinding(obj)
-	if err != nil {
-		returnError = errors.Join(returnError, err)
-	}
-	err = grb.reconcileNamespacedRoleBindings(obj)
-	if err != nil {
-		returnError = errors.Join(returnError, err)
-	}
-	err = grb.fleetPermissionsHandler.reconcileFleetWorkspacePermissionsBindings(obj)
-	if err != nil {
-		returnError = errors.Join(returnError, err)
-	}
+	returnError := errors.Join(
+		grb.reconcileClusterPermissions(obj),
+		grb.reconcileGlobalRoleBinding(obj),
+		grb.reconcileNamespacedRoleBindings(obj),
+		grb.fleetPermissionsHandler.reconcileFleetWorkspacePermissionsBindings(obj),
+	)
 	return obj, returnError
 }
 
 func (grb *globalRoleBindingLifecycle) Updated(obj *v3.GlobalRoleBinding) (runtime.Object, error) {
-	var returnError error
-	err := grb.reconcileClusterPermissions(obj)
-	if err != nil {
-		returnError = errors.Join(returnError, err)
-	}
-	err = grb.reconcileGlobalRoleBinding(obj)
-	if err != nil {
-		returnError = errors.Join(returnError, err)
-	}
-	err = grb.reconcileNamespacedRoleBindings(obj)
-	if err != nil {
-		returnError = errors.Join(returnError, err)
-	}
-	err = grb.fleetPermissionsHandler.reconcileFleetWorkspacePermissionsBindings(obj)
-	if err != nil {
-		returnError = errors.Join(returnError, err)
-	}
+	returnError := errors.Join(
+		grb.reconcileClusterPermissions(obj),
+		grb.reconcileGlobalRoleBinding(obj),
+		grb.reconcileNamespacedRoleBindings(obj),
+		grb.fleetPermissionsHandler.reconcileFleetWorkspacePermissionsBindings(obj),
+	)
 	return obj, returnError
 }
 

@@ -87,76 +87,39 @@ type globalRoleLifecycle struct {
 }
 
 func (gr *globalRoleLifecycle) Create(obj *v3.GlobalRole) (runtime.Object, error) {
-	var returnError error
-
 	// ObjectMeta.Generation does not get updated when the Status is updated.
 	// If only the status has been updated and we have finished updating the status (status.Summary != "InProgress")
 	// we don't need to perform a reconcile as nothing has changed.
 	if obj.Status.ObservedGeneration == obj.ObjectMeta.Generation && obj.Status.Summary != SummaryInProgress {
 		return obj, nil
 	}
-	// set GR status to "in progress" while the underlying roles get added
-	err := gr.setGRAsInProgress(obj)
-	if err != nil {
-		returnError = errors.Join(returnError, err)
-	}
-	err = gr.reconcileGlobalRole(obj)
-	if err != nil {
-		returnError = errors.Join(returnError, err)
-	}
-	err = gr.reconcileCatalogRole(obj)
-	if err != nil {
-		returnError = errors.Join(returnError, err)
-	}
-	err = gr.reconcileNamespacedRoles(obj)
-	if err != nil {
-		returnError = errors.Join(returnError, err)
-	}
-	err = gr.fleetPermissionsHandler.reconcileFleetWorkspacePermissions(obj)
-	if err != nil {
-		returnError = errors.Join(returnError, err)
-	}
-	err = gr.setGRAsCompleted(obj)
-	if err != nil {
-		returnError = errors.Join(returnError, err)
-	}
+	returnError := errors.Join(
+		gr.setGRAsInProgress(obj), // set GR status to "in progress" while the underlying roles get added
+		gr.reconcileGlobalRole(obj),
+		gr.reconcileCatalogRole(obj),
+		gr.reconcileNamespacedRoles(obj),
+		gr.fleetPermissionsHandler.reconcileFleetWorkspacePermissions(obj),
+		gr.setGRAsCompleted(obj),
+	)
 	return obj, returnError
 }
 
 func (gr *globalRoleLifecycle) Updated(obj *v3.GlobalRole) (runtime.Object, error) {
-	var returnError error
-
 	// ObjectMeta.Generation does not get updated when the Status is updated.
 	// If only the status has been updated and we have finished updating the status (status.Summary != "InProgress")
 	// we don't need to perform a reconcile as nothing has changed.
 	if obj.Status.ObservedGeneration == obj.ObjectMeta.Generation && obj.Status.Summary != SummaryInProgress {
 		return obj, nil
 	}
-	// set GR status to "in progress" while the underlying roles get added
-	err := gr.setGRAsInProgress(obj)
-	if err != nil {
-		returnError = errors.Join(returnError, err)
-	}
-	err = gr.reconcileGlobalRole(obj)
-	if err != nil {
-		returnError = errors.Join(returnError, err)
-	}
-	err = gr.reconcileCatalogRole(obj)
-	if err != nil {
-		returnError = errors.Join(returnError, err)
-	}
-	err = gr.reconcileNamespacedRoles(obj)
-	if err != nil {
-		returnError = errors.Join(returnError, err)
-	}
-	err = gr.fleetPermissionsHandler.reconcileFleetWorkspacePermissions(obj)
-	if err != nil {
-		returnError = errors.Join(returnError, err)
-	}
-	err = gr.setGRAsCompleted(obj)
-	if err != nil {
-		returnError = errors.Join(returnError, err)
-	}
+
+	returnError := errors.Join(
+		gr.setGRAsInProgress(obj), // set GR status to "in progress" while the underlying roles get added
+		gr.reconcileGlobalRole(obj),
+		gr.reconcileCatalogRole(obj),
+		gr.reconcileNamespacedRoles(obj),
+		gr.fleetPermissionsHandler.reconcileFleetWorkspacePermissions(obj),
+		gr.setGRAsCompleted(obj),
+	)
 	return nil, returnError
 }
 

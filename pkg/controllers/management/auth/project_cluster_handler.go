@@ -149,19 +149,14 @@ func (l *projectLifecycle) Remove(obj *apisv3.Project) (runtime.Object, error) {
 	var returnErr error
 	set := labels.Set{rbac.RestrictedAdminProjectRoleBinding: "true"}
 	rbs, err := l.mgr.rbLister.List(obj.Name, labels.SelectorFromSet(set))
-	if err != nil {
-		returnErr = errors.Join(returnErr, err)
-	}
+	returnErr = errors.Join(returnErr, err)
+
 	for _, rb := range rbs {
 		err := l.mgr.roleBindings.DeleteNamespaced(obj.Name, rb.Name, &v1.DeleteOptions{})
-		if err != nil {
-			returnErr = errors.Join(returnErr, err)
-		}
-	}
-	err = l.mgr.deleteNamespace(obj, projectRemoveController)
-	if err != nil {
 		returnErr = errors.Join(returnErr, err)
 	}
+	err = l.mgr.deleteNamespace(obj, projectRemoveController)
+	returnErr = errors.Join(returnErr, err)
 	return obj, returnErr
 }
 
@@ -239,23 +234,16 @@ func (l *clusterLifecycle) Remove(obj *apisv3.Cluster) (runtime.Object, error) {
 	var returnErr error
 	set := labels.Set{rbac.RestrictedAdminClusterRoleBinding: "true"}
 	rbs, err := l.mgr.rbLister.List(obj.Name, labels.SelectorFromSet(set))
-	if err != nil {
-		returnErr = errors.Join(returnErr, err)
-	}
+	returnErr = errors.Join(returnErr, err)
+
 	for _, rb := range rbs {
 		err := l.mgr.roleBindings.DeleteNamespaced(obj.Name, rb.Name, &v1.DeleteOptions{})
-		if err != nil {
-			returnErr = errors.Join(returnErr, err)
-		}
-	}
-	err = l.mgr.deleteSystemProject(obj, clusterRemoveController)
-	if err != nil {
 		returnErr = errors.Join(returnErr, err)
 	}
-	err = l.mgr.deleteNamespace(obj, clusterRemoveController)
-	if err != nil {
-		returnErr = errors.Join(returnErr, err)
-	}
+	returnErr = errors.Join(
+		l.mgr.deleteSystemProject(obj, clusterRemoveController),
+		l.mgr.deleteNamespace(obj, clusterRemoveController),
+	)
 	return obj, returnErr
 }
 

@@ -66,20 +66,11 @@ func main() {
 		if os.Getenv("CLUSTER_CLEANUP") == "true" {
 			err = clean.Cluster()
 		} else if os.Getenv("BINDING_CLEANUP") == "true" {
-			var bindingErr error
-			err = clean.DuplicateBindings(nil)
-			if err != nil {
-				bindingErr = errors.Join(bindingErr, err)
-			}
-			err = clean.OrphanBindings(nil)
-			if err != nil {
-				bindingErr = errors.Join(bindingErr, err)
-			}
-			err = clean.OrphanCatalogBindings(nil)
-			if err != nil {
-				bindingErr = errors.Join(bindingErr, err)
-			}
-			err = bindingErr
+			err = errors.Join(
+				clean.DuplicateBindings(nil),
+				clean.OrphanBindings(nil),
+				clean.OrphanCatalogBindings(nil),
+			)
 		} else if os.Getenv("AD_GUID_CLEANUP") == "true" {
 			dryrun := os.Getenv("DRY_RUN") == "true"
 			deleteMissingUsers := os.Getenv("AD_DELETE_MISSING_GUID_USERS") == "true"

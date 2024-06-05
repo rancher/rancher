@@ -460,9 +460,7 @@ func (p *prtbLifecycle) reconcilePRTBUserClusterLabels(binding *v3.ProjectRoleTe
 			_, err := p.crbClient.Update(crbToUpdate)
 			return err
 		})
-		if retryErr != nil {
-			returnErr = errors.Join(returnErr, retryErr)
-		}
+		returnErr = errors.Join(returnErr, retryErr)
 	}
 
 	reqUpdatedOwnerLabel, err := labels.NewRequirement(rtbOwnerLabel, selection.DoesNotExist, []string{})
@@ -488,9 +486,7 @@ func (p *prtbLifecycle) reconcilePRTBUserClusterLabels(binding *v3.ProjectRoleTe
 			_, err := p.rbClient.Update(rbToUpdate)
 			return err
 		})
-		if retryErr != nil {
-			returnErr = errors.Join(returnErr, retryErr)
-		}
+		returnErr = errors.Join(returnErr, retryErr)
 	}
 
 	if returnErr != nil {

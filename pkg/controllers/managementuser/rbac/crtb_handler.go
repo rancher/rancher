@@ -151,9 +151,7 @@ func (c *crtbLifecycle) reconcileCRTBUserClusterLabels(binding *v3.ClusterRoleTe
 			_, err := c.crbClient.Update(crbToUpdate)
 			return err
 		})
-		if retryErr != nil {
-			returnErr = errors.Join(returnErr, retryErr)
-		}
+		returnErr = errors.Join(returnErr, retryErr)
 	}
 	if returnErr != nil {
 		return returnErr
