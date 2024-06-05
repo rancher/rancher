@@ -63,10 +63,6 @@ ENV KUBECTL_VERSION v1.27.10
 RUN curl -sLf https://storage.googleapis.com/kubernetes-release/release/${KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl > /usr/bin/kubectl && \
     chmod +x /usr/bin/kubectl
 
-ENV LOGLEVEL_VERSION v0.1.6
-
-RUN curl -sLf https://github.com/rancher/loglevel/releases/download/${LOGLEVEL_VERSION}/loglevel-${ARCH}-${LOGLEVEL_VERSION}.tar.gz | tar xvzf - -C /usr/bin
-
 LABEL io.cattle.agent=true
 
 ARG RANCHER_REPO=rancher
@@ -80,7 +76,7 @@ ENV SSL_CERT_DIR /etc/kubernetes/ssl/certs
 COPY --from=rancher /var/lib/rancher-data /var/lib/rancher-data
 COPY --from=rancher /usr/bin/tini /usr/bin/
 COPY --from=build /app/agent /usr/bin/
-COPY package/run.sh package/kubectl-shell.sh package/shell-setup.sh /usr/bin/
+COPY package/loglevel package/run.sh package/kubectl-shell.sh package/shell-setup.sh /usr/bin/
 WORKDIR /var/lib/rancher
 
 LABEL "io.artifacthub.package.logo-url"="https://raw.githubusercontent.com/rancher/ui/master/public/assets/images/logos/welcome-cow.svg" \
