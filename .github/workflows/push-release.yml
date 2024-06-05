@@ -265,13 +265,7 @@ jobs:
         password: ${{ secrets.DOCKER_PASSWORD }}
     - name: Build Windows Server Image
       run: |
-        ref_name="${{ github.ref_name }}"
-        prefix="release/"
-        if [[ "$ref_name" == release/v* ]]; then
-          TAG=${ref_name#$prefix}-${{ github.sha }}-head
-          echo "TAG=$TAG" >> "$GITHUB_ENV"
-        fi
-        docker build -t ${{ env.IMAGE_AGENT }}:$TAG-windows-${{ matrix.version }} --build-arg VERSION=${{ env.COMMIT }} --build-arg SERVERCORE_VERSION=ltsc${{ matrix.version }} -f package/windows/Dockerfile.agent .
+        docker build -t ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-windows-${{ matrix.version }} --build-arg VERSION=${{ env.COMMIT }} --build-arg SERVERCORE_VERSION=ltsc${{ matrix.version }} -f package/windows/Dockerfile.agent .
         docker push ${{ env.IMAGE_AGENT }}:$TAG-windows-${{ matrix.version }}
       shell: bash
   merge-agent-manifest:
@@ -281,16 +275,8 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - name: Setup Environment variables
-        run: |
-          ref_name="${{ github.ref_name }}"
-          prefix="release/"
-          if [[ "$ref_name" == release/v* ]]; then
-            TAG=${ref_name#$prefix}-${{ github.sha }}-head
-            HEAD_TAG=${ref_name#$prefix}-head
-            echo "TAG=$TAG" >> "$GITHUB_ENV"
-            echo "HEAD_TAG=$HEAD_TAG" >> "$GITHUB_ENV"
-          fi
+      - name: Setup Environment Variables
+        uses: ./.github/actions/setup-tag-env
       - name: Download digests
         uses: actions/download-artifact@v4
         with:
@@ -410,16 +396,8 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - name: Setup Environment variables
-        run: |
-          ref_name="${{ github.ref_name }}"
-          prefix="release/"
-          if [[ "$ref_name" == release/v* ]]; then
-            TAG=${ref_name#$prefix}-${{ github.sha }}-head
-            HEAD_TAG=${ref_name#$prefix}-head
-            echo "TAG=$TAG" >> "$GITHUB_ENV"
-            echo "HEAD_TAG=$HEAD_TAG" >> "$GITHUB_ENV"
-          fi
+      - name: Setup Environment Variables
+        uses: ./.github/actions/setup-tag-env
       - name: Download digests
         uses: actions/download-artifact@v4
         with:
