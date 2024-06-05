@@ -191,7 +191,6 @@ func (a *auditLog) write(userInfo *User, reqHeaders, resHeaders http.Header, res
 	var compactBuffer bytes.Buffer
 	err = json.Compact(&compactBuffer, buffer.Bytes())
 	if err != nil {
-
 		return fmt.Errorf("failed to compact audit log: %w", err)
 	}
 
@@ -282,14 +281,14 @@ func isExist(array []string, key string) bool {
 	return false
 }
 
-func redactedBodyError(auditErr error) []byte {
+func redactedBodyWithErr(auditErr error) []byte {
 	m := map[string]string{
 		auditLogErrKey: auditErr.Error(),
 	}
 
 	body, err := json.Marshal(m)
 	if err != nil {
-		logrus.Debugf("auditLog: failed to generate audit log error body: %v", err)
+		logrus.Debugf("auditLog: recevied invalid json: %v", err)
 		return []byte("{}")
 	}
 
@@ -299,7 +298,7 @@ func redactedBodyError(auditErr error) []byte {
 func (a *auditLog) redactSensitiveData(requestURI string, body []byte) []byte {
 	var m map[string]interface{}
 	if err := json.Unmarshal(body, &m); err != nil {
-		return redactedBodyError(err)
+		return redactedBodyWithErr(err)
 	}
 
 	var changed bool
@@ -320,7 +319,7 @@ func (a *auditLog) redactSensitiveData(requestURI string, body []byte) []byte {
 
 	newBody, err := json.Marshal(m)
 	if err != nil {
-		return redactedBodyError(err)
+		return redactedBodyWithErr(err)
 	}
 
 	return newBody
