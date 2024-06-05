@@ -17,10 +17,12 @@ func addUnauthenticatedRoles(apply apply.Apply) error {
 				},
 				Rules: []rbacv1.PolicyRule{
 					{
-						Verbs:         []string{"get"},
-						APIGroups:     []string{"management.cattle.io"},
-						Resources:     []string{"settings"},
-						ResourceNames: []string{"first-login", "ui-pl", "ui-banners", "ui-brand", "ui-favicon", "ui-login-background-light", "ui-login-background-dark", "ui-primary-color", "ui-link-color"},
+						Verbs:     []string{"get"},
+						APIGroups: []string{"management.cattle.io"},
+						Resources: []string{"settings"},
+						ResourceNames: []string{
+							"first-login", "ui-pl", "ui-banners", "ui-brand", "ui-favicon", "ui-login-background-light", "ui-login-background-dark", "ui-primary-color", "ui-link-color",
+							"ui-banner-header", "ui-banner-footer", "ui-banner-login-consent"},
 					},
 				},
 			},
