@@ -65,8 +65,8 @@ export SOME_K8S_VERSION=$(curl -sS https://raw.githubusercontent.com/rancher/kon
 fi
 
 if [ -z "${CATTLE_CHART_DEFAULT_URL}" ]; then
-# If `CATTLE_CHART_DEFAULT_URL` is not set, use the `https://github.com/rancher/charts` so its used instead of default
-# `https://git.rancher.io/charts` to reduce reliance and load on our Git mirror
+# If `CATTLE_CHART_DEFAULT_URL` is not set, use the `https://github.com/rancher/charts` so GitHub is used instead of
+# the default `https://git.rancher.io/charts` to reduce the reliance and load on our Git mirror
 export CATTLE_CHART_DEFAULT_URL=https://github.com/rancher/charts
 fi
 

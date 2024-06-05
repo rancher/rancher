@@ -39,6 +39,7 @@ RUNARG="-run ${V2PROV_TEST_RUN_REGEX}"
 export DIST=${V2PROV_TEST_DIST}
 export SOME_K8S_VERSION=${SOME_K8S_VERSION}
 export TB_ORG=${TB_ORG}
+export CATTLE_CHART_DEFAULT_URL=${CATTLE_CHART_DEFAULT_URL}
 
 eval "$(grep '^ENV CATTLE_SYSTEM_AGENT' package/Dockerfile | awk '{print "export " $2 "=" $3}')"
 eval "$(grep '^ENV CATTLE_WINS_AGENT' package/Dockerfile | awk '{print "export " $2 "=" $3}')"
@@ -62,6 +63,12 @@ if [ -z "${SOME_K8S_VERSION}" ]; then
   else
     export SOME_K8S_VERSION=$(curl https://raw.githubusercontent.com/rancher/kontainer-driver-metadata/dev-v2.9/data/data.json | jq -r ".$DIST.channels[0].latest")
   fi
+fi
+
+if [ -z "${CATTLE_CHART_DEFAULT_URL}" ]; then
+# If `CATTLE_CHART_DEFAULT_URL` is not set, use the `https://github.com/rancher/charts` so GitHub is used instead of
+# the default `https://git.rancher.io/charts` to reduce the reliance and load on our Git mirror
+export CATTLE_CHART_DEFAULT_URL=https://github.com/rancher/charts
 fi
 
 echo "Starting rancher server for provisioning-tests using $SOME_K8S_VERSION"
