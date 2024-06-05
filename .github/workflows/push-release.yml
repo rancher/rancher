@@ -18,6 +18,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+      - name: Setup Environment Variables
+        uses: ./.github/actions/setup-tag-env
       - name: Install dependencies
         env:
           HELM_URL_V3: https://get.helm.sh/helm-v3.13.3-linux-amd64.tar.gz
@@ -28,8 +30,6 @@ jobs:
           sudo mv /tmp/helm /usr/bin/helm_v3 && \
           sudo chmod +x /usr/bin/helm_v3
           helm_v3 plugin install https://github.com/helm-unittest/helm-unittest.git --version ${{ env.HELM_UNITTEST_VERSION }}; \
-      - name: Setup Environment Variables
-        uses: ./.github/actions/setup-tag-env
       - name: Build
         run: ./scripts/chart/build chart
       - name: Validate
@@ -139,6 +139,8 @@ jobs:
       contents: read
       id-token: write
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
       - name: Setup Environment Variables
         uses: ./.github/actions/setup-tag-env
       - name: Download digests
@@ -277,6 +279,8 @@ jobs:
       contents: read
       id-token: write
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
       - name: Setup Environment Variables
         uses: ./.github/actions/setup-tag-env
       - name: Download digests
@@ -398,6 +402,8 @@ jobs:
       contents: read
       id-token: write
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
       - name: Setup Environment Variables
         uses: ./.github/actions/setup-tag-env
       - name: Download digests
