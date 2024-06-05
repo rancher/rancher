@@ -21,7 +21,7 @@ All tests can be run with `make controller-test`. That runs the bash script [`ru
 
 After installing `setup-envtest`, export the environment variable `KUBEBUILDER_ASSETS` to point to where setup-envtest was installed using the following:
 ```
-export KUBEBUILDER_ASSETS=($setup-envtest use -p path)
+export KUBEBUILDER_ASSETS=$(setup-envtest use -p path)
 ```
 
 Note: You can add a k8s version to the export command if you want to test a specific version. Otherwise it will use the latest version installed.

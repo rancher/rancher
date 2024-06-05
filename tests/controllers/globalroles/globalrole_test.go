@@ -2,7 +2,7 @@ package globalroles_integration_test
 
 import (
 	"context"
-	"fmt"
+	"reflect"
 	"testing"
 	"time"
 
@@ -34,6 +34,16 @@ const (
 	duration = 20 * time.Second
 )
 
+var (
+	getPodRule = rbacv1.PolicyRule{
+		Verbs:     []string{"get", "list", "watch"},
+		APIGroups: []string{""},
+		Resources: []string{"pods"},
+	}
+	globalRoleLabel = "authz.management.cattle.io/globalrole"
+	crNameLabel     = "authz.management.cattle.io/cr-name"
+)
+
 func (s *GlobalRoleTestSuite) SetupSuite() {
 	s.ctx, s.cancel = context.WithCancel(context.TODO())
 
@@ -48,6 +58,7 @@ func (s *GlobalRoleTestSuite) SetupSuite() {
 		crd.CRD{
 			SchemaObject: v3.GlobalRole{},
 			NonNamespace: true,
+			Status:       true,
 		},
 		crd.CRD{
 			SchemaObject: v3.GlobalRoleBinding{},
@@ -117,97 +128,105 @@ func (s *GlobalRoleTestSuite) TearDownSuite() {
 
 func (s *GlobalRoleTestSuite) TestCreateGlobalRole() {
 	tests := []struct {
-		name         string
-		globalRole   v3.GlobalRole
-		roles        []rbacv1.Role
-		clusterRoles []rbacv1.ClusterRole
+		name        string
+		globalRole  v3.GlobalRole
+		roles       []rbacv1.Role
+		clusterRole rbacv1.ClusterRole
 	}{
 		{
-			name: "global rule test",
+			name: "create primary cluster role given cr-name",
 			globalRole: v3.GlobalRole{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						"authz.management.cattle.io/cr-name": "cr-name",
+						crNameLabel: "cr-name",
 					},
 					Name: "test-gr",
 				},
-				Rules: []rbacv1.PolicyRule{
-					{
-						Verbs:     []string{"get", "list"},
-						APIGroups: []string{""},
-						Resources: []string{"pods"},
-					},
-				},
+				Rules: []rbacv1.PolicyRule{getPodRule},
 			},
-			clusterRoles: []rbacv1.ClusterRole{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "cr-name",
-					},
-					Rules: []rbacv1.PolicyRule{
-						{
-							Verbs:     []string{"get", "list"},
-							APIGroups: []string{""},
-							Resources: []string{"pods"},
-						},
-					},
+			clusterRole: rbacv1.ClusterRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cr-name",
 				},
+				Rules: []rbacv1.PolicyRule{getPodRule},
+			},
+		},
+		{
+			name: "create primary cluster role with generated name",
+			globalRole: v3.GlobalRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-gr",
+				},
+				Rules: []rbacv1.PolicyRule{getPodRule},
+			},
+			clusterRole: rbacv1.ClusterRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cattle-globalrole-test-gr",
+				},
+				Rules: []rbacv1.PolicyRule{getPodRule},
 			},
 		},
 	}
 	for _, test := range tests {
 		test := test
-		s.T().Run(test.name, func(t *testing.T) {
-			g, err := s.managementContext.Management.GlobalRoles("").Create(&test.globalRole)
-			assert.NoError(s.T(), err)
-			fmt.Printf("%v\n", g)
+		s.Run(test.name, func() {
+			t := s.T()
+			gr, err := s.managementContext.Management.GlobalRoles("").Create(&test.globalRole)
+			assert.NoError(t, err)
+
+			// testenv does not run any garbage collection, objects won't get deleted.
+			// To ensure that deletion would work, instead we check the created resources have the right OwnerReference
+			grOwnerRef := metav1.OwnerReference{
+				APIVersion: "management.cattle.io/v3",
+				Kind:       "GlobalRole",
+				Name:       test.globalRole.Name,
+				UID:        gr.UID,
+			}
 
 			// Create Global Role
-			assert.EventuallyWithT(s.T(), func(c *assert.CollectT) {
-				gr, err := s.managementContext.Management.GlobalRoles("").Get(test.globalRole.Name, metav1.GetOptions{})
+			assert.EventuallyWithT(t, func(c *assert.CollectT) {
+				gr, err = s.managementContext.Management.GlobalRoles("").Get(test.globalRole.Name, metav1.GetOptions{})
 				assert.NoError(c, err)
 				assert.NotNil(c, gr)
 				assert.NotNil(c, gr.Status)
 
 				// Once status is completed, all necessary backing resources should have been created
-				//assert.Equal(c, globalroles.SummaryCompleted, gr.Status.Summary)
+				assert.Equal(c, globalroles.SummaryCompleted, gr.Status.Summary)
 			}, duration, tick)
+
+			// Check created Cluster Role
+			clusterRole, err := s.managementContext.RBAC.ClusterRoles("").Get(test.clusterRole.Name, metav1.GetOptions{})
+			assert.NoError(t, err)
+			assert.Equal(t, test.globalRole.Name, clusterRole.OwnerReferences[0].Name)
+			assert.True(t, reflect.DeepEqual(test.clusterRole.Rules, clusterRole.Rules))
+			// Check the ownership to ensure deletion would work
+			assert.Contains(t, clusterRole.OwnerReferences, grOwnerRef)
+			// ClusterRole should always indicate it is from a globalrole
+			assert.Contains(t, clusterRole.Labels, globalRoleLabel)
+			assert.Equal(t, "true", clusterRole.Labels[globalRoleLabel])
 
 			// Check created Roles
 			for _, r := range test.roles {
 				role, err := s.managementContext.RBAC.Roles(r.Namespace).Get(r.Name, metav1.GetOptions{})
-				assert.NoError(s.T(), err)
+				assert.NoError(t, err)
+
 				// Assert any desired role fields
-				assert.Equal(s.T(), test.globalRole.Name, role.OwnerReferences[0].Name)
+				assert.Equal(t, test.globalRole.Name, role.OwnerReferences[0].Name)
+				assert.True(t, reflect.DeepEqual(r.Rules, role.Rules))
+
+				// Check the ownership to ensure deletion would work
+				assert.Contains(t, role.OwnerReferences, grOwnerRef)
 			}
 
-			// Check created Cluster Roles
-			for _, cr := range test.clusterRoles {
-				_, err := s.managementContext.RBAC.ClusterRoles("").Get(cr.Name, metav1.GetOptions{})
-				assert.NoError(s.T(), err)
-				// Assert any desired clusterRole fields
-				//assert.Equal(s.T(), test.globalRole.Name, clusterRole.OwnerReferences[0].Name)
+			// clean up
+			err = s.managementContext.Management.GlobalRoles("").Delete(test.globalRole.Name, &metav1.DeleteOptions{})
+			assert.NoError(t, err)
+			err = s.managementContext.RBAC.ClusterRoles("").Delete(test.clusterRole.Name, &metav1.DeleteOptions{})
+			assert.NoError(t, err)
+			for _, r := range test.roles {
+				err = s.managementContext.RBAC.Roles("").Delete(r.Name, &metav1.DeleteOptions{})
+				assert.NoError(t, err)
 			}
-
-			// Delete Global Role
-			//assert.EventuallyWithT(s.T(), func(c *assert.CollectT) {
-			//	err := s.managementContext.Management.GlobalRoles("").Delete(test.globalRole.Name, &metav1.DeleteOptions{})
-			//	assert.NoError(c, err)
-			//}, duration, tick)
-
-			// Check that Roles get deleted
-			//for _, r := range test.roles {
-			//	_, err = s.managementContext.RBAC.Roles(r.Namespace).Get(r.Name, metav1.GetOptions{})
-			//	assert.Error(s.T(), err)
-			// TODO make sure the error is a "NotFound"
-			//}
-
-			// Check that Cluster Roles get deleted
-			//for _, cr := range test.clusterRoles {
-			//	_, err = s.managementContext.RBAC.ClusterRoles("").Get(cr.Name, metav1.GetOptions{})
-			//	assert.Error(s.T(), err)
-			// TODO make sure the error is a "NotFound"
-			//}
 		})
 	}
 }
