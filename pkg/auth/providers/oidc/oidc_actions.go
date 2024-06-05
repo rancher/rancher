@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/api/handler"
@@ -69,6 +70,10 @@ func (o *OpenIDCProvider) TestAndApply(actionName string, action *types.Action, 
 		Code: oidcConfigApplyInput.Code,
 	}
 
+	if !validScopes(oidcConfig.Scopes) {
+		return errors.New("scopes are incorrectly configured, at a minimum, openid is required")
+	}
+
 	//encode url to ensure path is escaped properly
 	//the issuer url is used to get all the other urls for the provider
 	//so its the only one that needs encoded
@@ -111,4 +116,16 @@ func (o *OpenIDCProvider) TestAndApply(actionName string, action *types.Action, 
 	userExtraInfo := o.GetUserExtraAttributes(userPrincipal)
 
 	return o.TokenMGR.CreateTokenAndSetCookie(user.Name, userPrincipal, groupPrincipals, providerToken, 0, "Token via OIDC Configuration", request, userExtraInfo)
+}
+
+func validScopes(input string) bool {
+	values := strings.Fields(input)
+
+	// Iterate through the values and check if any of them is "openid"
+	for _, value := range values {
+		if value == "openid" {
+			return true
+		}
+	}
+	return false
 }
