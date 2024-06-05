@@ -44,6 +44,8 @@ const (
 	LevelRequestResponse
 
 	generateKubeconfigURI = "action=generateKubeconfig"
+
+	auditLogErrKey = "auditLogError"
 )
 
 var (
@@ -280,11 +282,24 @@ func isExist(array []string, key string) bool {
 	return false
 }
 
+func redactedBodyError(auditErr error) []byte {
+	m := map[string]string{
+		auditLogErrKey: auditErr.Error(),
+	}
+
+	body, err := json.Marshal(m)
+	if err != nil {
+		logrus.Debugf("auditLog: failed to generate audit log error body: %v", err)
+		return []byte("{}")
+	}
+
+	return body
+}
+
 func (a *auditLog) redactSensitiveData(requestURI string, body []byte) []byte {
 	var m map[string]interface{}
 	if err := json.Unmarshal(body, &m); err != nil {
-		logrus.Debugf("auditLog: Redacting entire body for requestURI [%s]. Cannot marshal body into a map[string]interface{}: %v", requestURI, err)
-		return []byte{}
+		return redactedBodyError(err)
 	}
 
 	var changed bool
@@ -305,8 +320,9 @@ func (a *auditLog) redactSensitiveData(requestURI string, body []byte) []byte {
 
 	newBody, err := json.Marshal(m)
 	if err != nil {
-		return []byte{}
+		return redactedBodyError(err)
 	}
+
 	return newBody
 }
 

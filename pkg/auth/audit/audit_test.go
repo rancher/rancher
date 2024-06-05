@@ -204,6 +204,11 @@ func (a *AuditTest) TestRedactSensitiveData() {
 			input: []byte(`{"credentials": "{'fakeCredName': 'fakeCred'}", "applicationSecret": "fakeAppSecret", "oauthCredential": "fakeOauth", "serviceAccountCredential": "fakeSACred", "spKey": "fakeSPKey", "spCert": "fakeSPCERT", "certificate": "fakeCert", "privateKey": "fakeKey"}`),
 			want:  []byte(fmt.Sprintf(`{"credentials": "%s", "applicationSecret": "%[1]s", "oauthCredential": "%[1]s", "serviceAccountCredential": "%[1]s", "spKey": "%[1]s", "spCert": "%[1]s", "certificate": "%[1]s", "privateKey": "%[1]s"}`, redacted)),
 		},
+		{
+			name:  "With malformed input",
+			input: []byte(`{"key": "value", "response":}`),
+			want:  []byte(fmt.Sprintf(`{"%s": "invalid character '}' looking for beginning of value"}`, auditLogErrKey)),
+		},
 	}
 	for i := range tests {
 		test := tests[i]
