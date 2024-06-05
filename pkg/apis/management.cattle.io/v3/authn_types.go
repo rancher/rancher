@@ -10,6 +10,9 @@ import (
 const (
 	UserConditionInitialRolesPopulated condition.Cond = "InitialRolesPopulated"
 	AuthConfigConditionSecretsMigrated condition.Cond = "SecretsMigrated"
+	// AuthConfigConditionShibbolethSecretFixed is applied to an AuthConfig when the
+	// incorrect name for the shibboleth OpenLDAP secret has been fixed.
+	AuthConfigConditionShibbolethSecretFixed condition.Cond = "ShibbolethSecretFixed"
 )
 
 // +genclient
