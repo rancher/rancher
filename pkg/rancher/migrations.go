@@ -8,6 +8,7 @@ import (
 	"github.com/mcuadros/go-version"
 	"github.com/rancher/norman/condition"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/features"
@@ -528,18 +529,21 @@ func migrateSystemAgentDataDirectory(w *wrangler.Context) error {
 
 	for _, cluster := range provClusters.Items {
 		systemAgentDataDir := ""
-		for i, e := range cluster.Spec.AgentEnvVars {
+		envVars := make([]rkev1.EnvVar, 0, len(cluster.Spec.AgentEnvVars))
+		for _, e := range cluster.Spec.AgentEnvVars {
 			if e.Name == "CATTLE_AGENT_VAR_DIR" {
-				systemAgentDataDir = e.Value
-				cluster = *cluster.DeepCopy()
-				cluster.Spec.AgentEnvVars = append(cluster.Spec.AgentEnvVars[:i], cluster.Spec.AgentEnvVars[i+1:]...)
 				// don't break, the webhook allows duplicate entries and the last one would have been the effective data dir
+				systemAgentDataDir = e.Value
+			} else {
+				envVars = append(envVars, e)
 			}
 		}
 		if systemAgentDataDir == "" {
 			continue
 		}
 
+		cluster = *cluster.DeepCopy()
+		cluster.Spec.AgentEnvVars = envVars
 		cluster.Spec.RKEConfig.DataDirectories.SystemAgent = systemAgentDataDir
 		_, err = w.Provisioning.Cluster().Update(&cluster)
 		if err != nil {
