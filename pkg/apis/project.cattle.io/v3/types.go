@@ -10,7 +10,7 @@ import (
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type ServiceAccountToken struct {
-	types.Namespaced
+	types.Namespaced `json:"-"`
 
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -33,7 +33,7 @@ type NamespacedServiceAccountToken ServiceAccountToken
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type DockerCredential struct {
-	types.Namespaced
+	types.Namespaced `json:"-"`
 
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -61,7 +61,7 @@ type RegistryCredential struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type Certificate struct {
-	types.Namespaced
+	types.Namespaced `json:"-"`
 
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -93,7 +93,7 @@ type NamespacedCertificate Certificate
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type BasicAuth struct {
-	types.Namespaced
+	types.Namespaced `json:"-"`
 
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -114,7 +114,7 @@ type NamespacedBasicAuth BasicAuth
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type SSHAuth struct {
-	types.Namespaced
+	types.Namespaced `json:"-"`
 
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -153,7 +153,7 @@ type PublicEndpoint struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type Workload struct {
-	types.Namespaced
+	types.Namespaced `json:"-"`
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 }
