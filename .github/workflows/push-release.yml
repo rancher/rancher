@@ -58,7 +58,7 @@ jobs:
       - name: Download chart
         uses: actions/download-artifact@v4
         with:
-          name: "chart"
+          name: chart
           path: /tmp/charts/
       - name: Upload chart to bucket
         run: |
@@ -85,12 +85,12 @@ jobs:
           images: ${{ env.IMAGE }}
           flavor: |
             latest=false
-      # - name: Load Secrets from Vault
-      #   uses: rancher-eio/read-vault-secrets@main
-      #   with:
-      #     secrets: |
-      #       secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
-      #       secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
+  #     # - name: Load Secrets from Vault
+  #     #   uses: rancher-eio/read-vault-secrets@main
+  #     #   with:
+  #     #     secrets: |
+  #     #       secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
+  #     #       secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
       - name: Docker Registry Login
         uses: docker/login-action@v3
         with:
@@ -119,19 +119,6 @@ jobs:
           platforms: "${{ matrix.os }}/${{ matrix.arch }}"
           file: ./package/Dockerfile
           labels: "${{ steps.meta.outputs.labels }}"
-      - name: Export digest
-        run: |
-          mkdir -p /tmp/digests
-          digest="${{ steps.build.outputs.digest }}"
-          touch "/tmp/digests/${digest#sha256:}"
-      - name: Upload digest
-        uses: actions/upload-artifact@v4
-        with:
-          name: "digests-server-${{ matrix.os }}-${{ matrix.arch }}"
-          path: /tmp/digests/*
-          if-no-files-found: error
-          retention-days: 1
-          overwrite: true
   merge-server-manifest:
     runs-on: ubuntu-latest
     needs: [build-server]
@@ -143,13 +130,6 @@ jobs:
         uses: actions/checkout@v4
       - name: Setup Environment Variables
         uses: ./.github/actions/setup-tag-env
-      - name: Download digests
-        uses: actions/download-artifact@v4
-        with:
-          path: /tmp/digests
-          pattern: digests-server*
-          merge-multiple: true
-      
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Docker meta
@@ -159,24 +139,22 @@ jobs:
           images: ${{ env.IMAGE }}
           flavor: |
             latest=false
-      # - name: Load Secrets from Vault
-      #   uses: rancher-eio/read-vault-secrets@main
-      #   with:
-      #     secrets: |
-      #       secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
-      #       secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
+  #     # - name: Load Secrets from Vault
+  #     #   uses: rancher-eio/read-vault-secrets@main
+  #     #   with:
+  #     #     secrets: |
+  #     #       secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
+  #     #       secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
       - name: Create manifest list and push
-        working-directory: /tmp/digests
         run: |
-          images=$(printf '${{ env.IMAGE }}@sha256:%s ' *)
-          docker buildx imagetools create -t ${{ env.IMAGE }}:${{ env.TAG }} $images
+          docker buildx imagetools create -t ${{ env.IMAGE }}:${{ env.TAG }} ${{ env.IMAGE }}:${{ env.TAG }}-amd64 ${{ env.IMAGE }}:${{ env.TAG }}-arm64
           if [[ "${{ github.ref_name }}" == release/v* ]]; then
-            docker buildx imagetools create -t ${{ env.IMAGE }}:${{ env.HEAD_TAG }} $images
+            docker buildx imagetools create -t ${{ env.IMAGE }}:${{ env.HEAD_TAG }} ${{ env.IMAGE }}:${{ env.HEAD_TAG }}-amd64 ${{ env.IMAGE }}:${{ env.HEAD_TAG }}-arm64
           fi
       - name: Create head manifest list and push
         run: |
@@ -202,12 +180,12 @@ jobs:
           images: ${{ env.IMAGE }}
           flavor: |
             latest=false
-      # - name: Load Secrets from Vault
-      #   uses: rancher-eio/read-vault-secrets@main
-      #   with:
-      #     secrets: |
-      #       secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
-            # secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
+  #     # - name: Load Secrets from Vault
+  #     #   uses: rancher-eio/read-vault-secrets@main
+  #     #   with:
+  #     #     secrets: |
+  #     #       secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
+  #           # secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
       - name: Docker Registry Login
         uses: docker/login-action@v3
         with:
@@ -232,19 +210,6 @@ jobs:
           platforms: "${{ matrix.os }}/${{ matrix.arch }}"
           file: ./package/Dockerfile.agent
           labels: "${{ steps.meta.outputs.labels }}"
-      - name: Export digest
-        run: |
-          mkdir -p /tmp/digests
-          digest="${{ steps.build.outputs.digest }}"
-          touch "/tmp/digests/${digest#sha256:}"
-      - name: Upload digest
-        uses: actions/upload-artifact@v4
-        with:
-          name: "digests-agent-${{ matrix.os }}-${{ matrix.arch }}"
-          path: /tmp/digests/*
-          if-no-files-found: error
-          retention-days: 1
-          overwrite: true
   build-agent-windows:
     strategy:
       matrix:
@@ -256,12 +221,12 @@ jobs:
         uses: actions/checkout@v4
       - name: Setup Environment Variables
         uses: ./.github/actions/setup-tag-env
-      # - name: Load Secrets from Vault
-        # uses: rancher-eio/read-vault-secrets@main
-        # with:
-        #   secrets: |
-        #     secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
-        #     secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
+  #     # - name: Load Secrets from Vault
+  #       # uses: rancher-eio/read-vault-secrets@main
+  #       # with:
+  #       #   secrets: |
+  #       #     secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
+  #       #     secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
@@ -283,13 +248,6 @@ jobs:
         uses: actions/checkout@v4
       - name: Setup Environment Variables
         uses: ./.github/actions/setup-tag-env
-      - name: Download digests
-        uses: actions/download-artifact@v4
-        with:
-          path: /tmp/digests
-          pattern: digests-agent-*
-          merge-multiple: true
-      
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Docker meta
@@ -299,26 +257,30 @@ jobs:
           images: ${{ env.IMAGE_AGENT }}
           flavor: |
             latest=false
-      # - name: Load Secrets from Vault
-      #   uses: rancher-eio/read-vault-secrets@main
-      #   with:
-      #     secrets: |
-      #       secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
-      #       secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
+  #     # - name: Load Secrets from Vault
+  #     #   uses: rancher-eio/read-vault-secrets@main
+  #     #   with:
+  #     #     secrets: |
+  #     #       secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
+  #     #       secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
       - name: Create manifest list and push
-        working-directory: /tmp/digests
         run: |
-          images=$(printf '${{ env.IMAGE_AGENT }}@sha256:%s ' *)
-          docker buildx imagetools create -t ${{ env.IMAGE_AGENT }}:${{ env.TAG }} $images
-          # create the same docker buildx command above but with the windows images for the agent
-          docker buildx imagetools create -t ${{ env.IMAGE_AGENT }}:${{ env.TAG }} $images ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-windows-2019 ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-windows-2022
+          docker buildx imagetools create -t ${{ env.IMAGE_AGENT }}:${{ env.TAG }} \
+            ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-amd64 \
+            ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-arm64 \
+            ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-windows-2019 \
+            ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-windows-2022
           if [[ "${{ github.ref_name }}" == release/v* ]]; then
-            docker buildx imagetools create -t ${{ env.IMAGE_AGENT }}:${{ env.HEAD_TAG }} $images ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-windows-2019 ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-windows-2022
+            docker buildx imagetools create -t ${{ env.IMAGE_AGENT }}:${{ env.HEAD_TAG }} \
+              ${{ env.IMAGE_AGENT }}:${{ env.HEAD_TAG }}-amd64 \
+              ${{ env.IMAGE_AGENT }}:${{ env.HEAD_TAG }}-arm64 \
+              ${{ env.IMAGE_AGENT }}:${{ env.HEAD_TAG }}-windows-2019 \
+              ${{ env.IMAGE_AGENT }}:${{ env.HEAD_TAG }}-windows-2022
           fi
       - name: Inspect image
         run: |
@@ -347,12 +309,12 @@ jobs:
           images: ${{ env.IMAGE }}
           flavor: |
             latest=false
-      # - name: Load Secrets from Vault
-      #   uses: rancher-eio/read-vault-secrets@main
-      #   with:
-      #     secrets: |
-      #       secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
-      #       secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
+  #     # - name: Load Secrets from Vault
+  #     #   uses: rancher-eio/read-vault-secrets@main
+  #     #   with:
+  #     #     secrets: |
+  #     #       secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
+  #     #       secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
       - name: Docker Registry Login
         uses: docker/login-action@v3
         with:
@@ -382,19 +344,6 @@ jobs:
           platforms: "${{ matrix.os }}/${{ matrix.arch }}"
           file: ./package/Dockerfile.installer
           labels: "${{ steps.meta.outputs.labels }}"
-      - name: Export digest
-        run: |
-          mkdir -p /tmp/digests
-          digest="${{ steps.build.outputs.digest }}"
-          touch "/tmp/digests/${digest#sha256:}"
-      - name: Upload digest
-        uses: actions/upload-artifact@v4
-        with:
-          name: "digests-installer-${{ matrix.os }}-${{ matrix.arch }}"
-          path: /tmp/digests/*
-          if-no-files-found: error
-          retention-days: 1
-          overwrite: true
   merge-installer-manifest:
     runs-on: ubuntu-latest
     needs: [build-installer]
@@ -406,13 +355,6 @@ jobs:
         uses: actions/checkout@v4
       - name: Setup Environment Variables
         uses: ./.github/actions/setup-tag-env
-      - name: Download digests
-        uses: actions/download-artifact@v4
-        with:
-          path: /tmp/digests
-          pattern: digests-installer-*
-          merge-multiple: true
-      
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Docker meta
@@ -422,24 +364,22 @@ jobs:
           images: ${{ env.IMAGE_INSTALLER }}
           flavor: |
             latest=false
-      # - name: Load Secrets from Vault
-      #   uses: rancher-eio/read-vault-secrets@main
-      #   with:
-      #     secrets: |
-      #       secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
-      #       secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
+  #     # - name: Load Secrets from Vault
+  #     #   uses: rancher-eio/read-vault-secrets@main
+  #     #   with:
+  #     #     secrets: |
+  #     #       secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
+  #     #       secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
       - name: Create manifest list and push
-        working-directory: /tmp/digests
         run: |
-          images=$(printf '${{ env.IMAGE_INSTALLER }}@sha256:%s ' *)
-          docker buildx imagetools create -t ${{ env.IMAGE_INSTALLER }}:${{ env.TAG }} $images
+          docker buildx imagetools create -t ${{ env.IMAGE_INSTALLER }}:${{ env.TAG }} ${{ env.IMAGE_INSTALLER }}:${{ env.TAG }}-amd64 ${{ env.IMAGE_INSTALLER }}:${{ env.TAG }}-arm64
           if [[ "${{ github.ref_name }}" == release/v* ]]; then
-            docker buildx imagetools create -t ${{ env.IMAGE_INSTALLER }}:${{ env.HEAD_TAG }} $images
+            docker buildx imagetools create -t ${{ env.IMAGE_INSTALLER }}:${{ env.HEAD_TAG }} ${{ env.IMAGE_INSTALLER }}:${{ env.HEAD_TAG }}-amd64 ${{ env.IMAGE_INSTALLER }}:${{ env.HEAD_TAG }}-arm64
           fi
       - name: Inspect image
         run: |
@@ -469,13 +409,9 @@ jobs:
           mv ./bin/*.sh ./dist
           mv ./bin/*.ps1 ./dist
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: "artifacts"
-          path: ./dist/*
-          if-no-files-found: error
-          retention-days: 1
-          overwrite: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload -R ${{ env.REPOSITORY_OWNER }}/rancher ${{ env.TAG }} ./dist/*
   docker-image-digests:
     if: github.event_name == 'push' && contains(github.ref, 'tags/') # Only run on push
     runs-on: ubuntu-latest
@@ -485,39 +421,28 @@ jobs:
         uses: actions/checkout@v4
       - name: Setup Environment Variables
         uses: ./.github/actions/setup-tag-env
-      - name: Download rancher-images.txt
-        uses: actions/download-artifact@v4
+      - name: Create dist folder
+        run: mkdir -p dist
+      - name: Setup ecm-distro-tools
+        uses: rancher/ecm-distro-tools@v0.35.0
         with:
-          name: "artifacts"
-          pattern: rancher-images.txt
-          path: .
-      - name: Install dependencies
-        run: sudo apt-get -y install skopeo jq
+          version: v0.36.0
       - name: Generate Linux Digests
-        run: ./scripts/generate-linux-digests.sh
+        run: |
+          release config gen
+          release generate rancher docker-images-digests \
+            --artifact-url "https://github.com/rancher/rancher/releases/download/${{ env.TAG }}/rancher-images.txt" \
+            --output-file ./dist/rancher-images-digests-linux-amd64.txt \
+            --registry "docker.io"
+          cp ./dist/rancher-images-digests-linux-amd64.txt ./dist/rancher-images-digests-linux-arm64.txt
+      - name: Generate Windows Digests
+        run: |
+          release generate rancher docker-images-digests \
+            --artifact-url "https://github.com/rancher/rancher/releases/download/${{ env.TAG }}/rancher-windows-images.txt" \
+            --output-file ./dist/rancher-images-digests-windows-1809.txt \
+            --registry "docker.io"
+          cp ./dist/rancher-images-digests-windows-1809.txt ./dist/rancher-images-digests-windows-ltsc2022.txt
       - name: Upload digests
-        uses: actions/upload-artifact@v4
-        with:
-          name: "digests"
-          path: ./bin/rancher-images-digests-linux-*
-          if-no-files-found: error
-          retention-days: 1
-  # docker-image-digests-windows:
-  #   if: github.event_name == 'push' && contains(github.ref, 'tags/') # Only run on push
-  #   strategy:
-  #     matrix:
-  #       os: [windows]
-  #       version: [2019, 2022]
-  #   runs-on: ${{ matrix.os }}-${{ matrix.version }}
-  #   steps:
-  #     - name: Docker run
-  #       shell: bash
-  #       run:  |
-  #         docker run \
-  #           -e PLUGIN_GITHUB_REPOSITORY="${{ env.REPOSITORY_OWNER }}/rancher" \
-  #           -e PLUGIN_GITHUB_TOKEN="${{ secrets.GITHUB_TOKEN }}" \
-  #           -e PLUGIN_GITHUB_TAG="${{ env.TAG }} \
-  #           -e PLUGIN_INPUT_FILE=""rancher-windows-images.txt" \
-  #           -e PLUGIN_OUTPUT_FILE=""rancher-images-digests-windows-1809.txt" \
-  #           -e PLUGIN_REGISTRY=""docker.io" \
-  #           rancher/drone-docker-image-digests:v0.0.12 
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload -R ${{ env.REPOSITORY_OWNER }}/rancher ${{ env.TAG }} ./dist/*
