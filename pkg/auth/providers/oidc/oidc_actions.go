@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -70,8 +71,8 @@ func (o *OpenIDCProvider) TestAndApply(actionName string, action *types.Action, 
 		Code: oidcConfigApplyInput.Code,
 	}
 
-	if !validScopes(oidcConfig.Scopes) {
-		return errors.New("scopes are incorrectly configured, at a minimum, openid is required")
+	if !validateScopes(oidcConfig.Scopes) {
+		return fmt.Errorf("scopes are invalid:  scopes must be space delimited and openid is a required scope. %s", oidcConfig.Scopes)
 	}
 
 	//encode url to ensure path is escaped properly
@@ -118,14 +119,12 @@ func (o *OpenIDCProvider) TestAndApply(actionName string, action *types.Action, 
 	return o.TokenMGR.CreateTokenAndSetCookie(user.Name, userPrincipal, groupPrincipals, providerToken, 0, "Token via OIDC Configuration", request, userExtraInfo)
 }
 
-func validScopes(input string) bool {
-	values := strings.Fields(input)
-
-	// Iterate through the values and check if any of them is "openid"
-	for _, value := range values {
-		if value == "openid" {
-			return true
-		}
+// validateScopes returns true if there are no commas in the scopes string and openid is included as a scope.
+// Otherwise, the scopes are invalid and we return false.
+func validateScopes(input string) bool {
+	if strings.Contains(input, ",") {
+		return false
 	}
-	return false
+	values := strings.Fields(input)
+	return slices.Contains(values, "openid")
 }
