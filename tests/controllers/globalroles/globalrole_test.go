@@ -15,6 +15,7 @@ import (
 	"github.com/rancher/wrangler/v2/pkg/crd"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
+	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -40,8 +41,19 @@ var (
 		APIGroups: []string{""},
 		Resources: []string{"pods"},
 	}
+	readNodeRule = rbacv1.PolicyRule{
+		Verbs:     []string{"get"},
+		APIGroups: []string{""},
+		Resources: []string{"nodes"},
+	}
+	editTemplates = rbacv1.PolicyRule{
+		Verbs:     []string{"edit"},
+		APIGroups: []string{"management.cattle.io"},
+		Resources: []string{"templates"},
+	}
 	globalRoleLabel = "authz.management.cattle.io/globalrole"
 	crNameLabel     = "authz.management.cattle.io/cr-name"
+	grOwnerLabel    = "authz.management.cattle.io/gr-owner"
 )
 
 func (s *GlobalRoleTestSuite) SetupSuite() {
@@ -117,6 +129,11 @@ func (s *GlobalRoleTestSuite) SetupSuite() {
 			Group:   "management.cattle.io",
 			Version: "v3",
 			Kind:    "GlobalRole",
+		},
+		schema.GroupVersionKind{
+			Group:   "",
+			Version: "v1",
+			Kind:    "Namespace",
 		})
 }
 
@@ -127,12 +144,32 @@ func (s *GlobalRoleTestSuite) TearDownSuite() {
 }
 
 func (s *GlobalRoleTestSuite) TestCreateGlobalRole() {
+	ns1 := corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "namespace1",
+		},
+	}
+	ns2 := corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "namespace2",
+		},
+	}
+	globalDataNS := corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "cattle-global-data",
+		},
+	}
+	s.managementContext.Core.Namespaces("").Create(&ns1)
+	s.managementContext.Core.Namespaces("").Create(&ns2)
+	s.managementContext.Core.Namespaces("").Create(&globalDataNS)
+
 	tests := []struct {
 		name        string
 		globalRole  v3.GlobalRole
 		roles       []rbacv1.Role
 		clusterRole rbacv1.ClusterRole
 	}{
+		// NOTE: These test can be run in parallel only if the global role names are unique
 		{
 			name: "create primary cluster role given cr-name",
 			globalRole: v3.GlobalRole{
@@ -140,7 +177,7 @@ func (s *GlobalRoleTestSuite) TestCreateGlobalRole() {
 					Annotations: map[string]string{
 						crNameLabel: "cr-name",
 					},
-					Name: "test-gr",
+					Name: "cr-name-gr",
 				},
 				Rules: []rbacv1.PolicyRule{getPodRule},
 			},
@@ -155,15 +192,84 @@ func (s *GlobalRoleTestSuite) TestCreateGlobalRole() {
 			name: "create primary cluster role with generated name",
 			globalRole: v3.GlobalRole{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-gr",
+					Name: "generated-name-gr",
 				},
 				Rules: []rbacv1.PolicyRule{getPodRule},
 			},
 			clusterRole: rbacv1.ClusterRole{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "cattle-globalrole-test-gr",
+					Name: "cattle-globalrole-generated-name-gr",
 				},
 				Rules: []rbacv1.PolicyRule{getPodRule},
+			},
+		},
+		{
+			name: "global role with catalog role",
+			globalRole: v3.GlobalRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "catalog-role-gr",
+				},
+				Rules: []rbacv1.PolicyRule{getPodRule, editTemplates},
+			},
+			clusterRole: rbacv1.ClusterRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cattle-globalrole-catalog-role-gr",
+				},
+				Rules: []rbacv1.PolicyRule{getPodRule, editTemplates},
+			},
+			roles: []rbacv1.Role{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "catalog-role-gr-global-catalog",
+						Namespace: "cattle-global-data",
+					},
+					Rules: []rbacv1.PolicyRule{
+						{
+							APIGroups: []string{"management.cattle.io"},
+							Resources: []string{"catalogtemplates"},
+							Verbs:     []string{"edit"},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "global role with namespaced rules",
+			globalRole: v3.GlobalRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "namespaced-rules-gr",
+				},
+				NamespacedRules: map[string][]rbacv1.PolicyRule{
+					"namespace1": {getPodRule, readNodeRule},
+					"namespace2": {getPodRule},
+				},
+			},
+			clusterRole: rbacv1.ClusterRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cattle-globalrole-namespaced-rules-gr",
+				},
+			},
+			roles: []rbacv1.Role{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "namespaced-rules-gr-namespace1",
+						Namespace: "namespace1",
+						Labels: map[string]string{
+							grOwnerLabel: "namespaced-rules-gr",
+						},
+					},
+					Rules: []rbacv1.PolicyRule{getPodRule, readNodeRule},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "namespaced-rules-gr-namespace2",
+						Namespace: "namespace2",
+						Labels: map[string]string{
+							grOwnerLabel: "namespaced-rules-gr",
+						},
+					},
+					Rules: []rbacv1.PolicyRule{getPodRule},
+				},
 			},
 		},
 	}
@@ -171,6 +277,7 @@ func (s *GlobalRoleTestSuite) TestCreateGlobalRole() {
 		test := test
 		s.Run(test.name, func() {
 			t := s.T()
+			t.Parallel()
 			gr, err := s.managementContext.Management.GlobalRoles("").Create(&test.globalRole)
 			assert.NoError(t, err)
 
@@ -197,7 +304,6 @@ func (s *GlobalRoleTestSuite) TestCreateGlobalRole() {
 			// Check created Cluster Role
 			clusterRole, err := s.managementContext.RBAC.ClusterRoles("").Get(test.clusterRole.Name, metav1.GetOptions{})
 			assert.NoError(t, err)
-			assert.Equal(t, test.globalRole.Name, clusterRole.OwnerReferences[0].Name)
 			assert.True(t, reflect.DeepEqual(test.clusterRole.Rules, clusterRole.Rules))
 			// Check the ownership to ensure deletion would work
 			assert.Contains(t, clusterRole.OwnerReferences, grOwnerRef)
@@ -211,8 +317,14 @@ func (s *GlobalRoleTestSuite) TestCreateGlobalRole() {
 				assert.NoError(t, err)
 
 				// Assert any desired role fields
-				assert.Equal(t, test.globalRole.Name, role.OwnerReferences[0].Name)
 				assert.True(t, reflect.DeepEqual(r.Rules, role.Rules))
+
+				// Check that the owner label exists and is set correctly
+				if _, ok := r.Labels[grOwnerLabel]; ok {
+					owner, ok := role.Labels[grOwnerLabel]
+					assert.True(t, ok)
+					assert.Equal(t, r.Labels[grOwnerLabel], owner)
+				}
 
 				// Check the ownership to ensure deletion would work
 				assert.Contains(t, role.OwnerReferences, grOwnerRef)
@@ -224,7 +336,7 @@ func (s *GlobalRoleTestSuite) TestCreateGlobalRole() {
 			err = s.managementContext.RBAC.ClusterRoles("").Delete(test.clusterRole.Name, &metav1.DeleteOptions{})
 			assert.NoError(t, err)
 			for _, r := range test.roles {
-				err = s.managementContext.RBAC.Roles("").Delete(r.Name, &metav1.DeleteOptions{})
+				err = s.managementContext.RBAC.Roles(r.Namespace).Delete(r.Name, &metav1.DeleteOptions{})
 				assert.NoError(t, err)
 			}
 		})
