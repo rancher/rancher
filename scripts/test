@@ -81,7 +81,7 @@ curl -sLf https://github.com/rancher/system-agent/releases/download/${CATTLE_SYS
 curl -sLf https://github.com/rancher/system-agent/releases/download/${CATTLE_SYSTEM_AGENT_VERSION}/rancher-system-agent-arm64 -o /usr/share/rancher/ui/assets/rancher-system-agent-arm64
 curl -sLf https://github.com/rancher/system-agent/releases/download/${CATTLE_SYSTEM_AGENT_VERSION}/system-agent-uninstall.sh -o /usr/share/rancher/ui/assets/system-agent-uninstall.sh
 
-run_rancher()
+build_and_run_rancher()
 {
     RESTART_COUNT=0
     while sleep 2; do
@@ -121,6 +121,12 @@ dump_rancher_logs()
   echo -e "\n-----RANCHER-LOG-DUMP-END-----"
 }
 
+# Compile Rancher
+# This needs to happen before build_and_run_rancher is executed in the background.
+# Otherwise, build_and_run_rancher will also compile Rancher, overly elongating the
+# time before Rancher is ready and therefore causing flakiness of the health check below.
+./scripts/build-server
+
 # uncomment to get startup logs. Don't leave them on because it slows drone down too
 # much
 #tail -F /tmp/rancher.log &
@@ -130,7 +136,7 @@ trap "exit 1" 42
 PWRAPPROC="$$"
 
 PID=-1
-run_rancher &
+build_and_run_rancher &
 RANCHER_RUN_PID=$!
 trap cleanup exit
 
