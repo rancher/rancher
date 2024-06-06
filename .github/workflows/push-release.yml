@@ -408,6 +408,8 @@ jobs:
           mv ./bin/*.txt ./dist
           mv ./bin/*.sh ./dist
           mv ./bin/*.ps1 ./dist
+      - name: Create sha256sum.txt file
+        run: ./scripts/artifacts-hashes.sh
       - name: Upload artifacts
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
