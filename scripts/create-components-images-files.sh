@@ -12,7 +12,6 @@ cd ../package
 ../scripts/k3s-images.sh
 
 # Make sure the used data.json is a release artifact
-cp ../bin/data.json ../bin/rancher-data.json
 
 if [ ${ARCH} == arm64 ]; then
     ETCD_UNSUPPORTED_ARCH=arm64
@@ -22,10 +21,7 @@ if [ ${ARCH} == s390x ]; then
 fi
 
 mkdir -p ../dist
-echo ${IMAGE} > ../dist/images
-echo ${AGENT_IMAGE} >> ../dist/images
-echo Built ${IMAGE} #${AGENT_IMAGE}
-echo
+cp ../bin/data.json ../dist/rancher-data.json
 
 cd ../bin
 
