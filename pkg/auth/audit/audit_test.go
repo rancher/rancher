@@ -204,6 +204,11 @@ func (a *AuditTest) TestRedactSensitiveData() {
 			input: []byte(`{"credentials": "{'fakeCredName': 'fakeCred'}", "applicationSecret": "fakeAppSecret", "oauthCredential": "fakeOauth", "serviceAccountCredential": "fakeSACred", "spKey": "fakeSPKey", "spCert": "fakeSPCERT", "certificate": "fakeCert", "privateKey": "fakeKey"}`),
 			want:  []byte(fmt.Sprintf(`{"credentials": "%s", "applicationSecret": "%[1]s", "oauthCredential": "%[1]s", "serviceAccountCredential": "%[1]s", "spKey": "%[1]s", "spCert": "%[1]s", "certificate": "%[1]s", "privateKey": "%[1]s"}`, redacted)),
 		},
+		{
+			name:  "With malformed input",
+			input: []byte(`{"key": "value", "response":}`),
+			want:  []byte(fmt.Sprintf(`{"%s": "invalid character '}' looking for beginning of value"}`, auditLogErrKey)),
+		},
 	}
 	for i := range tests {
 		test := tests[i]
@@ -341,18 +346,18 @@ func (a *AuditTest) TestCompression() {
 			level:      LevelRequestResponse,
 		},
 		{
-			name:       "invalid json gzip response",
-			respHeader: http.Header{"Content-Type": []string{"application/json"}, "Content-Encoding": []string{"gzip"}},
-			respBody:   a.gzip(""),
-			Error:      &json.SyntaxError{},
-			level:      LevelRequestResponse,
+			name:             "invalid json gzip response",
+			respHeader:       http.Header{"Content-Type": []string{"application/json"}, "Content-Encoding": []string{"gzip"}},
+			respBody:         a.gzip(""),
+			expectedRespBody: `{"auditLogError":"unexpected end of JSON input"}`,
+			level:            LevelRequestResponse,
 		},
 		{
-			name:       "invalid json deflate response",
-			respHeader: http.Header{"Content-Type": []string{"application/json"}, "Content-Encoding": []string{"deflate"}},
-			respBody:   a.deflate("Bad Data[]}"),
-			Error:      &json.SyntaxError{},
-			level:      LevelRequestResponse,
+			name:             "invalid json deflate response",
+			respHeader:       http.Header{"Content-Type": []string{"application/json"}, "Content-Encoding": []string{"deflate"}},
+			respBody:         a.deflate("Bad Data[]}"),
+			expectedRespBody: `{"auditLogError":"invalid character 'B' looking for beginning of value"}`,
+			level:            LevelRequestResponse,
 		},
 	}
 
@@ -382,7 +387,6 @@ func (a *AuditTest) TestCompression() {
 			a.JSONEqf(expectedData, a.drain(tmpPath), "Incorrect JSON stored.")
 		})
 	}
-
 }
 
 func (a *AuditTest) TestFilterSensitiveHeader() {
