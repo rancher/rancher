@@ -433,14 +433,14 @@ jobs:
         run: |
           release config gen
           release generate rancher docker-images-digests \
-            --artifact-url "https://github.com/rancher/rancher/releases/download/${{ env.TAG }}/rancher-images.txt" \
+            --artifact-url "https://github.com/${{ env.REPOSITORY_OWNER }}/rancher/releases/download/${{ env.TAG }}/rancher-images.txt" \
             --output-file ./dist/rancher-images-digests-linux-amd64.txt \
             --registry "docker.io"
           cp ./dist/rancher-images-digests-linux-amd64.txt ./dist/rancher-images-digests-linux-arm64.txt
       - name: Generate Windows Digests
         run: |
           release generate rancher docker-images-digests \
-            --artifact-url "https://github.com/rancher/rancher/releases/download/${{ env.TAG }}/rancher-windows-images.txt" \
+            --artifact-url "https://github.com/${{ env.REPOSITORY_OWNER }}/rancher/releases/download/${{ env.TAG }}/rancher-windows-images.txt" \
             --output-file ./dist/rancher-images-digests-windows-1809.txt \
             --registry "docker.io"
           cp ./dist/rancher-images-digests-windows-1809.txt ./dist/rancher-images-digests-windows-ltsc2022.txt
