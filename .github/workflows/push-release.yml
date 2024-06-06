@@ -413,7 +413,7 @@ jobs:
       - name: Upload artifacts
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload -R ${{ env.REPOSITORY_OWNER }}/rancher ${{ env.TAG }} ./dist/*
+        run: gh release upload -R ${{ env.REPOSITORY_OWNER }}/rancher ${{ env.TAG }} ./dist/* --clobber
   docker-image-digests:
     if: github.event_name == 'push' && contains(github.ref, 'tags/') # Only run on push
     runs-on: ubuntu-latest
@@ -426,12 +426,12 @@ jobs:
       - name: Create dist folder
         run: mkdir -p dist
       - name: Setup ecm-distro-tools
-        uses: rancher/ecm-distro-tools@v0.35.0
+        uses: rancher/ecm-distro-tools@v0.36.0
         with:
           version: v0.36.0
       - name: Generate Linux Digests
         run: |
-          release config gen
+          echo "{}" > ~/.ecm-distro-tools/config.json
           release generate rancher docker-images-digests \
             --artifact-url "https://github.com/${{ env.REPOSITORY_OWNER }}/rancher/releases/download/${{ env.TAG }}/rancher-images.txt" \
             --output-file ./dist/rancher-images-digests-linux-amd64.txt \
@@ -447,4 +447,4 @@ jobs:
       - name: Upload digests
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload -R ${{ env.REPOSITORY_OWNER }}/rancher ${{ env.TAG }} ./dist/*
+        run: gh release upload -R ${{ env.REPOSITORY_OWNER }}/rancher ${{ env.TAG }} ./dist/* --clobber
