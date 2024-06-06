@@ -46,23 +46,23 @@ jobs:
           if-no-files-found: error
           retention-days: 1
           overwrite: true
-  publish-chart:
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' && contains(github.ref, 'tags/') # Only run on push
-    env:
-      CLOUDSDK_AUTH_ACCESS_TOKEN: ${{ secrets.gcloud_token }}
-    steps:
-      - name: Install gcloud CLI
-        run: |
-          sudo snap install google-cloud-cli --classic
-      - name: Download chart
-        uses: actions/download-artifact@v4
-        with:
-          name: chart
-          path: /tmp/charts/
-      - name: Upload chart to bucket
-        run: |
-          gcloud storage cp /tmp/charts gs://releases.rancher.com/server-charts --recursive --acl allUsers:READER --cache-control "public,no-cache,proxy-revalidate"
+  # publish-chart:
+  #   runs-on: ubuntu-latest
+  #   if: github.event_name == 'push' && contains(github.ref, 'tags/') # Only run on push
+  #   env:
+  #     CLOUDSDK_AUTH_ACCESS_TOKEN: ${{ secrets.gcloud_token }}
+  #   steps:
+  #     - name: Install gcloud CLI
+  #       run: |
+  #         sudo snap install google-cloud-cli --classic
+  #     - name: Download chart
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: chart
+  #         path: /tmp/charts/
+  #     - name: Upload chart to bucket
+  #       run: |
+  #         gcloud storage cp /tmp/charts gs://releases.rancher.com/server-charts --recursive --acl allUsers:READER --cache-control "public,no-cache,proxy-revalidate"
   build-server:
     runs-on: ubuntu-latest
     strategy:
@@ -154,7 +154,7 @@ jobs:
         run: |
           docker buildx imagetools create -t ${{ env.IMAGE }}:${{ env.TAG }} ${{ env.IMAGE }}:${{ env.TAG }}-amd64 ${{ env.IMAGE }}:${{ env.TAG }}-arm64
           if [[ "${{ github.ref_name }}" == release/v* ]]; then
-            docker buildx imagetools create -t ${{ env.IMAGE }}:${{ env.HEAD_TAG }} ${{ env.IMAGE }}:${{ env.HEAD_TAG }}-amd64 ${{ env.IMAGE }}:${{ env.HEAD_TAG }}-arm64
+            docker buildx imagetools create -t ${{ env.IMAGE }}:${{ env.HEAD_TAG }} ${{ env.IMAGE }}:${{ env.TAG }}-amd64 ${{ env.IMAGE }}:${{ env.TAG }}-arm64
           fi
       - name: Create head manifest list and push
         run: |
@@ -277,10 +277,10 @@ jobs:
             ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-windows-2022
           if [[ "${{ github.ref_name }}" == release/v* ]]; then
             docker buildx imagetools create -t ${{ env.IMAGE_AGENT }}:${{ env.HEAD_TAG }} \
-              ${{ env.IMAGE_AGENT }}:${{ env.HEAD_TAG }}-amd64 \
-              ${{ env.IMAGE_AGENT }}:${{ env.HEAD_TAG }}-arm64 \
-              ${{ env.IMAGE_AGENT }}:${{ env.HEAD_TAG }}-windows-2019 \
-              ${{ env.IMAGE_AGENT }}:${{ env.HEAD_TAG }}-windows-2022
+              ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-amd64 \
+              ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-arm64 \
+              ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-windows-2019 \
+              ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-windows-2022
           fi
       - name: Inspect image
         run: |
@@ -379,7 +379,7 @@ jobs:
         run: |
           docker buildx imagetools create -t ${{ env.IMAGE_INSTALLER }}:${{ env.TAG }} ${{ env.IMAGE_INSTALLER }}:${{ env.TAG }}-amd64 ${{ env.IMAGE_INSTALLER }}:${{ env.TAG }}-arm64
           if [[ "${{ github.ref_name }}" == release/v* ]]; then
-            docker buildx imagetools create -t ${{ env.IMAGE_INSTALLER }}:${{ env.HEAD_TAG }} ${{ env.IMAGE_INSTALLER }}:${{ env.HEAD_TAG }}-amd64 ${{ env.IMAGE_INSTALLER }}:${{ env.HEAD_TAG }}-arm64
+            docker buildx imagetools create -t ${{ env.IMAGE_INSTALLER }}:${{ env.HEAD_TAG }} ${{ env.IMAGE_INSTALLER }}:${{ env.TAG }}-amd64 ${{ env.IMAGE_INSTALLER }}:${{ env.TAG }}-arm64
           fi
       - name: Inspect image
         run: |
