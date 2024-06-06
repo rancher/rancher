@@ -431,7 +431,8 @@ jobs:
           version: v0.36.0
       - name: Generate Linux Digests
         run: |
-          echo "{}" > ~/.ecm-distro-tools/config.json
+          mkdir -p ~/.ecm-distro-tools
+          release config gen
           release generate rancher docker-images-digests \
             --artifact-url "https://github.com/${{ env.REPOSITORY_OWNER }}/rancher/releases/download/${{ env.TAG }}/rancher-images.txt" \
             --output-file ./dist/rancher-images-digests-linux-amd64.txt \
