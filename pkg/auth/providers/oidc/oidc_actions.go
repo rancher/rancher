@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"slices"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/api/handler"
@@ -69,6 +71,10 @@ func (o *OpenIDCProvider) TestAndApply(actionName string, action *types.Action, 
 		Code: oidcConfigApplyInput.Code,
 	}
 
+	if !validateScopes(oidcConfig.Scopes) {
+		return fmt.Errorf("scopes are invalid:  scopes must be space delimited and openid is a required scope. %s", oidcConfig.Scopes)
+	}
+
 	//encode url to ensure path is escaped properly
 	//the issuer url is used to get all the other urls for the provider
 	//so its the only one that needs encoded
@@ -111,4 +117,14 @@ func (o *OpenIDCProvider) TestAndApply(actionName string, action *types.Action, 
 	userExtraInfo := o.GetUserExtraAttributes(userPrincipal)
 
 	return o.TokenMGR.CreateTokenAndSetCookie(user.Name, userPrincipal, groupPrincipals, providerToken, 0, "Token via OIDC Configuration", request, userExtraInfo)
+}
+
+// validateScopes returns true if there are no commas in the scopes string and openid is included as a scope.
+// Otherwise, the scopes are invalid and we return false.
+func validateScopes(input string) bool {
+	if strings.Contains(input, ",") {
+		return false
+	}
+	values := strings.Fields(input)
+	return slices.Contains(values, "openid")
 }

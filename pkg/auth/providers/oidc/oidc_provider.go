@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 
 	"github.com/coreos/go-oidc/v3/oidc"
@@ -372,7 +373,7 @@ func (o *OpenIDCProvider) getUserInfo(ctx *context.Context, config *v32.OIDCConf
 		return userInfo, oauth2Token, err
 	}
 
-	provider, err := oidc.NewProvider(updatedContext, config.Issuer)
+	provider, err := o.getOIDCProvider(updatedContext, config)
 	if err != nil {
 		return userInfo, oauth2Token, err
 	}
@@ -478,4 +479,39 @@ func (o *OpenIDCProvider) IsDisabledProvider() (bool, error) {
 		return false, err
 	}
 	return !oidcConfig.Enabled, nil
+}
+
+func (o *OpenIDCProvider) getOIDCProvider(ctx context.Context, oidcConfig *v32.OIDCConfig) (*oidc.Provider, error) {
+	oidcFields := map[string]string{
+		client.OIDCConfigFieldIssuer:           oidcConfig.Issuer,
+		client.OIDCConfigFieldAuthEndpoint:     oidcConfig.AuthEndpoint,
+		client.OIDCConfigFieldTokenEndpoint:    oidcConfig.TokenEndpoint,
+		client.OIDCConfigFieldJWKSUrl:          oidcConfig.JWKSUrl,
+		client.OIDCConfigFieldUserInfoEndpoint: oidcConfig.UserInfoEndpoint,
+	}
+	var emptyFields []string
+	for key, value := range oidcFields {
+		if value == "" {
+			emptyFields = append(emptyFields, key)
+		}
+	}
+
+	// If all the fields are set, we will use them and manually specify each one.
+	// Otherwise, we will fall back to using just the issuer and the others will be determined by discovery.
+	if len(emptyFields) > 0 && slices.Contains(emptyFields, oidcFields[client.OIDCConfigFieldIssuer]) {
+		return nil, fmt.Errorf("unable to create OIDC provider. The following fields are missing: %s", strings.Join(emptyFields, ","))
+	}
+
+	if len(emptyFields) == 0 {
+		pConfig := &oidc.ProviderConfig{
+			IssuerURL:   oidcConfig.Issuer,
+			AuthURL:     oidcConfig.AuthEndpoint,
+			TokenURL:    oidcConfig.TokenEndpoint,
+			UserInfoURL: oidcConfig.UserInfoEndpoint,
+			JWKSURL:     oidcConfig.JWKSUrl,
+		}
+		return pConfig.NewProvider(ctx), nil
+	}
+	// This will perform discovery in the oidc library
+	return oidc.NewProvider(ctx, oidcConfig.Issuer)
 }

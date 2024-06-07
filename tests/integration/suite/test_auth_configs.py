@@ -15,7 +15,7 @@ def test_auth_configs(admin_mc):
 
     configs = client.list_auth_config()
 
-    assert configs.pagination.total == 14
+    assert configs.pagination.total == 15
 
     gh = None
     local = None
@@ -31,6 +31,7 @@ def test_auth_configs(admin_mc):
     shibboleth = None
     oidc = None
     keycloakoidc = None
+    genericoidc = None
 
     for c in configs:
         print(c)
@@ -62,10 +63,12 @@ def test_auth_configs(admin_mc):
             oidc = c
         elif c.type == "keyCloakOIDCConfig":
             keycloakoidc = c
+        elif c.type == "genericOIDCConfig":
+            genericoidc = c
 
     for x in [gh, local, ad, azure, openldap,
               freeIpa, ping, adfs, keycloak, okta, googleoauth,
-              oidc, keycloakoidc]:
+              oidc, keycloakoidc, genericoidc]:
         assert x is not None
         config = client.by_id_auth_config(x.id)
         with pytest.raises(ApiError) as e:
@@ -99,6 +102,9 @@ def test_auth_configs(admin_mc):
 
     assert oidc.actions.configureTest
     assert oidc.actions.testAndApply
+
+    assert genericoidc.actions.configureTest
+    assert genericoidc.actions.testAndApply
 
 
 def test_auth_config_secrets(admin_mc):

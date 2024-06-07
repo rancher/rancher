@@ -456,13 +456,18 @@ type OIDCConfig struct {
 
 	ClientID           string `json:"clientId" norman:"required"`
 	ClientSecret       string `json:"clientSecret,omitempty" norman:"required,type=password"`
-	Scopes             string `json:"scope"`
-	AuthEndpoint       string `json:"authEndpoint,omitempty" norman:"required,notnullable"`
-	Issuer             string `json:"issuer" norman:"required,notnullable"`
-	Certificate        string `json:"certificate,omitempty"`
-	PrivateKey         string `json:"privateKey" norman:"type=password"`
 	RancherURL         string `json:"rancherUrl" norman:"required,notnullable"`
+	Issuer             string `json:"issuer" norman:"required,notnullable"`
+	AuthEndpoint       string `json:"authEndpoint,omitempty" norman:"required,notnullable"`
+	TokenEndpoint      string `json:"tokenEndpoint,omitempty"`
+	UserInfoEndpoint   string `json:"userInfoEndpoint,omitempty"`
+	JWKSUrl            string `json:"jwksUrl,omitempty"`
+	Certificate        string `json:"certificate,omitempty"`
+	PrivateKey         string `json:"privateKey,omitempty" norman:"type=password"`
 	GroupSearchEnabled *bool  `json:"groupSearchEnabled"`
+	GroupsClaim        string `json:"groupsClaim,omitempty"`
+	// Scopes is expected to be a space delimited list of scopes
+	Scopes string `json:"scope,omitempty"`
 }
 
 type OIDCTestOutput struct {
@@ -491,4 +496,21 @@ type ClusterProxyConfig struct {
 
 	// Enabled indicates whether downstream proxy requests for service account tokens is enabled.
 	Enabled bool `json:"enabled"`
+}
+
+// GenericOIDCConfig is the wrapper for the Generic OIDC provider to hold the OIDC Configuration
+type GenericOIDCConfig struct {
+	OIDCConfig `json:",inline" mapstructure:",squash"`
+}
+
+// GenericOIDCTestOutput is the wrapper for the Generic OIDC provider to hold the OIDC test output object, which
+// in turn holds the RedirectURL
+type GenericOIDCTestOutput struct {
+	OIDCTestOutput `json:",inline" mapstructure:",squash"`
+}
+
+// GenericOIDCApplyInput is the wrapper for the input used to enable/activate the Generic OIDC auth provider.  It holds
+// the configuration for the OIDC provider as well as an auth code.
+type GenericOIDCApplyInput struct {
+	OIDCApplyInput `json:",inline" mapstructure:",squash"`
 }

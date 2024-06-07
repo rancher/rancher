@@ -55,6 +55,7 @@ type Interface interface {
 	Feature() FeatureController
 	FleetWorkspace() FleetWorkspaceController
 	FreeIpaProvider() FreeIpaProviderController
+	GenericOIDCProvider() GenericOIDCProviderController
 	GithubProvider() GithubProviderController
 	GlobalDns() GlobalDnsController
 	GlobalDnsProvider() GlobalDnsProviderController
@@ -202,6 +203,10 @@ func (v *version) FleetWorkspace() FleetWorkspaceController {
 
 func (v *version) FreeIpaProvider() FreeIpaProviderController {
 	return generic.NewNonNamespacedController[*v3.FreeIpaProvider, *v3.FreeIpaProviderList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "FreeIpaProvider"}, "freeipaproviders", v.controllerFactory)
+}
+
+func (v *version) GenericOIDCProvider() GenericOIDCProviderController {
+	return generic.NewNonNamespacedController[*v3.GenericOIDCProvider, *v3.GenericOIDCProviderList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "GenericOIDCProvider"}, "genericoidcproviders", v.controllerFactory)
 }
 
 func (v *version) GithubProvider() GithubProviderController {
