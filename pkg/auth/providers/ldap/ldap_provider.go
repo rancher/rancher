@@ -345,13 +345,13 @@ func (p *ldapProvider) samlSearchGetPrincipal(
 			ObjectClass, config.UserObjectClass, config.UserLoginAttribute, ldapv3.EscapeFilter(externalID))
 		searchRequest = ldapv3.NewSearchRequest(config.UserSearchBase,
 			ldapv3.ScopeWholeSubtree, ldapv3.NeverDerefAliases, 0, 0, false,
-			filter, ldap.GetUserSearchAttributesForLDAP(ObjectClass, config), nil)
+			filter, config.GetUserSearchAttributes(ObjectClass), nil)
 	} else {
 		filter = fmt.Sprintf("(&(%v=%v)(%v=%v))",
 			ObjectClass, config.GroupObjectClass, config.GroupDNAttribute, ldapv3.EscapeFilter(externalID))
 		searchRequest = ldapv3.NewSearchRequest(config.GroupSearchBase,
 			ldapv3.ScopeWholeSubtree, ldapv3.NeverDerefAliases, 0, 0, false,
-			filter, ldap.GetGroupSearchAttributesForLDAP(ObjectClass, config), nil)
+			filter, config.GetGroupSearchAttributes(ObjectClass), nil)
 	}
 
 	result, err := lConn.Search(searchRequest)

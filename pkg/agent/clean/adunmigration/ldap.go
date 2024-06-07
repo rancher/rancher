@@ -150,7 +150,7 @@ func findLdapUser(guid string, lConn *ldapv3.Conn, adConfig *v3.ActiveDirectoryC
 	query := fmt.Sprintf("(&(%v=%v)(%v=%v))", AttributeObjectClass, adConfig.UserObjectClass, AttributeObjectGUID, escapeUUID(guid))
 	search := ldapv3.NewSearchRequest(adConfig.UserSearchBase, ldapv3.ScopeWholeSubtree, ldapv3.NeverDerefAliases,
 		0, 0, false,
-		query, ldap.GetUserSearchAttributes("memberOf", "objectClass", adConfig), nil)
+		query, adConfig.GetUserSearchAttributes("memberOf", "objectClass"), nil)
 
 	result, err := lConn.Search(search)
 	if err != nil {

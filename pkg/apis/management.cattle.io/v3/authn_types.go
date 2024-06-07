@@ -334,6 +334,26 @@ type ActiveDirectoryConfig struct {
 	NestedGroupMembershipEnabled *bool    `json:"nestedGroupMembershipEnabled,omitempty" norman:"default=false"`
 }
 
+func (c *ActiveDirectoryConfig) GetUserSearchAttributes(searchAttributes ...string) []string {
+	userSearchAttributes := []string{
+		c.UserObjectClass,
+		c.UserLoginAttribute,
+		c.UserNameAttribute,
+		c.UserEnabledAttribute,
+	}
+	return append(userSearchAttributes, searchAttributes...)
+}
+
+func (c *ActiveDirectoryConfig) GetGroupSearchAttributes(searchAttributes ...string) []string {
+	groupSeachAttributes := []string{
+		c.GroupObjectClass,
+		c.UserLoginAttribute,
+		c.GroupNameAttribute,
+		c.GroupSearchAttribute,
+	}
+	return append(groupSeachAttributes, searchAttributes...)
+}
+
 type ActiveDirectoryTestAndApplyInput struct {
 	ActiveDirectoryConfig ActiveDirectoryConfig `json:"activeDirectoryConfig,omitempty"`
 	Username              string                `json:"username"`
@@ -375,6 +395,29 @@ type LdapFields struct {
 type LdapConfig struct {
 	AuthConfig `json:",inline" mapstructure:",squash"`
 	LdapFields `json:",inline" mapstructure:",squash"`
+}
+
+func (c *LdapConfig) GetUserSearchAttributes(searchAttributes ...string) []string {
+	userSearchAttributes := []string{
+		"dn",
+		c.UserMemberAttribute,
+		c.UserObjectClass,
+		c.UserLoginAttribute,
+		c.UserNameAttribute,
+		c.UserEnabledAttribute,
+	}
+	return append(userSearchAttributes, searchAttributes...)
+}
+
+func (c *LdapConfig) GetGroupSearchAttributes(searchAttributes ...string) []string {
+	groupSeachAttributes := []string{
+		c.GroupMemberUserAttribute,
+		c.GroupObjectClass,
+		c.UserLoginAttribute,
+		c.GroupNameAttribute,
+		c.GroupSearchAttribute,
+	}
+	return append(groupSeachAttributes, searchAttributes...)
 }
 
 type LdapTestAndApplyInput struct {

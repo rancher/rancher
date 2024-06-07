@@ -11,7 +11,6 @@ import (
 	ldapv3 "github.com/go-ldap/ldap/v3"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -128,46 +127,6 @@ func GetAttributeValuesByName(search []*ldapv3.EntryAttribute, attributeName str
 		}
 	}
 	return []string{}
-}
-
-func GetUserSearchAttributes(memberOfAttribute, ObjectClass string, config *v32.ActiveDirectoryConfig) []string {
-	userSearchAttributes := []string{memberOfAttribute,
-		ObjectClass,
-		config.UserObjectClass,
-		config.UserLoginAttribute,
-		config.UserNameAttribute,
-		config.UserEnabledAttribute}
-	return userSearchAttributes
-}
-
-func GetGroupSearchAttributes(config *v32.ActiveDirectoryConfig, searchAttributes ...string) []string {
-	groupSeachAttributes := []string{
-		config.GroupObjectClass,
-		config.UserLoginAttribute,
-		config.GroupNameAttribute,
-		config.GroupSearchAttribute}
-	groupSeachAttributes = append(groupSeachAttributes, searchAttributes...)
-	return groupSeachAttributes
-}
-
-func GetUserSearchAttributesForLDAP(ObjectClass string, config *v3.LdapConfig) []string {
-	userSearchAttributes := []string{"dn", config.UserMemberAttribute,
-		ObjectClass,
-		config.UserObjectClass,
-		config.UserLoginAttribute,
-		config.UserNameAttribute,
-		config.UserEnabledAttribute}
-	return userSearchAttributes
-}
-
-func GetGroupSearchAttributesForLDAP(ObjectClass string, config *v3.LdapConfig) []string {
-	groupSeachAttributes := []string{config.GroupMemberUserAttribute,
-		ObjectClass,
-		config.GroupObjectClass,
-		config.UserLoginAttribute,
-		config.GroupNameAttribute,
-		config.GroupSearchAttribute}
-	return groupSeachAttributes
 }
 
 func AuthenticateServiceAccountUser(serviceAccountPassword string, serviceAccountUsername string, defaultLoginDomain string, lConn ldapv3.Client) error {

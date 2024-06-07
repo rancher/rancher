@@ -41,7 +41,7 @@ func (p *ldapProvider) loginUser(lConn ldapv3.Client, credential *v32.BasicLogin
 	searchRequest := ldapv3.NewSearchRequest(config.UserSearchBase,
 		ldapv3.ScopeWholeSubtree, ldapv3.NeverDerefAliases, 0, 0, false,
 		fmt.Sprintf("(&(%v=%v)(%v=%v))", ObjectClass, config.UserObjectClass, config.UserLoginAttribute, ldapv3.EscapeFilter(username)),
-		ldap.GetUserSearchAttributesForLDAP(ObjectClass, config), nil)
+		config.GetUserSearchAttributes(ObjectClass), nil)
 	result, err := lConn.Search(searchRequest)
 	if err != nil {
 		return v3.Principal{}, nil, httperror.WrapAPIError(err, httperror.Unauthorized, "authentication failed") // need to reload this error
@@ -295,12 +295,12 @@ func (p *ldapProvider) getPrincipal(distinguishedName string, scope string, conf
 		search = ldapv3.NewSearchRequest(distinguishedName,
 			ldapv3.ScopeBaseObject, ldapv3.NeverDerefAliases, 0, 0, false,
 			filter,
-			ldap.GetUserSearchAttributesForLDAP(ObjectClass, config), nil)
+			config.GetUserSearchAttributes(ObjectClass), nil)
 	} else {
 		search = ldapv3.NewSearchRequest(distinguishedName,
 			ldapv3.ScopeBaseObject, ldapv3.NeverDerefAliases, 0, 0, false,
 			filter,
-			ldap.GetGroupSearchAttributesForLDAP(ObjectClass, config), nil)
+			config.GetGroupSearchAttributes(ObjectClass), nil)
 	}
 
 	result, err := lConn.Search(search)
@@ -395,7 +395,7 @@ func (p *ldapProvider) searchLdap(query string, scope string, config *v3.LdapCon
 		search = ldapv3.NewSearchRequest(searchDomain,
 			ldapv3.ScopeWholeSubtree, ldapv3.NeverDerefAliases, 0, 0, false,
 			query,
-			ldap.GetUserSearchAttributesForLDAP(ObjectClass, config), nil)
+			config.GetUserSearchAttributes(ObjectClass), nil)
 	} else {
 		if config.GroupSearchBase != "" {
 			searchDomain = config.GroupSearchBase
@@ -403,7 +403,7 @@ func (p *ldapProvider) searchLdap(query string, scope string, config *v3.LdapCon
 		search = ldapv3.NewSearchRequest(searchDomain,
 			ldapv3.ScopeWholeSubtree, ldapv3.NeverDerefAliases, 0, 0, false,
 			query,
-			ldap.GetGroupSearchAttributesForLDAP(ObjectClass, config), nil)
+			config.GetGroupSearchAttributes(ObjectClass), nil)
 	}
 
 	// Bind before query
@@ -496,7 +496,7 @@ func (p *ldapProvider) RefetchGroupPrincipals(principalID string, secret string)
 		0,
 		false,
 		fmt.Sprintf("(%v=%v)", ObjectClass, config.UserObjectClass),
-		ldap.GetUserSearchAttributesForLDAP(ObjectClass, config),
+		config.GetUserSearchAttributes(ObjectClass),
 		nil,
 	)
 
