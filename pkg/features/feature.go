@@ -83,12 +83,6 @@ var (
 		true,
 		false,
 		false)
-	MonitoringV1 = newFeature(
-		"monitoringv1",
-		"Enable support for monitoring v1 in downstream clusters. The legacy feature flag is required to be enabled",
-		true,
-		false,
-		false)
 	TokenHashing = newFeature(
 		"token-hashing",
 		"Enable one way hashing of tokens. Once enabled token hashing can not be disabled",
@@ -118,6 +112,25 @@ var (
 		"[Experimental]: Allow Fleet workspace name to be changed on clusters administrated by provisioning v2",
 		false,
 		false,
+		true)
+	UIExtension = newFeature(
+		"uiextension",
+		"Enable UI Extensions when starting Rancher",
+		true,
+		false,
+		true,
+	)
+	UISQLCache = newFeature(
+		"ui-sql-cache",
+		"[Experimental]: Enable SQLite-backed caching to improve performance and provide additional UI sorting/filtering features.",
+		false,
+		false,
+		true)
+	RKE1UI = newFeature(
+		"rke1-ui",
+		"Enable RKE1 provisioning in the Rancher UI",
+		true,
+		true,
 		true)
 )
 

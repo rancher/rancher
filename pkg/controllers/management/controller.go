@@ -22,7 +22,6 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/node"
 	"github.com/rancher/rancher/pkg/controllers/management/nodepool"
 	"github.com/rancher/rancher/pkg/controllers/management/nodetemplate"
-	"github.com/rancher/rancher/pkg/controllers/management/podsecuritypolicy"
 	"github.com/rancher/rancher/pkg/controllers/management/rbac"
 	"github.com/rancher/rancher/pkg/controllers/management/restrictedadminrbac"
 	"github.com/rancher/rancher/pkg/controllers/management/rkeworkerupgrader"
@@ -55,7 +54,7 @@ func Register(ctx context.Context, management *config.ManagementContext, manager
 	nodepool.Register(ctx, management)
 	cloudcredential.Register(ctx, management)
 	node.Register(ctx, management, manager)
-	podsecuritypolicy.Register(ctx, management)
+
 	etcdbackup.Register(ctx, management)
 	clustertemplate.Register(ctx, management)
 	nodetemplate.Register(ctx, management)
@@ -65,11 +64,6 @@ func Register(ctx context.Context, management *config.ManagementContext, manager
 	secretmigrator.Register(ctx, management)
 	settings.Register(ctx, management)
 	managementlegacy.Register(ctx, management, manager)
-
-	// Ensure caches are available for user controllers, these are used as part of
-	// registration
-	management.Management.ClusterAlertGroups("").Controller()
-	management.Management.ClusterAlertRules("").Controller()
 
 	// Register last
 	auth.RegisterLate(ctx, management)

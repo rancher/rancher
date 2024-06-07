@@ -18,7 +18,7 @@ import (
 	"github.com/rancher/apiserver/pkg/types"
 	"github.com/rancher/rancher/pkg/capr"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
-	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
+	corecontrollers "github.com/rancher/wrangler/v2/pkg/generated/controllers/core/v1"
 	"golang.org/x/crypto/ssh"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )

@@ -15,6 +15,7 @@ const (
 	EphemeralContainerFieldReadinessProbe           = "readinessProbe"
 	EphemeralContainerFieldResizePolicy             = "resizePolicy"
 	EphemeralContainerFieldResources                = "resources"
+	EphemeralContainerFieldRestartPolicy            = "restartPolicy"
 	EphemeralContainerFieldSecurityContext          = "securityContext"
 	EphemeralContainerFieldStartupProbe             = "startupProbe"
 	EphemeralContainerFieldStdin                    = "stdin"
@@ -42,6 +43,7 @@ type EphemeralContainer struct {
 	ReadinessProbe           *Probe                  `json:"readinessProbe,omitempty" yaml:"readinessProbe,omitempty"`
 	ResizePolicy             []ContainerResizePolicy `json:"resizePolicy,omitempty" yaml:"resizePolicy,omitempty"`
 	Resources                *ResourceRequirements   `json:"resources,omitempty" yaml:"resources,omitempty"`
+	RestartPolicy            string                  `json:"restartPolicy,omitempty" yaml:"restartPolicy,omitempty"`
 	SecurityContext          *SecurityContext        `json:"securityContext,omitempty" yaml:"securityContext,omitempty"`
 	StartupProbe             *Probe                  `json:"startupProbe,omitempty" yaml:"startupProbe,omitempty"`
 	Stdin                    bool                    `json:"stdin,omitempty" yaml:"stdin,omitempty"`

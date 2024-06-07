@@ -12,7 +12,6 @@ const (
 	ClusterStatusFieldAppliedAgentEnvVars                        = "appliedAgentEnvVars"
 	ClusterStatusFieldAppliedClusterAgentDeploymentCustomization = "appliedClusterAgentDeploymentCustomization"
 	ClusterStatusFieldAppliedEnableNetworkPolicy                 = "appliedEnableNetworkPolicy"
-	ClusterStatusFieldAppliedPodSecurityPolicyTemplateName       = "appliedPodSecurityPolicyTemplateId"
 	ClusterStatusFieldAppliedSpec                                = "appliedSpec"
 	ClusterStatusFieldAuthImage                                  = "authImage"
 	ClusterStatusFieldCACert                                     = "caCert"
@@ -29,7 +28,6 @@ const (
 	ClusterStatusFieldIstioEnabled                               = "istioEnabled"
 	ClusterStatusFieldLimits                                     = "limits"
 	ClusterStatusFieldLinuxWorkerCount                           = "linuxWorkerCount"
-	ClusterStatusFieldMonitoringStatus                           = "monitoringStatus"
 	ClusterStatusFieldNodeCount                                  = "nodeCount"
 	ClusterStatusFieldNodeVersion                                = "nodeVersion"
 	ClusterStatusFieldOpenStackSecret                            = "openStackSecret"
@@ -56,7 +54,6 @@ type ClusterStatus struct {
 	AppliedAgentEnvVars                        []EnvVar                      `json:"appliedAgentEnvVars,omitempty" yaml:"appliedAgentEnvVars,omitempty"`
 	AppliedClusterAgentDeploymentCustomization *AgentDeploymentCustomization `json:"appliedClusterAgentDeploymentCustomization,omitempty" yaml:"appliedClusterAgentDeploymentCustomization,omitempty"`
 	AppliedEnableNetworkPolicy                 bool                          `json:"appliedEnableNetworkPolicy,omitempty" yaml:"appliedEnableNetworkPolicy,omitempty"`
-	AppliedPodSecurityPolicyTemplateName       string                        `json:"appliedPodSecurityPolicyTemplateId,omitempty" yaml:"appliedPodSecurityPolicyTemplateId,omitempty"`
 	AppliedSpec                                *ClusterSpec                  `json:"appliedSpec,omitempty" yaml:"appliedSpec,omitempty"`
 	AuthImage                                  string                        `json:"authImage,omitempty" yaml:"authImage,omitempty"`
 	CACert                                     string                        `json:"caCert,omitempty" yaml:"caCert,omitempty"`
@@ -73,7 +70,6 @@ type ClusterStatus struct {
 	IstioEnabled                               bool                          `json:"istioEnabled,omitempty" yaml:"istioEnabled,omitempty"`
 	Limits                                     map[string]string             `json:"limits,omitempty" yaml:"limits,omitempty"`
 	LinuxWorkerCount                           int64                         `json:"linuxWorkerCount,omitempty" yaml:"linuxWorkerCount,omitempty"`
-	MonitoringStatus                           *MonitoringStatus             `json:"monitoringStatus,omitempty" yaml:"monitoringStatus,omitempty"`
 	NodeCount                                  int64                         `json:"nodeCount,omitempty" yaml:"nodeCount,omitempty"`
 	NodeVersion                                int64                         `json:"nodeVersion,omitempty" yaml:"nodeVersion,omitempty"`
 	OpenStackSecret                            string                        `json:"openStackSecret,omitempty" yaml:"openStackSecret,omitempty"`

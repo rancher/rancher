@@ -20,7 +20,6 @@ const (
 	ClusterFieldAppliedAgentEnvVars                                  = "appliedAgentEnvVars"
 	ClusterFieldAppliedClusterAgentDeploymentCustomization           = "appliedClusterAgentDeploymentCustomization"
 	ClusterFieldAppliedEnableNetworkPolicy                           = "appliedEnableNetworkPolicy"
-	ClusterFieldAppliedPodSecurityPolicyTemplateName                 = "appliedPodSecurityPolicyTemplateId"
 	ClusterFieldAppliedSpec                                          = "appliedSpec"
 	ClusterFieldAuthImage                                            = "authImage"
 	ClusterFieldCACert                                               = "caCert"
@@ -40,7 +39,6 @@ const (
 	ClusterFieldCurrentCisRunName                                    = "currentCisRunName"
 	ClusterFieldDefaultClusterRoleForProjectMembers                  = "defaultClusterRoleForProjectMembers"
 	ClusterFieldDefaultPodSecurityAdmissionConfigurationTemplateName = "defaultPodSecurityAdmissionConfigurationTemplateName"
-	ClusterFieldDefaultPodSecurityPolicyTemplateID                   = "defaultPodSecurityPolicyTemplateId"
 	ClusterFieldDescription                                          = "description"
 	ClusterFieldDesiredAgentImage                                    = "desiredAgentImage"
 	ClusterFieldDesiredAuthImage                                     = "desiredAuthImage"
@@ -48,8 +46,6 @@ const (
 	ClusterFieldDriver                                               = "driver"
 	ClusterFieldEKSConfig                                            = "eksConfig"
 	ClusterFieldEKSStatus                                            = "eksStatus"
-	ClusterFieldEnableClusterAlerting                                = "enableClusterAlerting"
-	ClusterFieldEnableClusterMonitoring                              = "enableClusterMonitoring"
 	ClusterFieldEnableNetworkPolicy                                  = "enableNetworkPolicy"
 	ClusterFieldFailedSpec                                           = "failedSpec"
 	ClusterFieldFleetAgentDeploymentCustomization                    = "fleetAgentDeploymentCustomization"
@@ -64,7 +60,6 @@ const (
 	ClusterFieldLimits                                               = "limits"
 	ClusterFieldLinuxWorkerCount                                     = "linuxWorkerCount"
 	ClusterFieldLocalClusterAuthEndpoint                             = "localClusterAuthEndpoint"
-	ClusterFieldMonitoringStatus                                     = "monitoringStatus"
 	ClusterFieldName                                                 = "name"
 	ClusterFieldNodeCount                                            = "nodeCount"
 	ClusterFieldNodeVersion                                          = "nodeVersion"
@@ -106,7 +101,6 @@ type Cluster struct {
 	AppliedAgentEnvVars                                  []EnvVar                       `json:"appliedAgentEnvVars,omitempty" yaml:"appliedAgentEnvVars,omitempty"`
 	AppliedClusterAgentDeploymentCustomization           *AgentDeploymentCustomization  `json:"appliedClusterAgentDeploymentCustomization,omitempty" yaml:"appliedClusterAgentDeploymentCustomization,omitempty"`
 	AppliedEnableNetworkPolicy                           bool                           `json:"appliedEnableNetworkPolicy,omitempty" yaml:"appliedEnableNetworkPolicy,omitempty"`
-	AppliedPodSecurityPolicyTemplateName                 string                         `json:"appliedPodSecurityPolicyTemplateId,omitempty" yaml:"appliedPodSecurityPolicyTemplateId,omitempty"`
 	AppliedSpec                                          *ClusterSpec                   `json:"appliedSpec,omitempty" yaml:"appliedSpec,omitempty"`
 	AuthImage                                            string                         `json:"authImage,omitempty" yaml:"authImage,omitempty"`
 	CACert                                               string                         `json:"caCert,omitempty" yaml:"caCert,omitempty"`
@@ -126,7 +120,6 @@ type Cluster struct {
 	CurrentCisRunName                                    string                         `json:"currentCisRunName,omitempty" yaml:"currentCisRunName,omitempty"`
 	DefaultClusterRoleForProjectMembers                  string                         `json:"defaultClusterRoleForProjectMembers,omitempty" yaml:"defaultClusterRoleForProjectMembers,omitempty"`
 	DefaultPodSecurityAdmissionConfigurationTemplateName string                         `json:"defaultPodSecurityAdmissionConfigurationTemplateName,omitempty" yaml:"defaultPodSecurityAdmissionConfigurationTemplateName,omitempty"`
-	DefaultPodSecurityPolicyTemplateID                   string                         `json:"defaultPodSecurityPolicyTemplateId,omitempty" yaml:"defaultPodSecurityPolicyTemplateId,omitempty"`
 	Description                                          string                         `json:"description,omitempty" yaml:"description,omitempty"`
 	DesiredAgentImage                                    string                         `json:"desiredAgentImage,omitempty" yaml:"desiredAgentImage,omitempty"`
 	DesiredAuthImage                                     string                         `json:"desiredAuthImage,omitempty" yaml:"desiredAuthImage,omitempty"`
@@ -134,8 +127,6 @@ type Cluster struct {
 	Driver                                               string                         `json:"driver,omitempty" yaml:"driver,omitempty"`
 	EKSConfig                                            *EKSClusterConfigSpec          `json:"eksConfig,omitempty" yaml:"eksConfig,omitempty"`
 	EKSStatus                                            *EKSStatus                     `json:"eksStatus,omitempty" yaml:"eksStatus,omitempty"`
-	EnableClusterAlerting                                bool                           `json:"enableClusterAlerting,omitempty" yaml:"enableClusterAlerting,omitempty"`
-	EnableClusterMonitoring                              bool                           `json:"enableClusterMonitoring,omitempty" yaml:"enableClusterMonitoring,omitempty"`
 	EnableNetworkPolicy                                  *bool                          `json:"enableNetworkPolicy,omitempty" yaml:"enableNetworkPolicy,omitempty"`
 	FailedSpec                                           *ClusterSpec                   `json:"failedSpec,omitempty" yaml:"failedSpec,omitempty"`
 	FleetAgentDeploymentCustomization                    *AgentDeploymentCustomization  `json:"fleetAgentDeploymentCustomization,omitempty" yaml:"fleetAgentDeploymentCustomization,omitempty"`
@@ -150,7 +141,6 @@ type Cluster struct {
 	Limits                                               map[string]string              `json:"limits,omitempty" yaml:"limits,omitempty"`
 	LinuxWorkerCount                                     int64                          `json:"linuxWorkerCount,omitempty" yaml:"linuxWorkerCount,omitempty"`
 	LocalClusterAuthEndpoint                             *LocalClusterAuthEndpoint      `json:"localClusterAuthEndpoint,omitempty" yaml:"localClusterAuthEndpoint,omitempty"`
-	MonitoringStatus                                     *MonitoringStatus              `json:"monitoringStatus,omitempty" yaml:"monitoringStatus,omitempty"`
 	Name                                                 string                         `json:"name,omitempty" yaml:"name,omitempty"`
 	NodeCount                                            int64                          `json:"nodeCount,omitempty" yaml:"nodeCount,omitempty"`
 	NodeVersion                                          int64                          `json:"nodeVersion,omitempty" yaml:"nodeVersion,omitempty"`
@@ -197,12 +187,6 @@ type ClusterOperations interface {
 
 	ActionBackupEtcd(resource *Cluster) error
 
-	ActionDisableMonitoring(resource *Cluster) error
-
-	ActionEditMonitoring(resource *Cluster, input *MonitoringInput) error
-
-	ActionEnableMonitoring(resource *Cluster, input *MonitoringInput) error
-
 	ActionExportYaml(resource *Cluster) (*ExportOutput, error)
 
 	ActionGenerateKubeconfig(resource *Cluster) (*GenerateKubeConfigOutput, error)
@@ -216,8 +200,6 @@ type ClusterOperations interface {
 	ActionRotateEncryptionKey(resource *Cluster) (*RotateEncryptionKeyOutput, error)
 
 	ActionSaveAsTemplate(resource *Cluster, input *SaveAsTemplateInput) (*SaveAsTemplateOutput, error)
-
-	ActionViewMonitoring(resource *Cluster) (*MonitoringOutput, error)
 }
 
 func newClusterClient(apiClient *Client) *ClusterClient {
@@ -294,21 +276,6 @@ func (c *ClusterClient) ActionBackupEtcd(resource *Cluster) error {
 	return err
 }
 
-func (c *ClusterClient) ActionDisableMonitoring(resource *Cluster) error {
-	err := c.apiClient.Ops.DoAction(ClusterType, "disableMonitoring", &resource.Resource, nil, nil)
-	return err
-}
-
-func (c *ClusterClient) ActionEditMonitoring(resource *Cluster, input *MonitoringInput) error {
-	err := c.apiClient.Ops.DoAction(ClusterType, "editMonitoring", &resource.Resource, input, nil)
-	return err
-}
-
-func (c *ClusterClient) ActionEnableMonitoring(resource *Cluster, input *MonitoringInput) error {
-	err := c.apiClient.Ops.DoAction(ClusterType, "enableMonitoring", &resource.Resource, input, nil)
-	return err
-}
-
 func (c *ClusterClient) ActionExportYaml(resource *Cluster) (*ExportOutput, error) {
 	resp := &ExportOutput{}
 	err := c.apiClient.Ops.DoAction(ClusterType, "exportYaml", &resource.Resource, nil, resp)
@@ -347,11 +314,5 @@ func (c *ClusterClient) ActionRotateEncryptionKey(resource *Cluster) (*RotateEnc
 func (c *ClusterClient) ActionSaveAsTemplate(resource *Cluster, input *SaveAsTemplateInput) (*SaveAsTemplateOutput, error) {
 	resp := &SaveAsTemplateOutput{}
 	err := c.apiClient.Ops.DoAction(ClusterType, "saveAsTemplate", &resource.Resource, input, resp)
-	return resp, err
-}
-
-func (c *ClusterClient) ActionViewMonitoring(resource *Cluster) (*MonitoringOutput, error) {
-	resp := &MonitoringOutput{}
-	err := c.apiClient.Ops.DoAction(ClusterType, "viewMonitoring", &resource.Resource, nil, resp)
 	return resp, err
 }

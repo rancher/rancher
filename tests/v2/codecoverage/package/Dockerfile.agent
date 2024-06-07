@@ -11,8 +11,9 @@ FROM registry.suse.com/bci/bci-base:15.5 AS builder
 COPY --from=final / /chroot/
 
 # Install some packages with zypper in the chroot of the final micro image
-RUN zypper --installroot /chroot -n --gpg-auto-import-keys in --no-recommends \
-    curl ca-certificates jq git-core hostname iproute2 vim-small less \
+RUN zypper refresh && \
+    zypper --installroot /chroot -n in --no-recommends \
+    curl util-linux ca-certificates ca-certificates-mozilla jq git-core hostname iproute2 vim-small less \
 	bash-completion bind-utils acl openssh-clients tar gzip xz gawk sysstat && \
     zypper --installroot /chroot clean -a && \
     rm -rf /chroot/var/cache/zypp/* /chroot/var/log/zypp/* /chroot/tmp/* /chroot/var/tmp/* /chroot/usr/share/doc/packages/*
@@ -22,6 +23,13 @@ FROM final
 
 # Copy binaries and configuration files from builder to micro
 COPY --from=builder /chroot/ /
+
+# Test that some of the dependency binaries were copied
+# and are working on the target image.
+RUN /usr/bin/unshare --version && \
+    /usr/bin/mount --version && \
+    /usr/bin/umount --version && \
+    /usr/bin/nsenter --version
 
 ARG ARCH=amd64
 ENV KUBECTL_VERSION v1.27.10
@@ -39,6 +47,8 @@ ENV AGENT_IMAGE ${RANCHER_REPO}/rancher-agent:${VERSION}
 ENV SSL_CERT_DIR /etc/kubernetes/ssl/certs
 ARG CATTLE_RANCHER_WEBHOOK_VERSION
 ENV CATTLE_RANCHER_WEBHOOK_VERSION=$CATTLE_RANCHER_WEBHOOK_VERSION
+ARG CATTLE_RANCHER_PROVISIONING_CAPI_VERSION
+ENV CATTLE_RANCHER_PROVISIONING_CAPI_VERSION=$CATTLE_RANCHER_PROVISIONING_CAPI_VERSION
 COPY --from=rancher /var/lib/rancher-data /var/lib/rancher-data
 COPY --from=rancher /usr/bin/tini /usr/bin/
 COPY agent run_agent.sh kubectl-shell.sh shell-setup.sh /usr/bin/

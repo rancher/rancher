@@ -213,57 +213,6 @@ func NewCluster(namespace, name string, obj Cluster) *Cluster {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// ClusterAlertList is a list of ClusterAlert resources
-type ClusterAlertList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []ClusterAlert `json:"items"`
-}
-
-func NewClusterAlert(namespace, name string, obj ClusterAlert) *ClusterAlert {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("ClusterAlert").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// ClusterAlertGroupList is a list of ClusterAlertGroup resources
-type ClusterAlertGroupList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []ClusterAlertGroup `json:"items"`
-}
-
-func NewClusterAlertGroup(namespace, name string, obj ClusterAlertGroup) *ClusterAlertGroup {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("ClusterAlertGroup").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// ClusterAlertRuleList is a list of ClusterAlertRule resources
-type ClusterAlertRuleList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []ClusterAlertRule `json:"items"`
-}
-
-func NewClusterAlertRule(namespace, name string, obj ClusterAlertRule) *ClusterAlertRule {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("ClusterAlertRule").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
 // ClusterLoggingList is a list of ClusterLogging resources
 type ClusterLoggingList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -281,16 +230,16 @@ func NewClusterLogging(namespace, name string, obj ClusterLogging) *ClusterLoggi
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// ClusterMonitorGraphList is a list of ClusterMonitorGraph resources
-type ClusterMonitorGraphList struct {
+// ClusterProxyConfigList is a list of ClusterProxyConfig resources
+type ClusterProxyConfigList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata"`
 
-	Items []ClusterMonitorGraph `json:"items"`
+	Items []ClusterProxyConfig `json:"items"`
 }
 
-func NewClusterMonitorGraph(namespace, name string, obj ClusterMonitorGraph) *ClusterMonitorGraph {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("ClusterMonitorGraph").ToAPIVersionAndKind()
+func NewClusterProxyConfig(namespace, name string, obj ClusterProxyConfig) *ClusterProxyConfig {
+	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("ClusterProxyConfig").ToAPIVersionAndKind()
 	obj.Name = name
 	obj.Namespace = namespace
 	return &obj
@@ -461,6 +410,23 @@ type FreeIpaProviderList struct {
 
 func NewFreeIpaProvider(namespace, name string, obj FreeIpaProvider) *FreeIpaProvider {
 	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("FreeIpaProvider").ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// GenericOIDCProviderList is a list of GenericOIDCProvider resources
+type GenericOIDCProviderList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+
+	Items []GenericOIDCProvider `json:"items"`
+}
+
+func NewGenericOIDCProvider(namespace, name string, obj GenericOIDCProvider) *GenericOIDCProvider {
+	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("GenericOIDCProvider").ToAPIVersionAndKind()
 	obj.Name = name
 	obj.Namespace = namespace
 	return &obj
@@ -655,23 +621,6 @@ func NewManagedChart(namespace, name string, obj ManagedChart) *ManagedChart {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// MonitorMetricList is a list of MonitorMetric resources
-type MonitorMetricList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []MonitorMetric `json:"items"`
-}
-
-func NewMonitorMetric(namespace, name string, obj MonitorMetric) *MonitorMetric {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("MonitorMetric").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
 // MultiClusterAppList is a list of MultiClusterApp resources
 type MultiClusterAppList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -774,23 +723,6 @@ func NewNodeTemplate(namespace, name string, obj NodeTemplate) *NodeTemplate {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// NotifierList is a list of Notifier resources
-type NotifierList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []Notifier `json:"items"`
-}
-
-func NewNotifier(namespace, name string, obj Notifier) *Notifier {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("Notifier").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
 // OIDCProviderList is a list of OIDCProvider resources
 type OIDCProviderList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -835,40 +767,6 @@ type PodSecurityAdmissionConfigurationTemplateList struct {
 
 func NewPodSecurityAdmissionConfigurationTemplate(namespace, name string, obj PodSecurityAdmissionConfigurationTemplate) *PodSecurityAdmissionConfigurationTemplate {
 	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("PodSecurityAdmissionConfigurationTemplate").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// PodSecurityPolicyTemplateList is a list of PodSecurityPolicyTemplate resources
-type PodSecurityPolicyTemplateList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []PodSecurityPolicyTemplate `json:"items"`
-}
-
-func NewPodSecurityPolicyTemplate(namespace, name string, obj PodSecurityPolicyTemplate) *PodSecurityPolicyTemplate {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("PodSecurityPolicyTemplate").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// PodSecurityPolicyTemplateProjectBindingList is a list of PodSecurityPolicyTemplateProjectBinding resources
-type PodSecurityPolicyTemplateProjectBindingList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []PodSecurityPolicyTemplateProjectBinding `json:"items"`
-}
-
-func NewPodSecurityPolicyTemplateProjectBinding(namespace, name string, obj PodSecurityPolicyTemplateProjectBinding) *PodSecurityPolicyTemplateProjectBinding {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("PodSecurityPolicyTemplateProjectBinding").ToAPIVersionAndKind()
 	obj.Name = name
 	obj.Namespace = namespace
 	return &obj
@@ -927,57 +825,6 @@ func NewProject(namespace, name string, obj Project) *Project {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// ProjectAlertList is a list of ProjectAlert resources
-type ProjectAlertList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []ProjectAlert `json:"items"`
-}
-
-func NewProjectAlert(namespace, name string, obj ProjectAlert) *ProjectAlert {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("ProjectAlert").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// ProjectAlertGroupList is a list of ProjectAlertGroup resources
-type ProjectAlertGroupList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []ProjectAlertGroup `json:"items"`
-}
-
-func NewProjectAlertGroup(namespace, name string, obj ProjectAlertGroup) *ProjectAlertGroup {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("ProjectAlertGroup").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// ProjectAlertRuleList is a list of ProjectAlertRule resources
-type ProjectAlertRuleList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []ProjectAlertRule `json:"items"`
-}
-
-func NewProjectAlertRule(namespace, name string, obj ProjectAlertRule) *ProjectAlertRule {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("ProjectAlertRule").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
 // ProjectLoggingList is a list of ProjectLogging resources
 type ProjectLoggingList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -988,23 +835,6 @@ type ProjectLoggingList struct {
 
 func NewProjectLogging(namespace, name string, obj ProjectLogging) *ProjectLogging {
 	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("ProjectLogging").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// ProjectMonitorGraphList is a list of ProjectMonitorGraph resources
-type ProjectMonitorGraphList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []ProjectMonitorGraph `json:"items"`
-}
-
-func NewProjectMonitorGraph(namespace, name string, obj ProjectMonitorGraph) *ProjectMonitorGraph {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("ProjectMonitorGraph").ToAPIVersionAndKind()
 	obj.Name = name
 	obj.Namespace = namespace
 	return &obj

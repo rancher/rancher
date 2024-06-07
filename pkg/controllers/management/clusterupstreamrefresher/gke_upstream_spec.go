@@ -6,16 +6,12 @@ import (
 	gkecontroller "github.com/rancher/gke-operator/controller"
 	gkev1 "github.com/rancher/gke-operator/pkg/apis/gke.cattle.io/v1"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	wranglerv1 "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
+	wranglerv1 "github.com/rancher/wrangler/v2/pkg/generated/controllers/core/v1"
 )
 
-func BuildGKEUpstreamSpec(secretsCache wranglerv1.SecretCache, cluster *mgmtv3.Cluster) (*gkev1.GKEClusterConfigSpec, error) {
+func BuildGKEUpstreamSpec(secretsCache wranglerv1.SecretCache, secretClient wranglerv1.SecretClient, cluster *mgmtv3.Cluster) (*gkev1.GKEClusterConfigSpec, error) {
 	ctx := context.Background()
-	upstreamCluster, err := gkecontroller.GetCluster(ctx, secretsCache, cluster.Spec.GKEConfig)
-	if err != nil {
-		return nil, err
-	}
-	upstreamSpec, err := gkecontroller.BuildUpstreamClusterState(upstreamCluster)
+	upstreamSpec, err := gkecontroller.BuildUpstreamClusterState(ctx, secretsCache, secretClient, cluster.Spec.GKEConfig)
 	if err != nil {
 		return nil, err
 	}

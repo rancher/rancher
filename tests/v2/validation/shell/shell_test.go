@@ -22,13 +22,13 @@ import (
 const (
 	cattleSystemNameSpace = "cattle-system"
 	shellName             = "shell-image"
+	clusterName           = "local"
 )
 
 type ShellTestSuite struct {
 	suite.Suite
-	client      *rancher.Client
-	session     *session.Session
-	clusterName string
+	client  *rancher.Client
+	session *session.Session
 }
 
 func (s *ShellTestSuite) TearDownSuite() {
@@ -43,11 +43,6 @@ func (s *ShellTestSuite) SetupSuite() {
 	require.NoError(s.T(), err)
 
 	s.client = client
-
-	// Get clusterName from config yaml
-	s.clusterName = client.RancherConfig.ClusterName
-	require.NoError(s.T(), err)
-
 }
 
 func (s *ShellTestSuite) TestShell() {
@@ -55,7 +50,7 @@ func (s *ShellTestSuite) TestShell() {
 	defer subSession.Cleanup()
 
 	s.Run("Verify the version of shell on local cluster", func() {
-		shellImage, err := settings.ShellVersion(s.client, s.clusterName, shellName)
+		shellImage, err := settings.ShellVersion(s.client, clusterName, shellName)
 		require.NoError(s.T(), err)
 		assert.Equal(s.T(), shellImage, s.client.RancherConfig.ShellImage)
 	})

@@ -35,10 +35,6 @@ type Client struct {
 	Workload                      WorkloadOperations
 	App                           AppOperations
 	AppRevision                   AppRevisionOperations
-	Prometheus                    PrometheusOperations
-	ServiceMonitor                ServiceMonitorOperations
-	PrometheusRule                PrometheusRuleOperations
-	Alertmanager                  AlertmanagerOperations
 	HorizontalPodAutoscaler       HorizontalPodAutoscalerOperations
 }
 
@@ -80,10 +76,6 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 	client.Workload = newWorkloadClient(client)
 	client.App = newAppClient(client)
 	client.AppRevision = newAppRevisionClient(client)
-	client.Prometheus = newPrometheusClient(client)
-	client.ServiceMonitor = newServiceMonitorClient(client)
-	client.PrometheusRule = newPrometheusRuleClient(client)
-	client.Alertmanager = newAlertmanagerClient(client)
 	client.HorizontalPodAutoscaler = newHorizontalPodAutoscalerClient(client)
 
 	return client, nil

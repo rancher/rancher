@@ -46,16 +46,6 @@ func (f *Formatter) Formatter(request *types.APIContext, resource *types.RawReso
 	resource.AddAction(request, v32.ClusterActionGenerateKubeconfig)
 	resource.AddAction(request, v32.ClusterActionImportYaml)
 
-	// If user has permissions to update the cluster (regardless of RKE1 or not)
-	if canUpdateClusterWithValues(request, resource.Values) {
-		if convert.ToBool(resource.Values["enableClusterMonitoring"]) {
-			resource.AddAction(request, v32.ClusterActionDisableMonitoring)
-			resource.AddAction(request, v32.ClusterActionEditMonitoring)
-		} else {
-			resource.AddAction(request, v32.ClusterActionEnableMonitoring)
-		}
-	}
-
 	// If this is an RKE1 cluster only
 	if _, ok := resource.Values["rancherKubernetesEngineConfig"]; ok {
 		resource.AddAction(request, v32.ClusterActionExportYaml)
@@ -83,10 +73,6 @@ func (f *Formatter) Formatter(request *types.APIContext, resource *types.RawReso
 			}
 		}
 
-	}
-
-	if convert.ToBool(resource.Values["enableClusterMonitoring"]) {
-		resource.AddAction(request, v32.ClusterActionViewMonitoring)
 	}
 
 	if gkeConfig, ok := resource.Values["googleKubernetesEngineConfig"]; ok && gkeConfig != nil {

@@ -40,7 +40,7 @@ var (
 
 const (
 	corralName       = "ranchertestcoverage"
-	rancherTestImage = "ranchertest/rancher:v2.7-head"
+	rancherTestImage = "ranchertest/rancher:v2.9-head"
 	namespace        = "cattle-system"
 	deploymentName   = "rancher"
 	clusterName      = "local"

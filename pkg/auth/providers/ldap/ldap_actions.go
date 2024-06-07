@@ -123,12 +123,13 @@ func (p *ldapProvider) saveLDAPConfig(config *v3.LdapConfig) error {
 	config.ObjectMeta = storedConfig.ObjectMeta
 
 	field := strings.ToLower(client.LdapConfigFieldServiceAccountPassword)
-	if err := common.CreateOrUpdateSecrets(p.secrets, config.ServiceAccountPassword,
-		field, strings.ToLower(config.Type)); err != nil {
+	name, err := common.CreateOrUpdateSecrets(p.secrets, config.ServiceAccountPassword,
+		field, strings.ToLower(config.Type))
+	if err != nil {
 		return err
 	}
 
-	config.ServiceAccountPassword = common.GetFullSecretName(config.Type, field)
+	config.ServiceAccountPassword = name
 
 	logrus.Debugf("updating %s config", p.providerName)
 	_, err = p.authConfigs.ObjectClient().Update(config.ObjectMeta.Name, config)

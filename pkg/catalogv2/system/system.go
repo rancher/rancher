@@ -17,8 +17,8 @@ import (
 	catalogcontrollers "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
-	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
-	"github.com/rancher/wrangler/pkg/merr"
+	corecontrollers "github.com/rancher/wrangler/v2/pkg/generated/controllers/core/v1"
+	"github.com/rancher/wrangler/v2/pkg/merr"
 	"github.com/sirupsen/logrus"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/release"
@@ -49,9 +49,9 @@ type desiredKey struct {
 }
 
 type desired struct {
-	key        desiredKey
-	values     map[string]interface{}
-	forceAdopt bool
+	key           desiredKey
+	values        map[string]interface{}
+	takeOwnership bool
 }
 
 type HelmClient interface {
@@ -165,7 +165,7 @@ func (m *Manager) runSync() {
 					map[desiredKey]map[string]interface{}{
 						desired.key: desired.values,
 					},
-					desired.forceAdopt,
+					desired.takeOwnership,
 				)
 				if err == nil {
 					m.desiredCharts[desired.key] = desired.values
@@ -184,13 +184,13 @@ func getIntervalOrDefault(interval string) time.Duration {
 	return time.Duration(i) * time.Second
 }
 
-// installCharts installs charts with forceAdopt.
-func (m *Manager) installCharts(charts map[desiredKey]map[string]interface{}, forceAdopt bool) error {
+// installCharts installs charts with takeOwnership.
+func (m *Manager) installCharts(charts map[desiredKey]map[string]interface{}, takeOwnership bool) error {
 	var errs []error
 
 	for key, values := range charts {
 		for {
-			if err := m.install(key.namespace, key.name, key.minVersion, key.exactVersion, values, forceAdopt, key.installImageOverride); err == repo.ErrNoChartName || apierrors.IsNotFound(err) {
+			if err := m.install(key.namespace, key.name, key.minVersion, key.exactVersion, values, takeOwnership, key.installImageOverride); err == repo.ErrNoChartName || apierrors.IsNotFound(err) {
 				logrus.Errorf("Failed to find system chart %s will try again in 5 seconds: %v", key.name, err)
 				time.Sleep(5 * time.Second)
 				continue
@@ -232,7 +232,7 @@ func (m *Manager) Uninstall(namespace, name string) error {
 	return m.waitPodDone(op)
 }
 
-func (m *Manager) Ensure(namespace, name, minVersion, exactVersion string, values map[string]interface{}, forceAdopt bool, installImageOverride string) error {
+func (m *Manager) Ensure(namespace, name, minVersion, exactVersion string, values map[string]interface{}, takeOwnership bool, installImageOverride string) error {
 	go func() {
 		m.sync <- desired{
 			key: desiredKey{
@@ -242,8 +242,8 @@ func (m *Manager) Ensure(namespace, name, minVersion, exactVersion string, value
 				exactVersion:         exactVersion,
 				installImageOverride: installImageOverride,
 			},
-			values:     values,
-			forceAdopt: forceAdopt,
+			values:        values,
+			takeOwnership: takeOwnership,
 		}
 	}()
 	return nil
@@ -257,17 +257,25 @@ func (m *Manager) Remove(namespace, name string) {
 	}
 }
 
-// install tries to install a new version of a chart. If the exact version is provided, it will try to install it
-// otherwise it will try to install the latest version available. If a release with the version to be installed is already installed,
-// or it's pending install, upgrade or rollback this does nothing.
-// The operation created is always an upgrade, even in the case of an installation. In that case, the Install flag will be used.
-func (m *Manager) install(namespace, name, minVersion, exactVersion string, values map[string]interface{}, forceAdopt bool, installImageOverride string) error {
+// install tries to install a new version of a chart.
+// If the exact version is provided, it will try to install it regardless of whether minVersion is provided.
+// If minVersion is provided on its own, it will try to install it only if the current version is earlier than
+// minVersion.
+// A failure to find a chart for a provided version leads to an error being thrown, without any change in state.
+// If no version is provided, it will try to install the latest version available.
+// If a release with the version to be installed is already installed, or is pending install, upgrade or rollback, this
+// does nothing.
+func (m *Manager) install(namespace, name, minVersion, exactVersion string, values map[string]interface{}, takeOwnership bool, installImageOverride string) error {
 	index, err := m.content.Index("", "rancher-charts", "", true)
 	if err != nil {
 		return err
 	}
-	v := ">=0-a" // latest - this is special syntax to match everything including pre-releases build
+
+	const latestVersionMatcher = ">=0-a" // latest - special syntax to match everything including pre-release builds
+
+	v := latestVersionMatcher
 	var isExact bool
+
 	if exactVersion != "" {
 		v = exactVersion
 		isExact = true
@@ -285,8 +293,8 @@ func (m *Manager) install(namespace, name, minVersion, exactVersion string, valu
 		return fmt.Errorf(err.Error())
 	}
 	// Because of the behavior of `index.Get`, we need this check.
-	if isExact && chart.Version != v {
-		return fmt.Errorf("specified exact version %s doesn't exist in the index", exactVersion)
+	if v != latestVersionMatcher && chart.Version != v {
+		return fmt.Errorf("specified version %s doesn't exist in the index", v)
 	}
 
 	// If the chart version is already installed, we do nothing
@@ -311,12 +319,12 @@ func (m *Manager) install(namespace, name, minVersion, exactVersion string, valu
 		t = 5 * time.Minute
 	}
 	upgrade, err := json.Marshal(types.ChartUpgradeAction{
-		Timeout:    &metav1.Duration{Duration: t},
-		Wait:       true,
-		Install:    true,
-		MaxHistory: 5,
-		Namespace:  namespace,
-		ForceAdopt: forceAdopt,
+		Timeout:       &metav1.Duration{Duration: t},
+		Wait:          true,
+		Install:       true,
+		MaxHistory:    5,
+		Namespace:     namespace,
+		TakeOwnership: takeOwnership,
 		Charts: []types.ChartUpgrade{
 			{
 				ChartName:   name,

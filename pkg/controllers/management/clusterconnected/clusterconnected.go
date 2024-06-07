@@ -12,8 +12,8 @@ import (
 	managementcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/remotedialer"
-	"github.com/rancher/wrangler/pkg/condition"
-	"github.com/rancher/wrangler/pkg/ticker"
+	"github.com/rancher/wrangler/v2/pkg/condition"
+	"github.com/rancher/wrangler/v2/pkg/ticker"
 	"github.com/sirupsen/logrus"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -118,6 +118,7 @@ func (c *checker) updateClusterConnectedCondition(cluster *v3.Cluster, connected
 			v3.ClusterConditionReady.Reason(cluster, "Disconnected")
 			v3.ClusterConditionReady.Message(cluster, "Cluster agent is not connected")
 		}
+		logrus.Tracef("[clusterConnectedCondition] update cluster %v", cluster.Name)
 		_, err := c.clusters.Update(cluster)
 		if apierror.IsConflict(err) {
 			cluster, err = c.clusters.Get(cluster.Name, metav1.GetOptions{})

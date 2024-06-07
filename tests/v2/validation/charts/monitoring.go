@@ -1,6 +1,7 @@
 package charts
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -96,15 +97,11 @@ func waitUnknownPrometheusTargets(client *rancher.Client) error {
 	checkUnknownPrometheusTargets := func() (bool, error) {
 		var statusInit bool
 		var unknownTargets []string
-		resultAPI, err := ingresses.GetExternalIngressResponse(client, client.RancherConfig.Host, prometheusTargetsPathAPI, true)
+		bodyString, err := ingresses.GetExternalIngressResponse(client, client.RancherConfig.Host, prometheusTargetsPathAPI, true)
 		if err != nil {
 			return statusInit, err
 		}
 
-		bodyString, err := convertHTTPBodyToString(resultAPI)
-		if err != nil {
-			return statusInit, err
-		}
 		var mapResponse map[string]interface{}
 		if err = json.Unmarshal([]byte(bodyString), &mapResponse); err != nil {
 			return statusInit, err
@@ -125,7 +122,7 @@ func waitUnknownPrometheusTargets(client *rancher.Client) error {
 		return len(unknownTargets) == 0, nil
 	}
 
-	err := kubewait.Poll(500*time.Millisecond, 2*time.Minute, func() (ongoing bool, err error) {
+	return kubewait.PollUntilContextTimeout(context.TODO(), 500*time.Millisecond, 2*time.Minute, true, func(context.Context) (ongoing bool, err error) {
 		result, err := checkUnknownPrometheusTargets()
 		if err != nil {
 			return ongoing, err
@@ -137,11 +134,6 @@ func waitUnknownPrometheusTargets(client *rancher.Client) error {
 
 		return
 	})
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 // checkPrometheusTargets is a private helper function
@@ -155,12 +147,7 @@ func checkPrometheusTargets(client *rancher.Client) (bool, error) {
 		return statusInit, err
 	}
 
-	resultAPI, err := ingresses.GetExternalIngressResponse(client, client.RancherConfig.Host, prometheusTargetsPathAPI, true)
-	if err != nil {
-		return statusInit, err
-	}
-
-	bodyString, err := convertHTTPBodyToString(resultAPI)
+	bodyString, err := ingresses.GetExternalIngressResponse(client, client.RancherConfig.Host, prometheusTargetsPathAPI, true)
 	if err != nil {
 		return statusInit, err
 	}

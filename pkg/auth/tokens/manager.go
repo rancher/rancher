@@ -22,7 +22,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
-	"github.com/rancher/wrangler/pkg/randomtoken"
+	"github.com/rancher/wrangler/v2/pkg/randomtoken"
 	"github.com/sirupsen/logrus"
 	apicorev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -647,7 +647,7 @@ var uaBackoff = wait.Backoff{
 }
 
 // PerUserCacheProviders is a set of provider names for which the token manager creates a per-user login token.
-var PerUserCacheProviders = []string{"github", "azuread", "googleoauth", "oidc", "keycloakoidc"}
+var PerUserCacheProviders = []string{"github", "azuread", "googleoauth", "oidc", "keycloakoidc", "genericoidc"}
 
 func (m *Manager) NewLoginToken(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerToken string, ttl int64, description string, userExtraInfo map[string][]string) (v3.Token, string, error) {
 	provider := userPrincipal.Provider

@@ -8,13 +8,15 @@ import (
 	"regexp"
 	"sort"
 
-	"github.com/Azure/azure-sdk-for-go/profiles/latest/compute/mgmt/skus"
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2020-06-30/compute"
-	"github.com/Azure/azure-sdk-for-go/services/containerservice/mgmt/2020-09-01/containerservice"
-	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2020-07-01/network"
-	"github.com/Azure/azure-sdk-for-go/services/subscription/mgmt/2020-09-01/subscription"
-	"github.com/Azure/go-autorest/autorest"
-	"github.com/Azure/go-autorest/autorest/adal"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/arm"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
+	azcoreto "github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
+	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute/v5"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerservice/armcontainerservice/v4"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork/v5"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/subscription/armsubscription"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/mcuadros/go-version"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
@@ -35,90 +37,122 @@ type subnet struct {
 
 var matchResourceGroup = regexp.MustCompile("/resource[gG]roups/(.+?)/")
 
-func NewAzureClientAuthorizer(cap *Capabilities) (autorest.Authorizer, error) {
-	oauthConfig, err := adal.NewOAuthConfig(cap.AuthBaseURL, cap.TenantID)
-	if err != nil {
-		return nil, err
-	}
+func NewClientSecretCredential(cap *Capabilities) (*azidentity.ClientSecretCredential, error) {
+	cloud, _ := GetEnvironment(cap.Environment)
 
-	spToken, err := adal.NewServicePrincipalToken(*oauthConfig, cap.ClientID, cap.ClientSecret, cap.BaseURL)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't authenticate to Azure cloud with error: %v", err)
-	}
-
-	return autorest.NewBearerAuthorizer(spToken), nil
+	return azidentity.NewClientSecretCredential(cap.TenantID, cap.ClientID, cap.ClientSecret, &azidentity.ClientSecretCredentialOptions{
+		ClientOptions: azcore.ClientOptions{
+			Cloud: cloud,
+		},
+	})
 }
 
-func NewVirtualMachineSKUClient(cap *Capabilities) (*skus.ResourceSkusClient, error) {
-	authorizer, err := NewAzureClientAuthorizer(cap)
+func NewVirtualMachineSKUClient(cap *Capabilities) (*armcompute.ResourceSKUsClient, error) {
+	cloud, _ := GetEnvironment(cap.Environment)
+
+	cred, err := NewClientSecretCredential(cap)
 	if err != nil {
 		return nil, err
 	}
 
-	skusClient := skus.NewResourceSkusClientWithBaseURI(cap.BaseURL, cap.SubscriptionID)
-	skusClient.Authorizer = authorizer
+	options := &arm.ClientOptions{
+		ClientOptions: policy.ClientOptions{
+			Cloud: cloud,
+		},
+	}
 
-	return &skusClient, nil
+	clientFactory, err := armcompute.NewClientFactory(cap.SubscriptionID, cred, options)
+	if err != nil {
+		return nil, err
+	}
+
+	return clientFactory.NewResourceSKUsClient(), nil
 }
 
-func NewVirtualMachineClient(cap *Capabilities) (*compute.VirtualMachineSizesClient, error) {
-	authorizer, err := NewAzureClientAuthorizer(cap)
+func NewVirtualMachineSizesClient(cap *Capabilities) (*armcompute.VirtualMachineSizesClient, error) {
+	cloud, _ := GetEnvironment(cap.Environment)
+
+	cred, err := NewClientSecretCredential(cap)
 	if err != nil {
 		return nil, err
 	}
 
-	virtualMachine := compute.NewVirtualMachineSizesClientWithBaseURI(cap.BaseURL, cap.SubscriptionID)
-	virtualMachine.Authorizer = authorizer
+	clientFactory, err := armcompute.NewClientFactory(cap.SubscriptionID, cred, &arm.ClientOptions{
+		ClientOptions: azcore.ClientOptions{
+			Cloud: cloud,
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
 
-	return &virtualMachine, nil
+	return clientFactory.NewVirtualMachineSizesClient(), nil
 }
 
-func NewContainerServiceClient(cap *Capabilities) (*containerservice.ContainerServicesClient, error) {
-	authorizer, err := NewAzureClientAuthorizer(cap)
+func NewNetworkServiceClient(cap *Capabilities) (*armnetwork.VirtualNetworksClient, error) {
+	cloud, _ := GetEnvironment(cap.Environment)
+
+	cred, err := NewClientSecretCredential(cap)
 	if err != nil {
 		return nil, err
 	}
 
-	containerService := containerservice.NewContainerServicesClientWithBaseURI(cap.BaseURL, cap.SubscriptionID)
-	containerService.Authorizer = authorizer
+	options := &arm.ClientOptions{
+		ClientOptions: policy.ClientOptions{
+			Cloud: cloud,
+		},
+	}
 
-	return &containerService, nil
+	clientFactory, err := armnetwork.NewClientFactory(cap.SubscriptionID, cred, options)
+	if err != nil {
+		return nil, err
+	}
+
+	return clientFactory.NewVirtualNetworksClient(), nil
 }
 
-func NewNetworkServiceClient(cap *Capabilities) (*network.VirtualNetworksClient, error) {
-	authorizer, err := NewAzureClientAuthorizer(cap)
+func NewManagedClustersClient(cap *Capabilities) (*armcontainerservice.ManagedClustersClient, error) {
+	cloud, _ := GetEnvironment(cap.Environment)
+
+	cred, err := NewClientSecretCredential(cap)
 	if err != nil {
 		return nil, err
 	}
 
-	containerService := network.NewVirtualNetworksClientWithBaseURI(cap.BaseURL, cap.SubscriptionID)
-	containerService.Authorizer = authorizer
+	options := &arm.ClientOptions{
+		ClientOptions: policy.ClientOptions{
+			Cloud: cloud,
+		},
+	}
 
-	return &containerService, nil
+	clientFactory, err := armcontainerservice.NewClientFactory(cap.SubscriptionID, cred, options)
+	if err != nil {
+		return nil, err
+	}
+
+	return clientFactory.NewManagedClustersClient(), nil
 }
 
-func NewClusterClient(cap *Capabilities) (*containerservice.ManagedClustersClient, error) {
-	authorizer, err := NewAzureClientAuthorizer(cap)
+func NewSubscriptionServiceClient(cap *Capabilities) (*armsubscription.SubscriptionsClient, error) {
+	cloud, _ := GetEnvironment(cap.Environment)
+
+	cred, err := NewClientSecretCredential(cap)
 	if err != nil {
 		return nil, err
 	}
 
-	client := containerservice.NewManagedClustersClientWithBaseURI(cap.BaseURL, cap.SubscriptionID)
-	client.Authorizer = authorizer
+	options := &arm.ClientOptions{
+		ClientOptions: policy.ClientOptions{
+			Cloud: cloud,
+		},
+	}
 
-	return &client, nil
-}
-
-func NewSubscriptionServiceClient(cap *Capabilities) (*subscription.SubscriptionsClient, error) {
-	authorizer, err := NewAzureClientAuthorizer(cap)
+	clientFactory, err := armsubscription.NewClientFactory(cred, options)
 	if err != nil {
 		return nil, err
 	}
 
-	subscriptionService := subscription.NewSubscriptionsClientWithBaseURI(cap.BaseURL)
-	subscriptionService.Authorizer = authorizer
-
-	return &subscriptionService, nil
+	return clientFactory.NewSubscriptionsClient(), nil
 }
 
 type sortableVersion []string
@@ -181,48 +215,42 @@ func listKubernetesUpgradeVersions(ctx context.Context, clusterLister mgmtv3.Clu
 	}
 
 	// get the client for aks container service
-	clientContainer, err := NewContainerServiceClient(cap)
+	client, err := NewManagedClustersClient(cap)
 	if err != nil {
 		return nil, http.StatusInternalServerError, err
 	}
 
-	// request a list of orchestrators
-	orchestrators, err := clientContainer.ListOrchestrators(ctx, cap.ResourceLocation, "managedClusters")
+	res, err := client.ListKubernetesVersions(ctx, cap.ResourceLocation, nil)
 	if err != nil {
-		return nil, http.StatusBadRequest, fmt.Errorf("failed to get orchestrators: %v", err)
+		return nil, http.StatusBadRequest, fmt.Errorf("failed to get Kubernetes versions: %w", err)
 	}
 
-	// ensure the orchestrators are returned
-	if orchestrators.Orchestrators == nil {
-		return nil, http.StatusBadRequest, fmt.Errorf("no version profiles returned: %v", err)
+	if len(res.Values) == 0 {
+		return nil, http.StatusBadRequest, fmt.Errorf("no versions were returned: %w", err)
 	}
 
 	var upgradeVersions map[string]bool
-	for _, profile := range *orchestrators.Orchestrators {
-		// check for nil pointers to avoid a panic
-		if profile.OrchestratorType == nil || profile.OrchestratorVersion == nil {
-			logrus.Warning("unexpected nil orchestrator type or version")
+	for _, v := range res.Values {
+		if v == nil {
+			logrus.Warning("unexpected nil version")
 			continue
 		}
 
-		// exclude any non kubernetes types
-		if containerservice.OrchestratorTypes(*profile.OrchestratorType) != containerservice.Kubernetes {
-			continue
-		}
+		for patchVersion, upgrades := range v.PatchVersions {
+			// exclude any versions older than the current version
+			if version.Compare(patchVersion, resp.CurrentVersion, "<") {
+				continue
+			}
 
-		// exclude any versions older than the current version
-		if version.Compare(*profile.OrchestratorVersion, resp.CurrentVersion, "<") {
-			continue
-		}
+			// generate the upgrade map when the current version is found
+			if patchVersion == resp.CurrentVersion {
+				upgradeVersions = upgradeableVersionsMap(upgrades)
+				continue
+			}
 
-		// generate the upgrade map when the current version is found
-		if *profile.OrchestratorVersion == resp.CurrentVersion {
-			upgradeVersions = upgradeableVersionsMap(profile)
-			continue
+			// store this kubernetes version
+			resp.Upgrades = append(resp.Upgrades, &KubernetesUpgradeVersion{Version: patchVersion})
 		}
-
-		// store this kubernetes version
-		resp.Upgrades = append(resp.Upgrades, &KubernetesUpgradeVersion{Version: *profile.OrchestratorVersion})
 	}
 
 	// enable any version listed in the upgrade versions
@@ -243,29 +271,24 @@ func listKubernetesVersions(ctx context.Context, cap *Capabilities) ([]byte, int
 		return nil, http.StatusBadRequest, fmt.Errorf("region is required")
 	}
 
-	clientContainer, err := NewContainerServiceClient(cap)
+	client, err := NewManagedClustersClient(cap)
 	if err != nil {
 		return nil, http.StatusInternalServerError, err
 	}
 
-	orchestrators, err := clientContainer.ListOrchestrators(ctx, cap.ResourceLocation, "managedClusters")
+	res, err := client.ListKubernetesVersions(ctx, cap.ResourceLocation, nil)
 	if err != nil {
-		return nil, http.StatusBadRequest, fmt.Errorf("failed to get orchestrators: %v", err)
+		return nil, http.StatusBadRequest, fmt.Errorf("failed to get Kubernetes versions: %w", err)
 	}
 
-	if orchestrators.Orchestrators == nil {
-		return nil, http.StatusBadRequest, fmt.Errorf("no version profiles returned: %v", err)
+	if len(res.Values) == 0 {
+		return nil, http.StatusBadRequest, fmt.Errorf("no versions were returned: %w", err)
 	}
 
 	var kubernetesVersions []string
-
-	for _, profile := range *orchestrators.Orchestrators {
-		if profile.OrchestratorType == nil || profile.OrchestratorVersion == nil {
-			return nil, http.StatusInternalServerError, fmt.Errorf("unexpected nil orchestrator type or version")
-		}
-
-		if *profile.OrchestratorType == "Kubernetes" {
-			kubernetesVersions = append(kubernetesVersions, *profile.OrchestratorVersion)
+	for _, v := range res.Values {
+		for version := range v.PatchVersions {
+			kubernetesVersions = append(kubernetesVersions, version)
 		}
 	}
 
@@ -275,33 +298,32 @@ func listKubernetesVersions(ctx context.Context, cap *Capabilities) ([]byte, int
 }
 
 func listVirtualNetworks(ctx context.Context, cap *Capabilities) ([]byte, int, error) {
-	clientNetwork, err := NewNetworkServiceClient(cap)
+	client, err := NewNetworkServiceClient(cap)
 	if err != nil {
 		return nil, http.StatusInternalServerError, err
 	}
 
-	networkList, err := clientNetwork.ListAll(ctx)
-	if err != nil {
-		return nil, http.StatusBadRequest, fmt.Errorf("failed to get networks: %v", err)
-	}
-
 	var networks []virtualNetworksResponseBody
+	pager := client.NewListAllPager(nil)
+	for pager.More() {
+		page, err := pager.NextPage(ctx)
+		if err != nil {
+			return nil, http.StatusBadRequest, fmt.Errorf("failed to get networks: %w", err)
+		}
 
-	for networkList.NotDone() {
 		var batch []virtualNetworksResponseBody
-
-		for _, azureNetwork := range networkList.Values() {
+		for _, azureNetwork := range page.Value {
 			if cap.ResourceLocation != "" && to.String(azureNetwork.Location) != cap.ResourceLocation {
 				continue
 			}
 			var subnets []subnet
 
-			if azureNetwork.Subnets != nil {
-				for _, azureSubnet := range *azureNetwork.Subnets {
+			if azureNetwork.Properties.Subnets != nil {
+				for _, azureSubnet := range azureNetwork.Properties.Subnets {
 					if azureSubnet.Name != nil {
 						subnets = append(subnets, subnet{
 							Name:         to.String(azureSubnet.Name),
-							AddressRange: to.String(azureSubnet.AddressPrefix),
+							AddressRange: to.String(azureSubnet.Properties.AddressPrefix),
 						})
 					}
 				}
@@ -330,11 +352,6 @@ func listVirtualNetworks(ctx context.Context, cap *Capabilities) ([]byte, int, e
 		}
 
 		networks = append(networks, batch...)
-
-		err = networkList.NextWithContext(ctx)
-		if err != nil {
-			return nil, http.StatusInternalServerError, err
-		}
 	}
 
 	return encodeOutput(networks)
@@ -348,38 +365,33 @@ type clustersResponseBody struct {
 }
 
 func listClusters(ctx context.Context, cap *Capabilities) ([]byte, int, error) {
-	clientCluster, err := NewClusterClient(cap)
+	client, err := NewManagedClustersClient(cap)
 	if err != nil {
 		return nil, http.StatusInternalServerError, err
 	}
 
-	clusterList, err := clientCluster.List(ctx)
-	if err != nil {
-		return nil, http.StatusBadRequest, fmt.Errorf("failed to get cluster list: %v", err)
-	}
-
 	var clusters []clustersResponseBody
+	pager := client.NewListPager(nil)
+	for pager.More() {
+		page, err := pager.NextPage(ctx)
+		if err != nil {
+			return nil, http.StatusBadRequest, fmt.Errorf("failed to get cluster list: %w", err)
+		}
 
-	for clusterList.NotDone() {
-		for _, cluster := range clusterList.Values() {
-			tmpCluster := clustersResponseBody{
-				ClusterName: to.String(cluster.Name),
-				RBACEnabled: to.Bool(cluster.EnableRBAC),
-				Location:    to.String(cluster.Location),
+		for _, v := range page.Value {
+			cluster := clustersResponseBody{
+				ClusterName: to.String(v.Name),
+				RBACEnabled: to.Bool(v.Properties.EnableRBAC),
+				Location:    to.String(v.Location),
 			}
-			if cluster.ID != nil {
-				match := matchResourceGroup.FindStringSubmatch(to.String(cluster.ID))
+			if v.ID != nil {
+				match := matchResourceGroup.FindStringSubmatch(to.String(v.ID))
 				if len(match) < 2 || match[1] == "" {
 					return nil, http.StatusInternalServerError, fmt.Errorf("could not parse virtual network ID")
 				}
-				tmpCluster.ResourceGroup = match[1]
+				cluster.ResourceGroup = match[1]
 			}
-			clusters = append(clusters, tmpCluster)
-		}
-
-		err = clusterList.NextWithContext(ctx)
-		if err != nil {
-			return nil, http.StatusInternalServerError, err
+			clusters = append(clusters, cluster)
 		}
 	}
 
@@ -391,19 +403,21 @@ func listVMSizesV1(ctx context.Context, cap *Capabilities) ([]byte, int, error) 
 		return nil, http.StatusBadRequest, fmt.Errorf("region is required")
 	}
 
-	virtualMachine, err := NewVirtualMachineClient(cap)
+	client, err := NewVirtualMachineSizesClient(cap)
 	if err != nil {
 		return nil, http.StatusInternalServerError, err
 	}
-	vmMachineSizeList, err := virtualMachine.List(ctx, cap.ResourceLocation)
-	if err != nil {
-		return nil, http.StatusBadRequest, fmt.Errorf("failed to get VM sizes: %v", err)
-	}
 
-	vmSizes := make([]string, 0, len(*vmMachineSizeList.Value))
-
-	for _, virtualMachineSize := range *vmMachineSizeList.Value {
-		vmSizes = append(vmSizes, to.String(virtualMachineSize.Name))
+	vmSizes := make([]string, 0)
+	pager := client.NewListPager(cap.ResourceLocation, nil)
+	for pager.More() {
+		nextResult, err := pager.NextPage(ctx)
+		if err != nil {
+			return nil, http.StatusBadRequest, fmt.Errorf("failed to get VM sizes: %v", err)
+		}
+		for _, rg := range nextResult.Value {
+			vmSizes = append(vmSizes, to.String(rg.Name))
+		}
 	}
 
 	return encodeOutput(vmSizes)
@@ -431,62 +445,49 @@ func listVMSizesV2(ctx context.Context, cap *Capabilities) ([]byte, int, error) 
 		return nil, http.StatusInternalServerError, err
 	}
 
-	req, err := skuClient.ListPreparer(ctx)
-	if err != nil {
-		return nil, http.StatusInternalServerError, err
-	}
-
-	// only get resources for the given location.
-	// this is the only filter supported by API version 2017-09-01,
-	// which is the latest version at time of writing.
-	// A guide to azure API filtering can be found here
-	// https://learn.microsoft.com/en-us/rest/api/monitor/filter-syntax
-	q := req.URL.Query()
-	q.Add("$filter", fmt.Sprintf("location eq '%s'", cap.ResourceLocation))
-	req.URL.RawQuery = q.Encode()
-
-	resp, err := skuClient.ListSender(req)
-	if err != nil {
-		return nil, resp.StatusCode, err
-	}
-
-	skuList, err := skuClient.ListResponder(resp)
-	if err != nil {
-		return nil, http.StatusInternalServerError, fmt.Errorf("failed to get VM sizes: %v", err)
-	}
-
-	if skuList.Value == nil {
-		return nil, http.StatusNotFound, err
-	}
-
 	var vmSkuInfo []VMSizeInfo
-	for _, resourceSku := range *skuList.Value {
-		// we currently can't specify a particular SKU type in the API request,
-		// we have to filter them out here
-		if to.String(resourceSku.ResourceType) != AzureSkuResourceTypeVM {
-			continue
-		}
+	// only get resources for the given location.
+	// https://pkg.go.dev/github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute/v5#example-ResourceSKUsClient.NewListPager-ListsAllAvailableResourceSkUsForTheSpecifiedRegion
+	pager := skuClient.NewListPager(&armcompute.ResourceSKUsClientListOptions{
+		Filter: azcoreto.Ptr(fmt.Sprintf("location eq '%s'", cap.ResourceLocation)),
+	})
 
-		vm := VMSizeInfo{
-			Name: to.String(resourceSku.Name),
+	for pager.More() {
+		page, err := pager.NextPage(ctx)
+		if err != nil {
+			return nil, http.StatusInternalServerError, err
 		}
+		for _, v := range page.Value {
+			// we currently can't specify a particular SKU type in the API request,
+			// we have to filter them out here
+			if to.String(v.ResourceType) != AzureSkuResourceTypeVM {
+				continue
+			}
 
-		if resourceSku.Capabilities != nil {
-			for _, skuCapabilities := range *resourceSku.Capabilities {
-				if to.String(skuCapabilities.Name) == AzureAcceleratedNetworkingFeature && to.String(skuCapabilities.Value) == "True" {
-					vm.AcceleratedNetworkingSupported = true
-					break
+			vm := VMSizeInfo{
+				Name:              to.String(v.Name),
+				AvailabilityZones: []string{},
+			}
+
+			if v.Capabilities != nil {
+				for _, skuCapabilities := range v.Capabilities {
+					if to.String(skuCapabilities.Name) == AzureAcceleratedNetworkingFeature && to.String(skuCapabilities.Value) == "True" {
+						vm.AcceleratedNetworkingSupported = true
+						break
+					}
 				}
 			}
-		}
 
-		if resourceSku.LocationInfo != nil && len(*resourceSku.LocationInfo) > 0 {
-			locInfo := *resourceSku.LocationInfo
-			// We specified a location in the Azure API request so there is at most one element
-			vm.AvailabilityZones = to.StringSlice(locInfo[0].Zones)
-		}
+			if v.LocationInfo != nil && len(v.LocationInfo) > 0 {
+				locInfo := v.LocationInfo
+				// We specified a location in the Azure API request so there is at most one element
+				for _, z := range locInfo[0].Zones {
+					vm.AvailabilityZones = append(vm.AvailabilityZones, *z)
+				}
+			}
 
-		vmSkuInfo = append(vmSkuInfo, vm)
+			vmSkuInfo = append(vmSkuInfo, vm)
+		}
 	}
 
 	return encodeOutput(vmSkuInfo)
@@ -498,22 +499,25 @@ type locationsResponseBody struct {
 }
 
 func listLocations(ctx context.Context, cap *Capabilities) ([]byte, int, error) {
-	clientSubscription, err := NewSubscriptionServiceClient(cap)
+	client, err := NewSubscriptionServiceClient(cap)
 	if err != nil {
 		return nil, http.StatusInternalServerError, err
 	}
-	locationList, err := clientSubscription.ListLocations(ctx, cap.SubscriptionID)
-	if err != nil {
-		return nil, http.StatusBadRequest, fmt.Errorf("failed to get locations: %v", err)
-	}
 
 	var locations []locationsResponseBody
+	pager := client.NewListLocationsPager(cap.SubscriptionID, nil)
+	for pager.More() {
+		page, err := pager.NextPage(ctx)
+		if err != nil {
+			return nil, http.StatusBadRequest, fmt.Errorf("failed to get locations: %w", err)
+		}
 
-	for _, location := range *locationList.Value {
-		locations = append(locations, locationsResponseBody{
-			Name:        to.String(location.Name),
-			DisplayName: to.String(location.DisplayName),
-		})
+		for _, v := range page.Value {
+			locations = append(locations, locationsResponseBody{
+				Name:        to.String(v.Name),
+				DisplayName: to.String(v.DisplayName),
+			})
+		}
 	}
 
 	return encodeOutput(locations)
@@ -528,15 +532,15 @@ func encodeOutput(result interface{}) ([]byte, int, error) {
 	return data, http.StatusOK, err
 }
 
-func upgradeableVersionsMap(upgradeProfile containerservice.OrchestratorVersionProfile) map[string]bool {
+func upgradeableVersionsMap(patchVersion *armcontainerservice.KubernetesPatchVersion) map[string]bool {
 	rval := make(map[string]bool, 0)
 
-	if upgradeProfile.Upgrades == nil {
+	if patchVersion.Upgrades == nil {
 		// already on latest version, no upgrades available
 		return rval
 	}
-	for _, profile := range *upgradeProfile.Upgrades {
-		rval[*profile.OrchestratorVersion] = true
+	for _, upgradeVersion := range patchVersion.Upgrades {
+		rval[*upgradeVersion] = true
 	}
 
 	return rval

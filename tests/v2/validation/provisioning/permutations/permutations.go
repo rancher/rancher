@@ -1,21 +1,29 @@
 package permutations
 
 import (
+	"context"
 	"os"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/rancher/rancher/pkg/api/scheme"
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/shepherd/clients/corral"
 	"github.com/rancher/shepherd/clients/rancher"
+	"github.com/rancher/shepherd/clients/rancher/catalog"
+	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
 	steveV1 "github.com/rancher/shepherd/clients/rancher/v1"
 	"github.com/rancher/shepherd/extensions/charts"
 	"github.com/rancher/shepherd/extensions/clusters"
+	"github.com/rancher/shepherd/extensions/kubeapi/storageclasses"
+	"github.com/rancher/shepherd/extensions/kubeapi/volumes/persistentvolumeclaims"
 	"github.com/rancher/shepherd/extensions/machinepools"
 	"github.com/rancher/shepherd/extensions/projects"
 	"github.com/rancher/shepherd/extensions/provisioning"
 	"github.com/rancher/shepherd/extensions/provisioninginput"
 	"github.com/rancher/shepherd/extensions/rke1/componentchecks"
+	"github.com/rancher/shepherd/extensions/rke1/nodetemplates"
 	"github.com/rancher/shepherd/extensions/services"
 	"github.com/rancher/shepherd/extensions/workloads"
 	"github.com/rancher/shepherd/extensions/workloads/pods"
@@ -26,6 +34,9 @@ import (
 	"github.com/stretchr/testify/suite"
 	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/storage/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 const (
@@ -47,6 +58,9 @@ const (
 	nginxName            = "nginx"
 	defaultNamespace     = "default"
 
+	pollInterval = time.Duration(1 * time.Second)
+	pollTimeout  = time.Duration(1 * time.Minute)
+
 	repoType                     = "catalog.cattle.io.clusterrepo"
 	appsType                     = "catalog.cattle.io.apps"
 	awsUpstreamCloudProviderRepo = "https://github.com/kubernetes/cloud-provider-aws.git"
@@ -55,6 +69,13 @@ const (
 	kubeSystemNamespace          = "kube-system"
 	systemProject                = "System"
 	externalProviderString       = "external"
+	vsphereCPIchartName          = "rancher-vsphere-cpi"
+	vsphereCSIchartName          = "rancher-vsphere-csi"
+)
+
+var (
+	group int64
+	user  int64
 )
 
 // RunTestPermutations runs through all relevant perumutations in a given config file, including node providers, k8s versions, and CNIs
@@ -76,13 +97,22 @@ func RunTestPermutations(s *suite.Suite, testNamePrefix string, client *rancher.
 	} else {
 		providers = provisioningConfig.Providers
 	}
+
 	for _, nodeProviderName := range providers {
+
 		nodeProvider, rke1Provider, customProvider, kubeVersions := GetClusterProvider(clusterType, nodeProviderName, provisioningConfig)
+
 		for _, kubeVersion := range kubeVersions {
 			for _, cni := range provisioningConfig.CNIs {
+
 				testClusterConfig = clusters.ConvertConfigToClusterConfig(provisioningConfig)
 				testClusterConfig.CNI = cni
 				name = testNamePrefix + " Node Provider: " + nodeProviderName + " Kubernetes version: " + kubeVersion + " cni: " + cni
+
+				clusterObject := &steveV1.SteveAPIObject{}
+				rke1ClusterObject := &management.Cluster{}
+				nodeTemplate := &nodetemplates.NodeTemplate{}
+
 				s.Run(name, func() {
 					if testClusterConfig.CloudProvider == provisioninginput.AWSProviderName.String() {
 						byteYaml, err := os.ReadFile(outOfTreeAWSFilePath)
@@ -95,92 +125,66 @@ func RunTestPermutations(s *suite.Suite, testNamePrefix string, client *rancher.
 					switch clusterType {
 					case RKE2ProvisionCluster, K3SProvisionCluster:
 						testClusterConfig.KubernetesVersion = kubeVersion
-						clusterObject, err := provisioning.CreateProvisioningCluster(client, *nodeProvider, testClusterConfig, hostnameTruncation)
+						clusterObject, err = provisioning.CreateProvisioningCluster(client, *nodeProvider, testClusterConfig, hostnameTruncation)
 						require.NoError(s.T(), err)
 
 						provisioning.VerifyCluster(s.T(), client, testClusterConfig, clusterObject)
 
-						if testClusterConfig.CloudProvider == provisioninginput.AWSProviderName.String() {
-							lbServiceResp := createAWSWorkloadAndServices(s.T(), client, clusterObject)
-
-							status := &provv1.ClusterStatus{}
-							err := steveV1.ConvertToK8sType(clusterObject.Status, status)
-							require.NoError(s.T(), err)
-
-							services.VerifyAWSLoadBalancer(s.T(), client, lbServiceResp, status.ClusterName)
-						}
-
 					case RKE1ProvisionCluster:
 						testClusterConfig.KubernetesVersion = kubeVersion
-						nodeTemplate, err := rke1Provider.NodeTemplateFunc(client)
+						nodeTemplate, err = rke1Provider.NodeTemplateFunc(client)
 						require.NoError(s.T(), err)
-
-						clusterObject, err := provisioning.CreateProvisioningRKE1Cluster(client, *rke1Provider, testClusterConfig, nodeTemplate)
-						require.NoError(s.T(), err)
-
-						provisioning.VerifyRKE1Cluster(s.T(), client, testClusterConfig, clusterObject)
-
-						if strings.Contains(testClusterConfig.CloudProvider, provisioninginput.AWSProviderName.String()) {
-							if strings.Contains(testClusterConfig.CloudProvider, externalProviderString) {
-								err = createAndInstallAWSExternalCharts(client, clusterObject.ID)
-								require.NoError(s.T(), err)
-
-								podErrors := pods.StatusPods(client, clusterObject.ID)
-								require.Empty(s.T(), podErrors)
-							}
-
-							adminClient, err := rancher.NewClient(client.RancherConfig.AdminToken, client.Session)
-							require.NoError(s.T(), err)
-
-							steveClusterObject, err := adminClient.Steve.SteveType(clusters.ProvisioningSteveResourceType).ByID(provisioninginput.Namespace + "/" + clusterObject.ID)
-							require.NoError(s.T(), err)
-
-							lbServiceResp := createAWSWorkloadAndServices(s.T(), client, steveClusterObject)
-
-							status := &provv1.ClusterStatus{}
-							err = steveV1.ConvertToK8sType(steveClusterObject.Status, status)
-							require.NoError(s.T(), err)
-
-							services.VerifyAWSLoadBalancer(s.T(), client, lbServiceResp, status.ClusterName)
+						// workaround to simplify config for rke1 clusters with cloud provider set. This will allow external charts to be installed
+						// while using the rke2 CloudProvider.
+						if testClusterConfig.CloudProvider == provisioninginput.VsphereCloudProviderName.String() {
+							testClusterConfig.CloudProvider = "external"
 						}
+
+						rke1ClusterObject, err = provisioning.CreateProvisioningRKE1Cluster(client, *rke1Provider, testClusterConfig, nodeTemplate)
+						require.NoError(s.T(), err)
+
+						provisioning.VerifyRKE1Cluster(s.T(), client, testClusterConfig, rke1ClusterObject)
 
 					case RKE2CustomCluster, K3SCustomCluster:
 						testClusterConfig.KubernetesVersion = kubeVersion
 
-						clusterObject, err := provisioning.CreateProvisioningCustomCluster(client, customProvider, testClusterConfig)
+						clusterObject, err = provisioning.CreateProvisioningCustomCluster(client, customProvider, testClusterConfig)
 						require.NoError(s.T(), err)
 
 						provisioning.VerifyCluster(s.T(), client, testClusterConfig, clusterObject)
-						if testClusterConfig.CloudProvider == provisioninginput.AWSProviderName.String() {
-							lbServiceResp := createAWSWorkloadAndServices(s.T(), client, clusterObject)
-
-							status := &provv1.ClusterStatus{}
-							err := steveV1.ConvertToK8sType(clusterObject.Status, status)
-							require.NoError(s.T(), err)
-
-							services.VerifyAWSLoadBalancer(s.T(), client, lbServiceResp, status.ClusterName)
-						}
 
 					case RKE1CustomCluster:
 						testClusterConfig.KubernetesVersion = kubeVersion
-						clusterObject, nodes, err := provisioning.CreateProvisioningRKE1CustomCluster(client, customProvider, testClusterConfig)
+						// workaround to simplify config for rke1 clusters with cloud provider set. This will allow external charts to be installed
+						// while using the rke2 CloudProvider name in the
+						if testClusterConfig.CloudProvider == provisioninginput.VsphereCloudProviderName.String() {
+							testClusterConfig.CloudProvider = "external"
+						}
+
+						rke1ClusterObject, nodes, err := provisioning.CreateProvisioningRKE1CustomCluster(client, customProvider, testClusterConfig)
 						require.NoError(s.T(), err)
 
-						provisioning.VerifyRKE1Cluster(s.T(), client, testClusterConfig, clusterObject)
-						etcdVersion, err := componentchecks.CheckETCDVersion(client, nodes, clusterObject.ID)
+						provisioning.VerifyRKE1Cluster(s.T(), client, testClusterConfig, rke1ClusterObject)
+						etcdVersion, err := componentchecks.CheckETCDVersion(client, nodes, rke1ClusterObject.ID)
 						require.NoError(s.T(), err)
 						require.NotEmpty(s.T(), etcdVersion)
 
 					// airgap currently uses corral to create nodes and register with rancher
 					case RKE2AirgapCluster, K3SAirgapCluster:
 						testClusterConfig.KubernetesVersion = kubeVersion
-						clusterObject, err := provisioning.CreateProvisioningAirgapCustomCluster(client, testClusterConfig, corralPackages)
+						clusterObject, err = provisioning.CreateProvisioningAirgapCustomCluster(client, testClusterConfig, corralPackages)
 						require.NoError(s.T(), err)
 
 						provisioning.VerifyCluster(s.T(), client, testClusterConfig, clusterObject)
 
 					case RKE1AirgapCluster:
 						testClusterConfig.KubernetesVersion = kubeVersion
+						// workaround to simplify config for rke1 clusters with cloud provider set. This will allow external charts to be installed
+						// while using the rke2 CloudProvider name in the
+						if testClusterConfig.CloudProvider == provisioninginput.VsphereCloudProviderName.String() {
+							testClusterConfig.CloudProvider = "external"
+						}
+
 						clusterObject, err := provisioning.CreateProvisioningRKE1AirgapCustomCluster(client, testClusterConfig, corralPackages)
 						require.NoError(s.T(), err)
 
@@ -190,8 +194,74 @@ func RunTestPermutations(s *suite.Suite, testNamePrefix string, client *rancher.
 						s.T().Fatalf("Invalid cluster type: %s", clusterType)
 					}
 
+					RunPostClusterCloudProviderChecks(s.T(), client, clusterType, nodeTemplate, testClusterConfig, clusterObject, rke1ClusterObject)
 				})
 			}
+		}
+	}
+}
+
+// RunPostClusterCloudProviderChecks does additinal checks on the cluster if there's a cloud provider set
+// on an active cluster.
+func RunPostClusterCloudProviderChecks(t *testing.T, client *rancher.Client, clusterType string, nodeTemplate *nodetemplates.NodeTemplate, testClusterConfig *clusters.ClusterConfig, clusterObject *steveV1.SteveAPIObject, rke1ClusterObject *management.Cluster) {
+	if strings.Contains(clusterType, clusters.RKE1ClusterType.String()) {
+		providers := *testClusterConfig.Providers
+		adminClient, err := rancher.NewClient(client.RancherConfig.AdminToken, client.Session)
+		require.NoError(t, err)
+
+		if strings.Contains(testClusterConfig.CloudProvider, provisioninginput.AWSProviderName.String()) {
+			if strings.Contains(testClusterConfig.CloudProvider, externalProviderString) {
+				clusterMeta, err := clusters.NewClusterMeta(client, rke1ClusterObject.Name)
+				require.NoError(t, err)
+
+				err = CreateAndInstallAWSExternalCharts(client, clusterMeta, false)
+				require.NoError(t, err)
+
+				podErrors := pods.StatusPods(client, rke1ClusterObject.ID)
+				require.Empty(t, podErrors)
+			}
+
+			clusterObject, err = adminClient.Steve.SteveType(clusters.ProvisioningSteveResourceType).ByID(provisioninginput.Namespace + "/" + rke1ClusterObject.ID)
+			require.NoError(t, err)
+
+			lbServiceResp := CreateCloudProviderWorkloadAndServicesLB(t, client, clusterObject)
+
+			status := &provv1.ClusterStatus{}
+			err = steveV1.ConvertToK8sType(clusterObject.Status, status)
+			require.NoError(t, err)
+
+			services.VerifyAWSLoadBalancer(t, client, lbServiceResp, status.ClusterName)
+		} else if strings.Contains(testClusterConfig.CloudProvider, "external") && providers[0] == provisioninginput.VsphereProviderName.String() {
+			err := charts.InstallVsphereOutOfTreeCharts(client, nodeTemplate, catalog.RancherChartRepo, rke1ClusterObject.Name)
+			require.NoError(t, err)
+
+			podErrors := pods.StatusPods(client, rke1ClusterObject.ID)
+			require.Empty(t, podErrors)
+
+			clusterObject, err := adminClient.Steve.SteveType(clusters.ProvisioningSteveResourceType).ByID(provisioninginput.Namespace + "/" + rke1ClusterObject.ID)
+			require.NoError(t, err)
+
+			CreatePVCWorkload(t, client, clusterObject)
+		}
+	} else if strings.Contains(clusterType, clusters.RKE2ClusterType.String()) {
+		adminClient, err := rancher.NewClient(client.RancherConfig.AdminToken, client.Session)
+		require.NoError(t, err)
+
+		if testClusterConfig.CloudProvider == provisioninginput.AWSProviderName.String() {
+			clusterObject, err := adminClient.Steve.SteveType(clusters.ProvisioningSteveResourceType).ByID(clusterObject.ID)
+			require.NoError(t, err)
+
+			lbServiceResp := CreateCloudProviderWorkloadAndServicesLB(t, client, clusterObject)
+
+			status := &provv1.ClusterStatus{}
+			err = steveV1.ConvertToK8sType(clusterObject.Status, status)
+			require.NoError(t, err)
+
+			services.VerifyAWSLoadBalancer(t, client, lbServiceResp, status.ClusterName)
+		}
+
+		if testClusterConfig.CloudProvider == provisioninginput.VsphereCloudProviderName.String() {
+			CreatePVCWorkload(t, client, clusterObject)
 		}
 	}
 }
@@ -234,10 +304,11 @@ func GetClusterProvider(clusterType string, nodeProviderName string, provisionin
 	return &nodeProvider, &rke1NodeProvider, &customProvider, kubeVersions
 }
 
-// createAWSWorkloadAndServices creates a test workload, clusterIP service and awsLoadBalancer service.
-// This should be used when testing cloud provider for aws, with in-tree or out-of-tree set on the cluster.
-func createAWSWorkloadAndServices(t *testing.T, client *rancher.Client, cluster *steveV1.SteveAPIObject) *steveV1.SteveAPIObject {
+// CreateCloudProviderWorkloadAndServicesLB creates a test workload, clusterIP service and LoadBalancer service.
+// This should be used when testing cloud provider with in-tree or out-of-tree set on the cluster.
+func CreateCloudProviderWorkloadAndServicesLB(t *testing.T, client *rancher.Client, cluster *steveV1.SteveAPIObject) *steveV1.SteveAPIObject {
 	status := &provv1.ClusterStatus{}
+
 	err := steveV1.ConvertToK8sType(cluster.Status, status)
 	require.NoError(t, err)
 
@@ -268,6 +339,109 @@ func createAWSWorkloadAndServices(t *testing.T, client *rancher.Client, cluster 
 	return lbServiceResp
 }
 
+// CreatePVCWorkload creates a workload with a PVC for storage. This helper should be used to test
+// storage class functionality, i.e. for an in-tree / out-of-tree cloud provider
+func CreatePVCWorkload(t *testing.T, client *rancher.Client, cluster *steveV1.SteveAPIObject) *steveV1.SteveAPIObject {
+	status := &provv1.ClusterStatus{}
+	err := steveV1.ConvertToK8sType(cluster.Status, status)
+	require.NoError(t, err)
+
+	adminClient, err := rancher.NewClient(client.RancherConfig.AdminToken, client.Session)
+	require.NoError(t, err)
+
+	steveclient, err := adminClient.Steve.ProxyDownstream(status.ClusterName)
+	require.NoError(t, err)
+
+	dynamicClient, err := client.GetDownStreamClusterClient(status.ClusterName)
+	require.NoError(t, err)
+
+	storageClassVolumesResource := dynamicClient.Resource(storageclasses.StorageClassGroupVersionResource).Namespace("")
+
+	ctx := context.Background()
+	unstructuredResp, err := storageClassVolumesResource.List(ctx, metav1.ListOptions{})
+	require.NoError(t, err)
+
+	storageClasses := &v1.StorageClassList{}
+
+	err = scheme.Scheme.Convert(unstructuredResp, storageClasses, unstructuredResp.GroupVersionKind())
+	require.NoError(t, err)
+
+	storageClass := storageClasses.Items[0]
+
+	logrus.Infof("creating PVC")
+
+	accessModes := []corev1.PersistentVolumeAccessMode{
+		"ReadWriteOnce",
+	}
+
+	persistentVolumeClaim, err := persistentvolumeclaims.CreatePersistentVolumeClaim(
+		client,
+		status.ClusterName,
+		namegenerator.AppendRandomString("pvc"),
+		"test-pvc-volume",
+		defaultNamespace,
+		1,
+		accessModes,
+		nil,
+		&storageClass,
+	)
+	require.NoError(t, err)
+
+	pvcStatus := &corev1.PersistentVolumeClaimStatus{}
+	stevePvc := &steveV1.SteveAPIObject{}
+
+	err = wait.PollUntilContextTimeout(ctx, pollInterval, pollTimeout, true, func(ctx context.Context) (done bool, err error) {
+		stevePvc, err = steveclient.SteveType(persistentvolumeclaims.PersistentVolumeClaimType).ByID(defaultNamespace + "/" + persistentVolumeClaim.Name)
+		require.NoError(t, err)
+
+		err = steveV1.ConvertToK8sType(stevePvc.Status, pvcStatus)
+		require.NoError(t, err)
+
+		if pvcStatus.Phase == persistentvolumeclaims.PersistentVolumeBoundStatus {
+			return true, nil
+		}
+		return false, err
+	})
+	require.NoError(t, err)
+
+	nginxResponse, err := createNginxDeploymentWithPVC(steveclient, "pvcwkld", persistentVolumeClaim.Name, string(stevePvc.Spec.(map[string]interface{})[persistentvolumeclaims.StevePersistentVolumeClaimVolumeName].(string)))
+	require.NoError(t, err)
+
+	return nginxResponse
+}
+
+// createNginxDeploymentWithPVC is a helper function that creates a nginx deployment in a cluster's default namespace
+func createNginxDeploymentWithPVC(steveclient *steveV1.Client, containerNamePrefix, pvcName, volName string) (*steveV1.SteveAPIObject, error) {
+	logrus.Infof("Vol: %s", volName)
+	logrus.Infof("Pod: %s", pvcName)
+
+	containerName := namegenerator.AppendRandomString(containerNamePrefix)
+	volMount := *&corev1.VolumeMount{
+		MountPath: "/auto-mnt",
+		Name:      volName,
+	}
+
+	podVol := corev1.Volume{
+		Name: volName,
+		VolumeSource: corev1.VolumeSource{
+			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+				ClaimName: pvcName,
+			},
+		},
+	}
+
+	containerTemplate := workloads.NewContainer(nginxName, nginxName, corev1.PullAlways, []corev1.VolumeMount{volMount}, []corev1.EnvFromSource{}, nil, nil, nil)
+	podTemplate := workloads.NewPodTemplate([]corev1.Container{containerTemplate}, []corev1.Volume{podVol}, []corev1.LocalObjectReference{}, nil)
+	deployment := workloads.NewDeploymentTemplate(containerName, defaultNamespace, podTemplate, true, nil)
+
+	deploymentResp, err := steveclient.SteveType(workloads.DeploymentSteveType).Create(deployment)
+	if err != nil {
+		return nil, err
+	}
+
+	return deploymentResp, err
+}
+
 // createNginxDeployment is a helper function that creates a nginx deployment in a cluster's default namespace
 func createNginxDeployment(steveclient *steveV1.Client, containerNamePrefix string) (*steveV1.SteveAPIObject, error) {
 	containerName := namegenerator.AppendRandomString(containerNamePrefix)
@@ -283,10 +457,10 @@ func createNginxDeployment(steveclient *steveV1.Client, containerNamePrefix stri
 	return deploymentResp, err
 }
 
-// createAndInstallAWSExternalCharts is a helper function for rke1 external-aws cloud provider
+// CreateAndInstallAWSExternalCharts is a helper function for rke1 external-aws cloud provider
 // clusters that install the appropriate chart(s) and returns an error, if any.
-func createAndInstallAWSExternalCharts(client *rancher.Client, clusterID string) error {
-	steveclient, err := client.Steve.ProxyDownstream(clusterID)
+func CreateAndInstallAWSExternalCharts(client *rancher.Client, cluster *clusters.ClusterMeta, isLeaderMigration bool) error {
+	steveclient, err := client.Steve.ProxyDownstream(cluster.ID)
 	if err != nil {
 		return err
 	}
@@ -297,12 +471,12 @@ func createAndInstallAWSExternalCharts(client *rancher.Client, clusterID string)
 		return err
 	}
 
-	project, err := projects.GetProjectByName(client, clusterID, systemProject)
+	project, err := projects.GetProjectByName(client, cluster.ID, systemProject)
 	if err != nil {
 		return err
 	}
 
-	catalogClient, err := client.GetClusterCatalogClient(clusterID)
+	catalogClient, err := client.GetClusterCatalogClient(cluster.ID)
 	if err != nil {
 		return err
 	}
@@ -313,10 +487,10 @@ func createAndInstallAWSExternalCharts(client *rancher.Client, clusterID string)
 	}
 
 	installOptions := &charts.InstallOptions{
-		ClusterID: clusterID,
+		Cluster:   cluster,
 		Version:   latestVersion,
 		ProjectID: project.ID,
 	}
-	err = charts.InstallAWSOutOfTreeChart(client, installOptions, repoName, clusterID)
+	err = charts.InstallAWSOutOfTreeChart(client, installOptions, repoName, cluster.ID, isLeaderMigration)
 	return err
 }

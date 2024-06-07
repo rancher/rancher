@@ -46,6 +46,7 @@ func (ap *Provider) updateConfigAndTest() (*v32.AzureADConfig, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return cfg, nil
 }
 

@@ -17,7 +17,8 @@ spec:
     kubernetesVersion: "1.22"
     loggingTypes: []
     nodeGroups:
-    - desiredSize: 2
+    - arm: false
+      desiredSize: 2
       diskSize: 20
       ec2SshKey: null
       gpu: false
@@ -76,7 +77,8 @@ status:
       kubernetesVersion: "1.22"
       loggingTypes: []
       nodeGroups:
-      - desiredSize: 2
+      - arm: false
+        desiredSize: 2
         diskSize: 20
         ec2SshKey: null
         gpu: false

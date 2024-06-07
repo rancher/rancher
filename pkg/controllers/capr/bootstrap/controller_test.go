@@ -10,7 +10,7 @@ import (
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
-	ctrlfake "github.com/rancher/wrangler/pkg/generic/fake"
+	ctrlfake "github.com/rancher/wrangler/v2/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	v1apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"

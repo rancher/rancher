@@ -27,9 +27,7 @@ import (
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	extv1beta1 "github.com/rancher/rancher/pkg/generated/norman/extensions/v1beta1"
 	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	monitoringv1 "github.com/rancher/rancher/pkg/generated/norman/monitoring.coreos.com/v1"
 	knetworkingv1 "github.com/rancher/rancher/pkg/generated/norman/networking.k8s.io/v1"
-	policyv1beta1 "github.com/rancher/rancher/pkg/generated/norman/policy/v1beta1"
 	projectv3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	rbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
 	storagev1 "github.com/rancher/rancher/pkg/generated/norman/storage.k8s.io/v1"
@@ -43,11 +41,11 @@ import (
 	"github.com/rancher/rancher/pkg/user"
 	"github.com/rancher/rancher/pkg/wrangler"
 	steve "github.com/rancher/steve/pkg/server"
-	"github.com/rancher/wrangler/pkg/generated/controllers/core"
-	wcorev1 "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
-	"github.com/rancher/wrangler/pkg/generated/controllers/rbac"
-	wrbacv1 "github.com/rancher/wrangler/pkg/generated/controllers/rbac/v1"
-	"github.com/rancher/wrangler/pkg/generic"
+	"github.com/rancher/wrangler/v2/pkg/generated/controllers/core"
+	wcorev1 "github.com/rancher/wrangler/v2/pkg/generated/controllers/core/v1"
+	"github.com/rancher/wrangler/v2/pkg/generated/controllers/rbac"
+	wrbacv1 "github.com/rancher/wrangler/v2/pkg/generated/controllers/rbac/v1"
+	"github.com/rancher/wrangler/v2/pkg/generic"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -219,10 +217,8 @@ type UserContext struct {
 	Extensions     extv1beta1.Interface
 	BatchV1        batchv1.Interface
 	Networking     knetworkingv1.Interface
-	Monitoring     monitoringv1.Interface
 	Cluster        clusterv3.Interface
 	Storage        storagev1.Interface
-	Policy         policyv1beta1.Interface
 
 	RBACw          wrbacv1.Interface
 	Corew          wcorev1.Interface
@@ -308,10 +304,8 @@ func (w *UserContext) UserOnlyContext() *UserOnlyContext {
 		Extensions:  w.Extensions,
 		Networking:  w.Networking,
 		BatchV1:     w.BatchV1,
-		Monitoring:  w.Monitoring,
 		Cluster:     w.Cluster,
 		Storage:     w.Storage,
-		Policy:      w.Policy,
 	}
 }
 
@@ -332,10 +326,8 @@ type UserOnlyContext struct {
 	Extensions      extv1beta1.Interface
 	BatchV1         batchv1.Interface
 	Networking      knetworkingv1.Interface
-	Monitoring      monitoringv1.Interface
 	Cluster         clusterv3.Interface
 	Storage         storagev1.Interface
-	Policy          policyv1beta1.Interface
 }
 
 func newManagementContext(c *ScaledContext) (*ManagementContext, error) {
@@ -430,10 +422,8 @@ func NewUserContext(scaledContext *ScaledContext, config rest.Config, clusterNam
 	context.RBAC = rbacv1.NewFromControllerFactory(controllerFactory)
 	context.Networking = knetworkingv1.NewFromControllerFactory(controllerFactory)
 	context.Extensions = extv1beta1.NewFromControllerFactory(controllerFactory)
-	context.Policy = policyv1beta1.NewFromControllerFactory(controllerFactory)
 	context.BatchV1 = batchv1.NewFromControllerFactory(controllerFactory)
 	context.Autoscaling = autoscaling.NewFromControllerFactory(controllerFactory)
-	context.Monitoring = monitoringv1.NewFromControllerFactory(controllerFactory)
 	context.Cluster = clusterv3.NewFromControllerFactory(controllerFactory)
 	context.APIAggregation = apiregistrationv1.NewFromControllerFactory(controllerFactory)
 
@@ -499,10 +489,8 @@ func NewUserOnlyContext(config *wrangler.Context) (*UserOnlyContext, error) {
 	context.Storage = storagev1.NewFromControllerFactory(context.ControllerFactory)
 	context.RBAC = rbacv1.NewFromControllerFactory(context.ControllerFactory)
 	context.Extensions = extv1beta1.NewFromControllerFactory(context.ControllerFactory)
-	context.Policy = policyv1beta1.NewFromControllerFactory(context.ControllerFactory)
 	context.BatchV1 = batchv1.NewFromControllerFactory(context.ControllerFactory)
 	context.Autoscaling = autoscaling.NewFromControllerFactory(context.ControllerFactory)
-	context.Monitoring = monitoringv1.NewFromControllerFactory(context.ControllerFactory)
 	context.Cluster = clusterv3.NewFromControllerFactory(context.ControllerFactory)
 	context.APIRegistration = apiregistrationv1.NewFromControllerFactory(context.ControllerFactory)
 	context.Networking = knetworkingv1.NewFromControllerFactory(context.ControllerFactory)

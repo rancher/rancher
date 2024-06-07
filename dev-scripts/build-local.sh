@@ -42,7 +42,7 @@ GOOS="${TARGET_OS}" GOARCH="${TARGET_ARCH}" CGO_ENABLED=0 "${GO_BINARY}" build -
 
 DATA_JSON_FILE="${SCRIPT_DIR}/../bin/data.json"
 if [ ! -f "${DATA_JSON_FILE}" ]; then
-    curl -sLf https://releases.rancher.com/kontainer-driver-metadata/release-v2.7/data.json > "${DATA_JSON_FILE}"
+    curl -sLf https://releases.rancher.com/kontainer-driver-metadata/release-v2.9/data.json > "${DATA_JSON_FILE}"
 fi
 
 K3S_AIRGAP_IMAGES_TARBALL="${SCRIPT_DIR}/../bin/k3s-airgap-images.tar"

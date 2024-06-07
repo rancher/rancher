@@ -17,7 +17,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/clusteroperator"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	typesDialer "github.com/rancher/rancher/pkg/types/config/dialer"
-	"github.com/rancher/wrangler/pkg/generic/fake"
+	"github.com/rancher/wrangler/v2/pkg/generic/fake"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/mock"
 	secretv1 "k8s.io/api/core/v1"
@@ -101,7 +101,7 @@ func (m *mockEksOperatorController) setInitialUpstreamSpec(cluster *mgmtv3.Clust
 // test generateAndSetServiceAccount with mock sibling func (getAccessToken)
 
 func (m *mockEksOperatorController) generateAndSetServiceAccount(cluster *mgmtv3.Cluster) (*mgmtv3.Cluster, error) {
-	clusterDialer, err := m.ClientDialer.ClusterDialer(cluster.Name)
+	clusterDialer, err := m.ClientDialer.ClusterDialer(cluster.Name, true)
 	if err != nil {
 		return cluster, err
 	}

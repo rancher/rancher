@@ -40,6 +40,10 @@ func (c *FakeCatalogV1) Operations(namespace string) v1.OperationInterface {
 	return &FakeOperations{c, namespace}
 }
 
+func (c *FakeCatalogV1) UIPlugins(namespace string) v1.UIPluginInterface {
+	return &FakeUIPlugins{c, namespace}
+}
+
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
 func (c *FakeCatalogV1) RESTClient() rest.Interface {

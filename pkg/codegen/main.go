@@ -3,8 +3,6 @@ package main
 import (
 	"os"
 
-	"github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring"
-	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	fleet "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	"github.com/rancher/norman/types"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -15,18 +13,16 @@ import (
 	publicSchema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3public"
 	projectSchema "github.com/rancher/rancher/pkg/schemas/project.cattle.io/v3"
 	planv1 "github.com/rancher/system-upgrade-controller/pkg/apis/upgrade.cattle.io/v1"
-	controllergen "github.com/rancher/wrangler/pkg/controller-gen"
-	"github.com/rancher/wrangler/pkg/controller-gen/args"
+	controllergen "github.com/rancher/wrangler/v2/pkg/controller-gen"
+	"github.com/rancher/wrangler/v2/pkg/controller-gen/args"
 	appsv1 "k8s.io/api/apps/v1"
 	scalingv2 "k8s.io/api/autoscaling/v2"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	extv1beta1 "k8s.io/api/extensions/v1beta1"
 	knetworkingv1 "k8s.io/api/networking/v1"
-	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	k8sschema "k8s.io/apimachinery/pkg/runtime/schema"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
@@ -180,27 +176,11 @@ func main() {
 		},
 		nil,
 	)
-	generator.GenerateNativeTypes(policyv1beta1.SchemeGroupVersion,
-		nil,
-		[]interface{}{
-			policyv1beta1.PodSecurityPolicy{},
-		},
-	)
 	generator.GenerateNativeTypes(storagev1.SchemeGroupVersion,
 		nil,
 		[]interface{}{
 			storagev1.StorageClass{},
 		},
-	)
-	generator.GenerateNativeTypes(
-		k8sschema.GroupVersion{Group: monitoring.GroupName, Version: monitoringv1.Version},
-		[]interface{}{
-			monitoringv1.Prometheus{},
-			monitoringv1.Alertmanager{},
-			monitoringv1.PrometheusRule{},
-			monitoringv1.ServiceMonitor{},
-		},
-		nil,
 	)
 	generator.GenerateNativeTypes(scalingv2.SchemeGroupVersion,
 		[]interface{}{

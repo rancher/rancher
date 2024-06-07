@@ -16,7 +16,7 @@ import (
 	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/management/clusteroperator"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	"github.com/rancher/wrangler/pkg/generic/fake"
+	"github.com/rancher/wrangler/v2/pkg/generic/fake"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/mock"
 	secretv1 "k8s.io/api/core/v1"
@@ -108,7 +108,7 @@ func (m *mockGkeOperatorController) generateAndSetServiceAccount(cluster *mgmtv3
 		return cluster, fmt.Errorf("error getting kube config: %v", err)
 	}
 
-	clusterDialer, err := m.ClientDialer.ClusterDialer(cluster.Name)
+	clusterDialer, err := m.ClientDialer.ClusterDialer(cluster.Name, true)
 	if err != nil {
 		return cluster, err
 	}

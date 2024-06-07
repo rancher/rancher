@@ -31,7 +31,7 @@ else
 fi
 
 if [ -z "${V2PROV_TEST_RUN_REGEX}" ]; then
-  V2PROV_TEST_RUN_REGEX="^Test_(General|Provisioning)_.*$"
+  V2PROV_TEST_RUN_REGEX="^Test_(General|Provisioning|Fleet)_.*$"
 fi
 
 RUNARG="-run ${V2PROV_TEST_RUN_REGEX}"
@@ -39,19 +39,36 @@ RUNARG="-run ${V2PROV_TEST_RUN_REGEX}"
 export DIST=${V2PROV_TEST_DIST}
 export SOME_K8S_VERSION=${SOME_K8S_VERSION}
 export TB_ORG=${TB_ORG}
+export CATTLE_CHART_DEFAULT_URL=${CATTLE_CHART_DEFAULT_URL}
 
 eval "$(grep '^ENV CATTLE_SYSTEM_AGENT' package/Dockerfile | awk '{print "export " $2 "=" $3}')"
 eval "$(grep '^ENV CATTLE_WINS_AGENT' package/Dockerfile | awk '{print "export " $2 "=" $3}')"
 eval "$(grep '^ENV CATTLE_CSI_PROXY_AGENT' package/Dockerfile | awk '{print "export " $2 "=" $3}')"
 eval "$(grep '^ENV CATTLE_KDM_BRANCH' package/Dockerfile | awk '{print "export " $2 "=" $3}')"
 
-if [ -z "${SOME_K8S_VERSION}" ]; then
+#if [ -z "${SOME_K8S_VERSION}" ]; then
+# Only set SOME_K8S_VERSION if it is empty -- for KDM provisioning tests, this value should already be populated
 # Get the last release for $DIST, which is usually the latest version or an experimental version.
 # Previously this would use channels, but channels no longer reflect the latest version since
 # https://github.com/rancher/rancher/issues/36827 has added appDefaults. We do not use appDefaults
 # here for simplicity's sake, as it requires semver parsing & matching. The last release should
 # be good enough for our needs.
-export SOME_K8S_VERSION=$(curl -sS https://raw.githubusercontent.com/rancher/kontainer-driver-metadata/dev-v2.8/data/data.json | jq -r ".$DIST.releases[-1].version")
+#export SOME_K8S_VERSION=$(curl -sS https://raw.githubusercontent.com/rancher/kontainer-driver-metadata/dev-v2.9/data/data.json | jq -r ".$DIST.releases[-1].version")
+#fi
+
+# Remove the following K8s version setting after the root cause of issues/rancher/45577 is determined
+if [ -z "${SOME_K8S_VERSION}" ]; then
+  if [ "$DIST" = "rke2" ]; then
+    export SOME_K8S_VERSION="v1.27.10+rke2r1"
+  else
+    export SOME_K8S_VERSION=$(curl https://raw.githubusercontent.com/rancher/kontainer-driver-metadata/dev-v2.9/data/data.json | jq -r ".$DIST.channels[0].latest")
+  fi
+fi
+
+if [ -z "${CATTLE_CHART_DEFAULT_URL}" ]; then
+# If `CATTLE_CHART_DEFAULT_URL` is not set, use the `https://github.com/rancher/charts` so GitHub is used instead of
+# the default `https://git.rancher.io/charts` to reduce the reliance and load on our Git mirror
+export CATTLE_CHART_DEFAULT_URL=https://github.com/rancher/charts
 fi
 
 echo "Starting rancher server for provisioning-tests using $SOME_K8S_VERSION"
@@ -65,7 +82,7 @@ curl -sLf ${CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX}/${CATTLE_SYSTEM_AGENT_VERSION}/
 curl -sLf ${CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX}/${CATTLE_SYSTEM_AGENT_VERSION}/rancher-system-agent-arm64 -o /usr/share/rancher/ui/assets/rancher-system-agent-arm64
 curl -sLf ${CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX}/${CATTLE_SYSTEM_AGENT_VERSION}/system-agent-uninstall.sh -o /usr/share/rancher/ui/assets/system-agent-uninstall.sh
 
-run_rancher()
+build_and_run_rancher()
 {
     RESTART_COUNT=0
     while sleep 2; do
@@ -105,6 +122,12 @@ dump_rancher_logs()
   echo -e "\n-----RANCHER-LOG-DUMP-END-----"
 }
 
+# Compile Rancher
+# This needs to happen before build_and_run_rancher is executed in the background.
+# Otherwise, build_and_run_rancher will also compile Rancher, overly elongating the
+# time before Rancher is ready and therefore causing flakiness of the health check below.
+./scripts/build-server
+
 # uncomment to get startup logs. Don't leave them on because it slows drone down too
 # much
 #tail -F /tmp/rancher.log &
@@ -114,7 +137,7 @@ trap "exit 1" 42
 PWRAPPROC="$$"
 
 PID=-1
-run_rancher &
+build_and_run_rancher &
 RANCHER_RUN_PID=$!
 trap cleanup exit
 

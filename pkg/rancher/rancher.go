@@ -14,7 +14,6 @@ import (
 	"github.com/pkg/errors"
 	responsewriter "github.com/rancher/apiserver/pkg/middleware"
 	"github.com/rancher/rancher/pkg/api/norman/customization/kontainerdriver"
-	"github.com/rancher/rancher/pkg/api/norman/customization/podsecuritypolicytemplate"
 	steveapi "github.com/rancher/rancher/pkg/api/steve"
 	"github.com/rancher/rancher/pkg/api/steve/aggregation"
 	"github.com/rancher/rancher/pkg/api/steve/proxy"
@@ -24,6 +23,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/requests"
 	"github.com/rancher/rancher/pkg/controllers/dashboard"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/apiservice"
+	"github.com/rancher/rancher/pkg/controllers/dashboard/plugin"
 	"github.com/rancher/rancher/pkg/controllers/dashboardapi"
 	managementauth "github.com/rancher/rancher/pkg/controllers/management/auth"
 	"github.com/rancher/rancher/pkg/controllers/nodedriver"
@@ -43,9 +43,9 @@ import (
 	aggregation2 "github.com/rancher/steve/pkg/aggregation"
 	steveauth "github.com/rancher/steve/pkg/auth"
 	steveserver "github.com/rancher/steve/pkg/server"
-	"github.com/rancher/wrangler/pkg/generic"
-	"github.com/rancher/wrangler/pkg/k8scheck"
-	"github.com/rancher/wrangler/pkg/unstructured"
+	"github.com/rancher/wrangler/v2/pkg/generic"
+	"github.com/rancher/wrangler/v2/pkg/k8scheck"
+	"github.com/rancher/wrangler/v2/pkg/unstructured"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	v1 "k8s.io/api/core/v1"
@@ -149,7 +149,6 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 	}
 	features.InitializeFeatures(wranglerContext.Mgmt.Feature(), opts.Features)
 
-	podsecuritypolicytemplate.RegisterIndexers(wranglerContext)
 	kontainerdriver.RegisterIndexers(wranglerContext)
 	managementauth.RegisterWranglerIndexers(wranglerContext)
 
@@ -204,6 +203,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		AuthMiddleware:  steveauth.ExistingContext,
 		Next:            ui.New(wranglerContext.Mgmt.Preference().Cache(), wranglerContext.Mgmt.ClusterRegistrationToken().Cache()),
 		ClusterRegistry: opts.ClusterRegistry,
+		SQLCache:        features.UISQLCache.Enabled(),
 	})
 	if err != nil {
 		return nil, err
@@ -264,6 +264,9 @@ func (r *Rancher) Start(ctx context.Context) error {
 
 	if err := steveapi.Setup(ctx, r.Steve, r.Wrangler); err != nil {
 		return err
+	}
+	if features.UIExtension.Enabled() {
+		plugin.Register(ctx, r.Wrangler)
 	}
 
 	if features.MCM.Enabled() {

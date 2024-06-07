@@ -7,7 +7,7 @@ import (
 
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
-	corev1 "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
+	corev1 "github.com/rancher/wrangler/v2/pkg/generated/controllers/core/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/yaml"
 )
@@ -33,7 +33,7 @@ var errKeyNotFound = errors.New("key not found")
 // mockgen --build_flags=--mod=mod -destination=pkg/controllers/dashboard/chart/fake/manager.go -package=fake github.com/rancher/rancher/pkg/controllers/dashboard/chart Manager
 type Manager interface {
 	// Ensure ensures that the chart is installed into the given namespace with the given version configuration and values.
-	Ensure(namespace, name, minVersion, exactVersion string, values map[string]interface{}, forceAdopt bool, installImageOverride string) error
+	Ensure(namespace, name, minVersion, exactVersion string, values map[string]interface{}, takeOwnership bool, installImageOverride string) error
 
 	// Uninstall uninstalls the given chart in the given namespace.
 	Uninstall(namespace, name string) error

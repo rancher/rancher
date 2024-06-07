@@ -19,6 +19,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
@@ -32,11 +33,13 @@ import (
 	"github.com/rancher/rancher/pkg/catalogv2/git"
 	"github.com/rancher/rancher/pkg/catalogv2/helm"
 	helmhttp "github.com/rancher/rancher/pkg/catalogv2/http"
+	"github.com/rancher/rancher/pkg/catalogv2/oci"
 	catalogcontrollers "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/settings"
-	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
-	"github.com/rancher/wrangler/pkg/schemas/validation"
+	corecontrollers "github.com/rancher/wrangler/v2/pkg/generated/controllers/core/v1"
+	"github.com/rancher/wrangler/v2/pkg/schemas/validation"
 	"github.com/sirupsen/logrus"
+	"helm.sh/helm/v3/pkg/registry"
 	"helm.sh/helm/v3/pkg/repo"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -241,7 +244,23 @@ func (c *Manager) Chart(namespace, name, chartName, version string, skipFilter b
 		return nil, err
 	}
 
-	return helmhttp.Chart(secret, repo.status.URL, repo.spec.CABundle, repo.spec.InsecureSkipTLSverify, repo.spec.DisableSameOriginCheck, chart)
+	// Check if chart is nil and has at least one URL
+	if chart == nil {
+		return nil, errors.New("chart is nil")
+	}
+	if len(chart.URLs) <= 0 {
+		return nil, errors.New("chart has no urls specified")
+	}
+
+	switch {
+	// For OCI based helm repositories, there is no index.yaml.
+	// We generate index.yaml for it. While generating the index.yaml
+	// we only set index 0 of chart.URLs.
+	case registry.IsOCI(chart.URLs[0]):
+		return oci.Chart(secret, chart, *repo.spec)
+	default:
+		return helmhttp.Chart(secret, repo.status.URL, repo.spec.CABundle, repo.spec.InsecureSkipTLSverify, repo.spec.DisableSameOriginCheck, chart)
+	}
 }
 
 // Info retrieves detailed information about a specific Helm chart from a Helm repository.

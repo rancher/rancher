@@ -16,6 +16,25 @@ type AuthProvider struct {
 	Type string `json:"type"`
 }
 
+func (a *AuthProvider) GetType() string {
+	return a.Type
+}
+
+// OAuthProvider contains the OAuth configuration of the AuthProvider
+type OAuthProvider struct {
+	ClientID      string   `json:"clientId"`
+	Scopes        []string `json:"scopes"`
+	OAuthEndpoint `json:",inline"`
+}
+
+// OAuthEndpoint contains the endpoints needed for an oauth exchange.
+// See also https://pkg.go.dev/golang.org/x/oauth2#Endpoint
+type OAuthEndpoint struct {
+	AuthURL       string `json:"authUrl,omitempty"`
+	DeviceAuthURL string `json:"deviceAuthUrl,omitempty"`
+	TokenURL      string `json:"tokenUrl,omitempty"`
+}
+
 // +genclient
 // +kubebuilder:skipversion
 // +genclient:nonNamespaced
@@ -112,6 +131,9 @@ type AzureADProvider struct {
 	AuthProvider      `json:",inline"`
 
 	RedirectURL string `json:"redirectUrl"`
+	TenantID    string `json:"tenantId,omitempty"`
+
+	OAuthProvider `json:",inline"`
 }
 
 // +genclient
@@ -130,6 +152,7 @@ type SamlProvider struct {
 type AzureADLogin struct {
 	GenericLogin `json:",inline"`
 	Code         string `json:"code" norman:"type=string,required"`
+	IDToken      string `json:"id_token,omitempty"`
 }
 
 // +genclient
@@ -205,4 +228,23 @@ type OIDCLogin struct {
 
 type KeyCloakOIDCProvider struct {
 	OIDCProvider `json:",inline"`
+}
+
+// +genclient
+// +kubebuilder:skipversion
+// +genclient:nonNamespaced
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+type GenericOIDCProvider struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	AuthProvider      `json:",inline"`
+
+	RedirectURL string `json:"redirectUrl"`
+	Scopes      string `json:"scopes"`
+}
+
+type GenericOIDCLogin struct {
+	GenericLogin `json:",inline"`
+	Code         string `json:"code" norman:"type=string,required"`
 }

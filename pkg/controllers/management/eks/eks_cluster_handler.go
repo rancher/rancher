@@ -11,10 +11,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/eks"
-	"github.com/rancher/eks-operator/controller"
 	eksv1 "github.com/rancher/eks-operator/pkg/apis/eks.cattle.io/v1"
+	"github.com/rancher/eks-operator/utils"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/management/clusteroperator"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterupstreamrefresher"
@@ -27,6 +30,7 @@ import (
 	"github.com/rancher/rancher/pkg/types/config"
 	typesDialer "github.com/rancher/rancher/pkg/types/config/dialer"
 	"github.com/rancher/rancher/pkg/wrangler"
+	corecontrollers "github.com/rancher/wrangler/v2/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -50,6 +54,7 @@ const (
 
 type eksOperatorController struct {
 	clusteroperator.OperatorController
+	secretClient corecontrollers.SecretClient
 }
 
 func Register(ctx context.Context, wContext *wrangler.Context, mgmtCtx *config.ManagementContext) {
@@ -60,22 +65,25 @@ func Register(ctx context.Context, wContext *wrangler.Context, mgmtCtx *config.M
 	}
 
 	eksCCDynamicClient := mgmtCtx.DynamicClient.Resource(eksClusterConfigResource)
-	e := &eksOperatorController{clusteroperator.OperatorController{
-		ClusterEnqueueAfter:  wContext.Mgmt.Cluster().EnqueueAfter,
-		SecretsCache:         wContext.Core.Secret().Cache(),
-		Secrets:              mgmtCtx.Core.Secrets(""),
-		TemplateCache:        wContext.Mgmt.CatalogTemplate().Cache(),
-		ProjectCache:         wContext.Mgmt.Project().Cache(),
-		AppLister:            mgmtCtx.Project.Apps("").Controller().Lister(),
-		AppClient:            mgmtCtx.Project.Apps(""),
-		NsClient:             mgmtCtx.Core.Namespaces(""),
-		ClusterClient:        wContext.Mgmt.Cluster(),
-		CatalogManager:       mgmtCtx.CatalogManager,
-		SystemAccountManager: systemaccount.NewManager(mgmtCtx),
-		DynamicClient:        eksCCDynamicClient,
-		ClientDialer:         mgmtCtx.Dialer,
-		Discovery:            wContext.K8s.Discovery(),
-	}}
+	e := &eksOperatorController{
+		OperatorController: clusteroperator.OperatorController{
+			ClusterEnqueueAfter:  wContext.Mgmt.Cluster().EnqueueAfter,
+			SecretsCache:         wContext.Core.Secret().Cache(),
+			Secrets:              mgmtCtx.Core.Secrets(""),
+			TemplateCache:        wContext.Mgmt.CatalogTemplate().Cache(),
+			ProjectCache:         wContext.Mgmt.Project().Cache(),
+			AppLister:            mgmtCtx.Project.Apps("").Controller().Lister(),
+			AppClient:            mgmtCtx.Project.Apps(""),
+			NsClient:             mgmtCtx.Core.Namespaces(""),
+			ClusterClient:        wContext.Mgmt.Cluster(),
+			CatalogManager:       mgmtCtx.CatalogManager,
+			SystemAccountManager: systemaccount.NewManager(mgmtCtx),
+			DynamicClient:        eksCCDynamicClient,
+			ClientDialer:         mgmtCtx.Dialer,
+			Discovery:            wContext.K8s.Discovery(),
+		},
+		secretClient: wContext.Core.Secret(),
+	}
 
 	wContext.Mgmt.Cluster().OnChange(ctx, "eks-operator-controller", e.onClusterChange)
 }
@@ -190,7 +198,7 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 		// EKS cluster must have at least one node to run cluster agent. The best way to verify
 		// if a cluster has self-managed node or nodegroup is to check if the cluster agent was deployed.
 		// Issue: https://github.com/rancher/eks-operator/issues/301
-		addNgMessage := "Cluster must have at least one managed nodegroup."
+		addNgMessage := "Cluster must have at least one managed nodegroup or one self-managed node."
 		noNodeGroupsOnSpec := len(cluster.Spec.EKSConfig.NodeGroups) == 0
 		noNodeGroupsOnUpstreamSpec := len(cluster.Status.EKSStatus.UpstreamSpec.NodeGroups) == 0
 		if !apimgmtv3.ClusterConditionAgentDeployed.IsTrue(cluster) &&
@@ -379,7 +387,7 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 func (e *eksOperatorController) setInitialUpstreamSpec(cluster *mgmtv3.Cluster) (*mgmtv3.Cluster, error) {
 	logrus.Infof("setting initial upstreamSpec on cluster [%s]", cluster.Name)
 	cluster = cluster.DeepCopy()
-	upstreamSpec, err := clusterupstreamrefresher.BuildEKSUpstreamSpec(e.SecretsCache, cluster)
+	upstreamSpec, err := clusterupstreamrefresher.BuildEKSUpstreamSpec(e.secretClient, cluster)
 	if err != nil {
 		return cluster, err
 	}
@@ -431,7 +439,7 @@ func (e *eksOperatorController) updateEKSClusterConfig(cluster *mgmtv3.Cluster, 
 
 // generateAndSetServiceAccount uses the API endpoint and CA cert to generate a service account token. The token is then copied to the cluster status.
 func (e *eksOperatorController) generateAndSetServiceAccount(cluster *mgmtv3.Cluster) (*mgmtv3.Cluster, error) {
-	clusterDialer, err := e.ClientDialer.ClusterDialer(cluster.Name)
+	clusterDialer, err := e.ClientDialer.ClusterDialer(cluster.Name, true)
 	if err != nil {
 		return cluster, err
 	}
@@ -543,8 +551,42 @@ func (e *eksOperatorController) generateSATokenWithPublicAPI(cluster *mgmtv3.Clu
 	return serviceToken, requiresTunnel, err
 }
 
+func (e *eksOperatorController) getAWSSession(cluster *mgmtv3.Cluster) (*session.Session, error) {
+	awsConfig := &aws.Config{}
+	eksConfig := cluster.Spec.EKSConfig
+
+	if region := eksConfig.Region; region != "" {
+		awsConfig.Region = aws.String(region)
+	}
+
+	ns, id := utils.Parse(eksConfig.AmazonCredentialSecret)
+	if amazonCredentialSecret := eksConfig.AmazonCredentialSecret; amazonCredentialSecret != "" {
+		secret, err := e.SecretsCache.Get(ns, id)
+		if err != nil {
+			return nil, fmt.Errorf("error getting secret %s/%s: %w", ns, id, err)
+		}
+
+		accessKeyBytes := secret.Data["amazonec2credentialConfig-accessKey"]
+		secretKeyBytes := secret.Data["amazonec2credentialConfig-secretKey"]
+		if accessKeyBytes == nil || secretKeyBytes == nil {
+			return nil, fmt.Errorf("invalid aws cloud credential")
+		}
+
+		accessKey := string(accessKeyBytes)
+		secretKey := string(secretKeyBytes)
+
+		awsConfig.Credentials = credentials.NewStaticCredentials(accessKey, secretKey, "")
+	}
+
+	sess, err := session.NewSession(awsConfig)
+	if err != nil {
+		return nil, fmt.Errorf("error getting new aws session: %w", err)
+	}
+	return sess, nil
+}
+
 func (e *eksOperatorController) getAccessToken(cluster *mgmtv3.Cluster) (string, error) {
-	sess, _, err := controller.StartAWSSessions(e.SecretsCache, *cluster.Spec.EKSConfig)
+	sess, err := e.getAWSSession(cluster)
 	if err != nil {
 		return "", err
 	}

@@ -1,7 +1,7 @@
 package v1
 
 import (
-	"github.com/rancher/wrangler/pkg/genericcondition"
+	"github.com/rancher/wrangler/v2/pkg/genericcondition"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -23,15 +23,29 @@ type SecretReference struct {
 	Namespace string `json:"namespace,omitempty"`
 }
 
+// ExponentialBackOffValues are values in seconds for the ratelimiting func when OCI registry sends 429 http response code.
+type ExponentialBackOffValues struct {
+	MinWait    int `json:"minWait,omitempty"`
+	MaxWait    int `json:"maxWait,omitempty"`
+	MaxRetries int `json:"maxRetries,omitempty"`
+}
+
 type RepoSpec struct {
-	// URL A http URL of the repo to connect to
+	// URL can be a HTTP URL i.e https://charts.rancher.io or an OCI URL i.e oci://dp.apps.rancher.io/charts/etcd.
 	URL string `json:"url,omitempty"`
+
+	// InsecurePlainHTTP is only valid for OCI URL's and allows insecure connections to registries without enforcing TLS checks.
+	InsecurePlainHTTP bool `json:"insecurePlainHttp,omitempty"`
 
 	// GitRepo a git repo to clone and index as the helm repo
 	GitRepo string `json:"gitRepo,omitempty"`
 
 	// GitBranch The git branch to follow
 	GitBranch string `json:"gitBranch,omitempty"`
+
+	// ExponentialBackOffValues are values given to the Rancher manager to handle
+	// 429 TOOMANYREQUESTS response code from the OCI registry.
+	ExponentialBackOffValues *ExponentialBackOffValues `json:"exponentialBackOffValues,omitempty"`
 
 	// CABundle is a PEM encoded CA bundle which will be used to validate the repo's certificate.
 	// If unspecified, system trust roots will be used.
@@ -64,6 +78,7 @@ type RepoSpec struct {
 	Enabled *bool `json:"enabled,omitempty"`
 
 	// DisableSameOriginCheck attaches the Basic Auth Header to all helm client API calls, regardless of whether the destination of the API call matches the origin of the repository's URL
+	// This field is not supported for OCI based URLs
 	DisableSameOriginCheck bool `json:"disableSameOriginCheck,omitempty"`
 }
 
@@ -72,6 +87,7 @@ type RepoCondition string
 const (
 	RepoDownloaded         RepoCondition = "Downloaded"
 	FollowerRepoDownloaded RepoCondition = "FollowerDownloaded"
+	OCIDownloaded          RepoCondition = "OCIDownloaded"
 )
 
 type RepoStatus struct {
@@ -95,6 +111,15 @@ type RepoStatus struct {
 	Commit string `json:"commit,omitempty"`
 
 	Conditions []genericcondition.GenericCondition `json:"conditions,omitempty"`
+
+	// Number of times the handler will retry if it gets a 429 error
+	NumberOfRetries int `json:"numberOfRetries,omitempty"`
+
+	// The time the next retry will happen
+	NextRetryAt metav1.Time `json:"nextRetryAt,omitempty"`
+
+	// If the handler should be skipped or not
+	ShouldNotSkip bool `json:"shouldNotSkip,omitempty"`
 }
 
 // +genclient

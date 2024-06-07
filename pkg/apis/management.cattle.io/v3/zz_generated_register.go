@@ -39,12 +39,9 @@ var (
 	CatalogTemplateVersionResourceName                    = "catalogtemplateversions"
 	CloudCredentialResourceName                           = "cloudcredentials"
 	ClusterResourceName                                   = "clusters"
-	ClusterAlertResourceName                              = "clusteralerts"
-	ClusterAlertGroupResourceName                         = "clusteralertgroups"
-	ClusterAlertRuleResourceName                          = "clusteralertrules"
 	ClusterCatalogResourceName                            = "clustercatalogs"
 	ClusterLoggingResourceName                            = "clusterloggings"
-	ClusterMonitorGraphResourceName                       = "clustermonitorgraphs"
+	ClusterProxyConfigResourceName                        = "clusterproxyconfigs"
 	ClusterRegistrationTokenResourceName                  = "clusterregistrationtokens"
 	ClusterRoleTemplateBindingResourceName                = "clusterroletemplatebindings"
 	ClusterTemplateResourceName                           = "clustertemplates"
@@ -55,6 +52,7 @@ var (
 	FeatureResourceName                                   = "features"
 	FleetWorkspaceResourceName                            = "fleetworkspaces"
 	FreeIpaProviderResourceName                           = "freeipaproviders"
+	GenericOIDCProviderResourceName                       = "genericoidcproviders"
 	GithubProviderResourceName                            = "githubproviders"
 	GlobalDnsResourceName                                 = "globaldnses"
 	GlobalDnsProviderResourceName                         = "globaldnsproviders"
@@ -66,28 +64,20 @@ var (
 	KontainerDriverResourceName                           = "kontainerdrivers"
 	LocalProviderResourceName                             = "localproviders"
 	ManagedChartResourceName                              = "managedcharts"
-	MonitorMetricResourceName                             = "monitormetrics"
 	MultiClusterAppResourceName                           = "multiclusterapps"
 	MultiClusterAppRevisionResourceName                   = "multiclusterapprevisions"
 	NodeResourceName                                      = "nodes"
 	NodeDriverResourceName                                = "nodedrivers"
 	NodePoolResourceName                                  = "nodepools"
 	NodeTemplateResourceName                              = "nodetemplates"
-	NotifierResourceName                                  = "notifiers"
 	OIDCProviderResourceName                              = "oidcproviders"
 	OpenLdapProviderResourceName                          = "openldapproviders"
 	PodSecurityAdmissionConfigurationTemplateResourceName = "podsecurityadmissionconfigurationtemplates"
-	PodSecurityPolicyTemplateResourceName                 = "podsecuritypolicytemplates"
-	PodSecurityPolicyTemplateProjectBindingResourceName   = "podsecuritypolicytemplateprojectbindings"
 	PreferenceResourceName                                = "preferences"
 	PrincipalResourceName                                 = "principals"
 	ProjectResourceName                                   = "projects"
-	ProjectAlertResourceName                              = "projectalerts"
-	ProjectAlertGroupResourceName                         = "projectalertgroups"
-	ProjectAlertRuleResourceName                          = "projectalertrules"
 	ProjectCatalogResourceName                            = "projectcatalogs"
 	ProjectLoggingResourceName                            = "projectloggings"
-	ProjectMonitorGraphResourceName                       = "projectmonitorgraphs"
 	ProjectNetworkPolicyResourceName                      = "projectnetworkpolicies"
 	ProjectRoleTemplateBindingResourceName                = "projectroletemplatebindings"
 	RancherUserNotificationResourceName                   = "rancherusernotifications"
@@ -149,18 +139,12 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&CloudCredentialList{},
 		&Cluster{},
 		&ClusterList{},
-		&ClusterAlert{},
-		&ClusterAlertList{},
-		&ClusterAlertGroup{},
-		&ClusterAlertGroupList{},
-		&ClusterAlertRule{},
-		&ClusterAlertRuleList{},
 		&ClusterCatalog{},
 		&ClusterCatalogList{},
 		&ClusterLogging{},
 		&ClusterLoggingList{},
-		&ClusterMonitorGraph{},
-		&ClusterMonitorGraphList{},
+		&ClusterProxyConfig{},
+		&ClusterProxyConfigList{},
 		&ClusterRegistrationToken{},
 		&ClusterRegistrationTokenList{},
 		&ClusterRoleTemplateBinding{},
@@ -181,6 +165,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&FleetWorkspaceList{},
 		&FreeIpaProvider{},
 		&FreeIpaProviderList{},
+		&GenericOIDCProvider{},
+		&GenericOIDCProviderList{},
 		&GithubProvider{},
 		&GithubProviderList{},
 		&GlobalDns{},
@@ -203,8 +189,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&LocalProviderList{},
 		&ManagedChart{},
 		&ManagedChartList{},
-		&MonitorMetric{},
-		&MonitorMetricList{},
 		&MultiClusterApp{},
 		&MultiClusterAppList{},
 		&MultiClusterAppRevision{},
@@ -217,36 +201,22 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&NodePoolList{},
 		&NodeTemplate{},
 		&NodeTemplateList{},
-		&Notifier{},
-		&NotifierList{},
 		&OIDCProvider{},
 		&OIDCProviderList{},
 		&OpenLdapProvider{},
 		&OpenLdapProviderList{},
 		&PodSecurityAdmissionConfigurationTemplate{},
 		&PodSecurityAdmissionConfigurationTemplateList{},
-		&PodSecurityPolicyTemplate{},
-		&PodSecurityPolicyTemplateList{},
-		&PodSecurityPolicyTemplateProjectBinding{},
-		&PodSecurityPolicyTemplateProjectBindingList{},
 		&Preference{},
 		&PreferenceList{},
 		&Principal{},
 		&PrincipalList{},
 		&Project{},
 		&ProjectList{},
-		&ProjectAlert{},
-		&ProjectAlertList{},
-		&ProjectAlertGroup{},
-		&ProjectAlertGroupList{},
-		&ProjectAlertRule{},
-		&ProjectAlertRuleList{},
 		&ProjectCatalog{},
 		&ProjectCatalogList{},
 		&ProjectLogging{},
 		&ProjectLoggingList{},
-		&ProjectMonitorGraph{},
-		&ProjectMonitorGraphList{},
 		&ProjectNetworkPolicy{},
 		&ProjectNetworkPolicyList{},
 		&ProjectRoleTemplateBinding{},

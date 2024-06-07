@@ -17,7 +17,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-const RancherVersionDev = "2.8.99"
+const RancherVersionDev = "2.9.99"
+const DefaultMaxUIPluginFileSizeInBytes = 20 * 1024 * 1024 // 20MB
 
 var (
 	releasePattern = regexp.MustCompile("^v[0-9]")
@@ -50,7 +51,7 @@ var (
 		"cattle-elemental-system",
 	}
 
-	AgentImage                          = NewSetting("agent-image", "rancher/rancher-agent:v2.8-head")
+	AgentImage                          = NewSetting("agent-image", "rancher/rancher-agent:v2.9-head")
 	AgentRolloutTimeout                 = NewSetting("agent-rollout-timeout", "300s")
 	AgentRolloutWait                    = NewSetting("agent-rollout-wait", "true")
 	AuthImage                           = NewSetting("auth-image", v32.ToolsSystemImages.AuthSystemImages.KubeAPIAuth)
@@ -62,10 +63,10 @@ var (
 	CLIURLLinux                         = NewSetting("cli-url-linux", "https://releases.rancher.com/cli/v1.0.0-alpha8/rancher-linux-amd64-v1.0.0-alpha8.tar.gz")
 	CLIURLWindows                       = NewSetting("cli-url-windows", "https://releases.rancher.com/cli/v1.0.0-alpha8/rancher-windows-386-v1.0.0-alpha8.zip")
 	ClusterControllerStartCount         = NewSetting("cluster-controller-start-count", "50")
-	EngineInstallURL                    = NewSetting("engine-install-url", "https://releases.rancher.com/install-docker/24.0.sh")
+	EngineInstallURL                    = NewSetting("engine-install-url", "https://releases.rancher.com/install-docker/26.0.sh")
 	EngineISOURL                        = NewSetting("engine-iso-url", "https://releases.rancher.com/os/latest/rancheros-vmware.iso")
 	EngineNewestVersion                 = NewSetting("engine-newest-version", "v17.12.0")
-	EngineSupportedRange                = NewSetting("engine-supported-range", "~v1.11.2 || ~v1.12.0 || ~v1.13.0 || ~v17.03.0 || ~v17.06.0 || ~v17.09.0 || ~v18.06.0 || ~v18.09.0 || ~v19.03.0 || ~v20.10.0 || ~v23.0.0 || ~v24.0.0 ")
+	EngineSupportedRange                = NewSetting("engine-supported-range", "~v1.11.2 || ~v1.12.0 || ~v1.13.0 || ~v17.03.0 || ~v17.06.0 || ~v17.09.0 || ~v18.06.0 || ~v18.09.0 || ~v19.03.0 || ~v20.10.0 || ~v23.0.0 || ~v24.0.0 || ~v25.0.0 || ~v26.0.0")
 	FirstLogin                          = NewSetting("first-login", "true")
 	GlobalRegistryEnabled               = NewSetting("global-registry-enabled", "false")
 	GithubProxyAPIURL                   = NewSetting("github-proxy-api-url", "https://api.github.com")
@@ -82,7 +83,7 @@ var (
 	KubernetesVersionToSystemImages     = NewSetting("k8s-version-to-images", "")
 	KubernetesVersionsCurrent           = NewSetting("k8s-versions-current", "")
 	KubernetesVersionsDeprecated        = NewSetting("k8s-versions-deprecated", "")
-	KDMBranch                           = NewSetting("kdm-branch", "dev-v2.8")
+	KDMBranch                           = NewSetting("kdm-branch", "dev-v2.9")
 	MachineVersion                      = NewSetting("machine-version", "dev")
 	Namespace                           = NewSetting("namespace", os.Getenv("CATTLE_NAMESPACE"))
 	PasswordMinLength                   = NewSetting("password-min-length", "12")
@@ -96,8 +97,8 @@ var (
 	WinsAgentVersion                    = NewSetting("wins-agent-version", "")
 	CSIProxyAgentVersion                = NewSetting("csi-proxy-agent-version", "")
 	CSIProxyAgentURL                    = NewSetting("csi-proxy-agent-url", "https://acs-mirror.azureedge.net/csi-proxy/%[1]s/binaries/csi-proxy-%[1]s.tar.gz")
-	SystemAgentInstallScript            = NewSetting("system-agent-install-script", "") // Defined via environment variable
-	WinsAgentInstallScript              = NewSetting("wins-agent-install-script", "https://raw.githubusercontent.com/rancher/wins/v0.4.14/install.ps1")
+	SystemAgentInstallScript            = NewSetting("system-agent-install-script", "https://github.com/rancher/system-agent/releases/download/v0.3.6-rc2/install.sh") // To ensure consistency between SystemAgentInstallScript default value and CATTLE_SYSTEM_AGENT_INSTALL_SCRIPT to utilize the local system-agent-install.sh script when both values are equal.
+	WinsAgentInstallScript              = NewSetting("wins-agent-install-script", "https://raw.githubusercontent.com/rancher/wins/v0.4.15/install.ps1")
 	SystemAgentInstallerImage           = NewSetting("system-agent-installer-image", "") // Defined via environment variable
 	SystemAgentUpgradeImage             = NewSetting("system-agent-upgrade-image", "")   // Defined via environment variable
 	WinsAgentUpgradeImage               = NewSetting("wins-agent-upgrade-image", "")
@@ -109,7 +110,7 @@ var (
 	WhitelistDomain                     = NewSetting("whitelist-domain", "forums.rancher.com")
 	WhitelistEnvironmentVars            = NewSetting("whitelist-envvars", "HTTP_PROXY,HTTPS_PROXY,NO_PROXY")
 	AuthUserInfoResyncCron              = NewSetting("auth-user-info-resync-cron", "0 0 * * *")
-	APIUIVersion                        = NewSetting("api-ui-version", "1.1.10")              // Please update the CATTLE_API_UI_VERSION in package/Dockerfile when updating the version here.
+	APIUIVersion                        = NewSetting("api-ui-version", "1.1.11")              // Please update the CATTLE_API_UI_VERSION in package/Dockerfile when updating the version here.
 	RotateCertsIfExpiringInDays         = NewSetting("rotate-certs-if-expiring-in-days", "7") // 7 days
 	ClusterTemplateEnforcement          = NewSetting("cluster-template-enforcement", "false")
 	InitialDockerRootDir                = NewSetting("initial-docker-root-dir", "/var/lib/docker")
@@ -130,6 +131,7 @@ var (
 	SystemFeatureChartRefreshSeconds    = NewSetting("system-feature-chart-refresh-seconds", "21600")
 	ClusterAgentDefaultAffinity         = NewSetting("cluster-agent-default-affinity", ClusterAgentAffinity)
 	FleetAgentDefaultAffinity           = NewSetting("fleet-agent-default-affinity", FleetAgentAffinity)
+	MaxUIPluginFileByteSize             = NewSetting("max-ui-plugin-file-byte-size", strconv.Itoa(DefaultMaxUIPluginFileSizeInBytes)) // Max file size in bytes for ui plugins
 
 	Rke2DefaultVersion = NewSetting("rke2-default-version", "")
 	K3sDefaultVersion  = NewSetting("k3s-default-version", "")
@@ -188,6 +190,9 @@ var (
 
 	// RancherWebhookVersion is the exact version of the webhook that Rancher will install.
 	RancherWebhookVersion = NewSetting("rancher-webhook-version", "")
+
+	// RancherWebhookVersion is the exact version of the webhook that Rancher will install.
+	RancherProvisioningCAPIVersion = NewSetting("rancher-provisioning-capi-version", "")
 
 	// RKE2ChartDefaultBranch represents the default branch for the RKE2 charts repo.
 	RKE2ChartDefaultBranch = NewSetting("rke2-chart-default-branch", "main")
@@ -258,6 +263,28 @@ var (
 	// UIPL the vendor/company name.
 	UIPL = NewSetting("ui-pl", "rancher")
 
+	// UIPrimaryColor UI primary color for branding customisation
+	UIPrimaryColor = NewSetting("ui-primary-color", "")
+
+	// UILinkColor UI link color for branding customisation
+	UILinkColor = NewSetting("ui-link-color", "")
+
+	// UILoginBackground the custom background in the login page.
+	UILoginBackgroundLight = NewSetting("ui-login-background-light", "")
+	UILoginBackgroundDark  = NewSetting("ui-login-background-dark", "")
+
+	// UIBanner the custom background image in the home page.
+	UIBannerLight = NewSetting("ui-banner-light", "")
+	UIBannerDark  = NewSetting("ui-banner-dark", "")
+
+	// UIExtensions - setting for configuring UI Extensions (e.g. allow users to enable/disable extensions)
+	UIExtensions = NewSetting("ui-extensions", "")
+
+	// UI Settings for allowing separate configuration of page banners
+	UIBannerHeader       = NewSetting("ui-banner-header", "")
+	UIBannerFooter       = NewSetting("ui-banner-footer", "")
+	UIBannerLoginConsent = NewSetting("ui-banner-login-consent", "")
+
 	// UIPreferred Ensure that the new Dashboard is the default UI.
 	UIPreferred = NewSetting("ui-preferred", "vue")
 
@@ -265,6 +292,8 @@ var (
 	// This setting is for development purposes only.
 	SkipHostedClusterChartInstallation = NewSetting("skip-hosted-cluster-chart-installation", os.Getenv("CATTLE_SKIP_HOSTED_CLUSTER_CHART_INSTALLATION"))
 	MachineProvisionImagePullPolicy    = NewSetting("machine-provision-image-pull-policy", string(v1.PullAlways))
+	// EULAAgreed is used only by the UI, but needs to be known to Rancher so that it's not removed.
+	EULAAgreed = NewSetting("eula-agreed", "")
 )
 
 // FullShellImage returns the full private registry name of the rancher shell image.

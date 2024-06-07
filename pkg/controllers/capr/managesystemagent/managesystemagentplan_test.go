@@ -1,18 +1,17 @@
 package managesystemagent
 
 import (
-	"encoding/base64"
-	"encoding/json"
-	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"testing"
 	"time"
+
+	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 
 	"github.com/golang/mock/gomock"
 	"github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	fleetv1alpha1 "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
-	"github.com/rancher/wrangler/pkg/generic/fake"
+	"github.com/rancher/wrangler/v2/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -108,11 +107,7 @@ func TestManageSystemAgent_syncSystemUpgradeControllerStatusConditionManipulatio
 			}
 
 			capr.SystemUpgradeControllerReady.True(&mockControlPlane.Status)
-			metadata, err := json.Marshal(SUCMetadata{
-				PspEnabled: tt.args.pspEnabled,
-			})
-			assert.NoError(t, err)
-			capr.SystemUpgradeControllerReady.Message(&mockControlPlane.Status, base64.StdEncoding.EncodeToString(metadata))
+
 			// Set the "last updated time" to the start of time, because RFC3339 only provides granularity at seconds and the test can run in less than a second (thus ensuring the timestamp is mutated when we expect it to be mutated)
 			capr.SystemUpgradeControllerReady.LastUpdated(&mockControlPlane.Status, time.Time{}.UTC().Format(time.RFC3339))
 			lu := capr.SystemUpgradeControllerReady.GetLastUpdated(&mockControlPlane.Status)

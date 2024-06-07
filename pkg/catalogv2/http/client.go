@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -40,6 +41,7 @@ func HelmClient(secret *corev1.Secret, caBundle []byte, insecureSkipTLSVerify bo
 		}
 		pool, err := x509.SystemCertPool()
 		if err != nil {
+			logrus.Debugf("getting system cert pool failed with %v", err)
 			pool = x509.NewCertPool()
 		}
 		pool.AddCert(cert)

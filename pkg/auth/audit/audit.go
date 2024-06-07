@@ -20,6 +20,7 @@ import (
 	"github.com/sirupsen/logrus"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/utils/strings/slices"
 )
 
 const (
@@ -43,6 +44,8 @@ const (
 	LevelRequestResponse
 
 	generateKubeconfigURI = "action=generateKubeconfig"
+
+	auditLogErrKey = "auditLogError"
 )
 
 var (
@@ -50,8 +53,9 @@ var (
 		http.MethodPut:  true,
 		http.MethodPost: true,
 	}
-	sensitiveRequestHeader  = []string{"Cookie", "Authorization", "X-Api-Tunnel-Params", "X-Api-Tunnel-Token"}
-	sensitiveResponseHeader = []string{"Cookie", "Set-Cookie"}
+	sensitiveRequestHeader  = []string{"Cookie", "Authorization", "X-Api-Tunnel-Params", "X-Api-Tunnel-Token", "X-Api-Auth-Header", "X-Amz-Security-Token"}
+	sensitiveResponseHeader = []string{"Cookie", "Set-Cookie", "X-Api-Set-Cookie-Header"}
+	sensitiveBodyFields     = []string{"credentials", "applicationSecret", "oauthCredential", "serviceAccountCredential", "spKey", "spCert", "certificate", "privateKey"}
 	// ErrUnsupportedEncoding is returned when the response encoding is unsupported
 	ErrUnsupportedEncoding = fmt.Errorf("unsupported encoding")
 	secretBaseType         = regexp.MustCompile(".\"baseType\":\"([A-Za-z]*[S|s]ecret)\".")
@@ -187,7 +191,6 @@ func (a *auditLog) write(userInfo *User, reqHeaders, resHeaders http.Header, res
 	var compactBuffer bytes.Buffer
 	err = json.Compact(&compactBuffer, buffer.Bytes())
 	if err != nil {
-
 		return fmt.Errorf("failed to compact audit log: %w", err)
 	}
 
@@ -278,11 +281,24 @@ func isExist(array []string, key string) bool {
 	return false
 }
 
+func redactedBodyWithErr(auditErr error) []byte {
+	m := map[string]string{
+		auditLogErrKey: auditErr.Error(),
+	}
+
+	body, err := json.Marshal(m)
+	if err != nil {
+		logrus.Debugf("auditLog: recevied invalid json: %v", err)
+		return []byte("{}")
+	}
+
+	return body
+}
+
 func (a *auditLog) redactSensitiveData(requestURI string, body []byte) []byte {
 	var m map[string]interface{}
 	if err := json.Unmarshal(body, &m); err != nil {
-		logrus.Debugf("auditLog: Redacting entire body for requestURI [%s]. Cannot marshal body into a map[string]interface{}: %v", requestURI, err)
-		return []byte{}
+		return redactedBodyWithErr(err)
 	}
 
 	var changed bool
@@ -303,8 +319,9 @@ func (a *auditLog) redactSensitiveData(requestURI string, body []byte) []byte {
 
 	newBody, err := json.Marshal(m)
 	if err != nil {
-		return []byte{}
+		return redactedBodyWithErr(err)
 	}
+
 	return newBody
 }
 
@@ -394,7 +411,7 @@ func (a *auditLog) redactMap(m map[string]interface{}) bool {
 	for key := range m {
 		switch val := m[key].(type) {
 		case string:
-			if a.keysToRedactRegex.MatchString(key) {
+			if a.keysToRedactRegex.MatchString(key) || slices.Contains(sensitiveBodyFields, key) {
 				changed = true
 				m[key] = redacted
 			}

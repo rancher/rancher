@@ -5,7 +5,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/rancher/apiserver/pkg/types"
-	"github.com/rancher/wrangler/pkg/kv"
+	"github.com/rancher/wrangler/v2/pkg/kv"
 )
 
 type stripNS struct {

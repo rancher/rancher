@@ -3,7 +3,6 @@ package rbac
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -18,9 +17,10 @@ import (
 	nsutils "github.com/rancher/rancher/pkg/namespace"
 	pkgrbac "github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
-	"github.com/rancher/wrangler/pkg/relatedresource"
+	"github.com/rancher/wrangler/v2/pkg/relatedresource"
 	"github.com/sirupsen/logrus"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -102,22 +102,19 @@ func Register(ctx context.Context, workload *config.UserContext) {
 		crLister:            workload.RBAC.ClusterRoles("").Controller().Lister(),
 		clusterRoles:        workload.RBAC.ClusterRoles(""),
 		clusterRoleBindings: workload.RBAC.ClusterRoleBindings(""),
-		roleBindings:        workload.RBAC.RoleBindings(""),
 		nsLister:            workload.Core.Namespaces("").Controller().Lister(),
 		nsController:        workload.Core.Namespaces("").Controller(),
 		clusterLister:       management.Management.Clusters("").Controller().Lister(),
 		projectLister:       management.Management.Projects(workload.ClusterName).Controller().Lister(),
 		userLister:          management.Management.Users("").Controller().Lister(),
 		userAttributeLister: management.Management.UserAttributes("").Controller().Lister(),
-		crtbs:               management.Management.ClusterRoleTemplateBindings(""),
-		prtbs:               management.Management.ProjectRoleTemplateBindings(""),
 		clusterName:         workload.ClusterName,
 	}
 	management.Management.Projects(workload.ClusterName).AddClusterScopedLifecycle(ctx, "project-namespace-auth", workload.ClusterName, newProjectLifecycle(r))
-	management.Management.ProjectRoleTemplateBindings("").AddClusterScopedLifecycle(ctx, "cluster-prtb-sync", workload.ClusterName, newPRTBLifecycle(r))
+	management.Management.ProjectRoleTemplateBindings("").AddClusterScopedLifecycle(ctx, "cluster-prtb-sync", workload.ClusterName, newPRTBLifecycle(r, management, nsInformer))
 	workload.RBAC.ClusterRoles("").AddHandler(ctx, "cluster-clusterrole-sync", newClusterRoleHandler(r).sync)
 	workload.RBAC.ClusterRoleBindings("").AddHandler(ctx, "legacy-crb-cleaner-sync", newLegacyCRBCleaner(r).sync)
-	management.Management.ClusterRoleTemplateBindings("").AddClusterScopedLifecycle(ctx, "cluster-crtb-sync", workload.ClusterName, newCRTBLifecycle(r))
+	management.Management.ClusterRoleTemplateBindings("").AddClusterScopedLifecycle(ctx, "cluster-crtb-sync", workload.ClusterName, newCRTBLifecycle(r, management))
 	management.Management.Clusters("").AddHandler(ctx, "global-admin-cluster-sync", newClusterHandler(workload))
 	management.Management.GlobalRoleBindings("").AddHandler(ctx, grbHandlerName, newGlobalRoleBindingHandler(workload))
 
@@ -137,6 +134,18 @@ func Register(ctx context.Context, workload *config.UserContext) {
 		management.Wrangler.Mgmt.RoleTemplate(), management.Wrangler.Mgmt.RoleTemplate())
 }
 
+type managerInterface interface {
+	gatherRoles(*v3.RoleTemplate, map[string]*v3.RoleTemplate, int) error
+	ensureRoles(map[string]*v3.RoleTemplate) error
+	ensureClusterBindings(map[string]*v3.RoleTemplate, *v3.ClusterRoleTemplateBinding) error
+	ensureProjectRoleBindings(string, map[string]*v3.RoleTemplate, *v3.ProjectRoleTemplateBinding) error
+	ensureServiceAccountImpersonator(string) error
+	deleteServiceAccountImpersonator(string) error
+	ensureGlobalResourcesRolesForPRTB(string, map[string]*v3.RoleTemplate) ([]string, error)
+	reconcileProjectAccessToGlobalResources(*v3.ProjectRoleTemplateBinding, []string) (map[string]bool, error)
+	noRemainingOwnerLabels(*rbacv1.ClusterRoleBinding) (bool, error)
+}
+
 type manager struct {
 	workload            *config.UserContext
 	rtLister            v3.RoleTemplateLister
@@ -150,7 +159,6 @@ type manager struct {
 	crbLister           typesrbacv1.ClusterRoleBindingLister
 	clusterRoleBindings typesrbacv1.ClusterRoleBindingInterface
 	rbLister            typesrbacv1.RoleBindingLister
-	roleBindings        typesrbacv1.RoleBindingInterface
 	rLister             typesrbacv1.RoleLister
 	roles               typesrbacv1.RoleInterface
 	nsLister            typescorev1.NamespaceLister
@@ -159,8 +167,6 @@ type manager struct {
 	projectLister       v3.ProjectLister
 	userLister          v3.UserLister
 	userAttributeLister v3.UserAttributeLister
-	crtbs               v3.ClusterRoleTemplateBindingInterface
-	prtbs               v3.ProjectRoleTemplateBindingInterface
 	clusterName         string
 }
 
@@ -200,7 +206,7 @@ func (m *manager) ensureClusterRoles(rt *v3.RoleTemplate) error {
 }
 
 func (m *manager) compareAndUpdateClusterRole(clusterRole *rbacv1.ClusterRole, rt *v3.RoleTemplate) error {
-	if reflect.DeepEqual(clusterRole.Rules, rt.Rules) {
+	if equality.Semantic.DeepEqual(clusterRole.Rules, rt.Rules) {
 		return nil
 	}
 	clusterRole = clusterRole.DeepCopy()
@@ -318,7 +324,7 @@ func (m *manager) updateRole(rt *v3.RoleTemplate, namespace string) error {
 }
 
 func (m *manager) compareAndUpdateNamespacedRole(role *rbacv1.Role, rt *v3.RoleTemplate, namespace string) error {
-	if reflect.DeepEqual(role.Rules, rt.Rules) {
+	if equality.Semantic.DeepEqual(role.Rules, rt.Rules) {
 		return nil
 	}
 	role = role.DeepCopy()

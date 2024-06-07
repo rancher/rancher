@@ -2,6 +2,7 @@ package git
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/rancher/rancher/pkg/settings"
 	corev1 "k8s.io/api/core/v1"
@@ -57,47 +58,29 @@ func Head(secret *corev1.Secret, namespace, name, gitURL, branch string, insecur
 	return commit, nil
 }
 
-// Update updates git repo if remote sha has changed
+// Update updates git repo if remote sha has changed. It also skips the update if in bundled mode and the git dir has a certain prefix stateDir(utils.go).
+// If there is an error updating the repo especially stateDir(utils.go) repositories, it ignores the error and returns the current commit in the local pod directory.
+// except when the error is `branch not found`. It specifically checks for `couldn't find remote ref` & `Could not find remote branch` in the error message.
 func Update(secret *corev1.Secret, namespace, name, gitURL, branch string, insecureSkipTLS bool, caBundle []byte) (string, error) {
 	git, err := gitForRepo(secret, namespace, name, gitURL, insecureSkipTLS, caBundle)
 	if err != nil {
 		return "", fmt.Errorf("update failure: %w", err)
 	}
-
 	if IsBundled(git.Directory) && settings.SystemCatalog.Get() == "bundled" {
 		return Head(secret, namespace, name, gitURL, branch, insecureSkipTLS, caBundle)
 	}
 
-	if err := git.clone(branch); err != nil {
-		return "", nil
-	}
-
-	if err := git.reset("HEAD"); err != nil {
-		return "", fmt.Errorf("update failure: %w", err)
-	}
-
-	commit, err := git.currentCommit()
-	if err != nil {
-		return commit, fmt.Errorf("update failure: %w", err)
-	}
-
-	changed, err := git.remoteSHAChanged(branch, commit)
-	if err != nil {
-		return commit, fmt.Errorf("update failure: %w", err)
-	}
-	if !changed {
-		return commit, nil
-	}
-
-	if err := git.fetchAndReset(branch); err != nil {
-		return "", fmt.Errorf("update failure: %w", err)
-	}
-
-	lastCommit, err := git.currentCommit()
+	commit, err := git.Update(branch)
 	if err != nil && IsBundled(git.Directory) {
+		// We don't report an error unless the branch is invalid
+		// The reason being it would break airgap environments in downstream
+		// cluster. A new issue is created to tackle this in the forthcoming.
+		if strings.Contains(err.Error(), "couldn't find remote ref") || strings.Contains(err.Error(), "Could not find remote branch") {
+			return "", err
+		}
 		return Head(secret, namespace, name, gitURL, branch, insecureSkipTLS, caBundle)
 	}
-	return lastCommit, nil
+	return commit, err
 }
 
 func gitForRepo(secret *corev1.Secret, namespace, name, gitURL string, insecureSkipTLS bool, caBundle []byte) (*git, error) {

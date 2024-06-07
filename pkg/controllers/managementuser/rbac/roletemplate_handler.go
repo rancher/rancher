@@ -5,7 +5,7 @@ import (
 	wranglerv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/rbac"
-	"github.com/rancher/wrangler/pkg/relatedresource"
+	"github.com/rancher/wrangler/v2/pkg/relatedresource"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -68,29 +68,26 @@ func (c *rtSync) sync(key string, obj *v3.RoleTemplate) (runtime.Object, error) 
 }
 
 func (c *rtSync) syncRT(template *v3.RoleTemplate, usedInProjects bool, prtbs []interface{}, crtbs []interface{}) error {
-	roles := map[string]*v3.RoleTemplate{}
-	if err := c.m.gatherRoles(template, roles, 0); err != nil {
+	roleTemplates := map[string]*v3.RoleTemplate{}
+	if err := c.m.gatherRoles(template, roleTemplates, 0); err != nil {
 		return err
 	}
 
-	if err := c.m.ensureRoles(roles); err != nil {
+	if err := c.m.ensureRoles(roleTemplates); err != nil {
 		return errors.Wrapf(err, "couldn't ensure roles")
 	}
 
-	rolesToKeep := make(map[string]bool)
 	if usedInProjects {
-		for _, rt := range roles {
+		for _, rt := range roleTemplates {
 			for resource, baseRule := range globalResourceRulesNeededInProjects {
 				verbs, err := c.m.checkForGlobalResourceRules(rt, resource, baseRule)
 				if err != nil {
 					return err
 				}
-				if len(verbs) > 0 {
-					roleName, err := c.m.reconcileRoleForProjectAccessToGlobalResource(resource, rt, verbs, baseRule)
-					if err != nil {
-						return errors.Wrapf(err, "couldn't reconcile role for project access to global resources")
-					}
-					rolesToKeep[roleName] = true
+
+				roleName, err := c.m.reconcileRoleForProjectAccessToGlobalResource(resource, rt.Name, verbs, baseRule)
+				if err != nil {
+					return errors.Wrapf(err, "couldn't reconcile role '%s' for project access to global resources", roleName)
 				}
 			}
 		}
@@ -102,6 +99,10 @@ func (c *rtSync) syncRT(template *v3.RoleTemplate, usedInProjects bool, prtbs []
 			continue
 		}
 
+		roles, err := c.m.ensureGlobalResourcesRolesForPRTB(parseProjectName(prtb.ProjectName), roleTemplates)
+		if err != nil {
+			return err
+		}
 		crbsToKeep, err := c.m.reconcileProjectAccessToGlobalResources(prtb, roles)
 		if err != nil {
 			return err
@@ -131,7 +132,7 @@ func (c *rtSync) syncRT(template *v3.RoleTemplate, usedInProjects bool, prtbs []
 			if !ns.DeletionTimestamp.IsZero() {
 				continue
 			}
-			if err := c.m.ensureProjectRoleBindings(ns.Name, roles, prtb); err != nil {
+			if err := c.m.ensureProjectRoleBindings(ns.Name, roleTemplates, prtb); err != nil {
 				return errors.Wrapf(err, "couldn't ensure binding %v in %v", prtb.Name, ns.Name)
 			}
 		}
@@ -142,7 +143,7 @@ func (c *rtSync) syncRT(template *v3.RoleTemplate, usedInProjects bool, prtbs []
 		if !ok {
 			continue
 		}
-		if err := c.m.ensureClusterBindings(roles, crtb); err != nil {
+		if err := c.m.ensureClusterBindings(roleTemplates, crtb); err != nil {
 			return err
 		}
 	}

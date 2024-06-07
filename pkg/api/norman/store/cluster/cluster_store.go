@@ -434,7 +434,11 @@ func loadDataFromTemplate(clusterTemplateRevision *apimgmtv3.ClusterTemplateRevi
 					if err != nil {
 						return nil, httperror.WrapAPIError(err, httperror.ServerError, processingError)
 					}
-					question.Default = registries[index]["password"].(string)
+					// the key may not exist if the password is not set in the clusterTemplateRevision
+					password, ok := registries[index]["password"]
+					if ok {
+						question.Default = password.(string)
+					}
 				} else if strings.HasPrefix(question.Variable, "rancherKubernetesEngineConfig.cloudProvider.vsphereCloudProvider.virtualCenter") {
 					vcenters, ok := values.GetValue(dataFromTemplate, "rancherKubernetesEngineConfig", "cloudProvider", "vsphereCloudProvider", "virtualCenter")
 					if !ok {
@@ -537,7 +541,7 @@ func loadDataFromTemplate(clusterTemplateRevision *apimgmtv3.ClusterTemplateRevi
 		dataFromTemplate[managementv3.ClusterFieldFleetWorkspaceName] = fleetworkspace
 	}
 
-	//validate that the data loaded is valid clusterSpec
+	// validate that the data loaded is valid clusterSpec
 	var spec apimgmtv3.ClusterSpec
 	if err := convert.ToObj(dataFromTemplate, &spec); err != nil {
 		return nil, httperror.WrapAPIError(err, httperror.InvalidBodyContent, "Invalid clusterTemplate, cannot convert to cluster spec")
@@ -744,14 +748,6 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 
 		data = clusterUpdate
 
-		// keep monitoring and alerting flags on the cluster as is, no turning off these flags from templaterevision.
-		if !clusterTemplateRevision.Spec.ClusterConfig.EnableClusterMonitoring {
-			data[managementv3.ClusterSpecFieldEnableClusterMonitoring] = existingCluster[managementv3.ClusterSpecFieldEnableClusterMonitoring]
-		}
-		if !clusterTemplateRevision.Spec.ClusterConfig.EnableClusterAlerting {
-			data[managementv3.ClusterSpecFieldEnableClusterAlerting] = existingCluster[managementv3.ClusterSpecFieldEnableClusterAlerting]
-		}
-
 	} else if existingCluster[managementv3.ClusterSpecFieldClusterTemplateRevisionID] != nil {
 		return nil, httperror.NewFieldAPIError(httperror.MissingRequired, "ClusterTemplateRevision", "this cluster is created from a clusterTemplateRevision, please pass the clusterTemplateRevision")
 	}
@@ -775,7 +771,7 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 	}
 
 	cleanPrivateRegistry(data)
-	dialer, err := r.DialerFactory.ClusterDialer(id)
+	dialer, err := r.DialerFactory.ClusterDialer(id, true)
 	if err != nil {
 		return nil, errors.Wrap(err, "error getting dialer")
 	}

@@ -14,6 +14,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/providers/activedirectory"
 	"github.com/rancher/rancher/pkg/auth/providers/azure"
+	"github.com/rancher/rancher/pkg/auth/providers/genericoidc"
 	"github.com/rancher/rancher/pkg/auth/providers/github"
 	"github.com/rancher/rancher/pkg/auth/providers/googleoauth"
 	"github.com/rancher/rancher/pkg/auth/providers/keycloakoidc"
@@ -168,6 +169,9 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 	case client.KeyCloakOIDCProviderType:
 		input = &v32.OIDCLogin{}
 		providerName = keycloakoidc.Name
+	case client.GenericOIDCProviderType:
+		input = &v32.OIDCLogin{}
+		providerName = genericoidc.Name
 	default:
 		return v3.Token{}, "", "", httperror.NewAPIError(httperror.ServerError, "unknown authentication provider")
 	}

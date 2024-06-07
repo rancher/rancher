@@ -42,6 +42,7 @@ fi
 export DIST=${TEST_DIST}
 export SOME_K8S_VERSION=${SOME_K8S_VERSION}
 export TB_ORG=${TB_ORG}
+export CATTLE_CHART_DEFAULT_URL=${CATTLE_CHART_DEFAULT_URL}
 
 # Tell Rancher to use the recently-built Rancher cluster agent image. This image is built as part of CI and will be
 # copied to the in-cluster registry during test setup below.
@@ -60,7 +61,13 @@ if [ -z "${SOME_K8S_VERSION}" ]; then
 # https://github.com/rancher/rancher/issues/36827 has added appDefaults. We do not use appDefaults
 # here for simplicity's sake, as it requires semver parsing & matching. The last release should
 # be good enough for our needs.
-export SOME_K8S_VERSION=$(curl -sS https://raw.githubusercontent.com/rancher/kontainer-driver-metadata/dev-v2.8/data/data.json | jq -r ".$DIST.releases[-1].version")
+export SOME_K8S_VERSION=$(curl -sS https://raw.githubusercontent.com/rancher/kontainer-driver-metadata/dev-v2.9/data/data.json | jq -r ".$DIST.releases[-1].version")
+fi
+
+if [ -z "${CATTLE_CHART_DEFAULT_URL}" ]; then
+# If `CATTLE_CHART_DEFAULT_URL` is not set, use the `https://github.com/rancher/charts` so GitHub is used instead of
+# the default `https://git.rancher.io/charts` to reduce the reliance and load on our Git mirror
+export CATTLE_CHART_DEFAULT_URL=https://github.com/rancher/charts
 fi
 
 echo Starting rancher server for test
@@ -74,7 +81,7 @@ curl -sLf https://github.com/rancher/system-agent/releases/download/${CATTLE_SYS
 curl -sLf https://github.com/rancher/system-agent/releases/download/${CATTLE_SYSTEM_AGENT_VERSION}/rancher-system-agent-arm64 -o /usr/share/rancher/ui/assets/rancher-system-agent-arm64
 curl -sLf https://github.com/rancher/system-agent/releases/download/${CATTLE_SYSTEM_AGENT_VERSION}/system-agent-uninstall.sh -o /usr/share/rancher/ui/assets/system-agent-uninstall.sh
 
-run_rancher()
+build_and_run_rancher()
 {
     RESTART_COUNT=0
     while sleep 2; do
@@ -114,6 +121,12 @@ dump_rancher_logs()
   echo -e "\n-----RANCHER-LOG-DUMP-END-----"
 }
 
+# Compile Rancher
+# This needs to happen before build_and_run_rancher is executed in the background.
+# Otherwise, build_and_run_rancher will also compile Rancher, overly elongating the
+# time before Rancher is ready and therefore causing flakiness of the health check below.
+./scripts/build-server
+
 # uncomment to get startup logs. Don't leave them on because it slows drone down too
 # much
 #tail -F /tmp/rancher.log &
@@ -123,7 +136,7 @@ trap "exit 1" 42
 PWRAPPROC="$$"
 
 PID=-1
-run_rancher &
+build_and_run_rancher &
 RANCHER_RUN_PID=$!
 trap cleanup exit
 

@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers/activedirectory"
 	"github.com/rancher/rancher/pkg/auth/providers/azure"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
+	"github.com/rancher/rancher/pkg/auth/providers/genericoidc"
 	"github.com/rancher/rancher/pkg/auth/providers/github"
 	"github.com/rancher/rancher/pkg/auth/providers/googleoauth"
 	"github.com/rancher/rancher/pkg/auth/providers/keycloakoidc"
@@ -147,6 +148,14 @@ func Configure(ctx context.Context, mgmt *config.ScaledContext) {
 	Providers[keycloakoidc.Name] = p
 	providersByType[client.KeyCloakOIDCConfigType] = p
 	providersByType[publicclient.KeyCloakOIDCProviderType] = p
+
+	p = genericoidc.Configure(ctx, mgmt, userMGR, tokenMGR)
+	ProviderNames[genericoidc.Name] = true
+	providersWithSecrets[genericoidc.Name] = true
+	UnrefreshableProviders[genericoidc.Name] = true
+	Providers[genericoidc.Name] = p
+	providersByType[client.GenericOIDCConfigType] = p
+	providersByType[publicclient.GenericOIDCProviderType] = p
 }
 
 func IsValidUserExtraAttribute(key string) bool {

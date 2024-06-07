@@ -40,7 +40,6 @@ var (
 		Init(projectNetworkPolicyTypes).
 		Init(globalTypes).
 		Init(rkeTypes).
-		Init(alertTypes).
 		Init(composeType).
 		Init(projectCatalogTypes).
 		Init(clusterCatalogTypes).
@@ -48,7 +47,6 @@ var (
 		Init(globalDNSTypes).
 		Init(kontainerTypes).
 		Init(etcdBackupTypes).
-		Init(monitorTypes).
 		Init(credTypes).
 		Init(mgmtSecretTypes).
 		Init(clusterTemplateTypes).
@@ -239,8 +237,6 @@ func clusterTypes(schemas *types.Schemas) *types.Schemas {
 		MustImport(&Version, v3.RotateEncryptionKeyOutput{}).
 		MustImport(&Version, v3.ImportYamlOutput{}).
 		MustImport(&Version, v3.ExportOutput{}).
-		MustImport(&Version, v3.MonitoringInput{}).
-		MustImport(&Version, v3.MonitoringOutput{}).
 		MustImport(&Version, v3.RestoreFromEtcdBackupInput{}).
 		MustImport(&Version, v3.SaveAsTemplateInput{}).
 		MustImport(&Version, v3.SaveAsTemplateOutput{}).
@@ -274,16 +270,6 @@ func clusterTypes(schemas *types.Schemas) *types.Schemas {
 			schema.ResourceActions[v3.ClusterActionExportYaml] = types.Action{
 				Output: "exportOutput",
 			}
-			schema.ResourceActions[v3.ClusterActionEnableMonitoring] = types.Action{
-				Input: "monitoringInput",
-			}
-			schema.ResourceActions[v3.ClusterActionDisableMonitoring] = types.Action{}
-			schema.ResourceActions[v3.ClusterActionViewMonitoring] = types.Action{
-				Output: "monitoringOutput",
-			}
-			schema.ResourceActions[v3.ClusterActionEditMonitoring] = types.Action{
-				Input: "monitoringInput",
-			}
 			schema.ResourceActions[v3.ClusterActionBackupEtcd] = types.Action{}
 			schema.ResourceActions[v3.ClusterActionRestoreFromEtcdBackup] = types.Action{
 				Input: "restoreFromEtcdBackupInput",
@@ -315,43 +301,23 @@ func authzTypes(schemas *types.Schemas) *types.Schemas {
 		).
 		AddMapperForType(&Version, v3.GlobalRole{}, m.DisplayName{}).
 		AddMapperForType(&Version, v3.RoleTemplate{}, m.DisplayName{}).
-		AddMapperForType(&Version,
-			v3.PodSecurityPolicyTemplateProjectBinding{},
-			&mapper.NamespaceIDMapper{}).
 		AddMapperForType(&Version, v3.ProjectRoleTemplateBinding{},
 			&mapper.NamespaceIDMapper{},
 		).
-		MustImport(&Version, v3.SetPodSecurityPolicyTemplateInput{}).
 		MustImport(&Version, v3.ImportYamlOutput{}).
-		MustImport(&Version, v3.MonitoringInput{}).
-		MustImport(&Version, v3.MonitoringOutput{}).
 		MustImportAndCustomize(&Version, v3.Project{}, func(schema *types.Schema) {
 			schema.ResourceActions = map[string]types.Action{
-				"setpodsecuritypolicytemplate": {
-					Input:  "setPodSecurityPolicyTemplateInput",
-					Output: "project",
-				},
 				"exportYaml": {},
-				"enableMonitoring": {
-					Input: "monitoringInput",
-				},
-				"disableMonitoring": {},
-				"viewMonitoring": {
-					Output: "monitoringOutput",
-				},
-				"editMonitoring": {
-					Input: "monitoringInput",
-				},
 			}
 		}).
-		MustImport(&Version, v3.GlobalRole{}).
+		MustImportAndCustomize(&Version, v3.GlobalRole{}, func(s *types.Schema) {
+			s.MustCustomizeField("status", func(field types.Field) types.Field {
+				field.Nullable = false
+				return field
+			})
+		}).
 		MustImport(&Version, v3.GlobalRoleBinding{}).
 		MustImport(&Version, v3.RoleTemplate{}).
-		MustImport(&Version, v3.PodSecurityPolicyTemplate{}).
-		MustImportAndCustomize(&Version, v3.PodSecurityPolicyTemplateProjectBinding{}, func(schema *types.Schema) {
-			schema.CollectionMethods = []string{http.MethodGet, http.MethodPost}
-			schema.ResourceMethods = []string{}
-		}).
 		MustImport(&Version, v3.ClusterRoleTemplateBinding{}).
 		MustImport(&Version, v3.ProjectRoleTemplateBinding{}).
 		MustImport(&Version, v3.GlobalRoleBinding{})
@@ -631,6 +597,23 @@ func authnTypes(schemas *types.Schemas) *types.Schemas {
 		}).
 		MustImport(&Version, v3.OIDCApplyInput{}).
 		MustImport(&Version, v3.OIDCTestOutput{}).
+		MustImportAndCustomize(&Version, v3.GenericOIDCConfig{}, func(schema *types.Schema) {
+			schema.BaseType = "authConfig"
+			schema.ResourceActions = map[string]types.Action{
+				"disable": {},
+				"configureTest": {
+					Input:  "genericOIDCConfig",
+					Output: "genericOIDCTestOutput",
+				},
+				"testAndApply": {
+					Input: "genericOIDCApplyInput",
+				},
+			}
+			schema.CollectionMethods = []string{}
+			schema.ResourceMethods = []string{http.MethodGet, http.MethodPut}
+		}).
+		MustImport(&Version, v3.GenericOIDCApplyInput{}).
+		MustImport(&Version, v3.GenericOIDCTestOutput{}).
 		//KeyCloakOIDC Config
 		MustImportAndCustomize(&Version, v3.KeyCloakOIDCConfig{}, func(schema *types.Schema) {
 			schema.BaseType = "authConfig"
@@ -702,60 +685,6 @@ func globalTypes(schema *types.Schemas) *types.Schemas {
 				return f
 			})
 		})
-}
-
-func alertTypes(schema *types.Schemas) *types.Schemas {
-	return schema.
-		AddMapperForType(&Version, v3.Notifier{},
-			&m.Embed{Field: "status"},
-			m.DisplayName{}).
-		MustImport(&Version, v3.ClusterAlert{}).
-		MustImport(&Version, v3.ProjectAlert{}).
-		MustImport(&Version, v3.Notification{}).
-		MustImportAndCustomize(&Version, v3.Notifier{}, func(schema *types.Schema) {
-			schema.CollectionActions = map[string]types.Action{
-				"send": {
-					Input: "notification",
-				},
-			}
-			schema.ResourceActions = map[string]types.Action{
-				"send": {
-					Input: "notification",
-				},
-			}
-		}).
-		MustImport(&Version, v3.AlertStatus{}).
-		AddMapperForType(&Version, v3.ClusterAlertGroup{},
-			&m.Embed{Field: "status"},
-			m.DisplayName{}).
-		AddMapperForType(&Version, v3.ProjectAlertGroup{},
-			&m.Embed{Field: "status"},
-			m.DisplayName{}).
-		AddMapperForType(&Version, v3.ClusterAlertRule{},
-			&m.Embed{Field: "status"},
-			m.DisplayName{}).
-		AddMapperForType(&Version, v3.ProjectAlertRule{},
-			&m.Embed{Field: "status"},
-			m.DisplayName{}).
-		MustImport(&Version, v3.ClusterAlertGroup{}).
-		MustImport(&Version, v3.ProjectAlertGroup{}).
-		MustImportAndCustomize(&Version, v3.ClusterAlertRule{}, func(schema *types.Schema) {
-			schema.ResourceActions = map[string]types.Action{
-				"activate":   {},
-				"deactivate": {},
-				"mute":       {},
-				"unmute":     {},
-			}
-		}).
-		MustImportAndCustomize(&Version, v3.ProjectAlertRule{}, func(schema *types.Schema) {
-			schema.ResourceActions = map[string]types.Action{
-				"activate":   {},
-				"deactivate": {},
-				"mute":       {},
-				"unmute":     {},
-			}
-		})
-
 }
 
 func composeType(schemas *types.Schemas) *types.Schemas {
@@ -859,56 +788,6 @@ func kontainerTypes(schemas *types.Schemas) *types.Schemas {
 			}
 			schema.CollectionActions = map[string]types.Action{
 				"refresh": {},
-			}
-		})
-}
-
-func monitorTypes(schemas *types.Schemas) *types.Schemas {
-	return schemas.
-		MustImport(&Version, v3.QueryGraphInput{}).
-		MustImport(&Version, v3.QueryClusterGraphOutput{}).
-		MustImport(&Version, v3.QueryProjectGraphOutput{}).
-		MustImport(&Version, v3.QueryClusterMetricInput{}).
-		MustImport(&Version, v3.QueryProjectMetricInput{}).
-		MustImport(&Version, v3.QueryMetricOutput{}).
-		MustImport(&Version, v3.ClusterMetricNamesInput{}).
-		MustImport(&Version, v3.ProjectMetricNamesInput{}).
-		MustImport(&Version, v3.MetricNamesOutput{}).
-		MustImport(&Version, v3.TimeSeries{}).
-		MustImportAndCustomize(&Version, v3.MonitorMetric{}, func(schema *types.Schema) {
-			schema.CollectionActions = map[string]types.Action{
-				"querycluster": {
-					Input:  "queryClusterMetricInput",
-					Output: "queryMetricOutput",
-				},
-				"listclustermetricname": {
-					Input:  "clusterMetricNamesInput",
-					Output: "metricNamesOutput",
-				},
-				"queryproject": {
-					Input:  "queryProjectMetricInput",
-					Output: "queryMetricOutput",
-				},
-				"listprojectmetricname": {
-					Input:  "projectMetricNamesInput",
-					Output: "metricNamesOutput",
-				},
-			}
-		}).
-		MustImportAndCustomize(&Version, v3.ClusterMonitorGraph{}, func(schema *types.Schema) {
-			schema.CollectionActions = map[string]types.Action{
-				"query": {
-					Input:  "queryGraphInput",
-					Output: "queryClusterGraphOutput",
-				},
-			}
-		}).
-		MustImportAndCustomize(&Version, v3.ProjectMonitorGraph{}, func(schema *types.Schema) {
-			schema.CollectionActions = map[string]types.Action{
-				"query": {
-					Input:  "queryGraphInput",
-					Output: "queryProjectGraphOutput",
-				},
 			}
 		})
 }

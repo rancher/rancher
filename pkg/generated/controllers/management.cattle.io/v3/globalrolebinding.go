@@ -20,7 +20,7 @@ package v3
 
 import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	"github.com/rancher/wrangler/pkg/generic"
+	"github.com/rancher/wrangler/v2/pkg/generic"
 )
 
 // GlobalRoleBindingController interface for managing GlobalRoleBinding resources.

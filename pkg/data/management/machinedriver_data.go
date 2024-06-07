@@ -103,7 +103,7 @@ func addMachineDrivers(management *config.ManagementContext) error {
 	}
 	harvesterEnabled := features.GetFeatureByName(HarvesterDriver).Enabled()
 	// make sure the version number is consistent with the one at Line 40 of package/Dockerfile
-	if err := addMachineDriver(HarvesterDriver, "https://releases.rancher.com/harvester-node-driver/v0.6.5/docker-machine-driver-harvester-amd64.tar.gz", "", "8de48b07dd2e8b7ee60ec99b8456925e9c16a7523affb61a5f1788868bb1f8f6", []string{"releases.rancher.com"}, harvesterEnabled, harvesterEnabled, false, management); err != nil {
+	if err := addMachineDriver(HarvesterDriver, "https://releases.rancher.com/harvester-node-driver/v0.6.7/docker-machine-driver-harvester-amd64.tar.gz", "", "a913f22a7cad5d0df18e0dfa8a8ae19703c36eb8ed4f6a34ae471a06af0890c3", []string{"releases.rancher.com"}, harvesterEnabled, harvesterEnabled, false, management); err != nil {
 		return err
 	}
 	linodeBuiltin := true
@@ -134,7 +134,7 @@ func addMachineDrivers(management *config.ManagementContext) error {
 	if err := addMachineDriver(SoftLayerDriver, "local://", "", "", nil, false, true, false, management); err != nil {
 		return err
 	}
-	if err := addMachineDriver(NutanixDriver, "https://github.com/nutanix/docker-machine/releases/download/v3.4.0/docker-machine-driver-nutanix", "https://nutanix.github.io/rancher-ui-driver/v3.4.0/component.js", "65dbf92e2df2b4c6d1a6b1f77c542f2cb13a052a62f236eeee697a1151ede62c", []string{"nutanix.github.io"}, false, false, false, management); err != nil {
+	if err := addMachineDriver(NutanixDriver, "https://github.com/nutanix/docker-machine/releases/download/v3.6.0/docker-machine-driver-nutanix", "https://nutanix.github.io/rancher-ui-driver/v3.6.0/component.js", "d9710fe31a1357d1bbd57539a4b0b00e3ab3550fcaeffea18cbc145cb4e9b22f", []string{"nutanix.github.io"}, false, false, false, management); err != nil {
 		return err
 	}
 	if err := addMachineDriver(OutscaleDriver, "https://github.com/outscale/docker-machine-driver-outscale/releases/download/v0.2.0/docker-machine-driver-outscale_0.2.0_linux_amd64.zip", "https://oos.eu-west-2.outscale.com/rancher-ui-driver-outscale/v0.2.0/component.js", "bb539ed4e2b0f1a1083b29cbdbab59bde3efed0a3145fefc0b2f47026c48bfe0", []string{"oos.eu-west-2.outscale.com"}, false, false, false, management); err != nil {

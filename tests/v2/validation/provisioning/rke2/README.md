@@ -8,48 +8,65 @@ Please see below for more details for your config. Please see below for more det
 
 ## Table of Contents
 1. [Prerequisites](../README.md)
-2. [Define your test](#provisioning-input)
-3. [Cloud Credential](#cloud-credentials)
-4. [Configure providers to use for Node Driver Clusters](#machine-rke2-config)
-5. [Configuring Custom Clusters](#custom-cluster)
-6. [Advanced Cluster Settings](#advanced-settings)
-7. [Back to general provisioning](../README.md)
+2. [Configuring test flags](#Flags)
+3. [Define your test](#provisioning-input)
+4. [Cloud Credential](#cloud-credentials)
+5. [Cloud Provider](#cloud-provider)
+6. [Configure providers to use for Node Driver Clusters](#machine-rke2-config)
+7. [Configuring Custom Clusters](#custom-cluster)
+8. [Static test cases](#static-test-cases)
+9. [Advanced Cluster Settings](#advanced-settings)
+10. [Back to general provisioning](../README.md)
+
+## Flags
+Flags are used to determine which static table tests are run (has no effect on dynamic tests) 
+`Long` Will run the long version of the table tests (usually all of them)
+`Short` Will run the subset of table tests with the short flag.
+
+```yaml
+flags:
+  desiredflags: "Long"
+```
 
 ## Provisioning Input
-provisioningInput is needed to the run the RKE2 tests, specifically kubernetesVersion, cni, and providers. nodesAndRoles is only needed for the TestProvisioningDynamicInput test, node pools are divided by "{nodepool},". psact is optional and takes values `rancher-privileged`, `rancher-restricted` or `rancher-baseline`.
+provisioningInput is needed to the run the RKE2 tests.
 
 **nodeProviders is only needed for custom cluster tests; the framework only supports custom clusters through aws/ec2 instances.**
 ```yaml
 provisioningInput:
   machinePools:
-  - nodeRoles:
-      etcd: true
+  - machinePoolConfig:                        #required(dynamic only) (at least 1)
+      etcd: true                              #required(dynamic only) (at least 1 controlplane & etcd & worker)
       controlplane: true
       worker: true
-      quantity: 1
-  - nodeRoles:
+      quantity: 5
+      drainBeforeDelete: true
+      hostnameLengthLimit: 29
+      nodeStartupTimeout: "600s"
+      unhealthyNodeTimeout: "300s"
+      maxUnhealthy: "2"
+      unhealthyRange: "2-4"
+  - machinePoolConfig:
       worker: true
       quantity: 2
-      drainBeforeDelete: true
-  - nodeRoles:
+  - machinePoolConfig:
       windows: true
       quantity: 1
-  flags:
-    desiredflags: "Short|Long" #These flags are for running TestProvisioningRKE2Cluster or TestProvisioningRKE2CustomCluster it is not needed for the dynamic tests.
-  rke2KubernetesVersion: ["v1.27.6+rke2r1"]
+  rke2KubernetesVersion: ["v1.27.10+rke2r1"]
   cni: ["calico"]
-  providers: ["linode", "aws", "do", "harvester"]
+  providers: ["linode", "aws", "do", "harvester", "vsphere", "azure"]
+  cloudProvider: "aws"
   nodeProviders: ["ec2"]
   hardened: false
-  psact: ""
-  clusterSSHTests: [""]
+  psact: ""                                   #either rancher-privileged|rancher-restricted|rancher-baseline
+  clusterSSHTests: ["CheckCPU", "NodeReboot", "AuditLog"]
   etcd:
     disableSnapshot: false
     snapshotScheduleCron: "0 */5 * * *"
     snapshotRetain: 3
     s3:
       bucket: ""
-      endpoint: ""
+      endpoint: "s3.us-east-2.amazonaws.com"
       endpointCA: ""
       folder: ""
       region: "us-east-2"
@@ -57,169 +74,192 @@ provisioningInput:
 ```
 
 ## Cloud Credentials
-These are the inputs needed for the different node provider cloud credentials, inlcuding linode, aws, digital ocean, harvester, azure, and google.
+These are the inputs needed for the different node provider cloud credentials, including linode, aws, digital ocean, harvester, azure, and google.
 
 ### Digital Ocean
 ```yaml
 digitalOceanCredentials:
-  accessToken": ""
+  accessToken": ""                    #required
 ```
 ### Linode
 ```yaml
 linodeCredentials:
-  token: ""
+  token: ""                           #required
 ```
 ### Azure
 ```yaml
 azureCredentials:
-  clientId: ""
-  clientSecret: ""
-  subscriptionId": ""
-  environment: "AzurePublicCloud"
+  clientId: ""                        #required
+  clientSecret: ""                    #required
+  subscriptionId": ""                 #required
+  environment: "AzurePublicCloud"     #required
 ```
 ### AWS
 ```yaml
 awsCredentials:
-  secretKey: "",
-  accessKey: "",
-  defaultRegion: ""
+  secretKey: ""                       #required
+  accessKey: ""                       #required
+  defaultRegion: ""                   #required
 ```
 ### Harvester
 ```yaml
 harvesterCredentials:
-  clusterId: "",
-  clusterType: "",
-  kubeconfigContent: ""
+  clusterId: ""                       #required
+  clusterType: ""                     #required
+  kubeconfigContent: ""               #required
 ```
 ### Google
 ```yaml
 googleCredentials:
-  authEncodedJson: ""
+  authEncodedJson: ""                 #required
 ```
 ### VSphere
 ```yaml
 vmwarevsphereCredentials:
-  password: ""
-  username: ""
-  vcenter: ""
-  vcenterPort: ""
+  password: ""                        #required
+  username: ""                        #required
+  vcenter: ""                         #required
+  vcenterPort: ""                     #required
 ```
+
+## Cloud Provider
+Cloud Provider enables additional options through the cloud provider, like cloud persistent storage or cloud provisioned load balancers.
+
+Names of cloud provider options are typically controlled by rancher product. Hence the discrepancy in rke2 vs. rke1 AWS in-tree and out-of-tree options. 
+To use automation with a cloud provider, simply enter one of the following options in the `cloudProvider` field in the config. 
+
+### RKE2 Cloud Provider Options
+* `aws-in-tree` uses the in-tree provider for aws -- **Deprecated on kubernetes 1.26 and below**
+* `aws` uses the out-of-tree provider for aws. Built in logic to the automation will be applied to the cluster that applies the correct configuration for the out-of-tree charts to be installed. Supported on kubernetes 1.22+
+* rancher-vsphere
 
 ## Machine RKE2 Config
 Machine RKE2 config is the final piece needed for the config to run RKE2 provisioning tests.
 
 ### AWS RKE2 Machine Config
 ```yaml
-awsMachineConfig:
-  region: "us-east-2"
-  ami: ""
-  instanceType: "t3a.medium"
-  sshUser: "ubuntu"
-  vpcId: ""
-  volumeType: "gp2"
-  zone: "a"
-  retries: "5"
-  rootSize: "60"
-  securityGroup: [""]
+awsMachineConfigs:
+  region: "us-east-2"                         #required
+  awsMachineConfig:
+  - roles: ["etcd","controlplane","worker"]   #required
+    ami: ""                                   #required
+    instanceType: "t3a.medium"                
+    sshUser: "ubuntu"                         #required
+    vpcId: ""                                 #required
+    volumeType: "gp2"                         
+    zone: "a"                                 #required
+    retries: "5"                              
+    rootSize: "60"                            
+    securityGroup: [""]                       
 ```
 ### Digital Ocean RKE2 Machine Config
 ```yaml
-doMachineConfig:
-  image: "ubuntu-20-04-x64"
-  backups: false
-  ipv6: false
-  monitoring: false
-  privateNetworking: false
+doMachineConfigs:
   region: "nyc3"
-  size: "s-2vcpu-4gb"
-  sshKeyContents: ""
-  sshKeyFingerprint: ""
-  sshPort: "22"
-  sshUser: "root"
-  tags: ""
-  userdata: ""
+  doMachineConfig:
+  - roles: ["etcd","controlplane","worker"]
+    image: "ubuntu-20-04-x64"
+    backups: false
+    ipv6: false
+    monitoring: false
+    privateNetworking: false
+    size: "s-2vcpu-4gb"
+    sshKeyContents: ""
+    sshKeyFingerprint: ""
+    sshPort: "22"
+    sshUser: "root"
+    tags: ""
+    userdata: ""
 ```
 ### Linode RKE2 Machine Config
 ```yaml
-linodeMachineConfig:
-  authorizedUsers: ""
-  createPrivateIp: true
-  dockerPort: "2376"
-  image: "linode/ubuntu22.04"
-  instanceType: "g6-standard-8"
+linodeMachineConfigs:
   region: "us-west"
-  rootPass: ""
-  sshPort: "22"
-  sshUser: ""
-  stackscript: ""
-  stackscriptData: ""
-  swapSize: "512"
-  tags: ""
-  uaPrefix: "Rancher"
+  linodeMachineConfig:
+  - roles: ["etcd","controlplane","worker"]
+    authorizedUsers: ""
+    createPrivateIp: true
+    dockerPort: "2376"
+    image: "linode/ubuntu22.04"
+    instanceType: "g6-standard-8"
+    rootPass: ""
+    sshPort: "22"
+    sshUser: ""
+    stackscript: ""
+    stackscriptData: ""
+    swapSize: "512"
+    tags: ""
+    uaPrefix: "Rancher"
 ```
 ### Azure RKE2 Machine Config
 ```yaml
-azureMachineConfig:
-  availabilitySet: "docker-machine"
-  diskSize: "30"
+azureMachineConfigs:
   environment: "AzurePublicCloud"
-  faultDomainCount: "3"
-  image: "canonical:UbuntuServer:22.04-LTS:latest"
-  location: "westus"
-  managedDisks: false
-  noPublicIp: false
-  nsg: ""
-  openPort: ["6443/tcp", "2379/tcp", "2380/tcp", "8472/udp", "4789/udp", "9796/tcp", "10256/tcp", "10250/tcp", "10251/tcp", "10252/tcp"]
-  resourceGroup: "docker-machine"
-  size: "Standard_D2_v2"
-  sshUser: "docker-user"
-  staticPublicIp: false
-  storageType: "Standard_LRS"
-  subnet: "docker-machine"
-  subnetPrefix: "192.168.0.0/16"
-  updateDomainCount: "5"
-  usePrivateIp: false
-  vnet: "docker-machine-vnet"
+  azureMachineConfig:
+  - roles: ["etcd","controlplane","worker"]
+    availabilitySet: "docker-machine"
+    diskSize: "30"
+    faultDomainCount: "3"
+    image: "canonical:UbuntuServer:22.04-LTS:latest"
+    location: "westus"
+    managedDisks: false
+    noPublicIp: false
+    nsg: ""
+    openPort: ["6443/tcp", "2379/tcp", "2380/tcp", "8472/udp", "4789/udp", "9796/tcp", "10256/tcp", "10250/tcp", "10251/tcp", "10252/tcp"]
+    resourceGroup: "docker-machine"
+    size: "Standard_D2_v2"
+    sshUser: "docker-user"
+    staticPublicIp: false
+    storageType: "Standard_LRS"
+    subnet: "docker-machine"
+    subnetPrefix: "192.168.0.0/16"
+    updateDomainCount: "5"
+    usePrivateIp: false
+    vnet: "docker-machine-vnet"
 ```
 ### Harvester RKE2 Machine Config
 ```yaml
-harvesterMachineConfig":
-  diskSize: "40"
-  cpuCount: "2"
-  memorySize: "8"
-  networkName: "default/ctw-network-1"
-  imageName: "default/image-rpj98"
+harvesterMachineConfigs:
   vmNamespace: "default"
-  sshUser: "ubuntu"
-  diskBus: "virtio
+  harvesterMachineConfig:
+  - roles: ["etcd","controlplane","worker"]
+    diskSize: "40"
+    cpuCount: "2"
+    memorySize: "8"
+    networkName: "default/ctw-network-1"
+    imageName: "default/image-rpj98"
+    sshUser: "ubuntu"
+    diskBus: "virtio
 ```
 ## Vsphere RKE2 Machine Config
 ```yaml
-vmwarevsphereMachineConfig:
-  cfgparam: ["disk.enableUUID=TRUE"]
-  cloneFrom: ""
-  cloudinit: ""
-  contentLibrary: ""
-  cpuCount: "4"
-  creationType: ""
-  datacenter: ""
-  datastore: ""
-  datastoreCluster: ""
-  diskSize: "20000"
-  folder: ""
-  hostSystem: ""
-  memorySize: "4096"
-  network: [""]
-  os: "linux"
-  password: ""
-  pool: ""
-  sshPassword: ""
-  sshPort: "22"
-  sshUser: ""
-  sshUserGroup: ""
-  username: ""
-  vcenter: ""
-  vcenterPort: "443"
+vmwarevsphereMachineConfigs:
+    datacenter: "/<datacenter>"                                 #required 
+    hostSystem: "/<datacenter>/path-to-host"                    #required
+    datastore: "/<datacenter>/path-to-datastore"                #required 
+    datastoreURL: "ds:///<url>"             
+    folder: "/<datacenter>/path-to-vm-folder"                   #required 
+    pool: "/<datacenter>/path-to-resource-pool"                 #required 
+    vmwarevsphereMachineConfig:
+    - cfgparam: ["disk.enableUUID=TRUE"]                        #required
+      cloudConfig: "#cloud-config\n\n"
+      customAttribute: []
+      tag: []
+      roles: ["etcd","controlplane",worker]
+      creationType: "template"                                  #required
+      os: "linux"                                               #required
+      cloneFrom: "/<datacenter>/path-to-linux-image"            #required(linux templates only)
+      cloneFromWindows: "/<datacenter>/path-to-windows-image"   #required(windows templates only)
+      contentLibrary: ""                                        
+      datastoreCluster: ""
+      network: ["/<datacenter>/path-to-vm-network"]             #required
+      sshUser: ""                                               #required
+      sshPassword: ""                                           
+      sshUserGroup: ""
+      sshPort: "22"
+      cpuCount: "4"
+      diskSize: "40000"
+      memorySize: "8192"
 ```
 
 These tests utilize Go build tags. Due to this, see the below examples on how to run the node driver tests:
@@ -278,6 +318,66 @@ These tests utilize Go build tags. Due to this, see the below examples on how to
 `gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/provisioning/rke2 --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestCustomClusterRKE2ProvisioningTestSuite/TestProvisioningRKE2CustomClusterDynamicInput"`
 
 If the specified test passes immediately without warning, try adding the `-count=1` flag to get around this issue. This will avoid previous results from interfering with the new test run.
+
+## Static Test Cases
+In an effort to have uniform testing across our internal QA test case reporter, there are specific test cases that are put into their respective test files. This section highlights those test cases.
+
+### PSACT
+These test cases cover the following PSACT values as both an admin and standard user:
+1. `rancher-privileged`
+2. `rancher-restricted`
+3. `rancher-baseline`
+
+See an example YAML below:
+
+```yaml
+rancher:
+  host: "<rancher server url>"
+  adminToken: "<rancher admin bearer token>"
+  cleanup: false
+  clusterName: "<provided cluster name>"
+  insecure: true
+provisioningInput:
+  rke2KubernetesVersion: ["v1.27.10+rke2r1"]
+  cni: ["calico"]
+  providers: ["linode"]
+  nodeProviders: ["ec2"]
+linodeCredentials:
+   token: ""
+linodeMachineConfigs:
+  region: "us-west"
+  linodeMachineConfig:
+  - roles: ["etcd", "controlplane", "worker"]
+    authorizedUsers: ""
+    createPrivateIp: true
+    dockerPort: "2376"
+    image: "linode/ubuntu22.04"
+    instanceType: "g6-standard-8"
+    region: "us-west"
+    rootPass: ""
+    sshPort: "22"
+    sshUser: ""
+    stackscript: ""
+    stackscriptData: ""
+    swapSize: "512"
+    tags: ""
+    uaPrefix: "Rancher"
+```
+
+These tests utilize Go build tags. Due to this, see the below examples on how to run the tests:
+
+`gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/provisioning/rke2 --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestRKE2PSACTTestSuite$"`
+
+### Hardened Custom Cluster
+This will provision a hardened custom cluster that runs across the following CIS scan profiles:
+1. `rke2-cis-1.8-profile-hardened`
+2. `rke2-cis-1.8-profile-permissive`
+
+You would use the same config that you setup for a custom cluster to run this test. Plese reference this [section](#custom-cluster). It also important to note that the machines that you select has `sudo` capabilities. The tests utilize `sudo`, so this can cause issues if there is no `sudo` present on the machine.
+
+These tests utilize Go build tags. Due to this, see the below examples on how to run the tests:
+
+`gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/provisioning/rke2 --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestHardenedRKE2ClusterProvisioningTestSuite$"`
 
 ## Advanced Settings
 This encapsulates any other setting that is applied in the cluster.spec. Currently we have support for:

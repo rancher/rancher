@@ -31,13 +31,20 @@ const (
 	Name = "github"
 )
 
+type tokensManager interface {
+	GetSecret(userID string, provider string, fallbackTokens []*v3.Token) (string, error)
+	IsMemberOf(token v3.Token, group v3.Principal) bool
+	CreateTokenAndSetCookie(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerToken string, ttl int, description string, request *types.APIContext, userExtraInfo map[string][]string) error
+}
+
 type ghProvider struct {
 	ctx          context.Context
 	authConfigs  v3.AuthConfigInterface
 	secrets      corev1.SecretInterface
+	getConfig    func() (*v32.GithubConfig, error)
 	githubClient *GClient
 	userMGR      user.Manager
-	tokenMGR     *tokens.Manager
+	tokenMGR     tokensManager
 }
 
 func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *tokens.Manager) common.AuthProvider {
@@ -45,7 +52,7 @@ func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.
 		httpClient: &http.Client{},
 	}
 
-	return &ghProvider{
+	provider := &ghProvider{
 		ctx:          ctx,
 		authConfigs:  mgmtCtx.Management.AuthConfigs(""),
 		secrets:      mgmtCtx.Core.Secrets(""),
@@ -53,6 +60,9 @@ func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.
 		userMGR:      userMGR,
 		tokenMGR:     tokenMGR,
 	}
+	provider.getConfig = provider.getGithubConfigCR
+
+	return provider
 }
 
 func (g *ghProvider) GetName() string {
@@ -119,11 +129,12 @@ func (g *ghProvider) saveGithubConfig(config *v32.GithubConfig) error {
 
 	secretInfo := convert.ToString(config.ClientSecret)
 	field := strings.ToLower(client.GithubConfigFieldClientSecret)
-	if err := common.CreateOrUpdateSecrets(g.secrets, secretInfo, field, strings.ToLower(config.Type)); err != nil {
+	name, err := common.CreateOrUpdateSecrets(g.secrets, secretInfo, field, strings.ToLower(config.Type))
+	if err != nil {
 		return err
 	}
 
-	config.ClientSecret = common.GetFullSecretName(config.Type, field)
+	config.ClientSecret = name
 
 	_, err = g.authConfigs.ObjectClient().Update(config.ObjectMeta.Name, config)
 	if err != nil {
@@ -169,7 +180,7 @@ func (g *ghProvider) LoginUser(host string, githubCredential *v32.GithubLogin, c
 	var err error
 
 	if config == nil {
-		config, err = g.getGithubConfigCR()
+		config, err = g.getConfig()
 		if err != nil {
 			return v3.Principal{}, nil, "", err
 		}
@@ -232,11 +243,9 @@ func (g *ghProvider) RefetchGroupPrincipals(principalID string, secret string) (
 	var err error
 	var config *v32.GithubConfig
 
-	if config == nil {
-		config, err = g.getGithubConfigCR()
-		if err != nil {
-			return nil, err
-		}
+	config, err = g.getConfig()
+	if err != nil {
+		return nil, err
 	}
 
 	orgAccts, err := g.githubClient.getOrgs(secret, config)
@@ -266,7 +275,7 @@ func (g *ghProvider) SearchPrincipals(searchKey, principalType string, token v3.
 	var principals []v3.Principal
 	var err error
 
-	config, err := g.getGithubConfigCR()
+	config, err := g.getConfig()
 	if err != nil {
 		return principals, err
 	}
@@ -293,6 +302,19 @@ func (g *ghProvider) SearchPrincipals(searchKey, principalType string, token v3.
 		principals = append(principals, p)
 	}
 
+	if principalType == "" || principalType == "group" {
+		// Additionally see if there are any matching teams since GitHub user search API doesn't cover those.
+		teamAccts, err := g.githubClient.searchTeams(searchKey, accessToken, config)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, acct := range teamAccts {
+			p := g.toPrincipal(teamType, acct, &token)
+			principals = append(principals, p)
+		}
+	}
+
 	return principals, nil
 }
 
@@ -303,7 +325,7 @@ const (
 )
 
 func (g *ghProvider) GetPrincipal(principalID string, token v3.Token) (v3.Principal, error) {
-	config, err := g.getGithubConfigCR()
+	config, err := g.getConfig()
 	if err != nil {
 		return v3.Principal{}, err
 	}
@@ -330,9 +352,7 @@ func (g *ghProvider) GetPrincipal(principalID string, token v3.Token) (v3.Princi
 	principalType := parts[1]
 	var acct Account
 	switch principalType {
-	case userType:
-		fallthrough
-	case orgType:
+	case userType, orgType:
 		acct, err = g.githubClient.getUserOrgByID(externalID, accessToken, config)
 		if err != nil {
 			return v3.Principal{}, err
@@ -343,7 +363,7 @@ func (g *ghProvider) GetPrincipal(principalID string, token v3.Token) (v3.Princi
 			return v3.Principal{}, err
 		}
 	default:
-		return v3.Principal{}, fmt.Errorf("Cannot get the github account due to invalid externalIDType %v", principalType)
+		return v3.Principal{}, fmt.Errorf("cannot get the github account due to invalid externalIDType %v", principalType)
 	}
 
 	princ := g.toPrincipal(principalType, acct, &token)
@@ -381,15 +401,13 @@ func (g *ghProvider) toPrincipal(principalType string, acct Account, token *v3.T
 }
 
 func (g *ghProvider) isThisUserMe(me v3.Principal, other v3.Principal) bool {
-
-	if me.ObjectMeta.Name == other.ObjectMeta.Name && me.LoginName == other.LoginName && me.PrincipalType == other.PrincipalType {
-		return true
-	}
-	return false
+	return me.ObjectMeta.Name == other.ObjectMeta.Name &&
+		me.LoginName == other.LoginName &&
+		me.PrincipalType == other.PrincipalType
 }
 
 func (g *ghProvider) CanAccessWithGroupProviders(userPrincipalID string, groupPrincipals []v3.Principal) (bool, error) {
-	config, err := g.getGithubConfigCR()
+	config, err := g.getConfig()
 	if err != nil {
 		logrus.Errorf("Error fetching github config: %v", err)
 		return false, err
@@ -414,7 +432,7 @@ func (g *ghProvider) GetUserExtraAttributes(userPrincipal v3.Principal) map[stri
 
 // IsDisabledProvider checks if the GitHub auth provider is currently disabled in Rancher.
 func (g *ghProvider) IsDisabledProvider() (bool, error) {
-	ghConfig, err := g.getGithubConfigCR()
+	ghConfig, err := g.getConfig()
 	if err != nil {
 		return false, err
 	}

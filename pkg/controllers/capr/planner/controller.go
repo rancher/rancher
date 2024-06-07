@@ -11,8 +11,8 @@ import (
 	caprplanner "github.com/rancher/rancher/pkg/capr/planner"
 	v1 "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/wrangler"
-	"github.com/rancher/wrangler/pkg/generic"
-	"github.com/rancher/wrangler/pkg/relatedresource"
+	"github.com/rancher/wrangler/v2/pkg/generic"
+	"github.com/rancher/wrangler/v2/pkg/relatedresource"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -108,17 +108,17 @@ func (h *handler) OnChange(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPla
 				capr.Reconciled.Reason(&status, "Waiting")
 			}
 			return status, nil
-		} else if errors.Is(err, generic.ErrSkip) {
+		}
+		if errors.Is(err, generic.ErrSkip) {
 			logrus.Debugf("[planner] rkecluster %s/%s: ErrSkip: %v", cp.Namespace, cp.Name, err)
 			h.controlPlanes.EnqueueAfter(cp.Namespace, cp.Name, 5*time.Second)
 			return status, err
-		} else {
-			// An actual error occurred, so set the Ready and Reconciled conditions to this error and return
-			logrus.Errorf("[planner] rkecluster %s/%s: error during plan processing: %v", cp.Namespace, cp.Name, err)
-			capr.Ready.SetError(&status, "", err)
-			capr.Reconciled.SetError(&status, "", err)
-			return status, err
 		}
+		// An actual error occurred, so set the Ready and Reconciled conditions to this error and return
+		logrus.Errorf("[planner] rkecluster %s/%s: error during plan processing: %v", cp.Namespace, cp.Name, err)
+		capr.Ready.SetError(&status, "", err)
+		capr.Reconciled.SetError(&status, "", err)
+		return status, err
 	}
 	// No error encountered during planner.Process
 	logrus.Debugf("[planner] rkecluster %s/%s: reconciliation complete", cp.Namespace, cp.Name)

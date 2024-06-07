@@ -26,8 +26,8 @@ func RequiredCRDs() []string {
 	if features.Auth.Enabled() {
 		requiredCRDS = append(requiredCRDS, AuthCRDs()...)
 	}
-	if features.MonitoringV1.Enabled() {
-		requiredCRDS = append(requiredCRDS, MonitoringV1CRDs()...)
+	if features.UIExtension.Enabled() {
+		requiredCRDS = append(requiredCRDS, UIPluginsCRD()...)
 	}
 	return requiredCRDS
 }
@@ -105,6 +105,7 @@ func AuthCRDs() []string {
 		"tokens.management.cattle.io",
 		"users.management.cattle.io",
 		"userattributes.management.cattle.io",
+		"clusterproxyconfigs.management.cattle.io",
 	}
 }
 
@@ -113,16 +114,6 @@ func ClusterAuthCRDs() []string {
 	return []string{
 		"clusterauthtokens.cluster.cattle.io",
 		"clusteruserattributes.cluster.cattle.io",
-	}
-}
-
-// MonitoringV1CRDs returns a list of CRD names needed for MonitoringV1.
-func MonitoringV1CRDs() []string {
-	return []string{
-		"alertmanagers.monitoring.coreos.com",
-		"prometheuses.monitoring.coreos.com",
-		"prometheusrules.monitoring.coreos.com",
-		"servicemonitors.monitoring.coreos.com",
 	}
 }
 
@@ -164,8 +155,6 @@ func MCMCRDs() []string {
 		"nodetemplates.management.cattle.io",
 		"notifiers.management.cattle.io",
 		"podsecurityadmissionconfigurationtemplates.management.cattle.io",
-		"podsecuritypolicytemplates.management.cattle.io",
-		"podsecuritypolicytemplateprojectbindings.management.cattle.io",
 		"preferences.management.cattle.io",
 		"projects.management.cattle.io",
 		"projectalerts.management.cattle.io",
@@ -188,6 +177,13 @@ func MCMCRDs() []string {
 		"tokens.management.cattle.io",
 		"users.management.cattle.io",
 		"userattributes.management.cattle.io",
+	}
+}
+
+// UIPluginsCRD returns a list of CRD names needed to enable UIPlugins
+func UIPluginsCRD() []string {
+	return []string{
+		"uiplugins.catalog.cattle.io",
 	}
 }
 
@@ -215,6 +211,7 @@ var MigratedResources = map[string]bool{
 	"clusterclasses.cluster.x-k8s.io":                                 false,
 	"clusterloggings.management.cattle.io":                            false,
 	"clustermonitorgraphs.management.cattle.io":                       false,
+	"clusterproxyconfigs.management.cattle.io":                        true,
 	"clusterregistrationtokens.management.cattle.io":                  false,
 	"clusterrepoes.catalog.cattle.io":                                 false,
 	"clusterresourcesetbindings.addons.cluster.x-k8s.io":              false,
@@ -264,8 +261,6 @@ var MigratedResources = map[string]bool{
 	"openldapproviders.management.cattle.io":                          false,
 	"operations.catalog.cattle.io":                                    false,
 	"podsecurityadmissionconfigurationtemplates.management.cattle.io": false,
-	"podsecuritypolicytemplateprojectbindings.management.cattle.io":   false,
-	"podsecuritypolicytemplates.management.cattle.io":                 false,
 	"preferences.management.cattle.io":                                false,
 	"principals.management.cattle.io":                                 false,
 	"projectalertgroups.management.cattle.io":                         false,
@@ -296,5 +291,6 @@ var MigratedResources = map[string]bool{
 	"tokens.management.cattle.io":                                     false,
 	"userattributes.management.cattle.io":                             false,
 	"users.management.cattle.io":                                      false,
+	"uiplugins.catalog.cattle.io":                                     true,
 	"workloads.project.cattle.io":                                     false,
 }

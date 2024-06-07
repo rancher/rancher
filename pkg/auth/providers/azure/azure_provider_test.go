@@ -138,9 +138,9 @@ func TestConfigureTest(t *testing.T) {
 func TestTransformToAuthProvider(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		name                string
-		authConfig          map[string]interface{}
-		expectedRedirectUrl string
+		name                 string
+		authConfig           map[string]interface{}
+		expectedAuthProvider map[string]interface{}
 	}{
 		{
 			name: "redirect URL for Microsoft Graph",
@@ -148,6 +148,7 @@ func TestTransformToAuthProvider(t *testing.T) {
 				"enabled":    true,
 				"accessMode": "unrestricted",
 				"metadata": map[string]interface{}{
+					"name": "providerName",
 					"annotations": map[string]interface{}{
 						"auth.cattle.io/azuread-endpoint-migrated": "true",
 					},
@@ -161,13 +162,26 @@ func TestTransformToAuthProvider(t *testing.T) {
 				"applicationSecret": "secret123",
 				"rancherUrl":        "https://myrancher.com",
 			},
-			expectedRedirectUrl: "https://login.microsoftonline.com/tenant123/oauth2/v2.0/authorize?client_id=app123&redirect_uri=https://myrancher.com&response_type=code&scope=openid",
+			expectedAuthProvider: map[string]interface{}{
+				"id":            "providerName",
+				"clientId":      "app123",
+				"tenantId":      "tenant123",
+				"scopes":        []string{"openid", "profile", "email"},
+				"authUrl":       "https://login.microsoftonline.com/tenant123/oauth2/v2.0/authorize",
+				"tokenUrl":      "https://login.microsoftonline.com/tenant123/oauth2/v2.0/token",
+				"deviceAuthUrl": "https://login.microsoftonline.com/tenant123/oauth2/v2.0/devicecode",
+				"redirectUrl":   "https://login.microsoftonline.com/tenant123/oauth2/v2.0/authorize?client_id=app123&redirect_uri=https://myrancher.com&response_type=code&scope=openid",
+			},
 		},
 		{
 			name: "redirect URL for Azure AD Graph",
 			authConfig: map[string]interface{}{
-				"enabled":           true,
-				"accessMode":        "unrestricted",
+				"enabled":    true,
+				"accessMode": "unrestricted",
+				"metadata": map[string]interface{}{
+					"name":        "providerName",
+					"annotations": map[string]interface{}{},
+				},
 				"endpoint":          "https://login.microsoftonline.com/",
 				"graphEndpoint":     "https://graph.windows.net/",
 				"tokenEndpoint":     "https://login.microsoftonline.com/tenant123/oauth2/token",
@@ -177,13 +191,23 @@ func TestTransformToAuthProvider(t *testing.T) {
 				"applicationSecret": "secret123",
 				"rancherUrl":        "https://myrancher.com",
 			},
-			expectedRedirectUrl: "https://login.microsoftonline.com/tenant123/oauth2/authorize?client_id=app123&redirect_uri=https://myrancher.com&resource=https://graph.windows.net/&scope=openid",
+			expectedAuthProvider: map[string]interface{}{
+				"id":            "providerName",
+				"clientId":      "app123",
+				"tenantId":      "tenant123",
+				"scopes":        []string{"openid", "profile", "email"},
+				"authUrl":       "https://login.microsoftonline.com/tenant123/oauth2/authorize",
+				"tokenUrl":      "https://login.microsoftonline.com/tenant123/oauth2/token",
+				"deviceAuthUrl": "https://login.microsoftonline.com/tenant123/oauth2/v2.0/devicecode",
+				"redirectUrl":   "https://login.microsoftonline.com/tenant123/oauth2/authorize?client_id=app123&redirect_uri=https://myrancher.com&resource=https://graph.windows.net/&scope=openid",
+			},
 		},
 		{
 			name: "redirect URL for disabled auth provider with annotation",
 			authConfig: map[string]interface{}{
 				"accessMode": "unrestricted",
 				"metadata": map[string]interface{}{
+					"name": "providerName",
 					"annotations": map[string]interface{}{
 						"auth.cattle.io/azuread-endpoint-migrated": "true",
 					},
@@ -197,13 +221,26 @@ func TestTransformToAuthProvider(t *testing.T) {
 				"applicationSecret": "secret123",
 				"rancherUrl":        "https://myrancher.com",
 			},
-			expectedRedirectUrl: "https://login.microsoftonline.com/tenant123/oauth2/v2.0/authorize?client_id=app123&redirect_uri=https://myrancher.com&response_type=code&scope=openid",
+			expectedAuthProvider: map[string]interface{}{
+				"id":            "providerName",
+				"clientId":      "app123",
+				"tenantId":      "tenant123",
+				"scopes":        []string{"openid", "profile", "email"},
+				"authUrl":       "https://login.microsoftonline.com/tenant123/oauth2/v2.0/authorize",
+				"tokenUrl":      "https://login.microsoftonline.com/tenant123/oauth2/token",
+				"deviceAuthUrl": "https://login.microsoftonline.com/tenant123/oauth2/v2.0/devicecode",
+				"redirectUrl":   "https://login.microsoftonline.com/tenant123/oauth2/v2.0/authorize?client_id=app123&redirect_uri=https://myrancher.com&response_type=code&scope=openid",
+			},
 		},
 		{
 			name: "redirect URL for disabled auth provider without annotation",
 			authConfig: map[string]interface{}{
-				"enabled":           false, // Here, enabled is set to false explicitly.
-				"accessMode":        "unrestricted",
+				"enabled":    false, // Here, enabled is set to false explicitly.
+				"accessMode": "unrestricted",
+				"metadata": map[string]interface{}{
+					"name":        "providerName",
+					"annotations": map[string]interface{}{},
+				},
 				"endpoint":          "https://login.microsoftonline.com/",
 				"graphEndpoint":     "https://graph.windows.net/",
 				"tokenEndpoint":     "https://login.microsoftonline.com/tenant123/oauth2/token",
@@ -213,7 +250,102 @@ func TestTransformToAuthProvider(t *testing.T) {
 				"applicationSecret": "secret123",
 				"rancherUrl":        "https://myrancher.com",
 			},
-			expectedRedirectUrl: "https://login.microsoftonline.com/tenant123/oauth2/authorize?client_id=app123&redirect_uri=https://myrancher.com&response_type=code&scope=openid",
+			expectedAuthProvider: map[string]interface{}{
+				"id":            "providerName",
+				"clientId":      "app123",
+				"tenantId":      "tenant123",
+				"scopes":        []string{"openid", "profile", "email"},
+				"authUrl":       "https://login.microsoftonline.com/tenant123/oauth2/authorize",
+				"tokenUrl":      "https://login.microsoftonline.com/tenant123/oauth2/token",
+				"deviceAuthUrl": "https://login.microsoftonline.com/tenant123/oauth2/v2.0/devicecode",
+				"redirectUrl":   "https://login.microsoftonline.com/tenant123/oauth2/authorize?client_id=app123&redirect_uri=https://myrancher.com&response_type=code&scope=openid",
+			},
+		},
+		{
+			name: "oauth URLs from default endpoint",
+			authConfig: map[string]interface{}{
+				"enabled":    false, // Here, enabled is set to false explicitly.
+				"accessMode": "unrestricted",
+				"metadata": map[string]interface{}{
+					"name":        "providerName",
+					"annotations": map[string]interface{}{},
+				},
+				"endpoint":          "https://login.microsoftonline.com/",
+				"graphEndpoint":     "https://graph.windows.net/",
+				"authEndpoint":      "https://login.microsoftonline.com/tenant123/oauth2/authorize",
+				"tenantId":          "tenant123",
+				"applicationId":     "app123",
+				"applicationSecret": "secret123",
+				"rancherUrl":        "https://myrancher.com",
+			},
+			expectedAuthProvider: map[string]interface{}{
+				"id":            "providerName",
+				"clientId":      "app123",
+				"tenantId":      "tenant123",
+				"scopes":        []string{"openid", "profile", "email"},
+				"authUrl":       "https://login.microsoftonline.com/tenant123/oauth2/authorize",
+				"tokenUrl":      "https://login.microsoftonline.com/tenant123/oauth2/v2.0/token",
+				"deviceAuthUrl": "https://login.microsoftonline.com/tenant123/oauth2/v2.0/devicecode",
+				"redirectUrl":   "https://login.microsoftonline.com/tenant123/oauth2/authorize?client_id=app123&redirect_uri=https://myrancher.com&response_type=code&scope=openid",
+			},
+		},
+		{
+			name: "oauth URLs from custom endpoint and no oauth URLs",
+			authConfig: map[string]interface{}{
+				"enabled":    false, // Here, enabled is set to false explicitly.
+				"accessMode": "unrestricted",
+				"metadata": map[string]interface{}{
+					"name":        "providerName",
+					"annotations": map[string]interface{}{},
+				},
+				"endpoint":          "https://myendpoint.com/",
+				"graphEndpoint":     "https://graph.windows.net/",
+				"authEndpoint":      "https://myendpoint.com/tenant123/oauth2/authorize",
+				"tenantId":          "tenant123",
+				"applicationId":     "app123",
+				"applicationSecret": "secret123",
+				"rancherUrl":        "https://myrancher.com",
+			},
+			expectedAuthProvider: map[string]interface{}{
+				"id":            "providerName",
+				"clientId":      "app123",
+				"tenantId":      "tenant123",
+				"scopes":        []string{"openid", "profile", "email"},
+				"authUrl":       "https://myendpoint.com/tenant123/oauth2/authorize",
+				"tokenUrl":      "https://myendpoint.com/tenant123/oauth2/v2.0/token",
+				"deviceAuthUrl": "https://myendpoint.com/tenant123/oauth2/v2.0/devicecode",
+				"redirectUrl":   "https://myendpoint.com/tenant123/oauth2/authorize?client_id=app123&redirect_uri=https://myrancher.com&response_type=code&scope=openid",
+			},
+		},
+		{
+			name: "oauth URLs from custom URLs",
+			authConfig: map[string]interface{}{
+				"enabled":    false, // Here, enabled is set to false explicitly.
+				"accessMode": "unrestricted",
+				"metadata": map[string]interface{}{
+					"name":        "providerName",
+					"annotations": map[string]interface{}{},
+				},
+				"endpoint":           "https://login.microsoftonline.com/",
+				"graphEndpoint":      "https://graph.windows.net/",
+				"tokenEndpoint":      "https://custom.com/oauth2/token",
+				"authEndpoint":       "https://custom.com/oauth2/authorize",
+				"deviceAuthEndpoint": "https://custom.com/oauth2/device",
+				"tenantId":           "tenant123",
+				"applicationId":      "app123",
+				"applicationSecret":  "secret123",
+				"rancherUrl":         "https://myrancher.com",
+			},
+			expectedAuthProvider: map[string]interface{}{
+				"id":            "providerName",
+				"clientId":      "app123",
+				"tenantId":      "tenant123",
+				"scopes":        []string{"openid", "profile", "email"},
+				"authUrl":       "https://custom.com/oauth2/authorize",
+				"tokenUrl":      "https://custom.com/oauth2/token",
+				"deviceAuthUrl": "https://custom.com/oauth2/device",
+				"redirectUrl":   "https://custom.com/oauth2/authorize?client_id=app123&redirect_uri=https://myrancher.com&response_type=code&scope=openid",
+			},
 		},
 	}
 
@@ -222,9 +354,7 @@ func TestTransformToAuthProvider(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			authProvider, err := provider.TransformToAuthProvider(test.authConfig)
 			assert.NoError(t, err)
-			url, ok := authProvider["redirectUrl"].(string)
-			assert.True(t, ok)
-			assert.Equal(t, test.expectedRedirectUrl, url)
+			assert.Equal(t, test.expectedAuthProvider, authProvider)
 		})
 	}
 }

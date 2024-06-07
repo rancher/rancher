@@ -5,7 +5,7 @@ import (
 
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/types/config"
-	"github.com/rancher/wrangler/pkg/relatedresource"
+	"github.com/rancher/wrangler/v2/pkg/relatedresource"
 )
 
 const (
@@ -30,6 +30,10 @@ func Register(ctx context.Context, management *config.ManagementContext, cluster
 	relatedresource.WatchClusterScoped(ctx, roleEnqueuer, enqueuer.roleEnqueueGR, management.Wrangler.Mgmt.GlobalRole(), management.Wrangler.RBAC.Role())
 	relatedresource.WatchClusterScoped(ctx, roleBindingEnqueuer, enqueuer.roleBindingEnqueueGRB, management.Wrangler.Mgmt.GlobalRoleBinding(), management.Wrangler.RBAC.RoleBinding())
 	relatedresource.WatchClusterScoped(ctx, namespaceGrEnqueuer, enqueuer.namespaceEnqueueGR, management.Wrangler.Mgmt.GlobalRole(), management.Wrangler.Core.Namespace())
+
+	relatedresource.WatchClusterScoped(ctx, fleetWorkspaceGrbEnqueuer, enqueuer.fleetWorkspaceEnqueueGR, management.Wrangler.Mgmt.GlobalRole(), management.Wrangler.Mgmt.FleetWorkspace())
+	relatedresource.WatchClusterScoped(ctx, clusterRoleEnqueuer, enqueuer.clusterRoleEnqueueGR, management.Wrangler.Mgmt.GlobalRole(), management.Wrangler.RBAC.ClusterRole())
+	relatedresource.WatchClusterScoped(ctx, clusterRoleBindingEnqueuer, enqueuer.clusterRoleBindingEnqueueGRB, management.Wrangler.Mgmt.GlobalRoleBinding(), management.Wrangler.RBAC.ClusterRoleBinding())
 
 	gr := newGlobalRoleLifecycle(management.WithAgent(grController))
 	grb := newGlobalRoleBindingLifecycle(management.WithAgent(grbController), clusterManager)

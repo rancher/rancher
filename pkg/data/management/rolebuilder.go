@@ -8,7 +8,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers"
 	wranglerv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
-	"github.com/rancher/wrangler/pkg/generic"
+	"github.com/rancher/wrangler/v2/pkg/generic"
 	"github.com/sirupsen/logrus"
 	rbacv1 "k8s.io/api/rbac/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,6 +31,7 @@ type roleBuilder struct {
 	administrative    bool
 	roleTemplateNames []string
 	rules             []*ruleBuilder
+	namespacedRules   []*namespacedRuleBuilder
 }
 
 func (rb *roleBuilder) String() string {
@@ -78,6 +79,16 @@ func (rb *roleBuilder) addRule() *ruleBuilder {
 	return r
 }
 
+func (rb *roleBuilder) addNamespacedRule(namespace string) *namespacedRuleBuilder {
+	n := &namespacedRuleBuilder{
+		rb:         rb,
+		rules:      []*ruleBuilder{},
+		_namespace: namespace,
+	}
+	rb.namespacedRules = append(rb.namespacedRules, n)
+	return n
+}
+
 func (rb *roleBuilder) setRoleTemplateNames(names ...string) *roleBuilder {
 	rb.roleTemplateNames = names
 	return rb
@@ -96,6 +107,22 @@ func (rb *roleBuilder) policyRules() []rbacv1.PolicyRule {
 		prs = append(prs, r.toPolicyRule())
 	}
 	return prs
+}
+
+func (rb *roleBuilder) namespacedPolicyRules() map[string][]rbacv1.PolicyRule {
+	if len(rb.namespacedRules) == 0 {
+		return nil
+	}
+
+	nsRules := map[string][]rbacv1.PolicyRule{}
+	for _, n := range rb.namespacedRules {
+		var prs []rbacv1.PolicyRule
+		for _, r := range n.rules {
+			prs = append(prs, r.toPolicyRule())
+		}
+		nsRules[n._namespace] = prs
+	}
+	return nsRules
 }
 
 type ruleBuilder struct {
@@ -170,6 +197,24 @@ func (r *ruleBuilder) toPolicyRule() rbacv1.PolicyRule {
 	}
 }
 
+type namespacedRuleBuilder struct {
+	rb         *roleBuilder
+	rules      []*ruleBuilder
+	_namespace string
+}
+
+func (n *namespacedRuleBuilder) String() string {
+	return fmt.Sprintf("namespace: %v, rules: %v", n._namespace, n.rules)
+}
+
+func (n *namespacedRuleBuilder) addRule() *ruleBuilder {
+	r := &ruleBuilder{
+		rb: n.rb,
+	}
+	n.rules = append(n.rules, r)
+	return r
+}
+
 // buildFnc takes in a roleBuilder and returns desired runtime.Objects.
 type buildFnc[T runtime.Object] func(thisRB *roleBuilder) (name string, object T)
 
@@ -239,9 +284,10 @@ func (rb *roleBuilder) reconcileGlobalRoles(grClient wranglerv3.GlobalRoleClient
 				Name:   current.name,
 				Labels: defaultGRLabel,
 			},
-			DisplayName: current.displayName,
-			Rules:       current.policyRules(),
-			Builtin:     current.builtin,
+			DisplayName:     current.displayName,
+			Rules:           current.policyRules(),
+			Builtin:         current.builtin,
+			NamespacedRules: current.namespacedPolicyRules(),
 		}
 		return gr.Name, gr
 	}
@@ -263,10 +309,11 @@ func (rb *roleBuilder) reconcileGlobalRoles(grClient wranglerv3.GlobalRoleClient
 
 	compareAndMod := func(haveGR *v3.GlobalRole, wantGR *v3.GlobalRole) (bool, *v3.GlobalRole, error) {
 		builtin := haveGR.Builtin == wantGR.Builtin
-		equal := builtin && haveGR.DisplayName == wantGR.DisplayName && reflect.DeepEqual(haveGR.Rules, wantGR.Rules)
+		equal := builtin && haveGR.DisplayName == wantGR.DisplayName && reflect.DeepEqual(haveGR.Rules, wantGR.Rules) && reflect.DeepEqual(haveGR.NamespacedRules, wantGR.NamespacedRules)
 
 		haveGR.DisplayName = wantGR.DisplayName
 		haveGR.Rules = wantGR.Rules
+		haveGR.NamespacedRules = wantGR.NamespacedRules
 		haveGR.Builtin = wantGR.Builtin
 
 		return equal, haveGR, nil

@@ -4,7 +4,7 @@ import (
 	"context"
 	"net"
 
-	openapi2 "github.com/google/gnostic/openapiv2"
+	openapi2 "github.com/google/gnostic-models/openapiv2"
 	"github.com/rancher/rancher/pkg/types/config/dialer"
 	meta1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -542,7 +542,7 @@ func (m MockResourceInterfaceGkeCC) Patch(ctx context.Context, name string, pt t
 
 type MockFactory struct{}
 
-func (m MockFactory) ClusterDialer(clusterName string) (dialer.Dialer, error) {
+func (m MockFactory) ClusterDialer(clusterName string, retryOnError bool) (dialer.Dialer, error) {
 	// pass a dialer func to the client
 	dialer := func(ctx context.Context, network, address string) (net.Conn, error) {
 		return nil, nil

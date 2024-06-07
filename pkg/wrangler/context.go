@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"sync"
 
-	prommonitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	fleetv1alpha1api "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/lasso/pkg/dynamic"
@@ -46,24 +45,24 @@ import (
 	"github.com/rancher/remotedialer"
 	"github.com/rancher/steve/pkg/accesscontrol"
 	"github.com/rancher/steve/pkg/client"
-	"github.com/rancher/wrangler/pkg/apply"
-	admissionreg "github.com/rancher/wrangler/pkg/generated/controllers/admissionregistration.k8s.io"
-	admissionregcontrollers "github.com/rancher/wrangler/pkg/generated/controllers/admissionregistration.k8s.io/v1"
-	"github.com/rancher/wrangler/pkg/generated/controllers/apiextensions.k8s.io"
-	crdv1 "github.com/rancher/wrangler/pkg/generated/controllers/apiextensions.k8s.io/v1"
-	"github.com/rancher/wrangler/pkg/generated/controllers/apiregistration.k8s.io"
-	apiregv1 "github.com/rancher/wrangler/pkg/generated/controllers/apiregistration.k8s.io/v1"
-	"github.com/rancher/wrangler/pkg/generated/controllers/apps"
-	appsv1 "github.com/rancher/wrangler/pkg/generated/controllers/apps/v1"
-	"github.com/rancher/wrangler/pkg/generated/controllers/batch"
-	batchv1 "github.com/rancher/wrangler/pkg/generated/controllers/batch/v1"
-	"github.com/rancher/wrangler/pkg/generated/controllers/core"
-	corev1 "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
-	"github.com/rancher/wrangler/pkg/generated/controllers/rbac"
-	rbacv1 "github.com/rancher/wrangler/pkg/generated/controllers/rbac/v1"
-	"github.com/rancher/wrangler/pkg/generic"
-	"github.com/rancher/wrangler/pkg/leader"
-	"github.com/rancher/wrangler/pkg/schemes"
+	"github.com/rancher/wrangler/v2/pkg/apply"
+	admissionreg "github.com/rancher/wrangler/v2/pkg/generated/controllers/admissionregistration.k8s.io"
+	admissionregcontrollers "github.com/rancher/wrangler/v2/pkg/generated/controllers/admissionregistration.k8s.io/v1"
+	"github.com/rancher/wrangler/v2/pkg/generated/controllers/apiextensions.k8s.io"
+	crdv1 "github.com/rancher/wrangler/v2/pkg/generated/controllers/apiextensions.k8s.io/v1"
+	"github.com/rancher/wrangler/v2/pkg/generated/controllers/apiregistration.k8s.io"
+	apiregv1 "github.com/rancher/wrangler/v2/pkg/generated/controllers/apiregistration.k8s.io/v1"
+	"github.com/rancher/wrangler/v2/pkg/generated/controllers/apps"
+	appsv1 "github.com/rancher/wrangler/v2/pkg/generated/controllers/apps/v1"
+	"github.com/rancher/wrangler/v2/pkg/generated/controllers/batch"
+	batchv1 "github.com/rancher/wrangler/v2/pkg/generated/controllers/batch/v1"
+	"github.com/rancher/wrangler/v2/pkg/generated/controllers/core"
+	corev1 "github.com/rancher/wrangler/v2/pkg/generated/controllers/core/v1"
+	"github.com/rancher/wrangler/v2/pkg/generated/controllers/rbac"
+	rbacv1 "github.com/rancher/wrangler/v2/pkg/generated/controllers/rbac/v1"
+	"github.com/rancher/wrangler/v2/pkg/generic"
+	"github.com/rancher/wrangler/v2/pkg/leader"
+	"github.com/rancher/wrangler/v2/pkg/schemes"
 	"github.com/sirupsen/logrus"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -95,7 +94,6 @@ var (
 		scheme.AddToScheme,
 		apiextensionsv1.AddToScheme,
 		apiregistrationv12.AddToScheme,
-		prommonitoringv1.AddToScheme,
 		catalogv1.AddToScheme,
 	}
 	AddToScheme = localSchemeBuilder.AddToScheme

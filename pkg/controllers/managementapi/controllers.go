@@ -8,7 +8,7 @@ import (
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/management/auth"
 	v3cluster "github.com/rancher/rancher/pkg/controllers/management/cluster"
-	podsecuritypolicy2 "github.com/rancher/rancher/pkg/controllers/management/podsecuritypolicy"
+
 	"github.com/rancher/rancher/pkg/controllers/managementapi/catalog"
 	"github.com/rancher/rancher/pkg/controllers/managementapi/dynamicschema"
 	"github.com/rancher/rancher/pkg/controllers/managementapi/samlconfig"
@@ -17,8 +17,6 @@ import (
 	whitelistproxyNodeDriver "github.com/rancher/rancher/pkg/controllers/managementapi/whitelistproxy/nodedriver"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/clusterauthtoken"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/rbac"
-	"github.com/rancher/rancher/pkg/controllers/managementuser/rbac/podsecuritypolicy"
-	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/monitoring"
 	"github.com/rancher/rancher/pkg/types/config"
 )
 
@@ -43,21 +41,13 @@ func registerIndexers(scaledContext *config.ScaledContext) error {
 	if err := rbac.RegisterIndexers(scaledContext); err != nil {
 		return err
 	}
-	if err := monitoring.RegisterIndexers(scaledContext); err != nil {
-		return err
-	}
 	if err := auth.RegisterIndexers(scaledContext); err != nil {
 		return err
 	}
 	if err := tokens.RegisterIndexer(scaledContext); err != nil {
 		return err
 	}
-	if err := podsecuritypolicy.RegisterIndexers(scaledContext); err != nil {
-		return err
-	}
-	if err := podsecuritypolicy2.RegisterIndexers(scaledContext); err != nil {
-		return err
-	}
+
 	v3cluster.RegisterIndexers(scaledContext)
 	return nil
 }
