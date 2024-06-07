@@ -339,9 +339,9 @@ func (p *ldapProvider) samlSearchGetPrincipal(
 	}
 
 	var searchRequest *ldapv3.SearchRequest
-	var filter string
+
 	if scope == p.userScope {
-		filter = fmt.Sprintf(
+		filter := fmt.Sprintf(
 			"(&(%v=%v)(%v=%v))",
 			ObjectClass, config.UserObjectClass,
 			config.UserLoginAttribute, ldapv3.EscapeFilter(externalID),
@@ -353,7 +353,7 @@ func (p *ldapProvider) samlSearchGetPrincipal(
 			config.GetUserSearchAttributes(ObjectClass),
 		)
 	} else {
-		filter = fmt.Sprintf(
+		filter := fmt.Sprintf(
 			"(&(%v=%v)(%v=%v))",
 			ObjectClass, config.GroupObjectClass,
 			config.GroupDNAttribute, ldapv3.EscapeFilter(externalID),
