@@ -341,17 +341,29 @@ func (p *ldapProvider) samlSearchGetPrincipal(
 	var searchRequest *ldapv3.SearchRequest
 	var filter string
 	if scope == p.userScope {
-		filter = fmt.Sprintf("(&(%v=%v)(%v=%v))",
-			ObjectClass, config.UserObjectClass, config.UserLoginAttribute, ldapv3.EscapeFilter(externalID))
-		searchRequest = ldapv3.NewSearchRequest(config.UserSearchBase,
-			ldapv3.ScopeWholeSubtree, ldapv3.NeverDerefAliases, 0, 0, false,
-			filter, config.GetUserSearchAttributes(ObjectClass), nil)
+		filter = fmt.Sprintf(
+			"(&(%v=%v)(%v=%v))",
+			ObjectClass, config.UserObjectClass,
+			config.UserLoginAttribute, ldapv3.EscapeFilter(externalID),
+		)
+
+		searchRequest = ldap.NewSearchRequest(
+			config.UserSearchBase,
+			filter,
+			config.GetUserSearchAttributes(ObjectClass),
+		)
 	} else {
-		filter = fmt.Sprintf("(&(%v=%v)(%v=%v))",
-			ObjectClass, config.GroupObjectClass, config.GroupDNAttribute, ldapv3.EscapeFilter(externalID))
-		searchRequest = ldapv3.NewSearchRequest(config.GroupSearchBase,
-			ldapv3.ScopeWholeSubtree, ldapv3.NeverDerefAliases, 0, 0, false,
-			filter, config.GetGroupSearchAttributes(ObjectClass), nil)
+		filter = fmt.Sprintf(
+			"(&(%v=%v)(%v=%v))",
+			ObjectClass, config.GroupObjectClass,
+			config.GroupDNAttribute, ldapv3.EscapeFilter(externalID),
+		)
+
+		searchRequest = ldap.NewSearchRequest(
+			config.GroupSearchBase,
+			filter,
+			config.GetGroupSearchAttributes(ObjectClass),
+		)
 	}
 
 	result, err := lConn.Search(searchRequest)

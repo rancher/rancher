@@ -56,12 +56,15 @@ func (p *adProvider) loginUser(adCredential *v32.BasicLogin, config *v32.ActiveD
 	if strings.Contains(username, `\`) {
 		samName = strings.SplitN(username, `\`, 2)[1]
 	}
+
 	query := fmt.Sprintf("(%v=%v)", config.UserLoginAttribute, ldapv3.EscapeFilter(samName))
 	logrus.Debugf("LDAP Search query: {%s}", query)
-	search := ldapv3.NewSearchRequest(config.UserSearchBase,
-		ldapv3.ScopeWholeSubtree, ldapv3.NeverDerefAliases, 0, 0, false,
+
+	search := ldap.NewSearchRequest(
+		config.UserSearchBase,
 		query,
-		config.GetUserSearchAttributes(MemberOfAttribute, ObjectClass), nil)
+		config.GetUserSearchAttributes(MemberOfAttribute, ObjectClass),
+	)
 
 	result, err := lConn.Search(search)
 	if err != nil {
@@ -261,10 +264,11 @@ func (p *adProvider) getGroupPrincipalsFromSearch(searchBase string, filter stri
 	var groupPrincipals []v3.Principal
 	var nilPrincipal []v3.Principal
 
-	search := ldapv3.NewSearchRequest(searchBase,
-		ldapv3.ScopeWholeSubtree, ldapv3.NeverDerefAliases, 0, 0, false,
+	search := ldap.NewSearchRequest(
+		searchBase,
 		filter,
-		config.GetGroupSearchAttributes(ObjectClass), nil)
+		config.GetGroupSearchAttributes(ObjectClass),
+	)
 
 	serviceAccountUsername := ldap.GetUserExternalID(config.ServiceAccountUsername, config.DefaultLoginDomain)
 	err := lConn.Bind(serviceAccountUsername, config.ServiceAccountPassword)
@@ -460,18 +464,20 @@ func (p *adProvider) searchLdap(query string, scope string, config *v32.ActiveDi
 
 	searchDomain := config.UserSearchBase
 	if strings.EqualFold(UserScope, scope) {
-		search = ldapv3.NewSearchRequest(searchDomain,
-			ldapv3.ScopeWholeSubtree, ldapv3.NeverDerefAliases, 0, 0, false,
+		search = ldap.NewSearchRequest(
+			searchDomain,
 			query,
-			config.GetUserSearchAttributes(MemberOfAttribute, ObjectClass), nil)
+			config.GetUserSearchAttributes(MemberOfAttribute, ObjectClass),
+		)
 	} else {
 		if config.GroupSearchBase != "" {
 			searchDomain = config.GroupSearchBase
 		}
-		search = ldapv3.NewSearchRequest(searchDomain,
-			ldapv3.ScopeWholeSubtree, ldapv3.NeverDerefAliases, 0, 0, false,
+		search = ldap.NewSearchRequest(
+			searchDomain,
 			query,
-			config.GetGroupSearchAttributes(MemberOfAttribute, ObjectClass), nil)
+			config.GetGroupSearchAttributes(MemberOfAttribute, ObjectClass),
+		)
 	}
 
 	// Bind before query

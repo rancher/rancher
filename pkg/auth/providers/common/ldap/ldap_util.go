@@ -215,10 +215,18 @@ func GatherParentGroups(groupPrincipal v3.Principal, searchDomain string, groupS
 	}
 	groupDN := strings.TrimPrefix(parts[1], "//")
 
-	searchGroup := ldapv3.NewSearchRequest(searchDomain,
-		ldapv3.ScopeWholeSubtree, ldapv3.NeverDerefAliases, 0, 0, false,
-		fmt.Sprintf("(&(%v=%v)(%v=%v))", config.GroupMemberMappingAttribute, ldapv3.EscapeFilter(groupDN), config.ObjectClass, config.GroupObjectClass),
-		searchAttributes, nil)
+	filter := fmt.Sprintf(
+		"(&(%v=%v)(%v=%v))",
+		config.GroupMemberMappingAttribute, ldapv3.EscapeFilter(groupDN),
+		config.ObjectClass, config.GroupObjectClass,
+	)
+
+	searchGroup := NewSearchRequest(
+		searchDomain,
+		filter,
+		searchAttributes,
+	)
+
 	resultGroups, err := lConn.SearchWithPaging(searchGroup, 1000)
 	if err != nil {
 		return err
@@ -275,17 +283,23 @@ func NewCAPool(cert string) (*x509.CertPool, error) {
 	return pool, nil
 }
 
-func ValidateLdapConfig(ldapConfig *v3.LdapConfig, certpool *x509.CertPool) (bool, error) {
-	if len(ldapConfig.Servers) < 1 {
-		return false, nil
-	}
-
-	lConn, err := Connect(ldapConfig, certpool)
-	if err != nil {
-		return false, err
-	}
-	defer lConn.Close()
-
-	logrus.Debugf("validated ldap configuration: %s", strings.Join(ldapConfig.Servers, ","))
-	return true, nil
+// NewSearchRequest will return a new *ldapv3.SearchRequest based on some fixed common arguments:
+// - Scope (ScopeWholeSubtree)
+// - DerefAliases (NeverDerefAliases)
+// - SizeLimit (0)
+// - TimeLimit (0)
+// - TypesOnly (false)
+// - Controls (nil)
+func NewSearchRequest(baseDN, filter string, attributes []string) *ldapv3.SearchRequest {
+	return ldapv3.NewSearchRequest(
+		baseDN,                   // BaseDN
+		ldapv3.ScopeWholeSubtree, // Scope
+		ldapv3.NeverDerefAliases, // DerefAliases
+		0,                        // SizeLimit
+		0,                        // TimeLimit
+		false,                    // TypesOnly
+		filter,                   // Filter
+		attributes,               // Attributes
+		nil,                      // Controls
+	)
 }
