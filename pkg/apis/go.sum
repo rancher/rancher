@@ -90,8 +90,8 @@ github.com/rancher/aks-operator v1.9.0-rc.4 h1:7MFiKGS0RtDegh5OR9Ui9W2Ld6yeYfIfE
 github.com/rancher/aks-operator v1.9.0-rc.4/go.mod h1:1OwOCv1BLxKaDCltz/4Yp0bjZGIEY9Z4UMs6/FUgN2E=
 github.com/rancher/client-go v1.29.3-rancher1 h1:4nZ6BEtFLxBSomVgJFSCoOAmfo6hr8PYMwnsZk1Ubu8=
 github.com/rancher/client-go v1.29.3-rancher1/go.mod h1:tkDisCvgPfiRpxGnOORfkljmS+UrW+WtXAy2fTvXJB0=
-github.com/rancher/eks-operator v1.9.0-rc.4 h1:Fg+m0Blrbd9J6aNmhpLMlxaFBJcpztxY/C/g5aCq1ms=
-github.com/rancher/eks-operator v1.9.0-rc.4/go.mod h1:H5ePG4qm+M0ZY1u7XM+DvPYlMH/8jjJGVPjwkZejFkw=
+github.com/rancher/eks-operator v1.9.0-rc.5 h1:UlsBAz5YIj+952dOl0PNhATTK7lOHycC6LmY7gLNXds=
+github.com/rancher/eks-operator v1.9.0-rc.5/go.mod h1:B6Kg6cHYxPU54YOemHVCrN0lsuOpjizbnbiIskzOvyM=
 github.com/rancher/fleet/pkg/apis v0.0.0-20231017140638-93432f288e79 h1:vfrBGudEydmRw7bq85KWquPZki7PjsjzaLozWtbKmCw=
 github.com/rancher/fleet/pkg/apis v0.0.0-20231017140638-93432f288e79/go.mod h1:vqAYcX2NEkVb0AmUlY7luhh1TKIqbE2KRuERCKxW9pE=
 github.com/rancher/gke-operator v1.9.0-rc.4 h1:65gwsm0IiLWn5u1gO522tphuv7XWfSNGWiXY3b8KiBE=
