@@ -191,7 +191,7 @@ func (p *adProvider) getPrincipalsFromSearchResult(result *ldapv3.SearchResult, 
 
 	if len(memberOf) != 0 {
 		for i := 0; i < len(memberOf); i += 50 {
-			batch := memberOf[i:ldap.Min(i+50, len(memberOf))]
+			batch := memberOf[i:min(i+50, len(memberOf))]
 			filter := fmt.Sprintf("(%v=%v)", ObjectClass, config.GroupObjectClass)
 			query := "(|"
 			for _, attrib := range batch {

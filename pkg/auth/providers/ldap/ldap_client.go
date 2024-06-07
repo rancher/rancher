@@ -134,7 +134,7 @@ func (p *ldapProvider) getPrincipalsFromSearchResult(result *ldapv3.SearchResult
 
 	if len(userMemberAttribute) > 0 {
 		for i := 0; i < len(userMemberAttribute); i += 50 {
-			batchGroupDN := userMemberAttribute[i:ldap.Min(i+50, len(userMemberAttribute))]
+			batchGroupDN := userMemberAttribute[i:min(i+50, len(userMemberAttribute))]
 			filter := fmt.Sprintf("(%v=%v)", ObjectClass, config.GroupObjectClass)
 			query := "(|"
 			for _, gdn := range batchGroupDN {

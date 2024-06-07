@@ -266,13 +266,6 @@ func FindNonDuplicateBetweenGroupPrincipals(newGroupPrincipals []v3.Principal, g
 	return nonDupGroupPrincipals
 }
 
-func Min(a int, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
 func NewCAPool(cert string) (*x509.CertPool, error) {
 	pool, err := x509.SystemCertPool()
 	if err != nil {
