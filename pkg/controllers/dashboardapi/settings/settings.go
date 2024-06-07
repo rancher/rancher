@@ -196,6 +196,8 @@ func (s *settingsProvider) cleanupUnknownSettings(settingsMap map[string]setting
 	return nil
 }
 
+// anySettingsInstalled tries to find out if at least one setting is installed as a resource in the cluster.
+// It is used as a way to know if Rancher has been started for the first time.
 func (s *settingsProvider) anySettingsInstalled() (bool, error) {
 	list, err := s.settings.List(metav1.ListOptions{})
 	if err != nil {

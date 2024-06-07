@@ -1,6 +1,7 @@
 package settings
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"testing"
@@ -8,6 +9,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/rancher/wrangler/v2/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -163,6 +165,18 @@ func TestSetAll(t *testing.T) {
 	err = provider.SetAll(settingMap)
 	assert.NotNilf(t, err, "SetAll should return an error if setting client's Update returns an error.")
 
+	// Test when client's List method fails.
+	cannotListClient := fake.NewMockNonNamespacedControllerInterface[*v3.Setting, *v3.SettingList](gomock.NewController(t))
+	provider = settingsProvider{
+		settings: cannotListClient,
+	}
+	cannotListClient.EXPECT().List(gomock.Any()).DoAndReturn(func(opts metav1.ListOptions) (*v3.SettingList, error) {
+		return nil, apierrors.NewInternalError(errors.New("some error"))
+	}).Times(1)
+
+	err = provider.SetAll(settingMap)
+	assert.Error(t, err, "SetAll should return an error if setting client's List returns an error.")
+
 	// Test when setting client's Update method fails with AlreadyExists error.
 	alreadyExistsCreateClient := fake.NewMockNonNamespacedControllerInterface[*v3.Setting, *v3.SettingList](gomock.NewController(t))
 	provider = settingsProvider{
@@ -264,3 +278,181 @@ func populateTestCases() []*testCase {
 
 	return testCases
 }
+
+func TestSetAllWithDefaultOnUpgrade(t *testing.T) {
+	t.Parallel()
+	t.Run("setting gets regular default on fresh install", func(t *testing.T) {
+		t.Parallel()
+		client := fake.NewMockNonNamespacedControllerInterface[*v3.Setting, *v3.SettingList](gomock.NewController(t))
+		provider := settingsProvider{
+			settings: client,
+		}
+		store := make(map[string]v3.Setting)
+		get, set, list := storeOperations(store)
+
+		client.EXPECT().List(gomock.Any()).DoAndReturn(list).AnyTimes()
+		client.EXPECT().Get(gomock.Any(), gomock.Any()).DoAndReturn(get).AnyTimes()
+		client.EXPECT().Create(gomock.Any()).DoAndReturn(set).AnyTimes()
+
+		values := map[string]settings.Setting{
+			"tls-agent-mode": {
+				Name:             "tls-agent-mode",
+				Default:          "strict",
+				DefaultOnUpgrade: "system-store",
+			},
+		}
+		err := provider.SetAll(values)
+		require.NoError(t, err)
+		s, err := get("tls-agent-mode", metav1.GetOptions{})
+		require.NoError(t, err)
+		require.Equal(t, "strict", s.Default)
+	})
+
+	t.Run("setting exists and keeps its default on upgrade having the special upgrade default", func(t *testing.T) {
+		t.Parallel()
+		client := fake.NewMockNonNamespacedControllerInterface[*v3.Setting, *v3.SettingList](gomock.NewController(t))
+		provider := settingsProvider{
+			settings: client,
+		}
+		store := map[string]v3.Setting{
+			"tls-agent-mode": {
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "tls-agent-mode",
+				},
+				Value:   "",
+				Default: "system-store",
+			},
+		}
+		get, set, list := storeOperations(store)
+
+		client.EXPECT().List(gomock.Any()).DoAndReturn(list).AnyTimes()
+		client.EXPECT().Get(gomock.Any(), gomock.Any()).DoAndReturn(get).AnyTimes()
+		client.EXPECT().Update(gomock.Any()).DoAndReturn(set).AnyTimes()
+
+		values := map[string]settings.Setting{
+			"tls-agent-mode": settings.NewSetting("tls-agent-mode", "strict").WithDefaultOnUpgrade("system-store"),
+		}
+		err := provider.SetAll(values)
+		require.NoError(t, err)
+		s, err := get("tls-agent-mode", metav1.GetOptions{})
+		require.NoError(t, err)
+		require.Equal(t, "system-store", s.Default)
+	})
+
+	t.Run("setting exists and keeps its default on upgrade in absence of an upgrade default value", func(t *testing.T) {
+		t.Parallel()
+		client := fake.NewMockNonNamespacedControllerInterface[*v3.Setting, *v3.SettingList](gomock.NewController(t))
+		provider := settingsProvider{
+			settings: client,
+		}
+		store := map[string]v3.Setting{
+			"some-setting": {
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "some-setting",
+				},
+				Default: "some-default",
+			},
+		}
+		get, set, list := storeOperations(store)
+
+		client.EXPECT().List(gomock.Any()).DoAndReturn(list).AnyTimes()
+		client.EXPECT().Get(gomock.Any(), gomock.Any()).DoAndReturn(get).AnyTimes()
+		client.EXPECT().Update(gomock.Any()).DoAndReturn(set).AnyTimes()
+
+		values := map[string]settings.Setting{
+			"some-setting": settings.NewSetting("some-setting", "some-default"),
+		}
+		err := provider.SetAll(values)
+		require.NoError(t, err)
+		s, err := get("some-setting", metav1.GetOptions{})
+		require.NoError(t, err)
+		require.Equal(t, "some-default", s.Default)
+	})
+
+	t.Run("setting exists and gets its new default on upgrade in absence of an upgrade default value", func(t *testing.T) {
+		t.Parallel()
+		client := fake.NewMockNonNamespacedControllerInterface[*v3.Setting, *v3.SettingList](gomock.NewController(t))
+		provider := settingsProvider{
+			settings: client,
+		}
+		store := map[string]v3.Setting{
+			"some-setting": {
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "some-setting",
+				},
+				Default: "some-default",
+			},
+		}
+		get, set, list := storeOperations(store)
+
+		client.EXPECT().List(gomock.Any()).DoAndReturn(list).AnyTimes()
+		client.EXPECT().Get(gomock.Any(), gomock.Any()).DoAndReturn(get).AnyTimes()
+		client.EXPECT().Update(gomock.Any()).DoAndReturn(set).AnyTimes()
+
+		values := map[string]settings.Setting{
+			"some-setting": settings.NewSetting("some-setting", "some-new-default"),
+		}
+		err := provider.SetAll(values)
+		require.NoError(t, err)
+		s, err := get("some-setting", metav1.GetOptions{})
+		require.NoError(t, err)
+		require.Equal(t, "some-new-default", s.Default)
+	})
+
+	t.Run("setting does not exist and gets a special default on upgrade value on non fresh install", func(t *testing.T) {
+		t.Parallel()
+		client := fake.NewMockNonNamespacedControllerInterface[*v3.Setting, *v3.SettingList](gomock.NewController(t))
+		provider := settingsProvider{
+			settings: client,
+		}
+		store := map[string]v3.Setting{
+			"some-setting": {
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "some-setting",
+				},
+				Default: "some-default",
+			},
+		}
+		get, set, list := storeOperations(store)
+
+		client.EXPECT().List(gomock.Any()).DoAndReturn(list).AnyTimes()
+		client.EXPECT().Get(gomock.Any(), gomock.Any()).DoAndReturn(get).AnyTimes()
+		client.EXPECT().Create(gomock.Any()).DoAndReturn(set).AnyTimes()
+
+		values := map[string]settings.Setting{
+			"some-setting":   settings.NewSetting("some-setting", "some-default"),
+			"tls-agent-mode": settings.NewSetting("tls-agent-mode", "strict").WithDefaultOnUpgrade("system-store"),
+		}
+		err := provider.SetAll(values)
+		require.NoError(t, err)
+		s, err := get("tls-agent-mode", metav1.GetOptions{})
+		require.NoError(t, err)
+		require.Equal(t, "system-store", s.Default)
+	})
+}
+
+func storeOperations(store map[string]v3.Setting) (get, set, list) {
+	get := func(name string, opts metav1.GetOptions) (*v3.Setting, error) {
+		val, ok := store[name]
+		if !ok {
+			return nil, apierrors.NewNotFound(schema.GroupResource{}, name)
+		}
+		return &val, nil
+	}
+	set := func(setting *v3.Setting) (*v3.Setting, error) {
+		store[setting.Name] = *setting
+		return setting, nil
+	}
+	list := func(opts metav1.ListOptions) (*v3.SettingList, error) {
+		items := make([]v3.Setting, 0, len(store))
+		for _, setting := range store {
+			items = append(items, setting)
+		}
+		return &v3.SettingList{Items: items}, nil
+	}
+	return get, set, list
+}
+
+type get func(name string, opts metav1.GetOptions) (*v3.Setting, error)
+type set func(setting *v3.Setting) (*v3.Setting, error)
+type list func(opts metav1.ListOptions) (*v3.SettingList, error)

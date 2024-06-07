@@ -55,7 +55,7 @@ var (
 	AgentImage                          = NewSetting("agent-image", "rancher/rancher-agent:v2.9-head")
 	AgentRolloutTimeout                 = NewSetting("agent-rollout-timeout", "300s")
 	AgentRolloutWait                    = NewSetting("agent-rollout-wait", "true")
-	AgentTLSMode                        = NewSettingWithDefaultOnUpgrade("agent-tls-mode", "strict", "system-store")
+	AgentTLSMode                        = NewSetting("agent-tls-mode", "strict").WithDefaultOnUpgrade("system-store")
 	AuthImage                           = NewSetting("auth-image", v32.ToolsSystemImages.AuthSystemImages.KubeAPIAuth)
 	AuthorizationCacheTTLSeconds        = NewSetting("authorization-cache-ttl-seconds", "10")
 	AuthorizationDenyCacheTTLSeconds    = NewSetting("authorization-deny-cache-ttl-seconds", "10")
@@ -347,8 +347,8 @@ type Setting struct {
 	// Default represents a value to be used in the absence of an actual Value stored in etcd on the Setting resource.
 	Default string
 	// DefaultOnUpgrade represents a desired Default value that the setting should have on upgrade from a previous minor
-	// or major version of Rancher. This is used for special cases where, on upgrades, the Default value of a setting
-	// changes, and, instead of accepting the new value, Rancher chooses DefaultOnUpgrade as the Default.
+	// or major version of Rancher. This is used for special cases where the value of the setting must stay the same
+	// on upgraded setups but use a new value for fresh installations for backward compatibility.
 	DefaultOnUpgrade string
 	ReadOnly         bool
 }
@@ -420,14 +420,9 @@ func NewSetting(name, def string) Setting {
 	return s
 }
 
-// NewSettingWithDefaultOnUpgrade creates a new server setting, taking into account a regular Default value
-// and a Default value to be used on upgrades.
-func NewSettingWithDefaultOnUpgrade(name, def, defOnUpgrade string) Setting {
-	s := Setting{
-		Name:             name,
-		Default:          def,
-		DefaultOnUpgrade: defOnUpgrade,
-	}
+// WithDefaultOnUpgrade takes a setting and returns a new setting with the default value on upgrade set.
+func (s Setting) WithDefaultOnUpgrade(defOnUpgrade string) Setting {
+	s.DefaultOnUpgrade = defOnUpgrade
 	settings[s.Name] = s
 	return s
 }
