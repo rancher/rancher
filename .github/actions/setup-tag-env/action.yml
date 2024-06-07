@@ -14,3 +14,4 @@ runs:
           echo "HEAD_TAG=$HEAD_TAG" >> "$GITHUB_ENV"
         fi
         echo "TAG=$TAG" >> "$GITHUB_ENV"
+        echo "GIT_TAG=$TAG" >> "$GITHUB_ENV"
