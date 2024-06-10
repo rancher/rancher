@@ -12,7 +12,7 @@ RUN zypper -n install --no-recommends curl ca-certificates jq git-core hostname 
     curl -sLf https://storage.googleapis.com/kubernetes-release/release/${KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl > /usr/bin/kubectl && \
     chmod +x /usr/bin/kubectl
 
-ENV LOGLEVEL_VERSION v0.1.5
+ENV LOGLEVEL_VERSION v0.1.6
 
 RUN curl -sLf https://github.com/rancher/loglevel/releases/download/${LOGLEVEL_VERSION}/loglevel-${ARCH}-${LOGLEVEL_VERSION}.tar.gz | tar xvzf - -C /usr/bin
 
