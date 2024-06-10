@@ -327,9 +327,12 @@ node {
                       jobs["provisioning-cli-validation"] = { build job: individualJob, parameters: goValidation2Params }
 
                       sh "./yq e 'del(.rancher.rancherCLI)' -i ${mainRancherConfigPath}"
+                      
+                      sh "./yq e 'del(.flags.desiredflags)' -i ${mainRancherConfigPath}"
+                      sh "./yq e '.flags.desiredflags = \"Short|Long\"' -i ${mainRancherConfigPath}"
+                      sh "./yq e 'del(.corralRancherHA)' -i ${mainRancherConfigPath}"
 
                       def config3Yaml = readFile(file: "${mainRancherConfigPath}")
-                      // This is the config for the local cluster i.e. CLI tests
                       def goValidation3Params = [
                         string(name: 'TIMEOUT', value: timeout),
                         text(name: 'CONFIG', value: config3Yaml),
