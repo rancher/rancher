@@ -316,6 +316,16 @@ func Test_reconcileRoleTemplate(t *testing.T) {
 		Context:     "project",
 		Builtin:     true,
 	}
+	invalidExternalRT := &v3.RoleTemplate{
+		ObjectMeta: v1.ObjectMeta{
+			Name: "invalid-external-rt",
+		},
+		DisplayName:   "External RT",
+		Rules:         []rbacv1.PolicyRule{ruleAdmin},
+		Context:       "cluster",
+		Builtin:       true,
+		ExternalRules: []rbacv1.PolicyRule{ruleReadPods},
+	}
 	tests := []struct {
 		name        string
 		rtsToCreate []*v3.RoleTemplate
@@ -449,6 +459,24 @@ func Test_reconcileRoleTemplate(t *testing.T) {
 			},
 		},
 		{
+			name:        "Update existing RT external rules",
+			rtsToCreate: []*v3.RoleTemplate{adminRT},
+			setup: func(mocks testMocks) {
+				oldAdmin := adminRT.DeepCopy()
+				oldAdmin.External = true
+				oldAdmin.ExternalRules = []rbacv1.PolicyRule{ruleAdmin}
+				curr := &v3.RoleTemplateList{Items: []v3.RoleTemplate{*oldAdmin}}
+				mocks.rtClientMock.EXPECT().List(gomock.Any()).Return(curr, nil)
+				mocks.rtClientMock.EXPECT().WithImpersonation(controllers.WebhookImpersonation()).Return(mocks.rtClientMock, nil)
+				mocks.rtClientMock.EXPECT().Update(ObjectMatcher(adminRT)).DoAndReturn(
+					func(toUpdate *v3.RoleTemplate) (*v3.RoleTemplate, error) {
+						require.EqualValues(mocks.t, adminRT.External, toUpdate.External, "roleBuilder did not make the correct updates")
+						require.EqualValues(mocks.t, adminRT.ExternalRules, toUpdate.ExternalRules, "roleBuilder did not make the correct external rules updates")
+						return toUpdate, nil
+					})
+			},
+		},
+		{
 			name:        "Update existing RT Hidden bool",
 			rtsToCreate: []*v3.RoleTemplate{adminRT},
 			setup: func(mocks testMocks) {
@@ -569,6 +597,14 @@ func Test_reconcileRoleTemplate(t *testing.T) {
 				mocks.rtClientMock.EXPECT().Update(ObjectMatcher(adminRT)).Return(nil, errExpected)
 			},
 		},
+		{
+			name:        "Fail to create invalid external RoleTemplate",
+			rtsToCreate: []*v3.RoleTemplate{invalidExternalRT},
+			wantErr:     true,
+			setup: func(mocks testMocks) {
+				mocks.rtClientMock.EXPECT().WithImpersonation(controllers.WebhookImpersonation()).Return(mocks.rtClientMock, nil)
+			},
+		},
 	}
 	for _, tt := range tests {
 		test := tt
@@ -601,16 +637,17 @@ func addGlobalRole(builder *roleBuilder, roles ...*v3.GlobalRole) {
 		addNamespacedRules(builder, gr.NamespacedRules)
 	}
 }
+
 func addRoleTemplates(builder *roleBuilder, templates ...*v3.RoleTemplate) {
 	for _, rt := range templates {
-		addRules(
-			builder.addRoleTemplate(
-				rt.DisplayName, rt.Name, rt.Context, rt.External, rt.Hidden, rt.Administrative,
-			),
-			rt.Rules...,
+		builder = builder.addRoleTemplate(
+			rt.DisplayName, rt.Name, rt.Context, rt.External, rt.Hidden, rt.Administrative,
 		)
+		addRules(builder, rt.Rules...)
+		addExternalRules(builder, rt.ExternalRules...)
 	}
 }
+
 func addRules(builder *roleBuilder, rules ...rbacv1.PolicyRule) {
 	for _, rule := range rules {
 		rb := builder.addRule()
@@ -632,6 +669,17 @@ func addNamespacedRules(builder *roleBuilder, nsRules map[string][]rbacv1.Policy
 			rb.resourceNames(r.ResourceNames...)
 			rb.nonResourceURLs(r.NonResourceURLs...)
 		}
+	}
+}
+
+func addExternalRules(builder *roleBuilder, externalRules ...rbacv1.PolicyRule) {
+	for _, rule := range externalRules {
+		rb := builder.addExternalRule()
+		rb.verbs(rule.Verbs...)
+		rb.apiGroups(rule.APIGroups...)
+		rb.resources(rule.Resources...)
+		rb.resourceNames(rule.ResourceNames...)
+		rb.nonResourceURLs(rule.NonResourceURLs...)
 	}
 }
 

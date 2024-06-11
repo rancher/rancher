@@ -32,6 +32,7 @@ type roleBuilder struct {
 	roleTemplateNames []string
 	rules             []*ruleBuilder
 	namespacedRules   []*namespacedRuleBuilder
+	externalRules     []*ruleBuilder
 }
 
 func (rb *roleBuilder) String() string {
@@ -79,6 +80,14 @@ func (rb *roleBuilder) addRule() *ruleBuilder {
 	return r
 }
 
+func (rb *roleBuilder) addExternalRule() *ruleBuilder {
+	r := &ruleBuilder{
+		rb: rb,
+	}
+	rb.externalRules = append(rb.externalRules, r)
+	return r
+}
+
 func (rb *roleBuilder) addNamespacedRule(namespace string) *namespacedRuleBuilder {
 	n := &namespacedRuleBuilder{
 		rb:         rb,
@@ -104,6 +113,14 @@ func (rb *roleBuilder) first() *roleBuilder {
 func (rb *roleBuilder) policyRules() []rbacv1.PolicyRule {
 	var prs []rbacv1.PolicyRule
 	for _, r := range rb.rules {
+		prs = append(prs, r.toPolicyRule())
+	}
+	return prs
+}
+
+func (rb *roleBuilder) policyExternalRules() []rbacv1.PolicyRule {
+	var prs []rbacv1.PolicyRule
+	for _, r := range rb.externalRules {
 		prs = append(prs, r.toPolicyRule())
 	}
 	return prs
@@ -175,6 +192,10 @@ func (r *ruleBuilder) addRule() *ruleBuilder {
 	return r.rb.addRule()
 }
 
+func (r *ruleBuilder) addExternalRule() *ruleBuilder {
+	return r.rb.addExternalRule()
+}
+
 func (r *ruleBuilder) setRoleTemplateNames(names ...string) *roleBuilder {
 	return r.rb.setRoleTemplateNames(names...)
 }
@@ -216,7 +237,7 @@ func (n *namespacedRuleBuilder) addRule() *ruleBuilder {
 }
 
 // buildFnc takes in a roleBuilder and returns desired runtime.Objects.
-type buildFnc[T runtime.Object] func(thisRB *roleBuilder) (name string, object T)
+type buildFnc[T runtime.Object] func(thisRB *roleBuilder) (name string, object T, err error)
 
 // compareAndModifyFnc check two objects and returns if they are different as well as the desired object to create.
 // haveObj will be mutated and returned contain the desired values from the wantObj.
@@ -231,7 +252,10 @@ func reconcile[T generic.RuntimeMetaObject, TList runtime.Object](
 	current := rb.first()
 	builtRoles := map[string]T{}
 	for current != nil {
-		name, role := build(current)
+		name, role, err := build(current)
+		if err != nil {
+			return errors.Wrapf(err, "couldn't create %v", name)
+		}
 		if name != "" {
 			builtRoles[name] = role
 		}
@@ -278,7 +302,7 @@ func reconcile[T generic.RuntimeMetaObject, TList runtime.Object](
 
 func (rb *roleBuilder) reconcileGlobalRoles(grClient wranglerv3.GlobalRoleClient) error {
 	logrus.Info("Reconciling GlobalRoles")
-	build := func(current *roleBuilder) (string, *v3.GlobalRole) {
+	build := func(current *roleBuilder) (string, *v3.GlobalRole, error) {
 		gr := &v3.GlobalRole{
 			ObjectMeta: v1.ObjectMeta{
 				Name:   current.name,
@@ -289,7 +313,7 @@ func (rb *roleBuilder) reconcileGlobalRoles(grClient wranglerv3.GlobalRoleClient
 			Builtin:         current.builtin,
 			NamespacedRules: current.namespacedPolicyRules(),
 		}
-		return gr.Name, gr
+		return gr.Name, gr, nil
 	}
 
 	gather := func() (map[string]*v3.GlobalRole, error) {
@@ -329,7 +353,10 @@ func (rb *roleBuilder) reconcileGlobalRoles(grClient wranglerv3.GlobalRoleClient
 
 func (rb *roleBuilder) reconcileRoleTemplates(rtClient wranglerv3.RoleTemplateClient) error {
 	logrus.Info("Reconciling RoleTemplates")
-	build := func(current *roleBuilder) (string, *v3.RoleTemplate) {
+	build := func(current *roleBuilder) (string, *v3.RoleTemplate, error) {
+		if current.externalRules != nil && !current.external {
+			return "", nil, fmt.Errorf("can't create RoleTemplate with externalRules and external=false")
+		}
 		role := &v3.RoleTemplate{
 			ObjectMeta: v1.ObjectMeta{
 				Name:   current.name,
@@ -338,13 +365,14 @@ func (rb *roleBuilder) reconcileRoleTemplates(rtClient wranglerv3.RoleTemplateCl
 			DisplayName:       current.displayName,
 			Builtin:           current.builtin,
 			External:          current.external,
+			ExternalRules:     current.policyExternalRules(),
 			Hidden:            current.hidden,
 			Context:           current.context,
 			Rules:             current.policyRules(),
 			RoleTemplateNames: current.roleTemplateNames,
 			Administrative:    current.administrative,
 		}
-		return role.Name, role
+		return role.Name, role, nil
 	}
 
 	gather := func() (map[string]*v3.RoleTemplate, error) {
@@ -363,13 +391,14 @@ func (rb *roleBuilder) reconcileRoleTemplates(rtClient wranglerv3.RoleTemplateCl
 	}
 
 	compareAndMod := func(haveRT *v3.RoleTemplate, wantRT *v3.RoleTemplate) (bool, *v3.RoleTemplate, error) {
-		equal := haveRT.DisplayName == wantRT.DisplayName && reflect.DeepEqual(haveRT.Rules, wantRT.Rules) &&
+		equal := haveRT.DisplayName == wantRT.DisplayName && reflect.DeepEqual(haveRT.Rules, wantRT.Rules) && reflect.DeepEqual(haveRT.ExternalRules, wantRT.ExternalRules) &&
 			reflect.DeepEqual(haveRT.RoleTemplateNames, wantRT.RoleTemplateNames) && haveRT.Builtin == wantRT.Builtin &&
 			haveRT.External == wantRT.External && haveRT.Hidden == wantRT.Hidden && haveRT.Context == wantRT.Context &&
 			haveRT.Administrative == wantRT.Administrative
 
 		haveRT.DisplayName = wantRT.DisplayName
 		haveRT.Rules = wantRT.Rules
+		haveRT.ExternalRules = wantRT.ExternalRules
 		haveRT.RoleTemplateNames = wantRT.RoleTemplateNames
 		haveRT.Builtin = wantRT.Builtin
 		haveRT.External = wantRT.External
