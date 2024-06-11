@@ -3,6 +3,7 @@ package project_cluster
 import (
 	"errors"
 	"reflect"
+	"time"
 
 	"encoding/json"
 	"fmt"
@@ -358,10 +359,41 @@ func (l *clusterLifecycle) reconcileClusterCreatorRTB(obj runtime.Object) (runti
 
 		updateCondition := reflect.DeepEqual(roleMap["required"], createdRoles)
 
-		err = l.mgr.updateClusterAnnotationandCondition(cluster, string(d), updateCondition)
+		err = l.updateClusterAnnotationandCondition(cluster, string(d), updateCondition)
 		if err != nil {
 			return obj, err
 		}
 		return obj, nil
 	})
+}
+
+func (l *clusterLifecycle) updateClusterAnnotationandCondition(cluster *apisv3.Cluster, anno string, updateCondition bool) error {
+	sleep := 100
+	for i := 0; i <= 3; i++ {
+		c, err := l.mgr.mgmt.Management.Clusters("").Get(cluster.Name, v1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		c.Annotations[roleTemplatesRequired] = anno
+
+		if updateCondition {
+			apisv3.ClusterConditionInitialRolesPopulated.True(c)
+		}
+		_, err = l.mgr.mgmt.Management.Clusters("").Update(c)
+		if err != nil {
+			if apierrors.IsConflict(err) {
+				time.Sleep(time.Duration(sleep) * time.Millisecond)
+				sleep *= 2
+				continue
+			}
+			return err
+		}
+		// Only log if we successfully updated the cluster
+		if updateCondition {
+			logrus.Infof("[%v] Setting InitialRolesPopulated condition on cluster %v", ClusterCreateController, cluster.Name)
+		}
+		return nil
+	}
+	return nil
 }
