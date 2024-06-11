@@ -10,6 +10,7 @@ import (
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/capr"
+	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
 	"github.com/rancher/rancher/pkg/features"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	rancherversion "github.com/rancher/rancher/pkg/version"
@@ -38,12 +39,14 @@ const (
 	migrateFromMachineToPlanSecret             = "migratefrommachinetoplanesecret"
 	migrateEncryptionKeyRotationLeaderToStatus = "migrateencryptionkeyrotationleadertostatus"
 	migrateDynamicSchemaToMachinePools         = "migratedynamicschematomachinepools"
+	migrateRKEClusterState                     = "migraterkeclusterstate"
 	rancherVersionKey                          = "rancherVersion"
 	projectsCreatedKey                         = "projectsCreated"
 	namespacesAssignedKey                      = "namespacesAssigned"
 	capiMigratedKey                            = "capiMigrated"
 	encryptionKeyRotationStatusMigratedKey     = "encryptionKeyRotationStatusMigrated"
 	dynamicSchemaMachinePoolsMigratedKey       = "dynamicSchemaMachinePoolsMigrated"
+	rkeClustersAnnotatedForMigrationKey        = "rkeClustersAnnotatedForMigration"
 )
 
 func runMigrations(wranglerContext *wrangler.Context) error {
@@ -73,7 +76,7 @@ func runMigrations(wranglerContext *wrangler.Context) error {
 		}
 	}
 
-	return nil
+	return migrateRKEClusterStates(wranglerContext)
 }
 
 func getConfigMap(configMapController controllerv1.ConfigMapController, configMapName string) (*v1.ConfigMap, error) {
@@ -235,6 +238,72 @@ func applyProjectConditionForNamespaceAssignment(label string, condition conditi
 			return err
 		}
 	}
+	return nil
+}
+
+// migrateRKEClusterStates sets the `RKEForceUpdate` annotation on all management cluster objects for
+// RKE-provisioned clusters.
+func migrateRKEClusterStates(w *wrangler.Context) error {
+	cm, err := getConfigMap(w.Core.ConfigMap(), migrateRKEClusterState)
+	if err != nil {
+		return fmt.Errorf("error getting configmap %s: %w", migrateRKEClusterState, err)
+	} else if cm == nil {
+		return nil
+	}
+
+	// Check if this migration has already run.
+	if cm.Data[rkeClustersAnnotatedForMigrationKey] == "true" {
+		return nil
+	}
+
+	// Collect all RKE clusters that need migration.
+	mgmtClusters, err := w.Mgmt.Cluster().List(metav1.ListOptions{})
+	if err != nil {
+		return fmt.Errorf("error listing management clusters: %w", err)
+	}
+
+	// Mark all RKE clusters for migration.
+	for _, cluster := range mgmtClusters.Items {
+		// Skip this cluster if it's not RKE-provisioned.
+		if cluster.Spec.RancherKubernetesEngineConfig == nil {
+			continue
+		}
+
+		// Retry the cluster object status update on conflict in case something else is updating it at the same time.
+		if err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+			c, err := w.Mgmt.Cluster().Get(cluster.Name, metav1.GetOptions{})
+			if err != nil {
+				return fmt.Errorf("error getting cluster %s: %w", cluster.Name, err)
+			}
+
+			clusterCopy := c.DeepCopy()
+			clusterCopy.Annotations[clusterprovisioner.RKEForceUpdate] = "true"
+
+			if _, err = w.Mgmt.Cluster().Update(clusterCopy); err != nil {
+				return fmt.Errorf("error updating cluster %s: %w", cluster.Name, err)
+			}
+
+			return nil
+		}); err != nil {
+			logrus.Errorf("error updating annotation for cluster %s: %s", cluster.Name, err)
+			return err
+		}
+	}
+
+	cm.Data = map[string]string{
+		rkeClustersAnnotatedForMigrationKey: "true",
+	}
+
+	// Update the configmap that indicates that this migration is complete.
+	if err := retry.OnError(retry.DefaultBackoff, func(err error) bool {
+		// Retry all errors.
+		return true
+	}, func() error {
+		return createOrUpdateConfigMap(w.Core.ConfigMap(), cm)
+	}); err != nil {
+		return fmt.Errorf("error updating configmap %s: %w", cm.Name, err)
+	}
+
 	return nil
 }
 
