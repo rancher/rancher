@@ -6,28 +6,23 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"strings"
 	"time"
 
 	"github.com/rancher/norman/condition"
 	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers"
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/systemimage"
 	wranglerv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	rrbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
+	rbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/rancher/pkg/project"
-	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/rancher/pkg/types/config"
-	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/sirupsen/logrus"
 	v12 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -37,10 +32,6 @@ import (
 const (
 	creatorIDAnn                  = "field.cattle.io/creatorId"
 	creatorOwnerBindingAnnotation = "authz.management.cattle.io/creator-owner-binding"
-	projectCreateController       = "mgmt-project-rbac-create"
-	clusterCreateController       = "mgmt-cluster-rbac-delete" // TODO the word delete here is wrong, but changing it would break backwards compatibility
-	projectRemoveController       = "mgmt-project-rbac-remove"
-	clusterRemoveController       = "mgmt-cluster-rbac-remove"
 	roleTemplatesRequired         = "authz.management.cattle.io/creator-role-bindings"
 )
 
@@ -71,182 +62,6 @@ func newPandCLifecycles(management *config.ManagementContext) (*projectLifecycle
 	return p, c
 }
 
-type projectLifecycle struct {
-	mgr *mgr
-}
-
-func (l *projectLifecycle) sync(key string, orig *apisv3.Project) (runtime.Object, error) {
-	if orig == nil || orig.DeletionTimestamp != nil {
-		projectID := ""
-		splits := strings.Split(key, "/")
-		if len(splits) == 2 {
-			projectID = splits[1]
-		}
-		// remove the system account created for this project
-		logrus.Debugf("Deleting system user for project %v", projectID)
-		if err := l.mgr.systemAccountManager.RemoveSystemAccount(projectID); err != nil {
-			return nil, err
-		}
-		return nil, nil
-	}
-
-	obj := orig.DeepCopyObject()
-
-	obj, err := l.mgr.reconcileResourceToNamespace(obj, projectCreateController)
-	if err != nil {
-		return nil, err
-	}
-
-	obj, err = l.mgr.reconcileCreatorRTB(obj)
-	if err != nil {
-		return nil, err
-	}
-
-	// update if it has changed
-	if obj != nil && !reflect.DeepEqual(orig, obj) {
-		logrus.Infof("[%v] Updating project %v", projectCreateController, orig.Name)
-		obj, err = l.mgr.mgmt.Management.Projects("").ObjectClient().Update(orig.Name, obj)
-		if err != nil {
-			return nil, err
-		}
-	}
-	if err != nil && !kerrors.IsAlreadyExists(err) {
-		return nil, err
-	}
-
-	if err := l.enqueueCrtbs(orig); err != nil {
-		return obj, err
-	}
-
-	return obj, nil
-}
-
-func (l *projectLifecycle) enqueueCrtbs(project *apisv3.Project) error {
-	// get all crtbs in current project's cluster
-	clusterID := project.Namespace
-	crtbs, err := l.mgr.crtbLister.List(clusterID, labels.Everything())
-	if err != nil {
-		return err
-	}
-	// enqueue them so crtb controller picks them up and lists all projects and generates rolebindings for each crtb in the projects
-	for _, crtb := range crtbs {
-		l.mgr.crtbClient.Controller().Enqueue(clusterID, crtb.Name)
-	}
-	return nil
-}
-
-func (l *projectLifecycle) Create(obj *apisv3.Project) (runtime.Object, error) {
-	// no-op because the sync function will take care of it
-	return obj, nil
-}
-
-func (l *projectLifecycle) Updated(obj *apisv3.Project) (runtime.Object, error) {
-	// no-op because the sync function will take care of it
-	return obj, nil
-}
-
-func (l *projectLifecycle) Remove(obj *apisv3.Project) (runtime.Object, error) {
-	var returnErr error
-	set := labels.Set{rbac.RestrictedAdminProjectRoleBinding: "true"}
-	rbs, err := l.mgr.rbLister.List(obj.Name, labels.SelectorFromSet(set))
-	returnErr = errors.Join(returnErr, err)
-
-	for _, rb := range rbs {
-		err := l.mgr.roleBindings.DeleteNamespaced(obj.Name, rb.Name, &v1.DeleteOptions{})
-		returnErr = errors.Join(returnErr, err)
-	}
-	err = l.mgr.deleteNamespace(obj, projectRemoveController)
-	returnErr = errors.Join(returnErr, err)
-	return obj, returnErr
-}
-
-type clusterLifecycle struct {
-	mgr *mgr
-}
-
-func (l *clusterLifecycle) sync(key string, orig *apisv3.Cluster) (runtime.Object, error) {
-	if orig == nil || !orig.DeletionTimestamp.IsZero() {
-		return orig, nil
-	}
-
-	obj := orig.DeepCopyObject()
-	obj, err := l.mgr.reconcileResourceToNamespace(obj, clusterCreateController)
-	if err != nil {
-		return nil, err
-	}
-
-	obj, err = l.mgr.createDefaultProject(obj)
-	if err != nil {
-		return nil, err
-	}
-
-	obj, err = l.mgr.createSystemProject(obj)
-	if err != nil {
-		return nil, err
-	}
-	obj, err = l.mgr.addRTAnnotation(obj, "cluster")
-	if err != nil {
-		return nil, err
-	}
-
-	// update if it has changed
-	if obj != nil && !reflect.DeepEqual(orig, obj) {
-		logrus.Infof("[%v] Updating cluster %v", clusterCreateController, orig.Name)
-		_, err = l.mgr.mgmt.Management.Clusters("").ObjectClient().Update(orig.Name, obj)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	obj, err = l.mgr.reconcileCreatorRTB(obj)
-	if err != nil {
-		return nil, err
-	}
-
-	// update if it has changed
-	if obj != nil && !reflect.DeepEqual(orig, obj) {
-		logrus.Infof("[%v] Updating cluster %v", clusterCreateController, orig.Name)
-		_, err = l.mgr.mgmt.Management.Clusters("").ObjectClient().Update(orig.Name, obj)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return nil, nil
-}
-
-func (l *clusterLifecycle) Create(obj *apisv3.Cluster) (runtime.Object, error) {
-	// no-op because the sync function will take care of it
-	return obj, nil
-}
-
-func (l *clusterLifecycle) Updated(obj *apisv3.Cluster) (runtime.Object, error) {
-	// no-op because the sync function will take care of it
-	return obj, nil
-}
-
-func (l *clusterLifecycle) Remove(obj *apisv3.Cluster) (runtime.Object, error) {
-	if len(obj.Finalizers) > 1 {
-		logrus.Debugf("Skipping rbac cleanup for cluster [%s] until all other finalizers are removed.", obj.Name)
-		return obj, generic.ErrSkip
-	}
-
-	var returnErr error
-	set := labels.Set{rbac.RestrictedAdminClusterRoleBinding: "true"}
-	rbs, err := l.mgr.rbLister.List(obj.Name, labels.SelectorFromSet(set))
-	returnErr = errors.Join(returnErr, err)
-
-	for _, rb := range rbs {
-		err := l.mgr.roleBindings.DeleteNamespaced(obj.Name, rb.Name, &v1.DeleteOptions{})
-		returnErr = errors.Join(returnErr, err)
-	}
-	returnErr = errors.Join(
-		l.mgr.deleteSystemProject(obj, clusterRemoveController),
-		l.mgr.deleteNamespace(obj, clusterRemoveController),
-	)
-	return obj, returnErr
-}
-
 type mgr struct {
 	mgmt          *config.ManagementContext
 	nsLister      corev1.NamespaceLister
@@ -257,18 +72,17 @@ type mgr struct {
 	crtbLister           v3.ClusterRoleTemplateBindingLister
 	crtbClient           v3.ClusterRoleTemplateBindingInterface
 	roleTemplateLister   v3.RoleTemplateLister
-	clusterRoleClient    rrbacv1.ClusterRoleInterface
 	systemAccountManager *systemaccount.Manager
-	rbLister             rrbacv1.RoleBindingLister
-	roleBindings         rrbacv1.RoleBindingInterface
+	rbLister             rbacv1.RoleBindingLister
+	roleBindings         rbacv1.RoleBindingInterface
 }
 
 func (m *mgr) createDefaultProject(obj runtime.Object) (runtime.Object, error) {
-	return m.createProject(project.Default, v32.ClusterConditionDefaultProjectCreated, obj, defaultProjectLabels)
+	return m.createProject(project.Default, apisv3.ClusterConditionDefaultProjectCreated, obj, defaultProjectLabels)
 }
 
 func (m *mgr) createSystemProject(obj runtime.Object) (runtime.Object, error) {
-	return m.createProject(project.System, v32.ClusterConditionSystemProjectCreated, obj, systemProjectLabels)
+	return m.createProject(project.System, apisv3.ClusterConditionSystemProjectCreated, obj, systemProjectLabels)
 }
 
 func (m *mgr) createProject(name string, cond condition.Cond, obj runtime.Object, labels labels.Set) (runtime.Object, error) {
@@ -310,7 +124,7 @@ func (m *mgr) createProject(name string, cond condition.Cond, obj runtime.Object
 				Annotations:  annotation,
 				Labels:       labels,
 			},
-			Spec: v32.ProjectSpec{
+			Spec: apisv3.ProjectSpec{
 				DisplayName: name,
 				Description: fmt.Sprintf("%s project created for the cluster", name),
 				ClusterName: metaAccessor.GetName(),
@@ -353,7 +167,7 @@ func (m *mgr) deleteSystemProject(cluster *apisv3.Cluster, controller string) er
 }
 
 func (m *mgr) reconcileCreatorRTB(obj runtime.Object) (runtime.Object, error) {
-	return v32.CreatorMadeOwner.DoUntilTrue(obj, func() (runtime.Object, error) {
+	return apisv3.CreatorMadeOwner.DoUntilTrue(obj, func() (runtime.Object, error) {
 		metaAccessor, err := meta.Accessor(obj)
 		if err != nil {
 			return obj, err
@@ -374,7 +188,7 @@ func (m *mgr) reconcileCreatorRTB(obj runtime.Object) (runtime.Object, error) {
 		case v3.ProjectGroupVersionKind.Kind:
 			project := obj.(*apisv3.Project)
 
-			if v32.ProjectConditionInitialRolesPopulated.IsTrue(project) {
+			if apisv3.ProjectConditionInitialRolesPopulated.IsTrue(project) {
 				// The projectRoleBindings are already completed, no need to check
 				break
 			}
@@ -433,7 +247,7 @@ func (m *mgr) reconcileCreatorRTB(obj runtime.Object) (runtime.Object, error) {
 			project.Annotations[roleTemplatesRequired] = string(d)
 
 			if reflect.DeepEqual(roleMap["required"], createdRoles) {
-				v32.ProjectConditionInitialRolesPopulated.True(project)
+				apisv3.ProjectConditionInitialRolesPopulated.True(project)
 				logrus.Infof("[%v] Setting InitialRolesPopulated condition on project %v", ctrbMGMTController, project.Name)
 			}
 			if _, err := m.mgmt.Management.Projects("").Update(project); err != nil {
@@ -443,7 +257,7 @@ func (m *mgr) reconcileCreatorRTB(obj runtime.Object) (runtime.Object, error) {
 		case v3.ClusterGroupVersionKind.Kind:
 			cluster := obj.(*apisv3.Cluster)
 
-			if v32.ClusterConditionInitialRolesPopulated.IsTrue(cluster) {
+			if apisv3.ClusterConditionInitialRolesPopulated.IsTrue(cluster) {
 				// The clusterRoleBindings are already completed, no need to check
 				break
 			}
@@ -529,7 +343,7 @@ func (m *mgr) deleteNamespace(obj runtime.Object, controller string) error {
 }
 
 func (m *mgr) reconcileResourceToNamespace(obj runtime.Object, controller string) (runtime.Object, error) {
-	return v32.NamespaceBackedResource.Do(obj, func() (runtime.Object, error) {
+	return apisv3.NamespaceBackedResource.Do(obj, func() (runtime.Object, error) {
 		o, err := meta.Accessor(obj)
 		if err != nil {
 			return obj, condition.Error("MissingMetadata", err)
@@ -640,7 +454,7 @@ func (m *mgr) updateClusterAnnotationandCondition(cluster *apisv3.Cluster, anno 
 		c.Annotations[roleTemplatesRequired] = anno
 
 		if updateCondition {
-			v32.ClusterConditionInitialRolesPopulated.True(c)
+			apisv3.ClusterConditionInitialRolesPopulated.True(c)
 		}
 		_, err = m.mgmt.Management.Clusters("").Update(c)
 		if err != nil {
