@@ -29,11 +29,9 @@ func TestEnqueueCrtbsOnProjectCreation(t *testing.T) {
 		EnqueueFunc: func(namespace string, name string) {},
 	}
 	c := projectLifecycle{
-		mgr: &mgr{
-			crtbLister: &fakes.ClusterRoleTemplateBindingListerMock{
-				ListFunc: func(namespace string, selector labels.Selector) ([]*v3.ClusterRoleTemplateBinding, error) {
-					return existingCrtbs, nil
-				},
+		crtbLister: &fakes.ClusterRoleTemplateBindingListerMock{
+			ListFunc: func(namespace string, selector labels.Selector) ([]*v3.ClusterRoleTemplateBinding, error) {
+				return existingCrtbs, nil
 			},
 		},
 		crtbClient: &fakes.ClusterRoleTemplateBindingInterfaceMock{

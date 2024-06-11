@@ -19,6 +19,7 @@ import (
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/sirupsen/logrus"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -35,6 +36,7 @@ var systemProjectLabels = labels.Set(map[string]string{"authz.management.cattle.
 
 type clusterLifecycle struct {
 	mgr                *mgr
+	crtbLister         v3.ClusterRoleTemplateBindingLister
 	projects           wranglerv3.ProjectClient
 	projectLister      v3.ProjectLister
 	rbLister           rbacv1.RoleBindingLister
@@ -76,7 +78,7 @@ func (l *clusterLifecycle) sync(key string, orig *apisv3.Cluster) (runtime.Objec
 		}
 	}
 
-	obj, err = l.mgr.reconcileCreatorRTB(obj)
+	obj, err = l.reconcileClusterCreatorRTB(obj)
 	if err != nil {
 		return nil, err
 	}
@@ -281,4 +283,85 @@ func (l *clusterLifecycle) addRTAnnotation(obj runtime.Object, context string) (
 	}
 	meta.GetAnnotations()[roleTemplatesRequired] = string(d)
 	return obj, nil
+}
+
+func (l *clusterLifecycle) reconcileClusterCreatorRTB(obj runtime.Object) (runtime.Object, error) {
+	return apisv3.CreatorMadeOwner.DoUntilTrue(obj, func() (runtime.Object, error) {
+		metaAccessor, err := meta.Accessor(obj)
+		if err != nil {
+			return obj, err
+		}
+
+		typeAccessor, err := meta.TypeAccessor(obj)
+		if err != nil {
+			return obj, err
+		}
+
+		creatorID, ok := metaAccessor.GetAnnotations()[creatorIDAnn]
+		if !ok || creatorID == "" {
+			logrus.Warnf("%v %v has no creatorId annotation. Cannot add creator as owner", typeAccessor.GetKind(), metaAccessor.GetName())
+			return obj, nil
+		}
+		cluster := obj.(*apisv3.Cluster)
+
+		if apisv3.ClusterConditionInitialRolesPopulated.IsTrue(cluster) {
+			// The clusterRoleBindings are already completed, no need to check
+			return obj, nil
+		}
+
+		roleJSON, ok := cluster.Annotations[roleTemplatesRequired]
+		if !ok {
+			return cluster, nil
+		}
+
+		roleMap := make(map[string][]string)
+		err = json.Unmarshal([]byte(roleJSON), &roleMap)
+		if err != nil {
+			return obj, err
+		}
+
+		var createdRoles []string
+
+		for _, role := range roleMap["required"] {
+			rtbName := "creator-" + role
+
+			if rtb, _ := l.crtbLister.Get(metaAccessor.GetName(), rtbName); rtb != nil {
+				createdRoles = append(createdRoles, role)
+				// This clusterRoleBinding exists, need to check all of them so keep going
+				continue
+			}
+
+			// The clusterRoleBinding doesn't exist yet so create it
+			om := v1.ObjectMeta{
+				Name:      rtbName,
+				Namespace: metaAccessor.GetName(),
+			}
+			om.Annotations = crtbCreatorOwnerAnnotations
+
+			logrus.Infof("[%v] Creating creator clusterRoleTemplateBinding for user %v for cluster %v", projectCreateController, creatorID, metaAccessor.GetName())
+			if _, err := l.mgr.mgmt.Management.ClusterRoleTemplateBindings(metaAccessor.GetName()).Create(&apisv3.ClusterRoleTemplateBinding{
+				ObjectMeta:       om,
+				ClusterName:      metaAccessor.GetName(),
+				RoleTemplateName: role,
+				UserName:         creatorID,
+			}); err != nil && !apierrors.IsAlreadyExists(err) {
+				return obj, err
+			}
+			createdRoles = append(createdRoles, role)
+		}
+
+		roleMap["created"] = createdRoles
+		d, err := json.Marshal(roleMap)
+		if err != nil {
+			return obj, err
+		}
+
+		updateCondition := reflect.DeepEqual(roleMap["required"], createdRoles)
+
+		err = l.mgr.updateClusterAnnotationandCondition(cluster, string(d), updateCondition)
+		if err != nil {
+			return obj, err
+		}
+		return obj, nil
+	})
 }
