@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	projectsapi "github.com/rancher/rancher/tests/v2/actions/projects"
-	deployment "github.com/rancher/rancher/tests/v2/actions/workloads/deployment"
+	deployment "github.com/rancher/rancher/tests/v2/actions/workloads/deployments"
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
 	"github.com/rancher/shepherd/extensions/clusters"

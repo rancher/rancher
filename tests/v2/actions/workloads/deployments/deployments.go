@@ -1,4 +1,4 @@
-package deployment
+package deployments
 
 import (
 	"github.com/rancher/rancher/tests/v2/actions/workloads/pods"
