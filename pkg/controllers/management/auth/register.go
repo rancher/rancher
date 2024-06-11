@@ -59,7 +59,8 @@ func RegisterIndexers(scaledContext *config.ScaledContext) error {
 
 func RegisterEarly(ctx context.Context, management *config.ManagementContext, clusterManager *clustermanager.Manager) {
 	prtb, crtb := newRTBLifecycles(management.WithAgent("mgmt-auth-crtb-prtb-controller"))
-	p, c := project_cluster.NewPandCLifecycles(management)
+	p := project_cluster.NewProjectLifecycle(management)
+	c := project_cluster.NewClusterLifecycle(management)
 	u := newUserLifecycle(management, clusterManager)
 	n := newTokenController(management.WithAgent(tokenController))
 	ac := newAuthConfigController(ctx, management, clusterManager.ScaledContext)
@@ -88,7 +89,8 @@ func RegisterEarly(ctx context.Context, management *config.ManagementContext, cl
 }
 
 func RegisterLate(ctx context.Context, management *config.ManagementContext) {
-	p, c := project_cluster.NewPandCLifecycles(management)
+	p := project_cluster.NewProjectLifecycle(management)
+	c := project_cluster.NewClusterLifecycle(management)
 	management.Management.Projects("").AddLifecycle(ctx, project_cluster.ProjectRemoveController, p)
 	management.Management.Clusters("").AddLifecycle(ctx, project_cluster.ClusterRemoveController, c)
 }
