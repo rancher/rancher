@@ -36,9 +36,9 @@ func (ap *Provider) actionHandler(actionName string, action *types.Action, reque
 	}
 
 	if actionName == "configureTest" {
-		return ap.ConfigureTest(actionName, action, request)
+		return ap.ConfigureTest(request)
 	} else if actionName == "testAndApply" {
-		return ap.testAndApply(actionName, action, request)
+		return ap.testAndApply(request)
 	} else if actionName == "upgrade" {
 		return ap.migrateToMicrosoftGraph()
 	}
@@ -46,7 +46,7 @@ func (ap *Provider) actionHandler(actionName string, action *types.Action, reque
 	return httperror.NewAPIError(httperror.ActionNotAvailable, "")
 }
 
-func (ap *Provider) ConfigureTest(actionName string, action *types.Action, request *types.APIContext) error {
+func (ap *Provider) ConfigureTest(request *types.APIContext) error {
 	// Verify the body has all required fields
 	input, err := handler.ParseAndValidateActionBody(request, request.Schemas.Schema(&managementschema.Version,
 		client.AzureADConfigType))
@@ -63,7 +63,7 @@ func (ap *Provider) ConfigureTest(actionName string, action *types.Action, reque
 	return nil
 }
 
-func (ap *Provider) testAndApply(actionName string, action *types.Action, request *types.APIContext) error {
+func (ap *Provider) testAndApply(request *types.APIContext) error {
 	var err error
 	// On any error, delete the cached secret containing the access token to the Microsoft Graph, in case it had been
 	// cached without having sufficient API permissions. Rancher has no precise control over when this secret is cached.
@@ -102,7 +102,7 @@ func (ap *Provider) testAndApply(actionName string, action *types.Action, reques
 		}
 		azureADConfig.ApplicationSecret = value
 	}
-	//Call provider
+	// Call provider
 	userPrincipal, groupPrincipals, providerToken, err := ap.loginUser(azureADConfig, azureLogin, true)
 	if err != nil {
 		if httperror.IsAPIError(err) {
@@ -122,8 +122,12 @@ func (ap *Provider) testAndApply(actionName string, action *types.Action, reques
 	}
 
 	userExtraInfo := ap.GetUserExtraAttributes(userPrincipal)
+	err = ap.tokenMGR.UserAttributeCreateOrUpdate(user.Name, userPrincipal.Provider, groupPrincipals, userExtraInfo)
+	if err != nil {
+		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Failed to create or update userAttribute: %v", err))
+	}
 
-	return ap.tokenMGR.CreateTokenAndSetCookie(user.Name, userPrincipal, groupPrincipals, providerToken, 0, "Token via Azure Configuration", request, userExtraInfo)
+	return ap.tokenMGR.CreateTokenAndSetCookie(user.Name, userPrincipal, groupPrincipals, providerToken, 0, "Token via Azure Configuration", request)
 }
 
 // Check the current auth config and make sure that the proposed one submitted through the API has up-to-date annotations.

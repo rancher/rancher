@@ -33,15 +33,15 @@ func (o *OpenIDCProvider) ActionHandler(actionName string, action *types.Action,
 	}
 
 	if actionName == "configureTest" {
-		return o.ConfigureTest(actionName, action, request)
+		return o.ConfigureTest(request)
 	} else if actionName == "testAndApply" {
-		return o.TestAndApply(actionName, action, request)
+		return o.TestAndApply(request)
 	}
 
 	return httperror.NewAPIError(httperror.ActionNotAvailable, "")
 }
 
-func (o *OpenIDCProvider) ConfigureTest(actionName string, action *types.Action, request *types.APIContext) error {
+func (o *OpenIDCProvider) ConfigureTest(request *types.APIContext) error {
 	//verify body has all required fields
 	input, err := handler.ParseAndValidateActionBody(request, request.Schemas.Schema(&managementschema.Version,
 		o.Type))
@@ -57,7 +57,7 @@ func (o *OpenIDCProvider) ConfigureTest(actionName string, action *types.Action,
 	return nil
 }
 
-func (o *OpenIDCProvider) TestAndApply(actionName string, action *types.Action, request *types.APIContext) error {
+func (o *OpenIDCProvider) TestAndApply(request *types.APIContext) error {
 	var oidcConfig v32.OIDCConfig
 	oidcConfigApplyInput := &v32.OIDCApplyInput{}
 
@@ -75,9 +75,9 @@ func (o *OpenIDCProvider) TestAndApply(actionName string, action *types.Action, 
 		return fmt.Errorf("scopes are invalid:  scopes must be space delimited and openid is a required scope. %s", oidcConfig.Scopes)
 	}
 
-	//encode url to ensure path is escaped properly
-	//the issuer url is used to get all the other urls for the provider
-	//so its the only one that needs encoded
+	// encode url to ensure path is escaped properly
+	// the issuer url is used to get all the other urls for the provider
+	// so its the only one that needs encoded
 	issuerURL, err := url.Parse(oidcConfig.Issuer)
 	if err != nil {
 		if httperror.IsAPIError(err) {
@@ -87,7 +87,7 @@ func (o *OpenIDCProvider) TestAndApply(actionName string, action *types.Action, 
 	}
 	oidcConfig.Issuer = issuerURL.String()
 
-	//call provider
+	// call provider
 	userPrincipal, groupPrincipals, providerToken, claimInfo, err := o.LoginUser(request.Request.Context(), oidcLogin, &oidcConfig)
 	if err != nil {
 		if httperror.IsAPIError(err) {
@@ -95,8 +95,8 @@ func (o *OpenIDCProvider) TestAndApply(actionName string, action *types.Action, 
 		}
 		return errors.Wrap(err, "[generic oidc]: server error while authenticating")
 	}
-	//setting a bool for group search flag
-	//this only needs updated when an auth provider is enabled or edited
+	// setting a bool for group search flag
+	// this only needs updated when an auth provider is enabled or edited
 	if claimInfo.Groups == nil && claimInfo.FullGroupPath == nil {
 		falseBool := false
 		oidcConfig.GroupSearchEnabled = &falseBool
@@ -115,8 +115,12 @@ func (o *OpenIDCProvider) TestAndApply(actionName string, action *types.Action, 
 	}
 
 	userExtraInfo := o.GetUserExtraAttributes(userPrincipal)
+	err = o.TokenMGR.UserAttributeCreateOrUpdate(user.Name, userPrincipal.Provider, groupPrincipals, userExtraInfo)
+	if err != nil {
+		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("[generic oidc]: Failed to create or update userAttribute: %v", err))
+	}
 
-	return o.TokenMGR.CreateTokenAndSetCookie(user.Name, userPrincipal, groupPrincipals, providerToken, 0, "Token via OIDC Configuration", request, userExtraInfo)
+	return o.TokenMGR.CreateTokenAndSetCookie(user.Name, userPrincipal, groupPrincipals, providerToken, 0, "Token via OIDC Configuration", request)
 }
 
 // validateScopes returns true if there are no commas in the scopes string and openid is included as a scope.
