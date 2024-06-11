@@ -223,6 +223,7 @@ func (m *mcm) Start(ctx context.Context) error {
 		clusterupstreamrefresher.MigrateEksRefreshCronSetting(m.wranglerContext)
 		go managementdata.CleanupDuplicateBindings(m.ScaledContext, m.wranglerContext)
 		go managementdata.CleanupOrphanBindings(m.ScaledContext, m.wranglerContext)
+
 		logrus.Infof("Rancher startup complete")
 		return nil
 	})
