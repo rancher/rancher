@@ -46,6 +46,7 @@ const (
 	RKEDriverKey          = "rancherKubernetesEngineConfig"
 	KontainerEngineUpdate = "provisioner.cattle.io/ke-driver-update"
 	RkeRestoreAnnotation  = "rke.cattle.io/restore"
+	RKEForceUpdate        = "rke.cattle.io/force-update"
 )
 
 type Provisioner struct {
@@ -323,7 +324,7 @@ func (p *Provisioner) setKontainerEngineUpdate(cluster *apimgmtv3.Cluster, anno 
 func setVersion(cluster *apimgmtv3.Cluster) {
 	if cluster.Spec.RancherKubernetesEngineConfig != nil {
 		if cluster.Spec.RancherKubernetesEngineConfig.Version == "" {
-			//set version from the applied spec
+			// set version from the applied spec
 			if cluster.Status.AppliedSpec.RancherKubernetesEngineConfig != nil {
 				if cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.Version != "" {
 					cluster.Spec.RancherKubernetesEngineConfig.Version = cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.Version
@@ -519,9 +520,17 @@ func (p *Provisioner) reconcileCluster(cluster *apimgmtv3.Cluster, create bool) 
 
 	p.setGenericConfigs(cluster)
 
-	spec, err := p.getSpec(cluster)
-	if err != nil || spec == nil {
+	// Compute the new spec from the cluster resource.
+	spec, configChanged, err := p.getSpec(cluster)
+	if err != nil {
 		return cluster, err
+	}
+
+	// If there is no change to cluster config and the force update annotation is not set to true, a reconcile is
+	// not necessary, so we can just return early.
+	forceUpdate := cluster.Annotations != nil && cluster.Annotations[RKEForceUpdate] == "true"
+	if !configChanged && !forceUpdate {
+		return cluster, nil
 	}
 
 	if ok, delay := p.backoffFailure(cluster, spec); ok {
@@ -537,7 +546,7 @@ func (p *Provisioner) reconcileCluster(cluster *apimgmtv3.Cluster, create bool) 
 		apiEndpoint, serviceAccountToken, caCert, err = p.driverCreate(cluster, *spec)
 		if err != nil && err.Error() == "cluster already exists" {
 			logrus.Infof("Create done, Updating cluster [%s]", cluster.Name)
-			apiEndpoint, serviceAccountToken, caCert, updateTriggered, err = p.driverUpdate(cluster, *spec)
+			apiEndpoint, serviceAccountToken, caCert, updateTriggered, err = p.driverUpdate(cluster, *spec, forceUpdate)
 		}
 	} else if spec.RancherKubernetesEngineConfig != nil && spec.RancherKubernetesEngineConfig.Restore.Restore {
 		logrus.Infof("Restoring cluster [%s] from backup", cluster.Name)
@@ -550,10 +559,10 @@ func (p *Provisioner) reconcileCluster(cluster *apimgmtv3.Cluster, create bool) 
 		return cluster, nil // prevent driver updates if the cluster needs to be restored
 	} else if spec.RancherKubernetesEngineConfig != nil && spec.RancherKubernetesEngineConfig.RotateCertificates != nil {
 		logrus.Infof("Rotating certificates for cluster [%s]", cluster.Name)
-		apiEndpoint, serviceAccountToken, caCert, updateTriggered, err = p.driverUpdate(cluster, *spec)
+		apiEndpoint, serviceAccountToken, caCert, updateTriggered, err = p.driverUpdate(cluster, *spec, forceUpdate)
 	} else if spec.RancherKubernetesEngineConfig != nil && spec.RancherKubernetesEngineConfig.RotateEncryptionKey {
 		logrus.Infof("Rotating encryption key for cluster [%s]", cluster.Name)
-		apiEndpoint, serviceAccountToken, caCert, updateTriggered, err = p.driverUpdate(cluster, *spec)
+		apiEndpoint, serviceAccountToken, caCert, updateTriggered, err = p.driverUpdate(cluster, *spec, forceUpdate)
 		if err != nil {
 			logrus.Errorf("[reconcileCluster] Encryption key rotation error: %v", err)
 			// an error during key rotation means the user has to restore their cluster
@@ -569,7 +578,7 @@ func (p *Provisioner) reconcileCluster(cluster *apimgmtv3.Cluster, create bool) 
 			return cluster, fmt.Errorf("[reconcileCluster] Failed to update cluster [%s]: %v", cluster.Name, err)
 		}
 
-		apiEndpoint, serviceAccountToken, caCert, updateTriggered, err = p.driverUpdate(cluster, *spec)
+		apiEndpoint, serviceAccountToken, caCert, updateTriggered, err = p.driverUpdate(cluster, *spec, forceUpdate)
 	}
 	// at this point we know the cluster has been modified in driverCreate/Update so reload
 	if newCluster, reloadErr := p.Clusters.Get(cluster.Name, metav1.GetOptions{}); reloadErr == nil {
@@ -621,6 +630,9 @@ func (p *Provisioner) reconcileCluster(cluster *apimgmtv3.Cluster, create bool) 
 		if cluster.Status.AppliedSpec.RancherKubernetesEngineConfig != nil && cluster.Status.NodeVersion == 0 {
 			cluster.Status.NodeVersion++
 		}
+
+		// Remove the force reconcile annotation from the cluster since it has been reconciled successfully.
+		delete(cluster.Annotations, RKEForceUpdate)
 
 		if cluster, err = p.Clusters.Update(cluster); err == nil {
 			saved = true
@@ -876,39 +888,36 @@ func (p *Provisioner) getSystemImages(spec apimgmtv3.ClusterSpec) (*rketypes.RKE
 	return &systemImages, nil
 }
 
-func (p *Provisioner) getSpec(cluster *apimgmtv3.Cluster) (*apimgmtv3.ClusterSpec, error) {
+// getSpec computes the spec from the given cluster. Returns an error if the spec could not be computed. Otherwise,
+// returns the spec and a boolean that will be true if the cluster config has changed and false otherwise.
+func (p *Provisioner) getSpec(cluster *apimgmtv3.Cluster) (spec *apimgmtv3.ClusterSpec, configChanged bool, err error) {
 	driverName, err := p.validateDriver(cluster)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	censoredOldSpec, err := p.censorGenericEngineConfig(cluster.Status.AppliedSpec)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	_, oldConfig, err := p.getConfig(false, censoredOldSpec, driverName, cluster.Name)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	censoredSpec, err := p.censorGenericEngineConfig(cluster.Spec)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	_, newConfig, err := p.getConfig(true, censoredSpec, driverName, cluster.Name)
 	if err != nil {
-		return nil, err
-	}
-
-	if reflect.DeepEqual(oldConfig, newConfig) {
-		return nil, nil
+		return nil, false, err
 	}
 
 	newSpec, _, err := p.getConfig(true, cluster.Spec, driverName, cluster.Name)
-
-	return newSpec, err
+	return newSpec, !reflect.DeepEqual(oldConfig, newConfig), err
 }
 
 func (p *Provisioner) reconcileRKENodes(clusterName string) ([]rketypes.RKEConfigNode, error) {
@@ -1020,7 +1029,7 @@ func (p *Provisioner) restoreClusterBackup(cluster *apimgmtv3.Cluster, spec apim
 
 		if !reflect.DeepEqual(s3Config, appliedS3Conf) {
 			logrus.Infof("updated spec during restore detected for cluster [%s], update is required", cluster.Name)
-			api, token, cert, _, err = p.driverUpdate(cluster, spec)
+			api, token, cert, _, err = p.driverUpdate(cluster, spec, false)
 		}
 	}
 	return api, token, cert, err
@@ -1075,7 +1084,7 @@ func (p *Provisioner) k3sBasedClusterConfig(cluster *apimgmtv3.Cluster, nodes []
 		cluster.Status.Driver == apimgmtv3.ClusterDriverRke2 ||
 		cluster.Status.Driver == apimgmtv3.ClusterDriverRancherD ||
 		imported.IsAdministratedByProvisioningCluster(cluster) {
-		return nil //no-op
+		return nil // no-op
 	}
 	isEmbedded := cluster.Status.Driver == apimgmtv3.ClusterDriverLocal
 
