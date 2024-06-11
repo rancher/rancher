@@ -1,4 +1,4 @@
-package auth
+package project_cluster
 
 import (
 	"errors"
@@ -27,8 +27,8 @@ import (
 )
 
 const (
-	clusterCreateController = "mgmt-cluster-rbac-delete" // TODO the word delete here is wrong, but changing it would break backwards compatibility
-	clusterRemoveController = "mgmt-cluster-rbac-remove"
+	ClusterCreateController = "mgmt-cluster-rbac-delete" // TODO the word delete here is wrong, but changing it would break backwards compatibility
+	ClusterRemoveController = "mgmt-cluster-rbac-remove"
 )
 
 var defaultProjectLabels = labels.Set(map[string]string{"authz.management.cattle.io/default-project": "true"})
@@ -44,13 +44,13 @@ type clusterLifecycle struct {
 	roleTemplateLister v3.RoleTemplateLister
 }
 
-func (l *clusterLifecycle) sync(key string, orig *apisv3.Cluster) (runtime.Object, error) {
+func (l *clusterLifecycle) Sync(key string, orig *apisv3.Cluster) (runtime.Object, error) {
 	if orig == nil || !orig.DeletionTimestamp.IsZero() {
 		return orig, nil
 	}
 
 	obj := orig.DeepCopyObject()
-	obj, err := l.mgr.reconcileResourceToNamespace(obj, clusterCreateController)
+	obj, err := l.mgr.reconcileResourceToNamespace(obj, ClusterCreateController)
 	if err != nil {
 		return nil, err
 	}
@@ -71,7 +71,7 @@ func (l *clusterLifecycle) sync(key string, orig *apisv3.Cluster) (runtime.Objec
 
 	// update if it has changed
 	if obj != nil && !reflect.DeepEqual(orig, obj) {
-		logrus.Infof("[%v] Updating cluster %v", clusterCreateController, orig.Name)
+		logrus.Infof("[%v] Updating cluster %v", ClusterCreateController, orig.Name)
 		_, err = l.mgr.mgmt.Management.Clusters("").ObjectClient().Update(orig.Name, obj)
 		if err != nil {
 			return nil, err
@@ -85,7 +85,7 @@ func (l *clusterLifecycle) sync(key string, orig *apisv3.Cluster) (runtime.Objec
 
 	// update if it has changed
 	if obj != nil && !reflect.DeepEqual(orig, obj) {
-		logrus.Infof("[%v] Updating cluster %v", clusterCreateController, orig.Name)
+		logrus.Infof("[%v] Updating cluster %v", ClusterCreateController, orig.Name)
 		_, err = l.mgr.mgmt.Management.Clusters("").ObjectClient().Update(orig.Name, obj)
 		if err != nil {
 			return nil, err
@@ -121,8 +121,8 @@ func (l *clusterLifecycle) Remove(obj *apisv3.Cluster) (runtime.Object, error) {
 		returnErr = errors.Join(returnErr, err)
 	}
 	returnErr = errors.Join(
-		l.deleteSystemProject(obj, clusterRemoveController),
-		l.mgr.deleteNamespace(obj, clusterRemoveController),
+		l.deleteSystemProject(obj, ClusterRemoveController),
+		l.mgr.deleteNamespace(obj, ClusterRemoveController),
 	)
 	return obj, returnErr
 }
@@ -155,9 +155,9 @@ func (l *clusterLifecycle) createProject(name string, cond condition.Cond, obj r
 
 		annotation := map[string]string{}
 
-		creatorID := metaAccessor.GetAnnotations()[creatorIDAnn]
+		creatorID := metaAccessor.GetAnnotations()[CreatorIDAnn]
 		if creatorID != "" {
-			annotation[creatorIDAnn] = creatorID
+			annotation[CreatorIDAnn] = creatorID
 		}
 
 		if name == project.System {
@@ -185,7 +185,7 @@ func (l *clusterLifecycle) createProject(name string, cond condition.Cond, obj r
 			return obj, err
 		}
 		project = updated.(*apisv3.Project)
-		logrus.Infof("[%v] Creating %s project for cluster %v", clusterCreateController, name, metaAccessor.GetName())
+		logrus.Infof("[%v] Creating %s project for cluster %v", ClusterCreateController, name, metaAccessor.GetName())
 		if _, err = l.mgr.mgmt.Management.Projects(metaAccessor.GetName()).Create(project); err != nil {
 			return obj, err
 		}
@@ -297,7 +297,7 @@ func (l *clusterLifecycle) reconcileClusterCreatorRTB(obj runtime.Object) (runti
 			return obj, err
 		}
 
-		creatorID, ok := metaAccessor.GetAnnotations()[creatorIDAnn]
+		creatorID, ok := metaAccessor.GetAnnotations()[CreatorIDAnn]
 		if !ok || creatorID == "" {
 			logrus.Warnf("%v %v has no creatorId annotation. Cannot add creator as owner", typeAccessor.GetKind(), metaAccessor.GetName())
 			return obj, nil
@@ -338,7 +338,7 @@ func (l *clusterLifecycle) reconcileClusterCreatorRTB(obj runtime.Object) (runti
 			}
 			om.Annotations = crtbCreatorOwnerAnnotations
 
-			logrus.Infof("[%v] Creating creator clusterRoleTemplateBinding for user %v for cluster %v", projectCreateController, creatorID, metaAccessor.GetName())
+			logrus.Infof("[%v] Creating creator clusterRoleTemplateBinding for user %v for cluster %v", ClusterCreateController, creatorID, metaAccessor.GetName())
 			if _, err := l.mgr.mgmt.Management.ClusterRoleTemplateBindings(metaAccessor.GetName()).Create(&apisv3.ClusterRoleTemplateBinding{
 				ObjectMeta:       om,
 				ClusterName:      metaAccessor.GetName(),

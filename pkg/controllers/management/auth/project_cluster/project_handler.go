@@ -1,4 +1,4 @@
-package auth
+package project_cluster
 
 import (
 	"encoding/json"
@@ -21,8 +21,8 @@ import (
 )
 
 const (
-	projectCreateController = "mgmt-project-rbac-create"
-	projectRemoveController = "mgmt-project-rbac-remove"
+	ProjectCreateController = "mgmt-project-rbac-create"
+	ProjectRemoveController = "mgmt-project-rbac-remove"
 )
 
 type projectLifecycle struct {
@@ -35,7 +35,7 @@ type projectLifecycle struct {
 	systemAccountManager *systemaccount.Manager
 }
 
-func (l *projectLifecycle) sync(key string, orig *apisv3.Project) (runtime.Object, error) {
+func (l *projectLifecycle) Sync(key string, orig *apisv3.Project) (runtime.Object, error) {
 	if orig == nil || orig.DeletionTimestamp != nil {
 		projectID := ""
 		splits := strings.Split(key, "/")
@@ -52,7 +52,7 @@ func (l *projectLifecycle) sync(key string, orig *apisv3.Project) (runtime.Objec
 
 	obj := orig.DeepCopyObject()
 
-	obj, err := l.mgr.reconcileResourceToNamespace(obj, projectCreateController)
+	obj, err := l.mgr.reconcileResourceToNamespace(obj, ProjectCreateController)
 	if err != nil {
 		return nil, err
 	}
@@ -64,7 +64,7 @@ func (l *projectLifecycle) sync(key string, orig *apisv3.Project) (runtime.Objec
 
 	// update if it has changed
 	if obj != nil && !reflect.DeepEqual(orig, obj) {
-		logrus.Infof("[%v] Updating project %v", projectCreateController, orig.Name)
+		logrus.Infof("[%v] Updating project %v", ProjectCreateController, orig.Name)
 		obj, err = l.mgr.mgmt.Management.Projects("").ObjectClient().Update(orig.Name, obj)
 		if err != nil {
 			return nil, err
@@ -115,7 +115,7 @@ func (l *projectLifecycle) Remove(obj *apisv3.Project) (runtime.Object, error) {
 		err := l.roleBindings.DeleteNamespaced(obj.Name, rb.Name, &v1.DeleteOptions{})
 		returnErr = errors.Join(returnErr, err)
 	}
-	err = l.mgr.deleteNamespace(obj, projectRemoveController)
+	err = l.mgr.deleteNamespace(obj, ProjectRemoveController)
 	returnErr = errors.Join(returnErr, err)
 	return obj, returnErr
 }
@@ -132,7 +132,7 @@ func (l *projectLifecycle) reconcileProjectCreatorRTB(obj runtime.Object) (runti
 			return obj, err
 		}
 
-		creatorID, ok := metaAccessor.GetAnnotations()[creatorIDAnn]
+		creatorID, ok := metaAccessor.GetAnnotations()[CreatorIDAnn]
 		if !ok || creatorID == "" {
 			logrus.Warnf("%v %v has no creatorId annotation. Cannot add creator as owner", typeAccessor.GetKind(), metaAccessor.GetName())
 			return obj, nil
@@ -175,7 +175,7 @@ func (l *projectLifecycle) reconcileProjectCreatorRTB(obj runtime.Object) (runti
 				Namespace: metaAccessor.GetName(),
 			}
 
-			logrus.Infof("[%v] Creating creator projectRoleTemplateBinding for user %v for project %v", projectCreateController, creatorID, metaAccessor.GetName())
+			logrus.Infof("[%v] Creating creator projectRoleTemplateBinding for user %v for project %v", ProjectCreateController, creatorID, metaAccessor.GetName())
 			if _, err := l.mgr.mgmt.Management.ProjectRoleTemplateBindings(metaAccessor.GetName()).Create(&apisv3.ProjectRoleTemplateBinding{
 				ObjectMeta:       om,
 				ProjectName:      metaAccessor.GetNamespace() + ":" + metaAccessor.GetName(),
@@ -199,7 +199,7 @@ func (l *projectLifecycle) reconcileProjectCreatorRTB(obj runtime.Object) (runti
 
 		if reflect.DeepEqual(roleMap["required"], createdRoles) {
 			apisv3.ProjectConditionInitialRolesPopulated.True(project)
-			logrus.Infof("[%v] Setting InitialRolesPopulated condition on project %v", ctrbMGMTController, project.Name)
+			logrus.Infof("[%v] Setting InitialRolesPopulated condition on project %v", ProjectCreateController, project.Name)
 		}
 		if _, err := l.mgr.mgmt.Management.Projects("").Update(project); err != nil {
 			return obj, err
