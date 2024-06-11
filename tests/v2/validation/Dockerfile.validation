@@ -29,12 +29,12 @@ RUN CGO_ENABLED=0
 # necessary to run if statements using [[ ]]
 SHELL ["/bin/bash", "-c"] 
 
-RUN if [[ -n '$EXTERNAL_ENCODED_VPN' ]] ; then \
+RUN if [[ -z '$EXTERNAL_ENCODED_VPN' ]] ; then \
       echo 'no vpn provided' ; \
     else \
       apt-get update && apt-get -y install openvpn net-tools && \
       echo $EXTERNAL_ENCODED_VPN | base64 -d > external.ovpn && \
-      if [[ -n '$VPN_ENCODED_LOGIN' ]] ; then \
+      if [[ -z '$VPN_ENCODED_LOGIN' ]] ; then \
         echo 'no passcode provided' ; \
       else \
         echo 'adding passfile' && echo $VPN_ENCODED_LOGIN | base64 -d > passfile && \
