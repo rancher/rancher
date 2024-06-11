@@ -45,10 +45,10 @@ provisioningInput:
       worker: true
       drainBeforeDelete: true
       quantity: 2
-  rke1KubernetesVersion: ["v1.27.10-rancher1-1"]
+  rke1KubernetesVersion: ["v1.28.10-rancher1-1"]
   cni: ["calico"]
   providers: ["linode", "aws", "do", "harvester", "vsphere", "azure"]
-  cloudProvider: "external-aws"
+  cloudProvider: "" # either: external-aws|rancher-vsphere
   nodeProviders: ["ec2"]
   psact: ""
   criDockerd: false
@@ -67,6 +67,8 @@ provisioningInput:
         secretKey: ""
     retention: "72h"
     snapshot: false
+chartUpgrade: # will install a version of the out-of-tree chart (latest - 1) that can later be upgraded to the latest version. This is used for upgrade testing on cloud provider tests.
+  isUpgradable: false
 ```
 
 ## Cloud Credentials
@@ -130,6 +132,14 @@ To use automation with a cloud provider, simply enter one of the following optio
 * aws
 * rancher-vsphere
 
+### RKE1 Chart Upgrade Options
+At the root level of your config.yaml, you can provide the following option:
+```yaml
+chartUpgrade:
+  isUpgradable: true
+```
+which will install `latest-1` chart version for CPI and CSI charts so that you may run upgrade tests later, if you wish. 
+This is currently only available for Vsphere RKE1
 
 ## NodeTemplateConfigs
 RKE1 specifically needs a node template config to run properly. These are the inputs needed for the different node providers.
@@ -294,7 +304,10 @@ Cloud Provider enables additional options such as load-balancers and storage dev
 available options:
 ### AWS
 * `aws` uses the in-tree provider for aws -- **Deprecated on kubernetes 1.26 and below**
-* `external-aws` uses the out-of-tree provider for aws. Built in logic to the automation will be applied to the cluster that applies the correct configuration for the out-of-tree charts to be installed. Supported on kubernetes 1.22+
+* `external-aws` uses the out-of-tree provider for aws. Built in logic to the automation will be applied to the cluster that applies the correct configuration for the out-of-tree charts to be installed. Supported on kubernetes 1.22+. An AWS provided LB will be attached to a workload in order to test that the cloud provider is working as expected. 
+
+### Vsphere
+* `rancher-vsphere` is out-of-tree since 1.22. A workload using vsphere's cloud provider storage class will be created on the cluster to test that the provider is working as expected. 
 
 ## Custom Cluster
 For custom clusters, no nodeTemplateConfig or credentials are required. Currently only supported for ec2.

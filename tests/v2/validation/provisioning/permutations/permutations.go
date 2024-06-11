@@ -27,6 +27,7 @@ import (
 	"github.com/rancher/shepherd/extensions/services"
 	"github.com/rancher/shepherd/extensions/workloads"
 	"github.com/rancher/shepherd/extensions/workloads/pods"
+	"github.com/rancher/shepherd/pkg/config"
 	"github.com/rancher/shepherd/pkg/namegenerator"
 	"github.com/rancher/shepherd/pkg/session"
 	"github.com/sirupsen/logrus"
@@ -205,7 +206,6 @@ func RunTestPermutations(s *suite.Suite, testNamePrefix string, client *rancher.
 // on an active cluster.
 func RunPostClusterCloudProviderChecks(t *testing.T, client *rancher.Client, clusterType string, nodeTemplate *nodetemplates.NodeTemplate, testClusterConfig *clusters.ClusterConfig, clusterObject *steveV1.SteveAPIObject, rke1ClusterObject *management.Cluster) {
 	if strings.Contains(clusterType, clusters.RKE1ClusterType.String()) {
-		providers := *testClusterConfig.Providers
 		adminClient, err := rancher.NewClient(client.RancherConfig.AdminToken, client.Session)
 		require.NoError(t, err)
 
@@ -231,17 +231,25 @@ func RunPostClusterCloudProviderChecks(t *testing.T, client *rancher.Client, clu
 			require.NoError(t, err)
 
 			services.VerifyAWSLoadBalancer(t, client, lbServiceResp, status.ClusterName)
-		} else if strings.Contains(testClusterConfig.CloudProvider, "external") && providers[0] == provisioninginput.VsphereProviderName.String() {
-			err := charts.InstallVsphereOutOfTreeCharts(client, nodeTemplate, catalog.RancherChartRepo, rke1ClusterObject.Name)
+		} else if strings.Contains(testClusterConfig.CloudProvider, "external") {
+			rke1ClusterObject, err := adminClient.Management.Cluster.ByID(rke1ClusterObject.ID)
 			require.NoError(t, err)
 
-			podErrors := pods.StatusPods(client, rke1ClusterObject.ID)
-			require.Empty(t, podErrors)
+			if strings.Contains(rke1ClusterObject.AppliedSpec.DisplayName, provisioninginput.VsphereProviderName.String()) {
+				chartConfig := new(charts.Config)
+				config.LoadConfig(charts.ConfigurationFileKey, chartConfig)
 
-			clusterObject, err := adminClient.Steve.SteveType(clusters.ProvisioningSteveResourceType).ByID(provisioninginput.Namespace + "/" + rke1ClusterObject.ID)
-			require.NoError(t, err)
+				err := charts.InstallVsphereOutOfTreeCharts(client, catalog.RancherChartRepo, rke1ClusterObject.Name, !chartConfig.IsUpgradable)
+				require.NoError(t, err)
 
-			CreatePVCWorkload(t, client, clusterObject)
+				podErrors := pods.StatusPods(client, rke1ClusterObject.ID)
+				require.Empty(t, podErrors)
+
+				clusterObject, err := adminClient.Steve.SteveType(clusters.ProvisioningSteveResourceType).ByID(provisioninginput.Namespace + "/" + rke1ClusterObject.ID)
+				require.NoError(t, err)
+
+				CreatePVCWorkload(t, client, clusterObject)
+			}
 		}
 	} else if strings.Contains(clusterType, clusters.RKE2ClusterType.String()) {
 		adminClient, err := rancher.NewClient(client.RancherConfig.AdminToken, client.Session)
