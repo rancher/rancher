@@ -35,10 +35,10 @@ func TestEnqueueCrtbsOnProjectCreation(t *testing.T) {
 					return existingCrtbs, nil
 				},
 			},
-			crtbClient: &fakes.ClusterRoleTemplateBindingInterfaceMock{
-				ControllerFunc: func() v3.ClusterRoleTemplateBindingController {
-					return &mockedClusterRoleTemplateBindingController
-				},
+		},
+		crtbClient: &fakes.ClusterRoleTemplateBindingInterfaceMock{
+			ControllerFunc: func() v3.ClusterRoleTemplateBindingController {
+				return &mockedClusterRoleTemplateBindingController
 			},
 		},
 	}

@@ -6,7 +6,10 @@ import (
 	"strings"
 
 	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	rbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/rancher/pkg/rbac"
+	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/sirupsen/logrus"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -20,7 +23,11 @@ const (
 )
 
 type projectLifecycle struct {
-	mgr *mgr
+	mgr                  *mgr
+	crtbClient           v3.ClusterRoleTemplateBindingInterface
+	systemAccountManager *systemaccount.Manager
+	rbLister             rbacv1.RoleBindingLister
+	roleBindings         rbacv1.RoleBindingInterface
 }
 
 func (l *projectLifecycle) sync(key string, orig *apisv3.Project) (runtime.Object, error) {
@@ -32,7 +39,7 @@ func (l *projectLifecycle) sync(key string, orig *apisv3.Project) (runtime.Objec
 		}
 		// remove the system account created for this project
 		logrus.Debugf("Deleting system user for project %v", projectID)
-		if err := l.mgr.systemAccountManager.RemoveSystemAccount(projectID); err != nil {
+		if err := l.systemAccountManager.RemoveSystemAccount(projectID); err != nil {
 			return nil, err
 		}
 		return nil, nil
@@ -78,7 +85,7 @@ func (l *projectLifecycle) enqueueCrtbs(project *apisv3.Project) error {
 	}
 	// enqueue them so crtb controller picks them up and lists all projects and generates rolebindings for each crtb in the projects
 	for _, crtb := range crtbs {
-		l.mgr.crtbClient.Controller().Enqueue(clusterID, crtb.Name)
+		l.crtbClient.Controller().Enqueue(clusterID, crtb.Name)
 	}
 	return nil
 }
@@ -96,11 +103,11 @@ func (l *projectLifecycle) Updated(obj *apisv3.Project) (runtime.Object, error) 
 func (l *projectLifecycle) Remove(obj *apisv3.Project) (runtime.Object, error) {
 	var returnErr error
 	set := labels.Set{rbac.RestrictedAdminProjectRoleBinding: "true"}
-	rbs, err := l.mgr.rbLister.List(obj.Name, labels.SelectorFromSet(set))
+	rbs, err := l.rbLister.List(obj.Name, labels.SelectorFromSet(set))
 	returnErr = errors.Join(returnErr, err)
 
 	for _, rb := range rbs {
-		err := l.mgr.roleBindings.DeleteNamespaced(obj.Name, rb.Name, &v1.DeleteOptions{})
+		err := l.roleBindings.DeleteNamespaced(obj.Name, rb.Name, &v1.DeleteOptions{})
 		returnErr = errors.Join(returnErr, err)
 	}
 	err = l.mgr.deleteNamespace(obj, projectRemoveController)
