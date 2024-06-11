@@ -25,8 +25,8 @@ var (
 )
 
 const (
-	secretKeyCredAccessKey = "MINIO_ROOT_USER"
-	secretKeyCredSecretKey = "MINIO_ROOT_PASSWORD"
+	SecretKeyCredAccessKey = "MINIO_ROOT_USER"
+	SecretKeyCredSecretKey = "MINIO_ROOT_PASSWORD"
 	secretKeyTLSPublicCrt  = "public.crt"
 	secretKeyTLSPrivateKey = "private.key"
 )
@@ -115,8 +115,8 @@ func createCredSecret(clients *clients.Clients, namespace, objectStore string) (
 			Namespace: namespace,
 		},
 		Data: map[string][]byte{
-			secretKeyCredAccessKey: []byte(accessKey),
-			secretKeyCredSecretKey: []byte(secretKey),
+			SecretKeyCredAccessKey: []byte(accessKey),
+			SecretKeyCredSecretKey: []byte(secretKey),
 		},
 	})
 	if err == nil {
@@ -137,8 +137,8 @@ func createCloudCredentialSecret(clients *clients.Clients, namespace, name strin
 			Namespace: namespace,
 		},
 		Data: map[string][]byte{
-			"accessKey": credentials.Data[secretKeyCredAccessKey],
-			"secretKey": credentials.Data[secretKeyCredSecretKey],
+			"accessKey": credentials.Data[SecretKeyCredAccessKey],
+			"secretKey": credentials.Data[SecretKeyCredSecretKey],
 		},
 	})
 	if apierrors.IsAlreadyExists(err) {
@@ -166,7 +166,7 @@ func createHelperConfigmap(clients *clients.Clients, namespace, objectStore, buc
 			Namespace: namespace,
 		},
 		Data: map[string]string{
-			"setup.sh": fmt.Sprintf(setupMinioBucket, secretKeyCredAccessKey, secretKeyCredSecretKey, bucketName),
+			"setup.sh": fmt.Sprintf(setupMinioBucket, SecretKeyCredAccessKey, SecretKeyCredSecretKey, bucketName),
 		},
 	})
 	if apierrors.IsAlreadyExists(err) {
@@ -398,8 +398,8 @@ func GetObjectStore(clients *clients.Clients, namespace, identifier, bucket stri
 	}
 
 	return Info{
-		AccessKey:           string(cs.Data[secretKeyCredAccessKey]),
-		SecretKey:           string(cs.Data[secretKeyCredSecretKey]),
+		AccessKey:           string(cs.Data[SecretKeyCredAccessKey]),
+		SecretKey:           string(cs.Data[SecretKeyCredSecretKey]),
 		Bucket:              bucket,
 		Endpoint:            fmt.Sprintf("%s:9000", svc.Spec.ClusterIP),
 		Cert:                base64.StdEncoding.EncodeToString(tls.Data[secretKeyTLSPublicCrt]),
