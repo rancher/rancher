@@ -13,11 +13,13 @@ import (
 	"github.com/rancher/rancher/pkg/controllers"
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/systemimage"
 	wranglerv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	rbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/settings"
+	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -36,13 +38,29 @@ var defaultProjectLabels = labels.Set(map[string]string{"authz.management.cattle
 var systemProjectLabels = labels.Set(map[string]string{"authz.management.cattle.io/system-project": "true"})
 
 type clusterLifecycle struct {
-	mgr                *mgr
+	mgr                *config.ManagementContext
+	clusterClient      v3.ClusterInterface
 	crtbLister         v3.ClusterRoleTemplateBindingLister
+	nsClient           corev1.NamespaceInterface
 	projects           wranglerv3.ProjectClient
 	projectLister      v3.ProjectLister
 	rbLister           rbacv1.RoleBindingLister
 	roleBindings       rbacv1.RoleBindingInterface
 	roleTemplateLister v3.RoleTemplateLister
+}
+
+func NewClusterLifecycle(management *config.ManagementContext) *clusterLifecycle {
+	return &clusterLifecycle{
+		mgr:                management,
+		clusterClient:      management.Management.Clusters(""),
+		crtbLister:         management.Management.ClusterRoleTemplateBindings("").Controller().Lister(),
+		nsClient:           management.Core.Namespaces(""),
+		projects:           management.Wrangler.Mgmt.Project(),
+		projectLister:      management.Management.Projects("").Controller().Lister(),
+		rbLister:           management.RBAC.RoleBindings("").Controller().Lister(),
+		roleBindings:       management.RBAC.RoleBindings(""),
+		roleTemplateLister: management.Management.RoleTemplates("").Controller().Lister(),
+	}
 }
 
 func (l *clusterLifecycle) Sync(key string, orig *apisv3.Cluster) (runtime.Object, error) {
@@ -51,7 +69,7 @@ func (l *clusterLifecycle) Sync(key string, orig *apisv3.Cluster) (runtime.Objec
 	}
 
 	obj := orig.DeepCopyObject()
-	obj, err := l.mgr.reconcileResourceToNamespace(obj, ClusterCreateController)
+	obj, err := reconcileResourceToNamespace(obj, ClusterCreateController, l.nsClient)
 	if err != nil {
 		return nil, err
 	}
@@ -73,7 +91,7 @@ func (l *clusterLifecycle) Sync(key string, orig *apisv3.Cluster) (runtime.Objec
 	// update if it has changed
 	if obj != nil && !reflect.DeepEqual(orig, obj) {
 		logrus.Infof("[%v] Updating cluster %v", ClusterCreateController, orig.Name)
-		_, err = l.mgr.mgmt.Management.Clusters("").ObjectClient().Update(orig.Name, obj)
+		_, err = l.clusterClient.ObjectClient().Update(orig.Name, obj)
 		if err != nil {
 			return nil, err
 		}
@@ -87,7 +105,7 @@ func (l *clusterLifecycle) Sync(key string, orig *apisv3.Cluster) (runtime.Objec
 	// update if it has changed
 	if obj != nil && !reflect.DeepEqual(orig, obj) {
 		logrus.Infof("[%v] Updating cluster %v", ClusterCreateController, orig.Name)
-		_, err = l.mgr.mgmt.Management.Clusters("").ObjectClient().Update(orig.Name, obj)
+		_, err = l.clusterClient.ObjectClient().Update(orig.Name, obj)
 		if err != nil {
 			return nil, err
 		}
@@ -123,7 +141,7 @@ func (l *clusterLifecycle) Remove(obj *apisv3.Cluster) (runtime.Object, error) {
 	}
 	returnErr = errors.Join(
 		l.deleteSystemProject(obj, ClusterRemoveController),
-		l.mgr.deleteNamespace(obj, ClusterRemoveController),
+		deleteNamespace(obj, ClusterRemoveController, l.nsClient),
 	)
 	return obj, returnErr
 }
@@ -187,7 +205,7 @@ func (l *clusterLifecycle) createProject(name string, cond condition.Cond, obj r
 		}
 		project = updated.(*apisv3.Project)
 		logrus.Infof("[%v] Creating %s project for cluster %v", ClusterCreateController, name, metaAccessor.GetName())
-		if _, err = l.mgr.mgmt.Management.Projects(metaAccessor.GetName()).Create(project); err != nil {
+		if _, err = l.mgr.Management.Projects(metaAccessor.GetName()).Create(project); err != nil {
 			return obj, err
 		}
 		return obj, nil
@@ -340,7 +358,7 @@ func (l *clusterLifecycle) reconcileClusterCreatorRTB(obj runtime.Object) (runti
 			om.Annotations = crtbCreatorOwnerAnnotations
 
 			logrus.Infof("[%v] Creating creator clusterRoleTemplateBinding for user %v for cluster %v", ClusterCreateController, creatorID, metaAccessor.GetName())
-			if _, err := l.mgr.mgmt.Management.ClusterRoleTemplateBindings(metaAccessor.GetName()).Create(&apisv3.ClusterRoleTemplateBinding{
+			if _, err := l.mgr.Management.ClusterRoleTemplateBindings(metaAccessor.GetName()).Create(&apisv3.ClusterRoleTemplateBinding{
 				ObjectMeta:       om,
 				ClusterName:      metaAccessor.GetName(),
 				RoleTemplateName: role,
@@ -370,7 +388,7 @@ func (l *clusterLifecycle) reconcileClusterCreatorRTB(obj runtime.Object) (runti
 func (l *clusterLifecycle) updateClusterAnnotationandCondition(cluster *apisv3.Cluster, anno string, updateCondition bool) error {
 	sleep := 100
 	for i := 0; i <= 3; i++ {
-		c, err := l.mgr.mgmt.Management.Clusters("").Get(cluster.Name, v1.GetOptions{})
+		c, err := l.clusterClient.Get(cluster.Name, v1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -380,7 +398,7 @@ func (l *clusterLifecycle) updateClusterAnnotationandCondition(cluster *apisv3.C
 		if updateCondition {
 			apisv3.ClusterConditionInitialRolesPopulated.True(c)
 		}
-		_, err = l.mgr.mgmt.Management.Clusters("").Update(c)
+		_, err = l.clusterClient.Update(c)
 		if err != nil {
 			if apierrors.IsConflict(err) {
 				time.Sleep(time.Duration(sleep) * time.Millisecond)

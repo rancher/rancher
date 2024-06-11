@@ -7,13 +7,14 @@ import (
 	"strings"
 
 	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	rbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/systemaccount"
+	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -26,13 +27,29 @@ const (
 )
 
 type projectLifecycle struct {
-	mgr                  *mgr
+	mgr                  *config.ManagementContext
 	crtbClient           v3.ClusterRoleTemplateBindingInterface
 	crtbLister           v3.ClusterRoleTemplateBindingLister
+	nsClient             corev1.NamespaceInterface
+	projects             v3.ProjectInterface
 	prtbLister           v3.ProjectRoleTemplateBindingLister
 	rbLister             rbacv1.RoleBindingLister
 	roleBindings         rbacv1.RoleBindingInterface
 	systemAccountManager *systemaccount.Manager
+}
+
+func NewProjectLifecycle(management *config.ManagementContext) *projectLifecycle {
+	return &projectLifecycle{
+		mgr:                  management,
+		crtbClient:           management.Management.ClusterRoleTemplateBindings(""),
+		crtbLister:           management.Management.ClusterRoleTemplateBindings("").Controller().Lister(),
+		nsClient:             management.Core.Namespaces(""),
+		projects:             management.Management.Projects(""),
+		prtbLister:           management.Management.ProjectRoleTemplateBindings("").Controller().Lister(),
+		rbLister:             management.RBAC.RoleBindings("").Controller().Lister(),
+		roleBindings:         management.RBAC.RoleBindings(""),
+		systemAccountManager: systemaccount.NewManager(management),
+	}
 }
 
 func (l *projectLifecycle) Sync(key string, orig *apisv3.Project) (runtime.Object, error) {
@@ -52,7 +69,7 @@ func (l *projectLifecycle) Sync(key string, orig *apisv3.Project) (runtime.Objec
 
 	obj := orig.DeepCopyObject()
 
-	obj, err := l.mgr.reconcileResourceToNamespace(obj, ProjectCreateController)
+	obj, err := reconcileResourceToNamespace(obj, ProjectCreateController, l.nsClient)
 	if err != nil {
 		return nil, err
 	}
@@ -65,12 +82,12 @@ func (l *projectLifecycle) Sync(key string, orig *apisv3.Project) (runtime.Objec
 	// update if it has changed
 	if obj != nil && !reflect.DeepEqual(orig, obj) {
 		logrus.Infof("[%v] Updating project %v", ProjectCreateController, orig.Name)
-		obj, err = l.mgr.mgmt.Management.Projects("").ObjectClient().Update(orig.Name, obj)
+		obj, err = l.projects.ObjectClient().Update(orig.Name, obj)
 		if err != nil {
 			return nil, err
 		}
 	}
-	if err != nil && !kerrors.IsAlreadyExists(err) {
+	if err != nil && !apierrors.IsAlreadyExists(err) {
 		return nil, err
 	}
 
@@ -115,7 +132,7 @@ func (l *projectLifecycle) Remove(obj *apisv3.Project) (runtime.Object, error) {
 		err := l.roleBindings.DeleteNamespaced(obj.Name, rb.Name, &v1.DeleteOptions{})
 		returnErr = errors.Join(returnErr, err)
 	}
-	err = l.mgr.deleteNamespace(obj, ProjectRemoveController)
+	err = deleteNamespace(obj, ProjectRemoveController, l.nsClient)
 	returnErr = errors.Join(returnErr, err)
 	return obj, returnErr
 }
@@ -176,7 +193,7 @@ func (l *projectLifecycle) reconcileProjectCreatorRTB(obj runtime.Object) (runti
 			}
 
 			logrus.Infof("[%v] Creating creator projectRoleTemplateBinding for user %v for project %v", ProjectCreateController, creatorID, metaAccessor.GetName())
-			if _, err := l.mgr.mgmt.Management.ProjectRoleTemplateBindings(metaAccessor.GetName()).Create(&apisv3.ProjectRoleTemplateBinding{
+			if _, err := l.mgr.Management.ProjectRoleTemplateBindings(metaAccessor.GetName()).Create(&apisv3.ProjectRoleTemplateBinding{
 				ObjectMeta:       om,
 				ProjectName:      metaAccessor.GetNamespace() + ":" + metaAccessor.GetName(),
 				RoleTemplateName: role,
@@ -201,7 +218,7 @@ func (l *projectLifecycle) reconcileProjectCreatorRTB(obj runtime.Object) (runti
 			apisv3.ProjectConditionInitialRolesPopulated.True(project)
 			logrus.Infof("[%v] Setting InitialRolesPopulated condition on project %v", ProjectCreateController, project.Name)
 		}
-		if _, err := l.mgr.mgmt.Management.Projects("").Update(project); err != nil {
+		if _, err := l.projects.Update(project); err != nil {
 			return obj, err
 		}
 		return obj, nil
