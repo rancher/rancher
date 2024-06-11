@@ -31,13 +31,13 @@ func (p *ldapProvider) actionHandler(actionName string, action *types.Action, re
 	}
 
 	if actionName == "testAndApply" {
-		return p.testAndApply(actionName, action, request)
+		return p.testAndApply(request)
 	}
 
 	return httperror.NewAPIError(httperror.ActionNotAvailable, "")
 }
 
-func (p *ldapProvider) testAndApply(actionName string, action *types.Action, request *types.APIContext) error {
+func (p *ldapProvider) testAndApply(request *types.APIContext) error {
 	var input map[string]interface{}
 	var err error
 	input, err = handler.ParseAndValidateActionBody(request, request.Schemas.Schema(&managementschema.Version,
@@ -103,8 +103,12 @@ func (p *ldapProvider) testAndApply(actionName string, action *types.Action, req
 	}
 
 	userExtraInfo := p.GetUserExtraAttributes(userPrincipal)
+	err = p.tokenMGR.UserAttributeCreateOrUpdate(user.Name, userPrincipal.Provider, groupPrincipals, userExtraInfo)
+	if err != nil {
+		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("testAndApply: Failed to create or update userAttribute: %v", err))
+	}
 
-	return p.tokenMGR.CreateTokenAndSetCookie(user.Name, userPrincipal, groupPrincipals, "", 0, "Token via LDAP Configuration", request, userExtraInfo)
+	return p.tokenMGR.CreateTokenAndSetCookie(user.Name, userPrincipal, groupPrincipals, "", 0, "Token via LDAP Configuration", request)
 }
 
 func (p *ldapProvider) saveLDAPConfig(config *v3.LdapConfig) error {
