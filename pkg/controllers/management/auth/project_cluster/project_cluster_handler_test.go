@@ -1,4 +1,4 @@
-package auth
+package project_cluster
 
 import (
 	"testing"

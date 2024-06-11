@@ -1,4 +1,4 @@
-package auth
+package project_cluster
 
 import (
 	"context"
@@ -19,14 +19,14 @@ import (
 )
 
 const (
-	creatorIDAnn                  = "field.cattle.io/creatorId"
+	CreatorIDAnn                  = "field.cattle.io/creatorId"
 	creatorOwnerBindingAnnotation = "authz.management.cattle.io/creator-owner-binding"
 	roleTemplatesRequired         = "authz.management.cattle.io/creator-role-bindings"
 )
 
 var crtbCreatorOwnerAnnotations = map[string]string{creatorOwnerBindingAnnotation: "true"}
 
-func newPandCLifecycles(management *config.ManagementContext) (*projectLifecycle, *clusterLifecycle) {
+func NewPandCLifecycles(management *config.ManagementContext) (*projectLifecycle, *clusterLifecycle) {
 	m := &mgr{
 		mgmt:     management,
 		nsLister: management.Core.Namespaces("").Controller().Lister(),
@@ -134,7 +134,7 @@ func (m *mgr) updateClusterAnnotationandCondition(cluster *apisv3.Cluster, anno 
 		}
 		// Only log if we successfully updated the cluster
 		if updateCondition {
-			logrus.Infof("[%v] Setting InitialRolesPopulated condition on cluster %v", ctrbMGMTController, cluster.Name)
+			logrus.Infof("[%v] Setting InitialRolesPopulated condition on cluster %v", ClusterCreateController, cluster.Name)
 		}
 		return nil
 	}
