@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/rancher/tests/v2/actions/provisioning"
 	"github.com/rancher/rancher/tests/v2/actions/provisioninginput"
 	"github.com/rancher/shepherd/clients/rancher"
+	v1 "github.com/rancher/shepherd/clients/rancher/v1"
 	"github.com/rancher/shepherd/extensions/cloudcredentials"
 	"github.com/rancher/shepherd/extensions/clusters"
 	"github.com/rancher/shepherd/extensions/clusters/kubernetesversions"
@@ -36,7 +37,7 @@ type ClusterTemplateTestSuite struct {
 	standardUserClient *rancher.Client
 	session            *session.Session
 	templateConfig     *provisioninginput.TemplateConfig
-	cloudCredentials   *cloudcredentials.CloudCredential
+	cloudCredentials   *v1.SteveAPIObject
 }
 
 func (r *ClusterTemplateTestSuite) TearDownSuite() {
@@ -55,11 +56,13 @@ func (r *ClusterTemplateTestSuite) SetupSuite() {
 	r.client = client
 
 	provider := provisioning.CreateProvider(r.templateConfig.TemplateProvider)
-	r.cloudCredentials, err = provider.CloudCredFunc(client)
+
+	cloudCredentialConfig := cloudcredentials.LoadCloudCredential(r.templateConfig.TemplateProvider)
+	r.cloudCredentials, err = provider.CloudCredFunc(client, cloudCredentialConfig)
 	require.NoError(r.T(), err)
 }
 
-func (r *ClusterTemplateTestSuite) TestProvisionK3sTemplateCluster() {
+func (r *ClusterTemplateTestSuite) TestProvisionK3STemplateCluster() {
 	_, err := steve.CreateAndWaitForResource(r.client, stevetypes.ClusterRepo, r.templateConfig.Repo, true, 5*time.Second, defaults.FiveMinuteTimeout)
 	require.NoError(r.T(), err)
 
