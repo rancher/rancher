@@ -535,6 +535,8 @@ type OIDCConfig struct {
 	GroupsClaim        string `json:"groupsClaim,omitempty"`
 	// Scopes is expected to be a space delimited list of scopes
 	Scopes string `json:"scope,omitempty"`
+	// AcrValue is expected to be string containing the required ACR value
+	AcrValue string `json:"acrValue,omitempty"`
 }
 
 type OIDCTestOutput struct {

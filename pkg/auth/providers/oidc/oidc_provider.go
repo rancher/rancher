@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/coreos/go-oidc/v3/oidc"
+	"github.com/golang-jwt/jwt"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
@@ -54,6 +55,7 @@ type ClaimInfo struct {
 	EmailVerified     bool     `json:"email_verified"`
 	Groups            []string `json:"groups"`
 	FullGroupPath     []string `json:"full_group_path"`
+	ACR               string   `json:"acr"`
 }
 
 func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *tokens.Manager) common.AuthProvider {
@@ -378,6 +380,7 @@ func (o *OpenIDCProvider) getUserInfo(ctx *context.Context, config *v32.OIDCConf
 		return userInfo, oauth2Token, err
 	}
 	oauthConfig := ConfigToOauthConfig(provider.Endpoint(), config)
+
 	var verifier = provider.Verifier(&oidc.Config{ClientID: config.ClientID})
 	if err := json.Unmarshal([]byte(authCode), &oauth2Token); err != nil {
 		oauth2Token, err = oauthConfig.Exchange(updatedContext, authCode, oauth2.SetAuthURLParam("scope", strings.Join(oauthConfig.Scopes, " ")))
@@ -402,6 +405,11 @@ func (o *OpenIDCProvider) getUserInfo(ctx *context.Context, config *v32.OIDCConf
 	if !reflect.DeepEqual(oauth2Token, reusedToken) {
 		o.UpdateToken(reusedToken, userName)
 	}
+	// If an ACR value is configured, validate the value in the claim
+	if config.AcrValue != "" && !validateACR(oauth2Token, config) {
+		return userInfo, oauth2Token, errors.New("failed to validate ACR")
+	}
+
 	logrus.Debugf("[generic oidc] getUserInfo: getting user info")
 	userInfo, err = provider.UserInfo(updatedContext, oauthConfig.TokenSource(updatedContext, reusedToken))
 	if err != nil {
@@ -514,4 +522,27 @@ func (o *OpenIDCProvider) getOIDCProvider(ctx context.Context, oidcConfig *v32.O
 	}
 	// This will perform discovery in the oidc library
 	return oidc.NewProvider(ctx, oidcConfig.Issuer)
+}
+
+func validateACR(oauth2Token *oauth2.Token, config *v32.OIDCConfig) bool {
+	// if we have no ACR configured, all values are accepted
+	if config.AcrValue == "" {
+		return true
+	}
+	tokenClaims := make(jwt.MapClaims)
+	_, _, err := new(jwt.Parser).ParseUnverified(oauth2Token.AccessToken, &tokenClaims)
+	if err != nil {
+		logrus.Infof("unable to parse acr from access token: %v", err)
+		return false
+	}
+	acr, ok := tokenClaims["acr"].(string)
+	if !ok {
+		logrus.Errorf("acr value could not be parsed")
+		return false
+	}
+	if acr != config.AcrValue {
+		logrus.Infof("acr value in token does not match configured acr value")
+		return false
+	}
+	return true
 }

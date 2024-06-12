@@ -3,6 +3,7 @@ package client
 const (
 	GenericOIDCConfigType                     = "genericOIDCConfig"
 	GenericOIDCConfigFieldAccessMode          = "accessMode"
+	GenericOIDCConfigFieldAcrValue            = "acrValue"
 	GenericOIDCConfigFieldAllowedPrincipalIDs = "allowedPrincipalIds"
 	GenericOIDCConfigFieldAnnotations         = "annotations"
 	GenericOIDCConfigFieldAuthEndpoint        = "authEndpoint"
@@ -32,6 +33,7 @@ const (
 
 type GenericOIDCConfig struct {
 	AccessMode          string            `json:"accessMode,omitempty" yaml:"accessMode,omitempty"`
+	AcrValue            string            `json:"acrValue,omitempty" yaml:"acrValue,omitempty"`
 	AllowedPrincipalIDs []string          `json:"allowedPrincipalIds,omitempty" yaml:"allowedPrincipalIds,omitempty"`
 	Annotations         map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	AuthEndpoint        string            `json:"authEndpoint,omitempty" yaml:"authEndpoint,omitempty"`
