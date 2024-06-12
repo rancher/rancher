@@ -18,7 +18,6 @@ import (
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/capr"
-	"github.com/rancher/rancher/pkg/controllers/capr/managesystemagent"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	ranchercontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
@@ -311,14 +310,6 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlan
 		return status, err
 	}
 
-	lowestKubelet := getLowestMachineKubeletVersion(plan)
-	if lowestKubelet != nil {
-		logrus.Debugf("rkecluster %s/%s: lowest detected Kubelet version for cluster was: %s", cp.Namespace, cp.Name, lowestKubelet.String())
-		if err := blockProgressForSUCPSPIf125(fmt.Sprintf("[planner] rkecluster %s/%s:", cp.Namespace, cp.Name), status, currentVersion, lowestKubelet); err != nil {
-			return status, err
-		}
-	}
-
 	if status, err = p.rotateCertificates(cp, status, clusterSecretTokens, plan); err != nil {
 		return status, err
 	}
@@ -450,27 +441,6 @@ func getLowestMachineKubeletVersion(plan *plan.Plan) *semver.Version {
 		}
 	}
 	return lowestVersion
-}
-
-// blockProgressForSUCPSPIf125 handles the case that we're dealing with K8s >= 1.25, ensuring that system-upgrade-controller has PodSecurityPolicies disabled.
-// We need to make sure the cluster has undergone initial provisioning and bootstrapping before we can enforce this condition,
-// otherwise the system-upgrade-controller bundle will never become ready and the planner will be indefinitely blocked.
-// We do this by determining if any plans have been delivered to any of the nodes. Notably we perform this check after etcd
-// snapshot restoration can happen, to allow recovery in the event that the cluster has failed.
-func blockProgressForSUCPSPIf125(msgPrefix string, status rkev1.RKEControlPlaneStatus, currentVersion, lowestKubelet *semver.Version) error {
-	if currentVersion == nil || lowestKubelet == nil {
-		return fmt.Errorf("%s currentVersion or lowestKubelet was nil", msgPrefix)
-	}
-	if lowestKubelet != nil && !currentVersion.LessThan(managesystemagent.Kubernetes125) && lowestKubelet.LessThan(managesystemagent.Kubernetes125) {
-		logrus.Tracef("%s checking for SystemUpgradeController readiness", msgPrefix)
-		if capr.SystemUpgradeControllerReady.GetStatus(&status) == "" || capr.SystemUpgradeControllerReady.IsFalse(&status) || capr.SystemUpgradeControllerReady.IsUnknown(&status) {
-			if capr.SystemUpgradeControllerReady.GetReason(&status) != "" {
-				return errWaitingf("waiting for system-upgrade-controller helm chart reconciliation: %s", capr.SystemUpgradeControllerReady.GetReason(&status))
-			}
-			return errWaiting("waiting for system-upgrade-controller helm chart reconciliation")
-		}
-	}
-	return nil
 }
 
 // clusterIsSane ensures that there is at least one controlplane, etcd, and worker node that are not deleting for the cluster.
