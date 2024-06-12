@@ -5,11 +5,13 @@ import (
 	"github.com/rancher/rancher/tests/v2/actions/rke1/nodetemplates"
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
+	"github.com/rancher/shepherd/extensions/cloudcredentials"
 	"github.com/rancher/shepherd/extensions/cloudcredentials/azure"
 	"github.com/rancher/shepherd/pkg/config"
 )
 
 const azureNodeTemplateNameBase = "azureNodeConfig"
+const providerName = "azure"
 
 // CreateAzureNodeTemplate is a helper function that takes the rancher Client as a parameter and creates
 // an Azure node template and returns the NodeTemplate response
@@ -17,7 +19,8 @@ func CreateAzureNodeTemplate(rancherClient *rancher.Client) (*nodetemplates.Node
 	var azureNodeTemplateConfig nodetemplates.AzureNodeTemplateConfig
 	config.LoadConfig(nodetemplates.AzureNodeTemplateConfigurationFileKey, &azureNodeTemplateConfig)
 
-	cloudCredential, err := azure.CreateAzureCloudCredentials(rancherClient)
+	cloudCredentialConfig := cloudcredentials.LoadCloudCredential(providerName)
+	cloudCredential, err := azure.CreateAzureCloudCredentials(rancherClient, cloudCredentialConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -29,7 +32,7 @@ func CreateAzureNodeTemplate(rancherClient *rancher.Client) (*nodetemplates.Node
 	}
 
 	nodeTemplateConfig := &nodetemplates.NodeTemplate{
-		CloudCredentialID: cloudCredential.ID,
+		CloudCredentialID: cloudCredential.Namespace + ":" + cloudCredential.Name,
 	}
 
 	config.LoadConfig(nodetemplates.NodeTemplateConfigurationFileKey, nodeTemplateConfig)
