@@ -30,14 +30,6 @@ rules:
   - apiGroups: [ "admissionregistration.k8s.io" ]
     resources: [ "validatingwebhookconfigurations", "mutatingwebhookconfigurations" ]
     verbs: [ "get", "list", "delete" ]
-  - apiGroups: [ "policy" ]
-    resources: [ "podsecuritypolicies" ]
-    verbs: ["delete", "create" ]
-{{- if eq (include "rancher.chart_psp_enabled" . ) "true" }}
-  - apiGroups: [ "policy" ]
-    resources: [ "podsecuritypolicies" ]
-    verbs: [ "use"]
-{{- end }}
   - apiGroups: [ "networking.k8s.io" ]
     resources: [ "ingresses" ]
     verbs: [ "delete" ]
