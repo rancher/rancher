@@ -30,7 +30,7 @@ replace (
 require (
 	github.com/rancher/aks-operator v1.9.0-rc.4
 	github.com/rancher/eks-operator v1.9.0-rc.5
-	github.com/rancher/fleet/pkg/apis v0.0.0-20231017140638-93432f288e79
+	github.com/rancher/fleet/pkg/apis v0.10.0-rc.15
 	github.com/rancher/gke-operator v1.9.0-rc.4
 	github.com/rancher/norman v0.0.0-20240503193601-9f5f6586bb5b
 	github.com/rancher/rke v1.6.0-rc6
@@ -71,7 +71,6 @@ require (
 	github.com/prometheus/common v0.44.0 // indirect
 	github.com/prometheus/procfs v0.11.1 // indirect
 	github.com/rancher/lasso v0.0.0-20240424194130-d87ec407d941 // indirect
-	github.com/rancher/wrangler v1.1.1 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	golang.org/x/net v0.25.0 // indirect
 	golang.org/x/oauth2 v0.20.0 // indirect
@@ -92,6 +91,7 @@ require (
 	k8s.io/kubernetes v1.29.4 // indirect
 	k8s.io/utils v0.0.0-20230726121419-3b25d923346b // indirect
 	sigs.k8s.io/cli-utils v0.35.0 // indirect
+	sigs.k8s.io/controller-runtime v0.16.5 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
 	sigs.k8s.io/yaml v1.4.0 // indirect
