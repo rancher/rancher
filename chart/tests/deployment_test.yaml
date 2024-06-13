@@ -477,7 +477,7 @@ tests:
         content:
           name: CATTLE_NAMESPACE
           value: NAMESPACE
-- it: should not add CATTLE_AGENT_TLS_MODE to env and maintain default vars
+- it: should not add (null) CATTLE_AGENT_TLS_MODE to env and maintain default vars
   set:
     agentTLSMode: null
   asserts:
@@ -491,6 +491,50 @@ tests:
         content:
           name: CATTLE_AGENT_TLS_MODE
           value: "system-store"
+    - notContains:
+            path: spec.template.spec.containers[0].env
+            content:
+              name: CATTLE_AGENT_TLS_MODE
+              value: ""
+    - notContains:
+        path: spec.template.spec.containers[0].env
+        content:
+          name: CATTLE_AGENT_TLS_MODE
+          value: null
+    - contains:
+        path: spec.template.spec.containers[0].env
+        content:
+          name: CATTLE_PEER_SERVICE
+          value: RELEASE-NAME-rancher
+    - contains:
+        path: spec.template.spec.containers[0].env
+        content:
+          name: CATTLE_NAMESPACE
+          value: NAMESPACE
+- it: should not add ("") CATTLE_AGENT_TLS_MODE to env and maintain default vars
+  set:
+    agentTLSMode: ""
+  asserts:
+    - notContains:
+        path: spec.template.spec.containers[0].env
+        content:
+          name: CATTLE_AGENT_TLS_MODE
+          value: "strict"
+    - notContains:
+        path: spec.template.spec.containers[0].env
+        content:
+          name: CATTLE_AGENT_TLS_MODE
+          value: "system-store"
+    - notContains:
+        path: spec.template.spec.containers[0].env
+        content:
+          name: CATTLE_AGENT_TLS_MODE
+          value: ""
+    - notContains:
+        path: spec.template.spec.containers[0].env
+        content:
+          name: CATTLE_AGENT_TLS_MODE
+          value: null
     - contains:
         path: spec.template.spec.containers[0].env
         content:
