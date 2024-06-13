@@ -2,6 +2,9 @@ module github.com/rancher/rancher
 
 go 1.21
 
+// Remotedialer patches: https://github.com/aruiz14/remotedialer/commits/v0.3.0-debug-41809
+replace github.com/rancher/remotedialer => github.com/aruiz14/remotedialer v0.0.0-20240613102713-c474f5e85fcc
+
 replace (
 	github.com/containerd/containerd => github.com/containerd/containerd v1.6.22 // for compatibilty with docker 20.10.x
 	github.com/docker/distribution => github.com/docker/distribution v2.8.2+incompatible // rancher-machine requires a replace is set
