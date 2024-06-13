@@ -89,7 +89,7 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 	// restricted-admin will get cluster admin access to all downstream clusters but limited access to the local cluster
 	restrictedAdminRole := addUserRules(rb.addRole("Restricted Admin", "restricted-admin"))
 	restrictedAdminRole.
-		addRule().apiGroups("").resources("secret").verbs("create").
+		addRule().apiGroups("").resources("secrets").verbs("create").
 		addRule().apiGroups("catalog.cattle.io").resources("clusterrepos").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("clustertemplates").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("clustertemplaterevisions").verbs("*").
