@@ -20,7 +20,7 @@ package v3
 
 import (
 	v3 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
-	"github.com/rancher/wrangler/v2/pkg/generic"
+	"github.com/rancher/wrangler/v3/pkg/generic"
 )
 
 // NamespacedBasicAuthController interface for managing NamespacedBasicAuth resources.
