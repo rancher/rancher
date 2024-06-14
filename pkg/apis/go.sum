@@ -93,8 +93,8 @@ github.com/rancher/fleet/pkg/apis v0.10.0-rc.16 h1:M35Fk9q3ttZjHCOCCmaN8i4teqSso
 github.com/rancher/fleet/pkg/apis v0.10.0-rc.16/go.mod h1:AO27VlVcMra5roVMpe76QWo4YOr1V4dnfu4e2a2C9bw=
 github.com/rancher/gke-operator v1.9.0-rc.4 h1:65gwsm0IiLWn5u1gO522tphuv7XWfSNGWiXY3b8KiBE=
 github.com/rancher/gke-operator v1.9.0-rc.4/go.mod h1:hx4qmnYG4cRsD/ywVyKgWWQWAOZhE3L9RgXBKppqRrU=
-github.com/rancher/lasso v0.0.0-20240430201833-6f3def65ffc5 h1:6K4RhfmCy7uxaw9OzCljNLfFcgD/q7SeF+/2gCQ3Tvw=
-github.com/rancher/lasso v0.0.0-20240430201833-6f3def65ffc5/go.mod h1:7WkdfPEvWAdnHVioMUkhpZkshJzjDY62ocHVhcbw89M=
+github.com/rancher/lasso v0.0.0-20240603075835-701e919d08b7 h1:E5AeOkylBXf4APhnHgDvePdtpxOfIjhKnxfjm4sDIEk=
+github.com/rancher/lasso v0.0.0-20240603075835-701e919d08b7/go.mod h1:v0FJLrmL4m6zdWfIB0/qo7qN5QIjVMFyvFGaw8uyWsA=
 github.com/rancher/norman v0.0.0-20240604183301-20cd23aadce1 h1:7g0yOiUGfT4zK4N9H0PSijnS/e2YrObi4Gj19JgE1L8=
 github.com/rancher/norman v0.0.0-20240604183301-20cd23aadce1/go.mod h1:sGnN5ayvAHLfInOFZ4N1fzZw1IMy3i+9PZA7IxlPsRg=
 github.com/rancher/rke v1.6.0-rc7 h1:AfKugPEJtZrjgbcr5zGTwTuv18GJAUUMOMKaXUbT8TU=
@@ -103,8 +103,8 @@ github.com/rancher/wrangler/v2 v2.2.0-rc6 h1:jMsuOVl7nBuQ5QJqdNkR2yHEf1+rYiyd1gN
 github.com/rancher/wrangler/v2 v2.2.0-rc6/go.mod h1:rFxhBR+PpC1MuJli+JeMpxoGxfV7XdFWtpdLC8s+oWQ=
 github.com/rancher/wrangler/v3 v3.0.0-rc2 h1:XGSPPp6GXELqlLvwJp5MsdqyCPu6SCA4UKJ7rQJzE40=
 github.com/rancher/wrangler/v3 v3.0.0-rc2/go.mod h1:f54hh7gFkwwbjsieT2b63FowzTU8FvrBonPe//0CIXo=
-github.com/rogpeppe/go-internal v1.10.0 h1:TMyTOH3F/DB16zRVcYyreMH6GnZZrwQVAoYjRBZyWFQ=
-github.com/rogpeppe/go-internal v1.10.0/go.mod h1:UQnix2H7Ngw/k4C5ijL5+65zddjncjaFoBhdsK/akog=
+github.com/rogpeppe/go-internal v1.11.0 h1:cWPaGQEPrBb5/AsnsZesgZZ9yb1OQ+GOISoDNXVBh4M=
+github.com/rogpeppe/go-internal v1.11.0/go.mod h1:ddIwULY96R17DhadqLgMfk9H9tvdUzkipdSkR5nkCZA=
 github.com/sirupsen/logrus v1.9.3 h1:dueUQJ1C2q9oE3F7wvmSGAaVtTmUizReu6fjN8uqzbQ=
 github.com/sirupsen/logrus v1.9.3/go.mod h1:naHLuLoDiP4jHNo9R0sCBMtWGeIprob74mVsIT4qYEQ=
 github.com/spf13/pflag v1.0.5 h1:iy+VFUOCP1a+8yFto/drg2CJ5u0yRoB7fZw3DKv/JXA=

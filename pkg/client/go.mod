@@ -2,10 +2,10 @@ module github.com/rancher/rancher/pkg/client
 
 go 1.22.0
 
-toolchain go1.22.2
+toolchain go1.22.3
 
 require (
-	github.com/rancher/norman v0.0.0-20240503193601-9f5f6586bb5b
+	github.com/rancher/norman v0.0.0-20240604183301-20cd23aadce1
 	k8s.io/apimachinery v0.30.1
 )
 
@@ -16,7 +16,7 @@ require (
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/gorilla/websocket v1.5.1 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
-	github.com/rancher/wrangler/v2 v2.2.0-rc6 // indirect
+	github.com/rancher/wrangler/v3 v3.0.0-rc2 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	golang.org/x/net v0.24.0 // indirect
 	golang.org/x/sys v0.19.0 // indirect
