@@ -28,7 +28,7 @@ replace (
 )
 
 require (
-	github.com/rancher/aks-operator v1.9.0-rc.4
+	github.com/rancher/aks-operator v1.9.0-rc.6
 	github.com/rancher/eks-operator v1.9.0-rc.5
 	github.com/rancher/fleet/pkg/apis v0.0.0-20231017140638-93432f288e79
 	github.com/rancher/gke-operator v1.9.0-rc.4
@@ -73,11 +73,11 @@ require (
 	github.com/rancher/lasso v0.0.0-20240424194130-d87ec407d941 // indirect
 	github.com/rancher/wrangler v1.1.1 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
-	golang.org/x/net v0.25.0 // indirect
+	golang.org/x/net v0.26.0 // indirect
 	golang.org/x/oauth2 v0.20.0 // indirect
-	golang.org/x/sys v0.20.0 // indirect
-	golang.org/x/term v0.20.0 // indirect
-	golang.org/x/text v0.15.0 // indirect
+	golang.org/x/sys v0.21.0 // indirect
+	golang.org/x/term v0.21.0 // indirect
+	golang.org/x/text v0.16.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
 	google.golang.org/protobuf v1.33.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
