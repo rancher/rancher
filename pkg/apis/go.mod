@@ -5,6 +5,12 @@ go 1.22.0
 toolchain go1.22.3
 
 replace (
+	github.com/rancher/aks-operator => github.com/rancher/aks-operator v1.9.0-rc.8
+	github.com/rancher/eks-operator => github.com/rancher/eks-operator v1.9.0-rc.8
+	github.com/rancher/gke-operator => github.com/rancher/gke-operator v1.9.0-rc.7
+)
+
+replace (
 	k8s.io/api => k8s.io/api v0.30.1
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.30.1
 	k8s.io/apimachinery => k8s.io/apimachinery v0.30.1
@@ -30,10 +36,10 @@ replace (
 )
 
 require (
-	github.com/rancher/aks-operator v1.9.0-rc.6
-	github.com/rancher/eks-operator v1.9.0-rc.5
+	github.com/rancher/aks-operator v1.9.0-rc.8
+	github.com/rancher/eks-operator v1.9.0-rc.8
 	github.com/rancher/fleet/pkg/apis v0.10.0-rc.16
-	github.com/rancher/gke-operator v1.9.0-rc.4
+	github.com/rancher/gke-operator v1.9.0-rc.7
 	github.com/rancher/norman v0.0.0-20240604183301-20cd23aadce1
 	github.com/rancher/rke v1.6.0-rc7
 	github.com/rancher/wrangler/v3 v3.0.0-rc2
@@ -76,7 +82,7 @@ require (
 	github.com/rancher/wrangler/v2 v2.2.0-rc6 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	golang.org/x/net v0.26.0 // indirect
-	golang.org/x/oauth2 v0.20.0 // indirect
+	golang.org/x/oauth2 v0.21.0 // indirect
 	golang.org/x/sys v0.21.0 // indirect
 	golang.org/x/term v0.21.0 // indirect
 	golang.org/x/text v0.16.0 // indirect

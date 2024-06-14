@@ -5,6 +5,13 @@ go 1.22.0
 toolchain go1.22.3
 
 replace (
+	github.com/rancher/aks-operator => github.com/rancher/aks-operator v1.9.0-rc.8
+	github.com/rancher/eks-operator => github.com/rancher/eks-operator v1.9.0-rc.8
+	github.com/rancher/gke-operator => github.com/rancher/gke-operator v1.9.0-rc.7
+	github.com/rancher/shepherd => github.com/vardhaman22/shepherd v1.30.0-rancher5
+)
+
+replace (
 	github.com/containerd/containerd => github.com/containerd/containerd v1.6.27 // for compatibilty with docker 20.10.x
 	github.com/docker/distribution => github.com/docker/distribution v2.8.2+incompatible // rancher-machine requires a replace is set
 	github.com/docker/docker => github.com/docker/docker v20.10.27+incompatible // rancher-machine requires a repalce is set
@@ -62,7 +69,7 @@ replace (
 require (
 	github.com/antihax/optional v1.0.0
 	github.com/containers/image/v5 v5.30.0
-	github.com/rancher/rancher/pkg/apis v0.0.0-20240529155832-64dbde013b4c
+	github.com/rancher/rancher/pkg/apis v0.0.0-20240613110601-c21147a009c6
 	github.com/rancher/shepherd v0.0.0-20240618185935-9f1ffea0abab
 	go.qase.io/client v0.0.0-20231114201952-65195ec001fa
 )
@@ -82,8 +89,8 @@ require (
 	github.com/Masterminds/semver/v3 v3.2.1
 	github.com/Masterminds/sprig/v3 v3.2.3
 	github.com/aws/aws-sdk-go v1.50.38
-	github.com/aws/aws-sdk-go-v2 v1.27.0
-	github.com/aws/aws-sdk-go-v2/service/eks v1.42.5
+	github.com/aws/aws-sdk-go-v2 v1.27.2
+	github.com/aws/aws-sdk-go-v2/service/eks v1.43.1
 	github.com/bep/debounce v1.2.1
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/coreos/go-iptables v0.6.0
@@ -126,13 +133,13 @@ require (
 	github.com/prometheus/client_golang v1.18.0
 	github.com/prometheus/client_model v0.5.0
 	github.com/prometheus/common v0.45.0
-	github.com/rancher/aks-operator v1.9.0-rc.6
+	github.com/rancher/aks-operator v1.9.0-rc.8
 	github.com/rancher/apiserver v0.0.0-20240604183424-8c448886365e
 	github.com/rancher/channelserver v0.7.0
 	github.com/rancher/dynamiclistener v0.6.0-rc1
-	github.com/rancher/eks-operator v1.9.0-rc.5
+	github.com/rancher/eks-operator v1.9.0-rc.8
 	github.com/rancher/fleet/pkg/apis v0.10.0-rc.16
-	github.com/rancher/gke-operator v1.9.0-rc.4
+	github.com/rancher/gke-operator v1.9.0-rc.7
 	github.com/rancher/kubernetes-provider-detector v0.1.5
 	github.com/rancher/lasso v0.0.0-20240603075835-701e919d08b7
 	github.com/rancher/machine v0.15.0-rancher114
@@ -154,7 +161,7 @@ require (
 	golang.org/x/crypto v0.24.0
 	golang.org/x/mod v0.17.0
 	golang.org/x/net v0.26.0
-	golang.org/x/oauth2 v0.20.0
+	golang.org/x/oauth2 v0.21.0
 	golang.org/x/sync v0.7.0
 	golang.org/x/text v0.16.0
 	google.golang.org/api v0.153.0
@@ -193,20 +200,20 @@ require (
 	github.com/VividCortex/ewma v1.2.0 // indirect
 	github.com/acarl005/stripansi v0.0.0-20180116102854-5a71ef0e047d // indirect
 	github.com/antlr/antlr4/runtime/Go/antlr/v4 v4.0.0-20230305170008-8188dc5388df // indirect
-	github.com/aws/aws-sdk-go-v2/config v1.27.16 // indirect
-	github.com/aws/aws-sdk-go-v2/credentials v1.17.16 // indirect
-	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.16.3 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/configsources v1.3.7 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.6.7 // indirect
+	github.com/aws/aws-sdk-go-v2/config v1.27.18 // indirect
+	github.com/aws/aws-sdk-go-v2/credentials v1.17.18 // indirect
+	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.16.5 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/configsources v1.3.9 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.6.9 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/ini v1.8.0 // indirect
-	github.com/aws/aws-sdk-go-v2/service/cloudformation v1.51.1 // indirect
+	github.com/aws/aws-sdk-go-v2/service/cloudformation v1.51.3 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ec2 v1.162.0 // indirect
-	github.com/aws/aws-sdk-go-v2/service/iam v1.32.4 // indirect
+	github.com/aws/aws-sdk-go-v2/service/iam v1.32.6 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.11.2 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.11.9 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sso v1.20.9 // indirect
-	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.24.3 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sts v1.28.10 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.11.11 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sso v1.20.11 // indirect
+	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.24.5 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sts v1.28.12 // indirect
 	github.com/aws/smithy-go v1.20.2 // indirect
 	github.com/cenkalti/backoff/v4 v4.2.1 // indirect
 	github.com/cjlapao/common-go v0.0.39 // indirect
