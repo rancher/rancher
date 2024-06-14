@@ -40,9 +40,10 @@ const (
 )
 
 const (
-	SummaryInProgress = "InProgress"
-	SummaryCompleted  = "Completed"
-	SummaryError      = "Error"
+	SummaryInProgress  = "InProgress"
+	SummaryCompleted   = "Completed"
+	SummaryError       = "Error"
+	SummaryTerminating = "Terminating"
 )
 
 // Condition reason types
@@ -162,7 +163,8 @@ func (gr *globalRoleLifecycle) Updated(obj *v3.GlobalRole) (runtime.Object, erro
 
 func (gr *globalRoleLifecycle) Remove(obj *v3.GlobalRole) (runtime.Object, error) {
 	// Don't need to delete the created ClusterRole or Roles because owner reference will take care of them
-	return nil, nil
+	err := gr.setGRAsTerminating(obj)
+	return nil, err
 }
 
 func (gr *globalRoleLifecycle) reconcileGlobalRole(globalRole *v3.GlobalRole) error {
@@ -466,6 +468,14 @@ func (gr *globalRoleLifecycle) setGRAsCompleted(globalRole *v3.GlobalRole) error
 	}
 	globalRole.Status.LastUpdate = time.Now().String()
 	globalRole.Status.ObservedGeneration = globalRole.ObjectMeta.Generation
+	_, err := gr.grClient.UpdateStatus(globalRole)
+	return err
+}
+
+func (gr *globalRoleLifecycle) setGRAsTerminating(globalRole *v3.GlobalRole) error {
+	globalRole.Status.Conditions = []metav1.Condition{}
+	globalRole.Status.Summary = SummaryTerminating
+	globalRole.Status.LastUpdate = time.Now().String()
 	_, err := gr.grClient.UpdateStatus(globalRole)
 	return err
 }

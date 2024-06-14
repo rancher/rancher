@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.14.0
+    controller-gen.kubebuilder.io/version: v0.12.0
   name: projects.management.cattle.io
 spec:
   group: management.cattle.io
@@ -17,25 +17,19 @@ spec:
   - name: v3
     schema:
       openAPIV3Schema:
-        description: |-
-          Project is a group of namespaces.
-          Projects are used to create a multi-tenant environment within a Kubernetes cluster by managing namespace operations,
-          such as role assignments or quotas, as a group.
+        description: Project is a group of namespaces. Projects are used to create
+          a multi-tenant environment within a Kubernetes cluster by managing namespace
+          operations, such as role assignments or quotas, as a group.
         properties:
           apiVersion:
-            description: |-
-              APIVersion defines the versioned schema of this representation of an object.
-              Servers should convert recognized schemas to the latest internal value, and
-              may reject unrecognized values.
-              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
             type: string
           kind:
-            description: |-
-              Kind is a string value representing the REST resource this object represents.
-              Servers may infer this from the endpoint the client submits requests to.
-              Cannot be updated.
-              In CamelCase.
-              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
             type: string
           metadata:
             type: object
@@ -48,9 +42,9 @@ spec:
                   to. Immutable.
                 type: string
               containerDefaultResourceLimit:
-                description: |-
-                  ContainerDefaultResourceLimit is a specification for the default LimitRange for the namespace.
-                  See https://kubernetes.io/docs/concepts/policy/limit-range/ for more details.
+                description: ContainerDefaultResourceLimit is a specification for
+                  the default LimitRange for the namespace. See https://kubernetes.io/docs/concepts/policy/limit-range/
+                  for more details.
                 properties:
                   limitsCpu:
                     description: LimitsCPU is the CPU limits across all pods in a
@@ -76,10 +70,11 @@ spec:
                 description: DisplayName is the human-readable name for the project.
                 type: string
               namespaceDefaultResourceQuota:
-                description: |-
-                  NamespaceDefaultResourceQuota is a specification of the default ResourceQuota that a namespace will receive if none is provided.
+                description: NamespaceDefaultResourceQuota is a specification of the
+                  default ResourceQuota that a namespace will receive if none is provided.
                   Must provide ResourceQuota if NamespaceDefaultResourceQuota is specified.
-                  See https://kubernetes.io/docs/concepts/policy/resource-quotas/ for more details.
+                  See https://kubernetes.io/docs/concepts/policy/resource-quotas/
+                  for more details.
                 properties:
                   limit:
                     description: Limit is the default quota limits applied to new
@@ -141,10 +136,11 @@ spec:
                     type: object
                 type: object
               resourceQuota:
-                description: |-
-                  ResourceQuota is a specification for the total amount of quota for standard resources that will be shared by all namespaces in the project.
-                  Must provide NamespaceDefaultResourceQuota if ResourceQuota is specified.
-                  See https://kubernetes.io/docs/concepts/policy/resource-quotas/ for more details.
+                description: ResourceQuota is a specification for the total amount
+                  of quota for standard resources that will be shared by all namespaces
+                  in the project. Must provide NamespaceDefaultResourceQuota if ResourceQuota
+                  is specified. See https://kubernetes.io/docs/concepts/policy/resource-quotas/
+                  for more details.
                 properties:
                   limit:
                     description: Limit is the total allowable quota limits shared
