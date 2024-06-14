@@ -41,6 +41,7 @@ const (
 	NodeFieldRemoved              = "removed"
 	NodeFieldRequested            = "requested"
 	NodeFieldRequestedHostname    = "requestedHostname"
+	NodeFieldRuntimeHandlers      = "runtimeHandlers"
 	NodeFieldScaledownTime        = "scaledownTime"
 	NodeFieldSshUser              = "sshUser"
 	NodeFieldState                = "state"
@@ -91,6 +92,7 @@ type Node struct {
 	Removed              string                    `json:"removed,omitempty" yaml:"removed,omitempty"`
 	Requested            map[string]string         `json:"requested,omitempty" yaml:"requested,omitempty"`
 	RequestedHostname    string                    `json:"requestedHostname,omitempty" yaml:"requestedHostname,omitempty"`
+	RuntimeHandlers      []NodeRuntimeHandler      `json:"runtimeHandlers,omitempty" yaml:"runtimeHandlers,omitempty"`
 	ScaledownTime        string                    `json:"scaledownTime,omitempty" yaml:"scaledownTime,omitempty"`
 	SshUser              string                    `json:"sshUser,omitempty" yaml:"sshUser,omitempty"`
 	State                string                    `json:"state,omitempty" yaml:"state,omitempty"`

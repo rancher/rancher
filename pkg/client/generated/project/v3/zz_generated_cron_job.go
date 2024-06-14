@@ -8,6 +8,7 @@ const (
 	CronJobType                               = "cronJob"
 	CronJobFieldActiveDeadlineSeconds         = "activeDeadlineSeconds"
 	CronJobFieldAnnotations                   = "annotations"
+	CronJobFieldAppArmorProfile               = "appArmorProfile"
 	CronJobFieldAutomountServiceAccountToken  = "automountServiceAccountToken"
 	CronJobFieldBackoffLimitPerIndex          = "backoffLimitPerIndex"
 	CronJobFieldCompletionMode                = "completionMode"
@@ -31,6 +32,7 @@ const (
 	CronJobFieldHostname                      = "hostname"
 	CronJobFieldImagePullSecrets              = "imagePullSecrets"
 	CronJobFieldLabels                        = "labels"
+	CronJobFieldManagedBy                     = "managedBy"
 	CronJobFieldMaxFailedIndexes              = "maxFailedIndexes"
 	CronJobFieldName                          = "name"
 	CronJobFieldNamespaceId                   = "namespaceId"
@@ -59,6 +61,7 @@ const (
 	CronJobFieldShareProcessNamespace         = "shareProcessNamespace"
 	CronJobFieldState                         = "state"
 	CronJobFieldSubdomain                     = "subdomain"
+	CronJobFieldSuccessPolicy                 = "successPolicy"
 	CronJobFieldSysctls                       = "sysctls"
 	CronJobFieldTTLSecondsAfterFinished       = "ttlSecondsAfterFinished"
 	CronJobFieldTerminationGracePeriodSeconds = "terminationGracePeriodSeconds"
@@ -79,6 +82,7 @@ type CronJob struct {
 	types.Resource
 	ActiveDeadlineSeconds         *int64                         `json:"activeDeadlineSeconds,omitempty" yaml:"activeDeadlineSeconds,omitempty"`
 	Annotations                   map[string]string              `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	AppArmorProfile               *AppArmorProfile               `json:"appArmorProfile,omitempty" yaml:"appArmorProfile,omitempty"`
 	AutomountServiceAccountToken  *bool                          `json:"automountServiceAccountToken,omitempty" yaml:"automountServiceAccountToken,omitempty"`
 	BackoffLimitPerIndex          *int64                         `json:"backoffLimitPerIndex,omitempty" yaml:"backoffLimitPerIndex,omitempty"`
 	CompletionMode                string                         `json:"completionMode,omitempty" yaml:"completionMode,omitempty"`
@@ -102,6 +106,7 @@ type CronJob struct {
 	Hostname                      string                         `json:"hostname,omitempty" yaml:"hostname,omitempty"`
 	ImagePullSecrets              []LocalObjectReference         `json:"imagePullSecrets,omitempty" yaml:"imagePullSecrets,omitempty"`
 	Labels                        map[string]string              `json:"labels,omitempty" yaml:"labels,omitempty"`
+	ManagedBy                     string                         `json:"managedBy,omitempty" yaml:"managedBy,omitempty"`
 	MaxFailedIndexes              *int64                         `json:"maxFailedIndexes,omitempty" yaml:"maxFailedIndexes,omitempty"`
 	Name                          string                         `json:"name,omitempty" yaml:"name,omitempty"`
 	NamespaceId                   string                         `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
@@ -130,6 +135,7 @@ type CronJob struct {
 	ShareProcessNamespace         *bool                          `json:"shareProcessNamespace,omitempty" yaml:"shareProcessNamespace,omitempty"`
 	State                         string                         `json:"state,omitempty" yaml:"state,omitempty"`
 	Subdomain                     string                         `json:"subdomain,omitempty" yaml:"subdomain,omitempty"`
+	SuccessPolicy                 *SuccessPolicy                 `json:"successPolicy,omitempty" yaml:"successPolicy,omitempty"`
 	Sysctls                       []Sysctl                       `json:"sysctls,omitempty" yaml:"sysctls,omitempty"`
 	TTLSecondsAfterFinished       *int64                         `json:"ttlSecondsAfterFinished,omitempty" yaml:"ttlSecondsAfterFinished,omitempty"`
 	TerminationGracePeriodSeconds *int64                         `json:"terminationGracePeriodSeconds,omitempty" yaml:"terminationGracePeriodSeconds,omitempty"`

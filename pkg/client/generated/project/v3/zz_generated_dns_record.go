@@ -29,6 +29,7 @@ const (
 	DNSRecordFieldState                         = "state"
 	DNSRecordFieldTargetDNSRecordIDs            = "targetDnsRecordIds"
 	DNSRecordFieldTargetWorkloadIDs             = "targetWorkloadIds"
+	DNSRecordFieldTrafficDistribution           = "trafficDistribution"
 	DNSRecordFieldTransitioning                 = "transitioning"
 	DNSRecordFieldTransitioningMessage          = "transitioningMessage"
 	DNSRecordFieldUUID                          = "uuid"
@@ -60,6 +61,7 @@ type DNSRecord struct {
 	State                         string            `json:"state,omitempty" yaml:"state,omitempty"`
 	TargetDNSRecordIDs            []string          `json:"targetDnsRecordIds,omitempty" yaml:"targetDnsRecordIds,omitempty"`
 	TargetWorkloadIDs             []string          `json:"targetWorkloadIds,omitempty" yaml:"targetWorkloadIds,omitempty"`
+	TrafficDistribution           string            `json:"trafficDistribution,omitempty" yaml:"trafficDistribution,omitempty"`
 	Transitioning                 string            `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage          string            `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
 	UUID                          string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`

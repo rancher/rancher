@@ -3,6 +3,7 @@ package client
 const (
 	ContainerType                          = "container"
 	ContainerFieldAllowPrivilegeEscalation = "allowPrivilegeEscalation"
+	ContainerFieldAppArmorProfile          = "appArmorProfile"
 	ContainerFieldCapAdd                   = "capAdd"
 	ContainerFieldCapDrop                  = "capDrop"
 	ContainerFieldCommand                  = "command"
@@ -49,6 +50,7 @@ const (
 
 type Container struct {
 	AllowPrivilegeEscalation *bool                          `json:"allowPrivilegeEscalation,omitempty" yaml:"allowPrivilegeEscalation,omitempty"`
+	AppArmorProfile          *AppArmorProfile               `json:"appArmorProfile,omitempty" yaml:"appArmorProfile,omitempty"`
 	CapAdd                   []string                       `json:"capAdd,omitempty" yaml:"capAdd,omitempty"`
 	CapDrop                  []string                       `json:"capDrop,omitempty" yaml:"capDrop,omitempty"`
 	Command                  []string                       `json:"command,omitempty" yaml:"command,omitempty"`
