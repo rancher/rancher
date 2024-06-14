@@ -65,7 +65,7 @@ ENV LINODE_UI_DRIVER_VERSION v0.5.0
 # make sure the version number is consistent with the one at Line 100 of pkg/data/management/machinedriver_data.go
 ENV DOCKER_MACHINE_HARVESTER_VERSION v0.6.7
 ENV CATTLE_KDM_BRANCH ${CATTLE_KDM_BRANCH}
-ENV HELM_VERSION v3.14.3
+ENV HELM_VERSION v3.15.1
 ENV KUSTOMIZE_VERSION v5.0.1
 ENV CATTLE_WINS_AGENT_VERSION v0.4.15
 ENV CATTLE_WINS_AGENT_INSTALL_SCRIPT https://raw.githubusercontent.com/rancher/wins/${CATTLE_WINS_AGENT_VERSION}/install.ps1
