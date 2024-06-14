@@ -30,7 +30,7 @@ replace (
 require (
 	github.com/rancher/aks-operator v1.9.0-rc.6
 	github.com/rancher/eks-operator v1.9.0-rc.5
-	github.com/rancher/fleet/pkg/apis v0.0.0-20231017140638-93432f288e79
+	github.com/rancher/fleet/pkg/apis v0.10.0-rc.16
 	github.com/rancher/gke-operator v1.9.0-rc.4
 	github.com/rancher/norman v0.0.0-20240503193601-9f5f6586bb5b
 	github.com/rancher/rke v1.6.0-rc6
@@ -71,7 +71,6 @@ require (
 	github.com/prometheus/common v0.44.0 // indirect
 	github.com/prometheus/procfs v0.11.1 // indirect
 	github.com/rancher/lasso v0.0.0-20240424194130-d87ec407d941 // indirect
-	github.com/rancher/wrangler v1.1.1 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	golang.org/x/net v0.26.0 // indirect
 	golang.org/x/oauth2 v0.20.0 // indirect
