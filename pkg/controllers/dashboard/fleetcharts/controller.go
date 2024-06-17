@@ -65,7 +65,8 @@ func (h *handler) onSetting(key string, setting *v3.Setting) (*v3.Setting, error
 
 	if setting.Name != settings.ServerURL.Name &&
 		setting.Name != settings.CACerts.Name &&
-		setting.Name != settings.SystemDefaultRegistry.Name {
+		setting.Name != settings.SystemDefaultRegistry.Name &&
+		setting.Name != settings.AgentTLSMode.Name {
 		return setting, nil
 	}
 
@@ -88,6 +89,7 @@ func (h *handler) onSetting(key string, setting *v3.Setting) (*v3.Setting, error
 	}
 
 	fleetChartValues := map[string]interface{}{
+		"agentTLSMode": settings.AgentTLSMode.Get(),
 		"apiServerURL": settings.ServerURL.Get(),
 		"apiServerCA":  settings.CACerts.Get(),
 		"global":       systemGlobalRegistry,
