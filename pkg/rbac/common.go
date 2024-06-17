@@ -9,7 +9,6 @@ import (
 	"github.com/rancher/norman/types"
 	mgmt "github.com/rancher/rancher/pkg/apis/management.cattle.io"
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
-	"github.com/rancher/rancher/pkg/features"
 	v32 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/ref"
@@ -237,14 +236,16 @@ func RulesFromTemplate(clusterRoles k8srbacv1.ClusterRoleCache, roleTemplates v3
 func gatherRules(clusterRoles k8srbacv1.ClusterRoleCache, roleTemplates v32.RoleTemplateCache, rt *v3.RoleTemplate, rules []rbacv1.PolicyRule, seen map[string]bool) ([]rbacv1.PolicyRule, error) {
 	seen[rt.Name] = true
 
-	if features.ExternalRules.Enabled() && rt.ExternalRules != nil {
-		rules = append(rules, rt.ExternalRules...)
-	} else if rt.External && rt.Context == "cluster" {
-		cr, err := clusterRoles.Get(rt.Name)
-		if err != nil {
-			return nil, err
+	if rt.External {
+		if rt.ExternalRules != nil {
+			rules = append(rules, rt.ExternalRules...)
+		} else if rt.Context == "cluster" {
+			cr, err := clusterRoles.Get(rt.Name)
+			if err != nil {
+				return nil, err
+			}
+			rules = append(rules, cr.Rules...)
 		}
-		rules = append(rules, cr.Rules...)
 	}
 
 	rules = append(rules, rt.Rules...)
