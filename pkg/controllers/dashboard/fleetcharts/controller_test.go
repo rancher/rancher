@@ -56,6 +56,7 @@ func Test_ChartInstallation(t *testing.T) {
 
 				manager := fake.NewMockManager(ctrl)
 				expectedValues := map[string]interface{}{
+					"agentTLSMode": settings.AgentTLSMode.Get(),
 					"apiServerURL": settings.ServerURL.Get(),
 					"apiServerCA":  settings.CACerts.Get(),
 					"global": map[string]interface{}{
@@ -109,6 +110,7 @@ func Test_ChartInstallation(t *testing.T) {
 				settings.ConfigMapName.Set("pass")
 				manager := fake.NewMockManager(ctrl)
 				expectedValues := map[string]interface{}{
+					"agentTLSMode": settings.AgentTLSMode.Get(),
 					"apiServerURL": settings.ServerURL.Get(),
 					"apiServerCA":  settings.CACerts.Get(),
 					"global": map[string]interface{}{
@@ -166,6 +168,7 @@ func Test_ChartInstallation(t *testing.T) {
 
 				manager := fake.NewMockManager(ctrl)
 				expectedValues := map[string]interface{}{
+					"agentTLSMode": settings.AgentTLSMode.Get(),
 					"apiServerURL": settings.ServerURL.Get(),
 					"apiServerCA":  settings.CACerts.Get(),
 					"global": map[string]interface{}{
@@ -222,6 +225,7 @@ gitjob:
 
 				manager := fake.NewMockManager(ctrl)
 				expectedValues := map[string]interface{}{
+					"agentTLSMode": settings.AgentTLSMode.Get(),
 					"apiServerURL": settings.ServerURL.Get(),
 					"apiServerCA":  settings.CACerts.Get(),
 					"global": map[string]interface{}{

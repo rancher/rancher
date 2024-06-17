@@ -39,6 +39,7 @@ var (
 		settings.SystemDefaultRegistry.Name: {},
 		settings.FleetMinVersion.Name:       {},
 		settings.FleetVersion.Name:          {},
+		settings.AgentTLSMode.Name:          {},
 	}
 )
 
@@ -108,6 +109,7 @@ func (h *handler) onSetting(key string, setting *v3.Setting) (*v3.Setting, error
 	}
 
 	fleetChartValues := map[string]interface{}{
+		"agentTLSMode": settings.AgentTLSMode.Get(),
 		"apiServerURL": settings.ServerURL.Get(),
 		"apiServerCA":  settings.CACerts.Get(),
 		"global":       systemGlobalRegistry,
