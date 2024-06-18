@@ -174,7 +174,7 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 		input = &apiv3.OIDCLogin{}
 		providerName = keycloakoidc.Name
 	case client.GenericOIDCProviderType:
-		input = &v32.OIDCLogin{}
+		input = &apiv3.OIDCLogin{}
 		providerName = genericoidc.Name
 	default:
 		return v3.Token{}, "", "", httperror.NewAPIError(httperror.ServerError, "unknown authentication provider")
