@@ -251,7 +251,7 @@ jobs:
       - name: Build Windows Server Image
         run: |
           docker build -t ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-windows-${{ matrix.version }} --build-arg VERSION=${{ env.COMMIT }} --build-arg SERVERCORE_VERSION=ltsc${{ matrix.version }} -f package/windows/Dockerfile.agent .
-          docker push ${{ env.IMAGE_AGENT }}:$TAG-windows-${{ matrix.version }}
+          docker push ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-windows-${{ matrix.version }}
         shell: bash
   merge-agent-manifest:
     runs-on: ubuntu-latest
