@@ -134,7 +134,6 @@ jobs:
           fi
           docker tag "$image_id" localhost:5000/${{ env.IMAGE }}:${{ env.TAG }}
           docker push localhost:5000/${{ env.IMAGE }}:${{ env.TAG }}
-          docker image ls -a  
       - name: Build agent
         id: build
         uses: docker/build-push-action@v5
