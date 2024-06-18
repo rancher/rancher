@@ -24,7 +24,7 @@ RUN GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLA
 FROM ${RANCHER_IMAGE} as rancher
 
 FROM registry.suse.com/bci/bci-base:15.5
-ARG ARCH
+ARG ARCH=amd64
 
 ENV KUBECTL_VERSION v1.25.12
 RUN zypper -n install --no-recommends curl ca-certificates jq git-core hostname iproute2 vim-small less \
