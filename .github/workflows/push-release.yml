@@ -118,7 +118,7 @@ jobs:
         id: build
         uses: docker/build-push-action@v5
         with:
-          push: ${{ github.event_name != 'pull_request' }}
+          push: true
           build-args: |
             "VERSION=${{ env.COMMIT }}"
             "COMMIT=${{ env.COMMIT }}"
@@ -212,7 +212,7 @@ jobs:
         id: build
         uses: docker/build-push-action@v5
         with:
-          push:  ${{ github.event_name != 'pull_request' }}
+          push:  true
           build-args: |
             "VERSION=${{ env.COMMIT }}"
             "ARCH=${{ matrix.arch }}"
@@ -352,7 +352,7 @@ jobs:
         id: build
         uses: docker/build-push-action@v5
         with:
-          push:  ${{ github.event_name != 'pull_request' }}
+          push:  true
           build-args: |
             "VERSION=${{ env.COMMIT }}"
             "ARCH=${{ matrix.arch }}"
