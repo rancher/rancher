@@ -1,12 +1,5 @@
 name: Validate
-on:
-  pull_request:
-  push:
-    branches:
-      - "master"
-      - "release/v*"
-    tags:
-      - "v*"
+on: [pull_request, push]
 jobs:
   validate:
     runs-on: ubuntu-latest
@@ -21,4 +14,3 @@ jobs:
           curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.54.2; \
       - name: Validate
         run: ./scripts/validate
-
