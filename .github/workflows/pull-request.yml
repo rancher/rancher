@@ -13,7 +13,7 @@ env:
   IMAGE_INSTALLER: ${{ github.repository_owner }}/system-agent-installer-rancher
   CATTLE_KDM_BRANCH: dev-v2.8
   HELM_UNITTEST_VERSION: 0.3.2
-  HELM_URL_V3: https://get.helm.sh/helm-v3.13.3-linux-amd64.tar.gz
+  HELM_VERSION_V3: v3.13.3
 jobs:
   build-chart:
     runs-on: ubuntu-latest
@@ -21,6 +21,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Install dependencies
+        env: 
+          HELM_URL_V3: https://get.helm.sh/helm-${{ env.HELM_VERSION_V3 }}-linux-amd64.tar.gz
         run: |
           sudo snap install yq
           curl ${{ env.HELM_URL_V3 }} | tar xvzf - --strip-components=1 -C /tmp/ && \
