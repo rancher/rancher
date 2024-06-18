@@ -3,8 +3,11 @@ package operations
 import (
 	"context"
 	"crypto/sha256"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/base32"
 	"fmt"
+	"net/http"
 	"regexp"
 	"sort"
 	"strconv"
@@ -12,11 +15,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
 	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/tests/v2prov/clients"
 	"github.com/rancher/rancher/tests/v2prov/cluster"
+	"github.com/rancher/rancher/tests/v2prov/objectstore"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
@@ -33,7 +39,13 @@ func RunSnapshotCreateTest(t *testing.T, clients *clients.Clients, c *v1.Cluster
 			if newErr != nil {
 				logrus.Error(newErr)
 			}
-			fmt.Printf("cluster %s etcd snapshot creation operation failed\ncluster %s test data bundle: \n%s", c.Name, c.Name, data)
+			fmt.Printf("cluster %s etcd snapshot creation operation failed\ncluster %s test data bundle: \n%s\n", c.Name, c.Name, data)
+
+			c, newErr = clients.Provisioning.Cluster().Get(c.Namespace, c.Name, metav1.GetOptions{})
+			if newErr != nil {
+				logrus.Error(newErr)
+				return
+			}
 		}
 	}()
 
@@ -242,12 +254,80 @@ func RunSnapshotCreateTest(t *testing.T, clients *clients.Clients, c *v1.Cluster
 
 func RunSnapshotRestoreTest(t *testing.T, clients *clients.Clients, c *v1.Cluster, snapshotName string, expectedConfigMap corev1.ConfigMap, expectedNodeCount int) {
 	defer func() {
-		if t.Failed() {
+		if t.Failed() || true {
 			data, newErr := cluster.GatherDebugData(clients, c)
 			if newErr != nil {
 				logrus.Error(newErr)
 			}
-			fmt.Printf("cluster %s etcd snapshot restore operation failed\ncluster %s test data bundle: \n%s", c.Name, c.Name, data)
+			fmt.Printf("cluster %s etcd snapshot restore operation failed\ncluster %s test data bundle: \n%s\n", c.Name, c.Name, data)
+
+			if c.Spec.RKEConfig != nil && c.Spec.RKEConfig.ETCDSnapshotRestore != nil {
+				var snapshot *rkev1.ETCDSnapshot
+				snapshots, newErr := clients.RKE.ETCDSnapshot().List(c.Namespace, metav1.ListOptions{})
+				if newErr != nil {
+					logrus.Error(newErr)
+					return
+				}
+				for _, s := range snapshots.Items {
+					if s.SnapshotFile.Name == snapshotName {
+						snapshot = &s
+						break
+					}
+				}
+				if snapshot == nil {
+					logrus.Error("could not find snapshot with name: %s", snapshotName)
+					return
+				}
+
+				if snapshot.SnapshotFile.S3 == nil {
+					logrus.Info("%s is not an s3 snapshot", snapshot.Name)
+					return
+				}
+
+				certPool := x509.NewCertPool()
+				certPool.AppendCertsFromPEM([]byte(c.Spec.RKEConfig.ETCD.S3.EndpointCA))
+				var tr = http.DefaultTransport
+				tr.(*http.Transport).TLSClientConfig = &tls.Config{
+					RootCAs: certPool,
+				}
+				mc, newErr := minio.New(snapshot.SnapshotFile.S3.Endpoint, &minio.Options{
+					Creds:     credentials.NewStaticV4(objectstore.SecretKeyCredAccessKey, objectstore.SecretKeyCredSecretKey, ""),
+					Secure:    false,
+					Transport: tr,
+				})
+				if newErr != nil {
+					logrus.Error(newErr)
+					return
+				}
+
+				o, newErr := mc.GetObject(context.TODO(), snapshot.SnapshotFile.S3.Bucket, snapshot.SnapshotFile.Name, minio.GetObjectOptions{})
+				if newErr != nil {
+					logrus.Error(newErr)
+					return
+				}
+
+				stat, newErr := o.Stat()
+				if newErr != nil {
+					logrus.Error(newErr)
+					return
+				}
+
+				out := make([]byte, 0, stat.Size)
+				if _, newErr = o.Read(out); newErr != nil {
+					logrus.Error(newErr)
+					return
+				}
+
+				blob, newErr := capr.CompressInterface(map[string]any{
+					"snapshot": string(out),
+				})
+				if newErr != nil {
+					logrus.Error(newErr)
+					return
+				}
+
+				fmt.Printf("cluster %s etcd snapshot s3 restore operation failed\ncluster %s snapshot file: \n%s", c.Name, c.Name, blob)
+			}
 		}
 	}()
 

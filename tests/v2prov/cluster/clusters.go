@@ -570,6 +570,42 @@ func populatePodLogs(clients *clients.Clients, runtime, podNamespace, podName st
 		}
 	}
 
+	// copy rke2-server logs to output file and copy from host
+	systemdUnit := "k3s"
+	if runtime == capr.RuntimeRKE2 {
+		systemdUnit = "rke2-server"
+	}
+
+	success := true
+	kexec := []string{
+		"exec",
+		"-v",
+		"8",
+		"-n",
+		podNamespace,
+		podName,
+		"--",
+		fmt.Sprintf(`"journalctl -u %s --no-tail > /distro.log"`, systemdUnit),
+	}
+	cmd := exec.Command("kubectl", kexec...)
+	if err := cmd.Run(); err != nil {
+		logrus.Errorf("error running kubectl command %s: %v", cmd.String(), err)
+		kexec[7] = fmt.Sprintf(`"journalctl -u %s-agent --no-tail > /distro.log"`, systemdUnit)
+		cmd = exec.Command("kubectl", kexec...)
+		if err = cmd.Run(); err != nil {
+			logrus.Errorf("error running kubectl command %s: %v", cmd.String(), err)
+			success = false
+		}
+	}
+	if success {
+		distroLogs, newErr := getPodFileContents(podNamespace, podName, fmt.Sprintf("/distro.log"))
+		if newErr != nil {
+			logrus.Errorf("error while retrieving pod distro systemd unit logs: %v", newErr)
+		} else {
+			logMap["distroLogs"] = distroLogs
+		}
+	}
+
 	return logMap
 }
 
