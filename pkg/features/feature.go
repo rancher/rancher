@@ -107,10 +107,15 @@ var (
 		true,
 		true,
 		true)
-
 	HarvesterBaremetalContainerWorkload = newFeature(
 		"harvester-baremetal-container-workload",
 		"[Experimental]: Deploy container workloads to underlying harvester cluster",
+		false,
+		true,
+		true)
+	ExternalRules = newFeature(
+		"external-rules",
+		"Enable externalRules for RoleTemplates",
 		false,
 		true,
 		true)

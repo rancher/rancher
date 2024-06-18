@@ -139,6 +139,12 @@ type RoleTemplate struct {
 	// +optional
 	External bool `json:"external"`
 
+	// ExternalRules hold the external PolicyRules that will be used for authorization.
+	// This field is required when External=true and no underlying ClusterRole exists in the local cluster.
+	// This field is just used when the feature flag 'external-rules' is on.
+	// +optional
+	ExternalRules []rbacv1.PolicyRule `json:"externalRules,omitempty"`
+
 	// Hidden if true informs the Rancher UI not to display this RoleTemplate.
 	// Default to false.
 	// +optional
