@@ -68,32 +68,27 @@ spec:
               Default to false.
             type: boolean
           externalRules:
-            description: ExternalRules hold the external PolicyRules that will be
-              used for authorization. This field is required when External=true and
-              no underlying ClusterRole exists in the local cluster. This field is
-              just used when the feature flag 'external-rules' is on.
+            description: |-
+              ExternalRules hold the external PolicyRules that will be used for authorization.
+              This field is required when External=true and no underlying ClusterRole exists in the local cluster.
+              This field is just used when the feature flag 'external-rules' is on.
             items:
-              description: PolicyRule holds information that describes a policy rule,
-                but does not contain information about who the rule applies to or
-                which namespace the rule applies to.
+              description: |-
+                PolicyRule holds information that describes a policy rule, but does not contain information
+                about who the rule applies to or which namespace the rule applies to.
               properties:
                 apiGroups:
-                  description: APIGroups is the name of the APIGroup that contains
-                    the resources.  If multiple API groups are specified, any action
-                    requested against one of the enumerated resources in any API group
-                    will be allowed. "" represents the core API group and "*" represents
-                    all API groups.
+                  description: |-
+                    APIGroups is the name of the APIGroup that contains the resources.  If multiple API groups are specified, any action requested against one of
+                    the enumerated resources in any API group will be allowed. "" represents the core API group and "*" represents all API groups.
                   items:
                     type: string
                   type: array
                 nonResourceURLs:
-                  description: NonResourceURLs is a set of partial urls that a user
-                    should have access to.  *s are allowed, but only as the full,
-                    final step in the path Since non-resource URLs are not namespaced,
-                    this field is only applicable for ClusterRoles referenced from
-                    a ClusterRoleBinding. Rules can either apply to API resources
-                    (such as "pods" or "secrets") or non-resource URL paths (such
-                    as "/api"),  but not both.
+                  description: |-
+                    NonResourceURLs is a set of partial urls that a user should have access to.  *s are allowed, but only as the full, final step in the path
+                    Since non-resource URLs are not namespaced, this field is only applicable for ClusterRoles referenced from a ClusterRoleBinding.
+                    Rules can either apply to API resources (such as "pods" or "secrets") or non-resource URL paths (such as "/api"),  but not both.
                   items:
                     type: string
                   type: array
