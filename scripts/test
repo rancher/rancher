@@ -67,7 +67,7 @@ fi
 if [ -z "${CATTLE_CHART_DEFAULT_URL}" ]; then
 # If `CATTLE_CHART_DEFAULT_URL` is not set, use the `https://github.com/rancher/charts` so GitHub is used instead of
 # the default `https://git.rancher.io/charts` to reduce the reliance and load on our Git mirror
-export CATTLE_CHART_DEFAULT_URL=https://github.com/rancher/charts
+export CATTLE_CHART_DEFAULT_URL=https://github.com/chiukapoor/charts
 fi
 
 echo Starting rancher server for test
