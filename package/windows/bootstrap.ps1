@@ -105,7 +105,7 @@ try
 {
     `$cpuLogicalProccessors = Get-WmiObject -Class Win32_ComputerSystem | Select-Object -ExpandProperty NumberOfLogicalProcessors
     if (`$cpuLogicalProccessors -le 1) {
-        Log-Fatal "The CPU resource could not satisfy the default reservation for both Windows system and Kuberentes components, please increase the CPU resource to more than 2 logic processors"
+        Log-Fatal "The CPU resource could not satisfy the default reservation for both Windows system and Kubernetes components, please increase the CPU resource to more than 2 logic processors"
     } elseif (`$cpuLogicalProccessors -lt 2) {
         Log-Warn "The CPU resource only satisfies the lowest limit for running Kubernetes components"
         Log-Warn "Please increase the CPU resource to more than 2 logic processors if you are unable to schedule Pods on this Node"
@@ -133,7 +133,7 @@ try
 
     `$ramAvailableMB = `$(Get-WmiObject -Class Win32_PerfFormattedData_PerfOS_Memory | Measure-Object -Sum -Property AvailableBytes | Select-Object -ExpandProperty Sum)/1MB
     if (`$ramAvailableMB -le 500) {
-        Log-Fatal "The RAM resource could not satisfy the default reservation for Kuberentes components, please increase the RAM resource to more than `$lowestLimitGB GB"
+        Log-Fatal "The RAM resource could not satisfy the default reservation for Kubernetes components, please increase the RAM resource to more than `$lowestLimitGB GB"
     } elseif (`$ramAvailableMB -le 600) {
         Log-Warn "The RAM resource only satisfies the lowest limit for running Kubernetes components"
         Log-Warn "Please increase the RAM resource to more than `$lowestLimitGB GB if you are unable to schedule Pods on this Node"
