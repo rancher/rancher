@@ -162,11 +162,11 @@ jobs:
       - name: Create manifest list and push
         run: |
           docker buildx imagetools create -t ${{ env.IMAGE }}:${{ env.TAG }} ${{ env.IMAGE }}:${{ env.TAG }}-amd64 ${{ env.IMAGE }}:${{ env.TAG }}-arm64
+      - name: Create head manifest list and push
+        run: |
           if [[ "${{ github.ref_name }}" == release/v* ]]; then
             docker buildx imagetools create -t ${{ env.IMAGE }}:${{ env.HEAD_TAG }} ${{ env.IMAGE }}:${{ env.TAG }}-amd64 ${{ env.IMAGE }}:${{ env.TAG }}-arm64
           fi
-      - name: Create head manifest list and push
-        run: |
       - name: Inspect image
         run: |
           docker buildx imagetools inspect ${{ env.IMAGE }}:${{ env.TAG }}
