@@ -147,6 +147,30 @@ var (
 	// ChartDefaultURL represents the default URL for the system charts repo. It should only be set for test or
 	// debug purposes.
 	ChartDefaultURL = NewSetting("chart-default-url", "https://git.rancher.io/")
+	// DisableInactiveUserAfter is the duration a user can be inactive after which it's disabled by the user retention process.
+	// The value should be expressed in valid time.Duration units and truncated to a second e.g. "168h". See https://pkg.go.dev/time#ParseDuration
+	// DisableInactiveUserAfter should be greater than AuthUserSessionTTLMinutes.
+	// An empty string or a zero value means the feature is disabled.
+	DisableInactiveUserAfter = NewSetting("disable-inactive-user-after", "")
+
+	// DeleteInactiveUserAfter is the duration a user can be inactive after which it's deleted by the user retention process.
+	// The value should be expressed in valid time.Duration units and truncated to a second e.g. "168h". See https://pkg.go.dev/time#ParseDuration
+	// DeleteInactiveUserAfter should be greater than AuthUserSessionTTLMinutes.
+	// An empty string or a zero value means the feature is disabled.
+	DeleteInactiveUserAfter = NewSetting("delete-inactive-user-after", "")
+
+	// UserRetentionDryRun determines if the user retention process should actually disable and delete users.
+	// Valid values are "true" and "false". An empty string means "false".
+	UserRetentionDryRun = NewSetting("user-retention-dry-run", "false")
+
+	// UserLastLoginDefault is used if UserAttribute.LastLogin is not set.
+	// The value should be a date and time truncated to a second and formatted according to RFC3339 e.g. "2023-03-01T00:00:00Z".
+	// If the value is an empty string or time.Time zero value this settings is not used.
+	UserLastLoginDefault = NewSetting("user-last-login-default", "")
+
+	// UserRetentionCron determines how often the user retention process should run.
+	// The value should be a valid cron expression e.g. "0 * * * *" (every hour)
+	UserRetentionCron = NewSetting("user-retention-cron", "")
 
 	// ConfigMapName name of the configmap that stores rancher configuration information.
 	// Deprecated: to be removed in 2.8.0
