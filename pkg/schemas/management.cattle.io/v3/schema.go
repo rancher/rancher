@@ -660,6 +660,19 @@ func userTypes(schema *types.Schemas) *types.Schemas {
 		MustImportAndCustomize(&Version, v3.UserAttribute{}, func(schema *types.Schema) {
 			schema.CollectionMethods = []string{}
 			schema.ResourceMethods = []string{}
+			// UserAttribute is currently unstructured and norman is unaware of the Duration type
+			// which requires us to explicitly customize user retention fields
+			// to be treated as strings.
+			// The validation of these fields is done in the webhook.
+			// Once transitioned to the structured UserAttribute, this should be removed.
+			schema.MustCustomizeField("disableAfter", func(f types.Field) types.Field {
+				f.Type = "string"
+				return f
+			})
+			schema.MustCustomizeField("deleteAfter", func(f types.Field) types.Field {
+				f.Type = "string"
+				return f
+			})
 		})
 }
 

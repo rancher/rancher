@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/rancher/norman/types"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -17,7 +18,7 @@ import (
 type fakeTokensManager struct {
 	getSecretFunc               func(userID string, provider string, fallbackTokens []*v3.Token) (string, error)
 	isMemberOfFunc              func(token v3.Token, group v3.Principal) bool
-	createTokenAndSetCookieFunc func(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerToken string, ttl int, description string, request *types.APIContext, userExtraInfo map[string][]string) error
+	createTokenAndSetCookieFunc func(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerToken string, ttl int, description string, request *types.APIContext) error
 }
 
 func (m *fakeTokensManager) GetSecret(userID string, provider string, fallbackTokens []*v3.Token) (string, error) {
@@ -34,10 +35,14 @@ func (m *fakeTokensManager) IsMemberOf(token v3.Token, group v3.Principal) bool 
 	return false
 }
 
-func (m *fakeTokensManager) CreateTokenAndSetCookie(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerToken string, ttl int, description string, request *types.APIContext, userExtraInfo map[string][]string) error {
+func (m *fakeTokensManager) CreateTokenAndSetCookie(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerToken string, ttl int, description string, request *types.APIContext) error {
 	if m.createTokenAndSetCookieFunc != nil {
-		return m.createTokenAndSetCookieFunc(userID, userPrincipal, groupPrincipals, providerToken, ttl, description, request, userExtraInfo)
+		return m.createTokenAndSetCookieFunc(userID, userPrincipal, groupPrincipals, providerToken, ttl, description, request)
 	}
+	return nil
+}
+
+func (m *fakeTokensManager) UserAttributeCreateOrUpdate(userID, provider string, groupPrincipals []v3.Principal, userExtraInfo map[string][]string, loginTime ...time.Time) error {
 	return nil
 }
 
