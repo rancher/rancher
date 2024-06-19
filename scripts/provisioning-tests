@@ -61,7 +61,7 @@ if [ -z "${SOME_K8S_VERSION}" ]; then
   if [ "$DIST" = "rke2" ]; then
     export SOME_K8S_VERSION="v1.27.10+rke2r1"
   else
-    export SOME_K8S_VERSION=$(curl https://raw.githubusercontent.com/rancher/kontainer-driver-metadata/dev-v2.9/data/data.json | jq -r ".$DIST.channels[0].latest")
+    export SOME_K8S_VERSION=$(curl https://raw.githubusercontent.com/rancher/kontainer-driver-metadata/dev-v2.9/data/data.json | jq -r ".$DIST.releases[-1].version")
   fi
 fi
 
