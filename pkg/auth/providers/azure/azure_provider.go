@@ -464,6 +464,10 @@ func samePrincipal(me v3.Principal, other v3.Principal) bool {
 
 // UpdateGroupCacheSize attempts to update the size of the group cache defined at the package level.
 func UpdateGroupCacheSize(size string) {
+	if size == "" {
+		return
+	}
+
 	i, err := strconv.Atoi(size)
 	if err != nil {
 		logrus.Errorf("error parsing azure-group-cache-size, skipping update %v", err)
