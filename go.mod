@@ -108,7 +108,7 @@ require (
 	github.com/prometheus/client_golang v1.16.0
 	github.com/prometheus/client_model v0.4.0
 	github.com/prometheus/common v0.44.0
-	github.com/rancher/aks-operator v1.2.2
+	github.com/rancher/aks-operator v1.2.3-rc.2
 	github.com/rancher/apiserver v0.0.0-20240207153744-69b3c2b56f3f
 	github.com/rancher/channelserver v0.6.1-0.20240212155841-07630c8295da
 	github.com/rancher/dynamiclistener v0.4.0
@@ -132,13 +132,13 @@ require (
 	github.com/urfave/cli v1.22.14
 	github.com/vishvananda/netlink v1.2.1-beta.2
 	github.com/vmware/govmomi v0.30.6
-	golang.org/x/crypto v0.23.0
+	golang.org/x/crypto v0.24.0
 	golang.org/x/mod v0.17.0
-	golang.org/x/net v0.25.0
+	golang.org/x/net v0.26.0
 	golang.org/x/oauth2 v0.20.0
 	golang.org/x/sync v0.7.0
-	golang.org/x/text v0.15.0
-	golang.org/x/tools v0.20.0 // indirect
+	golang.org/x/text v0.16.0
+	golang.org/x/tools v0.21.1-0.20240508182429-e35e4ccd0d2d // indirect
 	google.golang.org/api v0.153.0
 	google.golang.org/grpc v1.59.0
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c
@@ -397,8 +397,8 @@ require (
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.24.0 // indirect
-	golang.org/x/sys v0.20.0 // indirect
-	golang.org/x/term v0.20.0 // indirect
+	golang.org/x/sys v0.21.0 // indirect
+	golang.org/x/term v0.21.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.3.0 // indirect
 	google.golang.org/genproto v0.0.0-20231106174013-bbf56f31fb17 // indirect
