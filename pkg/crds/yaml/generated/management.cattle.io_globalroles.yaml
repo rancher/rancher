@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.12.0
+    controller-gen.kubebuilder.io/version: v0.14.0
   name: globalroles.management.cattle.io
 spec:
   group: management.cattle.io
@@ -28,9 +28,11 @@ spec:
           and or every downstream cluster.
         properties:
           apiVersion:
-            description: 'APIVersion defines the versioned schema of this representation
-              of an object. Servers should convert recognized schemas to the latest
-              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
             type: string
           builtin:
             description: Builtin specifies that this GlobalRole was created by Rancher
@@ -44,42 +46,37 @@ spec:
               for this resource.
             type: string
           inheritedClusterRoles:
-            description: InheritedClusterRoles are the names of RoleTemplates whose
-              permissions are granted by this GlobalRole in every cluster besides
-              the local cluster. To grant permissions in the local cluster, use the
-              Rules field.
+            description: |-
+              InheritedClusterRoles are the names of RoleTemplates whose permissions are granted by this GlobalRole in every
+              cluster besides the local cluster. To grant permissions in the local cluster, use the Rules field.
             items:
               type: string
             type: array
           inheritedFleetWorkspacePermissions:
-            description: InheritedFleetWorkspacePermissions are the permissions granted
-              by this GlobalRole in every fleet workspace besides the local one.
+            description: |-
+              InheritedFleetWorkspacePermissions are the permissions granted by this GlobalRole in every fleet workspace besides
+              the local one.
             properties:
               resourceRules:
                 description: ResourceRules rules granted in all backing namespaces
                   for all fleet workspaces besides the local one.
                 items:
-                  description: PolicyRule holds information that describes a policy
-                    rule, but does not contain information about who the rule applies
-                    to or which namespace the rule applies to.
+                  description: |-
+                    PolicyRule holds information that describes a policy rule, but does not contain information
+                    about who the rule applies to or which namespace the rule applies to.
                   properties:
                     apiGroups:
-                      description: APIGroups is the name of the APIGroup that contains
-                        the resources.  If multiple API groups are specified, any
-                        action requested against one of the enumerated resources in
-                        any API group will be allowed. "" represents the core API
-                        group and "*" represents all API groups.
+                      description: |-
+                        APIGroups is the name of the APIGroup that contains the resources.  If multiple API groups are specified, any action requested against one of
+                        the enumerated resources in any API group will be allowed. "" represents the core API group and "*" represents all API groups.
                       items:
                         type: string
                       type: array
                     nonResourceURLs:
-                      description: NonResourceURLs is a set of partial urls that a
-                        user should have access to.  *s are allowed, but only as the
-                        full, final step in the path Since non-resource URLs are not
-                        namespaced, this field is only applicable for ClusterRoles
-                        referenced from a ClusterRoleBinding. Rules can either apply
-                        to API resources (such as "pods" or "secrets") or non-resource
-                        URL paths (such as "/api"),  but not both.
+                      description: |-
+                        NonResourceURLs is a set of partial urls that a user should have access to.  *s are allowed, but only as the full, final step in the path
+                        Since non-resource URLs are not namespaced, this field is only applicable for ClusterRoles referenced from a ClusterRoleBinding.
+                        Rules can either apply to API resources (such as "pods" or "secrets") or non-resource URL paths (such as "/api"),  but not both.
                       items:
                         type: string
                       type: array
@@ -107,44 +104,42 @@ spec:
                   type: object
                 type: array
               workspaceVerbs:
-                description: WorkspaceVerbs verbs used to grant permissions to the
-                  cluster-wide fleetworkspace resources. ResourceNames for this rule
-                  will contain all fleet workspace names except local.
+                description: |-
+                  WorkspaceVerbs verbs used to grant permissions to the cluster-wide fleetworkspace resources. ResourceNames for
+                  this rule will contain all fleet workspace names except local.
                 items:
                   type: string
                 type: array
             type: object
           kind:
-            description: 'Kind is a string value representing the REST resource this
-              object represents. Servers may infer this from the endpoint the client
-              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
             type: string
           metadata:
             type: object
           namespacedRules:
             additionalProperties:
               items:
-                description: PolicyRule holds information that describes a policy
-                  rule, but does not contain information about who the rule applies
-                  to or which namespace the rule applies to.
+                description: |-
+                  PolicyRule holds information that describes a policy rule, but does not contain information
+                  about who the rule applies to or which namespace the rule applies to.
                 properties:
                   apiGroups:
-                    description: APIGroups is the name of the APIGroup that contains
-                      the resources.  If multiple API groups are specified, any action
-                      requested against one of the enumerated resources in any API
-                      group will be allowed. "" represents the core API group and
-                      "*" represents all API groups.
+                    description: |-
+                      APIGroups is the name of the APIGroup that contains the resources.  If multiple API groups are specified, any action requested against one of
+                      the enumerated resources in any API group will be allowed. "" represents the core API group and "*" represents all API groups.
                     items:
                       type: string
                     type: array
                   nonResourceURLs:
-                    description: NonResourceURLs is a set of partial urls that a user
-                      should have access to.  *s are allowed, but only as the full,
-                      final step in the path Since non-resource URLs are not namespaced,
-                      this field is only applicable for ClusterRoles referenced from
-                      a ClusterRoleBinding. Rules can either apply to API resources
-                      (such as "pods" or "secrets") or non-resource URL paths (such
-                      as "/api"),  but not both.
+                    description: |-
+                      NonResourceURLs is a set of partial urls that a user should have access to.  *s are allowed, but only as the full, final step in the path
+                      Since non-resource URLs are not namespaced, this field is only applicable for ClusterRoles referenced from a ClusterRoleBinding.
+                      Rules can either apply to API resources (such as "pods" or "secrets") or non-resource URL paths (such as "/api"),  but not both.
                     items:
                       type: string
                     type: array
@@ -171,9 +166,10 @@ spec:
                 - verbs
                 type: object
               type: array
-            description: NamespacedRules are the rules that are active in each namespace
-              of this GlobalRole. These are applied to the local cluster only. * has
-              no special meaning in the keys - these keys are read as raw strings
+            description: |-
+              NamespacedRules are the rules that are active in each namespace of this GlobalRole.
+              These are applied to the local cluster only.
+              * has no special meaning in the keys - these keys are read as raw strings
               and must exactly match with one existing namespace.
             type: object
           newUserDefault:
@@ -184,27 +180,22 @@ spec:
             description: Rules holds a list of PolicyRules that are applied to the
               local cluster only.
             items:
-              description: PolicyRule holds information that describes a policy rule,
-                but does not contain information about who the rule applies to or
-                which namespace the rule applies to.
+              description: |-
+                PolicyRule holds information that describes a policy rule, but does not contain information
+                about who the rule applies to or which namespace the rule applies to.
               properties:
                 apiGroups:
-                  description: APIGroups is the name of the APIGroup that contains
-                    the resources.  If multiple API groups are specified, any action
-                    requested against one of the enumerated resources in any API group
-                    will be allowed. "" represents the core API group and "*" represents
-                    all API groups.
+                  description: |-
+                    APIGroups is the name of the APIGroup that contains the resources.  If multiple API groups are specified, any action requested against one of
+                    the enumerated resources in any API group will be allowed. "" represents the core API group and "*" represents all API groups.
                   items:
                     type: string
                   type: array
                 nonResourceURLs:
-                  description: NonResourceURLs is a set of partial urls that a user
-                    should have access to.  *s are allowed, but only as the full,
-                    final step in the path Since non-resource URLs are not namespaced,
-                    this field is only applicable for ClusterRoles referenced from
-                    a ClusterRoleBinding. Rules can either apply to API resources
-                    (such as "pods" or "secrets") or non-resource URL paths (such
-                    as "/api"),  but not both.
+                  description: |-
+                    NonResourceURLs is a set of partial urls that a user should have access to.  *s are allowed, but only as the full, final step in the path
+                    Since non-resource URLs are not namespaced, this field is only applicable for ClusterRoles referenced from a ClusterRoleBinding.
+                    Rules can either apply to API resources (such as "pods" or "secrets") or non-resource URL paths (such as "/api"),  but not both.
                   items:
                     type: string
                   type: array
@@ -234,47 +225,47 @@ spec:
             description: Status is the most recently observed status of the GlobalRole.
             properties:
               conditions:
-                description: Conditions is a slice of Condition, indicating the status
-                  of specific backing RBAC objects. There is one condition per ClusterRole
-                  and Role managed by the GlobalRole.
+                description: |-
+                  Conditions is a slice of Condition, indicating the status of specific backing RBAC objects.
+                  There is one condition per ClusterRole and Role managed by the GlobalRole.
                 items:
                   description: "Condition contains details for one aspect of the current
-                    state of this API Resource. --- This struct is intended for direct
-                    use as an array at the field path .status.conditions.  For example,
-                    \n type FooStatus struct{ // Represents the observations of a
-                    foo's current state. // Known .status.conditions.type are: \"Available\",
-                    \"Progressing\", and \"Degraded\" // +patchMergeKey=type // +patchStrategy=merge
-                    // +listType=map // +listMapKey=type Conditions []metav1.Condition
-                    `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\"
-                    protobuf:\"bytes,1,rep,name=conditions\"` \n // other fields }"
+                    state of this API Resource.\n---\nThis struct is intended for
+                    direct use as an array at the field path .status.conditions.  For
+                    example,\n\n\n\ttype FooStatus struct{\n\t    // Represents the
+                    observations of a foo's current state.\n\t    // Known .status.conditions.type
+                    are: \"Available\", \"Progressing\", and \"Degraded\"\n\t    //
+                    +patchMergeKey=type\n\t    // +patchStrategy=merge\n\t    // +listType=map\n\t
+                    \   // +listMapKey=type\n\t    Conditions []metav1.Condition `json:\"conditions,omitempty\"
+                    patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"`\n\n\n\t
+                    \   // other fields\n\t}"
                   properties:
                     lastTransitionTime:
-                      description: lastTransitionTime is the last time the condition
-                        transitioned from one status to another. This should be when
-                        the underlying condition changed.  If that is not known, then
-                        using the time when the API field changed is acceptable.
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
                       format: date-time
                       type: string
                     message:
-                      description: message is a human readable message indicating
-                        details about the transition. This may be an empty string.
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
                       maxLength: 32768
                       type: string
                     observedGeneration:
-                      description: observedGeneration represents the .metadata.generation
-                        that the condition was set based upon. For instance, if .metadata.generation
-                        is currently 12, but the .status.conditions[x].observedGeneration
-                        is 9, the condition is out of date with respect to the current
-                        state of the instance.
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
                       format: int64
                       minimum: 0
                       type: integer
                     reason:
-                      description: reason contains a programmatic identifier indicating
-                        the reason for the condition's last transition. Producers
-                        of specific condition types may define expected values and
-                        meanings for this field, and whether the values are considered
-                        a guaranteed API. The value should be a CamelCase string.
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
                         This field may not be empty.
                       maxLength: 1024
                       minLength: 1
@@ -288,11 +279,12 @@ spec:
                       - Unknown
                       type: string
                     type:
-                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
-                        --- Many .condition.type values are consistent across resources
-                        like Available, but because arbitrary conditions can be useful
-                        (see .node.status.conditions), the ability to deconflict is
-                        important. The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
+                      description: |-
+                        type of condition in CamelCase or in foo.example.com/CamelCase.
+                        ---
+                        Many .condition.type values are consistent across resources like Available, but because arbitrary conditions can be
+                        useful (see .node.status.conditions), the ability to deconflict is important.
+                        The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
                       maxLength: 316
                       pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
                       type: string
@@ -309,8 +301,9 @@ spec:
                   was updated.
                 type: string
               observedGeneration:
-                description: ObservedGeneration is the most recent generation (metadata.generation
-                  in GlobalRole CR) observed by the controller. Populated by the system.
+                description: |-
+                  ObservedGeneration is the most recent generation (metadata.generation in GlobalRole CR)
+                  observed by the controller. Populated by the system.
                 format: int64
                 type: integer
               summary:

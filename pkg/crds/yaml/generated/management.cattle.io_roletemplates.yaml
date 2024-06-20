@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.12.0
+    controller-gen.kubebuilder.io/version: v0.14.0
   name: roletemplates.management.cattle.io
 spec:
   group: management.cattle.io
@@ -17,33 +17,37 @@ spec:
   - name: v3
     schema:
       openAPIV3Schema:
-        description: RoleTemplate holds configuration for a template that is used
-          to create kubernetes Roles and ClusterRoles (in the rbac.authorization.k8s.io
-          group) for a cluster or project.
+        description: |-
+          RoleTemplate holds configuration for a template that is used to create kubernetes Roles and ClusterRoles
+          (in the rbac.authorization.k8s.io group) for a cluster or project.
         properties:
           administrative:
-            description: Administrative if false, and context is set to cluster this
-              RoleTemplate will not grant access to "CatalogTemplates" and "CatalogTemplateVersions"
-              for any project in the cluster. Default is false.
+            description: |-
+              Administrative if false, and context is set to cluster this RoleTemplate will not grant access to "CatalogTemplates" and "CatalogTemplateVersions" for any project in the cluster.
+              Default is false.
             type: boolean
           apiVersion:
-            description: 'APIVersion defines the versioned schema of this representation
-              of an object. Servers should convert recognized schemas to the latest
-              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
             type: string
           builtin:
-            description: Builtin if true specifies that this RoleTemplate was created
-              by Rancher and is immutable. Default to false.
+            description: |-
+              Builtin if true specifies that this RoleTemplate was created by Rancher and is immutable.
+              Default to false.
             type: boolean
           clusterCreatorDefault:
-            description: ClusterCreatorDefault if true, a binding with this RoleTemplate
-              will be created for a users when they create a new cluster. ClusterCreatorDefault
-              is only evaluated if the context of the RoleTemplate is set to cluster.
+            description: |-
+              ClusterCreatorDefault if true, a binding with this RoleTemplate will be created for a users when they create a new cluster.
+              ClusterCreatorDefault is only evaluated if the context of the RoleTemplate is set to cluster.
               Default to false.
             type: boolean
           context:
-            description: Context describes if the roleTemplate applies to clusters
-              or projects. Valid values are "project", "cluster" or "".
+            description: |-
+              Context describes if the roleTemplate applies to clusters or projects.
+              Valid values are "project", "cluster" or "".
             enum:
             - project
             - cluster
@@ -57,10 +61,10 @@ spec:
               for this resource.
             type: string
           external:
-            description: External if true specifies that rules for this RoleTemplate
-              should be gathered from a ClusterRole with the matching name. If set
-              to true the Rules on the template will not be evaluated. External's
-              value is only evaluated if the RoleTemplate's context is set to "cluster"
+            description: |-
+              External if true specifies that rules for this RoleTemplate should be gathered from a ClusterRole with the matching name.
+              If set to true the Rules on the template will not be evaluated.
+              External's value is only evaluated if the RoleTemplate's context is set to "cluster"
               Default to false.
             type: boolean
           externalRules:
@@ -111,57 +115,58 @@ spec:
               type: object
             type: array
           hidden:
-            description: Hidden if true informs the Rancher UI not to display this
-              RoleTemplate. Default to false.
+            description: |-
+              Hidden if true informs the Rancher UI not to display this RoleTemplate.
+              Default to false.
             type: boolean
           kind:
-            description: 'Kind is a string value representing the REST resource this
-              object represents. Servers may infer this from the endpoint the client
-              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
             type: string
           locked:
-            description: Locked if true, new bindings will not be able to use this
-              RoleTemplate. Default to false.
+            description: |-
+              Locked if true, new bindings will not be able to use this RoleTemplate.
+              Default to false.
             type: boolean
           metadata:
             type: object
           projectCreatorDefault:
-            description: ProjectCreatorDefault if true, a binding with this RoleTemplate
-              will be created for a user when they create a new project. ProjectCreatorDefault
-              is only evaluated if the context of the RoleTemplate is set to project.
+            description: |-
+              ProjectCreatorDefault if true, a binding with this RoleTemplate will be created for a user when they create a new project.
+              ProjectCreatorDefault is only evaluated if the context of the RoleTemplate is set to project.
               Default to false.
             type: boolean
           roleTemplateNames:
-            description: RoleTemplateNames list of RoleTemplate names that this RoleTemplate
-              will inherit. This RoleTemplate will grant all rules defined in an inherited
-              RoleTemplate. Inherited RoleTemplates must already exist.
+            description: |-
+              RoleTemplateNames list of RoleTemplate names that this RoleTemplate will inherit.
+              This RoleTemplate will grant all rules defined in an inherited RoleTemplate.
+              Inherited RoleTemplates must already exist.
             items:
               type: string
             type: array
           rules:
             description: Rules hold all the PolicyRules for this RoleTemplate.
             items:
-              description: PolicyRule holds information that describes a policy rule,
-                but does not contain information about who the rule applies to or
-                which namespace the rule applies to.
+              description: |-
+                PolicyRule holds information that describes a policy rule, but does not contain information
+                about who the rule applies to or which namespace the rule applies to.
               properties:
                 apiGroups:
-                  description: APIGroups is the name of the APIGroup that contains
-                    the resources.  If multiple API groups are specified, any action
-                    requested against one of the enumerated resources in any API group
-                    will be allowed. "" represents the core API group and "*" represents
-                    all API groups.
+                  description: |-
+                    APIGroups is the name of the APIGroup that contains the resources.  If multiple API groups are specified, any action requested against one of
+                    the enumerated resources in any API group will be allowed. "" represents the core API group and "*" represents all API groups.
                   items:
                     type: string
                   type: array
                 nonResourceURLs:
-                  description: NonResourceURLs is a set of partial urls that a user
-                    should have access to.  *s are allowed, but only as the full,
-                    final step in the path Since non-resource URLs are not namespaced,
-                    this field is only applicable for ClusterRoles referenced from
-                    a ClusterRoleBinding. Rules can either apply to API resources
-                    (such as "pods" or "secrets") or non-resource URL paths (such
-                    as "/api"),  but not both.
+                  description: |-
+                    NonResourceURLs is a set of partial urls that a user should have access to.  *s are allowed, but only as the full, final step in the path
+                    Since non-resource URLs are not namespaced, this field is only applicable for ClusterRoles referenced from a ClusterRoleBinding.
+                    Rules can either apply to API resources (such as "pods" or "secrets") or non-resource URL paths (such as "/api"),  but not both.
                   items:
                     type: string
                   type: array
