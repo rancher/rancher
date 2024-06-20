@@ -347,7 +347,7 @@ func (p *ldapProvider) samlSearchGetPrincipal(
 			config.UserLoginAttribute, ldapv3.EscapeFilter(externalID),
 		)
 
-		searchRequest = ldap.NewSearchRequest(
+		searchRequest = ldap.NewWholeSubtreeSearchRequest(
 			config.UserSearchBase,
 			filter,
 			config.GetUserSearchAttributes(ObjectClass),
@@ -359,7 +359,7 @@ func (p *ldapProvider) samlSearchGetPrincipal(
 			config.GroupDNAttribute, ldapv3.EscapeFilter(externalID),
 		)
 
-		searchRequest = ldap.NewSearchRequest(
+		searchRequest = ldap.NewWholeSubtreeSearchRequest(
 			config.GroupSearchBase,
 			filter,
 			config.GetGroupSearchAttributes(ObjectClass),

@@ -44,7 +44,7 @@ func (p *ldapProvider) loginUser(lConn ldapv3.Client, credential *v32.BasicLogin
 		config.UserLoginAttribute, ldapv3.EscapeFilter(username),
 	)
 
-	searchRequest := ldap.NewSearchRequest(
+	searchRequest := ldap.NewWholeSubtreeSearchRequest(
 		config.UserSearchBase,
 		filter,
 		config.GetUserSearchAttributes(ObjectClass),
@@ -70,7 +70,7 @@ func (p *ldapProvider) loginUser(lConn ldapv3.Client, credential *v32.BasicLogin
 		return v3.Principal{}, nil, httperror.WrapAPIError(err, httperror.ServerError, "server error while authenticating")
 	}
 
-	searchOpRequest := ldap.NewSearchRequest(
+	searchOpRequest := ldap.NewWholeSubtreeSearchRequest(
 		userDN,
 		fmt.Sprintf("(%v=%v)", ObjectClass, config.UserObjectClass),
 		operationalAttrList,
@@ -301,17 +301,18 @@ func (p *ldapProvider) getPrincipal(distinguishedName string, scope string, conf
 		return nil, fmt.Errorf("Error in ldap bind: %v", err)
 	}
 
+	var attrs []string
 	if strings.EqualFold("user", entityType) {
-		search = ldapv3.NewSearchRequest(distinguishedName,
-			ldapv3.ScopeBaseObject, ldapv3.NeverDerefAliases, 0, 0, false,
-			filter,
-			config.GetUserSearchAttributes(ObjectClass), nil)
+		attrs = config.GetUserSearchAttributes(ObjectClass)
 	} else {
-		search = ldapv3.NewSearchRequest(distinguishedName,
-			ldapv3.ScopeBaseObject, ldapv3.NeverDerefAliases, 0, 0, false,
-			filter,
-			config.GetGroupSearchAttributes(ObjectClass), nil)
+		attrs = config.GetGroupSearchAttributes(ObjectClass)
 	}
+
+	search = ldap.NewBaseObjectSearchRequest(
+		distinguishedName,
+		filter,
+		attrs,
+	)
 
 	result, err := lConn.Search(search)
 	if err != nil {
@@ -402,7 +403,7 @@ func (p *ldapProvider) searchLdap(query string, scope string, config *v3.LdapCon
 	entityType := strings.Split(scope, "_")[1]
 	searchDomain := config.UserSearchBase
 	if strings.EqualFold("user", entityType) {
-		search = ldap.NewSearchRequest(
+		search = ldap.NewWholeSubtreeSearchRequest(
 			searchDomain,
 			query,
 			config.GetUserSearchAttributes(ObjectClass),
@@ -411,7 +412,7 @@ func (p *ldapProvider) searchLdap(query string, scope string, config *v3.LdapCon
 		if config.GroupSearchBase != "" {
 			searchDomain = config.GroupSearchBase
 		}
-		search = ldap.NewSearchRequest(
+		search = ldap.NewWholeSubtreeSearchRequest(
 			searchDomain,
 			query,
 			config.GetGroupSearchAttributes(ObjectClass),
@@ -500,14 +501,10 @@ func (p *ldapProvider) RefetchGroupPrincipals(principalID string, secret string)
 		return nil, err
 	}
 
-	searchRequest := ldapv3.NewSearchRequest(
+	searchRequest := ldap.NewBaseObjectSearchRequest(
 		distinguishedName,
-		ldapv3.ScopeBaseObject,
-		ldapv3.NeverDerefAliases,
-		0, 0, false,
 		fmt.Sprintf("(%v=%v)", ObjectClass, config.UserObjectClass),
 		config.GetUserSearchAttributes(ObjectClass),
-		nil,
 	)
 
 	result, err := lConn.Search(searchRequest)
@@ -523,14 +520,10 @@ func (p *ldapProvider) RefetchGroupPrincipals(principalID string, secret string)
 
 	userDN := result.Entries[0].DN //userDN is externalID
 
-	searchOpRequest := ldapv3.NewSearchRequest(
+	searchOpRequest := ldap.NewBaseObjectSearchRequest(
 		userDN,
-		ldapv3.ScopeBaseObject,
-		ldapv3.NeverDerefAliases,
-		0, 0, false,
 		fmt.Sprintf("(%v=%v)", ObjectClass, config.UserObjectClass),
 		operationalAttrList,
-		nil,
 	)
 	opResult, err := lConn.Search(searchOpRequest)
 	if err != nil {

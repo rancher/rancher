@@ -221,7 +221,7 @@ func GatherParentGroups(groupPrincipal v3.Principal, searchDomain string, groupS
 		config.ObjectClass, config.GroupObjectClass,
 	)
 
-	searchGroup := NewSearchRequest(
+	searchGroup := NewWholeSubtreeSearchRequest(
 		searchDomain,
 		filter,
 		searchAttributes,
@@ -283,17 +283,26 @@ func NewCAPool(cert string) (*x509.CertPool, error) {
 	return pool, nil
 }
 
-// NewSearchRequest will return a new *ldapv3.SearchRequest based on some fixed common arguments:
-// - Scope (ScopeWholeSubtree)
+// NewWholeSubtreeSearchRequest will return a NewDefaultSearchRequest with a ScopeWholeSubtree scope
+func NewWholeSubtreeSearchRequest(baseDN, filter string, attributes []string) *ldapv3.SearchRequest {
+	return NewDefaultSearchRequest(baseDN, filter, ldapv3.ScopeWholeSubtree, attributes)
+}
+
+// NewBaseObjectSearchRequest will return a NewDefaultSearchRequest with a ScopeBaseObject scope
+func NewBaseObjectSearchRequest(baseDN, filter string, attributes []string) *ldapv3.SearchRequest {
+	return NewDefaultSearchRequest(baseDN, filter, ldapv3.ScopeBaseObject, attributes)
+}
+
+// NewDefaultSearchRequest will return a new *ldapv3.SearchRequest based on some fixed common arguments:
 // - DerefAliases (NeverDerefAliases)
 // - SizeLimit (0)
 // - TimeLimit (0)
 // - TypesOnly (false)
 // - Controls (nil)
-func NewSearchRequest(baseDN, filter string, attributes []string) *ldapv3.SearchRequest {
+func NewDefaultSearchRequest(baseDN, filter string, scope int, attributes []string) *ldapv3.SearchRequest {
 	return ldapv3.NewSearchRequest(
 		baseDN,                   // BaseDN
-		ldapv3.ScopeWholeSubtree, // Scope
+		scope,                    // Scope
 		ldapv3.NeverDerefAliases, // DerefAliases
 		0,                        // SizeLimit
 		0,                        // TimeLimit

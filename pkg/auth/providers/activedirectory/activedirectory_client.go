@@ -60,7 +60,7 @@ func (p *adProvider) loginUser(adCredential *v32.BasicLogin, config *v32.ActiveD
 	query := fmt.Sprintf("(%v=%v)", config.UserLoginAttribute, ldapv3.EscapeFilter(samName))
 	logrus.Debugf("LDAP Search query: {%s}", query)
 
-	search := ldap.NewSearchRequest(
+	search := ldap.NewWholeSubtreeSearchRequest(
 		config.UserSearchBase,
 		query,
 		config.GetUserSearchAttributes(MemberOfAttribute, ObjectClass),
@@ -122,16 +122,10 @@ func (p *adProvider) RefetchGroupPrincipals(principalID string, secret string) (
 
 	logrus.Debugf("LDAP Refetch principals base DN : {%s}", dn)
 
-	search := ldapv3.NewSearchRequest(
+	search := ldap.NewBaseObjectSearchRequest(
 		dn,
-		ldapv3.ScopeBaseObject,
-		ldapv3.NeverDerefAliases,
-		0,
-		0,
-		false,
 		fmt.Sprintf("(%v=%v)", ObjectClass, config.UserObjectClass),
 		config.GetUserSearchAttributes(MemberOfAttribute, ObjectClass),
-		nil,
 	)
 
 	result, err := lConn.Search(search)
@@ -264,7 +258,7 @@ func (p *adProvider) getGroupPrincipalsFromSearch(searchBase string, filter stri
 	var groupPrincipals []v3.Principal
 	var nilPrincipal []v3.Principal
 
-	search := ldap.NewSearchRequest(
+	search := ldap.NewWholeSubtreeSearchRequest(
 		searchBase,
 		filter,
 		config.GetGroupSearchAttributes(ObjectClass),
@@ -375,17 +369,18 @@ func (p *adProvider) getPrincipal(distinguishedName string, scope string, config
 		return nil, fmt.Errorf("Error in ldap bind: %v", err)
 	}
 
+	var attrs []string
 	if strings.EqualFold(UserScope, scope) {
-		search = ldapv3.NewSearchRequest(distinguishedName,
-			ldapv3.ScopeBaseObject, ldapv3.NeverDerefAliases, 0, 0, false,
-			filter,
-			config.GetUserSearchAttributes(MemberOfAttribute, ObjectClass), nil)
+		attrs = config.GetUserSearchAttributes(MemberOfAttribute, ObjectClass)
 	} else {
-		search = ldapv3.NewSearchRequest(distinguishedName,
-			ldapv3.ScopeBaseObject, ldapv3.NeverDerefAliases, 0, 0, false,
-			filter,
-			config.GetGroupSearchAttributes(MemberOfAttribute, ObjectClass), nil)
+		attrs = config.GetGroupSearchAttributes(MemberOfAttribute, ObjectClass)
 	}
+
+	search = ldap.NewBaseObjectSearchRequest(
+		distinguishedName,
+		filter,
+		attrs,
+	)
 
 	result, err := lConn.Search(search)
 	if err != nil {
@@ -464,7 +459,7 @@ func (p *adProvider) searchLdap(query string, scope string, config *v32.ActiveDi
 
 	searchDomain := config.UserSearchBase
 	if strings.EqualFold(UserScope, scope) {
-		search = ldap.NewSearchRequest(
+		search = ldap.NewWholeSubtreeSearchRequest(
 			searchDomain,
 			query,
 			config.GetUserSearchAttributes(MemberOfAttribute, ObjectClass),
@@ -473,7 +468,7 @@ func (p *adProvider) searchLdap(query string, scope string, config *v32.ActiveDi
 		if config.GroupSearchBase != "" {
 			searchDomain = config.GroupSearchBase
 		}
-		search = ldap.NewSearchRequest(
+		search = ldap.NewWholeSubtreeSearchRequest(
 			searchDomain,
 			query,
 			config.GetGroupSearchAttributes(MemberOfAttribute, ObjectClass),
