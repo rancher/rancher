@@ -13,9 +13,15 @@ CATTLE_RANCHER_PROVISIONING_CAPI_VERSION=$(yq -e '.provisioningCAPIVersion' "$fi
 CATTLE_CSP_ADAPTER_MIN_VERSION=$(yq -e '.cspAdapterMinVersion' "$file")
 CATTLE_DEFAULT_SHELL_VERSION=$(yq -e '.defaultShellVersion' "$file")
 CATTLE_FLEET_VERSION=$(yq -e '.fleetVersion' "$file")
+SYSTEM_CHART_DEFAULT_BRANCH=$(yq -e '.systemChartDefaultBranch' "$file")
+CHART_DEFAULT_BRANCH=$(yq -e '.chartDefaultBranch' "$file")
+CATTLE_KDM_BRANCH=$(yq -e '.kdmBranch' "$file")
 
 export CATTLE_RANCHER_WEBHOOK_VERSION
 export CATTLE_RANCHER_PROVISIONING_CAPI_VERSION
 export CATTLE_CSP_ADAPTER_MIN_VERSION
 export CATTLE_DEFAULT_SHELL_VERSION
 export CATTLE_FLEET_VERSION
+export SYSTEM_CHART_DEFAULT_BRANCH
+export CHART_DEFAULT_BRANCH
+export CATTLE_KDM_BRANCH
