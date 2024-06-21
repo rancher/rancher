@@ -2,6 +2,7 @@ package oidc
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -381,18 +382,18 @@ func (o *OpenIDCProvider) getUserInfo(ctx *context.Context, config *v32.OIDCConf
 		return userInfo, oauth2Token, err
 	}
 	oauthConfig := ConfigToOauthConfig(provider.Endpoint(), config)
-	var idToken *oidc.IDToken
 	var verifier = provider.Verifier(&oidc.Config{ClientID: config.ClientID})
 	if err := json.Unmarshal([]byte(authCode), &oauth2Token); err != nil {
 		oauth2Token, err = oauthConfig.Exchange(updatedContext, authCode, oauth2.SetAuthURLParam("scope", strings.Join(oauthConfig.Scopes, " ")))
 		if err != nil {
 			return userInfo, oauth2Token, err
 		}
-		idToken, err = verifier.Verify(updatedContext, oauth2Token.AccessToken)
+		_, err = verifier.Verify(updatedContext, oauth2Token.AccessToken)
 		if err != nil {
 			return userInfo, oauth2Token, err
 		}
 	}
+
 	// Valid will return false if access token is expired
 	if !oauth2Token.Valid() {
 		// since token is not valid, the TokenSource func will attempt to refresh the access token
@@ -408,14 +409,23 @@ func (o *OpenIDCProvider) getUserInfo(ctx *context.Context, config *v32.OIDCConf
 	}
 
 	if config.AcrValue != "" {
-		var claims struct {
-			ACR string `json:"acr"`
+		tokenClaims := make(map[string]interface{})
+		segments := strings.Split(oauth2Token.AccessToken, ".")
+		if len(segments) < 2 {
+			return userInfo, oauth2Token, errors.New("invalid access token format")
 		}
-		if err = idToken.Claims(&claims); err != nil {
-			return userInfo, oauth2Token, fmt.Errorf("extracting claims: %w", err)
+		decodedClaims, err := base64.URLEncoding.DecodeString(segments[1])
+		if err != nil {
+			return userInfo, oauth2Token, fmt.Errorf("decoding token claims: %w", err)
 		}
-		// If an ACR value is configured, validate the value in the claim
-		if !isValidACR(claims.ACR, config.AcrValue) {
+		if err := json.Unmarshal(decodedClaims, &tokenClaims); err != nil {
+			return userInfo, oauth2Token, fmt.Errorf("parsing token claims: %w", err)
+		}
+		acrValue, ok := tokenClaims["acr"].(string)
+		if !ok {
+			return userInfo, oauth2Token, errors.New("acr claim not found in token")
+		}
+		if !isValidACR(acrValue, config.AcrValue) {
 			return userInfo, oauth2Token, errors.New("failed to validate ACR")
 		}
 	}
