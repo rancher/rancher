@@ -409,21 +409,9 @@ func (o *OpenIDCProvider) getUserInfo(ctx *context.Context, config *v32.OIDCConf
 	}
 
 	if config.AcrValue != "" {
-		tokenClaims := make(map[string]interface{})
-		segments := strings.Split(oauth2Token.AccessToken, ".")
-		if len(segments) < 2 {
-			return userInfo, oauth2Token, errors.New("invalid access token format")
-		}
-		decodedClaims, err := base64.URLEncoding.DecodeString(segments[1])
+		acrValue, err := parseACRFromAccessToken(oauth2Token.AccessToken)
 		if err != nil {
-			return userInfo, oauth2Token, fmt.Errorf("decoding token claims: %w", err)
-		}
-		if err := json.Unmarshal(decodedClaims, &tokenClaims); err != nil {
-			return userInfo, oauth2Token, fmt.Errorf("parsing token claims: %w", err)
-		}
-		acrValue, ok := tokenClaims["acr"].(string)
-		if !ok {
-			return userInfo, oauth2Token, errors.New("acr claim not found in token")
+			return userInfo, oauth2Token, fmt.Errorf("failed to parse ACR from access token: %w", err)
 		}
 		if !isValidACR(acrValue, config.AcrValue) {
 			return userInfo, oauth2Token, errors.New("failed to validate ACR")
@@ -555,4 +543,24 @@ func isValidACR(claimACR string, configuredACR string) bool {
 		return false
 	}
 	return true
+}
+
+func parseACRFromAccessToken(accessToken string) (string, error) {
+	tokenClaims := make(map[string]interface{})
+	segments := strings.Split(accessToken, ".")
+	if len(segments) < 2 {
+		return "", errors.New("invalid access token format")
+	}
+	decodedClaims, err := base64.URLEncoding.DecodeString(segments[1])
+	if err != nil {
+		return "", fmt.Errorf("decoding token claims: %w", err)
+	}
+	if err := json.Unmarshal(decodedClaims, &tokenClaims); err != nil {
+		return "", fmt.Errorf("parsing token claims: %w", err)
+	}
+	acrValue, ok := tokenClaims["acr"].(string)
+	if !ok {
+		return "", errors.New("acr claim not found in token")
+	}
+	return acrValue, nil
 }
