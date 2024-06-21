@@ -63,6 +63,8 @@ spec:
           requiredDuringSchedulingIgnoredDuringExecution:
             nodeSelectorTerms: {{ include "linux-node-selector-terms" . | nindent 14 }}
       tolerations: {{ include "linux-node-tolerations" . | nindent 8 }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
       - image: {{ .Values.rancherImage }}:{{ default .Chart.AppVersion .Values.rancherImageTag }}
         imagePullPolicy: {{ default "IfNotPresent" .Values.rancherImagePullPolicy }}
@@ -172,6 +174,8 @@ spec:
           failureThreshold: {{.Values.readinessProbe.failureThreshold }}
         resources:
 {{ toYaml .Values.resources | indent 10 }}
+        securityContext:
+          {{- toYaml .Values.securityContext | nindent 10 }}
         volumeMounts:
 {{- if .Values.additionalTrustedCAs }}
         - mountPath: /etc/pki/trust/anchors/ca-additional.pem

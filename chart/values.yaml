@@ -115,6 +115,12 @@ replicas: 3
 # Set priorityClassName to avoid eviction
 priorityClassName: rancher-critical
 
+# Set security context for the Rancher pod.
+podSecurityContext: {}
+
+# Set security context for the Rancher container.
+securityContext: {}
+
 # Set pod resource requests/limits for Rancher.
 resources: {}
 
