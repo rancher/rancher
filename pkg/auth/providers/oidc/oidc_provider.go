@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/coreos/go-oidc/v3/oidc"
-	"github.com/golang-jwt/jwt"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
@@ -380,14 +379,14 @@ func (o *OpenIDCProvider) getUserInfo(ctx *context.Context, config *v32.OIDCConf
 		return userInfo, oauth2Token, err
 	}
 	oauthConfig := ConfigToOauthConfig(provider.Endpoint(), config)
-
+	var idToken *oidc.IDToken
 	var verifier = provider.Verifier(&oidc.Config{ClientID: config.ClientID})
 	if err := json.Unmarshal([]byte(authCode), &oauth2Token); err != nil {
 		oauth2Token, err = oauthConfig.Exchange(updatedContext, authCode, oauth2.SetAuthURLParam("scope", strings.Join(oauthConfig.Scopes, " ")))
 		if err != nil {
 			return userInfo, oauth2Token, err
 		}
-		_, err = verifier.Verify(updatedContext, oauth2Token.AccessToken)
+		idToken, err = verifier.Verify(updatedContext, oauth2Token.AccessToken)
 		if err != nil {
 			return userInfo, oauth2Token, err
 		}
@@ -405,9 +404,19 @@ func (o *OpenIDCProvider) getUserInfo(ctx *context.Context, config *v32.OIDCConf
 	if !reflect.DeepEqual(oauth2Token, reusedToken) {
 		o.UpdateToken(reusedToken, userName)
 	}
-	// If an ACR value is configured, validate the value in the claim
-	if config.AcrValue != "" && !validateACR(oauth2Token, config) {
-		return userInfo, oauth2Token, errors.New("failed to validate ACR")
+	var claims struct {
+		ACR string `json:"acr"`
+	}
+
+	if err = idToken.Claims(&claims); err != nil {
+		return userInfo, oauth2Token, fmt.Errorf("extracting claims: %w", err)
+	}
+
+	if config.AcrValue != "" {
+		// If an ACR value is configured, validate the value in the claim
+		if !isValidACR(claims.ACR, config.AcrValue) {
+			return userInfo, oauth2Token, errors.New("failed to validate ACR")
+		}
 	}
 
 	logrus.Debugf("[generic oidc] getUserInfo: getting user info")
@@ -524,23 +533,13 @@ func (o *OpenIDCProvider) getOIDCProvider(ctx context.Context, oidcConfig *v32.O
 	return oidc.NewProvider(ctx, oidcConfig.Issuer)
 }
 
-func validateACR(oauth2Token *oauth2.Token, config *v32.OIDCConfig) bool {
+func isValidACR(claimACR string, configuredACR string) bool {
 	// if we have no ACR configured, all values are accepted
-	if config.AcrValue == "" {
+	if configuredACR == "" {
 		return true
 	}
-	tokenClaims := make(jwt.MapClaims)
-	_, _, err := new(jwt.Parser).ParseUnverified(oauth2Token.AccessToken, &tokenClaims)
-	if err != nil {
-		logrus.Infof("unable to parse acr from access token: %v", err)
-		return false
-	}
-	acr, ok := tokenClaims["acr"].(string)
-	if !ok {
-		logrus.Errorf("acr value could not be parsed")
-		return false
-	}
-	if acr != config.AcrValue {
+
+	if claimACR != configuredACR {
 		logrus.Infof("acr value in token does not match configured acr value")
 		return false
 	}
