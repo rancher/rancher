@@ -187,9 +187,11 @@ func (o *OpenIDCProvider) TransformToAuthProvider(authConfig map[string]interfac
 }
 
 func (o *OpenIDCProvider) getRedirectURL(config map[string]interface{}) string {
+	authURL, _ := FetchAuthURL(config)
+
 	return fmt.Sprintf(
 		"%s?client_id=%s&response_type=code&redirect_uri=%s",
-		config["authEndpoint"],
+		authURL,
 		config["clientId"],
 		config["rancherUrl"],
 	)
@@ -404,15 +406,14 @@ func (o *OpenIDCProvider) getUserInfo(ctx *context.Context, config *v32.OIDCConf
 	if !reflect.DeepEqual(oauth2Token, reusedToken) {
 		o.UpdateToken(reusedToken, userName)
 	}
-	var claims struct {
-		ACR string `json:"acr"`
-	}
-
-	if err = idToken.Claims(&claims); err != nil {
-		return userInfo, oauth2Token, fmt.Errorf("extracting claims: %w", err)
-	}
 
 	if config.AcrValue != "" {
+		var claims struct {
+			ACR string `json:"acr"`
+		}
+		if err = idToken.Claims(&claims); err != nil {
+			return userInfo, oauth2Token, fmt.Errorf("extracting claims: %w", err)
+		}
 		// If an ACR value is configured, validate the value in the claim
 		if !isValidACR(claims.ACR, config.AcrValue) {
 			return userInfo, oauth2Token, errors.New("failed to validate ACR")
