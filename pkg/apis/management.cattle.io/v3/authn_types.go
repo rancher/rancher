@@ -525,7 +525,7 @@ type OIDCConfig struct {
 	ClientSecret       string `json:"clientSecret,omitempty" norman:"required,type=password"`
 	RancherURL         string `json:"rancherUrl" norman:"required,notnullable"`
 	Issuer             string `json:"issuer" norman:"required,notnullable"`
-	AuthEndpoint       string `json:"authEndpoint,omitempty" norman:"required,notnullable"`
+	AuthEndpoint       string `json:"authEndpoint,omitempty"`
 	TokenEndpoint      string `json:"tokenEndpoint,omitempty"`
 	UserInfoEndpoint   string `json:"userInfoEndpoint,omitempty"`
 	JWKSUrl            string `json:"jwksUrl,omitempty"`
