@@ -14,7 +14,14 @@ spec:
     singular: globalrole
   scope: Cluster
   versions:
-  - name: v3
+  - additionalPrinterColumns:
+    - jsonPath: .status.summary
+      name: STATUS
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v3
     schema:
       openAPIV3Schema:
         description: GlobalRole defines rules that can be applied to the local cluster

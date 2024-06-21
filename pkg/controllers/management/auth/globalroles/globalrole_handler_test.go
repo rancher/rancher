@@ -1664,3 +1664,78 @@ func TestSetGRAsCompleted(t *testing.T) {
 		})
 	}
 }
+
+func TestSetGRAsTerminating(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		oldGR        *v3.GlobalRole
+		updateReturn error
+		wantError    bool
+	}{
+		{
+			name: "update gr status to Terminating",
+			oldGR: &v3.GlobalRole{
+				Status: mgmtv3.GlobalRoleStatus{
+					Summary: SummaryCompleted,
+					Conditions: []metav1.Condition{
+						{
+							Type:   "test",
+							Status: metav1.ConditionTrue,
+						},
+					},
+				},
+			},
+			updateReturn: nil,
+			wantError:    false,
+		},
+		{
+			name: "update gr with empty status to Terminating",
+			oldGR: &v3.GlobalRole{
+				Status: mgmtv3.GlobalRoleStatus{},
+			},
+			updateReturn: nil,
+			wantError:    false,
+		},
+		{
+			name:         "update gr with nil status to Terminating",
+			oldGR:        &v3.GlobalRole{},
+			updateReturn: nil,
+			wantError:    false,
+		},
+		{
+			name:         "update gr fails",
+			oldGR:        &v3.GlobalRole{},
+			updateReturn: fmt.Errorf("error"),
+			wantError:    true,
+		},
+	}
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			grLifecycle := globalRoleLifecycle{}
+			ctrl := gomock.NewController(t)
+
+			grClientMock := fake.NewMockNonNamespacedControllerInterface[*v3.GlobalRole, *v3.GlobalRoleList](ctrl)
+			var updatedGR *v3.GlobalRole
+			grClientMock.EXPECT().UpdateStatus(gomock.Any()).AnyTimes().DoAndReturn(
+				func(gr *v3.GlobalRole) (*v3.GlobalRole, error) {
+					updatedGR = gr
+					return updatedGR, test.updateReturn
+				},
+			)
+			grLifecycle.grClient = grClientMock
+
+			err := grLifecycle.setGRAsTerminating(test.oldGR)
+			if test.wantError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+			require.Empty(t, updatedGR.Status.Conditions)
+			require.Equal(t, SummaryTerminating, updatedGR.Status.Summary)
+		})
+	}
+}
