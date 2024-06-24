@@ -18,6 +18,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
+const (
+	grOwnerLabel = "authz.management.cattle.io/gr-owner"
+)
+
 var (
 	globalRoleLabel       = map[string]string{"authz.management.cattle.io/globalrole": "true"}
 	crNameAnnotation      = "authz.management.cattle.io/cr-name"
@@ -25,20 +29,26 @@ var (
 	clusterRoleKind       = "ClusterRole"
 )
 
+type fleetPermissionsRoleHandler interface {
+	reconcileFleetWorkspacePermissions(globalRole *v3.GlobalRole) error
+}
+
 func newGlobalRoleLifecycle(management *config.ManagementContext) *globalRoleLifecycle {
 	return &globalRoleLifecycle{
-		crLister: management.RBAC.ClusterRoles("").Controller().Lister(),
-		crClient: management.RBAC.ClusterRoles(""),
-		rLister:  management.RBAC.Roles("").Controller().Lister(),
-		rClient:  management.RBAC.Roles(""),
+		crLister:                management.RBAC.ClusterRoles("").Controller().Lister(),
+		crClient:                management.RBAC.ClusterRoles(""),
+		rLister:                 management.RBAC.Roles("").Controller().Lister(),
+		rClient:                 management.RBAC.Roles(""),
+		fleetPermissionsHandler: newFleetWorkspaceRoleHandler(management),
 	}
 }
 
 type globalRoleLifecycle struct {
-	crLister rbacv1.ClusterRoleLister
-	crClient rbacv1.ClusterRoleInterface
-	rLister  rbacv1.RoleLister
-	rClient  rbacv1.RoleInterface
+	crLister                rbacv1.ClusterRoleLister
+	crClient                rbacv1.ClusterRoleInterface
+	rLister                 rbacv1.RoleLister
+	rClient                 rbacv1.RoleInterface
+	fleetPermissionsHandler fleetPermissionsRoleHandler
 }
 
 func (gr *globalRoleLifecycle) Create(obj *v3.GlobalRole) (runtime.Object, error) {
@@ -48,6 +58,10 @@ func (gr *globalRoleLifecycle) Create(obj *v3.GlobalRole) (runtime.Object, error
 		returnError = multierror.Append(returnError, err)
 	}
 	err = gr.reconcileCatalogRole(obj)
+	if err != nil {
+		returnError = multierror.Append(returnError, err)
+	}
+	err = gr.fleetPermissionsHandler.reconcileFleetWorkspacePermissions(obj)
 	if err != nil {
 		returnError = multierror.Append(returnError, err)
 	}
@@ -61,6 +75,10 @@ func (gr *globalRoleLifecycle) Updated(obj *v3.GlobalRole) (runtime.Object, erro
 		returnError = multierror.Append(returnError, err)
 	}
 	err = gr.reconcileCatalogRole(obj)
+	if err != nil {
+		returnError = multierror.Append(returnError, err)
+	}
+	err = gr.fleetPermissionsHandler.reconcileFleetWorkspacePermissions(obj)
 	if err != nil {
 		returnError = multierror.Append(returnError, err)
 	}

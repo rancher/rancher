@@ -39,26 +39,28 @@ const (
 	TemplateVersionResourceRule        = "templateversions"
 	localClusterName                   = "local"
 	grbOwnerLabel                      = "authz.management.cattle.io/grb-owner"
+	fleetWorkspacePermissionLabel      = "authz.management.cattle.io/fleet-workspace-permissions"
 )
 
 func newGlobalRoleBindingLifecycle(management *config.ManagementContext, clusterManager *clustermanager.Manager) *globalRoleBindingLifecycle {
 	management.Wrangler.Mgmt.ClusterRoleTemplateBinding().Cache().AddIndexer(crtbGrbOwnerIndex, crtbGrbOwnerIndexer)
 	return &globalRoleBindingLifecycle{
-		clusters:          management.Management.Clusters(""),
-		clusterLister:     management.Management.Clusters("").Controller().Lister(),
-		projectLister:     management.Management.Projects("").Controller().Lister(),
-		clusterManager:    clusterManager,
-		clusterRoles:      management.RBAC.ClusterRoles(""),
-		crbClient:         management.RBAC.ClusterRoleBindings(""),
-		crbLister:         management.RBAC.ClusterRoleBindings("").Controller().Lister(),
-		crLister:          management.RBAC.ClusterRoles("").Controller().Lister(),
-		crtbClient:        management.Management.ClusterRoleTemplateBindings(""),
-		crtbCache:         management.Wrangler.Mgmt.ClusterRoleTemplateBinding().Cache(),
-		grLister:          management.Management.GlobalRoles("").Controller().Lister(),
-		roles:             management.RBAC.Roles(""),
-		roleLister:        management.RBAC.Roles("").Controller().Lister(),
-		roleBindings:      management.RBAC.RoleBindings(""),
-		roleBindingLister: management.RBAC.RoleBindings("").Controller().Lister(),
+		clusters:                management.Management.Clusters(""),
+		clusterLister:           management.Management.Clusters("").Controller().Lister(),
+		projectLister:           management.Management.Projects("").Controller().Lister(),
+		clusterManager:          clusterManager,
+		clusterRoles:            management.RBAC.ClusterRoles(""),
+		crbClient:               management.RBAC.ClusterRoleBindings(""),
+		crbLister:               management.RBAC.ClusterRoleBindings("").Controller().Lister(),
+		crLister:                management.RBAC.ClusterRoles("").Controller().Lister(),
+		crtbClient:              management.Management.ClusterRoleTemplateBindings(""),
+		crtbCache:               management.Wrangler.Mgmt.ClusterRoleTemplateBinding().Cache(),
+		grLister:                management.Management.GlobalRoles("").Controller().Lister(),
+		roles:                   management.RBAC.Roles(""),
+		roleLister:              management.RBAC.Roles("").Controller().Lister(),
+		roleBindings:            management.RBAC.RoleBindings(""),
+		roleBindingLister:       management.RBAC.RoleBindings("").Controller().Lister(),
+		fleetPermissionsHandler: newFleetWorkspaceBindingHandler(management),
 	}
 }
 
@@ -72,22 +74,27 @@ func crtbGrbOwnerIndexer(crtb *v3.ClusterRoleTemplateBinding) ([]string, error) 
 	return []string{fmt.Sprintf("%s/%s", crtb.ClusterName, grbOwner)}, nil
 }
 
+type fleetPermissionsHandler interface {
+	reconcileFleetWorkspacePermissionsBindings(globalRoleBinding *v3.GlobalRoleBinding) error
+}
+
 type globalRoleBindingLifecycle struct {
-	clusters          v3.ClusterInterface
-	clusterLister     v3.ClusterLister
-	projectLister     v3.ProjectLister
-	clusterManager    *clustermanager.Manager
-	clusterRoles      rbacv1.ClusterRoleInterface
-	crLister          rbacv1.ClusterRoleLister
-	crbClient         rbacv1.ClusterRoleBindingInterface
-	crbLister         rbacv1.ClusterRoleBindingLister
-	crtbCache         mgmtcontroller.ClusterRoleTemplateBindingCache
-	crtbClient        v3.ClusterRoleTemplateBindingInterface
-	grLister          v3.GlobalRoleLister
-	roles             rbacv1.RoleInterface
-	roleLister        rbacv1.RoleLister
-	roleBindings      rbacv1.RoleBindingInterface
-	roleBindingLister rbacv1.RoleBindingLister
+	clusters                v3.ClusterInterface
+	clusterLister           v3.ClusterLister
+	projectLister           v3.ProjectLister
+	clusterManager          *clustermanager.Manager
+	clusterRoles            rbacv1.ClusterRoleInterface
+	crLister                rbacv1.ClusterRoleLister
+	crbClient               rbacv1.ClusterRoleBindingInterface
+	crbLister               rbacv1.ClusterRoleBindingLister
+	crtbCache               mgmtcontroller.ClusterRoleTemplateBindingCache
+	crtbClient              v3.ClusterRoleTemplateBindingInterface
+	grLister                v3.GlobalRoleLister
+	roles                   rbacv1.RoleInterface
+	roleLister              rbacv1.RoleLister
+	roleBindings            rbacv1.RoleBindingInterface
+	roleBindingLister       rbacv1.RoleBindingLister
+	fleetPermissionsHandler fleetPermissionsHandler
 }
 
 func (grb *globalRoleBindingLifecycle) Create(obj *v3.GlobalRoleBinding) (runtime.Object, error) {
@@ -101,6 +108,10 @@ func (grb *globalRoleBindingLifecycle) Create(obj *v3.GlobalRoleBinding) (runtim
 	if err != nil {
 		returnError = multierror.Append(returnError, err)
 	}
+	err = grb.fleetPermissionsHandler.reconcileFleetWorkspacePermissionsBindings(obj)
+	if err != nil {
+		returnError = multierror.Append(returnError, err)
+	}
 	return obj, returnError
 }
 
@@ -111,6 +122,10 @@ func (grb *globalRoleBindingLifecycle) Updated(obj *v3.GlobalRoleBinding) (runti
 		returnError = multierror.Append(returnError, err)
 	}
 	err = grb.reconcileGlobalRoleBinding(obj)
+	if err != nil {
+		returnError = multierror.Append(returnError, err)
+	}
+	err = grb.fleetPermissionsHandler.reconcileFleetWorkspacePermissionsBindings(obj)
 	if err != nil {
 		returnError = multierror.Append(returnError, err)
 	}

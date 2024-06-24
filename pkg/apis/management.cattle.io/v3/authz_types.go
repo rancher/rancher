@@ -171,6 +171,20 @@ type GlobalRole struct {
 	// cluster besides the local cluster. To grant permissions in the local cluster, use the Rules field.
 	// +optional
 	InheritedClusterRoles []string `json:"inheritedClusterRoles,omitempty"`
+
+	// InheritedFleetWorkspacePermissions are the permissions granted by this GlobalRole in every fleet workspace besides
+	// the local one.
+	// +optional
+	InheritedFleetWorkspacePermissions *FleetWorkspacePermission `json:"inheritedFleetWorkspacePermissions,omitempty"`
+}
+
+// FleetWorkspacePermission defines permissions that will apply to all fleet workspaces except local.
+type FleetWorkspacePermission struct {
+	// ResourceRules rules granted in all backing namespaces for all fleet workspaces besides the local one.
+	ResourceRules []rbacv1.PolicyRule `json:"resourceRules,omitempty" yaml:"resourceRules,omitempty"`
+	// WorkspaceVerbs verbs used to grant permissions to the cluster-wide fleetworkspace resources. ResourceNames for
+	// this rule will contain all fleet workspace names except local.
+	WorkspaceVerbs []string `json:"workspaceVerbs,omitempty" yaml:"workspaceVerbs,omitempty"`
 }
 
 // +genclient

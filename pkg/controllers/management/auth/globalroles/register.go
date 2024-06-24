@@ -15,6 +15,9 @@ const (
 
 func Register(ctx context.Context, management *config.ManagementContext, clusterManager *clustermanager.Manager) {
 	management.Wrangler.Mgmt.GlobalRoleBinding().Cache().AddIndexer(grbGrIndex, grbGrIndexer)
+	management.Wrangler.Mgmt.GlobalRoleBinding().Cache().AddIndexer(grbSafeConcatIndex, grbSafeConcatIndexer)
+	management.Wrangler.Mgmt.GlobalRole().Cache().AddIndexer(grSafeConcatIndex, grSafeConcatIndexer)
+
 	enqueuer := globalRBACEnqueuer{
 		grbCache:      management.Wrangler.Mgmt.GlobalRoleBinding().Cache(),
 		grCache:       management.Wrangler.Mgmt.GlobalRole().Cache(),
@@ -23,6 +26,10 @@ func Register(ctx context.Context, management *config.ManagementContext, cluster
 	relatedresource.WatchClusterScoped(ctx, grbEnqueuer, enqueuer.enqueueGRBs, management.Wrangler.Mgmt.GlobalRoleBinding(), management.Wrangler.Mgmt.GlobalRole())
 	relatedresource.WatchClusterScoped(ctx, clusterGrEnqueuer, enqueuer.clusterEnqueueGRs, management.Wrangler.Mgmt.GlobalRole(), management.Wrangler.Mgmt.Cluster())
 	relatedresource.WatchClusterScoped(ctx, crtbGRBEnqueuer, enqueuer.crtbEnqueueGRB, management.Wrangler.Mgmt.GlobalRoleBinding(), management.Wrangler.Mgmt.ClusterRoleTemplateBinding())
+
+	relatedresource.WatchClusterScoped(ctx, fleetWorkspaceGrbEnqueuer, enqueuer.fleetWorkspaceEnqueueGR, management.Wrangler.Mgmt.GlobalRole(), management.Wrangler.Mgmt.FleetWorkspace())
+	relatedresource.WatchClusterScoped(ctx, clusterRoleEnqueuer, enqueuer.clusterRoleEnqueueGR, management.Wrangler.Mgmt.GlobalRole(), management.Wrangler.RBAC.ClusterRole())
+	relatedresource.WatchClusterScoped(ctx, clusterRoleBindingEnqueuer, enqueuer.clusterRoleBindingEnqueueGRB, management.Wrangler.Mgmt.GlobalRoleBinding(), management.Wrangler.RBAC.ClusterRoleBinding())
 
 	gr := newGlobalRoleLifecycle(management.WithAgent(grController))
 	grb := newGlobalRoleBindingLifecycle(management.WithAgent(grbController), clusterManager)

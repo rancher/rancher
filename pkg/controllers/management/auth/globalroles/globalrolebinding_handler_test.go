@@ -9,6 +9,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	apisv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
+	rbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
 	rbacFakes "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1/fakes"
 	"github.com/rancher/wrangler/v2/pkg/generic/fake"
 	"github.com/stretchr/testify/require"
@@ -67,6 +68,7 @@ type testStateChanges struct {
 	createdCRTBs     []*v3.ClusterRoleTemplateBinding
 	createdCRBs      []*v1.ClusterRoleBinding
 	deletedCRTBNames []string
+	fwhCalled        bool
 }
 type testState struct {
 	crtbCacheMock     *fake.MockCacheInterface[*v3.ClusterRoleTemplateBinding]
@@ -75,6 +77,7 @@ type testState struct {
 	clusterListerMock *fakes.ClusterListerMock
 	crtbClientMock    *fakes.ClusterRoleTemplateBindingInterfaceMock
 	crbClientMock     *rbacFakes.ClusterRoleBindingInterfaceMock
+	fwhMock           *fleetPermissionsHandlerMock
 	stateChanges      *testStateChanges
 }
 
@@ -165,6 +168,11 @@ func TestCreateUpdate(t *testing.T) {
 					state.stateChanges.createdCRBs = append(state.stateChanges.createdCRBs, crb)
 					return crb, nil
 				}
+				// mocks for fleet workspace permissions
+				state.fwhMock.reconcileFleetWorkspacePermissionsFunc = func(globalRoleBinding *v3.GlobalRoleBinding) error {
+					state.stateChanges.fwhCalled = true
+					return nil
+				}
 			},
 			stateAssertions: func(stateChanges testStateChanges) {
 				require.Len(stateChanges.t, stateChanges.createdCRTBs, 1)
@@ -194,6 +202,8 @@ func TestCreateUpdate(t *testing.T) {
 				require.Equal(stateChanges.t, v1.Subject{Name: userName, Kind: "User", APIGroup: v1.GroupName}, crb.Subjects[0])
 				require.Equal(stateChanges.t, "true", crb.Labels["authz.management.cattle.io/globalrolebinding"])
 
+				// fleet workspace assertions
+				require.Equal(stateChanges.t, true, stateChanges.fwhCalled)
 			},
 			inputBinding: grb.DeepCopy(),
 			wantBinding:  addAnnotation(&grb),
@@ -230,6 +240,12 @@ func TestCreateUpdate(t *testing.T) {
 					state.stateChanges.createdCRBs = append(state.stateChanges.createdCRBs, crb)
 					return crb, nil
 				}
+
+				// mocks for fleet workspace permissions
+				state.fwhMock.reconcileFleetWorkspacePermissionsFunc = func(globalRoleBinding *v3.GlobalRoleBinding) error {
+					state.stateChanges.fwhCalled = true
+					return nil
+				}
 			},
 			stateAssertions: func(stateChanges testStateChanges) {
 				require.Len(stateChanges.t, stateChanges.createdCRTBs, 0)
@@ -250,6 +266,8 @@ func TestCreateUpdate(t *testing.T) {
 				require.Equal(stateChanges.t, v1.Subject{Name: userName, Kind: "User", APIGroup: v1.GroupName}, crb.Subjects[0])
 				require.Equal(stateChanges.t, "true", crb.Labels["authz.management.cattle.io/globalrolebinding"])
 
+				// fleet workspace assertions
+				require.Equal(stateChanges.t, true, stateChanges.fwhCalled)
 			},
 			inputBinding: grb.DeepCopy(),
 			wantBinding:  addAnnotation(&grb),
@@ -288,6 +306,12 @@ func TestCreateUpdate(t *testing.T) {
 					state.stateChanges.createdCRBs = append(state.stateChanges.createdCRBs, crb)
 					return nil, fmt.Errorf("server not available")
 				}
+
+				// mocks for fleet workspace permissions
+				state.fwhMock.reconcileFleetWorkspacePermissionsFunc = func(globalRoleBinding *v3.GlobalRoleBinding) error {
+					state.stateChanges.fwhCalled = true
+					return nil
+				}
 			},
 			stateAssertions: func(stateChanges testStateChanges) {
 				require.Len(stateChanges.t, stateChanges.createdCRTBs, 1)
@@ -317,6 +341,8 @@ func TestCreateUpdate(t *testing.T) {
 				require.Equal(stateChanges.t, v1.Subject{Name: userName, Kind: "User", APIGroup: v1.GroupName}, crb.Subjects[0])
 				require.Equal(stateChanges.t, "true", crb.Labels["authz.management.cattle.io/globalrolebinding"])
 
+				// fleet workspace assertions
+				require.Equal(stateChanges.t, true, stateChanges.fwhCalled)
 			},
 			inputBinding: grb.DeepCopy(),
 			wantBinding:  &grb,
@@ -347,6 +373,12 @@ func TestCreateUpdate(t *testing.T) {
 					state.stateChanges.createdCRBs = append(state.stateChanges.createdCRBs, crb)
 					return nil, fmt.Errorf("server not available")
 				}
+
+				// mocks for fleet workspace permissions
+				state.fwhMock.reconcileFleetWorkspacePermissionsFunc = func(globalRoleBinding *v3.GlobalRoleBinding) error {
+					state.stateChanges.fwhCalled = true
+					return nil
+				}
 			},
 			stateAssertions: func(stateChanges testStateChanges) {
 				require.Len(stateChanges.t, stateChanges.createdCRTBs, 0)
@@ -364,9 +396,86 @@ func TestCreateUpdate(t *testing.T) {
 				require.Equal(stateChanges.t, v1.Subject{Name: userName, Kind: "User", APIGroup: v1.GroupName}, crb.Subjects[0])
 				require.Equal(stateChanges.t, "true", crb.Labels["authz.management.cattle.io/globalrolebinding"])
 
+				// fleet workspace assertions
+				require.Equal(stateChanges.t, true, stateChanges.fwhCalled)
 			},
 			inputBinding: grb.DeepCopy(),
 			wantBinding:  &grb,
+			wantError:    true,
+		},
+		{
+			name: "success on cluster and global permissions, failure on fleet workspace permissions",
+			stateSetup: func(state testState) {
+				// mocks for both cluster and global permissions
+				state.grListerMock.GetFunc = func(namespace, name string) (*v3.GlobalRole, error) {
+					if name == gr.Name && namespace == "" {
+						return &gr, nil
+					}
+					return nil, fmt.Errorf("not found")
+				}
+				// mocks for just cluster permissions
+				state.crtbCacheMock.EXPECT().GetByIndex(crtbGrbOwnerIndex, "local/test-grb").Return([]*v3.ClusterRoleTemplateBinding{}, nil)
+				state.crtbCacheMock.EXPECT().GetByIndex(crtbGrbOwnerIndex, "not-local/test-grb").Return([]*v3.ClusterRoleTemplateBinding{}, nil).Times(2)
+				state.crtbClientMock.CreateFunc = func(crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
+					state.stateChanges.createdCRTBs = append(state.stateChanges.createdCRTBs, crtb)
+					return crtb, nil
+				}
+				state.crtbClientMock.DeleteNamespacedFunc = func(_ string, name string, _ *metav1.DeleteOptions) error {
+					state.stateChanges.deletedCRTBNames = append(state.stateChanges.deletedCRTBNames, name)
+					return nil
+				}
+				state.clusterListerMock.ListFunc = func(namespace string, selector labels.Selector) ([]*v3.Cluster, error) {
+					return []*v3.Cluster{&notLocalCluster, &localCluster}, nil
+				}
+
+				// mocks for just global permissions
+				state.crbListerMock.GetFunc = func(namespace, name string) (*rbacv1.ClusterRoleBinding, error) {
+					return nil, fmt.Errorf("not found")
+				}
+				state.crbClientMock.CreateFunc = func(crb *rbacv1.ClusterRoleBinding) (*rbacv1.ClusterRoleBinding, error) {
+					state.stateChanges.createdCRBs = append(state.stateChanges.createdCRBs, crb)
+					return crb, nil
+				}
+
+				// mocks for fleet workspace permissions
+				state.fwhMock.reconcileFleetWorkspacePermissionsFunc = func(globalRoleBinding *v3.GlobalRoleBinding) error {
+					state.stateChanges.fwhCalled = true
+					return fmt.Errorf("unavailable")
+				}
+			},
+			stateAssertions: func(stateChanges testStateChanges) {
+				require.Len(stateChanges.t, stateChanges.createdCRTBs, 1)
+				require.Len(stateChanges.t, stateChanges.createdCRBs, 1)
+				require.Len(stateChanges.t, stateChanges.deletedCRTBNames, 0)
+
+				// cluster assertions
+				crtb := stateChanges.createdCRTBs[0]
+				require.Equal(stateChanges.t, "not-local", crtb.ClusterName)
+				require.Equal(stateChanges.t, "not-local", crtb.Namespace)
+				require.Equal(stateChanges.t, "test-grb", crtb.Labels[grbOwnerLabel])
+				require.Equal(stateChanges.t, "test-grb", crtb.Labels[grbOwnerLabel])
+				require.Equal(stateChanges.t, readOnlyRoleName, crtb.RoleTemplateName)
+				require.Equal(stateChanges.t, userName, crtb.UserName)
+				require.Equal(stateChanges.t, "", crtb.GroupPrincipalName)
+				require.Len(stateChanges.t, crtb.OwnerReferences, 1)
+				require.Equal(stateChanges.t, grbOwnerRef, crtb.OwnerReferences[0])
+
+				// global assertions
+				crb := stateChanges.createdCRBs[0]
+				bindingName := "cattle-globalrolebinding-" + grb.Name
+				roleName := "cattle-globalrole-" + gr.Name
+				require.Equal(stateChanges.t, bindingName, crb.Name)
+				require.Len(stateChanges.t, crb.OwnerReferences, 1)
+				require.Equal(stateChanges.t, grbOwnerRef, crb.OwnerReferences[0])
+				require.Equal(stateChanges.t, v1.RoleRef{Name: roleName, Kind: "ClusterRole"}, crb.RoleRef)
+				require.Equal(stateChanges.t, v1.Subject{Name: userName, Kind: "User", APIGroup: rbacv1.GroupName}, crb.Subjects[0])
+				require.Equal(stateChanges.t, "true", crb.Labels["authz.management.cattle.io/globalrolebinding"])
+
+				// fleet workspace assertions
+				require.Equal(stateChanges.t, true, stateChanges.fwhCalled)
+			},
+			inputBinding: grb.DeepCopy(),
+			wantBinding:  addAnnotation(&grb),
 			wantError:    true,
 		},
 	}
@@ -385,6 +494,8 @@ func TestCreateUpdate(t *testing.T) {
 				clusterListerMock := fakes.ClusterListerMock{}
 				crtbClientMock := fakes.ClusterRoleTemplateBindingInterfaceMock{}
 				crbClientMock := rbacFakes.ClusterRoleBindingInterfaceMock{}
+				fphMock := fleetPermissionsHandlerMock{}
+
 				stateChanges := testStateChanges{
 					t:                t,
 					createdCRTBs:     []*v3.ClusterRoleTemplateBinding{},
@@ -399,6 +510,7 @@ func TestCreateUpdate(t *testing.T) {
 					crtbClientMock:    &crtbClientMock,
 					crbClientMock:     &crbClientMock,
 					stateChanges:      &stateChanges,
+					fwhMock:           &fphMock,
 				}
 				if test.stateSetup != nil {
 					test.stateSetup(state)
@@ -409,6 +521,7 @@ func TestCreateUpdate(t *testing.T) {
 				grbLifecycle.clusterLister = &clusterListerMock
 				grbLifecycle.crtbClient = &crtbClientMock
 				grbLifecycle.crbClient = &crbClientMock
+				grbLifecycle.fleetPermissionsHandler = &fphMock
 				res, resErr := testFunc(test.inputBinding)
 				require.Equal(t, test.wantBinding, res)
 				if test.wantError {
@@ -1145,4 +1258,12 @@ func Test_reconcileClusterPermissions(t *testing.T) {
 		})
 	}
 
+}
+
+type fleetPermissionsHandlerMock struct {
+	reconcileFleetWorkspacePermissionsFunc func(globalRoleBinding *v3.GlobalRoleBinding) error
+}
+
+func (f *fleetPermissionsHandlerMock) reconcileFleetWorkspacePermissionsBindings(globalRoleBinding *v3.GlobalRoleBinding) error {
+	return f.reconcileFleetWorkspacePermissionsFunc(globalRoleBinding)
 }
