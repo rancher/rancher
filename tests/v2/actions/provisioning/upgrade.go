@@ -14,6 +14,7 @@ func UpgradeClusterK8sVersion(client *rancher.Client, clusterName *string, upgra
 	if err != nil {
 		return nil, err
 	}
+
 	if clusterMeta == nil {
 		return nil, fmt.Errorf("cluster %s not found", *clusterName)
 	}
