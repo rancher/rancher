@@ -69,7 +69,7 @@ func (g GUID) Hex() string {
 // New returns a GUID object
 func New(encoded []byte) (GUID, error) {
 	if len(encoded) != 16 {
-		return nil, errors.New("invalid length")
+		return nil, errors.New("cannot create GUID from encoded bytes: invalid length")
 	}
 
 	return GUID(encoded), nil
@@ -84,7 +84,7 @@ func Parse(uuid string) (GUID, error) {
 	uuid = strings.ReplaceAll(uuid, "-", "")
 	uuidBytes, err := hex.DecodeString(uuid)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cannot decode uuid string '%s' to hex: %w", uuid, err)
 	}
 
 	swap(uuidBytes)
