@@ -29,13 +29,16 @@ func (h *handler) syncAuthConfig(_ string, authConfig *apimgmtv3.AuthConfig) (ru
 
 	switch authConfig.Type {
 	case client.ShibbolethConfigType:
-		obj, err := h.migrateAuthConfigPasswordToSecret(authConfig, h.migrateShibbolethSecrets)
+		obj, err := h.migrateAuthConfigPasswordToSecret(authConfig,
+			apimgmtv3.AuthConfigConditionSecretsMigrated, h.migrateShibbolethSecrets)
 		if err != nil {
 			return obj, err
 		}
 		return h.fixShibbolethSecretReference(obj)
 	case client.OKTAConfigType:
-		return h.migrateAuthConfigPasswordToSecret(authConfig, h.migrateOKTASecrets)
+		return h.migrateAuthConfigPasswordToSecret(authConfig,
+			apimgmtv3.AuthConfigOKTAPasswordMigrated,
+			h.migrateOKTASecrets)
 	default:
 		return h.migrateAuthConfig(authConfig)
 	}
@@ -58,12 +61,12 @@ func (h *handler) migrateAuthConfig(authConfig *apimgmtv3.AuthConfig) (runtime.O
 	return updated, nil
 }
 
-func (h *handler) migrateAuthConfigPasswordToSecret(authConfig *apimgmtv3.AuthConfig, f func(map[string]any) (runtime.Object, error)) (runtime.Object, error) {
-	if apimgmtv3.AuthConfigConditionSecretsMigrated.IsTrue(authConfig) {
+func (h *handler) migrateAuthConfigPasswordToSecret(authConfig *apimgmtv3.AuthConfig, cond condition.Cond, f func(map[string]any) (runtime.Object, error)) (runtime.Object, error) {
+	if cond.IsTrue(authConfig) {
 		return authConfig, nil
 	}
 
-	updated, err := apimgmtv3.AuthConfigConditionSecretsMigrated.DoUntilTrue(authConfig, func() (runtime.Object, error) {
+	updated, err := cond.DoUntilTrue(authConfig, func() (runtime.Object, error) {
 		unstructuredConfig, err := getUnstructuredAuthConfigByName(h.authConfigs, authConfig.Name)
 		if err != nil {
 			return nil, err
@@ -173,12 +176,10 @@ func (h *handler) migrateOKTASecrets(unstructuredConfig map[string]any) (runtime
 	if err != nil {
 		return nil, fmt.Errorf("unable to decode OKTAConfig: %w", err)
 	}
-
 	if oktaConfig.OpenLdapConfig.ServiceAccountPassword == "" {
 		// OpenLDAP is not configured, so nothing else is needed
 		return oktaConfig, nil
 	}
-
 	secretName := fmt.Sprintf("%s-%s", strings.ToLower(oktaConfig.Type), serviceAccountPasswordFieldName)
 	lowercaseFieldName := strings.ToLower(serviceAccountPasswordFieldName)
 
