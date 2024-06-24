@@ -10,12 +10,16 @@ import (
 	"github.com/rancher/rancher/tests/v2/validation/provisioning/registries"
 	"github.com/rancher/shepherd/clients/corral"
 	"github.com/rancher/shepherd/clients/rancher"
+	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
 	"github.com/rancher/shepherd/extensions/clusters"
 	"github.com/rancher/shepherd/extensions/clusters/kubernetesversions"
 	provisioning "github.com/rancher/shepherd/extensions/provisioning"
 	"github.com/rancher/shepherd/extensions/provisioninginput"
 	"github.com/rancher/shepherd/extensions/reports"
+	"github.com/rancher/shepherd/extensions/users"
+	password "github.com/rancher/shepherd/extensions/users/passwordgenerator"
 	"github.com/rancher/shepherd/pkg/config"
+	namegen "github.com/rancher/shepherd/pkg/namegenerator"
 	"github.com/rancher/shepherd/pkg/session"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
@@ -51,7 +55,25 @@ func (a *AirGapK3SCustomClusterTestSuite) SetupSuite() {
 	client, err := rancher.NewClient("", testSession)
 	require.NoError(a.T(), err)
 
-	a.client = client
+	var testuser = namegen.AppendRandomString("testuser-")
+	var testpassword = password.GenerateUserPassword("testpass-")
+	enabled := true
+
+	user := &management.User{
+		Username: testuser,
+		Password: testpassword,
+		Name:     testuser,
+		Enabled:  &enabled,
+	}
+
+	newUser, err := users.CreateUserWithRole(client, user, "user")
+	require.NoError(a.T(), err)
+
+	standardUserClient, err := client.AsUser(newUser)
+	require.NoError(a.T(), err)
+
+	a.client = standardUserClient
+
 	listOfCorrals, err := corral.ListCorral()
 	require.NoError(a.T(), err)
 
@@ -83,44 +105,73 @@ func (a *AirGapK3SCustomClusterTestSuite) SetupSuite() {
 }
 
 func (a *AirGapK3SCustomClusterTestSuite) TestProvisioningAirGapK3SCustomCluster() {
-	a.clustersConfig.MachinePools = []provisioninginput.MachinePools{provisioninginput.AllRolesMachinePool}
+	nodeRolesAll := []provisioninginput.MachinePools{provisioninginput.AllRolesMachinePool}
+	nodeRolesShared := []provisioninginput.MachinePools{provisioninginput.EtcdControlPlaneMachinePool, provisioninginput.WorkerMachinePool}
+	nodeRolesDedicated := []provisioninginput.MachinePools{provisioninginput.EtcdMachinePool, provisioninginput.ControlPlaneMachinePool, provisioninginput.WorkerMachinePool}
 
 	tests := []struct {
-		name   string
-		client *rancher.Client
+		name        string
+		client      *rancher.Client
+		machinePool []provisioninginput.MachinePools
 	}{
-		{provisioninginput.AdminClientName.String() + "-" + permutations.K3SAirgapCluster + "-", a.client},
+		{"1 Node All Roles " + provisioninginput.StandardClientName.String() + "-" + permutations.K3SAirgapCluster + "-", a.client, nodeRolesAll},
+		{"2 nodes - etcd|cp roles per 1 node " + provisioninginput.StandardClientName.String() + "-" + permutations.K3SAirgapCluster + "-", a.client, nodeRolesShared},
+		{"3 nodes - 1 role per node " + provisioninginput.StandardClientName.String() + "-" + permutations.K3SAirgapCluster + "-", a.client, nodeRolesDedicated},
 	}
 	for _, tt := range tests {
+
+		a.clustersConfig.MachinePools = tt.machinePool
 		permutations.RunTestPermutations(&a.Suite, tt.name, tt.client, a.clustersConfig, permutations.K3SAirgapCluster, nil, a.corralPackage)
 	}
 
 }
 
 func (a *AirGapK3SCustomClusterTestSuite) TestProvisioningUpgradeAirGapK3SCustomCluster() {
-	a.clustersConfig.MachinePools = []provisioninginput.MachinePools{provisioninginput.AllRolesMachinePool}
+	nodeRolesAll := []provisioninginput.MachinePools{provisioninginput.AllRolesMachinePool}
+	nodeRolesShared := []provisioninginput.MachinePools{provisioninginput.EtcdControlPlaneMachinePool, provisioninginput.WorkerMachinePool}
+	nodeRolesDedicated := []provisioninginput.MachinePools{provisioninginput.EtcdMachinePool, provisioninginput.ControlPlaneMachinePool, provisioninginput.WorkerMachinePool}
 
-	k3sVersions, err := kubernetesversions.ListK3SAllVersions(a.client)
-	require.NoError(a.T(), err)
+	tests := []struct {
+		name        string
+		client      *rancher.Client
+		machinePool []provisioninginput.MachinePools
+	}{
+		{"1 Node All Roles " + provisioninginput.StandardClientName.String() + "-" + permutations.K3SAirgapCluster + "-", a.client, nodeRolesAll},
+		{"2 nodes - etcd|cp roles per 1 node " + provisioninginput.StandardClientName.String() + "-" + permutations.K3SAirgapCluster + "-", a.client, nodeRolesShared},
+		{"3 nodes - 1 role per node " + provisioninginput.StandardClientName.String() + "-" + permutations.K3SAirgapCluster + "-", a.client, nodeRolesDedicated},
+	}
 
-	numOfK3SVersions := len(k3sVersions)
-	require.Equal(a.T(), len(a.clustersConfig.CNIs), 1)
+	for _, tt := range tests {
 
-	a.clustersConfig.K3SKubernetesVersions[0] = k3sVersions[numOfK3SVersions-2]
-	testConfig := clusters.ConvertConfigToClusterConfig(a.clustersConfig)
-	testConfig.KubernetesVersion = a.clustersConfig.K3SKubernetesVersions[0]
-	testConfig.CNI = a.clustersConfig.CNIs[0]
-	clusterObject, err := provisioning.CreateProvisioningAirgapCustomCluster(a.client, testConfig, a.corralPackage)
-	reports.TimeoutClusterReport(clusterObject, err)
-	require.NoError(a.T(), err)
+		a.clustersConfig.MachinePools = tt.machinePool
+		k3sVersions, err := kubernetesversions.ListK3SAllVersions(a.client)
+		require.NoError(a.T(), err)
 
-	provisioning.VerifyCluster(a.T(), a.client, testConfig, clusterObject)
+		numOfK3SVersions := len(k3sVersions)
+		require.Equal(a.T(), len(a.clustersConfig.CNIs), 1)
 
-	upgradedCluster, err := provisioning.UpgradeClusterK8sVersion(a.client, &clusterObject.Name, &k3sVersions[numOfK3SVersions-1])
-	reports.TimeoutClusterReport(clusterObject, err)
-	require.NoError(a.T(), err)
+		a.clustersConfig.K3SKubernetesVersions[0] = k3sVersions[numOfK3SVersions-2]
+		testConfig := clusters.ConvertConfigToClusterConfig(a.clustersConfig)
+		testConfig.KubernetesVersion = a.clustersConfig.K3SKubernetesVersions[0]
+		testConfig.CNI = a.clustersConfig.CNIs[0]
 
-	provisioning.VerifyUpgrade(a.T(), upgradedCluster, k3sVersions[numOfK3SVersions-1])
+		versionToUpgrade := k3sVersions[numOfK3SVersions-1]
+		tt.name += testConfig.KubernetesVersion + " to " + versionToUpgrade
+		a.Run(tt.name, func() {
+			clusterObject, err := provisioning.CreateProvisioningAirgapCustomCluster(a.client, testConfig, a.corralPackage)
+			require.NoError(a.T(), err)
+
+			reports.TimeoutClusterReport(clusterObject, err)
+			require.NoError(a.T(), err)
+
+			provisioning.VerifyCluster(a.T(), a.client, testConfig, clusterObject)
+
+			upgradedCluster, err := provisioning.UpgradeClusterK8sVersion(a.client, &clusterObject.Name, &versionToUpgrade)
+			require.NoError(a.T(), err)
+
+			provisioning.VerifyUpgrade(a.T(), upgradedCluster, versionToUpgrade)
+		})
+	}
 }
 
 // In order for 'go test' to run this suite, we need to create
