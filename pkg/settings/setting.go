@@ -239,7 +239,7 @@ var (
 	UIBrand = NewSetting("ui-brand", os.Getenv("CATTLE_BASE_UI_BRAND"))
 
 	// UICommunityLinks displays community links in the UI.
-	// Deprecated in favour of UICustomLinks = NewSetting("ui-custom-links", "").
+	// Deprecated in favour of UICustomLinks.
 	UICommunityLinks = NewSetting("ui-community-links", "true")
 
 	// UICustomLinks Key(display text), value(url) for user customisable links to display in homepage and support pages.
@@ -318,8 +318,17 @@ var (
 	// This setting is for development purposes only.
 	SkipHostedClusterChartInstallation = NewSetting("skip-hosted-cluster-chart-installation", os.Getenv("CATTLE_SKIP_HOSTED_CLUSTER_CHART_INSTALLATION"))
 	MachineProvisionImagePullPolicy    = NewSetting("machine-provision-image-pull-policy", string(v1.PullAlways))
-	// EULAAgreed is used only by the UI, but needs to be known to Rancher so that it's not removed.
-	EULAAgreed = NewSetting("eula-agreed", "")
+
+	// The following settings are only used by the UI, but need to be known to Rancher so that they're not removed.
+	_ = NewSetting("eula-agreed", "")
+	_ = NewSetting("display-add-extension-repos-banner", "")
+	_ = NewSetting("ui-logo-light", "")
+	_ = NewSetting("ui-logo-dark", "")
+	_ = NewSetting("ui-theme", "")
+	_ = NewSetting("cli-version", "")
+	_ = NewSetting("has-support", "")
+	_ = NewSetting("auth-password-requirements-description", "")
+	_ = NewSetting("api-host", "")
 )
 
 // FullShellImage returns the full private registry name of the rancher shell image.
