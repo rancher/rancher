@@ -212,7 +212,7 @@ RUN curl -sLf ${!TINI_URL} > /usr/bin/tini && \
     mkdir -p /var/lib/rancher-data/driver-metadata
 
 ENV CATTLE_UI_VERSION 2.9.0-alpha5
-ENV CATTLE_DASHBOARD_UI_VERSION v2.9.0-alpha5
+ENV CATTLE_DASHBOARD_UI_VERSION v2.9.0-alpha6
 ENV CATTLE_CLI_VERSION v2.9.0-rc1
 
 # Base UI brand used as a fallback env setting (not user facing) to indicate this is a non-prime install
