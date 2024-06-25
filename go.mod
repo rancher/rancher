@@ -2,6 +2,8 @@ module github.com/rancher/rancher
 
 go 1.21
 
+replace github.com/rancher/steve => github.com/rancher/steve v0.0.0-20240625145244-cc404c56c079
+
 replace (
 	github.com/containerd/containerd => github.com/containerd/containerd v1.6.22 // for compatibilty with docker 20.10.x
 	github.com/docker/distribution => github.com/docker/distribution v2.8.2+incompatible // rancher-machine requires a replace is set
