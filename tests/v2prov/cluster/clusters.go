@@ -90,6 +90,19 @@ func New(clients *clients.Clients, cluster *provisioningv1api.Cluster) (*provisi
 				DisableSnapshots: true,
 			}
 		}
+
+		// If an override is specified for a data directory, and one is not explicitly set for the cluster, use it
+		if dir := defaults.DistroDataDir; cluster.Spec.RKEConfig.DataDirectories.K8sDistro == "" {
+			cluster.Spec.RKEConfig.DataDirectories.K8sDistro = dir
+		}
+
+		if dir := defaults.ProvisioningDataDir; cluster.Spec.RKEConfig.DataDirectories.Provisioning == "" {
+			cluster.Spec.RKEConfig.DataDirectories.Provisioning = dir
+		}
+
+		if dir := defaults.SystemAgentDataDir; cluster.Spec.RKEConfig.DataDirectories.SystemAgent == "" {
+			cluster.Spec.RKEConfig.DataDirectories.SystemAgent = dir
+		}
 	}
 
 	c, err := clients.Provisioning.Cluster().Create(cluster)
