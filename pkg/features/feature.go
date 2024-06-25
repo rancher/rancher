@@ -113,12 +113,6 @@ var (
 		false,
 		false,
 		true)
-	ExternalRules = newFeature(
-		"external-rules",
-		"Enable externalRules for RoleTemplates",
-		true,
-		true,
-		true)
 	UIExtension = newFeature(
 		"uiextension",
 		"Enable UI Extensions when starting Rancher",
