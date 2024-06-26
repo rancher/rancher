@@ -525,7 +525,7 @@ type OIDCConfig struct {
 	ClientSecret       string `json:"clientSecret,omitempty" norman:"required,type=password"`
 	RancherURL         string `json:"rancherUrl" norman:"required,notnullable"`
 	Issuer             string `json:"issuer" norman:"required,notnullable"`
-	AuthEndpoint       string `json:"authEndpoint,omitempty" norman:"required,notnullable"`
+	AuthEndpoint       string `json:"authEndpoint,omitempty"`
 	TokenEndpoint      string `json:"tokenEndpoint,omitempty"`
 	UserInfoEndpoint   string `json:"userInfoEndpoint,omitempty"`
 	JWKSUrl            string `json:"jwksUrl,omitempty"`
@@ -535,6 +535,8 @@ type OIDCConfig struct {
 	GroupsClaim        string `json:"groupsClaim,omitempty"`
 	// Scopes is expected to be a space delimited list of scopes
 	Scopes string `json:"scope,omitempty"`
+	// AcrValue is expected to be string containing the required ACR value
+	AcrValue string `json:"acrValue,omitempty"`
 }
 
 type OIDCTestOutput struct {

@@ -131,12 +131,18 @@ func (g *GenOIDCProvider) groupToPrincipal(groupName string) v3.Principal {
 func (g *GenOIDCProvider) getRedirectURL(config map[string]interface{}) string {
 	authURL, _ := baseoidc.FetchAuthURL(config)
 
-	return fmt.Sprintf(
+	redirectURL := fmt.Sprintf(
 		"%s?client_id=%s&response_type=code&redirect_uri=%s",
 		authURL,
 		config["clientId"],
 		config["rancherUrl"],
 	)
+
+	if config["acrValue"] != nil {
+		redirectURL += fmt.Sprintf("&acr_values=%s", config["acrValue"])
+	}
+
+	return redirectURL
 }
 
 // toPrincipalFromToken uses additional information about the principal found in the token, if available, to provide

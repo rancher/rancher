@@ -3,6 +3,7 @@ package client
 const (
 	KeyCloakOIDCConfigType                     = "keyCloakOIDCConfig"
 	KeyCloakOIDCConfigFieldAccessMode          = "accessMode"
+	KeyCloakOIDCConfigFieldAcrValue            = "acrValue"
 	KeyCloakOIDCConfigFieldAllowedPrincipalIDs = "allowedPrincipalIds"
 	KeyCloakOIDCConfigFieldAnnotations         = "annotations"
 	KeyCloakOIDCConfigFieldAuthEndpoint        = "authEndpoint"
@@ -32,6 +33,7 @@ const (
 
 type KeyCloakOIDCConfig struct {
 	AccessMode          string            `json:"accessMode,omitempty" yaml:"accessMode,omitempty"`
+	AcrValue            string            `json:"acrValue,omitempty" yaml:"acrValue,omitempty"`
 	AllowedPrincipalIDs []string          `json:"allowedPrincipalIds,omitempty" yaml:"allowedPrincipalIds,omitempty"`
 	Annotations         map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	AuthEndpoint        string            `json:"authEndpoint,omitempty" yaml:"authEndpoint,omitempty"`
