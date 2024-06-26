@@ -14,6 +14,9 @@ env:
   CATTLE_KDM_BRANCH: dev-v2.9
   HELM_UNITTEST_VERSION: 0.3.2
   HELM_VERSION_V3: v3.13.3
+  CATTLE_RANCHER_WEBHOOK_VERSION: 104.0.0+up0.5.0-rc13
+  CATTLE_CSP_ADAPTER_MIN_VERSION: 104.0.0+up4.0.0-rc9
+  CATTLE_FLEET_VERSION: 104.0.0+up0.10.0-rc.20
 jobs:
   unit-tests:
     uses: ./.github/workflows/unit-test.yml
@@ -83,6 +86,9 @@ jobs:
             "COMMIT=${{ github.SHA }}"
             "RKE_VERSION=${{ env.RKE_VERSION }}"
             "ARCH=${{ matrix.arch }}"
+            "CATTLE_RANCHER_WEBHOOK_VERSION=${{ env.CATTLE_RANCHER_WEBHOOK_VERSION }}"
+            "CATTLE_CSP_ADAPTER_MIN_VERSION=${{ env.CATTLE_CSP_ADAPTER_MIN_VERSION }}"
+            "CATTLE_FLEET_VERSION=${{ env.CATTLE_FLEET_VERSION }}"
           tags: ${{ env.IMAGE }}:${{ env.TAG }}-${{ matrix.arch }}
           context: .
           platforms: "${{ matrix.os }}/${{ matrix.arch }}"
@@ -159,6 +165,7 @@ jobs:
             "RANCHER_TAG=${{ env.TAG }}"
             "RANCHER_REPO=${{ env.REPOSITORY_OWNER }}"
             "REGISTRY=localhost:5000"
+            "CATTLE_RANCHER_WEBHOOK_VERSION=${{ env.CATTLE_RANCHER_WEBHOOK_VERSION }}"
           tags: ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-${{ matrix.arch }}
           context: .
           platforms: "${{ matrix.os }}/${{ matrix.arch }}"
