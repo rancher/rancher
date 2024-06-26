@@ -1,0 +1,54 @@
+name: Provisioning tests
+run-name: Provisioning tests
+on:
+  workflow_dispatch:
+jobs:
+  provisioning_tests:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - V2PROV_TEST_DIST: "k3s"
+          V2PROV_TEST_RUN_REGEX: "^Test_(General|Provisioning)_.*$"
+        - V2PROV_TEST_DIST: "rke2"
+          V2PROV_TEST_RUN_REGEX: "^Test_(General|Provisioning)_.*$"
+        - V2PROV_TEST_DIST: "k3s"
+          V2PROV_TEST_RUN_REGEX: "^Test_Operation_.*$"
+        - V2PROV_TEST_DIST: "rke2"
+          V2PROV_TEST_RUN_REGEX: "^Test_Operation_SetA_.*$"
+        - V2PROV_TEST_DIST: "rke2"
+          V2PROV_TEST_RUN_REGEX: "^Test_Operation_SetB_.*$"
+        
+    name: Provisioning tests 
+    runs-on: [self-hosted, linux, ubuntu-18.04, ec2-ephemeral]
+    steps:
+      - name: Install git
+        run: |
+          sudo add-apt-repository ppa:git-core/candidate -y
+          sudo apt update
+          sudo apt install -y git
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: testdata
+        run: mkdir -p build/testdata
+      - name: Install Dapper
+        run: |
+          curl -sL https://releases.rancher.com/dapper/latest/dapper-$(uname -s)-$(uname -m) > ./.dapper
+          chmod +x ./.dapper
+      - name: Run tests
+        run: ./.dapper provisioning-tests
+        env:
+          V2PROV_TEST_RUN_REGEX: "${{ matrix.V2PROV_TEST_RUN_REGEX }}"
+          V2PROV_TEST_DIST: "${{ matrix.V2PROV_TEST_DIST }}"
+      - name: ls
+        if: failure()
+        run: ls -al build/testdata
+      - name: Upload testdata
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.job }}-testdata
+          path: |
+            build/testdata/rancher.log
+            build/testdata/k3s.log
+            build/testdata/k3s-dump
