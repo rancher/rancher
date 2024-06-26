@@ -3,6 +3,7 @@ package client
 const (
 	CronJobSpecType                               = "cronJobSpec"
 	CronJobSpecFieldActiveDeadlineSeconds         = "activeDeadlineSeconds"
+	CronJobSpecFieldAppArmorProfile               = "appArmorProfile"
 	CronJobSpecFieldAutomountServiceAccountToken  = "automountServiceAccountToken"
 	CronJobSpecFieldBackoffLimitPerIndex          = "backoffLimitPerIndex"
 	CronJobSpecFieldCompletionMode                = "completionMode"
@@ -22,6 +23,7 @@ const (
 	CronJobSpecFieldHostUsers                     = "hostUsers"
 	CronJobSpecFieldHostname                      = "hostname"
 	CronJobSpecFieldImagePullSecrets              = "imagePullSecrets"
+	CronJobSpecFieldManagedBy                     = "managedBy"
 	CronJobSpecFieldMaxFailedIndexes              = "maxFailedIndexes"
 	CronJobSpecFieldNodeID                        = "nodeId"
 	CronJobSpecFieldOS                            = "os"
@@ -44,6 +46,7 @@ const (
 	CronJobSpecFieldSetHostnameAsFQDN             = "setHostnameAsFQDN"
 	CronJobSpecFieldShareProcessNamespace         = "shareProcessNamespace"
 	CronJobSpecFieldSubdomain                     = "subdomain"
+	CronJobSpecFieldSuccessPolicy                 = "successPolicy"
 	CronJobSpecFieldSysctls                       = "sysctls"
 	CronJobSpecFieldTTLSecondsAfterFinished       = "ttlSecondsAfterFinished"
 	CronJobSpecFieldTerminationGracePeriodSeconds = "terminationGracePeriodSeconds"
@@ -56,6 +59,7 @@ const (
 
 type CronJobSpec struct {
 	ActiveDeadlineSeconds         *int64                         `json:"activeDeadlineSeconds,omitempty" yaml:"activeDeadlineSeconds,omitempty"`
+	AppArmorProfile               *AppArmorProfile               `json:"appArmorProfile,omitempty" yaml:"appArmorProfile,omitempty"`
 	AutomountServiceAccountToken  *bool                          `json:"automountServiceAccountToken,omitempty" yaml:"automountServiceAccountToken,omitempty"`
 	BackoffLimitPerIndex          *int64                         `json:"backoffLimitPerIndex,omitempty" yaml:"backoffLimitPerIndex,omitempty"`
 	CompletionMode                string                         `json:"completionMode,omitempty" yaml:"completionMode,omitempty"`
@@ -75,6 +79,7 @@ type CronJobSpec struct {
 	HostUsers                     *bool                          `json:"hostUsers,omitempty" yaml:"hostUsers,omitempty"`
 	Hostname                      string                         `json:"hostname,omitempty" yaml:"hostname,omitempty"`
 	ImagePullSecrets              []LocalObjectReference         `json:"imagePullSecrets,omitempty" yaml:"imagePullSecrets,omitempty"`
+	ManagedBy                     string                         `json:"managedBy,omitempty" yaml:"managedBy,omitempty"`
 	MaxFailedIndexes              *int64                         `json:"maxFailedIndexes,omitempty" yaml:"maxFailedIndexes,omitempty"`
 	NodeID                        string                         `json:"nodeId,omitempty" yaml:"nodeId,omitempty"`
 	OS                            *PodOS                         `json:"os,omitempty" yaml:"os,omitempty"`
@@ -97,6 +102,7 @@ type CronJobSpec struct {
 	SetHostnameAsFQDN             *bool                          `json:"setHostnameAsFQDN,omitempty" yaml:"setHostnameAsFQDN,omitempty"`
 	ShareProcessNamespace         *bool                          `json:"shareProcessNamespace,omitempty" yaml:"shareProcessNamespace,omitempty"`
 	Subdomain                     string                         `json:"subdomain,omitempty" yaml:"subdomain,omitempty"`
+	SuccessPolicy                 *SuccessPolicy                 `json:"successPolicy,omitempty" yaml:"successPolicy,omitempty"`
 	Sysctls                       []Sysctl                       `json:"sysctls,omitempty" yaml:"sysctls,omitempty"`
 	TTLSecondsAfterFinished       *int64                         `json:"ttlSecondsAfterFinished,omitempty" yaml:"ttlSecondsAfterFinished,omitempty"`
 	TerminationGracePeriodSeconds *int64                         `json:"terminationGracePeriodSeconds,omitempty" yaml:"terminationGracePeriodSeconds,omitempty"`

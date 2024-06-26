@@ -11,7 +11,7 @@ import (
 	rketypes "github.com/rancher/rke/types"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
-	configv1 "k8s.io/apiserver/pkg/apis/config/v1"
+	apiserverv1 "k8s.io/apiserver/pkg/apis/apiserver/v1"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 )
 
@@ -298,7 +298,7 @@ func AssembleSecretsEncryptionProvidersSecretCredential(secretRef, objType, objN
 	if err != nil {
 		return spec, err
 	}
-	var resource []configv1.ResourceConfiguration
+	var resource []apiserverv1.ResourceConfiguration
 	err = json.Unmarshal(secretsEncryptionProvidersSecret.Data[SecretKey], &resource)
 	if err != nil {
 		return spec, err

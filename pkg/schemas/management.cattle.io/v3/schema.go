@@ -11,7 +11,7 @@ import (
 	"github.com/rancher/rancher/pkg/schemas/factory"
 	"github.com/rancher/rancher/pkg/schemas/mapper"
 	v1 "k8s.io/api/core/v1"
-	apiserverconfig "k8s.io/apiserver/pkg/apis/config"
+	"k8s.io/apiserver/pkg/apis/apiserver"
 )
 
 var (
@@ -836,9 +836,9 @@ func clusterTemplateTypes(schemas *types.Schemas) *types.Schemas {
 
 func encryptionTypes(schemas *types.Schemas) *types.Schemas {
 	return schemas.MustImport(&Version, rketypes.SecretsEncryptionConfig{}).
-		MustImport(&Version, apiserverconfig.Key{}, struct {
+		MustImport(&Version, apiserver.Key{}, struct {
 			Secret string `norman:"type=password"`
-		}{}).MustImport(&Version, apiserverconfig.KMSConfiguration{}, struct {
+		}{}).MustImport(&Version, apiserver.KMSConfiguration{}, struct {
 		Timeout string
 	}{})
 }

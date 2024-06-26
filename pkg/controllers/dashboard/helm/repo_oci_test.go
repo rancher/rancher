@@ -10,8 +10,8 @@ import (
 
 	"github.com/golang/mock/gomock"
 	catalog "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
-	"github.com/rancher/wrangler/v2/pkg/generic/fake"
-	"github.com/rancher/wrangler/v2/pkg/genericcondition"
+	"github.com/rancher/wrangler/v3/pkg/generic/fake"
+	"github.com/rancher/wrangler/v3/pkg/genericcondition"
 	"github.com/stretchr/testify/assert"
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/repo"

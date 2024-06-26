@@ -3,6 +3,7 @@ package client
 const (
 	ReplicationControllerSpecType                               = "replicationControllerSpec"
 	ReplicationControllerSpecFieldActiveDeadlineSeconds         = "activeDeadlineSeconds"
+	ReplicationControllerSpecFieldAppArmorProfile               = "appArmorProfile"
 	ReplicationControllerSpecFieldAutomountServiceAccountToken  = "automountServiceAccountToken"
 	ReplicationControllerSpecFieldContainers                    = "containers"
 	ReplicationControllerSpecFieldDNSConfig                     = "dnsConfig"
@@ -50,6 +51,7 @@ const (
 
 type ReplicationControllerSpec struct {
 	ActiveDeadlineSeconds         *int64                         `json:"activeDeadlineSeconds,omitempty" yaml:"activeDeadlineSeconds,omitempty"`
+	AppArmorProfile               *AppArmorProfile               `json:"appArmorProfile,omitempty" yaml:"appArmorProfile,omitempty"`
 	AutomountServiceAccountToken  *bool                          `json:"automountServiceAccountToken,omitempty" yaml:"automountServiceAccountToken,omitempty"`
 	Containers                    []Container                    `json:"containers,omitempty" yaml:"containers,omitempty"`
 	DNSConfig                     *PodDNSConfig                  `json:"dnsConfig,omitempty" yaml:"dnsConfig,omitempty"`

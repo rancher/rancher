@@ -19,6 +19,7 @@ const (
 	NodeStatusFieldNodePlan           = "nodePlan"
 	NodeStatusFieldNodeTaints         = "nodeTaints"
 	NodeStatusFieldRequested          = "requested"
+	NodeStatusFieldRuntimeHandlers    = "runtimeHandlers"
 	NodeStatusFieldVolumesAttached    = "volumesAttached"
 	NodeStatusFieldVolumesInUse       = "volumesInUse"
 )
@@ -41,6 +42,7 @@ type NodeStatus struct {
 	NodePlan           *NodePlan                 `json:"nodePlan,omitempty" yaml:"nodePlan,omitempty"`
 	NodeTaints         []Taint                   `json:"nodeTaints,omitempty" yaml:"nodeTaints,omitempty"`
 	Requested          map[string]string         `json:"requested,omitempty" yaml:"requested,omitempty"`
+	RuntimeHandlers    []NodeRuntimeHandler      `json:"runtimeHandlers,omitempty" yaml:"runtimeHandlers,omitempty"`
 	VolumesAttached    map[string]AttachedVolume `json:"volumesAttached,omitempty" yaml:"volumesAttached,omitempty"`
 	VolumesInUse       []string                  `json:"volumesInUse,omitempty" yaml:"volumesInUse,omitempty"`
 }

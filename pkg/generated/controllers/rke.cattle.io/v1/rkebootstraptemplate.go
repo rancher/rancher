@@ -20,7 +20,7 @@ package v1
 
 import (
 	v1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
-	"github.com/rancher/wrangler/v2/pkg/generic"
+	"github.com/rancher/wrangler/v3/pkg/generic"
 )
 
 // RKEBootstrapTemplateController interface for managing RKEBootstrapTemplate resources.
