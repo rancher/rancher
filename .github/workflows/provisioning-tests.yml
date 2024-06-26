@@ -20,7 +20,7 @@ jobs:
           V2PROV_TEST_RUN_REGEX: "^Test_Operation_SetB_.*$"
         
     name: Provisioning tests 
-    runs-on: [self-hosted, linux, ubuntu-18.04, ec2-ephemeral]
+    runs-on: runs-on,runner=4cpu-linux-x64,image=legacy-cgroups-for-x64,run-id=${{ github.run_id }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
