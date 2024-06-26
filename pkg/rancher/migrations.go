@@ -11,6 +11,7 @@ import (
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/capr"
+	"github.com/rancher/rancher/pkg/capr/installer"
 	"github.com/rancher/rancher/pkg/features"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	rancherversion "github.com/rancher/rancher/pkg/version"
@@ -531,7 +532,7 @@ func migrateSystemAgentDataDirectory(w *wrangler.Context) error {
 		systemAgentDataDir := ""
 		envVars := make([]rkev1.EnvVar, 0, len(cluster.Spec.AgentEnvVars))
 		for _, e := range cluster.Spec.AgentEnvVars {
-			if e.Name == "CATTLE_AGENT_VAR_DIR" {
+			if e.Name == installer.SystemAgentEnvVar {
 				// don't break, the webhook allows duplicate entries and the last one would have been the effective data dir
 				systemAgentDataDir = e.Value
 			} else {
