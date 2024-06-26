@@ -22,11 +22,6 @@ jobs:
     name: Provisioning tests 
     runs-on: [self-hosted, linux, ubuntu-18.04, ec2-ephemeral]
     steps:
-      - name: Install git
-        run: |
-          sudo add-apt-repository ppa:git-core/candidate -y
-          sudo apt update
-          sudo apt install -y git
       - name: Checkout
         uses: actions/checkout@v4
       - name: testdata
@@ -40,15 +35,3 @@ jobs:
         env:
           V2PROV_TEST_RUN_REGEX: "${{ matrix.V2PROV_TEST_RUN_REGEX }}"
           V2PROV_TEST_DIST: "${{ matrix.V2PROV_TEST_DIST }}"
-      - name: ls
-        if: failure()
-        run: ls -al build/testdata
-      - name: Upload testdata
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ github.job }}-testdata
-          path: |
-            build/testdata/rancher.log
-            build/testdata/k3s.log
-            build/testdata/k3s-dump
