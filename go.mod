@@ -176,7 +176,7 @@ require (
 	github.com/antihax/optional v1.0.0
 	github.com/containers/image/v5 v5.25.0
 	github.com/rancher/cis-operator v1.0.11
-	github.com/rancher/shepherd v0.0.0-20240618185942-b231ed7d40bb
+	github.com/rancher/shepherd v0.0.0-20240625175636-3b9cd408533b
 	go.qase.io/client v0.0.0-20231114201952-65195ec001fa
 )
 

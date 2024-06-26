@@ -54,3 +54,34 @@ rancher:
 **note** that no upgradeInput is required
 
 `gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/upgrade --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestCloudProviderMigrationTestSuite/TestAWS"`
+
+
+## Cloud Provider Upgrade
+Upgrades the chart version of cloud provider (CPI/CSI)
+
+### Current Support:
+* Vsphere
+  * RKE1
+
+### Pre-Requisites on the cluster
+* cluster should have upgradeable CPI/CSI charts installed. You can do this via automation in provisioning/rke1 with the following option, chartUpgrade, which will install a version of the chart (latest - 1) that can later be upgraded to the latest version. 
+```yaml
+chartUpgrade:
+  isUpgradable: true
+```
+
+### Running the test
+```yaml
+rancher:
+  host: <your_host>
+  adminToken: <your_token>
+  insecure: true/false
+  cleanup: false/true
+  clusterName: "<your_cluster_name>"
+vmwarevsphereCredentials:
+  ...
+vmwarevsphereConfig: 
+  ...
+```
+
+`gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/upgrade --junitfile results.xml -- -timeout=60m -tags=validation -v -run ^TestCloudProviderVersionUpgradeSuite$"`
