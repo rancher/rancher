@@ -56,7 +56,7 @@ provisioningInput:
   rke2KubernetesVersion: ["v1.27.10+rke2r1"]
   cni: ["calico"]
   providers: ["linode", "aws", "do", "harvester", "vsphere", "azure"]
-  cloudProvider: "aws"
+  cloudProvider: "" # either: aws|rancher-vsphere
   nodeProviders: ["ec2"]
   hardened: false
   psact: ""                                   #either rancher-privileged|rancher-restricted|rancher-baseline
