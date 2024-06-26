@@ -12,7 +12,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-// renderRegistries accepts an RKEControlPlane, namespace, and registry and generates the data needed to set up registries
+// renderRegistries accepts an RKEControlPlane and generates the data needed to set up registries.
 func (p *Planner) renderRegistries(controlPlane *rkev1.RKEControlPlane) (registries, error) {
 	var (
 		files   []plan.File
@@ -91,7 +91,8 @@ func (p *Planner) renderRegistries(controlPlane *rkev1.RKEControlPlane) (registr
 	return data, nil
 }
 
-// toFile accepts the runtime, path, and a byte slice containing data to be written to a file on host. It returns a plan.File.
+// toFile accepts an RKEControlPlane, path, and a byte slice containing data to be written to a file on host. It returns
+// a plan.File.
 func toFile(controlPlane *rkev1.RKEControlPlane, path string, content []byte) plan.File {
 	return plan.File{
 		Content: base64.StdEncoding.EncodeToString(content),

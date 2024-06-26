@@ -18,7 +18,6 @@ import (
 const (
 	SystemAgentInstallPath = "/system-agent-install.sh" // corresponding curl -o in package/Dockerfile
 	WindowsRke2InstallPath = "/wins-agent-install.ps1"  // corresponding curl -o in package/Dockerfile
-	SystemAgentEnvVar      = "CATTLE_AGENT_VAR_DIR"
 )
 
 var (
