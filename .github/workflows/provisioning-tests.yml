@@ -1,7 +1,14 @@
 name: Provisioning tests
 run-name: Provisioning tests
 on:
-  workflow_dispatch:
+  push: 
+    branches:
+      - 'dev-v*'
+      - 'release-v*'
+  pull_request:
+    branches:
+      - 'dev-v*'
+      - 'release-v*'
 jobs:
   provisioning_tests:
     strategy:
