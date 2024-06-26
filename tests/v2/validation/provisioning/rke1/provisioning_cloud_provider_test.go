@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/rancher/tests/v2/validation/provisioning/permutations"
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
+	"github.com/rancher/shepherd/extensions/charts"
 	"github.com/rancher/shepherd/extensions/clusters"
 	"github.com/rancher/shepherd/extensions/clusters/kubernetesversions"
 	"github.com/rancher/shepherd/extensions/provisioninginput"
@@ -28,6 +29,7 @@ type RKE1CloudProviderTestSuite struct {
 	standardUserClient *rancher.Client
 	session            *session.Session
 	provisioningConfig *provisioninginput.Config
+	chartConfig        *charts.Config
 }
 
 func (r *RKE1CloudProviderTestSuite) TearDownSuite() {
