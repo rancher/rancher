@@ -82,10 +82,10 @@ func TestParseACRFromAccessToken(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			acr, err := parseACRFromAccessToken(tt.token)
 			if acr != tt.expectedACR {
-				t.Fatalf("expected acr to be '%s', got '%s'", tt.expectedACR, acr)
+				t.Errorf("expected acr to be '%s', got '%s'", tt.expectedACR, acr)
 			}
 			if (err != nil) != tt.wantError {
-				t.Fatalf("expected error: %v, got error: %v", tt.wantError, err)
+				t.Errorf("expected error: %v, got error: %v", tt.wantError, err)
 			}
 		})
 	}

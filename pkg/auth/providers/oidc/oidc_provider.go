@@ -2,7 +2,6 @@ package oidc
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -10,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/coreos/go-oidc/v3/oidc"
+	"github.com/golang-jwt/jwt"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
@@ -546,21 +546,19 @@ func isValidACR(claimACR string, configuredACR string) bool {
 }
 
 func parseACRFromAccessToken(accessToken string) (string, error) {
-	tokenClaims := make(map[string]interface{})
-	segments := strings.Split(accessToken, ".")
-	if len(segments) < 2 {
-		return "", errors.New("invalid access token format")
-	}
-	decodedClaims, err := base64.URLEncoding.DecodeString(segments[1])
+	var parser jwt.Parser
+	// we already validated the incoming token
+	token, _, err := parser.ParseUnverified(accessToken, jwt.MapClaims{})
 	if err != nil {
-		return "", fmt.Errorf("decoding token claims: %w", err)
+		return "", fmt.Errorf("failed to parse token: %w", err)
 	}
-	if err := json.Unmarshal(decodedClaims, &tokenClaims); err != nil {
-		return "", fmt.Errorf("parsing token claims: %w", err)
-	}
-	acrValue, ok := tokenClaims["acr"].(string)
+	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok {
-		return "", errors.New("acr claim not found in token")
+		return "", errors.New("invalid access token jwt.MapClaims format")
+	}
+	acrValue, found := claims["acr"].(string)
+	if !found {
+		return "", fmt.Errorf("acr claim invalid or not found in token: (acr=%v)", claims["acr"])
 	}
 	return acrValue, nil
 }
