@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -21,7 +22,6 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
-	"github.com/hashicorp/go-multierror"
 	"github.com/mattn/go-colorable"
 	"github.com/rancher/rancher/pkg/agent/clean"
 	"github.com/rancher/rancher/pkg/agent/cluster"
@@ -77,20 +77,11 @@ func runAgent(ctx context.Context) {
 		if os.Getenv("CLUSTER_CLEANUP") == "true" {
 			err = clean.Cluster()
 		} else if os.Getenv("BINDING_CLEANUP") == "true" {
-			var bindingErr error
-			err = clean.DuplicateBindings(nil)
-			if err != nil {
-				bindingErr = multierror.Append(bindingErr, err)
-			}
-			err = clean.OrphanBindings(nil)
-			if err != nil {
-				bindingErr = multierror.Append(bindingErr, err)
-			}
-			err = clean.OrphanCatalogBindings(nil)
-			if err != nil {
-				bindingErr = multierror.Append(bindingErr, err)
-			}
-			err = bindingErr
+			err = errors.Join(
+				clean.DuplicateBindings(nil),
+				clean.OrphanBindings(nil),
+				clean.OrphanCatalogBindings(nil),
+			)
 		} else {
 			err = run(ctx)
 		}

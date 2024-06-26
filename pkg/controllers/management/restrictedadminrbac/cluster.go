@@ -1,9 +1,9 @@
 package restrictedadminrbac
 
 import (
+	"errors"
 	"fmt"
 
-	"github.com/hashicorp/go-multierror"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/wrangler/v3/pkg/name"
@@ -32,7 +32,7 @@ func (r *rbaccontroller) clusterOwnerSync(_ string, grb *v3.GlobalRoleBinding) (
 		crtbName := name.SafeConcatName(rbac.GetGRBTargetKey(grb), "restricted-admin", "cluster-owner")
 		_, err := r.crtbCache.Get(cluster.Name, crtbName)
 		if err != nil && !apierrors.IsNotFound(err) {
-			retError = multierror.Append(retError, fmt.Errorf("failed to get CRTB '%s' from cache: %w", crtbName, err))
+			retError = errors.Join(retError, fmt.Errorf("failed to get CRTB '%s' from cache: %w", crtbName, err))
 			continue
 		}
 		if err == nil {
@@ -72,7 +72,7 @@ func (r *rbaccontroller) clusterOwnerSync(_ string, grb *v3.GlobalRoleBinding) (
 
 		_, err = r.crtbCtrl.Create(&crtb)
 		if err != nil && !apierrors.IsAlreadyExists(err) {
-			retError = multierror.Append(retError, fmt.Errorf("failed to create a CRTB '%s': %w", crtbName, err))
+			retError = errors.Join(retError, fmt.Errorf("failed to create a CRTB '%s': %w", crtbName, err))
 			continue
 		}
 	}
