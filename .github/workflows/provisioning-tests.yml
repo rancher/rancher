@@ -3,12 +3,10 @@ run-name: Provisioning tests
 on:
   push: 
     branches:
-      - 'dev-v*'
-      - 'release-v*'
+      - 'brooksn-*'
   pull_request:
     branches:
-      - 'dev-v*'
-      - 'release-v*'
+      - 'brooksn-*'
 jobs:
   provisioning_tests:
     strategy:
