@@ -55,17 +55,26 @@ func (c *CertificateAuthorityValidator) onStvAggregationSecret(_ string, obj *co
 			}
 			return obj, nil
 		}
-		newMgmtCluster := mgmtCluster.DeepCopy()
+		var needsUpdate bool
 		if string(obj.Data[CacertsValid]) == "false" {
-			CertificateAuthorityValid.False(newMgmtCluster)
+			if !CertificateAuthorityValid.IsFalse(mgmtCluster) {
+				needsUpdate = true
+				mgmtCluster = mgmtCluster.DeepCopy()
+				CertificateAuthorityValid.False(mgmtCluster)
+			}
 		} else {
-			CertificateAuthorityValid.Unknown(newMgmtCluster)
+			if !CertificateAuthorityValid.IsUnknown(mgmtCluster) {
+				needsUpdate = true
+				mgmtCluster = mgmtCluster.DeepCopy()
+				CertificateAuthorityValid.Unknown(mgmtCluster)
+			}
 		}
-		_, err = c.clusters.Update(newMgmtCluster)
-		if err != nil {
-			return obj, err
+		if needsUpdate {
+			_, err = c.clusters.Update(mgmtCluster)
+			if err != nil {
+				return obj, err
+			}
 		}
 	}
-
 	return obj, nil
 }
