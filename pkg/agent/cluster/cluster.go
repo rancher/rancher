@@ -49,6 +49,10 @@ func CAChecksum() string {
 	return os.Getenv("CATTLE_CA_CHECKSUM")
 }
 
+func CAStrictVerify() bool {
+	return strings.ToLower(os.Getenv("STRICT_VERIFY")) == "true"
+}
+
 func getTokenFromAPI() ([]byte, []byte, error) {
 	cfg, err := kubeconfig.GetNonInteractiveClientConfig("").ClientConfig()
 	if err != nil {

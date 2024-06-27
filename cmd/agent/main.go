@@ -24,18 +24,18 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/hashicorp/go-multierror"
 	"github.com/mattn/go-colorable"
-	"github.com/rancher/remotedialer"
-	"github.com/rancher/wrangler/v2/pkg/signals"
-	"github.com/sirupsen/logrus"
-
 	"github.com/rancher/rancher/pkg/agent/clean"
 	"github.com/rancher/rancher/pkg/agent/clean/adunmigration"
 	"github.com/rancher/rancher/pkg/agent/cluster"
 	"github.com/rancher/rancher/pkg/agent/node"
 	"github.com/rancher/rancher/pkg/agent/rancher"
+	"github.com/rancher/rancher/pkg/controllers/managementuser/cavalidator"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/logserver"
 	"github.com/rancher/rancher/pkg/rkenodeconfigclient"
+	"github.com/rancher/remotedialer"
+	"github.com/rancher/wrangler/v2/pkg/signals"
+	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -43,7 +43,8 @@ var (
 )
 
 const (
-	Token = "X-API-Tunnel-Token"
+	Token          = "X-API-Tunnel-Token"
+	caFileLocation = "/etc/kubernetes/ssl/certs/serverca"
 )
 
 func main() {
@@ -222,8 +223,26 @@ func run(ctx context.Context) error {
 		Timeout: time.Second * 5,
 	}
 
+	// Perform root CA verification
+	var transport *http.Transport
+	var rootCAFound bool
+	transport = rootCATransport()
+	if transport != nil {
+		logrus.Infof("Testing connection to %s using trusted certificate authorities within: %s", server, caFileLocation)
+		httpClient.Transport = transport
+		rootCAFound = true
+	} else if transport == nil && cluster.CAStrictVerify() {
+		logrus.Errorf("Strict CA verification is enabled but encountered error finding root CA: %v", err)
+		os.Exit(1)
+	}
+
 	_, err = httpClient.Get(server)
 	if err != nil {
+		if cluster.CAStrictVerify() {
+			logrus.Errorf("Could not securely connect to %s: %v", server, err)
+			os.Exit(1)
+		}
+		topContext = context.WithValue(topContext, cavalidator.CacertsValid, false)
 		if strings.Contains(err.Error(), "x509:") {
 			certErr := err
 			if strings.Contains(err.Error(), "certificate signed by unknown authority") {
@@ -265,7 +284,6 @@ func run(ctx context.Context) error {
 					lastFoundIssuer = cert.Issuer.String()
 				}
 			}
-			caFileLocation := "/etc/kubernetes/ssl/certs/serverca"
 			if _, err := os.Stat(caFileLocation); err == nil {
 				caFile, err := ioutil.ReadFile(caFileLocation)
 				if err != nil {
@@ -309,12 +327,24 @@ func run(ctx context.Context) error {
 			}
 			return certErr
 		}
+	} else if rootCAFound {
+		// If the rootCA was used to test the Get and we had no error, the CACerts are valid
+		topContext = context.WithValue(topContext, cavalidator.CacertsValid, true)
+	} else {
+		// No error connecting, but because we did not validate cacerts, CacertsValid should be set to false
+		topContext = context.WithValue(topContext, cavalidator.CacertsValid, false)
 	}
 
 	onConnect := func(ctx context.Context, _ *remotedialer.Session) error {
 		connected()
 		connectConfig := fmt.Sprintf("https://%s/v3/connect/config", serverURL.Host)
-		interval, err := rkenodeconfigclient.ConfigClient(ctx, connectConfig, headers, writeCertsOnly)
+		httpClient := http.Client{
+			Timeout: 300 * time.Second,
+		}
+		if transport != nil {
+			httpClient.Transport = transport
+		}
+		interval, err := rkenodeconfigclient.ConfigClient(ctx, &httpClient, connectConfig, headers, writeCertsOnly)
 		if err != nil {
 			return err
 		}
@@ -341,7 +371,7 @@ func run(ctx context.Context) error {
 			for {
 				select {
 				case <-time.After(tt):
-					receivedInterval, err := rkenodeconfigclient.ConfigClient(ctx, connectConfig, headers, writeCertsOnly)
+					receivedInterval, err := rkenodeconfigclient.ConfigClient(ctx, &httpClient, connectConfig, headers, writeCertsOnly)
 					if err != nil {
 						logrus.Errorf("failed to check plan: %v", err)
 					} else if receivedInterval != 0 && receivedInterval != interval {
@@ -497,5 +527,24 @@ func configureLogrus() {
 		logrus.SetLevel(logrus.TraceLevel)
 	} else if os.Getenv("CATTLE_DEBUG") == "true" || os.Getenv("RANCHER_DEBUG") == "true" {
 		logrus.SetLevel(logrus.DebugLevel)
+	}
+}
+
+// rootCATransport generates a http.Transport that contains the contents of the CA file as the Root CA for strict validation.
+func rootCATransport() *http.Transport {
+	caFile, err := os.ReadFile(caFileLocation)
+	if err != nil {
+		logrus.Errorf("unable to read CA file from %s: %v", caFileLocation, err)
+		return nil
+	}
+	certPool := x509.NewCertPool()
+	if ok := certPool.AppendCertsFromPEM(caFile); !ok {
+		logrus.Errorf("unable to parse CA file %s", caFileLocation)
+		return nil
+	}
+	return &http.Transport{
+		TLSClientConfig: &tls.Config{
+			RootCAs: certPool,
+		},
 	}
 }
