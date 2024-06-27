@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"path"
 	"regexp"
 	"sort"
 	"strings"
@@ -110,10 +111,10 @@ const (
 	RuntimeK3S  = "k3s"
 	RuntimeRKE2 = "rke2"
 
-	K3sKubectlPath     = "/usr/local/bin/kubectl"
-	K3sKubeconfigPath  = "/etc/rancher/k3s/k3s.yaml"
-	RKE2KubectlPath    = "/var/lib/rancher/rke2/bin/kubectl"
-	RKE2KubeconfigPath = "/etc/rancher/rke2/rke2.yaml"
+	K3sKubectlPath          = "/usr/local/bin/kubectl"
+	K3sKubeconfigPath       = "/etc/rancher/k3s/k3s.yaml"
+	RKE2RelativeKubectlPath = "bin/kubectl"
+	RKE2KubeconfigPath      = "/etc/rancher/rke2/rke2.yaml"
 
 	RoleBootstrap = "bootstrap"
 	RolePlan      = "plan"
@@ -122,6 +123,8 @@ const (
 
 	MinimumHostnameLengthLimit = 10
 	MaximumHostnameLengthLimit = 63
+
+	SystemAgentDataDirEnvVar = "CATTLE_AGENT_VAR_DIR"
 )
 
 var (
@@ -154,13 +157,14 @@ func GetMachineByOwner(machineCache capicontrollers.MachineCache, obj metav1.Obj
 	return nil, ErrNoMachineOwnerRef
 }
 
-// GetKubectlAndKubeconfigPaths returns the corresponding kubectl/kubeconfig paths for a downstream node for the given kubernetes version.
-func GetKubectlAndKubeconfigPaths(kubernetesVersion string) (string, string) {
-	switch GetRuntime(kubernetesVersion) {
+// GetKubectlAndKubeconfigPaths returns the corresponding kubectl/kubeconfig paths for a downstream node for the given
+// RKEControlPlane.
+func GetKubectlAndKubeconfigPaths(controlPlane *rkev1.RKEControlPlane) (string, string) {
+	switch GetRuntime(controlPlane.Spec.KubernetesVersion) {
 	case RuntimeK3S:
 		return K3sKubectlPath, K3sKubeconfigPath
 	case RuntimeRKE2:
-		return RKE2KubectlPath, RKE2KubeconfigPath
+		return path.Join(GetDistroDataDir(controlPlane), RKE2RelativeKubectlPath), RKE2KubeconfigPath
 	}
 	return "", ""
 }
@@ -237,6 +241,27 @@ func GetLoopbackAddress(controlPlane *rkev1.RKEControlPlane) string {
 		return "localhost"
 	}
 	return "127.0.0.1"
+}
+
+func GetDistroDataDir(controlPlane *rkev1.RKEControlPlane) string {
+	if dir := controlPlane.Spec.DataDirectories.K8sDistro; dir != "" {
+		return dir
+	}
+	return fmt.Sprintf("/var/lib/rancher/%s", GetRuntime(controlPlane.Spec.KubernetesVersion))
+}
+
+func GetProvisioningDataDir(controlPlane *rkev1.RKEControlPlane) string {
+	if dir := controlPlane.Spec.DataDirectories.Provisioning; dir != "" {
+		return dir
+	}
+	return "/var/lib/rancher/capr"
+}
+
+func GetSystemAgent(controlPlane *rkev1.RKEControlPlane) string {
+	if dir := controlPlane.Spec.DataDirectories.SystemAgent; dir != "" {
+		return dir
+	}
+	return "/var/lib/rancher/agent"
 }
 
 func IsOwnedByMachine(bootstrapCache rkecontroller.RKEBootstrapCache, machineName string, sa *corev1.ServiceAccount) (bool, error) {

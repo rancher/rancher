@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"path"
 	"sort"
 	"strconv"
 	"strings"
@@ -91,6 +92,14 @@ func addUserConfig(config map[string]interface{}, controlPlane *rkev1.RKEControl
 	}
 
 	filterConfigData(config, controlPlane, entry)
+
+	// "data-dir" is explicitly not added to KDM for filtering because it is mapped to a field in the provisioning cluster
+	// CRD. While technically possible to add feature gates and update KDM, there is nothing to be gained from such an
+	// approach as the "data-dir" implementation will likely never change distro-side.
+	if controlPlane.Spec.DataDirectories.K8sDistro != "" {
+		config["data-dir"] = controlPlane.Spec.DataDirectories.K8sDistro
+	}
+
 	return nil
 }
 
@@ -136,14 +145,14 @@ func addRoleConfig(config map[string]interface{}, controlPlane *rkev1.RKEControl
 	// to run.
 	if isControlPlane(entry) {
 		logrus.Debug("addRoleConfig rendering arguments and mounts for kube-controller-manager")
-		certDirArg, certDirMount := renderArgAndMount(config[KubeControllerManagerArg], config[KubeControllerManagerExtraMount], runtime, DefaultKubeControllerManagerDefaultSecurePort, DefaultKubeControllerManagerCertDir)
+		certDirArg, certDirMount := renderArgAndMount(config[KubeControllerManagerArg], config[KubeControllerManagerExtraMount], controlPlane, DefaultKubeControllerManagerDefaultSecurePort, DefaultKubeControllerManagerCertDir)
 		config[KubeControllerManagerArg] = certDirArg
 		if runtime == capr.RuntimeRKE2 {
 			config[KubeControllerManagerExtraMount] = certDirMount
 		}
 
 		logrus.Debug("addRoleConfig rendering arguments and mounts for kube-scheduler")
-		certDirArg, certDirMount = renderArgAndMount(config[KubeSchedulerArg], config[KubeSchedulerExtraMount], runtime, DefaultKubeSchedulerDefaultSecurePort, DefaultKubeSchedulerCertDir)
+		certDirArg, certDirMount = renderArgAndMount(config[KubeSchedulerArg], config[KubeSchedulerExtraMount], controlPlane, DefaultKubeSchedulerDefaultSecurePort, DefaultKubeSchedulerCertDir)
 		config[KubeSchedulerArg] = certDirArg
 		if runtime == capr.RuntimeRKE2 {
 			config[KubeSchedulerExtraMount] = certDirMount
@@ -161,7 +170,7 @@ func addLocalClusterAuthenticationEndpointConfig(config map[string]interface{}, 
 		return
 	}
 
-	authFile := fmt.Sprintf(authnWebhookFileName, capr.GetRuntime(controlPlane.Spec.KubernetesVersion))
+	authFile := path.Join(capr.GetDistroDataDir(controlPlane), authnWebhookFileName)
 	config["kube-apiserver-arg"] = append(convert.ToStringSlice(config["kube-apiserver-arg"]),
 		fmt.Sprintf("authentication-token-webhook-config-file=%s", authFile))
 }
@@ -172,7 +181,7 @@ func addLocalClusterAuthenticationEndpointFile(nodePlan plan.NodePlan, controlPl
 	}
 
 	loopbackAddress := capr.GetLoopbackAddress(controlPlane)
-	authFile := fmt.Sprintf(authnWebhookFileName, capr.GetRuntime(controlPlane.Spec.KubernetesVersion))
+	authFile := path.Join(capr.GetDistroDataDir(controlPlane), authnWebhookFileName)
 	nodePlan.Files = append(nodePlan.Files, plan.File{
 		Content: base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf(AuthnWebhook, loopbackAddress))),
 		Path:    authFile,
@@ -274,7 +283,7 @@ func (p *Planner) addChartConfigs(nodePlan plan.NodePlan, controlPlane *rkev1.RK
 
 	nodePlan.Files = append(nodePlan.Files, plan.File{
 		Content: base64.StdEncoding.EncodeToString(contents),
-		Path:    fmt.Sprintf("/var/lib/rancher/%s/server/manifests/rancher/managed-chart-config.yaml", capr.GetRuntime(controlPlane.Spec.KubernetesVersion)),
+		Path:    path.Join(capr.GetDistroDataDir(controlPlane), "server/manifests/rancher/managed-chart-config.yaml"),
 		Dynamic: true,
 	})
 
@@ -455,7 +464,7 @@ func checkForSecretFormat(secretFieldName, configValue string) (bool, string, st
 
 // configFile renders the full path to a config file based on the passed in filename and controlPlane
 // If the desired filename does not have a defined path template in the `filePaths` map, the function will fall back
-// to rendering a filepath based on `/var/lib/rancher/%s/etc/config-files/%s` where the first %s is the runtime and
+// to rendering a filepath based on `%s/etc/config-files/%s` where the first %s is the data-dir and
 // second %s is the filename.
 func configFile(controlPlane *rkev1.RKEControlPlane, filename string) string {
 	if path := filePaths[filename]; path != "" {
@@ -464,8 +473,7 @@ func configFile(controlPlane *rkev1.RKEControlPlane, filename string) string {
 		}
 		return path
 	}
-	return fmt.Sprintf("/var/lib/rancher/%s/etc/config-files/%s",
-		capr.GetRuntime(controlPlane.Spec.KubernetesVersion), filename)
+	return path.Join(capr.GetDistroDataDir(controlPlane), "etc/config-files", filename)
 }
 
 func (p *Planner) renderFiles(controlPlane *rkev1.RKEControlPlane, entry *planEntry) ([]plan.File, error) {

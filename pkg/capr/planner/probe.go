@@ -2,6 +2,7 @@ package planner
 
 import (
 	"fmt"
+	"path"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -38,9 +39,9 @@ var (
 			FailureThreshold:    2,
 			HTTPGetAction: plan.HTTPGetAction{
 				URL:        "https://%s:6443/readyz",
-				CACert:     "/var/lib/rancher/%s/server/tls/server-ca.crt",
-				ClientCert: "/var/lib/rancher/%s/server/tls/client-kube-apiserver.crt",
-				ClientKey:  "/var/lib/rancher/%s/server/tls/client-kube-apiserver.key",
+				CACert:     "%s/server/tls/server-ca.crt",
+				ClientCert: "%s/server/tls/client-kube-apiserver.crt",
+				ClientKey:  "%s/server/tls/client-kube-apiserver.key",
 			},
 		},
 		"kube-scheduler": {
@@ -91,7 +92,7 @@ func isCalico(controlPlane *rkev1.RKEControlPlane, runtime string) bool {
 
 // renderSecureProbe takes the existing argument value and renders a secure probe using the argument values and an error
 // if one occurred.
-func renderSecureProbe(arg any, rawProbe plan.Probe, runtime string, loopbackAddress, defaultSecurePort string, defaultCertDir string, defaultCert string) (plan.Probe, error) {
+func renderSecureProbe(arg any, rawProbe plan.Probe, controlPlane *rkev1.RKEControlPlane, loopbackAddress, defaultSecurePort string, defaultCertDir string, defaultCert string) (plan.Probe, error) {
 	securePort := getArgValue(arg, SecurePortArgument, "=")
 	if securePort == "" {
 		// If the user set a custom --secure-port, set --secure-port to an empty string, so we don't override
@@ -104,9 +105,8 @@ func renderSecureProbe(arg any, rawProbe plan.Probe, runtime string, loopbackAdd
 		// the --cert-dir was set. --tls-cert-file (if set) will take precedence over --cert-dir
 		certDir := getArgValue(arg, CertDirArgument, "=")
 		if certDir == "" {
-			// If --cert-dir was not set, we use defaultCertDir value that was passed in, but must render it to replace
-			// the %s for runtime
-			certDir = fmt.Sprintf(defaultCertDir, runtime)
+			// If --cert-dir was not set, we use defaultCertDir value that was passed in, but must prefix the data-dir
+			certDir = path.Join(capr.GetDistroDataDir(controlPlane), defaultCertDir)
 		}
 		// Our goal here is to generate the tlsCert. If we get to this point, we know we will be using the defaultCert
 		TLSCert = certDir + "/" + defaultCert
@@ -143,18 +143,18 @@ func (p *Planner) generateProbes(controlPlane *rkev1.RKEControlPlane, entry *pla
 		probes[probeName] = allProbes[probeName]
 	}
 
-	probes = replaceRuntimeForProbes(probes, runtime)
+	probes = insertDataDirForProbes(controlPlane, probes)
 
 	loopbackAddress := capr.GetLoopbackAddress(controlPlane)
 
 	if isControlPlane(entry) {
-		kcmProbe, err := renderSecureProbe(config[KubeControllerManagerArg], probes["kube-controller-manager"], runtime, loopbackAddress, DefaultKubeControllerManagerDefaultSecurePort, DefaultKubeControllerManagerCertDir, DefaultKubeControllerManagerCert)
+		kcmProbe, err := renderSecureProbe(config[KubeControllerManagerArg], probes["kube-controller-manager"], controlPlane, loopbackAddress, DefaultKubeControllerManagerDefaultSecurePort, DefaultKubeControllerManagerCertDir, DefaultKubeControllerManagerCert)
 		if err != nil {
 			return probes, err
 		}
 		probes["kube-controller-manager"] = kcmProbe
 
-		ksProbe, err := renderSecureProbe(config[KubeSchedulerArg], probes["kube-scheduler"], runtime, loopbackAddress, DefaultKubeSchedulerDefaultSecurePort, DefaultKubeSchedulerCertDir, DefaultKubeSchedulerCert)
+		ksProbe, err := renderSecureProbe(config[KubeSchedulerArg], probes["kube-scheduler"], controlPlane, loopbackAddress, DefaultKubeSchedulerDefaultSecurePort, DefaultKubeSchedulerCertDir, DefaultKubeSchedulerCert)
 		if err != nil {
 			return probes, err
 		}
@@ -182,13 +182,14 @@ func replaceCACertAndPortForProbes(probe plan.Probe, cacert, host, port string) 
 	return probe, nil
 }
 
-// replaceRuntimeForProbes will insert the k8s runtime for all probes based on the runtime provider.
-func replaceRuntimeForProbes(probes map[string]plan.Probe, runtime string) map[string]plan.Probe {
+// insertDataDirForProbes will insert the data-dir for all probes based on the controlplane object.
+func insertDataDirForProbes(controlPlane *rkev1.RKEControlPlane, probes map[string]plan.Probe) map[string]plan.Probe {
 	result := make(map[string]plan.Probe, len(probes))
+	dataDir := capr.GetDistroDataDir(controlPlane)
 	for k, v := range probes {
-		v.HTTPGetAction.CACert = replaceIfFormatSpecifier(v.HTTPGetAction.CACert, runtime)
-		v.HTTPGetAction.ClientCert = replaceIfFormatSpecifier(v.HTTPGetAction.ClientCert, runtime)
-		v.HTTPGetAction.ClientKey = replaceIfFormatSpecifier(v.HTTPGetAction.ClientKey, runtime)
+		v.HTTPGetAction.CACert = replaceIfFormatSpecifier(v.HTTPGetAction.CACert, dataDir)
+		v.HTTPGetAction.ClientCert = replaceIfFormatSpecifier(v.HTTPGetAction.ClientCert, dataDir)
+		v.HTTPGetAction.ClientKey = replaceIfFormatSpecifier(v.HTTPGetAction.ClientKey, dataDir)
 		result[k] = v
 	}
 	return result

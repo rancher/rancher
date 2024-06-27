@@ -2,10 +2,12 @@ package planner
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"hash/crc32"
 	"math"
+	"path"
 	"path/filepath"
 	"reflect"
 	"strconv"
@@ -46,19 +48,19 @@ const (
 
 	KubeControllerManagerArg                      = "kube-controller-manager-arg"
 	KubeControllerManagerExtraMount               = "kube-controller-manager-extra-mount"
-	DefaultKubeControllerManagerCertDir           = "/var/lib/rancher/%s/server/tls/kube-controller-manager"
+	DefaultKubeControllerManagerCertDir           = "server/tls/kube-controller-manager"
 	DefaultKubeControllerManagerDefaultSecurePort = "10257"
 	DefaultKubeControllerManagerCert              = "kube-controller-manager.crt"
 	KubeSchedulerArg                              = "kube-scheduler-arg"
 	KubeSchedulerExtraMount                       = "kube-scheduler-extra-mount"
-	DefaultKubeSchedulerCertDir                   = "/var/lib/rancher/%s/server/tls/kube-scheduler"
+	DefaultKubeSchedulerCertDir                   = "server/tls/kube-scheduler"
 	DefaultKubeSchedulerDefaultSecurePort         = "10259"
 	DefaultKubeSchedulerCert                      = "kube-scheduler.crt"
 	SecurePortArgument                            = "secure-port"
 	CertDirArgument                               = "cert-dir"
 	TLSCertFileArgument                           = "tls-cert-file"
 
-	authnWebhookFileName = "/var/lib/rancher/%s/kube-api-authn-webhook.yaml"
+	authnWebhookFileName = "kube-api-authn-webhook.yaml"
 	ConfigYamlFileName   = "/etc/rancher/%s/config.yaml.d/50-rancher.yaml"
 
 	bootstrapTier    = "bootstrap"
@@ -713,10 +715,10 @@ func convertInterfaceToStringSlice(input interface{}) []string {
 
 // renderArgAndMount takes the value of the existing value of the argument and mount and renders an output argument and
 // mount based on the value of the input interfaces. It will always return a set of slice of strings.
-func renderArgAndMount(existingArg interface{}, existingMount interface{}, runtime string, defaultSecurePort string, defaultCertDir string) ([]string, []string) {
+func renderArgAndMount(existingArg interface{}, existingMount interface{}, controlPlane *rkev1.RKEControlPlane, defaultSecurePort string, defaultCertDir string) ([]string, []string) {
 	retArg := convertInterfaceToStringSlice(existingArg)
 	retMount := convertInterfaceToStringSlice(existingMount)
-	renderedCertDir := fmt.Sprintf(defaultCertDir, runtime)
+	renderedCertDir := path.Join(capr.GetDistroDataDir(controlPlane), defaultCertDir)
 	// Set a default value for certDirArg and certDirMount (for the case where the user does not set these values)
 	// If a user sets these values, we will set them to an empty string and check to make sure they are not empty
 	// strings before adding them to the rendered arg/mount slices.
@@ -760,7 +762,7 @@ func renderArgAndMount(existingArg interface{}, existingMount interface{}, runti
 		logrus.Debugf("renderArgAndMount adding %s to component arguments", securePortArg)
 		retArg = appendToInterface(retArg, securePortArg)
 	}
-	if runtime == capr.RuntimeRKE2 {
+	if capr.GetRuntime(controlPlane.Spec.KubernetesVersion) == capr.RuntimeRKE2 {
 		// todo: make sure the certDirMount is not already set by the user to some custom value before we set it for the static pod extraMount
 		logrus.Debugf("renderArgAndMount adding %s to component mounts", certDirMount)
 		retMount = appendToInterface(existingMount, certDirMount)
@@ -1044,6 +1046,13 @@ func (p *Planner) generatePlanWithConfigFiles(controlPlane *rkev1.RKEControlPlan
 		}
 
 		nodePlan, err = addOtherFiles(nodePlan, controlPlane, entry)
+
+		idempotentScriptFile := plan.File{
+			Content: base64.StdEncoding.EncodeToString([]byte(idempotentActionScript)),
+			Path:    idempotentActionScriptPath(controlPlane),
+			Dynamic: true,
+			Minor:   true,
+		}
 
 		nodePlan.Files = append(nodePlan.Files, idempotentScriptFile)
 

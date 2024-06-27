@@ -55,7 +55,7 @@ func installScript(setting settings.Setting, files []string) ([]byte, error) {
 	return ioutil.ReadAll(resp.Body)
 }
 
-func LinuxInstallScript(ctx context.Context, token string, envVars []corev1.EnvVar, defaultHost string) ([]byte, error) {
+func LinuxInstallScript(ctx context.Context, token string, envVars []corev1.EnvVar, defaultHost, _ string) ([]byte, error) {
 	data, err := installScript(
 		settings.SystemAgentInstallScript,
 		localAgentInstallScripts)
@@ -124,7 +124,7 @@ func LinuxInstallScript(ctx context.Context, token string, envVars []corev1.EnvV
 `, envVarBuf.String(), binaryURL, server, ca, token, data)), nil
 }
 
-func WindowsInstallScript(ctx context.Context, token string, envVars []corev1.EnvVar, defaultHost string) ([]byte, error) {
+func WindowsInstallScript(ctx context.Context, token string, envVars []corev1.EnvVar, defaultHost, dataDir string) ([]byte, error) {
 	data, err := installScript(
 		settings.WinsAgentInstallScript,
 		localWindowsRke2InstallScripts)
@@ -185,9 +185,9 @@ func WindowsInstallScript(ctx context.Context, token string, envVars []corev1.En
 # Enables CSI Proxy
 $env:CSI_PROXY_URL = "%s"
 $env:CSI_PROXY_VERSION = "%s"
-$env:CSI_PROXY_KUBELET_PATH = "C:/var/lib/rancher/rke2/bin/kubelet.exe"
+$env:CSI_PROXY_KUBELET_PATH = "C:%s/bin/kubelet.exe"
 
 Invoke-WinsInstaller @PSBoundParameters
 exit 0
-`, data, envVarBuf.String(), binaryURL, server, ca, token, csiProxyURL, csiProxyVersion)), nil
+`, data, envVarBuf.String(), binaryURL, server, ca, token, csiProxyURL, csiProxyVersion, dataDir)), nil
 }

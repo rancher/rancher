@@ -84,7 +84,7 @@ func Test_getBootstrapSecret(t *testing.T) {
 			a.Nil(err)
 			machine, err := handler.machineCache.Get(tt.args.namespaceName, tt.args.os)
 			a.Nil(err)
-			secret, err := handler.getBootstrapSecret(tt.args.namespaceName, tt.args.secretName, []v1.EnvVar{}, machine)
+			secret, err := handler.getBootstrapSecret(tt.args.namespaceName, tt.args.secretName, []v1.EnvVar{}, machine, "")
 			a.Nil(err)
 
 			// assert
