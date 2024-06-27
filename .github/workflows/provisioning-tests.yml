@@ -1,0 +1,43 @@
+name: Provisioning tests
+run-name: Provisioning tests
+on:
+  push: 
+    branches:
+      - 'dev-v*'
+      - 'release-v*'
+  pull_request:
+    branches:
+      - 'dev-v*'
+      - 'release-v*'
+jobs:
+  provisioning_tests:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - V2PROV_TEST_DIST: "k3s"
+          V2PROV_TEST_RUN_REGEX: "^Test_(General|Provisioning)_.*$"
+        - V2PROV_TEST_DIST: "rke2"
+          V2PROV_TEST_RUN_REGEX: "^Test_(General|Provisioning)_.*$"
+        - V2PROV_TEST_DIST: "k3s"
+          V2PROV_TEST_RUN_REGEX: "^Test_Operation_.*$"
+        - V2PROV_TEST_DIST: "rke2"
+          V2PROV_TEST_RUN_REGEX: "^Test_Operation_SetA_.*$"
+        - V2PROV_TEST_DIST: "rke2"
+          V2PROV_TEST_RUN_REGEX: "^Test_Operation_SetB_.*$"
+    name: Provisioning tests 
+    runs-on: runs-on,runner=4cpu-linux-x64,image=legacy-cgroups-for-x64,run-id=${{ github.run_id }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: testdata
+        run: mkdir -p build/testdata
+      - name: Install Dapper
+        run: |
+          curl -sL https://releases.rancher.com/dapper/latest/dapper-$(uname -s)-$(uname -m) > ./.dapper
+          chmod +x ./.dapper
+      - name: Run tests
+        run: ./.dapper provisioning-tests
+        env:
+          V2PROV_TEST_RUN_REGEX: "${{ matrix.V2PROV_TEST_RUN_REGEX }}"
+          V2PROV_TEST_DIST: "${{ matrix.V2PROV_TEST_DIST }}"
