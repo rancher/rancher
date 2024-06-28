@@ -1,5 +1,4 @@
 name: Provisioning tests
-run-name: Provisioning tests
 on:
   push: 
     branches:
