@@ -203,6 +203,7 @@ var OriginMap = map[string]string{
 	"mirrored-prometheus-node-exporter":                       "https://github.com/prometheus/node_exporter",
 	"mirrored-prometheus-operator-prometheus-config-reloader": "https://github.com/prometheus-operator/prometheus-operator/pkgs/container/prometheus-config-reloader",
 	"mirrored-prometheus-operator-prometheus-operator":        "https://github.com/prometheus-operator/prometheus-operator",
+	"mirrored-prometheus-operator-admission-webhook":          "https://github.com/prometheus-operator/prometheus-operator/pkgs/container/admission-webhook",
 	"mirrored-prometheus-prometheus":                          "https://github.com/prometheus/prometheus",
 	"mirrored-prometheus-windows-exporter":                    "https://github.com/prometheus-community/windows_exporter",
 	"mirrored-pstauffer-curl":                                 "https://github.com/pstauffer/docker-curl",
