@@ -1,11 +1,10 @@
 name: Provisioning tests
 on:
-  push: 
+  push:
     branches:
-      - 'brooksn-*'
-  pull_request:
-    branches:
-      - 'brooksn-*'
+      - release/v*
+    tags:
+      - v*
 jobs:
   provisioning_tests:
     strategy:
