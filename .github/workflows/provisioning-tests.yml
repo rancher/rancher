@@ -1,5 +1,8 @@
 name: Provisioning tests
 on:
+  pull_request:
+    branches:
+      - release/v*
   push:
     branches:
       - release/v*
