@@ -6,6 +6,7 @@ fi
 
 cleanup()
 {
+    dump_rancher_logs
     EXIT=$?
     set +ex
     echo Stopping rancher server
