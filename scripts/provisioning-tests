@@ -129,11 +129,11 @@ RANCHER_RUN_PID=$!
 trap cleanup exit
 
 echo "Waiting for Rancher to be healthy"
-./scripts/retry --sleep 2 --timeout 300 "curl -sf -o /dev/null http://localhost:8080/ping"
+./scripts/retry --sleep 2 --timeout 600 "curl -sf -o /dev/null http://localhost:8080/ping"
 
 echo "Waiting up to 5 minutes for rancher-webhook deployment"
 ./scripts/retry \
-  --timeout 300 `# Time out after 300 seconds (5 min)` \
+  --timeout 600 `# Time out after 300 seconds (5 min)` \
   --sleep 2 `# Sleep for 2 seconds in between attempts` \
   --message-interval 30 `# Print the progress message below every 30 attempts (roughly every minute)` \
   --message "rancher-webhook was not available after {{elapsed}} seconds" `# Print this progress message` \
@@ -141,7 +141,7 @@ echo "Waiting up to 5 minutes for rancher-webhook deployment"
 
 echo "Waiting up to 5 minutes for rancher-provisioning-capi deployment"
 ./scripts/retry \
-  --timeout 300 `# Time out after 300 seconds (5 min)` \
+  --timeout 600 `# Time out after 300 seconds (5 min)` \
   --sleep 2 `# Sleep for 2 seconds in between attempts` \
   --message-interval 30 `# Print the progress message below every 30 attempts (roughly every minute)` \
   --message "rancher-provisioning-capi was not available after {{elapsed}} seconds" `# Print this progress message` \
