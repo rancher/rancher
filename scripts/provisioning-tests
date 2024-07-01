@@ -6,8 +6,10 @@ fi
 
 cleanup()
 {
-    dump_rancher_logs
     EXIT=$?
+    echo "exit code: $EXIT"
+    free -m
+    dump_rancher_logs
     set +ex
     echo Stopping rancher server
     kill $RANCHER_RUN_PID
