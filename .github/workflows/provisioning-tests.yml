@@ -38,5 +38,6 @@ jobs:
       - name: Run tests
         run: ./.dapper provisioning-tests
         env:
+          DRONE_BUILD_EVENT: "${{ github.event_name }}"
           V2PROV_TEST_RUN_REGEX: "${{ matrix.V2PROV_TEST_RUN_REGEX }}"
           V2PROV_TEST_DIST: "${{ matrix.V2PROV_TEST_DIST }}"
