@@ -117,6 +117,7 @@ func TestCreateUpdate(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-grb",
 			UID:  "1234",
+			Generation: generation,
 		},
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: apisv3.GlobalRoleBindingGroupVersionKind.GroupVersion().String(),
@@ -543,10 +544,14 @@ func TestCreateUpdate(t *testing.T) {
 					fwhMock:           &fphMock,
 					stateChanges:      &stateChanges,
 				}
+				grbClientMock := &globalRoleBindingControllerMock{
+					err: nil,
+				}
 				if test.stateSetup != nil {
 					test.stateSetup(state)
 				}
 				grbLifecycle.grLister = &grListerMock
+				grbLifecycle.grbClient = grbClientMock
 				grbLifecycle.crbLister = &crbListerMock
 				grbLifecycle.crtbCache = crtbCacheMock
 				grbLifecycle.clusterLister = &clusterListerMock
