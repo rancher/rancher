@@ -28,6 +28,8 @@ jobs:
     runs-on: runs-on,runner=8cpu-linux-x64,image=legacy-cgroups-for-x64,run-id=${{ github.run_id }}
     # runs-on: [self-hosted, linux, ubuntu-18.04, ec2-ephemeral]
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
       # - name: Install Git
       #   run: |
       #     sudo add-apt-repository ppa:git-core/candidate -y
