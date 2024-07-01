@@ -209,6 +209,7 @@ type GlobalRoleStatus struct {
 // +genclient:nonNamespaced
 // +kubebuilder:resource:scope=Cluster
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:subresource:status
 
 // GlobalRoleBinding binds a given subject user or group to a GlobalRole.
 type GlobalRoleBinding struct {
@@ -229,6 +230,30 @@ type GlobalRoleBinding struct {
 	// GlobalRoleName is the name of the Global Role that the subject will be bound to. Immutable.
 	// +kubebuilder:validation:Required
 	GlobalRoleName string `json:"globalRoleName" norman:"required,noupdate,type=reference[globalRole]"`
+
+	// Status is the most recently observed status of the GlobalRoleBinding
+	// +optional
+	Status GlobalRoleBindingStatus `json:"status,omitempty"`
+}
+
+// GlobalRoleBindingStatus represents the most recently observed status of the GlobalRoleBinding
+type GlobalRoleBindingStatus struct {
+	// ObservedGeneration is the most recent generation (metadata.generation in GRB)
+	// observed by the controller. Populated by the system.
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+
+	// LastUpdate is a k8s timestamp of the last time the status was updated.
+	// +optional
+	LastUpdateTime string `json:"lastUpdateTime,omitempty"`
+
+	// Summary is a string. One of "Complete", "InProgress" or "Error".
+	// +optional
+	Summary string `json:"summary,omitempty"`
+
+	// Conditions is a slice of Condition, indicating the status of specific backing RBAC objects.
+	// +optional
+	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 }
 
 // +genclient
