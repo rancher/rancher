@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"path"
 	"regexp"
 	"sort"
 	"strings"
@@ -24,11 +25,11 @@ import (
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
 	rkecontroller "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/serviceaccounttoken"
-	"github.com/rancher/wrangler/v2/pkg/condition"
-	"github.com/rancher/wrangler/v2/pkg/data"
-	corecontrollers "github.com/rancher/wrangler/v2/pkg/generated/controllers/core/v1"
-	"github.com/rancher/wrangler/v2/pkg/generic"
-	"github.com/rancher/wrangler/v2/pkg/name"
+	"github.com/rancher/wrangler/v3/pkg/condition"
+	"github.com/rancher/wrangler/v3/pkg/data"
+	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+	"github.com/rancher/wrangler/v3/pkg/generic"
+	"github.com/rancher/wrangler/v3/pkg/name"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -43,39 +44,40 @@ const (
 	AddressAnnotation = "rke.cattle.io/address"
 	ClusterNameLabel  = "rke.cattle.io/cluster-name"
 	// ClusterSpecAnnotation is used to define the cluster spec used to generate the rkecontrolplane object as an annotation on the object
-	ClusterSpecAnnotation         = "rke.cattle.io/cluster-spec"
-	ControlPlaneRoleLabel         = "rke.cattle.io/control-plane-role"
-	DrainAnnotation               = "rke.cattle.io/drain-options"
-	DrainDoneAnnotation           = "rke.cattle.io/drain-done"
-	DrainErrorAnnotation          = "rke.cattle.io/drain-error"
-	EtcdRoleLabel                 = "rke.cattle.io/etcd-role"
-	ForceRemoveEtcdAnnotation     = "rke.cattle.io/etcd-force-remove"
-	HostnameLengthLimitAnnotation = "rke.cattle.io/hostname-length-limit"
-	InitNodeLabel                 = "rke.cattle.io/init-node"
-	InitNodeMachineIDLabel        = "rke.cattle.io/init-node-machine-id"
-	InternalAddressAnnotation     = "rke.cattle.io/internal-address"
-	JoinURLAutosetDisabled        = "rke.cattle.io/join-url-autoset-disabled"
-	JoinURLAnnotation             = "rke.cattle.io/join-url"
-	JoinedToAnnotation            = "rke.cattle.io/joined-to"
-	LabelsAnnotation              = "rke.cattle.io/labels"
-	MachineIDLabel                = "rke.cattle.io/machine-id"
-	MachineNameLabel              = "rke.cattle.io/machine-name"
-	MachineTemplateHashLabel      = "rke.cattle.io/machine-template-hash"
-	RKEMachinePoolNameLabel       = "rke.cattle.io/rke-machine-pool-name"
-	MachineNamespaceLabel         = "rke.cattle.io/machine-namespace"
-	MachineRequestType            = "rke.cattle.io/machine-request"
-	MachineUIDLabel               = "rke.cattle.io/machine"
-	NodeNameLabel                 = "rke.cattle.io/node-name"
-	PlanSecret                    = "rke.cattle.io/plan-secret-name"
-	PostDrainAnnotation           = "rke.cattle.io/post-drain"
-	PreDrainAnnotation            = "rke.cattle.io/pre-drain"
-	RoleLabel                     = "rke.cattle.io/service-account-role"
-	TaintsAnnotation              = "rke.cattle.io/taints"
-	UnCordonAnnotation            = "rke.cattle.io/uncordon"
-	WorkerRoleLabel               = "rke.cattle.io/worker-role"
-	AuthorizedObjectAnnotation    = "rke.cattle.io/object-authorized-for-clusters"
-	PlanUpdatedTimeAnnotation     = "rke.cattle.io/plan-last-updated"
-	PlanProbesPassedAnnotation    = "rke.cattle.io/plan-probes-passed"
+	ClusterSpecAnnotation                      = "rke.cattle.io/cluster-spec"
+	ControlPlaneRoleLabel                      = "rke.cattle.io/control-plane-role"
+	DrainAnnotation                            = "rke.cattle.io/drain-options"
+	DrainDoneAnnotation                        = "rke.cattle.io/drain-done"
+	DrainErrorAnnotation                       = "rke.cattle.io/drain-error"
+	EtcdRoleLabel                              = "rke.cattle.io/etcd-role"
+	ForceRemoveEtcdAnnotation                  = "rke.cattle.io/etcd-force-remove"
+	HostnameLengthLimitAnnotation              = "rke.cattle.io/hostname-length-limit"
+	InitNodeLabel                              = "rke.cattle.io/init-node"
+	InitNodeMachineIDLabel                     = "rke.cattle.io/init-node-machine-id"
+	InternalAddressAnnotation                  = "rke.cattle.io/internal-address"
+	JoinURLAutosetDisabled                     = "rke.cattle.io/join-url-autoset-disabled"
+	JoinURLAnnotation                          = "rke.cattle.io/join-url"
+	JoinedToAnnotation                         = "rke.cattle.io/joined-to"
+	LabelsAnnotation                           = "rke.cattle.io/labels"
+	MachineIDLabel                             = "rke.cattle.io/machine-id"
+	MachineNameLabel                           = "rke.cattle.io/machine-name"
+	MachineTemplateHashLabel                   = "rke.cattle.io/machine-template-hash"
+	RKEMachinePoolNameLabel                    = "rke.cattle.io/rke-machine-pool-name"
+	MachineNamespaceLabel                      = "rke.cattle.io/machine-namespace"
+	MachineRequestType                         = "rke.cattle.io/machine-request"
+	MachineUIDLabel                            = "rke.cattle.io/machine"
+	NodeNameLabel                              = "rke.cattle.io/node-name"
+	PlanSecret                                 = "rke.cattle.io/plan-secret-name"
+	PostDrainAnnotation                        = "rke.cattle.io/post-drain"
+	PreDrainAnnotation                         = "rke.cattle.io/pre-drain"
+	RoleLabel                                  = "rke.cattle.io/service-account-role"
+	TaintsAnnotation                           = "rke.cattle.io/taints"
+	UnCordonAnnotation                         = "rke.cattle.io/uncordon"
+	WorkerRoleLabel                            = "rke.cattle.io/worker-role"
+	AuthorizedObjectAnnotation                 = "rke.cattle.io/object-authorized-for-clusters"
+	PlanUpdatedTimeAnnotation                  = "rke.cattle.io/plan-last-updated"
+	PlanProbesPassedAnnotation                 = "rke.cattle.io/plan-probes-passed"
+	DeleteMissingCustomMachinesAfterAnnotation = "rke.cattle.io/delete-missing-custom-machines-after"
 
 	JoinServerImplausible = "implausible"
 
@@ -110,10 +112,10 @@ const (
 	RuntimeK3S  = "k3s"
 	RuntimeRKE2 = "rke2"
 
-	K3sKubectlPath     = "/usr/local/bin/kubectl"
-	K3sKubeconfigPath  = "/etc/rancher/k3s/k3s.yaml"
-	RKE2KubectlPath    = "/var/lib/rancher/rke2/bin/kubectl"
-	RKE2KubeconfigPath = "/etc/rancher/rke2/rke2.yaml"
+	K3sKubectlPath          = "/usr/local/bin/kubectl"
+	K3sKubeconfigPath       = "/etc/rancher/k3s/k3s.yaml"
+	RKE2RelativeKubectlPath = "bin/kubectl"
+	RKE2KubeconfigPath      = "/etc/rancher/rke2/rke2.yaml"
 
 	RoleBootstrap = "bootstrap"
 	RolePlan      = "plan"
@@ -122,6 +124,8 @@ const (
 
 	MinimumHostnameLengthLimit = 10
 	MaximumHostnameLengthLimit = 63
+
+	SystemAgentDataDirEnvVar = "CATTLE_AGENT_VAR_DIR"
 )
 
 var (
@@ -154,13 +158,14 @@ func GetMachineByOwner(machineCache capicontrollers.MachineCache, obj metav1.Obj
 	return nil, ErrNoMachineOwnerRef
 }
 
-// GetKubectlAndKubeconfigPaths returns the corresponding kubectl/kubeconfig paths for a downstream node for the given kubernetes version.
-func GetKubectlAndKubeconfigPaths(kubernetesVersion string) (string, string) {
-	switch GetRuntime(kubernetesVersion) {
+// GetKubectlAndKubeconfigPaths returns the corresponding kubectl/kubeconfig paths for a downstream node for the given
+// RKEControlPlane.
+func GetKubectlAndKubeconfigPaths(controlPlane *rkev1.RKEControlPlane) (string, string) {
+	switch GetRuntime(controlPlane.Spec.KubernetesVersion) {
 	case RuntimeK3S:
 		return K3sKubectlPath, K3sKubeconfigPath
 	case RuntimeRKE2:
-		return RKE2KubectlPath, RKE2KubeconfigPath
+		return path.Join(GetDistroDataDir(controlPlane), RKE2RelativeKubectlPath), RKE2KubeconfigPath
 	}
 	return "", ""
 }
@@ -237,6 +242,27 @@ func GetLoopbackAddress(controlPlane *rkev1.RKEControlPlane) string {
 		return "localhost"
 	}
 	return "127.0.0.1"
+}
+
+func GetDistroDataDir(controlPlane *rkev1.RKEControlPlane) string {
+	if dir := controlPlane.Spec.DataDirectories.K8sDistro; dir != "" {
+		return dir
+	}
+	return fmt.Sprintf("/var/lib/rancher/%s", GetRuntime(controlPlane.Spec.KubernetesVersion))
+}
+
+func GetProvisioningDataDir(controlPlane *rkev1.RKEControlPlane) string {
+	if dir := controlPlane.Spec.DataDirectories.Provisioning; dir != "" {
+		return dir
+	}
+	return "/var/lib/rancher/capr"
+}
+
+func GetSystemAgent(controlPlane *rkev1.RKEControlPlane) string {
+	if dir := controlPlane.Spec.DataDirectories.SystemAgent; dir != "" {
+		return dir
+	}
+	return "/var/lib/rancher/agent"
 }
 
 func IsOwnedByMachine(bootstrapCache rkecontroller.RKEBootstrapCache, machineName string, sa *corev1.ServiceAccount) (bool, error) {

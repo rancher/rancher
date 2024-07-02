@@ -2,6 +2,7 @@ package planner
 
 import (
 	"fmt"
+	"path"
 	"strings"
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
@@ -29,6 +30,12 @@ func (p *Planner) generateInstallInstruction(controlPlane *rkev1.RKEControlPlane
 		default:
 			env = append(env, fmt.Sprintf("%s=%s", arg.Name, arg.Value))
 		}
+	}
+	switch cattleOS {
+	case capr.WindowsMachineOS:
+		env = append(env, fmt.Sprintf("$env:%s_DATA_DIR=\"c:%s\"", strings.ToUpper(capr.GetRuntime(controlPlane.Spec.KubernetesVersion)), capr.GetDistroDataDir(controlPlane)))
+	default:
+		env = append(env, fmt.Sprintf("%s_DATA_DIR=%s", strings.ToUpper(capr.GetRuntime(controlPlane.Spec.KubernetesVersion)), capr.GetDistroDataDir(controlPlane)))
 	}
 
 	switch cattleOS {
@@ -102,9 +109,8 @@ func (p *Planner) addInitNodePeriodicInstruction(nodePlan plan.NodePlan, control
 			Args: []string{
 				"-c",
 				// the grep here is to make the command fail if we don't get the output we expect, like empty string.
-				fmt.Sprintf("curl -f --retry 100 --retry-delay 5 --cacert "+
-					"/var/lib/rancher/%s/server/tls/server-ca.crt https://localhost:%d/db/info | grep 'clientURLs'",
-					capr.GetRuntime(controlPlane.Spec.KubernetesVersion),
+				fmt.Sprintf("curl -f --retry 100 --retry-delay 5 --cacert %s https://localhost:%d/db/info | grep 'clientURLs'",
+					path.Join(capr.GetDistroDataDir(controlPlane), "server/tls/server-ca.crt"),
 					capr.GetRuntimeSupervisorPort(controlPlane.Spec.KubernetesVersion)),
 			},
 			PeriodSeconds: 600,
@@ -114,7 +120,7 @@ func (p *Planner) addInitNodePeriodicInstruction(nodePlan plan.NodePlan, control
 			Command: "sh",
 			Args: []string{
 				"-c",
-				fmt.Sprintf("cat /var/lib/rancher/%s/server/db/etcd/name", capr.GetRuntime(controlPlane.Spec.KubernetesVersion)),
+				fmt.Sprintf("cat %s", path.Join(capr.GetDistroDataDir(controlPlane), "server/db/etcd/name")),
 			},
 			PeriodSeconds: 600,
 		},
@@ -150,4 +156,20 @@ func (p *Planner) addEtcdSnapshotListS3PeriodicInstruction(nodePlan plan.NodePla
 		PeriodSeconds: 600,
 	})
 	return nodePlan, nil
+}
+
+// generateManifestRemovalInstruction generates a rm -rf command for the manifests of a server. This was created in response to https://github.com/rancher/rancher/issues/41174
+func generateManifestRemovalInstruction(controlPlane *rkev1.RKEControlPlane, entry *planEntry) (bool, plan.OneTimeInstruction) {
+	runtime := capr.GetRuntime(controlPlane.Spec.KubernetesVersion)
+	if runtime == "" || entry == nil || roleNot(roleOr(isEtcd, isControlPlane))(entry) {
+		return false, plan.OneTimeInstruction{}
+	}
+	return true, plan.OneTimeInstruction{
+		Name:    "remove server manifests",
+		Command: "/bin/sh",
+		Args: []string{
+			"-c",
+			fmt.Sprintf("rm -rf %s/%s-*.yaml", path.Join(capr.GetDistroDataDir(controlPlane), "server/manifests"), runtime),
+		},
+	}
 }

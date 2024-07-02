@@ -324,9 +324,9 @@ func (l *Lifecycle) Remove(obj *v3.App) (runtime.Object, error) {
 		}
 		return obj, err
 	}
-	appIds := strings.Split(ns.Annotations[AppIDsLabel], ",")
+	appIDs := strings.Split(ns.Annotations[AppIDsLabel], ",")
 	appAnno := ""
-	for _, appID := range appIds {
+	for _, appID := range appIDs {
 		if appID == obj.Name {
 			continue
 		}

@@ -1,10 +1,13 @@
 package rbac
 
 import (
-	"github.com/hashicorp/go-multierror"
-	"github.com/pkg/errors"
+	"errors"
+	"fmt"
+
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	typesrbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
 	pkgrbac "github.com/rancher/rancher/pkg/rbac"
+	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -14,12 +17,22 @@ import (
 	"k8s.io/client-go/util/retry"
 )
 
-func newCRTBLifecycle(m *manager) *crtbLifecycle {
-	return &crtbLifecycle{m: m}
+func newCRTBLifecycle(m *manager, management *config.ManagementContext) *crtbLifecycle {
+	return &crtbLifecycle{
+		m:          m,
+		rtLister:   management.Management.RoleTemplates("").Controller().Lister(),
+		crbLister:  m.workload.RBAC.ClusterRoleBindings("").Controller().Lister(),
+		crbClient:  m.workload.RBAC.ClusterRoleBindings(""),
+		crtbClient: management.Management.ClusterRoleTemplateBindings(""),
+	}
 }
 
 type crtbLifecycle struct {
-	m *manager
+	m          managerInterface
+	rtLister   v3.RoleTemplateLister
+	crbLister  typesrbacv1.ClusterRoleBindingLister
+	crbClient  typesrbacv1.ClusterRoleBindingInterface
+	crtbClient v3.ClusterRoleTemplateBindingInterface
 }
 
 func (c *crtbLifecycle) Create(obj *v3.ClusterRoleTemplateBinding) (runtime.Object, error) {
@@ -50,9 +63,9 @@ func (c *crtbLifecycle) syncCRTB(binding *v3.ClusterRoleTemplateBinding) error {
 		return nil
 	}
 
-	rt, err := c.m.rtLister.Get("", binding.RoleTemplateName)
+	rt, err := c.rtLister.Get("", binding.RoleTemplateName)
 	if err != nil {
-		return errors.Wrapf(err, "couldn't get role template %v", binding.RoleTemplateName)
+		return fmt.Errorf("couldn't get role template %v: %w", binding.RoleTemplateName, err)
 	}
 
 	roles := map[string]*v3.RoleTemplate{}
@@ -61,16 +74,16 @@ func (c *crtbLifecycle) syncCRTB(binding *v3.ClusterRoleTemplateBinding) error {
 	}
 
 	if err := c.m.ensureRoles(roles); err != nil {
-		return errors.Wrap(err, "couldn't ensure roles")
+		return fmt.Errorf("couldn't ensure roles: %w", err)
 	}
 
 	if err := c.m.ensureClusterBindings(roles, binding); err != nil {
-		return errors.Wrapf(err, "couldn't ensure cluster bindings %v", binding)
+		return fmt.Errorf("couldn't ensure cluster bindings %v: %w", binding, err)
 	}
 
 	if binding.UserName != "" {
 		if err := c.m.ensureServiceAccountImpersonator(binding.UserName); err != nil {
-			return errors.Wrapf(err, "couldn't ensure service account impersonator")
+			return fmt.Errorf("couldn't ensure service account impersonator: %w", err)
 		}
 	}
 
@@ -79,22 +92,21 @@ func (c *crtbLifecycle) syncCRTB(binding *v3.ClusterRoleTemplateBinding) error {
 
 func (c *crtbLifecycle) ensureCRTBDelete(binding *v3.ClusterRoleTemplateBinding) error {
 	set := labels.Set(map[string]string{rtbOwnerLabel: pkgrbac.GetRTBLabel(binding.ObjectMeta)})
-	bindingCli := c.m.workload.RBAC.ClusterRoleBindings("")
-	rbs, err := c.m.crbLister.List("", set.AsSelector())
+	rbs, err := c.crbLister.List("", set.AsSelector())
 	if err != nil {
-		return errors.Wrapf(err, "couldn't list clusterrolebindings with selector %s", set.AsSelector())
+		return fmt.Errorf("couldn't list clusterrolebindings with selector %s: %w", set.AsSelector(), err)
 	}
 
 	for _, rb := range rbs {
-		if err := bindingCli.Delete(rb.Name, &metav1.DeleteOptions{}); err != nil {
+		if err := c.crbClient.Delete(rb.Name, &metav1.DeleteOptions{}); err != nil {
 			if !apierrors.IsNotFound(err) {
-				return errors.Wrapf(err, "error deleting clusterrolebinding %v", rb.Name)
+				return fmt.Errorf("error deleting clusterrolebinding %v: %w", rb.Name, err)
 			}
 		}
 	}
 
 	if err := c.m.deleteServiceAccountImpersonator(binding.UserName); err != nil {
-		return errors.Wrap(err, "error deleting service account impersonator")
+		return fmt.Errorf("error deleting service account impersonator: %w", err)
 	}
 
 	return nil
@@ -120,14 +132,14 @@ func (c *crtbLifecycle) reconcileCRTBUserClusterLabels(binding *v3.ClusterRoleTe
 		return err
 	}
 	set.AsSelector().Add(*reqUpdatedLabel, *reqNsAndNameLabel)
-	userCRBs, err := c.m.clusterRoleBindings.List(metav1.ListOptions{LabelSelector: set.AsSelector().Add(*reqUpdatedLabel, *reqNsAndNameLabel).String()})
+	userCRBs, err := c.crbClient.List(metav1.ListOptions{LabelSelector: set.AsSelector().Add(*reqUpdatedLabel, *reqNsAndNameLabel).String()})
 	if err != nil {
 		return err
 	}
 	bindingValue := pkgrbac.GetRTBLabel(binding.ObjectMeta)
 	for _, crb := range userCRBs.Items {
 		retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			crbToUpdate, updateErr := c.m.clusterRoleBindings.Get(crb.Name, metav1.GetOptions{})
+			crbToUpdate, updateErr := c.crbClient.Get(crb.Name, metav1.GetOptions{})
 			if updateErr != nil {
 				return updateErr
 			}
@@ -136,19 +148,17 @@ func (c *crtbLifecycle) reconcileCRTBUserClusterLabels(binding *v3.ClusterRoleTe
 			}
 			crbToUpdate.Labels[rtbOwnerLabel] = bindingValue
 			crbToUpdate.Labels[rtbLabelUpdated] = "true"
-			_, err := c.m.clusterRoleBindings.Update(crbToUpdate)
+			_, err := c.crbClient.Update(crbToUpdate)
 			return err
 		})
-		if retryErr != nil {
-			returnErr = multierror.Append(returnErr, retryErr)
-		}
+		returnErr = errors.Join(returnErr, retryErr)
 	}
 	if returnErr != nil {
 		return returnErr
 	}
 
 	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		crtbToUpdate, updateErr := c.m.crtbs.GetNamespaced(binding.Namespace, binding.Name, metav1.GetOptions{})
+		crtbToUpdate, updateErr := c.crtbClient.GetNamespaced(binding.Namespace, binding.Name, metav1.GetOptions{})
 		if updateErr != nil {
 			return updateErr
 		}
@@ -156,7 +166,7 @@ func (c *crtbLifecycle) reconcileCRTBUserClusterLabels(binding *v3.ClusterRoleTe
 			crtbToUpdate.Labels = make(map[string]string)
 		}
 		crtbToUpdate.Labels[rtbCrbRbLabelsUpdated] = "true"
-		_, err := c.m.crtbs.Update(crtbToUpdate)
+		_, err := c.crtbClient.Update(crtbToUpdate)
 		return err
 	})
 	return retryErr

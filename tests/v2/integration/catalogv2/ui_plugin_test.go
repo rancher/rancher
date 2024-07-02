@@ -5,13 +5,19 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"mime"
+	"path/filepath"
+
+	"io"
+	"net/http"
+	"testing"
+	"time"
 
 	rv1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/plugin"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/shepherd/clients/rancher"
 	"github.com/rancher/shepherd/clients/rancher/catalog"
-	client "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
 	"github.com/rancher/shepherd/extensions/kubeconfig"
 	"github.com/rancher/shepherd/pkg/api/steve/catalog/types"
 	"github.com/rancher/shepherd/pkg/session"
@@ -19,16 +25,12 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"helm.sh/helm/v3/pkg/action"
-	"io"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kwait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/kubernetes"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
-	"net/http"
-	"testing"
-	"time"
 )
 
 type UIPluginTest struct {
@@ -37,7 +39,6 @@ type UIPluginTest struct {
 	session          *session.Session
 	restClientGetter genericclioptions.RESTClientGetter
 	catalogClient    *catalog.Client
-	cluster          *client.Cluster
 	corev1           corev1.CoreV1Interface
 	originalBranch   string
 	originalGitRepo  string
@@ -109,6 +110,26 @@ func (w *UIPluginTest) SetupSuite() {
 	}, "extensions-examples"))
 	w.Require().NoError(w.waitForChart(rv1.StatusDeployed, "clock", 0))
 
+	w.Require().NoError(w.catalogClient.InstallChart(&types.ChartInstallAction{
+		DisableHooks:             false,
+		Timeout:                  &metav1.Duration{Duration: 60 * time.Second},
+		Wait:                     true,
+		Namespace:                namespace.UIPluginNamespace,
+		DisableOpenAPIValidation: false,
+		Charts: []types.ChartInstall{{
+			ChartName:   "top-level-product",
+			Version:     "0.1.0",
+			ReleaseName: "top-level-product",
+			Description: "top-level-product",
+			Values: map[string]interface{}{
+				"plugin": map[string]interface{}{
+					"noCache": true,
+				},
+			},
+		}},
+	}, "extensions-examples"))
+	w.Require().NoError(w.waitForChart(rv1.StatusDeployed, "top-level-product", 0))
+
 	//Waiting for controller cache to update
 	time.Sleep(10 * time.Second)
 }
@@ -134,7 +155,7 @@ func (w *UIPluginTest) TestGetIndexAuthenticated() {
 	res.Body.Close()
 	var index plugin.SafeIndex
 	w.Require().NoError(json.Unmarshal(body, &index))
-	w.Require().Equal(len(index.Entries), 2)
+	w.Require().Equal(len(index.Entries), 3)
 }
 
 // TestGetIndexUnauthenticated Tests if the unauthenticated extensions (and only them) are present
@@ -153,6 +174,23 @@ func (w *UIPluginTest) TestGetIndexUnauthenticated() {
 	w.Require().Equal(len(index.Entries), 1)
 	_, ok := index.Entries["uk-locale"]
 	w.Require().True(ok)
+}
+
+// TestGetSingleExtensionAuthenticated Tests that the requests returns the correct Content-Type header
+func (w *UIPluginTest) TestCorrectContentType() {
+	client := &http.Client{Transport: &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}}
+	file := "/top-level-product-0.1.0.umd.min.1.js"
+	req, _ := http.NewRequest(http.MethodGet, "https://localhost:8443/v1/uiplugins/top-level-product/0.1.0/plugin"+file, nil)
+	req.AddCookie(&http.Cookie{
+		Name:  "R_SESS",
+		Value: w.client.RancherConfig.AdminToken,
+	})
+
+	res, _ := client.Do(req)
+	w.Require().Equal(res.StatusCode, http.StatusOK)
+	w.Require().Equal(mime.TypeByExtension(filepath.Ext(file)), res.Header.Get("Content-Type"))
 }
 
 // TestGetSingleExtensionAuthenticated Tests that the requests succeeds if the user is authenticated

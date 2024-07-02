@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.12.0
+    controller-gen.kubebuilder.io/version: v0.14.0
   name: clusterproxyconfigs.management.cattle.io
 spec:
   group: management.cattle.io
@@ -17,24 +17,28 @@ spec:
   - name: v3
     schema:
       openAPIV3Schema:
-        description: ClusterProxyConfig determines which downstream requests will
-          be proxied to the downstream cluster for requests that contain service account
-          tokens. Objects of this type are created in the namespace of the target
-          cluster.  If no object exists, the feature will be disabled by default.
+        description: |-
+          ClusterProxyConfig determines which downstream requests will be proxied to the downstream cluster for requests that contain service account tokens.
+          Objects of this type are created in the namespace of the target cluster.  If no object exists, the feature will be disabled by default.
         properties:
           apiVersion:
-            description: 'APIVersion defines the versioned schema of this representation
-              of an object. Servers should convert recognized schemas to the latest
-              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
             type: string
           enabled:
             description: Enabled indicates whether downstream proxy requests for service
               account tokens is enabled.
             type: boolean
           kind:
-            description: 'Kind is a string value representing the REST resource this
-              object represents. Servers may infer this from the endpoint the client
-              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
             type: string
           metadata:
             type: object

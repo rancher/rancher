@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/rancher/rancher/pkg/catalogv2/chart"
-	"github.com/rancher/wrangler/v2/pkg/schemas/validation"
+	"github.com/rancher/wrangler/v3/pkg/schemas/validation"
 	"helm.sh/helm/v3/pkg/repo"
 )
 

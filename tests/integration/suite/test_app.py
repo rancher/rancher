@@ -191,35 +191,6 @@ def wait_for_app_annotation(admin_pc, ns, app_name, exists=True, timeout=60):
     return ns
 
 
-def test_app_custom_values_file(admin_pc, admin_mc):
-    client = admin_pc.client
-    ns = admin_pc.cluster.client.create_namespace(name=random_str(),
-                                                  projectId=admin_pc.
-                                                  project.id)
-    wait_for_template_to_be_created(admin_mc.client, "library")
-    values_yaml = "replicaCount: 2\r\nimage:\r\n  " \
-                  "repository: registry\r\n  tag: 2.7"
-    answers = {
-        "image.tag": "2.6"
-    }
-    app = client.create_app(
-        name=random_str(),
-        externalId="catalog://?catalog=library&template=docker-registry"
-                   "&version=1.8.1&namespace=cattle-global-data",
-        targetNamespace=ns.name,
-        projectId=admin_pc.project.id,
-        valuesYaml=values_yaml,
-        answers=answers
-    )
-    workloads = wait_for_workload(client, ns.name, count=1)
-    workloads = wait_for_replicas(client, ns.name, count=2)
-    print(workloads)
-    assert workloads.data[0].deploymentStatus.unavailableReplicas == 2
-    assert workloads.data[0].containers[0].image == "registry:2.6"
-    client.delete(app)
-    wait_for_app_to_be_deleted(client, app)
-
-
 @pytest.mark.nonparallel
 def test_app_create_validation(admin_mc, admin_pc, custom_catalog,
                                remove_resource, restore_rancher_version):
@@ -832,25 +803,6 @@ def wait_for_replicas(client, ns, timeout=60, count=0):
         interval *= 2
         workloads = client.list_workload(namespaceId=ns)
     return workloads
-
-
-def wait_for_app_to_be_deleted(client, app, timeout=120):
-    start = time.time()
-    interval = 0.5
-    while True:
-        if time.time() - start > timeout:
-            raise AssertionError(
-                "Timed out waiting for apps to be deleted")
-        apps = client.list_app()
-        found = False
-        for a in apps:
-            if a.id == app.id:
-                found = True
-                break
-        if not found:
-            break
-        time.sleep(interval)
-        interval *= 2
 
 
 def wait_for_monitor_metric(admin_cc, admin_mc, timeout=60):

@@ -11,7 +11,6 @@ import (
 	ldapv3 "github.com/go-ldap/ldap/v3"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -130,46 +129,6 @@ func GetAttributeValuesByName(search []*ldapv3.EntryAttribute, attributeName str
 	return []string{}
 }
 
-func GetUserSearchAttributes(memberOfAttribute, ObjectClass string, config *v32.ActiveDirectoryConfig) []string {
-	userSearchAttributes := []string{memberOfAttribute,
-		ObjectClass,
-		config.UserObjectClass,
-		config.UserLoginAttribute,
-		config.UserNameAttribute,
-		config.UserEnabledAttribute}
-	return userSearchAttributes
-}
-
-func GetGroupSearchAttributes(config *v32.ActiveDirectoryConfig, searchAttributes ...string) []string {
-	groupSeachAttributes := []string{
-		config.GroupObjectClass,
-		config.UserLoginAttribute,
-		config.GroupNameAttribute,
-		config.GroupSearchAttribute}
-	groupSeachAttributes = append(groupSeachAttributes, searchAttributes...)
-	return groupSeachAttributes
-}
-
-func GetUserSearchAttributesForLDAP(ObjectClass string, config *v3.LdapConfig) []string {
-	userSearchAttributes := []string{"dn", config.UserMemberAttribute,
-		ObjectClass,
-		config.UserObjectClass,
-		config.UserLoginAttribute,
-		config.UserNameAttribute,
-		config.UserEnabledAttribute}
-	return userSearchAttributes
-}
-
-func GetGroupSearchAttributesForLDAP(ObjectClass string, config *v3.LdapConfig) []string {
-	groupSeachAttributes := []string{config.GroupMemberUserAttribute,
-		ObjectClass,
-		config.GroupObjectClass,
-		config.UserLoginAttribute,
-		config.GroupNameAttribute,
-		config.GroupSearchAttribute}
-	return groupSeachAttributes
-}
-
 func AuthenticateServiceAccountUser(serviceAccountPassword string, serviceAccountUsername string, defaultLoginDomain string, lConn ldapv3.Client) error {
 	logrus.Debug("Binding service account username password")
 	if serviceAccountPassword == "" {
@@ -256,10 +215,18 @@ func GatherParentGroups(groupPrincipal v3.Principal, searchDomain string, groupS
 	}
 	groupDN := strings.TrimPrefix(parts[1], "//")
 
-	searchGroup := ldapv3.NewSearchRequest(searchDomain,
-		ldapv3.ScopeWholeSubtree, ldapv3.NeverDerefAliases, 0, 0, false,
-		fmt.Sprintf("(&(%v=%v)(%v=%v))", config.GroupMemberMappingAttribute, ldapv3.EscapeFilter(groupDN), config.ObjectClass, config.GroupObjectClass),
-		searchAttributes, nil)
+	filter := fmt.Sprintf(
+		"(&(%v=%v)(%v=%v))",
+		config.GroupMemberMappingAttribute, ldapv3.EscapeFilter(groupDN),
+		config.ObjectClass, config.GroupObjectClass,
+	)
+
+	searchGroup := NewWholeSubtreeSearchRequest(
+		searchDomain,
+		filter,
+		searchAttributes,
+	)
+
 	resultGroups, err := lConn.SearchWithPaging(searchGroup, 1000)
 	if err != nil {
 		return err
@@ -307,13 +274,6 @@ func FindNonDuplicateBetweenGroupPrincipals(newGroupPrincipals []v3.Principal, g
 	return nonDupGroupPrincipals
 }
 
-func Min(a int, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
 func NewCAPool(cert string) (*x509.CertPool, error) {
 	pool, err := x509.SystemCertPool()
 	if err != nil {
@@ -323,17 +283,32 @@ func NewCAPool(cert string) (*x509.CertPool, error) {
 	return pool, nil
 }
 
-func ValidateLdapConfig(ldapConfig *v3.LdapConfig, certpool *x509.CertPool) (bool, error) {
-	if len(ldapConfig.Servers) < 1 {
-		return false, nil
-	}
+// NewWholeSubtreeSearchRequest will return a NewDefaultSearchRequest with a ScopeWholeSubtree scope
+func NewWholeSubtreeSearchRequest(baseDN, filter string, attributes []string) *ldapv3.SearchRequest {
+	return NewDefaultSearchRequest(baseDN, filter, ldapv3.ScopeWholeSubtree, attributes)
+}
 
-	lConn, err := Connect(ldapConfig, certpool)
-	if err != nil {
-		return false, err
-	}
-	defer lConn.Close()
+// NewBaseObjectSearchRequest will return a NewDefaultSearchRequest with a ScopeBaseObject scope
+func NewBaseObjectSearchRequest(baseDN, filter string, attributes []string) *ldapv3.SearchRequest {
+	return NewDefaultSearchRequest(baseDN, filter, ldapv3.ScopeBaseObject, attributes)
+}
 
-	logrus.Debugf("validated ldap configuration: %s", strings.Join(ldapConfig.Servers, ","))
-	return true, nil
+// NewDefaultSearchRequest will return a new *ldapv3.SearchRequest based on some fixed common arguments:
+// - DerefAliases (NeverDerefAliases)
+// - SizeLimit (0)
+// - TimeLimit (0)
+// - TypesOnly (false)
+// - Controls (nil)
+func NewDefaultSearchRequest(baseDN, filter string, scope int, attributes []string) *ldapv3.SearchRequest {
+	return ldapv3.NewSearchRequest(
+		baseDN,                   // BaseDN
+		scope,                    // Scope
+		ldapv3.NeverDerefAliases, // DerefAliases
+		0,                        // SizeLimit
+		0,                        // TimeLimit
+		false,                    // TypesOnly
+		filter,                   // Filter
+		attributes,               // Attributes
+		nil,                      // Controls
+	)
 }

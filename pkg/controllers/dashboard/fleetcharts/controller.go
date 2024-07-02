@@ -11,8 +11,8 @@ import (
 	fleetconst "github.com/rancher/rancher/pkg/fleet"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
-	"github.com/rancher/wrangler/v2/pkg/data"
-	"github.com/rancher/wrangler/v2/pkg/relatedresource"
+	"github.com/rancher/wrangler/v3/pkg/data"
+	"github.com/rancher/wrangler/v3/pkg/relatedresource"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -39,6 +39,7 @@ var (
 		settings.SystemDefaultRegistry.Name: {},
 		settings.FleetMinVersion.Name:       {},
 		settings.FleetVersion.Name:          {},
+		settings.AgentTLSMode.Name:          {},
 	}
 )
 
@@ -108,6 +109,7 @@ func (h *handler) onSetting(key string, setting *v3.Setting) (*v3.Setting, error
 	}
 
 	fleetChartValues := map[string]interface{}{
+		"agentTLSMode": settings.AgentTLSMode.Get(),
 		"apiServerURL": settings.ServerURL.Get(),
 		"apiServerCA":  settings.CACerts.Get(),
 		"global":       systemGlobalRegistry,

@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -21,7 +22,6 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
-	"github.com/hashicorp/go-multierror"
 	"github.com/mattn/go-colorable"
 	"github.com/rancher/rancher/pkg/agent/clean"
 	"github.com/rancher/rancher/pkg/agent/cluster"
@@ -33,7 +33,7 @@ import (
 	"github.com/rancher/rancher/pkg/rkenodeconfigserver"
 	"github.com/rancher/remotedialer"
 	"github.com/rancher/shepherd/pkg/killserver"
-	"github.com/rancher/wrangler/v2/pkg/signals"
+	"github.com/rancher/wrangler/v3/pkg/signals"
 	"github.com/sirupsen/logrus"
 )
 
@@ -77,20 +77,11 @@ func runAgent(ctx context.Context) {
 		if os.Getenv("CLUSTER_CLEANUP") == "true" {
 			err = clean.Cluster()
 		} else if os.Getenv("BINDING_CLEANUP") == "true" {
-			var bindingErr error
-			err = clean.DuplicateBindings(nil)
-			if err != nil {
-				bindingErr = multierror.Append(bindingErr, err)
-			}
-			err = clean.OrphanBindings(nil)
-			if err != nil {
-				bindingErr = multierror.Append(bindingErr, err)
-			}
-			err = clean.OrphanCatalogBindings(nil)
-			if err != nil {
-				bindingErr = multierror.Append(bindingErr, err)
-			}
-			err = bindingErr
+			err = errors.Join(
+				clean.DuplicateBindings(nil),
+				clean.OrphanBindings(nil),
+				clean.OrphanCatalogBindings(nil),
+			)
 		} else {
 			err = run(ctx)
 		}
@@ -326,7 +317,10 @@ func run(ctx context.Context) error {
 	onConnect := func(ctx context.Context, _ *remotedialer.Session) error {
 		connected()
 		connectConfig := fmt.Sprintf("https://%s/v3/connect/config", serverURL.Host)
-		interval, err := rkenodeconfigclient.ConfigClient(ctx, connectConfig, headers, writeCertsOnly)
+		httpClient := http.Client{
+			Timeout: 300 * time.Second,
+		}
+		interval, err := rkenodeconfigclient.ConfigClient(ctx, &httpClient, connectConfig, headers, writeCertsOnly)
 		if err != nil {
 			return err
 		}
@@ -359,7 +353,7 @@ func run(ctx context.Context) error {
 					if err != nil {
 						logrus.Errorf("failed to check validity of kubelet certs: %v", err)
 					}
-					receivedInterval, err := rkenodeconfigclient.ConfigClient(ctx, connectConfig, headers, writeCertsOnly)
+					receivedInterval, err := rkenodeconfigclient.ConfigClient(ctx, &httpClient, connectConfig, headers, writeCertsOnly)
 					if err != nil {
 						logrus.Errorf("failed to check plan: %v", err)
 					} else if receivedInterval != 0 && receivedInterval != interval {

@@ -11,7 +11,7 @@ import (
 	"github.com/rancher/rancher/pkg/schemas/factory"
 	"github.com/rancher/rancher/pkg/schemas/mapper"
 	v1 "k8s.io/api/core/v1"
-	apiserverconfig "k8s.io/apiserver/pkg/apis/config"
+	"k8s.io/apiserver/pkg/apis/apiserver"
 )
 
 var (
@@ -301,20 +301,12 @@ func authzTypes(schemas *types.Schemas) *types.Schemas {
 		).
 		AddMapperForType(&Version, v3.GlobalRole{}, m.DisplayName{}).
 		AddMapperForType(&Version, v3.RoleTemplate{}, m.DisplayName{}).
-		AddMapperForType(&Version,
-			v3.PodSecurityPolicyTemplateProjectBinding{},
-			&mapper.NamespaceIDMapper{}).
 		AddMapperForType(&Version, v3.ProjectRoleTemplateBinding{},
 			&mapper.NamespaceIDMapper{},
 		).
-		MustImport(&Version, v3.SetPodSecurityPolicyTemplateInput{}).
 		MustImport(&Version, v3.ImportYamlOutput{}).
 		MustImportAndCustomize(&Version, v3.Project{}, func(schema *types.Schema) {
 			schema.ResourceActions = map[string]types.Action{
-				"setpodsecuritypolicytemplate": {
-					Input:  "setPodSecurityPolicyTemplateInput",
-					Output: "project",
-				},
 				"exportYaml": {},
 			}
 		}).
@@ -326,11 +318,6 @@ func authzTypes(schemas *types.Schemas) *types.Schemas {
 		}).
 		MustImport(&Version, v3.GlobalRoleBinding{}).
 		MustImport(&Version, v3.RoleTemplate{}).
-		MustImport(&Version, v3.PodSecurityPolicyTemplate{}).
-		MustImportAndCustomize(&Version, v3.PodSecurityPolicyTemplateProjectBinding{}, func(schema *types.Schema) {
-			schema.CollectionMethods = []string{http.MethodGet, http.MethodPost}
-			schema.ResourceMethods = []string{}
-		}).
 		MustImport(&Version, v3.ClusterRoleTemplateBinding{}).
 		MustImport(&Version, v3.ProjectRoleTemplateBinding{}).
 		MustImport(&Version, v3.GlobalRoleBinding{})
@@ -610,6 +597,23 @@ func authnTypes(schemas *types.Schemas) *types.Schemas {
 		}).
 		MustImport(&Version, v3.OIDCApplyInput{}).
 		MustImport(&Version, v3.OIDCTestOutput{}).
+		MustImportAndCustomize(&Version, v3.GenericOIDCConfig{}, func(schema *types.Schema) {
+			schema.BaseType = "authConfig"
+			schema.ResourceActions = map[string]types.Action{
+				"disable": {},
+				"configureTest": {
+					Input:  "genericOIDCConfig",
+					Output: "genericOIDCTestOutput",
+				},
+				"testAndApply": {
+					Input: "genericOIDCApplyInput",
+				},
+			}
+			schema.CollectionMethods = []string{}
+			schema.ResourceMethods = []string{http.MethodGet, http.MethodPut}
+		}).
+		MustImport(&Version, v3.GenericOIDCApplyInput{}).
+		MustImport(&Version, v3.GenericOIDCTestOutput{}).
 		//KeyCloakOIDC Config
 		MustImportAndCustomize(&Version, v3.KeyCloakOIDCConfig{}, func(schema *types.Schema) {
 			schema.BaseType = "authConfig"
@@ -656,6 +660,19 @@ func userTypes(schema *types.Schemas) *types.Schemas {
 		MustImportAndCustomize(&Version, v3.UserAttribute{}, func(schema *types.Schema) {
 			schema.CollectionMethods = []string{}
 			schema.ResourceMethods = []string{}
+			// UserAttribute is currently unstructured and norman is unaware of the Duration type
+			// which requires us to explicitly customize user retention fields
+			// to be treated as strings.
+			// The validation of these fields is done in the webhook.
+			// Once transitioned to the structured UserAttribute, this should be removed.
+			schema.MustCustomizeField("disableAfter", func(f types.Field) types.Field {
+				f.Type = "string"
+				return f
+			})
+			schema.MustCustomizeField("deleteAfter", func(f types.Field) types.Field {
+				f.Type = "string"
+				return f
+			})
 		})
 }
 
@@ -819,9 +836,9 @@ func clusterTemplateTypes(schemas *types.Schemas) *types.Schemas {
 
 func encryptionTypes(schemas *types.Schemas) *types.Schemas {
 	return schemas.MustImport(&Version, rketypes.SecretsEncryptionConfig{}).
-		MustImport(&Version, apiserverconfig.Key{}, struct {
+		MustImport(&Version, apiserver.Key{}, struct {
 			Secret string `norman:"type=password"`
-		}{}).MustImport(&Version, apiserverconfig.KMSConfiguration{}, struct {
+		}{}).MustImport(&Version, apiserver.KMSConfiguration{}, struct {
 		Timeout string
 	}{})
 }

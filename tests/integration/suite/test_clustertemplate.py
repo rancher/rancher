@@ -991,7 +991,7 @@ def create_cluster_template_revision(client, clusterTemplateId):
                   "rancherKubernetesEngineConfig.kubernetesVersion",
                   "required": "false",
                   "type": "string",
-                  "default": "1.25.x"
+                  "default": "1.27.x"
                  }]
 
     revision_name = random_str()

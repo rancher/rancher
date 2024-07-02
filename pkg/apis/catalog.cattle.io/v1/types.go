@@ -1,7 +1,7 @@
 package v1
 
 import (
-	"github.com/rancher/wrangler/v2/pkg/genericcondition"
+	"github.com/rancher/wrangler/v3/pkg/genericcondition"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -23,11 +23,11 @@ type SecretReference struct {
 	Namespace string `json:"namespace,omitempty"`
 }
 
-// ExponentialBackOffValues are values for the ratelimiting func when OCI registry sends 429 http response code.
+// ExponentialBackOffValues are values in seconds for the ratelimiting func when OCI registry sends 429 http response code.
 type ExponentialBackOffValues struct {
-	MinWait    *metav1.Duration `json:"minWait,omitempty"`
-	MaxWait    *metav1.Duration `json:"maxWait,omitempty"`
-	MaxRetries int              `json:"maxRetries,omitempty"`
+	MinWait    int `json:"minWait,omitempty"`
+	MaxWait    int `json:"maxWait,omitempty"`
+	MaxRetries int `json:"maxRetries,omitempty"`
 }
 
 type RepoSpec struct {
@@ -111,6 +111,15 @@ type RepoStatus struct {
 	Commit string `json:"commit,omitempty"`
 
 	Conditions []genericcondition.GenericCondition `json:"conditions,omitempty"`
+
+	// Number of times the handler will retry if it gets a 429 error
+	NumberOfRetries int `json:"numberOfRetries,omitempty"`
+
+	// The time the next retry will happen
+	NextRetryAt metav1.Time `json:"nextRetryAt,omitempty"`
+
+	// If the handler should be skipped or not
+	ShouldNotSkip bool `json:"shouldNotSkip,omitempty"`
 }
 
 // +genclient

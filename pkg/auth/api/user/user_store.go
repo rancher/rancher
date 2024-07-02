@@ -46,8 +46,8 @@ func SetUserStore(schema *types.Schema, mgmt *config.ScaledContext) {
 		Store: store,
 		Transformer: func(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, opt *types.QueryOptions) (map[string]interface{}, error) {
 			// filter system users out of the api
-			if princIds, ok := data[client.UserFieldPrincipalIDs].([]interface{}); ok {
-				for _, p := range princIds {
+			if princIDs, ok := data[client.UserFieldPrincipalIDs].([]interface{}); ok {
+				for _, p := range princIDs {
 					pid, _ := p.(string)
 					if strings.HasPrefix(pid, "system://") {
 						if opt != nil && opt.Options["ByID"] == "true" {

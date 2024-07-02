@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path"
 	"regexp"
 	"strings"
 	"time"
@@ -22,8 +23,8 @@ import (
 	"github.com/rancher/rancher/tests/v2prov/nodeconfig"
 	"github.com/rancher/rancher/tests/v2prov/registry"
 	"github.com/rancher/rancher/tests/v2prov/wait"
-	"github.com/rancher/wrangler/v2/pkg/condition"
-	"github.com/rancher/wrangler/v2/pkg/name"
+	"github.com/rancher/wrangler/v3/pkg/condition"
+	"github.com/rancher/wrangler/v3/pkg/name"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -89,6 +90,19 @@ func New(clients *clients.Clients, cluster *provisioningv1api.Cluster) (*provisi
 			cluster.Spec.RKEConfig.ETCD = &rkev1.ETCD{
 				DisableSnapshots: true,
 			}
+		}
+
+		// If an override is specified for a data directory, and one is not explicitly set for the cluster, use it
+		if cluster.Spec.RKEConfig.DataDirectories.K8sDistro == "" {
+			cluster.Spec.RKEConfig.DataDirectories.K8sDistro = defaults.DistroDataDir
+		}
+
+		if cluster.Spec.RKEConfig.DataDirectories.Provisioning == "" {
+			cluster.Spec.RKEConfig.DataDirectories.Provisioning = defaults.ProvisioningDataDir
+		}
+
+		if cluster.Spec.RKEConfig.DataDirectories.SystemAgent == "" {
+			cluster.Spec.RKEConfig.DataDirectories.SystemAgent = defaults.SystemAgentDataDir
 		}
 	}
 
@@ -420,8 +434,6 @@ func GatherDebugData(clients *clients.Clients, c *provisioningv1api.Cluster) (st
 		newControlPlane = nil
 	}
 
-	runtime := capr.GetRuntime(newControlPlane.Spec.KubernetesVersion)
-
 	var rkeBootstraps []*rkev1.RKEBootstrap
 	var infraMachines []*unstructured.Unstructured
 	var machineSecrets []*corev1.Secret
@@ -451,7 +463,7 @@ func GatherDebugData(clients *clients.Clients, c *provisioningv1api.Cluster) (st
 				if machine.Spec.InfrastructureRef.GroupVersionKind().Kind == "PodMachine" {
 					// In the case of a podmachine, the pod name will be strings.ReplaceAll(infra.meta.GetName(), ".", "-")
 					podName := strings.ReplaceAll(im.GetName(), ".", "-")
-					podLogs[podName] = populatePodLogs(clients, runtime, im.GetNamespace(), podName)
+					podLogs[podName] = populatePodLogs(clients, newControlPlane, im.GetNamespace(), podName)
 				}
 			}
 			ms, newErr := clients.Core.Secret().List(machine.Namespace, metav1.ListOptions{
@@ -474,7 +486,7 @@ func GatherDebugData(clients *clients.Clients, c *provisioningv1api.Cluster) (st
 		logrus.Errorf("failed to list custommachine pods: %v", newErr)
 	} else {
 		for _, pod := range customPods.Items {
-			podLogs[pod.Name] = populatePodLogs(clients, runtime, pod.Namespace, pod.Name)
+			podLogs[pod.Name] = populatePodLogs(clients, newControlPlane, pod.Namespace, pod.Name)
 		}
 	}
 
@@ -551,20 +563,20 @@ func GatherDebugData(clients *clients.Clients, c *provisioningv1api.Cluster) (st
 }
 
 // populatePodLogs creates a map[string]string of logs that correspond to the pod in question. If the pod is an RKE2 pod, it also collects the kubelet logs from the pod filesystem.
-func populatePodLogs(clients *clients.Clients, runtime, podNamespace, podName string) map[string]string {
+func populatePodLogs(clients *clients.Clients, controlPlane *rkev1.RKEControlPlane, podNamespace, podName string) map[string]string {
 	var logMap = make(map[string]string)
 
-	logs, newErr := getPodLogs(clients, podNamespace, podName)
-	if newErr != nil {
-		logrus.Errorf("error while retrieving pod logs: %v", newErr)
+	logs, err := getPodLogs(clients, podNamespace, podName)
+	if err != nil {
+		logrus.Errorf("error while retrieving pod logs: %v", err)
 	} else {
 		logMap["logs"] = logs
 	}
 
-	if runtime == capr.RuntimeRKE2 {
-		kubeletLogs, newErr := getPodFileContents(podNamespace, podName, fmt.Sprintf("/var/lib/rancher/rke2/agent/logs/kubelet.log"))
-		if newErr != nil {
-			logrus.Errorf("error while retrieving pod kubelet logs: %v", newErr)
+	if controlPlane != nil && capr.GetRuntime(controlPlane.Spec.KubernetesVersion) == capr.RuntimeRKE2 {
+		kubeletLogs, err := getPodFileContents(podNamespace, podName, path.Join(capr.GetDistroDataDir(controlPlane), "agent/logs/kubelet.log"))
+		if err != nil {
+			logrus.Errorf("error while retrieving pod kubelet logs: %v", err)
 		} else {
 			logMap["kubeletLogs"] = kubeletLogs
 		}

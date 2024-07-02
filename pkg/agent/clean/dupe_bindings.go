@@ -13,22 +13,22 @@ package clean
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"sort"
 	"strings"
 	"sync"
 
-	"github.com/hashicorp/go-multierror"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/management/auth"
 	"github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	pkgrbac "github.com/rancher/rancher/pkg/rbac"
-	"github.com/rancher/wrangler/v2/pkg/generated/controllers/rbac"
-	v1 "github.com/rancher/wrangler/v2/pkg/generated/controllers/rbac/v1"
-	"github.com/rancher/wrangler/v2/pkg/ratelimit"
-	"github.com/rancher/wrangler/v2/pkg/start"
+	"github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac"
+	v1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
+	"github.com/rancher/wrangler/v3/pkg/ratelimit"
+	"github.com/rancher/wrangler/v3/pkg/start"
 	"github.com/sirupsen/logrus"
 	k8srbacv1 "k8s.io/api/rbac/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
@@ -180,27 +180,19 @@ func (bc *dupeBindingsCleanup) cleanObjectDuplicates(bindingType string, newLabe
 			var CRBduplicates, RBDupes int
 
 			crbs, err := bc.clusterRoleBindings.List(metav1.ListOptions{LabelSelector: label})
-			if err != nil {
-				returnErr = multierror.Append(returnErr, err)
-			}
+			returnErr = errors.Join(returnErr, err)
 
 			if len(crbs.Items) > 1 {
 				CRBduplicates += len(crbs.Items) - 1
-				if err := bc.dedupeCRB(crbs.Items); err != nil {
-					returnErr = multierror.Append(returnErr, err)
-				}
+				returnErr = errors.Join(returnErr, bc.dedupeCRB(crbs.Items))
 			}
 
 			roleBindings, err := bc.roleBindings.List("", metav1.ListOptions{LabelSelector: label})
-			if err != nil {
-				returnErr = multierror.Append(returnErr, err)
-			}
+			returnErr = errors.Join(returnErr, err)
 
 			if len(roleBindings.Items) > 1 {
 				roleDuplicates, err := bc.dedupeRB(roleBindings.Items)
-				if err != nil {
-					returnErr = multierror.Append(returnErr, err)
-				}
+				returnErr = errors.Join(returnErr, err)
 				RBDupes += roleDuplicates
 			}
 			if CRBduplicates > 0 || RBDupes > 0 {

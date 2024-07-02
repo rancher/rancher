@@ -415,7 +415,4 @@ func (s *AuthzSuite) setupCRDs(c *check.C) {
 
 	setupCRD("clusterroletemplatebinding", "clusterroletemplatebindings", "management.cattle.io", "ClusterRoleTemplateBinding", "v3",
 		apiextensionsv1.ClusterScoped, crdClient, crdWatch, c)
-
-	setupCRD("podsecuritypolicytemplate", "podsecuritypolicytemplates", "management.cattle.io", "PodSecurityPolicyTemplates", "v3",
-		apiextensionsv1.ClusterScoped, crdClient, crdWatch, c)
 }

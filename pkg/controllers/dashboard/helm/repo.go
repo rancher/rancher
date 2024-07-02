@@ -14,10 +14,11 @@ import (
 	helmhttp "github.com/rancher/rancher/pkg/catalogv2/http"
 	catalogcontrollers "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
 	namespaces "github.com/rancher/rancher/pkg/namespace"
-	"github.com/rancher/wrangler/v2/pkg/apply"
-	"github.com/rancher/wrangler/v2/pkg/condition"
-	corev1controllers "github.com/rancher/wrangler/v2/pkg/generated/controllers/core/v1"
-	name2 "github.com/rancher/wrangler/v2/pkg/name"
+	"github.com/rancher/wrangler/v3/pkg/apply"
+	"github.com/rancher/wrangler/v3/pkg/condition"
+	corev1controllers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+	name2 "github.com/rancher/wrangler/v3/pkg/name"
+	"github.com/sirupsen/logrus"
 	"helm.sh/helm/v3/pkg/registry"
 	"helm.sh/helm/v3/pkg/repo"
 	corev1 "k8s.io/api/core/v1"
@@ -76,6 +77,9 @@ func RegisterReposForFollowers(ctx context.Context,
 }
 
 func (r *repoHandler) ClusterRepoDownloadEnsureStatusHandler(repo *catalog.ClusterRepo, status catalog.RepoStatus) (catalog.RepoStatus, error) {
+	if registry.IsOCI(repo.Spec.URL) {
+		return status, nil
+	}
 	r.clusterRepos.EnqueueAfter(repo.Name, interval)
 	return r.ensure(&repo.Spec, status, &repo.ObjectMeta)
 }
@@ -124,9 +128,11 @@ func createOrUpdateMap(namespace string, index *repo.IndexFile, owner metav1.Own
 	buf := &bytes.Buffer{}
 	gz := gzip.NewWriter(buf)
 	if err := json.NewEncoder(gz).Encode(index); err != nil {
+		logrus.Errorf("error while encoding index: %v", err)
 		return nil, err
 	}
 	if err := gz.Close(); err != nil {
+		logrus.Errorf("error while closing reader: %v", err)
 		return nil, err
 	}
 
@@ -176,8 +182,11 @@ func createOrUpdateMap(namespace string, index *repo.IndexFile, owner metav1.Own
 		bytes = left
 		left = nil
 	}
-
-	return objs[0].(*corev1.ConfigMap), apply.WithOwner(ownerObject).ApplyObjects(objs...)
+	err := apply.WithOwner(ownerObject).ApplyObjects(objs...)
+	if err != nil {
+		logrus.Errorf("error while applying configmap %s: %v", GenerateConfigMapName(owner.Name, i, owner.UID), err)
+	}
+	return objs[0].(*corev1.ConfigMap), err
 }
 
 func (r *repoHandler) ensure(repoSpec *catalog.RepoSpec, status catalog.RepoStatus, metadata *metav1.ObjectMeta) (catalog.RepoStatus, error) {
@@ -269,7 +278,12 @@ func ensureIndexConfigMap(repo *catalog.ClusterRepo, status *catalog.RepoStatus,
 				status.IndexConfigMapResourceVersion = ""
 				return nil
 			}
-			return err
+			logrus.Errorf("Error while fetching index config map %s : %v", status.IndexConfigMapName, err)
+			reason := apierrors.ReasonForError(err)
+			if reason == metav1.StatusReasonUnknown {
+				return err
+			}
+			return fmt.Errorf("failed to fetch index config map for cluster repo: %s", reason)
 		}
 	}
 	return nil

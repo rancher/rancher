@@ -111,6 +111,7 @@ type ClusterRepoParams struct {
 	URL2              string   // URL to use when updating the ClusterRepo resource to a new URL
 	InsecurePlainHTTP bool
 	StatusCode        int
+	ForceRefresh      bool
 }
 
 // TestHTTPRepo tests CREATE, UPDATE, and DELETE operations of HTTP ClusterRepo resources
@@ -156,7 +157,7 @@ func StartErrorRegistry(status int) (*url.URL, error) {
 	return u, nil
 }
 
-func Start429Registry(t assert.TestingT) (*url.URL, error) {
+func Start429Registry(t assert.TestingT, rateLimitedHeader bool) (*url.URL, error) {
 	testingChartPath := "../../../testdata/testingchart-0.1.0.tgz"
 	testChartPath := "../../../testdata/testchart-1.0.0.tgz"
 	helmChartTar, err := os.ReadFile(testingChartPath)
@@ -213,11 +214,10 @@ func Start429Registry(t assert.TestingT) (*url.URL, error) {
 	manifestCount := 1
 	timerStart := false
 
-	// Create a OCI Registry Server
+	// Create an OCI Registry Server
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 		switch r.URL.Path {
-
 		case "/v2/testingchart/tags/list":
 			t := `{"tags": ["0.1.0","0.0.1","sha256"]}`
 			w.Write([]byte(t))
@@ -245,6 +245,13 @@ func Start429Registry(t assert.TestingT) (*url.URL, error) {
 				assert.NoError(t, err)
 			}
 		case "/v2/testchart/manifests/1.0.0":
+			if r.Method == http.MethodHead {
+				if rateLimitedHeader {
+					w.Header().Set("RateLimit-Remaining", "0;w=60")
+				}
+				w.WriteHeader(http.StatusOK)
+				return
+			}
 			manifestCount++
 			if manifestCount > 1 {
 				if !timerStart {
@@ -382,7 +389,7 @@ func (c *ClusterRepoTestSuite) TestOCIRepo2() {
 	})
 }
 
-// TestOCIRepo3 tests 4xx response codes recieved from the registry
+// TestOCIRepo3 tests 4xx response codes received from the registry
 func (c *ClusterRepoTestSuite) TestOCIRepo3() {
 	statusCodes := [3]int{404, 401, 403}
 	for _, statusCode := range statusCodes {
@@ -398,15 +405,29 @@ func (c *ClusterRepoTestSuite) TestOCIRepo3() {
 	}
 }
 
-// TestOCIRepo4 tests 429 response code recieved from the registry
+// TestOCIRepo4 tests 429 response code received from the registry
 func (c *ClusterRepoTestSuite) TestOCIRepo4() {
-	u, err := Start429Registry(c.T())
+	u, err := Start429Registry(c.T(), false)
 	assert.NoError(c.T(), err)
 	c.test429Error(ClusterRepoParams{
 		Name:              OCIClusterRepoName,
 		URL1:              fmt.Sprintf("oci://%s/", u.Host),
 		InsecurePlainHTTP: true,
 		Type:              OCI,
+		ForceRefresh:      true,
+	})
+}
+
+// TestOCIRepo4 tests 429 response code received from the registry which sends RateLimited-Remaining header
+func (c *ClusterRepoTestSuite) TestOCIRepo5() {
+	u, err := Start429Registry(c.T(), true)
+	assert.NoError(c.T(), err)
+	c.test429Error(ClusterRepoParams{
+		Name:              OCIClusterRepoName,
+		URL1:              fmt.Sprintf("oci://%s/", u.Host),
+		InsecurePlainHTTP: true,
+		Type:              OCI,
+		ForceRefresh:      false,
 	})
 }
 
@@ -417,8 +438,8 @@ func (c *ClusterRepoTestSuite) test429Error(params ClusterRepoParams) {
 	setClusterRepoURL(&clusterRepo.Spec, params.Type, params.URL1)
 	clusterRepo.Spec.InsecurePlainHTTP = params.InsecurePlainHTTP
 	expoValues := v1.ExponentialBackOffValues{
-		MinWait:    &metav1.Duration{Duration: 1 * time.Second},
-		MaxWait:    &metav1.Duration{Duration: 1 * time.Second},
+		MinWait:    1,
+		MaxWait:    1,
 		MaxRetries: 1,
 	}
 	clusterRepo.Spec.ExponentialBackOffValues = &expoValues
@@ -431,7 +452,7 @@ func (c *ClusterRepoTestSuite) test429Error(params ClusterRepoParams) {
 
 		for _, condition := range clusterRepo.Status.Conditions {
 			if v1.RepoCondition(condition.Type) == v1.OCIDownloaded {
-				return condition.Status == corev1.ConditionFalse, nil
+				return condition.Status == corev1.ConditionFalse && clusterRepo.Status.NumberOfRetries == 0, nil
 			}
 		}
 
@@ -456,14 +477,16 @@ func (c *ClusterRepoTestSuite) test429Error(params ClusterRepoParams) {
 	assert.Equal(c.T(), len(index.Entries), 2)
 	assert.Equal(c.T(), len(index.Entries["testingchart"]), 2)
 	assert.NotEmpty(c.T(), index.Entries["testingchart"][0].Digest)
-	time.Sleep(1 * time.Minute)
+	time.Sleep(65 * time.Second)
 
-	// Refresh the clusterRepo
-	clusterRepo, err = c.catalogClient.ClusterRepos().Get(context.TODO(), params.Name, metav1.GetOptions{})
-	assert.NoError(c.T(), err)
-	clusterRepo.Spec.ForceUpdate = &metav1.Time{Time: time.Now()}
-	clusterRepo, err = c.catalogClient.ClusterRepos().Update(context.TODO(), clusterRepo.DeepCopy(), metav1.UpdateOptions{})
-	assert.NoError(c.T(), err)
+	if params.ForceRefresh {
+		// Refresh the clusterRepo
+		clusterRepo, err = c.catalogClient.ClusterRepos().Get(context.TODO(), params.Name, metav1.GetOptions{})
+		assert.NoError(c.T(), err)
+		clusterRepo.Spec.ForceUpdate = &metav1.Time{Time: time.Now()}
+		clusterRepo, err = c.catalogClient.ClusterRepos().Update(context.TODO(), clusterRepo.DeepCopy(), metav1.UpdateOptions{})
+		assert.NoError(c.T(), err)
+	}
 
 	err = wait.Poll(PollInterval, 5*time.Second, func() (done bool, err error) {
 		clusterRepo, err = c.catalogClient.ClusterRepos().Get(context.TODO(), params.Name, metav1.GetOptions{})
@@ -480,6 +503,7 @@ func (c *ClusterRepoTestSuite) test429Error(params ClusterRepoParams) {
 
 	clusterRepo, err = c.catalogClient.ClusterRepos().Get(context.TODO(), params.Name, metav1.GetOptions{})
 	assert.NoError(c.T(), err)
+	assert.Equal(c.T(), clusterRepo.Status.NumberOfRetries, 0, "Number of retries should be 0 since there were no 429s")
 	configMap, err = c.corev1.ConfigMaps(clusterRepo.Status.IndexConfigMapNamespace).Get(context.TODO(), clusterRepo.Status.IndexConfigMapName, metav1.GetOptions{})
 	assert.NoError(c.T(), err)
 
@@ -540,7 +564,7 @@ func (c *ClusterRepoTestSuite) test4xxErrors(params ClusterRepoParams) {
 	assert.Error(c.T(), err)
 }
 
-// TestOCI tests creating a OCI clusterrepo and install a chart
+// TestOCI tests creating an OCI clusterrepo and install a chart
 func (c *ClusterRepoTestSuite) TestOCIRepoChartInstallation() {
 	//start registry
 	u, err := StartRegistry()

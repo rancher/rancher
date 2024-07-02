@@ -2,6 +2,7 @@ package client
 
 const (
 	PodSecurityContextType                     = "podSecurityContext"
+	PodSecurityContextFieldAppArmorProfile     = "appArmorProfile"
 	PodSecurityContextFieldFSGroupChangePolicy = "fsGroupChangePolicy"
 	PodSecurityContextFieldFsgid               = "fsgid"
 	PodSecurityContextFieldGids                = "gids"
@@ -14,6 +15,7 @@ const (
 )
 
 type PodSecurityContext struct {
+	AppArmorProfile     *AppArmorProfile               `json:"appArmorProfile,omitempty" yaml:"appArmorProfile,omitempty"`
 	FSGroupChangePolicy string                         `json:"fsGroupChangePolicy,omitempty" yaml:"fsGroupChangePolicy,omitempty"`
 	Fsgid               *int64                         `json:"fsgid,omitempty" yaml:"fsgid,omitempty"`
 	Gids                []int64                        `json:"gids,omitempty" yaml:"gids,omitempty"`

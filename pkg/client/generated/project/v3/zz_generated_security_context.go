@@ -3,6 +3,7 @@ package client
 const (
 	SecurityContextType                          = "securityContext"
 	SecurityContextFieldAllowPrivilegeEscalation = "allowPrivilegeEscalation"
+	SecurityContextFieldAppArmorProfile          = "appArmorProfile"
 	SecurityContextFieldCapAdd                   = "capAdd"
 	SecurityContextFieldCapDrop                  = "capDrop"
 	SecurityContextFieldPrivileged               = "privileged"
@@ -17,6 +18,7 @@ const (
 
 type SecurityContext struct {
 	AllowPrivilegeEscalation *bool                          `json:"allowPrivilegeEscalation,omitempty" yaml:"allowPrivilegeEscalation,omitempty"`
+	AppArmorProfile          *AppArmorProfile               `json:"appArmorProfile,omitempty" yaml:"appArmorProfile,omitempty"`
 	CapAdd                   []string                       `json:"capAdd,omitempty" yaml:"capAdd,omitempty"`
 	CapDrop                  []string                       `json:"capDrop,omitempty" yaml:"capDrop,omitempty"`
 	Privileged               *bool                          `json:"privileged,omitempty" yaml:"privileged,omitempty"`

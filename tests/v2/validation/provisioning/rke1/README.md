@@ -10,12 +10,13 @@ Please see below for more details for your config. Please note that the config c
 1. [Prerequisites](../README.md)
 2. [Configuring test flags](#Flags)
 3. [Define your test](#Provisioning-Input)
-4. [Configuring providers to use for Node Driver Clusters](#NodeTemplateConfigs)
-5. [Configuring Custom Clusters](#Custom-Cluster)
-6. [Static test cases](#static-test-cases)
-7. [Cloud Provider](#Cloud-Provider)
-8. [Advanced Cluster Settings](#advanced-settings)
-9. [Back to general provisioning](../README.md)
+4. [Cloud Credential](#cloud-credentials)
+5. [Configuring providers to use for Node Driver Clusters](#NodeTemplateConfigs)
+6. [Configuring Custom Clusters](#Custom-Cluster)
+7. [Static test cases](#static-test-cases)
+8. [Cloud Provider](#Cloud-Provider)
+9. [Advanced Cluster Settings](#advanced-settings)
+10. [Back to general provisioning](../README.md)
 
 
 ## Flags
@@ -44,10 +45,10 @@ provisioningInput:
       worker: true
       drainBeforeDelete: true
       quantity: 2
-  rke1KubernetesVersion: ["v1.27.10-rancher1-1"]
+  rke1KubernetesVersion: ["v1.28.10-rancher1-1"]
   cni: ["calico"]
   providers: ["linode", "aws", "do", "harvester", "vsphere", "azure"]
-  cloudProvider: "external-aws"
+  cloudProvider: "" # either: external-aws|rancher-vsphere
   nodeProviders: ["ec2"]
   psact: ""
   criDockerd: false
@@ -66,6 +67,57 @@ provisioningInput:
         secretKey: ""
     retention: "72h"
     snapshot: false
+chartUpgrade: # will install a version of the out-of-tree chart (latest - 1) that can later be upgraded to the latest version. This is used for upgrade testing on cloud provider tests.
+  isUpgradable: false
+```
+
+## Cloud Credentials
+These are the inputs needed for the different node provider cloud credentials, including linode, aws, harvester, azure, and google.
+
+### Digital Ocean
+```yaml
+digitalOceanCredentials:               
+  accessToken: ""                     #required
+```
+### Linode
+```yaml
+linodeCredentials:                   
+  token: ""                           #required
+```
+### Azure
+```yaml
+azureCredentials:                     
+  clientId: ""                        #required
+  clientSecret: ""                    #required
+  subscriptionId: ""                  #required
+  environment: "AzurePublicCloud"     #required
+```
+### AWS
+```yaml
+awsCredentials:                       
+  secretKey: ""                       #required
+  accessKey: ""                       #required
+  defaultRegion: ""                   #required
+```
+### Harvester
+```yaml
+harvesterCredentials:                 
+  clusterId: ""                       #required
+  clusterType: ""                     #required
+  kubeconfigContent: ""               #required
+```
+### Google
+```yaml
+googleCredentials:                    
+  authEncodedJson: ""                 #required
+```
+### VSphere
+```yaml
+vmwarevsphereCredentials:             
+  password: ""                        #required
+  username: ""                        #required
+  vcenter: ""                         #required
+  vcenterPort: ""                     #required
 ```
 
 
@@ -80,6 +132,14 @@ To use automation with a cloud provider, simply enter one of the following optio
 * aws
 * rancher-vsphere
 
+### RKE1 Chart Upgrade Options
+At the root level of your config.yaml, you can provide the following option:
+```yaml
+chartUpgrade:
+  isUpgradable: true
+```
+which will install `latest-1` chart version for CPI and CSI charts so that you may run upgrade tests later, if you wish. 
+This is currently only available for Vsphere RKE1
 
 ## NodeTemplateConfigs
 RKE1 specifically needs a node template config to run properly. These are the inputs needed for the different node providers.
@@ -93,7 +153,6 @@ providers to work.
 ### AWS
 ```yaml
   awsNodeConfig:
-    accessKey: ""
     ami: ""
     blockDurationMinutes: "0"
     encryptEbsVolume: false
@@ -111,7 +170,6 @@ providers to work.
     requestSpotInstance: true
     retries: "5"
     rootSize: "16"
-    secretKey: ""
     securityGroup: ["open-all"]
     securityGroupReadonly: false
     sessionToken: ""
@@ -133,8 +191,6 @@ providers to work.
 ```yaml
 azureNodeConfig:
   availabilitySet: "docker-machine"
-  clientId: ""
-  clientSecret: ""
   customData: ""
   diskSize: "30"
   dns: ""
@@ -156,7 +212,6 @@ azureNodeConfig:
   subnet: "docker-machine"
   subnetPrefix: "192.168.0.0/16"
   subscriptionId: ""
-  tenantId: ""
   type: "azureConfig"
   updateDomainCount: "5"
   vnet: "docker-machine-vnet"
@@ -166,14 +221,11 @@ azureNodeConfig:
 ```yaml
 harvesterNodeConfig":
   cloudConfig: ""
-  clusterId: ""
-  clusterType: ""
   cpuCount: "2"
   diskBus: "virtio"
   diskSize: "40"
   imageName: "default/image-gchq8"
   keyPairName: ""
-  kubeconfigContent: ""
   memorySize: "4"
   networkData: ""
   networkModel: "virtio"
@@ -206,7 +258,6 @@ linodeNodeConfig:
   stackscriptData: ""
   swapSize: "512"
   tags: ""
-  token: ""
   type: "linodeConfig"
   uaPrefix: "Rancher"
 ```
@@ -253,7 +304,10 @@ Cloud Provider enables additional options such as load-balancers and storage dev
 available options:
 ### AWS
 * `aws` uses the in-tree provider for aws -- **Deprecated on kubernetes 1.26 and below**
-* `external-aws` uses the out-of-tree provider for aws. Built in logic to the automation will be applied to the cluster that applies the correct configuration for the out-of-tree charts to be installed. Supported on kubernetes 1.22+
+* `external-aws` uses the out-of-tree provider for aws. Built in logic to the automation will be applied to the cluster that applies the correct configuration for the out-of-tree charts to be installed. Supported on kubernetes 1.22+. An AWS provided LB will be attached to a workload in order to test that the cloud provider is working as expected. 
+
+### Vsphere
+* `rancher-vsphere` is out-of-tree since 1.22. A workload using vsphere's cloud provider storage class will be created on the cluster to test that the provider is working as expected. 
 
 ## Custom Cluster
 For custom clusters, no nodeTemplateConfig or credentials are required. Currently only supported for ec2.
@@ -369,6 +423,17 @@ linodeNodeConfig:
 These tests utilize Go build tags. Due to this, see the below examples on how to run the tests:
 
 `gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/provisioning/rke1 --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestRKE1PSACTTestSuite$"`
+
+### Hardened Custom Cluster
+This will provision a hardened custom cluster that runs across the following CIS scan profiles:
+1. `rke-profile-hardened-1.8`
+2. `rke-profile-permissive-1.8`
+
+You would use the same config that you setup for a custom cluster to run this test. Plese reference this [section](#custom-cluster). It also important to note that the machines that you select has `sudo` capabilities. The tests utilize `sudo`, so this can cause issues if there is no `sudo` present on the machine.
+
+These tests utilize Go build tags. Due to this, see the below examples on how to run the tests:
+
+`gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/provisioning/rke1 --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestHardenedRKE1ClusterProvisioningTestSuite$"`
 
 ## Advanced Settings
 This encapsulates any other setting that is applied in the cluster.spec. Currently we have support for:

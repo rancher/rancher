@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"hash/crc32"
 	"math"
+	"path"
 	"path/filepath"
 	"reflect"
 	"strconv"
@@ -19,16 +20,15 @@ import (
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/capr"
-	"github.com/rancher/rancher/pkg/controllers/capr/managesystemagent"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	ranchercontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	rkecontrollers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/wrangler"
-	corecontrollers "github.com/rancher/wrangler/v2/pkg/generated/controllers/core/v1"
-	"github.com/rancher/wrangler/v2/pkg/name"
-	"github.com/rancher/wrangler/v2/pkg/randomtoken"
-	"github.com/rancher/wrangler/v2/pkg/summary"
+	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+	"github.com/rancher/wrangler/v3/pkg/name"
+	"github.com/rancher/wrangler/v3/pkg/randomtoken"
+	"github.com/rancher/wrangler/v3/pkg/summary"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -48,19 +48,19 @@ const (
 
 	KubeControllerManagerArg                      = "kube-controller-manager-arg"
 	KubeControllerManagerExtraMount               = "kube-controller-manager-extra-mount"
-	DefaultKubeControllerManagerCertDir           = "/var/lib/rancher/%s/server/tls/kube-controller-manager"
+	DefaultKubeControllerManagerCertDir           = "server/tls/kube-controller-manager"
 	DefaultKubeControllerManagerDefaultSecurePort = "10257"
 	DefaultKubeControllerManagerCert              = "kube-controller-manager.crt"
 	KubeSchedulerArg                              = "kube-scheduler-arg"
 	KubeSchedulerExtraMount                       = "kube-scheduler-extra-mount"
-	DefaultKubeSchedulerCertDir                   = "/var/lib/rancher/%s/server/tls/kube-scheduler"
+	DefaultKubeSchedulerCertDir                   = "server/tls/kube-scheduler"
 	DefaultKubeSchedulerDefaultSecurePort         = "10259"
 	DefaultKubeSchedulerCert                      = "kube-scheduler.crt"
 	SecurePortArgument                            = "secure-port"
 	CertDirArgument                               = "cert-dir"
 	TLSCertFileArgument                           = "tls-cert-file"
 
-	authnWebhookFileName = "/var/lib/rancher/%s/kube-api-authn-webhook.yaml"
+	authnWebhookFileName = "kube-api-authn-webhook.yaml"
 	ConfigYamlFileName   = "/etc/rancher/%s/config.yaml.d/50-rancher.yaml"
 
 	bootstrapTier    = "bootstrap"
@@ -312,14 +312,6 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlan
 		return status, err
 	}
 
-	lowestKubelet := getLowestMachineKubeletVersion(plan)
-	if lowestKubelet != nil {
-		logrus.Debugf("rkecluster %s/%s: lowest detected Kubelet version for cluster was: %s", cp.Namespace, cp.Name, lowestKubelet.String())
-		if err := blockProgressForSUCPSPIf125(fmt.Sprintf("[planner] rkecluster %s/%s:", cp.Namespace, cp.Name), status, currentVersion, lowestKubelet); err != nil {
-			return status, err
-		}
-	}
-
 	if status, err = p.rotateCertificates(cp, status, clusterSecretTokens, plan); err != nil {
 		return status, err
 	}
@@ -453,56 +445,12 @@ func getLowestMachineKubeletVersion(plan *plan.Plan) *semver.Version {
 	return lowestVersion
 }
 
-// blockProgressForSUCPSPIf125 handles the case that we're dealing with K8s >= 1.25, ensuring that system-upgrade-controller has PodSecurityPolicies disabled.
-// We need to make sure the cluster has undergone initial provisioning and bootstrapping before we can enforce this condition,
-// otherwise the system-upgrade-controller bundle will never become ready and the planner will be indefinitely blocked.
-// We do this by determining if any plans have been delivered to any of the nodes. Notably we perform this check after etcd
-// snapshot restoration can happen, to allow recovery in the event that the cluster has failed.
-func blockProgressForSUCPSPIf125(msgPrefix string, status rkev1.RKEControlPlaneStatus, currentVersion, lowestKubelet *semver.Version) error {
-	if currentVersion == nil || lowestKubelet == nil {
-		return fmt.Errorf("%s currentVersion or lowestKubelet was nil", msgPrefix)
-	}
-	if lowestKubelet != nil && !currentVersion.LessThan(managesystemagent.Kubernetes125) && lowestKubelet.LessThan(managesystemagent.Kubernetes125) {
-		logrus.Tracef("%s checking for SystemUpgradeController readiness", msgPrefix)
-		if capr.SystemUpgradeControllerReady.GetStatus(&status) == "" || capr.SystemUpgradeControllerReady.IsFalse(&status) || capr.SystemUpgradeControllerReady.IsUnknown(&status) {
-			if capr.SystemUpgradeControllerReady.GetReason(&status) != "" {
-				return errWaitingf("waiting for system-upgrade-controller helm chart reconciliation: %s", capr.SystemUpgradeControllerReady.GetReason(&status))
-			}
-			return errWaiting("waiting for system-upgrade-controller helm chart reconciliation")
-		}
-		if disabled, err := systemUpgradeControllerPSPsDisabled(capr.SystemUpgradeControllerReady.GetMessage(&status)); err == nil {
-			if !disabled {
-				return errWaiting("system-upgrade-controller helm chart has podsecuritypolicy enabled, waiting for helm chart reconciliation")
-			}
-		} else {
-			return errWaitingf("error occurred while determining whether SUC PSPs were disabled: %v", err)
-		}
-	}
-	return nil
-}
-
 // clusterIsSane ensures that there is at least one controlplane, etcd, and worker node that are not deleting for the cluster.
 func clusterIsSane(plan *plan.Plan) bool {
 	if len(collect(plan, roleAnd(isEtcd, roleNot(isDeleting)))) == 0 || len(collect(plan, roleAnd(isControlPlane, roleNot(isDeleting)))) == 0 || len(collect(plan, roleAnd(isWorker, roleNot(isDeleting)))) == 0 {
 		return false
 	}
 	return true
-}
-
-func systemUpgradeControllerPSPsDisabled(data string) (bool, error) {
-	var sucMetadata = managesystemagent.SUCMetadata{}
-	if data == "" {
-		return false, fmt.Errorf("data for SUC Metadata was blank")
-	}
-	rawMetadata, err := base64.StdEncoding.DecodeString(data)
-	if err != nil {
-		return false, err
-	}
-	err = json.Unmarshal(rawMetadata, &sucMetadata)
-	if err != nil {
-		return false, err
-	}
-	return !sucMetadata.PspEnabled, nil
 }
 
 // calculateJoinURL will return a join URL based on calculating the checksum of the given machine UID. This is somewhat deterministic but will change when suitable machine lists change.
@@ -767,10 +715,10 @@ func convertInterfaceToStringSlice(input interface{}) []string {
 
 // renderArgAndMount takes the value of the existing value of the argument and mount and renders an output argument and
 // mount based on the value of the input interfaces. It will always return a set of slice of strings.
-func renderArgAndMount(existingArg interface{}, existingMount interface{}, runtime string, defaultSecurePort string, defaultCertDir string) ([]string, []string) {
+func renderArgAndMount(existingArg interface{}, existingMount interface{}, controlPlane *rkev1.RKEControlPlane, defaultSecurePort string, defaultCertDir string) ([]string, []string) {
 	retArg := convertInterfaceToStringSlice(existingArg)
 	retMount := convertInterfaceToStringSlice(existingMount)
-	renderedCertDir := fmt.Sprintf(defaultCertDir, runtime)
+	renderedCertDir := path.Join(capr.GetDistroDataDir(controlPlane), defaultCertDir)
 	// Set a default value for certDirArg and certDirMount (for the case where the user does not set these values)
 	// If a user sets these values, we will set them to an empty string and check to make sure they are not empty
 	// strings before adding them to the rendered arg/mount slices.
@@ -814,7 +762,7 @@ func renderArgAndMount(existingArg interface{}, existingMount interface{}, runti
 		logrus.Debugf("renderArgAndMount adding %s to component arguments", securePortArg)
 		retArg = appendToInterface(retArg, securePortArg)
 	}
-	if runtime == capr.RuntimeRKE2 {
+	if capr.GetRuntime(controlPlane.Spec.KubernetesVersion) == capr.RuntimeRKE2 {
 		// todo: make sure the certDirMount is not already set by the user to some custom value before we set it for the static pod extraMount
 		logrus.Debugf("renderArgAndMount adding %s to component mounts", certDirMount)
 		retMount = appendToInterface(existingMount, certDirMount)
@@ -1098,6 +1046,13 @@ func (p *Planner) generatePlanWithConfigFiles(controlPlane *rkev1.RKEControlPlan
 		}
 
 		nodePlan, err = addOtherFiles(nodePlan, controlPlane, entry)
+
+		idempotentScriptFile := plan.File{
+			Content: base64.StdEncoding.EncodeToString([]byte(idempotentActionScript)),
+			Path:    idempotentActionScriptPath(controlPlane),
+			Dynamic: true,
+			Minor:   true,
+		}
 
 		nodePlan.Files = append(nodePlan.Files, idempotentScriptFile)
 

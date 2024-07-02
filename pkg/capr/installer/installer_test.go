@@ -25,7 +25,7 @@ func TestInstaller_WindowsInstallScript(t *testing.T) {
 
 	CACertEncoded := systemtemplate.CAChecksum()
 
-	script, err := WindowsInstallScript(context.TODO(), "test", []corev1.EnvVar{}, "localhost")
+	script, err := WindowsInstallScript(context.TODO(), "test", []corev1.EnvVar{}, "localhost", "/var/lib/rancher/rke2")
 
 	// assert
 	a.Nil(err)

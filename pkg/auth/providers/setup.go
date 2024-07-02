@@ -27,6 +27,7 @@ var authConfigTypes = []string{
 	client.GoogleOauthConfigType,
 	client.OIDCConfigType,
 	client.KeyCloakOIDCConfigType,
+	client.GenericOIDCConfigType,
 }
 
 func SetupAuthConfig(ctx context.Context, management *config.ScaledContext, schemas *types.Schemas) {

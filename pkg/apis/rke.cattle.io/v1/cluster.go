@@ -1,7 +1,7 @@
 package v1
 
 import (
-	"github.com/rancher/wrangler/v2/pkg/genericcondition"
+	"github.com/rancher/wrangler/v3/pkg/genericcondition"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
@@ -54,6 +54,15 @@ type Networking struct {
 	StackPreference NetworkingStackPreference `json:"stackPreference,omitempty"`
 }
 
+type DataDirectories struct {
+	// Data directory for the system-agent connection info and plans
+	SystemAgent string `json:"systemAgent,omitempty"`
+	// Data directory for provisioning related files (idempotency)
+	Provisioning string `json:"provisioning,omitempty"`
+	// Data directory for the k8s distro
+	K8sDistro string `json:"k8sDistro,omitempty"`
+}
+
 type RKEClusterSpecCommon struct {
 	UpgradeStrategy       ClusterUpgradeStrategy `json:"upgradeStrategy,omitempty"`
 	ChartValues           GenericMap             `json:"chartValues,omitempty" wrangler:"nullable"`
@@ -66,6 +75,9 @@ type RKEClusterSpecCommon struct {
 
 	// Networking contains information regarding the desired and actual networking stack of the cluster.
 	Networking *Networking `json:"networking,omitempty"`
+
+	// DataDirectories contains the configuration for the data directories typically stored within /var/lib/rancher.
+	DataDirectories DataDirectories `json:"dataDirectories,omitempty"`
 
 	// Increment to force all nodes to re-provision
 	ProvisionGeneration int `json:"provisionGeneration,omitempty"`

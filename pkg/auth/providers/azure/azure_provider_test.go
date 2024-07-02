@@ -120,7 +120,7 @@ func TestConfigureTest(t *testing.T) {
 			}
 
 			provider := Provider{}
-			err = provider.ConfigureTest("configureTest", nil, r)
+			err = provider.ConfigureTest(r)
 			assert.NoError(t, err)
 
 			res := rr.Result()

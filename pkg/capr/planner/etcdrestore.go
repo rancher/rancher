@@ -3,6 +3,7 @@ package planner
 import (
 	"encoding/base64"
 	"fmt"
+	"path"
 	"strconv"
 	"strings"
 
@@ -11,7 +12,7 @@ import (
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/controllers/capr/managesystemagent"
-	"github.com/rancher/wrangler/v2/pkg/name"
+	"github.com/rancher/wrangler/v3/pkg/name"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -19,8 +20,7 @@ import (
 )
 
 const (
-	etcdRestoreInstallRoot = "/var/lib/rancher"
-	etcdRestoreBinPrefix   = "capr/etcd-restore/bin"
+	etcdRestoreBinPrefix = "capr/etcd-restore/bin"
 
 	etcdRestorePostRestoreWaitForPodListCleanupPath   = "wait_for_pod_list.sh"
 	etcdRestorePostRestoreWaitForPodListCleanupScript = `
@@ -341,25 +341,42 @@ func (p *Planner) generateEtcdSnapshotRestorePlan(controlPlane *rkev1.RKEControl
 
 	runtime := capr.GetRuntime(controlPlane.Spec.KubernetesVersion)
 
-	nodePlan.Instructions = append(nodePlan.Instructions, convertToIdempotentInstruction("etcd-restore/restore-kill-all", fmt.Sprintf("%v", controlPlane.Status.ETCDSnapshotRestore), generateKillAllInstruction(runtime)))
+	nodePlan.Instructions = append(nodePlan.Instructions, convertToIdempotentInstruction(
+		controlPlane,
+		"etcd-restore/restore-kill-all",
+		fmt.Sprintf("%v", controlPlane.Status.ETCDSnapshotRestore),
+		generateKillAllInstruction(runtime)))
 
 	if runtime == capr.RuntimeRKE2 {
-		if generated, instruction := generateManifestRemovalInstruction(runtime, entry); generated {
-			nodePlan.Instructions = append(nodePlan.Instructions, convertToIdempotentInstruction("etcd-restore/restore-manifest-removal", fmt.Sprintf("%v", controlPlane.Status.ETCDSnapshotRestore), instruction))
+		if generated, instruction := generateManifestRemovalInstruction(controlPlane, entry); generated {
+			nodePlan.Instructions = append(nodePlan.Instructions, convertToIdempotentInstruction(
+				controlPlane,
+				"etcd-restore/restore-manifest-removal",
+				fmt.Sprintf("%v", controlPlane.Status.ETCDSnapshotRestore),
+				instruction))
 		}
 	}
 
 	// make sure to install the desired version before performing restore
 	nodePlan.Instructions = append(nodePlan.Instructions,
 		p.generateInstallInstructionWithSkipStart(controlPlane, entry),
-		convertToIdempotentInstruction("etcd-restore/clean-etcd-dir", fmt.Sprintf("%v", controlPlane.Status.ETCDSnapshotRestore), plan.OneTimeInstruction{
-			Name:    "remove-etcd-db-dir",
-			Command: "rm",
-			Args: []string{
-				"-rf",
-				fmt.Sprintf("/var/lib/rancher/%s/server/db/etcd", capr.GetRuntimeCommand(controlPlane.Spec.KubernetesVersion)),
-			}}),
-		idempotentInstruction("etcd-restore/restore", fmt.Sprintf("%v", controlPlane.Status.ETCDSnapshotRestore), capr.GetRuntimeCommand(controlPlane.Spec.KubernetesVersion), args, env),
+		convertToIdempotentInstruction(
+			controlPlane,
+			"etcd-restore/clean-etcd-dir",
+			fmt.Sprintf("%v", controlPlane.Status.ETCDSnapshotRestore), plan.OneTimeInstruction{
+				Name:    "remove-etcd-db-dir",
+				Command: "rm",
+				Args: []string{
+					"-rf",
+					path.Join(capr.GetDistroDataDir(controlPlane), "server/db/etcd"),
+				}}),
+		idempotentInstruction(
+			controlPlane,
+			"etcd-restore/restore",
+			fmt.Sprintf("%v", controlPlane.Status.ETCDSnapshotRestore),
+			capr.GetRuntimeCommand(controlPlane.Spec.KubernetesVersion),
+			args,
+			env),
 	)
 
 	return nodePlan, joinedServer, nil
@@ -374,26 +391,11 @@ func (p *Planner) generateStopServiceAndKillAllPlan(controlPlane *rkev1.RKEContr
 	nodePlan.Instructions = append(nodePlan.Instructions,
 		generateKillAllInstruction(runtime))
 	if runtime == capr.RuntimeRKE2 {
-		if generated, instruction := generateManifestRemovalInstruction(runtime, server); generated {
+		if generated, instruction := generateManifestRemovalInstruction(controlPlane, server); generated {
 			nodePlan.Instructions = append(nodePlan.Instructions, instruction)
 		}
 	}
 	return nodePlan, joinedServer, nil
-}
-
-// generateManifestRemovalInstruction generates a rm -rf command for the manifests of a server. This was created in response to https://github.com/rancher/rancher/issues/41174
-func generateManifestRemovalInstruction(runtime string, entry *planEntry) (bool, plan.OneTimeInstruction) {
-	if runtime == "" || entry == nil || roleNot(roleOr(isEtcd, isControlPlane))(entry) {
-		return false, plan.OneTimeInstruction{}
-	}
-	return true, plan.OneTimeInstruction{
-		Name:    "remove server manifests",
-		Command: "/bin/sh",
-		Args: []string{
-			"-c",
-			fmt.Sprintf("rm -rf /var/lib/rancher/%s/server/manifests/%s-*.yaml", runtime, runtime),
-		},
-	}
 }
 
 func generateKillAllInstruction(runtime string) plan.OneTimeInstruction {
@@ -413,26 +415,27 @@ func generateCreateEtcdTombstoneInstruction(controlPlane *rkev1.RKEControlPlane)
 		Name:    "create-etcd-tombstone",
 		Command: "touch",
 		Args: []string{
-			fmt.Sprintf("/var/lib/rancher/%s/server/db/etcd/tombstone", capr.GetRuntimeCommand(controlPlane.Spec.KubernetesVersion)),
+			path.Join(capr.GetDistroDataDir(controlPlane), "server/db/etcd/tombstone"),
 		},
 	}
 }
 
 func etcdRestoreScriptPath(controlPlane *rkev1.RKEControlPlane, file string) string {
-	return fmt.Sprintf("%s/%s/%s/%s", etcdRestoreInstallRoot, capr.GetRuntime(controlPlane.Spec.KubernetesVersion), etcdRestoreBinPrefix, file)
+	return path.Join(capr.GetDistroDataDir(controlPlane), etcdRestoreBinPrefix, file)
 }
 
 // generateEtcdRestorePodCleanupFilesAndInstruction generates a file that contains a script that checks API server health and a slice of instructions that cleans up system pods on etcd restore.
 func (p *Planner) generateEtcdRestorePodCleanupFilesAndInstruction(controlPlane *rkev1.RKEControlPlane, cleanupMachineUIDs []string) ([]plan.File, []plan.OneTimeInstruction) {
 	runtime := capr.GetRuntime(controlPlane.Spec.KubernetesVersion)
 
-	kubectl, kubeconfig := capr.GetKubectlAndKubeconfigPaths(controlPlane.Spec.KubernetesVersion)
+	kubectl, kubeconfig := capr.GetKubectlAndKubeconfigPaths(controlPlane)
 	if kubectl == "" || kubeconfig == "" {
 		return nil, nil
 	}
 
 	instructions := []plan.OneTimeInstruction{
 		idempotentInstruction(
+			controlPlane,
 			"etcd-restore/pods-wait-for-podlist",
 			fmt.Sprintf("%v", controlPlane.Status.ETCDSnapshotRestore),
 			"/bin/sh",
@@ -448,6 +451,7 @@ func (p *Planner) generateEtcdRestorePodCleanupFilesAndInstruction(controlPlane 
 			},
 			[]string{}),
 		idempotentInstruction(
+			controlPlane,
 			"etcd-restore/wait-for-desired-ready-nodes",
 			fmt.Sprintf("%v", controlPlane.Status.ETCDSnapshotRestore),
 			"/bin/sh",
@@ -486,6 +490,7 @@ func (p *Planner) generateEtcdRestorePodCleanupFilesAndInstruction(controlPlane 
 	for i, podSelector := range podSelectors {
 		if namespace, labelSelector, usable := strings.Cut(podSelector, ":"); usable {
 			instructions = append(instructions, idempotentInstruction(
+				controlPlane,
 				fmt.Sprintf("etcd-restore/post-restore-cleanup-pods-%d", i),
 				fmt.Sprintf("%v", controlPlane.Status.ETCDSnapshotRestore),
 				kubectl,
@@ -520,15 +525,15 @@ func (p *Planner) generateEtcdRestorePodCleanupFilesAndInstruction(controlPlane 
 
 // generateEtcdRestorePodCleanupFilesAndInstruction generates a file that contains a script that checks API server health and a slice of instructions that cleans up system pods on etcd restore.
 func (p *Planner) generateEtcdRestoreNodeCleanupFilesAndInstruction(controlPlane *rkev1.RKEControlPlane, allMachineUIDs []string, allNodeNames []string) ([]plan.File, []plan.OneTimeInstruction) {
-	kubectl, kubeconfig := capr.GetKubectlAndKubeconfigPaths(controlPlane.Spec.KubernetesVersion)
+	kubectl, kubeconfig := capr.GetKubectlAndKubeconfigPaths(controlPlane)
 	if kubectl == "" || kubeconfig == "" {
 		return nil, nil
 	}
 
-	var nodeNames, machineIds []byte
+	var nodeNames, machineIDs []byte
 
 	for _, mid := range allMachineUIDs {
-		machineIds = fmt.Appendf(machineIds, "%s\n", mid)
+		machineIDs = fmt.Appendf(machineIDs, "%s\n", mid)
 	}
 
 	for _, nodeName := range allNodeNames {
@@ -537,15 +542,16 @@ func (p *Planner) generateEtcdRestoreNodeCleanupFilesAndInstruction(controlPlane
 
 	identifier := name.Hex(controlPlane.Spec.ETCDSnapshotRestore.Name+controlPlane.Spec.ETCDSnapshotRestore.RestoreRKEConfig+strconv.Itoa(controlPlane.Spec.ETCDSnapshotRestore.Generation), 10)
 
-	machineIdsFile := fmt.Sprintf("machine-ids-%s", identifier)
+	machineIDsFile := fmt.Sprintf("machine-ids-%s", identifier)
 	nodeNamesFile := fmt.Sprintf("node-names-%s", identifier)
 
 	instructions := []plan.OneTimeInstruction{
 		idempotentInstruction(
+			controlPlane,
 			"etcd-restore/cleanup-nodes",
 			fmt.Sprintf("%v", controlPlane.Status.ETCDSnapshotRestore),
 			"/bin/sh",
-			[]string{etcdRestoreScriptPath(controlPlane, etcdRestoreNodeCleanUpPath), etcdRestoreScriptPath(controlPlane, machineIdsFile), etcdRestoreScriptPath(controlPlane, nodeNamesFile)},
+			[]string{etcdRestoreScriptPath(controlPlane, etcdRestoreNodeCleanUpPath), etcdRestoreScriptPath(controlPlane, machineIDsFile), etcdRestoreScriptPath(controlPlane, nodeNamesFile)},
 			[]string{
 				fmt.Sprintf("%s=%s", "KUBECTL", kubectl),
 				fmt.Sprintf("%s=%s", "KUBECONFIG", kubeconfig),
@@ -559,8 +565,8 @@ func (p *Planner) generateEtcdRestoreNodeCleanupFilesAndInstruction(controlPlane
 			Dynamic: true,
 		},
 		{
-			Content: base64.StdEncoding.EncodeToString(machineIds),
-			Path:    etcdRestoreScriptPath(controlPlane, machineIdsFile),
+			Content: base64.StdEncoding.EncodeToString(machineIDs),
+			Path:    etcdRestoreScriptPath(controlPlane, machineIDsFile),
 			Dynamic: true,
 		},
 		{
@@ -578,7 +584,7 @@ func generateRemoveTLSAndCredDirInstructions(controlPlane *rkev1.RKEControlPlane
 			Command: "rm",
 			Args: []string{
 				"-rf",
-				fmt.Sprintf("/var/lib/rancher/%s/server/tls", capr.GetRuntimeCommand(controlPlane.Spec.KubernetesVersion)),
+				path.Join(capr.GetDistroDataDir(controlPlane), "server/tls"),
 			},
 		},
 		{
@@ -586,7 +592,7 @@ func generateRemoveTLSAndCredDirInstructions(controlPlane *rkev1.RKEControlPlane
 			Command: "rm",
 			Args: []string{
 				"-rf",
-				fmt.Sprintf("/var/lib/rancher/%s/server/cred", capr.GetRuntimeCommand(controlPlane.Spec.KubernetesVersion)),
+				path.Join(capr.GetDistroDataDir(controlPlane), "server/cred"),
 			},
 		},
 	}
@@ -646,7 +652,7 @@ func (p *Planner) runEtcdRestoreServiceStop(controlPlane *rkev1.RKEControlPlane,
 			return err
 		}
 		// Clean up previous restoration tracking attempts before starting this restoration.
-		stopPlan.Instructions = append(stopPlan.Instructions, generateIdempotencyCleanupInstruction("etcd-restore"))
+		stopPlan.Instructions = append(stopPlan.Instructions, generateIdempotencyCleanupInstruction(controlPlane, "etcd-restore"))
 		if isEtcd(server) {
 			stopPlan.Instructions = append(stopPlan.Instructions, generateCreateEtcdTombstoneInstruction(controlPlane))
 		}

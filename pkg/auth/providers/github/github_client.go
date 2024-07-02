@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strings"
@@ -37,27 +36,24 @@ func (g *GClient) getAccessToken(code string, config *v32.GithubConfig) (string,
 
 	b, err := g.postToGithub(url, form)
 	if err != nil {
-		logrus.Errorf("Github getAccessToken: GET url %v received error from github, err: %v", url, err)
-		return "", err
+		return "", fmt.Errorf("github getAccessToken: POST url %v received error from github, err: %v", url, err)
 	}
 
 	// Decode the response
 	var respMap map[string]interface{}
 
 	if err := json.Unmarshal(b, &respMap); err != nil {
-		logrus.Errorf("Github getAccessToken: received error unmarshalling response body, err: %v", err)
-		return "", err
+		return "", fmt.Errorf("github getAccessToken: received error unmarshalling response body, err: %v", err)
 	}
 
 	if respMap["error"] != nil {
 		desc := respMap["error_description"]
-		logrus.Errorf("Received Error from github %v, description from github %v", respMap["error"], desc)
-		return "", fmt.Errorf("Received Error from github %v, description from github %v", respMap["error"], desc)
+		return "", fmt.Errorf("github getAccessToken: received error from github %v, description from github %v", respMap["error"], desc)
 	}
 
 	acessToken, ok := respMap["access_token"].(string)
 	if !ok {
-		return "", fmt.Errorf("Received Error reading accessToken from response %v", respMap)
+		return "", fmt.Errorf("github getAccessToken: received error reading accessToken from response %v", respMap)
 	}
 	return acessToken, nil
 }
@@ -118,11 +114,54 @@ func (g *GClient) getTeams(githubAccessToken string, config *v32.GithubConfig) (
 			logrus.Errorf("Github getGithubTeams: received error unmarshalling teams array, err: %v", err)
 			return teams, err
 		}
-		for _, teamObj := range teamObjs {
-			teams = append(teams, teamObj)
-		}
+		teams = append(teams, teamObjs...)
 
 	}
+	return teams, nil
+}
+
+// getOrgTeams returns the teams belonging to an organization.
+func (g *GClient) getOrgTeams(githubAccessToken string, config *v32.GithubConfig, org Account) ([]Account, error) {
+	url := fmt.Sprintf(g.getURL("ORG_TEAMS", config), url.PathEscape(org.Login))
+	responses, err := g.paginateGithub(githubAccessToken, url)
+	if err != nil {
+		logrus.Errorf("Github getGithubTeams: GET url %v received error from github, err: %v", url, err)
+		return nil, err
+	}
+
+	var teams, respTeams []Account
+	for _, response := range responses {
+		respTeams, err = g.getOrgTeamInfo(response, config, org)
+		if err != nil {
+			logrus.Errorf("Github getOrgTeams: received error unmarshalling teams array, err: %v", err)
+			return teams, err
+		}
+		teams = append(teams, respTeams...)
+	}
+
+	return teams, nil
+}
+
+// getOrgTeamInfo is similar to getTeamInfo but takes an org as an argument.
+func (g *GClient) getOrgTeamInfo(b []byte, config *v32.GithubConfig, org Account) ([]Account, error) {
+	var teams []Account
+	var teamObjs []Team
+	if err := json.Unmarshal(b, &teamObjs); err != nil {
+		logrus.Errorf("Github getTeamInfo: received error unmarshalling team array, err: %v", err)
+		return teams, err
+	}
+
+	url := g.getURL("TEAM_PROFILE", config)
+	for _, team := range teamObjs {
+		teams = append(teams, Account{
+			ID:        team.ID,
+			Name:      team.Name,
+			AvatarURL: org.AvatarURL,
+			HTMLURL:   fmt.Sprintf(url, org.Login, team.Slug),
+			Login:     team.Slug,
+		})
+	}
+
 	return teams, nil
 }
 
@@ -221,22 +260,34 @@ func (g *GClient) searchUsers(searchTerm, searchType string, githubAccessToken s
 	return result.Items, nil
 }
 
-func (g *GClient) getOrgByName(org string, githubAccessToken string, config *v32.GithubConfig) (Account, error) {
-	org = URLEncoded(org)
-	url := g.getURL("ORGS", config) + org
-
-	b, _, err := g.getFromGithub(githubAccessToken, url)
+// searchTeams searches for teams that match the search term in the organizations the access token has access to.
+// At the moment it only does a case-insensitive prefix match on the team's name.
+func (g *GClient) searchTeams(searchTerm, githubAccessToken string, config *v32.GithubConfig) ([]Account, error) {
+	orgs, err := g.getOrgs(githubAccessToken, config)
 	if err != nil {
-		logrus.Debugf("Github getGithubOrgByName: GET url %v received error from github, err: %v", url, err)
-		return Account{}, err
-	}
-	var githubAcct Account
-	if err := json.Unmarshal(b, &githubAcct); err != nil {
-		logrus.Errorf("Github getGithubOrgByName: error unmarshalling response, err: %v", err)
-		return Account{}, err
+		return nil, err
 	}
 
-	return githubAcct, nil
+	lowerSearchTerm := strings.ToLower(searchTerm)
+
+	var matches, teams []Account
+	for _, org := range orgs {
+		teams, err = g.getOrgTeams(githubAccessToken, config, org)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, team := range teams {
+			if !strings.HasPrefix(strings.ToLower(team.Name), lowerSearchTerm) {
+				continue
+			}
+
+			matches = append(matches, team)
+		}
+
+	}
+
+	return matches, nil
 }
 
 func (g *GClient) getUserOrgByID(id string, githubAccessToken string, config *v32.GithubConfig) (Account, error) {
@@ -289,10 +340,10 @@ func (g *GClient) postToGithub(url string, form url.Values) ([]byte, error) {
 	default:
 		var body bytes.Buffer
 		io.Copy(&body, resp.Body)
-		return nil, fmt.Errorf("Request failed, got status code: %d. Response: %s",
+		return nil, fmt.Errorf("request failed, got status code: %d. Response: %s",
 			resp.StatusCode, body.Bytes())
 	}
-	return ioutil.ReadAll(resp.Body)
+	return io.ReadAll(resp.Body)
 }
 
 func (g *GClient) getFromGithub(githubAccessToken string, url string) ([]byte, string, error) {
@@ -321,12 +372,11 @@ func (g *GClient) getFromGithub(githubAccessToken string, url string) ([]byte, s
 	}
 
 	nextURL := g.nextGithubPage(resp)
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	return b, nextURL, err
 }
 
 func (g *GClient) getURL(endpoint string, config *v32.GithubConfig) string {
-
 	var hostName, apiEndpoint, toReturn string
 
 	if config.Hostname != "" {
@@ -368,6 +418,8 @@ func (g *GClient) getURL(endpoint string, config *v32.GithubConfig) string {
 		toReturn = apiEndpoint + "/user/teams?per_page=100"
 	case "TEAM_PROFILE":
 		toReturn = hostName + "/orgs/%s/teams/%s"
+	case "ORG_TEAMS":
+		toReturn = apiEndpoint + "/orgs/%s/teams?per_page=100"
 	default:
 		toReturn = apiEndpoint
 	}

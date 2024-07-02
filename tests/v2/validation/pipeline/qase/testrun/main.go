@@ -19,7 +19,7 @@ const (
 )
 
 var (
-	testRunName = os.Getenv(qasedefaults.TestRunNAMEEnvVar)
+	testRunName = os.Getenv(qasedefaults.TestRunNameEnvVar)
 	qaseToken   = os.Getenv(qasedefaults.QaseTokenEnvVar)
 )
 

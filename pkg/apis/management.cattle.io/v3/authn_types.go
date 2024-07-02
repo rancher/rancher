@@ -1,6 +1,8 @@
 package v3
 
 import (
+	"strings"
+
 	"github.com/rancher/norman/condition"
 	"github.com/rancher/norman/types"
 	v1 "k8s.io/api/core/v1"
@@ -10,6 +12,9 @@ import (
 const (
 	UserConditionInitialRolesPopulated condition.Cond = "InitialRolesPopulated"
 	AuthConfigConditionSecretsMigrated condition.Cond = "SecretsMigrated"
+	// AuthConfigConditionShibbolethSecretFixed is applied to an AuthConfig when the
+	// incorrect name for the shibboleth OpenLDAP secret has been fixed.
+	AuthConfigConditionShibbolethSecretFixed condition.Cond = "ShibbolethSecretFixed"
 )
 
 // +genclient
@@ -63,6 +68,22 @@ type User struct {
 	Status             UserStatus `json:"status"`
 }
 
+// IsSystem returns true if the user is a system user.
+func (u *User) IsSystem() bool {
+	for _, principalID := range u.PrincipalIDs {
+		if strings.HasPrefix(principalID, "system:") {
+			return true
+		}
+	}
+
+	return false
+}
+
+// IsDefaultAdmin returns true if the user is the default admin user.
+func (u *User) IsDefaultAdmin() bool {
+	return u.Username == "admin"
+}
+
 type UserStatus struct {
 	Conditions []UserCondition `json:"conditions"`
 }
@@ -99,6 +120,9 @@ type UserAttribute struct {
 	LastRefresh     string
 	NeedsRefresh    bool
 	ExtraByProvider map[string]map[string][]string // extra information for the user to print in audit logs, stored per authProvider. example: map[openldap:map[principalid:[openldap_user://uid=testuser1,ou=dev,dc=us-west-2,dc=compute,dc=internal]]]
+	LastLogin       *metav1.Time                   `json:"lastLogin,omitempty"`
+	DisableAfter    *metav1.Duration               `json:"disableAfter,omitempty"` // Overrides DisableInactiveUserAfter setting.
+	DeleteAfter     *metav1.Duration               `json:"deleteAfter,omitempty"`  // Overrides DeleteInactiveUserAfter setting.
 }
 
 type Principals struct {
@@ -280,15 +304,16 @@ type GoogleOauthConfigApplyInput struct {
 type AzureADConfig struct {
 	AuthConfig `json:",inline" mapstructure:",squash"`
 
-	Endpoint           string `json:"endpoint,omitempty" norman:"default=https://login.microsoftonline.com/,required,notnullable"`
-	GraphEndpoint      string `json:"graphEndpoint,omitempty" norman:"required,notnullable"`
-	TokenEndpoint      string `json:"tokenEndpoint,omitempty" norman:"required,notnullable"`
-	AuthEndpoint       string `json:"authEndpoint,omitempty" norman:"required,notnullable"`
-	DeviceAuthEndpoint string `json:"deviceAuthEndpoint,omitempty"`
-	TenantID           string `json:"tenantId,omitempty" norman:"required,notnullable"`
-	ApplicationID      string `json:"applicationId,omitempty" norman:"required,notnullable"`
-	ApplicationSecret  string `json:"applicationSecret,omitempty" norman:"required,type=password"`
-	RancherURL         string `json:"rancherUrl,omitempty" norman:"required,notnullable"`
+	Endpoint              string `json:"endpoint,omitempty" norman:"default=https://login.microsoftonline.com/,required,notnullable"`
+	GraphEndpoint         string `json:"graphEndpoint,omitempty" norman:"required,notnullable"`
+	TokenEndpoint         string `json:"tokenEndpoint,omitempty" norman:"required,notnullable"`
+	AuthEndpoint          string `json:"authEndpoint,omitempty" norman:"required,notnullable"`
+	DeviceAuthEndpoint    string `json:"deviceAuthEndpoint,omitempty"`
+	TenantID              string `json:"tenantId,omitempty" norman:"required,notnullable"`
+	ApplicationID         string `json:"applicationId,omitempty" norman:"required,notnullable"`
+	ApplicationSecret     string `json:"applicationSecret,omitempty" norman:"required,type=password"`
+	RancherURL            string `json:"rancherUrl,omitempty" norman:"required,notnullable"`
+	GroupMembershipFilter string `json:"groupMembershipFilter,omitempty"`
 }
 
 type AzureADConfigTestOutput struct {
@@ -333,6 +358,26 @@ type ActiveDirectoryConfig struct {
 	NestedGroupMembershipEnabled *bool    `json:"nestedGroupMembershipEnabled,omitempty" norman:"default=false"`
 }
 
+func (c *ActiveDirectoryConfig) GetUserSearchAttributes(searchAttributes ...string) []string {
+	userSearchAttributes := []string{
+		c.UserObjectClass,
+		c.UserLoginAttribute,
+		c.UserNameAttribute,
+		c.UserEnabledAttribute,
+	}
+	return append(userSearchAttributes, searchAttributes...)
+}
+
+func (c *ActiveDirectoryConfig) GetGroupSearchAttributes(searchAttributes ...string) []string {
+	groupSeachAttributes := []string{
+		c.GroupObjectClass,
+		c.UserLoginAttribute,
+		c.GroupNameAttribute,
+		c.GroupSearchAttribute,
+	}
+	return append(groupSeachAttributes, searchAttributes...)
+}
+
 type ActiveDirectoryTestAndApplyInput struct {
 	ActiveDirectoryConfig ActiveDirectoryConfig `json:"activeDirectoryConfig,omitempty"`
 	Username              string                `json:"username"`
@@ -374,6 +419,29 @@ type LdapFields struct {
 type LdapConfig struct {
 	AuthConfig `json:",inline" mapstructure:",squash"`
 	LdapFields `json:",inline" mapstructure:",squash"`
+}
+
+func (c *LdapConfig) GetUserSearchAttributes(searchAttributes ...string) []string {
+	userSearchAttributes := []string{
+		"dn",
+		c.UserMemberAttribute,
+		c.UserObjectClass,
+		c.UserLoginAttribute,
+		c.UserNameAttribute,
+		c.UserEnabledAttribute,
+	}
+	return append(userSearchAttributes, searchAttributes...)
+}
+
+func (c *LdapConfig) GetGroupSearchAttributes(searchAttributes ...string) []string {
+	groupSeachAttributes := []string{
+		c.GroupMemberUserAttribute,
+		c.GroupObjectClass,
+		c.UserLoginAttribute,
+		c.GroupNameAttribute,
+		c.GroupSearchAttribute,
+	}
+	return append(groupSeachAttributes, searchAttributes...)
 }
 
 type LdapTestAndApplyInput struct {
@@ -455,13 +523,20 @@ type OIDCConfig struct {
 
 	ClientID           string `json:"clientId" norman:"required"`
 	ClientSecret       string `json:"clientSecret,omitempty" norman:"required,type=password"`
-	Scopes             string `json:"scope"`
-	AuthEndpoint       string `json:"authEndpoint,omitempty" norman:"required,notnullable"`
-	Issuer             string `json:"issuer" norman:"required,notnullable"`
-	Certificate        string `json:"certificate,omitempty"`
-	PrivateKey         string `json:"privateKey" norman:"type=password"`
 	RancherURL         string `json:"rancherUrl" norman:"required,notnullable"`
+	Issuer             string `json:"issuer" norman:"required,notnullable"`
+	AuthEndpoint       string `json:"authEndpoint,omitempty"`
+	TokenEndpoint      string `json:"tokenEndpoint,omitempty"`
+	UserInfoEndpoint   string `json:"userInfoEndpoint,omitempty"`
+	JWKSUrl            string `json:"jwksUrl,omitempty"`
+	Certificate        string `json:"certificate,omitempty"`
+	PrivateKey         string `json:"privateKey,omitempty" norman:"type=password"`
 	GroupSearchEnabled *bool  `json:"groupSearchEnabled"`
+	GroupsClaim        string `json:"groupsClaim,omitempty"`
+	// Scopes is expected to be a space delimited list of scopes
+	Scopes string `json:"scope,omitempty"`
+	// AcrValue is expected to be string containing the required ACR value
+	AcrValue string `json:"acrValue,omitempty"`
 }
 
 type OIDCTestOutput struct {
@@ -490,4 +565,21 @@ type ClusterProxyConfig struct {
 
 	// Enabled indicates whether downstream proxy requests for service account tokens is enabled.
 	Enabled bool `json:"enabled"`
+}
+
+// GenericOIDCConfig is the wrapper for the Generic OIDC provider to hold the OIDC Configuration
+type GenericOIDCConfig struct {
+	OIDCConfig `json:",inline" mapstructure:",squash"`
+}
+
+// GenericOIDCTestOutput is the wrapper for the Generic OIDC provider to hold the OIDC test output object, which
+// in turn holds the RedirectURL
+type GenericOIDCTestOutput struct {
+	OIDCTestOutput `json:",inline" mapstructure:",squash"`
+}
+
+// GenericOIDCApplyInput is the wrapper for the input used to enable/activate the Generic OIDC auth provider.  It holds
+// the configuration for the OIDC provider as well as an auth code.
+type GenericOIDCApplyInput struct {
+	OIDCApplyInput `json:",inline" mapstructure:",squash"`
 }

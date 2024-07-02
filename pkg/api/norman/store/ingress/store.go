@@ -239,10 +239,10 @@ func getPaths(data map[string]interface{}) (map[hostPath]map[string]interface{},
 				key := hostPath{host: convert.ToString(converted["host"]), path: path}
 				if existing, ok := result[key]; ok {
 					flag = true
-					targetWorkloadIds := convert.ToStringSlice(values.GetValueN(targetMap, "workloadIds"))
+					targetWorkloadIDs := convert.ToStringSlice(values.GetValueN(targetMap, "workloadIds"))
 					updated := convert.ToStringSlice(values.GetValueN(convert.ToMapInterface(existing), "workloadIds"))
-					targetWorkloadIds = append(targetWorkloadIds, updated...)
-					values.PutValue(targetMap, targetWorkloadIds, "workloadIds")
+					targetWorkloadIDs = append(targetWorkloadIDs, updated...)
+					values.PutValue(targetMap, targetWorkloadIDs, "workloadIds")
 				}
 				result[key] = targetMap
 			}

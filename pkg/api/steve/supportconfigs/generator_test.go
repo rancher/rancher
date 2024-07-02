@@ -2,8 +2,10 @@ package supportconfigs
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	configmapfakes "github.com/rancher/rancher/pkg/generated/norman/core/v1/fakes"
@@ -47,14 +49,15 @@ func (c *FakeChartUtil) GetRelease(_ string, _ string) (*release.Release, error)
 
 func TestGenerateSupportConfigScenarios(t *testing.T) {
 	scenarios := []struct {
-		name                    string
-		usePAYG                 bool
-		generateAdapterError    bool
-		generateAdapterNotFound bool
-		generateAuthorizedError bool
-		authorized              bool
-		marshalledCSPConfig     string
-		expectedHTTPCode        int
+		name                            string
+		usePAYG                         bool
+		generateAdapterError            bool
+		generateAdapterNotFound         bool
+		generateAuthorizedError         bool
+		generateMeteringArchiveNotFound bool
+		authorized                      bool
+		marshalledCSPConfig             string
+		expectedHTTPCode                int
 	}{
 		{
 			name:                    "internal server error due to CSP release lookup",
@@ -135,6 +138,17 @@ func TestGenerateSupportConfigScenarios(t *testing.T) {
 			marshalledCSPConfig:     "{}",
 			expectedHTTPCode:        http.StatusOK,
 		},
+		{
+			name:                            "user requests PAYG, authorized to get PAYG, metering-archive is not available, we return output (200) ",
+			usePAYG:                         true,
+			generateAdapterError:            false,
+			generateAdapterNotFound:         false,
+			generateAuthorizedError:         false,
+			generateMeteringArchiveNotFound: true,
+			authorized:                      true,
+			marshalledCSPConfig:             "{}",
+			expectedHTTPCode:                http.StatusOK,
+		},
 	}
 	for _, scenario := range scenarios {
 		test := scenario
@@ -157,11 +171,22 @@ func TestGenerateSupportConfigScenarios(t *testing.T) {
 				ConfigMaps: &configmapfakes.ConfigMapInterfaceMock{
 					GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v1.ConfigMap, error) {
 						// NOTE: we are not testing the configmap itself. Just need to return a valid configmap.
-						return &v1.ConfigMap{
-							Data: map[string]string{
-								"data": "{}",
-							},
-						}, nil
+						if name == cspAdapterConfigmap {
+							return &v1.ConfigMap{
+								Data: map[string]string{
+									"data": "{}",
+								},
+							}, nil
+						} else {
+							if test.generateMeteringArchiveNotFound {
+								return nil, errNotFound
+							}
+							return &v1.ConfigMap{
+								Data: map[string]string{
+									"archive": "[]",
+								},
+							}, nil
+						}
 					},
 				},
 				SubjectAccessReviews: k8sClient.AuthorizationV1().SubjectAccessReviews(),
@@ -186,6 +211,15 @@ func TestGenerateSupportConfigScenarios(t *testing.T) {
 			req = req.WithContext(ctx)
 			h.ServeHTTP(rr, req)
 			assert.Equal(t, test.expectedHTTPCode, rr.Code)
+			if test.expectedHTTPCode == http.StatusForbidden {
+				// if user denied access, config.json should not be returned
+				body, _ := io.ReadAll(rr.Body)
+				assert.False(t, strings.Contains(string(body), "rancher/config.json"))
+			}
+			if test.generateMeteringArchiveNotFound {
+				body, _ := io.ReadAll(rr.Body)
+				assert.False(t, strings.Contains(string(body), "rancher/metering_archive.json"))
+			}
 		})
 	}
 }

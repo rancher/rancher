@@ -349,26 +349,36 @@ tests:
     - equal:
         path: spec.template.spec.priorityClassName
         value: "rancher-critical"
-- it: should default livenessProbe initialDelaySeconds to 60
+- it: should not set a livenessProbe initialDelaySeconds by default
   asserts:
-    - equal:
+    - notExists:
         path: spec.template.spec.containers[0].livenessProbe.initialDelaySeconds
-        value: 60
-- it: should default livenessProbe periodSeconds to 30
+- it: should set livenessProbe periodSeconds defaults
   asserts:
     - equal:
         path: spec.template.spec.containers[0].livenessProbe.periodSeconds
         value: 30
-- it: should default readinessProbe initialDelaySeconds to 5
-  asserts:
     - equal:
-        path: spec.template.spec.containers[0].readinessProbe.initialDelaySeconds
+        path: spec.template.spec.containers[0].livenessProbe.timeoutSeconds
         value: 5
-- it: should default readinessProbe periodSeconds to 30
+    - equal:
+        path: spec.template.spec.containers[0].livenessProbe.failureThreshold
+        value: 5
+- it: should not set readinessProbe initialDelaySeconds by default
+  asserts:
+    - notExists:
+        path: spec.template.spec.containers[0].readinessProbe.initialDelaySeconds
+- it: should set readinessProbe periodSeconds defaults
   asserts:
     - equal:
         path: spec.template.spec.containers[0].readinessProbe.periodSeconds
         value: 30
+    - equal:
+        path: spec.template.spec.containers[0].readinessProbe.timeoutSeconds
+        value: 5
+    - equal:
+        path: spec.template.spec.containers[0].readinessProbe.failureThreshold
+        value: 5
 - it: should set livenessProbe initialDelaySeconds to 90
   set:
     livenessProbe.initialDelaySeconds: 90
@@ -397,39 +407,141 @@ tests:
     - equal:
         path: spec.template.spec.containers[0].readinessProbe.periodSeconds
         value: 60
-- it: should set startupProbe periodSeconds to 60
-  set:
-    startupProbe.periodSeconds: 60
+- it: should always have a startupProbe
   asserts:
-    - equal:
-        path: spec.template.spec.containers[0].startupProbe.periodSeconds
-        value: 60
-    - equal:
-        path: spec.template.spec.containers[0].startupProbe.failureThreshold
-        value: 1
     - equal:
         path: spec.template.spec.containers[0].startupProbe.httpGet.port
         value: 80
     - equal:
         path: spec.template.spec.containers[0].startupProbe.httpGet.path
         value: /healthz
-- it: should set startupProbe failureThreshold to 10
-  set:
-    startupProbe.failureThreshold: 10
-  asserts:
+    - equal:
+        path: spec.template.spec.containers[0].startupProbe.timeoutSeconds
+        value: 5
+    - equal:
+        path: spec.template.spec.containers[0].startupProbe.failureThreshold
+        value: 12
     - equal:
         path: spec.template.spec.containers[0].startupProbe.periodSeconds
-        value: 30
+        value: 10
+- it: allows configuring startupProbe values
+  set:
+    startupProbe.timeoutSeconds: 2
+    startupProbe.failureThreshold: 10
+    startupProbe.periodSeconds: 15
+  asserts:
+    - equal:
+        path: spec.template.spec.containers[0].startupProbe.timeoutSeconds
+        value: 2
     - equal:
         path: spec.template.spec.containers[0].startupProbe.failureThreshold
         value: 10
     - equal:
-        path: spec.template.spec.containers[0].startupProbe.httpGet.port
-        value: 80
-    - equal:
-        path: spec.template.spec.containers[0].startupProbe.httpGet.path
-        value: /healthz
-- it: should not have startupProbe if no startupProbe fields set
+        path: spec.template.spec.containers[0].startupProbe.periodSeconds
+        value: 15
+- it: should add CATTLE_AGENT_TLS_MODE=strict to env and maintain default vars
+  set:
+    agentTLSMode: "strict"
   asserts:
-    - isNull:
-        path: spec.template.spec.containers[0].startupProbe
+    - contains:
+        path: spec.template.spec.containers[0].env
+        content:
+          name: CATTLE_AGENT_TLS_MODE
+          value: "strict"
+    - contains:
+        path: spec.template.spec.containers[0].env
+        content:
+          name: CATTLE_PEER_SERVICE
+          value: RELEASE-NAME-rancher
+    - contains:
+        path: spec.template.spec.containers[0].env
+        content:
+          name: CATTLE_NAMESPACE
+          value: NAMESPACE
+- it: should add CATTLE_AGENT_TLS_MODE=system-store to env and maintain default vars
+  set:
+    agentTLSMode: "system-store"
+  asserts:
+    - contains:
+        path: spec.template.spec.containers[0].env
+        content:
+          name: CATTLE_AGENT_TLS_MODE
+          value: "system-store"
+    - contains:
+        path: spec.template.spec.containers[0].env
+        content:
+          name: CATTLE_PEER_SERVICE
+          value: RELEASE-NAME-rancher
+    - contains:
+        path: spec.template.spec.containers[0].env
+        content:
+          name: CATTLE_NAMESPACE
+          value: NAMESPACE
+- it: should not add (null) CATTLE_AGENT_TLS_MODE to env and maintain default vars
+  set:
+    agentTLSMode: null
+  asserts:
+    - notContains:
+        path: spec.template.spec.containers[0].env
+        content:
+          name: CATTLE_AGENT_TLS_MODE
+          value: "strict"
+    - notContains:
+        path: spec.template.spec.containers[0].env
+        content:
+          name: CATTLE_AGENT_TLS_MODE
+          value: "system-store"
+    - notContains:
+            path: spec.template.spec.containers[0].env
+            content:
+              name: CATTLE_AGENT_TLS_MODE
+              value: ""
+    - notContains:
+        path: spec.template.spec.containers[0].env
+        content:
+          name: CATTLE_AGENT_TLS_MODE
+          value: null
+    - contains:
+        path: spec.template.spec.containers[0].env
+        content:
+          name: CATTLE_PEER_SERVICE
+          value: RELEASE-NAME-rancher
+    - contains:
+        path: spec.template.spec.containers[0].env
+        content:
+          name: CATTLE_NAMESPACE
+          value: NAMESPACE
+- it: should not add ("") CATTLE_AGENT_TLS_MODE to env and maintain default vars
+  set:
+    agentTLSMode: ""
+  asserts:
+    - notContains:
+        path: spec.template.spec.containers[0].env
+        content:
+          name: CATTLE_AGENT_TLS_MODE
+          value: "strict"
+    - notContains:
+        path: spec.template.spec.containers[0].env
+        content:
+          name: CATTLE_AGENT_TLS_MODE
+          value: "system-store"
+    - notContains:
+        path: spec.template.spec.containers[0].env
+        content:
+          name: CATTLE_AGENT_TLS_MODE
+          value: ""
+    - notContains:
+        path: spec.template.spec.containers[0].env
+        content:
+          name: CATTLE_AGENT_TLS_MODE
+          value: null
+    - contains:
+        path: spec.template.spec.containers[0].env
+        content:
+          name: CATTLE_PEER_SERVICE
+          value: RELEASE-NAME-rancher
+    - contains:
+        path: spec.template.spec.containers[0].env
+        content:
+          name: CATTLE_NAMESPACE
+          value: NAMESPACE

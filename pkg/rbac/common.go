@@ -12,8 +12,8 @@ import (
 	v32 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/ref"
-	k8srbacv1 "github.com/rancher/wrangler/v2/pkg/generated/controllers/rbac/v1"
-	wranglerName "github.com/rancher/wrangler/v2/pkg/name"
+	k8srbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
+	wranglerName "github.com/rancher/wrangler/v3/pkg/name"
 	"github.com/sirupsen/logrus"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -236,12 +236,16 @@ func RulesFromTemplate(clusterRoles k8srbacv1.ClusterRoleCache, roleTemplates v3
 func gatherRules(clusterRoles k8srbacv1.ClusterRoleCache, roleTemplates v32.RoleTemplateCache, rt *v3.RoleTemplate, rules []rbacv1.PolicyRule, seen map[string]bool) ([]rbacv1.PolicyRule, error) {
 	seen[rt.Name] = true
 
-	if rt.External && rt.Context == "cluster" {
-		cr, err := clusterRoles.Get(rt.Name)
-		if err != nil {
-			return nil, err
+	if rt.External {
+		if rt.ExternalRules != nil {
+			rules = append(rules, rt.ExternalRules...)
+		} else if rt.Context == "cluster" {
+			cr, err := clusterRoles.Get(rt.Name)
+			if err != nil {
+				return nil, err
+			}
+			rules = append(rules, cr.Rules...)
 		}
-		rules = append(rules, cr.Rules...)
 	}
 
 	rules = append(rules, rt.Rules...)

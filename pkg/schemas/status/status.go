@@ -3,7 +3,7 @@ package status
 import (
 	"strings"
 
-	"github.com/rancher/wrangler/v2/pkg/summary"
+	"github.com/rancher/wrangler/v3/pkg/summary"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 

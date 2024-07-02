@@ -172,21 +172,29 @@ func TestReplaceCACertAndPortForProbes(t *testing.T) {
 
 func TestRenderProbes(t *testing.T) {
 	tests := []struct {
-		name     string
-		input    map[string]plan.Probe
-		runtime  string
-		expected map[string]plan.Probe
+		name         string
+		input        map[string]plan.Probe
+		controlPlane *rkev1.RKEControlPlane
+		expected     map[string]plan.Probe
 	}{
 		{
-			name:     "nil",
-			input:    nil,
-			runtime:  "",
+			name:  "nil",
+			input: nil,
+			controlPlane: &rkev1.RKEControlPlane{
+				Spec: rkev1.RKEControlPlaneSpec{
+					KubernetesVersion: "v1.28.8+rke2r1",
+				},
+			},
 			expected: map[string]plan.Probe{},
 		},
 		{
-			name:     "no probes",
-			input:    map[string]plan.Probe{},
-			runtime:  "",
+			name:  "no probes",
+			input: map[string]plan.Probe{},
+			controlPlane: &rkev1.RKEControlPlane{
+				Spec: rkev1.RKEControlPlaneSpec{
+					KubernetesVersion: "v1.28.8+rke2r1",
+				},
+			},
 			expected: map[string]plan.Probe{},
 		},
 		{
@@ -200,7 +208,11 @@ func TestRenderProbes(t *testing.T) {
 					},
 				},
 			},
-			runtime: capr.RuntimeRKE2,
+			controlPlane: &rkev1.RKEControlPlane{
+				Spec: rkev1.RKEControlPlaneSpec{
+					KubernetesVersion: "v1.28.8+rke2r1",
+				},
+			},
 			expected: map[string]plan.Probe{
 				"a": {
 					HTTPGetAction: plan.HTTPGetAction{
@@ -222,13 +234,17 @@ func TestRenderProbes(t *testing.T) {
 					},
 				},
 			},
-			runtime: capr.RuntimeRKE2,
+			controlPlane: &rkev1.RKEControlPlane{
+				Spec: rkev1.RKEControlPlaneSpec{
+					KubernetesVersion: "v1.28.0+rke2r1",
+				},
+			},
 			expected: map[string]plan.Probe{
 				"a": {
 					HTTPGetAction: plan.HTTPGetAction{
-						CACert:     "rke2/cacert",
-						ClientCert: "rke2/clientcert",
-						ClientKey:  "rke2/clientkey",
+						CACert:     "/var/lib/rancher/rke2/cacert",
+						ClientCert: "/var/lib/rancher/rke2/clientcert",
+						ClientKey:  "/var/lib/rancher/rke2/clientkey",
 					},
 				},
 			},
@@ -236,7 +252,7 @@ func TestRenderProbes(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.expected, replaceRuntimeForProbes(tt.input, tt.runtime))
+			assert.Equal(t, tt.expected, insertDataDirForProbes(tt.controlPlane, tt.input))
 		})
 	}
 }

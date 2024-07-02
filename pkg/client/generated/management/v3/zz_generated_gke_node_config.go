@@ -11,6 +11,7 @@ const (
 	GKENodeConfigFieldMachineType    = "machineType"
 	GKENodeConfigFieldOauthScopes    = "oauthScopes"
 	GKENodeConfigFieldPreemptible    = "preemptible"
+	GKENodeConfigFieldServiceAccount = "serviceAccount"
 	GKENodeConfigFieldTags           = "tags"
 	GKENodeConfigFieldTaints         = "taints"
 )
@@ -25,6 +26,7 @@ type GKENodeConfig struct {
 	MachineType    string               `json:"machineType,omitempty" yaml:"machineType,omitempty"`
 	OauthScopes    []string             `json:"oauthScopes,omitempty" yaml:"oauthScopes,omitempty"`
 	Preemptible    bool                 `json:"preemptible,omitempty" yaml:"preemptible,omitempty"`
+	ServiceAccount string               `json:"serviceAccount,omitempty" yaml:"serviceAccount,omitempty"`
 	Tags           []string             `json:"tags,omitempty" yaml:"tags,omitempty"`
 	Taints         []GKENodeTaintConfig `json:"taints,omitempty" yaml:"taints,omitempty"`
 }

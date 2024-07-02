@@ -16,7 +16,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/rancher/wrangler/v2/pkg/randomtoken"
+	"github.com/rancher/wrangler/v3/pkg/randomtoken"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
@@ -213,6 +213,32 @@ func (g *git) clone(branch string) error {
 	}
 
 	return g.Clone(branch)
+}
+
+// Update updates git repo if remote sha has changed.
+func (g *git) Update(branch string) (string, error) {
+	if err := g.clone(branch); err != nil {
+		return "", err
+	}
+
+	if err := g.reset("HEAD"); err != nil {
+		return "", err
+	}
+
+	commit, err := g.currentCommit()
+	if err != nil {
+		return commit, err
+	}
+
+	if changed, err := g.remoteSHAChanged(branch, commit); err != nil || !changed {
+		return commit, err
+	}
+
+	if err := g.fetchAndReset(branch); err != nil {
+		return "", err
+	}
+
+	return g.currentCommit()
 }
 
 func (g *git) fetchAndReset(rev string) error {

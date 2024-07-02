@@ -12,9 +12,9 @@ import (
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
-	"github.com/rancher/wrangler/v2/pkg/data"
-	corecontrollers "github.com/rancher/wrangler/v2/pkg/generated/controllers/core/v1"
-	"github.com/rancher/wrangler/v2/pkg/relatedresource"
+	"github.com/rancher/wrangler/v3/pkg/data"
+	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+	"github.com/rancher/wrangler/v3/pkg/relatedresource"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -31,9 +31,10 @@ var (
 		chart.ProvisioningCAPIChartName: "rancher/mirrored-cluster-api-controller",
 	}
 	watchedSettings = map[string]struct{}{
-		settings.RancherWebhookVersion.Name: {},
-		settings.SystemDefaultRegistry.Name: {},
-		settings.ShellImage.Name:            {},
+		settings.RancherWebhookVersion.Name:          {},
+		settings.RancherProvisioningCAPIVersion.Name: {},
+		settings.SystemDefaultRegistry.Name:          {},
+		settings.ShellImage.Name:                     {},
 	}
 )
 
@@ -121,8 +122,8 @@ func (h *handler) onRepo(key string, repo *catalog.ClusterRepo) (*catalog.Cluste
 		// chart definition, but is now part of the chart definition
 		minVersion := chartDef.MinVersionSetting.Get()
 		exactVersion := chartDef.ExactVersionSetting.Get()
-		forceAdopt := chartDef.ChartName == chart.WebhookChartName || chartDef.ChartName == chart.ProvisioningCAPIChartName
-		if err := h.manager.Ensure(chartDef.ReleaseNamespace, chartDef.ChartName, minVersion, exactVersion, values, forceAdopt, installImageOverride); err != nil {
+		takeOwnership := chartDef.ChartName == chart.WebhookChartName || chartDef.ChartName == chart.ProvisioningCAPIChartName
+		if err := h.manager.Ensure(chartDef.ReleaseNamespace, chartDef.ChartName, minVersion, exactVersion, values, takeOwnership, installImageOverride); err != nil {
 			return repo, err
 		}
 	}
@@ -172,8 +173,9 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 			RemoveNamespace:  true,
 		},
 		{
-			ReleaseNamespace: namespace.ProvisioningCAPINamespace,
-			ChartName:        chart.ProvisioningCAPIChartName,
+			ReleaseNamespace:    namespace.ProvisioningCAPINamespace,
+			ChartName:           chart.ProvisioningCAPIChartName,
+			ExactVersionSetting: settings.RancherProvisioningCAPIVersion,
 			Values: func() map[string]interface{} {
 				values := map[string]interface{}{}
 				// add priority class value
