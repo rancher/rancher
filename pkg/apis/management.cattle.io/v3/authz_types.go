@@ -360,6 +360,8 @@ func (p *ProjectRoleTemplateBinding) ObjClusterName() string {
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.summary"
+// +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
 // ClusterRoleTemplateBinding is the object representing membership of a subject in a cluster with permissions
 // specified by a given role template.

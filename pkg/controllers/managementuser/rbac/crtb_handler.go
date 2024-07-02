@@ -19,15 +19,22 @@ import (
 )
 
 const (
-	SummaryInProgress = "InProgress"
-	SummaryCompleted  = "Completed"
-	SummaryError      = "Error"
+	SummaryInProgress  = "InProgress"
+	SummaryCompleted   = "Completed"
+	SummaryError       = "Error"
+	SummaryTerminating = "Terminating"
 )
 
 // Condition reason types
 const (
 	// BindingsExist is a success indicator. The CRTB-related bindings are all present and correct.
 	BindingsExist = "BindingsExist"
+	// CRTBExists
+	CRTBExists = "CRTBExists"
+	// FailedToDeleteClusterRoleBindings indicates that the controller was unable to delete the CRTB-related cluster role bindings.
+	FailedToDeleteClusterRoleBindings = "FailedToDeleteClusterRoleBindings"
+	// FailedToDeleteSAImpersonator indicates that the controller was unable to delete the impersonation account for the CRTB's user.
+	FailedToDeleteSAImpersonator = "FailedToDeleteSAImpersonator"
 	// FailedToEnsureClusterRoleBindings indicates that the controller was unable to create the cluster roles for the role template referenced by the CRTB.
 	FailedToEnsureClusterRoleBindings = "FailedToEnsureClusterRoleBindings"
 	// FailedToEnsureRoles indicates that the controller was unable to create the roles for the role template referenced by the CRTB.
@@ -130,7 +137,11 @@ func (c *crtbLifecycle) Updated(obj *v3.ClusterRoleTemplateBinding) (runtime.Obj
 }
 
 func (c *crtbLifecycle) Remove(obj *v3.ClusterRoleTemplateBinding) (runtime.Object, error) {
-	err := c.ensureCRTBDelete(obj)
+	err := c.setCRTBAsTerminating(obj)
+	if err != nil {
+		return nil, err
+	}
+	err = c.ensureCRTBDelete(obj)
 	return obj, err
 }
 
@@ -186,21 +197,26 @@ func (c *crtbLifecycle) syncCRTB(binding *v3.ClusterRoleTemplateBinding) error {
 }
 
 func (c *crtbLifecycle) ensureCRTBDelete(binding *v3.ClusterRoleTemplateBinding) error {
+	condition := metav1.Condition{Type: CRTBExists}
+
 	set := labels.Set(map[string]string{rtbOwnerLabel: pkgrbac.GetRTBLabel(binding.ObjectMeta)})
 	rbs, err := c.crbLister.List("", set.AsSelector())
 	if err != nil {
+		addCondition(binding, condition, FailedToGetClusterRoleBindings, binding.UserName, nil)
 		return fmt.Errorf("couldn't list clusterrolebindings with selector %s: %w", set.AsSelector(), err)
 	}
 
 	for _, rb := range rbs {
 		if err := c.crbClient.Delete(rb.Name, &metav1.DeleteOptions{}); err != nil {
 			if !apierrors.IsNotFound(err) {
+				addCondition(binding, condition, FailedToDeleteClusterRoleBindings, binding.UserName, nil)
 				return fmt.Errorf("error deleting clusterrolebinding %v: %w", rb.Name, err)
 			}
 		}
 	}
 
 	if err := c.m.deleteServiceAccountImpersonator(binding.UserName); err != nil {
+		addCondition(binding, condition, FailedToDeleteSAImpersonator, binding.UserName, nil)
 		return fmt.Errorf("error deleting service account impersonator: %w", err)
 	}
 
@@ -307,6 +323,14 @@ func (c *crtbLifecycle) setCRTBAsCompleted(binding *v3.ClusterRoleTemplateBindin
 	updatedCRTB, err := c.crtbClientM.UpdateStatus(binding)
 	// For future updates, we want the latest version of our CRTB
 	*binding = *updatedCRTB
+	return err
+}
+
+func (c *crtbLifecycle) setCRTBAsTerminating(binding *v3.ClusterRoleTemplateBinding) error {
+	binding.Status.Conditions = []metav1.Condition{}
+	binding.Status.Summary = SummaryTerminating
+	binding.Status.LastUpdate = time.Now().String()
+	_, err := c.crtbClientM.UpdateStatus(binding)
 	return err
 }
 
