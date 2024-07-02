@@ -103,6 +103,13 @@ func (c *checker) checkCluster(cluster *v3.Cluster) error {
 		return nil
 	}
 
+	// wait to update the connected condition until it is bootstrapped
+	if v3.ClusterConditionBootstrapped.IsUnknown(cluster) || v3.ClusterConditionBootstrapped.IsFalse(cluster) {
+		// TODO: do something here to prevent clsuter agent from marking cluster as connected since we're pre-bootstrapping. not sure how the error handling works here still.
+		// runtime.Breakpoint()
+		// return nil
+	}
+
 	return c.updateClusterConnectedCondition(cluster, hasSession)
 }
 

@@ -4,11 +4,13 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	rt "runtime"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/rancher/norman/controller"
+	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -40,6 +42,43 @@ type Controller struct {
 	managementNamespaceLister v1.NamespaceLister
 	projectLister             v3.ProjectLister
 	clusterName               string
+}
+
+func RegisterBootstrap(ctx context.Context, mgmt *config.ScaledContext, cluster *config.UserContext, clusterRec *apimgmtv3.Cluster) {
+	// TODO: clean this up a lot, move to a real controller style rather than just doing it inline
+	secrets, _ := mgmt.Core.Secrets("").ListNamespaced("kube-system", metav1.ListOptions{})
+
+	for _, sec := range secrets.Items {
+		if sec.Annotations["provisioning.cattle.io/sync-to-cluster"] == "" {
+			continue
+		}
+		// if sec.Annotations["provisioning.cattle.io/sync-to-cluster"] != cluster.ClusterName {
+		// 	continue
+		// }
+
+		n, err := cluster.Core.Secrets("kube-system").Create(&corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      sec.Name,
+				Namespace: sec.Namespace,
+			},
+			Data: sec.Data,
+		})
+
+		if !errors.IsAlreadyExists(err) && err != nil {
+			rt.Breakpoint()
+			logrus.Warnf("holy hell failed creating secret")
+			return
+		}
+
+		logrus.Infof("successfully synced secret %v/%v", n.Namespace, n.Name)
+	}
+
+	apimgmtv3.ClusterConditionBootstrapped.True(clusterRec)
+	_, err := mgmt.Management.Clusters("").Update(clusterRec)
+	if err != nil {
+		rt.Breakpoint()
+		logrus.Warn("holy hell failed updating cluster")
+	}
 }
 
 func Register(ctx context.Context, cluster *config.UserContext) {

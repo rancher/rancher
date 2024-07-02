@@ -40,6 +40,7 @@ const (
 	ClusterConditionPending        condition.Cond = "Pending"
 	ClusterConditionCertsGenerated condition.Cond = "CertsGenerated"
 	ClusterConditionEtcd           condition.Cond = "etcd"
+	ClusterConditionBootstrapped   condition.Cond = "Bootstrapped"
 	ClusterConditionProvisioned    condition.Cond = "Provisioned"
 	ClusterConditionUpdated        condition.Cond = "Updated"
 	ClusterConditionUpgraded       condition.Cond = "Upgraded"

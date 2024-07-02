@@ -85,3 +85,8 @@ func registerImpersonationCaches(cluster *config.UserContext) {
 	cluster.Core.ServiceAccounts("").Controller()
 	cluster.Core.Namespaces("").Controller()
 }
+
+func RegisterBootstrap(ctx context.Context, mgmt *config.ScaledContext, cluster *config.UserContext, clusterRec *apimgmtv3.Cluster, kubeConfigGetter common.KubeConfigGetter) error {
+	secret.RegisterBootstrap(ctx, mgmt, cluster, clusterRec)
+	return nil
+}
