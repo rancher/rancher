@@ -141,23 +141,13 @@ func (c *crtbLifecycle) Create(obj *v3.ClusterRoleTemplateBinding) (runtime.Obje
 		obj.Status.Summary != SummaryInProgress {
 		return obj, nil
 	}
-	err := c.setCRTBAsInProgress(obj)
-	if err != nil {
-		return nil, err
-	}
-	obj, err = c.reconcileSubject(obj)
-	if err != nil {
-		return nil, err
-	}
-	err = c.reconcileBindings(obj)
-	if err != nil {
-		return obj, err
-	}
-	err = c.setCRTBAsCompleted(obj)
-	if err != nil {
-		return nil, err
-	}
-	return obj, err
+	returnError := errors.Join(
+		c.setCRTBAsInProgress(obj),
+		c.reconcileSubject(obj),
+		c.reconcileBindings(obj),
+		c.setCRTBAsCompleted(obj),
+	)
+	return obj, returnError
 }
 
 func (c *crtbLifecycle) Updated(obj *v3.ClusterRoleTemplateBinding) (runtime.Object, error) {
@@ -169,56 +159,32 @@ func (c *crtbLifecycle) Updated(obj *v3.ClusterRoleTemplateBinding) (runtime.Obj
 		obj.Status.Summary != SummaryInProgress {
 		return obj, nil
 	}
-	err := c.setCRTBAsInProgress(obj)
-	if err != nil {
-		return nil, err
-	}
-	obj, err = c.reconcileSubject(obj)
-	if err != nil {
-		return nil, err
-	}
-	if err := c.reconcileLabels(obj); err != nil {
-		return nil, err
-	}
-	err = c.reconcileBindings(obj)
-	if err != nil {
-		return obj, err
-	}
-	err = c.setCRTBAsCompleted(obj)
-	if err != nil {
-		return nil, err
-	}
-	return obj, err
+	returnError := errors.Join(
+		c.setCRTBAsInProgress(obj),
+		c.reconcileSubject(obj),
+		c.reconcileLabels(obj),
+		c.reconcileBindings(obj),
+		c.setCRTBAsCompleted(obj),
+	)
+	return obj, returnError
 }
 
 func (c *crtbLifecycle) Remove(obj *v3.ClusterRoleTemplateBinding) (runtime.Object, error) {
-	condition := metav1.Condition{Type: CRTBExists}
-
-	err := c.setCRTBAsTerminating(obj)
-	if err != nil {
-		return nil, err
-	}
-	if err := c.mgr.reconcileClusterMembershipBindingForDelete("", pkgrbac.GetRTBLabel(obj.ObjectMeta)); err != nil {
-		addCondition(obj, condition, FailedClusterMembershipBindingForDelete, obj.UserName, nil)
-		return nil, err
-	}
-	if err := c.removeMGMTClusterScopedPrivilegesInProjectNamespace(obj); err != nil {
-		addCondition(obj, condition, FailedRemovalOfMGMTClusterScopedPrivilegesInProjectNamespace, obj.UserName, nil)
-		return nil, err
-	}
-	if err := c.mgr.removeAuthV2Permissions(authprovisioningv2.CRTBRoleBindingID, obj); err != nil {
-		addCondition(obj, condition, FailedRemovalOfAuthV2Permissions, obj.UserName, nil)
-		return obj, err
-	}
-	return nil, nil
+	returnError := errors.Join(
+		c.setCRTBAsTerminating(obj),
+		c.reconcileClusterMembershipBindingForDelete(obj),
+		c.removeMGMTClusterScopedPrivilegesInProjectNamespace(obj),
+		c.removeAuthV2Permissions(obj),
+	)
+	return obj, returnError
 }
 
-func (c *crtbLifecycle) reconcileSubject(binding *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
+func (c *crtbLifecycle) reconcileSubject(binding *v3.ClusterRoleTemplateBinding) error {
 	condition := metav1.Condition{Type: SubjectExists}
 
 	if binding.GroupName != "" || binding.GroupPrincipalName != "" || (binding.UserPrincipalName != "" && binding.UserName != "") {
 		addCondition(binding, condition, SubjectExists, binding.UserName, nil)
-		return binding, nil
+		return nil
 	}
 
 	if binding.UserPrincipalName != "" && binding.UserName == "" {
@@ -226,19 +192,19 @@ func (c *crtbLifecycle) reconcileSubject(binding *v3.ClusterRoleTemplateBinding)
 		user, err := c.userMGR.EnsureUser(binding.UserPrincipalName, displayName)
 		if err != nil {
 			addCondition(binding, condition, FailedToGetSubject, binding.UserPrincipalName, err)
-			return binding, err
+			return err
 		}
 
 		binding.UserName = user.Name
 		addCondition(binding, condition, SubjectExists, binding.UserName, nil)
-		return binding, nil
+		return nil
 	}
 
 	if binding.UserPrincipalName == "" && binding.UserName != "" {
 		u, err := c.userLister.Get("", binding.UserName)
 		if err != nil {
 			addCondition(binding, condition, FailedToGetSubject, binding.UserName, err)
-			return binding, err
+			return err
 		}
 		for _, p := range u.PrincipalIDs {
 			if strings.HasSuffix(p, binding.UserName) {
@@ -247,12 +213,12 @@ func (c *crtbLifecycle) reconcileSubject(binding *v3.ClusterRoleTemplateBinding)
 			}
 		}
 		addCondition(binding, condition, SubjectExists, binding.UserPrincipalName, nil)
-		return binding, nil
+		return nil
 	}
 
 	err := fmt.Errorf("ClusterRoleTemplateBinding %v has no subject", binding.Name)
 	addCondition(binding, condition, FailedToGetSubject, binding.Name, err)
-	return nil, err
+	return err
 }
 
 // When a CRTB is created or updated, translate it into several k8s roles and bindings to actually enforce the RBAC
@@ -328,9 +294,32 @@ func (c *crtbLifecycle) reconcileBindings(binding *v3.ClusterRoleTemplateBinding
 	return nil
 }
 
+func (c *crtbLifecycle) reconcileClusterMembershipBindingForDelete(binding *v3.ClusterRoleTemplateBinding) error {
+	condition := metav1.Condition{Type: CRTBExists}
+
+	err := c.mgr.reconcileClusterMembershipBindingForDelete("", pkgrbac.GetRTBLabel(binding.ObjectMeta))
+	if err != nil {
+		addCondition(binding, condition, FailedClusterMembershipBindingForDelete, binding.UserName, nil)
+	}
+	return err
+}
+
+func (c *crtbLifecycle) removeAuthV2Permissions(binding *v3.ClusterRoleTemplateBinding) error {
+	condition := metav1.Condition{Type: CRTBExists}
+
+	err := c.mgr.removeAuthV2Permissions(authprovisioningv2.CRTBRoleBindingID, binding)
+	if err != nil {
+		addCondition(binding, condition, FailedRemovalOfAuthV2Permissions, binding.UserName, nil)
+	}
+	return err
+}
+
 func (c *crtbLifecycle) removeMGMTClusterScopedPrivilegesInProjectNamespace(binding *v3.ClusterRoleTemplateBinding) error {
+	condition := metav1.Condition{Type: CRTBExists}
+
 	projects, err := c.projectLister.List(binding.Namespace, labels.Everything())
 	if err != nil {
+		addCondition(binding, condition, FailedRemovalOfMGMTClusterScopedPrivilegesInProjectNamespace, binding.UserName, nil)
 		return err
 	}
 	bindingKey := pkgrbac.GetRTBLabel(binding.ObjectMeta)
@@ -338,11 +327,13 @@ func (c *crtbLifecycle) removeMGMTClusterScopedPrivilegesInProjectNamespace(bind
 		set := labels.Set(map[string]string{bindingKey: CrtbInProjectBindingOwner})
 		rbs, err := c.rbLister.List(p.Name, set.AsSelector())
 		if err != nil {
+			addCondition(binding, condition, FailedRemovalOfMGMTClusterScopedPrivilegesInProjectNamespace, binding.UserName, nil)
 			return err
 		}
 		for _, rb := range rbs {
 			logrus.Infof("[%v] Deleting rolebinding %v in namespace %v for crtb %v", ctrbMGMTController, rb.Name, p.Name, binding.Name)
 			if err := c.rbClient.DeleteNamespaced(p.Name, rb.Name, &v1.DeleteOptions{}); err != nil {
+				addCondition(binding, condition, FailedRemovalOfMGMTClusterScopedPrivilegesInProjectNamespace, binding.UserName, nil)
 				return err
 			}
 		}

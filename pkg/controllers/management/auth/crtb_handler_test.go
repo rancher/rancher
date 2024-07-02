@@ -653,7 +653,7 @@ func TestReconcileSubject(t *testing.T) {
 			crtbLifecycle.userMGR = state.userMGRMock
 			crtbLifecycle.userLister = state.userListerMock
 
-			obj, err := crtbLifecycle.reconcileSubject(test.crtb)
+			err := crtbLifecycle.reconcileSubject(test.crtb)
 
 			if test.wantError {
 				require.Error(t, err)
@@ -663,8 +663,8 @@ func TestReconcileSubject(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 				// no error, check returned object
-				require.Len(t, obj.Status.Conditions, 1)
-				require.Equal(t, test.condition, rcOf(obj.Status.Conditions[0]))
+				require.Len(t, test.crtb.Status.Conditions, 1)
+				require.Equal(t, test.condition, rcOf(test.crtb.Status.Conditions[0]))
 			}
 		})
 	}
