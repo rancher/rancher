@@ -20,9 +20,10 @@ import (
 )
 
 const (
-	SummaryInProgress = "InProgress"
-	SummaryCompleted  = "Completed"
-	SummaryError      = "Error"
+	SummaryInProgress  = "InProgress"
+	SummaryCompleted   = "Completed"
+	SummaryError       = "Error"
+	SummaryTerminating = "Terminating"
 )
 
 // Condition reason types
@@ -31,6 +32,14 @@ const (
 	BadRoleReferences = "BadRoleReferences"
 	// BindingsExist is a success indicator. The CRTB-related bindings are all present and correct.
 	BindingsExist = "BindingsExist"
+	// CRTBExists
+	CRTBExists = "CRTBExists"
+	// FailedClusterMembershipBindingForDelete indicates that CRTB termination failed due to failure to delete the associated cluster membership binding
+	FailedClusterMembershipBindingForDelete = "FailedClusterMembershipBindingForDelete"
+	// FailedRemovalOfAuthV2Permissions indicates that CRTB termination failed due to failure of removing Auth V2 permissions
+	FailedRemovalOfAuthV2Permissions = "FailedRemovalOfAuthV2Permissions"
+	// FailedRemovalOfMGMTClusterScopedPrivilegesInProjectNamespace indicates that CRTB termination failed due to failure of removing cluster scoped privileges in the project namespace
+	FailedRemovalOfMGMTClusterScopedPrivilegesInProjectNamespace = "FailedRemovalOfMGMTClusterScopedPrivilegesInProjectNamespace"
 	// FailedToBuildSubject means that the controller did not have enough data in the CRTB to build a resource reference.
 	FailedToBuildSubject = "FailedToBuildSubject"
 	// FailedToEnsureClusterMembership means that the controller was unable to create the role binding providing the subject access to the cluster resource.
@@ -183,17 +192,25 @@ func (c *crtbLifecycle) Updated(obj *v3.ClusterRoleTemplateBinding) (runtime.Obj
 }
 
 func (c *crtbLifecycle) Remove(obj *v3.ClusterRoleTemplateBinding) (runtime.Object, error) {
+	condition := metav1.Condition{Type: CRTBExists}
+
+	err := c.setCRTBAsTerminating(obj)
+	if err != nil {
+		return nil, err
+	}
 	if err := c.mgr.reconcileClusterMembershipBindingForDelete("", pkgrbac.GetRTBLabel(obj.ObjectMeta)); err != nil {
+		addCondition(obj, condition, FailedClusterMembershipBindingForDelete, obj.UserName, nil)
 		return nil, err
 	}
 	if err := c.removeMGMTClusterScopedPrivilegesInProjectNamespace(obj); err != nil {
+		addCondition(obj, condition, FailedRemovalOfMGMTClusterScopedPrivilegesInProjectNamespace, obj.UserName, nil)
 		return nil, err
 	}
-	err := c.mgr.removeAuthV2Permissions(authprovisioningv2.CRTBRoleBindingID, obj)
-	if err != nil {
+	if err := c.mgr.removeAuthV2Permissions(authprovisioningv2.CRTBRoleBindingID, obj); err != nil {
+		addCondition(obj, condition, FailedRemovalOfAuthV2Permissions, obj.UserName, nil)
 		return obj, err
 	}
-	return nil, err
+	return nil, nil
 }
 
 func (c *crtbLifecycle) reconcileSubject(binding *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
@@ -436,11 +453,14 @@ func (c *crtbLifecycle) reconcileLabels(binding *v3.ClusterRoleTemplateBinding) 
 func (c *crtbLifecycle) setCRTBAsInProgress(binding *v3.ClusterRoleTemplateBinding) error {
 	binding.Status.Conditions = []metav1.Condition{}
 	binding.Status.Summary = SummaryInProgress
-	binding.Status.LastUpdate = time.Now().String()
+	binding.Status.LastUpdateTime = time.Now().String()
 	updatedCRTB, err := c.crtbClientM.UpdateStatus(binding)
+	if err != nil {
+		return err
+	}
 	// For future updates, we want the latest version of our CRTB
 	*binding = *updatedCRTB
-	return err
+	return nil
 }
 
 func (c *crtbLifecycle) setCRTBAsCompleted(binding *v3.ClusterRoleTemplateBinding) error {
@@ -451,11 +471,22 @@ func (c *crtbLifecycle) setCRTBAsCompleted(binding *v3.ClusterRoleTemplateBindin
 			break
 		}
 	}
-	binding.Status.LastUpdate = time.Now().String()
+	binding.Status.LastUpdateTime = time.Now().String()
 	binding.Status.ObservedGeneration = binding.ObjectMeta.Generation
 	updatedCRTB, err := c.crtbClientM.UpdateStatus(binding)
+	if err != nil {
+		return err
+	}
 	// For future updates, we want the latest version of our CRTB
 	*binding = *updatedCRTB
+	return nil
+}
+
+func (c *crtbLifecycle) setCRTBAsTerminating(binding *v3.ClusterRoleTemplateBinding) error {
+	binding.Status.Conditions = []metav1.Condition{}
+	binding.Status.Summary = SummaryTerminating
+	binding.Status.LastUpdateTime = time.Now().String()
+	_, err := c.crtbClientM.UpdateStatus(binding)
 	return err
 }
 

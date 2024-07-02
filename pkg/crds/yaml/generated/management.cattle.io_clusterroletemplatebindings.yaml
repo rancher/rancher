@@ -14,7 +14,14 @@ spec:
     singular: clusterroletemplatebinding
   scope: Namespaced
   versions:
-  - name: v3
+  - additionalPrinterColumns:
+    - jsonPath: .status.summary
+      name: STATUS
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v3
     schema:
       openAPIV3Schema:
         description: |-

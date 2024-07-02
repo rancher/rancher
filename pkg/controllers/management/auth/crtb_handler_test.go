@@ -9,12 +9,16 @@ import (
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	rbacfakes "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1/fakes"
+	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/rancher/rancher/pkg/user"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/mock/gomock"
 	rbacv1 "k8s.io/api/rbac/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+
+	// yes, both are needed, used. gh -> wrangler mock, uber -> local mock
+	gomockgh "github.com/golang/mock/gomock"
+	"go.uber.org/mock/gomock"
 )
 
 // using a subset of condition, because we don't need to check LastTransitionTime or Message
@@ -240,6 +244,83 @@ func TestSetCRTBAsCompleted(t *testing.T) {
 				require.Equal(t, test.condition, rcOf(test.crtb.Status.Conditions[0]))
 				require.Equal(t, test.summary, test.crtb.Status.Summary)
 			}
+		})
+	}
+}
+
+func TestSetCRTBAsTerminating(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		oldCRTB        *v3.ClusterRoleTemplateBinding
+		updateReturn error
+		wantError    bool
+	}{
+		{
+			name: "update crtb status to Terminating",
+			oldCRTB: &v3.ClusterRoleTemplateBinding{
+				Status: v31.ClusterRoleTemplateBindingStatus{
+					Summary: SummaryCompleted,
+					Conditions: []v1.Condition{
+						{
+							Type:   "test",
+							Status: v1.ConditionTrue,
+						},
+					},
+				},
+			},
+			updateReturn: nil,
+			wantError:    false,
+		},
+		{
+			name: "update crtb with empty status to Terminating",
+			oldCRTB: &v3.ClusterRoleTemplateBinding{
+				Status: v31.ClusterRoleTemplateBindingStatus{},
+			},
+			updateReturn: nil,
+			wantError:    false,
+		},
+		{
+			name:         "update crtb with nil status to Terminating",
+			oldCRTB:        &v3.ClusterRoleTemplateBinding{},
+			updateReturn: nil,
+			wantError:    false,
+		},
+		{
+			name:         "update crtb fails",
+			oldCRTB:        &v3.ClusterRoleTemplateBinding{},
+			updateReturn: fmt.Errorf("error"),
+			wantError:    true,
+		},
+	}
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			crtbLifecycle := crtbLifecycle{}
+			ctrl := gomockgh.NewController(t)
+
+			crtbClientMock := fake.NewMockNonNamespacedControllerInterface[*v3.ClusterRoleTemplateBinding, *v31.ClusterRoleTemplateBindingList](ctrl)
+
+			var updatedCRTB *v3.ClusterRoleTemplateBinding
+
+			crtbClientMock.EXPECT().UpdateStatus(gomock.Any()).AnyTimes().DoAndReturn(
+				func(crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
+					updatedCRTB = crtb
+					return updatedCRTB, test.updateReturn
+				},
+			)
+			crtbLifecycle.crtbClientM = crtbClientMock
+
+			err := crtbLifecycle.setCRTBAsTerminating(test.oldCRTB)
+			if test.wantError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+			require.Empty(t, updatedCRTB.Status.Conditions)
+			require.Equal(t, SummaryTerminating, updatedCRTB.Status.Summary)
 		})
 	}
 }
