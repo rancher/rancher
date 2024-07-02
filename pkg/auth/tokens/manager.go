@@ -580,7 +580,6 @@ func (m *Manager) UserAttributeCreateOrUpdate(userID, provider string, groupPrin
 	if attribs.GroupPrincipals == nil {
 		attribs.GroupPrincipals = make(map[string]v32.Principals)
 	}
-	attribs.GroupPrincipals[provider] = v32.Principals{Items: groupPrincipals}
 
 	if attribs.ExtraByProvider == nil {
 		attribs.ExtraByProvider = make(map[string]map[string][]string)
@@ -588,15 +587,17 @@ func (m *Manager) UserAttributeCreateOrUpdate(userID, provider string, groupPrin
 	if userExtraInfo == nil {
 		userExtraInfo = make(map[string][]string)
 	}
-	attribs.ExtraByProvider[provider] = userExtraInfo
 
-	var shouldUpdate bool
+	shouldUpdate := m.userAttributeChanged(attribs, provider, userExtraInfo, groupPrincipals)
 	if len(loginTime) > 0 && !loginTime[0].IsZero() {
 		// Login time is truncated to seconds as the corresponding user label is set as epoch time.
 		lastLogin := metav1.NewTime(loginTime[0].Truncate(time.Second))
 		attribs.LastLogin = &lastLogin
 		shouldUpdate = true
 	}
+
+	attribs.GroupPrincipals[provider] = v32.Principals{Items: groupPrincipals}
+	attribs.ExtraByProvider[provider] = userExtraInfo
 
 	if needCreate {
 		_, err = m.userAttributes.Create(attribs)
@@ -607,7 +608,7 @@ func (m *Manager) UserAttributeCreateOrUpdate(userID, provider string, groupPrin
 		return nil
 	}
 
-	if shouldUpdate || m.userAttributeChanged(attribs, provider, userExtraInfo, groupPrincipals) {
+	if shouldUpdate {
 		_, err = m.userAttributes.Update(attribs)
 		if err != nil {
 			return fmt.Errorf("failed to update UserAttribute: %w", err)
