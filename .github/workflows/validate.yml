@@ -4,7 +4,7 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     container:
-      image: registry.suse.com/bci/golang:1.21
+      image: registry.suse.com/bci/golang:1.22
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
