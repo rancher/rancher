@@ -9,8 +9,8 @@ on:
     tags:
       - v*
 jobs:
-  provisioning_tests:
-    name: Provisioning tests 
+  integration_tests:
+    name: Integration tests 
     runs-on: runs-on,runner=4cpu-linux-x64,image=legacy-cgroups-for-x64,run-id=${{ github.run_id }}
     steps:
       - name: Checkout
