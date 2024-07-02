@@ -13,7 +13,7 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-func RegisterCRDs(t *testing.T, ctx context.Context, r *rest.Config, crds ...crd.CRD) {
+func RegisterCRDs(ctx context.Context, t *testing.T, r *rest.Config, crds ...crd.CRD) {
 	factory, err := crd.NewFactoryFromClient(r)
 	assert.NoError(t, err)
 
@@ -21,7 +21,7 @@ func RegisterCRDs(t *testing.T, ctx context.Context, r *rest.Config, crds ...crd
 	assert.NoError(t, err)
 }
 
-func StartNormanControllers(t *testing.T, ctx context.Context, m *config.ManagementContext, gvk ...schema.GroupVersionKind) {
+func StartNormanControllers(ctx context.Context, t *testing.T, m *config.ManagementContext, gvk ...schema.GroupVersionKind) {
 	controllers := []controller.SharedController{}
 	for _, g := range gvk {
 		c, err := m.ControllerFactory.ForKind(g)
@@ -34,7 +34,7 @@ func StartNormanControllers(t *testing.T, ctx context.Context, m *config.Managem
 	}
 }
 
-func StartWranglerCaches(t *testing.T, ctx context.Context, w *wrangler.Context, gvk ...schema.GroupVersionKind) {
+func StartWranglerCaches(ctx context.Context, t *testing.T, w *wrangler.Context, gvk ...schema.GroupVersionKind) {
 	for _, g := range gvk {
 		err := w.ControllerFactory.SharedCacheFactory().StartGVK(ctx, g)
 		assert.NoError(t, err)

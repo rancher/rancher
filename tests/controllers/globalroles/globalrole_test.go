@@ -66,7 +66,7 @@ func (s *GlobalRoleTestSuite) SetupSuite() {
 	assert.NotNil(s.T(), restCfg)
 
 	// Register CRDs
-	common.RegisterCRDs(s.T(), s.ctx, restCfg,
+	common.RegisterCRDs(s.ctx, s.T(), restCfg,
 		crd.CRD{
 			SchemaObject: v3.GlobalRole{},
 			NonNamespace: true,
@@ -91,7 +91,7 @@ func (s *GlobalRoleTestSuite) SetupSuite() {
 	globalroles.Register(s.ctx, s.managementContext, clusterManager)
 
 	// Start controllers
-	common.StartNormanControllers(s.T(), s.ctx, s.managementContext,
+	common.StartNormanControllers(s.ctx, s.T(), s.managementContext,
 		schema.GroupVersionKind{
 			Group:   "management.cattle.io",
 			Version: "v3",
@@ -104,7 +104,7 @@ func (s *GlobalRoleTestSuite) SetupSuite() {
 		})
 
 	// Start caches
-	common.StartWranglerCaches(s.T(), s.ctx, s.managementContext.Wrangler,
+	common.StartWranglerCaches(s.ctx, s.T(), s.managementContext.Wrangler,
 		schema.GroupVersionKind{
 			Group:   "rbac.authorization.k8s.io",
 			Version: "v1",
