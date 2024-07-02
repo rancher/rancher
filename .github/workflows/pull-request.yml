@@ -104,6 +104,12 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+      - name: Clean runner
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
       - name: Setup Environment Variables
         run: |
           echo "ARCH=${{ matrix.arch }}" >> "$GITHUB_ENV"
