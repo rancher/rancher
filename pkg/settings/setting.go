@@ -17,7 +17,11 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-const RancherVersionDev = "2.8.99"
+const (
+	RancherVersionDev       = "2.8.99"
+	AgentTLSModeStrict      = "strict"
+	AgentTLSModeSystemStore = "system-store"
+)
 
 var (
 	releasePattern = regexp.MustCompile("^v[0-9]")
@@ -50,10 +54,11 @@ var (
 		"cattle-elemental-system",
 	}
 
-	AgentImage                          = NewSetting("agent-image", "rancher/rancher-agent:v2.8-head")
-	AgentRolloutTimeout                 = NewSetting("agent-rollout-timeout", "300s")
-	AgentRolloutWait                    = NewSetting("agent-rollout-wait", "true")
-	AgentTLSMode                        = NewSetting("agent-tls-mode", "system-store")
+	AgentImage          = NewSetting("agent-image", "rancher/rancher-agent:v2.8-head")
+	AgentRolloutTimeout = NewSetting("agent-rollout-timeout", "300s")
+	AgentRolloutWait    = NewSetting("agent-rollout-wait", "true")
+	// AgentTLSMode is translated to the environment variable STRICT_VERIFY when rendering the cluster/node agent manifests and should not be specified as a default agent setting as it has no direct effect on the agent itself.
+	AgentTLSMode                        = NewSetting("agent-tls-mode", AgentTLSModeSystemStore)
 	AuthImage                           = NewSetting("auth-image", v32.ToolsSystemImages.AuthSystemImages.KubeAPIAuth)
 	AuthorizationCacheTTLSeconds        = NewSetting("authorization-cache-ttl-seconds", "10")
 	AuthorizationDenyCacheTTLSeconds    = NewSetting("authorization-deny-cache-ttl-seconds", "10")
