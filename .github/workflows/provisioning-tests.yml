@@ -6,8 +6,6 @@ on:
   push:
     branches:
       - release/v*
-    tags:
-      - v*
 jobs:
   provisioning_tests:
     strategy:
