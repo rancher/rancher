@@ -94,19 +94,12 @@ func (c *crtbLifecycle) Create(obj *v3.ClusterRoleTemplateBinding) (runtime.Obje
 		obj.Status.Summary != SummaryInProgress {
 		return obj, nil
 	}
-	err := c.setCRTBAsInProgress(obj)
-	if err != nil {
-		return nil, err
-	}
-	err = c.syncCRTB(obj)
-	if err != nil {
-		return nil, err
-	}
-	err = c.setCRTBAsCompleted(obj)
-	if err != nil {
-		return nil, err
-	}
-	return obj, err
+	returnError := errors.Join(
+		c.setCRTBAsInProgress(obj),
+		c.syncCRTB(obj),
+		c.setCRTBAsCompleted(obj),
+	)
+	return obj, returnError
 }
 
 func (c *crtbLifecycle) Updated(obj *v3.ClusterRoleTemplateBinding) (runtime.Object, error) {
@@ -118,31 +111,21 @@ func (c *crtbLifecycle) Updated(obj *v3.ClusterRoleTemplateBinding) (runtime.Obj
 		obj.Status.Summary != SummaryInProgress {
 		return obj, nil
 	}
-	err := c.setCRTBAsInProgress(obj)
-	if err != nil {
-		return nil, err
-	}
-	if err := c.reconcileCRTBUserClusterLabels(obj); err != nil {
-		return obj, err
-	}
-	err = c.syncCRTB(obj)
-	if err != nil {
-		return nil, err
-	}
-	err = c.setCRTBAsCompleted(obj)
-	if err != nil {
-		return nil, err
-	}
-	return obj, err
+	returnError := errors.Join(
+		c.setCRTBAsInProgress(obj),
+		c.reconcileCRTBUserClusterLabels(obj),
+		c.syncCRTB(obj),
+		c.setCRTBAsCompleted(obj),
+	)
+	return obj, returnError
 }
 
 func (c *crtbLifecycle) Remove(obj *v3.ClusterRoleTemplateBinding) (runtime.Object, error) {
-	err := c.setCRTBAsTerminating(obj)
-	if err != nil {
-		return nil, err
-	}
-	err = c.ensureCRTBDelete(obj)
-	return obj, err
+	returnError := errors.Join(
+		c.setCRTBAsTerminating(obj),
+		c.ensureCRTBDelete(obj),
+	)
+	return obj, returnError
 }
 
 func (c *crtbLifecycle) syncCRTB(binding *v3.ClusterRoleTemplateBinding) error {
