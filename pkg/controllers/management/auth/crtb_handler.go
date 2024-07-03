@@ -17,6 +17,8 @@ import (
 	"k8s.io/client-go/util/retry"
 )
 
+// no functional change
+
 const (
 	/* Prior to 2.5, the label "memberhsip-binding-owner" was set on the CRB/RBs for a roleTemplateBinding with the key being the roleTemplateBinding's UID.
 	2.5 onwards, instead of the roleTemplateBinding's UID, a combination of its namespace and name will be used in this label.
