@@ -402,6 +402,11 @@ func Test_reconcileManagementPlaneRole(t *testing.T) {
 		Verbs:     []string{"verb3", "verb4"},
 		APIGroups: []string{"group2"},
 	}
+	rule3 := rbacv1.PolicyRule{
+		Resources: []string{"resource3"},
+		Verbs:     []string{"verb3", "verb4"},
+		APIGroups: []string{"group3"},
+	}
 	roleTemplate := &v3.RoleTemplate{
 		ObjectMeta: v1.ObjectMeta{
 			Name: "roleTemplate",
@@ -641,6 +646,34 @@ func Test_reconcileManagementPlaneRole(t *testing.T) {
 			stateAssertions: func(stateChanges StateChanges) {
 				require.NotNil(stateChanges.t, stateChanges.newRole)
 				require.Len(stateChanges.t, stateChanges.newRole.Rules, 0)
+			},
+			roleTemplate:    roleTemplate,
+			resourceToVerbs: rules,
+			wantError:       false,
+		},
+		{
+			name: "role have an extra rule, which means a Rule was removed from the RoleTemplate and should be removed",
+			stateSetup: func(state State) {
+				state.rListerMock.GetFunc = func(_, _ string) (*rbacv1.Role, error) {
+					role := &rbacv1.Role{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "role",
+						},
+						Rules: []rbacv1.PolicyRule{rule1, rule2, rule3},
+					}
+					return role, nil
+				}
+				state.rClientMock.UpdateFunc = func(role *rbacv1.Role) (*rbacv1.Role, error) {
+					state.stateChanges.newRole = role
+					return nil, nil
+				}
+			},
+			stateAssertions: func(stateChanges StateChanges) {
+				require.NotNil(stateChanges.t, stateChanges.newRole)
+				require.Len(stateChanges.t, stateChanges.newRole.Rules, 2)
+				require.Contains(stateChanges.t, stateChanges.newRole.Rules, rule1)
+				require.Contains(stateChanges.t, stateChanges.newRole.Rules, rule2)
+				require.Equal(stateChanges.t, "role", stateChanges.newRole.Name)
 			},
 			roleTemplate:    roleTemplate,
 			resourceToVerbs: rules,

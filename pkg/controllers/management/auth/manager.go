@@ -3,6 +3,7 @@ package auth
 import (
 	"fmt"
 	"reflect"
+	"slices"
 	"sort"
 
 	"github.com/hashicorp/go-multierror"
@@ -812,6 +813,20 @@ func (m *manager) reconcileManagementPlaneRole(namespace string, resourceToVerbs
 				}
 			}
 		}
+
+		// check if any Rule should be removed
+		if len(resourceToVerbs) < len(role.Rules) {
+			newRole.Rules = slices.DeleteFunc(newRole.Rules, func(rule v1.PolicyRule) bool {
+				for resource := range resourceToVerbs {
+					if slice.ContainsString(rule.Resources, resource) || slice.ContainsString(rule.Resources, "*") {
+						return false
+					}
+				}
+				update = true
+				return true
+			})
+		}
+
 		if update {
 			logrus.Infof("[%v] Updating role %v in namespace %v", m.controller, newRole.Name, namespace)
 			_, err := m.rClient.Update(newRole)

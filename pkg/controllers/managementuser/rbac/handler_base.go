@@ -8,7 +8,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/norman/types/convert"
-	"github.com/rancher/norman/types/slice"
 	wranglerv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/resourcequota"
 	typescorev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
@@ -95,8 +94,6 @@ func Register(ctx context.Context, workload *config.UserContext) {
 		crIndexer:           crInformer.GetIndexer(),
 		crbIndexer:          crbInformer.GetIndexer(),
 		rtLister:            management.Management.RoleTemplates("").Controller().Lister(),
-		rLister:             management.RBAC.Roles("").Controller().Lister(),
-		roles:               management.RBAC.Roles(""),
 		rbLister:            workload.RBAC.RoleBindings("").Controller().Lister(),
 		crbLister:           workload.RBAC.ClusterRoleBindings("").Controller().Lister(),
 		crLister:            workload.RBAC.ClusterRoles("").Controller().Lister(),
@@ -151,8 +148,6 @@ type manager struct {
 	clusterRoleBindings typesrbacv1.ClusterRoleBindingInterface
 	rbLister            typesrbacv1.RoleBindingLister
 	roleBindings        typesrbacv1.RoleBindingInterface
-	rLister             typesrbacv1.RoleLister
-	roles               typesrbacv1.RoleInterface
 	nsLister            typescorev1.NamespaceLister
 	nsController        typescorev1.NamespaceController
 	clusterLister       v3.ClusterLister
@@ -170,9 +165,6 @@ func (m *manager) ensureRoles(rts map[string]*v3.RoleTemplate) error {
 			continue
 		}
 		if err := m.ensureClusterRoles(rt); err != nil {
-			return err
-		}
-		if err := m.ensureNamespacedRoles(rt); err != nil {
 			return err
 		}
 	}
@@ -226,109 +218,6 @@ func (m *manager) createClusterRole(rt *v3.RoleTemplate) error {
 		return errors.Wrapf(err, "couldn't create clusterRole %v", rt.Name)
 	}
 	return nil
-}
-
-func (m *manager) ensureNamespacedRoles(rt *v3.RoleTemplate) error {
-	// if the RoleTemplate has cluster owner rules, don't update Roles
-	if isClusterOwner, err := m.isClusterOwner(rt.Name); isClusterOwner || err != nil {
-		return err
-	}
-
-	// role template is not a cluster owner
-	switch rt.Context {
-	case "cluster":
-		if err := m.updateRole(rt, m.clusterName); err != nil {
-			return err
-		}
-	case "project":
-		projects, err := m.projectLister.List(m.clusterName, labels.Everything())
-		if err != nil {
-			return err
-		}
-		for _, project := range projects {
-			if err := m.updateRole(rt, project.Name); err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
-}
-
-// isClusterOwner checks if a role template is cluster-owner, has cluster ownership rules, or inherits from a role template that grants cluster ownership.
-func (m *manager) isClusterOwner(rtName string) (bool, error) {
-	rt, err := m.rtLister.Get("", rtName)
-	if err != nil {
-		return false, err
-	}
-
-	// role template is the builtin cluster-owner
-	if rt.Builtin && rt.Context == "cluster" && rt.Name == "cluster-owner" {
-		return true, nil
-	}
-
-	for _, rule := range rt.Rules {
-		// cluster + own rule that indicates cluster owner permissions
-		if slice.ContainsString(rule.Resources, "clusters") && slice.ContainsString(rule.Verbs, "own") {
-			return true, nil
-		}
-		// rules with nonResourceURLs can only be applied to ClusterRoles and indicate a RoleTemplate with cluster owner permissions
-		if rule.NonResourceURLs != nil {
-			return true, nil
-		}
-	}
-
-	if len(rt.RoleTemplateNames) > 0 {
-		for _, inherited := range rt.RoleTemplateNames {
-			// recurse on inherited role template to check for cluster ownership
-			isOwner, err := m.isClusterOwner(inherited)
-			if err != nil {
-				return false, err
-			}
-
-			if isOwner {
-				return true, nil
-			}
-		}
-	}
-
-	return false, nil
-}
-
-func (m *manager) updateRole(rt *v3.RoleTemplate, namespace string) error {
-	if role, err := m.rLister.Get(namespace, rt.Name); err == nil && role != nil {
-		err = m.compareAndUpdateNamespacedRole(role, rt, namespace)
-		if err == nil {
-			return nil
-		}
-		if apierrors.IsConflict(err) {
-			// get object from etcd and retry
-			role, err = m.roles.GetNamespaced(namespace, rt.Name, metav1.GetOptions{})
-			if err != nil {
-				return errors.Wrapf(err, "error getting role %v", rt.Name)
-			}
-			return m.compareAndUpdateNamespacedRole(role, rt, namespace)
-		}
-		return errors.Wrapf(err, "couldn't update role %v", rt.Name)
-	} else if err != nil && !apierrors.IsNotFound(err) {
-		return errors.Wrapf(err, "error getting role from cache %v", rt.Name)
-	}
-	// auth/manager.go creates roles based on the prtb/crtb so not repeating it here
-	return nil
-}
-
-func (m *manager) compareAndUpdateNamespacedRole(role *rbacv1.Role, rt *v3.RoleTemplate, namespace string) error {
-	if equality.Semantic.DeepEqual(role.Rules, rt.Rules) {
-		return nil
-	}
-	role = role.DeepCopy()
-	role.Rules = rt.Rules
-	logrus.Infof("Updating role %v in %v because of rules difference with roleTemplate %v (%v).", role.Name, namespace, rt.DisplayName, rt.Name)
-	_, err := m.roles.Update(role)
-	if err != nil {
-		return errors.Wrapf(err, "couldn't update role %v in %v", rt.Name, namespace)
-	}
-	return err
 }
 
 func ToLowerRoleTemplates(roleTemplates map[string]*v3.RoleTemplate) {
