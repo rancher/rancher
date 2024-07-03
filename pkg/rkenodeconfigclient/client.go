@@ -26,6 +26,10 @@ const (
 )
 
 var (
+	client = &http.Client{
+		Timeout: 300 * time.Second,
+	}
+
 	nodeNotFoundRegexp    = regexp.MustCompile(`^node\.management\.cattle\.io.*not found$`)
 	clusterNotFoundRegexp = regexp.MustCompile(`^cluster.*not found$`)
 )
@@ -58,7 +62,7 @@ func newErrNodeOrClusterNotFound(msg, occursType string) *ErrNodeOrClusterNotFou
 // url and header values are used when crafting the GET request, and the writeCertOnly parameter is used to denote if the agent should disregard
 // all aspects of the received node-config except any delivered certificates. Upon a successful execution of the node config, this function
 // will return a polling interval which should be used to query the rancher server for the next node-config and any encountered errors.
-func ConfigClient(ctx context.Context, client *http.Client, url string, header http.Header, writeCertOnly bool) (int, error) {
+func ConfigClient(ctx context.Context, url string, header http.Header, writeCertOnly bool) (int, error) {
 	// try a few more times because there is a delay after registering a new node
 	nodeOrClusterNotFoundRetryLimit := 3
 	interval := 120

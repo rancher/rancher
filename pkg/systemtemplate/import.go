@@ -97,27 +97,6 @@ func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url
 		envVars = append(envVars, cluster.Spec.AgentEnvVars...)
 	}
 
-	// Merge the env vars with the AgentTLSModeStrict
-	found := false
-	for _, ev := range envVars {
-		if ev.Name == "STRICT_VERIFY" {
-			found = true // The user has specified `STRICT_VERIFY`, we should not attempt to overwrite it.
-		}
-	}
-	if !found {
-		if settings.AgentTLSMode.Get() == settings.AgentTLSModeStrict {
-			envVars = append(envVars, corev1.EnvVar{
-				Name:  "STRICT_VERIFY",
-				Value: "true",
-			})
-		} else {
-			envVars = append(envVars, corev1.EnvVar{
-				Name:  "STRICT_VERIFY",
-				Value: "false",
-			})
-		}
-	}
-
 	agentEnvVars = templates.ToYAML(envVars)
 
 	if appendTolerations := util.GetClusterAgentTolerations(cluster); appendTolerations != nil {

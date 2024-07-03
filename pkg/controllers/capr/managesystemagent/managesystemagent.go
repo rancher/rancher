@@ -180,27 +180,6 @@ func installer(cluster *rancherv1.Cluster, secretName string) []runtime.Object {
 		})
 	}
 
-	// Merge the env vars with the AgentTLSModeStrict
-	found := false
-	for _, ev := range env {
-		if ev.Name == "STRICT_VERIFY" {
-			found = true // The user has specified `STRICT_VERIFY`, we should not attempt to overwrite it.
-		}
-	}
-	if !found {
-		if settings.AgentTLSMode.Get() == settings.AgentTLSModeStrict {
-			env = append(env, corev1.EnvVar{
-				Name:  "STRICT_VERIFY",
-				Value: "true",
-			})
-		} else {
-			env = append(env, corev1.EnvVar{
-				Name:  "STRICT_VERIFY",
-				Value: "false",
-			})
-		}
-	}
-
 	if len(cluster.Spec.RKEConfig.MachineSelectorConfig) == 0 {
 		env = append(env, corev1.EnvVar{
 			Name:  "CATTLE_ROLE_WORKER",

@@ -326,10 +326,7 @@ func run(ctx context.Context) error {
 	onConnect := func(ctx context.Context, _ *remotedialer.Session) error {
 		connected()
 		connectConfig := fmt.Sprintf("https://%s/v3/connect/config", serverURL.Host)
-		httpClient := http.Client{
-			Timeout: 300 * time.Second,
-		}
-		interval, err := rkenodeconfigclient.ConfigClient(ctx, &httpClient, connectConfig, headers, writeCertsOnly)
+		interval, err := rkenodeconfigclient.ConfigClient(ctx, connectConfig, headers, writeCertsOnly)
 		if err != nil {
 			return err
 		}
@@ -362,7 +359,7 @@ func run(ctx context.Context) error {
 					if err != nil {
 						logrus.Errorf("failed to check validity of kubelet certs: %v", err)
 					}
-					receivedInterval, err := rkenodeconfigclient.ConfigClient(ctx, &httpClient, connectConfig, headers, writeCertsOnly)
+					receivedInterval, err := rkenodeconfigclient.ConfigClient(ctx, connectConfig, headers, writeCertsOnly)
 					if err != nil {
 						logrus.Errorf("failed to check plan: %v", err)
 					} else if receivedInterval != 0 && receivedInterval != interval {
