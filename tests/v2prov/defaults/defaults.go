@@ -15,7 +15,7 @@ var (
 	DistroDataDir          = os.Getenv("V2PROV_DISTRO_DATA_DIR")
 	ProvisioningDataDir    = os.Getenv("V2PROV_PROVISIONING_DATA_DIR")
 	SystemAgentDataDir     = os.Getenv("V2PROV_SYSTEM_AGENT_DATA_DIR")
-	WatchTimeoutSeconds    = int64(900) // 15 minutes.
+	WatchTimeoutSeconds    = int64(2700) // 45 minutes.
 	CommonClusterConfig    = map[string]interface{}{
 		"service-cidr": "10.45.0.0/16",
 		"cluster-cidr": "10.44.0.0/16",
