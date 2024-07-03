@@ -7,6 +7,5 @@ if ./only-ui-bumps.sh; then
     exit 0
 fi
 
-./build
 ./package
 ./test
