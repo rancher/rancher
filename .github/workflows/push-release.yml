@@ -16,6 +16,8 @@ env:
 jobs:
   unit-tests:
     uses: ./.github/workflows/unit-tests.yml
+  integration-tests:
+    uses: ./.github/workflows/integration-tests.yml
   build-chart:
     runs-on: ubuntu-latest
     steps:
