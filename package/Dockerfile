@@ -1,3 +1,4 @@
+ARG BUILDPLATFORM=linux/amd64
 FROM --platform=$BUILDPLATFORM registry.suse.com/bci/golang:1.21 as build
 ARG VERSION
 ARG COMMIT
