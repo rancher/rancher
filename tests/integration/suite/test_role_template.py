@@ -104,12 +104,11 @@ def test_update_role_template_permissions(admin_mc, remove_resource,
                      'type': '/v3/schemas/policyRule',
                      'verbs': ['get', 'list', 'watch']},
                     {'apiGroups': ['management.cattle.io'],
-                     'resources': ['clusterevents'],
+                     'resources': ['clusteralertrules'],
                      'type': '/v3/schemas/policyRule',
                      'verbs': ['get', 'list', 'watch']}]
     rt = client.create_role_template(name=cc_rt_name, context="cluster",
                                      rules=view_cc_rule)
-    # remove_resource(rt)
     role_template_id = rt['id']
     wait_for_role_template_creation(admin_mc, cc_rt_name)
 
@@ -142,7 +141,7 @@ def test_update_role_template_permissions(admin_mc, remove_resource,
     # update role to remove view clustercatalogs permission
     view_cc_role_template = client.by_id_role_template(role_template_id)
     new_rules = [{'apiGroups': ['management.cattle.io'],
-                  'resources': ['clusterevents'],
+                  'resources': ['clusteralertrules'],
                   'type': '/v3/schemas/policyRule',
                   'verbs': ['get', 'list', 'watch']}]
     client.update(view_cc_role_template, rules=new_rules)
@@ -153,7 +152,7 @@ def test_update_role_template_permissions(admin_mc, remove_resource,
     def check_role_rules(rbac, namespace, role_name, rules):
         role = rbac.read_namespaced_role(role_name, namespace)
         if len(role.rules) == len(rules) and \
-           role.rules[0].resources == ["clusterevents"]:
+           role.rules[0].resources == ["clusteralertrules"]:
             return True
 
     wait_for(lambda: check_role_rules(rbac, 'local', role_template_id,
