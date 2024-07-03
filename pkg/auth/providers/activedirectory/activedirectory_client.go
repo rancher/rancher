@@ -170,7 +170,7 @@ func getUsernameFromObjectGUID(lConn *ldapv3.Conn, config *v32.ActiveDirectoryCo
 
 	parsedGUID, err := guid.Parse(uuid)
 	if err != nil {
-		return "", fmt.Errorf("cannot parsing UUID: %w", err)
+		return "", fmt.Errorf("parsing objectGUID to get the username: %w", err)
 	}
 
 	// search the user by its objectGUID
@@ -194,11 +194,12 @@ func getUsernameFromObjectGUID(lConn *ldapv3.Conn, config *v32.ActiveDirectoryCo
 
 	if len(result.Entries) == 0 {
 		return "", errors.New("LDAP search of user by objectGUID returned no results")
+	} else if len(result.Entries) > 1 {
+		return "", fmt.Errorf("LDAP search of user by objectGUID returned no results")
 	}
 
 	// if found we can continue the login flow with the login attribute of the user
-	username = result.Entries[0].GetAttributeValue(config.UserLoginAttribute)
-	return username, nil
+	return result.Entries[0].GetAttributeValue(config.UserLoginAttribute), nil
 }
 
 func (p *adProvider) getPrincipalsFromSearchResult(result *ldapv3.SearchResult, config *v32.ActiveDirectoryConfig, lConn *ldapv3.Conn) (v3.Principal, []v3.Principal, error) {
