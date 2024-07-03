@@ -4,14 +4,9 @@ set -e
 cd $(dirname $0)
 
 if ./only-ui-bumps.sh; then
-    ./build
-    ./package
-    ./chart/ci
     exit 0
 fi
 
-./validate
 ./build
 ./package
 ./test
-./chart/ci

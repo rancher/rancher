@@ -1,0 +1,12 @@
+name: Unit Tests
+on: [workflow_call]
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    container:
+      image: registry.suse.com/bci/golang:1.21
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Run Unit Tests
+        run: go test -cover -tags=test ./pkg/...
