@@ -45,9 +45,7 @@ func (g GUID) UUID() string {
 		return ""
 	}
 
-	u := make([]byte, len(g))
-	copy(u, g)
-	swap(u)
+	u := swap(g)
 
 	return fmt.Sprintf(
 		"%x-%x-%x-%x-%x",
@@ -87,8 +85,7 @@ func Parse(uuid string) (GUID, error) {
 		return nil, fmt.Errorf("cannot decode uuid string '%s' to hex: %w", uuid, err)
 	}
 
-	swap(uuidBytes)
-	return GUID(uuidBytes), nil
+	return GUID(swap(uuidBytes)), nil
 }
 
 // Escape returns an escaped string format of the objectGUID that can be safely used
@@ -107,14 +104,18 @@ func Escape(guid GUID) string {
 	return builder.String()
 }
 
-func swap(u []byte) {
+// swap will return a new array with the first three "bytes blocks" reversed
+func swap(u []byte) []byte {
 	if len(u) != 16 {
-		return
+		return u
 	}
 
-	u[0], u[1], u[2], u[3] = u[3], u[2], u[1], u[0]
-	u[4], u[5] = u[5], u[4]
-	u[6], u[7] = u[7], u[6]
+	return []byte{
+		u[3], u[2], u[1], u[0], // reverse 0-4
+		u[5], u[4], // reverse 4-5
+		u[7], u[6], // reverse 6-7
+		u[8], u[9], u[10], u[11], u[12], u[13], u[14], u[15], // keep 8-15
+	}
 }
 
 // hexes returns a string array of the hex decoded values
@@ -122,8 +123,7 @@ func hexes(bytes []byte) []string {
 	var hexes []string
 
 	for _, b := range bytes {
-		hex := fmt.Sprintf("%02x", b)
-		hexes = append(hexes, hex)
+		hexes = append(hexes, fmt.Sprintf("%02x", b))
 	}
 
 	return hexes
