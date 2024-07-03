@@ -436,6 +436,11 @@ func (s *Operations) getUpgradeCommand(repoNamespace, repoName string, body io.R
 			upgradeArgs,
 		}
 
+		// Add the labels to the command arguments to indicate the chart is from a cluster repo
+		cmd.ArgObjects = append(cmd.ArgObjects, map[string]interface{}{
+			"labels": fmt.Sprintf("%s=%s", catalog.ClusterRepoNameLabel, repoName),
+		})
+
 		status.Release = chartUpgrade.ReleaseName
 		commands = append(commands, cmd)
 	}
@@ -778,6 +783,10 @@ func (s *Operations) getInstallCommand(repoNamespace, repoName string, body io.R
 				"install": "true",
 			})
 		}
+		// Add the labels to the command arguments to indicate the chart is from a cluster repo
+		cmd.ArgObjects = append(cmd.ArgObjects, map[string]interface{}{
+			"labels": fmt.Sprintf("%s=%s", catalog.ClusterRepoNameLabel, repoName),
+		})
 
 		status.Release = chartInstall.ReleaseName
 
