@@ -459,7 +459,7 @@ jobs:
           mkdir -p /tmp/digests
       - name: Generate Linux Digests
         run: |
-          export LINUX_IMAGES_URL=https://github.com/${{ github.repository_owner }}/rancher/releases/download/${{ env.TAG}}/rancher-images.txt
+          export LINUX_IMAGES_URL=https://github.com/${{ github.repository_owner }}/${{ github.repository }}/releases/download/${{ env.TAG}}/rancher-images.txt
           release generate rancher docker-images-digests \
             --images-url "$LINUX_IMAGES_URL" \
             --output-file /tmp/digests/rancher-images-digests-linux-amd64.txt \
@@ -467,7 +467,7 @@ jobs:
           cp /tmp/digests/rancher-images-digests-linux-amd64.txt /tmp/digests/rancher-images-digests-linux-arm64.txt
       - name: Generate Windows Digests
         run: |
-          export LINUX_IMAGES_URL=https://github.com/${{ github.repository_owner }}/rancher/releases/download/${{ env.TAG}}/rancher-images.txt
+          export LINUX_IMAGES_URL=https://github.com/${{ github.repository_owner }}/${{ github.repository }}/releases/download/${{ env.TAG}}/rancher-images.txt
           release generate rancher docker-images-digests \
             --images-url "$LINUX_IMAGES_URL" \
             --output-file /tmp/digests/rancher-images-digests-windows-ltsc2019.txt \
