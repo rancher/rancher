@@ -6,6 +6,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+var ClusterRepoNameLabel = "catalog.cattle.io/cluster-repo-name"
+
 // +genclient
 // +genclient:nonNamespaced
 // +kubebuilder:resource:scope=Cluster,path=clusterrepos
