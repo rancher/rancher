@@ -9,9 +9,11 @@ platform:
 steps:
 - name: integration-tests
   image: rancher/dapper:v0.6.0
+  privileged: true
+  settings:
+    debug: true
   commands:
   - dapper ci
-  privileged: true
   volumes:
   - name: docker
     path: /var/run/docker.sock
@@ -31,9 +33,11 @@ platform:
 steps:
 - name: integration-tests
   image: rancher/dapper:v0.6.0
+  privileged: true
+  settings:
+    debug: true
   commands:
   - dapper ci
-  privileged: true
   volumes:
   - name: docker
     path: /var/run/docker.sock
