@@ -3,6 +3,8 @@ package unmanaged
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -20,18 +22,25 @@ import (
 	"github.com/rancher/wrangler/v2/pkg/data"
 	corecontrollers "github.com/rancher/wrangler/v2/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v2/pkg/kv"
+	"github.com/rancher/wrangler/v2/pkg/relatedresource"
+	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	"sigs.k8s.io/cluster-api/util/conditions"
 )
+
+const UnmanagedMachineKind = "CustomMachine"
 
 func Register(ctx context.Context, clients *wrangler.Context, kubeconfigManager *kubeconfig.Manager) {
 	h := handler{
 		kubeconfigManager: kubeconfigManager,
 		unmanagedMachine:  clients.RKE.CustomMachine(),
+		rkeClusterCache:   clients.RKE.RKECluster().Cache(),
 		mgmtClusterCache:  clients.Mgmt.Cluster().Cache(),
 		clusterCache:      clients.Provisioning.Cluster().Cache(),
 		capiClusterCache:  clients.CAPI.Cluster().Cache(),
@@ -49,11 +58,50 @@ func Register(ctx context.Context, clients *wrangler.Context, kubeconfigManager 
 	clients.RKE.CustomMachine().OnRemove(ctx, "unmanaged-machine", h.onUnmanagedMachineOnRemove)
 	clients.RKE.CustomMachine().OnChange(ctx, "unmanaged-health", h.onUnmanagedMachineChange)
 	clients.Core.Secret().OnChange(ctx, "unmanaged-machine-secret", h.onSecretChange)
+
+	relatedresource.Watch(ctx, "unmanaged-machine", func(namespace, name string, obj runtime.Object) ([]relatedresource.Key, error) {
+		if rkeCluster, ok := obj.(*rkev1.RKECluster); ok {
+			var relatedResources []relatedresource.Key
+			if rkeCluster.Annotations[capr.DeleteMissingCustomMachinesAfterAnnotation] != "" {
+				logrus.Tracef("[unmanaged] handling related resource for RKECluster %s/%s", rkeCluster.Namespace, rkeCluster.Name)
+				machines, err := clients.CAPI.Machine().List(rkeCluster.Namespace, metav1.ListOptions{LabelSelector: capi.ClusterNameLabel + "=" + rkeCluster.Annotations[capi.ClusterNameLabel]})
+				if err != nil {
+					return nil, err
+				}
+				for _, m := range machines.Items {
+					if m.Spec.InfrastructureRef.Kind == UnmanagedMachineKind && m.Spec.InfrastructureRef.APIVersion == capr.RKEAPIVersion && machineHasNodeNotFoundCondition(&m) {
+						relatedResources = append(relatedResources, relatedresource.Key{
+							Namespace: m.Spec.InfrastructureRef.Namespace,
+							Name:      m.Spec.InfrastructureRef.Name,
+						})
+					}
+				}
+			}
+			return relatedResources, nil
+		} else if m, ok := obj.(*capi.Machine); ok {
+			if m.Spec.InfrastructureRef.Kind == UnmanagedMachineKind && m.Spec.InfrastructureRef.APIVersion == capr.RKEAPIVersion {
+				logrus.Tracef("[unmanaged] handling related resource for CAPI machine %s/%s", m.Namespace, m.Name)
+				rkeCluster, err := clients.RKE.RKECluster().Get(m.Namespace, m.Spec.ClusterName, metav1.GetOptions{})
+				if err != nil {
+					return nil, err
+				}
+				if rkeCluster.Annotations[capr.DeleteMissingCustomMachinesAfterAnnotation] != "" && machineHasNodeNotFoundCondition(m) {
+					logrus.Tracef("[unmanaged] machine %s/%s has node not found condition", m.Namespace, m.Name)
+					return []relatedresource.Key{{
+						Namespace: m.Spec.InfrastructureRef.Namespace,
+						Name:      m.Spec.InfrastructureRef.Name,
+					}}, nil
+				}
+			}
+		}
+		return nil, nil
+	}, clients.RKE.CustomMachine(), clients.RKE.RKECluster(), clients.CAPI.Machine())
 }
 
 type handler struct {
 	kubeconfigManager *kubeconfig.Manager
 	unmanagedMachine  rkecontroller.CustomMachineController
+	rkeClusterCache   rkecontroller.RKEClusterCache
 	mgmtClusterCache  mgmtcontroller.ClusterCache
 	capiClusterCache  capicontrollers.ClusterCache
 	machineCache      capicontrollers.MachineCache
@@ -235,7 +283,7 @@ func (h *handler) createMachineObjects(capiCluster *capi.Cluster, machineName st
 					},
 				},
 				InfrastructureRef: corev1.ObjectReference{
-					Kind:       "CustomMachine",
+					Kind:       UnmanagedMachineKind,
 					Namespace:  capiCluster.Namespace,
 					Name:       machineName,
 					APIVersion: capr.RKEAPIVersion,
@@ -266,20 +314,90 @@ func (h *handler) onUnmanagedMachineOnRemove(_ string, customMachine *rkev1.Cust
 	return customMachine, nil
 }
 
-func (h *handler) onUnmanagedMachineChange(_ string, machine *rkev1.CustomMachine) (*rkev1.CustomMachine, error) {
-	if machine != nil {
-		if !capr.Ready.IsTrue(machine) {
-			// CustomMachines are provisioned already, so their Ready condition should be true.
-			machine = machine.DeepCopy()
-			capr.Ready.SetStatus(machine, "True")
-			capr.Ready.Message(machine, "")
-			return h.unmanagedMachine.UpdateStatus(machine)
+func (h *handler) onUnmanagedMachineChange(_ string, customMachine *rkev1.CustomMachine) (*rkev1.CustomMachine, error) {
+	if customMachine == nil {
+		return customMachine, nil
+	}
+	if !capr.Ready.IsTrue(customMachine) {
+		// CustomMachines are provisioned already, so their Ready condition should be true.
+		customMachine = customMachine.DeepCopy()
+		capr.Ready.SetStatus(customMachine, "True")
+		capr.Ready.Message(customMachine, "")
+		return h.unmanagedMachine.UpdateStatus(customMachine)
+	}
+	if !customMachine.Status.Ready && customMachine.Spec.ProviderID != "" {
+		customMachine = customMachine.DeepCopy()
+		customMachine.Status.Ready = true
+		return h.unmanagedMachine.UpdateStatus(customMachine)
+	}
+
+	clusterName := customMachine.Labels[capi.ClusterNameLabel]
+	rkeCluster, err := h.rkeClusterCache.Get(customMachine.Namespace, clusterName)
+	if err != nil {
+		return customMachine, err
+	}
+
+	if rkeCluster.Annotations[capr.DeleteMissingCustomMachinesAfterAnnotation] != "" {
+		if customMachine.Spec.ProviderID == "" || !customMachine.Status.Ready {
+			return customMachine, nil
 		}
-		if !machine.Status.Ready && machine.Spec.ProviderID != "" {
-			machine = machine.DeepCopy()
-			machine.Status.Ready = true
-			return h.unmanagedMachine.UpdateStatus(machine)
+
+		capiMachine, err := capr.GetMachineByOwner(h.machineCache, customMachine)
+		if err != nil {
+			if errors.Is(err, capr.ErrNoMachineOwnerRef) {
+				return customMachine, nil
+			}
+			return customMachine, err
+		}
+
+		if machineHasNodeNotFoundCondition(capiMachine) {
+			if capiMachine.Status.NodeRef == nil {
+				return customMachine, nil
+			}
+			logrus.Tracef("[unmanaged] RKECluster %s/%s related to CustomMachine %s/%s specifies deletion after duration (%s), and machine was not found per CAPI, evaluating machine for potential deletion", rkeCluster.Namespace, rkeCluster.Name, customMachine.Namespace, customMachine.Name, rkeCluster.Annotations[capr.DeleteMissingCustomMachinesAfterAnnotation])
+			d, err := time.ParseDuration(rkeCluster.Annotations[capr.DeleteMissingCustomMachinesAfterAnnotation])
+			if err != nil {
+				return customMachine, err
+			}
+			lastTransition := conditions.GetLastTransitionTime(capiMachine, capi.MachineNodeHealthyCondition)
+			if lastTransition == nil {
+				return customMachine, fmt.Errorf("error retrieving last transition time for condition %s of Machine %s/%s related to CustomMachine %s/%s", capi.MachineNodeHealthyCondition, capiMachine.Namespace, capiMachine.Name, customMachine.Namespace, customMachine.Name)
+			}
+			now := time.Now()
+			if now.After(lastTransition.Time.Add(d)) {
+				cluster, err := h.clusterCache.Get(capiMachine.Namespace, capiMachine.Spec.ClusterName)
+				if err != nil {
+					return customMachine, err
+				}
+
+				restConfig, err := h.kubeconfigManager.GetRESTConfig(cluster, cluster.Status)
+				if err != nil {
+					return customMachine, err
+				}
+
+				clientset, err := kubernetes.NewForConfig(restConfig)
+				if err != nil {
+					return customMachine, err
+				}
+
+				_, err = clientset.CoreV1().Nodes().Get(context.Background(), capiMachine.Status.NodeRef.Name, metav1.GetOptions{})
+				if apierror.IsNotFound(err) {
+					logrus.Infof("[unmanaged] CustomMachine %s/%s NodeNotFound condition transition time (%s) was past specified deletion duration (%s), proceeding with delete", customMachine.Namespace, customMachine.Name, lastTransition.String(), d.String())
+					if err := h.machineClient.Delete(capiMachine.Namespace, capiMachine.Name, nil); err != nil {
+						return customMachine, err
+					}
+				}
+				logrus.Errorf("[unmanaged] CustomMachine %s/%s NodeNotFound condition transition time (%s) was past specified deletion duration (%s), but unable to validate node (%s) was actually missing in downstream cluster: %v", customMachine.Namespace, customMachine.Name, lastTransition.String(), d.String(), capiMachine.Status.NodeRef.Name, err)
+				return customMachine, err
+			}
+			nextEnqueueDuration := lastTransition.Time.Add(d).Sub(now)
+			logrus.Debugf("[unmanaged] CustomMachine %s/%s NodeNotFound condition last transition time (%s) was not past specified deletion duration (%s), enqueuing after %s", customMachine.Namespace, customMachine.Name, lastTransition.String(), d.String(), nextEnqueueDuration)
+			h.unmanagedMachine.EnqueueAfter(customMachine.Namespace, customMachine.Name, nextEnqueueDuration)
 		}
 	}
-	return machine, nil
+	return customMachine, nil
+}
+
+func machineHasNodeNotFoundCondition(capiMachine *capi.Machine) bool {
+	return conditions.IsFalse(capiMachine, capi.MachineNodeHealthyCondition) && (conditions.GetReason(capiMachine, capi.MachineNodeHealthyCondition) == capi.NodeNotFoundReason)
 }

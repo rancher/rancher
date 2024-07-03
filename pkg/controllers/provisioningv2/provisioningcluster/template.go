@@ -510,8 +510,9 @@ func assign(labels map[string]string, key string, value interface{}) error {
 func rkeCluster(cluster *rancherv1.Cluster) *rkev1.RKECluster {
 	return &rkev1.RKECluster{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      cluster.Name,
-			Namespace: cluster.Namespace,
+			Name:        cluster.Name,
+			Namespace:   cluster.Namespace,
+			Annotations: map[string]string{capr.DeleteMissingCustomMachinesAfterAnnotation: cluster.Annotations[capr.DeleteMissingCustomMachinesAfterAnnotation]},
 		},
 	}
 }
