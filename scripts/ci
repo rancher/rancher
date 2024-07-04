@@ -10,15 +10,8 @@ if ./only-ui-bumps.sh; then
     exit 0
 fi
 
-echo "cleaning Go cache"
-go env GOCACHE
-echo "==="
-ls -lha $(go env GOCACHE)
-echo "==="
-go clean -cache
-ls -lha $(go env GOCACHE)
-
-#./validate
+#go clean -cache
+./validate
 ./build
 ./package
 ./test
