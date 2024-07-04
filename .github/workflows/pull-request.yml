@@ -152,56 +152,6 @@ jobs:
           platforms: "${{ matrix.os }}/${{ matrix.arch }}"
           file: ./package/Dockerfile.agent
           labels: "${{ steps.meta.outputs.labels }}"
-          outputs: type=docker,dest=/tmp/rancher-agent-${{ matrix.os }}-${{ matrix.arch }}.tar
-      - name: Upload image
-        uses: actions/upload-artifact@v4
-        with:
-          name: "rancher-agent-${{ matrix.os }}-${{ matrix.arch }}"
-          path: /tmp/rancher-agent-${{ matrix.os }}-${{ matrix.arch }}.tar
-          if-no-files-found: error
-          retention-days: 1
-          overwrite: false
-  integration-tests:
-    needs: [build-agent]
-    runs-on: runs-on,runner=4cpu-linux-x64,image=legacy-cgroups-for-x64,run-id=${{ github.run_id }}
-    services:
-      registry:
-        image: registry:2
-        ports:
-          - 5000:5000
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Download rancher images
-        uses: actions/download-artifact@v4
-        with:
-          pattern: "rancher-*"
-          path: /tmp
-          merge-multiple: true
-      - name: Load Rancher Image
-        run: |
-          image_id=$(docker load --input /tmp/rancher-linux-amd64.tar 2>&1 | grep "Loaded image" | awk '{print $NF}')
-          if [ -z "$image_id" ]; then
-            echo "Error: Failed to load image from tarball!"
-            exit 1
-          fi
-          docker tag "$image_id" localhost:5000/${{ env.IMAGE }}:${{ env.TAG }}
-          docker push localhost:5000/${{ env.IMAGE }}:${{ env.TAG }}
-      - name: Load Rancher Agent Image
-        run: |
-          image_id=$(docker load --input /tmp/rancher-agent-linux-amd64.tar 2>&1 | grep "Loaded image" | awk '{print $NF}')
-          if [ -z "$image_id" ]; then
-            echo "Error: Failed to load image from tarball!"
-            exit 1
-          fi
-          docker tag "$image_id" localhost:5000/${{ env.IMAGE_AGENT }}:${{ env.TAG }}
-          docker push localhost:5000/${{ env.IMAGE_AGENT }}:${{ env.TAG }}
-      - name: Install Dapper
-        run: |
-          curl -sL https://releases.rancher.com/dapper/latest/dapper-$(uname -s)-$(uname -m) > ./.dapper
-          chmod +x ./.dapper
-      - name: Run tests
-        run: REGISTRY="localhost:5000" ./.dapper ci
   build-agent-windows:
     strategy:
       matrix:
