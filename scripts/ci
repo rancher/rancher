@@ -10,7 +10,8 @@ if ./only-ui-bumps.sh; then
     exit 0
 fi
 
-#go clean -cache
+go clean -cache
+
 ./validate
 ./build
 ./package
