@@ -233,6 +233,7 @@ type steveAPITestSuite struct {
 	userClients       map[string]*rancher.Client
 	lastContinueToken string
 	lastRevision      string
+	usesSQLCache      bool
 }
 
 type LocalSteveAPITestSuite struct {
@@ -273,6 +274,10 @@ func (s *steveAPITestSuite) setupSuite(clusterName string) {
 
 	mgmtCluster, err := client.Management.Cluster.ByID(s.clusterID)
 	require.NoError(s.T(), err)
+
+	f, err := client.Management.Feature.ByID("ui-sql-cache")
+	require.NoError(s.T(), err)
+	s.usesSQLCache = *f.Value
 
 	// create projects
 	for p := range projectMap {
@@ -439,13 +444,15 @@ func (s *steveAPITestSuite) TestList() {
 	defer subSession.Cleanup()
 
 	tests := []struct {
-		description    string
-		user           string
-		namespace      string
-		query          string
-		expect         []map[string]string
-		expectExcludes bool
-		expectContains bool
+		description           string
+		user                  string
+		namespace             string
+		query                 string
+		expect                []map[string]string
+		expectExcludes        bool
+		expectContains        bool
+		skipWhenUsingSQLCache bool
+		onlyWhenUsingSQLCache bool
 	}{
 		// user-a
 		{
@@ -519,6 +526,8 @@ func (s *steveAPITestSuite) TestList() {
 				{"name": "test2", "namespace": "test-ns-4"},
 				{"name": "test2", "namespace": "test-ns-5"},
 			},
+			// TODO: remove this or add a separate test when the SQL cache implements filtering for arbitrary labels
+			skipWhenUsingSQLCache: true,
 		},
 		{
 			description: "user:user-a,namespace:test-ns-2,query:labelSelector=test-label=2",
@@ -528,12 +537,29 @@ func (s *steveAPITestSuite) TestList() {
 			expect: []map[string]string{
 				{"name": "test2", "namespace": "test-ns-2"},
 			},
+			// TODO: remove this or add a separate test when the SQL cache implements filtering for arbitrary labels
+			skipWhenUsingSQLCache: true,
 		},
 		{
 			description: "user:user-a,namespace:none,query:fieldSelector=metadata.namespace=test-ns-1",
 			user:        "user-a",
 			namespace:   "",
 			query:       "fieldSelector=metadata.namespace=test-ns-1",
+			expect: []map[string]string{
+				{"name": "test1", "namespace": "test-ns-1"},
+				{"name": "test2", "namespace": "test-ns-1"},
+				{"name": "test3", "namespace": "test-ns-1"},
+				{"name": "test4", "namespace": "test-ns-1"},
+				{"name": "test5", "namespace": "test-ns-1"},
+			},
+			// SQL cache implements filter=metadata.namespace=... instead of fieldSelector=metadata.namespace=...
+			skipWhenUsingSQLCache: true,
+		},
+		{
+			description: "user:user-a,namespace:none,query:filter=metadata.namespace=test-ns-1",
+			user:        "user-a",
+			namespace:   "",
+			query:       "filter=metadata.namespace=test-ns-1",
 			expect: []map[string]string{
 				{"name": "test1", "namespace": "test-ns-1"},
 				{"name": "test2", "namespace": "test-ns-1"},
@@ -554,12 +580,42 @@ func (s *steveAPITestSuite) TestList() {
 				{"name": "test1", "namespace": "test-ns-4"},
 				{"name": "test1", "namespace": "test-ns-5"},
 			},
+			// SQL cache implements filter=metadata.name=... instead of fieldSelector=metadata.name=...
+			skipWhenUsingSQLCache: true,
+		},
+		{
+			description: "user:user-a,namespace:none,query:filter=metadata.name=test1",
+			user:        "user-a",
+			namespace:   "",
+			query:       "filter=metadata.name=test1",
+			expect: []map[string]string{
+				{"name": "test1", "namespace": "test-ns-1"},
+				{"name": "test1", "namespace": "test-ns-2"},
+				{"name": "test1", "namespace": "test-ns-3"},
+				{"name": "test1", "namespace": "test-ns-4"},
+				{"name": "test1", "namespace": "test-ns-5"},
+			},
 		},
 		{
 			description: "user:user-a,namespace:test-ns-1,query:fieldSelector=metadata.namespace=test-ns-1",
 			user:        "user-a",
 			namespace:   "test-ns-1",
 			query:       "fieldSelector=metadata.namespace=test-ns-1",
+			expect: []map[string]string{
+				{"name": "test1", "namespace": "test-ns-1"},
+				{"name": "test2", "namespace": "test-ns-1"},
+				{"name": "test3", "namespace": "test-ns-1"},
+				{"name": "test4", "namespace": "test-ns-1"},
+				{"name": "test5", "namespace": "test-ns-1"},
+			},
+			// SQL cache implements filter=metadata.namespace=... instead of fieldSelector=metadata.namespace=...
+			skipWhenUsingSQLCache: true,
+		},
+		{
+			description: "user:user-a,namespace:test-ns-1,query:filter=metadata.namespace=test-ns-1",
+			user:        "user-a",
+			namespace:   "test-ns-1",
+			query:       "filter=metadata.namespace=test-ns-1",
 			expect: []map[string]string{
 				{"name": "test1", "namespace": "test-ns-1"},
 				{"name": "test2", "namespace": "test-ns-1"},
@@ -574,12 +630,32 @@ func (s *steveAPITestSuite) TestList() {
 			namespace:   "test-ns-2",
 			query:       "fieldSelector=metadata.namespace=test-ns-1",
 			expect:      []map[string]string{},
+			// SQL cache implements filter=metadata.namespace=... instead of fieldSelector=metadata.namespace=...
+			skipWhenUsingSQLCache: true,
+		},
+		{
+			description: "user:user-a,namespace:test-ns-2,query:filter=metadata.namespace=test-ns-1",
+			user:        "user-a",
+			namespace:   "test-ns-2",
+			query:       "filter=metadata.namespace=test-ns-1",
+			expect:      []map[string]string{},
 		},
 		{
 			description: "user:user-a,namespace:test-ns-1,query:fieldSelector=metadata.name=test1",
 			user:        "user-a",
 			namespace:   "test-ns-1",
 			query:       "fieldSelector=metadata.name=test1",
+			expect: []map[string]string{
+				{"name": "test1", "namespace": "test-ns-1"},
+			},
+			// SQL cache implements filter=metadata.name=... instead of fieldSelector=metadata.name=...
+			skipWhenUsingSQLCache: true,
+		},
+		{
+			description: "user:user-a,namespace:test-ns-1,query:filter=metadata.name=test1",
+			user:        "user-a",
+			namespace:   "test-ns-1",
+			query:       "filter=metadata.name=test1",
 			expect: []map[string]string{
 				{"name": "test1", "namespace": "test-ns-1"},
 			},
@@ -694,6 +770,8 @@ func (s *steveAPITestSuite) TestList() {
 				{"name": "test4", "namespace": "test-ns-1"},
 				{"name": "test5", "namespace": "test-ns-1"},
 			},
+			// TODO: remove this or add a separate test when the SQL cache implements filtering for arbitrary labels
+			skipWhenUsingSQLCache: true,
 		},
 		{
 			description: "user:user-a,namespace:none,query:filter=metadata.name!=1",
@@ -948,6 +1026,26 @@ func (s *steveAPITestSuite) TestList() {
 				{"name": "test4"},
 				{"name": "test4"},
 			},
+			// in the SQL cache implementation, limit is implemented "correctly" (the minimum between limit and pageSize is considered)
+			// see following test
+			skipWhenUsingSQLCache: true,
+		},
+		{
+			// TODO: add case filtering by label instead of names when the SQL cache implements filtering for arbitrary labels
+			description: "user:user-a,namespace:none,query:filter=metadata.name=test3,metadata.name=test4,metadata.name=test5&sort=-metadata.name&pagesize=6&limit=20",
+			user:        "user-a",
+			namespace:   "",
+			query:       "filter=metadata.name=test3,metadata.name=test4,metadata.name=test5&sort=-metadata.name&pagesize=6&limit=20",
+			expect: []map[string]string{
+				{"name": "test5"},
+				{"name": "test5"},
+				{"name": "test5"},
+				{"name": "test5"},
+				{"name": "test5"},
+				{"name": "test4"},
+			},
+			// in the SQL cache implementation, limit is implemented "correctly" (the minimum between limit and pageSize is considered)
+			onlyWhenUsingSQLCache: true,
 		},
 		{
 			description: "user:user-a,namespace:none,query:filter=metadata.labels.test-label-gte=3&sort=-metadata.name&pagesize=6&page=2&revision=" + revisionNum + "&limit=20",
@@ -962,6 +1060,8 @@ func (s *steveAPITestSuite) TestList() {
 				{"name": "test3"},
 				{"name": "test3"},
 			},
+			// SQL cache does not support querying by revision
+			skipWhenUsingSQLCache: true,
 		},
 		{
 			description: "user:user-a,namespace:none,query:filter=metadata.labels.test-label-gte=3&sort=-metadata.name&pagesize=6&page=1&limit=20&continue=" + continueToken,
@@ -974,6 +1074,24 @@ func (s *steveAPITestSuite) TestList() {
 				{"name": "test4", "namespace": "test-ns-5"},
 				{"name": "test3", "namespace": "test-ns-5"},
 			},
+			// SQL cache does not support continue tokens (continue item counts are used instead)
+			skipWhenUsingSQLCache: true,
+		},
+		{
+			description: "user:user-a,namespace:none,query:filter=metadata.name=test3,metadata.name=test4,metadata.name=test5&sort=-metadata.name&pagesize=6&limit=20&continue=6",
+			user:        "user-a",
+			namespace:   "",
+			query:       "filter=metadata.name=test3,metadata.name=test4,metadata.name=test5&sort=-metadata.name&pagesize=6&limit=20&continue=6",
+			expect: []map[string]string{
+				{"name": "test4"},
+				{"name": "test4"},
+				{"name": "test4"},
+				{"name": "test4"},
+				{"name": "test3"},
+				{"name": "test3"},
+			},
+			// SQL cache does not support continue tokens (continue item counts are used instead)
+			onlyWhenUsingSQLCache: true,
 		},
 
 		// user-b
@@ -1018,6 +1136,8 @@ func (s *steveAPITestSuite) TestList() {
 			expect: []map[string]string{
 				{"name": "test2", "namespace": "test-ns-1"},
 			},
+			// TODO: remove this or add a test when the SQL cache implements filtering for arbitrary labels
+			skipWhenUsingSQLCache: true,
 		},
 		{
 			description: "user:user-b,namespace:test-ns-1,query:labelSelector=test-label=2",
@@ -1027,6 +1147,8 @@ func (s *steveAPITestSuite) TestList() {
 			expect: []map[string]string{
 				{"name": "test2", "namespace": "test-ns-1"},
 			},
+			// TODO: remove this or add a test when the SQL cache implements filtering for arbitrary labels
+			skipWhenUsingSQLCache: true,
 		},
 		{
 			description: "user:user-b,namespace:test-ns-2,query:labelSelector=test-label=2",
@@ -1034,12 +1156,29 @@ func (s *steveAPITestSuite) TestList() {
 			namespace:   "test-ns-2",
 			query:       "labelSelector=test-label=2",
 			expect:      []map[string]string{},
+			// TODO: remove this or add a test when the SQL cache implements filtering for arbitrary labels
+			skipWhenUsingSQLCache: true,
 		},
 		{
 			description: "user:user-b,namespace:none,query:fieldSelector=metadata.namespace=test-ns-1",
 			user:        "user-b",
 			namespace:   "",
 			query:       "fieldSelector=metadata.namespace=test-ns-1",
+			expect: []map[string]string{
+				{"name": "test1", "namespace": "test-ns-1"},
+				{"name": "test2", "namespace": "test-ns-1"},
+				{"name": "test3", "namespace": "test-ns-1"},
+				{"name": "test4", "namespace": "test-ns-1"},
+				{"name": "test5", "namespace": "test-ns-1"},
+			},
+			// SQL cache implements filter=metadata.namespace=... instead of fieldSelector=metadata.namespace=...
+			skipWhenUsingSQLCache: true,
+		},
+		{
+			description: "user:user-b,namespace:none,query:filter=metadata.namespace=test-ns-1",
+			user:        "user-b",
+			namespace:   "",
+			query:       "filter=metadata.namespace=test-ns-1",
 			expect: []map[string]string{
 				{"name": "test1", "namespace": "test-ns-1"},
 				{"name": "test2", "namespace": "test-ns-1"},
@@ -1054,12 +1193,32 @@ func (s *steveAPITestSuite) TestList() {
 			namespace:   "",
 			query:       "fieldSelector=metadata.namespace=test-ns-2",
 			expect:      []map[string]string{},
+			// SQL cache implements filter=metadata.namespace=... instead of fieldSelector=metadata.namespace=...
+			skipWhenUsingSQLCache: true,
+		},
+		{
+			description: "user:user-b,namespace:none,query:filter=metadata.namespace=test-ns-2",
+			user:        "user-b",
+			namespace:   "",
+			query:       "filter=metadata.namespace=test-ns-2",
+			expect:      []map[string]string{},
 		},
 		{
 			description: "user:user-b,namespace:none,query:fieldSelector=metadata.name=test1",
 			user:        "user-b",
 			namespace:   "",
 			query:       "fieldSelector=metadata.name=test1",
+			expect: []map[string]string{
+				{"name": "test1", "namespace": "test-ns-1"},
+			},
+			// SQL cache implements filter=metadata.name=... instead of fieldSelector=metadata.name=...
+			skipWhenUsingSQLCache: true,
+		},
+		{
+			description: "user:user-b,namespace:none,query:filter=metadata.name=test1",
+			user:        "user-b",
+			namespace:   "",
+			query:       "filter=metadata.name=test1",
 			expect: []map[string]string{
 				{"name": "test1", "namespace": "test-ns-1"},
 			},
@@ -1076,6 +1235,21 @@ func (s *steveAPITestSuite) TestList() {
 				{"name": "test4", "namespace": "test-ns-1"},
 				{"name": "test5", "namespace": "test-ns-1"},
 			},
+			// SQL cache implements filter=metadata.namespace=... instead of fieldSelector=metadata.namespace=...
+			skipWhenUsingSQLCache: true,
+		},
+		{
+			description: "user:user-b,namespace:test-ns-1,query:filter=metadata.namespace=test-ns-1",
+			user:        "user-b",
+			namespace:   "test-ns-1",
+			query:       "filter=metadata.namespace=test-ns-1",
+			expect: []map[string]string{
+				{"name": "test1", "namespace": "test-ns-1"},
+				{"name": "test2", "namespace": "test-ns-1"},
+				{"name": "test3", "namespace": "test-ns-1"},
+				{"name": "test4", "namespace": "test-ns-1"},
+				{"name": "test5", "namespace": "test-ns-1"},
+			},
 		},
 		{
 			description: "user:user-b,namespace:test-ns-2,query:fieldSelector=metadata.namespace=test-ns-1",
@@ -1083,12 +1257,30 @@ func (s *steveAPITestSuite) TestList() {
 			namespace:   "test-ns-2",
 			query:       "fieldSelector=metadata.namespace=test-ns-1",
 			expect:      []map[string]string{},
+			// SQL cache implements filter=metadata.namespace=... instead of fieldSelector=metadata.namespace=...
+			skipWhenUsingSQLCache: true,
+		},
+		{
+			description: "user:user-b,namespace:test-ns-2,query:filter=metadata.namespace=test-ns-1",
+			user:        "user-b",
+			namespace:   "test-ns-2",
+			query:       "filter=metadata.namespace=test-ns-1",
+			expect:      []map[string]string{},
 		},
 		{
 			description: "user:user-b,namespace:test-ns-1,query:fieldSelector=metadata.namespace=test-ns-2",
 			user:        "user-b",
 			namespace:   "test-ns-1",
 			query:       "fieldSelector=metadata.namespace=test-ns-2",
+			expect:      []map[string]string{},
+			// SQL cache implements filter=metadata.namespace=... instead of fieldSelector=metadata.namespace=...
+			skipWhenUsingSQLCache: true,
+		},
+		{
+			description: "user:user-b,namespace:test-ns-1,query:filter=metadata.namespace=test-ns-2",
+			user:        "user-b",
+			namespace:   "test-ns-1",
+			query:       "filter=metadata.namespace=test-ns-2",
 			expect:      []map[string]string{},
 		},
 		{
@@ -1099,12 +1291,32 @@ func (s *steveAPITestSuite) TestList() {
 			expect: []map[string]string{
 				{"name": "test1", "namespace": "test-ns-1"},
 			},
+			// SQL cache implements filter=metadata.name=... instead of fieldSelector=metadata.name=...
+			skipWhenUsingSQLCache: true,
+		},
+		{
+			description: "user:user-b,namespace:test-ns-1,query:filter=metadata.name=test1",
+			user:        "user-b",
+			namespace:   "test-ns-1",
+			query:       "filter=metadata.name=test1",
+			expect: []map[string]string{
+				{"name": "test1", "namespace": "test-ns-1"},
+			},
 		},
 		{
 			description: "user:user-b,namespace:test-ns-2,query:fieldSelector=metadata.name=test1",
 			user:        "user-b",
 			namespace:   "test-ns-2",
 			query:       "fieldSelector=metadata.name=test1",
+			expect:      []map[string]string{},
+			// SQL cache implements filter=metadata.name=... instead of fieldSelector=metadata.name=...
+			skipWhenUsingSQLCache: true,
+		},
+		{
+			description: "user:user-b,namespace:test-ns-2,query:filter=metadata.name=test1",
+			user:        "user-b",
+			namespace:   "test-ns-2",
+			query:       "filter=metadata.name=test1",
 			expect:      []map[string]string{},
 		},
 		{
@@ -1205,6 +1417,8 @@ func (s *steveAPITestSuite) TestList() {
 				{"name": "test4", "namespace": "test-ns-1"},
 				{"name": "test5", "namespace": "test-ns-1"},
 			},
+			// TODO: remove this or add a test when the SQL cache implements filtering for arbitrary labels
+			skipWhenUsingSQLCache: true,
 		},
 		{
 			description: "user:user-b,namespace:none,query:filter=metadata.name!=1",
@@ -1361,6 +1575,18 @@ func (s *steveAPITestSuite) TestList() {
 				{"name": "test5", "namespace": "test-ns-1"},
 				{"name": "test4", "namespace": "test-ns-1"},
 			},
+			// TODO: remove this or add a test when the SQL cache implements filtering for arbitrary labels
+			skipWhenUsingSQLCache: true,
+		},
+		{
+			description: "user:user-b,namespace:none,query:filter=metadata.name=test3,metadata.name=test4,metadata.name=test5&sort=-metadata.name&pagesize=2",
+			user:        "user-b",
+			namespace:   "",
+			query:       "filter=metadata.name=test3,metadata.name=test4,metadata.name=test5&sort=-metadata.name&pagesize=2",
+			expect: []map[string]string{
+				{"name": "test5", "namespace": "test-ns-1"},
+				{"name": "test4", "namespace": "test-ns-1"},
+			},
 		},
 		{
 			description: "user:user-b,namespace:none,query:filter=metadata.labels.test-label-gte=3&sort=-metadata.name&pagesize=2&page=2&revision=" + revisionNum,
@@ -1370,6 +1596,8 @@ func (s *steveAPITestSuite) TestList() {
 			expect: []map[string]string{
 				{"name": "test3", "namespace": "test-ns-1"},
 			},
+			// SQL cache does not support querying by revision
+			skipWhenUsingSQLCache: true,
 		},
 
 		// user-c
@@ -1414,6 +1642,8 @@ func (s *steveAPITestSuite) TestList() {
 				{"name": "test2", "namespace": "test-ns-2"},
 				{"name": "test2", "namespace": "test-ns-3"},
 			},
+			// TODO: remove this or add a test when the SQL cache implements filtering for arbitrary labels
+			skipWhenUsingSQLCache: true,
 		},
 		{
 			description: "user:user-c,namespace:test-ns-1,query:labelSelector=test-label=2",
@@ -1423,6 +1653,8 @@ func (s *steveAPITestSuite) TestList() {
 			expect: []map[string]string{
 				{"name": "test2", "namespace": "test-ns-1"},
 			},
+			// TODO: remove this or add a test when the SQL cache implements filtering for arbitrary labels
+			skipWhenUsingSQLCache: true,
 		},
 		{
 			description: "user:user-c,namespace:test-ns-5,query:labelSelector=test-label=2",
@@ -1430,12 +1662,26 @@ func (s *steveAPITestSuite) TestList() {
 			namespace:   "test-ns-5",
 			query:       "labelSelector=test-label=2",
 			expect:      []map[string]string{},
+			// TODO: remove this or add a test when the SQL cache implements filtering for arbitrary labels
+			skipWhenUsingSQLCache: true,
 		},
 		{
 			description: "user:user-c,namespace:none,query:fieldSelector=metadata.namespace=test-ns-1",
 			user:        "user-c",
 			namespace:   "",
 			query:       "fieldSelector=metadata.namespace=test-ns-1",
+			expect: []map[string]string{
+				{"name": "test1", "namespace": "test-ns-1"},
+				{"name": "test2", "namespace": "test-ns-1"},
+			},
+			// SQL cache implements filter=metadata.namespace=... instead of fieldSelector=metadata.namespace=...
+			skipWhenUsingSQLCache: true,
+		},
+		{
+			description: "user:user-c,namespace:none,query:filter=metadata.namespace=test-ns-1",
+			user:        "user-c",
+			namespace:   "",
+			query:       "filter=metadata.namespace=test-ns-1",
 			expect: []map[string]string{
 				{"name": "test1", "namespace": "test-ns-1"},
 				{"name": "test2", "namespace": "test-ns-1"},
@@ -1450,12 +1696,33 @@ func (s *steveAPITestSuite) TestList() {
 				{"name": "test1", "namespace": "test-ns-2"},
 				{"name": "test2", "namespace": "test-ns-2"},
 			},
+			// SQL cache implements filter=metadata.namespace=... instead of fieldSelector=metadata.namespace=...
+			skipWhenUsingSQLCache: true,
+		},
+		{
+			description: "user:user-c,namespace:none,query:filter=metadata.namespace=test-ns-2",
+			user:        "user-c",
+			namespace:   "",
+			query:       "filter=metadata.namespace=test-ns-2",
+			expect: []map[string]string{
+				{"name": "test1", "namespace": "test-ns-2"},
+				{"name": "test2", "namespace": "test-ns-2"},
+			},
 		},
 		{
 			description: "user:user-c,namespace:none,query:fieldSelector=metadata.namespace=test-ns-5",
 			user:        "user-c",
 			namespace:   "",
 			query:       "fieldSelector=metadata.namespace=test-ns-5",
+			expect:      []map[string]string{},
+			// SQL cache implements filter=metadata.namespace=... instead of fieldSelector=metadata.namespace=...
+			skipWhenUsingSQLCache: true,
+		},
+		{
+			description: "user:user-c,namespace:none,query:filter=metadata.namespace=test-ns-5",
+			user:        "user-c",
+			namespace:   "",
+			query:       "filter=metadata.namespace=test-ns-5",
 			expect:      []map[string]string{},
 		},
 		{
@@ -1468,12 +1735,34 @@ func (s *steveAPITestSuite) TestList() {
 				{"name": "test1", "namespace": "test-ns-2"},
 				{"name": "test1", "namespace": "test-ns-3"},
 			},
+			// SQL cache implements filter=metadata.name=... instead of fieldSelector=metadata.name=...
+			skipWhenUsingSQLCache: true,
+		},
+		{
+			description: "user:user-c,namespace:none,query:filter=metadata.name=test1",
+			user:        "user-c",
+			namespace:   "",
+			query:       "filter=metadata.name=test1",
+			expect: []map[string]string{
+				{"name": "test1", "namespace": "test-ns-1"},
+				{"name": "test1", "namespace": "test-ns-2"},
+				{"name": "test1", "namespace": "test-ns-3"},
+			},
 		},
 		{
 			description: "user:user-c,namespace:none,query:fieldSelector=metadata.name=test5",
 			user:        "user-c",
 			namespace:   "",
 			query:       "fieldSelector=metadata.name=test5",
+			expect:      []map[string]string{},
+			// SQL cache implements filter=metadata.name=... instead of fieldSelector=metadata.name=...
+			skipWhenUsingSQLCache: true,
+		},
+		{
+			description: "user:user-c,namespace:none,query:filter=metadata.name=test5",
+			user:        "user-c",
+			namespace:   "",
+			query:       "filter=metadata.name=test5",
 			expect:      []map[string]string{},
 		},
 		{
@@ -1485,6 +1774,18 @@ func (s *steveAPITestSuite) TestList() {
 				{"name": "test1", "namespace": "test-ns-1"},
 				{"name": "test2", "namespace": "test-ns-1"},
 			},
+			// SQL cache implements filter=metadata.namespace=... instead of fieldSelector=metadata.namespace=...
+			skipWhenUsingSQLCache: true,
+		},
+		{
+			description: "user:user-c,namespace:test-ns-1,query:filter=metadata.namespace=test-ns-1",
+			user:        "user-c",
+			namespace:   "test-ns-1",
+			query:       "filter=metadata.namespace=test-ns-1",
+			expect: []map[string]string{
+				{"name": "test1", "namespace": "test-ns-1"},
+				{"name": "test2", "namespace": "test-ns-1"},
+			},
 		},
 		{
 			description: "user:user-c,namespace:test-ns-2,query:fieldSelector=metadata.namespace=test-ns-1",
@@ -1492,12 +1793,30 @@ func (s *steveAPITestSuite) TestList() {
 			namespace:   "test-ns-2",
 			query:       "fieldSelector=metadata.namespace=test-ns-1",
 			expect:      []map[string]string{},
+			// SQL cache implements filter=metadata.namespace=... instead of fieldSelector=metadata.namespace=...
+			skipWhenUsingSQLCache: true,
+		},
+		{
+			description: "user:user-c,namespace:test-ns-2,query:filter=metadata.namespace=test-ns-1",
+			user:        "user-c",
+			namespace:   "test-ns-2",
+			query:       "filter=metadata.namespace=test-ns-1",
+			expect:      []map[string]string{},
 		},
 		{
 			description: "user:user-c,namespace:test-ns-1,query:fieldSelector=metadata.namespace=test-ns-2",
 			user:        "user-c",
 			namespace:   "test-ns-1",
 			query:       "fieldSelector=metadata.namespace=test-ns-2",
+			expect:      []map[string]string{},
+			// SQL cache implements filter=metadata.namespace=... instead of fieldSelector=metadata.namespace=...
+			skipWhenUsingSQLCache: true,
+		},
+		{
+			description: "user:user-c,namespace:test-ns-1,query:filter=metadata.namespace=test-ns-2",
+			user:        "user-c",
+			namespace:   "test-ns-1",
+			query:       "filter=metadata.namespace=test-ns-2",
 			expect:      []map[string]string{},
 		},
 		{
@@ -1508,6 +1827,17 @@ func (s *steveAPITestSuite) TestList() {
 			expect: []map[string]string{
 				{"name": "test1", "namespace": "test-ns-1"},
 			},
+			// SQL cache implements filter=metadata.namespace=... instead of fieldSelector=metadata.namespace=...
+			skipWhenUsingSQLCache: true,
+		},
+		{
+			description: "user:user-c,namespace:test-ns-1,query:filter=metadata.name=test1",
+			user:        "user-c",
+			namespace:   "test-ns-1",
+			query:       "filter=metadata.name=test1",
+			expect: []map[string]string{
+				{"name": "test1", "namespace": "test-ns-1"},
+			},
 		},
 		{
 			description: "user:user-c,namespace:test-ns-5,query:fieldSelector=metadata.name=test1",
@@ -1515,12 +1845,30 @@ func (s *steveAPITestSuite) TestList() {
 			namespace:   "test-ns-5",
 			query:       "fieldSelector=metadata.name=test1",
 			expect:      []map[string]string{},
+			// SQL cache implements filter=metadata.name=... instead of fieldSelector=metadata.name=...
+			skipWhenUsingSQLCache: true,
+		},
+		{
+			description: "user:user-c,namespace:test-ns-5,query:filter=metadata.name=test1",
+			user:        "user-c",
+			namespace:   "test-ns-5",
+			query:       "filter=metadata.name=test1",
+			expect:      []map[string]string{},
 		},
 		{
 			description: "user:user-c,namespace:test-ns-1,query:fieldSelector=metadata.name=test5",
 			user:        "user-c",
 			namespace:   "test-ns-1",
 			query:       "fieldSelector=metadata.name=test5",
+			expect:      []map[string]string{},
+			// SQL cache implements filter=metadata.name=... instead of fieldSelector=metadata.name=...
+			skipWhenUsingSQLCache: true,
+		},
+		{
+			description: "user:user-c,namespace:test-ns-1,query:filter=metadata.name=test5",
+			user:        "user-c",
+			namespace:   "test-ns-1",
+			query:       "filter=metadata.name=test5",
 			expect:      []map[string]string{},
 		},
 		{
@@ -1620,6 +1968,8 @@ func (s *steveAPITestSuite) TestList() {
 			expect: []map[string]string{
 				{"name": "test2", "namespace": "test-ns-1"},
 			},
+			// TODO: remove this or add a test when the SQL cache implements filtering for arbitrary labels
+			skipWhenUsingSQLCache: true,
 		},
 		{
 			description: "user:user-c,namespace:none,query:sort=metadata.name",
@@ -2358,6 +2708,12 @@ func (s *steveAPITestSuite) TestList() {
 	}
 
 	for _, test := range tests {
+		if s.usesSQLCache && test.skipWhenUsingSQLCache {
+			continue
+		}
+		if !s.usesSQLCache && test.onlyWhenUsingSQLCache {
+			continue
+		}
 		s.Run(test.description, func() {
 			userClient := s.userClients[test.user]
 			userClient, err := userClient.ReLogin()
@@ -2486,13 +2842,15 @@ func formatJSON(obj *clientv1.SteveCollection) ([]byte, error) {
 	if _, ok := mapResp["continue"]; ok {
 		mapResp["continue"] = continueToken
 	}
-	if pagination, ok := mapResp["pagination"].(map[string]interface{}); ok {
-		if next, ok := pagination["next"].(string); ok {
-			next = continueReg.ReplaceAllString(next, "${1}"+continueToken)
-			next = revisionReg.ReplaceAllString(next, "${1}"+revisionNum)
-			next = testLabelReg.ReplaceAllString(next, "${1}"+fakeTestID)
-			pagination["next"] = next
-			mapResp["pagination"] = pagination
+	if rawPagination, ok := mapResp["pagination"]; ok {
+		if pagination, ok := rawPagination.(map[string]interface{}); ok {
+			if next, ok := pagination["next"].(string); ok {
+				next = continueReg.ReplaceAllString(next, "${1}"+continueToken)
+				next = revisionReg.ReplaceAllString(next, "${1}"+revisionNum)
+				next = testLabelReg.ReplaceAllString(next, "${1}"+fakeTestID)
+				pagination["next"] = next
+				mapResp["pagination"] = pagination
+			}
 		}
 	}
 	data, ok := mapResp["data"].([]interface{})
@@ -2502,7 +2860,13 @@ func formatJSON(obj *clientv1.SteveCollection) ([]byte, error) {
 			delete(data[i].(map[string]interface{})["metadata"].(map[string]interface{}), "creationTimestamp")
 			delete(data[i].(map[string]interface{})["metadata"].(map[string]interface{}), "managedFields")
 			delete(data[i].(map[string]interface{})["metadata"].(map[string]interface{}), "uid")
-			data[i].(map[string]interface{})["metadata"].(map[string]interface{})["labels"].(map[string]interface{})[steveAPITestLabel] = fakeTestID
+
+			if labels, ok := data[i].(map[string]interface{})["metadata"].(map[string]interface{})["labels"]; ok {
+				labels.(map[string]interface{})[steveAPITestLabel] = fakeTestID
+			}
+			if labels, ok := data[i].(map[string]interface{})["metadata"].(map[string]interface{})["labels"]; ok {
+				labels.(map[string]interface{})[steveAPITestLabel] = fakeTestID
+			}
 			data[i].(map[string]interface{})["metadata"].(map[string]interface{})["resourceVersion"] = "1000"
 		}
 		mapResp["data"] = data
