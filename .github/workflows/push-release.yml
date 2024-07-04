@@ -14,6 +14,8 @@ env:
   CATTLE_KDM_BRANCH: dev-v2.9
   HELM_VERSION_V3: v3.13.3
 jobs:
+  unit-tests:
+    uses: ./.github/workflows/unit-tests.yml
   build-chart:
     runs-on: ubuntu-latest
     steps:
@@ -72,6 +74,7 @@ jobs:
           CLOUDSDK_AUTH_ACCESS_TOKEN=${{ env.GOOGLE_AUTH }} gcloud storage cp /tmp/charts gs://releases.rancher.com/server-charts --recursive --acl allUsers:READER --cache-control "public,no-cache,proxy-revalidate"
   build-server:
     runs-on: ubuntu-latest
+    needs: [unit-tests]
     strategy:
       matrix:
         os: [linux]
@@ -434,7 +437,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh release upload -R ${{ env.REPOSITORY_OWNER }}/rancher ${{ env.TAG }} ./dist/* --clobber
   docker-image-digests:
-    if: github.event_name == 'push' && contains(github.ref, 'tags/') # Only run on push
+    if: github.event_name == 'tag' && contains(github.ref, 'tags/') # Only run on tag
     runs-on: ubuntu-latest
     needs: [create-images-files]
     env:
@@ -457,7 +460,7 @@ jobs:
           mkdir -p /tmp/digests
       - name: Generate Linux Digests
         run: |
-          export LINUX_IMAGES_URL=https://github.com/${{ github.repository_owner }}/rancher/releases/download/${{ env.TAG}}/rancher-images.txt
+          export LINUX_IMAGES_URL=https://github.com/${{ github.repository_owner }}/${{ github.repository }}/releases/download/${{ env.TAG}}/rancher-images.txt
           release generate rancher docker-images-digests \
             --images-url "$LINUX_IMAGES_URL" \
             --output-file /tmp/digests/rancher-images-digests-linux-amd64.txt \
@@ -465,7 +468,7 @@ jobs:
           cp /tmp/digests/rancher-images-digests-linux-amd64.txt /tmp/digests/rancher-images-digests-linux-arm64.txt
       - name: Generate Windows Digests
         run: |
-          export LINUX_IMAGES_URL=https://github.com/${{ github.repository_owner }}/rancher/releases/download/${{ env.TAG}}/rancher-images.txt
+          export LINUX_IMAGES_URL=https://github.com/${{ github.repository_owner }}/${{ github.repository }}/releases/download/${{ env.TAG}}/rancher-images.txt
           release generate rancher docker-images-digests \
             --images-url "$LINUX_IMAGES_URL" \
             --output-file /tmp/digests/rancher-images-digests-windows-ltsc2019.txt \
