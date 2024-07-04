@@ -14,7 +14,7 @@ env:
   SETUP_GO_VERSION: '1.22.*'
 
 jobs:
-  check-changes:
+  run-tests:
     runs-on: ubuntu-latest
 
     steps:
