@@ -234,7 +234,7 @@ var OriginMap = map[string]string{
 	"pushprox-client":                                         "https://github.com/rancher/PushProx",
 	"pushprox-proxy":                                          "https://github.com/rancher/PushProx",
 	"rancher":                                                 "https://github.com/rancher/rancher",
-	"rancher-agent":                                           "https://github.com/rancher/rancher-agent",
+	"rancher-agent":                                           "https://github.com/rancher/rancher",
 	"rancher-csp-adapter":                                     "https://github.com/rancher/csp-adapter",
 	"rancher-webhook":                                         "https://github.com/rancher/webhook",
 	"rke-tools":                                               "https://github.com/rancher/rke-tools",
