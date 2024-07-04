@@ -1,4 +1,5 @@
-FROM registry.suse.com/bci/golang:1.22
+#FROM registry.suse.com/bci/golang:1.22
+FROM registry.suse.com/bci/golang:1.22@sha256:06feaef1d06dec9887ca536bc7f69704e08035372f29c3be546b6f4a2d3f8e36
 
 ARG DAPPER_HOST_ARCH
 ENV HOST_ARCH=${DAPPER_HOST_ARCH} ARCH=${DAPPER_HOST_ARCH}
