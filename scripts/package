@@ -1,5 +1,5 @@
 #!/bin/bash
-set -ex
+set -e
 
 source $(dirname $0)/version
 source $(dirname $0)/export-config
