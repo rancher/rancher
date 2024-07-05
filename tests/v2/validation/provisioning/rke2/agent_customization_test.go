@@ -11,6 +11,7 @@ import (
 	"github.com/rancher/shepherd/extensions/clusters"
 	"github.com/rancher/shepherd/extensions/provisioning"
 	"github.com/rancher/shepherd/extensions/provisioninginput"
+	"github.com/rancher/shepherd/extensions/reports"
 	"github.com/rancher/shepherd/extensions/users"
 	password "github.com/rancher/shepherd/extensions/users/passwordgenerator"
 	"github.com/rancher/shepherd/pkg/config"
@@ -189,7 +190,8 @@ func (r *RKE2AgentCustomizationTestSuite) TestFailureProvisioningRKE2ClusterAgen
 		testClusterConfig := clusters.ConvertConfigToClusterConfig(r.provisioningConfig)
 		testClusterConfig.KubernetesVersion = kubeVersions[0]
 
-		_, err = provisioning.CreateProvisioningCluster(client, *rke2Provider, testClusterConfig, nil)
+		clusterObject, err = provisioning.CreateProvisioningCluster(client, *rke2Provider, testClusterConfig, nil)
+		reports.TimeoutClusterReport(clusterObject, err)
 		require.Error(r.T(), err)
 	}
 }

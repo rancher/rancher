@@ -14,6 +14,7 @@ replace (
 
 	github.com/rancher/rancher/pkg/apis => ./pkg/apis
 	github.com/rancher/rancher/pkg/client => ./pkg/client
+	github.com/rancher/shepherd => github.com/lscalabrini01/shepherd v0.0.0-20240705200636-a86b49c33452
 
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc => go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.42.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp => go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.44.0
@@ -63,7 +64,7 @@ require (
 	github.com/antihax/optional v1.0.0
 	github.com/containers/image/v5 v5.30.0
 	github.com/rancher/rancher/pkg/apis v0.0.0-20240618122559-b9ec494d4f6f
-	github.com/rancher/shepherd v0.0.0-20240628185912-bd372ac2e2e1
+	github.com/rancher/shepherd v0.0.0-20240705200636-a86b49c33452
 	go.qase.io/client v0.0.0-20231114201952-65195ec001fa
 )
 

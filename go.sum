@@ -1573,6 +1573,8 @@ github.com/lib/pq v1.10.9 h1:YXG7RB+JIjhP29X+OtkiDnYaXQwpS4JEWq7dtCCRUEw=
 github.com/lib/pq v1.10.9/go.mod h1:AlVN5x4E4T544tWzH6hKfbfQvm3HdbOxrmggDNAPY9o=
 github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de h1:9TO3cAIGXtEhnIaL+V+BEER86oLrvS+kWobKpbJuye0=
 github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de/go.mod h1:zAbeS9B/r2mtpb6U+EI2rYA5OAXxsYw6wTamcNW+zcE=
+github.com/lscalabrini01/shepherd v0.0.0-20240705200636-a86b49c33452 h1:pvcZuD1JhIo2IPpONRoZDK1WzHF2vp1A73MQioaiT6I=
+github.com/lscalabrini01/shepherd v0.0.0-20240705200636-a86b49c33452/go.mod h1:u9MIIECvfn+aLZPYi6+JPnH2qmgE88NIJGQ2UwVsC3w=
 github.com/lyft/protoc-gen-star v0.6.0/go.mod h1:TGAoBVkt8w7MPG72TrKIu85MIdXwDuzJYeZuUPFPNwA=
 github.com/lyft/protoc-gen-star v0.6.1/go.mod h1:TGAoBVkt8w7MPG72TrKIu85MIdXwDuzJYeZuUPFPNwA=
 github.com/lyft/protoc-gen-star/v2 v2.0.1/go.mod h1:RcCdONR2ScXaYnQC5tUzxzlpA3WVYF7/opLeUgcQs/o=
@@ -1885,8 +1887,6 @@ github.com/rancher/remotedialer v0.3.2 h1:kstZbRwPS5gPWpGg8VjEHT2poHtArs+Fc317YM
 github.com/rancher/remotedialer v0.3.2/go.mod h1:Ys004RpJuTLSm+k4aYUCoFiOOad37ubYev3TkOFg/5w=
 github.com/rancher/rke v1.6.0-rc8 h1:KBqmmHSTLAksyw6NVS8eezd+uqb1Q8CQiJlE1IuSzjw=
 github.com/rancher/rke v1.6.0-rc8/go.mod h1:5xRbf3L8PxqJRhABjYRfaBqbpVqAnqyH3maUNQEuwvk=
-github.com/rancher/shepherd v0.0.0-20240628185912-bd372ac2e2e1 h1:JifxjqwelIDn2vx2gf857DBQHFnjaVhvWK4+yy4QQH4=
-github.com/rancher/shepherd v0.0.0-20240628185912-bd372ac2e2e1/go.mod h1:u9MIIECvfn+aLZPYi6+JPnH2qmgE88NIJGQ2UwVsC3w=
 github.com/rancher/steve v0.0.0-20240617145219-9ac9be9c0e21 h1:nS4q/uzKNlyK7qUh2oOKYwGfQ+aA5pLobBE07UTOuXk=
 github.com/rancher/steve v0.0.0-20240617145219-9ac9be9c0e21/go.mod h1:fFT7pNgAQA+ZPVwT2NqO6B6bLuOmReHpCKxkg0pKUqE=
 github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007 h1:ru+mqGnxMmKeU0Q3XIDxkARvInDIqT1hH2amTcsjxI4=
