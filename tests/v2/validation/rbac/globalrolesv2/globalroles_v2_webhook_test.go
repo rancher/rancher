@@ -59,7 +59,7 @@ func (grw *GlobalRolesV2WebhookTestSuite) SetupSuite() {
 
 func getCRTBFromGRBOwner(t *testing.T, client *rancher.Client, user *management.User, expectedCrtbCount int) (*v3.ClusterRoleTemplateBindingList, error, string) {
 	log.Info("Verify that the global role binding is created for the user.")
-	grbOwner, err := getGlobalRoleBindingForUser(client, user.ID)
+	grbOwner, err := getGlobalRoleBindingForUserWrangler(client, user.ID)
 	require.NoError(t, err)
 	require.NotEmpty(t, grbOwner, "Global Role Binding not found for the user")
 

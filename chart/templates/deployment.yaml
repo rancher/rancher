@@ -140,6 +140,10 @@ spec:
               name: "bootstrap-secret"
               key: "bootstrapPassword"
 {{- end }}
+{{- if .Values.agentTLSMode }}
+        - name: CATTLE_AGENT_TLS_MODE
+          value: "{{ .Values.agentTLSMode }}"
+{{- end }}
 {{- if .Values.extraEnv }}
 {{ toYaml .Values.extraEnv | indent 8}}
 {{- end }}
