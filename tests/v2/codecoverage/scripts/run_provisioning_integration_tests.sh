@@ -52,7 +52,7 @@ curl -sLf https://github.com/rancher/system-agent/releases/download/${CATTLE_SYS
 echo Running provisioning-tests $RUNARG
 
 export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
-go test $RUNARG -v -failfast -timeout 60m ./tests/v2prov/tests/... || {
+CGO_ENABLED=0 go test $RUNARG -v -failfast -timeout 60m ./tests/v2prov/tests/... || {
     echo -e "-----RANCHER-LOG-DUMP-START-----"
     cat /tmp/rancher.log | gzip | base64 -w 0
     echo -e "\n-----RANCHER-LOG-DUMP-END-----"
