@@ -1,6 +1,7 @@
 package rbac
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -94,7 +95,10 @@ func (c *grbHandler) sync(key string, obj *apisv3.GlobalRoleBinding) (runtime.Ob
 
 	// ignore deleted resources (and those pending final removal)
 	if obj == nil || obj.DeletionTimestamp != nil {
-		// if not nil - set as terminating ? ignore if already set ?
+		if obj != nil {
+			// Mark as in deletion
+			return obj, c.setGRBAsTerminating(obj)
+		}
 		return obj, nil
 	}
 
@@ -109,9 +113,13 @@ func (c *grbHandler) sync(key string, obj *apisv3.GlobalRoleBinding) (runtime.Ob
 	}
 
 	logrus.Debugf("GRB %v is an admin role", obj.GlobalRoleName)
-	// create|update admin roles
 
-	return obj, c.ensureClusterAdminBinding(obj)
+	// status for create|update of admin roles
+	return obj, errors.Join(
+		c.setGRBAsInProgress(obj),
+		c.ensureClusterAdminBinding(obj),
+		c.setGRBAsCompleted(obj),
+	)
 }
 
 // ensureClusterAdminBinding creates a ClusterRoleBinding for GRB subject to
