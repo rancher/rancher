@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/shepherd/extensions/clusters/gke"
 	"github.com/rancher/shepherd/extensions/provisioning"
 	"github.com/rancher/shepherd/extensions/provisioninginput"
+	"github.com/rancher/shepherd/extensions/reports"
 	"github.com/rancher/shepherd/extensions/users"
 	password "github.com/rancher/shepherd/extensions/users/passwordgenerator"
 	"github.com/rancher/shepherd/pkg/config"
@@ -73,6 +74,7 @@ func (h *HostedGKEClusterProvisioningTestSuite) TestProvisioningHostedGKE() {
 		var gkeClusterConfig gke.ClusterConfig
 		config.LoadConfig(gke.GKEClusterConfigConfigurationFileKey, &gkeClusterConfig)
 		clusterObject, err := provisioning.CreateProvisioningGKEHostedCluster(tt.client, gkeClusterConfig)
+		reports.TimeoutRKEReport(clusterObject, err)
 		require.NoError(h.T(), err)
 
 		provisioning.VerifyHostedCluster(h.T(), tt.client, clusterObject)
