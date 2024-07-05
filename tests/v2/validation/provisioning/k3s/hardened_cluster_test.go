@@ -15,6 +15,7 @@ import (
 	"github.com/rancher/shepherd/extensions/projects"
 	"github.com/rancher/shepherd/extensions/provisioning"
 	"github.com/rancher/shepherd/extensions/provisioninginput"
+	"github.com/rancher/shepherd/extensions/reports"
 	"github.com/rancher/shepherd/extensions/users"
 	password "github.com/rancher/shepherd/extensions/users/passwordgenerator"
 	"github.com/rancher/shepherd/pkg/config"
@@ -100,17 +101,20 @@ func (c *HardenedK3SClusterProvisioningTestSuite) TestProvisioningK3SHardenedClu
 			testConfig.KubernetesVersion = c.provisioningConfig.K3SKubernetesVersions[0]
 
 			clusterObject, err := provisioning.CreateProvisioningCustomCluster(tt.client, &externalNodeProvider, testConfig)
+			reports.TimeoutClusterReport(clusterObject, err)
 			require.NoError(c.T(), err)
 
 			provisioning.VerifyCluster(c.T(), tt.client, testConfig, clusterObject)
 
 			cluster, err := clusters.NewClusterMeta(tt.client, clusterObject.Name)
+			reports.TimeoutClusterReport(clusterObject, err)
 			require.NoError(c.T(), err)
 
 			latestCISBenchmarkVersion, err := tt.client.Catalog.GetLatestChartVersion(charts.CISBenchmarkName, catalog.RancherChartRepo)
 			require.NoError(c.T(), err)
 
 			project, err := projects.GetProjectByName(tt.client, cluster.ID, cis.System)
+			reports.TimeoutClusterReport(clusterObject, err)
 			require.NoError(c.T(), err)
 
 			c.project = project
