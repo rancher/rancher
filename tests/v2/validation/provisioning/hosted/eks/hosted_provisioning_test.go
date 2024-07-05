@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/shepherd/extensions/clusters/eks"
 	"github.com/rancher/shepherd/extensions/provisioning"
 	"github.com/rancher/shepherd/extensions/provisioninginput"
+	"github.com/rancher/shepherd/extensions/reports"
 	"github.com/rancher/shepherd/extensions/users"
 	password "github.com/rancher/shepherd/extensions/users/passwordgenerator"
 	"github.com/rancher/shepherd/pkg/config"
@@ -74,6 +75,7 @@ func (h *HostedEKSClusterProvisioningTestSuite) TestProvisioningHostedEKS() {
 		config.LoadConfig(eks.EKSClusterConfigConfigurationFileKey, &eksClusterConfig)
 
 		clusterObject, err := provisioning.CreateProvisioningEKSHostedCluster(tt.client, eksClusterConfig)
+		reports.TimeoutRKEReport(clusterObject, err)
 		require.NoError(h.T(), err)
 
 		provisioning.VerifyHostedCluster(h.T(), tt.client, clusterObject)
