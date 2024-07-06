@@ -1,8 +1,28 @@
-name: Running Test Script
+name: Unit and Integration Tests
 on:
   workflow_dispatch:
-
+  push:
+    branches:
+      - master
+      - release/v*
+      - refs/tags/v*
+    tags:
+      - v*
+  pull_request:
+    branches:
+      - master
+      - release/v*
 jobs:
+  unit-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run unit tests
+        run: go test -cover -tags=test ./pkg/...
+
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 60
