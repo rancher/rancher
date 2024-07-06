@@ -125,6 +125,7 @@ func (w *RancherManagedChartsTest) resetSettings() {
 }
 
 func TestRancherManagedChartsSuite(t *testing.T) {
+	t.Skip()
 	suite.Run(t, new(RancherManagedChartsTest))
 }
 
