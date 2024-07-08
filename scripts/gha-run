@@ -6,7 +6,7 @@ echo Starting rancher server
 echo "scripts/run"
 
 source $(dirname $0)/version
-source $(dirname $0)/export-config
+
 cd scripts
 source ./package-env
 cd ..
