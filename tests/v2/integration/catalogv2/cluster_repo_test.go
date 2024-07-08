@@ -27,7 +27,7 @@ const (
 )
 
 var (
-	PollInterval = time.Duration(100 * time.Millisecond)
+	PollInterval = time.Duration(500 * time.Millisecond)
 	PollTimeout  = time.Duration(5 * time.Minute)
 )
 
