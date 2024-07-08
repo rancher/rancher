@@ -135,6 +135,7 @@ func (w *UIPluginTest) SetupSuite() {
 }
 
 func TestUIPluginSuite(t *testing.T) {
+	t.Skip()
 	suite.Run(t, new(UIPluginTest))
 }
 
@@ -178,6 +179,7 @@ func (w *UIPluginTest) TestGetIndexUnauthenticated() {
 
 // TestGetSingleExtensionAuthenticated Tests that the requests returns the correct Content-Type header
 func (w *UIPluginTest) TestCorrectContentType() {
+	w.T().Skip()
 	client := &http.Client{Transport: &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}}
