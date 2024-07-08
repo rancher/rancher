@@ -28,16 +28,16 @@ replace (
 )
 
 require (
-	github.com/rancher/aks-operator v1.2.3-rc.2
-	github.com/rancher/eks-operator v1.3.2
+	github.com/rancher/aks-operator v1.2.3-rc.4
+	github.com/rancher/eks-operator v1.3.3-rc.2
 	github.com/rancher/fleet/pkg/apis v0.9.1-rc.2.0.20240213164401-2c6b1019687c
-	github.com/rancher/gke-operator v1.2.2
+	github.com/rancher/gke-operator v1.2.3-rc.2
 	github.com/rancher/norman v0.0.0-20240206180703-6eda4bc94b4c
 	github.com/rancher/rke v1.5.11-rc4
 	github.com/rancher/wrangler/v2 v2.1.4
 	github.com/sirupsen/logrus v1.9.3
-	k8s.io/api v0.28.8
-	k8s.io/apimachinery v0.28.8
+	k8s.io/api v0.28.9
+	k8s.io/apimachinery v0.28.9
 	sigs.k8s.io/cluster-api v1.5.5
 )
 
@@ -77,27 +77,28 @@ require (
 	github.com/prometheus/procfs v0.10.1 // indirect
 	github.com/rancher/lasso v0.0.0-20240123150939-7055397d6dfa // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
-	golang.org/x/net v0.26.0 // indirect
-	golang.org/x/oauth2 v0.20.0 // indirect
-	golang.org/x/sys v0.21.0 // indirect
-	golang.org/x/term v0.21.0 // indirect
+	golang.org/x/exp v0.0.0-20220722155223-a9213eeb770e // indirect
+	golang.org/x/net v0.27.0 // indirect
+	golang.org/x/oauth2 v0.21.0 // indirect
+	golang.org/x/sys v0.22.0 // indirect
+	golang.org/x/term v0.22.0 // indirect
 	golang.org/x/text v0.16.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
-	gomodules.xyz/jsonpatch/v2 v2.3.0 // indirect
+	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
 	google.golang.org/protobuf v1.33.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	k8s.io/apiextensions-apiserver v0.28.8 // indirect
-	k8s.io/apiserver v0.28.8 // indirect
+	k8s.io/apiextensions-apiserver v0.28.9 // indirect
+	k8s.io/apiserver v0.28.9 // indirect
 	k8s.io/client-go v12.0.0+incompatible // indirect
-	k8s.io/component-base v0.28.8 // indirect
+	k8s.io/component-base v0.28.9 // indirect
 	k8s.io/klog/v2 v2.100.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20230717233707-2695361300d9 // indirect
 	k8s.io/kubernetes v1.28.8 // indirect
 	k8s.io/utils v0.0.0-20230505201702-9f6742963106 // indirect
 	sigs.k8s.io/cli-utils v0.28.0 // indirect
-	sigs.k8s.io/controller-runtime v0.15.3 // indirect
+	sigs.k8s.io/controller-runtime v0.16.6 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
 	sigs.k8s.io/yaml v1.4.0 // indirect
