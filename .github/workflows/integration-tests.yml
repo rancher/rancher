@@ -74,6 +74,49 @@ jobs:
           wget -q https://github.com/mikefarah/yq/releases/download/${{ env.YQ_VERSION }}/yq_linux_${{ env.DAPPER_HOST_ARCH }}.tar.gz -O - | tar xz
           sudo mv yq_linux_${{ env.DAPPER_HOST_ARCH }} /usr/bin/yq
 
+      ## Helm Setup start
+      - name: Uninstall Helm
+        run: |
+          sudo rm -rf /usr/local/bin/helm /usr/bin/rancher-helm /usr/bin/rancher-tiller ~/.helm /usr/local/bin/helm_v3 /usr/local/bin/tiller
+
+      - name: Set Helm 2 URL
+        run: echo "HELM_URL_V2=https://github.com/rancher/helm/releases/download/${{ env.CATTLE_HELM_VERSION }}/rancher-helm" >> $GITHUB_ENV
+
+      - name: Set Tiller URL
+        run: echo "TILLER_URL=https://github.com/rancher/helm/releases/download/${{ env.CATTLE_HELM_VERSION }}/rancher-tiller" >> $GITHUB_ENV
+
+      - name: Download Rancher Helm
+        run: sudo curl -sLf ${{ env.HELM_URL_V2 }} -o /usr/bin/rancher-helm-v2
+
+      - name: Download Rancher Tiller
+        run: sudo curl -sLf ${{ env.TILLER_URL }} -o /usr/bin/rancher-tiller
+
+      - name: Set permissions for Helm and Tiller
+        run: sudo chmod +x /usr/bin/rancher-helm-v2 /usr/bin/rancher-tiller
+
+      - name: Create symlink for Helm
+        run: sudo ln -s /usr/bin/rancher-helm-v2 /usr/bin/helm
+
+      - name: Create symlink for Tiller
+        run: sudo ln -s /usr/bin/rancher-tiller /usr/bin/tiller
+
+      - name: Initialize Helm
+        run: helm init -c --stable-repo-url https://charts.helm.sh/stable/
+
+      - name: Set Helm 3 URL
+        run: echo "HELM_URL_V3=https://get.helm.sh/helm-${{ env.HELM_VERSION }}-linux-${{ env.DAPPER_HOST_ARCH }}.tar.gz" >> $GITHUB_ENV
+
+      - name: Create temporary directory for Helm 3
+        run: sudo mkdir /usr/tmp
+
+      - name: Download and extract Helm 3
+        run: curl ${{ env.HELM_URL_V3 }} | sudo tar xvzf - --strip-components=1 -C /usr/tmp/
+
+      - name: Move Helm 3 binary
+        run: sudo mv /usr/tmp/helm /usr/bin/helm_v3
+
+      ## Helm Setup end
+
       - name: Install kustomize
         run: |
           KUSTOMIZE_URL=https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/${{ env.KUSTOMIZE_VERSION }}/kustomize_${{ env.KUSTOMIZE_VERSION }}_linux_${{ env.DAPPER_HOST_ARCH }}.tar.gz
