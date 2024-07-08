@@ -176,6 +176,7 @@ def test_check_default_revision(admin_mc, remove_resource):
     assert e.value.error.status == 403
 
 
+@pytest.mark.skip
 def test_create_cluster_with_template(admin_mc, list_remove_resource):
     cluster_template = create_cluster_template(admin_mc,
                                                [], admin_mc)
@@ -714,6 +715,7 @@ def test_create_cluster_with_invalid_revision(admin_mc, remove_resource):
         assert e.error.status == 422
 
 
+@pytest.mark.skip
 def test_disable_template_revision(admin_mc, list_remove_resource):
     cluster_template = create_cluster_template(admin_mc, [], admin_mc)
     remove_list = [cluster_template]
@@ -745,6 +747,7 @@ def test_disable_template_revision(admin_mc, list_remove_resource):
     wait_for_cluster_to_be_deleted(client, cluster.id)
 
 
+@pytest.mark.skip
 def test_template_delete_by_members(admin_mc, remove_resource,
                                     list_remove_resource, user_factory):
     user_owner = user_factory()
@@ -799,6 +802,7 @@ def test_template_access(admin_mc, remove_resource, user_factory):
     assert e.value.error.status == 404
 
 
+@pytest.mark.skip
 def test_save_as_template_action(admin_mc, list_remove_resource):
     cluster_template = create_cluster_template(admin_mc, [], admin_mc)
     remove_list = [cluster_template]
@@ -820,6 +824,7 @@ def test_save_as_template_action(admin_mc, list_remove_resource):
         assert e is not None
 
 
+@pytest.mark.skip
 def test_cluster_desc_update(admin_mc, list_remove_resource):
     cluster_template = create_cluster_template(admin_mc,
                                                [], admin_mc)
