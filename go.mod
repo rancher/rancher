@@ -114,7 +114,7 @@ require (
 	github.com/rancher/dynamiclistener v0.4.0
 	github.com/rancher/eks-operator v1.3.2
 	github.com/rancher/fleet/pkg/apis v0.9.1-rc.2.0.20240213164401-2c6b1019687c
-	github.com/rancher/gke-operator v1.2.2
+	github.com/rancher/gke-operator v1.2.3-rc.2
 	github.com/rancher/kubernetes-provider-detector v0.1.5
 	github.com/rancher/lasso v0.0.0-20240123150939-7055397d6dfa
 	github.com/rancher/machine v0.15.0-rancher112
@@ -132,10 +132,10 @@ require (
 	github.com/urfave/cli v1.22.14
 	github.com/vishvananda/netlink v1.2.1-beta.2
 	github.com/vmware/govmomi v0.30.6
-	golang.org/x/crypto v0.24.0
+	golang.org/x/crypto v0.25.0
 	golang.org/x/mod v0.17.0
-	golang.org/x/net v0.26.0
-	golang.org/x/oauth2 v0.20.0
+	golang.org/x/net v0.27.0
+	golang.org/x/oauth2 v0.21.0
 	golang.org/x/sync v0.7.0
 	golang.org/x/text v0.16.0
 	golang.org/x/tools v0.21.1-0.20240508182429-e35e4ccd0d2d // indirect
@@ -145,10 +145,10 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 	gopkg.in/yaml.v2 v2.4.0
 	helm.sh/helm/v3 v3.9.0
-	k8s.io/api v0.28.8
-	k8s.io/apiextensions-apiserver v0.28.8
-	k8s.io/apimachinery v0.28.8
-	k8s.io/apiserver v0.28.8
+	k8s.io/api v0.28.9
+	k8s.io/apiextensions-apiserver v0.28.9
+	k8s.io/apimachinery v0.28.9
+	k8s.io/apiserver v0.28.9
 	k8s.io/cli-runtime v0.28.6
 	k8s.io/client-go v12.0.0+incompatible
 	k8s.io/gengo v0.0.0-20230306165830-ab3349d207d4
@@ -159,7 +159,7 @@ require (
 	k8s.io/utils v0.0.0-20230505201702-9f6742963106
 	sigs.k8s.io/aws-iam-authenticator v0.5.9
 	sigs.k8s.io/cluster-api v1.5.5
-	sigs.k8s.io/controller-runtime v0.15.3
+	sigs.k8s.io/controller-runtime v0.16.6
 	sigs.k8s.io/yaml v1.4.0
 )
 
@@ -168,7 +168,7 @@ require (
 	github.com/containers/image/v5 v5.25.0
 	github.com/google/gnostic-models v0.6.8
 	github.com/rancher/cis-operator v1.0.11
-	github.com/rancher/rancher/pkg/apis v0.0.0-20240213233515-935d309ebad4
+	github.com/rancher/rancher/pkg/apis v0.0.0-20240613212755-3021cf92ff9f
 	github.com/rancher/shepherd v0.0.0-20240628185929-7dadbb861c35
 	go.qase.io/client v0.0.0-20231114201952-65195ec001fa
 )
@@ -241,7 +241,7 @@ require (
 	gopkg.in/go-jose/go-jose.v2 v2.6.1 // indirect
 	k8s.io/cloud-provider v0.27.4 // indirect
 	k8s.io/controller-manager v0.28.6 // indirect
-	k8s.io/kms v0.28.6 // indirect
+	k8s.io/kms v0.28.9 // indirect
 	k8s.io/kubelet v0.27.4 // indirect
 	k8s.io/pod-security-admission v0.28.6 // indirect
 )
@@ -394,13 +394,12 @@ require (
 	go.opentelemetry.io/otel/trace v1.14.0 // indirect
 	go.opentelemetry.io/proto/otlp v0.19.0 // indirect
 	go.starlark.net v0.0.0-20230525235612-a134d8f9ddca // indirect
-	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	go.uber.org/zap v1.24.0 // indirect
-	golang.org/x/sys v0.21.0 // indirect
-	golang.org/x/term v0.21.0 // indirect
+	go.uber.org/zap v1.25.0 // indirect
+	golang.org/x/sys v0.22.0 // indirect
+	golang.org/x/term v0.22.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
-	gomodules.xyz/jsonpatch/v2 v2.3.0 // indirect
+	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
 	google.golang.org/genproto v0.0.0-20231106174013-bbf56f31fb17 // indirect
 	google.golang.org/protobuf v1.33.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
@@ -408,8 +407,8 @@ require (
 	gopkg.in/square/go-jose.v2 v2.6.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/cluster-bootstrap v0.27.2 // indirect
-	k8s.io/code-generator v0.28.8 // indirect
-	k8s.io/component-base v0.28.8 // indirect
+	k8s.io/code-generator v0.28.9 // indirect
+	k8s.io/component-base v0.28.9 // indirect
 	k8s.io/component-helpers v0.28.6 // indirect
 	k8s.io/klog v1.0.0 // indirect
 	k8s.io/klog/v2 v2.100.1 // indirect
