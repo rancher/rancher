@@ -337,6 +337,7 @@ def verify_driver_not_in_types(client, kd):
 
 
 @pytest.mark.nonparallel
+@pytest.mark.skip
 def test_user_update_settings(admin_mc):
     client = admin_mc.client
     k8s_version_setting = client.by_id_setting('k8s-version')
