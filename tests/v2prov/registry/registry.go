@@ -1,6 +1,7 @@
 package registry
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"sync"
@@ -203,23 +204,29 @@ func createSharedObjects(clients *clients.Clients, podName string, pullThrough b
 	cacheLock.Lock()
 	defer cacheLock.Unlock()
 
+	fmt.Printf("HITHERE createRegistrySecret")
 	registrySecret, err := createRegistrySecret(clients, podName)
 	if err != nil {
 		return nil, err
 	}
 
+	fmt.Printf("HITHERE createOrGetPod")
 	pod, err := createOrGetPod(clients, podName, pullThrough)
 	if err != nil {
 		return nil, err
 	}
 
+	fmt.Printf("HITHERE createService")
 	err = createService(clients, podName)
 	if err != nil {
 		return nil, err
 	}
 
+	fmt.Printf("HITHERE About to wait for sharedobject")
 	err = wait.Object(clients.Ctx, clients.Core.Pod().Watch, pod, func(obj runtime.Object) (bool, error) {
 		pod := obj.(*corev1.Pod)
+		bytes, _ := json.Marshal(pod)
+		fmt.Printf("HITHERE The registry pod %s\n", string(bytes))
 		return pod.Status.PodIP != "" && pod.Status.Phase == corev1.PodRunning, nil
 	})
 	return registrySecret, err
