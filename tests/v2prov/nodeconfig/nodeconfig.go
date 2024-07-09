@@ -2,6 +2,8 @@ package nodeconfig
 
 import (
 	"encoding/json"
+	"fmt"
+	"os"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/tests/v2prov/clients"
@@ -64,13 +66,19 @@ func NewPodConfig(clients *clients.Clients, namespace string) (*corev1.ObjectRef
 		return nil, err
 	}
 
+	fmt.Println("HITHERE", "probably waiting here")
+	fmt.Fprintf(os.Stderr, "HITHERE", "probably waiting here")
 	err = wait.ClusterScopedList(clients.Ctx, clients.CRD.CustomResourceDefinition().Watch, func(obj runtime.Object) (bool, error) {
+		fmt.Println("HITHERE", "is it true?")
+		fmt.Fprintf(os.Stderr, "HITHERE", "is it true?")
 		crd := obj.(*v1.CustomResourceDefinition)
 		return crd.Name == "podconfigs.rke-machine-config.cattle.io" && condition.Cond("Established").IsTrue(crd), nil
 	})
 	if err != nil {
 		return nil, err
 	}
+	fmt.Println("HITHERE", "done waiting")
+	fmt.Fprintf(os.Stderr, "HITHERE", "done waiting")
 
 	podConfig := &unstructured.Unstructured{}
 	podConfig.SetAPIVersion("rke-machine-config.cattle.io/v1")
