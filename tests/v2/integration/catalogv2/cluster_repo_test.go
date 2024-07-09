@@ -155,7 +155,7 @@ func StartRegistry() (*httptest.Server, error) {
 	// Bind the server to a specific IP address (your local machine's IP)
 	listener, err := net.Listen("tcp", fmt.Sprintf("%s:4050", ip.String()))
 	if err != nil {
-		log.Fatalf("Failed to bind to local IP: %v", err)
+		return nil, err
 	}
 	ts.Listener = listener
 	ts.Start()
