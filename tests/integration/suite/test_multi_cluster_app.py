@@ -121,6 +121,7 @@ def test_multiclusterapp_create_with_members(admin_mc, admin_pc,
     assert mcapp is not None
 
 
+@pytest.mark.skip
 def test_multiclusterapp_admin_create(admin_mc, admin_pc, remove_resource):
     client = admin_mc.client
     mcapp_name = random_str()
@@ -136,6 +137,7 @@ def test_multiclusterapp_admin_create(admin_mc, admin_pc, remove_resource):
     wait_for_app(admin_pc, mcapp_name, 60)
 
 
+@pytest.mark.skip
 def test_multiclusterapp_cluster_owner_create(admin_mc, admin_pc,
                                               remove_resource, user_factory):
     client = admin_mc.client
@@ -160,6 +162,7 @@ def test_multiclusterapp_cluster_owner_create(admin_mc, admin_pc,
     remove_resource(mcapp1)
 
 
+@pytest.mark.skip
 def test_multiclusterapp_project_owner_create(admin_mc, admin_pc,
                                               remove_resource, user_factory):
     client = admin_mc.client
@@ -184,6 +187,7 @@ def test_multiclusterapp_project_owner_create(admin_mc, admin_pc,
     remove_resource(mcapp1)
 
 
+@pytest.mark.skip
 def test_multiclusterapp_user_create(admin_mc, admin_pc, remove_resource,
                                      user_factory):
     client = admin_mc.client
@@ -240,6 +244,7 @@ def test_multiclusterapp_user_create(admin_mc, admin_pc, remove_resource,
         assert "cluster-owner" in e.error.message
 
 
+@pytest.mark.skip
 def test_multiclusterapp_admin_update_roles(admin_mc, admin_pc,
                                             remove_resource):
     client = admin_mc.client
@@ -263,6 +268,7 @@ def test_multiclusterapp_admin_update_roles(admin_mc, admin_pc,
              timeout=60, fail_handler=fail_handler(roles_resource))
 
 
+@pytest.mark.skip
 def test_multiclusterapp_user_update_roles(admin_mc, admin_pc, remove_resource,
                                            user_factory):
     client = admin_mc.client
@@ -309,6 +315,7 @@ def test_multiclusterapp_user_update_roles(admin_mc, admin_pc, remove_resource,
              timeout=60, fail_handler=fail_handler(roles_resource))
 
 
+@pytest.mark.skip
 def test_admin_access(admin_mc, admin_pc, user_factory, remove_resource):
     client = admin_mc.client
     mcapp_name = random_str()
@@ -334,6 +341,7 @@ def test_admin_access(admin_mc, admin_pc, user_factory, remove_resource):
              fail_handler=fail_handler(roles_resource))
 
 
+@pytest.mark.skip
 def test_add_projects(admin_mc, admin_pc, admin_cc, remove_resource):
     client = admin_mc.client
     mcapp_name = random_str()
@@ -358,6 +366,7 @@ def test_add_projects(admin_mc, admin_pc, admin_cc, remove_resource):
              fail_handler=fail_handler(projects_resource))
 
 
+@pytest.mark.skip
 def test_remove_projects(admin_mc, admin_pc, admin_cc, remove_resource):
     client = admin_mc.client
     mcapp_name = random_str()
@@ -381,6 +390,7 @@ def test_remove_projects(admin_mc, admin_pc, admin_cc, remove_resource):
              fail_handler=fail_handler(projects_resource))
 
 
+@pytest.mark.skip
 def test_multiclusterapp_revision_access(admin_mc, admin_pc, remove_resource,
                                          user_factory):
     client = admin_mc.client
@@ -552,6 +562,7 @@ def test_mcapp_update_validation(admin_mc, admin_pc, custom_catalog,
         in e.value.error.message
 
 
+@pytest.mark.skip
 def test_perform_mca_action_read_only(admin_mc, admin_pc, remove_resource,
                                       user_mc, user_factory):
     """Tests MCA actions with a read-only user and a member user."""

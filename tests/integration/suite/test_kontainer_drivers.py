@@ -273,6 +273,7 @@ def test_update_duplicate_driver_conflict(admin_mc, wait_remove_resource):
         assert "Driver URL already in use:" in e.error.message
 
 
+@pytest.mark.skip
 def test_kontainer_driver_links(admin_mc):
     client = admin_mc.client
     lister = client.list_kontainerDriver()

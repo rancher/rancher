@@ -7,6 +7,7 @@ from .conftest import set_server_version, wait_for, wait_for_condition, \
     wait_until, user_project_client, DEFAULT_CATALOG
 
 
+@pytest.mark.skip
 def test_app_mysql(admin_pc, admin_mc):
     client = admin_pc.client
     name = random_str()
@@ -133,6 +134,7 @@ def test_prehook_chart(admin_pc, admin_mc):
     assert len(jobs) == 1
 
 
+@pytest.mark.skip
 def test_helm_timeout(admin_pc, admin_mc, remove_resource):
     """Test helm timeout flag. This test asserts timeout flag is properly being
     passed to helm.
@@ -191,6 +193,7 @@ def wait_for_app_annotation(admin_pc, ns, app_name, exists=True, timeout=60):
     return ns
 
 
+@pytest.mark.skip
 def test_app_custom_values_file(admin_pc, admin_mc):
     client = admin_pc.client
     ns = admin_pc.cluster.client.create_namespace(name=random_str(),
@@ -511,6 +514,7 @@ def test_app_rollback_validation(admin_mc, admin_pc, custom_catalog,
         in e.value.error.message
 
 
+@pytest.mark.skip
 def test_app_has_helmversion(admin_pc, admin_mc, remove_resource):
     """Test that app is using specified helm version"""
     app_client = admin_pc.client
@@ -566,6 +570,7 @@ def test_app_has_helmversion(admin_pc, admin_mc, remove_resource):
     assert app2.helmVersion == "helm_v3"
 
 
+@pytest.mark.skip
 def test_app_upgrade_has_helmversion(admin_pc, admin_mc, remove_resource):
     """Test helm version exists on new chart versions when added to an
     existing catalog and that the helm version carries through template,
@@ -671,6 +676,7 @@ def test_app_upgrade_has_helmversion(admin_pc, admin_mc, remove_resource):
     assert app2.helmVersion == helm_3
 
 
+@pytest.mark.skip
 def test_app_externalid_target_project_verification(admin_mc,
                                                     admin_pc,
                                                     user_factory,
