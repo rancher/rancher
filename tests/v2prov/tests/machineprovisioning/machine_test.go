@@ -452,6 +452,7 @@ func Test_Provisioning_MP_FourNodesServerAndWorkerRolesWithDelete(t *testing.T) 
 }
 
 func Test_Provisioning_MP_Drain(t *testing.T) {
+	fmt.Println("HITHERE", "clients New")
 	clients, err := clients.New()
 	if err != nil {
 		t.Fatal(err)
@@ -483,6 +484,7 @@ func Test_Provisioning_MP_Drain(t *testing.T) {
 		},
 	}
 
+	fmt.Println("HITHERE", "cluster.New")
 	c, err := cluster.New(clients, &provisioningv1api.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-drain",
@@ -512,11 +514,13 @@ func Test_Provisioning_MP_Drain(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	fmt.Println("HITHERE", "WaitForCreate")
 	c, err = cluster.WaitForCreate(clients, c)
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	fmt.Println("HITHERE", "cluster.Machines")
 	machines, err := cluster.Machines(clients, c)
 	if err != nil {
 		t.Fatal(err)
@@ -526,6 +530,7 @@ func Test_Provisioning_MP_Drain(t *testing.T) {
 
 	for {
 		c.Spec.RKEConfig.ProvisionGeneration = 1
+		fmt.Println("HITHERE", "Cluster Update")
 		newC, err := clients.Provisioning.Cluster().Update(c)
 		if apierror.IsConflict(err) {
 			c, _ = clients.Provisioning.Cluster().Get(c.Namespace, c.Name, metav1.GetOptions{})
@@ -549,6 +554,7 @@ func Test_Provisioning_MP_Drain(t *testing.T) {
 			return err
 		})
 		return wait.Object(clients.Ctx, clients.Core.Secret().Watch, secret, func(obj runtime.Object) (bool, error) {
+			fmt.Println("HITHERE", "In wait object")
 			secret := obj.(*corev1.Secret)
 			if secret.Annotations[capr.PreDrainAnnotation] != "" &&
 				secret.Annotations[capr.PreDrainAnnotation] != secret.Annotations["test.io/pre-hook1"] {
@@ -574,21 +580,26 @@ func Test_Provisioning_MP_Drain(t *testing.T) {
 
 	errgroup, _ := errgroup2.WithContext(clients.Ctx)
 	errgroup.Go(func() error {
+		fmt.Println("HITHERE", "Run hooks 0")
 		return runHooks(&machines.Items[0])
 	})
 	errgroup.Go(func() error {
+		fmt.Println("HITHERE", "Run hooks 1")
 		return runHooks(&machines.Items[1])
 	})
+	fmt.Println("HITHERE", "Wait")
 	if err := errgroup.Wait(); err != nil {
 		t.Fatal(err)
 	}
 
+	fmt.Println("HITHERE", "WaitForCreate again")
 	c, err = cluster.WaitForCreate(clients, c)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	assert.Equal(t, int32(2), atomic.LoadInt32(&doneHooks))
+	fmt.Println("HITHERE", "EnsureMinimal")
 	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
 	assert.NoError(t, err)
 }
