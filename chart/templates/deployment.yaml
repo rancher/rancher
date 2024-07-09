@@ -222,10 +222,19 @@ spec:
       {{- end }}
         name: {{ template "rancher.name" . }}-audit-log
         command: ["tail"]
-        args: ["-F", "/var/log/auditlog/rancher-api-audit.log"]
+        args: ["-f", "/var/log/auditlog/rancher-api-audit.log"]
         volumeMounts:
         - mountPath: /var/log/auditlog
           name: audit-log
+      initContainers:
+        - image: {{ .Values.auditLog.image.repository }}:{{.Values.auditLog.image.tag}}
+          imagePullPolicy: {{ .Values.auditLog.image.pullPolicy }}
+          name: init-{{ template "rancher.name" . }}-audit-log
+          command: [ "touch" ]
+          args: [ "/var/log/auditlog/rancher-api-audit.log" ]
+          volumeMounts:
+            - mountPath: /var/log/auditlog
+              name: audit-log
   {{- end }}
 {{- end }}
       volumes:
