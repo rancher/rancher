@@ -127,7 +127,6 @@ func (w *RancherManagedChartsTest) resetSettings() {
 }
 
 func TestRancherManagedChartsSuite(t *testing.T) {
-	t.Skip()
 	suite.Run(t, new(RancherManagedChartsTest))
 }
 
@@ -469,6 +468,7 @@ func (w *RancherManagedChartsTest) pollUntilDownloaded(ClusterRepoName string, p
 }
 
 func (w *RancherManagedChartsTest) TestServeIcons() {
+<<<<<<< HEAD
 	// Clone the git repository at a spcecific location so
 	// that Rancher assumes it as prebuild helm repository.
 	// Since Rancher starts at build/testdata, the LocalDir would
@@ -487,6 +487,9 @@ func (w *RancherManagedChartsTest) TestServeIcons() {
 	})
 	w.Require().NoError(err)
 
+=======
+	w.T().Skip()
+>>>>>>> 055a9620c (tests)
 	// Testing: Chart.icon field with (file:// scheme)
 	// Create ClusterRepo for charts-small-fork
 	clusterRepoToCreate := rv1.NewClusterRepo("", smallForkClusterRepoName,
