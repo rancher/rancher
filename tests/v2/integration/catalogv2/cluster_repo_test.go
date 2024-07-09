@@ -155,7 +155,7 @@ func StartRegistry() (*httptest.Server, error) {
 	// Bind the server to a specific IP address (your local machine's IP)
 	listener, err := net.Listen("tcp", fmt.Sprintf("%s:4050", ip.String()))
 	if err != nil {
-		return nil, err
+		log.Fatalf("Failed to bind to local IP: %v", err)
 	}
 	ts.Listener = listener
 	ts.Start()
@@ -308,8 +308,7 @@ func Start429Registry(t assert.TestingT, rateLimitedHeader bool) (*httptest.Serv
 	// Bind the server to a specific IP address (your local machine's IP)
 	listener, err := net.Listen("tcp", fmt.Sprintf("%s:8080", ip.String()))
 	if err != nil {
-		log.Printf("Failed to bind to local IP: %v", err)
-		return nil, err
+		log.Fatalf("Failed to bind to local IP: %v", err)
 	}
 	ts.Listener = listener
 	ts.Start()
