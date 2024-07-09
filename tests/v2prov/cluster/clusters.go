@@ -67,6 +67,8 @@ func New(clients *clients.Clients, cluster *provisioningv1api.Cluster) (*provisi
 
 		for i, mp := range cluster.Spec.RKEConfig.MachinePools {
 			if mp.NodeConfig == nil {
+				fmt.Println("HITHERE", "NewPodConfig")
+				fmt.Fprintf(os.Stderr, "HITHERE %s", "NewPodConfig")
 				podConfig, err := nodeconfig.NewPodConfig(clients, cluster.Namespace)
 				if err != nil {
 					return nil, err
@@ -79,6 +81,8 @@ func New(clients *clients.Clients, cluster *provisioningv1api.Cluster) (*provisi
 		}
 
 		if cluster.Spec.RKEConfig.Registries == nil {
+			fmt.Println("HITHERE", "createorgetregistry")
+			fmt.Fprintf(os.Stderr, "HITHERE %s\n", "createorgetregistry")
 			registryConfig, err := registry.CreateOrGetRegistry(clients, cluster.Namespace, "registry-cache", false)
 			if err != nil {
 				return nil, err

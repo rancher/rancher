@@ -2,6 +2,7 @@ package registry
 
 import (
 	"fmt"
+	"os"
 	"sync"
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
@@ -229,21 +230,29 @@ func createSharedObjects(clients *clients.Clients, podName string, pullThrough b
 // that pods created in that namespace can rely on images sourced from the new registry. If pullThrough is set to true,
 // the registry will be configured as a proxy (a.k.a pull-through cache) for docker.io.
 func CreateOrGetRegistry(clients *clients.Clients, namespace, name string, pullThrough bool) (rkev1.Registry, error) {
+	fmt.Println("HITHERE", "createSharedObjects")
+	fmt.Fprintf(os.Stderr, "HITHERE %s\n", "createSharedObjects")
 	registrySecret, err := createSharedObjects(clients, name, pullThrough)
 	if err != nil {
 		return rkev1.Registry{}, err
 	}
 
+	fmt.Println("HITHERE", "createPasswordSecret")
+	fmt.Fprintf(os.Stderr, "HITHERE %s\n", "createPasswordSecret")
 	passwordSecret, err := createPasswordSecret(clients, namespace)
 	if err != nil {
 		return rkev1.Registry{}, err
 	}
 
+	fmt.Println("HITHERE", "createTLSSecret")
+	fmt.Fprintf(os.Stderr, "HITHERE %s\n", "createTLSSecret")
 	tlsSecret, err := createTLSSecret(clients, namespace, registrySecret)
 	if err != nil {
 		return rkev1.Registry{}, err
 	}
 
+	fmt.Println("HITHERE", "done this")
+	fmt.Fprintf(os.Stderr, "HITHERE %s\n", "done this")
 	serviceName := newRegistryServiceName(name)
 
 	// Specify dummy.io registries to ensure we can deliver the same data twice without thrashing.
