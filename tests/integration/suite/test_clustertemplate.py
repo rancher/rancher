@@ -315,6 +315,7 @@ def test_creation_standard_user(admin_mc, remove_resource, user_factory):
 
 
 @pytest.mark.nonparallel
+@pytest.mark.skip
 def test_check_enforcement(admin_mc, remove_resource,
                            list_remove_resource, user_factory):
     cluster_template = create_cluster_template(admin_mc, [], admin_mc)

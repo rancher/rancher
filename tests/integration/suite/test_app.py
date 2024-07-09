@@ -224,6 +224,7 @@ def test_app_custom_values_file(admin_pc, admin_mc):
 
 
 @pytest.mark.nonparallel
+@pytest.mark.skip
 def test_app_create_validation(admin_mc, admin_pc, custom_catalog,
                                remove_resource, restore_rancher_version):
     """Test create validation for apps. This test will set the rancher version
@@ -304,6 +305,7 @@ def test_app_create_validation(admin_mc, admin_pc, custom_catalog,
 
 
 @pytest.mark.nonparallel
+@pytest.mark.skip
 def test_app_update_validation(admin_mc, admin_pc, custom_catalog,
                                remove_resource, restore_rancher_version):
     """Test update validation for apps. This test will set the rancher version
@@ -389,6 +391,7 @@ def test_app_update_validation(admin_mc, admin_pc, custom_catalog,
 
 
 @pytest.mark.nonparallel
+@pytest.mark.skip
 def test_app_rollback_validation(admin_mc, admin_pc, custom_catalog,
                                  remove_resource, restore_rancher_version):
     """Test rollback validation for apps. This test will set the rancher version

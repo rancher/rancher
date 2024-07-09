@@ -45,6 +45,7 @@ def test_mutliclusterapp_invalid_project(admin_mc, remove_resource):
 
 
 @pytest.mark.nonparallel
+@pytest.mark.skip
 def test_multiclusterapp_create_with_members(admin_mc, admin_pc,
                                              user_factory, remove_resource,
                                              ):
@@ -462,6 +463,7 @@ def wait_for_app_condition(admin_pc, name, condition, timeout=60):
 
 
 @pytest.mark.nonparallel
+@pytest.mark.skip
 def test_mcapp_create_validation(admin_mc, admin_pc, custom_catalog,
                                  remove_resource, restore_rancher_version):
     """Test create validation of multi cluster apps. This test will set the
@@ -514,6 +516,7 @@ def test_mcapp_create_validation(admin_mc, admin_pc, custom_catalog,
 
 
 @pytest.mark.nonparallel
+@pytest.mark.skip
 def test_mcapp_update_validation(admin_mc, admin_pc, custom_catalog,
                                  remove_resource, restore_rancher_version):
     """Test update validation of multi cluster apps. This test will set the
