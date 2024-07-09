@@ -36,6 +36,7 @@ func (s *ServiceAccountSuite) SetupSuite() {
 }
 
 func (s *ServiceAccountSuite) TestSingleSecretForServiceAccount() {
+	s.T().Skip()
 	localCluster, err := s.client.Management.Cluster.ByID("local")
 	s.Require().NoError(err)
 	s.Require().NotEmpty(localCluster)

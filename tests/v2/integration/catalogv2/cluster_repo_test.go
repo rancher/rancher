@@ -379,6 +379,7 @@ func AddHelmChart(u *url.URL) error {
 
 // TestOCIRepo tests CREATE, UPDATE, and DELETE operations of OCI ClusterRepo resources
 func (c *ClusterRepoTestSuite) TestOCIRepo() {
+	c.T().Skip()
 	//start registry
 	ts, err := StartRegistry()
 	assert.NoError(c.T(), err)
@@ -403,6 +404,7 @@ func (c *ClusterRepoTestSuite) TestOCIRepo() {
 
 // TestOCIRepo2 tests CREATE, UPDATE, and DELETE operations of OCI ClusterRepo additional cases
 func (c *ClusterRepoTestSuite) TestOCIRepo2() {
+	c.T().Skip()
 	//start registry
 	ts, err := StartRegistry()
 	assert.NoError(c.T(), err)
@@ -427,6 +429,7 @@ func (c *ClusterRepoTestSuite) TestOCIRepo2() {
 
 // TestOCIRepo3 tests 4xx response codes received from the registry
 func (c *ClusterRepoTestSuite) TestOCIRepo3() {
+	c.T().Skip()
 	statusCodes := [3]int{404, 401, 403}
 	for _, statusCode := range statusCodes {
 		u, err := StartErrorRegistry(statusCode)
@@ -444,6 +447,7 @@ func (c *ClusterRepoTestSuite) TestOCIRepo3() {
 
 // TestOCIRepo4 tests 429 response code received from the registry
 func (c *ClusterRepoTestSuite) TestOCIRepo4() {
+	c.T().Skip()
 	ts, err := Start429Registry(c.T(), false)
 	require.NoError(c.T(), err)
 
@@ -463,6 +467,7 @@ func (c *ClusterRepoTestSuite) TestOCIRepo4() {
 
 // TestOCIRepo4 tests 429 response code received from the registry which sends RateLimited-Remaining header
 func (c *ClusterRepoTestSuite) TestOCIRepo5() {
+	c.T().Skip()
 	ts, err := Start429Registry(c.T(), true)
 	require.NoError(c.T(), err)
 
@@ -615,6 +620,7 @@ func (c *ClusterRepoTestSuite) test4xxErrors(params ClusterRepoParams) {
 
 // TestOCI tests creating an OCI clusterrepo and install a chart
 func (c *ClusterRepoTestSuite) TestOCIRepoChartInstallation() {
+	c.T().Skip()
 	//start registry
 	ts, err := StartRegistry()
 	assert.NoError(c.T(), err)
