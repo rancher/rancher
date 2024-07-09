@@ -83,7 +83,7 @@ steps:
   environment:
     CATTLE_RANCHER_WEBHOOK_VERSION: 103.0.7+up0.4.8-rc1
     CATTLE_CSP_ADAPTER_MIN_VERSION: 103.0.1+up3.0.1
-    CATTLE_FLEET_VERSION: 103.1.6+up0.9.6-rc.1
+    CATTLE_FLEET_VERSION: 103.1.6+up0.9.6-rc.3
   settings:
     purge: false
     build_args_from_env:
@@ -169,7 +169,7 @@ steps:
   environment:
     CATTLE_RANCHER_WEBHOOK_VERSION: 103.0.7+up0.4.8-rc1
     CATTLE_CSP_ADAPTER_MIN_VERSION: 103.0.1+up3.0.1
-    CATTLE_FLEET_VERSION: 103.1.6+up0.9.6-rc.1
+    CATTLE_FLEET_VERSION: 103.1.6+up0.9.6-rc.3
   settings:
     purge: false
     build_args_from_env:
@@ -365,7 +365,7 @@ steps:
   environment:
     CATTLE_RANCHER_WEBHOOK_VERSION: 103.0.7+up0.4.8-rc1
     CATTLE_CSP_ADAPTER_MIN_VERSION: 103.0.1+up3.0.1
-    CATTLE_FLEET_VERSION: 103.1.6+up0.9.6-rc.1
+    CATTLE_FLEET_VERSION: 103.1.6+up0.9.6-rc.3
   settings:
     purge: false
     build_args_from_env:
@@ -451,7 +451,7 @@ steps:
   environment:
     CATTLE_RANCHER_WEBHOOK_VERSION: 103.0.7+up0.4.8-rc1
     CATTLE_CSP_ADAPTER_MIN_VERSION: 103.0.1+up3.0.1
-    CATTLE_FLEET_VERSION: 103.1.6+up0.9.6-rc.1
+    CATTLE_FLEET_VERSION: 103.1.6+up0.9.6-rc.3
   settings:
     purge: false
     build_args_from_env:
