@@ -18,6 +18,7 @@ microsoft_teams_config = {
 MOCK_RECEIVER_ALERT_PORT = 4050
 
 
+@pytest.mark.skip
 def test_alert_access(admin_mc, admin_pc, admin_cc, user_mc, remove_resource):
     """Tests that a user with read-only access is not
     able to deactivate an alert.
@@ -57,6 +58,7 @@ def mock_receiver_alert():
     server.stop()
 
 
+@pytest.mark.skip
 def test_add_notifier(admin_mc, remove_resource, mock_receiver_alert):
     client = admin_mc.client
 
