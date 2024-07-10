@@ -1,4 +1,4 @@
-name: Unit and Integration Tests
+name: Integration Tests
 on:
   workflow_dispatch:
   push:
@@ -12,17 +12,10 @@ on:
     branches:
       - master
       - release/v*
+
+permissions: {}
+
 jobs:
-  unit-test:
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Run unit tests
-        run: go test -cover -tags=test ./pkg/...
-
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -30,7 +23,7 @@ jobs:
     env:
       ACTIONS_RUNNER_DEBUG: true
       ACTIONS_STEP_DEBUG: true
-      DAPPER_HOST_ARCH: amd64
+      HOST_ARCH: amd64
       CATTLE_HELM_VERSION: v2.16.8-rancher2
       CATTLE_MACHINE_VERSION: v0.15.0-rancher112
       CATTLE_K3S_VERSION: v1.28.6+k3s2
@@ -52,16 +45,13 @@ jobs:
         run: git config --global --add safe.directory /github/workspace
 
       - name: Install Rancher Machine
-        run: curl -sLf https://github.com/rancher/machine/releases/download/${{ env.CATTLE_MACHINE_VERSION }}/rancher-machine-${{ env.DAPPER_HOST_ARCH }}.tar.gz | sudo tar xvzf - -C /usr/bin
+        run: curl -sLf https://github.com/rancher/machine/releases/download/${{ env.CATTLE_MACHINE_VERSION }}/rancher-machine-${{ env.HOST_ARCH }}.tar.gz | sudo tar xvzf - -C /usr/bin
 
       - name: Install k3d
-        run: |
-          if [ "${{ env.DAPPER_HOST_ARCH }}" != "s390x" ]; then
-            curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | TAG=${{ env.K3D_VERSION }} bash
-          fi
+        run: curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | TAG=${{ env.K3D_VERSION }} bash
 
       - name: Install golangci-lint and spectrometer
-        if: ${{ env.DAPPER_HOST_ARCH == 'amd64' }}
+        if: ${{ env.HOST_ARCH == 'amd64' }}
         run: |
           curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.54.2
           curl -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/fossas/spectrometer/master/install.sh | sh
@@ -71,8 +61,8 @@ jobs:
 
       - name: Install yq
         run: |
-          wget -q https://github.com/mikefarah/yq/releases/download/${{ env.YQ_VERSION }}/yq_linux_${{ env.DAPPER_HOST_ARCH }}.tar.gz -O - | tar xz
-          sudo mv yq_linux_${{ env.DAPPER_HOST_ARCH }} /usr/bin/yq
+          wget -q https://github.com/mikefarah/yq/releases/download/${{ env.YQ_VERSION }}/yq_linux_${{ env.HOST_ARCH }}.tar.gz -O - | tar xz
+          sudo mv yq_linux_${{ env.HOST_ARCH }} /usr/bin/yq
 
       ## Helm Setup start
       - name: Uninstall Helm
@@ -104,7 +94,7 @@ jobs:
         run: helm init -c --stable-repo-url https://charts.helm.sh/stable/
 
       - name: Set Helm 3 URL
-        run: echo "HELM_URL_V3=https://get.helm.sh/helm-${{ env.HELM_VERSION }}-linux-${{ env.DAPPER_HOST_ARCH }}.tar.gz" >> $GITHUB_ENV
+        run: echo "HELM_URL_V3=https://get.helm.sh/helm-${{ env.HELM_VERSION }}-linux-${{ env.HOST_ARCH }}.tar.gz" >> $GITHUB_ENV
 
       - name: Create temporary directory for Helm 3
         run: sudo mkdir /usr/tmp
@@ -119,7 +109,7 @@ jobs:
 
       - name: Install kustomize
         run: |
-          KUSTOMIZE_URL=https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/${{ env.KUSTOMIZE_VERSION }}/kustomize_${{ env.KUSTOMIZE_VERSION }}_linux_${{ env.DAPPER_HOST_ARCH }}.tar.gz
+          KUSTOMIZE_URL=https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/${{ env.KUSTOMIZE_VERSION }}/kustomize_${{ env.KUSTOMIZE_VERSION }}_linux_${{ env.HOST_ARCH }}.tar.gz
           curl -sLf ${KUSTOMIZE_URL} | sudo tar -xzf - -C /usr/bin
           sudo chmod +x /usr/bin/kustomize
 
@@ -148,61 +138,29 @@ jobs:
             cp /bin/which /host-bin/ &&
             cp /bin/aux/xtables-legacy-multi /host-bin/"
 
-      #- name: List copied binaries
-        #run: ls -l /tmp/k3s-binaries
-
-      - name: Copy blkid binary to its place
-        run: sudo cp /tmp/k3s-binaries/blkid /usr/bin/blkid
-
-      - name: Copy bandwidth binary to its place
-        run: sudo cp /tmp/k3s-binaries/bandwidth /usr/bin/bandwidth
-
-      - name: Copy cni binary to its place
-        run: sudo cp /tmp/k3s-binaries/cni /usr/bin/cni
-
-      - name: Copy conntrack binary to its place
-        run: sudo cp /tmp/k3s-binaries/conntrack /usr/bin/conntrack
-
       - name: Removing containerd
         run: | 
           sudo rm -rf /usr/bin/containerd
           sudo rm -rf /usr/bin/containerd-shim-runc-v2
 
-      - name: Copy containerd binary to its place
-        run: sudo cp /tmp/k3s-binaries/containerd /usr/bin/containerd
-
-      - name: Copy containerd-shim-runc-v2 binary to its place
-        run: sudo cp /tmp/k3s-binaries/containerd-shim-runc-v2 /usr/bin/containerd-shim-runc-v2
-
-      - name: Copy ethtool binary to its place
-        run: sudo cp /tmp/k3s-binaries/ethtool /usr/bin/ethtool
-
-      - name: Copy firewall binary to its place
-        run: sudo cp /tmp/k3s-binaries/firewall /usr/bin/firewall
-
-      - name: Copy ip binary to its place
-        run: sudo cp /tmp/k3s-binaries/ip /usr/bin/ip
-
-      - name: Copy ipset binary to its place
-        run: sudo cp /tmp/k3s-binaries/ipset /usr/bin/ipset
-
-      - name: Copy k3s binary to its place
-        run: sudo cp /tmp/k3s-binaries/k3s /usr/bin/k3s
-
-      - name: Copy losetup binary to its place
-        run: sudo cp /tmp/k3s-binaries/losetup /usr/bin/losetup
-
-      - name: Copy pigz binary to its place
-        run: sudo cp /tmp/k3s-binaries/pigz /usr/bin/pigz
-
-      - name: Copy runc binary to its place
-        run: sudo cp /tmp/k3s-binaries/runc /usr/bin/runc
-
-      - name: Copy which binary to its place
-        run: sudo cp /tmp/k3s-binaries/which /usr/bin/which
-
-      - name: Copy xtables-legacy-multi binary to its place
-        run: sudo cp /tmp/k3s-binaries/xtables-legacy-multi /usr/bin/xtables-legacy-multi
+      - name: Copy binaries from temporary directories to bin directory
+        run: | 
+          sudo cp /tmp/k3s-binaries/blkid /usr/bin/blkid
+          sudo cp /tmp/k3s-binaries/bandwidth /usr/bin/bandwidth
+          sudo cp /tmp/k3s-binaries/cni /usr/bin/cni
+          sudo cp /tmp/k3s-binaries/conntrack /usr/bin/conntrack
+          sudo cp /tmp/k3s-binaries/containerd /usr/bin/containerd
+          sudo cp /tmp/k3s-binaries/containerd-shim-runc-v2 /usr/bin/containerd-shim-runc-v2
+          sudo cp /tmp/k3s-binaries/ethtool /usr/bin/ethtool
+          sudo cp /tmp/k3s-binaries/firewall /usr/bin/firewall
+          sudo cp /tmp/k3s-binaries/ip /usr/bin/ip
+          sudo cp /tmp/k3s-binaries/ipset /usr/bin/ipset
+          sudo cp /tmp/k3s-binaries/k3s /usr/bin/k3s
+          sudo cp /tmp/k3s-binaries/losetup /usr/bin/losetup
+          sudo cp /tmp/k3s-binaries/pigz /usr/bin/pigz
+          sudo cp /tmp/k3s-binaries/runc /usr/bin/runc
+          sudo cp /tmp/k3s-binaries/which /usr/bin/which
+          sudo cp /tmp/k3s-binaries/xtables-legacy-multi /usr/bin/xtables-legacy-multi
 
       - name: Create symbolic links for CNI binaries
         run: |
@@ -280,7 +238,7 @@ jobs:
     env:
       ACTIONS_RUNNER_DEBUG: true
       ACTIONS_STEP_DEBUG: true
-      DAPPER_HOST_ARCH: amd64
+      HOST_ARCH: amd64
       CATTLE_HELM_VERSION: v2.16.8-rancher2
       CATTLE_MACHINE_VERSION: v0.15.0-rancher112
       CATTLE_K3S_VERSION: v1.28.6+k3s2
@@ -305,7 +263,7 @@ jobs:
           docker volume prune -f
 
       - name: Clean up temporary files
-        run: rm -rf /path/to/temp/files
+        run: rm -rf /tmp
         
       - name: Download Docker images artifact
         uses: actions/download-artifact@v2
@@ -387,7 +345,7 @@ jobs:
         run: helm init -c --stable-repo-url https://charts.helm.sh/stable/
 
       - name: Set Helm 3 URL
-        run: echo "HELM_URL_V3=https://get.helm.sh/helm-${{ env.HELM_VERSION }}-linux-${{ env.DAPPER_HOST_ARCH }}.tar.gz" >> $GITHUB_ENV
+        run: echo "HELM_URL_V3=https://get.helm.sh/helm-${{ env.HELM_VERSION }}-linux-${{ env.HOST_ARCH }}.tar.gz" >> $GITHUB_ENV
 
       - name: Create temporary directory for Helm 3
         run: sudo mkdir /usr/tmp
