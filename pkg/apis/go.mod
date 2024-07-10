@@ -5,6 +5,7 @@ go 1.22.0
 toolchain go1.22.3
 
 replace (
+	github.com/rancher/rke => github.com/rancher/rke v1.6.0-rc10
 	k8s.io/api => k8s.io/api v0.30.1
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.30.1
 	k8s.io/apimachinery => k8s.io/apimachinery v0.30.1
