@@ -262,9 +262,6 @@ jobs:
           docker system prune -af
           docker volume prune -f
 
-      - name: Clean up temporary files
-        run: rm -rf /tmp
-        
       - name: Download Docker images artifact
         uses: actions/download-artifact@v2
         with:
