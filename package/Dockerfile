@@ -54,9 +54,9 @@ ENV CATTLE_PARTNER_CHART_DEFAULT_BRANCH=$PARTNER_CHART_DEFAULT_BRANCH
 ENV CATTLE_RKE2_CHART_DEFAULT_BRANCH=$RKE2_CHART_DEFAULT_BRANCH
 ENV CATTLE_HELM_VERSION v2.16.8-rancher2
 ENV CATTLE_MACHINE_VERSION v0.15.0-rancher114
-ENV CATTLE_K3S_VERSION v1.30.1+k3s1
+ENV CATTLE_K3S_VERSION v1.30.2+k3s2
 ENV CATTLE_MACHINE_PROVISION_IMAGE rancher/machine:${CATTLE_MACHINE_VERSION}
-ENV CATTLE_ETCD_VERSION v3.5.12
+ENV CATTLE_ETCD_VERSION v3.5.14
 ENV LOGLEVEL_VERSION v0.1.6
 ENV TINI_VERSION v0.18.0
 ENV TELEMETRY_VERSION v0.6.2
@@ -65,8 +65,8 @@ ENV LINODE_UI_DRIVER_VERSION v0.7.0
 # make sure the version number is consistent with the one at Line 100 of pkg/data/management/machinedriver_data.go
 ENV DOCKER_MACHINE_HARVESTER_VERSION v0.6.7
 ENV CATTLE_KDM_BRANCH ${CATTLE_KDM_BRANCH}
-ENV HELM_VERSION v3.15.1
-ENV KUSTOMIZE_VERSION v5.0.1
+ENV HELM_VERSION v3.15.2
+ENV KUSTOMIZE_VERSION v5.4.2
 ENV CATTLE_WINS_AGENT_VERSION v0.4.16
 ENV CATTLE_WINS_AGENT_INSTALL_SCRIPT https://raw.githubusercontent.com/rancher/wins/${CATTLE_WINS_AGENT_VERSION}/install.ps1
 ENV CATTLE_WINS_AGENT_UNINSTALL_SCRIPT https://raw.githubusercontent.com/rancher/wins/${CATTLE_WINS_AGENT_VERSION}/uninstall.ps1
@@ -164,7 +164,7 @@ RUN curl ${HELM_URL_V3} | tar xvzf - --strip-components=1 -C /usr/bin && \
     chmod +x /usr/bin/kustomize
 
 # Set up K3s: copy the necessary binaries from the K3s image.
-COPY --from=rancher/k3s:v1.30.1-k3s1 \
+COPY --from=rancher/k3s:v1.30.2-k3s2 \
     /bin/blkid \
     /bin/bandwidth \
     /bin/cni \
