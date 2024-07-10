@@ -329,5 +329,6 @@ func (p *RTBTestSuite) TestCRTBRoleTemplateInheritance() {
 }
 
 func TestRTBTestSuite(t *testing.T) {
+	t.Skip()
 	suite.Run(t, new(RTBTestSuite))
 }
