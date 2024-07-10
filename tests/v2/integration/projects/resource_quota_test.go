@@ -346,6 +346,5 @@ func (s *ResourceQuotaSuite) TestAddQuotaFromProjectWithNamespacePropagation() {
 }
 
 func TestResourceQuotaTestSuite(t *testing.T) {
-	t.Skip()
 	suite.Run(t, new(ResourceQuotaSuite))
 }
