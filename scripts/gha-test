@@ -17,12 +17,6 @@ cleanup()
 
 cd $(dirname $0)/..
 
-echo "PWD $(pwd)"
-
-if [ ${ARCH} == arm64 ] || [ ${ARCH} == s390x ]; then
-    export ETCD_UNSUPPORTED_ARCH=${ARCH}
-fi
-
 TB_ORG=rancher
 
 if [ -z "${TEST_DIST}" ] || [ "${TEST_DIST}" = "k3s" ]; then
