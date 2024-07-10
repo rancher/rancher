@@ -150,6 +150,12 @@ func TestGenOIDCProvider_SearchPrincipals(t *testing.T) {
 					PrincipalType: UserType,
 					Provider:      Name,
 				},
+				{
+					ObjectMeta:    metav1.ObjectMeta{Name: "genericoidc_group://user1"},
+					DisplayName:   "user1",
+					PrincipalType: GroupType,
+					Provider:      Name,
+				},
 			},
 		},
 		{
@@ -158,6 +164,11 @@ func TestGenOIDCProvider_SearchPrincipals(t *testing.T) {
 				{
 					ObjectMeta:    metav1.ObjectMeta{Name: "genericoidc_user://"},
 					PrincipalType: UserType,
+					Provider:      Name,
+				},
+				{
+					ObjectMeta:    metav1.ObjectMeta{Name: "genericoidc_group://"},
+					PrincipalType: GroupType,
 					Provider:      Name,
 				},
 			},
@@ -170,7 +181,6 @@ func TestGenOIDCProvider_SearchPrincipals(t *testing.T) {
 				{
 					ObjectMeta:    metav1.ObjectMeta{Name: "genericoidc_group://group1"},
 					DisplayName:   "group1",
-					LoginName:     "group1",
 					PrincipalType: GroupType,
 					Provider:      Name,
 				},
