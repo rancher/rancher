@@ -33,7 +33,7 @@ jobs:
     env:
       ACTIONS_RUNNER_DEBUG: true
       ACTIONS_STEP_DEBUG: true
-      DAPPER_HOST_ARCH: amd64
+      HOST_ARCH: amd64
       CATTLE_HELM_VERSION: v2.16.8-rancher2
       CATTLE_MACHINE_VERSION: v0.15.0-rancher112
       CATTLE_K3S_VERSION: v1.28.6+k3s2
@@ -55,13 +55,13 @@ jobs:
         run: git config --global --add safe.directory /github/workspace
 
       - name: Install Rancher Machine
-        run: curl -sLf https://github.com/rancher/machine/releases/download/${{ env.CATTLE_MACHINE_VERSION }}/rancher-machine-${{ env.DAPPER_HOST_ARCH }}.tar.gz | sudo tar xvzf - -C /usr/bin
+        run: curl -sLf https://github.com/rancher/machine/releases/download/${{ env.CATTLE_MACHINE_VERSION }}/rancher-machine-${{ env.HOST_ARCH }}.tar.gz | sudo tar xvzf - -C /usr/bin
 
       - name: Install k3d
         run: curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | TAG=${{ env.K3D_VERSION }} bash
 
       - name: Install golangci-lint and spectrometer
-        if: ${{ env.DAPPER_HOST_ARCH == 'amd64' }}
+        if: ${{ env.HOST_ARCH == 'amd64' }}
         run: |
           curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.54.2
           curl -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/fossas/spectrometer/master/install.sh | sh
@@ -71,8 +71,8 @@ jobs:
 
       - name: Install yq
         run: |
-          wget -q https://github.com/mikefarah/yq/releases/download/${{ env.YQ_VERSION }}/yq_linux_${{ env.DAPPER_HOST_ARCH }}.tar.gz -O - | tar xz
-          sudo mv yq_linux_${{ env.DAPPER_HOST_ARCH }} /usr/bin/yq
+          wget -q https://github.com/mikefarah/yq/releases/download/${{ env.YQ_VERSION }}/yq_linux_${{ env.HOST_ARCH }}.tar.gz -O - | tar xz
+          sudo mv yq_linux_${{ env.HOST_ARCH }} /usr/bin/yq
 
       ## Helm Setup start
       - name: Uninstall Helm
@@ -104,7 +104,7 @@ jobs:
         run: helm init -c --stable-repo-url https://charts.helm.sh/stable/
 
       - name: Set Helm 3 URL
-        run: echo "HELM_URL_V3=https://get.helm.sh/helm-${{ env.HELM_VERSION }}-linux-${{ env.DAPPER_HOST_ARCH }}.tar.gz" >> $GITHUB_ENV
+        run: echo "HELM_URL_V3=https://get.helm.sh/helm-${{ env.HELM_VERSION }}-linux-${{ env.HOST_ARCH }}.tar.gz" >> $GITHUB_ENV
 
       - name: Create temporary directory for Helm 3
         run: sudo mkdir /usr/tmp
@@ -119,7 +119,7 @@ jobs:
 
       - name: Install kustomize
         run: |
-          KUSTOMIZE_URL=https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/${{ env.KUSTOMIZE_VERSION }}/kustomize_${{ env.KUSTOMIZE_VERSION }}_linux_${{ env.DAPPER_HOST_ARCH }}.tar.gz
+          KUSTOMIZE_URL=https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/${{ env.KUSTOMIZE_VERSION }}/kustomize_${{ env.KUSTOMIZE_VERSION }}_linux_${{ env.HOST_ARCH }}.tar.gz
           curl -sLf ${KUSTOMIZE_URL} | sudo tar -xzf - -C /usr/bin
           sudo chmod +x /usr/bin/kustomize
 
@@ -248,7 +248,7 @@ jobs:
     env:
       ACTIONS_RUNNER_DEBUG: true
       ACTIONS_STEP_DEBUG: true
-      DAPPER_HOST_ARCH: amd64
+      HOST_ARCH: amd64
       CATTLE_HELM_VERSION: v2.16.8-rancher2
       CATTLE_MACHINE_VERSION: v0.15.0-rancher112
       CATTLE_K3S_VERSION: v1.28.6+k3s2
@@ -355,7 +355,7 @@ jobs:
         run: helm init -c --stable-repo-url https://charts.helm.sh/stable/
 
       - name: Set Helm 3 URL
-        run: echo "HELM_URL_V3=https://get.helm.sh/helm-${{ env.HELM_VERSION }}-linux-${{ env.DAPPER_HOST_ARCH }}.tar.gz" >> $GITHUB_ENV
+        run: echo "HELM_URL_V3=https://get.helm.sh/helm-${{ env.HELM_VERSION }}-linux-${{ env.HOST_ARCH }}.tar.gz" >> $GITHUB_ENV
 
       - name: Create temporary directory for Helm 3
         run: sudo mkdir /usr/tmp
