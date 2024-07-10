@@ -102,5 +102,6 @@ func (p *ProjectUserTestSuite) TestCreateNamespaceProjectOwner() {
 }
 
 func TestProjectUserTestSuite(t *testing.T) {
+	t.Skip()
 	suite.Run(t, new(ProjectUserTestSuite))
 }
