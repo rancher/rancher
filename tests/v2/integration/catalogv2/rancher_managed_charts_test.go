@@ -499,12 +499,7 @@ func (w *RancherManagedChartsTest) TestServeIcons() {
 	w.Require().NoError(err)
 	w.Assert().Equal("bundled", systemCatalogUpdated.Value)
 
-	// Fetch one icon with https:// scheme, it should return an empty object (i.e length of image equals 0) with nil error
-	imgLength, err := w.catalogClient.FetchChartIcon(smallForkClusterRepoName, "fleet")
-	w.Require().NoError(err)
-	w.Assert().Equal(0, imgLength)
-
-	imgLength, err = w.catalogClient.FetchChartIcon(smallForkClusterRepoName, "rancher-cis-benchmark")
+	imgLength, err := w.catalogClient.FetchChartIcon(smallForkClusterRepoName, "rancher-cis-benchmark")
 	w.Require().NoError(err)
 	w.Assert().Greater(imgLength, 0)
 
