@@ -55,10 +55,7 @@ jobs:
         run: curl -sLf https://github.com/rancher/machine/releases/download/${{ env.CATTLE_MACHINE_VERSION }}/rancher-machine-${{ env.DAPPER_HOST_ARCH }}.tar.gz | sudo tar xvzf - -C /usr/bin
 
       - name: Install k3d
-        run: |
-          if [ "${{ env.DAPPER_HOST_ARCH }}" != "s390x" ]; then
-            curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | TAG=${{ env.K3D_VERSION }} bash
-          fi
+        run: curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | TAG=${{ env.K3D_VERSION }} bash
 
       - name: Install golangci-lint and spectrometer
         if: ${{ env.DAPPER_HOST_ARCH == 'amd64' }}
