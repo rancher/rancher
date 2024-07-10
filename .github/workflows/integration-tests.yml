@@ -145,61 +145,29 @@ jobs:
             cp /bin/which /host-bin/ &&
             cp /bin/aux/xtables-legacy-multi /host-bin/"
 
-      #- name: List copied binaries
-        #run: ls -l /tmp/k3s-binaries
-
-      - name: Copy blkid binary to its place
-        run: sudo cp /tmp/k3s-binaries/blkid /usr/bin/blkid
-
-      - name: Copy bandwidth binary to its place
-        run: sudo cp /tmp/k3s-binaries/bandwidth /usr/bin/bandwidth
-
-      - name: Copy cni binary to its place
-        run: sudo cp /tmp/k3s-binaries/cni /usr/bin/cni
-
-      - name: Copy conntrack binary to its place
-        run: sudo cp /tmp/k3s-binaries/conntrack /usr/bin/conntrack
-
       - name: Removing containerd
         run: | 
           sudo rm -rf /usr/bin/containerd
           sudo rm -rf /usr/bin/containerd-shim-runc-v2
 
-      - name: Copy containerd binary to its place
-        run: sudo cp /tmp/k3s-binaries/containerd /usr/bin/containerd
-
-      - name: Copy containerd-shim-runc-v2 binary to its place
-        run: sudo cp /tmp/k3s-binaries/containerd-shim-runc-v2 /usr/bin/containerd-shim-runc-v2
-
-      - name: Copy ethtool binary to its place
-        run: sudo cp /tmp/k3s-binaries/ethtool /usr/bin/ethtool
-
-      - name: Copy firewall binary to its place
-        run: sudo cp /tmp/k3s-binaries/firewall /usr/bin/firewall
-
-      - name: Copy ip binary to its place
-        run: sudo cp /tmp/k3s-binaries/ip /usr/bin/ip
-
-      - name: Copy ipset binary to its place
-        run: sudo cp /tmp/k3s-binaries/ipset /usr/bin/ipset
-
-      - name: Copy k3s binary to its place
-        run: sudo cp /tmp/k3s-binaries/k3s /usr/bin/k3s
-
-      - name: Copy losetup binary to its place
-        run: sudo cp /tmp/k3s-binaries/losetup /usr/bin/losetup
-
-      - name: Copy pigz binary to its place
-        run: sudo cp /tmp/k3s-binaries/pigz /usr/bin/pigz
-
-      - name: Copy runc binary to its place
-        run: sudo cp /tmp/k3s-binaries/runc /usr/bin/runc
-
-      - name: Copy which binary to its place
-        run: sudo cp /tmp/k3s-binaries/which /usr/bin/which
-
-      - name: Copy xtables-legacy-multi binary to its place
-        run: sudo cp /tmp/k3s-binaries/xtables-legacy-multi /usr/bin/xtables-legacy-multi
+      - name: Copy binaries from temporary directories to bin directory
+        run: | 
+          sudo cp /tmp/k3s-binaries/blkid /usr/bin/blkid
+          sudo cp /tmp/k3s-binaries/bandwidth /usr/bin/bandwidth
+          sudo cp /tmp/k3s-binaries/cni /usr/bin/cni
+          sudo cp /tmp/k3s-binaries/conntrack /usr/bin/conntrack
+          sudo cp /tmp/k3s-binaries/containerd /usr/bin/containerd
+          sudo cp /tmp/k3s-binaries/containerd-shim-runc-v2 /usr/bin/containerd-shim-runc-v2
+          sudo cp /tmp/k3s-binaries/ethtool /usr/bin/ethtool
+          sudo cp /tmp/k3s-binaries/firewall /usr/bin/firewall
+          sudo cp /tmp/k3s-binaries/ip /usr/bin/ip
+          sudo cp /tmp/k3s-binaries/ipset /usr/bin/ipset
+          sudo cp /tmp/k3s-binaries/k3s /usr/bin/k3s
+          sudo cp /tmp/k3s-binaries/losetup /usr/bin/losetup
+          sudo cp /tmp/k3s-binaries/pigz /usr/bin/pigz
+          sudo cp /tmp/k3s-binaries/runc /usr/bin/runc
+          sudo cp /tmp/k3s-binaries/which /usr/bin/which
+          sudo cp /tmp/k3s-binaries/xtables-legacy-multi /usr/bin/xtables-legacy-multi
 
       - name: Create symbolic links for CNI binaries
         run: |
