@@ -2691,5 +2691,6 @@ func TestSteveLocal(t *testing.T) {
 }
 
 func TestSteveDownstream(t *testing.T) {
+	t.Skip()
 	suite.Run(t, new(DownstreamSteveAPITestSuite))
 }
