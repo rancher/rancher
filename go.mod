@@ -62,8 +62,7 @@ replace (
 require (
 	github.com/antihax/optional v1.0.0
 	github.com/containers/image/v5 v5.30.0
-	github.com/rancher/rancher/pkg/apis v0.0.0-20240618122559-b9ec494d4f6f
-	github.com/rancher/shepherd v0.0.0-20240628185912-bd372ac2e2e1
+	github.com/rancher/rancher/pkg/apis v0.0.0-20240701102734-a84c3a2f36c1
 	go.qase.io/client v0.0.0-20231114201952-65195ec001fa
 )
 
@@ -138,7 +137,8 @@ require (
 	github.com/rancher/norman v0.0.0-20240604183301-20cd23aadce1
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/remotedialer v0.4.0
-	github.com/rancher/rke v1.6.0-rc9
+	github.com/rancher/rke v1.6.0-rc8
+	github.com/rancher/shepherd v0.0.0-20240703153304-32fab9706137
 	github.com/rancher/steve v0.0.0-20240703132554-22a06dd14f51
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007
 	github.com/rancher/wrangler/v2 v2.2.0-rc6
