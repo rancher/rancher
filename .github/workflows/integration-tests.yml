@@ -12,6 +12,9 @@ on:
     branches:
       - master
       - release/v*
+
+permissions: {}
+
 jobs:
   unit-test:
     runs-on: ubuntu-latest
