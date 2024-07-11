@@ -1,0 +1,29 @@
+#!/bin/bash
+
+set -e
+
+socket_location="${LOG_SOCKET_LOCATION:-/tmp/log.sock}"
+curl_args=""
+
+while true; do
+  case "$1" in
+    --set )
+      curl_args="--data level=$2"
+      shift 2
+      ;;
+    --socket-location )
+      socket_location="$2"
+      shift 2
+      ;;
+    -* )
+      echo "Invalid flag $1"
+      exit 1
+      ;;
+    * )
+      break
+      ;;
+  esac
+done
+
+set -x
+curl --no-progress-meter --fail-with-body --proxy "" --unix-socket "${socket_location}" http://unix/v1/loglevel $curl_args

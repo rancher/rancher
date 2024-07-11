@@ -19,7 +19,6 @@ RUN $URL = 'https://dl.k8s.io/v1.25.12/kubernetes-client-windows-amd64.tar.gz'; 
     tar.exe -xzvf c:\kubernetes.tar.gz; \
     \
     Write-Host 'Complete.'
-# Need to support loglevel & kube-prompt
 # Move for PATH to work
 RUN Copy-Item -Path /wins.exe -Destination /Windows/
 RUN Copy-Item -Path /kubernetes/client/bin/kubectl.exe -Destination /Windows/
