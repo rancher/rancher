@@ -7,9 +7,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/go-git/go-git/v5"
 	rv1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/shepherd/clients/rancher"
@@ -466,6 +470,9 @@ func (w *RancherManagedChartsTest) pollUntilDownloaded(ClusterRepoName string, p
 }
 
 func (w *RancherManagedChartsTest) TestServeIcons() {
+	smallForkDir := "/rancher-data/local-catalogs/v2/rancher-charts-small-fork/d39a2f6abd49e537e5015bbe1a4cd4f14919ba1c3353208a7ff6be37ffe00c52"
+	err := CloneRepo(smallForkURL, smallForkDir)
+	w.Require().NoError(err)
 	// Testing: Chart.icon field with (file:// scheme)
 	// Create ClusterRepo for charts-small-fork
 	clusterRepoToCreate := rv1.NewClusterRepo("", smallForkClusterRepoName,
@@ -476,7 +483,7 @@ func (w *RancherManagedChartsTest) TestServeIcons() {
 			},
 		},
 	)
-	_, err := w.client.Steve.SteveType(catalog.ClusterRepoSteveResourceType).Create(clusterRepoToCreate)
+	_, err = w.client.Steve.SteveType(catalog.ClusterRepoSteveResourceType).Create(clusterRepoToCreate)
 	w.Require().NoError(err)
 	time.Sleep(1 * time.Second)
 
@@ -513,4 +520,80 @@ func (w *RancherManagedChartsTest) TestServeIcons() {
 	// Deleting clusterRepo
 	err = w.catalogClient.ClusterRepos().Delete(context.Background(), smallForkClusterRepoName, metav1.DeleteOptions{})
 	w.Require().NoError(err)
+}
+
+func CloneRepo(url, directory string) error {
+	directory, err := createDirToClone()
+	logrus.Infof("Cloning %s into %s", url, directory)
+	_, err = git.PlainClone(directory, false, &git.CloneOptions{
+		URL:      url,
+		Progress: os.Stdout, // Show progress
+		Depth:    1,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to clone repository: %w", err)
+	}
+	return nil
+}
+
+func createDirToClone() (string, error) {
+	dirToClone := "rancher-charts-small-fork/d39a2f6abd49e537e5015bbe1a4cd4f14919ba1c3353208a7ff6be37ffe00c52"
+
+	logrus.Info("starting search for rancher-charts directory")
+	localCatalogsDir, err := searchForRancherChartsDir()
+	if err != nil {
+		return "", err
+	}
+
+	dirToClonePath := filepath.Join(localCatalogsDir, dirToClone)
+	err = os.MkdirAll(dirToClonePath, 0755)
+	if err != nil {
+		return "", err
+	}
+	return dirToClonePath, nil
+}
+
+func searchForRancherChartsDir() (string, error) {
+	// Look for "rancher-charts" directory starting at root dir
+	var foundDirs []string
+	err := filepath.Walk("/", func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			if os.IsPermission(err) {
+				logrus.Infof("Skipping directory due to permissions: %s \n", path)
+				return filepath.SkipDir // Skip this directory but continue walking others
+			}
+			return err // Return the error for any other type of error
+		}
+		if info.IsDir() {
+			_, dirName := filepath.Split(path)
+			if dirName == "rancher-charts" {
+				if strings.Contains(strings.ToLower(path), "trash") {
+					return nil
+				}
+				if !strings.Contains(path, "rancher-data/local-catalogs/v2") {
+					return nil
+				}
+				foundDirs = append(foundDirs, path)
+			}
+		}
+		return nil
+	})
+
+	if err != nil && len(foundDirs) == 0 {
+		logrus.Errorf("Error walking the path %v", err)
+		return "", err
+	}
+
+	for _, dir := range foundDirs {
+		logrus.Infof("Found directory: %s", dir)
+	}
+	return removeRancherChartsAndAfter(foundDirs[0]), nil
+}
+
+func removeRancherChartsAndAfter(s string) string {
+	parts := strings.Split(s, "rancher-charts")
+	if len(parts) > 0 {
+		return parts[0]
+	}
+	return s // Return the original string if "rancher-charts" is not found
 }
