@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-git/go-git/v5"
 	rv1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/shepherd/clients/rancher"
@@ -87,7 +88,7 @@ func (w *RancherManagedChartsTest) SetupSuite() {
 	w.Require().NoError(err)
 	w.originalBranch = clusterRepo.Spec.GitBranch
 	w.originalGitRepo = clusterRepo.Spec.GitRepo
-	w.resetSettings()
+	// w.resetSettings()
 }
 
 func (w *RancherManagedChartsTest) resetSettings() {
@@ -466,6 +467,17 @@ func (w *RancherManagedChartsTest) pollUntilDownloaded(ClusterRepoName string, p
 }
 
 func (w *RancherManagedChartsTest) TestServeIcons() {
+	// Clone the git repository at a spcecific location so
+	// that Rancher assumes it as prebuild helm repository.
+	repoURL := "https://github.com/rancher/charts-small-fork"
+	cloneDir := "../../../../../rancher-data/local-catalogs/v2/rancher-charts-small-fork/d39a2f6abd49e537e5015bbe1a4cd4f14919ba1c3353208a7ff6be37ffe00c52"
+
+	_, err := git.PlainClone(cloneDir, false, &git.CloneOptions{
+		URL:   repoURL,
+		Depth: 1,
+	})
+	w.Require().NoError(err)
+
 	// Testing: Chart.icon field with (file:// scheme)
 	// Create ClusterRepo for charts-small-fork
 	clusterRepoToCreate := rv1.NewClusterRepo("", smallForkClusterRepoName,
@@ -476,7 +488,7 @@ func (w *RancherManagedChartsTest) TestServeIcons() {
 			},
 		},
 	)
-	_, err := w.client.Steve.SteveType(catalog.ClusterRepoSteveResourceType).Create(clusterRepoToCreate)
+	_, err = w.client.Steve.SteveType(catalog.ClusterRepoSteveResourceType).Create(clusterRepoToCreate)
 	w.Require().NoError(err)
 	time.Sleep(1 * time.Second)
 
