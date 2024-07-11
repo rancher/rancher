@@ -1,0 +1,361 @@
+name: Integration Tests
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+      - release/v*
+      - refs/tags/v*
+    tags:
+      - v*
+  pull_request:
+    branches:
+      - master
+      - release/v*
+
+permissions: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    env:
+      ACTIONS_RUNNER_DEBUG: true
+      ACTIONS_STEP_DEBUG: true
+      HOST_ARCH: amd64
+      CATTLE_HELM_VERSION: v2.16.8-rancher2
+      CATTLE_MACHINE_VERSION: v0.15.0-rancher112
+      CATTLE_K3S_VERSION: v1.28.6+k3s2
+      CATTLE_K3S_VERSION_DOCKER: v1.28.6-k3s2
+      HELM_VERSION: v3.13.3
+      KUSTOMIZE_VERSION: v5.0.1
+      HELM_UNITTEST_VERSION: 0.3.2
+      CATTLE_KDM_BRANCH: dev-v2.8
+      CONTROLLER_GEN_VERSION: v0.12.0
+      YQ_VERSION: v4.40.2
+      PYTHON_VERSION: '^3.11'
+      GOLANG_VERSION: '^1.21'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure git
+        run: git config --global --add safe.directory /github/workspace
+
+      - name: Install Rancher Machine
+        run: curl -sLf https://github.com/rancher/machine/releases/download/${{ env.CATTLE_MACHINE_VERSION }}/rancher-machine-${{ env.HOST_ARCH }}.tar.gz | sudo tar xvzf - -C /usr/bin
+
+      - name: Install k3d
+        run: curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | TAG=${{ env.K3D_VERSION }} bash
+
+      - name: Install golangci-lint and spectrometer
+        if: ${{ env.HOST_ARCH == 'amd64' }}
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.54.2
+          curl -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/fossas/spectrometer/master/install.sh | sh
+
+      - name: Install controller-gen
+        run: go install sigs.k8s.io/controller-tools/cmd/controller-gen@${{ env.CONTROLLER_GEN_VERSION }}
+
+      - name: Install yq
+        run: |
+          wget -q https://github.com/mikefarah/yq/releases/download/${{ env.YQ_VERSION }}/yq_linux_${{ env.HOST_ARCH }}.tar.gz -O - | tar xz
+          sudo mv yq_linux_${{ env.HOST_ARCH }} /usr/bin/yq
+
+      ## Helm Setup start
+      - name: Uninstall Helm
+        run: |
+          sudo rm -rf /usr/local/bin/helm /usr/bin/rancher-helm /usr/bin/rancher-tiller ~/.helm /usr/local/bin/helm_v3 /usr/local/bin/tiller
+
+      - name: Set Helm 2 URL
+        run: echo "HELM_URL_V2=https://github.com/rancher/helm/releases/download/${{ env.CATTLE_HELM_VERSION }}/rancher-helm" >> $GITHUB_ENV
+
+      - name: Set Tiller URL
+        run: echo "TILLER_URL=https://github.com/rancher/helm/releases/download/${{ env.CATTLE_HELM_VERSION }}/rancher-tiller" >> $GITHUB_ENV
+
+      - name: Download Rancher Helm
+        run: sudo curl -sLf ${{ env.HELM_URL_V2 }} -o /usr/bin/rancher-helm-v2
+
+      - name: Download Rancher Tiller
+        run: sudo curl -sLf ${{ env.TILLER_URL }} -o /usr/bin/rancher-tiller
+
+      - name: Set permissions for Helm and Tiller
+        run: sudo chmod +x /usr/bin/rancher-helm-v2 /usr/bin/rancher-tiller
+
+      - name: Create symlink for Helm
+        run: sudo ln -s /usr/bin/rancher-helm-v2 /usr/bin/helm
+
+      - name: Create symlink for Tiller
+        run: sudo ln -s /usr/bin/rancher-tiller /usr/bin/tiller
+
+      - name: Initialize Helm
+        run: helm init -c --stable-repo-url https://charts.helm.sh/stable/
+
+      - name: Set Helm 3 URL
+        run: echo "HELM_URL_V3=https://get.helm.sh/helm-${{ env.HELM_VERSION }}-linux-${{ env.HOST_ARCH }}.tar.gz" >> $GITHUB_ENV
+
+      - name: Create temporary directory for Helm 3
+        run: sudo mkdir /usr/tmp
+
+      - name: Download and extract Helm 3
+        run: curl ${{ env.HELM_URL_V3 }} | sudo tar xvzf - --strip-components=1 -C /usr/tmp/
+
+      - name: Move Helm 3 binary
+        run: sudo mv /usr/tmp/helm /usr/bin/helm_v3
+
+      ## Helm Setup end
+
+      - name: Install kustomize
+        run: |
+          KUSTOMIZE_URL=https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/${{ env.KUSTOMIZE_VERSION }}/kustomize_${{ env.KUSTOMIZE_VERSION }}_linux_${{ env.HOST_ARCH }}.tar.gz
+          curl -sLf ${KUSTOMIZE_URL} | sudo tar -xzf - -C /usr/bin
+          sudo chmod +x /usr/bin/kustomize
+
+      ## Start K3s binaries
+
+      - name: Create temporary directory for binaries
+        run: sudo mkdir -p /tmp/k3s-binaries
+
+      - name: Copy all binaries from k3s image to temporary directory
+        run: |
+          docker run --rm --entrypoint "" -v /tmp/k3s-binaries:/host-bin rancher/k3s:${{ env.CATTLE_K3S_VERSION_DOCKER }} sh -c "
+            cp /bin/blkid /host-bin/ &&
+            cp /bin/bandwidth /host-bin/ &&
+            cp /bin/cni /host-bin/ &&
+            cp /bin/conntrack /host-bin/ &&
+            cp /bin/containerd /host-bin/ &&
+            cp /bin/containerd-shim-runc-v2 /host-bin/ &&
+            cp /bin/ethtool /host-bin/ &&
+            cp /bin/firewall /host-bin/ &&
+            cp /bin/ip /host-bin/ &&
+            cp /bin/ipset /host-bin/ &&
+            cp /bin/k3s /host-bin/ &&
+            cp /bin/losetup /host-bin/ &&
+            cp /bin/pigz /host-bin/ &&
+            cp /bin/runc /host-bin/ &&
+            cp /bin/which /host-bin/ &&
+            cp /bin/aux/xtables-legacy-multi /host-bin/"
+
+      - name: Removing containerd
+        run: | 
+          sudo rm -rf /usr/bin/containerd
+          sudo rm -rf /usr/bin/containerd-shim-runc-v2
+
+      - name: Copy binaries from temporary directories to bin directory
+        run: | 
+          sudo cp /tmp/k3s-binaries/blkid /usr/bin/blkid
+          sudo cp /tmp/k3s-binaries/bandwidth /usr/bin/bandwidth
+          sudo cp /tmp/k3s-binaries/cni /usr/bin/cni
+          sudo cp /tmp/k3s-binaries/conntrack /usr/bin/conntrack
+          sudo cp /tmp/k3s-binaries/containerd /usr/bin/containerd
+          sudo cp /tmp/k3s-binaries/containerd-shim-runc-v2 /usr/bin/containerd-shim-runc-v2
+          sudo cp /tmp/k3s-binaries/ethtool /usr/bin/ethtool
+          sudo cp /tmp/k3s-binaries/firewall /usr/bin/firewall
+          sudo cp /tmp/k3s-binaries/ip /usr/bin/ip
+          sudo cp /tmp/k3s-binaries/ipset /usr/bin/ipset
+          sudo cp /tmp/k3s-binaries/k3s /usr/bin/k3s
+          sudo cp /tmp/k3s-binaries/losetup /usr/bin/losetup
+          sudo cp /tmp/k3s-binaries/pigz /usr/bin/pigz
+          sudo cp /tmp/k3s-binaries/runc /usr/bin/runc
+          sudo cp /tmp/k3s-binaries/which /usr/bin/which
+          sudo cp /tmp/k3s-binaries/xtables-legacy-multi /usr/bin/xtables-legacy-multi
+
+      - name: Create symbolic links for CNI binaries
+        run: |
+          sudo ln -s /usr/bin/cni /usr/bin/bridge
+          sudo ln -s /usr/bin/cni /usr/bin/flannel
+          sudo ln -s /usr/bin/cni /usr/bin/host-local
+          sudo ln -s /usr/bin/cni /usr/bin/loopback
+          sudo ln -s /usr/bin/cni /usr/bin/portmap
+
+      - name: Removing ctr and kubectl
+        run: | 
+          sudo rm -rf /usr/bin/ctr
+          sudo rm -rf /usr/bin/kubectl
+          sudo rm -rf /usr/bin/unpigz
+
+      - name: Create symbolic links for k3s binaries
+        run: |
+          sudo ln -s /usr/bin/k3s /usr/bin/crictl
+          sudo ln -s /usr/bin/k3s /usr/bin/ctr
+          sudo ln -s /usr/bin/k3s /usr/bin/k3s-agent
+          sudo ln -s /usr/bin/k3s /usr/bin/k3s-etcd-snapshot
+          sudo ln -s /usr/bin/k3s /usr/bin/k3s-server
+          sudo ln -s /usr/bin/k3s /usr/bin/kubectl
+
+      - name: Create symbolic links for pigz binary
+        run: sudo ln -s /usr/bin/pigz /usr/bin/unpigz
+
+      - name: Create symbolic links for iptables binaries
+        run: |
+          sudo ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables
+          sudo ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables-save
+          sudo ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables-restore
+          sudo ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables-translate
+          sudo ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables
+          sudo ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables-save
+          sudo ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables-restore
+          sudo ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables-translate
+
+      - name: Set up kubeconfig for k3s
+        run: |
+          sudo mkdir -p /go/src/github.com/rancher/rancher/.kube
+          sudo ln -s /etc/rancher/k3s/k3s.yaml /go/src/github.com/rancher/rancher/.kube/k3s.yaml
+
+      ## End K3s binaries
+
+      - name: Install k3s images
+        run: sudo curl -sLf https://github.com/rancher/k3s/releases/download/${{ env.CATTLE_K3S_VERSION }}/k3s-images.txt -o /usr/tmp/k3s-images.txt
+
+      - name: Install Python and dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-pip python3-dev libffi-dev libssl-dev
+          sudo pip3 install --upgrade pip
+          sudo pip3 install tox flake8
+
+      - name: Build Docker Images
+        run: sudo -E ./scripts/entry gha-build
+
+      - name: Save Docker images to files
+        run: |
+          docker save rancher/rancher -o rancher.tar
+          docker save rancher/rancher-agent -o rancher-agent.tar
+          tar -czf docker-images.tar.gz rancher.tar rancher-agent.tar ./bin/data.json
+
+      - name: Upload Docker images artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: docker-images
+          path: docker-images.tar.gz
+
+  test:
+    runs-on: ubuntu-latest
+    needs: build
+    timeout-minutes: 60
+
+    env:
+      ACTIONS_RUNNER_DEBUG: true
+      ACTIONS_STEP_DEBUG: true
+      HOST_ARCH: amd64
+      CATTLE_HELM_VERSION: v2.16.8-rancher2
+      CATTLE_MACHINE_VERSION: v0.15.0-rancher112
+      CATTLE_K3S_VERSION: v1.28.6+k3s2
+      CATTLE_K3S_VERSION_DOCKER: v1.28.6-k3s2
+      HELM_VERSION: v3.13.3
+      KUSTOMIZE_VERSION: v5.0.1
+      HELM_UNITTEST_VERSION: 0.3.2
+      CATTLE_KDM_BRANCH: dev-v2.8
+      CONTROLLER_GEN_VERSION: v0.12.0
+      YQ_VERSION: v4.40.2
+      K3D_VERSION: v5.6.3
+      PYTHON_VERSION: '^3.11'
+      GOLANG_VERSION: '^1.21'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Clean up Docker
+        run: |
+          docker system prune -af
+          docker volume prune -f
+
+      - name: Download Docker images artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: docker-images
+          path: .
+  
+      - name: Extract Docker images
+        run: tar -xzf docker-images.tar.gz
+
+      - name: Load Docker images
+        run: |
+          docker load -i rancher.tar
+          docker load -i rancher-agent.tar
+
+      - name: Install k3d
+        run: curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | TAG=${{ env.K3D_VERSION }} bash
+
+      - name: Uninstall existing Python versions
+        run: |
+          sudo apt-get remove -y python3
+          sudo apt-get autoremove -y
+          sudo apt-get purge -y python3
+          sudo apt-get clean
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "${{ env.PYTHON_VERSION }}"
+
+      - name: Check Python version
+        run: |
+          sudo rm -rf /usr/bin/python3
+          sudo cp $(which python3) /usr/bin/python3
+          python3 --version
+          python3 -m ensurepip --upgrade
+          #sudo apt-get install -y docker.io
+          #sudo systemctl start docker
+          #sudo usermod -aG docker $USER
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "${{ env.GOLANG_VERSION }}" # The Go version to download (if necessary) and use.
+  
+      - name: Install Python and dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-pip python3-dev libffi-dev libssl-dev
+          sudo pip3 install --upgrade pip
+          sudo pip3 install tox flake8
+
+      ## Helm Setup start
+      - name: Uninstall Helm
+        run: |
+          sudo rm -rf /usr/local/bin/helm /usr/bin/rancher-helm /usr/bin/rancher-tiller ~/.helm /usr/local/bin/helm_v3 /usr/local/bin/tiller
+
+      - name: Set Helm 2 URL
+        run: echo "HELM_URL_V2=https://github.com/rancher/helm/releases/download/${{ env.CATTLE_HELM_VERSION }}/rancher-helm" >> $GITHUB_ENV
+
+      - name: Set Tiller URL
+        run: echo "TILLER_URL=https://github.com/rancher/helm/releases/download/${{ env.CATTLE_HELM_VERSION }}/rancher-tiller" >> $GITHUB_ENV
+
+      - name: Download Rancher Helm
+        run: sudo curl -sLf ${{ env.HELM_URL_V2 }} -o /usr/bin/rancher-helm-v2
+
+      - name: Download Rancher Tiller
+        run: sudo curl -sLf ${{ env.TILLER_URL }} -o /usr/bin/rancher-tiller
+
+      - name: Set permissions for Helm and Tiller
+        run: sudo chmod +x /usr/bin/rancher-helm-v2 /usr/bin/rancher-tiller
+
+      - name: Create symlink for Helm
+        run: sudo ln -s /usr/bin/rancher-helm-v2 /usr/bin/helm
+
+      - name: Create symlink for Tiller
+        run: sudo ln -s /usr/bin/rancher-tiller /usr/bin/tiller
+
+      - name: Initialize Helm
+        run: helm init -c --stable-repo-url https://charts.helm.sh/stable/
+
+      - name: Set Helm 3 URL
+        run: echo "HELM_URL_V3=https://get.helm.sh/helm-${{ env.HELM_VERSION }}-linux-${{ env.HOST_ARCH }}.tar.gz" >> $GITHUB_ENV
+
+      - name: Create temporary directory for Helm 3
+        run: sudo mkdir /usr/tmp
+
+      - name: Download and extract Helm 3
+        run: curl ${{ env.HELM_URL_V3 }} | sudo tar xvzf - --strip-components=1 -C /usr/tmp/
+
+      - name: Move Helm 3 binary
+        run: sudo mv /usr/tmp/helm /usr/bin/helm_v3
+
+      ## Helm Setup end
+
+      - name: Run Tests
+        run: sudo -E ./scripts/entry gha-integration-tests

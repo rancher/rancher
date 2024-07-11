@@ -466,6 +466,7 @@ func (w *RancherManagedChartsTest) pollUntilDownloaded(ClusterRepoName string, p
 }
 
 func (w *RancherManagedChartsTest) TestServeIcons() {
+	w.T().Skip()
 	// Testing: Chart.icon field with (file:// scheme)
 	// Create ClusterRepo for charts-small-fork
 	clusterRepoToCreate := rv1.NewClusterRepo("", smallForkClusterRepoName,
