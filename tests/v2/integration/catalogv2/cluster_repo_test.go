@@ -20,6 +20,7 @@ import (
 	registryGoogle "github.com/google/go-containerregistry/pkg/registry"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	rv1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/catalogv2/oci"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/helm"
@@ -38,9 +39,11 @@ import (
 	"helm.sh/helm/v3/pkg/registry"
 	"helm.sh/helm/v3/pkg/repo"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	kwait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -633,6 +636,8 @@ func (c *ClusterRepoTestSuite) TestOCIRepoChartInstallation() {
 	catalogClient, err := c.client.GetClusterCatalogClient("local")
 	assert.NoError(c.T(), err)
 
+	logrus.Infof("Cluster Catalog Client: %v", catalogClient)
+
 	clusterRepo := &v1.ClusterRepo{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: repoName,
@@ -649,40 +654,51 @@ func (c *ClusterRepoTestSuite) TestOCIRepoChartInstallation() {
 	_, err = c.pollUntilDownloaded(repoName, metav1.Time{})
 	require.NoError(c.T(), err)
 
+	logrus.Infof("Cluster Repo Created %v", clusterRepo)
+
 	// check if chart can be fetched
 	chartInstallAction := types.ChartInstallAction{
-		DisableHooks: false,
-		Timeout:      nil,
-	}
-
-	chartInstallAction.Charts = []types.ChartInstall{
-		{
-			ChartName:   "testingchart",
-			Version:     "0.1.0",
-			ReleaseName: "testreleasename",
-		},
-	}
+		DisableHooks:             false,
+		Timeout:                  &metav1.Duration{Duration: 60 * time.Second},
+		Wait:                     true,
+		Namespace:                "default",
+		DisableOpenAPIValidation: false,
+		Charts: []types.ChartInstall{
+			{
+				ChartName:   "testingchart",
+				Version:     "0.1.0",
+				ReleaseName: "testreleasename",
+			},
+		}}
 
 	err = catalogClient.InstallChart(&chartInstallAction, repoName)
 	assert.NoError(c.T(), err)
 
+	logrus.Infof("Chart Installed %v", chartInstallAction)
+
+	// err = c.pollAppUntilInstalled("testreleasename", metav1.Time{})
+	err = c.waitForChart(rv1.StatusDeployed, "testreleasename", 0)
+	require.NoError(c.T(), err)
+	logrus.Info("APP INSTALLEEEEEED")
 	// wait for chart to be full deployed
-	watchAppInterface, err := catalogClient.Apps("default").Watch(context.TODO(), metav1.ListOptions{
-		FieldSelector:  "metadata.name=" + "testreleasename",
-		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
-	})
-	assert.NoError(c.T(), err)
+	// watchAppInterface, err := catalogClient.Apps("default").Watch(context.TODO(), metav1.ListOptions{
+	// 	FieldSelector:  "metadata.name=" + "testreleasename",
+	// 	TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+	// })
+	// assert.NoError(c.T(), err)
 
-	err = rancherWait.WatchWait(watchAppInterface, func(event watch.Event) (ready bool, err error) {
-		app := event.Object.(*v1.App)
+	// err = rancherWait.WatchWait(watchAppInterface, func(event watch.Event) (ready bool, err error) {
+	// 	app := event.Object.(*v1.App)
 
-		state := app.Status.Summary.State
-		if state == string(v1.StatusDeployed) {
-			return true, nil
-		}
-		return false, nil
-	})
-	assert.NoError(c.T(), err)
+	// 	state := app.Status.Summary.State
+	// 	if state == string(v1.StatusDeployed) {
+	// 		logrus.Debugf("App %s state is deployed: %s", app.Name, state)
+	// 		return true, nil
+	// 	}
+	// 	logrus.Debugf("App %s state is not deployed %s", app.Name, state)
+	// 	return false, nil
+	// })
+	// assert.NoError(c.T(), err)
 
 	// Validate uninstalling the chart
 	chartUninstallAction := types.ChartUninstallAction{
@@ -693,7 +709,7 @@ func (c *ClusterRepoTestSuite) TestOCIRepoChartInstallation() {
 	err = catalogClient.UninstallChart("testreleasename", "default", &chartUninstallAction)
 	assert.NoError(c.T(), err)
 
-	watchAppInterface, err = catalogClient.Apps("default").Watch(context.TODO(), metav1.ListOptions{
+	watchAppInterface, err := catalogClient.Apps("default").Watch(context.TODO(), metav1.ListOptions{
 		FieldSelector:  "metadata.name=" + "testreleasename",
 		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
 	})
@@ -760,6 +776,29 @@ func (c *ClusterRepoTestSuite) testClusterRepo(params ClusterRepoParams) {
 	require.Error(c.T(), err)
 }
 
+func (c *ClusterRepoTestSuite) waitForChart(status rv1.Status, name string, previousVersion int) error {
+	t := 360
+	var app *rv1.App
+	err := kwait.Poll(time.Duration(500*time.Millisecond), time.Duration(t)*time.Second, func() (done bool, err error) {
+		app, err = c.catalogClient.Apps("default").Get(context.TODO(), name, metav1.GetOptions{})
+		logrus.Errorf("waitForChart error: %v", err)
+		logrus.Infof("waitForChart app: %#+v\n", app)
+		e, ok := err.(*errors.StatusError)
+		if ok && errors.IsNotFound(e) {
+			return false, nil
+		}
+		if err != nil {
+			return false, err
+		}
+		if app.Spec.Info.Status == status && app.Spec.Version > previousVersion {
+			return true, nil
+		}
+		return false, nil
+	})
+	c.Require().NoError(err)
+	return err
+}
+
 // pollUntilDownloaded Polls until the ClusterRepo of the given name has been downloaded (by comparing prevDownloadTime against the current DownloadTime)
 func (c *ClusterRepoTestSuite) pollUntilDownloaded(ClusterRepoName string, prevDownloadTime metav1.Time) (*stevev1.SteveAPIObject, error) {
 	var clusterRepo *stevev1.SteveAPIObject
@@ -777,6 +816,30 @@ func (c *ClusterRepoTestSuite) pollUntilDownloaded(ClusterRepoName string, prevD
 	})
 
 	return clusterRepo, err
+}
+
+func (c *ClusterRepoTestSuite) pollAppUntilInstalled(AppName string, prevDownloadTime metav1.Time) error {
+	err := kwait.Poll(PollInterval, time.Minute, func() (done bool, err error) {
+		app, err := c.catalogClient.Apps("default").Get(context.TODO(), AppName, metav1.GetOptions{})
+
+		// clusterRepo, err := c.catalogClient.ClusterRepos().Get(context.TODO(), ClusterRepoName, metav1.GetOptions{})
+		if err != nil {
+			logrus.Errorf("Error getting app %s: %v", AppName, err)
+			return false, err
+		}
+		c.Require().NoError(err)
+		if app.Name != AppName {
+			logrus.Infof("App %s not found", AppName)
+			logrus.Infof("Current app found is %s", app.Name)
+			return false, nil
+		}
+
+		logrus.Debugf("App %s state is %s", app.Name, app.Status.Summary.State)
+
+		return app.Status.Summary.State == "deployed", nil
+	})
+
+	return err
 }
 
 func (c *ClusterRepoTestSuite) getSpecFromClusterRepo(obj *stevev1.SteveAPIObject) *v1.RepoSpec {

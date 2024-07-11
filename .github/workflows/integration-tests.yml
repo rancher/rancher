@@ -139,12 +139,12 @@ jobs:
             cp /bin/aux/xtables-legacy-multi /host-bin/"
 
       - name: Removing containerd
-        run: | 
+        run: |
           sudo rm -rf /usr/bin/containerd
           sudo rm -rf /usr/bin/containerd-shim-runc-v2
 
       - name: Copy binaries from temporary directories to bin directory
-        run: | 
+        run: |
           sudo cp /tmp/k3s-binaries/blkid /usr/bin/blkid
           sudo cp /tmp/k3s-binaries/bandwidth /usr/bin/bandwidth
           sudo cp /tmp/k3s-binaries/cni /usr/bin/cni
@@ -171,7 +171,7 @@ jobs:
           sudo ln -s /usr/bin/cni /usr/bin/portmap
 
       - name: Removing ctr and kubectl
-        run: | 
+        run: |
           sudo rm -rf /usr/bin/ctr
           sudo rm -rf /usr/bin/kubectl
           sudo rm -rf /usr/bin/unpigz
@@ -258,6 +258,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
+
       - name: Clean up Docker
         run: |
           docker system prune -af
@@ -268,7 +271,7 @@ jobs:
         with:
           name: docker-images
           path: .
-  
+
       - name: Extract Docker images
         run: tar -xzf docker-images.tar.gz
 
@@ -306,7 +309,7 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: "${{ env.GOLANG_VERSION }}" # The Go version to download (if necessary) and use.
-  
+
       - name: Install Python and dependencies
         run: |
           sudo apt-get update
