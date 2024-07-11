@@ -820,6 +820,5 @@ func getOutboundIP() net.IP {
 }
 
 func TestClusterRepoTestSuite(t *testing.T) {
-	t.Skip()
 	suite.Run(t, new(ClusterRepoTestSuite))
 }

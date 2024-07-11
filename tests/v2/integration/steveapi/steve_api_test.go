@@ -2686,11 +2686,9 @@ func retryRequest(fn func() error) error {
 }
 
 func TestSteveLocal(t *testing.T) {
-	t.Skip()
 	suite.Run(t, new(LocalSteveAPITestSuite))
 }
 
 func TestSteveDownstream(t *testing.T) {
-	t.Skip()
 	suite.Run(t, new(DownstreamSteveAPITestSuite))
 }
