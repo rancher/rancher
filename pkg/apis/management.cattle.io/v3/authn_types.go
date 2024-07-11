@@ -15,6 +15,10 @@ const (
 	// AuthConfigConditionShibbolethSecretFixed is applied to an AuthConfig when the
 	// incorrect name for the shibboleth OpenLDAP secret has been fixed.
 	AuthConfigConditionShibbolethSecretFixed condition.Cond = "ShibbolethSecretFixed"
+
+	// AuthConfigOKTAPasswordMigrated is applied when an Okta password has been
+	// moved to a Secret.
+	AuthConfigOKTAPasswordMigrated condition.Cond = "OktaPasswordMigrated"
 )
 
 // +genclient
@@ -504,7 +508,7 @@ type KeyCloakConfig struct {
 
 type OKTAConfig struct {
 	SamlConfig     `json:",inline" mapstructure:",squash"`
-	OpenLdapConfig LdapFields `json:"openLdapConfig" mapstructure:",squash"`
+	OpenLdapConfig LdapFields `json:"openLdapConfig"`
 }
 
 type ShibbolethConfig struct {

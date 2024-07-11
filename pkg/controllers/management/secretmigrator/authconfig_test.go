@@ -394,7 +394,7 @@ func TestOKTAAuthConfigMigration(t *testing.T) {
 	}{
 		{
 			name:                   "test migrating OKTA configuration with openLDAP",
-			unstructuredAuthConfig: getUnstructuredOKTAWithOpenLDAP(),
+			unstructuredAuthConfig: getUnstructuredOKTA(withOpenLDAP),
 			authConfig: apimgmtv3.AuthConfig{
 				Type:    "oktaConfig",
 				Enabled: true,
@@ -417,7 +417,8 @@ func TestOKTAAuthConfigMigration(t *testing.T) {
 		},
 		{
 			name:                   "test migrating with existing migration",
-			unstructuredAuthConfig: getUnstructuredOKTAWithOpenLDAP(),
+			unstructuredAuthConfig: getUnstructuredOKTA(withOpenLDAP),
+			wantMigration:          true,
 			authConfig: apimgmtv3.AuthConfig{
 				Type:    "oktaConfig",
 				Enabled: true,
@@ -485,7 +486,7 @@ func TestOKTAAuthConfigMigration(t *testing.T) {
 
 			assert.NotEmpty(t, oktaConfig.Status.Conditions)
 			assert.NotNil(t, oktaConfig.Status.Conditions[0])
-			assert.Equal(t, apimgmtv3.AuthConfigConditionSecretsMigrated, oktaConfig.Status.Conditions[0].Type)
+			assert.Equal(t, apimgmtv3.AuthConfigOKTAPasswordMigrated, oktaConfig.Status.Conditions[0].Type)
 			assert.Equal(t, tt.expectedLdapConfig, oktaConfig.OpenLdapConfig)
 		})
 	}
@@ -578,10 +579,11 @@ func getUnstructuredShibbolethConfig(opts ...func(map[string]any)) map[string]an
 	return raw
 }
 
-func getUnstructuredOKTAWithOpenLDAP() map[string]any {
+func getUnstructuredOKTA(opts ...func(map[string]any)) map[string]any {
 	timeStamp, _ := time.Parse(time.RFC3339, testCreationStampString)
 	createdTime := metav1.NewTime(timeStamp)
-	return map[string]any{
+
+	raw := map[string]any{
 		"metadata": map[string]any{
 			"name":              "okta",
 			"creationtimestamp": createdTime,
@@ -592,6 +594,12 @@ func getUnstructuredOKTAWithOpenLDAP() map[string]any {
 		"enabled":                true,
 		"serviceAccountPassword": testPassword,
 	}
+
+	for _, o := range opts {
+		o(raw)
+	}
+
+	return raw
 }
 
 type mockAuthConfigClient struct {

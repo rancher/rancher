@@ -29,7 +29,7 @@ func TestProxyRequest_content_type(t *testing.T) {
 		t.Errorf("got StatusCode %v, want %v", resp.StatusCode, http.StatusOK)
 	}
 
-	wantContent := "application/javascript"
+	wantContent := "text/javascript; charset=utf-8"
 	if ct := resp.Header.Get("Content-Type"); ct != wantContent {
 		t.Errorf("got Content-Type %s, want %s", ct, wantContent)
 
