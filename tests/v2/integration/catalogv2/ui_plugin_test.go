@@ -135,7 +135,6 @@ func (w *UIPluginTest) SetupSuite() {
 }
 
 func TestUIPluginSuite(t *testing.T) {
-	t.Skip()
 	suite.Run(t, new(UIPluginTest))
 }
 
