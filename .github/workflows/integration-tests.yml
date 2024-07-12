@@ -12,6 +12,8 @@ on:
     branches:
       - master
       - release/v*
+env:
+  CATTLE_KDM_BRANCH: dev-v2.9
 
 permissions: {}
 
@@ -67,7 +69,6 @@ jobs:
       HELM_VERSION: v3.15.2
       KUSTOMIZE_VERSION: v5.4.2
       HELM_UNITTEST_VERSION: 0.3.2
-      CATTLE_KDM_BRANCH: dev-v2.9
       CONTROLLER_GEN_VERSION: v0.14.0
       YQ_VERSION: v4.44.2
       K3D_VERSION: v5.6.3
