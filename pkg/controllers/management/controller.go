@@ -18,7 +18,6 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/drivers/kontainerdriver"
 	"github.com/rancher/rancher/pkg/controllers/management/drivers/nodedriver"
 	"github.com/rancher/rancher/pkg/controllers/management/etcdbackup"
-	"github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
 	"github.com/rancher/rancher/pkg/controllers/management/node"
 	"github.com/rancher/rancher/pkg/controllers/management/nodepool"
 	"github.com/rancher/rancher/pkg/controllers/management/nodetemplate"
@@ -50,7 +49,6 @@ func Register(ctx context.Context, management *config.ManagementContext, manager
 	clusterstats.Register(ctx, management, manager)
 	clusterstatus.Register(ctx, management)
 	kontainerdriver.Register(ctx, management)
-	kontainerdrivermetadata.Register(ctx, management)
 	nodedriver.Register(ctx, management)
 	nodepool.Register(ctx, management)
 	cloudcredential.Register(ctx, management)
