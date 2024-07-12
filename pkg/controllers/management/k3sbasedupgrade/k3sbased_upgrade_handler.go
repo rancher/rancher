@@ -65,6 +65,7 @@ func (h *handler) onClusterChange(key string, cluster *v3.Cluster) (*v3.Cluster,
 		if !needsUpgrade {
 			// if upgrade was in progress, make sure to set the state back
 			if v32.ClusterConditionUpgraded.IsUnknown(cluster) {
+				logrus.Infof("[k3s-based-upgrader] finished upgrading cluster [%s]", cluster.Name)
 				v32.ClusterConditionUpgraded.True(cluster)
 				v32.ClusterConditionUpgraded.Message(cluster, "")
 				return h.clusterClient.Update(cluster)
@@ -72,6 +73,18 @@ func (h *handler) onClusterChange(key string, cluster *v3.Cluster) (*v3.Cluster,
 			return cluster, nil
 		}
 
+	}
+
+	if v32.ClusterConditionUpgraded.IsTrue(cluster) {
+		logrus.Infof("[k3s-based-upgrader] upgrading cluster [%s] version from [%s] to [%s]",
+			cluster.Name, cluster.Status.Version.GitVersion, updateVersion)
+		if isNewer {
+			logrus.Debugf("[k3s-based-upgrader] upgrading cluster [%s] because cluster version [%s] is newer than observed version [%s]",
+				cluster.Name, updateVersion, cluster.Status.Version.GitVersion)
+		} else {
+			logrus.Debugf("[k3s-based-upgrader] upgrading cluster [%s] because cluster version [%s] is newer than observed node version",
+				cluster.Name, updateVersion)
+		}
 	}
 
 	// set cluster upgrading status
@@ -147,6 +160,7 @@ func (h *handler) deployK3sBasedUpgradeController(clusterName string, isK3s, isR
 		if !errors.IsNotFound(err) {
 			return err
 		}
+		logrus.Infof("[k3s-based-upgrader] installing app [%s] in cluster [%s]", appname, clusterName)
 		desiredApp := &v33.App{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      appname,
@@ -185,6 +199,7 @@ func (h *handler) deployK3sBasedUpgradeController(clusterName string, isK3s, isR
 
 		desiredApp := app.DeepCopy()
 		desiredApp.Spec.ExternalID = latestVersionID
+		logrus.Infof("[k3s-based-upgrader] updating app [%s] in cluster [%s]", appname, clusterName)
 		// new version of k3s upgrade available, or the valuesYaml have changed, update app
 		if _, err = appClient.Update(desiredApp); err != nil {
 			return err
@@ -233,6 +248,8 @@ func (h *handler) nodesNeedUpgrade(cluster *v3.Cluster, version string) (bool, e
 			return false, err
 		}
 		if isNewer {
+			logrus.Debugf("[k3s-based-upgrader] cluster [%s] version [%s] is newer than observed node [%s] version [%s]",
+				cluster.Name, version, node.Name, node.Status.InternalNodeStatus.NodeInfo.KubeletVersion)
 			return true, nil
 		}
 	}
