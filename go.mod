@@ -14,7 +14,6 @@ replace (
 
 	github.com/rancher/rancher/pkg/apis => ./pkg/apis
 	github.com/rancher/rancher/pkg/client => ./pkg/client
-	github.com/rancher/rke => github.com/rancher/rke v1.6.0-rc10
 
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc => go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.42.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp => go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.44.0
@@ -127,23 +126,23 @@ require (
 	github.com/prometheus/client_model v0.5.0
 	github.com/prometheus/common v0.45.0
 	github.com/rancher/aks-operator v1.9.0-rc.9
-	github.com/rancher/apiserver v0.0.0-20240708202538-39a6f2535146
+	github.com/rancher/apiserver v0.0.0-20240604183424-8c448886365e
 	github.com/rancher/channelserver v0.7.0
-	github.com/rancher/dynamiclistener v0.6.0-rc2
+	github.com/rancher/dynamiclistener v0.6.0-rc1
 	github.com/rancher/eks-operator v1.9.0-rc.9
 	github.com/rancher/fleet/pkg/apis v0.10.0-rc.19
 	github.com/rancher/gke-operator v1.9.0-rc.8
 	github.com/rancher/kubernetes-provider-detector v0.1.5
-	github.com/rancher/lasso v0.0.0-20240705194423-b2a060d103c1
+	github.com/rancher/lasso v0.0.0-20240603075835-701e919d08b7
 	github.com/rancher/machine v0.15.0-rancher114
-	github.com/rancher/norman v0.0.0-20240708202514-a0127673d1b9
+	github.com/rancher/norman v0.0.0-20240604183301-20cd23aadce1
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/remotedialer v0.4.0
 	github.com/rancher/rke v1.6.0-rc9
-	github.com/rancher/steve v0.0.0-20240709130809-47871606146c
+	github.com/rancher/steve v0.0.0-20240703132554-22a06dd14f51
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007
 	github.com/rancher/wrangler/v2 v2.2.0-rc6
-	github.com/rancher/wrangler/v3 v3.0.0
+	github.com/rancher/wrangler/v3 v3.0.0-rc2
 	github.com/robfig/cron v1.2.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.9.0
