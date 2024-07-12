@@ -669,8 +669,10 @@ func (c *ClusterRepoTestSuite) TestOCIRepoChartInstallation() {
 	require.NoError(c.T(), err)
 
 	list, err := c.catalogClient.Operations("default").List(context.TODO(), metav1.ListOptions{})
+	require.NoError(c.T(), err)
 
-	logrus.Infof("list is %v", list)
+	logrus.Infof("operation is %v", list.Items[0])
+	logrus.Infof("pod created is %v", list.Items[0].Status.Conditions)
 	require.NoError(c.T(), err)
 
 	// _, err = c.catalogClient.Apps("default").Get(context.TODO(), "testreleasename", metav1.GetOptions{})
