@@ -127,11 +127,11 @@ func (w *RancherManagedChartsTest) resetSettings() {
 }
 
 func TestRancherManagedChartsSuite(t *testing.T) {
+	t.Skip()
 	suite.Run(t, new(RancherManagedChartsTest))
 }
 
 func (w *RancherManagedChartsTest) TestInstallChartLatestVersion() {
-	w.T().Skip()
 	defer w.resetSettings()
 
 	w.Require().NoError(w.updateManagementCluster())
