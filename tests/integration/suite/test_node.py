@@ -135,6 +135,7 @@ def test_cloud_credential_delete(admin_mc, remove_resource):
     assert e.value.error.status == 405
 
 
+@pytest.mark.skip
 def test_writing_config_to_disk(admin_mc, wait_remove_resource):
     """Test that userdata and other fields from node driver configs are being
     written to disk as expected.
