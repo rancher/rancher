@@ -1,0 +1,18 @@
+name: Validate
+on: [pull_request, push]
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    container:
+      image: registry.suse.com/bci/golang:1.22
+    env:
+      GOLANG_CI_LINT_VERSION: v1.54.2
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Install Dependencies
+        run: |
+          zypper -n install gawk python311-pip python311-base python311 python311-devel python311-tox libffi-devel libopenssl-devel
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s $GOLANG_CI_LINT_VERSION
+      - name: Validate
+        run: ./scripts/validate
