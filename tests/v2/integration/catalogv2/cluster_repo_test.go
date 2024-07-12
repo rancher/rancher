@@ -616,7 +616,6 @@ func (c *ClusterRepoTestSuite) test4xxErrors(params ClusterRepoParams) {
 
 // TestOCI tests creating an OCI clusterrepo and install a chart
 func (c *ClusterRepoTestSuite) TestOCIRepoChartInstallation() {
-	c.T().Skip("Skipping test as it is flaky")
 	//start registry
 	ts, err := StartRegistry()
 	assert.NoError(c.T(), err)
