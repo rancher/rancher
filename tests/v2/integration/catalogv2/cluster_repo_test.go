@@ -618,7 +618,9 @@ func (c *ClusterRepoTestSuite) test4xxErrors(params ClusterRepoParams) {
 func (c *ClusterRepoTestSuite) TestOCIRepoChartInstallation() {
 	//start registry
 	ts, err := StartRegistry()
-	assert.NoError(c.T(), err)
+	require.NoError(c.T(), err)
+
+	defer ts.Close()
 
 	u, err := url.Parse(ts.URL)
 	require.NoError(c.T(), err)
@@ -646,10 +648,11 @@ func (c *ClusterRepoTestSuite) TestOCIRepoChartInstallation() {
 	assert.NoError(c.T(), err)
 
 	// Validate the ClusterRepo was created
-	_, err = c.pollUntilDownloaded(repoName, metav1.Time{})
+	repo, err := c.pollUntilDownloaded(repoName, metav1.Time{})
 	require.NoError(c.T(), err)
-
-	// check if chart can be fetched
+	logrus.Infof("repo name is %v", repo.State.Name)       // check if chart can be fetched
+	logrus.Infof("repo message is %v", repo.State.Message) // check if chart can be fetched
+	logrus.Infof("repo resp is %v", repo.JSONResp)         // check if chart can be fetched
 	chartInstallAction := types.ChartInstallAction{
 		DisableHooks: false,
 		Timeout:      &metav1.Duration{Duration: 60 * time.Second},
@@ -666,13 +669,6 @@ func (c *ClusterRepoTestSuite) TestOCIRepoChartInstallation() {
 
 	// err = kwait.PollUntilContextTimeout(context.TODO(), 500*time.Millisecond, 2*time.Minute, true, func(ctx context.Context) (done bool, err error) {
 	err = catalogClient.InstallChart(&chartInstallAction, repoName)
-	require.NoError(c.T(), err)
-
-	list, err := c.catalogClient.Operations("default").List(context.TODO(), metav1.ListOptions{})
-	require.NoError(c.T(), err)
-
-	logrus.Infof("operation is %v", list.Items[0])
-	logrus.Infof("pod created is %v", list.Items[0].Status.Conditions)
 	require.NoError(c.T(), err)
 
 	// _, err = c.catalogClient.Apps("default").Get(context.TODO(), "testreleasename", metav1.GetOptions{})
