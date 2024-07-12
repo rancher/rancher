@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -21,14 +23,18 @@ const (
 
 // RepoDir returns the directory where the git repo is cloned.
 func RepoDir(namespace, name, gitURL string) string {
+	logrus.Infof("RepoDir: %s %s %s", namespace, name, gitURL)
 	staticDir := filepath.Join(staticDir, namespace, name, Hash(gitURL))
 	if s, err := os.Stat(staticDir); err == nil && s.IsDir() {
+		logrus.Infof("RepoDir: StaticDir true")
 		return staticDir
 	}
 	localDir := filepath.Join(localDir, namespace, name, Hash(gitURL))
 	if s, err := os.Stat(localDir); err == nil && s.IsDir() {
+		logrus.Infof("RepoDir: LocalDir true")
 		return localDir
 	}
+	logrus.Infof("RepoDir: StateDir true")
 	return filepath.Join(stateDir, namespace, name, Hash(gitURL))
 }
 

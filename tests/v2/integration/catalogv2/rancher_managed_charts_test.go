@@ -475,7 +475,8 @@ func (w *RancherManagedChartsTest) TestServeIcons() {
 	// tests/v2/integration/catalogv2, the cloneDir would be
 	// ../../../../build/rancher-data/...
 	repoURL := "https://github.com/rancher/charts-small-fork"
-	cloneDir := "../../../../build/rancher-data/local-catalogs/v2/rancher-charts-small-fork/d39a2f6abd49e537e5015bbe1a4cd4f14919ba1c3353208a7ff6be37ffe00c52"
+	// cloneDir := "../../../../build/rancher-data/local-catalogs/v2/rancher-charts-small-fork/d39a2f6abd49e537e5015bbe1a4cd4f14919ba1c3353208a7ff6be37ffe00c52"
+	cloneDir := fmt.Sprintf("/var/lib/rancher-data/local-catalogs/v2/%s/d39a2f6abd49e537e5015bbe1a4cd4f14919ba1c3353208a7ff6be37ffe00c52", smallForkClusterRepoName)
 
 	workDir, _ := os.Getwd()
 	logrus.Infof("Current working directory: %s", workDir)
