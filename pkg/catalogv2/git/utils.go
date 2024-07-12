@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -29,6 +31,14 @@ func RepoDir(namespace, name, gitURL string) string {
 	if s, err := os.Stat(localDir); err == nil && s.IsDir() {
 		return localDir
 	}
+
+	absolutePath, _ := filepath.Abs(localDir)
+
+	fmt.Println("RepoDir: ", absolutePath)
+	logrus.Infof("RepoDir: %s", absolutePath)
+
+	logrus.Debugf("RepoDir: %s", absolutePath)
+
 	return filepath.Join(stateDir, namespace, name, Hash(gitURL))
 }
 

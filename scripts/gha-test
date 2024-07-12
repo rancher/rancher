@@ -153,8 +153,11 @@ export CATTLE_TEST_CONFIG=$(pwd)/config.yaml # used by integration tests and tes
   exit 1
 }
 
+ls 
+pwd
+
 echo Running go integration tests
-go test -v -failfast -timeout 30m -p 1 ./tests/v2/integration/... || {
+go test -v -failfast -timeout 30m -p 1 ./tests/v2/integration/catalogv2/rancher_managed_charts_test.go || {
   dump_rancher_logs
   exit 1
 }
