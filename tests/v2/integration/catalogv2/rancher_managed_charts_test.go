@@ -477,6 +477,9 @@ func (w *RancherManagedChartsTest) TestServeIcons() {
 	repoURL := "https://github.com/rancher/charts-small-fork"
 	cloneDir := "../../../../build/rancher-data/local-catalogs/v2/rancher-charts-small-fork/d39a2f6abd49e537e5015bbe1a4cd4f14919ba1c3353208a7ff6be37ffe00c52"
 
+	workDir, _ := os.Getwd()
+	logrus.Infof("Current working directory: %s", workDir)
+
 	err := os.MkdirAll(cloneDir, os.ModePerm)
 	w.Require().NoError(err)
 
