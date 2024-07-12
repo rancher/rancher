@@ -38,11 +38,9 @@ import (
 	"helm.sh/helm/v3/pkg/registry"
 	"helm.sh/helm/v3/pkg/repo"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	kwait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -666,22 +664,24 @@ func (c *ClusterRepoTestSuite) TestOCIRepoChartInstallation() {
 		},
 	}
 
-	err = kwait.PollUntilContextTimeout(context.TODO(), 500*time.Millisecond, 2*time.Minute, true, func(ctx context.Context) (done bool, err error) {
-		err = catalogClient.InstallChart(&chartInstallAction, repoName)
-		if err != nil {
-			return false, err
-		}
-
-		_, err = c.catalogClient.Apps("default").Get(context.TODO(), "testreleasename", metav1.GetOptions{})
-		logrus.Errorf("waitForChart error: %v", err)
-		e, ok := err.(*errors.StatusError)
-		if ok && errors.IsNotFound(e) {
-			return false, nil
-		}
-
-		return true, nil
-	})
+	// err = kwait.PollUntilContextTimeout(context.TODO(), 500*time.Millisecond, 2*time.Minute, true, func(ctx context.Context) (done bool, err error) {
+	err = catalogClient.InstallChart(&chartInstallAction, repoName)
 	require.NoError(c.T(), err)
+
+	list, err := c.catalogClient.Operations("default").List(context.TODO(), metav1.ListOptions{})
+
+	logrus.Infof("list is %v", list)
+	require.NoError(c.T(), err)
+
+	// _, err = c.catalogClient.Apps("default").Get(context.TODO(), "testreleasename", metav1.GetOptions{})
+	// logrus.Errorf("waitForChart error: %v", err)
+	// e, ok := err.(*errors.StatusError)
+	// if ok && errors.IsNotFound(e) {
+	// 	return false, nil
+	// }
+
+	// return true, nil
+	// })
 
 	// wait for chart to be full deployed
 	watchAppInterface, err := catalogClient.Apps("default").Watch(context.TODO(), metav1.ListOptions{
