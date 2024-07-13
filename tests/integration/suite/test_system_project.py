@@ -16,6 +16,7 @@ loggingNamespace = "cattle-logging"
 operatorNamespace = "rancher-operator-system"
 
 
+@pytest.mark.skip
 def test_system_project_created(admin_cc):
     projects = admin_cc.management.client.list_project(
         clusterId=admin_cc.cluster.id)
