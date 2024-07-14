@@ -164,7 +164,7 @@ jobs:
           platforms: "${{ matrix.os }}/${{ matrix.arch }}"
           file: ./package/Dockerfile.agent
           labels: "${{ steps.meta.outputs.labels }}"
-          outputs: type=docker,dest=/tmp/rancher-${{ matrix.os }}-${{ matrix.arch }}.tar
+          outputs: type=docker,dest=/tmp/rancher-agent-${{ matrix.os }}-${{ matrix.arch }}.tar
       - name: Upload image
         uses: actions/upload-artifact@v4
         with:
