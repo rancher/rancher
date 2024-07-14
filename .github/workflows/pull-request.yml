@@ -15,6 +15,8 @@ env:
   HELM_UNITTEST_VERSION: 0.3.2
   HELM_VERSION_V3: v3.13.3
 jobs:
+  unit-tests:
+    uses: ./.github/workflows/unit-tests.yml
   build-chart:
     runs-on: ubuntu-latest
     steps:

@@ -15,7 +15,7 @@ env:
   HELM_VERSION_V3: v3.13.3
 jobs:
   unit-tests:
-    uses: ./.github/workflows/unit-test.yml
+    uses: ./.github/workflows/unit-tests.yml
   build-chart:
     runs-on: ubuntu-latest
     steps:
@@ -91,6 +91,13 @@ jobs:
         run: |
           echo "ARCH=${{ matrix.arch }}" >> "$GITHUB_ENV"
           echo "RKE_VERSION=$(grep -m1 'github.com/rancher/rke' go.mod | awk '{print $2}')" >> "$GITHUB_ENV"
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          flavor: |
+            latest=false
       - name: Load Secrets from Vault
         uses: rancher-eio/read-vault-secrets@main
         with:
@@ -104,17 +111,16 @@ jobs:
           password: ${{ env.DOCKER_PASSWORD }}
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Create k3s images file
+        run: touch k3s-airgap-images.tar
+      - name: Download data.json
+        run: curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${{ env.CATTLE_KDM_BRANCH }}/data.json > ./data.json
       - name: Build and export server
         id: build
-        uses: ./.github/actions/build-rancher-server
+        uses: docker/build-push-action@v5
         with:
-          commit: ${{ github.sha }}
-          rke_version: ${{ env.RKE_VERSION }}
-          image: ${{ env.IMAGE }}
-          tag: ${{ env.TAG }}-${{ matrix.arch }}
-          kdm_branch: ${{ env.CATTLE_KDM_BRANCH }}
-          os: ${{ matrix.os }}
-          arch: ${{ matrix.arch }}
           push: true
           build-args: |
             "VERSION=${{ env.TAG }}"
@@ -139,6 +145,13 @@ jobs:
         uses: ./.github/actions/setup-tag-env
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          flavor: |
+            latest=false
       - name: Load Secrets from Vault
         uses: rancher-eio/read-vault-secrets@main
         with:
@@ -176,6 +189,13 @@ jobs:
         uses: actions/checkout@v4
       - name: Setup Environment Variables
         uses: ./.github/actions/setup-tag-env
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          flavor: |
+            latest=false
       - name: Load Secrets from Vault
         uses: rancher-eio/read-vault-secrets@main
         with:
@@ -189,14 +209,23 @@ jobs:
           password: ${{ env.DOCKER_PASSWORD }}
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
       - name: Build and export agent
-        uses: ./.github/actions/build-rancher-agent
+        id: build
+        uses: docker/build-push-action@v5
         with:
-          commit: ${{ github.sha }}
-          tag: ${{ env.TAG }}-${{ matrix.arch }}
-          os: ${{ matrix.os }}
-          arch: ${{ matrix.arch }}
-          push: true
+          push:  true
+          build-args: |
+            "VERSION=${{ env.COMMIT }}"
+            "ARCH=${{ matrix.arch }}"
+            "RANCHER_TAG=${{ env.TAG }}"
+            "RANCHER_REPO=${{ env.REPOSITORY_OWNER }}"
+          tags: ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-${{ matrix.arch }}
+          context: .
+          platforms: "${{ matrix.os }}/${{ matrix.arch }}"
+          file: ./package/Dockerfile.agent
+          labels: "${{ steps.meta.outputs.labels }}"
   build-agent-windows:
     strategy:
       matrix:
