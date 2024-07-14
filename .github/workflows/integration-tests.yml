@@ -47,7 +47,7 @@ jobs:
           commit: ${{ github.sha }}
           rke_version: ${{ env.RKE_VERSION }}
           image: ${{ github.repository_owner }}/rancher
-          tag: ${{ github.ref_name }}
+          tag: ${{ github.sha }}
           kdm_branch: ${{ env.CATTLE_KDM_BRANCH }}
           os: linux
           arch: amd64
@@ -56,7 +56,7 @@ jobs:
         uses: ./.github/actions/build-rancher-agent
         with:
           commit: ${{ github.sha }}
-          tag: ${{ github.ref_name }}
+          tag: ${{ github.sha }}
           os: linux
           arch: amd64
           push: false
