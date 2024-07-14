@@ -1,17 +1,11 @@
 name: Integration Tests
 on:
-  workflow_dispatch:
-  push:
-    branches:
-      - master
-      - release/v*
-      - refs/tags/v*
-    tags:
-      - v*
-  pull_request:
-    branches:
-      - master
-      - release/v*
+  workflow_call:
+    inputs:
+      parent_run_id:
+        type: string
+        description: "parent run_id to download images from"
+        required: true
 
 permissions: {}
 env:
@@ -29,52 +23,18 @@ env:
   YQ_VERSION: v4.44.2
   PYTHON_VERSION: '3.11'
   GOLANG_VERSION: '1.22'
-
+  IMAGE: ${{ github.repository_owner }}/rancher
+  IMAGE_AGENT: ${{ github.repository_owner }}/rancher-agent
+  TAG: ${{ github.sha }}
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Setup RKE_VERSION env
-        run: |
-          echo "RKE_VERSION=$(grep -m1 'github.com/rancher/rke' go.mod | awk '{print $2}')" >> "$GITHUB_ENV"
-      - name: Build and export server
-        id: build
-        uses: ./.github/actions/build-rancher-server
-        with:
-          commit: ${{ github.sha }}
-          rke_version: ${{ env.RKE_VERSION }}
-          image: ${{ github.repository_owner }}/rancher
-          tag: ${{ github.sha }}
-          kdm_branch: ${{ env.CATTLE_KDM_BRANCH }}
-          os: linux
-          arch: amd64
-          push: false
-      - name: Build and export agent
-        uses: ./.github/actions/build-rancher-agent
-        with:
-          commit: ${{ github.sha }}
-          tag: ${{ github.sha }}
-          os: linux
-          arch: amd64
-          push: false
-      - name: Save Docker images to files
-        run: |
-          docker save rancher/rancher -o rancher.tar
-          docker save rancher/rancher-agent -o rancher-agent.tar
-          tar -czf docker-images.tar.gz rancher.tar rancher-agent.tar ./bin/data.json
-      - name: Upload Docker images artifact
-        uses: actions/upload-artifact@v2
-        with:
-          name: docker-images
-          path: docker-images.tar.gz
-
   test:
     runs-on: ubuntu-latest
-    needs: build
     timeout-minutes: 60
+    services:
+      registry:
+        image: registry:2
+        ports:
+          - 5000:5000
     env:
       K3D_VERSION: v5.7.1
     steps:
@@ -84,17 +44,38 @@ jobs:
         run: |
           docker system prune -af
           docker volume prune -f
-      - name: Download Docker images artifact
-        uses: actions/download-artifact@v2
-        with:
-          name: docker-images
-          path: .
-      - name: Extract Docker images
-        run: tar -xzf docker-images.tar.gz
-      - name: Load Docker images
+      - name: Clean runner
         run: |
-          docker load -i rancher.tar
-          docker load -i rancher-agent.tar
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+      - name: Download Docker images artifact
+        uses: actions/download-artifact@v4
+        with:
+          pattern: *-linux-amd64.tar
+          run-id: ${{ inputs.parent_run_id }}
+          github-token: ${{ github.token }}
+          path: "/tmp"
+          merge-multiple: true
+      - name: Load server image
+        run: |
+          image_server_id=$(docker load --input /tmp/rancher-linux-amd64.tar 2>&1 | grep "Loaded image" | awk '{print $NF}')
+          if [ -z "$image_server_id" ]; then
+            echo "Error: Failed to load image from tarball!"
+            exit 1
+          fi
+          docker tag "$image_server_id" localhost:5000/${{ env.IMAGE }}:${{ env.TAG }}
+          docker push localhost:5000/${{ env.IMAGE }}:${{ env.TAG }}
+      - name: Load agent image
+        run: |
+          image_agent_id=$(docker load --input /tmp/rancher-agent-linux-amd64.tar 2>&1 | grep "Loaded image" | awk '{print $NF}')
+          if [ -z "$image_agent_id" ]; then
+            echo "Error: Failed to load image from tarball!"
+            exit 1
+          fi
+          docker tag "$image_agent_id" localhost:5000/${{ env.IMAGE }}:${{ env.TAG }}
+          docker push localhost:5000/${{ env.IMAGE }}:${{ env.TAG }}
       - name: Install k3d
         run: curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | TAG=${{ env.K3D_VERSION }} bash
       - name: Uninstall existing Python versions

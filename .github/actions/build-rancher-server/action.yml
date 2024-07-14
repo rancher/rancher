@@ -48,7 +48,6 @@ runs:
       id: build
       uses: docker/build-push-action@v5
       with:
-        push: true
         build-args: |
           "VERSION=${{ inputs.commit }}"
           "COMMIT=${{ inputs.commit }}"
@@ -59,3 +58,4 @@ runs:
         platforms: "${{ inputs.os }}/${{ inputs.arch }}"
         file: ./package/Dockerfile
         labels: "${{ steps.meta.outputs.labels }}"
+        push: ${{ inputs.push }}

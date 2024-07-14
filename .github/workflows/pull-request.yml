@@ -46,6 +46,12 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+      - name: Clean runner
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
       - name: Setup Environment Variables
         run: |
           echo "ARCH=${{ matrix.arch }}" >> "$GITHUB_ENV"
@@ -156,6 +162,19 @@ jobs:
           platforms: "${{ matrix.os }}/${{ matrix.arch }}"
           file: ./package/Dockerfile.agent
           labels: "${{ steps.meta.outputs.labels }}"
+          outputs: type=docker,dest=/tmp/rancher-${{ matrix.os }}-${{ matrix.arch }}.tar
+      - name: Upload image
+        uses: actions/upload-artifact@v4
+        with:
+          name: "rancher-agent-${{ matrix.os }}-${{ matrix.arch }}"
+          path: /tmp/rancher-agent-${{ matrix.os }}-${{ matrix.arch }}.tar
+          if-no-files-found: error
+          retention-days: 1
+          overwrite: false
+  integration-tests:
+    uses: ./.github/workflows/integration-tests.yml
+    with:
+      parent_run_id: ${{ github.run_id }}
   build-agent-windows:
     strategy:
       matrix:

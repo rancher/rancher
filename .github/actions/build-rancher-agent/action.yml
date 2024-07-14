@@ -35,7 +35,6 @@ runs:
     - name: Build and export agent
       uses: docker/build-push-action@v5
       with:
-        push:  true
         build-args: |
           "VERSION=${{ inputs.commit }}"
           "ARCH=${{ inputs.arch }}"
@@ -46,3 +45,4 @@ runs:
         platforms: "${{ inputs.os }}/${{ inputs.arch }}"
         file: ./package/Dockerfile.agent
         labels: "${{ steps.meta.outputs.labels }}"
+        push:  ${{ inputs.push }}
