@@ -52,7 +52,7 @@ jobs:
       - name: Download Docker images artifact
         uses: actions/download-artifact@v4
         with:
-          pattern: *-linux-amd64.tar
+          pattern: "*-linux-amd64.tar"
           run-id: ${{ inputs.parent_run_id }}
           github-token: ${{ github.token }}
           path: "/tmp"
