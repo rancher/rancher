@@ -92,10 +92,6 @@ jobs:
           sudo cp $(which python3) /usr/bin/python3
           python3 --version
           python3 -m ensurepip --upgrade
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: "${{ env.GOLANG_VERSION }}" # The Go version to download (if necessary) and use.
       - name: Install Python and dependencies
         run: |
           sudo apt-get update
@@ -145,6 +141,14 @@ jobs:
         run: sudo mv /usr/tmp/helm /usr/bin/helm_v3
 
       ## Helm Setup end
-
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "${{ env.GOLANG_VERSION }}"
+      - name: Build Integration Setup
+        shell: bash
+        run: |
+          ./tests/v2/integration/scripts/build-integration-setup
       - name: Run Tests
-        run: sudo -E ./scripts/gha/tests
+        shell: bash
+        run: ./scripts/gha/tests

@@ -141,10 +141,6 @@ echo "Waiting up to 5 minutes for rancher-provisioning-capi deployment"
   --message "rancher-provisioning-capi was not available after {{elapsed}} seconds" `# Print this progress message` \
   "kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -w -n cattle-provisioning-capi-system deploy/capi-controller-manager &"
 
-#kill $TPID
-
-echo Running build-integration-setup
-./tests/v2/integration/scripts/build-integration-setup
 
 echo Running integrationsetup
 export CATTLE_TEST_CONFIG=$(pwd)/config.yaml # used by integration tests and test setup
