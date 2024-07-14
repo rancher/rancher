@@ -6,7 +6,6 @@ on:
         type: string
         description: "parent run_id to download images from"
         required: true
-
 permissions: {}
 env:
   HOST_ARCH: amd64
