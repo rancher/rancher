@@ -15,7 +15,7 @@ cleanup()
     return $EXIT
 }
 
-cd $(dirname $0)/..
+cd $(dirname $0)/../..
 
 
 TB_ORG=rancher
@@ -97,7 +97,7 @@ run_rancher()
         fi
         if [ "$PID" = "-1" ]; then
           echo Starting rancher server using run
-          ./scripts/gha-run >/tmp/rancher.log 2>&1 &
+          ./scripts/gha/run >/tmp/rancher.log 2>&1 &
           PID=$!
         fi
         sleep 2

@@ -5,14 +5,14 @@ echo Starting rancher server
 
 echo "scripts/run"
 
-source $(dirname $0)/version
-source $(dirname $0)/export-config
+source $(dirname $0)/../version
+source $(dirname $0)/../export-config
 cd scripts
 source ./package-env
 cd ..
 
 
-cd $(dirname $0)/..
+cd $(dirname $0)/../..
 
 if [ ! -z $1 ] && ( [ $1 = "--trace" ] || [ $1 = "--info" ] || [ $1 = "--debug" ] ); then
   LOGFLAG=$1
