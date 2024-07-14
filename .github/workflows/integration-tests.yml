@@ -14,29 +14,25 @@ on:
       - release/v*
 
 permissions: {}
+env:
+  HOST_ARCH: amd64
+  CATTLE_HELM_VERSION: v2.16.8-rancher2
+  CATTLE_MACHINE_VERSION: v0.15.0-rancher114
+  CATTLE_K3S_VERSION: v1.30.2+k3s2
+  CATTLE_K3S_VERSION_DOCKER: v1.30.2+k3s2
+  HELM_VERSION: v3.15.2
+  KUSTOMIZE_VERSION: v5.4.2
+  HELM_UNITTEST_VERSION: 0.3.2
+  CATTLE_KDM_BRANCH: dev-v2.9
+  CONTROLLER_GEN_VERSION: v0.14.0
+  YQ_VERSION: v4.44.2
+  PYTHON_VERSION: '3.11'
+  GOLANG_VERSION: '1.22'
 
 jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 60
-
-    env:
-      ACTIONS_RUNNER_DEBUG: true
-      ACTIONS_STEP_DEBUG: true
-      HOST_ARCH: amd64
-      CATTLE_HELM_VERSION: v2.16.8-rancher2
-      CATTLE_MACHINE_VERSION: v0.15.0-rancher114
-      CATTLE_K3S_VERSION: v1.30.2+k3s2
-      CATTLE_K3S_VERSION_DOCKER: v1.30.2+k3s2
-      HELM_VERSION: v3.15.2
-      KUSTOMIZE_VERSION: v5.4.2
-      HELM_UNITTEST_VERSION: 0.3.2
-      CATTLE_KDM_BRANCH: dev-v2.9
-      CONTROLLER_GEN_VERSION: v0.14.0
-      YQ_VERSION: v4.44.2
-      PYTHON_VERSION: '^3.11'
-      GOLANG_VERSION: '^1.22'
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -235,25 +231,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     timeout-minutes: 60
-
     env:
-      ACTIONS_RUNNER_DEBUG: true
-      ACTIONS_STEP_DEBUG: true
-      HOST_ARCH: amd64
-      CATTLE_HELM_VERSION: v2.16.8-rancher2
-      CATTLE_MACHINE_VERSION: v0.15.0-rancher114
-      CATTLE_K3S_VERSION: v1.30.2+k3s2
-      CATTLE_K3S_VERSION_DOCKER: v1.30.2+k3s2
-      HELM_VERSION: v3.15.2
-      KUSTOMIZE_VERSION: v5.4.2
-      HELM_UNITTEST_VERSION: 0.3.2
-      CATTLE_KDM_BRANCH: dev-v2.9
-      CONTROLLER_GEN_VERSION: v0.14.0
-      YQ_VERSION: v4.44.2
       K3D_VERSION: v5.7.1
-      PYTHON_VERSION: '^3.11'
-      GOLANG_VERSION: '^1.22'
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
