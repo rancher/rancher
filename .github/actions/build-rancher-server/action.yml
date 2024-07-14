@@ -43,7 +43,7 @@ runs:
       run: touch k3s-airgap-images.tar
     - name: Download data.json
       shell: bash
-      run: curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${{ input.kdm_branch }}/data.json > ./data.json
+      run: curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${{ inputs.kdm_branch }}/data.json > ./data.json
     - name: Build and export server
       id: build
       uses: docker/build-push-action@v5
