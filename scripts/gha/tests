@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e
 
+GOBIN=${GOBIN-"go"}
+
 cleanup()
 {
     EXIT=$?
@@ -15,7 +17,7 @@ cleanup()
     return $EXIT
 }
 
-cd $(dirname $0)/..
+cd $(dirname $0)/../..
 
 
 TB_ORG=rancher
@@ -32,11 +34,12 @@ export DIST=${TEST_DIST}
 export SOME_K8S_VERSION=${SOME_K8S_VERSION}
 export TB_ORG=${TB_ORG}
 export CATTLE_CHART_DEFAULT_URL=${CATTLE_CHART_DEFAULT_URL}
+REGISTRY=${REGISTRY-""}
 
 # Tell Rancher to use the recently-built Rancher cluster agent image. This image is built as part of CI and will be
 # copied to the in-cluster registry during test setup below.
 source ./scripts/version
-export CATTLE_AGENT_IMAGE="rancher/rancher-agent:${AGENT_TAG}"
+export CATTLE_AGENT_IMAGE="${REGISTRY}rancher/rancher-agent:${AGENT_TAG}"
 echo "Using Rancher agent image $CATTLE_AGENT_IMAGE"
 
 eval "$(grep '^ENV CATTLE_SYSTEM_AGENT' package/Dockerfile | awk '{print "export " $2 "=" $3}')"
@@ -97,7 +100,7 @@ run_rancher()
         fi
         if [ "$PID" = "-1" ]; then
           echo Starting rancher server using run
-          ./scripts/gha-run >/tmp/rancher.log 2>&1 &
+          ./scripts/gha/run >/tmp/rancher.log 2>&1 &
           PID=$!
         fi
         sleep 2
@@ -141,10 +144,6 @@ echo "Waiting up to 5 minutes for rancher-provisioning-capi deployment"
   --message "rancher-provisioning-capi was not available after {{elapsed}} seconds" `# Print this progress message` \
   "kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -w -n cattle-provisioning-capi-system deploy/capi-controller-manager &"
 
-#kill $TPID
-
-echo Running build-integration-setup
-./tests/v2/integration/scripts/build-integration-setup
 
 echo Running integrationsetup
 export CATTLE_TEST_CONFIG=$(pwd)/config.yaml # used by integration tests and test setup
@@ -154,7 +153,7 @@ export CATTLE_TEST_CONFIG=$(pwd)/config.yaml # used by integration tests and tes
 }
 
 echo Running go integration tests
-go test -v -failfast -timeout 30m -p 1 ./tests/v2/integration/... || {
+$GOBIN test -v -failfast -timeout 30m -p 1 ./tests/v2/integration/... || {
   dump_rancher_logs
   exit 1
 }
