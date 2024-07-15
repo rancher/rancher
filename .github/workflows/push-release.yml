@@ -80,9 +80,6 @@ jobs:
       matrix:
         os: [linux]
         arch: [amd64, arm64]
-    permissions:
-      contents: read
-      id-token: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -105,11 +102,6 @@ jobs:
           images: ${{ env.IMAGE }}
           flavor: |
             latest=false
-      - name: Docker Registry Login
-        uses: docker/login-action@v3
-        with:
-          username: ${{ env.DOCKER_USERNAME }}
-          password: ${{ env.DOCKER_PASSWORD }}
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
@@ -189,11 +181,6 @@ jobs:
           images: ${{ env.IMAGE }}
           flavor: |
             latest=false
-      - name: Docker Registry Login
-        uses: docker/login-action@v3
-        with:
-          username: ${{ env.DOCKER_USERNAME }}
-          password: ${{ env.DOCKER_PASSWORD }}
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
@@ -284,6 +271,11 @@ jobs:
           secrets: |
             secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
             secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
+      - name: Docker Registry Login
+        uses: docker/login-action@v3
+        with:
+          username: ${{ env.DOCKER_USERNAME }}
+          password: ${{ env.DOCKER_PASSWORD }}
       - name: Push server image
         run: |
           image_id=$(docker load --input /tmp/rancher-${{ matrix.os }}-${{ matrix.arch }}.tar 2>&1 | grep "Loaded image" | awk '{print $NF}')
