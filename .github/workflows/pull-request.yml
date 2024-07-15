@@ -103,6 +103,11 @@ jobs:
       matrix:
         os: [linux]
         arch: [amd64, arm64]
+    services:
+      registry:
+        image: registry:2
+        ports:
+          - 5000:5000
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -140,7 +145,8 @@ jobs:
             echo "Error: Failed to load image from tarball!"
             exit 1
           fi
-          docker tag "$image_id" ${{ env.IMAGE }}:${{ env.TAG }}
+          docker tag "$image_id" localhost:5000/${{ env.IMAGE }}:${{ env.TAG }}
+          docker push localhost:5000/${{ env.IMAGE }}:${{ env.TAG }}
       - name: Build agent
         id: build
         uses: docker/build-push-action@v5
