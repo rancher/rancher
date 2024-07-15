@@ -36,6 +36,7 @@ jobs:
           - 5000:5000
     env:
       K3D_VERSION: v5.7.1
+      REGISTRY: "localhost:5000/"
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -63,8 +64,8 @@ jobs:
             echo "Error: Failed to load image from tarball!"
             exit 1
           fi
-          docker tag "$image_server_id" localhost:5000/${{ env.IMAGE }}:${{ env.TAG }}
-          docker push localhost:5000/${{ env.IMAGE }}:${{ env.TAG }}
+          docker tag "$image_server_id" ${{ env. REGISTRY }}${{ env.IMAGE }}:${{ env.TAG }}
+          docker push ${{ env. REGISTRY }}${{ env.IMAGE }}:${{ env.TAG }}
       - name: Load agent image
         run: |
           image_agent_id=$(docker load --input /tmp/rancher-agent-linux-amd64.tar 2>&1 | grep "Loaded image" | awk '{print $NF}')
@@ -72,8 +73,8 @@ jobs:
             echo "Error: Failed to load image from tarball!"
             exit 1
           fi
-          docker tag "$image_agent_id" localhost:5000/${{ env.IMAGE_AGENT }}:${{ env.TAG }}
-          docker push localhost:5000/${{ env.IMAGE_AGENT }}:${{ env.TAG }}
+          docker tag "$image_agent_id" ${{ env. REGISTRY }}${{ env.IMAGE_AGENT }}:${{ env.TAG }}
+          docker push ${{ env. REGISTRY }}${{ env.IMAGE_AGENT }}:${{ env.TAG }}
       - name: Install k3d
         run: curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | TAG=${{ env.K3D_VERSION }} bash
       - name: Uninstall existing Python versions
