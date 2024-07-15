@@ -383,15 +383,25 @@ func (o *OpenIDCProvider) getUserInfo(ctx *context.Context, config *v32.OIDCConf
 	}
 	oauthConfig := ConfigToOauthConfig(provider.Endpoint(), config)
 	var verifier = provider.Verifier(&oidc.Config{ClientID: config.ClientID})
-	if err := json.Unmarshal([]byte(authCode), &oauth2Token); err != nil {
-		oauth2Token, err = oauthConfig.Exchange(updatedContext, authCode, oauth2.SetAuthURLParam("scope", strings.Join(oauthConfig.Scopes, " ")))
-		if err != nil {
-			return userInfo, oauth2Token, err
-		}
-		_, err = verifier.Verify(updatedContext, oauth2Token.AccessToken)
-		if err != nil {
-			return userInfo, oauth2Token, err
-		}
+
+	oauth2Token, err = oauthConfig.Exchange(updatedContext, authCode, oauth2.SetAuthURLParam("scope", strings.Join(oauthConfig.Scopes, " ")))
+	if err != nil {
+		return userInfo, oauth2Token, err
+	}
+
+	// Get the ID token.  The ID token should be there because we require the openid scope.
+	rawIDToken, ok := oauth2Token.Extra("id_token").(string)
+	if !ok {
+		return userInfo, oauth2Token, fmt.Errorf("no id_token field in oauth2 token")
+	}
+
+	idToken, err := verifier.Verify(updatedContext, rawIDToken)
+	if err != nil {
+		return userInfo, oauth2Token, fmt.Errorf("failed to verify ID token: %w", err)
+	}
+
+	if err := idToken.Claims(&claimInfo); err != nil {
+		return userInfo, oauth2Token, fmt.Errorf("failed to parse claims: %w", err)
 	}
 
 	// Valid will return false if access token is expired

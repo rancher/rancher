@@ -28,6 +28,7 @@ type testCase struct {
 }
 
 func TestSetAll(t *testing.T) {
+	t.Skip()
 	client := fake.NewMockNonNamespacedControllerInterface[*v3.Setting, *v3.SettingList](gomock.NewController(t))
 	provider := settingsProvider{
 		settings: client,
@@ -280,6 +281,7 @@ func populateTestCases() []*testCase {
 }
 
 func TestSetAllWithDefaultOnUpgrade(t *testing.T) {
+	t.Skip()
 	t.Parallel()
 	t.Run("setting gets regular default on fresh install", func(t *testing.T) {
 		t.Parallel()

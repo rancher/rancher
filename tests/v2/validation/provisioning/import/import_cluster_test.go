@@ -16,7 +16,6 @@ import (
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
 	"github.com/rancher/shepherd/extensions/clusters"
 	"github.com/rancher/shepherd/extensions/provisioninginput"
-	"github.com/rancher/shepherd/extensions/reports"
 	"github.com/rancher/shepherd/extensions/users"
 	password "github.com/rancher/shepherd/extensions/users/passwordgenerator"
 	"github.com/rancher/shepherd/extensions/workloads/pods"
@@ -142,14 +141,13 @@ func (r *ImportProvisioningTestSuite) TestProvisioningImportK3SCluster() {
 	config, err := clientcmd.RESTConfigFromKubeConfig(decodedKubeConfig)
 	require.NoError(r.T(), err)
 
-	cluster, err = clusters.CreateK3SRKE2Cluster(r.client, &importCluster)
-	reports.TimeoutClusterReport(cluster, err)
+	_, err = clusters.CreateK3SRKE2Cluster(r.client, &importCluster)
 	require.NoError(r.T(), err)
 
 	updatedCluster := new(apiv1.Cluster)
+
 	err = wait.ExponentialBackoff(backoff, func() (finished bool, err error) {
 		updatedCluster, _, err = clusters.GetProvisioningClusterByName(r.client, importCluster.Name, importCluster.Namespace)
-		reports.TimeoutClusterReport(cluster, err)
 		require.NoError(r.T(), err)
 
 		if updatedCluster.Status.ClusterName != "" {
@@ -162,7 +160,6 @@ func (r *ImportProvisioningTestSuite) TestProvisioningImportK3SCluster() {
 
 	logrus.Info(updatedCluster.Status.ClusterName)
 	err = clusters.ImportCluster(r.client, updatedCluster, config)
-	reports.TimeoutClusterReport(cluster, err)
 	require.NoError(r.T(), err)
 
 	backoff = wait.Backoff{
@@ -174,7 +171,6 @@ func (r *ImportProvisioningTestSuite) TestProvisioningImportK3SCluster() {
 
 	err = wait.ExponentialBackoff(backoff, func() (finished bool, err error) {
 		updatedCluster, _, err = clusters.GetProvisioningClusterByName(r.client, importCluster.Name, importCluster.Namespace)
-		reports.TimeoutClusterReport(cluster, err)
 		require.NoError(r.T(), err)
 
 		if updatedCluster.Status.Ready {
