@@ -715,6 +715,15 @@ func (c *ClusterRepoTestSuite) TestOCIRepoChartInstallation() {
 	})
 	assert.NoError(c.T(), err)
 
+	appCR, err := catalogClient.Apps("default").Get(context.TODO(), "testreleasename", metav1.GetOptions{})
+	assert.NoError(c.T(), err)
+
+	// Every AppCR installed through rancher must
+	// have the catalog clusterRepoName label
+	value, ok := appCR.Labels["catalog.cattle.io/cluster-repo-name"]
+	assert.True(c.T(), ok)
+	assert.Equal(c.T(), value, "oci")
+
 	// Validate uninstalling the chart
 	chartUninstallAction := types.ChartUninstallAction{
 		DisableHooks: false,
