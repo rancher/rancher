@@ -158,4 +158,4 @@ jobs:
           ./tests/v2/integration/scripts/build-integration-setup
       - name: Run Tests
         shell: bash
-        run: sudo --preserve-env ./scripts/gha/tests
+        run: sudo --preserve-env GOBIN=$(which go) ./scripts/gha/tests
