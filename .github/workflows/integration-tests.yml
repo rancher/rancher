@@ -151,4 +151,4 @@ jobs:
           ./tests/v2/integration/scripts/build-integration-setup
       - name: Run Tests
         shell: bash
-        run: ./scripts/gha/tests
+        run: sudo --preserve-env ./scripts/gha/tests
