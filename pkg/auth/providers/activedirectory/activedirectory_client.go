@@ -195,7 +195,7 @@ func getUsernameFromObjectGUID(lConn *ldapv3.Conn, config *v32.ActiveDirectoryCo
 	if len(result.Entries) == 0 {
 		return "", errors.New("LDAP search of user by objectGUID returned no results")
 	} else if len(result.Entries) > 1 {
-		return "", fmt.Errorf("LDAP search of user by objectGUID returned no results")
+		return "", fmt.Errorf("LDAP search of user by objectGUID returned more than 1 result")
 	}
 
 	// if found we can continue the login flow with the login attribute of the user
