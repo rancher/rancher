@@ -140,6 +140,10 @@ jobs:
       - name: Move Helm 3 binary
         run: sudo mv /usr/tmp/helm /usr/bin/helm_v3
 
+      - name: KDM data
+        run: |
+          mkdir -p bin
+          curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${{ env.CATTLE_KDM_BRANCH }}/data.json > bin/data.json
       ## Helm Setup end
       - name: Set up Go
         uses: actions/setup-go@v5
