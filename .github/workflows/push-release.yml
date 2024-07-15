@@ -497,7 +497,7 @@ jobs:
           mkdir -p $HOME/bin
           touch $HOME/bin/rancher-rke-k8s-versions.txt
       - name: Create components and images files
-        run: ./scripts/create-components-images-files.sh
+        run: sudo -E ./scripts/create-components-images-files.sh
       - name: Move files
         run: |
           mv $HOME/bin/* ./dist
