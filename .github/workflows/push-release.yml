@@ -140,6 +140,11 @@ jobs:
       matrix:
         os: [linux]
         arch: [amd64, arm64]
+    services:
+      registry:
+        image: registry:2
+        ports:
+          - 5000:5000
     permissions:
       contents: read
       id-token: write
@@ -166,7 +171,8 @@ jobs:
             echo "Error: Failed to load image from tarball!"
             exit 1
           fi
-          docker tag "$image_id" ${{ env.IMAGE }}:${{ env.TAG }}
+          docker tag "$image_id" localhost:5000/${{ env.IMAGE }}:${{ env.TAG }}
+          docker push localhost:5000/${{ env.IMAGE }}:${{ env.TAG }}
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
@@ -188,6 +194,7 @@ jobs:
             "ARCH=${{ matrix.arch }}"
             "RANCHER_TAG=${{ env.TAG }}"
             "RANCHER_REPO=${{ env.REPOSITORY_OWNER }}"
+            "REGISTRY=localhost:5000"
           tags: ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-${{ matrix.arch }}
           context: .
           platforms: "${{ matrix.os }}/${{ matrix.arch }}"
