@@ -2,9 +2,9 @@ ARG RANCHER_TAG=dev
 ARG RANCHER_REPO=rancher
 ARG REGISTRY=docker.io
 ARG RANCHER_IMAGE=${REGISTRY}/${RANCHER_REPO}/rancher:${RANCHER_TAG}
+ARG VERSION=dev
 
 FROM --platform=$BUILDPLATFORM registry.suse.com/bci/golang:1.22 AS build
-ARG VERSION=dev
 ARG CGO_ENABLED=0
 ARG TAGS="k8s"
 ARG LINKFLAGS="-extldflags -static"
@@ -61,7 +61,6 @@ ENV LOGLEVEL_VERSION v0.1.6
 
 RUN curl -sLf https://github.com/rancher/loglevel/releases/download/${LOGLEVEL_VERSION}/loglevel-${ARCH}-${LOGLEVEL_VERSION}.tar.gz | tar xvzf - -C /usr/bin
 
-ARG VERSION=dev
 LABEL io.cattle.agent true
 ENV AGENT_IMAGE rancher/rancher-agent:${VERSION}
 # For now, this value needs to be manually synced with the one in the main Dockerfile. This pins downstream webhook's version.

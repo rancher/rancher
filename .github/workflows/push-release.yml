@@ -123,7 +123,7 @@ jobs:
         with:
           push: true
           build-args: |
-            "VERSION=${{ env.COMMIT }}"
+            "VERSION=${{ env.TAG }}"
             "COMMIT=${{ env.COMMIT }}"
             "RKE_VERSION=${{ env.RKE_VERSION }}"
             "ARCH=${{ matrix.arch }}"
@@ -217,7 +217,7 @@ jobs:
         with:
           push:  true
           build-args: |
-            "VERSION=${{ env.COMMIT }}"
+            "VERSION=${{ env.TAG }}"
             "ARCH=${{ matrix.arch }}"
             "RANCHER_TAG=${{ env.TAG }}"
             "RANCHER_REPO=${{ env.REPOSITORY_OWNER }}"
@@ -253,7 +253,7 @@ jobs:
           password: ${{ env.DOCKER_PASSWORD }}
       - name: Build Windows Server Image
         run: |
-          docker build -t ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-windows-${{ matrix.version }} --build-arg VERSION=${{ env.COMMIT }} --build-arg SERVERCORE_VERSION=ltsc${{ matrix.version }} -f package/windows/Dockerfile.agent .
+          docker build -t ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-windows-${{ matrix.version }} --build-arg VERSION=${{ env.TAG }} --build-arg SERVERCORE_VERSION=ltsc${{ matrix.version }} -f package/windows/Dockerfile.agent .
           docker push ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-windows-${{ matrix.version }}
         shell: bash
   merge-agent-manifest:
@@ -357,7 +357,7 @@ jobs:
         with:
           push:  true
           build-args: |
-            "VERSION=${{ env.COMMIT }}"
+            "VERSION=${{ env.TAG }}"
             "ARCH=${{ matrix.arch }}"
             "RANCHER_TAG=${{ env.TAG }}"
             "RANCHER_REPO=${{ env.REPOSITORY_OWNER }}"

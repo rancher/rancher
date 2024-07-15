@@ -1,19 +1,19 @@
 FROM --platform=$BUILDPLATFORM registry.suse.com/bci/golang:1.22 as build
- ARG VERSION
- ARG COMMIT
- ARG RKE_VERSION
- ARG CGO_ENABLED=0
- ARG TAGS="k8s"
- ARG LINKFLAGS="-extldflags -static"
- ARG DEFAULT_VALUES="{\"rke-version\":\"${RKE_VERSION}\"}"
- ARG LDFLAGS="-X github.com/rancher/rancher/pkg/version.Version=${VERSION} -X github.com/rancher/rancher/pkg/version.GitCommit=$COMMIT -X github.com/rancher/rancher/pkg/settings.InjectDefaults=$DEFAULT_VALUES $LINKFLAGS"
- ARG TARGETOS
- ARG TARGETARCH
+ARG VERSION
+ARG COMMIT
+ARG RKE_VERSION
+ARG CGO_ENABLED=0
+ARG TAGS="k8s"
+ARG LINKFLAGS="-extldflags -static"
+ARG DEFAULT_VALUES="{\"rke-version\":\"${RKE_VERSION}\"}"
+ARG LDFLAGS="-X github.com/rancher/rancher/pkg/version.Version=${VERSION} -X github.com/rancher/rancher/pkg/version.GitCommit=$COMMIT -X github.com/rancher/rancher/pkg/settings.InjectDefaults=$DEFAULT_VALUES $LINKFLAGS"
+ARG TARGETOS
+ARG TARGETARCH
 
- WORKDIR /app
- COPY . .
- RUN go mod download
- RUN GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" -o rancher
+WORKDIR /app
+COPY . .
+RUN go mod download
+RUN GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" -o rancher
 
 FROM registry.suse.com/bci/bci-micro:15.6 AS final
 
@@ -274,7 +274,6 @@ ENV CATTLE_CLI_URL_DARWIN  https://releases.rancher.com/cli2/${CATTLE_CLI_VERSIO
 ENV CATTLE_CLI_URL_LINUX   https://releases.rancher.com/cli2/${CATTLE_CLI_VERSION}/rancher-linux-amd64-${CATTLE_CLI_VERSION}.tar.gz
 ENV CATTLE_CLI_URL_WINDOWS https://releases.rancher.com/cli2/${CATTLE_CLI_VERSION}/rancher-windows-386-${CATTLE_CLI_VERSION}.zip
 
-ARG VERSION=dev
 ENV CATTLE_SERVER_VERSION ${VERSION}
 
 COPY --from=build /app/rancher /usr/bin/
