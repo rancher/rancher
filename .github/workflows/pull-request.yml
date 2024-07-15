@@ -151,6 +151,7 @@ jobs:
             "ARCH=${{ matrix.arch }}"
             "RANCHER_TAG=${{ env.TAG }}"
             "RANCHER_REPO=${{ env.REPOSITORY_OWNER }}"
+            "REGISTRY=localhost:5000"
           tags: ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-${{ matrix.arch }}
           context: .
           platforms: "${{ matrix.os }}/${{ matrix.arch }}"
