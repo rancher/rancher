@@ -148,20 +148,33 @@ jobs:
           - 5000:5000
     env:
       REGISTRY: "127.0.0.1:5000"
-    permissions:
-      contents: read
-      id-token: write
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Setup Environment Variables
-        uses: ./.github/actions/setup-tag-env
       - name: Clean runner
         run: |
           sudo rm -rf /usr/share/dotnet
           sudo rm -rf /opt/ghc
           sudo rm -rf "/usr/local/share/boost"
           sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup Environment Variables
+        run: |
+          echo "ARCH=${{ matrix.arch }}" >> "$GITHUB_ENV"
+      - name: Setup TAG Variables
+        uses: ./.github/actions/setup-tag-env
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          flavor: |
+            latest=false
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver-opts: network=host
       - name: Download rancher image
         uses: actions/download-artifact@v4
         with:
@@ -176,24 +189,13 @@ jobs:
           fi
           docker tag "$image_id" ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ env.TAG }}
           docker push ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ env.TAG }}
-      - name: Docker meta
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.IMAGE }}
-          flavor: |
-            latest=false
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-      - name: Build and export agent
+      - name: Build agent
         id: build
         uses: docker/build-push-action@v5
         with:
           push: false
           build-args: |
-            "VERSION=${{ env.COMMIT }}"
+            "VERSION=${{ env.TAG }}"
             "ARCH=${{ matrix.arch }}"
             "RANCHER_TAG=${{ env.TAG }}"
             "RANCHER_REPO=${{ env.REPOSITORY_OWNER }}"
