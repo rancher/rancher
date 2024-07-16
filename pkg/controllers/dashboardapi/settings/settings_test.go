@@ -26,6 +26,7 @@ type testCase struct {
 }
 
 func TestSetAll(t *testing.T) {
+	t
 	client := fake.NewMockNonNamespacedControllerInterface[*v3.Setting, *v3.SettingList](gomock.NewController(t))
 	provider := settingsProvider{
 		settings: client,
