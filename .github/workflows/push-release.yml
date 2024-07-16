@@ -91,10 +91,14 @@ jobs:
           sudo rm -rf "$AGENT_TOOLSDIRECTORY"
       - name: Setup Environment Variables
         uses: ./.github/actions/setup-tag-env
-      - name: Setup RKE_VERSION env
+      - name: Set up build-time environment variables
         run: |
           echo "ARCH=${{ matrix.arch }}" >> "$GITHUB_ENV"
           echo "RKE_VERSION=$(grep -m1 'github.com/rancher/rke' go.mod | awk '{print $4}')" >> "$GITHUB_ENV"
+          source scripts/export-config
+          echo "CATTLE_RANCHER_WEBHOOK_VERSION=$CATTLE_RANCHER_WEBHOOK_VERSION" >> "$GITHUB_ENV"
+          echo "CATTLE_CSP_ADAPTER_MIN_VERSION=$CATTLE_CSP_ADAPTER_MIN_VERSION" >> "$GITHUB_ENV"
+          echo "CATTLE_FLEET_VERSION=$CATTLE_FLEET_VERSION" >> "$GITHUB_ENV"
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
@@ -163,6 +167,8 @@ jobs:
       - name: Setup Environment Variables
         run: |
           echo "ARCH=${{ matrix.arch }}" >> "$GITHUB_ENV"
+          source scripts/export-config
+          echo "CATTLE_RANCHER_WEBHOOK_VERSION=$CATTLE_RANCHER_WEBHOOK_VERSION" >> "$GITHUB_ENV"
       - name: Setup TAG Variables
         uses: ./.github/actions/setup-tag-env
       - name: Docker meta
