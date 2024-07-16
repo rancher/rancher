@@ -28,6 +28,9 @@ var (
 		client.ShibbolethConfigType: {
 			client.ShibbolethConfigFieldOpenLdapConfig: {client.LdapConfigFieldServiceAccountPassword},
 		},
+		client.OKTAConfigType: {
+			client.OKTAConfigFieldOpenLdapConfig: {client.LdapConfigFieldServiceAccountPassword},
+		},
 	}
 
 	// NameToFields keeps track of secrets that Rancher must clean up for the given auth provider specified by name.
