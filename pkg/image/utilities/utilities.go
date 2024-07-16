@@ -2,6 +2,7 @@ package utilities
 
 import (
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"log"
 	"os"
 	"path/filepath"
@@ -106,24 +107,43 @@ func GatherTargetImagesAndSources(systemChartsPath, chartsPath string, imagesFro
 	}
 
 	externalLinuxImages := make(map[string][]string)
+	var k3sUpgradeImages, rke2LinuxImages []string
 
-	k3sUpgradeImages, err := ext.GetExternalImages(rancherVersion, data.K3S, ext.K3S, k8sVersion1_21_0, img.Linux)
+	latestK3sVersions, err := ext.GetLatestPatchesForSupportedVersions(rancherVersion, data.K3S, ext.K3S, k8sVersion1_21_0)
 	if err != nil {
-		return ImageTargetsAndSources{}, fmt.Errorf("%s: %w", "could not get external images for K3s", err)
-	}
-	if k3sUpgradeImages != nil {
-		externalLinuxImages["k3sUpgrade"] = k3sUpgradeImages
+		return ImageTargetsAndSources{}, fmt.Errorf("could not determine latest k3s versions: %v", err)
 	}
 
-	// RKE2 Provisioning will only be supported on Kubernetes v1.21+. In addition, only RKE2
-	// releases corresponding to Kubernetes v1.21+ include the "rke2-images-all.linux-amd64.txt" file that we need.
-	rke2LinuxImages, err := ext.GetExternalImages(rancherVersion, data.RKE2, ext.RKE2, k8sVersion1_21_0, img.Linux)
+	if latestK3sVersions != nil && len(latestK3sVersions) > 0 {
+		k3sUpgradeImages, err = ext.GetExternalImagesForVersions(ext.K3S, img.Linux, latestK3sVersions)
+		if err != nil {
+			return ImageTargetsAndSources{}, fmt.Errorf("%s: %w", "could not get external images for K3s", err)
+		}
+		if k3sUpgradeImages != nil {
+			externalLinuxImages["k3sUpgrade"] = k3sUpgradeImages
+		}
+	} else {
+		logrus.Infof("skipping k3s image generation since no compatible releases were found for version: %s", rancherVersion)
+	}
+
+	latestRke2Versions, err := ext.GetLatestPatchesForSupportedVersions(rancherVersion, data.RKE2, ext.RKE2, k8sVersion1_21_0)
 	if err != nil {
-		return ImageTargetsAndSources{}, fmt.Errorf("%s: %w", "could not get external images for RKE2", err)
-
+		return ImageTargetsAndSources{}, fmt.Errorf("could not determine latest rke2 versions: %v", err)
 	}
-	if rke2LinuxImages != nil {
-		externalLinuxImages["rke2All"] = rke2LinuxImages
+
+	if latestRke2Versions != nil && len(latestRke2Versions) > 0 {
+		// RKE2 Provisioning will only be supported on Kubernetes v1.21+. In addition, only RKE2
+		// releases corresponding to Kubernetes v1.21+ include the "rke2-images-all.linux-amd64.txt" file that we need.
+		rke2LinuxImages, err = ext.GetExternalImagesForVersions(ext.RKE2, img.Linux, latestRke2Versions)
+		if err != nil {
+			return ImageTargetsAndSources{}, fmt.Errorf("%s: %w", "could not get external images for RKE2", err)
+
+		}
+		if rke2LinuxImages != nil {
+			externalLinuxImages["rke2All"] = rke2LinuxImages
+		}
+	} else {
+		logrus.Infof("skipping rke2 image generation since no compatible releases were found for version: %s", rancherVersion)
 	}
 
 	sort.Strings(imagesFromArgs)
