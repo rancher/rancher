@@ -57,7 +57,7 @@ jobs:
       - name: Setup Environment Variables
         run: |
           echo "ARCH=${{ matrix.arch }}" >> "$GITHUB_ENV"
-          echo "RKE_VERSION=$(grep -m1 'github.com/rancher/rke' go.mod | awk '{print $2}')" >> "$GITHUB_ENV"
+          echo "RKE_VERSION=$(grep -m1 'github.com/rancher/rke' go.mod | awk '{print $4}')" >> "$GITHUB_ENV"
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
@@ -79,8 +79,8 @@ jobs:
         with:
           push: false
           build-args: |
-            "VERSION=${{ env.COMMIT }}"
-            "COMMIT=${{ env.COMMIT }}"
+            "VERSION=${{ env.TAG }}"
+            "COMMIT=${{ github.SHA }}"
             "RKE_VERSION=${{ env.RKE_VERSION }}"
             "ARCH=${{ matrix.arch }}"
           tags: ${{ env.IMAGE }}:${{ env.TAG }}-${{ matrix.arch }}
@@ -154,7 +154,7 @@ jobs:
         with:
           push:  ${{ github.event_name != 'pull_request' }}
           build-args: |
-            "VERSION=${{ env.COMMIT }}"
+            "VERSION=${{ env.TAG }}"
             "ARCH=${{ matrix.arch }}"
             "RANCHER_TAG=${{ env.TAG }}"
             "RANCHER_REPO=${{ env.REPOSITORY_OWNER }}"

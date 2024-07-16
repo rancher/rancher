@@ -94,7 +94,7 @@ jobs:
       - name: Setup RKE_VERSION env
         run: |
           echo "ARCH=${{ matrix.arch }}" >> "$GITHUB_ENV"
-          echo "RKE_VERSION=$(grep -m1 'github.com/rancher/rke' go.mod | awk '{print $2}')" >> "$GITHUB_ENV"
+          echo "RKE_VERSION=$(grep -m1 'github.com/rancher/rke' go.mod | awk '{print $4}')" >> "$GITHUB_ENV"
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
@@ -146,6 +146,8 @@ jobs:
         image: registry:2
         ports:
           - 5000:5000
+    env:
+      REGISTRY: "127.0.0.1:5000"
     permissions:
       contents: read
       id-token: write
@@ -172,8 +174,8 @@ jobs:
             echo "Error: Failed to load image from tarball!"
             exit 1
           fi
-          docker tag "$image_id" localhost:5000/${{ env.IMAGE }}:${{ env.TAG }}
-          docker push localhost:5000/${{ env.IMAGE }}:${{ env.TAG }}
+          docker tag "$image_id" ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ env.TAG }}
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ env.TAG }}
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
@@ -195,7 +197,7 @@ jobs:
             "ARCH=${{ matrix.arch }}"
             "RANCHER_TAG=${{ env.TAG }}"
             "RANCHER_REPO=${{ env.REPOSITORY_OWNER }}"
-            "REGISTRY=localhost:5000"
+            "REGISTRY=${{ env.REGISTRY }}"
           tags: ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-${{ matrix.arch }}
           context: .
           platforms: "${{ matrix.os }}/${{ matrix.arch }}"

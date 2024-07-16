@@ -37,6 +37,8 @@ RUN $URL = 'https://dl.k8s.io/v1.25.12/kubernetes-client-windows-amd64.tar.gz'; 
 RUN Copy-Item -Path /wins.exe -Destination /Windows/
 RUN Copy-Item -Path /kubernetes/client/bin/kubectl.exe -Destination /Windows/
 
+ARG VERSION=${VERSION}
+
 LABEL io.cattle.agent true
 ENV DOCKER_API_VERSION 1.24
 ENV AGENT_IMAGE rancher/rancher-agent:${VERSION}
