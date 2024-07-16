@@ -109,7 +109,7 @@ jobs:
         ports:
           - 5000:5000
     env:
-      REGISTRY: "http://127.0.0.15000"
+      REGISTRY: "http://127.0.0.1:5000"
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
