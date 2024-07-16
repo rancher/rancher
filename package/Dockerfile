@@ -180,7 +180,7 @@ RUN curl -sLf ${!TINI_URL} > /usr/bin/tini && \
 
 ENV CATTLE_UI_VERSION 2.8.6-alpha2
 ENV CATTLE_DASHBOARD_UI_VERSION v2.8.6-alpha2
-ENV CATTLE_CLI_VERSION v2.8.6-rc1
+ENV CATTLE_CLI_VERSION v2.8.6-rc4
 
 
 # Base UI brand used as a fallback env setting (not user facing) to indicate this is a non-prime install
