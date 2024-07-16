@@ -63,7 +63,7 @@ func TestMSGraphClient_ListUsers(t *testing.T) {
 		displayNames = append(displayNames, v.DisplayName)
 	}
 
-	assert.Len(t, users, 38)
+	assert.Len(t, users, 41)
 }
 
 func TestMSGraphClient_ListUsers_with_filter(t *testing.T) {
@@ -131,7 +131,24 @@ func TestMSGraphClient_ListGroupMemberships(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assert.Equal(t, []string{"15f6a947-9d67-4e7f-b1d0-f5f52145fed3", "bf881716-8d6d-456f-b234-2b143dfd5cf0"}, groups)
+	assert.Equal(t, []string{
+		"15f6a947-9d67-4e7f-b1d0-f5f52145fed3",
+		"748274fd-3ec7-40d1-b08b-775c1a8ec1af",
+		"bf881716-8d6d-456f-b234-2b143dfd5cf0"}, groups)
+}
+
+func TestMSGraphClient_ListGroupMemberships_nested_groups(t *testing.T) {
+	client := newTestClient(t)
+
+	groups, err := client.ListGroupMemberships("anunesteduser1@ranchertest.onmicrosoft.com", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, []string{
+		"95469c9b-7f7f-48c4-82f2-a4c1eacf454b",
+		"bf6fa98e-9d06-46ed-bd62-5d8eee196265",
+	}, groups)
 }
 
 func TestMSGraphClient_ListGroupMemberships_with_filter(t *testing.T) {
