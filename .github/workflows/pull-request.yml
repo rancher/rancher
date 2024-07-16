@@ -108,6 +108,8 @@ jobs:
         image: registry:2
         ports:
           - 5000:5000
+    env:
+      REGISTRY: "0.0.0.0:5000"
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -145,8 +147,8 @@ jobs:
             echo "Error: Failed to load image from tarball!"
             exit 1
           fi
-          docker tag "$image_id" localhost:5000/${{ env.IMAGE }}:${{ env.TAG }}
-          docker push localhost:5000/${{ env.IMAGE }}:${{ env.TAG }}
+          docker tag "$image_id" ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ env.TAG }}
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ env.TAG }}
       - name: Build agent
         id: build
         uses: docker/build-push-action@v5
@@ -157,7 +159,7 @@ jobs:
             "ARCH=${{ matrix.arch }}"
             "RANCHER_TAG=${{ env.TAG }}"
             "RANCHER_REPO=${{ env.REPOSITORY_OWNER }}"
-            "REGISTRY=localhost:5000"
+            "REGISTRY=${{ env.REGISTRY }}"
           tags: ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-${{ matrix.arch }}
           context: .
           platforms: "${{ matrix.os }}/${{ matrix.arch }}"
