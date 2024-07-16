@@ -139,7 +139,12 @@ func (h *Handler) setPassword(actionName string, action *types.Action, request *
 		return errors.New("Invalid password")
 	}
 
-	username := userData[client.UserFieldUsername].(string)
+	// if the username is not set the user is an external one
+	usernameInt, found := userData[client.UserFieldUsername]
+	if !found {
+		return errors.New("Cannot set password of non-local user")
+	}
+	username, _ := usernameInt.(string)
 
 	// passing empty currentPass to validator since, this api call doesn't assume an existing password
 	if err := validatePassword(username, "", newPass, settings.PasswordMinLength.GetInt()); err != nil {
