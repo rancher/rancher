@@ -226,6 +226,22 @@ func TestShibbolethAuthConfigMigration(t *testing.T) {
 			wantSecretRef: fmt.Sprintf("cattle-global-data:shibbolethconfig-%s", strings.ToLower(serviceAccountPasswordFieldName)),
 		},
 		{
+			name: "test migrating existing Shibboleth config",
+			authConfig: newTestShibbolethConfig(func(ac *apimgmtv3.AuthConfig) {
+				ac.Status = apimgmtv3.AuthConfigStatus{
+					Conditions: []apimgmtv3.AuthConfigConditions{
+						apimgmtv3.AuthConfigConditions{
+							Type:           apimgmtv3.AuthConfigConditionSecretsMigrated,
+							Status:         "True",
+							LastUpdateTime: "2024-05-13T15:20:34+01:00",
+						},
+					},
+				}
+			}),
+			unstructuredAuthConfig: getUnstructuredShibbolethConfig(),
+			wantConditions:         []condition.Cond{},
+		},
+		{
 			name:                   "test migrating Shibboleth configuration without OpenLDAP",
 			authConfig:             newTestShibbolethConfig(),
 			unstructuredAuthConfig: getUnstructuredShibbolethConfig(),
