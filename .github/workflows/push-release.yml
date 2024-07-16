@@ -261,10 +261,12 @@ jobs:
         os: [linux]
         arch: [amd64, arm64]
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
       - name: Download rancher image
         uses: actions/download-artifact@v4
         with:
-          pattern: "*-${{ matrix.os }}-${{ matrix.arch }}.tar"
+          pattern: "*-${{ matrix.os }}-${{ matrix.arch }}"
           path: /tmp
           merge-multiple: true
       - name: Setup Environment Variables
@@ -287,8 +289,8 @@ jobs:
             echo "Error: Failed to load image from tarball!"
             exit 1
           fi
-          docker tag "$image_id" docker.io/${{ env.IMAGE }}:${{ env.TAG }}
-          docker push docker.io/${{ env.IMAGE }}:${{ env.TAG }}
+          docker tag "$image_id" docker.io/${{ env.IMAGE }}:${{ env.TAG }}-${{ matrix.arch }}
+          docker push docker.io/${{ env.IMAGE }}:${{ env.TAG }}-${{ matrix.arch }}
       - name: Push agent image
         run: |
           image_agent_id=$(docker load --input /tmp/rancher-agent-${{ matrix.os }}-${{ matrix.arch }}.tar 2>&1 | grep "Loaded image" | awk '{print $NF}')
@@ -296,8 +298,8 @@ jobs:
             echo "Error: Failed to load image from tarball!"
             exit 1
           fi
-          docker tag "$image_agent_id" docker.io/${{ env.IMAGE_AGENT }}:${{ env.TAG }}
-          docker push docker.io/${{ env.IMAGE_AGENT }}:${{ env.TAG }}
+          docker tag "$image_agent_id" docker.io/${{ env.IMAGE_AGENT }}:${{ env.TAG }}-${{ matrix.arch }}
+          docker push docker.io/${{ env.IMAGE_AGENT }}:${{ env.TAG }}-${{ matrix.arch }}
   merge-server-manifest:
     runs-on: ubuntu-latest
     needs: [push-images]
