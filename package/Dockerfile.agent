@@ -53,6 +53,7 @@ RUN /usr/bin/unshare --version && \
 
 ARG ARCH=amd64
 ENV KUBECTL_VERSION v1.27.10
+ARG VERSION=${VERSION}
 
 RUN curl -sLf https://storage.googleapis.com/kubernetes-release/release/${KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl > /usr/bin/kubectl && \
     chmod +x /usr/bin/kubectl
