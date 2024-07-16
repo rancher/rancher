@@ -73,3 +73,22 @@ func TestSettingsSyncScheduleUserRetention(t *testing.T) {
 		t.Fatalf("Expected scheduleRetentionCalledTimes: %d got %d", want, got)
 	}
 }
+
+func TestSettingsSyncWithProviderRefresh(t *testing.T) {
+	for _, name := range []string{
+		settings.AuthUserInfoResyncCron.Name,
+		settings.AuthUserInfoMaxAgeSeconds.Name,
+	} {
+		t.Run(name, func(t *testing.T) {
+			controller := SettingController{}
+
+			_, err := controller.sync(name, &v3.Setting{
+				ObjectMeta: metav1.ObjectMeta{Name: name},
+				Value:      "* * * * *",
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}

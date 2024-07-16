@@ -28,6 +28,15 @@ func (p *grbCleaner) sync(key string, obj *v3.GlobalRoleBinding) (runtime.Object
 		return obj, nil
 	}
 
+	cleanedObj := gbrCleanUp(obj)
+	return p.mgmt.Management.GlobalRoleBindings("").Update(cleanedObj)
+}
+
+// rtCleanUp returns a clean GlobalRoleBinding based on filters specified within the function
+func gbrCleanUp(obj *v3.GlobalRoleBinding) *v3.GlobalRoleBinding {
+	// set finalizers to the object by filtering out
+	// the ones that start with "clusterscoped.controller.cattle.io/grb-sync_"
+	// and then clean annotations that start with "lifecycle.cattle.io/create.grb-sync_"
 	obj.SetFinalizers(cleanFinalizers(obj.GetFinalizers(), "clusterscoped.controller.cattle.io/grb-sync_"))
 	cleanAnnotations := cleanAnnotations(obj.GetAnnotations(), "lifecycle.cattle.io/create.grb-sync_")
 
@@ -37,7 +46,7 @@ func (p *grbCleaner) sync(key string, obj *v3.GlobalRoleBinding) (runtime.Object
 	delete(cleanAnnotations, grbstore.OldGrbVersion)
 	cleanAnnotations[grbstore.GrbVersion] = "true"
 	obj.SetAnnotations(cleanAnnotations)
-	return p.mgmt.Management.GlobalRoleBindings("").Update(obj)
+	return obj
 }
 
 // cleanFinalizers takes a list of finalizers and removes any finalizer that has the matching prefix
