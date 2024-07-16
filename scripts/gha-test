@@ -15,19 +15,7 @@ cleanup()
     return $EXIT
 }
 
-# skipping tests for s390x since k3s doesn't support s390x yet
-if [ ${ARCH} == s390x ]; then
-    exit 0
-fi
-
 cd $(dirname $0)/..
-
-echo Running unit tests
-go test -cover -tags=test ./pkg/...
-
-if [ ${ARCH} == arm64 ] || [ ${ARCH} == s390x ]; then
-    export ETCD_UNSUPPORTED_ARCH=${ARCH}
-fi
 
 TB_ORG=rancher
 
@@ -42,6 +30,7 @@ fi
 export DIST=${TEST_DIST}
 export SOME_K8S_VERSION=${SOME_K8S_VERSION}
 export TB_ORG=${TB_ORG}
+export CATTLE_CHART_DEFAULT_URL=${CATTLE_CHART_DEFAULT_URL}
 
 # Tell Rancher to use the recently-built Rancher cluster agent image. This image is built as part of CI and will be
 # copied to the in-cluster registry during test setup below.
@@ -60,11 +49,19 @@ if [ -z "${SOME_K8S_VERSION}" ]; then
 # https://github.com/rancher/rancher/issues/36827 has added appDefaults. We do not use appDefaults
 # here for simplicity's sake, as it requires semver parsing & matching. The last release should
 # be good enough for our needs.
-export SOME_K8S_VERSION=$(curl -sS https://raw.githubusercontent.com/rancher/kontainer-driver-metadata/dev-v2.7/data/data.json | jq -r ".$DIST.releases[-1].version")
+export SOME_K8S_VERSION=$(curl -sS https://raw.githubusercontent.com/rancher/kontainer-driver-metadata/dev-v2.8/data/data.json | jq -r ".$DIST.releases[-1].version")
+fi
+
+if [ -z "${CATTLE_CHART_DEFAULT_URL}" ]; then
+# If `CATTLE_CHART_DEFAULT_URL` is not set, use the `https://github.com/rancher/charts` so GitHub is used instead of
+# the default `https://git.rancher.io/charts` to reduce the reliance and load on our Git mirror
+export CATTLE_CHART_DEFAULT_URL=https://github.com/rancher/charts
 fi
 
 echo Starting rancher server for test
 touch /tmp/rancher.log
+
+export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
 
 mkdir -p /var/lib/rancher/$DIST/agent/images
 grep PodTestImage ./tests/v2prov/defaults/defaults.go | cut -f2 -d'"' > /var/lib/rancher/$DIST/agent/images/pull.txt
@@ -83,7 +80,7 @@ run_rancher()
             dump_rancher_logs
             echo K3s logs were:
             echo -e "-----K3S-LOG-DUMP-START-----"
-            cat build/testdata/k3s.log | gzip | base64 -w 0
+            cat build/testdata/k3s.log
             echo -e "\n-----K3S-LOG-DUMP-END-----"
             set +e
             echo Attempting to kill K3s
@@ -99,7 +96,7 @@ run_rancher()
         fi
         if [ "$PID" = "-1" ]; then
           echo Starting rancher server using run
-          ./scripts/run >/tmp/rancher.log 2>&1 &
+          ./scripts/gha-run >/tmp/rancher.log 2>&1 &
           PID=$!
         fi
         sleep 2
@@ -110,7 +107,7 @@ dump_rancher_logs()
 {
   echo Rancher logs were
   echo -e "-----RANCHER-LOG-DUMP-START-----"
-  cat /tmp/rancher.log | gzip | base64 -w 0
+  cat /tmp/rancher.log
   echo -e "\n-----RANCHER-LOG-DUMP-END-----"
 }
 
@@ -126,9 +123,6 @@ PID=-1
 run_rancher &
 RANCHER_RUN_PID=$!
 trap cleanup exit
-
-echo "Waiting for Rancher to be healthy"
-./scripts/retry --sleep 2 "curl -sf -o /dev/null http://localhost:8080/ping"
 
 echo "Waiting up to 5 minutes for rancher-webhook deployment"
 ./scripts/retry \
