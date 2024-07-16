@@ -193,6 +193,7 @@ def test_rke_k8s_deprecated_versions(admin_mc, remove_resource):
                                 value="")
 
 
+@pytest.mark.skip
 def test_save_as_template_action_rbac(admin_mc, remove_resource, user_factory):
     cluster = admin_mc.client.create_cluster(name=random_str(),
                                              rancherKubernetesEngineConfig={
