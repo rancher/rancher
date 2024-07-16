@@ -149,7 +149,7 @@ jobs:
       contents: read
       id-token: write
     env:
-      REGISTRY: "0.0.0.0:5000"
+      REGISTRY: "http://127.0.0.15000"
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
