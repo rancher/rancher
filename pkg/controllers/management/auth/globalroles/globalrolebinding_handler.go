@@ -38,14 +38,25 @@ const (
 	FailedToAddRules = "FailedToAddRules"
 	// FailedToCreateLabel means the controller was unable to set an owner label
 	FailedToCreateLabel = "FailedToCreateLabel"
+	// FailedToCreateRB means that creation of an associated rolebinding failed
+	FailedToCreateRB = "FailedToCreateRB"
+	// FailedToDeleteRB means deletion of an associated rolebinding failed.
+	FailedToDeleteRB = "FailedToDeleteRB"
 	// FailedToGetGlobalRole means that the controller was unable to find the GlobalRole referenced by the GR binding.
 	FailedToGetGlobalRole = "FailedToGetGlobalRole"
+	// FailedToGetRB means that retrieval of an associated rolebinding failed
+	FailedToGetRB = "FailedToGetRB"
+	// FailedToGetGRBNamespace means that controller was unable to get a GRB associated namespace
+	FailedToGetGRBNamespace = "FailedToGetGRBNamespace"
 	// FailedToListClusters means that the controller was unable to list the clusters needed for reconciliation.
 	FailedToListClusters = "FailedToListClusters"
 	// FailedToListRoleBindings means that related role bindings could not listed
 	FailedToListRoleBindings = "FailedToListRoleBindings"
 	// FailedToReconcileCRTBs means that the controller failed to reconcile the backing CRTBs for the GRB and that permissions may be missing.
-	FailedToReconcileCRTBs = "FailedToReconcileCRTBs"
+
+	// FailedToPurgeInvalidNamespacedRBs means that the controller failed to purge invalid namespaced RBs.
+	FailedToPurgeInvalidNamespacedRBs = "FailedToPurgeInvalidNamespacedRBs"
+	FailedToReconcileCRTBs            = "FailedToReconcileCRTBs"
 	// FailedToReconcileFleetWorkspacePermissions means that the controller failed to reconcile the permissions in the related fleet workspaces
 	FailedToReconcileFleetWorkspacePermissions = "FailedToReconcileFleetWorkspacePermissions"
 	// FailedToSyncDownstreamClusterPermissions means that the controller was unable set the cluster permissions in downstream clusters.
@@ -718,6 +729,7 @@ func (grb *globalRoleBindingLifecycle) reconcileNamespacedRoleBindings(globalRol
 			logrus.Warnf("[%v] Namespace %s not found. Not re-enqueueing GlobalRoleBinding %s", grController, ns, globalRoleBinding.Name)
 			continue
 		} else if err != nil {
+			addGRBCondition(globalRoleBinding, condition, FailedToGetGRBNamespace, globalRoleBinding.Name, err)
 			returnError = errors.Join(returnError, fmt.Errorf("couldn't get namespace %s: %w", ns, err))
 			continue
 		}
@@ -740,10 +752,12 @@ func (grb *globalRoleBindingLifecycle) reconcileNamespacedRoleBindings(globalRol
 			// Since roleRef is immutable, we have to delete and recreate the RB
 			err = grb.roleBindings.DeleteNamespaced(roleBinding.Namespace, roleBinding.Name, &metav1.DeleteOptions{})
 			if err != nil {
+				addGRBCondition(globalRoleBinding, condition, FailedToDeleteRB, globalRoleBinding.Name, err)
 				returnError = errors.Join(returnError, err)
 				continue
 			}
 		} else if !apierrors.IsNotFound(err) {
+			addGRBCondition(globalRoleBinding, condition, FailedToGetRB, globalRoleBinding.Name, err)
 			returnError = errors.Join(returnError, err)
 			continue
 		}
@@ -777,6 +791,7 @@ func (grb *globalRoleBindingLifecycle) reconcileNamespacedRoleBindings(globalRol
 
 		createdRB, err := grb.roleBindings.Create(newRoleBinding)
 		if err != nil {
+			addGRBCondition(globalRoleBinding, condition, FailedToCreateRB, globalRoleBinding.Name, err)
 			returnError = errors.Join(returnError, err)
 			continue
 		}
@@ -808,12 +823,14 @@ func (grb *globalRoleBindingLifecycle) reconcileNamespacedRoleBindings(globalRol
 	if len(rbs) != len(roleBindingUIDs) {
 		err = grb.purgeInvalidNamespacedRBs(rbs, roleBindingUIDs)
 		if err != nil {
+			addGRBCondition(globalRoleBinding, condition, FailedToPurgeInvalidNamespacedRBs, globalRoleBinding.Name, err)
 			returnError = errors.Join(returnError, err)
 		}
 	}
 	if returnError == nil {
 		addGRBCondition(globalRoleBinding, condition, NamespacedRoleBindingsOk, globalRoleBinding.Name, nil)
 	}
+
 	return returnError
 }
 

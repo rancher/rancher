@@ -24,6 +24,16 @@ const (
 	grbHandlerName        = "grb-cluster-sync"
 )
 
+// Condition reason types
+const (
+	// CRBExists is a success indicator
+	CRBExists = "CRBExists"
+	// FailedToGetCRB indicates that the controller failed to retrieve an existing associated CRB
+	FailedToGetCRB = "FailedToGetCRB"
+	// FailedToCreateCRB indicates that the controller failed to create a missing associated CRB
+	FailedToCreateCRB = "FailedToCreateCRB"
+)
+
 func RegisterIndexers(scaledContext *config.ScaledContext) error {
 	informer := scaledContext.Management.GlobalRoleBindings("").Controller().Informer()
 	indexers := map[string]cache.IndexFunc{
@@ -125,14 +135,18 @@ func (c *grbHandler) sync(key string, obj *apisv3.GlobalRoleBinding) (runtime.Ob
 // ensureClusterAdminBinding creates a ClusterRoleBinding for GRB subject to
 // the Kubernetes "cluster-admin" ClusterRole in the downstream cluster.
 func (c *grbHandler) ensureClusterAdminBinding(obj *apisv3.GlobalRoleBinding) error {
+	condition := metav1.Condition{Type: CRBExists}
+
 	bindingName := rbac.GrbCRBName(obj)
 	_, err := c.crbLister.Get("", bindingName)
 	if err != nil && !apierrors.IsNotFound(err) {
+		addGRBCondition(obj, condition, FailedToGetCRB, bindingName, err)
 		return fmt.Errorf("failed to get ClusterRoleBinding '%s' from the cache: %w", bindingName, err)
 	}
 
 	if err == nil {
 		// binding exists, nothing to do
+		addGRBCondition(obj, condition, CRBExists, bindingName, nil)
 		return nil
 	}
 
@@ -147,8 +161,11 @@ func (c *grbHandler) ensureClusterAdminBinding(obj *apisv3.GlobalRoleBinding) er
 		},
 	})
 	if err != nil && !apierrors.IsAlreadyExists(err) {
+		addGRBCondition(obj, condition, FailedToCreateCRB, bindingName, err)
 		return fmt.Errorf("failed to create ClusterRoleBinding '%s' for admin in downstream '%s': %w", bindingName, c.clusterName, err)
 	}
+
+	addGRBCondition(obj, condition, CRBExists, bindingName, nil)
 	return nil
 }
 
