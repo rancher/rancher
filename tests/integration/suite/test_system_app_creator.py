@@ -36,4 +36,3 @@ def wait_for_system_app(client, name, timeout=60):
         interval *= 2
         apps = client.list_app(name=name)
     return apps.data[0]
-    
