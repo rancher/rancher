@@ -23,7 +23,7 @@ RUN GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLA
 
 FROM ${RANCHER_IMAGE} AS rancher
 
-FROM registry.suse.com/bci/bci-micro:15.6 AS final
+FROM registry.suse.com/bci/bci-base:15.5 AS final
 ARG ARCH=${ARCH}
 ARG VERSION=${VERSION}
 
