@@ -40,8 +40,6 @@ type UIPluginTest struct {
 	restClientGetter genericclioptions.RESTClientGetter
 	catalogClient    *catalog.Client
 	corev1           corev1.CoreV1Interface
-	originalBranch   string
-	originalGitRepo  string
 }
 
 func (w *UIPluginTest) TearDownSuite() {
@@ -135,7 +133,6 @@ func (w *UIPluginTest) SetupSuite() {
 }
 
 func TestUIPluginSuite(t *testing.T) {
-	t.Skip()
 	suite.Run(t, new(UIPluginTest))
 }
 
@@ -145,6 +142,7 @@ func (w *UIPluginTest) TestGetIndexAuthenticated() {
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}}
 	req, err := http.NewRequest(http.MethodGet, "https://localhost:443/v1/uiplugins", nil)
+	require.NoError(w.T(), err)
 	req.AddCookie(&http.Cookie{
 		Name:  "R_SESS",
 		Value: w.client.RancherConfig.AdminToken,
@@ -153,6 +151,7 @@ func (w *UIPluginTest) TestGetIndexAuthenticated() {
 	res, err := client.Do(req)
 	w.Require().NoError(err)
 	body, err := io.ReadAll(res.Body)
+	require.NoError(w.T(), err)
 	res.Body.Close()
 	var index plugin.SafeIndex
 	w.Require().NoError(json.Unmarshal(body, &index))
@@ -169,6 +168,7 @@ func (w *UIPluginTest) TestGetIndexUnauthenticated() {
 	res, err := client.Get("https://localhost:443/v1/uiplugins")
 	w.Require().NoError(err)
 	body, err := io.ReadAll(res.Body)
+	require.NoError(w.T(), err)
 	res.Body.Close()
 	var index plugin.SafeIndex
 	w.Require().NoError(json.Unmarshal(body, &index))

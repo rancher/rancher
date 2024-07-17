@@ -25,8 +25,6 @@ import (
 )
 
 var (
-	// agentTag         = os.Getenv("AGENT_TAG")
-	// masterAgentImage = "rancher/rancher-agent:" + agentTag
 	agentImage = os.Getenv("CATTLE_AGENT_IMAGE")
 )
 
