@@ -1,0 +1,13 @@
+name: Unit Tests
+on: [workflow_dispatch, workflow_call]
+jobs:
+  unit-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run unit tests
+        run: go test -cover -tags=test ./pkg/...
+
