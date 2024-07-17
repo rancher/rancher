@@ -25,6 +25,7 @@ FROM ${RANCHER_IMAGE} AS rancher
 
 FROM registry.suse.com/bci/bci-micro:15.6 AS final
 ARG ARCH=${ARCH}
+ARG VERSION=${VERSION}
 
 ENV KUBECTL_VERSION v1.25.12
 RUN zypper -n install --no-recommends curl ca-certificates jq git-core hostname iproute2 vim-small less \
