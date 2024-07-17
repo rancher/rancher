@@ -7,6 +7,20 @@ if [ ! -e /run/secrets/kubernetes.io/serviceaccount ] && [ ! -e /dev/kmsg ]; the
     exit 1
 fi
 
+git_dirs=(
+  /var/lib/rancher-data/local-catalogs/system-library
+  /var/lib/rancher-data/local-catalogs/helm3-library
+  /var/lib/rancher-data/local-catalogs/library
+  /var/lib/rancher-data/local-catalogs/v2/rancher-rke2-charts/675f1b63a0a83905972dcab2794479ed599a6f41b86cd6193d69472d0fa889c9/
+  /var/lib/rancher-data/local-catalogs/v2/rancher-partner-charts/8f17acdce9bffd6e05a58a3798840e408c4ea71783381ecd2e9af30baad65974/
+  /var/lib/rancher-data/local-catalogs/v2/rancher-charts/4b40cac650031b74776e87c1a726b0484d0877c3ec137da0872547ff9b73a721/
+)
+echo "Restoring git repositories: "
+for dir in ${git_dirs[@]}; do
+  echo "- ${dir}"
+  cd "${dir}" && git restore .
+done
+
 #########################################################################################################################################
 # DISCLAIMER                                                                                                                            #
 # Copied from https://github.com/moby/moby/blob/ed89041433a031cafc0a0f19cfe573c31688d377/hack/dind#L28-L37                              #
