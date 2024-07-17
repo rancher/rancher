@@ -187,6 +187,7 @@ func (c AzureMSGraphClient) ListGroups(filter string) ([]v3.Principal, error) {
 func (c AzureMSGraphClient) ListGroupMemberships(userID string, filter string) ([]string, error) {
 	logrus.Debugf("[%s] ListGroupMemberships %s", providerLogPrefix, userID)
 	var groupIDs []string
+
 	err := c.listGroupMemberships(context.Background(), userID, filter, func(g *models.Group) {
 		if id := g.GetId(); id != nil {
 			groupIDs = append(groupIDs, *id)
@@ -206,11 +207,11 @@ func (c AzureMSGraphClient) listGroupMemberships(ctx context.Context, userID str
 
 	result, err := c.GraphClient.Users().
 		ByUserId(userID).
-		MemberOf().
+		TransitiveMemberOf().
 		Get(ctx,
-			&msgraphusers.ItemMemberOfRequestBuilderGetRequestConfiguration{
+			&msgraphusers.ItemTransitiveMemberOfRequestBuilderGetRequestConfiguration{
 				Headers: headers,
-				QueryParameters: &msgraphusers.ItemMemberOfRequestBuilderGetQueryParameters{
+				QueryParameters: &msgraphusers.ItemTransitiveMemberOfRequestBuilderGetQueryParameters{
 					Filter: &filter,
 					Count:  &requestCount,
 				}})
@@ -228,7 +229,9 @@ func (c AzureMSGraphClient) listGroupMemberships(ctx context.Context, userID str
 	err = pageIterator.Iterate(ctx, func(do models.DirectoryObjectable) bool {
 		group, ok := do.(*models.Group)
 		if !ok {
-			logrus.Errorf("[%s] Page Iterator received incorrect value of type %T", providerLogPrefix, do)
+			if _, ok := do.(*models.DirectoryRole); !ok {
+				logrus.Errorf("[%s] Page Iterator received incorrect value of type %T: %#v", providerLogPrefix, do, do)
+			}
 			return true
 		}
 		f(group)
