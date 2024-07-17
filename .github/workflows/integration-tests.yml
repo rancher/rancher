@@ -11,17 +11,17 @@ env:
   HOST_ARCH: amd64
   ARCH: amd64
   CATTLE_HELM_VERSION: v2.16.8-rancher2
-  CATTLE_MACHINE_VERSION: v0.15.0-rancher112
-  CATTLE_K3S_VERSION: v1.28.6+k3s2
-  CATTLE_K3S_VERSION_DOCKER: v1.28.6+k3s2
-  HELM_VERSION: v3.13.3
+  CATTLE_MACHINE_VERSION: v0.15.0-rancher109
+  CATTLE_K3S_VERSION: v1.27.10+k3s2
+  CATTLE_K3S_VERSION_DOCKER: v1.27.10+k3s2
+  HELM_VERSION: v3.12.3
   KUSTOMIZE_VERSION: v5.0.1
   HELM_UNITTEST_VERSION: 0.3.2
   CATTLE_KDM_BRANCH: dev-v2.7
   CONTROLLER_GEN_VERSION: v0.14.0
   YQ_VERSION: v4.44.2
   PYTHON_VERSION: '3.11'
-  GOLANG_VERSION: '1.22'
+  GOLANG_VERSION: '1.20'
   IMAGE: ${{ github.repository_owner }}/rancher
   IMAGE_AGENT: ${{ github.repository_owner }}/rancher-agent
   TAG: ${{ github.sha }}
@@ -30,7 +30,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
-      K3D_VERSION: v5.7.1
+      K3D_VERSION: v5.4.6
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
