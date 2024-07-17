@@ -6,7 +6,7 @@
 
 ## Test Setup
 
-Your GO suite should be set to `-run ^Test<TestSuite>$`. For example to run the rbac_terminating_project_test.go, set the GO suite to `-run ^TestRbacTerminatingProjectTestSuite$` You can find specific tests by checking the test file you plan to run.
+Your GO suite should be set to `-run ^Test<TestSuite>$`. For example to run the projects_test.go, set the GO suite to `-run ^TestProjectsTestSuite$` You can find specific tests by checking the test file you plan to run.
 
 In your config file, set the following:
 
