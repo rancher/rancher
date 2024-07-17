@@ -58,6 +58,10 @@ jobs:
         run: |
           echo "ARCH=${{ matrix.arch }}" >> "$GITHUB_ENV"
           echo "RKE_VERSION=$(grep -m1 'github.com/rancher/rke' go.mod | awk '{print $2}')" >> "$GITHUB_ENV"
+          source scripts/export-config
+          echo "CATTLE_RANCHER_WEBHOOK_VERSION=$CATTLE_RANCHER_WEBHOOK_VERSION" >> "$GITHUB_ENV"
+          echo "CATTLE_CSP_ADAPTER_MIN_VERSION=$CATTLE_CSP_ADAPTER_MIN_VERSION" >> "$GITHUB_ENV"
+          echo "CATTLE_FLEET_VERSION=$CATTLE_FLEET_VERSION" >> "$GITHUB_ENV"
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
@@ -83,6 +87,9 @@ jobs:
             "COMMIT=${{ github.SHA }}"
             "RKE_VERSION=${{ env.RKE_VERSION }}"
             "ARCH=${{ matrix.arch }}"
+            "CATTLE_RANCHER_WEBHOOK_VERSION=${{ env.CATTLE_RANCHER_WEBHOOK_VERSION }}"
+            "CATTLE_CSP_ADAPTER_MIN_VERSION=${{ env.CATTLE_CSP_ADAPTER_MIN_VERSION }}"
+            "CATTLE_FLEET_VERSION=${{ env.CATTLE_FLEET_VERSION }}"
           tags: ${{ env.IMAGE }}:${{ env.TAG }}-${{ matrix.arch }}
           context: .
           platforms: "${{ matrix.os }}/${{ matrix.arch }}"
@@ -121,6 +128,8 @@ jobs:
       - name: Setup Environment Variables
         run: |
           echo "ARCH=${{ matrix.arch }}" >> "$GITHUB_ENV"
+          source scripts/export-config
+          echo "CATTLE_RANCHER_WEBHOOK_VERSION=$CATTLE_RANCHER_WEBHOOK_VERSION" >> "$GITHUB_ENV"
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
@@ -159,6 +168,7 @@ jobs:
             "RANCHER_TAG=${{ env.TAG }}"
             "RANCHER_REPO=${{ env.REPOSITORY_OWNER }}"
             "REGISTRY=localhost:5000"
+            "CATTLE_RANCHER_WEBHOOK_VERSION=${{ env.CATTLE_RANCHER_WEBHOOK_VERSION }}"
           tags: ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-${{ matrix.arch }}
           context: .
           platforms: "${{ matrix.os }}/${{ matrix.arch }}"
