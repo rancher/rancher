@@ -13,6 +13,7 @@ import (
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
+	"k8s.io/client-go/util/retry"
 )
 
 func (g *googleOauthProvider) formatter(apiContext *types.APIContext, resource *types.RawResource) {
@@ -110,9 +111,10 @@ func (g *googleOauthProvider) testAndApply(request *types.APIContext) error {
 	}
 
 	userExtraInfo := g.GetUserExtraAttributes(userPrincipal)
-	err = g.tokenMGR.UserAttributeCreateOrUpdate(user.Name, userPrincipal.Provider, groupPrincipals, userExtraInfo)
-	if err != nil {
-		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("testAndApply: Failed to create or update userAttribute: %v", err))
+	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		return g.tokenMGR.UserAttributeCreateOrUpdate(user.Name, userPrincipal.Provider, groupPrincipals, userExtraInfo)
+	}); err != nil {
+		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Failed to create or update userAttribute: %v", err))
 	}
 
 	return g.tokenMGR.CreateTokenAndSetCookie(user.Name, userPrincipal, groupPrincipals, providerInfo, 0, "Token via Google OAuth Configuration", request)
