@@ -6,5 +6,5 @@ const (
 	CspAdapterMinVersion = "103.0.1+up3.0.1"
 	DefaultShellVersion  = "rancher/shell:v0.1.26"
 	FleetVersion         = "103.1.6+up0.9.6"
-	WebhookVersion       = "103.0.7+up0.4.8-rc5"
+	WebhookVersion       = "103.0.7+up0.4.8"
 )
