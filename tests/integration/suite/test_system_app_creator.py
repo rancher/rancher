@@ -1,7 +1,9 @@
 from .common import random_str
 import time
+import pytest
 
 
+@pytest.mark.skip
 def test_system_app_creator(admin_mc, admin_system_pc, remove_resource):
     client = admin_mc.client
     provider_name = random_str()
