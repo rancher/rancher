@@ -14,6 +14,7 @@ env:
   IMAGE_INSTALLER: ${{ github.repository_owner }}/system-agent-installer-rancher
   CATTLE_KDM_BRANCH: dev-v2.7
   HELM_VERSION_V3: v3.12.3
+  REGISTRY: "stgregistry.suse.com"
 jobs:
   unit-tests:
     uses: ./.github/workflows/unit-test.yml
@@ -120,9 +121,6 @@ jobs:
             "COMMIT=${{ env.COMMIT }}"
             "RKE_VERSION=${{ env.RKE_VERSION }}"
             "ARCH=${{ matrix.arch }}"
-            "CATTLE_RANCHER_WEBHOOK_VERSION=${{ env.CATTLE_RANCHER_WEBHOOK_VERSION }}"
-            "CATTLE_CSP_ADAPTER_MIN_VERSION=${{ env.CATTLE_CSP_ADAPTER_MIN_VERSION }}"
-            "CATTLE_FLEET_VERSION=${{ env.CATTLE_FLEET_VERSION }}"
           tags: ${{ env.IMAGE }}:${{ env.TAG }}-${{ matrix.arch }}
           context: .
           platforms: "${{ matrix.os }}/${{ matrix.arch }}"
@@ -203,7 +201,6 @@ jobs:
             "RANCHER_TAG=${{ env.TAG }}"
             "RANCHER_REPO=${{ env.REPOSITORY_OWNER }}"
             "REGISTRY=${{ env.REGISTRY }}"
-            "CATTLE_RANCHER_WEBHOOK_VERSION=${{ env.CATTLE_RANCHER_WEBHOOK_VERSION }}"
           tags: ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-${{ matrix.arch }}
           context: .
           platforms: "${{ matrix.os }}/${{ matrix.arch }}"
@@ -293,8 +290,8 @@ jobs:
             echo "Error: Failed to load image from tarball!"
             exit 1
           fi
-          docker tag "$image_id" docker.io/${{ env.IMAGE }}:${{ env.TAG }}-${{ matrix.arch }}
-          docker push docker.io/${{ env.IMAGE }}:${{ env.TAG }}-${{ matrix.arch }}
+          docker tag "$image_id" ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ env.TAG }}-${{ matrix.arch }}
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ env.TAG }}-${{ matrix.arch }}
       - name: Push agent image
         run: |
           image_agent_id=$(docker load --input /tmp/rancher-agent-${{ matrix.os }}-${{ matrix.arch }}.tar 2>&1 | grep "Loaded image" | awk '{print $NF}')
@@ -302,8 +299,8 @@ jobs:
             echo "Error: Failed to load image from tarball!"
             exit 1
           fi
-          docker tag "$image_agent_id" docker.io/${{ env.IMAGE_AGENT }}:${{ env.TAG }}-${{ matrix.arch }}
-          docker push docker.io/${{ env.IMAGE_AGENT }}:${{ env.TAG }}-${{ matrix.arch }}
+          docker tag "$image_agent_id" ${{ env.REGISTRY }}/${{ env.IMAGE_AGENT }}:${{ env.TAG }}-${{ matrix.arch }}
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_AGENT }}:${{ env.TAG }}-${{ matrix.arch }}
   merge-server-manifest:
     runs-on: ubuntu-latest
     needs: [push-images]
@@ -437,7 +434,7 @@ jobs:
             "ARCH=${{ matrix.arch }}"
             "RANCHER_TAG=${{ env.TAG }}"
             "RANCHER_REPO=${{ env.REPOSITORY_OWNER }}"
-          tags: ${{ env.IMAGE_INSTALLER }}:${{ env.TAG }}-${{ matrix.arch }}
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_INSTALLER }}:${{ env.TAG }}-${{ matrix.arch }}
           context: .
           platforms: "${{ matrix.os }}/${{ matrix.arch }}"
           file: ./package/Dockerfile.installer
@@ -516,8 +513,6 @@ jobs:
     if: github.event_name == 'tag' && contains(github.ref, 'tags/') # Only run on tag
     runs-on: ubuntu-latest
     needs: [create-images-files]
-    env:
-      DOCKER_REGISTRY: "docker.io"
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -540,7 +535,7 @@ jobs:
           release generate rancher docker-images-digests \
             --images-url "$LINUX_IMAGES_URL" \
             --output-file /tmp/digests/rancher-images-digests-linux-amd64.txt \
-            --registry ${{ env.DOCKER_REGISTRY }}
+            --registry ${{ env.REGISTRY }}
           cp /tmp/digests/rancher-images-digests-linux-amd64.txt /tmp/digests/rancher-images-digests-linux-arm64.txt
       - name: Generate Windows Digests
         run: |
@@ -548,7 +543,7 @@ jobs:
           release generate rancher docker-images-digests \
             --images-url "$LINUX_IMAGES_URL" \
             --output-file /tmp/digests/rancher-images-digests-windows-ltsc2019.txt \
-            --registry ${{ env.DOCKER_REGISTRY }}
+            --registry ${{ env.REGISTRY }}
           cp /tmp/digests/rancher-images-digests-windows-ltsc2019.txt /tmp/digests/rancher-images-digests-windows-ltsc2022.txt
       - name: Upload digests
         env:
