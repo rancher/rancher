@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 echo "-- chart/test --"
+set -ex
 
 # Check for helm
 if [ -z "$(type -p helm_v3)" ]; then
@@ -21,6 +22,6 @@ if [[ $? > 0 ]]; then
 fi
 
 current_dir=$(pwd)
-cd ../../build/chart/rancher
+cd $(dirname $0)/../../build/chart/rancher
 helm_v3 unittest ./
 cd $current_dir
