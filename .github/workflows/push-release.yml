@@ -505,10 +505,10 @@ jobs:
           mv ./bin/*.ps1 ./dist
       - name: Create sha256sum.txt file
         run: ./scripts/artifacts-hashes.sh
-      - name: Upload artifacts
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload -R ${{ env.REPOSITORY_OWNER }}/rancher ${{ env.TAG }} ./dist/* --clobber
+      # - name: Upload artifacts
+      #   env:
+      #     GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #   run: gh release upload -R ${{ env.REPOSITORY_OWNER }}/rancher ${{ env.TAG }} ./dist/* --clobber
   docker-image-digests:
     if: github.event_name == 'tag' && contains(github.ref, 'tags/') # Only run on tag
     runs-on: ubuntu-latest
@@ -545,7 +545,7 @@ jobs:
             --output-file /tmp/digests/rancher-images-digests-windows-ltsc2019.txt \
             --registry ${{ env.REGISTRY }}
           cp /tmp/digests/rancher-images-digests-windows-ltsc2019.txt /tmp/digests/rancher-images-digests-windows-ltsc2022.txt
-      - name: Upload digests
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload -R ${{ env.REPOSITORY_OWNER }}/rancher ${{ env.TAG }} /tmp/digests/* --clobber
+      # - name: Upload digests
+      #   env:
+      #     GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #   run: gh release upload -R ${{ env.REPOSITORY_OWNER }}/rancher ${{ env.TAG }} /tmp/digests/* --clobber
