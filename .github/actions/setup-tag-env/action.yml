@@ -1,0 +1,17 @@
+name: "Setup TAG and HEAD_TAG env variables"
+description: "Setup TAG and HEAD_TAG env variables"
+runs:
+  using: "composite"
+  steps:
+    - shell: bash
+      run: |
+        ref_name="${{ github.ref_name }}"
+        TAG="${ref_name}"
+        prefix="release/"
+        if [[ "$ref_name" == release/v* ]]; then
+          TAG=${ref_name#$prefix}-${{ github.sha }}-head
+          HEAD_TAG=${ref_name#$prefix}-head
+          echo "HEAD_TAG=$HEAD_TAG" >> "$GITHUB_ENV"
+        fi
+        echo "TAG=$TAG" >> "$GITHUB_ENV"
+        echo "GIT_TAG=$TAG" >> "$GITHUB_ENV"
