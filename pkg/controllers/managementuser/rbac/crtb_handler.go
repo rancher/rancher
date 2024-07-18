@@ -185,14 +185,14 @@ func (c *crtbLifecycle) ensureCRTBDelete(binding *v3.ClusterRoleTemplateBinding)
 	set := labels.Set(map[string]string{rtbOwnerLabel: pkgrbac.GetRTBLabel(binding.ObjectMeta)})
 	rbs, err := c.crbLister.List("", set.AsSelector())
 	if err != nil {
-		addCondition(binding, condition, FailedToGetClusterRoleBindings, binding.UserName, nil)
+		addCondition(binding, condition, FailedToGetClusterRoleBindings, binding.UserName, err)
 		return fmt.Errorf("couldn't list clusterrolebindings with selector %s: %w", set.AsSelector(), err)
 	}
 
 	for _, rb := range rbs {
 		if err := c.crbClient.Delete(rb.Name, &metav1.DeleteOptions{}); err != nil {
 			if !apierrors.IsNotFound(err) {
-				addCondition(binding, condition, FailedToDeleteClusterRoleBindings, binding.UserName, nil)
+				addCondition(binding, condition, FailedToDeleteClusterRoleBindings, binding.UserName, err)
 				return fmt.Errorf("error deleting clusterrolebinding %v: %w", rb.Name, err)
 			}
 		}
@@ -203,6 +203,7 @@ func (c *crtbLifecycle) ensureCRTBDelete(binding *v3.ClusterRoleTemplateBinding)
 		return fmt.Errorf("error deleting service account impersonator: %w", err)
 	}
 
+	addCondition(binding, condition, CRTBExists, binding.UserName, nil)
 	return nil
 }
 
