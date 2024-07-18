@@ -61,7 +61,7 @@ func (h *handler) migrateAuthConfig(authConfig *apimgmtv3.AuthConfig) (runtime.O
 	return updated, nil
 }
 
-func (h *handler) migrateAuthConfigPasswordToSecret(authConfig *apimgmtv3.AuthConfig, cond condition.Cond, f func(map[string]any) (runtime.Object, error)) (runtime.Object, error) {
+func (h *handler) migrateAuthConfigPasswordToSecret(authConfig *apimgmtv3.AuthConfig, cond condition.Cond, f func(runtime.Unstructured) (runtime.Object, error)) (runtime.Object, error) {
 	if cond.IsTrue(authConfig) {
 		return authConfig, nil
 	}
@@ -72,12 +72,11 @@ func (h *handler) migrateAuthConfigPasswordToSecret(authConfig *apimgmtv3.AuthCo
 			return nil, err
 		}
 
-		return f(unstructuredConfig.UnstructuredContent())
+		return f(unstructuredConfig)
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to update status for AuthConfig %s: %w", authConfig.Name, err)
 	}
-
 	updatedAuthConfig, err := h.authConfigs.Update(authConfig.Name, updated)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update AuthConfig %s: %w", authConfig.Name, err)
@@ -87,26 +86,26 @@ func (h *handler) migrateAuthConfigPasswordToSecret(authConfig *apimgmtv3.AuthCo
 }
 
 func (h *handler) fixShibbolethSecretReference(obj runtime.Object) (runtime.Object, error) {
-	if apimgmtv3.AuthConfigConditionShibbolethSecretFixed.IsTrue(obj) {
+	shibbConfig := &apimgmtv3.ShibbolethConfig{}
+	switch v := obj.(type) {
+	case *apimgmtv3.ShibbolethConfig:
+		shibbConfig = v
+	case *apimgmtv3.AuthConfig:
+		unstructuredConfig, err := getUnstructuredAuthConfigByName(h.authConfigs, v.Name)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := common.Decode(unstructuredConfig.UnstructuredContent(), shibbConfig); err != nil {
+			return nil, fmt.Errorf("unable to decode ShibbolethConfig: %w", err)
+		}
+	}
+
+	if apimgmtv3.AuthConfigConditionShibbolethSecretFixed.IsTrue(shibbConfig) {
 		return obj, nil
 	}
 
-	shibbConfig := &apimgmtv3.ShibbolethConfig{}
-	updated, err := apimgmtv3.AuthConfigConditionShibbolethSecretFixed.DoUntilTrue(obj, func() (runtime.Object, error) {
-		switch v := obj.(type) {
-		case *apimgmtv3.ShibbolethConfig:
-			shibbConfig = v
-		case *apimgmtv3.AuthConfig:
-			unstructuredConfig, err := getUnstructuredAuthConfigByName(h.authConfigs, v.Name)
-			if err != nil {
-				return nil, err
-			}
-
-			if err := common.Decode(unstructuredConfig.UnstructuredContent(), shibbConfig); err != nil {
-				return nil, fmt.Errorf("unable to decode ShibbolethConfig: %w", err)
-			}
-		}
-
+	updated, err := apimgmtv3.AuthConfigConditionShibbolethSecretFixed.DoUntilTrue(shibbConfig, func() (runtime.Object, error) {
 		// This is fixing a bug where the secret was created as a lower-case
 		// name, but referenced with mixed-case.
 		const badSecretName = "cattle-global-data:shibbolethconfig-serviceAccountPassword"
@@ -129,10 +128,9 @@ func (h *handler) fixShibbolethSecretReference(obj runtime.Object) (runtime.Obje
 }
 
 // migrateShibbolethSecrets effects the migration of secrets for the Shibboleth provider.
-func (h *handler) migrateShibbolethSecrets(unstructuredConfig map[string]any) (runtime.Object, error) {
+func (h *handler) migrateShibbolethSecrets(unstructuredConfig runtime.Unstructured) (runtime.Object, error) {
 	shibbConfig := &apimgmtv3.ShibbolethConfig{}
-
-	err := common.Decode(unstructuredConfig, shibbConfig)
+	err := common.Decode(unstructuredConfig.UnstructuredContent(), shibbConfig)
 	if err != nil {
 		return nil, fmt.Errorf("unable to decode ShibbolethConfig: %w", err)
 	}
@@ -167,13 +165,13 @@ func (h *handler) migrateShibbolethSecrets(unstructuredConfig map[string]any) (r
 }
 
 // migrateOKTASecrets effects the migration of secrets for the OKTA provider.
-func (h *handler) migrateOKTASecrets(unstructuredConfig map[string]any) (runtime.Object, error) {
+func (h *handler) migrateOKTASecrets(unstructuredConfig runtime.Unstructured) (runtime.Object, error) {
 	oktaConfig := &apimgmtv3.OKTAConfig{}
-
-	err := common.Decode(unstructuredConfig, oktaConfig)
+	err := common.Decode(unstructuredConfig.UnstructuredContent(), oktaConfig)
 	if err != nil {
 		return nil, fmt.Errorf("unable to decode OKTAConfig: %w", err)
 	}
+
 	if oktaConfig.OpenLdapConfig.ServiceAccountPassword == "" {
 		// OpenLDAP is not configured, so nothing else is needed
 		return oktaConfig, nil
