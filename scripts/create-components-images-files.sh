@@ -4,7 +4,6 @@
 cd $(dirname $0)
 
 source version
-source export-config
 source package-env
 
 cd ../package
