@@ -77,6 +77,21 @@ func TestRunCleanup(t *testing.T) {
 		},
 	}
 
+	var tokensStore = map[string]*v3.Token{
+		"local-123": {
+			ObjectMeta:   metav1.ObjectMeta{Name: "local-123"},
+			AuthProvider: "local",
+		},
+		"azure-123": {
+			ObjectMeta:   metav1.ObjectMeta{Name: "azure-123"},
+			AuthProvider: "azuread",
+		},
+		"openldap-333": {
+			ObjectMeta:   metav1.ObjectMeta{Name: "openldap-333"},
+			AuthProvider: "openldap",
+		},
+	}
+
 	var secretStore = map[string]*v1.Secret{
 		"cattle-system:oauthSecretName": {
 			ObjectMeta: metav1.ObjectMeta{
@@ -112,6 +127,7 @@ func TestRunCleanup(t *testing.T) {
 		globalRoleBindingStore,
 		projectRoleTemplateBindingStore,
 		clusterRoleTemplateBindingStore,
+		tokensStore,
 		userStore,
 		secretStore,
 	)
@@ -143,6 +159,7 @@ func newMockCleanupService(t *testing.T,
 	grbStore map[string]*v3.GlobalRoleBinding,
 	prtbStore map[string]*v3.ProjectRoleTemplateBinding,
 	crtbStore map[string]*v3.ClusterRoleTemplateBinding,
+	tokenStore map[string]*v3.Token,
 	userStore map[string]*v3.User,
 	secretStore map[string]*v1.Secret) Service {
 	t.Helper()
@@ -156,6 +173,9 @@ func newMockCleanupService(t *testing.T,
 
 	crtbCache := initNamespacedMockCache(ctrl, crtbStore)
 	crtbClient := initNamespacedMockClient[*v3.ClusterRoleTemplateBinding, *v3.ClusterRoleTemplateBindingList](ctrl, crtbStore)
+
+	tokenCache := initMockCache(ctrl, tokenStore)
+	tokenClient := initMockClient[*v3.Token, *v3.TokenList](ctrl, tokenStore)
 
 	userCache := initMockCache(ctrl, userStore)
 	userClient := initMockClient[*v3.User, *v3.UserList](ctrl, userStore)
@@ -172,6 +192,8 @@ func newMockCleanupService(t *testing.T,
 		projectRoleTemplateBindingsClient: prtbClient,
 		clusterRoleTemplateBindingsCache:  crtbCache,
 		clusterRoleTemplateBindingsClient: crtbClient,
+		tokensCache:                       tokenCache,
+		tokensClient:                      tokenClient,
 		userCache:                         userCache,
 		userClient:                        userClient,
 	}
