@@ -508,7 +508,7 @@ jobs:
         run: sudo --preserve-env ./scripts/create-components-images-files.sh
       - name: Move files
         run: |
-          mv $HOME/bin/* ./dist
+          sudo mv $HOME/bin/* ./dist
           mv ./bin/*.txt ./dist
           mv ./bin/*.sh ./dist
           mv ./bin/*.ps1 ./dist
