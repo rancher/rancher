@@ -7,6 +7,8 @@ ARG TAGS="k8s"
 ARG LINKFLAGS="-extldflags -static"
 ARG DEFAULT_VALUES="{\"rke-version\":\"${RKE_VERSION}\"}"
 ARG LDFLAGS="-X github.com/rancher/rancher/pkg/version.Version=${VERSION} -X github.com/rancher/rancher/pkg/version.GitCommit=$COMMIT -X github.com/rancher/rancher/pkg/settings.InjectDefaults=$DEFAULT_VALUES $LINKFLAGS"
+ARG TARGETOS
+ARG TARGETARCH
 
 WORKDIR /app
 
@@ -14,7 +16,7 @@ COPY . .
 
 RUN go mod download
 
-RUN go build -tags "${TAGS}" -ldflags "${LDFLAGS}" -o rancher
+RUN GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" -o rancher
 
 FROM registry.suse.com/bci/bci-base:15.5
 

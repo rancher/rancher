@@ -9,6 +9,8 @@ ARG CGO_ENABLED=0
 ARG TAGS="k8s"
 ARG LINKFLAGS="-extldflags -static"
 ARG LDFLAGS="-X main.VERSION=${VERSION} $LINKFLAGS"
+ARG TARGETOS
+ARG TARGETARCH
 
 WORKDIR /app
 
@@ -16,7 +18,7 @@ COPY . .
 
 RUN go mod download
 
-RUN go build -tags "${TAGS}" -ldflags "${LDFLAGS}" -o agent ./cmd/agent
+RUN GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" -o agent ./cmd/agent
 
 
 FROM ${RANCHER_IMAGE} AS rancher
