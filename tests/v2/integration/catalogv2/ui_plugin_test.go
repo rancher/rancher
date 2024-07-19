@@ -40,8 +40,6 @@ type UIPluginTest struct {
 	restClientGetter genericclioptions.RESTClientGetter
 	catalogClient    *catalog.Client
 	corev1           corev1.CoreV1Interface
-	originalBranch   string
-	originalGitRepo  string
 }
 
 func (w *UIPluginTest) TearDownSuite() {
