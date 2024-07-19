@@ -513,7 +513,7 @@ jobs:
           sudo mv ./bin/*.sh ./dist
           sudo mv ./bin/*.ps1 ./dist
       - name: Create sha256sum.txt file
-        run: ./scripts/artifacts-hashes.sh
+        run: sudo --preserve-env bash ./scripts/artifacts-hashes.sh
       - name: Upload artifacts
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
