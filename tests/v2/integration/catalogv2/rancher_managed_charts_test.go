@@ -73,7 +73,7 @@ func (w *RancherManagedChartsTest) SetupSuite() {
 
 	restConfig, err := (*kubeConfig).ClientConfig()
 	require.NoError(w.T(), err)
-	restConfig.Insecure = true
+	//restConfig.Insecure = true
 	cset, err := kubernetes.NewForConfig(restConfig)
 	require.NoError(w.T(), err)
 	w.corev1 = cset.CoreV1()
