@@ -52,27 +52,36 @@ jobs:
           overwrite: true
   publish-chart:
     runs-on: ubuntu-latest
+    needs: build-chart
     if: github.event_name == 'push' && contains(github.ref, 'tags/') # Only run on push
     permissions:
       contents: read
       id-token: write
     steps:
-      - name: Install gcloud CLI
-        run: |
-          sudo snap install google-cloud-cli --classic
       - name: Download chart
         uses: actions/download-artifact@v4
         with:
           name: chart
-          path: /tmp/charts/
+          path: ${{ runner.temp }}/charts
       - name: Load Secrets from Vault
         uses: rancher-eio/read-vault-secrets@main
         with:
           secrets: |
             secret/data/github/repo/${{ github.repository }}/google-auth/rancher/credentials token | GOOGLE_AUTH ;
-      - name: Upload chart to bucket
-        run: |
-          CLOUDSDK_AUTH_ACCESS_TOKEN=${{ env.GOOGLE_AUTH }} gcloud storage cp /tmp/charts gs://releases.rancher.com/server-charts --recursive --acl allUsers:READER --cache-control "public,no-cache,proxy-revalidate"
+      - name: Authenticate with Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ env.GOOGLE_AUTH }}
+      - name: Upload
+        uses: google-github-actions/upload-cloud-storage@v2
+        with:
+          destination: releases.rancher.com/server-charts
+          path: ${{ runner.temp }}/charts
+          parent: false
+          process_gcloudignore: false
+          predefinedAcl: publicRead
+          headers: |-
+            cache-control: public,no-cache,proxy-revalidate
   build-server:
     runs-on: ubuntu-latest
     strategy:
