@@ -274,7 +274,7 @@ COPY --from=build /app/rancher /usr/bin/
 COPY --from=build /app/package/entrypoint.sh /usr/bin/
 COPY --from=build /app/package/kustomize.sh /usr/bin/
 COPY --from=build app/package/jailer.sh /usr/bin/
-COPY --from=build /app/k3s-airgap-images.tar /var/lib/rancher/k3s/agent/images
+COPY --from=build /app/k3s-airgap-images.tar /var/lib/rancher/k3s/agent/images/
 RUN chmod +x /usr/bin/entrypoint.sh
 RUN chmod +x /usr/bin/kustomize.sh
 
