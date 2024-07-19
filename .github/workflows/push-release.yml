@@ -550,9 +550,9 @@ jobs:
           cp /tmp/digests/rancher-images-digests-linux-amd64.txt /tmp/digests/rancher-images-digests-linux-arm64.txt
       - name: Generate Windows Digests
         run: |
-          export LINUX_IMAGES_URL=https://github.com/${{ github.repository }}/releases/download/${{ env.TAG}}/rancher-images.txt
+          export WINDOWS_IMAGES_URL=https://github.com/${{ github.repository }}/releases/download/${{ env.TAG}}/rancher-windows-images.txt
           release generate rancher docker-images-digests \
-            --images-url "$LINUX_IMAGES_URL" \
+            --images-url "$WINDOWS_IMAGES_URL" \
             --output-file /tmp/digests/rancher-images-digests-windows-ltsc2019.txt \
             --registry ${{ env.DOCKER_REGISTRY }}
           cp /tmp/digests/rancher-images-digests-windows-ltsc2019.txt /tmp/digests/rancher-images-digests-windows-ltsc2022.txt
