@@ -13,5 +13,8 @@ runs:
           HEAD_TAG=${ref_name#$prefix}-head
           echo "HEAD_TAG=$HEAD_TAG" >> "$GITHUB_ENV"
         fi
+        if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+          TAG="$ref_name"
+        fi
         echo "TAG=$TAG" >> "$GITHUB_ENV"
         echo "GIT_TAG=$TAG" >> "$GITHUB_ENV"
