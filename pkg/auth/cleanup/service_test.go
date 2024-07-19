@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"k8s.io/apimachinery/pkg/runtime"
 	"strings"
 	"testing"
 	"time"
@@ -16,6 +17,7 @@ import (
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/rancher/pkg/generated/norman/core/v1/fakes"
+	generic "github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -145,76 +147,21 @@ func newMockCleanupService(t *testing.T,
 	secretStore map[string]*v1.Secret) Service {
 	t.Helper()
 	ctrl := gomock.NewController(t)
-	grbCache := fake.NewMockNonNamespacedCacheInterface[*v3.GlobalRoleBinding](ctrl)
-	grbCache.EXPECT().List(gomock.Any()).DoAndReturn(func(_ labels.Selector) ([]*v3.GlobalRoleBinding, error) {
-		var lst []*v3.GlobalRoleBinding
-		for _, v := range grbStore {
-			lst = append(lst, v)
-		}
-		return lst, nil
-	}).AnyTimes()
-	grbCache.EXPECT().Get(gomock.Any()).DoAndReturn(func(name string) (*v3.GlobalRoleBinding, error) {
-		return grbStore[name], nil
-	}).AnyTimes()
-	grbClient := fake.NewMockNonNamespacedClientInterface[*v3.GlobalRoleBinding, *v3.GlobalRoleBindingList](ctrl)
-	grbClient.EXPECT().Delete(gomock.Any(), gomock.Any()).DoAndReturn(func(name string, _ *metav1.DeleteOptions) error {
-		delete(grbStore, name)
-		return nil
-	}).AnyTimes()
 
-	prtbCache := fake.NewMockCacheInterface[*v3.ProjectRoleTemplateBinding](ctrl)
-	prtbCache.EXPECT().List(gomock.Any(), gomock.Any()).DoAndReturn(func(_ string, _ labels.Selector) ([]*v3.ProjectRoleTemplateBinding, error) {
-		var lst []*v3.ProjectRoleTemplateBinding
-		for _, v := range prtbStore {
-			lst = append(lst, v)
-		}
-		return lst, nil
-	}).AnyTimes()
-	prtbCache.EXPECT().Get(gomock.Any(), gomock.Any()).DoAndReturn(func(namespace, name string) (*v3.ProjectRoleTemplateBinding, error) {
-		return prtbStore[namespace+":"+name], nil
-	}).AnyTimes()
-	prtbClient := fake.NewMockClientInterface[*v3.ProjectRoleTemplateBinding, *v3.ProjectRoleTemplateBindingList](ctrl)
-	prtbClient.EXPECT().Delete(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(namespace, name string, _ *metav1.DeleteOptions) error {
-		delete(prtbStore, namespace+":"+name)
-		return nil
-	}).AnyTimes()
+	grbCache := initMockCache(ctrl, grbStore)
+	grbClient := initMockClient[*v3.GlobalRoleBinding, *v3.GlobalRoleBindingList](ctrl, grbStore)
 
-	crtbCache := fake.NewMockCacheInterface[*v3.ClusterRoleTemplateBinding](ctrl)
-	crtbCache.EXPECT().List(gomock.Any(), gomock.Any()).DoAndReturn(func(_ string, _ labels.Selector) ([]*v3.ClusterRoleTemplateBinding, error) {
-		var lst []*v3.ClusterRoleTemplateBinding
-		for _, v := range crtbStore {
-			lst = append(lst, v)
-		}
-		return lst, nil
-	}).AnyTimes()
-	crtbCache.EXPECT().Get(gomock.Any(), gomock.Any()).DoAndReturn(func(namespace, name string) (*v3.ClusterRoleTemplateBinding, error) {
-		return crtbStore[namespace+":"+name], nil
-	}).AnyTimes()
-	crtbClient := fake.NewMockClientInterface[*v3.ClusterRoleTemplateBinding, *v3.ClusterRoleTemplateBindingList](ctrl)
-	crtbClient.EXPECT().Delete(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(namespace, name string, _ *metav1.DeleteOptions) error {
-		delete(crtbStore, namespace+":"+name)
-		return nil
-	}).AnyTimes()
+	prtbCache := initNamespacedMockCache(ctrl, prtbStore)
+	prtbClient := initNamespacedMockClient[*v3.ProjectRoleTemplateBinding, *v3.ProjectRoleTemplateBindingList](ctrl, prtbStore)
 
-	userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
-	userCache.EXPECT().List(gomock.Any()).DoAndReturn(func(_ labels.Selector) ([]*v3.User, error) {
-		var lst []*v3.User
-		for _, v := range userStore {
-			lst = append(lst, v)
-		}
-		return lst, nil
-	}).AnyTimes()
-	userCache.EXPECT().Get(gomock.Any()).DoAndReturn(func(name string) (*v3.User, error) {
-		return userStore[name], nil
-	}).AnyTimes()
-	userClient := fake.NewMockNonNamespacedClientInterface[*v3.User, *v3.UserList](ctrl)
-	userClient.EXPECT().Delete(gomock.Any(), gomock.Any()).DoAndReturn(func(name string, _ *metav1.DeleteOptions) error {
-		delete(userStore, name)
-		return nil
-	}).AnyTimes()
-	userClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(user *v3.User) (*v3.User, error) {
-		userStore[user.Name] = user
-		return user, nil
+	crtbCache := initNamespacedMockCache(ctrl, crtbStore)
+	crtbClient := initNamespacedMockClient[*v3.ClusterRoleTemplateBinding, *v3.ClusterRoleTemplateBindingList](ctrl, crtbStore)
+
+	userCache := initMockCache(ctrl, userStore)
+	userClient := initMockClient[*v3.User, *v3.UserList](ctrl, userStore)
+	userClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(obj *v3.User) (*v3.User, error) {
+		userStore[obj.GetName()] = obj
+		return obj, nil
 	})
 
 	return Service{
@@ -228,6 +175,70 @@ func newMockCleanupService(t *testing.T,
 		userCache:                         userCache,
 		userClient:                        userClient,
 	}
+}
+
+// initMockCache will set up the mock with an expectation on the List(name string) and Get(name string)
+func initMockCache[T runtime.Object](ctrl *gomock.Controller, store map[string]T) *fake.MockNonNamespacedCacheInterface[T] {
+	cache := fake.NewMockNonNamespacedCacheInterface[T](ctrl)
+
+	cache.EXPECT().List(gomock.Any()).DoAndReturn(func(_ labels.Selector) ([]T, error) {
+		var lst []T
+		for _, v := range store {
+			lst = append(lst, v)
+		}
+		return lst, nil
+	}).AnyTimes()
+
+	cache.EXPECT().Get(gomock.Any()).DoAndReturn(func(name string) (T, error) {
+		return store[name], nil
+	}).AnyTimes()
+
+	return cache
+}
+
+// initNamespacedMockCache will set up the mock with an expectation on the List(name, namespace string) and Get(name, namespace string)
+// The Get is returning the object from the store with the "name:namespace" key
+func initNamespacedMockCache[T runtime.Object](ctrl *gomock.Controller, store map[string]T) *fake.MockCacheInterface[T] {
+	cache := fake.NewMockCacheInterface[T](ctrl)
+
+	cache.EXPECT().List(gomock.Any(), gomock.Any()).DoAndReturn(func(_ string, _ labels.Selector) ([]T, error) {
+		var lst []T
+		for _, v := range store {
+			lst = append(lst, v)
+		}
+		return lst, nil
+	}).AnyTimes()
+
+	cache.EXPECT().Get(gomock.Any(), gomock.Any()).DoAndReturn(func(namespace, name string) (T, error) {
+		return store[namespace+":"+name], nil
+	}).AnyTimes()
+
+	return cache
+}
+
+// initMockClient will set up the mock with an expectation on the Delete(name string)
+func initMockClient[T generic.RuntimeMetaObject, L runtime.Object](ctrl *gomock.Controller, store map[string]T) *fake.MockNonNamespacedClientInterface[T, L] {
+	cl := fake.NewMockNonNamespacedClientInterface[T, L](ctrl)
+
+	cl.EXPECT().Delete(gomock.Any(), gomock.Any()).DoAndReturn(func(name string, _ *metav1.DeleteOptions) error {
+		delete(store, name)
+		return nil
+	}).AnyTimes()
+
+	return cl
+}
+
+// initNamespacedMockClient will set up the mock with an expectation on the Delete(name, namespace string)
+// The Delete will remove the object from the store with the "name:namespace" key
+func initNamespacedMockClient[T generic.RuntimeMetaObject, L runtime.Object](ctrl *gomock.Controller, store map[string]T) *fake.MockClientInterface[T, L] {
+	cl := fake.NewMockClientInterface[T, L](ctrl)
+
+	cl.EXPECT().Delete(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(namespace, name string, _ *metav1.DeleteOptions) error {
+		delete(store, namespace+":"+name)
+		return nil
+	}).AnyTimes()
+
+	return cl
 }
 
 func getSecretInterfaceMock(store map[string]*corev1.Secret) v1.SecretInterface {
