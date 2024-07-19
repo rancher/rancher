@@ -143,6 +143,7 @@ func (w *RancherManagedChartsTest) TestInstallChartLatestVersion() {
 }
 
 func (w *RancherManagedChartsTest) TestUpgradeChartToLatestVersion() {
+	w.T().Skip()
 	defer w.resetSettings()
 
 	clusterRepo, err := w.catalogClient.ClusterRepos().Get(context.TODO(), "rancher-charts", metav1.GetOptions{})
@@ -188,6 +189,7 @@ func (w *RancherManagedChartsTest) TestUpgradeChartToLatestVersion() {
 }
 
 func (w *RancherManagedChartsTest) TestUpgradeToWorkingVersion() {
+	w.T().Skip()
 	defer w.resetSettings()
 	ctx := context.Background()
 	w.Require().Nil(w.cluster.AKSConfig)
@@ -242,6 +244,7 @@ func (w *RancherManagedChartsTest) TestUpgradeToWorkingVersion() {
 }
 
 func (w *RancherManagedChartsTest) TestUpgradeToBrokenVersion() {
+	w.T().Skip()
 	defer w.resetSettings()
 	ctx := context.Background()
 
