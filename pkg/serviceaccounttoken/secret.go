@@ -8,15 +8,12 @@ import (
 
 	corecontrollers "github.com/rancher/wrangler/v2/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
-	coordinationv1 "k8s.io/api/coordination/v1"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	clientv1 "k8s.io/client-go/kubernetes/typed/core/v1"
-	"k8s.io/utils/ptr"
 )
 
 const (
@@ -24,8 +21,6 @@ const (
 	ServiceAccountSecretLabel = "cattle.io/service-account.name"
 
 	serviceAccountSecretAnnotation = "kubernetes.io/service-account.name"
-
-	LeasePrefix = "sa-token-lease-"
 )
 
 // secretLister is an abstraction over any kind of secret lister.
@@ -52,17 +47,6 @@ func EnsureSecretForServiceAccount(ctx context.Context, secretsCache corecontrol
 	mutex := getLock(fmt.Sprintf("%v-%v", sa.Namespace, sa.Name))
 	mutex.Lock()
 	defer mutex.Unlock()
-
-	// Acquire lease
-	// acquireLease has a wait.Backoff until the lease is acquired, so this will be a blocking func call
-	if err := acquireLease(ctx, clientSet, sa.Namespace, sa.Name); err != nil {
-		return nil, fmt.Errorf("error acquiring lease: %w", err)
-	}
-	defer func() {
-		if err := releaseLease(ctx, clientSet, sa.Namespace, sa.Name); err != nil {
-			logrus.Errorf("error releasing lease: %v", err)
-		}
-	}()
 
 	secretClient := clientSet.CoreV1().Secrets(sa.Namespace)
 	var secretLister secretLister
@@ -194,51 +178,4 @@ func isSecretForServiceAccount(secret *v1.Secret, sa *v1.ServiceAccount) bool {
 	annotations := secret.Annotations
 	annotation := annotations[serviceAccountSecretAnnotation]
 	return sa.Name == annotation
-}
-
-func acquireLease(ctx context.Context, clientSet kubernetes.Interface, namespace, name string) error {
-	leaseClient := clientSet.CoordinationV1().Leases(namespace)
-	leaseDuration := int32(2)
-	lease := &coordinationv1.Lease{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprint(LeasePrefix + name),
-			Namespace: namespace,
-		},
-		Spec: coordinationv1.LeaseSpec{
-			HolderIdentity:       ptr.To("serviceaccounttoken-controller"),
-			LeaseDurationSeconds: ptr.To(leaseDuration),
-		},
-	}
-	// Wait for the Lease to be granted
-	backoff := wait.Backoff{
-		Duration: 500 * time.Millisecond,
-		Factor:   1.0,
-		Jitter:   1.0,
-		Steps:    50,
-	}
-	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
-		_, err := leaseClient.Create(ctx, lease, metav1.CreateOptions{})
-		// if create was success, meaning we got the lease
-		if err == nil {
-			return true, nil
-		}
-		// if lease already exists, another request has this lease, continue to wait
-		if errors.IsAlreadyExists(err) {
-			return false, nil
-		}
-		return false, err
-	})
-	if err != nil {
-		return fmt.Errorf("error acquiring the lease for %v: %w", name, err)
-	}
-	return nil
-}
-
-func releaseLease(ctx context.Context, clientSet kubernetes.Interface, namespace, name string) error {
-	leaseClient := clientSet.CoordinationV1().Leases(namespace)
-	err := leaseClient.Delete(ctx, fmt.Sprint(LeasePrefix+name), metav1.DeleteOptions{})
-	if err != nil {
-		return fmt.Errorf("error deleting lease: %w", err)
-	}
-	return nil
 }
