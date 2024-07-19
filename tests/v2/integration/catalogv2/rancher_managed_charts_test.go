@@ -135,6 +135,7 @@ func (w *RancherManagedChartsTest) TestInstallChartLatestVersion() {
 	defer w.resetSettings()
 
 	w.Require().NoError(w.updateManagementCluster())
+	logrus.Info("Waiting for aks chart")
 	app, _, err := w.waitForAksChart(rv1.StatusDeployed, "rancher-aks-operator", 0)
 	w.Require().NoError(err)
 	latest, err := w.catalogClient.GetLatestChartVersion("rancher-aks-operator", catalog.RancherChartRepo)
