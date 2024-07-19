@@ -146,6 +146,8 @@ jobs:
         shell: bash
         run: |
           ./tests/v2/integration/scripts/build-integration-setup
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
       - name: Run Tests
         shell: bash
         run: sudo --preserve-env GOBIN=$(which go) ./scripts/gha/tests
