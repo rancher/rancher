@@ -142,7 +142,9 @@ func (w *UIPluginTest) TestGetIndexAuthenticated() {
 	client := &http.Client{Transport: &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}}
-	req, err := http.NewRequest(http.MethodGet, "https://localhost:443/v1/uiplugins", nil)
+	req, err := http.NewRequest(http.MethodGet, "https://localhost:8443/v1/uiplugins", nil)
+	w.Require().NoError(err)
+
 	req.AddCookie(&http.Cookie{
 		Name:  "R_SESS",
 		Value: w.client.RancherConfig.AdminToken,
@@ -151,6 +153,7 @@ func (w *UIPluginTest) TestGetIndexAuthenticated() {
 	res, err := client.Do(req)
 	w.Require().NoError(err)
 	body, err := io.ReadAll(res.Body)
+	w.Require().NoError(err)
 	res.Body.Close()
 	var index plugin.SafeIndex
 	w.Require().NoError(json.Unmarshal(body, &index))
