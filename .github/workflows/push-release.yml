@@ -75,7 +75,6 @@ jobs:
           CLOUDSDK_AUTH_ACCESS_TOKEN=${{ env.GOOGLE_AUTH }} gcloud storage cp /tmp/charts gs://releases.rancher.com/server-charts --recursive --acl allUsers:READER --cache-control "public,no-cache,proxy-revalidate"
   build-server:
     runs-on: ubuntu-latest
-    needs: [unit-tests]
     strategy:
       matrix:
         os: [linux]
@@ -262,7 +261,7 @@ jobs:
         shell: bash
   push-images:
     runs-on: ubuntu-latest
-    needs: [integration-tests]
+    needs: [unit-tests, integration-tests]
     permissions:
       contents: read
       id-token: write
@@ -505,7 +504,8 @@ jobs:
           mkdir -p $HOME/bin
           touch $HOME/bin/rancher-rke-k8s-versions.txt
       - name: Create components and images files
-        run: sudo -E ./scripts/create-components-images-files.sh
+        shell: bash
+        run: sudo --preserve-env ./scripts/create-components-images-files.sh
       - name: Move files
         run: |
           mv $HOME/bin/* ./dist
