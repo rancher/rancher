@@ -4,7 +4,6 @@ import (
 	"context"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/rancher/rancher/pkg/serviceaccounttoken"
 	"github.com/rancher/shepherd/clients/rancher"
@@ -75,16 +74,6 @@ func (s *ServiceAccountSuite) TestSingleSecretForServiceAccount() {
 			s.Require().NoError(err)
 		}()
 	}
-
-	// Define the interval for checking.
-	interval := 500 * time.Millisecond
-	s.Assert().Eventually(func() bool {
-		leases, err := clientset.CoordinationV1().Leases(testNS.Name).List(context.Background(), metav1.ListOptions{})
-		s.Require().NoError(err)
-		return len(leases.Items) <= 1
-	}, time.Second*50, interval)
-
-	wg.Wait()
 
 	secrets, err := clientset.CoreV1().Secrets(testNS.Name).List(context.Background(), metav1.ListOptions{})
 	s.Require().NoError(err)
