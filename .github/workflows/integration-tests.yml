@@ -45,6 +45,8 @@ jobs:
           sudo rm -rf /opt/ghc
           sudo rm -rf "/usr/local/share/boost"
           sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
       - name: Download Docker images artifact
         uses: actions/download-artifact@v4
         with:

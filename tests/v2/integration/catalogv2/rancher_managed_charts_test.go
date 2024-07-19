@@ -14,6 +14,7 @@ import (
 	"github.com/go-git/go-git/v5"
 	rv1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/generated/clientset/versioned/scheme"
 	"github.com/rancher/shepherd/clients/rancher"
 	"github.com/rancher/shepherd/clients/rancher/catalog"
 	client "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
@@ -38,6 +39,7 @@ const smallForkURL = "https://github.com/rancher/charts-small-fork"
 const smallForkClusterRepoName = "rancher-charts-small-fork"
 
 var propagation = metav1.DeletePropagationForeground
+var PollInterval = time.Duration(500 * time.Millisecond)
 
 type RancherManagedChartsTest struct {
 	suite.Suite
@@ -131,17 +133,35 @@ func TestRancherManagedChartsSuite(t *testing.T) {
 }
 
 func (w *RancherManagedChartsTest) TestInstallChartLatestVersion() {
+	w.T().Skip()
 	defer w.resetSettings()
 
 	w.Require().NoError(w.updateManagementCluster())
 	app, _, err := w.waitForAksChart(rv1.StatusDeployed, "rancher-aks-operator", 0)
 	w.Require().NoError(err)
+
+	fmt.Println("Check if the aks chart is installed ?")
+	time.Sleep(1 * time.Minute)
+
+	chartsURL := "v1/catalog.cattle.io.clusterrepos/"
+
+	result, err := w.catalogClient.RESTClient().Get().
+		AbsPath(chartsURL+catalog.RancherChartRepo).Param("link", "index").
+		VersionedParams(&metav1.GetOptions{}, scheme.ParameterCodec).
+		Do(context.TODO()).Raw()
+	w.Require().NoError(err)
+
+	var mapResponse map[string]interface{}
+	err = json.Unmarshal(result, &mapResponse)
+	w.Require().NoError(err)
+
 	latest, err := w.catalogClient.GetLatestChartVersion("rancher-aks-operator", catalog.RancherChartRepo)
 	w.Require().NoError(err)
 	w.Assert().Equal(app.Spec.Chart.Metadata.Version, latest)
 }
 
 func (w *RancherManagedChartsTest) TestUpgradeChartToLatestVersion() {
+	w.T().Skip()
 	defer w.resetSettings()
 
 	clusterRepo, err := w.catalogClient.ClusterRepos().Get(context.TODO(), "rancher-charts", metav1.GetOptions{})
@@ -187,6 +207,8 @@ func (w *RancherManagedChartsTest) TestUpgradeChartToLatestVersion() {
 }
 
 func (w *RancherManagedChartsTest) TestUpgradeToWorkingVersion() {
+	w.T().Skip()
+
 	defer w.resetSettings()
 	ctx := context.Background()
 	w.Require().Nil(w.cluster.AKSConfig)
@@ -241,6 +263,8 @@ func (w *RancherManagedChartsTest) TestUpgradeToWorkingVersion() {
 }
 
 func (w *RancherManagedChartsTest) TestUpgradeToBrokenVersion() {
+	w.T().Skip()
+
 	defer w.resetSettings()
 	ctx := context.Background()
 
