@@ -32,6 +32,9 @@ type Service struct {
 
 	projectRoleTemplateBindingsCache  controllers.ProjectRoleTemplateBindingCache
 	projectRoleTemplateBindingsClient controllers.ProjectRoleTemplateBindingClient
+
+	tokensCache  controllers.TokenCache
+	tokensClient controllers.TokenClient
 }
 
 // NewCleanupService creates and returns a new auth provider cleanup service.
@@ -50,6 +53,9 @@ func NewCleanupService(secretsInterface corev1.SecretInterface, c controllers.In
 
 		globalRoleBindingsCache:  c.GlobalRoleBinding().Cache(),
 		globalRoleBindingsClient: c.GlobalRoleBinding(),
+
+		tokensCache:  c.Token().Cache(),
+		tokensClient: c.Token(),
 	}
 }
 
@@ -74,6 +80,10 @@ func (s *Service) Run(config *v3.AuthConfig) error {
 
 	if err := s.deleteUsers(config); err != nil {
 		return fmt.Errorf("error cleaning up users: %w", err)
+	}
+
+	if err := s.deleteTokens(config); err != nil {
+		return fmt.Errorf("error cleaning up tokens: %w", err)
 	}
 
 	return nil
@@ -174,6 +184,29 @@ func (s *Service) deleteUsers(config *v3.AuthConfig) error {
 				if err := s.resetLocalUser(u); err != nil {
 					return fmt.Errorf("failed to reset local user: %w", err)
 				}
+			}
+		}
+	}
+
+	return nil
+}
+
+// deleteTokens deletes all the tokens created with the disabled provider
+func (s *Service) deleteTokens(config *v3.AuthConfig) error {
+	if config == nil {
+		return errAuthConfigNil
+	}
+
+	tokens, err := s.tokensCache.List(labels.Everything())
+	if err != nil {
+		return fmt.Errorf("failed to list tokens: %w", err)
+	}
+
+	for _, t := range tokens {
+		if t.AuthProvider == config.Name {
+			err := s.tokensClient.Delete(t.Name, &v1.DeleteOptions{})
+			if err != nil && !apierrors.IsNotFound(err) {
+				return err
 			}
 		}
 	}
