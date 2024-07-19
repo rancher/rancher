@@ -6,7 +6,7 @@ runs:
     - shell: bash
       run: |
         ref_name="${{ github.ref_name }}"
-        TAG="${ref_name}"
+        TAG="${{ github.sha }}"
         prefix="release/"
         if [[ "$ref_name" == release/v* ]]; then
           TAG=${ref_name#$prefix}-${{ github.sha }}-head
