@@ -57,7 +57,7 @@ jobs:
       - name: Setup Environment Variables
         run: |
           echo "ARCH=${{ matrix.arch }}" >> "$GITHUB_ENV"
-          echo "RKE_VERSION=$(grep -m1 'github.com/rancher/rke' go.mod | awk '{print $4}')" >> "$GITHUB_ENV"
+          echo "RKE_VERSION=$(grep -m1 'github.com/rancher/rke' go.mod | awk '{print $2}')" >> "$GITHUB_ENV"
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
