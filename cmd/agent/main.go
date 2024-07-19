@@ -230,9 +230,13 @@ func run(ctx context.Context) error {
 			Timeout:   time.Second * 5,
 			Transport: transport,
 		}
-		if _, err = httpClient.Get(server); err != nil && cluster.CAStrictVerify() {
-			logrus.Errorf("Could not securely connect to %s: %v", server, err)
-			os.Exit(1)
+		if _, err = httpClient.Get(server); err != nil {
+			if cluster.CAStrictVerify() {
+				logrus.Errorf("Could not securely connect to %s: %v", server, err)
+				os.Exit(1)
+			}
+			// onConnect will use the transport later on, so discard it as it doesn't work and fallback to the system store.
+			transport = nil
 		} else {
 			topContext = context.WithValue(topContext, cavalidator.CacertsValid, true)
 			systemStoreConnectionCheckRequired = false
