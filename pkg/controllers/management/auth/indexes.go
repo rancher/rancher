@@ -54,7 +54,7 @@ func indexByMembershipBindingOwner(obj interface{}) ([]string, error) {
 		return []string{}, nil
 	}
 
-	return rbObjectKeys(metav1)
+	return rbObjectKeys(accessor)
 }
 
 // rbObjectKeys returns a formatted tuple of "namespace/key" from a generic object
