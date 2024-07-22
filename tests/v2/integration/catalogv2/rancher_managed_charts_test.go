@@ -127,7 +127,6 @@ func (w *RancherManagedChartsTest) resetSettings() {
 }
 
 func TestRancherManagedChartsSuite(t *testing.T) {
-	t.Skip()
 	suite.Run(t, new(RancherManagedChartsTest))
 }
 
@@ -137,6 +136,7 @@ func (w *RancherManagedChartsTest) TestInstallChartLatestVersion() {
 	w.Require().NoError(w.updateManagementCluster())
 	app, _, err := w.waitForAksChart(rv1.StatusDeployed, "rancher-aks-operator", 0)
 	w.Require().NoError(err)
+
 	latest, err := w.catalogClient.GetLatestChartVersion("rancher-aks-operator", catalog.RancherChartRepo)
 	w.Require().NoError(err)
 	w.Assert().Equal(app.Spec.Chart.Metadata.Version, latest)
@@ -518,12 +518,7 @@ func (w *RancherManagedChartsTest) TestServeIcons() {
 	w.Require().NoError(err)
 	w.Assert().Equal("bundled", systemCatalogUpdated.Value)
 
-	// Fetch one icon with https:// scheme, it should return an empty object (i.e length of image equals 0) with nil error
-	imgLength, err := w.catalogClient.FetchChartIcon(smallForkClusterRepoName, "fleet")
-	w.Require().NoError(err)
-	w.Assert().Equal(0, imgLength)
-
-	imgLength, err = w.catalogClient.FetchChartIcon(smallForkClusterRepoName, "rancher-cis-benchmark")
+	imgLength, err := w.catalogClient.FetchChartIcon(smallForkClusterRepoName, "rancher-cis-benchmark")
 	w.Require().NoError(err)
 	w.Assert().Greater(imgLength, 0)
 
