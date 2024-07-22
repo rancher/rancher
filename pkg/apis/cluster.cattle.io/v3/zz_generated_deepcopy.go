@@ -31,6 +31,10 @@ func (in *ClusterAuthToken) DeepCopyInto(out *ClusterAuthToken) {
 	out.Namespaced = in.Namespaced
 	out.TypeMeta = in.TypeMeta
 	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	if in.LastUsedAt != nil {
+		in, out := &in.LastUsedAt, &out.LastUsedAt
+		*out = (*in).DeepCopy()
+	}
 	return
 }
 
