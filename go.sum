@@ -1429,6 +1429,8 @@ github.com/huandu/xstrings v1.4.0/go.mod h1:y5/lhBue+AyNmUVz9RLU9xbLR0o4KIIExikq
 github.com/iancoleman/strcase v0.2.0/go.mod h1:iwCmte+B7n89clKwxIoIXy/HfoL7AsD47ZCWhYzw7ho=
 github.com/ianlancetaylor/demangle v0.0.0-20181102032728-5e5cf60278f6/go.mod h1:aSSvb/t6k1mPoxDqO4vJh6VOCGPwU4O0C2/Eqndh1Sc=
 github.com/ianlancetaylor/demangle v0.0.0-20200824232613-28f6c0f3b639/go.mod h1:aSSvb/t6k1mPoxDqO4vJh6VOCGPwU4O0C2/Eqndh1Sc=
+github.com/igomez06/shepherd v0.0.0-20240722235408-cd861704a1de h1:IDWNOVjJMLEyvhDWZBCE/QJX/YZSIhh8kUfIWWW5TvE=
+github.com/igomez06/shepherd v0.0.0-20240722235408-cd861704a1de/go.mod h1:7qf+6wlqrQ2Bver/WPCFrT6ZnC0V3KLllOmd1pr8Was=
 github.com/imdario/mergo v0.3.6/go.mod h1:2EnlNZ0deacrJVfApfmtdGgDfMuh/nq6Ok1EcJh5FfA=
 github.com/imdario/mergo v0.3.11/go.mod h1:jmQim1M+e3UYxmgPu/WyfjB3N3VflVyUjjjwH0dnCYA=
 github.com/imdario/mergo v0.3.16 h1:wwQJbIsHYGMUyLSPrEq1CT16AhnhNJQ51+4fdHUnCl4=
@@ -1793,8 +1795,6 @@ github.com/rancher/remotedialer v0.4.0 h1:T9yC5bFMsZFVQ6rK0dNrRg6rRb6Zr/4vsig8S0
 github.com/rancher/remotedialer v0.4.0/go.mod h1:Ys004RpJuTLSm+k4aYUCoFiOOad37ubYev3TkOFg/5w=
 github.com/rancher/rke v1.6.0-rc10 h1:p/mjEDoYxNoLEQmE10kcn17UJO2VbfZJURDGQN6dMBI=
 github.com/rancher/rke v1.6.0-rc10/go.mod h1:5xRbf3L8PxqJRhABjYRfaBqbpVqAnqyH3maUNQEuwvk=
-github.com/rancher/shepherd v0.0.0-20240715182512-3425bdf0c419 h1:5Q0KFfSVKJOiWVVru2HlqR2W1vfl4ZosquUVZhmm+Cw=
-github.com/rancher/shepherd v0.0.0-20240715182512-3425bdf0c419/go.mod h1:eU5EZYZt86odAKQrZLni9KhClgXh9aI13sPgIDy3FLc=
 github.com/rancher/steve v0.0.0-20240709130809-47871606146c h1:PIaN0/KUyGcqEcT6GyjUidld2lgGkGxS4dmC3Je3dFs=
 github.com/rancher/steve v0.0.0-20240709130809-47871606146c/go.mod h1:Za4nSt0V6kIHRfUo6jTXKkv6ABMMCHINA8EzhzygCfk=
 github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007 h1:ru+mqGnxMmKeU0Q3XIDxkARvInDIqT1hH2amTcsjxI4=
