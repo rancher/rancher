@@ -132,6 +132,16 @@ func TestRancherManagedChartsSuite(t *testing.T) {
 
 func (w *RancherManagedChartsTest) TestInstallChartLatestVersion() {
 	defer w.resetSettings()
+	ctx := context.Background()
+
+	clusterRepo, err := w.catalogClient.ClusterRepos().Get(ctx, "rancher-charts", metav1.GetOptions{})
+	w.Require().NoError(err)
+	clusterRepo.Spec.GitRepo = "https://github.com/rancher/charts-small-fork"
+	clusterRepo.Spec.GitBranch = "aks-integration-test-working-charts"
+	clusterRepo, err = w.catalogClient.ClusterRepos().Update(ctx, clusterRepo, metav1.UpdateOptions{})
+	w.Require().NoError(err)
+	downloadTime := clusterRepo.Status.DownloadTime
+	w.Require().NoError(w.pollUntilDownloaded("rancher-charts", downloadTime))
 
 	w.Require().NoError(w.updateManagementCluster())
 	app, _, err := w.waitForAksChart(rv1.StatusDeployed, "rancher-aks-operator", 0)
