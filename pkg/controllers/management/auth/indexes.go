@@ -14,7 +14,7 @@ func rbByOwner(rb *v1.RoleBinding) ([]string, error) {
 	return getRBOwnerKey(rb), nil
 }
 
-// getRBOwnerKey extract the list of OwnerReferences values
+// getRBOwnerKey returns the UIDs from the OwnerReferences of the provided RoleBindings.
 // from the given RoleBinding object.
 // It returns the list of OwnerReferences.
 func getRBOwnerKey(rb *v1.RoleBinding) []string {
