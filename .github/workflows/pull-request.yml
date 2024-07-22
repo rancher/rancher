@@ -126,6 +126,8 @@ jobs:
       - name: Setup Environment Variables
         run: |
           echo "ARCH=${{ matrix.arch }}" >> "$GITHUB_ENV"
+      - name: Setup TAG Variables
+        uses: ./.github/actions/setup-tag-env
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
