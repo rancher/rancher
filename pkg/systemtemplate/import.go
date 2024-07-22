@@ -25,8 +25,9 @@ import (
 )
 
 var (
-	templateFuncMap = sprig.TxtFuncMap()
-	t               = template.Must(template.New("import").Funcs(templateFuncMap).Parse(templateSource))
+	templateFuncMap      = sprig.TxtFuncMap()
+	t                    = template.Must(template.New("import").Funcs(templateFuncMap).Parse(templateSource))
+	preBootstrapTemplate = template.Must(template.New("import").Funcs(templateFuncMap).Parse(preBootstrapTemplateSource))
 )
 
 type context struct {
@@ -73,7 +74,7 @@ func toFeatureString(features map[string]bool) string {
 	return buf.String()
 }
 
-func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url string, isWindowsCluster bool,
+func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url string, isWindowsCluster bool, isPreBootstrap bool,
 	cluster *apimgmtv3.Cluster, features map[string]bool, taints []corev1.Taint, secretLister v1.SecretLister) error {
 	var tolerations, agentEnvVars, agentAppendTolerations, agentAffinity, agentResourceRequirements string
 	d := md5.Sum([]byte(url + token + namespace))
@@ -164,7 +165,11 @@ func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url
 		ClusterRegistry:       registryURL,
 	}
 
-	return t.Execute(resp, context)
+	if isPreBootstrap {
+		return preBootstrapTemplate.Execute(resp, context)
+	} else {
+		return t.Execute(resp, context)
+	}
 }
 
 func GetDesiredFeatures(cluster *apimgmtv3.Cluster) map[string]bool {
@@ -183,7 +188,9 @@ func ForCluster(cluster *apimgmtv3.Cluster, token string, taints []corev1.Taint,
 	buf := &bytes.Buffer{}
 	err := SystemTemplate(buf, GetDesiredAgentImage(cluster),
 		GetDesiredAuthImage(cluster),
-		cluster.Name, token, settings.ServerURL.Get(), cluster.Spec.WindowsPreferedCluster,
+		cluster.Name, token, settings.ServerURL.Get(),
+		cluster.Spec.WindowsPreferedCluster,
+		!apimgmtv3.ClusterConditionBootstrapped.IsTrue(cluster),
 		cluster, GetDesiredFeatures(cluster), taints, secretLister)
 	return buf.Bytes(), err
 }

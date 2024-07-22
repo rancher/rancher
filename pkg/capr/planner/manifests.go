@@ -3,6 +3,7 @@ package planner
 import (
 	"encoding/base64"
 	"fmt"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"path"
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
@@ -35,6 +36,15 @@ func (p *Planner) getControlPlaneManifests(controlPlane *rkev1.RKEControlPlane, 
 		return nil, err
 	}
 	result = append(result, clusterAgent)
+
+	mgmtCluster, err := p.managementClusters.Get(controlPlane.Spec.ManagementClusterName)
+	if err != nil {
+		return nil, err
+	}
+	// if we're bootstrapping - just return the cluster-agent manifest
+	if !v3.ClusterConditionBootstrapped.IsTrue(mgmtCluster) {
+		return result, nil
+	}
 
 	// if we have a nil snapshotMetadata object, it's probably because the annotation didn't exist on the controlplane object. this is not breaking though so don't block.
 	snapshotMetadata := getEtcdSnapshotExtraMetadata(controlPlane, capr.GetRuntime(controlPlane.Spec.KubernetesVersion))

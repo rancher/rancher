@@ -257,6 +257,12 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 }
 
 func (r *Rancher) Start(ctx context.Context) error {
+	if os.Getenv("CATTLE_PRE_BOOTSTRAP") == "true" {
+		// bail early if we are pre-bootstrapping
+		// TODO: maybe just return nil
+		return r.Wrangler.Start(ctx)
+	}
+
 	if err := dashboardapi.Register(ctx, r.Wrangler); err != nil {
 		return err
 	}

@@ -1021,44 +1021,56 @@ func (p *Planner) generatePlanWithConfigFiles(controlPlane *rkev1.RKEControlPlan
 		nodePlan plan.NodePlan
 		err      error
 	)
-	if !controlPlane.Spec.UnmanagedConfig {
-		nodePlan, reg, err = p.commonNodePlan(controlPlane, plan.NodePlan{})
-		if err != nil {
-			return nodePlan, map[string]interface{}{}, "", err
-		}
-		var (
-			joinedServer string
-			config       map[string]interface{}
-		)
-		nodePlan, config, joinedServer, err = p.addConfigFile(nodePlan, controlPlane, entry, tokensSecret, joinServer, reg, renderS3)
-		if err != nil {
-			return nodePlan, config, joinedServer, err
-		}
 
-		nodePlan, err = p.addManifests(nodePlan, controlPlane, entry)
-		if err != nil {
-			return nodePlan, config, joinedServer, err
-		}
+	if controlPlane.Spec.UnmanagedConfig {
+		return plan.NodePlan{}, map[string]interface{}{}, "", nil
+	}
 
-		nodePlan, err = p.addChartConfigs(nodePlan, controlPlane, entry)
-		if err != nil {
-			return nodePlan, config, joinedServer, err
-		}
+	nodePlan, reg, err = p.commonNodePlan(controlPlane, plan.NodePlan{})
+	if err != nil {
+		return nodePlan, map[string]interface{}{}, "", err
+	}
+	var (
+		joinedServer string
+		config       map[string]interface{}
+	)
 
-		nodePlan, err = addOtherFiles(nodePlan, controlPlane, entry)
-
-		idempotentScriptFile := plan.File{
-			Content: base64.StdEncoding.EncodeToString([]byte(idempotentActionScript)),
-			Path:    idempotentActionScriptPath(controlPlane),
-			Dynamic: true,
-			Minor:   true,
-		}
-
-		nodePlan.Files = append(nodePlan.Files, idempotentScriptFile)
-
+	nodePlan, config, joinedServer, err = p.addConfigFile(nodePlan, controlPlane, entry, tokensSecret, joinServer, reg, renderS3)
+	if err != nil {
 		return nodePlan, config, joinedServer, err
 	}
-	return plan.NodePlan{}, map[string]interface{}{}, "", nil
+
+	nodePlan, err = p.addManifests(nodePlan, controlPlane, entry)
+	if err != nil {
+		return nodePlan, config, joinedServer, err
+	}
+
+	mgmtCluster, err := p.managementClusters.Get(controlPlane.Spec.ManagementClusterName)
+	if err != nil {
+		return nodePlan, config, joinedServer, err
+	}
+	if !v3.ClusterConditionBootstrapped.IsTrue(mgmtCluster) {
+		// returning no matter what - even if err because we should end here and don't want the rest of the manifests to get added to the plan if this condition is not set.
+		return nodePlan, config, joinedServer, err
+	}
+
+	nodePlan, err = p.addChartConfigs(nodePlan, controlPlane, entry)
+	if err != nil {
+		return nodePlan, config, joinedServer, err
+	}
+
+	nodePlan, err = addOtherFiles(nodePlan, controlPlane, entry)
+
+	idempotentScriptFile := plan.File{
+		Content: base64.StdEncoding.EncodeToString([]byte(idempotentActionScript)),
+		Path:    idempotentActionScriptPath(controlPlane),
+		Dynamic: true,
+		Minor:   true,
+	}
+
+	nodePlan.Files = append(nodePlan.Files, idempotentScriptFile)
+
+	return nodePlan, config, joinedServer, err
 }
 
 func (p *Planner) desiredPlan(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, entry *planEntry, joinServer string) (plan.NodePlan, string, error) {
