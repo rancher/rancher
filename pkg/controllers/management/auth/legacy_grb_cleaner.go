@@ -32,7 +32,7 @@ func (p *grbCleaner) sync(key string, obj *v3.GlobalRoleBinding) (runtime.Object
 	return p.mgmt.Management.GlobalRoleBindings("").Update(cleanedObj)
 }
 
-// rtCleanUp returns a clean GlobalRoleBinding based on filters specified within the function
+// gbrCleanUp returns a clean GlobalRoleBinding based on filters specified within the function
 func gbrCleanUp(obj *v3.GlobalRoleBinding) *v3.GlobalRoleBinding {
 	// set finalizers to the object by filtering out
 	// the ones that start with "clusterscoped.controller.cattle.io/grb-sync_"
