@@ -52,7 +52,7 @@ jobs:
           overwrite: true
   publish-chart:
     runs-on: ubuntu-latest
-    needs: build-chart
+    needs: [build-chart, push-images]
     if: github.event_name == 'push' && contains(github.ref, 'tags/') # Only run on push
     permissions:
       contents: read
