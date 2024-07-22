@@ -63,14 +63,19 @@ jobs:
         with:
           name: chart
           path: ${{ runner.temp }}/charts
+      - name: Load Secrets from Vault
+        uses: rancher-eio/read-vault-secrets@main
+        with:
+          secrets: |
+            secret/data/github/repo/${{ github.repository }}/google-auth/rancher/credentials token | GOOGLE_AUTH ;
       - name: Authenticate with Google Cloud
         uses: google-github-actions/auth@v2
         with:
-          credentials_json: ${{ secrets.GOOGLE_AUTH }}
+          credentials_json: ${{ env.GOOGLE_AUTH }}
       - name: Upload
         uses: google-github-actions/upload-cloud-storage@v2
         with:
-          destination: testreleasesrancher/server-charts
+          destination: releases.rancher.com/server-charts
           path: ${{ runner.temp }}/charts
           parent: false
           process_gcloudignore: false
