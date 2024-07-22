@@ -11,7 +11,7 @@ import (
 	controllers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
@@ -101,7 +101,7 @@ func (s *Service) deleteClusterRoleTemplateBindings(config *v3.AuthConfig) error
 	for _, b := range list {
 		providerName := getProviderNameFromPrincipalNames(b.UserPrincipalName, b.GroupPrincipalName)
 		if providerName == config.Name {
-			err := s.clusterRoleTemplateBindingsClient.Delete(b.Namespace, b.Name, &v1.DeleteOptions{})
+			err := s.clusterRoleTemplateBindingsClient.Delete(b.Namespace, b.Name, &metav1.DeleteOptions{})
 			if err != nil && !apierrors.IsNotFound(err) {
 				return err
 			}
@@ -123,7 +123,7 @@ func (s *Service) deleteGlobalRoleBindings(config *v3.AuthConfig) error {
 	for _, b := range list {
 		providerName := getProviderNameFromPrincipalNames(b.GroupPrincipalName)
 		if providerName == config.Name {
-			err := s.globalRoleBindingsClient.Delete(b.Name, &v1.DeleteOptions{})
+			err := s.globalRoleBindingsClient.Delete(b.Name, &metav1.DeleteOptions{})
 			if err != nil && !apierrors.IsNotFound(err) {
 				return err
 			}
@@ -145,7 +145,7 @@ func (s *Service) deleteProjectRoleTemplateBindings(config *v3.AuthConfig) error
 	for _, b := range prtbs {
 		providerName := getProviderNameFromPrincipalNames(b.UserPrincipalName, b.GroupPrincipalName)
 		if providerName == config.Name {
-			err := s.projectRoleTemplateBindingsClient.Delete(b.Namespace, b.Name, &v1.DeleteOptions{})
+			err := s.projectRoleTemplateBindingsClient.Delete(b.Namespace, b.Name, &metav1.DeleteOptions{})
 			if err != nil && !apierrors.IsNotFound(err) {
 				return err
 			}
@@ -176,7 +176,7 @@ func (s *Service) deleteUsers(config *v3.AuthConfig) error {
 		if providerName == config.Name {
 			// A fully external user (who was never local) has no password.
 			if u.Password == "" {
-				err := s.userClient.Delete(u.Name, &v1.DeleteOptions{})
+				err := s.userClient.Delete(u.Name, &metav1.DeleteOptions{})
 				if err != nil && !apierrors.IsNotFound(err) {
 					return err
 				}
@@ -204,7 +204,7 @@ func (s *Service) deleteTokens(config *v3.AuthConfig) error {
 
 	for _, t := range tokens {
 		if t.AuthProvider == config.Name {
-			err := s.tokensClient.Delete(t.Name, &v1.DeleteOptions{})
+			err := s.tokensClient.Delete(t.Name, &metav1.DeleteOptions{})
 			if err != nil && !apierrors.IsNotFound(err) {
 				return err
 			}
