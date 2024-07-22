@@ -67,23 +67,23 @@ func (s *Service) Run(config *v3.AuthConfig) error {
 	}
 
 	if err := s.deleteGlobalRoleBindings(config); err != nil {
-		return fmt.Errorf("error cleaning up global role bindings: %w", err)
+		return fmt.Errorf("error cleaning up global role bindings associated with a disabled auth provider %s: %w", config.Name, err)
 	}
 
 	if err := s.deleteClusterRoleTemplateBindings(config); err != nil {
-		return fmt.Errorf("error cleaning up cluster role template bindings: %w", err)
+		return fmt.Errorf("error cleaning up cluster role template bindings associated with a disabled auth provider %s: %w", config.Name, err)
 	}
 
 	if err := s.deleteProjectRoleTemplateBindings(config); err != nil {
-		return fmt.Errorf("error cleaning up project role template bindings: %w", err)
+		return fmt.Errorf("error cleaning up project role template bindings associated with a disabled auth provider %s: %w", config.Name, err)
 	}
 
 	if err := s.deleteUsers(config); err != nil {
-		return fmt.Errorf("error cleaning up users: %w", err)
+		return fmt.Errorf("error cleaning up users associated with a disabled auth provider %s: %w", config.Name, err)
 	}
 
 	if err := s.deleteTokens(config); err != nil {
-		return fmt.Errorf("error cleaning up tokens: %w", err)
+		return fmt.Errorf("error cleaning up tokens associated with a disabled auth provider %s: %w", config.Name, err)
 	}
 
 	return nil
