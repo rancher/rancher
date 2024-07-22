@@ -20,7 +20,7 @@ func Test_cleanAnnotations(t *testing.T) {
 		want map[string]string
 	}{
 		{
-			name: "remove_one_annotation",
+			name: "remove one annotation",
 			args: args{
 				annotations: map[string]string{
 					"author":            "john.doe@example.com",
@@ -41,7 +41,7 @@ func Test_cleanAnnotations(t *testing.T) {
 			},
 		},
 		{
-			name: "remove_zero_annotation",
+			name: "remove zero annotation",
 			args: args{
 				annotations: map[string]string{
 					"author":            "john.doe@example.com",
@@ -63,7 +63,7 @@ func Test_cleanAnnotations(t *testing.T) {
 			},
 		},
 		{
-			name: "remove_all_annotation",
+			name: "remove all annotation",
 			args: args{
 				annotations: map[string]string{
 					"author":            "john.doe@example.com",
@@ -98,7 +98,7 @@ func Test_cleanFinalizers(t *testing.T) {
 		want []string
 	}{
 		{
-			name: "remove_one_finalizer",
+			name: "remove one finalizer",
 			args: args{
 				finalizers: []string{
 					"example.com/my-finalizer",
@@ -121,7 +121,7 @@ func Test_cleanFinalizers(t *testing.T) {
 			},
 		},
 		{
-			name: "remove_zero_finalizer",
+			name: "remove zero finalizer",
 			args: args{
 				finalizers: []string{
 					"example.com/my-finalizer",
@@ -145,7 +145,7 @@ func Test_cleanFinalizers(t *testing.T) {
 			},
 		},
 		{
-			name: "remove_all_finalizers",
+			name: "remove all finalizers",
 			args: args{
 				finalizers: []string{
 					"example.com/my-finalizer",
@@ -161,7 +161,7 @@ func Test_cleanFinalizers(t *testing.T) {
 			want: nil,
 		},
 		{
-			name: "remove_multiple_finalizers",
+			name: "remove multiple finalizers",
 			args: args{
 				finalizers: []string{
 					"example.com/my-finalizer",
@@ -201,7 +201,7 @@ func Test_grbCleanUp(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "test_1",
+			name: "test 1",
 			args: args{
 				key: "test-key",
 				obj: &v3.GlobalRoleBinding{
@@ -229,7 +229,7 @@ func Test_grbCleanUp(t *testing.T) {
 			},
 		},
 		{
-			name: "test_2",
+			name: "test 2",
 			args: args{
 				key: "test-key",
 				obj: &v3.GlobalRoleBinding{
