@@ -1,0 +1,153 @@
+name: Integration Tests
+on:
+  workflow_call:
+    inputs:
+      parent_run_id:
+        type: string
+        description: "parent run_id to download images from"
+        required: true
+permissions: {}
+env:
+  HOST_ARCH: amd64
+  ARCH: amd64
+  CATTLE_HELM_VERSION: v2.16.8-rancher2
+  CATTLE_MACHINE_VERSION: v0.15.0-rancher109
+  CATTLE_K3S_VERSION: v1.27.10+k3s2
+  CATTLE_K3S_VERSION_DOCKER: v1.27.10+k3s2
+  HELM_VERSION: v3.12.3
+  KUSTOMIZE_VERSION: v5.0.1
+  HELM_UNITTEST_VERSION: 0.3.2
+  CATTLE_KDM_BRANCH: dev-v2.7
+  CONTROLLER_GEN_VERSION: v0.14.0
+  YQ_VERSION: v4.44.2
+  PYTHON_VERSION: '3.11'
+  GOLANG_VERSION: '1.20'
+  IMAGE: ${{ github.repository_owner }}/rancher
+  IMAGE_AGENT: ${{ github.repository_owner }}/rancher-agent
+  TAG: ${{ github.sha }}
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      K3D_VERSION: v5.4.6
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup Environment Variables
+        uses: ./.github/actions/setup-tag-env
+      - name: Clean up Docker
+        run: |
+          docker system prune -af
+          docker volume prune -f
+      - name: Clean runner
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+      - name: Download Docker images artifact
+        uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ inputs.parent_run_id }}
+          github-token: ${{ github.token }}
+          path: "/tmp"
+          merge-multiple: true
+      - name: Load server image
+        run: |
+          image_server_id=$(docker load --input /tmp/rancher-linux-amd64.tar 2>&1 | grep "Loaded image" | awk '{print $NF}')
+          if [ -z "$image_server_id" ]; then
+            echo "Error: Failed to load image from tarball!"
+            exit 1
+          fi
+          docker tag "$image_server_id" ${{ env.IMAGE }}:${{ env.TAG }}
+      - name: Load agent image
+        run: |
+          image_agent_id=$(docker load --input /tmp/rancher-agent-linux-amd64.tar 2>&1 | grep "Loaded image" | awk '{print $NF}')
+          if [ -z "$image_agent_id" ]; then
+            echo "Error: Failed to load image from tarball!"
+            exit 1
+          fi
+          docker tag "$image_agent_id" ${{ env.IMAGE_AGENT }}:${{ env.TAG }}
+      - name: Install k3d
+        run: curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | TAG=${{ env.K3D_VERSION }} bash
+      - name: Uninstall existing Python versions
+        run: |
+          sudo apt-get remove -y python3
+          sudo apt-get autoremove -y
+          sudo apt-get purge -y python3
+          sudo apt-get clean
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "${{ env.PYTHON_VERSION }}"
+      - name: Check Python version
+        run: |
+          sudo rm -rf /usr/bin/python3
+          sudo cp $(which python3) /usr/bin/python3
+          python3 --version
+          python3 -m ensurepip --upgrade
+      - name: Install Python and dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-pip python3-dev libffi-dev libssl-dev
+          sudo pip3 install --upgrade pip
+          sudo pip3 install tox flake8
+
+      ## Helm Setup start
+      - name: Uninstall Helm
+        run: |
+          sudo rm -rf /usr/local/bin/helm /usr/bin/rancher-helm /usr/bin/rancher-tiller ~/.helm /usr/local/bin/helm_v3 /usr/local/bin/tiller
+
+      - name: Set Helm 2 URL
+        run: echo "HELM_URL_V2=https://github.com/rancher/helm/releases/download/${{ env.CATTLE_HELM_VERSION }}/rancher-helm" >> $GITHUB_ENV
+
+      - name: Set Tiller URL
+        run: echo "TILLER_URL=https://github.com/rancher/helm/releases/download/${{ env.CATTLE_HELM_VERSION }}/rancher-tiller" >> $GITHUB_ENV
+
+      - name: Download Rancher Helm
+        run: sudo curl -sLf ${{ env.HELM_URL_V2 }} -o /usr/bin/rancher-helm-v2
+
+      - name: Download Rancher Tiller
+        run: sudo curl -sLf ${{ env.TILLER_URL }} -o /usr/bin/rancher-tiller
+
+      - name: Set permissions for Helm and Tiller
+        run: sudo chmod +x /usr/bin/rancher-helm-v2 /usr/bin/rancher-tiller
+
+      - name: Create symlink for Helm
+        run: sudo ln -s /usr/bin/rancher-helm-v2 /usr/bin/helm
+
+      - name: Create symlink for Tiller
+        run: sudo ln -s /usr/bin/rancher-tiller /usr/bin/tiller
+
+      - name: Initialize Helm
+        run: helm init -c --stable-repo-url https://charts.helm.sh/stable/
+
+      - name: Set Helm 3 URL
+        run: echo "HELM_URL_V3=https://get.helm.sh/helm-${{ env.HELM_VERSION }}-linux-${{ env.HOST_ARCH }}.tar.gz" >> $GITHUB_ENV
+
+      - name: Create temporary directory for Helm 3
+        run: sudo mkdir /usr/tmp
+
+      - name: Download and extract Helm 3
+        run: curl ${{ env.HELM_URL_V3 }} | sudo tar xvzf - --strip-components=1 -C /usr/tmp/
+
+      - name: Move Helm 3 binary
+        run: sudo mv /usr/tmp/helm /usr/bin/helm_v3
+
+      - name: KDM data
+        run: |
+          mkdir -p bin
+          curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${{ env.CATTLE_KDM_BRANCH }}/data.json > bin/data.json
+      ## Helm Setup end
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "${{ env.GOLANG_VERSION }}"
+      - name: Build Integration Setup
+        shell: bash
+        run: |
+          ./tests/v2/integration/scripts/build-integration-setup
+      - name: Run Tests
+        shell: bash
+        run: sudo --preserve-env GOBIN=$(which go) ./scripts/gha/tests

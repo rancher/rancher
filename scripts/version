@@ -8,7 +8,7 @@ fi
 COMMIT=$(git rev-parse --short HEAD)
 COMMIT_DATE=$(git --no-pager log -1 --format='%ct')
 COMMIT_BRANCH=$(git rev-parse --abbrev-ref HEAD | sed -E 's/[^a-zA-Z0-9]+/-/g')
-GIT_TAG=${DRONE_TAG:-$(git tag -l --contains HEAD | head -n 1)}
+GIT_TAG=${GIT_TAG:-$(git tag -l --contains HEAD | head -n 1)}
 LAST_TAG=${GIT_TAG:-'v0.0.0'}
 
 if [[ -z "$DIRTY" && -n "$GIT_TAG" ]]; then
@@ -17,8 +17,8 @@ else
     VERSION="${COMMIT}${DIRTY}"
 fi
 
-if [ -z "$DRONE_TAG" ] && [ -n "$DRONE_COMMIT" ] && [ -n "$DRONE_BRANCH" ]; then
-    APP_VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-head
+if [ -z "$GIT_TAG" ] && [ -n "$COMMIT" ] && [ -n "$BRANCH" ]; then
+    APP_VERSION=${BRANCH/release\//}-${COMMIT}-head
 else
     APP_VERSION=$VERSION
 fi
@@ -61,10 +61,6 @@ if echo $TAG | grep -q dirty; then
     TAG=dev
 fi
 
-if [ -n "$DRONE_TAG" ]; then
-    TAG=$DRONE_TAG
-fi
-
 AGENT_TAG="$TAG"
 if [ "$AGENT_TAG" = dev ]; then
     AGENT_TAG="master-head"
@@ -79,3 +75,8 @@ echo "SUFFIX: $SUFFIX"
 echo "REPO: $REPO"
 echo "TAG: $TAG"
 echo "AGENT_TAG: $AGENT_TAG"
+echo "CATTLE_KDM_BRANCH: $CATTLE_KDM_BRANCH"
+echo "DIRNAME: $(dirname $0)"
+echo "GIT_TAG: $GIT_TAG"
+echo "COMMIT: $COMMIT"
+echo "BRANCH: $BRANCH"
