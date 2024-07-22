@@ -105,7 +105,7 @@ jobs:
           name: "rancher-${{ matrix.os }}-${{ matrix.arch }}"
           path: /tmp/rancher-${{ matrix.os }}-${{ matrix.arch }}.tar
           if-no-files-found: error
-          retention-days: 1
+          retention-days: 4
           overwrite: false
   build-agent:
     needs: [build-server]
@@ -184,7 +184,7 @@ jobs:
           name: "rancher-agent-${{ matrix.os }}-${{ matrix.arch }}"
           path: /tmp/rancher-agent-${{ matrix.os }}-${{ matrix.arch }}.tar
           if-no-files-found: error
-          retention-days: 1
+          retention-days: 4
           overwrite: false
   integration-tests:
     needs: [build-agent]
