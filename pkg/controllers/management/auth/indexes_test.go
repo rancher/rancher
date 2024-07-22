@@ -18,7 +18,7 @@ func Test_getRBOwnerKey(t *testing.T) {
 		want []string
 	}{
 		{
-			name: "get_two_ownerreferences",
+			name: "get two ownerreferences",
 			args: args{
 				rb: &v1.RoleBinding{
 					ObjectMeta: metav1.ObjectMeta{
@@ -42,7 +42,7 @@ func Test_getRBOwnerKey(t *testing.T) {
 			want: []string{"12345-67890-abcdef-1", "12345-67890-abcdef-2"},
 		},
 		{
-			name: "get_zero_ownerreferences",
+			name: "get zero ownerreferences",
 			args: args{
 				rb: &v1.RoleBinding{
 					ObjectMeta: metav1.ObjectMeta{
@@ -74,7 +74,7 @@ func Test_rbRoleSubjectKeys(t *testing.T) {
 		want []string
 	}{
 		{
-			name: "test_with_real_examples",
+			name: "test with real examples",
 			args: args{
 				roleName: "rbac-role-binding-role-binding",
 				subject: []v1.Subject{
@@ -94,7 +94,7 @@ func Test_rbRoleSubjectKeys(t *testing.T) {
 			},
 		},
 		{
-			name: "test_with_empty_examples",
+			name: "test with empty examples",
 			args: args{
 				roleName: "",
 				subject: []v1.Subject{
@@ -131,7 +131,7 @@ func Test_rbObjectKeys(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "get_one_object_key",
+			name: "get one object key",
 			args: args{
 				obj: &v1.RoleBinding{
 					ObjectMeta: metav1.ObjectMeta{
@@ -162,7 +162,7 @@ func Test_rbObjectKeys(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "get_zero_object_keys",
+			name: "get zero object keys",
 			args: args{
 				obj: &v1.RoleBinding{
 					ObjectMeta: metav1.ObjectMeta{
@@ -191,7 +191,7 @@ func Test_rbObjectKeys(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "manage_multiple_object_keys",
+			name: "manage multiple object keys",
 			args: args{
 				obj: &v1.RoleBinding{
 					ObjectMeta: metav1.ObjectMeta{
@@ -223,7 +223,7 @@ func Test_rbObjectKeys(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "get_multiple_object_keys",
+			name: "get multiple object keys",
 			args: args{
 				obj: &v1.RoleBinding{
 					ObjectMeta: metav1.ObjectMeta{

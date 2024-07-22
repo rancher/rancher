@@ -21,7 +21,7 @@ func Test_rtCleanUp(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "test_1",
+			name: "test 1",
 			args: args{
 				key: "test-key",
 				obj: &v3.RoleTemplate{
@@ -49,7 +49,7 @@ func Test_rtCleanUp(t *testing.T) {
 			},
 		},
 		{
-			name: "test_2",
+			name: "test 2",
 			args: args{
 				key: "test-key",
 				obj: &v3.RoleTemplate{
