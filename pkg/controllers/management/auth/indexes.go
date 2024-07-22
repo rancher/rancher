@@ -48,7 +48,7 @@ func indexByMembershipBindingOwner(obj interface{}) ([]string, error) {
 		return []string{}, nil
 	}
 
-	metav1, err := meta.Accessor(ro)
+	accessor, err := meta.Accessor(ro)
 	if err != nil {
 		logrus.Warnf("[indexByMembershipBindingOwner] unexpected object type: %T, err: %v", obj, err.Error())
 		return []string{}, nil
