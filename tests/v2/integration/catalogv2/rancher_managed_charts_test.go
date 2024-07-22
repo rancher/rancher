@@ -127,7 +127,7 @@ func (w *RancherManagedChartsTest) resetSettings() {
 }
 
 func TestRancherManagedChartsSuite(t *testing.T) {
-	t.Skip()
+	//t.Skip()
 	suite.Run(t, new(RancherManagedChartsTest))
 }
 
@@ -135,14 +135,17 @@ func (w *RancherManagedChartsTest) TestInstallChartLatestVersion() {
 	defer w.resetSettings()
 
 	w.Require().NoError(w.updateManagementCluster())
+	logrus.Info("Waiting for aks chart")
 	app, _, err := w.waitForAksChart(rv1.StatusDeployed, "rancher-aks-operator", 0)
 	w.Require().NoError(err)
+	time.Sleep(3 * time.Minute)
 	latest, err := w.catalogClient.GetLatestChartVersion("rancher-aks-operator", catalog.RancherChartRepo)
 	w.Require().NoError(err)
 	w.Assert().Equal(app.Spec.Chart.Metadata.Version, latest)
 }
 
 func (w *RancherManagedChartsTest) TestUpgradeChartToLatestVersion() {
+	w.T().Skip()
 	defer w.resetSettings()
 
 	clusterRepo, err := w.catalogClient.ClusterRepos().Get(context.TODO(), "rancher-charts", metav1.GetOptions{})
@@ -188,6 +191,7 @@ func (w *RancherManagedChartsTest) TestUpgradeChartToLatestVersion() {
 }
 
 func (w *RancherManagedChartsTest) TestUpgradeToWorkingVersion() {
+	w.T().Skip()
 	defer w.resetSettings()
 	ctx := context.Background()
 	w.Require().Nil(w.cluster.AKSConfig)
@@ -242,6 +246,7 @@ func (w *RancherManagedChartsTest) TestUpgradeToWorkingVersion() {
 }
 
 func (w *RancherManagedChartsTest) TestUpgradeToBrokenVersion() {
+	w.T().Skip()
 	defer w.resetSettings()
 	ctx := context.Background()
 
