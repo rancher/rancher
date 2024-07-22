@@ -41,7 +41,7 @@ func rbRoleSubjectKeys(roleName string, subjects []v1.Subject) []string {
 }
 
 // indexByMembershipBindingOwner validate the object passed throught the arguments
-// and return the list of keys whose value is the equal to "memberhip-binding-owner".
+// and return the list of keys whose value is the equal to "membership-binding-owner".
 func indexByMembershipBindingOwner(obj interface{}) ([]string, error) {
 	ro, ok := obj.(runtime.Object)
 	if !ok {
