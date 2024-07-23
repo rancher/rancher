@@ -248,6 +248,7 @@ jobs:
         with:
           username: ${{ env.STAGE_REGISTRY_USERNAME }}
           password: ${{ env.STAGE_REGISTRY_PASSWORD }}
+          registry: ${{ env.REGISTRY }}
       - name: Build Windows Server Image
         run: |
           docker build -t ${{ env.IMAGE_AGENT }}:${{ env.TAG }}-windows-${{ matrix.version }} --build-arg VERSION=${{ env.TAG }} --build-arg SERVERCORE_VERSION=ltsc${{ matrix.version }} -f package/windows/Dockerfile.agent .
@@ -484,6 +485,8 @@ jobs:
   create-images-files:
     if: github.event_name == 'push' && contains(github.ref, 'tags/') # Only run on push
     runs-on: ubuntu-latest
+    env:
+      REGISTRY: ""
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -498,7 +501,7 @@ jobs:
           mkdir -p $HOME/bin
           touch $HOME/bin/rancher-rke-k8s-versions.txt
       - name: Create components and images files
-        run: sudo -E ./scripts/create-components-images-files.sh
+        run: ./scripts/create-components-images-files.sh
       - name: Move files
         run: |
           mv $HOME/bin/* ./dist
