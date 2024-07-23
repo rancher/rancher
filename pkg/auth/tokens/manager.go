@@ -216,7 +216,7 @@ func (m *Manager) getToken(tokenAuthValue string) (*v3.Token, int, error) {
 	return storedToken, 0, nil
 }
 
-// GetTokens will list all(login and derived, and even expired) tokens of the authenticated user
+// GetTokens will list all (login and derived, and even expired) tokens of the authenticated user
 func (m *Manager) getTokens(tokenAuthValue string) ([]v3.Token, int, error) {
 	logrus.Debug("LIST Tokens Invoked")
 	tokens := make([]v3.Token, 0)
