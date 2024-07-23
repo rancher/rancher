@@ -18,6 +18,8 @@ auditLog:
   maxAge: 1
   maxBackup: 1
   maxSize: 100
+  # Set pod resource requests/limits for Rancher AuditLog.
+  resources: {}
 
   # Image for collecting rancher audit logs.
   # Important: update pkg/image/export/resolve.go when this default image is changed, so that it's reflected accordingly in rancher-images.txt generated for air-gapped setups.
