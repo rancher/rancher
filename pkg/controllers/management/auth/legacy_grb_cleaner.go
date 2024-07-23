@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"maps"
 	"strings"
 
 	grbstore "github.com/rancher/rancher/pkg/api/norman/store/globalrolebindings"
@@ -64,12 +65,8 @@ func cleanFinalizers(finalizers []string, prefix string) []string {
 // cleanAnnotations takes an objects annotations and removes any annotation that has the matching prefix
 // returning a new map
 func cleanAnnotations(annotations map[string]string, prefix string) map[string]string {
-	newAnnos := make(map[string]string)
-	for k, v := range annotations {
-		if strings.HasPrefix(k, prefix) {
-			continue
-		}
-		newAnnos[k] = v
-	}
-	return newAnnos
+	maps.DeleteFunc(annotations, func(key string, value string) bool {
+		return strings.HasPrefix(key, prefix)
+	})
+	return annotations
 }
