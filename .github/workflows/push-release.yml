@@ -72,7 +72,7 @@ jobs:
             secret/data/github/repo/${{ github.repository }}/optimus-charts-secret-key/credentials token | OPTIMUS_CHARTS_SECRET_KEY ;
       - name: Upload chart to bucket
         run: |
-          AWS_ACCESS_KEY_ID=${{ env.OPTIMUS_CHARTS_ACCESS_KEY }} AWS_SECRET_ACCESS_KEY=${{ env.OPTIMUS_CHARTS_SECRET_KEY }} aws s3 cp --recursive /tmp/charts s3://charts.optimus.rancher.io/test-charts
+          AWS_ACCESS_KEY_ID=${{ env.OPTIMUS_CHARTS_ACCESS_KEY }} AWS_SECRET_ACCESS_KEY=${{ env.OPTIMUS_CHARTS_SECRET_KEY }} aws s3 cp --recursive /tmp/charts s3://charts.optimus.rancher.io/server-charts
   build-server:
     runs-on: ubuntu-latest
     strategy:
