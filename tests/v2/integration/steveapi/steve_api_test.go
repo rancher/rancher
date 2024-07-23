@@ -30,6 +30,7 @@ import (
 	password "github.com/rancher/shepherd/extensions/users/passwordgenerator"
 	"github.com/rancher/shepherd/pkg/namegenerator"
 	"github.com/rancher/shepherd/pkg/session"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -280,6 +281,30 @@ func (s *steveAPITestSuite) setupSuite(clusterName string) {
 			ClusterID: s.clusterID,
 			Name:      p,
 		})
+		require.NoError(s.T(), err)
+
+		var getError error
+		err = wait.PollUntilContextTimeout(context.TODO(), 300*time.Millisecond, 3*time.Minute, true, func(ctx context.Context) (done bool, err error) {
+			steveClient, err := client.Steve.ProxyDownstream(s.clusterID)
+			if err != nil {
+				return false, err
+			}
+
+			projectID := strings.Split(project.ID, ":")[1]
+			clusterRoleName := fmt.Sprintf("%s-namespaces-edit", projectID)
+
+			resp, err := steveClient.SteveType("rbac.authorization.k8s.io.clusterrole").ByID(clusterRoleName) //Get(context.TODO(), fmt.Sprintf("%s-namespaces-edit", clusterRoleName), metav1.GetOptions{})
+			if err != nil {
+				getError = err
+				return false, nil
+			}
+
+			logrus.Infof("resp is %v", resp.JSONResp)
+			getError = nil
+			return true, nil
+		})
+
+		logrus.Infof("error is %v", getError)
 		require.NoError(s.T(), err)
 		projectMap[p] = project
 	}
@@ -2360,8 +2385,6 @@ func (s *steveAPITestSuite) TestList() {
 	for _, test := range tests {
 		s.Run(test.description, func() {
 			userClient := s.userClients[test.user]
-			userClient, err := userClient.ReLogin()
-			require.NoError(s.T(), err)
 
 			client, err := userClient.Steve.ProxyDownstream(s.clusterID)
 			require.NoError(s.T(), err)
