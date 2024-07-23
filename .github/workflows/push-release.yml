@@ -286,6 +286,7 @@ jobs:
         with:
           username: ${{ env.STAGE_REGISTRY_USERNAME }}
           password: ${{ env.STAGE_REGISTRY_PASSWORD }}
+          registry: ${{ env.REGISTRY }}
       - name: Push server image
         run: |
           image_id=$(docker load --input /tmp/rancher-${{ matrix.os }}-${{ matrix.arch }}.tar 2>&1 | grep "Loaded image" | awk '{print $NF}')
@@ -328,6 +329,7 @@ jobs:
         with:
           username: ${{ env.STAGE_REGISTRY_USERNAME }}
           password: ${{ env.STAGE_REGISTRY_PASSWORD }}
+          registry: ${{ env.REGISTRY }}
       - name: Create manifest list and push
         run: |
           docker buildx imagetools create -t ${{ env.IMAGE }}:${{ env.TAG }} ${{ env.IMAGE }}:${{ env.TAG }}-amd64 ${{ env.IMAGE }}:${{ env.TAG }}-arm64
@@ -363,6 +365,7 @@ jobs:
         with:
           username: ${{ env.STAGE_REGISTRY_USERNAME }}
           password: ${{ env.STAGE_REGISTRY_PASSWORD }}
+          registry: ${{ env.REGISTRY }}
       - name: Create manifest list and push
         run: |
           docker buildx imagetools create -t ${{ env.IMAGE_AGENT }}:${{ env.TAG }} \
@@ -418,6 +421,7 @@ jobs:
         with:
           username: ${{ env.STAGE_REGISTRY_USERNAME }}
           password: ${{ env.STAGE_REGISTRY_PASSWORD }}
+          registry: ${{ env.REGISTRY }}
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
@@ -473,6 +477,7 @@ jobs:
         with:
           username: ${{ env.STAGE_REGISTRY_USERNAME }}
           password: ${{ env.STAGE_REGISTRY_PASSWORD }}
+          registry: ${{ env.REGISTRY }}
       - name: Create manifest list and push
         run: |
           docker buildx imagetools create -t ${{ env.IMAGE_INSTALLER }}:${{ env.TAG }} ${{ env.IMAGE_INSTALLER }}:${{ env.TAG }}-amd64 ${{ env.IMAGE_INSTALLER }}:${{ env.TAG }}-arm64
