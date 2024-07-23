@@ -2,9 +2,10 @@ ARG RANCHER_TAG=dev
 ARG RANCHER_REPO=rancher
 ARG REGISTRY=stgregistry.suse.com
 ARG RANCHER_IMAGE=${REGISTRY}/${RANCHER_REPO}/rancher:${RANCHER_TAG}
-FROM --platform=$BUILDPLATFORM registry.suse.com/bci/golang:1.20 as build
-ARG VERSION
+ARG VERSION=dev
 
+FROM --platform=$BUILDPLATFORM registry.suse.com/bci/golang:1.20 AS build
+ARG VERSION=${VERSION}
 ARG CGO_ENABLED=0
 ARG TAGS="k8s"
 ARG LINKFLAGS="-extldflags -static"
