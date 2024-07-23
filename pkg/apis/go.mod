@@ -5,7 +5,6 @@ go 1.22.0
 toolchain go1.22.3
 
 replace (
-	github.com/rancher/rke => github.com/rancher/rke v1.6.0-rc10
 	k8s.io/api => k8s.io/api v0.30.1
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.30.1
 	k8s.io/apimachinery => k8s.io/apimachinery v0.30.1
@@ -36,7 +35,7 @@ require (
 	github.com/rancher/fleet/pkg/apis v0.10.0
 	github.com/rancher/gke-operator v1.9.0
 	github.com/rancher/norman v0.0.0-20240708202514-a0127673d1b9
-	github.com/rancher/rke v1.6.0-rc9
+	github.com/rancher/rke v1.6.0
 	github.com/rancher/wrangler/v3 v3.0.0
 	github.com/sirupsen/logrus v1.9.3
 	k8s.io/api v0.30.2
