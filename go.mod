@@ -15,7 +15,7 @@ replace (
 	github.com/rancher/rancher/pkg/apis => ./pkg/apis
 	github.com/rancher/rancher/pkg/client => ./pkg/client
 	github.com/rancher/rke => github.com/rancher/rke v1.6.0-rc10
-	github.com/rancher/shepherd => github.com/igomez06/shepherd v0.0.0-20240722235408-cd861704a1de
+	github.com/rancher/shepherd => github.com/igomez06/shepherd v0.0.0-20240723010146-ab2cb1559b89
 
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc => go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.42.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp => go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.44.0

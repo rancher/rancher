@@ -1429,8 +1429,8 @@ github.com/huandu/xstrings v1.4.0/go.mod h1:y5/lhBue+AyNmUVz9RLU9xbLR0o4KIIExikq
 github.com/iancoleman/strcase v0.2.0/go.mod h1:iwCmte+B7n89clKwxIoIXy/HfoL7AsD47ZCWhYzw7ho=
 github.com/ianlancetaylor/demangle v0.0.0-20181102032728-5e5cf60278f6/go.mod h1:aSSvb/t6k1mPoxDqO4vJh6VOCGPwU4O0C2/Eqndh1Sc=
 github.com/ianlancetaylor/demangle v0.0.0-20200824232613-28f6c0f3b639/go.mod h1:aSSvb/t6k1mPoxDqO4vJh6VOCGPwU4O0C2/Eqndh1Sc=
-github.com/igomez06/shepherd v0.0.0-20240722235408-cd861704a1de h1:IDWNOVjJMLEyvhDWZBCE/QJX/YZSIhh8kUfIWWW5TvE=
-github.com/igomez06/shepherd v0.0.0-20240722235408-cd861704a1de/go.mod h1:7qf+6wlqrQ2Bver/WPCFrT6ZnC0V3KLllOmd1pr8Was=
+github.com/igomez06/shepherd v0.0.0-20240723010146-ab2cb1559b89 h1:UChf8fNbqjkHVMkRuidshphylPfFkHEBd7e/ivfSO0c=
+github.com/igomez06/shepherd v0.0.0-20240723010146-ab2cb1559b89/go.mod h1:7qf+6wlqrQ2Bver/WPCFrT6ZnC0V3KLllOmd1pr8Was=
 github.com/imdario/mergo v0.3.6/go.mod h1:2EnlNZ0deacrJVfApfmtdGgDfMuh/nq6Ok1EcJh5FfA=
 github.com/imdario/mergo v0.3.11/go.mod h1:jmQim1M+e3UYxmgPu/WyfjB3N3VflVyUjjjwH0dnCYA=
 github.com/imdario/mergo v0.3.16 h1:wwQJbIsHYGMUyLSPrEq1CT16AhnhNJQ51+4fdHUnCl4=
