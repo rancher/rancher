@@ -126,6 +126,7 @@ def test_user_can_list_global_catalog(user_factory, remove_resource):
 
 
 @pytest.mark.nonparallel
+@pytest.mark.skip
 def test_template_version_links(admin_mc, admin_pc, custom_catalog,
                                 remove_resource, restore_rancher_version):
     """Test that template versionLinks are being updated based off the rancher

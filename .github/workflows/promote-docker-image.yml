@@ -1,0 +1,39 @@
+name: Promote docker image to latest or stable
+on: 
+  workflow_dispatch:
+    inputs:
+      tag:
+        type: string
+        description: "e.g: v2.8.4"
+        required: true
+      promote-to:
+        type: choice
+        description: "Promote to latest or stable"
+        options:
+          - "latest"
+          - "stable"
+        required: true
+env:
+  REGISTRY: "docker.io"
+  IMAGE: ${{ github.repository }}
+  TAG: ${{ github.event.inputs.tag }}
+  NEW_TAG: ${{ github.event.inputs.promote-to }}
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    container:
+      image: quay.io/skopeo/stable:v1.15
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Load Secrets from Vault
+        uses: rancher-eio/read-vault-secrets@main
+        with:
+          secrets: |
+            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
+            secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
+      - name: Skopeo login
+        run: echo ${{ env.DOCKER_PASSWORD }} | skopeo login ${{ env.REGISTRY }} --username ${{ env.DOCKER_USERNAME }} --password-stdin
+      - name: Copy image to new tag
+        run: skopeo copy docker://${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ env.TAG }} docker://${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ env.NEW_TAG }} --all

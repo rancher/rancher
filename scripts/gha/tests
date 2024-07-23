@@ -1,8 +1,7 @@
 #!/bin/bash
 set -e
-if ./scripts/only-ui-bumps.sh; then
-    exit 0
-fi
+
+GOBIN=${GOBIN-"go"}
 
 cleanup()
 {
@@ -18,28 +17,30 @@ cleanup()
     return $EXIT
 }
 
-cd $(dirname $0)/..
+cd $(dirname $0)/../..
+
 
 TB_ORG=rancher
 
-if [ -z "${V2PROV_TEST_DIST}" ] || [ "${V2PROV_TEST_DIST}" = "k3s" ]; then
-  V2PROV_TEST_DIST=k3s
+if [ -z "${TEST_DIST}" ] || [ "${TEST_DIST}" = "k3s" ]; then
+  TEST_DIST=k3s
   AIRGAP=-airgap
   TB_ORG=k3s-io
 else
   LINUX=.linux
 fi
 
-if [ -z "${V2PROV_TEST_RUN_REGEX}" ]; then
-  V2PROV_TEST_RUN_REGEX="^Test_(General|Provisioning)_.*$"
-fi
-
-RUNARG="-run ${V2PROV_TEST_RUN_REGEX}"
-
-export DIST=${V2PROV_TEST_DIST}
+export DIST=${TEST_DIST}
 export SOME_K8S_VERSION=${SOME_K8S_VERSION}
 export TB_ORG=${TB_ORG}
 export CATTLE_CHART_DEFAULT_URL=${CATTLE_CHART_DEFAULT_URL}
+REGISTRY=${REGISTRY/-""}
+
+# Tell Rancher to use the recently-built Rancher cluster agent image. This image is built as part of CI and will be
+# copied to the in-cluster registry during test setup below.
+source ./scripts/version
+export CATTLE_AGENT_IMAGE="${REGISTRY}rancher/rancher-agent:${AGENT_TAG}"
+echo "Using Rancher agent image $CATTLE_AGENT_IMAGE"
 
 eval "$(grep '^ENV CATTLE_SYSTEM_AGENT' package/Dockerfile | awk '{print "export " $2 "=" $3}')"
 eval "$(grep '^ENV CATTLE_WINS_AGENT' package/Dockerfile | awk '{print "export " $2 "=" $3}')"
@@ -52,7 +53,7 @@ if [ -z "${SOME_K8S_VERSION}" ]; then
 # https://github.com/rancher/rancher/issues/36827 has added appDefaults. We do not use appDefaults
 # here for simplicity's sake, as it requires semver parsing & matching. The last release should
 # be good enough for our needs.
-export SOME_K8S_VERSION=$(curl -sS https://raw.githubusercontent.com/rancher/kontainer-driver-metadata/release-v2.8/data/data.json | jq -r ".$DIST.releases[-1].version")
+export SOME_K8S_VERSION=$(curl -sS https://raw.githubusercontent.com/rancher/kontainer-driver-metadata/dev-v2.9/data/data.json | jq -r ".$DIST.releases[-1].version")
 fi
 
 if [ -z "${CATTLE_CHART_DEFAULT_URL}" ]; then
@@ -61,16 +62,18 @@ if [ -z "${CATTLE_CHART_DEFAULT_URL}" ]; then
 export CATTLE_CHART_DEFAULT_URL=https://github.com/rancher/charts
 fi
 
-echo "Starting rancher server for provisioning-tests using $SOME_K8S_VERSION"
+echo Starting rancher server for test
 touch /tmp/rancher.log
+
+export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
 
 mkdir -p /var/lib/rancher/$DIST/agent/images
 grep PodTestImage ./tests/v2prov/defaults/defaults.go | cut -f2 -d'"' > /var/lib/rancher/$DIST/agent/images/pull.txt
 grep MachineProvisionImage ./pkg/settings/setting.go | cut -f4 -d'"' >> /var/lib/rancher/$DIST/agent/images/pull.txt
 mkdir -p /usr/share/rancher/ui/assets
-curl -sLf ${CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX}/${CATTLE_SYSTEM_AGENT_VERSION}/rancher-system-agent-amd64 -o /usr/share/rancher/ui/assets/rancher-system-agent-amd64
-curl -sLf ${CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX}/${CATTLE_SYSTEM_AGENT_VERSION}/rancher-system-agent-arm64 -o /usr/share/rancher/ui/assets/rancher-system-agent-arm64
-curl -sLf ${CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX}/${CATTLE_SYSTEM_AGENT_VERSION}/system-agent-uninstall.sh -o /usr/share/rancher/ui/assets/system-agent-uninstall.sh
+curl -sLf https://github.com/rancher/system-agent/releases/download/${CATTLE_SYSTEM_AGENT_VERSION}/rancher-system-agent-amd64 -o /usr/share/rancher/ui/assets/rancher-system-agent-amd64
+curl -sLf https://github.com/rancher/system-agent/releases/download/${CATTLE_SYSTEM_AGENT_VERSION}/rancher-system-agent-arm64 -o /usr/share/rancher/ui/assets/rancher-system-agent-arm64
+curl -sLf https://github.com/rancher/system-agent/releases/download/${CATTLE_SYSTEM_AGENT_VERSION}/system-agent-uninstall.sh -o /usr/share/rancher/ui/assets/system-agent-uninstall.sh
 
 run_rancher()
 {
@@ -81,7 +84,7 @@ run_rancher()
             dump_rancher_logs
             echo K3s logs were:
             echo -e "-----K3S-LOG-DUMP-START-----"
-            cat build/testdata/k3s.log | gzip | base64 -w 0
+            cat build/testdata/k3s.log
             echo -e "\n-----K3S-LOG-DUMP-END-----"
             set +e
             echo Attempting to kill K3s
@@ -97,7 +100,7 @@ run_rancher()
         fi
         if [ "$PID" = "-1" ]; then
           echo Starting rancher server using run
-          ./scripts/run >/tmp/rancher.log 2>&1 &
+          ./scripts/gha/run >/tmp/rancher.log 2>&1 &
           PID=$!
         fi
         sleep 2
@@ -108,10 +111,9 @@ dump_rancher_logs()
 {
   echo Rancher logs were
   echo -e "-----RANCHER-LOG-DUMP-START-----"
-  cat /tmp/rancher.log | gzip | base64 -w 0
+  cat /tmp/rancher.log
   echo -e "\n-----RANCHER-LOG-DUMP-END-----"
 }
-export -f dump_rancher_logs
 
 # uncomment to get startup logs. Don't leave them on because it slows drone down too
 # much
@@ -126,17 +128,13 @@ run_rancher &
 RANCHER_RUN_PID=$!
 trap cleanup exit
 
-echo "Waiting for Rancher to be healthy"
-./scripts/retry --sleep 2 --timeout 300 "curl -sf -o /dev/null http://localhost:8080/ping"
-
 echo "Waiting up to 5 minutes for rancher-webhook deployment"
 ./scripts/retry \
   --timeout 300 `# Time out after 300 seconds (5 min)` \
   --sleep 2 `# Sleep for 2 seconds in between attempts` \
   --message-interval 30 `# Print the progress message below every 30 attempts (roughly every minute)` \
   --message "rancher-webhook was not available after {{elapsed}} seconds" `# Print this progress message` \
-  --exit-command "dump_rancher_logs" `# Dump logs to find out why webhook did not start` \
-  "kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -w -n cattle-system deploy/rancher-webhook &>/dev/null"
+  "kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -w -n cattle-system deploy/rancher-webhook &"
 
 echo "Waiting up to 5 minutes for rancher-provisioning-capi deployment"
 ./scripts/retry \
@@ -144,16 +142,26 @@ echo "Waiting up to 5 minutes for rancher-provisioning-capi deployment"
   --sleep 2 `# Sleep for 2 seconds in between attempts` \
   --message-interval 30 `# Print the progress message below every 30 attempts (roughly every minute)` \
   --message "rancher-provisioning-capi was not available after {{elapsed}} seconds" `# Print this progress message` \
-  --exit-command "dump_rancher_logs" `# Dump logs to find out why webhook did not start` \
-  "kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -w -n cattle-provisioning-capi-system deploy/capi-controller-manager &>/dev/null"
+  "kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -w -n cattle-provisioning-capi-system deploy/capi-controller-manager &"
 
 
-#kill $TPID
-
-echo Running provisioning-tests $RUNARG
-
-export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
-go test $RUNARG -v -failfast -timeout 60m ./tests/v2prov/tests/... || {
-     dump_rancher_logs
-     exit 1
+echo Running integrationsetup
+export CATTLE_TEST_CONFIG=$(pwd)/config.yaml # used by integration tests and test setup
+./tests/v2/integration/bin/integrationsetup || {
+  dump_rancher_logs
+  exit 1
 }
+
+echo Running go integration tests
+$GOBIN test -v -failfast -timeout 30m -p 1 ./tests/v2/integration/... || {
+  dump_rancher_logs
+  exit 1
+}
+
+echo Running tox tests
+INT_TESTS_STARTED=true
+cd ./tests/integration
+tox -e rancher -- -m "not nonparallel" -n $(nproc)
+tox -e rancher -- -m nonparallel
+
+tail -f /tmp/rancher-test.log &

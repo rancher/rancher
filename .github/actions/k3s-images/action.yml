@@ -1,0 +1,18 @@
+name: "Download K3S images"
+description: "Download k3s images txt file and save airgap images"
+inputs:
+  k3s_version:
+    description: "k3s version"
+    required: true
+runs:
+  using: "composite"
+  steps:
+    - name: Download images txt file
+      shell: bash
+      run: curl -sLf https://github.com/rancher/k3s/releases/download/${{ inputs.k3s_version }}/k3s-images.txt -o /tmp/k3s-images.txt
+    - name: Create k3s images file
+      shell: bash
+      run: |
+        images=$(grep -e 'docker.io/rancher/mirrored-pause' -e 'docker.io/rancher/mirrored-coredns-coredns' /tmp/k3s-images.txt)
+        xargs -n1 docker pull <<< "${images}"
+        docker save -o ./k3s-airgap-images.tar ${images}
