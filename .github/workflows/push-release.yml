@@ -251,7 +251,7 @@ jobs:
           registry: ${{ env.REGISTRY }}
       - name: Build Windows Server Image
         run: |
-          docker build -t ${{ env.REGISTRY}}/${{ env.IMAGE_AGENT }}:${{ env.TAG }}-windows-${{ matrix.version }} --build-arg VERSION=${{ env.TAG }} --build-arg SERVERCORE_VERSION=ltsc${{ matrix.version }} -f package/windows/Dockerfile.agent .
+          docker buildx -t ${{ env.REGISTRY}}/${{ env.IMAGE_AGENT }}:${{ env.TAG }}-windows-${{ matrix.version }} --build-arg VERSION=${{ env.TAG }} --build-arg SERVERCORE_VERSION=ltsc${{ matrix.version }} -f package/windows/Dockerfile.agent .
           docker push ${{ env.REGISTRY}}/${{ env.IMAGE_AGENT }}:${{ env.TAG }}-windows-${{ matrix.version }}
         shell: bash
   push-images:
