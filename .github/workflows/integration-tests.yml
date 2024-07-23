@@ -51,11 +51,11 @@ jobs:
         with:
           run-id: ${{ inputs.parent_run_id }}
           github-token: ${{ github.token }}
-          path: "${{ runner.temp }}"
+          path: "/tmp"
           merge-multiple: true
       - name: Load server image
         run: |
-          image_server_id=$(docker load --input ${{ runner.temp }}/rancher-linux-amd64.tar 2>&1 | grep "Loaded image" | awk '{print $NF}')
+          image_server_id=$(docker load --input /tmp/rancher-linux-amd64.tar 2>&1 | grep "Loaded image" | awk '{print $NF}')
           if [ -z "$image_server_id" ]; then
             echo "Error: Failed to load image from tarball!"
             exit 1
@@ -63,7 +63,7 @@ jobs:
           docker tag "$image_server_id" ${{ env.IMAGE }}:${{ env.TAG }}
       - name: Load agent image
         run: |
-          image_agent_id=$(docker load --input ${{ runner.temp }}/rancher-agent-linux-amd64.tar 2>&1 | grep "Loaded image" | awk '{print $NF}')
+          image_agent_id=$(docker load --input /tmp/rancher-agent-linux-amd64.tar 2>&1 | grep "Loaded image" | awk '{print $NF}')
           if [ -z "$image_agent_id" ]; then
             echo "Error: Failed to load image from tarball!"
             exit 1

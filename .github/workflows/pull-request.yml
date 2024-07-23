@@ -28,8 +28,8 @@ jobs:
           HELM_URL_V3: https://get.helm.sh/helm-${{ env.HELM_VERSION_V3 }}-linux-amd64.tar.gz
         run: |
           sudo snap install yq
-          curl ${{ env.HELM_URL_V3 }} | tar xvzf - --strip-components=1 -C ${{ runner.temp }}/ && \
-          sudo mv ${{ runner.temp }}/helm /usr/bin/helm_v3 && \
+          curl ${{ env.HELM_URL_V3 }} | tar xvzf - --strip-components=1 -C /tmp/ && \
+          sudo mv /tmp/helm /usr/bin/helm_v3 && \
           sudo chmod +x /usr/bin/helm_v3
           helm_v3 plugin install https://github.com/helm-unittest/helm-unittest.git --version ${{ env.HELM_UNITTEST_VERSION }}; \
       - name: Build
@@ -91,12 +91,12 @@ jobs:
           platforms: "${{ matrix.os }}/${{ matrix.arch }}"
           file: ./package/Dockerfile
           labels: "${{ steps.meta.outputs.labels }}"
-          outputs: type=docker,dest=${{ runner.temp }}/rancher-${{ matrix.os }}-${{ matrix.arch }}.tar
+          outputs: type=docker,dest=/tmp/rancher-${{ matrix.os }}-${{ matrix.arch }}.tar
       - name: Upload image
         uses: actions/upload-artifact@v4
         with:
           name: "rancher-${{ matrix.os }}-${{ matrix.arch }}"
-          path: ${{ runner.temp }}/rancher-${{ matrix.os }}-${{ matrix.arch }}.tar
+          path: /tmp/rancher-${{ matrix.os }}-${{ matrix.arch }}.tar
           if-no-files-found: error
           retention-days: 1
           overwrite: false
@@ -145,10 +145,10 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: "rancher-${{ matrix.os }}-${{ matrix.arch }}"
-          path: ${{ runner.temp }}
+          path: /tmp
       - name: Load image
         run: |
-          image_id=$(docker load --input ${{ runner.temp }}/rancher-${{ matrix.os }}-${{ matrix.arch }}.tar 2>&1 | grep "Loaded image" | awk '{print $NF}')
+          image_id=$(docker load --input /tmp/rancher-${{ matrix.os }}-${{ matrix.arch }}.tar 2>&1 | grep "Loaded image" | awk '{print $NF}')
           if [ -z "$image_id" ]; then
             echo "Error: Failed to load image from tarball!"
             exit 1
@@ -171,12 +171,12 @@ jobs:
           platforms: "${{ matrix.os }}/${{ matrix.arch }}"
           file: ./package/Dockerfile.agent
           labels: "${{ steps.meta.outputs.labels }}"
-          outputs: type=docker,dest=${{ runner.temp }}/rancher-agent-${{ matrix.os }}-${{ matrix.arch }}.tar
+          outputs: type=docker,dest=/tmp/rancher-agent-${{ matrix.os }}-${{ matrix.arch }}.tar
       - name: Upload image
         uses: actions/upload-artifact@v4
         with:
           name: "rancher-agent-${{ matrix.os }}-${{ matrix.arch }}"
-          path: ${{ runner.temp }}/rancher-agent-${{ matrix.os }}-${{ matrix.arch }}.tar
+          path: /tmp/rancher-agent-${{ matrix.os }}-${{ matrix.arch }}.tar
           if-no-files-found: error
           retention-days: 1
           overwrite: false
