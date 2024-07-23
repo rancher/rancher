@@ -76,24 +76,22 @@ func main() {
 	var client *rancherClient.Client
 
 	agentSetting := &v3.Setting{}
-	var agentSettingError error
+	// var agentSettingError error
 	var agentSettingResp *v1.SteveAPIObject
-	err = kwait.PollUntilContextTimeout(context.TODO(), 500*time.Millisecond, 5*time.Minute, true, func(ctx context.Context) (done bool, err error) {
-		client, err = rancherClient.NewClient("", testSession)
-		if err != nil {
-			return false, err
-		}
-
-		agentSettingResp, err = client.Steve.SteveType("management.cattle.io.setting").ByID("agent-image")
-		if err != nil {
-			agentSettingError = err
-			return false, nil
-		}
-		return true, nil
-	})
+	// err = kwait.PollUntilContextTimeout(context.TODO(), 500*time.Millisecond, 5*time.Minute, true, func(ctx context.Context) (done bool, err error) {
+	client, err = rancherClient.NewClient("", testSession)
 	if err != nil {
-		logrus.Fatalf("error get agent-image setting: %v", agentSettingError)
+		logrus.Fatalf("error instantiating client: %v", err)
 	}
+
+	agentSettingResp, err = client.Steve.SteveType("management.cattle.io.setting").ByID("agent-image")
+	if err != nil {
+		logrus.Fatalf("error get agent-image setting: %v", err)
+	}
+	// })
+	// if err != nil {
+	// 	logrus.Fatalf("error get agent-image setting: %v", agentSettingError)
+	// }
 
 	err = v1.ConvertToK8sType(agentSettingResp.JSONResp, agentSetting)
 	if err != nil {
