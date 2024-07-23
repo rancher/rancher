@@ -65,8 +65,9 @@ func cleanFinalizers(finalizers []string, prefix string) []string {
 // cleanAnnotations takes an objects annotations and removes any annotation that has the matching prefix
 // returning a new map
 func cleanAnnotations(annotations map[string]string, prefix string) map[string]string {
-	maps.DeleteFunc(annotations, func(key string, value string) bool {
+	filteredAnnotations := maps.Clone(annotations)
+	maps.DeleteFunc(filteredAnnotations, func(key string, value string) bool {
 		return strings.HasPrefix(key, prefix)
 	})
-	return annotations
+	return filteredAnnotations
 }
