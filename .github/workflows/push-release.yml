@@ -16,6 +16,7 @@ env:
   CATTLE_K3S_VERSION: v1.27.10+k3s2
   HELM_VERSION_V3: v3.12.3
   REGISTRY: "stgregistry.suse.com"
+  AWS_DEFAULT_REGION: "us-east-1"
 jobs:
   unit-tests:
     uses: ./.github/workflows/unit-test.yml
@@ -55,6 +56,7 @@ jobs:
   publish-chart:
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && contains(github.ref, 'tags/') # Only run on push
+    needs: [push-images]
     permissions:
       contents: read
       id-token: write
@@ -522,7 +524,7 @@ jobs:
           secrets: |
             secret/data/github/repo/${{ github.repository }}/prime-artifacts-uploader-access/credentials token | PRIME_ARTIFACTS_UPLOADER_ACCESS_KEY ;
             secret/data/github/repo/${{ github.repository }}/prime-artifacts-uploader-secret/credentials token | PRIME_ARTIFACTS_UPLOADER_SECRET_KEY ;
-      - name: Upload chart to bucket
+      - name: Upload artifacts to bucket
         run: |
           AWS_ACCESS_KEY_ID=${{ env.PRIME_ARTIFACTS_UPLOADER_ACCESS_KEY }} AWS_SECRET_ACCESS_KEY=${{ env.PRIME_ARTIFACTS_UPLOADER_SECRET_KEY }} aws s3 cp ./dist s3://prime-artifacts/rancher/${{ env.TAG }}
   docker-image-digests:
@@ -570,7 +572,7 @@ jobs:
           secrets: |
             secret/data/github/repo/${{ github.repository }}/prime-artifacts-uploader-access/credentials token | PRIME_ARTIFACTS_UPLOADER_ACCESS_KEY ;
             secret/data/github/repo/${{ github.repository }}/prime-artifacts-uploader-secret/credentials token | PRIME_ARTIFACTS_UPLOADER_SECRET_KEY ;
-      - name: Upload chart to bucket
+      - name: Upload docker image digests to bucket
         run: |
           AWS_ACCESS_KEY_ID=${{ env.PRIME_ARTIFACTS_UPLOADER_ACCESS_KEY }} AWS_SECRET_ACCESS_KEY=${{ env.PRIME_ARTIFACTS_UPLOADER_SECRET_KEY }} aws s3 cp /tmp/digests s3://prime-artifacts/rancher/${{ env.TAG }}
   build-artifacts-index:
@@ -601,7 +603,7 @@ jobs:
           secrets: |
             secret/data/github/repo/${{ github.repository }}/prime-artifacts-uploader-access/credentials token | PRIME_ARTIFACTS_UPLOADER_ACCESS_KEY ;
             secret/data/github/repo/${{ github.repository }}/prime-artifacts-uploader-secret/credentials token | PRIME_ARTIFACTS_UPLOADER_SECRET_KEY ;
-      - name: Upload chart to bucket
+      - name: Upload artifacts index to bucket
         run: AWS_ACCESS_KEY_ID=${{ env.PRIME_ARTIFACTS_UPLOADER_ACCESS_KEY }} AWS_SECRET_ACCESS_KEY=${{ env.PRIME_ARTIFACTS_UPLOADER_SECRET_KEY }} aws s3 cp /tmp/artifacts s3://prime-artifacts/
       - name: Invalidate caches
         run: |
