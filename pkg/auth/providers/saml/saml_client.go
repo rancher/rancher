@@ -247,7 +247,7 @@ func (s *Provider) getSamlPrincipals(config *v32.SamlConfig, samlData map[string
 	}
 
 	groups, ok := samlData[config.GroupsField]
-	if ok {
+	if ok && !config.GroupsFromLDAPOnly {
 		for _, group := range groups {
 			group := v3.Principal{
 				ObjectMeta:    metav1.ObjectMeta{Name: s.groupType + "://" + group},
@@ -256,6 +256,17 @@ func (s *Provider) getSamlPrincipals(config *v32.SamlConfig, samlData map[string
 				PrincipalType: "group",
 				MemberOf:      true,
 			}
+			groupPrincipals = append(groupPrincipals, group)
+		}
+	}
+
+	if s.hasLdapGroupSearch() && config.GroupsFromLDAPOnly {
+		ldapPrincipals, err := s.RefetchGroupPrincipals(userPrincipal.ObjectMeta.Name, "")
+		if err != nil {
+			return userPrincipal, groupPrincipals, err
+		}
+		for _, group := range ldapPrincipals {
+			log.Debugf("Adding initial group %s for principal %v", group.DisplayName, userName)
 			groupPrincipals = append(groupPrincipals, group)
 		}
 	}

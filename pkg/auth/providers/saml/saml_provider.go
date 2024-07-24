@@ -255,6 +255,22 @@ func (s *Provider) toPrincipal(principalType string, princ v3.Principal, token *
 }
 
 func (s *Provider) RefetchGroupPrincipals(principalID string, secret string) ([]v3.Principal, error) {
+	if s.hasLdapGroupSearch() {
+		config, err := s.getSamlConfig()
+		if err == nil && config.GroupsFromLDAPOnly {
+			ldapConfig, _, err := ldap.GetLDAPConfig(s.ldapProvider)
+			if err != nil {
+				return nil, err
+			}
+			parts := strings.SplitN(principalID, ":", 2)
+			if len(parts) != 2 {
+				return nil, fmt.Errorf("invalid id %v", principalID)
+			}
+			uid := strings.TrimPrefix(parts[1], "//")
+			searchPrincipal := fmt.Sprintf("%v://%v=%v,%v", parts[0], ldapConfig.UserLoginAttribute, uid, ldapConfig.UserSearchBase)
+			return s.ldapProvider.RefetchGroupPrincipals(searchPrincipal, secret)
+		}
+	}
 	return nil, errors.New("Not implemented")
 }
 
