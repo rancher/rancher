@@ -2,8 +2,10 @@ package requests
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
@@ -11,12 +13,14 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
+	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/steve/pkg/auth"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/client-go/tools/cache"
 )
@@ -24,6 +28,9 @@ import (
 var (
 	ErrMustAuthenticate = httperror.NewAPIError(httperror.Unauthorized, "must authenticate")
 )
+
+// Do not record lastUsedAt at the full possible precision
+const lastUsedAtGranularity = time.Minute
 
 type Authenticator interface {
 	Authenticate(req *http.Request) (*AuthenticatorResponse, error)
@@ -61,10 +68,18 @@ func NewAuthenticator(ctx context.Context, clusterRouter ClusterRouter, mgmtCtx 
 	tokenInformer.AddIndexers(map[string]cache.IndexFunc{tokenKeyIndex: tokenKeyIndexer})
 	providerRefresher := providerrefresh.NewUserAuthRefresher(ctx, mgmtCtx)
 
+	// This can be called without a wrangler set.
+	// After the fix done in the previous commit this is reduced to 1 of 8 calls.
+	var token mgmtcontrollers.TokenController
+	if mgmtCtx.Wrangler != nil {
+		token = mgmtCtx.Wrangler.Mgmt.Token()
+	}
+
 	return &tokenAuthenticator{
 		ctx:                 ctx,
 		tokenIndexer:        tokenInformer.GetIndexer(),
 		tokenClient:         mgmtCtx.Management.Tokens(""),
+		tokenWClient:        token,
 		userAttributeLister: mgmtCtx.Management.UserAttributes("").Controller().Lister(),
 		userAttributes:      mgmtCtx.Management.UserAttributes(""),
 		userLister:          mgmtCtx.Management.Users("").Controller().Lister(),
@@ -79,6 +94,7 @@ type tokenAuthenticator struct {
 	ctx                 context.Context
 	tokenIndexer        cache.Indexer
 	tokenClient         v3.TokenInterface
+	tokenWClient        mgmtcontrollers.TokenController
 	userAttributes      v3.UserAttributeInterface
 	userAttributeLister v3.UserAttributeLister
 	userLister          v3.UserLister
@@ -175,7 +191,67 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 	authResp.Extras = getUserExtraInfo(token, authUser, attribs)
 	logrus.Debugf("Extras returned %v", authResp.Extras)
 
+	logrus.Debugf("Token %v, lastUsedAt: started update of `lastused`", token.ObjectMeta.Name)
+
+	// While the fix in the previous commit should have made this impossible maybe better to keep a guard.
+	if a.tokenWClient == nil {
+		logrus.Errorf("Token %v, lastUsedAt: skipping update, no wrangler client", token.ObjectMeta.Name)
+		return authResp, nil
+	}
+
+	now := time.Now().Truncate(lastUsedAtGranularity)
+	logrus.Debugf("Token %v, lastUsedAt: now is       %v", token.ObjectMeta.Name, now)
+
+	if token.LastUsedAt != nil {
+		lastRecorded := token.LastUsedAt.Time.Truncate(lastUsedAtGranularity)
+		logrus.Debugf("Token %v, lastUsedAt: recorded %v", token.ObjectMeta.Name, lastRecorded)
+
+		// throttle ... skip update if the recorded/known last use is not
+		// strictly in the past, relative to us. IOW if the token is already
+		// at the minute we want, or even ahead, then we have nothing to do.
+
+		if now.Before(lastRecorded) || now.Equal(lastRecorded) {
+			logrus.Debugf("Token %v, lastUsedAt: now <= recorded, skipped update",
+				token.ObjectMeta.Name)
+			return authResp, nil
+		}
+	}
+
+	// green light for patch
+
+	lastUsed := metav1.NewTime(now)
+	patch, err := makeLastUsedPatch(lastUsed)
+
+	if err != nil {
+		logrus.Errorf("Token %v, lastUsedAt: patch creation failed: %v", token.ObjectMeta.Name, err)
+		return nil, err
+	}
+
+	logrus.Debugf("Token %v, lastUsedAt: created patch `%v`", token.ObjectMeta.Name, string(patch))
+
+	_, err = a.tokenWClient.Patch(token.ObjectMeta.Name, types.JSONPatchType, patch)
+	if err != nil {
+		logrus.Errorf("Token %v, lastUsedAt: patch application failed: %v", token.ObjectMeta.Name, err)
+		return nil, err
+	}
+
+	logrus.Debugf("Token %v, lastUsedAt: successfully completed update of `lastused`", token.ObjectMeta.Name)
 	return authResp, nil
+}
+
+func makeLastUsedPatch(lu metav1.Time) ([]byte, error) {
+	operations := []patchOperation{{
+		Op:    "replace",
+		Path:  "/lastUsedAt",
+		Value: lu,
+	}}
+	return json.Marshal(operations)
+}
+
+type patchOperation struct {
+	Op    string      `json:"op"`
+	Path  string      `json:"path"`
+	Value metav1.Time `json:"value"`
 }
 
 func getUserExtraInfo(token *v3.Token, u *v3.User, attribs *v3.UserAttribute) map[string][]string {
