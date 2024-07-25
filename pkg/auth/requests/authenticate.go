@@ -191,7 +191,7 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 	authResp.Extras = getUserExtraInfo(token, authUser, attribs)
 	logrus.Debugf("Extras returned %v", authResp.Extras)
 
-	logrus.Debugf("Token %v, lastUsedAt: started update of `lastused`", token.ObjectMeta.Name)
+	logrus.Debugf("Token %v, lastUsedAt: started update", token.ObjectMeta.Name)
 
 	// While the fix in the previous commit should have made this impossible maybe better to keep a guard.
 	if a.tokenWClient == nil {
@@ -200,7 +200,7 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 	}
 
 	now := time.Now().Truncate(lastUsedAtGranularity)
-	logrus.Debugf("Token %v, lastUsedAt: now is       %v", token.ObjectMeta.Name, now)
+	logrus.Debugf("Token %v, lastUsedAt: now is %v", token.ObjectMeta.Name, now)
 
 	if token.LastUsedAt != nil {
 		lastRecorded := token.LastUsedAt.Time.Truncate(lastUsedAtGranularity)
@@ -221,21 +221,22 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 
 	lastUsed := metav1.NewTime(now)
 	patch, err := makeLastUsedPatch(lastUsed)
-
 	if err != nil {
+		// Just logging this error, not reporting it. Operation was ok, do not wish to force a retry.
+		// IOW the field lastUsedAt is updated only with best effort.
 		logrus.Errorf("Token %v, lastUsedAt: patch creation failed: %v", token.ObjectMeta.Name, err)
-		return nil, err
+		return authResp, nil
 	}
-
-	logrus.Debugf("Token %v, lastUsedAt: created patch `%v`", token.ObjectMeta.Name, string(patch))
 
 	_, err = a.tokenWClient.Patch(token.ObjectMeta.Name, types.JSONPatchType, patch)
 	if err != nil {
+		// Just logging this error, not reporting it. Operation was ok, do not wish to force a retry.
+		// IOW the field lastUsedAt is updated only with best effort.
 		logrus.Errorf("Token %v, lastUsedAt: patch application failed: %v", token.ObjectMeta.Name, err)
-		return nil, err
+		return authResp, nil
 	}
 
-	logrus.Debugf("Token %v, lastUsedAt: successfully completed update of `lastused`", token.ObjectMeta.Name)
+	logrus.Debugf("Token %v, lastUsedAt: successfully completed update", token.ObjectMeta.Name)
 	return authResp, nil
 }
 
