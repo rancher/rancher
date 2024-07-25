@@ -10,6 +10,8 @@ import (
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/provisioningv2/image"
 	"github.com/stretchr/testify/assert"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
 func Test_shouldRotateEntry(t *testing.T) {
@@ -48,6 +50,190 @@ func Test_shouldRotateEntry(t *testing.T) {
 			assert.Equal(t, tt.rotateControlPlane, shouldRotateEntry(&rkev1.RotateCertificates{Services: tt.services}, controlPlaneRoleEntry))
 			assert.Equal(t, tt.rotateETCD, shouldRotateEntry(&rkev1.RotateCertificates{Services: tt.services}, etcdRoleEntry))
 			assert.True(t, shouldRotateEntry(&rkev1.RotateCertificates{Services: tt.services}, allRoleEntry))
+		})
+	}
+}
+
+func Test_certificateRotationOrderedEntriesPlan(t *testing.T) {
+	tests := []struct {
+		name                             string
+		clusterPlan                      *plan.Plan
+		expectedNumberOfCollectedEntries int
+		expectedOrder                    []string
+	}{
+		{
+			name: "one all-in-one",
+			clusterPlan: &plan.Plan{
+				Machines: map[string]*capi.Machine{
+					"node1": {ObjectMeta: metav1.ObjectMeta{Name: "node1"}},
+				},
+				Metadata: map[string]*plan.Metadata{
+					"node1": {Labels: map[string]string{capr.WorkerRoleLabel: "true", capr.ControlPlaneRoleLabel: "true", capr.EtcdRoleLabel: "true"}},
+				},
+			},
+			expectedNumberOfCollectedEntries: 1,
+			expectedOrder: []string{
+				"node1",
+			},
+		},
+		{
+			name: "various dedicated roles",
+			clusterPlan: &plan.Plan{
+				Machines: map[string]*capi.Machine{
+					"node1": {ObjectMeta: metav1.ObjectMeta{Name: "node1"}},
+					"node2": {ObjectMeta: metav1.ObjectMeta{Name: "node2"}},
+					"node3": {ObjectMeta: metav1.ObjectMeta{Name: "node3"}},
+				},
+				Metadata: map[string]*plan.Metadata{
+					"node1": {Labels: map[string]string{capr.WorkerRoleLabel: "true"}},
+					"node2": {Labels: map[string]string{capr.ControlPlaneRoleLabel: "true"}},
+					"node3": {Labels: map[string]string{capr.EtcdRoleLabel: "true"}},
+				},
+			},
+			expectedNumberOfCollectedEntries: 3,
+			expectedOrder: []string{
+				"node3",
+				"node2",
+				"node1",
+			},
+		},
+		{
+			name: "combined control and dedicated worker roles",
+			clusterPlan: &plan.Plan{
+				Machines: map[string]*capi.Machine{
+					"node1": {ObjectMeta: metav1.ObjectMeta{Name: "node1"}},
+					"node2": {ObjectMeta: metav1.ObjectMeta{Name: "node2"}},
+					"node3": {ObjectMeta: metav1.ObjectMeta{Name: "node3"}},
+					"node4": {ObjectMeta: metav1.ObjectMeta{Name: "node4"}},
+					"node5": {ObjectMeta: metav1.ObjectMeta{Name: "node5"}},
+					"node6": {ObjectMeta: metav1.ObjectMeta{Name: "node6"}},
+				},
+				Metadata: map[string]*plan.Metadata{
+					"node1": {Labels: map[string]string{capr.ControlPlaneRoleLabel: "true", capr.EtcdRoleLabel: "true"}},
+					"node2": {Labels: map[string]string{capr.WorkerRoleLabel: "true"}},
+					"node3": {Labels: map[string]string{capr.ControlPlaneRoleLabel: "true", capr.EtcdRoleLabel: "true"}},
+					"node4": {Labels: map[string]string{capr.WorkerRoleLabel: "true"}},
+					"node5": {Labels: map[string]string{capr.ControlPlaneRoleLabel: "true", capr.EtcdRoleLabel: "true"}},
+					"node6": {Labels: map[string]string{capr.WorkerRoleLabel: "true"}},
+				},
+			},
+			expectedNumberOfCollectedEntries: 6,
+			expectedOrder: []string{
+				"node1",
+				"node3",
+				"node5",
+				"node2",
+				"node4",
+				"node6",
+			},
+		},
+		{
+			name: "etcd-worker and dedicated control and worker roles",
+			clusterPlan: &plan.Plan{
+				Machines: map[string]*capi.Machine{
+					"node1": {ObjectMeta: metav1.ObjectMeta{Name: "node1"}},
+					"node2": {ObjectMeta: metav1.ObjectMeta{Name: "node2"}},
+					"node3": {ObjectMeta: metav1.ObjectMeta{Name: "node3"}},
+					"node4": {ObjectMeta: metav1.ObjectMeta{Name: "node4"}},
+					"node5": {ObjectMeta: metav1.ObjectMeta{Name: "node5"}},
+					"node6": {ObjectMeta: metav1.ObjectMeta{Name: "node6"}},
+					"node7": {ObjectMeta: metav1.ObjectMeta{Name: "node7"}},
+				},
+				Metadata: map[string]*plan.Metadata{
+					"node1": {Labels: map[string]string{capr.WorkerRoleLabel: "true", capr.EtcdRoleLabel: "true"}},
+					"node2": {Labels: map[string]string{capr.WorkerRoleLabel: "true"}},
+					"node3": {Labels: map[string]string{capr.WorkerRoleLabel: "true", capr.EtcdRoleLabel: "true"}},
+					"node4": {Labels: map[string]string{capr.ControlPlaneRoleLabel: "true"}},
+					"node5": {Labels: map[string]string{capr.WorkerRoleLabel: "true"}},
+					"node6": {Labels: map[string]string{capr.WorkerRoleLabel: "true", capr.EtcdRoleLabel: "true"}},
+					"node7": {Labels: map[string]string{capr.EtcdRoleLabel: "true"}},
+				},
+			},
+			expectedNumberOfCollectedEntries: 7,
+			expectedOrder: []string{
+				"node1",
+				"node3",
+				"node6",
+				"node7",
+				"node4",
+				"node2",
+				"node5",
+			},
+		},
+		{
+			name: "control-worker and dedicated etcd and worker roles",
+			clusterPlan: &plan.Plan{
+				Machines: map[string]*capi.Machine{
+					"node1": {ObjectMeta: metav1.ObjectMeta{Name: "node1"}},
+					"node2": {ObjectMeta: metav1.ObjectMeta{Name: "node2"}},
+					"node3": {ObjectMeta: metav1.ObjectMeta{Name: "node3"}},
+					"node4": {ObjectMeta: metav1.ObjectMeta{Name: "node4"}},
+					"node5": {ObjectMeta: metav1.ObjectMeta{Name: "node5"}},
+					"node6": {ObjectMeta: metav1.ObjectMeta{Name: "node6"}},
+					"node7": {ObjectMeta: metav1.ObjectMeta{Name: "node7"}},
+				},
+				Metadata: map[string]*plan.Metadata{
+					"node1": {Labels: map[string]string{capr.WorkerRoleLabel: "true", capr.ControlPlaneRoleLabel: "true"}},
+					"node2": {Labels: map[string]string{capr.WorkerRoleLabel: "true"}},
+					"node3": {Labels: map[string]string{capr.WorkerRoleLabel: "true", capr.ControlPlaneRoleLabel: "true"}},
+					"node4": {Labels: map[string]string{capr.EtcdRoleLabel: "true"}},
+					"node5": {Labels: map[string]string{capr.WorkerRoleLabel: "true"}},
+					"node6": {Labels: map[string]string{capr.WorkerRoleLabel: "true"}},
+					"node7": {Labels: map[string]string{capr.WorkerRoleLabel: "true", capr.ControlPlaneRoleLabel: "true"}},
+				},
+			},
+			expectedNumberOfCollectedEntries: 7,
+			expectedOrder: []string{
+				"node4",
+				"node1",
+				"node3",
+				"node7",
+				"node2",
+				"node5",
+				"node6",
+			},
+		},
+		{
+			name: "traditional architecture with a no role node",
+			clusterPlan: &plan.Plan{
+				Machines: map[string]*capi.Machine{
+					"node1": {ObjectMeta: metav1.ObjectMeta{Name: "node1"}},
+					"node2": {ObjectMeta: metav1.ObjectMeta{Name: "node2"}},
+					"node3": {ObjectMeta: metav1.ObjectMeta{Name: "node3"}},
+					"node4": {ObjectMeta: metav1.ObjectMeta{Name: "node4"}},
+					"node5": {ObjectMeta: metav1.ObjectMeta{Name: "node5"}},
+					"node6": {ObjectMeta: metav1.ObjectMeta{Name: "node6"}},
+					"node7": {ObjectMeta: metav1.ObjectMeta{Name: "node7"}},
+				},
+				Metadata: map[string]*plan.Metadata{
+					"node1": {Labels: map[string]string{capr.EtcdRoleLabel: "true", capr.ControlPlaneRoleLabel: "true"}},
+					"node2": {Labels: map[string]string{capr.EtcdRoleLabel: "true", capr.ControlPlaneRoleLabel: "true"}},
+					"node3": {Labels: map[string]string{capr.EtcdRoleLabel: "true", capr.ControlPlaneRoleLabel: "true"}},
+					"node4": {Labels: map[string]string{capr.WorkerRoleLabel: "true"}},
+					"node5": {Labels: map[string]string{capr.WorkerRoleLabel: "true"}},
+					"node6": {Labels: map[string]string{capr.WorkerRoleLabel: "true"}},
+					"node7": {Labels: map[string]string{}},
+				},
+			},
+			expectedNumberOfCollectedEntries: 6,
+			expectedOrder: []string{
+				"node1",
+				"node2",
+				"node3",
+				"node4",
+				"node5",
+				"node6",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run((tt.name), func(t *testing.T) {
+			collected := collectOrderedCertificateRotationEntries(tt.clusterPlan)
+			assert.Equal(t, tt.expectedNumberOfCollectedEntries, len(collected))
+			for i, n := range tt.expectedOrder {
+				assert.Equal(t, n, collected[i].Machine.Name)
+			}
 		})
 	}
 }
