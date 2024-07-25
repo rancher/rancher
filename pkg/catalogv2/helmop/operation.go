@@ -394,9 +394,10 @@ func (s *Operations) getUninstallArgs(appNamespace, appName string, body io.Read
 	}
 
 	status := catalog.OperationStatus{
-		Action:    cmd.Operation,
-		Release:   rel.Spec.Name,
-		Namespace: appNamespace,
+		Action:      cmd.Operation,
+		Release:     rel.Spec.Name,
+		Namespace:   appNamespace,
+		Tolerations: uninstallArgs.OperationTolerations,
 	}
 
 	return status, Commands{cmd}, nil
@@ -420,8 +421,9 @@ func (s *Operations) getUpgradeCommand(repoNamespace, repoName string, body io.R
 	upgradeArgs.Install = true
 
 	status := catalog.OperationStatus{
-		Action:    "upgrade",
-		Namespace: namespace(upgradeArgs.Namespace),
+		Action:      "upgrade",
+		Namespace:   namespace(upgradeArgs.Namespace),
+		Tolerations: upgradeArgs.OperationTolerations,
 	}
 
 	for _, chartUpgrade := range upgradeArgs.Charts {
@@ -545,6 +547,7 @@ func (c Command) renderArgs() ([]string, error) {
 	delete(dataMap, "releaseName")
 	delete(dataMap, "chartName")
 	delete(dataMap, "projectId")
+	delete(dataMap, "operationTolerations")
 	if v, ok := dataMap["disableOpenAPIValidation"]; ok {
 		delete(dataMap, "disableOpenAPIValidation")
 		dataMap["disableOpenapiValidation"] = v
@@ -786,6 +789,7 @@ func (s *Operations) getInstallCommand(repoNamespace, repoName string, body io.R
 
 	status.Namespace = namespace(installArgs.Namespace)
 	status.ProjectID = installArgs.ProjectID
+	status.Tolerations = installArgs.OperationTolerations
 
 	return status, cmds, err
 }
@@ -822,7 +826,7 @@ func (s *Operations) createOperation(ctx context.Context, user user.Info, status
 		kustomize = true
 		break
 	}
-	pod, podOptions := s.createPod(secretData, kustomize, imageOverride)
+	pod, podOptions := s.createPod(secretData, kustomize, imageOverride, status.Tolerations)
 	pod, err = s.Impersonator.CreatePod(ctx, user, pod, podOptions)
 	if err != nil {
 		return nil, err
@@ -978,7 +982,7 @@ func (s *Operations) createNamespace(ctx context.Context, namespace, projectID s
 // The created pod has default tolerations and node selectors.
 // If the kustomize flag is true, the created pod is modified to be able to run the kustomize.sh script.
 // Returns a pod object and a pod options object representing the helm operation pod and it's options
-func (s *Operations) createPod(secretData map[string][]byte, kustomize bool, imageOverride string) (*v1.Pod, *podimpersonation.PodOptions) {
+func (s *Operations) createPod(secretData map[string][]byte, kustomize bool, imageOverride string, tolerations []corev1.Toleration) (*v1.Pod, *podimpersonation.PodOptions) {
 	image := imageOverride
 	if image == "" {
 		image = settings.FullShellImage()
@@ -1064,6 +1068,8 @@ func (s *Operations) createPod(secretData map[string][]byte, kustomize bool, ima
 			},
 		},
 	}
+
+	pod.Spec.Tolerations = append(pod.Spec.Tolerations, tolerations...)
 
 	// if kustomize is false then helmDataPath is an acceptable path for helm to run. If it is true,
 	// files are copied from helmDataPath to helmRunPath. This is because the kustomize.sh script

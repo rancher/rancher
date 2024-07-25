@@ -2,6 +2,7 @@ package v1
 
 import (
 	"github.com/rancher/wrangler/v3/pkg/genericcondition"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -132,6 +133,7 @@ type Operation struct {
 	Status            OperationStatus `json:"status"`
 }
 
+// OperationStatus represents the status of a helm operation that's going to be created
 type OperationStatus struct {
 	ObservedGeneration int64                               `json:"observedGeneration"`
 	Action             string                              `json:"action,omitempty"`
@@ -146,4 +148,5 @@ type OperationStatus struct {
 	PodNamespace       string                              `json:"podNamespace,omitempty"`
 	PodCreated         bool                                `json:"podCreated,omitempty"`
 	Conditions         []genericcondition.GenericCondition `json:"conditions,omitempty"`
+	Tolerations        []corev1.Toleration                 `json:"tolerations,omitempty"`
 }
