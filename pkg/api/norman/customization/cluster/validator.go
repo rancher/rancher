@@ -730,14 +730,11 @@ func validateGKENodePools(spec *v32.ClusterSpec) error {
 }
 
 func validateGKEClusterName(client v3.ClusterInterface, spec *v32.ClusterSpec) error {
-	// validate cluster does not reference an GKE cluster that is already backed by a Rancher cluster
+	// validate cluster does not reference a GKE cluster that is already backed by a Rancher cluster
 	name := spec.GKEConfig.ClusterName
 	region := spec.GKEConfig.Region
 	zone := spec.GKEConfig.Zone
-	msgSuffix := fmt.Sprintf("in region [%s]", region)
-	if region == "" {
-		msgSuffix = fmt.Sprintf("in zone [%s]", spec.GKEConfig.Zone)
-	}
+	msgSuffix := fmt.Sprintf("in region [%s] and zone [%s]", region, zone)
 
 	// cluster client is being used instead of lister to avoid the use of an outdated cache
 	clusters, err := client.List(metav1.ListOptions{})
@@ -752,13 +749,9 @@ func validateGKEClusterName(client v3.ClusterInterface, spec *v32.ClusterSpec) e
 		if name != cluster.Spec.GKEConfig.ClusterName {
 			continue
 		}
-		if region != "" && region != cluster.Spec.GKEConfig.Region {
-			continue
+		if region == cluster.Spec.GKEConfig.Region && zone == cluster.Spec.GKEConfig.Zone {
+			return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("cluster already exists for GKE cluster [%s] "+msgSuffix, name))
 		}
-		if zone != "" && zone != cluster.Spec.GKEConfig.Zone {
-			continue
-		}
-		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("cluster already exists for GKE cluster [%s] "+msgSuffix, name))
 	}
 	return nil
 }
