@@ -394,9 +394,10 @@ func (s *Operations) getUninstallArgs(appNamespace, appName string, body io.Read
 	}
 
 	status := catalog.OperationStatus{
-		Action:    cmd.Operation,
-		Release:   rel.Spec.Name,
-		Namespace: appNamespace,
+		Action:      cmd.Operation,
+		Release:     rel.Spec.Name,
+		Namespace:   appNamespace,
+		Tolerations: uninstallArgs.OperationTolerations,
 	}
 
 	return status, Commands{cmd}, nil
@@ -420,8 +421,9 @@ func (s *Operations) getUpgradeCommand(repoNamespace, repoName string, body io.R
 	upgradeArgs.Install = true
 
 	status := catalog.OperationStatus{
-		Action:    "upgrade",
-		Namespace: namespace(upgradeArgs.Namespace),
+		Action:      "upgrade",
+		Namespace:   namespace(upgradeArgs.Namespace),
+		Tolerations: upgradeArgs.OperationTolerations,
 	}
 
 	for _, chartUpgrade := range upgradeArgs.Charts {
@@ -545,6 +547,7 @@ func (c Command) renderArgs() ([]string, error) {
 	delete(dataMap, "releaseName")
 	delete(dataMap, "chartName")
 	delete(dataMap, "projectId")
+	delete(dataMap, "operationTolerations")
 	if v, ok := dataMap["disableOpenAPIValidation"]; ok {
 		delete(dataMap, "disableOpenAPIValidation")
 		dataMap["disableOpenapiValidation"] = v
@@ -786,6 +789,7 @@ func (s *Operations) getInstallCommand(repoNamespace, repoName string, body io.R
 
 	status.Namespace = namespace(installArgs.Namespace)
 	status.ProjectID = installArgs.ProjectID
+	status.Tolerations = installArgs.OperationTolerations
 
 	return status, cmds, err
 }
@@ -822,7 +826,7 @@ func (s *Operations) createOperation(ctx context.Context, user user.Info, status
 		kustomize = true
 		break
 	}
-	pod, podOptions := s.createPod(secretData, kustomize, imageOverride)
+	pod, podOptions := s.createPod(secretData, kustomize, imageOverride, status.Tolerations)
 	pod, err = s.Impersonator.CreatePod(ctx, user, pod, podOptions)
 	if err != nil {
 		return nil, err
@@ -978,11 +982,40 @@ func (s *Operations) createNamespace(ctx context.Context, namespace, projectID s
 // The created pod has default tolerations and node selectors.
 // If the kustomize flag is true, the created pod is modified to be able to run the kustomize.sh script.
 // Returns a pod object and a pod options object representing the helm operation pod and it's options
-func (s *Operations) createPod(secretData map[string][]byte, kustomize bool, imageOverride string) (*v1.Pod, *podimpersonation.PodOptions) {
+func (s *Operations) createPod(secretData map[string][]byte, kustomize bool, imageOverride string, tolerations []corev1.Toleration) (*v1.Pod, *podimpersonation.PodOptions) {
 	image := imageOverride
 	if image == "" {
 		image = settings.FullShellImage()
 	}
+
+	defaultPodTolerations := []v1.Toleration{
+		{
+			Key:      "cattle.io/os",
+			Operator: corev1.TolerationOpEqual,
+			Value:    "linux",
+			Effect:   "NoSchedule",
+		},
+		{
+			Key:      "node-role.kubernetes.io/controlplane",
+			Operator: corev1.TolerationOpEqual,
+			Value:    "true",
+			Effect:   "NoSchedule",
+		},
+		{
+			Key:      "node-role.kubernetes.io/etcd",
+			Operator: corev1.TolerationOpEqual,
+			Value:    "true",
+			Effect:   "NoExecute",
+		},
+		{
+			Key:      "node.cloudprovider.kubernetes.io/uninitialized",
+			Operator: corev1.TolerationOpEqual,
+			Value:    "true",
+			Effect:   "NoSchedule",
+		},
+	}
+	uniqueTolerations := mergeTolerations(defaultPodTolerations, tolerations)
+
 	secret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "helm-operation-",
@@ -1011,32 +1044,7 @@ func (s *Operations) createPod(secretData map[string][]byte, kustomize bool, ima
 			NodeSelector: map[string]string{
 				"kubernetes.io/os": "linux",
 			},
-			Tolerations: []v1.Toleration{
-				{
-					Key:      "cattle.io/os",
-					Operator: corev1.TolerationOpEqual,
-					Value:    "linux",
-					Effect:   "NoSchedule",
-				},
-				{
-					Key:      "node-role.kubernetes.io/controlplane",
-					Operator: corev1.TolerationOpEqual,
-					Value:    "true",
-					Effect:   "NoSchedule",
-				},
-				{
-					Key:      "node-role.kubernetes.io/etcd",
-					Operator: corev1.TolerationOpEqual,
-					Value:    "true",
-					Effect:   "NoExecute",
-				},
-				{
-					Key:      "node.cloudprovider.kubernetes.io/uninitialized",
-					Operator: corev1.TolerationOpEqual,
-					Value:    "true",
-					Effect:   "NoSchedule",
-				},
-			},
+			Tolerations: uniqueTolerations,
 			Containers: []v1.Container{
 				{
 					Name: "helm",
@@ -1096,4 +1104,51 @@ func (s *Operations) createPod(secretData map[string][]byte, kustomize bool, ima
 		},
 		ImageOverride: imageOverride,
 	}
+}
+
+// addCpTaintsToTolerations gets the list of control plane nodes and adds their taints to the given tolerations.
+func (s *Operations) addCpTaintsToTolerations(tolerations []corev1.Toleration) ([]corev1.Toleration, error) {
+	cpList, err := s.nodes.List(metav1.ListOptions{LabelSelector: "node-role.kubernetes.io/control-plane=true"})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list control plane nodes: %w", err)
+	}
+	var allTaints []corev1.Taint
+	for _, cp := range cpList.Items {
+		toAdd, _ := taints.GetToDiffTaints(allTaints, cp.Spec.Taints)
+		for _, taint := range toAdd {
+			allTaints = append(allTaints, taint)
+		}
+	}
+	for _, taint := range allTaints {
+		tolerations = append(tolerations, corev1.Toleration{
+			Key:      taint.Key,
+			Operator: corev1.TolerationOpEqual,
+			Effect:   taint.Effect,
+			Value:    taint.Value,
+		})
+	}
+	return tolerations, nil
+}
+
+func mergeTolerations(tolerations1, tolerations2 []v1.Toleration) []v1.Toleration {
+	// Use a map to track unique tolerations.
+	uniqueTolerations := make(map[v1.Toleration]struct{})
+
+	// Add tolerations from the first slice.
+	for _, t := range tolerations1 {
+		uniqueTolerations[t] = struct{}{}
+	}
+
+	// Add tolerations from the second slice, only if they don't already exist.
+	for _, t := range tolerations2 {
+		uniqueTolerations[t] = struct{}{}
+	}
+
+	// Convert the map back to a slice.
+	var mergedTolerations []v1.Toleration
+	for t := range uniqueTolerations {
+		mergedTolerations = append(mergedTolerations, t)
+	}
+
+	return mergedTolerations
 }
