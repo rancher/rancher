@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/managementagent/nslabels"
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/helm"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
@@ -302,7 +303,7 @@ func (c *ClusterLifecycleCleanup) createCleanupJob(userContext *config.UserConte
 					Containers: []coreV1.Container{
 						coreV1.Container{
 							Name:  "cleanup-agent",
-							Image: settings.AgentImage.Get(),
+							Image: image.Resolve(settings.AgentImage.Get()),
 							Env: []coreV1.EnvVar{
 								coreV1.EnvVar{
 									Name:  "CLUSTER_CLEANUP",
