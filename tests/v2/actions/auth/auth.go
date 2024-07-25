@@ -1,4 +1,4 @@
-package lastlogin
+package auth
 
 import (
 	"fmt"
@@ -13,11 +13,11 @@ import (
 )
 
 const (
-	lastloginLabel = "cattle.io/last-login"
+	LastloginLabel = "cattle.io/last-login"
 )
 
-func getLastLoginTime(labels map[string]string) (lastLogin time.Time, err error) {
-	value, exists := isLabelPresent(labels)
+func GetLastLoginTime(labels map[string]string) (lastLogin time.Time, err error) {
+	value, exists := IsLabelPresent(labels)
 
 	if !exists || value == "" {
 		return
@@ -26,20 +26,20 @@ func getLastLoginTime(labels map[string]string) (lastLogin time.Time, err error)
 	if err != nil {
 		return
 	}
-	lastLogin = convertEpochToTime(epochTime)
+	lastLogin = ConvertEpochToTime(epochTime)
 	return
 }
 
-func convertEpochToTime(epochTime int64) time.Time {
+func ConvertEpochToTime(epochTime int64) time.Time {
 	return time.Unix(epochTime, 0)
 }
 
-func isLabelPresent(labels map[string]string) (string, bool) {
-	value, exists := labels[lastloginLabel]
+func IsLabelPresent(labels map[string]string) (string, bool) {
+	value, exists := labels[LastloginLabel]
 	return value, exists
 }
 
-func getUserAfterLogin(rancherClient *rancher.Client, user client.User) (userDetails *v3.User, err error) {
+func GetUserAfterLogin(rancherClient *rancher.Client, user client.User) (userDetails *v3.User, err error) {
 
 	_, err = rancherClient.AsUser(&user)
 	if err != nil {
