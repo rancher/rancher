@@ -57,3 +57,29 @@ func CreateDeployment(client *rancher.Client, clusterID, namespaceName string, r
 
 	return createdDeployment, err
 }
+
+// UpdateDeployment is a helper to update deployments
+func UpdateDeployment(client *rancher.Client, clusterID, namespaceName string, deployment *appv1.Deployment) (*appv1.Deployment, error) {
+	wranglerContext, err := client.WranglerContext.DownStreamClusterWranglerContext(clusterID)
+	if err != nil {
+		return nil, err
+	}
+
+	latestDeployment, err := wranglerContext.Apps.Deployment().Get(namespaceName, deployment.Name, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	deployment.ResourceVersion = latestDeployment.ResourceVersion
+
+	updatedDeployment, err := wranglerContext.Apps.Deployment().Update(deployment)
+	if err != nil {
+		return nil, err
+	}
+
+	err = charts.WatchAndWaitDeployments(client, clusterID, namespaceName, metav1.ListOptions{
+		FieldSelector: "metadata.name=" + updatedDeployment.Name,
+	})
+
+	return updatedDeployment, err
+}

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/rancher/shepherd/clients/rancher"
+	v1 "github.com/rancher/shepherd/clients/rancher/v1"
 	"github.com/rancher/shepherd/extensions/defaults"
 	"github.com/rancher/shepherd/extensions/kubeconfig"
 	"github.com/rancher/shepherd/extensions/workloads"
@@ -16,8 +17,9 @@ import (
 )
 
 const (
-	timeFormat = "2006/01/02 15:04:05"
-	imageName  = "nginx"
+	timeFormat   = "2006/01/02 15:04:05"
+	imageName    = "nginx"
+	podSteveType = "pod"
 )
 
 // NewPodTemplateWithConfig is a helper to create a Pod template with a secret/configmap as an environment variable or volume mount or both
@@ -117,4 +119,34 @@ func CheckPodLogsForErrors(client *rancher.Client, clusterID string, podName str
 	}
 
 	return nil
+}
+
+// CountPodContainerRunning is a helper to count all pod containers running
+func CountPodContainerRunning(client *rancher.Client, clusterID, namespaceName string) (int, error) {
+	steveclient, err := client.Steve.ProxyDownstream(clusterID)
+	if err != nil {
+		return 0, err
+	}
+
+	podsResp, err := steveclient.SteveType(podSteveType).NamespacedSteveClient(namespaceName).List(nil)
+	if err != nil {
+		return 0, err
+	}
+
+	count := 0
+	for _, podResp := range podsResp.Data {
+		podStatus := &corev1.PodStatus{}
+		err = v1.ConvertToK8sType(podResp.Status, podStatus)
+		if err != nil {
+			return 0, err
+		}
+
+		for _, containerStatus := range podStatus.ContainerStatuses {
+			if containerStatus.State.Running != nil {
+				count++
+			}
+		}
+	}
+
+	return count, nil
 }
