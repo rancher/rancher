@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/rancher/rancher/pkg/serviceaccounttoken"
 	"github.com/rancher/shepherd/clients/rancher"
@@ -11,6 +12,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 )
@@ -75,9 +77,19 @@ func (s *ServiceAccountSuite) TestSingleSecretForServiceAccount() {
 		}()
 	}
 
+	pollInterval := 500 * time.Millisecond
+	err = wait.Poll(pollInterval, 5*time.Second, func() (done bool, err error) {
+		secrets, err := clientset.CoreV1().Secrets(testNS.Name).List(context.Background(), metav1.ListOptions{})
+		if err != nil {
+			return false, err
+		}
+
+		return len(secrets.Items) > 0, nil
+	})
+
 	secrets, err := clientset.CoreV1().Secrets(testNS.Name).List(context.Background(), metav1.ListOptions{})
 	s.Require().NoError(err)
-	s.Assert().Equal(len(secrets.Items), 1)
+	s.Assert().Equal(1, len(secrets.Items))
 }
 
 func TestSATestSuite(t *testing.T) {
