@@ -19,7 +19,7 @@ skip_host_node_port = pytest.mark.skipif(
     not ENABLE_HOST_NODE_PORT_TESTS,
     reason='Tests Skipped for AKS,GKE,EKS Clusters')
 
-
+#Converted to go test in TestWorkloadSideKick
 def test_wl_sidekick():
     p_client = namespace["p_client"]
     ns = namespace["ns"]

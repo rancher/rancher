@@ -21,27 +21,27 @@ type WorkloadTestSuite struct {
 	cluster *management.Cluster
 }
 
-func (workload *WorkloadTestSuite) TearDownSuite() {
-	workload.session.Cleanup()
+func (w *WorkloadTestSuite) TearDownSuite() {
+	w.session.Cleanup()
 }
 
-func (workload *WorkloadTestSuite) SetupSuite() {
-	workload.session = session.NewSession()
+func (w *WorkloadTestSuite) SetupSuite() {
+	w.session = session.NewSession()
 
-	client, err := rancher.NewClient("", workload.session)
-	require.NoError(workload.T(), err)
+	client, err := rancher.NewClient("", w.session)
+	require.NoError(w.T(), err)
 
-	workload.client = client
+	w.client = client
 
 	log.Info("Getting cluster name from the config file and append cluster details in connection")
 	clusterName := client.RancherConfig.ClusterName
-	require.NotEmptyf(workload.T(), clusterName, "Cluster name to install should be set")
+	require.NotEmptyf(w.T(), clusterName, "Cluster name to install should be set")
 
-	clusterID, err := clusters.GetClusterIDByName(workload.client, clusterName)
-	require.NoError(workload.T(), err, "Error getting cluster ID")
+	clusterID, err := clusters.GetClusterIDByName(w.client, clusterName)
+	require.NoError(w.T(), err, "Error getting cluster ID")
 
-	workload.cluster, err = workload.client.Management.Cluster.ByID(clusterID)
-	require.NoError(workload.T(), err)
+	w.cluster, err = w.client.Management.Cluster.ByID(clusterID)
+	require.NoError(w.T(), err)
 }
 
 func (w *WorkloadTestSuite) TestWorkloadDeployment() {
@@ -49,6 +49,20 @@ func (w *WorkloadTestSuite) TestWorkloadDeployment() {
 	defer subSession.Cleanup()
 
 	_, namespace, err := projectsapi.CreateProjectAndNamespace(w.client, w.cluster.ID)
+	require.NoError(w.T(), err)
+
+	_, err = deployment.CreateDeployment(w.client, w.cluster.ID, namespace.Name, 1, "", "", false, false)
+	require.NoError(w.T(), err)
+}
+
+func (w *WorkloadTestSuite) TestWorkloadSideKick() {
+	subSession := w.session.NewSession()
+	defer subSession.Cleanup()
+
+	_, namespace, err := projectsapi.CreateProjectAndNamespace(w.client, w.cluster.ID)
+	require.NoError(w.T(), err)
+
+	_, err = deployment.CreateDeployment(w.client, w.cluster.ID, namespace.Name, 1, "", "", false, false)
 	require.NoError(w.T(), err)
 
 	_, err = deployment.CreateDeployment(w.client, w.cluster.ID, namespace.Name, 1, "", "", false, false)
