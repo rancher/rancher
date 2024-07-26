@@ -520,21 +520,20 @@ func samePrincipal(me v3.Principal, other v3.Principal) bool {
 }
 
 // UpdateGroupCacheSize attempts to update the size of the group cache defined at the package level.
-func UpdateGroupCacheSize(size string) {
+func UpdateGroupCacheSize(size string) error {
 	if size == "" {
-		return
+		return fmt.Errorf("missing minimum requirements to update group cache size")
 	}
 
 	i, err := strconv.Atoi(size)
 	if err != nil {
-		logrus.Errorf("error parsing azure-group-cache-size, skipping update %v", err)
-		return
+		return fmt.Errorf("error parsing azure-group-cache-size, skipping update %v", err)
 	}
 	if i < 0 {
-		logrus.Error("azure-group-cache-size must be >= 0, skipping update")
-		return
+		return fmt.Errorf("azure-group-cache-size must be >= 0, skipping update")
 	}
 	clients.GroupCache.Resize(i)
+	return nil
 }
 
 func (ap *Provider) GetUserExtraAttributes(userPrincipal v3.Principal) map[string][]string {

@@ -36,15 +36,14 @@ func StartRefreshDaemon(ctx context.Context, scaledContext *config.ScaledContext
 
 }
 
-func UpdateRefreshCronTime(refreshCronTime string) {
+func UpdateRefreshCronTime(refreshCronTime string) error {
 	if ref == nil || refreshCronTime == "" {
-		return
+		return fmt.Errorf("missing minimum requirements to refresh cron time")
 	}
 
 	parsed, err := ParseCron(refreshCronTime)
 	if err != nil {
-		logrus.Errorf("%v", err)
-		return
+		return fmt.Errorf("parsing error: %v", err)
 	}
 
 	c.Stop()
@@ -55,14 +54,16 @@ func UpdateRefreshCronTime(refreshCronTime string) {
 		c.Schedule(parsed, job)
 		c.Start()
 	}
+	return nil
 }
 
-func UpdateRefreshMaxAge(maxAge string) {
+func UpdateRefreshMaxAge(maxAge string) error {
 	if ref == nil {
-		return
+		return fmt.Errorf("missing minimum requirements to refresh max age")
 	}
 
 	ref.ensureMaxAgeUpToDate(maxAge)
+	return nil
 }
 
 func RefreshAllForCron() {
@@ -94,7 +95,7 @@ func ParseMaxAge(setting string) (time.Duration, error) {
 	durString := fmt.Sprintf("%vs", setting)
 	dur, err := time.ParseDuration(durString)
 	if err != nil {
-		return 0, fmt.Errorf("Error parsing auth refresh max age: %v", err)
+		return 0, fmt.Errorf("error parsing auth refresh max age: %v", err)
 	}
 	return dur, nil
 }
@@ -105,7 +106,7 @@ func ParseCron(setting string) (cron.Schedule, error) {
 	}
 	schedule, err := cron.ParseStandard(setting)
 	if err != nil {
-		return nil, fmt.Errorf("Error parsing auth refresh cron: %v", err)
+		return nil, fmt.Errorf("error parsing auth refresh cron: %v", err)
 	}
 	return schedule, nil
 }

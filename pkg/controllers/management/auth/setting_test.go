@@ -75,12 +75,28 @@ func TestSettingsSyncScheduleUserRetention(t *testing.T) {
 }
 
 func TestSettingsSyncWithProviderRefresh(t *testing.T) {
+	// counter to ensure the providerrefresh are called during execution
+	var providerRefreshCalledTimes int
+	controller := &SettingController{
+		providerRefreshCronTime: func(_ string) error {
+			providerRefreshCalledTimes++
+			return nil
+		},
+		providerRefreshMaxAge: func(_ string) error {
+			providerRefreshCalledTimes++
+			return nil
+		},
+	}
+
 	for _, name := range []string{
 		settings.AuthUserInfoResyncCron.Name,
 		settings.AuthUserInfoMaxAgeSeconds.Name,
 	} {
 		t.Run(name, func(t *testing.T) {
-			controller := SettingController{}
+			// reset the value after each test run
+			defer func() {
+				providerRefreshCalledTimes = 0
+			}()
 
 			_, err := controller.sync(name, &v3.Setting{
 				ObjectMeta: metav1.ObjectMeta{Name: name},
@@ -88,6 +104,9 @@ func TestSettingsSyncWithProviderRefresh(t *testing.T) {
 			})
 			if err != nil {
 				t.Fatal(err)
+			}
+			if want, got := 1, providerRefreshCalledTimes; want != got {
+				t.Fatalf("Expected providerRefreshCalledTimes: %d got %d", want, got)
 			}
 		})
 	}
