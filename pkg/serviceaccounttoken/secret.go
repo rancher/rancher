@@ -82,7 +82,7 @@ func EnsureSecretForServiceAccount(ctx context.Context, secretsCache corecontrol
 	if len(secret.Data[v1.ServiceAccountTokenKey]) > 0 {
 		return secret, nil
 	}
-	logrus.Infof("EnsureSecretForServiceAccount: waiting for secret [%s:%s] to be populated with token", secret.Namespace, secret.Name)
+	logrus.Infof("EnsureSecretForServiceAccount: waiting for secret [%s:%s] for service account [%s:%s] to be populated with token", secret.Namespace, secret.Name, sa.Namespace, sa.Name)
 	backoff := wait.Backoff{
 		Duration: 2 * time.Millisecond,
 		Cap:      100 * time.Millisecond,
@@ -98,7 +98,7 @@ func EnsureSecretForServiceAccount(ctx context.Context, secretsCache corecontrol
 			return false, fmt.Errorf("error ensuring secret for service account [%s:%s]: %w", sa.Namespace, sa.Name, err)
 		}
 		if len(secret.Data[v1.ServiceAccountTokenKey]) > 0 {
-			logrus.Infof("EnsureSecretForServiceAccount: got the service account token for [%s:%s] in %s", sa.GetNamespace(), sa.GetName(), time.Now().Sub(start))
+			logrus.Infof("EnsureSecretForServiceAccount: got the service account token for service account [%s:%s] in %s", sa.GetNamespace(), sa.GetName(), time.Now().Sub(start))
 			return true, nil
 		}
 		return false, nil
