@@ -41,6 +41,7 @@ func EnsureSecretForServiceAccount(ctx context.Context, secretsCache corecontrol
 	if sa == nil {
 		return nil, fmt.Errorf("could not ensure secret for invalid service account")
 	}
+	logrus.Tracef("EnsureSecretForServiceAccount for %s/%s", sa.GetNamespace(), sa.GetName())
 
 	// Lock avoids multiple calls to this func at the same time and creation of same resources multiple times
 	// Mutex is a addition to the Lease, it helps sync within the pod and avoid multiple Lease waits from the same pod
@@ -81,13 +82,15 @@ func EnsureSecretForServiceAccount(ctx context.Context, secretsCache corecontrol
 	if len(secret.Data[v1.ServiceAccountTokenKey]) > 0 {
 		return secret, nil
 	}
-	logrus.Infof("EnsureSecretForServiceAccount: waiting for secret [%s] to be populated with token", secret.Name)
+	logrus.Infof("EnsureSecretForServiceAccount: waiting for secret [%s:%s] for service account [%s:%s] to be populated with token", secret.Namespace, secret.Name, sa.Namespace, sa.Name)
 	backoff := wait.Backoff{
 		Duration: 2 * time.Millisecond,
 		Cap:      100 * time.Millisecond,
 		Steps:    50,
 	}
+	start := time.Now()
 	err = wait.ExponentialBackoff(backoff, func() (bool, error) {
+		logrus.Tracef("Waiting for the secret with backoff for %s/%s", sa.GetNamespace(), sa.GetName())
 		var err error
 		// use the secret client, rather than the secret getter, to circumvent the cache
 		secret, err = secretClient.Get(ctx, secret.Name, metav1.GetOptions{})
@@ -95,6 +98,7 @@ func EnsureSecretForServiceAccount(ctx context.Context, secretsCache corecontrol
 			return false, fmt.Errorf("error ensuring secret for service account [%s:%s]: %w", sa.Namespace, sa.Name, err)
 		}
 		if len(secret.Data[v1.ServiceAccountTokenKey]) > 0 {
+			logrus.Infof("EnsureSecretForServiceAccount: got the service account token for service account [%s:%s] in %s", sa.GetNamespace(), sa.GetName(), time.Now().Sub(start))
 			return true, nil
 		}
 		return false, nil
