@@ -268,7 +268,7 @@ func Test_rotateCertificatesPlan(t *testing.T) {
 			joinServer:          "my-magic-joinserver",
 			setup:               genericSetup,
 			expected: expected{
-				otiIndex: 1,
+				otiIndex: 2,
 				oti: &[]plan.OneTimeInstruction{idempotentInstruction(
 					createTestControlPlane("v1.25.7+k3s1"),
 					"certificate-rotation/rm-kcm-cert",
@@ -280,7 +280,7 @@ func Test_rotateCertificatesPlan(t *testing.T) {
 					},
 					[]string{},
 				)}[0],
-				otiCount:   7,
+				otiCount:   8,
 				joinServer: "my-magic-joinserver",
 			},
 		},
@@ -294,7 +294,7 @@ func Test_rotateCertificatesPlan(t *testing.T) {
 				Generation: 244,
 			},
 			expected: expected{
-				otiIndex: 1,
+				otiIndex: 2,
 				oti: &[]plan.OneTimeInstruction{idempotentInstruction(
 					createTestControlPlane("v1.25.7+rke2r1"),
 					"certificate-rotation/rm-kcm-cert",
@@ -306,7 +306,7 @@ func Test_rotateCertificatesPlan(t *testing.T) {
 					},
 					[]string{},
 				)}[0],
-				otiCount:   10, // the extra removal instructions are for removing the static pod manifests for RKE2
+				otiCount:   11, // the extra removal instructions are for removing the static pod manifests for RKE2
 				joinServer: "my-magic-joinserver",
 			},
 		},
@@ -317,7 +317,7 @@ func Test_rotateCertificatesPlan(t *testing.T) {
 			joinServer:          "my-magic-joinserver",
 			setup:               genericSetup,
 			expected: expected{
-				otiIndex: 3,
+				otiIndex: 4,
 				oti: &[]plan.OneTimeInstruction{idempotentInstruction(
 					createTestControlPlane("v1.25.7+k3s1"),
 					"certificate-rotation/rm-ks-cert",
@@ -329,7 +329,7 @@ func Test_rotateCertificatesPlan(t *testing.T) {
 					},
 					[]string{},
 				)}[0],
-				otiCount:   7,
+				otiCount:   8,
 				joinServer: "my-magic-joinserver",
 			},
 		},
@@ -340,7 +340,7 @@ func Test_rotateCertificatesPlan(t *testing.T) {
 			joinServer:          "my-magic-joinserver",
 			setup:               genericSetup,
 			expected: expected{
-				otiIndex: 4,
+				otiIndex: 5,
 				oti: &[]plan.OneTimeInstruction{idempotentInstruction(
 					createTestControlPlane("v1.25.7+rke2r1"),
 					"certificate-rotation/rm-ks-cert",
@@ -352,7 +352,7 @@ func Test_rotateCertificatesPlan(t *testing.T) {
 					},
 					[]string{},
 				)}[0],
-				otiCount:   10, // the extra removal instructions are for removing the static pod manifests for RKE2
+				otiCount:   11, // the extra removal instructions are for removing the static pod manifests for RKE2
 				joinServer: "my-magic-joinserver",
 			},
 		},
@@ -400,7 +400,7 @@ func Test_rotateCertificatesPlan(t *testing.T) {
 				},
 			},
 			expected: expected{
-				otiIndex: 1,
+				otiIndex: 2,
 				oti: &[]plan.OneTimeInstruction{idempotentInstruction(
 					createTestControlPlane("v1.25.7+k3s1"),
 					"certificate-rotation/rm-kcm-cert",
@@ -412,7 +412,7 @@ func Test_rotateCertificatesPlan(t *testing.T) {
 					},
 					[]string{},
 				)}[0],
-				otiCount:   7,
+				otiCount:   8,
 				joinServer: "my-magic-joinserver",
 			},
 		},
