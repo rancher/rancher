@@ -9,16 +9,26 @@ import (
 )
 
 func TestSettingsSyncWithEmptyAzureGroupCacheSize(t *testing.T) {
-	name := settings.AzureGroupCacheSize.Name
-	controller := SettingController{}
-
-	_, err := controller.sync(name, &v3.Setting{
-		ObjectMeta: metav1.ObjectMeta{Name: name},
-		Value:      "",
-	})
-	if err != nil {
-		t.Fatal(err)
+	var azureGroupCacheSizeCalledTimes int
+	controller := &SettingController{
+		azureUpdateGroupCacheSize: func(_ string) error {
+			azureGroupCacheSizeCalledTimes++
+			return nil
+		},
 	}
+	name := settings.AzureGroupCacheSize.Name
+	t.Run(name, func(t *testing.T) {
+		_, err := controller.sync(name, &v3.Setting{
+			ObjectMeta: metav1.ObjectMeta{Name: name},
+			Value:      "",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if want, got := 1, azureGroupCacheSizeCalledTimes; want != got {
+			t.Fatalf("Expected azureGroupCacheSizeCalledTimes: %d got %d", want, got)
+		}
+	})
 }
 
 func TestSettingsSyncEnsureUserRetentionLabels(t *testing.T) {
