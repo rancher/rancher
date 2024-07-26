@@ -43,6 +43,7 @@ type ChartInstallAction struct {
 	Namespace                string              `json:"namespace,omitempty"`
 	ProjectID                string              `json:"projectId,omitempty"`
 	OperationTolerations     []corev1.Toleration `json:"operationTolerations,omitempty"`
+	AutomaticCPTolerations   bool                `json:"automaticCPTolerations,omitempty"`
 	Charts                   []ChartInstall      `json:"charts,omitempty"`
 }
 
@@ -56,12 +57,13 @@ type ChartInfo struct {
 
 // ChartUninstallAction represents the input received when uninstalling a chart
 type ChartUninstallAction struct {
-	DisableHooks         bool                `json:"noHooks,omitempty"`
-	DryRun               bool                `json:"dryRun,omitempty"`
-	KeepHistory          bool                `json:"keepHistory,omitempty"`
-	Timeout              *metav1.Duration    `json:"timeout,omitempty"`
-	Description          string              `json:"description,omitempty"`
-	OperationTolerations []corev1.Toleration `json:"operationTolerations,omitempty"`
+	DisableHooks           bool                `json:"noHooks,omitempty"`
+	DryRun                 bool                `json:"dryRun,omitempty"`
+	KeepHistory            bool                `json:"keepHistory,omitempty"`
+	Timeout                *metav1.Duration    `json:"timeout,omitempty"`
+	Description            string              `json:"description,omitempty"`
+	OperationTolerations   []corev1.Toleration `json:"operationTolerations,omitempty"`
+	AutomaticCPTolerations bool                `json:"automaticCPTolerations,omitempty"`
 }
 
 // ChartUpgradeAction represents the input received when upgrading the charts received in the charts field
@@ -78,6 +80,7 @@ type ChartUpgradeAction struct {
 	CleanupOnFail            bool                `json:"cleanupOnFail,omitempty"`
 	Charts                   []ChartUpgrade      `json:"charts,omitempty"`
 	OperationTolerations     []corev1.Toleration `json:"operationTolerations,omitempty"`
+	AutomaticCPTolerations   bool                `json:"automaticCPTolerations,omitempty"`
 }
 
 type ChartUpgrade struct {

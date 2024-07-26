@@ -375,7 +375,8 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		helm.Catalog().V1(),
 		rbac.Rbac().V1(),
 		content,
-		core.Core().V1().Pod())
+		core.Core().V1().Pod(),
+		core.Core().V1().Node())
 
 	cache := memory.NewMemCacheClient(k8s.Discovery())
 	restMapper := restmapper.NewDeferredDiscoveryRESTMapper(cache)

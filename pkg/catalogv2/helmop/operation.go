@@ -10,6 +10,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/rancher/rancher/pkg/taints"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -151,10 +152,11 @@ type Operations struct {
 	clusterRepos   catalogcontrollers.ClusterRepoClient // client for cluster repo custom resource
 	ops            catalogcontrollers.OperationClient   // client for operation custom resource
 	pods           corev1controllers.PodClient          // client for pod kubernetes resource
-	apps           catalogcontrollers.AppClient         // client for apps custom resource
-	roles          rbacv1controllers.RoleClient         // client for role kubernetes resource
-	roleBindings   rbacv1controllers.RoleBindingClient  // client for rolebinding kubernetes resource
-	cg             proxy.ClientGetter                   // dynamic kubernetes client factory
+	nodes          corev1controllers.NodeClient
+	apps           catalogcontrollers.AppClient        // client for apps custom resource
+	roles          rbacv1controllers.RoleClient        // client for role kubernetes resource
+	roleBindings   rbacv1controllers.RoleBindingClient // client for rolebinding kubernetes resource
+	cg             proxy.ClientGetter                  // dynamic kubernetes client factory
 }
 
 // NewOperations creates a new Operations struct with all fields initialized
@@ -163,7 +165,8 @@ func NewOperations(
 	catalog catalogcontrollers.Interface,
 	rbac rbacv1controllers.Interface,
 	contentManager *content.Manager,
-	pods corev1controllers.PodClient) *Operations {
+	pods corev1controllers.PodClient,
+	nodes corev1controllers.NodeClient) *Operations {
 	return &Operations{
 		cg:             cg,
 		contentManager: contentManager,
@@ -175,6 +178,7 @@ func NewOperations(
 		apps:           catalog.App(),
 		roleBindings:   rbac.RoleBinding(),
 		roles:          rbac.Role(),
+		nodes:          nodes,
 	}
 }
 
@@ -184,6 +188,13 @@ func (s *Operations) Uninstall(ctx context.Context, user user.Info, namespace, n
 	status, cmds, err := s.getUninstallArgs(namespace, name, options)
 	if err != nil {
 		return nil, err
+	}
+
+	if status.AutomaticCPTolerations {
+		status.Tolerations, err = s.addCpTaintsToTolerations(status.Tolerations)
+		if err != nil {
+			return nil, fmt.Errorf("failed to add tolerations for CP nodes: %w", err)
+		}
 	}
 
 	user, err = s.getUser(user, namespace, name, true)
@@ -202,6 +213,13 @@ func (s *Operations) Upgrade(ctx context.Context, user user.Info, namespace, nam
 		return nil, err
 	}
 
+	if status.AutomaticCPTolerations {
+		status.Tolerations, err = s.addCpTaintsToTolerations(status.Tolerations)
+		if err != nil {
+			return nil, fmt.Errorf("failed to add tolerations for CP nodes: %w", err)
+		}
+	}
+
 	user, err = s.getUser(user, namespace, name, false)
 	if err != nil {
 		return nil, err
@@ -218,6 +236,13 @@ func (s *Operations) Install(ctx context.Context, user user.Info, namespace, nam
 		return nil, err
 	}
 
+	if status.AutomaticCPTolerations {
+		status.Tolerations, err = s.addCpTaintsToTolerations(status.Tolerations)
+		if err != nil {
+			return nil, fmt.Errorf("failed to add tolerations for CP nodes: %w", err)
+		}
+	}
+
 	user, err = s.getUser(user, namespace, name, false)
 	if err != nil {
 		return nil, err
@@ -226,7 +251,7 @@ func (s *Operations) Install(ctx context.Context, user user.Info, namespace, nam
 	return s.createOperation(ctx, user, status, cmds, imageOverride)
 }
 
-// decodeParams decodes the request using it's url and v1 group version into the target object
+// decodeParams decodes the request using its url and v1 group version into the target object
 func decodeParams(req *http.Request, target runtime.Object) error {
 	return podOptionsCodec.DecodeParameters(req.URL.Query(), corev1.SchemeGroupVersion, target)
 }
@@ -394,10 +419,11 @@ func (s *Operations) getUninstallArgs(appNamespace, appName string, body io.Read
 	}
 
 	status := catalog.OperationStatus{
-		Action:      cmd.Operation,
-		Release:     rel.Spec.Name,
-		Namespace:   appNamespace,
-		Tolerations: uninstallArgs.OperationTolerations,
+		Action:                 cmd.Operation,
+		Release:                rel.Spec.Name,
+		Namespace:              appNamespace,
+		Tolerations:            uninstallArgs.OperationTolerations,
+		AutomaticCPTolerations: uninstallArgs.AutomaticCPTolerations,
 	}
 
 	return status, Commands{cmd}, nil
@@ -421,9 +447,10 @@ func (s *Operations) getUpgradeCommand(repoNamespace, repoName string, body io.R
 	upgradeArgs.Install = true
 
 	status := catalog.OperationStatus{
-		Action:      "upgrade",
-		Namespace:   namespace(upgradeArgs.Namespace),
-		Tolerations: upgradeArgs.OperationTolerations,
+		Action:                 "upgrade",
+		Namespace:              namespace(upgradeArgs.Namespace),
+		Tolerations:            upgradeArgs.OperationTolerations,
+		AutomaticCPTolerations: upgradeArgs.AutomaticCPTolerations,
 	}
 
 	for _, chartUpgrade := range upgradeArgs.Charts {
@@ -548,6 +575,7 @@ func (c Command) renderArgs() ([]string, error) {
 	delete(dataMap, "chartName")
 	delete(dataMap, "projectId")
 	delete(dataMap, "operationTolerations")
+	delete(dataMap, "automaticCPTolerations")
 	if v, ok := dataMap["disableOpenAPIValidation"]; ok {
 		delete(dataMap, "disableOpenAPIValidation")
 		dataMap["disableOpenapiValidation"] = v
@@ -747,7 +775,6 @@ func (s *Operations) getInstallCommand(repoNamespace, repoName string, body io.R
 	if err != nil {
 		return catalog.OperationStatus{}, nil, err
 	}
-
 	var (
 		cmds   []Command
 		status = catalog.OperationStatus{
@@ -790,6 +817,7 @@ func (s *Operations) getInstallCommand(repoNamespace, repoName string, body io.R
 	status.Namespace = namespace(installArgs.Namespace)
 	status.ProjectID = installArgs.ProjectID
 	status.Tolerations = installArgs.OperationTolerations
+	status.AutomaticCPTolerations = installArgs.AutomaticCPTolerations
 
 	return status, cmds, err
 }
