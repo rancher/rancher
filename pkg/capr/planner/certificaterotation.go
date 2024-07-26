@@ -105,7 +105,11 @@ func (p *Planner) rotateCertificatesPlan(controlPlane *rkev1.RKEControlPlane, to
 		return rotatePlan, joinedServer, nil
 	}
 
-	rotatePlan.Instructions = append(rotatePlan.Instructions, generateKillAllInstruction(capr.GetRuntime(controlPlane.Spec.KubernetesVersion)))
+	rotatePlan.Instructions = append(rotatePlan.Instructions, idempotentStopInstruction(
+		controlPlane,
+		"certificate-rotation/stop",
+		strconv.FormatInt(rotation.Generation, 10),
+		capr.GetRuntime(controlPlane.Spec.KubernetesVersion)))
 
 	args := []string{
 		"certificate",
