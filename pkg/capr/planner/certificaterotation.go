@@ -109,7 +109,7 @@ func (p *Planner) rotateCertificatesPlan(controlPlane *rkev1.RKEControlPlane, to
 		controlPlane,
 		"certificate-rotation/stop",
 		strconv.FormatInt(rotation.Generation, 10),
-		capr.GetRuntime(controlPlane.Spec.KubernetesVersion)))
+		capr.GetRuntimeServerUnit(controlPlane.Spec.KubernetesVersion)))
 
 	args := []string{
 		"certificate",
