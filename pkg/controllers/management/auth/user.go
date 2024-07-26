@@ -118,7 +118,10 @@ func tokenByUserRefFunc(obj interface{}) ([]string, error) {
 	return []string{token.UserID}, nil
 }
 
-func (l *userLifecycle) Create(user *v3.User) (runtime.Object, error) {
+// hasLocalPrincipalID returns true in case the user
+// has at least one PrincipalID that starts with "local://".
+// Returns false otherwise.
+func hasLocalPrincipalID(user *v3.User) bool {
 	var match = false
 	for _, id := range user.PrincipalIDs {
 		if strings.HasPrefix(id, "local://") {
@@ -126,8 +129,13 @@ func (l *userLifecycle) Create(user *v3.User) (runtime.Object, error) {
 			break
 		}
 	}
+	return match
+}
 
-	if !match {
+// Create creates a new user role binding and sets the Status.Conditions.Type = "InitialRolesPopulated",
+// and then returns the object. Otherwise returns an error.
+func (l *userLifecycle) Create(user *v3.User) (runtime.Object, error) {
+	if !hasLocalPrincipalID(user) {
 		user.PrincipalIDs = append(user.PrincipalIDs, "local://"+user.Name)
 	}
 
