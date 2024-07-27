@@ -30,6 +30,7 @@ import (
 	password "github.com/rancher/shepherd/extensions/users/passwordgenerator"
 	"github.com/rancher/shepherd/pkg/namegenerator"
 	"github.com/rancher/shepherd/pkg/session"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -37,7 +38,6 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
 )
@@ -275,58 +275,13 @@ func (s *steveAPITestSuite) setupSuite(clusterName string) {
 	mgmtCluster, err := client.Management.Cluster.ByID(s.clusterID)
 	require.NoError(s.T(), err)
 
-	dynamicClient, err := client.GetDownStreamClusterClient(s.clusterID)
-	require.NoError(s.T(), err)
-
 	// create projects
 	for p := range projectMap {
 		project, err := s.client.Management.Project.Create(&management.Project{
 			ClusterID: s.clusterID,
 			Name:      p,
 		})
-		require.NoError(s.T(), err)
 
-		// Define the GVR (GroupVersionResource) for the custom resource
-		gvr := schema.GroupVersionResource{
-			Group:    "apiregistration.k8s.io",
-			Version:  "v1",
-			Resource: "apiservices",
-		}
-
-		// Example: List all resources
-		list, err := dynamicClient.Resource(gvr).Namespace("").List(context.TODO(), metav1.ListOptions{})
-		require.NoError(s.T(), err)
-
-		fmt.Println("List of APIService resources:")
-		for _, item := range list.Items {
-			fmt.Println("Name:", item.GetName())
-			fmt.Println("Group:", item.Object["group"])
-			fmt.Println("Version:", item.Object["spec"])
-			fmt.Println("Status:", item.Object["status"])
-		}
-
-		// var getError error
-		// err = wait.PollUntilContextTimeout(context.TODO(), 300*time.Millisecond, 3*time.Minute, true, func(ctx context.Context) (done bool, err error) {
-		// 	steveClient, err := client.Steve.ProxyDownstream(s.clusterID)
-		// 	if err != nil {
-		// 		return false, err
-		// 	}
-
-		// 	projectID := strings.Split(project.ID, ":")[1]
-		// 	clusterRoleName := fmt.Sprintf("%s-namespaces-edit", projectID)
-
-		// 	resp, err := steveClient.SteveType("rbac.authorization.k8s.io.clusterrole").ByID(clusterRoleName) //Get(context.TODO(), fmt.Sprintf("%s-namespaces-edit", clusterRoleName), metav1.GetOptions{})
-		// 	if err != nil {
-		// 		getError = err
-		// 		return false, nil
-		// 	}
-
-		// 	logrus.Infof("resp is %v", resp.JSONResp)
-		// 	getError = nil
-		// 	return true, nil
-		// })
-
-		// logrus.Infof("error is %v", getError)
 		require.NoError(s.T(), err)
 		projectMap[p] = project
 	}
@@ -337,6 +292,14 @@ func (s *steveAPITestSuite) setupSuite(clusterName string) {
 	impersonationSA := impersonationSABase + userID
 	err = serviceaccounts.IsServiceAccountReady(client, s.clusterID, impersonationNamespace, impersonationSA)
 	require.NoError(s.T(), err)
+
+	steveClient, err := client.Steve.ProxyDownstream(s.clusterID)
+	require.NoError(s.T(), err)
+
+	resp, err := steveClient.SteveType("rbac.authorization.k8s.io.clusterrole").ByID(impersonationSA)
+	require.NoError(s.T(), err)
+
+	logrus.Infof("cluster role is %v", resp.JSONResp)
 
 	// create project namespaces
 	for n := range namespaceMap {
