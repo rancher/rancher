@@ -208,6 +208,18 @@ func installer(cluster *rancherv1.Cluster, secretName string) []runtime.Object {
 		})
 	}
 
+	controlPlane, err := h.rkeControlPlane.Get(cluster.Namespace, cluster.Name, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	if controlPlane.Spec.RKEClusterSpecCommon.DataDirectories.SystemAgent != "" {
+		env = append(env, corev1.EnvVar{
+			Name:  capr.SystemAgentDataDirEnvVar,
+			Value: capr.GetSystemAgent(controlPlane),
+		})
+	}
+
 	plan := &upgradev1.Plan{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Plan",
