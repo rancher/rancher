@@ -221,7 +221,6 @@ func (c *controller) RKECapabilities(capabilities v32.Capabilities, rkeConfig rk
 	} else if rkeConfig.Services.KubeAPI.ExtraArgs["service-node-port-range"] != "" {
 		capabilities.NodePortRange = rkeConfig.Services.KubeAPI.ExtraArgs["service-node-port-range"]
 	}
-	capabilities.PspEnabled = rkeConfig.Services.KubeAPI.PodSecurityPolicy
 
 	return capabilities, nil
 }

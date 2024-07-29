@@ -12,7 +12,7 @@ import (
 	"github.com/rancher/rancher/pkg/features"
 	fleetconst "github.com/rancher/rancher/pkg/fleet"
 	"github.com/rancher/rancher/pkg/settings"
-	ctrlfake "github.com/rancher/wrangler/v2/pkg/generic/fake"
+	ctrlfake "github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -56,6 +56,7 @@ func Test_ChartInstallation(t *testing.T) {
 
 				manager := fake.NewMockManager(ctrl)
 				expectedValues := map[string]interface{}{
+					"agentTLSMode": settings.AgentTLSMode.Get(),
 					"apiServerURL": settings.ServerURL.Get(),
 					"apiServerCA":  settings.CACerts.Get(),
 					"global": map[string]interface{}{
@@ -109,6 +110,7 @@ func Test_ChartInstallation(t *testing.T) {
 				settings.ConfigMapName.Set("pass")
 				manager := fake.NewMockManager(ctrl)
 				expectedValues := map[string]interface{}{
+					"agentTLSMode": settings.AgentTLSMode.Get(),
 					"apiServerURL": settings.ServerURL.Get(),
 					"apiServerCA":  settings.CACerts.Get(),
 					"global": map[string]interface{}{
@@ -166,6 +168,7 @@ func Test_ChartInstallation(t *testing.T) {
 
 				manager := fake.NewMockManager(ctrl)
 				expectedValues := map[string]interface{}{
+					"agentTLSMode": settings.AgentTLSMode.Get(),
 					"apiServerURL": settings.ServerURL.Get(),
 					"apiServerCA":  settings.CACerts.Get(),
 					"global": map[string]interface{}{
@@ -222,6 +225,7 @@ gitjob:
 
 				manager := fake.NewMockManager(ctrl)
 				expectedValues := map[string]interface{}{
+					"agentTLSMode": settings.AgentTLSMode.Get(),
 					"apiServerURL": settings.ServerURL.Get(),
 					"apiServerCA":  settings.CACerts.Get(),
 					"global": map[string]interface{}{

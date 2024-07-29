@@ -1,6 +1,7 @@
 package git
 
 import (
+	"fmt"
 	"os"
 	"testing"
 
@@ -143,7 +144,8 @@ func Test_Update(t *testing.T) {
 		branch            string
 		systemCatalogMode string
 		expectedCommit    string
-		expectedError     error
+		expectedError     string
+		dir               string
 	}{
 		{
 			test:              "#1 TestCase: Success ",
@@ -156,24 +158,38 @@ func Test_Update(t *testing.T) {
 			branch:            lastBranch,
 			systemCatalogMode: "",
 			expectedCommit:    "226d544def39de56db210e96d2b0b535badf9bdd",
-			expectedError:     nil,
+			expectedError:     "",
+		},
+		{
+			test:              "Returns an error if invalid branch is specified",
+			secret:            nil,
+			namespace:         "cattle-test",
+			name:              "small-fork-test",
+			gitURL:            chartsSmallForkURL,
+			insecureSkipTLS:   false,
+			caBundle:          []byte{},
+			branch:            "invalidbranch",
+			systemCatalogMode: "",
+			expectedCommit:    "226d544def39de56db210e96d2b0b535badf9bdd",
+			expectedError:     "Could not find remote branch",
+			dir:               fmt.Sprintf("%s/%s", localDir, "cattle-test/small-fork-test/d39a2f6abd49e537e5015bbe1a4cd4f14919ba1c3353208a7ff6be37ffe00c52"),
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			if tc.dir != "" {
+				err := os.MkdirAll(tc.dir, 0755)
+				assert.NoError(t, err)
+			}
+
 			commit, err := Update(tc.secret, tc.namespace, tc.name, tc.gitURL, tc.branch, tc.insecureSkipTLS, tc.caBundle)
-			// Check the error
-			if tc.expectedError == nil && tc.expectedError != err {
-				t.Errorf("Expected error: %v |But got: %v", tc.expectedError, err)
+			if tc.expectedError != "" {
+				assert.Contains(t, err.Error(), tc.expectedError)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, len(commit), len(tc.expectedCommit))
 			}
-
-			// Only testing error in some cases
-			if err != nil {
-				assert.EqualError(t, tc.expectedError, err.Error())
-			}
-
-			assert.Equal(t, len(commit), len(tc.expectedCommit))
 		})
 	}
 }

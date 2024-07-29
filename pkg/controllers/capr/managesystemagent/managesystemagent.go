@@ -24,9 +24,9 @@ import (
 	"github.com/rancher/rancher/pkg/systemtemplate"
 	"github.com/rancher/rancher/pkg/wrangler"
 	upgradev1 "github.com/rancher/system-upgrade-controller/pkg/apis/upgrade.cattle.io/v1"
-	"github.com/rancher/wrangler/v2/pkg/generic"
-	"github.com/rancher/wrangler/v2/pkg/gvk"
-	"github.com/rancher/wrangler/v2/pkg/name"
+	"github.com/rancher/wrangler/v3/pkg/generic"
+	"github.com/rancher/wrangler/v3/pkg/gvk"
+	"github.com/rancher/wrangler/v3/pkg/name"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -178,6 +178,27 @@ func installer(cluster *rancherv1.Cluster, secretName string) []runtime.Object {
 			Name:  e.Name,
 			Value: e.Value,
 		})
+	}
+
+	// Merge the env vars with the AgentTLSModeStrict
+	found := false
+	for _, ev := range env {
+		if ev.Name == "STRICT_VERIFY" {
+			found = true // The user has specified `STRICT_VERIFY`, we should not attempt to overwrite it.
+		}
+	}
+	if !found {
+		if settings.AgentTLSMode.Get() == settings.AgentTLSModeStrict {
+			env = append(env, corev1.EnvVar{
+				Name:  "STRICT_VERIFY",
+				Value: "true",
+			})
+		} else {
+			env = append(env, corev1.EnvVar{
+				Name:  "STRICT_VERIFY",
+				Value: "false",
+			})
+		}
 	}
 
 	if len(cluster.Spec.RKEConfig.MachineSelectorConfig) == 0 {

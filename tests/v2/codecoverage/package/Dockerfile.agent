@@ -2,10 +2,10 @@ ARG RANCHER_TAG=dev
 ARG RANCHER_REPO=rancher
 FROM ${RANCHER_REPO}/rancher:${RANCHER_TAG} as rancher
 
-FROM registry.suse.com/bci/bci-micro:15.5 AS final
+FROM registry.suse.com/bci/bci-micro:15.6 AS final
 
 # Temporary build stage image
-FROM registry.suse.com/bci/bci-base:15.5 AS builder
+FROM registry.suse.com/bci/bci-base:15.6 AS builder
 
 # Install system packages using builder image that has zypper
 COPY --from=final / /chroot/
@@ -13,7 +13,7 @@ COPY --from=final / /chroot/
 # Install some packages with zypper in the chroot of the final micro image
 RUN zypper refresh && \
     zypper --installroot /chroot -n in --no-recommends \
-    curl ca-certificates jq git-core hostname iproute2 vim-small less \
+    curl util-linux ca-certificates ca-certificates-mozilla jq git-core hostname iproute2 vim-small less \
 	bash-completion bind-utils acl openssh-clients tar gzip xz gawk sysstat && \
     zypper --installroot /chroot clean -a && \
     rm -rf /chroot/var/cache/zypp/* /chroot/var/log/zypp/* /chroot/tmp/* /chroot/var/tmp/* /chroot/usr/share/doc/packages/*
@@ -23,11 +23,13 @@ FROM final
 
 # Copy binaries and configuration files from builder to micro
 COPY --from=builder /chroot/ /
-COPY --from=builder \
-    /usr/bin/unshare \
-    /usr/bin/mount \
-    /usr/bin/umount \
-    /usr/bin/
+
+# Test that some of the dependency binaries were copied
+# and are working on the target image.
+RUN /usr/bin/unshare --version && \
+    /usr/bin/mount --version && \
+    /usr/bin/umount --version && \
+    /usr/bin/nsenter --version
 
 ARG ARCH=amd64
 ENV KUBECTL_VERSION v1.27.10
@@ -35,7 +37,7 @@ ENV KUBECTL_VERSION v1.27.10
 RUN curl -sLf https://storage.googleapis.com/kubernetes-release/release/${KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl > /usr/bin/kubectl && \
     chmod +x /usr/bin/kubectl
 
-ENV LOGLEVEL_VERSION v0.1.5
+ENV LOGLEVEL_VERSION v0.1.6
 
 RUN curl -sLf https://github.com/rancher/loglevel/releases/download/${LOGLEVEL_VERSION}/loglevel-${ARCH}-${LOGLEVEL_VERSION}.tar.gz | tar xvzf - -C /usr/bin
 
@@ -45,6 +47,8 @@ ENV AGENT_IMAGE ${RANCHER_REPO}/rancher-agent:${VERSION}
 ENV SSL_CERT_DIR /etc/kubernetes/ssl/certs
 ARG CATTLE_RANCHER_WEBHOOK_VERSION
 ENV CATTLE_RANCHER_WEBHOOK_VERSION=$CATTLE_RANCHER_WEBHOOK_VERSION
+ARG CATTLE_RANCHER_PROVISIONING_CAPI_VERSION
+ENV CATTLE_RANCHER_PROVISIONING_CAPI_VERSION=$CATTLE_RANCHER_PROVISIONING_CAPI_VERSION
 COPY --from=rancher /var/lib/rancher-data /var/lib/rancher-data
 COPY --from=rancher /usr/bin/tini /usr/bin/
 COPY agent run_agent.sh kubectl-shell.sh shell-setup.sh /usr/bin/

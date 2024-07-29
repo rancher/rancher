@@ -30,6 +30,7 @@ const (
 	PersistentVolumeSpecFieldScaleIO                       = "scaleIO"
 	PersistentVolumeSpecFieldStorageClassID                = "storageClassId"
 	PersistentVolumeSpecFieldStorageOS                     = "storageos"
+	PersistentVolumeSpecFieldVolumeAttributesClassName     = "volumeAttributesClassName"
 	PersistentVolumeSpecFieldVolumeMode                    = "volumeMode"
 	PersistentVolumeSpecFieldVsphereVolume                 = "vsphereVolume"
 )
@@ -63,6 +64,7 @@ type PersistentVolumeSpec struct {
 	ScaleIO                       *ScaleIOPersistentVolumeSource    `json:"scaleIO,omitempty" yaml:"scaleIO,omitempty"`
 	StorageClassID                string                            `json:"storageClassId,omitempty" yaml:"storageClassId,omitempty"`
 	StorageOS                     *StorageOSPersistentVolumeSource  `json:"storageos,omitempty" yaml:"storageos,omitempty"`
+	VolumeAttributesClassName     string                            `json:"volumeAttributesClassName,omitempty" yaml:"volumeAttributesClassName,omitempty"`
 	VolumeMode                    string                            `json:"volumeMode,omitempty" yaml:"volumeMode,omitempty"`
 	VsphereVolume                 *VsphereVirtualDiskVolumeSource   `json:"vsphereVolume,omitempty" yaml:"vsphereVolume,omitempty"`
 }

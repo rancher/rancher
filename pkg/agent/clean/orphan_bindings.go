@@ -10,21 +10,21 @@ package clean
 
 import (
 	"context"
+	"errors"
 	"os"
 
-	"github.com/hashicorp/go-multierror"
 	"github.com/rancher/rancher/pkg/controllers/management/auth"
 	"github.com/rancher/rancher/pkg/controllers/management/auth/globalroles"
 	mgmt "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/namespace"
 	rbaccommon "github.com/rancher/rancher/pkg/rbac"
-	"github.com/rancher/wrangler/v2/pkg/generated/controllers/core"
-	corev1 "github.com/rancher/wrangler/v2/pkg/generated/controllers/core/v1"
-	"github.com/rancher/wrangler/v2/pkg/generated/controllers/rbac"
-	v1 "github.com/rancher/wrangler/v2/pkg/generated/controllers/rbac/v1"
-	"github.com/rancher/wrangler/v2/pkg/ratelimit"
-	"github.com/rancher/wrangler/v2/pkg/start"
+	"github.com/rancher/wrangler/v3/pkg/generated/controllers/core"
+	corev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+	"github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac"
+	v1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
+	"github.com/rancher/wrangler/v3/pkg/ratelimit"
+	"github.com/rancher/wrangler/v3/pkg/start"
 	"github.com/sirupsen/logrus"
 	k8srbacv1 "k8s.io/api/rbac/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -155,7 +155,7 @@ func (bc *orphanBindingsCleanup) cleanOrphans(dryRun bool) error {
 			logrus.Infof("[%v] deleting orphaned binding: %s/%s", orphanBindingsOperation, rb.Namespace, rb.Name)
 			err := bc.roleBindings.Delete(rb.Namespace, rb.Name, &metav1.DeleteOptions{})
 			if err != nil && !k8serrors.IsNotFound(err) {
-				returnErr = multierror.Append(returnErr, err)
+				returnErr = errors.Join(returnErr, err)
 			}
 		}
 	}

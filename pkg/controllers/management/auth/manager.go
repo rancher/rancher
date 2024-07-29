@@ -1,23 +1,20 @@
 package auth
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"sort"
 
-	"github.com/hashicorp/go-multierror"
-	"github.com/pkg/errors"
 	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/norman/types/slice"
-	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/rbac"
 	v13 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	typesrbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
 	pkgrbac "github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
-	"github.com/rancher/rancher/pkg/user"
-	"github.com/rancher/wrangler/v2/pkg/apply"
+	"github.com/rancher/wrangler/v3/pkg/apply"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/rbac/v1"
@@ -50,72 +47,79 @@ func newRTBLifecycles(management *config.ManagementContext) (*prtbLifecycle, *cr
 
 	prtb := &prtbLifecycle{
 		mgr: &manager{
-			mgmt:          management,
-			projectLister: management.Management.Projects("").Controller().Lister(),
-			crbLister:     management.RBAC.ClusterRoleBindings("").Controller().Lister(),
-			crbClient:     management.RBAC.ClusterRoleBindings(""),
-			crLister:      management.RBAC.ClusterRoles("").Controller().Lister(),
-			nsLister:      management.Core.Namespaces("").Controller().Lister(),
-			rLister:       management.RBAC.Roles("").Controller().Lister(),
-			rClient:       management.RBAC.Roles(""),
-			rbLister:      management.RBAC.RoleBindings("").Controller().Lister(),
-			rbClient:      management.RBAC.RoleBindings(""),
-			rtLister:      management.Management.RoleTemplates("").Controller().Lister(),
-			userLister:    management.Management.Users("").Controller().Lister(),
-			rbIndexer:     rbInformer.GetIndexer(),
-			crbIndexer:    crbInformer.GetIndexer(),
-			userMGR:       management.UserManager,
-			controller:    ptrbMGMTController,
-			prtbs:         management.Management.ProjectRoleTemplateBindings(""),
+			mgmt:       management,
+			crLister:   management.RBAC.ClusterRoles("").Controller().Lister(),
+			nsLister:   management.Core.Namespaces("").Controller().Lister(),
+			rLister:    management.RBAC.Roles("").Controller().Lister(),
+			rClient:    management.RBAC.Roles(""),
+			rbLister:   management.RBAC.RoleBindings("").Controller().Lister(),
+			rbClient:   management.RBAC.RoleBindings(""),
+			rtLister:   management.Management.RoleTemplates("").Controller().Lister(),
+			rbIndexer:  rbInformer.GetIndexer(),
+			crbIndexer: crbInformer.GetIndexer(),
+			controller: ptrbMGMTController,
 		},
 		projectLister: management.Management.Projects("").Controller().Lister(),
 		clusterLister: management.Management.Clusters("").Controller().Lister(),
+		userMGR:       management.UserManager,
+		userLister:    management.Management.Users("").Controller().Lister(),
+		rbLister:      management.RBAC.RoleBindings("").Controller().Lister(),
+		rbClient:      management.RBAC.RoleBindings(""),
+		crbLister:     management.RBAC.ClusterRoleBindings("").Controller().Lister(),
+		crbClient:     management.RBAC.ClusterRoleBindings(""),
+		prtbClient:    management.Management.ProjectRoleTemplateBindings(""),
 	}
 	crtb := &crtbLifecycle{
 		mgr: &manager{
-			mgmt:          management,
-			projectLister: management.Management.Projects("").Controller().Lister(),
-			crbLister:     management.RBAC.ClusterRoleBindings("").Controller().Lister(),
-			crbClient:     management.RBAC.ClusterRoleBindings(""),
-			crLister:      management.RBAC.ClusterRoles("").Controller().Lister(),
-			nsLister:      management.Core.Namespaces("").Controller().Lister(),
-			rLister:       management.RBAC.Roles("").Controller().Lister(),
-			rClient:       management.RBAC.Roles(""),
-			rbLister:      management.RBAC.RoleBindings("").Controller().Lister(),
-			rbClient:      management.RBAC.RoleBindings(""),
-			rtLister:      management.Management.RoleTemplates("").Controller().Lister(),
-			userLister:    management.Management.Users("").Controller().Lister(),
-			rbIndexer:     rbInformer.GetIndexer(),
-			crbIndexer:    crbInformer.GetIndexer(),
-			userMGR:       management.UserManager,
-			controller:    ctrbMGMTController,
-			crtbs:         management.Management.ClusterRoleTemplateBindings(""),
+			mgmt:       management,
+			crLister:   management.RBAC.ClusterRoles("").Controller().Lister(),
+			nsLister:   management.Core.Namespaces("").Controller().Lister(),
+			rLister:    management.RBAC.Roles("").Controller().Lister(),
+			rClient:    management.RBAC.Roles(""),
+			rbLister:   management.RBAC.RoleBindings("").Controller().Lister(),
+			rbClient:   management.RBAC.RoleBindings(""),
+			rtLister:   management.Management.RoleTemplates("").Controller().Lister(),
+			rbIndexer:  rbInformer.GetIndexer(),
+			crbIndexer: crbInformer.GetIndexer(),
+			controller: ctrbMGMTController,
 		},
 		clusterLister: management.Management.Clusters("").Controller().Lister(),
+		userMGR:       management.UserManager,
+		userLister:    management.Management.Users("").Controller().Lister(),
+		projectLister: management.Management.Projects("").Controller().Lister(),
+		rbLister:      management.RBAC.RoleBindings("").Controller().Lister(),
+		rbClient:      management.RBAC.RoleBindings(""),
+		crbLister:     management.RBAC.ClusterRoleBindings("").Controller().Lister(),
+		crbClient:     management.RBAC.ClusterRoleBindings(""),
+		crtbClient:    management.Management.ClusterRoleTemplateBindings(""),
 	}
 	return prtb, crtb
 }
 
+type managerInterface interface {
+	reconcileClusterMembershipBindingForDelete(string, string) error
+	reconcileProjectMembershipBindingForDelete(string, string, string) error
+	removeAuthV2Permissions(string, runtime.Object) error
+	checkReferencedRoles(string, string, int) (bool, error)
+	ensureClusterMembershipBinding(string, string, *v3.Cluster, bool, v1.Subject) error
+	ensureProjectMembershipBinding(string, string, string, *v3.Project, bool, v1.Subject) error
+	grantManagementPlanePrivileges(string, map[string]string, v1.Subject, interface{}) error
+	grantManagementClusterScopedPrivilegesInProjectNamespace(string, string, map[string]string, v1.Subject, *v3.ClusterRoleTemplateBinding) error
+	grantManagementProjectScopedPrivilegesInClusterNamespace(string, string, map[string]string, v1.Subject, *v3.ProjectRoleTemplateBinding) error
+}
+
 type manager struct {
-	projectLister  v3.ProjectLister
-	crLister       typesrbacv1.ClusterRoleLister
-	rLister        typesrbacv1.RoleLister
-	rClient        typesrbacv1.RoleInterface
-	rbLister       typesrbacv1.RoleBindingLister
-	rbClient       typesrbacv1.RoleBindingInterface
-	crbLister      typesrbacv1.ClusterRoleBindingLister
-	crbClient      typesrbacv1.ClusterRoleBindingInterface
-	rtLister       v3.RoleTemplateLister
-	nsLister       v13.NamespaceLister
-	userLister     v3.UserLister
-	rbIndexer      cache.Indexer
-	crbIndexer     cache.Indexer
-	mgmt           *config.ManagementContext
-	userMGR        user.Manager
-	controller     string
-	clusterManager *clustermanager.Manager
-	crtbs          v3.ClusterRoleTemplateBindingInterface
-	prtbs          v3.ProjectRoleTemplateBindingInterface
+	crLister   typesrbacv1.ClusterRoleLister
+	rLister    typesrbacv1.RoleLister
+	rClient    typesrbacv1.RoleInterface
+	rbLister   typesrbacv1.RoleBindingLister
+	rbClient   typesrbacv1.RoleBindingInterface
+	rtLister   v3.RoleTemplateLister
+	nsLister   v13.NamespaceLister
+	rbIndexer  cache.Indexer
+	crbIndexer cache.Indexer
+	mgmt       *config.ManagementContext
+	controller string
 }
 
 // When a CRTB is created that gives a subject some permissions in a project or cluster, we need to create a "membership" binding
@@ -455,7 +459,7 @@ func (m *manager) removeAuthV2Permissions(setID string, owner runtime.Object) er
 		err := m.rbClient.DeleteNamespaced(binding.Namespace, binding.Name, &metav1.DeleteOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
 			// Combine all errors so we try our best to delete everything in the first run
-			returnErr = multierror.Append(returnErr, err)
+			returnErr = errors.Join(returnErr, err)
 		}
 	}
 
@@ -713,7 +717,7 @@ func (m *manager) reconcileDesiredMGMTPlaneRoleBindings(currentRBs, desiredRBs m
 	// If the namespace is terminating don't create RoleBindings
 	ns, err := m.nsLister.Get("", namespace)
 	if err != nil {
-		return errors.Wrapf(err, "couldn't get namespace %v", namespace)
+		return fmt.Errorf("couldn't get namespace %v: %w", namespace, err)
 	}
 	if ns.Status.Phase == corev1.NamespaceTerminating {
 		logrus.Warnf("[%v] Namespace %v is terminating, not creating roleBindings", m.controller, namespace)
@@ -735,13 +739,17 @@ func (m *manager) reconcileDesiredMGMTPlaneRoleBindings(currentRBs, desiredRBs m
 func (m *manager) checkForManagementPlaneRules(role *v3.RoleTemplate, managementPlaneResource string, apiGroup string) (map[string]string, error) {
 	var rules []v1.PolicyRule
 	if role.External {
-		externalRole, err := m.crLister.Get("", role.Name)
-		if err != nil && !apierrors.IsNotFound(err) {
-			// dont error if it doesnt exist
-			return nil, err
-		}
-		if externalRole != nil {
-			rules = externalRole.Rules
+		if role.ExternalRules != nil {
+			rules = append(rules, role.ExternalRules...)
+		} else {
+			externalRole, err := m.crLister.Get("", role.Name)
+			if err != nil && !apierrors.IsNotFound(err) {
+				// dont error if it doesnt exist
+				return nil, err
+			}
+			if externalRole != nil {
+				rules = externalRole.Rules
+			}
 		}
 	} else {
 		rules = role.Rules
@@ -818,7 +826,7 @@ func (m *manager) reconcileManagementPlaneRole(namespace string, resourceToVerbs
 	// If the namespace is terminating, don't create a Role in it
 	ns, err := m.nsLister.Get("", namespace)
 	if err != nil {
-		return errors.Wrapf(err, "couldn't get namespace %v", namespace)
+		return fmt.Errorf("couldn't get namespace %v: %w", namespace, err)
 	}
 	if ns.Status.Phase == corev1.NamespaceTerminating {
 		logrus.Warnf("[%v] Namespace %v is terminating, not creating role", m.controller, namespace)
@@ -838,7 +846,7 @@ func (m *manager) reconcileManagementPlaneRole(namespace string, resourceToVerbs
 		Rules: rules,
 	})
 	if err != nil && !apierrors.IsAlreadyExists(err) {
-		return errors.Wrapf(err, "couldn't create role %v", rt.Name)
+		return fmt.Errorf("couldn't create role %v: %w", rt.Name, err)
 	}
 
 	return nil
@@ -850,10 +858,10 @@ func (m *manager) gatherRoleTemplates(rt *v3.RoleTemplate, roleTemplates map[str
 	for _, rtName := range rt.RoleTemplateNames {
 		subRT, err := m.rtLister.Get("", rtName)
 		if err != nil {
-			return errors.Wrapf(err, "couldn't get RoleTemplate %s", rtName)
+			return fmt.Errorf("couldn't get RoleTemplate %s: %w", rtName, err)
 		}
 		if err := m.gatherRoleTemplates(subRT, roleTemplates); err != nil {
-			return errors.Wrapf(err, "couldn't gather RoleTemplate %s", rtName)
+			return fmt.Errorf("couldn't gather RoleTemplate %s: %w", rtName, err)
 		}
 	}
 

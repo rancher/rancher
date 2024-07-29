@@ -8,16 +8,18 @@ import (
 	"github.com/mcuadros/go-version"
 	"github.com/rancher/norman/condition"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/capr"
+	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
 	"github.com/rancher/rancher/pkg/features"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	rancherversion "github.com/rancher/rancher/pkg/version"
 	"github.com/rancher/rancher/pkg/wrangler"
-	"github.com/rancher/wrangler/v2/pkg/data"
-	"github.com/rancher/wrangler/v2/pkg/data/convert"
-	controllerv1 "github.com/rancher/wrangler/v2/pkg/generated/controllers/core/v1"
-	"github.com/rancher/wrangler/v2/pkg/summary"
+	"github.com/rancher/wrangler/v3/pkg/data"
+	"github.com/rancher/wrangler/v3/pkg/data/convert"
+	controllerv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+	"github.com/rancher/wrangler/v3/pkg/summary"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/mod/semver"
 	v1 "k8s.io/api/core/v1"
@@ -38,12 +40,16 @@ const (
 	migrateFromMachineToPlanSecret             = "migratefrommachinetoplanesecret"
 	migrateEncryptionKeyRotationLeaderToStatus = "migrateencryptionkeyrotationleadertostatus"
 	migrateDynamicSchemaToMachinePools         = "migratedynamicschematomachinepools"
+	migrateRKEClusterState                     = "migraterkeclusterstate"
+	migrateSystemAgentVarDirToDataDirectory    = "migratesystemagentvardirtodatadirectory"
 	rancherVersionKey                          = "rancherVersion"
 	projectsCreatedKey                         = "projectsCreated"
 	namespacesAssignedKey                      = "namespacesAssigned"
 	capiMigratedKey                            = "capiMigrated"
 	encryptionKeyRotationStatusMigratedKey     = "encryptionKeyRotationStatusMigrated"
 	dynamicSchemaMachinePoolsMigratedKey       = "dynamicSchemaMachinePoolsMigrated"
+	rkeClustersAnnotatedForMigrationKey        = "rkeClustersAnnotatedForMigration"
+	systemAgentVarDirMigratedKey               = "systemAgentVarDirMigrated"
 )
 
 func runMigrations(wranglerContext *wrangler.Context) error {
@@ -62,6 +68,11 @@ func runMigrations(wranglerContext *wrangler.Context) error {
 	}
 
 	if features.RKE2.Enabled() {
+		// must migrate system agent data directory first, since update requests will be rejected by webhook if
+		// "CATTLE_AGENT_VAR_DIR" is set within AgentEnvVars.
+		if err := migrateSystemAgentDataDirectory(wranglerContext); err != nil {
+			return err
+		}
 		if err := migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(wranglerContext); err != nil {
 			return err
 		}
@@ -73,7 +84,7 @@ func runMigrations(wranglerContext *wrangler.Context) error {
 		}
 	}
 
-	return nil
+	return migrateRKEClusterStates(wranglerContext)
 }
 
 func getConfigMap(configMapController controllerv1.ConfigMapController, configMapName string) (*v1.ConfigMap, error) {
@@ -235,6 +246,72 @@ func applyProjectConditionForNamespaceAssignment(label string, condition conditi
 			return err
 		}
 	}
+	return nil
+}
+
+// migrateRKEClusterStates sets the `RKEForceUpdate` annotation on all management cluster objects for
+// RKE-provisioned clusters.
+func migrateRKEClusterStates(w *wrangler.Context) error {
+	cm, err := getConfigMap(w.Core.ConfigMap(), migrateRKEClusterState)
+	if err != nil {
+		return fmt.Errorf("error getting configmap %s: %w", migrateRKEClusterState, err)
+	} else if cm == nil {
+		return nil
+	}
+
+	// Check if this migration has already run.
+	if cm.Data[rkeClustersAnnotatedForMigrationKey] == "true" {
+		return nil
+	}
+
+	// Collect all RKE clusters that need migration.
+	mgmtClusters, err := w.Mgmt.Cluster().List(metav1.ListOptions{})
+	if err != nil {
+		return fmt.Errorf("error listing management clusters: %w", err)
+	}
+
+	// Mark all RKE clusters for migration.
+	for _, cluster := range mgmtClusters.Items {
+		// Skip this cluster if it's not RKE-provisioned.
+		if cluster.Spec.RancherKubernetesEngineConfig == nil {
+			continue
+		}
+
+		// Retry the cluster object status update on conflict in case something else is updating it at the same time.
+		if err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+			c, err := w.Mgmt.Cluster().Get(cluster.Name, metav1.GetOptions{})
+			if err != nil {
+				return fmt.Errorf("error getting cluster %s: %w", cluster.Name, err)
+			}
+
+			clusterCopy := c.DeepCopy()
+			clusterCopy.Annotations[clusterprovisioner.RKEForceUpdate] = "true"
+
+			if _, err = w.Mgmt.Cluster().Update(clusterCopy); err != nil {
+				return fmt.Errorf("error updating cluster %s: %w", cluster.Name, err)
+			}
+
+			return nil
+		}); err != nil {
+			logrus.Errorf("error updating annotation for cluster %s: %s", cluster.Name, err)
+			return err
+		}
+	}
+
+	cm.Data = map[string]string{
+		rkeClustersAnnotatedForMigrationKey: "true",
+	}
+
+	// Update the configmap that indicates that this migration is complete.
+	if err := retry.OnError(retry.DefaultBackoff, func(err error) bool {
+		// Retry all errors.
+		return true
+	}, func() error {
+		return createOrUpdateConfigMap(w.Core.ConfigMap(), cm)
+	}); err != nil {
+		return fmt.Errorf("error updating configmap %s: %w", cm.Name, err)
+	}
+
 	return nil
 }
 
@@ -501,6 +578,49 @@ func migrateMachinePoolsDynamicSchemaLabel(w *wrangler.Context) error {
 	}
 
 	cm.Data[dynamicSchemaMachinePoolsMigratedKey] = "true"
+	return createOrUpdateConfigMap(w.Core.ConfigMap(), cm)
+}
+
+func migrateSystemAgentDataDirectory(w *wrangler.Context) error {
+	cm, err := getConfigMap(w.Core.ConfigMap(), migrateSystemAgentVarDirToDataDirectory)
+	if err != nil || cm == nil {
+		return err
+	}
+
+	if cm.Data[systemAgentVarDirMigratedKey] == "true" {
+		return nil
+	}
+
+	provClusters, err := w.Provisioning.Cluster().List("", metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+
+	for _, cluster := range provClusters.Items {
+		systemAgentDataDir := ""
+		envVars := make([]rkev1.EnvVar, 0, len(cluster.Spec.AgentEnvVars))
+		for _, e := range cluster.Spec.AgentEnvVars {
+			if e.Name == capr.SystemAgentDataDirEnvVar {
+				// don't break, the webhook allows duplicate entries and the last one would have been the effective data dir
+				systemAgentDataDir = e.Value
+			} else {
+				envVars = append(envVars, e)
+			}
+		}
+		if systemAgentDataDir == "" {
+			continue
+		}
+
+		cluster = *cluster.DeepCopy()
+		cluster.Spec.AgentEnvVars = envVars
+		cluster.Spec.RKEConfig.DataDirectories.SystemAgent = systemAgentDataDir
+		_, err = w.Provisioning.Cluster().Update(&cluster)
+		if err != nil {
+			return err
+		}
+	}
+
+	cm.Data[systemAgentVarDirMigratedKey] = "true"
 	return createOrUpdateConfigMap(w.Core.ConfigMap(), cm)
 }
 

@@ -118,6 +118,19 @@ var (
 		"Enable UI Extensions when starting Rancher",
 		true,
 		false,
+		true,
+	)
+	UISQLCache = newFeature(
+		"ui-sql-cache",
+		"[Experimental]: Enable SQLite-backed caching to improve performance and provide additional UI sorting/filtering features.",
+		false,
+		false,
+		true)
+	RKE1UI = newFeature(
+		"rke1-ui",
+		"Enable RKE1 provisioning in the Rancher UI",
+		true,
+		true,
 		true)
 )
 

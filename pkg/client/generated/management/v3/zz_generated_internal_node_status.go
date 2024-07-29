@@ -10,6 +10,7 @@ const (
 	InternalNodeStatusFieldIPAddress         = "ipAddress"
 	InternalNodeStatusFieldInfo              = "info"
 	InternalNodeStatusFieldNodeConditions    = "nodeConditions"
+	InternalNodeStatusFieldRuntimeHandlers   = "runtimeHandlers"
 	InternalNodeStatusFieldVolumesAttached   = "volumesAttached"
 	InternalNodeStatusFieldVolumesInUse      = "volumesInUse"
 )
@@ -23,6 +24,7 @@ type InternalNodeStatus struct {
 	IPAddress         string                    `json:"ipAddress,omitempty" yaml:"ipAddress,omitempty"`
 	Info              *NodeInfo                 `json:"info,omitempty" yaml:"info,omitempty"`
 	NodeConditions    []NodeCondition           `json:"nodeConditions,omitempty" yaml:"nodeConditions,omitempty"`
+	RuntimeHandlers   []NodeRuntimeHandler      `json:"runtimeHandlers,omitempty" yaml:"runtimeHandlers,omitempty"`
 	VolumesAttached   map[string]AttachedVolume `json:"volumesAttached,omitempty" yaml:"volumesAttached,omitempty"`
 	VolumesInUse      []string                  `json:"volumesInUse,omitempty" yaml:"volumesInUse,omitempty"`
 }

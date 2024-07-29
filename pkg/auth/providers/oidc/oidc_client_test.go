@@ -10,14 +10,17 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"golang.org/x/oauth2"
 	"math/big"
 	"net"
 	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"golang.org/x/oauth2"
 )
 
 func createCert(isCA bool) (*x509.Certificate, *rsa.PrivateKey, error) {
@@ -181,6 +184,86 @@ func TestAddCertKeyToContext(t *testing.T) {
 			}
 
 			assert.Equal(t, tc.wantCerts, gotTransport.TLSClientConfig.Certificates, "cert did not match desired")
+		})
+	}
+}
+
+func TestFetchAuthURL(t *testing.T) {
+	testCases := []struct {
+		name         string
+		config       map[string]interface{}
+		mockResponse string
+		mockStatus   int
+		expectedURL  string
+		expectError  bool
+	}{
+		{
+			name: "AuthEndpoint already configured",
+			config: map[string]interface{}{
+				"authEndpoint": "https://ranchertest.io/auth",
+			},
+			expectedURL: "https://ranchertest.io/auth",
+			expectError: false,
+		},
+		{
+			name: "Issuer URL provided, valid discovery document",
+			config: map[string]interface{}{
+				"issuer": "https://ranchertest.io",
+			},
+			mockResponse: `{"authorization_endpoint": "https://ranchertest.io/auth"}`,
+			mockStatus:   http.StatusOK,
+			expectedURL:  "https://ranchertest.io/auth",
+			expectError:  false,
+		},
+		{
+			name: "Issuer URL provided, invalid discovery document",
+			config: map[string]interface{}{
+				"issuer": "https://ranchertest.io",
+			},
+			mockResponse: `{"authorization_endpoi": "https://ranchertest.io/auth"}`,
+			mockStatus:   http.StatusOK,
+			expectedURL:  "",
+			expectError:  true,
+		},
+		{
+			name: "Issuer URL provided, error fetching discovery document",
+			config: map[string]interface{}{
+				"issuer": "https://ranchertest.io",
+			},
+			mockResponse: `Internal Server Error`,
+			mockStatus:   http.StatusInternalServerError,
+			expectedURL:  "",
+			expectError:  true,
+		},
+		{
+			name:        "Both authEndpoint and issuerURL missing",
+			config:      map[string]interface{}{},
+			expectedURL: "",
+			expectError: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(tc.mockStatus)
+				w.Write([]byte(tc.mockResponse))
+			}))
+			defer server.Close()
+
+			// Adjust the config to use the mock server URL
+			if _, ok := tc.config["issuer"].(string); ok {
+				mockURL, _ := url.Parse(server.URL)
+				tc.config["issuer"] = mockURL.Scheme + "://" + mockURL.Host
+			}
+
+			authURL, err := FetchAuthURL(tc.config)
+			if (err != nil) != tc.expectError {
+				t.Fatalf("expected error: %v, got: %v", tc.expectError, err)
+			}
+			if authURL != tc.expectedURL {
+				t.Fatalf("expected URL: %s, got: %s", tc.expectedURL, authURL)
+			}
 		})
 	}
 }

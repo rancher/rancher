@@ -104,7 +104,7 @@ func (ap *Provider) RefetchGroupPrincipals(principalID, secret string) ([]v3.Pri
 
 	logrus.Debug("[AZURE_PROVIDER] Completed getting user info from AzureAD")
 
-	userGroups, err := azureClient.ListGroupMemberships(clients.GetPrincipalID(userPrincipal))
+	userGroups, err := azureClient.ListGroupMemberships(clients.GetPrincipalID(userPrincipal), cfg.GroupMembershipFilter)
 	if err != nil {
 		return nil, err
 	}
@@ -417,7 +417,7 @@ func (ap *Provider) updateToken(client clients.AzureClient, token *v3.Token) err
 
 	current, err := client.MarshalTokenJSON()
 	if err != nil {
-		return errors.New("failed to unmarshal token")
+		return fmt.Errorf("marshaling token to JSON: %w", err)
 	}
 
 	secret, err := ap.tokenMGR.GetSecret(token.UserID, token.AuthProvider, []*v3.Token{token})
@@ -521,6 +521,10 @@ func samePrincipal(me v3.Principal, other v3.Principal) bool {
 
 // UpdateGroupCacheSize attempts to update the size of the group cache defined at the package level.
 func UpdateGroupCacheSize(size string) {
+	if size == "" {
+		return
+	}
+
 	i, err := strconv.Atoi(size)
 	if err != nil {
 		logrus.Errorf("error parsing azure-group-cache-size, skipping update %v", err)

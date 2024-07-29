@@ -8,7 +8,6 @@ policies:
   description: |
     Mark unknown user instances for deletion in 1 day
   filters:
-    - "State.Name": running
     # instance name not in accepted user keys
     - type: value
       key: name

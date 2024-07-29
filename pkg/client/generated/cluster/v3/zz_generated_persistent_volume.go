@@ -47,6 +47,7 @@ const (
 	PersistentVolumeFieldTransitioning                 = "transitioning"
 	PersistentVolumeFieldTransitioningMessage          = "transitioningMessage"
 	PersistentVolumeFieldUUID                          = "uuid"
+	PersistentVolumeFieldVolumeAttributesClassName     = "volumeAttributesClassName"
 	PersistentVolumeFieldVolumeMode                    = "volumeMode"
 	PersistentVolumeFieldVsphereVolume                 = "vsphereVolume"
 )
@@ -94,6 +95,7 @@ type PersistentVolume struct {
 	Transitioning                 string                            `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage          string                            `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
 	UUID                          string                            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	VolumeAttributesClassName     string                            `json:"volumeAttributesClassName,omitempty" yaml:"volumeAttributesClassName,omitempty"`
 	VolumeMode                    string                            `json:"volumeMode,omitempty" yaml:"volumeMode,omitempty"`
 	VsphereVolume                 *VsphereVirtualDiskVolumeSource   `json:"vsphereVolume,omitempty" yaml:"vsphereVolume,omitempty"`
 }

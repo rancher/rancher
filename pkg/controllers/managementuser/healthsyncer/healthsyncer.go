@@ -17,7 +17,7 @@ import (
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
-	"github.com/rancher/wrangler/v2/pkg/ticker"
+	"github.com/rancher/wrangler/v3/pkg/ticker"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -178,6 +178,7 @@ func (h *HealthSyncer) updateClusterHealth() error {
 	}
 
 	if !reflect.DeepEqual(oldCluster, newObj) {
+		logrus.Tracef("[healthSyncer] update cluster %s", cluster.Name)
 		if _, err := h.clusters.Update(newObj.(*v3.Cluster)); err != nil {
 			return errors.Wrapf(err, "[updateClusterHealth] Failed to update cluster [%s]", cluster.Name)
 		}

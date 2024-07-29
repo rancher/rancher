@@ -9,16 +9,21 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/sirupsen/logrus"
+	v1 "k8s.io/api/core/v1"
+
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	authsettings "github.com/rancher/rancher/pkg/auth/settings"
 	"github.com/rancher/rancher/pkg/buildconfig"
 	fleetconst "github.com/rancher/rancher/pkg/fleet"
-	"github.com/sirupsen/logrus"
-	v1 "k8s.io/api/core/v1"
 )
 
-const RancherVersionDev = "2.9.99"
-const DefaultMaxUIPluginFileSizeInBytes = 20 * 1024 * 1024 // 20MB
+const (
+	RancherVersionDev                 = "2.9.99"
+	DefaultMaxUIPluginFileSizeInBytes = 20 * 1024 * 1024 // 20MB
+	AgentTLSModeStrict                = "strict"
+	AgentTLSModeSystemStore           = "system-store"
+)
 
 var (
 	releasePattern = regexp.MustCompile("^v[0-9]")
@@ -51,9 +56,11 @@ var (
 		"cattle-elemental-system",
 	}
 
-	AgentImage                          = NewSetting("agent-image", "rancher/rancher-agent:v2.9-head")
-	AgentRolloutTimeout                 = NewSetting("agent-rollout-timeout", "300s")
-	AgentRolloutWait                    = NewSetting("agent-rollout-wait", "true")
+	AgentImage          = NewSetting("agent-image", "rancher/rancher-agent:v2.9-head")
+	AgentRolloutTimeout = NewSetting("agent-rollout-timeout", "300s")
+	AgentRolloutWait    = NewSetting("agent-rollout-wait", "true")
+	// AgentTLSMode is translated to the environment variable STRICT_VERIFY when rendering the cluster/node agent manifests and should not be specified as a default agent setting as it has no direct effect on the agent itself.
+	AgentTLSMode                        = NewSetting("agent-tls-mode", AgentTLSModeStrict).WithDefaultOnUpgrade(AgentTLSModeSystemStore)
 	AuthImage                           = NewSetting("auth-image", v32.ToolsSystemImages.AuthSystemImages.KubeAPIAuth)
 	AuthorizationCacheTTLSeconds        = NewSetting("authorization-cache-ttl-seconds", "10")
 	AuthorizationDenyCacheTTLSeconds    = NewSetting("authorization-deny-cache-ttl-seconds", "10")
@@ -63,10 +70,10 @@ var (
 	CLIURLLinux                         = NewSetting("cli-url-linux", "https://releases.rancher.com/cli/v1.0.0-alpha8/rancher-linux-amd64-v1.0.0-alpha8.tar.gz")
 	CLIURLWindows                       = NewSetting("cli-url-windows", "https://releases.rancher.com/cli/v1.0.0-alpha8/rancher-windows-386-v1.0.0-alpha8.zip")
 	ClusterControllerStartCount         = NewSetting("cluster-controller-start-count", "50")
-	EngineInstallURL                    = NewSetting("engine-install-url", "https://releases.rancher.com/install-docker/25.0.sh")
+	EngineInstallURL                    = NewSetting("engine-install-url", "https://releases.rancher.com/install-docker/26.1.sh")
 	EngineISOURL                        = NewSetting("engine-iso-url", "https://releases.rancher.com/os/latest/rancheros-vmware.iso")
 	EngineNewestVersion                 = NewSetting("engine-newest-version", "v17.12.0")
-	EngineSupportedRange                = NewSetting("engine-supported-range", "~v1.11.2 || ~v1.12.0 || ~v1.13.0 || ~v17.03.0 || ~v17.06.0 || ~v17.09.0 || ~v18.06.0 || ~v18.09.0 || ~v19.03.0 || ~v20.10.0 || ~v23.0.0 || ~v24.0.0 || ~v25.0.0 ")
+	EngineSupportedRange                = NewSetting("engine-supported-range", "~v1.11.2 || ~v1.12.0 || ~v1.13.0 || ~v17.03.0 || ~v17.06.0 || ~v17.09.0 || ~v18.06.0 || ~v18.09.0 || ~v19.03.0 || ~v20.10.0 || ~v23.0.0 || ~v24.0.0 || ~v25.0.0 || ~v26.0.0 || ~v26.1.0")
 	FirstLogin                          = NewSetting("first-login", "true")
 	GlobalRegistryEnabled               = NewSetting("global-registry-enabled", "false")
 	GithubProxyAPIURL                   = NewSetting("github-proxy-api-url", "https://api.github.com")
@@ -97,8 +104,8 @@ var (
 	WinsAgentVersion                    = NewSetting("wins-agent-version", "")
 	CSIProxyAgentVersion                = NewSetting("csi-proxy-agent-version", "")
 	CSIProxyAgentURL                    = NewSetting("csi-proxy-agent-url", "https://acs-mirror.azureedge.net/csi-proxy/%[1]s/binaries/csi-proxy-%[1]s.tar.gz")
-	SystemAgentInstallScript            = NewSetting("system-agent-install-script", "https://github.com/rancher/system-agent/releases/download/v0.3.6-rc2/install.sh") // To ensure consistency between SystemAgentInstallScript default value and CATTLE_SYSTEM_AGENT_INSTALL_SCRIPT to utilize the local system-agent-install.sh script when both values are equal.
-	WinsAgentInstallScript              = NewSetting("wins-agent-install-script", "https://raw.githubusercontent.com/rancher/wins/v0.4.15-rc1/install.ps1")
+	SystemAgentInstallScript            = NewSetting("system-agent-install-script", "https://github.com/rancher/system-agent/releases/download/v0.3.7-rc2/install.sh") // To ensure consistency between SystemAgentInstallScript default value and CATTLE_SYSTEM_AGENT_INSTALL_SCRIPT to utilize the local system-agent-install.sh script when both values are equal.
+	WinsAgentInstallScript              = NewSetting("wins-agent-install-script", "https://raw.githubusercontent.com/rancher/wins/v0.4.16/install.ps1")
 	SystemAgentInstallerImage           = NewSetting("system-agent-installer-image", "") // Defined via environment variable
 	SystemAgentUpgradeImage             = NewSetting("system-agent-upgrade-image", "")   // Defined via environment variable
 	WinsAgentUpgradeImage               = NewSetting("wins-agent-upgrade-image", "")
@@ -148,6 +155,30 @@ var (
 	// ChartDefaultURL represents the default URL for the system charts repo. It should only be set for test or
 	// debug purposes.
 	ChartDefaultURL = NewSetting("chart-default-url", "https://git.rancher.io/")
+	// DisableInactiveUserAfter is the duration a user can be inactive after which it's disabled by the user retention process.
+	// The value should be expressed in valid time.Duration units and truncated to a second e.g. "168h". See https://pkg.go.dev/time#ParseDuration
+	// DisableInactiveUserAfter should be greater than AuthUserSessionTTLMinutes.
+	// An empty string or a zero value means the feature is disabled.
+	DisableInactiveUserAfter = NewSetting("disable-inactive-user-after", "")
+
+	// DeleteInactiveUserAfter is the duration a user can be inactive after which it's deleted by the user retention process.
+	// The value should be expressed in valid time.Duration units and truncated to a second e.g. "168h". See https://pkg.go.dev/time#ParseDuration
+	// DeleteInactiveUserAfter should be greater than AuthUserSessionTTLMinutes.
+	// An empty string or a zero value means the feature is disabled.
+	DeleteInactiveUserAfter = NewSetting("delete-inactive-user-after", "")
+
+	// UserRetentionDryRun determines if the user retention process should actually disable and delete users.
+	// Valid values are "true" and "false". An empty string means "false".
+	UserRetentionDryRun = NewSetting("user-retention-dry-run", "false")
+
+	// UserLastLoginDefault is used if UserAttribute.LastLogin is not set.
+	// The value should be a date and time truncated to a second and formatted according to RFC3339 e.g. "2023-03-01T00:00:00Z".
+	// If the value is an empty string or time.Time zero value this settings is not used.
+	UserLastLoginDefault = NewSetting("user-last-login-default", "")
+
+	// UserRetentionCron determines how often the user retention process should run.
+	// The value should be a valid cron expression e.g. "0 * * * *" (every hour)
+	UserRetentionCron = NewSetting("user-retention-cron", "")
 
 	// ConfigMapName name of the configmap that stores rancher configuration information.
 	// Deprecated: to be removed in 2.8.0
@@ -191,6 +222,9 @@ var (
 	// RancherWebhookVersion is the exact version of the webhook that Rancher will install.
 	RancherWebhookVersion = NewSetting("rancher-webhook-version", "")
 
+	// RancherWebhookVersion is the exact version of the webhook that Rancher will install.
+	RancherProvisioningCAPIVersion = NewSetting("rancher-provisioning-capi-version", "")
+
 	// RKE2ChartDefaultBranch represents the default branch for the RKE2 charts repo.
 	RKE2ChartDefaultBranch = NewSetting("rke2-chart-default-branch", "main")
 
@@ -210,7 +244,7 @@ var (
 	UIBrand = NewSetting("ui-brand", os.Getenv("CATTLE_BASE_UI_BRAND"))
 
 	// UICommunityLinks displays community links in the UI.
-	// Deprecated in favour of UICustomLinks = NewSetting("ui-custom-links", "").
+	// Deprecated in favour of UICustomLinks.
 	UICommunityLinks = NewSetting("ui-community-links", "true")
 
 	// UICustomLinks Key(display text), value(url) for user customisable links to display in homepage and support pages.
@@ -274,6 +308,14 @@ var (
 	UIBannerLight = NewSetting("ui-banner-light", "")
 	UIBannerDark  = NewSetting("ui-banner-dark", "")
 
+	// UIExtensions - setting for configuring UI Extensions (e.g. allow users to enable/disable extensions)
+	UIExtensions = NewSetting("ui-extensions", "")
+
+	// UI Settings for allowing separate configuration of page banners
+	UIBannerHeader       = NewSetting("ui-banner-header", "")
+	UIBannerFooter       = NewSetting("ui-banner-footer", "")
+	UIBannerLoginConsent = NewSetting("ui-banner-login-consent", "")
+
 	// UIPreferred Ensure that the new Dashboard is the default UI.
 	UIPreferred = NewSetting("ui-preferred", "vue")
 
@@ -281,8 +323,17 @@ var (
 	// This setting is for development purposes only.
 	SkipHostedClusterChartInstallation = NewSetting("skip-hosted-cluster-chart-installation", os.Getenv("CATTLE_SKIP_HOSTED_CLUSTER_CHART_INSTALLATION"))
 	MachineProvisionImagePullPolicy    = NewSetting("machine-provision-image-pull-policy", string(v1.PullAlways))
-	// EULAAgreed is used only by the UI, but needs to be known to Rancher so that it's not removed.
-	EULAAgreed = NewSetting("eula-agreed", "")
+
+	// The following settings are only used by the UI, but need to be known to Rancher so that they're not removed.
+	_ = NewSetting("eula-agreed", "")
+	_ = NewSetting("display-add-extension-repos-banner", "")
+	_ = NewSetting("ui-logo-light", "")
+	_ = NewSetting("ui-logo-dark", "")
+	_ = NewSetting("ui-theme", "")
+	_ = NewSetting("cli-version", "")
+	_ = NewSetting("has-support", "")
+	_ = NewSetting("auth-password-requirements-description", "")
+	_ = NewSetting("api-host", "")
 )
 
 // FullShellImage returns the full private registry name of the rancher shell image.
@@ -341,9 +392,14 @@ type Provider interface {
 
 // Setting stores information about a specific server setting.
 type Setting struct {
-	Name     string
-	Default  string
-	ReadOnly bool
+	Name string
+	// Default represents a value to be used in the absence of an actual Value stored in etcd on the Setting resource.
+	Default string
+	// DefaultOnUpgrade represents a desired Default value that the setting should have on upgrade from a previous minor
+	// or major version of Rancher. This is used for special cases where the value of the setting must stay the same
+	// on upgraded setups but use a new value for fresh installations for backward compatibility.
+	DefaultOnUpgrade string
+	ReadOnly         bool
 }
 
 // SetIfUnset will store the given value of the setting if it was not already stored.
@@ -409,6 +465,13 @@ func NewSetting(name, def string) Setting {
 		Name:    name,
 		Default: def,
 	}
+	settings[s.Name] = s
+	return s
+}
+
+// WithDefaultOnUpgrade takes a setting and returns a new setting with the default value on upgrade set.
+func (s Setting) WithDefaultOnUpgrade(defOnUpgrade string) Setting {
+	s.DefaultOnUpgrade = defOnUpgrade
 	settings[s.Name] = s
 	return s
 }

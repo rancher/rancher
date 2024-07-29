@@ -31,14 +31,14 @@ func (g *googleOauthProvider) actionHandler(actionName string, action *types.Act
 	}
 
 	if actionName == "configureTest" {
-		return g.configureTest(actionName, action, request)
+		return g.configureTest(request)
 	} else if actionName == "testAndApply" {
-		return g.testAndApply(actionName, action, request)
+		return g.testAndApply(request)
 	}
 	return httperror.NewAPIError(httperror.ActionNotAvailable, "")
 }
 
-func (g *googleOauthProvider) configureTest(actionName string, action *types.Action, request *types.APIContext) error {
+func (g *googleOauthProvider) configureTest(request *types.APIContext) error {
 	goauthConfig := &v32.GoogleOauthConfig{}
 	if err := json.NewDecoder(request.Request.Body).Decode(goauthConfig); err != nil {
 		return httperror.NewAPIError(httperror.InvalidBodyContent,
@@ -58,7 +58,7 @@ func (g *googleOauthProvider) configureTest(actionName string, action *types.Act
 	return nil
 }
 
-func (g *googleOauthProvider) testAndApply(actionName string, action *types.Action, request *types.APIContext) error {
+func (g *googleOauthProvider) testAndApply(request *types.APIContext) error {
 	var googleOAuthConfig v32.GoogleOauthConfig
 	googleOAuthConfigApplyInput := &v32.GoogleOauthConfigApplyInput{}
 	if err := json.NewDecoder(request.Request.Body).Decode(googleOAuthConfigApplyInput); err != nil {
@@ -89,7 +89,7 @@ func (g *googleOauthProvider) testAndApply(actionName string, action *types.Acti
 		googleOAuthConfig.ServiceAccountCredential = value
 	}
 
-	//Call provider to testLogin
+	// Call provider to testLogin
 	userPrincipal, groupPrincipals, providerInfo, err := g.loginUser(request.Request.Context(), googleLogin, &googleOAuthConfig, true)
 	if err != nil {
 		if httperror.IsAPIError(err) {
@@ -97,7 +97,7 @@ func (g *googleOauthProvider) testAndApply(actionName string, action *types.Acti
 		}
 		return fmt.Errorf("[Google OAuth] testAndApply: server error while authenticating: %v", err)
 	}
-	//if this works, save google oauth CR adding enabled flag
+	// if this works, save google oauth CR adding enabled flag
 	user, err := g.userMGR.SetPrincipalOnCurrentUser(request, userPrincipal)
 	if err != nil {
 		return err
@@ -110,8 +110,12 @@ func (g *googleOauthProvider) testAndApply(actionName string, action *types.Acti
 	}
 
 	userExtraInfo := g.GetUserExtraAttributes(userPrincipal)
+	err = g.tokenMGR.UserAttributeCreateOrUpdate(user.Name, userPrincipal.Provider, groupPrincipals, userExtraInfo)
+	if err != nil {
+		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("testAndApply: Failed to create or update userAttribute: %v", err))
+	}
 
-	return g.tokenMGR.CreateTokenAndSetCookie(user.Name, userPrincipal, groupPrincipals, providerInfo, 0, "Token via Google OAuth Configuration", request, userExtraInfo)
+	return g.tokenMGR.CreateTokenAndSetCookie(user.Name, userPrincipal, groupPrincipals, providerInfo, 0, "Token via Google OAuth Configuration", request)
 
 }
 

@@ -1,9 +1,9 @@
 package secrets
 
 import (
+	"errors"
 	"fmt"
 
-	"github.com/hashicorp/go-multierror"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/catalog/utils"
@@ -28,15 +28,13 @@ func CleanupClientSecrets(secretInterface corev1.SecretInterface, config *v3.Aut
 	for _, field := range fields {
 		err := common.DeleteSecret(secretInterface, config.Type, field)
 		if err != nil && !apierrors.IsNotFound(err) {
-			result = multierror.Append(result, err)
+			result = errors.Join(result, err)
 		}
 	}
 
 	if utils.Contains(tokens.PerUserCacheProviders, config.Name) {
 		err := CleanupOAuthTokens(secretInterface, config.Name)
-		if err != nil {
-			result = multierror.Append(result, err)
-		}
+		result = errors.Join(result, err)
 	}
 
 	if fieldsMap, ok := SubTypeToFields[config.Type]; ok {
@@ -44,7 +42,7 @@ func CleanupClientSecrets(secretInterface corev1.SecretInterface, config *v3.Aut
 			for _, field := range slice {
 				err := common.DeleteSecret(secretInterface, config.Type, field)
 				if err != nil && !apierrors.IsNotFound(err) {
-					result = multierror.Append(result, err)
+					result = errors.Join(result, err)
 				}
 			}
 		}
@@ -53,7 +51,7 @@ func CleanupClientSecrets(secretInterface corev1.SecretInterface, config *v3.Aut
 	for _, secretName := range NameToFields[config.Name] {
 		err := common.DeleteSecret(secretInterface, config.Name, secretName)
 		if err != nil && !apierrors.IsNotFound(err) {
-			result = multierror.Append(result, err)
+			result = errors.Join(result, err)
 		}
 	}
 	return result
@@ -75,7 +73,7 @@ func CleanupOAuthTokens(secretInterface corev1.SecretInterface, key string) erro
 		if _, keyPresent := secret.Data[key]; keyPresent {
 			err := secretInterface.DeleteNamespaced(tokens.SecretNamespace, secret.Name, &metav1.DeleteOptions{})
 			if err != nil && !apierrors.IsNotFound(err) {
-				result = multierror.Append(result, err)
+				result = errors.Join(result, err)
 			}
 		}
 	}

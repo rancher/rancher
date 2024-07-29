@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 
 	"github.com/coreos/go-oidc/v3/oidc"
+	"github.com/golang-jwt/jwt"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
@@ -53,6 +55,7 @@ type ClaimInfo struct {
 	EmailVerified     bool     `json:"email_verified"`
 	Groups            []string `json:"groups"`
 	FullGroupPath     []string `json:"full_group_path"`
+	ACR               string   `json:"acr"`
 }
 
 func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *tokens.Manager) common.AuthProvider {
@@ -185,9 +188,11 @@ func (o *OpenIDCProvider) TransformToAuthProvider(authConfig map[string]interfac
 }
 
 func (o *OpenIDCProvider) getRedirectURL(config map[string]interface{}) string {
+	authURL, _ := FetchAuthURL(config)
+
 	return fmt.Sprintf(
 		"%s?client_id=%s&response_type=code&redirect_uri=%s",
-		config["authEndpoint"],
+		authURL,
 		config["clientId"],
 		config["rancherUrl"],
 	)
@@ -372,7 +377,7 @@ func (o *OpenIDCProvider) getUserInfo(ctx *context.Context, config *v32.OIDCConf
 		return userInfo, oauth2Token, err
 	}
 
-	provider, err := oidc.NewProvider(updatedContext, config.Issuer)
+	provider, err := o.getOIDCProvider(updatedContext, config)
 	if err != nil {
 		return userInfo, oauth2Token, err
 	}
@@ -388,6 +393,7 @@ func (o *OpenIDCProvider) getUserInfo(ctx *context.Context, config *v32.OIDCConf
 			return userInfo, oauth2Token, err
 		}
 	}
+
 	// Valid will return false if access token is expired
 	if !oauth2Token.Valid() {
 		// since token is not valid, the TokenSource func will attempt to refresh the access token
@@ -401,6 +407,17 @@ func (o *OpenIDCProvider) getUserInfo(ctx *context.Context, config *v32.OIDCConf
 	if !reflect.DeepEqual(oauth2Token, reusedToken) {
 		o.UpdateToken(reusedToken, userName)
 	}
+
+	if config.AcrValue != "" {
+		acrValue, err := parseACRFromAccessToken(oauth2Token.AccessToken)
+		if err != nil {
+			return userInfo, oauth2Token, fmt.Errorf("failed to parse ACR from access token: %w", err)
+		}
+		if !isValidACR(acrValue, config.AcrValue) {
+			return userInfo, oauth2Token, errors.New("failed to validate ACR")
+		}
+	}
+
 	logrus.Debugf("[generic oidc] getUserInfo: getting user info")
 	userInfo, err = provider.UserInfo(updatedContext, oauthConfig.TokenSource(updatedContext, reusedToken))
 	if err != nil {
@@ -478,4 +495,70 @@ func (o *OpenIDCProvider) IsDisabledProvider() (bool, error) {
 		return false, err
 	}
 	return !oidcConfig.Enabled, nil
+}
+
+func (o *OpenIDCProvider) getOIDCProvider(ctx context.Context, oidcConfig *v32.OIDCConfig) (*oidc.Provider, error) {
+	oidcFields := map[string]string{
+		client.OIDCConfigFieldIssuer:           oidcConfig.Issuer,
+		client.OIDCConfigFieldAuthEndpoint:     oidcConfig.AuthEndpoint,
+		client.OIDCConfigFieldTokenEndpoint:    oidcConfig.TokenEndpoint,
+		client.OIDCConfigFieldJWKSUrl:          oidcConfig.JWKSUrl,
+		client.OIDCConfigFieldUserInfoEndpoint: oidcConfig.UserInfoEndpoint,
+	}
+	var emptyFields []string
+	for key, value := range oidcFields {
+		if value == "" {
+			emptyFields = append(emptyFields, key)
+		}
+	}
+
+	// If all the fields are set, we will use them and manually specify each one.
+	// Otherwise, we will fall back to using just the issuer and the others will be determined by discovery.
+	if len(emptyFields) > 0 && slices.Contains(emptyFields, oidcFields[client.OIDCConfigFieldIssuer]) {
+		return nil, fmt.Errorf("unable to create OIDC provider. The following fields are missing: %s", strings.Join(emptyFields, ","))
+	}
+
+	if len(emptyFields) == 0 {
+		pConfig := &oidc.ProviderConfig{
+			IssuerURL:   oidcConfig.Issuer,
+			AuthURL:     oidcConfig.AuthEndpoint,
+			TokenURL:    oidcConfig.TokenEndpoint,
+			UserInfoURL: oidcConfig.UserInfoEndpoint,
+			JWKSURL:     oidcConfig.JWKSUrl,
+		}
+		return pConfig.NewProvider(ctx), nil
+	}
+	// This will perform discovery in the oidc library
+	return oidc.NewProvider(ctx, oidcConfig.Issuer)
+}
+
+func isValidACR(claimACR string, configuredACR string) bool {
+	// if we have no ACR configured, all values are accepted
+	if configuredACR == "" {
+		return true
+	}
+
+	if claimACR != configuredACR {
+		logrus.Infof("acr value in token does not match configured acr value")
+		return false
+	}
+	return true
+}
+
+func parseACRFromAccessToken(accessToken string) (string, error) {
+	var parser jwt.Parser
+	// we already validated the incoming token
+	token, _, err := parser.ParseUnverified(accessToken, jwt.MapClaims{})
+	if err != nil {
+		return "", fmt.Errorf("failed to parse token: %w", err)
+	}
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return "", errors.New("invalid access token jwt.MapClaims format")
+	}
+	acrValue, found := claims["acr"].(string)
+	if !found {
+		return "", fmt.Errorf("acr claim invalid or not found in token: (acr=%v)", claims["acr"])
+	}
+	return acrValue, nil
 }

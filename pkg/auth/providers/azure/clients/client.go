@@ -20,7 +20,7 @@ type AzureClient interface {
 	ListUsers(filter string) ([]v3.Principal, error)
 	GetGroup(id string) (v3.Principal, error)
 	ListGroups(filter string) ([]v3.Principal, error)
-	ListGroupMemberships(id string) ([]string, error)
+	ListGroupMemberships(id string, filter string) ([]string, error)
 }
 
 // NewAzureClientFromCredential returns a new client to be used for first-time authentication. This means it does not need any

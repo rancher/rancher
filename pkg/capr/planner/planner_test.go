@@ -16,7 +16,7 @@ import (
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/provisioningv2/image"
-	"github.com/rancher/wrangler/v2/pkg/generic/fake"
+	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -531,7 +531,7 @@ func Test_renderArgAndMount(t *testing.T) {
 		inputMount      interface{}
 		inputSecurePort string
 		inputCertDir    string
-		runtime         string
+		controlPlane    *rkev1.RKEControlPlane
 		expectedArgs    []string
 		expectedMount   []string
 	}{
@@ -539,219 +539,315 @@ func Test_renderArgAndMount(t *testing.T) {
 			name:            "test default K3s KCM rendering",
 			inputSecurePort: DefaultKubeControllerManagerDefaultSecurePort,
 			inputCertDir:    DefaultKubeControllerManagerCertDir,
-			runtime:         capr.RuntimeK3S,
-			expectedArgs:    []string{CertDirArgument + "=" + fmt.Sprintf(DefaultKubeControllerManagerCertDir, capr.RuntimeK3S), SecurePortArgument + "=" + DefaultKubeControllerManagerDefaultSecurePort},
-			expectedMount:   []string{},
+			controlPlane: &rkev1.RKEControlPlane{
+				Spec: rkev1.RKEControlPlaneSpec{
+					KubernetesVersion: "v1.28.8+k3s1",
+				},
+			},
+			expectedArgs:  []string{CertDirArgument + "=" + fmt.Sprintf("%s/%s", "/var/lib/rancher/k3s", DefaultKubeControllerManagerCertDir), SecurePortArgument + "=" + DefaultKubeControllerManagerDefaultSecurePort},
+			expectedMount: []string{},
 		},
 		{
 			name:            "test custom K3s KCM cert-dir",
 			inputArg:        "cert-dir=/tmp",
 			inputSecurePort: DefaultKubeControllerManagerDefaultSecurePort,
 			inputCertDir:    DefaultKubeControllerManagerCertDir,
-			runtime:         capr.RuntimeK3S,
-			expectedArgs:    []string{"cert-dir=/tmp", SecurePortArgument + "=" + DefaultKubeControllerManagerDefaultSecurePort},
-			expectedMount:   []string{},
+			controlPlane: &rkev1.RKEControlPlane{
+				Spec: rkev1.RKEControlPlaneSpec{
+					KubernetesVersion: "v1.28.8+k3s1",
+				},
+			},
+			expectedArgs:  []string{"cert-dir=/tmp", SecurePortArgument + "=" + DefaultKubeControllerManagerDefaultSecurePort},
+			expectedMount: []string{},
 		},
 		{
 			name:            "test custom K3s KCM tls-cert-file",
 			inputArg:        "tls-cert-file=/mycustomfile.crt",
 			inputSecurePort: DefaultKubeControllerManagerDefaultSecurePort,
 			inputCertDir:    DefaultKubeControllerManagerCertDir,
-			runtime:         capr.RuntimeK3S,
-			expectedArgs:    []string{"tls-cert-file=/mycustomfile.crt", SecurePortArgument + "=" + DefaultKubeControllerManagerDefaultSecurePort},
-			expectedMount:   []string{},
+			controlPlane: &rkev1.RKEControlPlane{
+				Spec: rkev1.RKEControlPlaneSpec{
+					KubernetesVersion: "v1.28.8+k3s1",
+				},
+			},
+			expectedArgs:  []string{"tls-cert-file=/mycustomfile.crt", SecurePortArgument + "=" + DefaultKubeControllerManagerDefaultSecurePort},
+			expectedMount: []string{},
 		},
 		{
 			name:            "test custom K3s KCM cert-dir with surrounding bogus data in input args",
 			inputArg:        []string{"bogus", "cert-dir=/tmp", "data:"},
 			inputSecurePort: DefaultKubeControllerManagerDefaultSecurePort,
 			inputCertDir:    DefaultKubeControllerManagerCertDir,
-			runtime:         capr.RuntimeK3S,
-			expectedArgs:    []string{"bogus", "cert-dir=/tmp", "data:", SecurePortArgument + "=" + DefaultKubeControllerManagerDefaultSecurePort},
-			expectedMount:   []string{},
+			controlPlane: &rkev1.RKEControlPlane{
+				Spec: rkev1.RKEControlPlaneSpec{
+					KubernetesVersion: "v1.28.8+k3s1",
+				},
+			},
+			expectedArgs:  []string{"bogus", "cert-dir=/tmp", "data:", SecurePortArgument + "=" + DefaultKubeControllerManagerDefaultSecurePort},
+			expectedMount: []string{},
 		},
 		{
 			name:            "test custom K3s KCM tls-cert-file with surrounding bogus data in input args",
 			inputArg:        []string{"bogus=", "tls-cert-file=/mycustomfile.crt", "data"},
 			inputSecurePort: DefaultKubeControllerManagerDefaultSecurePort,
 			inputCertDir:    DefaultKubeControllerManagerCertDir,
-			runtime:         capr.RuntimeK3S,
-			expectedArgs:    []string{"bogus=", "tls-cert-file=/mycustomfile.crt", "data", SecurePortArgument + "=" + DefaultKubeControllerManagerDefaultSecurePort},
-			expectedMount:   []string{},
+			controlPlane: &rkev1.RKEControlPlane{
+				Spec: rkev1.RKEControlPlaneSpec{
+					KubernetesVersion: "v1.28.8+k3s1",
+				},
+			},
+			expectedArgs:  []string{"bogus=", "tls-cert-file=/mycustomfile.crt", "data", SecurePortArgument + "=" + DefaultKubeControllerManagerDefaultSecurePort},
+			expectedMount: []string{},
 		},
 		{
 			name:            "test default RKE2 KCM rendering",
 			inputSecurePort: DefaultKubeControllerManagerDefaultSecurePort,
 			inputCertDir:    DefaultKubeControllerManagerCertDir,
-			runtime:         capr.RuntimeRKE2,
-			expectedArgs:    []string{CertDirArgument + "=" + fmt.Sprintf(DefaultKubeControllerManagerCertDir, capr.RuntimeRKE2), SecurePortArgument + "=" + DefaultKubeControllerManagerDefaultSecurePort},
-			expectedMount:   []string{fmt.Sprintf(DefaultKubeControllerManagerCertDir, capr.RuntimeRKE2) + ":" + fmt.Sprintf(DefaultKubeControllerManagerCertDir, capr.RuntimeRKE2)},
+			controlPlane: &rkev1.RKEControlPlane{
+				Spec: rkev1.RKEControlPlaneSpec{
+					KubernetesVersion: "v1.28.8+rke2r1",
+				},
+			},
+			expectedArgs:  []string{CertDirArgument + "=" + fmt.Sprintf("%s/%s", "/var/lib/rancher/rke2", DefaultKubeControllerManagerCertDir), SecurePortArgument + "=" + DefaultKubeControllerManagerDefaultSecurePort},
+			expectedMount: []string{fmt.Sprintf("%s/%s", "/var/lib/rancher/rke2", DefaultKubeControllerManagerCertDir) + ":" + fmt.Sprintf("%s/%s", "/var/lib/rancher/rke2", DefaultKubeControllerManagerCertDir)},
 		},
 		{
 			name:            "test custom RKE2 KCM cert-dir",
 			inputArg:        "cert-dir=/tmp",
 			inputSecurePort: DefaultKubeControllerManagerDefaultSecurePort,
 			inputCertDir:    DefaultKubeControllerManagerCertDir,
-			runtime:         capr.RuntimeRKE2,
-			expectedArgs:    []string{"cert-dir=/tmp", SecurePortArgument + "=" + DefaultKubeControllerManagerDefaultSecurePort},
-			expectedMount:   []string{"/tmp:/tmp"},
+			controlPlane: &rkev1.RKEControlPlane{
+				Spec: rkev1.RKEControlPlaneSpec{
+					KubernetesVersion: "v1.28.8+rke2r1",
+				},
+			},
+			expectedArgs:  []string{"cert-dir=/tmp", SecurePortArgument + "=" + DefaultKubeControllerManagerDefaultSecurePort},
+			expectedMount: []string{"/tmp:/tmp"},
 		},
 		{
 			name:            "test custom RKE2 KCM tls-cert-file",
 			inputArg:        "tls-cert-file=/somedir/mycustomfile.crt",
 			inputSecurePort: DefaultKubeControllerManagerDefaultSecurePort,
 			inputCertDir:    DefaultKubeControllerManagerCertDir,
-			runtime:         capr.RuntimeRKE2,
-			expectedArgs:    []string{"tls-cert-file=/somedir/mycustomfile.crt", SecurePortArgument + "=" + DefaultKubeControllerManagerDefaultSecurePort},
-			expectedMount:   []string{"/somedir:/somedir"},
+			controlPlane: &rkev1.RKEControlPlane{
+				Spec: rkev1.RKEControlPlaneSpec{
+					KubernetesVersion: "v1.28.8+rke2r1",
+				},
+			},
+			expectedArgs:  []string{"tls-cert-file=/somedir/mycustomfile.crt", SecurePortArgument + "=" + DefaultKubeControllerManagerDefaultSecurePort},
+			expectedMount: []string{"/somedir:/somedir"},
 		},
 		{
 			name:            "test custom RKE2 KCM cert-dir with surrounding bogus data in input args",
 			inputArg:        []string{"bogus", "cert-dir=/tmp", "data:"},
 			inputSecurePort: DefaultKubeControllerManagerDefaultSecurePort,
 			inputCertDir:    DefaultKubeControllerManagerCertDir,
-			runtime:         capr.RuntimeRKE2,
-			expectedArgs:    []string{"bogus", "cert-dir=/tmp", "data:", SecurePortArgument + "=" + DefaultKubeControllerManagerDefaultSecurePort},
-			expectedMount:   []string{"/tmp:/tmp"},
+			controlPlane: &rkev1.RKEControlPlane{
+				Spec: rkev1.RKEControlPlaneSpec{
+					KubernetesVersion: "v1.28.8+rke2r1",
+				},
+			},
+			expectedArgs:  []string{"bogus", "cert-dir=/tmp", "data:", SecurePortArgument + "=" + DefaultKubeControllerManagerDefaultSecurePort},
+			expectedMount: []string{"/tmp:/tmp"},
 		},
 		{
 			name:            "test custom RKE2 KCM tls-cert-file with surrounding bogus data in input args",
 			inputArg:        []string{"bogus=", "tls-cert-file=/mycustomfile.crt", "data"},
 			inputSecurePort: DefaultKubeControllerManagerDefaultSecurePort,
 			inputCertDir:    DefaultKubeControllerManagerCertDir,
-			runtime:         capr.RuntimeRKE2,
-			expectedArgs:    []string{"bogus=", "tls-cert-file=/mycustomfile.crt", "data", SecurePortArgument + "=" + DefaultKubeControllerManagerDefaultSecurePort},
-			expectedMount:   []string{"/:/"}, // this is notably going to break things but it's still a good demonstration of expected value. If we ever add a validation for this in the future we need to change this test.
+			controlPlane: &rkev1.RKEControlPlane{
+				Spec: rkev1.RKEControlPlaneSpec{
+					KubernetesVersion: "v1.28.8+rke2r1",
+				},
+			},
+			expectedArgs:  []string{"bogus=", "tls-cert-file=/mycustomfile.crt", "data", SecurePortArgument + "=" + DefaultKubeControllerManagerDefaultSecurePort},
+			expectedMount: []string{"/:/"}, // this is notably going to break things but it's still a good demonstration of expected value. If we ever add a validation for this in the future we need to change this test.
 		},
 		{
 			name:            "test custom RKE2 KCM empty tls-cert-file with surrounding bogus data in input args",
 			inputArg:        []string{"tls-cert-file=", "data"},
 			inputSecurePort: DefaultKubeControllerManagerDefaultSecurePort,
 			inputCertDir:    DefaultKubeControllerManagerCertDir,
-			runtime:         capr.RuntimeRKE2,
-			expectedArgs:    []string{"tls-cert-file=", "data", CertDirArgument + "=" + fmt.Sprintf(DefaultKubeControllerManagerCertDir, capr.RuntimeRKE2), SecurePortArgument + "=" + DefaultKubeControllerManagerDefaultSecurePort},
-			expectedMount:   []string{fmt.Sprintf(DefaultKubeControllerManagerCertDir, capr.RuntimeRKE2) + ":" + fmt.Sprintf(DefaultKubeControllerManagerCertDir, capr.RuntimeRKE2)},
+			controlPlane: &rkev1.RKEControlPlane{
+				Spec: rkev1.RKEControlPlaneSpec{
+					KubernetesVersion: "v1.28.8+rke2r1",
+				},
+			},
+			expectedArgs:  []string{"tls-cert-file=", "data", CertDirArgument + "=" + fmt.Sprintf("%s/%s", "/var/lib/rancher/rke2", DefaultKubeControllerManagerCertDir), SecurePortArgument + "=" + DefaultKubeControllerManagerDefaultSecurePort},
+			expectedMount: []string{fmt.Sprintf("%s/%s", "/var/lib/rancher/rke2", DefaultKubeControllerManagerCertDir) + ":" + fmt.Sprintf("%s/%s", "/var/lib/rancher/rke2", DefaultKubeControllerManagerCertDir)},
 		},
 		{
 			name:            "test custom RKE2 KCM empty cert-dir with surrounding bogus data in input args",
 			inputArg:        []string{"cert-dir=", "data"},
 			inputSecurePort: DefaultKubeControllerManagerDefaultSecurePort,
 			inputCertDir:    DefaultKubeControllerManagerCertDir,
-			runtime:         capr.RuntimeRKE2,
-			expectedArgs:    []string{"cert-dir=", "data", CertDirArgument + "=" + fmt.Sprintf(DefaultKubeControllerManagerCertDir, capr.RuntimeRKE2), SecurePortArgument + "=" + DefaultKubeControllerManagerDefaultSecurePort},
-			expectedMount:   []string{fmt.Sprintf(DefaultKubeControllerManagerCertDir, capr.RuntimeRKE2) + ":" + fmt.Sprintf(DefaultKubeControllerManagerCertDir, capr.RuntimeRKE2)},
+			controlPlane: &rkev1.RKEControlPlane{
+				Spec: rkev1.RKEControlPlaneSpec{
+					KubernetesVersion: "v1.28.8+rke2r1",
+				},
+			},
+			expectedArgs:  []string{"cert-dir=", "data", CertDirArgument + "=" + fmt.Sprintf("%s/%s", "/var/lib/rancher/rke2", DefaultKubeControllerManagerCertDir), SecurePortArgument + "=" + DefaultKubeControllerManagerDefaultSecurePort},
+			expectedMount: []string{fmt.Sprintf("%s/%s", "/var/lib/rancher/rke2", DefaultKubeControllerManagerCertDir) + ":" + fmt.Sprintf("%s/%s", "/var/lib/rancher/rke2", DefaultKubeControllerManagerCertDir)},
 		},
 		{
 			name:            "test default K3s kube-scheduler rendering",
 			inputSecurePort: DefaultKubeSchedulerDefaultSecurePort,
 			inputCertDir:    DefaultKubeSchedulerCertDir,
-			runtime:         capr.RuntimeK3S,
-			expectedArgs:    []string{CertDirArgument + "=" + fmt.Sprintf(DefaultKubeSchedulerCertDir, capr.RuntimeK3S), SecurePortArgument + "=" + DefaultKubeSchedulerDefaultSecurePort},
-			expectedMount:   []string{},
+			controlPlane: &rkev1.RKEControlPlane{
+				Spec: rkev1.RKEControlPlaneSpec{
+					KubernetesVersion: "v1.28.8+k3s1",
+				},
+			},
+			expectedArgs:  []string{CertDirArgument + "=" + fmt.Sprintf("%s/%s", "/var/lib/rancher/k3s", DefaultKubeSchedulerCertDir), SecurePortArgument + "=" + DefaultKubeSchedulerDefaultSecurePort},
+			expectedMount: []string{},
 		},
 		{
 			name:            "test custom K3s kube-scheduler cert-dir",
 			inputArg:        "cert-dir=/tmp",
 			inputSecurePort: DefaultKubeSchedulerDefaultSecurePort,
 			inputCertDir:    DefaultKubeSchedulerCertDir,
-			runtime:         capr.RuntimeK3S,
-			expectedArgs:    []string{"cert-dir=/tmp", SecurePortArgument + "=" + DefaultKubeSchedulerDefaultSecurePort},
-			expectedMount:   []string{},
+			controlPlane: &rkev1.RKEControlPlane{
+				Spec: rkev1.RKEControlPlaneSpec{
+					KubernetesVersion: "v1.28.8+k3s1",
+				},
+			},
+			expectedArgs:  []string{"cert-dir=/tmp", SecurePortArgument + "=" + DefaultKubeSchedulerDefaultSecurePort},
+			expectedMount: []string{},
 		},
 		{
 			name:            "test custom K3s kube-scheduler tls-cert-file",
 			inputArg:        "tls-cert-file=/mycustomfile.crt",
 			inputSecurePort: DefaultKubeSchedulerDefaultSecurePort,
 			inputCertDir:    DefaultKubeSchedulerCertDir,
-			runtime:         capr.RuntimeK3S,
-			expectedArgs:    []string{"tls-cert-file=/mycustomfile.crt", SecurePortArgument + "=" + DefaultKubeSchedulerDefaultSecurePort},
-			expectedMount:   []string{},
+			controlPlane: &rkev1.RKEControlPlane{
+				Spec: rkev1.RKEControlPlaneSpec{
+					KubernetesVersion: "v1.28.8+k3s1",
+				},
+			},
+			expectedArgs:  []string{"tls-cert-file=/mycustomfile.crt", SecurePortArgument + "=" + DefaultKubeSchedulerDefaultSecurePort},
+			expectedMount: []string{},
 		},
 		{
 			name:            "test custom K3s kube-scheduler cert-dir with surrounding bogus data in input args",
 			inputArg:        []string{"bogus", "cert-dir=/tmp", "data:"},
 			inputSecurePort: DefaultKubeSchedulerDefaultSecurePort,
 			inputCertDir:    DefaultKubeSchedulerCertDir,
-			runtime:         capr.RuntimeK3S,
-			expectedArgs:    []string{"bogus", "cert-dir=/tmp", "data:", SecurePortArgument + "=" + DefaultKubeSchedulerDefaultSecurePort},
-			expectedMount:   []string{},
+			controlPlane: &rkev1.RKEControlPlane{
+				Spec: rkev1.RKEControlPlaneSpec{
+					KubernetesVersion: "v1.28.8+k3s1",
+				},
+			},
+			expectedArgs:  []string{"bogus", "cert-dir=/tmp", "data:", SecurePortArgument + "=" + DefaultKubeSchedulerDefaultSecurePort},
+			expectedMount: []string{},
 		},
 		{
 			name:            "test custom K3s kube-scheduler tls-cert-file with surrounding bogus data in input args",
 			inputArg:        []string{"bogus=", "tls-cert-file=/mycustomfile.crt", "data"},
 			inputSecurePort: DefaultKubeSchedulerDefaultSecurePort,
 			inputCertDir:    DefaultKubeSchedulerCertDir,
-			runtime:         capr.RuntimeK3S,
-			expectedArgs:    []string{"bogus=", "tls-cert-file=/mycustomfile.crt", "data", SecurePortArgument + "=" + DefaultKubeSchedulerDefaultSecurePort},
-			expectedMount:   []string{},
+			controlPlane: &rkev1.RKEControlPlane{
+				Spec: rkev1.RKEControlPlaneSpec{
+					KubernetesVersion: "v1.28.8+k3s1",
+				},
+			},
+			expectedArgs:  []string{"bogus=", "tls-cert-file=/mycustomfile.crt", "data", SecurePortArgument + "=" + DefaultKubeSchedulerDefaultSecurePort},
+			expectedMount: []string{},
 		},
 		{
 			name:            "test default RKE2 kube-scheduler rendering",
 			inputSecurePort: DefaultKubeSchedulerDefaultSecurePort,
 			inputCertDir:    DefaultKubeSchedulerCertDir,
-			runtime:         capr.RuntimeRKE2,
-			expectedArgs:    []string{CertDirArgument + "=" + fmt.Sprintf(DefaultKubeSchedulerCertDir, capr.RuntimeRKE2), SecurePortArgument + "=" + DefaultKubeSchedulerDefaultSecurePort},
-			expectedMount:   []string{fmt.Sprintf(DefaultKubeSchedulerCertDir, capr.RuntimeRKE2) + ":" + fmt.Sprintf(DefaultKubeSchedulerCertDir, capr.RuntimeRKE2)},
+			controlPlane: &rkev1.RKEControlPlane{
+				Spec: rkev1.RKEControlPlaneSpec{
+					KubernetesVersion: "v1.28.8+rke2r1",
+				},
+			},
+			expectedArgs:  []string{CertDirArgument + "=" + fmt.Sprintf("%s/%s", "/var/lib/rancher/rke2", DefaultKubeSchedulerCertDir), SecurePortArgument + "=" + DefaultKubeSchedulerDefaultSecurePort},
+			expectedMount: []string{fmt.Sprintf("%s/%s", "/var/lib/rancher/rke2", DefaultKubeSchedulerCertDir) + ":" + fmt.Sprintf("%s/%s", "/var/lib/rancher/rke2", DefaultKubeSchedulerCertDir)},
 		},
 		{
 			name:            "test custom RKE2 kube-scheduler cert-dir",
 			inputArg:        "cert-dir=/tmp",
 			inputSecurePort: DefaultKubeSchedulerDefaultSecurePort,
 			inputCertDir:    DefaultKubeSchedulerCertDir,
-			runtime:         capr.RuntimeRKE2,
-			expectedArgs:    []string{"cert-dir=/tmp", SecurePortArgument + "=" + DefaultKubeSchedulerDefaultSecurePort},
-			expectedMount:   []string{"/tmp:/tmp"},
+			controlPlane: &rkev1.RKEControlPlane{
+				Spec: rkev1.RKEControlPlaneSpec{
+					KubernetesVersion: "v1.28.8+rke2r1",
+				},
+			},
+			expectedArgs:  []string{"cert-dir=/tmp", SecurePortArgument + "=" + DefaultKubeSchedulerDefaultSecurePort},
+			expectedMount: []string{"/tmp:/tmp"},
 		},
 		{
 			name:            "test custom RKE2 kube-scheduler tls-cert-file",
 			inputArg:        "tls-cert-file=/somedir/mycustomfile.crt",
 			inputSecurePort: DefaultKubeSchedulerDefaultSecurePort,
 			inputCertDir:    DefaultKubeSchedulerCertDir,
-			runtime:         capr.RuntimeRKE2,
-			expectedArgs:    []string{"tls-cert-file=/somedir/mycustomfile.crt", SecurePortArgument + "=" + DefaultKubeSchedulerDefaultSecurePort},
-			expectedMount:   []string{"/somedir:/somedir"},
+			controlPlane: &rkev1.RKEControlPlane{
+				Spec: rkev1.RKEControlPlaneSpec{
+					KubernetesVersion: "v1.28.8+rke2r1",
+				},
+			},
+			expectedArgs:  []string{"tls-cert-file=/somedir/mycustomfile.crt", SecurePortArgument + "=" + DefaultKubeSchedulerDefaultSecurePort},
+			expectedMount: []string{"/somedir:/somedir"},
 		},
 		{
 			name:            "test custom RKE2 kube-scheduler cert-dir with surrounding bogus data in input args",
 			inputArg:        []string{"bogus", "cert-dir=/tmp", "data:"},
 			inputSecurePort: DefaultKubeSchedulerDefaultSecurePort,
 			inputCertDir:    DefaultKubeSchedulerCertDir,
-			runtime:         capr.RuntimeRKE2,
-			expectedArgs:    []string{"bogus", "cert-dir=/tmp", "data:", SecurePortArgument + "=" + DefaultKubeSchedulerDefaultSecurePort},
-			expectedMount:   []string{"/tmp:/tmp"},
+			controlPlane: &rkev1.RKEControlPlane{
+				Spec: rkev1.RKEControlPlaneSpec{
+					KubernetesVersion: "v1.28.8+rke2r1",
+				},
+			},
+			expectedArgs:  []string{"bogus", "cert-dir=/tmp", "data:", SecurePortArgument + "=" + DefaultKubeSchedulerDefaultSecurePort},
+			expectedMount: []string{"/tmp:/tmp"},
 		},
 		{
 			name:            "test custom RKE2 kube-scheduler tls-cert-file with surrounding bogus data in input args",
 			inputArg:        []string{"bogus=", "tls-cert-file=/mycustomfile.crt", "data"},
 			inputSecurePort: DefaultKubeSchedulerDefaultSecurePort,
 			inputCertDir:    DefaultKubeSchedulerCertDir,
-			runtime:         capr.RuntimeRKE2,
-			expectedArgs:    []string{"bogus=", "tls-cert-file=/mycustomfile.crt", "data", SecurePortArgument + "=" + DefaultKubeSchedulerDefaultSecurePort},
-			expectedMount:   []string{"/:/"}, // this is notably going to break things but it's still a good demonstration of expected value. If we ever add a validation for this in the future we need to change this test.
+			controlPlane: &rkev1.RKEControlPlane{
+				Spec: rkev1.RKEControlPlaneSpec{
+					KubernetesVersion: "v1.28.8+rke2r1",
+				},
+			},
+			expectedArgs:  []string{"bogus=", "tls-cert-file=/mycustomfile.crt", "data", SecurePortArgument + "=" + DefaultKubeSchedulerDefaultSecurePort},
+			expectedMount: []string{"/:/"}, // this is notably going to break things but it's still a good demonstration of expected value. If we ever add a validation for this in the future we need to change this test.
 		},
 		{
 			name:            "test custom RKE2 kube-scheduler empty tls-cert-file with surrounding bogus data in input args",
 			inputArg:        []string{"tls-cert-file=", "data"},
 			inputSecurePort: DefaultKubeSchedulerDefaultSecurePort,
 			inputCertDir:    DefaultKubeSchedulerCertDir,
-			runtime:         capr.RuntimeRKE2,
-			expectedArgs:    []string{"tls-cert-file=", "data", CertDirArgument + "=" + fmt.Sprintf(DefaultKubeSchedulerCertDir, capr.RuntimeRKE2), SecurePortArgument + "=" + DefaultKubeSchedulerDefaultSecurePort},
-			expectedMount:   []string{fmt.Sprintf(DefaultKubeSchedulerCertDir, capr.RuntimeRKE2) + ":" + fmt.Sprintf(DefaultKubeSchedulerCertDir, capr.RuntimeRKE2)},
+			controlPlane: &rkev1.RKEControlPlane{
+				Spec: rkev1.RKEControlPlaneSpec{
+					KubernetesVersion: "v1.28.8+rke2r1",
+				},
+			},
+			expectedArgs:  []string{"tls-cert-file=", "data", CertDirArgument + "=" + fmt.Sprintf("%s/%s", "/var/lib/rancher/rke2", DefaultKubeSchedulerCertDir), SecurePortArgument + "=" + DefaultKubeSchedulerDefaultSecurePort},
+			expectedMount: []string{fmt.Sprintf("%s/%s", "/var/lib/rancher/rke2", DefaultKubeSchedulerCertDir) + ":" + fmt.Sprintf("%s/%s", "/var/lib/rancher/rke2", DefaultKubeSchedulerCertDir)},
 		},
 		{
 			name:            "test custom RKE2 kube-scheduler empty cert-dir with surrounding bogus data in input args",
 			inputArg:        []string{"cert-dir=", "data"},
 			inputSecurePort: DefaultKubeSchedulerDefaultSecurePort,
 			inputCertDir:    DefaultKubeSchedulerCertDir,
-			runtime:         capr.RuntimeRKE2,
-			expectedArgs:    []string{"cert-dir=", "data", CertDirArgument + "=" + fmt.Sprintf(DefaultKubeSchedulerCertDir, capr.RuntimeRKE2), SecurePortArgument + "=" + DefaultKubeSchedulerDefaultSecurePort},
-			expectedMount:   []string{fmt.Sprintf(DefaultKubeSchedulerCertDir, capr.RuntimeRKE2) + ":" + fmt.Sprintf(DefaultKubeSchedulerCertDir, capr.RuntimeRKE2)},
+			controlPlane: &rkev1.RKEControlPlane{
+				Spec: rkev1.RKEControlPlaneSpec{
+					KubernetesVersion: "v1.28.8+rke2r1",
+				},
+			},
+			expectedArgs:  []string{"cert-dir=", "data", CertDirArgument + "=" + fmt.Sprintf("%s/%s", "/var/lib/rancher/rke2", DefaultKubeSchedulerCertDir), SecurePortArgument + "=" + DefaultKubeSchedulerDefaultSecurePort},
+			expectedMount: []string{fmt.Sprintf("%s/%s", "/var/lib/rancher/rke2", DefaultKubeSchedulerCertDir) + ":" + fmt.Sprintf("%s/%s", "/var/lib/rancher/rke2", DefaultKubeSchedulerCertDir)},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			args, mounts := renderArgAndMount(tt.inputArg, tt.inputMount, tt.runtime, tt.inputSecurePort, tt.inputCertDir)
+			args, mounts := renderArgAndMount(tt.inputArg, tt.inputMount, tt.controlPlane, tt.inputSecurePort, tt.inputCertDir)
 			assert.Equal(t, tt.expectedArgs, args, tt.name)
 			assert.Equal(t, tt.expectedMount, mounts, tt.name)
 		})

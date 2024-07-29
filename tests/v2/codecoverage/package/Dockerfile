@@ -1,7 +1,7 @@
-FROM registry.suse.com/bci/bci-micro:15.5 AS final
+FROM registry.suse.com/bci/bci-micro:15.6 AS final
 
 # Temporary build stage image
-FROM registry.suse.com/bci/bci-base:15.5 AS builder
+FROM registry.suse.com/bci/bci-base:15.6 AS builder
 
 # Install system packages using builder image that has zypper
 COPY --from=final / /chroot/
@@ -9,7 +9,7 @@ COPY --from=final / /chroot/
 # Install some packages with zypper in the chroot of the final micro image
 RUN zypper refresh && \
     zypper --installroot /chroot -n in --no-recommends \
-    git-core curl ca-certificates unzip xz gzip sed tar shadow gawk vim-small \
+    git-core curl util-linux ca-certificates ca-certificates-mozilla unzip xz gzip sed tar shadow gawk vim-small \
     netcat-openbsd mkisofs openssh-clients && \
     zypper --installroot /chroot clean -a && \
     rm -rf /chroot/var/cache/zypp/* /chroot/var/log/zypp/* /chroot/tmp/* /chroot/var/tmp/* /chroot/usr/share/doc/packages/*
@@ -19,6 +19,13 @@ FROM final
 
 # Copy binaries and configuration files from builder to micro
 COPY --from=builder /chroot/ /
+
+# Test that some of the dependency binaries were copied
+# and are working on the target image.
+RUN /usr/bin/unshare --version && \
+    /usr/bin/mount --version && \
+    /usr/bin/umount --version && \
+    /usr/bin/nsenter --version
 
 RUN useradd rancher && \
     mkdir -p /var/lib/rancher /var/lib/cattle /opt/jail /opt/drivers/management-state/bin && \
@@ -46,27 +53,27 @@ ENV CATTLE_CHART_DEFAULT_BRANCH=$CHART_DEFAULT_BRANCH
 ENV CATTLE_PARTNER_CHART_DEFAULT_BRANCH=$PARTNER_CHART_DEFAULT_BRANCH
 ENV CATTLE_RKE2_CHART_DEFAULT_BRANCH=$RKE2_CHART_DEFAULT_BRANCH
 ENV CATTLE_HELM_VERSION v2.16.8-rancher2
-ENV CATTLE_MACHINE_VERSION v0.15.0-rancher110
-ENV CATTLE_K3S_VERSION v1.28.6+k3s2
+ENV CATTLE_MACHINE_VERSION v0.15.0-rancher114
+ENV CATTLE_K3S_VERSION v1.30.1+k3s1
 ENV CATTLE_MACHINE_PROVISION_IMAGE rancher/machine:${CATTLE_MACHINE_VERSION}
 ENV CATTLE_ETCD_VERSION v3.5.12
-ENV LOGLEVEL_VERSION v0.1.5
+ENV LOGLEVEL_VERSION v0.1.6
 ENV TINI_VERSION v0.18.0
 ENV TELEMETRY_VERSION v0.5.20
-ENV DOCKER_MACHINE_LINODE_VERSION v0.1.12
-ENV LINODE_UI_DRIVER_VERSION v0.5.0
+ENV DOCKER_MACHINE_LINODE_VERSION v0.1.11
+ENV LINODE_UI_DRIVER_VERSION v0.7.0
 # make sure the version number is consistent with the one at Line 100 of pkg/data/management/machinedriver_data.go
 ENV DOCKER_MACHINE_HARVESTER_VERSION v0.6.5
 ENV CATTLE_KDM_BRANCH ${CATTLE_KDM_BRANCH}
-ENV HELM_VERSION v3.13.3
+ENV HELM_VERSION v3.15.1
 ENV KUSTOMIZE_VERSION v5.0.1
-ENV CATTLE_WINS_AGENT_VERSION v0.4.15-rc1
+ENV CATTLE_WINS_AGENT_VERSION v0.4.16
 ENV CATTLE_WINS_AGENT_INSTALL_SCRIPT https://raw.githubusercontent.com/rancher/wins/${CATTLE_WINS_AGENT_VERSION}/install.ps1
 ENV CATTLE_WINS_AGENT_UNINSTALL_SCRIPT https://raw.githubusercontent.com/rancher/wins/${CATTLE_WINS_AGENT_VERSION}/uninstall.ps1
 ENV CATTLE_WINS_AGENT_UPGRADE_IMAGE rancher/wins:${CATTLE_WINS_AGENT_VERSION}
 ENV CATTLE_CSI_PROXY_AGENT_VERSION v1.1.3
 # make sure the CATTLE_SYSTEM_AGENT_VERSION is consistent with tests/v2/codecoverage/package/Dockerfile
-ENV CATTLE_SYSTEM_AGENT_VERSION v0.3.6-rc2
+ENV CATTLE_SYSTEM_AGENT_VERSION v0.3.7-rc2
 ENV CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX https://github.com/rancher/system-agent/releases/download
 ENV CATTLE_SYSTEM_AGENT_UPGRADE_IMAGE rancher/system-agent:${CATTLE_SYSTEM_AGENT_VERSION}-suc
 ENV CATTLE_SYSTEM_AGENT_INSTALLER_IMAGE rancher/system-agent-installer-
@@ -89,6 +96,8 @@ ARG CATTLE_FLEET_VERSION
 ENV CATTLE_FLEET_VERSION=$CATTLE_FLEET_VERSION
 ARG CATTLE_RANCHER_WEBHOOK_VERSION
 ENV CATTLE_RANCHER_WEBHOOK_VERSION=$CATTLE_RANCHER_WEBHOOK_VERSION
+ARG CATTLE_RANCHER_PROVISIONING_CAPI_VERSION
+ENV CATTLE_RANCHER_PROVISIONING_CAPI_VERSION=$CATTLE_RANCHER_PROVISIONING_CAPI_VERSION
 ARG CATTLE_CSP_ADAPTER_MIN_VERSION
 ENV CATTLE_CSP_ADAPTER_MIN_VERSION=$CATTLE_CSP_ADAPTER_MIN_VERSION
 
@@ -154,7 +163,7 @@ RUN curl ${HELM_URL_V3} | tar xvzf - --strip-components=1 -C /usr/bin && \
     chmod +x /usr/bin/kustomize
 
 # Set up K3s: copy the necessary binaries from the K3s image.
-COPY --from=rancher/k3s:v1.28.6-k3s2 \
+COPY --from=rancher/k3s:v1.30.1-k3s1 \
     /bin/blkid \
     /bin/bandwidth \
     /bin/cni \
@@ -202,7 +211,7 @@ RUN curl -sLf ${!TINI_URL} > /usr/bin/tini && \
     mkdir -p /var/lib/rancher-data/driver-metadata
 
 ENV CATTLE_UI_VERSION 2.9.0-alpha2
-ENV CATTLE_DASHBOARD_UI_VERSION v2.9.0-alpha1
+ENV CATTLE_DASHBOARD_UI_VERSION v2.9.0-alpha6
 ENV CATTLE_CLI_VERSION v2.9.0-rc1
 
 # Base UI brand used as a fallback env setting (not user facing) to indicate this is a non-prime install

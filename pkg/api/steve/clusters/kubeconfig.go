@@ -13,7 +13,7 @@ import (
 	"github.com/rancher/rancher/pkg/kubeconfig"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/user"
-	"github.com/rancher/wrangler/v2/pkg/schemas/validation"
+	"github.com/rancher/wrangler/v3/pkg/schemas/validation"
 	"k8s.io/apiserver/pkg/endpoints/request"
 )
 

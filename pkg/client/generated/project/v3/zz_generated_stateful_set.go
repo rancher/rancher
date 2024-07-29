@@ -10,6 +10,7 @@ const (
 	StatefulSetType                                      = "statefulSet"
 	StatefulSetFieldActiveDeadlineSeconds                = "activeDeadlineSeconds"
 	StatefulSetFieldAnnotations                          = "annotations"
+	StatefulSetFieldAppArmorProfile                      = "appArmorProfile"
 	StatefulSetFieldAutomountServiceAccountToken         = "automountServiceAccountToken"
 	StatefulSetFieldContainers                           = "containers"
 	StatefulSetFieldCreated                              = "created"
@@ -79,6 +80,7 @@ type StatefulSet struct {
 	types.Resource
 	ActiveDeadlineSeconds                *int64                                           `json:"activeDeadlineSeconds,omitempty" yaml:"activeDeadlineSeconds,omitempty"`
 	Annotations                          map[string]string                                `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	AppArmorProfile                      *AppArmorProfile                                 `json:"appArmorProfile,omitempty" yaml:"appArmorProfile,omitempty"`
 	AutomountServiceAccountToken         *bool                                            `json:"automountServiceAccountToken,omitempty" yaml:"automountServiceAccountToken,omitempty"`
 	Containers                           []Container                                      `json:"containers,omitempty" yaml:"containers,omitempty"`
 	Created                              string                                           `json:"created,omitempty" yaml:"created,omitempty"`

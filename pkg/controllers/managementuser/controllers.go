@@ -5,6 +5,7 @@ import (
 
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/managementlegacy/compose/common"
+	"github.com/rancher/rancher/pkg/controllers/managementuser/cavalidator"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/certsexpiration"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/clusterauthtoken"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/healthsyncer"
@@ -12,9 +13,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/managementuser/networkpolicy"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/nodesyncer"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/nsserviceaccount"
-	"github.com/rancher/rancher/pkg/controllers/managementuser/pspdelete"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/rbac"
-	"github.com/rancher/rancher/pkg/controllers/managementuser/rbac/podsecuritypolicy"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/resourcequota"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/secret"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/snapshotbackpopulate"
@@ -31,7 +30,6 @@ func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.U
 	healthsyncer.Register(ctx, cluster)
 	networkpolicy.Register(ctx, cluster)
 	nodesyncer.Register(ctx, cluster, kubeConfigGetter)
-	podsecuritypolicy.Register(ctx, cluster)
 	secret.Register(ctx, cluster)
 	resourcequota.Register(ctx, cluster)
 	certsexpiration.Register(ctx, cluster)
@@ -42,9 +40,10 @@ func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.U
 		if clusterRec.Annotations["provisioning.cattle.io/administrated"] == "true" {
 			snapshotbackpopulate.Register(ctx, cluster)
 		}
-		pspdelete.Register(ctx, cluster)
+
 		machinerole.Register(ctx, cluster)
 	}
+	cavalidator.Register(ctx, cluster)
 
 	// register controller for API
 	cluster.APIAggregation.APIServices("").Controller()

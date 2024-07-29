@@ -9,9 +9,9 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/rbac"
-	apiextcontrollers "github.com/rancher/wrangler/v2/pkg/generated/controllers/apiextensions.k8s.io/v1"
-	"github.com/rancher/wrangler/v2/pkg/generic"
-	"github.com/rancher/wrangler/v2/pkg/name"
+	apiextcontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/apiextensions.k8s.io/v1"
+	"github.com/rancher/wrangler/v3/pkg/generic"
+	"github.com/rancher/wrangler/v3/pkg/name"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
@@ -54,9 +54,18 @@ func crdToResourceMatch(crd *apiextv1.CustomResourceDefinition) *resourceMatch {
 		return nil
 	}
 
+	version := crd.Spec.Versions[0]
+
+	for _, ver := range crd.Spec.Versions {
+		if !ver.Deprecated {
+			version = ver
+			break
+		}
+	}
+
 	gvk := schema.GroupVersionKind{
 		Group:   crd.Spec.Group,
-		Version: crd.Spec.Versions[0].Name,
+		Version: version.Name,
 		Kind:    crd.Status.AcceptedNames.Kind,
 	}
 

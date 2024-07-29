@@ -84,6 +84,7 @@ func Test_rotateCertificatesPlan(t *testing.T) {
 			expected: expected{
 				otiIndex: 1,
 				oti: &[]plan.OneTimeInstruction{idempotentInstruction(
+					createTestControlPlane("v1.25.7+k3s1"),
 					"certificate-rotation/rm-kcm-cert",
 					strconv.FormatInt(int64(0), 10),
 					"rm",
@@ -109,6 +110,7 @@ func Test_rotateCertificatesPlan(t *testing.T) {
 			expected: expected{
 				otiIndex: 1,
 				oti: &[]plan.OneTimeInstruction{idempotentInstruction(
+					createTestControlPlane("v1.25.7+rke2r1"),
 					"certificate-rotation/rm-kcm-cert",
 					strconv.FormatInt(int64(244), 10),
 					"rm",
@@ -131,6 +133,7 @@ func Test_rotateCertificatesPlan(t *testing.T) {
 			expected: expected{
 				otiIndex: 3,
 				oti: &[]plan.OneTimeInstruction{idempotentInstruction(
+					createTestControlPlane("v1.25.7+k3s1"),
 					"certificate-rotation/rm-ks-cert",
 					strconv.FormatInt(int64(0), 10),
 					"rm",
@@ -153,6 +156,7 @@ func Test_rotateCertificatesPlan(t *testing.T) {
 			expected: expected{
 				otiIndex: 4,
 				oti: &[]plan.OneTimeInstruction{idempotentInstruction(
+					createTestControlPlane("v1.25.7+rke2r1"),
 					"certificate-rotation/rm-ks-cert",
 					strconv.FormatInt(int64(0), 10),
 					"rm",
@@ -172,8 +176,12 @@ func Test_rotateCertificatesPlan(t *testing.T) {
 			entryIsControlPlane: false,
 			joinServer:          "my-magic-joinserver",
 			expected: expected{
-				otiIndex:   1,
-				oti:        &[]plan.OneTimeInstruction{idempotentRestartInstructions("certificate-rotation/restart", strconv.FormatInt(int64(0), 10), capr.GetRuntimeAgentUnit("v1.25.7+rke2r1"))[1]}[0],
+				otiIndex: 1,
+				oti: &[]plan.OneTimeInstruction{idempotentRestartInstructions(
+					createTestControlPlane("v1.25.7+rke2r1"),
+					"certificate-rotation/restart",
+					strconv.FormatInt(int64(0), 10),
+					capr.GetRuntimeAgentUnit("v1.25.7+rke2r1"))[1]}[0],
 				otiCount:   2,
 				joinServer: "",
 			},
@@ -184,8 +192,12 @@ func Test_rotateCertificatesPlan(t *testing.T) {
 			entryIsControlPlane: false,
 			joinServer:          "my-magic-joinserver",
 			expected: expected{
-				otiIndex:   1,
-				oti:        &[]plan.OneTimeInstruction{idempotentRestartInstructions("certificate-rotation/restart", strconv.FormatInt(int64(0), 10), capr.GetRuntimeAgentUnit("v1.25.7+k3s1"))[1]}[0],
+				otiIndex: 1,
+				oti: &[]plan.OneTimeInstruction{idempotentRestartInstructions(
+					createTestControlPlane("v1.25.7+k3s1"),
+					"certificate-rotation/restart",
+					strconv.FormatInt(int64(0), 10),
+					capr.GetRuntimeAgentUnit("v1.25.7+k3s1"))[1]}[0],
 				otiCount:   2,
 				joinServer: "",
 			},
@@ -204,6 +216,7 @@ func Test_rotateCertificatesPlan(t *testing.T) {
 			expected: expected{
 				otiIndex: 1,
 				oti: &[]plan.OneTimeInstruction{idempotentInstruction(
+					createTestControlPlane("v1.25.7+k3s1"),
 					"certificate-rotation/rm-kcm-cert",
 					strconv.FormatInt(int64(0), 10),
 					"rm",

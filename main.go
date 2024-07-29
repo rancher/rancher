@@ -16,7 +16,7 @@ import (
 	"github.com/rancher/rancher/pkg/logserver"
 	"github.com/rancher/rancher/pkg/rancher"
 	"github.com/rancher/rancher/pkg/version"
-	"github.com/rancher/wrangler/v2/pkg/signals"
+	"github.com/rancher/wrangler/v3/pkg/signals"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )

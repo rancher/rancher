@@ -21,7 +21,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	configv1 "k8s.io/apiserver/pkg/apis/config/v1"
+	apiserverv1 "k8s.io/apiserver/pkg/apis/apiserver/v1"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 )
 
@@ -415,13 +415,13 @@ func TestMigrateRKESecrets(t *testing.T) {
 						},
 						KubeAPI: rketypes.KubeAPIService{
 							SecretsEncryptionConfig: &rketypes.SecretsEncryptionConfig{
-								CustomConfig: &configv1.EncryptionConfiguration{
-									Resources: []configv1.ResourceConfiguration{
+								CustomConfig: &apiserverv1.EncryptionConfiguration{
+									Resources: []apiserverv1.ResourceConfiguration{
 										{
-											Providers: []configv1.ProviderConfiguration{
+											Providers: []apiserverv1.ProviderConfiguration{
 												{
-													AESGCM: &configv1.AESConfiguration{
-														Keys: []configv1.Key{
+													AESGCM: &apiserverv1.AESConfiguration{
+														Keys: []apiserverv1.Key{
 															{
 																Name:   "testName",
 																Secret: "testSecret",

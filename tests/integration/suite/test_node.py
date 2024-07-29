@@ -46,7 +46,8 @@ def test_node_fields(admin_mc):
         'sshUser': 'r',
         'imported': 'cru',
         'dockerInfo': 'r',
-        'scaledownTime': 'cru'
+        'scaledownTime': 'cru',
+        'runtimeHandlers': 'r'
     }
 
     for name in cclient.schema.types['node'].resourceFields.keys():

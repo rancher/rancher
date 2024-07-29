@@ -31,13 +31,13 @@ func (p *adProvider) actionHandler(actionName string, action *types.Action, requ
 	}
 
 	if actionName == "testAndApply" {
-		return p.testAndApply(actionName, action, request)
+		return p.testAndApply(request)
 	}
 
 	return httperror.NewAPIError(httperror.ActionNotAvailable, "")
 }
 
-func (p *adProvider) testAndApply(actionName string, action *types.Action, request *types.APIContext) error {
+func (p *adProvider) testAndApply(request *types.APIContext) error {
 	input, err := handler.ParseAndValidateActionBody(request, request.Schemas.Schema(&managementschema.Version,
 		client.ActiveDirectoryTestAndApplyInputType))
 	if err != nil {
@@ -79,7 +79,7 @@ func (p *adProvider) testAndApply(actionName string, action *types.Action, reque
 		return err
 	}
 
-	//if this works, save adConfig CR adding enabled flag
+	// if this works, save adConfig CR adding enabled flag
 	config.Enabled = configApplyInput.Enabled
 	err = p.saveActiveDirectoryConfig(config)
 	if err != nil {
@@ -92,8 +92,12 @@ func (p *adProvider) testAndApply(actionName string, action *types.Action, reque
 	}
 
 	userExtraInfo := p.GetUserExtraAttributes(userPrincipal)
+	err = p.tokenMGR.UserAttributeCreateOrUpdate(user.Name, userPrincipal.Provider, groupPrincipals, userExtraInfo)
+	if err != nil {
+		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Failed to create or update userAttribute: %v", err))
+	}
 
-	return p.tokenMGR.CreateTokenAndSetCookie(user.Name, userPrincipal, groupPrincipals, "", 0, "Token via AD Configuration", request, userExtraInfo)
+	return p.tokenMGR.CreateTokenAndSetCookie(user.Name, userPrincipal, groupPrincipals, "", 0, "Token via AD Configuration", request)
 }
 
 func (p *adProvider) saveActiveDirectoryConfig(config *v32.ActiveDirectoryConfig) error {

@@ -136,7 +136,6 @@ func (a ActionHandler) RestoreFromEtcdBackupHandler(actionName string, action *t
 				fmt.Sprintf("error decompressing cluster object for backupid %s: %s", input.EtcdBackupID, err))
 		}
 		cluster.Spec.RancherKubernetesEngineConfig = clusterBackup.Spec.RancherKubernetesEngineConfig
-		cluster.Spec.DefaultPodSecurityPolicyTemplateName = clusterBackup.Spec.DefaultPodSecurityPolicyTemplateName
 		cluster.Spec.DefaultPodSecurityAdmissionConfigurationTemplateName = clusterBackup.Spec.DefaultPodSecurityAdmissionConfigurationTemplateName
 
 		cluster.Spec.ClusterAgentDeploymentCustomization = clusterBackup.Spec.ClusterAgentDeploymentCustomization

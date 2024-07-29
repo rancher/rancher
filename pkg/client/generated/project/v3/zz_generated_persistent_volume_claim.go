@@ -5,55 +5,57 @@ import (
 )
 
 const (
-	PersistentVolumeClaimType                      = "persistentVolumeClaim"
-	PersistentVolumeClaimFieldAccessModes          = "accessModes"
-	PersistentVolumeClaimFieldAnnotations          = "annotations"
-	PersistentVolumeClaimFieldCreated              = "created"
-	PersistentVolumeClaimFieldCreatorID            = "creatorId"
-	PersistentVolumeClaimFieldDataSource           = "dataSource"
-	PersistentVolumeClaimFieldDataSourceRef        = "dataSourceRef"
-	PersistentVolumeClaimFieldLabels               = "labels"
-	PersistentVolumeClaimFieldName                 = "name"
-	PersistentVolumeClaimFieldNamespaceId          = "namespaceId"
-	PersistentVolumeClaimFieldOwnerReferences      = "ownerReferences"
-	PersistentVolumeClaimFieldProjectID            = "projectId"
-	PersistentVolumeClaimFieldRemoved              = "removed"
-	PersistentVolumeClaimFieldResources            = "resources"
-	PersistentVolumeClaimFieldSelector             = "selector"
-	PersistentVolumeClaimFieldState                = "state"
-	PersistentVolumeClaimFieldStatus               = "status"
-	PersistentVolumeClaimFieldStorageClassID       = "storageClassId"
-	PersistentVolumeClaimFieldTransitioning        = "transitioning"
-	PersistentVolumeClaimFieldTransitioningMessage = "transitioningMessage"
-	PersistentVolumeClaimFieldUUID                 = "uuid"
-	PersistentVolumeClaimFieldVolumeID             = "volumeId"
-	PersistentVolumeClaimFieldVolumeMode           = "volumeMode"
+	PersistentVolumeClaimType                           = "persistentVolumeClaim"
+	PersistentVolumeClaimFieldAccessModes               = "accessModes"
+	PersistentVolumeClaimFieldAnnotations               = "annotations"
+	PersistentVolumeClaimFieldCreated                   = "created"
+	PersistentVolumeClaimFieldCreatorID                 = "creatorId"
+	PersistentVolumeClaimFieldDataSource                = "dataSource"
+	PersistentVolumeClaimFieldDataSourceRef             = "dataSourceRef"
+	PersistentVolumeClaimFieldLabels                    = "labels"
+	PersistentVolumeClaimFieldName                      = "name"
+	PersistentVolumeClaimFieldNamespaceId               = "namespaceId"
+	PersistentVolumeClaimFieldOwnerReferences           = "ownerReferences"
+	PersistentVolumeClaimFieldProjectID                 = "projectId"
+	PersistentVolumeClaimFieldRemoved                   = "removed"
+	PersistentVolumeClaimFieldResources                 = "resources"
+	PersistentVolumeClaimFieldSelector                  = "selector"
+	PersistentVolumeClaimFieldState                     = "state"
+	PersistentVolumeClaimFieldStatus                    = "status"
+	PersistentVolumeClaimFieldStorageClassID            = "storageClassId"
+	PersistentVolumeClaimFieldTransitioning             = "transitioning"
+	PersistentVolumeClaimFieldTransitioningMessage      = "transitioningMessage"
+	PersistentVolumeClaimFieldUUID                      = "uuid"
+	PersistentVolumeClaimFieldVolumeAttributesClassName = "volumeAttributesClassName"
+	PersistentVolumeClaimFieldVolumeID                  = "volumeId"
+	PersistentVolumeClaimFieldVolumeMode                = "volumeMode"
 )
 
 type PersistentVolumeClaim struct {
 	types.Resource
-	AccessModes          []string                     `json:"accessModes,omitempty" yaml:"accessModes,omitempty"`
-	Annotations          map[string]string            `json:"annotations,omitempty" yaml:"annotations,omitempty"`
-	Created              string                       `json:"created,omitempty" yaml:"created,omitempty"`
-	CreatorID            string                       `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
-	DataSource           *TypedLocalObjectReference   `json:"dataSource,omitempty" yaml:"dataSource,omitempty"`
-	DataSourceRef        *TypedObjectReference        `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
-	Labels               map[string]string            `json:"labels,omitempty" yaml:"labels,omitempty"`
-	Name                 string                       `json:"name,omitempty" yaml:"name,omitempty"`
-	NamespaceId          string                       `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
-	OwnerReferences      []OwnerReference             `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
-	ProjectID            string                       `json:"projectId,omitempty" yaml:"projectId,omitempty"`
-	Removed              string                       `json:"removed,omitempty" yaml:"removed,omitempty"`
-	Resources            *ResourceRequirements        `json:"resources,omitempty" yaml:"resources,omitempty"`
-	Selector             *LabelSelector               `json:"selector,omitempty" yaml:"selector,omitempty"`
-	State                string                       `json:"state,omitempty" yaml:"state,omitempty"`
-	Status               *PersistentVolumeClaimStatus `json:"status,omitempty" yaml:"status,omitempty"`
-	StorageClassID       string                       `json:"storageClassId,omitempty" yaml:"storageClassId,omitempty"`
-	Transitioning        string                       `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
-	TransitioningMessage string                       `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
-	UUID                 string                       `json:"uuid,omitempty" yaml:"uuid,omitempty"`
-	VolumeID             string                       `json:"volumeId,omitempty" yaml:"volumeId,omitempty"`
-	VolumeMode           string                       `json:"volumeMode,omitempty" yaml:"volumeMode,omitempty"`
+	AccessModes               []string                     `json:"accessModes,omitempty" yaml:"accessModes,omitempty"`
+	Annotations               map[string]string            `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	Created                   string                       `json:"created,omitempty" yaml:"created,omitempty"`
+	CreatorID                 string                       `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	DataSource                *TypedLocalObjectReference   `json:"dataSource,omitempty" yaml:"dataSource,omitempty"`
+	DataSourceRef             *TypedObjectReference        `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
+	Labels                    map[string]string            `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Name                      string                       `json:"name,omitempty" yaml:"name,omitempty"`
+	NamespaceId               string                       `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
+	OwnerReferences           []OwnerReference             `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
+	ProjectID                 string                       `json:"projectId,omitempty" yaml:"projectId,omitempty"`
+	Removed                   string                       `json:"removed,omitempty" yaml:"removed,omitempty"`
+	Resources                 *VolumeResourceRequirements  `json:"resources,omitempty" yaml:"resources,omitempty"`
+	Selector                  *LabelSelector               `json:"selector,omitempty" yaml:"selector,omitempty"`
+	State                     string                       `json:"state,omitempty" yaml:"state,omitempty"`
+	Status                    *PersistentVolumeClaimStatus `json:"status,omitempty" yaml:"status,omitempty"`
+	StorageClassID            string                       `json:"storageClassId,omitempty" yaml:"storageClassId,omitempty"`
+	Transitioning             string                       `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
+	TransitioningMessage      string                       `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
+	UUID                      string                       `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	VolumeAttributesClassName string                       `json:"volumeAttributesClassName,omitempty" yaml:"volumeAttributesClassName,omitempty"`
+	VolumeID                  string                       `json:"volumeId,omitempty" yaml:"volumeId,omitempty"`
+	VolumeMode                string                       `json:"volumeMode,omitempty" yaml:"volumeMode,omitempty"`
 }
 
 type PersistentVolumeClaimCollection struct {

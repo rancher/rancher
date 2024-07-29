@@ -3,7 +3,7 @@
 package mocks
 
 import (
-	generic "github.com/rancher/wrangler/v2/pkg/generic"
+	generic "github.com/rancher/wrangler/v3/pkg/generic"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	mock "github.com/stretchr/testify/mock"

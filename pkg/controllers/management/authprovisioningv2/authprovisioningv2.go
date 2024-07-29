@@ -13,10 +13,10 @@ import (
 	provisioningcontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
-	"github.com/rancher/wrangler/v2/pkg/apply"
-	apiextcontrollers "github.com/rancher/wrangler/v2/pkg/generated/controllers/apiextensions.k8s.io/v1"
-	rbacv1 "github.com/rancher/wrangler/v2/pkg/generated/controllers/rbac/v1"
-	"github.com/rancher/wrangler/v2/pkg/gvk"
+	"github.com/rancher/wrangler/v3/pkg/apply"
+	apiextcontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/apiextensions.k8s.io/v1"
+	rbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
+	"github.com/rancher/wrangler/v3/pkg/gvk"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 

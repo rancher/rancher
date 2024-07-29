@@ -17,7 +17,6 @@ import (
 	util "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/healthsyncer"
-	"github.com/rancher/rancher/pkg/features"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/image"
@@ -272,17 +271,6 @@ func redeployAgent(cluster *apimgmtv3.Cluster, desiredAgent, desiredAuth string,
 	logrus.Tracef("clusterDeploy: redeployAgent: returning false for redeployAgent")
 
 	return false
-}
-
-func (cd *clusterDeploy) getDesiredFeatures(cluster *apimgmtv3.Cluster) map[string]bool {
-	return map[string]bool{
-		features.MCM.Name():                false,
-		features.MCMAgent.Name():           true,
-		features.Fleet.Name():              false,
-		features.RKE2.Name():               false,
-		features.ProvisioningV2.Name():     false,
-		features.EmbeddedClusterAPI.Name(): false,
-	}
 }
 
 func (cd *clusterDeploy) deployAgent(cluster *apimgmtv3.Cluster) error {

@@ -17,13 +17,13 @@ import (
 	"github.com/rancher/rancher/pkg/capr/planner"
 	"github.com/rancher/rancher/pkg/controllers/capr/machineprovision"
 	mgmtcontroller "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
-	"github.com/rancher/wrangler/v2/pkg/apply"
-	"github.com/rancher/wrangler/v2/pkg/data"
-	"github.com/rancher/wrangler/v2/pkg/data/convert"
-	v1 "github.com/rancher/wrangler/v2/pkg/generated/controllers/core/v1"
-	"github.com/rancher/wrangler/v2/pkg/generic"
-	"github.com/rancher/wrangler/v2/pkg/gvk"
-	"github.com/rancher/wrangler/v2/pkg/name"
+	"github.com/rancher/wrangler/v3/pkg/apply"
+	"github.com/rancher/wrangler/v3/pkg/data"
+	"github.com/rancher/wrangler/v3/pkg/data/convert"
+	v1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+	"github.com/rancher/wrangler/v3/pkg/generic"
+	"github.com/rancher/wrangler/v3/pkg/gvk"
+	"github.com/rancher/wrangler/v3/pkg/name"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -510,8 +510,9 @@ func assign(labels map[string]string, key string, value interface{}) error {
 func rkeCluster(cluster *rancherv1.Cluster) *rkev1.RKECluster {
 	return &rkev1.RKECluster{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      cluster.Name,
-			Namespace: cluster.Namespace,
+			Name:        cluster.Name,
+			Namespace:   cluster.Namespace,
+			Annotations: map[string]string{capr.DeleteMissingCustomMachinesAfterAnnotation: cluster.Annotations[capr.DeleteMissingCustomMachinesAfterAnnotation]},
 		},
 	}
 }

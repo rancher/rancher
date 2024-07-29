@@ -20,7 +20,7 @@ import (
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/provisioningv2/kubeconfig"
 	"github.com/rancher/rancher/pkg/wrangler"
-	"github.com/rancher/wrangler/v2/pkg/needacert"
+	"github.com/rancher/wrangler/v3/pkg/needacert"
 )
 
 func Register(ctx context.Context, wrangler *wrangler.Context, embedded bool, registryOverride string) error {
