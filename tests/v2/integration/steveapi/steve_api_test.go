@@ -2360,8 +2360,6 @@ func (s *steveAPITestSuite) TestList() {
 	for _, test := range tests {
 		s.Run(test.description, func() {
 			userClient := s.userClients[test.user]
-			userClient, err := userClient.ReLogin()
-			require.NoError(s.T(), err)
 
 			client, err := userClient.Steve.ProxyDownstream(s.clusterID)
 			require.NoError(s.T(), err)
