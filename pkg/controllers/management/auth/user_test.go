@@ -7,6 +7,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
+	v12 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -146,6 +147,290 @@ func TestCreate(t *testing.T) {
 			tt.mockSetup()
 
 			_, err := ul.Create(tt.inputUser)
+
+			if tt.expectedError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestUpdated(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockUserManager := NewMockManager(ctrl)
+
+	ul := &userLifecycle{
+		userManager: mockUserManager,
+	}
+
+	tests := []struct {
+		name          string
+		inputUser     *v3.User
+		mockSetup     func()
+		expectedUser  *v3.User
+		expectedError bool
+	}{
+		{
+			name: "user was not updated properly",
+			inputUser: &v3.User{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "testuser",
+				},
+				PrincipalIDs: []string{},
+			},
+			mockSetup: func() {
+				mockUserManager.EXPECT().CreateNewUserClusterRoleBinding("testuser", defaultCRTB.UID).Return(fmt.Errorf("error updating user"))
+			},
+			expectedUser:  nil,
+			expectedError: true,
+		},
+		{
+			name: "user was updated",
+			inputUser: &v3.User{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "testuser",
+				},
+				PrincipalIDs: []string{},
+			},
+			mockSetup: func() {
+				mockUserManager.EXPECT().CreateNewUserClusterRoleBinding("testuser", defaultCRTB.UID).Return(nil)
+			},
+			expectedUser: &v3.User{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "testuser",
+					Annotations: map[string]string{creatorIDAnn: "creator"},
+				},
+				PrincipalIDs: []string{"local://testuser"},
+			},
+			expectedError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.mockSetup()
+
+			_, err := ul.Updated(tt.inputUser)
+
+			if tt.expectedError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func Test_deleteAllCRTB(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	ctrbMock := NewMockClusterRoleTemplateBindingInterface(ctrl)
+
+	ul := &userLifecycle{
+		crtb: ctrbMock,
+	}
+
+	tests := []struct {
+		name          string
+		inputCRTB     []*v3.ClusterRoleTemplateBinding
+		mockSetup     func()
+		expectedError bool
+	}{
+		{
+			name: "crtb deleted properly",
+			inputCRTB: []*v3.ClusterRoleTemplateBinding{
+				&v3.ClusterRoleTemplateBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "testuser",
+					},
+				},
+			},
+			mockSetup: func() {
+				ctrbMock.EXPECT().Delete(gomock.Any(), &metav1.DeleteOptions{}).Return(nil)
+			},
+			expectedError: false,
+		},
+		{
+			name: "crtbs deleted properly",
+			inputCRTB: []*v3.ClusterRoleTemplateBinding{
+				&v3.ClusterRoleTemplateBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "testuser",
+					},
+				},
+				&v3.ClusterRoleTemplateBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "testuser-2",
+					},
+				},
+			},
+			mockSetup: func() {
+				gomock.InOrder(
+					ctrbMock.EXPECT().Delete(gomock.Any(), &metav1.DeleteOptions{}).Return(nil),
+					ctrbMock.EXPECT().Delete(gomock.Any(), &metav1.DeleteOptions{}).Return(nil),
+				)
+			},
+			expectedError: false,
+		},
+		{
+			name: "namespaced crtbs deleted properly",
+			inputCRTB: []*v3.ClusterRoleTemplateBinding{
+				&v3.ClusterRoleTemplateBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "testuser",
+						Namespace: "testnamespace",
+					},
+				},
+				&v3.ClusterRoleTemplateBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "testuser-2",
+						Namespace: "testnamespace",
+					},
+				},
+			},
+			mockSetup: func() {
+				gomock.InOrder(
+					ctrbMock.EXPECT().DeleteNamespaced(gomock.Any(), gomock.Any(), &metav1.DeleteOptions{}).Return(nil),
+					ctrbMock.EXPECT().DeleteNamespaced(gomock.Any(), gomock.Any(), &metav1.DeleteOptions{}).Return(nil),
+				)
+			},
+			expectedError: false,
+		},
+		{
+			name: "crtbs (non and namespaced) deleted properly",
+			inputCRTB: []*v3.ClusterRoleTemplateBinding{
+				&v3.ClusterRoleTemplateBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "testuser",
+					},
+				},
+				&v3.ClusterRoleTemplateBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "testuser-2",
+						Namespace: "testnamespace",
+					},
+				},
+			},
+			mockSetup: func() {
+				gomock.InOrder(
+					ctrbMock.EXPECT().Delete(gomock.Any(), &metav1.DeleteOptions{}).Return(nil),
+					ctrbMock.EXPECT().DeleteNamespaced(gomock.Any(), gomock.Any(), &metav1.DeleteOptions{}).Return(nil),
+				)
+			},
+			expectedError: false,
+		},
+		{
+			name: "crtbs (non and namespaced) not deleted properly",
+			inputCRTB: []*v3.ClusterRoleTemplateBinding{
+				&v3.ClusterRoleTemplateBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "testuser",
+					},
+				},
+				&v3.ClusterRoleTemplateBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "testuser-2",
+						Namespace: "testnamespace",
+					},
+				},
+			},
+			mockSetup: func() {
+				gomock.InOrder(
+					ctrbMock.EXPECT().Delete(gomock.Any(), &metav1.DeleteOptions{}).Return(nil),
+					ctrbMock.EXPECT().DeleteNamespaced(gomock.Any(), gomock.Any(), &metav1.DeleteOptions{}).Return(fmt.Errorf("namespaced crtb not deleted")),
+				)
+			},
+			expectedError: true,
+		},
+		{
+			name: "crtbs not deleted properly",
+			inputCRTB: []*v3.ClusterRoleTemplateBinding{
+				&v3.ClusterRoleTemplateBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "testuser",
+					},
+				},
+			},
+			mockSetup: func() {
+				gomock.InOrder(
+					ctrbMock.EXPECT().Delete(gomock.Any(), &metav1.DeleteOptions{}).Return(fmt.Errorf("")),
+				)
+			},
+			expectedError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.mockSetup()
+
+			err := ul.deleteAllCRTB(tt.inputCRTB)
+
+			if tt.expectedError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func Test_deleteUserNamespace(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	namespaceMock := NewMockNamespaceInterface(ctrl)
+	namespaceListerMock := NewMockNamespaceLister(ctrl)
+
+	ul := &userLifecycle{
+		namespaces:      namespaceMock,
+		namespaceLister: namespaceListerMock,
+	}
+
+	tests := []struct {
+		name          string
+		username      string
+		mockSetup     func()
+		expectedError bool
+	}{
+		{
+			name:     "delete namespace",
+			username: "testuser",
+			mockSetup: func() {
+				namespaceListerMock.EXPECT().Get("", "testuser").Return(&v12.Namespace{}, nil)
+				namespaceMock.EXPECT().Delete("testuser", &metav1.DeleteOptions{}).Return(nil)
+			},
+			expectedError: false,
+		},
+		{
+			name:     "error getting namespace",
+			username: "testuser",
+			mockSetup: func() {
+				namespaceListerMock.EXPECT().Get("", "testuser").Return(nil, fmt.Errorf(""))
+			},
+			expectedError: true,
+		},
+		{
+			name:     "error deleting namespace",
+			username: "testuser",
+			mockSetup: func() {
+				namespaceListerMock.EXPECT().Get("", "testuser").Return(&v12.Namespace{}, nil)
+				namespaceMock.EXPECT().Delete("testuser", &metav1.DeleteOptions{}).Return(fmt.Errorf(""))
+			},
+			expectedError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.mockSetup()
+
+			err := ul.deleteUserNamespace(tt.username)
 
 			if tt.expectedError {
 				assert.Error(t, err)
