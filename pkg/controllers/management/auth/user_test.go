@@ -645,8 +645,7 @@ func Test_removeLegacyFinalizers(t *testing.T) {
 					},
 				},
 			},
-			mockSetup: func() {},
-			//usersMock.EXPECT().Update(&v3.User{}).Return(&v3.User{}, nil)
+			mockSetup:     func() {},
 			expectedError: false,
 		},
 		{
