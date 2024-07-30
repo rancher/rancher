@@ -24,6 +24,7 @@ import (
 	"github.com/rancher/rancher/pkg/channelserver"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	rancherdialer "github.com/rancher/rancher/pkg/dialer"
+	"github.com/rancher/rancher/pkg/ext"
 	"github.com/rancher/rancher/pkg/httpproxy"
 	k8sProxyPkg "github.com/rancher/rancher/pkg/k8sproxy"
 	"github.com/rancher/rancher/pkg/metrics"
@@ -133,6 +134,9 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 	metricsAuthed.Use(requests.NewAuthenticatedFilter)
 
 	metricsAuthed.Path("/metrics").Handler(metricsHandler)
+
+	extAuthed := mux.NewRouter().PathPrefix("/ext")
+	ext.RegisterSubRoutes(extAuthed.Subrouter(), scaledContext.Wrangler.WithAgent("extensions"))
 
 	unauthed.NotFoundHandler = saauthed
 	saauthed.NotFoundHandler = authed
