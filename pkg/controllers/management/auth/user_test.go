@@ -380,6 +380,111 @@ func Test_deleteAllCRTB(t *testing.T) {
 	}
 }
 
+func Test_deleteAllPRTB(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	prtbMock := NewMockProjectRoleTemplateBindingInterface(ctrl)
+
+	ul := &userLifecycle{
+		prtb: prtbMock,
+	}
+
+	tests := []struct {
+		name          string
+		inputPRTB     []*v3.ProjectRoleTemplateBinding
+		mockSetup     func()
+		expectedError bool
+	}{
+		{
+			name: "remove namespaced prtb",
+			inputPRTB: []*v3.ProjectRoleTemplateBinding{
+				&v3.ProjectRoleTemplateBinding{
+					UserName: "testuser",
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "testprtb",
+						Namespace: "testprtbns",
+					},
+				},
+			},
+			mockSetup: func() {
+				prtbMock.EXPECT().DeleteNamespaced("testprtbns", "testprtb", &metav1.DeleteOptions{}).Return(nil)
+			},
+			expectedError: false,
+		},
+		{
+			name: "remove all prtb",
+			inputPRTB: []*v3.ProjectRoleTemplateBinding{
+				&v3.ProjectRoleTemplateBinding{
+					UserName: "testuser",
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "testprtb",
+						Namespace: "testprtbns",
+					},
+				},
+				&v3.ProjectRoleTemplateBinding{
+					UserName: "testuser2",
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "testprtb2",
+					},
+				},
+			},
+			mockSetup: func() {
+				gomock.InOrder(
+					prtbMock.EXPECT().DeleteNamespaced("testprtbns", "testprtb", &metav1.DeleteOptions{}).Return(nil),
+					prtbMock.EXPECT().Delete("testprtb2", &metav1.DeleteOptions{}).Return(nil),
+				)
+			},
+			expectedError: false,
+		},
+		{
+			name: "error deleting namespaced prtb",
+			inputPRTB: []*v3.ProjectRoleTemplateBinding{
+				&v3.ProjectRoleTemplateBinding{
+					UserName: "testuser",
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "testprtb",
+						Namespace: "testprtbns",
+					},
+				},
+			},
+			mockSetup: func() {
+				prtbMock.EXPECT().DeleteNamespaced("testprtbns", "testprtb", &metav1.DeleteOptions{}).Return(fmt.Errorf("error"))
+			},
+			expectedError: true,
+		},
+		{
+			name: "error deleting prtb",
+			inputPRTB: []*v3.ProjectRoleTemplateBinding{
+				&v3.ProjectRoleTemplateBinding{
+					UserName: "testuser",
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "testprtb",
+					},
+				},
+			},
+			mockSetup: func() {
+				prtbMock.EXPECT().Delete("testprtb", &metav1.DeleteOptions{}).Return(fmt.Errorf("error"))
+			},
+			expectedError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.mockSetup()
+
+			err := ul.deleteAllPRTB(tt.inputPRTB)
+
+			if tt.expectedError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
 func Test_deleteUserNamespace(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -509,6 +614,107 @@ func Test_deleteUserSecret(t *testing.T) {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func Test_removeLegacyFinalizers(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	usersMock := NewMockUserInterface(ctrl)
+
+	ul := &userLifecycle{
+		users: usersMock,
+	}
+
+	tests := []struct {
+		name          string
+		user          *v3.User
+		mockSetup     func()
+		expectedError bool
+	}{
+		{
+			name: "no need to remove finalizers",
+			user: &v3.User{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "testuser",
+					Finalizers: []string{
+						"controller.cattle.io/test-finalizer",
+					},
+				},
+			},
+			mockSetup: func() {},
+			//usersMock.EXPECT().Update(&v3.User{}).Return(&v3.User{}, nil)
+			expectedError: false,
+		},
+		{
+			name: "remove desired finalizer",
+			user: &v3.User{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "testuser",
+					Finalizers: []string{
+						"controller.cattle.io/test-finalizer",
+						"controller.cattle.io/cat-user-controller",
+					},
+				},
+			},
+			mockSetup: func() {
+				usersMock.EXPECT().Update(&v3.User{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "testuser",
+						Finalizers: []string{
+							"controller.cattle.io/test-finalizer",
+						},
+					},
+				}).Return(&v3.User{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "testuser",
+						Finalizers: []string{
+							"controller.cattle.io/test-finalizer",
+						},
+					},
+				}, nil)
+			},
+			expectedError: false,
+		},
+		{
+			name: "got error when updating user",
+			user: &v3.User{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "testuser",
+					Finalizers: []string{
+						"controller.cattle.io/test-finalizer",
+						"controller.cattle.io/cat-user-controller",
+					},
+				},
+			},
+			mockSetup: func() {
+				usersMock.EXPECT().Update(&v3.User{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "testuser",
+						Finalizers: []string{
+							"controller.cattle.io/test-finalizer",
+						},
+					},
+				}).Return(nil, fmt.Errorf("error"))
+			},
+			expectedError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.mockSetup()
+
+			user, err := ul.removeLegacyFinalizers(tt.user)
+
+			if tt.expectedError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.NotContains(t, user.Finalizers, "controller.cattle.io/cat-user-controller")
 			}
 		})
 	}
