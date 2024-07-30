@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/creasty/defaults"
-	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/shepherd/clients/k3d"
 	rancherClient "github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
@@ -22,11 +21,11 @@ import (
 	"github.com/rancher/shepherd/pkg/session"
 	"github.com/sirupsen/logrus"
 	kwait "k8s.io/apimachinery/pkg/util/wait"
+
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 )
 
-var (
-	agentImage = os.Getenv("CATTLE_AGENT_IMAGE")
-)
+var agentImage = os.Getenv("CATTLE_AGENT_IMAGE")
 
 const (
 	k3dClusterNameBasename = "k3d-cluster"
@@ -52,7 +51,6 @@ func main() {
 
 		return true, nil
 	})
-
 	if err != nil {
 		logrus.Fatalf("Error with generating admin token: %v", err)
 	}
@@ -60,10 +58,12 @@ func main() {
 	clusterName := namegen.AppendRandomString(k3dClusterNameBasename)
 
 	cleanup := true
+	insecure := true
 	rancherConfig.AdminToken = userToken.Token
 	rancherConfig.Host = hostURL
 	rancherConfig.Cleanup = &cleanup
 	rancherConfig.ClusterName = clusterName
+	rancherConfig.Insecure = &insecure
 
 	if err := defaults.Set(rancherConfig); err != nil {
 		logrus.Fatalf("error with setting up config file: %v", err)
