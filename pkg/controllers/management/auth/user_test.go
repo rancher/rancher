@@ -402,8 +402,10 @@ func Test_deleteUserNamespace(t *testing.T) {
 			name:     "delete namespace",
 			username: "testuser",
 			mockSetup: func() {
-				namespaceListerMock.EXPECT().Get("", "testuser").Return(&v12.Namespace{}, nil)
-				namespaceMock.EXPECT().Delete("testuser", &metav1.DeleteOptions{}).Return(nil)
+				gomock.InOrder(
+					namespaceListerMock.EXPECT().Get("", "testuser").Return(&v12.Namespace{}, nil),
+					namespaceMock.EXPECT().Delete("testuser", &metav1.DeleteOptions{}).Return(nil),
+				)
 			},
 			expectedError: false,
 		},
@@ -411,7 +413,9 @@ func Test_deleteUserNamespace(t *testing.T) {
 			name:     "error getting namespace",
 			username: "testuser",
 			mockSetup: func() {
-				namespaceListerMock.EXPECT().Get("", "testuser").Return(nil, fmt.Errorf(""))
+				gomock.InOrder(
+					namespaceListerMock.EXPECT().Get("", "testuser").Return(nil, fmt.Errorf("")),
+				)
 			},
 			expectedError: true,
 		},
@@ -419,8 +423,10 @@ func Test_deleteUserNamespace(t *testing.T) {
 			name:     "error deleting namespace",
 			username: "testuser",
 			mockSetup: func() {
-				namespaceListerMock.EXPECT().Get("", "testuser").Return(&v12.Namespace{}, nil)
-				namespaceMock.EXPECT().Delete("testuser", &metav1.DeleteOptions{}).Return(fmt.Errorf(""))
+				gomock.InOrder(
+					namespaceListerMock.EXPECT().Get("", "testuser").Return(&v12.Namespace{}, nil),
+					namespaceMock.EXPECT().Delete("testuser", &metav1.DeleteOptions{}).Return(fmt.Errorf("")),
+				)
 			},
 			expectedError: true,
 		},
@@ -431,6 +437,73 @@ func Test_deleteUserNamespace(t *testing.T) {
 			tt.mockSetup()
 
 			err := ul.deleteUserNamespace(tt.username)
+
+			if tt.expectedError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func Test_deleteUserSecret(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	secretsMock := NewMockSecretInterface(ctrl)
+	secretsListerMock := NewMockSecretLister(ctrl)
+
+	ul := &userLifecycle{
+		secrets:       secretsMock,
+		secretsLister: secretsListerMock,
+	}
+
+	tests := []struct {
+		name          string
+		username      string
+		mockSetup     func()
+		expectedError bool
+	}{
+		{
+			name:     "delete secret",
+			username: "testuser",
+			mockSetup: func() {
+				gomock.InOrder(
+					secretsListerMock.EXPECT().Get("cattle-system", "testuser-secret").Return(&v12.Secret{}, nil),
+					secretsMock.EXPECT().DeleteNamespaced("cattle-system", "testuser-secret", &metav1.DeleteOptions{}).Return(nil),
+				)
+			},
+			expectedError: false,
+		},
+		{
+			name:     "error getting secret",
+			username: "testuser",
+			mockSetup: func() {
+				gomock.InOrder(
+					secretsListerMock.EXPECT().Get("cattle-system", "testuser-secret").Return(nil, fmt.Errorf("")),
+				)
+			},
+			expectedError: true,
+		},
+		{
+			name:     "error deleting secret",
+			username: "testuser",
+			mockSetup: func() {
+				gomock.InOrder(
+					secretsListerMock.EXPECT().Get("cattle-system", "testuser-secret").Return(&v12.Secret{}, nil),
+					secretsMock.EXPECT().DeleteNamespaced("cattle-system", "testuser-secret", &metav1.DeleteOptions{}).Return(fmt.Errorf("")),
+				)
+			},
+			expectedError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.mockSetup()
+
+			err := ul.deleteUserSecret(tt.username)
 
 			if tt.expectedError {
 				assert.Error(t, err)
