@@ -1,4 +1,5 @@
 from .common import random_str, auth_check
+import time
 from rancher import ApiError
 import pytest
 
@@ -23,6 +24,27 @@ def test_dns_fields(admin_pc_client):
     })
 
 
+def wait_for_dns_active(client, obj, timeout=45):
+    start = time.time()
+    obj = client.reload(obj)
+    sleep = 0.01
+
+    while not obj.state == 'active':
+        time.sleep(sleep)
+        sleep *= 2
+        if sleep > 2:
+            sleep = 2
+        obj = client.reload(obj)
+        delta = time.time() - start
+        if delta > timeout:
+            msg = 'Expected state to be active.\n' \
+                'Timeout waiting for [{}:{}] for state after {} ' \
+                'seconds\n {}'.format(obj.type, obj.id,
+                                      delta, str(obj))
+            raise Exception(msg)
+    return obj
+
+
 def test_dns_hostname(admin_pc, admin_cc_client):
     client = admin_pc.client
 
@@ -33,6 +55,7 @@ def test_dns_hostname(admin_pc, admin_cc_client):
     dns_record = client.create_dns_record(name=name,
                                           hostname='target',
                                           namespaceId=ns.id)
+
     assert dns_record.baseType == 'dnsRecord'
     assert dns_record.type == 'dnsRecord'
     assert dns_record.name == name
@@ -79,6 +102,9 @@ def test_dns_ips(admin_pc, admin_cc_client):
                                           ipAddresses=['1.1.1.1',
                                                        '2.2.2.2'],
                                           namespaceId=ns.id)
+
+    wait_for_dns_active(client, dns_record, 120)
+
     assert dns_record.baseType == 'dnsRecord'
     assert dns_record.type == 'dnsRecord'
     assert dns_record.name == name

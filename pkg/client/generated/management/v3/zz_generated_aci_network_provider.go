@@ -77,6 +77,11 @@ const (
 	AciNetworkProviderFieldOpflexMode                           = "opflexMode"
 	AciNetworkProviderFieldOpflexOpensslCompat                  = "opflexOpensslCompat"
 	AciNetworkProviderFieldOpflexServerPort                     = "opflexServerPort"
+	AciNetworkProviderFieldOpflexStartupEnabled                 = "opflexStartupEnabled"
+	AciNetworkProviderFieldOpflexStartupPolicyDuration          = "opflexStartupPolicyDuration"
+	AciNetworkProviderFieldOpflexStartupResolveAftConn          = "opflexStartupResolveAftConn"
+	AciNetworkProviderFieldOpflexSwitchSyncDelay                = "opflexSwitchSyncDelay"
+	AciNetworkProviderFieldOpflexSwitchSyncDynamic              = "opflexSwitchSyncDynamic"
 	AciNetworkProviderFieldOverlayVRFName                       = "overlayVrfName"
 	AciNetworkProviderFieldPBRTrackingNonSnat                   = "pbrTrackingNonSnat"
 	AciNetworkProviderFieldPodSubnetChunkSize                   = "podSubnetChunkSize"
@@ -190,6 +195,11 @@ type AciNetworkProvider struct {
 	OpflexMode                           string              `json:"opflexMode,omitempty" yaml:"opflexMode,omitempty"`
 	OpflexOpensslCompat                  string              `json:"opflexOpensslCompat,omitempty" yaml:"opflexOpensslCompat,omitempty"`
 	OpflexServerPort                     string              `json:"opflexServerPort,omitempty" yaml:"opflexServerPort,omitempty"`
+	OpflexStartupEnabled                 string              `json:"opflexStartupEnabled,omitempty" yaml:"opflexStartupEnabled,omitempty"`
+	OpflexStartupPolicyDuration          string              `json:"opflexStartupPolicyDuration,omitempty" yaml:"opflexStartupPolicyDuration,omitempty"`
+	OpflexStartupResolveAftConn          string              `json:"opflexStartupResolveAftConn,omitempty" yaml:"opflexStartupResolveAftConn,omitempty"`
+	OpflexSwitchSyncDelay                string              `json:"opflexSwitchSyncDelay,omitempty" yaml:"opflexSwitchSyncDelay,omitempty"`
+	OpflexSwitchSyncDynamic              string              `json:"opflexSwitchSyncDynamic,omitempty" yaml:"opflexSwitchSyncDynamic,omitempty"`
 	OverlayVRFName                       string              `json:"overlayVrfName,omitempty" yaml:"overlayVrfName,omitempty"`
 	PBRTrackingNonSnat                   string              `json:"pbrTrackingNonSnat,omitempty" yaml:"pbrTrackingNonSnat,omitempty"`
 	PodSubnetChunkSize                   string              `json:"podSubnetChunkSize,omitempty" yaml:"podSubnetChunkSize,omitempty"`

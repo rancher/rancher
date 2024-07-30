@@ -56,15 +56,25 @@ func (p *Provisioner) getKontainerDriver(spec apimgmtv3.ClusterSpec) (*apimgmtv3
 	return nil, fmt.Errorf("no kontainer driver for cluster %v", spec.DisplayName)
 }
 
-func (p *Provisioner) driverUpdate(cluster *apimgmtv3.Cluster, spec apimgmtv3.ClusterSpec) (api string, token string, cert string, updateTriggered bool, err error) {
+// driverUpdate updates the given cluster with the new config from `spec` using its driver. If `forceUpdate` is true,
+// the update will be performed regardless of whether the spec has changed at all. Otherwise, the update will only
+// occur if the spec has changed.
+func (p *Provisioner) driverUpdate(
+	cluster *apimgmtv3.Cluster,
+	spec apimgmtv3.ClusterSpec,
+	forceUpdate bool,
+) (api string, token string, cert string, updateTriggered bool, err error) {
 	ctx, logger := clusterprovisioninglogger.NewLogger(p.Clusters, p.ConfigMaps, cluster, apimgmtv3.ClusterConditionUpdated)
 	defer logger.Close()
 
 	spec = cleanRKE(spec)
 	applied := cleanRKE(cluster.Status.AppliedSpec)
 
-	if spec.RancherKubernetesEngineConfig != nil && cluster.Status.APIEndpoint != "" && cluster.Status.ServiceAccountTokenSecret != "" &&
-		reflect.DeepEqual(applied.RancherKubernetesEngineConfig, spec.RancherKubernetesEngineConfig) {
+	configUnchanged := spec.RancherKubernetesEngineConfig != nil &&
+		cluster.Status.APIEndpoint != "" &&
+		cluster.Status.ServiceAccountTokenSecret != "" &&
+		reflect.DeepEqual(applied.RancherKubernetesEngineConfig, spec.RancherKubernetesEngineConfig)
+	if configUnchanged && !forceUpdate {
 		secret, err := p.Secrets.GetNamespaced("cattle-global-data", cluster.Status.ServiceAccountTokenSecret, v1.GetOptions{})
 		if err != nil {
 			logrus.Errorf("Could not find service account token secret %s for cluster %s: [%v]", cluster.Status.ServiceAccountTokenSecret, cluster.Name, err)

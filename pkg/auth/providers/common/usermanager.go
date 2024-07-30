@@ -288,7 +288,7 @@ func (m *userManager) EnsureClusterToken(clusterName string, input user.TokenInp
 
 	logrus.Infof("Creating token for user %v", input.UserName)
 	err = wait.ExponentialBackoff(backoff, func() (bool, error) {
-		// Backoff was added here because it is possible the token is the process of deleting.
+		// Backoff was added here because it is possible the token is in the process of deleting.
 		// This should cause the create to retry until the delete is finished.
 		newToken, err := m.tokens.Create(token)
 		if err != nil {
@@ -300,7 +300,6 @@ func (m *userManager) EnsureClusterToken(clusterName string, input user.TokenInp
 		token = newToken
 		return true, nil
 	})
-
 	if err != nil {
 		return "", err
 	}
@@ -310,13 +309,11 @@ func (m *userManager) EnsureClusterToken(clusterName string, input user.TokenInp
 
 // newTokenForKubeconfig creates a new token for a generated kubeconfig.
 func (m *userManager) newTokenForKubeconfig(clusterName, tokenName, description, kind, userName string, userPrincipal v3.Principal) (string, error) {
-
 	tokenTTL, err := tokens.GetKubeconfigDefaultTokenTTLInMilliSeconds()
 	if err != nil {
 		return "", fmt.Errorf("failed to get default token TTL: %w", err)
 	}
 
-	logrus.Infof("Creating token for user %v", userName)
 	input := user.TokenInput{
 		TokenName:     tokenName,
 		Description:   description,
@@ -327,11 +324,8 @@ func (m *userManager) newTokenForKubeconfig(clusterName, tokenName, description,
 		Randomize:     true,
 		UserPrincipal: userPrincipal,
 	}
-	fullToken, err := m.EnsureClusterToken(clusterName, input)
-	if err != nil {
-		return "", err
-	}
-	return fullToken, nil
+
+	return m.EnsureClusterToken(clusterName, input)
 }
 
 // GetKubeconfigToken creates a new token for use in a kubeconfig generated through the CLI.

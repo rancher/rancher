@@ -346,7 +346,7 @@ func (m *nodesSyncer) getNodePlan(node *apimgmtv3.Node) (rketypes.RKEConfigNodeP
 		return rketypes.RKEConfigNodePlan{}, err
 	}
 
-	appliedSpec, err := assemblers.AssembleRKEConfigSpec(cluster, cluster.Status.AppliedSpec, m.secretLister)
+	appliedSpec, err := assemblers.AssembleRKEConfigSpec(cluster, *cluster.Status.AppliedSpec.DeepCopy(), m.secretLister)
 	if err != nil {
 		return rketypes.RKEConfigNodePlan{}, err
 	}

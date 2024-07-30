@@ -37,6 +37,11 @@ debug: false
 # When starting Rancher for the first time, bootstrap the admin as restricted-admin
 restrictedAdmin: false
 
+# Control how the Rancher agents validate TLS connections
+# Valid options: strict, or system-store
+# Note, for new installations empty will default to strict on 2.9+, or system-store on 2.8 or older
+agentTLSMode: ""
+
 # Extra environment variables passed to the rancher pods.
 # extraEnv:
 # - name: CATTLE_TLS_MIN_VERSION
@@ -171,12 +176,19 @@ postDelete:
 # Set a bootstrap password. If leave empty, a random password will be generated.
 bootstrapPassword: ""
 
+startupProbe:
+  ## should be ready within 2 minutes
+  timeoutSeconds: 5
+  periodSeconds: 10
+  failureThreshold: 12
 livenessProbe:
-  initialDelaySeconds: 60
+  timeoutSeconds: 5
   periodSeconds: 30
+  failureThreshold: 5
 readinessProbe:
-  initialDelaySeconds: 5
+  timeoutSeconds: 5
   periodSeconds: 30
+  failureThreshold: 5
 
 global:
   cattle:

@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/rancher/rancher/pkg/agent/cluster"
+	"github.com/rancher/rancher/pkg/controllers/managementuser/cavalidator"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/rancher"
@@ -26,7 +27,7 @@ var (
 )
 
 func Run(ctx context.Context) error {
-	if err := setupSteveAggregation(); err != nil {
+	if err := setupSteveAggregation(ctx); err != nil {
 		return err
 	}
 
@@ -114,7 +115,7 @@ func (h *handler) OnChange(key string, service *corev1.Service) (*corev1.Service
 	return service, nil
 }
 
-func setupSteveAggregation() error {
+func setupSteveAggregation(ctx context.Context) error {
 	c, err := rest.InClusterConfig()
 	if err != nil {
 		return err
@@ -144,6 +145,12 @@ func setupSteveAggregation() error {
 		return err
 	} else {
 		data["ca.crt"] = ca
+	}
+
+	if ctx.Value(cavalidator.CacertsValid).(bool) {
+		data[cavalidator.CacertsValid] = []byte("true")
+	} else {
+		data[cavalidator.CacertsValid] = []byte("false")
 	}
 
 	return apply.

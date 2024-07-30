@@ -1,6 +1,6 @@
 //go:build (validation || infra.any || cluster.any || stress) && !sanity && !extended
 
-package rbac
+package psa
 
 import (
 	"regexp"
@@ -13,6 +13,7 @@ import (
 	"github.com/rancher/shepherd/extensions/clusters"
 	"github.com/rancher/shepherd/extensions/namespaces"
 	psadeploy "github.com/rancher/shepherd/extensions/psact"
+	rbac "github.com/rancher/shepherd/extensions/rbac"
 	"github.com/rancher/shepherd/extensions/users"
 	namegen "github.com/rancher/shepherd/pkg/namegenerator"
 	"github.com/rancher/shepherd/pkg/session"
@@ -47,7 +48,7 @@ type PSATestSuite struct {
 
 func (rb *PSATestSuite) TearDownSuite() {
 	// reset the PSACT
-	_, err := editPsactCluster(rb.client, rb.clusterName, defaultNamespace, "")
+	_, err := editPsactCluster(rb.client, rb.clusterName, rbac.DefaultNamespace, "")
 	require.NoError(rb.T(), err)
 	rb.session.Cleanup()
 }
@@ -97,15 +98,15 @@ func (rb *PSATestSuite) ValidatePSA(role string, customRole bool) {
 	response, err := rb.steveNonAdminClient.SteveType(namespaces.NamespaceSteveType).Update(rb.adminNamespace, updateNS)
 
 	switch role {
-	case restrictedAdmin, roleOwner:
+	case rbac.RestrictedAdmin.String(), rbac.ClusterOwner.String():
 		require.NoError(rb.T(), err)
 		expectedLabels := getPSALabels(response, labels)
 		assert.Equal(rb.T(), labels, expectedLabels)
-	case roleMember, roleProjectReadOnly:
+	case rbac.ClusterMember.String(), rbac.ReadOnly.String():
 		require.Error(rb.T(), err)
 		errMessage := strings.Split(err.Error(), ":")[0]
 		assert.Equal(rb.T(), "Resource type [namespace] is not updatable", errMessage)
-	case roleProjectOwner, roleProjectMember, roleCustomCreateNS:
+	case rbac.ProjectOwner.String(), rbac.ProjectMember.String(), rbac.CreateNS.String():
 		require.Error(rb.T(), err)
 		errStatus := strings.Split(err.Error(), ".")[1]
 		rgx := regexp.MustCompile(`\[(.*?)\]`)
@@ -115,7 +116,7 @@ func (rb *PSATestSuite) ValidatePSA(role string, customRole bool) {
 
 	rb.T().Logf("Validate deletion of the PSA labels as %v", role)
 
-	deleteLabels(labels)
+	deletePSALabels(labels)
 
 	deleteLabelsNS, err := getAndConvertNamespace(rb.adminNamespace, rb.steveAdminClient)
 	require.NoError(rb.T(), err)
@@ -123,19 +124,20 @@ func (rb *PSATestSuite) ValidatePSA(role string, customRole bool) {
 
 	_, err = rb.steveNonAdminClient.SteveType(namespaces.NamespaceSteveType).Update(rb.adminNamespace, deleteLabelsNS)
 	switch role {
-	case restrictedAdmin, roleOwner:
+	case rbac.RestrictedAdmin.String(), rbac.ClusterOwner.String():
 		require.NoError(rb.T(), err)
 		expectedLabels := getPSALabels(response, labels)
 		assert.Equal(rb.T(), 0, len(expectedLabels))
 		if !customRole {
-			_, err = createDeploymentAndWait(rb.steveNonAdminClient, rb.client, rb.cluster.ID, containerName, containerImage, rb.adminNamespace.Name)
+			_, err = createDeploymentAndWait(rb.steveNonAdminClient, containerName, containerImage, rb.adminNamespace.Name)
 			require.NoError(rb.T(), err)
 		}
-	case roleMember, roleProjectReadOnly:
+	case rbac.ClusterMember.String(), rbac.ReadOnly.String():
 		require.Error(rb.T(), err)
 		errMessage := strings.Split(err.Error(), ":")[0]
 		assert.Equal(rb.T(), "Resource type [namespace] is not updatable", errMessage)
-	case roleProjectOwner, roleProjectMember, roleCustomCreateNS:
+	case rbac.ProjectOwner.String(), rbac.ProjectMember.String(), rbac.CreateNS.String():
+		require.Error(rb.T(), err)
 		errStatus := strings.Split(err.Error(), ".")[1]
 		rgx := regexp.MustCompile(`\[(.*?)\]`)
 		errorMsg := rgx.FindStringSubmatch(errStatus)
@@ -153,21 +155,21 @@ func (rb *PSATestSuite) ValidatePSA(role string, customRole bool) {
 	namespaceCreate, err := namespaces.CreateNamespace(rb.nonAdminUserClient, namespaceName, "{}", labels, map[string]string{}, rb.adminProject)
 
 	switch role {
-	case restrictedAdmin, roleOwner:
+	case rbac.RestrictedAdmin.String(), rbac.ClusterOwner.String():
 		require.NoError(rb.T(), err)
 		expectedLabels := getPSALabels(response, labels)
 		assert.Equal(rb.T(), labels, expectedLabels)
 		if !customRole {
-			_, err = createDeploymentAndWait(rb.steveNonAdminClient, rb.client, rb.cluster.ID, containerName, containerImage, namespaceCreate.Name)
+			_, err = createDeploymentAndWait(rb.steveNonAdminClient, containerName, containerImage, namespaceCreate.Name)
 			require.NoError(rb.T(), err)
 		}
-	case roleProjectOwner, roleProjectMember, roleCustomCreateNS:
+	case rbac.ProjectOwner.String(), rbac.ProjectMember.String(), rbac.CreateNS.String():
 		require.Error(rb.T(), err)
 		errStatus := strings.Split(err.Error(), ".")[1]
 		rgx := regexp.MustCompile(`\[(.*?)\]`)
 		errorMsg := rgx.FindStringSubmatch(errStatus)
 		assert.Equal(rb.T(), "403 Forbidden", errorMsg[1])
-	case roleMember, roleProjectReadOnly:
+	case rbac.ClusterMember.String(), rbac.ReadOnly.String():
 		require.Error(rb.T(), err)
 		errMessage := strings.Split(err.Error(), ":")[0]
 		assert.Equal(rb.T(), "Resource type [namespace] is not creatable", errMessage)
@@ -214,13 +216,13 @@ func (rb *PSATestSuite) ValidateAdditionalPSA(role string) {
 	response, err := rb.steveNonAdminClient.SteveType(namespaces.NamespaceSteveType).Update(rb.stdUserNamespace, updateNS)
 
 	switch role {
-	case roleOwner, psaRole:
+	case rbac.ClusterOwner.String(), psaRole:
 		require.NoError(rb.T(), err)
 		expectedLabels := getPSALabels(response, labels)
 		assert.Equal(rb.T(), labels, expectedLabels)
-		_, err = createDeploymentAndWait(rb.steveNonAdminClient, rb.client, rb.cluster.ID, containerName, containerImage, rb.stdUserNamespace.Name)
+		_, err = createDeploymentAndWait(rb.steveNonAdminClient, containerName, containerImage, rb.stdUserNamespace.Name)
 		require.Error(rb.T(), err)
-	case roleMember:
+	case rbac.ClusterMember.String():
 		require.Error(rb.T(), err)
 		errStatus := strings.Split(err.Error(), ".")[1]
 		rgx := regexp.MustCompile(`\[(.*?)\]`)
@@ -235,7 +237,7 @@ func (rb *PSATestSuite) ValidateAdditionalPSA(role string) {
 
 	rb.T().Logf("Validate deletion of PSA labels in namespace in a cluster member created project as %v", role)
 
-	deleteLabels(labels)
+	deletePSALabels(labels)
 	deleteLabelsNS, err := getAndConvertNamespace(rb.stdUserNamespace, rb.steveAdminClient)
 	require.NoError(rb.T(), err)
 	deleteLabelsNS.Labels = labels
@@ -243,13 +245,13 @@ func (rb *PSATestSuite) ValidateAdditionalPSA(role string) {
 	_, err = rb.steveNonAdminClient.SteveType(namespaces.NamespaceSteveType).Update(rb.stdUserNamespace, deleteLabelsNS)
 
 	switch role {
-	case roleOwner, psaRole:
+	case rbac.ClusterOwner.String(), psaRole:
 		require.NoError(rb.T(), err)
 		expectedLabels := getPSALabels(response, labels)
 		assert.Equal(rb.T(), labels, expectedLabels)
-		_, err = createDeploymentAndWait(rb.steveNonAdminClient, rb.client, rb.cluster.ID, containerName, containerImage, rb.stdUserNamespace.Name)
+		_, err = createDeploymentAndWait(rb.steveNonAdminClient, containerName, containerImage, rb.stdUserNamespace.Name)
 		require.NoError(rb.T(), err)
-	case roleMember:
+	case rbac.ClusterMember.String():
 		require.Error(rb.T(), err)
 		errStatus := strings.Split(err.Error(), ".")[1]
 		rgx := regexp.MustCompile(`\[(.*?)\]`)
@@ -259,13 +261,13 @@ func (rb *PSATestSuite) ValidateAdditionalPSA(role string) {
 }
 
 func (rb *PSATestSuite) ValidateEditPsactCluster(role string, psact string) {
-	clusterType, err := editPsactCluster(rb.nonAdminUserClient, rb.clusterName, defaultNamespace, psact)
+	clusterType, err := editPsactCluster(rb.nonAdminUserClient, rb.clusterName, rbac.DefaultNamespace, psact)
 	switch role {
-	case roleOwner, restrictedAdmin:
+	case rbac.ClusterOwner.String(), rbac.RestrictedAdmin.String():
 		require.NoError(rb.T(), err)
 		err = psadeploy.CreateNginxDeployment(rb.nonAdminUserClient, rb.clusterID, psact)
 		require.NoError(rb.T(), err)
-	case roleMember, roleProjectOwner, roleProjectMember, roleProjectReadOnly:
+	case rbac.ClusterMember.String(), rbac.ProjectOwner.String(), rbac.ProjectMember.String(), rbac.ReadOnly.String():
 		require.Error(rb.T(), err)
 		if clusterType == "RKE2K3S" {
 			assert.Equal(rb.T(), "Resource type [provisioning.cattle.io.cluster] is not updatable", err.Error())
@@ -279,10 +281,10 @@ func (rb *PSATestSuite) ValidateEditPsactCluster(role string, psact string) {
 }
 
 func (rb *PSATestSuite) TestPSA() {
-	nonAdminUserRoles := [...]string{roleMember, restrictedAdmin, roleOwner, roleProjectOwner, roleProjectReadOnly, roleProjectMember, roleCustomCreateNS}
+	nonAdminUserRoles := [...]string{rbac.ClusterMember.String(), rbac.RestrictedAdmin.String(), rbac.ClusterOwner.String(), rbac.ProjectOwner.String(), rbac.ReadOnly.String(), rbac.ProjectMember.String(), rbac.CreateNS.String()}
 	for _, role := range nonAdminUserRoles {
 		var customRole bool
-		if role == roleCustomCreateNS {
+		if role == rbac.CreateNS.String() {
 			customRole = true
 		}
 		createProjectAsAdmin, err := createProject(rb.client, rb.cluster.ID)
@@ -303,15 +305,15 @@ func (rb *PSATestSuite) TestPSA() {
 		expectedPSALabels := getPSALabels(adminNamespace, labels)
 		assert.Equal(rb.T(), labels, expectedPSALabels)
 		rb.adminNamespace = adminNamespace
-		_, err = createDeploymentAndWait(rb.steveAdminClient, rb.client, rb.cluster.ID, containerName, containerImage, rb.adminNamespace.Name)
+		_, err = createDeploymentAndWait(rb.steveAdminClient, containerName, containerImage, rb.adminNamespace.Name)
 		require.Error(rb.T(), err)
 
 		rb.Run("Create a user with global role "+role, func() {
 			var userRole string
-			if role == restrictedAdmin {
-				userRole = restrictedAdmin
+			if role == rbac.RestrictedAdmin.String() {
+				userRole = rbac.RestrictedAdmin.String()
 			} else {
-				userRole = standardUser
+				userRole = rbac.StandardUser.String()
 			}
 			newUser, err := users.CreateUserWithRole(rb.client, users.UserConfig(), userRole)
 
@@ -325,8 +327,8 @@ func (rb *PSATestSuite) TestPSA() {
 			defer subSession.Cleanup()
 
 			log.Info("Adding user as " + role + " to the downstream cluster.")
-			if role != restrictedAdmin {
-				if strings.Contains(role, "project") || role == roleProjectReadOnly || role == roleCustomCreateNS {
+			if role != rbac.RestrictedAdmin.String() {
+				if strings.Contains(role, "project") || role == rbac.ReadOnly.String() || role == rbac.CreateNS.String() {
 					err := users.AddProjectMember(rb.client, rb.adminProject, rb.nonAdminUser, role, nil)
 					require.NoError(rb.T(), err)
 				} else {
@@ -353,7 +355,7 @@ func (rb *PSATestSuite) TestPSA() {
 			})
 		}
 
-		if strings.Contains(role, "project") || role == roleCustomCreateNS {
+		if strings.Contains(role, "project") || role == rbac.CreateNS.String() {
 			rb.Run("Additional testcase - Validate if "+role+" with an additional role update-psa can add/edit/delete labels from admin created namespace", func() {
 				err := users.AddClusterRoleToUser(rb.client, rb.cluster, rb.nonAdminUser, rb.psaRole.ID, nil)
 				require.NoError(rb.T(), err)
@@ -369,12 +371,12 @@ func (rb *PSATestSuite) TestPsactRBAC() {
 		role   string
 		member string
 	}{
-		{"Cluster Owner", roleOwner, standardUser},
-		{"Cluster Member", roleMember, standardUser},
-		{"Project Owner", roleProjectOwner, standardUser},
-		{"Project Member", roleProjectMember, standardUser},
-		{"Project Read Only", roleProjectReadOnly, standardUser},
-		{"Restricted Admin", restrictedAdmin, restrictedAdmin},
+		{"Cluster Owner", rbac.ClusterOwner.String(), rbac.StandardUser.String()},
+		{"Cluster Member", rbac.ClusterMember.String(), rbac.StandardUser.String()},
+		{"Project Owner", rbac.ProjectOwner.String(), rbac.StandardUser.String()},
+		{"Project Member", rbac.ProjectMember.String(), rbac.StandardUser.String()},
+		{"Project Read Only", rbac.ReadOnly.String(), rbac.StandardUser.String()},
+		{"Restricted Admin", rbac.RestrictedAdmin.String(), rbac.RestrictedAdmin.String()},
 	}
 	for _, tt := range tests {
 		rb.Run("Set up User with Cluster Role "+tt.name, func() {
@@ -393,8 +395,8 @@ func (rb *PSATestSuite) TestPsactRBAC() {
 			require.NoError(rb.T(), err)
 		})
 		rb.Run("Adding user as "+tt.name+" to the downstream cluster.", func() {
-			if tt.member == standardUser {
-				if strings.Contains(tt.role, "project") || tt.role == roleProjectReadOnly {
+			if tt.member == rbac.StandardUser.String() {
+				if strings.Contains(tt.role, "project") || tt.role == rbac.ReadOnly.String() {
 					err := users.AddProjectMember(rb.client, rb.adminProject, rb.nonAdminUser, tt.role, nil)
 					require.NoError(rb.T(), err)
 				} else {

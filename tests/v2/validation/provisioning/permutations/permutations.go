@@ -27,6 +27,7 @@ import (
 	"github.com/rancher/shepherd/extensions/services"
 	"github.com/rancher/shepherd/extensions/workloads"
 	"github.com/rancher/shepherd/extensions/workloads/pods"
+	"github.com/rancher/shepherd/pkg/config"
 	"github.com/rancher/shepherd/pkg/namegenerator"
 	"github.com/rancher/shepherd/pkg/session"
 	"github.com/sirupsen/logrus"
@@ -114,7 +115,6 @@ func RunTestPermutations(s *suite.Suite, testNamePrefix string, client *rancher.
 				nodeTemplate := &nodetemplates.NodeTemplate{}
 
 				s.Run(name, func() {
-
 					if testClusterConfig.CloudProvider == provisioninginput.AWSProviderName.String() {
 						byteYaml, err := os.ReadFile(outOfTreeAWSFilePath)
 						require.NoError(s.T(), err)
@@ -196,7 +196,6 @@ func RunTestPermutations(s *suite.Suite, testNamePrefix string, client *rancher.
 					}
 
 					RunPostClusterCloudProviderChecks(s.T(), client, clusterType, nodeTemplate, testClusterConfig, clusterObject, rke1ClusterObject)
-
 				})
 			}
 		}
@@ -207,13 +206,15 @@ func RunTestPermutations(s *suite.Suite, testNamePrefix string, client *rancher.
 // on an active cluster.
 func RunPostClusterCloudProviderChecks(t *testing.T, client *rancher.Client, clusterType string, nodeTemplate *nodetemplates.NodeTemplate, testClusterConfig *clusters.ClusterConfig, clusterObject *steveV1.SteveAPIObject, rke1ClusterObject *management.Cluster) {
 	if strings.Contains(clusterType, clusters.RKE1ClusterType.String()) {
-		providers := *testClusterConfig.Providers
 		adminClient, err := rancher.NewClient(client.RancherConfig.AdminToken, client.Session)
 		require.NoError(t, err)
 
 		if strings.Contains(testClusterConfig.CloudProvider, provisioninginput.AWSProviderName.String()) {
 			if strings.Contains(testClusterConfig.CloudProvider, externalProviderString) {
-				err := CreateAndInstallAWSExternalCharts(client, rke1ClusterObject.ID, false)
+				clusterMeta, err := clusters.NewClusterMeta(client, rke1ClusterObject.Name)
+				require.NoError(t, err)
+
+				err = CreateAndInstallAWSExternalCharts(client, clusterMeta, false)
 				require.NoError(t, err)
 
 				podErrors := pods.StatusPods(client, rke1ClusterObject.ID)
@@ -230,17 +231,25 @@ func RunPostClusterCloudProviderChecks(t *testing.T, client *rancher.Client, clu
 			require.NoError(t, err)
 
 			services.VerifyAWSLoadBalancer(t, client, lbServiceResp, status.ClusterName)
-		} else if strings.Contains(testClusterConfig.CloudProvider, "external") && providers[0] == provisioninginput.VsphereProviderName.String() {
-			err := charts.InstallVsphereOutOfTreeCharts(client, nodeTemplate, catalog.RancherChartRepo, rke1ClusterObject.ID)
+		} else if strings.Contains(testClusterConfig.CloudProvider, "external") {
+			rke1ClusterObject, err := adminClient.Management.Cluster.ByID(rke1ClusterObject.ID)
 			require.NoError(t, err)
 
-			podErrors := pods.StatusPods(client, rke1ClusterObject.ID)
-			require.Empty(t, podErrors)
+			if strings.Contains(rke1ClusterObject.AppliedSpec.DisplayName, provisioninginput.VsphereProviderName.String()) {
+				chartConfig := new(charts.Config)
+				config.LoadConfig(charts.ConfigurationFileKey, chartConfig)
 
-			clusterObject, err := adminClient.Steve.SteveType(clusters.ProvisioningSteveResourceType).ByID(provisioninginput.Namespace + "/" + rke1ClusterObject.ID)
-			require.NoError(t, err)
+				err := charts.InstallVsphereOutOfTreeCharts(client, catalog.RancherChartRepo, rke1ClusterObject.Name, !chartConfig.IsUpgradable)
+				require.NoError(t, err)
 
-			CreatePVCWorkload(t, client, clusterObject)
+				podErrors := pods.StatusPods(client, rke1ClusterObject.ID)
+				require.Empty(t, podErrors)
+
+				clusterObject, err := adminClient.Steve.SteveType(clusters.ProvisioningSteveResourceType).ByID(provisioninginput.Namespace + "/" + rke1ClusterObject.ID)
+				require.NoError(t, err)
+
+				CreatePVCWorkload(t, client, clusterObject)
+			}
 		}
 	} else if strings.Contains(clusterType, clusters.RKE2ClusterType.String()) {
 		adminClient, err := rancher.NewClient(client.RancherConfig.AdminToken, client.Session)
@@ -341,7 +350,6 @@ func CreateCloudProviderWorkloadAndServicesLB(t *testing.T, client *rancher.Clie
 // CreatePVCWorkload creates a workload with a PVC for storage. This helper should be used to test
 // storage class functionality, i.e. for an in-tree / out-of-tree cloud provider
 func CreatePVCWorkload(t *testing.T, client *rancher.Client, cluster *steveV1.SteveAPIObject) *steveV1.SteveAPIObject {
-
 	status := &provv1.ClusterStatus{}
 	err := steveV1.ConvertToK8sType(cluster.Status, status)
 	require.NoError(t, err)
@@ -391,7 +399,6 @@ func CreatePVCWorkload(t *testing.T, client *rancher.Client, cluster *steveV1.St
 	stevePvc := &steveV1.SteveAPIObject{}
 
 	err = wait.PollUntilContextTimeout(ctx, pollInterval, pollTimeout, true, func(ctx context.Context) (done bool, err error) {
-
 		stevePvc, err = steveclient.SteveType(persistentvolumeclaims.PersistentVolumeClaimType).ByID(defaultNamespace + "/" + persistentVolumeClaim.Name)
 		require.NoError(t, err)
 
@@ -413,7 +420,6 @@ func CreatePVCWorkload(t *testing.T, client *rancher.Client, cluster *steveV1.St
 
 // createNginxDeploymentWithPVC is a helper function that creates a nginx deployment in a cluster's default namespace
 func createNginxDeploymentWithPVC(steveclient *steveV1.Client, containerNamePrefix, pvcName, volName string) (*steveV1.SteveAPIObject, error) {
-
 	logrus.Infof("Vol: %s", volName)
 	logrus.Infof("Pod: %s", pvcName)
 
@@ -461,8 +467,8 @@ func createNginxDeployment(steveclient *steveV1.Client, containerNamePrefix stri
 
 // CreateAndInstallAWSExternalCharts is a helper function for rke1 external-aws cloud provider
 // clusters that install the appropriate chart(s) and returns an error, if any.
-func CreateAndInstallAWSExternalCharts(client *rancher.Client, clusterID string, isLeaderMigration bool) error {
-	steveclient, err := client.Steve.ProxyDownstream(clusterID)
+func CreateAndInstallAWSExternalCharts(client *rancher.Client, cluster *clusters.ClusterMeta, isLeaderMigration bool) error {
+	steveclient, err := client.Steve.ProxyDownstream(cluster.ID)
 	if err != nil {
 		return err
 	}
@@ -473,12 +479,12 @@ func CreateAndInstallAWSExternalCharts(client *rancher.Client, clusterID string,
 		return err
 	}
 
-	project, err := projects.GetProjectByName(client, clusterID, systemProject)
+	project, err := projects.GetProjectByName(client, cluster.ID, systemProject)
 	if err != nil {
 		return err
 	}
 
-	catalogClient, err := client.GetClusterCatalogClient(clusterID)
+	catalogClient, err := client.GetClusterCatalogClient(cluster.ID)
 	if err != nil {
 		return err
 	}
@@ -489,10 +495,10 @@ func CreateAndInstallAWSExternalCharts(client *rancher.Client, clusterID string,
 	}
 
 	installOptions := &charts.InstallOptions{
-		ClusterID: clusterID,
+		Cluster:   cluster,
 		Version:   latestVersion,
 		ProjectID: project.ID,
 	}
-	err = charts.InstallAWSOutOfTreeChart(client, installOptions, repoName, clusterID, isLeaderMigration)
+	err = charts.InstallAWSOutOfTreeChart(client, installOptions, repoName, cluster.ID, isLeaderMigration)
 	return err
 }

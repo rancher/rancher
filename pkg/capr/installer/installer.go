@@ -80,6 +80,28 @@ func LinuxInstallScript(ctx context.Context, token string, envVars []corev1.EnvV
 	if token != "" {
 		token = "CATTLE_ROLE_NONE=true\nCATTLE_TOKEN=\"" + token + "\""
 	}
+
+	// Merge the env vars with the AgentTLSModeStrict
+	found := false
+	for _, ev := range envVars {
+		if ev.Name == "STRICT_VERIFY" {
+			found = true // The user has specified `STRICT_VERIFY`, we should not attempt to overwrite it.
+		}
+	}
+	if !found {
+		if settings.AgentTLSMode.Get() == settings.AgentTLSModeStrict {
+			envVars = append(envVars, corev1.EnvVar{
+				Name:  "STRICT_VERIFY",
+				Value: "true",
+			})
+		} else {
+			envVars = append(envVars, corev1.EnvVar{
+				Name:  "STRICT_VERIFY",
+				Value: "false",
+			})
+		}
+	}
+
 	envVarBuf := &strings.Builder{}
 	for _, envVar := range envVars {
 		if envVar.Value == "" {

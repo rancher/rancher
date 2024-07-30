@@ -36,7 +36,7 @@ if [ -z "${SOME_K8S_VERSION}" ]; then
 # https://github.com/rancher/rancher/issues/36827 has added appDefaults. We do not use appDefaults
 # here for simplicity's sake, as it requires semver parsing & matching. The last release should
 # be good enough for our needs.
-export SOME_K8S_VERSION=$(curl -sS https://raw.githubusercontent.com/rancher/kontainer-driver-metadata/dev-v2.8/data/data.json | jq -r ".$DIST.releases[-1].version")
+export SOME_K8S_VERSION=$(curl -sS https://raw.githubusercontent.com/rancher/kontainer-driver-metadata/release-v2.8/data/data.json | jq -r ".$DIST.releases[-1].version")
 fi
 
 echo "Starting rancher server for provisioning-tests using $SOME_K8S_VERSION"
@@ -52,7 +52,7 @@ curl -sLf https://github.com/rancher/system-agent/releases/download/${CATTLE_SYS
 echo Running provisioning-tests $RUNARG
 
 export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
-go test $RUNARG -v -failfast -timeout 60m ./tests/v2prov/tests/... || {
+CGO_ENABLED=0 go test $RUNARG -v -failfast -timeout 60m ./tests/v2prov/tests/... || {
     echo -e "-----RANCHER-LOG-DUMP-START-----"
     cat /tmp/rancher.log | gzip | base64 -w 0
     echo -e "\n-----RANCHER-LOG-DUMP-END-----"
