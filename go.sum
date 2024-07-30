@@ -1802,8 +1802,6 @@ github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b0
 github.com/rancher/wrangler v0.6.1/go.mod h1:L4HtjPeX8iqLgsxfJgz+JjKMcX2q3qbRXSeTlC/CSd4=
 github.com/rancher/wrangler v1.1.2 h1:oXbXo9k7y/H4drUpb4RM1c++vT9O3rpoNEfyusGykiU=
 github.com/rancher/wrangler v1.1.2/go.mod h1:2k9MyhlBdjcutcBGoOJSUAz0HgDAXnMjv81d3n/AaQc=
-github.com/rancher/wrangler/v2 v2.2.0-rc6 h1:jMsuOVl7nBuQ5QJqdNkR2yHEf1+rYiyd1gN+mQzIcag=
-github.com/rancher/wrangler/v2 v2.2.0-rc6/go.mod h1:rFxhBR+PpC1MuJli+JeMpxoGxfV7XdFWtpdLC8s+oWQ=
 github.com/rancher/wrangler/v3 v3.0.0 h1:IHHCA+vrghJDPxjtLk4fmeSCFhNe9fFzLFj3m2B0YpA=
 github.com/rancher/wrangler/v3 v3.0.0/go.mod h1:Dfckuuq7MJk2JWVBDywRlZXMxEyPxHy4XqGrPEzu5Eg=
 github.com/remyoudompheng/bigfft v0.0.0-20200410134404-eec4a21b6bb0/go.mod h1:qqbHyh8v60DhA7CoWK5oRCqLrMHRGoxYCSS9EjAz6Eo=

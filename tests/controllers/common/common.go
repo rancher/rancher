@@ -7,7 +7,7 @@ import (
 	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
-	"github.com/rancher/wrangler/v2/pkg/crd"
+	"github.com/rancher/wrangler/v3/pkg/crd"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest"
