@@ -84,9 +84,8 @@ func (c *UserAttributeController) sync(key string, attribs *v3.UserAttribute) (r
 		return updated, nil
 	}
 
-	err = fmt.Errorf("error updating user attribute %s after provider refresh: %w", name, err)
 	if !apierrors.IsConflict(err) {
-		return nil, err
+		return nil, fmt.Errorf("error updating user attribute %s after provider refresh: %w", name, err)
 	}
 
 	newAttribs, nerr := c.userAttributes.Get(name, metav1.GetOptions{})
