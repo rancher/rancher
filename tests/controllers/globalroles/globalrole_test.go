@@ -12,7 +12,7 @@ import (
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/rancher/tests/controllers/common"
-	"github.com/rancher/wrangler/v2/pkg/crd"
+	"github.com/rancher/wrangler/v3/pkg/crd"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	corev1 "k8s.io/api/core/v1"

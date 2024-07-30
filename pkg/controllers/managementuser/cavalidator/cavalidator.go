@@ -7,7 +7,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/types/config"
-	"github.com/rancher/wrangler/v2/pkg/condition"
+	"github.com/rancher/wrangler/v3/pkg/condition"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
