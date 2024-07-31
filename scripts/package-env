@@ -8,7 +8,7 @@ SMALL_FORK_REPO_DIR=../build/rancher-data/local-catalogs/v2/rancher-charts-small
 
 CHART_DEFAULT_BRANCH=${CHART_DEFAULT_BRANCH:-"release-v2.8"}
 
-REGISTRY=${REGISTRY:-""}
+REGISTRY=${REGISTRY/:-""}
 IMAGE=${REGISTRY}${REPO}/rancher:${TAG}
 AGENT_IMAGE=${REPO}/rancher-agent:${AGENT_TAG}
 SYSTEM_AGENT_UPGRADE_TAG=$(grep "ENV CATTLE_SYSTEM_AGENT_VERSION" ../package/Dockerfile | awk '{ print $NF }')-suc
