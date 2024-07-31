@@ -21,7 +21,7 @@ func Test_rtCleanUp(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "test 1",
+			name: "remove one entry for annotation and finalizer",
 			args: args{
 				key: "test-key",
 				obj: &v3.RoleTemplate{
@@ -49,7 +49,7 @@ func Test_rtCleanUp(t *testing.T) {
 			},
 		},
 		{
-			name: "test 2",
+			name: "remove multiple annotation(s) and finalizer(s)",
 			args: args{
 				key: "test-key",
 				obj: &v3.RoleTemplate{
