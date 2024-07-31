@@ -7,6 +7,7 @@ import (
 	grbstore "github.com/rancher/rancher/pkg/api/norman/store/globalrolebindings"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
+	"golang.org/x/exp/slices"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -52,14 +53,9 @@ func gbrCleanUp(obj *v3.GlobalRoleBinding) *v3.GlobalRoleBinding {
 
 // cleanFinalizers takes a list of finalizers and removes any finalizer that has the matching prefix
 func cleanFinalizers(finalizers []string, prefix string) []string {
-	var newFinalizers []string
-	for _, finalizer := range finalizers {
-		if strings.HasPrefix(finalizer, prefix) {
-			continue
-		}
-		newFinalizers = append(newFinalizers, finalizer)
-	}
-	return newFinalizers
+	return slices.DeleteFunc(finalizers, func(s string) bool {
+		return strings.HasPrefix(s, prefix)
+	})
 }
 
 // cleanAnnotations takes an objects annotations and removes any annotation that has the matching prefix
