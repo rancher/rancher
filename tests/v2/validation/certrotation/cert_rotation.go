@@ -39,11 +39,6 @@ const (
 
 // rotateCerts rotates the certificates in a cluster
 func rotateCerts(client *rancher.Client, clusterName string) error {
-	kubeProvisioningClient, err := client.GetKubeAPIProvisioningClient()
-	if err != nil {
-		return err
-	}
-
 	adminClient, err := rancher.NewClient(client.RancherConfig.AdminToken, client.Session)
 	if err != nil {
 		return err
@@ -137,6 +132,11 @@ func rotateCerts(client *rancher.Client, clusterName string) error {
 		return err
 	}
 
+	kubeProvisioningClient, err := client.GetKubeAPIProvisioningClient()
+	if err != nil {
+		return err
+	}
+
 	clusterWait, err := kubeProvisioningClient.Clusters("fleet-default").Watch(context.TODO(), metav1.ListOptions{
 		FieldSelector:  "metadata.name=" + clusterName,
 		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
@@ -167,6 +167,8 @@ func rotateCerts(client *rancher.Client, clusterName string) error {
 	if !isAllCertRotated {
 		return errors.New("certs weren't properly rotated")
 	}
+
+	logrus.Infof("Cert Rotation Complete.")
 	return nil
 }
 
@@ -337,7 +339,7 @@ func getCertificatesFromV3Node(client *rancher.Client, v3Node *management.Node) 
 	return certificates, nil
 }
 
-func downloadRKE1SshKeys(client *rancher.Client, v3Node *management.Node) ([]byte, error) {
+func downloadRKE1SSHKeys(client *rancher.Client, v3Node *management.Node) ([]byte, error) {
 	sshKeyLink := v3Node.Links["nodeConfig"]
 
 	req, err := http.NewRequest("GET", sshKeyLink, nil)
@@ -365,7 +367,7 @@ func downloadRKE1SshKeys(client *rancher.Client, v3Node *management.Node) ([]byt
 }
 
 func getSSHNodeFromV3Node(client *rancher.Client, v3Node *management.Node) (*nodes.Node, error) {
-	sshkey, err := downloadRKE1SshKeys(client, v3Node)
+	sshkey, err := downloadRKE1SSHKeys(client, v3Node)
 	if err != nil {
 		return nil, err
 	}

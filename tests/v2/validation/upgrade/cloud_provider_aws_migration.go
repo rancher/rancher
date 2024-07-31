@@ -118,7 +118,6 @@ func enableLeaderMigrationRKE1(rke1Cluster *management.Cluster) *management.Clus
 
 // rke1AWSCloudProviderMigration is a helper function to migrate from aws in-tree to out-of-tree on rke1 clusters
 func rke1AWSCloudProviderMigration(t *testing.T, client *rancher.Client, clusterName string) {
-
 	clusterID, err := clusters.GetClusterIDByName(client, clusterName)
 	require.NoError(t, err)
 
@@ -166,7 +165,10 @@ func rke1AWSCloudProviderMigration(t *testing.T, client *rancher.Client, cluster
 
 	logrus.Info("Upgrading the cluster to preform in-tree to out-of-tree migration.")
 
-	err = permutations.CreateAndInstallAWSExternalCharts(client, status.ClusterName, true)
+	clusterMeta, err := clusters.NewClusterMeta(client, status.ClusterName)
+	require.NoError(t, err)
+
+	err = permutations.CreateAndInstallAWSExternalCharts(client, clusterMeta, true)
 	require.NoError(t, err)
 
 	newRKE1Cluster = rke1Cluster
@@ -288,5 +290,4 @@ func rke2AWSCloudProviderMigration(t *testing.T, client *rancher.Client, steveCl
 	lbServiceResponseOOT := permutations.CreateCloudProviderWorkloadAndServicesLB(t, client, steveClusterObject)
 
 	services.VerifyAWSLoadBalancer(t, client, lbServiceResponseOOT, status.ClusterName)
-
 }

@@ -1,6 +1,8 @@
 package v3
 
 import (
+	"strings"
+
 	"github.com/rancher/norman/condition"
 	"github.com/rancher/norman/types"
 	v1 "k8s.io/api/core/v1"
@@ -10,6 +12,13 @@ import (
 const (
 	UserConditionInitialRolesPopulated condition.Cond = "InitialRolesPopulated"
 	AuthConfigConditionSecretsMigrated condition.Cond = "SecretsMigrated"
+	// AuthConfigConditionShibbolethSecretFixed is applied to an AuthConfig when the
+	// incorrect name for the shibboleth OpenLDAP secret has been fixed.
+	AuthConfigConditionShibbolethSecretFixed condition.Cond = "ShibbolethSecretFixed"
+
+	// AuthConfigOKTAPasswordMigrated is applied when an Okta password has been
+	// moved to a Secret.
+	AuthConfigOKTAPasswordMigrated condition.Cond = "OktaPasswordMigrated"
 )
 
 // +genclient
@@ -63,6 +72,22 @@ type User struct {
 	Status             UserStatus `json:"status"`
 }
 
+// IsSystem returns true if the user is a system user.
+func (u *User) IsSystem() bool {
+	for _, principalID := range u.PrincipalIDs {
+		if strings.HasPrefix(principalID, "system:") {
+			return true
+		}
+	}
+
+	return false
+}
+
+// IsDefaultAdmin returns true if the user is the default admin user.
+func (u *User) IsDefaultAdmin() bool {
+	return u.Username == "admin"
+}
+
 type UserStatus struct {
 	Conditions []UserCondition `json:"conditions"`
 }
@@ -99,6 +124,9 @@ type UserAttribute struct {
 	LastRefresh     string
 	NeedsRefresh    bool
 	ExtraByProvider map[string]map[string][]string // extra information for the user to print in audit logs, stored per authProvider. example: map[openldap:map[principalid:[openldap_user://uid=testuser1,ou=dev,dc=us-west-2,dc=compute,dc=internal]]]
+	LastLogin       *metav1.Time                   `json:"lastLogin,omitempty"`
+	DisableAfter    *metav1.Duration               `json:"disableAfter,omitempty"` // Overrides DisableInactiveUserAfter setting.
+	DeleteAfter     *metav1.Duration               `json:"deleteAfter,omitempty"`  // Overrides DeleteInactiveUserAfter setting.
 }
 
 type Principals struct {
@@ -280,14 +308,15 @@ type GoogleOauthConfigApplyInput struct {
 type AzureADConfig struct {
 	AuthConfig `json:",inline" mapstructure:",squash"`
 
-	Endpoint          string `json:"endpoint,omitempty" norman:"default=https://login.microsoftonline.com/,required,notnullable"`
-	GraphEndpoint     string `json:"graphEndpoint,omitempty" norman:"required,notnullable"`
-	TokenEndpoint     string `json:"tokenEndpoint,omitempty" norman:"required,notnullable"`
-	AuthEndpoint      string `json:"authEndpoint,omitempty" norman:"required,notnullable"`
-	TenantID          string `json:"tenantId,omitempty" norman:"required,notnullable"`
-	ApplicationID     string `json:"applicationId,omitempty" norman:"required,notnullable"`
-	ApplicationSecret string `json:"applicationSecret,omitempty" norman:"required,type=password"`
-	RancherURL        string `json:"rancherUrl,omitempty" norman:"required,notnullable"`
+	Endpoint           string `json:"endpoint,omitempty" norman:"default=https://login.microsoftonline.com/,required,notnullable"`
+	GraphEndpoint      string `json:"graphEndpoint,omitempty" norman:"required,notnullable"`
+	TokenEndpoint      string `json:"tokenEndpoint,omitempty" norman:"required,notnullable"`
+	AuthEndpoint       string `json:"authEndpoint,omitempty" norman:"required,notnullable"`
+	DeviceAuthEndpoint string `json:"deviceAuthEndpoint,omitempty"`
+	TenantID           string `json:"tenantId,omitempty" norman:"required,notnullable"`
+	ApplicationID      string `json:"applicationId,omitempty" norman:"required,notnullable"`
+	ApplicationSecret  string `json:"applicationSecret,omitempty" norman:"required,type=password"`
+	RancherURL         string `json:"rancherUrl,omitempty" norman:"required,notnullable"`
 }
 
 type AzureADConfigTestOutput struct {
@@ -435,7 +464,7 @@ type KeyCloakConfig struct {
 
 type OKTAConfig struct {
 	SamlConfig     `json:",inline" mapstructure:",squash"`
-	OpenLdapConfig LdapFields `json:"openLdapConfig" mapstructure:",squash"`
+	OpenLdapConfig LdapFields `json:"openLdapConfig"`
 }
 
 type ShibbolethConfig struct {

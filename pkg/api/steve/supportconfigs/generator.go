@@ -30,8 +30,11 @@ const (
 	// Pay-As-You-Go (PAYG) offerings. However, they will be in different namespaces to avoid
 	// clashing.
 	cspAdapterConfigmap = "csp-config"
-	tarContentType      = "application/x-tar"
-	logPrefix           = "support-config-generator"
+	// Metering archive for CSP marketplace Pay-As-You-Go (PAYG
+	// offerings. Used for auditing purposes.
+	cspMeteringArchiveConfigmap = "metering-archive"
+	tarContentType              = "application/x-tar"
+	logPrefix                   = "support-config-generator"
 )
 
 var errNotFound = errors.New("not implemented")
@@ -56,11 +59,27 @@ func NewHandler(scaledContext *config.ScaledContext) Handler {
 	}
 }
 
+// Check to see if user have access to the configmaps needed to create
+// the supportconfig tarball. Return false if user is not authorize or error
+// in checking authorization, true otherwise.
+func (h *Handler) checkAuthorization(cspNamespace string, cspConfigmap string, writer http.ResponseWriter, request *http.Request) bool {
+	authorized, err := h.authorize(cspNamespace, cspConfigmap, request)
+	if err != nil {
+		logrus.Errorf("[%s] Failed to authorize user with error: %s", logPrefix, err.Error())
+		return false
+	}
+
+	return authorized
+}
+
 // ServerHTTP implements http.Handler - attempts to authenticate/authorize the user. Returns a tar of support information
 // if the user can get the backing configmap in the adapter namespace
 func (h *Handler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	var cspChartNamespace string
 	var cspChartName string
+
+	// indicating whether user is authorized to access the metering archive
+	var authorizedForMeteringArchive = false
 
 	if usePAYG := request.URL.Query()["usePAYG"]; len(usePAYG) > 0 && usePAYG[0] == "true" {
 		// if usePAYG query parameter exist that means we are using the new Pay-As-You-Go offering CSP billing adapter
@@ -71,17 +90,17 @@ func (h *Handler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 		cspChartNamespace = cspadapter.MLOChartNamespace
 		cspChartName = cspadapter.MLOChartName
 	}
-	authorized, err := h.authorize(cspChartNamespace, request)
-	if err != nil {
-		util.ReturnHTTPError(writer, request, http.StatusForbidden, http.StatusText(http.StatusForbidden))
-		logrus.Errorf("[%s] Failed to authorize user with error: %s", logPrefix, err.Error())
-		return
-	}
-	if !authorized {
+	if !h.checkAuthorization(cspChartNamespace, cspAdapterConfigmap, writer, request) {
 		util.ReturnHTTPError(writer, request, http.StatusForbidden, http.StatusText(http.StatusForbidden))
 		return
 	}
-	_, err = h.adapterUtil.GetRelease(cspChartNamespace, cspChartName)
+	if cspChartNamespace == cspadapter.PAYGChartNamespace {
+		// NOTE: to preserve backward compatibility, don't fail if user doesn't not have
+		// permission to access the metering archive. In that case, we simple don't
+		// include it in the support config bundle.
+		authorizedForMeteringArchive = h.checkAuthorization(cspChartNamespace, cspMeteringArchiveConfigmap, writer, request)
+	}
+	_, err := h.adapterUtil.GetRelease(cspChartNamespace, cspChartName)
 	if err != nil {
 		if errors.Is(err, cspadapter.ErrNotFound) {
 			// If neither adapter is installed, return a 501, so the
@@ -94,7 +113,7 @@ func (h *Handler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 	logrus.Infof("[%s] Generating supportconfig", logPrefix)
-	archive, err := h.generateSupportConfig(cspChartNamespace)
+	archive, err := h.generateSupportConfig(cspChartNamespace, authorizedForMeteringArchive)
 	logrus.Infof("[%s] Done Generating supportconfig", logPrefix)
 	if err != nil {
 		if errors.Is(err, errNotFound) {
@@ -116,9 +135,9 @@ func (h *Handler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	logrus.Debugf("[%s] wrote %v bytes in archive response", logPrefix, n)
 }
 
-// authorize checks to see if the user can get the csp adapter configmap. Returns a bool (if the user is authorized)
+// authorize checks to see if the user can get the given csp adapter configmap. Returns a bool (if the user is authorized)
 // and optionally an error
-func (h *Handler) authorize(cspNamespace string, r *http.Request) (bool, error) {
+func (h *Handler) authorize(cspNamespace string, cspConfigmap string, r *http.Request) (bool, error) {
 	userInfo, ok := request.UserFrom(r.Context())
 	if !ok {
 		return false, fmt.Errorf("unable to extract user info from context")
@@ -128,7 +147,7 @@ func (h *Handler) authorize(cspNamespace string, r *http.Request) (bool, error) 
 			ResourceAttributes: &authzv1.ResourceAttributes{
 				Resource:  "configmap",
 				Verb:      "get",
-				Name:      cspAdapterConfigmap,
+				Name:      cspConfigmap,
 				Namespace: cspNamespace,
 			},
 			User:   userInfo.GetName(),
@@ -165,9 +184,28 @@ func (h *Handler) getCSPConfig(cspNamespace string) (map[string]interface{}, err
 	return retVal, nil
 }
 
+// getMeteringArchive gets th metering-archive configmap produced by CSP billing adapter returns an error if not able to produce the map. Will return
+// an errNotFound if the map is not found at all
+func (h *Handler) getMeteringArchive(cspNamespace string) ([]interface{}, error) {
+	cspMeteringArchive, err := h.ConfigMaps.GetNamespaced(cspNamespace, cspMeteringArchiveConfigmap, metav1.GetOptions{})
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil, errNotFound
+		}
+		return nil, err
+	}
+	var retVal []interface{}
+	err = json.Unmarshal([]byte(cspMeteringArchive.Data["archive"]), &retVal)
+	if err != nil {
+		return nil, err
+	}
+
+	return retVal, nil
+}
+
 // generateSupportConfig produces an io.Reader with the supportconfig ready to be returned using a http.ResponseWriter
 // Returns an err if it can't get the support config
-func (h *Handler) generateSupportConfig(cspNamespace string) (io.Reader, error) {
+func (h *Handler) generateSupportConfig(cspNamespace string, authorizedForMeteringArchive bool) (io.Reader, error) {
 	cspConfig, err := h.getCSPConfig(cspNamespace)
 	// csp adapter won't always be installed
 	if err != nil {
@@ -183,6 +221,26 @@ func (h *Handler) generateSupportConfig(cspNamespace string) (io.Reader, error) 
 
 	files := map[string][]byte{
 		"rancher/config.json": configData,
+	}
+
+	if authorizedForMeteringArchive && cspNamespace == cspadapter.PAYGChartNamespace {
+		// For PAYG we also need to include the metering archive
+		// for auditing purposes
+		cspMeteringArchive, err := h.getMeteringArchive(cspNamespace)
+
+		// NOTE: metering archive may not have generated yet so don't include it
+		// if not found
+		if err == nil {
+			meteringArchiveData, err := json.MarshalIndent(cspMeteringArchive, "", "  ")
+			if err != nil {
+				return nil, err
+			}
+			files["rancher/metering_archive.json"] = meteringArchiveData
+		} else {
+			if !errors.Is(err, errNotFound) {
+				return nil, err
+			}
+		}
 	}
 
 	for name, body := range files {

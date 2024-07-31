@@ -7,10 +7,12 @@ import (
 
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
+	"github.com/rancher/shepherd/extensions/clusters/gke"
 	"github.com/rancher/shepherd/extensions/provisioning"
 	"github.com/rancher/shepherd/extensions/provisioninginput"
 	"github.com/rancher/shepherd/extensions/users"
 	password "github.com/rancher/shepherd/extensions/users/passwordgenerator"
+	"github.com/rancher/shepherd/pkg/config"
 	namegen "github.com/rancher/shepherd/pkg/namegenerator"
 	"github.com/rancher/shepherd/pkg/session"
 	"github.com/stretchr/testify/require"
@@ -68,7 +70,9 @@ func (h *HostedGKEClusterProvisioningTestSuite) TestProvisioningHostedGKE() {
 	}
 
 	for _, tt := range tests {
-		clusterObject, err := provisioning.CreateProvisioningGKEHostedCluster(tt.client)
+		var gkeClusterConfig gke.ClusterConfig
+		config.LoadConfig(gke.GKEClusterConfigConfigurationFileKey, &gkeClusterConfig)
+		clusterObject, err := provisioning.CreateProvisioningGKEHostedCluster(tt.client, gkeClusterConfig)
 		require.NoError(h.T(), err)
 
 		provisioning.VerifyHostedCluster(h.T(), tt.client, clusterObject)
@@ -78,5 +82,6 @@ func (h *HostedGKEClusterProvisioningTestSuite) TestProvisioningHostedGKE() {
 // In order for 'go test' to run this suite, we need to create
 // a normal test function and pass our suite to suite.Run
 func TestHostedGKEClusterProvisioningTestSuite(t *testing.T) {
+	t.Skip("This test has been deprecated; check https://github.com/rancher/hosted-providers-e2e for updated tests")
 	suite.Run(t, new(HostedGKEClusterProvisioningTestSuite))
 }

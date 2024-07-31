@@ -8,9 +8,10 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/condition"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/saml"
+	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	corefakes "github.com/rancher/rancher/pkg/generated/norman/core/v1/fakes"
 	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	"github.com/rancher/rancher/pkg/namespace"
@@ -21,12 +22,10 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/watch"
 )
 
 const (
-	mockPass                = "testpass1234"
+	testPassword            = "testpass1234"
 	testCreationStampString = "2023-05-15T19:28:22Z"
 )
 
@@ -210,28 +209,116 @@ func TestShibbolethAuthConfigMigration(t *testing.T) {
 		expectedError             bool
 		openLDAPEnabled           bool
 		expectedErrorCreateSecret bool
+		wantConditions            []condition.Cond
+		wantSecretRef             string
 	}{
 		{
 			name:                   "test migrating Shibboleth configuration with openLDAP",
 			expectedSecretName:     fmt.Sprintf("shibbolethconfig-%s", strings.ToLower(serviceAccountPasswordFieldName)),
-			authConfig:             getMockShibbolethConfig(),
-			unstructuredAuthConfig: getMockShibbolethWithOpenLDAP(),
+			authConfig:             newTestShibbolethConfig(),
+			unstructuredAuthConfig: getUnstructuredShibbolethConfig(withOpenLDAP),
 			expectedError:          false,
 			openLDAPEnabled:        true,
+			wantConditions: []condition.Cond{
+				apimgmtv3.AuthConfigConditionSecretsMigrated,
+				apimgmtv3.AuthConfigConditionShibbolethSecretFixed,
+			},
+			wantSecretRef: fmt.Sprintf("cattle-global-data:shibbolethconfig-%s", strings.ToLower(serviceAccountPasswordFieldName)),
 		},
 		{
 			name:                   "test migrating Shibboleth configuration without OpenLDAP",
-			authConfig:             getMockShibbolethConfig(),
-			unstructuredAuthConfig: getMockShibbolethWithoutOpenLDAP(),
+			authConfig:             newTestShibbolethConfig(),
+			unstructuredAuthConfig: getUnstructuredShibbolethConfig(),
 			expectedError:          false,
 			openLDAPEnabled:        false,
+			wantConditions:         []condition.Cond{apimgmtv3.AuthConfigConditionSecretsMigrated},
+			wantSecretRef:          fmt.Sprintf("cattle-global-data:shibbolethconfig-%s", strings.ToLower(serviceAccountPasswordFieldName)),
 		},
 		{
 			name:            "test migrating non Shibboleth configuration",
 			authConfig:      getMockNonShibbolethConfig(),
 			expectedError:   false,
 			openLDAPEnabled: false,
+			wantConditions:  []condition.Cond{},
 		},
+		{
+			name: "test migrating Shibboleth with incorrect secret name",
+			authConfig: newTestShibbolethConfig(func(ac *apimgmtv3.AuthConfig) {
+				ac.Status = apimgmtv3.AuthConfigStatus{
+					Conditions: []apimgmtv3.AuthConfigConditions{
+						apimgmtv3.AuthConfigConditions{
+							Type:           apimgmtv3.AuthConfigConditionSecretsMigrated,
+							Status:         "True",
+							LastUpdateTime: "2024-05-13T15:20:34+01:00",
+						},
+					},
+				}
+			}),
+			unstructuredAuthConfig: getUnstructuredShibbolethConfig(func(s map[string]any) {
+				s["openLdapConfig"] = map[string]any{
+					// This is the incorrect secret name from SURE-7772
+					"serviceAccountPassword": "cattle-global-data:shibbolethconfig-serviceAccountPassword",
+				}
+			}),
+			expectedError:   false,
+			openLDAPEnabled: true,
+			wantConditions: []condition.Cond{
+				apimgmtv3.AuthConfigConditionShibbolethSecretFixed,
+			},
+			wantSecretRef: fmt.Sprintf("cattle-global-data:shibbolethconfig-%s", strings.ToLower(serviceAccountPasswordFieldName)),
+		},
+		{
+			name: "test migrating Shibboleth with different secret name",
+			authConfig: newTestShibbolethConfig(func(ac *apimgmtv3.AuthConfig) {
+				ac.Status = apimgmtv3.AuthConfigStatus{
+					Conditions: []apimgmtv3.AuthConfigConditions{
+						apimgmtv3.AuthConfigConditions{
+							Type:           apimgmtv3.AuthConfigConditionSecretsMigrated,
+							Status:         "True",
+							LastUpdateTime: "2024-05-13T15:20:34+01:00",
+						},
+					},
+				}
+			}),
+			unstructuredAuthConfig: getUnstructuredShibbolethConfig(func(s map[string]any) {
+				s["openLdapConfig"] = map[string]any{
+					// This is perhaps a user-configured name.
+					"serviceAccountPassword": "cattle-global-data:testing-Password",
+				}
+			}),
+			expectedError:   false,
+			openLDAPEnabled: true,
+			wantConditions: []condition.Cond{
+				apimgmtv3.AuthConfigConditionShibbolethSecretFixed,
+			},
+			wantSecretRef: fmt.Sprintf("cattle-global-data:testing-Password"),
+		},
+		{
+			name:               "test migrating Shibboleth without migrated secret",
+			expectedSecretName: fmt.Sprintf("shibbolethconfig-%s", strings.ToLower(serviceAccountPasswordFieldName)),
+			authConfig:         newTestShibbolethConfig(),
+			unstructuredAuthConfig: getUnstructuredShibbolethConfig(func(s map[string]any) {
+				s["openLdapConfig"] = map[string]any{
+					"serviceAccountPassword": testPassword,
+				}
+			}),
+			expectedError:   false,
+			openLDAPEnabled: true,
+			wantConditions: []condition.Cond{
+				apimgmtv3.AuthConfigConditionSecretsMigrated,
+				apimgmtv3.AuthConfigConditionShibbolethSecretFixed,
+			},
+			wantSecretRef: fmt.Sprintf("cattle-global-data:shibbolethconfig-%s", strings.ToLower(serviceAccountPasswordFieldName)),
+		},
+	}
+
+	conditionTypes := func(s apimgmtv3.AuthConfigStatus) []condition.Cond {
+		var result []condition.Cond
+		for _, c := range s.Conditions {
+			result = append(result, c.Type)
+		}
+
+		return result
 	}
 
 	for _, tt := range testcases {
@@ -243,9 +330,9 @@ func TestShibbolethAuthConfigMigration(t *testing.T) {
 						return nil, errorCreateSecret
 					}
 
-					assert.Equal(t, tt.expectedSecretName, secret.Name)
+					assert.Equal(t, tt.expectedSecretName, secret.Name, "secret name did not match")
 					assert.Equal(t, namespace.GlobalNamespace, secret.Namespace)
-					assert.Equal(t, mockPass, secret.StringData[strings.ToLower(serviceAccountPasswordFieldName)])
+					assert.Equal(t, testPassword, secret.StringData[strings.ToLower(serviceAccountPasswordFieldName)])
 
 					return secret, nil
 				},
@@ -276,23 +363,131 @@ func TestShibbolethAuthConfigMigration(t *testing.T) {
 				assert.NotNil(t, config)
 				assert.NoError(t, err)
 
-				shibbConfig, ok := config.(*apimgmtv3.ShibbolethConfig)
+				shibbConfig := config.(*apimgmtv3.ShibbolethConfig)
 
-				assert.True(t, ok)
 				assert.NotNil(t, shibbConfig)
 
-				assert.NotEmpty(t, shibbConfig.Status.Conditions)
-				assert.NotNil(t, shibbConfig.Status.Conditions[0])
-				assert.Equal(t, apimgmtv3.AuthConfigConditionSecretsMigrated, shibbConfig.Status.Conditions[0].Type)
-
+				assert.Equal(t, tt.wantConditions, conditionTypes(shibbConfig.Status))
 				assert.Equal(t, tt.authConfig.ObjectMeta, shibbConfig.SamlConfig.ObjectMeta)
 				assert.Equal(t, tt.authConfig.TypeMeta, shibbConfig.SamlConfig.TypeMeta)
+				assert.Equal(t, tt.wantSecretRef, shibbConfig.OpenLdapConfig.ServiceAccountPassword)
 
 				return
 			}
 
 			assert.NoError(t, err)
 			assert.NotNil(t, config)
+		})
+	}
+}
+
+func TestOKTAAuthConfigMigration(t *testing.T) {
+	timeStamp, _ := time.Parse(time.RFC3339, testCreationStampString)
+	testcases := []struct {
+		name                   string
+		unstructuredAuthConfig map[string]any
+		authConfig             apimgmtv3.AuthConfig
+		expectedLdapConfig     apimgmtv3.LdapFields
+		wantStringData         map[string]string
+		// wantMigration is true when we expect the migration to execute
+		wantMigration bool
+	}{
+		{
+			name:                   "test migrating OKTA configuration with openLDAP",
+			unstructuredAuthConfig: getUnstructuredOKTA(withOpenLDAP),
+			authConfig: apimgmtv3.AuthConfig{
+				Type:    "oktaConfig",
+				Enabled: true,
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "okta",
+					CreationTimestamp: metav1.NewTime(timeStamp),
+				},
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "AuthConfig",
+					APIVersion: "management.cattle.io/v3",
+				},
+			},
+			expectedLdapConfig: apimgmtv3.LdapFields{
+				ServiceAccountPassword: "cattle-global-data:oktaconfig-serviceaccountpassword",
+			},
+			wantStringData: map[string]string{
+				"serviceaccountpassword": "testpass1234",
+			},
+			wantMigration: true,
+		},
+		{
+			name:                   "test migrating with existing migration",
+			unstructuredAuthConfig: getUnstructuredOKTA(withOpenLDAP),
+			wantMigration:          true,
+			authConfig: apimgmtv3.AuthConfig{
+				Type:    "oktaConfig",
+				Enabled: true,
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "okta",
+					CreationTimestamp: metav1.NewTime(timeStamp),
+				},
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "AuthConfig",
+					APIVersion: "management.cattle.io/v3",
+				},
+				Status: apimgmtv3.AuthConfigStatus{
+					Conditions: []apimgmtv3.AuthConfigConditions{
+						apimgmtv3.AuthConfigConditions{
+							Type:               apimgmtv3.AuthConfigConditionSecretsMigrated,
+							Status:             "True",
+							LastUpdateTime:     "2024-05-13T15:20:34+01:00",
+							LastTransitionTime: "",
+							Reason:             "",
+							Message:            "",
+						},
+					},
+				},
+			},
+			expectedLdapConfig: apimgmtv3.LdapFields{
+				ServiceAccountPassword: "cattle-global-data:oktaconfig-serviceaccountpassword",
+			},
+			wantStringData: map[string]string{
+				"serviceaccountpassword": "testpass1234",
+			},
+		},
+	}
+
+	for _, tt := range testcases {
+		t.Run(tt.name, func(t *testing.T) {
+			h := newFakeHandler(
+				tt.unstructuredAuthConfig,
+				func(secret *corev1.Secret) (*corev1.Secret, error) {
+					assert.Equal(t, "oktaconfig-serviceaccountpassword", secret.Name)
+					assert.Equal(t, namespace.GlobalNamespace, secret.Namespace)
+					assert.Equal(t, tt.wantStringData, secret.StringData)
+
+					return secret, nil
+				},
+				func(secret *corev1.Secret) (*corev1.Secret, error) {
+					return nil, nil
+				},
+				func(namespace string, name string) (*corev1.Secret, error) {
+					return nil, apierrors.NewNotFound(schema.GroupResource{Resource: "secrets"}, name)
+				},
+			)
+
+			config, err := h.syncAuthConfig("test", &tt.authConfig)
+
+			assert.NotNil(t, config)
+			assert.NoError(t, err)
+
+			oktaConfig, ok := config.(*apimgmtv3.OKTAConfig)
+
+			assert.Equal(t, tt.wantMigration, ok)
+			if !tt.wantMigration {
+				return
+			}
+			assert.NotNil(t, oktaConfig)
+
+			assert.NotEmpty(t, oktaConfig.Status.Conditions)
+			assert.NotNil(t, oktaConfig.Status.Conditions[0])
+			assert.Equal(t, apimgmtv3.AuthConfigOKTAPasswordMigrated, oktaConfig.Status.Conditions[0].Type)
+			assert.Equal(t, tt.expectedLdapConfig, oktaConfig.OpenLdapConfig)
 		})
 	}
 }
@@ -320,9 +515,9 @@ func newFakeHandler(
 	return h
 }
 
-func getMockShibbolethConfig() apimgmtv3.AuthConfig {
+func newTestShibbolethConfig(opts ...func(*apimgmtv3.AuthConfig)) apimgmtv3.AuthConfig {
 	timeStamp, _ := time.Parse(time.RFC3339, testCreationStampString)
-	return apimgmtv3.AuthConfig{
+	ac := apimgmtv3.AuthConfig{
 		Type:    "shibbolethConfig",
 		Enabled: true,
 		ObjectMeta: metav1.ObjectMeta{
@@ -334,6 +529,12 @@ func getMockShibbolethConfig() apimgmtv3.AuthConfig {
 			APIVersion: "management.cattle.io/v3",
 		},
 	}
+
+	for _, opt := range opts {
+		opt(&ac)
+	}
+
+	return ac
 }
 
 func getMockNonShibbolethConfig() apimgmtv3.AuthConfig {
@@ -350,41 +551,62 @@ func getMockNonShibbolethConfig() apimgmtv3.AuthConfig {
 	}
 }
 
-func getMockShibbolethWithoutOpenLDAP() map[string]any {
-	return map[string]any{
-		"metadata": map[string]any{
-			"name": saml.ShibbolethName,
-		},
-		"kind":       "AuthConfig",
-		"apiVersion": "management.cattle.io/v3",
-		"type":       "shibbolethConfig",
-		"enabled":    true,
+func withOpenLDAP(s map[string]any) {
+	s["openLdapConfig"] = map[string]any{
+		"serviceAccountPassword": testPassword,
 	}
 }
 
-func getMockShibbolethWithOpenLDAP() map[string]any {
+func getUnstructuredShibbolethConfig(opts ...func(map[string]any)) map[string]any {
 	timeStamp, _ := time.Parse(time.RFC3339, testCreationStampString)
 	createdTime := metav1.NewTime(timeStamp)
-	return map[string]any{
+
+	raw := map[string]any{
 		"metadata": map[string]any{
 			"name":              saml.ShibbolethName,
 			"creationtimestamp": createdTime,
 		},
 		"kind":       "AuthConfig",
 		"apiVersion": "management.cattle.io/v3",
-		"type":       "shibbolethConfig",
+		"type":       client.ShibbolethConfigType,
 		"enabled":    true,
-		"openLdapConfig": map[string]any{
-			"serviceAccountPassword": mockPass,
-		},
 	}
+
+	for _, o := range opts {
+		o(raw)
+	}
+
+	return raw
+}
+
+func getUnstructuredOKTA(opts ...func(map[string]any)) map[string]any {
+	timeStamp, _ := time.Parse(time.RFC3339, testCreationStampString)
+	createdTime := metav1.NewTime(timeStamp)
+
+	raw := map[string]any{
+		"metadata": map[string]any{
+			"name":              "okta",
+			"creationtimestamp": createdTime,
+		},
+		"kind":                   "AuthConfig",
+		"apiVersion":             "management.cattle.io/v3",
+		"type":                   client.OKTAConfigType,
+		"enabled":                true,
+		"serviceAccountPassword": testPassword,
+	}
+
+	for _, o := range opts {
+		o(raw)
+	}
+
+	return raw
 }
 
 type mockAuthConfigClient struct {
 	config map[string]any
 }
 
-func newMockAuthConfigClient(authConfig map[string]any) objectclient.GenericClient {
+func newMockAuthConfigClient(authConfig map[string]any) authConfigsClient {
 	return mockAuthConfigClient{config: authConfig}
 }
 
@@ -396,60 +618,4 @@ func (m mockAuthConfigClient) Get(name string, opts metav1.GetOptions) (runtime.
 
 func (m mockAuthConfigClient) Update(name string, o runtime.Object) (runtime.Object, error) {
 	return o, nil
-}
-
-func (m mockAuthConfigClient) UnstructuredClient() objectclient.GenericClient {
-	panic("implement me")
-}
-
-func (m mockAuthConfigClient) GroupVersionKind() schema.GroupVersionKind {
-	panic("implement me")
-}
-
-func (m mockAuthConfigClient) Create(o runtime.Object) (runtime.Object, error) {
-	panic("implement me")
-}
-
-func (m mockAuthConfigClient) GetNamespaced(namespace, name string, opts metav1.GetOptions) (runtime.Object, error) {
-	panic("implement me")
-}
-
-func (m mockAuthConfigClient) UpdateStatus(name string, o runtime.Object) (runtime.Object, error) {
-	panic("implement me")
-}
-
-func (m mockAuthConfigClient) DeleteNamespaced(namespace, name string, opts *metav1.DeleteOptions) error {
-	panic("implement me")
-}
-
-func (m mockAuthConfigClient) Delete(name string, opts *metav1.DeleteOptions) error {
-	panic("implement me")
-}
-
-func (m mockAuthConfigClient) List(opts metav1.ListOptions) (runtime.Object, error) {
-	panic("implement me")
-}
-
-func (m mockAuthConfigClient) ListNamespaced(namespace string, opts metav1.ListOptions) (runtime.Object, error) {
-	panic("implement me")
-}
-
-func (m mockAuthConfigClient) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	panic("implement me")
-}
-
-func (m mockAuthConfigClient) DeleteCollection(deleteOptions *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
-	panic("implement me")
-}
-
-func (m mockAuthConfigClient) Patch(name string, o runtime.Object, patchType types.PatchType, data []byte, subresources ...string) (runtime.Object, error) {
-	panic("implement me")
-}
-
-func (m mockAuthConfigClient) ObjectFactory() objectclient.ObjectFactory {
-	panic("implement me")
-}
-
-func (m mockAuthConfigClient) ObjectClient() *objectclient.ObjectClient {
-	panic("implement me")
 }

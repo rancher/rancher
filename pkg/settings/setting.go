@@ -17,7 +17,11 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-const RancherVersionDev = "2.8.99"
+const (
+	RancherVersionDev       = "2.8.99"
+	AgentTLSModeStrict      = "strict"
+	AgentTLSModeSystemStore = "system-store"
+)
 
 var (
 	releasePattern = regexp.MustCompile("^v[0-9]")
@@ -50,9 +54,11 @@ var (
 		"cattle-elemental-system",
 	}
 
-	AgentImage                          = NewSetting("agent-image", "rancher/rancher-agent:v2.8-head")
-	AgentRolloutTimeout                 = NewSetting("agent-rollout-timeout", "300s")
-	AgentRolloutWait                    = NewSetting("agent-rollout-wait", "true")
+	AgentImage          = NewSetting("agent-image", "rancher/rancher-agent:v2.8-head")
+	AgentRolloutTimeout = NewSetting("agent-rollout-timeout", "300s")
+	AgentRolloutWait    = NewSetting("agent-rollout-wait", "true")
+	// AgentTLSMode is translated to the environment variable STRICT_VERIFY when rendering the cluster/node agent manifests and should not be specified as a default agent setting as it has no direct effect on the agent itself.
+	AgentTLSMode                        = NewSetting("agent-tls-mode", AgentTLSModeSystemStore)
 	AuthImage                           = NewSetting("auth-image", v32.ToolsSystemImages.AuthSystemImages.KubeAPIAuth)
 	AuthorizationCacheTTLSeconds        = NewSetting("authorization-cache-ttl-seconds", "10")
 	AuthorizationDenyCacheTTLSeconds    = NewSetting("authorization-deny-cache-ttl-seconds", "10")
@@ -82,7 +88,7 @@ var (
 	KubernetesVersionToSystemImages     = NewSetting("k8s-version-to-images", "")
 	KubernetesVersionsCurrent           = NewSetting("k8s-versions-current", "")
 	KubernetesVersionsDeprecated        = NewSetting("k8s-versions-deprecated", "")
-	KDMBranch                           = NewSetting("kdm-branch", "dev-v2.8")
+	KDMBranch                           = NewSetting("kdm-branch", "release-v2.8")
 	MachineVersion                      = NewSetting("machine-version", "dev")
 	Namespace                           = NewSetting("namespace", os.Getenv("CATTLE_NAMESPACE"))
 	PasswordMinLength                   = NewSetting("password-min-length", "12")
@@ -96,8 +102,8 @@ var (
 	WinsAgentVersion                    = NewSetting("wins-agent-version", "")
 	CSIProxyAgentVersion                = NewSetting("csi-proxy-agent-version", "")
 	CSIProxyAgentURL                    = NewSetting("csi-proxy-agent-url", "https://acs-mirror.azureedge.net/csi-proxy/%[1]s/binaries/csi-proxy-%[1]s.tar.gz")
-	SystemAgentInstallScript            = NewSetting("system-agent-install-script", "https://github.com/rancher/system-agent/releases/download/v0.3.6/install.sh") // To ensure consistency between SystemAgentInstallScript default value and CATTLE_SYSTEM_AGENT_INSTALL_SCRIPT to utilize the local system-agent-install.sh script when both values are equal.
-	WinsAgentInstallScript              = NewSetting("wins-agent-install-script", "https://raw.githubusercontent.com/rancher/wins/v0.4.15-rc1/install.ps1")
+	SystemAgentInstallScript            = NewSetting("system-agent-install-script", "https://github.com/rancher/system-agent/releases/download/v0.3.7/install.sh") // To ensure consistency between SystemAgentInstallScript default value and CATTLE_SYSTEM_AGENT_INSTALL_SCRIPT to utilize the local system-agent-install.sh script when both values are equal.
+	WinsAgentInstallScript              = NewSetting("wins-agent-install-script", "https://raw.githubusercontent.com/rancher/wins/v0.4.16/install.ps1")
 	SystemAgentInstallerImage           = NewSetting("system-agent-installer-image", "") // Defined via environment variable
 	SystemAgentUpgradeImage             = NewSetting("system-agent-upgrade-image", "")   // Defined via environment variable
 	WinsAgentUpgradeImage               = NewSetting("wins-agent-upgrade-image", "")
@@ -114,10 +120,8 @@ var (
 	ClusterTemplateEnforcement          = NewSetting("cluster-template-enforcement", "false")
 	InitialDockerRootDir                = NewSetting("initial-docker-root-dir", "/var/lib/docker")
 	SystemCatalog                       = NewSetting("system-catalog", "external") // Options are 'external' or 'bundled'
-	ChartDefaultBranch                  = NewSetting("chart-default-branch", "dev-v2.8")
+	ChartDefaultBranch                  = NewSetting("chart-default-branch", "release-v2.8")
 	SystemManagedChartsOperationTimeout = NewSetting("system-managed-charts-operation-timeout", "300s")
-	PartnerChartDefaultBranch           = NewSetting("partner-chart-default-branch", "main")
-	RKE2ChartDefaultBranch              = NewSetting("rke2-chart-default-branch", "main")
 	FleetDefaultWorkspaceName           = NewSetting("fleet-default-workspace-name", fleetconst.ClustersDefaultNamespace) // fleetWorkspaceName to assign to clusters with none
 	ShellImage                          = NewSetting("shell-image", buildconfig.DefaultShellVersion)
 	IgnoreNodeName                      = NewSetting("ignore-node-name", "") // nodes to ignore when syncing v1.node to v3.node
@@ -145,6 +149,34 @@ var (
 	// AuthUserSessionTTLMinutes represents the time to live for tokens used for login sessions in minutes.
 	AuthUserSessionTTLMinutes = NewSetting("auth-user-session-ttl-minutes", "960") // 16 hours
 
+	// ChartDefaultURL represents the default URL for the system charts repo. It should only be set for test or
+	// debug purposes.
+	ChartDefaultURL = NewSetting("chart-default-url", "https://git.rancher.io/")
+	// DisableInactiveUserAfter is the duration a user can be inactive after which it's disabled by the user retention process.
+	// The value should be expressed in valid time.Duration units and truncated to a second e.g. "168h". See https://pkg.go.dev/time#ParseDuration
+	// DisableInactiveUserAfter should be greater than AuthUserSessionTTLMinutes.
+	// An empty string or a zero value means the feature is disabled.
+	DisableInactiveUserAfter = NewSetting("disable-inactive-user-after", "")
+
+	// DeleteInactiveUserAfter is the duration a user can be inactive after which it's deleted by the user retention process.
+	// The value should be expressed in valid time.Duration units and truncated to a second e.g. "168h". See https://pkg.go.dev/time#ParseDuration
+	// DeleteInactiveUserAfter should be greater than AuthUserSessionTTLMinutes.
+	// An empty string or a zero value means the feature is disabled.
+	DeleteInactiveUserAfter = NewSetting("delete-inactive-user-after", "")
+
+	// UserRetentionDryRun determines if the user retention process should actually disable and delete users.
+	// Valid values are "true" and "false". An empty string means "false".
+	UserRetentionDryRun = NewSetting("user-retention-dry-run", "false")
+
+	// UserLastLoginDefault is used if UserAttribute.LastLogin is not set.
+	// The value should be a date and time truncated to a second and formatted according to RFC3339 e.g. "2023-03-01T00:00:00Z".
+	// If the value is an empty string or time.Time zero value this settings is not used.
+	UserLastLoginDefault = NewSetting("user-last-login-default", "")
+
+	// UserRetentionCron determines how often the user retention process should run.
+	// The value should be a valid cron expression e.g. "0 * * * *" (every hour)
+	UserRetentionCron = NewSetting("user-retention-cron", "")
+
 	// ConfigMapName name of the configmap that stores rancher configuration information.
 	// Deprecated: to be removed in 2.8.0
 	ConfigMapName = NewSetting("config-map-name", "rancher-config")
@@ -168,8 +200,22 @@ var (
 	// If set to false the kubeconfig will contain a command to login to Rancher.
 	KubeconfigGenerateToken = NewSetting("kubeconfig-generate-token", "true")
 
+	// PartnerChartDefaultBranch represents the default branch for the partner charts repo.
+	PartnerChartDefaultBranch = NewSetting("partner-chart-default-branch", "main")
+
+	// PartnerChartDefaultURL represents the default URL for the partner charts repo. It should only be set for test
+	// or debug purposes.
+	PartnerChartDefaultURL = NewSetting("partner-chart-default-url", "https://git.rancher.io/")
+
 	// RancherWebhookVersion is the exact version of the webhook that Rancher will install.
 	RancherWebhookVersion = NewSetting("rancher-webhook-version", "")
+
+	// RKE2ChartDefaultBranch represents the default branch for the RKE2 charts repo.
+	RKE2ChartDefaultBranch = NewSetting("rke2-chart-default-branch", "main")
+
+	// RKE2ChartDefaultURL represents the default URL for the RKE2 charts repo. It should only be set for test or
+	// debug purposes.
+	RKE2ChartDefaultURL = NewSetting("rke2-chart-default-url", "https://git.rancher.io/")
 
 	// SystemDefaultRegistry is the default contrainer registry used for images.
 	// The environmental variable "CATTLE_BASE_REGISTRY" controls the default value of this setting.

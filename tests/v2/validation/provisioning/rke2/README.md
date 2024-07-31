@@ -14,9 +14,10 @@ Please see below for more details for your config. Please see below for more det
 5. [Cloud Provider](#cloud-provider)
 6. [Configure providers to use for Node Driver Clusters](#machine-rke2-config)
 7. [Configuring Custom Clusters](#custom-cluster)
-8. [Static test cases](#static-test-cases)
-9. [Advanced Cluster Settings](#advanced-settings)
-10. [Back to general provisioning](../README.md)
+8. [Template Test](#template-test)
+9. [Static test cases](#static-test-cases)
+10. [Advanced Cluster Settings](#advanced-settings)
+11. [Back to general provisioning](../README.md)
 
 ## Flags
 Flags are used to determine which static table tests are run (has no effect on dynamic tests) 
@@ -55,7 +56,7 @@ provisioningInput:
   rke2KubernetesVersion: ["v1.27.10+rke2r1"]
   cni: ["calico"]
   providers: ["linode", "aws", "do", "harvester", "vsphere", "azure"]
-  cloudProvider: "aws"
+  cloudProvider: "" # either: aws|rancher-vsphere
   nodeProviders: ["ec2"]
   hardened: false
   psact: ""                                   #either rancher-privileged|rancher-restricted|rancher-baseline
@@ -319,6 +320,26 @@ These tests utilize Go build tags. Due to this, see the below examples on how to
 
 If the specified test passes immediately without warning, try adding the `-count=1` flag to get around this issue. This will avoid previous results from interfering with the new test run.
 
+## Template Test
+
+Dependencies:
+* [Cloud Credential](#cloud-credentials)
+* Make sure the template provider matches the credentials.
+```yaml
+templateTest:
+  repo:
+    metadata:
+      name: "demo"
+    spec:
+      gitRepo: "https://github.com/<forked repo>/cluster-template-examples.git"
+      gitBranch: main
+      insecureSkipTLSVerify: true
+  templateProvider: "aws"
+  templateName: "cluster-template"
+```
+
+`gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/provisioning/rke2 --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestClusterTemplateTestSuite/TestProvisionRKE2TemplateCluster`
+
 ## Static Test Cases
 In an effort to have uniform testing across our internal QA test case reporter, there are specific test cases that are put into their respective test files. This section highlights those test cases.
 
@@ -367,6 +388,17 @@ linodeMachineConfigs:
 These tests utilize Go build tags. Due to this, see the below examples on how to run the tests:
 
 `gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/provisioning/rke2 --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestRKE2PSACTTestSuite$"`
+
+### Hardened Custom Cluster
+This will provision a hardened custom cluster that runs across the following CIS scan profiles:
+1. `rke2-cis-1.8-profile-hardened`
+2. `rke2-cis-1.8-profile-permissive`
+
+You would use the same config that you setup for a custom cluster to run this test. Plese reference this [section](#custom-cluster). It also important to note that the machines that you select has `sudo` capabilities. The tests utilize `sudo`, so this can cause issues if there is no `sudo` present on the machine.
+
+These tests utilize Go build tags. Due to this, see the below examples on how to run the tests:
+
+`gotestsum --format standard-verbose --packages=github.com/rancher/rancher/tests/v2/validation/provisioning/rke2 --junitfile results.xml -- -timeout=60m -tags=validation -v -run "TestHardenedRKE2ClusterProvisioningTestSuite$"`
 
 ## Advanced Settings
 This encapsulates any other setting that is applied in the cluster.spec. Currently we have support for:

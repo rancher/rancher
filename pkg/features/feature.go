@@ -119,6 +119,12 @@ var (
 		false,
 		false,
 		true)
+	ExternalRules = newFeature(
+		"external-rules",
+		"Enable externalRules for RoleTemplates",
+		true,
+		true,
+		true)
 )
 
 type Feature struct {

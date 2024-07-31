@@ -132,9 +132,17 @@ func (m *Migrator) CreateOrUpdatePrivateRegistrySecret(secretName string, rkeCon
 	}
 	for _, privateRegistry := range privateRegistries {
 		active[privateRegistry.URL] = struct{}{}
-		if privateRegistry.Password == "" {
-			continue
+		// If the existing private registry is NOT changed when the cluster is updated, the password will be empty as
+		// it has been cleaned up in the previous reconciliation and the username will match the existing value. It is
+		// the only case where Rancher should not update the secret to prevent from wiping the password from the secret.
+		if privateRegistry.Password == "" && privateRegistry.User != "" {
+			if v, ok := registry.Auths[privateRegistry.URL]; ok {
+				if privateRegistry.User == v.Username {
+					continue
+				}
+			}
 		}
+		// empty username or password or both means unsetting the value(s), which is a valid use case
 		// limitation: if a URL is repeated in the privateRegistries list, it will be overwritten in the registry secret
 		registry.Auths[privateRegistry.URL] = credentialprovider.DockerConfigEntry{
 			Username: privateRegistry.User,

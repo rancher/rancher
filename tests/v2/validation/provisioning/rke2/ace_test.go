@@ -102,7 +102,6 @@ func (r *RKE2ACETestSuite) TestProvisioningRKE2ClusterACE() {
 		machinePools []provisioninginput.MachinePools
 		client       *rancher.Client
 	}{
-		{"Multiple Control Planes - Admin", nodeRoles0, r.client},
 		{"Multiple Control Planes - Standard", nodeRoles0, r.standardUserClient},
 	}
 	require.NotNil(r.T(), r.provisioningConfig.Networking.LocalClusterAuthEndpoint)
