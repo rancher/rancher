@@ -42,7 +42,7 @@ def test_wl_sidekick():
     validate_workload_with_sidekicks(
         p_client, workload, "deployment", ns.name)
 
-
+#Converted to go test in TestWorkloadDeployment
 def test_wl_deployment():
     p_client = namespace["p_client"]
     ns = namespace["ns"]
