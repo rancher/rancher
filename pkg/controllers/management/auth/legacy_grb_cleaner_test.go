@@ -158,7 +158,7 @@ func Test_cleanFinalizers(t *testing.T) {
 				},
 				prefix: "",
 			},
-			want: nil,
+			want: []string{},
 		},
 		{
 			name: "remove multiple finalizers",
