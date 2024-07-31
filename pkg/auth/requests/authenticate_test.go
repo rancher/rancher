@@ -203,8 +203,8 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 
 		resp, err := authenticator.Authenticate(req)
 		require.NoError(t, err)
-		refresherArgs := <-refresher.done                       // Wait for refresher to finish.
-		assert.Equal(t, int32(1), refresher.calledTimes.Load()) // Refresh was called once.
+		refresherArgs := <-refresher.done // Wait for the provider refresh to finish.
+		assert.Equal(t, int32(1), refresher.calledTimes.Load())
 
 		require.NotNil(t, resp)
 		assert.True(t, resp.IsAuthed)
@@ -248,13 +248,9 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 			}, nil
 		}
 
-		oldTokenUserID := token.UserID
-		defer func() { token.UserID = oldTokenUserID }()
-		token.UserID = "system://provisioning/fleet-local/local"
-
 		resp, err := authenticator.Authenticate(req)
 		require.NoError(t, err)
-		assert.Equal(t, int32(0), refresher.calledTimes.Load()) // Refresh was called once.
+		assert.Equal(t, int32(0), refresher.calledTimes.Load())
 
 		require.NotNil(t, resp)
 		assert.True(t, resp.IsAuthed)

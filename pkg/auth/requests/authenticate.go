@@ -128,12 +128,12 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 		return nil, err
 	}
 
-	u, err := a.userLister.Get("", token.UserID)
+	authUser, err := a.userLister.Get("", token.UserID)
 	if err != nil {
 		return nil, err
 	}
 
-	if u.Enabled != nil && !*u.Enabled {
+	if authUser.Enabled != nil && !*authUser.Enabled {
 		return nil, errors.Wrap(ErrMustAuthenticate, "user is not enabled")
 	}
 
@@ -161,7 +161,7 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 	}
 	groups = append(groups, user.AllAuthenticated, "system:cattle:authenticated")
 
-	if !strings.HasPrefix(token.UserID, "system:") {
+	if !authUser.IsSystem() {
 		go a.userAuthRefresher.TriggerUserRefresh(token.UserID, false)
 	}
 
@@ -169,7 +169,7 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 	authResp.User = token.UserID
 	authResp.UserPrincipal = token.UserPrincipal.Name
 	authResp.Groups = groups
-	authResp.Extras = getUserExtraInfo(token, u, attribs)
+	authResp.Extras = getUserExtraInfo(token, authUser, attribs)
 	logrus.Debugf("Extras returned %v", authResp.Extras)
 
 	return authResp, nil
