@@ -13,10 +13,6 @@ runs:
     - name: Create k3s images file
       shell: bash
       run: |
-        if [ -e /usr/tmp/k3s-images.txt ]; then
-            images=$(grep -e 'docker.io/rancher/mirrored-pause' -e 'docker.io/rancher/mirrored-coredns-coredns' /tmp/k3s-images.txt)
-            xargs -n1 docker pull <<< "${images}"
-            docker save -o ./k3s-airgap-images.tar ${images}
-        else
-            touch k3s-airgap-images.tar
-        fi
+        images=$(grep -e 'docker.io/rancher/mirrored-pause' -e 'docker.io/rancher/mirrored-coredns-coredns' /tmp/k3s-images.txt)
+        xargs -n1 docker pull <<< "${images}"
+        docker save -o ./k3s-airgap-images.tar ${images}
