@@ -73,7 +73,7 @@ func Test_rtCleanUp(t *testing.T) {
 					Annotations: map[string]string{
 						roletemplate.RTVersion: "true",
 					},
-					Finalizers: nil,
+					Finalizers: []string{},
 				},
 			},
 		},
@@ -81,8 +81,9 @@ func Test_rtCleanUp(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := rtCleanUp(tt.args.obj)
+
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("grbCleaner.sync() = %v, want %v", got, tt.want)
+				t.Errorf("rtCleaner.sync() = %v, want %v", got, tt.want)
 			}
 		})
 	}
