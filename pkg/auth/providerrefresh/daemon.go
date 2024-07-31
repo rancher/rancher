@@ -38,7 +38,7 @@ func StartRefreshDaemon(ctx context.Context, scaledContext *config.ScaledContext
 
 func UpdateRefreshCronTime(refreshCronTime string) error {
 	if ref == nil || refreshCronTime == "" {
-		return fmt.Errorf("missing minimum requirements to refresh cron time")
+		return fmt.Errorf("refresh cron time age must be provided")
 	}
 
 	parsed, err := ParseCron(refreshCronTime)
@@ -59,7 +59,7 @@ func UpdateRefreshCronTime(refreshCronTime string) error {
 
 func UpdateRefreshMaxAge(maxAge string) error {
 	if ref == nil {
-		return fmt.Errorf("missing minimum requirements to refresh max age")
+		return fmt.Errorf("refresh max age must be provided")
 	}
 
 	ref.ensureMaxAgeUpToDate(maxAge)
