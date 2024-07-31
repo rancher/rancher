@@ -522,7 +522,7 @@ func samePrincipal(me v3.Principal, other v3.Principal) bool {
 // UpdateGroupCacheSize attempts to update the size of the group cache defined at the package level.
 func UpdateGroupCacheSize(size string) error {
 	if size == "" {
-		return fmt.Errorf("missing minimum requirements to update group cache size")
+		return fmt.Errorf("azure-group-cache-size must be provided")
 	}
 
 	i, err := strconv.Atoi(size)
