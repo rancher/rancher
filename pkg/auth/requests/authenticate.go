@@ -112,6 +112,17 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 		return nil, errors.Wrapf(ErrMustAuthenticate, "clusterID does not match")
 	}
 
+	// If the auth provider is specified make sure it exists and enabled.
+	if token.AuthProvider != "" {
+		disabled, err := providers.IsDisabledProvider(token.AuthProvider)
+		if err != nil {
+			return nil, errors.Wrapf(ErrMustAuthenticate, "provider %s doesn't exist", token.AuthProvider)
+		}
+		if disabled {
+			return nil, errors.Wrapf(ErrMustAuthenticate, "provider %s is disabled", token.AuthProvider)
+		}
+	}
+
 	attribs, err := a.userAttributeLister.Get("", token.UserID)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return nil, err
@@ -149,6 +160,7 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 		}
 	}
 	groups = append(groups, user.AllAuthenticated, "system:cattle:authenticated")
+
 	if !strings.HasPrefix(token.UserID, "system:") {
 		go a.userAuthRefresher.TriggerUserRefresh(token.UserID, false)
 	}
