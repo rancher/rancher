@@ -38,7 +38,7 @@ func StartRefreshDaemon(ctx context.Context, scaledContext *config.ScaledContext
 
 func UpdateRefreshCronTime(refreshCronTime string) error {
 	if ref == nil || refreshCronTime == "" {
-		return fmt.Errorf("refresh cron time age must be provided")
+		return fmt.Errorf("refresh cron time must be provided")
 	}
 
 	parsed, err := ParseCron(refreshCronTime)
