@@ -3,23 +3,23 @@
 package charts
 
 import (
-	"strings"
-	"testing"
-
 	"github.com/rancher/shepherd/clients/rancher"
 	"github.com/rancher/shepherd/clients/rancher/catalog"
 	"github.com/rancher/shepherd/extensions/charts"
 	"github.com/rancher/shepherd/extensions/clusters"
 	"github.com/rancher/shepherd/extensions/kubeconfig"
+	"github.com/rancher/shepherd/extensions/kubectl"
 	"github.com/rancher/shepherd/extensions/workloads/pods"
-
-	"github.com/rancher/shepherd/extensions/users"
 	"github.com/rancher/shepherd/pkg/session"
-
-	log "github.com/sirupsen/logrus"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"gopkg.in/yaml.v2"
+	"strings"
+	"testing"
+
+	"github.com/rancher/shepherd/extensions/users"
+	log "github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
 )
 
 type WebhookTestSuite struct {
@@ -126,6 +126,26 @@ func (w *WebhookTestSuite) TestWebhookEscalationCheck() {
 		require.Error(w.T(), err)
 		errMessage := "admission webhook \"rancher.cattle.io.globalroles.management.cattle.io\" denied the request"
 		assert.Contains(w.T(), err.Error(), errMessage)
+	})
+}
+
+func (w *WebhookTestSuite) TestWebhookPinnedVersion() {
+	w.Run("Verify pinned version", func() {
+		cmd := []string{"kubectl", "get", "setting", "rancher-webhook-version", "-o", "yaml"}
+		resp, err := kubectl.Command(w.client, nil, localCluster, cmd, "")
+		require.NoError(w.T(), err)
+
+		var data map[string]interface{}
+		err = yaml.Unmarshal([]byte(resp), &data)
+		require.NoError(w.T(), err)
+
+		source, ok := data["source"].(string)
+		require.True(w.T(), ok, "source field should be a string")
+		require.Equal(w.T(), "env", source, "source field should be 'env'")
+
+		value, ok := data["value"].(string)
+		require.True(w.T(), ok, "value field should be a string")
+		require.NotEmpty(w.T(), value, "value field should not be empty")
 	})
 }
 
