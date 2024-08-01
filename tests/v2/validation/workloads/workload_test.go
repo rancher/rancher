@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	projectsapi "github.com/rancher/rancher/tests/v2/actions/projects"
+	"github.com/rancher/rancher/tests/v2/actions/workloads/deamonset"
 	deployment "github.com/rancher/rancher/tests/v2/actions/workloads/deployment"
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
@@ -52,6 +53,17 @@ func (w *WorkloadTestSuite) TestWorkloadDeployment() {
 	require.NoError(w.T(), err)
 
 	_, err = deployment.CreateDeployment(w.client, w.cluster.ID, namespace.Name, 1, "", "", false, false)
+	require.NoError(w.T(), err)
+}
+
+func (w *WorkloadTestSuite) TestWorkloadDaemonSet() {
+	subSession := w.session.NewSession()
+	defer subSession.Cleanup()
+
+	_, namespace, err := projectsapi.CreateProjectAndNamespace(w.client, w.cluster.ID)
+	require.NoError(w.T(), err)
+
+	_, err = deamonset.CreateDeamonset(w.client, w.cluster.ID, namespace.Name, 1, "", "", false, false)
 	require.NoError(w.T(), err)
 }
 
