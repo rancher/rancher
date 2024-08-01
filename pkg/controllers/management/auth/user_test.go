@@ -4,11 +4,14 @@ import (
 	"fmt"
 	"testing"
 
+	management "github.com/rancher/rancher/pkg/apis/management.cattle.io"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 	v12 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 func Test_hasLocalPrincipalID(t *testing.T) {
@@ -544,7 +547,7 @@ func Test_deleteUserNamespace(t *testing.T) {
 			username: "testuser",
 			mockSetup: func() {
 				gomock.InOrder(
-					namespaceListerMock.EXPECT().Get("", "testuser").Return(nil, fmt.Errorf("")),
+					namespaceListerMock.EXPECT().Get("", "testuser").Return(nil, fmt.Errorf("some error")),
 				)
 			},
 			expectedError: true,
@@ -559,6 +562,33 @@ func Test_deleteUserNamespace(t *testing.T) {
 				)
 			},
 			expectedError: true,
+		},
+		{
+			name:     "namespace is in termination state",
+			username: "testuser",
+			mockSetup: func() {
+				gomock.InOrder(
+					namespaceListerMock.EXPECT().Get("", "testuser").Return(&v12.Namespace{
+						Status: v12.NamespaceStatus{
+							Phase: v12.NamespaceTerminating,
+						},
+					}, nil),
+				)
+			},
+			expectedError: false,
+		},
+		{
+			name:     "namespace was not found",
+			username: "testuser",
+			mockSetup: func() {
+				gomock.InOrder(
+					namespaceListerMock.EXPECT().Get("", "testuser").Return(nil, errors.NewNotFound(schema.GroupResource{
+						Group:    management.GroupName,
+						Resource: "Namespace",
+					}, "testns")),
+				)
+			},
+			expectedError: false,
 		},
 	}
 
