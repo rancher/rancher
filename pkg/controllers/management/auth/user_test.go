@@ -11,7 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func Test_hasValidPrincipalID(t *testing.T) {
+func Test_hasLocalPrincipalID(t *testing.T) {
 	type args struct {
 		user *v3.User
 	}
@@ -53,6 +53,31 @@ func Test_hasValidPrincipalID(t *testing.T) {
 				user: &v3.User{
 					Username:     "testuser",
 					PrincipalIDs: []string{},
+				},
+			},
+			want: false,
+		},
+		{
+			name: "has multiple local PrincipalIDs",
+			args: args{
+				user: &v3.User{
+					Username: "testuser",
+					PrincipalIDs: []string{
+						"ID1",
+						"local://localuser",
+						"ID2",
+						"local://testuser",
+					},
+				},
+			},
+			want: true,
+		},
+		{
+			name: "PrincipalIDs is nil",
+			args: args{
+				user: &v3.User{
+					Username:     "testuser",
+					PrincipalIDs: nil,
 				},
 			},
 			want: false,
