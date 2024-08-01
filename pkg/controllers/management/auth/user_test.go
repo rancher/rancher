@@ -641,7 +641,7 @@ func Test_deleteUserSecret(t *testing.T) {
 			username: "testuser",
 			mockSetup: func() {
 				gomock.InOrder(
-					secretsListerMock.EXPECT().Get("cattle-system", "testuser-secret").Return(nil, fmt.Errorf("")),
+					secretsListerMock.EXPECT().Get("cattle-system", "testuser-secret").Return(nil, fmt.Errorf("some error")),
 				)
 			},
 			expectedError: true,
@@ -656,6 +656,19 @@ func Test_deleteUserSecret(t *testing.T) {
 				)
 			},
 			expectedError: true,
+		},
+		{
+			name:     "secret not found",
+			username: "testuser",
+			mockSetup: func() {
+				gomock.InOrder(
+					secretsListerMock.EXPECT().Get("cattle-system", "testuser-secret").Return(nil, errors.NewNotFound(schema.GroupResource{
+						Group:    management.GroupName,
+						Resource: "Secrets",
+					}, "testsecret")),
+				)
+			},
+			expectedError: false,
 		},
 	}
 
