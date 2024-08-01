@@ -7,7 +7,7 @@ fi
 
 if [ -z "$KUBEBUILDER_ASSETS" ];
 then 
-    KUBEBUILDER_ASSETS=$(setup-envtest use --use-env -p path)
+    KUBEBUILDER_ASSETS=$(setup-envtest use --use-env -p path $ENVTEST_K8S_VERSION)
     export KUBEBUILDER_ASSETS
 fi
 
