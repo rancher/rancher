@@ -21,7 +21,7 @@ func Test_hasValidPrincipalID(t *testing.T) {
 		want bool
 	}{
 		{
-			name: "has local PrincipalIDs",
+			name: "has local PrincipalID",
 			args: args{
 				user: &v3.User{
 					Username: "testuser",
