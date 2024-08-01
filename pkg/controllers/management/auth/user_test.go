@@ -48,7 +48,7 @@ func Test_hasValidPrincipalID(t *testing.T) {
 			want: false,
 		},
 		{
-			name: "has not PrincipalIDs",
+			name: "PrincipalIDs is empty",
 			args: args{
 				user: &v3.User{
 					Username:     "testuser",
