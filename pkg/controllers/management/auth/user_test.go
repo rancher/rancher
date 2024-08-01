@@ -35,7 +35,7 @@ func Test_hasValidPrincipalID(t *testing.T) {
 			want: true,
 		},
 		{
-			name: "has not local PrincipalIDs",
+			name: "has no local PrincipalIDs",
 			args: args{
 				user: &v3.User{
 					Username: "testuser",
