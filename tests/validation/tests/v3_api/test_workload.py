@@ -68,7 +68,7 @@ def test_wl_statefulset():
                                         )
     validate_workload(p_client, workload, "statefulSet", ns.name)
 
-
+#Converted test to TestWorkloadDaemonSet
 def test_wl_daemonset():
     p_client = namespace["p_client"]
     ns = namespace["ns"]
