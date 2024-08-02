@@ -43,7 +43,6 @@ var Kubernetes125 = semver.MustParse("v1.25.0")
 type handler struct {
 	clusterRegistrationTokens v3.ClusterRegistrationTokenCache
 	bundles                   fleetcontrollers.BundleClient
-	rkeControlPlane           v1.RKEControlPlaneController
 	provClusters              rocontrollers.ClusterCache
 }
 
@@ -51,7 +50,6 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 	h := &handler{
 		clusterRegistrationTokens: clients.Mgmt.ClusterRegistrationToken().Cache(),
 		bundles:                   clients.Fleet.Bundle(),
-		rkeControlPlane:           clients.RKE.RKEControlPlane(),
 		provClusters:              clients.Provisioning.Cluster().Cache(),
 	}
 
@@ -208,15 +206,10 @@ func installer(cluster *rancherv1.Cluster, secretName string) []runtime.Object {
 		})
 	}
 
-	controlPlane, err := h.rkeControlPlane.Get(cluster.Namespace, cluster.Name, metav1.GetOptions{})
-	if err != nil {
-		return nil, err
-	}
-
-	if controlPlane.Spec.RKEClusterSpecCommon.DataDirectories.SystemAgent != "" {
+	if cluster.Spec.RKEConfig.DataDirectories.SystemAgent != "" {
 		env = append(env, corev1.EnvVar{
 			Name:  capr.SystemAgentDataDirEnvVar,
-			Value: capr.GetSystemAgent(controlPlane),
+			Value: capr.GetSystemAgent(&cluster.Spec.RKEConfig.RKEClusterSpecCommon),
 		})
 	}
 

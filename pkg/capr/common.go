@@ -258,8 +258,8 @@ func GetProvisioningDataDir(controlPlane *rkev1.RKEControlPlane) string {
 	return "/var/lib/rancher/capr"
 }
 
-func GetSystemAgent(controlPlane *rkev1.RKEControlPlane) string {
-	if dir := controlPlane.Spec.DataDirectories.SystemAgent; dir != "" {
+func GetSystemAgent(spec *rkev1.RKEClusterSpecCommon) string {
+	if dir := spec.DataDirectories.SystemAgent; dir != "" {
 		return dir
 	}
 	return "/var/lib/rancher/agent"
