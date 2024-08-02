@@ -52,17 +52,31 @@ func (etcd *SnapshotRBACTestSuite) testRKE2K3SSnapshotRBAC(role string, standard
 	switch role {
 	case rbac.ClusterOwner.String(), rbac.RestrictedAdmin.String():
 		require.NoError(etcd.T(), err)
+		log.Info("Snapshot successful!")
 
 	case rbac.ClusterMember.String(), rbac.ProjectOwner.String(), rbac.ProjectMember.String():
 		require.Error(etcd.T(), err)
 		assert.Equal(etcd.T(), "Resource type [provisioning.cattle.io.cluster] is not updatable", err.Error())
+		log.Info("Snapshot failed as expected.")
 	}
 }
 
-func (etcd *SnapshotRBACTestSuite) TestRKE2K3SSnapshotRBAC() {
-	subSession := etcd.session.NewSession()
-	defer subSession.Cleanup()
+func (etcd *SnapshotRBACTestSuite) testRKE1SnapshotRBAC(role string, standardUserClient *rancher.Client) {
+	log.Info("Test case - Take Etcd snapshot of an RKE1 cluster as a " + role)
+	err := etcdsnapshot.CreateRKE1Snapshot(standardUserClient, etcd.cluster.Name)
+	switch role {
+	case rbac.ClusterOwner.String(), rbac.RestrictedAdmin.String():
+		require.NoError(etcd.T(), err)
+		log.Info("Snapshot successful!")
 
+	case rbac.ClusterMember.String(), rbac.ProjectOwner.String(), rbac.ProjectMember.String():
+		require.Error(etcd.T(), err)
+		assert.Contains(etcd.T(), err.Error(), "action [backupEtcd] not available")
+		log.Info("Snapshot failed as expected.")
+	}
+}
+
+func (etcd *SnapshotRBACTestSuite) TestETCDRBAC() {
 	tests := []struct {
 		name   string
 		role   string
@@ -75,9 +89,6 @@ func (etcd *SnapshotRBACTestSuite) TestRKE2K3SSnapshotRBAC() {
 		{"Restricted Admin", rbac.RestrictedAdmin.String(), rbac.RestrictedAdmin.String()},
 	}
 	for _, tt := range tests {
-		if !(strings.Contains(etcd.cluster.ID, "c-m-")) {
-			etcd.T().Skip("Skipping tests since cluster is not of type - k3s or RKE2")
-		}
 		etcd.Run("Set up User with Role "+tt.name, func() {
 			clusterUser, clusterClient, err := rbac.SetupUser(etcd.client, tt.member)
 			require.NoError(etcd.T(), err)
@@ -99,7 +110,13 @@ func (etcd *SnapshotRBACTestSuite) TestRKE2K3SSnapshotRBAC() {
 			require.NoError(etcd.T(), err)
 			clusterClient = relogin
 
-			etcd.testRKE2K3SSnapshotRBAC(tt.role, clusterClient)
+			if !(strings.Contains(etcd.cluster.ID, "c-m-")) {
+				etcd.testRKE1SnapshotRBAC(tt.role, clusterClient)
+			} else {
+				etcd.testRKE2K3SSnapshotRBAC(tt.role, clusterClient)
+			}
+			subSession := etcd.session.NewSession()
+			defer subSession.Cleanup()
 		})
 	}
 }
