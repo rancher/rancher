@@ -102,6 +102,7 @@ func (h *handler) deployPlans(cluster *v3.Cluster, isK3s, isRke2 bool) error {
 				strategy.DrainServerNodes, masterPlanName)
 
 			if !cmp(*masterPlan, newMaster) {
+				logrus.Infof("[k3s-based-upgrader] updating plan [%s] in cluster [%s]", newMaster.Name, cluster.Name)
 				planClient = planConfig.Plans(systemUpgradeNS)
 				masterPlan, err = planClient.Update(context.TODO(), &newMaster, metav1.UpdateOptions{})
 				if err != nil {
@@ -116,6 +117,7 @@ func (h *handler) deployPlans(cluster *v3.Cluster, isK3s, isRke2 bool) error {
 				strategy.DrainWorkerNodes, upgradeImage, workerPlanName, masterPlanName)
 
 			if !cmp(*workerPlan, newWorker) {
+				logrus.Infof("[k3s-based-upgrader] updating plan [%s] in cluster [%s]", newWorker.Name, cluster.Name)
 				planClient = planConfig.Plans(systemUpgradeNS)
 				workerPlan, err = planClient.Update(context.TODO(), &newWorker, metav1.UpdateOptions{})
 				if err != nil {
@@ -125,6 +127,7 @@ func (h *handler) deployPlans(cluster *v3.Cluster, isK3s, isRke2 bool) error {
 		}
 
 	} else { // create the plans
+		logrus.Infof("[k3s-based-upgrader] creating plans in cluster [%s]", cluster.Name)
 		planClient = planConfig.Plans(systemUpgradeNS)
 		genMasterPlan := generateMasterPlan(Version,
 			strategy.ServerConcurrency,
@@ -142,7 +145,7 @@ func (h *handler) deployPlans(cluster *v3.Cluster, isK3s, isRke2 bool) error {
 		if err != nil {
 			return err
 		}
-		logrus.Infof("Plans successfully deployed into cluster %s", cluster.Name)
+		logrus.Infof("[k3s-based-upgrader] plans successfully deployed into cluster [%s]", cluster.Name)
 	}
 
 	cluster, err = h.modifyClusterCondition(cluster, *masterPlan, *workerPlan, strategy)
