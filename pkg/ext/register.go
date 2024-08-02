@@ -4,15 +4,12 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/rancher/rancher/pkg/ext/resources/tokens"
 	"github.com/rancher/rancher/pkg/wrangler"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func RegisterSubRoutes(router *mux.Router, wContext *wrangler.Context) {
 	apiServer := NewAPIServer()
-	tokenHandler := StoreDelegate[*tokens.RancherToken]{
-		GroupVersion: tokens.SchemeGroupVersion,
-		Store:        tokens.NewTokenStore(wContext.Core.Secret(), wContext.Core.Secret().Cache()),
-	}
-	apiServer.AddAPIResource(tokens.SchemeGroupVersion, metav1.APIResource{}, tokenHandler.Delegate)
+	tokenStore := tokens.NewTokenStore(wContext.Core.Secret(), wContext.Core.Secret().Cache(), wContext.K8s.AuthorizationV1().SubjectAccessReviews())
+	tokenHandler := NewStoreDelegate(tokenStore, tokens.SchemeGroupVersion)
+	apiServer.AddAPIResource(tokens.SchemeGroupVersion, tokens.TokenAPIResource, tokenHandler.Delegate)
 	apiServer.RegisterRoutes(router)
 }

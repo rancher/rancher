@@ -28,6 +28,7 @@ import (
 	gmux "github.com/gorilla/mux"
 	"github.com/munnerz/goautoneg"
 	"github.com/pkg/errors"
+	"github.com/rancher/wrangler/v3/pkg/schemes"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
@@ -39,9 +40,9 @@ import (
 var (
 	// Reference:
 	// Scheme scheme for unversioned types - such as APIResourceList, and Status
-	Scheme = k8sruntime.NewScheme()
+	scheme = k8sruntime.NewScheme()
 	// Codecs for unversioned types - such as APIResourceList, and Status
-	Codecs = serializer.NewCodecFactory(Scheme)
+	Codecs = serializer.NewCodecFactory(schemes.All)
 
 	unversionedVersion = schema.GroupVersion{Version: "v1"}
 	unversionedTypes   = []k8sruntime.Object{
@@ -58,7 +59,8 @@ const (
 )
 
 func init() {
-	Scheme.AddUnversionedTypes(unversionedVersion, unversionedTypes...)
+	scheme.AddUnversionedTypes(unversionedVersion, unversionedTypes...)
+	schemes.AddToScheme(scheme)
 }
 
 // CRDHandler is a http handler, that gets passed the Namespace it's working
@@ -131,17 +133,30 @@ func (s *APIServer) RegisterRoutes(router *gmux.Router) {
 	})
 	for groupVersion, resourceList := range s.resourceList {
 		pattern := fmt.Sprintf("/apis/%s", groupVersion)
+		s.logger.Info("Adding handler for path", pattern)
 		s.logger.WithField("groupversion", groupVersion).WithField("pattern", pattern).Info("Adding Discovery Handler")
 		s.addSerializedHandler(pattern, router, resourceList)
 
 		pattern = fmt.Sprintf("/apis/%s/namespaces/", groupVersion)
-		router.HandleFunc(pattern, https.ErrorHTTPHandler(s.logger, s.namespacedResourceHandler(groupVersion)))
+		s.logger.Info("Adding handler for path", pattern)
+		router.PathPrefix(pattern).HandlerFunc(https.ErrorHTTPHandler(s.logger, s.namespacedResourceHandler(groupVersion)))
+		//router.HandleFunc(pattern, https.ErrorHTTPHandler(s.logger, s.namespacedResourceHandler(groupVersion)))
 		s.logger.WithField("groupversion", groupVersion.String()).WithField("pattern", pattern).WithField("namespaced", "true").Info("Adding Resource Handler")
 
 		pattern = fmt.Sprintf("/apis/%s/", groupVersion)
-		router.HandleFunc(pattern, https.ErrorHTTPHandler(s.logger, s.resourceHandler(groupVersion)))
+		s.logger.Info("Adding handler for path", pattern)
+		router.PathPrefix(pattern).HandlerFunc(https.ErrorHTTPHandler(s.logger, s.resourceHandler(groupVersion)))
+		//router.HandleFunc(pattern, https.ErrorHTTPHandler(s.logger, s.resourceHandler(groupVersion)))
 		s.logger.WithField("groupversion", groupVersion.String()).WithField("pattern", pattern).WithField("namespaced", "false").Info("Adding Resource Handler")
 	}
+	router.Walk(func(route *gmux.Route, router *gmux.Router, ancestors []*gmux.Route) error {
+		template, err := route.GetPathTemplate()
+		if err != nil {
+			return err
+		}
+		logrus.Errorf("found route %s", template)
+		return nil
+	})
 
 }
 
@@ -179,6 +194,7 @@ func (as *APIServer) AddAPIResource(groupVersion schema.GroupVersion, resource m
 // namespacedResourceHandler handles namespaced resource calls, and sends them to the appropriate CRDHandler delegate
 func (as *APIServer) namespacedResourceHandler(groupVersion schema.GroupVersion) https.ErrorHandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) error {
+		logrus.Errorf("namespaced got a request for path: %s", r.URL.Path)
 		namespace, resource, err := splitNamespaceResource(r.URL.Path)
 		if err != nil {
 			https.FourZeroFour(as.logger.WithError(err), w, r)
@@ -207,6 +223,7 @@ func (as *APIServer) namespacedResourceHandler(groupVersion schema.GroupVersion)
 // Cluster: /apis/tomlebreux.com/v1/<resource>
 func (as *APIServer) resourceHandler(groupVersion schema.GroupVersion) https.ErrorHandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) error {
+		logrus.Errorf("got a request for path: %s", r.URL.Path)
 		resource, err := splitResource(r.URL.Path)
 		if err != nil {
 			https.FourZeroFour(as.logger.WithError(err), w, r)

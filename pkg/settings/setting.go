@@ -323,6 +323,9 @@ var (
 	SkipHostedClusterChartInstallation = NewSetting("skip-hosted-cluster-chart-installation", os.Getenv("CATTLE_SKIP_HOSTED_CLUSTER_CHART_INSTALLATION"))
 	MachineProvisionImagePullPolicy    = NewSetting("machine-provision-image-pull-policy", string(v1.PullAlways))
 
+	// ImperativeAPIExtension turns on an API Service for the imperative actions
+	ImperativeAPIExtension = NewSetting("imperative-api-extension", "off")
+
 	// The following settings are only used by the UI, but need to be known to Rancher so that they're not removed.
 	_ = NewSetting("eula-agreed", "")
 	_ = NewSetting("display-add-extension-repos-banner", "")

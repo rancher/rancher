@@ -135,10 +135,15 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 
 	metricsAuthed.Path("/metrics").Handler(metricsHandler)
 
-	extAuthed := mux.NewRouter().PathPrefix("/ext")
-	ext.RegisterSubRoutes(extAuthed.Subrouter(), scaledContext.Wrangler.WithAgent("extensions"))
+	extAuthed := mux.NewRouter().PathPrefix("/ext").Subrouter()
+	extAuthed.UseEncodedPath()
+	extAuthed.Use(mux.MiddlewareFunc(impersonatingAuth))
+	extAuthed.Use(mux.MiddlewareFunc(accessControlHandler))
+	extAuthed.Use(requests.NewAuthenticatedFilter)
+	ext.RegisterSubRoutes(extAuthed, scaledContext.Wrangler.WithAgent("extensions"))
 
-	unauthed.NotFoundHandler = saauthed
+	unauthed.NotFoundHandler = extAuthed
+	extAuthed.NotFoundHandler = saauthed
 	saauthed.NotFoundHandler = authed
 	authed.NotFoundHandler = metricsAuthed
 

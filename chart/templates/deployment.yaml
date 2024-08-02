@@ -70,6 +70,8 @@ spec:
         ports:
         - containerPort: 80
           protocol: TCP
+        - containerPort: 555
+          protocol: TCP
 {{- if (and .Values.hostPort (gt (int .Values.hostPort) 0)) }}
         - containerPort: 444
           hostPort: {{ int .Values.hostPort }}
