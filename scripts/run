@@ -40,7 +40,7 @@ fi
 
 if [ $CI ]; then
   # DISCLAIMER
-  # This code relies on the fact that our CI pipleine runs on one system at a time. Currently with drone this means that the setting `DRONE_AGENT_CONCURRENCY=1`
+  # This code relies on the fact that our CI pipeline runs on one system at a time. Currently with drone this means that the setting `DRONE_AGENT_CONCURRENCY=1`
 
   # Attempt to find and stop any previous instances of dapper containers.
   # To combat the scenario where drone runners are reused and an instance of rancher is still running.
