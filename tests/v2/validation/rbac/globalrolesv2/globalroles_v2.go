@@ -15,11 +15,15 @@ import (
 	v1 "github.com/rancher/shepherd/clients/rancher/v1"
 	"github.com/rancher/shepherd/extensions/clusters"
 	"github.com/rancher/shepherd/extensions/defaults"
-	"github.com/rancher/shepherd/extensions/kubeapi/rbac"
+	"github.com/rancher/shepherd/extensions/kubeapi/projects"
+	rbacapi "github.com/rancher/shepherd/extensions/kubeapi/rbac"
 	"github.com/rancher/shepherd/extensions/provisioning"
 	"github.com/rancher/shepherd/extensions/provisioninginput"
 
+	"github.com/rancher/rancher/tests/v2/actions/rbac"
+	"github.com/rancher/shepherd/extensions/kubeapi/namespaces"
 	"github.com/rancher/shepherd/extensions/users"
+	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -28,36 +32,66 @@ import (
 )
 
 const (
-	roleOwner          = "cluster-owner"
-	roleMember         = "cluster-member"
-	roleProjectOwner   = "project-owner"
-	roleCrtbView       = "clusterroletemplatebindings-view"
-	roleProjectsCreate = "projects-create"
-	roleProjectsView   = "projects-view"
-	standardUser       = "user"
-	localcluster       = "local"
-	crtbOwnerLabel     = "authz.management.cattle.io/grb-owner"
-	namespace          = "fleet-default"
-	localPrefix        = "local://"
-	clusterContext     = "cluster"
-	projectContext     = "project"
-	bindingLabel       = "membership-binding-owner"
+	localcluster        = "local"
+	ownerLabel          = "authz.management.cattle.io/grb-owner"
+	namespace           = "fleet-default"
+	localPrefix         = "local://"
+	clusterContext      = "cluster"
+	projectContext      = "project"
+	bindingLabel        = "membership-binding-owner"
+	globalDataNamespace = "cattle-global-data"
+	defaultNamespace    = "default"
 )
 
-var globalRole = v3.GlobalRole{
-	ObjectMeta: metav1.ObjectMeta{
-		Name: "",
-	},
-	InheritedClusterRoles: []string{},
-}
+var (
+	globalRole = v3.GlobalRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "",
+		},
+		InheritedClusterRoles: []string{},
+	}
 
-var globalRoleBinding = &v3.GlobalRoleBinding{
-	ObjectMeta: metav1.ObjectMeta{
-		Name: "",
-	},
-	GlobalRoleName: "",
-	UserName:       "",
-}
+	globalRoleBinding = &v3.GlobalRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "",
+		},
+		GlobalRoleName: "",
+		UserName:       "",
+	}
+
+	readSecretsPolicy = rbacv1.PolicyRule{
+		Verbs:     []string{"get", "list", "watch"},
+		APIGroups: []string{""},
+		Resources: []string{"secrets"},
+	}
+
+	readCRTBsPolicy = rbacv1.PolicyRule{
+		Verbs:     []string{"get", "list", "watch"},
+		APIGroups: []string{"management.cattle.io"},
+		Resources: []string{"clusterroletemplatebindings"},
+	}
+
+	readPods = rbacv1.PolicyRule{
+		Verbs:     []string{"get", "list", "watch"},
+		APIGroups: []string{""},
+		Resources: []string{"pods"},
+	}
+
+	readAllResourcesPolicy = rbacv1.PolicyRule{
+		Verbs:     []string{"get", "list", "watch"},
+		APIGroups: []string{"*"},
+		Resources: []string{"*"},
+	}
+
+	secret = corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: namegen.AppendRandomString("secret-"),
+		},
+		Data: map[string][]byte{
+			"key": []byte(namegen.RandStringLower(5)),
+		},
+	}
+)
 
 func createGlobalRoleWithInheritedClusterRolesWrangler(client *rancher.Client, inheritedRoles []string) (*v3.GlobalRole, error) {
 	globalRole.Name = namegen.AppendRandomString("testgr")
@@ -81,12 +115,11 @@ func getGlobalRoleBindingForUserWrangler(client *rancher.Client, userID string) 
 			return grbs.Name, nil
 		}
 	}
-
 	return "", nil
 }
 
 func listClusterRoleTemplateBindingsForInheritedClusterRoles(client *rancher.Client, grbOwner string, expectedCount int) (*v3.ClusterRoleTemplateBindingList, error) {
-	req, err := labels.NewRequirement(crtbOwnerLabel, selection.In, []string{grbOwner})
+	req, err := labels.NewRequirement(ownerLabel, selection.In, []string{grbOwner})
 
 	if err != nil {
 		return nil, err
@@ -97,7 +130,7 @@ func listClusterRoleTemplateBindingsForInheritedClusterRoles(client *rancher.Cli
 	var crtbs *v3.ClusterRoleTemplateBindingList
 
 	err = kwait.Poll(defaults.FiveHundredMillisecondTimeout, defaults.OneMinuteTimeout, func() (done bool, pollErr error) {
-		crtbs, pollErr = rbac.ListClusterRoleTemplateBindings(client, metav1.ListOptions{
+		crtbs, pollErr = rbacapi.ListClusterRoleTemplateBindings(client, metav1.ListOptions{
 			LabelSelector: selector.String(),
 		})
 		if pollErr != nil {
@@ -128,7 +161,7 @@ func getCRBsForCRTBs(client *rancher.Client, crtbs *v3.ClusterRoleTemplateBindin
 		}
 
 		selector := labels.NewSelector().Add(*req)
-		downstreamCRBsForCRTB, err := rbac.ListClusterRoleBindings(client, localcluster, metav1.ListOptions{
+		downstreamCRBsForCRTB, err := rbacapi.ListClusterRoleBindings(client, localcluster, metav1.ListOptions{
 			LabelSelector: selector.String(),
 		})
 
@@ -152,7 +185,7 @@ func getRBsForCRTBs(client *rancher.Client, crtbs *v3.ClusterRoleTemplateBinding
 			listOpt := metav1.ListOptions{
 				FieldSelector: "metadata.name=" + roleTemplateName,
 			}
-			roleTemplateList, err := rbac.ListRoleTemplates(client, listOpt)
+			roleTemplateList, err := rbacapi.ListRoleTemplates(client, listOpt)
 			if err != nil {
 				return nil, err
 			}
@@ -162,7 +195,7 @@ func getRBsForCRTBs(client *rancher.Client, crtbs *v3.ClusterRoleTemplateBinding
 		nameSelector := fmt.Sprintf("metadata.name=%s-%s", crtb.Name, roleTemplateName)
 		namespaceSelector := fmt.Sprintf("metadata.namespace=%s", crtb.ClusterName)
 		combinedSelector := fmt.Sprintf("%s,%s", nameSelector, namespaceSelector)
-		downstreamRBsForCRTB, err := rbac.ListRoleBindings(client, localcluster, "", metav1.ListOptions{
+		downstreamRBsForCRTB, err := rbacapi.ListRoleBindings(client, localcluster, "", metav1.ListOptions{
 			FieldSelector: combinedSelector,
 		})
 
@@ -214,20 +247,13 @@ func createDownstreamCluster(client *rancher.Client, clusterType string) (*manag
 	return clusterObject, steveObject, testClusterConfig, nil
 }
 
-func createGlobalRole(client *rancher.Client, inheritedClusterrole []string) (*v3.GlobalRole, error) {
-	globalRole.Name = namegen.AppendRandomString("testgr")
-	globalRole.InheritedClusterRoles = inheritedClusterrole
-	createdGlobalRole, err := rbac.CreateGlobalRole(client, &globalRole)
-	return createdGlobalRole, err
-}
-
 func createGlobalRoleAndUser(client *rancher.Client, inheritedClusterrole []string) (*management.User, error) {
-	globalRole, err := createGlobalRole(client, inheritedClusterrole)
+	globalRole, err := createGlobalRoleWithInheritedClusterRolesWrangler(client, inheritedClusterrole)
 	if err != nil {
 		return nil, err
 	}
 
-	createdUser, err := users.CreateUserWithRole(client, users.UserConfig(), standardUser, globalRole.Name)
+	createdUser, err := users.CreateUserWithRole(client, users.UserConfig(), rbac.StandardUser.String(), globalRole.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -240,7 +266,7 @@ func crtbStatus(client *rancher.Client, crtbName string, selector labels.Selecto
 	defer cancel()
 
 	err := kwait.PollUntilContextCancel(ctx, defaults.FiveHundredMillisecondTimeout, false, func(ctx context.Context) (done bool, err error) {
-		crtbs, err := rbac.ListClusterRoleTemplateBindings(client, metav1.ListOptions{
+		crtbs, err := rbacapi.ListClusterRoleTemplateBindings(client, metav1.ListOptions{
 			LabelSelector: selector.String(),
 		})
 		if err != nil {
@@ -256,4 +282,24 @@ func crtbStatus(client *rancher.Client, crtbName string, selector labels.Selecto
 	})
 
 	return err
+}
+
+func createGlobalRoleWithNamespacedRules(client *rancher.Client, namespacedRules map[string][]rbacv1.PolicyRule) (*v3.GlobalRole, error) {
+	globalRole.Name = namegen.AppendRandomString("test-nsr")
+	globalRole.NamespacedRules = namespacedRules
+	createdGlobalRole, err := rbacapi.CreateGlobalRole(client, &globalRole)
+	if err != nil {
+		return nil, err
+	}
+	return createdGlobalRole, nil
+}
+
+func createProjectAndAddANamespace(client *rancher.Client, nsPrefix string) (string, error) {
+	project := projects.NewProjectTemplate(localcluster)
+	customProject, err := client.WranglerContext.Mgmt.Project().Create(project)
+	if err != nil {
+		return "", err
+	}
+	customNS1, err := namespaces.CreateNamespace(client, localcluster, customProject.Name, namegen.AppendRandomString(nsPrefix), "", nil, nil)
+	return customNS1.Name, err
 }
