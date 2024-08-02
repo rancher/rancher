@@ -169,7 +169,7 @@ require (
 	github.com/google/gnostic-models v0.6.8
 	github.com/rancher/cis-operator v1.0.11
 	github.com/rancher/rancher/pkg/apis v0.0.0-20240613212755-3021cf92ff9f
-	github.com/rancher/shepherd v0.0.0-20240802211832-52071d6f1dc8
+	github.com/rancher/shepherd v0.0.0-20240802142039-681264e3b6ef
 	go.qase.io/client v0.0.0-20231114201952-65195ec001fa
 )
 
