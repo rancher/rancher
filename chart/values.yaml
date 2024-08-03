@@ -65,6 +65,9 @@ ingress:
   includeDefaultExtraAnnotations: true
   extraAnnotations: {}
   ingressClassName: ""
+  # Certain ingress controllers will require the pathType or path to be set to a different value.
+  pathType: ImplementationSpecific
+  path: "/"
   # backend port number
   servicePort: 80
 
