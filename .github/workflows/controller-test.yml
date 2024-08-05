@@ -28,5 +28,5 @@ jobs:
       -
         name: Run Integration Tests
         env:
-          ENVTEST_K8S_VERSION: 1.30
+          ENVTEST_K8S_VERSION: "1.30"
         run: ./tests/controllers/run_controller_tests.sh
