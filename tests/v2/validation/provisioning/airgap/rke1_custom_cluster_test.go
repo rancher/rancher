@@ -14,6 +14,7 @@ import (
 	"github.com/rancher/shepherd/extensions/clusters/kubernetesversions"
 	provisioning "github.com/rancher/shepherd/extensions/provisioning"
 	"github.com/rancher/shepherd/extensions/provisioninginput"
+	"github.com/rancher/shepherd/extensions/reports"
 	"github.com/rancher/shepherd/pkg/config"
 	"github.com/rancher/shepherd/pkg/session"
 	"github.com/sirupsen/logrus"
@@ -113,11 +114,13 @@ func (a *AirGapRKE1CustomClusterTestSuite) TestProvisioningUpgradeAirGapRKE1Cust
 	testConfig.KubernetesVersion = a.clustersConfig.RKE1KubernetesVersions[0]
 	testConfig.CNI = a.clustersConfig.CNIs[0]
 	clusterObject, err := provisioning.CreateProvisioningRKE1AirgapCustomCluster(a.client, testConfig, a.corralPackage)
+	reports.TimeoutRKEReport(clusterObject, err)
 	require.NoError(a.T(), err)
 
 	provisioning.VerifyRKE1Cluster(a.T(), a.client, testConfig, clusterObject)
 
 	upgradedCluster, err := provisioning.UpgradeClusterK8sVersion(a.client, &clusterObject.Name, &rke1Versions[numOfRKE1Versions-1])
+	reports.TimeoutRKEReport(clusterObject, err)
 	require.NoError(a.T(), err)
 
 	provisioning.VerifyUpgrade(a.T(), upgradedCluster, rke1Versions[numOfRKE1Versions-1])
