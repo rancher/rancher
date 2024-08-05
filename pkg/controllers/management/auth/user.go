@@ -142,7 +142,7 @@ func (l *userLifecycle) Create(user *v3.User) (runtime.Object, error) {
 
 	// creatorIDAnn indicates it was created through the API, create the new
 	// user bindings and add the annotation UserConditionInitialRolesPopulated
-	if user.ObjectMeta.Annotations[project_cluster.CreatorIDAnn] != "" {
+	if user.ObjectMeta.Annotations[project_cluster.CreatorIDAnnotation] != "" {
 		u, err := v32.UserConditionInitialRolesPopulated.DoUntilTrue(user, func() (runtime.Object, error) {
 			err := l.userManager.CreateNewUserClusterRoleBinding(user.Name, user.UID)
 			if err != nil {

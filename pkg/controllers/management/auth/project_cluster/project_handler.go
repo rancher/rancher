@@ -3,6 +3,7 @@ package project_cluster
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"reflect"
 	"strings"
 
@@ -16,13 +17,15 @@ import (
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
 const (
+	// The name of the project create controller
 	ProjectCreateController = "mgmt-project-rbac-create"
+	// The name of the project remove controller
 	ProjectRemoveController = "mgmt-project-rbac-remove"
 )
 
@@ -38,6 +41,7 @@ type projectLifecycle struct {
 	systemAccountManager *systemaccount.Manager
 }
 
+// NewProjectLifecycle creates and returns a projectLifecycle from a given ManagementContext
 func NewProjectLifecycle(management *config.ManagementContext) *projectLifecycle {
 	return &projectLifecycle{
 		mgr:                  management,
@@ -52,6 +56,8 @@ func NewProjectLifecycle(management *config.ManagementContext) *projectLifecycle
 	}
 }
 
+// Sync gets called whenever a project is created or updated and ensures the project
+// has all the necessary backing resources
 func (l *projectLifecycle) Sync(key string, orig *apisv3.Project) (runtime.Object, error) {
 	if orig == nil || orig.DeletionTimestamp != nil {
 		projectID := ""
@@ -112,16 +118,17 @@ func (l *projectLifecycle) enqueueCrtbs(project *apisv3.Project) error {
 	return nil
 }
 
+// Create is a no-op because the Sync function takes care of resource orchestration
 func (l *projectLifecycle) Create(obj *apisv3.Project) (runtime.Object, error) {
-	// no-op because the sync function will take care of it
 	return obj, nil
 }
 
+// Updated is a no-op because the Sync function takes care of resource orchestration
 func (l *projectLifecycle) Updated(obj *apisv3.Project) (runtime.Object, error) {
-	// no-op because the sync function will take care of it
 	return obj, nil
 }
 
+// Remove deletes all backing resources created by the project
 func (l *projectLifecycle) Remove(obj *apisv3.Project) (runtime.Object, error) {
 	var returnErr error
 	set := labels.Set{rbac.RestrictedAdminProjectRoleBinding: "true"}
@@ -129,7 +136,7 @@ func (l *projectLifecycle) Remove(obj *apisv3.Project) (runtime.Object, error) {
 	returnErr = errors.Join(returnErr, err)
 
 	for _, rb := range rbs {
-		err := l.roleBindings.DeleteNamespaced(obj.Name, rb.Name, &v1.DeleteOptions{})
+		err := l.roleBindings.DeleteNamespaced(obj.Name, rb.Name, &metav1.DeleteOptions{})
 		returnErr = errors.Join(returnErr, err)
 	}
 	err = deleteNamespace(obj, ProjectRemoveController, l.nsClient)
@@ -141,7 +148,7 @@ func (l *projectLifecycle) reconcileProjectCreatorRTB(obj runtime.Object) (runti
 	return apisv3.CreatorMadeOwner.DoUntilTrue(obj, func() (runtime.Object, error) {
 		metaAccessor, err := meta.Accessor(obj)
 		if err != nil {
-			return obj, err
+			return obj, fmt.Errorf("error accessing project object %v: %w", obj, err)
 		}
 
 		typeAccessor, err := meta.TypeAccessor(obj)
@@ -149,9 +156,9 @@ func (l *projectLifecycle) reconcileProjectCreatorRTB(obj runtime.Object) (runti
 			return obj, err
 		}
 
-		creatorID, ok := metaAccessor.GetAnnotations()[CreatorIDAnn]
+		creatorID, ok := metaAccessor.GetAnnotations()[CreatorIDAnnotation]
 		if !ok || creatorID == "" {
-			logrus.Warnf("%v %v has no creatorId annotation. Cannot add creator as owner", typeAccessor.GetKind(), metaAccessor.GetName())
+			logrus.Warnf("[%v] %v %v has no creatorId annotation. Cannot add creator as owner", ProjectCreateController, typeAccessor.GetKind(), metaAccessor.GetName())
 			return obj, nil
 		}
 		project := obj.(*apisv3.Project)
@@ -164,13 +171,13 @@ func (l *projectLifecycle) reconcileProjectCreatorRTB(obj runtime.Object) (runti
 		// If the project does not have the annotation it indicates the
 		// project is from a previous rancher version so don't add the
 		// default bindings.
-		roleJSON, ok := project.Annotations[roleTemplatesRequired]
-		if !ok {
+		bindingAnnotation := project.Annotations[roleTemplatesRequiredAnnotation]
+		if bindingAnnotation == "" {
 			return project, nil
 		}
 
 		roleMap := make(map[string][]string)
-		err = json.Unmarshal([]byte(roleJSON), &roleMap)
+		err = json.Unmarshal([]byte(bindingAnnotation), &roleMap)
 		if err != nil {
 			return obj, err
 		}
@@ -187,7 +194,7 @@ func (l *projectLifecycle) reconcileProjectCreatorRTB(obj runtime.Object) (runti
 			}
 
 			// The projectRoleBinding doesn't exist yet so create it
-			om := v1.ObjectMeta{
+			om := metav1.ObjectMeta{
 				Name:      rtbName,
 				Namespace: metaAccessor.GetName(),
 			}
@@ -212,7 +219,7 @@ func (l *projectLifecycle) reconcileProjectCreatorRTB(obj runtime.Object) (runti
 			return obj, err
 		}
 
-		project.Annotations[roleTemplatesRequired] = string(d)
+		project.Annotations[roleTemplatesRequiredAnnotation] = string(d)
 
 		if reflect.DeepEqual(roleMap["required"], createdRoles) {
 			apisv3.ProjectConditionInitialRolesPopulated.True(project)
