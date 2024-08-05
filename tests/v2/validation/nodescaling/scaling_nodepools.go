@@ -27,6 +27,10 @@ func scalingRKE2K3SNodePools(t *testing.T, client *rancher.Client, clusterID str
 	cluster, err := client.Steve.SteveType(ProvisioningSteveResourceType).ByID(clusterID)
 	require.NoError(t, err)
 
+	if nodeRoles.Windows {
+		nodeRoles.Quantity++
+	}
+
 	clusterResp, err := machinepools.ScaleMachinePoolNodes(client, cluster, nodeRoles)
 	require.NoError(t, err)
 
@@ -35,7 +39,12 @@ func scalingRKE2K3SNodePools(t *testing.T, client *rancher.Client, clusterID str
 	updatedCluster, err := client.Steve.SteveType(ProvisioningSteveResourceType).ByID(clusterID)
 	require.NoError(t, err)
 
-	nodeRoles.Quantity = -nodeRoles.Quantity
+	if nodeRoles.Windows {
+		nodeRoles.Quantity--
+	} else {
+		nodeRoles.Quantity = -nodeRoles.Quantity
+	}
+
 	scaledClusterResp, err := machinepools.ScaleMachinePoolNodes(client, updatedCluster, nodeRoles)
 	require.NoError(t, err)
 

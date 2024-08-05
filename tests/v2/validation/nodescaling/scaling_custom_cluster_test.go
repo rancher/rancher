@@ -64,21 +64,22 @@ func (s *CustomClusterNodeScalingTestSuite) TestScalingCustomClusterNodes() {
 		Quantity: 1,
 	}
 
-	nodeRolesTwoWorkers := machinepools.NodeRoles{
-		Worker:   true,
-		Quantity: 2,
+	nodeRolesWindows := machinepools.NodeRoles{
+		Windows:  true,
+		Quantity: 1,
 	}
 
 	tests := []struct {
 		name      string
 		nodeRoles machinepools.NodeRoles
 		client    *rancher.Client
+		isWindows bool
 	}{
-		{"control plane by 1", nodeRolesControlPlane, s.client},
-		{"etcd by 1", nodeRolesEtcd, s.client},
-		{"etcd and control plane by 1", nodeRolesEtcdControlPlane, s.client},
-		{"worker by 1", nodeRolesWorker, s.client},
-		{"worker by 2", nodeRolesTwoWorkers, s.client},
+		{"control plane by 1", nodeRolesControlPlane, s.client, false},
+		{"etcd by 1", nodeRolesEtcd, s.client, false},
+		{"etcd and control plane by 1", nodeRolesEtcdControlPlane, s.client, false},
+		{"worker by 1", nodeRolesWorker, s.client, false},
+		{"Windows by 1", nodeRolesWindows, s.client, true},
 	}
 
 	for _, tt := range tests {
@@ -94,8 +95,12 @@ func (s *CustomClusterNodeScalingTestSuite) TestScalingCustomClusterNodes() {
 
 		if strings.Contains(updatedCluster.Spec.KubernetesVersion, "rke2") {
 			tt.name = "Scaling custom RKE2 " + tt.name
-		} else {
+		} else if strings.Contains(updatedCluster.Spec.KubernetesVersion, "k3s") {
 			tt.name = "Scaling custom K3S " + tt.name
+
+			if tt.isWindows {
+				s.T().Skip("Skipping Windows tests")
+			}
 		}
 
 		s.Run(tt.name, func() {
