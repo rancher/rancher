@@ -15,6 +15,7 @@ import (
 	"github.com/rancher/shepherd/extensions/projects"
 	"github.com/rancher/shepherd/extensions/provisioning"
 	"github.com/rancher/shepherd/extensions/provisioninginput"
+	"github.com/rancher/shepherd/extensions/reports"
 	"github.com/rancher/shepherd/extensions/users"
 	password "github.com/rancher/shepherd/extensions/users/passwordgenerator"
 	"github.com/rancher/shepherd/pkg/config"
@@ -100,17 +101,20 @@ func (c *HardenedRKE1ClusterProvisioningTestSuite) TestProvisioningRKE1HardenedC
 			testConfig.KubernetesVersion = c.provisioningConfig.RKE1KubernetesVersions[0]
 
 			clusterObject, _, err := provisioning.CreateProvisioningRKE1CustomCluster(tt.client, &externalNodeProvider, testConfig)
+			reports.TimeoutRKEReport(clusterObject, err)
 			require.NoError(c.T(), err)
 
 			provisioning.VerifyRKE1Cluster(c.T(), tt.client, testConfig, clusterObject)
 
 			cluster, err := clusters.NewClusterMeta(tt.client, clusterObject.Name)
+			reports.TimeoutRKEReport(clusterObject, err)
 			require.NoError(c.T(), err)
 
 			latestCISBenchmarkVersion, err := tt.client.Catalog.GetLatestChartVersion(charts.CISBenchmarkName, catalog.RancherChartRepo)
 			require.NoError(c.T(), err)
 
 			project, err := projects.GetProjectByName(tt.client, cluster.ID, cis.System)
+			reports.TimeoutRKEReport(clusterObject, err)
 			require.NoError(c.T(), err)
 
 			c.project = project

@@ -14,6 +14,7 @@ import (
 	provisioning "github.com/rancher/shepherd/extensions/provisioning"
 	"github.com/rancher/shepherd/extensions/provisioninginput"
 	"github.com/rancher/shepherd/extensions/registries"
+	"github.com/rancher/shepherd/extensions/reports"
 	"github.com/rancher/shepherd/extensions/workloads/pods"
 	"github.com/rancher/shepherd/pkg/config"
 	"github.com/rancher/shepherd/pkg/environmentflag"
@@ -233,6 +234,7 @@ func (rt *RegistryTestSuite) TestRegistriesRKE() {
 			nodeTemplate, err := rke1Provider.NodeTemplateFunc(subClient)
 			require.NoError(rt.T(), err)
 			clusterObject, err := provisioning.CreateProvisioningRKE1Cluster(subClient, *rke1Provider, testConfig, nodeTemplate)
+			reports.TimeoutRKEReport(clusterObject, err)
 			require.NoError(rt.T(), err)
 
 			provisioning.VerifyRKE1Cluster(rt.T(), subClient, testConfig, clusterObject)
@@ -250,6 +252,7 @@ func (rt *RegistryTestSuite) TestRegistriesRKE() {
 		require.NoError(rt.T(), err)
 
 		clusterObject, err := provisioning.CreateProvisioningRKE1Cluster(subClient, *rke1Provider, testConfig, nodeTemplate)
+		reports.TimeoutRKEReport(clusterObject, err)
 		require.NoError(rt.T(), err)
 
 		provisioning.VerifyRKE1Cluster(rt.T(), subClient, testConfig, clusterObject)
@@ -283,6 +286,7 @@ func (rt *RegistryTestSuite) TestRegistriesK3S() {
 			testConfig = rt.configureRKE2K3SRegistry(tt.registry, testConfig)
 			k3sProvider, _, _, _ := permutations.GetClusterProvider(permutations.K3SProvisionCluster, (*testConfig.Providers)[0], rt.provisioningConfig)
 			clusterObject, err := provisioning.CreateProvisioningCluster(subClient, *k3sProvider, testConfig, nil)
+			reports.TimeoutClusterReport(clusterObject, err)
 			require.NoError(rt.T(), err)
 
 			provisioning.VerifyCluster(rt.T(), subClient, testConfig, clusterObject)
@@ -298,6 +302,7 @@ func (rt *RegistryTestSuite) TestRegistriesK3S() {
 		k3sProvider, _, _, _ := permutations.GetClusterProvider(permutations.K3SProvisionCluster, (*testConfig.Providers)[0], rt.provisioningConfig)
 
 		clusterObject, err := provisioning.CreateProvisioningCluster(subClient, *k3sProvider, testConfig, nil)
+		reports.TimeoutClusterReport(clusterObject, err)
 		require.NoError(rt.T(), err)
 
 		provisioning.VerifyCluster(rt.T(), subClient, testConfig, clusterObject)
@@ -332,6 +337,7 @@ func (rt *RegistryTestSuite) TestRegistriesRKE2() {
 			rke2Provider, _, _, _ := permutations.GetClusterProvider(permutations.RKE2ProvisionCluster, (*testConfig.Providers)[0], rt.provisioningConfig)
 
 			clusterObject, err := provisioning.CreateProvisioningCluster(subClient, *rke2Provider, testConfig, nil)
+			reports.TimeoutClusterReport(clusterObject, err)
 			require.NoError(rt.T(), err)
 
 			provisioning.VerifyCluster(rt.T(), subClient, testConfig, clusterObject)
@@ -346,6 +352,7 @@ func (rt *RegistryTestSuite) TestRegistriesRKE2() {
 		rke2Provider, _, _, _ := permutations.GetClusterProvider(permutations.RKE2ProvisionCluster, (*testConfig.Providers)[0], rt.provisioningConfig)
 
 		clusterObject, err := provisioning.CreateProvisioningCluster(subClient, *rke2Provider, testConfig, nil)
+		reports.TimeoutClusterReport(clusterObject, err)
 		require.NoError(rt.T(), err)
 
 		provisioning.VerifyCluster(rt.T(), subClient, testConfig, clusterObject)
