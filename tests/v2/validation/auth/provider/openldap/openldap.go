@@ -1,4 +1,4 @@
-package auth
+package openldap
 
 import (
 	"context"

@@ -1,16 +1,14 @@
-package auth
+package openldap
 
 import (
 	"testing"
 
 	"github.com/rancher/shepherd/clients/rancher"
 	v1 "github.com/rancher/shepherd/clients/rancher/v1"
-	"github.com/rancher/shepherd/extensions/auth"
 	"github.com/rancher/shepherd/pkg/session"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -38,30 +36,24 @@ func (o *OLDAPTestSuite) TestEnableOLDAP() {
 	subSession := o.session.NewSession()
 	defer subSession.Cleanup()
 
-	client, err := o.client.WithSession(subSession)
+	err := o.client.Auth.OLDAP.Enable()
 	require.NoError(o.T(), err)
 
-	a, err := auth.NewAuth(client, subSession)
+	ldapConfig, err := o.client.Management.AuthConfig.ByID("openldap")
 	require.NoError(o.T(), err)
 
-	err = a.OLDAP.Enable()
-	require.NoError(o.T(), err)
-
-	ldapConfig, err := client.Management.AuthConfig.ByID("openldap")
-	require.NoError(o.T(), err)
-
-	assert.Truef(o.T(), ldapConfig.Enabled, "Checking if Open LDAP is enabled")
+	assert.Truef(o.T(), ldapConfig.Enabled, "Checking if Open LDAP has enabled")
 
 	assert.Equalf(o.T(), authProvCleanupAnnotationValUnlocked, ldapConfig.Annotations[authProvCleanupAnnotationKey], "Checking if annotation set to unlocked for LDAP Auth Config")
 
-	passwordSecretResp, err := client.Steve.SteveType("secret").ByID(passwordSecretID)
+	passwordSecretResp, err := o.client.Steve.SteveType("secret").ByID(passwordSecretID)
 	assert.NoErrorf(o.T(), err, "Checking open LDAP config secret for service account password exists")
 
 	passwordSecret := &corev1.Secret{}
 	err = v1.ConvertToK8sType(passwordSecretResp.JSONResp, passwordSecret)
 	require.NoError(o.T(), err)
 
-	assert.Equal(o.T(), a.OLDAP.Config.ServiceAccount.Password, string(passwordSecret.Data["serviceaccountpassword"]), "Checking if serviceaccountpassword value is equal to the given")
+	assert.Equal(o.T(), o.client.Auth.OLDAP.Config.ServiceAccount.Password, string(passwordSecret.Data["serviceaccountpassword"]), "Checking if serviceaccountpassword value is equal to the given")
 }
 
 func (o *OLDAPTestSuite) TestDisableOLDAP() {
@@ -71,10 +63,7 @@ func (o *OLDAPTestSuite) TestDisableOLDAP() {
 	client, err := o.client.WithSession(subSession)
 	require.NoError(o.T(), err)
 
-	a, err := auth.NewAuth(client, subSession)
-	require.NoError(o.T(), err)
-
-	err = a.OLDAP.Disable()
+	err = o.client.Auth.OLDAP.Disable()
 	require.NoError(o.T(), err)
 
 	ldapConfig, err := waitUntilAnnotationIsUpdated(client)
