@@ -251,15 +251,15 @@ func GetDistroDataDir(controlPlane *rkev1.RKEControlPlane) string {
 	return fmt.Sprintf("/var/lib/rancher/%s", GetRuntime(controlPlane.Spec.KubernetesVersion))
 }
 
-func GetProvisioningDataDir(controlPlane *rkev1.RKEControlPlane) string {
-	if dir := controlPlane.Spec.DataDirectories.Provisioning; dir != "" {
+func GetProvisioningDataDir(spec *rkev1.RKEClusterSpecCommon) string {
+	if dir := spec.DataDirectories.Provisioning; dir != "" {
 		return dir
 	}
 	return "/var/lib/rancher/capr"
 }
 
-func GetSystemAgent(controlPlane *rkev1.RKEControlPlane) string {
-	if dir := controlPlane.Spec.DataDirectories.SystemAgent; dir != "" {
+func GetSystemAgentDataDir(spec *rkev1.RKEClusterSpecCommon) string {
+	if dir := spec.DataDirectories.SystemAgent; dir != "" {
 		return dir
 	}
 	return "/var/lib/rancher/agent"
