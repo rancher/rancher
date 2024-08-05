@@ -41,15 +41,15 @@ type Handler struct {
 func (h *Handler) Actions(actionName string, action *types.Action, apiContext *types.APIContext) error {
 	switch actionName {
 	case "changepassword":
-		if err := h.changePassword(actionName, action, apiContext); err != nil {
+		if err := h.changePassword(apiContext); err != nil {
 			return err
 		}
 	case "setpassword":
-		if err := h.setPassword(actionName, action, apiContext); err != nil {
+		if err := h.setPassword(apiContext); err != nil {
 			return err
 		}
 	case "refreshauthprovideraccess":
-		if err := h.refreshAttributes(actionName, action, apiContext); err != nil {
+		if err := h.refreshAttributes(apiContext); err != nil {
 			return err
 		}
 	default:
@@ -64,7 +64,7 @@ func (h *Handler) Actions(actionName string, action *types.Action, apiContext *t
 	return nil
 }
 
-func (h *Handler) changePassword(actionName string, action *types.Action, request *types.APIContext) error {
+func (h *Handler) changePassword(request *types.APIContext) error {
 	actionInput, err := parse.ReadBody(request.Request)
 	if err != nil {
 		return err
@@ -118,7 +118,7 @@ func (h *Handler) changePassword(actionName string, action *types.Action, reques
 	return nil
 }
 
-func (h *Handler) setPassword(actionName string, action *types.Action, request *types.APIContext) error {
+func (h *Handler) setPassword(request *types.APIContext) error {
 	actionInput, err := parse.ReadBody(request.Request)
 	if err != nil {
 		return err
@@ -139,7 +139,12 @@ func (h *Handler) setPassword(actionName string, action *types.Action, request *
 		return errors.New("Invalid password")
 	}
 
-	username := userData[client.UserFieldUsername].(string)
+	// if the username is not set the user is an external one
+	usernameInt, found := userData[client.UserFieldUsername]
+	if !found {
+		return errors.New("Cannot set password of non-local user")
+	}
+	username, _ := usernameInt.(string)
 
 	// passing empty currentPass to validator since, this api call doesn't assume an existing password
 	if err := validatePassword(username, "", newPass, settings.PasswordMinLength.GetInt()); err != nil {
@@ -162,7 +167,7 @@ func (h *Handler) setPassword(actionName string, action *types.Action, request *
 	return nil
 }
 
-func (h *Handler) refreshAttributes(actionName string, action *types.Action, request *types.APIContext) error {
+func (h *Handler) refreshAttributes(request *types.APIContext) error {
 	canRefresh := h.userCanRefresh(request)
 
 	if !canRefresh {
