@@ -22,13 +22,13 @@ func TestOptionsCorrectNamespaces(t *testing.T) {
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:        "ns1",
-				Annotations: map[string]string{project.ProjectIDAnn: "p-test123"},
+				Annotations: map[string]string{project.ProjectIDAnnotation: "p-test123"},
 			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:        "ns2",
-				Annotations: map[string]string{project.ProjectIDAnn: "p-test1234"},
+				Annotations: map[string]string{project.ProjectIDAnnotation: "p-test1234"},
 			},
 		},
 	}
@@ -43,19 +43,19 @@ func TestOptionsCorrectNamespaces(t *testing.T) {
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:        "ns1",
-				Annotations: map[string]string{project.ProjectIDAnn: "p-test123"},
+				Annotations: map[string]string{project.ProjectIDAnnotation: "p-test123"},
 			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:        "ns2",
-				Annotations: map[string]string{project.ProjectIDAnn: "p-test1234"},
+				Annotations: map[string]string{project.ProjectIDAnnotation: "p-test1234"},
 			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:        "ns3",
-				Annotations: map[string]string{project.ProjectIDAnn: "p-test123"},
+				Annotations: map[string]string{project.ProjectIDAnnotation: "p-test123"},
 			},
 		},
 	}

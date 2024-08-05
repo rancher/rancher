@@ -3,7 +3,6 @@ package project_cluster
 import (
 	"errors"
 	"reflect"
-	"time"
 
 	"encoding/json"
 	"fmt"
@@ -24,18 +23,27 @@ import (
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/util/retry"
 )
 
 const (
+	// The name of the cluster create controller
 	ClusterCreateController = "mgmt-cluster-rbac-delete" // TODO the word delete here is wrong, but changing it would break backwards compatibility
+	// The name of the cluster remove controller
 	ClusterRemoveController = "mgmt-cluster-rbac-remove"
 )
 
-var defaultProjectLabels = labels.Set(map[string]string{"authz.management.cattle.io/default-project": "true"})
-var systemProjectLabels = labels.Set(map[string]string{"authz.management.cattle.io/system-project": "true"})
+var (
+	defaultProjectLabels = labels.Set{
+		"authz.management.cattle.io/default-project": "true",
+	}
+	systemProjectLabels = labels.Set{
+		"authz.management.cattle.io/system-project": "true",
+	}
+)
 
 type clusterLifecycle struct {
 	mgr                *config.ManagementContext
@@ -49,6 +57,7 @@ type clusterLifecycle struct {
 	roleTemplateLister v3.RoleTemplateLister
 }
 
+// NewClusterLifecycle creates and returns a clusterLifecycle from a given ManagementContext
 func NewClusterLifecycle(management *config.ManagementContext) *clusterLifecycle {
 	return &clusterLifecycle{
 		mgr:                management,
@@ -63,6 +72,8 @@ func NewClusterLifecycle(management *config.ManagementContext) *clusterLifecycle
 	}
 }
 
+// Sync gets called whenever a cluster is created or updated and ensures the cluster
+// has all the necessary backing resources
 func (l *clusterLifecycle) Sync(key string, orig *apisv3.Cluster) (runtime.Object, error) {
 	if orig == nil || !orig.DeletionTimestamp.IsZero() {
 		return orig, nil
@@ -114,16 +125,17 @@ func (l *clusterLifecycle) Sync(key string, orig *apisv3.Cluster) (runtime.Objec
 	return nil, nil
 }
 
+// Create is a no-op because the Sync function takes care of resource orchestration
 func (l *clusterLifecycle) Create(obj *apisv3.Cluster) (runtime.Object, error) {
-	// no-op because the sync function will take care of it
 	return obj, nil
 }
 
+// Updated is a no-op because the Sync function takes care of resource orchestration
 func (l *clusterLifecycle) Updated(obj *apisv3.Cluster) (runtime.Object, error) {
-	// no-op because the sync function will take care of it
 	return obj, nil
 }
 
+// Remove deletes all backing resources created by the cluster
 func (l *clusterLifecycle) Remove(obj *apisv3.Cluster) (runtime.Object, error) {
 	if len(obj.Finalizers) > 1 {
 		logrus.Debugf("Skipping rbac cleanup for cluster [%s] until all other finalizers are removed.", obj.Name)
@@ -136,7 +148,7 @@ func (l *clusterLifecycle) Remove(obj *apisv3.Cluster) (runtime.Object, error) {
 	returnErr = errors.Join(returnErr, err)
 
 	for _, rb := range rbs {
-		err := l.roleBindings.DeleteNamespaced(obj.Name, rb.Name, &v1.DeleteOptions{})
+		err := l.roleBindings.DeleteNamespaced(obj.Name, rb.Name, &metav1.DeleteOptions{})
 		returnErr = errors.Join(returnErr, err)
 	}
 	returnErr = errors.Join(
@@ -158,7 +170,7 @@ func (l *clusterLifecycle) createProject(name string, cond condition.Cond, obj r
 	return cond.DoUntilTrue(obj, func() (runtime.Object, error) {
 		metaAccessor, err := meta.Accessor(obj)
 		if err != nil {
-			return obj, err
+			return obj, fmt.Errorf("error accessing project object %v: %w", obj, err)
 		}
 		// Attempt to use the cache first
 		projects, err := l.projectLister.List(metaAccessor.GetName(), labels.AsSelector())
@@ -167,16 +179,16 @@ func (l *clusterLifecycle) createProject(name string, cond condition.Cond, obj r
 		}
 
 		// Cache failed, try the API
-		projects2, err := l.projects.List(metaAccessor.GetName(), v1.ListOptions{LabelSelector: labels.String()})
+		projects2, err := l.projects.List(metaAccessor.GetName(), metav1.ListOptions{LabelSelector: labels.String()})
 		if err != nil || len(projects2.Items) > 0 {
 			return obj, err
 		}
 
 		annotation := map[string]string{}
 
-		creatorID := metaAccessor.GetAnnotations()[CreatorIDAnn]
+		creatorID := metaAccessor.GetAnnotations()[CreatorIDAnnotation]
 		if creatorID != "" {
-			annotation[CreatorIDAnn] = creatorID
+			annotation[CreatorIDAnnotation] = creatorID
 		}
 
 		if name == project.System {
@@ -184,11 +196,11 @@ func (l *clusterLifecycle) createProject(name string, cond condition.Cond, obj r
 			if err != nil {
 				return obj, err
 			}
-			annotation[project.SystemImageVersionAnn] = latestSystemVersion
+			annotation[project.SystemImageVersionAnnotation] = latestSystemVersion
 		}
 
 		project := &apisv3.Project{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "p-",
 				Annotations:  annotation,
 				Labels:       labels,
@@ -236,13 +248,13 @@ func (l *clusterLifecycle) deleteSystemProject(cluster *apisv3.Cluster, controll
 }
 
 func (l *clusterLifecycle) addRTAnnotation(obj runtime.Object, context string) (runtime.Object, error) {
-	meta, err := meta.Accessor(obj)
+	accessor, err := meta.Accessor(obj)
 	if err != nil {
-		return obj, err
+		return obj, fmt.Errorf("error accessing object %v: %w", obj, err)
 	}
 
 	// If the annotation is already there move along
-	if _, ok := meta.GetAnnotations()[roleTemplatesRequired]; ok {
+	if _, ok := accessor.GetAnnotations()[roleTemplatesRequiredAnnotation]; ok {
 		return obj, nil
 	}
 
@@ -258,6 +270,7 @@ func (l *clusterLifecycle) addRTAnnotation(obj runtime.Object, context string) (
 		restrictedAdmin = true
 	}
 
+	// Created isn't used in this function, but it is required in the annotation data
 	annoMap["created"] = []string{}
 	annoMap["required"] = []string{}
 
@@ -280,7 +293,7 @@ func (l *clusterLifecycle) addRTAnnotation(obj runtime.Object, context string) (
 	case "cluster":
 		// If we are in restricted mode, ensure we don't give the default restricted-admin
 		// the default permissions in the cluster
-		if restrictedAdmin && meta.GetName() == "local" {
+		if restrictedAdmin && accessor.GetName() == "local" {
 			break
 		}
 
@@ -297,10 +310,10 @@ func (l *clusterLifecycle) addRTAnnotation(obj runtime.Object, context string) (
 	}
 
 	// Save the required role templates to the annotation on the obj
-	if meta.GetAnnotations() == nil {
-		meta.SetAnnotations(make(map[string]string))
+	if accessor.GetAnnotations() == nil {
+		accessor.SetAnnotations(make(map[string]string))
 	}
-	meta.GetAnnotations()[roleTemplatesRequired] = string(d)
+	accessor.GetAnnotations()[roleTemplatesRequiredAnnotation] = string(d)
 	return obj, nil
 }
 
@@ -308,7 +321,7 @@ func (l *clusterLifecycle) reconcileClusterCreatorRTB(obj runtime.Object) (runti
 	return apisv3.CreatorMadeOwner.DoUntilTrue(obj, func() (runtime.Object, error) {
 		metaAccessor, err := meta.Accessor(obj)
 		if err != nil {
-			return obj, err
+			return obj, fmt.Errorf("error accessing cluster object %v: %w", obj, err)
 		}
 
 		typeAccessor, err := meta.TypeAccessor(obj)
@@ -316,9 +329,9 @@ func (l *clusterLifecycle) reconcileClusterCreatorRTB(obj runtime.Object) (runti
 			return obj, err
 		}
 
-		creatorID, ok := metaAccessor.GetAnnotations()[CreatorIDAnn]
+		creatorID, ok := metaAccessor.GetAnnotations()[CreatorIDAnnotation]
 		if !ok || creatorID == "" {
-			logrus.Warnf("%v %v has no creatorId annotation. Cannot add creator as owner", typeAccessor.GetKind(), metaAccessor.GetName())
+			logrus.Warnf("[%v] %v %v has no creatorId annotation. Cannot add creator as owner", ClusterCreateController, typeAccessor.GetKind(), metaAccessor.GetName())
 			return obj, nil
 		}
 		cluster := obj.(*apisv3.Cluster)
@@ -328,8 +341,8 @@ func (l *clusterLifecycle) reconcileClusterCreatorRTB(obj runtime.Object) (runti
 			return obj, nil
 		}
 
-		roleJSON, ok := cluster.Annotations[roleTemplatesRequired]
-		if !ok {
+		roleJSON := cluster.Annotations[roleTemplatesRequiredAnnotation]
+		if roleJSON == "" {
 			return cluster, nil
 		}
 
@@ -351,7 +364,7 @@ func (l *clusterLifecycle) reconcileClusterCreatorRTB(obj runtime.Object) (runti
 			}
 
 			// The clusterRoleBinding doesn't exist yet so create it
-			om := v1.ObjectMeta{
+			om := metav1.ObjectMeta{
 				Name:      rtbName,
 				Namespace: metaAccessor.GetName(),
 			}
@@ -385,26 +398,20 @@ func (l *clusterLifecycle) reconcileClusterCreatorRTB(obj runtime.Object) (runti
 	})
 }
 
-func (l *clusterLifecycle) updateClusterAnnotationandCondition(cluster *apisv3.Cluster, anno string, updateCondition bool) error {
-	sleep := 100
-	for i := 0; i <= 3; i++ {
-		c, err := l.clusterClient.Get(cluster.Name, v1.GetOptions{})
+func (l *clusterLifecycle) updateClusterAnnotationandCondition(cluster *apisv3.Cluster, annotation string, updateCondition bool) error {
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		c, err := l.clusterClient.Get(cluster.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
 
-		c.Annotations[roleTemplatesRequired] = anno
+		c.Annotations[roleTemplatesRequiredAnnotation] = annotation
 
 		if updateCondition {
 			apisv3.ClusterConditionInitialRolesPopulated.True(c)
 		}
 		_, err = l.clusterClient.Update(c)
 		if err != nil {
-			if apierrors.IsConflict(err) {
-				time.Sleep(time.Duration(sleep) * time.Millisecond)
-				sleep *= 2
-				continue
-			}
 			return err
 		}
 		// Only log if we successfully updated the cluster
@@ -412,6 +419,11 @@ func (l *clusterLifecycle) updateClusterAnnotationandCondition(cluster *apisv3.C
 			logrus.Infof("[%v] Setting InitialRolesPopulated condition on cluster %v", ClusterCreateController, cluster.Name)
 		}
 		return nil
+	})
+
+	if err != nil {
+		return err
 	}
+
 	return nil
 }

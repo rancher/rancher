@@ -121,7 +121,7 @@ func getMatchingNamespaces(apiContext types.APIContext, namespaces []*k8sv1.Name
 	}
 
 	for _, ns := range namespaces {
-		if ns.Annotations[project.ProjectIDAnn] == projectID {
+		if ns.Annotations[project.ProjectIDAnnotation] == projectID {
 			matchingNamespaces = append(matchingNamespaces, ns.Name)
 		}
 	}
