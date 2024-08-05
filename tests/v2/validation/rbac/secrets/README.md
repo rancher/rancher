@@ -1,4 +1,4 @@
-# Projects
+# RBAC Secrets
 
 ## Pre-requisites
 
@@ -6,7 +6,7 @@
 
 ## Test Setup
 
-Your GO suite should be set to `-run ^Test<TestSuite>$`. For example to run the projects_test.go, set the GO suite to `-run ^TestProjectsTestSuite$` You can find specific tests by checking the test file you plan to run.
+Your GO suite should be set to `-run ^TestRbacSecretTestSuite$`.
 
 In your config file, set the following:
 
@@ -16,5 +16,5 @@ rancher:
   adminToken: "rancher_admin_token"
   insecure: True #optional
   cleanup: True #optional
-  clusterName: "downstream_cluster_name"
+  clusterName: "cluster_name"
 ```

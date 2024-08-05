@@ -6,13 +6,15 @@ import (
 	"fmt"
 	"testing"
 
+	project "github.com/rancher/rancher/tests/v2/actions/projects"
+	rbac "github.com/rancher/rancher/tests/v2/actions/rbac"
+	deployment "github.com/rancher/rancher/tests/v2/actions/workloads/deployment"
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
 	"github.com/rancher/shepherd/extensions/charts"
 	"github.com/rancher/shepherd/extensions/clusters"
 	"github.com/rancher/shepherd/extensions/kubeapi/namespaces"
 	"github.com/rancher/shepherd/extensions/kubeapi/projects"
-	"github.com/rancher/shepherd/extensions/users"
 	"github.com/rancher/shepherd/pkg/session"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
@@ -53,10 +55,10 @@ func (pr *ProjectsTestSuite) TestProjectsCrudLocalCluster() {
 	defer subSession.Cleanup()
 
 	log.Info("Create a project in the local cluster and verify that the project can be listed.")
-	projectTemplate := NewProjectTemplate(projects.LocalCluster)
-	createdProject, err := createProject(pr.client, projectTemplate)
+	projectTemplate := projects.NewProjectTemplate(projects.LocalCluster)
+	createdProject, err := pr.client.WranglerContext.Mgmt.Project().Create(projectTemplate)
 	require.NoError(pr.T(), err, "Failed to create project")
-	err = waitForFinalizerToUpdate(pr.client, createdProject.Name, createdProject.Namespace, 2)
+	err = project.WaitForProjectFinalizerToUpdate(pr.client, createdProject.Name, createdProject.Namespace, 2)
 	require.NoError(pr.T(), err)
 	projectList, err := projects.ListProjects(pr.client, createdProject.Namespace, metav1.ListOptions{
 		FieldSelector: "metadata.name=" + createdProject.Name,
@@ -94,18 +96,14 @@ func (pr *ProjectsTestSuite) TestProjectsCrudDownstreamCluster() {
 	defer subSession.Cleanup()
 
 	log.Info("Create a standard user and add the user to the downstream cluster as cluster owner.")
-	standardUser, err := users.CreateUserWithRole(pr.client, users.UserConfig(), projects.StandardUser)
-	require.NoError(pr.T(), err, "Failed to create standard user")
-	standardUserClient, err := pr.client.AsUser(standardUser)
+	_, standardUserClient, err := rbac.AddUserWithRoleToCluster(pr.client, rbac.StandardUser.String(), rbac.ClusterOwner.String(), pr.cluster, nil)
 	require.NoError(pr.T(), err)
-	err = users.AddClusterRoleToUser(pr.client, pr.cluster, standardUser, clusterOwner, nil)
-	require.NoError(pr.T(), err, "Failed to add the user as a cluster owner to the downstream cluster")
 
 	log.Info("Create a project in the downstream cluster and verify that the project can be listed.")
-	projectTemplate := NewProjectTemplate(pr.cluster.ID)
-	createdProject, err := createProject(standardUserClient, projectTemplate)
+	projectTemplate := projects.NewProjectTemplate(pr.cluster.ID)
+	createdProject, err := standardUserClient.WranglerContext.Mgmt.Project().Create(projectTemplate)
 	require.NoError(pr.T(), err, "Failed to create project")
-	err = waitForFinalizerToUpdate(standardUserClient, createdProject.Name, createdProject.Namespace, 2)
+	err = project.WaitForProjectFinalizerToUpdate(standardUserClient, createdProject.Name, createdProject.Namespace, 2)
 	require.NoError(pr.T(), err)
 	projectList, err := projects.ListProjects(standardUserClient, createdProject.Namespace, metav1.ListOptions{
 		FieldSelector: "metadata.name=" + createdProject.Name,
@@ -174,15 +172,11 @@ func (pr *ProjectsTestSuite) TestProjectWithoutResourceQuota() {
 	defer subSession.Cleanup()
 
 	log.Info("Create a standard user and add the user to the downstream cluster as cluster owner.")
-	standardUser, err := users.CreateUserWithRole(pr.client, users.UserConfig(), projects.StandardUser)
-	require.NoError(pr.T(), err, "Failed to create standard user")
-	standardUserClient, err := pr.client.AsUser(standardUser)
+	_, standardUserClient, err := rbac.AddUserWithRoleToCluster(pr.client, rbac.StandardUser.String(), rbac.ClusterOwner.String(), pr.cluster, nil)
 	require.NoError(pr.T(), err)
-	err = users.AddClusterRoleToUser(pr.client, pr.cluster, standardUser, clusterOwner, nil)
-	require.NoError(pr.T(), err, "Failed to add the user as a cluster owner to the downstream cluster")
 
 	log.Info("Create a project (without any resource quota) and a namespace in the project.")
-	projectTemplate := NewProjectTemplate(pr.cluster.ID)
+	projectTemplate := projects.NewProjectTemplate(pr.cluster.ID)
 	createdProject, createdNamespace, err := createProjectAndNamespace(standardUserClient, pr.cluster.ID, projectTemplate)
 	require.NoError(pr.T(), err)
 
@@ -197,7 +191,7 @@ func (pr *ProjectsTestSuite) TestProjectWithoutResourceQuota() {
 	require.NoError(pr.T(), err, "'field.cattle.io/resourceQuota' annotation should not exist")
 
 	log.Info("Create a deployment in the namespace with ten replicas.")
-	deployment, err := createDeployment(standardUserClient, pr.cluster.ID, updatedNamespace.Name, 10)
+	deployment, err := deployment.CreateDeployment(standardUserClient, pr.cluster.ID, updatedNamespace.Name, 10, "", "", false, false)
 	require.NoError(pr.T(), err, "Failed to create deployment in the namespace")
 
 	log.Info("Verify that there are ten pods created in the deployment and they are in Running state.")
@@ -212,15 +206,11 @@ func (pr *ProjectsTestSuite) TestMoveNamespaceOutOfProject() {
 	defer subSession.Cleanup()
 
 	log.Info("Create a standard user and add the user to the downstream cluster as cluster owner.")
-	standardUser, err := users.CreateUserWithRole(pr.client, users.UserConfig(), projects.StandardUser)
-	require.NoError(pr.T(), err, "Failed to create standard user")
-	standardUserClient, err := pr.client.AsUser(standardUser)
+	_, standardUserClient, err := rbac.AddUserWithRoleToCluster(pr.client, rbac.StandardUser.String(), rbac.ClusterOwner.String(), pr.cluster, nil)
 	require.NoError(pr.T(), err)
-	err = users.AddClusterRoleToUser(pr.client, pr.cluster, standardUser, clusterOwner, nil)
-	require.NoError(pr.T(), err, "Failed to add the user as a cluster owner to the downstream cluster")
 
 	log.Info("Create a project in the downstream cluster and a namespace in the project.")
-	projectTemplate := NewProjectTemplate(pr.cluster.ID)
+	projectTemplate := projects.NewProjectTemplate(pr.cluster.ID)
 	createdProject, createdNamespace, err := createProjectAndNamespace(standardUserClient, pr.cluster.ID, projectTemplate)
 	require.NoError(pr.T(), err)
 
@@ -255,15 +245,11 @@ func (pr *ProjectsTestSuite) TestMoveNamespaceBetweenProjectsWithNoResourceQuota
 	defer subSession.Cleanup()
 
 	log.Info("Create a standard user and add the user to the downstream cluster as cluster owner.")
-	standardUser, err := users.CreateUserWithRole(pr.client, users.UserConfig(), projects.StandardUser)
-	require.NoError(pr.T(), err, "Failed to create standard user")
-	standardUserClient, err := pr.client.AsUser(standardUser)
+	_, standardUserClient, err := rbac.AddUserWithRoleToCluster(pr.client, rbac.StandardUser.String(), rbac.ClusterOwner.String(), pr.cluster, nil)
 	require.NoError(pr.T(), err)
-	err = users.AddClusterRoleToUser(pr.client, pr.cluster, standardUser, clusterOwner, nil)
-	require.NoError(pr.T(), err, "Failed to add the user as a cluster owner to the downstream cluster")
 
 	log.Info("Create a project in the downstream cluster and a namespace in the project.")
-	projectTemplate := NewProjectTemplate(pr.cluster.ID)
+	projectTemplate := projects.NewProjectTemplate(pr.cluster.ID)
 	projectTemplate.Spec.NamespaceDefaultResourceQuota.Limit.Pods = ""
 	projectTemplate.Spec.ResourceQuota.Limit.Pods = ""
 	createdProject, createdNamespace, err := createProjectAndNamespace(standardUserClient, pr.cluster.ID, projectTemplate)
@@ -280,7 +266,7 @@ func (pr *ProjectsTestSuite) TestMoveNamespaceBetweenProjectsWithNoResourceQuota
 	require.NoError(pr.T(), err, "'field.cattle.io/resourceQuota' annotation should not exist")
 
 	log.Info("Create a deployment in the namespace with ten replicas.")
-	deployment, err := createDeployment(standardUserClient, createdProject.Namespace, updatedNamespace.Name, 10)
+	deployment, err := deployment.CreateDeployment(standardUserClient, createdProject.Namespace, updatedNamespace.Name, 10, "", "", false, false)
 	require.NoError(pr.T(), err, "Failed to create deployment in the namespace")
 
 	log.Info("Verify that there are ten pods created in the deployment and they are in Running state.")
@@ -290,10 +276,10 @@ func (pr *ProjectsTestSuite) TestMoveNamespaceBetweenProjectsWithNoResourceQuota
 	require.NoError(pr.T(), err)
 
 	log.Info("Create another project in the downstream cluster.")
-	projectTemplate = NewProjectTemplate(pr.cluster.ID)
-	createdProject2, err := createProject(standardUserClient, projectTemplate)
+	projectTemplate = projects.NewProjectTemplate(pr.cluster.ID)
+	createdProject2, err := standardUserClient.WranglerContext.Mgmt.Project().Create(projectTemplate)
 	require.NoError(pr.T(), err, "Failed to create project")
-	err = waitForFinalizerToUpdate(pr.client, createdProject2.Name, createdProject2.Namespace, 2)
+	err = project.WaitForProjectFinalizerToUpdate(pr.client, createdProject2.Name, createdProject2.Namespace, 2)
 	require.NoError(pr.T(), err)
 
 	log.Info("Move the namespace from the first project to the second project.")
