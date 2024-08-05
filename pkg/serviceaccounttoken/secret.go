@@ -44,10 +44,13 @@ func EnsureSecretForServiceAccount(ctx context.Context, secretsCache corecontrol
 	logrus.Tracef("EnsureSecretForServiceAccount for %s/%s", sa.GetNamespace(), sa.GetName())
 
 	// Lock avoids multiple calls to this func at the same time and creation of same resources multiple times
-	// Mutex is a addition to the Lease, it helps sync within the pod and avoid multiple Lease waits from the same pod
-	mutex := getLock(fmt.Sprintf("%v-%v", sa.Namespace, sa.Name))
+	lockKey := fmt.Sprintf("%v-%v", sa.Namespace, sa.Name)
+	mutex := getLock(lockKey)
 	mutex.Lock()
-	defer mutex.Unlock()
+	defer func(key string) {
+		mutex.Unlock()
+		lockMap.Delete(key)
+	}(lockKey)
 
 	secretClient := clientSet.CoreV1().Secrets(sa.Namespace)
 	var secretLister secretLister
