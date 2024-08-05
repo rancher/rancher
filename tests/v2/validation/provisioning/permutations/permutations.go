@@ -22,6 +22,7 @@ import (
 	"github.com/rancher/shepherd/extensions/projects"
 	"github.com/rancher/shepherd/extensions/provisioning"
 	"github.com/rancher/shepherd/extensions/provisioninginput"
+	"github.com/rancher/shepherd/extensions/reports"
 	"github.com/rancher/shepherd/extensions/rke1/componentchecks"
 	"github.com/rancher/shepherd/extensions/rke1/nodetemplates"
 	"github.com/rancher/shepherd/extensions/services"
@@ -127,6 +128,7 @@ func RunTestPermutations(s *suite.Suite, testNamePrefix string, client *rancher.
 					case RKE2ProvisionCluster, K3SProvisionCluster:
 						testClusterConfig.KubernetesVersion = kubeVersion
 						clusterObject, err = provisioning.CreateProvisioningCluster(client, *nodeProvider, testClusterConfig, hostnameTruncation)
+						reports.TimeoutClusterReport(clusterObject, err)
 						require.NoError(s.T(), err)
 
 						provisioning.VerifyCluster(s.T(), client, testClusterConfig, clusterObject)
@@ -142,6 +144,7 @@ func RunTestPermutations(s *suite.Suite, testNamePrefix string, client *rancher.
 						}
 
 						rke1ClusterObject, err = provisioning.CreateProvisioningRKE1Cluster(client, *rke1Provider, testClusterConfig, nodeTemplate)
+						reports.TimeoutRKEReport(rke1ClusterObject, err)
 						require.NoError(s.T(), err)
 
 						provisioning.VerifyRKE1Cluster(s.T(), client, testClusterConfig, rke1ClusterObject)
@@ -150,6 +153,7 @@ func RunTestPermutations(s *suite.Suite, testNamePrefix string, client *rancher.
 						testClusterConfig.KubernetesVersion = kubeVersion
 
 						clusterObject, err = provisioning.CreateProvisioningCustomCluster(client, customProvider, testClusterConfig)
+						reports.TimeoutClusterReport(clusterObject, err)
 						require.NoError(s.T(), err)
 
 						provisioning.VerifyCluster(s.T(), client, testClusterConfig, clusterObject)
@@ -163,6 +167,7 @@ func RunTestPermutations(s *suite.Suite, testNamePrefix string, client *rancher.
 						}
 
 						rke1ClusterObject, nodes, err := provisioning.CreateProvisioningRKE1CustomCluster(client, customProvider, testClusterConfig)
+						reports.TimeoutRKEReport(rke1ClusterObject, err)
 						require.NoError(s.T(), err)
 
 						provisioning.VerifyRKE1Cluster(s.T(), client, testClusterConfig, rke1ClusterObject)
@@ -174,6 +179,7 @@ func RunTestPermutations(s *suite.Suite, testNamePrefix string, client *rancher.
 					case RKE2AirgapCluster, K3SAirgapCluster:
 						testClusterConfig.KubernetesVersion = kubeVersion
 						clusterObject, err = provisioning.CreateProvisioningAirgapCustomCluster(client, testClusterConfig, corralPackages)
+						reports.TimeoutClusterReport(clusterObject, err)
 						require.NoError(s.T(), err)
 
 						provisioning.VerifyCluster(s.T(), client, testClusterConfig, clusterObject)
@@ -187,6 +193,7 @@ func RunTestPermutations(s *suite.Suite, testNamePrefix string, client *rancher.
 						}
 
 						clusterObject, err := provisioning.CreateProvisioningRKE1AirgapCustomCluster(client, testClusterConfig, corralPackages)
+						reports.TimeoutRKEReport(clusterObject, err)
 						require.NoError(s.T(), err)
 
 						provisioning.VerifyRKE1Cluster(s.T(), client, testClusterConfig, clusterObject)
@@ -240,6 +247,7 @@ func RunPostClusterCloudProviderChecks(t *testing.T, client *rancher.Client, clu
 				config.LoadConfig(charts.ConfigurationFileKey, chartConfig)
 
 				err := charts.InstallVsphereOutOfTreeCharts(client, catalog.RancherChartRepo, rke1ClusterObject.Name, !chartConfig.IsUpgradable)
+				reports.TimeoutRKEReport(rke1ClusterObject, err)
 				require.NoError(t, err)
 
 				podErrors := pods.StatusPods(client, rke1ClusterObject.ID)

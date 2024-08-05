@@ -15,6 +15,7 @@ import (
 	"github.com/rancher/shepherd/extensions/defaults/stevetypes"
 	"github.com/rancher/shepherd/extensions/provisioning"
 	"github.com/rancher/shepherd/extensions/provisioninginput"
+	"github.com/rancher/shepherd/extensions/reports"
 	"github.com/rancher/shepherd/extensions/steve"
 	"github.com/rancher/shepherd/pkg/config"
 	"github.com/rancher/shepherd/pkg/namegenerator"
@@ -71,6 +72,7 @@ func (r *ClusterTemplateTestSuite) TestProvisionRKE2TemplateCluster() {
 	require.NoError(r.T(), err)
 
 	_, cluster, err := clusters.GetProvisioningClusterByName(r.client, clusterName, fleetNamespace)
+	reports.TimeoutClusterReport(cluster, err)
 	require.NoError(r.T(), err)
 
 	provisioning.VerifyCluster(r.T(), r.client, nil, cluster)
