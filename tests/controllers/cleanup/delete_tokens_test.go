@@ -155,7 +155,7 @@ func (s *AuthConfigSuite) TestTokensCleanup() {
 		assert.Zero(c, remainingTokens)
 	}, duration, tick)
 
-	t.True(ok, "not ok")
+	t.True(ok, "secrets were left over after disabling auth configuration")
 }
 
 func (s *AuthConfigSuite) TearDownSuite() {
