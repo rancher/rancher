@@ -45,19 +45,16 @@ func (r *fakeUserAuthRefresher) TriggerUserRefresh(userID string, force bool) {
 }
 
 type fakeProvider struct {
-	Name                   string
-	IsDisabledProviderFunc func() (bool, error)
+	name     string
+	disabled bool
 }
 
 func (p *fakeProvider) IsDisabledProvider() (bool, error) {
-	if p.IsDisabledProviderFunc != nil {
-		return p.IsDisabledProviderFunc()
-	}
-	return false, nil
+	return p.disabled, nil
 }
 
 func (p *fakeProvider) GetName() string {
-	return p.Name
+	return p.name
 }
 
 func (p *fakeProvider) AuthenticateUser(ctx context.Context, input interface{}) (v3.Principal, []v3.Principal, string, error) {
@@ -106,11 +103,10 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 	}()
 
 	fakeProvider := &fakeProvider{
-		Name: "fake",
+		name: "fake",
 	}
-
 	providers.Providers = map[string]common.AuthProvider{
-		fakeProvider.Name: fakeProvider,
+		fakeProvider.name: fakeProvider,
 	}
 
 	now := time.Now()
@@ -121,7 +117,7 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 			CreationTimestamp: metav1.NewTime(now),
 		},
 		Token:        "jnb9tksmnctvgbn92ngbkptblcjwg4pmfp98wqj29wk5kv85ktg59s",
-		AuthProvider: fakeProvider.Name,
+		AuthProvider: fakeProvider.name,
 		TTLMillis:    57600000,
 		UserID:       userID,
 		UserPrincipal: v3.Principal{
@@ -142,24 +138,24 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 					Name: userID,
 				},
 				GroupPrincipals: map[string]apiv3.Principals{
-					fakeProvider.Name: {
+					fakeProvider.name: {
 						Items: []apiv3.Principal{
 							{
 								ObjectMeta: metav1.ObjectMeta{
-									Name: fakeProvider.Name + "_group://56789",
+									Name: fakeProvider.name + "_group://56789",
 								},
 								MemberOf:      true,
 								LoginName:     "rancher",
 								DisplayName:   "rancher",
 								PrincipalType: "group",
-								Provider:      fakeProvider.Name,
+								Provider:      fakeProvider.name,
 							},
 						},
 					},
 				},
 				ExtraByProvider: map[string]map[string][]string{
-					fakeProvider.Name: {
-						common.UserAttributePrincipalID: {fakeProvider.Name + "_user://12345"},
+					fakeProvider.name: {
+						common.UserAttributePrincipalID: {fakeProvider.name + "_user://12345"},
 						common.UserAttributeUserName:    {"fake-user"},
 					},
 					providers.LocalProvider: {
@@ -212,9 +208,9 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 		assert.Equal(t, userID, resp.UserPrincipal)
 		assert.Equal(t, userID, refresherArgs.userID)
 		assert.False(t, refresherArgs.force)
-		assert.Contains(t, resp.Groups, fakeProvider.Name+"_group://56789")
+		assert.Contains(t, resp.Groups, fakeProvider.name+"_group://56789")
 		assert.Contains(t, resp.Groups, "system:cattle:authenticated")
-		assert.Contains(t, resp.Extras[common.UserAttributePrincipalID], fakeProvider.Name+"_user://12345")
+		assert.Contains(t, resp.Extras[common.UserAttributePrincipalID], fakeProvider.name+"_user://12345")
 		assert.Contains(t, resp.Extras[common.UserAttributeUserName], "fake-user")
 	})
 
@@ -232,8 +228,6 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 	})
 
 	t.Run("provider refresh is not called for system users", func(t *testing.T) {
-		refresher.calledTimes.Store(0)
-
 		oldGetUserFunc := userLister.GetFunc
 		defer func() { userLister.GetFunc = oldGetUserFunc }()
 		userLister.GetFunc = func(namespace, name string) (*v3.User, error) {
@@ -247,6 +241,8 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 				},
 			}, nil
 		}
+
+		refresher.calledTimes.Store(0)
 
 		resp, err := authenticator.Authenticate(req)
 		require.NoError(t, err)
@@ -308,9 +304,9 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 	})
 
 	t.Run("auth provider disabled", func(t *testing.T) {
-		oldIsDisabledProviderFunc := fakeProvider.IsDisabledProviderFunc
-		defer func() { fakeProvider.IsDisabledProviderFunc = oldIsDisabledProviderFunc }()
-		fakeProvider.IsDisabledProviderFunc = func() (bool, error) { return true, nil }
+		oldIsDisabled := fakeProvider.disabled
+		defer func() { fakeProvider.disabled = oldIsDisabled }()
+		fakeProvider.disabled = true
 
 		resp, err := authenticator.Authenticate(req)
 		require.Error(t, err)
