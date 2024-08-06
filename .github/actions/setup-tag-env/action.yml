@@ -8,7 +8,9 @@ runs:
         ref_name="${{ github.ref_name }}"
         TAG="${{ github.sha }}"
         prefix="release/"
-        if [[ "$ref_name" == release/v* ]]; then
+        if [[ "$ref_name" == "main" ]]; then
+          echo "HEAD_TAG=head" >> "$GITHUB_ENV"
+        elif [[ "$ref_name" == release/v* ]]; then
           TAG=${ref_name#$prefix}-${{ github.sha }}-head
           HEAD_TAG=${ref_name#$prefix}-head
           echo "HEAD_TAG=$HEAD_TAG" >> "$GITHUB_ENV"

@@ -3,9 +3,8 @@ on:
   - pull_request 
 env:
   ARCH: amd64
-  TAG: v2.9-${{ github.sha }}
-  GIT_TAG: v2.9-${{ github.sha }}
-  HEAD_TAG: v2.9-${{ github.sha }}
+  TAG: ${{ github.sha }}
+  GIT_TAG: ${{ github.sha }}
   COMMIT: ${{ github.sha }}
   REPOSITORY_OWNER: ${{ github.repository_owner }}
   IMAGE: ${{ github.repository_owner }}/rancher
