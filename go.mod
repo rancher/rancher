@@ -139,7 +139,7 @@ require (
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/remotedialer v0.4.0
 	github.com/rancher/rke v1.6.0
-	github.com/rancher/steve v0.0.0-20240709130809-47871606146c
+	github.com/rancher/steve v0.0.0-20240805194353-1d42891f81f7
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007
 	github.com/rancher/wrangler/v3 v3.0.0
 	github.com/robfig/cron v1.2.0
