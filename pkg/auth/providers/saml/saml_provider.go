@@ -149,7 +149,7 @@ func PerformSamlLogoutAll(apiContext *types.APIContext, token *v3.Token) error {
 	samlLogout := &v32.SamlConfigLogoutInput{}
 	if err := json.NewDecoder(r.Body).Decode(samlLogout); err != nil {
 		return httperror.NewAPIError(httperror.InvalidBodyContent,
-			fmt.Sprintf("SAML: Failed to parse body: %w", err))
+			fmt.Sprintf("SAML: Failed to parse body: %+v", err))
 	}
 
 	userName := provider.userMGR.GetUser(apiContext)
