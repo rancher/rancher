@@ -1,0 +1,32 @@
+name: Controller Integration Tests
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches:
+    - 'release/*'
+
+env:
+  GOARCH: amd64
+  CGO_ENABLED: 0
+  SETUP_GO_VERSION: '1.22.*'
+
+jobs:
+  run-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      -
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      -
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.SETUP_GO_VERSION }}
+      -
+        name: Run Integration Tests
+        env:
+          ENVTEST_K8S_VERSION: "1.30"
+        run: ./tests/controllers/run_controller_tests.sh
