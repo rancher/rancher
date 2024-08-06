@@ -16,7 +16,6 @@
 package ext
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"reflect"
@@ -24,7 +23,7 @@ import (
 
 	"agones.dev/agones/pkg/util/https"
 	"agones.dev/agones/pkg/util/runtime"
-	"github.com/go-openapi/spec"
+	"github.com/emicklei/go-restful/v3"
 	gmux "github.com/gorilla/mux"
 	"github.com/munnerz/goautoneg"
 	"github.com/pkg/errors"
@@ -34,7 +33,11 @@ import (
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/kube-openapi/pkg/handler3"
+	"k8s.io/apiserver/pkg/endpoints/openapi"
+	genericapiserver "k8s.io/apiserver/pkg/server"
+	kmux "k8s.io/apiserver/pkg/server/mux"
+	"k8s.io/apiserver/pkg/server/routes"
+	openapicommon "k8s.io/kube-openapi/pkg/common"
 )
 
 var (
@@ -72,21 +75,42 @@ type CRDHandler func(http.ResponseWriter, *http.Request, string) error
 type APIServer struct {
 	logger              *logrus.Entry
 	resourceList        map[schema.GroupVersion]*metav1.APIResourceList
-	openapiv2           *spec.Swagger
-	openapiv3Discovery  *handler3.OpenAPIV3Discovery
 	delegates           map[schema.GroupVersionResource]CRDHandler
 	namespacedDelegates map[schema.GroupVersionResource]CRDHandler
+
+	openAPIRoutes *routes.OpenAPI
+	// container is used to build all the routes that will be added in the
+	// OpenAPI V2 and V3 documents
+	container *restful.Container
 }
 
 // NewAPIServer returns a new API Server from the given Mux.
 // creates a empty Swagger definition and sets up the endpoint.
-func NewAPIServer() *APIServer {
+func NewAPIServer(getDefinitions openapicommon.GetOpenAPIDefinitions) *APIServer {
+	oapiConfigV2 := genericapiserver.DefaultOpenAPIConfig(
+		getDefinitions,
+		// TODO: Stop using NewDefinitionNamer because it's not generating
+		// the names that we want
+		openapi.NewDefinitionNamer(scheme),
+	)
+	oapiConfigV3 := genericapiserver.DefaultOpenAPIV3Config(
+		getDefinitions,
+		// TODO: Stop using NewDefinitionNamer because it's not generating
+		// the names that we want
+		openapi.NewDefinitionNamer(scheme),
+	)
+	oapiRoutes := &routes.OpenAPI{
+		Config:   oapiConfigV2,
+		V3Config: oapiConfigV3,
+	}
+
 	s := &APIServer{
 		resourceList:        map[schema.GroupVersion]*metav1.APIResourceList{},
-		openapiv2:           &spec.Swagger{},
-		openapiv3Discovery:  &handler3.OpenAPIV3Discovery{Paths: map[string]handler3.OpenAPIV3DiscoveryGroupVersion{}},
 		delegates:           map[schema.GroupVersionResource]CRDHandler{},
 		namespacedDelegates: map[schema.GroupVersionResource]CRDHandler{},
+
+		openAPIRoutes: oapiRoutes,
+		container:     restful.NewContainer(),
 	}
 	s.logger = runtime.NewLoggerWithType(s)
 	s.logger.Debug("API Server Started")
@@ -96,29 +120,13 @@ func NewAPIServer() *APIServer {
 
 // RegisterRoutes registers the routes for this endpoint. Note that this must be called only after all of the resources have been added
 func (s *APIServer) RegisterRoutes(router *gmux.Router) {
-	router.HandleFunc("/openapi/v3", https.ErrorHTTPHandler(s.logger, func(w http.ResponseWriter, r *http.Request) error {
-		https.LogRequest(s.logger, r).Info("OpenAPI V3")
-		w.Header().Set(ContentTypeHeader, k8sruntime.ContentTypeJSON)
-		err := json.NewEncoder(w).Encode(s.openapiv3Discovery)
-		if err != nil {
-			return errors.Wrap(err, "error encoding openapi/v3")
-		}
-		return nil
-	}))
+	oapiMux := kmux.NewPathRecorderMux("openapi")
 
-	s.openapiv2.SwaggerProps.Info = &spec.Info{InfoProps: spec.InfoProps{Title: "ext.cattle.io"}}
-	router.HandleFunc("/openapi/v2", https.ErrorHTTPHandler(s.logger, func(w http.ResponseWriter, r *http.Request) error {
-		https.LogRequest(s.logger, r).Info("OpenAPI V2")
-		w.Header().Set(ContentTypeHeader, k8sruntime.ContentTypeJSON)
-		raw, err := json.MarshalIndent(s.openapiv2, "", "  ")
-		fmt.Println(string(raw))
+	s.openAPIRoutes.InstallV2(s.container, oapiMux)
+	s.openAPIRoutes.InstallV3(s.container, oapiMux)
 
-		err = json.NewEncoder(w).Encode(s.openapiv2)
-		if err != nil {
-			return errors.Wrap(err, "error encoding openapi/v2")
-		}
-		return nil
-	}))
+	router.Handle("/openapi/v2", http.StripPrefix("/ext", oapiMux))
+	router.NewRoute().PathPrefix("/openapi/v3").Handler(http.StripPrefix("/ext", oapiMux))
 
 	// This endpoint serves APIGroupDiscoveryList objects which is defined in this
 	// KEP: https://github.com/kubernetes/enhancements/blob/master/keps/sig-api-machinery/3352-aggregated-discovery/
@@ -164,7 +172,7 @@ func (s *APIServer) RegisterRoutes(router *gmux.Router) {
 // in the appropriate place for the K8s discovery service
 // e.g. http://localhost:8001/apis/scheduling.k8s.io/v1
 // as well as registering a CRDHandler that all http requests for the given APIResource are routed to
-func (as *APIServer) AddAPIResource(groupVersion schema.GroupVersion, resource metav1.APIResource, handler CRDHandler) {
+func (as *APIServer) AddAPIResource(groupVersion schema.GroupVersion, resource metav1.APIResource, handler CRDHandler, webService *restful.WebService) {
 	_, ok := as.resourceList[groupVersion]
 	if !ok {
 		// discovery handler
@@ -186,6 +194,8 @@ func (as *APIServer) AddAPIResource(groupVersion schema.GroupVersion, resource m
 	} else {
 		as.delegates[gvr] = handler
 	}
+
+	as.container.Add(webService)
 
 	as.logger.WithField("groupversion", groupVersion).WithField("apiresource", resource).Info("Adding APIResource")
 }

@@ -7,6 +7,7 @@ import (
 
 	"agones.dev/agones/pkg/util/https"
 	agonesRuntime "agones.dev/agones/pkg/util/runtime"
+	"github.com/emicklei/go-restful/v3"
 	"github.com/rancher/rancher/pkg/ext/resources/types"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -29,6 +30,94 @@ func NewStoreDelegate[T runtime.Object, TList runtime.Object](store types.Store[
 		GroupVersion:       groupVersion,
 		requestInfoFactory: request.RequestInfoFactory{APIPrefixes: sets.NewString("apis", "api"), GrouplessAPIPrefixes: sets.NewString("api")},
 	}
+}
+
+func (s *StoreDelegate[T, TList]) WebService(resource string, isNamespaced bool) *restful.WebService {
+	// WebService builder absolutely want a function with .To()
+	noop := func(*restful.Request, *restful.Response) {}
+
+	var t T
+	var tList TList
+
+	path := fmt.Sprintf("/%s", resource)
+	pathWithNameParam := fmt.Sprintf("/%s/{name}", resource)
+	if isNamespaced {
+		path = fmt.Sprintf("/namespaces/{namespace}/%s", resource)
+		pathWithNameParam = fmt.Sprintf("/namespaces/{namespace}/%s/{name}", resource)
+	}
+
+	ws := &restful.WebService{}
+	ws.Path(fmt.Sprintf("/apis/%s/%s", s.GroupVersion.Group, s.GroupVersion.Version))
+	// TODO: Missing deletecollection
+	ws.Route(
+		ws.GET(path).
+			To(noop).
+			Operation("list").
+			AddExtension("x-kubernetes-action", "list").
+			Doc(fmt.Sprintf("list objects of kind %T", t)).
+			Consumes(restful.MIME_JSON).
+			Produces(restful.MIME_JSON).
+			Returns(200, "OK", tList),
+	)
+	ws.Route(
+		ws.POST(path).
+			To(noop).
+			Operation("create").
+			Reads(t).
+			AddExtension("x-kubernetes-action", "post").
+			Doc(fmt.Sprintf("create a %T", t)).
+			Consumes(restful.MIME_JSON).
+			Produces(restful.MIME_JSON).
+			Returns(200, "OK", tList).
+			Returns(201, "Created", tList).
+			Returns(202, "Accepted", tList),
+	)
+	ws.Route(
+		ws.GET(pathWithNameParam).
+			To(noop).
+			Operation("get").
+			AddExtension("x-kubernetes-action", "get").
+			Doc(fmt.Sprintf("get objects of kind %T", t)).
+			Consumes(restful.MIME_JSON).
+			Produces(restful.MIME_JSON).
+			Returns(200, "OK", t),
+	)
+	ws.Route(
+		ws.PUT(pathWithNameParam).
+			To(noop).
+			Operation("replace").
+			AddExtension("x-kubernetes-action", "put").
+			Reads(t).
+			Doc(fmt.Sprintf("replace the specified %T", t)).
+			Consumes(restful.MIME_JSON).
+			Produces(restful.MIME_JSON).
+			Returns(200, "OK", t).
+			Returns(201, "Created", t),
+	)
+	ws.Route(
+		ws.DELETE(pathWithNameParam).
+			To(noop).
+			Operation("delete").
+			AddExtension("x-kubernetes-action", "delete").
+			Doc(fmt.Sprintf("delete a %T", t)).
+			Produces(restful.MIME_JSON).
+			// FIXME: Should be Status
+			Returns(200, "OK", tList).
+			// FIXME: Should be Status
+			Returns(202, "Accepted", tList),
+	)
+	ws.Route(
+		ws.PATCH(pathWithNameParam).
+			To(noop).
+			Operation("patch").
+			AddExtension("x-kubernetes-action", "patch").
+			Doc(fmt.Sprintf("delete a %T", t)).
+			Consumes("application/merge-patch+json").
+			Produces(restful.MIME_JSON).
+			Returns(200, "OK", t).
+			Returns(201, "Created", t),
+	)
+	return ws
 }
 
 func (s *StoreDelegate[T, TList]) Delegate(w http.ResponseWriter, req *http.Request, namespace string) error {
