@@ -253,7 +253,6 @@ var OriginMap = map[string]string{
 	"ui-plugin-catalog":                                       "https://github.com/rancher/ui-plugin-charts",
 	"weave-kube":                                              "https://github.com/weaveworks-experiments/weave-kube",
 	"weave-npc":                                               "https://github.com/weaveworks/weave",
-	"webhook-receiver":                                        "https://github.com/rancher/webhook-receiver",
 	"windows_exporter-package":                                "https://github.com/rancher/windows_exporter-package",
 	"wins":                                                    "https://github.com/rancher/wins",
 	"wmi_exporter-package":                                    "https://github.com/rancher/wmi_exporter-package",
