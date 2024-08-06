@@ -84,6 +84,8 @@ func (c *UserAttributeController) sync(key string, attribs *v3.UserAttribute) (r
 		return updated, nil
 	}
 
+	// We deliberately wrap and shadow the original error so that we can return it later on.
+	// IsConflict is still able to figure out if it's a conflict.
 	err = fmt.Errorf("error updating user attribute %s after provider refresh: %w", name, err)
 	if !apierrors.IsConflict(err) {
 		return nil, err
