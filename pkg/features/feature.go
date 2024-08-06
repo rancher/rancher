@@ -159,6 +159,12 @@ func InitializeFeatures(featuresClient managementv3.FeatureClient, featureArgs s
 		return
 	}
 
+	// external-rules feature flag was removed in 2.9. We need to delete it for users upgrading from 2.8.
+	err := featuresClient.Delete("external-rules", &metav1.DeleteOptions{})
+	if err != nil && !errors.IsNotFound(err) {
+		logrus.Errorf("unable to delete external-rules feature: %v", err)
+	}
+
 	// creates any features in map that do not exist, updates features with new default value
 	for key, f := range features {
 		featureState, err := featuresClient.Get(key, metav1.GetOptions{})
