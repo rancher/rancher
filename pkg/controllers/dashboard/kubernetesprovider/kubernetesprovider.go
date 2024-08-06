@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	providerKey = "provider.cattle.io"
+	ProviderKey = "provider.cattle.io"
 )
 
 type handler struct {
@@ -36,7 +36,7 @@ func Register(ctx context.Context,
 }
 
 func (h *handler) OnChange(key string, cluster *v3.Cluster) (*v3.Cluster, error) {
-	if cluster == nil || (cluster.Status.Provider != "" && cluster.Labels[providerKey] != "") {
+	if cluster == nil || (cluster.Status.Provider != "" && cluster.Labels[ProviderKey] != "") {
 		// if cluster has windows enabled and provider is not rke.windows, continue to detect if it has windows nodes
 		if cluster == nil || !cluster.Spec.WindowsPreferedCluster || cluster.Status.Provider == "rke.windows" {
 			return cluster, nil
@@ -72,7 +72,7 @@ func (h *handler) OnChange(key string, cluster *v3.Cluster) (*v3.Cluster, error)
 	if cluster.Labels == nil {
 		cluster.Labels = map[string]string{}
 	}
-	cluster.Labels[providerKey] = provider
+	cluster.Labels[ProviderKey] = provider
 	cluster.Status.Provider = provider
 	return h.clusters.Update(cluster)
 }

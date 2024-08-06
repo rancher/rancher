@@ -4,11 +4,14 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/rancher/kubernetes-provider-detector/providers"
 	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/controllers/dashboard/kubernetesprovider"
 	"github.com/rancher/rancher/pkg/rbac"
 	rbacv1 "k8s.io/api/rbac/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
 // OnCluster creates the roles required for users to be able to see/manage the
@@ -60,6 +63,12 @@ func (h *handler) createClusterViewRole(cluster *v1.Cluster) error {
 		if _, err := h.roleController.Create(role); err != nil && !k8serrors.IsAlreadyExists(err) {
 			return err
 		}
+
+		// This is needed for creating RoleBindings when moving rke clusters to a different workspace.
+		// This is only needed for rke because Role and RoleBindings are moved to the new workspace. In other k8s distros they stay in the fleet-default ns.
+		if err = h.enqueueCRTBsForRKEClusters(cluster); err != nil {
+			return err
+		}
 		return nil
 	}
 
@@ -99,5 +108,19 @@ func (h *handler) cleanClusterAdminRoleBindings(cluster *v1.Cluster) error {
 	if len(allErrors) > 0 {
 		return fmt.Errorf("errors deleting cluster admin role binding: %v", allErrors)
 	}
+	return nil
+}
+
+func (h *handler) enqueueCRTBsForRKEClusters(cluster *v1.Cluster) error {
+	if cluster.Labels[kubernetesprovider.ProviderKey] == providers.RKE {
+		crtbs, err := h.clusterRoleTemplateBindings.List(cluster.Name, labels.Everything())
+		if err != nil {
+			return err
+		}
+		for _, crtb := range crtbs {
+			h.clusterRoleTemplateBindingController.Enqueue(crtb.Namespace, crtb.Name)
+		}
+	}
+
 	return nil
 }
