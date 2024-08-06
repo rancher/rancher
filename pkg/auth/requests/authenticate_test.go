@@ -36,11 +36,9 @@ type fakeUserAuthRefresher struct {
 func (*fakeUserAuthRefresher) TriggerAllUserRefresh() {}
 func (r *fakeUserAuthRefresher) TriggerUserRefresh(userID string, force bool) {
 	r.calledTimes.Add(1)
-	if r.done != nil {
-		r.done <- fakeUserAuthRefresherArgs{
-			userID: userID,
-			force:  force,
-		}
+	r.done <- fakeUserAuthRefresherArgs{
+		userID: userID,
+		force:  force,
 	}
 }
 
@@ -177,7 +175,9 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 		},
 	}
 
-	refresher := &fakeUserAuthRefresher{}
+	refresher := &fakeUserAuthRefresher{
+		done: make(chan fakeUserAuthRefresherArgs),
+	}
 
 	authenticator := tokenAuthenticator{
 		ctx:                 context.Background(),
@@ -191,23 +191,17 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer "+token.Name+":"+token.Token)
 
 	t.Run("authenticated", func(t *testing.T) {
-		refresher.done = make(chan fakeUserAuthRefresherArgs)
-		refresher.calledTimes.Store(0)
-		defer func() {
-			refresher.done = nil
-		}()
-
 		resp, err := authenticator.Authenticate(req)
 		require.NoError(t, err)
 		refresherArgs := <-refresher.done // Wait for the provider refresh to finish.
 		assert.Equal(t, int32(1), refresher.calledTimes.Load())
+		assert.Equal(t, userID, refresherArgs.userID)
+		assert.False(t, refresherArgs.force)
 
 		require.NotNil(t, resp)
 		assert.True(t, resp.IsAuthed)
 		assert.Equal(t, userID, resp.User)
 		assert.Equal(t, userID, resp.UserPrincipal)
-		assert.Equal(t, userID, refresherArgs.userID)
-		assert.False(t, refresherArgs.force)
 		assert.Contains(t, resp.Groups, fakeProvider.name+"_group://56789")
 		assert.Contains(t, resp.Groups, "system:cattle:authenticated")
 		assert.Contains(t, resp.Extras[common.UserAttributePrincipalID], fakeProvider.name+"_user://12345")
@@ -223,6 +217,25 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 
 		resp, err := authenticator.Authenticate(req)
 		require.NoError(t, err)
+		<-refresher.done // Wait for the provider refresh to finish.
+
+		require.NotNil(t, resp)
+		assert.True(t, resp.IsAuthed)
+	})
+
+	t.Run("provider refresh is not called if token user id has system prefix", func(t *testing.T) {
+		oldTokenUserID := token.UserID
+		defer func() { token.UserID = oldTokenUserID }()
+		token.UserID = "system://provisioning/fleet-local/local"
+
+		refresher.calledTimes.Store(0)
+
+		resp, err := authenticator.Authenticate(req)
+		require.NoError(t, err)
+
+		refresherCalledTimes := refresher.calledTimes.Load()
+		assert.Equal(t, int32(0), refresherCalledTimes)
+
 		require.NotNil(t, resp)
 		assert.True(t, resp.IsAuthed)
 	})
@@ -246,7 +259,9 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 
 		resp, err := authenticator.Authenticate(req)
 		require.NoError(t, err)
-		assert.Equal(t, int32(0), refresher.calledTimes.Load())
+
+		refresherCalledTimes := refresher.calledTimes.Load()
+		assert.Equal(t, int32(0), refresherCalledTimes)
 
 		require.NotNil(t, resp)
 		assert.True(t, resp.IsAuthed)
