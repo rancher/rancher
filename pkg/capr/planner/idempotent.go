@@ -78,6 +78,8 @@ func idempotentInstruction(controlPlane *rkev1.RKEControlPlane, identifier, valu
 
 // convertToIdempotentInstruction converts a OneTimeInstruction to a OneTimeInstruction wrapped with the idempotent script.
 // This is useful when an instruction may be used in various phases, without needing idempotency in all cases.
+// identifier is expected to be a unique key for tracking, and value should be something like the generation of the attempt
+// (and is what we track to determine whether we should run the instruction or not)
 func convertToIdempotentInstruction(controlPlane *rkev1.RKEControlPlane, identifier, value string, instruction plan.OneTimeInstruction) plan.OneTimeInstruction {
 	newInstruction := idempotentInstruction(controlPlane, identifier, value, instruction.Command, instruction.Args, instruction.Env)
 	newInstruction.Image = instruction.Image
@@ -86,7 +88,8 @@ func convertToIdempotentInstruction(controlPlane *rkev1.RKEControlPlane, identif
 }
 
 // idempotentRestartInstructions generates an idempotent restart instructions for the given runtimeUnit. It checks the
-// unit for failure, resets it if necessary, and restarts the unit.
+// unit for failure, resets it if necessary, and restarts the unit. identifier is expected to be a unique key for tracking,
+// and value should be something like the generation of the attempt (and is what we track to determine whether we should run the instruction or not)
 func idempotentRestartInstructions(controlPlane *rkev1.RKEControlPlane, identifier, value, runtimeUnit string) []plan.OneTimeInstruction {
 	return []plan.OneTimeInstruction{
 		idempotentInstruction(
@@ -112,4 +115,20 @@ func idempotentRestartInstructions(controlPlane *rkev1.RKEControlPlane, identifi
 			[]string{},
 		),
 	}
+}
+
+// idempotentStopInstruction generates an idempotent stop instruction for the given runtimeUnit. It simply calls systemctl stop <runtime-unit>
+// identifier is expected to be a unique key for tracking, and value should be something like the generation of the attempt (and is what we track to determine whether we should run the instruction or not)
+func idempotentStopInstruction(controlPlane *rkev1.RKEControlPlane, identifier, value, runtimeUnit string) plan.OneTimeInstruction {
+	return idempotentInstruction(
+		controlPlane,
+		identifier+"-stop",
+		value,
+		"systemctl",
+		[]string{
+			"stop",
+			runtimeUnit,
+		},
+		[]string{},
+	)
 }
