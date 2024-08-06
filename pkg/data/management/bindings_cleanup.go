@@ -12,10 +12,59 @@ import (
 )
 
 const (
+	dupePRTBsCleanupKey             = "DedupePRTBsDone"
 	dupeBindingsCleanupKey          = "DedupeBindingsDone"
 	orphanBindingsCleanupKey        = "CleanupOrphanBindingsDone"
 	orphanCatalogBindingsCleanupKey = "CleanupOrphanCatalogBindingsDone"
 )
+
+func CleanupDuplicatePRTBs(scaledContext *config.ScaledContext, wContext *wrangler.Context) {
+	// check if duplicate PRTB cleanup has run already
+	logrus.Infof("checking configmap %s/%s to determine if duplicate PRTBs cleanup needs to run", cattleNamespace, bootstrapAdminConfig)
+	if adminConfig, err := wContext.K8s.CoreV1().ConfigMaps(cattleNamespace).Get(scaledContext.RunContext, bootstrapAdminConfig, v1.GetOptions{}); err != nil {
+		if !apierrors.IsNotFound(err) {
+			logrus.Warnf("unable to determine if duplicate PRTBs cleanup has ran, skipping: %v", err)
+			return
+		}
+	} else {
+		// config map already exists, check if the cleanup key is found
+		if _, ok := adminConfig.Data[dupePRTBsCleanupKey]; ok {
+			// cleanup has been run already, nothing to do here
+			logrus.Info("duplicate PRTBs cleanup has already run, skipping")
+			return
+		}
+		// run cleanup after delay to give other controllers a chance to create CRTBs/PRTBs and ease the load on the API at startup
+		const delayMinutes = 2
+		logrus.Infof("PRTBs cleanup needed, waiting %v minutes before starting", delayMinutes)
+		time.Sleep(time.Minute * delayMinutes)
+		logrus.Info("starting duplicate PRTB cleanup")
+		err = clean.DuplicatePRTBs(&scaledContext.RESTConfig)
+		if err != nil {
+			logrus.Warnf("error in cleaning up duplicate PRTBs: %v", err)
+			return
+		}
+		// update configmap
+		reloadedConfig, err := wContext.K8s.CoreV1().ConfigMaps(cattleNamespace).Get(scaledContext.RunContext, bootstrapAdminConfig, v1.GetOptions{})
+		if err != nil {
+			if !apierrors.IsNotFound(err) {
+				logrus.Warnf("unable to load configmap %v: %v", bootstrapAdminConfig, err)
+				return
+			}
+		}
+
+		adminConfigCopy := reloadedConfig.DeepCopy()
+		if adminConfigCopy.Data == nil {
+			adminConfigCopy.Data = make(map[string]string)
+		}
+		adminConfigCopy.Data[dupePRTBsCleanupKey] = "yes"
+
+		_, err = wContext.K8s.CoreV1().ConfigMaps(cattleNamespace).Update(scaledContext.RunContext, adminConfigCopy, v1.UpdateOptions{})
+		if err != nil {
+			logrus.Warnf("error %v in updating %v configmap to record that the duplicate PRTB cleanup is done", err, bootstrapAdminConfig)
+		}
+		logrus.Infof("successfully cleaned up duplicate PRTBs")
+	}
+}
 
 func CleanupDuplicateBindings(scaledContext *config.ScaledContext, wContext *wrangler.Context) {
 	// check if duplicate binding cleanup has run already
@@ -28,7 +77,7 @@ func CleanupDuplicateBindings(scaledContext *config.ScaledContext, wContext *wra
 	} else {
 		// config map already exists, check if the cleanup key is found
 		if _, ok := adminConfig.Data[dupeBindingsCleanupKey]; ok {
-			//cleanup has been run already, nothing to do here
+			// cleanup has been run already, nothing to do here
 			logrus.Info("duplicate bindings cleanup has already run, skipping")
 			return
 		}
