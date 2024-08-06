@@ -68,6 +68,7 @@ func main() {
 			err = clean.Cluster()
 		} else if os.Getenv("BINDING_CLEANUP") == "true" {
 			err = errors.Join(
+				clean.DuplicatePRTBs(nil),
 				clean.DuplicateBindings(nil),
 				clean.OrphanBindings(nil),
 				clean.OrphanCatalogBindings(nil),
