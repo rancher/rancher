@@ -175,9 +175,13 @@ func ServiceAccountSecret(ctx context.Context, sa *corev1.ServiceAccount, secret
 		return nil, nil
 	}
 
+	var result *corev1.Secret
 	for _, s := range secrets {
 		if isSecretForServiceAccount(s, sa) {
-			return s, nil
+			if result == nil {
+				result = s
+			}
+			continue
 		}
 
 		logrus.Warnf("EnsureSecretForServiceAccount: secret [%s:%s] is invalid for service account [%s], deleting", s.Namespace, s.Name, sa.Name)
@@ -189,7 +193,7 @@ func ServiceAccountSecret(ctx context.Context, sa *corev1.ServiceAccount, secret
 		}
 	}
 
-	return nil, nil
+	return result, nil
 }
 
 func isSecretForServiceAccount(secret *corev1.Secret, sa *corev1.ServiceAccount) bool {
