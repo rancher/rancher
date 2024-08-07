@@ -7,15 +7,15 @@ set -x
 
 # variables
 COMMIT=$(git rev-parse --short HEAD)
-TAG="${TAG:-v2.8-${COMMIT}}"
+TAG="${TAG:-$(yq '.env.TAG | sub("-.*", "")' < .github/workflows/pull-request.yml)-${COMMIT}}"
 OS="${OS:-linux}"
 ARCH="${ARCH:-amd64}"
-CATTLE_K3S_VERSION=$(yq .env.CATTLE_K3S_VERSION < .github/workflows/pull-request.yml)
-CATTLE_KDM_BRANCH=$(yq .env.CATTLE_KDM_BRANCH < .github/workflows/pull-request.yml)
+CATTLE_K3S_VERSION=$(yq '.env.CATTLE_K3S_VERSION' < .github/workflows/pull-request.yml)
+CATTLE_KDM_BRANCH=$(yq '.env.CATTLE_KDM_BRANCH' < .github/workflows/pull-request.yml)
 RKE_VERSION=$(grep -m1 'github.com/rancher/rke' go.mod | awk '{print $2}')
-CATTLE_RANCHER_WEBHOOK_VERSION=$(yq .webhookVersion < build.yaml)
-CATTLE_CSP_ADAPTER_MIN_VERSION=$(yq .cspAdapterMinVersion < build.yaml)
-CATTLE_FLEET_VERSION=$(yq .fleetVersion < build.yaml)
+CATTLE_RANCHER_WEBHOOK_VERSION=$(yq '.webhookVersion' < build.yaml)
+CATTLE_CSP_ADAPTER_MIN_VERSION=$(yq '.cspAdapterMinVersion' < build.yaml)
+CATTLE_FLEET_VERSION=$(yq '.fleetVersion' < build.yaml)
 
 # download airgap images and export it to a tarball
 if [ ! -f ./k3s-images.txt ]; then
