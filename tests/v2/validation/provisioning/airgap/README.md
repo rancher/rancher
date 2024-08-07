@@ -11,17 +11,17 @@ provisioningInput:
   - calico
   # For the kubernetes versions please set it to what is appropriate for that release check
   k3sKubernetesVersion:
-  - v1.23
-  - v1.24
-  - v1.25
+  - v1.30
+  - v1.29
+  - v1.28
   rke1KubernetesVersion:
-  - v1.23
-  - v1.24
-  - v1.25
+  - v1.30
+  - v1.29
+  - v1.28
   rke2KubernetesVersion:
-  - v1.25
-  - v1.24
-  - v1.23
+  - v1.30
+  - v1.29
+  - v1.28
 registries:
   existingNoAuthRegistry: <value> # only set this if the registry was created beforehand just do `corral vars <corral> registry_fqdn` to get the registry hostname 
 corralPackages:
