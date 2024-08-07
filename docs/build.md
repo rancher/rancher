@@ -57,7 +57,7 @@ The following are examples of files that often refer to newly added configuratio
 
 - [build-server](../scripts/build-server)
 - [build-agent](../scripts/build-agent)
-- [build-local.sh](../dev-scripts/build-local.sh)
+- [quick](../dev-scripts/quick)
 - [Dockerfile](../package/Dockerfile)
 - [Dockerfile.agent](../package/Dockerfile.agent)
 - [pkg/settings/setting.go](../pkg/settings/setting.go)
