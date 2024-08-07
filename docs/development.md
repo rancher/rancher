@@ -3,29 +3,20 @@
 ## Generate a local container image
 
 If you need to test some changes in a container image before they make it to a
-pull request, you can use the handy [build-local.sh](../dev-scripts/build-local.sh)
-script.
+pull request, you can use the handy `make quick` script.
 
 This script uses `docker buildx` in order to enable cross-building of different
 architecture images. To build an image for your current OS and architecture, run
 from the Rancher project root:
 ```shell
-TARGET_REPO="localhost:5000/my-test-repo/image:tag" dev-scripts/build-local.sh
+TAG="localhost:5000/my-test-repo/image:tag" make quick
 ```
 
-If you wish to cross-build for a different OS or architecture, set the variables
-`TARGET_ARCH` and/or `TARGET_OS`:
+If you wish to cross-build for a different architecture, set the variable `ARCH`:
 ```shell
-TARGET_REPO="localhost:5000/my-test-repo/image:tag" \
-  TARGET_ARCH="amd64" \
-  TARGET_OS="linux" \
-  dev-scripts/build-local.sh
-```
-
-To specify a `go` binary other than the one present in your `PATH`, use the
-`GO_BINARY` environment variable:
-```shell
-GO_BINARY="/opt/go1.18/bin/go" dev-scripts/build-local.sh
+TAG="localhost:5000/my-test-repo/image:tag" \
+  ARCH="amd64" \
+  make quick
 ```
 
 ## Deploy your custom image via Helm
