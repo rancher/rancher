@@ -72,7 +72,7 @@ func (s *ServiceAccountSuite) TestSingleSecretForServiceAccount() {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			_, err := serviceaccounttoken.EnsureSecretForServiceAccount(context.Background(), nil, clientset, serviceAccount)
+			_, err := serviceaccounttoken.EnsureSecretForServiceAccount(context.Background(), nil, clientset, serviceAccount, "cluster-")
 			s.Require().NoError(err)
 		}()
 	}
