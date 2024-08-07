@@ -8,7 +8,7 @@ set -x
 # variables
 COMMIT=$(git rev-parse --short HEAD)
 TAG="${TAG:-v2.8-${COMMIT}}"
-OS="${ARCH:-linux}"
+OS="${OS:-linux}"
 ARCH="${ARCH:-amd64}"
 CATTLE_K3S_VERSION=$(yq .env.CATTLE_K3S_VERSION < .github/workflows/pull-request.yml)
 CATTLE_KDM_BRANCH=$(yq .env.CATTLE_KDM_BRANCH < .github/workflows/pull-request.yml)
