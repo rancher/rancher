@@ -116,7 +116,7 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 	if token.AuthProvider != "" {
 		disabled, err := providers.IsDisabledProvider(token.AuthProvider)
 		if err != nil {
-			return nil, errors.Wrapf(ErrMustAuthenticate, "provider %s doesn't exist", token.AuthProvider)
+			return nil, errors.Wrapf(ErrMustAuthenticate, "error checking if provider %s is disabled: %v", token.AuthProvider, err)
 		}
 		if disabled {
 			return nil, errors.Wrapf(ErrMustAuthenticate, "provider %s is disabled", token.AuthProvider)
