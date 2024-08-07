@@ -8,6 +8,7 @@ set -x
 # variables
 COMMIT=$(git rev-parse --short HEAD)
 TAG="${TAG:-v2.8-${COMMIT}}"
+OS="${ARCH:-linux}"
 ARCH="${ARCH:-amd64}"
 CATTLE_K3S_VERSION=$(yq .env.CATTLE_K3S_VERSION < .github/workflows/pull-request.yml)
 CATTLE_KDM_BRANCH=$(yq .env.CATTLE_KDM_BRANCH < .github/workflows/pull-request.yml)
@@ -41,4 +42,5 @@ docker buildx build \
   --build-arg CATTLE_CSP_ADAPTER_MIN_VERSION=${CATTLE_CSP_ADAPTER_MIN_VERSION} \
   --build-arg CATTLE_FLEET_VERSION=${CATTLE_FLEET_VERSION} \
   --tag rancher/rancher:${TAG}-${ARCH} \
+  --platform="${OS}/${ARCH}" \
   --file ./package/Dockerfile .
