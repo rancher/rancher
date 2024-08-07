@@ -1,0 +1,9 @@
+apiVersion: ext.cattle.io/v1alpha1
+kind: RancherToken
+metadata:
+  name: "foo"
+spec:
+  userID: "my-user"
+  clusterName: "my-cluster"
+  ttl: "90"
+  enabled: "true"

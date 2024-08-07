@@ -37,3 +37,4 @@ kontainer-engine
 k3s-images.txt
 k3s-airgap-images.tar
 data.json
+/build-ext/ext
