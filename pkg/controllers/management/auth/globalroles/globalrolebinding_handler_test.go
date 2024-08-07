@@ -28,6 +28,30 @@ import (
 // see globalrole_handler_test.go for definition
 // type reducedCondition struct
 
+// A subset of the GRB status, because we do not have/want to check timings.
+type reducedStatus struct {
+	Summary    string
+	Conditions []reducedCondition
+}
+
+// A subset of the GRB, because we do not have/want to check timings.
+type reducedGRB struct {
+	// type meta
+	Kind string
+	APIVersion string
+	// object meta
+	Name               string
+	Namespace          string
+	UID                types.UID
+	Generation         int64
+	Labels             map[string]string
+	Annotations        map[string]string
+	UserName           string
+	GroupPrincipalName string
+	GlobalRoleName     string
+	Status             reducedStatus
+}
+
 // local implementation of the globalRoleBindingController interface for mocking
 type globalRoleBindingControllerMock struct {
 	err error
@@ -154,12 +178,18 @@ func TestCreateUpdate(t *testing.T) {
 		return newGRB
 	}
 
+	addStatus := func(grb reducedGRB, n string, rcs []reducedCondition) reducedGRB {
+		grb.Status.Summary = n
+		grb.Status.Conditions = rcs
+		return grb
+	}
+
 	tests := []struct {
 		name            string
 		stateSetup      func(grbTestState)
 		stateAssertions func(grbTestStateChanges)
 		inputBinding    *v3.GlobalRoleBinding
-		wantBinding     *v3.GlobalRoleBinding
+		wantBinding     reducedGRB
 		wantError       bool
 	}{
 		{
@@ -237,7 +267,12 @@ func TestCreateUpdate(t *testing.T) {
 				require.Equal(stateChanges.t, true, stateChanges.fwhCalled)
 			},
 			inputBinding: grb.DeepCopy(),
-			wantBinding:  addAnnotation(&grb),
+			wantBinding:  addStatus(reducedGRBOf(addAnnotation(&grb)), SummaryCompleted, []reducedCondition{
+				{ reason:"ClusterPermissionsOk", status:"True"},
+				{ reason:"GlobalRoleBindingOk", status:"True"},
+				{ reason:"NamespacedRoleBindingsOk", status:"True"},
+			        { reason:"FleetWorkspacePermissionsOk", status:"True"},
+			}),
 			wantError:    false,
 		},
 		{
@@ -304,7 +339,12 @@ func TestCreateUpdate(t *testing.T) {
 				require.Equal(stateChanges.t, true, stateChanges.fwhCalled)
 			},
 			inputBinding: grb.DeepCopy(),
-			wantBinding:  addAnnotation(&grb),
+			wantBinding:  addStatus(reducedGRBOf(addAnnotation(&grb)), SummaryInProgress, []reducedCondition{
+				{ reason:"FailedToListClusters", status:"False"},
+				{ reason:"GlobalRoleBindingOk", status:"True"},
+				{ reason:"NamespacedRoleBindingsOk", status:"True"},
+			        { reason:"FleetWorkspacePermissionsOk", status:"True"},
+			}),
 			wantError:    true,
 		},
 		{
@@ -382,7 +422,12 @@ func TestCreateUpdate(t *testing.T) {
 				require.Equal(stateChanges.t, true, stateChanges.fwhCalled)
 			},
 			inputBinding: grb.DeepCopy(),
-			wantBinding:  &grb,
+			wantBinding:  addStatus (reducedGRBOf(&grb), SummaryInProgress, []reducedCondition{
+				{ reason:"ClusterPermissionsOk", status:"True"},
+				{ reason:"FailedToAddCRB", status:"False"},
+				{ reason:"NamespacedRoleBindingsOk", status:"True"},
+			        { reason:"FleetWorkspacePermissionsOk", status:"True"},
+			}),
 			wantError:    true,
 		},
 		{
@@ -440,7 +485,12 @@ func TestCreateUpdate(t *testing.T) {
 				require.Equal(stateChanges.t, true, stateChanges.fwhCalled)
 			},
 			inputBinding: grb.DeepCopy(),
-			wantBinding:  &grb,
+			wantBinding:  addStatus(reducedGRBOf(&grb), SummaryInProgress, []reducedCondition{
+				{ reason:"FailedToGetGlobalRole", status:"False"},
+				{ reason:"FailedToAddCRB", status:"False"},
+				{ reason:"FailedToGetGlobalRole", status:"False"},
+				{ reason:"FleetWorkspacePermissionsOk", status:"True"},
+			}),
 			wantError:    true,
 		},
 		{
@@ -518,7 +568,12 @@ func TestCreateUpdate(t *testing.T) {
 				require.Equal(stateChanges.t, true, stateChanges.fwhCalled)
 			},
 			inputBinding: grb.DeepCopy(),
-			wantBinding:  addAnnotation(&grb),
+			wantBinding:  addStatus(reducedGRBOf(addAnnotation(&grb)),SummaryInProgress, []reducedCondition{
+				{ reason: "ClusterPermissionsOk", status: "True" },
+				{ reason: "GlobalRoleBindingOk", status: "True" },
+				{ reason: "NamespacedRoleBindingsOk", status: "True" },
+				{ reason: "FailedToReconcileFleetWorkspacePermissions", status: "False" },
+			}),
 			wantError:    true,
 		},
 	}
@@ -573,7 +628,7 @@ func TestCreateUpdate(t *testing.T) {
 				grbLifecycle.roleBindingLister = &rbListerMock
 				grbLifecycle.fleetPermissionsHandler = &fphMock
 				res, resErr := testFunc(test.inputBinding)
-				require.Equal(t, test.wantBinding, res)
+				require.Equal(t, test.wantBinding, reducedGRBOf(res.(*v3.GlobalRoleBinding)))
 				if test.wantError {
 					require.Error(t, resErr)
 				} else {
@@ -2367,5 +2422,37 @@ func rcOf(c metav1.Condition) reducedCondition {
 	return reducedCondition{
 		reason: c.Reason,
 		status: c.Status,
+	}
+}
+
+func rcOfMap(mcs []metav1.Condition) []reducedCondition {
+	var cs []reducedCondition
+	for _, c := range mcs {
+		cs = append (cs, rcOf (c))
+	}
+	return cs
+}
+
+func reducedGRBStatusOf(status v3.GlobalRoleBindingStatus) reducedStatus {
+	return reducedStatus{
+		Summary: status.Summary,
+		Conditions: rcOfMap (status.Conditions),
+	}
+}
+
+func reducedGRBOf(grb *v3.GlobalRoleBinding) reducedGRB {
+	return reducedGRB{
+		Kind:               grb.Kind,
+		APIVersion:         grb.APIVersion,
+		Name:		    grb.Name,
+		Namespace:	    grb.Namespace,
+		UID:		    grb.UID,
+		Generation:	    grb.Generation,
+		Labels:		    grb.Labels,
+		Annotations: 	    grb.Annotations,
+		UserName:           grb.UserName,
+		GroupPrincipalName: grb.GroupPrincipalName,
+		GlobalRoleName:     grb.GlobalRoleName,
+		Status:             reducedGRBStatusOf (grb.Status),
 	}
 }
