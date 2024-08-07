@@ -8,7 +8,7 @@ import (
 
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -26,7 +26,7 @@ const (
 // secretLister is an abstraction over any kind of secret lister.
 // The caller can use any cache or client it has available, whether that is from norman, wrangler, or client-go,
 // as long as it can wrap it in a simplified lambda with this signature.
-type secretLister func(namespace string, selector labels.Selector) ([]*v1.Secret, error)
+type secretLister func(namespace string, selector labels.Selector) ([]*corev1.Secret, error)
 
 var lockMap sync.Map
 
@@ -36,15 +36,25 @@ func getLock(key string) *sync.Mutex {
 }
 
 // EnsureSecretForServiceAccount gets or creates a service account token Secret for the provided Service Account.
-// For k8s <1.24, the secret is automatically generated for the service account. For >=1.24, we need to generate it explicitly.
-func EnsureSecretForServiceAccount(ctx context.Context, secretsCache corecontrollers.SecretCache, clientSet kubernetes.Interface, sa *v1.ServiceAccount) (*v1.Secret, error) {
+//
+// If lockPrefix is provided, this is used as a prefix for the lock to provide
+// context for concurrent requests. No concurrent creates will be allowed for a
+// service account.
+//
+// For example, if this is "cluster-1" and the ServiceAccount is
+// "default:test-sa" subsequent requests to create a ServiceAccount with the
+// same name in "cluster-1" will be blocked until the first request has
+// completed.
+//
+// Note: This mutex is per-replica, currently there's no attempt to co-ordinate
+// across replicas.
+func EnsureSecretForServiceAccount(ctx context.Context, secretsCache corecontrollers.SecretCache, clientSet kubernetes.Interface, sa *corev1.ServiceAccount, lockPrefix string) (*corev1.Secret, error) {
 	if sa == nil {
 		return nil, fmt.Errorf("could not ensure secret for invalid service account")
 	}
-	logrus.Tracef("EnsureSecretForServiceAccount for %s/%s", sa.GetNamespace(), sa.GetName())
+	logrus.Tracef("EnsureSecretForServiceAccount for %s:%s", sa.Namespace, sa.Name)
 
-	// Lock avoids multiple calls to this func at the same time and creation of same resources multiple times
-	lockKey := fmt.Sprintf("%v-%v", sa.Namespace, sa.Name)
+	lockKey := fmt.Sprintf("%v%v-%v", lockPrefix, sa.Namespace, sa.Name)
 	mutex := getLock(lockKey)
 	mutex.Lock()
 	defer func(key string) {
@@ -57,24 +67,26 @@ func EnsureSecretForServiceAccount(ctx context.Context, secretsCache corecontrol
 	if secretsCache != nil {
 		secretLister = secretsCache.List
 	} else {
-		secretLister = func(_ string, selector labels.Selector) ([]*v1.Secret, error) {
+		secretLister = func(_ string, selector labels.Selector) ([]*corev1.Secret, error) {
 			secretList, err := secretClient.List(ctx, metav1.ListOptions{
 				LabelSelector: selector.String(),
 			})
 			if err != nil {
 				return nil, err
 			}
-			result := make([]*v1.Secret, len(secretList.Items))
+			result := make([]*corev1.Secret, len(secretList.Items))
 			for i := range secretList.Items {
 				result[i] = &secretList.Items[i]
 			}
 			return result, nil
 		}
 	}
+
 	secret, err := ServiceAccountSecret(ctx, sa, secretLister, secretClient)
 	if err != nil {
 		return nil, fmt.Errorf("error looking up secret for service account [%s:%s]: %w", sa.Namespace, sa.Name, err)
 	}
+
 	if secret == nil {
 		sc := SecretTemplate(sa)
 		secret, err = secretClient.Create(ctx, sc, metav1.CreateOptions{})
@@ -82,9 +94,10 @@ func EnsureSecretForServiceAccount(ctx context.Context, secretsCache corecontrol
 			return nil, fmt.Errorf("error ensuring secret for service account [%s:%s]: %w", sa.Namespace, sa.Name, err)
 		}
 	}
-	if len(secret.Data[v1.ServiceAccountTokenKey]) > 0 {
+	if len(secret.Data[corev1.ServiceAccountTokenKey]) > 0 {
 		return secret, nil
 	}
+
 	logrus.Infof("EnsureSecretForServiceAccount: waiting for secret [%s:%s] for service account [%s:%s] to be populated with token", secret.Namespace, secret.Name, sa.Namespace, sa.Name)
 	backoff := wait.Backoff{
 		Duration: 2 * time.Millisecond,
@@ -100,7 +113,7 @@ func EnsureSecretForServiceAccount(ctx context.Context, secretsCache corecontrol
 		if err != nil {
 			return false, fmt.Errorf("error ensuring secret for service account [%s:%s]: %w", sa.Namespace, sa.Name, err)
 		}
-		if len(secret.Data[v1.ServiceAccountTokenKey]) > 0 {
+		if len(secret.Data[corev1.ServiceAccountTokenKey]) > 0 {
 			logrus.Infof("EnsureSecretForServiceAccount: got the service account token for service account [%s:%s] in %s", sa.GetNamespace(), sa.GetName(), time.Now().Sub(start))
 			return true, nil
 		}
@@ -109,12 +122,13 @@ func EnsureSecretForServiceAccount(ctx context.Context, secretsCache corecontrol
 	if err != nil {
 		return nil, fmt.Errorf("error ensuring secret for service account [%s:%s]: %w", sa.Namespace, sa.Name, err)
 	}
+
 	return secret, nil
 }
 
 // SecretTemplate generate a template of service-account-token Secret for the provided Service Account.
-func SecretTemplate(sa *v1.ServiceAccount) *v1.Secret {
-	return &v1.Secret{
+func SecretTemplate(sa *corev1.ServiceAccount) *corev1.Secret {
+	return &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: serviceAccountSecretPrefix(sa),
 			Namespace:    sa.Namespace,
@@ -133,20 +147,20 @@ func SecretTemplate(sa *v1.ServiceAccount) *v1.Secret {
 				ServiceAccountSecretLabel: sa.Name,
 			},
 		},
-		Type: v1.SecretTypeServiceAccountToken,
+		Type: corev1.SecretTypeServiceAccountToken,
 	}
 
 }
 
 // serviceAccountSecretPrefix returns the prefix that will be used to generate the secret for the given service account.
-func serviceAccountSecretPrefix(sa *v1.ServiceAccount) string {
+func serviceAccountSecretPrefix(sa *corev1.ServiceAccount) string {
 	return fmt.Sprintf("%s-token-", sa.Name)
 }
 
 // ServiceAccountSecret returns the secret for the given Service Account.
 // If there are more than one, it returns the first. Can return a nil secret
 // and a nil error if no secret is found
-func ServiceAccountSecret(ctx context.Context, sa *v1.ServiceAccount, secretLister secretLister, secretClient clientv1.SecretInterface) (*v1.Secret, error) {
+func ServiceAccountSecret(ctx context.Context, sa *corev1.ServiceAccount, secretLister secretLister, secretClient clientv1.SecretInterface) (*corev1.Secret, error) {
 	if sa == nil {
 		return nil, fmt.Errorf("cannot get secret for nil service account")
 	}
@@ -156,10 +170,12 @@ func ServiceAccountSecret(ctx context.Context, sa *v1.ServiceAccount, secretList
 	if err != nil {
 		return nil, fmt.Errorf("could not get secrets for service account: %w", err)
 	}
+
 	if len(secrets) < 1 {
 		return nil, nil
 	}
-	var result *v1.Secret
+
+	var result *corev1.Secret
 	for _, s := range secrets {
 		if isSecretForServiceAccount(s, sa) {
 			if result == nil {
@@ -167,6 +183,7 @@ func ServiceAccountSecret(ctx context.Context, sa *v1.ServiceAccount, secretList
 			}
 			continue
 		}
+
 		logrus.Warnf("EnsureSecretForServiceAccount: secret [%s:%s] is invalid for service account [%s], deleting", s.Namespace, s.Name, sa.Name)
 		err = secretClient.Delete(ctx, s.Name, metav1.DeleteOptions{})
 		if err != nil {
@@ -175,14 +192,16 @@ func ServiceAccountSecret(ctx context.Context, sa *v1.ServiceAccount, secretList
 			logrus.Errorf("unable to delete secret [%s:%s]: %v", s.Namespace, s.Name, err)
 		}
 	}
+
 	return result, nil
 }
 
-func isSecretForServiceAccount(secret *v1.Secret, sa *v1.ServiceAccount) bool {
-	if secret.Type != v1.SecretTypeServiceAccountToken {
+func isSecretForServiceAccount(secret *corev1.Secret, sa *corev1.ServiceAccount) bool {
+	if secret.Type != corev1.SecretTypeServiceAccountToken {
 		return false
 	}
 	annotations := secret.Annotations
 	annotation := annotations[serviceAccountSecretAnnotation]
+
 	return sa.Name == annotation
 }
