@@ -1,6 +1,8 @@
 module github.com/rancher/rancher
 
-go 1.21
+go 1.22.0
+
+toolchain go1.22.5
 
 replace (
 	github.com/containerd/containerd => github.com/containerd/containerd v1.6.22 // for compatibilty with docker 20.10.x
@@ -116,8 +118,8 @@ require (
 	github.com/rancher/fleet/pkg/apis v0.9.6
 	github.com/rancher/gke-operator v1.2.3
 	github.com/rancher/kubernetes-provider-detector v0.1.5
-	github.com/rancher/lasso v0.0.0-20240123150939-7055397d6dfa
-	github.com/rancher/machine v0.15.0-rancher112
+	github.com/rancher/lasso v0.0.0-20240430201833-6f3def65ffc5
+	github.com/rancher/machine v0.15.0-rancher116
 	github.com/rancher/norman v0.0.0-20240206180703-6eda4bc94b4c
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/remotedialer v0.3.0
@@ -145,9 +147,9 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 	gopkg.in/yaml.v2 v2.4.0
 	helm.sh/helm/v3 v3.9.0
-	k8s.io/api v0.28.9
+	k8s.io/api v0.30.1
 	k8s.io/apiextensions-apiserver v0.28.9
-	k8s.io/apimachinery v0.28.9
+	k8s.io/apimachinery v0.30.1
 	k8s.io/apiserver v0.28.9
 	k8s.io/cli-runtime v0.28.6
 	k8s.io/client-go v12.0.0+incompatible
@@ -156,7 +158,7 @@ require (
 	k8s.io/kube-aggregator v0.28.6
 	k8s.io/kubectl v0.28.6
 	k8s.io/kubernetes v1.28.8
-	k8s.io/utils v0.0.0-20230505201702-9f6742963106
+	k8s.io/utils v0.0.0-20230726121419-3b25d923346b
 	sigs.k8s.io/aws-iam-authenticator v0.5.9
 	sigs.k8s.io/cluster-api v1.5.5
 	sigs.k8s.io/controller-runtime v0.16.6
@@ -385,13 +387,13 @@ require (
 	k8s.io/component-base v0.28.9 // indirect
 	k8s.io/component-helpers v0.28.6 // indirect
 	k8s.io/klog v1.0.0 // indirect
-	k8s.io/klog/v2 v2.100.1 // indirect
-	k8s.io/kube-openapi v0.0.0-20230717233707-2695361300d9 // indirect
+	k8s.io/klog/v2 v2.120.1 // indirect
+	k8s.io/kube-openapi v0.0.0-20240228011516-70dd3763d340 // indirect
 	oras.land/oras-go v1.2.4 // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.1.2 // indirect
 	sigs.k8s.io/cli-utils v0.28.0 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/kustomize/api v0.13.5-0.20230601165947-6ce0bf390ce3 // indirect
 	sigs.k8s.io/kustomize/kyaml v0.14.3-0.20230601165947-6ce0bf390ce3 // indirect
-	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
+	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
 )
