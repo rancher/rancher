@@ -22,26 +22,42 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/request"
 )
 
-type Object interface {
+// Ptr[U] acts as a type constraint such that
+//
+//	T Ptr[U]
+//
+// means that T is a pointer to U and a runtime.Object.
+type Ptr[U any] interface {
+	*U
 	runtime.Object
-	Default() any
 }
 
-type StoreDelegate[T Object, TList runtime.Object] struct {
+// Note: We need both T and DerefT. T because that's the object we're interested
+//       in (runtime.Object). DerefT because we want to instantiate T objects.
+
+type StoreDelegate[
+	T Ptr[DerefT],
+	DerefT any,
+	TList runtime.Object,
+] struct {
 	Store              types.Store[T, TList]
 	GroupVersion       schema.GroupVersion
 	requestInfoFactory request.RequestInfoFactory
 }
 
-func NewStoreDelegate[T Object, TList runtime.Object](store types.Store[T, TList], groupVersion schema.GroupVersion) StoreDelegate[T, TList] {
-	return StoreDelegate[T, TList]{
+func NewStoreDelegate[
+	T Ptr[DerefT],
+	DerefT any,
+	TList runtime.Object,
+](store types.Store[T, TList], groupVersion schema.GroupVersion) StoreDelegate[T, DerefT, TList] {
+	return StoreDelegate[T, DerefT, TList]{
 		Store:              store,
 		GroupVersion:       groupVersion,
 		requestInfoFactory: request.RequestInfoFactory{APIPrefixes: sets.NewString("apis", "api"), GrouplessAPIPrefixes: sets.NewString("api")},
 	}
 }
 
-func (s *StoreDelegate[T, TList]) WebService(resource string, isNamespaced bool) *restful.WebService {
+func (s *StoreDelegate[T, DerefT, TList]) WebService(resource string, isNamespaced bool) *restful.WebService {
 	// WebService builder absolutely want a function with .To()
 	noop := func(*restful.Request, *restful.Response) {}
 
@@ -129,7 +145,7 @@ func (s *StoreDelegate[T, TList]) WebService(resource string, isNamespaced bool)
 	return ws
 }
 
-func (s *StoreDelegate[T, TList]) Delegate(w http.ResponseWriter, req *http.Request, namespace string) error {
+func (s *StoreDelegate[T, DerefT, TList]) Delegate(w http.ResponseWriter, req *http.Request, namespace string) error {
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Println(r)
@@ -280,7 +296,7 @@ func (s *StoreDelegate[T, TList]) Delegate(w http.ResponseWriter, req *http.Requ
 	}
 }
 
-func (s *StoreDelegate[T, TList]) writeOkResponse(w http.ResponseWriter, req *http.Request, obj runtime.Object) error {
+func (s *StoreDelegate[T, DerefT, TList]) writeOkResponse(w http.ResponseWriter, req *http.Request, obj runtime.Object) error {
 	info, err := AcceptedSerializer(req, Codecs)
 	if err != nil {
 		return err
@@ -296,21 +312,21 @@ func (s *StoreDelegate[T, TList]) writeOkResponse(w http.ResponseWriter, req *ht
 	return nil
 }
 
-func (s *StoreDelegate[T, TList]) readObjectFromRequest(req *http.Request) (T, error) {
-	var resource T
-	result := resource.Default()
+func (s *StoreDelegate[T, DerefT, TList]) readObjectFromRequest(req *http.Request) (T, error) {
+	var resource T = new(DerefT)
+
 	bytes, err := io.ReadAll(req.Body)
 	if err != nil {
 		return resource, err
 	}
 
-	_, _, err = Codecs.UniversalDecoder(s.GroupVersion).Decode(bytes, nil, result.(runtime.Object))
-	return result.(T), err
+	_, _, err = Codecs.UniversalDecoder(s.GroupVersion).Decode(bytes, nil, resource)
+	return resource, err
 }
 
 // resourceNameAndNamespace returns the name and namespace of a resource (in that order) according to the
 // url path
-func (s *StoreDelegate[T, TList]) resourceNameAndNamespace(req *http.Request) (string, string, error) {
+func (s *StoreDelegate[T, DerefT, TList]) resourceNameAndNamespace(req *http.Request) (string, string, error) {
 	info, err := s.requestInfoFactory.NewRequestInfo(req)
 	if err != nil {
 		return "", "", err
