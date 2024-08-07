@@ -80,7 +80,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 }
 
 func (h *handle) OnSetting(key string, setting *mgmt.Setting) (*mgmt.Setting, error) {
-	if setting == nil || setting.Name != "fleet-default-workspace-name" {
+	if setting == nil {
 		return setting, nil
 	}
 	switch setting.Name {
@@ -100,7 +100,7 @@ func (h *handle) onExtensionSetting(setting *mgmt.Setting) (*mgmt.Setting, error
 	svcNamespace := "cattle-system"
 	switch value {
 	case "on":
-		var port int32 = 555
+		var port int32 = 5555
 		apisvc := &apiregv1.APIService{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: apiSvcName,
@@ -115,6 +115,8 @@ func (h *handle) onExtensionSetting(setting *mgmt.Setting) (*mgmt.Setting, error
 				Version: "v1alpha1",
 				// Note: this done for POC sake, but shouldn't be done for prod
 				InsecureSkipTLSVerify: true,
+				GroupPriorityMinimum:  100,
+				VersionPriority:       100,
 			},
 		}
 		_, err := h.apiClient.Create(apisvc)
