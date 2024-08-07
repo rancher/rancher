@@ -182,7 +182,7 @@ func TestEnsureSecretForServiceAccount(t *testing.T) {
 					return true, ret, nil
 				},
 			)
-			got, gotErr := EnsureSecretForServiceAccount(context.Background(), nil, k8sClient, tt.sa)
+			got, gotErr := EnsureSecretForServiceAccount(context.Background(), nil, k8sClient, tt.sa, "")
 			if tt.wantErr {
 				assert.Error(t, gotErr)
 				return
@@ -371,12 +371,21 @@ func TestEnsureSecretForServiceAccount_in_parallel(t *testing.T) {
 
 	k8sClient.PrependReactor("create", "secrets",
 		func(action k8stesting.Action) (bool, runtime.Object, error) {
+			m.Lock()
+			defer m.Unlock()
 			ret := action.(k8stesting.CreateAction).GetObject().(*corev1.Secret)
 			ret.ObjectMeta.Name = ret.GenerateName + rand.String(5)
+			ret.ObjectMeta.Labels = map[string]string{
+				ServiceAccountSecretLabel: "test", // sa.Name from below
+			}
+			ret.ObjectMeta.Annotations = map[string]string{
+				serviceAccountSecretAnnotation: "test", // sa.Name from below
+			}
 			ret.Data = map[string][]byte{
 				"token": []byte("abcde"),
 			}
 			created = append(created, ret)
+
 			return true, ret, nil
 		},
 	)
@@ -391,7 +400,7 @@ func TestEnsureSecretForServiceAccount_in_parallel(t *testing.T) {
 					Name:      "test",
 					Namespace: "default",
 				},
-			})
+			}, "cluster-1-")
 			assert.NoError(t, err)
 		}()
 	}
