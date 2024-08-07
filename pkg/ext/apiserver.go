@@ -125,8 +125,10 @@ func (s *APIServer) RegisterRoutes(router *gmux.Router) {
 	s.openAPIRoutes.InstallV2(s.container, oapiMux)
 	s.openAPIRoutes.InstallV3(s.container, oapiMux)
 
-	router.Handle("/openapi/v2", http.StripPrefix("/ext", oapiMux))
-	router.NewRoute().PathPrefix("/openapi/v3").Handler(http.StripPrefix("/ext", oapiMux))
+	// router.Handle("/openapi/v2", http.StripPrefix("/ext", oapiMux))
+	// router.NewRoute().PathPrefix("/openapi/v3").Handler(http.StripPrefix("/ext", oapiMux))
+	router.Handle("/openapi/v2", oapiMux)
+	router.NewRoute().PathPrefix("/openapi/v3").Handler(oapiMux)
 
 	// This endpoint serves APIGroupDiscoveryList objects which is defined in this
 	// KEP: https://github.com/kubernetes/enhancements/blob/master/keps/sig-api-machinery/3352-aggregated-discovery/

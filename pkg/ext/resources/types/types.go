@@ -1,15 +1,23 @@
 package types
 
 import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/authentication/user"
 )
+
+type WatchEvent[T runtime.Object] struct {
+	Event  watch.EventType
+	Object T
+}
 
 type Store[T runtime.Object, TList runtime.Object] interface {
 	Create(userInfo user.Info, obj T) (T, error)
 	Update(userInfo user.Info, obj T) (T, error)
 	Get(userInfo user.Info, name string) (T, error)
 	List(userInfo user.Info) (TList, error)
+	Watch(userInfo user.Info, opts metav1.ListOptions) (<-chan WatchEvent[T], error)
 	Delete(userInfo user.Info, name string) error
 }
 
@@ -18,6 +26,7 @@ type backingStore[T runtime.Object, TList runtime.Object] struct {
 	updateFunc func(userInfo user.Info, obj T) (T, error)
 	getFunc    func(userInfo user.Info, name string) (T, error)
 	listFunc   func(userInfo user.Info) (TList, error)
+	watchFunc  func(userInfo user.Info, opts metav1.ListOptions) (<-chan WatchEvent[T], error)
 	deleteFunc func(userInfo user.Info, name string) error
 }
 
@@ -37,6 +46,10 @@ func (b *backingStore[T, TList]) List(userInfo user.Info) (TList, error) {
 	return b.listFunc(userInfo)
 }
 
+func (b *backingStore[T, TList]) Watch(userInfo user.Info, opts metav1.ListOptions) (<-chan WatchEvent[T], error) {
+	return b.watchFunc(userInfo, opts)
+}
+
 func (b *backingStore[T, TList]) Delete(userInfo user.Info, name string) error {
 	return b.deleteFunc(userInfo, name)
 }
@@ -46,6 +59,7 @@ func NewStore[T runtime.Object, TList runtime.Object](
 	updateFunc func(userInfo user.Info, obj T) (T, error),
 	getFunc func(userInfo user.Info, name string) (T, error),
 	listFunc func(userInfo user.Info) (TList, error),
+	watchFunc func(userInfo user.Info, opts metav1.ListOptions) (<-chan WatchEvent[T], error),
 	deleteFunc func(userInfo user.Info, name string) error,
 ) Store[T, TList] {
 	return &backingStore[T, TList]{
@@ -53,6 +67,7 @@ func NewStore[T runtime.Object, TList runtime.Object](
 		updateFunc: updateFunc,
 		getFunc:    getFunc,
 		listFunc:   listFunc,
+		watchFunc:  watchFunc,
 		deleteFunc: deleteFunc,
 	}
 }

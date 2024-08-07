@@ -12,7 +12,6 @@ import (
 	authv1 "k8s.io/api/authorization/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apiserver/pkg/authentication/user"
 	authzv1 "k8s.io/client-go/kubernetes/typed/authorization/v1"
 )
@@ -119,7 +118,7 @@ func (t *TokenStore) Get(userInfo user.Info, name string) (*RancherToken, error)
 }
 
 func (t *TokenStore) List(userInfo user.Info) (*RancherTokenList, error) {
-	secrets, err := t.secretCache.List(tokenNamespace, labels.Everything())
+	secrets, err := t.secretClient.List(tokenNamespace, metav1.ListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("unable to list tokens: %w", err)
 	}
@@ -128,8 +127,8 @@ func (t *TokenStore) List(userInfo user.Info) (*RancherTokenList, error) {
 		return nil, fmt.Errorf("unable to check if user has * on tokens: %w", err)
 	}
 	var tokens []RancherToken
-	for _, secret := range secrets {
-		token := tokenFromSecret(secret)
+	for _, secret := range secrets.Items {
+		token := tokenFromSecret(&secret)
 		// users can only list their own tokens, unless they have * on this group
 		if !authed && token.Spec.UserID != userInfo.GetName() {
 			continue
@@ -137,9 +136,52 @@ func (t *TokenStore) List(userInfo user.Info) (*RancherTokenList, error) {
 		tokens = append(tokens, *token)
 	}
 	list := RancherTokenList{
+		ListMeta: metav1.ListMeta{
+			ResourceVersion: secrets.ResourceVersion,
+		},
 		Items: tokens,
 	}
 	return &list, nil
+}
+
+// TODO: Close channel
+func (t *TokenStore) Watch(userInfo user.Info, opts metav1.ListOptions) (<-chan types.WatchEvent[*RancherToken], error) {
+	authed, err := t.userHasFullPermissions(userInfo)
+	if err != nil {
+		return nil, fmt.Errorf("unable to check if user has * on tokens: %w", err)
+	}
+
+	ch := make(chan types.WatchEvent[*RancherToken])
+
+	go func() {
+		watcher, err := t.secretClient.Watch(tokenNamespace, metav1.ListOptions{
+			ResourceVersion: opts.ResourceVersion,
+		})
+		if err != nil {
+			return
+		}
+		defer watcher.Stop()
+
+		for event := range watcher.ResultChan() {
+			secret, ok := event.Object.(*corev1.Secret)
+			if !ok {
+				continue
+			}
+
+			token := tokenFromSecret(secret)
+			if !authed && token.Spec.UserID != userInfo.GetName() {
+				continue
+			}
+
+			watchEvent := types.WatchEvent[*RancherToken]{
+				Event:  event.Type,
+				Object: token,
+			}
+			ch <- watchEvent
+		}
+	}()
+
+	return ch, nil
 }
 
 func (t *TokenStore) Delete(userInfo user.Info, name string) error {
@@ -206,6 +248,10 @@ func secretFromToken(token *RancherToken) *corev1.Secret {
 
 func tokenFromSecret(secret *corev1.Secret) *RancherToken {
 	token := &RancherToken{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "RancherToken",
+			APIVersion: "ext.cattle.io/v1alpha1",
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: secret.Name,
 		},

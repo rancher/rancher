@@ -12,6 +12,10 @@ type RancherToken struct {
 	Status RancherTokenStatus `json:"status"`
 }
 
+func (r *RancherToken) Default() any {
+	return &RancherToken{}
+}
+
 type RancherTokenSpec struct {
 	UserID      string `json:"userID"`
 	ClusterName string `json:"clusterName"`

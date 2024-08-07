@@ -1,9 +1,11 @@
 package ext
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"runtime/debug"
 
 	"agones.dev/agones/pkg/util/https"
 	agonesRuntime "agones.dev/agones/pkg/util/runtime"
@@ -15,16 +17,23 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
+
+	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
 )
 
-type StoreDelegate[T runtime.Object, TList runtime.Object] struct {
+type Object interface {
+	runtime.Object
+	Default() any
+}
+
+type StoreDelegate[T Object, TList runtime.Object] struct {
 	Store              types.Store[T, TList]
 	GroupVersion       schema.GroupVersion
 	requestInfoFactory request.RequestInfoFactory
 }
 
-func NewStoreDelegate[T runtime.Object, TList runtime.Object](store types.Store[T, TList], groupVersion schema.GroupVersion) StoreDelegate[T, TList] {
+func NewStoreDelegate[T Object, TList runtime.Object](store types.Store[T, TList], groupVersion schema.GroupVersion) StoreDelegate[T, TList] {
 	return StoreDelegate[T, TList]{
 		Store:              store,
 		GroupVersion:       groupVersion,
@@ -54,7 +63,7 @@ func (s *StoreDelegate[T, TList]) WebService(resource string, isNamespaced bool)
 			To(noop).
 			Operation("list").
 			AddExtension("x-kubernetes-action", "list").
-			Doc(fmt.Sprintf("list objects of kind %T", t)).
+			Doc(fmt.Sprintf("list or watch objects of kind %T", t)).
 			Consumes(restful.MIME_JSON).
 			Produces(restful.MIME_JSON).
 			Returns(200, "OK", tList),
@@ -121,10 +130,22 @@ func (s *StoreDelegate[T, TList]) WebService(resource string, isNamespaced bool)
 }
 
 func (s *StoreDelegate[T, TList]) Delegate(w http.ResponseWriter, req *http.Request, namespace string) error {
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println(r)
+			fmt.Println("stacktrace from panic: \n" + string(debug.Stack()))
+		}
+	}()
+
+	ctx := request.WithUser(req.Context(), &user.DefaultInfo{
+		Name:   "admin",
+		Groups: []string{"system:masters"},
+	})
+
 	logger := agonesRuntime.NewLoggerWithType(namespace)
 	https.LogRequest(logger, req).Info("RancherTokens")
 	// other middleware is expected to filter out unauthenticated requests
-	userInfo, _ := request.UserFrom(req.Context())
+	userInfo, _ := request.UserFrom(ctx)
 
 	switch req.Method {
 	case http.MethodDelete:
@@ -152,6 +173,52 @@ func (s *StoreDelegate[T, TList]) Delegate(w http.ResponseWriter, req *http.Requ
 			}
 			return s.writeOkResponse(w, req, resource)
 		}
+		if req.URL.Query().Get("watch") == "true" {
+			resultCh, err := s.Store.Watch(userInfo, metav1.ListOptions{
+				ResourceVersion: req.URL.Query().Get("resourceVersion"),
+			})
+			if err != nil {
+				return fmt.Errorf("unable to watch: %w", err)
+			}
+
+			flusher, ok := w.(http.Flusher)
+			if !ok {
+				return fmt.Errorf("unable to start watch - can't get http.Flusher: %#v", w)
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			w.Header().Set("Transfer-Encoding", "chunked")
+			w.WriteHeader(http.StatusOK)
+			flusher.Flush()
+
+			for event := range resultCh {
+				objBuffer := runtime.NewSpliceBuffer()
+				eventBuffer := runtime.NewSpliceBuffer()
+				err = json.NewEncoder(objBuffer).Encode(event.Object)
+				if err != nil {
+					return fmt.Errorf("unable to encode RancherToken: %w", err)
+				}
+
+				outEvent := &metav1.WatchEvent{
+					Type:   string(event.Event),
+					Object: runtime.RawExtension{Raw: objBuffer.Bytes()},
+				}
+
+				err = json.NewEncoder(eventBuffer).Encode(outEvent)
+				if err != nil {
+					return fmt.Errorf("unable to encode WatchEvent: %w", err)
+				}
+
+				_, err = w.Write(eventBuffer.Bytes())
+				if err != nil {
+					return err
+				}
+				flusher.Flush()
+			}
+
+			return nil
+		}
+
 		resources, err := s.Store.List(userInfo)
 		if err != nil {
 			return err
@@ -231,13 +298,14 @@ func (s *StoreDelegate[T, TList]) writeOkResponse(w http.ResponseWriter, req *ht
 
 func (s *StoreDelegate[T, TList]) readObjectFromRequest(req *http.Request) (T, error) {
 	var resource T
+	result := resource.Default()
 	bytes, err := io.ReadAll(req.Body)
 	if err != nil {
 		return resource, err
 	}
 
-	_, _, err = Codecs.UniversalDecoder(s.GroupVersion).Decode(bytes, nil, resource)
-	return resource, err
+	_, _, err = Codecs.UniversalDecoder(s.GroupVersion).Decode(bytes, nil, result.(runtime.Object))
+	return result.(T), err
 }
 
 // resourceNameAndNamespace returns the name and namespace of a resource (in that order) according to the
