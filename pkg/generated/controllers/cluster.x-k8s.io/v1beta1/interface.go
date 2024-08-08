@@ -34,6 +34,7 @@ type Interface interface {
 	Cluster() ClusterController
 	Machine() MachineController
 	MachineDeployment() MachineDeploymentController
+	MachineHealthCheck() MachineHealthCheckController
 	MachineSet() MachineSetController
 }
 
@@ -57,6 +58,10 @@ func (v *version) Machine() MachineController {
 
 func (v *version) MachineDeployment() MachineDeploymentController {
 	return generic.NewController[*v1beta1.MachineDeployment, *v1beta1.MachineDeploymentList](schema.GroupVersionKind{Group: "cluster.x-k8s.io", Version: "v1beta1", Kind: "MachineDeployment"}, "machinedeployments", true, v.controllerFactory)
+}
+
+func (v *version) MachineHealthCheck() MachineHealthCheckController {
+	return generic.NewController[*v1beta1.MachineHealthCheck, *v1beta1.MachineHealthCheckList](schema.GroupVersionKind{Group: "cluster.x-k8s.io", Version: "v1beta1", Kind: "MachineHealthCheck"}, "machinehealthchecks", true, v.controllerFactory)
 }
 
 func (v *version) MachineSet() MachineSetController {
