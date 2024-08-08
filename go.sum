@@ -946,8 +946,8 @@ github.com/bugsnag/osext v0.0.0-20130617224835-0dd3f918b21b/go.mod h1:obH5gd0Bsq
 github.com/bugsnag/panicwrap v0.0.0-20160118154447-aceac81c6e2f h1:7+HZb3PwI0cCUETyMDgPCvSta1y3idwBL8PHwSgelJk=
 github.com/bugsnag/panicwrap v0.0.0-20160118154447-aceac81c6e2f/go.mod h1:D/8v3kj0zr8ZAKg1AQ6crr+5VwKN5eIywRkfhyM/+dE=
 github.com/bwesterb/go-ristretto v1.2.3/go.mod h1:fUIoIZaG73pV5biE2Blr2xEzDoMj7NFEuV9ekS419A0=
-github.com/caliskanugur/shepherd v0.0.0-20240808143019-6b3956c340b2 h1:MALXnsb9a1gxxYTNgv0iHoq/H/L27jJVt7EQUHJ3+bs=
-github.com/caliskanugur/shepherd v0.0.0-20240808143019-6b3956c340b2/go.mod h1:7qf+6wlqrQ2Bver/WPCFrT6ZnC0V3KLllOmd1pr8Was=
+github.com/caliskanugur/shepherd v0.0.0-20240808203234-e86587838e4d h1:w7sZGJXBkZYqMJSxdFCm7tOKmRq2Ry2Jn5aUbhmeyvQ=
+github.com/caliskanugur/shepherd v0.0.0-20240808203234-e86587838e4d/go.mod h1:7qf+6wlqrQ2Bver/WPCFrT6ZnC0V3KLllOmd1pr8Was=
 github.com/cenkalti/backoff/v4 v4.1.1/go.mod h1:scbssz8iZGpm3xbr14ovlUdkxfGXNInqkPWOWmG2CLw=
 github.com/cenkalti/backoff/v4 v4.2.1 h1:y4OZtCnogmCPw98Zjyt5a6+QwPLGkiQsYW5oUqylYbM=
 github.com/cenkalti/backoff/v4 v4.2.1/go.mod h1:Y3VNntkOUPxTVeUxJ/G5vcM//AlwfmyYozVcomhLiZE=
