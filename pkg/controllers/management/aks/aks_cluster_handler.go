@@ -341,7 +341,7 @@ func (e *aksOperatorController) generateAndSetServiceAccount(cluster *apimgmtv3.
 	}
 
 	restConfig.Dial = clusterDialer
-	saToken, err := clusteroperator.GenerateSAToken(restConfig)
+	saToken, err := clusteroperator.GenerateSAToken(restConfig, cluster.Name)
 	if err != nil {
 		return cluster, fmt.Errorf("error generating service account token: %v", err)
 	}
@@ -422,7 +422,7 @@ func (e *aksOperatorController) generateSATokenWithPublicAPI(cluster *apimgmtv3.
 		Timeout:   30 * time.Second,
 		KeepAlive: 30 * time.Second,
 	}).DialContext
-	serviceToken, err := clusteroperator.GenerateSAToken(restConfig)
+	serviceToken, err := clusteroperator.GenerateSAToken(restConfig, cluster.Name)
 	if err != nil {
 		*requiresTunnel = true
 		var dnsError *net.DNSError
