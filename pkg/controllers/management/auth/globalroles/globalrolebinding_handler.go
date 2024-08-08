@@ -188,7 +188,7 @@ func (grb *globalRoleBindingLifecycle) Updated(obj *v3.GlobalRoleBinding) (runti
 		grb.reconcileClusterPermissions(obj),
 		grb.reconcileGlobalRoleBinding(obj),
 		grb.reconcileNamespacedRoleBindings(obj),
-		grb.fleetPermissionsHandler.reconcileFleetWorkspacePermissionsBindings(obj),
+		grb.reconcileFleetWorkspacePermissionsBindings(obj),
 	)
 	if returnError == nil {
 		err = grb.setGRBAsCompleted(obj)
