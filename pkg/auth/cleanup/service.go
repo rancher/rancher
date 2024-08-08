@@ -206,7 +206,7 @@ func (s *Service) deleteTokens(config *v3.AuthConfig) error {
 		if t.AuthProvider == config.Name {
 			err := s.tokensClient.Delete(t.Name, &metav1.DeleteOptions{})
 			if err != nil && !apierrors.IsNotFound(err) {
-				return fmt.Errorf("cleaning up authprovider %s: %w", t.AuthProvider, err)
+				return fmt.Errorf("failed deleting token %s while disabling authprovider %s: %w", t.Name, t.AuthProvider, err)
 			}
 		}
 	}
