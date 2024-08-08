@@ -215,9 +215,12 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 			return nil, apierrors.NewNotFound(schema.GroupResource{}, name)
 		}
 
+		refresher.calledTimes.Store(0)
+
 		resp, err := authenticator.Authenticate(req)
 		require.NoError(t, err)
 		<-refresher.done // Wait for the provider refresh to finish.
+		assert.Equal(t, int32(1), refresher.calledTimes.Load())
 
 		require.NotNil(t, resp)
 		assert.True(t, resp.IsAuthed)
@@ -232,9 +235,7 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 
 		resp, err := authenticator.Authenticate(req)
 		require.NoError(t, err)
-
-		refresherCalledTimes := refresher.calledTimes.Load()
-		assert.Equal(t, int32(0), refresherCalledTimes)
+		assert.Equal(t, int32(0), refresher.calledTimes.Load())
 
 		require.NotNil(t, resp)
 		assert.True(t, resp.IsAuthed)
@@ -259,9 +260,7 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 
 		resp, err := authenticator.Authenticate(req)
 		require.NoError(t, err)
-
-		refresherCalledTimes := refresher.calledTimes.Load()
-		assert.Equal(t, int32(0), refresherCalledTimes)
+		assert.Equal(t, int32(0), refresher.calledTimes.Load())
 
 		require.NotNil(t, resp)
 		assert.True(t, resp.IsAuthed)

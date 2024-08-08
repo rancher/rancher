@@ -161,7 +161,7 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 	}
 	groups = append(groups, user.AllAuthenticated, "system:cattle:authenticated")
 
-	if !authUser.IsSystem() || !strings.HasPrefix(token.UserID, "system:") {
+	if !(authUser.IsSystem() || strings.HasPrefix(token.UserID, "system:")) {
 		go a.userAuthRefresher.TriggerUserRefresh(token.UserID, false)
 	}
 
