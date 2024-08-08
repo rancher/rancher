@@ -38,7 +38,7 @@ runs:
         echo "CATTLE_K3S_VERSION=$(grep -m1 'ENV CATTLE_K3S_VERSION' package/Dockerfile | awk '{print $3}')" >> $GITHUB_OUTPUT
         echo "HELM_VERSION=$(grep -m1 'ENV HELM_VERSION' package/Dockerfile | awk '{print $3}')" >> $GITHUB_OUTPUT
         echo "CATTLE_HELM_VERSION=$(grep -m1 'ENV CATTLE_HELM_VERSION' package/Dockerfile | awk '{print $3}')" >> $GITHUB_OUTPUT
-        echo "CATTLE_HELM_VERSION=$(grep -m1 'ENV HELM_UNITTEST_VERSION' Dockerfile.dapper | awk '{print $3}')" >> $GITHUB_OUTPUT
+        echo "HELM_UNITTEST_VERSION=$(grep -m1 'ENV HELM_UNITTEST_VERSION' Dockerfile.dapper | awk '{print $3}')" >> $GITHUB_OUTPUT
         RKE_VERSION=$(grep -m1 'github.com/rancher/rke' go.mod | awk '{print $2}')
         if [[ -z "$RKE_VERSION" ]]; then
           RKE_VERSION=$(grep -m1 'github.com/rancher/rke' go.mod | awk '{print $4}')
