@@ -1521,8 +1521,8 @@ github.com/rancher/channelserver v0.6.1-0.20240212155841-07630c8295da h1:M7p9bmF
 github.com/rancher/channelserver v0.6.1-0.20240212155841-07630c8295da/go.mod h1:DuOeweH+bHP22OVq7mgQwDMVJjMmPNn8WzF1IHAU39U=
 github.com/rancher/cis-operator v1.0.11 h1:3fOkwk45no0S9NaGFYgIINqxjBChqvvGhXWY/ZPGGDM=
 github.com/rancher/cis-operator v1.0.11/go.mod h1:tSfpBeEcxYizMRT+rPtvQebJ5CcSJCKL9LW16Zdm7Zc=
-github.com/rancher/client-go v1.28.6-rancher1 h1:nSoGKs12BuPviZtzemO7wTX8jxABaLqfYKFLRBV8MI0=
-github.com/rancher/client-go v1.28.6-rancher1/go.mod h1:+nu0Yp21Oeo/cBCsprNVXB2BfJTV51lFfe5tXl2rUL8=
+github.com/rancher/client-go v1.28.6-rancher1.0.20240808092930-f8daebb090f0 h1:qXrd0EAgla0VhCGMmc15QZM9yr5KiBAQ+D4PuNFQKnA=
+github.com/rancher/client-go v1.28.6-rancher1.0.20240808092930-f8daebb090f0/go.mod h1:+nu0Yp21Oeo/cBCsprNVXB2BfJTV51lFfe5tXl2rUL8=
 github.com/rancher/dynamiclistener v0.4.0 h1:1bOlH4uzD5BPQ8fo2FeiWxiMp87ppwmyc2uYxN2z1kc=
 github.com/rancher/dynamiclistener v0.4.0/go.mod h1:Y+VdjQH9KQGE97uMwYEWqNN6puFQ17aBemIjVLYdlD8=
 github.com/rancher/eks-operator v1.3.3 h1:fST9aIplL54uebHoCD6PqEYGATKx47OMg42HEl/cHEg=
