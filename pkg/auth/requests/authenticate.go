@@ -54,11 +54,15 @@ func ToAuthMiddleware(a Authenticator) auth.Middleware {
 	return auth.ToMiddleware(auth.AuthenticatorFunc(f))
 }
 
-type ClusterRouter func(req *http.Request) string
+type (
+	ClusterRouter func(req *http.Request) string
+	userRefresher func(string, bool)
+)
 
 func NewAuthenticator(ctx context.Context, clusterRouter ClusterRouter, mgmtCtx *config.ScaledContext) Authenticator {
 	tokenInformer := mgmtCtx.Management.Tokens("").Controller().Informer()
 	tokenInformer.AddIndexers(map[string]cache.IndexFunc{tokenKeyIndex: tokenKeyIndexer})
+	providerRefresher := providerrefresh.NewUserAuthRefresher(ctx, mgmtCtx)
 
 	return &tokenAuthenticator{
 		ctx:                 ctx,
@@ -68,7 +72,9 @@ func NewAuthenticator(ctx context.Context, clusterRouter ClusterRouter, mgmtCtx 
 		userAttributes:      mgmtCtx.Management.UserAttributes(""),
 		userLister:          mgmtCtx.Management.Users("").Controller().Lister(),
 		clusterRouter:       clusterRouter,
-		userAuthRefresher:   providerrefresh.NewUserAuthRefresher(ctx, mgmtCtx),
+		refreshUser: func(userID string, force bool) {
+			go providerRefresher.TriggerUserRefresh(userID, force)
+		},
 	}
 }
 
@@ -80,7 +86,7 @@ type tokenAuthenticator struct {
 	userAttributeLister v3.UserAttributeLister
 	userLister          v3.UserLister
 	clusterRouter       ClusterRouter
-	userAuthRefresher   providerrefresh.UserAuthRefresher
+	refreshUser         userRefresher
 }
 
 const (
@@ -162,7 +168,7 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 	groups = append(groups, user.AllAuthenticated, "system:cattle:authenticated")
 
 	if !(authUser.IsSystem() || strings.HasPrefix(token.UserID, "system:")) {
-		go a.userAuthRefresher.TriggerUserRefresh(token.UserID, false)
+		a.refreshUser(token.UserID, false)
 	}
 
 	authResp.IsAuthed = true

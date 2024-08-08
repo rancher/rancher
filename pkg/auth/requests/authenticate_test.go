@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -13,6 +12,7 @@ import (
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
+	"github.com/rancher/rancher/pkg/clusterrouter"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	mgmtFakes "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	"github.com/stretchr/testify/assert"
@@ -24,22 +24,22 @@ import (
 	"k8s.io/utils/pointer"
 )
 
-type fakeUserAuthRefresherArgs struct {
+type fakeUserRefresher struct {
+	called bool
 	userID string
 	force  bool
 }
-type fakeUserAuthRefresher struct {
-	calledTimes atomic.Int32
-	done        chan fakeUserAuthRefresherArgs
+
+func (r *fakeUserRefresher) refreshUser(userID string, force bool) {
+	r.called = true
+	r.userID = userID
+	r.force = force
 }
 
-func (*fakeUserAuthRefresher) TriggerAllUserRefresh() {}
-func (r *fakeUserAuthRefresher) TriggerUserRefresh(userID string, force bool) {
-	r.calledTimes.Add(1)
-	r.done <- fakeUserAuthRefresherArgs{
-		userID: userID,
-		force:  force,
-	}
+func (r *fakeUserRefresher) reset() {
+	r.called = false
+	r.userID = ""
+	r.force = false
 }
 
 type fakeProvider struct {
@@ -175,29 +175,25 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 		},
 	}
 
-	refresher := &fakeUserAuthRefresher{
-		done: make(chan fakeUserAuthRefresherArgs),
-	}
+	userRefresher := &fakeUserRefresher{}
 
 	authenticator := tokenAuthenticator{
 		ctx:                 context.Background(),
 		tokenIndexer:        mockIndexer,
 		userAttributeLister: userAttributeLister,
 		userLister:          userLister,
-		userAuthRefresher:   refresher,
+		clusterRouter:       clusterrouter.GetClusterID,
+		refreshUser:         userRefresher.refreshUser,
 	}
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/namespaces", nil)
 	req.Header.Set("Authorization", "Bearer "+token.Name+":"+token.Token)
 
-	t.Run("authenticated", func(t *testing.T) {
+	t.Run("authenticate", func(t *testing.T) {
+		userRefresher.reset()
+
 		resp, err := authenticator.Authenticate(req)
 		require.NoError(t, err)
-		refresherArgs := <-refresher.done // Wait for the provider refresh to finish.
-		assert.Equal(t, int32(1), refresher.calledTimes.Load())
-		assert.Equal(t, userID, refresherArgs.userID)
-		assert.False(t, refresherArgs.force)
-
 		require.NotNil(t, resp)
 		assert.True(t, resp.IsAuthed)
 		assert.Equal(t, userID, resp.User)
@@ -206,24 +202,43 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 		assert.Contains(t, resp.Groups, "system:cattle:authenticated")
 		assert.Contains(t, resp.Extras[common.UserAttributePrincipalID], fakeProvider.name+"_user://12345")
 		assert.Contains(t, resp.Extras[common.UserAttributeUserName], "fake-user")
+		assert.True(t, userRefresher.called)
+		assert.Equal(t, userID, userRefresher.userID)
+		assert.False(t, userRefresher.force)
 	})
 
-	t.Run("authenticated if userattribute doesn't exist", func(t *testing.T) {
+	t.Run("authenticate with a cluster specific token", func(t *testing.T) {
+		clusterID := "c-955nj"
+		oldTokenClusterName := token.ClusterName
+		defer func() { token.ClusterName = oldTokenClusterName }()
+		token.ClusterName = clusterID
+
+		clusterReq := httptest.NewRequest(http.MethodGet, "/k8s/clusters/"+clusterID+"/v1/management.cattle.io.authconfigs", nil)
+		clusterReq.Header.Set("Authorization", "Bearer "+token.Name+":"+token.Token)
+
+		userRefresher.reset()
+
+		resp, err := authenticator.Authenticate(clusterReq)
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		assert.True(t, resp.IsAuthed)
+		assert.True(t, userRefresher.called)
+	})
+
+	t.Run("authenticate if userattribute doesn't exist", func(t *testing.T) {
 		oldGetUserAttributeFunc := userAttributeLister.GetFunc
 		defer func() { userAttributeLister.GetFunc = oldGetUserAttributeFunc }()
 		userAttributeLister.GetFunc = func(namespace, name string) (*v3.UserAttribute, error) {
 			return nil, apierrors.NewNotFound(schema.GroupResource{}, name)
 		}
 
-		refresher.calledTimes.Store(0)
+		userRefresher.reset()
 
 		resp, err := authenticator.Authenticate(req)
 		require.NoError(t, err)
-		<-refresher.done // Wait for the provider refresh to finish.
-		assert.Equal(t, int32(1), refresher.calledTimes.Load())
-
 		require.NotNil(t, resp)
 		assert.True(t, resp.IsAuthed)
+		assert.True(t, userRefresher.called)
 	})
 
 	t.Run("provider refresh is not called if token user id has system prefix", func(t *testing.T) {
@@ -231,14 +246,13 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 		defer func() { token.UserID = oldTokenUserID }()
 		token.UserID = "system://provisioning/fleet-local/local"
 
-		refresher.calledTimes.Store(0)
+		userRefresher.reset()
 
 		resp, err := authenticator.Authenticate(req)
 		require.NoError(t, err)
-		assert.Equal(t, int32(0), refresher.calledTimes.Load())
-
 		require.NotNil(t, resp)
 		assert.True(t, resp.IsAuthed)
+		assert.False(t, userRefresher.called)
 	})
 
 	t.Run("provider refresh is not called for system users", func(t *testing.T) {
@@ -256,22 +270,40 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 			}, nil
 		}
 
-		refresher.calledTimes.Store(0)
+		userRefresher.reset()
 
 		resp, err := authenticator.Authenticate(req)
 		require.NoError(t, err)
-		assert.Equal(t, int32(0), refresher.calledTimes.Load())
-
 		require.NotNil(t, resp)
 		assert.True(t, resp.IsAuthed)
+		assert.False(t, userRefresher.called)
 	})
 
-	t.Run("token disabled", func(t *testing.T) {
+	t.Run("token is disabled", func(t *testing.T) {
 		oldTokenEnabled := token.Enabled
 		defer func() { token.Enabled = oldTokenEnabled }()
 		token.Enabled = pointer.BoolPtr(false)
 
+		userRefresher.reset()
+
 		resp, err := authenticator.Authenticate(req)
+		require.Error(t, err)
+		require.Nil(t, resp)
+		assert.False(t, userRefresher.called)
+	})
+
+	t.Run("cluster ID doesn't match", func(t *testing.T) {
+		clusterID := "c-955nj"
+		oldTokenClusterName := token.ClusterName
+		defer func() { token.ClusterName = oldTokenClusterName }()
+		token.ClusterName = clusterID
+
+		clusterReq := httptest.NewRequest(http.MethodGet, "/k8s/clusters/c-unknown/v1/management.cattle.io.authconfigs", nil)
+		clusterReq.Header.Set("Authorization", "Bearer "+token.Name+":"+token.Token)
+
+		userRefresher.reset()
+
+		resp, err := authenticator.Authenticate(clusterReq)
 		require.Error(t, err)
 		require.Nil(t, resp)
 	})
@@ -283,12 +315,15 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 			return nil, apierrors.NewNotFound(schema.GroupResource{}, name)
 		}
 
+		userRefresher.reset()
+
 		resp, err := authenticator.Authenticate(req)
 		require.Error(t, err)
 		require.Nil(t, resp)
+		assert.False(t, userRefresher.called)
 	})
 
-	t.Run("user disabled", func(t *testing.T) {
+	t.Run("user is disabled", func(t *testing.T) {
 		oldGetUserFunc := userLister.GetFunc
 		defer func() { userLister.GetFunc = oldGetUserFunc }()
 		userLister.GetFunc = func(namespace, name string) (*v3.User, error) {
@@ -300,9 +335,12 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 			}, nil
 		}
 
+		userRefresher.reset()
+
 		resp, err := authenticator.Authenticate(req)
 		require.Error(t, err)
 		require.Nil(t, resp)
+		assert.False(t, userRefresher.called)
 	})
 
 	t.Run("error getting userattribute", func(t *testing.T) {
@@ -312,19 +350,25 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 			return nil, fmt.Errorf("some error")
 		}
 
+		userRefresher.reset()
+
 		resp, err := authenticator.Authenticate(req)
 		require.Error(t, err)
 		require.Nil(t, resp)
+		assert.False(t, userRefresher.called)
 	})
 
-	t.Run("auth provider disabled", func(t *testing.T) {
+	t.Run("auth provider is disabled", func(t *testing.T) {
 		oldIsDisabled := fakeProvider.disabled
 		defer func() { fakeProvider.disabled = oldIsDisabled }()
 		fakeProvider.disabled = true
 
+		userRefresher.reset()
+
 		resp, err := authenticator.Authenticate(req)
 		require.Error(t, err)
 		require.Nil(t, resp)
+		assert.False(t, userRefresher.called)
 	})
 
 	t.Run("auth provider doesn't exist", func(t *testing.T) {
@@ -332,8 +376,11 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 		token.AuthProvider = "foo"
 		defer func() { token.AuthProvider = oldProvider }()
 
+		userRefresher.reset()
+
 		resp, err := authenticator.Authenticate(req)
 		require.Error(t, err)
 		require.Nil(t, resp)
+		assert.False(t, userRefresher.called)
 	})
 }
