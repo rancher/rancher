@@ -51,9 +51,8 @@ func CreateDeployment(client *rancher.Client, clusterID, namespaceName string, r
 		return nil, err
 	}
 
-	charts.WatchAndWaitDeployments(client, clusterID, namespaceName, metav1.ListOptions{
+	err = charts.WatchAndWaitDeployments(client, clusterID, namespaceName, metav1.ListOptions{
 		FieldSelector: "metadata.name=" + createdDeployment.Name,
 	})
-
-	return createdDeployment, nil
+	return createdDeployment, err
 }
