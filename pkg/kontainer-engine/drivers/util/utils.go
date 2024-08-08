@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/rancher/rancher/pkg/serviceaccounttoken"
+	"github.com/rancher/rancher/pkg/utils"
 	rketypes "github.com/rancher/rke/types"
 	"gopkg.in/yaml.v2"
 	v1 "k8s.io/api/core/v1"
@@ -25,7 +26,7 @@ const (
 )
 
 // GenerateServiceAccountToken generate a serviceAccountToken for clusterAdmin given a rest clientset
-func GenerateServiceAccountToken(clientset kubernetes.Interface) (string, error) {
+func GenerateServiceAccountToken(clientset kubernetes.Interface, clusterName string) (string, error) {
 	_, err := clientset.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: cattleNamespace,
@@ -95,7 +96,7 @@ func GenerateServiceAccountToken(clientset kubernetes.Interface) (string, error)
 	if serviceAccount, err = clientset.CoreV1().ServiceAccounts(cattleNamespace).Get(context.Background(), serviceAccount.Name, metav1.GetOptions{}); err != nil {
 		return "", fmt.Errorf("error getting service account: %w", err)
 	}
-	secret, err := serviceaccounttoken.EnsureSecretForServiceAccount(context.Background(), nil, clientset, serviceAccount, "")
+	secret, err := serviceaccounttoken.EnsureSecretForServiceAccount(context.Background(), nil, clientset, serviceAccount, utils.FormatPrefix(clusterName))
 	if err != nil {
 		return "", fmt.Errorf("error ensuring secret for service account: %w", err)
 	}

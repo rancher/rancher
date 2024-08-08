@@ -163,7 +163,7 @@ func (d *Driver) PostCheck(ctx context.Context, info *types.ClusterInfo) (*types
 		return nil, fmt.Errorf("failed to get Kubernetes server version: %v", err)
 	}
 
-	info.ServiceAccountToken, err = util.GenerateServiceAccountToken(clientset)
+	info.ServiceAccountToken, err = util.GenerateServiceAccountToken(clientset, "")
 
 	if err != nil {
 		return nil, err
