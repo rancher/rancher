@@ -13,6 +13,7 @@ import (
 	"github.com/rancher/rancher/pkg/ext/resources/types"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metainternalversionscheme "k8s.io/apimachinery/pkg/apis/meta/internalversion/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -147,12 +148,14 @@ func (s *StoreDelegate[T, DerefT, TList]) WebService(resource string, isNamespac
 
 func (s *StoreDelegate[T, DerefT, TList]) Delegate(w http.ResponseWriter, req *http.Request, namespace string) error {
 	defer func() {
+		// XXX: Until https://github.com/rancher/dynamiclistener/pull/118 is fixed
 		if r := recover(); r != nil {
 			fmt.Println(r)
 			fmt.Println("stacktrace from panic: \n" + string(debug.Stack()))
 		}
 	}()
 
+	// TODO: Remove once we do auth
 	ctx := request.WithUser(req.Context(), &user.DefaultInfo{
 		Name:   "admin",
 		Groups: []string{"system:masters"},
@@ -178,6 +181,7 @@ func (s *StoreDelegate[T, DerefT, TList]) Delegate(w http.ResponseWriter, req *h
 		}
 		return s.writeOkResponse(w, req, status)
 	case http.MethodGet:
+		// XXX: StoreDelegate doesn't support namespaced resources
 		name, _, err := s.resourceNameAndNamespace(req)
 		if err != nil {
 			return err
@@ -189,10 +193,15 @@ func (s *StoreDelegate[T, DerefT, TList]) Delegate(w http.ResponseWriter, req *h
 			}
 			return s.writeOkResponse(w, req, resource)
 		}
+
+		listOptions := &metav1.ListOptions{}
+		err = metainternalversionscheme.ParameterCodec.DecodeParameters(req.URL.Query(), metav1.SchemeGroupVersion, listOptions)
+		if err != nil {
+			return err
+		}
+
 		if req.URL.Query().Get("watch") == "true" {
-			resultCh, err := s.Store.Watch(userInfo, metav1.ListOptions{
-				ResourceVersion: req.URL.Query().Get("resourceVersion"),
-			})
+			resultCh, err := s.Store.Watch(userInfo, listOptions)
 			if err != nil {
 				return fmt.Errorf("unable to watch: %w", err)
 			}

@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
-	"strings"
 
 	"agones.dev/agones/pkg/util/https"
 	"agones.dev/agones/pkg/util/runtime"
@@ -33,7 +32,9 @@ import (
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/endpoints/openapi"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	kmux "k8s.io/apiserver/pkg/server/mux"
 	"k8s.io/apiserver/pkg/server/routes"
@@ -82,6 +83,8 @@ type APIServer struct {
 	// container is used to build all the routes that will be added in the
 	// OpenAPI V2 and V3 documents
 	container *restful.Container
+
+	requestInfoFactory request.RequestInfoFactory
 }
 
 // NewAPIServer returns a new API Server from the given Mux.
@@ -111,6 +114,8 @@ func NewAPIServer(getDefinitions openapicommon.GetOpenAPIDefinitions) *APIServer
 
 		openAPIRoutes: oapiRoutes,
 		container:     restful.NewContainer(),
+
+		requestInfoFactory: request.RequestInfoFactory{APIPrefixes: sets.NewString("apis", "api"), GrouplessAPIPrefixes: sets.NewString("api")},
 	}
 	s.logger = runtime.NewLoggerWithType(s)
 	s.logger.Debug("API Server Started")
@@ -150,13 +155,11 @@ func (s *APIServer) RegisterRoutes(router *gmux.Router) {
 		pattern = fmt.Sprintf("/apis/%s/namespaces/", groupVersion)
 		s.logger.Info("Adding handler for path", pattern)
 		router.PathPrefix(pattern).HandlerFunc(https.ErrorHTTPHandler(s.logger, s.namespacedResourceHandler(groupVersion)))
-		//router.HandleFunc(pattern, https.ErrorHTTPHandler(s.logger, s.namespacedResourceHandler(groupVersion)))
 		s.logger.WithField("groupversion", groupVersion.String()).WithField("pattern", pattern).WithField("namespaced", "true").Info("Adding Resource Handler")
 
 		pattern = fmt.Sprintf("/apis/%s/", groupVersion)
 		s.logger.Info("Adding handler for path", pattern)
 		router.PathPrefix(pattern).HandlerFunc(https.ErrorHTTPHandler(s.logger, s.resourceHandler(groupVersion)))
-		//router.HandleFunc(pattern, https.ErrorHTTPHandler(s.logger, s.resourceHandler(groupVersion)))
 		s.logger.WithField("groupversion", groupVersion.String()).WithField("pattern", pattern).WithField("namespaced", "false").Info("Adding Resource Handler")
 	}
 	router.Walk(func(route *gmux.Route, router *gmux.Router, ancestors []*gmux.Route) error {
@@ -206,12 +209,14 @@ func (as *APIServer) AddAPIResource(groupVersion schema.GroupVersion, resource m
 // namespacedResourceHandler handles namespaced resource calls, and sends them to the appropriate CRDHandler delegate
 func (as *APIServer) namespacedResourceHandler(groupVersion schema.GroupVersion) https.ErrorHandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) error {
-		logrus.Errorf("namespaced got a request for path: %s", r.URL.Path)
-		namespace, resource, err := splitNamespaceResource(r.URL.Path)
+		info, err := as.requestInfoFactory.NewRequestInfo(r)
 		if err != nil {
-			https.FourZeroFour(as.logger.WithError(err), w, r)
+			http.Error(w, "bad request", http.StatusBadRequest)
 			return nil
 		}
+
+		resource := info.Resource
+		namespace := info.Namespace
 
 		gvr := schema.GroupVersionResource{
 			Group:    groupVersion.Group,
@@ -235,13 +240,13 @@ func (as *APIServer) namespacedResourceHandler(groupVersion schema.GroupVersion)
 // Cluster: /apis/tomlebreux.com/v1/<resource>
 func (as *APIServer) resourceHandler(groupVersion schema.GroupVersion) https.ErrorHandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) error {
-		logrus.Errorf("got a request for path: %s", r.URL.Path)
-		resource, err := splitResource(r.URL.Path)
+		info, err := as.requestInfoFactory.NewRequestInfo(r)
 		if err != nil {
-			https.FourZeroFour(as.logger.WithError(err), w, r)
+			http.Error(w, "bad request", http.StatusBadRequest)
 			return nil
 		}
 
+		resource := info.Resource
 		gvr := schema.GroupVersionResource{
 			Group:    groupVersion.Group,
 			Version:  groupVersion.Version,
@@ -316,30 +321,4 @@ func AcceptedSerializer(r *http.Request, codecs serializer.CodecFactory) (k8srun
 	}
 
 	return info, nil
-}
-
-// splitNameSpaceResource returns the namespace and the type of resource
-func splitNamespaceResource(path string) (string, string, error) {
-	list := strings.Split(strings.Trim(path, "/"), "/")
-	if len(list) < 4 {
-		return "", "", errors.Errorf("could not find namespace and resource in path: %s", path)
-	}
-	last := list[3:]
-
-	if last[0] != "namespaces" {
-		return "", "", errors.Errorf("wrong format in path: %s", path)
-	}
-
-	return last[1], last[2], nil
-}
-
-// Cluster: /apis/tomlebreux.com/v1/<resource>
-func splitResource(path string) (string, error) {
-	list := strings.Split(strings.Trim(path, "/"), "/")
-	if len(list) < 4 {
-		return "", errors.Errorf("could not find resource in path: %s", path)
-	}
-	last := list[len(list)-1:]
-
-	return last[0], nil
 }

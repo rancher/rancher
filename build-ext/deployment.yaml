@@ -22,7 +22,8 @@ spec:
         image: local/api-extension:dev
         imagePullPolicy: IfNotPresent
         ports:
-        - containerPort: 5555
+        # Port forward port
+        - containerPort: 5554
 ---
 apiVersion: v1
 kind: Service
@@ -34,8 +35,8 @@ spec:
     app: api-extension
   ports:
   - protocol: TCP
-    port: 5555
-    targetPort: 5555
+    port: 5554
+    targetPort: 5554
 ---
 apiVersion: v1
 kind: ServiceAccount
