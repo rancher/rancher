@@ -449,7 +449,7 @@ func (e *eksOperatorController) generateAndSetServiceAccount(cluster *mgmtv3.Clu
 		return cluster, err
 	}
 
-	saToken, err := clusteroperator.GenerateSAToken(restConfig)
+	saToken, err := clusteroperator.GenerateSAToken(restConfig, cluster.Name)
 	if err != nil {
 		return cluster, err
 	}
@@ -529,7 +529,7 @@ func (e *eksOperatorController) generateSATokenWithPublicAPI(cluster *mgmtv3.Clu
 	}
 
 	requiresTunnel := new(bool)
-	serviceToken, err := clusteroperator.GenerateSAToken(restConfig)
+	serviceToken, err := clusteroperator.GenerateSAToken(restConfig, cluster.Name)
 	if err != nil {
 		*requiresTunnel = true
 		var dnsError *net.DNSError

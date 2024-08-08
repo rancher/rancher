@@ -166,13 +166,13 @@ func (e *OperatorController) CheckCrdReady(cluster *mgmtv3.Cluster, clusterType 
 	return cluster, nil
 }
 
-func GenerateSAToken(restConfig *rest.Config) (string, error) {
+func GenerateSAToken(restConfig *rest.Config, clusterName string) (string, error) {
 	clientSet, err := kubernetes.NewForConfig(restConfig)
 	if err != nil {
-		return "", fmt.Errorf("error creating clientset: %v", err)
+		return "", fmt.Errorf("error creating clientset for cluster %s: %v", clusterName, err)
 	}
 
-	return util.GenerateServiceAccountToken(clientSet)
+	return util.GenerateServiceAccountToken(clientSet, clusterName)
 }
 
 func addAdditionalCA(secretsCache wranglerv1.SecretCache, caCert string) (string, error) {
