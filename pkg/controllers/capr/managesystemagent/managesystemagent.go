@@ -213,6 +213,19 @@ func installer(cluster *rancherv1.Cluster, secretName string) []runtime.Object {
 		})
 	}
 
+	switch capr.GetRuntime(cluster.Spec.KubernetesVersion) {
+	case capr.RuntimeRKE2:
+		env = append(env, corev1.EnvVar{
+			Name:  capr.SystemAgentFallbackPathEnvVar,
+			Value: "/opt/rke2/bin",
+		})
+	default:
+		env = append(env, corev1.EnvVar{
+			Name:  capr.SystemAgentFallbackPathEnvVar,
+			Value: "/opt/bin",
+		})
+	}
+
 	plan := &upgradev1.Plan{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Plan",

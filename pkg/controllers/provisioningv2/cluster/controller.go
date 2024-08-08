@@ -329,6 +329,19 @@ func (h *handler) createNewCluster(cluster *v1.Cluster, status v1.ClusterStatus,
 		}
 	}
 
+	switch capr.GetRuntime(cluster.Spec.KubernetesVersion) {
+	case capr.RuntimeRKE2:
+		spec.AgentEnvVars = append(spec.AgentEnvVars, corev1.EnvVar{
+			Name:  capr.SystemAgentFallbackPathEnvVar,
+			Value: "/opt/rke2/bin",
+		})
+	default:
+		spec.AgentEnvVars = append(spec.AgentEnvVars, corev1.EnvVar{
+			Name:  capr.SystemAgentFallbackPathEnvVar,
+			Value: "/opt/bin",
+		})
+	}
+
 	if cluster.Spec.ClusterAgentDeploymentCustomization != nil {
 		clusterAgentCustomizationCopy := cluster.Spec.ClusterAgentDeploymentCustomization.DeepCopy()
 		spec.ClusterAgentDeploymentCustomization = &v3.AgentDeploymentCustomization{
