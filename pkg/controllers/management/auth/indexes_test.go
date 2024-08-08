@@ -2,6 +2,7 @@ package auth
 
 import (
 	"reflect"
+	"sort"
 	"testing"
 
 	v1 "k8s.io/api/rbac/v1"
@@ -263,6 +264,10 @@ func Test_rbObjectKeys(t *testing.T) {
 				t.Errorf("rbObjectKeys() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
+
+			// sort values to ensure their order
+			// this will make the test deterministic
+			sort.Strings(got)
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("rbObjectKeys() = %v, want %v", got, tt.want)
 			}
