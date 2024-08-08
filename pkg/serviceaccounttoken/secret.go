@@ -114,13 +114,13 @@ func EnsureSecretForServiceAccount(ctx context.Context, secretsCache corecontrol
 			return false, fmt.Errorf("error ensuring secret for service account [%s:%s]: %w", sa.Namespace, sa.Name, err)
 		}
 		if len(secret.Data[corev1.ServiceAccountTokenKey]) > 0 {
-			logrus.Infof("EnsureSecretForServiceAccount: got the service account token for service account [%s:%s] in %s", sa.GetNamespace(), sa.GetName(), time.Now().Sub(start))
+			logrus.Infof("EnsureSecretForServiceAccount: got the service account token for service account [%s:%s] in %s %s ", sa.GetNamespace(), sa.GetName(), time.Now().Sub(start), lockPrefix)
 			return true, nil
 		}
 		return false, nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("error ensuring secret for service account [%s:%s]: %w", sa.Namespace, sa.Name, err)
+		return nil, err // err is already wapped inside the Wait.
 	}
 
 	return secret, nil
