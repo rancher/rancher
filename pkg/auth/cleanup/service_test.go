@@ -75,7 +75,7 @@ func TestRunCleanup(t *testing.T) {
 		},
 	}
 
-	var tokensStore = map[string]*v3.Token{
+	var tokenStore = map[string]*v3.Token{
 		"local-123": {
 			ObjectMeta:   metav1.ObjectMeta{Name: "local-123"},
 			AuthProvider: "local",
@@ -125,7 +125,7 @@ func TestRunCleanup(t *testing.T) {
 		globalRoleBindingStore,
 		projectRoleTemplateBindingStore,
 		clusterRoleTemplateBindingStore,
-		tokensStore,
+		tokenStore,
 		userStore,
 		secretStore,
 	)
@@ -145,6 +145,8 @@ func TestRunCleanup(t *testing.T) {
 	assert.Len(t, projectRoleTemplateBindingStore, 1)
 	assert.Len(t, userStore, 2)
 	assert.Len(t, secretStore, 1)
+	assert.Len(t, tokenStore, 2)
+	assert.Empty(t, tokenStore["azure-123"])
 
 	for _, user := range userStore {
 		require.Lenf(t, user.PrincipalIDs, 1, "every user after cleanup must have only one principal ID, got %d", len(user.PrincipalIDs))
@@ -239,7 +241,7 @@ func newMockCleanupService(t *testing.T,
 	// Setup Token mock client
 	tokenClient := fake.NewMockNonNamespacedClientInterface[*v3.Token, *v3.TokenList](ctrl)
 	tokenClient.EXPECT().Delete(gomock.Any(), gomock.Any()).DoAndReturn(func(name string, _ *metav1.DeleteOptions) error {
-		delete(userStore, name)
+		delete(tokenStore, name)
 		return nil
 	}).AnyTimes()
 
