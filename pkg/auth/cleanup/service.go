@@ -11,7 +11,7 @@ import (
 	controllers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
@@ -32,6 +32,9 @@ type Service struct {
 
 	projectRoleTemplateBindingsCache  controllers.ProjectRoleTemplateBindingCache
 	projectRoleTemplateBindingsClient controllers.ProjectRoleTemplateBindingClient
+
+	tokensCache  controllers.TokenCache
+	tokensClient controllers.TokenClient
 }
 
 // NewCleanupService creates and returns a new auth provider cleanup service.
@@ -50,6 +53,9 @@ func NewCleanupService(secretsInterface corev1.SecretInterface, c controllers.In
 
 		globalRoleBindingsCache:  c.GlobalRoleBinding().Cache(),
 		globalRoleBindingsClient: c.GlobalRoleBinding(),
+
+		tokensCache:  c.Token().Cache(),
+		tokensClient: c.Token(),
 	}
 }
 
@@ -61,19 +67,23 @@ func (s *Service) Run(config *v3.AuthConfig) error {
 	}
 
 	if err := s.deleteGlobalRoleBindings(config); err != nil {
-		return fmt.Errorf("error cleaning up global role bindings: %w", err)
+		return fmt.Errorf("error cleaning up global role bindings associated with a disabled auth provider %s: %w", config.Name, err)
 	}
 
 	if err := s.deleteClusterRoleTemplateBindings(config); err != nil {
-		return fmt.Errorf("error cleaning up cluster role template bindings: %w", err)
+		return fmt.Errorf("error cleaning up cluster role template bindings associated with a disabled auth provider %s: %w", config.Name, err)
 	}
 
 	if err := s.deleteProjectRoleTemplateBindings(config); err != nil {
-		return fmt.Errorf("error cleaning up project role template bindings: %w", err)
+		return fmt.Errorf("error cleaning up project role template bindings associated with a disabled auth provider %s: %w", config.Name, err)
 	}
 
 	if err := s.deleteUsers(config); err != nil {
-		return fmt.Errorf("error cleaning up users: %w", err)
+		return fmt.Errorf("error cleaning up users associated with a disabled auth provider %s: %w", config.Name, err)
+	}
+
+	if err := s.deleteTokens(config); err != nil {
+		return fmt.Errorf("error cleaning up tokens associated with a disabled auth provider %s: %w", config.Name, err)
 	}
 
 	return nil
@@ -91,7 +101,7 @@ func (s *Service) deleteClusterRoleTemplateBindings(config *v3.AuthConfig) error
 	for _, b := range list {
 		providerName := getProviderNameFromPrincipalNames(b.UserPrincipalName, b.GroupPrincipalName)
 		if providerName == config.Name {
-			err := s.clusterRoleTemplateBindingsClient.Delete(b.Namespace, b.Name, &v1.DeleteOptions{})
+			err := s.clusterRoleTemplateBindingsClient.Delete(b.Namespace, b.Name, &metav1.DeleteOptions{})
 			if err != nil && !apierrors.IsNotFound(err) {
 				return err
 			}
@@ -113,7 +123,7 @@ func (s *Service) deleteGlobalRoleBindings(config *v3.AuthConfig) error {
 	for _, b := range list {
 		providerName := getProviderNameFromPrincipalNames(b.GroupPrincipalName)
 		if providerName == config.Name {
-			err := s.globalRoleBindingsClient.Delete(b.Name, &v1.DeleteOptions{})
+			err := s.globalRoleBindingsClient.Delete(b.Name, &metav1.DeleteOptions{})
 			if err != nil && !apierrors.IsNotFound(err) {
 				return err
 			}
@@ -135,7 +145,7 @@ func (s *Service) deleteProjectRoleTemplateBindings(config *v3.AuthConfig) error
 	for _, b := range prtbs {
 		providerName := getProviderNameFromPrincipalNames(b.UserPrincipalName, b.GroupPrincipalName)
 		if providerName == config.Name {
-			err := s.projectRoleTemplateBindingsClient.Delete(b.Namespace, b.Name, &v1.DeleteOptions{})
+			err := s.projectRoleTemplateBindingsClient.Delete(b.Namespace, b.Name, &metav1.DeleteOptions{})
 			if err != nil && !apierrors.IsNotFound(err) {
 				return err
 			}
@@ -166,7 +176,7 @@ func (s *Service) deleteUsers(config *v3.AuthConfig) error {
 		if providerName == config.Name {
 			// A fully external user (who was never local) has no password.
 			if u.Password == "" {
-				err := s.userClient.Delete(u.Name, &v1.DeleteOptions{})
+				err := s.userClient.Delete(u.Name, &metav1.DeleteOptions{})
 				if err != nil && !apierrors.IsNotFound(err) {
 					return err
 				}
@@ -174,6 +184,29 @@ func (s *Service) deleteUsers(config *v3.AuthConfig) error {
 				if err := s.resetLocalUser(u); err != nil {
 					return fmt.Errorf("failed to reset local user: %w", err)
 				}
+			}
+		}
+	}
+
+	return nil
+}
+
+// deleteTokens deletes all the tokens created with the disabled provider
+func (s *Service) deleteTokens(config *v3.AuthConfig) error {
+	if config == nil {
+		return errAuthConfigNil
+	}
+
+	tokens, err := s.tokensCache.List(labels.Everything())
+	if err != nil {
+		return fmt.Errorf("failed to list tokens: %w", err)
+	}
+
+	for _, t := range tokens {
+		if t.AuthProvider == config.Name {
+			err := s.tokensClient.Delete(t.Name, &metav1.DeleteOptions{})
+			if err != nil && !apierrors.IsNotFound(err) {
+				return fmt.Errorf("failed deleting token %s while disabling authprovider %s: %w", t.Name, t.AuthProvider, err)
 			}
 		}
 	}
