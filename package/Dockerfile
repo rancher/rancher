@@ -27,7 +27,7 @@ COPY --from=final / /chroot/
 RUN zypper refresh && \
     zypper --installroot /chroot -n in --no-recommends \
     git-core curl util-linux ca-certificates ca-certificates-mozilla unzip xz gzip sed tar shadow gawk vim-small \
-    netcat-openbsd mkisofs openssh-clients && \
+    netcat-openbsd mkisofs openssh-clients openssl patterns-base-fips && \
     zypper --installroot /chroot clean -a && \
     rm -rf /chroot/var/cache/zypp/* /chroot/var/log/zypp/* /chroot/tmp/* /chroot/var/tmp/* /chroot/usr/share/doc/packages/*
 

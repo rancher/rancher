@@ -36,7 +36,7 @@ COPY --from=final / /chroot/
 RUN zypper refresh && \
     zypper --installroot /chroot -n in --no-recommends \
     curl util-linux ca-certificates ca-certificates-mozilla jq git-core hostname iproute2 vim-small less \
-	bash-completion bind-utils acl openssh-clients tar gzip xz gawk sysstat && \
+	bash-completion bind-utils acl openssh-clients tar gzip xz gawk sysstat openssl patterns-base-fips && \
     zypper --installroot /chroot clean -a && \
     rm -rf /chroot/var/cache/zypp/* /chroot/var/log/zypp/* /chroot/tmp/* /chroot/var/tmp/* /chroot/usr/share/doc/packages/*
 
