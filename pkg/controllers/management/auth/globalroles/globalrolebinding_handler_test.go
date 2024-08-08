@@ -580,11 +580,16 @@ func TestCreateUpdate(t *testing.T) {
 
 	for _, test := range tests {
 		test := test
-		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
-			grbLifecycle := globalRoleBindingLifecycle{}
-			testFuncs := []func(*v3.GlobalRoleBinding) (runtime.Object, error){grbLifecycle.Create, grbLifecycle.Updated}
-			for _, testFunc := range testFuncs {
+		grbLifecycle := globalRoleBindingLifecycle{}
+		testFuncs := []struct {
+			name string
+			fun  func(*v3.GlobalRoleBinding) (runtime.Object, error)
+		} {
+			{"create", grbLifecycle.Create},
+			{"update", grbLifecycle.Updated},
+		}
+		for _, testFunc := range testFuncs {
+			t.Run(testFunc.name + " " + test.name, func(t *testing.T) {
 				ctrl := gomock.NewController(t)
 				crtbCacheMock := fake.NewMockCacheInterface[*v3.ClusterRoleTemplateBinding](ctrl)
 				grListerMock := fakes.GlobalRoleListerMock{}
@@ -627,7 +632,7 @@ func TestCreateUpdate(t *testing.T) {
 				grbLifecycle.crbClient = &crbClientMock
 				grbLifecycle.roleBindingLister = &rbListerMock
 				grbLifecycle.fleetPermissionsHandler = &fphMock
-				res, resErr := testFunc(test.inputBinding)
+				res, resErr := testFunc.fun(test.inputBinding)
 				require.Equal(t, test.wantBinding, reducedGRBOf(res.(*v3.GlobalRoleBinding)))
 				if test.wantError {
 					require.Error(t, resErr)
@@ -637,8 +642,8 @@ func TestCreateUpdate(t *testing.T) {
 				if test.stateAssertions != nil {
 					test.stateAssertions(*state.stateChanges)
 				}
-			}
-		})
+			})
+		}
 	}
 }
 
