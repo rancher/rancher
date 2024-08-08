@@ -3,6 +3,7 @@ package kontainerdrivermetadata
 import (
 	"context"
 	"fmt"
+	"github.com/rancher/rancher/pkg/wrangler"
 	"net/http"
 	"path/filepath"
 	"sync"
@@ -31,6 +32,7 @@ type MetadataController struct {
 	SettingLister        v3.SettingLister
 	Settings             v3.SettingInterface
 	url                  *MetadataURL
+	wranglerContext      *wrangler.Context
 }
 
 type MetadataURL struct {
@@ -59,7 +61,7 @@ var (
 	fileMapData = map[string]bool{}
 )
 
-func Register(ctx context.Context, management *config.ManagementContext) {
+func Register(ctx context.Context, management *config.ManagementContext, wranglerContext *wrangler.Context) {
 	mgmt := management.Management
 
 	m := &MetadataController{
@@ -72,6 +74,7 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 		Addons:               mgmt.RkeAddons(""),
 		SettingLister:        mgmt.Settings("").Controller().Lister(),
 		Settings:             mgmt.Settings(""),
+		wranglerContext:      wranglerContext,
 	}
 
 	mgmt.Settings("").AddHandler(ctx, "rke-metadata-handler", m.sync)
@@ -107,9 +110,14 @@ func (m *MetadataController) sync(key string, setting *v3.Setting) (runtime.Obje
 		return nil, fmt.Errorf("invalid number %v", interval)
 	}
 
-	if interval > 0 {
-		logrus.Infof("Refreshing driverMetadata in %v minutes", interval)
-		m.Settings.Controller().EnqueueAfter(setting.Namespace, setting.Name, time.Minute*time.Duration(interval))
+	// Enqueue refresh only on the Leader pod
+	if m.wranglerContext.PeerManager != nil {
+		if m.wranglerContext.PeerManager.IsLeader() {
+			if interval > 0 {
+				logrus.Infof("Refreshing driverMetadata in %v minutes", interval)
+				m.Settings.Controller().EnqueueAfter(setting.Namespace, setting.Name, time.Minute*time.Duration(interval))
+			}
+		}
 	}
 
 	// refresh to sync k3s/rke2 releases

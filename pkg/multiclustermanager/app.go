@@ -2,6 +2,7 @@ package multiclustermanager
 
 import (
 	"context"
+	"github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
 	"net/http"
 	"os"
 	"sync"
@@ -175,6 +176,7 @@ func (m *mcm) Middleware(next http.Handler) http.Handler {
 func (m *mcm) Start(ctx context.Context) error {
 	var (
 		management *config.ManagementContext
+		err        error
 	)
 
 	if dm := os.Getenv("CATTLE_DEV_MODE"); dm == "" {
@@ -187,17 +189,13 @@ func (m *mcm) Start(ctx context.Context) error {
 		}
 	}
 
+	management, err = m.ScaledContext.NewManagementContext()
+	if err != nil {
+		return errors.Wrap(err, "failed to create management context")
+	}
+
 	m.wranglerContext.OnLeader(func(ctx context.Context) error {
 		err := m.wranglerContext.StartWithTransaction(ctx, func(ctx context.Context) error {
-			var (
-				err error
-			)
-
-			management, err = m.ScaledContext.NewManagementContext()
-			if err != nil {
-				return errors.Wrap(err, "failed to create management context")
-			}
-
 			if err := managementdata.Add(ctx, m.wranglerContext, management); err != nil {
 				return errors.Wrap(err, "failed to add management data")
 			}
@@ -227,6 +225,9 @@ func (m *mcm) Start(ctx context.Context) error {
 		logrus.Infof("Rancher startup complete")
 		return nil
 	})
+
+	// Keep KDM handlers out of the above OnLeader block because we need KDM handlers running on each Rancher replica
+	kontainerdrivermetadata.Register(ctx, management, m.wranglerContext)
 
 	return nil
 }
