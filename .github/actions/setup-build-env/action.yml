@@ -14,11 +14,8 @@ outputs:
     description: "HELM_VERSION from package/Dockerfile"
     value: ${{ steps.vars.outputs.HELM_VERSION }}
   HELM_UNITTEST_VERSION: 
-    description: "HELM_UNITTEST_VERSION"
-    value: 0.3.2
-  KUSTOMIZE_VERSION: 
-    description: "KUSTOMIZE_VERSION from package/Dockerfile"
-    value: ${{ steps.vars.outputs.KUSTOMIZE_VERSION }}
+    description: "HELM_UNITTEST_VERSION from Dockerfile.dapper"
+    value: ${{ steps.vars.outputs.HELM_UNITTEST_VERSION }}
   RKE_VERSION: 
     description: "RKE_VERSION from go.mod"
     value: ${{ steps.vars.outputs.RKE_VERSION }}
@@ -40,8 +37,8 @@ runs:
         echo "CATTLE_KDM_BRANCH=$(grep -m1 'ARG CATTLE_KDM_BRANCH=' package/Dockerfile | cut -d '=' -f2)" >> $GITHUB_OUTPUT
         echo "CATTLE_K3S_VERSION=$(grep -m1 'ENV CATTLE_K3S_VERSION' package/Dockerfile | awk '{print $3}')" >> $GITHUB_OUTPUT
         echo "HELM_VERSION=$(grep -m1 'ENV HELM_VERSION' package/Dockerfile | awk '{print $3}')" >> $GITHUB_OUTPUT
-        echo "KUSTOMIZE_VERSION=$(grep -m1 'ENV KUSTOMIZE_VERSION' package/Dockerfile | awk '{print $3}')" >> $GITHUB_OUTPUT
         echo "CATTLE_HELM_VERSION=$(grep -m1 'ENV CATTLE_HELM_VERSION' package/Dockerfile | awk '{print $3}')" >> $GITHUB_OUTPUT
+        echo "CATTLE_HELM_VERSION=$(grep -m1 'ENV HELM_UNITTEST_VERSION' Dockerfile.dapper | awk '{print $3}')" >> $GITHUB_OUTPUT
         RKE_VERSION=$(grep -m1 'github.com/rancher/rke' go.mod | awk '{print $2}')
         if [[ -z "$RKE_VERSION" ]]; then
           RKE_VERSION=$(grep -m1 'github.com/rancher/rke' go.mod | awk '{print $4}')

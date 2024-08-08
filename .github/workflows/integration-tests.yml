@@ -10,10 +10,6 @@ permissions: {}
 env:
   HOST_ARCH: amd64
   ARCH: amd64
-  CATTLE_MACHINE_VERSION: v0.15.0-rancher116
-  KUSTOMIZE_VERSION: v5.4.2
-  CONTROLLER_GEN_VERSION: v0.14.0
-  YQ_VERSION: v4.44.2
   PYTHON_VERSION: '3.11'
   GOLANG_VERSION: '1.22'
   IMAGE: ${{ github.repository_owner }}/rancher
