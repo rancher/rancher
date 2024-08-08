@@ -125,7 +125,8 @@ const (
 	MinimumHostnameLengthLimit = 10
 	MaximumHostnameLengthLimit = 63
 
-	SystemAgentDataDirEnvVar = "CATTLE_AGENT_VAR_DIR"
+	SystemAgentDataDirEnvVar      = "CATTLE_AGENT_VAR_DIR"
+	SystemAgentFallbackPathEnvVar = "CATTLE_AGENT_FALLBACK_PATH"
 )
 
 var (
