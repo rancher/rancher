@@ -632,7 +632,11 @@ func TestCreateUpdate(t *testing.T) {
 				grbLifecycle.crbClient = &crbClientMock
 				grbLifecycle.roleBindingLister = &rbListerMock
 				grbLifecycle.fleetPermissionsHandler = &fphMock
-				res, resErr := testFunc.fun(test.inputBinding)
+
+				// run test on local of input. prevent modifications from .fun to leak into other tests.
+				input := test.inputBinding.DeepCopy()
+
+				res, resErr := testFunc.fun(input)
 				require.Equal(t, test.wantBinding, reducedGRBOf(res.(*v3.GlobalRoleBinding)))
 				if test.wantError {
 					require.Error(t, resErr)
