@@ -1175,7 +1175,7 @@ func (d *Driver) PostCheck(ctx context.Context, info *types.ClusterInfo) (*types
 
 	logrus.Infof("[amazonelasticcontainerservice] Generating service account token")
 
-	info.ServiceAccountToken, err = util.GenerateServiceAccountToken(clientset)
+	info.ServiceAccountToken, err = util.GenerateServiceAccountToken(clientset, "")
 	if err != nil {
 		return nil, fmt.Errorf("error generating service account token: %v", err)
 	}

@@ -1304,7 +1304,7 @@ func (d *Driver) PostCheck(ctx context.Context, info *types.ClusterInfo) (*types
 	failureCount := 0
 
 	for {
-		info.ServiceAccountToken, err = util.GenerateServiceAccountToken(clientset)
+		info.ServiceAccountToken, err = util.GenerateServiceAccountToken(clientset, "")
 
 		if err == nil {
 			logrus.Info("[azurekubernetesservice] service account token generated successfully")
