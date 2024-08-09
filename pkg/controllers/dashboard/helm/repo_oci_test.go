@@ -363,7 +363,7 @@ func TestGetRetryPolicy(t *testing.T) {
 }
 
 func TestShouldSkip(t *testing.T) {
-	interval = 1 * time.Hour
+	ociInterval = 1 * time.Hour
 	testCases := []struct {
 		name                     string
 		ociDownloadedTime        time.Time
@@ -468,7 +468,7 @@ func TestShouldSkip(t *testing.T) {
 			newClusterRepoController: func(ctrl *gomock.Controller) *fake.MockNonNamespacedControllerInterface[*catalog.ClusterRepo, *catalog.ClusterRepoList] {
 				mockController := fake.NewMockNonNamespacedControllerInterface[*catalog.ClusterRepo, *catalog.ClusterRepoList](ctrl)
 				mockController.EXPECT().Get("clusterRepo", metav1.GetOptions{}).Return(&catalog.ClusterRepo{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}}, nil)
-				mockController.EXPECT().EnqueueAfter("", interval).Return()
+				mockController.EXPECT().EnqueueAfter("", ociInterval).Return()
 				return mockController
 			},
 			generation:         1,
