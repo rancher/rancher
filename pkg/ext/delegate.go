@@ -172,10 +172,18 @@ func (s *StoreDelegate[T, DerefT, TList]) Delegate(w http.ResponseWriter, req *h
 		if err != nil {
 			return err
 		}
-		err = s.Store.Delete(userInfo, name)
+
+		deleteOptions := &metav1.DeleteOptions{}
+		err = metainternalversionscheme.ParameterCodec.DecodeParameters(req.URL.Query(), metav1.SchemeGroupVersion, deleteOptions)
 		if err != nil {
 			return err
 		}
+
+		err = s.Store.Delete(ctx, userInfo, name, deleteOptions)
+		if err != nil {
+			return err
+		}
+
 		status := &metav1.Status{
 			Status: "Success",
 		}
@@ -187,7 +195,12 @@ func (s *StoreDelegate[T, DerefT, TList]) Delegate(w http.ResponseWriter, req *h
 			return err
 		}
 		if name != "" {
-			resource, err := s.Store.Get(userInfo, name)
+			getOptions := &metav1.GetOptions{}
+			err = metainternalversionscheme.ParameterCodec.DecodeParameters(req.URL.Query(), metav1.SchemeGroupVersion, getOptions)
+			if err != nil {
+				return err
+			}
+			resource, err := s.Store.Get(ctx, userInfo, name, getOptions)
 			if err != nil {
 				return err
 			}
@@ -200,8 +213,8 @@ func (s *StoreDelegate[T, DerefT, TList]) Delegate(w http.ResponseWriter, req *h
 			return err
 		}
 
-		if req.URL.Query().Get("watch") == "true" {
-			resultCh, err := s.Store.Watch(userInfo, listOptions)
+		if listOptions.Watch {
+			resultCh, err := s.Store.Watch(ctx, userInfo, listOptions)
 			if err != nil {
 				return fmt.Errorf("unable to watch: %w", err)
 			}
@@ -244,7 +257,7 @@ func (s *StoreDelegate[T, DerefT, TList]) Delegate(w http.ResponseWriter, req *h
 			return nil
 		}
 
-		resources, err := s.Store.List(userInfo)
+		resources, err := s.Store.List(ctx, userInfo, listOptions)
 		if err != nil {
 			return err
 		}
@@ -255,20 +268,29 @@ func (s *StoreDelegate[T, DerefT, TList]) Delegate(w http.ResponseWriter, req *h
 		if err != nil {
 			return err
 		}
+
+		updateOptions := &metav1.UpdateOptions{}
+		err = metainternalversionscheme.ParameterCodec.DecodeParameters(req.URL.Query(), metav1.SchemeGroupVersion, updateOptions)
+		if err != nil {
+			return err
+		}
+
 		accessor := meta.NewAccessor()
 		name, err := accessor.Name(resource)
 		if err != nil {
 			return err
 		}
+
 		var retResource T
-		_, err = s.Store.Get(userInfo, name)
+		// XXX: What GetOptions to give here?
+		_, err = s.Store.Get(ctx, userInfo, name, &metav1.GetOptions{})
 		if err != nil {
 			if !apierrors.IsNotFound(err) {
 				return err
 			}
-			retResource, err = s.Store.Create(userInfo, resource)
+			retResource, err = s.Store.Create(ctx, userInfo, resource, newCreateOptionsFromUpdateOptions(updateOptions))
 		} else {
-			retResource, err = s.Store.Update(userInfo, resource)
+			retResource, err = s.Store.Update(ctx, userInfo, resource, updateOptions)
 		}
 		if err != nil {
 			return err
@@ -280,7 +302,13 @@ func (s *StoreDelegate[T, DerefT, TList]) Delegate(w http.ResponseWriter, req *h
 			return err
 		}
 
-		retResource, err := s.Store.Create(userInfo, resource)
+		createOptions := &metav1.CreateOptions{}
+		err = metainternalversionscheme.ParameterCodec.DecodeParameters(req.URL.Query(), metav1.SchemeGroupVersion, createOptions)
+		if err != nil {
+			return err
+		}
+
+		retResource, err := s.Store.Create(ctx, userInfo, resource, createOptions)
 		if err != nil {
 			return err
 		}
@@ -295,7 +323,14 @@ func (s *StoreDelegate[T, DerefT, TList]) Delegate(w http.ResponseWriter, req *h
 			return err
 		}
 
-		retResource, err := s.Store.Update(userInfo, resource)
+		// XXX: Should this be metav1.PatchOptions?
+		updateOptions := &metav1.UpdateOptions{}
+		err = metainternalversionscheme.ParameterCodec.DecodeParameters(req.URL.Query(), metav1.SchemeGroupVersion, updateOptions)
+		if err != nil {
+			return err
+		}
+
+		retResource, err := s.Store.Update(ctx, userInfo, resource, updateOptions)
 		if err != nil {
 			return err
 		}
@@ -341,4 +376,15 @@ func (s *StoreDelegate[T, DerefT, TList]) resourceNameAndNamespace(req *http.Req
 		return "", "", err
 	}
 	return info.Name, info.Namespace, nil
+}
+
+// copied from k8s.io/apiserver/pkg/registry/generic/registry/store.go
+func newCreateOptionsFromUpdateOptions(in *metav1.UpdateOptions) *metav1.CreateOptions {
+	co := &metav1.CreateOptions{
+		DryRun:          in.DryRun,
+		FieldManager:    in.FieldManager,
+		FieldValidation: in.FieldValidation,
+	}
+	co.TypeMeta.SetGroupVersionKind(metav1.SchemeGroupVersion.WithKind("CreateOptions"))
+	return co
 }

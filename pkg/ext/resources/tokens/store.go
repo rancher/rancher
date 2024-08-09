@@ -33,7 +33,7 @@ func NewTokenStore(secretClient v1.SecretClient, secretCache v1.SecretCache, sar
 	return &tokenStore
 }
 
-func (t *TokenStore) Create(userInfo user.Info, token *RancherToken) (*RancherToken, error) {
+func (t *TokenStore) Create(ctx context.Context, userInfo user.Info, token *RancherToken, opts *metav1.CreateOptions) (*RancherToken, error) {
 	if token.Status.PlaintextToken == "" {
 		tokenValue, err := randomtoken.Generate()
 		if err != nil {
@@ -66,7 +66,7 @@ func (t *TokenStore) Create(userInfo user.Info, token *RancherToken) (*RancherTo
 	return token, nil
 }
 
-func (t *TokenStore) Update(userInfo user.Info, token *RancherToken) (*RancherToken, error) {
+func (t *TokenStore) Update(ctx context.Context, userInfo user.Info, token *RancherToken, opts *metav1.UpdateOptions) (*RancherToken, error) {
 	// user is trying to update a token for another user
 	if token.Spec.UserID != userInfo.GetName() {
 		authed, err := t.userHasFullPermissions(userInfo)
@@ -96,7 +96,7 @@ func (t *TokenStore) Update(userInfo user.Info, token *RancherToken) (*RancherTo
 	return newToken, nil
 }
 
-func (t *TokenStore) Get(userInfo user.Info, name string) (*RancherToken, error) {
+func (t *TokenStore) Get(ctx context.Context, userInfo user.Info, name string, opts *metav1.GetOptions) (*RancherToken, error) {
 	currentSecret, err := t.secretCache.Get(tokenNamespace, name)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get token %s: %w", name, err)
@@ -117,7 +117,7 @@ func (t *TokenStore) Get(userInfo user.Info, name string) (*RancherToken, error)
 	return token, nil
 }
 
-func (t *TokenStore) List(userInfo user.Info) (*RancherTokenList, error) {
+func (t *TokenStore) List(ctx context.Context, userInfo user.Info, opts *metav1.ListOptions) (*RancherTokenList, error) {
 	secrets, err := t.secretClient.List(tokenNamespace, metav1.ListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("unable to list tokens: %w", err)
@@ -145,7 +145,7 @@ func (t *TokenStore) List(userInfo user.Info) (*RancherTokenList, error) {
 }
 
 // TODO: Close channel
-func (t *TokenStore) Watch(userInfo user.Info, opts *metav1.ListOptions) (<-chan types.WatchEvent[*RancherToken], error) {
+func (t *TokenStore) Watch(ctx context.Context, userInfo user.Info, opts *metav1.ListOptions) (<-chan types.WatchEvent[*RancherToken], error) {
 	authed, err := t.userHasFullPermissions(userInfo)
 	if err != nil {
 		return nil, fmt.Errorf("unable to check if user has * on tokens: %w", err)
@@ -184,7 +184,7 @@ func (t *TokenStore) Watch(userInfo user.Info, opts *metav1.ListOptions) (<-chan
 	return ch, nil
 }
 
-func (t *TokenStore) Delete(userInfo user.Info, name string) error {
+func (t *TokenStore) Delete(ctx context.Context, userInfo user.Info, name string, opts *metav1.DeleteOptions) error {
 	fmt.Println(userInfo, name)
 	secret, err := t.secretCache.Get(tokenNamespace, name)
 	if err != nil {
