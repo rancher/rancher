@@ -59,7 +59,7 @@ func (s *Syncer) Sync() error {
 	}
 
 	versionMap := make(map[string]string)
-	curSysImageVersion := systemProject.Annotations[project.SystemImageVersionAnn]
+	curSysImageVersion := systemProject.Annotations[project.SystemImageVersionAnnotation]
 	if curSysImageVersion != "" {
 		if err = json.Unmarshal([]byte(curSysImageVersion), &versionMap); err != nil {
 			return fmt.Errorf("unmashal current system service version failed, %v", err)
@@ -93,7 +93,7 @@ func (s *Syncer) Sync() error {
 		return fmt.Errorf("marshal new system service version %v failed, %v", versionMap, err)
 	}
 
-	systemProject.Annotations[project.SystemImageVersionAnn] = string(newVersion)
+	systemProject.Annotations[project.SystemImageVersionAnnotation] = string(newVersion)
 	_, err = s.projects.Update(systemProject)
 	return err
 }
