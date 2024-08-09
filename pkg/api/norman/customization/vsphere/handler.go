@@ -26,6 +26,7 @@ import (
 const (
 	UnknownFinder = iota
 	SoapFinder
+	SoapFinderExtended
 	SoapGetter
 	ContentLibraryManager
 	TagsManager
@@ -43,6 +44,7 @@ var fieldNames = map[string]int{
 	"templates":           SoapFinder,
 	"clusters":            SoapFinder,
 	"resource-pools":      SoapFinder,
+	"networks-extended":   SoapFinderExtended,
 	"guest-os":            SoapGetter,
 	"content-libraries":   ContentLibraryManager,
 	"library-templates":   ContentLibraryManager,
@@ -86,6 +88,12 @@ func (v *handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	if fieldName == "networks" {
+		// The existing endpoint /meta/vsphere/networks continue working,
+		// the header X-API-Deprecated is to indicate the endpoint is deprecated.
+		res.Header().Set("X-API-Deprecated", "true")
+	}
+
 	var cc *v1.Secret
 	var errcode httperror.ErrorCode
 	var vmPath string
@@ -126,6 +134,13 @@ func (v *handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 			return
 		}
 		js, err = json.Marshal(map[string][]string{"data": data})
+	case SoapFinderExtended:
+		var data []map[string]interface{}
+		if data, err = processSoapFinderExtended(req.Context(), fieldName, cc, dc); err != nil {
+			invalidBody(res, req, err)
+			return
+		}
+		js, err = json.Marshal(map[string][]map[string]interface{}{"data": data})
 	case ContentLibraryManager:
 		l := req.FormValue("library")
 		var data []string
