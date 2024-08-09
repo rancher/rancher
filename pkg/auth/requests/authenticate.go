@@ -131,12 +131,12 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 
 	attribs, err := a.userAttributeLister.Get("", token.UserID)
 	if err != nil && !apierrors.IsNotFound(err) {
-		return nil, err
+		return nil, errors.Wrapf(ErrMustAuthenticate, "failed to retrieve userattribute %s: %v", token.UserID, err)
 	}
 
 	authUser, err := a.userLister.Get("", token.UserID)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(ErrMustAuthenticate, "failed to retrieve user %s: %v", token.UserID, err)
 	}
 
 	if authUser.Enabled != nil && !*authUser.Enabled {
