@@ -141,13 +141,20 @@ func (c *crtbLifecycle) Create(obj *v3.ClusterRoleTemplateBinding) (runtime.Obje
 		obj.Status.Summary != SummaryInProgress {
 		return obj, nil
 	}
-	returnError := errors.Join(
-		c.setCRTBAsInProgress(obj),
-		c.reconcileSubject(obj),
-		c.reconcileBindings(obj),
-		c.setCRTBAsCompleted(obj),
-	)
-	return obj, returnError
+	err := c.setCRTBAsInProgress(obj)
+	if err != nil {
+		return obj, err
+	}
+	err = c.reconcileSubject(obj)
+	if err != nil {
+		return obj, err
+	}
+	err = c.reconcileBindings(obj)
+	if err != nil {
+		return obj, err
+	}
+	err = c.setCRTBAsCompleted(obj)
+	return obj, err
 }
 
 func (c *crtbLifecycle) Updated(obj *v3.ClusterRoleTemplateBinding) (runtime.Object, error) {
@@ -159,24 +166,40 @@ func (c *crtbLifecycle) Updated(obj *v3.ClusterRoleTemplateBinding) (runtime.Obj
 		obj.Status.Summary != SummaryInProgress {
 		return obj, nil
 	}
-	returnError := errors.Join(
-		c.setCRTBAsInProgress(obj),
-		c.reconcileSubject(obj),
-		c.reconcileLabels(obj),
-		c.reconcileBindings(obj),
-		c.setCRTBAsCompleted(obj),
-	)
-	return obj, returnError
+	err := c.setCRTBAsInProgress(obj)
+	if err != nil {
+		return obj, err
+	}
+	err = c.reconcileSubject(obj)
+	if err != nil {
+		return obj, err
+	}
+	if err := c.reconcileLabels(obj); err != nil {
+		return obj, err
+	}
+	err = c.reconcileBindings(obj)
+	if err != nil {
+		return obj, err
+	}
+	err = c.setCRTBAsCompleted(obj)
+	return obj, err
 }
 
 func (c *crtbLifecycle) Remove(obj *v3.ClusterRoleTemplateBinding) (runtime.Object, error) {
-	returnError := errors.Join(
-		c.setCRTBAsTerminating(obj),
-		c.reconcileClusterMembershipBindingForDelete(obj),
-		c.removeMGMTClusterScopedPrivilegesInProjectNamespace(obj),
-		c.removeAuthV2Permissions(obj),
-	)
-	return obj, returnError
+	err := c.setCRTBAsTerminating(obj)
+	if err != nil {
+		return obj, err
+	}
+	err = c.reconcileClusterMembershipBindingForDelete(obj)
+	if err != nil {
+		return obj, err
+	}
+	err = c.removeMGMTClusterScopedPrivilegesInProjectNamespace(obj)
+	if err != nil {
+		return obj, err
+	}
+	err = c.removeAuthV2Permissions(obj)
+	return obj, err
 }
 
 func (c *crtbLifecycle) reconcileSubject(binding *v3.ClusterRoleTemplateBinding) error {
