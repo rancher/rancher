@@ -67,7 +67,7 @@ func TestIsTokenExpired(t *testing.T) {
 	}
 }
 
-func TestAuthenticate(t *testing.T) {
+func TestServiceAccountAuthAuthenticate(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name                  string
@@ -298,7 +298,7 @@ func TestAuthenticate(t *testing.T) {
 }
 
 func generateDownstreamRequest(method string, path string) *http.Request {
-	req, _ := http.NewRequest("GET", proxyPrefix+path, nil)
+	req, _ := http.NewRequest(method, proxyPrefix+path, nil)
 	return req
 }
 
