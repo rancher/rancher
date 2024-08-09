@@ -8,7 +8,7 @@ import (
 
 	project "github.com/rancher/rancher/tests/v2/actions/projects"
 	rbac "github.com/rancher/rancher/tests/v2/actions/rbac"
-	deployment "github.com/rancher/rancher/tests/v2/actions/workloads/deployment"
+	deployment "github.com/rancher/rancher/tests/v2/actions/workloads/deployments"
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
 	"github.com/rancher/shepherd/extensions/charts"
