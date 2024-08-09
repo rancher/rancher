@@ -28,6 +28,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/wrangler/v3/pkg/schemes"
 	"github.com/sirupsen/logrus"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -154,12 +155,12 @@ func (s *APIServer) RegisterRoutes(router *gmux.Router) {
 
 		pattern = fmt.Sprintf("/apis/%s/namespaces/", groupVersion)
 		s.logger.Info("Adding handler for path", pattern)
-		router.PathPrefix(pattern).HandlerFunc(https.ErrorHTTPHandler(s.logger, s.namespacedResourceHandler(groupVersion)))
+		router.PathPrefix(pattern).HandlerFunc(errorHTTPHandler(s.logger, s.namespacedResourceHandler(groupVersion)))
 		s.logger.WithField("groupversion", groupVersion.String()).WithField("pattern", pattern).WithField("namespaced", "true").Info("Adding Resource Handler")
 
 		pattern = fmt.Sprintf("/apis/%s/", groupVersion)
 		s.logger.Info("Adding handler for path", pattern)
-		router.PathPrefix(pattern).HandlerFunc(https.ErrorHTTPHandler(s.logger, s.resourceHandler(groupVersion)))
+		router.PathPrefix(pattern).HandlerFunc(errorHTTPHandler(s.logger, s.resourceHandler(groupVersion)))
 		s.logger.WithField("groupversion", groupVersion.String()).WithField("pattern", pattern).WithField("namespaced", "false").Info("Adding Resource Handler")
 	}
 	router.Walk(func(route *gmux.Route, router *gmux.Router, ancestors []*gmux.Route) error {
@@ -207,7 +208,7 @@ func (as *APIServer) AddAPIResource(groupVersion schema.GroupVersion, resource m
 
 // Namespaced: /apis/tomlebreux.com/v1/namespaces/<namespace>/<resource>
 // namespacedResourceHandler handles namespaced resource calls, and sends them to the appropriate CRDHandler delegate
-func (as *APIServer) namespacedResourceHandler(groupVersion schema.GroupVersion) https.ErrorHandlerFunc {
+func (as *APIServer) namespacedResourceHandler(groupVersion schema.GroupVersion) errorHandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) error {
 		info, err := as.requestInfoFactory.NewRequestInfo(r)
 		if err != nil {
@@ -238,7 +239,7 @@ func (as *APIServer) namespacedResourceHandler(groupVersion schema.GroupVersion)
 }
 
 // Cluster: /apis/tomlebreux.com/v1/<resource>
-func (as *APIServer) resourceHandler(groupVersion schema.GroupVersion) https.ErrorHandlerFunc {
+func (as *APIServer) resourceHandler(groupVersion schema.GroupVersion) errorHandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) error {
 		info, err := as.requestInfoFactory.NewRequestInfo(r)
 		if err != nil {
@@ -311,6 +312,7 @@ func AcceptedSerializer(r *http.Request, codecs serializer.CodecFactory) (k8srun
 		alternatives[i] = media.MediaType
 	}
 	header := r.Header.Get(AcceptHeader)
+	// XXX: Kubernetes already has negotiation as exported function, we should use that instead
 	accept := goautoneg.Negotiate(header, alternatives)
 	if accept == "" {
 		accept = k8sruntime.ContentTypeJSON
@@ -321,4 +323,25 @@ func AcceptedSerializer(r *http.Request, codecs serializer.CodecFactory) (k8srun
 	}
 
 	return info, nil
+}
+
+type errorHandlerFunc func(http.ResponseWriter, *http.Request) error
+
+func errorHTTPHandler(logger *logrus.Entry, f errorHandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		err := f(w, r)
+		if err == nil {
+			return
+		}
+
+		// XXX: Do we want to check for exact error OR for any wrapped error?
+		if status, ok := err.(apierrors.APIStatus); ok {
+			metaStatus := status.Status()
+			http.Error(w, string(metaStatus.Reason), int(metaStatus.Code))
+			return
+		}
+
+		runtime.HandleError(https.LogRequest(logger, r), err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }

@@ -11,6 +11,7 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/randomtoken"
 	authv1 "k8s.io/api/authorization/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/user"
 	authzv1 "k8s.io/client-go/kubernetes/typed/authorization/v1"
@@ -99,6 +100,9 @@ func (t *TokenStore) Update(ctx context.Context, userInfo user.Info, token *Ranc
 func (t *TokenStore) Get(ctx context.Context, userInfo user.Info, name string, opts *metav1.GetOptions) (*RancherToken, error) {
 	currentSecret, err := t.secretCache.Get(tokenNamespace, name)
 	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil, err
+		}
 		return nil, fmt.Errorf("unable to get token %s: %w", name, err)
 	}
 	token := tokenFromSecret(currentSecret)
