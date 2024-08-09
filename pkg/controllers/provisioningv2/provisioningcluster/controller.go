@@ -82,6 +82,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 			WithCacheTypes(
 				clients.CAPI.Cluster(),
 				clients.CAPI.MachineDeployment(),
+				clients.CAPI.MachineHealthCheck(),
 				clients.RKE.RKEControlPlane(),
 				clients.RKE.RKECluster(),
 				clients.RKE.RKEBootstrapTemplate(),

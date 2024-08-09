@@ -109,6 +109,7 @@ func main() {
 					capi.Machine{},
 					capi.MachineSet{},
 					capi.MachineDeployment{},
+					capi.MachineHealthCheck{},
 					capi.Cluster{},
 				},
 			},
