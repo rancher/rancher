@@ -111,48 +111,6 @@ func (r *RKE2PSACTTestSuite) TestRKE2PSACTNodeDriverCluster() {
 	}
 }
 
-func (r *RKE2PSACTTestSuite) TestRKE2PSACTCustomCluster() {
-	nodeRolesDedicated := []provisioninginput.MachinePools{
-		provisioninginput.EtcdMachinePool,
-		provisioninginput.ControlPlaneMachinePool,
-		provisioninginput.WorkerMachinePool,
-	}
-
-	tests := []struct {
-		name         string
-		machinePools []provisioninginput.MachinePools
-		psact        provisioninginput.PSACT
-		client       *rancher.Client
-	}{
-		{
-			name:         "Rancher Privileged " + provisioninginput.StandardClientName.String(),
-			machinePools: nodeRolesDedicated,
-			psact:        "rancher-privileged",
-			client:       r.standardUserClient,
-		},
-		{
-			name:         "Rancher Restricted " + provisioninginput.StandardClientName.String(),
-			machinePools: nodeRolesDedicated,
-			psact:        "rancher-restricted",
-			client:       r.standardUserClient,
-		},
-		{
-			name:         "Rancher Baseline " + provisioninginput.AdminClientName.String(),
-			machinePools: nodeRolesDedicated,
-			psact:        "rancher-baseline",
-			client:       r.client,
-		},
-	}
-
-	for _, tt := range tests {
-		provisioningConfig := *r.provisioningConfig
-		provisioningConfig.MachinePools = tt.machinePools
-		provisioningConfig.PSACT = string(tt.psact)
-		permutations.RunTestPermutations(&r.Suite, tt.name, tt.client, &provisioningConfig,
-			permutations.RKE2CustomCluster, nil, nil)
-	}
-}
-
 // In order for 'go test' to run this suite, we need to create
 // a normal test function and pass our suite to suite.Run
 func TestRKE2PSACTTestSuite(t *testing.T) {

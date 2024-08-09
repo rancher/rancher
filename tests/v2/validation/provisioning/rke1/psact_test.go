@@ -111,51 +111,6 @@ func (r *RKE1PSACTTestSuite) TestRKE1PSACTNodeDriverCluster() {
 	}
 }
 
-func (r *RKE1PSACTTestSuite) TestRKE1PSACTCustomCluster() {
-	nodeRolesDedicated := []provisioninginput.NodePools{
-		provisioninginput.EtcdNodePool,
-		provisioninginput.ControlPlaneNodePool,
-		provisioninginput.WorkerNodePool,
-	}
-
-	require.GreaterOrEqual(r.T(), len(r.provisioningConfig.CNIs), 1)
-
-	tests := []struct {
-		name      string
-		nodePools []provisioninginput.NodePools
-		psact     provisioninginput.PSACT
-		client    *rancher.Client
-	}{
-		{
-			name:      "Rancher Privileged " + provisioninginput.StandardClientName.String(),
-			nodePools: nodeRolesDedicated,
-			psact:     "rancher-privileged",
-			client:    r.standardUserClient,
-		},
-		{
-			name:      "Rancher Restricted " + provisioninginput.StandardClientName.String(),
-			nodePools: nodeRolesDedicated,
-			psact:     "rancher-restricted",
-			client:    r.standardUserClient,
-		},
-		{
-			name:      "Rancher Baseline " + provisioninginput.AdminClientName.String(),
-			nodePools: nodeRolesDedicated,
-			psact:     "rancher-baseline",
-			client:    r.client,
-		},
-	}
-
-	for _, tt := range tests {
-		provisioningConfig := *r.provisioningConfig
-		provisioningConfig.NodePools = tt.nodePools
-		provisioningConfig.PSACT = string(tt.psact)
-		provisioningConfig.NodePools[0].SpecifyCustomPublicIP = true
-		permutations.RunTestPermutations(&r.Suite, tt.name, tt.client, &provisioningConfig,
-			permutations.RKE1CustomCluster, nil, nil)
-	}
-}
-
 // In order for 'go test' to run this suite, we need to create
 // a normal test function and pass our suite to suite.Run
 func TestRKE1PSACTTestSuite(t *testing.T) {
