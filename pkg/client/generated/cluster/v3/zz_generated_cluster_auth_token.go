@@ -8,6 +8,7 @@ const (
 	ClusterAuthTokenFieldEnabled         = "enabled"
 	ClusterAuthTokenFieldExpiresAt       = "expiresAt"
 	ClusterAuthTokenFieldLabels          = "labels"
+	ClusterAuthTokenFieldLastUsedAt      = "lastUsedAt"
 	ClusterAuthTokenFieldName            = "name"
 	ClusterAuthTokenFieldNamespaceId     = "namespaceId"
 	ClusterAuthTokenFieldOwnerReferences = "ownerReferences"
@@ -24,6 +25,7 @@ type ClusterAuthToken struct {
 	Enabled         bool              `json:"enabled,omitempty" yaml:"enabled,omitempty"`
 	ExpiresAt       string            `json:"expiresAt,omitempty" yaml:"expiresAt,omitempty"`
 	Labels          map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
+	LastUsedAt      string            `json:"lastUsedAt,omitempty" yaml:"lastUsedAt,omitempty"`
 	Name            string            `json:"name,omitempty" yaml:"name,omitempty"`
 	NamespaceId     string            `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
 	OwnerReferences []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
