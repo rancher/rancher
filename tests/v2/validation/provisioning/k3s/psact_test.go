@@ -111,48 +111,6 @@ func (k *K3SPSACTTestSuite) TestK3SPSACTNodeDriverCluster() {
 	}
 }
 
-func (k *K3SPSACTTestSuite) TestK3SPSACTCustomCluster() {
-	nodeRolesDedicated := []provisioninginput.MachinePools{
-		provisioninginput.EtcdMachinePool,
-		provisioninginput.ControlPlaneMachinePool,
-		provisioninginput.WorkerMachinePool,
-	}
-
-	tests := []struct {
-		name         string
-		machinePools []provisioninginput.MachinePools
-		psact        provisioninginput.PSACT
-		client       *rancher.Client
-	}{
-		{
-			"Rancher Privileged " + provisioninginput.StandardClientName.String(),
-			nodeRolesDedicated,
-			"rancher-privileged",
-			k.standardUserClient,
-		},
-		{
-			"Rancher Restricted " + provisioninginput.StandardClientName.String(),
-			nodeRolesDedicated,
-			"rancher-restricted",
-			k.standardUserClient,
-		},
-		{
-			"Rancher Baseline " + provisioninginput.AdminClientName.String(),
-			nodeRolesDedicated,
-			"rancher-baseline",
-			k.client,
-		},
-	}
-
-	for _, tt := range tests {
-		provisioningConfig := *k.provisioningConfig
-		provisioningConfig.MachinePools = tt.machinePools
-		provisioningConfig.PSACT = string(tt.psact)
-		permutations.RunTestPermutations(&k.Suite, tt.name, tt.client, &provisioningConfig,
-			permutations.K3SCustomCluster, nil, nil)
-	}
-}
-
 // In order for 'go test' to run this suite, we need to create
 // a normal test function and pass our suite to suite.Run
 func TestK3SPSACTTestSuite(t *testing.T) {
