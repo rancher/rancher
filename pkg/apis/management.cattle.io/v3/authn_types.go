@@ -205,6 +205,7 @@ type AuthConfig struct {
 	Enabled             bool             `json:"enabled,omitempty"`
 	AccessMode          string           `json:"accessMode,omitempty" norman:"required,notnullable,type=enum,options=required|restricted|unrestricted"`
 	AllowedPrincipalIDs []string         `json:"allowedPrincipalIds,omitempty" norman:"type=array[reference[principal]]"`
+	LogoutAllSupported  bool             `json:"logoutAllSupported,omitempty"`
 	Status              AuthConfigStatus `json:"status"`
 }
 
@@ -475,6 +476,8 @@ type FreeIpaTestAndApplyInput struct {
 type SamlConfig struct {
 	AuthConfig `json:",inline" mapstructure:",squash"`
 
+	LogoutAllEnabled   bool   `json:"logoutAllEnabled,omitempty"`
+	LogoutAllForced    bool   `json:"logoutAllForced,omitempty"`
 	IDPMetadataContent string `json:"idpMetadataContent" norman:"required"`
 	SpCert             string `json:"spCert"             norman:"required"`
 	SpKey              string `json:"spKey"              norman:"required,type=password"`
@@ -491,6 +494,14 @@ type SamlConfigTestInput struct {
 }
 
 type SamlConfigTestOutput struct {
+	IdpRedirectURL string `json:"idpRedirectUrl"`
+}
+
+type SamlConfigLogoutInput struct {
+	FinalRedirectURL string `json:"finalRedirectUrl"`
+}
+
+type SamlConfigLogoutOutput struct {
 	IdpRedirectURL string `json:"idpRedirectUrl"`
 }
 

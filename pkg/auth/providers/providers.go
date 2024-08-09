@@ -53,6 +53,10 @@ func Configure(ctx context.Context, mgmt *config.ScaledContext) {
 	defer confMu.Unlock()
 	userMGR := mgmt.UserManager
 	tokenMGR := tokens.NewManager(ctx, mgmt)
+
+	tokens.OnLogoutAll(saml.PerformSamlLogoutAll)
+	tokens.OnLogout(saml.PerformSamlLogout)
+
 	var p common.AuthProvider
 
 	p = local.Configure(ctx, mgmt, tokenMGR)

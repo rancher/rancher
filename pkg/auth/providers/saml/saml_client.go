@@ -25,6 +25,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/namespace"
+	dsig "github.com/russellhaering/goxmldsig"
 	log "github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -45,6 +46,9 @@ var initMu sync.Mutex
 
 const UITranslationKeyForErrorMessage = "invalidSamlAttrs"
 
+// InitializeSamlServiceProvider validates changes to SamlConfig structures and
+// creates or updates the associated in-memory information. It is called from the
+// auth samlconfig controller when a SAML configuration was changed.
 func InitializeSamlServiceProvider(configToSet *v32.SamlConfig, name string) error {
 
 	initMu.Lock()
@@ -58,8 +62,6 @@ func InitializeSamlServiceProvider(configToSet *v32.SamlConfig, name string) err
 	var cert *x509.Certificate
 	var err error
 	var ok bool
-
-	log.Debugf("SAML [InitializeSamlServiceProvider]: Validating input for provider %v", name)
 
 	if configToSet.IDPMetadataContent == "" {
 		return fmt.Errorf("SAML: Cannot initialize saml SP properly, missing IDP URL/metadata in the config %v", configToSet)
@@ -117,12 +119,14 @@ func InitializeSamlServiceProvider(configToSet *v32.SamlConfig, name string) err
 		}
 	}
 
+	if configToSet.LogoutAllForced && !configToSet.LogoutAllEnabled {
+		return fmt.Errorf("invalid SAML configuration: cannot force SLO if not enabled")
+	}
+
 	provider, ok := SamlProviders[name]
 	if !ok {
 		return fmt.Errorf("SAML [InitializeSamlServiceProvider]: Provider %v not configured", name)
 	}
-
-	log.Debugf("SAML [InitializeSamlServiceProvider]: Initializing provider %v", name)
 
 	rancherAPIHost := strings.TrimRight(configToSet.RancherAPIHost, "/")
 	samlURL := rancherAPIHost + "/v1-saml/"
@@ -136,13 +140,17 @@ func InitializeSamlServiceProvider(configToSet *v32.SamlConfig, name string) err
 	metadataURL.Path = metadataURL.Path + "/saml/metadata"
 	acsURL := *actURL
 	acsURL.Path = acsURL.Path + "/saml/acs"
+	sloURL := *actURL
+	sloURL.Path = sloURL.Path + "/saml/slo"
 
 	sp := saml.ServiceProvider{
-		Key:         privKey,
-		Certificate: cert,
-		MetadataURL: metadataURL,
-		AcsURL:      acsURL,
-		EntityID:    configToSet.EntityID,
+		Key:             privKey,
+		Certificate:     cert,
+		MetadataURL:     metadataURL,
+		AcsURL:          acsURL,
+		SloURL:          sloURL,
+		EntityID:        configToSet.EntityID,
+		SignatureMethod: dsig.RSASHA256SignatureMethod,
 	}
 
 	// XML unmarshal throws an error for IdP Metadata cacheDuration field, as it's of type xml Duration. Using a separate struct for unmarshaling for now
@@ -153,6 +161,9 @@ func InitializeSamlServiceProvider(configToSet *v32.SamlConfig, name string) err
 			return fmt.Errorf("SAML: cannot initialize saml SP, cannot decode IDP Metadata content from the config %v, error %v", configToSet, err)
 		}
 	}
+
+	provider.sloEnabled = configToSet.LogoutAllEnabled
+	provider.sloForced = configToSet.LogoutAllForced
 
 	sp.IDPMetadata.XMLName = idm.XMLName
 	sp.IDPMetadata.ValidUntil = idm.ValidUntil
@@ -180,18 +191,28 @@ func InitializeSamlServiceProvider(configToSet *v32.SamlConfig, name string) err
 	switch name {
 	case PingName:
 		root.Get("PingACS").HandlerFunc(provider.ServeHTTP)
+		root.Get("PingSLO").HandlerFunc(provider.ServeHTTP)
+		root.Get("PingSLOGet").HandlerFunc(provider.ServeHTTP)
 		root.Get("PingMetadata").HandlerFunc(provider.ServeHTTP)
 	case ADFSName:
 		root.Get("AdfsACS").HandlerFunc(provider.ServeHTTP)
+		root.Get("AdfsSLO").HandlerFunc(provider.ServeHTTP)
+		root.Get("AdfsSLOGet").HandlerFunc(provider.ServeHTTP)
 		root.Get("AdfsMetadata").HandlerFunc(provider.ServeHTTP)
 	case KeyCloakName:
 		root.Get("KeyCloakACS").HandlerFunc(provider.ServeHTTP)
+		root.Get("KeyCloakSLO").HandlerFunc(provider.ServeHTTP)
+		root.Get("KeyCloakSLOGet").HandlerFunc(provider.ServeHTTP)
 		root.Get("KeyCloakMetadata").HandlerFunc(provider.ServeHTTP)
 	case OKTAName:
 		root.Get("OktaACS").HandlerFunc(provider.ServeHTTP)
+		root.Get("OktaSLO").HandlerFunc(provider.ServeHTTP)
+		root.Get("OktaSLOGet").HandlerFunc(provider.ServeHTTP)
 		root.Get("OktaMetadata").HandlerFunc(provider.ServeHTTP)
 	case ShibbolethName:
 		root.Get("ShibbolethACS").HandlerFunc(provider.ServeHTTP)
+		root.Get("ShibbolethSLO").HandlerFunc(provider.ServeHTTP)
+		root.Get("ShibbolethSLOGet").HandlerFunc(provider.ServeHTTP)
 		root.Get("ShibbolethMetadata").HandlerFunc(provider.ServeHTTP)
 	}
 
@@ -204,18 +225,28 @@ func AuthHandler() http.Handler {
 	root = mux.NewRouter()
 
 	root.Methods("POST").Path("/v1-saml/ping/saml/acs").Name("PingACS")
+	root.Methods("POST").Path("/v1-saml/ping/saml/slo").Name("PingSLO")
+	root.Methods("GET").Path("/v1-saml/ping/saml/slo").Name("PingSLOGet")
 	root.Methods("GET").Path("/v1-saml/ping/saml/metadata").Name("PingMetadata")
 
 	root.Methods("POST").Path("/v1-saml/adfs/saml/acs").Name("AdfsACS")
+	root.Methods("POST").Path("/v1-saml/adfs/saml/slo").Name("AdfsSLO")
+	root.Methods("GET").Path("/v1-saml/adfs/saml/slo").Name("AdfsSLOGet")
 	root.Methods("GET").Path("/v1-saml/adfs/saml/metadata").Name("AdfsMetadata")
 
 	root.Methods("POST").Path("/v1-saml/keycloak/saml/acs").Name("KeyCloakACS")
+	root.Methods("POST").Path("/v1-saml/keycloak/saml/slo").Name("KeyCloakSLO")
+	root.Methods("GET").Path("/v1-saml/keycloak/saml/slo").Name("KeyCloakSLOGet")
 	root.Methods("GET").Path("/v1-saml/keycloak/saml/metadata").Name("KeyCloakMetadata")
 
 	root.Methods("POST").Path("/v1-saml/okta/saml/acs").Name("OktaACS")
+	root.Methods("POST").Path("/v1-saml/okta/saml/slo").Name("OktaSLO")
+	root.Methods("GET").Path("/v1-saml/okta/saml/slo").Name("OktaSLOGet")
 	root.Methods("GET").Path("/v1-saml/okta/saml/metadata").Name("OktaMetadata")
 
 	root.Methods("POST").Path("/v1-saml/shibboleth/saml/acs").Name("ShibbolethACS")
+	root.Methods("POST").Path("/v1-saml/shibboleth/saml/slo").Name("ShibbolethSLO")
+	root.Methods("GET").Path("/v1-saml/shibboleth/saml/slo").Name("ShibbolethSLOGet")
 	root.Methods("GET").Path("/v1-saml/shibboleth/saml/metadata").Name("ShibbolethMetadata")
 
 	return root
@@ -229,6 +260,7 @@ func (s *Provider) getSamlPrincipals(config *v32.SamlConfig, samlData map[string
 		// UID field provided by user is actually not there in SAMLResponse, without this we cannot differentiate between users and create separate principals
 		return userPrincipal, groupPrincipals, fmt.Errorf("SAML: Unique ID field is not provided in SAML Response")
 	}
+
 	userPrincipal = v3.Principal{
 		ObjectMeta:    metav1.ObjectMeta{Name: s.userType + "://" + uid[0]},
 		Provider:      s.name,
@@ -263,6 +295,60 @@ func (s *Provider) getSamlPrincipals(config *v32.SamlConfig, samlData map[string
 	return userPrincipal, groupPrincipals, nil
 }
 
+// FinalizeSamlLogout processes the logout obtained by the POST to /saml/slo from IdP
+func (s *Provider) FinalizeSamlLogout(w http.ResponseWriter, r *http.Request) {
+
+	if relayState := r.Form.Get("RelayState"); relayState != "" {
+		// delete the cookie
+		s.clientState.DeleteState(w, r, relayState)
+	}
+
+	redirectURL := s.clientState.GetState(r, "Rancher_FinalRedirectURL")
+
+	s.clientState.DeleteState(w, r, "Rancher_UserID")
+	s.clientState.DeleteState(w, r, "Rancher_Action")
+	s.clientState.DeleteState(w, r, "Rancher_FinalRedirectURL")
+
+	r.ParseForm()
+	err := s.serviceProvider.ValidateLogoutResponseRequest(r)
+	if err != nil {
+		log.Debugf("SAML [FinalizeSamlLogout]: response validation failed: %v", err)
+		if parseErr, ok := err.(*saml.InvalidResponseError); ok {
+			log.Debugf("SAML RESPONSE: ===\n%s\n===\nSAML NOW: %s\nSAML ERROR: %s",
+				parseErr.Response, parseErr.Now, parseErr.PrivateErr)
+		}
+
+		rURL, errParse := url.Parse(redirectURL)
+		if errParse != nil {
+			// The redirect url is bad. That is bad for error reporting.
+			// We go with the old string ops, and pray.
+
+			redirectURL += "&errorCode=500&errorMsg=" + url.QueryEscape(err.Error())
+		} else {
+			// Principled extension of a good url with the error information
+
+			params := rURL.Query()
+			params.Add("errorCode", "500")
+			params.Add("errorMsg", err.Error())
+
+			rURL.RawQuery = params.Encode()
+
+			redirectURL = rURL.String()
+		}
+
+		http.Redirect(w, r, redirectURL, http.StatusFound)
+
+		log.Debugf("SAML [FinalizeSamlLogout]: Redirected to (%s)", redirectURL)
+		return
+	}
+
+	log.Debugf("SAML [FinalizeSamlLogout]: response validated ok")
+
+	http.Redirect(w, r, redirectURL, http.StatusFound)
+
+	log.Debugf("SAML [FinalizeSamlLogout]: Redirected to (%s)", redirectURL)
+}
+
 // HandleSamlAssertion processes/handles the assertion obtained by the POST to /saml/acs from IdP
 func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, assertion *saml.Assertion) {
 	var groupPrincipals []v3.Principal
@@ -275,6 +361,7 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 
 	redirectURL := s.clientState.GetState(r, "Rancher_FinalRedirectURL")
 	rancherAction := s.clientState.GetState(r, "Rancher_Action")
+
 	if rancherAction == loginAction {
 		redirectURL += "/login?"
 	} else if rancherAction == testAndEnableAction {
@@ -405,7 +492,6 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 		s.clientState.DeleteState(w, r, "Rancher_FinalRedirectURL")
 
 		requestID := s.clientState.GetState(r, "Rancher_RequestID")
-		log.Debugf("SAML: requestID: %s", requestID)
 		if requestID != "" {
 			// generate kubeconfig saml token
 			responseType := s.clientState.GetState(r, "Rancher_ResponseType")
@@ -463,7 +549,6 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 			s.clientState.DeleteState(w, r, "Rancher_RequestUUID")
 			s.clientState.DeleteState(w, r, "Rancher_ResponseType")
 			s.clientState.DeleteState(w, r, "Rancher_PublicKey")
-
 		}
 
 		http.Redirect(w, r, redirectURL, http.StatusFound)

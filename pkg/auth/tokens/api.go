@@ -35,7 +35,8 @@ func NewAPIHandler(ctx context.Context, apiContext *config.ScaledContext, opts .
 	schemas := types.NewSchemas().AddSchemas(managementSchema.TokenSchemas)
 	schema := schemas.Schema(&managementSchema.Version, client.TokenType)
 	schema.CollectionActions = map[string]types.Action{
-		"logout": {},
+		"logout":    {},
+		"logoutAll": {},
 	}
 
 	schema.ActionHandler = api.tokenActionHandler
@@ -61,7 +62,7 @@ type tokenAPI struct {
 
 func (t *tokenAPI) tokenActionHandler(actionName string, action *types.Action, request *types.APIContext) error {
 	logrus.Debugf("TokenActionHandler called for action %v", actionName)
-	if actionName == "logout" {
+	if actionName == "logout" || actionName == "logoutAll" {
 		return t.mgr.logout(actionName, action, request)
 	}
 	return httperror.NewAPIError(httperror.ActionNotAvailable, "")

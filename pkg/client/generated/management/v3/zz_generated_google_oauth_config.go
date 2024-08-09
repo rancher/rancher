@@ -11,6 +11,7 @@ const (
 	GoogleOauthConfigFieldEnabled                      = "enabled"
 	GoogleOauthConfigFieldHostname                     = "hostname"
 	GoogleOauthConfigFieldLabels                       = "labels"
+	GoogleOauthConfigFieldLogoutAllSupported           = "logoutAllSupported"
 	GoogleOauthConfigFieldName                         = "name"
 	GoogleOauthConfigFieldNestedGroupMembershipEnabled = "nestedGroupMembershipEnabled"
 	GoogleOauthConfigFieldOauthCredential              = "oauthCredential"
@@ -33,6 +34,7 @@ type GoogleOauthConfig struct {
 	Enabled                      bool              `json:"enabled,omitempty" yaml:"enabled,omitempty"`
 	Hostname                     string            `json:"hostname,omitempty" yaml:"hostname,omitempty"`
 	Labels                       map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
+	LogoutAllSupported           bool              `json:"logoutAllSupported,omitempty" yaml:"logoutAllSupported,omitempty"`
 	Name                         string            `json:"name,omitempty" yaml:"name,omitempty"`
 	NestedGroupMembershipEnabled bool              `json:"nestedGroupMembershipEnabled,omitempty" yaml:"nestedGroupMembershipEnabled,omitempty"`
 	OauthCredential              string            `json:"oauthCredential,omitempty" yaml:"oauthCredential,omitempty"`

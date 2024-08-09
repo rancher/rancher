@@ -13,6 +13,9 @@ const (
 	ShibbolethConfigFieldGroupsField         = "groupsField"
 	ShibbolethConfigFieldIDPMetadataContent  = "idpMetadataContent"
 	ShibbolethConfigFieldLabels              = "labels"
+	ShibbolethConfigFieldLogoutAllEnabled    = "logoutAllEnabled"
+	ShibbolethConfigFieldLogoutAllForced     = "logoutAllForced"
+	ShibbolethConfigFieldLogoutAllSupported  = "logoutAllSupported"
 	ShibbolethConfigFieldName                = "name"
 	ShibbolethConfigFieldOpenLdapConfig      = "openLdapConfig"
 	ShibbolethConfigFieldOwnerReferences     = "ownerReferences"
@@ -39,6 +42,9 @@ type ShibbolethConfig struct {
 	GroupsField         string            `json:"groupsField,omitempty" yaml:"groupsField,omitempty"`
 	IDPMetadataContent  string            `json:"idpMetadataContent,omitempty" yaml:"idpMetadataContent,omitempty"`
 	Labels              map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
+	LogoutAllEnabled    bool              `json:"logoutAllEnabled,omitempty" yaml:"logoutAllEnabled,omitempty"`
+	LogoutAllForced     bool              `json:"logoutAllForced,omitempty" yaml:"logoutAllForced,omitempty"`
+	LogoutAllSupported  bool              `json:"logoutAllSupported,omitempty" yaml:"logoutAllSupported,omitempty"`
 	Name                string            `json:"name,omitempty" yaml:"name,omitempty"`
 	OpenLdapConfig      *LdapFields       `json:"openLdapConfig,omitempty" yaml:"openLdapConfig,omitempty"`
 	OwnerReferences     []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
