@@ -16,9 +16,14 @@ ARG TARGETARCH
 
 WORKDIR /app
 
-COPY . .
-
+# Only invalidate cache if mod files changes.
+COPY go.mod go.sum .
+COPY pkg/apis/go.mod pkg/apis/go.sum pkg/apis/
+COPY pkg/client/go.mod pkg/client/go.sum pkg/client/
 RUN go mod download
+
+COPY cmd/ cmd/
+COPY pkg/ pkg/
 
 RUN GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" -o agent ./cmd/agent
 
@@ -26,8 +31,7 @@ FROM ${RANCHER_IMAGE} AS rancher
 
 FROM registry.suse.com/bci/bci-micro:15.6 AS final
 
-# Temporary build stage image
-FROM registry.suse.com/bci/bci-base:15.6 AS builder
+FROM registry.suse.com/bci/bci-base:15.6 AS zypper
 
 # Install system packages using builder image that has zypper
 COPY --from=final / /chroot/
@@ -40,11 +44,11 @@ RUN zypper refresh && \
     zypper --installroot /chroot clean -a && \
     rm -rf /chroot/var/cache/zypp/* /chroot/var/log/zypp/* /chroot/tmp/* /chroot/var/tmp/* /chroot/usr/share/doc/packages/*
 
-# Main stage using bci-micro as the base image
+# Main stage using bci-micro as the base image.
 FROM final
 
-# Copy binaries and configuration files from builder to micro
-COPY --from=builder /chroot/ /
+# Copy binaries and configuration files from zypper to micro.
+COPY --from=zypper /chroot/ /
 
 # Test that some of the dependency binaries were copied
 # and are working on the target image.
@@ -55,7 +59,6 @@ RUN /usr/bin/unshare --version && \
 
 ARG ARCH=amd64
 ENV KUBECTL_VERSION v1.27.10
-ARG VERSION=${VERSION}
 
 RUN curl -sLf https://storage.googleapis.com/kubernetes-release/release/${KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl > /usr/bin/kubectl && \
     chmod +x /usr/bin/kubectl
@@ -74,6 +77,7 @@ ENV CATTLE_RANCHER_PROVISIONING_CAPI_VERSION=$CATTLE_RANCHER_PROVISIONING_CAPI_V
 ENV SSL_CERT_DIR /etc/kubernetes/ssl/certs
 COPY --from=rancher /var/lib/rancher-data /var/lib/rancher-data
 COPY --from=rancher /usr/bin/tini /usr/bin/
-COPY --from=build /app/agent /app/package/run.sh /app/package/kubectl-shell.sh /app/package/shell-setup.sh /usr/bin/
+COPY --from=build /app/agent /usr/bin/
+COPY package/run.sh package/kubectl-shell.sh package/shell-setup.sh /usr/bin/
 WORKDIR /var/lib/rancher
 ENTRYPOINT ["run.sh"]

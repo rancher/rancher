@@ -1,20 +1,3 @@
-FROM --platform=$BUILDPLATFORM registry.suse.com/bci/golang:1.22 as build
-ARG VERSION
-ARG COMMIT
-ARG RKE_VERSION
-ARG CGO_ENABLED=0
-ARG TAGS="k8s"
-ARG LINKFLAGS="-extldflags -static"
-ARG DEFAULT_VALUES="{\"rke-version\":\"${RKE_VERSION}\"}"
-ARG LDFLAGS="-X github.com/rancher/rancher/pkg/version.Version=${VERSION} -X github.com/rancher/rancher/pkg/version.GitCommit=${COMMIT} -X github.com/rancher/rancher/pkg/settings.InjectDefaults=${DEFAULT_VALUES} ${LINKFLAGS}"
-ARG TARGETOS
-ARG TARGETARCH
-
-WORKDIR /app
-COPY . .
-RUN go mod download
-RUN GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" -o rancher
-
 FROM registry.suse.com/bci/bci-micro:15.6 AS final
 
 # Temporary build stage image
@@ -32,7 +15,7 @@ RUN zypper refresh && \
     rm -rf /chroot/var/cache/zypp/* /chroot/var/log/zypp/* /chroot/tmp/* /chroot/var/tmp/* /chroot/usr/share/doc/packages/*
 
 # Main stage using bci-micro as the base image
-FROM final
+FROM final AS base
 
 # Copy binaries and configuration files from builder to micro
 COPY --from=builder /chroot/ /
@@ -167,7 +150,8 @@ ENV HELM_URL_V2_amd64=https://github.com/rancher/helm/releases/download/${CATTLE
     ETCD_URL=https://github.com/etcd-io/etcd/releases/download/${CATTLE_ETCD_VERSION}/etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}.tar.gz \
     KUSTOMIZE_URL=https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/${KUSTOMIZE_VERSION}/kustomize_${KUSTOMIZE_VERSION}_linux_${ARCH}.tar.gz
 
-RUN curl -sLf ${KUSTOMIZE_URL} | tar -xzf - -C /usr/bin
+RUN curl -sLf ${KUSTOMIZE_URL} | tar -xzf - -C /usr/bin && \
+    chmod +x /usr/bin/kustomize
 
 # set up helm 2
 RUN curl -sLf ${!HELM_URL_V2} > /usr/bin/rancher-helm && \
@@ -179,7 +163,7 @@ RUN curl -sLf ${!HELM_URL_V2} > /usr/bin/rancher-helm && \
 # set up helm 3
 RUN curl ${HELM_URL_V3} | tar xvzf - --strip-components=1 -C /usr/bin && \
     mv /usr/bin/helm /usr/bin/helm_v3 && \
-    chmod +x /usr/bin/kustomize
+    chmod +x /usr/bin/helm_v3
 
 # Set up K3s: copy the necessary binaries from the K3s image.
 COPY --from=rancher/k3s:v1.30.2-k3s2 \
@@ -275,28 +259,74 @@ ENV CATTLE_CLI_URL_DARWIN  https://releases.rancher.com/cli2/${CATTLE_CLI_VERSIO
 ENV CATTLE_CLI_URL_LINUX   https://releases.rancher.com/cli2/${CATTLE_CLI_VERSION}/rancher-linux-amd64-${CATTLE_CLI_VERSION}.tar.gz
 ENV CATTLE_CLI_URL_WINDOWS https://releases.rancher.com/cli2/${CATTLE_CLI_VERSION}/rancher-windows-386-${CATTLE_CLI_VERSION}.zip
 
-ENV CATTLE_SERVER_VERSION ${VERSION}
+RUN curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${CATTLE_KDM_BRANCH}/data.json > /var/lib/rancher-data/driver-metadata/data.json
 
-COPY --from=build /app/rancher /usr/bin/
-COPY --from=build /app/package/entrypoint.sh /usr/bin/
-COPY --from=build /app/package/kustomize.sh /usr/bin/
-COPY --from=build app/package/jailer.sh /usr/bin/
-COPY --from=build /app/k3s-airgap-images.tar /var/lib/rancher/k3s/agent/images/
-RUN chmod +x /usr/bin/entrypoint.sh
-RUN chmod +x /usr/bin/kustomize.sh
-
-COPY --from=build /app/data.json /var/lib/rancher-data/driver-metadata/
-
-ENV CATTLE_AGENT_IMAGE ${IMAGE_REPO}/rancher-agent:${VERSION}
-ENV CATTLE_SERVER_IMAGE ${IMAGE_REPO}/rancher
 ENV ETCDCTL_API=3
 
 ENV SSL_CERT_DIR /etc/rancher/ssl
+ENV ETCD_UNSUPPORTED_ARCH ${ETCD_UNSUPPORTED_ARCH}
+
+
+# Enable exporting of the k3s images as part of the build process.
+FROM --platform=$BUILDPLATFORM registry.suse.com/bci/golang:1.22 AS images
+
+ENV CATTLE_K3S_VERSION v1.30.2+k3s2
+
+RUN zypper -n install libbtrfs-devel libgpgme-devel
+
+WORKDIR /src
+COPY hack/airgap/ /src/
+RUN go mod download
+
+RUN go build -tags k3s_export -o export-images ./...
+RUN ./export-images -k3s-version ${CATTLE_K3S_VERSION} -output /src/k3s-airgap-images.tar
+
+
+FROM --platform=$BUILDPLATFORM registry.suse.com/bci/golang:1.22 AS build
+ARG VERSION
+ARG COMMIT
+ARG RKE_VERSION
+ARG CGO_ENABLED=0
+ARG TAGS="k8s"
+ARG LINKFLAGS="-extldflags -static"
+ARG DEFAULT_VALUES="{\"rke-version\":\"${RKE_VERSION}\"}"
+ARG LDFLAGS="-X github.com/rancher/rancher/pkg/version.Version=${VERSION} -X github.com/rancher/rancher/pkg/version.GitCommit=${COMMIT} -X github.com/rancher/rancher/pkg/settings.InjectDefaults=${DEFAULT_VALUES} ${LINKFLAGS}"
+ARG TARGETOS
+ARG TARGETARCH
+
+WORKDIR /app
+
+# Only invalidate cache if go.mod/go.sum changes.
+COPY go.mod go.sum .
+COPY pkg/apis/go.mod pkg/apis/go.sum pkg/apis/
+COPY pkg/client/go.mod pkg/client/go.sum pkg/client/
+RUN go mod download
+
+COPY pkg/ pkg/
+COPY main.go .
+
+RUN GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" -o rancher
+
+FROM base
+
+ARG VERSION=${VERSION}
+ENV CATTLE_SERVER_VERSION ${VERSION}
+ENV CATTLE_AGENT_IMAGE ${IMAGE_REPO}/rancher-agent:${VERSION}
+ENV CATTLE_SERVER_IMAGE ${IMAGE_REPO}/rancher
+
+COPY --chown=root:root --chmod=0755 \
+     --from=build /app/rancher /usr/bin/
+COPY --chown=root:root --chmod=0755 \
+     --from=images /src/k3s-airgap-images.tar /var/lib/rancher/k3s/agent/images/
+
+COPY --chown=root:root --chmod=0755 \
+        package/entrypoint.sh \
+        package/kustomize.sh \
+        package/jailer.sh /usr/bin/
+
 VOLUME /var/lib/rancher
 VOLUME /var/lib/kubelet
 VOLUME /var/lib/cni
 VOLUME /var/log
-
-ENV ETCD_UNSUPPORTED_ARCH ${ETCD_UNSUPPORTED_ARCH}
 
 ENTRYPOINT ["entrypoint.sh"]
