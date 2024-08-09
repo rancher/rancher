@@ -65,11 +65,11 @@ func (g *GenericEncryptedStore) getKey(name string) string {
 	return g.prefix + name
 }
 
-func (g *GenericEncryptedStore) Set(name string, data map[string]string) error {
-	return g.set(name, data)
+func (g *GenericEncryptedStore) Set(name string, data map[string]string, owner *metav1.OwnerReference) error {
+	return g.set(name, data, owner)
 }
 
-func (g *GenericEncryptedStore) set(name string, data map[string]string) error {
+func (g *GenericEncryptedStore) set(name string, data map[string]string, owner *metav1.OwnerReference) error {
 	logrus.Debugf("[GenericEncryptedStore]: set secret called for %v", g.getKey(name))
 	sec, err := g.secretLister.Get(g.namespace, g.getKey(name))
 	if errors.IsNotFound(err) {
@@ -77,6 +77,9 @@ func (g *GenericEncryptedStore) set(name string, data map[string]string) error {
 		sec = &corev1.Secret{}
 		sec.Name = g.getKey(name)
 		sec.StringData = data
+		if owner != nil {
+			sec.SetOwnerReferences([]metav1.OwnerReference{*owner})
+		}
 		if _, err := g.secrets.Create(sec); err != nil {
 			if !errors.IsAlreadyExists(err) {
 				return err
@@ -93,13 +96,27 @@ func (g *GenericEncryptedStore) set(name string, data map[string]string) error {
 	secToUpdate := prepareSecretForUpdate(sec, data)
 	if !reflect.DeepEqual(secToUpdate.Data, sec.Data) {
 		logrus.Debugf("[GenericEncryptedStore]: updating secret %v", g.getKey(name))
-		_, err = g.secrets.Update(secToUpdate)
-		if err != nil {
+
+		if owner != nil {
+			ownerFound := false
+			for _, ownerRef := range secToUpdate.OwnerReferences {
+				if ownerRef.UID == owner.UID {
+					ownerFound = true
+					break
+				}
+			}
+			if !ownerFound {
+				secToUpdate.SetOwnerReferences(append(secToUpdate.OwnerReferences, *owner))
+			}
+		}
+
+		if _, err := g.secrets.Update(secToUpdate); err != nil {
 			if !errors.IsConflict(err) {
 				return err
 			}
 			return g.updateSecretWithBackoff(name, data)
 		}
+
 	}
 	return err
 }
